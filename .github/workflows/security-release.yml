@@ -1,0 +1,192 @@
+name: Security Release
+on:
+  push:
+    tags:
+      - "v*-security*"
+env:
+  COMMIT: ${{ github.sha }}
+  AWS_DEFAULT_REGION: "us-east-1"
+  REPOSITORY_OWNER: ${{ github.repository_owner }}
+  IMAGE: ${{ github.repository_owner }}/rancher
+  IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
+  IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
+jobs:
+  unit-tests:
+    uses: ./.github/workflows/unit-test.yml
+  build-server:
+    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
+    strategy:
+      matrix:
+        os: [linux]
+        arch: [x64, arm64]
+    env:
+      ARCH: ${{ matrix.arch }}
+      OS: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: setup and build
+        uses: ./.github/actions/build-images/server
+  build-agent:
+    strategy:
+      matrix:
+        os: [linux]
+        arch: [x64, arm64]
+    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
+    env:
+      ARCH: ${{ matrix.arch }}
+      OS: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: setup and build
+        uses: ./.github/actions/build-images/agent
+  integration-tests:
+    needs: [build-server, build-agent]
+    uses: ./.github/workflows/integration-tests.yml
+    permissions:
+      contents: read
+  push-images:
+    needs: [unit-tests, integration-tests]
+    strategy:
+      matrix:
+        os: [linux]
+        arch: [x64, arm64]
+    runs-on: runs-on,runner=2cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ARCH: ${{ matrix.arch }}
+      OS: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials username | DOCKER_USERNAME;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials password | DOCKER_PASSWORD;
+      - name: push
+        uses: ./.github/actions/push-images
+  build-publish-chart:
+    needs: [push-images]
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: registry.suse.com/bci/bci-base:15.7
+    permissions:
+      contents: read
+      id-token: write
+    concurrency:
+      group: 'build-chart-tag'
+      # instead of cancelling other runs, wait until they are finished
+      cancel-in-progress: false
+    env:
+      ARCH: amd64
+    steps:
+      - name: install dependencies
+        shell: bash
+        run: zypper install -y git
+      - name: Git safe directory
+        run: git config --global --add safe.directory "$PWD"
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: setup and build
+        uses: ./.github/actions/rancher-chart/build
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/aws/credentials accessKeyId | AWS_ACCESS_KEY_ID_CHARTS;
+            secret/data/github/repo/${{ github.repository }}/aws/credentials secretAccessKey | AWS_SECRET_ACCESS_KEY_CHARTS;
+            secret/data/github/repo/${{ github.repository }}/aws/credentials chartsBucketName | CHARTS_BUCKET_NAME;
+      - name: publish
+        env:
+          CHARTS_BUCKET_NAME: ${{ env.CHARTS_BUCKET_NAME }}
+          AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID_CHARTS }}
+          AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY_CHARTS }}
+        uses: ./.github/actions/rancher-chart/publish-aws
+  build-installer:
+    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
+    strategy:
+      matrix:
+        os: [linux]
+        arch: [x64, arm64]
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ARCH: ${{ matrix.arch }}
+      OS: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials username | DOCKER_USERNAME;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials password | DOCKER_PASSWORD;
+      - name: build
+        uses: ./.github/actions/build-images/installer
+  merge-server-agent-installer-manifests:
+    needs: [push-images, build-installer]
+    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials username | DOCKER_USERNAME;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials password | DOCKER_PASSWORD;
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to Docker Registry
+        uses: docker/login-action@v3
+        with:
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ env.DOCKER_PASSWORD }}
+          registry: ${{ env.REGISTRY }}
+      - name: merge server manifests
+        with:
+          image: "${{ env.IMAGE }}"
+        uses: ./.github/actions/merge-manifests
+      - name: merge agent manifests
+        with:
+          image: "${{ env.IMAGE_AGENT }}"
+        uses: ./.github/actions/merge-manifests
+      - name: merge installer manifests
+        with:
+          image: "${{ env.IMAGE_INSTALLER }}"
+        uses: ./.github/actions/merge-manifests
+  create-images-files:
+    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      REGISTRY: ""
+      CHECKSUM_FILE: "sha256sum.txt"
+      ARTIFACTS_BASE_DIR: "bin"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: generate
+        uses: ./.github/actions/images-files/generate
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/aws/credentials accessKeyId | AWS_ACCESS_KEY_ID;
+            secret/data/github/repo/${{ github.repository }}/aws/credentials secretAccessKey | AWS_SECRET_ACCESS_KEY;
+            secret/data/github/repo/${{ github.repository }}/aws/credentials artifactBucketName | ARTIFACTS_BUCKET_NAME;
+      - name: publish to aws
+        uses: ./.github/actions/images-files/publish-aws
