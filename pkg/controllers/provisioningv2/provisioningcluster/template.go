@@ -228,14 +228,16 @@ func populateHostnameLengthLimitAnnotation(mp rancherv1.RKEMachinePool, cluster 
 		}
 	}
 
-	// if the machine pool limit was not specified, or was invalid, fallback to cluster default
-	if limit := cluster.Spec.RKEConfig.MachinePoolDefaults.HostnameLengthLimit; hostnameLimit == 0 && limit != 0 {
-		if limit < capr.MinimumHostnameLengthLimit {
-			logrus.Errorf("rkecluster %s/%s: cannot use cluster machine pool default hostname length limit, %d under minimum value of %d", cluster.Namespace, cluster.Name, limit, capr.MinimumHostnameLengthLimit)
-		} else if limit > capr.MaximumHostnameLengthLimit {
-			logrus.Errorf("rkecluster %s/%s: cannot use cluster machine pool default hostname length limit, %d under minimum value of %d", cluster.Namespace, cluster.Name, limit, capr.MinimumHostnameLengthLimit)
-		} else {
-			hostnameLimit = limit
+	if cluster.Spec.RKEConfig.MachinePoolDefaults != nil {
+		// if the machine pool limit was not specified, or was invalid, fallback to cluster default
+		if limit := cluster.Spec.RKEConfig.MachinePoolDefaults.HostnameLengthLimit; hostnameLimit == 0 && limit != 0 {
+			if limit < capr.MinimumHostnameLengthLimit {
+				logrus.Errorf("rkecluster %s/%s: cannot use cluster machine pool default hostname length limit, %d under minimum value of %d", cluster.Namespace, cluster.Name, limit, capr.MinimumHostnameLengthLimit)
+			} else if limit > capr.MaximumHostnameLengthLimit {
+				logrus.Errorf("rkecluster %s/%s: cannot use cluster machine pool default hostname length limit, %d under minimum value of %d", cluster.Namespace, cluster.Name, limit, capr.MinimumHostnameLengthLimit)
+			} else {
+				hostnameLimit = limit
+			}
 		}
 	}
 
