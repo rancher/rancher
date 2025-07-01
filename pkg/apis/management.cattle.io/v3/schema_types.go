@@ -10,12 +10,15 @@ import (
 // +kubebuilder:resource:scope=Cluster
 
 // DynamicSchema is the definition of a schema. Dynamic schemas are
-// created and used internally by Rancher to generate CRDs and API
-// endpoints, and should not be created manually.
+// created and used internally by Rancher to generate CRDs and Norman
+// API endpoints, and should not be created manually.
 //
-// Functionality for generating Rancher dynamic API endpoints is
-// limited. These endpoints are not backed by any Norman stores, and
-// most related fields will not have any useful effect.
+// Functionality for generating Rancher dynamic Norman API endpoints
+// is limited. These endpoints are not backed by any Norman
+// stores. Related fields will affect the definition of the Norman
+// schema in Rancher but without stores these will have no useful
+// effect. The schema definitions themselves will still be available
+// in the Norman API.
 // ---
 // DynamicSchema is used by Rancher for generating dynamic
 // provisioning and CAPI CRDs for Rancher node drivers: the machine
@@ -28,10 +31,6 @@ import (
 // in the schema (see the "nodeconfig", "nodetemplateconfig",
 // "cluster" and "credentialconfig" schemas). Some of these are used
 // by the UI.
-//
-// The schemas themselves become available in the Norman API under
-// /v3/schemas, but don't define any resources that can be used with
-// the Norman API.
 type DynamicSchema struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -47,25 +46,37 @@ type DynamicSchema struct {
 
 type DynamicSchemaSpec struct {
 	// SchemaName is the id under which the schema will be registered in the
-	// Norman API. If unset, the dynamic schema resource name will be used.
+	// Norman API collection of schemas. If unset, the dynamic schema
+	// resource name will be used.
 	// +optional
 	SchemaName string `json:"schemaName,omitempty"`
 
 	// Embed determines whether the ResourceFields of this schema should be
-	// embedded into another schema (EmbedType).
+	// embedded into another Norman schema (EmbedType). When Embed is true,
+	// updates after creation to this object don't affect its corresponding
+	// Norman schema and will only change the fields of the EmbedType
+	// schema.
 	// +optional
 	Embed bool `json:"embed,omitempty"`
 
-	// EmbedType defines the schema into which the ResourceFields of this
-	// schema should be embedded in.
+	// EmbedType identifies the Norman schema into which the ResourceFields
+	// of this object should be embedded in, when Embed is true.
 	// +optional
 	EmbedType string `json:"embedType,omitempty"`
 
-	// PluralName has no useful effects and should not be set.
+	// PluralName is an alternate name used to reference collections of
+	// resources of this schema in the Norman API.
+	//
+	// No Norman stores are defined for dynamic schemas, so no collections
+	// can be retrieved through this name.
 	// +optional
 	PluralName string `json:"pluralName,omitempty"`
 
-	// ResourceMethods has no useful effects and should not be set.
+	// ResourceMethods is a list of http methods available for resources of
+	// this Norman schema in the Norman API.
+	//
+	// No Norman stores are defined for dynamic schemas, so these methods
+	// will always return an error.
 	// +optional
 	ResourceMethods []string `json:"resourceMethods,omitempty"`
 
@@ -78,45 +89,63 @@ type DynamicSchemaSpec struct {
 	// "nodetemplateconfig" and "credentialconfig" generated schemas).
 	ResourceFields map[string]Field `json:"resourceFields,omitempty"`
 
-	// ResourceActions has no useful effects and should not be set.
+	// ResourceActions is the list of custom actions for this resource in
+	// the Norman API.
+	//
+	// No API action handlers can be defined for dynamic schemas, so the
+	// behavior of these actions cannot be defined.
 	// +optional
 	ResourceActions map[string]Action `json:"resourceActions,omitempty"`
 
-	// CollectionMethods has no useful effects and should not be set.
+	// CollectionMethods is a list of http methods available for collections
+	// of resources of this schema in the Norman API.
+	//
+	// No Norman stores are defined for dynamic schemas, so these methods
+	// will always return an error.
 	// +optional
 	CollectionMethods []string `json:"collectionMethods,omitempty"`
 
-	// CollectionFields has no useful effects and should not be set.
+	// CollectionFields has no effect.
 	// +optional
 	CollectionFields map[string]Field `json:"collectionFields,omitempty"`
 
-	// CollectionActions has no useful effects and should not be set.
+	// CollectionActions is the list of custom actions for collections of
+	// resources of this schema in the Norman API.
+	//
+	// No action handlers can be defined for dynamic schemas, so the
+	// behavior of these actions cannot be defined.
 	// +optional
 	CollectionActions map[string]Action `json:"collectionActions,omitempty"`
 
-	// CollectionFilters has no useful effects and should not be set.
+	// CollectionFilters are filters for listing collections of resources of
+	// this schema. Each map key is a field that can be used as a filter.
+	//
+	// No Norman stores are defined for dynamic schemas, so no collections
+	// can be retrieved to be filtered.
 	// +optional
 	CollectionFilters map[string]Filter `json:"collectionFilters,omitempty"`
 
-	// IncludeableLinks has no useful effects and should not be set.
+	// IncludeableLinks has no effect.
 	// +optional
 	IncludeableLinks []string `json:"includeableLinks,omitempty"`
 
-	// DynamicSchemaVersion has no useful effects and should not be set.
+	// DynamicSchemaVersion is used to determine whether the Norman schema
+	// should be updated when this object is updated. The schema is only
+	// updated if the previous version differs. Rancher overwrites this
+	// field.
 	// +optional
 	DynamicSchemaVersion string `json:"dynamicSchemaVersion,omitempty"`
 }
 
 type DynamicSchemaStatus struct {
-	// Fake has no useful effects and should not be set.
+	// Fake has no effect.
 	// +optional
 	Fake string `json:"fake,omitempty"`
 }
 
 type Field struct {
 	// Type is the type of the field. Possible types are "string",
-	// "password", "boolean", "int", "array[string]" or another schema
-	// name.
+	// "password", "boolean", "int", "array[string]" or another schema name.
 	// +optional
 	Type string `json:"type,omitempty"`
 
@@ -124,62 +153,124 @@ type Field struct {
 	// +optional
 	Default Values `json:"default,omitempty"`
 
-	// Unique has no useful effects and should not be set.
+	// Unique has no effect.
 	// +optional
 	Unique bool `json:"unique,omitempty"`
 
-	// Nullable indicates whether the field can take a null value in a valid
-	// object of a schema with this field.
+	// Nullable indicates that a field in a CRD derived from this schema
+	// will be nullable.
 	//
-	// The Norman API will reject null values for non-nullable fields, and
-	// nullable is also used to determine if a field in a CRD derived from
-	// this schema will be nullable.
+	// It also indicates whether the field can take a null value in a valid
+	// object of this schema in the Norman API.
+	//
+	// No Norman stores are defined for DynamicSchemas, so no resources of
+	// this schema can be created in the Norman API.
 	// +optional
 	Nullable bool `json:"nullable,omitempty"`
 
 	// Create indicates that this field should not be set when creating a
-	// new object of a schema with this field through the Norman API.  A
-	// value for this field will be filtered out if present in the create
-	// request.
+	// new object of this schema through the Norman API. A value for this
+	// field will be filtered out if present in the create request.
+	//
+	// No Norman stores are defined for DynamicSchemas, so no resources of
+	// this schema can be created in the Norman API.
 	// +optional
 	Create bool `json:"create,omitempty"`
 
-	// Required indicates that this field is required when creating a new
-	// object of a schema with this field through the Norman API.
+	// Required indicates that a field in a CRD derived from this schema
+	// will be required.
+	//
+	// It also indicates that this field is required when creating a new
+	// object of this schema through the Norman API.
+	//
+	// No Norman stores are defined for DynamicSchemas, so no resources of
+	// this schema can be created in the Norman API.
 	// +optional
 	Required bool `json:"required,omitempty"`
 
 	// Update indicates that this field should not be modified when updating
-	// an object of a schema with this field through the Norman API. A value
-	// for this field will be filtered out if present in the update request.
+	// an object of this schema through the Norman API.
+	//
+	// No Norman stores are defined for DynamicSchemas, so no resources of
+	// this schema can be updated in the Norman API.
 	// +optional
 	Update bool `json:"update,omitempty"`
 
-	// MinLength has no useful effects and should not be set.
+	// MinLength defines the "minLength" attribute for this field in a CRD
+	// derived from this schema.
+	//
+	// It is also used to validate the length of the string representation
+	// of this field in the Norman API.
+	//
+	// No Norman stores are defined for DynamicSchemas, so no resources of
+	// this schema can be created in the Norman API.
 	// +optional
 	MinLength int64 `json:"minLength,omitempty"`
 
-	// MaxLength has no useful effects and should not be set.
+	// MaxLength defines the "maxLength" attribute for this field in a CRD
+	// derived from this schema.
+	//
+	// It is also used to validate the length of the string representation
+	// of this field in the Norman API.
+	//
+	// No Norman stores are defined for DynamicSchemas, so no resources of
+	// this schema can be created in the Norman API.
 	// +optional
 	MaxLength int64 `json:"maxLength,omitempty"`
 
-	// Min has no useful effects and should not be set.
+	// Min defines the "minimum" attribute for this field in a CRD derived
+	// from this schema.
+	//
+	// It is also used to validate minimum value of this field in the Norman
+	// API.
+	//
+	// No Norman stores are defined for DynamicSchemas, so no resources of
+	// this schema can be created in the Norman API.
 	// +optional
 	Min int64 `json:"min,omitempty"`
 
-	// Max has no useful effects and should not be set.
+	// Max defines the "maximum" attribute for this field in a CRD derived
+	// from this schema.
+	//
+	// It is also used to validate maximum value of this field in the Norman
+	// API.
+	//
+	// No Norman stores are defined for DynamicSchemas, so no resources of
+	// this schema can be created in the Norman API.
 	// +optional
 	Max int64 `json:"max,omitempty"`
 
-	// Options has no useful effects and should not be set.
+	// Options defines the "enum" attribute with valid values for this field
+	// in a CRD derived from this schema.
+	//
+	// It is also used to validate the value of the string representation of
+	// this field in the Norman API.
+	//
+	// No Norman stores are defined for DynamicSchemas, so no resources of
+	// this schema can be created in the Norman API.
 	// +optional
 	Options []string `json:"options,omitempty"`
 
-	// ValidChars has no useful effects and should not be set.
+	// ValidChars defines a value for the "pattern" attribute with the
+	// allowed characters for this field in a CRD derived from this schema.
+	//
+	// It is also used to validate the value of the string representation of
+	// this field in the Norman API.
+	//
+	// No Norman stores are defined for DynamicSchemas, so no resources of
+	// this schema can be created in the Norman API.
 	// +optional
 	ValidChars string `json:"validChars,omitempty"`
 
-	// InvalidChars has no useful effects and should not be set.
+	// InvalidChars defines a value for the "pattern" attribute with the
+	// disallowed characters for this field in a CRD derived from this
+	// schema.
+	//
+	// It is also used to validate the value of the string representation of
+	// this field in the Norman API.
+	//
+	// No Norman stores are defined for DynamicSchemas, so no resources of
+	// this schema can be created in the Norman API.
 	// +optional
 	InvalidChars string `json:"invalidChars,omitempty"`
 
@@ -217,17 +308,18 @@ type Values struct {
 }
 
 type Action struct {
-	// Input has no useful effects and should not be set.
+	// Input is the input for a custom Norman API action.
 	// +optional
 	Input string `json:"input,omitempty"`
 
-	// Output has no useful effects and should not be set.
+	// Input is the output for a custom Norman API action.
 	// +optional
 	Output string `json:"output,omitempty"`
 }
 
 type Filter struct {
-	// Modifiers has no useful effects and should not be set.
+	// Modifiers are the operators that can be used when filtering a
+	// collection of resources in the Norman API.
 	// +optional
 	Modifiers []string `json:"modifiers,omitempty"`
 }

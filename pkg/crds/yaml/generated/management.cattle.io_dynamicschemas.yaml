@@ -19,12 +19,15 @@ spec:
       openAPIV3Schema:
         description: |-
           DynamicSchema is the definition of a schema. Dynamic schemas are
-          created and used internally by Rancher to generate CRDs and API
-          endpoints, and should not be created manually.
+          created and used internally by Rancher to generate CRDs and Norman
+          API endpoints, and should not be created manually.
 
-          Functionality for generating Rancher dynamic API endpoints is
-          limited. These endpoints are not backed by any Norman stores, and
-          most related fields will not have any useful effect.
+          Functionality for generating Rancher dynamic Norman API endpoints
+          is limited. These endpoints are not backed by any Norman
+          stores. Related fields will affect the definition of the Norman
+          schema in Rancher but without stores these will have no useful
+          effect. The schema definitions themselves will still be available
+          in the Norman API.
         properties:
           apiVersion:
             description: |-
@@ -52,15 +55,18 @@ spec:
                 additionalProperties:
                   properties:
                     input:
-                      description: Input has no useful effects and should not be set.
+                      description: Input is the input for a custom Norman API action.
                       type: string
                     output:
-                      description: Output has no useful effects and should not be
-                        set.
+                      description: Input is the output for a custom Norman API action.
                       type: string
                   type: object
-                description: CollectionActions has no useful effects and should not
-                  be set.
+                description: |-
+                  CollectionActions is the list of custom actions for collections of
+                  resources of this schema in the Norman API.
+
+                  No action handlers can be defined for dynamic schemas, so the
+                  behavior of these actions cannot be defined.
                 type: object
               collectionFields:
                 additionalProperties:
@@ -68,9 +74,11 @@ spec:
                     create:
                       description: |-
                         Create indicates that this field should not be set when creating a
-                        new object of a schema with this field through the Norman API.  A
-                        value for this field will be filtered out if present in the create
-                        request.
+                        new object of this schema through the Norman API. A value for this
+                        field will be filtered out if present in the create request.
+
+                        No Norman stores are defined for DynamicSchemas, so no resources of
+                        this schema can be created in the Norman API.
                       type: boolean
                     default:
                       description: Default is the default value for the field.
@@ -106,126 +114,207 @@ spec:
                         when embedding another schema into it.
                       type: boolean
                     invalidChars:
-                      description: InvalidChars has no useful effects and should not
-                        be set.
+                      description: |-
+                        InvalidChars defines a value for the "pattern" attribute with the
+                        disallowed characters for this field in a CRD derived from this
+                        schema.
+
+                        It is also used to validate the value of the string representation of
+                        this field in the Norman API.
+
+                        No Norman stores are defined for DynamicSchemas, so no resources of
+                        this schema can be created in the Norman API.
                       type: string
                     max:
-                      description: Max has no useful effects and should not be set.
+                      description: |-
+                        Max defines the "maximum" attribute for this field in a CRD derived
+                        from this schema.
+
+                        It is also used to validate maximum value of this field in the Norman
+                        API.
+
+                        No Norman stores are defined for DynamicSchemas, so no resources of
+                        this schema can be created in the Norman API.
                       format: int64
                       type: integer
                     maxLength:
-                      description: MaxLength has no useful effects and should not
-                        be set.
+                      description: |-
+                        MaxLength defines the "maxLength" attribute for this field in a CRD
+                        derived from this schema.
+
+                        It is also used to validate the length of the string representation
+                        of this field in the Norman API.
+
+                        No Norman stores are defined for DynamicSchemas, so no resources of
+                        this schema can be created in the Norman API.
                       format: int64
                       type: integer
                     min:
-                      description: Min has no useful effects and should not be set.
+                      description: |-
+                        Min defines the "minimum" attribute for this field in a CRD derived
+                        from this schema.
+
+                        It is also used to validate minimum value of this field in the Norman
+                        API.
+
+                        No Norman stores are defined for DynamicSchemas, so no resources of
+                        this schema can be created in the Norman API.
                       format: int64
                       type: integer
                     minLength:
-                      description: MinLength has no useful effects and should not
-                        be set.
+                      description: |-
+                        MinLength defines the "minLength" attribute for this field in a CRD
+                        derived from this schema.
+
+                        It is also used to validate the length of the string representation
+                        of this field in the Norman API.
+
+                        No Norman stores are defined for DynamicSchemas, so no resources of
+                        this schema can be created in the Norman API.
                       format: int64
                       type: integer
                     nullable:
                       description: |-
-                        Nullable indicates whether the field can take a null value in a valid
-                        object of a schema with this field.
+                        Nullable indicates that a field in a CRD derived from this schema
+                        will be nullable.
 
-                        The Norman API will reject null values for non-nullable fields, and
-                        nullable is also used to determine if a field in a CRD derived from
-                        this schema will be nullable.
+                        It also indicates whether the field can take a null value in a valid
+                        object of this schema in the Norman API.
+
+                        No Norman stores are defined for DynamicSchemas, so no resources of
+                        this schema can be created in the Norman API.
                       type: boolean
                     options:
-                      description: Options has no useful effects and should not be
-                        set.
+                      description: |-
+                        Options defines the "enum" attribute with valid values for this field
+                        in a CRD derived from this schema.
+
+                        It is also used to validate the value of the string representation of
+                        this field in the Norman API.
+
+                        No Norman stores are defined for DynamicSchemas, so no resources of
+                        this schema can be created in the Norman API.
                       items:
                         type: string
                       type: array
                     required:
                       description: |-
-                        Required indicates that this field is required when creating a new
-                        object of a schema with this field through the Norman API.
+                        Required indicates that a field in a CRD derived from this schema
+                        will be required.
+
+                        It also indicates that this field is required when creating a new
+                        object of this schema through the Norman API.
+
+                        No Norman stores are defined for DynamicSchemas, so no resources of
+                        this schema can be created in the Norman API.
                       type: boolean
                     type:
                       description: |-
                         Type is the type of the field. Possible types are "string",
-                        "password", "boolean", "int", "array[string]" or another schema
-                        name.
+                        "password", "boolean", "int", "array[string]" or another schema name.
                       type: string
                     unique:
-                      description: Unique has no useful effects and should not be
-                        set.
+                      description: Unique has no effect.
                       type: boolean
                     update:
                       description: |-
                         Update indicates that this field should not be modified when updating
-                        an object of a schema with this field through the Norman API. A value
-                        for this field will be filtered out if present in the update request.
+                        an object of this schema through the Norman API.
+
+                        No Norman stores are defined for DynamicSchemas, so no resources of
+                        this schema can be updated in the Norman API.
                       type: boolean
                     validChars:
-                      description: ValidChars has no useful effects and should not
-                        be set.
+                      description: |-
+                        ValidChars defines a value for the "pattern" attribute with the
+                        allowed characters for this field in a CRD derived from this schema.
+
+                        It is also used to validate the value of the string representation of
+                        this field in the Norman API.
+
+                        No Norman stores are defined for DynamicSchemas, so no resources of
+                        this schema can be created in the Norman API.
                       type: string
                   type: object
-                description: CollectionFields has no useful effects and should not
-                  be set.
+                description: CollectionFields has no effect.
                 type: object
               collectionFilters:
                 additionalProperties:
                   properties:
                     modifiers:
-                      description: Modifiers has no useful effects and should not
-                        be set.
+                      description: |-
+                        Modifiers are the operators that can be used when filtering a
+                        collection of resources in the Norman API.
                       items:
                         type: string
                       type: array
                   type: object
-                description: CollectionFilters has no useful effects and should not
-                  be set.
+                description: |-
+                  CollectionFilters are filters for listing collections of resources of
+                  this schema. Each map key is a field that can be used as a filter.
+
+                  No Norman stores are defined for dynamic schemas, so no collections
+                  can be retrieved to be filtered.
                 type: object
               collectionMethods:
-                description: CollectionMethods has no useful effects and should not
-                  be set.
+                description: |-
+                  CollectionMethods is a list of http methods available for collections
+                  of resources of this schema in the Norman API.
+
+                  No Norman stores are defined for dynamic schemas, so these methods
+                  will always return an error.
                 items:
                   type: string
                 type: array
               dynamicSchemaVersion:
-                description: DynamicSchemaVersion has no useful effects and should
-                  not be set.
+                description: |-
+                  DynamicSchemaVersion is used to determine whether the Norman schema
+                  should be updated when this object is updated. The schema is only
+                  updated if the previous version differs. Rancher overwrites this
+                  field.
                 type: string
               embed:
                 description: |-
                   Embed determines whether the ResourceFields of this schema should be
-                  embedded into another schema (EmbedType).
+                  embedded into another Norman schema (EmbedType). When Embed is true,
+                  updates after creation to this object don't affect its corresponding
+                  Norman schema and will only change the fields of the EmbedType
+                  schema.
                 type: boolean
               embedType:
                 description: |-
-                  EmbedType defines the schema into which the ResourceFields of this
-                  schema should be embedded in.
+                  EmbedType identifies the Norman schema into which the ResourceFields
+                  of this object should be embedded in, when Embed is true.
                 type: string
               includeableLinks:
-                description: IncludeableLinks has no useful effects and should not
-                  be set.
+                description: IncludeableLinks has no effect.
                 items:
                   type: string
                 type: array
               pluralName:
-                description: PluralName has no useful effects and should not be set.
+                description: |-
+                  PluralName is an alternate name used to reference collections of
+                  resources of this schema in the Norman API.
+
+                  No Norman stores are defined for dynamic schemas, so no collections
+                  can be retrieved through this name.
                 type: string
               resourceActions:
                 additionalProperties:
                   properties:
                     input:
-                      description: Input has no useful effects and should not be set.
+                      description: Input is the input for a custom Norman API action.
                       type: string
                     output:
-                      description: Output has no useful effects and should not be
-                        set.
+                      description: Input is the output for a custom Norman API action.
                       type: string
                   type: object
-                description: ResourceActions has no useful effects and should not
-                  be set.
+                description: |-
+                  ResourceActions is the list of custom actions for this resource in
+                  the Norman API.
+
+                  No API action handlers can be defined for dynamic schemas, so the
+                  behavior of these actions cannot be defined.
                 type: object
               resourceFields:
                 additionalProperties:
@@ -233,9 +322,11 @@ spec:
                     create:
                       description: |-
                         Create indicates that this field should not be set when creating a
-                        new object of a schema with this field through the Norman API.  A
-                        value for this field will be filtered out if present in the create
-                        request.
+                        new object of this schema through the Norman API. A value for this
+                        field will be filtered out if present in the create request.
+
+                        No Norman stores are defined for DynamicSchemas, so no resources of
+                        this schema can be created in the Norman API.
                       type: boolean
                     default:
                       description: Default is the default value for the field.
@@ -271,80 +362,145 @@ spec:
                         when embedding another schema into it.
                       type: boolean
                     invalidChars:
-                      description: InvalidChars has no useful effects and should not
-                        be set.
+                      description: |-
+                        InvalidChars defines a value for the "pattern" attribute with the
+                        disallowed characters for this field in a CRD derived from this
+                        schema.
+
+                        It is also used to validate the value of the string representation of
+                        this field in the Norman API.
+
+                        No Norman stores are defined for DynamicSchemas, so no resources of
+                        this schema can be created in the Norman API.
                       type: string
                     max:
-                      description: Max has no useful effects and should not be set.
+                      description: |-
+                        Max defines the "maximum" attribute for this field in a CRD derived
+                        from this schema.
+
+                        It is also used to validate maximum value of this field in the Norman
+                        API.
+
+                        No Norman stores are defined for DynamicSchemas, so no resources of
+                        this schema can be created in the Norman API.
                       format: int64
                       type: integer
                     maxLength:
-                      description: MaxLength has no useful effects and should not
-                        be set.
+                      description: |-
+                        MaxLength defines the "maxLength" attribute for this field in a CRD
+                        derived from this schema.
+
+                        It is also used to validate the length of the string representation
+                        of this field in the Norman API.
+
+                        No Norman stores are defined for DynamicSchemas, so no resources of
+                        this schema can be created in the Norman API.
                       format: int64
                       type: integer
                     min:
-                      description: Min has no useful effects and should not be set.
+                      description: |-
+                        Min defines the "minimum" attribute for this field in a CRD derived
+                        from this schema.
+
+                        It is also used to validate minimum value of this field in the Norman
+                        API.
+
+                        No Norman stores are defined for DynamicSchemas, so no resources of
+                        this schema can be created in the Norman API.
                       format: int64
                       type: integer
                     minLength:
-                      description: MinLength has no useful effects and should not
-                        be set.
+                      description: |-
+                        MinLength defines the "minLength" attribute for this field in a CRD
+                        derived from this schema.
+
+                        It is also used to validate the length of the string representation
+                        of this field in the Norman API.
+
+                        No Norman stores are defined for DynamicSchemas, so no resources of
+                        this schema can be created in the Norman API.
                       format: int64
                       type: integer
                     nullable:
                       description: |-
-                        Nullable indicates whether the field can take a null value in a valid
-                        object of a schema with this field.
+                        Nullable indicates that a field in a CRD derived from this schema
+                        will be nullable.
 
-                        The Norman API will reject null values for non-nullable fields, and
-                        nullable is also used to determine if a field in a CRD derived from
-                        this schema will be nullable.
+                        It also indicates whether the field can take a null value in a valid
+                        object of this schema in the Norman API.
+
+                        No Norman stores are defined for DynamicSchemas, so no resources of
+                        this schema can be created in the Norman API.
                       type: boolean
                     options:
-                      description: Options has no useful effects and should not be
-                        set.
+                      description: |-
+                        Options defines the "enum" attribute with valid values for this field
+                        in a CRD derived from this schema.
+
+                        It is also used to validate the value of the string representation of
+                        this field in the Norman API.
+
+                        No Norman stores are defined for DynamicSchemas, so no resources of
+                        this schema can be created in the Norman API.
                       items:
                         type: string
                       type: array
                     required:
                       description: |-
-                        Required indicates that this field is required when creating a new
-                        object of a schema with this field through the Norman API.
+                        Required indicates that a field in a CRD derived from this schema
+                        will be required.
+
+                        It also indicates that this field is required when creating a new
+                        object of this schema through the Norman API.
+
+                        No Norman stores are defined for DynamicSchemas, so no resources of
+                        this schema can be created in the Norman API.
                       type: boolean
                     type:
                       description: |-
                         Type is the type of the field. Possible types are "string",
-                        "password", "boolean", "int", "array[string]" or another schema
-                        name.
+                        "password", "boolean", "int", "array[string]" or another schema name.
                       type: string
                     unique:
-                      description: Unique has no useful effects and should not be
-                        set.
+                      description: Unique has no effect.
                       type: boolean
                     update:
                       description: |-
                         Update indicates that this field should not be modified when updating
-                        an object of a schema with this field through the Norman API. A value
-                        for this field will be filtered out if present in the update request.
+                        an object of this schema through the Norman API.
+
+                        No Norman stores are defined for DynamicSchemas, so no resources of
+                        this schema can be updated in the Norman API.
                       type: boolean
                     validChars:
-                      description: ValidChars has no useful effects and should not
-                        be set.
+                      description: |-
+                        ValidChars defines a value for the "pattern" attribute with the
+                        allowed characters for this field in a CRD derived from this schema.
+
+                        It is also used to validate the value of the string representation of
+                        this field in the Norman API.
+
+                        No Norman stores are defined for DynamicSchemas, so no resources of
+                        this schema can be created in the Norman API.
                       type: string
                   type: object
                 description: ResourceFields defines the schema fields and their types.
                 type: object
               resourceMethods:
-                description: ResourceMethods has no useful effects and should not
-                  be set.
+                description: |-
+                  ResourceMethods is a list of http methods available for resources of
+                  this Norman schema in the Norman API.
+
+                  No Norman stores are defined for dynamic schemas, so these methods
+                  will always return an error.
                 items:
                   type: string
                 type: array
               schemaName:
                 description: |-
                   SchemaName is the id under which the schema will be registered in the
-                  Norman API. If unset, the dynamic schema resource name will be used.
+                  Norman API collection of schemas. If unset, the dynamic schema
+                  resource name will be used.
                 type: string
             type: object
           status:
@@ -353,7 +509,7 @@ spec:
               https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
             properties:
               fake:
-                description: Fake has no useful effects and should not be set.
+                description: Fake has no effect.
                 type: string
             type: object
         required:
