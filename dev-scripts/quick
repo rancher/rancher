@@ -47,6 +47,16 @@ abs_path() {
   echo "$(cd "$(dirname "$1")" && pwd -P)/$(basename "$1")"
 }
 
+is_safe_local_directive() {
+  while IFS= read -r safe_path; do
+    safe_path="$(abs_path "$safe_path")"
+    if [[ "$1" == "$safe_path"* ]]; then
+      return 0
+    fi
+  done < <(echo "$BUILD_SAFE_DIRS" | tr ':' '\n')
+  return 1
+}
+
 needs_workdir="false"
 
 # add_context adds _some_ support for local replace directives of dependency.
@@ -59,14 +69,30 @@ add_context() {
   #             github.com/rancher/steve => /absolute/or/relative/path/to/steve
   # or
   #     replace github.com/rancher/steve => /absolute/or/relative/path/to/steve
-  if [ -z "$(echo "$replace" | cut -d= -f2 | cut -d' ' -f3)" ]; then
-    godep=$(echo "$replace" | cut -d= -f2 | cut -d' ' -f2)
-    path=$(abs_path "$godep")
-    BUILD_ARGS+=("--build-context=$2=$path")
-    BUILD_ARGS+=("--build-arg=$3=$2")
-    BUILD_ARGS+=("--build-arg=$3_PATH=$path")
-    needs_workdir="true"
+  if [ -n "$(echo "$replace" | cut -d= -f2 | cut -d' ' -f3)" ]; then
+    return 0
   fi
+
+  set +x
+  godep=$(echo "$replace" | cut -d= -f2 | cut -d' ' -f2)
+  path=$(abs_path "$godep")
+  if ! is_safe_local_directive "$path"; then
+    cat <<EOF
+Detected replace directive with path $godep ($path). This directive is not listed under a safe
+prefix path with BUILD_SAFE_DIRS environment variable.
+
+Path you want to use with replace directive must be under a prefix path set in the BUILD_SAFE_DIRS
+env var. Its value should be a colon-separated (:) list of prefix paths.
+For example, for a path of /home/user/sources/steve, you could set BUILD_SAFE_DIRS=/home/user/sources.
+EOF
+    exit 1
+  fi
+    
+  set -x
+  BUILD_ARGS+=("--build-context=$2=$path")
+  BUILD_ARGS+=("--build-arg=$3=$2")
+  BUILD_ARGS+=("--build-arg=$3_PATH=$path")
+  needs_workdir="true"
 }
 
 add_context "github.com/rancher/apiserver" "apiserver-context" "GODEP_APISERVER"
