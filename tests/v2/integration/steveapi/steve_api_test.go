@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -748,6 +749,12 @@ func (s *steveAPITestSuite) TestList() {
 	subSession := s.session.NewSession()
 	defer subSession.Cleanup()
 	usingSQLCache := features.UISQLCache.Enabled()
+	relativeDateRx := regexp.MustCompile(`^(\d+[smhd])+$`)
+	containsNamespaceTag := regexp.MustCompile(`(%2Fsteveapi%5D~)[a-z]+`)
+	containsSortNamespace := regexp.MustCompile(`sort=.*metadata.namespace\b`)
+	containsSortName := regexp.MustCompile(`sort=.*metadata.name\b`)
+	containsReverseOrderSortName := regexp.MustCompile(`sort=.*-metadata.name\b`)
+	replacementNamespaceTag := "${1}MYTAG"
 
 	tests := []listTestType{
 		// user-a
@@ -2593,6 +2600,48 @@ func (s *steveAPITestSuite) TestList() {
 			if s.clusterID == "local" {
 				curlURL, err := getCurlURL(client, test.namespace, test.query)
 				require.NoError(s.T(), err)
+				if strings.Contains(test.query, "sort=") {
+					fmt.Println("stop here for ", test.query)
+				}
+				if containsSortName.MatchString(test.query) && !containsSortNamespace.MatchString(test.query) {
+					// We're getting objects with the same name returned in random order based on namespace,
+					// so save them consistently w.r.t their namespace
+					multiplier := 1
+					if containsReverseOrderSortName.MatchString(test.query) {
+						multiplier = -1
+					}
+					steveAPIObjects := make([]*clientv1.SteveAPIObject, len(secretList.Data))
+					for i, secret := range secretList.Data {
+						steveAPIObjects[i] = &secret
+					}
+					isSorted := slices.IsSortedFunc(steveAPIObjects, func(x, y *clientv1.SteveAPIObject) int {
+						return multiplier * strings.Compare(x.Name, y.Name)
+					})
+					assert.True(s.T(), isSorted, "secretList.Data is not sorted by name")
+					secretList.Data = slices.SortedStableFunc(slices.Values(secretList.Data),
+						func(x, y clientv1.SteveAPIObject) int {
+							nameDiff := strings.Compare(x.Name, y.Name)
+							if nameDiff != 0 {
+								return multiplier * nameDiff
+							}
+							return multiplier * strings.Compare(x.Namespace, y.Namespace)
+						})
+				}
+				for _, steveAPIObj := range secretList.Data {
+					fields := steveAPIObj.Fields
+					if len(fields) > 3 {
+						fieldValue := fields[3].(string)
+						if fieldValue != "0s" && relativeDateRx.MatchString(fieldValue) {
+							fields[3] = "0s"
+						}
+					}
+				}
+				pagination := secretList.Pagination
+				if pagination != nil {
+					pagination.First = containsNamespaceTag.ReplaceAllString(pagination.First, replacementNamespaceTag)
+					pagination.Next = containsNamespaceTag.ReplaceAllString(pagination.Next, replacementNamespaceTag)
+				}
+
 				jsonResp, err := formatJSON(secretList)
 				require.NoError(s.T(), err)
 				jsonFilePath := filepath.Join(jsonDir, getFileName(test.user, test.namespace, test.query))
