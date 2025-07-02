@@ -116,6 +116,42 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID_CHARTS }}
           AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY_CHARTS }}
         uses: ./.github/actions/rancher-chart/publish-aws
+  merge-server-manifest:
+    needs: [push-images]
+    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY ;
+      - name: merge
+        uses: ./.github/actions/merge-manifests/server
+  merge-agent-manifest:
+    needs: [push-images]
+    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Load Secrets from Vault
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY ;
+      - name: merge
+        uses: ./.github/actions/merge-manifests/agent
   build-installer:
     runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
     strategy:
@@ -140,8 +176,8 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials password | DOCKER_PASSWORD;
       - name: build
         uses: ./.github/actions/build-images/installer
-  merge-server-agent-installer-manifests:
-    needs: [push-images, build-installer]
+  merge-installer-manifest:
+    needs: [build-installer]
     runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     permissions:
       contents: read
@@ -156,26 +192,8 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY;
             secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials username | DOCKER_USERNAME;
             secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials password | DOCKER_PASSWORD;
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Login to Docker Registry
-        uses: docker/login-action@v3
-        with:
-          username: ${{ env.DOCKER_USERNAME }}
-          password: ${{ env.DOCKER_PASSWORD }}
-          registry: ${{ env.REGISTRY }}
-      - name: merge server manifests
-        with:
-          image: "${{ env.IMAGE }}"
-        uses: ./.github/actions/merge-manifests
-      - name: merge agent manifests
-        with:
-          image: "${{ env.IMAGE_AGENT }}"
-        uses: ./.github/actions/merge-manifests
-      - name: merge installer manifests
-        with:
-          image: "${{ env.IMAGE_INSTALLER }}"
-        uses: ./.github/actions/merge-manifests
+      - name: merge
+        uses: ./.github/actions/merge-manifests/installer
   create-images-files:
     runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     permissions:
