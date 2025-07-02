@@ -1,12 +1,6 @@
 name: Integration Tests
 on:
   workflow_call:
-    inputs:
-      parent_run_id:
-        type: string
-        description: "parent run_id to download images from"
-        required: true
-permissions: {}
 env:
   TAG: v2.10-${{ github.sha }}-head
   GIT_TAG: v2.10-${{ github.sha }}-head
