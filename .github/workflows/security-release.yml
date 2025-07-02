@@ -30,14 +30,21 @@ jobs:
       - name: setup and build
         uses: ./.github/actions/build-images/server
   build-agent:
+    needs: [build-server]
     strategy:
       matrix:
         os: [linux]
         arch: [x64, arm64]
     runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
+    services:
+      registry:
+        image: registry.suse.com/suse/registry:2.8
+        ports:
+          - 5000:5000
     env:
       ARCH: ${{ matrix.arch }}
       OS: ${{ matrix.os }}
+      REGISTRY: "127.0.0.1:5000"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
