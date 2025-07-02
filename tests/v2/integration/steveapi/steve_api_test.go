@@ -2633,7 +2633,6 @@ func (s *steveAPITestSuite) TestList() {
 						fieldValue := fields[3].(string)
 						if fieldValue != "0s" && relativeDateRx.MatchString(fieldValue) {
 							fields[3] = "0s"
-							//madeChange = true
 						}
 					}
 				}
