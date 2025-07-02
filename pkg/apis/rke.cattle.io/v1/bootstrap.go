@@ -68,7 +68,7 @@ type RKEBootstrapTemplate struct {
 
 	// Spec is the desired state of RKEBootstrapTemplate.
 	// +required
-	Spec RKEBootstrapTemplateSpec `json:"spec" wrangler:"required"`
+	Spec RKEBootstrapTemplateSpec `json:"spec"`
 }
 
 // RKEBootstrapTemplateSpec defines the desired state of RKEBootstrapTemplate.
