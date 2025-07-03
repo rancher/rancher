@@ -156,7 +156,7 @@ func TestSyncDeleteSystemUser(t *testing.T) {
 }
 
 // TestCreateAndUpdated verifies that the Create and Updated methods return the original object because they're currently no-op
-func TestCreateAndUpdate(t *testing.T) {
+func TestCreateAndUpdated(t *testing.T) {
 	lifecycle := &projectLifecycle{}
 	proj := &v3.Project{
 		ObjectMeta: v1.ObjectMeta{
