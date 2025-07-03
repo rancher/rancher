@@ -58,23 +58,23 @@ const (
 	ClusterConditionDefaultNamespaceAssigned condition.Cond = "DefaultNamespaceAssigned"
 	// Deprecated: ClusterConditionSystemNamespacesAssigned true when cluster's system namespaces has been initially assigned to
 	// a system project
-	ClusterConditionSystemNamespacesAssigned             condition.Cond = "SystemNamespacesAssigned"
-	ClusterConditionAddonDeploy                          condition.Cond = "AddonDeploy"
+	// ClusterConditionSystemNamespacesAssigned             condition.Cond = "SystemNamespacesAssigned"
+	// ClusterConditionAddonDeploy                          condition.Cond = "AddonDeploy"
 	ClusterConditionSystemAccountCreated                 condition.Cond = "SystemAccountCreated"
 	ClusterConditionAgentDeployed                        condition.Cond = "AgentDeployed"
 	ClusterConditionGlobalAdminsSynced                   condition.Cond = "GlobalAdminsSynced"
 	ClusterConditionInitialRolesPopulated                condition.Cond = "InitialRolesPopulated"
 	ClusterConditionServiceAccountMigrated               condition.Cond = "ServiceAccountMigrated"
-	ClusterConditionAlertingEnabled                      condition.Cond = "AlertingEnabled"
-	ClusterConditionSecretsMigrated                      condition.Cond = "SecretsMigrated"
+	// ClusterConditionAlertingEnabled                      condition.Cond = "AlertingEnabled"
+	// ClusterConditionSecretsMigrated                      condition.Cond = "SecretsMigrated"
 	ClusterConditionServiceAccountSecretsMigrated        condition.Cond = "ServiceAccountSecretsMigrated"
 	ClusterConditionHarvesterCloudProviderConfigMigrated condition.Cond = "HarvesterCloudProviderConfigMigrated"
-	ClusterConditionACISecretsMigrated                   condition.Cond = "ACISecretsMigrated"
-	ClusterConditionRKESecretsMigrated                   condition.Cond = "RKESecretsMigrated"
+	// ClusterConditionACISecretsMigrated                   condition.Cond = "ACISecretsMigrated"
+	// ClusterConditionRKESecretsMigrated                   condition.Cond = "RKESecretsMigrated"
 
 	ClusterDriverImported = "imported"
 	ClusterDriverLocal    = "local"
-	ClusterDriverRKE      = "rancherKubernetesEngine" // Deprecated: RKE clusters are deprecated
+	// ClusterDriverRKE      = "rancherKubernetesEngine" // Deprecated: RKE clusters are deprecated
 	ClusterDriverK3s      = "k3s"
 	ClusterDriverK3os     = "k3os"
 	ClusterDriverRke2     = "rke2"
