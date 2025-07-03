@@ -195,6 +195,16 @@ func (h *handler) OnDownstreamChange(_ string, downstream *k3s.ETCDSnapshotFile)
 		_, err = h.etcdSnapshotController.Create(upstream)
 		// snapshot may exist on a previous version of Rancher but fail to indexer criteria, update in this case
 		if apierrors.IsAlreadyExists(err) {
+			upstream, err = h.etcdSnapshotCache.Get(upstream.Namespace, upstream.Name)
+			if err != nil {
+				return downstream, err
+			}
+
+			upstream, err = h.populateUpstreamSnapshotFromDownstream(upstream, downstream, cluster, controlPlane)
+			if err != nil {
+				return downstream, err
+			}
+
 			logrus.Debugf("%s snapshot %s already exists but does not match indexer criteria, updating", logPrefix, upstream.Name)
 			_, err = h.etcdSnapshotController.Update(upstream)
 		}
