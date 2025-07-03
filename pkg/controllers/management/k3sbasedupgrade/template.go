@@ -43,7 +43,7 @@ func generateMasterPlan(version string, concurrency int, drain bool, image, mast
 	masterPlan := genericPlan
 	return generatePlan(masterPlan, masterPlanName, version, image, concurrency, drain, &metav1.LabelSelector{
 		MatchExpressions: []metav1.LabelSelectorRequirement{{
-			Key:      describe.LabelNodeRolePrefix + "master",
+			Key:      describe.LabelNodeRolePrefix + "control-plane",
 			Operator: metav1.LabelSelectorOpIn,
 			Values:   []string{"true"},
 		},
@@ -65,7 +65,7 @@ func generateWorkerPlan(version string, concurrency int, drain bool, image, work
 	return generatePlan(workerPlan, workerPlanName, version, image, concurrency, drain, &metav1.LabelSelector{
 		MatchExpressions: []metav1.LabelSelectorRequirement{
 			{
-				Key:      describe.LabelNodeRolePrefix + "master",
+				Key:      describe.LabelNodeRolePrefix + "control-plane",
 				Operator: metav1.LabelSelectorOpDoesNotExist,
 			},
 			{
@@ -81,7 +81,7 @@ func configureMasterPlan(masterPlan planv1.Plan, version string, concurrency int
 	return configurePlan(masterPlan, version, concurrency, drain, masterPlanName, &metav1.LabelSelector{
 		MatchExpressions: []metav1.LabelSelectorRequirement{
 			{
-				Key:      describe.LabelNodeRolePrefix + "master",
+				Key:      describe.LabelNodeRolePrefix + "control-plane",
 				Operator: metav1.LabelSelectorOpIn,
 				Values:   []string{"true"},
 			},
@@ -103,7 +103,7 @@ func configureWorkerPlan(workerPlan planv1.Plan, version string, concurrency int
 	return configurePlan(workerPlan, version, concurrency, drain, workerPlanName, &metav1.LabelSelector{
 		MatchExpressions: []metav1.LabelSelectorRequirement{
 			{
-				Key:      describe.LabelNodeRolePrefix + "master",
+				Key:      describe.LabelNodeRolePrefix + "control-plane",
 				Operator: metav1.LabelSelectorOpDoesNotExist,
 			},
 			{
