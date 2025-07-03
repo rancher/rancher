@@ -4,25 +4,28 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/rancher/rancher/pkg/scc/controllers/shared"
-	"github.com/rancher/rancher/pkg/scc/suseconnect/offline"
 	"maps"
 	"slices"
 	"time"
 
-	"github.com/rancher/rancher/pkg/scc/consts"
-
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
-	registrationControllers "github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/scc/consts"
+	"github.com/rancher/rancher/pkg/scc/controllers/shared"
 	"github.com/rancher/rancher/pkg/scc/suseconnect"
 	"github.com/rancher/rancher/pkg/scc/suseconnect/credentials"
+	"github.com/rancher/rancher/pkg/scc/suseconnect/offline"
 	"github.com/rancher/rancher/pkg/scc/systeminfo"
 	"github.com/rancher/rancher/pkg/scc/util/log"
+
+	registrationControllers "github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io/v1"
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -103,7 +106,7 @@ func Register(
 	controller.initIndexers()
 	controller.initResolvers(ctx)
 	secrets.OnChange(ctx, controllerID+"-secrets", controller.OnSecretChange)
-	secrets.OnRemove(ctx, controllerID+"-secrets-remove", controller.OnSecretRemove)
+	scopedOnRemove(ctx, controllerID+"-secrets-remove", systemNamespace, secrets, controller.OnSecretRemove)
 
 	registrations.OnChange(ctx, controllerID, controller.OnRegistrationChange)
 	registrations.OnRemove(ctx, controllerID+"-remove", controller.OnRegistrationRemove)
@@ -698,4 +701,29 @@ func (h *handler) OnRegistrationRemove(name string, registrationObj *v1.Registra
 	}
 
 	return nil, nil
+}
+
+// TODO(wrangler/v4): revert to use OnRemove when it supports options (https://github.com/rancher/wrangler/pull/472).
+func scopedOnRemove[T generic.RuntimeMetaObject](ctx context.Context, name, namespace string, c generic.ControllerMeta, sync generic.ObjectHandler[T]) {
+	condition := scopedOnRemoveConditionChecker(namespace)
+	onRemoveHandler := generic.NewRemoveHandler(name, c.Updater(), generic.FromObjectHandlerToHandler(sync))
+	c.AddGenericHandler(ctx, name, func(key string, obj runtime.Object) (runtime.Object, error) {
+		if condition(obj) {
+			return onRemoveHandler(key, obj)
+		}
+		return obj, nil
+	})
+}
+
+func scopedOnRemoveConditionChecker(namespace string) func(obj runtime.Object) bool {
+	return func(obj runtime.Object) bool { return inExpectedNamespace(obj, namespace) }
+}
+
+func inExpectedNamespace(obj runtime.Object, namespace string) bool {
+	metadata, err := meta.Accessor(obj)
+	if err != nil {
+		return false
+	}
+
+	return metadata.GetNamespace() == namespace
 }
