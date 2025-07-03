@@ -47,6 +47,7 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/pkg/printers"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 const (
@@ -1479,6 +1480,12 @@ func toSecret(token *ext.Token) (*corev1.Secret, error) {
 	secret.StringData[FieldLastUpdateTime] = token.Status.LastUpdateTime
 	secret.StringData[FieldLastActivitySeen] = ""
 
+	secret.ObjectMeta.ManagedFields, err = extcommon.MapManagedFields(mapFromToken,
+		token.ObjectMeta.ManagedFields)
+	if err != nil {
+		return nil, fmt.Errorf("failed to map token managed-fields: %w", err)
+	}
+
 	return secret, nil
 }
 
@@ -1557,6 +1564,12 @@ func fromSecret(secret *corev1.Secret) (*ext.Token, error) {
 
 	if err := setExpired(token); err != nil {
 		return nil, fmt.Errorf("failed to set expiration information: %w", err)
+	}
+
+	token.ObjectMeta.ManagedFields, err = extcommon.MapManagedFields(mapFromSecret,
+		token.ObjectMeta.ManagedFields)
+	if err != nil {
+		return nil, fmt.Errorf("failed to map secret managed-fields: %w", err)
 	}
 
 	return token, nil
@@ -1673,4 +1686,49 @@ var (
 	_ rest.Scoper                   = &Store{}
 	_ rest.SingularNameProvider     = &Store{}
 	_ rest.GroupVersionKindProvider = &Store{}
+)
+
+var (
+	pathSecData        = fieldpath.MakePathOrDie("data")
+	pathSecDescription = fieldpath.MakePathOrDie("data", FieldDescription)
+	pathSecEnabled     = fieldpath.MakePathOrDie("data", FieldEnabled)
+	pathSecHash        = fieldpath.MakePathOrDie("data", FieldHash)
+	pathSecKind        = fieldpath.MakePathOrDie("data", FieldKind)
+	pathSecUID         = fieldpath.MakePathOrDie("data", FieldUID)
+	pathSecLAS         = fieldpath.MakePathOrDie("data", FieldLastActivitySeen)
+	pathSecLUT         = fieldpath.MakePathOrDie("data", FieldLastUpdateTime)
+	pathSecLUA         = fieldpath.MakePathOrDie("data", FieldLastUsedAt)
+	pathSecPrincipal   = fieldpath.MakePathOrDie("data", FieldPrincipal)
+	pathSecTTL         = fieldpath.MakePathOrDie("data", FieldTTL)
+	pathSecUserID      = fieldpath.MakePathOrDie("data", FieldUserID)
+
+	pathSecLabelKind = fieldpath.MakePathOrDie("metadata", "labels", SecretKindLabel)
+
+	pathTokDescription = fieldpath.MakePathOrDie("spec", "description")
+	pathTokEnabled     = fieldpath.MakePathOrDie("spec", "enabled")
+	pathTokKind        = fieldpath.MakePathOrDie("spec", "kind")
+	pathTokPrincipal   = fieldpath.MakePathOrDie("spec", "userPrincipal")
+	pathTokTTL         = fieldpath.MakePathOrDie("spec", "ttl")
+	pathTokUserID      = fieldpath.MakePathOrDie("spec", "userID")
+
+	// secret data reported as status is dropped by the map, as is .data itself
+	// .type, .metadata pass as-is, except the pathSecLabelKind
+	mapFromSecret = extcommon.NewMapSpec(
+		extcommon.NewMap(pathSecData, nil),
+		extcommon.NewMap(pathSecDescription, pathTokDescription),
+		extcommon.NewMap(pathSecEnabled, pathTokEnabled),
+		extcommon.NewMap(pathSecHash, nil),
+		extcommon.NewMap(pathSecKind, pathTokKind),
+		extcommon.NewMap(pathSecHash, nil),
+		extcommon.NewMap(pathSecLAS, nil),
+		extcommon.NewMap(pathSecLUT, nil),
+		extcommon.NewMap(pathSecLUA, nil),
+		extcommon.NewMap(pathSecPrincipal, pathTokPrincipal),
+		extcommon.NewMap(pathSecTTL, pathTokTTL),
+		extcommon.NewMap(pathSecUID, nil),
+		extcommon.NewMap(pathSecUserID, pathTokUserID),
+		extcommon.NewMap(pathSecLabelKind, nil),
+	)
+
+	mapFromToken = extcommon.MapInvert(mapFromSecret)
 )
