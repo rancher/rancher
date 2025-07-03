@@ -111,7 +111,8 @@ func addRoleConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 	runtime := capr.GetRuntime(controlPlane.Spec.KubernetesVersion)
 	if isInitNode(entry) {
 		// If this node is the init node, it should not be joined to anything. Clear the joinServer URL.
-		if runtime == capr.RuntimeK3S {
+		if _, ok := config["cluster-init"]; !ok && runtime == capr.RuntimeK3S {
+			// Initialize embedded etcd, unless explictly overridden by the user.
 			config["cluster-init"] = true
 		}
 		joinServer = "-"
