@@ -193,7 +193,7 @@ func TestRemove(t *testing.T) {
 	}
 	Obj, err := lifecycle.Remove(project)
 	// Since the namespace exists in the cache, a GET & DELETE call should be recorded
-	require.Len(t, clientset.Fake.Actions(), 2, "expected exactly one action to be recorded")
+	require.Len(t, clientset.Fake.Actions(), 2, "expected exactly two actions to be recorded")
 	require.NoError(t, err)
 	require.NotNil(t, Obj)
 	// Since Remove returns the original project after deleting, assert the returned object equals original project
