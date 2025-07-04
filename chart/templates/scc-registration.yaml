@@ -29,7 +29,4 @@ data:
 {{- if .Values.registration.registrationUrl }}
   registrationUrl: {{ .Values.registration.registrationUrl | b64enc | quote }}
 {{- end }}
-{{- if .Values.registration.certificate }}
-  certificate: {{ .Values.registration.certificate | b64enc | quote  }}
-{{- end }}
 {{ end -}}
