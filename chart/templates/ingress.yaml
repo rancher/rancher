@@ -10,7 +10,8 @@ metadata:
     {{- toYaml . | nindent 4 -}}
   {{- end }}
 spec:
-  ingressClassName: alb
+  ingressClassName: {{ .Values.ingress.className | quote }}
+  {{- if .Values.ingress.tls }}
   rules:
   - host: {{ .Values.ingress.hostname }}  # hostname to access rancher server
     http:

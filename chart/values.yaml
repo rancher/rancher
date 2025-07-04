@@ -47,6 +47,7 @@ ingress:
   enabled: true
   # Fully qualified name to reach your Rancher server
   hostname: rancher.my.org
+  className: alb
   includeDefaultExtraAnnotations: true
   annotations: {}
   ingressClassName: ""
