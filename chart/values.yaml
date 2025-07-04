@@ -1,8 +1,3 @@
-# Additional Trusted CAs.
-# Enable this flag and add your CA certs as a secret named tls-ca-additional in the namespace.
-# See README.md for details.
-additionalTrustedCAs: false
-
 antiAffinity: preferred
 topologyKey: kubernetes.io/hostname
 
@@ -40,39 +35,20 @@ auditLog:
     # options: Always, Never, IfNotPresent
     pullPolicy: "IfNotPresent"
 
-# As of Rancher v2.5.0 this flag is deprecated and must be set to 'true' in order for Rancher to start
-addLocal: "true"
-
-# Add debug flag to Rancher server
-debug: false
-
-# Control how the Rancher agents validate TLS connections
-# Valid options: strict, or system-store
-# Note, for new installations empty will default to strict on 2.9+, or system-store on 2.8 or older
-agentTLSMode: ""
-
-# Extra environment variables passed to the rancher pods.
-# extraEnv:
-# - name: CATTLE_TLS_MIN_VERSION
-#   value: "1.0"
-
-# Fully qualified name to reach your Rancher server
-# hostname: rancher.my.org
-
 ## Optional array of imagePullSecrets containing private registry credentials
 ## Ref: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
 imagePullSecrets: []
 # - name: secretName
 
-### ingress ###
-# Readme for details and instruction on adding tls secrets.
 ingress:
   # If set to false, ingress will not be created
   # Defaults to true
   # options: true, false
   enabled: true
+  # Fully qualified name to reach your Rancher server
+  hostname: rancher.my.org
   includeDefaultExtraAnnotations: true
-  extraAnnotations: {}
+  annotations: {}
   ingressClassName: ""
   # Certain ingress controllers will require the pathType or path to be set to a different value.
   pathType: ImplementationSpecific
@@ -85,11 +61,6 @@ ingress:
   # configurationSnippet: |
   #   more_set_input_headers "X-Forwarded-Host: {{ .Values.hostname }}";
 
-  tls:
-    # options: rancher, letsEncrypt, secret
-    source: rancher
-    secretName: tls-rancher-ingress
-
 ### service ###
 # Override to use NodePort or LoadBalancer service type - default is ClusterIP
 service:
@@ -99,18 +70,6 @@ service:
   # When set true, you must also set `ingress.servicePort` to 443 and the appropriate ingress annotation to use HTTPS
   disableHTTP: false
 
-### LetsEncrypt config ###
-# ProTip: The production environment only allows you to register a name 5 times a week.
-#         Use staging until you have your config right.
-letsEncrypt:
-  # email: none@example.com
-  environment: production
-  ingress:
-    # options: traefik, nginx
-    class: ""
-# If you are using certs signed by a private CA set to 'true' and set the 'tls-ca'
-# in the 'cattle-system' namespace. See the README.md for details
-privateCA: false
 
 # http[s] proxy server passed into rancher server.
 # proxy: http://<username>@<password>:<url>:<port>
@@ -141,13 +100,6 @@ priorityClassName: rancher-critical
 # Set pod resource requests/limits for Rancher.
 resources: {}
 
-#
-# tls
-#   Where to offload the TLS/SSL encryption
-# - ingress (default)
-# - external
-tls: ingress
-
 systemDefaultRegistry: ""
 
 # Set to use the packaged system charts
@@ -177,8 +129,8 @@ customLogos:
 postDelete:
   enabled: true
   image:
-    repository: %POST_DELETE_IMAGE_NAME%
-    tag: %POST_DELETE_IMAGE_TAG%
+    repository: POST_DELETE_IMAGE_NAME
+    tag: POST_DELETE_IMAGE_TAG
   namespaceList:
     - cattle-fleet-system
     - cattle-system
@@ -190,8 +142,8 @@ postDelete:
 
 preUpgrade:
   image:
-    repository: %PRE_UPGRADE_IMAGE_NAME%
-    tag: %PRE_UPGRADE_IMAGE_TAG%
+    repository: PRE_UPGRADE_IMAGE_NAME
+    tag: PRE_UPGRADE_IMAGE_TAG
 
 # Set a bootstrap password. If leave empty, a random password will be generated.
 bootstrapPassword: ""
@@ -287,7 +239,6 @@ registration:
   #           --type='merge' -p "{\"data\": {\"certificate\": \"$(cat <your Offline Cert file> )\"}}"
   # Step 5.b. Using Rancher UI upload the certificate to complete the registration.
   # Step 5.c  Using helm with the certificate value field and then `helm upgrade` rancher.
-  # certificate: {}
   ## Alternative Registration Endpoint
   # For users with a local RMT server you can use an alternative registration endpoint to register your cluster.
   # This will cause the registration process to sync with your RMT server instead of with the SCC.

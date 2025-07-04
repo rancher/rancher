@@ -1,69 +1,25 @@
 {{- if .Values.ingress.enabled }}
-{{- if or (.Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress") (not (.Capabilities.APIVersions.Has "networking.k8s.io/v1beta1/Ingress")) }}
 apiVersion: networking.k8s.io/v1
-{{- else }}
-apiVersion: networking.k8s.io/v1beta1
-{{- end }}
 kind: Ingress
 metadata:
   name: {{ template "rancher.fullname" . }}
   labels:
 {{ include "rancher.labels" . | indent 4 }}
+  {{- with .Values.ingress.annotations }}
   annotations:
-{{- if .Values.ingress.configurationSnippet }}
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      {{- template "configurationSnippet" . }}
-{{- end }}
-{{- if eq .Values.tls "external" }}
-    nginx.ingress.kubernetes.io/ssl-redirect: "false" # turn off ssl redirect for external.
-{{- else }}
-  {{- if ne .Values.ingress.tls.source "secret" }}
-    {{- $certmanagerVer :=  split "." .Values.certmanager.version -}}
-    {{- if or (.Capabilities.APIVersions.Has "certmanager.k8s.io/v1alpha1") (and (gt (len $certmanagerVer._0) 0) (eq (int $certmanagerVer._0) 0) (lt (int $certmanagerVer._1) 11)) }}
-    certmanager.k8s.io/issuer: {{ template "rancher.fullname" . }}
-    {{- else }}
-    cert-manager.io/issuer: {{ template "rancher.fullname" . }}
-    cert-manager.io/issuer-kind: Issuer
-    {{- end }}
+    {{- toYaml . | nindent 4 -}}
   {{- end }}
-{{- end }}
-{{- if .Values.ingress.includeDefaultExtraAnnotations }}
-    nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
-{{- end }}
-{{- if eq (int .Values.ingress.servicePort) 443 }}
-    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
-{{- end }}
-{{- if .Values.ingress.extraAnnotations }}
-{{ toYaml .Values.ingress.extraAnnotations | indent 4 }}
-{{- end }}
 spec:
-{{- if .Values.ingress.ingressClassName }}
-  ingressClassName: {{ .Values.ingress.ingressClassName }}
-{{- end }}
+  ingressClassName: alb
   rules:
-  - host: {{ .Values.hostname }}  # hostname to access rancher server
+  - host: {{ .Values.ingress.hostname }}  # hostname to access rancher server
     http:
       paths:
       - backend:
-          {{- if or (.Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress") (not (.Capabilities.APIVersions.Has "networking.k8s.io/v1beta1/Ingress")) }}
           service:
             name: {{ template "rancher.fullname" . }}
             port:
               number: {{ .Values.ingress.servicePort }}
-          {{- else }}
-          serviceName: {{ template "rancher.fullname" . }}
-          servicePort: {{ .Values.ingress.servicePort }}
-          {{- end }}
-        {{- if or (.Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress") (not (.Capabilities.APIVersions.Has "networking.k8s.io/v1beta1/Ingress")) }}
         pathType: {{ .Values.ingress.pathType }}
         path: {{ .Values.ingress.path }}
-        {{- end }}
-{{- if eq .Values.tls "ingress" }}
-  tls:
-  - hosts:
-    - {{ .Values.hostname }}
-    secretName: {{ .Values.ingress.tls.secretName }}
-{{- end }}
 {{- end }}
