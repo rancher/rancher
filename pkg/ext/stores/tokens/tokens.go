@@ -273,6 +273,64 @@ func (t *Store) Create(
 	return t.create(ctx, objToken, options)
 }
 
+// DeleteCollection implements [rest.CollectionDeleter]
+func (t *Store) DeleteCollection(
+	ctx context.Context,
+	deleteValidation rest.ValidateObjectFunc,
+	options *metav1.DeleteOptions,
+	listOptions *metainternalversion.ListOptions,
+) (runtime.Object, error) {
+	userInfo, fullAccess, _, err := t.auth.UserName(ctx, &t.SystemStore, "delete")
+	if err != nil {
+		return nil, apierrors.NewInternalError(fmt.Errorf("error getting user info: %w", err))
+	}
+
+	lOptions, err := extcore.ConvertListOptions(listOptions)
+	if err != nil {
+		return nil, apierrors.NewInternalError(err)
+	}
+	// Non-system requests always filter the tokens down to those of the current user.
+	// Merge our own selection request (user match!) into the caller's demands
+	localOptions, err := ListOptionMerge(fullAccess, userInfo.GetName(), lOptions)
+	if err != nil {
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to process list options: %w", err))
+	}
+
+	secrets, err := t.secretClient.List(TokenNamespace, localOptions)
+	if err != nil {
+		if apierrors.IsResourceExpired(err) || apierrors.IsGone(err) { // Continue token expired.
+			return nil, apierrors.NewResourceExpired(err.Error())
+		}
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to list tokens: %w", err))
+	}
+
+	list := &ext.TokenList{
+		ListMeta: metav1.ListMeta{
+			Continue:           secrets.Continue,
+			ResourceVersion:    secrets.ResourceVersion,
+			RemainingItemCount: secrets.RemainingItemCount,
+		},
+		Items: make([]ext.Token, 0, len(secrets.Items)),
+	}
+
+	for _, secret := range secrets.Items {
+		obj, _, err := t.DeleteToken(ctx, &secret, deleteValidation, options)
+		if err != nil {
+			return nil, apierrors.NewInternalError(fmt.Errorf("error deleting kubeconfig %s: %w",
+				secret.Name, err))
+		}
+
+		token, ok := obj.(*ext.Token)
+		if !ok { // Sanity check.
+			return nil, apierrors.NewInternalError(fmt.Errorf("expected token object, got %T", obj))
+		}
+
+		list.Items = append(list.Items, *token)
+	}
+
+	return list, nil
+}
+
 // Delete implements [rest.GracefulDeleter], the interface to support the
 // `delete` verb. Delegates to the actual store method after some generic
 // boilerplate.
@@ -301,6 +359,38 @@ func (t *Store) Delete(
 	}
 
 	return obj, true, nil
+}
+
+// DeleteToken is a variant of Delete for use by DeleteCollection. It avoids
+// doing a second `token get` calling on `Delete` would invoke. Delegates to the
+// actual store method after some generic boilerplate.
+func (t *Store) DeleteToken(
+	ctx context.Context,
+	secret *corev1.Secret,
+	deleteValidation rest.ValidateObjectFunc,
+	options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+
+	token, err := fromSecret(secret)
+	if err != nil {
+		return nil, false, apierrors.NewInternalError(
+			fmt.Errorf("error converting secret %s to token: %w",
+				secret.Name, err))
+	}
+
+	// ensure that deletion is possible
+	if deleteValidation != nil {
+		err := deleteValidation(ctx, token)
+		if err != nil {
+			return nil, false, err
+		}
+	}
+
+	// and now actually delete
+	if err := t.delete(ctx, token, options); err != nil {
+		return nil, false, err
+	}
+
+	return token, true, nil
 }
 
 // Get implements [rest.Getter], the interface to support the `get` verb.
