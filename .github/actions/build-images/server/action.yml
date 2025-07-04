@@ -52,6 +52,7 @@ runs:
           "CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_PROVISIONING_CAPI_VERSION }}"
           "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ steps.env.outputs.CATTLE_CSP_ADAPTER_MIN_VERSION }}"
           "CATTLE_FLEET_VERSION=${{ steps.env.outputs.CATTLE_FLEET_VERSION }}"
+          "IMAGE_REPO=${{ env.REGISTRY }}/rancher"
         tags: ${{ github.repository_owner }}/rancher:${{ env.TAG }}-${{ env.ARCH }}
         context: .
         platforms: "${{ env.OS }}/${{ env.ARCH }}"
