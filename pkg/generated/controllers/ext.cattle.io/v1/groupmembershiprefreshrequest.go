@@ -34,31 +34,31 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// UserRefreshRequestController interface for managing UserRefreshRequest resources.
-type UserRefreshRequestController interface {
-	generic.ControllerInterface[*v1.UserRefreshRequest, *v1.UserRefreshRequestList]
+// GroupMembershipRefreshRequestController interface for managing GroupMembershipRefreshRequest resources.
+type GroupMembershipRefreshRequestController interface {
+	generic.ControllerInterface[*v1.GroupMembershipRefreshRequest, *v1.GroupMembershipRefreshRequestList]
 }
 
-// UserRefreshRequestClient interface for managing UserRefreshRequest resources in Kubernetes.
-type UserRefreshRequestClient interface {
-	generic.ClientInterface[*v1.UserRefreshRequest, *v1.UserRefreshRequestList]
+// GroupMembershipRefreshRequestClient interface for managing GroupMembershipRefreshRequest resources in Kubernetes.
+type GroupMembershipRefreshRequestClient interface {
+	generic.ClientInterface[*v1.GroupMembershipRefreshRequest, *v1.GroupMembershipRefreshRequestList]
 }
 
-// UserRefreshRequestCache interface for retrieving UserRefreshRequest resources in memory.
-type UserRefreshRequestCache interface {
-	generic.CacheInterface[*v1.UserRefreshRequest]
+// GroupMembershipRefreshRequestCache interface for retrieving GroupMembershipRefreshRequest resources in memory.
+type GroupMembershipRefreshRequestCache interface {
+	generic.CacheInterface[*v1.GroupMembershipRefreshRequest]
 }
 
-// UserRefreshRequestStatusHandler is executed for every added or modified UserRefreshRequest. Should return the new status to be updated
-type UserRefreshRequestStatusHandler func(obj *v1.UserRefreshRequest, status v1.UserRefreshRequestStatus) (v1.UserRefreshRequestStatus, error)
+// GroupMembershipRefreshRequestStatusHandler is executed for every added or modified GroupMembershipRefreshRequest. Should return the new status to be updated
+type GroupMembershipRefreshRequestStatusHandler func(obj *v1.GroupMembershipRefreshRequest, status v1.GroupMembershipRefreshRequestStatus) (v1.GroupMembershipRefreshRequestStatus, error)
 
-// UserRefreshRequestGeneratingHandler is the top-level handler that is executed for every UserRefreshRequest event. It extends UserRefreshRequestStatusHandler by a returning a slice of child objects to be passed to apply.Apply
-type UserRefreshRequestGeneratingHandler func(obj *v1.UserRefreshRequest, status v1.UserRefreshRequestStatus) ([]runtime.Object, v1.UserRefreshRequestStatus, error)
+// GroupMembershipRefreshRequestGeneratingHandler is the top-level handler that is executed for every GroupMembershipRefreshRequest event. It extends GroupMembershipRefreshRequestStatusHandler by a returning a slice of child objects to be passed to apply.Apply
+type GroupMembershipRefreshRequestGeneratingHandler func(obj *v1.GroupMembershipRefreshRequest, status v1.GroupMembershipRefreshRequestStatus) ([]runtime.Object, v1.GroupMembershipRefreshRequestStatus, error)
 
-// RegisterUserRefreshRequestStatusHandler configures a UserRefreshRequestController to execute a UserRefreshRequestStatusHandler for every events observed.
+// RegisterGroupMembershipRefreshRequestStatusHandler configures a GroupMembershipRefreshRequestController to execute a GroupMembershipRefreshRequestStatusHandler for every events observed.
 // If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
-func RegisterUserRefreshRequestStatusHandler(ctx context.Context, controller UserRefreshRequestController, condition condition.Cond, name string, handler UserRefreshRequestStatusHandler) {
-	statusHandler := &userRefreshRequestStatusHandler{
+func RegisterGroupMembershipRefreshRequestStatusHandler(ctx context.Context, controller GroupMembershipRefreshRequestController, condition condition.Cond, name string, handler GroupMembershipRefreshRequestStatusHandler) {
+	statusHandler := &groupMembershipRefreshRequestStatusHandler{
 		client:    controller,
 		condition: condition,
 		handler:   handler,
@@ -66,31 +66,31 @@ func RegisterUserRefreshRequestStatusHandler(ctx context.Context, controller Use
 	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
 }
 
-// RegisterUserRefreshRequestGeneratingHandler configures a UserRefreshRequestController to execute a UserRefreshRequestGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
+// RegisterGroupMembershipRefreshRequestGeneratingHandler configures a GroupMembershipRefreshRequestController to execute a GroupMembershipRefreshRequestGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
 // If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
-func RegisterUserRefreshRequestGeneratingHandler(ctx context.Context, controller UserRefreshRequestController, apply apply.Apply,
-	condition condition.Cond, name string, handler UserRefreshRequestGeneratingHandler, opts *generic.GeneratingHandlerOptions) {
-	statusHandler := &userRefreshRequestGeneratingHandler{
-		UserRefreshRequestGeneratingHandler: handler,
-		apply:                               apply,
-		name:                                name,
-		gvk:                                 controller.GroupVersionKind(),
+func RegisterGroupMembershipRefreshRequestGeneratingHandler(ctx context.Context, controller GroupMembershipRefreshRequestController, apply apply.Apply,
+	condition condition.Cond, name string, handler GroupMembershipRefreshRequestGeneratingHandler, opts *generic.GeneratingHandlerOptions) {
+	statusHandler := &groupMembershipRefreshRequestGeneratingHandler{
+		GroupMembershipRefreshRequestGeneratingHandler: handler,
+		apply: apply,
+		name:  name,
+		gvk:   controller.GroupVersionKind(),
 	}
 	if opts != nil {
 		statusHandler.opts = *opts
 	}
 	controller.OnChange(ctx, name, statusHandler.Remove)
-	RegisterUserRefreshRequestStatusHandler(ctx, controller, condition, name, statusHandler.Handle)
+	RegisterGroupMembershipRefreshRequestStatusHandler(ctx, controller, condition, name, statusHandler.Handle)
 }
 
-type userRefreshRequestStatusHandler struct {
-	client    UserRefreshRequestClient
+type groupMembershipRefreshRequestStatusHandler struct {
+	client    GroupMembershipRefreshRequestClient
 	condition condition.Cond
-	handler   UserRefreshRequestStatusHandler
+	handler   GroupMembershipRefreshRequestStatusHandler
 }
 
 // sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
-func (a *userRefreshRequestStatusHandler) sync(key string, obj *v1.UserRefreshRequest) (*v1.UserRefreshRequest, error) {
+func (a *groupMembershipRefreshRequestStatusHandler) sync(key string, obj *v1.GroupMembershipRefreshRequest) (*v1.GroupMembershipRefreshRequest, error) {
 	if obj == nil {
 		return obj, nil
 	}
@@ -129,8 +129,8 @@ func (a *userRefreshRequestStatusHandler) sync(key string, obj *v1.UserRefreshRe
 	return obj, err
 }
 
-type userRefreshRequestGeneratingHandler struct {
-	UserRefreshRequestGeneratingHandler
+type groupMembershipRefreshRequestGeneratingHandler struct {
+	GroupMembershipRefreshRequestGeneratingHandler
 	apply apply.Apply
 	opts  generic.GeneratingHandlerOptions
 	gvk   schema.GroupVersionKind
@@ -139,12 +139,12 @@ type userRefreshRequestGeneratingHandler struct {
 }
 
 // Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
-func (a *userRefreshRequestGeneratingHandler) Remove(key string, obj *v1.UserRefreshRequest) (*v1.UserRefreshRequest, error) {
+func (a *groupMembershipRefreshRequestGeneratingHandler) Remove(key string, obj *v1.GroupMembershipRefreshRequest) (*v1.GroupMembershipRefreshRequest, error) {
 	if obj != nil {
 		return obj, nil
 	}
 
-	obj = &v1.UserRefreshRequest{}
+	obj = &v1.GroupMembershipRefreshRequest{}
 	obj.Namespace, obj.Name = kv.RSplit(key, "/")
 	obj.SetGroupVersionKind(a.gvk)
 
@@ -158,13 +158,13 @@ func (a *userRefreshRequestGeneratingHandler) Remove(key string, obj *v1.UserRef
 		ApplyObjects()
 }
 
-// Handle executes the configured UserRefreshRequestGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
-func (a *userRefreshRequestGeneratingHandler) Handle(obj *v1.UserRefreshRequest, status v1.UserRefreshRequestStatus) (v1.UserRefreshRequestStatus, error) {
+// Handle executes the configured GroupMembershipRefreshRequestGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
+func (a *groupMembershipRefreshRequestGeneratingHandler) Handle(obj *v1.GroupMembershipRefreshRequest, status v1.GroupMembershipRefreshRequestStatus) (v1.GroupMembershipRefreshRequestStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
 	}
 
-	objs, newStatus, err := a.UserRefreshRequestGeneratingHandler(obj, status)
+	objs, newStatus, err := a.GroupMembershipRefreshRequestGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err
 	}
@@ -185,7 +185,7 @@ func (a *userRefreshRequestGeneratingHandler) Handle(obj *v1.UserRefreshRequest,
 
 // isNewResourceVersion detects if a specific resource version was already successfully processed.
 // Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
-func (a *userRefreshRequestGeneratingHandler) isNewResourceVersion(obj *v1.UserRefreshRequest) bool {
+func (a *groupMembershipRefreshRequestGeneratingHandler) isNewResourceVersion(obj *v1.GroupMembershipRefreshRequest) bool {
 	if !a.opts.UniqueApplyForResourceVersion {
 		return true
 	}
@@ -198,7 +198,7 @@ func (a *userRefreshRequestGeneratingHandler) isNewResourceVersion(obj *v1.UserR
 
 // storeResourceVersion keeps track of the latest resource version of an object for which Apply was executed
 // Only used if UniqueApplyForResourceVersion is set in generic.GeneratingHandlerOptions
-func (a *userRefreshRequestGeneratingHandler) storeResourceVersion(obj *v1.UserRefreshRequest) {
+func (a *groupMembershipRefreshRequestGeneratingHandler) storeResourceVersion(obj *v1.GroupMembershipRefreshRequest) {
 	if !a.opts.UniqueApplyForResourceVersion {
 		return
 	}

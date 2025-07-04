@@ -5,12 +5,12 @@ import (
 
 	extv1 "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/ext/stores/groupmembershiprefreshrequest"
 	"github.com/rancher/rancher/pkg/ext/stores/kubeconfig"
 	"github.com/rancher/rancher/pkg/ext/stores/passwordchangerequest"
 	"github.com/rancher/rancher/pkg/ext/stores/selfuser"
 	"github.com/rancher/rancher/pkg/ext/stores/tokens"
 	"github.com/rancher/rancher/pkg/ext/stores/useractivity"
-	"github.com/rancher/rancher/pkg/ext/stores/userrefreshrequest"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/wrangler"
 	steveext "github.com/rancher/steve/pkg/ext"
@@ -74,16 +74,16 @@ func InstallStores(
 	if err != nil {
 		return fmt.Errorf("unable to install %s store: %w", passwordchangerequest.SingularName, err)
 	}
-	userRefreshStore, err := userrefreshrequest.New(wranglerContext, server.GetAuthorizer())
+	groupMembershipRefreshStore, err := groupmembershiprefreshrequest.New(wranglerContext, server.GetAuthorizer())
 	if err != nil {
-		return fmt.Errorf("unable to create %s store: %w", userrefreshrequest.SingularName, err)
+		return fmt.Errorf("unable to create %s store: %w", groupmembershiprefreshrequest.SingularName, err)
 	}
 	err = server.Install(
-		userrefreshrequest.PluralName,
-		userrefreshrequest.GVK,
-		userRefreshStore)
+		groupmembershiprefreshrequest.PluralName,
+		groupmembershiprefreshrequest.GVK,
+		groupMembershipRefreshStore)
 	if err != nil {
-		return fmt.Errorf("unable to install %s store: %w", userrefreshrequest.SingularName, err)
+		return fmt.Errorf("unable to install %s store: %w", groupmembershiprefreshrequest.SingularName, err)
 	}
 	err = server.Install(
 		selfuser.PluralName,

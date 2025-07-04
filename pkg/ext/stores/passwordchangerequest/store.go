@@ -8,6 +8,7 @@ import (
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
+	"github.com/rancher/rancher/pkg/controllers/status"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -144,6 +145,7 @@ func (s *Store) Create(
 			Status: "True",
 		}
 		objPasswordChangeRequest.Status.Conditions = append(objPasswordChangeRequest.Status.Conditions, c)
+		objPasswordChangeRequest.Status.Summary = status.SummaryCompleted
 
 		return objPasswordChangeRequest, nil
 	}
@@ -158,6 +160,7 @@ func (s *Store) Create(
 			Status: "True",
 		}
 		objPasswordChangeRequest.Status.Conditions = append(objPasswordChangeRequest.Status.Conditions, c)
+		objPasswordChangeRequest.Status.Summary = status.SummaryCompleted
 
 		return objPasswordChangeRequest, nil
 	}

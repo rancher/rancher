@@ -54,7 +54,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("kontainerdrivers").verbs("*")
 	rb.addRole("Manage Users", "users-manage").
 		addNamespacedRule(pbkdf2.LocalUserPasswordsNamespace).addRule().apiGroups("").resources("secrets").verbs("create").
-		addRule().apiGroups("ext.cattle.io").resources("userrefreshrequests").verbs("create").
+		addRule().apiGroups("ext.cattle.io").resources("groupmembershiprefreshrequests").verbs("create").
 		addRule().apiGroups("management.cattle.io").resources("users", "globalrolebindings").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("globalroles").verbs("get", "list", "watch")
 	rb.addRole("Manage Roles", "roles-manage").

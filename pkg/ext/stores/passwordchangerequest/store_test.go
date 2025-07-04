@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/controllers/status"
 	"github.com/rancher/rancher/pkg/ext/mocks"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -61,6 +62,7 @@ func TestCreate(t *testing.T) {
 							Status: "True",
 						},
 					},
+					Summary: status.SummaryCompleted,
 				},
 			},
 		},
@@ -95,6 +97,7 @@ func TestCreate(t *testing.T) {
 							Status: "True",
 						},
 					},
+					Summary: status.SummaryCompleted,
 				},
 			},
 		},
