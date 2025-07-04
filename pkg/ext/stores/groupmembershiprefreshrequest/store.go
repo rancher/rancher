@@ -1,15 +1,15 @@
-// userrefreshrequest implements the store for the new public API userrefreshrequest resources
-package userrefreshrequest
+// groupmembershiprefreshrequest implements the store for the new public API groupmembershiprefreshrequest resources
+package groupmembershiprefreshrequest
 
 import (
 	"context"
 	"fmt"
-	"github.com/rancher/rancher/pkg/auth/providerrefresh"
-	"github.com/rancher/rancher/pkg/types/config"
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/auth/providerrefresh"
+	"github.com/rancher/rancher/pkg/controllers/status"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-
+	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,8 +21,9 @@ import (
 )
 
 const (
-	SingularName = "userrefreshrequest"
+	SingularName = "groupmembershiprefreshrequest"
 	PluralName   = SingularName + "s"
+	allUsers     = "*"
 )
 
 var GV = schema.GroupVersion{
@@ -33,7 +34,7 @@ var GV = schema.GroupVersion{
 var GVK = schema.GroupVersionKind{
 	Group:   GV.Group,
 	Version: GV.Version,
-	Kind:    "UserRefreshRequest",
+	Kind:    "GroupMembershipRefreshRequest",
 }
 
 // +k8s:openapi-gen=false
@@ -80,7 +81,7 @@ func (s *Store) GetSingularName() string {
 
 // New implements [rest.Storage], a required interface.
 func (s *Store) New() runtime.Object {
-	obj := &ext.UserRefreshRequest{}
+	obj := &ext.GroupMembershipRefreshRequest{}
 	obj.GetObjectKind().SetGroupVersionKind(GVK)
 	return obj
 }
@@ -104,14 +105,14 @@ func (s *Store) Create(
 	}
 	dryRun := options != nil && len(options.DryRun) > 0 && options.DryRun[0] == metav1.DryRunAll
 
-	objUserRefreshRequest, ok := obj.(*ext.UserRefreshRequest)
+	objGroupMembershipRefreshRequest, ok := obj.(*ext.GroupMembershipRefreshRequest)
 	if !ok {
-		var zeroT *ext.UserRefreshRequest
+		var zeroT *ext.GroupMembershipRefreshRequest
 		return nil, apierrors.NewInternalError(fmt.Errorf("expected %T but got %T",
 			zeroT, obj))
 	}
-	if !objUserRefreshRequest.Spec.All && objUserRefreshRequest.Spec.UserID == "" {
-		return nil, apierrors.NewBadRequest("user ID or 'all' must be set")
+	if objGroupMembershipRefreshRequest.Spec.UserID == "" {
+		return nil, apierrors.NewBadRequest("user ID must be set")
 	}
 
 	userInfo, ok := request.UserFrom(ctx)
@@ -138,17 +139,18 @@ func (s *Store) Create(
 		return obj, nil
 	}
 
-	if objUserRefreshRequest.Spec.All {
+	if objGroupMembershipRefreshRequest.Spec.UserID == allUsers {
 		s.userAuthRefresher.TriggerAllUserRefresh()
-	} else if objUserRefreshRequest.Spec.UserID != "" {
-		s.userAuthRefresher.TriggerUserRefresh(objUserRefreshRequest.Spec.UserID, true)
+	} else {
+		s.userAuthRefresher.TriggerUserRefresh(objGroupMembershipRefreshRequest.Spec.UserID, true)
 	}
 
 	c := metav1.Condition{
 		Type:   "UserRefreshInitiated",
 		Status: "True",
 	}
-	objUserRefreshRequest.Status.Conditions = append(objUserRefreshRequest.Status.Conditions, c)
+	objGroupMembershipRefreshRequest.Status.Conditions = append(objGroupMembershipRefreshRequest.Status.Conditions, c)
+	objGroupMembershipRefreshRequest.Status.Summary = status.SummaryCompleted
 
-	return objUserRefreshRequest, nil
+	return objGroupMembershipRefreshRequest, nil
 }

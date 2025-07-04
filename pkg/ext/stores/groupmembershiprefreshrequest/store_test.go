@@ -1,10 +1,11 @@
-package userrefreshrequest
+package groupmembershiprefreshrequest
 
 import (
 	"context"
 	"testing"
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/controllers/status"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -26,9 +27,9 @@ func TestCreate(t *testing.T) {
 	}{
 		"all user refreshed": {
 			ctx: request.WithUser(context.Background(), &user.DefaultInfo{Name: fakeUserId}),
-			obj: &ext.UserRefreshRequest{
-				Spec: ext.UserRefreshRequestSpec{
-					All: true,
+			obj: &ext.GroupMembershipRefreshRequest{
+				Spec: ext.GroupMembershipRefreshRequestSpec{
+					UserID: allUsers,
 				},
 			},
 			authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
@@ -38,23 +39,25 @@ func TestCreate(t *testing.T) {
 				assert.True(t, refresher.TriggerAllUserRefreshCalled)
 				assert.Nil(t, refresher.TriggerUserRefreshCalledWith)
 			},
-			wantObj: &ext.UserRefreshRequest{
-				Spec: ext.UserRefreshRequestSpec{
-					All: true,
+			wantObj: &ext.GroupMembershipRefreshRequest{
+				Spec: ext.GroupMembershipRefreshRequestSpec{
+					UserID: allUsers,
 				},
-				Status: ext.UserRefreshRequestStatus{Conditions: []metav1.Condition{
-					{
-						Type:   "UserRefreshInitiated",
-						Status: "True",
+				Status: ext.GroupMembershipRefreshRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   "UserRefreshInitiated",
+							Status: "True",
+						},
 					},
-				},
+					Summary: status.SummaryCompleted,
 				},
 			},
 		},
 		"single user refreshed": {
 			ctx: request.WithUser(context.Background(), &user.DefaultInfo{Name: fakeUserId}),
-			obj: &ext.UserRefreshRequest{
-				Spec: ext.UserRefreshRequestSpec{
+			obj: &ext.GroupMembershipRefreshRequest{
+				Spec: ext.GroupMembershipRefreshRequestSpec{
 					UserID: fakeUserId,
 				},
 			},
@@ -68,22 +71,24 @@ func TestCreate(t *testing.T) {
 					Force  bool
 				}{{UserID: fakeUserId, Force: true}})
 			},
-			wantObj: &ext.UserRefreshRequest{
-				Spec: ext.UserRefreshRequestSpec{
+			wantObj: &ext.GroupMembershipRefreshRequest{
+				Spec: ext.GroupMembershipRefreshRequestSpec{
 					UserID: fakeUserId,
 				},
-				Status: ext.UserRefreshRequestStatus{Conditions: []metav1.Condition{
-					{
-						Type:   "UserRefreshInitiated",
-						Status: "True",
+				Status: ext.GroupMembershipRefreshRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   "UserRefreshInitiated",
+							Status: "True",
+						},
 					},
-				},
+					Summary: status.SummaryCompleted,
 				},
 			},
 		},
 		"invalid request": {
 			ctx: request.WithUser(context.Background(), &user.DefaultInfo{Name: fakeUserId}),
-			obj: &ext.UserRefreshRequest{},
+			obj: &ext.GroupMembershipRefreshRequest{},
 			assertUserAuthRefresher: func(t *testing.T, refresher *fakeUserAuthRefresher) {
 				assert.False(t, refresher.TriggerAllUserRefreshCalled)
 				assert.Nil(t, refresher.TriggerUserRefreshCalledWith)
@@ -92,9 +97,9 @@ func TestCreate(t *testing.T) {
 		},
 		"not authorized": {
 			ctx: request.WithUser(context.Background(), &user.DefaultInfo{Name: fakeUserId}),
-			obj: &ext.UserRefreshRequest{
-				Spec: ext.UserRefreshRequestSpec{
-					All: true,
+			obj: &ext.GroupMembershipRefreshRequest{
+				Spec: ext.GroupMembershipRefreshRequestSpec{
+					UserID: allUsers,
 				},
 			},
 			authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {

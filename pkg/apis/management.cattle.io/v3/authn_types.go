@@ -109,11 +109,11 @@ type User struct {
 	DisplayName string `json:"displayName,omitempty"`
 	Description string `json:"description"`
 	Username    string `json:"username,omitempty"`
-	// Deprecated
+	// Deprecated. Password are stored in secrets in the cattle-local-user-passwords namespace.
 	Password           string   `json:"password,omitempty" norman:"writeOnly,noupdate"`
 	MustChangePassword bool     `json:"mustChangePassword,omitempty"`
 	PrincipalIDs       []string `json:"principalIds,omitempty" norman:"type=array[reference[principal]]"`
-	// Deprecated
+	// Deprecated. Me is an old field only used in the norman API.
 	Me      bool       `json:"me,omitempty" norman:"nocreate,noupdate"`
 	Enabled *bool      `json:"enabled,omitempty" norman:"default=true"`
 	Spec    UserSpec   `json:"spec,omitempty"`

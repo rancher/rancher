@@ -29,12 +29,12 @@ import (
 )
 
 var (
-	KubeconfigResourceName            = "kubeconfigs"
-	PasswordChangeRequestResourceName = "passwordchangerequests"
-	SelfUserResourceName              = "selfusers"
-	TokenResourceName                 = "tokens"
-	UserActivityResourceName          = "useractivities"
-	UserRefreshRequestResourceName    = "userrefreshrequests"
+	GroupMembershipRefreshRequestResourceName = "groupmembershiprefreshrequests"
+	KubeconfigResourceName                    = "kubeconfigs"
+	PasswordChangeRequestResourceName         = "passwordchangerequests"
+	SelfUserResourceName                      = "selfusers"
+	TokenResourceName                         = "tokens"
+	UserActivityResourceName                  = "useractivities"
 )
 
 // SchemeGroupVersion is group version used to register these objects
@@ -58,6 +58,8 @@ var (
 // Adds the list of known types to Scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
+		&GroupMembershipRefreshRequest{},
+		&GroupMembershipRefreshRequestList{},
 		&Kubeconfig{},
 		&KubeconfigList{},
 		&PasswordChangeRequest{},
@@ -68,8 +70,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&TokenList{},
 		&UserActivity{},
 		&UserActivityList{},
-		&UserRefreshRequest{},
-		&UserRefreshRequestList{},
 	)
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil

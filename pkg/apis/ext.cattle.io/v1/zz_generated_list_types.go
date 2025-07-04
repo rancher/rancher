@@ -27,6 +27,23 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// GroupMembershipRefreshRequestList is a list of GroupMembershipRefreshRequest resources
+type GroupMembershipRefreshRequestList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []GroupMembershipRefreshRequest `json:"items"`
+}
+
+func NewGroupMembershipRefreshRequest(namespace, name string, obj GroupMembershipRefreshRequest) *GroupMembershipRefreshRequest {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("GroupMembershipRefreshRequest").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // KubeconfigList is a list of Kubeconfig resources
 type KubeconfigList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -105,23 +122,6 @@ type UserActivityList struct {
 
 func NewUserActivity(namespace, name string, obj UserActivity) *UserActivity {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("UserActivity").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// UserRefreshRequestList is a list of UserRefreshRequest resources
-type UserRefreshRequestList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []UserRefreshRequest `json:"items"`
-}
-
-func NewUserRefreshRequest(namespace, name string, obj UserRefreshRequest) *UserRefreshRequest {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("UserRefreshRequest").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj

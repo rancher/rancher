@@ -253,29 +253,32 @@ type KubeconfigStatus struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// UserRefreshRequest is used to initiate a user refresh action.
-type UserRefreshRequest struct {
+// GroupMembershipRefreshRequest is used to initiate a user refresh action.
+type GroupMembershipRefreshRequest struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	// Spec is the desired state of the UserRefreshRequestSpec.
+	// Spec is the desired state of the GroupMembershipRefreshRequestSpec.
 	// +optional
-	Spec UserRefreshRequestSpec `json:"spec,omitempty"`
-	// Status is the most recently observed status of the UserRefreshRequestSpec.
+	Spec GroupMembershipRefreshRequestSpec `json:"spec,omitempty"`
+	// Status is the most recently observed status of the GroupMembershipRefreshRequestSpec.
 	// +optional
-	Status UserRefreshRequestStatus `json:"status,omitempty"`
+	Status GroupMembershipRefreshRequestStatus `json:"status,omitempty"`
 }
 
-// UserRefreshRequestSpec contains the data about the user refresh request.
-type UserRefreshRequestSpec struct {
-	UserID string `json:"userID,omitempty"`
-	All    bool   `json:"all,omitempty"`
+// GroupMembershipRefreshRequestSpec contains the data about the user refresh request.
+type GroupMembershipRefreshRequestSpec struct {
+	// UserID specifies the user ID. Use '*' for all users.
+	UserID string `json:"userId,omitempty"`
 }
 
-// UserRefreshRequestStatus defines the most recently observed status of the UserRefreshRequest.
-type UserRefreshRequestStatus struct {
+// GroupMembershipRefreshRequestStatus defines the most recently observed status of the GroupMembershipRefreshRequest.
+type GroupMembershipRefreshRequestStatus struct {
+	// Conditions indicate state for particular aspects of the GroupMembershipRefreshRequest.
 	Conditions []metav1.Condition `json:"conditions"`
+	// Summary of the GroupMembershipRefreshRequest status.
+	Summary string `json:"summary,omitempty"`
 }
 
 // +genclient
@@ -297,14 +300,20 @@ type PasswordChangeRequest struct {
 
 // PasswordChangeRequestSpec contains the data about the password change request.
 type PasswordChangeRequestSpec struct {
-	UserID          string `json:"userID,omitempty"`
+	// UserID specifies the user ID for which the password is to be changed.
+	UserID string `json:"userID,omitempty"`
+	// CurrentPassword is the user's current password.
 	CurrentPassword string `json:"currentPassword,omitempty"`
-	NewPassword     string `json:"newPassword,omitempty"`
+	// NewPassword is the new password to set for the user.
+	NewPassword string `json:"newPassword,omitempty"`
 }
 
 // PasswordChangeRequestStatus defines the most recently observed status of the PasswordChangeRequest.
 type PasswordChangeRequestStatus struct {
+	// Conditions indicate state for particular aspects of the GroupMembershipRefreshRequest.
 	Conditions []metav1.Condition `json:"conditions"`
+	// Summary of the GroupMembershipRefreshRequest status.
+	Summary string `json:"summary,omitempty"`
 }
 
 // +genclient
