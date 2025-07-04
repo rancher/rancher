@@ -10,6 +10,8 @@ import (
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
+	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
+	wfakes "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -286,8 +288,8 @@ func Test_clusterHandler_sync(t *testing.T) {
 type testMocks struct {
 	t           *testing.T
 	mockCluster *MockClusterInterface
-	mockInt     *MockClusterRoleBindingInterface
-	mockLister  *MockClusterRoleBindingLister
+	mockInt     *wrbacv1.ClusterRoleBindingController
+	mockLister  *wrbacv1.ClusterRoleBindingCache
 	mockCache   cache.Indexer
 }
 
@@ -302,8 +304,8 @@ func newMocks(t *testing.T) *testMocks {
 	return &testMocks{
 		t:           t,
 		mockCluster: NewMockClusterInterface(ctrl),
-		mockInt:     NewMockClusterRoleBindingInterface(ctrl),
-		mockLister:  NewMockClusterRoleBindingLister(ctrl),
+		mockInt:     wfakes.NewMockControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl),
+		mockLister:  wfakes.NewMockCacheInterface[*rbacv1.ClusterRoleBinding](ctrl),
 		mockCache:   mockIndexer,
 	}
 }
