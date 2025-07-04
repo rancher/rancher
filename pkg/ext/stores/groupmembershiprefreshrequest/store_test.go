@@ -93,7 +93,7 @@ func TestCreate(t *testing.T) {
 				assert.False(t, refresher.TriggerAllUserRefreshCalled)
 				assert.Nil(t, refresher.TriggerUserRefreshCalledWith)
 			},
-			wantErr: "user ID or 'all' must be set",
+			wantErr: "user ID must be set",
 		},
 		"not authorized": {
 			ctx: request.WithUser(context.Background(), &user.DefaultInfo{Name: fakeUserId}),
