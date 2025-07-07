@@ -273,7 +273,9 @@ type RKEMachinePool struct {
 
 	// HostnameLengthLimit defines the maximum length of the hostname for
 	// machines in this pool.
-	// For windows nodes, the hostname must be less than 15 characters.
+	// For Windows nodes utilizing NETBIOS authentication, a maximum of 15
+	// should be set to ensure all nodes adhere to the protocol's naming
+	// requirements.
 	// +kubebuilder:validation:Minimum=10
 	// +kubebuilder:validation:Maximum=63
 	// +optional
@@ -321,7 +323,9 @@ type RKEMachinePoolRollingUpdate struct {
 type RKEMachinePoolDefaults struct {
 	// HostnameLengthLimit defines the maximum length of the hostname for
 	// machines in this pool.
-	// For windows nodes, the hostname must be less than 15 characters.
+	// For Windows nodes utilizing NETBIOS authentication, a maximum of 15
+	// should be set to ensure all nodes adhere to the protocol's naming
+	// requirements.
 	// +kubebuilder:validation:Minimum=10
 	// +kubebuilder:validation:Maximum=63
 	// +optional

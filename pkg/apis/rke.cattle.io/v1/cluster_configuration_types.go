@@ -269,9 +269,9 @@ type Mirror struct {
 	// The scheme, host, and path from the endpoint URL will be used.
 	Endpoints []string `json:"endpoint,omitempty"`
 
-	// Rewrites are repository rewrite rules for a namespace.
-	// When fetching image resources from an endpoint and a key matches the
-	// repository via regular expression matching it will be replaced with
+	// Rewrites are repository rewrite rules for a Mirror.
+	// When fetching image resources from a registry, a regular expression
+	// can be used to match the image name and modify it using
 	// the corresponding value from the map in the resource request.
 	Rewrites map[string]string `json:"rewrite,omitempty"`
 }
