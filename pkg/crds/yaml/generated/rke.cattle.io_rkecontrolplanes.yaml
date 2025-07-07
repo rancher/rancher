@@ -217,6 +217,7 @@ spec:
                   restoreRKEConfig:
                     description: Set to either none (or empty string), all, or kubernetesVersion
                     enum:
+                    - ""
                     - none
                     - all
                     - kubernetesVersion
@@ -231,12 +232,11 @@ spec:
                 description: |-
                   LocalClusterAuthEndpoint is the configuration for the local cluster
                   auth endpoint.
-                nullable: true
                 properties:
                   caCerts:
                     description: CACerts is the CA certificate for the local cluster
                       auth endpoint.
-                    maxLength: 32768
+                    minLength: 1
                     type: string
                   enabled:
                     description: |-
@@ -248,6 +248,7 @@ spec:
                       FQDN is the fully qualified domain name of the local cluster auth
                       endpoint.
                     maxLength: 255
+                    minLength: 1
                     type: string
                 type: object
                 x-kubernetes-validations:
@@ -507,9 +508,6 @@ spec:
                 description: |-
                   ManagementClusterName is the name of the management cluster object
                   that relates to this cluster.
-                maxLength: 12
-                minLength: 5
-                pattern: ^(c-m-[a-z0-9]{8}|local)$
                 type: string
               networking:
                 description: |-
@@ -1047,6 +1045,7 @@ spec:
                         description: Set to either none (or empty string), all, or
                           kubernetesVersion
                         enum:
+                        - ""
                         - none
                         - all
                         - kubernetesVersion
@@ -1061,12 +1060,11 @@ spec:
                     description: |-
                       LocalClusterAuthEndpoint is the configuration for the local cluster
                       auth endpoint.
-                    nullable: true
                     properties:
                       caCerts:
                         description: CACerts is the CA certificate for the local cluster
                           auth endpoint.
-                        maxLength: 32768
+                        minLength: 1
                         type: string
                       enabled:
                         description: |-
@@ -1078,6 +1076,7 @@ spec:
                           FQDN is the fully qualified domain name of the local cluster auth
                           endpoint.
                         maxLength: 255
+                        minLength: 1
                         type: string
                     type: object
                     x-kubernetes-validations:
@@ -1337,9 +1336,6 @@ spec:
                     description: |-
                       ManagementClusterName is the name of the management cluster object
                       that relates to this cluster.
-                    maxLength: 12
-                    minLength: 5
-                    pattern: ^(c-m-[a-z0-9]{8}|local)$
                     type: string
                   networking:
                     description: |-
@@ -1777,7 +1773,7 @@ spec:
                 type: object
               etcdSnapshotCreatePhase:
                 description: |-
-                  ETCDSnapshotCreatePhase is the current phase the etcd snapshot create
+                  ETCDSnapshotCreatePhase is the phase the etcd snapshot create
                   operation is currently executing.
                 enum:
                 - Started
@@ -1804,6 +1800,7 @@ spec:
                   restoreRKEConfig:
                     description: Set to either none (or empty string), all, or kubernetesVersion
                     enum:
+                    - ""
                     - none
                     - all
                     - kubernetesVersion
@@ -1811,7 +1808,7 @@ spec:
                 type: object
               etcdSnapshotRestorePhase:
                 description: |-
-                  ETCDSnapshotRestorePhase is the current phase the etcd snapshot
+                  ETCDSnapshotRestorePhase is the phase the etcd snapshot
                   restore operation is currently executing.
                 enum:
                 - Started
@@ -1862,7 +1859,7 @@ spec:
                 type: string
               rotateEncryptionKeysPhase:
                 description: |-
-                  RotateEncryptionKeysPhase is the current phase the encryption key
+                  RotateEncryptionKeysPhase is the phase the encryption key
                   rotation operation is currently executing.
                 type: string
             required:

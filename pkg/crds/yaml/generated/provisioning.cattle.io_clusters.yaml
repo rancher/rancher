@@ -1136,7 +1136,7 @@ spec:
                               One can prevent all voluntary evictions by specifying 0.
                               This is a mutually exclusive setting with "minAvailable".
                             maxLength: 10
-                            pattern: ^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0))$
+                            pattern: ^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0)|)$
                             type: string
                           minAvailable:
                             description: |-
@@ -1145,18 +1145,9 @@ spec:
                               pod.
                               One can prevent all voluntary evictions by specifying "100%".
                             maxLength: 10
-                            pattern: ^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0))$
+                            pattern: ^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0)|)$
                             type: string
                         type: object
-                        x-kubernetes-validations:
-                        - message: both minAvailable and maxUnavailable cannot be
-                            set to a non-zero value, at least one must be omitted
-                            or set to zero
-                          rule: (has(self.minAvailable) && self.minAvailable != "0"
-                            && (!has(self.maxUnavailable) || self.maxUnavailable ==
-                            "0")) || (has(self.maxUnavailable) && self.maxUnavailable
-                            != "0" && (!has(self.minAvailable) || self.minAvailable
-                            == "0"))
                       priorityClass:
                         description: |-
                           PriorityClass is the configuration for the priority class associated
@@ -1173,7 +1164,7 @@ spec:
                             description: |-
                               Value represents the integer value of this priority class.
                               This is the actual priority value that pods receive when their
-                              associated deployment specifies name of this class in the spec.
+                              associated deployment specifies the name of this class in the spec.
                             maximum: 1000000000
                             minimum: -1000000000
                             type: integer
@@ -2245,7 +2236,7 @@ spec:
                               One can prevent all voluntary evictions by specifying 0.
                               This is a mutually exclusive setting with "minAvailable".
                             maxLength: 10
-                            pattern: ^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0))$
+                            pattern: ^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0)|)$
                             type: string
                           minAvailable:
                             description: |-
@@ -2254,18 +2245,9 @@ spec:
                               pod.
                               One can prevent all voluntary evictions by specifying "100%".
                             maxLength: 10
-                            pattern: ^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0))$
+                            pattern: ^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0)|)$
                             type: string
                         type: object
-                        x-kubernetes-validations:
-                        - message: both minAvailable and maxUnavailable cannot be
-                            set to a non-zero value, at least one must be omitted
-                            or set to zero
-                          rule: (has(self.minAvailable) && self.minAvailable != "0"
-                            && (!has(self.maxUnavailable) || self.maxUnavailable ==
-                            "0")) || (has(self.maxUnavailable) && self.maxUnavailable
-                            != "0" && (!has(self.minAvailable) || self.minAvailable
-                            == "0"))
                       priorityClass:
                         description: |-
                           PriorityClass is the configuration for the priority class associated
@@ -2282,7 +2264,7 @@ spec:
                             description: |-
                               Value represents the integer value of this priority class.
                               This is the actual priority value that pods receive when their
-                              associated deployment specifies name of this class in the spec.
+                              associated deployment specifies the name of this class in the spec.
                             maximum: 1000000000
                             minimum: -1000000000
                             type: integer
@@ -2302,7 +2284,7 @@ spec:
                   caCerts:
                     description: CACerts is the CA certificate for the local cluster
                       auth endpoint.
-                    maxLength: 32768
+                    minLength: 1
                     type: string
                   enabled:
                     description: |-
@@ -2314,6 +2296,7 @@ spec:
                       FQDN is the fully qualified domain name of the local cluster auth
                       endpoint.
                     maxLength: 255
+                    minLength: 1
                     type: string
                 type: object
                 x-kubernetes-validations:
@@ -2467,6 +2450,7 @@ spec:
                         description: Set to either none (or empty string), all, or
                           kubernetesVersion
                         enum:
+                        - ""
                         - none
                         - all
                         - kubernetesVersion
@@ -3454,9 +3438,6 @@ spec:
                 description: |-
                   Name of the cluster.management.cattle.io object that relates to this
                   cluster.
-                maxLength: 12
-                minLength: 5
-                pattern: ^(c-m-[a-z0-9]{8}|local)$
                 type: string
               conditions:
                 description: Conditions is a representation of the Cluster's current
