@@ -236,7 +236,6 @@ spec:
                   caCerts:
                     description: CACerts is the CA certificate for the local cluster
                       auth endpoint.
-                    minLength: 1
                     type: string
                   enabled:
                     description: |-
@@ -247,13 +246,8 @@ spec:
                     description: |-
                       FQDN is the fully qualified domain name of the local cluster auth
                       endpoint.
-                    maxLength: 255
-                    minLength: 1
                     type: string
                 type: object
-                x-kubernetes-validations:
-                - message: CACerts defined but FQDN is not defined
-                  rule: '!self.enabled || has(self.fqdn) || !has(self.caCerts)'
               machineGlobalConfig:
                 description: |-
                   MachineGlobalConfig is a list of distro arguments which will be copied
@@ -383,7 +377,6 @@ spec:
                                   - key
                                   - path
                                   type: object
-                                minItems: 1
                                 type: array
                               name:
                                 description: |-
@@ -440,7 +433,6 @@ spec:
                                   - key
                                   - path
                                   type: object
-                                minItems: 1
                                 type: array
                               name:
                                 description: |-
@@ -529,6 +521,7 @@ spec:
                       completely rendered configuration via the planner nor various engines
                       themselves.
                     enum:
+                    - ""
                     - ipv4
                     - ipv6
                     - dual
@@ -602,9 +595,9 @@ spec:
                           additionalProperties:
                             type: string
                           description: |-
-                            Rewrites are repository rewrite rules for a namespace.
-                            When fetching image resources from an endpoint and a key matches the
-                            repository via regular expression matching it will be replaced with
+                            Rewrites are repository rewrite rules for a Mirror.
+                            When fetching image resources from a registry, a regular expression
+                            can be used to match the image name and modify it using
                             the corresponding value from the map in the resource request.
                           type: object
                       type: object
@@ -663,7 +656,7 @@ spec:
                       The default value is 1, a 0 value is infinite.
                       Percentages are also accepted.
                     maxLength: 10
-                    pattern: ^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0))$
+                    pattern: ^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0)|)$
                     type: string
                   controlPlaneDrainOptions:
                     description: |-
@@ -686,7 +679,6 @@ spec:
                           before upgrading.
                         type: boolean
                       force:
-                        default: false
                         description: |-
                           Force specifies whether to drain the node even if there are pods not
                           managed by a ReplicationController, Job, or DaemonSet.
@@ -704,7 +696,7 @@ spec:
                           IgnoreDaemonSets specifies whether to ignore DaemonSet-managed pods.
                           If there are DaemonSet-managed pods, drain will not proceed without
                           IgnoreDaemonSets set to true (even when set to true, kubectl won't
-                          delete pods - so setting default to true).
+                          delete pods - so an unset value will default to true).
                         type: boolean
                       ignoreErrors:
                         description: |-
@@ -721,7 +713,7 @@ spec:
                               description: |-
                                 Annotation that will need to be populated on the machine-plan secret
                                 with the value from the annotation "rke.cattle.io/pre-drain" before
-                                the planner will continue with drain the specific node.
+                                the planner will continue to drain the specific node.
                                 The annotation "rke.cattle.io/pre-drain" is used for pre-drain and
                                 "rke.cattle.io/post-drain" is used for post-drain.
                               maxLength: 63
@@ -737,7 +729,7 @@ spec:
                               description: |-
                                 Annotation that will need to be populated on the machine-plan secret
                                 with the value from the annotation "rke.cattle.io/pre-drain" before
-                                the planner will continue with drain the specific node.
+                                the planner will continue to drain the specific node.
                                 The annotation "rke.cattle.io/pre-drain" is used for pre-drain and
                                 "rke.cattle.io/post-drain" is used for post-drain.
                               maxLength: 63
@@ -746,21 +738,22 @@ spec:
                         type: array
                       skipWaitForDeleteTimeoutSeconds:
                         description: |-
-                          SkipWaitForDeleteTimeoutSeconds If pod DeletionTimestamp older than N
-                          seconds, skip waiting for the pod.
+                          SkipWaitForDeleteTimeoutSeconds defines how long the draining
+                          operation should wait for a given to be removed after deletion.
+                          If the pod's DeletionTimestamp is older than N seconds, the drain
+                          operation will move on.
                           Seconds must be greater than 0 to skip.
                         minimum: 0
                         type: integer
                       timeout:
-                        description: Time to wait (in seconds) before giving up for
-                          one try
+                        description: Timeout is the time to wait (in seconds) before
+                          giving up for one try.
                         minimum: 0
                         type: integer
                     required:
                     - deleteEmptyDirData
                     - disableEviction
                     - enabled
-                    - force
                     - gracePeriod
                     - skipWaitForDeleteTimeoutSeconds
                     - timeout
@@ -772,7 +765,7 @@ spec:
                       The default value is 1, a 0 value is infinite.
                       Percentages are also accepted.
                     maxLength: 10
-                    pattern: ^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0))$
+                    pattern: ^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0)|)$
                     type: string
                   workerDrainOptions:
                     description: |-
@@ -794,7 +787,6 @@ spec:
                           before upgrading.
                         type: boolean
                       force:
-                        default: false
                         description: |-
                           Force specifies whether to drain the node even if there are pods not
                           managed by a ReplicationController, Job, or DaemonSet.
@@ -812,7 +804,7 @@ spec:
                           IgnoreDaemonSets specifies whether to ignore DaemonSet-managed pods.
                           If there are DaemonSet-managed pods, drain will not proceed without
                           IgnoreDaemonSets set to true (even when set to true, kubectl won't
-                          delete pods - so setting default to true).
+                          delete pods - so an unset value will default to true).
                         type: boolean
                       ignoreErrors:
                         description: |-
@@ -829,7 +821,7 @@ spec:
                               description: |-
                                 Annotation that will need to be populated on the machine-plan secret
                                 with the value from the annotation "rke.cattle.io/pre-drain" before
-                                the planner will continue with drain the specific node.
+                                the planner will continue to drain the specific node.
                                 The annotation "rke.cattle.io/pre-drain" is used for pre-drain and
                                 "rke.cattle.io/post-drain" is used for post-drain.
                               maxLength: 63
@@ -845,7 +837,7 @@ spec:
                               description: |-
                                 Annotation that will need to be populated on the machine-plan secret
                                 with the value from the annotation "rke.cattle.io/pre-drain" before
-                                the planner will continue with drain the specific node.
+                                the planner will continue to drain the specific node.
                                 The annotation "rke.cattle.io/pre-drain" is used for pre-drain and
                                 "rke.cattle.io/post-drain" is used for post-drain.
                               maxLength: 63
@@ -854,21 +846,22 @@ spec:
                         type: array
                       skipWaitForDeleteTimeoutSeconds:
                         description: |-
-                          SkipWaitForDeleteTimeoutSeconds If pod DeletionTimestamp older than N
-                          seconds, skip waiting for the pod.
+                          SkipWaitForDeleteTimeoutSeconds defines how long the draining
+                          operation should wait for a given to be removed after deletion.
+                          If the pod's DeletionTimestamp is older than N seconds, the drain
+                          operation will move on.
                           Seconds must be greater than 0 to skip.
                         minimum: 0
                         type: integer
                       timeout:
-                        description: Time to wait (in seconds) before giving up for
-                          one try
+                        description: Timeout is the time to wait (in seconds) before
+                          giving up for one try.
                         minimum: 0
                         type: integer
                     required:
                     - deleteEmptyDirData
                     - disableEviction
                     - enabled
-                    - force
                     - gracePeriod
                     - skipWaitForDeleteTimeoutSeconds
                     - timeout
@@ -1064,7 +1057,6 @@ spec:
                       caCerts:
                         description: CACerts is the CA certificate for the local cluster
                           auth endpoint.
-                        minLength: 1
                         type: string
                       enabled:
                         description: |-
@@ -1075,13 +1067,8 @@ spec:
                         description: |-
                           FQDN is the fully qualified domain name of the local cluster auth
                           endpoint.
-                        maxLength: 255
-                        minLength: 1
                         type: string
                     type: object
-                    x-kubernetes-validations:
-                    - message: CACerts defined but FQDN is not defined
-                      rule: '!self.enabled || has(self.fqdn) || !has(self.caCerts)'
                   machineGlobalConfig:
                     description: |-
                       MachineGlobalConfig is a list of distro arguments which will be copied
@@ -1211,7 +1198,6 @@ spec:
                                       - key
                                       - path
                                       type: object
-                                    minItems: 1
                                     type: array
                                   name:
                                     description: |-
@@ -1268,7 +1254,6 @@ spec:
                                       - key
                                       - path
                                       type: object
-                                    minItems: 1
                                     type: array
                                   name:
                                     description: |-
@@ -1357,6 +1342,7 @@ spec:
                           completely rendered configuration via the planner nor various engines
                           themselves.
                         enum:
+                        - ""
                         - ipv4
                         - ipv6
                         - dual
@@ -1430,9 +1416,9 @@ spec:
                               additionalProperties:
                                 type: string
                               description: |-
-                                Rewrites are repository rewrite rules for a namespace.
-                                When fetching image resources from an endpoint and a key matches the
-                                repository via regular expression matching it will be replaced with
+                                Rewrites are repository rewrite rules for a Mirror.
+                                When fetching image resources from a registry, a regular expression
+                                can be used to match the image name and modify it using
                                 the corresponding value from the map in the resource request.
                               type: object
                           type: object
@@ -1492,7 +1478,7 @@ spec:
                           The default value is 1, a 0 value is infinite.
                           Percentages are also accepted.
                         maxLength: 10
-                        pattern: ^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0))$
+                        pattern: ^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0)|)$
                         type: string
                       controlPlaneDrainOptions:
                         description: |-
@@ -1515,7 +1501,6 @@ spec:
                               before upgrading.
                             type: boolean
                           force:
-                            default: false
                             description: |-
                               Force specifies whether to drain the node even if there are pods not
                               managed by a ReplicationController, Job, or DaemonSet.
@@ -1533,7 +1518,7 @@ spec:
                               IgnoreDaemonSets specifies whether to ignore DaemonSet-managed pods.
                               If there are DaemonSet-managed pods, drain will not proceed without
                               IgnoreDaemonSets set to true (even when set to true, kubectl won't
-                              delete pods - so setting default to true).
+                              delete pods - so an unset value will default to true).
                             type: boolean
                           ignoreErrors:
                             description: |-
@@ -1550,7 +1535,7 @@ spec:
                                   description: |-
                                     Annotation that will need to be populated on the machine-plan secret
                                     with the value from the annotation "rke.cattle.io/pre-drain" before
-                                    the planner will continue with drain the specific node.
+                                    the planner will continue to drain the specific node.
                                     The annotation "rke.cattle.io/pre-drain" is used for pre-drain and
                                     "rke.cattle.io/post-drain" is used for post-drain.
                                   maxLength: 63
@@ -1566,7 +1551,7 @@ spec:
                                   description: |-
                                     Annotation that will need to be populated on the machine-plan secret
                                     with the value from the annotation "rke.cattle.io/pre-drain" before
-                                    the planner will continue with drain the specific node.
+                                    the planner will continue to drain the specific node.
                                     The annotation "rke.cattle.io/pre-drain" is used for pre-drain and
                                     "rke.cattle.io/post-drain" is used for post-drain.
                                   maxLength: 63
@@ -1575,21 +1560,22 @@ spec:
                             type: array
                           skipWaitForDeleteTimeoutSeconds:
                             description: |-
-                              SkipWaitForDeleteTimeoutSeconds If pod DeletionTimestamp older than N
-                              seconds, skip waiting for the pod.
+                              SkipWaitForDeleteTimeoutSeconds defines how long the draining
+                              operation should wait for a given to be removed after deletion.
+                              If the pod's DeletionTimestamp is older than N seconds, the drain
+                              operation will move on.
                               Seconds must be greater than 0 to skip.
                             minimum: 0
                             type: integer
                           timeout:
-                            description: Time to wait (in seconds) before giving up
-                              for one try
+                            description: Timeout is the time to wait (in seconds)
+                              before giving up for one try.
                             minimum: 0
                             type: integer
                         required:
                         - deleteEmptyDirData
                         - disableEviction
                         - enabled
-                        - force
                         - gracePeriod
                         - skipWaitForDeleteTimeoutSeconds
                         - timeout
@@ -1601,7 +1587,7 @@ spec:
                           The default value is 1, a 0 value is infinite.
                           Percentages are also accepted.
                         maxLength: 10
-                        pattern: ^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0))$
+                        pattern: ^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0)|)$
                         type: string
                       workerDrainOptions:
                         description: |-
@@ -1623,7 +1609,6 @@ spec:
                               before upgrading.
                             type: boolean
                           force:
-                            default: false
                             description: |-
                               Force specifies whether to drain the node even if there are pods not
                               managed by a ReplicationController, Job, or DaemonSet.
@@ -1641,7 +1626,7 @@ spec:
                               IgnoreDaemonSets specifies whether to ignore DaemonSet-managed pods.
                               If there are DaemonSet-managed pods, drain will not proceed without
                               IgnoreDaemonSets set to true (even when set to true, kubectl won't
-                              delete pods - so setting default to true).
+                              delete pods - so an unset value will default to true).
                             type: boolean
                           ignoreErrors:
                             description: |-
@@ -1658,7 +1643,7 @@ spec:
                                   description: |-
                                     Annotation that will need to be populated on the machine-plan secret
                                     with the value from the annotation "rke.cattle.io/pre-drain" before
-                                    the planner will continue with drain the specific node.
+                                    the planner will continue to drain the specific node.
                                     The annotation "rke.cattle.io/pre-drain" is used for pre-drain and
                                     "rke.cattle.io/post-drain" is used for post-drain.
                                   maxLength: 63
@@ -1674,7 +1659,7 @@ spec:
                                   description: |-
                                     Annotation that will need to be populated on the machine-plan secret
                                     with the value from the annotation "rke.cattle.io/pre-drain" before
-                                    the planner will continue with drain the specific node.
+                                    the planner will continue to drain the specific node.
                                     The annotation "rke.cattle.io/pre-drain" is used for pre-drain and
                                     "rke.cattle.io/post-drain" is used for post-drain.
                                   maxLength: 63
@@ -1683,21 +1668,22 @@ spec:
                             type: array
                           skipWaitForDeleteTimeoutSeconds:
                             description: |-
-                              SkipWaitForDeleteTimeoutSeconds If pod DeletionTimestamp older than N
-                              seconds, skip waiting for the pod.
+                              SkipWaitForDeleteTimeoutSeconds defines how long the draining
+                              operation should wait for a given to be removed after deletion.
+                              If the pod's DeletionTimestamp is older than N seconds, the drain
+                              operation will move on.
                               Seconds must be greater than 0 to skip.
                             minimum: 0
                             type: integer
                           timeout:
-                            description: Time to wait (in seconds) before giving up
-                              for one try
+                            description: Timeout is the time to wait (in seconds)
+                              before giving up for one try.
                             minimum: 0
                             type: integer
                         required:
                         - deleteEmptyDirData
                         - disableEviction
                         - enabled
-                        - force
                         - gracePeriod
                         - skipWaitForDeleteTimeoutSeconds
                         - timeout

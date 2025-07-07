@@ -64,11 +64,7 @@ func (in *ClusterConfiguration) DeepCopyInto(out *ClusterConfiguration) {
 		*out = new(Networking)
 		**out = **in
 	}
-	if in.DataDirectories != nil {
-		in, out := &in.DataDirectories, &out.DataDirectories
-		*out = new(DataDirectories)
-		**out = **in
-	}
+	out.DataDirectories = in.DataDirectories
 	return
 }
 
