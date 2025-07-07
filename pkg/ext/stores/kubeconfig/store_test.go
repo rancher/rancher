@@ -1087,7 +1087,7 @@ func TestStoreCreate(t *testing.T) {
 		require.Error(t, err)
 		assert.Nil(t, obj)
 		assert.True(t, apierrors.IsBadRequest(err))
-		assert.Contains(t, err.Error(), "exceeds max tll")
+		assert.Contains(t, err.Error(), "exceeds max ttl")
 	})
 }
 
