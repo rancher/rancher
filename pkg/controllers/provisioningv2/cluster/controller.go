@@ -476,7 +476,7 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 	}
 
 	if cluster.Spec.RKEConfig != nil {
-		if cluster.Spec.RKEConfig.DataDirectories != nil && cluster.Spec.RKEConfig.DataDirectories.SystemAgent != "" {
+		if cluster.Spec.RKEConfig.DataDirectories.SystemAgent != "" {
 			spec.AgentEnvVars = append(spec.AgentEnvVars, corev1.EnvVar{
 				Name:  capr.SystemAgentDataDirEnvVar,
 				Value: cluster.Spec.RKEConfig.DataDirectories.SystemAgent,
@@ -487,12 +487,10 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 		}
 	}
 
-	if cluster.Spec.LocalClusterAuthEndpoint != nil {
-		spec.LocalClusterAuthEndpoint = v3.LocalClusterAuthEndpoint{
-			FQDN:    cluster.Spec.LocalClusterAuthEndpoint.FQDN,
-			CACerts: cluster.Spec.LocalClusterAuthEndpoint.CACerts,
-			Enabled: cluster.Spec.LocalClusterAuthEndpoint.Enabled,
-		}
+	spec.LocalClusterAuthEndpoint = v3.LocalClusterAuthEndpoint{
+		FQDN:    cluster.Spec.LocalClusterAuthEndpoint.FQDN,
+		CACerts: cluster.Spec.LocalClusterAuthEndpoint.CACerts,
+		Enabled: cluster.Spec.LocalClusterAuthEndpoint.Enabled,
 	}
 
 	newCluster := &v3.Cluster{

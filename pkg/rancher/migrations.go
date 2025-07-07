@@ -558,9 +558,6 @@ func migrateSystemAgentDataDirectory(w *wrangler.Context) error {
 
 		cluster = *cluster.DeepCopy()
 		cluster.Spec.AgentEnvVars = envVars
-		if cluster.Spec.RKEConfig.DataDirectories == nil {
-			cluster.Spec.RKEConfig.DataDirectories = &rkev1.DataDirectories{}
-		}
 		cluster.Spec.RKEConfig.DataDirectories.SystemAgent = systemAgentDataDir
 		_, err = w.Provisioning.Cluster().Update(&cluster)
 		if err != nil {

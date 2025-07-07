@@ -35,7 +35,6 @@ func (in *GenericMap) DeepCopyInto(out *GenericMap) {
 	}
 }
 
-// +kubebuilder:validation:XValidation:rule="!self.enabled || has(self.fqdn) || !has(self.caCerts)",message="CACerts defined but FQDN is not defined"
 type LocalClusterAuthEndpoint struct {
 	// Enabled indicates whether the local cluster auth endpoint should be
 	// enabled.
@@ -44,13 +43,10 @@ type LocalClusterAuthEndpoint struct {
 
 	// FQDN is the fully qualified domain name of the local cluster auth
 	// endpoint.
-	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=255
 	// +optional
 	FQDN string `json:"fqdn,omitempty"`
 
 	// CACerts is the CA certificate for the local cluster auth endpoint.
-	// +kubebuilder:validation:MinLength=1
 	// +optional
 	CACerts string `json:"caCerts,omitempty"`
 }

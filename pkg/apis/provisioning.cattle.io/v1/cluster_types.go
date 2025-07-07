@@ -36,7 +36,7 @@ type ClusterSpec struct {
 	// LocalClusterAuthEndpoint is the configuration for the local cluster
 	// auth endpoint.
 	// +optional
-	LocalClusterAuthEndpoint *rkev1.LocalClusterAuthEndpoint `json:"localClusterAuthEndpoint,omitempty"`
+	LocalClusterAuthEndpoint rkev1.LocalClusterAuthEndpoint `json:"localClusterAuthEndpoint,omitempty"`
 
 	// AgentEnvVars is a list of environment variables that will be set on
 	// the cluster agent deployment and system agent service.
@@ -130,7 +130,7 @@ type RKEConfig struct {
 	// This configuration will be applied to all machine pools unless
 	// overridden by the machine pool configuration.
 	// +optional
-	MachinePoolDefaults *RKEMachinePoolDefaults `json:"machinePoolDefaults,omitempty"`
+	MachinePoolDefaults RKEMachinePoolDefaults `json:"machinePoolDefaults,omitempty"`
 
 	// InfrastructureRef is a reference to the infrastructure cluster object
 	// that is required when provisioning a CAPI cluster.
@@ -252,8 +252,7 @@ type RKEMachinePool struct {
 	// MachineOS is the operating system of the machines provisioned by this
 	// pool.
 	// This is only used to designate linux versus windows nodes.
-	// +kubebuilder:default:=linux
-	// +kubebuilder:validation:Enum=linux;windows
+	// +kubebuilder:validation:Enum="";linux;windows
 	// +optional
 	MachineOS string `json:"machineOS,omitempty"`
 
@@ -456,7 +455,7 @@ type ClusterStatus struct {
 // +genclient
 // +kubebuilder:resource:path=clusters,scope=Namespaced,categories=provisioning
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="Version",type=string,JSONPath=".spec.rkeConfig.kubernetesVersion"
+// +kubebuilder:printcolumn:name="Version",type=string,JSONPath=".spec.kubernetesVersion"
 // +kubebuilder:printcolumn:name="Cluster Name",type=string,JSONPath=".status.clusterName"
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=".metadata.creationTimestamp"
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=".status.ready"

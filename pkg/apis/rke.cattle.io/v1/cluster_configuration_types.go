@@ -62,7 +62,7 @@ type ClusterConfiguration struct {
 	// configured via the provisioning cluster object and are immutable once
 	// set.
 	// +optional
-	DataDirectories *DataDirectories `json:"dataDirectories,omitempty"`
+	DataDirectories DataDirectories `json:"dataDirectories,omitempty"`
 
 	// ProvisionGeneration is used to force the planner to reconcile the
 	// cluster, regardless of whether a reconciliation is required.
@@ -75,7 +75,7 @@ type ClusterUpgradeStrategy struct {
 	// upgraded at a time.
 	// The default value is 1, a 0 value is infinite.
 	// Percentages are also accepted.
-	// +kubebuilder:validation:Pattern="^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0))$"
+	// +kubebuilder:validation:Pattern="^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0)|)$"
 	// +kubebuilder:validation:MaxLength=10
 	// +optional
 	ControlPlaneConcurrency string `json:"controlPlaneConcurrency,omitempty"`
@@ -90,7 +90,7 @@ type ClusterUpgradeStrategy struct {
 	// upgraded at a time.
 	// The default value is 1, a 0 value is infinite.
 	// Percentages are also accepted.
-	// +kubebuilder:validation:Pattern="^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0))$"
+	// +kubebuilder:validation:Pattern="^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0)|)$"
 	// +kubebuilder:validation:MaxLength=10
 	// +optional
 	WorkerConcurrency string `json:"workerConcurrency,omitempty"`
@@ -111,13 +111,13 @@ type DrainOptions struct {
 	// managed by a ReplicationController, Job, or DaemonSet.
 	// Drain will not proceed without Force set to true if there are such
 	// pods.
-	// +kubebuilder:default=false
+	// +optional
 	Force bool `json:"force"`
 
 	// IgnoreDaemonSets specifies whether to ignore DaemonSet-managed pods.
 	// If there are DaemonSet-managed pods, drain will not proceed without
 	// IgnoreDaemonSets set to true (even when set to true, kubectl won't
-	// delete pods - so setting default to true).
+	// delete pods - so an unset value will default to true).
 	// +optional
 	IgnoreDaemonSets *bool `json:"ignoreDaemonSets,omitempty"`
 
@@ -138,12 +138,14 @@ type DrainOptions struct {
 	// If negative, the default value specified in the pod will be used.
 	GracePeriod int `json:"gracePeriod"`
 
-	// Time to wait (in seconds) before giving up for one try
+	// Timeout is the time to wait (in seconds) before giving up for one try.
 	// +kubebuilder:validation:Minimum=0
 	Timeout int `json:"timeout"`
 
-	// SkipWaitForDeleteTimeoutSeconds If pod DeletionTimestamp older than N
-	// seconds, skip waiting for the pod.
+	// SkipWaitForDeleteTimeoutSeconds defines how long the draining
+	// operation should wait for a given to be removed after deletion.
+	// If the pod's DeletionTimestamp is older than N seconds, the drain
+	// operation will move on.
 	// Seconds must be greater than 0 to skip.
 	// +kubebuilder:validation:Minimum=0
 	SkipWaitForDeleteTimeoutSeconds int `json:"skipWaitForDeleteTimeoutSeconds"`
@@ -161,7 +163,7 @@ type DrainOptions struct {
 type DrainHook struct {
 	// Annotation that will need to be populated on the machine-plan secret
 	// with the value from the annotation "rke.cattle.io/pre-drain" before
-	// the planner will continue with drain the specific node.
+	// the planner will continue to drain the specific node.
 	// The annotation "rke.cattle.io/pre-drain" is used for pre-drain and
 	// "rke.cattle.io/post-drain" is used for post-drain.
 	// +kubebuilder:validation:MaxLength=63
@@ -216,7 +218,6 @@ type K8sObjectFileSource struct {
 	// Items is a list of mappings from the keys within the resource to the
 	// files to create on the downstream machine.
 	// +optional
-	// +kubebuilder:validation:MinItems=1
 	Items []KeyToPath `json:"items,omitempty"`
 
 	// DefaultPermissions provides a fallback value for all files within the
@@ -341,7 +342,7 @@ type Networking struct {
 	// or via cloud-init, and there is currently no mechanism to extract the
 	// completely rendered configuration via the planner nor various engines
 	// themselves.
-	// +kubebuilder:validation:Enum=ipv4;ipv6;dual
+	// +kubebuilder:validation:Enum="";ipv4;ipv6;dual
 	// +optional
 	StackPreference NetworkingStackPreference `json:"stackPreference,omitempty"`
 }

@@ -45,7 +45,7 @@ func Test_PreBootstrap_Provisioning_Flow(t *testing.T) {
 				},
 				Spec: provisioningv1.ClusterSpec{
 					RKEConfig: &provisioningv1.RKEConfig{},
-					LocalClusterAuthEndpoint: &rkev1.LocalClusterAuthEndpoint{
+					LocalClusterAuthEndpoint: rkev1.LocalClusterAuthEndpoint{
 						Enabled: true,
 					},
 				},

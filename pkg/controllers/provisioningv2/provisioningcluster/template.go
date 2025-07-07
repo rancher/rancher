@@ -228,16 +228,14 @@ func populateHostnameLengthLimitAnnotation(mp rancherv1.RKEMachinePool, cluster 
 		}
 	}
 
-	if cluster.Spec.RKEConfig.MachinePoolDefaults != nil {
-		// if the machine pool limit was not specified, or was invalid, fallback to cluster default
-		if limit := cluster.Spec.RKEConfig.MachinePoolDefaults.HostnameLengthLimit; hostnameLimit == 0 && limit != 0 {
-			if limit < capr.MinimumHostnameLengthLimit {
-				logrus.Errorf("rkecluster %s/%s: cannot use cluster machine pool default hostname length limit, %d under minimum value of %d", cluster.Namespace, cluster.Name, limit, capr.MinimumHostnameLengthLimit)
-			} else if limit > capr.MaximumHostnameLengthLimit {
-				logrus.Errorf("rkecluster %s/%s: cannot use cluster machine pool default hostname length limit, %d under minimum value of %d", cluster.Namespace, cluster.Name, limit, capr.MinimumHostnameLengthLimit)
-			} else {
-				hostnameLimit = limit
-			}
+	// if the machine pool limit was not specified, or was invalid, fallback to cluster default
+	if limit := cluster.Spec.RKEConfig.MachinePoolDefaults.HostnameLengthLimit; hostnameLimit == 0 && limit != 0 {
+		if limit < capr.MinimumHostnameLengthLimit {
+			logrus.Errorf("rkecluster %s/%s: cannot use cluster machine pool default hostname length limit, %d under minimum value of %d", cluster.Namespace, cluster.Name, limit, capr.MinimumHostnameLengthLimit)
+		} else if limit > capr.MaximumHostnameLengthLimit {
+			logrus.Errorf("rkecluster %s/%s: cannot use cluster machine pool default hostname length limit, %d under minimum value of %d", cluster.Namespace, cluster.Name, limit, capr.MinimumHostnameLengthLimit)
+		} else {
+			hostnameLimit = limit
 		}
 	}
 
@@ -535,10 +533,6 @@ func rkeControlPlane(cluster *rancherv1.Cluster) (*rkev1.RKEControlPlane, error)
 		return nil, err
 	}
 	rkeConfig := cluster.Spec.RKEConfig.DeepCopy()
-	localClusterAuthEndpoint := rkev1.LocalClusterAuthEndpoint{}
-	if cluster.Spec.LocalClusterAuthEndpoint != nil {
-		localClusterAuthEndpoint = *cluster.Spec.LocalClusterAuthEndpoint.DeepCopy()
-	}
 	return &rkev1.RKEControlPlane{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cluster.Name,
@@ -552,7 +546,7 @@ func rkeControlPlane(cluster *rancherv1.Cluster) (*rkev1.RKEControlPlane, error)
 		},
 		Spec: rkev1.RKEControlPlaneSpec{
 			ClusterConfiguration:     rkeConfig.ClusterConfiguration,
-			LocalClusterAuthEndpoint: localClusterAuthEndpoint,
+			LocalClusterAuthEndpoint: *cluster.Spec.LocalClusterAuthEndpoint.DeepCopy(),
 			ETCDSnapshotRestore:      rkeConfig.ETCDSnapshotRestore,
 			ETCDSnapshotCreate:       rkeConfig.ETCDSnapshotCreate,
 			RotateCertificates:       rkeConfig.RotateCertificates,
