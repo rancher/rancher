@@ -11,6 +11,12 @@ TAG="${TAG:-$(yq '.env.TAG | sub("-.*", "")' < .github/workflows/pull-request.ym
 OS="${OS:-linux}"
 ARCH="${ARCH:-amd64}"
 REPO="${REPO:-rancher}"
+AGENT_OS="${AGENT_OS:-$OS}"
+AGENT_ARCH="${AGENT_ARCH:-$ARCH}"
+AGENT_REPO="${AGENT_REPO:-$REPO}"
+AGENT_TAG="${AGENT_TAG:-$TAG}"
+AGENT_TAG=$(echo "$TAG" | sed 's/arm/amd/g')
+
 CATTLE_K3S_VERSION=$(grep -m1 'ENV CATTLE_K3S_VERSION' package/Dockerfile | awk '{print $3}')
 CATTLE_KDM_BRANCH=$(grep -m1 'ARG CATTLE_KDM_BRANCH=' package/Dockerfile | cut -d '=' -f2)
 CATTLE_RANCHER_WEBHOOK_VERSION=$(yq '.webhookVersion' < build.yaml)
@@ -52,21 +58,23 @@ fi
 
 if [ -z $TARGET ] || [ $TARGET = "agent" ]; then
   docker buildx build \
-    --build-arg VERSION="${TAG}" \
-    --build-arg ARCH="${ARCH}" \
-    --build-arg RANCHER_TAG="${TAG}" \
-    --build-arg RANCHER_REPO="${REPO}" \
+    --build-arg VERSION="${AGENT_TAG}" \
+    --build-arg ARCH="${AGENT_ARCH}" \
+    --build-arg RANCHER_TAG="${AGENT_TAG}" \
+    --build-arg RANCHER_REPO="${AGENT_REPO}" \
     --build-arg COMMIT="${COMMIT}" \
     --build-arg CATTLE_RANCHER_WEBHOOK_VERSION="${CATTLE_RANCHER_WEBHOOK_VERSION}" \
     --build-arg CATTLE_RANCHER_PROVISIONING_CAPI_VERSION="${CATTLE_RANCHER_PROVISIONING_CAPI_VERSION}" \
-    --tag "${REPO}"/rancher-agent:"${TAG}" \
-    --platform="${OS}/${ARCH}" \
+    --tag "${AGENT_REPO}"/rancher-agent:"${AGENT_TAG}" \
+    --platform="${AGENT_OS}/${AGENT_ARCH}" \
     --target agent \
     --file ./package/Dockerfile .
 
     if [ "$REPO" != "rancher" ]; then
-      docker push "${REPO}"/rancher-agent:"${TAG}" &
+      docker push "${AGENT_REPO}"/rancher-agent:"${AGENT_TAG}" &
     fi
 fi
+
+trap wait 1 INT HUP
 
 wait
