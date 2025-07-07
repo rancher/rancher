@@ -272,7 +272,7 @@ func (s *Store) Create(
 		ttlMilliseconds = *defaultTTL
 		kubeconfig.Spec.TTL = defaultTTLSeconds
 	case ttlMilliseconds > *defaultTTL:
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("spec.ttl %d exceeds max tll %d", kubeconfig.Spec.TTL, defaultTTLSeconds))
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("spec.ttl %d exceeds max ttl %d", kubeconfig.Spec.TTL, defaultTTLSeconds))
 	default: // Valid TTL.
 	}
 
