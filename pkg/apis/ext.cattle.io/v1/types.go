@@ -198,7 +198,7 @@ func (t *Token) GetCreationTime() metav1.Time {
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// Kubeconfig contains information about clusters, users, namespaces, and authentication mechanisms.
+// Kubeconfig allows creating v1.Config kubeconfig files for interacting with Rancher and clusters managed by Rancher.
 type Kubeconfig struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.

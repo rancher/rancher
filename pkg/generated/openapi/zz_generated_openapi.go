@@ -107,7 +107,7 @@ func schema_pkg_apis_extcattleio_v1_Kubeconfig(ref common.ReferenceCallback) com
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "Kubeconfig contains information about clusters, users, namespaces, and authentication mechanisms.",
+				Description: "Kubeconfig allows creating v1.Config kubeconfig files for interacting with Rancher and clusters managed by Rancher.",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
