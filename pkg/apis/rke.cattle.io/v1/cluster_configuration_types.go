@@ -14,6 +14,7 @@ type ClusterConfiguration struct {
 	// by the distro, with values corresponding to the helm values
 	// configurable in the chart.
 	// +kubebuilder:pruning:PreserveUnknownFields
+	// +nullable
 	// +optional
 	ChartValues GenericMap `json:"chartValues,omitempty"`
 
@@ -21,17 +22,20 @@ type ClusterConfiguration struct {
 	// to /etc/rancher/<rke2/k3s>/config.yaml.d/50-rancher.yaml for all
 	// machines.
 	// +kubebuilder:pruning:PreserveUnknownFields
+	// +nullable
 	// +optional
 	MachineGlobalConfig GenericMap `json:"machineGlobalConfig,omitempty"`
 
 	// MachineSelectorConfig is a list of distro arguments which will be
 	// copied to /etc/rancher/<rke2/k3s>/config.yaml.d/50-rancher.yaml if the
 	// machine matches the label selector.
+	// +nullable
 	// +optional
 	MachineSelectorConfig []RKESystemConfig `json:"machineSelectorConfig,omitempty"`
 
 	// MachineSelectorFiles is a list of files which will be copied to the
 	// machine if the machine matches the label selector.
+	// +nullable
 	// +optional
 	MachineSelectorFiles []RKEProvisioningFiles `json:"machineSelectorFiles,omitempty"`
 
@@ -40,20 +44,24 @@ type ClusterConfiguration struct {
 	// The distro will automatically create these resources.
 	// Resources created as additional manifests will be deleted if removed
 	// from additional manifests.
+	// +nullable
 	// +optional
 	AdditionalManifest string `json:"additionalManifest,omitempty"`
 
 	// Registries is the list of mirrors and configurations for the cluster's
 	// container registries.
+	// +nullable
 	// +optional
 	Registries *Registry `json:"registries,omitempty"`
 
 	// ETCD contains the etcd snapshot configuration for the cluster.
+	// +nullable
 	// +optional
 	ETCD *ETCD `json:"etcd,omitempty"`
 
 	// Networking contains information regarding the desired networking stack
 	// of the cluster.
+	// +nullable
 	// +optional
 	Networking *Networking `json:"networking,omitempty"`
 
@@ -77,6 +85,7 @@ type ClusterUpgradeStrategy struct {
 	// Percentages are also accepted.
 	// +kubebuilder:validation:Pattern="^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0)|)$"
 	// +kubebuilder:validation:MaxLength=10
+	// +nullable
 	// +optional
 	ControlPlaneConcurrency string `json:"controlPlaneConcurrency,omitempty"`
 
@@ -92,6 +101,7 @@ type ClusterUpgradeStrategy struct {
 	// Percentages are also accepted.
 	// +kubebuilder:validation:Pattern="^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0)|)$"
 	// +kubebuilder:validation:MaxLength=10
+	// +nullable
 	// +optional
 	WorkerConcurrency string `json:"workerConcurrency,omitempty"`
 
@@ -105,6 +115,7 @@ type ClusterUpgradeStrategy struct {
 type DrainOptions struct {
 	// Enabled specifies whether draining is required for the machine pool
 	// before upgrading.
+	// +optional
 	Enabled bool `json:"enabled"`
 
 	// Force specifies whether to drain the node even if there are pods not
@@ -118,6 +129,7 @@ type DrainOptions struct {
 	// If there are DaemonSet-managed pods, drain will not proceed without
 	// IgnoreDaemonSets set to true (even when set to true, kubectl won't
 	// delete pods - so an unset value will default to true).
+	// +nullable
 	// +optional
 	IgnoreDaemonSets *bool `json:"ignoreDaemonSets,omitempty"`
 
@@ -128,18 +140,21 @@ type DrainOptions struct {
 
 	// DeleteEmptyDirData instructs the drain operation to proceed even if
 	// there are pods using emptyDir.
+	// +optional
 	DeleteEmptyDirData bool `json:"deleteEmptyDirData"`
 
 	// DisableEviction forces drain to use delete rather than evict.
+	// +optional
 	DisableEviction bool `json:"disableEviction"`
 
 	// GracePeriod is the period of time in seconds given to each pod to
 	// terminate gracefully.
 	// If negative, the default value specified in the pod will be used.
+	// +optional
 	GracePeriod int `json:"gracePeriod"`
 
 	// Timeout is the time to wait (in seconds) before giving up for one try.
-	// +kubebuilder:validation:Minimum=0
+	// +optional
 	Timeout int `json:"timeout"`
 
 	// SkipWaitForDeleteTimeoutSeconds defines how long the draining
@@ -147,15 +162,17 @@ type DrainOptions struct {
 	// If the pod's DeletionTimestamp is older than N seconds, the drain
 	// operation will move on.
 	// Seconds must be greater than 0 to skip.
-	// +kubebuilder:validation:Minimum=0
+	// +optional
 	SkipWaitForDeleteTimeoutSeconds int `json:"skipWaitForDeleteTimeoutSeconds"`
 
 	// PreDrainHooks is a list of hooks to run before draining a node.
+	// +nullable
 	// +optional
 	PreDrainHooks []DrainHook `json:"preDrainHooks,omitempty"`
 
 	// PostDrainHooks is a list of hooks to run after draining and updating
 	// a node.
+	// +nullable
 	// +optional
 	PostDrainHooks []DrainHook `json:"postDrainHooks,omitempty"`
 }
@@ -166,13 +183,16 @@ type DrainHook struct {
 	// the planner will continue to drain the specific node.
 	// The annotation "rke.cattle.io/pre-drain" is used for pre-drain and
 	// "rke.cattle.io/post-drain" is used for post-drain.
-	// +kubebuilder:validation:MaxLength=63
+	// +kubebuilder:validation:MaxLength=317
+	// +nullable
+	// +optional
 	Annotation string `json:"annotation,omitempty"`
 }
 
 type RKESystemConfig struct {
 	// MachineLabelSelector is a label selector used to match machines.
 	// An empty/null label selector matches all machines.
+	// +nullable
 	// +optional
 	MachineLabelSelector *metav1.LabelSelector `json:"machineLabelSelector,omitempty"`
 
@@ -180,19 +200,22 @@ type RKESystemConfig struct {
 	// /etc/rancher/<rke2/k3s>/config.yaml.d/50-rancher.yaml if the machine
 	// matches the label selector.
 	// +kubebuilder:pruning:PreserveUnknownFields
-	// +optional
 	// +nullable
+	// +optional
 	Config GenericMap `json:"config,omitempty"`
 }
 
 type RKEProvisioningFiles struct {
 	// MachineLabelSelector is a label selector used to match machines.
 	// An empty/null label selector matches all machines.
+	// +nullable
 	// +optional
 	MachineLabelSelector *metav1.LabelSelector `json:"machineLabelSelector,omitempty"`
 
 	// FileSources is a list of file sources that will be copied to the
 	// machine if the machine matches the label selector.
+	// +nullable
+	// +optional
 	FileSources []ProvisioningFileSource `json:"fileSources,omitempty"`
 }
 
@@ -213,25 +236,32 @@ type K8sObjectFileSource struct {
 	// The namespace is required to be the same as the related
 	// RKEControlPlane object.
 	// +kubebuilder:validation:MaxLength=253
+	// +nullable
+	// +required
 	Name string `json:"name"`
 
 	// Items is a list of mappings from the keys within the resource to the
 	// files to create on the downstream machine.
+	// +nullable
 	// +optional
 	Items []KeyToPath `json:"items,omitempty"`
 
 	// DefaultPermissions provides a fallback value for all files within the
 	// configmap/secret.
+	// +nullable
 	// +optional
 	DefaultPermissions string `json:"defaultPermissions,omitempty"`
 }
 
 type KeyToPath struct {
 	// Key is the key used to index the associated configmap or secret.
+	// +nullable
 	Key string `json:"key"`
 
 	// Path is the absolute path the data within the configmap or secret
 	// should be written to by the system-agent.
+	// +nullable
+	// +required
 	Path string `json:"path"`
 
 	// Dynamic indicates whether the rendered file should be included when
@@ -242,22 +272,26 @@ type KeyToPath struct {
 
 	// Permissions specifies the desired permissions for this file on the
 	// machine's filesystem.
+	// +nullable
 	// +optional
 	Permissions string `json:"permissions,omitempty"`
 
 	// Hash is used to ensure that the data within the configmap or secret
 	// matches the expected sha256sum of the value at the provided key.
+	// +nullable
 	// +optional
 	Hash string `json:"hash,omitempty"`
 }
 
 type Registry struct {
 	// Mirrors are namespace to mirror mapping for all namespaces.
+	// +nullable
 	// +optional
 	Mirrors map[string]Mirror `json:"mirrors,omitempty"`
 
 	// Configs are configs for each registry.
 	// The key is the FDQN or IP of the registry.
+	// +nullable
 	// +optional
 	Configs map[string]RegistryConfig `json:"configs,omitempty"`
 }
@@ -268,12 +302,16 @@ type Mirror struct {
 	// endpoints one by one until a working one is found.
 	// The endpoint must be a valid url with host specified.
 	// The scheme, host, and path from the endpoint URL will be used.
+	// +nullable
+	// +optional
 	Endpoints []string `json:"endpoint,omitempty"`
 
 	// Rewrites are repository rewrite rules for a Mirror.
 	// When fetching image resources from a registry, a regular expression
 	// can be used to match the image name and modify it using
 	// the corresponding value from the map in the resource request.
+	// +nullable
+	// +optional
 	Rewrites map[string]string `json:"rewrite,omitempty"`
 }
 
@@ -287,6 +325,7 @@ type RegistryConfig struct {
 	// - auth
 	// - identityToken
 	// +kubebuilder:validation:MaxLength=253
+	// +nullable
 	// +optional
 	AuthConfigSecretName string `json:"authConfigSecretName,omitempty"`
 
@@ -295,11 +334,13 @@ type RegistryConfig struct {
 	// and "Key" which are used when creating the transport that communicates
 	// with the registry.
 	// +kubebuilder:validation:MaxLength=253
+	// +nullable
 	// +optional
 	TLSSecretName string `json:"tlsSecretName,omitempty"`
 
 	// CABundle is the CA chain used when communicating with the image
 	// registry.
+	// +nullable
 	// +optional
 	CABundle []byte `json:"caBundle,omitempty"`
 
@@ -315,6 +356,7 @@ type ETCD struct {
 	DisableSnapshots bool `json:"disableSnapshots,omitempty"`
 
 	// SnapshotScheduleCron is the cron schedule for the snapshot creation.
+	// +nullable
 	// +optional
 	SnapshotScheduleCron string `json:"snapshotScheduleCron,omitempty"`
 
@@ -324,6 +366,7 @@ type ETCD struct {
 	SnapshotRetention int `json:"snapshotRetention,omitempty"`
 
 	// S3 defines the S3 configuration for the cluster if enabled.
+	// +nullable
 	// +optional
 	S3 *ETCDSnapshotS3 `json:"s3,omitempty"`
 }
@@ -342,7 +385,7 @@ type Networking struct {
 	// or via cloud-init, and there is currently no mechanism to extract the
 	// completely rendered configuration via the planner nor various engines
 	// themselves.
-	// +kubebuilder:validation:Enum="";ipv4;ipv6;dual
+	// +nullable
 	// +optional
 	StackPreference NetworkingStackPreference `json:"stackPreference,omitempty"`
 }
@@ -350,16 +393,19 @@ type Networking struct {
 type DataDirectories struct {
 	// SystemAgent is the data directory for the system-agent connection info
 	// and plans.
+	// +nullable
 	// +optional
 	SystemAgent string `json:"systemAgent,omitempty"`
 
 	// Provisioning is the data directory for provisioning related files
 	// (e.g. idempotency).
+	// +nullable
 	// +optional
 	Provisioning string `json:"provisioning,omitempty"`
 
 	// K8sDistro is the data directory for the k8s distro, i.e. the data-dir
 	// arg.
+	// +nullable
 	// +optional
 	K8sDistro string `json:"k8sDistro,omitempty"`
 }

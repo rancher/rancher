@@ -13,23 +13,27 @@ type ClusterSpec struct {
 	// the cluster.
 	// This field must be in the format of "namespace:name".
 	// +kubebuilder:validation:MaxLength=317
+	// +nullable
 	// +optional
 	CloudCredentialSecretName string `json:"cloudCredentialSecretName,omitempty"`
 
 	// KubernetesVersion is the desired version of RKE2/K3s for the cluster.
 	// This field is only populated for provisioned and custom clusters.
+	// +nullable
 	// +optional
 	KubernetesVersion string `json:"kubernetesVersion,omitempty"`
 
 	// ClusterAPIConfig is unused.
 	// Deprecated: this field is unused and will be removed in a future
 	// version.
+	// +nullable
 	// +optional
 	ClusterAPIConfig *ClusterAPIConfig `json:"clusterAPIConfig,omitempty"`
 
 	// RKEConfig represents the desired state for machine configuration and
 	// day 2 operations.
 	// NOTE: This is only populated for provisioned and custom clusters.
+	// +nullable
 	// +optional
 	RKEConfig *RKEConfig `json:"rkeConfig,omitempty"`
 
@@ -40,11 +44,13 @@ type ClusterSpec struct {
 
 	// AgentEnvVars is a list of environment variables that will be set on
 	// the cluster agent deployment and system agent service.
+	// +nullable
 	// +optional
 	AgentEnvVars []rkev1.EnvVar `json:"agentEnvVars,omitempty"`
 
 	// ClusterAgentDeploymentCustomization is the customization configuration
 	// to apply to the cluster agent deployment.
+	// +nullable
 	// +optional
 	ClusterAgentDeploymentCustomization *AgentDeploymentCustomization `json:"clusterAgentDeploymentCustomization,omitempty"`
 
@@ -56,20 +62,24 @@ type ClusterSpec struct {
 	// machineSelectorFile at /etc/rancher/k3s/config/rancher-psact.yaml or
 	// /etc/rancher/rke2/config/rancher-psact.yaml for K3s and RKE2
 	// respectively.
+	// +nullable
 	// +optional
 	DefaultPodSecurityAdmissionConfigurationTemplateName string `json:"defaultPodSecurityAdmissionConfigurationTemplateName,omitempty"`
 
 	// DefaultClusterRoleForProjectMembers is unused.
 	// Deprecated: this field is unused and will be removed in a future
 	// version.
+	// +nullable
 	// +optional
 	DefaultClusterRoleForProjectMembers string `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
 
+	// +nullable
 	// +optional
 	EnableNetworkPolicy *bool `json:"enableNetworkPolicy,omitempty" norman:"default=false"`
 
 	// FleetAgentDeploymentCustomization is the customization configuration
 	// to apply to the fleet agent deployment.
+	// +nullable
 	// +optional
 	FleetAgentDeploymentCustomization *AgentDeploymentCustomization `json:"fleetAgentDeploymentCustomization,omitempty"`
 
@@ -86,6 +96,7 @@ type ClusterAPIConfig struct {
 	// ClusterName is unused.
 	// Deprecated: this field is unused and will be removed in a future
 	// version.
+	// +nullable
 	// +optional
 	ClusterName string `json:"clusterName,omitempty"`
 }
@@ -100,26 +111,31 @@ type RKEConfig struct {
 
 	// ETCDSnapshotCreate is the configuration for the etcd snapshot creation
 	// operation.
+	// +nullable
 	// +optional
 	ETCDSnapshotCreate *rkev1.ETCDSnapshotCreate `json:"etcdSnapshotCreate,omitempty"`
 
 	// ETCDSnapshotRestore is the configuration for the etcd snapshot restore
 	// operation.
+	// +nullable
 	// +optional
 	ETCDSnapshotRestore *rkev1.ETCDSnapshotRestore `json:"etcdSnapshotRestore,omitempty"`
 
 	// RotateCertificates is the configuration for the certificate rotation
 	// operation.
+	// +nullable
 	// +optional
 	RotateCertificates *rkev1.RotateCertificates `json:"rotateCertificates,omitempty"`
 
 	// RotateEncryptionKeys is the configuration for the encryption key
 	// rotation operation.
+	// +nullable
 	// +optional
 	RotateEncryptionKeys *rkev1.RotateEncryptionKeys `json:"rotateEncryptionKeys,omitempty"`
 
 	// MachinePools is a list of machine pools to be created in the
 	// provisioning cluster.
+	// +nullable
 	// +optional
 	// +listType=map
 	// +listMapKey=name
@@ -135,6 +151,7 @@ type RKEConfig struct {
 	// InfrastructureRef is a reference to the infrastructure cluster object
 	// that is required when provisioning a CAPI cluster.
 	// NOTE: in practice this will always be a rkecluster.rke.cattle.io.
+	// +nullable
 	// +optional
 	InfrastructureRef *corev1.ObjectReference `json:"infrastructureRef,omitempty"`
 }
@@ -173,6 +190,7 @@ type RKEMachinePool struct {
 
 	// DrainBeforeDeleteTimeout defines the timeout for draining the machines
 	// provisioned by this pool before deletion.
+	// +nullable
 	// +optional
 	DrainBeforeDeleteTimeout *metav1.Duration `json:"drainBeforeDeleteTimeout,omitempty"`
 
@@ -180,6 +198,7 @@ type RKEMachinePool struct {
 	// to configure the machines provisioned by this pool.
 	// The NodeConfig object will, in turn, be used to create a corresponding
 	// MachineTemplate object for the generated machine deployment.
+	// +nullable
 	// +required
 	NodeConfig *corev1.ObjectReference `json:"machineConfigRef,omitempty"`
 
@@ -187,34 +206,39 @@ type RKEMachinePool struct {
 	// The generated CAPI machine deployment will be a concatenation of the
 	// cluster name and the machine pool name which, if over 63 characters is
 	// truncated to 54 with a sha256sum appended.
-	// +required
 	// +kubebuilder:validation:MinLength=1
+	// +required
 	Name string `json:"name,omitempty"`
 
 	// DisplayName is the display name for the generated CAPI
 	// machinedeployment object.
 	// Deprecated: this field is currently unused and will be removed in a
 	// future version.
+	// +nullable
 	// +optional
 	DisplayName string `json:"displayName,omitempty"`
 
 	// Quantity is the desired number of machines in the machine pool.
 	// +kubebuilder:validation:Minimum=0
+	// +nullable
 	// +optional
 	Quantity *int32 `json:"quantity,omitempty"`
 
 	// RollingUpdate is the configuration for the rolling update of the
 	// generated machine deployment.
+	// +nullable
 	// +optional
 	RollingUpdate *RKEMachinePoolRollingUpdate `json:"rollingUpdate,omitempty"`
 
 	// MachineDeploymentLabels are the labels to add to the generated
 	// machine deployment.
+	// +nullable
 	// +optional
 	MachineDeploymentLabels map[string]string `json:"machineDeploymentLabels,omitempty"`
 
 	// MachineDeploymentAnnotations are the annotations to add to the
 	// generated machine deployment.
+	// +nullable
 	// +optional
 	MachineDeploymentAnnotations map[string]string `json:"machineDeploymentAnnotations,omitempty"`
 
@@ -230,29 +254,33 @@ type RKEMachinePool struct {
 	//
 	// Defaults to 10 minutes.
 	// If you wish to disable this feature, set the value explicitly to 0.
+	// +nullable
 	// +optional
 	NodeStartupTimeout *metav1.Duration `json:"nodeStartupTimeout,omitempty"`
 
 	// UnhealthyNodeTimeout specifies the maximum duration a generated
 	// MachineHealthCheck should wait before marking a not ready machine as
 	// unhealthy.
+	// +nullable
 	// +optional
 	UnhealthyNodeTimeout *metav1.Duration `json:"unhealthyNodeTimeout,omitempty"`
 
 	// MaxUnhealthy specifies the minimum number of unhealthy machines that a
 	// MachineHealthCheck can tolerate before remediating unhealthy machines.
+	// +nullable
 	// +optional
 	MaxUnhealthy *string `json:"maxUnhealthy,omitempty"`
 
 	// UnhealthyRange specifies the number of unhealthy machines in which a
 	// MachineHealthCheck is allowed to remediate.
+	// +nullable
 	// +optional
 	UnhealthyRange *string `json:"unhealthyRange,omitempty"`
 
 	// MachineOS is the operating system of the machines provisioned by this
 	// pool.
 	// This is only used to designate linux versus windows nodes.
-	// +kubebuilder:validation:Enum="";linux;windows
+	// +nullable
 	// +optional
 	MachineOS string `json:"machineOS,omitempty"`
 
@@ -267,6 +295,7 @@ type RKEMachinePool struct {
 	// "provisioning.cattle.io/allow-dynamic-schema-drop" annotation is
 	// present on the provisioning cluster object, otherwise it will be
 	// reinserted.
+	// +nullable
 	// +optional
 	DynamicSchemaSpec string `json:"dynamicSchemaSpec,omitempty"`
 
@@ -295,6 +324,7 @@ type RKEMachinePoolRollingUpdate struct {
 	// down further, followed by scaling up the new MachineSet, ensuring
 	// that the total number of machines available at all times
 	// during the update is at least 70% of desired machines.
+	// +nullable
 	// +optional
 	MaxUnavailable *intstr.IntOrString `json:"maxUnavailable,omitempty"`
 
@@ -311,6 +341,7 @@ type RKEMachinePoolRollingUpdate struct {
 	// machines. Once old machines have been killed, new MachineSet can
 	// be scaled up further, ensuring that total number of machines running
 	// at any time during the update is at most 130% of desired machines.
+	// +nullable
 	// +optional
 	MaxSurge *intstr.IntOrString `json:"maxSurge,omitempty"`
 }
@@ -335,21 +366,25 @@ type RKEMachinePoolDefaults struct {
 type AgentDeploymentCustomization struct {
 	// AppendTolerations is a list of tolerations that will be appended to
 	// the agent deployment.
+	// +nullable
 	// +optional
 	AppendTolerations []corev1.Toleration `json:"appendTolerations,omitempty"`
 
 	// OverrideAffinity is an affinity that will be used to override the
 	// agent deployment's affinity.
+	// +nullable
 	// +optional
 	OverrideAffinity *corev1.Affinity `json:"overrideAffinity,omitempty"`
 
 	// OverrideResourceRequirements defines the limits, requests, and
 	// claims of compute resources for a given container.
+	// +nullable
 	// +optional
 	OverrideResourceRequirements *corev1.ResourceRequirements `json:"overrideResourceRequirements,omitempty"`
 
 	// SchedulingCustomization is an optional configuration that will be
 	// used to override the agent deployment's scheduling customization.
+	// +nullable
 	// +optional
 	SchedulingCustomization *AgentSchedulingCustomization `json:"schedulingCustomization,omitempty"`
 }
@@ -357,11 +392,13 @@ type AgentDeploymentCustomization struct {
 type AgentSchedulingCustomization struct {
 	// PriorityClass is the configuration for the priority class associated
 	// with the agent deployment.
+	// +nullable
 	// +optional
 	PriorityClass *PriorityClassSpec `json:"priorityClass,omitempty"`
 
 	// PodDisruptionBudget is the configuration for the pod disruption budget
 	// associated with the agent deployment.
+	// +nullable
 	// +optional
 	PodDisruptionBudget *PodDisruptionBudgetSpec `json:"podDisruptionBudget,omitempty"`
 }
@@ -376,7 +413,7 @@ type PriorityClassSpec struct {
 	Value int `json:"value,omitempty"`
 
 	// PreemptionPolicy describes a policy for if/when to preempt a pod.
-	// +kubebuilder:validation:Enum=PreemptLowerPriority;Never
+	// +nullable
 	// +optional
 	PreemptionPolicy *corev1.PreemptionPolicy `json:"preemptionPolicy,omitempty"`
 }
@@ -389,6 +426,7 @@ type PodDisruptionBudgetSpec struct {
 	// One can prevent all voluntary evictions by specifying "100%".
 	// +kubebuilder:validation:Pattern="^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0)|)$"
 	// +kubebuilder:validation:MaxLength=10
+	// +nullable
 	// +optional
 	MinAvailable string `json:"minAvailable,omitempty"`
 
@@ -399,6 +437,7 @@ type PodDisruptionBudgetSpec struct {
 	// This is a mutually exclusive setting with "minAvailable".
 	// +kubebuilder:validation:Pattern="^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0)|)$"
 	// +kubebuilder:validation:MaxLength=10
+	// +nullable
 	// +optional
 	MaxUnavailable string `json:"maxUnavailable,omitempty"`
 }
@@ -458,6 +497,7 @@ type ClusterStatus struct {
 // +kubebuilder:printcolumn:name="Version",type=string,JSONPath=".spec.kubernetesVersion"
 // +kubebuilder:printcolumn:name="Cluster Name",type=string,JSONPath=".status.clusterName"
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:printcolumn:name="Kubeconfig",type=date,JSONPath=".status.clientSecretName"
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=".status.ready"
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 

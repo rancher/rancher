@@ -4,10 +4,12 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 type ETCDSnapshotS3 struct {
 	// Endpoint is the S3 endpoint used for snapshot operations.
+	// +nullable
 	// +optional
 	Endpoint string `json:"endpoint,omitempty"`
 
 	// EndpointCA is the CA certificate for validating the S3 endpoint.
+	// +nullable
 	// +optional
 	EndpointCA string `json:"endpointCA,omitempty"`
 
@@ -17,10 +19,12 @@ type ETCDSnapshotS3 struct {
 	SkipSSLVerify bool `json:"skipSSLVerify,omitempty"`
 
 	// Bucket is the name of the S3 bucket used for snapshot operations.
+	// +nullable
 	// +optional
 	Bucket string `json:"bucket,omitempty"`
 
 	// Region is the S3 region used for snapshot operations.
+	// +nullable
 	// +optional
 	Region string `json:"region,omitempty"`
 
@@ -35,10 +39,12 @@ type ETCDSnapshotS3 struct {
 	// - defaultSkipSSLVerify
 	// - defaultBucket
 	// - defaultFolder
+	// +nullable
 	// +optional
 	CloudCredentialName string `json:"cloudCredentialName,omitempty"`
 
 	// Folder is the name of the S3 folder used for snapshot operations.
+	// +nullable
 	// +optional
 	Folder string `json:"folder,omitempty"`
 }

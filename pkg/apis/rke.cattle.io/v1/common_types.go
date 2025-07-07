@@ -43,10 +43,12 @@ type LocalClusterAuthEndpoint struct {
 
 	// FQDN is the fully qualified domain name of the local cluster auth
 	// endpoint.
+	// +nullable
 	// +optional
 	FQDN string `json:"fqdn,omitempty"`
 
 	// CACerts is the CA certificate for the local cluster auth endpoint.
+	// +nullable
 	// +optional
 	CACerts string `json:"caCerts,omitempty"`
 }
@@ -57,6 +59,7 @@ type EnvVar struct {
 	Name string `json:"name,omitempty"`
 
 	// Value is the value of the environment variable.
+	// +nullable
 	// +optional
 	Value string `json:"value,omitempty"`
 }
@@ -72,6 +75,8 @@ type ETCDSnapshotCreate struct {
 
 type ETCDSnapshotRestore struct {
 	// Name refers to the name of the associated etcdsnapshot object.
+	// +nullable
+	// +optional
 	Name string `json:"name,omitempty"`
 
 	// Generation is the current generation for which an etcd snapshot
@@ -82,7 +87,7 @@ type ETCDSnapshotRestore struct {
 	Generation int `json:"generation,omitempty"`
 
 	// Set to either none (or empty string), all, or kubernetesVersion
-	// +kubebuilder:validation:Enum="";none;all;kubernetesVersion
+	// +nullable
 	// +optional
 	RestoreRKEConfig string `json:"restoreRKEConfig,omitempty"`
 }
@@ -97,6 +102,7 @@ type RotateCertificates struct {
 
 	// Services is a list of services to rotate certificates for.
 	// If the list is empty, all services will be rotated.
+	// +nullable
 	// +optional
 	Services []string `json:"services,omitempty"`
 }

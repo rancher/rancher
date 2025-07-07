@@ -10,6 +10,7 @@ type RKEControlPlaneSpec struct {
 
 	// AgentEnvVars is a list of environment variables that will be set on
 	// the cluster agent deployment and system agent service.
+	// +nullable
 	// +optional
 	AgentEnvVars []EnvVar `json:"agentEnvVars,omitempty"`
 
@@ -20,26 +21,31 @@ type RKEControlPlaneSpec struct {
 
 	// ETCDSnapshotCreate is the configuration for the etcd snapshot creation
 	// operation.
+	// +nullable
 	// +optional
 	ETCDSnapshotCreate *ETCDSnapshotCreate `json:"etcdSnapshotCreate,omitempty"`
 
 	// ETCDSnapshotRestore is the configuration for the etcd snapshot restore
 	// operation.
+	// +nullable
 	// +optional
 	ETCDSnapshotRestore *ETCDSnapshotRestore `json:"etcdSnapshotRestore,omitempty"`
 
 	// RotateCertificates is the configuration for the certificate rotation
 	// operation.
+	// +nullable
 	// +optional
 	RotateCertificates *RotateCertificates `json:"rotateCertificates,omitempty"`
 
 	// RotateEncryptionKeys is the configuration for the encryption key
 	// rotation operation.
+	// +nullable
 	// +optional
 	RotateEncryptionKeys *RotateEncryptionKeys `json:"rotateEncryptionKeys,omitempty"`
 
 	// KubernetesVersion is the desired version of RKE2/K3s for the cluster.
 	// This field is only populated for provisioned and custom clusters.
+	// +nullable
 	// +optional
 	KubernetesVersion string `json:"kubernetesVersion,omitempty"`
 
