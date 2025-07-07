@@ -44,12 +44,13 @@ type LocalClusterAuthEndpoint struct {
 
 	// FQDN is the fully qualified domain name of the local cluster auth
 	// endpoint.
+	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=255
 	// +optional
 	FQDN string `json:"fqdn,omitempty"`
 
 	// CACerts is the CA certificate for the local cluster auth endpoint.
-	// +kubebuilder:validation:MaxLength=32768
+	// +kubebuilder:validation:MinLength=1
 	// +optional
 	CACerts string `json:"caCerts,omitempty"`
 }
@@ -85,7 +86,7 @@ type ETCDSnapshotRestore struct {
 	Generation int `json:"generation,omitempty"`
 
 	// Set to either none (or empty string), all, or kubernetesVersion
-	// +kubebuilder:validation:Enum=none;all;kubernetesVersion
+	// +kubebuilder:validation:Enum="";none;all;kubernetesVersion
 	// +optional
 	RestoreRKEConfig string `json:"restoreRKEConfig,omitempty"`
 }

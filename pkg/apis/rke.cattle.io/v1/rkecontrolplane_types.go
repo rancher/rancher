@@ -16,7 +16,6 @@ type RKEControlPlaneSpec struct {
 	// LocalClusterAuthEndpoint is the configuration for the local cluster
 	// auth endpoint.
 	// +optional
-	// +nullable
 	LocalClusterAuthEndpoint LocalClusterAuthEndpoint `json:"localClusterAuthEndpoint,omitempty"`
 
 	// ETCDSnapshotCreate is the configuration for the etcd snapshot creation
@@ -51,9 +50,6 @@ type RKEControlPlaneSpec struct {
 
 	// ManagementClusterName is the name of the management cluster object
 	// that relates to this cluster.
-	// +kubebuilder:validation:Pattern=`^(c-m-[a-z0-9]{8}|local)$`
-	// +kubebuilder:validation:MinLength=5
-	// +kubebuilder:validation:MaxLength=12
 	// +required
 	ManagementClusterName string `json:"managementClusterName,omitempty"`
 
@@ -98,7 +94,7 @@ type RKEControlPlaneStatus struct {
 	// +optional
 	RotateEncryptionKeys *RotateEncryptionKeys `json:"rotateEncryptionKeys,omitempty"`
 
-	// RotateEncryptionKeysPhase is the current phase the encryption key
+	// RotateEncryptionKeysPhase is the phase the encryption key
 	// rotation operation is currently executing.
 	// +optional
 	RotateEncryptionKeysPhase RotateEncryptionKeysPhase `json:"rotateEncryptionKeysPhase,omitempty"`
@@ -114,7 +110,7 @@ type RKEControlPlaneStatus struct {
 	// +optional
 	ETCDSnapshotRestore *ETCDSnapshotRestore `json:"etcdSnapshotRestore,omitempty"`
 
-	// ETCDSnapshotRestorePhase is the current phase the etcd snapshot
+	// ETCDSnapshotRestorePhase is the phase the etcd snapshot
 	// restore operation is currently executing.
 	// +kubebuilder:validation:Enum=Started;Shutdown;Restore;PostRestorePodCleanup;InitialRestartCluster;PostRestoreNodeCleanup;RestartCluster;Finished;Failed
 	// +optional
@@ -125,7 +121,7 @@ type RKEControlPlaneStatus struct {
 	// +optional
 	ETCDSnapshotCreate *ETCDSnapshotCreate `json:"etcdSnapshotCreate,omitempty"`
 
-	// ETCDSnapshotCreatePhase is the current phase the etcd snapshot create
+	// ETCDSnapshotCreatePhase is the phase the etcd snapshot create
 	// operation is currently executing.
 	// +kubebuilder:validation:Enum=Started;RestartCluster;Finished;Failed
 	// +optional
@@ -150,7 +146,6 @@ type RKEControlPlaneStatus struct {
 }
 
 // +genclient
-// +kubebuilder:object:root=true
 // +kubebuilder:resource:path=rkecontrolplanes,shortName=rcp,scope=Namespaced,categories=cluster-api
 // +kubebuilder:subresource:status
 // +kubebuilder:metadata:labels="cluster.x-k8s.io/v1beta1=v1"
@@ -163,11 +158,7 @@ type RKEControlPlaneStatus struct {
 
 // RKEControlPlane is the Schema for the controlplane.
 type RKEControlPlane struct {
-	metav1.TypeMeta `json:",inline"`
-
-	// metadata is the standard object's metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
-	// +optional
+	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Spec is the desired state of the controlplane.

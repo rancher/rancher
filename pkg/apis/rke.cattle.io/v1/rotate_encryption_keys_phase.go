@@ -11,14 +11,14 @@ const (
 	RotateEncryptionKeysPhasePostPrepareRestart = RotateEncryptionKeysPhase("PostPrepareRestart")
 
 	// RotateEncryptionKeysPhaseRotate is the state assigned to the RKEControlPlane when the encryption key rotation operation is in the Rotate phase.
-	//	// During this phase, the "secrets-encrypt rotate" subcommand is executed on the elected controlplane leader.
+	//During this phase, the "secrets-encrypt rotate" subcommand is executed on the elected controlplane leader.
 	RotateEncryptionKeysPhaseRotate = RotateEncryptionKeysPhase("Rotate")
 
 	// RotateEncryptionKeysPhasePostRotateRestart is the state assigned to the RKEControlPlane when the encryption key rotation operation is in the Restart phase post executing the rotate command.
 	RotateEncryptionKeysPhasePostRotateRestart = RotateEncryptionKeysPhase("PostRotateRestart")
 
 	// RotateEncryptionKeysPhaseReencrypt is the state assigned to the RKEControlPlane when the encryption key rotation operation is in the Reencrypt phase.
-	//	//	// During this phase, the "secrets-encrypt reencrypt" subcommand is executed on the elected controlplane leader.
+	// During this phase, the "secrets-encrypt reencrypt" subcommand is executed on the elected controlplane leader.
 	RotateEncryptionKeysPhaseReencrypt = RotateEncryptionKeysPhase("Reencrypt")
 
 	// RotateEncryptionKeysPhasePostReencryptRestart is the state assigned to the RKEControlPlane when the encryption key rotation operation is in the Restart phase post executing the reencrypt command.

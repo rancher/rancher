@@ -4,7 +4,6 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/wrangler/v3/pkg/genericcondition"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
@@ -334,17 +333,17 @@ type AgentDeploymentCustomization struct {
 	// AppendTolerations is a list of tolerations that will be appended to
 	// the agent deployment.
 	// +optional
-	AppendTolerations []v1.Toleration `json:"appendTolerations,omitempty"`
+	AppendTolerations []corev1.Toleration `json:"appendTolerations,omitempty"`
 
 	// OverrideAffinity is an affinity that will be used to override the
 	// agent deployment's affinity.
 	// +optional
-	OverrideAffinity *v1.Affinity `json:"overrideAffinity,omitempty"`
+	OverrideAffinity *corev1.Affinity `json:"overrideAffinity,omitempty"`
 
 	// OverrideResourceRequirements defines the limits, requests, and
 	// claims of compute resources for a given container.
 	// +optional
-	OverrideResourceRequirements *v1.ResourceRequirements `json:"overrideResourceRequirements,omitempty"`
+	OverrideResourceRequirements *corev1.ResourceRequirements `json:"overrideResourceRequirements,omitempty"`
 
 	// SchedulingCustomization is an optional configuration that will be
 	// used to override the agent deployment's scheduling customization.
@@ -367,7 +366,7 @@ type AgentSchedulingCustomization struct {
 type PriorityClassSpec struct {
 	// Value represents the integer value of this priority class.
 	// This is the actual priority value that pods receive when their
-	// associated deployment specifies name of this class in the spec.
+	// associated deployment specifies the name of this class in the spec.
 	// +kubebuilder:validation:Maximum=1000000000
 	// +kubebuilder:validation:Minimum=-1000000000
 	// +optional
@@ -376,17 +375,16 @@ type PriorityClassSpec struct {
 	// PreemptionPolicy describes a policy for if/when to preempt a pod.
 	// +kubebuilder:validation:Enum=PreemptLowerPriority;Never
 	// +optional
-	PreemptionPolicy *v1.PreemptionPolicy `json:"preemptionPolicy,omitempty"`
+	PreemptionPolicy *corev1.PreemptionPolicy `json:"preemptionPolicy,omitempty"`
 }
 
-// PodDisruptionBudgetSpec is the spec for the desired pod disruption budget for the cluster.
-// +kubebuilder:validation:XValidation:rule="(has(self.minAvailable) && self.minAvailable != \"0\" && (!has(self.maxUnavailable) || self.maxUnavailable == \"0\")) || (has(self.maxUnavailable) && self.maxUnavailable != \"0\" && (!has(self.minAvailable) || self.minAvailable == \"0\"))",message="both minAvailable and maxUnavailable cannot be set to a non-zero value, at least one must be omitted or set to zero"
+// PodDisruptionBudgetSpec is the spec for the desired pod disruption budget for the corresponding agent deployment.
 type PodDisruptionBudgetSpec struct {
 	// An eviction is allowed if at least "minAvailable" will still be
 	// available after the eviction, i.e. even in the absence of the evicted
 	// pod.
 	// One can prevent all voluntary evictions by specifying "100%".
-	// +kubebuilder:validation:Pattern="^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0))$"
+	// +kubebuilder:validation:Pattern="^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0)|)$"
 	// +kubebuilder:validation:MaxLength=10
 	// +optional
 	MinAvailable string `json:"minAvailable,omitempty"`
@@ -396,7 +394,7 @@ type PodDisruptionBudgetSpec struct {
 	// evicted pod.
 	// One can prevent all voluntary evictions by specifying 0.
 	// This is a mutually exclusive setting with "minAvailable".
-	// +kubebuilder:validation:Pattern="^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0))$"
+	// +kubebuilder:validation:Pattern="^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0)|)$"
 	// +kubebuilder:validation:MaxLength=10
 	// +optional
 	MaxUnavailable string `json:"maxUnavailable,omitempty"`
@@ -410,9 +408,6 @@ type ClusterStatus struct {
 
 	// Name of the cluster.management.cattle.io object that relates to this
 	// cluster.
-	// +kubebuilder:validation:Pattern=`^(c-m-[a-z0-9]{8}|local)$`
-	// +kubebuilder:validation:MinLength=5
-	// +kubebuilder:validation:MaxLength=12
 	// +optional
 	ClusterName string `json:"clusterName,omitempty"`
 
@@ -455,7 +450,6 @@ type ClusterStatus struct {
 }
 
 // +genclient
-// +kubebuilder:object:root=true
 // +kubebuilder:resource:path=clusters,scope=Namespaced,categories=provisioning
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Version",type=string,JSONPath=".spec.rkeConfig.kubernetesVersion"
