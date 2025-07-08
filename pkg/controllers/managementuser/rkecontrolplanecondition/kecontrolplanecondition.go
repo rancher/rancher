@@ -22,32 +22,32 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type handler struct {
-	mgmtClusterName      string
-	clusterCache         provisioningcontrollers.ClusterCache
-	downstreamAppClient  catalogv1.AppClient
-	downstreamPlanClient upgradev1.PlanClient
+type Handler struct {
+	MgmtClusterName      string
+	ClusterCache         provisioningcontrollers.ClusterCache
+	DownstreamAppClient  catalogv1.AppClient
+	DownstreamPlanClient upgradev1.PlanClient
 }
 
 func Register(ctx context.Context, context *config.UserContext) {
-	h := handler{
-		mgmtClusterName:      context.ClusterName,
-		clusterCache:         context.Management.Wrangler.Provisioning.Cluster().Cache(),
-		downstreamAppClient:  context.Catalog.V1().App(),
-		downstreamPlanClient: context.Plan.V1().Plan(),
+	h := Handler{
+		MgmtClusterName:      context.ClusterName,
+		ClusterCache:         context.Management.Wrangler.Provisioning.Cluster().Cache(),
+		DownstreamAppClient:  context.Catalog.V1().App(),
+		DownstreamPlanClient: context.Plan.V1().Plan(),
 	}
 
 	rkecontrollers.RegisterRKEControlPlaneStatusHandler(ctx, context.Management.Wrangler.RKE.RKEControlPlane(),
-		"", "sync-system-upgrade-controller-condition", h.syncSystemUpgradeControllerCondition)
+		"", "sync-system-upgrade-controller-condition", h.SyncSystemUpgradeControllerCondition)
 }
 
-// syncSystemUpgradeControllerCondition checks the status of the system-upgrade-controller app in the downstream cluster
+// SyncSystemUpgradeControllerCondition checks the status of the system-upgrade-controller app in the target cluster
 // and manages the SystemUpgradeControllerReady condition on the RKEControlPlane object
-func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
+func (h *Handler) SyncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return status, nil
 	}
-	if obj.Spec.ManagementClusterName != h.mgmtClusterName {
+	if obj.Spec.ManagementClusterName != h.MgmtClusterName {
 		return status, nil
 	}
 
@@ -89,7 +89,7 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 	// If that happens, the following Get call can hang until it times out, causing this handler to take longer to return
 	// and delaying the execution of other handlers.
 	name := appName(obj.Spec.ClusterName)
-	app, err := h.downstreamAppClient.Get(namespace.System, name, metav1.GetOptions{})
+	app, err := h.DownstreamAppClient.Get(namespace.System, name, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		capr.SystemUpgradeControllerReady.Reason(&status, err.Error())
 		capr.SystemUpgradeControllerReady.Message(&status, "")
@@ -134,10 +134,10 @@ func appName(clusterName string) string {
 }
 
 // getCluster returns the provisioning cluster associated with the current userContext.
-func (h *handler) getCluster() (*provv1.Cluster, error) {
-	clusters, err := h.clusterCache.GetByIndex(cluster2.ByCluster, h.mgmtClusterName)
+func (h *Handler) getCluster() (*provv1.Cluster, error) {
+	clusters, err := h.ClusterCache.GetByIndex(cluster2.ByCluster, h.MgmtClusterName)
 	if err != nil || len(clusters) != 1 {
-		return nil, fmt.Errorf("error while retrieving cluster %s from cache via index: %w", h.mgmtClusterName, err)
+		return nil, fmt.Errorf("error while retrieving cluster %s from cache via index: %w", h.MgmtClusterName, err)
 	}
 	return clusters[0], nil
 }

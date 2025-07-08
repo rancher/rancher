@@ -520,11 +520,11 @@ func Test_handler_syncSystemUpgradeControllerStatus(t *testing.T) {
 			bc := fake.NewMockControllerInterface[*catalog.App, *catalog.AppList](ctrl)
 			cc := fake.NewMockCacheInterface[*prov.Cluster](ctrl)
 			pc := fake.NewMockControllerInterface[*upgradev1.Plan, *upgradev1.PlanList](ctrl)
-			h := &handler{
-				mgmtClusterName:      tt.setup.mgmtClusterName,
-				downstreamAppClient:  bc,
-				downstreamPlanClient: pc,
-				clusterCache:         cc,
+			h := &Handler{
+				MgmtClusterName:      tt.setup.mgmtClusterName,
+				DownstreamAppClient:  bc,
+				DownstreamPlanClient: pc,
+				ClusterCache:         cc,
 			}
 			if tt.appClientIsInvoked {
 				bc.EXPECT().Get(namespace.System, appName(tt.input.Spec.ClusterName), metav1.GetOptions{}).Return(tt.setup.app, tt.setup.appError)
@@ -548,16 +548,16 @@ func Test_handler_syncSystemUpgradeControllerStatus(t *testing.T) {
 					}
 				}()
 			}
-			got, err := h.syncSystemUpgradeControllerCondition(tt.input, tt.input.Status)
+			got, err := h.SyncSystemUpgradeControllerCondition(tt.input, tt.input.Status)
 
 			if (err != nil) != tt.wantError {
-				t.Errorf("syncSystemUpgradeControllerCondition() error = %v, wantError %v", err, tt.wantError)
+				t.Errorf("SyncSystemUpgradeControllerCondition() error = %v, wantError %v", err, tt.wantError)
 				return
 			}
 			// Check the condition's status value instead of the entire object,
 			// as it includes a lastUpdateTime field that is difficult to mock
 			if capr.SystemUpgradeControllerReady.GetStatus(&got) != tt.wantedConditionStatus {
-				t.Errorf("syncSystemUpgradeControllerCondition() got = %v, expected SystemUpgradeControllerReady condition status value = %v", got, tt.wantedConditionStatus)
+				t.Errorf("SyncSystemUpgradeControllerCondition() got = %v, expected SystemUpgradeControllerReady condition status value = %v", got, tt.wantedConditionStatus)
 			}
 		})
 	}

@@ -253,6 +253,9 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 				if name := os.Getenv("CATTLE_SUC_APP_NAME_OVERRIDE"); name != "" {
 					return name
 				}
+				if isInHarvesterLocal() {
+					return "mcc-local-managed-system-upgrade-controller"
+				}
 				return chart.SystemUpgradeControllerChartName
 			}(),
 			ChartName:           chart.SystemUpgradeControllerChartName,
@@ -310,6 +313,15 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 						versionManagementEnabled = importedclusterversionmanagement.Enabled(cluster)
 					}
 				}
+				if isInHarvesterLocal() {
+					cluster, err := h.clusterCache.Get("local")
+					if err != nil {
+						logrus.Warnf("[systemcharts] failed to get the local cluster: %v", err)
+					}
+					if cluster != nil && cluster.Status.Provider == "harvester" && cluster.Status.Driver == v3.ClusterDriverImported {
+						versionManagementEnabled = importedclusterversionmanagement.Enabled(cluster)
+					}
+				}
 				toInstall := versionManagementEnabled && toEnable
 				logrus.Debugf("[systemcharts] install system-upgrade-controller: %t (versionManagementEnabled: %t && toEnable: %t)",
 					toInstall, versionManagementEnabled, toEnable)
@@ -341,6 +353,15 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 						logrus.Warnf("[systemcharts] failed to get the local cluster: %v", err)
 					}
 					if cluster != nil && (cluster.Status.Driver == v3.ClusterDriverRke2 || cluster.Status.Driver == v3.ClusterDriverK3s) {
+						versionManagementEnabled = importedclusterversionmanagement.Enabled(cluster)
+					}
+				}
+				if isInHarvesterLocal() {
+					cluster, err := h.clusterCache.Get("local")
+					if err != nil {
+						logrus.Warnf("[systemcharts] failed to get the local cluster: %v", err)
+					}
+					if cluster != nil && cluster.Status.Provider == "harvester" && cluster.Status.Driver == v3.ClusterDriverImported {
 						versionManagementEnabled = importedclusterversionmanagement.Enabled(cluster)
 					}
 				}
@@ -538,4 +559,15 @@ func relatedConfigMaps(_, _ string, obj runtime.Object) ([]relatedresource.Key, 
 		}}, nil
 	}
 	return nil, nil
+}
+
+func isInHarvesterLocal() bool {
+	// When Rancher is embedded and running in the Harvester local cluster,
+	// the multi-cluster-management and multi-cluster-management-agent features are disabled,
+	// and the Harvester feature is enabled.
+	if !features.MCMAgent.Enabled() && !features.MCM.Enabled() && features.Harvester.Enabled() {
+		logrus.Debugf("Rnacher is embedded and running in the Harvester local cluster.")
+		return true
+	}
+	return false
 }
