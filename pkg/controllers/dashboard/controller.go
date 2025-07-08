@@ -19,7 +19,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rkecontrolplanecondition"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2"
 	"github.com/rancher/rancher/pkg/features"
-	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/needacert"
@@ -79,14 +78,12 @@ func Register(ctx context.Context, wrangler *wrangler.Context, embedded bool, re
 	// Note that the local cluster is treated as a Rancher-provisioned RKE2 cluster
 	// rather than an imported one in this scenario.
 	if !features.MCMAgent.Enabled() && !features.MCM.Enabled() && features.Harvester.Enabled() {
-		h := rkecontrolplanecondition.Handler{
-			MgmtClusterName:      "local",
-			ClusterCache:         wrangler.Provisioning.Cluster().Cache(),
-			DownstreamAppClient:  wrangler.Catalog.App(),
-			DownstreamPlanClient: wrangler.Plan.Plan(),
-		}
-		rkecontrollers.RegisterRKEControlPlaneStatusHandler(ctx, wrangler.RKE.RKEControlPlane(),
-			"", "sync-suc-condition-harvester-local", h.SyncSystemUpgradeControllerCondition)
+		rkecontrolplanecondition.Register(ctx,
+			"local",
+			wrangler.Provisioning.Cluster().Cache(),
+			wrangler.Catalog.App(),
+			wrangler.Plan.Plan(),
+			wrangler.RKE.RKEControlPlane())
 	}
 
 	if features.MCMAgent.Enabled() || features.MCM.Enabled() {

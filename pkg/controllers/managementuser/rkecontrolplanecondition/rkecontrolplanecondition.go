@@ -16,7 +16,6 @@ import (
 	upgradev1 "github.com/rancher/rancher/pkg/generated/controllers/upgrade.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,15 +28,18 @@ type Handler struct {
 	DownstreamPlanClient upgradev1.PlanClient
 }
 
-func Register(ctx context.Context, context *config.UserContext) {
+func Register(ctx context.Context, mgmtClusterName string, clusterCache provisioningcontrollers.ClusterCache,
+	downstreamAppClient catalogv1.AppClient, downstreamPlanClient upgradev1.PlanClient,
+	rkeControlPlaneController rkecontrollers.RKEControlPlaneController) {
+
 	h := Handler{
-		MgmtClusterName:      context.ClusterName,
-		ClusterCache:         context.Management.Wrangler.Provisioning.Cluster().Cache(),
-		DownstreamAppClient:  context.Catalog.V1().App(),
-		DownstreamPlanClient: context.Plan.V1().Plan(),
+		MgmtClusterName:      mgmtClusterName,
+		ClusterCache:         clusterCache,
+		DownstreamAppClient:  downstreamAppClient,
+		DownstreamPlanClient: downstreamPlanClient,
 	}
 
-	rkecontrollers.RegisterRKEControlPlaneStatusHandler(ctx, context.Management.Wrangler.RKE.RKEControlPlane(),
+	rkecontrollers.RegisterRKEControlPlaneStatusHandler(ctx, rkeControlPlaneController,
 		"", "sync-system-upgrade-controller-condition", h.SyncSystemUpgradeControllerCondition)
 }
 
