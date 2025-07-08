@@ -17,10 +17,12 @@ type RKECommonNodeConfig struct {
 	// +optional
 	// +nullable
 	Taints []corev1.Taint `json:"taints,omitempty"`
-	// CloudCredentialSecretName is the id of the secret used to provision the cluster.
+	// CloudCredentialSecretName is the id of the secret used to provision
+	// the cluster.
 	// This field must be in the format of "namespace:name".
-	// NOTE: this field overrides the field of the same name on the cluster spec, allowing individual machine pools to
-	// use separate credentials.
+	// NOTE: this field overrides the field of the same name on the cluster
+	// spec, allowing individual machine pools to use separate credentials.
+	// +kubebuilder:validation:MaxLength=317
 	// +optional
 	// +nullable
 	CloudCredentialSecretName string `json:"cloudCredentialSecretName,omitempty"`
