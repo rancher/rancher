@@ -73,6 +73,12 @@ type ClusterSpec struct {
 	// +optional
 	DefaultClusterRoleForProjectMembers string `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
 
+	// EnableNetworkPolicy defines whether project network isolation is
+	// enabled, preventing inter-project communication.
+	// It can be used with any network plugin that supports Kubernetes
+	// NetworkPolicy enforcement (e.g. canal, calico, cilium).
+	// Host network policies are only configured for RKE2 clusters using
+	// Calico; other CNIs apply host network policies using pod CIDRs.
 	// +nullable
 	// +optional
 	EnableNetworkPolicy *bool `json:"enableNetworkPolicy,omitempty" norman:"default=false"`
