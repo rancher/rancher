@@ -108,7 +108,6 @@ func (c *crtbLifecycle) syncCRTB(binding *v3.ClusterRoleTemplateBinding, remoteC
 				"RoleTemplate %s not found for ClusterRoleTemplateBinding %s. Skipping.",
 				binding.RoleTemplateName,
 				binding.Name,
-```
 			)
 			return nil
 		}
