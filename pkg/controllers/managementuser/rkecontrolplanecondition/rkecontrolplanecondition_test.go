@@ -520,7 +520,7 @@ func Test_handler_syncSystemUpgradeControllerStatus(t *testing.T) {
 			bc := fake.NewMockControllerInterface[*catalog.App, *catalog.AppList](ctrl)
 			cc := fake.NewMockCacheInterface[*prov.Cluster](ctrl)
 			pc := fake.NewMockControllerInterface[*upgradev1.Plan, *upgradev1.PlanList](ctrl)
-			h := &Handler{
+			h := &handler{
 				MgmtClusterName:      tt.setup.mgmtClusterName,
 				DownstreamAppClient:  bc,
 				DownstreamPlanClient: pc,

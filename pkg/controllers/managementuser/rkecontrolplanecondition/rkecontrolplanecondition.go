@@ -21,7 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type Handler struct {
+type handler struct {
 	MgmtClusterName      string
 	ClusterCache         provisioningcontrollers.ClusterCache
 	DownstreamAppClient  catalogv1.AppClient
@@ -32,7 +32,7 @@ func Register(ctx context.Context, mgmtClusterName string, clusterCache provisio
 	downstreamAppClient catalogv1.AppClient, downstreamPlanClient upgradev1.PlanClient,
 	rkeControlPlaneController rkecontrollers.RKEControlPlaneController) {
 
-	h := Handler{
+	h := handler{
 		MgmtClusterName:      mgmtClusterName,
 		ClusterCache:         clusterCache,
 		DownstreamAppClient:  downstreamAppClient,
@@ -45,7 +45,7 @@ func Register(ctx context.Context, mgmtClusterName string, clusterCache provisio
 
 // SyncSystemUpgradeControllerCondition checks the status of the system-upgrade-controller app in the target cluster
 // and manages the SystemUpgradeControllerReady condition on the RKEControlPlane object
-func (h *Handler) SyncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
+func (h *handler) SyncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return status, nil
 	}
@@ -136,7 +136,7 @@ func appName(clusterName string) string {
 }
 
 // getCluster returns the provisioning cluster associated with the current userContext.
-func (h *Handler) getCluster() (*provv1.Cluster, error) {
+func (h *handler) getCluster() (*provv1.Cluster, error) {
 	clusters, err := h.ClusterCache.GetByIndex(cluster2.ByCluster, h.MgmtClusterName)
 	if err != nil || len(clusters) != 1 {
 		return nil, fmt.Errorf("error while retrieving cluster %s from cache via index: %w", h.MgmtClusterName, err)
