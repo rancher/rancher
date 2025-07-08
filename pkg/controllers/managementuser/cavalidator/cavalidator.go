@@ -3,78 +3,78 @@ package cavalidator
 import (
 	"context"
 
-	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	mgmtv3controllers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/watcher"
+
 	"github.com/rancher/wrangler/v3/pkg/condition"
-	"k8s.io/apimachinery/pkg/runtime"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/util/retry"
 )
 
 const (
 	CertificateAuthorityValid = condition.Cond("AgentTlsStrictCheck")
 	CacertsValid              = "CATTLE_CACERTS_VALID"
+	stvAggregationSecretName  = "stv-aggregation"
 )
 
 type CertificateAuthorityValidator struct {
-	clusterName   string
-	clusterLister v3.ClusterLister
-	clusters      v3.ClusterInterface
-	secrets       corev1.SecretController
+	clusterName  string
+	clusterCache mgmtv3controllers.ClusterCache
+	clusters     mgmtv3controllers.ClusterClient
 }
 
 func Register(ctx context.Context, downstream *config.UserContext) {
-	c := &CertificateAuthorityValidator{
-		clusterName:   downstream.ClusterName,
-		clusterLister: downstream.Management.Management.Clusters("").Controller().Lister(),
-		clusters:      downstream.Management.Management.Clusters(""),
-		secrets:       downstream.Core.Secrets(namespace.System).Controller(),
+	// The stv-aggregation secret will never exist in the local cluster, as it is created by cattle-cluster-agent
+	if downstream.ClusterName == "local" {
+		return
 	}
 
-	c.secrets.AddHandler(ctx, "cavalidator-secret", c.onStvAggregationSecret)
+	c := &CertificateAuthorityValidator{
+		clusterName:  downstream.ClusterName,
+		clusterCache: downstream.Management.Wrangler.Mgmt.Cluster().Cache(),
+		clusters:     downstream.Management.Wrangler.Mgmt.Cluster(),
+	}
+
+	// Downstream Secret caches are restricted to the impersonation namespace only, see https://github.com/rancher/rancher/issues/46827
+	// Use a single Watch instead of relying on full-blown informers
+	watcher.OnChange(downstream.Corew.Secret(), ctx, "cavalidator-secret", c.onStvAggregationSecret,
+		watcher.WithNamespace(namespace.System),
+		watcher.WithFieldSelector(map[string]string{"metadata.name": stvAggregationSecretName}),
+	)
 }
 
-func (c *CertificateAuthorityValidator) onStvAggregationSecret(_ string, obj *corev1.Secret) (runtime.Object, error) {
-	if obj == nil {
+func (c *CertificateAuthorityValidator) onStvAggregationSecret(_ string, obj *corev1.Secret) (*corev1.Secret, error) {
+	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
 
-	if obj.Name == "stv-aggregation" && obj.Namespace == namespace.System {
-		mgmtCluster, err := c.clusterLister.Get("", c.clusterName)
+	return nil, retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		mgmtCluster, err := c.clusterCache.Get(c.clusterName)
 		if err != nil {
-			return obj, err
+			return err
 		}
+		mgmtCluster = mgmtCluster.DeepCopy()
+
 		if string(obj.Data[CacertsValid]) == "true" && len(obj.Data["ca.crt"]) != 0 {
-			if !CertificateAuthorityValid.IsTrue(mgmtCluster) {
-				newMgmtCluster := mgmtCluster.DeepCopy()
-				CertificateAuthorityValid.True(newMgmtCluster)
-				_, err = c.clusters.Update(newMgmtCluster)
-				if err != nil {
-					return obj, err
-				}
+			if CertificateAuthorityValid.IsTrue(mgmtCluster) {
+				return nil
 			}
-			return obj, nil
-		}
-		var needsUpdate bool
-		if string(obj.Data[CacertsValid]) == "false" {
-			if !CertificateAuthorityValid.IsFalse(mgmtCluster) {
-				needsUpdate = true
-				mgmtCluster = mgmtCluster.DeepCopy()
-				CertificateAuthorityValid.False(mgmtCluster)
+			CertificateAuthorityValid.True(mgmtCluster)
+		} else if string(obj.Data[CacertsValid]) == "false" {
+			if CertificateAuthorityValid.IsFalse(mgmtCluster) {
+				return nil
 			}
+			CertificateAuthorityValid.False(mgmtCluster)
 		} else {
-			if !CertificateAuthorityValid.IsUnknown(mgmtCluster) {
-				needsUpdate = true
-				mgmtCluster = mgmtCluster.DeepCopy()
-				CertificateAuthorityValid.Unknown(mgmtCluster)
+			if CertificateAuthorityValid.IsUnknown(mgmtCluster) {
+				return nil
 			}
+			CertificateAuthorityValid.Unknown(mgmtCluster)
 		}
-		if needsUpdate {
-			_, err = c.clusters.Update(mgmtCluster)
-			if err != nil {
-				return obj, err
-			}
-		}
-	}
-	return obj, nil
+
+		_, err = c.clusters.UpdateStatus(mgmtCluster)
+		return err
+	})
 }
