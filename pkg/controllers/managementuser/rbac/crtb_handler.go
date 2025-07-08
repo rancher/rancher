@@ -103,6 +103,14 @@ func (c *crtbLifecycle) syncCRTB(binding *v3.ClusterRoleTemplateBinding, remoteC
 	if err != nil {
 		err = fmt.Errorf("couldn't get role template %v: %w", binding.RoleTemplateName, err)
 		c.s.AddCondition(remoteConditions, condition, failedToGetRoleTemplate, err)
+		if apierrors.IsNotFound(err) {
+			logrus.Warnf(
+				"RoleTemplate %s not found for ClusterRoleTemplateBinding %s. Skipping.",
+				binding.RoleTemplateName,
+				binding.Name,
+			)
+			return nil
+		}
 		return err
 	}
 

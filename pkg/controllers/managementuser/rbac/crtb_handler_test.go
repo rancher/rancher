@@ -5,20 +5,21 @@ import (
 	"testing"
 	"time"
 
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/status"
 	controllersv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 var (
-	e           = fmt.Errorf("error")
+	errDefault  = fmt.Errorf("error")
 	defaultCRTB = v3.ClusterRoleTemplateBinding{
 		UserName:         "crtb-name",
 		RoleTemplateName: "rt-name",
@@ -92,7 +93,7 @@ func TestSyncCRTB(t *testing.T) {
 			name: "error getting roletemplate",
 			stateSetup: func(cts crtbTestState) {
 				cts.rtListerMock.GetFunc = func(namespace, name string) (*v3.RoleTemplate, error) {
-					return nil, e
+					return nil, errDefault
 				}
 			},
 			crtb:      defaultCRTB.DeepCopy(),
@@ -101,7 +102,29 @@ func TestSyncCRTB(t *testing.T) {
 				{
 					Type:    clusterRolesExists,
 					Status:  v1.ConditionFalse,
-					Message: "couldn't get role template rt-name: " + e.Error(),
+					Message: "couldn't get role template rt-name: " + errDefault.Error(),
+					Reason:  failedToGetRoleTemplate,
+					LastTransitionTime: v1.Time{
+						Time: mockTime,
+					},
+				},
+			},
+		},
+		{
+			name: "error getting roletemplate when role template is not found",
+			stateSetup: func(cts crtbTestState) {
+				cts.rtListerMock.GetFunc = func(namespace, name string) (*v3.RoleTemplate, error) {
+					notFoundErr := apierrors.NewNotFound(schema.GroupResource{}, "roletemplates.management.cattle.io \"rt-name\" not found")
+					return nil, notFoundErr
+				}
+			},
+			crtb:      defaultCRTB.DeepCopy(),
+			wantError: false,
+			wantConditions: []v1.Condition{
+				{
+					Type:    clusterRolesExists,
+					Status:  v1.ConditionFalse,
+					Message: "couldn't get role template rt-name:  \"roletemplates.management.cattle.io \\\"rt-name\\\" not found\" not found",
 					Reason:  failedToGetRoleTemplate,
 					LastTransitionTime: v1.Time{
 						Time: mockTime,
@@ -115,7 +138,7 @@ func TestSyncCRTB(t *testing.T) {
 				cts.rtListerMock.GetFunc = func(namespace, name string) (*v3.RoleTemplate, error) {
 					return nil, nil
 				}
-				cts.managerMock.EXPECT().gatherRoles(gomock.Any(), gomock.Any(), gomock.Any()).Return(e)
+				cts.managerMock.EXPECT().gatherRoles(gomock.Any(), gomock.Any(), gomock.Any()).Return(errDefault)
 			},
 			crtb:      defaultCRTB.DeepCopy(),
 			wantError: true,
@@ -123,7 +146,7 @@ func TestSyncCRTB(t *testing.T) {
 				{
 					Type:    clusterRolesExists,
 					Status:  v1.ConditionFalse,
-					Message: e.Error(),
+					Message: errDefault.Error(),
 					Reason:  failedToGatherRoles,
 					LastTransitionTime: v1.Time{
 						Time: mockTime,
@@ -138,7 +161,7 @@ func TestSyncCRTB(t *testing.T) {
 					return nil, nil
 				}
 				cts.managerMock.EXPECT().gatherRoles(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
-				cts.managerMock.EXPECT().ensureRoles(gomock.Any()).Return(e)
+				cts.managerMock.EXPECT().ensureRoles(gomock.Any()).Return(errDefault)
 			},
 			crtb:      defaultCRTB.DeepCopy(),
 			wantError: true,
@@ -146,7 +169,7 @@ func TestSyncCRTB(t *testing.T) {
 				{
 					Type:    clusterRolesExists,
 					Status:  v1.ConditionFalse,
-					Message: "couldn't ensure roles: " + e.Error(),
+					Message: "couldn't ensure roles: " + errDefault.Error(),
 					Reason:  failedToCreateRoles,
 					LastTransitionTime: v1.Time{
 						Time: mockTime,
@@ -162,7 +185,7 @@ func TestSyncCRTB(t *testing.T) {
 				}
 				cts.managerMock.EXPECT().gatherRoles(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 				cts.managerMock.EXPECT().ensureRoles(gomock.Any()).Return(nil)
-				cts.managerMock.EXPECT().ensureClusterBindings(gomock.Any(), gomock.Any()).Return(e)
+				cts.managerMock.EXPECT().ensureClusterBindings(gomock.Any(), gomock.Any()).Return(errDefault)
 			},
 			crtb:      defaultCRTB.DeepCopy(),
 			wantError: true,
@@ -178,7 +201,7 @@ func TestSyncCRTB(t *testing.T) {
 				{
 					Type:    clusterRoleBindingsExists,
 					Status:  v1.ConditionFalse,
-					Message: "couldn't ensure cluster bindings : " + e.Error(),
+					Message: "couldn't ensure cluster bindings : " + errDefault.Error(),
 					Reason:  failedToCreateBindings,
 					LastTransitionTime: v1.Time{
 						Time: mockTime,
@@ -195,7 +218,7 @@ func TestSyncCRTB(t *testing.T) {
 				cts.managerMock.EXPECT().gatherRoles(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 				cts.managerMock.EXPECT().ensureRoles(gomock.Any()).Return(nil)
 				cts.managerMock.EXPECT().ensureClusterBindings(gomock.Any(), gomock.Any()).Return(nil)
-				cts.managerMock.EXPECT().ensureServiceAccountImpersonator(gomock.Any()).Return(e)
+				cts.managerMock.EXPECT().ensureServiceAccountImpersonator(gomock.Any()).Return(errDefault)
 			},
 			crtb:      defaultCRTB.DeepCopy(),
 			wantError: true,
@@ -219,7 +242,7 @@ func TestSyncCRTB(t *testing.T) {
 				{
 					Type:    serviceAccountImpersonatorExists,
 					Status:  v1.ConditionFalse,
-					Message: "couldn't ensure service account impersonator: " + e.Error(),
+					Message: "couldn't ensure service account impersonator: " + errDefault.Error(),
 					Reason:  failedToCreateServiceAccountImpersonator,
 					LastTransitionTime: v1.Time{
 						Time: mockTime,
