@@ -126,7 +126,7 @@ type RKEProvisioningFiles struct {
 }
 
 type RKEClusterSpec struct {
-	// controlPlaneEndpoint represents the endpoint used to communicate with the control plane.
+	// ControlPlaneEndpoint represents the endpoint used to communicate with the control plane.
 	// +optional
 	ControlPlaneEndpoint *capi.APIEndpoint `json:"controlPlaneEndpoint,omitempty"`
 }
