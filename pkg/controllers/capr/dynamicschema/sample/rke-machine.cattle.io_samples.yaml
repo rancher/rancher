@@ -42,10 +42,12 @@ spec:
                 properties:
                   cloudCredentialSecretName:
                     description: |-
-                      CloudCredentialSecretName is the id of the secret used to provision the cluster.
+                      CloudCredentialSecretName is the id of the secret used to provision
+                      the cluster.
                       This field must be in the format of "namespace:name".
-                      NOTE: this field overrides the field of the same name on the cluster spec, allowing individual machine pools to
-                      use separate credentials.
+                      NOTE: this field overrides the field of the same name on the cluster
+                      spec, allowing individual machine pools to use separate credentials.
+                    maxLength: 317
                     nullable: true
                     type: string
                   labels:
