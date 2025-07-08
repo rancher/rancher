@@ -76,6 +76,8 @@ func Register(ctx context.Context, wrangler *wrangler.Context, embedded bool, re
 
 	// In the case where Rancher is embedded and running in the Harvester local cluster,
 	// we need to manage the SystemUpgradeControllerReady condition for the local cluster.
+	// Note that the local cluster is treated as a Rancher-provisioned RKE2 cluster
+	// rather than an imported one in this scenario.
 	if !features.MCMAgent.Enabled() && !features.MCM.Enabled() && features.Harvester.Enabled() {
 		h := rkecontrolplanecondition.Handler{
 			MgmtClusterName:      "local",

@@ -566,7 +566,7 @@ func isInHarvesterLocal() bool {
 	// the multi-cluster-management and multi-cluster-management-agent features are disabled,
 	// and the Harvester feature is enabled.
 	if !features.MCMAgent.Enabled() && !features.MCM.Enabled() && features.Harvester.Enabled() {
-		logrus.Debugf("Rnacher is embedded and running in the Harvester local cluster.")
+		logrus.Debugf("Rancher is embedded and running in the Harvester local cluster.")
 		return true
 	}
 	return false
