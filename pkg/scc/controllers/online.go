@@ -95,6 +95,23 @@ func (s sccOnlineMode) Register(registrationObj *v1.Registration) (suseconnect.R
 	return id, nil
 }
 
+func (s sccOnlineMode) PrepareRegisteredForActivation(registration *v1.Registration) (*v1.Registration, error) {
+	if registration.Status.SCCSystemId == nil {
+		return registration, errors.New("SCC system ID cannot be empty when preparing registered system")
+	}
+	sccSystemUrl := fmt.Sprintf("https://scc.suse.com/systems/%d", *registration.Status.SCCSystemId)
+	s.log.Debugf("system announced, check %s", sccSystemUrl)
+
+	registration.Status.ActivationStatus.SystemUrl = &sccSystemUrl
+	v1.RegistrationConditionSccUrlReady.SetStatusBool(registration, false) // This must be false until successful activation too.
+	v1.RegistrationConditionSccUrlReady.SetMessageIfBlank(registration, fmt.Sprintf("system announced, check %s", sccSystemUrl))
+	v1.RegistrationConditionAnnounced.SetStatusBool(registration, true)
+	v1.ResourceConditionFailure.SetStatusBool(registration, false)
+	v1.ResourceConditionReady.SetStatusBool(registration, true)
+
+	return registration, nil
+}
+
 func isNonRecoverableHttpError(err error) bool {
 	var sccApiError *connection.ApiError
 
@@ -124,6 +141,7 @@ func getHttpErrorCode(err error) *int {
 
 type registrationReconcilerApplier func(regApplierIn *v1.Registration, httpCode *int) *v1.Registration
 
+// reconcileNonRecoverableHttpError can help reconcile the registration state for any API/HTTP error related reasons
 func (s sccOnlineMode) reconcileNonRecoverableHttpError(registrationIn *v1.Registration, registerErr error, additionalApplier registrationReconcilerApplier) *v1.Registration {
 	httpCode := *getHttpErrorCode(registerErr)
 	nowTime := metav1.Now()
@@ -160,24 +178,9 @@ func (s sccOnlineMode) ReconcileRegisterError(registrationObj *v1.Registration, 
 		)
 	}
 
+	// TODO: any phase specific state updates
+
 	return shared.PrepareFailed(registrationObj, registerErr)
-}
-
-func (s sccOnlineMode) PrepareRegisteredForActivation(registration *v1.Registration) (*v1.Registration, error) {
-	if registration.Status.SCCSystemId == nil {
-		return registration, errors.New("SCC system ID cannot be empty when preparing registered system")
-	}
-	sccSystemUrl := fmt.Sprintf("https://scc.suse.com/systems/%d", *registration.Status.SCCSystemId)
-	s.log.Debugf("system announced, check %s", sccSystemUrl)
-
-	registration.Status.ActivationStatus.SystemUrl = &sccSystemUrl
-	v1.RegistrationConditionSccUrlReady.SetStatusBool(registration, false) // This must be false until successful activation too.
-	v1.RegistrationConditionSccUrlReady.SetMessageIfBlank(registration, fmt.Sprintf("system announced, check %s", sccSystemUrl))
-	v1.RegistrationConditionAnnounced.SetStatusBool(registration, true)
-	v1.ResourceConditionFailure.SetStatusBool(registration, false)
-	v1.ResourceConditionReady.SetStatusBool(registration, true)
-
-	return registration, nil
 }
 
 func (s sccOnlineMode) NeedsActivation(registrationObj *v1.Registration) bool {

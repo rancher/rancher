@@ -56,10 +56,6 @@ func (s sccOfflineMode) Register(registrationObj *v1.Registration) (suseconnect.
 	return suseconnect.OfflineRegistrationSystemId, nil
 }
 
-func (s sccOfflineMode) ReconcileRegisterError(registrationObj *v1.Registration, registerErr error, phase types.RegistrationPhase) *v1.Registration {
-	return registrationObj
-}
-
 func (s sccOfflineMode) PrepareRegisteredForActivation(registrationObj *v1.Registration) (*v1.Registration, error) {
 
 	v1.RegistrationConditionOfflineRequestReady.True(registrationObj)
@@ -67,6 +63,13 @@ func (s sccOfflineMode) PrepareRegisteredForActivation(registrationObj *v1.Regis
 	v1.RegistrationConditionOfflineCertificateReady.SetMessageIfBlank(registrationObj, "Awaiting registration certificate secret")
 
 	return registrationObj, nil
+}
+
+// ReconcileRegisterError helps reconcile any errors in the register phase
+func (s sccOfflineMode) ReconcileRegisterError(registrationObj *v1.Registration, registerErr error, phase types.RegistrationPhase) *v1.Registration {
+	// TODO: handle PrepareForRegister related errors - secret related
+	// TODO: handle Register related errors - from prepare offline request and updating secret
+	return registrationObj
 }
 
 func (s sccOfflineMode) NeedsActivation(registrationObj *v1.Registration) bool {
@@ -155,9 +158,6 @@ func (s sccOfflineMode) Keepalive(registrationObj *v1.Registration) error {
 }
 
 func (s sccOfflineMode) PrepareKeepaliveSucceeded(registrationObj *v1.Registration) (*v1.Registration, error) {
-
-	// TODO other post keep alive success
-
 	sccWrapper := suseconnect.OfflineRancherRegistration(s.systemInfoExporter)
 	generatedOfflineRegistrationRequest, err := sccWrapper.PrepareOfflineRegistrationRequest()
 	if err != nil {
@@ -172,13 +172,11 @@ func (s sccOfflineMode) PrepareKeepaliveSucceeded(registrationObj *v1.Registrati
 }
 
 func (s sccOfflineMode) ReconcileKeepaliveError(registration *v1.Registration, err error, phase types.KeepalivePhase) *v1.Registration {
-	s.log.Debugf("Because offline Keepalive is intentional noop, this shouldn't trigger")
+	// TODO: handle errors from Keepalive and PrepareKeepaliveSucceeded
 	return registration
 }
 
 func (s sccOfflineMode) Deregister() error {
-	// TODO implement me; for now this is no-op
-	// TODO eventually this should clean up secrets downstream of this offline reg
 	delErr := s.offlineSecrets.Remove()
 	if delErr != nil {
 		return fmt.Errorf("deregister failed: %w", delErr)

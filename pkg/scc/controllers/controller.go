@@ -563,6 +563,7 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 			activated := registrationObj.DeepCopy()
 			activated = shared.PrepareSuccessfulActivation(activated)
 			prepared, err := registrationHandler.PrepareActivatedForKeepalive(activated)
+			// TODO: should this use the reconciler too
 			if err != nil {
 				return err
 			}
