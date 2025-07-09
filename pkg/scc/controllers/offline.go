@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/SUSE/connect-ng/pkg/registration"
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/scc/controllers/shared"
+	"github.com/rancher/rancher/pkg/scc/controllers/common"
 	"github.com/rancher/rancher/pkg/scc/suseconnect"
 	offlineSecrets "github.com/rancher/rancher/pkg/scc/suseconnect/offline"
 	"github.com/rancher/rancher/pkg/scc/systeminfo"
@@ -125,7 +125,7 @@ func (s sccOfflineMode) ReconcileActivateError(registrationObj *v1.Registration,
 	// Cannot recover from this error so must set failure
 	registrationObj.Status.ActivationStatus.Activated = false
 
-	return shared.PrepareFailed(registrationObj, activationErr)
+	return common.PrepareFailed(registrationObj, activationErr)
 }
 
 func (s sccOfflineMode) Keepalive(registrationObj *v1.Registration) error {

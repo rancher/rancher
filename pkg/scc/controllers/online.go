@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/rancher/rancher/pkg/scc/consts"
-	"github.com/rancher/rancher/pkg/scc/controllers/shared"
+	"github.com/rancher/rancher/pkg/scc/controllers/common"
 	"github.com/rancher/rancher/pkg/scc/types"
 	"golang.org/x/sync/semaphore"
 	"net/http"
@@ -180,7 +180,7 @@ func (s sccOnlineMode) ReconcileRegisterError(registrationObj *v1.Registration, 
 
 	// TODO: any phase specific state updates
 
-	return shared.PrepareFailed(registrationObj, registerErr)
+	return common.PrepareFailed(registrationObj, registerErr)
 }
 
 func (s sccOnlineMode) NeedsActivation(registrationObj *v1.Registration) bool {

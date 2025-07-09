@@ -1,4 +1,4 @@
-package shared
+package common
 
 import (
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"

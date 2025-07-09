@@ -11,7 +11,7 @@ import (
 
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/scc/consts"
-	"github.com/rancher/rancher/pkg/scc/controllers/shared"
+	"github.com/rancher/rancher/pkg/scc/controllers/common"
 	"github.com/rancher/rancher/pkg/scc/suseconnect"
 	"github.com/rancher/rancher/pkg/scc/suseconnect/credentials"
 	"github.com/rancher/rancher/pkg/scc/suseconnect/offline"
@@ -454,7 +454,7 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 		return registrationObj, errors.New("no server url found in the system info")
 	}
 
-	if shared.RegistrationIsFailed(registrationObj) {
+	if common.RegistrationIsFailed(registrationObj) {
 		return registrationObj, errors.New("registration has failed status; create a new one to retry")
 	}
 
@@ -561,7 +561,7 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 			}
 
 			activated := registrationObj.DeepCopy()
-			activated = shared.PrepareSuccessfulActivation(activated)
+			activated = common.PrepareSuccessfulActivation(activated)
 			prepared, err := registrationHandler.PrepareActivatedForKeepalive(activated)
 			// TODO: should this use the reconciler too
 			if err != nil {
@@ -578,7 +578,7 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 	}
 
 	// Handle what to do when CheckNow is used...
-	if shared.RegistrationNeedsSyncNow(registrationObj) {
+	if common.RegistrationNeedsSyncNow(registrationObj) {
 		if registrationObj.Spec.Mode == v1.RegistrationModeOffline {
 			updated := registrationObj.DeepCopy()
 			// TODO(o&b): When offline calls this it should immediately sync the OfflineRegistrationRequest secret content
