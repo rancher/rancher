@@ -472,6 +472,11 @@ func (s *steveAPITestSuite) setupSuite(clusterName string) {
 				labels[labelGTEKey] = "3"
 			}
 			secret.ObjectMeta.SetLabels(labels)
+			if i == 4 && name == "test-ns-2" {
+				// test4 in namespace test-ns-2 has this annotation
+				annotations := map[string]string{"management.cattle.io/project-scoped-secret-copy": "spuds"}
+				secret.ObjectMeta.SetAnnotations(annotations)
+			}
 			err := retryRequest(func() error {
 				_, err := secrets.CreateSecretForCluster(s.client, secret, s.clusterID, n)
 				if apierrors.IsAlreadyExists(err) {
@@ -979,6 +984,22 @@ func (s *steveAPITestSuite) TestList() {
 				{"name": "test4", "namespace": "test-ns-5"},
 				{"name": "test5", "namespace": "test-ns-5"},
 			},
+		},
+		{
+			description: "user:user-a,namespace:test-ns-2,query:filter=metadata.annotations[management.cattle.io/project-scoped-secret-copy]=spuds",
+			user:        "user-a",
+			namespace:   "test-ns-2",
+			query:       "filter=metadata.annotations[management.cattle.io/project-scoped-secret-copy]=spuds",
+			expect: []map[string]string{
+				{"name": "test4", "namespace": "test-ns-2"},
+			},
+		},
+		{
+			description: "user:user-a,namespace:test-ns-2,query:filter=metadata.annotations[management.cattle.io/project-scoped-secret-copy]=potatoes",
+			user:        "user-a",
+			namespace:   "test-ns-2",
+			query:       "filter=metadata.annotations[management.cattle.io/project-scoped-secret-copy]=potatoes",
+			expect: []map[string]string{ },
 		},
 		{
 			description: "user:user-a,namespace:none,query:sort=metadata.name",
@@ -2661,6 +2682,8 @@ func getFileName(user, ns, query string) string {
 	}
 	if query == "" {
 		query = "none"
+	} else {
+		query = strings.ReplaceAll(query, "/", "%2F")
 	}
 	return user + "_" + ns + "_" + query + ".json"
 }
