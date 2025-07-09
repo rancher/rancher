@@ -300,7 +300,7 @@ func (s sccOnlineMode) PrepareKeepaliveSucceeded(registration *v1.Registration) 
 	return registration, nil
 }
 
-func (s sccOnlineMode) ReconcileKeepaliveError(registration *v1.Registration, keepaliveErr error, phase types.KeepalivePhase) *v1.Registration {
+func (s sccOnlineMode) ReconcileKeepaliveError(registration *v1.Registration, keepaliveErr error) *v1.Registration {
 	if isNonRecoverableHttpError(keepaliveErr) {
 		return s.reconcileNonRecoverableHttpError(
 			registration,

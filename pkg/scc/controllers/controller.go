@@ -70,7 +70,7 @@ type SCCHandler interface {
 	// ReconcileRegisterError prepares the Registration object for error reconciliation after RegisterSystem fails.
 	ReconcileRegisterError(*v1.Registration, error, types.RegistrationPhase) *v1.Registration
 	// ReconcileKeepaliveError prepares the Registration object for error reconciliation after Keepalive fails.
-	ReconcileKeepaliveError(*v1.Registration, error, types.KeepalivePhase) *v1.Registration
+	ReconcileKeepaliveError(*v1.Registration, error) *v1.Registration
 	// ReconcileActivateError prepares the Registration object for error reconciliation after Activate fails.
 	ReconcileActivateError(*v1.Registration, error, types.ActivationPhase) *v1.Registration
 }
@@ -607,11 +607,27 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 
 	keepaliveErr := registrationHandler.Keepalive(registrationObj)
 	if keepaliveErr != nil {
-		err := h.reconcileKeepalive(registrationHandler, registrationObj, keepaliveErr, types.KeepaliveAlive)
+		reconcileErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			curReg, getErr := h.registrations.Get(registrationObj.Name, metav1.GetOptions{})
+			if getErr != nil {
+				return getErr
+			}
+
+			prepareObj := curReg.DeepCopy()
+			prepareObj = registrationHandler.ReconcileKeepaliveError(prepareObj, keepaliveErr)
+
+			_, reconcileUpdateErr := h.registrations.Update(prepareObj)
+			return reconcileUpdateErr
+		})
+
+		err := fmt.Errorf("keepalive failed: %w", keepaliveErr)
+		if reconcileErr != nil {
+			err = fmt.Errorf("keepalive failed with additional errors: %w, %w", keepaliveErr, reconcileErr)
+		}
+
 		return registrationObj, err
 	}
 
-	// TODO: maybe this should be in a PrepareKeepaliveSuccess
 	updateErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		var err error
 		registrationObj, err = h.registrations.Get(registrationObj.Name, metav1.GetOptions{})
@@ -619,16 +635,16 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 			return err
 		}
 
+		timeNow := time.Now()
 		updated := registrationObj.DeepCopy()
 		v1.RegistrationConditionSccUrlReady.True(updated)
 		v1.ResourceConditionProgressing.False(updated)
 		v1.ResourceConditionReady.True(updated)
 		v1.ResourceConditionDone.True(updated)
+		v1.RegistrationConditionKeepalive.True(updated)
 		updated.Status.ActivationStatus.LastValidatedTS = &metav1.Time{
-			Time: time.Now(),
+			Time: timeNow,
 		}
-		// TODO: set keepalive condition success
-		// TODO: make sure we set Activated condition and add "ValidUntilTS" to that status
 		updated.Status.ActivationStatus.Activated = true
 		_, err = h.registrations.UpdateStatus(updated)
 		return err

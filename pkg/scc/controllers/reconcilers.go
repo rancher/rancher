@@ -62,11 +62,3 @@ func (h *handler) reconcileActivation(registrationHandler SCCHandler, registrati
 	}
 	return genericReconcilerApplier(h.registrations, registrationObj.Name, adapter, regErr, phase)
 }
-
-func (h *handler) reconcileKeepalive(registrationHandler SCCHandler, registrationObj *v1.Registration, regErr error, phase types.KeepalivePhase) error {
-	adapter := func(reg *v1.Registration, err error, p types.Phase) *v1.Registration {
-		specificPhase, _ := p.(types.KeepalivePhase)
-		return registrationHandler.ReconcileKeepaliveError(reg, err, specificPhase)
-	}
-	return genericReconcilerApplier(h.registrations, registrationObj.Name, adapter, regErr, phase)
-}

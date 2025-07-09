@@ -177,7 +177,7 @@ func (s sccOfflineMode) PrepareKeepaliveSucceeded(registrationObj *v1.Registrati
 	return registrationObj, nil
 }
 
-func (s sccOfflineMode) ReconcileKeepaliveError(registration *v1.Registration, err error, phase types.KeepalivePhase) *v1.Registration {
+func (s sccOfflineMode) ReconcileKeepaliveError(registration *v1.Registration, err error) *v1.Registration {
 	// TODO: handle errors from Keepalive and PrepareKeepaliveSucceeded
 	return registration
 }

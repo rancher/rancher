@@ -38,6 +38,7 @@ const (
 	// ActivationInit is unused (for now) but represents any phase before things actually get started
 	ActivationInit ActivationPhase = iota
 	ActivationMain
+	ActivationPrepForKeepalive
 )
 
 func (a ActivationPhase) String() string {
@@ -52,26 +53,5 @@ func (a ActivationPhase) IndividualName() string {
 	return [...]string{"Init", "Main"}[a]
 }
 
-type KeepalivePhase int
-
-const (
-	KeepaliveInit KeepalivePhase = iota
-	KeepaliveAlive
-)
-
-func (k KeepalivePhase) String() string {
-	return k.IndividualName()
-}
-
-func (k KeepalivePhase) GroupName() string {
-	return "Keepalive"
-}
-
-func (k KeepalivePhase) IndividualName() string {
-	// TODO: Implement with actual names for Keepalive phases
-	return [...]string{"Init", "Main"}[k]
-}
-
 var _ Phase = RegistrationPhase(0)
 var _ Phase = ActivationPhase(0)
-var _ Phase = KeepalivePhase(0)
