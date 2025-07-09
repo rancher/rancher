@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/dashboard/scaleavailable"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/systemcharts"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/rkecontrolplanecondition"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
@@ -70,6 +71,19 @@ func Register(ctx context.Context, wrangler *wrangler.Context, embedded bool, re
 				return err
 			}
 		}
+	}
+
+	// In the case where Rancher is embedded and running in the Harvester local cluster,
+	// we need to manage the SystemUpgradeControllerReady condition for the local cluster.
+	// Note that the local cluster is treated as a Rancher-provisioned RKE2 cluster
+	// rather than an imported one in this scenario.
+	if !features.MCMAgent.Enabled() && !features.MCM.Enabled() && features.Harvester.Enabled() {
+		rkecontrolplanecondition.Register(ctx,
+			"local",
+			wrangler.Provisioning.Cluster().Cache(),
+			wrangler.Catalog.App(),
+			wrangler.Plan.Plan(),
+			wrangler.RKE.RKEControlPlane())
 	}
 
 	if features.MCMAgent.Enabled() || features.MCM.Enabled() {
