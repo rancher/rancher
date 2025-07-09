@@ -30,7 +30,7 @@ func makeRegistrationReconcileRetry(
 	}
 }
 
-func genericReconcilerApplier(
+func phaseBasedReconcilerApplier(
 	registrations registrationControllers.RegistrationController,
 	regName string,
 	reconciler types.HandlerReconcileErrorProcessor,
@@ -52,7 +52,7 @@ func (h *handler) reconcileRegistration(registrationHandler SCCHandler, registra
 		specificPhase, _ := p.(types.RegistrationPhase)
 		return registrationHandler.ReconcileRegisterError(reg, err, specificPhase)
 	}
-	return genericReconcilerApplier(h.registrations, registrationObj.Name, adapter, regErr, phase)
+	return phaseBasedReconcilerApplier(h.registrations, registrationObj.Name, adapter, regErr, phase)
 }
 
 func (h *handler) reconcileActivation(registrationHandler SCCHandler, registrationObj *v1.Registration, regErr error, phase types.ActivationPhase) error {
@@ -60,5 +60,5 @@ func (h *handler) reconcileActivation(registrationHandler SCCHandler, registrati
 		specificPhase, _ := p.(types.ActivationPhase)
 		return registrationHandler.ReconcileActivateError(reg, err, specificPhase)
 	}
-	return genericReconcilerApplier(h.registrations, registrationObj.Name, adapter, regErr, phase)
+	return phaseBasedReconcilerApplier(h.registrations, registrationObj.Name, adapter, regErr, phase)
 }
