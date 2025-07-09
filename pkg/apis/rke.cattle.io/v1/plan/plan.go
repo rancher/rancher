@@ -1,6 +1,10 @@
 package plan
 
-import capi "sigs.k8s.io/cluster-api/api/v1beta1"
+import (
+	"hash"
+
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+)
 
 type Plan struct {
 	Nodes    map[string]*Node         `json:"nodes,omitempty"`
@@ -69,7 +73,17 @@ type File struct {
 	Path        string `json:"path,omitempty"`
 	Permissions string `json:"permissions,omitempty"`
 	Dynamic     bool   `json:"dynamic,omitempty"`
-	Minor       bool   `json:"minor,omitempty"` // minor signifies that the file can be changed on a node without having to cause a full-blown drain/cordon operation
+	// Minor signifies that the file can be changed on a node without having to cause a full-blown drain/cordon operation
+	Minor bool `json:"minor,omitempty"`
+
+	// DrainHashFunc specifies a custom hash function to be used by the planner when this file is processed while
+	// updating the plans DRAIN_HASH value, as opposed to the default behavior of directly hashing the contents of the
+	// File.
+	// This allows the planner to better determine when a given File operation should drain or restart a node (or both).
+	// This can be useful when changing certain properties of the rke2/k3s ConfigYamlFileName file, such as the "server"
+	// arg, which should restart the distribution but not trigger a drain (so long as that was the only change within
+	// the File).
+	DrainHashFunc func(hash.Hash) error `json:"-"`
 }
 
 // NodePlan is the struct used to deliver instructions/files/probes to the system-agent, and retrieve feedback

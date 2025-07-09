@@ -24,9 +24,9 @@ import (
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/equality"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/labels"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
@@ -41,13 +41,15 @@ type PlanStore struct {
 	secrets      corecontrollers.SecretClient
 	secretsCache corecontrollers.SecretCache
 	machineCache capicontrollers.MachineCache
+	equalities   conversion.Equalities
 }
 
-func NewStore(secrets corecontrollers.SecretController, machineCache capicontrollers.MachineCache) *PlanStore {
+func NewStore(secrets corecontrollers.SecretController, machineCache capicontrollers.MachineCache, equalities conversion.Equalities) *PlanStore {
 	return &PlanStore{
 		secrets:      secrets,
 		secretsCache: secrets.Cache(),
 		machineCache: machineCache,
+		equalities:   equalities,
 	}
 }
 
@@ -476,7 +478,7 @@ func (p *PlanStore) removePlanSecretLabel(entry *planEntry, key string) error {
 
 // assignAndCheckPlan assigns the given newPlan to the designated server in the planEntry, and will return nil if the plan is assigned and in sync.
 func assignAndCheckPlan(store *PlanStore, msg string, entry *planEntry, newPlan plan.NodePlan, joinedTo string, failureThreshold, maxRetries int) error {
-	if entry.Plan == nil || !equality.Semantic.DeepEqual(entry.Plan.Plan, newPlan) {
+	if entry.Plan == nil || !store.equalities.DeepEqual(entry.Plan.Plan, newPlan) {
 		if err := store.UpdatePlan(entry, newPlan, joinedTo, failureThreshold, maxRetries); err != nil {
 			return err
 		}

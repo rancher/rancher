@@ -36,6 +36,7 @@ import (
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/client-go/util/retry"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
@@ -127,6 +128,12 @@ type Planner struct {
 	locker                        locker.Locker
 	etcdS3Args                    s3Args
 	retrievalFunctions            InfoFunctions
+
+	// equalities provides a custom interface for `DeepEqual`, so NodePlan's can be compared
+	// (which have a function pointer field) without attempting to compare function pointers.
+	// DeepEqual cannot compare function pointer, unless that are `nil`, so otherwise it would
+	// always return false.
+	equalities conversion.Equalities
 }
 
 // InfoFunctions is a struct that contains various dynamic functions that allow for abstracting out Rancher-specific
@@ -143,8 +150,11 @@ func New(ctx context.Context, clients *wrangler.Context, functions InfoFunctions
 	clients.Mgmt.ClusterRegistrationToken().Cache().AddIndexer(ClusterRegToken, func(obj *v3.ClusterRegistrationToken) ([]string, error) {
 		return []string{obj.Spec.ClusterName}, nil
 	})
-	store := NewStore(clients.Core.Secret(),
-		clients.CAPI.Machine().Cache())
+	equalities := equality.Semantic.Copy()
+	_ = equalities.AddFunc(func(a, b plan.File) bool {
+		return a.Content == b.Content && a.Path == b.Path && a.Permissions == b.Permissions && a.Dynamic == b.Dynamic && a.Minor == b.Minor
+	})
+	store := NewStore(clients.Core.Secret(), clients.CAPI.Machine().Cache(), equalities)
 	return &Planner{
 		ctx:                           ctx,
 		store:                         store,
@@ -166,6 +176,7 @@ func New(ctx context.Context, clients *wrangler.Context, functions InfoFunctions
 			secretCache: clients.Core.Secret().Cache(),
 		},
 		retrievalFunctions: functions,
+		equalities:         equalities,
 	}
 }
 
@@ -875,7 +886,7 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 			entry:       entry,
 			desiredPlan: plan,
 			joinedURL:   joinedURL,
-			change:      entry.Plan != nil && !equality.Semantic.DeepEqual(entry.Plan.Plan, plan),
+			change:      entry.Plan != nil && !p.equalities.DeepEqual(entry.Plan.Plan, plan),
 			minorChange: entry.Plan != nil && minorPlanChangeDetected(entry.Plan.Plan, plan),
 		})
 	}

@@ -3,6 +3,7 @@ package planner
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	"github.com/rancher/channelserver/pkg/model"
 	"github.com/rancher/norman/types/convert"
@@ -28,6 +29,17 @@ func filterConfigData(config map[string]interface{}, controlPlane *rkev1.RKECont
 		}
 	}
 	return nil
+}
+
+var removeForDraining = []string{"server"}
+
+func filterDrainData(config map[string]any) map[string]any {
+	filtered := map[string]any{}
+	maps.Copy(filtered, config)
+	for _, key := range removeForDraining {
+		delete(config, key)
+	}
+	return filtered
 }
 
 func filterField(isServer bool, k string, v interface{}, release model.Release) (interface{}, bool) {

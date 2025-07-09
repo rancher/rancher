@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"hash"
 	"path"
 	"sort"
 	"strconv"
@@ -321,6 +322,25 @@ func restartStamp(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, i
 	}
 	restartStamp.Write([]byte(strconv.FormatInt(controlPlane.Status.ConfigGeneration, 10)))
 	return hex.EncodeToString(restartStamp.Sum(nil))
+}
+
+func drainHash(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, image string) string {
+	h := sha256.New()
+	h.Write([]byte(strconv.Itoa(controlPlane.Spec.ProvisionGeneration)))
+	h.Write([]byte(image))
+	for _, file := range nodePlan.Files {
+		if file.Dynamic {
+			continue
+		}
+		h.Write([]byte(file.Path))
+		if file.DrainHashFunc != nil {
+			_ = file.DrainHashFunc(h)
+		} else {
+			h.Write([]byte(file.Content))
+		}
+	}
+	h.Write([]byte(strconv.FormatInt(controlPlane.Status.ConfigGeneration, 10)))
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 func addToken(config map[string]interface{}, entry *planEntry, tokensSecret plan.Secret) {
@@ -669,6 +689,15 @@ func (p *Planner) addConfigFile(nodePlan plan.NodePlan, controlPlane *rkev1.RKEC
 	nodePlan.Files = append(nodePlan.Files, plan.File{
 		Content: base64.StdEncoding.EncodeToString(configData),
 		Path:    fmt.Sprintf(ConfigYamlFileName, capr.GetRuntime(controlPlane.Spec.KubernetesVersion)),
+		DrainHashFunc: func(h hash.Hash) error {
+			filtered := filterDrainData(config)
+			filteredData, err := json.MarshalIndent(filtered, "", "  ")
+			if err != nil {
+				return err
+			}
+			_, err = h.Write(filteredData)
+			return err
+		},
 	})
 
 	return nodePlan, config, joinedServer, nil
