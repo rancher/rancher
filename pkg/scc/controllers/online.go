@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/rancher/rancher/pkg/scc/consts"
 	"github.com/rancher/rancher/pkg/scc/controllers/shared"
+	"github.com/rancher/rancher/pkg/scc/types"
 	"golang.org/x/sync/semaphore"
 	"net/http"
 	"slices"
@@ -140,7 +141,7 @@ func (s sccOnlineMode) reconcileNonRecoverableHttpError(registrationIn *v1.Regis
 	return registrationIn
 }
 
-func (s sccOnlineMode) ReconcileRegisterError(registrationObj *v1.Registration, registerErr error) *v1.Registration {
+func (s sccOnlineMode) ReconcileRegisterError(registrationObj *v1.Registration, registerErr error, phase types.RegistrationPhase) *v1.Registration {
 	if isNonRecoverableHttpError(registerErr) {
 		return s.reconcileNonRecoverableHttpError(
 			registrationObj,
@@ -239,7 +240,7 @@ func (s sccOnlineMode) PrepareActivatedForKeepalive(registrationObj *v1.Registra
 }
 
 // ReconcileActivateError will first verify if an error is recoverable and then reconcile the error as needed
-func (s sccOnlineMode) ReconcileActivateError(registration *v1.Registration, activationErr error) *v1.Registration {
+func (s sccOnlineMode) ReconcileActivateError(registration *v1.Registration, activationErr error, phase types.ActivationPhase) *v1.Registration {
 	if isNonRecoverableHttpError(activationErr) {
 		return s.reconcileNonRecoverableHttpError(
 			registration,
@@ -296,7 +297,7 @@ func (s sccOnlineMode) PrepareKeepaliveSucceeded(registration *v1.Registration) 
 	return registration, nil
 }
 
-func (s sccOnlineMode) ReconcileKeepaliveError(registration *v1.Registration, keepaliveErr error) *v1.Registration {
+func (s sccOnlineMode) ReconcileKeepaliveError(registration *v1.Registration, keepaliveErr error, phase types.KeepalivePhase) *v1.Registration {
 	if isNonRecoverableHttpError(keepaliveErr) {
 		return s.reconcileNonRecoverableHttpError(
 			registration,

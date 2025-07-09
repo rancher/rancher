@@ -9,6 +9,7 @@ import (
 	offlineSecrets "github.com/rancher/rancher/pkg/scc/suseconnect/offline"
 	"github.com/rancher/rancher/pkg/scc/systeminfo"
 	"github.com/rancher/rancher/pkg/scc/systeminfo/offline"
+	"github.com/rancher/rancher/pkg/scc/types"
 	"github.com/rancher/rancher/pkg/scc/util/log"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -55,7 +56,7 @@ func (s sccOfflineMode) Register(registrationObj *v1.Registration) (suseconnect.
 	return suseconnect.OfflineRegistrationSystemId, nil
 }
 
-func (s sccOfflineMode) ReconcileRegisterError(registrationObj *v1.Registration, registerErr error) *v1.Registration {
+func (s sccOfflineMode) ReconcileRegisterError(registrationObj *v1.Registration, registerErr error, phase types.RegistrationPhase) *v1.Registration {
 	return registrationObj
 }
 
@@ -115,7 +116,7 @@ func (s sccOfflineMode) PrepareActivatedForKeepalive(registrationObj *v1.Registr
 	return registrationObj, nil
 }
 
-func (s sccOfflineMode) ReconcileActivateError(registrationObj *v1.Registration, activationErr error) *v1.Registration {
+func (s sccOfflineMode) ReconcileActivateError(registrationObj *v1.Registration, activationErr error, phase types.ActivationPhase) *v1.Registration {
 	v1.RegistrationConditionActivated.SetError(registrationObj, "offline activation failed", activationErr)
 
 	// Cannot recover from this error so must set failure
@@ -170,7 +171,7 @@ func (s sccOfflineMode) PrepareKeepaliveSucceeded(registrationObj *v1.Registrati
 	return registrationObj, nil
 }
 
-func (s sccOfflineMode) ReconcileKeepaliveError(registration *v1.Registration, err error) *v1.Registration {
+func (s sccOfflineMode) ReconcileKeepaliveError(registration *v1.Registration, err error, phase types.KeepalivePhase) *v1.Registration {
 	s.log.Debugf("Because offline Keepalive is intentional noop, this shouldn't trigger")
 	return registration
 }

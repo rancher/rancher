@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/rancher/rancher/pkg/scc/types"
 	"maps"
 	"slices"
 	"time"
@@ -67,11 +68,11 @@ type SCCHandler interface {
 	Deregister() error
 
 	// ReconcileRegisterError prepares the Registration object for error reconciliation after RegisterSystem fails.
-	ReconcileRegisterError(*v1.Registration, error) *v1.Registration
+	ReconcileRegisterError(*v1.Registration, error, types.RegistrationPhase) *v1.Registration
 	// ReconcileKeepaliveError prepares the Registration object for error reconciliation after Keepalive fails.
-	ReconcileKeepaliveError(*v1.Registration, error) *v1.Registration
+	ReconcileKeepaliveError(*v1.Registration, error, types.KeepalivePhase) *v1.Registration
 	// ReconcileActivateError prepares the Registration object for error reconciliation after Activate fails.
-	ReconcileActivateError(*v1.Registration, error) *v1.Registration
+	ReconcileActivateError(*v1.Registration, error, types.ActivationPhase) *v1.Registration
 }
 
 type handler struct {
@@ -472,8 +473,8 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 	// Only on the first time an object passes through here should it need to be registered
 	// The logical default condition should always be to try activation, unless we know it's not registered.
 	if registrationHandler.NeedsRegistration(registrationObj) {
-		progressingObj := registrationObj.DeepCopy()
 		if !registrationObj.HasCondition(v1.ResourceConditionProgressing) || v1.ResourceConditionProgressing.IsFalse(registrationObj) {
+			progressingObj := registrationObj.DeepCopy()
 			// Set object to progressing
 			progressingUpdateErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 				var err error
@@ -484,12 +485,16 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 			if progressingUpdateErr != nil {
 				return registrationObj, progressingUpdateErr
 			}
+
+			return registrationObj, nil
 		}
 
-		regForAnnounce := progressingObj.DeepCopy()
+		// Start of initial registration/announce of cluster
+		regForAnnounce := registrationObj.DeepCopy()
 		preparedForRegister, prepareErr := registrationHandler.PrepareForRegister(regForAnnounce)
 		if prepareErr != nil {
-			return progressingObj, prepareErr
+			err := h.reconcileRegistration(registrationHandler, preparedForRegister, prepareErr, types.RegistrationPrepare)
+			return registrationObj, err
 		}
 		regForAnnounce, updateErr := h.registrations.UpdateStatus(preparedForRegister)
 		if updateErr != nil {
@@ -498,25 +503,7 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 
 		announcedSystemId, registerErr := registrationHandler.Register(regForAnnounce)
 		if registerErr != nil {
-			// reconcile state
-			//var reconciledReg *v1.Registration
-			reconcileErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-				var reconcileUpdateErr error
-				curReg, retryErr := h.registrations.Get(registrationObj.Name, metav1.GetOptions{})
-				if retryErr != nil {
-					return retryErr
-				}
-				prepareObj := curReg.DeepCopy()
-				prepareObj = registrationHandler.ReconcileRegisterError(prepareObj, registerErr)
-				_, reconcileUpdateErr = h.registrations.UpdateStatus(prepareObj)
-				return reconcileUpdateErr
-			})
-
-			err := fmt.Errorf("registration failed: %w", registerErr)
-			if reconcileErr != nil {
-				err = fmt.Errorf("registration failed with additional errors: %w, %w", err, reconcileErr)
-			}
-
+			err := h.reconcileRegistration(registrationHandler, preparedForRegister, prepareErr, types.RegistrationMain)
 			return registrationObj, err
 		}
 
@@ -539,7 +526,8 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 		}
 		regForAnnounce, prepareError = registrationHandler.PrepareRegisteredForActivation(regForAnnounce)
 		if prepareError != nil {
-			return registrationObj, prepareError
+			err := h.reconcileRegistration(registrationHandler, preparedForRegister, prepareError, types.RegistrationForActivation)
+			return registrationObj, err
 		}
 		regForAnnounce.Status.RegistrationProcessedTS = &metav1.Time{
 			Time: time.Now(),
@@ -561,25 +549,7 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 		activationErr := registrationHandler.Activate(registrationObj)
 		// reconcile error state - must be able to handle Auth errors (or other SCC sourced errors)
 		if activationErr != nil {
-			//var reconciledReg *v1.Registration
-			reconcileErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-				var retryErr, reconcileUpdateErr error
-				registrationObj, retryErr = h.registrations.Get(registrationObj.Name, metav1.GetOptions{})
-				if retryErr != nil {
-					return retryErr
-				}
-				prepareObj := registrationObj.DeepCopy()
-				prepareObj = registrationHandler.ReconcileActivateError(prepareObj, activationErr)
-
-				_, reconcileUpdateErr = h.registrations.Update(prepareObj)
-				return reconcileUpdateErr
-			})
-
-			err := fmt.Errorf("activation failed: %w", activationErr)
-			if reconcileErr != nil {
-				err = fmt.Errorf("activation failed with additional errors: %w, %w", err, reconcileErr)
-			}
-
+			err := h.reconcileActivation(registrationHandler, registrationObj, activationErr, types.ActivationMain)
 			return registrationObj, err
 		}
 
@@ -636,20 +606,8 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 
 	keepaliveErr := registrationHandler.Keepalive(registrationObj)
 	if keepaliveErr != nil {
-		//var reconciledReg *v1.Registration
-		reconcileErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			var retryErr, reconcileUpdateErr error
-			registrationObj, retryErr = h.registrations.Get(registrationObj.Name, metav1.GetOptions{})
-			if retryErr != nil {
-				return retryErr
-			}
-			preparedObj := registrationHandler.ReconcileKeepaliveError(registrationObj, keepaliveErr)
-
-			_, reconcileUpdateErr = h.registrations.Update(preparedObj)
-			return reconcileUpdateErr
-		})
-
-		return registrationObj, reconcileErr
+		err := h.reconcileKeepalive(registrationHandler, registrationObj, keepaliveErr, types.KeepaliveAlive)
+		return registrationObj, err
 	}
 
 	// TODO: maybe this should be in a PrepareKeepaliveSuccess

@@ -13,3 +13,7 @@ type RegistrationStatusProcessor func(*v1.Registration) *v1.Registration
 
 // RegistrationFailureReconciler helps to reconcile Registration state after errors
 type RegistrationFailureReconciler func(*v1.Registration, error) *v1.Registration
+
+type RegistrationReconcileRetry func() error
+
+type HandlerReconcileErrorProcessor func(*v1.Registration, error, Phase) *v1.Registration
