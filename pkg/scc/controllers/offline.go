@@ -67,8 +67,12 @@ func (s sccOfflineMode) PrepareRegisteredForActivation(registrationObj *v1.Regis
 
 // ReconcileRegisterError helps reconcile any errors in the register phase
 func (s sccOfflineMode) ReconcileRegisterError(registrationObj *v1.Registration, registerErr error, phase types.RegistrationPhase) *v1.Registration {
-	// TODO: handle PrepareForRegister related errors - secret related
-	// TODO: handle Register related errors - from prepare offline request and updating secret
+	if phase == types.RegistrationInit {
+		v1.RegistrationConditionOfflineRequestReady.SetError(registrationObj, "Failed to prepare Offline Request secret & ref", registerErr)
+	}
+	if phase == types.RegistrationMain {
+		v1.RegistrationConditionOfflineRequestReady.SetError(registrationObj, "Failed to prepare Offline Request", registerErr)
+	}
 	return registrationObj
 }
 
@@ -103,6 +107,7 @@ func (s sccOfflineMode) Activate(registrationObj *v1.Registration) error {
 
 func (s sccOfflineMode) PrepareActivatedForKeepalive(registrationObj *v1.Registration) (*v1.Registration, error) {
 	// TODO: can we actually get the SCC systemID in offline mode?
+	// GH issue: https://github.com/SUSE/connect-ng/issues/313
 	/*
 		certReader, err := s.offlineSecrets.OfflineCertificateReader()
 		if err != nil {
@@ -120,6 +125,7 @@ func (s sccOfflineMode) PrepareActivatedForKeepalive(registrationObj *v1.Registr
 }
 
 func (s sccOfflineMode) ReconcileActivateError(registrationObj *v1.Registration, activationErr error, phase types.ActivationPhase) *v1.Registration {
+	// TODO: this will need updating to use phase after todo inside PrepareActivatedForKeepalive is solved
 	v1.RegistrationConditionActivated.SetError(registrationObj, "offline activation failed", activationErr)
 
 	// Cannot recover from this error so must set failure
