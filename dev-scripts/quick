@@ -11,7 +11,7 @@ TAG="${TAG:-$(yq '.env.TAG | sub("-.*", "")' < .github/workflows/pull-request.ym
 OS="${OS:-linux}"
 ARCH="${ARCH:-amd64}"
 REPO="${REPO:-rancher}"
-CATTLE_K3S_VERSION=$(grep -m1 'ENV CATTLE_K3S_VERSION' package/Dockerfile | awk '{print $3}')
+CATTLE_K3S_VERSION=$(grep -m1 'ENV CATTLE_K3S_VERSION=' package/Dockerfile | cut -d '=' -f2)
 CATTLE_KDM_BRANCH=$(grep -m1 'ARG CATTLE_KDM_BRANCH=' package/Dockerfile | cut -d '=' -f2)
 CATTLE_RANCHER_WEBHOOK_VERSION=$(yq '.webhookVersion' < build.yaml)
 CATTLE_REMOTEDIALER_PROXY_VERSION=$(yq '.remoteDialerProxyVersion' < build.yaml)
