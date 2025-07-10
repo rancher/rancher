@@ -99,12 +99,16 @@ func (s sccOnlineMode) PrepareRegisteredForActivation(registration *v1.Registrat
 	if registration.Status.SCCSystemId == nil {
 		return registration, errors.New("SCC system ID cannot be empty when preparing registered system")
 	}
-	sccSystemUrl := fmt.Sprintf("https://scc.suse.com/systems/%d", *registration.Status.SCCSystemId)
-	s.log.Debugf("system announced, check %s", sccSystemUrl)
+	baseSccUrl := consts.BaseURLForSCC()
+	if baseSccUrl != "" {
+		sccSystemUrl := fmt.Sprintf("%s/systems/%d", baseSccUrl, *registration.Status.SCCSystemId)
+		s.log.Debugf("system announced, check %s", sccSystemUrl)
 
-	registration.Status.ActivationStatus.SystemUrl = &sccSystemUrl
-	v1.RegistrationConditionSccUrlReady.SetStatusBool(registration, false) // This must be false until successful activation too.
-	v1.RegistrationConditionSccUrlReady.SetMessageIfBlank(registration, fmt.Sprintf("system announced, check %s", sccSystemUrl))
+		registration.Status.ActivationStatus.SystemUrl = &sccSystemUrl
+		v1.RegistrationConditionSccUrlReady.SetStatusBool(registration, false) // This must be false until successful activation too.
+		v1.RegistrationConditionSccUrlReady.SetMessageIfBlank(registration, fmt.Sprintf("system announced, check %s", sccSystemUrl))
+	}
+
 	v1.RegistrationConditionAnnounced.SetStatusBool(registration, true)
 	v1.ResourceConditionFailure.SetStatusBool(registration, false)
 	v1.ResourceConditionReady.SetStatusBool(registration, true)

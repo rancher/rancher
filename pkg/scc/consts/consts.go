@@ -65,6 +65,37 @@ const (
 	OfflineCertificate SecretRole = "offline-certificate"
 )
 
+type SCCEnvironment int
+
+const (
+	Production SCCEnvironment = iota
+	Staging
+	PayAsYouGo
+	RGS
+)
+
+func (s SCCEnvironment) String() string {
+	switch s {
+	case Production:
+		return "production"
+	case Staging:
+		return "staging"
+	case PayAsYouGo:
+		return "payAsYouGo"
+	case RGS:
+		return "rgs"
+	default:
+		return "unknown"
+	}
+}
+
+func GetSCCEnvironment() SCCEnvironment {
+	if !IsDevMode() {
+		return Production
+	}
+	return Staging
+}
+
 type AlternativeSCCUrls string
 
 const (
@@ -77,4 +108,17 @@ const (
 func (s AlternativeSCCUrls) Ptr() *string {
 	stringVal := string(s)
 	return &stringVal
+}
+
+func BaseURLForSCC() string {
+	switch GetSCCEnvironment() {
+	case Production:
+		return string(ProdSCCUrl)
+	case Staging:
+		return string(StagingSCCUrl)
+	// explicitly return empty for RGS
+	case RGS:
+	default:
+		return ""
+	}
 }
