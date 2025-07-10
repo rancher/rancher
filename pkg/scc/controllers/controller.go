@@ -578,11 +578,13 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 	if common.RegistrationNeedsSyncNow(registrationObj) {
 		if registrationObj.Spec.Mode == v1.RegistrationModeOffline {
 			updated := registrationObj.DeepCopy()
-			// TODO(o&b): When offline calls this it should immediately sync the OfflineRegistrationRequest secret content
 			updated.Spec = *registrationObj.Spec.WithoutSyncNow()
 
-			_, err := h.registrations.Update(updated)
-			return registrationObj, err
+			offlineHandler := registrationHandler.(sccOfflineMode)
+			refreshErr := offlineHandler.RefreshOfflineRequestSecret()
+			_, updateErr := h.registrations.Update(updated)
+
+			return registrationObj, errors.Join(refreshErr, updateErr)
 		} else {
 			// Todo: online/offline  handler should have a sync now
 			updated := registrationObj.DeepCopy()
@@ -636,7 +638,6 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 		keepalive = common.PrepareSuccessfulActivation(keepalive)
 		v1.RegistrationConditionKeepalive.True(keepalive)
 		prepared, err := registrationHandler.PrepareKeepaliveSucceeded(keepalive)
-		// todo: use ReconcileKeepaliveError
 		if err != nil {
 			return err
 		}
