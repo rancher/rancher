@@ -24,9 +24,7 @@ type sccOfflineMode struct {
 
 func (s sccOfflineMode) NeedsRegistration(registrationObj *v1.Registration) bool {
 	return registrationObj.Spec.OfflineRegistrationCertificateSecretRef == nil &&
-		(registrationObj.Status.RegistrationProcessedTS.IsZero() ||
-			!registrationObj.HasCondition(v1.RegistrationConditionOfflineRequestReady) ||
-			v1.RegistrationConditionOfflineRequestReady.IsFalse(registrationObj))
+		common.RegistrationHasNotStarted(registrationObj)
 }
 
 func (s sccOfflineMode) PrepareForRegister(registrationObj *v1.Registration) (*v1.Registration, error) {
@@ -78,8 +76,7 @@ func (s sccOfflineMode) ReconcileRegisterError(registrationObj *v1.Registration,
 
 func (s sccOfflineMode) NeedsActivation(registrationObj *v1.Registration) bool {
 	return registrationObj.Status.OfflineRegistrationRequest != nil &&
-		(!registrationObj.Status.ActivationStatus.Activated ||
-			registrationObj.Status.ActivationStatus.LastValidatedTS.IsZero())
+		common.RegistrationNeedsActivation(registrationObj)
 }
 
 func (s sccOfflineMode) ReadyForActivation(registrationObj *v1.Registration) bool {

@@ -10,6 +10,8 @@ func GetRegistrationDeciders() []types.RegistrationDecider {
 	return []types.RegistrationDecider{
 		RegistrationIsFailed,
 		RegistrationNeedsSyncNow,
+		RegistrationHasNotStarted,
+		RegistrationNeedsActivation,
 	}
 }
 
@@ -19,4 +21,15 @@ func RegistrationIsFailed(regIn *v1.Registration) bool {
 
 func RegistrationNeedsSyncNow(regIn *v1.Registration) bool {
 	return regIn.Spec.SyncNow != nil && *regIn.Spec.SyncNow
+}
+
+func RegistrationHasNotStarted(regIn *v1.Registration) bool {
+	return regIn.Status.RegistrationProcessedTS.IsZero() ||
+		!regIn.HasCondition(v1.RegistrationConditionOfflineRequestReady) ||
+		v1.RegistrationConditionOfflineRequestReady.IsFalse(regIn)
+}
+
+func RegistrationNeedsActivation(regIn *v1.Registration) bool {
+	return regIn.Status.RegistrationProcessedTS.IsZero() ||
+		!regIn.Status.ActivationStatus.Activated
 }

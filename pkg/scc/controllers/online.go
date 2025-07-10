@@ -49,9 +49,7 @@ type sccOnlineMode struct {
 }
 
 func (s sccOnlineMode) NeedsRegistration(registrationObj *v1.Registration) bool {
-	return registrationObj.Status.RegistrationProcessedTS.IsZero() ||
-		!registrationObj.HasCondition(v1.RegistrationConditionSccUrlReady) ||
-		!registrationObj.HasCondition(v1.RegistrationConditionAnnounced)
+	return common.RegistrationHasNotStarted(registrationObj)
 }
 
 // PrepareForRegister creates the necessary SCC creds secret and secret reference
@@ -188,8 +186,7 @@ func (s sccOnlineMode) ReconcileRegisterError(registrationObj *v1.Registration, 
 }
 
 func (s sccOnlineMode) NeedsActivation(registrationObj *v1.Registration) bool {
-	return !registrationObj.Status.ActivationStatus.Activated ||
-		registrationObj.Status.ActivationStatus.LastValidatedTS.IsZero()
+	return common.RegistrationNeedsActivation(registrationObj)
 }
 
 func (s sccOnlineMode) ReadyForActivation(registrationObj *v1.Registration) bool {
