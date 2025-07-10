@@ -1,6 +1,8 @@
 package crds
 
-import "github.com/rancher/rancher/pkg/features"
+import (
+	"github.com/rancher/rancher/pkg/features"
+)
 
 // RequiredCRDs returns a list of CRD to install based on enabled features.
 func RequiredCRDs() []string {
@@ -35,7 +37,20 @@ func RequiredCRDs() []string {
 	if features.RancherSCCRegistrationExtension.Enabled() {
 		requiredCRDS = append(requiredCRDS, SCCRegistrationCRDs()...)
 	}
-	return requiredCRDS
+
+	// get unique CRDs so they aren't registered twice
+	uniqueCRDs := make([]string, 0, len(requiredCRDS))
+	keys := map[string]struct{}{}
+	for _, crdName := range requiredCRDS {
+		if _, ok := keys[crdName]; ok {
+			continue
+		}
+
+		keys[crdName] = struct{}{}
+		uniqueCRDs = append(uniqueCRDs, crdName)
+	}
+
+	return uniqueCRDs
 }
 
 // BasicCRDs returns a list of CRD names needed to run rancher.
@@ -206,7 +221,7 @@ var MigratedResources = map[string]bool{
 	"clusterroletemplatebindings.management.cattle.io":                true,
 	"clusters.cluster.x-k8s.io":                                       false,
 	"clusters.management.cattle.io":                                   false,
-	"clusters.provisioning.cattle.io":                                 false,
+	"clusters.provisioning.cattle.io":                                 true,
 	"clusteruserattributes.cluster.cattle.io":                         false,
 	"composeconfigs.management.cattle.io":                             false,
 	"custommachines.rke.cattle.io":                                    false,
@@ -251,7 +266,7 @@ var MigratedResources = map[string]bool{
 	"rkebootstraps.rke.cattle.io":                                     true,
 	"rkebootstraptemplates.rke.cattle.io":                             true,
 	"rkeclusters.rke.cattle.io":                                       true,
-	"rkecontrolplanes.rke.cattle.io":                                  false,
+	"rkecontrolplanes.rke.cattle.io":                                  true,
 	"roletemplates.management.cattle.io":                              true,
 	"samlproviders.management.cattle.io":                              false,
 	"samltokens.management.cattle.io":                                 false,

@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
@@ -459,7 +460,7 @@ func Test_Provisioning_MP_Drain(t *testing.T) {
 	defer clients.Close()
 
 	drainOpt := rkev1.DrainOptions{
-		IgnoreDaemonSets:                &[]bool{true}[0],
+		IgnoreDaemonSets:                ptr.To(true),
 		DeleteEmptyDirData:              true,
 		Enabled:                         true,
 		Force:                           true,
@@ -490,7 +491,7 @@ func Test_Provisioning_MP_Drain(t *testing.T) {
 		Spec: provisioningv1api.ClusterSpec{
 			KubernetesVersion: defaults.SomeK8sVersion,
 			RKEConfig: &provisioningv1api.RKEConfig{
-				RKEClusterSpecCommon: rkev1.RKEClusterSpecCommon{
+				ClusterConfiguration: rkev1.ClusterConfiguration{
 					UpgradeStrategy: rkev1.ClusterUpgradeStrategy{
 						ControlPlaneDrainOptions: drainOpt,
 						WorkerDrainOptions:       drainOpt,

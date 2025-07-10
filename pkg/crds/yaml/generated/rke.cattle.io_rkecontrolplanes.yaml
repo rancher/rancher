@@ -1,0 +1,1935 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.1
+  labels:
+    cluster.x-k8s.io/v1beta1: v1
+  name: rkecontrolplanes.rke.cattle.io
+spec:
+  group: rke.cattle.io
+  names:
+    categories:
+    - cluster-api
+    kind: RKEControlPlane
+    listKind: RKEControlPlaneList
+    plural: rkecontrolplanes
+    shortNames:
+    - rcp
+    singular: rkecontrolplane
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - description: Cluster
+      jsonPath: .metadata.labels['cluster\.x-k8s\.io/cluster-name']
+      name: Cluster
+      type: string
+    - description: This denotes whether or not the control plane is initialized
+      jsonPath: .status.initialized
+      name: Initialized
+      type: string
+    - description: RKEControlPlane API Server is ready to receive requests
+      jsonPath: .status.ready
+      name: API Server Available
+      type: boolean
+    - description: Time duration since creation of RKEControlPlane
+      jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    - description: Kubernetes version associated with this control plane
+      jsonPath: .spec.kubernetesVersion
+      name: Version
+      type: string
+    name: v1
+    schema:
+      openAPIV3Schema:
+        description: RKEControlPlane is the Schema for the controlplane.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: Spec is the desired state of the controlplane.
+            properties:
+              additionalManifest:
+                description: |-
+                  AdditionalManifest is a string containing a yaml blob to insert in the
+                  /var/lib/rancher/<rke2/k3s>/server/manifests/rancher/addons.yaml file.
+                  The distro will automatically create these resources.
+                  Resources created as additional manifests will be deleted if removed
+                  from additional manifests.
+                nullable: true
+                type: string
+              agentEnvVars:
+                description: |-
+                  AgentEnvVars is a list of environment variables that will be set on
+                  the cluster agent deployment and system agent service.
+                items:
+                  description: EnvVar represents a key value pair for an environment
+                    variable.
+                  properties:
+                    name:
+                      description: Name is the name of the environment variable.
+                      type: string
+                    value:
+                      description: Value is the value of the environment variable.
+                      nullable: true
+                      type: string
+                  type: object
+                nullable: true
+                type: array
+              chartValues:
+                description: |-
+                  ChartValues is a map whose keys correspond to charts to be installed
+                  by the distro, with values corresponding to the helm values
+                  configurable in the chart.
+                nullable: true
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+              clusterName:
+                description: ClusterName is the name of the provisioning cluster object.
+                maxLength: 63
+                type: string
+              dataDirectories:
+                description: |-
+                  DataDirectories contains the configuration for the data directories
+                  typically stored within /var/lib/rancher. The data directories must be
+                  configured via the provisioning cluster object and are immutable once
+                  set.
+                properties:
+                  k8sDistro:
+                    description: |-
+                      K8sDistro is the data directory for the k8s distro, i.e. the data-dir
+                      arg.
+                    nullable: true
+                    type: string
+                  provisioning:
+                    description: |-
+                      Provisioning is the data directory for provisioning related files
+                      (e.g. idempotency).
+                    nullable: true
+                    type: string
+                  systemAgent:
+                    description: |-
+                      SystemAgent is the data directory for the system-agent connection info
+                      and plans.
+                    nullable: true
+                    type: string
+                type: object
+              etcd:
+                description: ETCD contains the etcd snapshot configuration for the
+                  cluster.
+                nullable: true
+                properties:
+                  disableSnapshots:
+                    description: DisableSnapshots disables the creation of snapshots
+                      for the cluster.
+                    type: boolean
+                  s3:
+                    description: S3 defines the S3 configuration for the cluster if
+                      enabled.
+                    nullable: true
+                    properties:
+                      bucket:
+                        description: Bucket is the name of the S3 bucket used for
+                          snapshot operations.
+                        nullable: true
+                        type: string
+                      cloudCredentialName:
+                        description: |-
+                          CloudCredentialName is the name of the secret containing the
+                          credentials used to access the S3 bucket.
+                          The secret is expected to have the following keys:
+                          - accessKey [required]
+                          - secretKey [required]
+                          - defaultRegion
+                          - defaultEndpoint
+                          - defaultEndpointCA
+                          - defaultSkipSSLVerify
+                          - defaultBucket
+                          - defaultFolder
+                        nullable: true
+                        type: string
+                      endpoint:
+                        description: Endpoint is the S3 endpoint used for snapshot
+                          operations.
+                        nullable: true
+                        type: string
+                      endpointCA:
+                        description: EndpointCA is the CA certificate for validating
+                          the S3 endpoint.
+                        nullable: true
+                        type: string
+                      folder:
+                        description: Folder is the name of the S3 folder used for
+                          snapshot operations.
+                        nullable: true
+                        type: string
+                      region:
+                        description: Region is the S3 region used for snapshot operations.
+                        nullable: true
+                        type: string
+                      skipSSLVerify:
+                        description: |-
+                          SkipSSLVerify is a flag used to ignore certificate validation errors
+                          when using the configured endpoint.
+                        type: boolean
+                    type: object
+                  snapshotRetention:
+                    description: |-
+                      SnapshotRetention is the number of snapshots the downstream cluster
+                      should retain per snapshot generation.
+                    type: integer
+                  snapshotScheduleCron:
+                    description: SnapshotScheduleCron is the cron schedule for the
+                      snapshot creation.
+                    nullable: true
+                    type: string
+                type: object
+              etcdSnapshotCreate:
+                description: |-
+                  ETCDSnapshotCreate is the configuration for the etcd snapshot creation
+                  operation.
+                nullable: true
+                properties:
+                  generation:
+                    description: |-
+                      Generation is the current generation for which an etcd snapshot
+                      creation operation has been requested.
+                      Changing the Generation is the only thing required to create a
+                      snapshot.
+                    type: integer
+                type: object
+              etcdSnapshotRestore:
+                description: |-
+                  ETCDSnapshotRestore is the configuration for the etcd snapshot restore
+                  operation.
+                nullable: true
+                properties:
+                  generation:
+                    description: |-
+                      Generation is the current generation for which an etcd snapshot
+                      restore operation has been requested.
+                      Changing the Generation is the only thing required to initiate a
+                      snapshot restore.
+                    type: integer
+                  name:
+                    description: Name refers to the name of the associated etcdsnapshot
+                      object.
+                    nullable: true
+                    type: string
+                  restoreRKEConfig:
+                    description: Set to either none (or empty string), all, or kubernetesVersion
+                    nullable: true
+                    type: string
+                type: object
+              kubernetesVersion:
+                description: |-
+                  KubernetesVersion is the desired version of RKE2/K3s for the cluster.
+                  This field is only populated for provisioned and custom clusters.
+                nullable: true
+                type: string
+              localClusterAuthEndpoint:
+                description: |-
+                  LocalClusterAuthEndpoint is the configuration for the local cluster
+                  auth endpoint.
+                properties:
+                  caCerts:
+                    description: CACerts is the CA certificate for the local cluster
+                      auth endpoint.
+                    nullable: true
+                    type: string
+                  enabled:
+                    description: |-
+                      Enabled indicates whether the local cluster auth endpoint should be
+                      enabled.
+                    type: boolean
+                  fqdn:
+                    description: |-
+                      FQDN is the fully qualified domain name of the local cluster auth
+                      endpoint.
+                    nullable: true
+                    type: string
+                type: object
+              machineGlobalConfig:
+                description: |-
+                  MachineGlobalConfig is a list of distro arguments which will be copied
+                  to /etc/rancher/<rke2/k3s>/config.yaml.d/50-rancher.yaml for all
+                  machines.
+                nullable: true
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+              machineSelectorConfig:
+                description: |-
+                  MachineSelectorConfig is a list of distro arguments which will be
+                  copied to /etc/rancher/<rke2/k3s>/config.yaml.d/50-rancher.yaml if the
+                  machine matches the label selector.
+                items:
+                  properties:
+                    config:
+                      description: |-
+                        Config is a map of distro arguments which will be copied to
+                        /etc/rancher/<rke2/k3s>/config.yaml.d/50-rancher.yaml if the machine
+                        matches the label selector.
+                      nullable: true
+                      type: object
+                      x-kubernetes-preserve-unknown-fields: true
+                    machineLabelSelector:
+                      description: |-
+                        MachineLabelSelector is a label selector used to match machines.
+                        An empty/null label selector matches all machines.
+                      nullable: true
+                      properties:
+                        matchExpressions:
+                          description: matchExpressions is a list of label selector
+                            requirements. The requirements are ANDed.
+                          items:
+                            description: |-
+                              A label selector requirement is a selector that contains values, a key, and an operator that
+                              relates the key and values.
+                            properties:
+                              key:
+                                description: key is the label key that the selector
+                                  applies to.
+                                type: string
+                              operator:
+                                description: |-
+                                  operator represents a key's relationship to a set of values.
+                                  Valid operators are In, NotIn, Exists and DoesNotExist.
+                                type: string
+                              values:
+                                description: |-
+                                  values is an array of string values. If the operator is In or NotIn,
+                                  the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                  the values array must be empty. This array is replaced during a strategic
+                                  merge patch.
+                                items:
+                                  type: string
+                                type: array
+                                x-kubernetes-list-type: atomic
+                            required:
+                            - key
+                            - operator
+                            type: object
+                          type: array
+                          x-kubernetes-list-type: atomic
+                        matchLabels:
+                          additionalProperties:
+                            type: string
+                          description: |-
+                            matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                            map is equivalent to an element of matchExpressions, whose key field is "key", the
+                            operator is "In", and the values array contains only "value". The requirements are ANDed.
+                          type: object
+                      type: object
+                      x-kubernetes-map-type: atomic
+                  type: object
+                nullable: true
+                type: array
+              machineSelectorFiles:
+                description: |-
+                  MachineSelectorFiles is a list of files which will be copied to the
+                  machine if the machine matches the label selector.
+                items:
+                  properties:
+                    fileSources:
+                      description: |-
+                        FileSources is a list of file sources that will be copied to the
+                        machine if the machine matches the label selector.
+                      items:
+                        properties:
+                          configMap:
+                            description: |-
+                              ConfigMap is the configuration for mapping a configmap containing
+                              arbitrary data to a series of files on the system-agent host.
+                            properties:
+                              defaultPermissions:
+                                description: |-
+                                  DefaultPermissions provides a fallback value for all files within the
+                                  configmap/secret.
+                                nullable: true
+                                type: string
+                              items:
+                                description: |-
+                                  Items is a list of mappings from the keys within the resource to the
+                                  files to create on the downstream machine.
+                                items:
+                                  properties:
+                                    dynamic:
+                                      description: |-
+                                        Dynamic indicates whether the rendered file should be included when
+                                        calculating the restart stamp i.e. whether changes to this resource
+                                        should trigger draining when reconciling.
+                                      type: boolean
+                                    hash:
+                                      description: |-
+                                        Hash is used to ensure that the data within the configmap or secret
+                                        matches the expected sha256sum of the value at the provided key.
+                                      nullable: true
+                                      type: string
+                                    key:
+                                      description: Key is the key used to index the
+                                        associated configmap or secret.
+                                      nullable: true
+                                      type: string
+                                    path:
+                                      description: |-
+                                        Path is the absolute path the data within the configmap or secret
+                                        should be written to by the system-agent.
+                                      nullable: true
+                                      type: string
+                                    permissions:
+                                      description: |-
+                                        Permissions specifies the desired permissions for this file on the
+                                        machine's filesystem.
+                                      nullable: true
+                                      type: string
+                                  required:
+                                  - key
+                                  - path
+                                  type: object
+                                nullable: true
+                                type: array
+                              name:
+                                description: |-
+                                  Name is the name of the resource.
+                                  The namespace is required to be the same as the related
+                                  RKEControlPlane object.
+                                maxLength: 253
+                                nullable: true
+                                type: string
+                            required:
+                            - name
+                            type: object
+                          secret:
+                            description: |-
+                              Secret is the configuration for mapping a secret containing arbitrary
+                              data to a series of files on the system-agent host.
+                            properties:
+                              defaultPermissions:
+                                description: |-
+                                  DefaultPermissions provides a fallback value for all files within the
+                                  configmap/secret.
+                                nullable: true
+                                type: string
+                              items:
+                                description: |-
+                                  Items is a list of mappings from the keys within the resource to the
+                                  files to create on the downstream machine.
+                                items:
+                                  properties:
+                                    dynamic:
+                                      description: |-
+                                        Dynamic indicates whether the rendered file should be included when
+                                        calculating the restart stamp i.e. whether changes to this resource
+                                        should trigger draining when reconciling.
+                                      type: boolean
+                                    hash:
+                                      description: |-
+                                        Hash is used to ensure that the data within the configmap or secret
+                                        matches the expected sha256sum of the value at the provided key.
+                                      nullable: true
+                                      type: string
+                                    key:
+                                      description: Key is the key used to index the
+                                        associated configmap or secret.
+                                      nullable: true
+                                      type: string
+                                    path:
+                                      description: |-
+                                        Path is the absolute path the data within the configmap or secret
+                                        should be written to by the system-agent.
+                                      nullable: true
+                                      type: string
+                                    permissions:
+                                      description: |-
+                                        Permissions specifies the desired permissions for this file on the
+                                        machine's filesystem.
+                                      nullable: true
+                                      type: string
+                                  required:
+                                  - key
+                                  - path
+                                  type: object
+                                nullable: true
+                                type: array
+                              name:
+                                description: |-
+                                  Name is the name of the resource.
+                                  The namespace is required to be the same as the related
+                                  RKEControlPlane object.
+                                maxLength: 253
+                                nullable: true
+                                type: string
+                            required:
+                            - name
+                            type: object
+                        type: object
+                      nullable: true
+                      type: array
+                    machineLabelSelector:
+                      description: |-
+                        MachineLabelSelector is a label selector used to match machines.
+                        An empty/null label selector matches all machines.
+                      nullable: true
+                      properties:
+                        matchExpressions:
+                          description: matchExpressions is a list of label selector
+                            requirements. The requirements are ANDed.
+                          items:
+                            description: |-
+                              A label selector requirement is a selector that contains values, a key, and an operator that
+                              relates the key and values.
+                            properties:
+                              key:
+                                description: key is the label key that the selector
+                                  applies to.
+                                type: string
+                              operator:
+                                description: |-
+                                  operator represents a key's relationship to a set of values.
+                                  Valid operators are In, NotIn, Exists and DoesNotExist.
+                                type: string
+                              values:
+                                description: |-
+                                  values is an array of string values. If the operator is In or NotIn,
+                                  the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                  the values array must be empty. This array is replaced during a strategic
+                                  merge patch.
+                                items:
+                                  type: string
+                                type: array
+                                x-kubernetes-list-type: atomic
+                            required:
+                            - key
+                            - operator
+                            type: object
+                          type: array
+                          x-kubernetes-list-type: atomic
+                        matchLabels:
+                          additionalProperties:
+                            type: string
+                          description: |-
+                            matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                            map is equivalent to an element of matchExpressions, whose key field is "key", the
+                            operator is "In", and the values array contains only "value". The requirements are ANDed.
+                          type: object
+                      type: object
+                      x-kubernetes-map-type: atomic
+                  type: object
+                nullable: true
+                type: array
+              managementClusterName:
+                description: |-
+                  ManagementClusterName is the name of the management cluster object
+                  that relates to this cluster.
+                type: string
+              networking:
+                description: |-
+                  Networking contains information regarding the desired networking stack
+                  of the cluster.
+                nullable: true
+                properties:
+                  stackPreference:
+                    description: |-
+                      StackPreference specifies which networking stack to prefer for
+                      external cluster communication.
+                      In practice, this is used by the planner to render the various probes
+                      to force IPv4, IPv6, or default to localhost.
+                      There is currently no sanitization or validation as cluster
+                      configuration can be specified with machineGlobalConfig and
+                      machineSelectorConfig, which although easy to instrument to determine
+                      a potential interface, user defined configuration can be specified in
+                      the `/etc/rancher/<rke2/k3s>/config.yaml.d` directory either manually
+                      or via cloud-init, and there is currently no mechanism to extract the
+                      completely rendered configuration via the planner nor various engines
+                      themselves.
+                    nullable: true
+                    type: string
+                type: object
+              provisionGeneration:
+                description: |-
+                  ProvisionGeneration is used to force the planner to reconcile the
+                  cluster, regardless of whether a reconciliation is required.
+                type: integer
+              registries:
+                description: |-
+                  Registries is the list of mirrors and configurations for the cluster's
+                  container registries.
+                nullable: true
+                properties:
+                  configs:
+                    additionalProperties:
+                      description: RegistryConfig contains configuration used to communicate
+                        with the registry.
+                      properties:
+                        authConfigSecretName:
+                          description: |-
+                            AuthConfigSecretName contains information to authenticate to the
+                            registry.
+                            The accepted keys are as follows:
+                            - username
+                            - password
+                            - auth
+                            - identityToken
+                          maxLength: 253
+                          nullable: true
+                          type: string
+                        caBundle:
+                          description: |-
+                            CABundle is the CA chain used when communicating with the image
+                            registry.
+                          format: byte
+                          nullable: true
+                          type: string
+                        insecureSkipVerify:
+                          description: |-
+                            InsecureSkipVerify indicates whether validation of the server's
+                            certificate should be skipped.
+                          type: boolean
+                        tlsSecretName:
+                          description: |-
+                            TLSSecretName is the name of the secret residing within the same
+                            namespace as the RKEControlPlane object that contains the keys "Cert"
+                            and "Key" which are used when creating the transport that communicates
+                            with the registry.
+                          maxLength: 253
+                          nullable: true
+                          type: string
+                      type: object
+                    description: |-
+                      Configs are configs for each registry.
+                      The key is the FDQN or IP of the registry.
+                    nullable: true
+                    type: object
+                  mirrors:
+                    additionalProperties:
+                      description: Mirror contains the config related to the registry
+                        mirror
+                      properties:
+                        endpoint:
+                          description: |-
+                            Endpoints are endpoints for a namespace. CRI plugin will try the
+                            endpoints one by one until a working one is found.
+                            The endpoint must be a valid url with host specified.
+                            The scheme, host, and path from the endpoint URL will be used.
+                          items:
+                            type: string
+                          nullable: true
+                          type: array
+                        rewrite:
+                          additionalProperties:
+                            type: string
+                          description: |-
+                            Rewrites are repository rewrite rules for a Mirror.
+                            When fetching image resources from a registry, a regular expression
+                            can be used to match the image name and modify it using
+                            the corresponding value from the map in the resource request.
+                          nullable: true
+                          type: object
+                      type: object
+                    description: Mirrors are namespace to mirror mapping for all namespaces.
+                    nullable: true
+                    type: object
+                type: object
+              rotateCertificates:
+                description: |-
+                  RotateCertificates is the configuration for the certificate rotation
+                  operation.
+                nullable: true
+                properties:
+                  generation:
+                    description: |-
+                      Generation is the current generation for which a certificate rotation
+                      operation has been requested.
+                      Changing the Generation is the only thing required to initiate a
+                      certificate rotation.
+                    format: int64
+                    type: integer
+                  services:
+                    description: |-
+                      Services is a list of services to rotate certificates for.
+                      If the list is empty, all services will be rotated.
+                    items:
+                      type: string
+                    nullable: true
+                    type: array
+                type: object
+              rotateEncryptionKeys:
+                description: |-
+                  RotateEncryptionKeys is the configuration for the encryption key
+                  rotation operation.
+                nullable: true
+                properties:
+                  generation:
+                    description: |-
+                      Generation is the current generation for which an encryption key
+                      rotation operation has been requested.
+                      Changing the Generation is the only thing required to rotate
+                      encryption keys.
+                    format: int64
+                    type: integer
+                type: object
+              unmanagedConfig:
+                description: |-
+                  UnamanagedConfig indicates whether the configuration files for this
+                  cluster are managed by Rancher or externally.
+                type: boolean
+              upgradeStrategy:
+                description: |-
+                  UpgradeStrategy contains the concurrency and drain configuration to be
+                  used when upgrading machine pools of servers and agents.
+                properties:
+                  controlPlaneConcurrency:
+                    description: |-
+                      ControlPlaneConcurrency is the number of server nodes that should be
+                      upgraded at a time.
+                      The default value is 1, a 0 value is infinite.
+                      Percentages are also accepted.
+                    maxLength: 10
+                    nullable: true
+                    pattern: ^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0)|)$
+                    type: string
+                  controlPlaneDrainOptions:
+                    description: |-
+                      ControlPlaneDrainOptions is the drain configuration to be used when
+                      draining controlplane nodes, during both upgrades and machine
+                      rollouts.
+                    properties:
+                      deleteEmptyDirData:
+                        description: |-
+                          DeleteEmptyDirData instructs the drain operation to proceed even if
+                          there are pods using emptyDir.
+                        type: boolean
+                      disableEviction:
+                        description: DisableEviction forces drain to use delete rather
+                          than evict.
+                        type: boolean
+                      enabled:
+                        description: |-
+                          Enabled specifies whether draining is required for the machine pool
+                          before upgrading.
+                        type: boolean
+                      force:
+                        description: |-
+                          Force specifies whether to drain the node even if there are pods not
+                          managed by a ReplicationController, Job, or DaemonSet.
+                          Drain will not proceed without Force set to true if there are such
+                          pods.
+                        type: boolean
+                      gracePeriod:
+                        description: |-
+                          GracePeriod is the period of time in seconds given to each pod to
+                          terminate gracefully.
+                          If negative, the default value specified in the pod will be used.
+                        type: integer
+                      ignoreDaemonSets:
+                        description: |-
+                          IgnoreDaemonSets specifies whether to ignore DaemonSet-managed pods.
+                          If there are DaemonSet-managed pods, drain will not proceed without
+                          IgnoreDaemonSets set to true (even when set to true, kubectl won't
+                          delete pods - so an unset value will default to true).
+                        nullable: true
+                        type: boolean
+                      ignoreErrors:
+                        description: |-
+                          IgnoreErrors Ignore errors occurred between drain nodes in group
+                          NOTE: currently unimplemented
+                        type: boolean
+                      postDrainHooks:
+                        description: |-
+                          PostDrainHooks is a list of hooks to run after draining and updating
+                          a node.
+                        items:
+                          properties:
+                            annotation:
+                              description: |-
+                                Annotation that will need to be populated on the machine-plan secret
+                                with the value from the annotation "rke.cattle.io/pre-drain" before
+                                the planner will continue to drain the specific node.
+                                The annotation "rke.cattle.io/pre-drain" is used for pre-drain and
+                                "rke.cattle.io/post-drain" is used for post-drain.
+                              maxLength: 317
+                              nullable: true
+                              type: string
+                          type: object
+                        nullable: true
+                        type: array
+                      preDrainHooks:
+                        description: PreDrainHooks is a list of hooks to run before
+                          draining a node.
+                        items:
+                          properties:
+                            annotation:
+                              description: |-
+                                Annotation that will need to be populated on the machine-plan secret
+                                with the value from the annotation "rke.cattle.io/pre-drain" before
+                                the planner will continue to drain the specific node.
+                                The annotation "rke.cattle.io/pre-drain" is used for pre-drain and
+                                "rke.cattle.io/post-drain" is used for post-drain.
+                              maxLength: 317
+                              nullable: true
+                              type: string
+                          type: object
+                        nullable: true
+                        type: array
+                      skipWaitForDeleteTimeoutSeconds:
+                        description: |-
+                          SkipWaitForDeleteTimeoutSeconds defines how long the draining
+                          operation should wait for a given to be removed after deletion.
+                          If the pod's DeletionTimestamp is older than N seconds, the drain
+                          operation will move on.
+                          Seconds must be greater than 0 to skip.
+                        type: integer
+                      timeout:
+                        description: Timeout is the time to wait (in seconds) before
+                          giving up for one try.
+                        type: integer
+                    type: object
+                  workerConcurrency:
+                    description: |-
+                      WorkerConcurrency is the number of worker nodes that should be
+                      upgraded at a time.
+                      The default value is 1, a 0 value is infinite.
+                      Percentages are also accepted.
+                    maxLength: 10
+                    nullable: true
+                    pattern: ^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0)|)$
+                    type: string
+                  workerDrainOptions:
+                    description: |-
+                      WorkerDrainOptions is the drain configuration to be used when draining
+                      worker nodes, during both upgrades and machine rollouts.
+                    properties:
+                      deleteEmptyDirData:
+                        description: |-
+                          DeleteEmptyDirData instructs the drain operation to proceed even if
+                          there are pods using emptyDir.
+                        type: boolean
+                      disableEviction:
+                        description: DisableEviction forces drain to use delete rather
+                          than evict.
+                        type: boolean
+                      enabled:
+                        description: |-
+                          Enabled specifies whether draining is required for the machine pool
+                          before upgrading.
+                        type: boolean
+                      force:
+                        description: |-
+                          Force specifies whether to drain the node even if there are pods not
+                          managed by a ReplicationController, Job, or DaemonSet.
+                          Drain will not proceed without Force set to true if there are such
+                          pods.
+                        type: boolean
+                      gracePeriod:
+                        description: |-
+                          GracePeriod is the period of time in seconds given to each pod to
+                          terminate gracefully.
+                          If negative, the default value specified in the pod will be used.
+                        type: integer
+                      ignoreDaemonSets:
+                        description: |-
+                          IgnoreDaemonSets specifies whether to ignore DaemonSet-managed pods.
+                          If there are DaemonSet-managed pods, drain will not proceed without
+                          IgnoreDaemonSets set to true (even when set to true, kubectl won't
+                          delete pods - so an unset value will default to true).
+                        nullable: true
+                        type: boolean
+                      ignoreErrors:
+                        description: |-
+                          IgnoreErrors Ignore errors occurred between drain nodes in group
+                          NOTE: currently unimplemented
+                        type: boolean
+                      postDrainHooks:
+                        description: |-
+                          PostDrainHooks is a list of hooks to run after draining and updating
+                          a node.
+                        items:
+                          properties:
+                            annotation:
+                              description: |-
+                                Annotation that will need to be populated on the machine-plan secret
+                                with the value from the annotation "rke.cattle.io/pre-drain" before
+                                the planner will continue to drain the specific node.
+                                The annotation "rke.cattle.io/pre-drain" is used for pre-drain and
+                                "rke.cattle.io/post-drain" is used for post-drain.
+                              maxLength: 317
+                              nullable: true
+                              type: string
+                          type: object
+                        nullable: true
+                        type: array
+                      preDrainHooks:
+                        description: PreDrainHooks is a list of hooks to run before
+                          draining a node.
+                        items:
+                          properties:
+                            annotation:
+                              description: |-
+                                Annotation that will need to be populated on the machine-plan secret
+                                with the value from the annotation "rke.cattle.io/pre-drain" before
+                                the planner will continue to drain the specific node.
+                                The annotation "rke.cattle.io/pre-drain" is used for pre-drain and
+                                "rke.cattle.io/post-drain" is used for post-drain.
+                              maxLength: 317
+                              nullable: true
+                              type: string
+                          type: object
+                        nullable: true
+                        type: array
+                      skipWaitForDeleteTimeoutSeconds:
+                        description: |-
+                          SkipWaitForDeleteTimeoutSeconds defines how long the draining
+                          operation should wait for a given to be removed after deletion.
+                          If the pod's DeletionTimestamp is older than N seconds, the drain
+                          operation will move on.
+                          Seconds must be greater than 0 to skip.
+                        type: integer
+                      timeout:
+                        description: Timeout is the time to wait (in seconds) before
+                          giving up for one try.
+                        type: integer
+                    type: object
+                type: object
+            required:
+            - clusterName
+            - managementClusterName
+            type: object
+          status:
+            description: Status is the observed state of the controlplane.
+            properties:
+              agentConnected:
+                description: |-
+                  AgentConnected denotes that the cluster-agent connection is currently
+                  established for the cluster.
+                type: boolean
+              appliedSpec:
+                description: |-
+                  AppliedSpec is the state for which the last reconciliation loop for
+                  the controlplane was completed.
+                properties:
+                  additionalManifest:
+                    description: |-
+                      AdditionalManifest is a string containing a yaml blob to insert in the
+                      /var/lib/rancher/<rke2/k3s>/server/manifests/rancher/addons.yaml file.
+                      The distro will automatically create these resources.
+                      Resources created as additional manifests will be deleted if removed
+                      from additional manifests.
+                    nullable: true
+                    type: string
+                  agentEnvVars:
+                    description: |-
+                      AgentEnvVars is a list of environment variables that will be set on
+                      the cluster agent deployment and system agent service.
+                    items:
+                      description: EnvVar represents a key value pair for an environment
+                        variable.
+                      properties:
+                        name:
+                          description: Name is the name of the environment variable.
+                          type: string
+                        value:
+                          description: Value is the value of the environment variable.
+                          nullable: true
+                          type: string
+                      type: object
+                    nullable: true
+                    type: array
+                  chartValues:
+                    description: |-
+                      ChartValues is a map whose keys correspond to charts to be installed
+                      by the distro, with values corresponding to the helm values
+                      configurable in the chart.
+                    nullable: true
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                  clusterName:
+                    description: ClusterName is the name of the provisioning cluster
+                      object.
+                    maxLength: 63
+                    type: string
+                  dataDirectories:
+                    description: |-
+                      DataDirectories contains the configuration for the data directories
+                      typically stored within /var/lib/rancher. The data directories must be
+                      configured via the provisioning cluster object and are immutable once
+                      set.
+                    properties:
+                      k8sDistro:
+                        description: |-
+                          K8sDistro is the data directory for the k8s distro, i.e. the data-dir
+                          arg.
+                        nullable: true
+                        type: string
+                      provisioning:
+                        description: |-
+                          Provisioning is the data directory for provisioning related files
+                          (e.g. idempotency).
+                        nullable: true
+                        type: string
+                      systemAgent:
+                        description: |-
+                          SystemAgent is the data directory for the system-agent connection info
+                          and plans.
+                        nullable: true
+                        type: string
+                    type: object
+                  etcd:
+                    description: ETCD contains the etcd snapshot configuration for
+                      the cluster.
+                    nullable: true
+                    properties:
+                      disableSnapshots:
+                        description: DisableSnapshots disables the creation of snapshots
+                          for the cluster.
+                        type: boolean
+                      s3:
+                        description: S3 defines the S3 configuration for the cluster
+                          if enabled.
+                        nullable: true
+                        properties:
+                          bucket:
+                            description: Bucket is the name of the S3 bucket used
+                              for snapshot operations.
+                            nullable: true
+                            type: string
+                          cloudCredentialName:
+                            description: |-
+                              CloudCredentialName is the name of the secret containing the
+                              credentials used to access the S3 bucket.
+                              The secret is expected to have the following keys:
+                              - accessKey [required]
+                              - secretKey [required]
+                              - defaultRegion
+                              - defaultEndpoint
+                              - defaultEndpointCA
+                              - defaultSkipSSLVerify
+                              - defaultBucket
+                              - defaultFolder
+                            nullable: true
+                            type: string
+                          endpoint:
+                            description: Endpoint is the S3 endpoint used for snapshot
+                              operations.
+                            nullable: true
+                            type: string
+                          endpointCA:
+                            description: EndpointCA is the CA certificate for validating
+                              the S3 endpoint.
+                            nullable: true
+                            type: string
+                          folder:
+                            description: Folder is the name of the S3 folder used
+                              for snapshot operations.
+                            nullable: true
+                            type: string
+                          region:
+                            description: Region is the S3 region used for snapshot
+                              operations.
+                            nullable: true
+                            type: string
+                          skipSSLVerify:
+                            description: |-
+                              SkipSSLVerify is a flag used to ignore certificate validation errors
+                              when using the configured endpoint.
+                            type: boolean
+                        type: object
+                      snapshotRetention:
+                        description: |-
+                          SnapshotRetention is the number of snapshots the downstream cluster
+                          should retain per snapshot generation.
+                        type: integer
+                      snapshotScheduleCron:
+                        description: SnapshotScheduleCron is the cron schedule for
+                          the snapshot creation.
+                        nullable: true
+                        type: string
+                    type: object
+                  etcdSnapshotCreate:
+                    description: |-
+                      ETCDSnapshotCreate is the configuration for the etcd snapshot creation
+                      operation.
+                    nullable: true
+                    properties:
+                      generation:
+                        description: |-
+                          Generation is the current generation for which an etcd snapshot
+                          creation operation has been requested.
+                          Changing the Generation is the only thing required to create a
+                          snapshot.
+                        type: integer
+                    type: object
+                  etcdSnapshotRestore:
+                    description: |-
+                      ETCDSnapshotRestore is the configuration for the etcd snapshot restore
+                      operation.
+                    nullable: true
+                    properties:
+                      generation:
+                        description: |-
+                          Generation is the current generation for which an etcd snapshot
+                          restore operation has been requested.
+                          Changing the Generation is the only thing required to initiate a
+                          snapshot restore.
+                        type: integer
+                      name:
+                        description: Name refers to the name of the associated etcdsnapshot
+                          object.
+                        nullable: true
+                        type: string
+                      restoreRKEConfig:
+                        description: Set to either none (or empty string), all, or
+                          kubernetesVersion
+                        nullable: true
+                        type: string
+                    type: object
+                  kubernetesVersion:
+                    description: |-
+                      KubernetesVersion is the desired version of RKE2/K3s for the cluster.
+                      This field is only populated for provisioned and custom clusters.
+                    nullable: true
+                    type: string
+                  localClusterAuthEndpoint:
+                    description: |-
+                      LocalClusterAuthEndpoint is the configuration for the local cluster
+                      auth endpoint.
+                    properties:
+                      caCerts:
+                        description: CACerts is the CA certificate for the local cluster
+                          auth endpoint.
+                        nullable: true
+                        type: string
+                      enabled:
+                        description: |-
+                          Enabled indicates whether the local cluster auth endpoint should be
+                          enabled.
+                        type: boolean
+                      fqdn:
+                        description: |-
+                          FQDN is the fully qualified domain name of the local cluster auth
+                          endpoint.
+                        nullable: true
+                        type: string
+                    type: object
+                  machineGlobalConfig:
+                    description: |-
+                      MachineGlobalConfig is a list of distro arguments which will be copied
+                      to /etc/rancher/<rke2/k3s>/config.yaml.d/50-rancher.yaml for all
+                      machines.
+                    nullable: true
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                  machineSelectorConfig:
+                    description: |-
+                      MachineSelectorConfig is a list of distro arguments which will be
+                      copied to /etc/rancher/<rke2/k3s>/config.yaml.d/50-rancher.yaml if the
+                      machine matches the label selector.
+                    items:
+                      properties:
+                        config:
+                          description: |-
+                            Config is a map of distro arguments which will be copied to
+                            /etc/rancher/<rke2/k3s>/config.yaml.d/50-rancher.yaml if the machine
+                            matches the label selector.
+                          nullable: true
+                          type: object
+                          x-kubernetes-preserve-unknown-fields: true
+                        machineLabelSelector:
+                          description: |-
+                            MachineLabelSelector is a label selector used to match machines.
+                            An empty/null label selector matches all machines.
+                          nullable: true
+                          properties:
+                            matchExpressions:
+                              description: matchExpressions is a list of label selector
+                                requirements. The requirements are ANDed.
+                              items:
+                                description: |-
+                                  A label selector requirement is a selector that contains values, a key, and an operator that
+                                  relates the key and values.
+                                properties:
+                                  key:
+                                    description: key is the label key that the selector
+                                      applies to.
+                                    type: string
+                                  operator:
+                                    description: |-
+                                      operator represents a key's relationship to a set of values.
+                                      Valid operators are In, NotIn, Exists and DoesNotExist.
+                                    type: string
+                                  values:
+                                    description: |-
+                                      values is an array of string values. If the operator is In or NotIn,
+                                      the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                      the values array must be empty. This array is replaced during a strategic
+                                      merge patch.
+                                    items:
+                                      type: string
+                                    type: array
+                                    x-kubernetes-list-type: atomic
+                                required:
+                                - key
+                                - operator
+                                type: object
+                              type: array
+                              x-kubernetes-list-type: atomic
+                            matchLabels:
+                              additionalProperties:
+                                type: string
+                              description: |-
+                                matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                                map is equivalent to an element of matchExpressions, whose key field is "key", the
+                                operator is "In", and the values array contains only "value". The requirements are ANDed.
+                              type: object
+                          type: object
+                          x-kubernetes-map-type: atomic
+                      type: object
+                    nullable: true
+                    type: array
+                  machineSelectorFiles:
+                    description: |-
+                      MachineSelectorFiles is a list of files which will be copied to the
+                      machine if the machine matches the label selector.
+                    items:
+                      properties:
+                        fileSources:
+                          description: |-
+                            FileSources is a list of file sources that will be copied to the
+                            machine if the machine matches the label selector.
+                          items:
+                            properties:
+                              configMap:
+                                description: |-
+                                  ConfigMap is the configuration for mapping a configmap containing
+                                  arbitrary data to a series of files on the system-agent host.
+                                properties:
+                                  defaultPermissions:
+                                    description: |-
+                                      DefaultPermissions provides a fallback value for all files within the
+                                      configmap/secret.
+                                    nullable: true
+                                    type: string
+                                  items:
+                                    description: |-
+                                      Items is a list of mappings from the keys within the resource to the
+                                      files to create on the downstream machine.
+                                    items:
+                                      properties:
+                                        dynamic:
+                                          description: |-
+                                            Dynamic indicates whether the rendered file should be included when
+                                            calculating the restart stamp i.e. whether changes to this resource
+                                            should trigger draining when reconciling.
+                                          type: boolean
+                                        hash:
+                                          description: |-
+                                            Hash is used to ensure that the data within the configmap or secret
+                                            matches the expected sha256sum of the value at the provided key.
+                                          nullable: true
+                                          type: string
+                                        key:
+                                          description: Key is the key used to index
+                                            the associated configmap or secret.
+                                          nullable: true
+                                          type: string
+                                        path:
+                                          description: |-
+                                            Path is the absolute path the data within the configmap or secret
+                                            should be written to by the system-agent.
+                                          nullable: true
+                                          type: string
+                                        permissions:
+                                          description: |-
+                                            Permissions specifies the desired permissions for this file on the
+                                            machine's filesystem.
+                                          nullable: true
+                                          type: string
+                                      required:
+                                      - key
+                                      - path
+                                      type: object
+                                    nullable: true
+                                    type: array
+                                  name:
+                                    description: |-
+                                      Name is the name of the resource.
+                                      The namespace is required to be the same as the related
+                                      RKEControlPlane object.
+                                    maxLength: 253
+                                    nullable: true
+                                    type: string
+                                required:
+                                - name
+                                type: object
+                              secret:
+                                description: |-
+                                  Secret is the configuration for mapping a secret containing arbitrary
+                                  data to a series of files on the system-agent host.
+                                properties:
+                                  defaultPermissions:
+                                    description: |-
+                                      DefaultPermissions provides a fallback value for all files within the
+                                      configmap/secret.
+                                    nullable: true
+                                    type: string
+                                  items:
+                                    description: |-
+                                      Items is a list of mappings from the keys within the resource to the
+                                      files to create on the downstream machine.
+                                    items:
+                                      properties:
+                                        dynamic:
+                                          description: |-
+                                            Dynamic indicates whether the rendered file should be included when
+                                            calculating the restart stamp i.e. whether changes to this resource
+                                            should trigger draining when reconciling.
+                                          type: boolean
+                                        hash:
+                                          description: |-
+                                            Hash is used to ensure that the data within the configmap or secret
+                                            matches the expected sha256sum of the value at the provided key.
+                                          nullable: true
+                                          type: string
+                                        key:
+                                          description: Key is the key used to index
+                                            the associated configmap or secret.
+                                          nullable: true
+                                          type: string
+                                        path:
+                                          description: |-
+                                            Path is the absolute path the data within the configmap or secret
+                                            should be written to by the system-agent.
+                                          nullable: true
+                                          type: string
+                                        permissions:
+                                          description: |-
+                                            Permissions specifies the desired permissions for this file on the
+                                            machine's filesystem.
+                                          nullable: true
+                                          type: string
+                                      required:
+                                      - key
+                                      - path
+                                      type: object
+                                    nullable: true
+                                    type: array
+                                  name:
+                                    description: |-
+                                      Name is the name of the resource.
+                                      The namespace is required to be the same as the related
+                                      RKEControlPlane object.
+                                    maxLength: 253
+                                    nullable: true
+                                    type: string
+                                required:
+                                - name
+                                type: object
+                            type: object
+                          nullable: true
+                          type: array
+                        machineLabelSelector:
+                          description: |-
+                            MachineLabelSelector is a label selector used to match machines.
+                            An empty/null label selector matches all machines.
+                          nullable: true
+                          properties:
+                            matchExpressions:
+                              description: matchExpressions is a list of label selector
+                                requirements. The requirements are ANDed.
+                              items:
+                                description: |-
+                                  A label selector requirement is a selector that contains values, a key, and an operator that
+                                  relates the key and values.
+                                properties:
+                                  key:
+                                    description: key is the label key that the selector
+                                      applies to.
+                                    type: string
+                                  operator:
+                                    description: |-
+                                      operator represents a key's relationship to a set of values.
+                                      Valid operators are In, NotIn, Exists and DoesNotExist.
+                                    type: string
+                                  values:
+                                    description: |-
+                                      values is an array of string values. If the operator is In or NotIn,
+                                      the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                      the values array must be empty. This array is replaced during a strategic
+                                      merge patch.
+                                    items:
+                                      type: string
+                                    type: array
+                                    x-kubernetes-list-type: atomic
+                                required:
+                                - key
+                                - operator
+                                type: object
+                              type: array
+                              x-kubernetes-list-type: atomic
+                            matchLabels:
+                              additionalProperties:
+                                type: string
+                              description: |-
+                                matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                                map is equivalent to an element of matchExpressions, whose key field is "key", the
+                                operator is "In", and the values array contains only "value". The requirements are ANDed.
+                              type: object
+                          type: object
+                          x-kubernetes-map-type: atomic
+                      type: object
+                    nullable: true
+                    type: array
+                  managementClusterName:
+                    description: |-
+                      ManagementClusterName is the name of the management cluster object
+                      that relates to this cluster.
+                    type: string
+                  networking:
+                    description: |-
+                      Networking contains information regarding the desired networking stack
+                      of the cluster.
+                    nullable: true
+                    properties:
+                      stackPreference:
+                        description: |-
+                          StackPreference specifies which networking stack to prefer for
+                          external cluster communication.
+                          In practice, this is used by the planner to render the various probes
+                          to force IPv4, IPv6, or default to localhost.
+                          There is currently no sanitization or validation as cluster
+                          configuration can be specified with machineGlobalConfig and
+                          machineSelectorConfig, which although easy to instrument to determine
+                          a potential interface, user defined configuration can be specified in
+                          the `/etc/rancher/<rke2/k3s>/config.yaml.d` directory either manually
+                          or via cloud-init, and there is currently no mechanism to extract the
+                          completely rendered configuration via the planner nor various engines
+                          themselves.
+                        nullable: true
+                        type: string
+                    type: object
+                  provisionGeneration:
+                    description: |-
+                      ProvisionGeneration is used to force the planner to reconcile the
+                      cluster, regardless of whether a reconciliation is required.
+                    type: integer
+                  registries:
+                    description: |-
+                      Registries is the list of mirrors and configurations for the cluster's
+                      container registries.
+                    nullable: true
+                    properties:
+                      configs:
+                        additionalProperties:
+                          description: RegistryConfig contains configuration used
+                            to communicate with the registry.
+                          properties:
+                            authConfigSecretName:
+                              description: |-
+                                AuthConfigSecretName contains information to authenticate to the
+                                registry.
+                                The accepted keys are as follows:
+                                - username
+                                - password
+                                - auth
+                                - identityToken
+                              maxLength: 253
+                              nullable: true
+                              type: string
+                            caBundle:
+                              description: |-
+                                CABundle is the CA chain used when communicating with the image
+                                registry.
+                              format: byte
+                              nullable: true
+                              type: string
+                            insecureSkipVerify:
+                              description: |-
+                                InsecureSkipVerify indicates whether validation of the server's
+                                certificate should be skipped.
+                              type: boolean
+                            tlsSecretName:
+                              description: |-
+                                TLSSecretName is the name of the secret residing within the same
+                                namespace as the RKEControlPlane object that contains the keys "Cert"
+                                and "Key" which are used when creating the transport that communicates
+                                with the registry.
+                              maxLength: 253
+                              nullable: true
+                              type: string
+                          type: object
+                        description: |-
+                          Configs are configs for each registry.
+                          The key is the FDQN or IP of the registry.
+                        nullable: true
+                        type: object
+                      mirrors:
+                        additionalProperties:
+                          description: Mirror contains the config related to the registry
+                            mirror
+                          properties:
+                            endpoint:
+                              description: |-
+                                Endpoints are endpoints for a namespace. CRI plugin will try the
+                                endpoints one by one until a working one is found.
+                                The endpoint must be a valid url with host specified.
+                                The scheme, host, and path from the endpoint URL will be used.
+                              items:
+                                type: string
+                              nullable: true
+                              type: array
+                            rewrite:
+                              additionalProperties:
+                                type: string
+                              description: |-
+                                Rewrites are repository rewrite rules for a Mirror.
+                                When fetching image resources from a registry, a regular expression
+                                can be used to match the image name and modify it using
+                                the corresponding value from the map in the resource request.
+                              nullable: true
+                              type: object
+                          type: object
+                        description: Mirrors are namespace to mirror mapping for all
+                          namespaces.
+                        nullable: true
+                        type: object
+                    type: object
+                  rotateCertificates:
+                    description: |-
+                      RotateCertificates is the configuration for the certificate rotation
+                      operation.
+                    nullable: true
+                    properties:
+                      generation:
+                        description: |-
+                          Generation is the current generation for which a certificate rotation
+                          operation has been requested.
+                          Changing the Generation is the only thing required to initiate a
+                          certificate rotation.
+                        format: int64
+                        type: integer
+                      services:
+                        description: |-
+                          Services is a list of services to rotate certificates for.
+                          If the list is empty, all services will be rotated.
+                        items:
+                          type: string
+                        nullable: true
+                        type: array
+                    type: object
+                  rotateEncryptionKeys:
+                    description: |-
+                      RotateEncryptionKeys is the configuration for the encryption key
+                      rotation operation.
+                    nullable: true
+                    properties:
+                      generation:
+                        description: |-
+                          Generation is the current generation for which an encryption key
+                          rotation operation has been requested.
+                          Changing the Generation is the only thing required to rotate
+                          encryption keys.
+                        format: int64
+                        type: integer
+                    type: object
+                  unmanagedConfig:
+                    description: |-
+                      UnamanagedConfig indicates whether the configuration files for this
+                      cluster are managed by Rancher or externally.
+                    type: boolean
+                  upgradeStrategy:
+                    description: |-
+                      UpgradeStrategy contains the concurrency and drain configuration to be
+                      used when upgrading machine pools of servers and agents.
+                    properties:
+                      controlPlaneConcurrency:
+                        description: |-
+                          ControlPlaneConcurrency is the number of server nodes that should be
+                          upgraded at a time.
+                          The default value is 1, a 0 value is infinite.
+                          Percentages are also accepted.
+                        maxLength: 10
+                        nullable: true
+                        pattern: ^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0)|)$
+                        type: string
+                      controlPlaneDrainOptions:
+                        description: |-
+                          ControlPlaneDrainOptions is the drain configuration to be used when
+                          draining controlplane nodes, during both upgrades and machine
+                          rollouts.
+                        properties:
+                          deleteEmptyDirData:
+                            description: |-
+                              DeleteEmptyDirData instructs the drain operation to proceed even if
+                              there are pods using emptyDir.
+                            type: boolean
+                          disableEviction:
+                            description: DisableEviction forces drain to use delete
+                              rather than evict.
+                            type: boolean
+                          enabled:
+                            description: |-
+                              Enabled specifies whether draining is required for the machine pool
+                              before upgrading.
+                            type: boolean
+                          force:
+                            description: |-
+                              Force specifies whether to drain the node even if there are pods not
+                              managed by a ReplicationController, Job, or DaemonSet.
+                              Drain will not proceed without Force set to true if there are such
+                              pods.
+                            type: boolean
+                          gracePeriod:
+                            description: |-
+                              GracePeriod is the period of time in seconds given to each pod to
+                              terminate gracefully.
+                              If negative, the default value specified in the pod will be used.
+                            type: integer
+                          ignoreDaemonSets:
+                            description: |-
+                              IgnoreDaemonSets specifies whether to ignore DaemonSet-managed pods.
+                              If there are DaemonSet-managed pods, drain will not proceed without
+                              IgnoreDaemonSets set to true (even when set to true, kubectl won't
+                              delete pods - so an unset value will default to true).
+                            nullable: true
+                            type: boolean
+                          ignoreErrors:
+                            description: |-
+                              IgnoreErrors Ignore errors occurred between drain nodes in group
+                              NOTE: currently unimplemented
+                            type: boolean
+                          postDrainHooks:
+                            description: |-
+                              PostDrainHooks is a list of hooks to run after draining and updating
+                              a node.
+                            items:
+                              properties:
+                                annotation:
+                                  description: |-
+                                    Annotation that will need to be populated on the machine-plan secret
+                                    with the value from the annotation "rke.cattle.io/pre-drain" before
+                                    the planner will continue to drain the specific node.
+                                    The annotation "rke.cattle.io/pre-drain" is used for pre-drain and
+                                    "rke.cattle.io/post-drain" is used for post-drain.
+                                  maxLength: 317
+                                  nullable: true
+                                  type: string
+                              type: object
+                            nullable: true
+                            type: array
+                          preDrainHooks:
+                            description: PreDrainHooks is a list of hooks to run before
+                              draining a node.
+                            items:
+                              properties:
+                                annotation:
+                                  description: |-
+                                    Annotation that will need to be populated on the machine-plan secret
+                                    with the value from the annotation "rke.cattle.io/pre-drain" before
+                                    the planner will continue to drain the specific node.
+                                    The annotation "rke.cattle.io/pre-drain" is used for pre-drain and
+                                    "rke.cattle.io/post-drain" is used for post-drain.
+                                  maxLength: 317
+                                  nullable: true
+                                  type: string
+                              type: object
+                            nullable: true
+                            type: array
+                          skipWaitForDeleteTimeoutSeconds:
+                            description: |-
+                              SkipWaitForDeleteTimeoutSeconds defines how long the draining
+                              operation should wait for a given to be removed after deletion.
+                              If the pod's DeletionTimestamp is older than N seconds, the drain
+                              operation will move on.
+                              Seconds must be greater than 0 to skip.
+                            type: integer
+                          timeout:
+                            description: Timeout is the time to wait (in seconds)
+                              before giving up for one try.
+                            type: integer
+                        type: object
+                      workerConcurrency:
+                        description: |-
+                          WorkerConcurrency is the number of worker nodes that should be
+                          upgraded at a time.
+                          The default value is 1, a 0 value is infinite.
+                          Percentages are also accepted.
+                        maxLength: 10
+                        nullable: true
+                        pattern: ^((([1-9]|[1-9][0-9]|100)%)|([1-9][0-9]*|0)|)$
+                        type: string
+                      workerDrainOptions:
+                        description: |-
+                          WorkerDrainOptions is the drain configuration to be used when draining
+                          worker nodes, during both upgrades and machine rollouts.
+                        properties:
+                          deleteEmptyDirData:
+                            description: |-
+                              DeleteEmptyDirData instructs the drain operation to proceed even if
+                              there are pods using emptyDir.
+                            type: boolean
+                          disableEviction:
+                            description: DisableEviction forces drain to use delete
+                              rather than evict.
+                            type: boolean
+                          enabled:
+                            description: |-
+                              Enabled specifies whether draining is required for the machine pool
+                              before upgrading.
+                            type: boolean
+                          force:
+                            description: |-
+                              Force specifies whether to drain the node even if there are pods not
+                              managed by a ReplicationController, Job, or DaemonSet.
+                              Drain will not proceed without Force set to true if there are such
+                              pods.
+                            type: boolean
+                          gracePeriod:
+                            description: |-
+                              GracePeriod is the period of time in seconds given to each pod to
+                              terminate gracefully.
+                              If negative, the default value specified in the pod will be used.
+                            type: integer
+                          ignoreDaemonSets:
+                            description: |-
+                              IgnoreDaemonSets specifies whether to ignore DaemonSet-managed pods.
+                              If there are DaemonSet-managed pods, drain will not proceed without
+                              IgnoreDaemonSets set to true (even when set to true, kubectl won't
+                              delete pods - so an unset value will default to true).
+                            nullable: true
+                            type: boolean
+                          ignoreErrors:
+                            description: |-
+                              IgnoreErrors Ignore errors occurred between drain nodes in group
+                              NOTE: currently unimplemented
+                            type: boolean
+                          postDrainHooks:
+                            description: |-
+                              PostDrainHooks is a list of hooks to run after draining and updating
+                              a node.
+                            items:
+                              properties:
+                                annotation:
+                                  description: |-
+                                    Annotation that will need to be populated on the machine-plan secret
+                                    with the value from the annotation "rke.cattle.io/pre-drain" before
+                                    the planner will continue to drain the specific node.
+                                    The annotation "rke.cattle.io/pre-drain" is used for pre-drain and
+                                    "rke.cattle.io/post-drain" is used for post-drain.
+                                  maxLength: 317
+                                  nullable: true
+                                  type: string
+                              type: object
+                            nullable: true
+                            type: array
+                          preDrainHooks:
+                            description: PreDrainHooks is a list of hooks to run before
+                              draining a node.
+                            items:
+                              properties:
+                                annotation:
+                                  description: |-
+                                    Annotation that will need to be populated on the machine-plan secret
+                                    with the value from the annotation "rke.cattle.io/pre-drain" before
+                                    the planner will continue to drain the specific node.
+                                    The annotation "rke.cattle.io/pre-drain" is used for pre-drain and
+                                    "rke.cattle.io/post-drain" is used for post-drain.
+                                  maxLength: 317
+                                  nullable: true
+                                  type: string
+                              type: object
+                            nullable: true
+                            type: array
+                          skipWaitForDeleteTimeoutSeconds:
+                            description: |-
+                              SkipWaitForDeleteTimeoutSeconds defines how long the draining
+                              operation should wait for a given to be removed after deletion.
+                              If the pod's DeletionTimestamp is older than N seconds, the drain
+                              operation will move on.
+                              Seconds must be greater than 0 to skip.
+                            type: integer
+                          timeout:
+                            description: Timeout is the time to wait (in seconds)
+                              before giving up for one try.
+                            type: integer
+                        type: object
+                    type: object
+                required:
+                - clusterName
+                - managementClusterName
+                type: object
+              certificateRotationGeneration:
+                description: |-
+                  CertificateRotationGeneration is the last observed state for which the
+                  certificate rotation operation was successful.
+                format: int64
+                type: integer
+              conditions:
+                description: |-
+                  Conditions is a representation of the current state of the
+                  RKEControlPlane object.
+                  This includes its machine reconciliation status
+                  (Bootstrapped, Provisioned, Stable, Reconciled), the status of the
+                  system-upgrade-controller (SystemUpgradeControllerReady), and CAPI
+                  required conditions (ScalingUp, ScalingDown, RollingOut).
+                  Information related to errors encountered while transitioning to one
+                  of these states will be populated in the Message and Reason fields.
+                items:
+                  properties:
+                    lastTransitionTime:
+                      description: Last time the condition transitioned from one status
+                        to another.
+                      type: string
+                    lastUpdateTime:
+                      description: The last time this condition was updated.
+                      type: string
+                    message:
+                      description: Human-readable message indicating details about
+                        last transition
+                      type: string
+                    reason:
+                      description: The reason for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of cluster condition.
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+              configGeneration:
+                description: |-
+                  ConfigGeneration is the current generation of the configuration for a
+                  given cluster.
+                  Changing this value (which is done automatically during an etcd restore) will trigger a reconciliation loop
+                  which will invoke draining (if enabled).
+                format: int64
+                type: integer
+              etcdSnapshotCreate:
+                description: |-
+                  ETCDSnapshotCreate is the state for which the last etcd snapshot
+                  create operation was successful.
+                properties:
+                  generation:
+                    description: |-
+                      Generation is the current generation for which an etcd snapshot
+                      creation operation has been requested.
+                      Changing the Generation is the only thing required to create a
+                      snapshot.
+                    type: integer
+                type: object
+              etcdSnapshotCreatePhase:
+                description: |-
+                  ETCDSnapshotCreatePhase is the phase the etcd snapshot create
+                  operation is currently executing.
+                enum:
+                - Started
+                - RestartCluster
+                - Finished
+                - Failed
+                type: string
+              etcdSnapshotRestore:
+                description: |-
+                  ETCDSnapshotRestore is the state for which the last etcd snapshot
+                  restore operation was successful.
+                properties:
+                  generation:
+                    description: |-
+                      Generation is the current generation for which an etcd snapshot
+                      restore operation has been requested.
+                      Changing the Generation is the only thing required to initiate a
+                      snapshot restore.
+                    type: integer
+                  name:
+                    description: Name refers to the name of the associated etcdsnapshot
+                      object.
+                    nullable: true
+                    type: string
+                  restoreRKEConfig:
+                    description: Set to either none (or empty string), all, or kubernetesVersion
+                    nullable: true
+                    type: string
+                type: object
+              etcdSnapshotRestorePhase:
+                description: |-
+                  ETCDSnapshotRestorePhase is the phase the etcd snapshot
+                  restore operation is currently executing.
+                enum:
+                - Started
+                - Shutdown
+                - Restore
+                - PostRestorePodCleanup
+                - InitialRestartCluster
+                - PostRestoreNodeCleanup
+                - RestartCluster
+                - Finished
+                - Failed
+                type: string
+              initialized:
+                description: |-
+                  Initialized denotes that the API server is initialized and worker
+                  nodes can be joined to the cluster.
+                type: boolean
+              observedGeneration:
+                description: |-
+                  ObservedGeneration is the generation for which the RKEControlPlane has
+                  started processing.
+                format: int64
+                type: integer
+              ready:
+                description: |-
+                  Ready denotes that the API server has been initialized and is ready to
+                  receive requests.
+                type: boolean
+              rotateEncryptionKeys:
+                description: |-
+                  RotateEncryptionKeys is the state for which the last encryption key
+                  rotation operation was successful.
+                properties:
+                  generation:
+                    description: |-
+                      Generation is the current generation for which an encryption key
+                      rotation operation has been requested.
+                      Changing the Generation is the only thing required to rotate
+                      encryption keys.
+                    format: int64
+                    type: integer
+                type: object
+              rotateEncryptionKeysLeader:
+                description: |-
+                  RotateEncryptionKeysLeader is the name of the CAPI machine object
+                  which has been elected leader of the controlplane nodes for
+                  encryption key rotation purposes.
+                type: string
+              rotateEncryptionKeysPhase:
+                description: |-
+                  RotateEncryptionKeysPhase is the phase the encryption key
+                  rotation operation is currently executing.
+                type: string
+            required:
+            - observedGeneration
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

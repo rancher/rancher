@@ -252,22 +252,22 @@ func GetLoopbackAddress(controlPlane *rkev1.RKEControlPlane) string {
 }
 
 func GetDistroDataDir(controlPlane *rkev1.RKEControlPlane) string {
-	if dir := controlPlane.Spec.DataDirectories.K8sDistro; dir != "" {
-		return dir
+	if controlPlane.Spec.DataDirectories.K8sDistro != "" {
+		return controlPlane.Spec.DataDirectories.K8sDistro
 	}
 	return fmt.Sprintf("/var/lib/rancher/%s", GetRuntime(controlPlane.Spec.KubernetesVersion))
 }
 
-func GetProvisioningDataDir(spec *rkev1.RKEClusterSpecCommon) string {
-	if dir := spec.DataDirectories.Provisioning; dir != "" {
-		return dir
+func GetProvisioningDataDir(spec *rkev1.ClusterConfiguration) string {
+	if spec.DataDirectories.Provisioning != "" {
+		return spec.DataDirectories.Provisioning
 	}
 	return "/var/lib/rancher/capr"
 }
 
-func GetSystemAgentDataDir(spec *rkev1.RKEClusterSpecCommon) string {
-	if dir := spec.DataDirectories.SystemAgent; dir != "" {
-		return dir
+func GetSystemAgentDataDir(spec *rkev1.ClusterConfiguration) string {
+	if spec.DataDirectories.SystemAgent != "" {
+		return spec.DataDirectories.SystemAgent
 	}
 	return "/var/lib/rancher/agent"
 }

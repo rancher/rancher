@@ -41,14 +41,25 @@ spec:
                 description: Generic machine configuration.
                 properties:
                   cloudCredentialSecretName:
+                    description: |-
+                      CloudCredentialSecretName is the id of the secret used to provision
+                      the cluster.
+                      This field must be in the format of "namespace:name".
+                      NOTE: this field overrides the field of the same name on the cluster
+                      spec, allowing individual machine pools to use separate credentials.
+                    maxLength: 317
                     nullable: true
                     type: string
                   labels:
                     additionalProperties:
                       type: string
+                    description: Labels is a list of labels to apply to the machines
+                      created by the CAPI machine deployment.
                     nullable: true
                     type: object
                   taints:
+                    description: Taints is a list of taints to apply to the machines
+                      created by the CAPI machine deployment.
                     items:
                       description: |-
                         The node this Taint is attached to has the "effect" on
