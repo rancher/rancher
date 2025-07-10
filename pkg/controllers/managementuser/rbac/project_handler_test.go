@@ -276,7 +276,7 @@ func TestUpdated(t *testing.T) {
 			var newCRs []*rbacv1.ClusterRole
 			crLister := wfakes.NewMockNonNamespacedCacheInterface[*rbacv1.ClusterRole](ctrl)
 			crLister.EXPECT().Get(gomock.Any()).DoAndReturn(
-				func(namespace string, name string) (*rbacv1.ClusterRole, error) {
+				func(name string) (*rbacv1.ClusterRole, error) {
 					if test.getError != nil {
 						return nil, test.getError
 					}
@@ -288,7 +288,7 @@ func TestUpdated(t *testing.T) {
 						Resource: "ClusterRoles",
 					}, name)
 				},
-			)
+			).AnyTimes()
 			clusterRoles := wfakes.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
 			clusterRoles.EXPECT().Create(gomock.Any()).DoAndReturn(
 				func(in *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
@@ -298,7 +298,7 @@ func TestUpdated(t *testing.T) {
 					}
 					return in, nil
 				},
-			)
+			).AnyTimes()
 			clusterRoles.EXPECT().Update(gomock.Any()).DoAndReturn(
 				func(in *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
 					newCRs = append(newCRs, in)
@@ -307,7 +307,7 @@ func TestUpdated(t *testing.T) {
 					}
 					return in, nil
 				},
-			)
+			).AnyTimes()
 			lifecycle := pLifecycle{
 				m: &manager{
 					crLister:     crLister,
