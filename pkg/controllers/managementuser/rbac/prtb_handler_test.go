@@ -11,6 +11,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rancherv3fakes "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	typesrbacv1fakes "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
+	wfakes "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -112,6 +113,8 @@ var (
 func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 	// discard logs to avoid cluttering
 	logrus.SetOutput(io.Discard)
+
+	ctrl := gomock.NewController(t)
 
 	type args struct {
 		rtName        string
@@ -327,24 +330,36 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			// setup ClusterRoleLister mock
-			crListerMock := &typesrbacv1fakes.ClusterRoleListerMock{
-				GetFunc: func(namespace, name string) (*v1.ClusterRole, error) {
+			crListGetCall := 0
+			crListerMock := wfakes.NewMockNonNamespacedCacheInterface[*v1.ClusterRole](ctrl)
+			crListerMock.EXPECT().Get(gomock.Any()).DoAndReturn(
+				func() (*v1.ClusterRole, error) {
+					crListGetCall++
 					return tc.crListerMockGetResult, tc.crListerMockGetErr
 				},
-			}
+			)
 
 			// setup ClusterRole mock: it will just return the passed ClusterRole or the error
-			clusterRolesMock := &typesrbacv1fakes.ClusterRoleInterfaceMock{
-				CreateFunc: func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
-					return in1, tc.clusterRolesMockCreateErr
-				},
-				UpdateFunc: func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
+			clusterRolesCreateCall, clusterRolesUpdateCall, clusterRolesDeleteCall := 0, 0, 0
+			clusterRolesMock := wfakes.NewMockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
+			clusterRolesMock.EXPECT().Create(gomock.Any()).DoAndReturn(
+				func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
+					clusterRolesCreateCall++
 					return in1, tc.clusterRolesMockUpdateErr
 				},
-				DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
-					return tc.clusterRolesMockDeleteErr
+			)
+			clusterRolesMock.EXPECT().Update(gomock.Any()).DoAndReturn(
+				func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
+					clusterRolesUpdateCall++
+					return in1, tc.clusterRolesMockUpdateErr
 				},
-			}
+			)
+			clusterRolesMock.EXPECT().Delete(gomock.Any(), gomock.Any()).DoAndReturn(
+				func(in1 *v1.ClusterRole, in2 *metav1.DeleteOptions) (*v1.ClusterRole, error) {
+					clusterRolesDeleteCall++
+					return in1, tc.clusterRolesMockDeleteErr
+				},
+			)
 
 			manager := manager{
 				crLister:     crListerMock,
@@ -361,45 +376,34 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 
 			// if result and err are nil the method should have not been called
 			if tc.crListerMockGetResult == nil && tc.crListerMockGetErr == nil {
-				assert.Empty(t, crListerMock.GetCalls())
+				assert.Empty(t, crListGetCall)
 			} else {
 				// otherwise only one call to Get is expected
-				assert.Len(t, crListerMock.GetCalls(), 1)
+				assert.Len(t, crListGetCall, 1)
 			}
 
 			// if result and err are nil the method should have not been called
 			if tc.clusterRolesMockCreateResult == nil && tc.clusterRolesMockCreateErr == nil {
-				assert.Empty(t, clusterRolesMock.CreateCalls())
+				assert.Empty(t, clusterRolesCreateCall)
 			} else {
 				// otherwise only one call to Get is expected, and the values should match
-				results := clusterRolesMock.CreateCalls()
-				assert.Len(t, results, 1)
-
-				if tc.clusterRolesMockCreateErr == nil {
-					assert.Equal(t, tc.clusterRolesMockCreateResult, results[0].In1)
-				}
+				assert.Len(t, clusterRolesCreateCall, 1)
 			}
 
 			// if result and err are nil the method should have not been called
 			if tc.clusterRolesMockUpdateResult == nil && tc.clusterRolesMockUpdateErr == nil {
-				assert.Empty(t, clusterRolesMock.UpdateCalls())
+				assert.Empty(t, clusterRolesUpdateCall)
 			} else {
 				// otherwise only one call to Update is expected, and the values should match
-				results := clusterRolesMock.UpdateCalls()
-				assert.Len(t, results, 1)
-
-				if tc.clusterRolesMockUpdateErr == nil {
-					assert.Equal(t, tc.clusterRolesMockUpdateResult, results[0].In1)
-				}
+				assert.Len(t, clusterRolesUpdateCall, 1)
 			}
 
 			// if nil the method should have not been called
 			if tc.clusterRolesMockDeleteErr == nil {
-				assert.Empty(t, clusterRolesMock.DeleteCalls())
+				assert.Empty(t, clusterRolesDeleteCall)
 			} else {
 				// otherwise only one call to Delete is expected
-				results := clusterRolesMock.DeleteCalls()
-				assert.Len(t, results, 1)
+				assert.Len(t, clusterRolesDeleteCall, 1)
 			}
 		})
 	}

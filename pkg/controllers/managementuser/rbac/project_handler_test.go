@@ -7,7 +7,9 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
+	wfakes "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,6 +18,7 @@ import (
 
 func TestCreate(t *testing.T) {
 	const projectName = "p-123xyz"
+	ctrl := gomock.NewController(t)
 	tests := []struct {
 		name                     string
 		existingClusterRoleNames []string
@@ -80,37 +83,41 @@ func TestCreate(t *testing.T) {
 				},
 			}
 			var newCRs []*rbacv1.ClusterRole
+			crLister := wfakes.NewMockNonNamespacedCacheInterface[*rbacv1.ClusterRole](ctrl)
+			crLister.EXPECT().Get(gomock.Any()).DoAndReturn(
+				func(namespace string, name string) (*rbacv1.ClusterRole, error) {
+					if test.getErr != nil {
+						return nil, test.getErr
+					}
+					for _, clusterRoleName := range test.existingClusterRoleNames {
+						if clusterRoleName == name {
+							return &rbacv1.ClusterRole{
+								ObjectMeta: metav1.ObjectMeta{
+									Name: clusterRoleName,
+								},
+							}, nil
+						}
+					}
+					return nil, apierror.NewNotFound(schema.GroupResource{
+						Group:    "rbac.authorization.k8s.io",
+						Resource: "ClusterRoles",
+					}, name)
+				},
+			)
+			clusterRoles := wfakes.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
+			clusterRoles.EXPECT().Create(gomock.Any()).DoAndReturn(
+				func(in *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
+					newCRs = append(newCRs, in)
+					if test.createErr != nil {
+						return nil, test.createErr
+					}
+					return in, nil
+				},
+			)
 			lifecycle := pLifecycle{
 				m: &manager{
-					crLister: &fakes.ClusterRoleListerMock{
-						GetFunc: func(namespace string, name string) (*rbacv1.ClusterRole, error) {
-							if test.getErr != nil {
-								return nil, test.getErr
-							}
-							for _, clusterRoleName := range test.existingClusterRoleNames {
-								if clusterRoleName == name {
-									return &rbacv1.ClusterRole{
-										ObjectMeta: metav1.ObjectMeta{
-											Name: clusterRoleName,
-										},
-									}, nil
-								}
-							}
-							return nil, apierror.NewNotFound(schema.GroupResource{
-								Group:    "rbac.authorization.k8s.io",
-								Resource: "ClusterRoles",
-							}, name)
-						},
-					},
-					clusterRoles: &fakes.ClusterRoleInterfaceMock{
-						CreateFunc: func(in *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
-							newCRs = append(newCRs, in)
-							if test.createErr != nil {
-								return nil, test.createErr
-							}
-							return in, nil
-						},
-					},
+					crLister:     crLister,
+					clusterRoles: clusterRoles,
 				},
 			}
 			_, err := lifecycle.Create(project)
@@ -129,6 +136,7 @@ func TestCreate(t *testing.T) {
 
 func TestUpdated(t *testing.T) {
 	const projectName = "p-123xyz"
+	ctrl := gomock.NewController(t)
 	tests := []struct {
 		name               string
 		currentClusterRole *rbacv1.ClusterRole
@@ -266,38 +274,44 @@ func TestUpdated(t *testing.T) {
 				},
 			}
 			var newCRs []*rbacv1.ClusterRole
+			crLister := wfakes.NewMockNonNamespacedCacheInterface[*rbacv1.ClusterRole](ctrl)
+			crLister.EXPECT().Get(gomock.Any()).DoAndReturn(
+				func(namespace string, name string) (*rbacv1.ClusterRole, error) {
+					if test.getError != nil {
+						return nil, test.getError
+					}
+					if test.currentClusterRole != nil && name == test.currentClusterRole.Name {
+						return test.currentClusterRole, nil
+					}
+					return nil, apierror.NewNotFound(schema.GroupResource{
+						Group:    "rbac.authorization.k8s.io",
+						Resource: "ClusterRoles",
+					}, name)
+				},
+			)
+			clusterRoles := wfakes.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
+			clusterRoles.EXPECT().Create(gomock.Any()).DoAndReturn(
+				func(in *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
+					newCRs = append(newCRs, in)
+					if test.createError != nil {
+						return nil, test.createError
+					}
+					return in, nil
+				},
+			)
+			clusterRoles.EXPECT().Update(gomock.Any()).DoAndReturn(
+				func(in *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
+					newCRs = append(newCRs, in)
+					if test.updError != nil {
+						return nil, test.updError
+					}
+					return in, nil
+				},
+			)
 			lifecycle := pLifecycle{
 				m: &manager{
-					crLister: &fakes.ClusterRoleListerMock{
-						GetFunc: func(namespace string, name string) (*rbacv1.ClusterRole, error) {
-							if test.getError != nil {
-								return nil, test.getError
-							}
-							if test.currentClusterRole != nil && name == test.currentClusterRole.Name {
-								return test.currentClusterRole, nil
-							}
-							return nil, apierror.NewNotFound(schema.GroupResource{
-								Group:    "rbac.authorization.k8s.io",
-								Resource: "ClusterRoles",
-							}, name)
-						},
-					},
-					clusterRoles: &fakes.ClusterRoleInterfaceMock{
-						CreateFunc: func(in *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
-							newCRs = append(newCRs, in)
-							if test.createError != nil {
-								return nil, test.createError
-							}
-							return in, nil
-						},
-						UpdateFunc: func(in *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
-							newCRs = append(newCRs, in)
-							if test.updError != nil {
-								return nil, test.updError
-							}
-							return in, nil
-						},
-					},
+					crLister:     crLister,
+					clusterRoles: clusterRoles,
 				},
 			}
 			_, err := lifecycle.Updated(project)
