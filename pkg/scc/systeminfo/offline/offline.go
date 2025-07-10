@@ -15,6 +15,7 @@ func offlineValidatorContextLogger() log.StructuredLogger {
 	return logBuilder.ToLogger()
 }
 
+// offlineCertError represents an issue encountered with offline certs; either a base error or wrapped error
 type offlineCertError struct {
 	Operation  string
 	Details    string
@@ -33,6 +34,12 @@ func (e *offlineCertError) Error() string {
 }
 
 func (e *offlineCertError) Unwrap() error {
+	// If e.WrappedErr is nil, it means this offlineCertError is
+	// the "base" or "original" error and doesn't wrap anything.
+	// In this case, return nil as per the errors.Unwrap contract.
+	if e.WrappedErr == nil {
+		return nil
+	}
 	return *e.WrappedErr
 }
 

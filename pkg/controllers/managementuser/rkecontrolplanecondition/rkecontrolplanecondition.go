@@ -16,7 +16,6 @@ import (
 	upgradev1 "github.com/rancher/rancher/pkg/generated/controllers/upgrade.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -29,19 +28,22 @@ type handler struct {
 	downstreamPlanClient upgradev1.PlanClient
 }
 
-func Register(ctx context.Context, context *config.UserContext) {
+func Register(ctx context.Context, mgmtClusterName string, clusterCache provisioningcontrollers.ClusterCache,
+	downstreamAppClient catalogv1.AppClient, downstreamPlanClient upgradev1.PlanClient,
+	rkeControlPlaneController rkecontrollers.RKEControlPlaneController) {
+
 	h := handler{
-		mgmtClusterName:      context.ClusterName,
-		clusterCache:         context.Management.Wrangler.Provisioning.Cluster().Cache(),
-		downstreamAppClient:  context.Catalog.V1().App(),
-		downstreamPlanClient: context.Plan.V1().Plan(),
+		mgmtClusterName:      mgmtClusterName,
+		clusterCache:         clusterCache,
+		downstreamAppClient:  downstreamAppClient,
+		downstreamPlanClient: downstreamPlanClient,
 	}
 
-	rkecontrollers.RegisterRKEControlPlaneStatusHandler(ctx, context.Management.Wrangler.RKE.RKEControlPlane(),
+	rkecontrollers.RegisterRKEControlPlaneStatusHandler(ctx, rkeControlPlaneController,
 		"", "sync-system-upgrade-controller-condition", h.syncSystemUpgradeControllerCondition)
 }
 
-// syncSystemUpgradeControllerCondition checks the status of the system-upgrade-controller app in the downstream cluster
+// syncSystemUpgradeControllerCondition checks the status of the system-upgrade-controller app in the target cluster
 // and manages the SystemUpgradeControllerReady condition on the RKEControlPlane object
 func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
