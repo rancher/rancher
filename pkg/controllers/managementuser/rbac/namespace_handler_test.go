@@ -682,7 +682,7 @@ func TestEnsurePRTBAddToNamespace(t *testing.T) {
 
 			rtLister := wfakes.NewMockNonNamespacedCacheInterface[*v3.RoleTemplate](ctrl)
 			rtLister.EXPECT().Get(gomock.Any()).DoAndReturn(
-				func(namespace string, name string) (*v3.RoleTemplate, error) {
+				func(name string) (*v3.RoleTemplate, error) {
 					return nil, apierrors.NewNotFound(schema.GroupResource{
 						Group:    "management.cattle.io",
 						Resource: "roletemplates",
