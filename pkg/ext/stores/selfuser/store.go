@@ -1,4 +1,4 @@
-// selfuser implements the store for the new public API selfuser resources
+// selfuser implements the store for the imperative selfuser resource.
 package selfuser
 
 import (
@@ -16,7 +16,6 @@ import (
 
 const (
 	SingularName = "selfuser"
-	PluralName   = SingularName + "s"
 )
 
 var GV = schema.GroupVersion{

@@ -68,7 +68,7 @@ func InstallStores(
 	}
 
 	err = server.Install(
-		passwordchangerequest.PluralName,
+		extv1.PasswordChangeRequestResourceName,
 		passwordchangerequest.GVK,
 		passwordchangerequest.New(wranglerContext, server.GetAuthorizer()))
 	if err != nil {
@@ -79,14 +79,14 @@ func InstallStores(
 		return fmt.Errorf("unable to create %s store: %w", groupmembershiprefreshrequest.SingularName, err)
 	}
 	err = server.Install(
-		groupmembershiprefreshrequest.PluralName,
+		extv1.GroupMembershipRefreshRequestResourceName,
 		groupmembershiprefreshrequest.GVK,
 		groupMembershipRefreshStore)
 	if err != nil {
 		return fmt.Errorf("unable to install %s store: %w", groupmembershiprefreshrequest.SingularName, err)
 	}
 	err = server.Install(
-		selfuser.PluralName,
+		extv1.SelfUserResourceName,
 		selfuser.GVK,
 		selfuser.New())
 	if err != nil {
