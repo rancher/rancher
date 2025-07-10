@@ -581,19 +581,19 @@ func TestAsyncCleanupRBAC_NamespaceDeleted(t *testing.T) {
 				func(in *v1.ClusterRole) (*v1.ClusterRole, error) {
 					return in, nil
 				},
-			)
+			).AnyTimes()
 			fakeClusterRoles.EXPECT().Delete(gomock.Any(), gomock.Any()).DoAndReturn(
 				func(name string, options *metav1.DeleteOptions) error {
 					return nil
 				},
-			)
+			).AnyTimes()
 
 			fakeLister := wfakes.NewMockNonNamespacedCacheInterface[*v1.ClusterRole](ctrl)
 			fakeLister.EXPECT().Get(gomock.Any()).DoAndReturn(
 				func(int1 string) (*v1.ClusterRole, error) {
 					return &v1.ClusterRole{}, nil
 				},
-			)
+			).AnyTimes()
 			nsLifecycle := &nsLifecycle{
 				m: &manager{
 					nsLister:     namespaceListerMock,
