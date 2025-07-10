@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"github.com/SUSE/connect-ng/pkg/registration"
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/scc/controllers/shared"
+	"github.com/rancher/rancher/pkg/scc/controllers/common"
 	"github.com/rancher/rancher/pkg/scc/suseconnect"
 	offlineSecrets "github.com/rancher/rancher/pkg/scc/suseconnect/offline"
 	"github.com/rancher/rancher/pkg/scc/systeminfo"
 	"github.com/rancher/rancher/pkg/scc/systeminfo/offline"
+	"github.com/rancher/rancher/pkg/scc/types"
 	"github.com/rancher/rancher/pkg/scc/util/log"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -55,10 +56,6 @@ func (s sccOfflineMode) Register(registrationObj *v1.Registration) (suseconnect.
 	return suseconnect.OfflineRegistrationSystemId, nil
 }
 
-func (s sccOfflineMode) ReconcileRegisterError(registrationObj *v1.Registration, registerErr error) *v1.Registration {
-	return registrationObj
-}
-
 func (s sccOfflineMode) PrepareRegisteredForActivation(registrationObj *v1.Registration) (*v1.Registration, error) {
 
 	v1.RegistrationConditionOfflineRequestReady.True(registrationObj)
@@ -66,6 +63,17 @@ func (s sccOfflineMode) PrepareRegisteredForActivation(registrationObj *v1.Regis
 	v1.RegistrationConditionOfflineCertificateReady.SetMessageIfBlank(registrationObj, "Awaiting registration certificate secret")
 
 	return registrationObj, nil
+}
+
+// ReconcileRegisterError helps reconcile any errors in the register phase
+func (s sccOfflineMode) ReconcileRegisterError(registrationObj *v1.Registration, registerErr error, phase types.RegistrationPhase) *v1.Registration {
+	if phase == types.RegistrationInit {
+		v1.RegistrationConditionOfflineRequestReady.SetError(registrationObj, "Failed to prepare Offline Request secret & ref", registerErr)
+	}
+	if phase == types.RegistrationMain {
+		v1.RegistrationConditionOfflineRequestReady.SetError(registrationObj, "Failed to prepare Offline Request", registerErr)
+	}
+	return registrationObj
 }
 
 func (s sccOfflineMode) NeedsActivation(registrationObj *v1.Registration) bool {
@@ -99,6 +107,7 @@ func (s sccOfflineMode) Activate(registrationObj *v1.Registration) error {
 
 func (s sccOfflineMode) PrepareActivatedForKeepalive(registrationObj *v1.Registration) (*v1.Registration, error) {
 	// TODO: can we actually get the SCC systemID in offline mode?
+	// GH issue: https://github.com/SUSE/connect-ng/issues/313
 	/*
 		certReader, err := s.offlineSecrets.OfflineCertificateReader()
 		if err != nil {
@@ -115,13 +124,16 @@ func (s sccOfflineMode) PrepareActivatedForKeepalive(registrationObj *v1.Registr
 	return registrationObj, nil
 }
 
-func (s sccOfflineMode) ReconcileActivateError(registrationObj *v1.Registration, activationErr error) *v1.Registration {
-	v1.RegistrationConditionActivated.SetError(registrationObj, "offline activation failed", activationErr)
+func (s sccOfflineMode) ReconcileActivateError(registrationObj *v1.Registration, activationErr error, phase types.ActivationPhase) *v1.Registration {
+	// TODO: this will need updating to use phase after todo inside PrepareActivatedForKeepalive is solved
+	v1.RegistrationConditionActivated.False(registrationObj)
+	v1.RegistrationConditionActivated.Reason(registrationObj, "offline activation failed")
+	v1.RegistrationConditionOfflineCertificateReady.SetError(registrationObj, "cannot validate offline certificate", activationErr)
 
 	// Cannot recover from this error so must set failure
 	registrationObj.Status.ActivationStatus.Activated = false
 
-	return shared.PrepareFailed(registrationObj, activationErr)
+	return common.PrepareFailed(registrationObj, activationErr)
 }
 
 func (s sccOfflineMode) Keepalive(registrationObj *v1.Registration) error {
@@ -154,9 +166,6 @@ func (s sccOfflineMode) Keepalive(registrationObj *v1.Registration) error {
 }
 
 func (s sccOfflineMode) PrepareKeepaliveSucceeded(registrationObj *v1.Registration) (*v1.Registration, error) {
-
-	// TODO other post keep alive success
-
 	sccWrapper := suseconnect.OfflineRancherRegistration(s.systemInfoExporter)
 	generatedOfflineRegistrationRequest, err := sccWrapper.PrepareOfflineRegistrationRequest()
 	if err != nil {
@@ -171,13 +180,11 @@ func (s sccOfflineMode) PrepareKeepaliveSucceeded(registrationObj *v1.Registrati
 }
 
 func (s sccOfflineMode) ReconcileKeepaliveError(registration *v1.Registration, err error) *v1.Registration {
-	s.log.Debugf("Because offline Keepalive is intentional noop, this shouldn't trigger")
+	// TODO: handle errors from Keepalive and PrepareKeepaliveSucceeded
 	return registration
 }
 
 func (s sccOfflineMode) Deregister() error {
-	// TODO implement me; for now this is no-op
-	// TODO eventually this should clean up secrets downstream of this offline reg
 	delErr := s.offlineSecrets.Remove()
 	if delErr != nil {
 		return fmt.Errorf("deregister failed: %w", delErr)

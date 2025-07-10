@@ -4,7 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/rancher/rancher/pkg/scc/consts"
-	"github.com/rancher/rancher/pkg/scc/controllers/shared"
+	"github.com/rancher/rancher/pkg/scc/controllers/common"
+	"github.com/rancher/rancher/pkg/scc/types"
 	"golang.org/x/sync/semaphore"
 	"net/http"
 	"slices"
@@ -94,6 +95,23 @@ func (s sccOnlineMode) Register(registrationObj *v1.Registration) (suseconnect.R
 	return id, nil
 }
 
+func (s sccOnlineMode) PrepareRegisteredForActivation(registration *v1.Registration) (*v1.Registration, error) {
+	if registration.Status.SCCSystemId == nil {
+		return registration, errors.New("SCC system ID cannot be empty when preparing registered system")
+	}
+	sccSystemUrl := fmt.Sprintf("https://scc.suse.com/systems/%d", *registration.Status.SCCSystemId)
+	s.log.Debugf("system announced, check %s", sccSystemUrl)
+
+	registration.Status.ActivationStatus.SystemUrl = &sccSystemUrl
+	v1.RegistrationConditionSccUrlReady.SetStatusBool(registration, false) // This must be false until successful activation too.
+	v1.RegistrationConditionSccUrlReady.SetMessageIfBlank(registration, fmt.Sprintf("system announced, check %s", sccSystemUrl))
+	v1.RegistrationConditionAnnounced.SetStatusBool(registration, true)
+	v1.ResourceConditionFailure.SetStatusBool(registration, false)
+	v1.ResourceConditionReady.SetStatusBool(registration, true)
+
+	return registration, nil
+}
+
 func isNonRecoverableHttpError(err error) bool {
 	var sccApiError *connection.ApiError
 
@@ -123,6 +141,7 @@ func getHttpErrorCode(err error) *int {
 
 type registrationReconcilerApplier func(regApplierIn *v1.Registration, httpCode *int) *v1.Registration
 
+// reconcileNonRecoverableHttpError can help reconcile the registration state for any API/HTTP error related reasons
 func (s sccOnlineMode) reconcileNonRecoverableHttpError(registrationIn *v1.Registration, registerErr error, additionalApplier registrationReconcilerApplier) *v1.Registration {
 	httpCode := *getHttpErrorCode(registerErr)
 	nowTime := metav1.Now()
@@ -140,7 +159,7 @@ func (s sccOnlineMode) reconcileNonRecoverableHttpError(registrationIn *v1.Regis
 	return registrationIn
 }
 
-func (s sccOnlineMode) ReconcileRegisterError(registrationObj *v1.Registration, registerErr error) *v1.Registration {
+func (s sccOnlineMode) ReconcileRegisterError(registrationObj *v1.Registration, registerErr error, phase types.RegistrationPhase) *v1.Registration {
 	if isNonRecoverableHttpError(registerErr) {
 		return s.reconcileNonRecoverableHttpError(
 			registrationObj,
@@ -159,24 +178,9 @@ func (s sccOnlineMode) ReconcileRegisterError(registrationObj *v1.Registration, 
 		)
 	}
 
-	return shared.PrepareFailed(registrationObj, registerErr)
-}
+	// TODO: any phase specific state updates
 
-func (s sccOnlineMode) PrepareRegisteredForActivation(registration *v1.Registration) (*v1.Registration, error) {
-	if registration.Status.SCCSystemId == nil {
-		return registration, errors.New("SCC system ID cannot be empty when preparing registered system")
-	}
-	sccSystemUrl := fmt.Sprintf("https://scc.suse.com/systems/%d", *registration.Status.SCCSystemId)
-	s.log.Debugf("system announced, check %s", sccSystemUrl)
-
-	registration.Status.ActivationStatus.SystemUrl = &sccSystemUrl
-	v1.RegistrationConditionSccUrlReady.SetStatusBool(registration, false) // This must be false until successful activation too.
-	v1.RegistrationConditionSccUrlReady.SetMessageIfBlank(registration, fmt.Sprintf("system announced, check %s", sccSystemUrl))
-	v1.RegistrationConditionAnnounced.SetStatusBool(registration, true)
-	v1.ResourceConditionFailure.SetStatusBool(registration, false)
-	v1.ResourceConditionReady.SetStatusBool(registration, true)
-
-	return registration, nil
+	return common.PrepareFailed(registrationObj, registerErr)
 }
 
 func (s sccOnlineMode) NeedsActivation(registrationObj *v1.Registration) bool {
@@ -239,7 +243,7 @@ func (s sccOnlineMode) PrepareActivatedForKeepalive(registrationObj *v1.Registra
 }
 
 // ReconcileActivateError will first verify if an error is recoverable and then reconcile the error as needed
-func (s sccOnlineMode) ReconcileActivateError(registration *v1.Registration, activationErr error) *v1.Registration {
+func (s sccOnlineMode) ReconcileActivateError(registration *v1.Registration, activationErr error, phase types.ActivationPhase) *v1.Registration {
 	if isNonRecoverableHttpError(activationErr) {
 		return s.reconcileNonRecoverableHttpError(
 			registration,
