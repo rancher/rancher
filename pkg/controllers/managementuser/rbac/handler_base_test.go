@@ -92,8 +92,8 @@ func withRoleTemplates(roleTemplates map[string]*v3.RoleTemplate, errs *clientEr
 				return true
 			})
 			return result, nil
-		})
-		rtLister.EXPECT().Get(gomock.Any()).DoAndReturn(func(namespace string, name string) (*v3.RoleTemplate, error) {
+		}).AnyTimes()
+		rtLister.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v3.RoleTemplate, error) {
 			if errs.getError != nil {
 				return nil, errs.getError
 			}
@@ -105,7 +105,7 @@ func withRoleTemplates(roleTemplates map[string]*v3.RoleTemplate, errs *clientEr
 
 			rt := rtVal.(*v3.RoleTemplate)
 			return rt.DeepCopy(), nil
-		})
+		}).AnyTimes()
 		m.rtLister = rtLister
 	}
 }
