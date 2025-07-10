@@ -147,14 +147,18 @@ func extractRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationPar
 	contentsId := hex.EncodeToString(hasher.Sum(nil))
 
 	return RegistrationParams{
-		regType:            regMode,
-		nameId:             nameId,
-		contentHash:        contentsId,
-		regCode:            regCode,
-		hasOfflineCertData: hasOfflineCert,
-		offlineCertData:    &offlineRegCertData,
+		regType:     regMode,
+		nameId:      nameId,
+		contentHash: contentsId,
+		regCode:     regCode,
 		regCodeSecretRef: &corev1.SecretReference{
 			Name:      consts.RegistrationCodeSecretName(nameId),
+			Namespace: secret.Namespace,
+		},
+		hasOfflineCertData: hasOfflineCert,
+		offlineCertData:    &offlineRegCertData,
+		offlineCertSecretRef: &corev1.SecretReference{
+			Name:      consts.OfflineCertificateSecretName(nameId),
 			Namespace: secret.Namespace,
 		},
 		regUrl: regUrlString,
@@ -162,14 +166,15 @@ func extractRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationPar
 }
 
 type RegistrationParams struct {
-	regType            v1.RegistrationMode
-	nameId             string
-	contentHash        string
-	regCode            []byte
-	regUrl             string
-	hasOfflineCertData bool
-	regCodeSecretRef   *corev1.SecretReference
-	offlineCertData    *[]byte
+	regType              v1.RegistrationMode
+	nameId               string
+	contentHash          string
+	regCode              []byte
+	regCodeSecretRef     *corev1.SecretReference
+	regUrl               string
+	hasOfflineCertData   bool
+	offlineCertData      *[]byte
+	offlineCertSecretRef *corev1.SecretReference
 }
 
 func (r RegistrationParams) Labels() map[string]string {
@@ -230,7 +235,7 @@ func paramsToRegSpec(params RegistrationParams) v1.RegistrationSpec {
 			RegistrationCodeSecretRef: params.regCodeSecretRef,
 		}
 	} else if params.regType == v1.RegistrationModeOffline && params.hasOfflineCertData {
-		regSpec.OfflineRegistrationCertificateSecretRef = params.regCodeSecretRef
+		regSpec.OfflineRegistrationCertificateSecretRef = params.offlineCertSecretRef
 	}
 
 	// check if params has regUrl and use, otherwise check if devmode and when true use staging Scc url
