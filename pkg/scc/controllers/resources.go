@@ -111,23 +111,7 @@ func extractRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationPar
 	if regMode == v1.RegistrationModeOnline {
 		regUrlBytes = getCurrentRegURL(secret)
 		regUrlString = string(regUrlBytes)
-		//if consts.IsDevMode() {
-		//	regUrlBytes = []byte(consts.StagingSCCUrl)
-		//	regUrlString = string(consts.StagingSCCUrl)
-		//}
-		//
-		//regUrlBytes, ok = secret.Data[consts.RegistrationUrl]
-		//if ok && len(regUrlBytes) != 0 {
-		//	regUrlString = string(regUrlBytes)
-		//} else if util.HasGlobalPrimeRegistrationUrl() {
-		//	globalRegistrationUrl := util.GetGlobalPrimeRegistrationUrl()
-		//	regUrlBytes = []byte(globalRegistrationUrl)
-		//	regUrlString = globalRegistrationUrl
-		//}
 	}
-
-	// TODO: do we care to validate this; online shouldn't have this at all, offline has it eventually
-	// So it cannot be required for offline mode like RegCode is above, we could error online mode with it?
 
 	hasher := md5.New()
 	nameData := append(incomingSalt, regType...)
@@ -198,7 +182,6 @@ func (h *handler) registrationFromSecretEntrypoint(
 		)
 	}
 
-	// FIXME: lets figure how to generate better unique names
 	genName := fmt.Sprintf("scc-registration-%s", params.nameId)
 	var reg *v1.Registration
 	var err error
