@@ -16,18 +16,18 @@ import (
 
 const (
 	SingularName = "selfuser"
+	kind         = "SelfUser"
 )
 
-var GV = schema.GroupVersion{
-	Group:   "ext.cattle.io",
-	Version: "v1",
-}
+var (
+	_ rest.Creater                  = &Store{}
+	_ rest.Storage                  = &Store{}
+	_ rest.Scoper                   = &Store{}
+	_ rest.SingularNameProvider     = &Store{}
+	_ rest.GroupVersionKindProvider = &Store{}
+)
 
-var GVK = schema.GroupVersionKind{
-	Group:   GV.Group,
-	Version: GV.Version,
-	Kind:    "SelfUser",
-}
+var GVK = ext.SchemeGroupVersion.WithKind(kind)
 
 // +k8s:openapi-gen=false
 // +k8s:deepcopy-gen=false
@@ -59,9 +59,7 @@ func (s *Store) GetSingularName() string {
 
 // New implements [rest.Storage], a required interface.
 func (s *Store) New() runtime.Object {
-	obj := &ext.SelfUser{}
-	obj.GetObjectKind().SetGroupVersionKind(GVK)
-	return obj
+	return &ext.SelfUser{}
 }
 
 // Destroy implements [rest.Storage], a required interface.

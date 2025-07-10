@@ -22,20 +22,19 @@ import (
 
 const (
 	SingularName = "groupmembershiprefreshrequest"
-	PluralName   = SingularName + "s"
+	kind         = "GroupMembershipRefreshRequest"
 	allUsers     = "*"
 )
 
-var GV = schema.GroupVersion{
-	Group:   "ext.cattle.io",
-	Version: "v1",
-}
+var (
+	_ rest.Creater                  = &Store{}
+	_ rest.Storage                  = &Store{}
+	_ rest.Scoper                   = &Store{}
+	_ rest.SingularNameProvider     = &Store{}
+	_ rest.GroupVersionKindProvider = &Store{}
+)
 
-var GVK = schema.GroupVersionKind{
-	Group:   GV.Group,
-	Version: GV.Version,
-	Kind:    "GroupMembershipRefreshRequest",
-}
+var GVK = ext.SchemeGroupVersion.WithKind(kind)
 
 // +k8s:openapi-gen=false
 // +k8s:deepcopy-gen=false
@@ -81,9 +80,7 @@ func (s *Store) GetSingularName() string {
 
 // New implements [rest.Storage], a required interface.
 func (s *Store) New() runtime.Object {
-	obj := &ext.GroupMembershipRefreshRequest{}
-	obj.GetObjectKind().SetGroupVersionKind(GVK)
-	return obj
+	return &ext.GroupMembershipRefreshRequest{}
 }
 
 // Destroy implements [rest.Storage], a required interface.
@@ -145,12 +142,13 @@ func (s *Store) Create(
 		s.userAuthRefresher.TriggerUserRefresh(objGroupMembershipRefreshRequest.Spec.UserID, true)
 	}
 
-	c := metav1.Condition{
-		Type:   "UserRefreshInitiated",
-		Status: "True",
+	objGroupMembershipRefreshRequest.Status = ext.GroupMembershipRefreshRequestStatus{
+		Conditions: []metav1.Condition{{
+			Type:   "UserRefreshInitiated",
+			Status: metav1.ConditionTrue,
+		}},
+		Summary: status.SummaryCompleted,
 	}
-	objGroupMembershipRefreshRequest.Status.Conditions = append(objGroupMembershipRefreshRequest.Status.Conditions, c)
-	objGroupMembershipRefreshRequest.Status.Summary = status.SummaryCompleted
 
 	return objGroupMembershipRefreshRequest, nil
 }

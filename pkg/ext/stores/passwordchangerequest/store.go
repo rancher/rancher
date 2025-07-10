@@ -24,18 +24,18 @@ import (
 
 const (
 	SingularName = "passwordchangerequest"
+	kind         = "PasswordChangeRequest"
 )
 
-var GV = schema.GroupVersion{
-	Group:   "ext.cattle.io",
-	Version: "v1",
-}
+var (
+	_ rest.Creater                  = &Store{}
+	_ rest.Storage                  = &Store{}
+	_ rest.Scoper                   = &Store{}
+	_ rest.SingularNameProvider     = &Store{}
+	_ rest.GroupVersionKindProvider = &Store{}
+)
 
-var GVK = schema.GroupVersionKind{
-	Group:   GV.Group,
-	Version: GV.Version,
-	Kind:    "PasswordChangeRequest",
-}
+var GVK = ext.SchemeGroupVersion.WithKind(kind)
 
 type PasswordUpdater interface {
 	VerifyAndUpdatePassword(userId string, currentPassword, newPassword string) error
@@ -82,9 +82,7 @@ func (s *Store) GetSingularName() string {
 
 // New implements [rest.Storage], a required interface.
 func (s *Store) New() runtime.Object {
-	obj := &ext.PasswordChangeRequest{}
-	obj.GetObjectKind().SetGroupVersionKind(GVK)
-	return obj
+	return &ext.PasswordChangeRequest{}
 }
 
 // Destroy implements [rest.Storage], a required interface.
@@ -139,12 +137,15 @@ func (s *Store) Create(
 			return nil, apierrors.NewUnauthorized(fmt.Sprintf("error checking permissions %s", err.Error()))
 		}
 
-		c := metav1.Condition{
-			Type:   "PasswordUpdated",
-			Status: "True",
+		objPasswordChangeRequest.Status = ext.PasswordChangeRequestStatus{
+			Conditions: []metav1.Condition{
+				{
+					Type:   "PasswordUpdated",
+					Status: "True",
+				},
+			},
+			Summary: status.SummaryCompleted,
 		}
-		objPasswordChangeRequest.Status.Conditions = append(objPasswordChangeRequest.Status.Conditions, c)
-		objPasswordChangeRequest.Status.Summary = status.SummaryCompleted
 
 		return objPasswordChangeRequest, nil
 	}
@@ -154,12 +155,15 @@ func (s *Store) Create(
 		if err != nil {
 			return nil, apierrors.NewInternalError(fmt.Errorf("error updating password: %w", err))
 		}
-		c := metav1.Condition{
-			Type:   "PasswordUpdated",
-			Status: "True",
+		objPasswordChangeRequest.Status = ext.PasswordChangeRequestStatus{
+			Conditions: []metav1.Condition{
+				{
+					Type:   "PasswordUpdated",
+					Status: "True",
+				},
+			},
+			Summary: status.SummaryCompleted,
 		}
-		objPasswordChangeRequest.Status.Conditions = append(objPasswordChangeRequest.Status.Conditions, c)
-		objPasswordChangeRequest.Status.Summary = status.SummaryCompleted
 
 		return objPasswordChangeRequest, nil
 	}
