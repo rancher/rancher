@@ -16,6 +16,7 @@ import (
 const (
 	CertificateAuthorityValid = condition.Cond("AgentTlsStrictCheck")
 	CacertsValid              = "CATTLE_CACERTS_VALID"
+	stvAggregationSecretName  = "stv-aggregation"
 )
 
 type CertificateAuthorityValidator struct {
@@ -39,7 +40,7 @@ func Register(ctx context.Context, downstream *config.UserContext) {
 	// Use a single Watch instead of relying on full-blown informers
 	watcher.OnChange(downstream.Corew.Secret(), ctx, "cavalidator-secret", c.onStvAggregationSecret,
 		watcher.WithNamespace(namespace.System),
-		watcher.WithFieldSelector(map[string]string{"metadata.name": "stv-aggregation"}),
+		watcher.WithFieldSelector(map[string]string{"metadata.name": stvAggregationSecretName}),
 	)
 }
 
