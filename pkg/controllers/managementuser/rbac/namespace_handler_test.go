@@ -204,7 +204,7 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 						Resource: "ClusterRoles",
 					}, in1)
 				},
-			)
+			).AnyTimes()
 			fakeClusterRoles := wfakes.NewMockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
 			fakeClusterRoles.EXPECT().Create(gomock.Any()).DoAndReturn(
 				func(in *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
@@ -214,7 +214,7 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 					}
 					return in, nil
 				},
-			)
+			).AnyTimes()
 			fakeClusterRoles.EXPECT().Update(gomock.Any()).DoAndReturn(
 				func(in *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
 					newRoles = append(newRoles, in)
@@ -223,7 +223,7 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 					}
 					return in, nil
 				},
-			)
+			).AnyTimes()
 			fakeClusterRoles.EXPECT().Delete(gomock.Any(), gomock.Any()).DoAndReturn(
 				func(name string, options *metav1.DeleteOptions) error {
 					deletedRoleNames = append(deletedRoleNames, name)
@@ -232,7 +232,7 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 					}
 					return nil
 				},
-			)
+			).AnyTimes()
 			lifecycle := nsLifecycle{
 				m: &manager{
 					crLister:     fakeLister,
