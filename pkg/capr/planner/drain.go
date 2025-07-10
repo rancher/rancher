@@ -12,12 +12,15 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/kv"
 )
 
-func getRestartStamp(plan *plan.NodePlan) string {
+func getDrainHash(plan *plan.NodePlan) string {
 	for _, instr := range plan.Instructions {
+		if instr.Name != "install" {
+			continue
+		}
 		for _, env := range instr.Env {
 			k, v := kv.Split(env, "=")
-			if k == "RESTART_STAMP" ||
-				k == "$env:RESTART_STAMP" {
+			if k == "DRAIN_HASH" ||
+				k == "$env:DRAIN_HASH" {
 				return v
 			}
 		}
@@ -31,7 +34,11 @@ func shouldDrain(oldPlan *plan.NodePlan, newPlan plan.NodePlan) bool {
 	if oldPlan == nil {
 		return false
 	}
-	return getRestartStamp(oldPlan) != getRestartStamp(&newPlan)
+	oldDrainHash := getDrainHash(oldPlan)
+	if oldDrainHash == "" {
+		return false
+	}
+	return oldDrainHash != getDrainHash(&newPlan)
 }
 
 func optionsToString(options rkev1.DrainOptions, disable bool) (string, error) {

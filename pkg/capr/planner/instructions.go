@@ -84,20 +84,27 @@ func (p *Planner) generateInstallInstruction(controlPlane *rkev1.RKEControlPlane
 // addInstallInstructionWithRestartStamp will generate an instruction and append it to the node plan that executes the `run.sh` or `run.ps1`
 // from the installer image based on the control plane configuration. It will generate a restart stamp based on the
 // passed in configuration to determine whether it needs to start/restart the service being managed.
+// It will also add a separate environment variable containing the hash of the drainable config.
 func (p *Planner) addInstallInstructionWithRestartStamp(nodePlan plan.NodePlan, controlPlane *rkev1.RKEControlPlane, entry *planEntry) (plan.NodePlan, error) {
-	var restartStampEnv string
-	stamp := restartStamp(nodePlan, controlPlane, p.getInstallerImage(controlPlane))
+	env := make([]string, 0, 2)
+	image := p.getInstallerImage(controlPlane)
+	stamp := restartStamp(nodePlan, controlPlane, image)
+	drainHash := drainHash(nodePlan, controlPlane, image)
 	switch entry.Metadata.Labels[capr.CattleOSLabel] {
 	case capr.WindowsMachineOS:
-		restartStampEnv = capr.FormatWindowsEnvVar(corev1.EnvVar{
-			Name:  "WINS_RESTART_STAMP",
-			Value: stamp,
-		}, true)
+		env = append(env,
+			capr.FormatWindowsEnvVar(corev1.EnvVar{
+				Name:  "WINS_RESTART_STAMP",
+				Value: stamp,
+			}, true),
+			capr.FormatWindowsEnvVar(corev1.EnvVar{
+				Name:  "WINS_DRAIN_HASH",
+				Value: drainHash,
+			}, true))
 	default:
-		restartStampEnv = "RESTART_STAMP=" + stamp
+		env = append(env, "RESTART_STAMP="+stamp, "DRAIN_HASH="+drainHash)
 	}
-	instEnv := []string{restartStampEnv}
-	nodePlan.Instructions = append(nodePlan.Instructions, p.generateInstallInstruction(controlPlane, entry, instEnv))
+	nodePlan.Instructions = append(nodePlan.Instructions, p.generateInstallInstruction(controlPlane, entry, env))
 	return nodePlan, nil
 }
 
