@@ -368,6 +368,9 @@ var (
 	// (by default every 5 minutes, or as soon as the cluster is edited, whichever comes first).
 	// Valid values: ture, false
 	ImportedClusterVersionManagement = NewSetting("imported-cluster-version-management", "true")
+
+	SQLCacheGCInterval  = NewSetting("sql-cache-gc-interval", "15m")
+	SQLCacheGCKeepCount = NewSetting("sql-cache-gc-keep-count", "1000")
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.
