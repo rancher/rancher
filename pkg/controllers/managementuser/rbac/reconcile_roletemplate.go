@@ -111,8 +111,8 @@ func (m *manager) ensureGlobalResourcesRolesForPRTB(projectName string, rts map[
 				if slice.ContainsString(rule.Verbs, "*") || slice.ContainsString(rule.Verbs, "create") {
 					roleVerb = "*"
 					roles.Insert("create-ns")
-					if nsRole, _ := m.crLister.Get("", "create-ns"); nsRole == nil {
-						createNSRT, err := m.rtLister.Get("", "create-ns")
+					if nsRole, _ := m.crLister.Get("create-ns"); nsRole == nil {
+						createNSRT, err := m.rtLister.Get("create-ns")
 						if err != nil {
 							return nil, err
 						}

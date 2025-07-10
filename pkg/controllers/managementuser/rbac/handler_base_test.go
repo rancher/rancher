@@ -5,14 +5,13 @@ import (
 	"sync"
 	"testing"
 
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
-	fakes2 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	wfakes "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 	v1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 )
 
 var (
@@ -55,8 +54,6 @@ type managerOpt func(m *manager)
 func newManager(opts ...managerOpt) *manager {
 	manager := &manager{
 		clusterName: "testcluster",
-		rtLister:    &fakes.RoleTemplateListerMock{},
-		crLister:    &fakes2.ClusterRoleListerMock{},
 	}
 
 	for _, opt := range opts {
@@ -67,7 +64,7 @@ func newManager(opts ...managerOpt) *manager {
 }
 
 // withRoleTemplates setup a rtLister mock with the provided roleTemplates and errors
-func withRoleTemplates(roleTemplates map[string]*v3.RoleTemplate, errs *clientErrs) managerOpt {
+func withRoleTemplates(roleTemplates map[string]*v3.RoleTemplate, errs *clientErrs, ctrl *gomock.Controller) managerOpt {
 	if roleTemplates == nil {
 		roleTemplates = map[string]*v3.RoleTemplate{}
 	}
@@ -82,27 +79,39 @@ func withRoleTemplates(roleTemplates map[string]*v3.RoleTemplate, errs *clientEr
 	}
 
 	return func(m *manager) {
-		m.rtLister = &fakes.RoleTemplateListerMock{
-			ListFunc: newListFunc[*v3.RoleTemplate](syncRoleTemplates, errs.listError),
-			GetFunc: func(namespace string, name string) (*v3.RoleTemplate, error) {
-				if errs.getError != nil {
-					return nil, errs.getError
-				}
+		rtLister := wfakes.NewMockNonNamespacedCacheInterface[*v3.RoleTemplate](ctrl)
+		rtLister.EXPECT().List(gomock.Any()).DoAndReturn(func() ([]*v3.RoleTemplate, error) {
+			if errs.listError != nil {
+				return nil, errs.listError
+			}
 
-				rtVal, ok := syncRoleTemplates.Load(name)
-				if !ok {
-					return nil, errors.NewNotFound(v3.RoleTemplateGroupVersionResource.GroupResource(), name)
-				}
+			var result []*v3.RoleTemplate
+			syncRoleTemplates.Range(func(key, value interface{}) bool {
+				rt := value.(*v3.RoleTemplate)
+				result = append(result, rt.DeepCopy())
+				return true
+			})
+			return result, nil
+		})
+		rtLister.EXPECT().Get(gomock.Any()).DoAndReturn(func(namespace string, name string) (*v3.RoleTemplate, error) {
+			if errs.getError != nil {
+				return nil, errs.getError
+			}
 
-				rt := rtVal.(*v3.RoleTemplate)
-				return rt.DeepCopy(), nil
-			},
-		}
+			rtVal, ok := syncRoleTemplates.Load(name)
+			if !ok {
+				return nil, errors.NewNotFound(v3.Resource(v3.RoleTemplateResourceName), name)
+			}
+
+			rt := rtVal.(*v3.RoleTemplate)
+			return rt.DeepCopy(), nil
+		})
+		m.rtLister = rtLister
 	}
 }
 
 // withRoleTemplates setup a crLister and clusterRoles mock with the provided clusterRoles and errors
-func withClusterRoles(clusterRoles map[string]*v1.ClusterRole, errs *clientErrs) managerOpt {
+func withClusterRoles(clusterRoles map[string]*v1.ClusterRole, errs *clientErrs, ctrl *gomock.Controller) managerOpt {
 	if clusterRoles == nil {
 		clusterRoles = map[string]*v1.ClusterRole{}
 	}
@@ -117,85 +126,116 @@ func withClusterRoles(clusterRoles map[string]*v1.ClusterRole, errs *clientErrs)
 	}
 
 	return func(m *manager) {
-		m.crLister = &fakes2.ClusterRoleListerMock{
-			ListFunc: newListFunc[*v1.ClusterRole](syncClusterRoles, errs.listError),
-			GetFunc: func(namespace string, name string) (*v1.ClusterRole, error) {
-				if errs.getError != nil {
-					return nil, errs.getError
-				}
+		crLister := wfakes.NewMockNonNamespacedCacheInterface[*v1.ClusterRole](ctrl)
+		crLister.EXPECT().List(gomock.Any()).DoAndReturn(func() ([]*v1.ClusterRole, error) {
+			if errs.listError != nil {
+				return nil, errs.listError
+			}
 
-				crVal, ok := syncClusterRoles.Load(name)
-				if !ok {
-					return nil, errors.NewNotFound(v3.RoleTemplateGroupVersionResource.GroupResource(), name)
-				}
-
-				cr := crVal.(*v1.ClusterRole)
-				return cr.DeepCopy(), nil
-			},
-		}
-
-		m.clusterRoles = &fakes2.ClusterRoleInterfaceMock{
-			GetFunc: func(name string, opts metav1.GetOptions) (*v1.ClusterRole, error) {
-				if errs.getError != nil {
-					return nil, errs.getError
-				}
-
-				crVal, ok := syncClusterRoles.Load(name)
-				if !ok {
-					return nil, errors.NewNotFound(v3.RoleTemplateGroupVersionResource.GroupResource(), name)
-				}
-
-				cr := crVal.(*v1.ClusterRole)
-				return cr.DeepCopy(), nil
-			},
-			UpdateFunc: func(cr *v1.ClusterRole) (*v1.ClusterRole, error) {
-				if errs.updateError != nil {
-					return nil, errs.updateError
-				}
-
-				_, ok := syncClusterRoles.Load(cr.Name)
-				if !ok {
-					return nil, errors.NewNotFound(v3.RoleTemplateGroupVersionResource.GroupResource(), cr.Name)
-				}
-
-				syncClusterRoles.Store(cr.Name, cr)
-				return cr.DeepCopy(), nil
-			},
-			CreateFunc: func(cr *v1.ClusterRole) (*v1.ClusterRole, error) {
-				if errs.createError != nil {
-					return nil, errs.createError
-				}
-
-				_, ok := syncClusterRoles.Load(cr.Name)
-				if ok {
-					return nil, errors.NewAlreadyExists(v3.RoleTemplateGroupVersionResource.GroupResource(), cr.Name)
-				}
-
-				syncClusterRoles.Store(cr.Name, cr)
-				return cr.DeepCopy(), nil
-			},
-		}
-	}
-}
-
-func newListFunc[T any](resourceMap *sync.Map, err error) func(string, labels.Selector) ([]T, error) {
-	return func(namespace string, selector labels.Selector) ([]T, error) {
-		if err != nil {
-			return nil, err
-		}
-
-		resourceList := []T{}
-		resourceMap.Range(func(key, value any) bool {
-			resourceList = append(resourceList, value.(T))
-			return true
+			var result []*v1.ClusterRole
+			syncClusterRoles.Range(func(key, value interface{}) bool {
+				cr := value.(*v1.ClusterRole)
+				result = append(result, cr.DeepCopy())
+				return true
+			})
+			return result, nil
 		})
+		crLister.EXPECT().Get(gomock.Any()).DoAndReturn(func(namespace string, name string) (*v1.ClusterRole, error) {
+			if errs.getError != nil {
+				return nil, errs.getError
+			}
 
-		return resourceList, nil
+			crVal, ok := syncClusterRoles.Load(name)
+			if !ok {
+				return nil, errors.NewNotFound(v3.Resource(v3.RoleTemplateResourceName), name)
+			}
+
+			cr := crVal.(*v1.ClusterRole)
+			return cr.DeepCopy(), nil
+		})
+		m.crLister = crLister
 	}
 }
+
+//		m.crLister = &fakes2.ClusterRoleListerMock{
+//			ListFunc: newListFunc[*v1.ClusterRole](syncClusterRoles, errs.listError),
+//			GetFunc: func(namespace string, name string) (*v1.ClusterRole, error) {
+//				if errs.getError != nil {
+//					return nil, errs.getError
+//				}
+//
+//				crVal, ok := syncClusterRoles.Load(name)
+//				if !ok {
+//					return nil, errors.NewNotFound(v3.RoleTemplateGroupVersionResource.GroupResource(), name)
+//				}
+//
+//				cr := crVal.(*v1.ClusterRole)
+//				return cr.DeepCopy(), nil
+//			},
+//		}
+//
+//		m.clusterRoles = &fakes2.ClusterRoleInterfaceMock{
+//			GetFunc: func(name string, opts metav1.GetOptions) (*v1.ClusterRole, error) {
+//				if errs.getError != nil {
+//					return nil, errs.getError
+//				}
+//
+//				crVal, ok := syncClusterRoles.Load(name)
+//				if !ok {
+//					return nil, errors.NewNotFound(v3.RoleTemplateGroupVersionResource.GroupResource(), name)
+//				}
+//
+//				cr := crVal.(*v1.ClusterRole)
+//				return cr.DeepCopy(), nil
+//			},
+//			UpdateFunc: func(cr *v1.ClusterRole) (*v1.ClusterRole, error) {
+//				if errs.updateError != nil {
+//					return nil, errs.updateError
+//				}
+//
+//				_, ok := syncClusterRoles.Load(cr.Name)
+//				if !ok {
+//					return nil, errors.NewNotFound(v3.RoleTemplateGroupVersionResource.GroupResource(), cr.Name)
+//				}
+//
+//				syncClusterRoles.Store(cr.Name, cr)
+//				return cr.DeepCopy(), nil
+//			},
+//			CreateFunc: func(cr *v1.ClusterRole) (*v1.ClusterRole, error) {
+//				if errs.createError != nil {
+//					return nil, errs.createError
+//				}
+//
+//				_, ok := syncClusterRoles.Load(cr.Name)
+//				if ok {
+//					return nil, errors.NewAlreadyExists(v3.RoleTemplateGroupVersionResource.GroupResource(), cr.Name)
+//				}
+//
+//				syncClusterRoles.Store(cr.Name, cr)
+//				return cr.DeepCopy(), nil
+//			},
+//		}
+//	}
+
+//func newListFunc[T any](resourceMap *sync.Map, err error) func(string, labels.Selector) ([]T, error) {
+//	return func(namespace string, selector labels.Selector) ([]T, error) {
+//		if err != nil {
+//			return nil, err
+//		}
+//
+//		resourceList := []T{}
+//		resourceMap.Range(func(key, value any) bool {
+//			resourceList = append(resourceList, value.(T))
+//			return true
+//		})
+//
+//		return resourceList, nil
+//	}
+//}
 
 func Test_gatherRoles(t *testing.T) {
-	m := newManager(withRoleTemplates(recursiveTestRoleTemplates, nil))
+	ctrl := gomock.NewController(t)
+	m := newManager(withRoleTemplates(recursiveTestRoleTemplates, nil, ctrl))
 
 	emptyRoleTemplates := make(map[string]*v3.RoleTemplate)
 	type args struct {
@@ -251,6 +291,18 @@ func Test_gatherRoles(t *testing.T) {
 
 func TestCompareAndUpdateClusterRole(t *testing.T) {
 	t.Parallel()
+
+	numUpdatesCalled := 0
+	var updateParamCalled *v1.ClusterRole
+	ctrl := gomock.NewController(t)
+	clusterRolesMock := wfakes.NewMockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
+	clusterRolesMock.EXPECT().Update(gomock.Any()).DoAndReturn(
+		func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
+			numUpdatesCalled++
+			updateParamCalled = in1
+			return &v1.ClusterRole{}, nil
+		},
+	)
 
 	tests := map[string]struct {
 		clusterRole         *v1.ClusterRole
@@ -326,15 +378,6 @@ func TestCompareAndUpdateClusterRole(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			numUpdatesCalled := 0
-			var updateParamCalled *v1.ClusterRole
-			clusterRolesMock := &fakes2.ClusterRoleInterfaceMock{
-				UpdateFunc: func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
-					numUpdatesCalled++
-					updateParamCalled = in1
-					return &v1.ClusterRole{}, nil
-				},
-			}
 			m := manager{clusterRoles: clusterRolesMock}
 			err := m.compareAndUpdateClusterRole(test.clusterRole, test.roleTemplate)
 			assert.NoError(t, err)

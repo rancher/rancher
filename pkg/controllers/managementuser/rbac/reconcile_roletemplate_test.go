@@ -8,6 +8,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 	v1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,9 +18,10 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 	t.Parallel()
 	logrus.SetOutput(io.Discard)
 
+	ctrl := gomock.NewController(t)
 	defaultManager := newManager(
-		withRoleTemplates(map[string]*v3.RoleTemplate{"create-ns": createNSRoleTemplate}, nil),
-		withClusterRoles(nil, nil),
+		withRoleTemplates(map[string]*v3.RoleTemplate{"create-ns": createNSRoleTemplate}, nil, ctrl),
+		withClusterRoles(nil, nil, ctrl),
 	)
 
 	type testCase struct {
@@ -206,8 +208,8 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 			projectName: "testproject",
 			description: "error return when RoleTemplate client returns error",
 			manager: newManager(
-				withRoleTemplates(map[string]*v3.RoleTemplate{"create-ns": createNSRoleTemplate}, &clientErrs{getError: errNotFound}),
-				withClusterRoles(nil, nil),
+				withRoleTemplates(map[string]*v3.RoleTemplate{"create-ns": createNSRoleTemplate}, &clientErrs{getError: errNotFound}, ctrl),
+				withClusterRoles(nil, nil, ctrl),
 			),
 			expectedError: "not found",
 			roleTemplates: map[string]*v3.RoleTemplate{
@@ -229,8 +231,8 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 			projectName: "testproject",
 			description: "error return when ClusterRole client returns error and RoleTemplate is external",
 			manager: newManager(
-				withRoleTemplates(map[string]*v3.RoleTemplate{"create-ns": createNSRoleTemplate}, nil),
-				withClusterRoles(nil, &clientErrs{getError: apierrors.NewInternalError(errors.New("internal error"))}),
+				withRoleTemplates(map[string]*v3.RoleTemplate{"create-ns": createNSRoleTemplate}, nil, ctrl),
+				withClusterRoles(nil, &clientErrs{getError: apierrors.NewInternalError(errors.New("internal error"))}, ctrl),
 			),
 			expectedError: "internal error",
 			roleTemplates: map[string]*v3.RoleTemplate{

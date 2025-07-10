@@ -29,7 +29,7 @@ type pLifecycle struct {
 func (p *pLifecycle) Create(project *v3.Project) (runtime.Object, error) {
 	for verb, suffix := range projectNSVerbToSuffix {
 		roleName := fmt.Sprintf(projectNSGetClusterRoleNameFmt, project.Name, suffix)
-		_, err := p.m.crLister.Get("", roleName)
+		_, err := p.m.crLister.Get(roleName)
 		if err == nil || !apierrors.IsNotFound(err) {
 			continue
 		}
@@ -139,7 +139,7 @@ func (p *pLifecycle) ensureNamespaceRolesUpdated(project *v3.Project) error {
 	// right now, only the edit role for namespaces has need of an update
 	suffix := projectNSVerbToSuffix[projectNSEditVerb]
 	roleName := fmt.Sprintf(projectNSGetClusterRoleNameFmt, project.Name, suffix)
-	cr, err := p.m.crLister.Get("", roleName)
+	cr, err := p.m.crLister.Get(roleName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return p.m.createProjectNSRole(roleName, projectNSEditVerb, "", project.Name)
