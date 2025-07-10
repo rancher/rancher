@@ -126,7 +126,9 @@ func (s sccOfflineMode) PrepareActivatedForKeepalive(registrationObj *v1.Registr
 
 func (s sccOfflineMode) ReconcileActivateError(registrationObj *v1.Registration, activationErr error, phase types.ActivationPhase) *v1.Registration {
 	// TODO: this will need updating to use phase after todo inside PrepareActivatedForKeepalive is solved
-	v1.RegistrationConditionActivated.SetError(registrationObj, "offline activation failed", activationErr)
+	v1.RegistrationConditionActivated.False(registrationObj)
+	v1.RegistrationConditionActivated.Reason(registrationObj, "offline activation failed")
+	v1.RegistrationConditionOfflineCertificateReady.SetError(registrationObj, "cannot validate offline certificate", activationErr)
 
 	// Cannot recover from this error so must set failure
 	registrationObj.Status.ActivationStatus.Activated = false
