@@ -26,6 +26,7 @@ type CertificateAuthorityValidator struct {
 }
 
 func Register(ctx context.Context, downstream *config.UserContext) {
+	// The stv-aggregation secret will never exist in the local cluster, as it is created by cattle-cluster-agent
 	if downstream.ClusterName == "local" {
 		return
 	}
