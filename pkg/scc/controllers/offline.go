@@ -92,7 +92,7 @@ func (s sccOfflineMode) Activate(registrationObj *v1.Registration) error {
 		return fmt.Errorf("activate failed, cannot get offline certificate reader: %w", err)
 	}
 
-	offlineCert, certErr := registration.OfflineCertificateFrom(certReader)
+	offlineCert, certErr := registration.OfflineCertificateFrom(certReader, false)
 	if certErr != nil {
 		return fmt.Errorf("activate failed, cannot prepare offline certificate: %w", certErr)
 	}
@@ -111,7 +111,7 @@ func (s sccOfflineMode) PrepareActivatedForKeepalive(registrationObj *v1.Registr
 			return registrationObj, fmt.Errorf("activate failed, cannot get offline certificate reader: %w", err)
 		}
 
-		offlineCert, certErr := registration.OfflineCertificateFrom(certReader)
+		offlineCert, certErr := registration.OfflineCertificateFrom(certReader, false)
 		if certErr != nil {
 			return registrationObj, fmt.Errorf("activate failed, cannot prepare offline certificate: %w", certErr)
 		}
@@ -148,7 +148,7 @@ func (s sccOfflineMode) Keepalive(registrationObj *v1.Registration) error {
 		return fmt.Errorf("activate failed, cannot get offline certificate reader: %w", err)
 	}
 
-	offlineCert, certErr := registration.OfflineCertificateFrom(certReader)
+	offlineCert, certErr := registration.OfflineCertificateFrom(certReader, false)
 	if certErr != nil {
 		return fmt.Errorf("activate failed, cannot prepare offline certificate: %w", certErr)
 	}

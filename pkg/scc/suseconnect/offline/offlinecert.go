@@ -2,7 +2,6 @@ package offline
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -136,11 +135,7 @@ func (o *SecretManager) OfflineCertificateReader() (io.Reader, error) {
 		return nil, err
 	}
 
-	encodedCertBytes := make([]byte, base64.StdEncoding.EncodedLen(len(certBytes)))
-	// TODO remove after SCC library update
-	base64.StdEncoding.Encode(encodedCertBytes, certBytes)
-
-	reader := bytes.NewReader(encodedCertBytes)
+	reader := bytes.NewReader(certBytes)
 
 	return reader, nil
 }
