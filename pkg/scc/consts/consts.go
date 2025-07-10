@@ -111,14 +111,16 @@ func (s AlternativeSCCUrls) Ptr() *string {
 }
 
 func BaseURLForSCC() string {
+	var baseUrl string
 	switch GetSCCEnvironment() {
 	case Production:
-		return string(ProdSCCUrl)
+		baseUrl = string(ProdSCCUrl)
 	case Staging:
-		return string(StagingSCCUrl)
-	// explicitly return empty for RGS
-	case RGS:
+		baseUrl = string(StagingSCCUrl)
+	case RGS: // explicitly return empty for RGS
 	default:
-		return ""
+		// intentionally do nothing and return empty string
 	}
+
+	return baseUrl
 }
