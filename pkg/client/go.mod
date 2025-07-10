@@ -4,6 +4,8 @@ go 1.24.0
 
 toolchain go1.24.3
 
+replace github.com/rancher/wrangler/v3 => github.com/rancher/wrangler/v3 v3.2.2
+
 require (
 	github.com/rancher/norman v0.6.1
 	k8s.io/apimachinery v0.33.1
