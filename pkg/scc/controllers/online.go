@@ -299,6 +299,8 @@ func (s sccOnlineMode) Keepalive(registrationObj *v1.Registration) error {
 }
 
 func (s sccOnlineMode) PrepareKeepaliveSucceeded(registration *v1.Registration) (*v1.Registration, error) {
+	v1.RegistrationConditionSccUrlReady.True(registration)
+
 	// TODO take any post keepalive success steps
 	s.log.Debug("preparing keepalive succeeded")
 	return registration, nil

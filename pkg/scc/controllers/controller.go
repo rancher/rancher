@@ -628,29 +628,26 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 		return registrationObj, err
 	}
 
-	updateErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		var err error
-		registrationObj, err = h.registrations.Get(registrationObj.Name, metav1.GetOptions{})
+	keepaliveUpdateErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var retryErr, updateErr error
+		registrationObj, retryErr = h.registrations.Get(registrationObj.Name, metav1.GetOptions{})
+		if retryErr != nil {
+			return retryErr
+		}
+
+		keepalive := registrationObj.DeepCopy()
+		keepalive = common.PrepareSuccessfulActivation(keepalive)
+		v1.RegistrationConditionKeepalive.True(keepalive)
+		prepared, err := registrationHandler.PrepareKeepaliveSucceeded(keepalive)
+		// todo: use ReconcileKeepaliveError
 		if err != nil {
 			return err
 		}
-
-		timeNow := time.Now()
-		updated := registrationObj.DeepCopy()
-		v1.RegistrationConditionSccUrlReady.True(updated)
-		v1.ResourceConditionProgressing.False(updated)
-		v1.ResourceConditionReady.True(updated)
-		v1.ResourceConditionDone.True(updated)
-		v1.RegistrationConditionKeepalive.True(updated)
-		updated.Status.ActivationStatus.LastValidatedTS = &metav1.Time{
-			Time: timeNow,
-		}
-		updated.Status.ActivationStatus.Activated = true
-		_, err = h.registrations.UpdateStatus(updated)
-		return err
+		_, updateErr = h.registrations.UpdateStatus(prepared)
+		return updateErr
 	})
-	if updateErr != nil {
-		return nil, updateErr
+	if keepaliveUpdateErr != nil {
+		return registrationObj, keepaliveUpdateErr
 	}
 
 	return registrationObj, nil
