@@ -87,26 +87,6 @@ func (cv *CertificateValidator) ValidateCertificate() error {
 		}
 	}
 
-	/*
-		TODO: eventually we may re-enable this code, or it can be removed
-		This is hard to use for rancher offline mode currently so is disabled.
-		The issue is that Rancher has no idea what Product class it should report.
-		We intentionally use an arch of `unknown` everywhere else - but offline expects real arch.
-
-		prod, _, _ := cv.systemInfoExporter.GetProductIdentifier()
-		matchesProductClass, err := cv.offlineCert.ProductClassIncluded(prod)
-		if err != nil {
-			return fmt.Errorf("failed to validate product class: %v", err)
-		}
-
-		if !matchesProductClass {
-			return fmt.Errorf("product class does not match the offline cert's product class")
-		}
-	*/
-
-	// TODO: Same as above, enable or remove eventually; for offline mode we don't collect RegCode in rancher.
-	// matchesRegCode, regCodeErr := cv.offlineCert.RegcodeMatches("")
-
 	// Check if Offline Cert is using a wildcard UUID
 	wildcardMatch, wildCardErr := cv.offlineCert.UUIDMatches("0x0")
 	if wildCardErr != nil {
