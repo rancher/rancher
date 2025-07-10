@@ -40,8 +40,6 @@ const (
 
 // SCCHandler Defines a common interface for online and offline operations
 // IMPORTANT: All the `Reconcile*` methods modifies the object in memory but does NOT save it. The caller is responsible for saving the state.
-// TODO: these that return `*v1.Registration` probably need to return a object set to use with apply
-// TODO: That way we can use apply to update Registrations and Secrets related to them together.
 type SCCHandler interface {
 	// NeedsRegistration determines if the system requires initial SCC registration.
 	NeedsRegistration(*v1.Registration) bool
