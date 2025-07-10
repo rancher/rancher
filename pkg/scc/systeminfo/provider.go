@@ -64,6 +64,12 @@ func (i *InfoProvider) IsLocalReady() bool {
 	return false
 }
 
+// CanStartSccOperator determines when the SCC operator should fully start
+// Currently this waits for a valid Server URL to be configured and the local cluster to appear ready
+func (i *InfoProvider) CanStartSccOperator() bool {
+	return IsServerUrlReady() && i.IsLocalReady()
+}
+
 // ServerUrl returns the Rancher server URL
 func ServerUrl() string {
 	return settings.ServerURL.Get()
