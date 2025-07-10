@@ -1,4 +1,4 @@
-// groupmembershiprefreshrequest implements the store for the new public API groupmembershiprefreshrequest resources
+// groupmembershiprefreshrequest implements the store for the imperative groupmembershiprefreshrequest resource.
 package groupmembershiprefreshrequest
 
 import (

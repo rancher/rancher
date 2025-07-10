@@ -1,4 +1,4 @@
-// passwordchangerequest implements the store for the new public API passwordchangerequest resources
+// passwordchangerequest implements the store for the imperative passwordchangerequest resource.
 package passwordchangerequest
 
 import (
@@ -24,7 +24,6 @@ import (
 
 const (
 	SingularName = "passwordchangerequest"
-	PluralName   = SingularName + "s"
 )
 
 var GV = schema.GroupVersion{
