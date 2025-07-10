@@ -190,7 +190,7 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 			newSecret.Annotations[consts.LabelSccLastProcessed] = time.Now().Format(time.RFC3339)
 			maps.Copy(newSecret.Labels, params.Labels())
 
-			_, updateErr := h.updateSecret(incomingObj, newSecret)
+			_, updateErr := h.patchUpdateSecret(incomingObj, newSecret)
 			if updateErr != nil {
 				h.log.Error("error applying metadata updates to default SCC registration secret")
 				return nil, updateErr
@@ -233,8 +233,7 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 		maps.Copy(labels, params.Labels())
 		newSecret.Labels = labels
 
-		// TODO(dan): make sure all update logic is handled via the new patch mechanism
-		if _, err := h.updateSecret(incomingObj, newSecret); err != nil {
+		if _, err := h.patchUpdateSecret(incomingObj, newSecret); err != nil {
 			return incomingObj, err
 		}
 
@@ -561,8 +560,8 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 			activated := registrationObj.DeepCopy()
 			activated = common.PrepareSuccessfulActivation(activated)
 			prepared, err := registrationHandler.PrepareActivatedForKeepalive(activated)
-			// TODO: should this use the reconciler too
 			if err != nil {
+				err := h.reconcileActivation(registrationHandler, registrationObj, activationErr, types.ActivationPrepForKeepalive)
 				return err
 			}
 			_, updateErr = h.registrations.UpdateStatus(prepared)

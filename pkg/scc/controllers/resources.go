@@ -46,6 +46,7 @@ func (h *handler) isRancherEntrypointSecret(secretObj *corev1.Secret) bool {
 	return true
 }
 
+// prepareSecretSalt applies an instance salt onto an entrypoint secret used to create randomness in hashes
 func (h *handler) prepareSecretSalt(secret *corev1.Secret) (*corev1.Secret, error) {
 	preparedSecret := secret.DeepCopy()
 	generatedSalt := util.NewSaltGen(nil, nil).GenerateSalt()
@@ -57,7 +58,7 @@ func (h *handler) prepareSecretSalt(secret *corev1.Secret) (*corev1.Secret, erro
 	existingLabels[consts.LabelObjectSalt] = generatedSalt
 	preparedSecret.SetLabels(existingLabels)
 
-	_, updateErr := h.updateSecret(secret, preparedSecret)
+	_, updateErr := h.patchUpdateSecret(secret, preparedSecret)
 	if updateErr != nil {
 		h.log.Error("error applying metadata updates to default SCC registration secret; cannot initialize secret salt value")
 		return nil, updateErr

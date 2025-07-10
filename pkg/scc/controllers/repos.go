@@ -11,7 +11,7 @@ import (
 	"k8s.io/client-go/util/retry"
 )
 
-func (h *handler) updateSecret(incoming, target *corev1.Secret) (*corev1.Secret, error) {
+func (h *handler) patchUpdateSecret(incoming, target *corev1.Secret) (*corev1.Secret, error) {
 	incomingJson, err := json.Marshal(incoming)
 	if err != nil {
 		return incoming, err
@@ -48,12 +48,12 @@ func (h *handler) createOrUpdateSecret(secret *corev1.Secret) error {
 			}
 		}
 
-		_, updateErr := h.updateSecret(currentSecret, secret)
+		_, updateErr := h.patchUpdateSecret(currentSecret, secret)
 		return updateErr
 	})
 }
 
-func (h *handler) updateRegistration(incoming, target *v1.Registration) (*v1.Registration, error) {
+func (h *handler) patchUpdateRegistration(incoming, target *v1.Registration) (*v1.Registration, error) {
 	incomingJson, err := json.Marshal(incoming)
 	if err != nil {
 		return incoming, err
@@ -89,7 +89,7 @@ func (h *handler) createOrUpdateRegistration(reg *v1.Registration) error {
 			}
 		}
 
-		_, updateErr := h.updateRegistration(currentReg, reg)
+		_, updateErr := h.patchUpdateRegistration(currentReg, reg)
 		return updateErr
 	})
 }
