@@ -1,0 +1,117 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.1
+  labels:
+    auth.cattle.io/cluster-indexed: "true"
+    cluster.x-k8s.io/v1beta1: v1
+  name: rkeclusters.rke.cattle.io
+spec:
+  group: rke.cattle.io
+  names:
+    categories:
+    - cluster-api
+    kind: RKECluster
+    listKind: RKEClusterList
+    plural: rkeclusters
+    singular: rkecluster
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          RKECluster represents the InfraCluster resource required by Cluster API
+          to provide the necessary infrastructure prerequisites for running machines.
+          It is referenced by the core Cluster API resource, Cluster.
+          More info: https://cluster-api.sigs.k8s.io/developer/providers/contracts/infra-cluster
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: Spec is the desired state of the RKECluster.
+            properties:
+              controlPlaneEndpoint:
+                description: ControlPlaneEndpoint represents the endpoint used to
+                  communicate with the control plane.
+                properties:
+                  host:
+                    description: host is the hostname on which the API server is serving.
+                    maxLength: 512
+                    type: string
+                  port:
+                    description: port is the port on which the API server is serving.
+                    format: int32
+                    type: integer
+                required:
+                - host
+                - port
+                type: object
+            type: object
+          status:
+            description: Status is the observed state of the RKECluster.
+            properties:
+              conditions:
+                description: Conditions is a representation of the current state of
+                  the RKE cluster.
+                items:
+                  properties:
+                    lastTransitionTime:
+                      description: Last time the condition transitioned from one status
+                        to another.
+                      type: string
+                    lastUpdateTime:
+                      description: The last time this condition was updated.
+                      type: string
+                    message:
+                      description: Human-readable message indicating details about
+                        last transition
+                      type: string
+                    reason:
+                      description: The reason for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of cluster condition.
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
+              ready:
+                description: |-
+                  Ready denotes that the RKE cluster infrastructure is fully provisioned.
+                  NOTE:
+                  This field is part of the Cluster API contract, and it is used to
+                  orchestrate provisioning.
+                  The value of this field is never updated after provisioning is completed.
+                  Please use conditions to check the operational state of the cluster.
+                type: boolean
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
