@@ -67,23 +67,45 @@ type RKEMachineStatus struct {
 }
 
 // +genclient
-// +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:resource:scope=Namespaced
+// +kubebuilder:subresource:status
+// +kubebuilder:metadata:labels={"cluster.x-k8s.io/v1beta1=v1","auth.cattle.io/cluster-indexed=true"}
 
+// CustomMachine represents an unmanaged CAPI
+// machine registered to a Rancher custom cluster.
 type CustomMachine struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   CustomMachineSpec   `json:"spec,omitempty"`
+	// Spec represents the desired configuration of the machine.
+	Spec CustomMachineSpec `json:"spec,omitempty"`
+
+	// Status represents the most recently observed status of the machine.
+	// +optional
 	Status CustomMachineStatus `json:"status,omitempty"`
 }
 
 type CustomMachineSpec struct {
+	// ProviderID is a reference to the CAPI Node object corresponding to
+	// this machine. This field is automatically set by CAPI during the
+	// machine provisioning process.
+	// +optional
+	// +nullable
 	ProviderID string `json:"providerID,omitempty"`
 }
 
 type CustomMachineStatus struct {
+	// Conditions is a representation of the current state of the machine.
+	// +optional
 	Conditions []genericcondition.GenericCondition `json:"conditions,omitempty"`
-	Ready      bool                                `json:"ready,omitempty"`
-	Addresses  []capi.MachineAddress               `json:"addresses,omitempty"`
+	// Ready indicates that the machine infrastructure is fully provisioned,
+	// and is a requirement of the Cluster API contract. The value of this
+	// field is never updated after provisioning has completed.
+	// Please use Conditions to determine the current state of the machine.
+	// +optional
+	Ready bool `json:"ready,omitempty"`
+	// Addresses contains the associated addresses for the machine.
+	// +optional
+	Addresses []capi.MachineAddress `json:"addresses,omitempty"`
 }
