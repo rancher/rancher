@@ -692,7 +692,7 @@ func (h *handler) OnRegistrationRemove(name string, registrationObj *v1.Registra
 }
 
 func scopedOnChange[T generic.RuntimeMetaObject](ctx context.Context, name, namespace string, c generic.ControllerMeta, sync generic.ObjectHandler[T]) {
-	condition := scopedOnRemoveConditionChecker(namespace)
+	condition := namespaceScopedCondition(namespace)
 	onChangeHandler := generic.FromObjectHandlerToHandler(sync)
 	c.AddGenericHandler(ctx, name, func(key string, obj runtime.Object) (runtime.Object, error) {
 		if condition(obj) {
@@ -704,7 +704,7 @@ func scopedOnChange[T generic.RuntimeMetaObject](ctx context.Context, name, name
 
 // TODO(wrangler/v4): revert to use OnRemove when it supports options (https://github.com/rancher/wrangler/pull/472).
 func scopedOnRemove[T generic.RuntimeMetaObject](ctx context.Context, name, namespace string, c generic.ControllerMeta, sync generic.ObjectHandler[T]) {
-	condition := scopedOnRemoveConditionChecker(namespace)
+	condition := namespaceScopedCondition(namespace)
 	onRemoveHandler := generic.NewRemoveHandler(name, c.Updater(), generic.FromObjectHandlerToHandler(sync))
 	c.AddGenericHandler(ctx, name, func(key string, obj runtime.Object) (runtime.Object, error) {
 		if condition(obj) {
@@ -714,7 +714,7 @@ func scopedOnRemove[T generic.RuntimeMetaObject](ctx context.Context, name, name
 	})
 }
 
-func scopedOnRemoveConditionChecker(namespace string) func(obj runtime.Object) bool {
+func namespaceScopedCondition(namespace string) func(obj runtime.Object) bool {
 	return func(obj runtime.Object) bool { return inExpectedNamespace(obj, namespace) }
 }
 
