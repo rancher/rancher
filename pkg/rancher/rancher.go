@@ -508,7 +508,7 @@ func (r *Rancher) checkAPIAggregationOrDie() {
 				logrus.Warnf("failed to uunset aggregation pre-check: %s", err)
 			}
 
-			logrus.Fatal("kube-apiserver did not contact the rancher imperative api in time, please ensure k8s is configured to support api extension")
+			logrus.Fatal("kube-apiserver did not contact the rancher imperative api in time, please see https://ranchermanager.docs.rancher.com/api/extension-apiserver for more information")
 		}
 	}
 }
