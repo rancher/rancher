@@ -448,7 +448,7 @@ func (m *manager) ownerExistsByNsName(nsAndName interface{}) (bool, error) {
 func (m *manager) checkForGlobalResourceRules(role *v3.RoleTemplate, resource string, baseRule rbacv1.PolicyRule) (sets.Set[string], error) {
 	var rules []rbacv1.PolicyRule
 	if role.External {
-		externalRole, err := m.crLister.Get("", role.Name)
+		externalRole, err := m.crLister.Get(role.Name)
 		if err != nil && !apierrors.IsNotFound(err) {
 			// dont error if it doesnt exist
 			return nil, err
@@ -484,7 +484,7 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 	}
 	roleName = roleName + "-promoted"
 
-	role, err := m.crLister.Get("", roleName)
+	role, err := m.crLister.Get(roleName)
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return "", fmt.Errorf("get cluster role %s failed: %w", roleName, err)
