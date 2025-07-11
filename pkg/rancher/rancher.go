@@ -468,7 +468,7 @@ func (r *Rancher) checkAPIAggregationOrDie() {
 			}
 		case <-ctxTimeout.Done():
 			ext.SetAggregationCheck(apiserviceClient, false)
-			logrus.Fatal("kube-apiserver did not contact the rancher imperative api in time, please seee https://ranchermanager.docs.rancher.com/api/extension-apiserver for more information")
+			logrus.Fatal("kube-apiserver did not contact the rancher imperative api in time, please see https://ranchermanager.docs.rancher.com/api/extension-apiserver for more information")
 		}
 	}
 }
