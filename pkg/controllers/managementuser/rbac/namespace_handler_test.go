@@ -394,7 +394,6 @@ func TestCreateProjectNSRole(t *testing.T) {
 			assert.ErrorContains(t, err, test.expectedErr, test.description)
 		} else {
 			assert.NoError(t, err)
-			//assert.Equal(t, test.expectedCR, calls[0].In1, test.description)
 		}
 	}
 }

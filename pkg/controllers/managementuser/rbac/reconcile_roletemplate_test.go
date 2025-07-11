@@ -1,11 +1,13 @@
 package rbac
 
 import (
+	"fmt"
 	"io"
 	"testing"
 
 	"github.com/pkg/errors"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	wfakes "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -22,6 +24,15 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 	defaultManager := newManager(
 		withRoleTemplates(map[string]*v3.RoleTemplate{"create-ns": createNSRoleTemplate}, nil, ctrl),
 		withClusterRoles(nil, nil, ctrl),
+		func(m *manager) {
+			clusterRoles := wfakes.NewMockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
+			clusterRoles.EXPECT().Create(gomock.Any()).DoAndReturn(
+				func(In1 *v1.ClusterRole) (*v1.ClusterRole, error) {
+					return In1, nil
+				},
+			).AnyTimes()
+			m.clusterRoles = clusterRoles
+		},
 	)
 
 	type testCase struct {
@@ -233,6 +244,15 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 			manager: newManager(
 				withRoleTemplates(map[string]*v3.RoleTemplate{"create-ns": createNSRoleTemplate}, nil, ctrl),
 				withClusterRoles(nil, &clientErrs{getError: apierrors.NewInternalError(errors.New("internal error"))}, ctrl),
+				func(m *manager) {
+					clusterRoles := wfakes.NewMockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
+					clusterRoles.EXPECT().Create(gomock.Any()).DoAndReturn(
+						func(In1 *v1.ClusterRole) (*v1.ClusterRole, error) {
+							return nil, fmt.Errorf("internal error")
+						},
+					).AnyTimes()
+					m.clusterRoles = clusterRoles
+				},
 			),
 			expectedError: "internal error",
 			roleTemplates: map[string]*v3.RoleTemplate{
