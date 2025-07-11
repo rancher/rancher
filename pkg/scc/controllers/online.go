@@ -7,8 +7,8 @@ import (
 	"github.com/rancher/rancher/pkg/scc/controllers/common"
 	"github.com/rancher/rancher/pkg/scc/types"
 	"golang.org/x/sync/semaphore"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"net/http"
-	"slices"
 	"sync"
 	"sync/atomic"
 
@@ -49,7 +49,7 @@ type sccOnlineMode struct {
 }
 
 func (s sccOnlineMode) NeedsRegistration(registrationObj *v1.Registration) bool {
-	return registrationObj.Status.RegistrationProcessedTS.IsZero() ||
+	return common.RegistrationHasNotStarted(registrationObj) ||
 		!registrationObj.HasCondition(v1.RegistrationConditionSccUrlReady) ||
 		!registrationObj.HasCondition(v1.RegistrationConditionAnnounced)
 }
@@ -99,12 +99,16 @@ func (s sccOnlineMode) PrepareRegisteredForActivation(registration *v1.Registrat
 	if registration.Status.SCCSystemId == nil {
 		return registration, errors.New("SCC system ID cannot be empty when preparing registered system")
 	}
-	sccSystemUrl := fmt.Sprintf("https://scc.suse.com/systems/%d", *registration.Status.SCCSystemId)
-	s.log.Debugf("system announced, check %s", sccSystemUrl)
+	baseSccUrl := consts.BaseURLForSCC()
+	if baseSccUrl != "" {
+		sccSystemUrl := fmt.Sprintf("%s/systems/%d", baseSccUrl, *registration.Status.SCCSystemId)
+		s.log.Debugf("system announced, check %s", sccSystemUrl)
 
-	registration.Status.ActivationStatus.SystemUrl = &sccSystemUrl
-	v1.RegistrationConditionSccUrlReady.SetStatusBool(registration, false) // This must be false until successful activation too.
-	v1.RegistrationConditionSccUrlReady.SetMessageIfBlank(registration, fmt.Sprintf("system announced, check %s", sccSystemUrl))
+		registration.Status.ActivationStatus.SystemUrl = &sccSystemUrl
+		v1.RegistrationConditionSccUrlReady.SetStatusBool(registration, false) // This must be false until successful activation too.
+		v1.RegistrationConditionSccUrlReady.SetMessageIfBlank(registration, fmt.Sprintf("system announced, check %s", sccSystemUrl))
+	}
+
 	v1.RegistrationConditionAnnounced.SetStatusBool(registration, true)
 	v1.ResourceConditionFailure.SetStatusBool(registration, false)
 	v1.ResourceConditionReady.SetStatusBool(registration, true)
@@ -184,8 +188,7 @@ func (s sccOnlineMode) ReconcileRegisterError(registrationObj *v1.Registration, 
 }
 
 func (s sccOnlineMode) NeedsActivation(registrationObj *v1.Registration) bool {
-	return !registrationObj.Status.ActivationStatus.Activated ||
-		registrationObj.Status.ActivationStatus.LastValidatedTS.IsZero()
+	return common.RegistrationNeedsActivation(registrationObj)
 }
 
 func (s sccOnlineMode) ReadyForActivation(registrationObj *v1.Registration) bool {
@@ -295,6 +298,8 @@ func (s sccOnlineMode) Keepalive(registrationObj *v1.Registration) error {
 }
 
 func (s sccOnlineMode) PrepareKeepaliveSucceeded(registration *v1.Registration) (*v1.Registration, error) {
+	v1.RegistrationConditionSccUrlReady.True(registration)
+
 	// TODO take any post keepalive success steps
 	s.log.Debug("preparing keepalive succeeded")
 	return registration, nil
@@ -331,8 +336,7 @@ func (s sccOnlineMode) Deregister() error {
 	// we want to fail to delete if deregister fails, but the system is registered in SCC
 
 	// Finalizers on the credential secret have helped this case, but it's still invalid if users edit the secret manually for some reason.
-	err := sccConnection.Deregister()
-	if err != nil {
+	if err := sccConnection.Deregister(); err != nil {
 		s.log.Warn("Deregister failure will be logged but not prevent cleanup")
 		s.log.Errorf("Failed to deregister SCC registration: %v", err)
 	}
@@ -346,21 +350,21 @@ func (s sccOnlineMode) Deregister() error {
 	// TODO refactor this to a cleanup
 	regCodeSecretRef := s.registration.Spec.RegistrationRequest.RegistrationCodeSecretRef
 	regCodeSecret, regCodeErr := s.secrets.Get(regCodeSecretRef.Namespace, regCodeSecretRef.Name, metav1.GetOptions{})
-	if regCodeErr != nil {
+	if regCodeErr != nil && !apierrors.IsNotFound(regCodeErr) {
 		return regCodeErr
 	}
-	if slices.Contains(regCodeSecret.Finalizers, consts.FinalizerSccRegistrationCode) {
-		index := slices.Index(regCodeSecret.Finalizers, consts.FinalizerSccRegistrationCode)
-		regCodeSecret.Finalizers = slices.Delete(regCodeSecret.Finalizers, index, 1)
-	}
+	if common.SecretHasRegCodeFinalizer(regCodeSecret) {
+		updateRegCodeSecret := regCodeSecret.DeepCopy()
+		updateRegCodeSecret, _ = common.SecretRemoveRegCodeFinalizer(updateRegCodeSecret)
 
-	regCodeSecret, regCodeErr = s.secrets.Update(regCodeSecret)
-	if regCodeErr != nil {
-		return regCodeErr
+		_, regCodeErr = s.secrets.Update(updateRegCodeSecret)
+		if regCodeErr != nil {
+			return regCodeErr
+		}
 	}
 
 	regCodeErr = s.secrets.Delete(regCodeSecretRef.Namespace, regCodeSecretRef.Name, &metav1.DeleteOptions{})
-	if regCodeErr != nil {
+	if err := s.secrets.Delete(regCodeSecretRef.Namespace, regCodeSecretRef.Name, &metav1.DeleteOptions{}); err != nil {
 		return regCodeErr
 	}
 

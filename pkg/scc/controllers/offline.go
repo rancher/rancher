@@ -24,7 +24,7 @@ type sccOfflineMode struct {
 
 func (s sccOfflineMode) NeedsRegistration(registrationObj *v1.Registration) bool {
 	return registrationObj.Spec.OfflineRegistrationCertificateSecretRef == nil &&
-		(registrationObj.Status.RegistrationProcessedTS.IsZero() ||
+		(common.RegistrationHasNotStarted(registrationObj) ||
 			!registrationObj.HasCondition(v1.RegistrationConditionOfflineRequestReady) ||
 			v1.RegistrationConditionOfflineRequestReady.IsFalse(registrationObj))
 }
@@ -41,16 +41,19 @@ func (s sccOfflineMode) PrepareForRegister(registrationObj *v1.Registration) (*v
 	return registrationObj, nil
 }
 
-func (s sccOfflineMode) Register(registrationObj *v1.Registration) (suseconnect.RegistrationSystemId, error) {
+func (s sccOfflineMode) RefreshOfflineRequestSecret() error {
 	sccWrapper := suseconnect.OfflineRancherRegistration(s.systemInfoExporter)
-
 	generatedOfflineRegistrationRequest, err := sccWrapper.PrepareOfflineRegistrationRequest()
 	if err != nil {
-		return suseconnect.EmptyRegistrationSystemId, err
+		return err
 	}
-	updateErr := s.offlineSecrets.UpdateOfflineRequest(generatedOfflineRegistrationRequest)
-	if updateErr != nil {
-		return suseconnect.EmptyRegistrationSystemId, updateErr
+	return s.offlineSecrets.UpdateOfflineRequest(generatedOfflineRegistrationRequest)
+}
+
+func (s sccOfflineMode) Register(registrationObj *v1.Registration) (suseconnect.RegistrationSystemId, error) {
+	refreshErr := s.RefreshOfflineRequestSecret()
+	if refreshErr != nil {
+		return suseconnect.EmptyRegistrationSystemId, refreshErr
 	}
 
 	return suseconnect.OfflineRegistrationSystemId, nil
@@ -78,8 +81,7 @@ func (s sccOfflineMode) ReconcileRegisterError(registrationObj *v1.Registration,
 
 func (s sccOfflineMode) NeedsActivation(registrationObj *v1.Registration) bool {
 	return registrationObj.Status.OfflineRegistrationRequest != nil &&
-		(!registrationObj.Status.ActivationStatus.Activated ||
-			registrationObj.Status.ActivationStatus.LastValidatedTS.IsZero())
+		common.RegistrationNeedsActivation(registrationObj)
 }
 
 func (s sccOfflineMode) ReadyForActivation(registrationObj *v1.Registration) bool {
@@ -95,7 +97,7 @@ func (s sccOfflineMode) Activate(registrationObj *v1.Registration) error {
 		return fmt.Errorf("activate failed, cannot get offline certificate reader: %w", err)
 	}
 
-	offlineCert, certErr := registration.OfflineCertificateFrom(certReader)
+	offlineCert, certErr := registration.OfflineCertificateFrom(certReader, false)
 	if certErr != nil {
 		return fmt.Errorf("activate failed, cannot prepare offline certificate: %w", certErr)
 	}
@@ -114,7 +116,7 @@ func (s sccOfflineMode) PrepareActivatedForKeepalive(registrationObj *v1.Registr
 			return registrationObj, fmt.Errorf("activate failed, cannot get offline certificate reader: %w", err)
 		}
 
-		offlineCert, certErr := registration.OfflineCertificateFrom(certReader)
+		offlineCert, certErr := registration.OfflineCertificateFrom(certReader, false)
 		if certErr != nil {
 			return registrationObj, fmt.Errorf("activate failed, cannot prepare offline certificate: %w", certErr)
 		}
@@ -151,7 +153,7 @@ func (s sccOfflineMode) Keepalive(registrationObj *v1.Registration) error {
 		return fmt.Errorf("activate failed, cannot get offline certificate reader: %w", err)
 	}
 
-	offlineCert, certErr := registration.OfflineCertificateFrom(certReader)
+	offlineCert, certErr := registration.OfflineCertificateFrom(certReader, false)
 	if certErr != nil {
 		return fmt.Errorf("activate failed, cannot prepare offline certificate: %w", certErr)
 	}

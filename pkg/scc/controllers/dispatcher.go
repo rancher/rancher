@@ -59,10 +59,13 @@ func (h *handler) RunLifecycleManager(
 				// Also, ensure that when a registration is over the strictDeadline it is checked.
 				if timeSinceLastValidation >= nextTrigger || timeSinceLastValidation >= strictDeadline {
 					checkInWasTriggered = true
-					// TODO (o&b): 95% sure that enqueue alone won't be good enough based on other controller logic.
-					// Either we need to adjust that controller logic so enqueue alone is enough, or use `CheckNow`.
-					// Seems check now is most simple as it reuses controller logic
-					h.registrations.Enqueue(registrationObj.Name)
+					syncNowReg := registrationObj.DeepCopy()
+					syncNow := true
+					syncNowReg.Spec.SyncNow = &syncNow
+					_, err := h.registrations.Update(syncNowReg)
+					if err != nil {
+						return true, err
+					}
 				}
 			}
 

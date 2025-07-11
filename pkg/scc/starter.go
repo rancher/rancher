@@ -16,18 +16,14 @@ type sccStarter struct {
 func (s *sccStarter) waitForSystemReady(onSystemReady func()) {
 	// Currently we only wait for ServerUrl not being empty, this is a good start as without the URL we cannot start.
 	// However, we should also consider other state that we "need" to register with SCC like metrics about nodes/clusters.
-	// TODO: expand wait to include verifying at least local cluster is ready too - this prevents issues with offline clusters
 	defer onSystemReady()
-	if systeminfo.IsServerUrlReady() &&
-		(s.systemInfoProvider != nil && s.systemInfoProvider.IsLocalReady()) {
+	if s.systemInfoProvider != nil && s.systemInfoProvider.CanStartSccOperator() {
 		close(s.systemRegistrationReady)
 		return
 	}
 	s.log.Info("Waiting for server-url and/or local cluster to be ready")
 	wait.Until(func() {
-		// Todo: also wait for local cluster ready
-		if systeminfo.IsServerUrlReady() &&
-			(s.systemInfoProvider != nil && s.systemInfoProvider.IsLocalReady()) {
+		if s.systemInfoProvider != nil && s.systemInfoProvider.CanStartSccOperator() {
 			s.log.Info("can now start controllers; server URL and local cluster are now ready.")
 			close(s.systemRegistrationReady)
 		} else {

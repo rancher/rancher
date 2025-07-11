@@ -77,7 +77,7 @@ require (
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.4.2
 	github.com/Masterminds/semver/v3 v3.3.0
 	github.com/Masterminds/sprig/v3 v3.3.0
-	github.com/SUSE/connect-ng v1.12.1-0.20250612150514-c7ee160a09b4
+	github.com/SUSE/connect-ng v1.14.0
 	github.com/aws/aws-sdk-go v1.55.5
 	github.com/aws/aws-sdk-go-v2 v1.36.4
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.69

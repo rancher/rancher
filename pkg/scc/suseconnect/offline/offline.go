@@ -2,15 +2,19 @@ package offline
 
 import (
 	"fmt"
-	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/rancher/rancher/pkg/scc/controllers/common"
+	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 )
 
 type SecretManager struct {
 	secretNamespace       string
 	requestSecretName     string
 	certificateSecretName string
-	finalizer             string
 	ownerRef              *metav1.OwnerReference
 	secrets               v1core.SecretController
 	secretCache           v1core.SecretCache
@@ -20,7 +24,6 @@ type SecretManager struct {
 
 func New(
 	namespace, requestName, certificateName string,
-	finalizer string,
 	ownerRef *metav1.OwnerReference,
 	secrets v1core.SecretController,
 	secretCache v1core.SecretCache,
@@ -32,7 +35,6 @@ func New(
 		certificateSecretName: certificateName,
 		secrets:               secrets,
 		secretCache:           secretCache,
-		finalizer:             finalizer,
 		ownerRef:              ownerRef,
 		defaultLabels:         labels,
 	}
@@ -41,15 +43,31 @@ func New(
 func (o *SecretManager) Remove() error {
 	var err error
 	certErr := o.RemoveOfflineCertificate()
-	if certErr != nil {
-		err = fmt.Errorf("failed to remove offline certificate: %v", certErr)
-	}
 	requestErr := o.RemoveOfflineRequest()
-	if requestErr != nil {
-		err = fmt.Errorf("failed to remove offline request: %v", requestErr)
-	}
 	if requestErr != nil && certErr != nil {
 		err = fmt.Errorf("failed to remove both offline request & certificate: %v; %v", requestErr, certErr)
 	}
+	if certErr != nil {
+		err = fmt.Errorf("failed to remove offline certificate: %v", certErr)
+	}
+	if requestErr != nil {
+		err = fmt.Errorf("failed to remove offline request: %v", requestErr)
+	}
 	return err
+}
+
+func (o *SecretManager) removeOfflineFinalizer(incomingSecret *corev1.Secret) error {
+	if common.SecretHasOfflineFinalizer(incomingSecret) {
+		updatedSecret := incomingSecret.DeepCopy()
+		updatedSecret, _ = common.SecretRemoveOfflineFinalizer(updatedSecret)
+		if _, updateErr := o.secrets.Update(updatedSecret); updateErr != nil {
+			if apierrors.IsNotFound(updateErr) {
+				return nil
+			}
+
+			return updateErr
+		}
+	}
+
+	return nil
 }

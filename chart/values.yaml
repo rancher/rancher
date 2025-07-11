@@ -261,35 +261,3 @@ extraObjects: []
 #         app: rancher
 #     policyTypes:
 #       - Ingress
-
-# SCC Registration for Rancher Prime
-# For more information see: TODO link to a docs page
-registration:
-  enabled: false
-  regCode: ""
-  ## Air-gap Users
-  # If your cluster is in an air-gap, then using offline mode (or a local RMT server) may be necessary.
-  # To complete the offline registration via helm is a multi-step process - or you can complete it via the Rancher UI.
-  # Step 1. Enable registration (above) and then uncomment the next line to set mode to offline; then complete the initial helm install.
-  # mode: offline
-  # Step 2. Fetch the offline registration Request needed for the SCC
-  # Step 2.a. Using kubectl fetch the offline registration request and save to local file, OR
-  #     cmd: kubectl get secrets -n  cattle-scc-system \
-  #	          -l scc.cattle.io/secret-role=offline-request,scc.cattle.io/scc-hash=$(kubectl get secrets \
-  #           -n cattle-scc-system scc-registration -o yaml|yq '.metadata.labels["scc.cattle.io/scc-hash"]') \
-  #           -o yaml | yq '.items[0].data.request' > offline.base64
-  # Step 2.b. Using the Rancher UI download the offline registration request file.
-  # Step 3. Upload that certificate file to the SCC to begin the offline registration process.
-  # Step 4. Download the offline registration certificate file and save it to local file,
-  # Step 5. Finally, upload the offline registration certificate to the Rancher
-  # Step 5.a. Using either kubectl:
-  #     cmd: kubectl patch secret -n cattle-scc-system scc-registration  \
-  #           --type='merge' -p "{\"data\": {\"certificate\": \"$(cat <your Offline Cert file> )\"}}"
-  # Step 5.b. Using Rancher UI upload the certificate to complete the registration.
-  # Step 5.c  Using helm with the certificate value field and then `helm upgrade` rancher.
-  # certificate: {}
-  ## Alternative Registration Endpoint
-  # For users with a local RMT server you can use an alternative registration endpoint to register your cluster.
-  # This will cause the registration process to sync with your RMT server instead of with the SCC.
-  # registrationUrl: "https://my-rmt-server.example.com"
-  

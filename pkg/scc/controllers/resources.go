@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/rancher/rancher/pkg/scc/consts"
+	"github.com/rancher/rancher/pkg/scc/controllers/common"
 	"github.com/rancher/rancher/pkg/scc/util"
 	"maps"
 	"slices"
@@ -46,6 +47,7 @@ func (h *handler) isRancherEntrypointSecret(secretObj *corev1.Secret) bool {
 	return true
 }
 
+// prepareSecretSalt applies an instance salt onto an entrypoint secret used to create randomness in hashes
 func (h *handler) prepareSecretSalt(secret *corev1.Secret) (*corev1.Secret, error) {
 	preparedSecret := secret.DeepCopy()
 	generatedSalt := util.NewSaltGen(nil, nil).GenerateSalt()
@@ -57,7 +59,7 @@ func (h *handler) prepareSecretSalt(secret *corev1.Secret) (*corev1.Secret, erro
 	existingLabels[consts.LabelObjectSalt] = generatedSalt
 	preparedSecret.SetLabels(existingLabels)
 
-	_, updateErr := h.updateSecret(secret, preparedSecret)
+	_, updateErr := h.secretRepo.RetryingPatchUpdate(secret, preparedSecret)
 	if updateErr != nil {
 		h.log.Error("error applying metadata updates to default SCC registration secret; cannot initialize secret salt value")
 		return nil, updateErr
@@ -110,23 +112,7 @@ func extractRegistrationParamsFromSecret(secret *corev1.Secret) (RegistrationPar
 	if regMode == v1.RegistrationModeOnline {
 		regUrlBytes = getCurrentRegURL(secret)
 		regUrlString = string(regUrlBytes)
-		//if consts.IsDevMode() {
-		//	regUrlBytes = []byte(consts.StagingSCCUrl)
-		//	regUrlString = string(consts.StagingSCCUrl)
-		//}
-		//
-		//regUrlBytes, ok = secret.Data[consts.RegistrationUrl]
-		//if ok && len(regUrlBytes) != 0 {
-		//	regUrlString = string(regUrlBytes)
-		//} else if util.HasGlobalPrimeRegistrationUrl() {
-		//	globalRegistrationUrl := util.GetGlobalPrimeRegistrationUrl()
-		//	regUrlBytes = []byte(globalRegistrationUrl)
-		//	regUrlString = globalRegistrationUrl
-		//}
 	}
-
-	// TODO: do we care to validate this; online shouldn't have this at all, offline has it eventually
-	// So it cannot be required for offline mode like RegCode is above, we could error online mode with it?
 
 	hasher := md5.New()
 	nameData := append(incomingSalt, regType...)
@@ -197,7 +183,6 @@ func (h *handler) registrationFromSecretEntrypoint(
 		)
 	}
 
-	// FIXME: lets figure how to generate better unique names
 	genName := fmt.Sprintf("scc-registration-%s", params.nameId)
 	var reg *v1.Registration
 	var err error
@@ -269,11 +254,8 @@ func (h *handler) regCodeFromSecretEntrypoint(params RegistrationParams) (*corev
 	defaultLabels[consts.LabelSccSecretRole] = string(consts.RegistrationCode)
 	maps.Copy(regcodeSecret.Labels, defaultLabels)
 
-	if !slices.Contains(regcodeSecret.Finalizers, consts.FinalizerSccRegistrationCode) {
-		if regcodeSecret.Finalizers == nil {
-			regcodeSecret.Finalizers = []string{}
-		}
-		regcodeSecret.Finalizers = append(regcodeSecret.Finalizers, consts.FinalizerSccRegistrationCode)
+	if !common.SecretHasRegCodeFinalizer(regcodeSecret) {
+		regcodeSecret, _ = common.SecretAddRegCodeFinalizer(regcodeSecret)
 	}
 
 	return regcodeSecret, nil

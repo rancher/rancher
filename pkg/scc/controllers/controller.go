@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/rancher/rancher/pkg/scc/controllers/repos"
 	"github.com/rancher/rancher/pkg/scc/types"
 	"maps"
 	"slices"
@@ -40,8 +41,6 @@ const (
 
 // SCCHandler Defines a common interface for online and offline operations
 // IMPORTANT: All the `Reconcile*` methods modifies the object in memory but does NOT save it. The caller is responsible for saving the state.
-// TODO: these that return `*v1.Registration` probably need to return a object set to use with apply
-// TODO: That way we can use apply to update Registrations and Secrets related to them together.
 type SCCHandler interface {
 	// NeedsRegistration determines if the system requires initial SCC registration.
 	NeedsRegistration(*v1.Registration) bool
@@ -80,6 +79,7 @@ type handler struct {
 	log                *logrus.Entry
 	registrations      registrationControllers.RegistrationController
 	registrationCache  registrationControllers.RegistrationCache
+	secretRepo         repos.SecretRepo
 	secrets            v1core.SecretController
 	secretCache        v1core.SecretCache
 	systemInfoExporter *systeminfo.InfoExporter
@@ -94,10 +94,14 @@ func Register(
 	systemInfoExporter *systeminfo.InfoExporter,
 ) {
 	controller := &handler{
-		log:                log.NewControllerLogger("registration-controller"),
-		ctx:                ctx,
-		registrations:      registrations,
-		registrationCache:  registrations.Cache(),
+		log:               log.NewControllerLogger("registration-controller"),
+		ctx:               ctx,
+		registrations:     registrations,
+		registrationCache: registrations.Cache(),
+		secretRepo: repos.SecretRepo{
+			Secrets:      secrets,
+			SecretsCache: secrets.Cache(),
+		},
 		secrets:            secrets,
 		secretCache:        secrets.Cache(),
 		systemInfoExporter: systemInfoExporter,
@@ -106,7 +110,8 @@ func Register(
 
 	controller.initIndexers()
 	controller.initResolvers(ctx)
-	secrets.OnChange(ctx, controllerID+"-secrets", controller.OnSecretChange)
+	// secrets.OnChange(ctx, controllerID+"-secrets", controller.OnSecretChange)
+	scopedOnChange(ctx, controllerID+"-secrets", systemNamespace, secrets, controller.OnSecretChange)
 	scopedOnRemove(ctx, controllerID+"-secrets-remove", systemNamespace, secrets, controller.OnSecretRemove)
 
 	registrations.OnChange(ctx, controllerID, controller.OnRegistrationChange)
@@ -137,7 +142,6 @@ func (h *handler) prepareHandler(registrationObj *v1.Registration) SCCHandler {
 				h.systemNamespace,
 				offlineRequestSecretName,
 				offlineCertSecretName,
-				consts.FinalizerSccCredentials,
 				ref,
 				h.secrets,
 				h.secretCache,
@@ -154,7 +158,6 @@ func (h *handler) prepareHandler(registrationObj *v1.Registration) SCCHandler {
 		sccCredentials: credentials.New(
 			h.systemNamespace,
 			credsSecretName,
-			consts.FinalizerSccCredentials,
 			ref,
 			h.secrets,
 			h.secretCache,
@@ -192,7 +195,7 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 			newSecret.Annotations[consts.LabelSccLastProcessed] = time.Now().Format(time.RFC3339)
 			maps.Copy(newSecret.Labels, params.Labels())
 
-			_, updateErr := h.updateSecret(incomingObj, newSecret)
+			_, updateErr := h.secretRepo.RetryingPatchUpdate(incomingObj, newSecret)
 			if updateErr != nil {
 				h.log.Error("error applying metadata updates to default SCC registration secret")
 				return nil, updateErr
@@ -235,8 +238,7 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 		maps.Copy(labels, params.Labels())
 		newSecret.Labels = labels
 
-		// TODO(dan): make sure all update logic is handled via the new patch mechanism
-		if _, err := h.updateSecret(incomingObj, newSecret); err != nil {
+		if _, err := h.secretRepo.RetryingPatchUpdate(incomingObj, newSecret); err != nil {
 			return incomingObj, err
 		}
 
@@ -246,7 +248,7 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 				return incomingObj, err
 			}
 
-			if err := h.createOrUpdateSecret(offlineCertSecret); err != nil {
+			if _, err := h.secretRepo.CreateOrUpdateSecret(offlineCertSecret); err != nil {
 				return incomingObj, err
 			}
 		}
@@ -257,7 +259,7 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 				return incomingObj, err
 			}
 
-			if err := h.createOrUpdateSecret(regCodeSecret); err != nil {
+			if _, err := h.secretRepo.CreateOrUpdateSecret(regCodeSecret); err != nil {
 				return incomingObj, err
 			}
 		}
@@ -342,23 +344,18 @@ func (h *handler) cleanupRelatedSecretsByHash(contentHash string) error {
 	})
 
 	for _, secret := range secrets {
-		if !slices.Contains(secret.Finalizers, consts.FinalizerSccCredentials) || !slices.Contains(secret.Finalizers, consts.FinalizerSccRegistrationCode) {
-			continue
-		}
+		if common.SecretHasCredentialsFinalizer(secret) ||
+			common.SecretHasRegCodeFinalizer(secret) {
 
-		if retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			var remainingFin []string
-			for _, finalizer := range secret.Finalizers {
-				if finalizer != consts.FinalizerSccCredentials && finalizer != consts.FinalizerSccRegistrationCode {
-					remainingFin = append(remainingFin, finalizer)
-				}
+			var updateErr error
+			secretUpdated := secret.DeepCopy()
+			secretUpdated, _ = common.SecretRemoveCredentialsFinalizer(secretUpdated)
+			secretUpdated, _ = common.SecretRemoveRegCodeFinalizer(secretUpdated)
+			secretUpdated, updateErr = h.secretRepo.RetryingPatchUpdate(secret, secretUpdated)
+			if updateErr != nil {
+				h.log.Errorf("failed to update secret %s/%s: %v", secret.Namespace, secret.Name, updateErr)
+				return updateErr
 			}
-			secret.Finalizers = remainingFin
-
-			_, updateErr := h.secrets.Update(secret)
-			return updateErr
-		}); retryErr != nil {
-			return retryErr
 		}
 
 		deleteErr := h.secrets.Delete(secret.Namespace, secret.Name, &metav1.DeleteOptions{})
@@ -405,37 +402,55 @@ func (h *handler) OnSecretRemove(name string, incomingObj *corev1.Secret) (*core
 
 		return incomingObj, nil
 	}
-	finalizers := incomingObj.GetFinalizers()
-	for i, finalizer := range finalizers {
-		// check if we are ready to remove the finalizer
-		if finalizer == consts.FinalizerSccCredentials {
-			refs := incomingObj.GetOwnerReferences()
-			danglingRefs := 0
-			for _, ref := range refs {
-				if ref.APIVersion == v1.SchemeGroupVersion.String() &&
-					ref.Kind == "Registration" {
-					_, err := h.registrations.Get(ref.Name, metav1.GetOptions{})
-					if apierrors.IsNotFound(err) {
-						continue
-					} else {
+
+	if common.SecretHasCredentialsFinalizer(incomingObj) ||
+		common.SecretHasRegCodeFinalizer(incomingObj) {
+		refs := incomingObj.GetOwnerReferences()
+		danglingRefs := 0
+		for _, ref := range refs {
+			if ref.APIVersion == v1.SchemeGroupVersion.String() &&
+				ref.Kind == "Registration" {
+				reg, err := h.registrations.Get(ref.Name, metav1.GetOptions{})
+				if apierrors.IsNotFound(err) {
+					continue
+				} else {
+					if reg.DeletionTimestamp == nil {
 						danglingRefs++
+					} else {
+						// TODO(alex): verify this logic when you are back
+						// When reg is marked to delete too - we may need to help clean it up
+						regFinalizers := reg.GetFinalizers()
+						if len(regFinalizers) > 0 && slices.Contains(regFinalizers, consts.FinalizerSccRegistration) {
+							regUpdate := reg.DeepCopy()
+							removeIndex := slices.Index(regFinalizers, consts.FinalizerSccRegistration)
+							regUpdate.Finalizers = append(reg.Finalizers[:removeIndex], reg.Finalizers[removeIndex+1:]...)
+							_, err = h.patchUpdateRegistration(reg, regUpdate)
+							if err != nil {
+								h.log.Errorf("failed to patch registration %s/%s: %v", reg.Namespace, reg.Name, err)
+							}
+						}
 					}
 				}
 			}
-			if danglingRefs > 0 {
-				h.log.Errorf("cannot remove finalizer %s from secret %s/%s, dangling references to Registration found", finalizer, incomingObj.Namespace, incomingObj.Name)
-				return nil, fmt.Errorf("cannot remove finalizer %s from secret %s/%s, dangling references to Registration found", finalizer, incomingObj.Namespace, incomingObj.Name)
-			}
-			newSecret := incomingObj.DeepCopy()
-			newSecret.SetFinalizers(append(finalizers[:i], finalizers[i+1:]...))
-			logrus.Info("Removing finalizer from secret", newSecret.Name, "in namespace", newSecret.Namespace)
-			if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-				_, err := h.secrets.Update(newSecret)
-				return err
-			}); err != nil {
-				h.log.Errorf("failed to remove finalizer %s from secret %s/%s: %v", finalizer, incomingObj.Namespace, incomingObj.Name, err)
-				return nil, fmt.Errorf("failed to remove finalizer %s from secret %s/%s: %w", finalizer, incomingObj.Namespace, incomingObj.Name, err)
-			}
+		}
+		if danglingRefs > 0 {
+			h.log.Errorf("cannot remove SCC finalizer from secret %s/%s, dangling references to Registration found", incomingObj.Namespace, incomingObj.Name)
+			return nil, fmt.Errorf("cannot remove SCC finalizer from secret %s/%s, dangling references to Registration found", incomingObj.Namespace, incomingObj.Name)
+		}
+		newSecret := incomingObj.DeepCopy()
+		if common.SecretHasCredentialsFinalizer(newSecret) {
+			newSecret, _ = common.SecretRemoveCredentialsFinalizer(newSecret)
+		}
+		if common.SecretHasRegCodeFinalizer(newSecret) {
+			newSecret, _ = common.SecretRemoveRegCodeFinalizer(newSecret)
+		}
+		logrus.Info("Removing finalizer from secret", newSecret.Name, "in namespace", newSecret.Namespace)
+		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			_, err := h.secretRepo.PatchUpdate(incomingObj, newSecret)
+			return err
+		}); err != nil {
+			h.log.Errorf("failed to remove SCC finalizer from secret %s/%s: %v", incomingObj.Namespace, incomingObj.Name, err)
+			return nil, fmt.Errorf("failed to remove SCC finalizer from secret %s/%s: %w", incomingObj.Namespace, incomingObj.Name, err)
 		}
 	}
 
@@ -445,7 +460,7 @@ func (h *handler) OnSecretRemove(name string, incomingObj *corev1.Secret) (*core
 func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registration) (*v1.Registration, error) {
 	activiateMu.Lock()
 	defer activiateMu.Unlock()
-	if registrationObj == nil {
+	if registrationObj == nil || registrationObj.DeletionTimestamp != nil {
 		return nil, nil
 	}
 
@@ -563,8 +578,8 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 			activated := registrationObj.DeepCopy()
 			activated = common.PrepareSuccessfulActivation(activated)
 			prepared, err := registrationHandler.PrepareActivatedForKeepalive(activated)
-			// TODO: should this use the reconciler too
 			if err != nil {
+				err := h.reconcileActivation(registrationHandler, registrationObj, activationErr, types.ActivationPrepForKeepalive)
 				return err
 			}
 			_, updateErr = h.registrations.UpdateStatus(prepared)
@@ -581,11 +596,13 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 	if common.RegistrationNeedsSyncNow(registrationObj) {
 		if registrationObj.Spec.Mode == v1.RegistrationModeOffline {
 			updated := registrationObj.DeepCopy()
-			// TODO(o&b): When offline calls this it should immediately sync the OfflineRegistrationRequest secret content
 			updated.Spec = *registrationObj.Spec.WithoutSyncNow()
 
-			_, err := h.registrations.Update(updated)
-			return registrationObj, err
+			offlineHandler := registrationHandler.(sccOfflineMode)
+			refreshErr := offlineHandler.RefreshOfflineRequestSecret()
+			_, updateErr := h.registrations.Update(updated)
+
+			return registrationObj, errors.Join(refreshErr, updateErr)
 		} else {
 			// Todo: online/offline  handler should have a sync now
 			updated := registrationObj.DeepCopy()
@@ -628,35 +645,30 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 		return registrationObj, err
 	}
 
-	updateErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		var err error
-		registrationObj, err = h.registrations.Get(registrationObj.Name, metav1.GetOptions{})
+	keepaliveUpdateErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var retryErr, updateErr error
+		registrationObj, retryErr = h.registrations.Get(registrationObj.Name, metav1.GetOptions{})
+		if retryErr != nil {
+			return retryErr
+		}
+
+		keepalive := registrationObj.DeepCopy()
+		keepalive = common.PrepareSuccessfulActivation(keepalive)
+		v1.RegistrationConditionKeepalive.True(keepalive)
+		prepared, err := registrationHandler.PrepareKeepaliveSucceeded(keepalive)
 		if err != nil {
 			return err
 		}
-
-		timeNow := time.Now()
-		updated := registrationObj.DeepCopy()
-		v1.RegistrationConditionSccUrlReady.True(updated)
-		v1.ResourceConditionProgressing.False(updated)
-		v1.ResourceConditionReady.True(updated)
-		v1.ResourceConditionDone.True(updated)
-		v1.RegistrationConditionKeepalive.True(updated)
-		updated.Status.ActivationStatus.LastValidatedTS = &metav1.Time{
-			Time: timeNow,
-		}
-		updated.Status.ActivationStatus.Activated = true
-		_, err = h.registrations.UpdateStatus(updated)
-		return err
+		_, updateErr = h.registrations.UpdateStatus(prepared)
+		return updateErr
 	})
-	if updateErr != nil {
-		return nil, updateErr
+	if keepaliveUpdateErr != nil {
+		return registrationObj, keepaliveUpdateErr
 	}
 
 	return registrationObj, nil
 }
 
-// TODO: do we want a finalizer for preventing deregister from failing then deleting object?
 func (h *handler) OnRegistrationRemove(name string, registrationObj *v1.Registration) (*v1.Registration, error) {
 	if registrationObj == nil {
 		return nil, nil
@@ -668,8 +680,6 @@ func (h *handler) OnRegistrationRemove(name string, registrationObj *v1.Registra
 		h.log.Warn(deRegErr)
 	}
 
-	// TODO: owner finalizers handled here
-	// (alex) :  I don't think this is needed
 	err := h.registrations.Delete(name, &metav1.DeleteOptions{})
 	if err != nil {
 		return registrationObj, err
@@ -678,9 +688,20 @@ func (h *handler) OnRegistrationRemove(name string, registrationObj *v1.Registra
 	return nil, nil
 }
 
+func scopedOnChange[T generic.RuntimeMetaObject](ctx context.Context, name, namespace string, c generic.ControllerMeta, sync generic.ObjectHandler[T]) {
+	condition := namespaceScopedCondition(namespace)
+	onChangeHandler := generic.FromObjectHandlerToHandler(sync)
+	c.AddGenericHandler(ctx, name, func(key string, obj runtime.Object) (runtime.Object, error) {
+		if condition(obj) {
+			return onChangeHandler(key, obj)
+		}
+		return obj, nil
+	})
+}
+
 // TODO(wrangler/v4): revert to use OnRemove when it supports options (https://github.com/rancher/wrangler/pull/472).
 func scopedOnRemove[T generic.RuntimeMetaObject](ctx context.Context, name, namespace string, c generic.ControllerMeta, sync generic.ObjectHandler[T]) {
-	condition := scopedOnRemoveConditionChecker(namespace)
+	condition := namespaceScopedCondition(namespace)
 	onRemoveHandler := generic.NewRemoveHandler(name, c.Updater(), generic.FromObjectHandlerToHandler(sync))
 	c.AddGenericHandler(ctx, name, func(key string, obj runtime.Object) (runtime.Object, error) {
 		if condition(obj) {
@@ -690,7 +711,7 @@ func scopedOnRemove[T generic.RuntimeMetaObject](ctx context.Context, name, name
 	})
 }
 
-func scopedOnRemoveConditionChecker(namespace string) func(obj runtime.Object) bool {
+func namespaceScopedCondition(namespace string) func(obj runtime.Object) bool {
 	return func(obj runtime.Object) bool { return inExpectedNamespace(obj, namespace) }
 }
 

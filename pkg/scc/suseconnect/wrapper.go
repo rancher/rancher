@@ -2,8 +2,6 @@ package suseconnect
 
 import (
 	"fmt"
-	"github.com/rancher/rancher/pkg/scc/consts"
-
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/scc/systeminfo"
 	"github.com/rancher/rancher/pkg/scc/util/log"
@@ -44,8 +42,7 @@ func OnlineRancherConnection(credentials connection.Credentials, systemInfo *sys
 
 	options := DefaultConnectionOptions()
 
-	// TODO: consider if dev mode should ever point to default Prod SCC connection
-	if consts.IsDevMode() {
+	if url != "" {
 		options.URL = url
 	}
 

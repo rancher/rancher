@@ -35,6 +35,7 @@ const (
 )
 
 const (
+	FinalizerSccOfflineSecret    = "scc.cattle.io/managed-offline-secret"
 	FinalizerSccCredentials      = "scc.cattle.io/managed-credentials"
 	FinalizerSccRegistration     = "scc.cattle.io/managed-registration"
 	FinalizerSccRegistrationCode = "scc.cattle.io/managed-registration-code"
@@ -65,6 +66,37 @@ const (
 	OfflineCertificate SecretRole = "offline-certificate"
 )
 
+type SCCEnvironment int
+
+const (
+	Production SCCEnvironment = iota
+	Staging
+	PayAsYouGo
+	RGS
+)
+
+func (s SCCEnvironment) String() string {
+	switch s {
+	case Production:
+		return "production"
+	case Staging:
+		return "staging"
+	case PayAsYouGo:
+		return "payAsYouGo"
+	case RGS:
+		return "rgs"
+	default:
+		return "unknown"
+	}
+}
+
+func GetSCCEnvironment() SCCEnvironment {
+	if !IsDevMode() {
+		return Production
+	}
+	return Staging
+}
+
 type AlternativeSCCUrls string
 
 const (
@@ -77,4 +109,19 @@ const (
 func (s AlternativeSCCUrls) Ptr() *string {
 	stringVal := string(s)
 	return &stringVal
+}
+
+func BaseURLForSCC() string {
+	var baseUrl string
+	switch GetSCCEnvironment() {
+	case Production:
+		baseUrl = string(ProdSCCUrl)
+	case Staging:
+		baseUrl = string(StagingSCCUrl)
+	case RGS: // explicitly return empty for RGS
+	default:
+		// intentionally do nothing and return empty string
+	}
+
+	return baseUrl
 }
