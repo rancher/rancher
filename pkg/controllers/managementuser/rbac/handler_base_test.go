@@ -110,7 +110,7 @@ func withRoleTemplates(roleTemplates map[string]*v3.RoleTemplate, errs *clientEr
 	}
 }
 
-// withRoleTemplates setup a crLister and clusterRoles mock with the provided clusterRoles and errors
+// withClusterRoles setup a crLister and clusterRoles mock with the provided clusterRoles and errors
 func withClusterRoles(clusterRoles map[string]*v1.ClusterRole, errs *clientErrs, ctrl *gomock.Controller) managerOpt {
 	if clusterRoles == nil {
 		clusterRoles = map[string]*v1.ClusterRole{}
@@ -139,8 +139,8 @@ func withClusterRoles(clusterRoles map[string]*v1.ClusterRole, errs *clientErrs,
 				return true
 			})
 			return result, nil
-		})
-		crLister.EXPECT().Get(gomock.Any()).DoAndReturn(func(namespace string, name string) (*v1.ClusterRole, error) {
+		}).AnyTimes()
+		crLister.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v1.ClusterRole, error) {
 			if errs.getError != nil {
 				return nil, errs.getError
 			}
@@ -152,7 +152,7 @@ func withClusterRoles(clusterRoles map[string]*v1.ClusterRole, errs *clientErrs,
 
 			cr := crVal.(*v1.ClusterRole)
 			return cr.DeepCopy(), nil
-		})
+		}).AnyTimes()
 		m.crLister = crLister
 	}
 }
