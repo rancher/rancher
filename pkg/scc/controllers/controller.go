@@ -447,7 +447,7 @@ func (h *handler) OnSecretRemove(name string, incomingObj *corev1.Secret) (*core
 func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registration) (*v1.Registration, error) {
 	activiateMu.Lock()
 	defer activiateMu.Unlock()
-	if registrationObj == nil {
+	if registrationObj == nil || registrationObj.DeletionTimestamp != nil {
 		return nil, nil
 	}
 
