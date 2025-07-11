@@ -53,6 +53,7 @@ var (
 		"cattle-csp-adapter-system",
 		"calico-apiserver",
 		"cattle-elemental-system",
+		"cattle-kubewarden-system",
 	}
 
 	AgentImage          = NewSetting("agent-image", "rancher/rancher-agent:head")
