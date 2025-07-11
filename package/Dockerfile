@@ -86,7 +86,7 @@ RUN mkdir -p /var/lib/rancher-data/driver-metadata && \
 
 FROM builder AS tini
 ARG ARCH
-ENV TINI_VERSION v0.18.0
+ENV TINI_VERSION=v0.18.0
 ENV TINI_URL_amd64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini \
     TINI_URL_arm64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-arm64 \
     TINI_URL_s390x=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-s390x \
@@ -133,29 +133,29 @@ ARG CATTLE_KDM_BRANCH
 ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
-ENV CATTLE_MACHINE_VERSION v0.15.0-rancher127
-ENV CATTLE_K3S_VERSION v1.32.1+k3s1
-ENV CATTLE_MACHINE_PROVISION_IMAGE rancher/machine:${CATTLE_MACHINE_VERSION}
-ENV CATTLE_ETCD_VERSION v3.5.16
-ENV DOCKER_MACHINE_LINODE_VERSION v0.1.15
-ENV LINODE_UI_DRIVER_VERSION v0.7.0
+ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher127
+ENV CATTLE_K3S_VERSION=v1.32.1+k3s1
+ENV CATTLE_MACHINE_PROVISION_IMAGE=rancher/machine:${CATTLE_MACHINE_VERSION}
+ENV CATTLE_ETCD_VERSION=v3.5.16
+ENV DOCKER_MACHINE_LINODE_VERSION=v0.1.15
+ENV LINODE_UI_DRIVER_VERSION=v0.7.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
-ENV DOCKER_MACHINE_HARVESTER_VERSION v1.0.2
-ENV CATTLE_KDM_BRANCH ${CATTLE_KDM_BRANCH}
-ENV CATTLE_WINS_AGENT_VERSION v0.5.1
-ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
-ENV CATTLE_WINS_AGENT_UNINSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/uninstall.ps1
-ENV CATTLE_WINS_AGENT_UPGRADE_IMAGE rancher/wins:${CATTLE_WINS_AGENT_VERSION}
-ENV CATTLE_CSI_PROXY_AGENT_VERSION v1.1.3
+ENV DOCKER_MACHINE_HARVESTER_VERSION=v1.0.2
+ENV CATTLE_KDM_BRANCH=${CATTLE_KDM_BRANCH}
+ENV CATTLE_WINS_AGENT_VERSION=v0.5.1
+ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT=https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
+ENV CATTLE_WINS_AGENT_UNINSTALL_SCRIPT=https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/uninstall.ps1
+ENV CATTLE_WINS_AGENT_UPGRADE_IMAGE=rancher/wins:${CATTLE_WINS_AGENT_VERSION}
+ENV CATTLE_CSI_PROXY_AGENT_VERSION=v1.1.3
 # make sure the CATTLE_SYSTEM_AGENT_VERSION is consistent with tests/v2/codecoverage/package/Dockerfile
-ENV CATTLE_SYSTEM_AGENT_VERSION v0.3.12
-ENV CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX https://github.com/rancher/system-agent/releases/download
-ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE rancher/system-agent:${CATTLE_SYSTEM_AGENT_VERSION}-suc
-ENV CATTLE_SYSTEM_AGENT_INSTALLER_IMAGE rancher/system-agent-installer-
+ENV CATTLE_SYSTEM_AGENT_VERSION=v0.3.12
+ENV CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX=https://github.com/rancher/system-agent/releases/download
+ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE=rancher/system-agent:${CATTLE_SYSTEM_AGENT_VERSION}-suc
+ENV CATTLE_SYSTEM_AGENT_INSTALLER_IMAGE=rancher/system-agent-installer-
 # make sure the ENV CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT is consistent with pkg/settings/setting.go to utlize the local version of install script downloaded during build/package
-ENV CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT ${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/install.sh
-ENV CATTLE_SYSTEM_AGENT_UNINSTALL_SCRIPT ${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh
-ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION 106.0.0
+ENV CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT=${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/install.sh
+ENV CATTLE_SYSTEM_AGENT_UNINSTALL_SCRIPT=${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh
+ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION=106.0.0
 
 # AKS,EKS,GKE Operator charts versions
 ARG CATTLE_AKS_OPERATOR_VERSION
@@ -245,22 +245,22 @@ RUN mkdir -p /var/lib/rancher/k3s/agent/images/ && \
     curl -sfL ${ETCD_URL} | tar xvzf - --strip-components=1 --no-same-owner -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
-ENV CATTLE_UI_VERSION 2.11.4-alpha1
-ENV CATTLE_DASHBOARD_UI_VERSION v2.11.4-alpha1
-ENV CATTLE_CLI_VERSION v2.11.3
+ENV CATTLE_UI_VERSION=2.11.4-alpha1
+ENV CATTLE_DASHBOARD_UI_VERSION=v2.11.4-alpha1
+ENV CATTLE_CLI_VERSION=v2.11.3
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
 ENV CATTLE_BASE_UI_BRAND=
 
 # Please update the api-ui-version in pkg/settings/settings.go when updating the version here.
-ENV CATTLE_API_UI_VERSION 1.1.11
+ENV CATTLE_API_UI_VERSION=1.1.11
 
 RUN mkdir -p /var/log/auditlog
-ENV AUDIT_LOG_PATH /var/log/auditlog/rancher-api-audit.log
-ENV AUDIT_LOG_MAXAGE 10
-ENV AUDIT_LOG_MAXBACKUP 10
-ENV AUDIT_LOG_MAXSIZE 100
-ENV AUDIT_LEVEL 0
+ENV AUDIT_LOG_PATH=/var/log/auditlog/rancher-api-audit.log
+ENV AUDIT_LOG_MAXAGE=10
+ENV AUDIT_LOG_MAXBACKUP=10
+ENV AUDIT_LOG_MAXSIZE=100
+ENV AUDIT_LEVEL=0
 
 RUN mkdir -p /usr/share/rancher/ui && \
     cd /usr/share/rancher/ui && \
@@ -287,23 +287,23 @@ RUN mkdir -p /usr/share/rancher/ui && \
     curl -sfL ${CATTLE_WINS_AGENT_INSTALL_SCRIPT} -o wins-agent-install.ps1 \
     curl -sfL ${CATTLE_WINS_AGENT_UNINSTALL_SCRIPT} -o wins-agent-uninstall.ps1
 
-ENV CATTLE_CLI_URL_DARWIN  https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-darwin-amd64-${CATTLE_CLI_VERSION}.tar.gz
-ENV CATTLE_CLI_URL_LINUX   https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-linux-amd64-${CATTLE_CLI_VERSION}.tar.gz
-ENV CATTLE_CLI_URL_WINDOWS https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-windows-386-${CATTLE_CLI_VERSION}.zip
+ENV CATTLE_CLI_URL_DARWIN=https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-darwin-amd64-${CATTLE_CLI_VERSION}.tar.gz
+ENV CATTLE_CLI_URL_LINUX=https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-linux-amd64-${CATTLE_CLI_VERSION}.tar.gz
+ENV CATTLE_CLI_URL_WINDOWS=https://releases.rancher.com/cli2/${CATTLE_CLI_VERSION}/rancher-windows-386-${CATTLE_CLI_VERSION}.zip
 
 COPY --from=kdm /var/lib/rancher-data/driver-metadata/data.json /var/lib/rancher-data/driver-metadata/data.json
 
 ENV ETCDCTL_API=3
 
-ENV SSL_CERT_DIR /etc/rancher/ssl
-ENV ETCD_UNSUPPORTED_ARCH ${ETCD_UNSUPPORTED_ARCH}
+ENV SSL_CERT_DIR=/etc/rancher/ssl
+ENV ETCD_UNSUPPORTED_ARCH=${ETCD_UNSUPPORTED_ARCH}
 
 
 # Enable exporting of the k3s images as part of the build process.
 FROM --platform=$BUILDPLATFORM go-builder AS images
 WORKDIR /src
 ENV CGO_ENABLED=1
-ENV CATTLE_K3S_VERSION v1.32.1+k3s1
+ENV CATTLE_K3S_VERSION=v1.32.1+k3s1
 RUN zypper -n install libbtrfs-devel libgpgme-devel
 COPY hack/airgap/go.mod hack/airgap/go.sum /src/
 RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
@@ -317,7 +317,7 @@ RUN ./export-images -k3s-version ${CATTLE_K3S_VERSION} -output /src/k3s-airgap-i
 FROM --platform=$BUILDPLATFORM go-builder AS rancher-go-builder
 WORKDIR /app
 # Only invalidate cache if go.mod/go.sum changes.
-COPY go.mod go.sum .
+COPY go.mod go.sum ./
 COPY pkg/apis/go.mod pkg/apis/go.sum pkg/apis/
 COPY pkg/client/go.mod pkg/client/go.sum pkg/client/
 RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
@@ -336,7 +336,7 @@ ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X git
 ARG TARGETOS
 ARG TARGETARCH
 COPY pkg/ pkg/
-COPY main.go .
+COPY main.go ./
 RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o rancher
 
 
@@ -353,8 +353,7 @@ RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TAR
 
 
 FROM base AS server
-
-ARG VERSION=${VERSION}
+ARG VERSION
 ARG BASE_REGISTRY
 ARG BASE_UI_BRAND
 ARG RANCHER_VERSION_TYPE
@@ -362,9 +361,9 @@ ARG RANCHER_VERSION_TYPE
 ENV CATTLE_BASE_REGISTRY=$BASE_REGISTRY
 ENV CATTLE_BASE_UI_BRAND=$BASE_UI_BRAND
 ENV RANCHER_VERSION_TYPE=$RANCHER_VERSION_TYPE
-ENV CATTLE_SERVER_VERSION ${VERSION}
-ENV CATTLE_AGENT_IMAGE ${IMAGE_REPO}/rancher-agent:${VERSION}
-ENV CATTLE_SERVER_IMAGE ${IMAGE_REPO}/rancher
+ENV CATTLE_SERVER_VERSION=${VERSION}
+ENV CATTLE_AGENT_IMAGE=${IMAGE_REPO}/rancher-agent:${VERSION}
+ENV CATTLE_SERVER_IMAGE=${IMAGE_REPO}/rancher
 
 COPY --chown=root:root --chmod=0755 \
     --from=server-build /app/rancher /usr/bin/
@@ -404,7 +403,7 @@ RUN /usr/bin/unshare --version && \
     /usr/bin/nsenter --version
 
 ARG ARCH
-ENV KUBECTL_VERSION v1.32.1
+ENV KUBECTL_VERSION=v1.32.1
 
 RUN curl -sLf https://dl.k8s.io/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl > /usr/bin/kubectl && \
     chmod +x /usr/bin/kubectl
@@ -413,13 +412,13 @@ LABEL io.cattle.agent=true
 
 ARG RANCHER_REPO=rancher
 ARG VERSION
-ENV AGENT_IMAGE ${RANCHER_REPO}/rancher-agent:${VERSION}
+ENV AGENT_IMAGE=${RANCHER_REPO}/rancher-agent:${VERSION}
 # For now, this value needs to be manually synced with the one in the main Dockerfile. This pins downstream webhook's version.
 ARG CATTLE_RANCHER_WEBHOOK_VERSION
 ENV CATTLE_RANCHER_WEBHOOK_VERSION=$CATTLE_RANCHER_WEBHOOK_VERSION
 ARG CATTLE_RANCHER_PROVISIONING_CAPI_VERSION
 ENV CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$CATTLE_RANCHER_PROVISIONING_CAPI_VERSION
-ENV SSL_CERT_DIR /etc/kubernetes/ssl/certs
+ENV SSL_CERT_DIR=/etc/kubernetes/ssl/certs
 COPY --from=rancher-charts /var/lib/rancher-data/local-catalogs/v2/rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721 /var/lib/rancher-data/local-catalogs/v2/rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721
 COPY --from=partner-charts /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974 /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974
 COPY --from=rke2-charts /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9 /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-charts/675f1b63a0a83905972dcab2794479ed599a6f41b86cd6193d69472d0fa889c9
