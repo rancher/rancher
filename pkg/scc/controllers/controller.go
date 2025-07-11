@@ -110,7 +110,8 @@ func Register(
 
 	controller.initIndexers()
 	controller.initResolvers(ctx)
-	secrets.OnChange(ctx, controllerID+"-secrets", controller.OnSecretChange)
+	// secrets.OnChange(ctx, controllerID+"-secrets", controller.OnSecretChange)
+	scopedOnChange(ctx, controllerID+"-secrets", systemNamespace, secrets, controller.OnSecretChange)
 	scopedOnRemove(ctx, controllerID+"-secrets-remove", systemNamespace, secrets, controller.OnSecretRemove)
 
 	registrations.OnChange(ctx, controllerID, controller.OnRegistrationChange)
@@ -675,6 +676,17 @@ func (h *handler) OnRegistrationRemove(name string, registrationObj *v1.Registra
 	}
 
 	return nil, nil
+}
+
+func scopedOnChange[T generic.RuntimeMetaObject](ctx context.Context, name, namespace string, c generic.ControllerMeta, sync generic.ObjectHandler[T]) {
+	condition := scopedOnRemoveConditionChecker(namespace)
+	onChangeHandler := generic.FromObjectHandlerToHandler(sync)
+	c.AddGenericHandler(ctx, name, func(key string, obj runtime.Object) (runtime.Object, error) {
+		if condition(obj) {
+			return onChangeHandler(key, obj)
+		}
+		return obj, nil
+	})
 }
 
 // TODO(wrangler/v4): revert to use OnRemove when it supports options (https://github.com/rancher/wrangler/pull/472).
