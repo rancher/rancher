@@ -275,6 +275,7 @@ func TestCreateProjectNSRole(t *testing.T) {
 		verb        string
 		namespace   string
 		projectName string
+		crSetup     func()
 		startingCR  *v1.ClusterRole
 		expectedCR  *v1.ClusterRole
 		createError error
@@ -369,20 +370,25 @@ func TestCreateProjectNSRole(t *testing.T) {
 			}
 		}
 
-		m := newManager(withClusterRoles(clusterRoles, &clientErrs{createError: test.createError}, ctrl))
+		crCreateCall := 0
+		m := newManager(withClusterRoles(clusterRoles, &clientErrs{createError: test.createError}, ctrl), func(m *manager) {
+			clusterRoles := wfakes.NewMockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
+			clusterRoles.EXPECT().Create(gomock.Any()).DoAndReturn(
+				func(In1 *v1.ClusterRole) (*v1.ClusterRole, error) {
+					crCreateCall++
+					if test.expectedErr != "" {
+						return nil, fmt.Errorf("%v", test.expectedErr)
+					}
+					return In1, nil
+				},
+			).AnyTimes()
+			m.clusterRoles = clusterRoles
+		})
 
 		roleName := fmt.Sprintf(projectNSGetClusterRoleNameFmt, test.projectName, projectNSVerbToSuffix[test.verb])
 		err := m.createProjectNSRole(roleName, test.verb, test.namespace, test.projectName)
 
-		crCreateCall := 0
-		crMock := wfakes.NewMockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
-		crMock.EXPECT().Create(gomock.Any()).DoAndReturn(
-			func() {
-				crCreateCall++
-			},
-		)
-		calls := crCreateCall
-		assert.Len(t, calls, 1)
+		assert.Equal(t, crCreateCall, 1)
 
 		if test.expectedErr != "" {
 			assert.ErrorContains(t, err, test.expectedErr, test.description)
