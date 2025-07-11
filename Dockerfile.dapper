@@ -2,15 +2,15 @@ FROM registry.suse.com/bci/golang:1.23
 
 ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
-ENV CATTLE_HELM_VERSION v2.16.8-rancher2
-ENV CATTLE_MACHINE_VERSION v0.15.0-rancher125
-ENV CATTLE_K3S_VERSION v1.31.1+k3s1
+ENV CATTLE_HELM_VERSION=v2.16.8-rancher2
+ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher125
+ENV CATTLE_K3S_VERSION=v1.31.1+k3s1
 # helm 3 version
-ENV HELM_VERSION v3.16.1
-ENV KUSTOMIZE_VERSION v5.4.2
-ENV HELM_UNITTEST_VERSION 0.3.2
+ENV HELM_VERSION=v3.16.1
+ENV KUSTOMIZE_VERSION=v5.4.2
+ENV HELM_UNITTEST_VERSION=0.3.2
 # k3d ci version
-ENV K3D_VERSION v5.7.1
+ENV K3D_VERSION=v5.7.1
 
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
 ENV CATTLE_KDM_BRANCH=dev-v2.10
@@ -27,17 +27,17 @@ RUN if [ "${ARCH}" != "s390x" ]; then \
         curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=${K3D_VERSION} bash; \
     fi
 
-ENV GOLANGCI_LINT v1.59.0
+ENV GOLANGCI_LINT=v1.59.0
 RUN if [ "${ARCH}" == "amd64" ]; then \
         curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s "${GOLANGCI_LINT}"; \
     fi
 
 # Tool for CRD generation.
-ENV CONTROLLER_GEN_VERSION v0.16.0
+ENV CONTROLLER_GEN_VERSION=v0.16.0
 RUN go install sigs.k8s.io/controller-tools/cmd/controller-gen@${CONTROLLER_GEN_VERSION}
 
 # YAML processor for release configuration.
-ENV YQ_VERSION v4.44.2
+ENV YQ_VERSION=v4.44.2
 RUN wget -q https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${ARCH}.tar.gz -O - | tar xz && mv yq_linux_${ARCH} /usr/bin/yq
 
 ENV HELM_URL_V2_amd64=https://github.com/rancher/helm/releases/download/${CATTLE_HELM_VERSION}/rancher-helm \
@@ -117,16 +117,18 @@ RUN curl -sLf https://github.com/rancher/k3s/releases/download/${CATTLE_K3S_VERS
 # Python related dependencies for the Integration/Validation tests.
 RUN zypper -n install python311-pip python311-base python311 python311-devel python311-tox libffi-devel libopenssl-devel
 
-ENV HELM_HOME /root/.helm
-ENV DAPPER_ENV REPO TAG CI DRONE_BUILD_NUMBER DRONE_TAG DRONE_COMMIT DRONE_BRANCH DRONE_BUILD_EVENT SYSTEM_CHART_DEFAULT_BRANCH GOGET_MODULE GOGET_VERSION RELEASE_ACTION RELEASE_TYPE POSTRELEASE_RANCHER_VERSION POSTRELEASE_RANCHER_STABLE DEBUG SOME_K8S_VERSION V2PROV_TEST_DIST V2PROV_TEST_RUN_REGEX V2PROV_DISTRO_DATA_DIR V2PROV_PROVISIONING_DATA_DIR V2PROV_SYSTEM_AGENT_DATA_DIR
-ENV DAPPER_SOURCE /go/src/github.com/rancher/rancher/
-ENV DAPPER_OUTPUT ./bin ./dist ./go.mod ./go.sum ./pkg/apis/go.mod ./pkg/apis/go.sum ./pkg/client/go.mod ./pkg/client/go.sum ./scripts/package ./pkg/settings/setting.go ./package/Dockerfile ./Dockerfile.dapper ./pkg/crds/yaml/generated
-ENV DAPPER_DOCKER_SOCKET true
+
+ENV HELM_HOME=/root/.helm
+ENV DAPPER_ENV="REPO TAG CI DRONE_BUILD_NUMBER DRONE_TAG DRONE_COMMIT DRONE_BRANCH DRONE_BUILD_EVENT SYSTEM_CHART_DEFAULT_BRANCH GOGET_MODULE GOGET_VERSION RELEASE_ACTION RELEASE_TYPE POSTRELEASE_RANCHER_VERSION POSTRELEASE_RANCHER_STABLE DEBUG SOME_K8S_VERSION V2PROV_TEST_DIST V2PROV_TEST_RUN_REGEX V2PROV_DISTRO_DATA_DIR V2PROV_PROVISIONING_DATA_DIR V2PROV_SYSTEM_AGENT_DATA_DIR"
+ENV DAPPER_SOURCE=/go/src/github.com/rancher/rancher/
+ENV DAPPER_OUTPUT="./bin ./dist ./go.mod ./go.sum ./pkg/apis/go.mod ./pkg/apis/go.sum ./pkg/client/go.mod ./pkg/client/go.sum ./scripts/package ./pkg/settings/setting.go ./package/Dockerfile ./Dockerfile.dapper ./pkg/crds/yaml/generated"
+ENV DAPPER_DOCKER_SOCKET=true
+
 ARG CI
 ARG DRONE_BUILD_NUMBER
-ENV DAPPER_RUN_ARGS "-v rancher2-go16-pkg-1:/go/pkg -v rancher2-go16-cache-1:/root/.cache/go-build --privileged --label CI=${CI} --label DRONE_BUILD_NUMBER=${DRONE_BUILD_NUMBER}"
-ENV GOCACHE /root/.cache/go-build
-ENV HOME ${DAPPER_SOURCE}
+ENV DAPPER_RUN_ARGS="-v rancher2-go16-pkg-1:/go/pkg -v rancher2-go16-cache-1:/root/.cache/go-build --privileged --label CI=${CI} --label DRONE_BUILD_NUMBER=${DRONE_BUILD_NUMBER}"
+ENV GOCACHE=/root/.cache/go-build
+ENV HOME=${DAPPER_SOURCE}
 
 # set up helm unittest - only needs to run on one arch. Needs to run after $HOME has been changed so we can find it later 
 RUN if [ "${ARCH}" == "amd64" ]; then \

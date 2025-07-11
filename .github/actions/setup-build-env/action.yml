@@ -48,11 +48,11 @@ runs:
         cd ${{ inputs.rancher_path }}
         source scripts/export-config
         CATTLE_KDM_BRANCH=$(grep -m1 'ARG CATTLE_KDM_BRANCH=' package/Dockerfile | cut -d '=' -f2)
-        CATTLE_K3S_VERSION=$(grep -m1 'ENV CATTLE_K3S_VERSION' package/Dockerfile | awk '{print $3}')
-        HELM_VERSION=$(grep -m1 'ENV HELM_VERSION' package/Dockerfile | awk '{print $3}')
-        CATTLE_HELM_VERSION=$(grep -m1 'ENV CATTLE_HELM_VERSION' package/Dockerfile | awk '{print $3}')
+        CATTLE_K3S_VERSION=$(grep -m1 'ENV CATTLE_K3S_VERSION=' package/Dockerfile | cut -d '=' -f2)
+        HELM_VERSION=$(grep -m1 'ENV HELM_VERSION=' package/Dockerfile.installer | cut -d '=' -f2)
+        CATTLE_HELM_VERSION=$(grep -m1 'ENV CATTLE_HELM_VERSION' package/Dockerfile | cut -d '=' -f2)
         GO_VERSION=$(grep -m1 'golang:' package/Dockerfile | cut -d ':' -f2 | cut -d ' ' -f1)
-        HELM_UNITTEST_VERSION=$(grep -m1 'ENV HELM_UNITTEST_VERSION' Dockerfile.dapper | awk '{print $3}')
+        HELM_UNITTEST_VERSION=$(grep -m1 'ENV HELM_UNITTEST_VERSION=' Dockerfile.dapper | cut -d '=' -f2)
         RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')
         if [[ -z "$RKE_VERSION" ]]; then
           RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $4}')
