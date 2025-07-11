@@ -114,7 +114,7 @@ if [ -z "$TARGET" ] || [ "$TARGET" = "server" ]; then
     --target server \
     --file ./package/Dockerfile .
 
-  if [ "$REPO" != "rancher" ]; then
+  if [ "$PUSH" = "true" ]; then
     docker push "${REPO}"/rancher:"${TAG}" &
   fi
 fi
@@ -127,7 +127,7 @@ if [ -z "$TARGET" ] || [ "$TARGET" = "agent" ]; then
     --target agent \
     --file ./package/Dockerfile .
 
-    if [ "$REPO" != "rancher" ]; then
+    if [ "$PUSH" = "true" ]; then
       docker push "${REPO}"/rancher-agent:"${TAG}" &
     fi
 fi
