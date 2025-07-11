@@ -333,11 +333,11 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 			crListGetCall := 0
 			crListerMock := wfakes.NewMockNonNamespacedCacheInterface[*v1.ClusterRole](ctrl)
 			crListerMock.EXPECT().Get(gomock.Any()).DoAndReturn(
-				func() (*v1.ClusterRole, error) {
+				func(name string) (*v1.ClusterRole, error) {
 					crListGetCall++
 					return tc.crListerMockGetResult, tc.crListerMockGetErr
 				},
-			)
+			).AnyTimes()
 
 			// setup ClusterRole mock: it will just return the passed ClusterRole or the error
 			clusterRolesCreateCall, clusterRolesUpdateCall, clusterRolesDeleteCall := 0, 0, 0
@@ -345,21 +345,21 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 			clusterRolesMock.EXPECT().Create(gomock.Any()).DoAndReturn(
 				func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
 					clusterRolesCreateCall++
-					return in1, tc.clusterRolesMockUpdateErr
+					return in1, tc.clusterRolesMockCreateErr
 				},
-			)
+			).AnyTimes()
 			clusterRolesMock.EXPECT().Update(gomock.Any()).DoAndReturn(
 				func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
 					clusterRolesUpdateCall++
 					return in1, tc.clusterRolesMockUpdateErr
 				},
-			)
+			).AnyTimes()
 			clusterRolesMock.EXPECT().Delete(gomock.Any(), gomock.Any()).DoAndReturn(
 				func(in1 *v1.ClusterRole, in2 *metav1.DeleteOptions) (*v1.ClusterRole, error) {
 					clusterRolesDeleteCall++
 					return in1, tc.clusterRolesMockDeleteErr
 				},
-			)
+			).AnyTimes()
 
 			manager := manager{
 				crLister:     crListerMock,
@@ -379,7 +379,7 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 				assert.Empty(t, crListGetCall)
 			} else {
 				// otherwise only one call to Get is expected
-				assert.Len(t, crListGetCall, 1)
+				assert.Equal(t, crListGetCall, 1)
 			}
 
 			// if result and err are nil the method should have not been called
@@ -387,7 +387,7 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 				assert.Empty(t, clusterRolesCreateCall)
 			} else {
 				// otherwise only one call to Get is expected, and the values should match
-				assert.Len(t, clusterRolesCreateCall, 1)
+				assert.Equal(t, clusterRolesCreateCall, 1)
 			}
 
 			// if result and err are nil the method should have not been called
@@ -395,7 +395,7 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 				assert.Empty(t, clusterRolesUpdateCall)
 			} else {
 				// otherwise only one call to Update is expected, and the values should match
-				assert.Len(t, clusterRolesUpdateCall, 1)
+				assert.Equal(t, clusterRolesUpdateCall, 1)
 			}
 
 			// if nil the method should have not been called
@@ -403,7 +403,7 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 				assert.Empty(t, clusterRolesDeleteCall)
 			} else {
 				// otherwise only one call to Delete is expected
-				assert.Len(t, clusterRolesDeleteCall, 1)
+				assert.Equal(t, clusterRolesDeleteCall, 1)
 			}
 		})
 	}
