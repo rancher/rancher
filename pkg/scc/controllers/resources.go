@@ -59,7 +59,7 @@ func (h *handler) prepareSecretSalt(secret *corev1.Secret) (*corev1.Secret, erro
 	existingLabels[consts.LabelObjectSalt] = generatedSalt
 	preparedSecret.SetLabels(existingLabels)
 
-	_, updateErr := h.patchUpdateSecret(secret, preparedSecret)
+	_, updateErr := h.secretRepo.RetryingPatchUpdate(secret, preparedSecret)
 	if updateErr != nil {
 		h.log.Error("error applying metadata updates to default SCC registration secret; cannot initialize secret salt value")
 		return nil, updateErr

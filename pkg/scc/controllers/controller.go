@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/rancher/rancher/pkg/scc/controllers/repos"
 	"github.com/rancher/rancher/pkg/scc/types"
 	"maps"
 	"slices"
@@ -78,6 +79,7 @@ type handler struct {
 	log                *logrus.Entry
 	registrations      registrationControllers.RegistrationController
 	registrationCache  registrationControllers.RegistrationCache
+	secretRepo         repos.SecretRepo
 	secrets            v1core.SecretController
 	secretCache        v1core.SecretCache
 	systemInfoExporter *systeminfo.InfoExporter
@@ -92,10 +94,14 @@ func Register(
 	systemInfoExporter *systeminfo.InfoExporter,
 ) {
 	controller := &handler{
-		log:                log.NewControllerLogger("registration-controller"),
-		ctx:                ctx,
-		registrations:      registrations,
-		registrationCache:  registrations.Cache(),
+		log:               log.NewControllerLogger("registration-controller"),
+		ctx:               ctx,
+		registrations:     registrations,
+		registrationCache: registrations.Cache(),
+		secretRepo: repos.SecretRepo{
+			Secrets:      secrets,
+			SecretsCache: secrets.Cache(),
+		},
 		secrets:            secrets,
 		secretCache:        secrets.Cache(),
 		systemInfoExporter: systemInfoExporter,
@@ -188,7 +194,7 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 			newSecret.Annotations[consts.LabelSccLastProcessed] = time.Now().Format(time.RFC3339)
 			maps.Copy(newSecret.Labels, params.Labels())
 
-			_, updateErr := h.patchUpdateSecret(incomingObj, newSecret)
+			_, updateErr := h.secretRepo.RetryingPatchUpdate(incomingObj, newSecret)
 			if updateErr != nil {
 				h.log.Error("error applying metadata updates to default SCC registration secret")
 				return nil, updateErr
@@ -231,7 +237,7 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 		maps.Copy(labels, params.Labels())
 		newSecret.Labels = labels
 
-		if _, err := h.patchUpdateSecret(incomingObj, newSecret); err != nil {
+		if _, err := h.secretRepo.RetryingPatchUpdate(incomingObj, newSecret); err != nil {
 			return incomingObj, err
 		}
 
@@ -241,7 +247,7 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 				return incomingObj, err
 			}
 
-			if err := h.createOrUpdateSecret(offlineCertSecret); err != nil {
+			if _, err := h.secretRepo.CreateOrUpdateSecret(offlineCertSecret); err != nil {
 				return incomingObj, err
 			}
 		}
@@ -252,7 +258,7 @@ func (h *handler) OnSecretChange(name string, incomingObj *corev1.Secret) (*core
 				return incomingObj, err
 			}
 
-			if err := h.createOrUpdateSecret(regCodeSecret); err != nil {
+			if _, err := h.secretRepo.CreateOrUpdateSecret(regCodeSecret); err != nil {
 				return incomingObj, err
 			}
 		}
