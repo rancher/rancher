@@ -5,12 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"maps"
-	"slices"
-
+	
 	"github.com/SUSE/connect-ng/pkg/registration"
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/scc/consts"
+	"github.com/rancher/rancher/pkg/scc/controllers/common"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -75,14 +74,7 @@ func (o *SecretManager) saveCertificateSecret() error {
 		offlineRequest.Data[consts.SecretKeyOfflineRegRequest] = o.offlineRequest
 	}
 
-	if o.finalizer != "" {
-		if offlineRequest.Finalizers == nil {
-			offlineRequest.Finalizers = []string{}
-		}
-		if !slices.Contains(offlineRequest.Finalizers, o.finalizer) {
-			offlineRequest.Finalizers = append(offlineRequest.Finalizers, o.finalizer)
-		}
-	}
+	offlineRequest, _ = common.SecretAddRegCodeFinalizer(offlineRequest)
 
 	labels := o.defaultLabels
 	if offlineRequest.Labels == nil {
@@ -141,6 +133,18 @@ func (o *SecretManager) OfflineCertificateReader() (io.Reader, error) {
 }
 
 func (o *SecretManager) RemoveOfflineCertificate() error {
+	currentSecret, err := o.secretCache.Get(o.secretNamespace, o.certificateSecretName)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
+	if removeFinalizerErr := o.removeOfflineFinalizer(currentSecret); removeFinalizerErr != nil {
+		return removeFinalizerErr
+	}
+
 	delErr := o.secrets.Delete(o.secretNamespace, o.certificateSecretName, &metav1.DeleteOptions{})
 	if delErr != nil && apierrors.IsNotFound(delErr) {
 		return nil

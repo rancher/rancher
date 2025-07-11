@@ -135,7 +135,6 @@ func (h *handler) prepareHandler(registrationObj *v1.Registration) SCCHandler {
 				h.systemNamespace,
 				offlineRequestSecretName,
 				offlineCertSecretName,
-				consts.FinalizerSccCredentials,
 				ref,
 				h.secrets,
 				h.secretCache,
@@ -152,7 +151,6 @@ func (h *handler) prepareHandler(registrationObj *v1.Registration) SCCHandler {
 		sccCredentials: credentials.New(
 			h.systemNamespace,
 			credsSecretName,
-			consts.FinalizerSccCredentials,
 			ref,
 			h.secrets,
 			h.secretCache,

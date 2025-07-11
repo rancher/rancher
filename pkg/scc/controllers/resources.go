@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/rancher/rancher/pkg/scc/consts"
+	"github.com/rancher/rancher/pkg/scc/controllers/common"
 	"github.com/rancher/rancher/pkg/scc/util"
 	"maps"
 	"slices"
@@ -253,11 +254,8 @@ func (h *handler) regCodeFromSecretEntrypoint(params RegistrationParams) (*corev
 	defaultLabels[consts.LabelSccSecretRole] = string(consts.RegistrationCode)
 	maps.Copy(regcodeSecret.Labels, defaultLabels)
 
-	if !slices.Contains(regcodeSecret.Finalizers, consts.FinalizerSccRegistrationCode) {
-		if regcodeSecret.Finalizers == nil {
-			regcodeSecret.Finalizers = []string{}
-		}
-		regcodeSecret.Finalizers = append(regcodeSecret.Finalizers, consts.FinalizerSccRegistrationCode)
+	if !common.SecretHasRegCodeFinalizer(regcodeSecret) {
+		regcodeSecret, _ = common.SecretAddRegCodeFinalizer(regcodeSecret)
 	}
 
 	return regcodeSecret, nil

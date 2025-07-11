@@ -35,6 +35,7 @@ const (
 )
 
 const (
+	FinalizerSccOfflineSecret    = "scc.cattle.io/managed-offline-secret"
 	FinalizerSccCredentials      = "scc.cattle.io/managed-credentials"
 	FinalizerSccRegistration     = "scc.cattle.io/managed-registration"
 	FinalizerSccRegistrationCode = "scc.cattle.io/managed-registration-code"

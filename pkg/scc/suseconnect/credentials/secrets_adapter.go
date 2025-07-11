@@ -2,16 +2,15 @@ package credentials
 
 import (
 	"fmt"
-	"github.com/rancher/rancher/pkg/scc/consts"
-	"maps"
-	"slices"
-
 	"github.com/SUSE/connect-ng/pkg/connection"
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/scc/consts"
+	"github.com/rancher/rancher/pkg/scc/controllers/common"
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"maps"
 )
 
 const (
@@ -23,7 +22,6 @@ const (
 type CredentialSecretsAdapter struct {
 	secretNamespace string
 	secretName      string
-	finalizerName   string
 	ownerRef        *metav1.OwnerReference
 	// TODO (dan) : let's make sure the lookups are handled via a secret cache
 	secrets     v1core.SecretController
@@ -34,7 +32,6 @@ type CredentialSecretsAdapter struct {
 
 func New(
 	namespace, name string,
-	finalizer string,
 	ownerRef *metav1.OwnerReference,
 	secrets v1core.SecretController,
 	secretCache v1core.SecretCache,
@@ -44,7 +41,6 @@ func New(
 	return &CredentialSecretsAdapter{
 		secretNamespace: namespace,
 		secretName:      name,
-		finalizerName:   finalizer,
 		ownerRef:        ownerRef,
 		secrets:         secrets,
 		secretCache:     secretCache,
@@ -111,14 +107,7 @@ func (c *CredentialSecretsAdapter) saveCredentials() error {
 		sccCreds.Data[TokenKey] = []byte(token)
 	}
 
-	if c.finalizerName != "" {
-		if sccCreds.Finalizers == nil {
-			sccCreds.Finalizers = []string{}
-		}
-		if !slices.Contains(sccCreds.Finalizers, c.finalizerName) {
-			sccCreds.Finalizers = append(sccCreds.Finalizers, c.finalizerName)
-		}
-	}
+	sccCreds, _ = common.SecretAddCredentialsFinalizer(sccCreds)
 
 	if sccCreds.Labels == nil {
 		sccCreds.Labels = c.labels
@@ -145,16 +134,14 @@ func (c *CredentialSecretsAdapter) Remove() error {
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
-	if slices.Contains(currentSecret.Finalizers, c.finalizerName) {
-		var newFinalizers []string
-		for _, finalizer := range currentSecret.Finalizers {
-			if finalizer != c.finalizerName {
-				newFinalizers = append(newFinalizers, finalizer)
-			}
-		}
-		currentSecret.Finalizers = newFinalizers
+	if currentSecret == nil {
+		return nil
+	}
 
-		if _, updateErr := c.secrets.Update(currentSecret); updateErr != nil {
+	if common.SecretHasCredentialsFinalizer(currentSecret) {
+		updatedSecret := currentSecret.DeepCopy()
+		updatedSecret, _ = common.SecretRemoveCredentialsFinalizer(updatedSecret)
+		if _, updateErr := c.secrets.Update(updatedSecret); updateErr != nil {
 			if apierrors.IsNotFound(updateErr) {
 				return nil
 			}
