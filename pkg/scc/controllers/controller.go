@@ -353,7 +353,7 @@ func (h *handler) cleanupRelatedSecretsByHash(contentHash string) error {
 			secretUpdated, _ = common.SecretRemoveRegCodeFinalizer(secretUpdated)
 			secretUpdated, updateErr = h.secretRepo.RetryingPatchUpdate(secret, secretUpdated)
 			if updateErr != nil {
-				h.log.Errorf("failed to update secret %s/%s: %w", secret.Namespace, secret.Name, updateErr)
+				h.log.Errorf("failed to update secret %s/%s: %v", secret.Namespace, secret.Name, updateErr)
 				return updateErr
 			}
 		}
@@ -426,7 +426,7 @@ func (h *handler) OnSecretRemove(name string, incomingObj *corev1.Secret) (*core
 							regUpdate.Finalizers = append(reg.Finalizers[:removeIndex], reg.Finalizers[removeIndex+1:]...)
 							_, err = h.patchUpdateRegistration(reg, regUpdate)
 							if err != nil {
-								h.log.Errorf("failed to patch registration %s/%s: %w", reg.Namespace, reg.Name, err)
+								h.log.Errorf("failed to patch registration %s/%s: %v", reg.Namespace, reg.Name, err)
 							}
 						}
 					}
@@ -449,8 +449,8 @@ func (h *handler) OnSecretRemove(name string, incomingObj *corev1.Secret) (*core
 			_, err := h.secretRepo.PatchUpdate(incomingObj, newSecret)
 			return err
 		}); err != nil {
-			h.log.Errorf("failed to remove SCC finalizer %s from secret %s/%s: %v", incomingObj.Namespace, incomingObj.Name, err)
-			return nil, fmt.Errorf("failed to remove SCC finalizer %s from secret %s/%s: %w", incomingObj.Namespace, incomingObj.Name, err)
+			h.log.Errorf("failed to remove SCC finalizer from secret %s/%s: %v", incomingObj.Namespace, incomingObj.Name, err)
+			return nil, fmt.Errorf("failed to remove SCC finalizer from secret %s/%s: %w", incomingObj.Namespace, incomingObj.Name, err)
 		}
 	}
 
@@ -669,7 +669,6 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 	return registrationObj, nil
 }
 
-// TODO: do we want a finalizer for preventing deregister from failing then deleting object?
 func (h *handler) OnRegistrationRemove(name string, registrationObj *v1.Registration) (*v1.Registration, error) {
 	if registrationObj == nil {
 		return nil, nil
@@ -681,8 +680,6 @@ func (h *handler) OnRegistrationRemove(name string, registrationObj *v1.Registra
 		h.log.Warn(deRegErr)
 	}
 
-	// TODO: owner finalizers handled here
-	// (alex) :  I don't think this is needed
 	err := h.registrations.Delete(name, &metav1.DeleteOptions{})
 	if err != nil {
 		return registrationObj, err

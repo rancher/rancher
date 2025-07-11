@@ -5,7 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	
+	"maps"
+
 	"github.com/SUSE/connect-ng/pkg/registration"
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/scc/consts"
