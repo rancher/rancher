@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -260,6 +261,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	// Only wait for ExtensionAPIServer if it was never validated before
 	skipWaitForExtensionAPIServer := ext.AggregationPreCheck(wranglerContext.API.APIService())
 
+	gcInterval, gcKeepCount := getSQLCacheGCValues(wranglerContext)
 	steve, err := steveserver.New(ctx, restConfig, &steveserver.Options{
 		ServerVersion:   settings.ServerVersion.Get(),
 		Controllers:     steveControllers,
@@ -269,7 +271,8 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		ClusterRegistry: opts.ClusterRegistry,
 		SQLCache:        features.UISQLCache.Enabled(),
 		SQLCacheFactoryOptions: factory.CacheFactoryOptions{
-			DefaultMaximumEventsCount: defaultSQLCacheMaxEventsCount,
+			GCInterval:  gcInterval,
+			GCKeepCount: gcKeepCount,
 		},
 		ExtensionAPIServer:            extensionAPIServer,
 		SkipWaitForExtensionAPIServer: skipWaitForExtensionAPIServer,
@@ -358,6 +361,36 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		aggregationRegistrationTimeout: opts.AggregationRegistrationTimeout,
 		kubeAggregationReadyChan:       kubeAggregationReadyChan,
 	}, nil
+}
+
+// settings aren't initialized yet so we need to use the regular client.
+func getSQLCacheGCValues(wranglerContext *wrangler.Context) (time.Duration, int) {
+	interval, _ := time.ParseDuration(settings.SQLCacheGCInterval.Default)
+	gcIntervalSetting, err := wranglerContext.Mgmt.Setting().Get(settings.SQLCacheGCInterval.Name, metav1.GetOptions{})
+	if err != nil {
+		logrus.Warnf("Unable to fetch %s setting (will use default): %v", settings.SQLCacheGCInterval.Name, err)
+	} else {
+		dur, err := time.ParseDuration(gcIntervalSetting.Value)
+		if err != nil {
+			logrus.Warnf("Invalid GC interval %q: %v", gcIntervalSetting.Value, err)
+		} else {
+			interval = dur
+		}
+	}
+
+	keepCount, _ := strconv.Atoi(settings.SQLCacheGCKeepCount.Default)
+	gcKeepCountSetting, err := wranglerContext.Mgmt.Setting().Get(settings.SQLCacheGCKeepCount.Name, metav1.GetOptions{})
+	if err != nil {
+		logrus.Warnf("Unable to fetch %s setting (will use default): %v", settings.SQLCacheGCKeepCount.Name, err)
+	} else {
+		count, err := strconv.Atoi(gcKeepCountSetting.Value)
+		if err != nil {
+			logrus.Warnf("Invalid GC keep count %q: %v", gcKeepCountSetting.Value, err)
+		} else {
+			keepCount = count
+		}
+	}
+	return interval, keepCount
 }
 
 func (r *Rancher) Start(ctx context.Context) error {

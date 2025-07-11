@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	authsettings "github.com/rancher/rancher/pkg/auth/settings"
@@ -367,6 +368,9 @@ var (
 	// (by default every 5 minutes, or as soon as the cluster is edited, whichever comes first).
 	// Valid values: ture, false
 	ImportedClusterVersionManagement = NewSetting("imported-cluster-version-management", "true")
+
+	SQLCacheGCInterval  = NewSetting("sql-cache-gc-interval", "15m")
+	SQLCacheGCKeepCount = NewSetting("sql-cache-gc-keep-count", "1000")
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.
@@ -465,6 +469,23 @@ func (s Setting) Get() string {
 		return s.Default
 	}
 	return provider.Get(s.Name)
+}
+
+// GetDuration will return the currently stored value of the setting as a time.Duration.
+// If the stored value is not a duration then the default value will be returned as a duration.
+// If the default value is not a duration then the function will return 0
+func (s Setting) GetDuration() time.Duration {
+	v := s.Get()
+	dur, err := time.ParseDuration(v)
+	if err == nil {
+		return dur
+	}
+	logrus.Errorf("failed to parse setting %s=%s as time.Duration: %v", s.Name, v, err)
+	dur, err = time.ParseDuration(s.Default)
+	if err != nil {
+		return 0
+	}
+	return dur
 }
 
 // GetInt will return the currently stored value of the setting as an integer.
