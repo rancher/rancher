@@ -344,23 +344,18 @@ func (h *handler) cleanupRelatedSecretsByHash(contentHash string) error {
 	})
 
 	for _, secret := range secrets {
-		if !slices.Contains(secret.Finalizers, consts.FinalizerSccCredentials) || !slices.Contains(secret.Finalizers, consts.FinalizerSccRegistrationCode) {
-			continue
-		}
+		if common.SecretHasCredentialsFinalizer(secret) ||
+			common.SecretHasRegCodeFinalizer(secret) {
 
-		if retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			var remainingFin []string
-			for _, finalizer := range secret.Finalizers {
-				if finalizer != consts.FinalizerSccCredentials && finalizer != consts.FinalizerSccRegistrationCode {
-					remainingFin = append(remainingFin, finalizer)
-				}
+			var updateErr error
+			secretUpdated := secret.DeepCopy()
+			secretUpdated, _ = common.SecretRemoveCredentialsFinalizer(secretUpdated)
+			secretUpdated, _ = common.SecretRemoveRegCodeFinalizer(secretUpdated)
+			secretUpdated, updateErr = h.secretRepo.RetryingPatchUpdate(secret, secretUpdated)
+			if updateErr != nil {
+				h.log.Errorf("failed to update secret %s/%s: %w", secret.Namespace, secret.Name, updateErr)
+				return updateErr
 			}
-			secret.Finalizers = remainingFin
-
-			_, updateErr := h.secrets.Update(secret)
-			return updateErr
-		}); retryErr != nil {
-			return retryErr
 		}
 
 		deleteErr := h.secrets.Delete(secret.Namespace, secret.Name, &metav1.DeleteOptions{})
@@ -407,37 +402,55 @@ func (h *handler) OnSecretRemove(name string, incomingObj *corev1.Secret) (*core
 
 		return incomingObj, nil
 	}
-	finalizers := incomingObj.GetFinalizers()
-	for i, finalizer := range finalizers {
-		// check if we are ready to remove the finalizer
-		if finalizer == consts.FinalizerSccCredentials {
-			refs := incomingObj.GetOwnerReferences()
-			danglingRefs := 0
-			for _, ref := range refs {
-				if ref.APIVersion == v1.SchemeGroupVersion.String() &&
-					ref.Kind == "Registration" {
-					_, err := h.registrations.Get(ref.Name, metav1.GetOptions{})
-					if apierrors.IsNotFound(err) {
-						continue
-					} else {
+
+	if common.SecretHasCredentialsFinalizer(incomingObj) ||
+		common.SecretHasRegCodeFinalizer(incomingObj) {
+		refs := incomingObj.GetOwnerReferences()
+		danglingRefs := 0
+		for _, ref := range refs {
+			if ref.APIVersion == v1.SchemeGroupVersion.String() &&
+				ref.Kind == "Registration" {
+				reg, err := h.registrations.Get(ref.Name, metav1.GetOptions{})
+				if apierrors.IsNotFound(err) {
+					continue
+				} else {
+					if reg.DeletionTimestamp == nil {
 						danglingRefs++
+					} else {
+						// TODO(alex): verify this logic when you are back
+						// When reg is marked to delete too - we may need to help clean it up
+						regFinalizers := reg.GetFinalizers()
+						if len(regFinalizers) > 0 && slices.Contains(regFinalizers, consts.FinalizerSccRegistration) {
+							regUpdate := reg.DeepCopy()
+							removeIndex := slices.Index(regFinalizers, consts.FinalizerSccRegistration)
+							regUpdate.Finalizers = append(reg.Finalizers[:removeIndex], reg.Finalizers[removeIndex+1:]...)
+							_, err = h.patchUpdateRegistration(reg, regUpdate)
+							if err != nil {
+								h.log.Errorf("failed to patch registration %s/%s: %w", reg.Namespace, reg.Name, err)
+							}
+						}
 					}
 				}
 			}
-			if danglingRefs > 0 {
-				h.log.Errorf("cannot remove finalizer %s from secret %s/%s, dangling references to Registration found", finalizer, incomingObj.Namespace, incomingObj.Name)
-				return nil, fmt.Errorf("cannot remove finalizer %s from secret %s/%s, dangling references to Registration found", finalizer, incomingObj.Namespace, incomingObj.Name)
-			}
-			newSecret := incomingObj.DeepCopy()
-			newSecret.SetFinalizers(append(finalizers[:i], finalizers[i+1:]...))
-			logrus.Info("Removing finalizer from secret", newSecret.Name, "in namespace", newSecret.Namespace)
-			if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-				_, err := h.secrets.Update(newSecret)
-				return err
-			}); err != nil {
-				h.log.Errorf("failed to remove finalizer %s from secret %s/%s: %v", finalizer, incomingObj.Namespace, incomingObj.Name, err)
-				return nil, fmt.Errorf("failed to remove finalizer %s from secret %s/%s: %w", finalizer, incomingObj.Namespace, incomingObj.Name, err)
-			}
+		}
+		if danglingRefs > 0 {
+			h.log.Errorf("cannot remove SCC finalizer from secret %s/%s, dangling references to Registration found", incomingObj.Namespace, incomingObj.Name)
+			return nil, fmt.Errorf("cannot remove SCC finalizer from secret %s/%s, dangling references to Registration found", incomingObj.Namespace, incomingObj.Name)
+		}
+		newSecret := incomingObj.DeepCopy()
+		if common.SecretHasCredentialsFinalizer(newSecret) {
+			newSecret, _ = common.SecretRemoveCredentialsFinalizer(newSecret)
+		}
+		if common.SecretHasRegCodeFinalizer(newSecret) {
+			newSecret, _ = common.SecretRemoveRegCodeFinalizer(newSecret)
+		}
+		logrus.Info("Removing finalizer from secret", newSecret.Name, "in namespace", newSecret.Namespace)
+		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			_, err := h.secretRepo.PatchUpdate(incomingObj, newSecret)
+			return err
+		}); err != nil {
+			h.log.Errorf("failed to remove SCC finalizer %s from secret %s/%s: %v", incomingObj.Namespace, incomingObj.Name, err)
+			return nil, fmt.Errorf("failed to remove SCC finalizer %s from secret %s/%s: %w", incomingObj.Namespace, incomingObj.Name, err)
 		}
 	}
 
