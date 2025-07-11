@@ -72,15 +72,15 @@ fi
 export CATTLE_AGENT_IMAGE=${CATTLE_AGENT_IMAGE:-rancher/rancher-agent:${TAG:-head}}
 echo "Using Rancher agent image $CATTLE_AGENT_IMAGE"
 
-eval "$(grep '^ENV CATTLE_SYSTEM_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
-eval "$(grep '^ENV CATTLE_WINS_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
-eval "$(grep '^ENV CATTLE_CSI_PROXY_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
-eval "$(grep '^ENV CATTLE_KDM_BRANCH' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
+eval "$(grep '^ENV CATTLE_SYSTEM_AGENT' package/Dockerfile | awk '{print "export " $2}')"
+eval "$(grep '^ENV CATTLE_WINS_AGENT' package/Dockerfile | awk '{print "export " $2}')"
+eval "$(grep '^ENV CATTLE_CSI_PROXY_AGENT' package/Dockerfile | awk '{print "export " $2}')"
+eval "$(grep '^ENV CATTLE_KDM_BRANCH' package/Dockerfile | awk '{print "export " $2}')"
 
-eval "$(grep '^ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
-eval "$(grep '^ENV CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
-eval "$(grep '^ENV CATTLE_SYSTEM_AGENT_VERSION' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
-eval "$(grep '^ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
+eval "$(grep '^ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION' package/Dockerfile | awk '{print "export " $2}')"
+eval "$(grep '^ENV CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX' package/Dockerfile | awk '{print "export " $2}')"
+eval "$(grep '^ENV CATTLE_SYSTEM_AGENT_VERSION' package/Dockerfile | awk '{print "export " $2}')"
+eval "$(grep '^ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE' package/Dockerfile | awk '{print "export " $2}')"
 
 export CATTLE_RANCHER_WEBHOOK_VERSION=$(yq '.webhookVersion' < build.yaml)
 export CATTLE_REMOTEDIALER_PROXY_VERSION=$(yq '.remoteDialerProxyVersion' < build.yaml)

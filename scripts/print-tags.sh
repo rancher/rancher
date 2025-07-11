@@ -7,7 +7,7 @@ else
     tag=$1
 fi
 
-CATTLE_VER=$(curl https://raw.githubusercontent.com/rancher/rancher/$tag/server/Dockerfile 2>/dev/null | grep 'ENV CATTLE_CATTLE_VERSION' | awk '{print $3}')
+CATTLE_VER=$(curl https://raw.githubusercontent.com/rancher/rancher/$tag/server/Dockerfile 2>/dev/null | grep 'ENV CATTLE_CATTLE_VERSION=' | cut -d '=' -f2)
 
 echo -e "\nPrinting project/service tag information for Rancher tag $tag. $master"
 
