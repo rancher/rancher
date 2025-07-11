@@ -1,0 +1,22 @@
+environments:
+  debug:
+    kubeContext: debug
+
+repositories:
+
+  - name: rancher
+    url: https://releases.rancher.com/server-charts/stable
+
+  - name: marketplace
+    url: https://charts.rancher.io
+
+releases:
+
+  - name: rancher
+    chart: ../chart
+    namespace: rancher
+    version: 2.11.3
+    labels:
+      app: rancher
+    values:
+      - rancher-values.yaml

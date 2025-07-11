@@ -1,0 +1,29 @@
+replicas: 1
+
+# username is admin
+bootstrapPassword: "my-password"
+
+ingress:
+  enabled: true
+  hostname: rancher.org.cloud.stemys.ch
+  annotations:
+    # aws load-balancer controller annotations specific to aws-eks
+    # ensure TLS termination is configured on the ALB
+    # from https://kubernetes-sigs.github.io/aws-load-balancer-controller/v2.2/guide/ingress/annotations/
+    alb.ingress.kubernetes.io/target-type: ip # because service type: ClusterIP
+    alb.ingress.kubernetes.io/scheme: internet-facing # internet-facing or internal
+    alb.ingress.kubernetes.io/group.name: cluster
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:999999999999:certificate/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxx
+    alb.ingress.kubernetes.io/ssl-redirect: '443' # enforcing encrypted connections: any ALB HTTP requests are redirected to HTTPS on port 443
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 1Gi
+  limits:
+    memory: 1Gi
+
+useBundledSystemChart: false
+
+postDelete:
+  enabled: false

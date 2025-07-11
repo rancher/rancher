@@ -77,28 +77,14 @@ spec:
         ports:
         - containerPort: 80
           protocol: TCP
-{{- if (and .Values.hostPort (gt (int .Values.hostPort) 0)) }}
-        - containerPort: 444
-          hostPort: {{ int .Values.hostPort }}
-          protocol: TCP
-{{- end}}
         - containerPort: 6666
           protocol: TCP
         args:
-{{- if .Values.debug }}
         - "--debug"
-{{- end }}
-{{- if .Values.privateCA }}
-        # Private CA - don't clear ca certs
-{{- else if and (eq .Values.tls "ingress") (eq .Values.ingress.tls.source "rancher") }}
-        # Rancher self-signed - don't clear ca certs
-{{- else }}
-        # Public trusted CA - clear ca certs
         - "--no-cacerts"
-{{- end }}
         - "--http-listen-port=80"
         - "--https-listen-port=443"
-        - "--add-local={{ .Values.addLocal }}"
+        - "--add-local=true"
         env:
         - name: CATTLE_NAMESPACE
           value: {{ .Release.Namespace }}
@@ -147,10 +133,6 @@ spec:
               name: "bootstrap-secret"
               key: "bootstrapPassword"
 {{- end }}
-{{- if .Values.agentTLSMode }}
-        - name: CATTLE_AGENT_TLS_MODE
-          value: "{{ .Values.agentTLSMode }}"
-{{- end }}
         - name: IMPERATIVE_API_DIRECT
           value: "true"
         - name: IMPERATIVE_API_APP_SELECTOR
@@ -193,23 +175,6 @@ spec:
         resources: {{- toYaml .Values.resources | nindent 10 }}
         {{- end }}
         volumeMounts:
-{{- if .Values.additionalTrustedCAs }}
-        - mountPath: /etc/pki/trust/anchors/ca-additional.pem
-          name: tls-ca-additional-volume
-          subPath: ca-additional.pem
-          readOnly: true
-        - mountPath: /etc/rancher/ssl/ca-additional.pem
-          name: tls-ca-additional-volume
-          subPath: ca-additional.pem
-          readOnly: true
-{{- end }}
-{{- if .Values.privateCA }}
-        # Pass CA cert into rancher for private CA
-        - mountPath: /etc/rancher/ssl/cacerts.pem
-          name: tls-ca-volume
-          subPath: cacerts.pem
-          readOnly: true
-{{- end }}
 {{- if and .Values.customLogos.enabled (or (eq .Values.customLogos.volumeKind "persistentVolumeClaim") (and (eq .Values.customLogos.volumeKind "configMap") (.Values.customLogos.volumeName))) }}
         # Mount rancher custom-logos volume
         - mountPath: /usr/share/rancher/ui/assets/images/logos
@@ -240,18 +205,6 @@ spec:
   {{- end }}
 {{- end }}
       volumes:
-{{- if .Values.additionalTrustedCAs }}
-      - name: tls-ca-additional-volume
-        secret:
-          defaultMode: 0400
-          secretName: tls-ca-additional
-{{- end }}
-{{- if .Values.privateCA }}
-      - name: tls-ca-volume
-        secret:
-          defaultMode: 0400
-          secretName: tls-ca
-{{- end }}
 {{- if .Values.auditLog.enabled }}
   {{- if eq .Values.auditLog.destination "hostPath" }}
       - name: audit-log
