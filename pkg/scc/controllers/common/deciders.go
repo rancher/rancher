@@ -28,9 +28,7 @@ func RegistrationNeedsSyncNow(regIn *v1.Registration) bool {
 }
 
 func RegistrationHasNotStarted(regIn *v1.Registration) bool {
-	return regIn.Status.RegistrationProcessedTS.IsZero() ||
-		!regIn.HasCondition(v1.RegistrationConditionOfflineRequestReady) ||
-		v1.RegistrationConditionOfflineRequestReady.IsFalse(regIn)
+	return regIn.Status.RegistrationProcessedTS.IsZero()
 }
 
 func RegistrationNeedsActivation(regIn *v1.Registration) bool {

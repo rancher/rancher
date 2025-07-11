@@ -49,7 +49,9 @@ type sccOnlineMode struct {
 }
 
 func (s sccOnlineMode) NeedsRegistration(registrationObj *v1.Registration) bool {
-	return common.RegistrationHasNotStarted(registrationObj)
+	return common.RegistrationHasNotStarted(registrationObj) ||
+		!registrationObj.HasCondition(v1.RegistrationConditionSccUrlReady) ||
+		!registrationObj.HasCondition(v1.RegistrationConditionAnnounced)
 }
 
 // PrepareForRegister creates the necessary SCC creds secret and secret reference
