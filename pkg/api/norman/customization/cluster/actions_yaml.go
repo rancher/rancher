@@ -1,27 +1,19 @@
 package cluster
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"time"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
-	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/types"
-	"github.com/rancher/norman/types/convert"
 	clusterclient "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
-	"github.com/rancher/rancher/pkg/generated/compose"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/kubectl"
-	"github.com/rancher/rancher/pkg/ref"
 	schema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -79,86 +71,6 @@ func (a ActionHandler) ImportYamlHandler(actionName string, action *types.Action
 		apiContext.WriteResponse(http.StatusBadRequest, rtn)
 	}
 
-	return nil
-}
-
-func (a ActionHandler) ExportYamlHandler(actionName string, action *types.Action, apiContext *types.APIContext) error {
-	cluster, err := a.ClusterClient.Get(apiContext.ID, v1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	if cluster.Status.Driver != v32.ClusterDriverRKE {
-		return fmt.Errorf("cluster %v does not support being exported", cluster.Name)
-	}
-
-	topkey := compose.Config{}
-	topkey.Version = "v3"
-	c := mgmtclient.Cluster{}
-	if err := convert.ToObj(cluster.Spec, &c); err != nil {
-		return err
-	}
-	topkey.Clusters = map[string]mgmtclient.Cluster{}
-	topkey.Clusters[cluster.Spec.DisplayName] = c
-
-	// if driver is rancherKubernetesEngine, add any nodePool if found
-	if cluster.Status.Driver == v32.ClusterDriverRKE {
-		nodepools, err := a.NodepoolGetter.NodePools(cluster.Name).List(v1.ListOptions{})
-		if err != nil {
-			return err
-		}
-		topkey.NodePools = map[string]mgmtclient.NodePool{}
-		for _, nodepool := range nodepools.Items {
-			n := mgmtclient.NodePool{}
-			if err := convert.ToObj(nodepool.Spec, &n); err != nil {
-				return err
-			}
-			n.ClusterID = cluster.Spec.DisplayName
-			namespace, id := ref.Parse(nodepool.Spec.NodeTemplateName)
-			nodeTemplate, err := a.NodeTemplateGetter.NodeTemplates(namespace).Get(id, v1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			n.NodeTemplateID = nodeTemplate.Spec.DisplayName
-			topkey.NodePools[nodepool.Name] = n
-		}
-	}
-
-	m, err := convert.EncodeToMap(topkey)
-	if err != nil {
-		return err
-	}
-	delete(m["clusters"].(map[string]interface{})[cluster.Spec.DisplayName].(map[string]interface{}), "actions")
-	delete(m["clusters"].(map[string]interface{})[cluster.Spec.DisplayName].(map[string]interface{}), "links")
-	for name := range topkey.NodePools {
-		delete(m["nodePools"].(map[string]interface{})[name].(map[string]interface{}), "actions")
-		delete(m["nodePools"].(map[string]interface{})[name].(map[string]interface{}), "links")
-	}
-
-	data, err := json.Marshal(m)
-	if err != nil {
-		return err
-	}
-	buf, err := yaml.JSONToYAML(data)
-	if err != nil {
-		return err
-	}
-	if apiContext.ResponseFormat == "yaml" {
-		reader := bytes.NewReader(buf)
-		apiContext.Response.Header().Set("Content-Type", "application/yaml")
-		http.ServeContent(apiContext.Response, apiContext.Request, "exportYaml", time.Now(), reader)
-		return nil
-	}
-	r := v32.ExportOutput{
-		YAMLOutput: string(buf),
-	}
-	jsonOutput, err := json.Marshal(r)
-	if err != nil {
-		return err
-	}
-	reader := bytes.NewReader(jsonOutput)
-	apiContext.Response.Header().Set("Content-Type", "application/json")
-	http.ServeContent(apiContext.Response, apiContext.Request, "exportYaml", time.Now(), reader)
 	return nil
 }
 

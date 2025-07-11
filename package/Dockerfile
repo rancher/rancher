@@ -8,11 +8,11 @@ ARG CATTLE_KDM_BRANCH=dev-v2.12
 
 ARG VERSION=${VERSION}
 
-FROM registry.suse.com/bci/bci-micro:15.6 AS final
+FROM registry.suse.com/bci/bci-micro:15.7 AS final
 RUN : # No-op command to create an explicit layer - this fixes a weird buildkit/buildx bug on macos arm
 
 # Temporary build stage image
-FROM registry.suse.com/bci/bci-base:15.6 AS chroot-builder
+FROM registry.suse.com/bci/bci-base:15.7 AS chroot-builder
 # Install system packages using builder image that has zypper
 COPY --from=final / /chroot/
 # Install some packages with zypper in the chroot of the final micro image
@@ -58,7 +58,6 @@ RUN mkdir -p /var/lib/rancher-data/local-catalogs/v2 && \
     git config --global url."https://github.com/rancher/".insteadOf https://git.rancher.io/ && \
     # Charts need to be copied into the sha256 value of git url computed in https://github.com/rancher/rancher/blob/5ebda9ac23c06e9647b586ec38aa51cc9ff9b031/pkg/catalogv2/git/download.go#L102 to create a unique folder per url
     git clone --no-checkout -b $CHART_DEFAULT_BRANCH --depth 1 https://git.rancher.io/charts /var/lib/rancher-data/local-catalogs/v2/rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721
-
 
 FROM builder AS partner-charts
 ARG PARTNER_CHART_DEFAULT_BRANCH
@@ -125,6 +124,7 @@ WORKDIR /var/lib/rancher
 ARG ARCH
 ARG ETCD_UNSUPPORTED_ARCH
 ARG IMAGE_REPO=rancher
+ARG IMAGE_NAME=rancher
 ARG CHART_DEFAULT_BRANCH
 ARG PARTNER_CHART_DEFAULT_BRANCH
 ARG RKE2_CHART_DEFAULT_BRANCH
@@ -133,29 +133,29 @@ ARG CATTLE_KDM_BRANCH
 ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
-ENV CATTLE_MACHINE_VERSION v0.15.0-rancher128
-ENV CATTLE_K3S_VERSION v1.32.1+k3s1
+ENV CATTLE_MACHINE_VERSION v0.15.0-rancher130
+ENV CATTLE_K3S_VERSION v1.33.1+k3s1
 ENV CATTLE_MACHINE_PROVISION_IMAGE rancher/machine:${CATTLE_MACHINE_VERSION}
-ENV CATTLE_ETCD_VERSION v3.5.16
+ENV CATTLE_ETCD_VERSION v3.5.21
 ENV DOCKER_MACHINE_LINODE_VERSION v0.1.15
 ENV LINODE_UI_DRIVER_VERSION v0.7.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
 ENV DOCKER_MACHINE_HARVESTER_VERSION v1.0.2
 ENV CATTLE_KDM_BRANCH ${CATTLE_KDM_BRANCH}
-ENV CATTLE_WINS_AGENT_VERSION v0.5.1
+ENV CATTLE_WINS_AGENT_VERSION v0.5.2-rc.1
 ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
 ENV CATTLE_WINS_AGENT_UNINSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/uninstall.ps1
 ENV CATTLE_WINS_AGENT_UPGRADE_IMAGE rancher/wins:${CATTLE_WINS_AGENT_VERSION}
 ENV CATTLE_CSI_PROXY_AGENT_VERSION v1.1.3
 # make sure the CATTLE_SYSTEM_AGENT_VERSION is consistent with tests/v2/codecoverage/package/Dockerfile
-ENV CATTLE_SYSTEM_AGENT_VERSION v0.3.13-rc.2
+ENV CATTLE_SYSTEM_AGENT_VERSION v0.3.13-rc.3
 ENV CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX https://github.com/rancher/system-agent/releases/download
 ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE rancher/system-agent:${CATTLE_SYSTEM_AGENT_VERSION}-suc
 ENV CATTLE_SYSTEM_AGENT_INSTALLER_IMAGE rancher/system-agent-installer-
 # make sure the ENV CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT is consistent with pkg/settings/setting.go to utlize the local version of install script downloaded during build/package
 ENV CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT ${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/install.sh
 ENV CATTLE_SYSTEM_AGENT_UNINSTALL_SCRIPT ${CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX}/${CATTLE_SYSTEM_AGENT_VERSION}/system-agent-uninstall.sh
-ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION 106.0.0
+ENV CATTLE_SYSTEM_UPGRADE_CONTROLLER_CHART_VERSION 107.0.0
 
 # AKS,EKS,GKE Operator charts versions
 ARG CATTLE_AKS_OPERATOR_VERSION
@@ -199,7 +199,7 @@ RUN curl -LO https://github.com/harvester/docker-machine-driver-harvester/releas
 ENV ETCD_URL=https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}.tar.gz
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.32.1-k3s1 \
+COPY --from=rancher/k3s:v1.33.1-k3s1 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \
@@ -245,9 +245,10 @@ RUN mkdir -p /var/lib/rancher/k3s/agent/images/ && \
     curl -sfL ${ETCD_URL} | tar xvzf - --strip-components=1 --no-same-owner -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
-ENV CATTLE_UI_VERSION 2.12.0-alpha2
-ENV CATTLE_DASHBOARD_UI_VERSION v2.12.0-alpha2
-ENV CATTLE_CLI_VERSION v2.11.0-rc.1
+ENV CATTLE_UI_VERSION 2.12.0-alpha11
+ENV CATTLE_DASHBOARD_UI_VERSION v2.12.0-alpha11
+
+ENV CATTLE_CLI_VERSION v2.12.0-rc.1
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
 ENV CATTLE_BASE_UI_BRAND=
@@ -303,7 +304,7 @@ ENV ETCD_UNSUPPORTED_ARCH ${ETCD_UNSUPPORTED_ARCH}
 FROM --platform=$BUILDPLATFORM go-builder AS images
 WORKDIR /src
 ENV CGO_ENABLED=1
-ENV CATTLE_K3S_VERSION v1.32.1+k3s1
+ENV CATTLE_K3S_VERSION v1.33.1+k3s1
 RUN zypper -n install libbtrfs-devel libgpgme-devel
 COPY hack/airgap/go.mod hack/airgap/go.sum /src/
 RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
@@ -329,11 +330,9 @@ RUN --mount=type=cache,target=/root/.cache,id=rancher cd pkg/client && go mod do
 FROM --platform=$BUILDPLATFORM rancher-go-builder AS server-build
 ARG VERSION
 ARG COMMIT
-ARG RKE_VERSION
 ARG TAGS="k8s"
 ARG LINKFLAGS="-extldflags -static -s"
-ARG DEFAULT_VALUES="{\"rke-version\":\"${RKE_VERSION}\"}"
-ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X github.com/rancher/rancher/pkg/version.GitCommit=${COMMIT} -X github.com/rancher/rancher/pkg/settings.InjectDefaults=${DEFAULT_VALUES} ${LINKFLAGS}"
+ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X github.com/rancher/rancher/pkg/version.GitCommit=${COMMIT} ${LINKFLAGS}"
 ARG TARGETOS
 ARG TARGETARCH
 COPY pkg/ pkg/
@@ -365,7 +364,7 @@ ENV CATTLE_BASE_UI_BRAND=$BASE_UI_BRAND
 ENV RANCHER_VERSION_TYPE=$RANCHER_VERSION_TYPE
 ENV CATTLE_SERVER_VERSION ${VERSION}
 ENV CATTLE_AGENT_IMAGE ${IMAGE_REPO}/rancher-agent:${VERSION}
-ENV CATTLE_SERVER_IMAGE ${IMAGE_REPO}/rancher
+ENV CATTLE_SERVER_IMAGE ${IMAGE_REPO}/${IMAGE_NAME}
 
 COPY --chown=root:root --chmod=0755 \
     --from=server-build /app/rancher /usr/bin/

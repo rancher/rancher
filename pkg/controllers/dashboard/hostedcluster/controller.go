@@ -23,26 +23,32 @@ const priorityClassKey = "priorityClassName"
 var (
 	AksCrdChart = chart.Definition{
 		ReleaseNamespace: "cattle-system",
+		ReleaseName:      "rancher-aks-operator-crd",
 		ChartName:        "rancher-aks-operator-crd",
 	}
 	AksChart = chart.Definition{
 		ReleaseNamespace: "cattle-system",
+		ReleaseName:      "rancher-aks-operator",
 		ChartName:        "rancher-aks-operator",
 	}
 	EksCrdChart = chart.Definition{
 		ReleaseNamespace: "cattle-system",
+		ReleaseName:      "rancher-eks-operator-crd",
 		ChartName:        "rancher-eks-operator-crd",
 	}
 	EksChart = chart.Definition{
 		ReleaseNamespace: "cattle-system",
+		ReleaseName:      "rancher-eks-operator",
 		ChartName:        "rancher-eks-operator",
 	}
 	GkeCrdChart = chart.Definition{
 		ReleaseNamespace: "cattle-system",
+		ReleaseName:      "rancher-gke-operator-crd",
 		ChartName:        "rancher-gke-operator-crd",
 	}
 	GkeChart = chart.Definition{
 		ReleaseNamespace: "cattle-system",
+		ReleaseName:      "rancher-gke-operator",
 		ChartName:        "rancher-gke-operator",
 	}
 )
@@ -111,6 +117,7 @@ func (h handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster, 
 	if err := h.manager.Ensure(
 		toInstallCrdChart.ReleaseNamespace,
 		toInstallCrdChart.ChartName,
+		toInstallCrdChart.ReleaseName,
 		toInstallCrdChartVersion,
 		"",
 		nil,
@@ -149,6 +156,7 @@ func (h handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster, 
 	if err := h.manager.Ensure(
 		toInstallChart.ReleaseNamespace,
 		toInstallChart.ChartName,
+		toInstallChart.ReleaseName,
 		toInstallChartVersion,
 		"",
 		chartValues,

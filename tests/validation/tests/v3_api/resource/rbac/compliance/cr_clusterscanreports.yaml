@@ -1,0 +1,6 @@
+apiVersion: compliance.cattle.io/v1
+kind: ClusterScanReport
+metadata:
+  name: report-sample
+spec:
+  benchmarkVersion: k3s-ssb-1.0

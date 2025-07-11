@@ -12,6 +12,12 @@
         "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test1"
       },
       "metadata": {
+        "fields": [
+          "test1",
+          "Opaque",
+          0,
+          "0s"
+        ],
         "labels": {
           "test.cattle.io/steveapi": "nondeterministicid"
         },
@@ -35,6 +41,12 @@
         "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test2"
       },
       "metadata": {
+        "fields": [
+          "test2",
+          "Opaque",
+          0,
+          "0s"
+        ],
         "labels": {
           "test-label": "2",
           "test.cattle.io/steveapi": "nondeterministicid"
@@ -59,6 +71,12 @@
         "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test3"
       },
       "metadata": {
+        "fields": [
+          "test3",
+          "Opaque",
+          0,
+          "0s"
+        ],
         "labels": {
           "test-label-gte": "3",
           "test.cattle.io/steveapi": "nondeterministicid"
@@ -83,6 +101,12 @@
         "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test4"
       },
       "metadata": {
+        "fields": [
+          "test4",
+          "Opaque",
+          0,
+          "0s"
+        ],
         "labels": {
           "test-label-gte": "3",
           "test.cattle.io/steveapi": "nondeterministicid"
@@ -107,6 +131,12 @@
         "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test5"
       },
       "metadata": {
+        "fields": [
+          "test5",
+          "Opaque",
+          0,
+          "0s"
+        ],
         "labels": {
           "test-label-gte": "3",
           "test.cattle.io/steveapi": "nondeterministicid"

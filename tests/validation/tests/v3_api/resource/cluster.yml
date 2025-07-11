@@ -39,7 +39,7 @@ services:
                - cattle-neuvector-system
                - cattle-monitoring-system
                - rancher-alerting-drivers
-               - cis-operator-system
+               - rancher-compliance-system
                - cattle-csp-adapter-system
                - cattle-externalip-system
                - cattle-gatekeeper-system

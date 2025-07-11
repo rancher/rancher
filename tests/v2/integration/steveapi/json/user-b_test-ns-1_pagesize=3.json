@@ -1,5 +1,6 @@
 {
   "actions": {},
+  "continue": "nondeterministictoken",
   "count": 5,
   "data": [
     {
@@ -12,6 +13,12 @@
         "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test1"
       },
       "metadata": {
+        "fields": [
+          "test1",
+          "Opaque",
+          0,
+          "0s"
+        ],
         "labels": {
           "test.cattle.io/steveapi": "nondeterministicid"
         },
@@ -35,6 +42,12 @@
         "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test2"
       },
       "metadata": {
+        "fields": [
+          "test2",
+          "Opaque",
+          0,
+          "0s"
+        ],
         "labels": {
           "test-label": "2",
           "test.cattle.io/steveapi": "nondeterministicid"
@@ -59,6 +72,12 @@
         "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test3"
       },
       "metadata": {
+        "fields": [
+          "test3",
+          "Opaque",
+          0,
+          "0s"
+        ],
         "labels": {
           "test-label-gte": "3",
           "test.cattle.io/steveapi": "nondeterministicid"
@@ -77,7 +96,11 @@
   "links": {
     "self": "https://rancherurl/v1/secrets/test-ns-1"
   },
-  "pages": 2,
+  "pagination": {
+    "first": "https://rancherurl/v1/secrets/test-ns-1",
+    "next": "https://rancherurl/v1/secrets/test-ns-1?continue=nondeterministictoken\u0026filter=metadata.labels%5Btest.cattle.io%2Fsteveapi%5D~MYTAG\u0026pagesize=3",
+    "partial": true
+  },
   "resourceType": "secret",
   "revision": "100",
   "type": "collection"

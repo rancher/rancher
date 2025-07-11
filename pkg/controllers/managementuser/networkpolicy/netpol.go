@@ -17,7 +17,6 @@ import (
 	rnetworkingv1 "github.com/rancher/rancher/pkg/generated/norman/networking.k8s.io/v1"
 
 	cluster2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
-	rkecluster "github.com/rancher/rke/cluster"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	knetworkingv1 "k8s.io/api/networking/v1"
@@ -38,6 +37,7 @@ const (
 	defaultSystemProjectNamespacePolicyName = "np-default-allow-all"
 	hostNetworkPolicyName                   = "hn-nodes"
 	creatorNorman                           = "norman"
+	calicoNetworkPlugin                     = "calico"
 )
 
 var ErrNodeNotFound = errors.New("node not found")
@@ -120,7 +120,7 @@ func (npmgr *netpolMgr) programNetworkPolicy(projectID string, clusterNamespace 
 
 		// add an allow all network policy to system project namespaces
 		// this is the same as having no network policy, i.e. it allows all ingress and egress traffic to/from the namespace
-		// this is needed to ensure CIS Scans pass. See: https://github.com/rancher/rancher/issues/30211 for more info
+		// this is needed to ensure Compliance Scans pass. See: https://github.com/rancher/rancher/issues/30211 for more info
 		// we also guard against overriding existing network policies, the default network policy for a namespace in the system project
 		// will only be added if there are no other network policies in the namespace (network policies are additive)
 		if systemNamespaces[aNS.Name] {
@@ -203,13 +203,13 @@ func (npmgr *netpolMgr) handleHostNetwork(clusterNamespace string) error {
 
 	// This for loop builds CNI specific host network policies to allow traffic from ingress controllers through to endpoints.
 	// Calico nodes require special handling. Calico has the following routing modes: IP in IP, VXLAN, and Direct.
-	// RKE1 deploys calico with IP in IP routing, while RKE2 deploys calico with VXLAN routing.
+	// RKE2 deploys calico with VXLAN routing.
 	// When calico sends traffic to pods, the source IP address changes to either the IPIP tunnel address or the VXLAN tunnel address,
 	// depending on the routing mode. These are the IPs that the host network policy needs to use.
 	var policies []knetworkingv1.NetworkPolicyPeer
 	for _, node := range nodes {
 		// for calico, we get the IPs for the hn-nodes policy from the tunnel address annotations, which are managed by calico-node
-		if cni == rkecluster.CalicoNetworkPlugin { // RKE1/2 use the same "calico" value
+		if cni == calicoNetworkPlugin {
 			tunnelAddr, ok := node.Annotations[calicoIPIPTunnelAddrAnno]
 			if !ok {
 				tunnelAddr = node.Annotations[calicoVXLANTunnelAddrAnno]
@@ -312,10 +312,6 @@ func (npmgr *netpolMgr) getClusterCNI(clusterName string, node *corev1.Node) (st
 		return npmgr.getImportedRke2ClusterCNI(node)
 	}
 
-	if cluster.Spec.RancherKubernetesEngineConfig != nil {
-		return cluster.Spec.RancherKubernetesEngineConfig.Network.Plugin, nil
-	}
-
 	return "", nil
 }
 
@@ -354,7 +350,7 @@ func (npmgr *netpolMgr) getRKE2ClusterCNI(mgmtCluster *v3.Cluster) (string, erro
 func (npmgr *netpolMgr) getImportedRke2ClusterCNI(node *corev1.Node) (string, error) {
 	if node != nil {
 		if node.Annotations[calicoIPv4AddrAnno] != "" || node.Annotations[calicoIPv6AddrAnno] != "" {
-			return rkecluster.CalicoNetworkPlugin, nil
+			return calicoNetworkPlugin, nil
 		}
 		return "", nil
 	}

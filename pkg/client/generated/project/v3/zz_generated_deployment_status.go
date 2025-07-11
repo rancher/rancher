@@ -8,6 +8,7 @@ const (
 	DeploymentStatusFieldObservedGeneration  = "observedGeneration"
 	DeploymentStatusFieldReadyReplicas       = "readyReplicas"
 	DeploymentStatusFieldReplicas            = "replicas"
+	DeploymentStatusFieldTerminatingReplicas = "terminatingReplicas"
 	DeploymentStatusFieldUnavailableReplicas = "unavailableReplicas"
 	DeploymentStatusFieldUpdatedReplicas     = "updatedReplicas"
 )
@@ -19,6 +20,7 @@ type DeploymentStatus struct {
 	ObservedGeneration  int64                 `json:"observedGeneration,omitempty" yaml:"observedGeneration,omitempty"`
 	ReadyReplicas       int64                 `json:"readyReplicas,omitempty" yaml:"readyReplicas,omitempty"`
 	Replicas            int64                 `json:"replicas,omitempty" yaml:"replicas,omitempty"`
+	TerminatingReplicas *int64                `json:"terminatingReplicas,omitempty" yaml:"terminatingReplicas,omitempty"`
 	UnavailableReplicas int64                 `json:"unavailableReplicas,omitempty" yaml:"unavailableReplicas,omitempty"`
 	UpdatedReplicas     int64                 `json:"updatedReplicas,omitempty" yaml:"updatedReplicas,omitempty"`
 }

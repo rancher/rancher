@@ -1,0 +1,167 @@
+name: Restart CI Tests for CI Testing PRs
+on:
+  workflow_run:
+    workflows: ["*"]
+    types:
+      - completed
+    branches:
+      - 'ci_testing_*'
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write # Vault access
+
+jobs:
+  restart-ci:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: "Read some Secrets"
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/github/pr-actions-write-app/credentials appId | APP_ID;
+            secret/data/github/repo/${{ github.repository }}/github/pr-actions-write-app/credentials privateKey | PRIVATE_KEY
+
+      - name: "Create temporary token"
+        uses: actions/create-github-app-token@v2
+        id: app-token
+        with:
+          app-id: ${{ env.APP_ID }}
+          private-key: ${{ env.PRIVATE_KEY }}
+          permission-actions: write
+
+      - name: Clear sensitive variables
+        run: |
+          echo "PRIVATE_KEY=" >> $GITHUB_ENV
+          echo "APP_ID=" >> $GITHUB_ENV
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Find CI testing PR
+        id: find-pr
+        run: |
+          BRANCH_NAME="${{ github.event.workflow_run.head_branch }}"
+          PR_NUMBER=$(gh pr list --head "$BRANCH_NAME" --json number -q '.[0].number')
+          if [[ -n "$PR_NUMBER" ]]; then
+            echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+            echo "branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
+            echo "workflow_id=${{ github.event.workflow_run.workflow_id }}" >> $GITHUB_OUTPUT
+            echo "run_id=${{ github.event.workflow_run.id }}" >> $GITHUB_OUTPUT
+            echo "workflow_name=${{ github.event.workflow_run.name }}" >> $GITHUB_OUTPUT
+          else
+            echo "No PR found for branch $BRANCH_NAME"
+            exit 0
+          fi
+
+      - name: Get settings from PR
+        id: pr-settings
+        if: steps.find-pr.outputs.pr_number
+        run: |
+          PR_BODY=$(gh pr view "${{ steps.find-pr.outputs.pr_number }}" --json body -q '.body')
+
+          MAX_ATTEMPTS=$(echo "$PR_BODY" | grep -o "MAX_CI_ATTEMPTS: \`[0-9]*\`" | sed "s/MAX_CI_ATTEMPTS: \`//; s/\`$//")
+          echo "Extracted MAX_ATTEMPTS: $MAX_ATTEMPTS"
+
+          if [[ ! "$MAX_ATTEMPTS" =~ ^[0-9]+$ ]]; then
+            echo "Warning: Could not extract valid MAX_ATTEMPTS, using default."
+            MAX_ATTEMPTS=20
+          fi
+          echo "max_attempts=$MAX_ATTEMPTS" >> $GITHUB_OUTPUT
+
+          INCLUDE_LINE=$(echo "$PR_BODY" | grep "INCLUDE_PATTERNS:")
+          if [[ -n "$INCLUDE_LINE" ]]; then
+            INCLUDE_PATTERNS=$(echo "$INCLUDE_LINE" | sed 's/INCLUDE_PATTERNS: \`\(.*\)\`$/\1/')
+            echo "include_patterns=$INCLUDE_PATTERNS" >> $GITHUB_OUTPUT
+          fi
+
+          EXCLUDE_LINE=$(echo "$PR_BODY" | grep "EXCLUDE_PATTERNS:")
+          if [[ -n "$EXCLUDE_LINE" ]]; then
+            EXCLUDE_PATTERNS=$(echo "$EXCLUDE_LINE" | sed 's/EXCLUDE_PATTERNS: \`\(.*\)\`$/\1/')
+            echo "exclude_patterns=$EXCLUDE_PATTERNS" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get current workflow attempt
+        id: current-attempt
+        if: steps.find-pr.outputs.pr_number
+        run: |
+          WORKFLOW_NAME="${{ steps.find-pr.outputs.workflow_name }}"
+          CURRENT_ATTEMPT=$(gh api "repos/${{ github.repository }}/actions/runs/${{ steps.find-pr.outputs.run_id }}" --jq '.run_attempt')
+          echo "value=$CURRENT_ATTEMPT" >> $GITHUB_OUTPUT
+          MAX_ATTEMPTS=${{ steps.pr-settings.outputs.max_attempts }}
+
+          if (( CURRENT_ATTEMPT >= MAX_ATTEMPTS )); then
+            echo "✅ Workflow '$WORKFLOW_NAME' reached limit: $CURRENT_ATTEMPT of $MAX_ATTEMPTS attempts"
+            echo "reached_limit=true" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️ Workflow '$WORKFLOW_NAME' under limit: $CURRENT_ATTEMPT of $MAX_ATTEMPTS attempts"
+            echo "reached_limit=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Restart workflow if under limit
+        if: steps.find-pr.outputs.pr_number && steps.current-attempt.outputs.reached_limit != 'true'
+        env:
+          # Needs write permissions to Actions
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          echo "Restart workflow '${{ steps.find-pr.outputs.workflow_name }}'"
+          gh api --method POST "repos/${{ github.repository }}/actions/runs/${{ steps.find-pr.outputs.run_id }}/rerun"
+
+      - name: Check if all workflows have reached limit
+        if: steps.find-pr.outputs.pr_number && steps.current-attempt.outputs.reached_limit == 'true'
+        env:
+          REPOSITORY: ${{ github.repository }}
+          INCLUDE_PATTERNS: ${{ steps.pr-settings.outputs.include_patterns }}
+          EXCLUDE_PATTERNS: ${{ steps.pr-settings.outputs.exclude_patterns }}
+        run: |
+          PR_NUMBER="${{ steps.find-pr.outputs.pr_number }}"
+          BRANCH="${{ steps.find-pr.outputs.branch }}"
+          MAX_ATTEMPTS=${{ steps.pr-settings.outputs.max_attempts }}
+
+          INCOMPLETE_WORKFLOWS=0
+
+          BRANCH_WORKFLOW_RUNS=$(gh api "repos/${{ github.repository }}/actions/runs" \
+            -X GET \
+            -f branch="$BRANCH" \
+            --paginate \
+            --jq '.workflow_runs[] | {workflow_id: .workflow_id, name: .name, attempt: .run_attempt, conclusion: .conclusion}')
+
+          WORKFLOW_IDS=$(echo "$BRANCH_WORKFLOW_RUNS" | jq -r '.workflow_id' | sort -u)
+
+          for WORKFLOW_ID in $WORKFLOW_IDS; do
+            WORKFLOW_NAME=$(echo "$BRANCH_WORKFLOW_RUNS" | jq -r "select(.workflow_id == $WORKFLOW_ID) | .name" | head -1)
+            COMPLETED_RUNS=$(echo "$BRANCH_WORKFLOW_RUNS" | jq -r "select(.workflow_id == $WORKFLOW_ID and (.conclusion == \"success\" or .conclusion == \"failure\" or .conclusion == \"cancelled\"))" | jq -s '.')
+            HIGHEST_RUN=$(echo "$COMPLETED_RUNS" | jq 'sort_by(.attempt) | reverse | .[0]')
+
+            if [[ -n "$HIGHEST_RUN" && "$HIGHEST_RUN" != "null" ]]; then
+              HIGHEST_ATTEMPT=$(echo "$HIGHEST_RUN" | jq -r '.attempt')
+              RUN_CONCLUSION=$(echo "$HIGHEST_RUN" | jq -r '.conclusion')
+
+              if (( HIGHEST_ATTEMPT >= MAX_ATTEMPTS )); then
+                echo "✅ Workflow '$WORKFLOW_NAME' reached limit: $HIGHEST_ATTEMPT of $MAX_ATTEMPTS attempts (conclusion: $RUN_CONCLUSION)"
+              else
+                echo "⚠️ Workflow '$WORKFLOW_NAME' under limit: $HIGHEST_ATTEMPT of $MAX_ATTEMPTS attempts (conclusion: $RUN_CONCLUSION)"
+                INCOMPLETE_WORKFLOWS=$((INCOMPLETE_WORKFLOWS + 1))
+              fi
+            else
+              echo "⚠️ No completed runs found for workflow '$WORKFLOW_NAME'"
+              INCOMPLETE_WORKFLOWS=$((INCOMPLETE_WORKFLOWS + 1))
+            fi
+          done
+
+          echo "Incomplete workflows: $INCOMPLETE_WORKFLOWS"
+          if [[ "$INCOMPLETE_WORKFLOWS" -eq 0 ]]; then
+            echo "All workflows have reached their attempt limits. Closing PR..."
+
+            if FAILURE_REPORT=$(python3 .github/scripts/list-ci-failures-for-pr.py "$PR_NUMBER" 2>&1); then
+              gh pr close "$PR_NUMBER" --comment "$FAILURE_REPORT" --delete-branch
+            else
+              echo "❌ Failure report could not be generated."
+              gh pr close "$PR_NUMBER" --comment "Closing PR after completing all CI test runs ($MAX_ATTEMPTS per workflow)" --delete-branch
+            fi
+          fi

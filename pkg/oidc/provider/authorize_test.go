@@ -117,7 +117,7 @@ func TestAuthEndpoint(t *testing.T) {
 				}
 			},
 			wantHttpCode: http.StatusFound,
-			wantRedirect: fakeServerUrl + "/dashboard/auth/login?client_id=client-id&code_challenge=code-challenge&redirect_uri=https%3A%2F%2Fwww.rancher.com&response_type=code&scope=openid",
+			wantRedirect: fakeServerUrl + "/dashboard/auth/login?client_id=client-id&code_challenge=code-challenge&code_challenge_method=S256&redirect_uri=https%3A%2F%2Fwww.rancher.com&response_type=code&scope=openid",
 		},
 		"redirect to login page if Rancher token does not match": {
 			req: func() *http.Request {
@@ -145,7 +145,7 @@ func TestAuthEndpoint(t *testing.T) {
 				}, nil)
 			},
 			wantHttpCode: http.StatusFound,
-			wantRedirect: fakeServerUrl + "/dashboard/auth/login?client_id=client-id&code_challenge=code-challenge&redirect_uri=https%3A%2F%2Fwww.rancher.com&response_type=code&scope=openid",
+			wantRedirect: fakeServerUrl + "/dashboard/auth/login?client_id=client-id&code_challenge=code-challenge&code_challenge_method=S256&redirect_uri=https%3A%2F%2Fwww.rancher.com&response_type=code&scope=openid",
 		},
 		"response type not supported": {
 			req: func() *http.Request {

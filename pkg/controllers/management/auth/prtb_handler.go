@@ -22,7 +22,6 @@ import (
 const (
 	projectResource    = "projects"
 	ptrbMGMTController = "mgmt-auth-prtb-controller"
-	updatePSAVerb      = "updatepsa"
 )
 
 var projectManagementPlaneResources = map[string]string{
@@ -171,22 +170,11 @@ func (p *prtbLifecycle) reconcileBindings(binding *v3.ProjectRoleTemplateBinding
 		}
 		return err
 	}
-	canUpdatePSA, err := p.mgr.canUpdatePSA(binding.RoleTemplateName)
-	if err != nil {
-		return err
-	}
-
-	var projectRoleNames []string
+	var projectRoleName string
 	if isOwnerRole {
-		projectRoleNames = append(projectRoleNames, strings.ToLower(fmt.Sprintf("%s-projectowner", projectName)))
-	} else if canUpdatePSA {
-		// in this specific case we are going to create multiple roles
-		// in particular, we are going to add a special role who can perform controlled actions on the namespaces PSA labels.
-		projectRoleNames = append(projectRoleNames, strings.ToLower(fmt.Sprintf("%s-projectpsa", projectName)))
-		projectRoleNames = append(projectRoleNames, strings.ToLower(fmt.Sprintf("%s-projectmember", projectName)))
+		projectRoleName = strings.ToLower(fmt.Sprintf("%s-projectowner", projectName))
 	} else {
-		// if no special verbs are found, we create only the <project_name>-projectmember role
-		projectRoleNames = append(projectRoleNames, strings.ToLower(fmt.Sprintf("%s-projectmember", projectName)))
+		projectRoleName = strings.ToLower(fmt.Sprintf("%s-projectmember", projectName))
 	}
 
 	subject, err := pkgrbac.BuildSubjectFromRTB(binding)
@@ -194,11 +182,8 @@ func (p *prtbLifecycle) reconcileBindings(binding *v3.ProjectRoleTemplateBinding
 		return err
 	}
 	rtbNsAndName := pkgrbac.GetRTBLabel(binding.ObjectMeta)
-	for _, projectRoleName := range projectRoleNames {
-		// depending on the number of roles collected above, we create them accordingly.
-		if err := p.mgr.ensureProjectMembershipBinding(projectRoleName, rtbNsAndName, clusterName, proj, isOwnerRole, subject); err != nil {
-			return err
-		}
+	if err := p.mgr.ensureProjectMembershipBinding(projectRoleName, rtbNsAndName, clusterName, proj, isOwnerRole, subject); err != nil {
+		return err
 	}
 	if err := p.mgr.ensureClusterMembershipBinding(roleName, rtbNsAndName, cluster, false, subject); err != nil {
 		return err

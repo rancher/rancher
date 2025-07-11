@@ -22,7 +22,7 @@ jobs:
     uses: ./.github/workflows/unit-test.yml
   build-chart:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: registry.suse.com/bci/bci-base:latest
+    container: registry.suse.com/bci/bci-base:15.7
     steps:
       - name: install dependencies
         shell: bash
@@ -64,21 +64,6 @@ jobs:
   integration-tests:
     needs: [build-server, build-agent]
     uses: ./.github/workflows/integration-tests.yml
-    with:
-      parent_run_id: ${{ github.run_id }}
   provisioning-tests:
     needs: [build-server, build-agent]
     uses: ./.github/workflows/provisioning-tests.yml
-    with:
-      parent_run_id: ${{ github.run_id }}
-  build-agent-windows:
-    strategy:
-      matrix:
-        os: [windows]
-        version: [2019, 2022]
-    runs-on: ${{ matrix.os }}-${{ matrix.version }}
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    - name: Build Windows Agent Image
-      run: docker build -t ${{ env.IMAGE_AGENT }}:${{ env.TAG }} --build-arg VERSION=${{ env.COMMIT }} --build-arg SERVERCORE_VERSION=ltsc${{ matrix.version }} -f package/windows/Dockerfile.agent .

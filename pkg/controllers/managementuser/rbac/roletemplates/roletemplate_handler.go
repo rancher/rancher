@@ -1,7 +1,6 @@
 package roletemplates
 
 import (
-	"errors"
 	"slices"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -15,7 +14,6 @@ import (
 
 const (
 	clusterRoleOwnerAnnotation = "authz.cluster.cattle.io/clusterrole-owner"
-	aggregationLabel           = "management.cattle.io/aggregates"
 	projectContext             = "project"
 )
 
@@ -62,8 +60,10 @@ func (rth *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.Rol
 // clusterRolesForRoleTemplate builds and returns all needed Cluster Roles for the RoleTemplate using the given rules.
 func (rth *roleTemplateHandler) clusterRolesForRoleTemplate(rt *v3.RoleTemplate) ([]*rbacv1.ClusterRole, error) {
 	res := []*rbacv1.ClusterRole{}
+	// We extract the promoted rules from the RoleTemplate, so we don't want to modify the original object
+	rtCopy := rt.DeepCopy()
 
-	if rt.Context == projectContext {
+	if rtCopy.Context == projectContext {
 		// ClusterRoles for promoted rules
 		var promotedClusterRoles []*rbacv1.ClusterRole
 		var err error
@@ -76,40 +76,12 @@ func (rth *roleTemplateHandler) clusterRolesForRoleTemplate(rt *v3.RoleTemplate)
 	}
 
 	// If the RoleTemplate refers to an external cluster role, don't modify/create it. Instead we will aggregate it.
-	if !rt.External {
-		res = append(res, rbac.BuildClusterRole(rbac.ClusterRoleNameFor(rt.Name), rt.Name, rt.Rules))
+	if !rtCopy.External {
+		res = append(res, rbac.BuildClusterRole(rbac.ClusterRoleNameFor(rtCopy.Name), rtCopy.Name, rtCopy.Rules))
 	}
-	res = append(res, rbac.BuildAggregatingClusterRole(rt, rbac.ClusterRoleNameFor))
+	res = append(res, rbac.BuildAggregatingClusterRole(rtCopy, rbac.ClusterRoleNameFor))
 
 	return res, nil
-}
-
-// OnRemove deletes all ClusterRoles created by the RoleTemplate
-func (rth *roleTemplateHandler) OnRemove(_ string, rt *v3.RoleTemplate) (*v3.RoleTemplate, error) {
-	var returnedErrors error
-
-	crName := rbac.ClusterRoleNameFor(rt.Name)
-	acrName := rbac.AggregatedClusterRoleNameFor(crName)
-
-	returnedErrors = rth.removeLabelFromExternalRole(rt)
-
-	// if the cluster role is external don't delete the external cluster role
-	if !rt.External {
-		returnedErrors = rbac.DeleteResource(crName, rth.crController)
-	}
-
-	returnedErrors = errors.Join(returnedErrors, rbac.DeleteResource(acrName, rth.crController))
-
-	if rt.Context == projectContext {
-		promotedCRName := rbac.PromotedClusterRoleNameFor(crName)
-		promotedACRName := rbac.AggregatedClusterRoleNameFor(promotedCRName)
-		returnedErrors = errors.Join(returnedErrors,
-			rbac.DeleteResource(promotedCRName, rth.crController),
-			rbac.DeleteResource(promotedACRName, rth.crController),
-		)
-	}
-
-	return nil, returnedErrors
 }
 
 // buildPromotedClusterRoles looks for promoted rules in a project role template and creates required promoted cluster roles.
@@ -216,34 +188,8 @@ func (rth *roleTemplateHandler) addLabelToExternalRole(rt *v3.RoleTemplate) erro
 		externalRole.Labels = map[string]string{}
 	}
 
-	if val, ok := externalRole.Labels[aggregationLabel]; !ok || val != rbac.ClusterRoleNameFor(rt.Name) {
-		externalRole.Labels[aggregationLabel] = rbac.ClusterRoleNameFor(rt.Name)
-		if _, err := rth.crController.Update(externalRole); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// removeLabelFromExternalRole removes the aggregation label from the external role.
-// It is a no-op if the RoleTemplate does not have an external role.
-func (rth *roleTemplateHandler) removeLabelFromExternalRole(rt *v3.RoleTemplate) error {
-	if !rt.External {
-		return nil
-	}
-
-	externalRole, err := rth.crController.Get(rt.Name, metav1.GetOptions{})
-	if err != nil {
-		return err
-	}
-
-	if externalRole.Labels == nil {
-		return nil
-	}
-
-	if _, ok := externalRole.Labels[aggregationLabel]; ok {
-		delete(externalRole.Labels, aggregationLabel)
+	if val, ok := externalRole.Labels[rbac.AggregationLabel]; !ok || val != rbac.ClusterRoleNameFor(rt.Name) {
+		externalRole.Labels[rbac.AggregationLabel] = rbac.ClusterRoleNameFor(rt.Name)
 		if _, err := rth.crController.Update(externalRole); err != nil {
 			return err
 		}

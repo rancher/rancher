@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -25,8 +26,10 @@ const (
 	nodeRoleControlPlane       = "node-role.kubernetes.io/controlplane"
 	nodeRoleControlPlaneHyphen = "node-role.kubernetes.io/control-plane"
 	nodeRoleETCD               = "node-role.kubernetes.io/etcd"
-	nodeRoleMaster             = "node-role.kubernetes.io/master"
 	agentVersionUpgraded       = "agent.cluster.cattle.io/upgraded-v1.22"
+
+	// quietPeriod marks the minimum period between sync calls for the same Cluster
+	quietPeriod = time.Second * 10
 )
 
 var numericReg = regexp.MustCompile("[^0-9]")
@@ -35,6 +38,9 @@ type StatsAggregator struct {
 	NodesLister    v3.NodeLister
 	Clusters       v3.ClusterInterface
 	ClusterManager *clustermanager.Manager
+
+	// lastReconcile is a map[string]time.Time storing the last execution time of the sync reconciler for every Cluster key
+	lastReconcile sync.Map
 }
 
 type ClusterNodeData struct {
@@ -62,16 +68,39 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 
 func (s *StatsAggregator) sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
 	if cluster == nil {
+		s.lastReconcile.Delete(key)
 		return nil, nil
 	}
 
-	return nil, s.aggregate(cluster, cluster.Name)
+	if d := s.getMininumWaitTime(key); d > 0 {
+		// re-enqueue this controller after the quiet period
+		s.Clusters.Controller().EnqueueAfter(cluster.Namespace, cluster.Name, d)
+		return nil, nil
+	}
+
+	updated, err := s.aggregate(cluster)
+	if err == nil {
+		s.lastReconcile.Store(key, time.Now())
+	}
+	return updated, err
 }
 
-func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) error {
+func (s *StatsAggregator) getMininumWaitTime(key string) time.Duration {
+	if v, ok := s.lastReconcile.Load(key); ok {
+		lastReconcile := v.(time.Time)
+		if wait := quietPeriod - time.Since(lastReconcile); wait > 0 {
+			// only return positive values
+			// the workqueue implementation accounts for negative or zero values, but let's play safe
+			return wait
+		}
+	}
+	return 0
+}
+
+func (s *StatsAggregator) aggregate(cluster *v3.Cluster) (*v3.Cluster, error) {
 	allMachines, err := s.NodesLister.List(cluster.Name, labels.Everything())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	workerCounts := make(map[string]int)
@@ -80,7 +109,7 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 	for _, m := range allMachines {
 		// if none are set, then nodes syncer has not completed
 		if !m.Spec.Worker && !m.Spec.ControlPlane && !m.Spec.Etcd {
-			return errors.Errorf("node role cannot be determined because node %s has not finished syncing. retrying", m.Status.NodeName)
+			return nil, errors.Errorf("node role cannot be determined because node %s has not finished syncing. retrying", m.Status.NodeName)
 		}
 		if isTaintedNoExecuteNoSchedule(m) && !m.Spec.Worker {
 			continue
@@ -145,10 +174,10 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 			lcpu.Add(*limits.Cpu())
 		}
 
-		if condDisk == v1.ConditionTrue && v32.ClusterConditionNoDiskPressure.IsTrue(machine) {
+		if v32.ClusterConditionNoDiskPressure.IsTrue(machine) {
 			condDisk = v1.ConditionFalse
 		}
-		if condMem == v1.ConditionTrue && v32.ClusterConditionNoMemoryPressure.IsTrue(machine) {
+		if v32.ClusterConditionNoMemoryPressure.IsTrue(machine) {
 			condMem = v1.ConditionFalse
 		}
 	}
@@ -172,15 +201,10 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 	if cluster.Status.Version != nil {
 		oldVersion, err = minorVersion(cluster)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 	versionChanged := s.updateVersion(cluster)
-
-	if statusChanged(origStatus, &cluster.Status) || versionChanged {
-		_, err = s.Clusters.Update(cluster)
-		return err
-	}
 
 	// If the cluster went through an upgrade from <=1.21 to >=1.22, restart
 	// the cluster agent in order to restart controllers that will no longer work
@@ -188,17 +212,20 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster, clusterName string) err
 	if versionChanged && !cluster.Spec.Internal {
 		newVersion, err := minorVersion(cluster)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if newVersion >= 22 && oldVersion <= 21 {
 			err := s.restartAgentDeployment(cluster)
 			if err != nil {
-				return err
+				return nil, err
 			}
 		}
 	}
 
-	return nil
+	if statusChanged(origStatus, &cluster.Status) || versionChanged {
+		return s.Clusters.Update(cluster)
+	}
+	return nil, nil
 }
 
 func minorVersion(cluster *v3.Cluster) (int, error) {
@@ -317,16 +344,20 @@ func callWithTimeout(do func()) {
 }
 
 func (s *StatsAggregator) machineChanged(key string, machine *v3.Node) (runtime.Object, error) {
-	if machine != nil {
-		s.Clusters.Controller().Enqueue("", machine.Namespace)
+	if machine == nil {
+		return nil, nil
 	}
+
+	d := s.getMininumWaitTime(machine.Namespace)
+	s.Clusters.Controller().EnqueueAfter("", machine.Namespace, d)
+
 	return nil, nil
 }
 
 func isTaintedNoExecuteNoSchedule(m *v3.Node) bool {
 	for _, taint := range m.Spec.InternalNodeSpec.Taints {
 		isETCDOrControlPlane := taint.Key == nodeRoleControlPlane || taint.Key == nodeRoleETCD ||
-			taint.Key == nodeRoleControlPlaneHyphen || taint.Key == nodeRoleMaster
+			taint.Key == nodeRoleControlPlaneHyphen
 		if isETCDOrControlPlane && (taint.Effect == "NoSchedule" || taint.Effect == "NoExecute") {
 			return true
 		}

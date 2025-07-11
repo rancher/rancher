@@ -92,8 +92,6 @@ if_test_all_snapshot = \
                        reason='Snapshots check tests are skipped')
 DATA_SUBDIR = os.path.join(os.path.dirname(os.path.realpath(__file__)),
                            'resource')
-# As of release 2.4 default rke scan profile is "rke-cis-1.4"
-CIS_SCAN_PROFILE = os.environ.get('RANCHER_CIS_SCAN_PROFILE', "rke-cis-1.4")
 
 # here are all supported roles for RBAC testing
 CLUSTER_MEMBER = "cluster-member"

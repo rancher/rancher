@@ -2,8 +2,9 @@ package management
 
 import (
 	"context"
-	"github.com/sirupsen/logrus"
 	"os"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
 	v1 "k8s.io/api/core/v1"

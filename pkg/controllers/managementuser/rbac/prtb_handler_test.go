@@ -6,7 +6,10 @@ import (
 	"io"
 	"testing"
 
+	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
+	apisV3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	rancherv3fakes "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	typesrbacv1fakes "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -14,7 +17,9 @@ import (
 	"go.uber.org/mock/gomock"
 	rbacv1 "k8s.io/api/rbac/v1"
 	v1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 type prtbTestState struct {
@@ -395,6 +400,414 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 				// otherwise only one call to Delete is expected
 				results := clusterRolesMock.DeleteCalls()
 				assert.Len(t, results, 1)
+			}
+		})
+	}
+}
+
+func Test_ensurePSAPermissions(t *testing.T) {
+	type args struct {
+		binding *v3.ProjectRoleTemplateBinding
+		roles   map[string]*v3.RoleTemplate
+	}
+
+	p := &prtbLifecycle{}
+
+	tests := []struct {
+		name      string
+		mockSetup func()
+		args      args
+		wantErr   bool
+	}{
+		{
+			name: "create psa rbac resources without errors",
+			mockSetup: func() {
+				p.crLister = &typesrbacv1fakes.ClusterRoleListerMock{
+					GetFunc: func(namespace, name string) (*v1.ClusterRole, error) {
+						return nil, apierrors.NewNotFound(schema.GroupResource{}, "")
+					},
+				}
+				p.crClient = &typesrbacv1fakes.ClusterRoleInterfaceMock{
+					CreateFunc: func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
+						return &v1.ClusterRole{
+							Rules: []rbacv1.PolicyRule{
+								{
+									APIGroups:     []string{management.GroupName},
+									Verbs:         []string{"updatepsa"},
+									Resources:     []string{apisV3.ProjectResourceName},
+									ResourceNames: []string{"p-example"},
+								},
+							},
+						}, nil
+					},
+				}
+				p.crbClient = &typesrbacv1fakes.ClusterRoleBindingInterfaceMock{
+					CreateFunc: func(in1 *v1.ClusterRoleBinding) (*v1.ClusterRoleBinding, error) {
+						return &v1.ClusterRoleBinding{}, nil
+					},
+				}
+			},
+			args: args{
+				binding: &apisV3.ProjectRoleTemplateBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "prtb-example",
+					},
+					UserName:    "u-test1",
+					ProjectName: "c-abc:p-example",
+				},
+				roles: map[string]*v3.RoleTemplate{
+					"role_template_0": &apisV3.RoleTemplate{
+						Rules: []v1.PolicyRule{
+							{
+								APIGroups: []string{management.GroupName},
+								Verbs:     []string{"updatepsa"},
+								Resources: []string{apisV3.ProjectResourceName},
+							},
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "unable to create CRB",
+			mockSetup: func() {
+				p.crLister = &typesrbacv1fakes.ClusterRoleListerMock{
+					GetFunc: func(namespace, name string) (*v1.ClusterRole, error) {
+						return nil, apierrors.NewNotFound(schema.GroupResource{}, "")
+					},
+				}
+				p.crClient = &typesrbacv1fakes.ClusterRoleInterfaceMock{
+					CreateFunc: func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
+						return &v1.ClusterRole{
+							Rules: []rbacv1.PolicyRule{
+								{
+									APIGroups:     []string{management.GroupName},
+									Verbs:         []string{"updatepsa"},
+									Resources:     []string{apisV3.ProjectResourceName},
+									ResourceNames: []string{"p-example"},
+								},
+							},
+						}, nil
+					},
+				}
+				p.crbClient = &typesrbacv1fakes.ClusterRoleBindingInterfaceMock{
+					CreateFunc: func(in1 *v1.ClusterRoleBinding) (*v1.ClusterRoleBinding, error) {
+						return nil, fmt.Errorf("error")
+					},
+				}
+			},
+			args: args{
+				binding: &apisV3.ProjectRoleTemplateBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "prtb-example",
+					},
+					UserName:    "u-test1",
+					ProjectName: "c-abc:p-example",
+				},
+				roles: map[string]*v3.RoleTemplate{
+					"role_template_0": &apisV3.RoleTemplate{
+						Rules: []v1.PolicyRule{
+							{
+								APIGroups: []string{management.GroupName},
+								Verbs:     []string{"updatepsa"},
+								Resources: []string{apisV3.ProjectResourceName},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "unable to create CR",
+			mockSetup: func() {
+				p.crLister = &typesrbacv1fakes.ClusterRoleListerMock{
+					GetFunc: func(namespace, name string) (*v1.ClusterRole, error) {
+						return nil, apierrors.NewNotFound(schema.GroupResource{}, "")
+					},
+				}
+				p.crClient = &typesrbacv1fakes.ClusterRoleInterfaceMock{
+					CreateFunc: func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
+						return nil, fmt.Errorf("error")
+					},
+				}
+			},
+			args: args{
+				binding: &apisV3.ProjectRoleTemplateBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "prtb-example",
+					},
+					UserName:    "u-test1",
+					ProjectName: "c-abc:p-example",
+				},
+				roles: map[string]*v3.RoleTemplate{
+					"role_template_0": &apisV3.RoleTemplate{
+						Rules: []v1.PolicyRule{
+							{
+								APIGroups: []string{management.GroupName},
+								Verbs:     []string{"updatepsa"},
+								Resources: []string{apisV3.ProjectResourceName},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "unable to update CR",
+			mockSetup: func() {
+				p.crLister = &typesrbacv1fakes.ClusterRoleListerMock{
+					GetFunc: func(namespace, name string) (*v1.ClusterRole, error) {
+						return &v1.ClusterRole{
+							Rules: []rbacv1.PolicyRule{
+								{
+									APIGroups:     []string{management.GroupName},
+									Verbs:         []string{"updatepsa"},
+									Resources:     []string{apisV3.ProjectResourceName},
+									ResourceNames: []string{"p-example"},
+								},
+								{
+									APIGroups:     []string{management.GroupName},
+									Verbs:         []string{"get"},
+									Resources:     []string{apisV3.ProjectResourceName},
+									ResourceNames: []string{"p-example"},
+								},
+							},
+						}, nil
+					},
+				}
+				p.crClient = &typesrbacv1fakes.ClusterRoleInterfaceMock{
+					UpdateFunc: func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
+						return &v1.ClusterRole{}, fmt.Errorf("error")
+					},
+				}
+			},
+			args: args{
+				binding: &apisV3.ProjectRoleTemplateBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "prtb-example",
+					},
+					UserName:    "u-test1",
+					ProjectName: "c-abc:p-example",
+				},
+				roles: map[string]*v3.RoleTemplate{
+					"role_template_0": &apisV3.RoleTemplate{
+						Rules: []v1.PolicyRule{
+							{
+								APIGroups: []string{management.GroupName},
+								Verbs:     []string{"updatepsa"},
+								Resources: []string{apisV3.ProjectResourceName},
+							},
+						},
+					},
+				},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.mockSetup()
+			if err := p.ensurePSAPermissions(tt.args.binding, tt.args.roles); (err != nil) != tt.wantErr {
+				t.Errorf("prtbLifecycle.ensurePSAPermissions() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_ensurePSAPermissionsDelete(t *testing.T) {
+	type args struct {
+		binding *v3.ProjectRoleTemplateBinding
+	}
+
+	p := &prtbLifecycle{}
+
+	tests := []struct {
+		name      string
+		mockSetup func()
+		args      args
+		wantErr   bool
+	}{
+		{
+			name: "clean up psa rbac resources",
+			mockSetup: func() {
+				p.rtLister = &rancherv3fakes.RoleTemplateListerMock{
+					GetFunc: func(namespace, name string) (*apisV3.RoleTemplate, error) {
+						return &apisV3.RoleTemplate{
+							Rules: []v1.PolicyRule{
+								{
+									APIGroups: []string{management.GroupName},
+									Verbs:     []string{"updatepsa"},
+									Resources: []string{apisV3.ProjectResourceName},
+								},
+							},
+						}, nil
+					},
+				}
+				p.crClient = &typesrbacv1fakes.ClusterRoleInterfaceMock{
+					DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+						return nil
+					},
+				}
+				p.crbClient = &typesrbacv1fakes.ClusterRoleBindingInterfaceMock{
+					ListFunc: func(opts metav1.ListOptions) (*v1.ClusterRoleBindingList, error) {
+						return &v1.ClusterRoleBindingList{}, nil
+					},
+					DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+						return nil
+					},
+				}
+			},
+			args: args{
+				binding: &apisV3.ProjectRoleTemplateBinding{
+					ProjectName:      "c-abc:p-example",
+					RoleTemplateName: "role_template_0",
+					UserName:         "u-zxv",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "unable to delete CRB",
+			mockSetup: func() {
+				p.rtLister = &rancherv3fakes.RoleTemplateListerMock{
+					GetFunc: func(namespace, name string) (*apisV3.RoleTemplate, error) {
+						return &apisV3.RoleTemplate{
+							Rules: []v1.PolicyRule{
+								{
+									APIGroups: []string{management.GroupName},
+									Verbs:     []string{"updatepsa"},
+									Resources: []string{apisV3.ProjectResourceName},
+								},
+							},
+						}, nil
+					},
+				}
+				p.crClient = &typesrbacv1fakes.ClusterRoleInterfaceMock{
+					DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+						return nil
+					},
+				}
+				p.crbClient = &typesrbacv1fakes.ClusterRoleBindingInterfaceMock{
+					ListFunc: func(opts metav1.ListOptions) (*v1.ClusterRoleBindingList, error) {
+						return &v1.ClusterRoleBindingList{}, nil
+					},
+					DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+						return fmt.Errorf("error")
+					},
+				}
+			},
+			args: args{
+				binding: &apisV3.ProjectRoleTemplateBinding{
+					ProjectName:      "c-abc:p-example",
+					RoleTemplateName: "role_template_0",
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "unable to delete CR",
+			mockSetup: func() {
+				p.rtLister = &rancherv3fakes.RoleTemplateListerMock{
+					GetFunc: func(namespace, name string) (*apisV3.RoleTemplate, error) {
+						return &apisV3.RoleTemplate{
+							Rules: []v1.PolicyRule{
+								{
+									APIGroups: []string{management.GroupName},
+									Verbs:     []string{"updatepsa"},
+									Resources: []string{apisV3.ProjectResourceName},
+								},
+							},
+						}, nil
+					},
+				}
+				p.crClient = &typesrbacv1fakes.ClusterRoleInterfaceMock{
+					DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+						return fmt.Errorf("error")
+					},
+				}
+			},
+			args: args{
+				binding: &apisV3.ProjectRoleTemplateBinding{
+					ProjectName:      "c-abc:p-example",
+					RoleTemplateName: "role_template_0",
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "delete only CRB (CR locked by other CRBs)",
+			mockSetup: func() {
+				p.rtLister = &rancherv3fakes.RoleTemplateListerMock{
+					GetFunc: func(namespace, name string) (*apisV3.RoleTemplate, error) {
+						return &apisV3.RoleTemplate{
+							Rules: []v1.PolicyRule{
+								{
+									APIGroups: []string{management.GroupName},
+									Verbs:     []string{"updatepsa"},
+									Resources: []string{apisV3.ProjectResourceName},
+								},
+							},
+						}, nil
+					},
+				}
+				p.crbClient = &typesrbacv1fakes.ClusterRoleBindingInterfaceMock{
+					ListFunc: func(opts metav1.ListOptions) (*v1.ClusterRoleBindingList, error) {
+						return &v1.ClusterRoleBindingList{
+							Items: []v1.ClusterRoleBinding{
+								v1.ClusterRoleBinding{
+									RoleRef: v1.RoleRef{
+										Kind: "ClusterRole",
+										Name: "p-example-namespaces-psa",
+									},
+								},
+							},
+						}, nil
+					},
+					DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+						return nil
+					},
+				}
+			},
+			args: args{
+				binding: &apisV3.ProjectRoleTemplateBinding{
+					ProjectName:      "c-abc:p-example",
+					RoleTemplateName: "role_template_0",
+					UserName:         "u-zxv",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "unable to get RT",
+			mockSetup: func() {
+				p.rtLister = &rancherv3fakes.RoleTemplateListerMock{
+					GetFunc: func(namespace, name string) (*apisV3.RoleTemplate, error) {
+						return nil, fmt.Errorf("error")
+					},
+				}
+				p.crClient = &typesrbacv1fakes.ClusterRoleInterfaceMock{
+					DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+						return fmt.Errorf("error")
+					},
+				}
+			},
+			args: args{
+				binding: &apisV3.ProjectRoleTemplateBinding{
+					ProjectName:      "c-abc:p-example",
+					RoleTemplateName: "role_template_0",
+				},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.mockSetup()
+			if err := p.ensurePSAPermissionsDelete(tt.args.binding); (err != nil) != tt.wantErr {
+				t.Errorf("prtbLifecycle.ensurePRTBDelete() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

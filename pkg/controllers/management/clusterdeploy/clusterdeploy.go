@@ -41,7 +41,6 @@ import (
 
 const (
 	AgentForceDeployAnn = "io.cattle.agent.force.deploy"
-	nodeImage           = "nodeImage"
 	clusterImage        = "clusterImage"
 )
 
@@ -50,13 +49,11 @@ var ErrCantConnectToAPI = errors.New("cannot connect to the cluster's Kubernetes
 var (
 	agentImagesMutex sync.RWMutex
 	agentImages      = map[string]map[string]string{
-		nodeImage:    {},
 		clusterImage: {},
 	}
 	controlPlaneTaintsMutex sync.RWMutex
 	controlPlaneTaints      = make(map[string][]corev1.Taint)
 	controlPlaneLabels      = map[string]string{
-		"node-role.kubernetes.io/master":        "true",
 		"node-role.kubernetes.io/controlplane":  "true",
 		"node-role.kubernetes.io/control-plane": "true",
 	}
@@ -104,15 +101,6 @@ func (cd *clusterDeploy) sync(key string, cluster *apimgmtv3.Cluster) (runtime.O
 
 	original := cluster
 	cluster = original.DeepCopy()
-
-	if cluster.Status.Driver == apimgmtv3.ClusterDriverRKE {
-		if cluster.Spec.LocalClusterAuthEndpoint.Enabled {
-			cluster.Spec.RancherKubernetesEngineConfig.Authentication.Strategy = "x509|webhook"
-		} else {
-			cluster.Spec.RancherKubernetesEngineConfig.Authentication.Strategy = "x509"
-		}
-		logrus.Tracef("clusterDeploy: sync: cluster.Spec.RancherKubernetesEngineConfig.Authentication.Strategy set to [%s] for cluster [%s]", cluster.Spec.RancherKubernetesEngineConfig.Authentication.Strategy, cluster.Name)
-	}
 
 	err = cd.doSync(cluster)
 	if cluster != nil && !reflect.DeepEqual(cluster, original) {
@@ -186,7 +174,7 @@ func (cd *clusterDeploy) doSync(cluster *apimgmtv3.Cluster) error {
 		return err
 	}
 
-	return cd.setNetworkPolicyAnn(cluster)
+	return nil
 }
 
 // agentFeaturesChanged will treat a missing key as false. This means we only detect changes
@@ -216,26 +204,10 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string,
 	forceDeploy := cluster.Annotations[AgentForceDeployAnn] == "true"
 	imageChange := cluster.Status.AgentImage != desiredAgent || cluster.Status.AuthImage != desiredAuth
 	agentFeaturesChanged := agentFeaturesChanged(desiredFeatures, cluster.Status.AgentFeatures)
-	repoChange := false
-	if cluster.Spec.RancherKubernetesEngineConfig != nil {
-		if cluster.Status.AppliedSpec.RancherKubernetesEngineConfig != nil {
-			if len(cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.PrivateRegistries) > 0 {
-				desiredRepo := util.GetPrivateRegistry(cluster)
-				appliedRepo := &cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.PrivateRegistries[0]
 
-				if desiredRepo != nil && appliedRepo != nil && !reflect.DeepEqual(desiredRepo, appliedRepo) {
-					repoChange = true
-				}
-				if (desiredRepo == nil && appliedRepo != nil) || (desiredRepo != nil && appliedRepo == nil) {
-					repoChange = true
-				}
-			}
-		}
-	}
-
-	if forceDeploy || imageChange || repoChange || agentFeaturesChanged {
+	if forceDeploy || imageChange || agentFeaturesChanged {
 		logrus.Infof("Redeploy Rancher Agents is needed for %s: forceDeploy=%v, agent/auth image changed=%v,"+
-			" private repo changed=%v, agent features changed=%v", cluster.Name, forceDeploy, imageChange, repoChange,
+			" agent features changed=%v", cluster.Name, forceDeploy, imageChange,
 			agentFeaturesChanged)
 		logrus.Tracef("clusterDeploy: redeployAgent: cluster.Status.AgentImage: [%s], desiredAgent: [%s]", cluster.Status.AgentImage, desiredAgent)
 		logrus.Tracef("clusterDeploy: redeployAgent: cluster.Status.AuthImage [%s], desiredAuth: [%s]", cluster.Status.AuthImage, desiredAuth)
@@ -243,11 +215,11 @@ func redeployAgent(cluster *apimgmtv3.Cluster, desiredAgent, desiredAuth string,
 		return true
 	}
 
-	na, ca := getAgentImages(cluster.Name)
-	if (cluster.Status.AgentImage != na && cluster.Status.Driver == apimgmtv3.ClusterDriverRKE) || cluster.Status.AgentImage != ca {
+	ca := getAgentImages(cluster.Name)
+	if cluster.Status.AgentImage != ca {
 		// downstream agent does not match, kick a redeploy with settings agent
 		logrus.Infof("clusterDeploy: redeployAgent: redeploy Rancher agents due to downstream agent image mismatch for [%s]: was [%s] and will be [%s]",
-			cluster.Name, na, image.ResolveWithCluster(settings.AgentImage.Get(), cluster))
+			cluster.Name, cluster.Status.AgentImage, image.ResolveWithCluster(settings.AgentImage.Get(), cluster))
 		clearAgentImages(cluster.Name)
 		return true
 	}
@@ -518,33 +490,6 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 			}
 			logrus.Debugf("Ignored '%s' error during delete kube-api-auth DaemonSet", dsNotFoundError)
 		}
-		if cluster.Status.Driver != apimgmtv3.ClusterDriverRKE {
-			if output, err = kubectl.Delete([]byte(systemtemplate.NodeAgentDaemonSet), kubeConfig); err != nil {
-				logrus.Tracef("Output from kubectl delete cattle-node-agent DaemonSet, output: %s, err: %v", string(output), err)
-				// Ignore if the resource does not exist and it returns 'daemonsets.apps "kube-api-auth" not found'
-				dsNotFoundError := "daemonsets.apps \"cattle-node-agent\" not found"
-				if !strings.Contains(string(output), dsNotFoundError) {
-					return cluster, errors.WithMessage(types.NewErrors(err, errors.New(string(output))), "kubectl delete failed")
-				}
-				logrus.Debugf("Ignored '%s' error during delete cattle-node-agent DaemonSet", dsNotFoundError)
-			}
-		} else if strings.ToLower(settings.AgentRolloutWait.Get()) == "true" {
-			// Check for agent daemonset rollout if parameter is set and driverv32.ClusterDriverRKE
-			timeout := settings.AgentRolloutTimeout.Get()
-			_, err = time.ParseDuration(timeout)
-			if err != nil {
-				logrus.Warnf("[deployAgent] agent-rollout-timeout setting must be in Duration format. Using default: 300s")
-				timeout = "300s"
-			}
-			logrus.Debugf("clusterDeploy: deployAgent: waiting rollout agent daemonset for cluster [%s]", cluster.Name)
-			output, err := kubectl.RolloutStatusWithNamespace("cattle-system", "ds/cattle-node-agent", timeout, kubeConfig)
-			if err != nil {
-				logrus.Debugf("clusterDeploy: deployAgent: timeout waiting rollout agent daemonset for cluster [%s]: %v", cluster.Name, err)
-				return cluster, errors.WithMessage(types.NewErrors(err, errors.New(formatKubectlApplyOutput(string(output)))), "Timeout waiting rollout agent daemonset")
-			}
-			logrus.Debugf("clusterDeploy: deployAgent: successfully rollout agent daemonset for cluster [%s]", cluster.Name)
-			apimgmtv3.ClusterConditionAgentDeployed.Message(cluster, "Successfully rollout agent daemonset")
-		}
 		apimgmtv3.ClusterConditionAgentDeployed.Message(cluster, string(output))
 		return cluster, nil
 	}); err != nil {
@@ -572,20 +517,6 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 
 	util.UpdateAppliedAgentDeploymentCustomization(cluster)
 
-	return nil
-}
-
-func (cd *clusterDeploy) setNetworkPolicyAnn(cluster *apimgmtv3.Cluster) error {
-	if cluster.Spec.EnableNetworkPolicy != nil {
-		return nil
-	}
-	// set current state for upgraded canal clusters
-	if cluster.Spec.RancherKubernetesEngineConfig != nil &&
-		cluster.Spec.RancherKubernetesEngineConfig.Network.Plugin == "canal" {
-		enableNetworkPolicy := true
-		cluster.Spec.EnableNetworkPolicy = &enableNetworkPolicy
-		cluster.Annotations["networking.management.cattle.io/enable-network-policy"] = "true"
-	}
 	return nil
 }
 
@@ -625,8 +556,7 @@ func (cd *clusterDeploy) getYAML(cluster *apimgmtv3.Cluster, agentImage, authIma
 
 	buf := &bytes.Buffer{}
 	err = systemtemplate.SystemTemplate(buf, agentImage, authImage, cluster.Name,
-		token, url, cluster.Spec.WindowsPreferedCluster,
-		capr.PreBootstrap(cluster), cluster, features,
+		token, url, capr.PreBootstrap(cluster), cluster, features,
 		taints, cd.secretLister, priorityClassExists)
 
 	return buf.Bytes(), err
@@ -655,35 +585,7 @@ func (cd *clusterDeploy) getClusterAgentImage(name string) (string, error) {
 	return "", nil
 }
 
-func (cd *clusterDeploy) getNodeAgentImage(name string) (string, error) {
-	uc, err := cd.clusterManager.UserContextNoControllers(name)
-	if err != nil {
-		return "", err
-	}
-
-	ds, err := uc.Apps.DaemonSets("cattle-system").Get("cattle-node-agent", metav1.GetOptions{})
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			return "", err
-		}
-		return "", nil
-	}
-
-	for _, c := range ds.Spec.Template.Spec.Containers {
-		if c.Name == "agent" {
-			return c.Image, nil
-		}
-	}
-
-	return "", nil
-}
-
 func (cd *clusterDeploy) cacheAgentImages(name string) error {
-	na, err := cd.getNodeAgentImage(name)
-	if err != nil {
-		return err
-	}
-
 	ca, err := cd.getClusterAgentImage(name)
 	if err != nil {
 		return err
@@ -691,14 +593,13 @@ func (cd *clusterDeploy) cacheAgentImages(name string) error {
 
 	agentImagesMutex.Lock()
 	defer agentImagesMutex.Unlock()
-	agentImages[nodeImage][name] = na
 	agentImages[clusterImage][name] = ca
 	return nil
 }
 
 func agentImagesCached(name string) bool {
-	na, ca := getAgentImages(name)
-	return na != "" && ca != ""
+	ca := getAgentImages(name)
+	return ca != ""
 }
 
 func controlPlaneTaintsCached(name string) bool {
@@ -710,10 +611,10 @@ func controlPlaneTaintsCached(name string) bool {
 	return false
 }
 
-func getAgentImages(name string) (string, string) {
+func getAgentImages(name string) string {
 	agentImagesMutex.RLock()
 	defer agentImagesMutex.RUnlock()
-	return agentImages[nodeImage][name], agentImages[clusterImage][name]
+	return agentImages[clusterImage][name]
 }
 
 func getCachedControlPlaneTaints(name string) []corev1.Taint {
@@ -729,7 +630,6 @@ func clearAgentImages(name string) {
 	logrus.Tracef("clusterDeploy: clearAgentImages called for [%s]", name)
 	agentImagesMutex.Lock()
 	defer agentImagesMutex.Unlock()
-	delete(agentImages[nodeImage], name)
 	delete(agentImages[clusterImage], name)
 }
 

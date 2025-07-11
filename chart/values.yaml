@@ -6,15 +6,24 @@ additionalTrustedCAs: false
 antiAffinity: preferred
 topologyKey: kubernetes.io/hostname
 
-# Audit Logs
 # Source: https://ranchermanager.docs.rancher.com/how-to-guides/advanced-user-guides/enable-api-audit-log
-# The audit log is piped to the console of the rancher-audit-log container in the rancher pod.
-# level: Verbosity of logs, 0 to 3. 0 is off, 3 most verbose.
-# Docs: https://ranchermanager.docs.rancher.com/how-to-guides/advanced-user-guides/enable-api-audit-log#audit-log-levels
 auditLog:
+  enabled: false
+
+  # level can be one of 0, 1, 2, or 3 with 3 being the most verbose. This value is a system level default and may
+  # impact the verbosity on any AuditPolicies you define. See below for a description of each log level:
+  #   0: Only log metadata such as URI, method, user, etc
+  #   1: Log metadata, request headers, and response headers
+  #   2: Log metadata, request header, response headers, and request body
+  #   3: Log metadata, request header, response heaeders, request body, and response body
+  level: 0
+
+  # destination may be one of "sidecar" or "hostpath". When set to "sidecar" logs will be sent and output to a sidecar
+  # container called "rancher-audit-log". When "hostpath" logs are written to a hostpath volume called "audit-log" to
+  # a directory configured by auditLog.hostPath.
   destination: sidecar
   hostPath: /var/log/rancher/audit/
-  level: 0
+
   maxAge: 1
   maxBackup: 1
   maxSize: 100
@@ -120,6 +129,8 @@ rancherImage: rancher/rancher
 # Defaults to IfNotPresent
 # rancherImagePullPolicy: <pullPolicy>
 
+# aggregationRegistrationTimeout: 5m
+
 # Number of Rancher server replicas. Setting to negative number will dynamically between 0 and the abs(replicas) based on available nodes.
 # of available nodes in the cluster
 replicas: 3
@@ -176,6 +187,11 @@ postDelete:
   timeout: 120
   # by default, the job will fail if it fail to uninstall any of the apps
   ignoreTimeoutError: false
+
+preUpgrade:
+  image:
+    repository: %PRE_UPGRADE_IMAGE_NAME%
+    tag: %PRE_UPGRADE_IMAGE_TAG%
 
 # Set a bootstrap password. If leave empty, a random password will be generated.
 bootstrapPassword: ""
@@ -245,3 +261,35 @@ extraObjects: []
 #         app: rancher
 #     policyTypes:
 #       - Ingress
+
+# SCC Registration for Rancher Prime
+# For more information see: TODO link to a docs page
+registration:
+  enabled: false
+  regCode: ""
+  ## Air-gap Users
+  # If your cluster is in an air-gap, then using offline mode (or a local RMT server) may be necessary.
+  # To complete the offline registration via helm is a multi-step process - or you can complete it via the Rancher UI.
+  # Step 1. Enable registration (above) and then uncomment the next line to set mode to offline; then complete the initial helm install.
+  # mode: offline
+  # Step 2. Fetch the offline registration Request needed for the SCC
+  # Step 2.a. Using kubectl fetch the offline registration request and save to local file, OR
+  #     cmd: kubectl get secrets -n  cattle-scc-system \
+  #	          -l scc.cattle.io/secret-role=offline-request,scc.cattle.io/scc-hash=$(kubectl get secrets \
+  #           -n cattle-scc-system scc-registration -o yaml|yq '.metadata.labels["scc.cattle.io/scc-hash"]') \
+  #           -o yaml | yq '.items[0].data.request' > offline.base64
+  # Step 2.b. Using the Rancher UI download the offline registration request file.
+  # Step 3. Upload that certificate file to the SCC to begin the offline registration process.
+  # Step 4. Download the offline registration certificate file and save it to local file,
+  # Step 5. Finally, upload the offline registration certificate to the Rancher
+  # Step 5.a. Using either kubectl:
+  #     cmd: kubectl patch secret -n cattle-scc-system scc-registration  \
+  #           --type='merge' -p "{\"data\": {\"certificate\": \"$(cat <your Offline Cert file> )\"}}"
+  # Step 5.b. Using Rancher UI upload the certificate to complete the registration.
+  # Step 5.c  Using helm with the certificate value field and then `helm upgrade` rancher.
+  # certificate: {}
+  ## Alternative Registration Endpoint
+  # For users with a local RMT server you can use an alternative registration endpoint to register your cluster.
+  # This will cause the registration process to sync with your RMT server instead of with the SCC.
+  # registrationUrl: "https://my-rmt-server.example.com"
+  

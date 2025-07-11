@@ -37,7 +37,7 @@ import (
 )
 
 const ConflictMessageRegex = `\[K8s\] encountered an error while attempting to update the secret: Operation cannot be fulfilled on secrets.*: the object has been modified; please apply your changes to the latest version and try again`
-const SaneConflictMessageThreshold = 3
+const SaneConflictMessageThreshold = 10
 
 func New(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*provisioningv1api.Cluster, error) {
 	cluster = cluster.DeepCopy()
@@ -147,7 +147,7 @@ func WaitForCreate(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 			if newErr != nil {
 				logrus.Error(newErr)
 			}
-			err = fmt.Errorf("cluster %s creation wait failed on: %w\ncluster %s test data bundle: \n%s", c.Name, err, c.Name, data)
+			err = fmt.Errorf("cluster %s creation wait failed on: %w\ncluster %s test data bundle: \n%s\n", c.Name, err, c.Name, data)
 		}
 	}()
 
@@ -237,7 +237,7 @@ func WaitForControlPlane(clients *clients.Clients, c *provisioningv1api.Cluster,
 			if newErr != nil {
 				logrus.Error(newErr)
 			}
-			err = fmt.Errorf("cluster %s %s wait failed on: %w\ncluster %s test data bundle: \n%s", c.Name, errorPrefix, err, c.Name, data)
+			err = fmt.Errorf("cluster %s %s wait failed on: %w\ncluster %s test data bundle: \n%s\n", c.Name, errorPrefix, err, c.Name, data)
 		}
 	}()
 
@@ -264,7 +264,7 @@ func WaitForDelete(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 			if newErr != nil {
 				logrus.Error(newErr)
 			}
-			err = fmt.Errorf("cluster %s delete wait failed on: %w\ncluster %s test data bundle: \n%s", c.Name, err, c.Name, data)
+			err = fmt.Errorf("cluster %s delete wait failed on: %w\ncluster %s test data bundle: \n%s\n", c.Name, err, c.Name, data)
 		}
 	}()
 

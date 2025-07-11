@@ -162,18 +162,22 @@ func TestTokenEndpoint(t *testing.T) {
 		Path  string `json:"path"`
 		Value any    `json:"value"`
 	}{{
-		Op:    "add",
-		Path:  "/metadata/annotations/cattle.io.oidc-client-secret-used-" + fakeClientSecretID,
-		Value: fmt.Sprintf("%d", fakeTime().Unix()),
+		Op:   "add",
+		Path: "/metadata/annotations",
+		Value: map[string]string{
+			"cattle.io.oidc-client-secret-used-" + fakeClientSecretID: fmt.Sprintf("%d", fakeTime().Unix()),
+		},
 	}})
 	tokenPatch, _ := json.Marshal([]struct {
 		Op    string `json:"op"`
 		Path  string `json:"path"`
 		Value any    `json:"value"`
 	}{{
-		Op:    "add",
-		Path:  "/metadata/labels/cattle.io.oidc-client-" + fakeClientName,
-		Value: "true",
+		Op:   "add",
+		Path: "/metadata/labels",
+		Value: map[string]string{
+			"cattle.io.oidc-client-" + fakeClientName: "true",
+		},
 	}})
 	tests := map[string]struct {
 		req                    func() *http.Request

@@ -62,13 +62,12 @@ func (r *Retriever) GeneratePreBootstrapClusterAgentManifest(controlPlane *rkev1
 		return nil, fmt.Errorf("failed to generate pre-bootstrap cluster-agent manifest: %w", err)
 	}
 
-	return []plan.File{
-		{
-			Content: base64.StdEncoding.EncodeToString(data),
-			Path:    path.Join(capr.GetDistroDataDir(controlPlane), "server/manifests/rancher/cluster-agent-job.yaml"),
-			Dynamic: true,
-			Minor:   true,
-		}}, nil
+	return []plan.File{{
+		Content: base64.StdEncoding.EncodeToString(data),
+		Path:    path.Join(capr.GetDistroDataDir(controlPlane), "server/manifests/rancher/cluster-agent.yaml"),
+		Dynamic: true,
+		Minor:   true,
+	}}, nil
 }
 
 func (r *Retriever) preBootstrapCluster(cp *rkev1.RKEControlPlane) (bool, error) {

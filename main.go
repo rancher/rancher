@@ -6,6 +6,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/docker/docker/pkg/reexec"
 	"github.com/ehazlett/simplelog"
@@ -137,8 +138,14 @@ func main() {
 			Name:        "audit-level",
 			Value:       0,
 			EnvVar:      "AUDIT_LEVEL",
-			Usage:       "Audit log level: 0 - disable audit log, 1 - log event metadata, 2 - log event metadata and request body, 3 - log event metadata, request body and response body",
-			Destination: &config.AuditLevel,
+			Usage:       "Audit log level: 0 - audit log event metadata, 1 - log metadata and headers, 2 - log event metadata, headers, and request body, 3 - log event metadata, headers, request body, and response body",
+			Destination: &config.AuditLogLevel,
+		},
+		cli.BoolFlag{
+			Name:        "enable-audit-log",
+			Usage:       "enable the rancher audit log system",
+			EnvVar:      "AUDIT_LOG_ENABLED",
+			Destination: &config.AuditLogEnabled,
 		},
 		cli.StringFlag{
 			Name:        "profile-listen-address",
@@ -152,6 +159,13 @@ func main() {
 			Value:       "",
 			Usage:       "Declare specific feature values on start up. Example: \"kontainer-driver=true\" - kontainer driver feature will be enabled despite false default value",
 			Destination: &config.Features,
+		},
+		cli.DurationFlag{
+			Name:        "aggregation-registration-timeout",
+			EnvVar:      "AGGREGATION_REGISTRATION_TIMEOUT",
+			Value:       time.Minute * 5,
+			Usage:       "Declare a different timeout duration when waiting to registration requests from the aggregation layer",
+			Destination: &config.AggregationRegistrationTimeout,
 		},
 	}
 

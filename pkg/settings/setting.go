@@ -57,7 +57,6 @@ var (
 
 	AgentImage          = NewSetting("agent-image", "rancher/rancher-agent:head")
 	AgentRolloutTimeout = NewSetting("agent-rollout-timeout", "300s")
-	AgentRolloutWait    = NewSetting("agent-rollout-wait", "true")
 	// AgentTLSMode is translated to the environment variable STRICT_VERIFY when rendering the cluster/node agent manifests and should not be specified as a default agent setting as it has no direct effect on the agent itself.
 	AgentTLSMode                        = NewSetting("agent-tls-mode", AgentTLSModeStrict).WithDefaultOnUpgrade(AgentTLSModeSystemStore)
 	AuthImage                           = NewSetting("auth-image", v32.ToolsSystemImages.AuthSystemImages.KubeAPIAuth)
@@ -82,7 +81,6 @@ var (
 	InstallUUID                         = NewSetting("install-uuid", "")
 	InternalServerURL                   = NewSetting("internal-server-url", "")
 	InternalCACerts                     = NewSetting("internal-cacerts", "")
-	IsRKE                               = NewSetting("is-rke", "")
 	JailerTimeout                       = NewSetting("jailer-timeout", "60")
 	KubernetesVersion                   = NewSetting("k8s-version", "")
 	KubernetesVersionToServiceOptions   = NewSetting("k8s-version-to-service-options", "")
@@ -94,7 +92,6 @@ var (
 	Namespace                           = NewSetting("namespace", os.Getenv("CATTLE_NAMESPACE"))
 	PasswordMinLength                   = NewSetting("password-min-length", "12")
 	PeerServices                        = NewSetting("peer-service", os.Getenv("CATTLE_PEER_SERVICE"))
-	RkeVersion                          = NewSetting("rke-version", "")
 	RkeMetadataConfig                   = NewSetting("rke-metadata-config", getMetadataConfig())
 	ServerImage                         = NewSetting("server-image", "rancher/rancher")
 	ServerURL                           = NewSetting("server-url", "")
@@ -103,8 +100,8 @@ var (
 	WinsAgentVersion                    = NewSetting("wins-agent-version", "")
 	CSIProxyAgentVersion                = NewSetting("csi-proxy-agent-version", "")
 	CSIProxyAgentURL                    = NewSetting("csi-proxy-agent-url", "https://acs-mirror.azureedge.net/csi-proxy/%[1]s/binaries/csi-proxy-%[1]s.tar.gz")
-	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://github.com/rancher/system-agent/releases/download/v0.3.13-rc.2/install.sh") // To ensure consistency between SystemAgentInstallScript default value and CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT to utilize the local system-agent-install.sh script when both values are equal.
-	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.5.1/install.ps1")
+	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://github.com/rancher/system-agent/releases/download/v0.3.13-rc.3/install.sh") // To ensure consistency between SystemAgentInstallScript default value and CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT to utilize the local system-agent-install.sh script when both values are equal.
+	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.5.2-rc.1/install.ps1")
 	SystemAgentInstallerImage           = NewSetting("system-agent-installer-image", "") // Defined via environment variable
 	SystemAgentUpgradeImage             = NewSetting("system-agent-upgrade-image", "")   // Defined via environment variable
 	WinsAgentUpgradeImage               = NewSetting("wins-agent-upgrade-image", "")
@@ -131,7 +128,7 @@ var (
 	EKSUpstreamRefresh                  = NewSetting("eks-refresh", "300")
 	GKEUpstreamRefresh                  = NewSetting("gke-refresh", "300")
 	HideLocalCluster                    = NewSetting("hide-local-cluster", "false")
-	MachineProvisionImage               = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher128")
+	MachineProvisionImage               = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher130")
 	SystemFeatureChartRefreshSeconds    = NewSetting("system-feature-chart-refresh-seconds", "21600")
 	ClusterAgentDefaultAffinity         = NewSetting("cluster-agent-default-affinity", ClusterAgentAffinity)
 	FleetAgentDefaultAffinity           = NewSetting("fleet-agent-default-affinity", FleetAgentAffinity)
@@ -250,8 +247,12 @@ var (
 	SystemDefaultRegistry = NewSetting("system-default-registry", os.Getenv("CATTLE_BASE_REGISTRY"))
 
 	// K3sBasedUpgraderUninstallConcurrency defines the maximum number of clusters
-	// for which the K3s-based-upgrade handler can simultaneously uninstall the legacy K3s-based upgrade app.
+	// for which Rancher can simultaneously uninstall the legacy K3s-based upgrade app.
 	K3sBasedUpgraderUninstallConcurrency = NewSetting("k3s-based-upgrader-uninstall-concurrency", "5")
+
+	// SystemAgentUpgraderInstallConcurrency defines the maximum number of clusters
+	// for which Rancher can simultaneously install or upgrade the resources needed for upgrading system-agent.
+	SystemAgentUpgraderInstallConcurrency = NewSetting("system-agent-upgrader-install-concurrency", "5")
 
 	// UIBanners holds configuration to display a custom fixed banner in the header, footer, or both
 	UIBanners = NewSetting("ui-banners", "{}")

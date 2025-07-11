@@ -32,23 +32,27 @@ func RequiredCRDs() []string {
 	if features.OIDCProvider.Enabled() {
 		requiredCRDS = append(requiredCRDS, OIDCClientCRD()...)
 	}
+	if features.RancherSCCRegistrationExtension.Enabled() {
+		requiredCRDS = append(requiredCRDS, SCCRegistrationCRDs()...)
+	}
 	return requiredCRDS
 }
 
 // BasicCRDs returns a list of CRD names needed to run rancher.
 func BasicCRDs() []string {
 	return []string{
-		"apps.catalog.cattle.io",
-		"clusterrepos.catalog.cattle.io",
-		"operations.catalog.cattle.io",
 		"apiservices.management.cattle.io",
-		"clusters.management.cattle.io",
+		"apps.catalog.cattle.io",
+		"auditpolicies.auditlog.cattle.io",
 		"clusterregistrationtokens.management.cattle.io",
+		"clusterrepos.catalog.cattle.io",
+		"clusters.management.cattle.io",
 		"features.management.cattle.io",
+		"navlinks.ui.cattle.io",
+		"operations.catalog.cattle.io",
 		"podsecurityadmissionconfigurationtemplates.management.cattle.io",
 		"preferences.management.cattle.io",
 		"settings.management.cattle.io",
-		"navlinks.ui.cattle.io",
 	}
 }
 
@@ -128,11 +132,8 @@ func MCMCRDs() []string {
 		"clusters.management.cattle.io",
 		"clusterregistrationtokens.management.cattle.io",
 		"clusterroletemplatebindings.management.cattle.io",
-		"clustertemplates.management.cattle.io",
-		"clustertemplaterevisions.management.cattle.io",
 		"composeconfigs.management.cattle.io",
 		"dynamicschemas.management.cattle.io",
-		"etcdbackups.management.cattle.io",
 		"features.management.cattle.io",
 		"fleetworkspaces.management.cattle.io",
 		"globalroles.management.cattle.io",
@@ -144,16 +145,12 @@ func MCMCRDs() []string {
 		"nodes.management.cattle.io",
 		"nodedrivers.management.cattle.io",
 		"nodepools.management.cattle.io",
-		"nodetemplates.management.cattle.io",
 		"podsecurityadmissionconfigurationtemplates.management.cattle.io",
 		"preferences.management.cattle.io",
 		"projects.management.cattle.io",
 		"projectnetworkpolicys.management.cattle.io",
 		"projectroletemplatebindings.management.cattle.io",
 		"rancherusernotificationtypes.management.cattle.io",
-		"rkeaddons.management.cattle.io",
-		"rkek8sserviceoptions.management.cattle.io",
-		"rkek8ssystemimages.management.cattle.io",
 		"roletemplates.management.cattle.io",
 		"samltokens.management.cattle.io",
 		"settings.management.cattle.io",
@@ -180,11 +177,19 @@ func OIDCClientCRD() []string {
 	}
 }
 
+// SCCRegistrationCRDs returns a list of required CRD names needed for SCC Registration features
+func SCCRegistrationCRDs() []string {
+	return []string{
+		"registrations.scc.cattle.io",
+	}
+}
+
 // MigratedResources map list of resource that have been migrated after all resource have a CRD this can be removed.
 var MigratedResources = map[string]bool{
 	"activedirectoryproviders.management.cattle.io":                   false,
 	"apiservices.management.cattle.io":                                false,
 	"apps.catalog.cattle.io":                                          false,
+	"auditpolicies.auditlog.cattle.io":                                true,
 	"authconfigs.management.cattle.io":                                false,
 	"authproviders.management.cattle.io":                              false,
 	"authtokens.management.cattle.io":                                 false,
@@ -202,14 +207,11 @@ var MigratedResources = map[string]bool{
 	"clusters.cluster.x-k8s.io":                                       false,
 	"clusters.management.cattle.io":                                   false,
 	"clusters.provisioning.cattle.io":                                 false,
-	"clustertemplaterevisions.management.cattle.io":                   false,
-	"clustertemplates.management.cattle.io":                           false,
 	"clusteruserattributes.cluster.cattle.io":                         false,
 	"composeconfigs.management.cattle.io":                             false,
 	"custommachines.rke.cattle.io":                                    false,
 	"dockercredentials.project.cattle.io":                             false,
-	"dynamicschemas.management.cattle.io":                             false,
-	"etcdbackups.management.cattle.io":                                false,
+	"dynamicschemas.management.cattle.io":                             true,
 	"etcdsnapshots.rke.cattle.io":                                     false,
 	"extensionconfigs.runtime.cluster.x-k8s.io":                       false,
 	"features.management.cattle.io":                                   false,
@@ -231,10 +233,10 @@ var MigratedResources = map[string]bool{
 	"managedcharts.management.cattle.io":                              false,
 	"monitormetrics.management.cattle.io":                             false,
 	"navlinks.ui.cattle.io":                                           false,
-	"nodedrivers.management.cattle.io":                                false,
+	"nodedrivers.management.cattle.io":                                true,
 	"nodepools.management.cattle.io":                                  false,
 	"nodes.management.cattle.io":                                      false,
-	"nodetemplates.management.cattle.io":                              false,
+	"oidcclients.management.cattle.io":                                true,
 	"oidcproviders.management.cattle.io":                              false,
 	"openldapproviders.management.cattle.io":                          false,
 	"operations.catalog.cattle.io":                                    false,
@@ -245,13 +247,11 @@ var MigratedResources = map[string]bool{
 	"projectroletemplatebindings.management.cattle.io":                true,
 	"projects.management.cattle.io":                                   true,
 	"rancherusernotifications.management.cattle.io":                   false,
-	"rkeaddons.management.cattle.io":                                  false,
+	"registrations.scc.cattle.io":                                     true,
 	"rkebootstraps.rke.cattle.io":                                     false,
 	"rkebootstraptemplates.rke.cattle.io":                             false,
 	"rkeclusters.rke.cattle.io":                                       false,
 	"rkecontrolplanes.rke.cattle.io":                                  false,
-	"rkek8sserviceoptions.management.cattle.io":                       false,
-	"rkek8ssystemimages.management.cattle.io":                         false,
 	"roletemplates.management.cattle.io":                              true,
 	"samlproviders.management.cattle.io":                              false,
 	"samltokens.management.cattle.io":                                 false,
@@ -266,5 +266,4 @@ var MigratedResources = map[string]bool{
 	"users.management.cattle.io":                                      false,
 	"uiplugins.catalog.cattle.io":                                     true,
 	"workloads.project.cattle.io":                                     false,
-	"oidcclients.management.cattle.io":                                true,
 }

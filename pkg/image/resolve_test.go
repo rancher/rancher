@@ -6,12 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
-	rketypes "github.com/rancher/rke/types"
 	assertlib "github.com/stretchr/testify/assert"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestConvertMirroredImages(t *testing.T) {
@@ -56,23 +53,6 @@ func TestResolveWithCluster(t *testing.T) {
 		return
 	}
 
-	clusterWithPrivateRegistry := func(s string) *v3.Cluster {
-		return &v3.Cluster{
-			TypeMeta:   metav1.TypeMeta{},
-			ObjectMeta: metav1.ObjectMeta{},
-			Spec: apimgmtv3.ClusterSpec{
-				ClusterSpecBase: apimgmtv3.ClusterSpecBase{
-					RancherKubernetesEngineConfig: &rketypes.RancherKubernetesEngineConfig{
-						PrivateRegistries: []rketypes.PrivateRegistry{
-							{
-								URL: s,
-							},
-						},
-					},
-				},
-			},
-		}
-	}
 	type input struct {
 		cluster            *v3.Cluster
 		image              string
@@ -136,42 +116,6 @@ func TestResolveWithCluster(t *testing.T) {
 				cluster:            &v3.Cluster{},
 			},
 			expected: "default-registry.com/rancher/imagename",
-		},
-		{
-			name: "Cluster with URL, no default registry, no rancher/ on image",
-			input: input{
-				image:              "imagename",
-				CattleBaseRegistry: "",
-				cluster:            clusterWithPrivateRegistry("cluster-url.com"),
-			},
-			expected: "cluster-url.com/rancher/imagename",
-		},
-		{
-			name: "Cluster with URL, no default registry, with rancher/ on image",
-			input: input{
-				image:              "imagename",
-				CattleBaseRegistry: "",
-				cluster:            clusterWithPrivateRegistry("cluster-url.com"),
-			},
-			expected: "cluster-url.com/rancher/imagename",
-		},
-		{
-			name: "Cluster with URL, and default registry, no rancher/ on image",
-			input: input{
-				image:              "imagename",
-				CattleBaseRegistry: "registry-url",
-				cluster:            clusterWithPrivateRegistry("cluster-url.com"),
-			},
-			expected: "cluster-url.com/rancher/imagename",
-		},
-		{
-			name: "Cluster with URL, and default registry, with rancher/ on image",
-			input: input{
-				image:              "rancher/imagename",
-				CattleBaseRegistry: "registry-url",
-				cluster:            clusterWithPrivateRegistry("cluster-url.com"),
-			},
-			expected: "cluster-url.com/rancher/imagename",
 		},
 	}
 
@@ -241,7 +185,7 @@ func TestGetImages(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			imagesList, _, err := GetImages(tt.exportConfig, make(map[string][]string), []string{}, map[string]rketypes.RKESystemImages{})
+			imagesList, _, err := GetImages(tt.exportConfig, make(map[string][]string), []string{})
 			assertlib.NoError(t, err)
 
 			for _, expected := range tt.expected {

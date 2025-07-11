@@ -269,28 +269,51 @@ type NodeCommonParams struct {
 }
 
 // +genclient
-// +kubebuilder:skipversion
 // +genclient:nonNamespaced
+// +kubebuilder:resource:scope=Cluster
+// +kubebuilder:printcolumn:name="Activated",type=string,JSONPath=".spec.active"
+// +kubebuilder:printcolumn:name="Binary URL",type=string,JSONPath=".spec.url"
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// NodeDriver represents a Rancher node driver for a specific cloud provider used to provision cluster nodes.
 type NodeDriver struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object’s metadata. More info:
-	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#metadata
 	metav1.ObjectMeta `json:"metadata,omitempty"`
-	// Specification of the desired behavior of the the cluster. More info:
-	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
+	// Specification of the desired behavior of the Node Driver. More info:
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	// +kubebuilder:validation:XValidation:rule="!has(self.checksum) || (self.checksum.size() in [0, 32, 40, 64, 128])",message="Checksum must be an md5, sha1, sha256, or sha512 digest."
 	Spec NodeDriverSpec `json:"spec"`
-	// Most recent observed status of the cluster. More info:
-	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
-	Status NodeDriverStatus `json:"status"`
+	// Most recent observed status of the Node Driver. More info:
+	// https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
+	// +optional
+	Status NodeDriverStatus `json:"status,omitempty"`
 }
 
 type NodeDriverStatus struct {
-	Conditions                  []Condition `json:"conditions"`
-	AppliedURL                  string      `json:"appliedURL"`
-	AppliedChecksum             string      `json:"appliedChecksum"`
-	AppliedDockerMachineVersion string      `json:"appliedDockerMachineVersion"`
+	// Conditions is a representation of the current state of the driver,
+	// this includes its installation status (Downloaded, Installed), as well
+	// as its current state (Active, Inactive). Information related to
+	// errors encountered while transitioning to one of these states will be
+	// populated in the Message and Reason fields.
+	// +optional
+	Conditions []Condition `json:"conditions,omitempty"`
+	// AppliedURL is the url last used to download the driver.
+	// +optional
+	AppliedURL string `json:"appliedURL,omitempty"`
+	// AppliedChecksum is the last known checksum of the driver. This is used
+	// to determine when a Driver needs to be redownloaded from its URL.
+	// +optional
+	AppliedChecksum string `json:"appliedChecksum,omitempty"`
+	// AppliedDockerMachineVersion specifies the last docker machine version
+	// (a.k.a rancher-machine) which provides this driver. When this version
+	// is incremented, Rancher will query the rancher-machine driver to
+	// obtain its arguments and update the automatically generated schema
+	// and associated machine config object. This field is only specified for
+	// drivers bundled within Rancher via rancher-machine.
+	// +optional
+	AppliedDockerMachineVersion string `json:"appliedDockerMachineVersion,omitempty"`
 }
 
 var (
@@ -300,34 +323,47 @@ var (
 	NodeDriverConditionInactive   condition.Cond = "Inactive"
 )
 
-type Condition struct {
-	// Type of cluster condition.
-	Type string `json:"type"`
-	// Status of the condition, one of True, False, Unknown.
-	Status v1.ConditionStatus `json:"status"`
-	// The last time this condition was updated.
-	LastUpdateTime string `json:"lastUpdateTime,omitempty"`
-	// Last time the condition transitioned from one status to another.
-	LastTransitionTime string `json:"lastTransitionTime,omitempty"`
-	// The reason for the condition's last transition.
-	Reason string `json:"reason,omitempty"`
-	// Human-readable message indicating details about last transition
-	Message string `json:"message,omitempty"`
-}
-
 type NodeDriverSpec struct {
-	DisplayName string `json:"displayName"`
-	Description string `json:"description"`
-	URL         string `json:"url" norman:"required"`
-	ExternalID  string `json:"externalId"`
-	Builtin     bool   `json:"builtin"`
-	Active      bool   `json:"active"`
-	// If AddCloudCredential is true, then the cloud credential schema is created
-	// regardless of whether the node driver is active.
-	AddCloudCredential bool     `json:"addCloudCredential"`
-	Checksum           string   `json:"checksum"`
-	UIURL              string   `json:"uiUrl"`
-	WhitelistDomains   []string `json:"whitelistDomains,omitempty"`
+	// DisplayName specifies the publicly visible name of the driver shown in the Rancher UI.
+	// +kubebuilder:validation:MaxLength=57
+	// +optional
+	DisplayName string `json:"displayName,omitempty"`
+	// Description provides a short explanation of what the driver does.
+	// +optional
+	Description string `json:"description,omitempty"`
+	// URL defines the location of the driver binary that will
+	// be downloaded when the driver is enabled. This can either be
+	// an absolute url to a remote resource, or a reference to localhost.
+	// +required
+	URL string `json:"url" norman:"required"`
+	// ExternalID is not currently used.
+	// +optional
+	ExternalID string `json:"externalId,omitempty"`
+	// Builtin specifies if a driver is built into Rancher via rancher-machine.
+	// +optional
+	Builtin bool `json:"builtin,omitempty"`
+	// Active specifies if the driver can be used to provision clusters.
+	// +required
+	Active bool `json:"active"`
+	// AddCloudCredential determines if an associated cloud credential
+	// dynamic schema should be created for this driver even if it is not
+	// enabled.
+	// +optional
+	AddCloudCredential bool `json:"addCloudCredential,omitempty"`
+	// Checksum is used to represent the expected content of the driver
+	// binary. When this value changes, the driver binary will be
+	// redownloaded from its URL.
+	// +kubebuilder:validation:Pattern="^$|^[a-fA-F0-9]{32,128}$"
+	// +kubebuilder:validation:MaxLength=128
+	// +optional
+	Checksum string `json:"checksum,omitempty"`
+	// UIURL is the url to load for a customized Add Nodes screen for this driver.
+	// +optional
+	UIURL string `json:"uiUrl,omitempty"`
+	// WhitelistDomains is a list of domains which will be automatically
+	// white-listed by Rancher to allow for the driver to be downloaded.
+	// +optional
+	WhitelistDomains []string `json:"whitelistDomains,omitempty"`
 }
 
 type PublicEndpoint struct {

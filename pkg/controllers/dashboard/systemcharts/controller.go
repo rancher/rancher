@@ -4,6 +4,7 @@ package systemcharts
 import (
 	"context"
 	"fmt"
+	"os"
 	"slices"
 	"time"
 
@@ -38,9 +39,11 @@ import (
 const (
 	repoName             = "rancher-charts"
 	sucDeploymentName    = "system-upgrade-controller"
-	legacyAppLabel       = "io.cattle.field/appId"
 	legacyAppFinalizer   = "systemcharts.cattle.io/legacy-k3s-based-upgrader-deprecation"
 	managedPlanFinalizer = "systemcharts.cattle.io/rancher-managed-plan"
+
+	// managedSucDeploymentAnno is added to the system-upgrade-controller chart since Rancher v2.12
+	managedSucDeploymentAnno = "apps.cattle.io/managed-system-upgrade-controller"
 )
 
 var (
@@ -166,7 +169,7 @@ func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.Cluste
 		minVersion := chartDef.MinVersionSetting.Get()
 		exactVersion := chartDef.ExactVersionSetting.Get()
 		takeOwnership := chartDef.ChartName == chart.WebhookChartName || chartDef.ChartName == chart.ProvisioningCAPIChartName
-		if err := h.manager.Ensure(chartDef.ReleaseNamespace, chartDef.ChartName, minVersion, exactVersion, values, takeOwnership, installImageOverride); err != nil {
+		if err := h.manager.Ensure(chartDef.ReleaseNamespace, chartDef.ChartName, chartDef.ReleaseName, minVersion, exactVersion, values, takeOwnership, installImageOverride); err != nil {
 			return repo, err
 		}
 	}
@@ -178,6 +181,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 	return []*chart.Definition{
 		{
 			ReleaseNamespace:    namespace.System,
+			ReleaseName:         chart.RemoteDialerProxyChartName,
 			ChartName:           chart.RemoteDialerProxyChartName,
 			ExactVersionSetting: settings.RemoteDialerProxyVersion,
 			Values: func() map[string]interface{} {
@@ -192,13 +196,13 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 					return false
 				}
 
-				return features.ImperativeApiExtension.Enabled() && ext.RDPEnabled()
+				return ext.RDPEnabled()
 			},
-			Uninstall:       !features.ImperativeApiExtension.Enabled(),
 			RemoveNamespace: false,
 		},
 		{
 			ReleaseNamespace:    namespace.System,
+			ReleaseName:         chart.WebhookChartName,
 			ChartName:           chart.WebhookChartName,
 			ExactVersionSetting: settings.RancherWebhookVersion,
 			Values: func() map[string]interface{} {
@@ -221,12 +225,14 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 		},
 		{
 			ReleaseNamespace: "rancher-operator-system",
+			ReleaseName:      "rancher-operator",
 			ChartName:        "rancher-operator",
 			Uninstall:        true,
 			RemoveNamespace:  true,
 		},
 		{
 			ReleaseNamespace:    namespace.ProvisioningCAPINamespace,
+			ReleaseName:         chart.ProvisioningCAPIChartName,
 			ChartName:           chart.ProvisioningCAPIChartName,
 			ExactVersionSetting: settings.RancherProvisioningCAPIVersion,
 			Values: func() map[string]interface{} {
@@ -242,7 +248,13 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 			RemoveNamespace: !features.EmbeddedClusterAPI.Enabled(),
 		},
 		{
-			ReleaseNamespace:    namespace.System,
+			ReleaseNamespace: namespace.System,
+			ReleaseName: func() string {
+				if name := os.Getenv("CATTLE_SUC_APP_NAME_OVERRIDE"); name != "" {
+					return name
+				}
+				return chart.SystemUpgradeControllerChartName
+			}(),
 			ChartName:           chart.SystemUpgradeControllerChartName,
 			ExactVersionSetting: settings.SystemUpgradeControllerChartVersion,
 			Values: func() map[string]interface{} {
@@ -267,26 +279,23 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 				return data.MergeMaps(values, configMapValues)
 			},
 			Enabled: func() bool {
-				toEnable := false
+				toEnable := true
 				suc, err := h.deploymentCache.Get(namespace.System, sucDeploymentName)
-
-				// the absence of the deployment or the absence of the legacy label on the existing deployment indicate
-				// that the old rancher-k3s/rke2-upgrader Project App has been removed
-				if err != nil {
-					if errors.IsNotFound(err) {
-						toEnable = true
-					} else {
-						logrus.Warnf("[systemcharts] failed to get the deployment %s/%s: %v", namespace.System, sucDeploymentName, err)
-					}
+				if err != nil && !errors.IsNotFound(err) {
+					toEnable = false
+					logrus.Warnf("[systemcharts] failed to get the deployment %s/%s: %s", namespace.System, sucDeploymentName, err.Error())
 				}
 				if suc != nil {
-					if _, ok := suc.Labels[legacyAppLabel]; !ok {
-						toEnable = true
+					// The missing annotation suggests that either the legacy Fleet bundle in the node-driver RKE2/K3s cluster,
+					// or the old rancher-k3s/rke2-upgrader Project App in the imported RKE2/K3s cluster, is still present.
+					// Note: these legacy components are cleaned up by other handlers within Rancher.
+					if _, ok := suc.Annotations[managedSucDeploymentAnno]; !ok {
+						toEnable = false
 					}
 				}
 				var versionManagementEnabled bool
 				if features.MCMAgent.Enabled() {
-					// For the imported RKE2/K3s cluster,
+					// For the imported or node-driver RKE2/K3s cluster,
 					// cluster agent checks the ManagedSystemUpgradeController feature in the imported cluster
 					versionManagementEnabled = features.ManagedSystemUpgradeController.Enabled()
 				}
@@ -344,19 +353,20 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 	}
 }
 
-// onDeployment enqueues the rancher-charts ClusterRepo to the controller's processing queue
-// when a specific event occurs on the target deployment. It is currently used to manage
-// the migration from the legacy k3s-based-upgrader app to the system-upgrade-controller app.
+// onDeployment enqueues the rancher-charts ClusterRepo into the controller's processing queue in response to specific
+// deployment events. It is currently used to handle the migration from the legacy k3s-based-upgrader app in
+// imported clusters, and the Fleet-managed system-upgrade-controller in node-driver clusters,
+// to the system-upgrade-controller app as a systemChart.
 func (h *handler) onDeployment(_ string, d *k8sappsv1.Deployment) (*k8sappsv1.Deployment, error) {
 	if d == nil || d.Namespace != namespace.System || d.Name != sucDeploymentName {
 		return d, nil
 	}
-	if appName, ok := d.Labels[legacyAppLabel]; !ok || (appName != k3sbasedupgrade.K3sAppName && appName != k3sbasedupgrade.Rke2AppName) {
+	if _, ok := d.Annotations[managedSucDeploymentAnno]; ok {
 		return d, nil
 	}
+
 	index := slices.Index(d.Finalizers, legacyAppFinalizer)
-	logrus.Debugf("[systemcharts] found deployment %s/%s with label %s=%s, index of target finalzier = %d",
-		d.Namespace, d.Name, legacyAppLabel, d.Labels[legacyAppLabel], index)
+	logrus.Infof("[systemcharts] found deployment %s/%s with index of target finalzier = %d", d.Namespace, d.Name, index)
 	if (d.DeletionTimestamp != nil && index == -1) || (d.DeletionTimestamp == nil && index >= 0) {
 		return d, nil
 	}

@@ -112,9 +112,9 @@ type TokenPrincipal struct {
 // TokenStatus defines the most recently observed status of the Token.
 type TokenStatus struct {
 	// Value is the access key. It is shown only on token creation and not saved.
-	Value string `json:"tokenValue,omitempty"`
+	Value string `json:"value,omitempty"`
 	// Hash is the hash of the Value.
-	Hash string `json:"tokenHash,omitempty"`
+	Hash string `json:"hash,omitempty"`
 	// Current indicates whether the token was used to authenticate the current request.
 	Current bool `json:"current"`
 	// Expired indicates whether the token has exceeded its TTL.
@@ -192,4 +192,60 @@ func (t *Token) GetLastActivitySeen() *metav1.Time {
 
 func (t *Token) GetCreationTime() metav1.Time {
 	return t.CreationTimestamp
+}
+
+// +genclient
+// +genclient:nonNamespaced
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// Kubeconfig allows creating v1.Config kubeconfig files for interacting with Rancher and clusters managed by Rancher.
+type Kubeconfig struct {
+	metav1.TypeMeta `json:",inline"`
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
+	// Note: Name and GenerateName are not respected. A name is always generated with a predefined prefix.
+	// +optional
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	// Spec is the desired state of the Kubeconfig.
+	// +optional
+	Spec KubeconfigSpec `json:"spec,omitempty"`
+	// Status is the most recently observed status of the Kubeconfig.
+	// +optional
+	Status KubeconfigStatus `json:"status,omitempty"`
+}
+
+// KubeconfigSpec defines the desired state of Kubeconfig.
+type KubeconfigSpec struct {
+	// Clusters is a list of cluster names.
+	// +listType=set
+	// +optional
+	Clusters []string `json:"clusters"`
+	// CurrentContext is the cluster ID default context for which will be set as the current context.
+	// If omitted, the first cluster in the list is considered for setting the current context.
+	// +optional
+	CurrentContext string `json:"currentContext,omitempty"`
+	// Description is a human readable description of the Kubeconfig.
+	// +optional
+	Description string `json:"description,omitempty"`
+	// TTL is the time-to-live of the kubeconfig tokens, in seconds.
+	// +optional
+	TTL int64 `json:"ttl,omitempty"`
+}
+
+// KubeconfigStatus defines the most recently observed status of the Kubeconfig.
+type KubeconfigStatus struct {
+	// Conditions indicate state for particular aspects of the Kubeconfig.
+	// +listType=map
+	// +listMapKey=type
+	// +patchStrategy=merge
+	// +patchMergeKey=type
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+	// Summary of the Kubeconfig status. Can be "Complete" or "Error".
+	// +optional
+	Summary string `json:"summary,omitempty"`
+	// Tokens is a list of Kubeconfig tokens.
+	// +optional
+	Tokens []string `json:"tokens,omitempty"`
+	// Value contains the generated content of the kubeconfig.
+	Value string `json:"value,omitempty"`
 }

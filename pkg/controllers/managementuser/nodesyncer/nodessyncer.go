@@ -13,7 +13,6 @@ import (
 	cond "github.com/rancher/norman/condition"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/controllers/management/secretmigrator/assemblers"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/podresources"
 	"github.com/rancher/rancher/pkg/controllers/managementlegacy/compose/common"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
@@ -21,13 +20,10 @@ import (
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	kd "github.com/rancher/rancher/pkg/kontainerdrivermetadata"
-	"github.com/rancher/rancher/pkg/librke"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/config/systemtokens"
-	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -62,10 +58,6 @@ type nodesSyncer struct {
 	nodeClient           v1.NodeInterface
 	clusterNamespace     string
 	clusterLister        v3.ClusterLister
-	serviceOptionsLister v3.RkeK8sServiceOptionLister
-	serviceOptions       v3.RkeK8sServiceOptionInterface
-	sysImagesLister      v3.RkeK8sSystemImageLister
-	sysImages            v3.RkeK8sSystemImageInterface
 	secretLister         v1.SecretLister
 	provClusterCache     provcontrollers.ClusterCache
 	capiClusterCache     capicontrollers.ClusterCache
@@ -96,10 +88,6 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 		nodeLister:           cluster.Core.Nodes("").Controller().Lister(),
 		nodeClient:           cluster.Core.Nodes(""),
 		clusterLister:        cluster.Management.Management.Clusters("").Controller().Lister(),
-		serviceOptionsLister: cluster.Management.Management.RkeK8sServiceOptions("").Controller().Lister(),
-		serviceOptions:       cluster.Management.Management.RkeK8sServiceOptions(""),
-		sysImagesLister:      cluster.Management.Management.RkeK8sSystemImages("").Controller().Lister(),
-		sysImages:            cluster.Management.Management.RkeK8sSystemImages(""),
 		secretLister:         cluster.Management.Core.Secrets("").Controller().Lister(),
 		provClusterCache:     cluster.Management.Wrangler.Provisioning.Cluster().Cache(),
 		capiClusterCache:     cluster.Management.Wrangler.CAPI.Cluster().Cache(),
@@ -128,7 +116,6 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 
 	cluster.Core.Nodes("").Controller().AddHandler(ctx, "nodesSyncer", n.sync)
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler(ctx, "machinesSyncer", m.sync)
-	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler(ctx, "machinesLabelSyncer", m.syncLabels)
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler(ctx, "cordonFieldsSyncer", m.syncCordonFields)
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler(ctx, "drainNodeSyncer", d.drainNode)
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler(ctx, "machineTaintSyncer", m.syncTaints)
@@ -259,214 +246,6 @@ func (m *nodesSyncer) sync(key string, _ *apimgmtv3.Node) (runtime.Object, error
 		return nil, m.reconcileAll()
 	}
 	return nil, nil
-}
-
-func (m *nodesSyncer) updateNodeAndNode(node *corev1.Node, obj *apimgmtv3.Node) (*corev1.Node, *apimgmtv3.Node, error) {
-	node, err := m.nodeClient.Update(node)
-	if err != nil {
-		// Return apimgmtv3.Node is nil because it hasn't been persisted and therefor out of sync with cache
-		// so we don't want to return it from the handler
-		return node, nil, err
-	}
-
-	obj, err = m.machines.Update(obj)
-	if err != nil {
-		// Same logic as above, but more so that we don't know the state of this object
-		return node, nil, err
-	}
-
-	return node, obj, nil
-}
-
-func (m *nodesSyncer) updateLabels(node *corev1.Node, obj *apimgmtv3.Node, nodePlan rketypes.RKEConfigNodePlan) (*corev1.Node, *apimgmtv3.Node, error) {
-	finalMap, changed := computeDelta(node.Labels, nodePlan.Labels, obj.Spec.MetadataUpdate.Labels, onlyKubeLabels)
-	if !changed {
-		return node, obj, nil
-	}
-
-	node, obj = node.DeepCopy(), obj.DeepCopy()
-	if obj.Status.NodeConfig != nil {
-		planValues, changed := computePlanDelta(obj.Status.NodeConfig.Labels, obj.Spec.MetadataUpdate.Labels)
-		if changed {
-			obj.Status.NodeConfig.Labels = planValues
-		}
-	}
-
-	node.Labels = finalMap
-
-	obj.Spec.MetadataUpdate.Labels = apimgmtv3.MapDelta{}
-
-	return m.updateNodeAndNode(node, obj)
-}
-
-// For any key that already exist in the plan, we should update or delete. For others, do not touch the plan.
-func computePlanDelta(planValues map[string]string, delta apimgmtv3.MapDelta) (map[string]string, bool) {
-	update := false
-	for k, v := range delta.Add {
-		if planValues[k] != "" {
-			update = true
-			planValues[k] = v
-		}
-	}
-
-	for k := range delta.Delete {
-		if planValues[k] != "" {
-			update = true
-			delete(planValues, k)
-		}
-	}
-	return planValues, update
-
-}
-
-func (m *nodesSyncer) updateAnnotations(node *corev1.Node, obj *apimgmtv3.Node, nodePlan rketypes.RKEConfigNodePlan) (*corev1.Node, *apimgmtv3.Node, error) {
-	finalMap, changed := computeDelta(node.Annotations, nodePlan.Annotations, obj.Spec.MetadataUpdate.Annotations, allowAllPolicy)
-	if !changed {
-		return node, obj, nil
-	}
-
-	node, obj = node.DeepCopy(), obj.DeepCopy()
-	node.Annotations = finalMap
-	obj.Spec.MetadataUpdate.Annotations = apimgmtv3.MapDelta{}
-
-	return m.updateNodeAndNode(node, obj)
-}
-
-func (m *nodesSyncer) syncLabels(_ string, obj *apimgmtv3.Node) (runtime.Object, error) {
-	if obj == nil {
-		return nil, nil
-	}
-
-	node, err := nodehelper.GetNodeForMachine(obj, m.nodeLister)
-	if err != nil || node == nil {
-		return nil, err
-	}
-
-	nodePlan, err := m.getNodePlan(obj)
-	if err != nil {
-		return obj, err
-	}
-
-	node, obj, err = m.updateLabels(node, obj, nodePlan)
-	if err != nil {
-		return obj, err
-	}
-
-	_, obj, err = m.updateAnnotations(node, obj, nodePlan)
-	return obj, err
-}
-
-func onlyKubeLabels(key string) bool {
-	return strings.Contains(key, "kubernetes.io")
-}
-
-func allowAllPolicy(_ string) bool {
-	return true
-}
-
-// computeDelta will return the final updated map to apply and a boolean indicating whether there are changes to be applied.
-// If the boolean is false, the caller need not take any action as the data is already in sync.
-func computeDelta(currentState map[string]string, planValues map[string]string, delta apimgmtv3.MapDelta, canChangeValue canChangeValuePolicy) (map[string]string, bool) {
-	result := map[string]string{}
-	changed := false
-
-	// copy map
-	for k, v := range currentState {
-		result[k] = v
-	}
-
-	for k, v := range planValues {
-		currentValue, ok := result[k]
-		// if the key is missing or the value is allowed to be changed
-		if !ok || (currentValue != v && canChangeValue(k)) {
-			result[k] = v
-			changed = true
-		}
-	}
-
-	for k, v := range delta.Add {
-		if result[k] != v {
-			changed = true
-			result[k] = v
-		}
-	}
-
-	for k := range delta.Delete {
-		if _, ok := result[k]; ok {
-			delete(result, k)
-			changed = true
-		}
-	}
-
-	return result, changed
-}
-
-func (m *nodesSyncer) getNodePlan(node *apimgmtv3.Node) (rketypes.RKEConfigNodePlan, error) {
-	cluster, err := m.clusterLister.Get("", node.Namespace)
-	if err != nil {
-		return rketypes.RKEConfigNodePlan{}, err
-	}
-
-	if cluster.Status.Driver != apimgmtv3.ClusterDriverRKE || cluster.Status.AppliedSpec.RancherKubernetesEngineConfig == nil {
-		return rketypes.RKEConfigNodePlan{}, nil
-	}
-
-	if node.Status.NodeConfig == nil {
-		return rketypes.RKEConfigNodePlan{}, nil
-	}
-
-	dockerInfo, err := librke.GetDockerInfo(node)
-	if err != nil {
-		return rketypes.RKEConfigNodePlan{}, err
-	}
-
-	hostAddress := node.Status.NodeConfig.Address
-	hostDockerInfo := dockerInfo[hostAddress]
-
-	svcOptions, err := m.getServiceOptions(cluster.Status.AppliedSpec.RancherKubernetesEngineConfig.Version, hostDockerInfo.OSType)
-	if err != nil {
-		return rketypes.RKEConfigNodePlan{}, err
-	}
-
-	appliedSpec, err := assemblers.AssembleRKEConfigSpec(cluster, *cluster.Status.AppliedSpec.DeepCopy(), m.secretLister)
-	if err != nil {
-		return rketypes.RKEConfigNodePlan{}, err
-	}
-	plan, err := librke.New().GeneratePlan(context.Background(), appliedSpec.RancherKubernetesEngineConfig, dockerInfo, svcOptions)
-	if err != nil {
-		return rketypes.RKEConfigNodePlan{}, err
-	}
-
-	for _, nodePlan := range plan.Nodes {
-		if nodePlan.Address == node.Status.NodeConfig.Address {
-			return nodePlan, nil
-		}
-	}
-
-	return rketypes.RKEConfigNodePlan{}, nil
-}
-
-func (m *nodesSyncer) getServiceOptions(k8sVersion string, osType string) (map[string]interface{}, error) {
-	data := map[string]interface{}{}
-	svcOptions, err := kd.GetRKEK8sServiceOptions(k8sVersion, m.serviceOptionsLister, m.serviceOptions, m.sysImagesLister, m.sysImages, kd.Linux)
-	if err != nil {
-		logrus.Errorf("getK8sServiceOptions: k8sVersion %s [%v]", k8sVersion, err)
-		return data, err
-	}
-	if svcOptions != nil {
-		data["k8s-service-options"] = svcOptions
-	}
-	if osType == "windows" {
-		svcOptionsWindows, err := kd.GetRKEK8sServiceOptions(k8sVersion, m.serviceOptionsLister, m.serviceOptions, m.sysImagesLister, m.sysImages, kd.Windows)
-		if err != nil {
-			logrus.Errorf("getK8sServiceOptionsWindows: k8sVersion %s [%v]", k8sVersion, err)
-			return data, err
-		}
-		if svcOptionsWindows != nil {
-			data["k8s-windows-service-options"] = svcOptionsWindows
-		}
-	}
-	return data, nil
 }
 
 func (m *nodesSyncer) reconcileAll() error {
@@ -920,10 +699,6 @@ func (m *nodesSyncer) isClusterRestoring() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if cluster.Spec.RancherKubernetesEngineConfig != nil &&
-		cluster.Spec.RancherKubernetesEngineConfig.Restore.Restore {
-		return true, nil
-	}
 	if cluster.Status.Driver == "imported" {
 		return false, nil
 	}
@@ -957,7 +732,7 @@ func determineNodeRoles(machine *apimgmtv3.Node) {
 	if machine.Status.NodeLabels != nil {
 		_, etcd := machine.Status.NodeLabels["node-role.kubernetes.io/etcd"]
 		_, control := machine.Status.NodeLabels["node-role.kubernetes.io/controlplane"]
-		_, master := machine.Status.NodeLabels["node-role.kubernetes.io/master"]
+		_, master := machine.Status.NodeLabels["node-role.kubernetes.io/control-plane"]
 		_, worker := machine.Status.NodeLabels["node-role.kubernetes.io/worker"]
 		machine.Spec.Etcd = etcd
 		machine.Spec.Worker = worker

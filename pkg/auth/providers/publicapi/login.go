@@ -223,7 +223,7 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		currUser *v3.User
 	)
 
-	err = wait.ExponentialBackoffWithContext(ctx, backoff, func(_ context.Context) (bool, error) {
+	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
 		var err error
 
 		currUser, err = h.userMGR.EnsureUser(userPrincipal.Name, displayName)

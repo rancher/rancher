@@ -15,11 +15,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/rancher/rancher/pkg/kontainer-engine/cluster"
-	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/aks"
-	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/eks"
-	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/gke"
 	kubeimport "github.com/rancher/rancher/pkg/kontainer-engine/drivers/import"
-	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/rke"
 	"github.com/rancher/rancher/pkg/kontainer-engine/types"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
@@ -27,8 +23,6 @@ import (
 
 const (
 	ListenAddress                           = "127.0.0.1:"
-	GoogleKubernetesEngineDriverName        = "googlekubernetesengine"
-	AzureKubernetesServiceDriverName        = "azurekubernetesservice"
 	AmazonElasticContainerServiceDriverName = "amazonelasticcontainerservice"
 	ImportDriverName                        = "import"
 	RancherKubernetesEngineDriverName       = "rancherkubernetesengine"
@@ -36,11 +30,7 @@ const (
 
 var (
 	Drivers = map[string]types.Driver{
-		GoogleKubernetesEngineDriverName:        gke.NewDriver(),
-		AzureKubernetesServiceDriverName:        aks.NewDriver(),
-		AmazonElasticContainerServiceDriverName: eks.NewDriver(),
-		ImportDriverName:                        kubeimport.NewDriver(),
-		RancherKubernetesEngineDriverName:       rke.NewDriver(),
+		ImportDriverName: kubeimport.NewDriver(),
 	}
 )
 
@@ -64,12 +54,6 @@ func (c controllerConfigGetter) GetConfig() (types.DriverOptions, error) {
 			return driverOptions, err
 		}
 		flatten(config, &driverOptions)
-	case RancherKubernetesEngineDriverName:
-		config, err := yaml.Marshal(c.clusterSpec.RancherKubernetesEngineConfig)
-		if err != nil {
-			return driverOptions, err
-		}
-		driverOptions.StringOptions["rkeConfig"] = string(config)
 	default:
 		config, err := toMap(c.clusterSpec.GenericEngineConfig, "json")
 		if err != nil {
@@ -174,8 +158,6 @@ func (e *EngineService) convertCluster(name string, listenAddr string, spec v3.C
 	driverName := ""
 	if spec.ImportedConfig != nil {
 		driverName = ImportDriverName
-	} else if spec.RancherKubernetesEngineConfig != nil {
-		driverName = RancherKubernetesEngineDriverName
 	} else if spec.GenericEngineConfig != nil {
 		driverName = (*spec.GenericEngineConfig)["driverName"].(string)
 		if driverName == "" {

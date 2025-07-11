@@ -139,8 +139,11 @@ func (m *manager) ensureGlobalResourcesRolesForPRTB(projectName string, rts map[
 		var rules []rbacv1.PolicyRule
 		if rt.External {
 			externalRole, err := m.crLister.Get("", rt.Name)
-			if err != nil && !apierrors.IsNotFound(err) {
-				// dont error if it doesnt exist
+			if apierrors.IsNotFound(err) {
+				// Don't error if it doesn't exist, just move on to the next RoleTemplate
+				continue
+			}
+			if err != nil {
 				return nil, err
 			}
 			if externalRole != nil {

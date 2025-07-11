@@ -27,6 +27,23 @@ import (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// KubeconfigList is a list of Kubeconfig resources
+type KubeconfigList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []Kubeconfig `json:"items"`
+}
+
+func NewKubeconfig(namespace, name string, obj Kubeconfig) *Kubeconfig {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("Kubeconfig").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // TokenList is a list of Token resources
 type TokenList struct {
 	metav1.TypeMeta `json:",inline"`

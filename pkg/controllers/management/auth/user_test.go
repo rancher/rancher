@@ -8,9 +8,9 @@ import (
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	management "github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	fakes "github.com/rancher/rancher/pkg/controllers/management/auth/fakes"
 	"github.com/rancher/rancher/pkg/controllers/management/auth/project_cluster"
 	exttokens "github.com/rancher/rancher/pkg/ext/stores/tokens"
+	userMocks "github.com/rancher/rancher/pkg/user/mocks"
 	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -107,7 +107,7 @@ func TestCreate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserManager := fakes.NewMockManager(ctrl)
+	mockUserManager := userMocks.NewMockManager(ctrl)
 
 	ul := &userLifecycle{
 		userManager: mockUserManager,
@@ -197,7 +197,7 @@ func TestUpdated(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	mockUserManager := fakes.NewMockManager(ctrl)
+	mockUserManager := userMocks.NewMockManager(ctrl)
 
 	ul := &userLifecycle{
 		userManager: mockUserManager,
@@ -389,7 +389,7 @@ func TestUpdated(t *testing.T) {
 
 			timer := exttokens.NewMocktimeHandler(ctrl)
 
-			store := exttokens.NewSystem(nil, secrets, users, nil, timer, nil, nil)
+			store := exttokens.NewSystem(nil, nil, secrets, users, nil, timer, nil, nil)
 			ul.extTokenStore = store
 
 			tt.mockSetup(secrets, scache, timer)

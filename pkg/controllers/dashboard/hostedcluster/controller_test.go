@@ -54,6 +54,7 @@ func Test_handler_onClusterChange(t *testing.T) {
 				var b bool
 				manager.EXPECT().Ensure(
 					AksCrdChart.ReleaseNamespace,
+					AksCrdChart.ReleaseName,
 					AksCrdChart.ChartName,
 					settings.AksOperatorVersion.Get(),
 					"",
@@ -63,6 +64,7 @@ func Test_handler_onClusterChange(t *testing.T) {
 				).Return(nil)
 				manager.EXPECT().Ensure(
 					AksChart.ReleaseNamespace,
+					AksChart.ReleaseName,
 					AksChart.ChartName,
 					settings.AksOperatorVersion.Get(),
 					"",
@@ -99,6 +101,7 @@ func Test_handler_onClusterChange(t *testing.T) {
 				var b bool
 				manager.EXPECT().Ensure(
 					AksCrdChart.ReleaseNamespace,
+					AksCrdChart.ReleaseName,
 					AksCrdChart.ChartName,
 					settings.AksOperatorVersion.Get(),
 					"",
@@ -108,6 +111,7 @@ func Test_handler_onClusterChange(t *testing.T) {
 				).Return(nil)
 				manager.EXPECT().Ensure(
 					AksChart.ReleaseNamespace,
+					AksChart.ReleaseName,
 					AksChart.ChartName,
 					settings.AksOperatorVersion.Get(),
 					"",
@@ -148,6 +152,7 @@ func Test_handler_onClusterChange(t *testing.T) {
 				var b bool
 				manager.EXPECT().Ensure(
 					AksCrdChart.ReleaseNamespace,
+					AksCrdChart.ReleaseName,
 					AksCrdChart.ChartName,
 					exactVersion,
 					"",
@@ -157,6 +162,7 @@ func Test_handler_onClusterChange(t *testing.T) {
 				).Return(nil)
 				manager.EXPECT().Ensure(
 					AksChart.ReleaseNamespace,
+					AksChart.ReleaseName,
 					AksChart.ChartName,
 					exactVersion,
 					"",

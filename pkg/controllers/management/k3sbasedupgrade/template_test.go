@@ -68,7 +68,7 @@ func TestGenerateMasterPlan(t *testing.T) {
 					Version: "test-version",
 					NodeSelector: &metav1.LabelSelector{
 						MatchExpressions: []metav1.LabelSelectorRequirement{{
-							Key:      "node-role.kubernetes.io/master",
+							Key:      "node-role.kubernetes.io/control-plane",
 							Operator: metav1.LabelSelectorOpIn,
 							Values:   []string{"true"},
 						},
@@ -119,7 +119,7 @@ func TestGenerateMasterPlan(t *testing.T) {
 					Version: "test-version",
 					NodeSelector: &metav1.LabelSelector{
 						MatchExpressions: []metav1.LabelSelectorRequirement{{
-							Key:      "node-role.kubernetes.io/master",
+							Key:      "node-role.kubernetes.io/control-plane",
 							Operator: metav1.LabelSelectorOpIn,
 							Values:   []string{"true"},
 						},
@@ -167,7 +167,7 @@ func TestGenerateMasterPlan(t *testing.T) {
 					Version: "test-version",
 					NodeSelector: &metav1.LabelSelector{
 						MatchExpressions: []metav1.LabelSelectorRequirement{{
-							Key:      "node-role.kubernetes.io/master",
+							Key:      "node-role.kubernetes.io/control-plane",
 							Operator: metav1.LabelSelectorOpIn,
 							Values:   []string{"true"},
 						},
@@ -239,7 +239,7 @@ func TestGenerateWorkerPlan(t *testing.T) {
 					Version: "test-version",
 					NodeSelector: &metav1.LabelSelector{
 						MatchExpressions: []metav1.LabelSelectorRequirement{{
-							Key:      "node-role.kubernetes.io/master",
+							Key:      "node-role.kubernetes.io/control-plane",
 							Operator: metav1.LabelSelectorOpDoesNotExist,
 						},
 							{
@@ -293,7 +293,7 @@ func TestGenerateWorkerPlan(t *testing.T) {
 					Version: "test-version",
 					NodeSelector: &metav1.LabelSelector{
 						MatchExpressions: []metav1.LabelSelectorRequirement{{
-							Key:      "node-role.kubernetes.io/master",
+							Key:      "node-role.kubernetes.io/control-plane",
 							Operator: metav1.LabelSelectorOpDoesNotExist,
 						},
 							{
@@ -344,7 +344,7 @@ func TestGenerateWorkerPlan(t *testing.T) {
 					Version: "test-version",
 					NodeSelector: &metav1.LabelSelector{
 						MatchExpressions: []metav1.LabelSelectorRequirement{{
-							Key:      "node-role.kubernetes.io/master",
+							Key:      "node-role.kubernetes.io/control-plane",
 							Operator: metav1.LabelSelectorOpDoesNotExist,
 						},
 							{
@@ -407,7 +407,7 @@ func TestConfigureMasterPlan(t *testing.T) {
 					Version: "test-version",
 					NodeSelector: &metav1.LabelSelector{
 						MatchExpressions: []metav1.LabelSelectorRequirement{{
-							Key:      "node-role.kubernetes.io/master",
+							Key:      "node-role.kubernetes.io/control-plane",
 							Operator: metav1.LabelSelectorOpIn,
 							Values:   []string{"true"},
 						},
@@ -448,7 +448,7 @@ func TestConfigureMasterPlan(t *testing.T) {
 					Version: "test-version",
 					NodeSelector: &metav1.LabelSelector{
 						MatchExpressions: []metav1.LabelSelectorRequirement{{
-							Key:      "node-role.kubernetes.io/master",
+							Key:      "node-role.kubernetes.io/control-plane",
 							Operator: metav1.LabelSelectorOpIn,
 							Values:   []string{"true"},
 						},
@@ -486,7 +486,7 @@ func TestConfigureMasterPlan(t *testing.T) {
 					Version: "test-version",
 					NodeSelector: &metav1.LabelSelector{
 						MatchExpressions: []metav1.LabelSelectorRequirement{{
-							Key:      "node-role.kubernetes.io/master",
+							Key:      "node-role.kubernetes.io/control-plane",
 							Operator: metav1.LabelSelectorOpIn,
 							Values:   []string{"true"},
 						},
@@ -555,7 +555,7 @@ func TestConfigureWorkerPlan(t *testing.T) {
 					Version: "test-version",
 					NodeSelector: &metav1.LabelSelector{
 						MatchExpressions: []metav1.LabelSelectorRequirement{{
-							Key:      "node-role.kubernetes.io/master",
+							Key:      "node-role.kubernetes.io/control-plane",
 							Operator: metav1.LabelSelectorOpDoesNotExist,
 						},
 							{
@@ -599,7 +599,7 @@ func TestConfigureWorkerPlan(t *testing.T) {
 					Version: "test-version",
 					NodeSelector: &metav1.LabelSelector{
 						MatchExpressions: []metav1.LabelSelectorRequirement{{
-							Key:      "node-role.kubernetes.io/master",
+							Key:      "node-role.kubernetes.io/control-plane",
 							Operator: metav1.LabelSelectorOpDoesNotExist,
 						},
 							{
@@ -640,7 +640,7 @@ func TestConfigureWorkerPlan(t *testing.T) {
 					Version: "test-version",
 					NodeSelector: &metav1.LabelSelector{
 						MatchExpressions: []metav1.LabelSelectorRequirement{{
-							Key:      "node-role.kubernetes.io/master",
+							Key:      "node-role.kubernetes.io/control-plane",
 							Operator: metav1.LabelSelectorOpDoesNotExist,
 						},
 							{

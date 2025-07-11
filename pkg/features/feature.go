@@ -130,8 +130,8 @@ var (
 		true)
 	UISQLCache = newFeature(
 		"ui-sql-cache",
-		"[Experimental]: Enable SQLite-backed caching to improve performance and provide additional UI sorting/filtering features.",
-		false,
+		"Improve performance by enabling SQLite-backed caching. This also enables server-side pagination and other scaling based performance improvements.",
+		true,
 		false,
 		true)
 	RKE1UI = newFeature(
@@ -164,12 +164,6 @@ var (
 		false,
 		true,
 		true)
-	ImperativeApiExtension = newFeature(
-		"imperative-api-extension",
-		"Enable imperative API extension as a k8s aggregation layer as proxy to the kube apiserver",
-		true,
-		false,
-		true)
 	Provisioningv2ETCDSnapshotBackPopulation = newFeature(
 		"v2prov-etcd-snapshot-backpopulate",
 		"Allow Rancher to create ETCD Snapshot CRs for downstream clusters in the local cluster",
@@ -179,6 +173,24 @@ var (
 	OIDCProvider = newFeature(
 		"oidc-provider",
 		"Provide an OIDC provider embedded in Rancher. Required to enable SSO in Rancher Prime components.",
+		isPrime(),
+		false,
+		true)
+	ExtKubeconfigs = newFeature(
+		"ext-kubeconfigs",
+		"Enable Imperative API resource kubeconfigs.ext.cattle.io.",
+		true,
+		false,
+		true)
+	ExtTokens = newFeature(
+		"ext-tokens",
+		"Enable Imperative API resource tokens.ext.cattle.io.",
+		true,
+		false,
+		true)
+	RancherSCCRegistrationExtension = newFeature(
+		"rancher-scc-registration-extension",
+		"Enable Rancher's SCC registration extension to register the system(s) for customer support",
 		isPrime(),
 		false,
 		true)

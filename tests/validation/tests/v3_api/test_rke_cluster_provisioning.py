@@ -329,34 +329,6 @@ if_test_edit_cluster = pytest.mark.skipif(
     reason='Edit cluster tests not enabled')
 
 
-def test_cis_complaint():
-    # rke_config_cis
-    node_roles = [
-        ["controlplane"], ["controlplane"],
-        ["etcd"], ["etcd"], ["etcd"],
-        ["worker"], ["worker"], ["worker"]
-    ]
-    aws_nodes = \
-        AmazonWebServices().create_multiple_nodes(
-            len(node_roles), random_test_name(HOST_NAME))
-    rke_config_cis = get_cis_rke_config()
-    client = get_admin_client()
-    cluster = client.create_cluster(
-        name=evaluate_clustername(),
-        driver="rancherKubernetesEngine",
-        rancherKubernetesEngineConfig=rke_config_cis,
-        enableNetworkPolicy=True,
-        defaultPodSecurityPolicyTemplateId=POD_SECURITY_POLICY_TEMPLATE)
-    assert cluster.state == "provisioning"
-    configure_cis_requirements(aws_nodes,
-                               CIS_SCAN_PROFILE,
-                               node_roles,
-                               client,
-                               cluster
-                               )
-    cluster_cleanup(client, cluster, aws_nodes)
-
-
 def test_rke_az_host_1(node_template_az):
     validate_rke_dm_host_1(node_template_az, rke_config)
 
@@ -1192,21 +1164,3 @@ def create_custom_host_from_nodes(nodes, node_roles,
                                      check_intermediate_state=False)
 
     return cluster, nodes
-
-
-def get_cis_rke_config(profile=CIS_SCAN_PROFILE):
-    rke_tmp_config = None
-    rke_config_dict = None
-    try:
-        rke_config_dict = {
-            'rke-cis-1.4': rke_config_cis_1_4,
-            'rke-cis-1.5': rke_config_cis_1_5
-        }
-        rke_tmp_config = rke_config_dict[profile]
-    except KeyError:
-        print('Invalid RKE CIS profile. Supported profiles: ')
-        for k in rke_config_dict.keys():
-            print("{0}".format(k))
-    else:
-        print('Valid RKE CIS Profile loaded: {0}'.format(profile))
-    return rke_tmp_config

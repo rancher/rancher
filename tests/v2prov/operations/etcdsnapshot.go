@@ -34,7 +34,7 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 			if newErr != nil {
 				logrus.Error(newErr)
 			}
-			fmt.Printf("cluster %s etcd snapshot creation operation failed\ncluster %s test data bundle: \n%s", c.Name, c.Name, data)
+			fmt.Printf("cluster %s etcd snapshot creation operation failed\ncluster %s test data bundle: \n%s\n", c.Name, c.Name, data)
 		}
 	}()
 
@@ -250,7 +250,7 @@ func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 			if newErr != nil {
 				logrus.Error(newErr)
 			}
-			fmt.Printf("cluster %s etcd snapshot restore operation failed\ncluster %s test data bundle: \n%s", c.Name, c.Name, data)
+			fmt.Printf("cluster %s etcd snapshot restore operation failed\ncluster %s test data bundle: \n%s\n", c.Name, c.Name, data)
 		}
 	}()
 

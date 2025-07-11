@@ -1,7 +1,7 @@
-FROM registry.suse.com/bci/bci-micro:15.6 AS final
+FROM registry.suse.com/bci/bci-micro:15.7 AS final
 
 # Temporary build stage image
-FROM registry.suse.com/bci/bci-base:15.6 AS builder
+FROM registry.suse.com/bci/bci-base:15.7 AS builder
 
 # Install system packages using builder image that has zypper
 COPY --from=final / /chroot/
@@ -50,23 +50,23 @@ ARG CATTLE_KDM_BRANCH=dev-v2.12
 ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
-ENV CATTLE_MACHINE_VERSION v0.15.0-rancher128
-ENV CATTLE_K3S_VERSION v1.32.1+k3s1
+ENV CATTLE_MACHINE_VERSION v0.15.0-rancher130
+ENV CATTLE_K3S_VERSION v1.33.1+k3s1
 ENV CATTLE_MACHINE_PROVISION_IMAGE rancher/machine:${CATTLE_MACHINE_VERSION}
-ENV CATTLE_ETCD_VERSION v3.5.16
+ENV CATTLE_ETCD_VERSION v3.5.21
 ENV TINI_VERSION v0.18.0
 ENV DOCKER_MACHINE_LINODE_VERSION v0.1.15
 ENV LINODE_UI_DRIVER_VERSION v0.7.0
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
 ENV DOCKER_MACHINE_HARVESTER_VERSION v0.6.7
 ENV CATTLE_KDM_BRANCH ${CATTLE_KDM_BRANCH}
-ENV CATTLE_WINS_AGENT_VERSION v0.5.1
+ENV CATTLE_WINS_AGENT_VERSION v0.5.2-rc.1
 ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
 ENV CATTLE_WINS_AGENT_UNINSTALL_SCRIPT https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/uninstall.ps1
 ENV CATTLE_WINS_AGENT_UPGRADE_IMAGE rancher/wins:${CATTLE_WINS_AGENT_VERSION}
 ENV CATTLE_CSI_PROXY_AGENT_VERSION v1.1.3
 # make sure the CATTLE_SYSTEM_AGENT_VERSION is consistent with tests/v2/codecoverage/package/Dockerfile
-ENV CATTLE_SYSTEM_AGENT_VERSION v0.3.13-rc.2
+ENV CATTLE_SYSTEM_AGENT_VERSION v0.3.13-rc.3
 ENV CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX https://github.com/rancher/system-agent/releases/download
 ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE rancher/system-agent:${CATTLE_SYSTEM_AGENT_VERSION}-suc
 ENV CATTLE_SYSTEM_AGENT_INSTALLER_IMAGE rancher/system-agent-installer-
@@ -128,7 +128,7 @@ ENV TINI_URL_amd64=https://github.com/krallin/tini/releases/download/${TINI_VERS
 ENV ETCD_URL=https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}.tar.gz
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.32.1-k3s1 \
+COPY --from=rancher/k3s:v1.33.1-k3s1 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \
@@ -176,7 +176,7 @@ RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
 
 ENV CATTLE_UI_VERSION 2.9.0
 ENV CATTLE_DASHBOARD_UI_VERSION v2.9.0
-ENV CATTLE_CLI_VERSION v2.11.0-rc.1
+ENV CATTLE_CLI_VERSION v2.12.0-rc.1
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
 ENV CATTLE_BASE_UI_BRAND=
@@ -231,7 +231,7 @@ ENV ETCD_UNSUPPORTED_ARCH ${ETCD_UNSUPPORTED_ARCH}
 # Enable exporting of the k3s images as part of the build process.
 FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.24 AS images
 
-ENV CATTLE_K3S_VERSION v1.32.1+k3s1
+ENV CATTLE_K3S_VERSION v1.33.1+k3s1
 
 RUN zypper -n install libbtrfs-devel libgpgme-devel
 

@@ -1,0 +1,199 @@
+apiVersion: compliance.cattle.io/v1
+kind: ClusterScanBenchmark
+metadata:
+  name: benchmark-sample
+  namespace: rancher-compliance-system
+spec:
+  customBenchmarkConfigMapName: sample-ssb-1.0
+  customBenchmarkConfigMapNamespace: rancher-compliance-system
+  minKubernetesVersion: '1.30.0'
+  maxKubernetesVersion: '1.36.0'
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sample-ssb-1.0
+  namespace: rancher-compliance-system
+data:
+  config.yaml: |
+    ## Version-specific settings that override the values in cfg/config.yaml
+    target_mapping:
+      "sample-ssb-1.0":
+        - "master"
+        - "node"
+        - "controlplane"
+        - "etcd"
+        - "policies"
+
+    version_mapping:
+      "v1.31.8+rke2r1": "sample-ssb-1.0"
+      "v1.33.1-k3s1": "sample-ssb-1.0"
+    
+    master:
+      components:
+        - apiserver
+        - kubelet
+        - scheduler
+        - controllermanager
+        - etcd
+        - policies
+      apiserver:
+        bins:
+          - containerd
+      kubelet:
+        bins:
+          - containerd
+        defaultkubeconfig: /var/lib/rancher/k3s/agent/kubelet.kubeconfig
+        defaultcafile: /var/lib/rancher/k3s/agent/client-ca.crt
+      scheduler:
+        bins:
+          - containerd
+        kubeconfig:
+          - /var/lib/rancher/k3s/server/cred/scheduler.kubeconfig
+      controllermanager:
+        bins:
+          - containerd
+        kubeconfig:
+          - /var/lib/rancher/k3s/server/cred/controller.kubeconfig
+      etcd:
+        bins:
+          - containerd
+
+    etcd:
+      confs: /var/lib/rancher/k3s/server/db/etcd/config
+
+    node:
+      components:
+        - kubelet
+        - proxy
+      kubelet:
+        bins:
+          - containerd
+        confs:
+          - /var/lib/rancher/k3s/agent/etc/kubelet.conf.d/00-k3s-defaults.conf
+        defaultkubeconfig: /var/lib/rancher/k3s/agent/kubelet.kubeconfig
+        defaultcafile: /var/lib/rancher/k3s/agent/client-ca.crt
+      proxy:
+        bins:
+          - containerd
+        defaultkubeconfig: /var/lib/rancher/k3s/agent/kubeproxy.kubeconfig
+    
+    controlplane:
+      components:
+        - apiserver
+
+      apiserver:
+        bins:
+          - "kube-apiserver"
+          - "hyperkube apiserver"
+          - "hyperkube kube-apiserver"
+          - "apiserver"
+          - "containerd"
+
+    managedservices:
+      components: []
+
+    policies:
+      components:
+        - policies
+
+  controlplane.yaml: |
+    controls:
+    version: "sample-ssb-1.0"
+    id: c
+    text: "Control Plane Configuration"
+    type: "controlplane"
+    groups:
+      - id: c-2
+        text: "Logging"
+        checks:
+          - id: c-2-1
+            text: "Sample check control plane"
+            audit: "echo --audit-policy-file some/file"
+            tests:
+              test_items:
+                - flag: "--audit-policy-file"
+                  set: true
+            scored: true
+
+  etcd.yaml: |
+    controls:
+    version: "sample-ssb-1.0"
+    id: e
+    text: "Etcd Node Configuration"
+    type: "etcd"
+    groups:
+      - id: e
+        text: "Etcd Node Configuration"
+        checks:
+          - id: e-1
+            text: "Sample check etcd"
+            audit: "echo --cert-file some/file"
+            tests:
+              test_items:
+                - flag: "--cert-file"
+                  set: true
+            scored: true
+
+  master.yaml: |
+    controls:
+    version: "sample-ssb-1.0"
+    id: m
+    text: "Control Plane Security Configuration"
+    type: "master"
+    groups:
+      - id: m.1
+        text: "Control Plane Node Configuration Files"
+        checks:
+          - id: m.1.1
+            text: "Sample check master"
+            audit: "echo --cni-file some/file"
+            tests:
+              test_items:
+                - flag: "--cni-file"
+                  set: true
+            scored: true
+
+  node.yaml: |
+    controls:
+    version: "sample-ssb-1.0"
+    id: w
+    text: "Worker Node Security Configuration"
+    type: "node"
+    groups:
+      - id: w-1
+        text: "Worker Node Configuration Files"
+        checks:
+          - id: w-1-1
+            text: "Sample check Worker Node"
+            audit: "echo --kubeconfig-file some/file"
+            tests:
+              test_items:
+                - flag: "--kubeconfig-file"
+                  set: true
+            remediation: |
+              Run the below command on each k3s worker node:
+              chmod 600 $proxykubeconfig
+            scored: true
+
+  policies.yaml: |
+    controls:
+    version: "sample-ssb-1.0"
+    id: p
+    text: "Kubernetes Policies"
+    type: "policies"
+    groups:
+      - id: p-1
+        text: "RBAC and Service Accounts"
+        checks:
+          - id: p-1-1
+            text: "Sample check Policies"
+            audit: echo cluster-admin
+            use_multiple_values: true
+            tests:
+              test_items:
+                - flag: "cluster-admin"
+                  compare:
+                    op: valid_elements
+                    value: cluster-admin, helm-kube-system-traefik, helm-kube-system-traefik-crd
+            scored: true

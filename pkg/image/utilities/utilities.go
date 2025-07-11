@@ -1,7 +1,6 @@
 package utilities
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -12,10 +11,8 @@ import (
 	"github.com/coreos/go-semver/semver"
 	img "github.com/rancher/rancher/pkg/image"
 	ext "github.com/rancher/rancher/pkg/image/external"
-	kd "github.com/rancher/rancher/pkg/kontainerdrivermetadata"
+	"github.com/rancher/rancher/pkg/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rke/types/image"
-	"github.com/rancher/rke/types/kdm"
 )
 
 var (
@@ -78,26 +75,9 @@ func GatherTargetImagesAndSources(chartsPath string, imagesFromArgs []string) (I
 	if err != nil {
 		return ImageTargetsAndSources{}, fmt.Errorf("could not read data.json: %w", err)
 	}
-	data, err := kdm.FromData(b)
+	data, err := kontainerdrivermetadata.FromData(b)
 	if err != nil {
 		return ImageTargetsAndSources{}, fmt.Errorf("could not load KDM data: %w", err)
-	}
-
-	linuxInfo, windowsInfo := kd.GetK8sVersionInfo(
-		rancherVersion,
-		data.K8sVersionRKESystemImages,
-		data.K8sVersionServiceOptions,
-		data.K8sVersionWindowsServiceOptions,
-		data.K8sVersionInfo,
-	)
-
-	var k8sVersions []string
-	for k := range linuxInfo.RKESystemImages {
-		k8sVersions = append(k8sVersions, k)
-	}
-	sort.Strings(k8sVersions)
-	if err := writeSliceToFile(filepath.Join(os.Getenv("HOME"), "bin", "rancher-rke-k8s-versions.txt"), k8sVersions); err != nil {
-		return ImageTargetsAndSources{}, fmt.Errorf("%s: %w", "could not write rancher-rke-k8s-versions.txt file", err)
 	}
 
 	k8sVersion1_21_0 := &semver.Version{
@@ -141,13 +121,13 @@ func GatherTargetImagesAndSources(chartsPath string, imagesFromArgs []string) (I
 		RancherVersion:  rancherVersion,
 		GithubEndpoints: img.ExtensionEndpoints,
 	}
-	targetImages, targetImagesAndSources, err := img.GetImages(exportConfig, externalLinuxImages, linuxImagesFromArgs, linuxInfo.RKESystemImages)
+	targetImages, targetImagesAndSources, err := img.GetImages(exportConfig, externalLinuxImages, linuxImagesFromArgs)
 	if err != nil {
 		return ImageTargetsAndSources{}, err
 	}
 
 	exportConfig.OsType = img.Windows
-	targetWindowsImages, targetWindowsImagesAndSources, err := img.GetImages(exportConfig, nil, []string{getWindowsAgentImage(), winsAgentUpdateImage}, windowsInfo.RKESystemImages)
+	targetWindowsImages, targetWindowsImagesAndSources, err := img.GetImages(exportConfig, nil, []string{winsAgentUpdateImage})
 	if err != nil {
 		return ImageTargetsAndSources{}, err
 	}
@@ -257,7 +237,7 @@ func MirrorScript(arch string, targetImages []string) error {
 
 	var saveImages []string
 	for _, targetImage := range targetImages {
-		srcImage, ok := image.Mirrors[targetImage]
+		srcImage, ok := img.Mirrors[targetImage]
 		if !ok {
 			continue
 		}
@@ -276,7 +256,7 @@ func MirrorScript(arch string, targetImages []string) error {
 func saveImages(targetImages []string) []string {
 	var saveImages []string
 	for _, targetImage := range targetImages {
-		_, ok := image.Mirrors[targetImage]
+		_, ok := img.Mirrors[targetImage]
 		if !ok {
 			continue
 		}
@@ -290,7 +270,7 @@ func saveImagesAndSources(imagesAndSources []string) []string {
 	var saveImagesAndSources []string
 	for _, imageAndSources := range imagesAndSources {
 		targetImage := strings.Split(imageAndSources, " ")[0]
-		_, ok := image.Mirrors[targetImage]
+		_, ok := img.Mirrors[targetImage]
 		if !ok {
 			continue
 		}
@@ -319,50 +299,6 @@ func checkImage(image string) error {
 		return fmt.Errorf("Image [%s] has trailing '-', probably an error in image substitution", image)
 	}
 	return nil
-}
-
-func writeSliceToFile(filename string, versions []string) error {
-	log.Printf("Creating %s\n", filename)
-
-	dir := filepath.Dir(filename)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("failed to create directories: %w", err)
-	}
-
-	save, err := os.Create(filename)
-	if err != nil {
-		return fmt.Errorf("failed to create file: %w", err)
-	}
-
-	defer func() {
-		if cerr := save.Close(); cerr != nil {
-			err = errors.Join(err, cerr)
-		}
-	}()
-
-	if err := save.Chmod(0755); err != nil {
-		return fmt.Errorf("failed to set file permissions: %w", err)
-	}
-
-	for _, version := range versions {
-		if _, err := fmt.Fprintln(save, version); err != nil {
-			return fmt.Errorf("failed to write to file: %w", err)
-		}
-	}
-
-	return nil
-}
-
-func getWindowsAgentImage() string {
-	tag, ok := os.LookupEnv("TAG")
-	if !ok {
-		return ""
-	}
-	repo, ok := os.LookupEnv("REPO")
-	if !ok {
-		return ""
-	}
-	return fmt.Sprintf("%s/rancher-agent:%s", repo, tag)
 }
 
 func getScript(arch, fileType string) string {

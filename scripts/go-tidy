@@ -1,0 +1,14 @@
+#!/bin/bash
+set -e
+
+SUBDIRS="pkg/apis pkg/client"
+
+for SUBDIR in $SUBDIRS; do
+    cd "$SUBDIR"
+    go mod tidy
+    go mod verify
+    cd -
+done
+
+go mod tidy
+go mod verify

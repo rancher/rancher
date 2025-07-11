@@ -214,6 +214,40 @@ func Test_ttlGreater(t *testing.T) {
 	}
 }
 
+func Test_Store_New(t *testing.T) {
+	t.Parallel()
+
+	store := &Store{}
+	obj := store.New()
+	require.NotNil(t, obj)
+	assert.IsType(t, &ext.Token{}, obj)
+}
+
+func Test_Store_NewList(t *testing.T) {
+	store := &Store{}
+	obj := store.NewList()
+	require.NotNil(t, obj)
+	require.IsType(t, &ext.TokenList{}, obj)
+
+	list := obj.(*ext.TokenList)
+	assert.Nil(t, list.Items)
+}
+
+func Test_Store_GetSingularName(t *testing.T) {
+	store := &Store{}
+	assert.Equal(t, SingularName, store.GetSingularName())
+}
+
+func Test_Store_NamespaceScoped(t *testing.T) {
+	store := &Store{}
+	assert.False(t, store.NamespaceScoped())
+}
+
+func Test_Store_GroupVersionKind(t *testing.T) {
+	store := &Store{}
+	assert.Equal(t, GVK, store.GroupVersionKind(ext.SchemeGroupVersion))
+}
+
 func Test_Store_Delete(t *testing.T) {
 	// The majority of the code is tested later, in Test_SystemStore_Delete
 	// Here we test the actions and checks done before delegation to the
@@ -234,7 +268,7 @@ func Test_Store_Delete(t *testing.T) {
 			Get("cattle-tokens", "bogus").
 			Return(nil, someerror)
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
 		_, ok, err := store.Delete(context.TODO(), "bogus", nil, &metav1.DeleteOptions{})
 
 		assert.False(t, ok)
@@ -258,7 +292,7 @@ func Test_Store_Delete(t *testing.T) {
 			Get("cattle-tokens", "bogus").
 			Return(nil, apierrors.NewNotFound(GVR.GroupResource(), "bogus"))
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
 		_, ok, err := store.Delete(context.TODO(), "bogus", nil, &metav1.DeleteOptions{})
 
 		assert.False(t, ok)
@@ -276,7 +310,7 @@ func Test_Store_Delete(t *testing.T) {
 			Return(&mockUser{name: ""}, false, false, apierrors.NewInternalError(invalidContext))
 		secrets.EXPECT().Cache().Return(nil)
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
 		_, ok, err := store.Delete(context.TODO(), "bogus", nil, &metav1.DeleteOptions{})
 
 		assert.False(t, ok)
@@ -299,7 +333,7 @@ func Test_Store_Delete(t *testing.T) {
 			Get("cattle-tokens", "bogus").
 			Return(&properSecret, nil)
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
 		_, ok, err := store.Delete(context.TODO(), "bogus", nil, &metav1.DeleteOptions{})
 
 		assert.False(t, ok)
@@ -325,7 +359,7 @@ func Test_Store_Delete(t *testing.T) {
 			Delete("cattle-tokens", "bogus", gomock.Any()).
 			Return(nil)
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
 		_, ok, err := store.Delete(context.TODO(), "bogus", nil, &metav1.DeleteOptions{})
 
 		assert.True(t, ok)
@@ -353,7 +387,7 @@ func Test_Store_Get(t *testing.T) {
 			Get("cattle-tokens", "bogus").
 			Return(&properSecret, nil)
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
 		tok, err := store.Get(context.TODO(), "bogus", &metav1.GetOptions{})
 
 		assert.Equal(t, bogusNotFoundError, err)
@@ -376,7 +410,7 @@ func Test_Store_Get(t *testing.T) {
 			Get("cattle-tokens", "bogus").
 			Return(&properSecret, nil)
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
 		tok, err := store.Get(context.TODO(), "bogus", &metav1.GetOptions{})
 
 		assert.Nil(t, err)
@@ -399,7 +433,7 @@ func Test_Store_Get(t *testing.T) {
 			Get("cattle-tokens", "bogus").
 			Return(&properSecret, nil)
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
 		tok, err := store.Get(context.TODO(), "bogus", &metav1.GetOptions{})
 
 		assert.Nil(t, err)
@@ -430,7 +464,7 @@ func Test_Store_Watch(t *testing.T) {
 		todo, cancel := context.WithCancel(context.TODO())
 		defer cancel()
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
 		consumer, err := store.watch(todo, &metav1.ListOptions{})
 		assert.Error(t, err)
 		assert.Nil(t, consumer)
@@ -444,8 +478,10 @@ func Test_Store_Watch(t *testing.T) {
 
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
+
+		watcher := NewWatcherFor(watch.Event{Object: &properSecret, Type: watch.Bookmark})
 		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
-			Return(NewWatcher(), nil)
+			Return(watcher, nil)
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -453,20 +489,18 @@ func Test_Store_Watch(t *testing.T) {
 
 		todo, cancel := context.WithCancel(context.TODO())
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
 		consumer, err := store.watch(todo, &metav1.ListOptions{})
 		assert.Nil(t, err)
 
-		cancel()
+		// receive bookmark event
+		event, more := (<-consumer.ResultChan())
+		assert.True(t, more)
+		assert.Equal(t, watch.Bookmark, event.Type)
+		assert.Equal(t, &ext.Token{ObjectMeta: metav1.ObjectMeta{ResourceVersion: ""}}, event.Object)
 
-		select {
-		case _, more := (<-consumer.ResultChan()):
-			// no events received, and none pending - should not trigger
-			assert.False(t, more)
-		case <-time.After(5 * time.Second):
-			// trigger and end - we close the consumer
-			consumer.Stop()
-		}
+		cancel()
+		consumer.Stop()
 	})
 
 	t.Run("closing backend channel does not close watch channel", func(t *testing.T) {
@@ -478,7 +512,7 @@ func Test_Store_Watch(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
 
-		watcher := NewWatcher()
+		watcher := NewWatcherFor(watch.Event{Object: &properSecret, Type: watch.Bookmark})
 		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
 			Return(watcher, nil)
 
@@ -486,20 +520,19 @@ func Test_Store_Watch(t *testing.T) {
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
 		watcher.Done() // close backend channel
 
-		select {
-		case _, more := (<-consumer.ResultChan()):
-			// no events received, and none pending - should not trigger
-			assert.False(t, more)
-		case <-time.After(5 * time.Second):
-			// trigger and end - we close the consumer
-			consumer.Stop()
-		}
+		// still receive bookmark event
+		event, more := (<-consumer.ResultChan())
+		assert.True(t, more)
+		assert.Equal(t, watch.Bookmark, event.Type)
+		assert.Equal(t, &ext.Token{ObjectMeta: metav1.ObjectMeta{ResourceVersion: ""}}, event.Object)
+
+		consumer.Stop()
 	})
 
 	t.Run("event for non-secret is ignored", func(t *testing.T) {
@@ -511,7 +544,11 @@ func Test_Store_Watch(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
 
-		watcher := NewWatcherFor(watch.Event{Object: &corev1.Namespace{}})
+		// bad event to ignore, plus bookmark to see
+		watcher := NewWatcherFor(
+			watch.Event{Object: &corev1.Namespace{}},
+			watch.Event{Object: &properSecret, Type: watch.Bookmark},
+		)
 		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
 			Return(watcher, nil)
 
@@ -519,20 +556,18 @@ func Test_Store_Watch(t *testing.T) {
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
-		watcher.Done() // close backend channel - no further events
+		// receive bookmark event, preceding bad event is swallowed
+		event, more := (<-consumer.ResultChan())
+		assert.True(t, more)
+		assert.Equal(t, watch.Bookmark, event.Type)
+		assert.Equal(t, &ext.Token{ObjectMeta: metav1.ObjectMeta{ResourceVersion: ""}}, event.Object)
 
-		select {
-		case _, more := (<-consumer.ResultChan()):
-			// no events received, and none pending - should not trigger
-			assert.False(t, more)
-		case <-time.After(5 * time.Second):
-			// trigger and end - we close the consumer
-			consumer.Stop()
-		}
+		watcher.Done() // close backend channel - no further events
+		consumer.Stop()
 	})
 
 	t.Run("event for broken secret is ignored", func(t *testing.T) {
@@ -544,7 +579,11 @@ func Test_Store_Watch(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
 
-		watcher := NewWatcherFor(watch.Event{Object: &corev1.Secret{}})
+		// bad event to ignore, plus bookmark to see
+		watcher := NewWatcherFor(
+			watch.Event{Object: &corev1.Secret{}},
+			watch.Event{Object: &properSecret, Type: watch.Bookmark},
+		)
 		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
 			Return(watcher, nil)
 
@@ -552,23 +591,21 @@ func Test_Store_Watch(t *testing.T) {
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
-		watcher.Done() // close backend channel
+		// receive bookmark event, preceding bad event is swallowed
+		event, more := (<-consumer.ResultChan())
+		assert.True(t, more)
+		assert.Equal(t, watch.Bookmark, event.Type)
+		assert.Equal(t, &ext.Token{ObjectMeta: metav1.ObjectMeta{ResourceVersion: ""}}, event.Object)
 
-		select {
-		case _, more := (<-consumer.ResultChan()):
-			// no events received, and none pending - should not trigger
-			assert.False(t, more)
-		case <-time.After(5 * time.Second):
-			// trigger and end - we close the consumer
-			consumer.Stop()
-		}
+		watcher.Done() // close backend channel - no further events
+		consumer.Stop()
 	})
 
-	t.Run("event for non-owned secret is ignored", func(t *testing.T) {
+	t.Run("no events for non-owned secret", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
@@ -577,8 +614,9 @@ func Test_Store_Watch(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
 
+		// return fake bookmark for easy channel management
+		watcher := NewWatcherFor(watch.Event{Object: &properSecret, Type: watch.Bookmark})
 		// Expect a watch() call with filter for user
-		watcher := NewWatcher()
 		secrets.EXPECT().Watch("cattle-tokens", metav1.ListOptions{
 			LabelSelector: UserIDLabel + "=lkajdl/ksjlkds",
 		}).Return(watcher, nil)
@@ -587,20 +625,18 @@ func Test_Store_Watch(t *testing.T) {
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(&mockUser{name: "lkajdl/ksjlkds"}, false, true, nil)
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
-		watcher.Done() // close backend channel
+		// receive fake bookmark event for easy channel management
+		event, more := (<-consumer.ResultChan())
+		assert.True(t, more)
+		assert.Equal(t, watch.Bookmark, event.Type)
+		assert.Equal(t, &ext.Token{ObjectMeta: metav1.ObjectMeta{ResourceVersion: ""}}, event.Object)
 
-		select {
-		case _, more := (<-consumer.ResultChan()):
-			// no events received, and none pending - should not trigger
-			assert.False(t, more)
-		case <-time.After(5 * time.Second):
-			// trigger and end - we close the consumer
-			consumer.Stop()
-		}
+		watcher.Done() // close backend channel
+		consumer.Stop()
 	})
 
 	t.Run("receive event for owned secret, not current", func(t *testing.T) {
@@ -620,7 +656,7 @@ func Test_Store_Watch(t *testing.T) {
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
@@ -630,15 +666,7 @@ func Test_Store_Watch(t *testing.T) {
 		assert.Equal(t, &properToken, event.Object)
 
 		watcher.Done() // close backend channel
-
-		select {
-		case _, more := (<-consumer.ResultChan()):
-			// no events received, and none pending - should not trigger
-			assert.False(t, more)
-		case <-time.After(5 * time.Second):
-			// trigger and end - we close the consumer
-			consumer.Stop()
-		}
+		consumer.Stop()
 	})
 
 	t.Run("receive event for owned secret, current", func(t *testing.T) {
@@ -658,7 +686,7 @@ func Test_Store_Watch(t *testing.T) {
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
@@ -668,15 +696,7 @@ func Test_Store_Watch(t *testing.T) {
 		assert.Equal(t, &properTokenCurrent, event.Object)
 
 		watcher.Done() // close backend channel
-
-		select {
-		case _, more := (<-consumer.ResultChan()):
-			// no events received, and none pending - should not trigger
-			assert.False(t, more)
-		case <-time.After(5 * time.Second):
-			// trigger and end - we close the consumer
-			consumer.Stop()
-		}
+		consumer.Stop()
 	})
 
 	t.Run("event for error is ignored", func(t *testing.T) {
@@ -688,7 +708,11 @@ func Test_Store_Watch(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
 
-		watcher := NewWatcherFor(watch.Event{Object: &corev1.Namespace{}, Type: watch.Error})
+		// bad event to ignore, plus bookmark to see
+		watcher := NewWatcherFor(
+			watch.Event{Object: &corev1.Namespace{}, Type: watch.Error},
+			watch.Event{Object: &properSecret, Type: watch.Bookmark},
+		)
 		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
 			Return(watcher, nil)
 
@@ -696,20 +720,18 @@ func Test_Store_Watch(t *testing.T) {
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
-		watcher.Done() // close backend channel - no further events
+		// receive bookmark event, preceding bad event is swallowed
+		event, more := (<-consumer.ResultChan())
+		assert.True(t, more)
+		assert.Equal(t, watch.Bookmark, event.Type)
+		assert.Equal(t, &ext.Token{ObjectMeta: metav1.ObjectMeta{ResourceVersion: ""}}, event.Object)
 
-		select {
-		case _, more := (<-consumer.ResultChan()):
-			// no events received, and none pending - should not trigger
-			assert.False(t, more)
-		case <-time.After(5 * time.Second):
-			// trigger and end - we close the consumer
-			consumer.Stop()
-		}
+		watcher.Done() // close backend channel - no further events
+		consumer.Stop()
 	})
 
 	t.Run("event for bad bookmark is ignored", func(t *testing.T) {
@@ -721,7 +743,11 @@ func Test_Store_Watch(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
 
-		watcher := NewWatcherFor(watch.Event{Object: &corev1.Namespace{}, Type: watch.Bookmark})
+		// bad event to ignore, plus bookmark to see
+		watcher := NewWatcherFor(
+			watch.Event{Object: &corev1.Namespace{}, Type: watch.Bookmark},
+			watch.Event{Object: &properSecret, Type: watch.Bookmark},
+		)
 		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
 			Return(watcher, nil)
 
@@ -729,20 +755,18 @@ func Test_Store_Watch(t *testing.T) {
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
-		watcher.Done() // close backend channel - no further events
+		// receive bookmark event, preceding bad event is swallowed
+		event, more := (<-consumer.ResultChan())
+		assert.True(t, more)
+		assert.Equal(t, watch.Bookmark, event.Type)
+		assert.Equal(t, &ext.Token{ObjectMeta: metav1.ObjectMeta{ResourceVersion: ""}}, event.Object)
 
-		select {
-		case _, more := (<-consumer.ResultChan()):
-			// no events received, and none pending - should not trigger
-			assert.False(t, more)
-		case <-time.After(5 * time.Second):
-			// trigger and end - we close the consumer
-			consumer.Stop()
-		}
+		watcher.Done() // close backend channel - no further events
+		consumer.Stop()
 	})
 
 	t.Run("receive event for bookmark", func(t *testing.T) {
@@ -762,29 +786,17 @@ func Test_Store_Watch(t *testing.T) {
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
 
-		store := New(nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
-		event, more := (<-consumer.ResultChan()) // receive update event
+		event, more := (<-consumer.ResultChan()) // receive bookmark event
 		assert.True(t, more)
 		assert.Equal(t, watch.Bookmark, event.Type)
-		assert.Equal(t, &ext.Token{
-			ObjectMeta: metav1.ObjectMeta{
-				ResourceVersion: "",
-			},
-		}, event.Object)
+		assert.Equal(t, &ext.Token{ObjectMeta: metav1.ObjectMeta{ResourceVersion: ""}}, event.Object)
 
 		watcher.Done() // close backend channel
-
-		select {
-		case _, more := (<-consumer.ResultChan()):
-			// no events received, and none pending - should not trigger
-			assert.False(t, more)
-		case <-time.After(5 * time.Second):
-			// trigger and end - we close the consumer
-			consumer.Stop()
-		}
+		consumer.Stop()
 	})
 }
 
@@ -824,28 +836,6 @@ func Test_Store_Create(t *testing.T) {
 					Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
 			},
 		},
-		{
-			name: "namespace creation error",
-			err:  someerror,
-			tok:  &ext.Token{},
-			opts: &metav1.CreateOptions{},
-			storeSetup: func( // configure store backend clients
-				space *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList],
-				secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
-				scache *fake.MockCacheInterface[*corev1.Secret],
-				users *fake.MockNonNamespacedCacheInterface[*v3.User],
-				token *fake.MockNonNamespacedCacheInterface[*v3.Token],
-				timer *MocktimeHandler,
-				hasher *MockhashHandler,
-				auth *MockauthHandler) {
-
-				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(&mockUser{name: "world"}, false, true, nil)
-
-				space.EXPECT().Create(gomock.Any()).
-					Return(nil, someerror)
-			},
-		},
 		// token generation and hash errors -- no mocking -- unable to induce and test
 		{
 			name: "user retrieval error",
@@ -868,9 +858,6 @@ func Test_Store_Create(t *testing.T) {
 
 				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(&mockUser{name: "world"}, false, true, nil)
-
-				space.EXPECT().Create(gomock.Any()).
-					Return(nil, nil)
 
 				users.EXPECT().Get("world").
 					Return(nil, someerror)
@@ -897,9 +884,6 @@ func Test_Store_Create(t *testing.T) {
 
 				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(&mockUser{name: "world"}, false, true, nil)
-
-				space.EXPECT().Create(gomock.Any()).
-					Return(nil, nil)
 
 				users.EXPECT().Get("world").
 					Return(&v3.User{
@@ -937,9 +921,6 @@ func Test_Store_Create(t *testing.T) {
 				scache.EXPECT().Get("cattle-tokens", "session-token").
 					Return(nil, someerror)
 
-				space.EXPECT().Create(gomock.Any()).
-					Return(nil, nil)
-
 				users.EXPECT().Get("world").
 					Return(enabledUser, nil)
 			},
@@ -974,9 +955,6 @@ func Test_Store_Create(t *testing.T) {
 					UserPrincipal: v3.Principal{
 						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
 					}}, nil)
-
-				space.EXPECT().Create(gomock.Any()).
-					Return(nil, nil)
 
 				users.EXPECT().Get("world").
 					Return(enabledUser, nil)
@@ -1015,9 +993,6 @@ func Test_Store_Create(t *testing.T) {
 					UserPrincipal: v3.Principal{
 						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
 					}}, nil)
-
-				space.EXPECT().Create(gomock.Any()).
-					Return(nil, nil)
 
 				users.EXPECT().Get("world").
 					Return(&v3.User{
@@ -1067,9 +1042,6 @@ func Test_Store_Create(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
 					}}, nil)
 
-				space.EXPECT().Create(gomock.Any()).
-					Return(nil, nil)
-
 				users.EXPECT().Get("world").
 					Return(&v3.User{
 						DisplayName: "worldwide",
@@ -1117,9 +1089,6 @@ func Test_Store_Create(t *testing.T) {
 					UserPrincipal: v3.Principal{
 						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
 					}}, nil)
-
-				space.EXPECT().Create(gomock.Any()).
-					Return(nil, nil)
 
 				users.EXPECT().Get("world").
 					Return(&v3.User{
@@ -1177,9 +1146,6 @@ func Test_Store_Create(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{Name: "local://world"},
 					}}, nil)
 
-				space.EXPECT().Create(gomock.Any()).
-					Return(nil, nil)
-
 				users.EXPECT().Get("world").
 					Return(&v3.User{
 						DisplayName: "worldwide",
@@ -1212,7 +1178,9 @@ func Test_Store_Create(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			// assemble and configure a store from mock clients ...
-			space := fake.NewMockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList](ctrl)
+			nsCache := fake.NewMockNonNamespacedCacheInterface[*corev1.Namespace](ctrl)
+			nsCache.EXPECT().Get(TokenNamespace).AnyTimes()
+
 			scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 			ucache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 			tcache := fake.NewMockNonNamespacedCacheInterface[*v3.Token](ctrl)
@@ -1226,8 +1194,8 @@ func Test_Store_Create(t *testing.T) {
 			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 			secrets.EXPECT().Cache().Return(scache)
 
-			store := New(nil, space, secrets, users, tcache, timer, hasher, auth)
-			test.storeSetup(space, secrets, scache, ucache, tcache, timer, hasher, auth)
+			store := New(nil, nil, nsCache, secrets, users, tcache, timer, hasher, auth)
+			test.storeSetup(nil, secrets, scache, ucache, tcache, timer, hasher, auth)
 
 			// perform test and validate results
 			tok, err := store.create(context.TODO(), test.tok, test.opts)
@@ -1386,7 +1354,7 @@ func Test_SystemStore_List(t *testing.T) {
 			users.EXPECT().Cache().Return(nil)
 			secrets.EXPECT().Cache().Return(nil)
 
-			store := NewSystem(nil, secrets, users, nil, nil, nil, nil)
+			store := NewSystem(nil, nil, secrets, users, nil, nil, nil, nil)
 			test.storeSetup(secrets)
 
 			// perform test and validate results
@@ -1458,7 +1426,7 @@ func Test_SystemStore_Delete(t *testing.T) {
 			users.EXPECT().Cache().Return(nil)
 			secrets.EXPECT().Cache().Return(nil)
 
-			store := NewSystem(nil, secrets, users, nil, nil, nil, nil)
+			store := NewSystem(nil, nil, secrets, users, nil, nil, nil, nil)
 			test.storeSetup(secrets)
 
 			// perform test and validate results
@@ -1483,7 +1451,7 @@ func Test_SystemStore_UpdateLastUsedAt(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
 
-		store := NewSystem(nil, secrets, users, nil, nil, nil, nil)
+		store := NewSystem(nil, nil, secrets, users, nil, nil, nil, nil)
 
 		var patchData []byte
 		secrets.EXPECT().Patch("cattle-tokens", "atoken", types.JSONPatchType, gomock.Any()).
@@ -1513,7 +1481,7 @@ func Test_SystemStore_UpdateLastUsedAt(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
 
-		store := NewSystem(nil, secrets, users, nil, nil, nil, nil)
+		store := NewSystem(nil, nil, secrets, users, nil, nil, nil, nil)
 
 		secrets.EXPECT().Patch("cattle-tokens", "atoken", types.JSONPatchType, gomock.Any()).
 			Return(nil, fmt.Errorf("some error")).
@@ -1536,7 +1504,7 @@ func Test_SystemStore_UpdateLastActivitySeen(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
 
-		store := NewSystem(nil, secrets, users, nil, nil, nil, nil)
+		store := NewSystem(nil, nil, secrets, users, nil, nil, nil, nil)
 
 		var patchData []byte
 		secrets.EXPECT().Patch("cattle-tokens", "atoken", types.JSONPatchType, gomock.Any()).
@@ -1566,7 +1534,7 @@ func Test_SystemStore_UpdateLastActivitySeen(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
 
-		store := NewSystem(nil, secrets, users, nil, nil, nil, nil)
+		store := NewSystem(nil, nil, secrets, users, nil, nil, nil, nil)
 
 		secrets.EXPECT().Patch("cattle-tokens", "atoken", types.JSONPatchType, gomock.Any()).
 			Return(nil, fmt.Errorf("some error")).
@@ -1859,7 +1827,7 @@ func Test_SystemStore_Update(t *testing.T) {
 			hasher := NewMockhashHandler(ctrl)
 			auth := NewMockauthHandler(ctrl)
 
-			store := NewSystem(nil, secrets, users, nil, timer, hasher, auth)
+			store := NewSystem(nil, nil, secrets, users, nil, timer, hasher, auth)
 			if test.storeSetup != nil {
 				test.storeSetup(secrets, scache, timer, hasher, auth)
 			}
@@ -2095,7 +2063,7 @@ func Test_SystemStore_Get(t *testing.T) {
 			users.EXPECT().Cache().Return(nil)
 			secrets.EXPECT().Cache().Return(scache)
 
-			store := NewSystem(nil, secrets, users, nil, nil, nil, nil)
+			store := NewSystem(nil, nil, secrets, users, nil, nil, nil, nil)
 			test.storeSetup(scache)
 
 			// perform test and validate results
@@ -2136,15 +2104,11 @@ func (u *mockUser) GetExtra() map[string][]string {
 
 // implementation of the k8s watch interface for mocking
 
-func NewWatcher() *mockWatch {
-	return &mockWatch{
-		ch: make(chan watch.Event),
+func NewWatcherFor(e ...watch.Event) *mockWatch {
+	ch := make(chan watch.Event, len(e))
+	for _, ev := range e {
+		ch <- ev
 	}
-}
-
-func NewWatcherFor(e watch.Event) *mockWatch {
-	ch := make(chan watch.Event, 1)
-	ch <- e
 	return &mockWatch{
 		ch: ch,
 	}

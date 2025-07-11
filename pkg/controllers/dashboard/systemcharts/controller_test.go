@@ -46,7 +46,6 @@ var (
 	originalSUCVersion                     = settings.SystemUpgradeControllerChartVersion.Get()
 	originalImportedVersionManagement      = settings.ImportedClusterVersionManagement.Get()
 	originalMCM                            = features.MCM.Enabled()
-	originalImperativeAPI                  = features.ImperativeApiExtension.Enabled()
 	originalMCMAgent                       = features.MCMAgent.Enabled()
 	originalManagedSystemUpgradeController = features.ManagedSystemUpgradeController.Enabled()
 	sucDeployment                          = &appsv1.Deployment{
@@ -57,8 +56,23 @@ var (
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      chart.SystemUpgradeControllerChartName,
 			Namespace: namespace.System,
+			Annotations: map[string]string{
+				managedSucDeploymentAnno: "true",
+			},
 		},
 	}
+	sucDeploymentFromFleetBundle = &appsv1.Deployment{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Deployment",
+			APIVersion: "apps/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      chart.SystemUpgradeControllerChartName,
+			Namespace: namespace.System,
+		},
+	}
+	sucAppNameOverride = "mcc-dev-cluster-system-upgrade-controller"
+
 	localCuster = &v3.Cluster{
 		Status: v3.ClusterStatus{
 			Driver: "k3s",
@@ -140,6 +154,7 @@ func Test_ChartInstallation(t *testing.T) {
 				features.MCM.Set(false)
 				features.MCMAgent.Set(true)
 				features.ManagedSystemUpgradeController.Set(true)
+				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
 
 				// rancher-webhook
 				expectedValues := map[string]interface{}{
@@ -156,7 +171,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"rancher-webhook",
+					chart.WebhookChartName,
+					chart.WebhookChartName,
 					"",
 					"2.0.0",
 					expectedValues,
@@ -175,7 +191,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.ProvisioningCAPINamespace,
-					"rancher-provisioning-capi",
+					chart.ProvisioningCAPIChartName,
+					chart.ProvisioningCAPIChartName,
 					"",
 					"2.0.0",
 					expectedProvCAPIValues,
@@ -195,12 +212,231 @@ func Test_ChartInstallation(t *testing.T) {
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
 					chart.SystemUpgradeControllerChartName,
+					chart.SystemUpgradeControllerChartName,
 					"",
 					"2.0.0",
 					expectedSUCValues,
 					gomock.AssignableToTypeOf(false),
 					"",
 				).Return(nil)
+
+				// rancher-operator
+				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
+				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+			},
+		},
+		{
+			name: "normal installation in downstream cluster with system-upgrade-controller name override",
+			setup: func(mocks testMocks) {
+				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
+				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(6)
+				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
+				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
+				_ = settings.RancherWebhookVersion.Set("2.0.0")
+				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
+				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
+				features.MCM.Set(false)
+				features.MCMAgent.Set(true)
+				features.ManagedSystemUpgradeController.Set(true)
+				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", sucAppNameOverride)
+
+				// rancher-webhook
+				expectedValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"capi":              nil,
+					"mcm": map[string]interface{}{
+						"enabled": features.MCM.Enabled(),
+					},
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					chart.WebhookChartName,
+					chart.WebhookChartName,
+					"",
+					"2.0.0",
+					expectedValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				// rancher-provisioning-capi
+				expectedProvCAPIValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.ProvisioningCAPINamespace,
+					chart.ProvisioningCAPIChartName,
+					chart.ProvisioningCAPIChartName,
+					"",
+					"2.0.0",
+					expectedProvCAPIValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				// system-upgrade-controller
+				expectedSUCValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					chart.SystemUpgradeControllerChartName,
+					sucAppNameOverride,
+					"",
+					"2.0.0",
+					expectedSUCValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				// rancher-operator
+				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
+				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+			},
+		},
+		{
+			name: "normal installation in downstream cluster with the system-upgrade-controller deployment from old Fleet Bundle",
+			setup: func(mocks testMocks) {
+				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
+				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(4)
+				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeploymentFromFleetBundle, nil).Times(1)
+				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
+				_ = settings.RancherWebhookVersion.Set("2.0.0")
+				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
+				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
+				features.MCM.Set(false)
+				features.MCMAgent.Set(true)
+				features.ManagedSystemUpgradeController.Set(true)
+				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
+
+				// rancher-webhook
+				expectedValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"capi":              nil,
+					"mcm": map[string]interface{}{
+						"enabled": features.MCM.Enabled(),
+					},
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					chart.WebhookChartName,
+					chart.WebhookChartName,
+					"",
+					"2.0.0",
+					expectedValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				// rancher-provisioning-capi
+				expectedProvCAPIValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.ProvisioningCAPINamespace,
+					chart.ProvisioningCAPIChartName,
+					chart.ProvisioningCAPIChartName,
+					"",
+					"2.0.0",
+					expectedProvCAPIValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				// system-upgrade-controller
+				// the Ensure function is not invoked in this case
+
+				// rancher-operator
+				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
+				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+			},
+		},
+		{
+			name: "normal installation in downstream cluster without the system-upgrade-controller deployment",
+			setup: func(mocks testMocks) {
+				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
+				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(4)
+				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(nil, errTest).Times(1)
+				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
+				_ = settings.RancherWebhookVersion.Set("2.0.0")
+				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
+				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
+				features.MCM.Set(false)
+				features.MCMAgent.Set(true)
+				features.ManagedSystemUpgradeController.Set(true)
+				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
+
+				// rancher-webhook
+				expectedValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"capi":              nil,
+					"mcm": map[string]interface{}{
+						"enabled": features.MCM.Enabled(),
+					},
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					chart.WebhookChartName,
+					chart.WebhookChartName,
+					"",
+					"2.0.0",
+					expectedValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				// rancher-provisioning-capi
+				expectedProvCAPIValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.ProvisioningCAPINamespace,
+					chart.ProvisioningCAPIChartName,
+					chart.ProvisioningCAPIChartName,
+					"",
+					"2.0.0",
+					expectedProvCAPIValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
+
+				// system-upgrade-controller
+				// the Ensure function is not invoked in this case
 
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
@@ -220,6 +456,7 @@ func Test_ChartInstallation(t *testing.T) {
 				features.MCM.Set(false)
 				features.MCMAgent.Set(true)
 				features.ManagedSystemUpgradeController.Set(false)
+				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
 
 				// rancher-webhook
 				expectedValues := map[string]interface{}{
@@ -236,7 +473,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"rancher-webhook",
+					chart.WebhookChartName,
+					chart.WebhookChartName,
 					"",
 					"2.0.0",
 					expectedValues,
@@ -255,7 +493,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.ProvisioningCAPINamespace,
-					"rancher-provisioning-capi",
+					chart.ProvisioningCAPIChartName,
+					chart.ProvisioningCAPIChartName,
 					"",
 					"2.0.0",
 					expectedProvCAPIValues,
@@ -264,7 +503,7 @@ func Test_ChartInstallation(t *testing.T) {
 				).Return(nil)
 
 				// system-upgrade-controller
-				// nothing to do in this case
+				// the Ensure function is not invoked in this case
 
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
@@ -283,6 +522,7 @@ func Test_ChartInstallation(t *testing.T) {
 				features.MCM.Set(false)
 				features.MCMAgent.Set(true)
 				features.ManagedSystemUpgradeController.Set(false)
+				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
 
 				// rancher-webhook
 				expectedValues := map[string]interface{}{
@@ -299,7 +539,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"rancher-webhook",
+					chart.WebhookChartName,
+					chart.WebhookChartName,
 					"",
 					"2.0.0",
 					expectedValues,
@@ -318,7 +559,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.ProvisioningCAPINamespace,
-					"rancher-provisioning-capi",
+					chart.ProvisioningCAPIChartName,
+					chart.ProvisioningCAPIChartName,
 					"",
 					"2.0.0",
 					expectedProvCAPIValues,
@@ -343,11 +585,11 @@ func Test_ChartInstallation(t *testing.T) {
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
 				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
-				features.ImperativeApiExtension.Set(true)
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
 				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
 				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
 				_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
+				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
 
 				// rancher-webhook
 				expectedValues := map[string]interface{}{
@@ -364,7 +606,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"rancher-webhook",
+					chart.WebhookChartName,
+					chart.WebhookChartName,
 					"",
 					"2.0.0",
 					expectedValues,
@@ -383,7 +626,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.ProvisioningCAPINamespace,
-					"rancher-provisioning-capi",
+					chart.ProvisioningCAPIChartName,
+					chart.ProvisioningCAPIChartName,
 					"",
 					"2.0.0",
 					expectedProvCAPIValues,
@@ -403,6 +647,7 @@ func Test_ChartInstallation(t *testing.T) {
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
 					chart.SystemUpgradeControllerChartName,
+					chart.SystemUpgradeControllerChartName,
 					"",
 					"2.0.0",
 					expectedSUCValues,
@@ -421,7 +666,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"remotedialer-proxy",
+					chart.RemoteDialerProxyChartName,
+					chart.RemoteDialerProxyChartName,
 					"",
 					"2.0.0",
 					expectedRDPValues,
@@ -441,12 +687,12 @@ func Test_ChartInstallation(t *testing.T) {
 				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(5)
 				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(1)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
-				features.ImperativeApiExtension.Set(true)
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
 				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
 				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
 				_ = settings.ImportedClusterVersionManagement.Set("false")
 				_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
+				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
 
 				// rancher-webhook
 				expectedValues := map[string]interface{}{
@@ -463,7 +709,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"rancher-webhook",
+					chart.WebhookChartName,
+					chart.WebhookChartName,
 					"",
 					"2.0.0",
 					expectedValues,
@@ -482,7 +729,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.ProvisioningCAPINamespace,
-					"rancher-provisioning-capi",
+					chart.ProvisioningCAPIChartName,
+					chart.ProvisioningCAPIChartName,
 					"",
 					"2.0.0",
 					expectedProvCAPIValues,
@@ -501,7 +749,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"remotedialer-proxy",
+					chart.RemoteDialerProxyChartName,
+					chart.RemoteDialerProxyChartName,
 					"",
 					"2.0.0",
 					expectedRDPValues,
@@ -526,12 +775,12 @@ func Test_ChartInstallation(t *testing.T) {
 				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(plans, nil).Times(1)
-				features.ImperativeApiExtension.Set(true)
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
 				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
 				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
 				_ = settings.ImportedClusterVersionManagement.Set("false")
 				_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
+				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
 
 				// rancher-webhook
 				expectedValues := map[string]interface{}{
@@ -548,7 +797,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"rancher-webhook",
+					chart.WebhookChartName,
+					chart.WebhookChartName,
 					"",
 					"2.0.0",
 					expectedValues,
@@ -567,7 +817,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.ProvisioningCAPINamespace,
-					"rancher-provisioning-capi",
+					chart.ProvisioningCAPIChartName,
+					chart.ProvisioningCAPIChartName,
 					"",
 					"2.0.0",
 					expectedProvCAPIValues,
@@ -586,7 +837,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"remotedialer-proxy",
+					chart.RemoteDialerProxyChartName,
+					chart.RemoteDialerProxyChartName,
 					"",
 					"2.0.0",
 					expectedRDPValues,
@@ -595,76 +847,7 @@ func Test_ChartInstallation(t *testing.T) {
 				).Return(nil)
 
 				// system-upgrade-controller
-				// nothing to do in this case
-
-				// rancher-operator
-				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
-				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
-			},
-		},
-		{
-			name: "normal installation in local cluster with imperative API disabled",
-			setup: func(mocks testMocks) {
-				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
-				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(4)
-				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
-				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
-				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(plans, nil).Times(1)
-				features.ImperativeApiExtension.Set(false)
-				_ = settings.RancherWebhookVersion.Set("2.0.0")
-				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
-				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
-				_ = settings.ImportedClusterVersionManagement.Set("false")
-				_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
-
-				// rancher-webhook
-				expectedValues := map[string]interface{}{
-					"priorityClassName": priorityClassName,
-					"capi":              nil,
-					"mcm": map[string]interface{}{
-						"enabled": features.MCM.Enabled(),
-					},
-					"global": map[string]interface{}{
-						"cattle": map[string]interface{}{
-							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
-						},
-					},
-				}
-				mocks.manager.EXPECT().Ensure(
-					namespace.System,
-					"rancher-webhook",
-					"",
-					"2.0.0",
-					expectedValues,
-					gomock.AssignableToTypeOf(false),
-					"",
-				).Return(nil)
-
-				// rancher-provisioning-capi
-				expectedProvCAPIValues := map[string]interface{}{
-					"priorityClassName": priorityClassName,
-					"global": map[string]interface{}{
-						"cattle": map[string]interface{}{
-							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
-						},
-					},
-				}
-				mocks.manager.EXPECT().Ensure(
-					namespace.ProvisioningCAPINamespace,
-					"rancher-provisioning-capi",
-					"",
-					"2.0.0",
-					expectedProvCAPIValues,
-					gomock.AssignableToTypeOf(false),
-					"",
-				).Return(nil)
-
-				// system-upgrade-controller
-				// nothing to do in this case
-
-				// remotedialer-proxy
-				mocks.manager.EXPECT().Uninstall(namespace.System, "remotedialer-proxy").Return(nil)
-				mocks.manager.EXPECT().Remove(namespace.System, "remotedialer-proxy")
+				// the Ensure function is not invoked in this case
 
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
@@ -679,13 +862,13 @@ func Test_ChartInstallation(t *testing.T) {
 				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(plans, nil).Times(1)
-				features.ImperativeApiExtension.Set(true)
 				os.Setenv("IMPERATIVE_API_DIRECT", "true")
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
 				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
 				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
 				_ = settings.ImportedClusterVersionManagement.Set("false")
 				_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
+				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
 
 				// rancher-webhook
 				expectedValues := map[string]interface{}{
@@ -702,7 +885,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"rancher-webhook",
+					chart.WebhookChartName,
+					chart.WebhookChartName,
 					"",
 					"2.0.0",
 					expectedValues,
@@ -721,7 +905,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.ProvisioningCAPINamespace,
-					"rancher-provisioning-capi",
+					chart.ProvisioningCAPIChartName,
+					chart.ProvisioningCAPIChartName,
 					"",
 					"2.0.0",
 					expectedProvCAPIValues,
@@ -730,7 +915,7 @@ func Test_ChartInstallation(t *testing.T) {
 				).Return(nil)
 
 				// system-upgrade-controller
-				// nothing to do in this case
+				// the Ensure function is not invoked in this case
 
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
@@ -745,11 +930,11 @@ func Test_ChartInstallation(t *testing.T) {
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
 				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
-				features.ImperativeApiExtension.Set(true)
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
 				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
 				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
 				_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
+				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
 
 				// rancher-webhook
 				expectedValues := map[string]interface{}{
@@ -765,7 +950,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"rancher-webhook",
+					chart.WebhookChartName,
+					chart.WebhookChartName,
 					"",
 					"2.0.0",
 					expectedValues,
@@ -783,7 +969,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.ProvisioningCAPINamespace,
-					"rancher-provisioning-capi",
+					chart.ProvisioningCAPIChartName,
+					chart.ProvisioningCAPIChartName,
 					"",
 					"2.0.0",
 					expectedProvCAPIValues,
@@ -802,6 +989,7 @@ func Test_ChartInstallation(t *testing.T) {
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
 					chart.SystemUpgradeControllerChartName,
+					chart.SystemUpgradeControllerChartName,
 					"",
 					"2.0.0",
 					expectedSUCValues,
@@ -819,7 +1007,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"remotedialer-proxy",
+					chart.RemoteDialerProxyChartName,
+					chart.RemoteDialerProxyChartName,
 					"",
 					"2.0.0",
 					expectedRDPValues,
@@ -840,11 +1029,11 @@ func Test_ChartInstallation(t *testing.T) {
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
 				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
-				features.ImperativeApiExtension.Set(true)
 				_ = settings.RancherWebhookVersion.Set("2.0.1")
 				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.1")
 				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.1")
 				_ = settings.RemoteDialerProxyVersion.Set("2.0.1")
+				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
 
 				// rancher-webhook
 				expectedValues := map[string]interface{}{
@@ -863,7 +1052,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"rancher-webhook",
+					chart.WebhookChartName,
+					chart.WebhookChartName,
 					"",
 					"2.0.1",
 					expectedValues,
@@ -884,7 +1074,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.ProvisioningCAPINamespace,
-					"rancher-provisioning-capi",
+					chart.ProvisioningCAPIChartName,
+					chart.ProvisioningCAPIChartName,
 					"",
 					"2.0.1",
 					expectedProvCAPIValues,
@@ -912,6 +1103,7 @@ func Test_ChartInstallation(t *testing.T) {
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
 					chart.SystemUpgradeControllerChartName,
+					chart.SystemUpgradeControllerChartName,
 					"",
 					"2.0.1",
 					expectedSUCValues,
@@ -932,7 +1124,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"remotedialer-proxy",
+					chart.RemoteDialerProxyChartName,
+					chart.RemoteDialerProxyChartName,
 					"",
 					"2.0.1",
 					expectedRDPValues,
@@ -954,12 +1147,12 @@ func Test_ChartInstallation(t *testing.T) {
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
 				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
-				features.ImperativeApiExtension.Set(true)
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
 				_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
 				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
 				_ = settings.RemoteDialerProxyVersion.Set("2.0.1")
 				features.MCM.Set(true)
+				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
 
 				// rancher-webhook
 				expectedValues := map[string]interface{}{
@@ -973,7 +1166,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"rancher-webhook",
+					chart.WebhookChartName,
+					chart.WebhookChartName,
 					"",
 					"2.0.0",
 					expectedValues,
@@ -992,7 +1186,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.ProvisioningCAPINamespace,
-					"rancher-provisioning-capi",
+					chart.ProvisioningCAPIChartName,
+					chart.ProvisioningCAPIChartName,
 					"",
 					"2.0.0",
 					expectedProvCAPIValues,
@@ -1012,6 +1207,7 @@ func Test_ChartInstallation(t *testing.T) {
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
 					chart.SystemUpgradeControllerChartName,
+					chart.SystemUpgradeControllerChartName,
 					"",
 					"2.0.0",
 					expectedSUCValues,
@@ -1030,7 +1226,8 @@ func Test_ChartInstallation(t *testing.T) {
 				}
 				mocks.manager.EXPECT().Ensure(
 					namespace.System,
-					"remotedialer-proxy",
+					chart.RemoteDialerProxyChartName,
+					chart.RemoteDialerProxyChartName,
 					"",
 					"2.0.1",
 					expectedRDPValues,
@@ -1053,7 +1250,6 @@ func Test_ChartInstallation(t *testing.T) {
 			_ = settings.SystemUpgradeControllerChartVersion.Set(originalSUCVersion)
 			_ = settings.ImportedClusterVersionManagement.Set(originalImportedVersionManagement)
 			features.MCM.Set(originalMCM)
-			features.ImperativeApiExtension.Set(originalImperativeAPI)
 			features.MCMAgent.Set(originalMCMAgent)
 			features.ManagedSystemUpgradeController.Set(originalManagedSystemUpgradeController)
 

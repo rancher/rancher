@@ -18,16 +18,13 @@ var (
 	}
 	HostOSLabels = []labels.Set{
 		labels.Set(map[string]string{
-			"beta.kubernetes.io/os": "linux",
-		}),
-		labels.Set(map[string]string{
 			"kubernetes.io/os": "linux",
 		}),
 	}
 )
 
 // NodeTaintsController This controller will only run on the cluster with windowsPreferred is true.
-// It will add taints to the v1.Node.Spec.Taints to the nodes with label beta.kubernetes.io/os=linux.
+// It will add taints to the v1.Node.Spec.Taints to the nodes with label kubernetes.io/os=linux.
 type NodeTaintsController struct {
 	nodeClient apicorev1.NodeInterface
 }

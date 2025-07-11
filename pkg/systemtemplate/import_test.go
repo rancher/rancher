@@ -16,7 +16,6 @@ import (
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	corefakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
 	"github.com/rancher/rancher/pkg/image"
-	rketypes "github.com/rancher/rke/types"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -57,7 +56,6 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 		namespace                         string
 		token                             string
 		url                               string
-		isWindowsCluster                  bool
 		isPreBootstrap                    bool
 		features                          map[string]bool
 		taints                            []corev1.Taint
@@ -73,54 +71,22 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 		expectedPodDisruptionBudgetHashes map[string]string
 	}{
 		{
-			name: "test-rke",
-			cluster: &apimgmtv3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-rke",
-				},
-				Spec: apimgmtv3.ClusterSpec{
-					ClusterSpecBase: apimgmtv3.ClusterSpecBase{
-						RancherKubernetesEngineConfig: &rketypes.RancherKubernetesEngineConfig{},
-					},
-				},
-			},
-			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "9a35d9bed78e5c35b2ae9bcedbc60d72eb4201d817674cb60c222a1c77795cb4",
-			},
-			expectedDaemonSetHashes: map[string]string{},
-			expectedClusterRoleHashes: map[string]string{
-				"proxy-clusterrole-kubeapiserver": "0d28ae2947ce0c5faef85ff59169a5f65e0490552bf9cb00f29a98eb97a02a7e",
-				"cattle-admin":                    "009abecc023b1e4ac1bc35e4153ef4492b2bc66a5972df9c5617a38f587c3f42",
-			},
-			expectedClusterRoleBindingHashes: map[string]string{
-				"proxy-role-binding-kubernetes-master": "0df909395597974e60d905e9860bc0a02367bd2df74528d430c635c3f7afdeb0",
-				"cattle-admin-binding":                 "0da37cf0d4c4b4d068a3000967c4e37d11e1cecd126779633095dbe30b39c6ba",
-			},
-			expectedNamespaceHashes: map[string]string{
-				"cattle-system": "fd527fed9cae2e8b27f9610d64e9476e692a3dfde42954aeaecba450fe2b9571",
-			},
-			expectedServiceHashes: map[string]string{
-				"cattle-cluster-agent": "9512a8430f6d32f31eac6e4446724dc5a336c3d9c8147c824f2734c2f8afe792",
-			},
-			expectedServiceAccountHashes: map[string]string{
-				"cattle": "5cf160de85eaef5de9ce917130c64c23e91836920f7e9b2e2d7a8be8290079f2",
-			},
-			expectedSecretHashes: map[string]string{
-				"cattle-credentials-5ec1f7e700": "b2ec2a5655ff908557b5a46695be7429c9eb5bf32c799e37832e57405ce54f46",
-			},
-		},
-		{
 			name: "test-provisioned-import",
 			cluster: &apimgmtv3.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-prov",
 				},
 				Spec: apimgmtv3.ClusterSpec{
+					DisplayName:    "testing-rke2",
 					ImportedConfig: &apimgmtv3.ImportedConfig{},
+				},
+				Status: apimgmtv3.ClusterStatus{
+					Driver:   "imported",
+					Provider: "rke2",
 				},
 			},
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "9a35d9bed78e5c35b2ae9bcedbc60d72eb4201d817674cb60c222a1c77795cb4",
+				"cattle-cluster-agent": "de4c14250ecab17d8f14f5e42d6c9096318e49ba8621f3e2e4b4bac7c6f15f80",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
@@ -152,6 +118,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 					Name: "test-prov",
 				},
 				Spec: apimgmtv3.ClusterSpec{
+					DisplayName:    "testing-rke2",
 					ImportedConfig: &apimgmtv3.ImportedConfig{},
 					ClusterSpecBase: apimgmtv3.ClusterSpecBase{
 						ClusterAgentDeploymentCustomization: &apimgmtv3.AgentDeploymentCustomization{
@@ -167,9 +134,13 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 						},
 					},
 				},
+				Status: apimgmtv3.ClusterStatus{
+					Driver:   "imported",
+					Provider: "rke2",
+				},
 			},
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "9a35d9bed78e5c35b2ae9bcedbc60d72eb4201d817674cb60c222a1c77795cb4",
+				"cattle-cluster-agent": "de4c14250ecab17d8f14f5e42d6c9096318e49ba8621f3e2e4b4bac7c6f15f80",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
@@ -204,6 +175,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 					Name: "test-prov",
 				},
 				Spec: apimgmtv3.ClusterSpec{
+					DisplayName:    "testing-rke2",
 					ImportedConfig: &apimgmtv3.ImportedConfig{},
 					ClusterSpecBase: apimgmtv3.ClusterSpecBase{
 						ClusterAgentDeploymentCustomization: &apimgmtv3.AgentDeploymentCustomization{
@@ -219,9 +191,13 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 						},
 					},
 				},
+				Status: apimgmtv3.ClusterStatus{
+					Driver:   "imported",
+					Provider: "rke2",
+				},
 			},
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "2093af1547b1eef8b22527ecb1590fe3302c3287b317e0aed3e268ff2a6dc0df",
+				"cattle-cluster-agent": "acefadd59268701232c3226bd5d435bba3fa0e449eda5b5858af17c910ed994f",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
@@ -255,16 +231,21 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 					Name: "test-prov",
 				},
 				Spec: apimgmtv3.ClusterSpec{
+					DisplayName: "testing-rke2",
 					ImportedConfig: &apimgmtv3.ImportedConfig{
 						PrivateRegistryURL: "localhost:5001",
 					},
+				},
+				Status: apimgmtv3.ClusterStatus{
+					Driver:   "imported",
+					Provider: "rke2",
 				},
 			},
 			url:        "some-dummy-url",
 			token:      "some-dummy-token",
 			agentImage: "my/agent:image",
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "48868d8d72bfe924be0eb248def83f78088c68f91e12cd2b67116e6d448d889a",
+				"cattle-cluster-agent": "8e648ee72f5f35e48c67ce914d4cbcc1b1ec23543c6a3c10a4e494c2078ef7c5",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
@@ -299,7 +280,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 			if tt.cluster.Spec.ImportedConfig != nil && tt.cluster.Spec.ImportedConfig.PrivateRegistryURL != "" {
 				tt.agentImage = image.ResolveWithCluster(tt.agentImage, tt.cluster)
 			}
-			err := SystemTemplate(&b, tt.agentImage, tt.authImage, tt.namespace, tt.token, tt.url, tt.isWindowsCluster, tt.isPreBootstrap, tt.cluster, tt.features, tt.taints, secretLister, tt.pcExists)
+			err := SystemTemplate(&b, tt.agentImage, tt.authImage, tt.namespace, tt.token, tt.url, tt.isPreBootstrap, tt.cluster, tt.features, tt.taints, secretLister, tt.pcExists)
 
 			assert.Nil(t, err)
 			decoder := scheme.Codecs.UniversalDeserializer()

@@ -2,11 +2,9 @@ package clustermanager
 
 import (
 	"context"
-	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -23,12 +21,11 @@ import (
 	clusterController "github.com/rancher/rancher/pkg/controllers/managementuser"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/kontainer-engine/drivers/gke"
 	"github.com/rancher/rancher/pkg/rbac"
+	"github.com/rancher/rancher/pkg/rkecerts"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/config/dialer"
-	"github.com/rancher/rke/pki/cert"
 	"github.com/rancher/steve/pkg/accesscontrol"
 	rbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/ratelimit"
@@ -309,14 +306,6 @@ func ToRESTConfig(cluster *apimgmtv3.Cluster, context *config.ScaledContext, sec
 		return nil, err
 	}
 
-	var tlsDialer func(string, string) (net.Conn, error)
-	if cluster.Status.Driver == apimgmtv3.ClusterDriverRKE {
-		tlsDialer, err = nameIgnoringTLSDialer(clusterDialer, caBytes)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	secret, err := secretLister.Get(secretmigrator.SecretNamespace, cluster.Status.ServiceAccountTokenSecret)
 	if err != nil {
 		return nil, err
@@ -336,19 +325,7 @@ func ToRESTConfig(cluster *apimgmtv3.Cluster, context *config.ScaledContext, sec
 		UserAgent:   rest.DefaultKubernetesUserAgent() + " cluster " + cluster.Name,
 		WrapTransport: func(rt http.RoundTripper) http.RoundTripper {
 			if ht, ok := rt.(*http.Transport); ok {
-				if tlsDialer == nil {
-					ht.DialContext = clusterDialer
-				} else {
-					ht.DialContext = nil
-					ht.DialTLS = tlsDialer
-				}
-			}
-			if cluster.Status.Driver == "googleKubernetesEngine" && cluster.Spec.GenericEngineConfig != nil {
-				cred, _ := (*cluster.Spec.GenericEngineConfig)["credential"].(string)
-				rt, err = gke.Oauth2Transport(context.RunContext, rt, cred)
-				if err != nil {
-					logrus.Errorf("unable to retrieve token source for GKE oauth2: %v", err)
-				}
+				ht.DialContext = clusterDialer
 			}
 			return rt
 		},
@@ -357,39 +334,10 @@ func ToRESTConfig(cluster *apimgmtv3.Cluster, context *config.ScaledContext, sec
 	return rc, nil
 }
 
-func nameIgnoringTLSDialer(dialer dialer.Dialer, caBytes []byte) (func(string, string) (net.Conn, error), error) {
-	rkeVerify, err := VerifyIgnoreDNSName(caBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	tlsConfig := &tls.Config{
-		// Use custom TLS validate that validates the cert chain, but not the server.  This should be secure because
-		// we use a private per cluster CA always for RKE
-		InsecureSkipVerify:    true,
-		VerifyPeerCertificate: rkeVerify,
-	}
-
-	return func(network, address string) (net.Conn, error) {
-		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(15*time.Second))
-		defer cancel()
-		rawConn, err := dialer(ctx, network, address)
-		if err != nil {
-			return nil, err
-		}
-		tlsConn := tls.Client(rawConn, tlsConfig)
-		if err := tlsConn.Handshake(); err != nil {
-			rawConn.Close()
-			return nil, err
-		}
-		return tlsConn, err
-	}, nil
-}
-
 func VerifyIgnoreDNSName(caCertsPEM []byte) (func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error, error) {
 	rootCAs := x509.NewCertPool()
 	if len(caCertsPEM) > 0 {
-		caCerts, err := cert.ParseCertsPEM(caCertsPEM)
+		caCerts, err := rkecerts.ParseCertsPEM(caCertsPEM)
 		if err != nil {
 			return nil, err
 		}

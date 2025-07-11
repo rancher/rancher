@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"sort"
@@ -20,9 +21,9 @@ import (
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/image"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rke/templates"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/yaml"
 )
 
 var (
@@ -43,9 +44,7 @@ type clusterAgentContext struct {
 	URL                   string
 	Namespace             string
 	URLPlain              string
-	IsWindowsCluster      bool
 	IsPreBootstrap        bool
-	IsRKE                 bool
 	PrivateRegistryConfig string
 	Tolerations           string
 	AppendTolerations     string
@@ -54,6 +53,7 @@ type clusterAgentContext struct {
 	ClusterRegistry       string
 	EnablePriorityClass   bool
 	PodDisruptionBudget   string
+	SUCAppNameOverride    string
 }
 
 type priorityClassContext struct {
@@ -133,8 +133,9 @@ func PodDisruptionBudgetTemplate(cluster *apimgmtv3.Cluster) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url string, isWindowsCluster, isPreBootstrap bool, cluster *apimgmtv3.Cluster,
-	agentFeatures map[string]bool, taints []corev1.Taint, secretLister v1.SecretLister, pcExists bool) error {
+func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url string, isPreBootstrap bool,
+	cluster *apimgmtv3.Cluster, agentFeatures map[string]bool, taints []corev1.Taint,
+	secretLister v1.SecretLister, pcExists bool) error {
 	var tolerations, agentEnvVars, agentAppendTolerations, agentAffinity, agentResourceRequirements string
 	d := sha256.Sum256([]byte(fmt.Sprintf("%s.%s.%s", url, token, namespace)))
 	tokenKey := hex.EncodeToString(d[:])[:10]
@@ -149,7 +150,7 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 	}
 
 	if taints != nil {
-		tolerations = templates.ToYAML(taints)
+		tolerations = toYAML(taints)
 	}
 
 	envVars := settings.DefaultAgentSettingsAsEnvVars()
@@ -178,10 +179,10 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		}
 	}
 
-	agentEnvVars = templates.ToYAML(envVars)
+	agentEnvVars = toYAML(envVars)
 
 	if appendTolerations := util.GetClusterAgentTolerations(cluster); appendTolerations != nil {
-		agentAppendTolerations = templates.ToYAML(appendTolerations)
+		agentAppendTolerations = toYAML(appendTolerations)
 		if agentAppendTolerations == "" {
 			return fmt.Errorf("error converting agent append tolerations to YAML")
 		}
@@ -191,13 +192,13 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 	if err != nil {
 		return err
 	}
-	agentAffinity = templates.ToYAML(affinity)
+	agentAffinity = toYAML(affinity)
 	if agentAffinity == "" {
 		return fmt.Errorf("error converting agent affinity to YAML")
 	}
 
 	if resourceRequirements := util.GetClusterAgentResourceRequirements(cluster); resourceRequirements != nil {
-		agentResourceRequirements = templates.ToYAML(resourceRequirements)
+		agentResourceRequirements = toYAML(resourceRequirements)
 		if agentResourceRequirements == "" {
 			return fmt.Errorf("error converting agent resource requirements to YAML")
 		}
@@ -225,9 +226,7 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		URL:                   base64.StdEncoding.EncodeToString([]byte(url)),
 		Namespace:             base64.StdEncoding.EncodeToString([]byte(namespace)),
 		URLPlain:              url,
-		IsWindowsCluster:      isWindowsCluster,
 		IsPreBootstrap:        isPreBootstrap,
-		IsRKE:                 cluster != nil && cluster.Status.Driver == apimgmtv3.ClusterDriverRKE,
 		PrivateRegistryConfig: registryConfig,
 		Tolerations:           tolerations,
 		AppendTolerations:     agentAppendTolerations,
@@ -236,6 +235,17 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 		ClusterRegistry:       registryURL,
 		PodDisruptionBudget:   pdb,
 		EnablePriorityClass:   pcExists && pcEnabled,
+		SUCAppNameOverride: func() string {
+			// Set the field to ensure backward compatibility in the case of node-driver RKE2/K3s cluster
+			if cluster.Status.Driver == apimgmtv3.ClusterDriverImported &&
+				(cluster.Status.Provider == apimgmtv3.ClusterDriverRke2 || cluster.Status.Provider == apimgmtv3.ClusterDriverK3s) {
+				if cluster.Spec.DisplayName != "" {
+					return capr.SafeConcatName(capr.MaxHelmReleaseNameLength, "mcc",
+						capr.SafeConcatName(48, cluster.Spec.DisplayName, "managed", "system-upgrade-controller"))
+				}
+			}
+			return ""
+		}(),
 	}
 
 	return t.Execute(resp, context)
@@ -244,10 +254,14 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 	enableMSUC := false
 	if cluster.Status.Driver == apimgmtv3.ClusterDriverRke2 || cluster.Status.Driver == apimgmtv3.ClusterDriverK3s {
-		// the case of imported rke2/k3s cluster
+		// the case of imported RKE2/K3s cluster
 		enableMSUC = importedclusterversionmanagement.Enabled(cluster)
 	}
-
+	if cluster.Status.Driver == apimgmtv3.ClusterDriverImported &&
+		(cluster.Status.Provider == apimgmtv3.ClusterDriverRke2 || cluster.Status.Provider == apimgmtv3.ClusterDriverK3s) {
+		// the case of node-driver RKE2/K3s cluster
+		enableMSUC = true
+	}
 	return map[string]bool{
 		features.MCM.Name():                            false,
 		features.MCMAgent.Name():                       true,
@@ -268,8 +282,7 @@ func ForCluster(cluster *apimgmtv3.Cluster, token string, taints []corev1.Taint,
 
 	buf := &bytes.Buffer{}
 	err := SystemTemplate(buf, GetDesiredAgentImage(cluster), GetDesiredAuthImage(cluster),
-		cluster.Name, token, settings.ServerURL.Get(), cluster.Spec.WindowsPreferedCluster,
-		capr.PreBootstrap(cluster), cluster, GetDesiredFeatures(cluster), taints, secretLister, pcExists)
+		cluster.Name, token, settings.ServerURL.Get(), capr.PreBootstrap(cluster), cluster, GetDesiredFeatures(cluster), taints, secretLister, pcExists)
 	return buf.Bytes(), err
 }
 
@@ -320,4 +333,20 @@ func GetDesiredAuthImage(cluster *apimgmtv3.Cluster) string {
 	}
 	logrus.Tracef("clusterDeploy: deployAgent: desiredAuth is [%s] for cluster [%s]", desiredAuth, cluster.Name)
 	return desiredAuth
+}
+
+func toYAML(v interface{}) string {
+	data, err := json.Marshal(v)
+	if err != nil {
+		// Swallow errors inside of a template so it doesn't affect remaining template lines
+		logrus.Errorf("[ToYAML] Error marshaling %v: %v", v, err)
+		return ""
+	}
+	yamlData, err := yaml.JSONToYAML(data)
+	if err != nil {
+		// Swallow errors inside of a template so it doesn't affect remaining template lines
+		logrus.Errorf("[ToYAML] Error converting json to yaml for %v: %v ", string(data), err)
+		return ""
+	}
+	return strings.TrimSuffix(string(yamlData), "\n")
 }

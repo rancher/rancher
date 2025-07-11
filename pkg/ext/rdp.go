@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -15,8 +16,9 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/rest"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"k8s.io/client-go/util/retry"
 )
 
 const (
@@ -26,13 +28,16 @@ const (
 	certServerName   = "api-extension-tls-name"
 )
 
+var rdpSecretBackoff = wait.Backoff{
+	Steps:    7,
+	Duration: 15 * time.Second,
+	Factor:   2.0,
+	Jitter:   0.1,
+}
+
 func RDPStart(ctx context.Context, restConfig *rest.Config, wranglerContext *wrangler.Context) error {
 	if features.MCMAgent.Enabled() {
 		return nil
-	}
-
-	if !features.ImperativeApiExtension.Enabled() || !RDPEnabled() {
-		return DeleteRDPConnectSecret(wranglerContext.Core.Secret())
 	}
 
 	portForwarder, err := forward.New(
@@ -46,9 +51,22 @@ func RDPStart(ctx context.Context, restConfig *rest.Config, wranglerContext *wra
 		return err
 	}
 
-	connectSecret, err := GetOrCreateRDPConnectSecret(wranglerContext.Core.Secret())
-	if err != nil {
-		return err
+	var connectSecret string
+	var retryErr error
+	retryCount := 0
+
+	// Retry to get or create the connect secret for approx 15 minutes
+	retry.OnError(rdpSecretBackoff, func(err error) bool {
+		retryCount++
+		logrus.Errorf("RDPClient: error getting connect secret (retry #%d), will retry: %s", retryCount, err.Error())
+		return true
+	}, func() error {
+		connectSecret, retryErr = GetOrCreateRDPConnectSecret(wranglerContext.Core.Secret())
+		return retryErr
+	})
+
+	if retryErr != nil {
+		return retryErr
 	}
 
 	remoteDialerProxyClient, err := proxyclient.New(
@@ -70,12 +88,7 @@ func RDPStart(ctx context.Context, restConfig *rest.Config, wranglerContext *wra
 }
 
 func RDPEnabled() bool {
-	switch os.Getenv(rdpEnabledEnvVar) {
-	case "true":
-		return false
-	default:
-		return true
-	}
+	return os.Getenv(rdpEnabledEnvVar) != "true"
 }
 
 func GetOrCreateRDPConnectSecret(secretController corecontrollers.SecretController) (string, error) {
@@ -112,9 +125,4 @@ func GetOrCreateRDPConnectSecret(secretController corecontrollers.SecretControll
 	}
 
 	return secretValue, nil
-}
-
-func DeleteRDPConnectSecret(secretController corecontrollers.SecretController) error {
-	err := secretController.Delete(namespace.System, apiExtSecretName, &v1.DeleteOptions{})
-	return client.IgnoreNotFound(err)
 }

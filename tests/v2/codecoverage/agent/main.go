@@ -25,12 +25,9 @@ import (
 	"github.com/mattn/go-colorable"
 	"github.com/rancher/rancher/pkg/agent/clean"
 	"github.com/rancher/rancher/pkg/agent/cluster"
-	"github.com/rancher/rancher/pkg/agent/node"
 	"github.com/rancher/rancher/pkg/agent/rancher"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/logserver"
-	"github.com/rancher/rancher/pkg/rkenodeconfigclient"
-	"github.com/rancher/rancher/pkg/rkenodeconfigserver"
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/shepherd/pkg/killserver"
 	"github.com/rancher/wrangler/v3/pkg/signals"
@@ -42,8 +39,8 @@ var (
 )
 
 const (
-	Token                    = "X-API-Tunnel-Token"
-	KubeletCertValidityLimit = time.Hour * 72
+	Token  = "X-API-Tunnel-Token"
+	Params = "X-API-Tunnel-Params"
 )
 
 func main() {
@@ -59,31 +56,23 @@ func main() {
 func runAgent(ctx context.Context) {
 	var err error
 
-	if len(os.Args) > 1 {
-		err = runArgs(ctx)
+	logrus.SetOutput(colorable.NewColorableStdout())
+	logserver.StartServerWithDefaults()
+	if os.Getenv("CATTLE_DEBUG") == "true" || os.Getenv("RANCHER_DEBUG") == "true" {
+		logrus.SetLevel(logrus.DebugLevel)
+	}
+
+	initFeatures()
+
+	if os.Getenv("CLUSTER_CLEANUP") == "true" {
+		err = clean.Cluster()
+	} else if os.Getenv("BINDING_CLEANUP") == "true" {
+		err = errors.Join(
+			clean.DuplicateBindings(nil),
+			clean.OrphanBindings(nil),
+		)
 	} else {
-		if _, err = reconcileKubelet(ctx); err != nil {
-			logrus.Warnf("failed to reconcile kubelet, error: %v", err)
-		}
-
-		logrus.SetOutput(colorable.NewColorableStdout())
-		logserver.StartServerWithDefaults()
-		if os.Getenv("CATTLE_DEBUG") == "true" || os.Getenv("RANCHER_DEBUG") == "true" {
-			logrus.SetLevel(logrus.DebugLevel)
-		}
-
-		initFeatures()
-
-		if os.Getenv("CLUSTER_CLEANUP") == "true" {
-			err = clean.Cluster()
-		} else if os.Getenv("BINDING_CLEANUP") == "true" {
-			err = errors.Join(
-				clean.DuplicateBindings(nil),
-				clean.OrphanBindings(nil),
-			)
-		} else {
-			err = run(ctx)
-		}
+		err = run(ctx)
 	}
 
 	if err != nil {
@@ -91,39 +80,16 @@ func runAgent(ctx context.Context) {
 	}
 }
 
-func runArgs(ctx context.Context) error {
-	switch os.Args[1] {
-	case "clean":
-		return clean.Run(ctx, os.Args)
-	default:
-		return run(ctx)
-	}
-}
-
 func initFeatures() {
 	features.InitializeFeatures(nil, os.Getenv("CATTLE_FEATURES"))
 }
 
-func isCluster() bool {
-	return os.Getenv("CATTLE_CLUSTER") == "true"
-}
-
 func getParams() (map[string]interface{}, error) {
-	if isCluster() {
-		return cluster.Params()
-	}
-	return node.Params(), nil
+	return cluster.Params()
 }
 
 func getTokenAndURL() (string, string, error) {
-	token, url, err := node.TokenAndURL()
-	if err != nil {
-		return "", "", err
-	}
-	if token == "" {
-		return cluster.TokenAndURL()
-	}
-	return token, url, nil
+	return cluster.TokenAndURL()
 }
 
 func isConnect() bool {
@@ -139,50 +105,6 @@ func connected() {
 	if err != nil {
 		f.Close()
 	}
-}
-
-func cleanup(ctx context.Context) error {
-	if os.Getenv("CATTLE_K8S_MANAGED") != "true" {
-		return nil
-	}
-
-	c, err := client.NewClientWithOpts(client.WithAPIVersionNegotiation(), client.FromEnv)
-	if err != nil {
-		return err
-	}
-	defer c.Close()
-
-	args := filters.NewArgs()
-	args.Add("label", "io.cattle.agent=true")
-
-	containers, err := c.ContainerList(ctx, types.ContainerListOptions{
-		All:     true,
-		Filters: args,
-	})
-	if err != nil {
-		return err
-	}
-
-	for _, container := range containers {
-		if _, ok := container.Labels["io.kubernetes.pod.namespace"]; ok {
-			continue
-		}
-
-		if strings.Contains(container.Names[0], "share-mnt") {
-			continue
-		}
-
-		container := container
-		go func() {
-			time.Sleep(15 * time.Second)
-			logrus.Infof("Removing unmanaged agent %s(%s)", container.Names[0], container.ID)
-			c.ContainerRemove(ctx, container.ID, types.ContainerRemoveOptions{
-				Force: true,
-			})
-		}()
-	}
-
-	return nil
 }
 
 func run(ctx context.Context) error {
@@ -205,13 +127,8 @@ func run(ctx context.Context) error {
 	}
 
 	headers := http.Header{
-		Token:                      {token},
-		rkenodeconfigclient.Params: {base64.StdEncoding.EncodeToString(bytes)},
-	}
-
-	err = KubeletNeedsNewCertificate(headers)
-	if err != nil {
-		return err
+		Token:  {token},
+		Params: {base64.StdEncoding.EncodeToString(bytes)},
 	}
 
 	serverURL, err := url.Parse(server)
@@ -315,76 +232,27 @@ func run(ctx context.Context) error {
 
 	onConnect := func(ctx context.Context, _ *remotedialer.Session) error {
 		connected()
-		connectConfig := fmt.Sprintf("https://%s/v3/connect/config", serverURL.Host)
-		httpClient := http.Client{
-			Timeout: 300 * time.Second,
-		}
-		interval, err := rkenodeconfigclient.ConfigClient(ctx, &httpClient, connectConfig, headers, writeCertsOnly)
-		if err != nil {
-			return err
-		}
 
 		if writeCertsOnly {
 			exitCertWriter(ctx)
 		}
 
-		if isCluster() {
-			err = rancher.Run(topContext)
-			if err != nil {
-				logrus.Fatal(err)
-			}
-			return nil
+		err = rancher.Run(topContext)
+		if err != nil {
+			logrus.Fatal(err)
 		}
-
-		if err := cleanup(context.Background()); err != nil {
-			logrus.Warnf("Unable to perform docker cleanup: %v", err)
-		}
-
-		go func() {
-			logrus.Infof("Starting plan monitor, checking every %v seconds", interval)
-			tt := time.Duration(interval) * time.Second
-			for {
-				select {
-				case <-time.After(tt):
-					// each time we request a plan we should
-					// check if our cert about to expire
-					err = KubeletNeedsNewCertificate(headers)
-					if err != nil {
-						logrus.Errorf("failed to check validity of kubelet certs: %v", err)
-					}
-					receivedInterval, err := rkenodeconfigclient.ConfigClient(ctx, &httpClient, connectConfig, headers, writeCertsOnly)
-					if err != nil {
-						logrus.Errorf("failed to check plan: %v", err)
-					} else if receivedInterval != 0 && receivedInterval != interval {
-						tt = time.Duration(receivedInterval) * time.Second
-						logrus.Infof("Plan monitor checking %v seconds", receivedInterval)
-					}
-
-				case <-ctx.Done():
-					return
-				}
-			}
-		}()
 
 		return nil
 	}
 
-	if isCluster() {
-		go func() {
-			log.Println(http.ListenAndServe("localhost:6060", nil))
-		}()
-	}
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
 
 	for {
 		wsURL := fmt.Sprintf("wss://%s/v3/connect", serverURL.Host)
 		if !isConnect() {
 			wsURL += "/register"
-		}
-
-		// check if we need a new kubelet cert on reconnection
-		err = KubeletNeedsNewCertificate(headers)
-		if err != nil {
-			return err
 		}
 
 		logrus.Infof("Connecting to %s with token starting with %s", wsURL, token[:len(token)/2])
@@ -465,157 +333,4 @@ func certinfo(cert *x509.Certificate) {
 	logrus.Infof("NotAfter: %+v", cert.NotAfter)
 	logrus.Infof("SignatureAlgorithm: %+v", cert.SignatureAlgorithm)
 	logrus.Infof("PublicKeyAlgorithm: %+v", cert.PublicKeyAlgorithm)
-}
-
-// reconcileKubelet restarts kubelet in unmanaged agents
-func reconcileKubelet(ctx context.Context) (bool, error) {
-	if os.Getenv("CATTLE_K8S_MANAGED") == "true" {
-		return true, nil
-	}
-
-	writeCertsOnly := os.Getenv("CATTLE_WRITE_CERT_ONLY") == "true"
-	if writeCertsOnly {
-		return true, nil
-	}
-
-	c, err := client.NewClientWithOpts(client.WithAPIVersionNegotiation(), client.FromEnv)
-	if err != nil {
-		return false, err
-	}
-	defer c.Close()
-
-	args := filters.NewArgs()
-	args.Add("label", "io.rancher.rke.container.name=kubelet")
-
-	containers, err := c.ContainerList(ctx, types.ContainerListOptions{
-		All:     true,
-		Filters: args,
-	})
-	if err != nil {
-		return false, err
-	}
-
-	for _, container := range containers {
-		if len(container.Names) > 0 && strings.Contains(container.Names[0], "kubelet") {
-			nodeName := os.Getenv("CATTLE_NODE_NAME")
-			logrus.Infof("node %v is not registered, restarting kubelet now", nodeName)
-			if err := c.ContainerRestart(ctx, container.ID, nil); err != nil {
-				return false, err
-			}
-			break
-		}
-	}
-	return false, nil
-}
-
-// KubeletNeedsNewCertificate will set the
-// 'RegenerateKubeletCertificate' header field to true if
-// a) the kubelet serving certificate does not exist
-// b) the certificate will expire in 72 hours
-// c) the certificate does not accurately represent the
-//
-//	current IP address and Hostname of the node
-//
-// While the agent may denote it needs a new kubelet certificate
-// in its connection request, a new certificate will only be
-// delivered by Rancher if the generate_serving_certificate property
-// is set to 'true' for the clusters kubelet service.
-func KubeletNeedsNewCertificate(headers http.Header) error {
-	currentHostname := os.Getenv("CATTLE_NODE_NAME")
-
-	// RKE will save the certs on the node using either the public or private IP address, depending on the infrastructure provider.
-	// For example, the certs will be stored using the public IP address for VM's on digital ocean, but will use the private IP
-	// address for VM's on AWS. We do not know which IP address RKE decided to use, so we need to check both locations.
-	kubeletCertFile, kubeletCertKeyFile, ipAddress := findCertificateFiles(os.Getenv("CATTLE_ADDRESS"), os.Getenv("CATTLE_INTERNAL_ADDRESS"))
-	if kubeletCertFile == "" || kubeletCertKeyFile == "" || ipAddress == "" {
-		logrus.Tracef("did not find kubelet certificate files using either public ip address (%s) or private ip address (%s)", os.Getenv("CATTLE_ADDRESS"), os.Getenv("CATTLE_INTERNAL_ADDRESS"))
-	}
-
-	cert, err := tls.LoadX509KeyPair(kubeletCertFile, kubeletCertKeyFile)
-	if err != nil && !strings.Contains(err.Error(), "no such file") {
-		return err
-	}
-
-	needsRegen, err := KubeletCertificateNeedsRegeneration(ipAddress, currentHostname, cert, time.Now())
-	if err != nil {
-		return err
-	}
-
-	if needsRegen {
-		headers.Set(rkenodeconfigserver.RegenerateKubeletCertificate, "true")
-	} else {
-		headers.Set(rkenodeconfigserver.RegenerateKubeletCertificate, "false")
-	}
-
-	return nil
-}
-
-func findCertificateFiles(IPAddresses ...string) (string, string, string) {
-	for _, ip := range IPAddresses {
-		fileSafeIPAddress := strings.ReplaceAll(ip, ".", "-")
-		certFile := fmt.Sprintf("/etc/kubernetes/ssl/kube-kubelet-%s.pem", fileSafeIPAddress)
-		certKeyFile := fmt.Sprintf("/etc/kubernetes/ssl/kube-kubelet-%s-key.pem", fileSafeIPAddress)
-		_, certErr := os.Stat(certFile)
-		_, keyErr := os.Stat(certKeyFile)
-		// check that both files exist
-		if certErr == nil && keyErr == nil {
-			return certFile, certKeyFile, ip
-		}
-	}
-	return "", "", ""
-}
-
-func KubeletCertificateNeedsRegeneration(ipAddress, currentHostname string, cert tls.Certificate, currentTime time.Time) (bool, error) {
-	if len(cert.Certificate) == 0 {
-		return true, nil
-	}
-
-	parsedCert, err := x509.ParseCertificate(cert.Certificate[0])
-	if err != nil {
-		return false, err
-	}
-
-	if !CertificateIncludesHostname(currentHostname, parsedCert) {
-		logrus.Tracef("certificate does not include current hostname, requesting new certificate")
-		return true, nil
-	}
-
-	if CertificateIsExpiring(parsedCert, currentTime) {
-		logrus.Tracef("certificate is expiring soon, requesting new certificate")
-		return true, nil
-	}
-
-	if !CertificateIncludesCurrentIP(ipAddress, parsedCert) {
-		logrus.Tracef("certificate does not include current IP address, requesting new certificate")
-		return true, nil
-	}
-
-	return false, nil
-}
-
-// CertificateIsExpiring checks if the passed certificate will expire within
-// the KubeletCertValidityLimit
-func CertificateIsExpiring(cert *x509.Certificate, currentTime time.Time) bool {
-	return cert.NotAfter.Sub(currentTime) < KubeletCertValidityLimit
-}
-
-// CertificateIncludesHostname checks that the passed certificate includes
-// the provided hostname in its SAN list
-func CertificateIncludesHostname(hostname string, cert *x509.Certificate) bool {
-	for _, name := range cert.DNSNames {
-		if name == hostname {
-			return true
-		}
-	}
-	return false
-}
-
-// CertificateIncludesCurrentIP checks that the passed certificate includes the provided IP address
-func CertificateIncludesCurrentIP(ipAddress string, cert *x509.Certificate) bool {
-	for _, ip := range cert.IPAddresses {
-		if ipAddress == ip.String() {
-			return true
-		}
-	}
-	return false
 }
