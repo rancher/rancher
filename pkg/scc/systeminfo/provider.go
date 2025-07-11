@@ -34,15 +34,9 @@ func (i *InfoProvider) SetUuids(rancherUuid uuid.UUID, clusterUuid uuid.UUID) *I
 }
 
 // GetVersion returns a version number for the systeminfo provider
+// TODO(scc-devs): unclear if they want the "real" version rancher sets, or the one we must use for product info
 func GetVersion() string {
-	var version string
-	version = coreVersion.Version
-	if versionIsDevBuild() {
-		// TODO: maybe SCC devs can give us a static dev version?
-		version = "2.10.3"
-	}
-
-	return version
+	return coreVersion.Version
 }
 
 // GetProductIdentifier returns a triple of product ID, version and CPU architecture
