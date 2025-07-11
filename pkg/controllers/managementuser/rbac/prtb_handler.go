@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -16,14 +15,13 @@ import (
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
@@ -31,38 +29,6 @@ import (
 )
 
 const owner = "owner-user"
-
-// globalResourceRulesNeededInProjects is the set of PolicyRules that need to be present on *-promoted ClusterRoles
-// Binding a user to a *-promoted ClusterRole with these PolicyRules results in that user being granted access to these "global" resources.
-// The PolicyRule for each resource is the base policy rule, verbs are added dynamically and the key is used for the Resources value of each rule
-var globalResourceRulesNeededInProjects = map[string]rbacv1.PolicyRule{
-	"navlinks": rbacv1.PolicyRule{
-		APIGroups: []string{"ui.cattle.io"},
-	},
-	"nodes": rbacv1.PolicyRule{
-		APIGroups: []string{""},
-	},
-	"persistentvolumes": rbacv1.PolicyRule{
-		APIGroups: []string{"", "core"},
-	},
-	"storageclasses": rbacv1.PolicyRule{
-		APIGroups: []string{"storage.k8s.io"},
-	},
-	"apiservices": rbacv1.PolicyRule{
-		APIGroups: []string{"apiregistration.k8s.io"},
-	},
-	"clusterrepos": rbacv1.PolicyRule{
-		APIGroups: []string{"catalog.cattle.io"},
-	},
-	"clusters": rbacv1.PolicyRule{
-		APIGroups: []string{"management.cattle.io"},
-		// since *-promoted roles may be applied in all clusters, the resource name needs to be "local"
-		// performing 'kubectl get clusters.management.cattle.io local' needs to work for the user within the context of the cluster they are promoted in,
-		// otherwise certain functionality that relies on this global permission will not work correctly, e.g. kubectl shell
-		// this will not grant the user permissions on the management cluster unless they are added as a project member/owner/read-only within that cluster
-		ResourceNames: []string{"local"},
-	},
-}
 
 func newPRTBLifecycle(m *manager, management *config.ManagementContext, nsInformer cache.SharedIndexInformer) *prtbLifecycle {
 	return &prtbLifecycle{
@@ -146,7 +112,7 @@ func (p *prtbLifecycle) syncPRTB(binding *v3.ProjectRoleTemplateBinding) error {
 	}
 
 	for _, n := range namespaces {
-		ns := n.(*v1.Namespace)
+		ns := n.(*corev1.Namespace)
 		if !ns.DeletionTimestamp.IsZero() {
 			continue
 		}
@@ -262,7 +228,7 @@ func (p *prtbLifecycle) ensurePRTBDelete(binding *v3.ProjectRoleTemplateBinding)
 
 	set := labels.Set(map[string]string{rtbOwnerLabel: pkgrbac.GetRTBLabel(binding.ObjectMeta)})
 	for _, n := range namespaces {
-		ns := n.(*v1.Namespace)
+		ns := n.(*corev1.Namespace)
 		rbs, err := p.rbLister.List(ns.Name, set.AsSelector())
 		if err != nil {
 			return fmt.Errorf("couldn't list rolebindings with selector %s: %w", set.AsSelector(), err)
@@ -444,41 +410,11 @@ func (m *manager) ownerExistsByNsName(nsAndName interface{}) (bool, error) {
 	return len(prtbs) > 0, err
 }
 
-// If the roleTemplate has rules granting access to non-namespaced (global) resource, return the verbs for those rules
-func (m *manager) checkForGlobalResourceRules(role *v3.RoleTemplate, resource string, baseRule rbacv1.PolicyRule) (sets.Set[string], error) {
-	var rules []rbacv1.PolicyRule
-	if role.External {
-		externalRole, err := m.crLister.Get("", role.Name)
-		if err != nil && !apierrors.IsNotFound(err) {
-			// dont error if it doesnt exist
-			return nil, err
-		}
-		if externalRole != nil {
-			rules = externalRole.Rules
-		}
-	} else {
-		rules = role.Rules
-	}
-
-	verbs := sets.New[string]()
-	for _, rule := range rules {
-		// given the global resource, we check if the passed in RoleTemplate has a corresponding rule, if it does, we add the verbs specified in the rule to the map of verbs that is returned
-		// NOTE: ResourceNames are checked since some global resources are scoped to specific resources, e.g. management.cattle.io/v3.Clusters are scoped to just the "local" cluster resource
-		if (slice.ContainsString(rule.Resources, resource) || slice.ContainsString(rule.Resources, "*")) && reflect.DeepEqual(rule.ResourceNames, baseRule.ResourceNames) {
-			if checkGroup(resource, rule) {
-				verbs.Insert(rule.Verbs...)
-			}
-		}
-	}
-
-	return verbs, nil
-}
-
 // reconcileRoleForProjectAccessToGlobalResource ensure the clusterRole used to grant access of global resources
 // to users/groups in projects has appropriate rules for the given resource and verbs.
 // It returns the created or updated ClusterRole name, or blank "" if none were created or updated.
 // The roleName is used to find and create/update the relevant '<roleName>-promoted' ClusterRole.
-func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string, roleName string, newVerbs sets.Set[string], baseRule rbacv1.PolicyRule) (string, error) {
+func (m *manager) reconcileRoleForProjectAccessToGlobalResource(roleName string, promotedRules []rbacv1.PolicyRule) (string, error) {
 	if roleName == "" {
 		return "", fmt.Errorf("cannot reconcile Role: missing roleName")
 	}
@@ -492,9 +428,9 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 
 		// try to create the role if not found
 
-		// if newVerbs are empty we can skip the creation and return a blank role name
+		// if promotedRules are empty we can skip the creation and return a blank role name
 		// to let the caller knows that this was a no-op
-		if len(newVerbs) == 0 {
+		if len(promotedRules) == 0 {
 			return "", nil
 		}
 
@@ -504,7 +440,7 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 			ObjectMeta: metav1.ObjectMeta{
 				Name: roleName,
 			},
-			Rules: []rbacv1.PolicyRule{buildRule(resource, newVerbs, baseRule)},
+			Rules: promotedRules,
 		}
 
 		_, err := m.clusterRoles.Create(clusterRole)
@@ -520,84 +456,25 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(resource string,
 
 	// role already exists -> updating / reconciling
 
-	currentVerbs := sets.New[string]()
-	currentResourceNames := sets.New[string]()
-	for _, rule := range role.Rules {
-		if slice.ContainsString(rule.Resources, resource) {
-			currentVerbs.Insert(rule.Verbs...)
-			currentResourceNames.Insert(rule.ResourceNames...)
-		}
+	// If there shouldn't be a promoted clusterRole, remove it
+	if len(promotedRules) == 0 {
+		logrus.Infof("RoleTemplate has no promoted rules, removing clusterRole %s", role.Name)
+		return "", m.clusterRoles.Delete(role.Name, &metav1.DeleteOptions{})
+
 	}
 
-	desiredResourceNames := sets.New(baseRule.ResourceNames...)
-
-	// if the currentVerbs and the currentResourceNames matches the desired state we can return
-	// if the number of verbs desired is 0, we don't need to check ResourceNames because we don't want any rule
-	if currentVerbs.Equal(newVerbs) && (newVerbs.Len() == 0 || currentResourceNames.Equal(desiredResourceNames)) {
+	// if the rules are already correct, no need to update
+	if reflect.DeepEqual(role.Rules, promotedRules) {
 		return roleName, nil
 	}
 
-	// if the verbs or the resourceNames in the promoted clusterrole don't match what's desired then the role requires updating
-	// desired verbs are passed in and the desired resourceNames come from the resource's base rule
-	role = role.DeepCopy()
+	role.Rules = promotedRules
 
-	added := false
-	for i, rule := range role.Rules {
-		if slice.ContainsString(rule.Resources, resource) {
-			role.Rules[i] = buildRule(resource, newVerbs, baseRule)
-			added = true
-		}
-	}
-	if !added {
-		role.Rules = append(role.Rules, buildRule(resource, newVerbs, baseRule))
-	}
-
-	// check if we need to delete some policy rules
-	if len(newVerbs) == 0 {
-		newRules := []rbacv1.PolicyRule{}
-		for _, rule := range role.Rules {
-			if !slice.ContainsString(rule.Resources, resource) {
-				newRules = append(newRules, rule)
-			}
-		}
-		role.Rules = newRules
-	}
-
-	logrus.Infof("Updating clusterRole %v for project access to global resource.", role.Name)
-	_, err = m.clusterRoles.Update(role)
-	if err != nil {
-		return "", fmt.Errorf("couldn't update role %v: %w", role.Name, err)
+	logrus.Infof("Updating clusterRole %s for project access to global resources", role.Name)
+	if _, err := m.clusterRoles.Update(role); err != nil {
+		return "", fmt.Errorf("couldn't update role %s: %w", role.Name, err)
 	}
 	return roleName, nil
-}
-
-// checkGroup returns true if the passed in PolicyRule has a group that matches the corresponding baseRule for the passed in global resource
-func checkGroup(resource string, rule rbacv1.PolicyRule) bool {
-	if slice.ContainsString(rule.APIGroups, "*") {
-		return true
-	}
-
-	baseRule, ok := globalResourceRulesNeededInProjects[resource]
-	if !ok {
-		return false
-	}
-
-	for _, rg := range rule.APIGroups {
-		if slice.ContainsString(baseRule.APIGroups, rg) {
-			return true
-		}
-	}
-
-	return false
-}
-
-func buildRule(resource string, verbs sets.Set[string], baseRule rbacv1.PolicyRule) rbacv1.PolicyRule {
-	return rbacv1.PolicyRule{
-		Resources:     []string{resource},
-		Verbs:         sets.List(verbs), // List returns a sorted array of the verbs
-		APIGroups:     baseRule.APIGroups,
-		ResourceNames: baseRule.ResourceNames,
-	}
 }
 
 func (p *prtbLifecycle) reconcilePRTBUserClusterLabels(binding *v3.ProjectRoleTemplateBinding) error {
@@ -648,7 +525,7 @@ func (p *prtbLifecycle) reconcilePRTBUserClusterLabels(binding *v3.ProjectRoleTe
 		return err
 	}
 	set = map[string]string{rtbOwnerLabelLegacy: string(binding.UID)}
-	rbs, err := p.rbLister.List(v1.NamespaceAll, set.AsSelector().Add(*reqUpdatedLabel, *reqUpdatedOwnerLabel))
+	rbs, err := p.rbLister.List(corev1.NamespaceAll, set.AsSelector().Add(*reqUpdatedLabel, *reqUpdatedOwnerLabel))
 	if err != nil {
 		return err
 	}
