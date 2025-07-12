@@ -59,7 +59,7 @@ type RKEControlPlaneSpec struct {
 	// +required
 	ManagementClusterName string `json:"managementClusterName,omitempty"`
 
-	// UnamanagedConfig indicates whether the configuration files for this
+	// UnmanagedConfig indicates whether the configuration files for this
 	// cluster are managed by Rancher or externally.
 	UnmanagedConfig bool `json:"unmanagedConfig,omitempty"`
 }
