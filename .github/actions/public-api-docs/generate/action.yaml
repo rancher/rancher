@@ -44,7 +44,11 @@ runs:
       run: |
         # TODO: Switch to official rancher repository
         go install github.com/tomleb/rancher-crd-swagger@236ff9f29c511116cff4736f11aa81cd12941f73
+    - name: Create ARTIFACTS_BASE_DIR
+      shell: bash
+      run: |
+        mkdir -p "$ARTIFACTS_BASE_DIR"
     - name: Generate Rancher Public API docs
       shell: bash
       run: |
-        rancher-crd-swagger -i "${{ steps.load.outputs.image_server_id }}" -f ./public-api.txt -p 9998 -t 9999 -o bin/openapi.json
+        rancher-crd-swagger -i "${{ steps.load.outputs.image_server_id }}" -f ./public-api.txt -p 9998 -t 9999 -o "$ARTIFACTS_BASE_DIR/openapi.json"
