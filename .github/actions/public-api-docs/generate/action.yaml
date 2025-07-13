@@ -16,7 +16,6 @@ runs:
       run: |
         echo '{"exec-opts": ["native.cgroupdriver=cgroupfs"]}'| sudo tee /etc/docker/daemon.json
         sudo systemctl restart docker
-      #TODO: Wait for image server ready
     - uses: actions/setup-go@v5
       with:
         go-version: '${{ steps.env.outputs.GO_VERSION }}'
@@ -42,7 +41,6 @@ runs:
     - name: Install crd-swagger
       shell: bash
       run: |
-        # TODO: Switch to official rancher repository
         go install github.com/tomleb/rancher-crd-swagger@236ff9f29c511116cff4736f11aa81cd12941f73
     - name: Create ARTIFACTS_BASE_DIR
       shell: bash
