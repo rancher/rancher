@@ -1,3 +1,5 @@
+Kubeconfig.ext.cattle.io
+Token.ext.cattle.io
 GlobalRole.management.cattle.io
 GlobalRoleBinding.management.cattle.io
 RoleTemplate.management.cattle.io
