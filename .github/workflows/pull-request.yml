@@ -80,7 +80,7 @@ jobs:
         uses: actions/checkout@v4
       - name: generate
         uses: ./.github/actions/public-api-docs/generate
-      - name: Upload image
+      - name: Upload public API docs
         uses: actions/upload-artifact@v4
         with:
           name: "openapi.json"
