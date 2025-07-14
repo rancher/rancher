@@ -258,8 +258,11 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	if extensionAPIServer != nil {
 		kubeAggregationReadyChan = extensionAPIServer.Registered()
 	}
-	// Only wait for ExtensionAPIServer if it was never validated before
+
 	skipWaitForExtensionAPIServer := ext.AggregationPreCheck(wranglerContext.API.APIService())
+	if skipWaitForExtensionAPIServer {
+		logrus.Info("skipping api aggregation check")
+	}
 
 	gcInterval, gcKeepCount := getSQLCacheGCValues(wranglerContext)
 	steve, err := steveserver.New(ctx, restConfig, &steveserver.Options{
@@ -483,7 +486,6 @@ func (r *Rancher) checkAPIAggregationOrDie() {
 	defer cancel()
 
 	apiserviceClient := r.Wrangler.API.APIService()
-	waitingForAPIService := !r.Steve.SkipWaitForExtensionAPIServer
 	for {
 		// Case 1: Successful - ExtensionServer was contacted by the Kube API, causing the channel to be closed.
 		// Case 2: Successful - ExtensionServer in a different replica was contacted by the Kube API, and that updated the APIService object annotation.
@@ -499,7 +501,7 @@ func (r *Rancher) checkAPIAggregationOrDie() {
 
 			return
 		case <-time.After(5 * time.Second):
-			if waitingForAPIService && ext.AggregationPreCheck(apiserviceClient) {
+			if r.Steve.SkipWaitForExtensionAPIServer && ext.AggregationPreCheck(apiserviceClient) {
 				logrus.Info("kube-apiserver connected to imperative api")
 				return
 			}
