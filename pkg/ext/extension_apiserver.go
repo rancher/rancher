@@ -25,6 +25,7 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+	"k8s.io/client-go/util/retry"
 	apiregv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
 
@@ -271,29 +272,33 @@ func AggregationPreCheck(client wranglerapiregistrationv1.APIServiceClient) bool
 }
 
 // SetAggregationCheck adds an annotation in the extension APIService object, so it can later be retrieved by AggregationPreCheck
-func SetAggregationCheck(client wranglerapiregistrationv1.APIServiceClient, value bool) {
-	apiservice, err := client.Get(APIServiceName, metav1.GetOptions{})
-	if err != nil {
-		logrus.Warnf("failed to set aggregation check for APIService: %v", err)
-		return
-	}
-
-	previous := apiservice.Annotations[apiAggregationPreCheckedAnnotation] == "true"
-	if previous == value {
-		// already set
-		return
-	}
-
-	if value {
-		if apiservice.Annotations == nil {
-			apiservice.Annotations = make(map[string]string)
+func SetAggregationCheck(client wranglerapiregistrationv1.APIServiceClient, value bool) error {
+	return retry.OnError(retry.DefaultBackoff, func(err error) bool {
+		return err != nil
+	}, func() error {
+		apiservice, err := client.Get(APIServiceName, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to get APIService: %w", err)
 		}
-		apiservice.Annotations[apiAggregationPreCheckedAnnotation] = "true"
-	} else {
-		delete(apiservice.Annotations, apiAggregationPreCheckedAnnotation)
-	}
 
-	if _, err := client.Update(apiservice); err != nil {
-		logrus.Warnf("failed to set aggregation check for APIService: %v", err)
-	}
+		previous := apiservice.Annotations[apiAggregationPreCheckedAnnotation] == "true"
+		if previous == value {
+			return nil
+		}
+
+		if value {
+			if apiservice.Annotations == nil {
+				apiservice.Annotations = make(map[string]string)
+			}
+			apiservice.Annotations[apiAggregationPreCheckedAnnotation] = "true"
+		} else {
+			delete(apiservice.Annotations, apiAggregationPreCheckedAnnotation)
+		}
+
+		if _, err := client.Update(apiservice); err != nil {
+			return fmt.Errorf("failed to update APIService: %w", err)
+		}
+
+		return nil
+	})
 }

@@ -492,7 +492,11 @@ func (r *Rancher) checkAPIAggregationOrDie() {
 		select {
 		case <-r.kubeAggregationReadyChan:
 			logrus.Info("kube-apiserver connected to imperative api")
-			ext.SetAggregationCheck(apiserviceClient, true)
+
+			if err := ext.SetAggregationCheck(apiserviceClient, true); err != nil {
+				logrus.Warnf("failed to set aggregation pre-check: %s", err)
+			}
+
 			return
 		case <-time.After(5 * time.Second):
 			if waitingForAPIService && ext.AggregationPreCheck(apiserviceClient) {
@@ -500,7 +504,10 @@ func (r *Rancher) checkAPIAggregationOrDie() {
 				return
 			}
 		case <-ctxTimeout.Done():
-			ext.SetAggregationCheck(apiserviceClient, false)
+			if err := ext.SetAggregationCheck(apiserviceClient, false); err != nil {
+				logrus.Warnf("failed to uunset aggregation pre-check: %s", err)
+			}
+
 			logrus.Fatal("kube-apiserver did not contact the rancher imperative api in time, please ensure k8s is configured to support api extension")
 		}
 	}
