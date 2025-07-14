@@ -15,7 +15,7 @@ func GetRegistrationReconcilers() []types.RegistrationFailureReconciler {
 func PrepareFailed(regIn *v1.Registration, err error) *v1.Registration {
 	v1.ResourceConditionProgressing.False(regIn)
 	v1.ResourceConditionReady.False(regIn)
-
+	v1.ResourceConditionFailure.True(regIn)
 	v1.ResourceConditionFailure.SetError(regIn, "could not complete registration", err)
 
 	return regIn

@@ -511,14 +511,15 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 			err := h.reconcileRegistration(registrationHandler, preparedForRegister, prepareErr, types.RegistrationPrepare)
 			return registrationObj, err
 		}
-		regForAnnounce, updateErr := h.registrations.UpdateStatus(preparedForRegister)
-		if updateErr != nil {
-			return registrationObj, prepareErr
+
+		var updateErr error
+		if regForAnnounce, updateErr = h.registrations.UpdateStatus(preparedForRegister); updateErr != nil {
+			return registrationObj, updateErr
 		}
 
 		announcedSystemId, registerErr := registrationHandler.Register(regForAnnounce)
 		if registerErr != nil {
-			err := h.reconcileRegistration(registrationHandler, preparedForRegister, prepareErr, types.RegistrationMain)
+			err := h.reconcileRegistration(registrationHandler, preparedForRegister, registerErr, types.RegistrationMain)
 			return registrationObj, err
 		}
 
