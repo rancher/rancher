@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/norman/types/slice"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac/roletemplates"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -134,21 +135,36 @@ func (m *manager) ensureGlobalResourcesRolesForPRTB(projectName string, rts map[
 	roles.Insert(role)
 
 	for _, rt := range rts {
-		for resource, baseRule := range globalResourceRulesNeededInProjects {
-			verbs, err := m.checkForGlobalResourceRules(rt, resource, baseRule)
+		// Get the rules of the RoleTemplate
+		var rules []rbacv1.PolicyRule
+		if rt.External {
+			externalRole, err := m.crLister.Get("", rt.Name)
+			if apierrors.IsNotFound(err) {
+				// Don't error if it doesn't exist, just move on to the next RoleTemplate
+				continue
+			}
 			if err != nil {
 				return nil, err
 			}
-
-			roleName, err := m.reconcileRoleForProjectAccessToGlobalResource(resource, rt.Name, verbs, baseRule)
-			if err != nil {
-				return nil, err
+			if externalRole != nil {
+				rules = externalRole.Rules
 			}
+		} else {
+			rules = rt.Rules
+		}
 
-			// if a role was created or updated append it to the existing roles
-			if roleName != "" {
-				roles.Insert(roleName)
-			}
+		// Find any Promoted Rules
+		promotedRules := roletemplates.ExtractPromotedRules(rules)
+
+		// Create a ClusterRole with the Promoted Rules
+		roleName, err := m.reconcileRoleForProjectAccessToGlobalResource(rt.Name, promotedRules)
+		if err != nil {
+			return nil, err
+		}
+
+		// if a role was created or updated append it to the existing roles
+		if roleName != "" {
+			roles.Insert(roleName)
 		}
 	}
 
