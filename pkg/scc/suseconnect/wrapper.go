@@ -140,6 +140,9 @@ func (sw *SccWrapper) Activate(regCode string) (*registration.Metadata, *registr
 		return nil, nil, err
 	}
 
+	// After success, prepare info for SCC to update metrics secret
+	_, _ = sw.systemInfo.PreparedForSCC()
+
 	return metaData, product, err
 }
 

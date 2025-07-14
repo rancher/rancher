@@ -29,8 +29,7 @@ type sccOperator struct {
 	log                log.StructuredLogger
 	sccResourceFactory *scc.Factory
 	secrets            corev1.SecretController
-	systemInfoProvider *systeminfo.InfoProvider
-	systemInfoExporter *systeminfo.InfoExporter
+	rancherTelemetry   telemetry.TelemetryGatherer
 }
 
 func setup(wContext *wrangler.Context, logger log.StructuredLogger, infoProvider *systeminfo.InfoProvider) (*sccOperator, error) {
@@ -86,8 +85,7 @@ func setup(wContext *wrangler.Context, logger log.StructuredLogger, infoProvider
 		log:                logger,
 		sccResourceFactory: sccResources,
 		secrets:            wContext.Core.Secret(),
-		systemInfoProvider: infoProvider,
-		systemInfoExporter: systeminfo.NewInfoExporter(infoProvider, rancherTelemetry),
+		rancherTelemetry:   rancherTelemetry,
 	}, nil
 }
 
@@ -121,7 +119,8 @@ func Setup(
 			consts.DefaultSCCNamespace,
 			initOperator.sccResourceFactory.Scc().V1().Registration(),
 			initOperator.secrets,
-			initOperator.systemInfoExporter,
+			initOperator.rancherTelemetry,
+			infoProvider,
 		)
 
 		if err := start.All(ctx, 2, initOperator.sccResourceFactory); err != nil {
