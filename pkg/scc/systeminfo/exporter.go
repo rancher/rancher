@@ -141,28 +141,3 @@ func (e *InfoExporter) PreparedForSCC() (registration.SystemInformation, error) 
 
 	return systemInfoMap, nil
 }
-
-// PrepareOfflineRegistrationRequest returns a RancherOfflineRequestEncoded just to delineate between other []byte types,
-// and to show connection to the original data structure it came from
-func (e *InfoExporter) PrepareOfflineRegistrationRequest() (RancherOfflineRequestEncoded, error) {
-	sccPreparedInfo := e.preparedForSCC()
-
-	identifier, version, arch := e.infoProvider.GetProductIdentifier()
-
-	offlinePrepared := RancherOfflineRequest{
-		UUID:       sccPreparedInfo.UUID,
-		RancherUrl: sccPreparedInfo.RancherUrl,
-		Product: ProductTriplet{
-			Identifier: identifier,
-			Version:    version,
-			Arch:       arch,
-		},
-	}
-
-	offlineJson, jsonErr := json.Marshal(offlinePrepared)
-	if jsonErr != nil {
-		return nil, jsonErr
-	}
-
-	return util.JSONToBase64(offlineJson)
-}
