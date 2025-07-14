@@ -1193,6 +1193,9 @@ func (p *Planner) ensureRKEStateSecret(controlPlane *rkev1.RKEControlPlane, newC
 						UID:        controlPlane.UID,
 					},
 				},
+				Labels: map[string]string{
+					capr.BackupLabel: "true",
+				},
 			},
 			Data: map[string][]byte{
 				"serverToken": []byte(serverToken),
