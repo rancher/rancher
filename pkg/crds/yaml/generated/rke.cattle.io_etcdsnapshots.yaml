@@ -1,0 +1,168 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.1
+  name: etcdsnapshots.rke.cattle.io
+spec:
+  group: rke.cattle.io
+  names:
+    kind: ETCDSnapshot
+    listKind: ETCDSnapshotList
+    plural: etcdsnapshots
+    singular: etcdsnapshot
+  scope: Namespaced
+  versions:
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: ETCDSnapshot is the top-level resource representing a snapshot
+          operation.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          snapshotFile:
+            description: SnapshotFile holds metadata about the snapshot file produced
+              by this snapshot operation.
+            properties:
+              createdAt:
+                description: CreatedAt is the timestamp when the snapshot was created.
+                format: date-time
+                type: string
+              location:
+                description: Location is the absolute file:// or s3:// URI address
+                  of the snapshot.
+                type: string
+              message:
+                description: Message is a string detailing the encountered error during
+                  snapshot creation if specified.
+                type: string
+              metadata:
+                description: Metadata contains a base64-encoded, gzipped snapshot
+                  of the cluster spec at the time the snapshot was taken.
+                type: string
+              name:
+                description: |-
+                  Name is the full snapshot name. It consists of the cluster name prefix,
+                  followed by the base snapshot identifier and ends with an optional storage suffix (e.g. "s3").
+                  The typical format is:
+                    <cluster>-etcd-snapshot-<cluster>-<nodepool>-<uniqueid>-<timestamp>[-<storage-type>]
+                  The base snapshot identifier follows:
+                    etcd-snapshot-<cluster>-<nodepool>-<uniqueid>-<timestamp>
+                type: string
+              nodeName:
+                description: NodeName is the name of the downstream node where the
+                  snapshot was created.
+                type: string
+              s3:
+                description: |-
+                  S3 holds metadata about the S3 destination if the snapshot is stored remotely. If nil, the snapshot
+                  is assumed to be stored locally and associated with the owning CAPI machine.
+                properties:
+                  bucket:
+                    description: |-
+                      Bucket is the name of the S3 bucket used for snapshot operations.
+                      If this field is not explicitly set, the 'defaultBucket' value from the referenced CloudCredential will be used.
+                      An empty bucket name will cause a 'failed to initialize S3 client: s3 bucket name was not set' error.
+                    maxLength: 63
+                    nullable: true
+                    type: string
+                  cloudCredentialName:
+                    description: |-
+                      CloudCredentialName is the name of the secret containing the
+                      credentials used to access the S3 bucket.
+                      The secret is expected to have the following keys:
+                      - accessKey [required]
+                      - secretKey [required]
+                      - defaultRegion
+                      - defaultEndpoint
+                      - defaultEndpointCA
+                      - defaultSkipSSLVerify
+                      - defaultBucket
+                      - defaultFolder
+                      Fields set directly in this spec (`ETCDSnapshotS3`) take precedence over the corresponding
+                      values from the CloudCredential secret. This field must be in the format of "namespace:name".
+                    nullable: true
+                    type: string
+                  endpoint:
+                    description: |-
+                      Endpoint is the S3 endpoint used for snapshot operations.
+                      If this field is not explicitly set, the 'defaultEndpoint' value from the referenced CloudCredential will be used.
+                    nullable: true
+                    type: string
+                  endpointCA:
+                    description: |-
+                      EndpointCA is the CA certificate for validating the S3 endpoint.
+                      This can be either a file path (e.g., "/etc/ssl/certs/my-ca.crt")
+                      or the CA certificate content, in base64-encoded or plain PEM format.
+                      If this field is not explicitly set, the 'defaultEndpointCA' value from the referenced CloudCredential will be used.
+                    nullable: true
+                    type: string
+                  folder:
+                    description: |-
+                      Folder is the name of the S3 folder used for snapshot operations.
+                      If this field is not explicitly set, the folder from the referenced CloudCredential will be used.
+                    nullable: true
+                    type: string
+                  region:
+                    description: |-
+                      Region is the S3 region used for snapshot operations. (e.g., "us-east-1").
+                      If this field is not explicitly set, the 'defaultRegion' value from the referenced CloudCredential will be used.
+                    nullable: true
+                    type: string
+                  skipSSLVerify:
+                    description: |-
+                      SkipSSLVerify defines whether TLS certificate verification is disabled.
+                      If this field is not explicitly set, the 'defaultSkipSSLVerify' value
+                      from the referenced CloudCredential will be used.
+                    type: boolean
+                type: object
+              size:
+                description: Size is the size of the snapshot file in bytes.
+                format: int64
+                type: integer
+              status:
+                description: Status represents the current state of the snapshot,
+                  such as "successful" or "failed".
+                type: string
+            type: object
+          spec:
+            description: Spec defines the desired state of the ETCDSnapshot.
+            properties:
+              clusterName:
+                description: ClusterName is the name of the cluster (cluster.provisioning.cattle.io)
+                  for which this snapshot was taken.
+                type: string
+            type: object
+          status:
+            description: Status contains information about the current state of the
+              snapshot operation.
+            properties:
+              missing:
+                description: This field is currently unused but retained for backward
+                  compatibility or future use.
+                type: boolean
+            required:
+            - missing
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

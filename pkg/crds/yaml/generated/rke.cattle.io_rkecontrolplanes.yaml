@@ -146,8 +146,11 @@ spec:
                     nullable: true
                     properties:
                       bucket:
-                        description: Bucket is the name of the S3 bucket used for
-                          snapshot operations.
+                        description: |-
+                          Bucket is the name of the S3 bucket used for snapshot operations.
+                          If this field is not explicitly set, the 'defaultBucket' value from the referenced CloudCredential will be used.
+                          An empty bucket name will cause a 'failed to initialize S3 client: s3 bucket name was not set' error.
+                        maxLength: 63
                         nullable: true
                         type: string
                       cloudCredentialName:
@@ -163,31 +166,41 @@ spec:
                           - defaultSkipSSLVerify
                           - defaultBucket
                           - defaultFolder
+                          Fields set directly in this spec (`ETCDSnapshotS3`) take precedence over the corresponding
+                          values from the CloudCredential secret. This field must be in the format of "namespace:name".
                         nullable: true
                         type: string
                       endpoint:
-                        description: Endpoint is the S3 endpoint used for snapshot
-                          operations.
+                        description: |-
+                          Endpoint is the S3 endpoint used for snapshot operations.
+                          If this field is not explicitly set, the 'defaultEndpoint' value from the referenced CloudCredential will be used.
                         nullable: true
                         type: string
                       endpointCA:
-                        description: EndpointCA is the CA certificate for validating
-                          the S3 endpoint.
+                        description: |-
+                          EndpointCA is the CA certificate for validating the S3 endpoint.
+                          This can be either a file path (e.g., "/etc/ssl/certs/my-ca.crt")
+                          or the CA certificate content, in base64-encoded or plain PEM format.
+                          If this field is not explicitly set, the 'defaultEndpointCA' value from the referenced CloudCredential will be used.
                         nullable: true
                         type: string
                       folder:
-                        description: Folder is the name of the S3 folder used for
-                          snapshot operations.
+                        description: |-
+                          Folder is the name of the S3 folder used for snapshot operations.
+                          If this field is not explicitly set, the folder from the referenced CloudCredential will be used.
                         nullable: true
                         type: string
                       region:
-                        description: Region is the S3 region used for snapshot operations.
+                        description: |-
+                          Region is the S3 region used for snapshot operations. (e.g., "us-east-1").
+                          If this field is not explicitly set, the 'defaultRegion' value from the referenced CloudCredential will be used.
                         nullable: true
                         type: string
                       skipSSLVerify:
                         description: |-
-                          SkipSSLVerify is a flag used to ignore certificate validation errors
-                          when using the configured endpoint.
+                          SkipSSLVerify defines whether TLS certificate verification is disabled.
+                          If this field is not explicitly set, the 'defaultSkipSSLVerify' value
+                          from the referenced CloudCredential will be used.
                         type: boolean
                     type: object
                   snapshotRetention:
@@ -687,7 +700,7 @@ spec:
                 type: object
               unmanagedConfig:
                 description: |-
-                  UnamanagedConfig indicates whether the configuration files for this
+                  UnmanagedConfig indicates whether the configuration files for this
                   cluster are managed by Rancher or externally.
                 type: boolean
               upgradeStrategy:
@@ -1005,8 +1018,11 @@ spec:
                         nullable: true
                         properties:
                           bucket:
-                            description: Bucket is the name of the S3 bucket used
-                              for snapshot operations.
+                            description: |-
+                              Bucket is the name of the S3 bucket used for snapshot operations.
+                              If this field is not explicitly set, the 'defaultBucket' value from the referenced CloudCredential will be used.
+                              An empty bucket name will cause a 'failed to initialize S3 client: s3 bucket name was not set' error.
+                            maxLength: 63
                             nullable: true
                             type: string
                           cloudCredentialName:
@@ -1022,32 +1038,41 @@ spec:
                               - defaultSkipSSLVerify
                               - defaultBucket
                               - defaultFolder
+                              Fields set directly in this spec (`ETCDSnapshotS3`) take precedence over the corresponding
+                              values from the CloudCredential secret. This field must be in the format of "namespace:name".
                             nullable: true
                             type: string
                           endpoint:
-                            description: Endpoint is the S3 endpoint used for snapshot
-                              operations.
+                            description: |-
+                              Endpoint is the S3 endpoint used for snapshot operations.
+                              If this field is not explicitly set, the 'defaultEndpoint' value from the referenced CloudCredential will be used.
                             nullable: true
                             type: string
                           endpointCA:
-                            description: EndpointCA is the CA certificate for validating
-                              the S3 endpoint.
+                            description: |-
+                              EndpointCA is the CA certificate for validating the S3 endpoint.
+                              This can be either a file path (e.g., "/etc/ssl/certs/my-ca.crt")
+                              or the CA certificate content, in base64-encoded or plain PEM format.
+                              If this field is not explicitly set, the 'defaultEndpointCA' value from the referenced CloudCredential will be used.
                             nullable: true
                             type: string
                           folder:
-                            description: Folder is the name of the S3 folder used
-                              for snapshot operations.
+                            description: |-
+                              Folder is the name of the S3 folder used for snapshot operations.
+                              If this field is not explicitly set, the folder from the referenced CloudCredential will be used.
                             nullable: true
                             type: string
                           region:
-                            description: Region is the S3 region used for snapshot
-                              operations.
+                            description: |-
+                              Region is the S3 region used for snapshot operations. (e.g., "us-east-1").
+                              If this field is not explicitly set, the 'defaultRegion' value from the referenced CloudCredential will be used.
                             nullable: true
                             type: string
                           skipSSLVerify:
                             description: |-
-                              SkipSSLVerify is a flag used to ignore certificate validation errors
-                              when using the configured endpoint.
+                              SkipSSLVerify defines whether TLS certificate verification is disabled.
+                              If this field is not explicitly set, the 'defaultSkipSSLVerify' value
+                              from the referenced CloudCredential will be used.
                             type: boolean
                         type: object
                       snapshotRetention:
@@ -1549,7 +1574,7 @@ spec:
                     type: object
                   unmanagedConfig:
                     description: |-
-                      UnamanagedConfig indicates whether the configuration files for this
+                      UnmanagedConfig indicates whether the configuration files for this
                       cluster are managed by Rancher or externally.
                     type: boolean
                   upgradeStrategy:
