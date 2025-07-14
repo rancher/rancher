@@ -74,7 +74,7 @@ func (s sccOfflineMode) ReconcileRegisterError(registrationObj *v1.Registration,
 		v1.RegistrationConditionOfflineRequestReady.SetError(registrationObj, "Failed to prepare Offline Request secret & ref", registerErr)
 	}
 	if phase == types.RegistrationMain {
-		v1.RegistrationConditionOfflineRequestReady.SetError(registrationObj, "Failed to prepare Offline Request", registerErr)
+		v1.RegistrationConditionOfflineRequestReady.SetError(registrationObj, "Failed to update Offline Request secret", registerErr)
 	}
 	return registrationObj
 }
