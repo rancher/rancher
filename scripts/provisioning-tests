@@ -72,10 +72,10 @@ fi
 export CATTLE_AGENT_IMAGE=${CATTLE_AGENT_IMAGE:-rancher/rancher-agent:${TAG:-head}}
 echo "Using Rancher agent image $CATTLE_AGENT_IMAGE"
 
-eval "$(grep '^ENV CATTLE_SYSTEM_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
-eval "$(grep '^ENV CATTLE_WINS_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
-eval "$(grep '^ENV CATTLE_CSI_PROXY_AGENT' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
-eval "$(grep '^ENV CATTLE_KDM_BRANCH' package/Dockerfile | awk '{print "export " $2 "=" $3}')"
+eval "$(grep '^ENV CATTLE_SYSTEM_AGENT' package/Dockerfile | awk '{print "export " $2}')"
+eval "$(grep '^ENV CATTLE_WINS_AGENT' package/Dockerfile | awk '{print "export " $2}')"
+eval "$(grep '^ENV CATTLE_CSI_PROXY_AGENT' package/Dockerfile | awk '{print "export " $2}')"
+eval "$(grep '^ENV CATTLE_KDM_BRANCH' package/Dockerfile | awk '{print "export " $2}')"
 
 export CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$(yq '.provisioningCAPIVersion' < build.yaml)
 

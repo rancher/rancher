@@ -7,9 +7,9 @@ CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH:-"dev-v2.11"}
 REGISTRY=${REGISTRY/:-""}
 IMAGE=${REGISTRY}${REPO}/rancher:${TAG}
 AGENT_IMAGE=${REPO}/rancher-agent:${AGENT_TAG}
-SYSTEM_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_SYSTEM_AGENT_VERSION" ../package/Dockerfile | awk '{ print $NF }')-suc
+SYSTEM_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_SYSTEM_AGENT_VERSION" ../package/Dockerfile | awk -F'=' '{ print $NF }')-suc
 SYSTEM_AGENT_UPGRADE_IMAGE=${REPO}/system-agent:${SYSTEM_AGENT_UPGRADE_TAG}
-WINS_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_WINS_AGENT_VERSION" ../package/Dockerfile | awk '{ print $NF }')
+WINS_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_WINS_AGENT_VERSION" ../package/Dockerfile | awk -F'=' '{ print $NF }')
 WINS_AGENT_UPGRADE_IMAGE=${REPO}/wins:${WINS_AGENT_UPGRADE_TAG}
 
 # Query KDM data for RKE2 released versions where server args are defined.
