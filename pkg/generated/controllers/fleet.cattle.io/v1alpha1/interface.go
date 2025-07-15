@@ -34,6 +34,7 @@ type Interface interface {
 	Bundle() BundleController
 	Cluster() ClusterController
 	ClusterGroup() ClusterGroupController
+	HelmOp() HelmOpController
 }
 
 func New(controllerFactory controller.SharedControllerFactory) Interface {
@@ -56,4 +57,8 @@ func (v *version) Cluster() ClusterController {
 
 func (v *version) ClusterGroup() ClusterGroupController {
 	return generic.NewController[*v1alpha1.ClusterGroup, *v1alpha1.ClusterGroupList](schema.GroupVersionKind{Group: "fleet.cattle.io", Version: "v1alpha1", Kind: "ClusterGroup"}, "clustergroups", true, v.controllerFactory)
+}
+
+func (v *version) HelmOp() HelmOpController {
+	return generic.NewController[*v1alpha1.HelmOp, *v1alpha1.HelmOpList](schema.GroupVersionKind{Group: "fleet.cattle.io", Version: "v1alpha1", Kind: "HelmOp"}, "helmops", true, v.controllerFactory)
 }

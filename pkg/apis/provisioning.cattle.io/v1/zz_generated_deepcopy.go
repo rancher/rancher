@@ -364,6 +364,16 @@ func (in *RKEMachinePool) DeepCopyInto(out *RKEMachinePool) {
 			(*out)[key] = val
 		}
 	}
+	if in.AutoscalingMinSize != nil {
+		in, out := &in.AutoscalingMinSize, &out.AutoscalingMinSize
+		*out = new(int32)
+		**out = **in
+	}
+	if in.AutoscalingMaxSize != nil {
+		in, out := &in.AutoscalingMaxSize, &out.AutoscalingMaxSize
+		*out = new(int32)
+		**out = **in
+	}
 	if in.NodeStartupTimeout != nil {
 		in, out := &in.NodeStartupTimeout, &out.NodeStartupTimeout
 		*out = new(metav1.Duration)

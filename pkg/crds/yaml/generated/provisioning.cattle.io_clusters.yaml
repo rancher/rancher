@@ -2593,6 +2593,20 @@ spec:
                       description: RKEMachinePool is the configuration for a RKE2/K3s
                         machine pool within a provisioning cluster.
                       properties:
+                        autoscalingMaxSize:
+                          description: |-
+                            AutoscalingMaxSize is the autoscaler max node size, this maps
+                            to the autoscaling annotations which are mapped to the CAPI machineDeployment object
+                          format: int32
+                          nullable: true
+                          type: integer
+                        autoscalingMinSize:
+                          description: |-
+                            AutoscalingMinSize is the autoscaler min node size, this maps
+                            to the autoscaling annotations which are mapped to the CAPI machineDeployment object
+                          format: int32
+                          nullable: true
+                          type: integer
                         cloudCredentialSecretName:
                           description: |-
                             CloudCredentialSecretName is the id of the secret used to provision
