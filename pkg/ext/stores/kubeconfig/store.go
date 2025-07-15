@@ -1505,7 +1505,7 @@ var (
 	pathCMCurrentContextField   = fieldpath.MakePathOrDie("data", "current-context")
 	pathCMDescriptionField      = fieldpath.MakePathOrDie("data", "description")
 	pathCMTTLField              = fieldpath.MakePathOrDie("data", "ttl")
-	pathCMStatusConditionsField = fieldpath.MakePathOrDie("data", "status-condition")
+	pathCMStatusConditionsField = fieldpath.MakePathOrDie("data", "status-conditions")
 	pathCMStatusSummaryField    = fieldpath.MakePathOrDie("data", "status-summary")
 	pathCMStatusTokensField     = fieldpath.MakePathOrDie("data", "status-tokens")
 
