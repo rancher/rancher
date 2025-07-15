@@ -6,13 +6,13 @@
 Kubeconfig.ext.cattle.io
 Token.ext.cattle.io
 
+ClusterRoleTemplateBinding.management.cattle.io
 GlobalRole.management.cattle.io
 GlobalRoleBinding.management.cattle.io
-RoleTemplate.management.cattle.io
-ProjectRoleTemplateBinding.management.cattle.io
-ClusterRoleTemplateBinding.management.cattle.io
+NodeDriver.management.cattle.io
 Project.management.cattle.io
+ProjectRoleTemplateBinding.management.cattle.io
+RoleTemplate.management.cattle.io
 
 CustomMachine.rke.cattle.io
 ETCDSnapshot.rke.cattle.io
-NodeDriver.rke.cattle.io
