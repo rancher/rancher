@@ -298,7 +298,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 				}
 				var versionManagementEnabled bool
 				if features.MCMAgent.Enabled() {
-					// For the imported or node-driver RKE2/K3s cluster,
+					// For the imported or node-driver/custom RKE2/K3s cluster,
 					// cluster agent checks the ManagedSystemUpgradeController feature in the cluster
 					versionManagementEnabled = features.ManagedSystemUpgradeController.Enabled()
 				}
@@ -341,7 +341,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 
 				var versionManagementEnabled bool
 				if features.MCMAgent.Enabled() {
-					// For the imported or node-driver RKE2/K3s cluster,
+					// For the imported or node-driver/custom RKE2/K3s cluster,
 					// cluster agent checks the ManagedSystemUpgradeController feature in the cluster
 					versionManagementEnabled = features.ManagedSystemUpgradeController.Enabled()
 				}

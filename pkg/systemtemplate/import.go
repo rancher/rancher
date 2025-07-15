@@ -259,7 +259,7 @@ func GetDesiredFeatures(cluster *apimgmtv3.Cluster) map[string]bool {
 	}
 	if cluster.Status.Driver == apimgmtv3.ClusterDriverImported &&
 		(cluster.Status.Provider == apimgmtv3.ClusterDriverRke2 || cluster.Status.Provider == apimgmtv3.ClusterDriverK3s) {
-		// the case of node-driver RKE2/K3s cluster
+		// the case of node-driver/custom RKE2/K3s cluster
 		// The SUC app must be installed in order for Rancher to upgrade the cluster’s Kubernetes version.
 		enableMSUC = true
 	}
