@@ -80,10 +80,8 @@ func (s sccOnlineMode) Register(registrationObj *v1.Registration) (suseconnect.R
 	//	b. BAYG/RMT/etc based Registration and will not use a code
 	registrationCode := suseconnect.FetchSccRegistrationCodeFrom(s.secrets, registrationObj.Spec.RegistrationRequest.RegistrationCodeSecretRef)
 
-	regUrl := registrationObj.Spec.RegistrationRequest.RegistrationAPIUrl
-
 	// Initiate connection to SCC & verify reg code is for Rancher
-	sccConnection := suseconnect.OnlineRancherConnection(s.sccCredentials.SccCredentials(), s.systemInfoExporter, *regUrl)
+	sccConnection := suseconnect.OnlineRancherConnection(s.sccCredentials.SccCredentials(), s.systemInfoExporter, suseconnect.PrepareSCCUrl(registrationObj))
 
 	// Register this Rancher cluster to SCC
 	id, regErr := sccConnection.RegisterOrKeepAlive(registrationCode)
@@ -151,10 +149,9 @@ func (s sccOnlineMode) reconcileNonRecoverableHttpError(registrationIn *v1.Regis
 	nowTime := metav1.Now()
 	registrationIn.Status.RegistrationProcessedTS = &nowTime
 	registrationIn.Status.ActivationStatus.LastValidatedTS = &nowTime
-	v1.ResourceConditionFailure.True(registrationIn)
-	v1.ResourceConditionFailure.Message(registrationIn, "Non-recoverable HTTP error encountered; to reregister Rancher, resolve connection issues then try again.")
-	v1.ResourceConditionProgressing.False(registrationIn)
-	v1.ResourceConditionReady.False(registrationIn)
+
+	wrappedErr := fmt.Errorf("non-recoverable HTTP error encountered; to reregister Rancher, resolve connection issues then try again. Original error: %w", registerErr)
+	registrationIn = common.PrepareFailed(registrationIn, wrappedErr)
 
 	if additionalApplier != nil {
 		return additionalApplier(registrationIn, &httpCode)
@@ -164,12 +161,14 @@ func (s sccOnlineMode) reconcileNonRecoverableHttpError(registrationIn *v1.Regis
 }
 
 func (s sccOnlineMode) ReconcileRegisterError(registrationObj *v1.Registration, registerErr error, phase types.RegistrationPhase) *v1.Registration {
+	registrationObj = common.PrepareFailed(registrationObj, registerErr)
+
 	if isNonRecoverableHttpError(registerErr) {
 		return s.reconcileNonRecoverableHttpError(
 			registrationObj,
 			registerErr,
 			func(regApplierIn *v1.Registration, httpCode *int) *v1.Registration {
-				preparedErrorReasonCondition := fmt.Sprintf("Error: SCC sync returned %s (%d) status", http.StatusText(*httpCode), httpCode)
+				preparedErrorReasonCondition := fmt.Sprintf("Error: SCC api call returned %s (%d) status", http.StatusText(*httpCode), httpCode)
 				v1.RegistrationConditionAnnounced.SetError(regApplierIn, preparedErrorReasonCondition, registerErr)
 				v1.RegistrationConditionSccUrlReady.False(regApplierIn)
 				v1.RegistrationConditionActivated.False(regApplierIn)
@@ -182,9 +181,17 @@ func (s sccOnlineMode) ReconcileRegisterError(registrationObj *v1.Registration, 
 		)
 	}
 
-	// TODO: any phase specific state updates
+	v1.RegistrationConditionActivated.False(registrationObj)
+	if phase <= types.RegistrationForActivation {
+		v1.RegistrationConditionAnnounced.False(registrationObj)
+		v1.RegistrationConditionSccUrlReady.False(registrationObj)
+	}
 
-	return common.PrepareFailed(registrationObj, registerErr)
+	if phase == types.RegistrationPrepare {
+		v1.ResourceConditionFailure.SetError(registrationObj, "failed during secret initialization", registerErr)
+	}
+
+	return registrationObj
 }
 
 func (s sccOnlineMode) NeedsActivation(registrationObj *v1.Registration) bool {
@@ -205,8 +212,7 @@ func (s sccOnlineMode) Activate(registrationObj *v1.Registration) error {
 	}
 
 	registrationCode := suseconnect.FetchSccRegistrationCodeFrom(s.secrets, registrationObj.Spec.RegistrationRequest.RegistrationCodeSecretRef)
-	registrationUrl := registrationObj.Spec.RegistrationRequest.RegistrationAPIUrl
-	sccConnection := suseconnect.OnlineRancherConnection(s.sccCredentials.SccCredentials(), s.systemInfoExporter, *registrationUrl)
+	sccConnection := suseconnect.OnlineRancherConnection(s.sccCredentials.SccCredentials(), s.systemInfoExporter, suseconnect.PrepareSCCUrl(registrationObj))
 
 	metaData, product, err := sccConnection.Activate(registrationCode)
 	if err != nil {
@@ -227,8 +233,7 @@ func (s sccOnlineMode) PrepareActivatedForKeepalive(registrationObj *v1.Registra
 	if credentialsErr != nil {
 		return nil, fmt.Errorf("cannot load scc credentials: %w", credentialsErr)
 	}
-	regUrl := registrationObj.Spec.RegistrationRequest.RegistrationAPIUrl
-	sccConnection := suseconnect.OnlineRancherConnection(s.sccCredentials.SccCredentials(), s.systemInfoExporter, *regUrl)
+	sccConnection := suseconnect.OnlineRancherConnection(s.sccCredentials.SccCredentials(), s.systemInfoExporter, suseconnect.PrepareSCCUrl(registrationObj))
 
 	activations, err := sccConnection.ActivationStatus()
 	if err != nil {
@@ -276,8 +281,7 @@ func (s sccOnlineMode) Keepalive(registrationObj *v1.Registration) error {
 	}
 
 	regCode := suseconnect.FetchSccRegistrationCodeFrom(s.secrets, registrationObj.Spec.RegistrationRequest.RegistrationCodeSecretRef)
-	regUrl := registrationObj.Spec.RegistrationRequest.RegistrationAPIUrl
-	sccConnection := suseconnect.OnlineRancherConnection(s.sccCredentials.SccCredentials(), s.systemInfoExporter, *regUrl)
+	sccConnection := suseconnect.OnlineRancherConnection(s.sccCredentials.SccCredentials(), s.systemInfoExporter, suseconnect.PrepareSCCUrl(registrationObj))
 
 	metaData, product, err := sccConnection.Activate(regCode)
 	if err != nil {
@@ -329,8 +333,7 @@ func (s sccOnlineMode) ReconcileKeepaliveError(registration *v1.Registration, ke
 
 func (s sccOnlineMode) Deregister() error {
 	_ = s.sccCredentials.Refresh()
-	regUrl := s.registration.Spec.RegistrationRequest.RegistrationAPIUrl
-	sccConnection := suseconnect.OnlineRancherConnection(s.sccCredentials.SccCredentials(), s.systemInfoExporter, *regUrl)
+	sccConnection := suseconnect.OnlineRancherConnection(s.sccCredentials.SccCredentials(), s.systemInfoExporter, suseconnect.PrepareSCCUrl(s.registration))
 	// TODO : this causes deletion to fail if the credentials are invalid. I think we
 	// need to do a best effort check to see if it was ever registered before
 	// we want to fail to delete if deregister fails, but the system is registered in SCC

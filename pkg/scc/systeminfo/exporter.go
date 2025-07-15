@@ -4,15 +4,19 @@ import (
 	"encoding/json"
 	"github.com/SUSE/connect-ng/pkg/registration"
 	"github.com/pborman/uuid"
+	"github.com/rancher/rancher/pkg/scc/systeminfo/secret"
 	"github.com/rancher/rancher/pkg/scc/util"
+	"github.com/rancher/rancher/pkg/scc/util/log"
 	"github.com/rancher/rancher/pkg/telemetry"
 	"k8s.io/client-go/util/retry"
 )
 
 type InfoExporter struct {
-	infoProvider *InfoProvider
-	tel          telemetry.TelemetryGatherer
-	isLocalReady bool
+	infoProvider         *InfoProvider
+	tel                  telemetry.TelemetryGatherer
+	isLocalReady         bool
+	logger               log.StructuredLogger
+	metricsSecretManager *secret.MetricsSecretManager
 }
 
 type RancherSCCInfo struct {
@@ -44,11 +48,15 @@ type RancherOfflineRequestEncoded []byte
 func NewInfoExporter(
 	infoProvider *InfoProvider,
 	rancherTelemetry telemetry.TelemetryGatherer,
+	logger log.StructuredLogger,
+	metricsSecretManager *secret.MetricsSecretManager,
 ) *InfoExporter {
 	return &InfoExporter{
-		infoProvider: infoProvider,
-		tel:          rancherTelemetry,
-		isLocalReady: false,
+		infoProvider:         infoProvider,
+		tel:                  rancherTelemetry,
+		isLocalReady:         false,
+		logger:               logger,
+		metricsSecretManager: metricsSecretManager,
 	}
 }
 
@@ -133,6 +141,11 @@ func (e *InfoExporter) PreparedForSCC() (registration.SystemInformation, error) 
 		return nil, jsonErr
 	}
 
+	metricsUpdateErr := e.metricsSecretManager.UpdateMetricsDebugSecret(sccJson)
+	if metricsUpdateErr != nil {
+		e.logger.Errorf("error updating metrics secret: %s", metricsUpdateErr.Error())
+	}
+
 	systemInfoMap := make(registration.SystemInformation)
 	err := json.Unmarshal(sccJson, &systemInfoMap)
 	if err != nil {
@@ -140,29 +153,4 @@ func (e *InfoExporter) PreparedForSCC() (registration.SystemInformation, error) 
 	}
 
 	return systemInfoMap, nil
-}
-
-// PrepareOfflineRegistrationRequest returns a RancherOfflineRequestEncoded just to delineate between other []byte types,
-// and to show connection to the original data structure it came from
-func (e *InfoExporter) PrepareOfflineRegistrationRequest() (RancherOfflineRequestEncoded, error) {
-	sccPreparedInfo := e.preparedForSCC()
-
-	identifier, version, arch := e.infoProvider.GetProductIdentifier()
-
-	offlinePrepared := RancherOfflineRequest{
-		UUID:       sccPreparedInfo.UUID,
-		RancherUrl: sccPreparedInfo.RancherUrl,
-		Product: ProductTriplet{
-			Identifier: identifier,
-			Version:    version,
-			Arch:       arch,
-		},
-	}
-
-	offlineJson, jsonErr := json.Marshal(offlinePrepared)
-	if jsonErr != nil {
-		return nil, jsonErr
-	}
-
-	return util.JSONToBase64(offlineJson)
 }

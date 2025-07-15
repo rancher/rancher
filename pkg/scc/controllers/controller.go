@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/rancher/rancher/pkg/scc/controllers/repos"
+	"github.com/rancher/rancher/pkg/scc/systeminfo/secret"
 	"github.com/rancher/rancher/pkg/scc/types"
+	"github.com/rancher/rancher/pkg/telemetry"
 	"maps"
 	"slices"
 	"time"
@@ -75,15 +77,16 @@ type SCCHandler interface {
 }
 
 type handler struct {
-	ctx                context.Context
-	log                *logrus.Entry
-	registrations      registrationControllers.RegistrationController
-	registrationCache  registrationControllers.RegistrationCache
-	secretRepo         repos.SecretRepo
-	secrets            v1core.SecretController
-	secretCache        v1core.SecretCache
-	systemInfoExporter *systeminfo.InfoExporter
-	systemNamespace    string
+	ctx                  context.Context
+	log                  *logrus.Entry
+	registrations        registrationControllers.RegistrationController
+	registrationCache    registrationControllers.RegistrationCache
+	secretRepo           repos.SecretRepo
+	secrets              v1core.SecretController
+	secretCache          v1core.SecretCache
+	systemInfoExporter   *systeminfo.InfoExporter
+	metricsSecretManager *secret.MetricsSecretManager
+	systemNamespace      string
 }
 
 func Register(
@@ -91,17 +94,27 @@ func Register(
 	systemNamespace string,
 	registrations registrationControllers.RegistrationController,
 	secrets v1core.SecretController,
-	systemInfoExporter *systeminfo.InfoExporter,
+	rancherTelemetry telemetry.TelemetryGatherer,
+	systemInfoProvider *systeminfo.InfoProvider,
 ) {
+	secretsRepo := repos.SecretRepo{
+		Secrets:      secrets,
+		SecretsCache: secrets.Cache(),
+	}
+
+	systemInfoExporter := systeminfo.NewInfoExporter(
+		systemInfoProvider,
+		rancherTelemetry,
+		log.NewLog().WithField("subcomponent", "systeminfo-exporter"),
+		secret.New(systemNamespace, &secretsRepo),
+	)
+
 	controller := &handler{
-		log:               log.NewControllerLogger("registration-controller"),
-		ctx:               ctx,
-		registrations:     registrations,
-		registrationCache: registrations.Cache(),
-		secretRepo: repos.SecretRepo{
-			Secrets:      secrets,
-			SecretsCache: secrets.Cache(),
-		},
+		log:                log.NewControllerLogger("registration-controller"),
+		ctx:                ctx,
+		registrations:      registrations,
+		registrationCache:  registrations.Cache(),
+		secretRepo:         secretsRepo,
 		secrets:            secrets,
 		secretCache:        secrets.Cache(),
 		systemInfoExporter: systemInfoExporter,
@@ -511,14 +524,15 @@ func (h *handler) OnRegistrationChange(name string, registrationObj *v1.Registra
 			err := h.reconcileRegistration(registrationHandler, preparedForRegister, prepareErr, types.RegistrationPrepare)
 			return registrationObj, err
 		}
-		regForAnnounce, updateErr := h.registrations.UpdateStatus(preparedForRegister)
-		if updateErr != nil {
-			return registrationObj, prepareErr
+
+		var updateErr error
+		if regForAnnounce, updateErr = h.registrations.UpdateStatus(preparedForRegister); updateErr != nil {
+			return registrationObj, updateErr
 		}
 
 		announcedSystemId, registerErr := registrationHandler.Register(regForAnnounce)
 		if registerErr != nil {
-			err := h.reconcileRegistration(registrationHandler, preparedForRegister, prepareErr, types.RegistrationMain)
+			err := h.reconcileRegistration(registrationHandler, preparedForRegister, registerErr, types.RegistrationMain)
 			return registrationObj, err
 		}
 

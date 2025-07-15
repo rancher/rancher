@@ -3,6 +3,7 @@ package suseconnect
 import (
 	"fmt"
 	"github.com/pkg/errors"
+	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/scc/systeminfo"
 	"github.com/rancher/rancher/pkg/scc/util/log"
 
@@ -139,6 +140,9 @@ func (sw *SccWrapper) Activate(regCode string) (*registration.Metadata, *registr
 		return nil, nil, err
 	}
 
+	// After success, prepare info for SCC to update metrics secret
+	_, _ = sw.systemInfo.PreparedForSCC()
+
 	return metaData, product, err
 }
 
@@ -157,4 +161,11 @@ func (sw *SccWrapper) ProductInfo() (*registration.Product, error) {
 
 func (sw *SccWrapper) Deregister() error {
 	return registration.Deregister(sw.conn)
+}
+
+func PrepareSCCUrl(regIn *v1.Registration) string {
+	if regIn != nil && regIn.Spec.RegistrationRequest != nil && regIn.Spec.RegistrationRequest.RegistrationAPIUrl != nil {
+		return *regIn.Spec.RegistrationRequest.RegistrationAPIUrl
+	}
+	return ""
 }
