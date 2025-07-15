@@ -64,6 +64,11 @@ func MapManagedFields(mapSpec MapSpec, originManagedFields []metav1.ManagedField
 	destManagedFields := make([]metav1.ManagedFieldsEntry, size)
 
 	for _, originEntry := range originManagedFields {
+		if originEntry.FieldsV1 == nil {
+			destManagedFields = append(destManagedFields, originEntry)
+			continue
+		}
+
 		originPaths := fieldpath.NewSet()
 		err := originPaths.FromJSON(strings.NewReader(originEntry.FieldsV1.String()))
 		if err != nil {
