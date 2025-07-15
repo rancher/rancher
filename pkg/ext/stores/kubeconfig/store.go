@@ -1516,16 +1516,22 @@ var (
 	pathKConfigDescriptionField    = fieldpath.MakePathOrDie("spec", "description")
 	pathKConfigTTLField            = fieldpath.MakePathOrDie("spec", "ttl")
 
-	mapFromConfigMap = extcommon.NewMapSpec(
-		extcommon.NewMap(pathCMData, nil),
-		extcommon.NewMap(pathCMClustersField, pathKConfigClustersField),
-		extcommon.NewMap(pathCMCurrentContextField, pathKConfigCurrentContextField),
-		extcommon.NewMap(pathCMDescriptionField, pathKConfigDescriptionField),
-		extcommon.NewMap(pathCMTTLField, pathKConfigTTLField),
-		extcommon.NewMap(pathCMStatusConditionsField, nil),
-		extcommon.NewMap(pathCMStatusSummaryField, nil),
-		extcommon.NewMap(pathCMStatusTokensField, nil),
-		extcommon.NewMap(pathCMLabelKind, nil),
-	)
-	mapFromKubeconfig = extcommon.MapInvert(mapFromConfigMap)
+	mapFromConfigMap = extcommon.MapSpec{
+		pathCMData.String():                  nil,
+		pathCMClustersField.String():         pathKConfigClustersField,
+		pathCMCurrentContextField.String():   pathKConfigCurrentContextField,
+		pathCMDescriptionField.String():      pathKConfigDescriptionField,
+		pathCMTTLField.String():              pathKConfigTTLField,
+		pathCMStatusConditionsField.String(): nil,
+		pathCMStatusSummaryField.String():    nil,
+		pathCMStatusTokensField.String():     nil,
+		pathCMLabelKind.String():             nil,
+	}
+
+	mapFromKubeconfig = extcommon.MapSpec{
+		pathKConfigClustersField.String():       pathCMClustersField,
+		pathKConfigCurrentContextField.String(): pathCMCurrentContextField,
+		pathKConfigDescriptionField.String():    pathCMDescriptionField,
+		pathKConfigTTLField.String():            pathCMTTLField,
+	}
 )

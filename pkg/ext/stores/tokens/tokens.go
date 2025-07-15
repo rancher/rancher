@@ -1712,23 +1712,30 @@ var (
 	pathTokUserID      = fieldpath.MakePathOrDie("spec", "userID")
 
 	// secret data reported as status is dropped by the map, as is .data itself
-	// .type, .metadata pass as-is, except the pathSecLabelKind
-	mapFromSecret = extcommon.NewMapSpec(
-		extcommon.NewMap(pathSecData, nil),
-		extcommon.NewMap(pathSecDescription, pathTokDescription),
-		extcommon.NewMap(pathSecEnabled, pathTokEnabled),
-		extcommon.NewMap(pathSecHash, nil),
-		extcommon.NewMap(pathSecKind, pathTokKind),
-		extcommon.NewMap(pathSecHash, nil),
-		extcommon.NewMap(pathSecLAS, nil),
-		extcommon.NewMap(pathSecLUT, nil),
-		extcommon.NewMap(pathSecLUA, nil),
-		extcommon.NewMap(pathSecPrincipal, pathTokPrincipal),
-		extcommon.NewMap(pathSecTTL, pathTokTTL),
-		extcommon.NewMap(pathSecUID, nil),
-		extcommon.NewMap(pathSecUserID, pathTokUserID),
-		extcommon.NewMap(pathSecLabelKind, nil),
-	)
+	// The .type and .metadata pass as-is, except for pathSecLabelKind
+	mapFromSecret = extcommon.MapSpec{
+		pathSecData.String():        nil,
+		pathSecDescription.String(): pathTokDescription,
+		pathSecEnabled.String():     pathTokEnabled,
+		pathSecHash.String():        nil,
+		pathSecKind.String():        pathTokKind,
+		pathSecHash.String():        nil,
+		pathSecLAS.String():         nil,
+		pathSecLUT.String():         nil,
+		pathSecLUA.String():         nil,
+		pathSecPrincipal.String():   pathTokPrincipal,
+		pathSecTTL.String():         pathTokTTL,
+		pathSecUID.String():         nil,
+		pathSecUserID.String():      pathTokUserID,
+		pathSecLabelKind.String():   nil,
+	}
 
-	mapFromToken = extcommon.MapInvert(mapFromSecret)
+	mapFromToken = extcommon.MapSpec{
+		pathTokDescription.String(): pathSecDescription,
+		pathTokEnabled.String():     pathSecEnabled,
+		pathTokKind.String():        pathSecKind,
+		pathTokPrincipal.String():   pathSecPrincipal,
+		pathTokTTL.String():         pathSecTTL,
+		pathTokUserID.String():      pathSecUserID,
+	}
 )
