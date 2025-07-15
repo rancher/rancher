@@ -194,10 +194,8 @@ jobs:
       id-token: write
     env:
       ARTIFACTS_BASE_DIR: "dist"
-      LINUX_AMD64_FILE: "rancher-images-digests-linux-amd64.txt"
-      LINUX_ARM64_FILE: "rancher-images-digests-linux-arm64.txt"
-      WINDOWS_2019_FILE: "rancher-images-digests-windows-ltsc2019.txt"
-      WINDOWS_2022_FILE: "rancher-images-digests-windows-ltsc2022.txt"
+      LINUX_FILE: "rancher-images-digests-linux.txt"
+      WINDOWS_FILE: "rancher-images-digests-windows.txt"
       CHECKSUM_FILE: "images-digests-sha256sum.txt"
     steps:
       - name: install dependencies

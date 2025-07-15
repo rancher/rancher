@@ -17,10 +17,8 @@ case $ARTIFACTS_TYPE in
     ;;
   digests)
     export ARTIFACTS=(
-      "$(basename "$LINUX_AMD64_FILE")"
-      "$(basename "$LINUX_ARM64_FILE")"
-      "$(basename "$WINDOWS_2019_FILE")"
-      "$(basename "$WINDOWS_2022_FILE")"
+      "$(basename "$LINUX_FILE")"
+      "$(basename "$WINDOWS_FILE")"
     )
     ;;
   *)
