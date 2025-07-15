@@ -8,7 +8,7 @@ replace golang.org/x/net => golang.org/x/net v0.36.0 // CVE-2025-22870
 
 require (
 	github.com/rancher/norman v0.0.0-20240708202514-a0127673d1b9
-	k8s.io/apimachinery v0.30.10
+	k8s.io/apimachinery v0.30.14
 )
 
 require (
