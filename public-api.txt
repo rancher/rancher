@@ -5,9 +5,14 @@
 # The file is a line-separated list of `<Kind>.<group>`
 Kubeconfig.ext.cattle.io
 Token.ext.cattle.io
+
 GlobalRole.management.cattle.io
 GlobalRoleBinding.management.cattle.io
 RoleTemplate.management.cattle.io
 ProjectRoleTemplateBinding.management.cattle.io
 ClusterRoleTemplateBinding.management.cattle.io
 Project.management.cattle.io
+
+CustomMachine.rke.cattle.io
+ETCDSnapshot.rke.cattle.io
+NodeDriver.rke.cattle.io
