@@ -1,0 +1,13 @@
+# This file lists the APIs that are considered "public". It is used by the
+# crd-swagger tool to generate the OpenAPI document for Rancher API reference
+# page.
+#
+# The file is a line-separated list of `<Kind>.<group>`
+Kubeconfig.ext.cattle.io
+Token.ext.cattle.io
+GlobalRole.management.cattle.io
+GlobalRoleBinding.management.cattle.io
+RoleTemplate.management.cattle.io
+ProjectRoleTemplateBinding.management.cattle.io
+ClusterRoleTemplateBinding.management.cattle.io
+Project.management.cattle.io
