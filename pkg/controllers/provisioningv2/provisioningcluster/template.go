@@ -368,12 +368,25 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 			return nil, err
 		}
 
+		deployAnnotations := machinePool.MachineDeploymentAnnotations
+		if deployAnnotations == nil {
+			deployAnnotations = make(map[string]string)
+		}
+
+		// potentially gross, hopefully a user doesn't want the max to be 2^16
+		if machinePool.AutoscalingMinSize != nil {
+			deployAnnotations[capi.AutoscalerMinSizeAnnotation] = strconv.Itoa(int(*machinePool.AutoscalingMinSize))
+		}
+		if machinePool.AutoscalingMaxSize != nil {
+			deployAnnotations[capi.AutoscalerMaxSizeAnnotation] = strconv.Itoa(int(*machinePool.AutoscalingMaxSize))
+		}
+
 		machineDeployment := &capi.MachineDeployment{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:   cluster.Namespace,
 				Name:        machineDeploymentName,
 				Labels:      machineDeploymentLabels,
-				Annotations: machinePool.MachineDeploymentAnnotations,
+				Annotations: deployAnnotations,
 			},
 			Spec: capi.MachineDeploymentSpec{
 				ClusterName: capiCluster.Name,
@@ -567,14 +580,24 @@ func capiCluster(cluster *rancherv1.Cluster, rkeControlPlane *rkev1.RKEControlPl
 		panic(err)
 	}
 
+	// telling the autoscaling controllers in rancher to function - this is controlled by an annotation on the provisioning cluster "pausing" the autoscaling as well as any of the RKEMachinePool objects having autoscaler values set
+	var annotations map[string]string
+	if cluster.Annotations[capr.AutoscalerPausedAnnotation] == "" &&
+		capr.AutoscalerEnabledByProvisioningCluster(cluster) {
+		annotations = map[string]string{
+			capr.AutoscalerEnabledAnnotation: "true",
+		}
+	}
+
 	apiVersion, kind := gvk.ToAPIVersionAndKind()
 
 	ownerGVK := rancherv1.SchemeGroupVersion.WithKind("Cluster")
 	ownerAPIVersion, _ := ownerGVK.ToAPIVersionAndKind()
 	return &capi.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      cluster.Name,
-			Namespace: cluster.Namespace,
+			Name:        cluster.Name,
+			Namespace:   cluster.Namespace,
+			Annotations: annotations,
 			OwnerReferences: []metav1.OwnerReference{
 				{
 					APIVersion:         ownerAPIVersion,

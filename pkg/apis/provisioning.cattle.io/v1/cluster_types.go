@@ -248,6 +248,18 @@ type RKEMachinePool struct {
 	// +optional
 	MachineDeploymentAnnotations map[string]string `json:"machineDeploymentAnnotations,omitempty"`
 
+	// AutoscalingMinSize is the autoscaler min node size, this maps
+	// to the autoscaling annotations which are mapped to the CAPI machineDeployment object
+	// +nullable
+	// +optional
+	AutoscalingMinSize *int32 `json:"autoscalingMinSize,omitempty"`
+
+	// AutoscalingMaxSize is the autoscaler max node size, this maps
+	// to the autoscaling annotations which are mapped to the CAPI machineDeployment object
+	// +nullable
+	// +optional
+	AutoscalingMaxSize *int32 `json:"autoscalingMaxSize,omitempty"`
+
 	// NodeStartupTimeout allows setting the maximum time for
 	// MachineHealthCheck to consider a Machine unhealthy if a corresponding
 	// Node isn't associated through a `Spec.ProviderID` field.

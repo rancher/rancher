@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 const (
@@ -101,6 +102,18 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 		}
 		return nil, nil
 	}, clients.Provisioning.Cluster(), clients.RKE.RKEControlPlane())
+
+	relatedresource.Watch(ctx, "machinedeployment-cluster-trigger", func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
+		if md, ok := obj.(*capi.MachineDeployment); ok &&
+			md.Annotations["cluster.x-k8s.io/cluster-api-autoscaler-node-group-min-size"] != "" &&
+			md.Annotations["cluster.x-k8s.io/cluster-api-autoscaler-node-group-max-size"] != "" {
+			return []relatedresource.Key{{
+				Namespace: namespace,
+				Name:      md.Spec.ClusterName,
+			}}, nil
+		}
+		return nil, nil
+	}, clients.Provisioning.Cluster(), clients.CAPI.MachineDeployment())
 
 	clients.Provisioning.Cluster().OnChange(ctx, "provisioning-cluster-change", h.OnChange)
 	clients.Provisioning.Cluster().OnRemove(ctx, "rke-cluster-remove", h.OnRemove)

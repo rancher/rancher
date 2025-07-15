@@ -20,6 +20,7 @@ import (
 	"github.com/rancher/channelserver/pkg/model"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/channelserver"
@@ -115,6 +116,10 @@ const (
 	InfrastructureReady          = condition.Cond(capi.InfrastructureReadyCondition)
 	SystemUpgradeControllerReady = condition.Cond("SystemUpgradeControllerReady")
 	Bootstrapped                 = condition.Cond("Bootstrapped")
+	Autoscaler                   = condition.Cond("Autoscaler")
+
+	AutoscalerEnabledAnnotation = "provisioning.cattle.io/autoscaler-enabled"
+	AutoscalerPausedAnnotation  = "provisioning.cattle.io/autoscaler-paused"
 
 	RuntimeK3S  = "k3s"
 	RuntimeRKE2 = "rke2"
@@ -646,6 +651,41 @@ func PreBootstrap(mgmtCluster *v3.Cluster) bool {
 	}
 
 	return !v3.ClusterConditionPreBootstrapped.IsTrue(mgmtCluster)
+}
+
+func AutoscalerEnabledByCAPI(cluster *capi.Cluster, mds []*capi.MachineDeployment) bool {
+	// first see if the autoscaling is "on" for the capi cluster
+	if cluster.Annotations[AutoscalerEnabledAnnotation] != "true" {
+		return false
+	}
+
+	// then check to see if there are actually any of the appropriate annotations on the machineDeployments
+	for _, md := range mds {
+		if md.Annotations[capi.AutoscalerMinSizeAnnotation] != "" &&
+			md.Annotations[capi.AutoscalerMaxSizeAnnotation] != "" {
+			return true
+		}
+	}
+
+	return false
+}
+
+func AutoscalerEnabledByProvisioningCluster(cluster *v1.Cluster) bool {
+	if cluster.Spec.RKEConfig == nil || len(cluster.Spec.RKEConfig.MachinePools) == 0 {
+		return false
+	}
+
+	for _, pool := range cluster.Spec.RKEConfig.MachinePools {
+		if AutoscalerEnabledForRKEMachinePool(&pool) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func AutoscalerEnabledForRKEMachinePool(pool *provv1.RKEMachinePool) bool {
+	return pool.AutoscalingMinSize != nil && pool.AutoscalingMaxSize != nil
 }
 
 // FormatWindowsEnvVar accepts a corev1.EnvVar and returns a string to be used in either

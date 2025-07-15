@@ -7,6 +7,7 @@ import (
 	"github.com/k3s-io/api/pkg/generated/controllers/k3s.cattle.io"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementlegacy/compose/common"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/autoscaler"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/cavalidator"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/healthsyncer"
@@ -43,6 +44,7 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	mgmt.Wrangler.DeferredCAPIRegistration.DeferFunc(func(capi *wrangler.CAPIContext) {
 		_ = cluster.DeferredStart(ctx, func(ctx context.Context) error {
 			nodesyncer.Register(ctx, cluster, capi, kubeConfigGetter)
+			autoscaler.Register(ctx, capi, cluster, clusterRec)
 			registerProvV2(ctx, cluster, capi, clusterRec)
 			return nil
 		})()
