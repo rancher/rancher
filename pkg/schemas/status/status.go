@@ -11,7 +11,7 @@ func Set(data map[string]interface{}) {
 	if data == nil {
 		return
 	}
-	summary := summary.Summarize(&unstructured.Unstructured{Object: data})
+	summary := summary.SummarizeWithOptions(&unstructured.Unstructured{Object: data}, nil)
 	data["state"] = summary.State
 	data["transitioning"] = "no"
 	if summary.Error {
