@@ -260,9 +260,6 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	}
 
 	skipWaitForExtensionAPIServer := ext.AggregationPreCheck(wranglerContext.API.APIService())
-	if skipWaitForExtensionAPIServer {
-		logrus.Info("skipping api aggregation check")
-	}
 
 	gcInterval, gcKeepCount := getSQLCacheGCValues(wranglerContext)
 	steve, err := steveserver.New(ctx, restConfig, &steveserver.Options{
@@ -507,7 +504,7 @@ func (r *Rancher) checkAPIAggregationOrDie() {
 			}
 		case <-ctxTimeout.Done():
 			if err := ext.SetAggregationCheck(apiserviceClient, false); err != nil {
-				logrus.Warnf("failed to uunset aggregation pre-check: %s", err)
+				logrus.Warnf("failed to unset aggregation pre-check: %s", err)
 			}
 
 			logrus.Fatal("kube-apiserver did not contact the rancher imperative api in time, please see https://ranchermanager.docs.rancher.com/api/extension-apiserver for more information")

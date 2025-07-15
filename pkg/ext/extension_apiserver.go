@@ -275,7 +275,7 @@ func AggregationPreCheck(client wranglerapiregistrationv1.APIServiceClient) bool
 func SetAggregationCheck(client wranglerapiregistrationv1.APIServiceClient, value bool) error {
 	return retry.OnError(retry.DefaultBackoff, func(err error) bool {
 		if err != nil {
-			logrus.Warn("failed to update APIService annotation: %ws", err)
+			logrus.Warnf("failed to update APIService annotation: %s", err)
 			return true
 		}
 
