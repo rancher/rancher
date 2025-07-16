@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/telemetry"
 	"maps"
 	"slices"
+	"strings"
 	"time"
 
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
@@ -351,7 +352,7 @@ func (h *handler) cleanupRelatedSecretsByHash(contentHash string) error {
 	// It should never be in there, but just in case don't act on the entrypoint
 	secrets = slices.Collect(func(yield func(secret *corev1.Secret) bool) {
 		for _, secret := range secrets {
-			if secret.Name != consts.ResourceSCCEntrypointSecretName {
+			if secret.Name != consts.ResourceSCCEntrypointSecretName && !strings.HasPrefix(secret.Name, consts.OfflineRequestSecretNamePrefix) {
 				if !yield(secret) {
 					return
 				}
