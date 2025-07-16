@@ -29,8 +29,7 @@ webhookVersion: 2.0.6+up0.3.6-rc1
 Then update the [export-config](../scripts/export-config) script.
 
 ```
-CATTLE_RANCHER_WEBHOOK_VERSION=$(yq -e '.webhookVersion' "$file")
-export CATTLE_RANCHER_WEBHOOK_VERSION
+export CATTLE_RANCHER_WEBHOOK_VERSION=$(grep -m1 'webhookVersion' < "$file" | cut -d ' ' -f2)
 ```
 
 Run `go generate` from the root of the repo.

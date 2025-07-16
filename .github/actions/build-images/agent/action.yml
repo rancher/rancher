@@ -9,11 +9,6 @@ runs:
         if [[ "$ARCH" == "x64" ]]; then
           echo "ARCH=amd64" >> $GITHUB_ENV
         fi
-    - name: install yq
-      uses: ./.github/actions/install-yq
-      with:
-        arch: ${{ env.ARCH }}
-        use-sudo: true
     - id: env 
       name: Setup Dependencies Env Variables
       uses: ./.github/actions/setup-build-env
