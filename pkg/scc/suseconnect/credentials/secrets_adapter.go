@@ -107,7 +107,7 @@ func (c *CredentialSecretsAdapter) saveCredentials() error {
 		sccCreds.Data[TokenKey] = []byte(token)
 	}
 
-	sccCreds, _ = common.SecretAddCredentialsFinalizer(sccCreds)
+	sccCreds = common.SecretAddCredentialsFinalizer(sccCreds)
 
 	if sccCreds.Labels == nil {
 		sccCreds.Labels = c.labels
@@ -140,7 +140,7 @@ func (c *CredentialSecretsAdapter) Remove() error {
 
 	if common.SecretHasCredentialsFinalizer(currentSecret) {
 		updatedSecret := currentSecret.DeepCopy()
-		updatedSecret, _ = common.SecretRemoveCredentialsFinalizer(updatedSecret)
+		updatedSecret = common.SecretRemoveCredentialsFinalizer(updatedSecret)
 		if _, updateErr := c.secrets.Update(updatedSecret); updateErr != nil {
 			if apierrors.IsNotFound(updateErr) {
 				return nil

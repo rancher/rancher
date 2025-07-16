@@ -4,16 +4,14 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"fmt"
+	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/scc/consts"
 	"github.com/rancher/rancher/pkg/scc/controllers/common"
 	"github.com/rancher/rancher/pkg/scc/util"
-	"maps"
-	"slices"
-
-	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"maps"
 )
 
 type HashType int
@@ -201,12 +199,10 @@ func (h *handler) registrationFromSecretEntrypoint(
 	maps.Copy(reg.Labels, params.Labels())
 
 	reg.Spec = paramsToRegSpec(params)
-	if !slices.Contains(reg.Finalizers, consts.FinalizerSccRegistration) {
-		if reg.Finalizers == nil {
-			reg.Finalizers = []string{}
-		}
-		reg.Finalizers = append(reg.Finalizers, consts.FinalizerSccRegistration)
+	if !common.RegistrationHasManagedFinalizer(reg) {
+		reg = common.RegistrationAddManagedFinalizer(reg)
 	}
+
 	return reg, nil
 }
 
@@ -255,7 +251,7 @@ func (h *handler) regCodeFromSecretEntrypoint(params RegistrationParams) (*corev
 	maps.Copy(regcodeSecret.Labels, defaultLabels)
 
 	if !common.SecretHasRegCodeFinalizer(regcodeSecret) {
-		regcodeSecret, _ = common.SecretAddRegCodeFinalizer(regcodeSecret)
+		regcodeSecret = common.SecretAddRegCodeFinalizer(regcodeSecret)
 	}
 
 	return regcodeSecret, nil
@@ -284,11 +280,8 @@ func (h *handler) offlineCertFromSecretEntrypoint(params RegistrationParams) (*c
 	defaultLabels[consts.LabelSccSecretRole] = string(consts.OfflineCertificate)
 	maps.Copy(offlineCertSecret.Labels, defaultLabels)
 
-	if !slices.Contains(offlineCertSecret.Finalizers, consts.FinalizerSccRegistration) {
-		if offlineCertSecret.Finalizers == nil {
-			offlineCertSecret.Finalizers = []string{}
-		}
-		offlineCertSecret.Finalizers = append(offlineCertSecret.Finalizers, consts.FinalizerSccRegistration)
+	if !common.SecretHasOfflineFinalizer(offlineCertSecret) {
+		offlineCertSecret = common.SecretAddOfflineFinalizer(offlineCertSecret)
 	}
 
 	return offlineCertSecret, nil

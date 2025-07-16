@@ -71,7 +71,7 @@ func (o *SecretManager) saveRequestSecret() error {
 		offlineRequest.Data[consts.SecretKeyOfflineRegRequest] = o.offlineRequest
 	}
 
-	offlineRequest, _ = common.SecretAddRegCodeFinalizer(offlineRequest)
+	offlineRequest = common.SecretAddOfflineFinalizer(offlineRequest)
 
 	labels := o.defaultLabels
 	labels[consts.LabelSccSecretRole] = string(consts.OfflineRequestRole)

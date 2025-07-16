@@ -90,8 +90,6 @@ func (s sccOfflineMode) ReadyForActivation(registrationObj *v1.Registration) boo
 }
 
 func (s sccOfflineMode) Activate(registrationObj *v1.Registration) error {
-	// fetch secret contents (needs io.Reader)
-	// registration.OfflineCertificateFrom()
 	certReader, err := s.offlineSecrets.OfflineCertificateReader()
 	if err != nil {
 		return fmt.Errorf("activate failed, cannot get offline certificate reader: %w", err)
@@ -122,6 +120,8 @@ func (s sccOfflineMode) PrepareActivatedForKeepalive(registrationObj *v1.Registr
 		}
 	*/
 
+	registrationObj.RemoveCondition(v1.RegistrationConditionOfflineCertificateReady)
+	v1.RegistrationConditionOfflineCertificateReady.True(registrationObj)
 	v1.ActivationConditionOfflineDone.True(registrationObj)
 	return registrationObj, nil
 }

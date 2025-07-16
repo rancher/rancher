@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/telemetry"
 	"maps"
 	"slices"
+	"strings"
 	"time"
 
 	v1 "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1"
@@ -102,23 +103,26 @@ func Register(
 		SecretsCache: secrets.Cache(),
 	}
 
+	metricsSecretManager := secret.New(systemNamespace, &secretsRepo)
+
 	systemInfoExporter := systeminfo.NewInfoExporter(
 		systemInfoProvider,
 		rancherTelemetry,
 		log.NewLog().WithField("subcomponent", "systeminfo-exporter"),
-		secret.New(systemNamespace, &secretsRepo),
+		metricsSecretManager,
 	)
 
 	controller := &handler{
-		log:                log.NewControllerLogger("registration-controller"),
-		ctx:                ctx,
-		registrations:      registrations,
-		registrationCache:  registrations.Cache(),
-		secretRepo:         secretsRepo,
-		secrets:            secrets,
-		secretCache:        secrets.Cache(),
-		systemInfoExporter: systemInfoExporter,
-		systemNamespace:    systemNamespace,
+		log:                  log.NewControllerLogger("registration-controller"),
+		ctx:                  ctx,
+		registrations:        registrations,
+		registrationCache:    registrations.Cache(),
+		secretRepo:           secretsRepo,
+		secrets:              secrets,
+		secretCache:          secrets.Cache(),
+		systemInfoExporter:   systemInfoExporter,
+		systemNamespace:      systemNamespace,
+		metricsSecretManager: metricsSecretManager,
 	}
 
 	controller.initIndexers()
@@ -348,7 +352,7 @@ func (h *handler) cleanupRelatedSecretsByHash(contentHash string) error {
 	// It should never be in there, but just in case don't act on the entrypoint
 	secrets = slices.Collect(func(yield func(secret *corev1.Secret) bool) {
 		for _, secret := range secrets {
-			if secret.Name != consts.ResourceSCCEntrypointSecretName {
+			if secret.Name != consts.ResourceSCCEntrypointSecretName && !strings.HasPrefix(secret.Name, consts.OfflineRequestSecretNamePrefix) {
 				if !yield(secret) {
 					return
 				}
@@ -362,8 +366,8 @@ func (h *handler) cleanupRelatedSecretsByHash(contentHash string) error {
 
 			var updateErr error
 			secretUpdated := secret.DeepCopy()
-			secretUpdated, _ = common.SecretRemoveCredentialsFinalizer(secretUpdated)
-			secretUpdated, _ = common.SecretRemoveRegCodeFinalizer(secretUpdated)
+			secretUpdated = common.SecretRemoveCredentialsFinalizer(secretUpdated)
+			secretUpdated = common.SecretRemoveRegCodeFinalizer(secretUpdated)
 			secretUpdated, updateErr = h.secretRepo.RetryingPatchUpdate(secret, secretUpdated)
 			if updateErr != nil {
 				h.log.Errorf("failed to update secret %s/%s: %v", secret.Namespace, secret.Name, updateErr)
@@ -452,10 +456,10 @@ func (h *handler) OnSecretRemove(name string, incomingObj *corev1.Secret) (*core
 		}
 		newSecret := incomingObj.DeepCopy()
 		if common.SecretHasCredentialsFinalizer(newSecret) {
-			newSecret, _ = common.SecretRemoveCredentialsFinalizer(newSecret)
+			newSecret = common.SecretRemoveCredentialsFinalizer(newSecret)
 		}
 		if common.SecretHasRegCodeFinalizer(newSecret) {
-			newSecret, _ = common.SecretRemoveRegCodeFinalizer(newSecret)
+			newSecret = common.SecretRemoveRegCodeFinalizer(newSecret)
 		}
 		logrus.Info("Removing finalizer from secret", newSecret.Name, "in namespace", newSecret.Namespace)
 		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
@@ -697,6 +701,11 @@ func (h *handler) OnRegistrationRemove(name string, registrationObj *v1.Registra
 	err := h.registrations.Delete(name, &metav1.DeleteOptions{})
 	if err != nil {
 		return registrationObj, err
+	}
+
+	cleanupErr := h.metricsSecretManager.Remove()
+	if cleanupErr != nil {
+		return registrationObj, cleanupErr
 	}
 
 	return nil, nil
