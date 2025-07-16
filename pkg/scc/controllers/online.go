@@ -358,7 +358,7 @@ func (s sccOnlineMode) Deregister() error {
 	}
 	if common.SecretHasRegCodeFinalizer(regCodeSecret) {
 		updateRegCodeSecret := regCodeSecret.DeepCopy()
-		updateRegCodeSecret, _ = common.SecretRemoveRegCodeFinalizer(updateRegCodeSecret)
+		updateRegCodeSecret = common.SecretRemoveRegCodeFinalizer(updateRegCodeSecret)
 
 		_, regCodeErr = s.secrets.Update(updateRegCodeSecret)
 		if regCodeErr != nil {

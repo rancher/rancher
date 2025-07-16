@@ -255,7 +255,7 @@ func (h *handler) regCodeFromSecretEntrypoint(params RegistrationParams) (*corev
 	maps.Copy(regcodeSecret.Labels, defaultLabels)
 
 	if !common.SecretHasRegCodeFinalizer(regcodeSecret) {
-		regcodeSecret, _ = common.SecretAddRegCodeFinalizer(regcodeSecret)
+		regcodeSecret = common.SecretAddRegCodeFinalizer(regcodeSecret)
 	}
 
 	return regcodeSecret, nil

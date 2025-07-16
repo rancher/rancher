@@ -59,7 +59,7 @@ func (o *SecretManager) Remove() error {
 func (o *SecretManager) removeOfflineFinalizer(incomingSecret *corev1.Secret) error {
 	if common.SecretHasOfflineFinalizer(incomingSecret) {
 		updatedSecret := incomingSecret.DeepCopy()
-		updatedSecret, _ = common.SecretRemoveOfflineFinalizer(updatedSecret)
+		updatedSecret = common.SecretRemoveOfflineFinalizer(updatedSecret)
 		if _, updateErr := o.secrets.Update(updatedSecret); updateErr != nil {
 			if apierrors.IsNotFound(updateErr) {
 				return nil

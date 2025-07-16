@@ -366,8 +366,8 @@ func (h *handler) cleanupRelatedSecretsByHash(contentHash string) error {
 
 			var updateErr error
 			secretUpdated := secret.DeepCopy()
-			secretUpdated, _ = common.SecretRemoveCredentialsFinalizer(secretUpdated)
-			secretUpdated, _ = common.SecretRemoveRegCodeFinalizer(secretUpdated)
+			secretUpdated = common.SecretRemoveCredentialsFinalizer(secretUpdated)
+			secretUpdated = common.SecretRemoveRegCodeFinalizer(secretUpdated)
 			secretUpdated, updateErr = h.secretRepo.RetryingPatchUpdate(secret, secretUpdated)
 			if updateErr != nil {
 				h.log.Errorf("failed to update secret %s/%s: %v", secret.Namespace, secret.Name, updateErr)
@@ -456,10 +456,10 @@ func (h *handler) OnSecretRemove(name string, incomingObj *corev1.Secret) (*core
 		}
 		newSecret := incomingObj.DeepCopy()
 		if common.SecretHasCredentialsFinalizer(newSecret) {
-			newSecret, _ = common.SecretRemoveCredentialsFinalizer(newSecret)
+			newSecret = common.SecretRemoveCredentialsFinalizer(newSecret)
 		}
 		if common.SecretHasRegCodeFinalizer(newSecret) {
-			newSecret, _ = common.SecretRemoveRegCodeFinalizer(newSecret)
+			newSecret = common.SecretRemoveRegCodeFinalizer(newSecret)
 		}
 		logrus.Info("Removing finalizer from secret", newSecret.Name, "in namespace", newSecret.Namespace)
 		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
