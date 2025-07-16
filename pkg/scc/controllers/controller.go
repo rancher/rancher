@@ -102,23 +102,26 @@ func Register(
 		SecretsCache: secrets.Cache(),
 	}
 
+	metricsSecretManager := secret.New(systemNamespace, &secretsRepo)
+
 	systemInfoExporter := systeminfo.NewInfoExporter(
 		systemInfoProvider,
 		rancherTelemetry,
 		log.NewLog().WithField("subcomponent", "systeminfo-exporter"),
-		secret.New(systemNamespace, &secretsRepo),
+		metricsSecretManager,
 	)
 
 	controller := &handler{
-		log:                log.NewControllerLogger("registration-controller"),
-		ctx:                ctx,
-		registrations:      registrations,
-		registrationCache:  registrations.Cache(),
-		secretRepo:         secretsRepo,
-		secrets:            secrets,
-		secretCache:        secrets.Cache(),
-		systemInfoExporter: systemInfoExporter,
-		systemNamespace:    systemNamespace,
+		log:                  log.NewControllerLogger("registration-controller"),
+		ctx:                  ctx,
+		registrations:        registrations,
+		registrationCache:    registrations.Cache(),
+		secretRepo:           secretsRepo,
+		secrets:              secrets,
+		secretCache:          secrets.Cache(),
+		systemInfoExporter:   systemInfoExporter,
+		systemNamespace:      systemNamespace,
+		metricsSecretManager: metricsSecretManager,
 	}
 
 	controller.initIndexers()
@@ -697,6 +700,11 @@ func (h *handler) OnRegistrationRemove(name string, registrationObj *v1.Registra
 	err := h.registrations.Delete(name, &metav1.DeleteOptions{})
 	if err != nil {
 		return registrationObj, err
+	}
+
+	cleanupErr := h.metricsSecretManager.Remove()
+	if cleanupErr != nil {
+		return registrationObj, cleanupErr
 	}
 
 	return nil, nil
