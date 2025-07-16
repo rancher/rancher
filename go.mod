@@ -7,6 +7,7 @@ toolchain go1.24.5
 replace (
 	github.com/crewjam/saml => github.com/rancher/saml v0.4.14-rancher3
 	github.com/docker/distribution => github.com/docker/distribution v2.8.2+incompatible // rancher-machine requires a replace is set
+	github.com/go-jose/go-jose/v3 => github.com/go-jose/go-jose/v3 v3.0.4 // CVE-2025-27144
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
 
