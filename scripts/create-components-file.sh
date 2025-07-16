@@ -23,7 +23,7 @@ grep -e '^ENV CATTLE_.*_VERSION.*' package/Dockerfile | grep -E -v 'http|\$|MIN_
 # find components envs that match `ENV CATTLE_*_VERSION`, NOT contain `http` or `$` or `MIN_VERSION` and contain `-rc` or `-alpha`
 grep -e '^ENV CATTLE_.*_VERSION.*' package/Dockerfile | grep -E -v 'http|\$|MIN_VERSION' | grep -e '-rc' -e '-alpha' | sed 's/ENV CATTLE_//g' | sort >>$COMPONENTSFILE
 # find deps that contain `rancher/` and `-rc` or `-alpha`, NOT contain `./` or `/pkg/apis` or `/pkg/client` or `=>` or start with `module`
-grep -e "rancher/" go.mod | grep -v -e '\./' -e '/pkg/apis' -e '/pkg/client' -e '^module' -e '=>' | grep -e '-rc' -e '-alpha' | cut -d '/' -f3 | awk '$1 = toupper($1)' | sort >>$COMPONENTSFILE
+grep -e "rancher/" go.mod | grep -v -e '\./' -e '/pkg/apis' -e '/pkg/client' -e '^module' -e '=>' | grep -e '-rc' -e '-alpha' | cut -d '/' -f3 | awk '{ printf "%s=%s\n", toupper($1), $2 }' | sort >>$COMPONENTSFILE
 echo "" >>$COMPONENTSFILE
 
 echo "# Min version components with -rc" >>$COMPONENTSFILE
