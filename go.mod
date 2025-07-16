@@ -5,6 +5,7 @@ go 1.24.0
 toolchain go1.24.5
 
 replace (
+	github.com/cloudflare/circl => github.com/cloudflare/circl v1.6.1 // GHSA-2x5j-vhc8-9cwm
 	github.com/crewjam/saml => github.com/rancher/saml v0.4.14-rancher3
 	github.com/docker/distribution => github.com/docker/distribution v2.8.2+incompatible // rancher-machine requires a replace is set
 	github.com/go-jose/go-jose/v3 => github.com/go-jose/go-jose/v3 v3.0.4 // CVE-2025-27144
