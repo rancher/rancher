@@ -11,8 +11,6 @@ import (
 
 var metricSecretMu sync.Mutex
 
-const SecretName = "scc-metrics"
-
 type MetricsSecretManager struct {
 	secretNamespace string
 	secretRepo      *repos.SecretRepo
@@ -35,7 +33,7 @@ func (m *MetricsSecretManager) UpdateMetricsDebugSecret(byteData []byte) error {
 
 	desiredSecret := v1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      SecretName,
+			Name:      consts.SCCMetricsOutputSecretName,
 			Namespace: m.secretNamespace,
 			Annotations: map[string]string{
 				"secret.kubernetes.io/managed-by":        "scc-operator",
@@ -61,7 +59,7 @@ func (m *MetricsSecretManager) UpdateMetricsDebugSecret(byteData []byte) error {
 func (m *MetricsSecretManager) Remove() error {
 	metricSecretMu.Lock()
 	defer metricSecretMu.Unlock()
-	currentSecret, err := m.secretRepo.SecretsCache.Get(m.secretNamespace, SecretName)
+	currentSecret, err := m.secretRepo.SecretsCache.Get(m.secretNamespace, consts.SCCMetricsOutputSecretName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil
