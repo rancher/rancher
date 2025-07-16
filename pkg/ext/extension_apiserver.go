@@ -25,11 +25,14 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+	"k8s.io/client-go/util/retry"
 	apiregv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 )
 
 const (
 	imperativeApiExtensionEnvVar = "IMPERATIVE_API_APP_SELECTOR"
+
+	annotationApiAggregationPreChecked = "ext.cattle.io/aggregation-available-checked"
 )
 
 type Options struct {
@@ -259,41 +262,49 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 	return extensionAPIServer, nil
 }
 
-const apiAggregationPreCheckedAnnotation = "ext.cattle.io/aggregation-available-checked"
-
 // AggregationPreCheck allows verifying if a previous execution of Rancher already checked API Agreggation works in the upstream cluster
 func AggregationPreCheck(client wranglerapiregistrationv1.APIServiceClient) bool {
 	apiservice, err := client.Get(APIServiceName, metav1.GetOptions{})
 	if err != nil {
 		return false
 	}
-	return apiservice.Annotations[apiAggregationPreCheckedAnnotation] == "true"
+	return apiservice.Annotations[annotationApiAggregationPreChecked] == "true"
 }
 
 // SetAggregationCheck adds an annotation in the extension APIService object, so it can later be retrieved by AggregationPreCheck
-func SetAggregationCheck(client wranglerapiregistrationv1.APIServiceClient, value bool) {
-	apiservice, err := client.Get(APIServiceName, metav1.GetOptions{})
-	if err != nil {
-		logrus.Warnf("failed to set aggregation check for APIService: %v", err)
-		return
-	}
+func SetAggregationCheck(client wranglerapiregistrationv1.APIServiceClient, value bool) error {
+	return retry.OnError(retry.DefaultBackoff, func(err error) bool {
+		if err != nil {
+			logrus.Warnf("failed to update APIService annotation: %s", err)
+			return true
+		}
 
-	previous := apiservice.Annotations[apiAggregationPreCheckedAnnotation] == "true"
-	if previous == value {
-		// already set
-		return
-	}
+		return false
+	}, func() error {
+		apiservice, err := client.Get(APIServiceName, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to get APIService: %w", err)
+		}
 
-	if value {
+		previous := apiservice.Annotations[annotationApiAggregationPreChecked] == "true"
+		if previous == value {
+			return nil
+		}
+
 		if apiservice.Annotations == nil {
 			apiservice.Annotations = make(map[string]string)
 		}
-		apiservice.Annotations[apiAggregationPreCheckedAnnotation] = "true"
-	} else {
-		delete(apiservice.Annotations, apiAggregationPreCheckedAnnotation)
-	}
 
-	if _, err := client.Update(apiservice); err != nil {
-		logrus.Warnf("failed to set aggregation check for APIService: %v", err)
-	}
+		if value {
+			apiservice.Annotations[annotationApiAggregationPreChecked] = "true"
+		} else {
+			apiservice.Annotations[annotationApiAggregationPreChecked] = "false"
+		}
+
+		if _, err := client.Update(apiservice); err != nil {
+			return fmt.Errorf("failed to update APIService: %w", err)
+		}
+
+		return nil
+	})
 }
