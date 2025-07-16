@@ -128,6 +128,18 @@ func (r *Registration) HasCondition(matchCond condition.Cond) bool {
 	return false
 }
 
+func (r *Registration) RemoveCondition(matchCond condition.Cond) {
+	var newConditions []genericcondition.GenericCondition
+	for _, cond := range r.Status.Conditions {
+		if cond.Type == string(matchCond) {
+			continue
+		}
+		newConditions = append(newConditions, cond)
+	}
+
+	r.Status.Conditions = newConditions
+}
+
 func (r *Registration) ToOwnerRef() *metav1.OwnerReference {
 	return &metav1.OwnerReference{
 		APIVersion: r.TypeMeta.APIVersion,
