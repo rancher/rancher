@@ -1,8 +1,8 @@
-name: Security Release
+name: RCS Release
 on:
   push:
     tags:
-      - "v*-security*"
+      - "v*-rcs*"
 env:
   COMMIT: ${{ github.sha }}
   DOCKERIO_REGISTRY: "docker.io"

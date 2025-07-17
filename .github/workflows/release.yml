@@ -4,7 +4,7 @@ on:
     tags:
       - "v*"
       - "!v*-hotfix*"
-      - "!v*-security*"
+      - "!v*-rcs*"
 env:
   COMMIT: ${{ github.sha }}
   DOCKERIO_REGISTRY: "docker.io"
