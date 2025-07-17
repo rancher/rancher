@@ -370,25 +370,21 @@ func TestCreateProjectNSRole(t *testing.T) {
 			}
 		}
 
-		crCreateCall := 0
 		m := newManager(withClusterRoles(clusterRoles, &clientErrs{createError: test.createError}, ctrl), func(m *manager) {
 			clusterRoles := wfakes.NewMockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
 			clusterRoles.EXPECT().Create(gomock.Any()).DoAndReturn(
 				func(In1 *v1.ClusterRole) (*v1.ClusterRole, error) {
-					crCreateCall++
 					if test.expectedErr != "" {
 						return nil, fmt.Errorf("%v", test.expectedErr)
 					}
 					return In1, nil
 				},
-			).AnyTimes()
+			).Times(1)
 			m.clusterRoles = clusterRoles
 		})
 
 		roleName := fmt.Sprintf(projectNSGetClusterRoleNameFmt, test.projectName, projectNSVerbToSuffix[test.verb])
 		err := m.createProjectNSRole(roleName, test.verb, test.namespace, test.projectName)
-
-		assert.Equal(t, crCreateCall, 1)
 
 		if test.expectedErr != "" {
 			assert.ErrorContains(t, err, test.expectedErr, test.description)
