@@ -263,8 +263,8 @@ RUN mkdir -p /var/lib/rancher/k3s/agent/images/ && \
     curl -sfL ${ETCD_URL} | tar xvzf - --strip-components=1 --no-same-owner -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
-ENV CATTLE_UI_VERSION=2.12.0-alpha13
-ENV CATTLE_DASHBOARD_UI_VERSION=v2.12.0-alpha13
+ENV CATTLE_UI_VERSION=2.12.0-alpha14
+ENV CATTLE_DASHBOARD_UI_VERSION=v2.12.0-alpha14
 
 ENV CATTLE_CLI_VERSION=v2.12.0-rc.1
 
