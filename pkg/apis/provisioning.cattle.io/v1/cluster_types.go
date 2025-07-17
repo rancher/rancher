@@ -500,6 +500,7 @@ type ClusterStatus struct {
 // +genclient
 // +kubebuilder:resource:path=clusters,scope=Namespaced,categories=provisioning
 // +kubebuilder:subresource:status
+// +kubebuilder:metadata:labels={"auth.cattle.io/cluster-indexed=true"}
 // +kubebuilder:printcolumn:name="Version",type=string,JSONPath=".spec.kubernetesVersion"
 // +kubebuilder:printcolumn:name="Cluster Name",type=string,JSONPath=".status.clusterName"
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=".metadata.creationTimestamp"
