@@ -51,8 +51,6 @@ jobs:
         uses: ./.github/actions/build-images/agent
   integration-tests:
     needs: [build-server, build-agent]
-    with:
-      parent_run_id: ${{ github.run_id }}
     uses: ./.github/workflows/integration-tests.yml
   push-images:
     needs: [unit-tests, integration-tests]
