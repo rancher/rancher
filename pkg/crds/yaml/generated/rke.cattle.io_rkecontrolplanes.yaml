@@ -5,6 +5,7 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.1
   labels:
+    auth.cattle.io/cluster-indexed: "true"
     cluster.x-k8s.io/v1beta1: v1
   name: rkecontrolplanes.rke.cattle.io
 spec:
