@@ -213,5 +213,3 @@ jobs:
   integration-tests:
     needs: [build-agent]
     uses: ./.github/workflows/integration-tests.yml
-    with:
-      parent_run_id: ${{ github.run_id }}
