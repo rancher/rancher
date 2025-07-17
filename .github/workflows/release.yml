@@ -3,6 +3,7 @@ on:
   push:
     tags:
       - "v*"
+      - "!v*-rcs*"
 env:
   COMMIT: ${{ github.sha }}
   AWS_DEFAULT_REGION: "us-east-1"
