@@ -23,7 +23,10 @@ quick-agent:
 quick-server:
 	@$(MAKE) quick TARGET="server"
 
+quick-binary-server:
+	@$(MAKE) quick TARGET="binary-server"
+
 $(DEV_TARGETS):
 	./dev-scripts/$@
 
-.PHONY: $(TARGETS) $(DEV_TARGETS) quick-agent quick-server
+.PHONY: $(TARGETS) $(DEV_TARGETS) quick-agent quick-server quick-binary-server
