@@ -2,8 +2,8 @@ name: Integration Tests
 on:
   workflow_call:
 env:
-  TAG: v2.12-${{ github.sha }}-head
-  GIT_TAG: v2.12-${{ github.sha }}-head
+  TAG: v2.13-${{ github.sha }}-head
+  GIT_TAG: v2.13-${{ github.sha }}-head
   HOST_ARCH: amd64
   ARCH: amd64
   PYTHON_VERSION: '3.11'
