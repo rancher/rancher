@@ -420,7 +420,7 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(roleName string,
 	}
 	roleName = roleName + "-promoted"
 
-	role, err := m.crLister.Get("", roleName)
+	role, err := m.crLister.Get(roleName)
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return "", fmt.Errorf("get cluster role %s failed: %w", roleName, err)

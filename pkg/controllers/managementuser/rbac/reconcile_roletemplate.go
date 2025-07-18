@@ -112,8 +112,8 @@ func (m *manager) ensureGlobalResourcesRolesForPRTB(projectName string, rts map[
 				if slice.ContainsString(rule.Verbs, "*") || slice.ContainsString(rule.Verbs, "create") {
 					roleVerb = "*"
 					roles.Insert("create-ns")
-					if nsRole, _ := m.crLister.Get("", "create-ns"); nsRole == nil {
-						createNSRT, err := m.rtLister.Get("", "create-ns")
+					if nsRole, _ := m.crLister.Get("create-ns"); nsRole == nil {
+						createNSRT, err := m.rtLister.Get("create-ns")
 						if err != nil {
 							return nil, err
 						}
@@ -138,7 +138,7 @@ func (m *manager) ensureGlobalResourcesRolesForPRTB(projectName string, rts map[
 		// Get the rules of the RoleTemplate
 		var rules []rbacv1.PolicyRule
 		if rt.External {
-			externalRole, err := m.crLister.Get("", rt.Name)
+			externalRole, err := m.crLister.Get(rt.Name)
 			if apierrors.IsNotFound(err) {
 				// Don't error if it doesn't exist, just move on to the next RoleTemplate
 				continue
