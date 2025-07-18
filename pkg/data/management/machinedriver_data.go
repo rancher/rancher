@@ -140,15 +140,22 @@ var DriverData = map[string]DriverDataConfig{
 func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver(Amazonec2driver, "local://", "", "",
 		[]string{
+			// https://docs.aws.amazon.com/general/latest/gr/iam-service.html
 			"iam.amazonaws.com",
 			"iam.us-gov.amazonaws.com",
 			"iam.%.amazonaws.com.cn",
+			// https://docs.aws.amazon.com/general/latest/gr/ec2-service.html
 			"ec2.%.amazonaws.com",
 			"ec2.%.amazonaws.com.cn",
+			"ec2.%.api.aws",
+			// https://docs.aws.amazon.com/general/latest/gr/eks.html
 			"eks.%.amazonaws.com",
 			"eks.%.amazonaws.com.cn",
+			"eks.%.api.aws",
+			// https://docs.aws.amazon.com/general/latest/gr/kms.html
 			"kms.%.amazonaws.com",
 			"kms.%.amazonaws.com.cn",
+			"kms.%.api.aws",
 		},
 		true, true, true, nil, management); err != nil {
 		return err
