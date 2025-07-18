@@ -379,6 +379,16 @@ func (t *Store) deleteCore(
 		}
 	}
 
+	// If an UID precondition exists and matches the tokens's UID, then we
+	// have to replace it with the corresponding secrets's UID.
+	if options != nil &&
+		options.Preconditions != nil &&
+		options.Preconditions.UID != nil &&
+		*options.Preconditions.UID == token.UID {
+
+		options.Preconditions.UID = &secret.UID
+	}
+
 	// and now actually delete
 	if err := t.SystemStore.Delete(token.Name, options); err != nil {
 		return nil, false, err
