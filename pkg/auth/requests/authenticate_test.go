@@ -659,6 +659,9 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "token-v2rcx",
 			CreationTimestamp: metav1.NewTime(now),
+			Labels: map[string]string{
+				exttokenstore.UserIDLabel: userID,
+			},
 		},
 		Spec: ext.TokenSpec{
 			UserID:  userID,
@@ -682,6 +685,10 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:              "token-v2rcx",
 			CreationTimestamp: metav1.NewTime(now),
+			Labels: map[string]string{
+				exttokenstore.UserIDLabel:     userID,
+				exttokenstore.SecretKindLabel: exttokenstore.SecretKindLabelValue,
+			},
 		},
 		Data: map[string][]byte{
 			exttokenstore.FieldEnabled:        []byte("true"),
