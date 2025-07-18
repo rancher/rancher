@@ -332,7 +332,7 @@ func TestStoreCreate(t *testing.T) {
 			users.EXPECT().Cache().Return(nil)
 			secrets.EXPECT().Cache().Return(scache)
 
-			store = exttokenstore.NewSystem(nil, nil, secrets, users, mockTokenCacheFake, nil, nil, nil)
+			store = exttokenstore.NewSystem(nil, nil, secrets, users, mockTokenCacheFake, nil, nil, nil, nil)
 
 			uas := &Store{
 				tokens:        mockTokenControllerFake,
@@ -536,7 +536,7 @@ func TestStoreGet(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(scache)
 
-		store = exttokenstore.NewSystem(nil, nil, secrets, users, mockTokenCacheFake, nil, nil, nil)
+		store = exttokenstore.NewSystem(nil, nil, secrets, users, mockTokenCacheFake, nil, nil, nil, nil)
 
 		uas := &Store{
 			tokens:        mockTokenControllerFake,
