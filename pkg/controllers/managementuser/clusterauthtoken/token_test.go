@@ -10,6 +10,8 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/generated/norman/cluster.cattle.io/v3/fakes"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	coreFakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	mgmtFakes "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/rancher/wrangler/v3/pkg/generic"
@@ -46,10 +48,20 @@ func TestCreate(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "ClusterAuthToken",
 		},
-		ExpiresAt:     "10000000000",
-		UserName:      userID,
-		SecretKeyHash: legacyHashedTokenKey,
-		Enabled:       true,
+		ExpiresAt: "10000000000",
+		UserName:  userID,
+		Enabled:   true,
+	}
+	testAuthSecret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cat-test-token",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "Secret",
+		},
+		Data: map[string][]byte{
+			"hash": []byte(legacyHashedTokenKey),
+		},
 	}
 
 	authTokenNotFoundError := apierrors.NewNotFound(schema.GroupResource{Group: "cluster.cattle.io", Resource: "ClusterAuthToken"}, testToken.Name)
@@ -57,11 +69,12 @@ func TestCreate(t *testing.T) {
 		name  string
 		token *managementv3.Token
 
-		existingClusterAuthToken *clusterv3.ClusterAuthToken
-		existingTokenError       error
-		tokenHashingEnabled      bool
-		updateAuthTokenErr       error
-		createAuthTokenErr       error
+		existingClusterAuthToken  *clusterv3.ClusterAuthToken
+		existingClusterAuthSecret *v1.Secret
+		existingTokenError        error
+		tokenHashingEnabled       bool
+		updateAuthTokenErr        error
+		createAuthTokenErr        error
 
 		wantClusterAuthToken bool
 		wantAuthTokenUpdate  bool
@@ -122,10 +135,11 @@ func TestCreate(t *testing.T) {
 			wantError: true,
 		},
 		{
-			name:                     "existing cluster auth token, update secretHash",
-			token:                    hashToken(testToken, hashedTokenKey),
-			tokenHashingEnabled:      true,
-			existingClusterAuthToken: testAuthToken,
+			name:                      "existing cluster auth token, update secretHash",
+			token:                     hashToken(testToken, hashedTokenKey),
+			tokenHashingEnabled:       true,
+			existingClusterAuthToken:  testAuthToken,
+			existingClusterAuthSecret: testAuthSecret,
 
 			wantClusterAuthToken: true,
 			wantAuthTokenUpdate:  true,
@@ -162,13 +176,14 @@ func TestCreate(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			output := runCreateUpdateTest(t, &testInput{
-				Token:                    test.token,
-				ExistingClusterAuthToken: test.existingClusterAuthToken,
-				ExistingTokenError:       test.existingTokenError,
-				TokenHashingEnabled:      test.tokenHashingEnabled,
-				UpdateAuthTokenErr:       test.updateAuthTokenErr,
-				CreateAuthTokenErr:       test.createAuthTokenErr,
-				CallCreate:               true,
+				Token:                     test.token,
+				ExistingClusterAuthToken:  test.existingClusterAuthToken,
+				ExistingClusterAuthSecret: test.existingClusterAuthSecret,
+				ExistingTokenError:        test.existingTokenError,
+				TokenHashingEnabled:       test.tokenHashingEnabled,
+				UpdateAuthTokenErr:        test.updateAuthTokenErr,
+				CreateAuthTokenErr:        test.createAuthTokenErr,
+				CallCreate:                true,
 			})
 			if test.wantError {
 				require.Error(t, output.Error)
@@ -182,6 +197,7 @@ func TestCreate(t *testing.T) {
 			}
 			if test.wantClusterAuthToken {
 				modifiedToken := output.ModifiedClusterAuthToken
+				modifiedSecret := output.ModifiedClusterAuthSecret
 				require.NotNil(t, modifiedToken)
 				require.Equal(t, test.wantAuthTokenUpdate, output.AuthTokenUpdated)
 
@@ -191,16 +207,18 @@ func TestCreate(t *testing.T) {
 				require.Equal(t, test.token.ExpiresAt, modifiedToken.ExpiresAt)
 				require.Equal(t, test.wantAuthTokenEnabled, modifiedToken.Enabled)
 
-				if test.tokenHashingEnabled {
-					// if tokenHashing is enabled hash should be the same on the token and cluster auth token
-					require.Equal(t, test.token.Token, modifiedToken.SecretKeyHash)
-				} else {
-					// if tokenHashing is not enabled, the clusterAuthToken will be hashed but the token won't be
-					// so we verify that the cluster auth token is a valid hash for the token
-					hashedToken := modifiedToken.SecretKeyHash
-					hasher, err := hashers.GetHasherForHash(hashedToken)
-					require.NoError(t, err)
-					require.NoError(t, hasher.VerifyHash(hashedToken, test.token.Token))
+				if modifiedSecret != nil {
+					hashedToken := string(modifiedSecret.Data["hash"])
+					if test.tokenHashingEnabled {
+						// if tokenHashing is enabled hash should be the same on the token and cluster auth token
+						require.Equal(t, test.token.Token, hashedToken)
+					} else {
+						// if tokenHashing is not enabled, the clusterAuthToken will be hashed but the token won't be
+						// so we verify that the cluster auth token is a valid hash for the token
+						hasher, err := hashers.GetHasherForHash(hashedToken)
+						require.NoError(t, err)
+						require.NoError(t, hasher.VerifyHash(hashedToken, test.token.Token))
+					}
 				}
 			} else {
 				require.Nil(t, output.ModifiedClusterAuthToken)
@@ -227,24 +245,36 @@ func TestUpdate(t *testing.T) {
 		TypeMeta: metav1.TypeMeta{
 			Kind: "ClusterAuthToken",
 		},
-		ExpiresAt:     "10000000000",
-		UserName:      userID,
-		SecretKeyHash: hashedTokenKey,
-		Enabled:       true,
+		ExpiresAt: "10000000000",
+		UserName:  userID,
+		Enabled:   true,
+	}
+	testAuthSecret := &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cat-test-token",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind: "Secret",
+		},
+		Data: map[string][]byte{
+			"hash": []byte(hashedTokenKey),
+		},
 	}
 	oldAuthToken := testAuthToken.DeepCopy()
-	oldAuthToken.SecretKeyHash = legacyHashedTokenKey
+	oldAuthSecret := testAuthSecret.DeepCopy()
+	oldAuthSecret.Data["hash"] = []byte(legacyHashedTokenKey)
 
 	authTokenNotFoundError := apierrors.NewNotFound(schema.GroupResource{Group: "cluster.cattle.io", Resource: "ClusterAuthToken"}, testToken.Name)
 	tests := []struct {
 		name  string
 		token *managementv3.Token
 
-		existingClusterAuthToken *clusterv3.ClusterAuthToken
-		existingTokenError       error
-		tokenHashingEnabled      bool
-		updateAuthTokenErr       error
-		createAuthTokenErr       error
+		existingClusterAuthToken  *clusterv3.ClusterAuthToken
+		existingClusterAuthSecret *v1.Secret
+		existingTokenError        error
+		tokenHashingEnabled       bool
+		updateAuthTokenErr        error
+		createAuthTokenErr        error
 
 		wantClusterAuthToken bool
 		wantAuthTokenUpdate  bool
@@ -254,61 +284,68 @@ func TestUpdate(t *testing.T) {
 	}{
 
 		{
-			name:                     "token disabled, update token",
-			token:                    setTokenEnabled(testToken, pointer.Bool(false)),
-			existingClusterAuthToken: testAuthToken,
+			name:                      "token disabled, update token",
+			token:                     setTokenEnabled(testToken, pointer.Bool(false)),
+			existingClusterAuthToken:  testAuthToken,
+			existingClusterAuthSecret: testAuthSecret,
 
 			wantClusterAuthToken: true,
 			wantAuthTokenEnabled: false,
 			wantAuthTokenUpdate:  true,
 		},
 		{
-			name:                     "token enabled missing, no token update",
-			token:                    setTokenEnabled(testToken, nil),
-			existingClusterAuthToken: testAuthToken,
+			name:                      "token enabled missing, no token update",
+			token:                     setTokenEnabled(testToken, nil),
+			existingClusterAuthToken:  testAuthToken,
+			existingClusterAuthSecret: testAuthSecret,
 
 			wantClusterAuthToken: false,
 		},
 		{
-			name:                     "token expiry change, update token",
-			token:                    setTokenExpiry(testToken, "2000"),
-			existingClusterAuthToken: testAuthToken,
+			name:                      "token expiry change, update token",
+			token:                     setTokenExpiry(testToken, "2000"),
+			existingClusterAuthToken:  testAuthToken,
+			existingClusterAuthSecret: testAuthSecret,
 
 			wantClusterAuthToken: true,
 			wantAuthTokenUpdate:  true,
 			wantAuthTokenEnabled: true,
 		},
 		{
-			name:                     "token username change, update token",
-			token:                    setTokenUser(testToken, "new-user"),
-			existingClusterAuthToken: testAuthToken,
+			name:                      "token username change, update token",
+			token:                     setTokenUser(testToken, "new-user"),
+			existingClusterAuthToken:  testAuthToken,
+			existingClusterAuthSecret: testAuthSecret,
 
 			wantClusterAuthToken: true,
 			wantAuthTokenUpdate:  true,
 			wantAuthTokenEnabled: true,
 		},
 		{
-			name:                     "token hash change sha3, update token",
-			token:                    hashToken(testToken, hashedTokenKey),
-			existingClusterAuthToken: oldAuthToken,
-			tokenHashingEnabled:      true,
+			name:                      "token hash change sha3, update token",
+			token:                     hashToken(testToken, hashedTokenKey),
+			existingClusterAuthToken:  oldAuthToken,
+			existingClusterAuthSecret: oldAuthSecret,
+			tokenHashingEnabled:       true,
 
 			wantClusterAuthToken: true,
 			wantAuthTokenUpdate:  true,
 			wantAuthTokenEnabled: true,
 		},
 		{
-			name:                     "token hash change non-sha3, don't update token",
-			token:                    hashToken(testToken, legacyHashedTokenKey),
-			existingClusterAuthToken: testAuthToken,
-			tokenHashingEnabled:      true,
+			name:                      "token hash change non-sha3, don't update token",
+			token:                     hashToken(testToken, legacyHashedTokenKey),
+			existingClusterAuthToken:  testAuthToken,
+			existingClusterAuthSecret: testAuthSecret,
+			tokenHashingEnabled:       true,
 
 			wantClusterAuthToken: false,
 		},
 		{
-			name:                     "no change, don't update",
-			token:                    testToken,
-			existingClusterAuthToken: testAuthToken,
+			name:                      "no change, don't update",
+			token:                     testToken,
+			existingClusterAuthToken:  testAuthToken,
+			existingClusterAuthSecret: testAuthSecret,
 
 			wantClusterAuthToken: false,
 		},
@@ -329,19 +366,21 @@ func TestUpdate(t *testing.T) {
 			wantError: true,
 		},
 		{
-			name:                     "invalid token hash version",
-			token:                    hashToken(testToken, invalidHashKey),
-			existingClusterAuthToken: testAuthToken,
-			tokenHashingEnabled:      true,
+			name:                      "invalid token hash version",
+			token:                     hashToken(testToken, invalidHashKey),
+			existingClusterAuthToken:  testAuthToken,
+			existingClusterAuthSecret: testAuthSecret,
+			tokenHashingEnabled:       true,
 
 			wantError:     true,
 			wantSkipError: true,
 		},
 		{
-			name:                     "update auth token error",
-			token:                    setTokenUser(testToken, "new-user"),
-			existingClusterAuthToken: testAuthToken,
-			updateAuthTokenErr:       fmt.Errorf("server unavailable"),
+			name:                      "update auth token error",
+			token:                     setTokenUser(testToken, "new-user"),
+			existingClusterAuthToken:  testAuthToken,
+			existingClusterAuthSecret: testAuthSecret,
+			updateAuthTokenErr:        fmt.Errorf("server unavailable"),
 
 			wantError:            true,
 			wantAuthTokenUpdate:  true,
@@ -349,21 +388,23 @@ func TestUpdate(t *testing.T) {
 			wantAuthTokenEnabled: true,
 		},
 		{
-			name:                     "update auth token not found, create token success",
-			token:                    setTokenUser(testToken, "new-user"),
-			existingClusterAuthToken: testAuthToken,
-			updateAuthTokenErr:       authTokenNotFoundError,
+			name:                      "update auth token not found, create token success",
+			token:                     setTokenUser(testToken, "new-user"),
+			existingClusterAuthToken:  testAuthToken,
+			existingClusterAuthSecret: testAuthSecret,
+			updateAuthTokenErr:        authTokenNotFoundError,
 
 			wantClusterAuthToken: true,
 			wantAuthTokenUpdate:  true,
 			wantAuthTokenEnabled: true,
 		},
 		{
-			name:                     "update auth token not found, create token error",
-			token:                    setTokenUser(testToken, "new-user"),
-			existingClusterAuthToken: testAuthToken,
-			updateAuthTokenErr:       authTokenNotFoundError,
-			createAuthTokenErr:       fmt.Errorf("server not available"),
+			name:                      "update auth token not found, create token error",
+			token:                     setTokenUser(testToken, "new-user"),
+			existingClusterAuthToken:  testAuthToken,
+			existingClusterAuthSecret: testAuthSecret,
+			updateAuthTokenErr:        authTokenNotFoundError,
+			createAuthTokenErr:        fmt.Errorf("server not available"),
 
 			wantError:            true,
 			wantClusterAuthToken: true,
@@ -375,13 +416,14 @@ func TestUpdate(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			output := runCreateUpdateTest(t, &testInput{
-				Token:                    test.token,
-				ExistingClusterAuthToken: test.existingClusterAuthToken,
-				ExistingTokenError:       test.existingTokenError,
-				TokenHashingEnabled:      test.tokenHashingEnabled,
-				UpdateAuthTokenErr:       test.updateAuthTokenErr,
-				CreateAuthTokenErr:       test.createAuthTokenErr,
-				CallCreate:               false,
+				Token:                     test.token,
+				ExistingClusterAuthToken:  test.existingClusterAuthToken,
+				ExistingClusterAuthSecret: test.existingClusterAuthSecret,
+				ExistingTokenError:        test.existingTokenError,
+				TokenHashingEnabled:       test.tokenHashingEnabled,
+				UpdateAuthTokenErr:        test.updateAuthTokenErr,
+				CreateAuthTokenErr:        test.createAuthTokenErr,
+				CallCreate:                false,
 			})
 			if test.wantError {
 				require.Error(t, output.Error)
@@ -395,6 +437,7 @@ func TestUpdate(t *testing.T) {
 			}
 			if test.wantClusterAuthToken {
 				modifiedToken := output.ModifiedClusterAuthToken
+				modifiedSecret := output.ModifiedClusterAuthSecret
 				require.NotNil(t, modifiedToken)
 				require.Equal(t, test.wantAuthTokenUpdate, output.AuthTokenUpdated)
 
@@ -404,16 +447,18 @@ func TestUpdate(t *testing.T) {
 				require.Equal(t, test.token.ExpiresAt, modifiedToken.ExpiresAt)
 				require.Equal(t, test.wantAuthTokenEnabled, modifiedToken.Enabled)
 
-				if test.tokenHashingEnabled {
-					// if tokenHashing is enabled hash should be the same on the token and cluster auth token
-					require.Equal(t, test.token.Token, modifiedToken.SecretKeyHash)
-				} else {
-					// if tokenHashing is not enabled, the clusterAuthToken will be hashed but the token won't be
-					// so we verify that the cluster auth token is a valid hash for the token
-					hashedToken := modifiedToken.SecretKeyHash
-					hasher, err := hashers.GetHasherForHash(hashedToken)
-					require.NoError(t, err)
-					require.NoError(t, hasher.VerifyHash(hashedToken, test.token.Token))
+				if modifiedSecret != nil {
+					hashedToken := string(modifiedSecret.Data["hash"])
+					if test.tokenHashingEnabled {
+						// if tokenHashing is enabled hash should be the same on the token and cluster auth token
+						require.Equal(t, test.token.Token, hashedToken)
+					} else {
+						// if tokenHashing is not enabled, the clusterAuthToken will be hashed but the token won't be
+						// so we verify that the cluster auth token is a valid hash for the token
+						hasher, err := hashers.GetHasherForHash(hashedToken)
+						require.NoError(t, err)
+						require.NoError(t, hasher.VerifyHash(hashedToken, test.token.Token))
+					}
 				}
 			} else {
 				require.Nil(t, output.ModifiedClusterAuthToken)
@@ -451,25 +496,42 @@ func setTokenUser(token *managementv3.Token, user string) *managementv3.Token {
 }
 
 type testInput struct {
-	Token                    *managementv3.Token
-	ExistingClusterAuthToken *clusterv3.ClusterAuthToken
-	ExistingTokenError       error
-	TokenHashingEnabled      bool
-	UpdateAuthTokenErr       error
-	CreateAuthTokenErr       error
-	CallCreate               bool
+	Token                     *managementv3.Token
+	ExistingClusterAuthToken  *clusterv3.ClusterAuthToken
+	ExistingClusterAuthSecret *v1.Secret
+	ExistingTokenError        error
+	TokenHashingEnabled       bool
+	UpdateAuthTokenErr        error
+	CreateAuthTokenErr        error
+	CallCreate                bool
 }
 
 type testOutput struct {
-	ModifiedClusterAuthToken *clusterv3.ClusterAuthToken
-	AuthTokenUpdated         bool
-	Error                    error
+	ModifiedClusterAuthToken  *clusterv3.ClusterAuthToken
+	ModifiedClusterAuthSecret *v1.Secret
+	AuthTokenUpdated          bool
+	Error                     error
 }
 
 func runCreateUpdateTest(t *testing.T, testInput *testInput) *testOutput {
 	mockLister := fakes.ClusterAuthTokenListerMock{}
 	mockLister.GetFunc = func(namespace, name string) (*clusterv3.ClusterAuthToken, error) {
 		return testInput.ExistingClusterAuthToken.DeepCopy(), testInput.ExistingTokenError
+	}
+	mockSecretLister := coreFakes.SecretListerMock{}
+	mockSecretLister.GetFunc = func(namespace, name string) (*v1.Secret, error) {
+		return testInput.ExistingClusterAuthSecret.DeepCopy(), testInput.ExistingTokenError
+	}
+
+	var modifiedSecret *v1.Secret
+	mockSecrets := coreFakes.SecretInterfaceMock{}
+	mockSecrets.UpdateFunc = func(in1 *v1.Secret) (*v1.Secret, error) {
+		modifiedSecret = in1
+		return in1, testInput.UpdateAuthTokenErr
+	}
+	mockSecrets.CreateFunc = func(in1 *v1.Secret) (*v1.Secret, error) {
+		modifiedSecret = in1
+		return in1, nil
 	}
 
 	var modifiedToken *clusterv3.ClusterAuthToken
@@ -519,6 +581,8 @@ func runCreateUpdateTest(t *testing.T, testInput *testInput) *testOutput {
 		userAttributeLister:        &userAttributeLister,
 		clusterUserAttributeLister: &clusterUserAttributeLister,
 		clusterUserAttribute:       &fakes.ClusterUserAttributeInterfaceMock{},
+		clusterSecret:              &mockSecrets,
+		clusterSecretLister:        &mockSecretLister,
 	}
 	var err error
 	if testInput.CallCreate {
@@ -527,8 +591,9 @@ func runCreateUpdateTest(t *testing.T, testInput *testInput) *testOutput {
 		_, err = h.Updated(testInput.Token)
 	}
 	return &testOutput{
-		ModifiedClusterAuthToken: modifiedToken,
-		AuthTokenUpdated:         isUpdated,
-		Error:                    err,
+		ModifiedClusterAuthToken:  modifiedToken,
+		ModifiedClusterAuthSecret: modifiedSecret,
+		AuthTokenUpdated:          isUpdated,
+		Error:                     err,
 	}
 }
