@@ -18,6 +18,7 @@ CATTLE_REMOTEDIALER_PROXY_VERSION=$(grep -m1 'remoteDialerProxyVersion' build.ya
 CATTLE_CSP_ADAPTER_MIN_VERSION=$(grep -m1 'cspAdapterMinVersion' build.yaml | cut -d ' ' -f2)
 CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$(grep -m1 'provisioningCAPIVersion' build.yaml | cut -d ' ' -f2)
 CATTLE_FLEET_VERSION=$(grep -m1 'fleetVersion' build.yaml | cut -d ' ' -f2)
+CATTLE_HELM_VERSION=$(grep -m1 'ENV CATTLE_HELM_VERSION=' package/Dockerfile | cut -d '=' -f2)
 
 # download airgap images and export it to a tarball
 curl -Lf https://github.com/rancher/k3s/releases/download/"${CATTLE_K3S_VERSION}"/k3s-images.txt -o ./k3s-images.txt
@@ -39,6 +40,7 @@ BUILD_ARGS+=("--build-arg=CATTLE_REMOTEDIALER_PROXY_VERSION=${CATTLE_REMOTEDIALE
 BUILD_ARGS+=("--build-arg=CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=${CATTLE_RANCHER_PROVISIONING_CAPI_VERSION}")
 BUILD_ARGS+=("--build-arg=CATTLE_CSP_ADAPTER_MIN_VERSION=${CATTLE_CSP_ADAPTER_MIN_VERSION}")
 BUILD_ARGS+=("--build-arg=CATTLE_FLEET_VERSION=${CATTLE_FLEET_VERSION}")
+BUILD_ARGS+=("--build-arg=CATTLE_HELM_VERSION=${CATTLE_HELM_VERSION}")
 BUILD_ARGS+=("--build-arg=RANCHER_TAG=${TAG}")
 BUILD_ARGS+=("--build-arg=RANCHER_REPO=${REPO}")
 
