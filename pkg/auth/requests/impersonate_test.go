@@ -224,6 +224,10 @@ func TestAuthenticateImpersonation(t *testing.T) {
 					Return(&corev1.Secret{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "kubeconfig-u-user5zfww",
+							Labels: map[string]string{
+								exttokenstore.UserIDLabel:     "impUser",
+								exttokenstore.SecretKindLabel: exttokenstore.SecretKindLabelValue,
+							},
 						},
 						Data: map[string][]byte{
 							exttokenstore.FieldUserID: []byte("impUser"),
@@ -426,6 +430,10 @@ func TestAuthenticateImpersonation(t *testing.T) {
 					Return(&corev1.Secret{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "kubeconfig-u-user5zfww",
+							Labels: map[string]string{
+								exttokenstore.UserIDLabel:     "someoneelse",
+								exttokenstore.SecretKindLabel: exttokenstore.SecretKindLabelValue,
+							},
 						},
 						Data: map[string][]byte{
 							exttokenstore.FieldUserID: []byte("someoneelse"),
