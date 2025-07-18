@@ -44,6 +44,10 @@ var (
 	properSecret            = corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "bogus",
+			Labels: map[string]string{
+				UserIDLabel:     properUser,
+				SecretKindLabel: SecretKindLabelValue,
+			},
 		},
 		Data: map[string][]byte{
 			FieldDescription:    []byte(""),
@@ -61,6 +65,10 @@ var (
 	badSecret = corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "bogus",
+			Labels: map[string]string{
+				UserIDLabel:     properUser,
+				SecretKindLabel: SecretKindLabelValue,
+			},
 		},
 		Data: map[string][]byte{
 			FieldDescription:    []byte(""),
@@ -80,8 +88,9 @@ var (
 			APIVersion: "ext.cattle.io/v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "bogus",
-			UID:  types.UID("2905498-kafld-lkad"),
+			Name:   "bogus",
+			UID:    types.UID("2905498-kafld-lkad"),
+			Labels: map[string]string{UserIDLabel: properUser},
 		},
 		Spec: ext.TokenSpec{
 			UserID:        properUser,
@@ -113,6 +122,10 @@ var (
 	ttlPlusSecret = corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "bogus",
+			Labels: map[string]string{
+				UserIDLabel:     properUser,
+				SecretKindLabel: SecretKindLabelValue,
+			},
 		},
 		Data: map[string][]byte{
 			FieldEnabled:        []byte("false"),
@@ -129,6 +142,10 @@ var (
 	ttlSubSecret = corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "bogus",
+			Labels: map[string]string{
+				UserIDLabel:     properUser,
+				SecretKindLabel: SecretKindLabelValue,
+			},
 		},
 		Data: map[string][]byte{
 			FieldEnabled:        []byte("false"),
@@ -450,7 +467,6 @@ func Test_Store_Get(t *testing.T) {
 		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 		auth := NewMockauthHandler(ctrl)
 
-		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(&mockUser{name: "lkajdl/ksjlkds"}, false, true, nil)
 		users.EXPECT().Cache().Return(nil)
@@ -1960,7 +1976,7 @@ func Test_SystemStore_Get(t *testing.T) {
 			tok: nil,
 		},
 		{
-			name: "empty secret (no kube id)",
+			name: "empty secret (not found)",
 			storeSetup: func(secrets *fake.MockCacheInterface[*corev1.Secret]) {
 				secrets.EXPECT().
 					Get("cattle-tokens", "bogus").
@@ -1968,15 +1984,14 @@ func Test_SystemStore_Get(t *testing.T) {
 			},
 			tokname: "bogus",
 			opts:    &metav1.GetOptions{},
-			err: apierrors.NewInternalError(fmt.Errorf("failed to extract token %s: %w", "bogus",
-				kubeIDMissingError)),
-			tok: nil,
+			err:     bogusNotFoundError,
+			tok:     nil,
 		},
 		{
 			name: "part-filled secret (no enabled)",
 			storeSetup: func(secrets *fake.MockCacheInterface[*corev1.Secret]) {
 				reduced := properSecret.DeepCopy()
-				delete(reduced.Data, "enabled")
+				delete(reduced.Data, FieldEnabled)
 
 				secrets.EXPECT().
 					Get("cattle-tokens", "bogus").
@@ -1991,7 +2006,7 @@ func Test_SystemStore_Get(t *testing.T) {
 			name: "part-filled secret (no ttl)",
 			storeSetup: func(secrets *fake.MockCacheInterface[*corev1.Secret]) {
 				reduced := properSecret.DeepCopy()
-				delete(reduced.Data, "ttl")
+				delete(reduced.Data, FieldTTL)
 
 				secrets.EXPECT().
 					Get("cattle-tokens", "bogus").
@@ -2006,7 +2021,7 @@ func Test_SystemStore_Get(t *testing.T) {
 			name: "part-filled secret (no hash)",
 			storeSetup: func(secrets *fake.MockCacheInterface[*corev1.Secret]) {
 				reduced := properSecret.DeepCopy()
-				delete(reduced.Data, "hash")
+				delete(reduced.Data, FieldHash)
 
 				secrets.EXPECT().
 					Get("cattle-tokens", "bogus").
@@ -2040,7 +2055,7 @@ func Test_SystemStore_Get(t *testing.T) {
 			storeSetup: func(secrets *fake.MockCacheInterface[*corev1.Secret]) {
 
 				reduced := properSecret.DeepCopy()
-				delete(reduced.Data, "last-update-time")
+				delete(reduced.Data, FieldLastUpdateTime)
 
 				secrets.EXPECT().
 					Get("cattle-tokens", "bogus").
@@ -2072,9 +2087,8 @@ func Test_SystemStore_Get(t *testing.T) {
 		{
 			name: "part-filled secret (no kube id)",
 			storeSetup: func(secrets *fake.MockCacheInterface[*corev1.Secret]) {
-
 				reduced := properSecret.DeepCopy()
-				delete(reduced.Data, "kube-uid")
+				delete(reduced.Data, FieldUID)
 
 				secrets.EXPECT().
 					Get("cattle-tokens", "bogus").
@@ -2101,8 +2115,9 @@ func Test_SystemStore_Get(t *testing.T) {
 					APIVersion: "ext.cattle.io/v1",
 				},
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "bogus",
-					UID:  types.UID("2905498-kafld-lkad"),
+					Name:   "bogus",
+					UID:    types.UID("2905498-kafld-lkad"),
+					Labels: map[string]string{UserIDLabel: properUser},
 				},
 				Spec: ext.TokenSpec{
 					UserID:        properUser,
