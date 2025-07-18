@@ -166,6 +166,7 @@ var OriginMap = map[string]string{
 	"mirrored-kubernetes-external-dns":                        "https://github.com/kubernetes-sigs/external-dns",
 	"mirrored-library-busybox":                                "https://github.com/docker-library/busybox",
 	"mirrored-library-nginx":                                  "https://github.com/docker-library/nginx",
+	"mirrored-library-redis":                                  "https://github.com/redis/docker-library-redis",
 	"mirrored-library-registry":                               "https://github.com/docker-library/official-images",
 	"mirrored-library-traefik":                                "https://github.com/traefik/traefik-library-image",
 	"mirrored-longhornio-backing-image-manager":               "https://github.com/longhorn/backing-image-manager",
