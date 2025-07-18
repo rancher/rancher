@@ -274,6 +274,7 @@ func (t *Store) Create(
 }
 
 // DeleteCollection implements [rest.CollectionDeleter]
+// Calls on deleteCore.
 func (t *Store) DeleteCollection(
 	ctx context.Context,
 	deleteValidation rest.ValidateObjectFunc,
@@ -314,7 +315,7 @@ func (t *Store) DeleteCollection(
 	}
 
 	for _, secret := range secrets.Items {
-		token, _, err := t.deleteToken(ctx, &secret, deleteValidation, options)
+		token, _, err := t.deleteCore(ctx, &secret, deleteValidation, options)
 		if err != nil {
 			return nil, apierrors.NewInternalError(fmt.Errorf("error deleting token %s: %w",
 				secret.Name, err))
@@ -327,39 +328,38 @@ func (t *Store) DeleteCollection(
 }
 
 // Delete implements [rest.GracefulDeleter], the interface to support the
-// `delete` verb. Delegates to the actual store method after some generic
-// boilerplate.
+// `delete` verb. Calls on `deleteCore`.
 func (t *Store) Delete(
 	ctx context.Context,
 	name string,
 	deleteValidation rest.ValidateObjectFunc,
 	options *metav1.DeleteOptions) (runtime.Object, bool, error) {
-	// locate resource first
-	obj, err := t.get(ctx, name, &metav1.GetOptions{})
+
+	userInfo, fullAccess, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore, "delete")
 	if err != nil {
-		return nil, false, err
+		return nil, false, err // The err is already an [apierrors.APIStatus].
 	}
 
-	// ensure that deletion is possible
-	if deleteValidation != nil {
-		err := deleteValidation(ctx, obj)
-		if err != nil {
-			return nil, false, err
-		}
+	// locate underlying resource first, bypass cache
+	secret, err := t.GetSecret(name, &metav1.GetOptions{}, false)
+	if err != nil {
+		return nil, false, err // The err is already an [apierrors.APIStatus].
 	}
 
-	// and now actually delete
-	if err := t.delete(ctx, obj, options); err != nil {
-		return nil, false, err
+	if !fullAccess && (!isRancherUser || !userMatchSecret(userInfo.GetName(), secret)) {
+		// An ordinary user can only access their own tokens.  We return
+		// a NotFound error to avoid leaking information about other
+		// users' tokens.
+		return nil, false, apierrors.NewNotFound(GVR.GroupResource(), name)
 	}
 
-	return obj, true, nil
+	return t.deleteCore(ctx, secret, deleteValidation, options)
 }
 
-// deleteToken is a variant of Delete for use by DeleteCollection. It avoids
-// doing a second `token get` calling on `Delete` would invoke. Delegates to the
-// actual store method after some generic boilerplate.
-func (t *Store) deleteToken(
+// deleteCore is invoked by Delete and DeleteCollection, after access checks,
+// with the backing secret of the token to delete. After conversion and further
+// checks it delegates to the system store.
+func (t *Store) deleteCore(
 	ctx context.Context,
 	secret *corev1.Secret,
 	deleteValidation rest.ValidateObjectFunc,
@@ -380,7 +380,7 @@ func (t *Store) deleteToken(
 	}
 
 	// and now actually delete
-	if err := t.delete(ctx, token, options); err != nil {
+	if err := t.SystemStore.Delete(token.Name, options); err != nil {
 		return nil, false, err
 	}
 
@@ -698,19 +698,6 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	newToken.Status.Value = tokenValue
 
 	return newToken, nil
-}
-
-// delete implements the core resource destruction for tokens
-func (t *Store) delete(ctx context.Context, token *ext.Token, options *metav1.DeleteOptions) error {
-	userInfo, fullAccess, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore, "delete")
-	if err != nil {
-		return err
-	}
-	if !fullAccess && (!isRancherUser || !userMatch(userInfo.GetName(), token)) {
-		return apierrors.NewNotFound(GVR.GroupResource(), token.Name)
-	}
-
-	return t.SystemStore.Delete(token.Name, options)
 }
 
 func (t *SystemStore) Delete(name string, options *metav1.DeleteOptions) error {

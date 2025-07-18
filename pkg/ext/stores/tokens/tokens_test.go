@@ -311,14 +311,12 @@ func TestStoreDeleteCollection(t *testing.T) {
 				assert.Equal(t, deleteOptions, options)
 				return nil
 			}).Times(1)
-		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
-		secretClient.EXPECT().Cache().Return(scache)
+		secretClient.EXPECT().Cache().Return(nil)
 		userClient := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 		userClient.EXPECT().Cache().Return(nil)
 		auth := NewMockauthHandler(ctrl)
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(&mockUser{name: properUser}, false, true, nil).
-			Times(2)
+			Return(&mockUser{name: properUser}, false, true, nil)
 
 		store := New(nil, nil, nil, secretClient, userClient, nil, nil, nil, auth)
 
@@ -344,17 +342,14 @@ func Test_Store_Delete(t *testing.T) {
 	t.Run("failed to get secret, arbitrary error", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
-		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 		auth := NewMockauthHandler(ctrl)
 
-		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(&mockUser{name: "laber"}, false, true, nil)
 		users.EXPECT().Cache().Return(nil)
-		secrets.EXPECT().Cache().Return(scache)
-		scache.EXPECT().
-			Get("cattle-tokens", "bogus").
+		secrets.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Get("cattle-tokens", "bogus", gomock.Any()).
 			Return(nil, someerror)
 
 		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
@@ -368,17 +363,14 @@ func Test_Store_Delete(t *testing.T) {
 	t.Run("failed to get secret, not found", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
-		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 		auth := NewMockauthHandler(ctrl)
 
-		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(&mockUser{name: "laber"}, false, true, nil)
 		users.EXPECT().Cache().Return(nil)
-		secrets.EXPECT().Cache().Return(scache)
-		scache.EXPECT().
-			Get("cattle-tokens", "bogus").
+		secrets.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Get("cattle-tokens", "bogus", gomock.Any()).
 			Return(nil, apierrors.NewNotFound(GVR.GroupResource(), "bogus"))
 
 		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
@@ -409,17 +401,14 @@ func Test_Store_Delete(t *testing.T) {
 	t.Run("not owned, no permission, not found", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
-		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 		auth := NewMockauthHandler(ctrl)
 
-		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(&mockUser{name: "lkajdl/ksjlkds"}, false, true, nil)
 		users.EXPECT().Cache().Return(nil)
-		secrets.EXPECT().Cache().Return(scache)
-		scache.EXPECT().
-			Get("cattle-tokens", "bogus").
+		secrets.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Get("cattle-tokens", "bogus", gomock.Any()).
 			Return(&properSecret, nil)
 
 		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
@@ -432,17 +421,14 @@ func Test_Store_Delete(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
-		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 		auth := NewMockauthHandler(ctrl)
 
-		auth.EXPECT().SessionID(gomock.Any()).Return("")
-		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(&mockUser{name: properUser}, false, true, nil).Times(2)
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), "delete").
+			Return(&mockUser{name: properUser}, false, true, nil)
 		users.EXPECT().Cache().Return(nil)
-		secrets.EXPECT().Cache().Return(scache)
-		scache.EXPECT().
-			Get("cattle-tokens", "bogus").
+		secrets.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Get("cattle-tokens", "bogus", gomock.Any()).
 			Return(&properSecret, nil)
 		secrets.EXPECT().
 			Delete("cattle-tokens", "bogus", gomock.Any()).
