@@ -16,7 +16,10 @@ import (
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/utils/pointer"
@@ -37,6 +40,7 @@ var (
 		LoginName:   "hello",
 	}
 	properPrincipalBytes, _ = json.Marshal(properPrincipal)
+	properUser              = "lkajdlksjlkds"
 	properSecret            = corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "bogus",
@@ -50,7 +54,7 @@ var (
 			FieldPrincipal:      properPrincipalBytes,
 			FieldTTL:            []byte("4000"),
 			FieldUID:            []byte("2905498-kafld-lkad"),
-			FieldUserID:         []byte("lkajdlksjlkds"),
+			FieldUserID:         []byte(properUser),
 		},
 	}
 	// missing user-id - for list tests
@@ -80,7 +84,7 @@ var (
 			UID:  types.UID("2905498-kafld-lkad"),
 		},
 		Spec: ext.TokenSpec{
-			UserID:        "lkajdlksjlkds",
+			UserID:        properUser,
 			Description:   "",
 			TTL:           4000,
 			Enabled:       pointer.Bool(false),
@@ -118,7 +122,7 @@ var (
 			FieldPrincipal:      properPrincipalBytes,
 			FieldTTL:            []byte("5000"),
 			FieldUID:            []byte("2905498-kafld-lkad"),
-			FieldUserID:         []byte("lkajdlksjlkds"),
+			FieldUserID:         []byte(properUser),
 		},
 	}
 	// ttlSubSecret is the properSecret with reduced ttl
@@ -134,7 +138,7 @@ var (
 			FieldPrincipal:      properPrincipalBytes,
 			FieldTTL:            []byte("3000"),
 			FieldUID:            []byte("2905498-kafld-lkad"),
-			FieldUserID:         []byte("lkajdlksjlkds"),
+			FieldUserID:         []byte(properUser),
 		},
 	}
 
@@ -248,6 +252,74 @@ func Test_Store_GroupVersionKind(t *testing.T) {
 	assert.Equal(t, GVK, store.GroupVersionKind(ext.SchemeGroupVersion))
 }
 
+func TestStoreDeleteCollection(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+
+	t.Run("admin deletes a user's tokens with a label", func(t *testing.T) {
+
+		var deleteValidationCalledTimes int
+		deleteValidation := func(ctx context.Context, obj runtime.Object) error {
+			deleteValidationCalledTimes++
+			return nil
+		}
+		deleteOptions := &metav1.DeleteOptions{
+			GracePeriodSeconds: pointer.Int64(60),
+		}
+		listOptions := &metainternalversion.ListOptions{
+			LabelSelector: labels.Set{
+				UserIDLabel: properUser,
+				"custom":    "label",
+			}.AsSelector(),
+		}
+
+		secretClient := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		secretClient.EXPECT().List(TokenNamespace, gomock.Any()).
+			DoAndReturn(func(namespace string, options metav1.ListOptions) (*corev1.SecretList, error) {
+				labelSet, err := labels.ConvertSelectorToLabelsMap(options.LabelSelector)
+				require.NoError(t, err)
+				assert.Equal(t, properUser, labelSet[UserIDLabel])
+				assert.Equal(t, "label", labelSet["custom"])
+
+				return &corev1.SecretList{
+					ListMeta: metav1.ListMeta{
+						ResourceVersion: "1",
+					},
+					Items: []corev1.Secret{*properSecret.DeepCopy()},
+				}, nil
+			}).Times(1)
+		secretClient.EXPECT().Delete(TokenNamespace, "bogus", gomock.Any()).
+			DoAndReturn(func(namespace, name string, options *metav1.DeleteOptions) error {
+				assert.Equal(t, deleteOptions, options)
+				return nil
+			}).Times(1)
+		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		secretClient.EXPECT().Cache().Return(scache)
+		userClient := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+		userClient.EXPECT().Cache().Return(nil)
+		auth := NewMockauthHandler(ctrl)
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(&mockUser{name: properUser}, false, true, nil).
+			Times(2)
+
+		store := New(nil, nil, nil, secretClient, userClient, nil, nil, nil, auth)
+
+		obj, err := store.DeleteCollection(context.Background(), deleteValidation,
+			deleteOptions, listOptions)
+
+		require.NoError(t, err)
+		require.NotNil(t, obj)
+		require.IsType(t, &ext.TokenList{}, obj)
+
+		list := obj.(*ext.TokenList)
+		require.Len(t, list.Items, 1)
+		assert.Equal(t, "1", list.ResourceVersion)
+
+		assert.Equal(t, deleteValidationCalledTimes, 1)
+	})
+}
+
 func Test_Store_Delete(t *testing.T) {
 	// The majority of the code is tested later, in Test_SystemStore_Delete
 	// Here we test the actions and checks done before delegation to the
@@ -349,7 +421,7 @@ func Test_Store_Delete(t *testing.T) {
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil).Times(2)
+			Return(&mockUser{name: properUser}, false, true, nil).Times(2)
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(scache)
 		scache.EXPECT().
@@ -403,7 +475,7 @@ func Test_Store_Get(t *testing.T) {
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
+			Return(&mockUser{name: properUser}, false, true, nil)
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(scache)
 		scache.EXPECT().
@@ -426,7 +498,7 @@ func Test_Store_Get(t *testing.T) {
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("bogus")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
+			Return(&mockUser{name: properUser}, false, true, nil)
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(scache)
 		scache.EXPECT().
@@ -459,7 +531,7 @@ func Test_Store_Watch(t *testing.T) {
 			Return(nil, someerror)
 
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
+			Return(&mockUser{name: properUser}, false, true, nil)
 
 		todo, cancel := context.WithCancel(context.TODO())
 		defer cancel()
@@ -485,7 +557,7 @@ func Test_Store_Watch(t *testing.T) {
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
+			Return(&mockUser{name: properUser}, false, true, nil)
 
 		todo, cancel := context.WithCancel(context.TODO())
 
@@ -518,7 +590,7 @@ func Test_Store_Watch(t *testing.T) {
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
+			Return(&mockUser{name: properUser}, false, true, nil)
 
 		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
@@ -554,7 +626,7 @@ func Test_Store_Watch(t *testing.T) {
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
+			Return(&mockUser{name: properUser}, false, true, nil)
 
 		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
@@ -589,7 +661,7 @@ func Test_Store_Watch(t *testing.T) {
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
+			Return(&mockUser{name: properUser}, false, true, nil)
 
 		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
@@ -654,7 +726,7 @@ func Test_Store_Watch(t *testing.T) {
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
+			Return(&mockUser{name: properUser}, false, true, nil)
 
 		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
@@ -684,7 +756,7 @@ func Test_Store_Watch(t *testing.T) {
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("bogus")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
+			Return(&mockUser{name: properUser}, false, true, nil)
 
 		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
@@ -718,7 +790,7 @@ func Test_Store_Watch(t *testing.T) {
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
+			Return(&mockUser{name: properUser}, false, true, nil)
 
 		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
@@ -753,7 +825,7 @@ func Test_Store_Watch(t *testing.T) {
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
+			Return(&mockUser{name: properUser}, false, true, nil)
 
 		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
@@ -784,7 +856,7 @@ func Test_Store_Watch(t *testing.T) {
 
 		auth.EXPECT().SessionID(gomock.Any()).Return("")
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
+			Return(&mockUser{name: properUser}, false, true, nil)
 
 		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
@@ -833,7 +905,7 @@ func Test_Store_Create(t *testing.T) {
 				auth *MockauthHandler) {
 
 				auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(&mockUser{name: "lkajdlksjlkds"}, false, true, nil)
+					Return(&mockUser{name: properUser}, false, true, nil)
 			},
 		},
 		// token generation and hash errors -- no mocking -- unable to induce and test
@@ -1248,7 +1320,7 @@ func Test_SystemStore_List(t *testing.T) {
 		},
 		{
 			name: "ok, not empty, not current",
-			user: "lkajdlksjlkds",
+			user: properUser,
 			opts: &metav1.ListOptions{},
 			err:  nil,
 			toks: &ext.TokenList{
@@ -1278,7 +1350,7 @@ func Test_SystemStore_List(t *testing.T) {
 		},
 		{
 			name:    "ok, not empty, current",
-			user:    "lkajdlksjlkds",
+			user:    properUser,
 			session: "bogus",
 			opts:    &metav1.ListOptions{},
 			err:     nil,
@@ -1304,7 +1376,7 @@ func Test_SystemStore_List(t *testing.T) {
 		},
 		{
 			name: "ok, ignore broken secrets",
-			user: "lkajdlksjlkds",
+			user: properUser,
 			opts: &metav1.ListOptions{},
 			err:  nil,
 			toks: &ext.TokenList{
@@ -2033,7 +2105,7 @@ func Test_SystemStore_Get(t *testing.T) {
 					UID:  types.UID("2905498-kafld-lkad"),
 				},
 				Spec: ext.TokenSpec{
-					UserID:        "lkajdlksjlkds",
+					UserID:        properUser,
 					Description:   "",
 					TTL:           4000,
 					Enabled:       pointer.Bool(false),
