@@ -391,6 +391,7 @@ func getLabelsAndAnnotationsForPlanSecret(bootstrap *rkev1.RKEBootstrap, machine
 	labels := make(map[string]string, len(bootstrap.Labels)+2)
 	labels[capr.MachineNameLabel] = machine.Name
 	labels[capr.ClusterNameLabel] = bootstrap.Spec.ClusterName
+	labels[capr.BackupLabel] = "true"
 	for k, v := range bootstrap.Labels {
 		labels[k] = v
 	}
