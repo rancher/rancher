@@ -314,15 +314,10 @@ func (t *Store) DeleteCollection(
 	}
 
 	for _, secret := range secrets.Items {
-		obj, _, err := t.deleteToken(ctx, &secret, deleteValidation, options)
+		token, _, err := t.deleteToken(ctx, &secret, deleteValidation, options)
 		if err != nil {
 			return nil, apierrors.NewInternalError(fmt.Errorf("error deleting token %s: %w",
 				secret.Name, err))
-		}
-
-		token, ok := obj.(*ext.Token)
-		if !ok { // Sanity check.
-			return nil, apierrors.NewInternalError(fmt.Errorf("expected token object, got %T", obj))
 		}
 
 		list.Items = append(list.Items, *token)
@@ -368,7 +363,7 @@ func (t *Store) deleteToken(
 	ctx context.Context,
 	secret *corev1.Secret,
 	deleteValidation rest.ValidateObjectFunc,
-	options *metav1.DeleteOptions) (runtime.Object, bool, error) {
+	options *metav1.DeleteOptions) (*ext.Token, bool, error) {
 
 	token, err := fromSecret(secret)
 	if err != nil {
