@@ -121,7 +121,7 @@ func GenerateIndex(ociClient *Client, URL string, credentialSecret *corev1.Secre
 
 	var maxTag string
 	var chartName string
-
+	var updatedChartVersions []*repo.ChartVersion
 	// Loop over all the tags and find the latest version
 	tagsFunc := func(tags []string) error {
 		existingTags := make(map[string]bool)
@@ -155,7 +155,6 @@ func GenerateIndex(ociClient *Client, URL string, credentialSecret *corev1.Secre
 				indexFile.Entries[chartName] = append(indexFile.Entries[chartName], chartVersion)
 			}
 		}
-		var updatedChartVersions []*repo.ChartVersion
 
 		// Only keep the versions that are also present in the /tags/list call
 		for _, chartVersion := range indexFile.Entries[chartName] {
@@ -186,6 +185,7 @@ func GenerateIndex(ociClient *Client, URL string, credentialSecret *corev1.Secre
 				chartName = ociClient.repository[strings.LastIndex(ociClient.repository, "/")+1:]
 				existingCharts[chartName] = true
 				maxTag = ""
+				updatedChartVersions = nil
 
 				// call tags to get the max tag and update the indexFile
 				err = orasRepository.Tags(context.Background(), "", tagsFunc)
