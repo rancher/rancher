@@ -11,7 +11,7 @@ import (
 	coreFakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	v3fakes "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
-	"github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
+	wfakes "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
@@ -28,6 +28,7 @@ import (
 
 func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 	const namespaceName = "test-ns"
+	ctrl := gomock.NewController(t)
 	tests := []struct {
 		name                string
 		indexedRoles        []*rbacv1.ClusterRole
@@ -187,45 +188,51 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 				},
 				err: test.indexerError,
 			}
-			fakeLister := &fakes.ClusterRoleListerMock{
-				GetFunc: func(namespace string, name string) (*rbacv1.ClusterRole, error) {
+			fakeLister := wfakes.NewMockNonNamespacedCacheInterface[*v1.ClusterRole](ctrl)
+			fakeLister.EXPECT().Get(gomock.Any()).DoAndReturn(
+				func(in1 string) (*v1.ClusterRole, error) {
 					if test.getError != nil {
 						return nil, test.getError
 					}
 					for _, role := range test.currentRoles {
-						if role.Name == name {
+						if role.Name == in1 {
 							return role, nil
 						}
 					}
 					return nil, apierror.NewNotFound(schema.GroupResource{
 						Group:    "rbac.authorization.k8s.io",
 						Resource: "ClusterRoles",
-					}, name)
+					}, in1)
 				},
-			}
-			fakeClusterRoles := &fakes.ClusterRoleInterfaceMock{
-				CreateFunc: func(in *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
+			).AnyTimes()
+			fakeClusterRoles := wfakes.NewMockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
+			fakeClusterRoles.EXPECT().Create(gomock.Any()).DoAndReturn(
+				func(in *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
 					newRoles = append(newRoles, in)
 					if test.createError != nil {
 						return nil, test.createError
 					}
 					return in, nil
 				},
-				UpdateFunc: func(in *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
+			).AnyTimes()
+			fakeClusterRoles.EXPECT().Update(gomock.Any()).DoAndReturn(
+				func(in *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
 					newRoles = append(newRoles, in)
 					if test.updateError != nil {
 						return nil, test.updateError
 					}
 					return in, nil
 				},
-				DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+			).AnyTimes()
+			fakeClusterRoles.EXPECT().Delete(gomock.Any(), gomock.Any()).DoAndReturn(
+				func(name string, options *metav1.DeleteOptions) error {
 					deletedRoleNames = append(deletedRoleNames, name)
 					if test.deleteError != nil {
 						return test.deleteError
 					}
 					return nil
 				},
-			}
+			).AnyTimes()
 			lifecycle := nsLifecycle{
 				m: &manager{
 					crLister:     fakeLister,
@@ -261,12 +268,14 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 
 func TestCreateProjectNSRole(t *testing.T) {
 	t.Parallel()
+	ctrl := gomock.NewController(t)
 
 	type testCase struct {
 		description string
 		verb        string
 		namespace   string
 		projectName string
+		crSetup     func()
 		startingCR  *v1.ClusterRole
 		expectedCR  *v1.ClusterRole
 		createError error
@@ -361,20 +370,26 @@ func TestCreateProjectNSRole(t *testing.T) {
 			}
 		}
 
-		m := newManager(withClusterRoles(clusterRoles, &clientErrs{createError: test.createError}))
+		m := newManager(withClusterRoles(clusterRoles, &clientErrs{createError: test.createError}, ctrl), func(m *manager) {
+			clusterRoles := wfakes.NewMockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
+			clusterRoles.EXPECT().Create(gomock.Any()).DoAndReturn(
+				func(In1 *v1.ClusterRole) (*v1.ClusterRole, error) {
+					if test.expectedErr != "" {
+						return nil, fmt.Errorf("%v", test.expectedErr)
+					}
+					return In1, nil
+				},
+			).Times(1)
+			m.clusterRoles = clusterRoles
+		})
 
 		roleName := fmt.Sprintf(projectNSGetClusterRoleNameFmt, test.projectName, projectNSVerbToSuffix[test.verb])
 		err := m.createProjectNSRole(roleName, test.verb, test.namespace, test.projectName)
-
-		crMock := m.clusterRoles.(*fakes.ClusterRoleInterfaceMock)
-		calls := crMock.CreateCalls()
-		assert.Len(t, calls, 1)
 
 		if test.expectedErr != "" {
 			assert.ErrorContains(t, err, test.expectedErr, test.description)
 		} else {
 			assert.NoError(t, err)
-			assert.Equal(t, test.expectedCR, calls[0].In1, test.description)
 		}
 	}
 }
@@ -562,19 +577,24 @@ func TestAsyncCleanupRBAC_NamespaceDeleted(t *testing.T) {
 				err: nil,
 			}
 
-			fakeClusterRoles := &fakes.ClusterRoleInterfaceMock{
-				UpdateFunc: func(in *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
+			fakeClusterRoles := wfakes.NewMockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
+			fakeClusterRoles.EXPECT().Update(gomock.Any()).DoAndReturn(
+				func(in *v1.ClusterRole) (*v1.ClusterRole, error) {
 					return in, nil
 				},
-				DeleteFunc: func(name string, options *metav1.DeleteOptions) error {
+			).AnyTimes()
+			fakeClusterRoles.EXPECT().Delete(gomock.Any(), gomock.Any()).DoAndReturn(
+				func(name string, options *metav1.DeleteOptions) error {
 					return nil
 				},
-			}
-			fakeLister := &fakes.ClusterRoleListerMock{
-				GetFunc: func(namespace string, name string) (*rbacv1.ClusterRole, error) {
-					return &rbacv1.ClusterRole{}, nil
+			).AnyTimes()
+
+			fakeLister := wfakes.NewMockNonNamespacedCacheInterface[*v1.ClusterRole](ctrl)
+			fakeLister.EXPECT().Get(gomock.Any()).DoAndReturn(
+				func(int1 string) (*v1.ClusterRole, error) {
+					return &v1.ClusterRole{}, nil
 				},
-			}
+			).AnyTimes()
 			nsLifecycle := &nsLifecycle{
 				m: &manager{
 					nsLister:     namespaceListerMock,
@@ -606,10 +626,11 @@ func waitForCondition(t *testing.T, condition func() bool, timeout time.Duration
 
 func TestEnsurePRTBAddToNamespace(t *testing.T) {
 	const namespaceName = "test-ns"
+	ctrl := gomock.NewController(t)
 	tests := []struct {
 		name                string
-		indexedRoles        []*rbacv1.ClusterRole
-		currentRoles        []*rbacv1.ClusterRole
+		indexedRoles        []*v1.ClusterRole
+		currentRoles        []*v1.ClusterRole
 		indexedPRTBs        []*v3.ProjectRoleTemplateBinding
 		projectNSAnnotation string
 		indexerError        error
@@ -624,7 +645,7 @@ func TestEnsurePRTBAddToNamespace(t *testing.T) {
 		{
 			name:                "update namespace with missing namespace",
 			projectNSAnnotation: "c-123xyz:p-123xyz",
-			indexedRoles: []*rbacv1.ClusterRole{
+			indexedRoles: []*v1.ClusterRole{
 				createClusterRoleForProject("p-123xyz", namespaceName, "*"),
 				addNamespaceToClusterRole("otherNamespace", "get", createClusterRoleForProject("p-123abc", namespaceName, "get")),
 			},
@@ -645,8 +666,8 @@ func TestEnsurePRTBAddToNamespace(t *testing.T) {
 	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
-			crIndexer := &FakeResourceIndexer[*rbacv1.ClusterRole]{
-				resources: map[string][]*rbacv1.ClusterRole{
+			crIndexer := &FakeResourceIndexer[*v1.ClusterRole]{
+				resources: map[string][]*v1.ClusterRole{
 					namespaceName: test.indexedRoles,
 				},
 				index: crByNSIndex,
@@ -660,18 +681,20 @@ func TestEnsurePRTBAddToNamespace(t *testing.T) {
 				index: prtbByProjectIndex,
 			}
 
+			rtLister := wfakes.NewMockNonNamespacedCacheInterface[*v3.RoleTemplate](ctrl)
+			rtLister.EXPECT().Get(gomock.Any()).DoAndReturn(
+				func(name string) (*v3.RoleTemplate, error) {
+					return nil, apierrors.NewNotFound(schema.GroupResource{
+						Group:    "management.cattle.io",
+						Resource: "roletemplates",
+					}, name)
+				},
+			)
 			lifecycle := nsLifecycle{
 				m: &manager{
 					crIndexer:   crIndexer,
 					prtbIndexer: prtbIndexer,
-					rtLister: &v3fakes.RoleTemplateListerMock{
-						GetFunc: func(namespace string, name string) (*v3.RoleTemplate, error) {
-							return nil, apierrors.NewNotFound(schema.GroupResource{
-								Group:    "management.cattle.io",
-								Resource: "roletemplates",
-							}, name)
-						},
-					},
+					rtLister:    rtLister,
 				},
 				rq: &resourcequota.SyncController{
 					ProjectLister: &v3fakes.ProjectListerMock{

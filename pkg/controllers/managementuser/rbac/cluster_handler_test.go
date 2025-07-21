@@ -10,6 +10,8 @@ import (
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
+	"github.com/rancher/wrangler/v3/pkg/generic/fake"
+	wfakes "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -55,7 +57,7 @@ func Test_clusterHandler_sync(t *testing.T) {
 			cluster:     testCluster.DeepCopy(),
 			setup: func(m *testMocks) {
 				m.mockCache.Add(testGrbs[0])
-				m.mockLister.EXPECT().Get("", rbac.GrbCRBName(testGrbs[0])).Return(nil, errNotFound)
+				m.mockLister.EXPECT().Get(rbac.GrbCRBName(testGrbs[0])).Return(nil, errNotFound)
 				m.mockInt.EXPECT().Create(gomock.Any()).Return(nil, nil).Times(1)
 				m.mockCluster.EXPECT().Update(gomock.Any()).DoAndReturn(func(cluster *v32.Cluster) (*v32.Cluster, error) {
 					require.Len(m.t, cluster.Status.Conditions, 1)
@@ -72,7 +74,7 @@ func Test_clusterHandler_sync(t *testing.T) {
 			cluster:     falseCluster.DeepCopy(),
 			setup: func(m *testMocks) {
 				m.mockCache.Add(testGrbs[0])
-				m.mockLister.EXPECT().Get("", rbac.GrbCRBName(testGrbs[0])).Return(nil, errNotFound)
+				m.mockLister.EXPECT().Get(rbac.GrbCRBName(testGrbs[0])).Return(nil, errNotFound)
 				m.mockInt.EXPECT().Create(gomock.Any()).Return(nil, nil).Times(1)
 				m.mockCluster.EXPECT().Update(gomock.Any()).DoAndReturn(func(cluster *v32.Cluster) (*v32.Cluster, error) {
 					require.Len(m.t, cluster.Status.Conditions, 1)
@@ -98,9 +100,9 @@ func Test_clusterHandler_sync(t *testing.T) {
 				for _, obj := range testGrbs {
 					m.mockCache.Add(obj)
 				}
-				m.mockLister.EXPECT().Get("", rbac.GrbCRBName(testGrbs[0])).Return(nil, errNotFound)
-				m.mockLister.EXPECT().Get("", rbac.GrbCRBName(testGrbs[1])).Return(nil, errNotFound)
-				m.mockLister.EXPECT().Get("", rbac.GrbCRBName(testGrbs[2])).Return(nil, errNotFound)
+				m.mockLister.EXPECT().Get(rbac.GrbCRBName(testGrbs[0])).Return(nil, errNotFound)
+				m.mockLister.EXPECT().Get(rbac.GrbCRBName(testGrbs[1])).Return(nil, errNotFound)
+				m.mockLister.EXPECT().Get(rbac.GrbCRBName(testGrbs[2])).Return(nil, errNotFound)
 
 				m.mockInt.EXPECT().Create(gomock.Any()).Return(nil, nil).Times(3)
 
@@ -121,9 +123,9 @@ func Test_clusterHandler_sync(t *testing.T) {
 				for _, obj := range testGrbs {
 					m.mockCache.Add(obj)
 				}
-				m.mockLister.EXPECT().Get("", rbac.GrbCRBName(testGrbs[0])).Return(nil, errNotFound)
-				m.mockLister.EXPECT().Get("", rbac.GrbCRBName(testGrbs[1])).Return(&rbacv1.ClusterRoleBinding{}, nil)
-				m.mockLister.EXPECT().Get("", rbac.GrbCRBName(testGrbs[2])).Return(nil, errNotFound)
+				m.mockLister.EXPECT().Get(rbac.GrbCRBName(testGrbs[0])).Return(nil, errNotFound)
+				m.mockLister.EXPECT().Get(rbac.GrbCRBName(testGrbs[1])).Return(&rbacv1.ClusterRoleBinding{}, nil)
+				m.mockLister.EXPECT().Get(rbac.GrbCRBName(testGrbs[2])).Return(nil, errNotFound)
 
 				m.mockInt.EXPECT().Create(gomock.Any()).Return(nil, nil).Times(2)
 
@@ -144,9 +146,9 @@ func Test_clusterHandler_sync(t *testing.T) {
 				for _, obj := range testGrbs {
 					m.mockCache.Add(obj)
 				}
-				m.mockLister.EXPECT().Get("", rbac.GrbCRBName(testGrbs[0])).Return(nil, errNotFound)
-				m.mockLister.EXPECT().Get("", rbac.GrbCRBName(testGrbs[1])).Return(nil, errNotFound)
-				m.mockLister.EXPECT().Get("", rbac.GrbCRBName(testGrbs[2])).Return(nil, errNotFound)
+				m.mockLister.EXPECT().Get(rbac.GrbCRBName(testGrbs[0])).Return(nil, errNotFound)
+				m.mockLister.EXPECT().Get(rbac.GrbCRBName(testGrbs[1])).Return(nil, errNotFound)
+				m.mockLister.EXPECT().Get(rbac.GrbCRBName(testGrbs[2])).Return(nil, errNotFound)
 
 				m.mockInt.EXPECT().Create(gomock.Any()).Return(nil, nil)
 				m.mockInt.EXPECT().Create(gomock.Any()).Return(nil, errAlreadyExist)
@@ -193,7 +195,7 @@ func Test_clusterHandler_sync(t *testing.T) {
 			cluster:     falseCluster.DeepCopy(),
 			setup: func(m *testMocks) {
 				m.mockCache.Add(testGrbs[0])
-				m.mockLister.EXPECT().Get("", rbac.GrbCRBName(testGrbs[0])).Return(nil, errNotFound)
+				m.mockLister.EXPECT().Get(rbac.GrbCRBName(testGrbs[0])).Return(nil, errNotFound)
 				m.mockInt.EXPECT().Create(gomock.Any()).Return(nil, errExpected)
 			},
 		},
@@ -205,7 +207,7 @@ func Test_clusterHandler_sync(t *testing.T) {
 			cluster:     falseCluster.DeepCopy(),
 			setup: func(m *testMocks) {
 				m.mockCache.Add(testGrbs[0])
-				m.mockLister.EXPECT().Get("", rbac.GrbCRBName(testGrbs[0])).Return(nil, errExpected)
+				m.mockLister.EXPECT().Get(rbac.GrbCRBName(testGrbs[0])).Return(nil, errExpected)
 			},
 		},
 		{
@@ -220,8 +222,8 @@ func Test_clusterHandler_sync(t *testing.T) {
 				m.mockCache.Add(testGrbs[2])
 
 				// first GRB returns not found and is created
-				m.mockLister.EXPECT().Get("", rbac.GrbCRBName(testGrbs[0])).Return(nil, errNotFound)
-				m.mockLister.EXPECT().Get("", rbac.GrbCRBName(testGrbs[1])).Return(nil, errNotFound)
+				m.mockLister.EXPECT().Get(rbac.GrbCRBName(testGrbs[0])).Return(nil, errNotFound)
+				m.mockLister.EXPECT().Get(rbac.GrbCRBName(testGrbs[1])).Return(nil, errNotFound)
 
 				m.mockInt.EXPECT().Create(gomock.Any()).Return(nil, nil)
 				m.mockInt.EXPECT().Create(gomock.Any()).Return(nil, errExpected)
@@ -239,10 +241,10 @@ func Test_clusterHandler_sync(t *testing.T) {
 				m.mockCache.Add(testGrbs[2])
 
 				// first GRB returns not found and is created
-				m.mockLister.EXPECT().Get("", rbac.GrbCRBName(testGrbs[0])).Return(nil, errNotFound)
+				m.mockLister.EXPECT().Get(rbac.GrbCRBName(testGrbs[0])).Return(nil, errNotFound)
 
 				// second GRB returns an error and the handler returns that error.
-				m.mockLister.EXPECT().Get("", rbac.GrbCRBName(testGrbs[1])).Return(nil, errExpected)
+				m.mockLister.EXPECT().Get(rbac.GrbCRBName(testGrbs[1])).Return(nil, errExpected)
 
 				m.mockInt.EXPECT().Create(gomock.Any()).Return(nil, nil)
 			},
@@ -286,8 +288,8 @@ func Test_clusterHandler_sync(t *testing.T) {
 type testMocks struct {
 	t           *testing.T
 	mockCluster *MockClusterInterface
-	mockInt     *MockClusterRoleBindingInterface
-	mockLister  *MockClusterRoleBindingLister
+	mockInt     *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]
+	mockLister  *fake.MockNonNamespacedCacheInterface[*rbacv1.ClusterRoleBinding]
 	mockCache   cache.Indexer
 }
 
@@ -302,8 +304,8 @@ func newMocks(t *testing.T) *testMocks {
 	return &testMocks{
 		t:           t,
 		mockCluster: NewMockClusterInterface(ctrl),
-		mockInt:     NewMockClusterRoleBindingInterface(ctrl),
-		mockLister:  NewMockClusterRoleBindingLister(ctrl),
+		mockInt:     wfakes.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl),
+		mockLister:  wfakes.NewMockNonNamespacedCacheInterface[*rbacv1.ClusterRoleBinding](ctrl),
 		mockCache:   mockIndexer,
 	}
 }

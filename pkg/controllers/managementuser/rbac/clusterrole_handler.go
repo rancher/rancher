@@ -1,8 +1,8 @@
 package rbac
 
 import (
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	typesrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -10,8 +10,8 @@ import (
 )
 
 type crHandler struct {
-	clusterRoles       typesrbacv1.ClusterRoleInterface
-	roleTemplateLister v3.RoleTemplateLister
+	clusterRoles       wrbacv1.ClusterRoleController
+	roleTemplateLister mgmtv3.RoleTemplateCache
 }
 
 func newClusterRoleHandler(r *manager) *crHandler {
@@ -29,7 +29,7 @@ func (c *crHandler) sync(key string, obj *rbacv1.ClusterRole) (runtime.Object, e
 	}
 
 	if owner, ok := obj.Annotations[clusterRoleOwner]; ok {
-		_, err := c.roleTemplateLister.Get("", owner)
+		_, err := c.roleTemplateLister.Get(owner)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return obj, c.clusterRoles.Delete(obj.Name, &metav1.DeleteOptions{})

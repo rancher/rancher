@@ -12,12 +12,14 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac/roletemplates"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
 	"github.com/rancher/rancher/pkg/features"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	typescorev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	typesrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	nsutils "github.com/rancher/rancher/pkg/namespace"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
+	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -100,11 +102,11 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		nsIndexer:           nsInformer.GetIndexer(),
 		crIndexer:           crInformer.GetIndexer(),
 		crbIndexer:          crbInformer.GetIndexer(),
-		rtLister:            management.Management.RoleTemplates("").Controller().Lister(),
+		rtLister:            management.Wrangler.Mgmt.RoleTemplate().Cache(),
 		rbLister:            workload.RBAC.RoleBindings("").Controller().Lister(),
 		crbLister:           workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
-		crLister:            workload.RBAC.ClusterRoles("").Controller().Lister(),
-		clusterRoles:        workload.RBAC.ClusterRoles(""),
+		crLister:            workload.RBACw.ClusterRole().Cache(),
+		clusterRoles:        workload.RBACw.ClusterRole(),
 		clusterRoleBindings: workload.RBAC.ClusterRoleBindings(""),
 		nsLister:            workload.Core.Namespaces("").Controller().Lister(),
 		nsController:        workload.Core.Namespaces("").Controller(),
@@ -164,14 +166,14 @@ type managerInterface interface {
 
 type manager struct {
 	workload            *config.UserContext
-	rtLister            v3.RoleTemplateLister
+	rtLister            mgmtv3.RoleTemplateCache
 	prtbIndexer         cache.Indexer
 	crtbIndexer         cache.Indexer
 	nsIndexer           cache.Indexer
 	crIndexer           cache.Indexer
 	crbIndexer          cache.Indexer
-	crLister            typesrbacv1.ClusterRoleLister
-	clusterRoles        typesrbacv1.ClusterRoleInterface
+	crLister            wrbacv1.ClusterRoleCache
+	clusterRoles        wrbacv1.ClusterRoleController
 	crbLister           typesrbacv1.ClusterRoleBindingLister
 	clusterRoleBindings typesrbacv1.ClusterRoleBindingInterface
 	rbLister            typesrbacv1.RoleBindingLister
@@ -197,7 +199,7 @@ func (m *manager) ensureRoles(rts map[string]*v3.RoleTemplate) error {
 }
 
 func (m *manager) ensureClusterRoles(rt *v3.RoleTemplate) error {
-	if clusterRole, err := m.crLister.Get("", rt.Name); err == nil && clusterRole != nil {
+	if clusterRole, err := m.crLister.Get(rt.Name); err == nil && clusterRole != nil {
 		err := m.compareAndUpdateClusterRole(clusterRole, rt)
 		if err == nil {
 			return nil
@@ -295,7 +297,7 @@ func (m *manager) gatherRolesRecurse(rt *v3.RoleTemplate, roleTemplates map[stri
 	depthCounter++
 
 	for _, rtName := range rt.RoleTemplateNames {
-		subRT, err := m.rtLister.Get("", rtName)
+		subRT, err := m.rtLister.Get(rtName)
 		if err != nil {
 			return errors.Wrapf(err, "couldn't get RoleTemplate %s", rtName)
 		}
