@@ -909,8 +909,11 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 			continue
 		}
 
+		opts := &summary.SummarizeOptions{
+			HasObservedGeneration: true,
+		}
 		// The Reconciled condition should be removed when summarizing so that the messages are not duplicated.
-		summary := summary.Summarize(removeReconciledCondition(r.entry.Machine))
+		summary := summary.Summarize(removeReconciledCondition(r.entry.Machine), opts)
 		if summary.Error {
 			errMachines = append(errMachines, r.entry.Machine.Name)
 		}
