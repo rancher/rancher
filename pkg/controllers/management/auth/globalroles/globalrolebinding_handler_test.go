@@ -6,12 +6,12 @@ import (
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	authfakes "github.com/rancher/rancher/pkg/controllers/management/auth/fakes"
 	"github.com/rancher/rancher/pkg/controllers/status"
 	apisv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	normanv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	rbacFakes "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
+	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -86,22 +86,22 @@ type grbTestStateChanges struct {
 	fwhCalled        bool
 }
 type grbTestState struct {
-	crtbCacheMock     *fake.MockCacheInterface[*v3.ClusterRoleTemplateBinding]
-	grListerMock      *fakes.GlobalRoleListerMock
-	crbListerMock     *rbacFakes.ClusterRoleBindingListerMock
-	clusterListerMock *fakes.ClusterListerMock
-	crtbClientMock    *fakes.ClusterRoleTemplateBindingInterfaceMock
-	crbClientMock     *rbacFakes.ClusterRoleBindingInterfaceMock
-	nsCacheMock       *fake.MockNonNamespacedCacheInterface[*corev1.Namespace]
-	rListerMock       *rbacFakes.RoleListerMock
-	rbListerMock      *rbacFakes.RoleBindingListerMock
-	rbClientMock      *rbacFakes.RoleBindingInterfaceMock
-	grbListerMock     *fake.MockNonNamespacedCacheInterface[*v3.GlobalRoleBinding]
-	grbClientMock     *fake.MockNonNamespacedControllerInterface[*v3.GlobalRoleBinding, *v3.GlobalRoleBindingList]
-	fwhMock           *fleetPermissionsHandlerMock
-	userManagerMock   *authfakes.MockManager
-	userListerMock    *fakes.UserListerMock
-	stateChanges      *grbTestStateChanges
+	crtbCacheMock    *fake.MockCacheInterface[*v3.ClusterRoleTemplateBinding]
+	grListerMock     *fakes.GlobalRoleListerMock
+	crbListerMock    *rbacFakes.ClusterRoleBindingListerMock
+	clusterCacheMock *fake.MockNonNamespacedCacheInterface[*v3.Cluster]
+	crtbClientMock   *fakes.ClusterRoleTemplateBindingInterfaceMock
+	crbClientMock    *rbacFakes.ClusterRoleBindingInterfaceMock
+	nsCacheMock      *fake.MockNonNamespacedCacheInterface[*corev1.Namespace]
+	rListerMock      *rbacFakes.RoleListerMock
+	rbListerMock     *rbacFakes.RoleBindingListerMock
+	rbClientMock     *rbacFakes.RoleBindingInterfaceMock
+	grbListerMock    *fake.MockNonNamespacedCacheInterface[*v3.GlobalRoleBinding]
+	grbClientMock    *fake.MockNonNamespacedControllerInterface[*v3.GlobalRoleBinding, *v3.GlobalRoleBindingList]
+	fwhMock          *fleetPermissionsHandlerMock
+	userManagerMock  *user.MockManager
+	userListerMock   *fakes.UserListerMock
+	stateChanges     *grbTestStateChanges
 }
 
 func TestCreateUpdate(t *testing.T) {
@@ -196,9 +196,7 @@ func TestCreateUpdate(t *testing.T) {
 					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
 					return nil
 				}
-				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
-					return []*v3.Cluster{&notLocalCluster, &localCluster}, nil
-				}
+				state.clusterCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&notLocalCluster, &localCluster}, nil).AnyTimes()
 
 				// mocks for just global permissions
 				state.crbListerMock.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
@@ -331,9 +329,7 @@ func TestCreateUpdate(t *testing.T) {
 					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
 					return nil
 				}
-				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
-					return []*v3.Cluster{&notLocalCluster, &localCluster}, nil
-				}
+				state.clusterCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&notLocalCluster, &localCluster}, nil).AnyTimes()
 
 				// mocks for just global permissions
 				state.crbListerMock.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
@@ -463,9 +459,7 @@ func TestCreateUpdate(t *testing.T) {
 					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
 					return nil
 				}
-				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
-					return nil, fmt.Errorf("server not available")
-				}
+				state.clusterCacheMock.EXPECT().List(labels.Everything()).Return(nil, fmt.Errorf("server not available")).AnyTimes()
 
 				// mocks for just global permissions
 				state.crbListerMock.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
@@ -588,9 +582,7 @@ func TestCreateUpdate(t *testing.T) {
 					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
 					return nil
 				}
-				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
-					return []*v3.Cluster{&notLocalCluster, &localCluster}, nil
-				}
+				state.clusterCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&notLocalCluster, &localCluster}, nil).AnyTimes()
 
 				// mocks for just global permissions
 				state.crbListerMock.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
@@ -837,9 +829,7 @@ func TestCreateUpdate(t *testing.T) {
 					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
 					return nil
 				}
-				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
-					return []*v3.Cluster{&notLocalCluster, &localCluster}, nil
-				}
+				state.clusterCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&notLocalCluster, &localCluster}, nil).AnyTimes()
 
 				// mocks for just global permissions
 				state.crbListerMock.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
@@ -949,9 +939,7 @@ func TestCreateUpdate(t *testing.T) {
 		{
 			name: "binding referencing user triggers creation of user",
 			stateSetup: func(state grbTestState) {
-				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
-					return []*v3.Cluster{&notLocalCluster, &localCluster}, nil
-				}
+				state.clusterCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&notLocalCluster, &localCluster}, nil).AnyTimes()
 				state.rbListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.RoleBinding, error) {
 					return nil, nil
 				}
@@ -1052,9 +1040,7 @@ func TestCreateUpdate(t *testing.T) {
 		{
 			name: "binding referencing groupName and no user or userPrincipal",
 			stateSetup: func(state grbTestState) {
-				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
-					return []*v3.Cluster{&notLocalCluster, &localCluster}, nil
-				}
+				state.clusterCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&notLocalCluster, &localCluster}, nil).AnyTimes()
 				state.rbListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.RoleBinding, error) {
 					return nil, nil
 				}
@@ -1158,9 +1144,7 @@ func TestCreateUpdate(t *testing.T) {
 		{
 			name: "binding referencing user links to existing user",
 			stateSetup: func(state grbTestState) {
-				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
-					return []*v3.Cluster{&notLocalCluster, &localCluster}, nil
-				}
+				state.clusterCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&notLocalCluster, &localCluster}, nil).AnyTimes()
 				state.rbListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.RoleBinding, error) {
 					return nil, nil
 				}
@@ -1293,7 +1277,7 @@ func TestCreateUpdate(t *testing.T) {
 				crtbCacheMock := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
 				grListerMock := fakes.GlobalRoleListerMock{}
 				crbListerMock := rbacFakes.ClusterRoleBindingListerMock{}
-				clusterListerMock := fakes.ClusterListerMock{}
+				clusterCacheMock := fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl)
 				crtbClientMock := fakes.ClusterRoleTemplateBindingInterfaceMock{}
 				crbClientMock := rbacFakes.ClusterRoleBindingInterfaceMock{}
 				rbListerMock := rbacFakes.RoleBindingListerMock{}
@@ -1308,19 +1292,19 @@ func TestCreateUpdate(t *testing.T) {
 					deletedCRTBNames: []string{},
 				}
 				state := grbTestState{
-					crtbCacheMock:     crtbCacheMock,
-					grListerMock:      &grListerMock,
-					crbListerMock:     &crbListerMock,
-					clusterListerMock: &clusterListerMock,
-					crtbClientMock:    &crtbClientMock,
-					crbClientMock:     &crbClientMock,
-					rbListerMock:      &rbListerMock,
-					fwhMock:           &fphMock,
-					grbListerMock:     grbListerMock,
-					grbClientMock:     grbClientMock,
-					userManagerMock:   authfakes.NewMockManager(ctrl),
-					userListerMock:    &fakes.UserListerMock{},
-					stateChanges:      &stateChanges,
+					crtbCacheMock:    crtbCacheMock,
+					grListerMock:     &grListerMock,
+					crbListerMock:    &crbListerMock,
+					clusterCacheMock: clusterCacheMock,
+					crtbClientMock:   &crtbClientMock,
+					crbClientMock:    &crbClientMock,
+					rbListerMock:     &rbListerMock,
+					fwhMock:          &fphMock,
+					grbListerMock:    grbListerMock,
+					grbClientMock:    grbClientMock,
+					userManagerMock:  user.NewMockManager(ctrl),
+					userListerMock:   &fakes.UserListerMock{},
+					stateChanges:     &stateChanges,
 				}
 				if test.stateSetup != nil {
 					test.stateSetup(state)
@@ -1328,7 +1312,7 @@ func TestCreateUpdate(t *testing.T) {
 				grbLifecycle.grLister = &grListerMock
 				grbLifecycle.crbLister = &crbListerMock
 				grbLifecycle.crtbCache = crtbCacheMock
-				grbLifecycle.clusterLister = &clusterListerMock
+				grbLifecycle.clusterLister = clusterCacheMock
 				grbLifecycle.crtbClient = &crtbClientMock
 				grbLifecycle.crbClient = &crbClientMock
 				grbLifecycle.roleBindingLister = &rbListerMock
@@ -1425,7 +1409,7 @@ func TestUpdate(t *testing.T) {
 
 }
 
-func Test_reconcileClusterPermissions(t *testing.T) {
+func TestReconcileClusterPermissions(t *testing.T) {
 	t.Parallel()
 	grListerGetFunc := func(_ string, name string) (*v3.GlobalRole, error) {
 		switch name {
@@ -1463,9 +1447,7 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
 					return nil
 				}
-				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
-					return []*v3.Cluster{&notLocalCluster, &localCluster}, nil
-				}
+				state.clusterCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&notLocalCluster, &localCluster}, nil).AnyTimes()
 			},
 			stateAssertions: func(stateChanges grbTestStateChanges) {
 				require.Len(stateChanges.t, stateChanges.createdCRTBs, 0)
@@ -1495,9 +1477,7 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
 					return nil
 				}
-				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
-					return []*v3.Cluster{&notLocalCluster, &localCluster}, nil
-				}
+				state.clusterCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&notLocalCluster, &localCluster}, nil).AnyTimes()
 			},
 			stateAssertions: func(stateChanges grbTestStateChanges) {
 				require.Len(stateChanges.t, stateChanges.createdCRTBs, 0)
@@ -1527,9 +1507,7 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
 					return nil
 				}
-				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
-					return []*v3.Cluster{&notLocalCluster, &localCluster}, nil
-				}
+				state.clusterCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&notLocalCluster, &localCluster}, nil).AnyTimes()
 			},
 			stateAssertions: func(stateChanges grbTestStateChanges) {
 				require.Len(stateChanges.t, stateChanges.createdCRTBs, 1)
@@ -1753,9 +1731,7 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 					return nil
 				}
 
-				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
-					return []*v3.Cluster{&notLocalCluster, &localCluster}, nil
-				}
+				state.clusterCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&notLocalCluster, &localCluster}, nil).AnyTimes()
 			},
 			stateAssertions: func(stateChanges grbTestStateChanges) {
 				require.Len(stateChanges.t, stateChanges.createdCRTBs, 5)
@@ -1811,9 +1787,7 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
 					return nil
 				}
-				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
-					return nil, fmt.Errorf("server unavailable")
-				}
+				state.clusterCacheMock.EXPECT().List(labels.Everything()).Return(nil, fmt.Errorf("server unavailable")).AnyTimes()
 			},
 			stateAssertions: func(stateChanges grbTestStateChanges) {
 				require.Len(stateChanges.t, stateChanges.createdCRTBs, 0)
@@ -1847,9 +1821,7 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
 					return nil
 				}
-				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
-					return []*v3.Cluster{&errorCluster, &notLocalCluster, &localCluster}, nil
-				}
+				state.clusterCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&errorCluster, &notLocalCluster, &localCluster}, nil).AnyTimes()
 			},
 			stateAssertions: func(stateChanges grbTestStateChanges) {
 				require.Len(stateChanges.t, stateChanges.createdCRTBs, 2)
@@ -1898,9 +1870,7 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
 					return nil
 				}
-				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
-					return []*v3.Cluster{&errorCluster, &notLocalCluster, &localCluster}, nil
-				}
+				state.clusterCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&errorCluster, &notLocalCluster, &localCluster}, nil).AnyTimes()
 			},
 			stateAssertions: func(stateChanges grbTestStateChanges) {
 				require.Len(stateChanges.t, stateChanges.createdCRTBs, 1)
@@ -1972,9 +1942,7 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 					}
 					return nil
 				}
-				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
-					return []*v3.Cluster{&errorCluster, &localCluster}, nil
-				}
+				state.clusterCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&errorCluster, &localCluster}, nil).AnyTimes()
 			},
 			stateAssertions: func(stateChanges grbTestStateChanges) {
 				require.Len(stateChanges.t, stateChanges.createdCRTBs, 1)
@@ -2019,9 +1987,7 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
 					return nil
 				}
-				state.clusterListerMock.ListFunc = func(namespace string, selector labels.Selector) ([]*v3.Cluster, error) {
-					return []*v3.Cluster{&errorCluster, &notLocalCluster, &localCluster}, nil
-				}
+				state.clusterCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&errorCluster, &notLocalCluster, &localCluster}, nil).AnyTimes()
 			},
 			stateAssertions: func(stateChanges grbTestStateChanges) {
 				require.Len(stateChanges.t, stateChanges.createdCRTBs, 0)
@@ -2045,13 +2011,13 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			crtbCacheMock := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
 			grListerMock := fakes.GlobalRoleListerMock{}
-			clusterListerMock := fakes.ClusterListerMock{}
+			clusterCacheMock := fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl)
 			crtbClientMock := fakes.ClusterRoleTemplateBindingInterfaceMock{}
 			state := grbTestState{
-				crtbCacheMock:     crtbCacheMock,
-				grListerMock:      &grListerMock,
-				clusterListerMock: &clusterListerMock,
-				crtbClientMock:    &crtbClientMock,
+				crtbCacheMock:    crtbCacheMock,
+				grListerMock:     &grListerMock,
+				clusterCacheMock: clusterCacheMock,
+				crtbClientMock:   &crtbClientMock,
 				stateChanges: &grbTestStateChanges{
 					t:                t,
 					createdCRTBs:     []*v3.ClusterRoleTemplateBinding{},
@@ -2064,7 +2030,7 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 			grbLifecycle := globalRoleBindingLifecycle{
 				grLister:      &grListerMock,
 				crtbCache:     crtbCacheMock,
-				clusterLister: &clusterListerMock,
+				clusterLister: clusterCacheMock,
 				crtbClient:    &crtbClientMock,
 				status:        status.NewStatus(),
 			}

@@ -74,8 +74,8 @@ const (
 func newGlobalRoleBindingLifecycle(management *config.ManagementContext, clusterManager *clustermanager.Manager) *globalRoleBindingLifecycle {
 	management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache().AddIndexer(crtbGrbOwnerIndex, crtbGrbOwnerIndexer)
 	return &globalRoleBindingLifecycle{
-		clusters:                management.Management.Clusters(""),
-		clusterLister:           management.Management.Clusters("").Controller().Lister(),
+		clusters:                management.Wrangler.Mgmt.Cluster(),
+		clusterLister:           management.Wrangler.Mgmt.Cluster().Cache(),
 		projectLister:           management.Management.Projects("").Controller().Lister(),
 		clusterManager:          clusterManager,
 		clusterRoles:            management.RBAC.ClusterRoles(""),
@@ -114,8 +114,8 @@ type fleetPermissionsHandler interface {
 }
 
 type globalRoleBindingLifecycle struct {
-	clusters                v3.ClusterInterface
-	clusterLister           v3.ClusterLister
+	clusters                mgmtv3.ClusterClient
+	clusterLister           mgmtv3.ClusterCache
 	projectLister           v3.ProjectLister
 	clusterManager          *clustermanager.Manager
 	clusterRoles            rbacv1.ClusterRoleInterface
@@ -171,58 +171,28 @@ func (grb *globalRoleBindingLifecycle) Updated(obj *v3.GlobalRoleBinding) (runti
 }
 
 func (grb *globalRoleBindingLifecycle) Remove(obj *v3.GlobalRoleBinding) (runtime.Object, error) {
-	if obj.GlobalRoleName == rbac.GlobalAdmin {
-		return obj, grb.deleteAdminBinding(obj)
+	isAdminGlobalRole := obj.GlobalRoleName == rbac.GlobalAdmin
+
+	if !isAdminGlobalRole {
+		// See if the GlobalRole is a custom admin role.
+		gr, err := grb.grLister.Get("", obj.GlobalRoleName)
+		if err == nil {
+			isAdminGlobalRole = rbac.IsAdminGlobalRole(gr)
+		} else if !apierrors.IsNotFound(err) {
+			return nil, err
+		}
 	}
+
+	if isAdminGlobalRole {
+		err := DeleteAdminClusterRoleBindings(grb.clusters, grb.clusterManager, obj)
+		if err != nil {
+			logrus.Errorf("Failed to delete admin global role ClusterRole bindings %s: %v", obj.Name, err)
+			return nil, err
+		}
+	}
+
 	// Don't need to delete the created ClusterRole or RoleBindings because owner reference will take care of them
 	return obj, nil
-}
-
-func (grb *globalRoleBindingLifecycle) deleteAdminBinding(obj *v3.GlobalRoleBinding) error {
-	// Explicit API call to ensure we have the most recent cluster info when deleting admin bindings
-	clusters, err := grb.clusters.List(metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-
-	// Collect all the errors to delete as many user context bindings as possible
-	var allErrors []error
-
-	for _, cluster := range clusters.Items {
-		userContext, err := grb.clusterManager.UserContext(cluster.Name)
-		if err != nil {
-			// ClusterUnavailable error indicates the record can't talk to the downstream cluster
-			if !clustermanager.IsClusterUnavailableErr(err) {
-				allErrors = append(allErrors, err)
-			}
-			continue
-		}
-
-		bindingName := rbac.GrbCRBName(obj)
-		b, err := userContext.RBAC.ClusterRoleBindings("").Controller().Lister().Get("", bindingName)
-		if err != nil {
-			// User context clusterRoleBinding doesn't exist
-			if !apierrors.IsNotFound(err) {
-				allErrors = append(allErrors, err)
-			}
-			continue
-		}
-
-		err = userContext.RBAC.ClusterRoleBindings("").Delete(b.Name, &metav1.DeleteOptions{})
-		if err != nil {
-			// User context clusterRoleBinding doesn't exist
-			if !apierrors.IsNotFound(err) {
-				allErrors = append(allErrors, err)
-			}
-			continue
-		}
-
-	}
-
-	if len(allErrors) > 0 {
-		return fmt.Errorf("errors deleting admin global role binding: %v", allErrors)
-	}
-	return nil
 }
 
 func (grb *globalRoleBindingLifecycle) reconcileSubject(binding *v3.GlobalRoleBinding, localConditions *[]metav1.Condition) (*v3.GlobalRoleBinding, error) {
@@ -275,7 +245,7 @@ func (grb *globalRoleBindingLifecycle) reconcileClusterPermissions(globalRoleBin
 		grb.status.AddCondition(localConditions, condition, failedToGetGlobalRole, err)
 		return fmt.Errorf("unable to get globalRole %s: %w", globalRoleBinding.Name, err)
 	}
-	clusters, err := grb.clusterLister.List("", labels.Everything())
+	clusters, err := grb.clusterLister.List(labels.Everything())
 	if err != nil {
 		grb.status.AddCondition(localConditions, condition, failedToListCluster, err)
 		return fmt.Errorf("unable to list clusters when reconciling globalRoleBinding %s: %w", globalRoleBinding.Name, err)
@@ -659,11 +629,13 @@ func (c *globalRoleBindingLifecycle) updateStatus(grb *apisv3.GlobalRoleBinding,
 		}
 		if !foundError {
 			grbFromCluster.Status.SummaryLocal = status.SummaryCompleted
-			isAdminGlobalRole, err := rbac.IsAdminGlobalRole(grb.GlobalRoleName, c.grLister)
+
+			gr, err := c.grLister.Get("", grb.GlobalRoleName)
 			if err != nil {
 				return err
 			}
-			if !isAdminGlobalRole || grbFromCluster.Status.SummaryRemote == status.SummaryCompleted {
+
+			if !rbac.IsAdminGlobalRole(gr) || grbFromCluster.Status.SummaryRemote == status.SummaryCompleted {
 				grbFromCluster.Status.Summary = status.SummaryCompleted
 			}
 		}

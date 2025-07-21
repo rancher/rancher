@@ -1,7 +1,6 @@
 package rbac
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -10,7 +9,6 @@ import (
 	"github.com/rancher/norman/types"
 	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/stretchr/testify/assert"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -312,135 +310,92 @@ func TestGetRTBLabel(t *testing.T) {
 	}
 }
 
-type grbTestState struct {
-	grListerMock *fakes.GlobalRoleListerMock
-}
-
 func TestIsAdminGlobalRole(t *testing.T) {
-	err := errors.New("unexpected error")
 	tests := map[string]struct {
-		stateSetup  func(state grbTestState)
-		inputObject *v3.GlobalRoleBinding
-		wantResult  bool
-		wantError   error
+		obj        *v3.GlobalRole
+		wantResult bool
 	}{
 		"is builtin admin role": {
-			stateSetup: func(state grbTestState) {
-				state.grListerMock.GetFunc = func(namespace string, name string) (*v3.GlobalRole, error) {
-					return &v3.GlobalRole{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: GlobalAdmin,
-						},
-						Builtin: true,
-					}, nil
-				}
+			obj: &v3.GlobalRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: GlobalAdmin,
+				},
+				Builtin: true,
 			},
 			wantResult: true,
 		},
 		"is admin role": {
-			stateSetup: func(state grbTestState) {
-				state.grListerMock.GetFunc = func(namespace string, name string) (*v3.GlobalRole, error) {
-					return &v3.GlobalRole{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "gr",
-						},
-						Rules: []rbacv1.PolicyRule{
-							{
-								Verbs:     []string{"*"},
-								APIGroups: []string{"*"},
-								Resources: []string{"*"},
-							},
-							{
-								Verbs:           []string{"*"},
-								NonResourceURLs: []string{"*"},
-							},
-						},
-					}, nil
-				}
+			obj: &v3.GlobalRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gr",
+				},
+				Rules: []rbacv1.PolicyRule{
+					{
+						Verbs:     []string{"*"},
+						APIGroups: []string{"*"},
+						Resources: []string{"*"},
+					},
+					{
+						Verbs:           []string{"*"},
+						NonResourceURLs: []string{"*"},
+					},
+				},
 			},
 			wantResult: true,
 		},
 		"is not admin role": {
-			stateSetup: func(state grbTestState) {
-				state.grListerMock.GetFunc = func(namespace string, name string) (*v3.GlobalRole, error) {
-					return &v3.GlobalRole{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "gr",
-						},
-						Rules: []rbacv1.PolicyRule{
-							{
-								Verbs:     []string{"get"},
-								APIGroups: []string{""},
-								Resources: []string{"pods"},
-							},
-						},
-					}, nil
-				}
+			obj: &v3.GlobalRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gr",
+				},
+				Rules: []rbacv1.PolicyRule{
+					{
+						Verbs:     []string{"get"},
+						APIGroups: []string{""},
+						Resources: []string{"pods"},
+					},
+				},
 			},
 			wantResult: false,
 		},
 		"is not admin role- has admin for NonResourceURLs, but not for Resources": {
-			stateSetup: func(state grbTestState) {
-				state.grListerMock.GetFunc = func(namespace string, name string) (*v3.GlobalRole, error) {
-					return &v3.GlobalRole{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "gr",
-						},
-						Rules: []rbacv1.PolicyRule{
-							{
-								Verbs:           []string{"*"},
-								NonResourceURLs: []string{"*"},
-							},
-						},
-					}, nil
-				}
+			obj: &v3.GlobalRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gr",
+				},
+				Rules: []rbacv1.PolicyRule{
+					{
+						Verbs:           []string{"*"},
+						NonResourceURLs: []string{"*"},
+					},
+				},
 			},
 			wantResult: false,
 		},
 		"is not admin role- has admin for Resources, but not for NonResourceURLs": {
-			stateSetup: func(state grbTestState) {
-				state.grListerMock.GetFunc = func(namespace string, name string) (*v3.GlobalRole, error) {
-					return &v3.GlobalRole{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "gr",
-						},
-						Rules: []rbacv1.PolicyRule{
-							{
-								Verbs:     []string{"*"},
-								APIGroups: []string{"*"},
-								Resources: []string{"*"},
-							},
-						},
-					}, nil
-				}
+			obj: &v3.GlobalRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "gr",
+				},
+				Rules: []rbacv1.PolicyRule{
+					{
+						Verbs:     []string{"*"},
+						APIGroups: []string{"*"},
+						Resources: []string{"*"},
+					},
+				},
 			},
 		},
 		"error getting GlobalRole": {
-			stateSetup: func(state grbTestState) {
-				state.grListerMock.GetFunc = func(namespace string, name string) (*v3.GlobalRole, error) {
-					return nil, err
-				}
-			},
 			wantResult: false,
-			wantError:  err,
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			grListerMock := fakes.GlobalRoleListerMock{}
-			state := grbTestState{
-				grListerMock: &grListerMock,
-			}
-			if test.stateSetup != nil {
-				test.stateSetup(state)
-			}
 
-			isAdmin, err := IsAdminGlobalRole("", state.grListerMock)
-
-			assert.Equal(t, test.wantResult, isAdmin)
-			assert.Equal(t, test.wantError, err)
+			assert.Equal(t, test.wantResult, IsAdminGlobalRole(test.obj))
 		})
 	}
 }

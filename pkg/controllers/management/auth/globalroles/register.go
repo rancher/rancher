@@ -35,7 +35,7 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 	relatedresource.WatchClusterScoped(ctx, clusterRoleEnqueuer, enqueuer.clusterRoleEnqueueGR, management.Wrangler.Mgmt.GlobalRole(), management.Wrangler.RBAC.ClusterRole())
 	relatedresource.WatchClusterScoped(ctx, clusterRoleBindingEnqueuer, enqueuer.clusterRoleBindingEnqueueGRB, management.Wrangler.Mgmt.GlobalRoleBinding(), management.Wrangler.RBAC.ClusterRoleBinding())
 
-	gr := newGlobalRoleLifecycle(management.WithAgent(grController))
+	gr := newGlobalRoleLifecycle(management.WithAgent(grController), clusterManager)
 	grb := newGlobalRoleBindingLifecycle(management.WithAgent(grbController), clusterManager)
 	management.Management.GlobalRoles("").AddLifecycle(ctx, grController, gr)
 	management.Management.GlobalRoleBindings("").AddLifecycle(ctx, grbController, grb)

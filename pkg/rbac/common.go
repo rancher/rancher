@@ -13,7 +13,6 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	v32 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	normanv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/wrangler/pkg/name"
 	k8srbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
@@ -32,6 +31,7 @@ const (
 	ProjectID                         = "projectId"
 	ClusterID                         = "clusterId"
 	GlobalAdmin                       = "admin"
+	globalAdminCRBPrefix              = "globaladmin-"
 	GlobalRestrictedAdmin             = "restricted-admin"
 	ClusterCRDsClusterRole            = "cluster-crd-clusterRole"
 	RestrictedAdminClusterRoleBinding = "restricted-admin-rb-cluster"
@@ -124,7 +124,7 @@ func BuildSubjectFromRTB(object metav1.Object) (rbacv1.Subject, error) {
 }
 
 func GrbCRBName(grb *v3.GlobalRoleBinding) string {
-	return "globaladmin-" + GetGRBTargetKey(grb)
+	return globalAdminCRBPrefix + GetGRBTargetKey(grb)
 }
 
 // GetGRBSubject creates and returns a subject that is
@@ -304,16 +304,36 @@ func isRuleInTargetAPIGroup(rule rbacv1.PolicyRule) bool {
 	return false
 }
 
-// IsAdminGlobalRole detects whether a GlobalRole has admin permissions or not.
-func IsAdminGlobalRole(rtName string, grLister normanv3.GlobalRoleLister) (bool, error) {
-	gr, err := grLister.Get("", rtName)
-	if err != nil {
-		return false, err
+// IsAdminGlobalRole returns true is a GlobalRole has admin permissions.
+// A global role is considered to have admin permissions if it is the built-in admin role
+// or it gives full access to all resources and non-resource URLs, as in:
+// apiVersion: management.cattle.io/v3
+// displayName: custom-admin
+// kind: GlobalRole
+// metadata:
+//
+//	name: custom-admin
+//
+// rules:
+// - apiGroups:
+//   - '*'
+//     resources:
+//   - '*'
+//     verbs:
+//   - '*'
+//
+// - nonResourceURLs:
+//   - '*'
+//     verbs:
+//   - '*'
+func IsAdminGlobalRole(gr *v3.GlobalRole) bool {
+	if gr == nil {
+		return false
 	}
 
-	// global role is builtin admin role
+	// Global role is the built-in admin role.
 	if gr.Builtin && gr.Name == GlobalAdmin {
-		return true, nil
+		return true
 	}
 
 	var hasResourceRule, hasNonResourceRule bool
@@ -328,12 +348,8 @@ func IsAdminGlobalRole(rtName string, grLister normanv3.GlobalRoleLister) (bool,
 		}
 	}
 
-	// global role has an admin resource rule, and admin nonResourceURLs rule
-	if hasResourceRule && hasNonResourceRule {
-		return true, nil
-	}
-
-	return false, nil
+	// Global role gives full access to all resources and non-resource URLs.
+	return hasResourceRule && hasNonResourceRule
 }
 
 // CreateOrUpdateResource creates or updates the given resource
