@@ -157,6 +157,8 @@ ENV CATTLE_MACHINE_PROVISION_IMAGE=rancher/machine:${CATTLE_MACHINE_VERSION}
 ENV CATTLE_ETCD_VERSION=v3.5.21
 ENV DOCKER_MACHINE_LINODE_VERSION=v0.1.15
 ENV LINODE_UI_DRIVER_VERSION=v0.7.0
+# For displaying Helm version in the UI only.
+ENV CATTLE_HELM_VERSION=v3.18.3-rancher1
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
 ENV DOCKER_MACHINE_HARVESTER_VERSION=v1.0.2
 ENV CATTLE_KDM_BRANCH=${CATTLE_KDM_BRANCH}
