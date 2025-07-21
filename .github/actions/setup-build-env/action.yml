@@ -15,6 +15,9 @@ outputs:
   HELM_VERSION: 
     description: "HELM_VERSION from package/Dockerfile.installer"
     value: ${{ steps.vars.outputs.HELM_VERSION }}
+  CATTLE_HELM_VERSION: 
+    description: "CATTLE_HELM_VERSION from package/Dockerfile"
+    value: ${{ steps.vars.outputs.CATTLE_HELM_VERSION }}
   GO_VERSION: 
     description: "GO_VERSION from package/Dockerfile"
     value: ${{ steps.vars.outputs.GO_VERSION }}
@@ -54,6 +57,7 @@ runs:
         CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$CATTLE_RANCHER_PROVISIONING_CAPI_VERSION
         CATTLE_CSP_ADAPTER_MIN_VERSION=$CATTLE_CSP_ADAPTER_MIN_VERSION
         CATTLE_FLEET_VERSION=$CATTLE_FLEET_VERSION
+        CATTLE_HELM_VERSION=$(grep -m1 'ENV CATTLE_HELM_VERSION=' package/Dockerfile | cut -d '=' -f2)
 
         if [[ -z "$CATTLE_KDM_BRANCH" ]]; then
           echo "CATTLE_KDM_BRANCH not found"
@@ -65,6 +69,10 @@ runs:
         fi
         if [[ -z "$HELM_VERSION" ]]; then
           echo "HELM_VERSION not found"
+          exit 1
+        fi
+        if [[ -z "$CATTLE_HELM_VERSION" ]]; then
+          echo "CATTLE_HELM_VERSION not found"
           exit 1
         fi
         if [[ -z "$GO_VERSION" ]]; then
@@ -106,4 +114,5 @@ runs:
         echo "CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$CATTLE_RANCHER_PROVISIONING_CAPI_VERSION" >> $GITHUB_OUTPUT
         echo "CATTLE_CSP_ADAPTER_MIN_VERSION=$CATTLE_CSP_ADAPTER_MIN_VERSION" >> $GITHUB_OUTPUT 
         echo "CATTLE_FLEET_VERSION=$CATTLE_FLEET_VERSION" >> $GITHUB_OUTPUT 
+        echo "CATTLE_HELM_VERSION=$CATTLE_HELM_VERSION" >> $GITHUB_OUTPUT
 
