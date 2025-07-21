@@ -1,13 +1,16 @@
 package rbac
 
 import (
+	"fmt"
 	"io"
 	"testing"
 
 	"github.com/pkg/errors"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	wfakes "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 	v1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,9 +20,19 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 	t.Parallel()
 	logrus.SetOutput(io.Discard)
 
+	ctrl := gomock.NewController(t)
 	defaultManager := newManager(
-		withRoleTemplates(map[string]*v3.RoleTemplate{"create-ns": createNSRoleTemplate}, nil),
-		withClusterRoles(nil, nil),
+		withRoleTemplates(map[string]*v3.RoleTemplate{"create-ns": createNSRoleTemplate}, nil, ctrl),
+		withClusterRoles(nil, nil, ctrl),
+		func(m *manager) {
+			clusterRoles := wfakes.NewMockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
+			clusterRoles.EXPECT().Create(gomock.Any()).DoAndReturn(
+				func(In1 *v1.ClusterRole) (*v1.ClusterRole, error) {
+					return In1, nil
+				},
+			).AnyTimes()
+			m.clusterRoles = clusterRoles
+		},
 	)
 
 	type testCase struct {
@@ -206,8 +219,8 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 			projectName: "testproject",
 			description: "error return when RoleTemplate client returns error",
 			manager: newManager(
-				withRoleTemplates(map[string]*v3.RoleTemplate{"create-ns": createNSRoleTemplate}, &clientErrs{getError: errNotFound}),
-				withClusterRoles(nil, nil),
+				withRoleTemplates(map[string]*v3.RoleTemplate{"create-ns": createNSRoleTemplate}, &clientErrs{getError: errNotFound}, ctrl),
+				withClusterRoles(nil, nil, ctrl),
 			),
 			expectedError: "not found",
 			roleTemplates: map[string]*v3.RoleTemplate{
@@ -229,8 +242,17 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 			projectName: "testproject",
 			description: "error return when ClusterRole client returns error and RoleTemplate is external",
 			manager: newManager(
-				withRoleTemplates(map[string]*v3.RoleTemplate{"create-ns": createNSRoleTemplate}, nil),
-				withClusterRoles(nil, &clientErrs{getError: apierrors.NewInternalError(errors.New("internal error"))}),
+				withRoleTemplates(map[string]*v3.RoleTemplate{"create-ns": createNSRoleTemplate}, nil, ctrl),
+				withClusterRoles(nil, &clientErrs{getError: apierrors.NewInternalError(errors.New("internal error"))}, ctrl),
+				func(m *manager) {
+					clusterRoles := wfakes.NewMockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
+					clusterRoles.EXPECT().Create(gomock.Any()).DoAndReturn(
+						func(In1 *v1.ClusterRole) (*v1.ClusterRole, error) {
+							return nil, fmt.Errorf("internal error")
+						},
+					).AnyTimes()
+					m.clusterRoles = clusterRoles
+				},
 			),
 			expectedError: "internal error",
 			roleTemplates: map[string]*v3.RoleTemplate{

@@ -237,7 +237,7 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 			continue
 		}
 
-		rt, err := n.m.rtLister.Get("", prtb.RoleTemplateName)
+		rt, err := n.m.rtLister.Get(prtb.RoleTemplateName)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				logrus.Warnf("ProjectRoleTemplateBinding %q sets a non-existing role template %q. Skipping.", prtb.Name, prtb.RoleTemplateName)
@@ -407,7 +407,7 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace) err
 
 		if !nsInDesiredRole && desiredRole != "" {
 			mustUpdate := true
-			cr, err := n.m.crLister.Get("", desiredRole)
+			cr, err := n.m.crLister.Get(desiredRole)
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
