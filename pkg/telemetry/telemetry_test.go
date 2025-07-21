@@ -61,6 +61,9 @@ func TestTelemetryManagedClusterCount(t *testing.T) {
 	for _, tc := range testcases {
 		rancherT := newTelemetryImpl(
 			"",
+			"",
+			"",
+			"",
 			tc.input.localCluster,
 			tc.input.localNodes,
 			tc.input.managedClusters,
@@ -107,6 +110,9 @@ func TestTelemetryManagedNodes(t *testing.T) {
 	for _, tc := range testcases {
 		rancherT := newTelemetryImpl(
 			"",
+			"",
+			"",
+			"",
 			tc.input.localCluster,
 			tc.input.localNodes,
 			tc.input.managedClusters,
@@ -152,6 +158,9 @@ func TestTelemetryLocalClusterCompute(t *testing.T) {
 
 	for _, tc := range testcases {
 		rancherT := newTelemetryImpl(
+			"",
+			"",
+			"",
 			"",
 			tc.input.localCluster,
 			tc.input.localNodes,
@@ -236,6 +245,9 @@ func TestTelemetryLocalNodeCompute(t *testing.T) {
 
 	for _, tc := range testcases {
 		rancherT := newTelemetryImpl(
+			"",
+			"",
+			"",
 			"",
 			tc.input.localCluster,
 			tc.input.localNodes,
@@ -333,6 +345,9 @@ func TestTelemetryClusterCompute(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		rancherT := newTelemetryImpl(
+			"",
+			"",
+			"",
 			"",
 			tc.input.localCluster,
 			tc.input.localNodes,
@@ -466,6 +481,9 @@ func TestTelemetryPerNodeCompute(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		rancherT := newTelemetryImpl(
+			"",
+			"",
+			"",
 			"",
 			tc.input.localCluster,
 			tc.input.localNodes,
