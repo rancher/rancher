@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/scc"
+	"github.com/rancher/rancher/pkg/telemetry"
+	"github.com/rancher/rancher/pkg/telemetry/initcond"
 
 	"github.com/Masterminds/semver/v3"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
@@ -396,6 +398,12 @@ func getSQLCacheGCValues(wranglerContext *wrangler.Context) (time.Duration, int)
 }
 
 func (r *Rancher) Start(ctx context.Context) error {
+	telG := telemetry.NewTelemetryGatherer(
+		r.Wrangler.Mgmt.Cluster().Cache(),
+		r.Wrangler.Mgmt.Node().Cache(),
+	)
+	telemetryManager := telemetry.NewTelemetryExporterManager(telG)
+
 	// ensure namespace for storing local users password is created
 	if _, err := r.Wrangler.Core.Namespace().Create(&v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{Name: pbkdf2.LocalUserPasswordsNamespace},
@@ -438,7 +446,15 @@ func (r *Rancher) Start(ctx context.Context) error {
 
 	if features.RancherSCCRegistrationExtension.Enabled() {
 		r.Wrangler.OnLeader(func(ctx context.Context) error {
+			telemetryManager.Register("scc", telemetry.NewSecretExporter(r.Wrangler.Core.Secret(), &v1.SecretReference{
+				Name:      telemetry.SccSecretName,
+				Namespace: telemetry.SccSecretNamespace,
+			}),
+				time.Second*60,
+			)
 			logrus.Debug("[rancher::Start] starting RancherSCCRegistrationExtension")
+
+			//TODO(dan) : reconcile scc-deployment here instead
 			return scc.Setup(ctx, r.Wrangler)
 		})
 	}
@@ -450,7 +466,25 @@ func (r *Rancher) Start(ctx context.Context) error {
 	r.Wrangler.OnLeader(r.authServer.OnLeader)
 
 	r.auditLog.Start(ctx)
-
+	initChan := make(chan struct{})
+	initInfo := &initcond.InitInfo{}
+	go func() {
+		initcond.WaitForInfo(r.Wrangler, initInfo, initChan)
+	}()
+	go func() {
+		logrus.Info("waiting for telemetry manager to start...")
+		<-initChan
+		log := logrus.WithFields(
+			logrus.Fields{
+				"server-url":      initInfo.ServerURL,
+				"cluster-uuid":    initInfo.ClusterUUID,
+				"install-uuid":    initInfo.InstallUUID,
+				"rancher-version": initInfo.RancherVersion,
+			},
+		)
+		log.Info("telemetry manger started")
+		telemetryManager.Start(context.TODO(), *initInfo)
+	}()
 	return r.Wrangler.Start(ctx)
 }
 
