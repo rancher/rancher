@@ -45,6 +45,16 @@ release: {{ .Release.Name }}
 {{- end }}
 
 {{/*
+Generate the labels for pre-upgrade-hook.
+*/}}
+{{- define "rancher.preupgradelabels" -}}
+app: {{ template "rancher.fullname" . }}-pre-upgrade
+chart: {{ template "rancher.chartname" . }}
+heritage: {{ .Release.Service }}
+release: {{ .Release.Name }}
+{{- end }}
+
+{{/*
 Generate the Kubernetes recommended common labels.
 
 Usage:
