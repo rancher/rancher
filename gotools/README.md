@@ -8,6 +8,18 @@ dependency conflicts.
 
 ## Managing tools
 
+**Using a tool**
+
+```sh
+go tool -modfile <path to modfile> <tool>
+```
+
+For example, to use controller-gen:
+
+```sh
+go tool -modfile gotools/controller-gen/go.mod controller-gen -h
+```
+
 **Add a new tool**
 
 From repository root:
