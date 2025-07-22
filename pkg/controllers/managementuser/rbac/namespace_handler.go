@@ -34,8 +34,8 @@ const (
 )
 
 var projectNSVerbToSuffix = map[string]string{
-	"get":             "readonly",
-	projectNSEditVerb: "edit",
+	"get": "readonly",
+	//projectNSEditVerb: "edit",
 }
 var defaultProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/default-project": "true"})
 var systemProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/system-project": "true"})
@@ -475,9 +475,10 @@ func (m *manager) createProjectNSRole(roleName, verb, ns, projectName string) er
 	}
 	// the verbs passed into this function come from projectNSVerbToSuffix which only contains two verbs, one for read
 	// permissions and one for write. Only the write permission should get the manage-ns verb
-	if verb == projectNSEditVerb {
-		cr = addManageNSPermission(cr, projectName)
-	}
+	//if verb == projectNSEditVerb {
+	//	cr = addManageNSPermission(cr, projectName)
+	//}
+	cr = addManageNSPermission(cr, projectName)
 	_, err := roleCli.Create(cr)
 	return err
 }

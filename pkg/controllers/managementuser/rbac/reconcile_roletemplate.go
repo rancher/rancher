@@ -3,7 +3,6 @@ package rbac
 import (
 	"fmt"
 
-	"github.com/rancher/norman/types/slice"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac/roletemplates"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
@@ -103,34 +102,34 @@ func (m *manager) ensureGlobalResourcesRolesForPRTB(projectName string, rts map[
 		return nil, nil
 	}
 
-	var roleVerb, roleSuffix string
-	for _, r := range rts {
-		for _, rule := range r.Rules {
-			hasNamespaceResources := slice.ContainsString(rule.Resources, "namespaces") || slice.ContainsString(rule.Resources, "*")
-			hasNamespaceGroup := slice.ContainsString(rule.APIGroups, "") || slice.ContainsString(rule.APIGroups, "*")
-			if hasNamespaceGroup && hasNamespaceResources && len(rule.ResourceNames) == 0 {
-				if slice.ContainsString(rule.Verbs, "*") || slice.ContainsString(rule.Verbs, "create") {
-					roleVerb = "*"
-					roles.Insert("create-ns")
-					if nsRole, _ := m.crLister.Get("", "create-ns"); nsRole == nil {
-						createNSRT, err := m.rtLister.Get("", "create-ns")
-						if err != nil {
-							return nil, err
-						}
-						if err := m.ensureRoles(map[string]*v3.RoleTemplate{"create-ns": createNSRT}); err != nil && !apierrors.IsAlreadyExists(err) {
-							return nil, err
-						}
-					}
-					break
-				}
-			}
-
-		}
-	}
-	if roleVerb == "" {
-		roleVerb = "get"
-	}
-	roleSuffix = projectNSVerbToSuffix[roleVerb]
+	//var roleVerb, roleSuffix string
+	//for _, r := range rts {
+	//	for _, rule := range r.Rules {
+	//		hasNamespaceResources := slice.ContainsString(rule.Resources, "namespaces") || slice.ContainsString(rule.Resources, "*")
+	//		hasNamespaceGroup := slice.ContainsString(rule.APIGroups, "") || slice.ContainsString(rule.APIGroups, "*")
+	//		if hasNamespaceGroup && hasNamespaceResources && len(rule.ResourceNames) == 0 {
+	//			if slice.ContainsString(rule.Verbs, "*") || slice.ContainsString(rule.Verbs, "create") {
+	//				roleVerb = "*"
+	//				roles.Insert("create-ns")
+	//				if nsRole, _ := m.crLister.Get("", "create-ns"); nsRole == nil {
+	//					createNSRT, err := m.rtLister.Get("", "create-ns")
+	//					if err != nil {
+	//						return nil, err
+	//					}
+	//					if err := m.ensureRoles(map[string]*v3.RoleTemplate{"create-ns": createNSRT}); err != nil && !apierrors.IsAlreadyExists(err) {
+	//						return nil, err
+	//					}
+	//				}
+	//				break
+	//			}
+	//		}
+	//
+	//	}
+	//}
+	//if roleVerb == "" {
+	//	roleVerb = "get"
+	//}
+	roleSuffix := projectNSVerbToSuffix["get"]
 	role := fmt.Sprintf(projectNSGetClusterRoleNameFmt, projectName, roleSuffix)
 	roles.Insert(role)
 
