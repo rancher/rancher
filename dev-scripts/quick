@@ -107,6 +107,15 @@ if [ "$needs_workdir" = "true" ]; then
   BUILD_ARGS+=("--build-arg=BUILD_WORKDIR=$PWD")
 fi
 
+if [ "$TARGET" = "binary-server" ]; then
+  docker buildx build \
+    "${BUILD_ARGS[@]}" \
+    --output=type=local,dest=$PWD \
+    --platform="${OS}/${ARCH}" \
+    --target server-binary \
+    --file ./package/Dockerfile .
+fi
+
 if [ -z "$TARGET" ] || [ "$TARGET" = "server" ]; then
   # start the builds
   docker buildx build \

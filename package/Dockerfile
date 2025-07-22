@@ -369,6 +369,10 @@ COPY pkg/ pkg/
 COPY main.go ./
 RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o /app/rancher
 
+# Output just the server binary
+FROM scratch AS server-binary
+COPY --from=server-build /app/rancher /bin/rancher
+
 
 FROM --platform=$BUILDPLATFORM rancher-go-builder AS agent-build
 ARG VERSION
