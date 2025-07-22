@@ -384,6 +384,7 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 // ClusterRole exists for every project member
 func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace) error {
 	for verb, name := range projectNSVerbToSuffix {
+		fmt.Println("inside reconcileNamespaceProjectClusterRole:::  name: ", name)
 		var desiredRole string
 		var projectName string
 		if ns.DeletionTimestamp == nil {
@@ -393,6 +394,7 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace) err
 			}
 		}
 
+		fmt.Println("inside reconcileNamespaceProjectClusterRole::::::::: desiredRole =", desiredRole, " projectName =", projectName)
 		clusterRoles, err := n.m.crIndexer.ByIndex(crByNSIndex, ns.Name)
 		if err != nil {
 			return err
@@ -456,6 +458,9 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace) err
 			}
 		}
 
+		fmt.Println("about to enter nsindesired condition" +
+			"" +
+			"")
 		if !nsInDesiredRole && desiredRole != "" {
 			mustUpdate := true
 			cr, err := n.m.crLister.Get(desiredRole)
@@ -464,7 +469,9 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace) err
 			}
 
 			// Create new role
+			fmt.Println("create new role????")
 			if cr == nil {
+				fmt.Println("calling createProjectNSRole from reconcileNamespaceProjectClusterRole")
 				return n.m.createProjectNSRole(desiredRole, verb, ns.Name, projectName)
 			}
 
@@ -506,6 +513,7 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace) err
 }
 
 func (m *manager) createProjectNSRole(roleName, verb, ns, projectName string) error {
+	fmt.Println("Entered createProjectNSRole::::::::::: ")
 	roleCli := m.clusterRoles
 
 	cr := &rbacv1.ClusterRole{
@@ -516,6 +524,7 @@ func (m *manager) createProjectNSRole(roleName, verb, ns, projectName string) er
 	}
 	if ns != "" {
 		cr.Rules = []rbacv1.PolicyRule{
+
 			{
 				APIGroups:     []string{""},
 				Verbs:         []string{verb},
@@ -526,10 +535,14 @@ func (m *manager) createProjectNSRole(roleName, verb, ns, projectName string) er
 	}
 	// the verbs passed into this function come from projectNSVerbToSuffix which only contains two verbs, one for read
 	// permissions and one for write. Only the write permission should get the manage-ns verb
-	//if verb == projectNSEditVerb {
+	//if verb !=projectNSEditVerb {
 	//	cr = addManageNSPermission(cr, projectName)
-	//}
-	cr = addManageNSPermission(cr, projectName)
+
+	fmt.Println("roleName inside createProjectNSRole: ", roleName)
+	if strings.Contains(roleName, "promoted") {
+		fmt.Println("about to call addManageNSPermission")
+		cr = addManageNSPermission(cr, projectName)
+	}
 	_, err := roleCli.Create(cr)
 	return err
 }
