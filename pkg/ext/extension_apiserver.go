@@ -53,7 +53,7 @@ const (
 	// The main kube-apiserver will connect to that port (through a tunnel).
 	Port              = 6666
 	APIServiceName    = "v1.ext.cattle.io"
-	TargetServiceName = "imperative-api-extension"
+	TargetServiceName = "api-extension"
 	Namespace         = "cattle-system"
 )
 
@@ -191,9 +191,9 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 
 	additionalSniProviders = append(additionalSniProviders, sniProvider)
 
-	if err := CreateOrUpdateService(wranglerContext.Core.Service(), opts.AppSelector); err != nil {
-		return nil, fmt.Errorf("failed to create or update APIService: %w", err)
-	}
+	//if err := CreateOrUpdateService(wranglerContext.Core.Service(), opts.AppSelector); err != nil {
+	//	return nil, fmt.Errorf("failed to create or update APIService: %w", err)
+	//}
 
 	defaultAuthenticator, err := steveext.NewDefaultAuthenticator(wranglerContext.K8s)
 	if err != nil {
