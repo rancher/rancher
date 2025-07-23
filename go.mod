@@ -74,6 +74,13 @@ require (
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.4.2
 	github.com/Masterminds/semver/v3 v3.3.0
 	github.com/Masterminds/sprig/v3 v3.3.0
+	github.com/alibabacloud-go/cs-20151215/v5 v5.9.5
+	github.com/alibabacloud-go/darabonba-openapi/v2 v2.1.8
+	github.com/alibabacloud-go/ecs-20140526/v7 v7.0.13
+	github.com/alibabacloud-go/resourcemanager-20200331/v3 v3.3.0
+	github.com/alibabacloud-go/tea v1.3.9
+	github.com/alibabacloud-go/vpc-20160428/v6 v6.12.8
+	github.com/aliyun/credentials-go v1.4.6
 	github.com/aws/aws-sdk-go v1.55.5
 	github.com/aws/aws-sdk-go-v2 v1.36.5
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.70
@@ -189,6 +196,11 @@ require (
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/ProtonMail/go-crypto v1.1.3 // indirect
+	github.com/alibabacloud-go/alibabacloud-gateway-spi v0.0.5 // indirect
+	github.com/alibabacloud-go/debug v1.0.1 // indirect
+	github.com/alibabacloud-go/endpoint-util v1.1.0 // indirect
+	github.com/alibabacloud-go/openapi-util v0.1.1 // indirect
+	github.com/alibabacloud-go/tea-utils/v2 v2.0.7 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.29.17 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.32 // indirect
@@ -205,6 +217,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.34.0 // indirect
 	github.com/aws/smithy-go v1.22.4 // indirect
 	github.com/cjlapao/common-go v0.0.39 // indirect
+	github.com/clbanning/mxj/v2 v2.7.0 // indirect
 	github.com/cloudflare/circl v1.6.1 // indirect
 	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
@@ -242,6 +255,7 @@ require (
 	github.com/skeema/knownhosts v1.3.0 // indirect
 	github.com/std-uritemplate/std-uritemplate/go v0.0.57 // indirect
 	github.com/stoewer/go-strcase v1.3.0 // indirect
+	github.com/tjfoc/gmsm v1.4.1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
@@ -254,6 +268,7 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20250505200425-f936aa4a68b2 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250603155806-513f23925822 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
+	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	k8s.io/controller-manager v0.0.0 // indirect
 	k8s.io/gengo v0.0.0-20250130153323-76c5745d3511 // indirect
