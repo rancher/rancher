@@ -1,8 +1,8 @@
 module github.com/rancher/rancher/airgap
 
-go 1.23.0
+go 1.24.0
 
-toolchain go1.23.7
+toolchain go1.24.5
 
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.7.27 // CVE-2024-40635
