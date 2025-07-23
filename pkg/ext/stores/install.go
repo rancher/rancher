@@ -5,7 +5,10 @@ import (
 
 	extv1 "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/ext/stores/groupmembershiprefreshrequest"
 	"github.com/rancher/rancher/pkg/ext/stores/kubeconfig"
+	"github.com/rancher/rancher/pkg/ext/stores/passwordchangerequest"
+	"github.com/rancher/rancher/pkg/ext/stores/selfuser"
 	"github.com/rancher/rancher/pkg/ext/stores/tokens"
 	"github.com/rancher/rancher/pkg/ext/stores/useractivity"
 	"github.com/rancher/rancher/pkg/features"
@@ -62,6 +65,32 @@ func InstallStores(
 		logrus.Infof("Successfully installed kubeconfig store")
 	} else {
 		logrus.Infof("Feature ext-kubeconfigs is disabled")
+	}
+
+	err = server.Install(
+		extv1.PasswordChangeRequestResourceName,
+		passwordchangerequest.GVK,
+		passwordchangerequest.New(wranglerContext, server.GetAuthorizer()))
+	if err != nil {
+		return fmt.Errorf("unable to install %s store: %w", passwordchangerequest.SingularName, err)
+	}
+	groupMembershipRefreshStore, err := groupmembershiprefreshrequest.New(wranglerContext, server.GetAuthorizer())
+	if err != nil {
+		return fmt.Errorf("unable to create %s store: %w", groupmembershiprefreshrequest.SingularName, err)
+	}
+	err = server.Install(
+		extv1.GroupMembershipRefreshRequestResourceName,
+		groupmembershiprefreshrequest.GVK,
+		groupMembershipRefreshStore)
+	if err != nil {
+		return fmt.Errorf("unable to install %s store: %w", groupmembershiprefreshrequest.SingularName, err)
+	}
+	err = server.Install(
+		extv1.SelfUserResourceName,
+		selfuser.GVK,
+		selfuser.New())
+	if err != nil {
+		return fmt.Errorf("unable to install %s store: %w", selfuser.SingularName, err)
 	}
 
 	return nil

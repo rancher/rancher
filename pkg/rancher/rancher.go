@@ -25,6 +25,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth"
 	"github.com/rancher/rancher/pkg/auth/audit"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	auditlogcontroller "github.com/rancher/rancher/pkg/controllers/auditlog/auditpolicy"
@@ -64,6 +65,7 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -394,6 +396,12 @@ func getSQLCacheGCValues(wranglerContext *wrangler.Context) (time.Duration, int)
 }
 
 func (r *Rancher) Start(ctx context.Context) error {
+	// ensure namespace for storing local users password is created
+	if _, err := r.Wrangler.Core.Namespace().Create(&v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{Name: pbkdf2.LocalUserPasswordsNamespace},
+	}); err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
+	}
 	if err := dashboardapi.Register(ctx, r.Wrangler); err != nil {
 		return err
 	}
