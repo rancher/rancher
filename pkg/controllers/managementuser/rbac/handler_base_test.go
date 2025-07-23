@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	wfakes "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -215,23 +216,12 @@ func Test_gatherRoles(t *testing.T) {
 
 func TestCompareAndUpdateClusterRole(t *testing.T) {
 	t.Parallel()
-
-	numUpdatesCalled := 0
-	var updateParamCalled *v1.ClusterRole
 	ctrl := gomock.NewController(t)
-	clusterRolesMock := wfakes.NewMockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
-	clusterRolesMock.EXPECT().Update(gomock.Any()).DoAndReturn(
-		func(in1 *v1.ClusterRole) (*v1.ClusterRole, error) {
-			numUpdatesCalled++
-			updateParamCalled = in1
-			return &v1.ClusterRole{}, nil
-		},
-	)
 
 	tests := map[string]struct {
-		clusterRole         *v1.ClusterRole
-		roleTemplate        *v3.RoleTemplate
-		wantNumUpdatesCalls int
+		clusterRole     *v1.ClusterRole
+		roleTemplate    *v3.RoleTemplate
+		clusterRoleMock func() wrbacv1.ClusterRoleController
 	}{
 		"semantic difference": {
 			clusterRole: &v1.ClusterRole{
@@ -254,7 +244,9 @@ func TestCompareAndUpdateClusterRole(t *testing.T) {
 					},
 				},
 			},
-			wantNumUpdatesCalls: 0,
+			clusterRoleMock: func() wrbacv1.ClusterRoleController {
+				return wfakes.NewMockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
+			},
 		},
 		"no difference": {
 			clusterRole: &v1.ClusterRole{
@@ -275,7 +267,9 @@ func TestCompareAndUpdateClusterRole(t *testing.T) {
 					},
 				},
 			},
-			wantNumUpdatesCalls: 0,
+			clusterRoleMock: func() wrbacv1.ClusterRoleController {
+				return wfakes.NewMockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
+			},
 		},
 		"difference": {
 			clusterRole: &v1.ClusterRole{
@@ -296,19 +290,30 @@ func TestCompareAndUpdateClusterRole(t *testing.T) {
 					},
 				},
 			},
-			wantNumUpdatesCalls: 1,
+			clusterRoleMock: func() wrbacv1.ClusterRoleController {
+				mock := wfakes.NewMockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
+				mock.EXPECT().Update(&v1.ClusterRole{
+					Rules: []v1.PolicyRule{
+						{
+							Verbs:     []string{"get", "update"},
+							APIGroups: []string{""},
+							Resources: []string{"pods"},
+						},
+					},
+				})
+
+				return mock
+			},
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			m := manager{clusterRoles: clusterRolesMock}
+			m := manager{
+				clusterRoles: test.clusterRoleMock(),
+			}
 			err := m.compareAndUpdateClusterRole(test.clusterRole, test.roleTemplate)
 			assert.NoError(t, err)
-			assert.Equal(t, test.wantNumUpdatesCalls, numUpdatesCalled)
-			if test.wantNumUpdatesCalls > 0 {
-				assert.Equal(t, test.roleTemplate.Rules, updateParamCalled.Rules)
-			}
 		})
 	}
 }
