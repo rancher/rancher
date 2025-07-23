@@ -97,30 +97,3 @@ jobs:
         with:
           name: "Results ${{ matrix.V2PROV_TEST_DIST }} ${{ env.TESTSUITE }}"
           path: "/tmp/report-${{ matrix.V2PROV_TEST_DIST }}-${{ env.TESTSUITE }}.xml"
-
-  publish-provisioning-test-results:
-    needs: [provisioning_tests]
-    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
-    permissions:
-      checks: write
-      pull-requests: write
-      actions: read
-    steps:
-      - name: Download All XML Test Reports
-        uses: actions/download-artifact@v4
-        with:
-          path: /tmp
-          merge-multiple: true
-          pattern: "*.xml"
-      - name: debugme
-        run: |
-          ls -l /tmp
-          ls -l /tmp/*.xml
-      - name: Publish Test Results
-        uses: rancher/publish-unit-test-result-action/linux@3a74b2957438d0b6e2e61d67b05318aa25c9e6c6
-        if: always()
-        with:
-          commit: ${{ github.sha }}
-          event_name: ${{ github.event_name }}
-          event_file: ${{ github.event_path}}
-          files: "/tmp/**/*.xml"
