@@ -118,7 +118,7 @@ func InitializeSamlServiceProvider(configToSet *v32.SamlConfig, name string) err
 
 		cert, err = x509.ParseCertificate(block.Bytes)
 		if err != nil {
-			return fmt.Errorf("SAML: failed to parse DER encoded public key: " + err.Error())
+			return fmt.Errorf("SAML: failed to parse DER encoded public key: %w", err)
 		}
 	}
 
