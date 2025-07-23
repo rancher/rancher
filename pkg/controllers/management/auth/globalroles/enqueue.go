@@ -279,7 +279,8 @@ func (g *globalRBACEnqueuer) clusterRoleEnqueueGR(_, _ string, obj runtime.Objec
 	}
 	grOwner, ok := clusterRole.Labels[grOwnerLabel]
 	if !ok {
-		// this RoleBinding isn't owned by a GRB, no need to enqueue a GRB
+		// this clusterRole isn't owned by a GRB, no need to enqueue a GRB
+		logrus.Debugf("clusterRole %s has no associated globalRole label, skipping enqueue", clusterRole.Name)
 		return nil, nil
 	}
 	grs, err := g.grCache.GetByIndex(grSafeConcatIndex, grOwner)

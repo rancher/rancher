@@ -25,7 +25,7 @@ import (
 )
 
 var (
-	globalRoleLabel       = map[string]string{"authz.management.cattle.io/globalrole": "true"}
+	globalRoleLabel       = "authz.management.cattle.io/globalrole"
 	crNameAnnotation      = "authz.management.cattle.io/cr-name"
 	initialSyncAnnotation = "authz.management.cattle.io/initial-sync"
 	clusterRoleKind       = "ClusterRole"
@@ -62,6 +62,7 @@ type fleetPermissionsRoleHandler interface {
 }
 
 func newGlobalRoleLifecycle(management *config.ManagementContext) *globalRoleLifecycle {
+
 	return &globalRoleLifecycle{
 		crLister:                management.RBAC.ClusterRoles("").Controller().Lister(),
 		crClient:                management.RBAC.ClusterRoles(""),
@@ -156,7 +157,10 @@ func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole) er
 					UID:        globalRole.UID,
 				},
 			},
-			Labels: globalRoleLabel,
+			Labels: map[string]string{
+				globalRoleLabel: "true",
+				grOwnerLabel:    globalRole.Name,
+			},
 		},
 		Rules: globalRole.Rules,
 	})
