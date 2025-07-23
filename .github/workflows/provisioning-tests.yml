@@ -104,23 +104,24 @@ jobs:
     permissions:
       checks: write
       pull-requests: write
-      actions: read
     steps:
+      - name: mkdir test-results
+        run: mkdir -p /tmp/test-results
       - name: Download All XML Test Reports
         uses: actions/download-artifact@v4
         with:
-          path: /tmp
+          path: /tmp/test-results/
           merge-multiple: true
-          pattern: "*.xml"
       - name: debugme
         run: |
           ls -l /tmp
-          ls -l /tmp/*.xml
+          ls -l /tmp/test-results/*
       - name: Publish Test Results
         uses: rancher/publish-unit-test-result-action/linux@3a74b2957438d0b6e2e61d67b05318aa25c9e6c6
         if: always()
         with:
-          commit: ${{ github.sha }}
-          event_name: ${{ github.event_name }}
-          event_file: ${{ github.event_path}}
-          files: "/tmp/**/*.xml"
+          commit: ${{ github.event.workflow_run.head_sha }}
+          event_name: ${{ github.event.workflow_run.event }}
+          event_file: /tmp/test-results/event.json
+          check_run: false
+          files: "/tmp/test-results/*.xml"

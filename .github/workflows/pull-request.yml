@@ -67,3 +67,12 @@ jobs:
   provisioning-tests:
     needs: [build-server, build-agent]
     uses: ./.github/workflows/provisioning-tests.yml
+  event_file:
+    name: "Event File"
+    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
+    steps:
+    - name: Upload
+      uses: actions/upload-artifact@v4
+      with:
+        name: Event File
+        path: ${{ github.event_path }}
