@@ -739,8 +739,8 @@ github.com/prometheus/procfs v0.0.2/go.mod h1:TjEm7ze935MbeOT/UhFTIMYKhuLP4wbCsT
 github.com/prometheus/procfs v0.0.3/go.mod h1:4A/X28fw3Fc593LaREMrKMqOKvUAntwMDaekg4FpcdQ=
 github.com/prometheus/procfs v0.15.1 h1:YagwOFzUgYfKKHX6Dr+sHT7km/hxC76UB0learggepc=
 github.com/prometheus/procfs v0.15.1/go.mod h1:fB45yRUv8NstnjriLhBQLuOUt+WW4BsoGhij/e3PBqk=
-github.com/rancher/aks-operator v1.11.4-rc.1 h1:2lp0ZVfPjDGfHX2wrn2Bra0b9AgmPMbziJAm+mpxQc0=
-github.com/rancher/aks-operator v1.11.4-rc.1/go.mod h1:bff7qqT9PhYhR6fvDhLWzWsr5W9+ITwFdNBDiFUB4sY=
+github.com/rancher/aks-operator v1.11.4 h1:He5vpBLqQa88vxtMC+WZzxU6Or7d+qBzq5J12HxwNC0=
+github.com/rancher/aks-operator v1.11.4/go.mod h1:bff7qqT9PhYhR6fvDhLWzWsr5W9+ITwFdNBDiFUB4sY=
 github.com/rancher/apiserver v0.5.2 h1:K7b+7m8TOyGJGwYwq95O5tSkn/bb/k0PRBtcMqyReao=
 github.com/rancher/apiserver v0.5.2/go.mod h1:Tc4+kkh5mO7M1sZYaqlunx4S/YVcz9AapvbScS3hQRg=
 github.com/rancher/channelserver v0.7.0 h1:ZN5o8aD4mD31uhjEEW2e9yQXa3eOb+4Cp6DcWm7W/Lc=
