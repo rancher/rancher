@@ -314,7 +314,7 @@ func (t *Store) DeleteCollection(
 	}
 
 	for _, secret := range secrets.Items {
-		token, _, err := t.deleteToken(ctx, &secret, deleteValidation, options)
+		token, _, err := t.deleteCore(ctx, &secret, deleteValidation, options)
 		if err != nil {
 			return nil, apierrors.NewInternalError(fmt.Errorf("error deleting token %s: %w",
 				secret.Name, err))
@@ -326,40 +326,36 @@ func (t *Store) DeleteCollection(
 	return list, nil
 }
 
-// Delete implements [rest.GracefulDeleter], the interface to support the
-// `delete` verb. Delegates to the actual store method after some generic
-// boilerplate.
+// Delete implements [rest.GracefulDeleter], the interface to support the `delete` verb.
 func (t *Store) Delete(
 	ctx context.Context,
 	name string,
 	deleteValidation rest.ValidateObjectFunc,
 	options *metav1.DeleteOptions) (runtime.Object, bool, error) {
-	// locate resource first
-	obj, err := t.get(ctx, name, &metav1.GetOptions{})
+
+	userInfo, fullAccess, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore, "delete")
 	if err != nil {
-		return nil, false, err
+		return nil, false, err // The err is already an [apierrors.APIStatus].
 	}
 
-	// ensure that deletion is possible
-	if deleteValidation != nil {
-		err := deleteValidation(ctx, obj)
-		if err != nil {
-			return nil, false, err
-		}
+	// locate underlying resource first, bypass cache
+	secret, err := t.GetSecret(name, &metav1.GetOptions{}, false)
+	if err != nil {
+		return nil, false, err // The err is already an [apierrors.APIStatus].
 	}
 
-	// and now actually delete
-	if err := t.delete(ctx, obj, options); err != nil {
-		return nil, false, err
+	if !fullAccess && (!isRancherUser || !userMatchSecret(userInfo.GetName(), secret)) {
+		// An ordinary user can only access their own tokens.  We return
+		// a NotFound error to avoid leaking information about other
+		// users' tokens.
+		return nil, false, apierrors.NewNotFound(GVR.GroupResource(), name)
 	}
 
-	return obj, true, nil
+	return t.deleteCore(ctx, secret, deleteValidation, options)
 }
 
-// deleteToken is a variant of Delete for use by DeleteCollection. It avoids
-// doing a second `token get` calling on `Delete` would invoke. Delegates to the
-// actual store method after some generic boilerplate.
-func (t *Store) deleteToken(
+// deleteCore performs the common parts of token deletion.
+func (t *Store) deleteCore(
 	ctx context.Context,
 	secret *corev1.Secret,
 	deleteValidation rest.ValidateObjectFunc,
@@ -379,8 +375,18 @@ func (t *Store) deleteToken(
 		}
 	}
 
+	// If an UID precondition exists and matches the tokens's UID, then we
+	// have to replace it with the corresponding secrets's UID.
+	if options != nil &&
+		options.Preconditions != nil &&
+		options.Preconditions.UID != nil &&
+		*options.Preconditions.UID == token.UID {
+
+		options.Preconditions.UID = &secret.UID
+	}
+
 	// and now actually delete
-	if err := t.delete(ctx, token, options); err != nil {
+	if err := t.SystemStore.Delete(token.Name, options); err != nil {
 		return nil, false, err
 	}
 
@@ -388,12 +394,38 @@ func (t *Store) deleteToken(
 }
 
 // Get implements [rest.Getter], the interface to support the `get` verb.
-// Simply delegates to the actual store method.
 func (t *Store) Get(
 	ctx context.Context,
 	name string,
 	options *metav1.GetOptions) (runtime.Object, error) {
-	return t.get(ctx, name, options)
+
+	userInfo, fullAccess, _, err := t.auth.UserName(ctx, &t.SystemStore, "get")
+	if err != nil {
+		return nil, err
+	}
+
+	// We try to go through the fast cache as much as we can.
+	empty := metav1.GetOptions{}
+	useCache := options == nil || *options == empty
+
+	currentSecret, err := t.GetSecret(name, options, useCache)
+	if err != nil {
+		return nil, err
+	}
+
+	if !fullAccess && !userMatchSecret(userInfo.GetName(), currentSecret) {
+		return nil, apierrors.NewNotFound(GVR.GroupResource(), name)
+	}
+
+	token, err := fromSecret(currentSecret)
+	if err != nil {
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to extract token %s: %w", name, err))
+	}
+
+	token.Status.Current = token.Name == t.auth.SessionID(ctx)
+	token.Status.Value = ""
+
+	return token, nil
 }
 
 // NewList implements [rest.Lister], the interface to support the `list` verb.
@@ -674,19 +706,6 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	return newToken, nil
 }
 
-// delete implements the core resource destruction for tokens
-func (t *Store) delete(ctx context.Context, token *ext.Token, options *metav1.DeleteOptions) error {
-	userInfo, fullAccess, isRancherUser, err := t.auth.UserName(ctx, &t.SystemStore, "delete")
-	if err != nil {
-		return err
-	}
-	if !fullAccess && (!isRancherUser || !userMatch(userInfo.GetName(), token)) {
-		return apierrors.NewNotFound(GVR.GroupResource(), token.Name)
-	}
-
-	return t.SystemStore.Delete(token.Name, options)
-}
-
 func (t *SystemStore) Delete(name string, options *metav1.DeleteOptions) error {
 	err := t.secretClient.Delete(TokenNamespace, name, options)
 	if err == nil {
@@ -698,36 +717,34 @@ func (t *SystemStore) Delete(name string, options *metav1.DeleteOptions) error {
 	return apierrors.NewInternalError(fmt.Errorf("failed to delete token %s: %w", name, err))
 }
 
-// get implements the core resource retrieval for tokens
-func (t *Store) get(ctx context.Context, name string, options *metav1.GetOptions) (*ext.Token, error) {
-	userInfo, fullAccess, _, err := t.auth.UserName(ctx, &t.SystemStore, "get")
+// Get retrieves the named ext token, without permission checking
+func (t *SystemStore) Get(name, sessionID string, options *metav1.GetOptions) (*ext.Token, error) {
+
+	// We try to go through the fast cache as much as we can.
+	empty := metav1.GetOptions{}
+	useCache := options == nil || *options == empty
+
+	currentSecret, err := t.GetSecret(name, options, useCache)
 	if err != nil {
 		return nil, err
 	}
 
-	// note: have to get token first before we can check for a user mismatch
-	token, err := t.SystemStore.Get(name, t.auth.SessionID(ctx), options)
+	token, err := fromSecret(currentSecret)
 	if err != nil {
-		return nil, err
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to extract token %s: %w", name, err))
 	}
 
-	if fullAccess {
-		return token, nil
-	}
-	if !userMatch(userInfo.GetName(), token) {
-		return nil, apierrors.NewNotFound(GVR.GroupResource(), name)
-	}
-
+	token.Status.Current = token.Name == sessionID
+	token.Status.Value = ""
 	return token, nil
 }
 
-func (t *SystemStore) Get(name, sessionID string, options *metav1.GetOptions) (*ext.Token, error) {
-	// Core token retrieval from backing secrets
-	// We try to go through the fast cache as much as we can.
+// GetSecret retrieves the backing secret for an ext token, optionally using the cache.
+func (t *SystemStore) GetSecret(name string, options *metav1.GetOptions, useCache bool) (*corev1.Secret, error) {
 	var err error
 	var currentSecret *corev1.Secret
-	empty := metav1.GetOptions{}
-	if options == nil || *options == empty {
+
+	if useCache {
 		currentSecret, err = t.secretCache.Get(TokenNamespace, name)
 	} else {
 		currentSecret, err = t.secretClient.Get(TokenNamespace, name, *options)
@@ -738,14 +755,12 @@ func (t *SystemStore) Get(name, sessionID string, options *metav1.GetOptions) (*
 		}
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to retrieve token %s: %w", name, err))
 	}
-	token, err := fromSecret(currentSecret)
-	if err != nil {
-		return nil, apierrors.NewInternalError(fmt.Errorf("failed to extract token %s: %w", name, err))
+
+	if currentSecret.Labels[SecretKindLabel] != SecretKindLabelValue {
+		return nil, apierrors.NewNotFound(GVR.GroupResource(), name)
 	}
 
-	token.Status.Current = token.Name == sessionID
-	token.Status.Value = ""
-	return token, nil
+	return currentSecret, nil
 }
 
 // list implements the core resource listing of tokens
@@ -1137,6 +1152,11 @@ func (w *watcher) addEvent(event watch.Event) bool {
 // userMatch hides the details of matching a user name against an ext token.
 func userMatch(name string, token *ext.Token) bool {
 	return name == token.Spec.UserID
+}
+
+// userMatchSecret hides the details of matching a user name against the backing secret of an ext token.
+func userMatchSecret(name string, secret *corev1.Secret) bool {
+	return name == secret.Labels[UserIDLabel]
 }
 
 // userMatchOrDefault hides the details of matching a user name against an ext

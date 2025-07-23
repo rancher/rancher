@@ -137,6 +137,10 @@ func TestStoreCreate(t *testing.T) {
 				eSecret := corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "token-12345",
+						Labels: map[string]string{
+							exttokenstore.UserIDLabel:     "admin",
+							exttokenstore.SecretKindLabel: exttokenstore.SecretKindLabelValue,
+						},
 					},
 					Data: map[string][]byte{
 						exttokenstore.FieldDescription:    []byte(""),
@@ -451,6 +455,10 @@ func TestStoreGet(t *testing.T) {
 				eSecret := corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "token-12345",
+						Labels: map[string]string{
+							exttokenstore.UserIDLabel:     "admin",
+							exttokenstore.SecretKindLabel: exttokenstore.SecretKindLabelValue,
+						},
 					},
 					Data: map[string][]byte{
 						exttokenstore.FieldDescription:      []byte(""),
