@@ -14,9 +14,14 @@ import (
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
-	"golang.org/x/crypto/bcrypt"
+	wranglerv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+type PasswordUpdater interface {
+	VerifyAndUpdatePassword(userId string, currentPassword, newPassword string) error
+	UpdatePassword(userId string, newPassword string) error
+}
 
 func (h *Handler) UserFormatter(apiContext *types.APIContext, resource *types.RawResource) {
 	resource.AddAction(apiContext, "setpassword")
@@ -38,6 +43,9 @@ type Handler struct {
 	GlobalRoleBindingsClient v3.GlobalRoleBindingInterface
 	UserAuthRefresher        providerrefresh.UserAuthRefresher
 	ExtTokenStore            *exttokenstore.SystemStore
+	SecretLister             wranglerv1.SecretCache
+	SecretClient             wranglerv1.SecretClient
+	PwdChanger               PasswordUpdater
 }
 
 func (h *Handler) Actions(actionName string, action *types.Action, apiContext *types.APIContext) error {
@@ -101,16 +109,10 @@ func (h *Handler) changePassword(request *types.APIContext) error {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(currentPass)); err != nil {
-		return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid current password")
+	if err := h.PwdChanger.VerifyAndUpdatePassword(user.Name, currentPass, newPass); err != nil {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 	}
 
-	newPassHash, err := HashPasswordString(newPass)
-	if err != nil {
-		return err
-	}
-
-	user.Password = newPassHash
 	user.MustChangePassword = false
 	user, err = h.UserClient.Update(user)
 	if err != nil {
@@ -153,10 +155,14 @@ func (h *Handler) setPassword(request *types.APIContext) error {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
 	}
 
-	userData[client.UserFieldPassword] = newPass
-	if err := hashPassword(userData); err != nil {
-		return err
+	userId, ok := userData[types.ResourceFieldID].(string)
+	if !ok {
+		return errors.New("failed to get userId")
 	}
+	if err := h.PwdChanger.UpdatePassword(userId, newPass); err != nil {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, err.Error())
+	}
+
 	userData[client.UserFieldMustChangePassword] = false
 	delete(userData, "me")
 

@@ -6,12 +6,12 @@ import (
 	"sync"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/crypto/bcrypt"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -53,6 +53,8 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	rb.addRole("Manage Cluster Drivers", "kontainerdrivers-manage").
 		addRule().apiGroups("management.cattle.io").resources("kontainerdrivers").verbs("*")
 	rb.addRole("Manage Users", "users-manage").
+		addNamespacedRule(pbkdf2.LocalUserPasswordsNamespace).addRule().apiGroups("").resources("secrets").verbs("create").
+		addRule().apiGroups("ext.cattle.io").resources("groupmembershiprefreshrequests").verbs("create").
 		addRule().apiGroups("management.cattle.io").resources("users", "globalrolebindings").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("globalroles").verbs("get", "list", "watch")
 	rb.addRole("Manage Roles", "roles-manage").
@@ -78,6 +80,8 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 
 	rb.addRole("User Base", "user-base").
 		addRule().apiGroups("ext.cattle.io").resources("useractivities").verbs("get", "create").
+		addRule().apiGroups("ext.cattle.io").resources("selfusers").verbs("create").
+		addRule().apiGroups("ext.cattle.io").resources("passwordchangerequests").verbs("create").
 		addRule().apiGroups("ext.cattle.io").resources("kubeconfigs").verbs("get", "list", "watch", "create", "delete", "deletecollection", "update", "patch").
 		// standard permissions for regular users, on their tokens
 		// Note: The ext token store applies additional restrictions. A user can see and manipulate only their own tokens.
@@ -389,6 +393,8 @@ func addUserRules(role *roleBuilder) *roleBuilder {
 		// standard permissions for regular users, on their tokens
 		// Note: The ext token store applies additional restrictions. A user can see and manipulate only their own tokens.
 		addRule().apiGroups("ext.cattle.io").resources("tokens").verbs("get", "list", "watch", "create", "delete", "update", "patch").
+		addRule().apiGroups("ext.cattle.io").resources("selfusers").verbs("create").
+		addRule().apiGroups("ext.cattle.io").resources("passwordchangerequests").verbs("create").
 		addRule().apiGroups("management.cattle.io").resources("principals", "roletemplates").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch").
@@ -449,8 +455,6 @@ func BootstrapAdmin(management *wrangler.Context) (string, error) {
 			return "", fmt.Errorf("failed to retrieve bootstrap password: %w", err)
 		}
 
-		bootstrapPasswordHash, _ := bcrypt.GenerateFromPassword([]byte(bootstrapPassword), bcrypt.DefaultCost)
-
 		admin, err := management.Mgmt.User().Create(&v3.User{
 			ObjectMeta: v1.ObjectMeta{
 				GenerateName: "user-",
@@ -458,13 +462,17 @@ func BootstrapAdmin(management *wrangler.Context) (string, error) {
 			},
 			DisplayName:        "Default Admin",
 			Username:           "admin",
-			Password:           string(bootstrapPasswordHash),
 			MustChangePassword: bootstrapPasswordIsGenerated || bootstrapPassword == "admin",
 		})
 		if err != nil && !apierrors.IsAlreadyExists(err) {
 			return "", fmt.Errorf("can not ensure admin user exists: %w", err)
 		}
 		if err == nil {
+			pwdCreator := pbkdf2.New(management.Core.Secret().Cache(), management.Core.Secret())
+			err = pwdCreator.CreatePassword(admin, bootstrapPassword)
+			if err != nil {
+				return "", fmt.Errorf("failed to create secret password: %w", err)
+			}
 			var serverURL string
 			if settings.ServerURL.Get() != "" {
 				serverURL = settings.ServerURL.Get()

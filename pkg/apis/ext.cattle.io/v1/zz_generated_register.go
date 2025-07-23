@@ -29,9 +29,12 @@ import (
 )
 
 var (
-	KubeconfigResourceName   = "kubeconfigs"
-	TokenResourceName        = "tokens"
-	UserActivityResourceName = "useractivities"
+	GroupMembershipRefreshRequestResourceName = "groupmembershiprefreshrequests"
+	KubeconfigResourceName                    = "kubeconfigs"
+	PasswordChangeRequestResourceName         = "passwordchangerequests"
+	SelfUserResourceName                      = "selfusers"
+	TokenResourceName                         = "tokens"
+	UserActivityResourceName                  = "useractivities"
 )
 
 // SchemeGroupVersion is group version used to register these objects
@@ -55,8 +58,14 @@ var (
 // Adds the list of known types to Scheme.
 func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
+		&GroupMembershipRefreshRequest{},
+		&GroupMembershipRefreshRequestList{},
 		&Kubeconfig{},
 		&KubeconfigList{},
+		&PasswordChangeRequest{},
+		&PasswordChangeRequestList{},
+		&SelfUser{},
+		&SelfUserList{},
 		&Token{},
 		&TokenList{},
 		&UserActivity{},

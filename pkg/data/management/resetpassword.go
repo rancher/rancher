@@ -1,6 +1,7 @@
 package management
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
 	"log"
@@ -8,8 +9,9 @@ import (
 
 	"github.com/docker/docker/pkg/reexec"
 	"github.com/pkg/errors"
-	"github.com/rancher/rancher/pkg/auth/api/user"
+	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/urfave/cli"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -65,13 +67,19 @@ func resetPassword() {
 
 		admin := admins.Items[0]
 		pass := generatePassword(length)
-		hashedPass, err := user.HashPasswordString(string(pass))
+		admin.MustChangePassword = false
+		_, err = client.Users("").Update(&admin)
+
+		wranglerContext, err := wrangler.NewContext(context.TODO(), nil, conf)
 		if err != nil {
 			return err
 		}
-		admin.Password = hashedPass
-		admin.MustChangePassword = false
-		_, err = client.Users("").Update(&admin)
+
+		pwdCreator := pbkdf2.New(wranglerContext.Core.Secret().Cache(), wranglerContext.Core.Secret())
+		if err := pwdCreator.CreatePassword(&admin, string(pass)); err != nil {
+			return errors.Errorf("couldn't create password %v", err)
+		}
+
 		fmt.Fprintf(os.Stdout, "New password for default admin user (%v):\n%s\n", admin.Name, pass)
 		return err
 	}
