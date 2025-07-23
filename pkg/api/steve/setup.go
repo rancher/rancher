@@ -19,7 +19,9 @@ func Setup(ctx context.Context, server *steve.Server, config *wrangler.Context) 
 	if err := clusters.Register(ctx, server, config); err != nil {
 		return err
 	}
-	machine.Register(server, config)
+	if config.CAPI != nil {
+		machine.Register(server, config)
+	}
 	navlinks.Register(ctx, server)
 	settings.Register(server)
 	disallow.Register(server)
@@ -27,4 +29,12 @@ func Setup(ctx context.Context, server *steve.Server, config *wrangler.Context) 
 		server,
 		config.HelmOperations,
 		config.CatalogContentManager)
+}
+
+// SetupPostCAPI sets up CAPI dependent components after CAPI CRDs are available
+func SetupPostCAPI(ctx context.Context, server *steve.Server, config *wrangler.Context) error {
+	if config.CAPI != nil {
+		machine.Register(server, config)
+	}
+	return nil
 }

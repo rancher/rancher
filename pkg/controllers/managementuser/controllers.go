@@ -25,6 +25,7 @@ import (
 	"github.com/rancher/rancher/pkg/generated/controllers/upgrade.cattle.io"
 	"github.com/rancher/rancher/pkg/impersonation"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -32,7 +33,6 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	rbac.Register(ctx, cluster)
 	healthsyncer.Register(ctx, cluster)
 	networkpolicy.Register(ctx, cluster)
-	nodesyncer.Register(ctx, cluster, kubeConfigGetter)
 	secret.Register(ctx, mgmt, cluster, clusterRec)
 	resourcequota.Register(ctx, cluster)
 	windows.Register(ctx, clusterRec, cluster)
@@ -42,7 +42,22 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 		if clusterRec.Annotations["provisioning.cattle.io/administrated"] == "true" {
 			if features.Provisioningv2ETCDSnapshotBackPopulation.Enabled() {
 				cluster.K3s = k3s.New(cluster.ControllerFactory)
-				snapshotbackpopulate.Register(ctx, cluster)
+				go func() {
+					logrus.Debug("[managementuser] Waiting for CAPI CRDs to be available for snapshot back population")
+					if !cluster.Management.Wrangler.WaitForCAPICRDs(ctx) {
+						return
+					}
+					logrus.Debug("[managementuser] CAPI CRDs are available, proceeding with initialization")
+
+					if err := cluster.Management.Wrangler.InitializeCAPIFactory(ctx); err != nil {
+						logrus.Errorf("[managementuser] Failed to initialize CAPI factory for snapshot back population: %v", err)
+						return
+					}
+
+					snapshotbackpopulate.Register(ctx, cluster)
+					nodesyncer.Register(ctx, cluster, kubeConfigGetter)
+					logrus.Debug("[managementuser] Snapshot back populate and node syncer controllers registered successfully")
+				}()
 			}
 			cluster.Plan = upgrade.New(cluster.ControllerFactory)
 			rkecontrolplanecondition.Register(ctx,

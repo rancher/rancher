@@ -425,6 +425,23 @@ func (r *Rancher) Start(ctx context.Context) error {
 			return err
 		}
 
+		// Wait for CAPI CRDs to be available and initialize CAPI factory before setting up CAPI dependent components
+		if features.RKE2.Enabled() {
+			logrus.Debug("[rancher] Waiting for CAPI CRDs to be available")
+			if !r.Wrangler.WaitForCAPICRDs(ctx) {
+				return fmt.Errorf("timeout waiting for CAPI CRDs to be available")
+			}
+
+			if err := r.Wrangler.InitializeCAPIFactory(ctx); err != nil {
+				return err
+			}
+		}
+
+		if err := steveapi.SetupPostCAPI(ctx, r.Steve, r.Wrangler); err != nil {
+			return err
+		}
+		logrus.Debug("[rancher] Post-CAPI components setup completed successfully")
+
 		return runMigrations(r.Wrangler)
 	})
 

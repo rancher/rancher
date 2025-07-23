@@ -15,14 +15,13 @@ import (
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/sirupsen/logrus"
 )
 
 func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager *kubeconfig.Manager) {
-	cluster.Register(ctx, clients, kubeconfigManager)
 	if features.MCM.Enabled() {
 		secret.Register(ctx, clients)
 	}
-	provisioningcluster.Register(ctx, clients)
 	provisioninglog.Register(ctx, clients)
 	machineconfigcleanup.Register(ctx, clients)
 
@@ -32,7 +31,24 @@ func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager 
 		fleetworkspace.Register(ctx, clients)
 	}
 
-	if features.Harvester.Enabled() {
-		harvestercleanup.Register(ctx, clients)
-	}
+	go func() {
+		logrus.Debug("[provisioningv2] Waiting for CAPI CRDs to be available")
+		if !clients.WaitForCAPICRDs(ctx) {
+			return
+		}
+		logrus.Debug("[provisioningv2] CAPI CRDs are available, proceeding with initialization")
+
+		if err := clients.InitializeCAPIFactory(ctx); err != nil {
+			logrus.Errorf("[provisioningv2] Failed to initialize CAPI factory: %v", err)
+			return
+		}
+
+		cluster.Register(ctx, clients, kubeconfigManager)
+		provisioningcluster.Register(ctx, clients)
+
+		if features.Harvester.Enabled() {
+			harvestercleanup.Register(ctx, clients)
+		}
+		logrus.Debug("[provisioningv2] All CAPI dependent controllers registered successfully")
+	}()
 }

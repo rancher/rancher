@@ -6,11 +6,13 @@ package wrangler
 import (
 	"context"
 	"fmt"
-	"github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io"
-	sccv1 "github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io/v1"
 	"net"
 	"net/http"
 	"sync"
+	"time"
+
+	"github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io"
+	sccv1 "github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io/v1"
 
 	fleetv1alpha1api "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/lasso/pkg/controller"
@@ -70,6 +72,7 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/schemes"
 	"github.com/sirupsen/logrus"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -185,6 +188,86 @@ func (w *Context) OnLeader(f func(ctx context.Context) error) {
 	w.leadership.OnLeader(f)
 }
 
+// WaitForCAPICRDs waits for all essential CAPI CRDs to be available and established
+func (w *Context) WaitForCAPICRDs(ctx context.Context) bool {
+	requiredCRDs := []string{
+		"clusters.cluster.x-k8s.io",
+		"machines.cluster.x-k8s.io",
+		"machinesets.cluster.x-k8s.io",
+		"machinedeployments.cluster.x-k8s.io",
+		"machinehealthchecks.cluster.x-k8s.io",
+	}
+
+	logrus.Debug("Starting to wait for CAPI CRDs to be available and established")
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			logrus.Debug("Context cancelled while waiting for CAPI CRDs")
+			return false
+		case <-ticker.C:
+			logrus.Debug("Checking CAPI CRDs availability and establishment status")
+			allCRDsReady := true
+			for _, crdName := range requiredCRDs {
+				crd, err := w.CRD.CustomResourceDefinition().Get(crdName, metav1.GetOptions{})
+				if err != nil {
+					if errors.IsNotFound(err) {
+						logrus.Debugf("CRD %s not found, continuing to wait", crdName)
+						allCRDsReady = false
+						break
+					}
+					logrus.Warnf("Error checking for CAPI CRD %s: %v", crdName, err)
+					allCRDsReady = false
+					break
+				}
+
+				established := false
+				for _, condition := range crd.Status.Conditions {
+					if condition.Type == "Established" && condition.Status == "True" {
+						established = true
+						break
+					}
+				}
+
+				if !established {
+					logrus.Debugf("CRD %s exists but is not yet established, continuing to wait", crdName)
+					allCRDsReady = false
+					break
+				}
+
+				logrus.Debugf("CRD %s is available and established", crdName)
+			}
+			if allCRDsReady {
+				logrus.Debug("All CAPI CRDs are now available and established")
+				return true
+			}
+		}
+	}
+}
+
+// InitializeCAPIFactory creates and initializes the CAPI factory, should be called after CRDs are available
+func (w *Context) InitializeCAPIFactory(ctx context.Context) error {
+	if w.capi != nil {
+		return nil
+	}
+
+	opts := &generic.FactoryOptions{
+		SharedControllerFactory: w.SharedControllerFactory,
+	}
+
+	capiFactory, err := capi.NewFactoryFromConfigWithOptions(w.RESTConfig, opts)
+	if err != nil {
+		return err
+	}
+
+	w.capi = capiFactory
+	w.CAPI = capiFactory.Cluster().V1beta1()
+
+	return nil
+}
+
 func (w *Context) StartWithTransaction(ctx context.Context, f func(context.Context) error) (err error) {
 	transaction := controller.NewHandlerTransaction(ctx)
 	if err := f(transaction); err != nil {
@@ -247,7 +330,9 @@ func (w *Context) WithAgent(userAgent string) *Context {
 		wContextCopy.Apply = applyWithAgent
 	}
 	wContextCopy.Dynamic = dynamic.New(wContextCopy.K8s.Discovery())
-	wContextCopy.CAPI = wContextCopy.capi.WithAgent(userAgent).V1beta1()
+	if wContextCopy.capi != nil {
+		wContextCopy.CAPI = wContextCopy.capi.WithAgent(userAgent).V1beta1()
+	}
 	wContextCopy.RKE = wContextCopy.rke.WithAgent(userAgent).V1()
 	wContextCopy.Mgmt = wContextCopy.mgmt.WithAgent(userAgent).V3()
 	wContextCopy.Apps = wContextCopy.apps.WithAgent(userAgent).V1()
@@ -321,11 +406,6 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 	}
 
 	project, err := project.NewFactoryFromConfigWithOptions(restConfig, opts)
-	if err != nil {
-		return nil, err
-	}
-
-	capi, err := capi.NewFactoryFromConfigWithOptions(restConfig, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -435,7 +515,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		Apply:                   apply,
 		SharedControllerFactory: controllerFactory,
 		Dynamic:                 dynamic.New(k8s.Discovery()),
-		CAPI:                    capi.Cluster().V1beta1(),
+		CAPI:                    nil, // Will be set later when CAPI factory is initialized
 		RKE:                     rke.Rke().V1(),
 		Mgmt:                    mgmt.Management().V3(),
 		Apps:                    apps.Apps().V1(),
@@ -479,7 +559,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		core:         core,
 		api:          api,
 		crd:          crd,
-		capi:         capi,
+		capi:         nil, // Will be set later when CAPI factory is initialized
 		rke:          rke,
 		rbac:         rbac,
 		plan:         plan,

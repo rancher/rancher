@@ -23,16 +23,41 @@ import (
 	"github.com/rancher/rancher/pkg/provisioningv2/systeminfo"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/sirupsen/logrus"
 )
 
 func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager *kubeconfig.Manager) error {
-	rkePlanner := planner.New(ctx, clients, planner.InfoFunctions{
-		ImageResolver:           image.ResolveWithControlPlane,
-		ReleaseData:             capr.GetKDMReleaseData,
-		SystemAgentImage:        settings.SystemAgentInstallerImage.Get,
-		SystemPodLabelSelectors: systeminfo.NewRetriever(clients).GetSystemPodLabelSelectors,
-		GetBootstrapManifests:   prebootstrap.NewRetriever(clients).GeneratePreBootstrapClusterAgentManifest,
-	})
+	go func() {
+		logrus.Debug("[capr] Waiting for CAPI CRDs to be available and established")
+		if !clients.WaitForCAPICRDs(ctx) {
+			return
+		}
+		logrus.Debug("[capr] CAPI CRDs are available, proceeding with initialization")
+
+		if err := clients.InitializeCAPIFactory(ctx); err != nil {
+			logrus.Errorf("Failed to initialize CAPI factory: %v", err)
+			return
+		}
+
+		rkePlanner := planner.New(ctx, clients, planner.InfoFunctions{
+			ImageResolver:           image.ResolveWithControlPlane,
+			ReleaseData:             capr.GetKDMReleaseData,
+			SystemAgentImage:        settings.SystemAgentInstallerImage.Get,
+			SystemPodLabelSelectors: systeminfo.NewRetriever(clients).GetSystemPodLabelSelectors,
+			GetBootstrapManifests:   prebootstrap.NewRetriever(clients).GeneratePreBootstrapClusterAgentManifest,
+		})
+
+		if err := registerCAPRControllers(ctx, clients, kubeconfigManager, rkePlanner); err != nil {
+			logrus.Errorf("[capr] Failed to register CAPR controllers: %v", err)
+			return
+		}
+		logrus.Debug("[capr] CAPR controllers registered successfully")
+	}()
+
+	return nil
+}
+
+func registerCAPRControllers(ctx context.Context, clients *wrangler.Context, kubeconfigManager *kubeconfig.Manager, rkePlanner *planner.Planner) error {
 	if features.MCM.Enabled() {
 		if err := dynamicschema.Register(ctx, clients); err != nil {
 			return err
