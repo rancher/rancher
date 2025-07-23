@@ -274,7 +274,6 @@ func (t *Store) Create(
 }
 
 // DeleteCollection implements [rest.CollectionDeleter]
-// Calls on deleteCore.
 func (t *Store) DeleteCollection(
 	ctx context.Context,
 	deleteValidation rest.ValidateObjectFunc,
@@ -327,8 +326,7 @@ func (t *Store) DeleteCollection(
 	return list, nil
 }
 
-// Delete implements [rest.GracefulDeleter], the interface to support the
-// `delete` verb. Calls on `deleteCore`.
+// Delete implements [rest.GracefulDeleter], the interface to support the `delete` verb.
 func (t *Store) Delete(
 	ctx context.Context,
 	name string,
@@ -356,9 +354,7 @@ func (t *Store) Delete(
 	return t.deleteCore(ctx, secret, deleteValidation, options)
 }
 
-// deleteCore is invoked by Delete and DeleteCollection, after access checks,
-// with the backing secret of the token to delete. After conversion and further
-// checks it delegates to the system store.
+// deleteCore performs the common parts of token deletion.
 func (t *Store) deleteCore(
 	ctx context.Context,
 	secret *corev1.Secret,
