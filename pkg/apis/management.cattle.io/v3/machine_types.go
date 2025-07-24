@@ -400,9 +400,10 @@ type CloudCredential struct {
 }
 
 type CloudCredentialSpec struct {
-	DisplayName        string              `json:"displayName"`
-	Description        string              `json:"description,omitempty"`
-	S3CredentialConfig *S3CredentialConfig `json:"s3credentialConfig,omitempty"`
+	DisplayName             string                   `json:"displayName"`
+	Description             string                   `json:"description,omitempty"`
+	S3CredentialConfig      *S3CredentialConfig      `json:"s3credentialConfig,omitempty"`
+	AlibabaCredentialConfig *AlibabaCredentialConfig `json:"alibabacredentialConfig,omitempty"`
 }
 
 type S3CredentialConfig struct {
@@ -414,4 +415,9 @@ type S3CredentialConfig struct {
 	DefaultSkipSSLVerify string
 	DefaultBucket        string
 	DefaultFolder        string
+}
+
+type AlibabaCredentialConfig struct {
+	AccessKeyId     string `json:"accessKeyId" norman:"required"`
+	AccessKeySecret string `json:"accessKeySecret" norman:"required,type=password"`
 }
