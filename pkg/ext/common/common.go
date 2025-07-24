@@ -61,7 +61,7 @@ func MapManagedFields(mapSpec MapSpec, originManagedFields []metav1.ManagedField
 		return nil, nil
 	}
 
-	destManagedFields := make([]metav1.ManagedFieldsEntry, size)
+	destManagedFields := make([]metav1.ManagedFieldsEntry, 0, size)
 
 	for _, originEntry := range originManagedFields {
 		if originEntry.FieldsV1 == nil {
@@ -75,7 +75,7 @@ func MapManagedFields(mapSpec MapSpec, originManagedFields []metav1.ManagedField
 			return nil, err
 		}
 
-		destPaths := make([]fieldpath.Path, originPaths.Size())
+		destPaths := make([]fieldpath.Path, 0, originPaths.Size())
 
 		originPaths.Iterate(func(originPath fieldpath.Path) {
 			if destPath, ok := mapSpec[originPath.String()]; ok {
