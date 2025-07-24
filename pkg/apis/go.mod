@@ -7,28 +7,28 @@ toolchain go1.23.7
 replace (
 	golang.org/x/net => golang.org/x/net v0.36.0 // CVE-2025-22870
 
-	k8s.io/api => k8s.io/api v0.30.10
-	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.30.10
-	k8s.io/apimachinery => k8s.io/apimachinery v0.30.10
-	k8s.io/apiserver => k8s.io/apiserver v0.30.10
-	k8s.io/cli-runtime => k8s.io/cli-runtime v0.30.10
-	k8s.io/client-go => k8s.io/client-go v0.30.10
-	k8s.io/cloud-provider => k8s.io/cloud-provider v0.30.10
-	k8s.io/component-base => k8s.io/component-base v0.30.10
-	k8s.io/controller-manager => k8s.io/controller-manager v0.30.10
-	k8s.io/cri-api => k8s.io/cri-api v0.30.10
-	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.30.10
-	k8s.io/dynamic-resource-allocation => k8s.io/dynamic-resource-allocation v0.30.10
-	k8s.io/endpointslice => k8s.io/endpointslice v0.30.10
-	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.30.10
-	k8s.io/kube-proxy => k8s.io/kube-proxy v0.30.10
-	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.30.10
-	k8s.io/kubectl => k8s.io/kubectl v0.30.10
-	k8s.io/kubelet => k8s.io/kubelet v0.30.10
-	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.30.10
-	k8s.io/mount-utils => k8s.io/mount-utils v0.30.10
-	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.30.10
-	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.30.10
+	k8s.io/api => k8s.io/api v0.30.14
+	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.30.14
+	k8s.io/apimachinery => k8s.io/apimachinery v0.30.14
+	k8s.io/apiserver => k8s.io/apiserver v0.30.14
+	k8s.io/cli-runtime => k8s.io/cli-runtime v0.30.14
+	k8s.io/client-go => k8s.io/client-go v0.30.14
+	k8s.io/cloud-provider => k8s.io/cloud-provider v0.30.14
+	k8s.io/component-base => k8s.io/component-base v0.30.14
+	k8s.io/controller-manager => k8s.io/controller-manager v0.30.14
+	k8s.io/cri-api => k8s.io/cri-api v0.30.14
+	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.30.14
+	k8s.io/dynamic-resource-allocation => k8s.io/dynamic-resource-allocation v0.30.14
+	k8s.io/endpointslice => k8s.io/endpointslice v0.30.14
+	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.30.14
+	k8s.io/kube-proxy => k8s.io/kube-proxy v0.30.14
+	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.30.14
+	k8s.io/kubectl => k8s.io/kubectl v0.30.14
+	k8s.io/kubelet => k8s.io/kubelet v0.30.14
+	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.30.14
+	k8s.io/mount-utils => k8s.io/mount-utils v0.30.14
+	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.30.14
+	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.30.14
 	sigs.k8s.io/structured-merge-diff/v4 => sigs.k8s.io/structured-merge-diff/v4 v4.4.1
 )
 
