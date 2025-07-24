@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/utils/pointer"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 var (
@@ -548,6 +549,89 @@ func Test_Store_Get(t *testing.T) {
 
 		assert.Nil(t, err)
 		assert.Equal(t, &properTokenCurrent, tok)
+	})
+
+	t.Run("ok, current, managed fields", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+		scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+		auth := NewMockauthHandler(ctrl)
+
+		fieldSecretJSON, err := fieldpath.NewSet(
+			pathSecData,
+			pathSecDescription,
+			pathSecEnabled,
+			pathSecHash,
+			pathSecKind,
+			pathSecUID,
+			pathSecLAS,
+			pathSecLUT,
+			pathSecLUA,
+			pathSecPrincipal,
+			pathSecTTL,
+			pathSecUserID,
+			fieldpath.MakePathOrDie("metadata"),
+			fieldpath.MakePathOrDie("type"),
+		).ToJSON()
+		assert.Nil(t, err)
+
+		now, errb := time.Parse(time.RFC3339, "2024-12-06T03:02:01Z")
+		nowT := metav1.NewTime(now)
+		assert.Nil(t, errb)
+
+		fieldSecret := properSecret.DeepCopy()
+		fieldSecret.ObjectMeta.ManagedFields = []metav1.ManagedFieldsEntry{
+			metav1.ManagedFieldsEntry{
+				Manager:    "token",
+				Operation:  "something",
+				Time:       &nowT,
+				FieldsType: "v1",
+				FieldsV1: &metav1.FieldsV1{
+					Raw: fieldSecretJSON,
+				},
+			},
+		}
+
+		fieldTokenJSON, err := fieldpath.NewSet(
+			pathTokDescription,
+			pathTokEnabled,
+			pathTokKind,
+			pathTokPrincipal,
+			pathTokTTL,
+			pathTokUserID,
+			fieldpath.MakePathOrDie("metadata"),
+			fieldpath.MakePathOrDie("type"),
+		).ToJSON()
+		assert.Nil(t, err)
+
+		fieldToken := properTokenCurrent.DeepCopy()
+		fieldToken.ObjectMeta.ManagedFields = []metav1.ManagedFieldsEntry{
+			metav1.ManagedFieldsEntry{
+				Manager:    "token",
+				Operation:  "something",
+				Time:       &nowT,
+				FieldsType: "v1",
+				FieldsV1: &metav1.FieldsV1{
+					Raw: fieldTokenJSON,
+				},
+			},
+		}
+
+		auth.EXPECT().SessionID(gomock.Any()).Return("bogus")
+		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(&mockUser{name: properUser}, false, true, nil)
+		users.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Cache().Return(scache)
+		scache.EXPECT().
+			Get("cattle-tokens", "bogus").
+			Return(fieldSecret, nil)
+
+		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
+		tok, err := store.Get(context.TODO(), "bogus", &metav1.GetOptions{})
+
+		assert.Nil(t, err)
+		assert.Equal(t, fieldToken, tok)
 	})
 }
 
