@@ -29,12 +29,11 @@ type pLifecycle struct {
 func (p *pLifecycle) Create(project *v3.Project) (runtime.Object, error) {
 	for verb, suffix := range projectNSVerbToSuffix {
 		roleName := fmt.Sprintf(projectNSGetClusterRoleNameFmt, project.Name, suffix)
-		_, err := p.m.crLister.Get("", roleName)
+		_, err := p.m.crLister.Get(roleName)
 		if err == nil || !apierrors.IsNotFound(err) {
 			continue
 		}
 
-		fmt.Println("calling createProjectNSRole from Create")
 		err = p.m.createProjectNSRole(roleName, verb, "", project.Name)
 		if err != nil {
 			return project, err
@@ -47,11 +46,11 @@ func (p *pLifecycle) Create(project *v3.Project) (runtime.Object, error) {
 }
 
 func (p *pLifecycle) Updated(project *v3.Project) (runtime.Object, error) {
-	//err := p.ensureNamespaceRolesUpdated(project)
-	//if err != nil {
-	//	return project, err
-	//}
-	err := p.ensureNamespacesAssigned(project)
+	err := p.ensureNamespaceRolesUpdated(project)
+	if err != nil {
+		return project, err
+	}
+	err = p.ensureNamespacesAssigned(project)
 	return project, err
 }
 
@@ -137,16 +136,13 @@ func (p *pLifecycle) ensureSystemNamespaceAssigned(project *v3.Project) error {
 
 // ensureNamespaceRolesUpdated makes sure that the namespace roles have up-to-date rules, and issues updates if they don't
 func (p *pLifecycle) ensureNamespaceRolesUpdated(project *v3.Project) error {
-	// right now, only the promoted role for namespaces has need of an update
-	//suffix := projectNSVerbToSuffix[projectNSEditVerb]
-	roleName := fmt.Sprintf(projectNSGetClusterRoleNameFmt, project.Name, "promoted")
-	fmt.Println("inside ensureNamespaceRolesUpdated:::########## name: ", roleName)
-	cr, err := p.m.crLister.Get("", roleName)
-	fmt.Println("listing crs::: !!!!! ", cr)
+	// right now, only the edit role for namespaces has need of an update
+	suffix := projectNSVerbToSuffix[manageNSVerb]
+	roleName := fmt.Sprintf(projectNSGetClusterRoleNameFmt, project.Name, suffix)
+	cr, err := p.m.crLister.Get(roleName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			fmt.Println("calling createProjectNSRole from ensureNamespaceRolesUpdated")
-			return p.m.createProjectNSRole(roleName, "promoted", "", project.Name)
+			return p.m.createProjectNSRole(roleName, manageNSVerb, "", project.Name)
 		}
 		return fmt.Errorf("unable to get backing cluster role for project %s: %w", project.Name, err)
 	}
