@@ -116,7 +116,7 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		userAttributeLister: management.Management.UserAttributes("").Controller().Lister(),
 		clusterName:         workload.ClusterName,
 	}
-	management.Management.Projects(workload.ClusterName).AddClusterScopedLifecycle(ctx, "project-namespace-auth", workload.ClusterName, newProjectLifecycle(r))
+	management.Management.Projects(workload.ClusterName).AddClusterScopedLifecycle(ctx, "project-namespace-auth", workload.ClusterName, newProjectLifecycle(r, workload.Corew.Secret()))
 	workload.RBAC.ClusterRoles("").AddHandler(ctx, "cluster-clusterrole-sync", newClusterRoleHandler(r).sync)
 	workload.RBAC.ClusterRoleBindings("").AddHandler(ctx, "legacy-crb-cleaner-sync", newLegacyCRBCleaner(r).sync)
 	management.Management.Clusters("").AddHandler(ctx, "global-admin-cluster-sync", newClusterHandler(workload))
@@ -141,7 +141,6 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		NsIndexer: nsInformer.GetIndexer(),
 	}
 	relatedresource.WatchClusterScoped(ctx, "enqueue-namespaces-by-roletemplate", nsEnqueuer.RoleTemplateEnqueueNamespace, workload.Corew.Namespace(), management.Wrangler.Mgmt.RoleTemplate())
-	relatedresource.WatchClusterScoped(ctx, "enqueue-namespaces-by-project", nsEnqueuer.ProjectEnqueueNamespace, workload.Corew.Namespace(), management.Wrangler.Mgmt.Project())
 
 	// Only one set of CRTB/PRTB/RoleTemplate controllers should run at a time. Using aggregated cluster roles is currently experimental and only available via feature flags.
 	if features.AggregatedRoleTemplates.Enabled() {

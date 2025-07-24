@@ -49,31 +49,6 @@ type NsEnqueuer struct {
 	NsIndexer cache.Indexer
 }
 
-// ProjectEnqueueNamespace enqueues namespaces when a Project is updated
-func (n NsEnqueuer) ProjectEnqueueNamespace(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
-	if obj == nil {
-		return nil, nil
-	}
-	project, ok := obj.(*v3.Project)
-	if !ok {
-		logrus.Errorf("unable to convert object: %[1]v, type %[1]T to a project", obj)
-		return nil, nil
-	}
-
-	namespaces, err := n.NsIndexer.ByIndex(NsByProjectIndex, project.Spec.ClusterName+":"+project.Name)
-	if err != nil {
-		return nil, err
-	}
-
-	var namespaceKeys = []relatedresource.Key{}
-	for _, ns := range namespaces {
-		if ns, ok := ns.(*v1.Namespace); ok {
-			namespaceKeys = append(namespaceKeys, relatedresource.Key{Name: ns.Name})
-		}
-	}
-	return namespaceKeys, nil
-}
-
 // RoleTemplateEnqueueNamespace enqueues namespaces when a Role Template with PRTBs in that namespace is updated
 func (n *NsEnqueuer) RoleTemplateEnqueueNamespace(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
 	if obj == nil {
