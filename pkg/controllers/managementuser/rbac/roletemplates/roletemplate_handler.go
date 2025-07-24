@@ -125,7 +125,6 @@ func (rth *roleTemplateHandler) areThereInheritedPromotedRules(inheritedRoleTemp
 	return false, nil
 }
 
-// promotedRulesForProjects maps cluster-scoped resources to their API groups, accessible at project-level.
 var promotedRulesForProjects = map[string]string{
 	"navlinks":          "ui.cattle.io",
 	"nodes":             "",
@@ -134,7 +133,6 @@ var promotedRulesForProjects = map[string]string{
 	"apiservices":       "apiregistration.k8s.io",
 	"clusterrepos":      "catalog.cattle.io",
 	"clusters":          "management.cattle.io",
-	"namespaces":        "",
 }
 
 // ExtractPromotedRules filters a list of PolicyRules for promoted rules for projects and returns the list of promoted rules.
@@ -147,11 +145,6 @@ func ExtractPromotedRules(rules []rbacv1.PolicyRule) []rbacv1.PolicyRule {
 			apiGroupMatch := slices.Contains(rule.APIGroups, apigroup) || slices.Contains(rule.APIGroups, rbacv1.APIGroupAll)
 
 			if resourceMatch && apiGroupMatch {
-				// no promoted rule has to be created for namespaces if no access is defined
-				if resource == "namespaces" && len(rule.Verbs) == 0 {
-					continue
-				}
-
 				// Create our promoted rule for the specific global resource
 				promotedRule := rbacv1.PolicyRule{
 					Resources:     []string{resource},

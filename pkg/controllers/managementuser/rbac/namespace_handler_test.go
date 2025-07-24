@@ -104,7 +104,7 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 				createClusterRoleForProject("p-123xyz", namespaceName, "get"),
 			},
 			wantRoles: []*rbacv1.ClusterRole{
-				addManagePermissionToClusterRole("p-123xyz", createClusterRoleForProject("p-123xyz", namespaceName, "*")),
+				addManagePermissionToClusterRole("p-123xyz", createClusterRoleForProject("p-123xyz", namespaceName, manageNSVerb)),
 			},
 			wantError: false,
 		},
@@ -116,7 +116,7 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 				addManagePermissionToClusterRole("p-123abc", addNamespaceToClusterRole("otherNamespace", "*", createClusterRoleForProject("p-123abc", namespaceName, "*"))),
 			},
 			wantRoles: []*rbacv1.ClusterRole{
-				addManagePermissionToClusterRole("p-123xyz", createClusterRoleForProject("p-123xyz", namespaceName, "*")),
+				addManagePermissionToClusterRole("p-123xyz", createClusterRoleForProject("p-123xyz", namespaceName, manageNSVerb)),
 				addManagePermissionToClusterRole("p-123abc", createClusterRoleForProject("p-123abc", "otherNamespace", "*")),
 			},
 			wantError: false,
@@ -252,6 +252,7 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
+				fmt.Println("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ newRoles: ", newRoles)
 				assert.Len(t, newRoles, len(test.wantRoles))
 				for _, role := range test.wantRoles {
 					assert.Contains(t, newRoles, role)
