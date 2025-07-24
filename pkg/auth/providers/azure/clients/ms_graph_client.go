@@ -27,6 +27,7 @@ import (
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -334,19 +335,24 @@ func userToPrincipal(user models.Userable) v3.Principal {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: Name + "_user://" + *user.GetId(),
 		},
-		DisplayName:   *user.GetDisplayName(),
-		LoginName:     *user.GetUserPrincipalName(),
+		DisplayName:   ptr.Deref(user.GetDisplayName(), ""),
+		LoginName:     ptr.Deref(user.GetUserPrincipalName(), ""),
 		PrincipalType: "user",
 		Provider:      Name,
 	}
 }
 
-func groupToPrincipal(group models.Groupable) v3.Principal {
+type groupObject interface {
+	GetId() *string
+	GetDisplayName() *string
+}
+
+func groupToPrincipal(group groupObject) v3.Principal {
 	return v3.Principal{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: Name + "_group://" + *group.GetId(),
 		},
-		DisplayName:   *group.GetDisplayName(),
+		DisplayName:   ptr.Deref(group.GetDisplayName(), ""),
 		PrincipalType: "group",
 		Provider:      Name,
 	}
