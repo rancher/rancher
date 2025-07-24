@@ -77,7 +77,7 @@ func CreateOrUpdateAPIService(apiservice wranglerapiregistrationv1.APIServiceCon
 		},
 	}
 
-	current, err := apiservice.Get(APIServiceName, metav1.GetOptions{})
+	_, err := apiservice.Get(APIServiceName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		if _, err := apiservice.Create(desired); err != nil {
 			return err
@@ -85,6 +85,11 @@ func CreateOrUpdateAPIService(apiservice wranglerapiregistrationv1.APIServiceCon
 	} else if err != nil {
 		return err
 	} else {
+		//getting it again with newest version
+		current, err := apiservice.Get(APIServiceName, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
 		current.Spec = desired.Spec
 
 		if _, err := apiservice.Update(current); err != nil {
