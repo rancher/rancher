@@ -12,20 +12,26 @@ import (
 	"io/ioutil"
 	"net/http"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/rancher/pkg/capr"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type sshClient struct {
-	secrets  corecontrollers.SecretClient
-	machines capicontrollers.MachineClient
+	secrets         corecontrollers.SecretClient
+	machines        capicontrollers.MachineClient
+	wranglerContext *wrangler.Context
+	capiInitOnce    sync.Once
+	capiInitialized bool
 }
 
 var upgrader = websocket.Upgrader{
@@ -40,7 +46,50 @@ func onError(rw http.ResponseWriter, _ *http.Request, code int, err error) {
 	rw.Write([]byte(err.Error()))
 }
 
+// ensureCAPIInitialized ensures CAPI factory is initialized, doing so only once
+func (s *sshClient) ensureCAPIInitialized(ctx context.Context) error {
+	if s.capiInitialized {
+		return nil
+	}
+
+	initCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	if !s.wranglerContext.WaitForCAPICRDs(initCtx) {
+		return fmt.Errorf("CAPI CRDs not yet available")
+	}
+
+	var initErr error
+	s.capiInitOnce.Do(func() {
+		logrus.Debugf("[ssh] Initializing CAPI factory on demand")
+
+		if err := s.wranglerContext.InitializeCAPIFactory(ctx); err != nil {
+			initErr = fmt.Errorf("failed to initialize CAPI factory: %w", err)
+			return
+		}
+
+		if s.wranglerContext.CAPI != nil {
+			s.machines = s.wranglerContext.CAPI.Machine()
+			s.capiInitialized = true
+			logrus.Infof("[ssh] CAPI factory initialized successfully")
+		} else {
+			initErr = fmt.Errorf("CAPI factory is nil after initialization")
+		}
+	})
+
+	return initErr
+}
+
 func (s *sshClient) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	if !s.capiInitialized {
+		if err := s.ensureCAPIInitialized(req.Context()); err != nil {
+			logrus.Debugf("[ssh] CAPI not ready yet: %v", err)
+			http.Error(rw, "Machine SSH service not ready, please retry", http.StatusServiceUnavailable)
+			rw.Header().Set("Retry-After", "5")
+			return
+		}
+	}
+
 	apiRequest := types.GetAPIContext(req.Context())
 	if err := apiRequest.AccessControl.CanUpdate(apiRequest, types.APIObject{}, apiRequest.Schema); err != nil {
 		apiRequest.WriteError(err)
