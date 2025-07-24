@@ -5,25 +5,33 @@ import (
 	"strings"
 
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
 	projectpkg "github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/settings"
+	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 )
 
-func newProjectLifecycle(r *manager) *pLifecycle {
-	return &pLifecycle{m: r}
+const (
+	projectScopedSecretLabel = "management.cattle.io/project-scoped-secret"
+)
+
+func newProjectLifecycle(r *manager, secretClient wcorev1.SecretClient) *pLifecycle {
+	return &pLifecycle{
+		m:            r,
+		secretClient: secretClient,
+	}
 }
 
 type pLifecycle struct {
-	m *manager
+	m            *manager
+	secretClient wcorev1.SecretClient
 }
 
 func (p *pLifecycle) Create(project *v3.Project) (runtime.Object, error) {
@@ -58,7 +66,7 @@ func (p *pLifecycle) Remove(project *v3.Project) (runtime.Object, error) {
 	for _, suffix := range projectNSVerbToSuffix {
 		roleName := fmt.Sprintf(projectNSGetClusterRoleNameFmt, project.Name, suffix)
 
-		err := p.m.workload.RBAC.ClusterRoles("").Delete(roleName, &v1.DeleteOptions{})
+		err := p.m.workload.RBAC.ClusterRoles("").Delete(roleName, &metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return project, err
 		}
@@ -73,7 +81,7 @@ func (p *pLifecycle) Remove(project *v3.Project) (runtime.Object, error) {
 	for _, o := range namespaces {
 		namespace, _ := o.(*corev1.Namespace)
 		if _, ok := namespace.Annotations["field.cattle.io/creatorId"]; ok {
-			err := p.m.workload.Core.Namespaces("").Delete(namespace.Name, &v1.DeleteOptions{})
+			err := p.m.workload.Core.Namespaces("").Delete(namespace.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				return project, err
 			}
@@ -85,6 +93,17 @@ func (p *pLifecycle) Remove(project *v3.Project) (runtime.Object, error) {
 				if err != nil {
 					return project, err
 				}
+			}
+		}
+
+		// remove project scoped secrets if they exist
+		secrets, err := p.secretClient.List(namespace.Name, metav1.ListOptions{LabelSelector: projectScopedSecretLabel + "=" + project.Name})
+		if err != nil {
+			return project, fmt.Errorf("failed to list project scoped secrets: %w", err)
+		}
+		for _, secret := range secrets.Items {
+			if err := p.secretClient.Delete(namespace.Name, secret.Name, &metav1.DeleteOptions{}); err != nil {
+				return project, fmt.Errorf("failed to delete project scoped secret %s: %w", secret.Name, err)
 			}
 		}
 	}
@@ -121,14 +140,14 @@ func (p *pLifecycle) ensureNamespacesAssigned(project *v3.Project) error {
 }
 
 func (p *pLifecycle) ensureDefaultNamespaceAssigned(project *v3.Project) error {
-	_, err := v32.ProjectConditionDefaultNamespacesAssigned.DoUntilTrue(project, func() (runtime.Object, error) {
+	_, err := v3.ProjectConditionDefaultNamespacesAssigned.DoUntilTrue(project, func() (runtime.Object, error) {
 		return nil, p.assignNamespacesToProject(project, projectpkg.Default)
 	})
 	return err
 }
 
 func (p *pLifecycle) ensureSystemNamespaceAssigned(project *v3.Project) error {
-	_, err := v32.ProjectConditionSystemNamespacesAssigned.DoUntilTrue(project, func() (runtime.Object, error) {
+	_, err := v3.ProjectConditionSystemNamespacesAssigned.DoUntilTrue(project, func() (runtime.Object, error) {
 		return nil, p.assignNamespacesToProject(project, projectpkg.System)
 	})
 	return err
@@ -151,7 +170,7 @@ func (p *pLifecycle) ensureNamespaceRolesUpdated(project *v3.Project) error {
 	manageNSRecord := authorizer.AttributesRecord{
 		Verb:            manageNSVerb,
 		APIGroup:        management.GroupName,
-		Resource:        v32.ProjectResourceName,
+		Resource:        v3.ProjectResourceName,
 		Name:            project.Name,
 		ResourceRequest: true,
 	}
