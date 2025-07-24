@@ -2,6 +2,7 @@ package clients
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/services/graphrbac/1.6/graphrbac"
@@ -51,6 +52,9 @@ func (c *azureADGraphClient) GetGroup(id string) (v3.Principal, error) {
 	group, err := c.groupClient.Get(context.Background(), id)
 	if err != nil {
 		return v3.Principal{}, err
+	}
+	if group.ObjectID == nil || group.DisplayName == nil {
+		return v3.Principal{}, fmt.Errorf("invalid azure group object: %v", group)
 	}
 	return c.groupToPrincipal(group)
 }
