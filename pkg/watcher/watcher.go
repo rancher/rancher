@@ -6,6 +6,7 @@ import (
 
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -116,6 +117,10 @@ func resumableWatch[T generic.RuntimeMetaObject, TList runtime.Object](ctx conte
 				ResourceVersion: lastSeen, // if empty, it will produce an "Added" event with the initial state of the resources
 			})
 			if err != nil {
+				if errors.IsResourceExpired(err) {
+					lastSeen = ""
+					continue
+				}
 				logger.WithError(err).Warnf("creating watch")
 				time.Sleep(options.retryPeriod)
 				continue
