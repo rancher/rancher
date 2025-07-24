@@ -49,7 +49,7 @@ func NewClusterAuthTokenSecretForName(name, hashedValue string) *corev1.Secret {
 		},
 		Type: corev1.SecretTypeOpaque,
 		Data: map[string][]byte{
-			"hash": []byte(hashedValue),
+			ClusterAuthSecretHashField: []byte(hashedValue),
 		},
 	}
 }
@@ -61,7 +61,7 @@ func ClusterAuthTokenSecretName(tokenName string) string {
 
 // ClusterAuthSecretValue extracts the token hash stored in the secret.
 func ClusterAuthTokenSecretValue(clusterAuthSecret *corev1.Secret) string {
-	return string(clusterAuthSecret.Data["hash"])
+	return string(clusterAuthSecret.Data[ClusterAuthSecretHashField])
 }
 
 // VerifyClusterAuthToken verifies that a provided secret key is valid for the
