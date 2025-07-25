@@ -523,7 +523,7 @@ func validateEKSNodegroups(spec *v32.ClusterSpec) error {
 	for _, ng := range nodegroups {
 		name := aws.StringValue(ng.NodegroupName)
 		if name == "" {
-			return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("nodegroupName cannot be an empty"))
+			return httperror.NewAPIError(httperror.InvalidBodyContent, "nodegroupName cannot be an empty")
 		}
 
 		version := ng.Version
@@ -537,7 +537,7 @@ func validateEKSNodegroups(spec *v32.ClusterSpec) error {
 	}
 
 	if len(errors) != 0 {
-		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf(strings.Join(errors, ";")))
+		return httperror.NewAPIError(httperror.InvalidBodyContent, strings.Join(errors, ";"))
 	}
 	return nil
 }
@@ -691,11 +691,11 @@ func validateGKENodePools(spec *v32.ClusterSpec) error {
 	}
 
 	if !hasRequiredLinuxPool {
-		errors = append(errors, fmt.Sprintf("at least 1 Linux node pool is required"))
+		errors = append(errors, "at least 1 Linux node pool is required")
 	}
 
 	if len(errors) != 0 {
-		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf(strings.Join(errors, ";")))
+		return httperror.NewAPIError(httperror.InvalidBodyContent, strings.Join(errors, ";"))
 	}
 	return nil
 }

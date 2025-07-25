@@ -1,6 +1,7 @@
 package yaml
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -47,7 +48,7 @@ func (s *yamlLinkHandler) LinkHandler(apiContext *types.APIContext, next types.R
 
 	schema := apiContext.Schemas.Schema(apiContext.Version, apiContext.Type)
 	if schema == nil {
-		return fmt.Errorf("failed to find schema " + apiContext.Type)
+		return errors.New("failed to find schema " + apiContext.Type)
 	}
 
 	data, err := schema.Store.ByID(apiContext, schema, apiContext.ID)
