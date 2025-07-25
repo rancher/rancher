@@ -133,9 +133,20 @@ func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole) er
 
 	clusterRole, _ := gr.crLister.Get("", crName)
 	if clusterRole != nil {
+		updated := false
 		if !reflect.DeepEqual(globalRole.Rules, clusterRole.Rules) {
 			clusterRole.Rules = globalRole.Rules
 			logrus.Infof("[%v] Updating clusterRole %v. GlobalRole rules have changed. Have: %+v. Want: %+v", grController, clusterRole.Name, clusterRole.Rules, globalRole.Rules)
+			updated = true
+		}
+		// Ensure existing ClusterRoles have the correct grOwnerLabel pointing to the owning GlobalRole.
+		if _, exists := clusterRole.Labels[grOwnerLabel]; !exists {
+			clusterRole.Labels[grOwnerLabel] = globalRole.Name
+			logrus.Infof("[%v] Updating clusterRole %v. Adds missing grOwner label.", grController, clusterRole.Name)
+			updated = true
+		}
+
+		if updated {
 			if _, err := gr.crClient.Update(clusterRole); err != nil {
 				addCondition(globalRole, condition, FailedToUpdateClusterRole, crName, err)
 				return fmt.Errorf("couldn't update ClusterRole %v: %w", clusterRole.Name, err)
