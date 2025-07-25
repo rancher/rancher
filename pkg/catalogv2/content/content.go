@@ -366,13 +366,7 @@ func deepCopyIndex(src *repo.IndexFile) *repo.IndexFile {
 // filterReleases filters out any chart versions that do not match the Rancher and Kubernetes versions, if specified in the chart's annotations.
 // Returns the filtered or unfiltered IndexFile of a chart repository
 func (c *Manager) filterReleases(index *repo.IndexFile, k8sVersion *semver.Version, skipFilter bool) *repo.IndexFile {
-
-	// This block of code checks if the current version of the server is a released version or not.
-	// The method settings.IsRelease() checks two things:
-	// 1. If the server version does not contain the "head" substring. If "head" is present, it means the server is not a released version.
-	// 2. If the server version matches the releasePattern. A valid release version should start with "v" followed by a single digit, such as v1, v2, v3, etc.
-	// If the server is not a released version (settings.IsRelease() returns false) or if skipFilter is true, it returns the current index.
-	if !settings.IsRelease() || skipFilter {
+	if skipFilter || skipIndexFiltering() {
 		return index
 	}
 
@@ -457,4 +451,16 @@ func isHTTP(iconURL string) bool {
 func isRancherAndBundledCatalog(repo repoDef) bool {
 	gitDir := git.RepoDir(repo.metadata.Namespace, repo.metadata.Name, repo.status.URL)
 	return (git.IsBundled(gitDir) && settings.SystemCatalog.Get() == "bundled")
+}
+
+// skipIndexFiltering returns true if the helm index filtering should be skipped.
+func skipIndexFiltering() bool {
+	serverVersion := settings.ServerVersion.Get()
+
+	// If the server version is a release or a release candidate (rc), we don't skip filtering.
+	if settings.IsRelease() || strings.Contains(serverVersion, "-rc") {
+		return false
+	}
+	// If setting is true, we skip filtering.
+	return settings.SkipHelmIndexFiltering.Get() == "true"
 }
