@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 )
@@ -129,6 +130,62 @@ func TestResumableWatch_ResumesAfterErrorEvent(t *testing.T) {
 
 	go resumableWatch[*corev1.ConfigMap, *corev1.ConfigMapList](ctx, mockClient, callback)
 	for !doneFirstWatch {
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			ResourceVersion: "1",
+		},
+	}
+	watcher.Add(cm)
+	watcher.Error(nil)
+
+	// Wait for events to be processed and watch resumed (first try is immediate)
+	time.Sleep(100 * time.Millisecond)
+	assert.Equal(t, 1, eventsProcessed, "Expected one watch event")
+
+	cm.ResourceVersion = "2"
+	watcher.Modify(cm)
+
+	// Verify the watcher keeps working and processing events after the interruption
+	time.Sleep(100 * time.Millisecond)
+	assert.Equal(t, 2, eventsProcessed, "Expected one watch event")
+}
+
+// TestResumableWatch_ResetResourceVersionAfterExpired verifies that the watch is reset after receiving 410 Gone HTTP code
+func TestResumableWatch_ResetResourceVersionAfterExpired(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	watcher := watch.NewFake()
+	mockClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
+	var count int
+	mockClient.EXPECT().Watch(gomock.Any(), gomock.Cond(func(opts metav1.ListOptions) bool {
+		switch {
+		case count == 1:
+			return opts.ResourceVersion == "1"
+		case count == 2:
+			return opts.ResourceVersion == ""
+		}
+		return true
+	})).DoAndReturn(func(_ string, opts metav1.ListOptions) (watch.Interface, error) {
+		count++
+		watcher.Reset()
+		if opts.ResourceVersion == "1" {
+			return nil, errors.NewResourceExpired("resource version too old")
+		}
+		return watcher, nil
+	}).Times(3)
+
+	var eventsProcessed int
+	callback := func(obj *corev1.ConfigMap, eventType watch.EventType) {
+		eventsProcessed++
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go resumableWatch[*corev1.ConfigMap, *corev1.ConfigMapList](ctx, mockClient, callback)
+	for count == 0 {
 		time.Sleep(50 * time.Millisecond)
 	}
 
