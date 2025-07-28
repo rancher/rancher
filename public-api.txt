@@ -6,6 +6,7 @@
 Kubeconfig.ext.cattle.io
 Token.ext.cattle.io
 
+AuditPolicy.auditlog.cattle.io
 ClusterRoleTemplateBinding.management.cattle.io
 GlobalRole.management.cattle.io
 GlobalRoleBinding.management.cattle.io
