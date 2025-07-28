@@ -1,11 +1,13 @@
 package rbac
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/secret"
 	"github.com/rancher/rancher/pkg/namespace"
 	projectpkg "github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/settings"
@@ -16,10 +18,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
-)
-
-const (
-	projectScopedSecretLabel = "management.cattle.io/project-scoped-secret"
 )
 
 func newProjectLifecycle(r *manager, secretClient wcorev1.SecretClient) *pLifecycle {
@@ -78,6 +76,8 @@ func (p *pLifecycle) Remove(project *v3.Project) (runtime.Object, error) {
 		return project, err
 	}
 
+	var returnErrors error
+
 	for _, o := range namespaces {
 		namespace, _ := o.(*corev1.Namespace)
 		if _, ok := namespace.Annotations["field.cattle.io/creatorId"]; ok {
@@ -97,18 +97,18 @@ func (p *pLifecycle) Remove(project *v3.Project) (runtime.Object, error) {
 		}
 
 		// remove project scoped secrets if they exist
-		secrets, err := p.secretClient.List(namespace.Name, metav1.ListOptions{LabelSelector: projectScopedSecretLabel + "=" + project.Name})
+		secrets, err := p.secretClient.List(namespace.Name, metav1.ListOptions{LabelSelector: secret.ProjectScopedSecretLabel + "=" + project.Name})
 		if err != nil {
 			return project, fmt.Errorf("failed to list project scoped secrets: %w", err)
 		}
 		for _, secret := range secrets.Items {
-			if err := p.secretClient.Delete(namespace.Name, secret.Name, &metav1.DeleteOptions{}); err != nil {
-				return project, fmt.Errorf("failed to delete project scoped secret %s: %w", secret.Name, err)
+			if err := p.secretClient.Delete(namespace.Name, secret.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+				returnErrors = errors.Join(returnErrors, err)
 			}
 		}
 	}
 
-	return nil, nil
+	return nil, returnErrors
 }
 
 func (p *pLifecycle) ensureNamespacesAssigned(project *v3.Project) error {
