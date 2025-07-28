@@ -1,4 +1,4 @@
-webhookVersion: 106.0.4+up0.7.4-rc.2
+webhookVersion: 106.0.4+up0.7.4
 remoteDialerProxyVersion: 106.0.0+up0.4.4
 provisioningCAPIVersion: 106.0.0+up0.7.0
 cspAdapterMinVersion: 106.0.0+up6.0.0
