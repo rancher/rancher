@@ -204,6 +204,29 @@ func (w *Context) OnLeader(f func(ctx context.Context) error) {
 	w.leadership.OnLeader(f)
 }
 
+func (w *Context) checkGVK(ctx context.Context, gvk schema.GroupVersionKind) error {
+	logrus.Warnf("cache for '%s' did not sync", gvk.String())
+	crd, err := w.CRD.CustomResourceDefinition().Get(gvk.GroupKind().String(), metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get crd for gvk: %s", err)
+
+	}
+
+	var enabled bool
+	for _, v := range crd.Spec.Versions {
+		if v.Served {
+			enabled = true
+			break
+		}
+	}
+
+	if !enabled {
+		return fmt.Errorf("crd '%s' has not served versions")
+	}
+
+	return nil
+}
+
 func (w *Context) StartWithTransaction(ctx context.Context, f func(context.Context) error) (err error) {
 	transaction := controller.NewHandlerTransaction(ctx)
 	if err := f(transaction); err != nil {
@@ -222,7 +245,9 @@ func (w *Context) StartWithTransaction(ctx context.Context, f func(context.Conte
 
 	for gvk, isSynced := range gvks {
 		if !isSynced {
-			logrus.Warnf("cache for '%s' did not sync", gvk.String())
+			if err := w.checkGVK(ctx, gvk); err != nil {
+				logrus.Errorf("found issues for gvk '%s': %s", gvk.String(), err)
+			}
 		}
 	}
 
