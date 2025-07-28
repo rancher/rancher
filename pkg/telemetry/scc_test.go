@@ -315,6 +315,7 @@ func TestSccPayload(t *testing.T) {
 			"",
 			"",
 			"",
+			"",
 			tc.input.localCluster,
 			tc.input.localNodes,
 			tc.input.managedClusters,

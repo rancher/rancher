@@ -18,8 +18,12 @@ import (
 )
 
 type TelemetryExporterManager interface {
-	// Registers an exporter. Must be registered before Start
-	Register(name string, exp TelemetryExporter, retry time.Duration)
+	// Register will Register an exporterd. Exporter ids should be unique.
+	// When a duplicate id is registered it will be ignored.
+	Register(exporterId string, exp TelemetryExporter, retry time.Duration)
+	// Delete deregisters an exporter
+	Delete(exporterId string)
+	Has(exporterId string) bool
 	// Start starts the collection and export background tasks
 	Start(ctx context.Context, info initcond.InitInfo) error
 	Stop() error
@@ -30,7 +34,7 @@ func NewTelemetryExporterManager(telG TelemetryGatherer) TelemetryExporterManage
 	started.Store(0)
 	return &simpleManager{
 		telG:       telG,
-		exporterMu: &sync.Mutex{},
+		exporterMu: &sync.RWMutex{},
 		exporters:  map[string]exporterRetry{},
 		done:       make(chan struct{}),
 		log: logrus.WithFields(
@@ -45,10 +49,12 @@ func NewTelemetryExporterManager(telG TelemetryGatherer) TelemetryExporterManage
 type exporterRetry struct {
 	exp      TelemetryExporter
 	retryDur time.Duration
+	running  *atomic.Uint32
+	caFunc   context.CancelFunc
 }
 
 type simpleManager struct {
-	exporterMu *sync.Mutex
+	exporterMu *sync.RWMutex
 	exporters  map[string]exporterRetry
 
 	started *atomic.Uint32
@@ -61,12 +67,94 @@ type simpleManager struct {
 func (s *simpleManager) Register(name string, exp TelemetryExporter, retry time.Duration) {
 	s.exporterMu.Lock()
 	defer s.exporterMu.Unlock()
-	if s.started.Load() == 1 {
+	initVal := &atomic.Uint32{}
+	initVal.Store(uint32(0))
+	// FIXME: probably treat this as an update instead...
+	if _, ok := s.exporters[name]; ok {
 		return
 	}
 	s.exporters[name] = exporterRetry{
 		exp:      exp,
 		retryDur: retry,
+		running:  initVal,
+	}
+}
+
+func (s *simpleManager) Has(name string) bool {
+	_, ok := s.exporters[name]
+	return ok
+}
+
+func (s *simpleManager) Delete(name string) {
+	s.exporterMu.Lock()
+	defer s.exporterMu.Unlock()
+	if exp, ok := s.exporters[name]; ok {
+		// TODO : this will have race conditions! Big bad
+		if exp.running.Load() == 1 {
+			if exp.caFunc != nil {
+				panic("unexpected nil context cancel func")
+			}
+			exp.caFunc()
+		}
+		delete(s.exporters, name)
+
+	} else {
+		// debug log
+	}
+}
+
+func (s *simpleManager) startIfNotStarted(ctx context.Context, info initcond.InitInfo) error {
+	s.exporterMu.Lock()
+	defer s.exporterMu.Unlock()
+	for name, exporter := range s.exporters {
+		exporter := exporter
+		exporter.exp.Register(s.telG)
+
+		if exporter.running.CompareAndSwap(0, 1) {
+			ctxca, ca := context.WithCancel(ctx)
+			exporter.caFunc = ca
+			log := s.log.WithField("telemetry-exporter", name)
+			go func() {
+				defer ca()
+				t := time.NewTicker(exporter.retryDur)
+				defer t.Stop()
+				for {
+					select {
+					case <-t.C:
+						log.Trace("gathering telemetry...")
+						if err := exporter.exp.CollectAndExport(); err != nil {
+							log.WithError(err).Error("failed to collect and export telemetry data")
+						}
+						log.Trace("gathered telemetry")
+					case <-s.done:
+						return
+					case <-ctx.Done():
+						return
+					case <-ctxca.Done():
+						return
+					}
+				}
+			}()
+		}
+	}
+	return nil
+}
+
+// run should only after Start is called
+func (s *simpleManager) runAll(ctx context.Context, info initcond.InitInfo) {
+	// TODO: configurable? or something more sane
+	poller := time.NewTicker(time.Second * 60)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-s.done:
+			return
+		case <-poller.C:
+			if err := s.startIfNotStarted(ctx, info); err != nil {
+				s.log.Error("failed to start pending telemetry exporters")
+			}
+		}
 	}
 }
 
@@ -80,30 +168,7 @@ func (s *simpleManager) Start(ctx context.Context, info initcond.InitInfo) error
 		return fmt.Errorf("already started")
 	}
 
-	for name, exporter := range s.exporters {
-		exporter := exporter
-		exporter.exp.Register(s.telG)
-		go func() {
-			log := s.log.WithField("telemetry-exporter", name)
-			t := time.NewTicker(exporter.retryDur)
-			defer t.Stop()
-
-			for {
-				select {
-				case <-t.C:
-					log.Trace("gathering telemetry...")
-					if err := exporter.exp.CollectAndExport(); err != nil {
-						log.WithError(err).Error("failed to collect and export telemetry data")
-					}
-					log.Trace("gathered telemetry")
-				case <-s.done:
-					return
-				case <-ctx.Done():
-					return
-				}
-			}
-		}()
-	}
+	go s.runAll(ctx, info)
 	return nil
 }
 

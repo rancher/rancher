@@ -41,6 +41,7 @@ type RancherVersionTelemetry interface {
 	ClusterUUID() string
 	ServerURL() string
 	RancherVersion() string
+	RancherGitHash() string
 	FeatureFlags() []string
 }
 
@@ -55,7 +56,7 @@ type RancherManagerTelemetry interface {
 	LocalNodeCount() int
 	LocalClusterTelemetry() ClusterTelemetry
 
-	// Versionning
+	// RancherVersionTelemetry exposes versioning related metadata
 	RancherVersionTelemetry
 }
 
@@ -140,6 +141,7 @@ func (n *nodeTelemetryImpl) KernelVersion() string {
 
 type rancherTelemetryImpl struct {
 	rancherVersion string
+	gitHash        string
 	installUUID    string
 	clusterUUID    string
 	serverURL      string
@@ -150,6 +152,8 @@ type rancherTelemetryImpl struct {
 	managedClusters []*v3.Cluster
 	managedNodes    map[ClusterID][]*v3.Node
 }
+
+var _ RancherManagerTelemetry = (*rancherTelemetryImpl)(nil)
 
 func (r *rancherTelemetryImpl) ManagedClusterCount() int {
 	return 1 + len(r.managedClusters)
@@ -186,6 +190,10 @@ func (r *rancherTelemetryImpl) PerManagedClusterTelemetry() iter.Seq2[ClusterID,
 
 func (r *rancherTelemetryImpl) RancherVersion() string {
 	return r.rancherVersion
+}
+
+func (r *rancherTelemetryImpl) RancherGitHash() string {
+	return r.gitHash
 }
 
 func (r *rancherTelemetryImpl) InstallUUID() string {
@@ -243,6 +251,7 @@ func (c *clusterTelemetryImpl) PerNodeTelemetry() iter.Seq2[NodeID, NodeTelemetr
 
 type TelemetryGatherer struct {
 	rancherVersion string
+	gitHash        string
 	installUUID    string
 	clusterUUID    string
 	serverURL      string
@@ -266,6 +275,7 @@ func (t *TelemetryGatherer) visitWithInitInfo(info initcond.InitInfo) {
 	t.serverURL = info.ServerURL
 	t.installUUID = info.InstallUUID
 	t.rancherVersion = info.RancherVersion
+	t.gitHash = info.GitHash
 }
 
 func (t *TelemetryGatherer) GetClusterTelemetry() (RancherManagerTelemetry, error) {
@@ -303,6 +313,7 @@ func (t *TelemetryGatherer) GetClusterTelemetry() (RancherManagerTelemetry, erro
 	}
 	return newTelemetryImpl(
 		t.rancherVersion,
+		t.gitHash,
 		t.installUUID,
 		t.clusterUUID,
 		t.serverURL,
@@ -315,6 +326,7 @@ func (t *TelemetryGatherer) GetClusterTelemetry() (RancherManagerTelemetry, erro
 
 func newTelemetryImpl(
 	version,
+	gitHash,
 	installUUID,
 	clusterUUID string,
 	serverURL string,
@@ -325,6 +337,7 @@ func newTelemetryImpl(
 ) *rancherTelemetryImpl {
 	return &rancherTelemetryImpl{
 		rancherVersion:  version,
+		gitHash:         gitHash,
 		installUUID:     installUUID,
 		clusterUUID:     clusterUUID,
 		serverURL:       serverURL,
