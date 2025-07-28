@@ -6,11 +6,13 @@ package wrangler
 import (
 	"context"
 	"fmt"
-	"github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io"
-	sccv1 "github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io/v1"
 	"net"
 	"net/http"
 	"sync"
+	"time"
+
+	"github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io"
+	sccv1 "github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io/v1"
 
 	fleetv1alpha1api "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/lasso/pkg/controller"
@@ -198,7 +200,15 @@ func (w *Context) StartWithTransaction(ctx context.Context, f func(context.Conte
 		return err
 	}
 
-	w.ControllerFactory.SharedCacheFactory().WaitForCacheSync(ctx)
+	timeoutCtx, _ := context.WithTimeout(ctx, time.Minute*5)
+	gvks := w.ControllerFactory.SharedCacheFactory().WaitForCacheSync(timeoutCtx)
+
+	for gvk, isSynced := range gvks {
+		if !isSynced {
+			logrus.Warnf("cache for '%s' did not sync", gvk.String())
+		}
+	}
+
 	transaction.Commit()
 	return w.Start(ctx)
 }
