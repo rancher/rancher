@@ -6,12 +6,13 @@ import (
 )
 
 const (
-	SccSecretName      = "rancher-scc-telemetry"
-	SccSecretNamespace = "cattle-system"
+	SccSecretName = "rancher-scc-telemetry"
 
-	archUnknown = "unknown"
+	archUnknown              = "unknown"
+	rancherProductIdentifier = "rancher"
 )
 
+// SccPayload represents the canonical golang implementation of `schemas/scc-RMSSubscription.json`
 type SccPayload struct {
 	Version         string          `json:"version"`
 	Subscription    SccSubscription `json:"subscription"`
@@ -72,8 +73,8 @@ func GenerateSCCPayload(telG RancherManagerTelemetry) (*SccPayload, error) {
 	now := time.Now()
 	systemsMap := map[sccSystemKey]int{}
 	clustersMap := map[nodeCount]int{}
-	systems := []SccSystem{}
-	clusters := []SccCluster{}
+	var systems []SccSystem
+	var clusters []SccCluster
 
 	localCluster := telG.LocalClusterTelemetry()
 	localNodeCount := 0
@@ -148,11 +149,9 @@ func GenerateSCCPayload(telG RancherManagerTelemetry) (*SccPayload, error) {
 			ClusterUUID: telG.ClusterUUID(),
 			Version:     telG.RancherVersion(),
 			Arch:        archUnknown,
-			// TODO
-			Product: "",
-			// TODO
-			Git:       "",
-			ServerURL: telG.ServerURL(),
+			Product:     rancherProductIdentifier,
+			Git:         telG.RancherGitHash(),
+			ServerURL:   telG.ServerURL(),
 		},
 		Timestamp: now,
 	}, nil
