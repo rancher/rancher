@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"sync"
+	"time"
 
 	fleetv1alpha1api "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/lasso/pkg/controller"
@@ -101,12 +103,27 @@ var (
 	}
 	AddToScheme = localSchemeBuilder.AddToScheme
 	Scheme      = runtime.NewScheme()
+
+	cacheSyncTimeoutEnvVar = "CACHE_SYNC_TIMEOUT"
+	cacheSyncTimeout       time.Duration
 )
 
 func init() {
 	metav1.AddToGroupVersion(Scheme, schema.GroupVersion{Version: "v1"})
 	utilruntime.Must(AddToScheme(Scheme))
 	utilruntime.Must(schemes.AddToScheme(Scheme))
+
+	switch timeout := os.Getenv(cacheSyncTimeoutEnvVar); timeout {
+	case "":
+		cacheSyncTimeout = time.Minute * 5
+
+	default:
+		var err error
+		cacheSyncTimeout, err = time.ParseDuration(timeout)
+		if err != nil {
+			logrus.Fatalf("env var '%s' is not a valid duration: %s", cacheSyncTimeoutEnvVar, timeout)
+		}
+	}
 }
 
 type Context struct {
@@ -204,7 +221,15 @@ func (w *Context) StartWithTransaction(ctx context.Context, f func(context.Conte
 		return err
 	}
 
-	w.ControllerFactory.SharedCacheFactory().WaitForCacheSync(ctx)
+	timeoutCtx, _ := context.WithTimeout(ctx, cacheSyncTimeout)
+	gvks := w.ControllerFactory.SharedCacheFactory().WaitForCacheSync(timeoutCtx)
+
+	for gvk, isSynced := range gvks {
+		if !isSynced {
+			logrus.Warnf("cache for '%s' did not sync", gvk.String())
+		}
+	}
+
 	transaction.Commit()
 	return w.Start(ctx)
 }
