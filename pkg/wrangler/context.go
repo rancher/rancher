@@ -201,7 +201,15 @@ func (w *Context) StartWithTransaction(ctx context.Context, f func(context.Conte
 		return err
 	}
 
-	w.ControllerFactory.SharedCacheFactory().WaitForCacheSync(ctx)
+	timeoutCtx, _ := context.WithTimeout(ctx, time.Minute*5)
+	gvks := w.ControllerFactory.SharedCacheFactory().WaitForCacheSync(timeoutCtx)
+
+	for gvk, isSynced := range gvks {
+		if !isSynced {
+			logrus.Warnf("cache for '%s' did not sync", gvk.String())
+		}
+	}
+
 	transaction.Commit()
 	return w.Start(ctx)
 }
