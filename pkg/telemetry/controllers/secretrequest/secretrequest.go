@@ -3,6 +3,7 @@ package secretrequest
 import (
 	"context"
 	"fmt"
+
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/telemetry.cattle.io/v1"
 	secretRequestControllers "github.com/rancher/rancher/pkg/generated/controllers/telemetry.cattle.io/v1"
@@ -11,9 +12,11 @@ import (
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+
 	//"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"time"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const PayloadSecretKey = "payload"
@@ -38,6 +41,7 @@ func Register(
 	systemProject *mgmtv3.Project,
 	namespaces v1core.NamespaceController,
 	secrets v1core.SecretController,
+	telemetryManager telemetry.TelemetryExporterManager,
 ) {
 	controller := &handler{
 		ctx:                ctx,
@@ -46,6 +50,7 @@ func Register(
 		systemProject:      systemProject,
 		namespaces:         namespaces,
 		secrets:            secrets,
+		telemetryManager:   telemetryManager,
 	}
 
 	secretRequests.OnChange(ctx, "secret-requests", controller.OnSecretRequestChange)
@@ -64,17 +69,15 @@ func (h *handler) OnSecretRequestRemove(key string, incomingObj *v1.SecretReques
 	return nil, nil
 }
 
+// FIXME: status and retry considerations should be more carefully implemented here
 func (h *handler) OnSecretRequestChange(key string, incomingObj *v1.SecretRequest) (*v1.SecretRequest, error) {
 	if incomingObj == nil {
 		return nil, nil
 	}
-
 	logrus.Debugf("Received secret request for '%s'", incomingObj.Name)
 	logrus.Debug(incomingObj)
 
-	// TODO: does this need to verify we're going to make changes somehow?
 	if !incomingObj.HasCondition(v1.ResourceConditionProgressing) {
-		// TODO: in retry loop?
 		preparedObj := incomingObj.DeepCopy()
 		v1.ResourceConditionProgressing.True(preparedObj)
 		_, err := h.secretRequests.UpdateStatus(preparedObj)
@@ -83,7 +86,6 @@ func (h *handler) OnSecretRequestChange(key string, incomingObj *v1.SecretReques
 	}
 
 	if isValid, err := h.isValidSecretRequest(incomingObj); !isValid {
-		// TODO: in retry loop?
 		preparedObj := incomingObj.DeepCopy()
 		v1.ResourceConditionFailure.SetError(preparedObj, "Secret Request is in an invalid state", err)
 		v1.ResourceConditionFailure.True(preparedObj)
@@ -115,40 +117,6 @@ func (h *handler) OnSecretRequestChange(key string, incomingObj *v1.SecretReques
 		),
 		time.Second*60,
 	)
-	//existingTargetSecret, existingErr := h.secrets.Get(incomingObj.Spec.TargetSecretRef.Namespace, incomingObj.Spec.TargetSecretRef.Name, metav1.GetOptions{})
-	//if existingErr != nil && !errors.IsNotFound(existingErr) {
-	//	logrus.Errorf("error getting existing target secret for secret request '%s': %v", incomingObj.Name, existingErr)
-	//	return incomingObj, existingErr
-	//}
-
-	// TODO: something to actually prepare the secret data (or fetch it from the main instance of the secret of that type to clone it to this target)?
-
-	//desiredSecret := &corev1.Secret{
-	//	ObjectMeta: metav1.ObjectMeta{
-	//		Name:      incomingObj.Spec.TargetSecretRef.Name,
-	//		Namespace: incomingObj.Spec.TargetSecretRef.Namespace,
-	//	},
-	//	Data: map[string][]byte{
-	//		PayloadSecretKey: []byte("TODO: some secret data"),
-	//	},
-	//}
-	//
-	//if existingErr != nil && errors.IsNotFound(existingErr) {
-	//	created, createErr := h.secrets.Create(desiredSecret)
-	//	if createErr != nil {
-	//		return nil, fmt.Errorf("error creating target secret '%s': %w", incomingObj.Spec.TargetSecretRef, createErr)
-	//	}
-	//	logrus.Debugf("Created target secret '%s'", created)
-	//} else {
-	//	preparedSecret := existingTargetSecret.DeepCopy()
-	//	preparedSecret.Data = desiredSecret.Data
-	//	updated, updateErr := h.secrets.Update(preparedSecret)
-	//	if updateErr != nil {
-	//		return nil, fmt.Errorf("error updating target secret '%s': %w", incomingObj.Spec.TargetSecretRef, updateErr)
-	//	}
-	//	logrus.Debugf("Updated target secret '%s'", updated)
-	//}
-	// TODO: (dan)
 	preparedObj := incomingObj.DeepCopy()
 	v1.ResourceConditionDone.True(preparedObj)
 	v1.ResourceConditionProgressing.False(preparedObj)
@@ -158,8 +126,7 @@ func (h *handler) OnSecretRequestChange(key string, incomingObj *v1.SecretReques
 	if updateErr != nil {
 		return incomingObj, fmt.Errorf("error updating secret request '%s': %w", incomingObj.Spec.TargetSecretRef, updateErr)
 	}
-
-	logrus.Debugf("Updated secret request '%s'", updated)
+	logrus.Debugf("Updated secret request '%v'", updated)
 	return incomingObj, nil
 }
 
@@ -168,7 +135,7 @@ func (h *handler) isValidSecretRequest(secretRequest *v1.SecretRequest) (bool, e
 		return false, fmt.Errorf("secretRequest cannot be nil")
 	}
 
-	// TODO: better way to manage this enums maybe?
+	// could design an enum system here, but I think it's fine
 	if secretRequest.Spec.SecretType != "scc" {
 		return false, fmt.Errorf("secretRequest.Spec.SecretType must be 'scc'")
 	}

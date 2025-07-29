@@ -17,26 +17,35 @@ import (
 	"k8s.io/client-go/util/retry"
 )
 
+type ExporterStatus string
+
+const (
+	ExporterStatusRunning    ExporterStatus = "Running"
+	ExporterStatusNotRunning ExporterStatus = "NotRunning"
+)
+
 type TelemetryExporterManager interface {
 	// Register will Register an exporterd. Exporter ids should be unique.
 	// When a duplicate id is registered it will be ignored.
 	Register(exporterId string, exp TelemetryExporter, retry time.Duration)
 	// Delete deregisters an exporter
 	Delete(exporterId string)
+	Status(exporterId string) ExporterStatus
 	Has(exporterId string) bool
 	// Start starts the collection and export background tasks
 	Start(ctx context.Context, info initcond.InitInfo) error
 	Stop() error
 }
 
-func NewTelemetryExporterManager(telG TelemetryGatherer) TelemetryExporterManager {
+func NewTelemetryExporterManager(telG TelemetryGatherer, pollInterval time.Duration) TelemetryExporterManager {
 	started := &atomic.Uint32{}
 	started.Store(0)
 	return &simpleManager{
-		telG:       telG,
-		exporterMu: &sync.RWMutex{},
-		exporters:  map[string]exporterRetry{},
-		done:       make(chan struct{}),
+		pollInterval: pollInterval,
+		telG:         telG,
+		exporterMu:   &sync.RWMutex{},
+		exporters:    map[string]*exporterRetry{},
+		done:         make(chan struct{}),
 		log: logrus.WithFields(
 			logrus.Fields{
 				"component": "telemetry-broker",
@@ -55,9 +64,10 @@ type exporterRetry struct {
 
 type simpleManager struct {
 	exporterMu *sync.RWMutex
-	exporters  map[string]exporterRetry
+	exporters  map[string]*exporterRetry
 
-	started *atomic.Uint32
+	started      *atomic.Uint32
+	pollInterval time.Duration
 
 	telG TelemetryGatherer
 	done chan struct{}
@@ -69,11 +79,11 @@ func (s *simpleManager) Register(name string, exp TelemetryExporter, retry time.
 	defer s.exporterMu.Unlock()
 	initVal := &atomic.Uint32{}
 	initVal.Store(uint32(0))
-	// FIXME: probably treat this as an update instead...
+	// FIXME: we could probably think about treating this as an update instead...
 	if _, ok := s.exporters[name]; ok {
 		return
 	}
-	s.exporters[name] = exporterRetry{
+	s.exporters[name] = &exporterRetry{
 		exp:      exp,
 		retryDur: retry,
 		running:  initVal,
@@ -81,35 +91,48 @@ func (s *simpleManager) Register(name string, exp TelemetryExporter, retry time.
 }
 
 func (s *simpleManager) Has(name string) bool {
+	s.exporterMu.RLock()
+	defer s.exporterMu.RUnlock()
 	_, ok := s.exporters[name]
 	return ok
+}
+
+func (s *simpleManager) Status(name string) ExporterStatus {
+	s.exporterMu.RLock()
+	defer s.exporterMu.RUnlock()
+
+	exp, ok := s.exporters[name]
+
+	if !ok {
+		return ExporterStatusNotRunning
+	}
+	if exp.running.Load() == 1 {
+		return ExporterStatusRunning
+	}
+	return ExporterStatusNotRunning
 }
 
 func (s *simpleManager) Delete(name string) {
 	s.exporterMu.Lock()
 	defer s.exporterMu.Unlock()
 	if exp, ok := s.exporters[name]; ok {
-		// TODO : this will have race conditions! Big bad
 		if exp.running.Load() == 1 {
-			if exp.caFunc != nil {
+			if exp.caFunc == nil {
 				panic("unexpected nil context cancel func")
 			}
 			exp.caFunc()
 		}
 		delete(s.exporters, name)
 
-	} else {
-		// debug log
 	}
 }
 
-func (s *simpleManager) startIfNotStarted(ctx context.Context, info initcond.InitInfo) error {
+func (s *simpleManager) startIfNotStarted(ctx context.Context) error {
 	s.exporterMu.Lock()
 	defer s.exporterMu.Unlock()
 	for name, exporter := range s.exporters {
 		exporter := exporter
 		exporter.exp.Register(s.telG)
-
 		if exporter.running.CompareAndSwap(0, 1) {
 			ctxca, ca := context.WithCancel(ctx)
 			exporter.caFunc = ca
@@ -141,9 +164,9 @@ func (s *simpleManager) startIfNotStarted(ctx context.Context, info initcond.Ini
 }
 
 // run should only after Start is called
-func (s *simpleManager) runAll(ctx context.Context, info initcond.InitInfo) {
+func (s *simpleManager) runAll(ctx context.Context) {
 	// TODO: configurable? or something more sane
-	poller := time.NewTicker(time.Second * 60)
+	poller := time.NewTicker(s.pollInterval)
 	for {
 		select {
 		case <-ctx.Done():
@@ -151,7 +174,7 @@ func (s *simpleManager) runAll(ctx context.Context, info initcond.InitInfo) {
 		case <-s.done:
 			return
 		case <-poller.C:
-			if err := s.startIfNotStarted(ctx, info); err != nil {
+			if err := s.startIfNotStarted(ctx); err != nil {
 				s.log.Error("failed to start pending telemetry exporters")
 			}
 		}
@@ -168,7 +191,7 @@ func (s *simpleManager) Start(ctx context.Context, info initcond.InitInfo) error
 		return fmt.Errorf("already started")
 	}
 
-	go s.runAll(ctx, info)
+	go s.runAll(ctx)
 	return nil
 }
 
