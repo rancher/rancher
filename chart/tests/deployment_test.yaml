@@ -695,3 +695,20 @@ tests:
           limits:
             cpu: 500m
             memory: 500Mi
+- it: should set the CACHE_SYNC_TIMEOUT when provided
+  set:
+    cacheSyncTimeout: 10m
+  asserts:
+  - equal:
+      path: spec.template.spec.containers[0].env
+      value:
+        - name: CATTLE_NAMESPACE
+          value: NAMESPACE
+        - name: CATTLE_PEER_SERVICE
+          value: RELEASE-NAME-rancher
+        - name: IMPERATIVE_API_APP_SELECTOR
+          value: RELEASE-NAME-rancher
+        - name: IMPERATIVE_API_DIRECT
+          value: "true"
+        - name: CACHE_SYNC_TIMEOUT
+          value: 10m
