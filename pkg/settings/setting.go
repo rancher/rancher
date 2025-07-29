@@ -56,6 +56,7 @@ var (
 		"cattle-elemental-system",
 		"cattle-scc-system",
 		"cattle-telemetry-system",
+		"cattle-tokens",
 	}
 
 	AgentImage          = NewSetting("agent-image", "rancher/rancher-agent:head")
