@@ -403,7 +403,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 		r.Wrangler.Mgmt.Cluster().Cache(),
 		r.Wrangler.Mgmt.Node().Cache(),
 	)
-	telemetryManager := telemetry.NewTelemetryExporterManager(telG)
+	telemetryManager := telemetry.NewTelemetryExporterManager(telG, time.Second*10)
 
 	// ensure namespace for storing local users password is created
 	if _, err := r.Wrangler.Core.Namespace().Create(&v1.Namespace{
@@ -447,34 +447,9 @@ func (r *Rancher) Start(ctx context.Context) error {
 
 	if features.RancherSCCRegistrationExtension.Enabled() {
 		r.Wrangler.OnLeader(func(ctx context.Context) error {
-
-			// Rancher core telemetry init
-			telemetrycontrollers.RegisterControllers(ctx, r.Wrangler)
-			go func() {
-				retry.RetryOnConflict(retry.DefaultBackoff,
-					func() error {
-						telemetryNamespace, err := initcond.CreateTelemetryNamespace(context.TODO(), r.Wrangler)
-						if err != nil {
-							logrus.Warnf("Unable to create telemetry namespace: %v", err)
-							return err
-						}
-						logrus.Infof("Created telemetry namespace %s", telemetryNamespace)
-						return nil
-					})
-			}()
-			//
-			//// Register all built-in exporters to default ns path
-			//telemetryManager.Register(
-			//	"scc",
-			//	telemetry.NewSecretExporter(
-			//		r.Wrangler.Core.Secret(),
-			//		&v1.SecretReference{
-			//			Name:      telemetry.SccSecretName,
-			//			Namespace: telemetryConsts.TelemetrySecretNamespace,
-			//		},
-			//	),
-			//	time.Second*60,
-			//)
+			if err := telemetrycontrollers.RegisterControllers(ctx, r.Wrangler, telemetryManager); err != nil {
+				return err
+			}
 			logrus.Debug("[rancher::Start] starting RancherSCCRegistrationExtension")
 
 			//TODO(dan) : reconcile scc-deployment here instead
