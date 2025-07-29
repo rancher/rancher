@@ -55,6 +55,7 @@ var (
 		"calico-apiserver",
 		"cattle-elemental-system",
 		"cattle-local-user-passwords",
+		"cattle-tokens",
 	}
 
 	AgentImage          = NewSetting("agent-image", "rancher/rancher-agent:head")
