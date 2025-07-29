@@ -159,6 +159,10 @@ spec:
         - name: AGGREGATION_REGISTRATION_TIMEOUT
           value: {{ .Values.aggregationRegistrationTimeout }}
 {{- end }}
+{{- if .Values.cacheSyncTimeout }}
+        - name: CACHE_SYNC_TIMEOUT
+          value: {{ .Values.cacheSyncTimeout }}
+{{- end }}
 {{- if .Values.extraEnv }}
 {{ toYaml .Values.extraEnv | indent 8}}
 {{- end }}
