@@ -13,11 +13,14 @@ const (
 	KeyCloakOIDCConfigFieldCreated             = "created"
 	KeyCloakOIDCConfigFieldCreatorID           = "creatorId"
 	KeyCloakOIDCConfigFieldEnabled             = "enabled"
+	KeyCloakOIDCConfigFieldEndSessionEndpoint  = "endSessionEndpoint"
 	KeyCloakOIDCConfigFieldGroupSearchEnabled  = "groupSearchEnabled"
 	KeyCloakOIDCConfigFieldGroupsClaim         = "groupsClaim"
 	KeyCloakOIDCConfigFieldIssuer              = "issuer"
 	KeyCloakOIDCConfigFieldJWKSUrl             = "jwksUrl"
 	KeyCloakOIDCConfigFieldLabels              = "labels"
+	KeyCloakOIDCConfigFieldLogoutAllEnabled    = "logoutAllEnabled"
+	KeyCloakOIDCConfigFieldLogoutAllForced     = "logoutAllForced"
 	KeyCloakOIDCConfigFieldLogoutAllSupported  = "logoutAllSupported"
 	KeyCloakOIDCConfigFieldName                = "name"
 	KeyCloakOIDCConfigFieldOwnerReferences     = "ownerReferences"
@@ -44,11 +47,14 @@ type KeyCloakOIDCConfig struct {
 	Created             string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID           string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	Enabled             bool              `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+	EndSessionEndpoint  string            `json:"endSessionEndpoint,omitempty" yaml:"endSessionEndpoint,omitempty"`
 	GroupSearchEnabled  *bool             `json:"groupSearchEnabled,omitempty" yaml:"groupSearchEnabled,omitempty"`
 	GroupsClaim         string            `json:"groupsClaim,omitempty" yaml:"groupsClaim,omitempty"`
 	Issuer              string            `json:"issuer,omitempty" yaml:"issuer,omitempty"`
 	JWKSUrl             string            `json:"jwksUrl,omitempty" yaml:"jwksUrl,omitempty"`
 	Labels              map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	LogoutAllEnabled    bool              `json:"logoutAllEnabled,omitempty" yaml:"logoutAllEnabled,omitempty"`
+	LogoutAllForced     bool              `json:"logoutAllForced,omitempty" yaml:"logoutAllForced,omitempty"`
 	LogoutAllSupported  bool              `json:"logoutAllSupported,omitempty" yaml:"logoutAllSupported,omitempty"`
 	Name                string            `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences     []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
