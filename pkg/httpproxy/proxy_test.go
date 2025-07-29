@@ -222,3 +222,33 @@ func TestConstructRegex(t *testing.T) {
 			))
 	}
 }
+
+func TestIsBadHeader(t *testing.T) {
+	tests := []struct {
+		key   string
+		isBad bool
+	}{
+		{"X-Forwarded-Proto", false},
+		{"Accept-Language", false},
+		{"Accept", false},
+		{"impersonate-user", true},
+		{"impersonate-group", true},
+		{"Impersonate-Extra-requesthost", true},
+		{"Impersonate-Extra-username", true},
+		{"Impersonate-Extra-requesttokenid", true},
+		{"Impersonate-Extra-foo", true},
+		{"Host", true},
+		{"transfer-encoding", true},
+		{"Content-Length", true},
+		{"X-API-Auth-Header", true},
+		{"X-API-CattleAuth-Header", true},
+		{"CF-Connecting-IP", true},
+		{"CF-Ray", true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.key, func(t *testing.T) {
+			assert.Equal(t, test.isBad, isBadHeader(test.key))
+		})
+	}
+}
