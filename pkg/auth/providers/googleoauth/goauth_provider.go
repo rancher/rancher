@@ -66,7 +66,7 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 	}
 }
 
-func (g *googleOauthProvider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
+func (g *googleOauthProvider) AuthenticateUser(ctx context.Context, _ *types.APIContext, input interface{}) (v3.Principal, []v3.Principal, string, error) {
 	login, ok := input.(*v32.GoogleOauthLogin)
 	if !ok {
 		return v3.Principal{}, nil, "", fmt.Errorf("unexpected input type")

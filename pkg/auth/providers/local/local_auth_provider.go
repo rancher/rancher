@@ -118,7 +118,7 @@ func (l *Provider) getUser(username string) (*v3.User, error) {
 	return user, nil
 }
 
-func (l *Provider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
+func (l *Provider) AuthenticateUser(ctx context.Context, _ *types.APIContext, input interface{}) (v3.Principal, []v3.Principal, string, error) {
 	localInput, ok := input.(*v32.BasicLogin)
 	if !ok {
 		return v3.Principal{}, nil, "", httperror.NewAPIError(httperror.ServerError, "Unexpected input type")
