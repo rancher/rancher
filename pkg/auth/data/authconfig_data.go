@@ -68,18 +68,18 @@ func AuthConfigs(management *config.ManagementContext) error {
 		return err
 	}
 
-	if err := addAuthConfig(oidc.Name, client.OIDCConfigType, false, management); err != nil {
+	if err := addAuthConfigWithSLO(oidc.Name, client.OIDCConfigType, false, management); err != nil {
 		return err
 	}
 
-	if err := addAuthConfig(keycloakoidc.Name, client.KeyCloakOIDCConfigType, false, management); err != nil {
+	if err := addAuthConfigWithSLO(keycloakoidc.Name, client.KeyCloakOIDCConfigType, false, management); err != nil {
 		return err
 	}
 
-	if err := addAuthConfig(genericoidc.Name, client.GenericOIDCConfigType, false, management); err != nil {
+	if err := addAuthConfigWithSLO(genericoidc.Name, client.GenericOIDCConfigType, false, management); err != nil {
 		return err
 	}
-	if err := addAuthConfig(cognito.Name, client.CognitoConfigType, false, management); err != nil {
+	if err := addAuthConfigWithSLO(cognito.Name, client.CognitoConfigType, false, management); err != nil {
 		return err
 	}
 

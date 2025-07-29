@@ -106,7 +106,7 @@ func (o *OpenIDCProvider) TestAndApply(request *types.APIContext) error {
 	oidcConfig.Issuer = issuerURL.String()
 
 	// call provider
-	userPrincipal, groupPrincipals, providerToken, _, err := o.LoginUser(request.Request.Context(), oidcLogin, &oidcConfig)
+	userPrincipal, groupPrincipals, providerToken, _, err := o.LoginUser(request.Request.Context(), oidcLogin, &oidcConfig, request)
 	if err != nil {
 		if httperror.IsAPIError(err) {
 			return err
@@ -125,12 +125,12 @@ func (o *OpenIDCProvider) TestAndApply(request *types.APIContext) error {
 
 	userExtraInfo := o.GetUserExtraAttributes(userPrincipal)
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return o.TokenMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
+		return o.TokenMgr.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
 	}); err != nil {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("[generic oidc]: Failed to create or update userAttribute: %v", err))
 	}
 
-	return o.TokenMGR.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerToken, 0, "Token via OIDC Configuration", request)
+	return o.TokenMgr.CreateTokenAndSetCookie(user.Name, userPrincipal, groupPrincipals, providerToken, 0, "Token via OIDC Configuration", request)
 }
 
 // validateScopes returns true if there are no commas in the scopes string and openid is included as a scope.
