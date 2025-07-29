@@ -94,7 +94,7 @@ func (p *adProvider) TransformToAuthProvider(authConfig map[string]interface{}) 
 	return ap, nil
 }
 
-func (p *adProvider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
+func (p *adProvider) AuthenticateUser(ctx context.Context, _ *types.APIContext, input interface{}) (v3.Principal, []v3.Principal, string, error) {
 	login, ok := input.(*v3.BasicLogin)
 	if !ok {
 		return v3.Principal{}, nil, "", errors.New("unexpected input type")

@@ -154,7 +154,7 @@ func (g *ghProvider) saveGithubConfig(config *v32.GithubConfig) error {
 	return nil
 }
 
-func (g *ghProvider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
+func (g *ghProvider) AuthenticateUser(ctx context.Context, _ *types.APIContext, input interface{}) (v3.Principal, []v3.Principal, string, error) {
 	login, ok := input.(*v32.GithubLogin)
 	if !ok {
 		return v3.Principal{}, nil, "", errors.New("unexpected input type")

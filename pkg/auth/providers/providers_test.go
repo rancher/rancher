@@ -168,7 +168,7 @@ func (f fakeProvider) GetName() string {
 	panic("implement me")
 }
 
-func (f fakeProvider) AuthenticateUser(_ context.Context, _ interface{}) (v3.Principal, []v3.Principal, string, error) {
+func (f fakeProvider) AuthenticateUser(_ context.Context, _ *types.APIContext, _ interface{}) (v3.Principal, []v3.Principal, string, error) {
 	panic("implement me")
 }
 

@@ -27,7 +27,7 @@ const (
 // AuthProvider allows to authenticate a user and search for user and group principals.
 type AuthProvider interface {
 	GetName() string
-	AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error)
+	AuthenticateUser(ctx context.Context, apiContext *types.APIContext, input interface{}) (v3.Principal, []v3.Principal, string, error)
 	SearchPrincipals(name, principalType string, myToken accessor.TokenAccessor) ([]v3.Principal, error)
 	GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error)
 	CustomizeSchema(schema *types.Schema)
