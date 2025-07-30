@@ -134,6 +134,10 @@ func (h *tokenHandler) Updated(token *managementv3.Token) (runtime.Object, error
 	forced := false
 	clusterAuthTokenSecret, err := h.clusterSecretLister.Get(h.namespace, common.ClusterAuthTokenSecretName(token.Name))
 	if err != nil {
+		if !errors.IsNotFound(err) {
+			return nil, err
+		}
+
 		// While the cluster auth token exists, the associated secret is
 		// missing. Make it now, and force an update later.
 
