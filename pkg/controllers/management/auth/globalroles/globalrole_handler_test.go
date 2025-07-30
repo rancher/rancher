@@ -51,6 +51,9 @@ var (
 	}
 
 	defaultGR = v3.GlobalRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "default-globalRole",
+		},
 		Rules: []rbacv1.PolicyRule{
 			readPodPolicyRule,
 		},
@@ -58,6 +61,10 @@ var (
 	readConfigCR = rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "clusterRole",
+			Labels: map[string]string{
+				"authz.management.cattle.io/globalrole": "true",
+				"authz.management.cattle.io/gr-owner":   defaultGR.Name,
+			},
 		},
 		Rules: []rbacv1.PolicyRule{
 			readConfigPolicyRule,
@@ -66,6 +73,21 @@ var (
 	readPodCR = rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "clusterRole",
+			Labels: map[string]string{
+				"authz.management.cattle.io/globalrole": "true",
+				"authz.management.cattle.io/gr-owner":   defaultGR.Name,
+			},
+		},
+		Rules: []rbacv1.PolicyRule{
+			readPodPolicyRule,
+		},
+	}
+	missingLabelCR = rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "clusterRole",
+			Labels: map[string]string{
+				"authz.management.cattle.io/globalrole": "true",
+			},
 		},
 		Rules: []rbacv1.PolicyRule{
 			readPodPolicyRule,
@@ -238,7 +260,7 @@ func TestReconcileGlobalRole(t *testing.T) {
 			},
 			stateAssertions: func(gtsc grTestStateChanges) {
 				require.Len(gtsc.t, gtsc.createdClusterRoles, 1)
-				cr, ok := gtsc.createdClusterRoles["cattle-globalrole-"]
+				cr, ok := gtsc.createdClusterRoles[getCRName(&defaultGR)]
 				require.True(gtsc.t, ok)
 				require.Equal(gtsc.t, readPodCR.Rules, cr.Rules)
 			},
@@ -248,7 +270,36 @@ func TestReconcileGlobalRole(t *testing.T) {
 				reason: ClusterRoleExists,
 				status: metav1.ConditionTrue,
 			},
-			annotation: "cattle-globalrole-",
+			annotation: getCRName(&defaultGR),
+		},
+		{
+			name: "missing grOwnerLabel in clusterRole triggers update",
+			stateSetup: func(state grTestState) {
+				state.crListerMock.GetFunc = func(_, _ string) (*normanv1.ClusterRole, error) {
+					return missingLabelCR.DeepCopy(), nil
+				}
+				state.crClientMock.UpdateFunc = func(cr *normanv1.ClusterRole) (*normanv1.ClusterRole, error) {
+					state.stateChanges.createdClusterRoles[cr.Name] = cr
+					return nil, nil
+				}
+			},
+			stateAssertions: func(gtsc grTestStateChanges) {
+				require.Len(gtsc.t, gtsc.createdClusterRoles, 1)
+				cr, ok := gtsc.createdClusterRoles["clusterRole"]
+				require.True(gtsc.t, ok)
+				require.Equal(gtsc.t, &readPodCR, cr)
+
+				// Validate that label had expected owner value set
+				val, exists := cr.Labels[grOwnerLabel]
+				require.True(gtsc.t, exists)
+				require.Equal(gtsc.t, defaultGR.Name, val)
+			},
+			globalRole: defaultGR.DeepCopy(),
+			wantError:  false,
+			condition: reducedCondition{
+				reason: ClusterRoleExists,
+				status: metav1.ConditionTrue,
+			},
 		},
 	}
 
