@@ -32,9 +32,10 @@ type ClusterAuthToken struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	UserName      string       `json:"userName"`
-	LastUsedAt    *metav1.Time `json:"lastUsedAt,omitempty"`
-	ExpiresAt     string       `json:"expiresAt,omitempty"`
-	SecretKeyHash string       `json:"hash"`
-	Enabled       bool         `json:"enabled"`
+	UserName   string       `json:"userName"`
+	LastUsedAt *metav1.Time `json:"lastUsedAt,omitempty"`
+	ExpiresAt  string       `json:"expiresAt,omitempty"`
+	// Deprecated: The token's secret key hash is now stored in the corresponding v1.Secret.
+	SecretKeyHash string `json:"hash"`
+	Enabled       bool   `json:"enabled"`
 }
