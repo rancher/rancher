@@ -2,6 +2,7 @@ package ext
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -9,18 +10,18 @@ import (
 	"strings"
 	"time"
 
+	jsonpatch "github.com/evanphx/json-patch/v5"
 	extstores "github.com/rancher/rancher/pkg/ext/stores"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/wrangler"
 	steveext "github.com/rancher/steve/pkg/ext"
 	steveserver "github.com/rancher/steve/pkg/server"
 	wranglerapiregistrationv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiregistration.k8s.io/v1"
-	wranglercorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -77,7 +78,7 @@ func CreateOrUpdateAPIService(apiservice wranglerapiregistrationv1.APIServiceCon
 		},
 	}
 
-	_, err := apiservice.Get(APIServiceName, metav1.GetOptions{})
+	original, err := apiservice.Get(APIServiceName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		if _, err := apiservice.Create(desired); err != nil {
 			return err
@@ -85,59 +86,47 @@ func CreateOrUpdateAPIService(apiservice wranglerapiregistrationv1.APIServiceCon
 	} else if err != nil {
 		return err
 	} else {
-		//getting it again with newest version
-		current, err := apiservice.Get(APIServiceName, metav1.GetOptions{})
-		if err != nil {
-			return err
-		}
-		current.Spec = desired.Spec
 
-		if _, err := apiservice.Update(current); err != nil {
-			return err
+		updateErr := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			current, err := apiservice.Get(APIServiceName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			modified := current.DeepCopy()
+			modified.Spec = desired.Spec
+			patch, err := makePatchAndUpdate(original, modified, apiservice)
+			if err != nil {
+				logrus.Errorf(":: error updating APIService %s -> request: %s", APIServiceName, patch)
+				return err
+			}
+			return nil
+		})
+		if updateErr != nil {
+			return fmt.Errorf(":: CreateOrUpdateAPIService :: failed to update APIService %s after retries: %w", APIServiceName, updateErr)
 		}
+
 	}
 
 	return nil
 }
 
-func CreateOrUpdateService(service wranglercorev1.ServiceController, appSelector string) error {
-	if RDPEnabled() {
-		appSelector = "api-extension"
+func makePatchAndUpdate(original, modified *apiregv1.APIService, apiservice wranglerapiregistrationv1.APIServiceController) ([]byte, error) {
+	originalJSON, err := json.Marshal(original)
+	if err != nil {
+		return nil, err
 	}
-
-	desired := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      TargetServiceName,
-			Namespace: Namespace,
-		},
-		Spec: corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{
-				{
-					Port: Port,
-				},
-			},
-			Selector: map[string]string{
-				"app": appSelector,
-			},
-		},
+	modifiedJSON, err := json.Marshal(modified)
+	if err != nil {
+		return nil, err
 	}
-
-	current, err := service.Get(Namespace, TargetServiceName, metav1.GetOptions{})
-	if apierrors.IsNotFound(err) {
-		if _, err := service.Create(desired); err != nil {
-			return err
-		}
-	} else if err != nil {
-		return err
-	} else {
-		current.Spec = desired.Spec
-
-		if _, err := service.Update(current); err != nil {
-			return err
-		}
+	patch, err := jsonpatch.CreateMergePatch(originalJSON, modifiedJSON)
+	if err != nil {
+		return nil, err
 	}
-
-	return nil
+	if _, err := apiservice.Patch(APIServiceName, types.MergePatchType, patch); err != nil {
+		return patch, err
+	}
+	return patch, nil
 }
 
 func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Context, opts Options) (steveserver.ExtensionAPIServer, error) {
@@ -195,10 +184,6 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 	}
 
 	additionalSniProviders = append(additionalSniProviders, sniProvider)
-
-	//if err := CreateOrUpdateService(wranglerContext.Core.Service(), opts.AppSelector); err != nil {
-	//	return nil, fmt.Errorf("failed to create or update APIService: %w", err)
-	//}
 
 	defaultAuthenticator, err := steveext.NewDefaultAuthenticator(wranglerContext.K8s)
 	if err != nil {
