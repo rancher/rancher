@@ -63,6 +63,8 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	clusterUserAttributeLister := cluster.Cluster.ClusterUserAttributes(namespace).Controller().Lister()
 	clusterConfigMap := cluster.Core.ConfigMaps(namespace)
 	clusterConfigMapLister := cluster.Core.ConfigMaps(namespace).Controller().Lister()
+	clusterSecret := cluster.Core.Secrets(namespace)
+	clusterSecretLister := cluster.Core.Secrets(namespace).Controller().Lister()
 	tokenIndexer := tokenInformer.GetIndexer()
 	userLister := cluster.Management.Management.Users("").Controller().Lister()
 	userAttribute := cluster.Management.Management.UserAttributes("")
@@ -88,6 +90,8 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 			tokenIndexer,
 			userLister,
 			userAttributeLister,
+			clusterSecret,
+			clusterSecretLister,
 		})
 
 	cluster.Management.Management.Users("").AddHandler(ctx, userController, (&userHandler{
