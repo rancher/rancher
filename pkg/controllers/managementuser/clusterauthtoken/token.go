@@ -182,7 +182,7 @@ func (h *tokenHandler) createClusterAuthToken(token accessor.TokenAccessor, hash
 		return err
 	}
 
-	clusterAuthToken := common.NewClusterAuthToken(token)
+	clusterAuthToken := common.NewClusterAuthToken(token, hashedValue)
 	clusterAuthTokenSecret := common.NewClusterAuthTokenSecret(token, hashedValue)
 
 	// Creating the secret first, then the token for it. This ensures that
@@ -335,9 +335,9 @@ func (h *tokenHandler) remove(name, userID, key string) error {
 		}
 	}
 
-	err := h.clusterSecret.Delete(common.ClusterAuthTokenSecretName(name), &metav1.DeleteOptions{})
+	err = h.clusterSecret.Delete(common.ClusterAuthTokenSecretName(name), &metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
-		return nil, err
+		return err
 	}
 
 	err = h.clusterAuthToken.Delete(name, &metav1.DeleteOptions{})

@@ -14,7 +14,7 @@ import (
 // NewClusterAuthToken creates a new cluster auth token from a given token
 // accessor and it's hashed value. Does not create the token in the remote
 // cluster.
-func NewClusterAuthToken(token accessor.TokenAccessor, hashedValue string) (*clusterv3.ClusterAuthToken, error) {
+func NewClusterAuthToken(token accessor.TokenAccessor, hashedValue string) *clusterv3.ClusterAuthToken {
 	return &clusterv3.ClusterAuthToken{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: token.GetName(),
@@ -25,7 +25,7 @@ func NewClusterAuthToken(token accessor.TokenAccessor, hashedValue string) (*clu
 		UserName:  token.GetUserID(),
 		ExpiresAt: token.GetExpiresAt(),
 		Enabled:   token.GetIsEnabled(),
-	}, nil
+	}
 }
 
 // NewClusterAuthSecret creates a new secret from the given token and its hash value
