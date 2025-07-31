@@ -24,6 +24,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      # The following step can be used to get a shell into the runner for debugging.
+      # To use it, change `if: false` to `if: true` in your branch.
+      # The workflow will pause and output connection details for an SSH session.
+      - name: Setup tmate session for debugging
+        if: false
+        uses: mxschmitt/action-tmate@v3
       - name: Configure Docker for cgroupfs
         run: |
           echo '{"exec-opts": ["native.cgroupdriver=cgroupfs"]}'| sudo tee /etc/docker/daemon.json
@@ -95,3 +101,11 @@ jobs:
       - name: Run Tests
         shell: bash
         run: sudo --preserve-env GOBIN=$(which go) ./scripts/gha/tests
+      - name: Debug on Failure
+        # # This step will only run if the 'Run Tests' step (or any previous step) fails.
+        # if: failure()
+        uses: mxschmitt/action-tmate@v3
+        with:
+          # The action will create an SSH session and wait for 15 minutes before closing.
+          # A value of 0 will wait until the job time-out.
+          timeout: 30

@@ -135,10 +135,15 @@ echo "Waiting up to 5 minutes for rancher-provisioning-capi deployment"
 
 echo Running integrationsetup
 export CATTLE_TEST_CONFIG=$(pwd)/config.yaml # used by integration tests and test setup
-./tests/v2/integration/bin/integrationsetup || {
+
+# Temporarily disable the cleanup trap to allow for debugging on failure.
+trap - exit
+./tests/v2/integration/bin/integrationsetup || { # On failure, dump logs and exit without cleanup.
   dump_rancher_logs
-  exit 1
+  echo "Integration setup failed. The rancher-server container will be left running for debugging."
+  exit 1 # Exit, so the workflow's 'Debug on Failure' step can take over.
 }
+trap cleanup exit # Re-enable the cleanup trap for subsequent steps.
 
 echo Running go integration tests
 $GOBIN test -v -failfast -timeout 30m -p 1 ./tests/v2/integration/... || {

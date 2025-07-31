@@ -12,6 +12,7 @@ replace (
 
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
+	github.com/rancher/shepherd => github.com/igomez06/shepherd v0.0.0-20250731181204-a82290dcba76
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.58.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.58.0
 	go.opentelemetry.io/otel => go.opentelemetry.io/otel v1.33.0
@@ -58,7 +59,10 @@ replace (
 	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.10.2
 )
 
-require github.com/rancher/rancher/pkg/apis v0.0.0
+require (
+	github.com/rancher/rancher/pkg/apis v0.0.0
+	github.com/rancher/shepherd v0.0.0-20250410162748-9d50a3d8c82c
+)
 
 require (
 	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible
@@ -133,7 +137,7 @@ require (
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.5.0-rc.1
 	github.com/rancher/rke v1.8.0-rc.4
-	github.com/rancher/shepherd v0.0.0-20250411212007-f3f2fd268849
+	// github.com/rancher/shepherd v0.0.0-20250411212007-f3f2fd268849
 	github.com/rancher/steve v0.7.0
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20250710162344-185ff9f785cd
 	github.com/rancher/tests/actions v0.0.0-20250505204226-5b136337f7c5
