@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -30,14 +30,10 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/auth/util"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3public"
-	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	schema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3public"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/utils/pointer"
 )
 
 const (
@@ -45,41 +41,51 @@ const (
 )
 
 func newLoginHandler(ctx context.Context, mgmt *config.ScaledContext) *loginHandler {
+	tokenManager := tokens.NewManager(ctx, mgmt)
 	return &loginHandler{
-		scaledContext: mgmt,
-		userMGR:       mgmt.UserManager,
-		tokenMGR:      tokens.NewManager(ctx, mgmt),
-		clusterLister: mgmt.Management.Clusters("").Controller().Lister(),
-		secretLister:  mgmt.Core.Secrets("").Controller().Lister(),
+		scaledContext:         mgmt,
+		kubeconfigTokenGetter: mgmt.UserManager,
+		ensureUser:            mgmt.UserManager.EnsureUser,
+		ensureUserAttribute:   tokenManager.UserAttributeCreateOrUpdate,
+		newLoginToken:         tokenManager.NewLoginToken,
 	}
 }
 
 type loginHandler struct {
-	scaledContext *config.ScaledContext
-	userMGR       user.Manager
-	tokenMGR      *tokens.Manager
-	clusterLister v3.ClusterLister
-	secretLister  v1.SecretLister
+	scaledContext         *config.ScaledContext
+	kubeconfigTokenGetter kubeconfigTokenGetter
+	ensureUser            func(principalName, displayName string) (*apiv3.User, error)
+	ensureUserAttribute   func(userID, provider string, groupPrincipals []apiv3.Principal, userExtraInfo map[string][]string, loginTime ...time.Time) error
+	newLoginToken         func(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, ttl int64, description string) (apiv3.Token, string, error)
 }
+
+type kubeconfigTokenGetter interface {
+	GetKubeconfigToken(clusterName, tokenName, description, kind, userName string, userPrincipal apiv3.Principal) (*apiv3.Token, string, error)
+}
+
+const (
+	SAMLResponseType   = "saml"
+	CookieResponseType = "kubeconfig"
+)
 
 func (h *loginHandler) login(actionName string, action *types.Action, request *types.APIContext) error {
 	if actionName != "login" {
 		return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 	}
 
-	w := request.Response
-
 	token, unhashedTokenKey, responseType, err := h.createLoginToken(request)
 	if err != nil {
-		// if user fails to authenticate, hide the details of the exact error. bad credentials will already be APIErrors
-		// otherwise, return a generic error message
+		// If the user fails to authenticate, hide the details of the exact error.
+		// Bad credentials will already be APIErrors. Otherwise, return a generic error message.
 		if httperror.IsAPIError(err) {
 			return err
 		}
+
 		return httperror.WrapAPIError(err, httperror.ServerError, "Server error while authenticating")
 	}
 
-	if responseType == "cookie" {
+	switch responseType {
+	case CookieResponseType:
 		tokenCookie := &http.Cookie{
 			Name:     CookieName,
 			Value:    token.ObjectMeta.Name + ":" + unhashedTokenKey,
@@ -87,10 +93,9 @@ func (h *loginHandler) login(actionName string, action *types.Action, request *t
 			Path:     "/",
 			HttpOnly: true,
 		}
-		http.SetCookie(w, tokenCookie)
-	} else if responseType == "saml" {
-		return nil
-	} else {
+		http.SetCookie(request.Response, tokenCookie)
+	case SAMLResponseType: // Do nothing.
+	default:
 		tokenData, err := tokens.ConvertTokenResource(request.Schemas.Schema(&schema.PublicVersion, client.TokenType), token)
 		if err != nil {
 			return httperror.WrapAPIError(err, httperror.ServerError, "Server error while authenticating")
@@ -103,23 +108,20 @@ func (h *loginHandler) login(actionName string, action *types.Action, request *t
 }
 
 // createLoginToken returns token, unhashed token key (where applicable), responseType and error
-func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, string, string, error) {
-	var userPrincipal v3.Principal
-	var groupPrincipals []v3.Principal
-	var providerToken string
-	logrus.Debugf("Create Token Invoked")
+func (h *loginHandler) createLoginToken(request *types.APIContext) (apiv3.Token, string, string, error) {
+	logrus.Debugf("Creating a login token")
 
-	bytes, err := ioutil.ReadAll(request.Request.Body)
+	bytes, err := io.ReadAll(request.Request.Body)
 	if err != nil {
-		logrus.Errorf("login failed with error: %v", err)
-		return v3.Token{}, "", "", httperror.NewAPIError(httperror.InvalidBodyContent, "")
+		logrus.Errorf("Error reading request body: %v", err)
+		return apiv3.Token{}, "", "", httperror.NewAPIError(httperror.InvalidBodyContent, "")
 	}
 
 	generic := &apiv3.GenericLogin{}
 	err = json.Unmarshal(bytes, generic)
 	if err != nil {
-		logrus.Errorf("unmarshal failed with error: %v", err)
-		return v3.Token{}, "", "", httperror.NewAPIError(httperror.InvalidBodyContent, "")
+		logrus.Errorf("Error unmarshalling GenericLogin: %v", err)
+		return apiv3.Token{}, "", "", httperror.NewAPIError(httperror.InvalidBodyContent, "")
 	}
 	responseType := generic.ResponseType
 	description := generic.Description
@@ -130,8 +132,11 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		ttl = minutes * 60 * 1000
 	}
 
-	var input interface{}
-	var providerName string
+	var (
+		input          any
+		providerName   string
+		isSAMLProvider bool
+	)
 	switch request.Type {
 	case client.LocalProviderType:
 		input = &apiv3.BasicLogin{}
@@ -157,18 +162,23 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	case client.PingProviderType:
 		input = &apiv3.SamlLoginInput{}
 		providerName = saml.PingName
+		isSAMLProvider = true
 	case client.ADFSProviderType:
 		input = &apiv3.SamlLoginInput{}
 		providerName = saml.ADFSName
+		isSAMLProvider = true
 	case client.KeyCloakProviderType:
 		input = &apiv3.SamlLoginInput{}
 		providerName = saml.KeyCloakName
+		isSAMLProvider = true
 	case client.OKTAProviderType:
 		input = &apiv3.SamlLoginInput{}
 		providerName = saml.OKTAName
+		isSAMLProvider = true
 	case client.ShibbolethProviderType:
 		input = &apiv3.SamlLoginInput{}
 		providerName = saml.ShibbolethName
+		isSAMLProvider = true
 	case client.GoogleOAuthProviderType:
 		input = &apiv3.GoogleOauthLogin{}
 		providerName = googleoauth.Name
@@ -185,29 +195,26 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		input = &apiv3.OIDCLogin{}
 		providerName = cognito.Name
 	default:
-		return v3.Token{}, "", "", httperror.NewAPIError(httperror.ServerError, "unknown authentication provider")
+		return apiv3.Token{}, "", "", httperror.NewAPIError(httperror.ServerError, "unknown authentication provider")
 	}
 
 	err = json.Unmarshal(bytes, input)
 	if err != nil {
-		logrus.Errorf("unmarshal failed with error: %v", err)
-		return v3.Token{}, "", "", httperror.NewAPIError(httperror.InvalidBodyContent, "")
+		logrus.Errorf("Error unmarshalling %T: %v", input, err)
+		return apiv3.Token{}, "", "", httperror.NewAPIError(httperror.InvalidBodyContent, "")
 	}
 
-	// Authenticate User
-	// SAML's login flow is different from the other providers. Unlike the other providers, it gets the logged in user's data via a POST from
-	// the identity provider on a separate endpoint specifically for that.
-
-	if providerName == saml.PingName || providerName == saml.ADFSName || providerName == saml.KeyCloakName ||
-		providerName == saml.OKTAName || providerName == saml.ShibbolethName {
+	if isSAMLProvider {
+		// SAML's login flow is different. Unlike other providers it gets the logged in user's data
+		// via a POST from the identity provider on a separate endpoint.
 		err = saml.PerformSamlLogin(providerName, request, input)
-		return v3.Token{}, "", "saml", err
+		return apiv3.Token{}, "", SAMLResponseType, err
 	}
 
 	ctx := context.WithValue(request.Request.Context(), util.RequestKey, request.Request)
-	userPrincipal, groupPrincipals, providerToken, err = providers.AuthenticateUser(ctx, input, providerName)
+	userPrincipal, groupPrincipals, providerToken, err := providers.AuthenticateUser(ctx, input, providerName)
 	if err != nil {
-		return v3.Token{}, "", "", err
+		return apiv3.Token{}, "", "", err
 	}
 
 	displayName := userPrincipal.DisplayName
@@ -215,35 +222,32 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		displayName = userPrincipal.LoginName
 	}
 
-	var backoff = wait.Backoff{
-		Duration: 100 * time.Millisecond,
-		Factor:   2,
-		Jitter:   .2,
-		Steps:    5,
-	}
-
 	var (
-		enabled  bool
-		currUser *v3.User
+		user    *apiv3.User
+		backoff = wait.Backoff{
+			Duration: 100 * time.Millisecond,
+			Factor:   2,
+			Jitter:   .2,
+			Steps:    5,
+		}
 	)
 
 	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
 		var err error
 
-		currUser, err = h.userMGR.EnsureUser(userPrincipal.Name, displayName)
+		user, err = h.ensureUser(userPrincipal.Name, displayName)
 		if err != nil {
 			logrus.Warnf("Error creating or updating user for %s, retrying: %v", userPrincipal.Name, err)
 			return false, nil
 		}
 
-		enabled = pointer.BoolDeref(currUser.Enabled, true)
-		if !enabled {
+		if !user.GetEnabled() {
 			return true, nil
 		}
 
 		loginTime := time.Now()
 		userExtraInfo := providers.GetUserExtraAttributes(providerName, userPrincipal)
-		err = h.tokenMGR.UserAttributeCreateOrUpdate(currUser.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo, loginTime)
+		err = h.ensureUserAttribute(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo, loginTime)
 		if err != nil {
 			logrus.Warnf("Error creating or updating userAttribute for %s, retrying: %v", userPrincipal.Name, err)
 			return false, nil
@@ -252,21 +256,27 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 		return true, nil
 	})
 	if err != nil {
-		return v3.Token{}, "", "", fmt.Errorf("error creating or updating user and/or userAttribute for %s: %w", userPrincipal.Name, err)
+		return apiv3.Token{}, "", "", fmt.Errorf("error creating or updating user and/or userAttribute for %s: %w", userPrincipal.Name, err)
 	}
 
-	if !enabled {
-		return v3.Token{}, "", "", httperror.NewAPIError(httperror.PermissionDenied, "Permission Denied")
+	if !user.GetEnabled() {
+		return apiv3.Token{}, "", "", httperror.NewAPIError(httperror.PermissionDenied, "Permission Denied")
 	}
 
 	if strings.HasPrefix(responseType, tokens.KubeconfigResponseType) {
-		token, tokenValue, err := tokens.GetKubeConfigToken(currUser.Name, responseType, h.userMGR, userPrincipal)
+		token, tokenKey, err := tokens.GetKubeConfigToken(user.Name, responseType, h.kubeconfigTokenGetter, userPrincipal)
 		if err != nil {
-			return v3.Token{}, "", "", err
+			return apiv3.Token{}, "", "", err
 		}
-		return *token, tokenValue, responseType, nil
+
+		return *token, tokenKey, responseType, nil
 	}
 
-	rToken, unhashedTokenKey, err := h.tokenMGR.NewLoginToken(currUser.Name, userPrincipal, groupPrincipals, providerToken, ttl, description)
-	return rToken, unhashedTokenKey, responseType, err
+	token, tokenKey, err := h.newLoginToken(user.Name, userPrincipal, groupPrincipals, providerToken, ttl, description)
+	if err != nil {
+		logrus.Errorf("Error creating login token for user %s: %v", user.Name, err)
+		return apiv3.Token{}, "", "", err
+	}
+
+	return token, tokenKey, responseType, err
 }
