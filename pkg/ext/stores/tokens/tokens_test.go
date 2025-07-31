@@ -324,7 +324,7 @@ func TestStoreDeleteCollection(t *testing.T) {
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(&mockUser{name: properUser}, false, true, nil)
 
-		store := New(nil, nil, nil, secretClient, userClient, nil, nil, nil, auth)
+		store := New(nil, nil, nil, secretClient, userClient, nil, nil, nil, nil, auth)
 
 		obj, err := store.DeleteCollection(context.Background(), deleteValidation,
 			deleteOptions, listOptions)
@@ -467,7 +467,7 @@ func Test_Store_Delete(t *testing.T) {
 				return nil
 			})
 
-		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, nil, secrets, users, nil, nil, nil, nil, auth)
 		_, ok, err := store.Delete(context.TODO(), "bogus", nil,
 			&metav1.DeleteOptions{
 				Preconditions: metav1.NewUIDPreconditions("2905498-kafld-lkad"),
