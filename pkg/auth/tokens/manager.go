@@ -24,9 +24,7 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
-
 	"github.com/sirupsen/logrus"
-
 	apicorev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -609,7 +607,7 @@ func (m *Manager) EnsureAndGetUserAttribute(userID string) (*v3.UserAttribute, b
 	return attribs, true, nil
 }
 
-func (m *Manager) UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, userExtraInfo map[string][]string, loginTime ...time.Time) error {
+func (m *Manager) UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v32.Principal, userExtraInfo map[string][]string, loginTime ...time.Time) error {
 	attribs, needCreate, err := m.EnsureAndGetUserAttribute(userID)
 	if err != nil {
 		return err
@@ -689,7 +687,7 @@ func (m *Manager) userAttributeChanged(attribs *v32.UserAttribute, provider stri
 // PerUserCacheProviders is a set of provider names for which the token manager creates a per-user login token.
 var PerUserCacheProviders = []string{"github", "azuread", "googleoauth", "oidc", "keycloakoidc"}
 
-func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int64, description string) (v3.Token, string, error) {
+func (m *Manager) NewLoginToken(userID string, userPrincipal v32.Principal, groupPrincipals []v32.Principal, providerToken string, ttl int64, description string) (v32.Token, string, error) {
 	provider := userPrincipal.Provider
 	// Providers that use oauth need to create a secret for storing the access token.
 	if slices.Contains(PerUserCacheProviders, provider) && providerToken != "" {
