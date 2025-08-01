@@ -37,10 +37,10 @@ const (
 )
 
 type Capabilities struct {
-	Ak             string `json:"accessKeyId"`
-	Sk             string `json:"accessKeySecret"`
-	RegionId       string `json:"regionId"`
-	AcceptLanguage string `json:"acceptLanguage"`
+	AccessKeyID     string `json:"accessKeyId"`
+	AccessKeySecret string `json:"accessKeySecret"`
+	RegionId        string `json:"regionId"`
+	AcceptLanguage  string `json:"acceptLanguage"`
 }
 
 type handler struct {
@@ -81,8 +81,8 @@ func (h *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 			handleErr(writer, statusCode, fmt.Errorf("error accessing cloud credential %s", credID))
 			return
 		}
-		capabilities.Ak = string(cc.Data["alibabacredentialConfig-accessKeyId"])
-		capabilities.Sk = string(cc.Data["alibabacredentialConfig-accessKeySecret"])
+		capabilities.AccessKeyID = string(cc.Data["alibabacredentialConfig-accessKeyId"])
+		capabilities.AccessKeySecret = string(cc.Data["alibabacredentialConfig-accessKeySecret"])
 	} else {
 		handleErr(writer, http.StatusBadRequest, fmt.Errorf("cloud credential ID not found"))
 		return
@@ -111,7 +111,7 @@ func (h *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 		writer.Write(serialized)
 	case "alibabaZones":
 		if serialized, errCode, err = describeZones(capabilities, req); err != nil {
-			logrus.Debugf("[alibaba-handler] error call describeRegions: %v", err)
+			logrus.Debugf("[alibaba-handler] error call describeZones: %v", err)
 			util.ReturnHTTPError(writer, req, errCode, err.Error())
 			return
 		}
@@ -198,14 +198,14 @@ func (h *handler) checkCredentials(req *http.Request) (int, error) {
 	if cred.RegionId == "" {
 		cred.RegionId = defaultRegion
 	}
-	if cred.Ak == "" {
+	if cred.AccessKeyID == "" {
 		return http.StatusBadRequest, fmt.Errorf("must provide access key ID")
 	}
-	if cred.Sk == "" {
+	if cred.AccessKeySecret == "" {
 		return http.StatusBadRequest, fmt.Errorf("must provide access key secret")
 	}
 
-	client, err := CreateECSClient(cred.Ak, cred.Sk, cred.RegionId)
+	client, err := CreateECSClient(cred.AccessKeyID, cred.AccessKeySecret, cred.RegionId)
 	if err != nil {
 		return http.StatusInternalServerError, err
 	}

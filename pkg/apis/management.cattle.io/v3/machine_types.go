@@ -418,6 +418,6 @@ type S3CredentialConfig struct {
 }
 
 type AlibabaCredentialConfig struct {
-	AccessKeyId     string `json:"accessKeyId" norman:"required"`
+	AccessKeyID     string `json:"accessKeyId" norman:"required"`
 	AccessKeySecret string `json:"accessKeySecret" norman:"required,type=password"`
 }
