@@ -34,9 +34,9 @@ const (
 
 var errKeyNotFound = errors.New("key not found")
 
+//go:generate go tool -modfile ../../../../gotools/mockgen/go.mod mockgen -package=fake -destination=fake/manager.go -source=chart.go Manager
+
 // Manager is an interface used by the handler to install and uninstall charts.
-// If the interface is changed, regenerate the mock with the below command (run from project root):
-// mockgen --build_flags=--mod=mod -destination=pkg/controllers/dashboard/chart/fake/manager.go -package=fake github.com/rancher/rancher/pkg/controllers/dashboard/chart Manager
 type Manager interface {
 	// Ensure ensures that the chart is installed into the given namespace with the given version configuration and values.
 	Ensure(namespace, chartName, releaseName, minVersion, exactVersion string, values map[string]interface{}, takeOwnership bool, installImageOverride string) error
