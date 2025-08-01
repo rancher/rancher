@@ -54,6 +54,7 @@ var (
 		"cattle-csp-adapter-system",
 		"calico-apiserver",
 		"cattle-elemental-system",
+		"cattle-tokens",
 	}
 
 	AgentImage          = NewSetting("agent-image", "rancher/rancher-agent:head")
