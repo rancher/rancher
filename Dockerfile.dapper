@@ -28,10 +28,6 @@ RUN if [ "${ARCH}" == "amd64" ]; then \
         curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s "${GOLANGCI_LINT}"; \
     fi
 
-# Tool for CRD generation.
-ENV CONTROLLER_GEN_VERSION=v0.17.1
-RUN go install sigs.k8s.io/controller-tools/cmd/controller-gen@${CONTROLLER_GEN_VERSION}
-
 # Set up K3s: copy the necessary binaries from the K3s image.
 COPY --from=rancher/k3s:v1.32.0-k3s1 \
     /bin/blkid \
