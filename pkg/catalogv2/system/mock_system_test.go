@@ -27,6 +27,7 @@ import (
 type MockContentClient struct {
 	ctrl     *gomock.Controller
 	recorder *MockContentClientMockRecorder
+	isgomock struct{}
 }
 
 // MockContentClientMockRecorder is the mock recorder for MockContentClient.
@@ -47,24 +48,25 @@ func (m *MockContentClient) EXPECT() *MockContentClientMockRecorder {
 }
 
 // Index mocks base method.
-func (m *MockContentClient) Index(arg0, arg1, arg2 string, arg3 bool) (*repo.IndexFile, error) {
+func (m *MockContentClient) Index(namespace, name, targetK8sVersion string, skipFilter bool) (*repo.IndexFile, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Index", arg0, arg1, arg2, arg3)
+	ret := m.ctrl.Call(m, "Index", namespace, name, targetK8sVersion, skipFilter)
 	ret0, _ := ret[0].(*repo.IndexFile)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Index indicates an expected call of Index.
-func (mr *MockContentClientMockRecorder) Index(arg0, arg1, arg2, arg3 any) *gomock.Call {
+func (mr *MockContentClientMockRecorder) Index(namespace, name, targetK8sVersion, skipFilter any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Index", reflect.TypeOf((*MockContentClient)(nil).Index), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Index", reflect.TypeOf((*MockContentClient)(nil).Index), namespace, name, targetK8sVersion, skipFilter)
 }
 
 // MockOperationClient is a mock of OperationClient interface.
 type MockOperationClient struct {
 	ctrl     *gomock.Controller
 	recorder *MockOperationClientMockRecorder
+	isgomock struct{}
 }
 
 // MockOperationClientMockRecorder is the mock recorder for MockOperationClient.
@@ -85,54 +87,55 @@ func (m *MockOperationClient) EXPECT() *MockOperationClientMockRecorder {
 }
 
 // AddCpTaintsToTolerations mocks base method.
-func (m *MockOperationClient) AddCpTaintsToTolerations(arg0 []v10.Toleration) ([]v10.Toleration, error) {
+func (m *MockOperationClient) AddCpTaintsToTolerations(tolerations []v10.Toleration) ([]v10.Toleration, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddCpTaintsToTolerations", arg0)
+	ret := m.ctrl.Call(m, "AddCpTaintsToTolerations", tolerations)
 	ret0, _ := ret[0].([]v10.Toleration)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // AddCpTaintsToTolerations indicates an expected call of AddCpTaintsToTolerations.
-func (mr *MockOperationClientMockRecorder) AddCpTaintsToTolerations(arg0 any) *gomock.Call {
+func (mr *MockOperationClientMockRecorder) AddCpTaintsToTolerations(tolerations any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddCpTaintsToTolerations", reflect.TypeOf((*MockOperationClient)(nil).AddCpTaintsToTolerations), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddCpTaintsToTolerations", reflect.TypeOf((*MockOperationClient)(nil).AddCpTaintsToTolerations), tolerations)
 }
 
 // Uninstall mocks base method.
-func (m *MockOperationClient) Uninstall(arg0 context.Context, arg1 user.Info, arg2, arg3 string, arg4 io.Reader, arg5 string) (*v1.Operation, error) {
+func (m *MockOperationClient) Uninstall(ctx context.Context, user user.Info, namespace, name string, options io.Reader, imageOverride string) (*v1.Operation, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Uninstall", arg0, arg1, arg2, arg3, arg4, arg5)
+	ret := m.ctrl.Call(m, "Uninstall", ctx, user, namespace, name, options, imageOverride)
 	ret0, _ := ret[0].(*v1.Operation)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Uninstall indicates an expected call of Uninstall.
-func (mr *MockOperationClientMockRecorder) Uninstall(arg0, arg1, arg2, arg3, arg4, arg5 any) *gomock.Call {
+func (mr *MockOperationClientMockRecorder) Uninstall(ctx, user, namespace, name, options, imageOverride any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Uninstall", reflect.TypeOf((*MockOperationClient)(nil).Uninstall), arg0, arg1, arg2, arg3, arg4, arg5)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Uninstall", reflect.TypeOf((*MockOperationClient)(nil).Uninstall), ctx, user, namespace, name, options, imageOverride)
 }
 
 // Upgrade mocks base method.
-func (m *MockOperationClient) Upgrade(arg0 context.Context, arg1 user.Info, arg2, arg3 string, arg4 io.Reader, arg5 string) (*v1.Operation, error) {
+func (m *MockOperationClient) Upgrade(ctx context.Context, user user.Info, namespace, name string, options io.Reader, imageOverride string) (*v1.Operation, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Upgrade", arg0, arg1, arg2, arg3, arg4, arg5)
+	ret := m.ctrl.Call(m, "Upgrade", ctx, user, namespace, name, options, imageOverride)
 	ret0, _ := ret[0].(*v1.Operation)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Upgrade indicates an expected call of Upgrade.
-func (mr *MockOperationClientMockRecorder) Upgrade(arg0, arg1, arg2, arg3, arg4, arg5 any) *gomock.Call {
+func (mr *MockOperationClientMockRecorder) Upgrade(ctx, user, namespace, name, options, imageOverride any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Upgrade", reflect.TypeOf((*MockOperationClient)(nil).Upgrade), arg0, arg1, arg2, arg3, arg4, arg5)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Upgrade", reflect.TypeOf((*MockOperationClient)(nil).Upgrade), ctx, user, namespace, name, options, imageOverride)
 }
 
 // MockHelmClient is a mock of HelmClient interface.
 type MockHelmClient struct {
 	ctrl     *gomock.Controller
 	recorder *MockHelmClientMockRecorder
+	isgomock struct{}
 }
 
 // MockHelmClientMockRecorder is the mock recorder for MockHelmClient.
@@ -153,16 +156,16 @@ func (m *MockHelmClient) EXPECT() *MockHelmClientMockRecorder {
 }
 
 // ListReleases mocks base method.
-func (m *MockHelmClient) ListReleases(arg0, arg1 string, arg2 action.ListStates) ([]*release.Release, error) {
+func (m *MockHelmClient) ListReleases(namespace, name string, stateMask action.ListStates) ([]*release.Release, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListReleases", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "ListReleases", namespace, name, stateMask)
 	ret0, _ := ret[0].([]*release.Release)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListReleases indicates an expected call of ListReleases.
-func (mr *MockHelmClientMockRecorder) ListReleases(arg0, arg1, arg2 any) *gomock.Call {
+func (mr *MockHelmClientMockRecorder) ListReleases(namespace, name, stateMask any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListReleases", reflect.TypeOf((*MockHelmClient)(nil).ListReleases), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListReleases", reflect.TypeOf((*MockHelmClient)(nil).ListReleases), namespace, name, stateMask)
 }

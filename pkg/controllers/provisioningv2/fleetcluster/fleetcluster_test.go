@@ -1,4 +1,3 @@
-// mockgen --build_flags=--mod=mod -package fleetcluster -destination=./mock_cluster_host_getter_test.go github.com/rancher/rancher/pkg/controllers/provisioningv2/fleetcluster ClusterHostGetter
 package fleetcluster
 
 import (
