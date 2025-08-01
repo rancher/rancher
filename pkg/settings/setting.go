@@ -54,6 +54,8 @@ var (
 		"cattle-csp-adapter-system",
 		"calico-apiserver",
 		"cattle-elemental-system",
+		"cattle-scc-system",
+		"cattle-telemetry-system",
 		"cattle-local-user-passwords",
 		"cattle-tokens",
 	}

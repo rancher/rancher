@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RMSSubscription",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+$"
+    },
+    "subscription": {
+      "type": "object",
+      "required": ["installuuid", "clusteruuid", "product", "version", "arch", "git", "server_url"],
+      "properties": {
+        "installuuid": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "clusteruuid": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "product": {
+          "$comment": "cpe of the product",
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "git": {
+          "type": "string"
+        },
+        "arch": {
+          "type": "string"
+        },
+        "server_url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "feature_flags": {
+      "$comment": "Feature flags enabled on RMS https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/installation-references/feature-flags",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "managedSystems": {
+      "$comment": "Active systems under management and their details; to be expanded",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["arch", "memory", "cpu", "count"],
+        "properties": {
+          "arch": {
+            "type": "string"
+          },
+          "cpu": {
+            "$comment": "https://kubernetes.io/docs/tasks/configure-pod-container/assign-cpu-resource/#cpu-units status.internalNodeStatus.capacity.cpu",
+            "type": "integer",
+            "minimum": 0
+          },
+          "memory": {
+            "$comment": "Capacity of the node(s): status.internalNodeStatus.capacity.memory (converted to MiB)",
+            "type": "integer",
+            "minimum": 0
+          },
+          "count": {
+            "$comment": "Count of systems with these attributes (deduplication to shrink data size)",
+            "type": "integer",
+            "minimum": 1,
+            "default": 1
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "managedClusters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["nodes", "count"],
+        "properties": {
+          "nodes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "upstream": {
+            "$comment": "Identifies the cluster hosting RMS itself",
+            "type": "boolean",
+            "default": false
+          },
+          "count": {
+            "$comment": "De-duplication of identical clusters",
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": ["version", "subscription", "managedSystems", "managedClusters", "timestamp"],
+  "additionalProperties": false
+}
