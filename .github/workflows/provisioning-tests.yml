@@ -87,3 +87,13 @@ jobs:
           V2PROV_TEST_DIST: "${{ matrix.V2PROV_TEST_DIST }}"
           CATTLE_FEATURES: "${{ matrix.CATTLE_FEATURES }}"
           CATTLE_AGENT_IMAGE: "${{ env.IMAGE_AGENT}}:${{ env.TAG }}"
+      - name: Convert test output to junit
+        run: |
+          export TESTSUITE="$(echo '${{ matrix.V2PROV_TEST_RUN_REGEX }}' | tr -d '()|^.*$')"
+          echo "TESTSUITE=${TESTSUITE}" >> $GITHUB_ENV
+          go run github.com/jstemmer/go-junit-report/v2@latest -parser gojson > /tmp/report-${{ matrix.V2PROV_TEST_DIST }}-$TESTSUITE.xml < /tmp/out.json
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: "Results ${{ matrix.V2PROV_TEST_DIST }} ${{ env.TESTSUITE }}"
+          path: "/tmp/report-${{ matrix.V2PROV_TEST_DIST }}-${{ env.TESTSUITE }}.xml"
