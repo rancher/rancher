@@ -53,7 +53,7 @@ func Test_validateACR(t *testing.T) {
 	}
 }
 
-func TestParseACRFromAccessToken(t *testing.T) {
+func TestParseACRFromToken(t *testing.T) {
 	header := base64.URLEncoding.EncodeToString([]byte(`{"alg":"none"}`))
 	validClaims := base64.URLEncoding.EncodeToString([]byte(`{"acr":"example_acr"}`))
 	invalidBase64Claims := "invalid_base64_claims"
@@ -92,7 +92,7 @@ func TestParseACRFromAccessToken(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			acr, err := parseACRFromAccessToken(tt.token)
+			acr, err := parseACRFromToken(tt.token)
 			if acr != tt.expectedACR {
 				t.Errorf("expected acr to be '%s', got '%s'", tt.expectedACR, acr)
 			}
