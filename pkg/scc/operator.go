@@ -132,5 +132,6 @@ func Setup(
 		operatorLogger.Info("SCC operator initialized; controllers waiting to start until system is ready")
 	}
 
+	// debug
 	return nil
 }
