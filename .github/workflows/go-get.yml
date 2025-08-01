@@ -35,7 +35,6 @@ jobs:
         run: make go-get
       - name: Run go generate
         run: |
-          go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.12.0
           go generate ./...
       - name: Check for repository changes
         run: |
