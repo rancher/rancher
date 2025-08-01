@@ -468,20 +468,20 @@ func (r *RunningDriver) Start() (string, error) {
 
 // portOnly attempts to return port fragment of address
 func portOnly(address string) (string, error) {
-	portParseErr := fmt.Errorf("failed to parse port from address [%s]", address)
+	portParseErrPrefix := fmt.Errorf("failed to parse port from address [%s]", address)
 
 	_, port, err := net.SplitHostPort(address)
 	if err != nil {
-		return "", errors.Wrap(err, portParseErr.Error())
+		return "", fmt.Errorf("%s: %w", portParseErrPrefix, err)
 	}
 
 	portNum, err := strconv.Atoi(port)
 	if err != nil {
-		return "", portParseErr
+		return "", fmt.Errorf("%s: %w", portParseErrPrefix, err)
 	}
 
 	if portNum < 1 || portNum > 65535 {
-		return "", errors.Wrap(fmt.Errorf(fmt.Sprintf("invalid port [%s], port range is between 1 and 65535", port)), portParseErr.Error())
+		return "", fmt.Errorf("%s: invalid port [%s], port range is between 1 and 65535", portParseErrPrefix, port)
 	}
 
 	return port, nil
