@@ -4,6 +4,7 @@ import (
 	"sort"
 	"strconv"
 
+	"github.com/rancher/rancher/pkg/capr"
 	name2 "github.com/rancher/wrangler/v3/pkg/name"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -37,6 +38,9 @@ func objects(ready bool, args driverArgs) []runtime.Object {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      args.StateSecretName,
 			Namespace: args.MachineNamespace,
+			Labels: map[string]string{
+				capr.BackupLabel: "true",
+			},
 		},
 		Type: "rke.cattle.io/machine-state",
 	}
