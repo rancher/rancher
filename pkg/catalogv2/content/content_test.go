@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 
@@ -595,6 +596,49 @@ func TestAirgappedAndBundledIcons(t *testing.T) {
 	}
 
 	deleteDir("../rancher-data")
+}
+
+func TestSkipIndexFiltering(t *testing.T) {
+	tests := []struct {
+		testName               string
+		serverVersion          string
+		skipHelmIndexFiltering bool
+		expected               bool
+	}{
+		{
+			"Shouldn't skip if version is release",
+			"v2.13.0",
+			true,
+			false,
+		},
+		{
+			"Should skip if version is dev",
+			"dev",
+			false,
+			true,
+		},
+		{
+			"Should skip if version is head and skipHelmIndexFiltering is true",
+			"v2.13.0-head",
+			true,
+			true,
+		},
+		{
+			"Shouldn't skip if version is head and skipHelmIndexFiltering is false",
+			"v2.13.0-head",
+			false,
+			false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.testName, func(t *testing.T) {
+			_ = settings.SkipHelmIndexFiltering.Set(strconv.FormatBool(tt.skipHelmIndexFiltering))
+			_ = settings.ServerVersion.Set(tt.serverVersion)
+			result := skipIndexFiltering()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }
 
 func createDir(dir string) error {
