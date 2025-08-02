@@ -2,7 +2,7 @@
 // known as ext tokens.
 package tokens
 
-//go::generate mockgen -source tokens.go -destination=zz_token_fakes.go -package=tokens
+//go::generate go tool -modfile ../../../../gotools/mockgen/go.mod mockgen -source tokens.go -destination=zz_token_fakes.go -package=tokens
 
 import (
 	"context"
