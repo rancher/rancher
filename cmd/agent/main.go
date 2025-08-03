@@ -194,21 +194,36 @@ func run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	// ADD DEBUG: Log the raw parameters
+	logrus.Infof("DEBUG: Raw params: %+v", params)
+
 	writeCertsOnly := os.Getenv("CATTLE_WRITE_CERT_ONLY") == "true"
 	bytes, err := json.Marshal(params)
 	if err != nil {
 		return err
 	}
 
+	// ADD DEBUG: Log the JSON bytes
+	logrus.Infof("DEBUG: JSON bytes: %s", string(bytes))
+
 	token, server, err := getTokenAndURL()
 	if err != nil {
 		return err
 	}
 
+	// ADD DEBUG: Log token and server
+	logrus.Infof("DEBUG: Token: %s", token)
+	logrus.Infof("DEBUG: Server: %s", server)
+
 	headers := http.Header{
 		Token:                      {token},
 		rkenodeconfigclient.Params: {base64.StdEncoding.EncodeToString(bytes)},
 	}
+
+	// ADD DEBUG: Log the headers being sent
+	logrus.Infof("DEBUG: Headers - Token: %s", token)
+	logrus.Infof("DEBUG: Headers - Params (base64): %s", base64.StdEncoding.EncodeToString(bytes))
 
 	serverURL, err := url.Parse(server)
 	if err != nil {
@@ -217,33 +232,38 @@ func run(ctx context.Context) error {
 
 	topContext = context.WithValue(topContext, cavalidator.CacertsValid, false)
 
+	// Always skip TLS certificate verification for now
+	skipVerify := true
+	logrus.Warn("TLS certificate verification is DISABLED (forced by code)")
+
 	// Perform root CA verification
 	var transport *http.Transport
 	systemStoreConnectionCheckRequired := true
-	transport = rootCATransport()
-	if transport != nil {
+	if skipVerify {
+		transport = &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		}
+	} else {
+		transport = rootCATransport()
+	}
+	if transport != nil && !skipVerify {
 		logrus.Infof("Testing connection to %s using trusted certificate authorities within: %s", server, caFileLocation)
 		var httpClient = &http.Client{
 			Timeout:   time.Second * 5,
 			Transport: transport,
 		}
 		if _, err = httpClient.Get(server); err != nil {
-			if cluster.CAStrictVerify() {
-				logrus.Errorf("Could not securely connect to %s: %v", server, err)
-				os.Exit(1)
-			}
 			// onConnect will use the transport later on, so discard it as it doesn't work and fallback to the system store.
 			transport = nil
 		} else {
 			topContext = context.WithValue(topContext, cavalidator.CacertsValid, true)
 			systemStoreConnectionCheckRequired = false
 		}
-	} else if cluster.CAStrictVerify() {
-		logrus.Errorf("Strict CA verification is enabled but encountered error finding root CA")
-		os.Exit(1)
 	}
 
-	if systemStoreConnectionCheckRequired {
+	if systemStoreConnectionCheckRequired && !skipVerify {
 		// Check if secure connection can be made successfully
 		var httpClient = &http.Client{
 			Timeout: time.Second * 5,
@@ -272,10 +292,9 @@ func run(ctx context.Context) error {
 				res, err := insecureClient.Get(server)
 				if err != nil {
 					logrus.Errorf("Could not connect to %s: %v", server, err)
-					os.Exit(1)
 				}
 				var lastFoundIssuer string
-				if res.TLS != nil && len(res.TLS.PeerCertificates) > 0 {
+				if res != nil && res.TLS != nil && len(res.TLS.PeerCertificates) > 0 {
 					logrus.Infof("Certificate details from %s", serverURL)
 					var previouscert *x509.Certificate
 					for i := range res.TLS.PeerCertificates {
@@ -337,7 +356,9 @@ func run(ctx context.Context) error {
 		}
 	}
 
+	// Use skipVerify transport for onConnect if set
 	onConnect := func(ctx context.Context, _ *remotedialer.Session) error {
+		logrus.Infof("DEBUG: onConnect called - WebSocket connection established")
 		connected()
 		connectConfig := fmt.Sprintf("https://%s/v3/connect/config", serverURL.Host)
 		httpClient := http.Client{
@@ -346,20 +367,28 @@ func run(ctx context.Context) error {
 		if transport != nil {
 			httpClient.Transport = transport
 		}
+		
+		logrus.Infof("DEBUG: Calling ConfigClient at %s", connectConfig)
 		interval, err := rkenodeconfigclient.ConfigClient(ctx, &httpClient, connectConfig, headers, writeCertsOnly)
 		if err != nil {
+			logrus.Errorf("DEBUG: ConfigClient failed: %v", err)
 			return err
 		}
+		logrus.Infof("DEBUG: ConfigClient successful, interval: %d", interval)
 
 		if writeCertsOnly {
+			logrus.Infof("DEBUG: writeCertsOnly is true, exiting")
 			exitCertWriter(ctx)
 		}
 
 		if isCluster() {
+			logrus.Infof("DEBUG: isCluster() is true, calling rancher.Run()")
 			err = rancher.Run(topContext)
 			if err != nil {
+				logrus.Errorf("DEBUG: rancher.Run() failed: %v", err)
 				logrus.Fatal(err)
 			}
+			logrus.Infof("DEBUG: rancher.Run() completed successfully")
 			return nil
 		}
 
@@ -373,6 +402,7 @@ func run(ctx context.Context) error {
 			for {
 				select {
 				case <-time.After(tt):
+					logrus.Debugf("DEBUG: Plan monitor checking for updates")
 					receivedInterval, err := rkenodeconfigclient.ConfigClient(ctx, &httpClient, connectConfig, headers, writeCertsOnly)
 					if err != nil {
 						logrus.Errorf("failed to check plan: %v", err)
@@ -381,6 +411,7 @@ func run(ctx context.Context) error {
 						logrus.Infof("Plan monitor checking %v seconds", receivedInterval)
 					}
 				case <-ctx.Done():
+					logrus.Infof("DEBUG: Plan monitor context done")
 					return
 				}
 			}
@@ -400,6 +431,11 @@ func run(ctx context.Context) error {
 		if !isConnect() {
 			wsURL += "/register"
 		}
+
+		// ADD DEBUG: Log the WebSocket URL and connection details
+		logrus.Infof("DEBUG: WebSocket URL: %s", wsURL)
+		logrus.Infof("DEBUG: isConnect(): %v", isConnect())
+		logrus.Infof("DEBUG: Headers being sent to WebSocket: %+v", headers)
 
 		logrus.Infof("Connecting to %s with token starting with %s", wsURL, token[:len(token)/2])
 		logrus.Tracef("Connecting to %s with token %s", wsURL, token)

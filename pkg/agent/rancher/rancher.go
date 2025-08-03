@@ -20,7 +20,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/rest"
+	"k8s.io/client-go/kubernetes"
 )
 
 var (
@@ -28,27 +28,37 @@ var (
 )
 
 func Run(ctx context.Context) error {
+	logrus.Infof("DEBUG: rancher.Run() called")
+
 	if err := setupSteveAggregation(ctx); err != nil {
+		logrus.Errorf("DEBUG: setupSteveAggregation failed: %v", err)
 		return err
 	}
+	logrus.Infof("DEBUG: setupSteveAggregation completed")
 
 	if started {
+		logrus.Infof("DEBUG: rancher already started, returning")
 		return nil
 	}
 
 	if !features.MCMAgent.Enabled() {
+		logrus.Infof("DEBUG: MCMAgent feature not enabled, returning")
 		return nil
 	}
 
 	cfg, err := kubeconfig.GetNonInteractiveClientConfig("").ClientConfig()
 	if err != nil {
+		logrus.Errorf("DEBUG: Failed to get client config: %v", err)
 		return err
 	}
+	logrus.Infof("DEBUG: Got client config successfully")
 
 	core, err := corefactory.NewFactoryFromConfig(cfg)
 	if err != nil {
+		logrus.Errorf("DEBUG: Failed to create core factory: %v", err)
 		return err
 	}
+	logrus.Infof("DEBUG: Created core factory successfully")
 
 	h := handler{
 		ctx:          ctx,
@@ -57,9 +67,13 @@ func Run(ctx context.Context) error {
 
 	core.Core().V1().Service().OnChange(ctx, "rancher-installed", h.OnChange)
 	if err := core.Start(ctx, 1); err != nil {
+		logrus.Errorf("DEBUG: Failed to start core factory: %v", err)
 		return err
 	}
+	logrus.Infof("DEBUG: Started core factory successfully")
+
 	started = true
+	logrus.Infof("DEBUG: rancher.Run() completed successfully, started=true")
 	return nil
 }
 
@@ -131,12 +145,23 @@ func (h *handler) OnChange(key string, service *corev1.Service) (*corev1.Service
 }
 
 func setupSteveAggregation(ctx context.Context) error {
-	c, err := rest.InClusterConfig()
+	logrus.Infof("DEBUG: setupSteveAggregation called")
+
+	cfg, err := kubeconfig.GetNonInteractiveClientConfig("").ClientConfig()
 	if err != nil {
+		logrus.Errorf("DEBUG: setupSteveAggregation - failed to get client config: %v", err)
 		return err
 	}
+	logrus.Infof("DEBUG: setupSteveAggregation - got client config")
 
-	apply, err := apply.NewForConfig(c)
+	_, err = kubernetes.NewForConfig(cfg)
+	if err != nil {
+		logrus.Errorf("DEBUG: setupSteveAggregation - failed to create kubernetes client: %v", err)
+		return err
+	}
+	logrus.Infof("DEBUG: setupSteveAggregation - created kubernetes client")
+
+	apply, err := apply.NewForConfig(cfg)
 	if err != nil {
 		return err
 	}
@@ -168,7 +193,8 @@ func setupSteveAggregation(ctx context.Context) error {
 		data[cavalidator.CacertsValid] = []byte("false")
 	}
 
-	return apply.
+	logrus.Infof("DEBUG: Applying Steve aggregation secret")
+	err = apply.
 		WithDynamicLookup().
 		WithSetID("rancher-stv-aggregation").
 		WithListerNamespace(namespace.System).
@@ -179,4 +205,12 @@ func setupSteveAggregation(ctx context.Context) error {
 			},
 			Data: data,
 		})
+	if err != nil {
+		logrus.Errorf("DEBUG: Failed to apply Steve aggregation secret: %v", err)
+		return err
+	}
+	logrus.Infof("DEBUG: Steve aggregation secret applied successfully")
+
+	logrus.Infof("DEBUG: setupSteveAggregation completed successfully")
+	return nil
 }

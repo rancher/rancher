@@ -1,0 +1,21 @@
+# Stage 1: Build the agent binary
+FROM golang:1.23 AS builder
+
+# Use direct Go proxy and disable checksum DB to avoid slow downloads
+#ENV GOPROXY=direct
+#ENV GOSUMDB=off
+
+# Install CA certificates
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o agent ./cmd/agent
+
+# Stage 2: Create minimal image
+FROM debian:bullseye-slim
+COPY --from=builder /src/agent /agent
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+RUN mkdir -p /etc/kubernetes/ssl/certs \
+    && cp /etc/ssl/certs/ca-certificates.crt /etc/kubernetes/ssl/certs/serverca
+ENTRYPOINT ["/agent"]

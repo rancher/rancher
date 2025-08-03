@@ -23,7 +23,14 @@ quick-agent:
 quick-server:
 	@$(MAKE) quick TARGET="server"
 
+scale-cluster-agent:
+	@echo "Building scale-cluster-agent..."
+	@mkdir -p bin
+	@cd scale-cluster-agent && go mod tidy
+	@cd scale-cluster-agent && go build -o ../bin/scale-cluster-agent main.go
+	@echo "Scale cluster agent built successfully: bin/scale-cluster-agent"
+
 $(DEV_TARGETS):
 	./dev-scripts/$@
 
-.PHONY: $(TARGETS) $(DEV_TARGETS) quick-agent quick-server
+.PHONY: $(TARGETS) $(DEV_TARGETS) quick-agent quick-server scale-cluster-agent

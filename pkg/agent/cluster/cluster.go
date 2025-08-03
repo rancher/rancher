@@ -16,6 +16,7 @@ import (
 	coreV1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -42,6 +43,11 @@ func TokenAndURL() (string, string, error) {
 		return "", "", err
 	}
 	token, err := readKey(tokenFilename)
+	
+	// ADD DEBUG: Log the token and URL values
+	logrus.Infof("DEBUG: Cluster.TokenAndURL() - token: %s", token)
+	logrus.Infof("DEBUG: Cluster.TokenAndURL() - url: %s", url)
+	
 	return token, url, err
 }
 
@@ -100,13 +106,18 @@ func Params() (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	return map[string]interface{}{
+	result := map[string]interface{}{
 		"cluster": map[string]interface{}{
 			"address": fmt.Sprintf("%s:%s", kubernetesServiceHost, kubernetesServicePort),
 			"token":   strings.TrimSpace(string(token)),
 			"caCert":  base64.StdEncoding.EncodeToString(caData),
 		},
-	}, nil
+	}
+	
+	// ADD DEBUG: Log the final result
+	logrus.Infof("DEBUG: Cluster.Params() returning: %+v", result)
+	
+	return result, nil
 }
 
 func getenv(env string) (string, error) {

@@ -59,20 +59,26 @@ func newErrNodeOrClusterNotFound(msg, occursType string) *ErrNodeOrClusterNotFou
 // all aspects of the received node-config except any delivered certificates. Upon a successful execution of the node config, this function
 // will return a polling interval which should be used to query the rancher server for the next node-config and any encountered errors.
 func ConfigClient(ctx context.Context, client *http.Client, url string, header http.Header, writeCertOnly bool) (int, error) {
+	logrus.Infof("DEBUG: ConfigClient called with url: %s", url)
+	logrus.Infof("DEBUG: ConfigClient headers: %+v", header)
+	
 	// try a few more times because there is a delay after registering a new node
 	nodeOrClusterNotFoundRetryLimit := 3
 	interval := 120
 	requestedRenewedCert := false
 	for {
+		logrus.Infof("DEBUG: ConfigClient - calling getConfig")
 		nc, err := getConfig(client, url, header)
 		if err != nil {
 			if _, ok := err.(*ErrNodeOrClusterNotFound); ok {
 				if nodeOrClusterNotFoundRetryLimit < 1 {
 					// return the error if the node cannot connect to server or remove from a cluster
+					logrus.Errorf("DEBUG: ConfigClient - node/cluster not found, retry limit exceeded")
 					return interval, err
 				}
 
 				nodeOrClusterNotFoundRetryLimit--
+				logrus.Infof("DEBUG: ConfigClient - node/cluster not found, retries left: %d", nodeOrClusterNotFoundRetryLimit)
 			}
 
 			logrus.Warnf("Error while getting agent config: %v", err)
@@ -81,6 +87,7 @@ func ConfigClient(ctx context.Context, client *http.Client, url string, header h
 		}
 
 		if nc != nil {
+			logrus.Infof("DEBUG: ConfigClient - got config successfully: %+v", nc)
 
 			// if a cert file and key file are passed to the kubelet
 			// then we need to ensure they are valid, otherwise we can safely skip the check
@@ -112,10 +119,13 @@ func ConfigClient(ctx context.Context, client *http.Client, url string, header h
 				interval = nc.AgentCheckInterval
 			}
 
+			logrus.Infof("DEBUG: ConfigClient - executing plan")
 			err = rkeworker.ExecutePlan(ctx, nc, writeCertOnly)
 			if err != nil {
+				logrus.Errorf("DEBUG: ConfigClient - ExecutePlan failed: %v", err)
 				return interval, err
 			}
+			logrus.Infof("DEBUG: ConfigClient - ExecutePlan completed successfully")
 
 			/* server sends non-zero nodeVersion when node is upgrading (node.Status.AppliedVersion != cluster.Status.NodeVersion)
 			ExecutePlan doesn't update processes if writeCertOnly, shouldn't consider this an upgrade */
@@ -139,6 +149,7 @@ func ConfigClient(ctx context.Context, client *http.Client, url string, header h
 				continue
 			}
 
+			logrus.Infof("DEBUG: ConfigClient - returning interval: %d", interval)
 			return interval, err
 		}
 

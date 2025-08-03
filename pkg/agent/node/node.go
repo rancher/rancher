@@ -11,7 +11,14 @@ import (
 )
 
 func TokenAndURL() (string, string, error) {
-	return os.Getenv("CATTLE_TOKEN"), os.Getenv("CATTLE_SERVER"), nil
+	token := os.Getenv("CATTLE_TOKEN")
+	server := os.Getenv("CATTLE_SERVER")
+	
+	// ADD DEBUG: Log the token and server values
+	logrus.Infof("DEBUG: TokenAndURL() - CATTLE_TOKEN: %s", token)
+	logrus.Infof("DEBUG: TokenAndURL() - CATTLE_SERVER: %s", server)
+	
+	return token, server, nil
 }
 
 func Params() map[string]interface{} {
@@ -55,9 +62,14 @@ func Params() map[string]interface{} {
 		}
 	}
 
-	return map[string]interface{}{
+	result := map[string]interface{}{
 		"node": params,
 	}
+	
+	// ADD DEBUG: Log the final result
+	logrus.Infof("DEBUG: Node.Params() returning: %+v", result)
+	
+	return result
 }
 
 func parseLabel(v string) map[string]string {
