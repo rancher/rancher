@@ -1,0 +1,147 @@
+name: "{{cluster-name}}"
+nodes:
+  - name: "{{cluster-name}}-node1"
+    status: "Ready"
+    roles: ["control-plane", "etcd", "master"]
+    age: "42h"
+    version: "v1.28.5+k3s1"
+    internalIP: "10.244.244.1"
+    externalIP: "<none>"
+    osImage: "0.0.0-poc-k3s-june11-aca5d463-dirty-2025-07-31.04.42-kubevirt-amd64"
+    kernelVersion: "6.1.112-linuxkit-63f4d774fbc8"
+    containerRuntime: "containerd://1.7.11-k3s2"
+    capacity:
+      cpu: "4"
+      memory: "8Gi"
+      pods: "110"
+    allocatable:
+      cpu: "3800m"
+      memory: "7Gi"
+      pods: "110"
+  - name: "{{cluster-name}}-node2"
+    status: "Ready"
+    roles: ["control-plane", "etcd", "master"]
+    age: "39h"
+    version: "v1.28.5+k3s1"
+    internalIP: "10.244.244.3"
+    externalIP: "<none>"
+    osImage: "0.0.0-poc-k3s-june11-aca5d463-dirty-2025-07-31.04.42-kubevirt-amd64"
+    kernelVersion: "6.1.112-linuxkit-63f4d774fbc8"
+    containerRuntime: "containerd://1.7.11-k3s2"
+    capacity:
+      cpu: "4"
+      memory: "8Gi"
+      pods: "110"
+    allocatable:
+      cpu: "3800m"
+      memory: "7Gi"
+      pods: "110"
+
+pods:
+  - name: "coredns-6799fbcd5-lgj8v"
+    namespace: "kube-system"
+    status: "Running"
+    ready: "1/1"
+    restarts: 3
+    age: "42h"
+    ip: "10.42.0.97"
+    node: "{{cluster-name}}-node1"
+    labels:
+      k8s-app: "kube-dns"
+  - name: "traefik-f4564c4f4-xz9t5"
+    namespace: "kube-system"
+    status: "Running"
+    ready: "1/1"
+    restarts: 3
+    age: "42h"
+    ip: "10.42.0.105"
+    node: "{{cluster-name}}-node1"
+    labels:
+      app.kubernetes.io/name: "traefik"
+  - name: "nginx-deployment-7d4cd48b5c-abc12"
+    namespace: "default"
+    status: "Running"
+    ready: "3/3"
+    restarts: 0
+    age: "2h"
+    ip: "10.42.1.10"
+    node: "{{cluster-name}}-node2"
+    labels:
+      app: "nginx"
+  - name: "grafana-6b8c5d4f3e-def34"
+    namespace: "monitoring"
+    status: "Running"
+    ready: "1/1"
+    restarts: 1
+    age: "1h"
+    ip: "10.42.2.15"
+    node: "{{cluster-name}}-node1"
+    labels:
+      app: "grafana"
+
+services:
+  - name: "kubernetes"
+    namespace: "default"
+    type: "ClusterIP"
+    clusterIP: "10.43.0.1"
+    externalIP: "<none>"
+    ports: "443/TCP"
+    age: "42h"
+  - name: "kube-dns"
+    namespace: "kube-system"
+    type: "ClusterIP"
+    clusterIP: "10.43.0.10"
+    externalIP: "<none>"
+    ports: "53/UDP,53/TCP,9153/TCP"
+    age: "42h"
+    labels:
+      k8s-app: "kube-dns"
+  - name: "traefik"
+    namespace: "kube-system"
+    type: "LoadBalancer"
+    clusterIP: "10.43.185.148"
+    externalIP: "10.244.244.1,10.244.244.3"
+    ports: "80:32522/TCP,443:32443/TCP"
+    age: "42h"
+    labels:
+      app.kubernetes.io/name: "traefik"
+
+secrets:
+  - name: "default-token-abc12"
+    namespace: "default"
+    type: "kubernetes.io/service-account-token"
+    data: 3
+    age: "42h"
+  - name: "rancher-token-def34"
+    namespace: "cattle-system"
+    type: "kubernetes.io/service-account-token"
+    data: 3
+    age: "42h"
+
+configmaps:
+  - name: "kube-root-ca.crt"
+    namespace: "default"
+    data: 1
+    age: "42h"
+  - name: "traefik-config"
+    namespace: "kube-system"
+    data: 2
+    age: "42h"
+
+deployments:
+  - name: "nginx-deployment"
+    namespace: "default"
+    ready: "3"
+    upToDate: "3"
+    available: "3"
+    age: "2h"
+    labels:
+      app: "nginx"
+  - name: "grafana"
+    namespace: "monitoring"
+    ready: "1"
+    upToDate: "1"
+    available: "1"
+    age: "1h"
+    labels:
+      app: "grafana" 
