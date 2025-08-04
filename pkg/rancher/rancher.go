@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/scc"
+	"github.com/rancher/rancher/pkg/telemetry"
+	"github.com/rancher/rancher/pkg/telemetry/initcond"
 
 	"github.com/Masterminds/semver/v3"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
@@ -48,6 +50,7 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/pkg/settings"
+	telemetrycontrollers "github.com/rancher/rancher/pkg/telemetry/controllers"
 	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/ui"
@@ -106,13 +109,14 @@ type Options struct {
 }
 
 type Rancher struct {
-	Auth       steveauth.Middleware
-	Handler    http.Handler
-	Wrangler   *wrangler.Context
-	Steve      *steveserver.Server
-	auditLog   *audit.Writer
-	authServer *auth.Server
-	opts       *Options
+	Auth             steveauth.Middleware
+	Handler          http.Handler
+	Wrangler         *wrangler.Context
+	Steve            *steveserver.Server
+	auditLog         *audit.Writer
+	telemetryManager telemetry.TelemetryExporterManager
+	authServer       *auth.Server
+	opts             *Options
 
 	aggregationRegistrationTimeout time.Duration
 	kubeAggregationReadyChan       <-chan struct{}
@@ -338,6 +342,15 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil
 	})
 
+	var telemetryManager telemetry.TelemetryExporterManager
+	if !features.MCMAgent.Enabled() {
+		telG := telemetry.NewTelemetryGatherer(
+			wranglerContext.Mgmt.Cluster().Cache(),
+			wranglerContext.Mgmt.Node().Cache(),
+		)
+		telemetryManager = telemetry.NewTelemetryExporterManager(telG, time.Second*10)
+	}
+
 	return &Rancher{
 		Auth: authServer.Authenticator.Chain(
 			auditFilter),
@@ -359,6 +372,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		Steve:                          steve,
 		auditLog:                       auditLogWriter,
 		authServer:                     authServer,
+		telemetryManager:               telemetryManager,
 		opts:                           opts,
 		aggregationRegistrationTimeout: opts.AggregationRegistrationTimeout,
 		kubeAggregationReadyChan:       kubeAggregationReadyChan,
@@ -436,9 +450,14 @@ func (r *Rancher) Start(ctx context.Context) error {
 		return runMigrations(r.Wrangler)
 	})
 
-	if features.RancherSCCRegistrationExtension.Enabled() {
+	if !features.MCMAgent.Enabled() && features.RancherSCCRegistrationExtension.Enabled() {
 		r.Wrangler.OnLeader(func(ctx context.Context) error {
+			if err := telemetrycontrollers.RegisterControllers(ctx, r.Wrangler, r.telemetryManager); err != nil {
+				return err
+			}
 			logrus.Debug("[rancher::Start] starting RancherSCCRegistrationExtension")
+
+			//TODO(dan) : reconcile scc-deployment here instead
 			return scc.Setup(ctx, r.Wrangler)
 		})
 	}
@@ -451,7 +470,39 @@ func (r *Rancher) Start(ctx context.Context) error {
 
 	r.auditLog.Start(ctx)
 
+	if !features.MCMAgent.Enabled() {
+		r.startTelemetryManager(context.TODO())
+	}
 	return r.Wrangler.Start(ctx)
+}
+
+func (r *Rancher) startTelemetryManager(ctx context.Context) {
+	if r.telemetryManager == nil {
+		logrus.Info("telemetry manager not enabled")
+	}
+
+	initChan := make(chan struct{})
+	initInfo := &initcond.InitInfo{}
+	go func() {
+		initcond.WaitForInfo(r.Wrangler, initInfo, initChan)
+	}()
+	go func() {
+		logrus.Info("waiting for telemetry manager to start...")
+		<-initChan
+		log := logrus.WithFields(
+			logrus.Fields{
+				"server-url":      initInfo.ServerURL,
+				"cluster-uuid":    initInfo.ClusterUUID,
+				"install-uuid":    initInfo.InstallUUID,
+				"rancher-version": initInfo.RancherVersion,
+				"git-hash":        initInfo.GitHash,
+			},
+		)
+		if err := r.telemetryManager.Start(ctx, *initInfo); err != nil {
+			log.Errorf("failed to start telemetry manager : %s", err)
+		}
+		log.Info("telemetry manager started")
+	}()
 }
 
 func (r *Rancher) ListenAndServe(ctx context.Context) error {

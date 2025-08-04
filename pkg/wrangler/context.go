@@ -6,8 +6,6 @@ package wrangler
 import (
 	"context"
 	"fmt"
-	"github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io"
-	sccv1 "github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io/v1"
 	"net"
 	"net/http"
 	"sync"
@@ -42,6 +40,10 @@ import (
 	provisioningv1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io"
+	sccv1 "github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/generated/controllers/telemetry.cattle.io"
+	telemetryv1 "github.com/rancher/rancher/pkg/generated/controllers/telemetry.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/generated/controllers/upgrade.cattle.io"
 	plancontrolers "github.com/rancher/rancher/pkg/generated/controllers/upgrade.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/peermanager"
@@ -138,6 +140,7 @@ type Context struct {
 	K8s                 *kubernetes.Clientset
 	Plan                plancontrolers.Interface
 	SCC                 sccv1.Interface
+	Telemetry           telemetryv1.Interface
 
 	ASL                     accesscontrol.AccessSetLookup
 	ClientConfig            clientcmd.ClientConfig
@@ -168,6 +171,7 @@ type Context struct {
 	crd          *apiextensions.Factory
 	plan         *upgrade.Factory
 	sccReg       *scc.Factory
+	telemetry    *telemetry.Factory
 
 	started bool
 }
@@ -375,6 +379,11 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		return nil, err
 	}
 
+	telemetry, err := telemetry.NewFactoryFromConfigWithOptions(restConfig, opts)
+	if err != nil {
+		return nil, err
+	}
+
 	k8s, err := kubernetes.NewForConfig(restConfig)
 	if err != nil {
 		return nil, err
@@ -467,6 +476,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		TunnelServer:            tunnelServer,
 		Plan:                    plan.Upgrade().V1(),
 		SCC:                     scc.Scc().V1(),
+		Telemetry:               telemetry.Telemetry().V1(),
 
 		mgmt:         mgmt,
 		apps:         apps,
@@ -484,6 +494,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		rbac:         rbac,
 		plan:         plan,
 		sccReg:       scc,
+		telemetry:    telemetry,
 	}
 
 	return wContext, nil
