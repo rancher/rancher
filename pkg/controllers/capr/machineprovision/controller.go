@@ -49,6 +49,7 @@ const (
 	deleteJobConditionType = "DeleteJob"
 
 	forceRemoveMachineAnn = "provisioning.cattle.io/force-machine-remove"
+	deleteOnFailureAfter  = 60 * 60 // 1 hour
 )
 
 type infraObject struct {
@@ -566,9 +567,20 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 	}
 
 	if failure {
-		logrus.Infof("[machineprovision] %s/%s: Failed to create infrastructure for machine %s, deleting and recreating...", infra.meta.GetNamespace(), infra.meta.GetName(), machine.Name)
-		if err = h.machineClient.Delete(machine.Namespace, machine.Name, &metav1.DeleteOptions{}); err != nil {
-			return obj, err
+
+		if deleteOnFailureAfter < 0 {
+			// If deleteOnFailureAfter is negative, we will not delete the machine
+			logrus.Infof("[machineprovision] %s/%s: Failed to create infrastructure for machine %s, not deleting", infra.meta.GetNamespace(), infra.meta.GetName(), machine.Name)
+		} else if deleteOnFailureAfter > 0 {
+			// If deleteOnFailureAfter is bigger then zero, we will delete as the variable defines in seconds
+			logrus.Infof("[machineprovision] %s/%s: Failed to create infrastructure for machine %s, deleting and requeing after %d...", infra.meta.GetNamespace(), infra.meta.GetName(), machine.Name, deleteOnFailureAfter)
+			h.EnqueueAfter(infra, deleteOnFailureAfter)
+		} else {
+			// If deleteOnFailureAfter if zero, delete immediately
+			logrus.Infof("[machineprovision] %s/%s: Failed to create infrastructure for machine %s, deleting and recreating...", infra.meta.GetNamespace(), infra.meta.GetName(), machine.Name)
+			if err = h.machineClient.Delete(machine.Namespace, machine.Name, &metav1.DeleteOptions{}); err != nil {
+				return obj, err
+			}
 		}
 	}
 
