@@ -10,6 +10,9 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io"
+	sccv1 "github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io/v1"
+
 	fleetv1alpha1api "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/lasso/pkg/dynamic"
@@ -181,8 +184,8 @@ type MultiClusterManager interface {
 	K8sClient(clusterName string) (kubernetes.Interface, error)
 }
 
-func (w *Context) OnLeader(f func(ctx context.Context) error) {
-	w.leadership.OnLeader(f)
+func (w *Context) OnLeaderOrDie(f func(ctx context.Context) error) {
+	w.leadership.OnLeaderOrDie(f)
 }
 
 func (w *Context) StartWithTransaction(ctx context.Context, f func(context.Context) error) (err error) {
@@ -423,7 +426,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 	}
 
 	leadership := leader.NewManager("", "cattle-controllers", k8s)
-	leadership.OnLeader(func(ctx context.Context) error {
+	leadership.OnLeaderOrDie(func(ctx context.Context) error {
 		if peerManager != nil {
 			peerManager.Leader()
 		}
