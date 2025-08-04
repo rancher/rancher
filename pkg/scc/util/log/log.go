@@ -20,7 +20,7 @@ func NewLog() StructuredLogger {
 	}
 
 	baseLogger := rootLog.
-		WithField("component", "scc-operator")
+		WithField("component", "scc-operator-deployer")
 
 	if consts.IsDevMode() {
 		return baseLogger.WithField("devMode", true)

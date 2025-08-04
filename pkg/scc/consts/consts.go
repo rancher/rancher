@@ -8,6 +8,8 @@ const (
 
 // Secret names and name prefixes
 const (
+	DeploymentName                       = "rancher-scc-operator"
+	ServiceAccountName                   = "rancher-scc-operator"
 	ResourceSCCEntrypointSecretName      = "scc-registration"
 	SCCMetricsOutputSecretName           = "scc-metrics"
 	SCCSystemCredentialsSecretNamePrefix = "scc-system-credentials-"
@@ -50,6 +52,11 @@ const (
 	LabelSccLastProcessed = "scc.cattle.io/last-processed"
 	LabelSccManagedBy     = "scc.cattle.io/managed-by"
 	LabelSccSecretRole    = "scc.cattle.io/secret-role"
+
+	// LabelSccOperatorHash is used to determine if the deployment needs to be updated
+	LabelSccOperatorHash = "scc.cattle.io/operator-config-hash"
+	LabelK8sManagedBy    = "app.kubernetes.io/managed-by"
+	LabelK8sPartOf       = "app.kubernetes.io/part-of"
 )
 
 const (
