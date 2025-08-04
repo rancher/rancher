@@ -51,6 +51,8 @@ var OriginMap = map[string]string{
 	"hardened-k8s-metrics-server":                             "https://github.com/rancher/image-build-k8s-metrics-server",
 	"hardened-kubernetes":                                     "https://github.com/rancher/image-build-kubernetes",
 	"hardened-multus-cni":                                     "https://github.com/rancher/image-build-multus",
+	"hardened-multus-dynamic-networks-controller":             "https://github.com/rancher/image-build-multus-dynamic-networks-controller",
+	"hardened-multus-thick":                                   "https://github.com/rancher/image-build-multus",
 	"hardened-node-feature-discovery":                         "https://github.com/rancher/image-build-node-feature-discovery",
 	"hardened-sriov-cni":                                      "https://github.com/rancher/image-build-sriov-cni",
 	"hardened-sriov-network-config-daemon":                    "https://github.com/openshift/sriov-network-operator/blob/master/Dockerfile.sriov-network-config-daemon",
