@@ -6,6 +6,7 @@ import (
 
 	apismgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
@@ -15,6 +16,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -464,4 +466,92 @@ func newTestSecretsClient(ctrl *gomock.Controller) *wranglerfake.MockControllerI
 	secretController.EXPECT().Cache().Return(secretCache).AnyTimes()
 
 	return secretController
+}
+
+func TestUserToPrincipal(t *testing.T) {
+	principalTests := map[string]struct {
+		user azureUserObject
+		want v3.Principal
+	}{
+		"complete user": {
+			user: fakeUser{
+				id:            ptr.To("3f2504e0-4f89-11d3-9a0c-0305e82c3301"),
+				displayName:   ptr.To("Test User"),
+				principalName: ptr.To("testuser"),
+			},
+			want: v3.Principal{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "azuread_user://3f2504e0-4f89-11d3-9a0c-0305e82c3301",
+				},
+				PrincipalType: "user",
+				DisplayName:   "Test User",
+				LoginName:     "testuser",
+				Provider:      "azuread",
+			},
+		},
+		"missing display name": {
+			user: fakeUser{
+				id:            ptr.To("3f2504e0-4f89-11d3-9a0c-0305e82c3301"),
+				principalName: ptr.To("testuser"),
+			},
+			want: v3.Principal{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "azuread_user://3f2504e0-4f89-11d3-9a0c-0305e82c3301",
+				},
+				PrincipalType: "user",
+				LoginName:     "testuser",
+				Provider:      "azuread",
+			},
+		},
+		"missing user principal name": {
+			user: fakeUser{
+				id:          ptr.To("3f2504e0-4f89-11d3-9a0c-0305e82c3301"),
+				displayName: ptr.To("Test User"),
+			},
+			want: v3.Principal{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "azuread_user://3f2504e0-4f89-11d3-9a0c-0305e82c3301",
+				},
+				PrincipalType: "user",
+				DisplayName:   "Test User",
+				Provider:      "azuread",
+			},
+		},
+		"missing user principal name and display name": {
+			user: fakeUser{
+				id: ptr.To("3f2504e0-4f89-11d3-9a0c-0305e82c3301"),
+			},
+			want: v3.Principal{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "azuread_user://3f2504e0-4f89-11d3-9a0c-0305e82c3301",
+				},
+				PrincipalType: "user",
+				Provider:      "azuread",
+			},
+		},
+	}
+
+	for name, tt := range principalTests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tt.want, userToPrincipal(tt.user))
+		})
+	}
+}
+
+type fakeUser struct {
+	id            *string
+	displayName   *string
+	principalName *string
+}
+
+func (f fakeUser) GetId() *string {
+	return f.id
+}
+
+func (f fakeUser) GetDisplayName() *string {
+	return f.displayName
+}
+
+func (f fakeUser) GetUserPrincipalName() *string {
+	return f.principalName
 }
