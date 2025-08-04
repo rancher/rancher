@@ -25,6 +25,7 @@ import (
 type MockClusterInterface struct {
 	ctrl     *gomock.Controller
 	recorder *MockClusterInterfaceMockRecorder
+	isgomock struct{}
 }
 
 // MockClusterInterfaceMockRecorder is the mock recorder for MockClusterInterface.
@@ -45,99 +46,99 @@ func (m *MockClusterInterface) EXPECT() *MockClusterInterfaceMockRecorder {
 }
 
 // AddClusterScopedFeatureHandler mocks base method.
-func (m *MockClusterInterface) AddClusterScopedFeatureHandler(arg0 context.Context, arg1 func() bool, arg2, arg3 string, arg4 v30.ClusterHandlerFunc) {
+func (m *MockClusterInterface) AddClusterScopedFeatureHandler(ctx context.Context, enabled func() bool, name, clusterName string, sync v30.ClusterHandlerFunc) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "AddClusterScopedFeatureHandler", arg0, arg1, arg2, arg3, arg4)
+	m.ctrl.Call(m, "AddClusterScopedFeatureHandler", ctx, enabled, name, clusterName, sync)
 }
 
 // AddClusterScopedFeatureHandler indicates an expected call of AddClusterScopedFeatureHandler.
-func (mr *MockClusterInterfaceMockRecorder) AddClusterScopedFeatureHandler(arg0, arg1, arg2, arg3, arg4 any) *gomock.Call {
+func (mr *MockClusterInterfaceMockRecorder) AddClusterScopedFeatureHandler(ctx, enabled, name, clusterName, sync any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddClusterScopedFeatureHandler", reflect.TypeOf((*MockClusterInterface)(nil).AddClusterScopedFeatureHandler), arg0, arg1, arg2, arg3, arg4)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddClusterScopedFeatureHandler", reflect.TypeOf((*MockClusterInterface)(nil).AddClusterScopedFeatureHandler), ctx, enabled, name, clusterName, sync)
 }
 
 // AddClusterScopedFeatureLifecycle mocks base method.
-func (m *MockClusterInterface) AddClusterScopedFeatureLifecycle(arg0 context.Context, arg1 func() bool, arg2, arg3 string, arg4 v30.ClusterLifecycle) {
+func (m *MockClusterInterface) AddClusterScopedFeatureLifecycle(ctx context.Context, enabled func() bool, name, clusterName string, lifecycle v30.ClusterLifecycle) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "AddClusterScopedFeatureLifecycle", arg0, arg1, arg2, arg3, arg4)
+	m.ctrl.Call(m, "AddClusterScopedFeatureLifecycle", ctx, enabled, name, clusterName, lifecycle)
 }
 
 // AddClusterScopedFeatureLifecycle indicates an expected call of AddClusterScopedFeatureLifecycle.
-func (mr *MockClusterInterfaceMockRecorder) AddClusterScopedFeatureLifecycle(arg0, arg1, arg2, arg3, arg4 any) *gomock.Call {
+func (mr *MockClusterInterfaceMockRecorder) AddClusterScopedFeatureLifecycle(ctx, enabled, name, clusterName, lifecycle any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddClusterScopedFeatureLifecycle", reflect.TypeOf((*MockClusterInterface)(nil).AddClusterScopedFeatureLifecycle), arg0, arg1, arg2, arg3, arg4)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddClusterScopedFeatureLifecycle", reflect.TypeOf((*MockClusterInterface)(nil).AddClusterScopedFeatureLifecycle), ctx, enabled, name, clusterName, lifecycle)
 }
 
 // AddClusterScopedHandler mocks base method.
-func (m *MockClusterInterface) AddClusterScopedHandler(arg0 context.Context, arg1, arg2 string, arg3 v30.ClusterHandlerFunc) {
+func (m *MockClusterInterface) AddClusterScopedHandler(ctx context.Context, name, clusterName string, sync v30.ClusterHandlerFunc) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "AddClusterScopedHandler", arg0, arg1, arg2, arg3)
+	m.ctrl.Call(m, "AddClusterScopedHandler", ctx, name, clusterName, sync)
 }
 
 // AddClusterScopedHandler indicates an expected call of AddClusterScopedHandler.
-func (mr *MockClusterInterfaceMockRecorder) AddClusterScopedHandler(arg0, arg1, arg2, arg3 any) *gomock.Call {
+func (mr *MockClusterInterfaceMockRecorder) AddClusterScopedHandler(ctx, name, clusterName, sync any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddClusterScopedHandler", reflect.TypeOf((*MockClusterInterface)(nil).AddClusterScopedHandler), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddClusterScopedHandler", reflect.TypeOf((*MockClusterInterface)(nil).AddClusterScopedHandler), ctx, name, clusterName, sync)
 }
 
 // AddClusterScopedLifecycle mocks base method.
-func (m *MockClusterInterface) AddClusterScopedLifecycle(arg0 context.Context, arg1, arg2 string, arg3 v30.ClusterLifecycle) {
+func (m *MockClusterInterface) AddClusterScopedLifecycle(ctx context.Context, name, clusterName string, lifecycle v30.ClusterLifecycle) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "AddClusterScopedLifecycle", arg0, arg1, arg2, arg3)
+	m.ctrl.Call(m, "AddClusterScopedLifecycle", ctx, name, clusterName, lifecycle)
 }
 
 // AddClusterScopedLifecycle indicates an expected call of AddClusterScopedLifecycle.
-func (mr *MockClusterInterfaceMockRecorder) AddClusterScopedLifecycle(arg0, arg1, arg2, arg3 any) *gomock.Call {
+func (mr *MockClusterInterfaceMockRecorder) AddClusterScopedLifecycle(ctx, name, clusterName, lifecycle any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddClusterScopedLifecycle", reflect.TypeOf((*MockClusterInterface)(nil).AddClusterScopedLifecycle), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddClusterScopedLifecycle", reflect.TypeOf((*MockClusterInterface)(nil).AddClusterScopedLifecycle), ctx, name, clusterName, lifecycle)
 }
 
 // AddFeatureHandler mocks base method.
-func (m *MockClusterInterface) AddFeatureHandler(arg0 context.Context, arg1 func() bool, arg2 string, arg3 v30.ClusterHandlerFunc) {
+func (m *MockClusterInterface) AddFeatureHandler(ctx context.Context, enabled func() bool, name string, sync v30.ClusterHandlerFunc) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "AddFeatureHandler", arg0, arg1, arg2, arg3)
+	m.ctrl.Call(m, "AddFeatureHandler", ctx, enabled, name, sync)
 }
 
 // AddFeatureHandler indicates an expected call of AddFeatureHandler.
-func (mr *MockClusterInterfaceMockRecorder) AddFeatureHandler(arg0, arg1, arg2, arg3 any) *gomock.Call {
+func (mr *MockClusterInterfaceMockRecorder) AddFeatureHandler(ctx, enabled, name, sync any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddFeatureHandler", reflect.TypeOf((*MockClusterInterface)(nil).AddFeatureHandler), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddFeatureHandler", reflect.TypeOf((*MockClusterInterface)(nil).AddFeatureHandler), ctx, enabled, name, sync)
 }
 
 // AddFeatureLifecycle mocks base method.
-func (m *MockClusterInterface) AddFeatureLifecycle(arg0 context.Context, arg1 func() bool, arg2 string, arg3 v30.ClusterLifecycle) {
+func (m *MockClusterInterface) AddFeatureLifecycle(ctx context.Context, enabled func() bool, name string, lifecycle v30.ClusterLifecycle) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "AddFeatureLifecycle", arg0, arg1, arg2, arg3)
+	m.ctrl.Call(m, "AddFeatureLifecycle", ctx, enabled, name, lifecycle)
 }
 
 // AddFeatureLifecycle indicates an expected call of AddFeatureLifecycle.
-func (mr *MockClusterInterfaceMockRecorder) AddFeatureLifecycle(arg0, arg1, arg2, arg3 any) *gomock.Call {
+func (mr *MockClusterInterfaceMockRecorder) AddFeatureLifecycle(ctx, enabled, name, lifecycle any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddFeatureLifecycle", reflect.TypeOf((*MockClusterInterface)(nil).AddFeatureLifecycle), arg0, arg1, arg2, arg3)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddFeatureLifecycle", reflect.TypeOf((*MockClusterInterface)(nil).AddFeatureLifecycle), ctx, enabled, name, lifecycle)
 }
 
 // AddHandler mocks base method.
-func (m *MockClusterInterface) AddHandler(arg0 context.Context, arg1 string, arg2 v30.ClusterHandlerFunc) {
+func (m *MockClusterInterface) AddHandler(ctx context.Context, name string, sync v30.ClusterHandlerFunc) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "AddHandler", arg0, arg1, arg2)
+	m.ctrl.Call(m, "AddHandler", ctx, name, sync)
 }
 
 // AddHandler indicates an expected call of AddHandler.
-func (mr *MockClusterInterfaceMockRecorder) AddHandler(arg0, arg1, arg2 any) *gomock.Call {
+func (mr *MockClusterInterfaceMockRecorder) AddHandler(ctx, name, sync any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddHandler", reflect.TypeOf((*MockClusterInterface)(nil).AddHandler), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddHandler", reflect.TypeOf((*MockClusterInterface)(nil).AddHandler), ctx, name, sync)
 }
 
 // AddLifecycle mocks base method.
-func (m *MockClusterInterface) AddLifecycle(arg0 context.Context, arg1 string, arg2 v30.ClusterLifecycle) {
+func (m *MockClusterInterface) AddLifecycle(ctx context.Context, name string, lifecycle v30.ClusterLifecycle) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "AddLifecycle", arg0, arg1, arg2)
+	m.ctrl.Call(m, "AddLifecycle", ctx, name, lifecycle)
 }
 
 // AddLifecycle indicates an expected call of AddLifecycle.
-func (mr *MockClusterInterfaceMockRecorder) AddLifecycle(arg0, arg1, arg2 any) *gomock.Call {
+func (mr *MockClusterInterfaceMockRecorder) AddLifecycle(ctx, name, lifecycle any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddLifecycle", reflect.TypeOf((*MockClusterInterface)(nil).AddLifecycle), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddLifecycle", reflect.TypeOf((*MockClusterInterface)(nil).AddLifecycle), ctx, name, lifecycle)
 }
 
 // Controller mocks base method.
@@ -170,105 +171,105 @@ func (mr *MockClusterInterfaceMockRecorder) Create(arg0 any) *gomock.Call {
 }
 
 // Delete mocks base method.
-func (m *MockClusterInterface) Delete(arg0 string, arg1 *v1.DeleteOptions) error {
+func (m *MockClusterInterface) Delete(name string, options *v1.DeleteOptions) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Delete", arg0, arg1)
+	ret := m.ctrl.Call(m, "Delete", name, options)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Delete indicates an expected call of Delete.
-func (mr *MockClusterInterfaceMockRecorder) Delete(arg0, arg1 any) *gomock.Call {
+func (mr *MockClusterInterfaceMockRecorder) Delete(name, options any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockClusterInterface)(nil).Delete), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockClusterInterface)(nil).Delete), name, options)
 }
 
 // DeleteCollection mocks base method.
-func (m *MockClusterInterface) DeleteCollection(arg0 *v1.DeleteOptions, arg1 v1.ListOptions) error {
+func (m *MockClusterInterface) DeleteCollection(deleteOpts *v1.DeleteOptions, listOpts v1.ListOptions) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteCollection", arg0, arg1)
+	ret := m.ctrl.Call(m, "DeleteCollection", deleteOpts, listOpts)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeleteCollection indicates an expected call of DeleteCollection.
-func (mr *MockClusterInterfaceMockRecorder) DeleteCollection(arg0, arg1 any) *gomock.Call {
+func (mr *MockClusterInterfaceMockRecorder) DeleteCollection(deleteOpts, listOpts any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCollection", reflect.TypeOf((*MockClusterInterface)(nil).DeleteCollection), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCollection", reflect.TypeOf((*MockClusterInterface)(nil).DeleteCollection), deleteOpts, listOpts)
 }
 
 // DeleteNamespaced mocks base method.
-func (m *MockClusterInterface) DeleteNamespaced(arg0, arg1 string, arg2 *v1.DeleteOptions) error {
+func (m *MockClusterInterface) DeleteNamespaced(namespace, name string, options *v1.DeleteOptions) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteNamespaced", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "DeleteNamespaced", namespace, name, options)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeleteNamespaced indicates an expected call of DeleteNamespaced.
-func (mr *MockClusterInterfaceMockRecorder) DeleteNamespaced(arg0, arg1, arg2 any) *gomock.Call {
+func (mr *MockClusterInterfaceMockRecorder) DeleteNamespaced(namespace, name, options any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteNamespaced", reflect.TypeOf((*MockClusterInterface)(nil).DeleteNamespaced), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteNamespaced", reflect.TypeOf((*MockClusterInterface)(nil).DeleteNamespaced), namespace, name, options)
 }
 
 // Get mocks base method.
-func (m *MockClusterInterface) Get(arg0 string, arg1 v1.GetOptions) (*v3.Cluster, error) {
+func (m *MockClusterInterface) Get(name string, opts v1.GetOptions) (*v3.Cluster, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Get", arg0, arg1)
+	ret := m.ctrl.Call(m, "Get", name, opts)
 	ret0, _ := ret[0].(*v3.Cluster)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Get indicates an expected call of Get.
-func (mr *MockClusterInterfaceMockRecorder) Get(arg0, arg1 any) *gomock.Call {
+func (mr *MockClusterInterfaceMockRecorder) Get(name, opts any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockClusterInterface)(nil).Get), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockClusterInterface)(nil).Get), name, opts)
 }
 
 // GetNamespaced mocks base method.
-func (m *MockClusterInterface) GetNamespaced(arg0, arg1 string, arg2 v1.GetOptions) (*v3.Cluster, error) {
+func (m *MockClusterInterface) GetNamespaced(namespace, name string, opts v1.GetOptions) (*v3.Cluster, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetNamespaced", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "GetNamespaced", namespace, name, opts)
 	ret0, _ := ret[0].(*v3.Cluster)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetNamespaced indicates an expected call of GetNamespaced.
-func (mr *MockClusterInterfaceMockRecorder) GetNamespaced(arg0, arg1, arg2 any) *gomock.Call {
+func (mr *MockClusterInterfaceMockRecorder) GetNamespaced(namespace, name, opts any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNamespaced", reflect.TypeOf((*MockClusterInterface)(nil).GetNamespaced), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNamespaced", reflect.TypeOf((*MockClusterInterface)(nil).GetNamespaced), namespace, name, opts)
 }
 
 // List mocks base method.
-func (m *MockClusterInterface) List(arg0 v1.ListOptions) (*v3.ClusterList, error) {
+func (m *MockClusterInterface) List(opts v1.ListOptions) (*v3.ClusterList, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "List", arg0)
+	ret := m.ctrl.Call(m, "List", opts)
 	ret0, _ := ret[0].(*v3.ClusterList)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // List indicates an expected call of List.
-func (mr *MockClusterInterfaceMockRecorder) List(arg0 any) *gomock.Call {
+func (mr *MockClusterInterfaceMockRecorder) List(opts any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockClusterInterface)(nil).List), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockClusterInterface)(nil).List), opts)
 }
 
 // ListNamespaced mocks base method.
-func (m *MockClusterInterface) ListNamespaced(arg0 string, arg1 v1.ListOptions) (*v3.ClusterList, error) {
+func (m *MockClusterInterface) ListNamespaced(namespace string, opts v1.ListOptions) (*v3.ClusterList, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListNamespaced", arg0, arg1)
+	ret := m.ctrl.Call(m, "ListNamespaced", namespace, opts)
 	ret0, _ := ret[0].(*v3.ClusterList)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListNamespaced indicates an expected call of ListNamespaced.
-func (mr *MockClusterInterfaceMockRecorder) ListNamespaced(arg0, arg1 any) *gomock.Call {
+func (mr *MockClusterInterfaceMockRecorder) ListNamespaced(namespace, opts any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListNamespaced", reflect.TypeOf((*MockClusterInterface)(nil).ListNamespaced), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListNamespaced", reflect.TypeOf((*MockClusterInterface)(nil).ListNamespaced), namespace, opts)
 }
 
 // ObjectClient mocks base method.
@@ -301,16 +302,16 @@ func (mr *MockClusterInterfaceMockRecorder) Update(arg0 any) *gomock.Call {
 }
 
 // Watch mocks base method.
-func (m *MockClusterInterface) Watch(arg0 v1.ListOptions) (watch.Interface, error) {
+func (m *MockClusterInterface) Watch(opts v1.ListOptions) (watch.Interface, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Watch", arg0)
+	ret := m.ctrl.Call(m, "Watch", opts)
 	ret0, _ := ret[0].(watch.Interface)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Watch indicates an expected call of Watch.
-func (mr *MockClusterInterfaceMockRecorder) Watch(arg0 any) *gomock.Call {
+func (mr *MockClusterInterfaceMockRecorder) Watch(opts any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Watch", reflect.TypeOf((*MockClusterInterface)(nil).Watch), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Watch", reflect.TypeOf((*MockClusterInterface)(nil).Watch), opts)
 }
