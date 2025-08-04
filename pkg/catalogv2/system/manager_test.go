@@ -1,6 +1,6 @@
 package system
 
-// mockgen --build_flags=--mod=mod -package system -destination=./mock_system_test.go github.com/rancher/rancher/pkg/catalogv2/system ContentClient,OperationClient,HelmClient
+//go:generate go tool -modfile ../../../gotools/mockgen/go.mod mockgen --build_flags=--mod=mod -package system -destination=./mock_system_test.go github.com/rancher/rancher/pkg/catalogv2/system ContentClient,OperationClient,HelmClient
 
 import (
 	"context"

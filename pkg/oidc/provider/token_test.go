@@ -112,7 +112,7 @@ func TestTokenEndpoint(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fakeTokenName,
 			CreationTimestamp: metav1.Time{
-				time.Unix(10, 0),
+				Time: time.Unix(10, 0),
 			},
 		},
 		UserID:       fakeUserID,
