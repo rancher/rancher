@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/rancher/rancher/pkg/scc/consts"
 	"github.com/rancher/rancher/pkg/telemetry"
 
@@ -77,8 +78,7 @@ func setup(wContext *wrangler.Context, logger log.StructuredLogger, infoProvider
 	}
 	infoProvider = infoProvider.SetUuids(parsedRancherUUID, parsedkubeSystemNSUID)
 
-	rancherVersion := systeminfo.GetVersion()
-	rancherTelemetry := telemetry.NewTelemetryGatherer(rancherVersion, wContext.Mgmt.Cluster().Cache(), wContext.Mgmt.Node().Cache())
+	rancherTelemetry := telemetry.NewTelemetryGatherer(wContext.Mgmt.Cluster().Cache(), wContext.Mgmt.Node().Cache())
 
 	return &sccOperator{
 		devMode:            consts.IsDevMode(),
