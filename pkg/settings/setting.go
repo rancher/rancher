@@ -374,11 +374,18 @@ var (
 
 	SQLCacheGCInterval  = NewSetting("sql-cache-gc-interval", "15m")
 	SQLCacheGCKeepCount = NewSetting("sql-cache-gc-keep-count", "1000")
+
+	SCCOperatorImage = NewSetting("scc-operator-image", buildconfig.DefaultSccOperatorImage)
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.
 func FullShellImage() string {
 	return PrefixPrivateRegistry(ShellImage.Get())
+}
+
+// FullSCCOperatorImage returns the full private registry name of the rancher shell image.
+func FullSCCOperatorImage() string {
+	return PrefixPrivateRegistry(SCCOperatorImage.Get())
 }
 
 // PrefixPrivateRegistry prefixes the given image name with the stored private registry path.
