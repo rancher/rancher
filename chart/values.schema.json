@@ -57,32 +57,6 @@
           "enum": [443, 80]
         }
       }
-    },
-    "registration": {
-      "type": "object",
-      "description": "Rancher's subscription registration configuration",
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "mode": {
-          "type": "string",
-          "enum": ["online", "offline"],
-          "default": "online"
-        },
-        "regCode": {
-          "type": "string",
-          "description": "The registration code which will be saved to a secret"
-        },
-        "certificate": {
-          "type": "string",
-          "description": "The offline registration certificate provided by SCC - which will be saved to a secret"
-        },
-        "registrationUrl": {
-          "type": "string",
-          "description": "An alternative registration endpoint URL"
-        }
-      }
     }
   },
   "required": [],

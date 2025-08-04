@@ -120,7 +120,7 @@ var (
 	ClusterTemplateEnforcement          = NewSetting("cluster-template-enforcement", "false")
 	InitialDockerRootDir                = NewSetting("initial-docker-root-dir", "/var/lib/docker")
 	SystemCatalog                       = NewSetting("system-catalog", "external") // Options are 'external' or 'bundled'
-	ChartDefaultBranch                  = NewSetting("chart-default-branch", "dev-v2.12")
+	ChartDefaultBranch                  = NewSetting("chart-default-branch", "dev-v2.13")
 	SystemManagedChartsOperationTimeout = NewSetting("system-managed-charts-operation-timeout", "300s")
 	FleetDefaultWorkspaceName           = NewSetting("fleet-default-workspace-name", fleetconst.ClustersDefaultNamespace) // fleetWorkspaceName to assign to clusters with none
 	ShellImage                          = NewSetting("shell-image", buildconfig.DefaultShellVersion)
@@ -172,6 +172,12 @@ var (
 	// DeleteInactiveUserAfter should be greater than AuthUserSessionTTLMinutes.
 	// An empty string or a zero value means the feature is disabled.
 	DeleteInactiveUserAfter = NewSetting("delete-inactive-user-after", "")
+
+	// DeleteMachineJobOnFailureAfter is the duration after which a machine job that failed to provision a machine will be deleted.
+	// The value should be expressed in valid time.Duration units and truncated to a second e.g. "600s". See https://pkg.go.dev/time#ParseDuration
+	// If the value is empty or zero, the job will not be deleted.
+	// If the value is negative, the job will be deleted immediately.
+	DeleteMachineJobOnFailureAfter = NewSetting("delete-machine-job-on-failure-after", "0")
 
 	// UserRetentionDryRun determines if the user retention process should actually disable and delete users.
 	// Valid values are "true" and "false". An empty string means "false".

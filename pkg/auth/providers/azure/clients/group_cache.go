@@ -12,9 +12,13 @@ import (
 // GroupCache is an in-memory cache of group principals.
 var GroupCache *lru.Cache
 
+type userPrincipalsClient interface {
+	GetGroup(id string) (v3.Principal, error)
+}
+
 // UserGroupsToPrincipals attempts to convert a value representing a collection of groups to a slice of principal values.
 // It also stores group values in an in-memory cache for faster subsequent access.
-func UserGroupsToPrincipals(azureClient AzureClient, groupNames []string) ([]v3.Principal, error) {
+func UserGroupsToPrincipals(azureClient userPrincipalsClient, groupNames []string) ([]v3.Principal, error) {
 	var tasksManager errgroup.Group
 	groupPrincipals := make([]v3.Principal, len(groupNames))
 

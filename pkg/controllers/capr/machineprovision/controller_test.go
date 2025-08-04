@@ -1,9 +1,12 @@
 package machineprovision
 
 import (
+	"errors"
 	"testing"
+	"time"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/stretchr/testify/assert"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -235,4 +238,126 @@ func TestConstructFilesSecret(t *testing.T) {
 			assert.Equal(t, tc.expectedSecret, secret)
 		})
 	}
+}
+
+func TestGetJobFailureTime(t *testing.T) {
+
+	fakeTime := time.Date(2023, time.August, 13, 10, 0, 0, 0, time.UTC)
+
+	testCases := []struct {
+		name          string
+		job           *batchv1.Job
+		expectedTime  time.Time
+		expectedError error
+	}{
+		{
+			name: "job with valid fail time",
+			job: &batchv1.Job{
+				Status: batchv1.JobStatus{
+					Conditions: []batchv1.JobCondition{
+						{Type: batchv1.JobFailed, Status: corev1.ConditionTrue, LastTransitionTime: metav1.Time{Time: fakeTime}},
+					},
+				},
+			},
+			expectedTime:  fakeTime,
+			expectedError: nil,
+		},
+		{
+			name: "job with no valid fail time",
+			job: &batchv1.Job{
+				Status: batchv1.JobStatus{
+					Conditions: []batchv1.JobCondition{
+						{Type: batchv1.JobComplete, Status: corev1.ConditionTrue, LastTransitionTime: metav1.Time{Time: fakeTime}},
+					},
+				},
+			},
+			expectedTime:  fakeTime,
+			expectedError: errors.New("job failure condition not found"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := getJobFailureTime(tc.job)
+			if tc.expectedError == nil {
+				assert.Nil(t, err)
+				assert.Equal(t, tc.expectedTime, got)
+			} else {
+				assert.Equal(t, tc.expectedError.Error(), err.Error())
+			}
+		})
+	}
+
+}
+
+func TestGetInfraDeleteAction(t *testing.T) {
+
+	fiveMinutesAgo := time.Now().Add(-5 * time.Minute)
+
+	testCases := []struct {
+		name                 string
+		job                  *batchv1.Job
+		deleteOnFailureAfter string
+		expectedAction       string
+	}{
+		{
+			name: "job that must be enqueued",
+			job: &batchv1.Job{
+
+				Status: batchv1.JobStatus{
+					Conditions: []batchv1.JobCondition{
+						{Type: batchv1.JobFailed, Status: corev1.ConditionTrue, LastTransitionTime: metav1.Time{Time: fiveMinutesAgo}},
+					},
+				},
+			},
+			deleteOnFailureAfter: "6m",
+			expectedAction:       "enqueue",
+		},
+		{
+			name: "job that must be deleted",
+			job: &batchv1.Job{
+				Status: batchv1.JobStatus{
+					Conditions: []batchv1.JobCondition{
+						{Type: batchv1.JobFailed, Status: corev1.ConditionTrue, LastTransitionTime: metav1.Time{Time: fiveMinutesAgo}},
+					},
+				},
+			},
+			deleteOnFailureAfter: "4m",
+			expectedAction:       "delete",
+		},
+		{
+			name: "job that must do default behavior",
+			job: &batchv1.Job{
+				Status: batchv1.JobStatus{
+					Conditions: []batchv1.JobCondition{
+						{Type: batchv1.JobFailed, Status: corev1.ConditionTrue, LastTransitionTime: metav1.Time{Time: fiveMinutesAgo}},
+					},
+				},
+			},
+			deleteOnFailureAfter: "0",
+			expectedAction:       "delete",
+		},
+		{
+			name: "job that must do nothing",
+			job: &batchv1.Job{
+				Status: batchv1.JobStatus{
+					Conditions: []batchv1.JobCondition{
+						{Type: batchv1.JobFailed, Status: corev1.ConditionTrue, LastTransitionTime: metav1.Time{Time: fiveMinutesAgo}},
+					},
+				},
+			},
+			deleteOnFailureAfter: "-1s",
+			expectedAction:       "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			settings.DeleteMachineJobOnFailureAfter.Set(tc.deleteOnFailureAfter)
+			gotAction, _, gotError := getInfraDeletionAction(tc.job)
+			assert.Equal(t, tc.expectedAction, gotAction)
+			assert.Nil(t, gotError)
+		})
+	}
+
 }
