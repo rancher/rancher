@@ -38,6 +38,8 @@ func RequiredCRDs() []string {
 		requiredCRDS = append(requiredCRDS, SCCRegistrationCRDs()...)
 	}
 
+	requiredCRDS = append(requiredCRDS, TelemetryCRDs()...)
+
 	// get unique CRDs so they aren't registered twice
 	uniqueCRDs := make([]string, 0, len(requiredCRDS))
 	keys := map[string]struct{}{}
@@ -199,6 +201,13 @@ func SCCRegistrationCRDs() []string {
 	}
 }
 
+// TelemetryCRDs returns a list of required CRD names needed for rancher telemetry
+func TelemetryCRDs() []string {
+	return []string{
+		"secretrequests.telemetry.cattle.io",
+	}
+}
+
 // MigratedResources map list of resource that have been migrated after all resource have a CRD this can be removed.
 var MigratedResources = map[string]bool{
 	"activedirectoryproviders.management.cattle.io":                   false,
@@ -270,6 +279,7 @@ var MigratedResources = map[string]bool{
 	"roletemplates.management.cattle.io":                              true,
 	"samlproviders.management.cattle.io":                              false,
 	"samltokens.management.cattle.io":                                 false,
+	"secretrequests.telemetry.cattle.io":                              true,
 	"serviceaccounttokens.project.cattle.io":                          false,
 	"settings.management.cattle.io":                                   false,
 	"sshauths.project.cattle.io":                                      false,

@@ -196,6 +196,16 @@ var (
 		true)
 )
 
+func ListEnabled() []string {
+	ret := []string{}
+	for _, f := range features {
+		if f.Enabled() {
+			ret = append(ret, f.name)
+		}
+	}
+	return ret
+}
+
 type Feature struct {
 	name        string
 	description string
