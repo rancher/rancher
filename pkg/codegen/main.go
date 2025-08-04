@@ -146,6 +146,18 @@ func main() {
 					"k8s.io/apimachinery/pkg/version",
 				},
 			},
+			"telemetry.cattle.io": {
+				PackageName: "telemetry.cattle.io",
+				Types: []interface{}{
+					"./pkg/apis/telemetry.cattle.io/v1",
+				},
+				GenerateTypes:   true,
+				GenerateClients: true,
+				GenerateOpenAPI: true,
+				OpenAPIDependencies: []string{
+					"k8s.io/apimachinery/pkg/apis/meta/v1",
+				},
+			},
 		},
 	})
 
