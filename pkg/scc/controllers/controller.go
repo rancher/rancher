@@ -28,7 +28,6 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/retry"
@@ -732,17 +731,4 @@ func scopedOnRemove[T generic.RuntimeMetaObject](ctx context.Context, name, name
 		}
 		return obj, nil
 	})
-}
-
-func namespaceScopedCondition(namespace string) func(obj runtime.Object) bool {
-	return func(obj runtime.Object) bool { return inExpectedNamespace(obj, namespace) }
-}
-
-func inExpectedNamespace(obj runtime.Object, namespace string) bool {
-	metadata, err := meta.Accessor(obj)
-	if err != nil {
-		return false
-	}
-
-	return metadata.GetNamespace() == namespace
 }
