@@ -49,7 +49,7 @@ const (
 	deleteJobConditionType = "DeleteJob"
 
 	forceRemoveMachineAnn = "provisioning.cattle.io/force-machine-remove"
-	deleteOnFailureAfter  = 60 * 60 // 1 hour
+	deleteOnFailureAfter  = 1_000_000_000 * 60 * 60 // 1 hour
 )
 
 type infraObject struct {
