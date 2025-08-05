@@ -424,7 +424,7 @@ func (t *Store) Get(
 
 	session, err := t.auth.SessionID(ctx)
 	if err != nil {
-		return nil, apierrors.NewInternalError(err)
+		return nil, apierrors.NewInternalError(fmt.Errorf("error getting the authentication token: %w", err))
 	}
 
 	token.Status.Current = token.Name == session
@@ -571,7 +571,7 @@ func (t *Store) Update(
 
 	sessionID, err := t.auth.SessionID(ctx)
 	if err != nil {
-		return nil, false, apierrors.NewInternalError(err)
+		return nil, false, apierrors.NewInternalError(fmt.Errorf("error getting the authentication token: %w", err))
 	}
 
 	resultToken, err := t.SystemStore.update(sessionID, false, oldToken, newToken, options)
@@ -623,7 +623,7 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 
 	session, err := t.auth.SessionID(ctx)
 	if err != nil {
-		return nil, apierrors.NewInternalError(err)
+		return nil, apierrors.NewInternalError(fmt.Errorf("error getting the authentication token: %w", err))
 	}
 
 	// Get token of the request and use its principal as ours. Any attempt
@@ -785,7 +785,7 @@ func (t *Store) list(ctx context.Context, options *metav1.ListOptions) (*ext.Tok
 
 	session, err := t.auth.SessionID(ctx)
 	if err != nil {
-		return nil, apierrors.NewInternalError(err)
+		return nil, apierrors.NewInternalError(fmt.Errorf("error getting the authentication token: %w", err))
 	}
 
 	return t.SystemStore.list(fullAccess, userInfo.GetName(), session, options)
@@ -1044,7 +1044,7 @@ func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 
 	sessionID, err := t.auth.SessionID(ctx)
 	if err != nil {
-		return nil, apierrors.NewInternalError(err)
+		return nil, apierrors.NewInternalError(fmt.Errorf("error getting the authentication token: %w", err))
 	}
 
 	// watch the backend secrets for changes and transform their events into
