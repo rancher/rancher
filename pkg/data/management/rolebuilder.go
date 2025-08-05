@@ -218,6 +218,10 @@ func (r *ruleBuilder) toPolicyRule() rbacv1.PolicyRule {
 	}
 }
 
+func (r *ruleBuilder) addNamespacedRule(namespace string) *namespacedRuleBuilder {
+	return r.rb.addNamespacedRule(namespace)
+}
+
 type namespacedRuleBuilder struct {
 	rb         *roleBuilder
 	rules      []*ruleBuilder
