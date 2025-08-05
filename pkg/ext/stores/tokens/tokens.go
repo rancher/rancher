@@ -422,12 +422,12 @@ func (t *Store) Get(
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to extract token %s: %w", name, err))
 	}
 
-	session, err := t.auth.SessionID(ctx)
+	authTokenID, err := t.auth.SessionID(ctx)
 	if err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("error getting the authentication token: %w", err))
 	}
 
-	token.Status.Current = token.Name == session
+	token.Status.Current = token.Name == authTokenID
 	token.Status.Value = ""
 
 	return token, nil
@@ -569,12 +569,12 @@ func (t *Store) Update(
 		return nil, false, apierrors.NewNotFound(GVR.GroupResource(), oldToken.Name)
 	}
 
-	sessionID, err := t.auth.SessionID(ctx)
+	authTokenID, err := t.auth.SessionID(ctx)
 	if err != nil {
 		return nil, false, apierrors.NewInternalError(fmt.Errorf("error getting the authentication token: %w", err))
 	}
 
-	resultToken, err := t.SystemStore.update(sessionID, false, oldToken, newToken, options)
+	resultToken, err := t.SystemStore.update(authTokenID, false, oldToken, newToken, options)
 
 	return resultToken, false, err
 }
@@ -621,7 +621,7 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 		return nil, apierrors.NewBadRequest("operation references a disabled user")
 	}
 
-	session, err := t.auth.SessionID(ctx)
+	authTokenID, err := t.auth.SessionID(ctx)
 	if err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("error getting the authentication token: %w", err))
 	}
@@ -629,7 +629,7 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	// Get token of the request and use its principal as ours. Any attempt
 	// by the user to set their own information for the principal is
 	// discarded and written over. No checks are made, no errors are thrown.
-	requestToken, err := t.Fetch(session)
+	requestToken, err := t.Fetch(authTokenID)
 	if err != nil {
 		return nil, apierrors.NewInternalError(err)
 	}
@@ -731,7 +731,7 @@ func (t *SystemStore) Delete(name string, options *metav1.DeleteOptions) error {
 }
 
 // Get retrieves the named ext token, without permission checking
-func (t *SystemStore) Get(name, sessionID string, options *metav1.GetOptions) (*ext.Token, error) {
+func (t *SystemStore) Get(name, authTokenID string, options *metav1.GetOptions) (*ext.Token, error) {
 
 	// We try to go through the fast cache as much as we can.
 	empty := metav1.GetOptions{}
@@ -747,7 +747,7 @@ func (t *SystemStore) Get(name, sessionID string, options *metav1.GetOptions) (*
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to extract token %s: %w", name, err))
 	}
 
-	token.Status.Current = token.Name == sessionID
+	token.Status.Current = token.Name == authTokenID
 	token.Status.Value = ""
 	return token, nil
 }
@@ -783,12 +783,12 @@ func (t *Store) list(ctx context.Context, options *metav1.ListOptions) (*ext.Tok
 		return nil, err
 	}
 
-	session, err := t.auth.SessionID(ctx)
+	authTokenID, err := t.auth.SessionID(ctx)
 	if err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("error getting the authentication token: %w", err))
 	}
 
-	return t.SystemStore.list(fullAccess, userInfo.GetName(), session, options)
+	return t.SystemStore.list(fullAccess, userInfo.GetName(), authTokenID, options)
 }
 
 // ListForUser returns the set of token owned by the named user. It is an
@@ -819,7 +819,7 @@ func (t *SystemStore) ListForUser(userName string) (*ext.TokenList, error) {
 	}, nil
 }
 
-func (t *SystemStore) list(fullAccess bool, userName, sessionID string, options *metav1.ListOptions) (*ext.TokenList, error) {
+func (t *SystemStore) list(fullAccess bool, userName, authTokenID string, options *metav1.ListOptions) (*ext.TokenList, error) {
 	// Non-system requests always filter the tokens down to those of the current user.
 	// Merge our own selection request (user match!) into the caller's demands
 	localOptions, err := ListOptionMerge(fullAccess, userName, options)
@@ -845,7 +845,7 @@ func (t *SystemStore) list(fullAccess bool, userName, sessionID string, options 
 		}
 
 		// Filtering for users is done already, see above where the options are set up and/or merged.
-		token.Status.Current = token.Name == sessionID
+		token.Status.Current = token.Name == authTokenID
 		tokens = append(tokens, *token)
 	}
 
@@ -863,7 +863,7 @@ func (t *SystemStore) Update(oldToken, token *ext.Token, options *metav1.UpdateO
 	return t.update("", true, oldToken, token, options)
 }
 
-func (t *SystemStore) update(sessionID string, fullPermission bool, oldToken, token *ext.Token,
+func (t *SystemStore) update(authTokenID string, fullPermission bool, oldToken, token *ext.Token,
 	options *metav1.UpdateOptions) (*ext.Token, error) {
 	// check if the user does not wish to actually change anything
 	dryRun := options != nil && len(options.DryRun) > 0 && options.DryRun[0] == metav1.DryRunAll
@@ -932,7 +932,7 @@ func (t *SystemStore) update(sessionID string, fullPermission bool, oldToken, to
 		return nil, apierrors.NewInternalError(fmt.Errorf("failed to regenerate token: %w", err))
 	}
 
-	newToken.Status.Current = newToken.Name == sessionID
+	newToken.Status.Current = newToken.Name == authTokenID
 	newToken.Status.Value = ""
 	return newToken, nil
 }
@@ -1042,7 +1042,7 @@ func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 		return nil, apierrors.NewInternalError(fmt.Errorf("tokens: watch: error starting watch: %w", err))
 	}
 
-	sessionID, err := t.auth.SessionID(ctx)
+	authTokenID, err := t.auth.SessionID(ctx)
 	if err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("error getting the authentication token: %w", err))
 	}
@@ -1105,7 +1105,7 @@ func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 					// user is not required. The watch filter (see
 					// ListOptionMerge above) takes care of only
 					// asking for owned tokens
-					token.Status.Current = token.Name == sessionID
+					token.Status.Current = token.Name == authTokenID
 				default:
 					logrus.Warnf("tokens: watch: received and ignored unknown event: '%s'", event.Type)
 					continue
@@ -1368,17 +1368,17 @@ func SessionID(ctx context.Context) (string, error) {
 	//   - multiple query attempts instead
 	userInfo, ok := request.UserFrom(ctx)
 	if !ok {
-		return "", fmt.Errorf("context has no provider/principal data")
+		return "", fmt.Errorf("context has no principal data")
 	}
 
 	extras := userInfo.GetExtra()
 	if extras == nil {
-		return "", fmt.Errorf("context has no provider/principal data")
+		return "", fmt.Errorf("context principal has no extras")
 	}
 
 	tokenIDs := extras[common.ExtraRequestTokenID]
 	if len(tokenIDs) != 1 {
-		return "", fmt.Errorf("context has no provider/principal data")
+		return "", fmt.Errorf("context principal extras has no request token id")
 	}
 
 	tokenID := tokenIDs[0]
