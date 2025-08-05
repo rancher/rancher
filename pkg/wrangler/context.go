@@ -6,9 +6,11 @@ package wrangler
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	fleetv1alpha1api "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/lasso/pkg/controller"
@@ -113,12 +115,38 @@ func init() {
 	utilruntime.Must(schemes.AddToScheme(Scheme))
 }
 
+type ProvisioningCtx struct {
+	SharedControllerFactory controller.SharedControllerFactory
+	Started                 bool
+
+	Core    corev1.Interface
+	Batch   batchv1.Interface
+	Mgmt    managementv3.Interface
+	Fleet   fleetv1alpha1.Interface
+	Apps    appsv1.Interface
+	K8s     *kubernetes.Clientset
+	Apply   apply.Apply
+	RBAC    rbacv1.Interface
+	Dynamic *dynamic.Controller
+
+	CAPIProvisioning provisioningv1.Interface
+	capiProvisioning *provisioning.Factory
+
+	CAPI capicontrollers.Interface
+	capi *capi.Factory
+
+	RKE rkecontrollers.Interface
+	rke *rke.Factory
+}
+
 type Context struct {
 	RESTConfig *rest.Config
 
-	Apply               apply.Apply
-	Dynamic             *dynamic.Controller
-	CAPI                capicontrollers.Interface
+	ProvisioningCtx *ProvisioningCtx
+
+	Apply   apply.Apply
+	Dynamic *dynamic.Controller
+	//CAPI                capicontrollers.Interface
 	RKE                 rkecontrollers.Interface
 	Mgmt                managementv3.Interface
 	Apps                appsv1.Interface
@@ -155,13 +183,13 @@ type Context struct {
 	HelmOperations        *helmop.Operations
 	SystemChartsManager   *system.Manager
 
-	mgmt         *management.Factory
-	rbac         *rbac.Factory
-	project      *project.Factory
-	ctlg         *catalog.Factory
-	adminReg     *admissionreg.Factory
-	apps         *apps.Factory
-	capi         *capi.Factory
+	mgmt     *management.Factory
+	rbac     *rbac.Factory
+	project  *project.Factory
+	ctlg     *catalog.Factory
+	adminReg *admissionreg.Factory
+	apps     *apps.Factory
+	//capi         *capi.Factory
 	rke          *rke.Factory
 	fleet        *fleet.Factory
 	provisioning *provisioning.Factory
@@ -226,6 +254,116 @@ func (w *Context) Start(ctx context.Context) error {
 	return nil
 }
 
+func (w *Context) checkCAPICRDs() bool {
+	log := func(msg string) {
+		if !w.ProvisioningCtx.Started {
+			logrus.Infof("[deferred-capi] %s", msg)
+		}
+	}
+
+	requiredCRDs := []string{
+		"clusters.cluster.x-k8s.io",
+		"machines.cluster.x-k8s.io",
+		"machinesets.cluster.x-k8s.io",
+		"machinedeployments.cluster.x-k8s.io",
+		"machinehealthchecks.cluster.x-k8s.io",
+	}
+
+	log("[deferred-capi] Checking CAPI CRDs availability and establishment status")
+	allCRDsReady := true
+	for _, crdName := range requiredCRDs {
+		crd, err := w.CRD.CustomResourceDefinition().Get(crdName, metav1.GetOptions{})
+		if err != nil {
+			if errors.IsNotFound(err) {
+				log(fmt.Sprintf("[deferred-capi] CRD %s not found, continuing to wait", crdName))
+				allCRDsReady = false
+				break
+			}
+			log(fmt.Sprintf("[deferred-capi] Error checking for CAPI CRD %s: %v", crdName, err))
+			allCRDsReady = false
+			break
+		}
+
+		established := false
+		for _, condition := range crd.Status.Conditions {
+			if condition.Type == "Established" && condition.Status == "True" {
+				established = true
+				break
+			}
+		}
+
+		if !established {
+			log(fmt.Sprintf("[deferred-capi] CRD %s exists but is not yet established, continuing to wait", crdName))
+			allCRDsReady = false
+			break
+		}
+
+		log(fmt.Sprintf("[deferred-capi] CRD %s is available and established", crdName))
+	}
+
+	return allCRDsReady
+}
+
+func (w *Context) ManageDeferredProvisioningContext(ctx context.Context) {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	cctx, cancel := context.WithCancel(ctx)
+
+	allCRDsReady := w.checkCAPICRDs()
+	if allCRDsReady && !w.ProvisioningCtx.Started {
+		logrus.Infof("[deferred-capi] All CAPI CRDs are now available and established. Starting capiProvisioning context.")
+
+		if err := w.ProvisioningCtx.SharedControllerFactory.SharedCacheFactory().Start(cctx); err != nil {
+			cancel()
+		}
+
+		w.ProvisioningCtx.SharedControllerFactory.SharedCacheFactory().WaitForCacheSync(cctx)
+
+		if err := w.ProvisioningCtx.SharedControllerFactory.Start(cctx, 50); err != nil {
+			cancel()
+		}
+
+		w.ProvisioningCtx.Started = true
+	}
+
+	logrus.Infof("[deferred-capi] Starting to monitor CAPI CRD availability")
+Dance:
+	for {
+		select {
+		case <-ctx.Done():
+			cancel()
+			fmt.Errorf("[deferred-capi]  Context cancelled while waiting for CAPI CRDs")
+			break Dance
+		case <-ticker.C:
+			allCRDsReady := w.checkCAPICRDs()
+			if allCRDsReady && !w.ProvisioningCtx.Started {
+				logrus.Infof("[deferred-capi] All CAPI CRDs are now available and established. Starting capiProvisioning context.")
+
+				if err := w.ProvisioningCtx.SharedControllerFactory.SharedCacheFactory().Start(cctx); err != nil {
+					cancel()
+					break
+				}
+
+				w.ProvisioningCtx.SharedControllerFactory.SharedCacheFactory().WaitForCacheSync(cctx)
+
+				if err := w.ProvisioningCtx.SharedControllerFactory.Start(cctx, 50); err != nil {
+					cancel()
+					break
+				}
+
+				w.ProvisioningCtx.Started = true
+			}
+
+			if !allCRDsReady && w.ProvisioningCtx.Started {
+				logrus.Error("[defered-capi] Some CAPI CRDs are no longer available, stopping capiProvisioning context.")
+				cancel()
+				cctx, cancel = context.WithCancel(ctx)
+				w.ProvisioningCtx.Started = false
+			}
+		}
+	}
+}
+
 // WithAgent returns a shallow copy of the Context that has been configured to use a user agent in its
 // clients that is the given userAgent appended to "rancher-%s-%s".
 func (w *Context) WithAgent(userAgent string) *Context {
@@ -251,7 +389,7 @@ func (w *Context) WithAgent(userAgent string) *Context {
 		wContextCopy.Apply = applyWithAgent
 	}
 	wContextCopy.Dynamic = dynamic.New(wContextCopy.K8s.Discovery())
-	wContextCopy.CAPI = wContextCopy.capi.WithAgent(userAgent).V1beta1()
+	//wContextCopy.CAPI = wContextCopy.capi.WithAgent(userAgent).V1beta1()
 	wContextCopy.RKE = wContextCopy.rke.WithAgent(userAgent).V1()
 	wContextCopy.Mgmt = wContextCopy.mgmt.WithAgent(userAgent).V3()
 	wContextCopy.Apps = wContextCopy.apps.WithAgent(userAgent).V1()
@@ -260,7 +398,8 @@ func (w *Context) WithAgent(userAgent string) *Context {
 	wContextCopy.Fleet = wContextCopy.fleet.WithAgent(userAgent).V1alpha1()
 	wContextCopy.Project = wContextCopy.project.WithAgent(userAgent).V3()
 	wContextCopy.Catalog = wContextCopy.ctlg.WithAgent(userAgent).V1()
-	wContextCopy.Provisioning = wContextCopy.provisioning.WithAgent(userAgent).V1()
+	wContextCopy.ControllerFactory = wContextCopy.ProvisioningCtx.SharedControllerFactory
+	wContextCopy.ProvisioningCtx = copyProvCtxWithAgent(wContextCopy.ProvisioningCtx, userAgent)
 	wContextCopy.RBAC = wContextCopy.rbac.WithAgent(userAgent).V1()
 	wContextCopy.Core = wContextCopy.core.WithAgent(userAgent).V1()
 	wContextCopy.API = wContextCopy.api.WithAgent(userAgent).V1()
@@ -269,6 +408,14 @@ func (w *Context) WithAgent(userAgent string) *Context {
 	wContextCopy.SCC = wContextCopy.sccReg.WithAgent(userAgent).V1()
 
 	return &wContextCopy
+}
+
+func copyProvCtxWithAgent(curCtx *ProvisioningCtx, userAgent string) *ProvisioningCtx {
+	cpy := *curCtx
+	cpy.CAPIProvisioning = cpy.capiProvisioning.WithAgent(userAgent).V1()
+	cpy.RKE = cpy.rke.WithAgent(userAgent).V1()
+	cpy.CAPI = cpy.capi.WithAgent(userAgent).V1beta1()
+	return &cpy
 }
 
 func enableProtobuf(cfg *rest.Config) *rest.Config {
@@ -329,10 +476,10 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		return nil, err
 	}
 
-	capi, err := capi.NewFactoryFromConfigWithOptions(restConfig, opts)
-	if err != nil {
-		return nil, err
-	}
+	//capi, err := capi.NewFactoryFromConfigWithOptions(restConfig, capiOpts)
+	//if err != nil {
+	//	return nil, err
+	//}
 
 	rke, err := rke.NewFactoryFromConfigWithOptions(restConfig, opts)
 	if err != nil {
@@ -444,39 +591,39 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		Apply:                   apply,
 		SharedControllerFactory: controllerFactory,
 		Dynamic:                 dynamic.New(k8s.Discovery()),
-		CAPI:                    capi.Cluster().V1beta1(),
-		RKE:                     rke.Rke().V1(),
-		Mgmt:                    mgmt.Management().V3(),
-		Apps:                    apps.Apps().V1(),
-		Admission:               adminReg.Admissionregistration().V1(),
-		Project:                 project.Project().V3(),
-		Fleet:                   fleet.Fleet().V1alpha1(),
-		Provisioning:            provisioning.Provisioning().V1(),
-		Catalog:                 helm.Catalog().V1(),
-		Batch:                   batch.Batch().V1(),
-		RBAC:                    rbac.Rbac().V1(),
-		Core:                    core.Core().V1(),
-		API:                     api.Apiregistration().V1(),
-		CRD:                     crd.Apiextensions().V1(),
-		K8s:                     k8s,
-		ControllerFactory:       controllerFactory,
-		ASL:                     asl,
-		ClientConfig:            clientConfig,
-		MultiClusterManager:     noopMCM{},
-		CachedDiscovery:         cache,
-		RESTMapper:              restMapper,
-		leadership:              leadership,
-		controllerLock:          &sync.Mutex{},
-		PeerManager:             peerManager,
-		RESTClientGetter:        restClientGetter,
-		CatalogContentManager:   content,
-		HelmOperations:          helmop,
-		SystemChartsManager:     systemCharts,
-		TunnelAuthorizer:        tunnelAuth,
-		TunnelServer:            tunnelServer,
-		Plan:                    plan.Upgrade().V1(),
-		SCC:                     scc.Scc().V1(),
-		Telemetry:               telemetry.Telemetry().V1(),
+		//CAPI:                        capi.Cluster().V1beta1(),
+		RKE:               rke.Rke().V1(),
+		Mgmt:              mgmt.Management().V3(),
+		Apps:              apps.Apps().V1(),
+		Admission:         adminReg.Admissionregistration().V1(),
+		Project:           project.Project().V3(),
+		Fleet:             fleet.Fleet().V1alpha1(),
+		Provisioning:      provisioning.Provisioning().V1(),
+		Catalog:           helm.Catalog().V1(),
+		Batch:             batch.Batch().V1(),
+		RBAC:              rbac.Rbac().V1(),
+		Core:              core.Core().V1(),
+		API:               api.Apiregistration().V1(),
+		CRD:               crd.Apiextensions().V1(),
+		K8s:               k8s,
+		ControllerFactory: controllerFactory,
+		//CAPISharedControllerFactory: CAPIControllerFactory,
+		ASL:                   asl,
+		ClientConfig:          clientConfig,
+		MultiClusterManager:   noopMCM{},
+		CachedDiscovery:       cache,
+		RESTMapper:            restMapper,
+		leadership:            leadership,
+		controllerLock:        &sync.Mutex{},
+		PeerManager:           peerManager,
+		RESTClientGetter:      restClientGetter,
+		CatalogContentManager: content,
+		HelmOperations:        helmop,
+		SystemChartsManager:   systemCharts,
+		TunnelAuthorizer:      tunnelAuth,
+		TunnelServer:          tunnelServer,
+		Plan:                  plan.Upgrade().V1(),
+		SCC:                   scc.Scc().V1(),
 
 		mgmt:         mgmt,
 		apps:         apps,
@@ -489,15 +636,66 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		core:         core,
 		api:          api,
 		crd:          crd,
-		capi:         capi,
-		rke:          rke,
-		rbac:         rbac,
-		plan:         plan,
-		sccReg:       scc,
-		telemetry:    telemetry,
+		//capi:         capi,
+		rke:       rke,
+		rbac:      rbac,
+		plan:      plan,
+		sccReg:    scc,
+		telemetry: telemetry,
 	}
 
-	return wContext, nil
+	err = wContext.CreateProvisioningCtx()
+
+	return wContext, err
+}
+
+func (w *Context) CreateProvisioningCtx() error {
+	sharedOpts := controllers.GetOptsFromEnv(controllers.Management)
+	provisioningFactory, err := controller.NewSharedControllerFactoryFromConfigWithOptions(enableProtobuf(w.RESTConfig), Scheme, sharedOpts)
+	if err != nil {
+		return err
+	}
+
+	provCtx := ProvisioningCtx{
+		SharedControllerFactory: provisioningFactory,
+		Core:                    w.Core,
+		Batch:                   w.Batch,
+		Mgmt:                    w.Mgmt,
+		Fleet:                   w.Fleet,
+		Apps:                    w.Apps,
+		K8s:                     w.K8s,
+		Apply:                   w.Apply,
+		RBAC:                    w.RBAC,
+		Dynamic:                 w.Dynamic,
+	}
+
+	capiOpts := &generic.FactoryOptions{
+		SharedControllerFactory: provisioningFactory,
+	}
+
+	provisioning, err := provisioning.NewFactoryFromConfigWithOptions(w.RESTConfig, capiOpts)
+	if err != nil {
+		return err
+	}
+	provCtx.capiProvisioning = provisioning
+	provCtx.CAPIProvisioning = provisioning.Provisioning().V1()
+
+	capi, err := capi.NewFactoryFromConfigWithOptions(w.RESTConfig, capiOpts)
+	if err != nil {
+		return err
+	}
+	provCtx.capi = capi
+	provCtx.CAPI = capi.Cluster().V1beta1()
+
+	rke, err := rke.NewFactoryFromConfigWithOptions(w.RESTConfig, capiOpts)
+	if err != nil {
+		return err
+	}
+	provCtx.rke = rke
+	provCtx.RKE = rke.Rke().V1()
+
+	w.ProvisioningCtx = &provCtx
+	return nil
 }
 
 type noopMCM struct {
