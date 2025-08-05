@@ -22,6 +22,7 @@ import (
 type SCCDeployer struct {
 	log log.StructuredLogger
 
+	useDeployerOperator              bool
 	currentParams                    *sccOperatorParams
 	currentSCCOperatorDeploymentHash string
 
@@ -31,6 +32,12 @@ type SCCDeployer struct {
 }
 
 func NewSCCDeployer(wContext *wrangler.Context, log log.StructuredLogger) (*SCCDeployer, error) {
+	// Allow for disabling the deployer actually deploying the operator for dev mode (running scc-operator from IDE)
+	useDeployerOperator := true
+	if GetBuiltinDisabledEnv() {
+		useDeployerOperator = false
+	}
+
 	deployerParams, err := extractSccOperatorParams()
 	if err != nil {
 		log.Errorf("Failed to extract SCC operator params: %v", err)
@@ -43,6 +50,7 @@ func NewSCCDeployer(wContext *wrangler.Context, log log.StructuredLogger) (*SCCD
 
 	return &SCCDeployer{
 		log:                              log,
+		useDeployerOperator:              useDeployerOperator,
 		currentParams:                    deployerParams,
 		currentSCCOperatorDeploymentHash: maybeCurrentDeploymentHash,
 		namespaces:                       wContext.Core.Namespace(),
@@ -180,5 +188,11 @@ func (d *SCCDeployer) EnsureDependenciesConfigured(ctx context.Context) error {
 }
 
 func (d *SCCDeployer) EnsureSCCOperatorDeployment(ctx context.Context) error {
+	if !d.useDeployerOperator {
+		// TODO: update this.
+		// Do nothing and/or scale to 0?
+		return nil
+	}
+
 	return nil
 }
