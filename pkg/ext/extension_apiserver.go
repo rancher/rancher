@@ -17,6 +17,8 @@ import (
 	steveext "github.com/rancher/steve/pkg/ext"
 	steveserver "github.com/rancher/steve/pkg/server"
 	wranglerapiregistrationv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiregistration.k8s.io/v1"
+	wranglercorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,6 +58,9 @@ const (
 	APIServiceName    = "v1.ext.cattle.io"
 	TargetServiceName = "api-extension"
 	Namespace         = "cattle-system"
+
+	LegacySecretName  = "imperative-api-sni-provider-cert-ca"
+	LegacyServiceName = "imperative-api-extension"
 )
 
 func CreateOrUpdateAPIService(apiservice wranglerapiregistrationv1.APIServiceController, caBundle []byte) error {
@@ -96,13 +101,13 @@ func CreateOrUpdateAPIService(apiservice wranglerapiregistrationv1.APIServiceCon
 			modified.Spec = desired.Spec
 			patch, err := makePatchAndUpdate(original, modified, apiservice)
 			if err != nil {
-				logrus.Errorf(":: error updating APIService %s -> request: %s", APIServiceName, patch)
+				logrus.Errorf("error updating APIService %s -> request: %s", APIServiceName, patch)
 				return err
 			}
 			return nil
 		})
 		if updateErr != nil {
-			return fmt.Errorf(":: CreateOrUpdateAPIService :: failed to update APIService %s after retries: %w", APIServiceName, updateErr)
+			return fmt.Errorf("failed to update APIService %s after retries: %w", APIServiceName, updateErr)
 		}
 
 	}
@@ -153,7 +158,7 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 	logrus.Info("creating imperative extension apiserver resources")
 
 	sniProvider, err := NewSNIProviderForCname(
-		"imperative-api-sni-provider",
+		"api-extension-sni-provider",
 		[]string{fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace)},
 		wranglerContext.Core.Secret(),
 	)
@@ -297,4 +302,52 @@ func SetAggregationCheck(client wranglerapiregistrationv1.APIServiceClient, valu
 
 		return nil
 	})
+}
+
+func DeleteLegacyServiceAndSecret(apiservice wranglerapiregistrationv1.APIServiceController, secrets wranglercorev1.SecretController) error {
+	logrus.Info("Attempting to delete legacy Service and Secret...")
+
+	// Check if the legacy service exists before attempting to delete to avoid logging "not found" as an error
+	_, err := apiservice.Get(LegacyServiceName, metav1.GetOptions{})
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			// An actual error occurred during Get, so return it
+			return fmt.Errorf("failed to get legacy Service %s/%s: %w", Namespace, LegacyServiceName, err)
+		}
+	} else {
+		// Service found, proceed with deletion
+		logrus.Infof("Deleting legacy Service %s/%s...", Namespace, LegacyServiceName)
+		deleteErr := apiservice.Delete(LegacyServiceName, &metav1.DeleteOptions{})
+		if deleteErr != nil {
+			if !apierrors.IsNotFound(deleteErr) {
+				return fmt.Errorf("failed to delete legacy Service %s/%s: %w", Namespace, LegacyServiceName, deleteErr)
+			}
+			logrus.Infof("Legacy Service %s/%s was already gone.", Namespace, LegacyServiceName)
+		} else {
+			logrus.Infof("Successfully deleted legacy Service %s/%s.", Namespace, LegacyServiceName)
+		}
+	}
+
+	// Check if the legacy secret exists before attempting to delete
+	_, err = secrets.Get(Namespace, LegacySecretName, metav1.GetOptions{})
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return fmt.Errorf("failed to get legacy Secret %s/%s: %w", Namespace, LegacySecretName, err)
+		}
+	} else {
+		// Secret found, proceed with deletion
+		logrus.Infof("Deleting legacy Secret %s/%s...", Namespace, LegacySecretName)
+		deleteErr := secrets.Delete(Namespace, LegacySecretName, &metav1.DeleteOptions{})
+		if deleteErr != nil {
+			if !apierrors.IsNotFound(deleteErr) { // Check again in case it was deleted concurrently
+				return fmt.Errorf("failed to delete legacy Secret %s/%s: %w", Namespace, LegacySecretName, deleteErr)
+			}
+			logrus.Infof("Legacy Secret %s/%s was already gone.", Namespace, LegacySecretName)
+		} else {
+			logrus.Infof("Successfully deleted legacy Secret %s/%s.", Namespace, LegacySecretName)
+		}
+	}
+
+	logrus.Info("Finished attempting to delete legacy Service and Secret.")
+	return nil
 }

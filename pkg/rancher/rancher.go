@@ -327,6 +327,10 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	auditFilter := audit.NewAuditLogMiddleware(auditLogWriter)
 	aggregationMiddleware := aggregation.NewMiddleware(ctx, wranglerContext.Mgmt.APIService(), wranglerContext.TunnelServer)
 
+	if err := ext.DeleteLegacyServiceAndSecret(wranglerContext.API.APIService(), wranglerContext.Core.Secret()); err != nil {
+		logrus.Errorf("failed to delete legacy service and secret: %w", err)
+	}
+
 	wranglerContext.OnLeader(func(ctx context.Context) error {
 		serviceaccounttoken.StartServiceAccountSecretCleaner(
 			ctx,
