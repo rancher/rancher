@@ -333,7 +333,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	auditFilter := audit.NewAuditLogMiddleware(auditLogWriter)
 	aggregationMiddleware := aggregation.NewMiddleware(ctx, wranglerContext.Mgmt.APIService(), wranglerContext.TunnelServer)
 
-	wranglerContext.OnLeaderOrDie("rancher-new]", func(ctx context.Context) error {
+	wranglerContext.OnLeaderOrDie("rancher-new", func(ctx context.Context) error {
 		serviceaccounttoken.StartServiceAccountSecretCleaner(
 			ctx,
 			wranglerContext.Core.Secret().Cache(),
