@@ -11,8 +11,10 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	appsv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/apps/v1"
 	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -26,9 +28,10 @@ type SCCDeployer struct {
 	currentParams                    *sccOperatorParams
 	currentSCCOperatorDeploymentHash string
 
-	namespaces      v1core.NamespaceController
-	serviceAccounts v1core.ServiceAccountController
-	deployments     appsv1.DeploymentController
+	namespaces          v1core.NamespaceController
+	serviceAccounts     v1core.ServiceAccountController
+	clusterRoleBindings v1.ClusterRoleBindingController
+	deployments         appsv1.DeploymentController
 }
 
 func NewSCCDeployer(wContext *wrangler.Context, log log.StructuredLogger) (*SCCDeployer, error) {
@@ -55,6 +58,7 @@ func NewSCCDeployer(wContext *wrangler.Context, log log.StructuredLogger) (*SCCD
 		currentSCCOperatorDeploymentHash: maybeCurrentDeploymentHash,
 		namespaces:                       wContext.Core.Namespace(),
 		serviceAccounts:                  wContext.Core.ServiceAccount(),
+		clusterRoleBindings:              wContext.RBAC.ClusterRoleBinding(),
 		deployments:                      wContext.Apps.Deployment(),
 	}, nil
 }
@@ -175,12 +179,55 @@ func (d *SCCDeployer) ensureServiceAccount(_ context.Context) error {
 	return nil
 }
 
+func (d *SCCDeployer) ensureClusterRoleBinding(_ context.Context) error {
+	_, err := d.clusterRoleBindings.Get("rancher-scc-operator", metav1.GetOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		return fmt.Errorf("error checking for cluster role binding %s: %w", "rancher-scc-operator", err)
+	}
+
+	if errors.IsNotFound(err) {
+		// ClusterRoleBinding to give the service account cluster-admin
+		desiredClusterRoleBinding := &rbacv1.ClusterRoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "rancher-scc-operator",
+				Labels: map[string]string{
+					consts.LabelK8sManagedBy: "rancher",
+					consts.LabelK8sPartOf:    "scc-operator",
+				},
+			},
+			RoleRef: rbacv1.RoleRef{
+				APIGroup: rbacv1.GroupName,
+				Kind:     "ClusterRole",
+				Name:     "cluster-admin",
+			},
+			Subjects: []rbacv1.Subject{
+				{
+					Kind:      "ServiceAccount",
+					Namespace: consts.DefaultSCCNamespace,
+					Name:      consts.ServiceAccountName,
+				},
+			},
+		}
+
+		_, err = d.clusterRoleBindings.Create(desiredClusterRoleBinding)
+		if err != nil {
+			return fmt.Errorf("error creating cluster role binding %s: %w", "rancher-scc-operator", err)
+		}
+	}
+
+	return nil
+}
+
 func (d *SCCDeployer) EnsureDependenciesConfigured(ctx context.Context) error {
 	if err := d.ensureNamespace(ctx); err != nil {
 		return err
 	}
 
 	if err := d.ensureServiceAccount(ctx); err != nil {
+		return err
+	}
+
+	if err := d.ensureClusterRoleBinding(ctx); err != nil {
 		return err
 	}
 
