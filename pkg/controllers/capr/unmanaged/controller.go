@@ -36,13 +36,13 @@ import (
 
 const UnmanagedMachineKind = "CustomMachine"
 
-func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager *kubeconfig.Manager) {
+func Register(ctx context.Context, clients *wrangler.ProvisioningCtx, kubeconfigManager *kubeconfig.Manager) {
 	h := handler{
 		kubeconfigManager: kubeconfigManager,
 		unmanagedMachine:  clients.RKE.CustomMachine(),
 		rkeClusterCache:   clients.RKE.RKECluster().Cache(),
 		mgmtClusterCache:  clients.Mgmt.Cluster().Cache(),
-		clusterCache:      clients.Provisioning.Cluster().Cache(),
+		clusterCache:      clients.CAPIProvisioning.Cluster().Cache(),
 		capiClusterCache:  clients.CAPI.Cluster().Cache(),
 		machineCache:      clients.CAPI.Machine().Cache(),
 		machineClient:     clients.CAPI.Machine(),
@@ -50,7 +50,7 @@ func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager 
 		apply: clients.Apply.WithSetID("unmanaged-machine").
 			WithCacheTypes(
 				clients.Mgmt.Cluster(),
-				clients.Provisioning.Cluster(),
+				clients.CAPIProvisioning.Cluster(),
 				clients.RKE.CustomMachine(),
 				clients.CAPI.Machine(),
 				clients.RKE.RKEBootstrap()),

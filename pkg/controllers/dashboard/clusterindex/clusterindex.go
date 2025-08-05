@@ -14,7 +14,7 @@ const (
 )
 
 func Register(ctx context.Context, clients *wrangler.Context) {
-	clusterCache := clients.Provisioning.Cluster().Cache()
+	clusterCache := clients.ProvisioningCtx.CAPIProvisioning.Cluster().Cache()
 
 	clusterCache.AddIndexer(ClusterV1ByClusterV3Reference, func(obj *rancherv1.Cluster) ([]string, error) {
 		return []string{obj.Status.ClusterName}, nil
@@ -32,5 +32,5 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 			})
 		}
 		return result, nil
-	}, clients.Provisioning.Cluster(), clients.Mgmt.Cluster())
+	}, clients.ProvisioningCtx.CAPIProvisioning.Cluster(), clients.Mgmt.Cluster())
 }

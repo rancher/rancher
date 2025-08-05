@@ -31,7 +31,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	h := &handler{
 		configMapsCache: clients.Core.ConfigMap().Cache(),
 		configMaps:      clients.Core.ConfigMap(),
-		clusterCache:    clients.Provisioning.Cluster().Cache(),
+		clusterCache:    clients.ProvisioningCtx.CAPIProvisioning.Cluster().Cache(),
 	}
 
 	clients.Core.Namespace().OnChange(ctx, "prov-log-namespace", h.OnNamespace)

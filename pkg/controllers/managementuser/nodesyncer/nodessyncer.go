@@ -89,8 +89,8 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 		nodeClient:           cluster.Core.Nodes(""),
 		clusterLister:        cluster.Management.Management.Clusters("").Controller().Lister(),
 		secretLister:         cluster.Management.Core.Secrets("").Controller().Lister(),
-		provClusterCache:     cluster.Management.Wrangler.Provisioning.Cluster().Cache(),
-		capiClusterCache:     cluster.Management.Wrangler.CAPI.Cluster().Cache(),
+		provClusterCache:     cluster.Management.Wrangler.ProvisioningCtx.CAPIProvisioning.Cluster().Cache(),
+		capiClusterCache:     cluster.Management.Wrangler.ProvisioningCtx.CAPI.Cluster().Cache(),
 		rkeControlPlaneCache: cluster.Management.Wrangler.RKE.RKEControlPlane().Cache(),
 	}
 

@@ -26,7 +26,7 @@ import (
 )
 
 func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager *kubeconfig.Manager) error {
-	rkePlanner := planner.New(ctx, clients, planner.InfoFunctions{
+	rkePlanner := planner.New(ctx, clients.ProvisioningCtx, planner.InfoFunctions{
 		ImageResolver:           image.ResolveWithControlPlane,
 		ReleaseData:             capr.GetKDMReleaseData,
 		SystemAgentImage:        settings.SystemAgentInstallerImage.Get,
@@ -37,17 +37,17 @@ func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager 
 		if err := dynamicschema.Register(ctx, clients); err != nil {
 			return err
 		}
-		machineprovision.Register(ctx, clients, kubeconfigManager)
+		machineprovision.Register(ctx, clients.ProvisioningCtx, kubeconfigManager)
 	}
-	rkecluster.Register(ctx, clients)
-	bootstrap.Register(ctx, clients)
-	machinenodelookup.Register(ctx, clients, kubeconfigManager)
-	plannercontroller.Register(ctx, clients, rkePlanner)
-	plansecret.Register(ctx, clients)
-	unmanaged.Register(ctx, clients, kubeconfigManager)
-	rkecontrolplane.Register(ctx, clients)
-	managesystemagent.Register(ctx, clients)
-	machinedrain.Register(ctx, clients)
+	rkecluster.Register(ctx, clients.ProvisioningCtx)
+	bootstrap.Register(ctx, clients.ProvisioningCtx)
+	machinenodelookup.Register(ctx, clients.ProvisioningCtx, kubeconfigManager)
+	plannercontroller.Register(ctx, clients.ProvisioningCtx, rkePlanner)
+	plansecret.Register(ctx, clients.ProvisioningCtx)
+	unmanaged.Register(ctx, clients.ProvisioningCtx, kubeconfigManager)
+	rkecontrolplane.Register(ctx, clients.ProvisioningCtx)
+	managesystemagent.Register(ctx, clients.ProvisioningCtx)
+	machinedrain.Register(ctx, clients.ProvisioningCtx)
 
 	return nil
 }

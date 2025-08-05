@@ -62,18 +62,20 @@ type handler struct {
 // the downstream etcd-snapshots configmap and backpopulating snapshots into etcd snapshot objects in the management cluster.
 func Register(ctx context.Context, userContext *config.UserContext) {
 	h := handler{
-		clusterName:                userContext.ClusterName,
-		clusterCache:               userContext.Management.Wrangler.Provisioning.Cluster().Cache(),
-		controlPlaneCache:          userContext.Management.Wrangler.RKE.RKEControlPlane().Cache(),
-		etcdSnapshotCache:          userContext.Management.Wrangler.RKE.ETCDSnapshot().Cache(),
-		etcdSnapshotController:     userContext.Management.Wrangler.RKE.ETCDSnapshot(),
-		machineCache:               userContext.Management.Wrangler.CAPI.Machine().Cache(),
-		capiClusterCache:           userContext.Management.Wrangler.CAPI.Cluster().Cache(),
+		clusterName:            userContext.ClusterName,
+		clusterCache:           userContext.Management.Wrangler.ProvisioningCtx.CAPIProvisioning.Cluster().Cache(),
+		controlPlaneCache:      userContext.Management.Wrangler.RKE.RKEControlPlane().Cache(),
+		etcdSnapshotCache:      userContext.Management.Wrangler.RKE.ETCDSnapshot().Cache(),
+		etcdSnapshotController: userContext.Management.Wrangler.RKE.ETCDSnapshot(),
+
+		machineCache:     userContext.Management.Wrangler.ProvisioningCtx.CAPI.Machine().Cache(),
+		capiClusterCache: userContext.Management.Wrangler.ProvisioningCtx.CAPI.Cluster().Cache(),
+
 		etcdSnapshotFileController: userContext.K3s.V1().ETCDSnapshotFile(),
 		etcdSnapshotFileCache:      userContext.K3s.V1().ETCDSnapshotFile().Cache(),
 	}
 
-	userContext.Management.Wrangler.RKE.ETCDSnapshot().OnChange(ctx, "snapshotcleanup", h.OnUpstreamChange)
+	userContext.Management.Wrangler.ProvisioningCtx.RKE.ETCDSnapshot().OnChange(ctx, "snapshotcleanup", h.OnUpstreamChange)
 	userContext.K3s.V1().ETCDSnapshotFile().OnChange(ctx, "snapshotbackpopulate", h.OnDownstreamChange)
 }
 

@@ -74,7 +74,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		secretsController: clients.Core.Secret(),
 		nodesController:   clients.Core.Node(),
 		fleetClusters:     clients.Fleet.Cluster(),
-		apply:             clients.Apply.WithCacheTypes(clients.Provisioning.Cluster()),
+		apply:             clients.Apply.WithCacheTypes(clients.ProvisioningCtx.CAPIProvisioning.Cluster()),
 	}
 
 	h.getPrivateRepoURL = func(cluster *provv1.Cluster, mgmtCluster *apimgmtv3.Cluster) string {
@@ -88,11 +88,11 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	}
 
 	rocontrollers.RegisterClusterGeneratingHandler(ctx,
-		clients.Provisioning.Cluster(),
+		clients.ProvisioningCtx.CAPIProvisioning.Cluster(),
 		clients.Apply.
 			WithCacheTypes(clients.Fleet.Cluster(),
 				clients.Fleet.ClusterGroup(),
-				clients.Provisioning.Cluster()),
+				clients.ProvisioningCtx.CAPIProvisioning.Cluster()),
 		"",
 		"fleet-cluster",
 		h.createCluster,

@@ -82,7 +82,7 @@ type handler struct {
 
 func Register(
 	ctx context.Context,
-	clients *wrangler.Context, kubeconfigManager *kubeconfig.Manager) {
+	clients *wrangler.ProvisioningCtx, kubeconfigManager *kubeconfig.Manager) {
 	h := handler{
 		mgmtClusterCache:      clients.Mgmt.Cluster().Cache(),
 		mgmtClusters:          clients.Mgmt.Cluster(),
@@ -90,8 +90,8 @@ func Register(
 		clusterTokens:         clients.Mgmt.ClusterRegistrationToken(),
 		featureCache:          clients.Mgmt.Feature().Cache(),
 		featureClient:         clients.Mgmt.Feature(),
-		clusters:              clients.Provisioning.Cluster(),
-		clusterCache:          clients.Provisioning.Cluster().Cache(),
+		clusters:              clients.CAPIProvisioning.Cluster(),
+		clusterCache:          clients.CAPIProvisioning.Cluster().Cache(),
 		rkeControlPlanes:      clients.RKE.RKEControlPlane(),
 		rkeControlPlanesCache: clients.RKE.RKEControlPlane().Cache(),
 		secretCache:           clients.Core.Secret().Cache(),
@@ -100,7 +100,7 @@ func Register(
 		capiMachinesCache:     clients.CAPI.Machine().Cache(),
 		kubeconfigManager:     kubeconfigManager,
 		apply: clients.Apply.WithCacheTypes(
-			clients.Provisioning.Cluster(),
+			clients.CAPIProvisioning.Cluster(),
 			clients.Mgmt.Cluster()),
 	}
 
@@ -108,7 +108,7 @@ func Register(
 	// clusters.management.cattle.io/v3 (legacy) cluster objects.
 	mgmtcontrollers.RegisterClusterGeneratingHandler(ctx,
 		clients.Mgmt.Cluster(),
-		clients.Apply.WithCacheTypes(clients.Provisioning.Cluster()),
+		clients.Apply.WithCacheTypes(clients.CAPIProvisioning.Cluster()),
 		"",
 		"provisioning-cluster-create",
 		h.generateProvisioningClusterFromLegacyCluster,
@@ -127,7 +127,7 @@ func Register(
 	// Register a generating handler in order to generate clusters.management.cattle.io/v3 objects based on
 	// clusters.provisioning.cattle.io/v1 objects.
 	rocontrollers.RegisterClusterGeneratingHandler(ctx,
-		clients.Provisioning.Cluster(),
+		clients.CAPIProvisioning.Cluster(),
 		clusterCreateApply,
 		"Created",
 		"cluster-create",
@@ -137,25 +137,32 @@ func Register(
 		},
 	)
 
-	clients.Provisioning.Cluster().OnChange(ctx, "provisioning-cluster-update", h.OnChange)
+	clients.CAPIProvisioning.Cluster().OnChange(ctx, "provisioning-cluster-update", h.OnChange)
 
 	clients.Mgmt.Cluster().OnChange(ctx, "cluster-watch", h.createToken)
 
-	clients.Provisioning.Cluster().OnChange(ctx, "v1-scheduling-customization-backfill", h.updateV1SchedulingCustomization)
+	clients.CAPIProvisioning.Cluster().OnChange(ctx, "v1-scheduling-customization-backfill", h.updateV1SchedulingCustomization)
 	clients.Mgmt.Cluster().OnChange(ctx, "v3-scheduling-customization-backfill", h.updateV3SchedulingCustomization)
 
 	relatedresource.Watch(ctx, "cluster-watch", h.clusterWatch,
-		clients.Provisioning.Cluster(), clients.Mgmt.Cluster())
+		clients.CAPIProvisioning.Cluster(), clients.Mgmt.Cluster())
 
 	clients.Mgmt.Cluster().OnRemove(ctx, "mgmt-cluster-remove", h.OnMgmtClusterRemove)
-	clients.Provisioning.Cluster().OnRemove(ctx, "provisioning-cluster-remove", h.OnClusterRemove)
+	clients.CAPIProvisioning.Cluster().OnRemove(ctx, "provisioning-cluster-remove", h.OnClusterRemove)
 }
 
 func RegisterIndexers(config *wrangler.Context) {
+	// Register the standard provisioning indexers. These are used by followers
 	config.Provisioning.Cluster().Cache().AddIndexer(ByCluster, byClusterIndex)
 	config.Provisioning.Cluster().Cache().AddIndexer(ByCloudCred, byCloudCredentialIndex)
+
+	// Register the prov context indexers, these are used by the leader
+	config.ProvisioningCtx.CAPIProvisioning.Cluster().Cache().AddIndexer(ByCluster, byClusterIndex)
+	config.ProvisioningCtx.CAPIProvisioning.Cluster().Cache().AddIndexer(ByCloudCred, byCloudCredentialIndex)
+
 	if features.Provisioningv2ETCDSnapshotBackPopulation.Enabled() {
 		config.RKE.ETCDSnapshot().Cache().AddIndexer(ByETCDSnapshotName, byETCDSnapshotName)
+		config.ProvisioningCtx.RKE.ETCDSnapshot().Cache().AddIndexer(ByETCDSnapshotName, byETCDSnapshotName)
 	}
 }
 

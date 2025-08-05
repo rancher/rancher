@@ -59,7 +59,7 @@ type RKE2ConfigServer struct {
 	k8s                      kubernetes.Interface
 }
 
-func New(clients *wrangler.Context) *RKE2ConfigServer {
+func New(clients *wrangler.ProvisioningCtx) *RKE2ConfigServer {
 	clients.Core.Secret().Cache().AddIndexer(tokenIndex, func(obj *corev1.Secret) ([]string, error) {
 		if obj.Type == corev1.SecretTypeServiceAccountToken {
 			hash := sha256.Sum256(obj.Data["token"])
@@ -83,7 +83,7 @@ func New(clients *wrangler.Context) *RKE2ConfigServer {
 		machineCache:             clients.CAPI.Machine().Cache(),
 		machines:                 clients.CAPI.Machine(),
 		bootstrapCache:           clients.RKE.RKEBootstrap().Cache(),
-		provisioningClusterCache: clients.Provisioning.Cluster().Cache(),
+		provisioningClusterCache: clients.CAPIProvisioning.Cluster().Cache(),
 		k8s:                      clients.K8s,
 	}
 }

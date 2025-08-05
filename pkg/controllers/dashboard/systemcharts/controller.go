@@ -371,6 +371,17 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 				return toUninstall
 			}(),
 		},
+		{
+			ReleaseNamespace: "cattle-system",
+			ReleaseName:      "rancher-turtles",
+			ChartName:        "rancher-turtles",
+			Values: func() map[string]interface{} {
+				return nil
+			},
+			Enabled: func() bool {
+				return true
+			},
+		},
 	}
 }
 

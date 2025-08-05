@@ -101,7 +101,7 @@ type handler struct {
 	kubeconfigManager   *kubeconfig.Manager
 }
 
-func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager *kubeconfig.Manager) {
+func Register(ctx context.Context, clients *wrangler.ProvisioningCtx, kubeconfigManager *kubeconfig.Manager) {
 	h := &handler{
 		ctx: ctx,
 		apply: clients.Apply.WithCacheTypes(clients.Core.Secret(),
@@ -120,7 +120,7 @@ func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager 
 		nodeDriverCache:     clients.Mgmt.NodeDriver().Cache(),
 		namespaces:          clients.Core.Namespace().Cache(),
 		dynamic:             clients.Dynamic,
-		rancherClusterCache: clients.Provisioning.Cluster().Cache(),
+		rancherClusterCache: clients.CAPIProvisioning.Cluster().Cache(),
 		kubeconfigManager:   kubeconfigManager,
 	}
 

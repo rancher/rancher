@@ -18,11 +18,11 @@ import (
 )
 
 func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager *kubeconfig.Manager) {
-	cluster.Register(ctx, clients, kubeconfigManager)
+	cluster.Register(ctx, clients.ProvisioningCtx, kubeconfigManager)
 	if features.MCM.Enabled() {
 		secret.Register(ctx, clients)
 	}
-	provisioningcluster.Register(ctx, clients)
+	provisioningcluster.Register(ctx, clients.ProvisioningCtx)
 	provisioninglog.Register(ctx, clients)
 	machineconfigcleanup.Register(ctx, clients)
 
@@ -33,6 +33,6 @@ func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager 
 	}
 
 	if features.Harvester.Enabled() {
-		harvestercleanup.Register(ctx, clients)
+		harvestercleanup.Register(ctx, clients.ProvisioningCtx)
 	}
 }

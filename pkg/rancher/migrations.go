@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/mcuadros/go-version"
 	"github.com/rancher/norman/condition"
@@ -60,6 +61,17 @@ var (
 )
 
 func runMigrations(wranglerContext *wrangler.Context) error {
+	// TODO: handle migrations better
+	for {
+		time.Sleep(time.Second * 1)
+		if !wranglerContext.ProvisioningCtx.Started {
+			logrus.Infof("Waiting for provisioning context to start before running migrations")
+			continue
+		}
+		logrus.Infof("Provisioning context has started, running migrations")
+		break
+	}
+
 	if err := forceUpgradeLogout(wranglerContext.Core.ConfigMap(), wranglerContext.Mgmt.Token(), "v2.6.0"); err != nil {
 		return err
 	}
@@ -77,16 +89,16 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 	if features.RKE2.Enabled() {
 		// must migrate system agent data directory first, since update requests will be rejected by webhook if
 		// "CATTLE_AGENT_VAR_DIR" is set within AgentEnvVars.
-		if err := migrateSystemAgentDataDirectory(wranglerContext); err != nil {
+		if err := migrateSystemAgentDataDirectory(wranglerContext.ProvisioningCtx); err != nil {
 			return err
 		}
-		if err := migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(wranglerContext); err != nil {
+		if err := migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(wranglerContext.ProvisioningCtx); err != nil {
 			return err
 		}
-		if err := migrateEncryptionKeyRotationLeader(wranglerContext); err != nil {
+		if err := migrateEncryptionKeyRotationLeader(wranglerContext.ProvisioningCtx); err != nil {
 			return err
 		}
-		if err := migrateMachinePoolsDynamicSchemaLabel(wranglerContext); err != nil {
+		if err := migrateMachinePoolsDynamicSchemaLabel(wranglerContext.ProvisioningCtx); err != nil {
 			return err
 		}
 	}
@@ -260,7 +272,7 @@ func applyProjectConditionForNamespaceAssignment(label string, condition conditi
 	return nil
 }
 
-func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) error {
+func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.ProvisioningCtx) error {
 	cm, err := getConfigMap(w.Core.ConfigMap(), migrateFromMachineToPlanSecret)
 	if err != nil || cm == nil {
 		return err
@@ -290,7 +302,7 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) err
 	}
 
 	for _, mgmtCluster := range mgmtClusters.Items {
-		provClusters, err := w.Provisioning.Cluster().List(mgmtCluster.Spec.FleetWorkspaceName, metav1.ListOptions{})
+		provClusters, err := w.CAPIProvisioning.Cluster().List(mgmtCluster.Spec.FleetWorkspaceName, metav1.ListOptions{})
 		if k8serror.IsNotFound(err) || len(provClusters.Items) == 0 {
 			continue
 		} else if err != nil {
@@ -403,7 +415,7 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) err
 	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
 }
 
-func migrateEncryptionKeyRotationLeader(w *wrangler.Context) error {
+func migrateEncryptionKeyRotationLeader(w *wrangler.ProvisioningCtx) error {
 	cm, err := getConfigMap(w.Core.ConfigMap(), migrateEncryptionKeyRotationLeaderToStatus)
 	if err != nil || cm == nil {
 		return err
@@ -453,7 +465,7 @@ func migrateEncryptionKeyRotationLeader(w *wrangler.Context) error {
 	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
 }
 
-func migrateMachinePoolsDynamicSchemaLabel(w *wrangler.Context) error {
+func migrateMachinePoolsDynamicSchemaLabel(w *wrangler.ProvisioningCtx) error {
 	cm, err := getConfigMap(w.Core.ConfigMap(), migrateDynamicSchemaToMachinePools)
 	if err != nil || cm == nil {
 		return err
@@ -469,7 +481,7 @@ func migrateMachinePoolsDynamicSchemaLabel(w *wrangler.Context) error {
 	}
 
 	for _, mgmtCluster := range mgmtClusters.Items {
-		provClusters, err := w.Provisioning.Cluster().List(mgmtCluster.Spec.FleetWorkspaceName, metav1.ListOptions{})
+		provClusters, err := w.CAPIProvisioning.Cluster().List(mgmtCluster.Spec.FleetWorkspaceName, metav1.ListOptions{})
 		if k8serror.IsNotFound(err) || len(provClusters.Items) == 0 {
 			continue
 		} else if err != nil {
@@ -480,7 +492,7 @@ func migrateMachinePoolsDynamicSchemaLabel(w *wrangler.Context) error {
 				continue
 			}
 			if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-				cluster, err := w.Provisioning.Cluster().Get(provCluster.Namespace, provCluster.Name, metav1.GetOptions{})
+				cluster, err := w.CAPIProvisioning.Cluster().Get(provCluster.Namespace, provCluster.Name, metav1.GetOptions{})
 				if k8serror.IsNotFound(err) {
 					return nil
 				} else if err != nil {
@@ -511,7 +523,7 @@ func migrateMachinePoolsDynamicSchemaLabel(w *wrangler.Context) error {
 					}
 					cluster.Spec.RKEConfig.MachinePools[i].DynamicSchemaSpec = string(specJSON)
 				}
-				_, err = w.Provisioning.Cluster().Update(cluster)
+				_, err = w.CAPIProvisioning.Cluster().Update(cluster)
 				if err != nil {
 					return err
 				}
@@ -526,7 +538,7 @@ func migrateMachinePoolsDynamicSchemaLabel(w *wrangler.Context) error {
 	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
 }
 
-func migrateSystemAgentDataDirectory(w *wrangler.Context) error {
+func migrateSystemAgentDataDirectory(w *wrangler.ProvisioningCtx) error {
 	cm, err := getConfigMap(w.Core.ConfigMap(), migrateSystemAgentVarDirToDataDirectory)
 	if err != nil || cm == nil {
 		return err
@@ -536,7 +548,7 @@ func migrateSystemAgentDataDirectory(w *wrangler.Context) error {
 		return nil
 	}
 
-	provClusters, err := w.Provisioning.Cluster().List("", metav1.ListOptions{})
+	provClusters, err := w.CAPIProvisioning.Cluster().List("", metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -559,7 +571,7 @@ func migrateSystemAgentDataDirectory(w *wrangler.Context) error {
 		cluster = *cluster.DeepCopy()
 		cluster.Spec.AgentEnvVars = envVars
 		cluster.Spec.RKEConfig.DataDirectories.SystemAgent = systemAgentDataDir
-		_, err = w.Provisioning.Cluster().Update(&cluster)
+		_, err = w.CAPIProvisioning.Cluster().Update(&cluster)
 		if err != nil {
 			return err
 		}

@@ -77,7 +77,7 @@ func Register(ctx context.Context, clients *wrangler.Context, management *config
 		projectRoleTemplateBindingController: clients.Mgmt.ProjectRoleTemplateBinding(),
 		projectRoleTemplateBindings:          clients.Mgmt.ProjectRoleTemplateBinding().Cache(),
 		roleTemplatesCache:                   clients.Mgmt.RoleTemplate().Cache(),
-		clusters:                             clients.Provisioning.Cluster().Cache(),
+		clusters:                             clients.ProvisioningCtx.CAPIProvisioning.Cluster().Cache(),
 		mgmtClusters:                         clients.Mgmt.Cluster().Cache(),
 		crdCache:                             clients.CRD.CustomResourceDefinition().Cache(),
 		dynamic:                              clients.Dynamic,
@@ -96,6 +96,7 @@ func Register(ctx context.Context, clients *wrangler.Context, management *config
 	}
 
 	h.dynamic.AddIndexer(clusterIndexed, h.gvkMatcher, indexByCluster)
+
 	h.dynamic.OnChange(ctx, "auth-prov-v2-trigger", h.gvkMatcher, h.OnClusterObjectChanged)
 	clients.Mgmt.RoleTemplate().OnChange(ctx, "auth-prov-v2-roletemplate", h.OnChange)
 	clients.Mgmt.ClusterRoleTemplateBinding().OnChange(ctx, "auth-prov-v2-crtb", h.OnCRTB)
@@ -104,12 +105,12 @@ func Register(ctx context.Context, clients *wrangler.Context, management *config
 	scopedOnRemove(ctx, "auth-prov-v2-rb", clients.RBAC.RoleBinding(), h.OnRemoveRoleBinding)
 	scopedOnRemove(ctx, "auth-prov-v2-crole", clients.RBAC.ClusterRole(), h.OnRemoveClusterRole)
 	scopedOnRemove(ctx, "auth-prov-v2-crb", clients.RBAC.ClusterRoleBinding(), h.OnRemoveClusterRoleBinding)
-	clients.Provisioning.Cluster().OnChange(ctx, "auth-prov-v2-cluster", h.OnCluster)
+	clients.ProvisioningCtx.CAPIProvisioning.Cluster().OnChange(ctx, "auth-prov-v2-cluster", h.OnCluster)
 	clients.CRD.CustomResourceDefinition().OnChange(ctx, "auth-prov-v2-crd", h.OnCRD)
 	if features.RKE2.Enabled() {
 		clients.Dynamic.OnChange(ctx, "auth-prov-v2-rke-machine-config", validMachineConfigGVK, h.OnMachineConfigChange)
 	}
-	clients.Provisioning.Cluster().Cache().AddIndexer(byClusterName, func(obj *v1.Cluster) ([]string, error) {
+	clients.ProvisioningCtx.CAPIProvisioning.Cluster().Cache().AddIndexer(byClusterName, func(obj *v1.Cluster) ([]string, error) {
 		return []string{obj.Status.ClusterName}, nil
 	})
 	clients.Mgmt.ClusterRoleTemplateBinding().Cache().AddIndexer(crbtByRoleTemplateName, func(obj *v3.ClusterRoleTemplateBinding) ([]string, error) {

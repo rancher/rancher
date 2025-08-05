@@ -82,18 +82,18 @@ type handler struct {
 	secrets                   corev1controllers.SecretController
 }
 
-func Register(ctx context.Context, clients *wrangler.Context) {
+func Register(ctx context.Context, clients *wrangler.ProvisioningCtx) {
 	h := &handler{
 		clusterRegistrationTokens: clients.Mgmt.ClusterRegistrationToken().Cache(),
 		bundles:                   clients.Fleet.Bundle(),
-		cluster:                   clients.Provisioning.Cluster(),
+		cluster:                   clients.CAPIProvisioning.Cluster(),
 		rkeControlPlanes:          clients.RKE.RKEControlPlane(),
 		managedCharts:             clients.Mgmt.ManagedChart(),
 		secrets:                   clients.Core.Secret(),
 	}
 
-	clients.Provisioning.Cluster().OnChange(ctx, "uninstall-fleet-managed-suc-and-system-agent", h.UninstallFleetBasedApps)
-	clients.Provisioning.Cluster().OnChange(ctx, "install-system-agent-upgrader", h.InstallSystemAgentUpgrader)
+	clients.CAPIProvisioning.Cluster().OnChange(ctx, "uninstall-fleet-managed-suc-and-system-agent", h.UninstallFleetBasedApps)
+	clients.CAPIProvisioning.Cluster().OnChange(ctx, "install-system-agent-upgrader", h.InstallSystemAgentUpgrader)
 
 }
 

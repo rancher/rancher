@@ -19,7 +19,7 @@ func Setup(ctx context.Context, server *steve.Server, config *wrangler.Context) 
 	if err := clusters.Register(ctx, server, config); err != nil {
 		return err
 	}
-	machine.Register(server, config)
+	machine.Register(server, config.ProvisioningCtx)
 	navlinks.Register(ctx, server)
 	settings.Register(server)
 	disallow.Register(server)

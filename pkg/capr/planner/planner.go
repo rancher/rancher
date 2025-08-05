@@ -146,7 +146,7 @@ type InfoFunctions struct {
 	GetBootstrapManifests   func(plane *rkev1.RKEControlPlane) ([]plan.File, error)
 }
 
-func New(ctx context.Context, clients *wrangler.Context, functions InfoFunctions) *Planner {
+func New(ctx context.Context, clients *wrangler.ProvisioningCtx, functions InfoFunctions) *Planner {
 	clients.Mgmt.ClusterRegistrationToken().Cache().AddIndexer(ClusterRegToken, func(obj *v3.ClusterRegistrationToken) ([]string, error) {
 		return []string{obj.Spec.ClusterName}, nil
 	})
@@ -167,7 +167,7 @@ func New(ctx context.Context, clients *wrangler.Context, functions InfoFunctions
 		capiClient:                    clients.CAPI.Cluster(),
 		capiClusters:                  clients.CAPI.Cluster().Cache(),
 		managementClusters:            clients.Mgmt.Cluster().Cache(),
-		rancherClusterCache:           clients.Provisioning.Cluster().Cache(),
+		rancherClusterCache:           clients.CAPIProvisioning.Cluster().Cache(),
 		rkeControlPlanes:              clients.RKE.RKEControlPlane(),
 		rkeBootstrap:                  clients.RKE.RKEBootstrap(),
 		rkeBootstrapCache:             clients.RKE.RKEBootstrap().Cache(),

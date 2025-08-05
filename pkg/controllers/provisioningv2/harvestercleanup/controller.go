@@ -35,10 +35,10 @@ type handler struct {
 	secretCache  corecontrollers.SecretCache
 }
 
-func Register(ctx context.Context, clients *wrangler.Context) {
+func Register(ctx context.Context, clients *wrangler.ProvisioningCtx) {
 	h := handler{
 		capiClusters: clients.CAPI.Cluster().Cache(),
-		clusterCache: clients.Provisioning.Cluster().Cache(),
+		clusterCache: clients.CAPIProvisioning.Cluster().Cache(),
 		secretCache:  clients.Core.Secret().Cache(),
 	}
 

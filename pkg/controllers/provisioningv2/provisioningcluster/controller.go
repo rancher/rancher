@@ -52,13 +52,13 @@ type handler struct {
 	capiMachineCache  capicontrollers.MachineCache
 }
 
-func Register(ctx context.Context, clients *wrangler.Context) {
+func Register(ctx context.Context, clients *wrangler.ProvisioningCtx) {
 	h := handler{
 		dynamic:           clients.Dynamic,
 		secretCache:       clients.Core.Secret().Cache(),
 		secretClient:      clients.Core.Secret(),
-		clusterCache:      clients.Provisioning.Cluster().Cache(),
-		clusterController: clients.Provisioning.Cluster(),
+		clusterCache:      clients.CAPIProvisioning.Cluster().Cache(),
+		clusterController: clients.CAPIProvisioning.Cluster(),
 		capiClusters:      clients.CAPI.Cluster().Cache(),
 		mgmtClusterCache:  clients.Mgmt.Cluster().Cache(),
 		mgmtClusterClient: clients.Mgmt.Cluster(),
@@ -72,10 +72,10 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 	}
 
 	clients.Dynamic.OnChange(ctx, "rke-dynamic", matchRKENodeGroup, h.infraWatch)
-	clients.Provisioning.Cluster().Cache().AddIndexer(byNodeInfra, byNodeInfraIndex)
+	clients.CAPIProvisioning.Cluster().Cache().AddIndexer(byNodeInfra, byNodeInfraIndex)
 
 	rocontrollers.RegisterClusterGeneratingHandler(ctx,
-		clients.Provisioning.Cluster(),
+		clients.CAPIProvisioning.Cluster(),
 		clients.Apply.
 			// Because capi wants to own objects we don't set ownerreference with apply
 			WithDynamicLookup().
@@ -100,10 +100,10 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 			}}, nil
 		}
 		return nil, nil
-	}, clients.Provisioning.Cluster(), clients.RKE.RKEControlPlane())
+	}, clients.CAPIProvisioning.Cluster(), clients.RKE.RKEControlPlane())
 
-	clients.Provisioning.Cluster().OnChange(ctx, "provisioning-cluster-change", h.OnChange)
-	clients.Provisioning.Cluster().OnRemove(ctx, "rke-cluster-remove", h.OnRemove)
+	clients.CAPIProvisioning.Cluster().OnChange(ctx, "provisioning-cluster-change", h.OnChange)
+	clients.CAPIProvisioning.Cluster().OnRemove(ctx, "rke-cluster-remove", h.OnRemove)
 }
 
 func byNodeInfraIndex(obj *rancherv1.Cluster) ([]string, error) {
