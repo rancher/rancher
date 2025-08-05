@@ -183,7 +183,7 @@ func (m *mcm) Start(ctx context.Context) error {
 		}
 	}
 
-	m.wranglerContext.OnLeaderOrDie(func(ctx context.Context) error {
+	m.wranglerContext.OnLeaderOrDie("multiclustermanager-start", func(ctx context.Context) error {
 		err := m.wranglerContext.StartWithTransaction(ctx, func(ctx context.Context) error {
 			var (
 				err error

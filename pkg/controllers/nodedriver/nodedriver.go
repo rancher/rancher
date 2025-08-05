@@ -15,7 +15,7 @@ func Register(ctx context.Context, wrangler *wrangler.Context) {
 	wrangler.Mgmt.NodeDriver().OnChange(ctx, "custom-node-driver-handler", onChange)
 
 	// when this pod becomes the leader, do not run the onChange code
-	wrangler.OnLeaderOrDie(func(ctx context.Context) error {
+	wrangler.OnLeaderOrDie("nodedriver-register", func(ctx context.Context) error {
 		leader.Store(true)
 		return nil
 	})

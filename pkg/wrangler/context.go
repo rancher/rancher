@@ -184,8 +184,8 @@ type MultiClusterManager interface {
 	K8sClient(clusterName string) (kubernetes.Interface, error)
 }
 
-func (w *Context) OnLeaderOrDie(f func(ctx context.Context) error) {
-	w.leadership.OnLeaderOrDie(f)
+func (w *Context) OnLeaderOrDie(name string, f func(ctx context.Context) error) {
+	w.leadership.OnLeaderOrDie(name, f)
 }
 
 func (w *Context) StartWithTransaction(ctx context.Context, f func(context.Context) error) (err error) {
@@ -426,7 +426,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 	}
 
 	leadership := leader.NewManager("", "cattle-controllers", k8s)
-	leadership.OnLeaderOrDie(func(ctx context.Context) error {
+	leadership.OnLeaderOrDie("wrangler-newContext", func(ctx context.Context) error {
 		if peerManager != nil {
 			peerManager.Leader()
 		}
