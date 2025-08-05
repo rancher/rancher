@@ -119,13 +119,13 @@ func New(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*provisi
 }
 
 func Machines(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*capi.MachineList, error) {
-	return clients.CAPI.Machine().List(cluster.Namespace, metav1.ListOptions{
+	return clients.ProvisioningCtx.CAPI.Machine().List(cluster.Namespace, metav1.ListOptions{
 		LabelSelector: "cluster.x-k8s.io/cluster-name=" + cluster.Name,
 	})
 }
 
 func MachineSets(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*capi.MachineSetList, error) {
-	return clients.CAPI.MachineSet().List(cluster.Namespace, metav1.ListOptions{
+	return clients.ProvisioningCtx.CAPI.MachineSet().List(cluster.Namespace, metav1.ListOptions{
 		LabelSelector: "cluster.x-k8s.io/cluster-name=" + cluster.Name,
 	})
 }
@@ -171,11 +171,11 @@ func WaitForCreate(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 			if !ok {
 				return nil, fmt.Errorf("machineset %s/%s did not have a corresponding machine pool name label", machineSet.Namespace, machineSet.Name)
 			}
-			md, err := clients.CAPI.MachineDeployment().Get(c.Namespace, name.SafeConcatName(c.Name, mpName), metav1.GetOptions{})
+			md, err := clients.ProvisioningCtx.CAPI.MachineDeployment().Get(c.Namespace, name.SafeConcatName(c.Name, mpName), metav1.GetOptions{})
 			if err != nil {
 				return nil, err
 			}
-			err = wait.Object(clients.Ctx, clients.CAPI.MachineDeployment().Watch, md, func(obj runtime.Object) (bool, error) {
+			err = wait.Object(clients.Ctx, clients.ProvisioningCtx.CAPI.MachineDeployment().Watch, md, func(obj runtime.Object) (bool, error) {
 				md = obj.(*capi.MachineDeployment)
 				for _, mp := range c.Spec.RKEConfig.MachinePools {
 					if mpName == mp.Name {
@@ -203,7 +203,7 @@ func WaitForCreate(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 		if !machine.DeletionTimestamp.IsZero() {
 			continue
 		}
-		err = wait.Object(clients.Ctx, clients.CAPI.Machine().Watch, &machine, func(obj runtime.Object) (bool, error) {
+		err = wait.Object(clients.Ctx, clients.ProvisioningCtx.CAPI.Machine().Watch, &machine, func(obj runtime.Object) (bool, error) {
 			machine = *obj.(*capi.Machine)
 			return machine.Status.NodeRef != nil, nil
 		})
@@ -309,7 +309,7 @@ func WaitForDelete(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 		}
 
 		if err := wait.EnsureDoesNotExist(clients.Ctx, func() (runtime.Object, error) {
-			return clients.CAPI.Machine().Get(machine.Namespace, machine.Name, metav1.GetOptions{})
+			return clients.ProvisioningCtx.CAPI.Machine().Get(machine.Namespace, machine.Name, metav1.GetOptions{})
 		}); err != nil {
 			return nil, fmt.Errorf("machine not deleted: %w", err)
 		}
@@ -508,7 +508,7 @@ func GatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 	var machineDeployments *capi.MachineDeploymentList
 	var machineSets *capi.MachineSetList
 
-	capiCluster, newErr := clients.CAPI.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
+	capiCluster, newErr := clients.ProvisioningCtx.CAPI.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
 	if apierrors.IsNotFound(newErr) {
 		capiCluster = nil
 	} else if newErr != nil {
@@ -523,14 +523,14 @@ func GatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 			logrus.Errorf("failed to get %s %s/%s to print error: %v", capiCluster.Spec.InfrastructureRef.GroupVersionKind().String(), capiCluster.Spec.InfrastructureRef.Namespace, capiCluster.Spec.InfrastructureRef.Name, newErr)
 			infraCluster = nil
 		}
-		machineDeployments, newErr = clients.CAPI.MachineDeployment().List(c.Namespace, metav1.ListOptions{
+		machineDeployments, newErr = clients.ProvisioningCtx.CAPI.MachineDeployment().List(c.Namespace, metav1.ListOptions{
 			LabelSelector: "cluster.x-k8s.io/cluster-name=" + c.Name,
 		})
 		if newErr != nil {
 			logrus.Error(newErr)
 			machineDeployments = nil
 		}
-		machineSets, newErr = clients.CAPI.MachineSet().List(c.Namespace, metav1.ListOptions{
+		machineSets, newErr = clients.ProvisioningCtx.CAPI.MachineSet().List(c.Namespace, metav1.ListOptions{
 			LabelSelector: "cluster.x-k8s.io/cluster-name=" + c.Name,
 		})
 		if newErr != nil {

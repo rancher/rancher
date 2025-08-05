@@ -111,13 +111,13 @@ func Test_Operation_SetB_Custom_EtcdSnapshotOperationsOnNewCombinedNode(t *testi
 	}
 
 	// Delete the machine from the cluster too...
-	oldEtcdMachines, err := clients.CAPI.Machine().List(c.Namespace, metav1.ListOptions{LabelSelector: capr.EtcdRoleLabel + "=true"})
+	oldEtcdMachines, err := clients.ProvisioningCtx.CAPI.Machine().List(c.Namespace, metav1.ListOptions{LabelSelector: capr.EtcdRoleLabel + "=true"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	for _, machine := range oldEtcdMachines.Items {
-		err = clients.CAPI.Machine().Delete(machine.Namespace, machine.Name, &metav1.DeleteOptions{PropagationPolicy: &[]metav1.DeletionPropagation{metav1.DeletePropagationForeground}[0]})
+		err = clients.ProvisioningCtx.CAPI.Machine().Delete(machine.Namespace, machine.Name, &metav1.DeleteOptions{PropagationPolicy: &[]metav1.DeletionPropagation{metav1.DeletePropagationForeground}[0]})
 		if err != nil {
 			t.Fatal(err)
 		}

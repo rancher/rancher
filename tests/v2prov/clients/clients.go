@@ -70,6 +70,8 @@ func NewForConfig(ctx context.Context, config clientcmd.ClientConfig) (*Clients,
 		return nil, err
 	}
 
+	go wranglerCtx.ManageDeferredProvisioningContext(ctx)
+
 	dynamic, err := dynamic.NewForConfig(rest)
 	if err != nil {
 		cancel()
