@@ -1,8 +1,9 @@
 package log
 
 import (
-	"github.com/rancher/rancher/pkg/scc/consts"
 	"github.com/sirupsen/logrus"
+
+	"github.com/rancher/rancher/pkg/scc/consts"
 )
 
 type StructuredLogger = *logrus.Entry
@@ -20,7 +21,7 @@ func NewLog() StructuredLogger {
 	}
 
 	baseLogger := rootLog.
-		WithField("component", "scc-operator")
+		WithField("component", "scc-operator-deployer")
 
 	if consts.IsDevMode() {
 		return baseLogger.WithField("devMode", true)

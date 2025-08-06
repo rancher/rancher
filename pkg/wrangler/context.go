@@ -40,8 +40,6 @@ import (
 	provisioningv1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io"
-	sccv1 "github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/generated/controllers/telemetry.cattle.io"
 	telemetryv1 "github.com/rancher/rancher/pkg/generated/controllers/telemetry.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/generated/controllers/upgrade.cattle.io"
@@ -139,7 +137,6 @@ type Context struct {
 	CRD                 crdv1.Interface
 	K8s                 *kubernetes.Clientset
 	Plan                plancontrolers.Interface
-	SCC                 sccv1.Interface
 	Telemetry           telemetryv1.Interface
 
 	ASL                     accesscontrol.AccessSetLookup
@@ -170,7 +167,6 @@ type Context struct {
 	api          *apiregistration.Factory
 	crd          *apiextensions.Factory
 	plan         *upgrade.Factory
-	sccReg       *scc.Factory
 	telemetry    *telemetry.Factory
 
 	started bool
@@ -266,7 +262,6 @@ func (w *Context) WithAgent(userAgent string) *Context {
 	wContextCopy.API = wContextCopy.api.WithAgent(userAgent).V1()
 	wContextCopy.CRD = wContextCopy.crd.WithAgent(userAgent).V1()
 	wContextCopy.Plan = wContextCopy.plan.WithAgent(userAgent).V1()
-	wContextCopy.SCC = wContextCopy.sccReg.WithAgent(userAgent).V1()
 
 	return &wContextCopy
 }
@@ -374,11 +369,6 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		return nil, err
 	}
 
-	scc, err := scc.NewFactoryFromConfigWithOptions(restConfig, opts)
-	if err != nil {
-		return nil, err
-	}
-
 	telemetry, err := telemetry.NewFactoryFromConfigWithOptions(restConfig, opts)
 	if err != nil {
 		return nil, err
@@ -475,7 +465,6 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		TunnelAuthorizer:        tunnelAuth,
 		TunnelServer:            tunnelServer,
 		Plan:                    plan.Upgrade().V1(),
-		SCC:                     scc.Scc().V1(),
 		Telemetry:               telemetry.Telemetry().V1(),
 
 		mgmt:         mgmt,
@@ -493,7 +482,6 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		rke:          rke,
 		rbac:         rbac,
 		plan:         plan,
-		sccReg:       scc,
 		telemetry:    telemetry,
 	}
 

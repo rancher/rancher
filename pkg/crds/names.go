@@ -34,9 +34,6 @@ func RequiredCRDs() []string {
 	if features.OIDCProvider.Enabled() {
 		requiredCRDS = append(requiredCRDS, OIDCClientCRD()...)
 	}
-	if features.RancherSCCRegistrationExtension.Enabled() {
-		requiredCRDS = append(requiredCRDS, SCCRegistrationCRDs()...)
-	}
 
 	requiredCRDS = append(requiredCRDS, TelemetryCRDs()...)
 
@@ -194,13 +191,6 @@ func OIDCClientCRD() []string {
 	}
 }
 
-// SCCRegistrationCRDs returns a list of required CRD names needed for SCC Registration features
-func SCCRegistrationCRDs() []string {
-	return []string{
-		"registrations.scc.cattle.io",
-	}
-}
-
 // TelemetryCRDs returns a list of required CRD names needed for rancher telemetry
 func TelemetryCRDs() []string {
 	return []string{
@@ -271,7 +261,6 @@ var MigratedResources = map[string]bool{
 	"projectroletemplatebindings.management.cattle.io":                true,
 	"projects.management.cattle.io":                                   true,
 	"rancherusernotifications.management.cattle.io":                   false,
-	"registrations.scc.cattle.io":                                     true,
 	"rkebootstraps.rke.cattle.io":                                     true,
 	"rkebootstraptemplates.rke.cattle.io":                             true,
 	"rkeclusters.rke.cattle.io":                                       true,
