@@ -13,9 +13,9 @@ import (
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
-	"github.com/rancher/rancher/pkg/auth/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/text/runes"
@@ -48,22 +48,22 @@ type Provider struct {
 	userIndexer  cache.Indexer
 	gmIndexer    cache.Indexer
 	groupIndexer cache.Indexer
-	tokenMGR     *tokens.Manager
+	userMgr      user.Manager
 	pwdVerifier  PasswordVerifier
 }
 
-func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, tokenMGR *tokens.Manager) common.AuthProvider {
+func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMgr user.Manager) common.AuthProvider {
 	informer := mgmtCtx.Management.Users("").Controller().Informer()
 	indexers := map[string]cache.IndexFunc{userNameIndex: userNameIndexer, userSearchIndex: userSearchIndexer}
-	informer.AddIndexers(indexers)
+	_ = informer.AddIndexers(indexers)
 
 	gmInformer := mgmtCtx.Management.GroupMembers("").Controller().Informer()
 	gmIndexers := map[string]cache.IndexFunc{gmPrincipalIndex: gmPIdIndexer}
-	gmInformer.AddIndexers(gmIndexers)
+	_ = gmInformer.AddIndexers(gmIndexers)
 
 	gInformer := mgmtCtx.Management.Groups("").Controller().Informer()
 	gIndexers := map[string]cache.IndexFunc{groupSearchIndex: groupSearchIndexer}
-	gInformer.AddIndexers(gIndexers)
+	_ = gInformer.AddIndexers(gIndexers)
 
 	l := &Provider{
 		userIndexer:  informer.GetIndexer(),
@@ -71,7 +71,7 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, tokenMGR *tok
 		groupLister:  mgmtCtx.Management.Groups("").Controller().Lister(),
 		groupIndexer: gInformer.GetIndexer(),
 		userLister:   mgmtCtx.Management.Users("").Controller().Lister(),
-		tokenMGR:     tokenMGR,
+		userMgr:      userMgr,
 		pwdVerifier:  pbkdf2.New(mgmtCtx.Wrangler.Core.Secret().Cache(), mgmtCtx.Wrangler.Core.Secret()),
 	}
 	return l
@@ -282,7 +282,7 @@ func (l *Provider) toPrincipal(principalType, displayName, loginName, id string,
 	} else {
 		princ.PrincipalType = "group"
 		if token != nil {
-			princ.MemberOf = l.tokenMGR.IsMemberOf(token, princ)
+			princ.MemberOf = l.userMgr.IsMemberOf(token, princ)
 		}
 	}
 

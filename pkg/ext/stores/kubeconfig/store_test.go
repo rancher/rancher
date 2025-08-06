@@ -62,14 +62,14 @@ var commonAuthorizer = authorizer.AuthorizerFunc(func(ctx context.Context, a aut
 	}
 })
 
-type fakeUserManager struct {
+type fakeTokenManager struct {
 	clusterTokens          []string
 	tokens                 []string
 	ensureClusterTokenFunc func(clusterID string, input user.TokenInput) (string, runtime.Object, error)
 	ensureTokenFunc        func(input user.TokenInput) (string, runtime.Object, error)
 }
 
-func (f *fakeUserManager) EnsureClusterToken(clusterID string, input user.TokenInput) (string, runtime.Object, error) {
+func (f *fakeTokenManager) EnsureClusterToken(clusterID string, input user.TokenInput) (string, runtime.Object, error) {
 	if f.ensureClusterTokenFunc != nil {
 		return f.ensureClusterTokenFunc(clusterID, input)
 	}
@@ -81,7 +81,7 @@ func (f *fakeUserManager) EnsureClusterToken(clusterID string, input user.TokenI
 	return tokenKey, token, nil
 }
 
-func (f *fakeUserManager) EnsureToken(input user.TokenInput) (string, runtime.Object, error) {
+func (f *fakeTokenManager) EnsureToken(input user.TokenInput) (string, runtime.Object, error) {
 	if f.ensureTokenFunc != nil {
 		return f.ensureTokenFunc(input)
 	}
@@ -94,7 +94,7 @@ func (f *fakeUserManager) EnsureToken(input user.TokenInput) (string, runtime.Ob
 	return tokenKey, token, nil
 }
 
-func (f *fakeUserManager) Generate() (string, runtime.Object, error) {
+func (f *fakeTokenManager) Generate() (string, runtime.Object, error) {
 	key, err := randomtoken.Generate()
 	if err != nil {
 		return "", nil, err
@@ -393,7 +393,7 @@ func TestStoreCreate(t *testing.T) {
 	}
 	shouldGenerateToken := func() bool { return true }
 	options := &metav1.CreateOptions{}
-	userManager := &fakeUserManager{}
+	tokenManager := &fakeTokenManager{}
 
 	t.Run("user creates a kubeconfig", func(t *testing.T) {
 		authorizer := authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
@@ -417,7 +417,7 @@ func TestStoreCreate(t *testing.T) {
 			return configMap, nil
 		}).Times(1)
 
-		userManager := &fakeUserManager{} // Subtest specific instance.
+		tokenManager := &fakeTokenManager{} // Subtest specific instance.
 
 		store := &Store{
 			mcmEnabled:          true,
@@ -428,7 +428,7 @@ func TestStoreCreate(t *testing.T) {
 			tokenCache:          tokenCache,
 			clusterCache:        clusterCache,
 			nodeCache:           nodeCache,
-			userMgr:             userManager,
+			tokenMgr:            tokenManager,
 			getCACert:           func() string { return rancherCACert },
 			getDefaultTTL:       getDefaultTTL,
 			getServerURL:        getServerURL,
@@ -531,10 +531,10 @@ func TestStoreCreate(t *testing.T) {
 		assert.Equal(t, "downstream2", config.Contexts["downstream2-cp"].AuthInfo)
 
 		require.Len(t, config.AuthInfos, 2)
-		require.Len(t, userManager.tokens, 1)
-		assert.Equal(t, userManager.tokens[0], config.AuthInfos[defaultClusterName].Token)
-		require.Len(t, userManager.clusterTokens, 1)
-		assert.Equal(t, userManager.clusterTokens[0], config.AuthInfos["downstream2"].Token)
+		require.Len(t, tokenManager.tokens, 1)
+		assert.Equal(t, tokenManager.tokens[0], config.AuthInfos[defaultClusterName].Token)
+		require.Len(t, tokenManager.clusterTokens, 1)
+		assert.Equal(t, tokenManager.clusterTokens[0], config.AuthInfos["downstream2"].Token)
 
 		assert.Equal(t, "downstream1", config.CurrentContext)
 	})
@@ -554,7 +554,7 @@ func TestStoreCreate(t *testing.T) {
 			return configMap, nil
 		}).Times(1)
 
-		userManager := &fakeUserManager{} // Subtest specific instance.
+		tokenManager := &fakeTokenManager{} // Subtest specific instance.
 
 		store := &Store{
 			mcmEnabled:          true,
@@ -564,7 +564,7 @@ func TestStoreCreate(t *testing.T) {
 			userCache:           userCache,
 			tokenCache:          tokenCache,
 			clusterCache:        clusterCache,
-			userMgr:             userManager,
+			tokenMgr:            tokenManager,
 			getCACert:           func() string { return "" },
 			getDefaultTTL:       getDefaultTTL,
 			getServerURL:        getServerURL,
@@ -634,14 +634,14 @@ func TestStoreCreate(t *testing.T) {
 		assert.Equal(t, "rancher", config.Contexts["rancher"].AuthInfo)
 
 		require.Len(t, config.AuthInfos, 1)
-		require.Len(t, userManager.tokens, 1)
-		assert.Equal(t, userManager.tokens[0], config.AuthInfos["rancher"].Token)
-		require.Len(t, userManager.clusterTokens, 0)
+		require.Len(t, tokenManager.tokens, 1)
+		assert.Equal(t, tokenManager.tokens[0], config.AuthInfos["rancher"].Token)
+		require.Len(t, tokenManager.clusterTokens, 0)
 
 		assert.Equal(t, "rancher", config.CurrentContext)
 	})
 	t.Run("dry run", func(t *testing.T) {
-		userManager := &fakeUserManager{} // Subtest specific instance.
+		tokenManager := &fakeTokenManager{} // Subtest specific instance.
 
 		store := &Store{
 			mcmEnabled:          true,
@@ -650,7 +650,7 @@ func TestStoreCreate(t *testing.T) {
 			tokenCache:          tokenCache,
 			clusterCache:        clusterCache,
 			nodeCache:           nodeCache,
-			userMgr:             userManager,
+			tokenMgr:            tokenManager,
 			getCACert:           func() string { return "" },
 			getDefaultTTL:       getDefaultTTL,
 			getServerURL:        getServerURL,
@@ -722,9 +722,9 @@ func TestStoreCreate(t *testing.T) {
 		assert.Equal(t, "downstream2", config.Contexts["downstream2-cp"].AuthInfo)
 
 		require.Len(t, config.AuthInfos, 2)
-		require.Len(t, userManager.tokens, 0)
+		require.Len(t, tokenManager.tokens, 0)
 		assert.Equal(t, "", config.AuthInfos[defaultClusterName].Token)
-		require.Len(t, userManager.clusterTokens, 0)
+		require.Len(t, tokenManager.clusterTokens, 0)
 		assert.Equal(t, "", config.AuthInfos["downstream2"].Token)
 
 		assert.Equal(t, "downstream1", config.CurrentContext)
@@ -759,7 +759,7 @@ func TestStoreCreate(t *testing.T) {
 			return configMap, nil
 		}).Times(1)
 
-		userManager := &fakeUserManager{} // Subtest specific instance.
+		tokenManager := &fakeTokenManager{} // Subtest specific instance.
 
 		store := &Store{
 			mcmEnabled:          true,
@@ -769,7 +769,7 @@ func TestStoreCreate(t *testing.T) {
 			userCache:           userCache,
 			tokenCache:          tokenCache,
 			clusterCache:        clusterCache,
-			userMgr:             userManager,
+			tokenMgr:            tokenManager,
 			getCACert:           func() string { return "" },
 			getDefaultTTL:       getDefaultTTL,
 			getServerURL:        getServerURL,
@@ -843,9 +843,9 @@ func TestStoreCreate(t *testing.T) {
 		assert.Equal(t, defaultClusterName, config.Contexts["downstream1"].AuthInfo)
 
 		require.Len(t, config.AuthInfos, 1)
-		require.Len(t, userManager.tokens, 1)
-		assert.Equal(t, userManager.tokens[0], config.AuthInfos[defaultClusterName].Token)
-		require.Len(t, userManager.clusterTokens, 0)
+		require.Len(t, tokenManager.tokens, 1)
+		assert.Equal(t, tokenManager.tokens[0], config.AuthInfos[defaultClusterName].Token)
+		require.Len(t, tokenManager.clusterTokens, 0)
 
 		assert.Equal(t, "downstream1", config.CurrentContext)
 	})
@@ -869,7 +869,7 @@ func TestStoreCreate(t *testing.T) {
 			return configMap, nil
 		}).Times(1)
 
-		userManager := &fakeUserManager{} // Subtest specific instance.
+		tokenManager := &fakeTokenManager{} // Subtest specific instance.
 
 		store := &Store{
 			authorizer:          authorizer,
@@ -878,7 +878,7 @@ func TestStoreCreate(t *testing.T) {
 			userCache:           userCache,
 			tokenCache:          tokenCache,
 			clusterCache:        clusterCache,
-			userMgr:             userManager,
+			tokenMgr:            tokenManager,
 			getCACert:           func() string { return rancherCACert },
 			getDefaultTTL:       getDefaultTTL,
 			getServerURL:        getServerURL,
@@ -951,8 +951,8 @@ func TestStoreCreate(t *testing.T) {
 		assert.Equal(t, defaultClusterName, config.Contexts[defaultClusterName].AuthInfo)
 
 		require.Len(t, config.AuthInfos, 1)
-		require.Len(t, userManager.tokens, 1)
-		assert.Equal(t, userManager.tokens[0], config.AuthInfos[defaultClusterName].Token)
+		require.Len(t, tokenManager.tokens, 1)
+		assert.Equal(t, tokenManager.tokens[0], config.AuthInfos[defaultClusterName].Token)
 
 		assert.Equal(t, "local", config.CurrentContext)
 	})
@@ -961,7 +961,7 @@ func TestStoreCreate(t *testing.T) {
 			authorizer: commonAuthorizer,
 			userCache:  userCache,
 			tokenCache: tokenCache,
-			userMgr:    userManager,
+			tokenMgr:   tokenManager,
 		}
 
 		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
@@ -985,7 +985,7 @@ func TestStoreCreate(t *testing.T) {
 			authorizer: commonAuthorizer,
 			userCache:  userCache,
 			tokenCache: tokenCache,
-			userMgr:    userManager,
+			tokenMgr:   tokenManager,
 		}
 
 		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
@@ -1009,7 +1009,7 @@ func TestStoreCreate(t *testing.T) {
 			authorizer: commonAuthorizer,
 			userCache:  userCache,
 			tokenCache: tokenCache,
-			userMgr:    userManager,
+			tokenMgr:   tokenManager,
 		}
 
 		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
@@ -1036,7 +1036,7 @@ func TestStoreCreate(t *testing.T) {
 			authorizer:    commonAuthorizer,
 			userCache:     userCache,
 			tokenCache:    tokenCache,
-			userMgr:       userManager,
+			tokenMgr:      tokenManager,
 			getDefaultTTL: getDefaultTTL,
 		}
 
@@ -1065,7 +1065,7 @@ func TestStoreCreate(t *testing.T) {
 			authorizer:    commonAuthorizer,
 			userCache:     userCache,
 			tokenCache:    tokenCache,
-			userMgr:       userManager,
+			tokenMgr:      tokenManager,
 			getDefaultTTL: getDefaultTTL,
 		}
 
@@ -1252,7 +1252,7 @@ func TestStoreGet(t *testing.T) {
 		}
 	}).AnyTimes()
 
-	userManager := &fakeUserManager{}
+	tokenManager := &fakeTokenManager{}
 
 	ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
 		Name: userID,
@@ -1266,7 +1266,7 @@ func TestStoreGet(t *testing.T) {
 			authorizer:     commonAuthorizer,
 			configMapCache: configMapCache,
 			userCache:      userCache,
-			userMgr:        userManager,
+			tokenMgr:       tokenManager,
 		}
 
 		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
@@ -1306,7 +1306,7 @@ func TestStoreGet(t *testing.T) {
 			authorizer:     commonAuthorizer,
 			configMapCache: configMapCache,
 			userCache:      userCache,
-			userMgr:        userManager,
+			tokenMgr:       tokenManager,
 		}
 
 		obj, err := store.Get(ctx, kubeconfigID, &metav1.GetOptions{})
@@ -1329,7 +1329,7 @@ func TestStoreGet(t *testing.T) {
 			authorizer:     commonAuthorizer,
 			configMapCache: configMapCache,
 			userCache:      userCache,
-			userMgr:        userManager,
+			tokenMgr:       tokenManager,
 		}
 
 		obj, err := store.Get(ctx, kubeconfigID, &metav1.GetOptions{})
@@ -1349,7 +1349,7 @@ func TestStoreGet(t *testing.T) {
 			authorizer:      commonAuthorizer,
 			configMapClient: configMapClient,
 			userCache:       userCache,
-			userMgr:         userManager,
+			tokenMgr:        tokenManager,
 		}
 
 		obj, err := store.Get(ctx, kubeconfigID, &metav1.GetOptions{ResourceVersion: "1"})
@@ -1366,7 +1366,7 @@ func TestStoreGet(t *testing.T) {
 			authorizer:     commonAuthorizer,
 			configMapCache: configMapCache,
 			userCache:      userCache,
-			userMgr:        userManager,
+			tokenMgr:       tokenManager,
 		}
 
 		obj, err := store.Get(ctx, "non-existing", &metav1.GetOptions{})
@@ -1483,14 +1483,14 @@ func TestStoreList(t *testing.T) {
 		}, nil
 	}).AnyTimes()
 
-	userManager := &fakeUserManager{}
+	tokenManager := &fakeTokenManager{}
 
 	t.Run("admin lists kubeconfigs", func(t *testing.T) {
 		store := &Store{
 			authorizer:      commonAuthorizer,
 			configMapClient: configMapClient,
 			userCache:       userCache,
-			userMgr:         userManager,
+			tokenMgr:        tokenManager,
 		}
 
 		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
@@ -1516,7 +1516,7 @@ func TestStoreList(t *testing.T) {
 			authorizer:      commonAuthorizer,
 			configMapClient: configMapClient,
 			userCache:       userCache,
-			userMgr:         userManager,
+			tokenMgr:        tokenManager,
 		}
 
 		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
@@ -1586,7 +1586,7 @@ func TestStoreWatch(t *testing.T) {
 		},
 	}
 
-	userManager := &fakeUserManager{}
+	tokenManager := &fakeTokenManager{}
 
 	t.Run("admin watches kubeconfigs", func(t *testing.T) {
 		configMapWatcher := &watcher{
@@ -1608,7 +1608,7 @@ func TestStoreWatch(t *testing.T) {
 			authorizer:      commonAuthorizer,
 			configMapClient: configMapClient,
 			userCache:       userCache,
-			userMgr:         userManager,
+			tokenMgr:        tokenManager,
 		}
 
 		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
@@ -1709,7 +1709,7 @@ func TestStoreWatch(t *testing.T) {
 			authorizer:      commonAuthorizer,
 			configMapClient: configMapClient,
 			userCache:       userCache,
-			userMgr:         userManager,
+			tokenMgr:        tokenManager,
 		}
 
 		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
@@ -1793,7 +1793,7 @@ func TestStoreUpdate(t *testing.T) {
 		},
 	}
 
-	userManager := &fakeUserManager{}
+	tokenManager := &fakeTokenManager{}
 
 	t.Run("admin updates a kubeconfig", func(t *testing.T) {
 		configMapClient := fake.NewMockClientInterface[*corev1.ConfigMap, *corev1.ConfigMapList](ctrl)
@@ -1811,7 +1811,7 @@ func TestStoreUpdate(t *testing.T) {
 			authorizer:      commonAuthorizer,
 			configMapClient: configMapClient,
 			userCache:       userCache,
-			userMgr:         userManager,
+			tokenMgr:        tokenManager,
 		}
 
 		createValidation := func(ctx context.Context, obj runtime.Object) error {
@@ -1879,7 +1879,7 @@ func TestStoreUpdate(t *testing.T) {
 			authorizer:      commonAuthorizer,
 			configMapClient: configMapClient,
 			userCache:       userCache,
-			userMgr:         userManager,
+			tokenMgr:        tokenManager,
 		}
 
 		createValidation := func(ctx context.Context, obj runtime.Object) error {
@@ -1942,7 +1942,7 @@ func TestStoreUpdate(t *testing.T) {
 			authorizer:      commonAuthorizer,
 			configMapClient: configMapClient,
 			userCache:       userCache,
-			userMgr:         userManager,
+			tokenMgr:        tokenManager,
 		}
 
 		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
@@ -1975,7 +1975,7 @@ func TestStoreUpdate(t *testing.T) {
 			authorizer:      commonAuthorizer,
 			configMapClient: configMapClient,
 			userCache:       userCache,
-			userMgr:         userManager,
+			tokenMgr:        tokenManager,
 		}
 
 		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
@@ -2006,7 +2006,7 @@ func TestStoreUpdate(t *testing.T) {
 			authorizer:      commonAuthorizer,
 			configMapClient: configMapClient,
 			userCache:       userCache,
-			userMgr:         userManager,
+			tokenMgr:        tokenManager,
 		}
 
 		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
@@ -2037,7 +2037,7 @@ func TestStoreUpdate(t *testing.T) {
 			authorizer:      commonAuthorizer,
 			configMapClient: configMapClient,
 			userCache:       userCache,
-			userMgr:         userManager,
+			tokenMgr:        tokenManager,
 		}
 
 		updateValidation := func(ctx context.Context, obj, old runtime.Object) error { return nil }
@@ -2096,7 +2096,7 @@ func TestStoreUpdate(t *testing.T) {
 			authorizer:      commonAuthorizer,
 			configMapClient: configMapClient,
 			userCache:       userCache,
-			userMgr:         userManager,
+			tokenMgr:        tokenManager,
 		}
 
 		var updateValidationCalled bool
@@ -2186,7 +2186,7 @@ func TestStoreDelete(t *testing.T) {
 		},
 	}
 
-	userManager := &fakeUserManager{}
+	tokenManager := &fakeTokenManager{}
 
 	t.Run("admin deletes a kubeconfig", func(t *testing.T) {
 		var deleteValidationCalled bool
@@ -2238,7 +2238,7 @@ func TestStoreDelete(t *testing.T) {
 			tokenCache:      tokenCache,
 			tokens:          tokenClient,
 			userCache:       userCache,
-			userMgr:         userManager,
+			tokenMgr:        tokenManager,
 		}
 
 		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
@@ -2265,7 +2265,7 @@ func TestStoreDelete(t *testing.T) {
 			authorizer:      commonAuthorizer,
 			configMapClient: configMapClient,
 			userCache:       userCache,
-			userMgr:         userManager,
+			tokenMgr:        tokenManager,
 		}
 
 		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{
@@ -2331,7 +2331,7 @@ func TestStoreDeleteCollection(t *testing.T) {
 		},
 	}
 
-	userManager := &fakeUserManager{}
+	tokenManager := &fakeTokenManager{}
 
 	t.Run("admin deletes users kubeconfigs with a label", func(t *testing.T) {
 		var deleteValidationCalledTimes int
@@ -2400,7 +2400,7 @@ func TestStoreDeleteCollection(t *testing.T) {
 			tokenCache:      tokenCache,
 			tokens:          tokenClient,
 			userCache:       userCache,
-			userMgr:         userManager,
+			tokenMgr:        tokenManager,
 		}
 
 		ctx := request.WithUser(context.Background(), &k8suser.DefaultInfo{

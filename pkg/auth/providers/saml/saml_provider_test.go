@@ -31,7 +31,7 @@ func TestConfiguredOktaProviderContainsLdapProvider(t *testing.T) {
 	require.NoError(t, err, "Failed to create wranglerContext")
 	mgmtCtx.Wrangler = wranglerContext
 
-	tokenMGR := tokens.NewManager(ctx, mgmtCtx)
+	tokenMGR := tokens.NewManager(wranglerContext)
 	provider, ok := Configure(ctx, mgmtCtx, mgmtCtx.UserManager, tokenMGR, "okta").(*Provider)
 	require.True(t, ok, "Failed to Configure a valid Provider")
 

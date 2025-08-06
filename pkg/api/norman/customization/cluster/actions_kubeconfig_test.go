@@ -19,7 +19,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	apitypes "k8s.io/apimachinery/pkg/types"
 )
 
 func TestGenerateKubeconfigActionHandler(t *testing.T) {
@@ -110,8 +109,9 @@ func TestGenerateKubeconfigActionHandler(t *testing.T) {
 						return nil, test.nodeListerErr
 					},
 				},
-				UserMgr: &fakeManager,
-				Auth:    &fakeAuth,
+				UserMgr:  &fakeManager,
+				TokenMgr: &fakeTokenManager{},
+				Auth:     &fakeAuth,
 			}
 			err = handler.GenerateKubeconfigActionHandler("not-used", nil, apiContext)
 			if test.wantErr {
@@ -219,42 +219,6 @@ func (f *fakeUserManager) GetUser(apiContext *types.APIContext) string {
 	}
 	return contextUser
 }
-func (f *fakeUserManager) EnsureToken(input user.TokenInput) (string, runtime.Object, error) {
-	if input.UserName == errUserName {
-		return "", nil, fmt.Errorf("can't generate token for err user")
-	}
-	return input.TokenName + ":" + "tokenvalue", nil, nil
-}
-func (f *fakeUserManager) EnsureClusterToken(clusterName string, input user.TokenInput) (string, runtime.Object, error) {
-	if input.UserName == errUserName {
-		return "", nil, fmt.Errorf("can't generate token for err user")
-	}
-	return input.TokenName + ":" + "tokenvalue", nil, nil
-}
-
-// Remaining functions are only implemented to satisfy the interface
-func (f *fakeUserManager) SetPrincipalOnCurrentUser(apiContext *types.APIContext, principal apimgmtv3.Principal) (*apimgmtv3.User, error) {
-	return nil, nil
-}
-func (f *fakeUserManager) DeleteToken(tokenName string) error { return nil }
-func (f *fakeUserManager) EnsureUser(principalName, displayName string) (*apimgmtv3.User, error) {
-	return nil, nil
-}
-func (f *fakeUserManager) CheckAccess(accessMode string, allowedPrincipalIDs []string, userPrincipalID string, groups []apimgmtv3.Principal) (bool, error) {
-	return false, nil
-}
-func (f *fakeUserManager) SetPrincipalOnCurrentUserByUserID(userID string, principal apimgmtv3.Principal) (*apimgmtv3.User, error) {
-	return nil, nil
-}
-func (f *fakeUserManager) CreateNewUserClusterRoleBinding(userName string, userUID apitypes.UID) error {
-	return nil
-}
-func (f *fakeUserManager) GetUserByPrincipalID(principalName string) (*apimgmtv3.User, error) {
-	return nil, nil
-}
-func (f *fakeUserManager) GetKubeconfigToken(clusterName, tokenName, description, kind, userName string, userPrincipal apimgmtv3.Principal) (*apimgmtv3.Token, string, error) {
-	return nil, "", nil
-}
 
 // fakeAuthenticator implements requests.Authenticator for the purposes of testing
 type fakeAuthenticator struct {
@@ -271,4 +235,19 @@ func (f *fakeAuthenticator) TokenFromRequest(req *http.Request) (accessor.TokenA
 
 func (f *fakeAuthenticator) Authenticate(req *http.Request) (*requests.AuthenticatorResponse, error) {
 	return nil, nil
+}
+
+type fakeTokenManager struct{}
+
+func (f *fakeTokenManager) EnsureToken(input user.TokenInput) (string, runtime.Object, error) {
+	if input.UserName == errUserName {
+		return "", nil, fmt.Errorf("can't generate token for err user")
+	}
+	return input.TokenName + ":" + "tokenvalue", nil, nil
+}
+func (f *fakeTokenManager) EnsureClusterToken(clusterName string, input user.TokenInput) (string, runtime.Object, error) {
+	if input.UserName == errUserName {
+		return "", nil, fmt.Errorf("can't generate token for err user")
+	}
+	return input.TokenName + ":" + "tokenvalue", nil, nil
 }

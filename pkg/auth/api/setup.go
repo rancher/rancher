@@ -35,7 +35,7 @@ func User(ctx context.Context, schemas *types.Schemas, management *config.Scaled
 	handler := &user.Handler{
 		UserClient:               management.Management.Users(""),
 		GlobalRoleBindingsClient: management.Management.GlobalRoleBindings(""),
-		UserAuthRefresher:        providerrefresh.NewUserAuthRefresher(ctx, management),
+		UserAuthRefresher:        providerrefresh.NewUserAuthRefresher(management),
 		ExtTokenStore:            extTokenStore,
 		SecretLister:             management.Wrangler.Core.Secret().Cache(),
 		SecretClient:             management.Wrangler.Core.Secret(),

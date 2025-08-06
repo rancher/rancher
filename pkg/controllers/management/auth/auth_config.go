@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 
@@ -48,10 +47,10 @@ type authConfigController struct {
 	authConfigsUnstructured objectclient.GenericClient
 }
 
-func newAuthConfigController(context context.Context, mgmt *config.ManagementContext, scaledContext *config.ScaledContext) *authConfigController {
+func newAuthConfigController(mgmt *config.ManagementContext, scaledContext *config.ScaledContext) *authConfigController {
 	controller := &authConfigController{
 		users:                   mgmt.Management.Users("").Controller().Lister(),
-		authRefresher:           providerrefresh.NewUserAuthRefresher(context, scaledContext),
+		authRefresher:           providerrefresh.NewUserAuthRefresher(scaledContext),
 		cleanup:                 cleanup.NewCleanupService(mgmt.Wrangler.Core.Secret(), mgmt.Wrangler.Mgmt),
 		authConfigsUnstructured: scaledContext.Management.AuthConfigs("").ObjectClient().UnstructuredClient(),
 	}

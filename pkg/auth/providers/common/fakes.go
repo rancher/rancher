@@ -1,10 +1,11 @@
 package common
 
 import (
+	"time"
+
 	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/user"
-	"k8s.io/apimachinery/pkg/runtime"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	apitypes "k8s.io/apimachinery/pkg/types"
 )
 
@@ -16,13 +17,7 @@ func (m FakeUserManager) SetPrincipalOnCurrentUser(apiContext *types.APIContext,
 	panic("unimplemented")
 }
 func (m FakeUserManager) GetUser(apiContext *types.APIContext) string { panic("unimplemented") }
-func (m FakeUserManager) EnsureToken(input user.TokenInput) (string, runtime.Object, error) {
-	panic("unimplemented")
-}
-func (m FakeUserManager) EnsureClusterToken(clusterName string, input user.TokenInput) (string, runtime.Object, error) {
-	panic("unimplemented")
-}
-func (m FakeUserManager) DeleteToken(tokenName string) error { panic("unimplemented") }
+
 func (m FakeUserManager) EnsureUser(principalName, displayName string) (*v3.User, error) {
 	panic("unimplemented")
 }
@@ -38,6 +33,16 @@ func (m FakeUserManager) CreateNewUserClusterRoleBinding(userName string, userUI
 func (m FakeUserManager) GetUserByPrincipalID(principalName string) (*v3.User, error) {
 	panic("unimplemented")
 }
-func (m FakeUserManager) GetKubeconfigToken(clusterName, tokenName, description, kind, userName string, userPrincipal v3.Principal) (*v3.Token, string, error) {
+
+func (m FakeUserManager) GetGroupsForTokenAuthProvider(token accessor.TokenAccessor) []v3.Principal {
+	panic("unimplemented")
+}
+func (m FakeUserManager) EnsureAndGetUserAttribute(userID string) (*v3.UserAttribute, bool, error) {
+	panic("unimplemented")
+}
+func (m FakeUserManager) IsMemberOf(token accessor.TokenAccessor, group v3.Principal) bool {
+	panic("unimplemented")
+}
+func (m FakeUserManager) UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, userExtraInfo map[string][]string, loginTime ...time.Time) error {
 	panic("unimplemented")
 }

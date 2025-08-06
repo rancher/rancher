@@ -1,7 +1,6 @@
 package providerrefresh
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"sync"
@@ -28,31 +27,33 @@ type UserAuthRefresher interface {
 	TriggerUserRefresh(string, bool)
 }
 
-func NewUserAuthRefresher(ctx context.Context, scaledContext *config.ScaledContext) UserAuthRefresher {
+func NewUserAuthRefresher(scaledContext *config.ScaledContext) UserAuthRefresher {
 	extTokenStore := exttokenstore.NewSystemFromWrangler(scaledContext.Wrangler)
 
 	return &refresher{
-		tokenLister:         scaledContext.Management.Tokens("").Controller().Lister(),
-		tokens:              scaledContext.Management.Tokens(""),
-		userLister:          scaledContext.Management.Users("").Controller().Lister(),
-		tokenMGR:            tokens.NewManager(ctx, scaledContext),
-		userAttributes:      scaledContext.Management.UserAttributes(""),
-		userAttributeLister: scaledContext.Management.UserAttributes("").Controller().Lister(),
-		extTokenStore:       extTokenStore,
+		tokenLister:               scaledContext.Management.Tokens("").Controller().Lister(),
+		tokens:                    scaledContext.Management.Tokens(""),
+		tokenMGR:                  tokens.NewManager(scaledContext.Wrangler),
+		userLister:                scaledContext.Management.Users("").Controller().Lister(),
+		userAttributes:            scaledContext.Management.UserAttributes(""),
+		userAttributeLister:       scaledContext.Management.UserAttributes("").Controller().Lister(),
+		extTokenStore:             extTokenStore,
+		ensureAndGetUserAttribute: scaledContext.UserManager.EnsureAndGetUserAttribute,
 	}
 }
 
 type refresher struct {
 	sync.Mutex
-	tokenLister         v3.TokenLister
-	tokens              v3.TokenInterface
-	tokenMGR            *tokens.Manager
-	userLister          v3.UserLister
-	userAttributes      v3.UserAttributeInterface
-	userAttributeLister v3.UserAttributeLister
-	unparsedMaxAge      string
-	maxAge              time.Duration
-	extTokenStore       *exttokenstore.SystemStore
+	tokenLister               v3.TokenLister
+	tokens                    v3.TokenInterface
+	tokenMGR                  *tokens.Manager
+	userLister                v3.UserLister
+	userAttributes            v3.UserAttributeInterface
+	userAttributeLister       v3.UserAttributeLister
+	unparsedMaxAge            string
+	maxAge                    time.Duration
+	extTokenStore             *exttokenstore.SystemStore
+	ensureAndGetUserAttribute func(userID string) (*apiv3.UserAttribute, bool, error)
 }
 
 func (r *refresher) ensureMaxAgeUpToDate(maxAge string) {
@@ -102,7 +103,7 @@ func (r *refresher) refreshAll(force bool) {
 }
 
 func (r *refresher) triggerUserRefresh(userName string, force bool) {
-	attribs, needCreate, err := r.tokenMGR.EnsureAndGetUserAttribute(userName)
+	attribs, needCreate, err := r.ensureAndGetUserAttribute(userName)
 	if err != nil {
 		logrus.Errorf("Error fetching user attribute to trigger refresh: %v", err)
 		return

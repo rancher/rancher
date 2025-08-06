@@ -54,8 +54,9 @@ func GetProviderByType(configType string) common.AuthProvider {
 func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	confMu.Lock()
 	defer confMu.Unlock()
+
 	userMGR := mgmt.UserManager
-	tokenMGR := tokens.NewManager(ctx, mgmt)
+	tokenMGR := tokens.NewManager(mgmt.Wrangler)
 
 	// TODO: refactor to eliminate the need for these callbacks, which exist to avoid the import cycle.
 	tokens.OnLogoutAll(ProviderLogoutAll)
@@ -63,7 +64,7 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 
 	var p common.AuthProvider
 
-	p = local.Configure(ctx, mgmt, tokenMGR)
+	p = local.Configure(ctx, mgmt, userMGR)
 	ProviderNames[local.Name] = true
 	Providers[local.Name] = p
 	providersByType[client.LocalConfigType] = p

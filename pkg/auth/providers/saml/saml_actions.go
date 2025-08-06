@@ -27,13 +27,13 @@ func (s *Provider) actionHandler(actionName string, action *types.Action, reques
 	}
 
 	if actionName == "testAndEnable" {
-		return s.testAndEnable(actionName, action, request)
+		return s.testAndEnable(request)
 	}
 
 	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }
 
-func (s *Provider) testAndEnable(actionName string, action *types.Action, request *types.APIContext) error {
+func (s *Provider) testAndEnable(request *types.APIContext) error {
 	// get Final redirect URL from request body
 
 	samlLogin := &v32.SamlConfigTestInput{}
