@@ -2,14 +2,16 @@ package controllers
 
 import (
 	"context"
+
+	deploymentControllers "github.com/rancher/wrangler/v3/pkg/generated/controllers/apps/v1"
+	"github.com/rancher/wrangler/v3/pkg/relatedresource"
+	appsv1 "k8s.io/api/apps/v1"
+
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/scc/consts"
 	"github.com/rancher/rancher/pkg/scc/deployer"
 	"github.com/rancher/rancher/pkg/scc/util/generic"
 	"github.com/rancher/rancher/pkg/scc/util/log"
-	deploymentControllers "github.com/rancher/wrangler/v3/pkg/generated/controllers/apps/v1"
-	"github.com/rancher/wrangler/v3/pkg/relatedresource"
-	appsv1 "k8s.io/api/apps/v1"
 )
 
 type deployersHandler struct {

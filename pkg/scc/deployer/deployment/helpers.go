@@ -1,10 +1,11 @@
 package deployment
 
 import (
-	"github.com/rancher/rancher/pkg/scc/consts"
 	appsControllers "github.com/rancher/wrangler/v3/pkg/generated/controllers/apps/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/rancher/rancher/pkg/scc/consts"
 )
 
 func fetchCurrentDeployment(deployments appsControllers.DeploymentController) (*appsv1.Deployment, error) {

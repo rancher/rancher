@@ -4,13 +4,15 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
-	"github.com/rancher/rancher/pkg/scc/consts"
-	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rancher/pkg/version"
+	"maps"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"maps"
+
+	"github.com/rancher/rancher/pkg/scc/consts"
+	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/version"
 )
 
 type SCCOperatorParams struct {

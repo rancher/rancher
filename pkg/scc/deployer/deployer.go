@@ -2,6 +2,10 @@ package deployer
 
 import (
 	"context"
+
+	"github.com/rancher/wrangler/v3/pkg/relatedresource"
+	"k8s.io/apimachinery/pkg/runtime"
+
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/scc/consts"
 	"github.com/rancher/rancher/pkg/scc/deployer/clusterrolebinding"
@@ -12,8 +16,6 @@ import (
 	"github.com/rancher/rancher/pkg/scc/util/log"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
-	"github.com/rancher/wrangler/v3/pkg/relatedresource"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 // SCCDeployer orchestrates the deployment of SCC operator resources
