@@ -625,7 +625,9 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 	if err != nil {
 		return nil, apierrors.NewInternalError(fmt.Errorf("error getting the authentication token: %w", err))
 	}
-
+	if authTokenID == "" {
+		return nil, apierrors.NewForbidden(GVR.GroupResource(), "", fmt.Errorf("missing authentication token ID"))
+	}
 	// Get token of the request and use its principal as ours. Any attempt
 	// by the user to set their own information for the principal is
 	// discarded and written over. No checks are made, no errors are thrown.
@@ -1372,10 +1374,6 @@ func SessionID(ctx context.Context) (string, error) {
 	}
 
 	extras := userInfo.GetExtra()
-	if extras == nil {
-		return "", fmt.Errorf("context principal has no extras")
-	}
-
 	tokenIDs := extras[common.ExtraRequestTokenID]
 	if len(tokenIDs) != 1 {
 		// log only because we get internal requests (watch setup) without token id
