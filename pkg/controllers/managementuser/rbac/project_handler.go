@@ -12,6 +12,7 @@ import (
 	projectpkg "github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/settings"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -102,13 +103,15 @@ func (p *pLifecycle) Remove(project *v3.Project) (runtime.Object, error) {
 			return project, fmt.Errorf("failed to list project scoped secrets: %w", err)
 		}
 		for _, secret := range secrets.Items {
-			if err := p.secretClient.Delete(namespace.Name, secret.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			err := p.secretClient.Delete(namespace.Name, secret.Name, &metav1.DeleteOptions{})
+			if err != nil && !apierrors.IsNotFound(err) {
+				logrus.Errorf("failed to delete project scoped secret %s/%s: %v", namespace.Name, secret.Name, err)
 				returnErrors = errors.Join(returnErrors, err)
 			}
 		}
 	}
 
-	return nil, returnErrors
+	return project, returnErrors
 }
 
 func (p *pLifecycle) ensureNamespacesAssigned(project *v3.Project) error {
