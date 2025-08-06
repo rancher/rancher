@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	appsControllers "github.com/rancher/wrangler/v3/pkg/generated/controllers/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -40,34 +41,44 @@ func (d *Deployer) HasResource() (bool, error) {
 
 func (d *Deployer) Ensure(ctx context.Context, _ map[string]string) error {
 	// check if deployment exists
-	existingHash := fetchCurrentDeploymentHash(d.deployments)
 	existingDeployment, getErr := d.deployments.Get(consts.DefaultSCCNamespace, consts.DeploymentName, metav1.GetOptions{})
 	if getErr != nil && !errors.IsNotFound(getErr) {
 		return fmt.Errorf("error checking for existing deployment %s/%s: %w", consts.DefaultSCCNamespace, consts.DeploymentName, getErr)
 	}
-	desiredDeployment := d.desiredParams.PrepareDeployment()
 
-	if errors.IsNotFound(getErr) {
-		_, createErr := d.deployments.Create(desiredDeployment)
-		// todo conditionally wrap this for extra context when actual error
-		return createErr
+	_, err := d.Reconcile(ctx, d.desiredParams, existingDeployment)
+	return err
+}
+
+func (d *Deployer) Reconcile(_ context.Context, desiredParams *params.SCCOperatorParams, incoming *appsv1.Deployment) (*appsv1.Deployment, error) {
+	existingHash := fetchCurrentDeploymentHash(incoming)
+	desiredDeployment := desiredParams.PrepareDeployment()
+
+	if existingHash == "" {
+		created, createErr := d.deployments.Create(desiredDeployment)
+		if createErr != nil {
+			return nil, fmt.Errorf("error creating deployment %s/%s: %w", consts.DefaultSCCNamespace, consts.DeploymentName, createErr)
+		}
+		return created, nil
 	}
 
-	if d.desiredParams.RefreshHash != existingHash {
-		d.log.Debug("The deployment hash has changed, so the deployment is in need of update.")
-		patchUpdatedObj, err := generic.PreparePatchUpdated(existingDeployment, desiredDeployment)
+	if desiredParams.RefreshHash != existingHash {
+		d.log.Debug("The deployment hash has changed; the deployment must be updated or redeployed.")
+		patchUpdatedObj, err := generic.PreparePatchUpdated(incoming, desiredDeployment)
 		if err != nil {
 			// todo: wrap this
-			return err
+			return incoming, err
 		}
 
-		_, err = d.deployments.Update(patchUpdatedObj)
-		// todo conditionally wrap this for extra context when actual error
-		return err
+		updated, err := d.deployments.Update(patchUpdatedObj)
+		if err != nil {
+			return nil, fmt.Errorf("error updating deployment %s/%s: %w", consts.DefaultSCCNamespace, consts.DeploymentName, err)
+		}
+		return updated, nil
 	}
 
-	d.log.Debugf("The current deployment hash matched the desired one, so no update needed.")
-	return nil
+	d.log.Debugf("The current deployment hash and desired hash match; no update needed.")
+	return incoming, nil
 }
 
 func (d *Deployer) SetDesiredParams(params *params.SCCOperatorParams) {
