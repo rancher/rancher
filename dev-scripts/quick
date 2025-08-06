@@ -33,35 +33,95 @@ xargs -n2 docker save -o ./k3s-airgap-images.tar <<< "${AIRGAP_IMAGES}"
 # download kontainer driver metadata
 curl -sLf https://releases.rancher.com/kontainer-driver-metadata/"${CATTLE_KDM_BRANCH}"/data.json > ./data.json
 
-if [ -z $TARGET ] || [ $TARGET = "server" ]; then
+BUILD_ARGS=()
+BUILD_ARGS+=("--build-arg=VERSION=${TAG}")
+BUILD_ARGS+=("--build-arg=ARCH=${ARCH}")
+BUILD_ARGS+=("--build-arg=IMAGE_REPO=${REPO}")
+BUILD_ARGS+=("--build-arg=COMMIT=${COMMIT}")
+BUILD_ARGS+=("--build-arg=RKE_VERSION=${RKE_VERSION}")
+BUILD_ARGS+=("--build-arg=CATTLE_RANCHER_WEBHOOK_VERSION=${CATTLE_RANCHER_WEBHOOK_VERSION}")
+BUILD_ARGS+=("--build-arg=CATTLE_REMOTEDIALER_PROXY_VERSION=${CATTLE_REMOTEDIALER_PROXY_VERSION}")
+BUILD_ARGS+=("--build-arg=CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=${CATTLE_RANCHER_PROVISIONING_CAPI_VERSION}")
+BUILD_ARGS+=("--build-arg=CATTLE_CSP_ADAPTER_MIN_VERSION=${CATTLE_CSP_ADAPTER_MIN_VERSION}")
+BUILD_ARGS+=("--build-arg=CATTLE_FLEET_VERSION=${CATTLE_FLEET_VERSION}")
+BUILD_ARGS+=("--build-arg=RANCHER_TAG=${TAG}")
+BUILD_ARGS+=("--build-arg=RANCHER_REPO=${REPO}")
+
+# because macos doesn't have realpath apparently
+abs_path() {
+  echo "$(cd "$(dirname "$1")" && pwd -P)/$(basename "$1")"
+}
+
+is_safe_local_directive() {
+  while IFS= read -r safe_path; do
+    safe_path="$(abs_path "$safe_path")"
+    if [[ "$1" == "$safe_path"* ]]; then
+      return 0
+    fi
+  done < <(echo "$BUILD_SAFE_DIRS" | tr ':' '\n')
+  return 1
+}
+
+needs_workdir="false"
+
+# add_context adds _some_ support for local replace directives of dependency.
+add_context() {
+  if ! replace=$(grep "$1 =>" go.mod); then
+    return 0
+  fi
+
+  # Detect local replace directive or either form:
+  #             github.com/rancher/steve => /absolute/or/relative/path/to/steve
+  # or
+  #     replace github.com/rancher/steve => /absolute/or/relative/path/to/steve
+  if [ -n "$(echo "$replace" | cut -d= -f2 | cut -d' ' -f3)" ]; then
+    return 0
+  fi
+
+  set +x
+  godep=$(echo "$replace" | cut -d= -f2 | cut -d' ' -f2)
+  path=$(abs_path "$godep")
+  if ! is_safe_local_directive "$path"; then
+    cat <<EOF
+Detected replace directive with path $godep ($path). This directive is not listed under a safe
+prefix path with BUILD_SAFE_DIRS environment variable.
+Path you want to use with replace directive must be under a prefix path set in the BUILD_SAFE_DIRS
+env var. Its value should be a colon-separated (:) list of prefix paths.
+For example, for a path of /home/user/sources/steve, you could set BUILD_SAFE_DIRS=/home/user/sources.
+EOF
+    exit 1
+  fi
+
+  set -x
+  BUILD_ARGS+=("--build-context=$2=$path")
+  BUILD_ARGS+=("--build-arg=$3=$2")
+  BUILD_ARGS+=("--build-arg=$3_PATH=$path")
+  needs_workdir="true"
+}
+
+add_context "github.com/rancher/apiserver" "apiserver-context" "GODEP_APISERVER"
+add_context "github.com/rancher/remotedialer" "remotedialer-context" "GODEP_REMOTEDIALER"
+add_context "github.com/rancher/shepherd" "shepherd-context" "GODEP_SHEPHERD"
+add_context "github.com/rancher/steve" "steve-context" "GODEP_STEVE"
+add_context "github.com/rancher/wrangler/v3" "wrangler-context" "GODEP_WRANGLER"
+
+if [ "$needs_workdir" = "true" ]; then
+  BUILD_ARGS+=("--build-arg=BUILD_WORKDIR=$PWD")
+fi
+
+if [ -z "$TARGET" ] || [ "$TARGET" = "server" ]; then
   # start the builds
   docker buildx build \
-    --build-arg VERSION="${TAG}" \
-    --build-arg ARCH="${ARCH}" \
-    --build-arg IMAGE_REPO="${REPO}" \
-    --build-arg COMMIT="${COMMIT}" \
-    --build-arg RKE_VERSION="${RKE_VERSION}" \
-    --build-arg CATTLE_RANCHER_WEBHOOK_VERSION="${CATTLE_RANCHER_WEBHOOK_VERSION}" \
-    --build-arg CATTLE_REMOTEDIALER_PROXY_VERSION="${CATTLE_REMOTEDIALER_PROXY_VERSION}" \
-    --build-arg CATTLE_RANCHER_PROVISIONING_CAPI_VERSION="${CATTLE_RANCHER_PROVISIONING_CAPI_VERSION}" \
-    --build-arg CATTLE_CSP_ADAPTER_MIN_VERSION="${CATTLE_CSP_ADAPTER_MIN_VERSION}" \
-    --build-arg CATTLE_FLEET_VERSION="${CATTLE_FLEET_VERSION}" \
+    "${BUILD_ARGS[@]}" \
     --tag "${REPO}"/rancher:"${TAG}" \
     --platform="${OS}/${ARCH}" \
     --target server \
     --file ./package/Dockerfile .
 fi
 
-if [ -z $TARGET ] || [ $TARGET = "agent" ]; then
+if [ -z "$TARGET" ] || [ "$TARGET" = "agent" ]; then
   docker buildx build \
-    --build-arg VERSION="${TAG}" \
-    --build-arg ARCH="${ARCH}" \
-    --build-arg RANCHER_TAG="${TAG}" \
-    --build-arg RANCHER_REPO="${REPO}" \
-    --build-arg COMMIT="${COMMIT}" \
-    --build-arg RKE_VERSION="${RKE_VERSION}" \
-    --build-arg CATTLE_RANCHER_WEBHOOK_VERSION="${CATTLE_RANCHER_WEBHOOK_VERSION}" \
-    --build-arg CATTLE_RANCHER_PROVISIONING_CAPI_VERSION="${CATTLE_RANCHER_PROVISIONING_CAPI_VERSION}" \
+    "${BUILD_ARGS[@]}" \
     --tag "${REPO}"/rancher-agent:"${TAG}" \
     --platform="${OS}/${ARCH}" \
     --target agent \
