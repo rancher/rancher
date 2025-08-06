@@ -4,16 +4,17 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 
-	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
+	"github.com/cenkalti/backoff/v4"
 	"github.com/rancher/rancher/pkg/scc/consts"
 	"github.com/rancher/rancher/pkg/scc/deployer/types"
 	"github.com/rancher/rancher/pkg/scc/util/generic"
 	"github.com/rancher/rancher/pkg/scc/util/log"
+	v1core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // Deployer implements ResourceDeployer for Namespace resources
@@ -51,6 +52,9 @@ func (d *Deployer) Ensure(ctx context.Context, labels map[string]string) error {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   consts.DefaultSCCNamespace,
 			Labels: labels,
+			Finalizers: []string{
+				consts.FinalizerSccNamespace,
+			},
 		},
 	}
 
@@ -66,18 +70,38 @@ func (d *Deployer) Ensure(ctx context.Context, labels map[string]string) error {
 		d.log.Infof("Namespace %s is marked for deletion, cleaning up and recreating", consts.DefaultSCCNamespace)
 
 		// Try to remove finalizers to speed up deletion
-		if len(existingSccNs.Finalizers) > 0 {
+		finalizerIndex := slices.Index(existingSccNs.Finalizers, consts.FinalizerSccNamespace)
+		if len(existingSccNs.Finalizers) > 0 && finalizerIndex != -1 {
 			d.log.Infof("Removing finalizers from namespace %s to speed up deletion", consts.DefaultSCCNamespace)
-			existingSccNs.Finalizers = []string{}
+			existingSccNs.Finalizers = slices.Delete(existingSccNs.Finalizers, finalizerIndex, 1)
 			if _, err := d.namespaces.Update(existingSccNs); err != nil {
 				d.log.Warnf("Failed to remove finalizers from namespace %s: %v", consts.DefaultSCCNamespace, err)
-				// Continue anyway, we'll check if it's gone and recreate
 			}
 		}
 
 		// Check if namespace is actually gone after removing finalizers
-		_, err = d.namespaces.Get(consts.DefaultSCCNamespace, metav1.GetOptions{})
-		if err != nil && errors.IsNotFound(err) {
+		var getErr error
+		retryErr := backoff.Retry(
+			func() error {
+				var ns *corev1.Namespace
+				ns, getErr = d.namespaces.Get(consts.DefaultSCCNamespace, metav1.GetOptions{})
+				if getErr != nil && !errors.IsNotFound(getErr) {
+					return nil
+				}
+
+				if ns != nil {
+					return fmt.Errorf("namespace %s still exists", consts.DefaultSCCNamespace)
+				}
+
+				return nil
+			},
+			backoff.WithMaxRetries(backoff.NewConstantBackOff(3), 3),
+		)
+		if retryErr != nil {
+			return fmt.Errorf("encountered error while waiting for namespace to clean up: %w", retryErr)
+		}
+
+		if getErr != nil && errors.IsNotFound(getErr) {
 			// Namespace is gone, create a new one
 			d.log.Infof("Namespace %s is deleted, creating new one", consts.DefaultSCCNamespace)
 			_, err = d.namespaces.Create(desiredSccNs)

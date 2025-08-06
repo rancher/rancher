@@ -7,15 +7,13 @@ const (
 // Secret names and name prefixes
 const (
 	DeploymentName         = "rancher-scc-operator"
-	PodNamePrefix          = "rancher-scc-operator-"
 	ServiceAccountName     = DeploymentName + "-sa"
 	ClusterRoleName        = "cluster-admin"
 	ClusterRoleBindingName = DeploymentName + "-crb"
 )
 
 const (
-	FinalizerSccOperatorDeployment = "scc.cattle.io/scc-operator-deployment"
-	FinalizerSccOperatorPod        = "scc.cattle.io/scc-operator-pod"
+	FinalizerSccNamespace = "scc.cattle.io/namespace"
 )
 
 const (

@@ -66,7 +66,6 @@ func RegisterDeployer(
 
 // OnRelatedSettings triggers changes to deployment if related settings change
 func (h *deployersHandler) OnRelatedSettings(_, name string, obj runtime.Object) ([]relatedresource.Key, error) {
-	// TODO: not sure if this is done correctly - didnt' seem to trigger an update on the deployment...
 	if _, ok := obj.(*v3.Setting); ok {
 		if name == settings.SCCOperatorImage.Name {
 			return []relatedresource.Key{{
