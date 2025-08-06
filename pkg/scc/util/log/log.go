@@ -1,8 +1,9 @@
 package log
 
 import (
-	"github.com/rancher/rancher/pkg/scc/consts"
 	"github.com/sirupsen/logrus"
+
+	"github.com/rancher/rancher/pkg/scc/consts"
 )
 
 type StructuredLogger = *logrus.Entry

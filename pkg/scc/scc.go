@@ -3,6 +3,7 @@ package scc
 import (
 	"context"
 	"fmt"
+
 	"github.com/rancher/rancher/pkg/scc/controllers"
 	"github.com/rancher/rancher/pkg/scc/deployer"
 	"github.com/rancher/rancher/pkg/scc/deployer/params"
