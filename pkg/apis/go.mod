@@ -34,7 +34,7 @@ replace (
 )
 
 require (
-	github.com/rancher/aks-operator v1.12.0
+	github.com/rancher/aks-operator v1.12.1-rc.1
 	github.com/rancher/eks-operator v1.12.0
 	github.com/rancher/fleet/pkg/apis v0.13.0
 	github.com/rancher/gke-operator v1.12.0
@@ -104,5 +104,5 @@ require (
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.6.0 // indirect
-	sigs.k8s.io/yaml v1.5.0 // indirect
+	sigs.k8s.io/yaml v1.6.0 // indirect
 )
