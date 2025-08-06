@@ -1378,7 +1378,9 @@ func SessionID(ctx context.Context) (string, error) {
 
 	tokenIDs := extras[common.ExtraRequestTokenID]
 	if len(tokenIDs) != 1 {
-		return "", fmt.Errorf("context principal extras has no request token id")
+		// log only because we get internal requests (watch setup) without token id
+		logrus.Debugf("context principal extras has no unique request token id: %d", len(tokenIDs))
+		return "", nil
 	}
 
 	tokenID := tokenIDs[0]
