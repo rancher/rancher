@@ -450,7 +450,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 			}
 			logrus.Debug("[rancher::Start] starting RancherSCCRegistrationExtension")
 
-			return scc.Start(ctx, r.Wrangler)
+			return scc.StartDeployer(ctx, r.Wrangler)
 		})
 	}
 
