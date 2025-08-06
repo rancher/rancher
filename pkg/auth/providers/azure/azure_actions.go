@@ -125,7 +125,7 @@ func (ap *Provider) testAndApply(request *types.APIContext) error {
 
 	userExtraInfo := ap.GetUserExtraAttributes(userPrincipal)
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return ap.tokenMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
+		return ap.userMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
 	}); err != nil {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to create or update userAttribute: %v", err))
 	}

@@ -55,7 +55,7 @@ func New(wranglerContext *wrangler.Context, authorizer authorizer.Authorizer) (*
 	if err != nil {
 		return nil, err
 	}
-	userAuthRefresher := providerrefresh.NewUserAuthRefresher(context.TODO(), scaledContext)
+	userAuthRefresher := providerrefresh.NewUserAuthRefresher(scaledContext)
 	store := Store{
 		userAuthRefresher: userAuthRefresher,
 		authorizer:        authorizer,

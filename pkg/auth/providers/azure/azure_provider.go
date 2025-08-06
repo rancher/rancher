@@ -302,7 +302,7 @@ func (ap *Provider) getGroupPrincipal(client clients.AzureClient, id string, tok
 	if err != nil {
 		return v32.Principal{}, httperror.NewAPIError(httperror.NotFound, err.Error())
 	}
-	principal.MemberOf = ap.tokenMGR.IsMemberOf(token, principal)
+	principal.MemberOf = ap.userMGR.IsMemberOf(token, principal)
 	return principal, nil
 }
 
@@ -325,7 +325,7 @@ func (ap *Provider) searchGroupPrincipalsByName(client clients.AzureClient, name
 		return nil, err
 	}
 	for _, principal := range principals {
-		principal.MemberOf = ap.tokenMGR.IsMemberOf(token, principal)
+		principal.MemberOf = ap.userMGR.IsMemberOf(token, principal)
 	}
 	return principals, nil
 }

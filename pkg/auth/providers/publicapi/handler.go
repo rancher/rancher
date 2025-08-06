@@ -16,7 +16,7 @@ type ServerOption func(server *normanapi.Server)
 
 func NewHandler(ctx context.Context, mgmtCtx *config.ScaledContext, opts ...ServerOption) (http.Handler, error) {
 	schemas := types.NewSchemas().AddSchemas(publicSchema.PublicSchemas)
-	if err := authProviderSchemas(ctx, mgmtCtx, schemas); err != nil {
+	if err := authProviderSchemas(mgmtCtx, schemas); err != nil {
 		return nil, err
 	}
 
@@ -52,10 +52,10 @@ var authProviderTypes = []string{
 	v3public.CognitoProviderType,
 }
 
-func authProviderSchemas(ctx context.Context, management *config.ScaledContext, schemas *types.Schemas) error {
+func authProviderSchemas(management *config.ScaledContext, schemas *types.Schemas) error {
 	schema := schemas.Schema(&publicSchema.PublicVersion, v3public.AuthProviderType)
 	setAuthProvidersStore(schema, management)
-	lh := newLoginHandler(ctx, management)
+	lh := newLoginHandler(management)
 
 	for _, apSubtype := range authProviderTypes {
 		subSchema := schemas.Schema(&publicSchema.PublicVersion, apSubtype)

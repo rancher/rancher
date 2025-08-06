@@ -47,7 +47,7 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 		clusterImport  = clusterregistrationtokens.ClusterImport{Clusters: scaledContext.Management.Clusters("")}
 	)
 
-	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext, norman.ConfigureAPIUI)
+	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext.Wrangler, norman.ConfigureAPIUI)
 	if err != nil {
 		return nil, err
 	}

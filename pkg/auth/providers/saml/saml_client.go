@@ -29,7 +29,6 @@ import (
 	dsig "github.com/russellhaering/goxmldsig"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -362,12 +361,13 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	redirectURL := s.clientState.GetState(r, "Rancher_FinalRedirectURL")
 	rancherAction := s.clientState.GetState(r, "Rancher_Action")
 
-	if rancherAction == loginAction {
+	switch rancherAction {
+	case loginAction:
 		if !strings.Contains(redirectURL, dashboardAuthPath) {
 			redirectURL += dashboardAuthPath
 		}
 		redirectURL += loginPath
-	} else if rancherAction == testAndEnableAction {
+	case testAndEnableAction:
 		var err error
 		userID, err = s.getUserIdFromRelayStateCookie(r)
 		if err != nil {
@@ -377,6 +377,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		}
 		// the first query param is config=saml_provider_name set by UI
 		redirectURL += "&"
+	default:
 	}
 	if relayState := r.Form.Get("RelayState"); relayState != "" {
 		// delete the cookie
@@ -485,7 +486,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	loginTime := time.Now()
 	userExtraInfo := s.GetUserExtraAttributes(userPrincipal)
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return s.tokenMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo, loginTime)
+		return s.userMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo, loginTime)
 	}); err != nil {
 		log.Errorf("SAML: Failed creating or updating userAttribute with error: %v", err)
 		http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
@@ -509,7 +510,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 			responseType := s.clientState.GetState(r, "Rancher_ResponseType")
 			publicKey := s.clientState.GetState(r, "Rancher_PublicKey")
 
-			token, tokenValue, err := tokens.GetKubeConfigToken(user.Name, responseType, s.userMGR, userPrincipal)
+			token, tokenValue, err := tokens.GetKubeConfigToken(user.Name, responseType, s.tokenMGR, userPrincipal)
 			if err != nil {
 				log.Errorf("SAML: getToken error %v", err)
 				http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
@@ -545,7 +546,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 			samlToken := &v3.SamlToken{
 				Token:     encoded,
 				ExpiresAt: token.ExpiresAt,
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      requestID,
 					Namespace: namespace.GlobalNamespace,
 				},

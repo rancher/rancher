@@ -123,7 +123,7 @@ func (k *keyCloakOIDCProvider) toPrincipal(principalType string, acct account, t
 		princ.PrincipalType = GroupType
 		princ.ObjectMeta = metav1.ObjectMeta{Name: k.GetName() + "_" + principalType + "://" + acct.Name}
 		if token != nil {
-			princ.MemberOf = k.TokenMgr.IsMemberOf(token, princ)
+			princ.MemberOf = k.UserMGR.IsMemberOf(token, princ)
 		}
 	}
 	return princ

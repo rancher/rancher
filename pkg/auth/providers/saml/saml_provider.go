@@ -153,7 +153,7 @@ func (s *Provider) LogoutAll(apiContext *types.APIContext, token accessor.TokenA
 	}
 
 	userName := provider.userMGR.GetUser(apiContext)
-	userAttributes, _, err := provider.tokenMGR.EnsureAndGetUserAttribute(userName)
+	userAttributes, _, err := provider.userMGR.EnsureAndGetUserAttribute(userName)
 	if err != nil {
 		return err
 	}
@@ -335,7 +335,7 @@ func (s *Provider) toPrincipal(principalType string, princ v3.Principal, token a
 	} else {
 		princ.PrincipalType = common.GroupPrincipalType
 		if token != nil {
-			princ.MemberOf = s.tokenMGR.IsMemberOf(token, princ)
+			princ.MemberOf = s.userMGR.IsMemberOf(token, princ)
 		}
 	}
 

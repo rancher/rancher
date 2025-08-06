@@ -147,7 +147,7 @@ func (p *adProvider) SearchPrincipals(searchKey, principalType string, myToken a
 					principal.Me = true
 				}
 			} else if principal.PrincipalType == "group" {
-				principal.MemberOf = p.tokenMGR.IsMemberOf(myToken, principal)
+				principal.MemberOf = p.userMGR.IsMemberOf(myToken, principal)
 			}
 		}
 	}

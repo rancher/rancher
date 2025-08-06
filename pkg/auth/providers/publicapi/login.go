@@ -40,13 +40,13 @@ const (
 	CookieName = "R_SESS"
 )
 
-func newLoginHandler(ctx context.Context, mgmt *config.ScaledContext) *loginHandler {
-	tokenManager := tokens.NewManager(ctx, mgmt)
+func newLoginHandler(mgmt *config.ScaledContext) *loginHandler {
+	tokenManager := tokens.NewManager(mgmt.Wrangler)
 	return &loginHandler{
 		scaledContext:         mgmt,
-		kubeconfigTokenGetter: mgmt.UserManager,
+		kubeconfigTokenGetter: tokenManager,
 		ensureUser:            mgmt.UserManager.EnsureUser,
-		ensureUserAttribute:   tokenManager.UserAttributeCreateOrUpdate,
+		ensureUserAttribute:   mgmt.UserManager.UserAttributeCreateOrUpdate,
 		newLoginToken:         tokenManager.NewLoginToken,
 	}
 }

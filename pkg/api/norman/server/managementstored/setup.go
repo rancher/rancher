@@ -163,6 +163,7 @@ func Clusters(ctx context.Context, schemas *types.Schemas, managementContext *co
 	handler := ccluster.ActionHandler{
 		NodeLister:     managementContext.Management.Nodes("").Controller().Lister(),
 		UserMgr:        managementContext.UserManager,
+		TokenMgr:       tokens.NewManager(managementContext.Wrangler),
 		ClusterManager: clusterManager,
 		Auth:           requests.NewAuthenticator(ctx, clusterrouter.GetClusterID, managementContext),
 	}
@@ -188,7 +189,7 @@ func ClusterRegistrationTokens(schemas *types.Schemas, management *config.Scaled
 
 func Tokens(ctx context.Context, schemas *types.Schemas, mgmt *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.TokenType)
-	manager := tokens.NewManager(ctx, mgmt)
+	manager := tokens.NewManager(mgmt.Wrangler)
 
 	schema.Store = &transform.Store{
 		Store:             schema.Store,
