@@ -444,13 +444,13 @@ func (r *Rancher) Start(ctx context.Context) error {
 
 	if !features.MCMAgent.Enabled() && features.RancherSCCRegistrationExtension.Enabled() {
 		r.Wrangler.OnLeader(func(ctx context.Context) error {
+			// TODO: pull this out of here if/when other features depend on the SecretRequest controllers
 			if err := telemetrycontrollers.RegisterControllers(ctx, r.Wrangler, r.telemetryManager); err != nil {
 				return err
 			}
 			logrus.Debug("[rancher::Start] starting RancherSCCRegistrationExtension")
 
-			//TODO(dan) : reconcile scc-deployment here instead
-			return scc.Setup(ctx, r.Wrangler)
+			return scc.StartDeployer(ctx, r.Wrangler)
 		})
 	}
 
