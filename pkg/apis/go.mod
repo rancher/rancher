@@ -39,10 +39,10 @@ replace (
 )
 
 require (
-	github.com/rancher/aks-operator v1.11.4
-	github.com/rancher/eks-operator v1.11.4
+	github.com/rancher/aks-operator v1.11.5-rc.1
+	github.com/rancher/eks-operator v1.11.5-rc.1
 	github.com/rancher/fleet/pkg/apis v0.12.3
-	github.com/rancher/gke-operator v1.11.4
+	github.com/rancher/gke-operator v1.11.5-rc.1
 	github.com/rancher/norman v0.5.2
 	github.com/rancher/rke v1.8.5
 	github.com/rancher/wrangler/v3 v3.2.1
@@ -97,7 +97,7 @@ require (
 	golang.org/x/term v0.33.0 // indirect
 	golang.org/x/text v0.27.0 // indirect
 	golang.org/x/time v0.10.0 // indirect
-	google.golang.org/protobuf v1.36.5 // indirect
+	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
@@ -111,5 +111,5 @@ require (
 	k8s.io/utils v0.0.0-20250502105355-0f33e8f1c979 // indirect
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.3 // indirect
-	sigs.k8s.io/yaml v1.5.0 // indirect
+	sigs.k8s.io/yaml v1.6.0 // indirect
 )
