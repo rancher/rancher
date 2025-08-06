@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"github.com/rancher/rancher/pkg/scc/controllers"
 	"github.com/rancher/rancher/pkg/scc/deployer"
+	"github.com/rancher/rancher/pkg/scc/deployer/params"
 	"github.com/rancher/rancher/pkg/scc/util/log"
 	"github.com/rancher/rancher/pkg/wrangler"
 )
 
-// Start sets up the SCCDeployer and registers the related scoped controllers
-func Start(ctx context.Context, wContext *wrangler.Context) error {
+// StartDeployer sets up the SCCDeployer and registers the related scoped controllers
+func StartDeployer(ctx context.Context, wContext *wrangler.Context) error {
 	operatorLogger := log.NewLog()
 	operatorLogger.Debug("Preparing to deploy scc-operator")
 
@@ -19,19 +20,28 @@ func Start(ctx context.Context, wContext *wrangler.Context) error {
 		return fmt.Errorf("error creating scc deployer: %v", err)
 	}
 
-	if err = sccDeployer.EnsureDependenciesConfigured(ctx); err != nil {
+	initialParams, err := params.ExtractSccOperatorParams()
+	if err != nil {
+		operatorLogger.Errorf("Failed to extract SCC operator params: %v", err)
+		return err
+	}
+	operatorLogger.Debugf("SCC operator params: %v", initialParams)
+
+	if err = sccDeployer.EnsureDependenciesConfigured(ctx, initialParams); err != nil {
 		return fmt.Errorf("cannot start scc-operator deployer, failed to ensure dependencies: %w", err)
 	}
 
-	controllers.RegisterDeployers(
+	// TODO: maybe namespace controller scoped for the SCC namespace - or webhook?
+
+	controllers.RegisterDeployer(
 		ctx,
 		operatorLogger,
-		*sccDeployer,
+		sccDeployer,
 		wContext.Apps.Deployment(),
-		wContext.Apps.Deployment().Cache(),
 		wContext.Mgmt.Setting(),
 	)
 
-	// Initial deployment
-	return sccDeployer.EnsureSCCOperatorDeployment(ctx)
+	// Handle initial deployment or initial update on leader start
+	// TODO: maybe this should be a go routine
+	return sccDeployer.EnsureSCCOperatorDeployed(ctx, initialParams)
 }
