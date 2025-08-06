@@ -27,7 +27,16 @@ func NewDeployer(log log.StructuredLogger, clusterRoleBindings rbacControllers.C
 	}
 }
 
-func (d Deployer) Ensure(_ context.Context, labels map[string]string) error {
+func (d *Deployer) HasResource() (bool, error) {
+	existing, err := d.clusterRoleBindings.Get(consts.ClusterRoleBindingName, metav1.GetOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		return false, fmt.Errorf("error getting existing cluster role binding: %v", err)
+	}
+
+	return existing != nil, nil
+}
+
+func (d *Deployer) Ensure(_ context.Context, labels map[string]string) error {
 	_, err := d.clusterRoleBindings.Get(consts.ClusterRoleBindingName, metav1.GetOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		return fmt.Errorf("error checking for cluster role binding %s: %w", consts.ClusterRoleBindingName, err)

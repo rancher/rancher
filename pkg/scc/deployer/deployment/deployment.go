@@ -29,6 +29,15 @@ func NewDeployer(log log.StructuredLogger, deployment appsControllers.Deployment
 	}
 }
 
+func (d *Deployer) HasResource() (bool, error) {
+	existing, err := d.deployments.Get(consts.DefaultSCCNamespace, consts.DeploymentName, metav1.GetOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		return false, fmt.Errorf("error getting existing deployment: %v", err)
+	}
+
+	return existing != nil, nil
+}
+
 func (d *Deployer) Ensure(ctx context.Context, _ map[string]string) error {
 	// check if deployment exists
 	existingHash := fetchCurrentDeploymentHash(d.deployments)
