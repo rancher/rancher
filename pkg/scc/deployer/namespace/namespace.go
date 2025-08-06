@@ -30,6 +30,15 @@ func NewDeployer(log log.StructuredLogger, namespaces v1core.NamespaceController
 	}
 }
 
+func (d *Deployer) HasResource() (bool, error) {
+	existing, err := d.namespaces.Get(consts.DefaultSCCNamespace, metav1.GetOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		return false, fmt.Errorf("error getting existing SCC namespace: %v", err)
+	}
+
+	return existing != nil, nil
+}
+
 // Ensure ensures that the SCC namespace exists and is not marked for deletion
 func (d *Deployer) Ensure(ctx context.Context, labels map[string]string) error {
 	// Check if namespace exists

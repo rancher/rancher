@@ -33,6 +33,15 @@ func NewDeployer(
 	}
 }
 
+func (d *Deployer) HasResource() (bool, error) {
+	existing, err := d.serviceAccounts.Get(consts.DefaultSCCNamespace, consts.ServiceAccountName, metav1.GetOptions{})
+	if err != nil && !errors.IsNotFound(err) {
+		return false, fmt.Errorf("error getting existing service account: %v", err)
+	}
+
+	return existing != nil, nil
+}
+
 // Ensure ensures that the service account exists and is configured correctly
 func (d *Deployer) Ensure(ctx context.Context, labels map[string]string) error {
 	saName := consts.ServiceAccountName
