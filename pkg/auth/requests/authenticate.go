@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/providers"
@@ -87,7 +88,7 @@ func NewAuthenticator(ctx context.Context, clusterRouter ClusterRouter, mgmtCtx 
 	tokenInformer := mgmtCtx.Management.Tokens("").Controller().Informer()
 	// Deliberately ignore the error if the indexer was already added.
 	_ = tokenInformer.AddIndexers(map[string]cache.IndexFunc{tokenKeyIndex: tokenKeyIndexer})
-	providerRefresher := providerrefresh.NewUserAuthRefresher(ctx, mgmtCtx)
+	providerRefresher := providerrefresh.NewUserAuthRefresher(mgmtCtx)
 
 	extTokenStore := exttokenstore.NewSystemFromWrangler(mgmtCtx.Wrangler)
 
@@ -108,7 +109,7 @@ func NewAuthenticator(ctx context.Context, clusterRouter ClusterRouter, mgmtCtx 
 }
 
 func tokenKeyIndexer(obj interface{}) ([]string, error) {
-	token, ok := obj.(*v3.Token)
+	token, ok := obj.(*apiv3.Token)
 	if !ok {
 		return []string{}, nil
 	}
@@ -219,7 +220,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 
 	if err := func() error {
 		switch token.(type) {
-		case *v3.Token:
+		case *apiv3.Token:
 			patch, err := json.Marshal([]struct {
 				Op    string `json:"op"`
 				Path  string `json:"path"`
@@ -249,7 +250,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	return authResp, nil
 }
 
-func getUserExtraInfo(token accessor.TokenAccessor, user *v3.User, attribs *v3.UserAttribute) map[string][]string {
+func getUserExtraInfo(token accessor.TokenAccessor, user *apiv3.User, attribs *apiv3.UserAttribute) map[string][]string {
 	extraInfo := make(map[string][]string)
 
 	ap := token.GetAuthProvider()
@@ -330,7 +331,7 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 		lookupUsingClient = true
 	}
 
-	var storedToken *v3.Token
+	var storedToken *apiv3.Token
 	if lookupUsingClient {
 		storedToken, err = a.tokenClient.Get(tokenName, metav1.GetOptions{})
 		if err != nil {

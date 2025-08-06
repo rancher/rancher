@@ -537,6 +537,12 @@ func TestRefreshAttributes(t *testing.T) {
 				tt.eTokenSetup(secrets, scache)
 			}
 
+			tokenClient := fake.NewMockNonNamespacedClientInterface[*v3.Token, *v3.TokenList](ctrl)
+			tokenClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(token *v3.Token) (*v3.Token, error) {
+				tokenUpdateCalled = true
+				return token.DeepCopy(), nil
+			}).AnyTimes()
+
 			r := &refresher{
 				tokenLister: &fakes.TokenListerMock{
 					ListFunc: func(_ string, _ labels.Selector) ([]*v3.Token, error) {
@@ -554,12 +560,7 @@ func TestRefreshAttributes(t *testing.T) {
 						return nil
 					},
 				},
-				tokenMGR: tokens.NewMockedManager(&fakes.TokenInterfaceMock{
-					UpdateFunc: func(_ *v3.Token) (*v3.Token, error) {
-						tokenUpdateCalled = true
-						return nil, nil
-					},
-				}),
+				tokenMGR: tokens.NewMockedManager(tokenClient),
 				extTokenStore: exttokens.NewSystem(nil, nil, secrets, users, nil, nil,
 					exttokens.NewTimeHandler(),
 					exttokens.NewHashHandler(),

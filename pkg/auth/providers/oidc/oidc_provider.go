@@ -9,7 +9,6 @@ import (
 	"reflect"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/golang-jwt/jwt/v5"
@@ -40,9 +39,7 @@ const (
 )
 
 type tokenManager interface {
-	IsMemberOf(token accessor.TokenAccessor, group v3.Principal) bool
 	UpdateSecret(userID, provider, secret string) error
-	UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, userExtraInfo map[string][]string, loginTime ...time.Time) error
 	CreateTokenAndSetCookie(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error
 	GetSecret(userID string, provider string, fallbackTokens []accessor.TokenAccessor) (string, error)
 }
@@ -296,7 +293,7 @@ func (o *OpenIDCProvider) toPrincipalFromToken(principalType string, princ v3.Pr
 	} else {
 		princ.PrincipalType = GroupType
 		if token != nil {
-			princ.MemberOf = o.TokenMgr.IsMemberOf(token, princ)
+			princ.MemberOf = o.UserMGR.IsMemberOf(token, princ)
 		}
 	}
 	return princ

@@ -125,7 +125,7 @@ func (o *OpenIDCProvider) TestAndApply(request *types.APIContext) error {
 
 	userExtraInfo := o.GetUserExtraAttributes(userPrincipal)
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return o.TokenMgr.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
+		return o.UserMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
 	}); err != nil {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("[generic oidc]: Failed to create or update userAttribute: %v", err))
 	}

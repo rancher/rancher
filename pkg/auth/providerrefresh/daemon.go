@@ -1,7 +1,6 @@
 package providerrefresh
 
 import (
-	"context"
 	"fmt"
 	"time"
 
@@ -20,7 +19,7 @@ var (
 	c   = cron.New()
 )
 
-func StartRefreshDaemon(ctx context.Context, scaledContext *config.ScaledContext, mgmtContext *config.ManagementContext) {
+func StartRefreshDaemon(scaledContext *config.ScaledContext, mgmtContext *config.ManagementContext) {
 	extTokenStore := exttokenstore.NewSystemFromWrangler(scaledContext.Wrangler)
 	refreshCronTime := settings.AuthUserInfoResyncCron.Get()
 	maxAge := settings.AuthUserInfoMaxAgeSeconds.Get()
@@ -28,7 +27,7 @@ func StartRefreshDaemon(ctx context.Context, scaledContext *config.ScaledContext
 		tokenLister:         mgmtContext.Management.Tokens("").Controller().Lister(),
 		tokens:              mgmtContext.Management.Tokens(""),
 		userLister:          mgmtContext.Management.Users("").Controller().Lister(),
-		tokenMGR:            tokens.NewManager(ctx, scaledContext),
+		tokenMGR:            tokens.NewManager(scaledContext.Wrangler),
 		userAttributes:      mgmtContext.Management.UserAttributes(""),
 		userAttributeLister: mgmtContext.Management.UserAttributes("").Controller().Lister(),
 		extTokenStore:       extTokenStore,

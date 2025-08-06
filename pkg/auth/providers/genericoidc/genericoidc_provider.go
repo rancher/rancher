@@ -172,7 +172,7 @@ func (g *GenOIDCProvider) toPrincipalFromToken(principalType string, princ v3.Pr
 	} else {
 		princ.PrincipalType = GroupType
 		if token != nil {
-			princ.MemberOf = g.TokenMgr.IsMemberOf(token, princ)
+			princ.MemberOf = g.UserMGR.IsMemberOf(token, princ)
 		}
 	}
 	return princ

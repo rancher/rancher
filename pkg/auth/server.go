@@ -97,7 +97,7 @@ func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext) 
 }
 
 func newPrivateAPI(ctx context.Context, scaledContext *config.ScaledContext) (*mux.Router, error) {
-	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext, norman.ConfigureAPIUI)
+	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext.Wrangler, norman.ConfigureAPIUI)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +135,7 @@ func (s *Server) OnLeader(ctx context.Context) error {
 	}
 
 	tokens.StartPurgeDaemon(ctx, management)
-	providerrefresh.StartRefreshDaemon(ctx, s.scaledContext, management)
+	providerrefresh.StartRefreshDaemon(s.scaledContext, management)
 	logrus.Infof("Steve auth startup complete")
 	return nil
 }
