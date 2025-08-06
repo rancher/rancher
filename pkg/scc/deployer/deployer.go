@@ -3,19 +3,14 @@ package deployer
 import (
 	"context"
 
-	"github.com/rancher/wrangler/v3/pkg/relatedresource"
-	"k8s.io/apimachinery/pkg/runtime"
-
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/scc/consts"
 	"github.com/rancher/rancher/pkg/scc/deployer/clusterrolebinding"
 	"github.com/rancher/rancher/pkg/scc/deployer/deployment"
 	"github.com/rancher/rancher/pkg/scc/deployer/namespace"
 	"github.com/rancher/rancher/pkg/scc/deployer/params"
 	"github.com/rancher/rancher/pkg/scc/deployer/serviceaccount"
 	"github.com/rancher/rancher/pkg/scc/util/log"
-	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
+	appsv1 "k8s.io/api/apps/v1"
 )
 
 // SCCDeployer orchestrates the deployment of SCC operator resources
@@ -42,18 +37,20 @@ func NewSCCDeployer(wContext *wrangler.Context, log log.StructuredLogger) (*SCCD
 	}, nil
 }
 
-// OnRelatedSettings handles changes to related settings
-func (d *SCCDeployer) OnRelatedSettings(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
-	if setting, ok := obj.(*v3.Setting); ok {
-		if setting.Name == settings.SCCOperatorImage.Name {
-			return []relatedresource.Key{{
-				Namespace: consts.DefaultSCCNamespace,
-				Name:      "", // TODO: something to track current deployment name
-			}}, nil
-		}
+func (d *SCCDeployer) HasAllDependencies() (bool, error) {
+	if hasNamespace, err := d.namespaceDeployer.HasResource(); err != nil || !hasNamespace {
+		return false, err
 	}
 
-	return nil, nil
+	if hasServiceAccount, err := d.serviceAccountDeployer.HasResource(); err != nil || !hasServiceAccount {
+		return false, err
+	}
+
+	if hasClusterRB, err := d.clusterRoleBindingDeployer.HasResource(); err != nil || !hasClusterRB {
+		return false, err
+	}
+
+	return true, nil
 }
 
 // EnsureDependenciesConfigured ensures that all dependencies for the SCC operator are configured
@@ -80,4 +77,8 @@ func (d *SCCDeployer) EnsureDependenciesConfigured(ctx context.Context, desiredP
 func (d *SCCDeployer) EnsureSCCOperatorDeployed(ctx context.Context, desiredParams *params.SCCOperatorParams) error {
 	d.deploymentDeployer.SetDesiredParams(desiredParams)
 	return d.deploymentDeployer.Ensure(ctx, desiredParams.Labels(params.TargetDeployment))
+}
+
+func (d *SCCDeployer) ReconcileDeployment(ctx context.Context, desiredParams *params.SCCOperatorParams, incoming *appsv1.Deployment) (*appsv1.Deployment, error) {
+	return d.deploymentDeployer.Reconcile(ctx, desiredParams, incoming)
 }
