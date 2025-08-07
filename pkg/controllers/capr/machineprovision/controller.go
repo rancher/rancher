@@ -570,21 +570,15 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 
 		jobName := infra.data.String("status", "jobName")
 		if jobName == "" {
-			fmt.Println("Failed job no name not found HERE0")
-
 			return obj, nil
 		}
 
 		job, err := h.jobs.Get(infra.meta.GetNamespace(), jobName)
 		if apierrors.IsNotFound(err) {
-			fmt.Println("Failed job not found HERE0")
-
 			return h.dynamic.UpdateStatus(&unstructured.Unstructured{
 				Object: infra.data,
 			})
 		} else if err != nil {
-			fmt.Println("Failed job not found HERE1")
-
 			return obj, err
 		}
 
@@ -593,8 +587,6 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 
 		for _, jobCondition := range job.Status.Conditions {
 			if jobCondition.Type == batchv1.JobFailed && jobCondition.Status == corev1.ConditionTrue {
-				fmt.Println("Failed job found HERE1")
-				fmt.Println(job)
 				failedTime = jobCondition.LastTransitionTime.Time
 			}
 		}
@@ -606,13 +598,14 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 			// If deleteOnFailureAfter is bigger then zero, we will delete as the variable defines in seconds
 		} else if deleteOnFailureAfter > 0 && (currentTime.Sub(failedTime).Seconds() < deleteOnFailureAfter.Seconds()) {
 			logrus.Infof("[machineprovision] %s/%s: Failed to create infrastructure for machine %s, deleting and requeing after %d...", infra.meta.GetNamespace(), infra.meta.GetName(), machine.Name, deleteOnFailureAfter)
-			fmt.Println("Compare done! HERE2")
 			h.EnqueueAfter(infra, deleteOnFailureAfter)
 
 			// If deleteOnFailureAfter if zero, delete immediately
-		} else {
+		} else if deleteOnFailureAfter == 0 {
 			logrus.Infof("[machineprovision] %s/%s: Failed to create infrastructure for machine %s, deleting and recreating...", infra.meta.GetNamespace(), infra.meta.GetName(), machine.Name)
 			err = h.machineClient.Delete(machine.Namespace, machine.Name, &metav1.DeleteOptions{})
+		} else {
+			logrus.Infof("[machineprovision] %s/%s: Failed to create infrastructure for machine %s, not deleting and not requeing", infra.meta.GetNamespace(), infra.meta.GetName(), machine.Name)
 		}
 
 		return obj, err
@@ -691,6 +684,11 @@ func (h *handler) run(infra *infraObject, create bool) (rkev1.RKEMachineStatus, 
 
 	// Check to see if we have a failure reason.
 	failure := infra.data.String("status", "failureReason") == string(failureReasonType)
+
+	if failure && create {
+		return dArgs.RKEMachineStatus, failure, nil
+	}
+
 	ready := false
 
 	cond := getCondition(infra.data, "Ready")
