@@ -31,7 +31,7 @@ type ActionHandler struct {
 	UserMgr        userManager
 	TokenMgr       tokenManager
 	ClusterManager *clustermanager.Manager
-	Auth           requests.Authenticator
+	AuthToken      requests.AuthTokenGetter
 }
 
 // ClusterActionHandler runs the handler for the provided cluster action in the given context.
@@ -80,7 +80,7 @@ func (a ActionHandler) createTokenInput(apiContext *types.APIContext) (user.Toke
 	userName := a.UserMgr.GetUser(apiContext)
 	tokenNamePrefix := fmt.Sprintf("kubeconfig-%s", userName)
 
-	authToken, err := a.Auth.TokenFromRequest(apiContext.Request)
+	authToken, err := a.AuthToken.TokenFromRequest(apiContext.Request)
 	if err != nil {
 		return user.TokenInput{}, err
 	}

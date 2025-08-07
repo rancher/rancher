@@ -35,6 +35,11 @@ const tokenKeyIndex = "authn.management.cattle.io/token-key-index"
 
 var ErrMustAuthenticate = httperror.NewAPIError(httperror.Unauthorized, "must authenticate")
 
+// AuthTokenGetter retrieves a token from the request.
+type AuthTokenGetter interface {
+	TokenFromRequest(req *http.Request) (accessor.TokenAccessor, error)
+}
+
 // Authenticator authenticates a request.
 type Authenticator interface {
 	Authenticate(req *http.Request) (*AuthenticatorResponse, error)

@@ -14,6 +14,7 @@ import (
 	normanv3 "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/steve/pkg/podimpersonation"
 	schema2 "github.com/rancher/steve/pkg/schema"
@@ -24,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-func Register(ctx context.Context, server *steve.Server, wrangler *wrangler.Context) error {
+func Register(ctx context.Context, server *steve.Server, wrangler *wrangler.Context, userManager user.Manager) error {
 	log := &log{
 		cg: server.ClientFactory,
 	}
@@ -40,10 +41,11 @@ func Register(ctx context.Context, server *steve.Server, wrangler *wrangler.Cont
 	}
 
 	sc.Wrangler = wrangler
+	sc.UserManager = userManager
 
 	kubeconfig := kubeconfigDownload{
-		tokenMgr: tokens.NewManager(sc.Wrangler),
-		auth:     requests.NewAuthenticator(ctx, clusterrouter.GetClusterID, sc),
+		tokenMgr:  tokens.NewManager(sc.Wrangler),
+		authToken: requests.NewAuthenticator(ctx, clusterrouter.GetClusterID, sc),
 	}
 
 	server.ClusterCache.OnAdd(ctx, shell.impersonator.PurgeOldRoles)

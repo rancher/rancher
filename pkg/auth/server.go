@@ -15,7 +15,6 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	"github.com/rancher/rancher/pkg/clusterrouter"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/utils"
@@ -51,7 +50,7 @@ func NewHeaderAuth() (*Server, error) {
 }
 
 func NewServer(ctx context.Context, wContext *wrangler.Context, scaledContext *config.ScaledContext, authenticator requests.Authenticator) (*Server, error) {
-	authManagement, err := newAPIManagement(ctx, scaledContext)
+	authManagement, err := newAPIManagement(ctx, scaledContext, authenticator)
 	if err != nil {
 		return nil, err
 	}
@@ -63,8 +62,8 @@ func NewServer(ctx context.Context, wContext *wrangler.Context, scaledContext *c
 	}, nil
 }
 
-func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext) (steveauth.Middleware, error) {
-	privateAPI, err := newPrivateAPI(ctx, scaledContext)
+func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext, authToken requests.AuthTokenGetter) (steveauth.Middleware, error) {
+	privateAPI, err := newPrivateAPI(ctx, scaledContext, authToken)
 	if err != nil {
 		return nil, err
 	}
@@ -96,13 +95,13 @@ func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext) 
 	}, nil
 }
 
-func newPrivateAPI(ctx context.Context, scaledContext *config.ScaledContext) (*mux.Router, error) {
+func newPrivateAPI(ctx context.Context, scaledContext *config.ScaledContext, authToken requests.AuthTokenGetter) (*mux.Router, error) {
 	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext.Wrangler, norman.ConfigureAPIUI)
 	if err != nil {
 		return nil, err
 	}
 
-	otherAPIs, err := api.NewNormanServer(ctx, clusterrouter.GetClusterID, scaledContext)
+	otherAPIs, err := api.NewNormanServer(ctx, scaledContext, authToken)
 	if err != nil {
 		return nil, err
 	}
