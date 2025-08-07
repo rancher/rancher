@@ -607,6 +607,24 @@ func TestVerifyPassword(t *testing.T) {
 				return fake.NewMockClientInterface[*v1.Secret, *v1.SecretList](ctlr)
 			},
 		},
+		"can't use legacy password if password is empty": {
+			user: &v3.User{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fakeUserID,
+				},
+			},
+			password: "",
+			mockSecretCache: func() *fake.MockCacheInterface[*v1.Secret] {
+				mock := fake.NewMockCacheInterface[*v1.Secret](ctlr)
+				mock.EXPECT().Get(LocalUserPasswordsNamespace, fakeUserID).Return(nil, apierrors.NewNotFound(schema.GroupResource{}, ""))
+
+				return mock
+			},
+			mockSecretClient: func() *fake.MockClientInterface[*v1.Secret, *v1.SecretList] {
+				return fake.NewMockClientInterface[*v1.Secret, *v1.SecretList](ctlr)
+			},
+			expectErrorMessage: "failed to get password",
+		},
 		"valid bcrypt password is migrated": {
 			user: &v3.User{
 				ObjectMeta: metav1.ObjectMeta{
