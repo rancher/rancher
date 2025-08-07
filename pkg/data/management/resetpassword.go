@@ -15,6 +15,7 @@ import (
 	"github.com/urfave/cli"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -67,20 +68,31 @@ func resetPassword() {
 
 		admin := admins.Items[0]
 		pass := generatePassword(length)
-		admin.MustChangePassword = false
-		_, err = client.Users("").Update(&admin)
-
-		wranglerContext, err := wrangler.NewContext(context.TODO(), nil, conf)
+		wranglerContext, err := wrangler.NewContext(context.Background(), nil, conf)
 		if err != nil {
-			return err
+			return fmt.Errorf("couldn't create wrangler context %w", err)
 		}
-
+		err = wranglerContext.ControllerFactory.SharedCacheFactory().StartGVK(context.Background(), schema.GroupVersionKind{
+			Group:   "",
+			Version: "v1",
+			Kind:    "Secret",
+		})
+		wranglerContext.ControllerFactory.SharedCacheFactory().WaitForCacheSync(context.Background())
+		if err != nil {
+			return fmt.Errorf("couldn't start wrangler cache for secrets %w", err)
+		}
 		pwdCreator := pbkdf2.New(wranglerContext.Core.Secret().Cache(), wranglerContext.Core.Secret())
-		if err := pwdCreator.CreatePassword(&admin, string(pass)); err != nil {
-			return errors.Errorf("couldn't create password %v", err)
+		if err := pwdCreator.UpdatePassword(admin.Name, string(pass)); err != nil {
+			return fmt.Errorf("couldn't update password %w", err)
+		}
+		fmt.Fprintf(os.Stdout, "New password for default admin user (%v):\n%s\n", admin.Name, pass)
+
+		admin.MustChangePassword = true
+		_, err = wranglerContext.Mgmt.User().Update(&admin)
+		if err != nil {
+			return fmt.Errorf("couldn't update user must change password %w", err)
 		}
 
-		fmt.Fprintf(os.Stdout, "New password for default admin user (%v):\n%s\n", admin.Name, pass)
 		return err
 	}
 

@@ -146,6 +146,9 @@ func (p *Pbkdf2) VerifyPassword(user *v3.User, password string) error {
 		return fmt.Errorf("failed to get password secret: %w", err)
 	}
 	if apierrors.IsNotFound(err) {
+		if user.Password == "" {
+			return fmt.Errorf("failed to get password")
+		}
 		// This will only be reached if migration failed. This code will be removed in 2.14
 		logrus.Warn("Using old password field. Check if User migration failed!")
 		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
