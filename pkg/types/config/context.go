@@ -33,6 +33,7 @@ import (
 	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	storagev1 "github.com/rancher/rancher/pkg/generated/norman/storage.k8s.io/v1"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/peermanager"
 	clusterSchema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
 	managementSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
@@ -50,11 +51,16 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8dynamic "k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+)
+
+const (
+	stvAggregationSecretName = "stv-aggregation"
 )
 
 var (
@@ -411,7 +417,18 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 		KindNamespace: context.KindNamespaces,
 	})
 
-	controllerFactory := controller.NewSharedControllerFactory(cacheFactory, controllers.GetOptsFromEnv(controllers.User))
+	factoryOpts := controllers.GetOptsFromEnv(controllers.User)
+
+	// Secrets: only keep a cache for the single Secret that is needed by Steve aggregation
+	factoryOpts.CacheOptions = &cache.SharedCacheFactoryOptions{
+		KindTweakList: map[schema.GroupVersionKind]cache.TweakListOptionsFunc{
+			corev1.SchemeGroupVersion.WithKind("Secret"): func(opts *metav1.ListOptions) {
+				opts.FieldSelector = fmt.Sprintf("metadata.namespace=%s,metadata.name=%s", namespace.System, stvAggregationSecretName)
+			},
+		},
+	}
+
+	controllerFactory := controller.NewSharedControllerFactory(cacheFactory, factoryOpts)
 	context.ControllerFactory = controllerFactory
 
 	context.K8sClient, err = kubernetes.NewForConfig(&config)
