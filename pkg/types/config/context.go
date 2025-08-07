@@ -233,6 +233,9 @@ type UserContext struct {
 	K3s k3s.Interface
 
 	KindNamespaces map[schema.GroupVersionKind]string
+
+	caValidatorControllerFactory controller.SharedControllerFactory
+	CAValidatorSecret            wcorev1.SecretController
 }
 
 // WithAgent returns a shallow copy of the Context that has been configured to use a user agent in its
@@ -316,6 +319,9 @@ func (w *UserContext) UserOnlyContext() *UserOnlyContext {
 		BatchV1:     w.BatchV1,
 		Cluster:     w.Cluster,
 		Storage:     w.Storage,
+
+		caValidatorControllerFactory: w.caValidatorControllerFactory,
+		CAValidatorSecret:            w.CAValidatorSecret,
 	}
 }
 
@@ -338,6 +344,9 @@ type UserOnlyContext struct {
 	Networking      knetworkingv1.Interface
 	Cluster         clusterv3.Interface
 	Storage         storagev1.Interface
+
+	caValidatorControllerFactory controller.SharedControllerFactory
+	CAValidatorSecret            wcorev1.SecretController
 }
 
 func newManagementContext(c *ScaledContext) (*ManagementContext, error) {
@@ -419,15 +428,6 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 
 	factoryOpts := controllers.GetOptsFromEnv(controllers.User)
 
-	// Secrets: only keep a cache for the single Secret that is needed by Steve aggregation
-	factoryOpts.CacheOptions = &cache.SharedCacheFactoryOptions{
-		KindTweakList: map[schema.GroupVersionKind]cache.TweakListOptionsFunc{
-			corev1.SchemeGroupVersion.WithKind("Secret"): func(opts *metav1.ListOptions) {
-				opts.FieldSelector = fmt.Sprintf("metadata.namespace=%s,metadata.name=%s", namespace.System, stvAggregationSecretName)
-			},
-		},
-	}
-
 	controllerFactory := controller.NewSharedControllerFactory(cacheFactory, factoryOpts)
 	context.ControllerFactory = controllerFactory
 
@@ -485,6 +485,19 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 		return nil, err
 	}
 
+	// We want to avoid keeping in the cache all Secrets so we use a separate controller
+	// factory that only watches a single Secret
+	caValidatorControllerFactory := newCAValidatorControllerFactory(clientFactory)
+	context.caValidatorControllerFactory = caValidatorControllerFactory
+	caValidatorOpts := &generic.FactoryOptions{
+		SharedControllerFactory: caValidatorControllerFactory,
+	}
+	caValidatorCorew, err := core.NewFactoryFromConfigWithOptions(&context.RESTConfig, caValidatorOpts)
+	if err != nil {
+		return nil, err
+	}
+	context.CAValidatorSecret = caValidatorCorew.Core().V1().Secret()
+
 	return context, err
 }
 
@@ -494,7 +507,10 @@ func (w *UserContext) Start(ctx context.Context) error {
 		return err
 	}
 	ctx = metrics.WithContextID(ctx, fmt.Sprintf("usercontext_%s", w.ClusterName))
-	return w.ControllerFactory.Start(ctx, 5)
+	if err := w.ControllerFactory.Start(ctx, 5); err != nil {
+		return err
+	}
+	return w.caValidatorControllerFactory.Start(ctx, 1)
 }
 
 func NewUserOnlyContext(config *wrangler.Context) (*UserOnlyContext, error) {
@@ -532,6 +548,23 @@ func NewUserOnlyContext(config *wrangler.Context) (*UserOnlyContext, error) {
 		AddSchemas(clusterSchema.Schemas).
 		AddSchemas(projectSchema.Schemas)
 
+	clientFactory, err := client.NewSharedClientFactory(enableProtobuf(&context.RESTConfig), &client.SharedClientFactoryOptions{
+		Scheme: wrangler.Scheme,
+	})
+	if err != nil {
+		return nil, err
+	}
+	caValidatorControllerFactory := newCAValidatorControllerFactory(clientFactory)
+	context.caValidatorControllerFactory = caValidatorControllerFactory
+	caValidatorOpts := &generic.FactoryOptions{
+		SharedControllerFactory: caValidatorControllerFactory,
+	}
+	caValidatorCorew, err := core.NewFactoryFromConfigWithOptions(&context.RESTConfig, caValidatorOpts)
+	if err != nil {
+		return nil, err
+	}
+	context.CAValidatorSecret = caValidatorCorew.Core().V1().Secret()
+
 	return context, err
 }
 
@@ -539,4 +572,18 @@ func (w *UserOnlyContext) Start(ctx context.Context) error {
 	logrus.Info("Starting workload controllers")
 	ctx = metrics.WithContextID(ctx, fmt.Sprintf("useronlycontext_%s", w.ClusterName))
 	return w.ControllerFactory.Start(ctx, 5)
+}
+
+func newCAValidatorControllerFactory(clientFactory client.SharedClientFactory) controller.SharedControllerFactory {
+	caValidatorCacheFactory := cache.NewSharedCachedFactory(clientFactory, &cache.SharedCacheFactoryOptions{
+		KindTweakList: map[schema.GroupVersionKind]cache.TweakListOptionsFunc{
+			corev1.SchemeGroupVersion.WithKind("Secret"): func(opts *metav1.ListOptions) {
+				opts.FieldSelector = fmt.Sprintf("metadata.namespace=%s,metadata.name=%s", namespace.System, stvAggregationSecretName)
+			},
+		},
+	})
+
+	caValidatorFactoryOpts := controllers.GetOptsFromEnv(controllers.User)
+	caValidatorControllerFactory := controller.NewSharedControllerFactory(caValidatorCacheFactory, caValidatorFactoryOpts)
+	return caValidatorControllerFactory
 }

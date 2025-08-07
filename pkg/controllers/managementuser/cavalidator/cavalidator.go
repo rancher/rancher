@@ -33,15 +33,15 @@ func Register(ctx context.Context, downstream *config.UserContext) {
 		clusters:     downstream.Management.Wrangler.Mgmt.Cluster(),
 	}
 
-	downstream.Corew.Secret().OnChange(ctx, "cavalidator-secret", c.onStvAggregationSecret)
+	downstream.CAValidatorSecret.OnChange(ctx, "cavalidator-secret", c.onStvAggregationSecret)
 }
 
-func (c *CertificateAuthorityValidator) onStvAggregationSecret(_ string, obj *corev1.Secret) (*corev1.Secret, error) {
+func (c *CertificateAuthorityValidator) onStvAggregationSecret(key string, obj *corev1.Secret) (*corev1.Secret, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
 
-	return nil, retry.RetryOnConflict(retry.DefaultRetry, func() error {
+	return obj, retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		mgmtCluster, err := c.clusterCache.Get(c.clusterName)
 		if err != nil {
 			return err
@@ -65,7 +65,7 @@ func (c *CertificateAuthorityValidator) onStvAggregationSecret(_ string, obj *co
 			CertificateAuthorityValid.Unknown(mgmtCluster)
 		}
 
-		_, err = c.clusters.UpdateStatus(mgmtCluster)
+		_, err = c.clusters.Update(mgmtCluster)
 		return err
 	})
 }
