@@ -618,7 +618,7 @@ func Test_Store_Get(t *testing.T) {
 			},
 		}
 
-		auth.EXPECT().SessionID(gomock.Any()).Return("bogus")
+		auth.EXPECT().SessionID(gomock.Any()).Return("bogus", nil)
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(&mockUser{name: properUser}, false, true, nil)
 		users.EXPECT().Cache().Return(nil)
