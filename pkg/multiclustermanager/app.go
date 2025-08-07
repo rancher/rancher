@@ -2,6 +2,7 @@ package multiclustermanager
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"sync"
@@ -79,7 +80,7 @@ func BuildScaledContext(ctx context.Context, wranglerContext *wrangler.Context, 
 
 	userManager, err := common.NewUserManager(wranglerContext)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("mcm: error creating user manager: %w", err)
 	}
 
 	scaledContext.UserManager = userManager

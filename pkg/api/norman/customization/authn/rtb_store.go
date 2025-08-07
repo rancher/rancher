@@ -11,13 +11,12 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
-	"github.com/rancher/rancher/pkg/clusterrouter"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 )
 
-func SetRTBStore(ctx context.Context, schema *types.Schema, mgmt *config.ScaledContext) {
+func SetRTBStore(ctx context.Context, schema *types.Schema, mgmt *config.ScaledContext, authToken requests.AuthTokenGetter) {
 	providers.Configure(ctx, mgmt)
 	userLister := mgmt.Management.Users("").Controller().Lister()
 
@@ -47,8 +46,8 @@ func SetRTBStore(ctx context.Context, schema *types.Schema, mgmt *config.ScaledC
 	}
 
 	s := &Store{
-		Store: t,
-		auth:  requests.NewAuthenticator(ctx, clusterrouter.GetClusterID, mgmt),
+		Store:     t,
+		authToken: authToken,
 	}
 
 	schema.Store = s
@@ -56,12 +55,12 @@ func SetRTBStore(ctx context.Context, schema *types.Schema, mgmt *config.ScaledC
 
 type Store struct {
 	types.Store
-	auth requests.Authenticator
+	authToken requests.AuthTokenGetter
 }
 
 func (s *Store) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
 	if principalID, ok := data[client.ClusterRoleTemplateBindingFieldUserPrincipalID].(string); ok && principalID != "" && !strings.HasPrefix(principalID, "local://") {
-		token, err := s.auth.TokenFromRequest(apiContext.Request)
+		token, err := s.authToken.TokenFromRequest(apiContext.Request)
 		if err != nil {
 			return nil, err
 		}

@@ -65,7 +65,7 @@ type kubeconfigTokenGetter interface {
 
 const (
 	SAMLResponseType   = "saml"
-	CookieResponseType = "kubeconfig"
+	CookieResponseType = "cookie"
 )
 
 func (h *loginHandler) login(actionName string, action *types.Action, request *types.APIContext) error {

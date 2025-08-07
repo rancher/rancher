@@ -9,7 +9,6 @@ import (
 	"github.com/rancher/norman/types/convert"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
-	"github.com/rancher/rancher/pkg/auth/requests"
 	v3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	managementSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
@@ -109,9 +108,9 @@ func TestGenerateKubeconfigActionHandler(t *testing.T) {
 						return nil, test.nodeListerErr
 					},
 				},
-				UserMgr:  &fakeManager,
-				TokenMgr: &fakeTokenManager{},
-				Auth:     &fakeAuth,
+				UserMgr:   &fakeManager,
+				TokenMgr:  &fakeTokenManager{},
+				AuthToken: &fakeAuth,
 			}
 			err = handler.GenerateKubeconfigActionHandler("not-used", nil, apiContext)
 			if test.wantErr {
@@ -231,10 +230,6 @@ func (f *fakeAuthenticator) TokenFromRequest(req *http.Request) (accessor.TokenA
 		return nil, f.err
 	}
 	return &f.token, nil
-}
-
-func (f *fakeAuthenticator) Authenticate(req *http.Request) (*requests.AuthenticatorResponse, error) {
-	return nil, nil
 }
 
 type fakeTokenManager struct{}

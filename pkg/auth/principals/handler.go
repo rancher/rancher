@@ -14,7 +14,6 @@ import (
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/requests"
-	"github.com/rancher/rancher/pkg/auth/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -24,17 +23,16 @@ type principalsHandler struct {
 	principalsClient   v3.PrincipalInterface
 	getAuthTokenGroups func(token accessor.TokenAccessor) []apiv3.Principal
 	tokensClient       v3.TokenInterface
-	auth               requests.Authenticator
-	tokenMGR           *tokens.Manager
+	authToken          requests.AuthTokenGetter
 	ac                 types.AccessControl
 }
 
-func newPrincipalsHandler(ctx context.Context, clusterRouter requests.ClusterRouter, mgmt *config.ScaledContext) *principalsHandler {
+func newPrincipalsHandler(ctx context.Context, mgmt *config.ScaledContext, authToken requests.AuthTokenGetter) *principalsHandler {
 	providers.Configure(ctx, mgmt)
 	return &principalsHandler{
 		principalsClient:   mgmt.Management.Principals(""),
 		tokensClient:       mgmt.Management.Tokens(""),
-		auth:               requests.NewAuthenticator(ctx, clusterRouter, mgmt),
+		authToken:          authToken,
 		getAuthTokenGroups: mgmt.UserManager.GetGroupsForTokenAuthProvider,
 		ac:                 mgmt.AccessControl,
 	}
@@ -140,6 +138,6 @@ func convertPrincipal(schema *types.Schema, principal v3.Principal) (map[string]
 }
 
 func (h *principalsHandler) getToken(request *http.Request) (accessor.TokenAccessor, error) {
-	token, err := h.auth.TokenFromRequest(request)
+	token, err := h.authToken.TokenFromRequest(request)
 	return token, errors.Wrap(err, requests.ErrMustAuthenticate.Error())
 }
