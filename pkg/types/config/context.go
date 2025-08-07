@@ -485,8 +485,9 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 		return nil, err
 	}
 
-	// We want to avoid keeping in the cache all Secrets so we use a separate controller
-	// factory that only watches a single Secret
+	// We want to avoid keeping in the cache all Secrets so we use a separate controller factory that only watches a single Secret
+	//
+	// The default controller factory restricts downstream Secret caches to the impersonation namespace only, see https://github.com/rancher/rancher/issues/46827
 	caValidatorControllerFactory := newCAValidatorControllerFactory(clientFactory)
 	context.caValidatorControllerFactory = caValidatorControllerFactory
 	caValidatorOpts := &generic.FactoryOptions{
