@@ -212,7 +212,12 @@ func (p *rotatingSNIProvider) Run(stopChan <-chan struct{}) error {
 	if err != nil {
 		return fmt.Errorf("failed to create secret watcher: %w", err)
 	}
-	defer watcher.Stop()
+	defer func() {
+		watcher.Stop()
+		// drain events
+		for range watcher.ResultChan() {
+		}
+	}()
 
 	if err := p.handleCert(); err != nil {
 		logrus.Error(err)
