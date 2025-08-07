@@ -227,7 +227,7 @@ func (o *Client) SetAuthClient() error {
 	}
 
 	o.HTTPClient.Transport = &roundtripper.UserAgent{
-		UserAgent: fmt.Sprintf("%s/%s %s", "go-rancher", settings.ServerVersion.Get(), "(OCI-based Helm Repository)"),
+		UserAgent: fmt.Sprintf("%s/%s/%s %s", "go", "rancher", settings.ServerVersion.Get(), "(OCI-based Helm Repository)"),
 		Next:      o.HTTPClient.Transport,
 	}
 

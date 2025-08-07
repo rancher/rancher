@@ -166,7 +166,7 @@ func StartHTTPRepository(c *ClusterRepoTestSuite) *httptest.Server {
 			serverVersion.Value = serverVersion.Default
 		}
 
-		assert.Equal(c.T(), r.Header.Get("User-Agent"), fmt.Sprintf("%s/%s %s", "go-rancher", serverVersion.Value, "(HTTP-based Helm Repository)"))
+		assert.Equal(c.T(), r.Header.Get("User-Agent"), fmt.Sprintf("%s/%s/%s %s", "go", "rancher", serverVersion.Value, "(HTTP-based Helm Repository)"))
 		http.StripPrefix("/", http.FileServer(http.Dir(repositoryDirectory))).ServeHTTP(w, r)
 	}))
 
@@ -187,7 +187,8 @@ func StartRegistry(c *ClusterRepoTestSuite) (*httptest.Server, error) {
 	// Optionally, you can customize the handler here if needed
 	// e.g., add middleware, logging, etc.
 	customHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Contains(c.T(), r.Header["User-Agent"][0], "go-rancher")
+		assert.Contains(c.T(), r.Header["User-Agent"][0], "go")
+		assert.Contains(c.T(), r.Header["User-Agent"][0], "rancher")
 		assert.Contains(c.T(), r.Header["User-Agent"][0], "(OCI-based Helm Repository)")
 		handler.ServeHTTP(w, r)
 	})
