@@ -2,10 +2,12 @@ package watcher
 
 import (
 	"context"
+	"net/http"
 	"time"
 
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -122,15 +124,31 @@ func resumableWatch[T generic.RuntimeMetaObject, TList runtime.Object](ctx conte
 			}
 		}
 
+		stopWatcher := func() {
+			watcher.Stop()
+			// Draining the events
+			for range watcher.ResultChan() {
+			}
+			watcher = nil
+		}
+
 		select {
 		case <-ctx.Done():
-			watcher.Stop()
+			stopWatcher()
 			return
 		case event, ok := <-watcher.ResultChan():
+			if !ok {
+				stopWatcher()
+				continue
+			}
+
 			// Special case for watcher closed by the producer, e.g., due to an error or timeout
-			if !ok || event.Type == watch.Error {
-				watcher.Stop()
-				watcher = nil
+			if event.Type == watch.Error {
+				if status, ok := event.Object.(*metav1.Status); ok && (status.Reason == metav1.StatusReasonGone || status.Code == http.StatusGone) {
+					lastSeen = ""
+				}
+				logger.Error("Received watch error from resumableWatch", event.Object)
+				stopWatcher()
 				continue
 			}
 
