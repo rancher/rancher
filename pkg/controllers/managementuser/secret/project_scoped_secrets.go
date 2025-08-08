@@ -31,7 +31,7 @@ const (
 	namespaceChangeHandler   = "project-scoped-secret-namespace-handler"
 	namespaceEnqueuerName    = "project-scoped-secret-namespace-enqueuer"
 	projectIDLabel           = "field.cattle.io/projectId"
-	projectScopedSecretLabel = "management.cattle.io/project-scoped-secret"
+	ProjectScopedSecretLabel = "management.cattle.io/project-scoped-secret"
 	pssCopyAnnotation        = "management.cattle.io/project-scoped-secret-copy"
 )
 
@@ -136,7 +136,7 @@ func (n *namespaceHandler) migrateExistingProjectScopedSecrets(project *v3.Proje
 		if i := slices.Index(secretCopy.Finalizers, oldPSSFinalizer+clusterName); i >= 0 {
 			secretCopy.Finalizers = slices.Delete(secretCopy.Finalizers, i, i+1)
 		}
-		secretCopy.Labels[projectScopedSecretLabel] = project.Name
+		secretCopy.Labels[ProjectScopedSecretLabel] = project.Name
 		_, err := n.managementSecretClient.Update(secretCopy)
 		errs = errors.Join(errs, err)
 	}
@@ -148,7 +148,7 @@ func (n *namespaceHandler) migrateExistingProjectScopedSecrets(project *v3.Proje
 func (n *namespaceHandler) getProjectScopedSecretsFromNamespace(project *v3.Project) ([]*corev1.Secret, error) {
 	backingNamespace := project.GetProjectBackingNamespace()
 
-	r, err := labels.NewRequirement(projectScopedSecretLabel, selection.Equals, []string{project.Name})
+	r, err := labels.NewRequirement(ProjectScopedSecretLabel, selection.Equals, []string{project.Name})
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +159,7 @@ func (n *namespaceHandler) getProjectScopedSecretsFromNamespace(project *v3.Proj
 func (n *namespaceHandler) removeUndesiredProjectScopedSecrets(namespace *corev1.Namespace, desiredSecrets sets.Set[types.NamespacedName]) error {
 	// remove any project scoped secrets that don't belong in the project
 	downstreamProjectScopedSecrets, err := n.secretClient.List(namespace.Name, metav1.ListOptions{
-		LabelSelector: projectScopedSecretLabel,
+		LabelSelector: ProjectScopedSecretLabel,
 	})
 	if err != nil {
 		return err
@@ -231,7 +231,7 @@ func (n *namespaceHandler) getNamespacesFromSecret(secret *corev1.Secret) ([]*co
 	}
 
 	// we only care about project scoped secrets
-	projectName, ok := secret.Labels[projectScopedSecretLabel]
+	projectName, ok := secret.Labels[ProjectScopedSecretLabel]
 	if !ok {
 		return nil, nil
 	}
@@ -274,6 +274,6 @@ func getNamespacedSecret(obj *corev1.Secret, namespace string) *corev1.Secret {
 
 func areSecretsSame(s1, s2 *corev1.Secret) (bool, *corev1.Secret) {
 	return reflect.DeepEqual(s1.Data, s2.Data) &&
-		s1.Annotations[projectScopedSecretLabel] == s2.Annotations[projectScopedSecretLabel] &&
+		s1.Annotations[ProjectScopedSecretLabel] == s2.Annotations[ProjectScopedSecretLabel] &&
 		s1.Annotations[pssCopyAnnotation] == s2.Annotations[pssCopyAnnotation], s2
 }

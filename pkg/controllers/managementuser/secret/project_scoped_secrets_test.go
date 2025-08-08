@@ -62,7 +62,7 @@ func Test_namespaceHandler_getNamespacesFromSecret(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-secret",
 					Labels: map[string]string{
-						projectScopedSecretLabel: "p-abc",
+						ProjectScopedSecretLabel: "p-abc",
 					},
 				},
 			},
@@ -78,7 +78,7 @@ func Test_namespaceHandler_getNamespacesFromSecret(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-secret",
 					Labels: map[string]string{
-						projectScopedSecretLabel: "p-abc",
+						ProjectScopedSecretLabel: "p-abc",
 					},
 				},
 			},
@@ -96,7 +96,7 @@ func Test_namespaceHandler_getNamespacesFromSecret(t *testing.T) {
 					Name:      "test-secret",
 					Namespace: "wrong-namespace",
 					Labels: map[string]string{
-						projectScopedSecretLabel: "p-abc",
+						ProjectScopedSecretLabel: "p-abc",
 					},
 				},
 			},
@@ -117,7 +117,7 @@ func Test_namespaceHandler_getNamespacesFromSecret(t *testing.T) {
 					Name:      "test-secret",
 					Namespace: "c-xyz",
 					Labels: map[string]string{
-						projectScopedSecretLabel: "p-abc",
+						ProjectScopedSecretLabel: "p-abc",
 					},
 				},
 			},
@@ -142,7 +142,7 @@ func Test_namespaceHandler_getNamespacesFromSecret(t *testing.T) {
 					Name:      "test-secret",
 					Namespace: "c-xyz",
 					Labels: map[string]string{
-						projectScopedSecretLabel: "p-abc",
+						ProjectScopedSecretLabel: "p-abc",
 					},
 				},
 			},
@@ -205,7 +205,7 @@ func Test_namespaceHandler_getProjectScopedSecretsFromNamespace(t *testing.T) {
 				Status:     v3.ProjectStatus{BackingNamespace: "c-abc123-p-test"},
 			},
 			setupManagementCache: func(f *fake.MockCacheInterface[*corev1.Secret]) {
-				expectedSelector, _ := labels.NewRequirement(projectScopedSecretLabel, selection.Equals, []string{"p-test"})
+				expectedSelector, _ := labels.NewRequirement(ProjectScopedSecretLabel, selection.Equals, []string{"p-test"})
 				f.EXPECT().List("c-abc123-p-test", labels.NewSelector().Add(*expectedSelector)).Return([]*corev1.Secret{
 					{ObjectMeta: metav1.ObjectMeta{Name: "secret1", Namespace: "c-abc123-p-test"}},
 					{ObjectMeta: metav1.ObjectMeta{Name: "secret2", Namespace: "c-abc123-p-test"}},
@@ -224,7 +224,7 @@ func Test_namespaceHandler_getProjectScopedSecretsFromNamespace(t *testing.T) {
 				Status:     v3.ProjectStatus{BackingNamespace: "c-abc123-p-test"},
 			},
 			setupManagementCache: func(f *fake.MockCacheInterface[*corev1.Secret]) {
-				expectedSelector, _ := labels.NewRequirement(projectScopedSecretLabel, selection.Equals, []string{"p-test"})
+				expectedSelector, _ := labels.NewRequirement(ProjectScopedSecretLabel, selection.Equals, []string{"p-test"})
 				f.EXPECT().List("c-abc123-p-test", labels.NewSelector().Add(*expectedSelector)).Return([]*corev1.Secret{}, nil)
 			},
 			wantSecrets: []*corev1.Secret{},
@@ -237,7 +237,7 @@ func Test_namespaceHandler_getProjectScopedSecretsFromNamespace(t *testing.T) {
 				Status:     v3.ProjectStatus{BackingNamespace: "c-abc123-p-test"},
 			},
 			setupManagementCache: func(f *fake.MockCacheInterface[*corev1.Secret]) {
-				expectedSelector, _ := labels.NewRequirement(projectScopedSecretLabel, selection.Equals, []string{"p-test"})
+				expectedSelector, _ := labels.NewRequirement(ProjectScopedSecretLabel, selection.Equals, []string{"p-test"})
 				f.EXPECT().List("c-abc123-p-test", labels.NewSelector().Add(*expectedSelector)).Return(nil, errDefault)
 			},
 			wantSecrets: nil,
@@ -294,7 +294,7 @@ var (
 			Namespace: backingNS,
 			Labels: map[string]string{
 				"otherLabel":             "val",
-				projectScopedSecretLabel: projectName,
+				ProjectScopedSecretLabel: projectName,
 			},
 			Annotations: map[string]string{
 				"otherAnno": "val",
@@ -524,7 +524,7 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 				},
 			},
 			setupSecretClient: func(f *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]) {
-				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: projectScopedSecretLabel}).Return(&corev1.SecretList{
+				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: ProjectScopedSecretLabel}).Return(&corev1.SecretList{
 					Items: []corev1.Secret{},
 				}, errDefault)
 			},
@@ -540,7 +540,7 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 				},
 			},
 			setupSecretClient: func(f *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]) {
-				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: projectScopedSecretLabel}).Return(&corev1.SecretList{
+				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: ProjectScopedSecretLabel}).Return(&corev1.SecretList{
 					Items: []corev1.Secret{
 						{
 							ObjectMeta: metav1.ObjectMeta{
@@ -570,7 +570,7 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 				},
 			},
 			setupSecretClient: func(f *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]) {
-				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: projectScopedSecretLabel}).Return(&corev1.SecretList{
+				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: ProjectScopedSecretLabel}).Return(&corev1.SecretList{
 					Items: []corev1.Secret{},
 				}, nil)
 			},
@@ -584,7 +584,7 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 				},
 			},
 			setupSecretClient: func(f *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]) {
-				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: projectScopedSecretLabel}).Return(&corev1.SecretList{
+				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: ProjectScopedSecretLabel}).Return(&corev1.SecretList{
 					Items: []corev1.Secret{
 						{
 							ObjectMeta: metav1.ObjectMeta{
@@ -612,7 +612,7 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 				desiredSecrets: sets.Set[types.NamespacedName]{},
 			},
 			setupSecretClient: func(f *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]) {
-				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: projectScopedSecretLabel}).Return(&corev1.SecretList{
+				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: ProjectScopedSecretLabel}).Return(&corev1.SecretList{
 					Items: []corev1.Secret{
 						{
 							ObjectMeta: metav1.ObjectMeta{
@@ -643,7 +643,7 @@ func Test_namespaceHandler_removeUndesiredProjectScopedSecrets(t *testing.T) {
 				},
 			},
 			setupSecretClient: func(f *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]) {
-				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: projectScopedSecretLabel}).Return(&corev1.SecretList{
+				f.EXPECT().List("ns1", metav1.ListOptions{LabelSelector: ProjectScopedSecretLabel}).Return(&corev1.SecretList{
 					Items: []corev1.Secret{
 						{
 							ObjectMeta: metav1.ObjectMeta{
