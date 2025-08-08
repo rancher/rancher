@@ -7,11 +7,12 @@ import (
 	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/rancher/norman/httperror"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/auth/providers/common"
 	ldapFakes "github.com/rancher/rancher/pkg/auth/providers/common/ldap"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	userMocks "github.com/rancher/rancher/pkg/user/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -44,9 +45,13 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 		},
 	}
 
+	ctrl := gomock.NewController(t)
+	userManager := userMocks.NewMockManager(ctrl)
+	userManager.EXPECT().CheckAccess(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(true, nil).AnyTimes()
+
 	provider := ldapProvider{
 		providerName: "openldap",
-		userMGR:      common.FakeUserManager{HasAccess: true},
+		userMGR:      userManager,
 		tokenMGR:     &tokens.Manager{},
 		userScope:    "openldap_user",
 		groupScope:   "openldap_group",
@@ -243,8 +248,12 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 			},
 		}
 
+		// Test-specific instance.
+		userManager := userMocks.NewMockManager(ctrl)
+		userManager.EXPECT().CheckAccess(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(false, nil).AnyTimes()
+
 		provider := provider
-		provider.userMGR = common.FakeUserManager{HasAccess: false}
+		provider.userMGR = userManager
 
 		_, _, err := provider.loginUser(ldapConn, &credentials, &config)
 		require.Error(t, err)

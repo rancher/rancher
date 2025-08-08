@@ -14,7 +14,9 @@ import (
 	managementSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/user"
+	userMocks "github.com/rancher/rancher/pkg/user/mocks"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -57,11 +59,18 @@ func TestGenerateKubeconfigActionHandler(t *testing.T) {
 		},
 	}
 
+	const (
+		testClusterName = "test-cluster"
+		fakeHost        = "fake-request-host.fake"
+		testUser        = ""
+	)
+
+	ctrl := gomock.NewController(t)
+	userManager := userMocks.NewMockManager(ctrl)
+	userManager.EXPECT().GetUser(gomock.Any()).Return(testUser).AnyTimes()
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			const testClusterName = "test-cluster"
-			const fakeHost = "fake-request-host.fake"
-			const testUser = ""
 			testSchemas := types.NewSchemas().AddSchemas(managementSchema.Schemas)
 			clusterSchema := testSchemas.Schema(&managementSchema.Version, v3.ClusterType)
 			fakeStore := fakeClusterStore{
@@ -85,8 +94,7 @@ func TestGenerateKubeconfigActionHandler(t *testing.T) {
 				Schemas:        testSchemas,
 				Request:        &http.Request{Host: fakeHost},
 			}
-			fakeManager := fakeUserManager{}
-			fakeManager.addUserForContext(apiContext, testUser)
+
 			fakeAuth := fakeAuthToken{
 				token: apimgmtv3.Token{
 					AuthProvider: "local",
@@ -108,7 +116,7 @@ func TestGenerateKubeconfigActionHandler(t *testing.T) {
 						return nil, test.nodeListerErr
 					},
 				},
-				UserMgr:   &fakeManager,
+				UserMgr:   userManager,
 				TokenMgr:  &fakeTokenManager{},
 				AuthToken: &fakeAuth,
 			}
@@ -194,30 +202,6 @@ func (n *normanRecorder) Write(apiContext *types.APIContext, code int, obj inter
 }
 
 const errUserName = "errUser"
-
-// fakeUserManager implements user.Manager
-type fakeUserManager struct {
-	usersForContext map[string]string
-}
-
-// Utility methods helpful for setting up mocks
-func (f *fakeUserManager) addUserForContext(context *types.APIContext, user string) {
-	if f.usersForContext == nil {
-		f.usersForContext = map[string]string{}
-	}
-	f.usersForContext[context.ID] = user
-}
-
-func (f *fakeUserManager) GetUser(apiContext *types.APIContext) string {
-	if f.usersForContext == nil {
-		return errUserName
-	}
-	contextUser, ok := f.usersForContext[apiContext.ID]
-	if !ok {
-		return errUserName
-	}
-	return contextUser
-}
 
 // fakeAuthToken implements requests.Authenticator for the purposes of testing
 type fakeAuthToken struct {
