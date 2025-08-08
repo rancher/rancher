@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	baseoidc "github.com/rancher/rancher/pkg/auth/providers/oidc"
@@ -119,9 +118,10 @@ func (g *GenOIDCProvider) TransformToAuthProvider(authConfig map[string]interfac
 	return p, nil
 }
 
-// RefetchGroupPrincipals is not implemented for OIDC.
+// RefetchGroupPrincipals retrieves updated group information for a user from the OIDC provider.
 func (g *GenOIDCProvider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
-	return nil, errors.New("Not implemented")
+	// Use the base OIDC provider's RefetchGroupPrincipals method
+	return g.OpenIDCProvider.RefetchGroupPrincipals(principalID, secret)
 }
 
 // groupToPrincipal takes a bare group name and turns it into a v3.Principal group object by filling-in other fields
