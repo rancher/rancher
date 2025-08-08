@@ -33,6 +33,7 @@ import (
 	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	storagev1 "github.com/rancher/rancher/pkg/generated/norman/storage.k8s.io/v1"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/peermanager"
 	clusterSchema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
 	managementSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
@@ -50,11 +51,16 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8dynamic "k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+)
+
+const (
+	stvAggregationSecretName = "stv-aggregation"
 )
 
 var (
@@ -227,6 +233,9 @@ type UserContext struct {
 	K3s k3s.Interface
 
 	KindNamespaces map[schema.GroupVersionKind]string
+
+	caValidatorControllerFactory controller.SharedControllerFactory
+	CAValidatorSecret            wcorev1.SecretController
 }
 
 // WithAgent returns a shallow copy of the Context that has been configured to use a user agent in its
@@ -310,6 +319,9 @@ func (w *UserContext) UserOnlyContext() *UserOnlyContext {
 		BatchV1:     w.BatchV1,
 		Cluster:     w.Cluster,
 		Storage:     w.Storage,
+
+		caValidatorControllerFactory: w.caValidatorControllerFactory,
+		CAValidatorSecret:            w.CAValidatorSecret,
 	}
 }
 
@@ -332,6 +344,9 @@ type UserOnlyContext struct {
 	Networking      knetworkingv1.Interface
 	Cluster         clusterv3.Interface
 	Storage         storagev1.Interface
+
+	caValidatorControllerFactory controller.SharedControllerFactory
+	CAValidatorSecret            wcorev1.SecretController
 }
 
 func newManagementContext(c *ScaledContext) (*ManagementContext, error) {
@@ -411,7 +426,9 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 		KindNamespace: context.KindNamespaces,
 	})
 
-	controllerFactory := controller.NewSharedControllerFactory(cacheFactory, controllers.GetOptsFromEnv(controllers.User))
+	factoryOpts := controllers.GetOptsFromEnv(controllers.User)
+
+	controllerFactory := controller.NewSharedControllerFactory(cacheFactory, factoryOpts)
 	context.ControllerFactory = controllerFactory
 
 	context.K8sClient, err = kubernetes.NewForConfig(&config)
@@ -468,6 +485,20 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 		return nil, err
 	}
 
+	// We want to avoid keeping in the cache all Secrets so we use a separate controller factory that only watches a single Secret
+	//
+	// The default controller factory restricts downstream Secret caches to the impersonation namespace only, see https://github.com/rancher/rancher/issues/46827
+	caValidatorControllerFactory := newCAValidatorControllerFactory(clientFactory)
+	context.caValidatorControllerFactory = caValidatorControllerFactory
+	caValidatorOpts := &generic.FactoryOptions{
+		SharedControllerFactory: caValidatorControllerFactory,
+	}
+	caValidatorCorew, err := core.NewFactoryFromConfigWithOptions(&context.RESTConfig, caValidatorOpts)
+	if err != nil {
+		return nil, err
+	}
+	context.CAValidatorSecret = caValidatorCorew.Core().V1().Secret()
+
 	return context, err
 }
 
@@ -477,7 +508,10 @@ func (w *UserContext) Start(ctx context.Context) error {
 		return err
 	}
 	ctx = metrics.WithContextID(ctx, fmt.Sprintf("usercontext_%s", w.ClusterName))
-	return w.ControllerFactory.Start(ctx, 5)
+	if err := w.ControllerFactory.Start(ctx, 5); err != nil {
+		return err
+	}
+	return w.caValidatorControllerFactory.Start(ctx, 1)
 }
 
 func NewUserOnlyContext(config *wrangler.Context) (*UserOnlyContext, error) {
@@ -515,6 +549,23 @@ func NewUserOnlyContext(config *wrangler.Context) (*UserOnlyContext, error) {
 		AddSchemas(clusterSchema.Schemas).
 		AddSchemas(projectSchema.Schemas)
 
+	clientFactory, err := client.NewSharedClientFactory(enableProtobuf(&context.RESTConfig), &client.SharedClientFactoryOptions{
+		Scheme: wrangler.Scheme,
+	})
+	if err != nil {
+		return nil, err
+	}
+	caValidatorControllerFactory := newCAValidatorControllerFactory(clientFactory)
+	context.caValidatorControllerFactory = caValidatorControllerFactory
+	caValidatorOpts := &generic.FactoryOptions{
+		SharedControllerFactory: caValidatorControllerFactory,
+	}
+	caValidatorCorew, err := core.NewFactoryFromConfigWithOptions(&context.RESTConfig, caValidatorOpts)
+	if err != nil {
+		return nil, err
+	}
+	context.CAValidatorSecret = caValidatorCorew.Core().V1().Secret()
+
 	return context, err
 }
 
@@ -522,4 +573,18 @@ func (w *UserOnlyContext) Start(ctx context.Context) error {
 	logrus.Info("Starting workload controllers")
 	ctx = metrics.WithContextID(ctx, fmt.Sprintf("useronlycontext_%s", w.ClusterName))
 	return w.ControllerFactory.Start(ctx, 5)
+}
+
+func newCAValidatorControllerFactory(clientFactory client.SharedClientFactory) controller.SharedControllerFactory {
+	caValidatorCacheFactory := cache.NewSharedCachedFactory(clientFactory, &cache.SharedCacheFactoryOptions{
+		KindTweakList: map[schema.GroupVersionKind]cache.TweakListOptionsFunc{
+			corev1.SchemeGroupVersion.WithKind("Secret"): func(opts *metav1.ListOptions) {
+				opts.FieldSelector = fmt.Sprintf("metadata.namespace=%s,metadata.name=%s", namespace.System, stvAggregationSecretName)
+			},
+		},
+	})
+
+	caValidatorFactoryOpts := controllers.GetOptsFromEnv(controllers.User)
+	caValidatorControllerFactory := controller.NewSharedControllerFactory(caValidatorCacheFactory, caValidatorFactoryOpts)
+	return caValidatorControllerFactory
 }

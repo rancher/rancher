@@ -4,10 +4,7 @@ import (
 	"context"
 
 	mgmtv3controllers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/rancher/pkg/watcher"
-
 	"github.com/rancher/wrangler/v3/pkg/condition"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/util/retry"
@@ -16,7 +13,6 @@ import (
 const (
 	CertificateAuthorityValid = condition.Cond("AgentTlsStrictCheck")
 	CacertsValid              = "CATTLE_CACERTS_VALID"
-	stvAggregationSecretName  = "stv-aggregation"
 )
 
 type CertificateAuthorityValidator struct {
@@ -37,20 +33,15 @@ func Register(ctx context.Context, downstream *config.UserContext) {
 		clusters:     downstream.Management.Wrangler.Mgmt.Cluster(),
 	}
 
-	// Downstream Secret caches are restricted to the impersonation namespace only, see https://github.com/rancher/rancher/issues/46827
-	// Use a single Watch instead of relying on full-blown informers
-	watcher.OnChange(downstream.Corew.Secret(), ctx, "cavalidator-secret", c.onStvAggregationSecret,
-		watcher.WithNamespace(namespace.System),
-		watcher.WithFieldSelector(map[string]string{"metadata.name": stvAggregationSecretName}),
-	)
+	downstream.CAValidatorSecret.OnChange(ctx, "cavalidator-secret", c.onStvAggregationSecret)
 }
 
-func (c *CertificateAuthorityValidator) onStvAggregationSecret(_ string, obj *corev1.Secret) (*corev1.Secret, error) {
+func (c *CertificateAuthorityValidator) onStvAggregationSecret(key string, obj *corev1.Secret) (*corev1.Secret, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
 
-	return nil, retry.RetryOnConflict(retry.DefaultRetry, func() error {
+	return obj, retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		mgmtCluster, err := c.clusterCache.Get(c.clusterName)
 		if err != nil {
 			return err
@@ -74,7 +65,7 @@ func (c *CertificateAuthorityValidator) onStvAggregationSecret(_ string, obj *co
 			CertificateAuthorityValid.Unknown(mgmtCluster)
 		}
 
-		_, err = c.clusters.UpdateStatus(mgmtCluster)
+		_, err = c.clusters.Update(mgmtCluster)
 		return err
 	})
 }
