@@ -90,7 +90,7 @@ func IsCloudDriver(cluster *v3.Cluster) bool {
 	return !cluster.Spec.Internal &&
 		cluster.Status.Driver != "" &&
 		cluster.Status.Driver != v32.ClusterDriverImported &&
-		cluster.Status.Driver != v32.ClusterDriverRKE &&
+		// cluster.Status.Driver != v32.ClusterDriverRKE &&
 		cluster.Status.Driver != v32.ClusterDriverK3s &&
 		cluster.Status.Driver != v32.ClusterDriverK3os &&
 		cluster.Status.Driver != v32.ClusterDriverRke2 &&
