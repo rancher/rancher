@@ -8,7 +8,12 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"sync"
+	"time"
+
+	"github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io"
+	sccv1 "github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io/v1"
 
 	fleetv1alpha1api "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/lasso/pkg/controller"
@@ -103,12 +108,27 @@ var (
 	}
 	AddToScheme = localSchemeBuilder.AddToScheme
 	Scheme      = runtime.NewScheme()
+
+	cacheSyncTimeoutEnvVar = "CACHE_SYNC_TIMEOUT"
+	cacheSyncTimeout       time.Duration
 )
 
 func init() {
 	metav1.AddToGroupVersion(Scheme, schema.GroupVersion{Version: "v1"})
 	utilruntime.Must(AddToScheme(Scheme))
 	utilruntime.Must(schemes.AddToScheme(Scheme))
+
+	switch timeout := os.Getenv(cacheSyncTimeoutEnvVar); timeout {
+	case "":
+		cacheSyncTimeout = time.Minute * 5
+
+	default:
+		var err error
+		cacheSyncTimeout, err = time.ParseDuration(timeout)
+		if err != nil {
+			logrus.Fatalf("env var '%s' is not a valid duration: %s", cacheSyncTimeoutEnvVar, timeout)
+		}
+	}
 }
 
 type Context struct {
@@ -185,6 +205,29 @@ func (w *Context) OnLeader(f func(ctx context.Context) error) {
 	w.leadership.OnLeader(f)
 }
 
+func (w *Context) checkGVK(ctx context.Context, gvk schema.GroupVersionKind) error {
+	logrus.Warnf("cache for '%s' did not sync", gvk.String())
+	crd, err := w.CRD.CustomResourceDefinition().Get(gvk.GroupKind().String(), metav1.GetOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to get crd for gvk: %s", err)
+
+	}
+
+	var enabled bool
+	for _, v := range crd.Spec.Versions {
+		if v.Served {
+			enabled = true
+			break
+		}
+	}
+
+	if !enabled {
+		return fmt.Errorf("crd '%s' has not served versions")
+	}
+
+	return nil
+}
+
 func (w *Context) StartWithTransaction(ctx context.Context, f func(context.Context) error) (err error) {
 	transaction := controller.NewHandlerTransaction(ctx)
 	if err := f(transaction); err != nil {
@@ -198,7 +241,17 @@ func (w *Context) StartWithTransaction(ctx context.Context, f func(context.Conte
 		return err
 	}
 
-	w.ControllerFactory.SharedCacheFactory().WaitForCacheSync(ctx)
+	timeoutCtx, _ := context.WithTimeout(ctx, cacheSyncTimeout)
+	gvks := w.ControllerFactory.SharedCacheFactory().WaitForCacheSync(timeoutCtx)
+
+	for gvk, isSynced := range gvks {
+		if !isSynced {
+			if err := w.checkGVK(ctx, gvk); err != nil {
+				logrus.Errorf("found issues for gvk '%s': %s", gvk.String(), err)
+			}
+		}
+	}
+
 	transaction.Commit()
 	return w.Start(ctx)
 }
