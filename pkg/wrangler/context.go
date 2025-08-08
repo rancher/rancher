@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	fleetv1alpha1api "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/lasso/pkg/controller"
@@ -114,6 +115,8 @@ func init() {
 type Context struct {
 	RESTConfig *rest.Config
 
+	DeferredCAPIRegistration *DeferredCAPIRegistration
+
 	Apply               apply.Apply
 	Dynamic             *dynamic.Controller
 	CAPI                capicontrollers.Interface
@@ -203,6 +206,32 @@ func (w *Context) StartWithTransaction(ctx context.Context, f func(context.Conte
 	return w.Start(ctx)
 }
 
+func (w *Context) StartSharedFactoryWithTransaction(ctx context.Context, f func(context.Context) error) (err error) {
+	w.controllerLock.Lock()
+	defer w.controllerLock.Unlock()
+
+	transaction := controller.NewHandlerTransaction(ctx)
+	if err := f(transaction); err != nil {
+		transaction.Rollback()
+		return err
+	}
+
+	ctx = metrics.WithContextID(ctx, "wranglercontext")
+	if err := w.ControllerFactory.SharedCacheFactory().Start(ctx); err != nil {
+		transaction.Rollback()
+		return err
+	}
+
+	w.ControllerFactory.SharedCacheFactory().WaitForCacheSync(ctx)
+	transaction.Commit()
+
+	if err := w.ControllerFactory.Start(ctx, 50); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (w *Context) Start(ctx context.Context) error {
 	w.controllerLock.Lock()
 	defer w.controllerLock.Unlock()
@@ -247,7 +276,6 @@ func (w *Context) WithAgent(userAgent string) *Context {
 		wContextCopy.Apply = applyWithAgent
 	}
 	wContextCopy.Dynamic = dynamic.New(wContextCopy.K8s.Discovery())
-	wContextCopy.CAPI = wContextCopy.capi.WithAgent(userAgent).V1beta1()
 	wContextCopy.RKE = wContextCopy.rke.WithAgent(userAgent).V1()
 	wContextCopy.Mgmt = wContextCopy.mgmt.WithAgent(userAgent).V3()
 	wContextCopy.Apps = wContextCopy.apps.WithAgent(userAgent).V1()
@@ -262,8 +290,29 @@ func (w *Context) WithAgent(userAgent string) *Context {
 	wContextCopy.API = wContextCopy.api.WithAgent(userAgent).V1()
 	wContextCopy.CRD = wContextCopy.crd.WithAgent(userAgent).V1()
 	wContextCopy.Plan = wContextCopy.plan.WithAgent(userAgent).V1()
+	if w.DeferredCAPIRegistration.CAPIInitialized {
+		wContextCopy.CAPI = wContextCopy.capi.WithAgent(userAgent).V1beta1()
+	} else {
+		go wContextCopy.BackfillCAPI(&wContextCopy)
+	}
 
 	return &wContextCopy
+}
+
+func (w *Context) BackfillCAPI(cpy *Context) {
+	printCapi := false
+	for {
+		if w.DeferredCAPIRegistration.CAPIInitialized {
+			if printCapi {
+				logrus.Trace("CAPI was initialized, retroactively adding to copy")
+			}
+			w.CAPI = cpy.CAPI
+			return
+		}
+		printCapi = true
+		logrus.Trace("Waiting for CAPI to be initialized before populating CAPI clients in copy")
+		time.Sleep(time.Second * 2)
+	}
 }
 
 func enableProtobuf(cfg *rest.Config) *rest.Config {
@@ -320,11 +369,6 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 	}
 
 	project, err := project.NewFactoryFromConfigWithOptions(restConfig, opts)
-	if err != nil {
-		return nil, err
-	}
-
-	capi, err := capi.NewFactoryFromConfigWithOptions(restConfig, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -434,7 +478,6 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		Apply:                   apply,
 		SharedControllerFactory: controllerFactory,
 		Dynamic:                 dynamic.New(k8s.Discovery()),
-		CAPI:                    capi.Cluster().V1beta1(),
 		RKE:                     rke.Rke().V1(),
 		Mgmt:                    mgmt.Management().V3(),
 		Apps:                    apps.Apps().V1(),
@@ -478,12 +521,20 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		core:         core,
 		api:          api,
 		crd:          crd,
-		capi:         capi,
 		rke:          rke,
 		rbac:         rbac,
 		plan:         plan,
 		telemetry:    telemetry,
+
+		DeferredCAPIRegistration: &DeferredCAPIRegistration{
+			wg:              &sync.WaitGroup{},
+			CAPIInitialized: false,
+		},
 	}
+
+	// back-fill the context with the CAPI factory when the relevant
+	// CRDs are available
+	go wContext.ManageDeferredCAPIContext(ctx)
 
 	return wContext, nil
 }

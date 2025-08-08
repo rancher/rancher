@@ -69,7 +69,26 @@ func TestEnsure_MCM(t *testing.T) {
 
 	migrated := map[string]bool{rtCRD: true, capiCRD: true, grCRD: false}
 	expected := []string{rtCRD, capiCRD}
+	features.EmbeddedClusterAPI.Set(true)
+	features.MCM.Set(true)
 
+	MigratedResources = migrated
+	err := EnsureRequired(context.Background(), testClient.client.CustomResourceDefinitions())
+	require.NoError(t, err, "unexpected error when creating yaml")
+	sort.Strings(expected)
+	sort.Strings(testClient.CrdNames)
+	require.Equal(t, expected, testClient.CrdNames, "unexpected CRDs created")
+}
+
+func TestEnsure_MCM_Not_Embedded(t *testing.T) {
+	defer resetGlobals()
+	testClient := setupFakeClient()
+	crdFS = validFS
+
+	migrated := map[string]bool{rtCRD: true, grCRD: false}
+	expected := []string{rtCRD}
+
+	features.EmbeddedClusterAPI.Set(false)
 	features.MCM.Set(true)
 
 	MigratedResources = migrated

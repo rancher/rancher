@@ -243,9 +243,18 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 				configMapValues := h.getChartValues(chart.ProvisioningCAPIChartName)
 				return data.MergeMaps(values, configMapValues)
 			},
-			Enabled:         func() bool { return true },
+			Enabled:         func() bool { return features.EmbeddedClusterAPI.Enabled() },
 			Uninstall:       !features.EmbeddedClusterAPI.Enabled(),
 			RemoveNamespace: !features.EmbeddedClusterAPI.Enabled(),
+		},
+		{
+			ReleaseNamespace: "cattle-system",
+			ReleaseName:      "rancher-turtles",
+			ChartName:        "rancher-turtles",
+			Enabled: func() bool {
+				return !features.EmbeddedClusterAPI.Enabled()
+			},
+			Uninstall: features.EmbeddedClusterAPI.Enabled(),
 		},
 		{
 			ReleaseNamespace: namespace.System,

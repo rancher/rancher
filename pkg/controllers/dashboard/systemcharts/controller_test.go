@@ -154,6 +154,8 @@ func Test_ChartInstallation(t *testing.T) {
 				features.MCM.Set(false)
 				features.MCMAgent.Set(true)
 				features.ManagedSystemUpgradeController.Set(true)
+				// temporary workaround until official turtles chart is added to repo
+				features.EmbeddedClusterAPI.Set(true)
 				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
 
 				// rancher-webhook
@@ -238,6 +240,8 @@ func Test_ChartInstallation(t *testing.T) {
 				features.MCM.Set(false)
 				features.MCMAgent.Set(true)
 				features.ManagedSystemUpgradeController.Set(true)
+				// temporary workaround until official turtles chart is added to repo
+				features.EmbeddedClusterAPI.Set(true)
 				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", sucAppNameOverride)
 
 				// rancher-webhook
@@ -322,6 +326,8 @@ func Test_ChartInstallation(t *testing.T) {
 				features.MCM.Set(false)
 				features.MCMAgent.Set(true)
 				features.ManagedSystemUpgradeController.Set(true)
+				// temporary workaround until official turtles chart is added to repo
+				features.EmbeddedClusterAPI.Set(true)
 				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
 
 				// rancher-webhook
@@ -389,6 +395,8 @@ func Test_ChartInstallation(t *testing.T) {
 				features.MCM.Set(false)
 				features.MCMAgent.Set(true)
 				features.ManagedSystemUpgradeController.Set(true)
+				// temporary workaround until official turtles chart is added to repo
+				features.EmbeddedClusterAPI.Set(true)
 				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
 
 				// rancher-webhook
@@ -456,6 +464,8 @@ func Test_ChartInstallation(t *testing.T) {
 				features.MCM.Set(false)
 				features.MCMAgent.Set(true)
 				features.ManagedSystemUpgradeController.Set(false)
+				// temporary workaround until official turtles chart is added to repo
+				features.EmbeddedClusterAPI.Set(true)
 				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
 
 				// rancher-webhook
@@ -522,6 +532,8 @@ func Test_ChartInstallation(t *testing.T) {
 				features.MCM.Set(false)
 				features.MCMAgent.Set(true)
 				features.ManagedSystemUpgradeController.Set(false)
+				// temporary workaround until official turtles chart is added to repo
+				features.EmbeddedClusterAPI.Set(true)
 				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
 
 				// rancher-webhook
@@ -590,7 +602,8 @@ func Test_ChartInstallation(t *testing.T) {
 				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
 				_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
 				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
-
+				// temporary workaround until official turtles chart is added to repo
+				features.EmbeddedClusterAPI.Set(true)
 				// rancher-webhook
 				expectedValues := map[string]interface{}{
 					"priorityClassName": priorityClassName,
@@ -693,7 +706,8 @@ func Test_ChartInstallation(t *testing.T) {
 				_ = settings.ImportedClusterVersionManagement.Set("false")
 				_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
 				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
-
+				// temporary workaround until official turtles chart is added to repo
+				features.EmbeddedClusterAPI.Set(true)
 				// rancher-webhook
 				expectedValues := map[string]interface{}{
 					"priorityClassName": priorityClassName,
@@ -781,7 +795,8 @@ func Test_ChartInstallation(t *testing.T) {
 				_ = settings.ImportedClusterVersionManagement.Set("false")
 				_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
 				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
-
+				// temporary workaround until official turtles chart is added to repo
+				features.EmbeddedClusterAPI.Set(true)
 				// rancher-webhook
 				expectedValues := map[string]interface{}{
 					"priorityClassName": priorityClassName,
@@ -869,7 +884,8 @@ func Test_ChartInstallation(t *testing.T) {
 				_ = settings.ImportedClusterVersionManagement.Set("false")
 				_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
 				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
-
+				// temporary workaround until official turtles chart is added to repo
+				features.EmbeddedClusterAPI.Set(true)
 				// rancher-webhook
 				expectedValues := map[string]interface{}{
 					"priorityClassName": priorityClassName,
@@ -935,7 +951,8 @@ func Test_ChartInstallation(t *testing.T) {
 				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
 				_ = settings.RemoteDialerProxyVersion.Set("2.0.0")
 				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
-
+				// temporary workaround until official turtles chart is added to repo
+				features.EmbeddedClusterAPI.Set(true)
 				// rancher-webhook
 				expectedValues := map[string]interface{}{
 					"capi": nil,
@@ -1034,7 +1051,8 @@ func Test_ChartInstallation(t *testing.T) {
 				_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.1")
 				_ = settings.RemoteDialerProxyVersion.Set("2.0.1")
 				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
-
+				// temporary workaround until official turtles chart is added to repo
+				features.EmbeddedClusterAPI.Set(true)
 				// rancher-webhook
 				expectedValues := map[string]interface{}{
 					"capi": nil,
@@ -1153,7 +1171,8 @@ func Test_ChartInstallation(t *testing.T) {
 				_ = settings.RemoteDialerProxyVersion.Set("2.0.1")
 				features.MCM.Set(true)
 				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
-
+				// temporary workaround until official turtles chart is added to repo
+				features.EmbeddedClusterAPI.Set(true)
 				// rancher-webhook
 				expectedValues := map[string]interface{}{
 					"priorityClassName": "newClass",

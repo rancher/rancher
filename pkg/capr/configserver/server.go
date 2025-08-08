@@ -21,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/pkg/wrangler"
+	wrangler2 "github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -57,6 +58,8 @@ type RKE2ConfigServer struct {
 	bootstrapCache           rkecontroller.RKEBootstrapCache
 	provisioningClusterCache provisioningcontrollers.ClusterCache
 	k8s                      kubernetes.Interface
+
+	capiAvailable bool
 }
 
 func New(clients *wrangler.Context) *RKE2ConfigServer {
@@ -73,22 +76,39 @@ func New(clients *wrangler.Context) *RKE2ConfigServer {
 			return []string{obj.Status.Token}, nil
 		})
 
-	return &RKE2ConfigServer{
+	configSrv := &RKE2ConfigServer{
 		serviceAccountsCache:     clients.Core.ServiceAccount().Cache(),
 		serviceAccounts:          clients.Core.ServiceAccount(),
 		secretsCache:             clients.Core.Secret().Cache(),
 		secrets:                  clients.Core.Secret(),
 		clusterTokenCache:        clients.Mgmt.ClusterRegistrationToken().Cache(),
 		clusterTokens:            clients.Mgmt.ClusterRegistrationToken(),
-		machineCache:             clients.CAPI.Machine().Cache(),
-		machines:                 clients.CAPI.Machine(),
 		bootstrapCache:           clients.RKE.RKEBootstrap().Cache(),
 		provisioningClusterCache: clients.Provisioning.Cluster().Cache(),
 		k8s:                      clients.K8s,
 	}
+
+	configSrv.DeferCAPIResources(clients)
+
+	return configSrv
+}
+
+func (r *RKE2ConfigServer) DeferCAPIResources(wrangler *wrangler.Context) {
+	wrangler.DeferredCAPIRegistration.DeferFunc(wrangler, func(wrangler *wrangler2.Context) {
+		r.machineCache = wrangler.CAPI.Machine().Cache()
+		r.machines = wrangler.CAPI.Machine()
+		r.capiAvailable = true
+	})
 }
 
 func (r *RKE2ConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	if !r.capiAvailable {
+		logrus.Debugf("[rke2configserver] CAPI not ready yet")
+		rw.WriteHeader(http.StatusServiceUnavailable)
+		rw.Header().Set("Retry-After", "5")
+		return
+	}
+
 	if !r.secrets.Informer().HasSynced() || !r.clusterTokens.Informer().HasSynced() {
 		if err := r.secrets.Informer().GetIndexer().Resync(); err != nil {
 			logrus.Errorf("error re-syncing secrets informer in rke2configserver: %v", err)
