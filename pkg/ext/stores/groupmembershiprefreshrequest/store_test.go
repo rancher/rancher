@@ -7,6 +7,7 @@ import (
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/status"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -22,7 +23,7 @@ func TestCreate(t *testing.T) {
 		options                 *metav1.CreateOptions
 		authorizer              authorizer.Authorizer
 		assertUserAuthRefresher func(*testing.T, *fakeUserAuthRefresher)
-		wantObj                 runtime.Object
+		wantObj                 *ext.GroupMembershipRefreshRequest
 		wantErr                 string
 	}{
 		"all user refreshed": {
@@ -131,7 +132,17 @@ func TestCreate(t *testing.T) {
 				assert.ErrorContains(t, err, test.wantErr)
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, test.wantObj, obj)
+				req, ok := obj.(*ext.GroupMembershipRefreshRequest)
+				assert.True(t, ok, "expected object to be of type GroupMembershipRefreshRequest")
+
+				assert.Equal(t, test.wantObj.Spec.UserID, req.Spec.UserID)
+				assert.Equal(t, test.wantObj.Status.Summary, req.Status.Summary)
+				require.Len(t, req.Status.Conditions, 1)
+				assert.Equal(t, test.wantObj.Status.Conditions[0].Type, req.Status.Conditions[0].Type)
+				assert.Equal(t, test.wantObj.Status.Conditions[0].Status, req.Status.Conditions[0].Status)
+				assert.Equal(t, test.wantObj.Status.Conditions[0].Message, req.Status.Conditions[0].Message)
+				assert.Equal(t, test.wantObj.Status.Conditions[0].Reason, req.Status.Conditions[0].Reason)
+				assert.NotEmpty(t, req.Status.Conditions[0].LastTransitionTime)
 			}
 		})
 	}
