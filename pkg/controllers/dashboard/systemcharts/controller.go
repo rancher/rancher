@@ -248,15 +248,6 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 			RemoveNamespace: !features.EmbeddedClusterAPI.Enabled(),
 		},
 		{
-			ReleaseNamespace: "cattle-system",
-			ReleaseName:      "rancher-turtles",
-			ChartName:        "rancher-turtles",
-			Enabled: func() bool {
-				return !features.EmbeddedClusterAPI.Enabled()
-			},
-			Uninstall: features.EmbeddedClusterAPI.Enabled(),
-		},
-		{
 			ReleaseNamespace: namespace.System,
 			ReleaseName: func() string {
 				if name := os.Getenv("CATTLE_SUC_APP_NAME_OVERRIDE"); name != "" {

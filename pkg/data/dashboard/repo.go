@@ -55,14 +55,11 @@ func addRepo(wrangler *wrangler.Context, repoName, repoURL, branchName string) e
 
 // addRepos upserts the rancher-charts, rancher-partner-charts and rancher-rke2-charts ClusterRepos
 func addRepos(wrangler *wrangler.Context) error {
-	// While turtles maintains a separate chart in their own repo,
-	// Rancher can only automatically install charts located in the
-	// rancher/charts repo. This is hard coded into the catalog v2 codebase.
 	if err := addRepo(
 		wrangler,
 		"rancher-charts",
-		"https://github.com/harrisonwaffel/charts",
-		"upstream-turtles",
+		settings.ChartDefaultURL.Get(),
+		settings.ChartDefaultBranch.Get(),
 	); err != nil {
 		return err
 	}
