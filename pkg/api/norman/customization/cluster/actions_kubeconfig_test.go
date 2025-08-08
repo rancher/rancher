@@ -87,7 +87,7 @@ func TestGenerateKubeconfigActionHandler(t *testing.T) {
 			}
 			fakeManager := fakeUserManager{}
 			fakeManager.addUserForContext(apiContext, testUser)
-			fakeAuth := fakeAuthenticator{
+			fakeAuth := fakeAuthToken{
 				token: apimgmtv3.Token{
 					AuthProvider: "local",
 					UserPrincipal: apimgmtv3.Principal{
@@ -219,13 +219,13 @@ func (f *fakeUserManager) GetUser(apiContext *types.APIContext) string {
 	return contextUser
 }
 
-// fakeAuthenticator implements requests.Authenticator for the purposes of testing
-type fakeAuthenticator struct {
+// fakeAuthToken implements requests.Authenticator for the purposes of testing
+type fakeAuthToken struct {
 	token apimgmtv3.Token
 	err   error
 }
 
-func (f *fakeAuthenticator) TokenFromRequest(req *http.Request) (accessor.TokenAccessor, error) {
+func (f *fakeAuthToken) TokenFromRequest(req *http.Request) (accessor.TokenAccessor, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
