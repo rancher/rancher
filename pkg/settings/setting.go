@@ -243,6 +243,9 @@ var (
 	// debug purposes.
 	RKE2ChartDefaultURL = NewSetting("rke2-chart-default-url", "https://git.rancher.io/")
 
+	// SkipHelmIndexFiltering flag that tells Rancher to skip filtering charts in helm index. Only works in -head or dev versions.
+	SkipHelmIndexFiltering = NewSetting("skip-helm-index-filtering", "true")
+
 	// S3BucketCheckTimeout is the timeout for checking if an s3 bucket for etcd backups exists,
 	// in the go duration string format.
 	S3BucketCheckTimeout = NewSetting("s3-bucket-check-timeout", "30s")

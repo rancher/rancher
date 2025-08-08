@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 
@@ -595,6 +596,73 @@ func TestAirgappedAndBundledIcons(t *testing.T) {
 	}
 
 	deleteDir("../rancher-data")
+}
+
+func TestSkipIndexFiltering(t *testing.T) {
+	tests := []struct {
+		testName               string
+		serverVersion          string
+		skipHelmIndexFiltering bool
+		expected               bool
+	}{
+		{
+			"Should NOT skip if version is release and setting is true",
+			"v2.13.0",
+			true,
+			false,
+		},
+		{
+			"Should NOT skip if version is release and setting is false",
+			"v2.13.0",
+			false,
+			false,
+		},
+		{
+			"Should NOT skip if version is rc and setting is true",
+			"v2.13.0-rc.1",
+			true,
+			false,
+		},
+		{
+			"Should NOT skip if version is rc and setting is false",
+			"v2.13.0-rc.1",
+			false,
+			false,
+		},
+		{
+			"Should skip if version is dev and setting is true",
+			"dev",
+			true,
+			true,
+		},
+		{
+			"Should NOT skip if version is dev and setting is false",
+			"dev",
+			false,
+			false,
+		},
+		{
+			"Should skip if version is head and setting is true",
+			"v2.13.0-head",
+			true,
+			true,
+		},
+		{
+			"Should NOT skip if version is head and setting is false",
+			"v2.13.0-head",
+			false,
+			false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.testName, func(t *testing.T) {
+			_ = settings.SkipHelmIndexFiltering.Set(strconv.FormatBool(tt.skipHelmIndexFiltering))
+			_ = settings.ServerVersion.Set(tt.serverVersion)
+			result := skipIndexFiltering()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
 }
 
 func createDir(dir string) error {
