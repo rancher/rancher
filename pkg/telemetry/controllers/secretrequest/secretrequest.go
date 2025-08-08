@@ -120,6 +120,7 @@ func (h *handler) OnSecretRequestChange(key string, incomingObj *v1.SecretReques
 	preparedObj := incomingObj.DeepCopy()
 	v1.ResourceConditionDone.True(preparedObj)
 	v1.ResourceConditionProgressing.False(preparedObj)
+	preparedObj.RemoveCondition(v1.ResourceConditionFailure)
 	timeNow := metav1.Now()
 	preparedObj.Status.LastSyncTS = &timeNow
 	updated, updateErr := h.secretRequests.UpdateStatus(preparedObj)
