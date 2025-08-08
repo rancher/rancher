@@ -39,7 +39,7 @@ const (
 type Capabilities struct {
 	AccessKeyID     string `json:"accessKeyId"`
 	AccessKeySecret string `json:"accessKeySecret"`
-	RegionId        string `json:"regionId"`
+	RegionID        string `json:"regionId"`
 	AcceptLanguage  string `json:"acceptLanguage"`
 }
 
@@ -94,12 +94,12 @@ func (h *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 		err        error
 	)
 
-	regionId := req.URL.Query().Get("regionId")
-	if regionId == "" {
+	regionID := req.URL.Query().Get("regionId")
+	if regionID == "" {
 		util.ReturnHTTPError(writer, req, http.StatusBadRequest, "regionId not set")
 		return
 	}
-	capabilities.RegionId = regionId
+	capabilities.RegionID = regionID
 
 	switch resourceType {
 	case "alibabaRegions":
@@ -195,8 +195,8 @@ func (h *handler) checkCredentials(req *http.Request) (int, error) {
 		return http.StatusBadRequest, fmt.Errorf("cannot parse request body: %v", err)
 	}
 
-	if cred.RegionId == "" {
-		cred.RegionId = defaultRegion
+	if cred.RegionID == "" {
+		cred.RegionID = defaultRegion
 	}
 	if cred.AccessKeyID == "" {
 		return http.StatusBadRequest, fmt.Errorf("must provide access key ID")
@@ -205,7 +205,7 @@ func (h *handler) checkCredentials(req *http.Request) (int, error) {
 		return http.StatusBadRequest, fmt.Errorf("must provide access key secret")
 	}
 
-	client, err := CreateECSClient(cred.AccessKeyID, cred.AccessKeySecret, cred.RegionId)
+	client, err := CreateECSClient(cred.AccessKeyID, cred.AccessKeySecret, cred.RegionID)
 	if err != nil {
 		return http.StatusInternalServerError, err
 	}
@@ -225,8 +225,8 @@ func (h *handler) checkCredentials(req *http.Request) (int, error) {
 	return http.StatusOK, nil
 }
 
-func CreateCSClient(ak, sk, regionId string) (*cs.Client, error) {
-	if regionId == "" {
+func CreateCSClient(ak, sk, regionID string) (*cs.Client, error) {
+	if regionID == "" {
 		return nil, errors.New("regionId can not be empty")
 	}
 
@@ -241,12 +241,12 @@ func CreateCSClient(ak, sk, regionId string) (*cs.Client, error) {
 		Protocol:   &protocol,
 	}
 
-	openAPICfg.Endpoint = tea.String("cs." + regionId + ".aliyuncs.com")
+	openAPICfg.Endpoint = tea.String("cs." + regionID + ".aliyuncs.com")
 	return cs.NewClient(openAPICfg)
 }
 
-func CreateECSClient(ak, sk, regionId string) (*ecs.Client, error) {
-	if regionId == "" {
+func CreateECSClient(ak, sk, regionID string) (*ecs.Client, error) {
+	if regionID == "" {
 		return nil, errors.New("regionId can not be empty")
 	}
 
@@ -261,12 +261,12 @@ func CreateECSClient(ak, sk, regionId string) (*ecs.Client, error) {
 		Protocol:   &protocol,
 	}
 
-	openAPICfg.Endpoint = tea.String("ecs." + regionId + ".aliyuncs.com")
+	openAPICfg.Endpoint = tea.String("ecs." + regionID + ".aliyuncs.com")
 	return ecs.NewClient(openAPICfg)
 }
 
-func CreateResourceManagerClient(ak, sk, regionId string) (*resourcemanager.Client, error) {
-	if regionId == "" {
+func CreateResourceManagerClient(ak, sk, regionID string) (*resourcemanager.Client, error) {
+	if regionID == "" {
 		return nil, errors.New("regionId can not be empty")
 	}
 
@@ -281,12 +281,12 @@ func CreateResourceManagerClient(ak, sk, regionId string) (*resourcemanager.Clie
 		Protocol:   &protocol,
 	}
 
-	openAPICfg.Endpoint = tea.String("resourcemanager." + regionId + ".aliyuncs.com")
+	openAPICfg.Endpoint = tea.String("resourcemanager." + regionID + ".aliyuncs.com")
 	return resourcemanager.NewClient(openAPICfg)
 }
 
-func CreateVpcClient(ak, sk, regionId string) (*vpc.Client, error) {
-	if regionId == "" {
+func CreateVpcClient(ak, sk, regionID string) (*vpc.Client, error) {
+	if regionID == "" {
 		return nil, errors.New("regionId can not be empty")
 	}
 
@@ -301,7 +301,7 @@ func CreateVpcClient(ak, sk, regionId string) (*vpc.Client, error) {
 		Protocol:   &protocol,
 	}
 
-	openAPICfg.Endpoint = tea.String("vpc." + regionId + ".aliyuncs.com")
+	openAPICfg.Endpoint = tea.String("vpc." + regionID + ".aliyuncs.com")
 	return vpc.NewClient(openAPICfg)
 }
 

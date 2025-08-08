@@ -28,7 +28,7 @@ const (
 )
 
 func describeClusters(capabilities *Capabilities, req *http.Request) ([]byte, int, error) {
-	client, err := CreateCSClient(capabilities.AccessKeyID, capabilities.AccessKeySecret, capabilities.RegionId)
+	client, err := CreateCSClient(capabilities.AccessKeyID, capabilities.AccessKeySecret, capabilities.RegionID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
@@ -45,7 +45,7 @@ func describeClusters(capabilities *Capabilities, req *http.Request) ([]byte, in
 		request.ClusterType = &clusterType
 	}
 
-	resp, err := client.DescribeClustersForRegion(&capabilities.RegionId, request)
+	resp, err := client.DescribeClustersForRegion(&capabilities.RegionID, request)
 	if err != nil {
 		status, err := handleSDKError(err)
 		return nil, status, err
@@ -59,11 +59,11 @@ func describeClusters(capabilities *Capabilities, req *http.Request) ([]byte, in
 }
 
 func describeRegions(capabilities *Capabilities, req *http.Request) ([]byte, int, error) {
-	if capabilities.RegionId == "" {
-		capabilities.RegionId = defaultRegion
+	if capabilities.RegionID == "" {
+		capabilities.RegionID = defaultRegion
 	}
 
-	client, err := CreateECSClient(capabilities.AccessKeyID, capabilities.AccessKeySecret, capabilities.RegionId)
+	client, err := CreateECSClient(capabilities.AccessKeyID, capabilities.AccessKeySecret, capabilities.RegionID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
@@ -88,7 +88,7 @@ func describeRegions(capabilities *Capabilities, req *http.Request) ([]byte, int
 }
 
 func describeInstanceTypes(capabilities *Capabilities, req *http.Request) ([]byte, int, error) {
-	client, err := CreateECSClient(capabilities.AccessKeyID, capabilities.AccessKeySecret, capabilities.RegionId)
+	client, err := CreateECSClient(capabilities.AccessKeyID, capabilities.AccessKeySecret, capabilities.RegionID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
@@ -124,7 +124,7 @@ func describeInstanceTypes(capabilities *Capabilities, req *http.Request) ([]byt
 }
 
 func describeKeyPairs(capabilities *Capabilities, req *http.Request) ([]byte, int, error) {
-	client, err := CreateECSClient(capabilities.AccessKeyID, capabilities.AccessKeySecret, capabilities.RegionId)
+	client, err := CreateECSClient(capabilities.AccessKeyID, capabilities.AccessKeySecret, capabilities.RegionID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
@@ -137,9 +137,9 @@ func describeKeyPairs(capabilities *Capabilities, req *http.Request) ([]byte, in
 		PageSize:   &pNum,
 	}
 
-	resourceGroupId := req.URL.Query().Get("resourceGroupId")
-	if resourceGroupId != "" {
-		request.ResourceGroupId = &resourceGroupId
+	resourceGroupID := req.URL.Query().Get("resourceGroupId")
+	if resourceGroupID != "" {
+		request.ResourceGroupId = &resourceGroupID
 	}
 
 	resp, err := client.DescribeKeyPairs(request)
@@ -162,13 +162,13 @@ func describeAvailableResource(capabilities *Capabilities, req *http.Request) ([
 		return nil, httperror.InvalidReference.Status, fmt.Errorf("invalid param destinationResource")
 	}
 
-	client, err := CreateECSClient(capabilities.AccessKeyID, capabilities.AccessKeySecret, capabilities.RegionId)
+	client, err := CreateECSClient(capabilities.AccessKeyID, capabilities.AccessKeySecret, capabilities.RegionID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
 
 	request := &ecs.DescribeAvailableResourceRequest{
-		RegionId:            &capabilities.RegionId,
+		RegionId:            &capabilities.RegionID,
 		DestinationResource: &destinationResource,
 	}
 
@@ -176,9 +176,9 @@ func describeAvailableResource(capabilities *Capabilities, req *http.Request) ([
 	if networkCategory != "" {
 		request.NetworkCategory = &networkCategory
 	}
-	zoneId := req.URL.Query().Get("zoneId")
-	if zoneId != "" {
-		request.ZoneId = &zoneId
+	zoneID := req.URL.Query().Get("zoneId")
+	if zoneID != "" {
+		request.ZoneId = &zoneID
 	}
 	resourceType := req.URL.Query().Get("resourceType")
 	if resourceType != "" {
@@ -203,7 +203,7 @@ func describeAvailableResource(capabilities *Capabilities, req *http.Request) ([
 }
 
 func describeResourceGroups(capabilities *Capabilities, req *http.Request) ([]byte, int, error) {
-	client, err := CreateResourceManagerClient(capabilities.AccessKeyID, capabilities.AccessKeySecret, capabilities.RegionId)
+	client, err := CreateResourceManagerClient(capabilities.AccessKeyID, capabilities.AccessKeySecret, capabilities.RegionID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
@@ -230,7 +230,7 @@ func describeResourceGroups(capabilities *Capabilities, req *http.Request) ([]by
 }
 
 func describeVpcs(capabilities *Capabilities, req *http.Request) ([]byte, int, error) {
-	client, err := CreateVpcClient(capabilities.AccessKeyID, capabilities.AccessKeySecret, capabilities.RegionId)
+	client, err := CreateVpcClient(capabilities.AccessKeyID, capabilities.AccessKeySecret, capabilities.RegionID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
@@ -243,9 +243,9 @@ func describeVpcs(capabilities *Capabilities, req *http.Request) ([]byte, int, e
 		PageNumber: &pNum,
 	}
 
-	resourceGroupId := req.URL.Query().Get("resourceGroupId")
-	if resourceGroupId != "" {
-		request.ResourceGroupId = &resourceGroupId
+	resourceGroupID := req.URL.Query().Get("resourceGroupId")
+	if resourceGroupID != "" {
+		request.ResourceGroupId = &resourceGroupID
 	}
 
 	resp, err := client.DescribeVpcs(request)
@@ -262,7 +262,7 @@ func describeVpcs(capabilities *Capabilities, req *http.Request) ([]byte, int, e
 }
 
 func describeVSwitches(capabilities *Capabilities, req *http.Request) ([]byte, int, error) {
-	client, err := CreateVpcClient(capabilities.AccessKeyID, capabilities.AccessKeySecret, capabilities.RegionId)
+	client, err := CreateVpcClient(capabilities.AccessKeyID, capabilities.AccessKeySecret, capabilities.RegionID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
@@ -275,18 +275,18 @@ func describeVSwitches(capabilities *Capabilities, req *http.Request) ([]byte, i
 		PageSize:   &pSize,
 	}
 
-	vpcId := req.URL.Query().Get("vpcId")
-	if vpcId != "" {
-		request.VpcId = &vpcId
+	vpcID := req.URL.Query().Get("vpcId")
+	if vpcID != "" {
+		request.VpcId = &vpcID
 	}
-	zoneId := req.URL.Query().Get("zoneId")
-	if zoneId != "" {
-		request.ZoneId = &zoneId
+	zoneID := req.URL.Query().Get("zoneId")
+	if zoneID != "" {
+		request.ZoneId = &zoneID
 	}
 
-	resourceGroupId := req.URL.Query().Get("resourceGroupId")
-	if resourceGroupId != "" {
-		request.ResourceGroupId = &resourceGroupId
+	resourceGroupID := req.URL.Query().Get("resourceGroupId")
+	if resourceGroupID != "" {
+		request.ResourceGroupId = &resourceGroupID
 	}
 
 	resp, err := client.DescribeVSwitches(request)
@@ -341,13 +341,13 @@ func handleSDKError(err error) (int, error) {
 }
 
 func describeKubernetesMetadata(capabilities *Capabilities, req *http.Request) ([]byte, int, error) {
-	client, err := CreateCSClient(capabilities.AccessKeyID, capabilities.AccessKeySecret, capabilities.RegionId)
+	client, err := CreateCSClient(capabilities.AccessKeyID, capabilities.AccessKeySecret, capabilities.RegionID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
 
 	request := &cs.DescribeKubernetesVersionMetadataRequest{
-		Region: &capabilities.RegionId,
+		Region: &capabilities.RegionID,
 	}
 
 	clusterType := req.URL.Query().Get("clusterType")
@@ -394,13 +394,13 @@ func describeKubernetesMetadata(capabilities *Capabilities, req *http.Request) (
 }
 
 func describeZones(capabilities *Capabilities, req *http.Request) ([]byte, int, error) {
-	client, err := CreateECSClient(capabilities.AccessKeyID, capabilities.AccessKeySecret, capabilities.RegionId)
+	client, err := CreateECSClient(capabilities.AccessKeyID, capabilities.AccessKeySecret, capabilities.RegionID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
 
 	request := &ecs.DescribeZonesRequest{
-		RegionId: &capabilities.RegionId,
+		RegionId: &capabilities.RegionID,
 	}
 	acceptLanguage := req.URL.Query().Get("acceptLanguage")
 	if acceptLanguage != "" {
@@ -421,18 +421,18 @@ func describeZones(capabilities *Capabilities, req *http.Request) ([]byte, int, 
 }
 
 func describeImageSupportedInstanceTypes(capabilities *Capabilities, req *http.Request) ([]byte, int, error) {
-	client, err := CreateECSClient(capabilities.AccessKeyID, capabilities.AccessKeySecret, capabilities.RegionId)
+	client, err := CreateECSClient(capabilities.AccessKeyID, capabilities.AccessKeySecret, capabilities.RegionID)
 	if err != nil {
 		return nil, http.StatusInternalServerError, err
 	}
 
 	request := &ecs.DescribeImageSupportInstanceTypesRequest{
-		RegionId: &capabilities.RegionId,
+		RegionId: &capabilities.RegionID,
 	}
 
-	imageId := req.URL.Query().Get("imageId")
-	if imageId != "" {
-		request.ImageId = &imageId
+	imageID := req.URL.Query().Get("imageId")
+	if imageID != "" {
+		request.ImageId = &imageID
 	}
 
 	action := req.URL.Query().Get("action")
