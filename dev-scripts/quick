@@ -48,7 +48,7 @@ if [ "$DEBUG" = true ]; then
   # Remove -s (strip symbols)
   BUILD_ARGS+=("--build-arg=LINKFLAGS=-extldflags -static")
   # Disable compiler optimizations
-  BUILD_ARGS+=("--build-arg=EXTRAFLAGS=-gcflags=all=-N -l")
+  BUILD_ARGS+=("--build-arg=GCFLAGS=all=-N -l")
 fi
 
 # because macos doesn't have realpath apparently
