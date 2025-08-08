@@ -1,12 +1,14 @@
 package configserver
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -57,6 +59,10 @@ type RKE2ConfigServer struct {
 	bootstrapCache           rkecontroller.RKEBootstrapCache
 	provisioningClusterCache provisioningcontrollers.ClusterCache
 	k8s                      kubernetes.Interface
+	wranglerContext          *wrangler.Context
+	capiInitOnce             sync.Once
+	capiInitialized          bool
+	capiInitError            error
 }
 
 func New(clients *wrangler.Context) *RKE2ConfigServer {
@@ -80,15 +86,58 @@ func New(clients *wrangler.Context) *RKE2ConfigServer {
 		secrets:                  clients.Core.Secret(),
 		clusterTokenCache:        clients.Mgmt.ClusterRegistrationToken().Cache(),
 		clusterTokens:            clients.Mgmt.ClusterRegistrationToken(),
-		machineCache:             clients.CAPI.Machine().Cache(),
-		machines:                 clients.CAPI.Machine(),
 		bootstrapCache:           clients.RKE.RKEBootstrap().Cache(),
 		provisioningClusterCache: clients.Provisioning.Cluster().Cache(),
 		k8s:                      clients.K8s,
+		wranglerContext:          clients,
 	}
 }
 
+// ensureCAPIInitialized ensures CAPI factory is initialized, doing so only once
+func (r *RKE2ConfigServer) ensureCAPIInitialized(ctx context.Context) error {
+	if r.capiInitialized {
+		return nil
+	}
+
+	initCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	if !r.wranglerContext.WaitForCAPICRDs(initCtx) {
+		return fmt.Errorf("CAPI CRDs not yet available")
+	}
+
+	var initErr error
+	r.capiInitOnce.Do(func() {
+		logrus.Debugf("[rke2configserver] Initializing CAPI factory on demand")
+
+		if err := r.wranglerContext.InitializeCAPIFactory(ctx); err != nil {
+			initErr = fmt.Errorf("failed to initialize CAPI factory: %w", err)
+			return
+		}
+
+		if r.wranglerContext.CAPI != nil {
+			r.machineCache = r.wranglerContext.CAPI.Machine().Cache()
+			r.machines = r.wranglerContext.CAPI.Machine()
+			r.capiInitialized = true
+			logrus.Infof("[rke2configserver] CAPI factory initialized successfully")
+		} else {
+			initErr = fmt.Errorf("CAPI factory is nil after initialization")
+		}
+	})
+
+	return initErr
+}
+
 func (r *RKE2ConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	if !r.capiInitialized {
+		if err := r.ensureCAPIInitialized(req.Context()); err != nil {
+			logrus.Debugf("[rke2configserver] CAPI not ready yet: %v", err)
+			rw.WriteHeader(http.StatusServiceUnavailable)
+			rw.Header().Set("Retry-After", "5")
+			return
+		}
+	}
+
 	if !r.secrets.Informer().HasSynced() || !r.clusterTokens.Informer().HasSynced() {
 		if err := r.secrets.Informer().GetIndexer().Resync(); err != nil {
 			logrus.Errorf("error re-syncing secrets informer in rke2configserver: %v", err)

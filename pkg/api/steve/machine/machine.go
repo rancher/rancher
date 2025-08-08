@@ -12,8 +12,8 @@ import (
 
 func Register(server *steve.Server, clients *wrangler.Context) {
 	sshClient := &sshClient{
-		machines: clients.CAPI.Machine(),
-		secrets:  clients.Core.Secret(),
+		secrets:         clients.Core.Secret(),
+		wranglerContext: clients,
 	}
 
 	server.SchemaFactory.AddTemplate(schema2.Template{
