@@ -265,7 +265,9 @@ func TestUserAttributeCreateOrUpdateSetsLastLoginTime(t *testing.T) {
 	}).AnyTimes()
 
 	manager := userManager{
-		userCache: userCache,
+		userCache:          userCache,
+		userAttributes:     userAttributes,
+		userAttributeCache: userAttributeCache,
 	}
 
 	groupPrincipals := []v3.Principal{}

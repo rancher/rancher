@@ -14,12 +14,13 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	userMocks "github.com/rancher/rancher/pkg/user/mocks"
+	"go.uber.org/mock/gomock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type fakeTokensManager struct {
 	getSecretFunc               func(userID string, provider string, fallbackTokens []accessor.TokenAccessor) (string, error)
-	isMemberOfFunc              func(token accessor.TokenAccessor, group v3.Principal) bool
 	createTokenAndSetCookieFunc func(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error
 }
 
@@ -28,13 +29,6 @@ func (m *fakeTokensManager) GetSecret(userID string, provider string, fallbackTo
 		return m.getSecretFunc(userID, provider, fallbackTokens)
 	}
 	return "", nil
-}
-
-func (m *fakeTokensManager) IsMemberOf(token accessor.TokenAccessor, group v3.Principal) bool {
-	if m.isMemberOfFunc != nil {
-		return m.isMemberOfFunc(token, group)
-	}
-	return false
 }
 
 func (m *fakeTokensManager) CreateTokenAndSetCookie(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error {
@@ -133,11 +127,10 @@ func TestSearchPrincipals(t *testing.T) {
 		}]
 	}`)
 
-	fakeTokensManager := &fakeTokensManager{
-		isMemberOfFunc: func(token accessor.TokenAccessor, group v3.Principal) bool {
-			return true
-		},
-	}
+	ctrl := gomock.NewController(t)
+	userManager := userMocks.NewMockManager(ctrl)
+	userManager.EXPECT().IsMemberOf(gomock.Any(), gomock.Any()).Return(true).AnyTimes()
+
 	config := &v32.GithubConfig{
 		Hostname: srvURL.Host,
 	}
@@ -146,7 +139,8 @@ func TestSearchPrincipals(t *testing.T) {
 		ctx:          context.Background(),
 		githubClient: &GClient{httpClient: srv.Client()},
 		getConfig:    func() (*v32.GithubConfig, error) { return config, nil },
-		tokenMGR:     fakeTokensManager,
+		userMGR:      userManager,
+		tokenMGR:     &fakeTokensManager{},
 	}
 
 	token := v32.Token{
@@ -321,11 +315,10 @@ func TestSearchPrincipalsExt(t *testing.T) {
 		}]
 	}`)
 
-	fakeTokensManager := &fakeTokensManager{
-		isMemberOfFunc: func(token accessor.TokenAccessor, group v3.Principal) bool {
-			return true
-		},
-	}
+	ctrl := gomock.NewController(t)
+	userManager := userMocks.NewMockManager(ctrl)
+	userManager.EXPECT().IsMemberOf(gomock.Any(), gomock.Any()).Return(true).AnyTimes()
+
 	config := &v32.GithubConfig{
 		Hostname: srvURL.Host,
 	}
@@ -334,7 +327,8 @@ func TestSearchPrincipalsExt(t *testing.T) {
 		ctx:          context.Background(),
 		githubClient: &GClient{httpClient: srv.Client()},
 		getConfig:    func() (*v32.GithubConfig, error) { return config, nil },
-		tokenMGR:     fakeTokensManager,
+		userMGR:      userManager,
+		tokenMGR:     &fakeTokensManager{},
 	}
 
 	token := ext.Token{
