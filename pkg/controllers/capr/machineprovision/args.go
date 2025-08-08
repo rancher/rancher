@@ -96,6 +96,9 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]any, d
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      wranglername.SafeConcatName(infra.meta.GetName(), "machine", "driver", "secret"),
 			Namespace: infra.meta.GetNamespace(),
+			Labels: map[string]string{
+				capr.BackupLabel: "true",
+			},
 		},
 		Data: getWhitelistedEnvVars(),
 	}
