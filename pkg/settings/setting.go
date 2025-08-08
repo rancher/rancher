@@ -58,6 +58,7 @@ var (
 		"cattle-telemetry-system",
 		"cattle-local-user-passwords",
 		"cattle-tokens",
+		"cattle-kubewarden-system",
 	}
 
 	AgentImage          = NewSetting("agent-image", "rancher/rancher-agent:head")
