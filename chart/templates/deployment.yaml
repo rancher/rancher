@@ -166,6 +166,9 @@ spec:
           httpGet:
             path: /healthz
             port: 80
+          {{- with .Values.startupProbe.initialDelaySeconds}}
+          initialDelaySeconds: {{ . }}
+          {{- end }}
           timeoutSeconds: {{ .Values.startupProbe.timeoutSeconds }}
           failureThreshold: {{ .Values.startupProbe.failureThreshold }}
           periodSeconds: {{ .Values.startupProbe.periodSeconds }}
