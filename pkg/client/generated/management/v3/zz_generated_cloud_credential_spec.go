@@ -1,16 +1,14 @@
 package client
 
 const (
-	CloudCredentialSpecType                         = "cloudCredentialSpec"
-	CloudCredentialSpecFieldAlibabaCredentialConfig = "alibabacredentialConfig"
-	CloudCredentialSpecFieldDescription             = "description"
-	CloudCredentialSpecFieldDisplayName             = "displayName"
-	CloudCredentialSpecFieldS3CredentialConfig      = "s3credentialConfig"
+	CloudCredentialSpecType                    = "cloudCredentialSpec"
+	CloudCredentialSpecFieldDescription        = "description"
+	CloudCredentialSpecFieldDisplayName        = "displayName"
+	CloudCredentialSpecFieldS3CredentialConfig = "s3credentialConfig"
 )
 
 type CloudCredentialSpec struct {
-	AlibabaCredentialConfig *AlibabaCredentialConfig `json:"alibabacredentialConfig,omitempty" yaml:"alibabacredentialConfig,omitempty"`
-	Description             string                   `json:"description,omitempty" yaml:"description,omitempty"`
-	DisplayName             string                   `json:"displayName,omitempty" yaml:"displayName,omitempty"`
-	S3CredentialConfig      *S3CredentialConfig      `json:"s3credentialConfig,omitempty" yaml:"s3credentialConfig,omitempty"`
+	Description        string              `json:"description,omitempty" yaml:"description,omitempty"`
+	DisplayName        string              `json:"displayName,omitempty" yaml:"displayName,omitempty"`
+	S3CredentialConfig *S3CredentialConfig `json:"s3credentialConfig,omitempty" yaml:"s3credentialConfig,omitempty"`
 }

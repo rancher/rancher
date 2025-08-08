@@ -43,6 +43,14 @@ func init() {
 		}
 	}
 
+	for _, fields := range management.KEv2OperatorsCredentialFields {
+		for fieldName, field := range fields {
+			if field.Type == "password" {
+				sensitiveBodyFields = append(sensitiveBodyFields, fieldName)
+			}
+		}
+	}
+
 	r, err := regexRedactor([]string{defaultRegex})
 	if err != nil {
 		panic(fmt.Sprintf("failed to create regex redactor: %v", err))
