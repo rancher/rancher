@@ -59,3 +59,15 @@ func (sr *SecretRequest) HasCondition(matchCond condition.Cond) bool {
 
 	return false
 }
+
+func (sr *SecretRequest) RemoveCondition(matchCond condition.Cond) {
+	newConditions := make([]genericcondition.GenericCondition, 0)
+	for _, cond := range sr.Status.Conditions {
+		if cond.Type == string(matchCond) {
+			continue
+		}
+		newConditions = append(newConditions, cond)
+	}
+
+	sr.Status.Conditions = newConditions
+}

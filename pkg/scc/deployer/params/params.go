@@ -129,6 +129,8 @@ func (p *SCCOperatorParams) PrepareDeployment() *appsv1.Deployment {
 		scale = 0
 	}
 
+	// TODO: We should support the "extra tolerations" feature users are asking for
+	// ref: https://github.com/rancher/rancher/issues/48541
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: consts.DefaultSCCNamespace,
@@ -151,6 +153,7 @@ func (p *SCCOperatorParams) PrepareDeployment() *appsv1.Deployment {
 }
 
 func (p *SCCOperatorParams) preparePodSpec() corev1.PodSpec {
+	// TODO: should pass in some relevant ENVs to the container
 	return corev1.PodSpec{
 		ServiceAccountName: consts.ServiceAccountName,
 		Containers: []corev1.Container{
