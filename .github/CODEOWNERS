@@ -1,3 +1,11 @@
+# Rancher Chart files
+chart @rancher/observation-backup
+
+# SCC & Telemetry features
+pkg/apis/telemetry.cattle.io @rancher/observation-backup
+pkg/scc @rancher/observation-backup
+pkg/telemetry @rancher/observation-backup
+
 # Apps markeplace & ui extensions
 pkg/catalogv2 @rancher/observation-backup
 pkg/api/steve/catalog @rancher/observation-backup
