@@ -97,6 +97,10 @@ func (t *Token) GetCreationTime() metav1.Time {
 	return t.CreationTimestamp
 }
 
+func (t *Token) GetExpiresAt() string {
+	return t.ExpiresAt
+}
+
 // +genclient
 // +kubebuilder:skipversion
 // +genclient:nonNamespaced
