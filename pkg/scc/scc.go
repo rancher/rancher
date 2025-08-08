@@ -32,8 +32,6 @@ func StartDeployer(ctx context.Context, wContext *wrangler.Context) error {
 		return fmt.Errorf("cannot start scc-operator deployer, failed to ensure dependencies: %w", err)
 	}
 
-	// TODO: maybe namespace controller scoped for the SCC namespace - or webhook?
-
 	controllers.RegisterDeployer(
 		ctx,
 		operatorLogger,

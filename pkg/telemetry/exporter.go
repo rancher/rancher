@@ -265,7 +265,7 @@ func (s *secretTelemetryExporter) createOrUpdate(data []byte) error {
 		return nil
 	}
 
-	if err != nil && !apierrors.IsAlreadyExists(err) {
+	if !apierrors.IsAlreadyExists(err) {
 		return err
 	}
 
