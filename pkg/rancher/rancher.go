@@ -441,13 +441,25 @@ func (r *Rancher) Start(ctx context.Context) error {
 		if err := dashboarddata.Add(ctx, r.Wrangler, localClusterEnabled(r.opts), r.opts.AddLocal == "false", r.opts.Embedded); err != nil {
 			return err
 		}
+
 		if err := r.Wrangler.StartWithTransaction(ctx, func(ctx context.Context) error {
 			return dashboard.Register(ctx, r.Wrangler, r.opts.Embedded, r.opts.ClusterRegistry)
 		}); err != nil {
 			return err
 		}
 
-		return runMigrations(r.Wrangler)
+		return nil
+	})
+
+	r.Wrangler.OnLeader(func(ctx context.Context) error {
+		errChan := r.Wrangler.DeferredCAPIRegistration.DeferFuncWithError(r.Wrangler, runMigrations)
+		select {
+		case err, ok := <-errChan:
+			if !ok {
+				return nil
+			}
+			return err
+		}
 	})
 
 	if !features.MCMAgent.Enabled() && features.RancherSCCRegistrationExtension.Enabled() {

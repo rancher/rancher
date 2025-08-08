@@ -69,7 +69,7 @@ func TestEnsure_MCM(t *testing.T) {
 
 	migrated := map[string]bool{rtCRD: true, capiCRD: true, grCRD: false}
 	expected := []string{rtCRD, capiCRD}
-
+	features.EmbeddedClusterAPI.Set(true)
 	features.MCM.Set(true)
 
 	MigratedResources = migrated

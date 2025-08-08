@@ -25,6 +25,7 @@ import (
 	"github.com/rancher/rancher/pkg/generated/controllers/upgrade.cattle.io"
 	"github.com/rancher/rancher/pkg/impersonation"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/wrangler"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -32,29 +33,42 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	rbac.Register(ctx, cluster)
 	healthsyncer.Register(ctx, cluster)
 	networkpolicy.Register(ctx, cluster)
-	nodesyncer.Register(ctx, cluster, kubeConfigGetter)
+
+	if err := mgmt.Wrangler.DeferredCAPIRegistration.DeferRegistration(ctx, mgmt.Wrangler, func(ctx context.Context, _ *wrangler.Context) error {
+		nodesyncer.Register(ctx, cluster, kubeConfigGetter)
+		return nil
+	}); err != nil {
+		return err
+	}
+
 	secret.Register(ctx, mgmt, cluster, clusterRec)
 	resourcequota.Register(ctx, cluster)
 	windows.Register(ctx, clusterRec, cluster)
 	nsserviceaccount.Register(ctx, cluster)
-	if features.RKE2.Enabled() {
-		// Just register the snapshot controller if the cluster is administrated by rancher.
-		if clusterRec.Annotations["provisioning.cattle.io/administrated"] == "true" {
-			if features.Provisioningv2ETCDSnapshotBackPopulation.Enabled() {
-				cluster.K3s = k3s.New(cluster.ControllerFactory)
-				snapshotbackpopulate.Register(ctx, cluster)
-			}
-			cluster.Plan = upgrade.New(cluster.ControllerFactory)
-			rkecontrolplanecondition.Register(ctx,
-				cluster.ClusterName,
-				cluster.Management.Wrangler.Provisioning.Cluster().Cache(),
-				cluster.Catalog.V1().App(),
-				cluster.Plan.V1().Plan(),
-				cluster.Management.Wrangler.RKE.RKEControlPlane())
-		}
 
-		machinerole.Register(ctx, cluster)
+	if err := mgmt.Wrangler.DeferredCAPIRegistration.DeferRegistration(ctx, mgmt.Wrangler, func(ctx context.Context, _ *wrangler.Context) error {
+		if features.RKE2.Enabled() {
+			// Just register the snapshot controller if the cluster is administrated by rancher.
+			if clusterRec.Annotations["provisioning.cattle.io/administrated"] == "true" {
+				if features.Provisioningv2ETCDSnapshotBackPopulation.Enabled() {
+					cluster.K3s = k3s.New(cluster.ControllerFactory)
+					snapshotbackpopulate.Register(ctx, cluster)
+				}
+				cluster.Plan = upgrade.New(cluster.ControllerFactory)
+				rkecontrolplanecondition.Register(ctx,
+					cluster.ClusterName,
+					cluster.Management.Wrangler.Provisioning.Cluster().Cache(),
+					cluster.Catalog.V1().App(),
+					cluster.Plan.V1().Plan(),
+					cluster.Management.Wrangler.RKE.RKEControlPlane())
+			}
+			machinerole.Register(ctx, cluster)
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
+
 	registerImpersonationCaches(cluster)
 
 	cavalidator.Register(ctx, cluster)

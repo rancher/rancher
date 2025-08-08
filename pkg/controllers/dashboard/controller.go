@@ -18,9 +18,11 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rkecontrolplanecondition"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/wrangler"
+	wrangler2 "github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/needacert"
 )
 
@@ -63,13 +65,21 @@ func Register(ctx context.Context, wrangler *wrangler.Context, embedded bool, re
 	}
 
 	if features.ProvisioningV2.Enabled() {
+		// defer registration of controllers which have CAPI clients or use CAPI caches
 		kubeconfigManager := kubeconfig.New(wrangler)
 		clusterindex.Register(ctx, wrangler)
-		provisioningv2.Register(ctx, wrangler, kubeconfigManager)
-		if features.RKE2.Enabled() {
-			if err := capr.Register(ctx, wrangler, kubeconfigManager); err != nil {
-				return err
+		cluster.EarlyRegister(ctx, wrangler, kubeconfigManager)
+		if err := wrangler.DeferredCAPIRegistration.DeferRegistration(ctx, wrangler, func(ctx context.Context, w *wrangler2.Context) error {
+			kubeconfigManager := kubeconfig.New(w)
+			provisioningv2.Register(ctx, w, kubeconfigManager)
+			if features.RKE2.Enabled() {
+				if err := capr.Register(ctx, w, kubeconfigManager); err != nil {
+					panic(err)
+				}
 			}
+			return nil
+		}); err != nil {
+			return err
 		}
 	}
 
