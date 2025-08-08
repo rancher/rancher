@@ -120,7 +120,7 @@ func TestCAValidator_clusterConditionManipulation(t *testing.T) {
 
 			mockCluster := fake.NewMockNonNamespacedClientInterface[*mgmtv3.Cluster, *mgmtv3.ClusterList](ctrl)
 			if tt.args.conditionSet {
-				mockCluster.EXPECT().UpdateStatus(gomock.Any()).DoAndReturn(func(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
+				mockCluster.EXPECT().Update(gomock.Any()).DoAndReturn(func(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
 					if tt.args.conditionSet {
 						require.Len(t, cluster.Status.Conditions, 1)
 						require.Equal(t, string(CertificateAuthorityValid), string(cluster.Status.Conditions[0].Type), "incorrect condition set")
