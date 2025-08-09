@@ -11,8 +11,8 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 )
 
-func Schema(ctx context.Context, clusterRouter requests.ClusterRouter, management *config.ScaledContext, schemas *types.Schemas) error {
-	p := newPrincipalsHandler(ctx, clusterRouter, management)
+func Schema(ctx context.Context, management *config.ScaledContext, schemas *types.Schemas, authToken requests.AuthTokenGetter) error {
+	p := newPrincipalsHandler(ctx, management, authToken)
 	schema := schemas.Schema(&managementSchema.Version, client.PrincipalType)
 	schema.ActionHandler = p.actions
 	schema.ListHandler = p.list
