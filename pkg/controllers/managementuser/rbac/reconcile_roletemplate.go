@@ -109,8 +109,8 @@ func (m *manager) ensureGlobalResourcesRolesForPRTB(projectName string, rts map[
 			hasNamespaceResources := slice.ContainsString(rule.Resources, "namespaces") || slice.ContainsString(rule.Resources, "*")
 			hasNamespaceGroup := slice.ContainsString(rule.APIGroups, "") || slice.ContainsString(rule.APIGroups, "*")
 			if hasNamespaceGroup && hasNamespaceResources && len(rule.ResourceNames) == 0 {
-				if slice.ContainsString(rule.Verbs, "*") || slice.ContainsString(rule.Verbs, "create") {
-					roleVerb = "*"
+				if !slice.ContainsString(rule.Verbs, "get") || !slice.ContainsString(rule.Verbs, "list") || !slice.ContainsString(rule.Verbs, "watch") {
+					roleVerb = manageNSVerb
 					roles.Insert("create-ns")
 					if nsRole, _ := m.crLister.Get("create-ns"); nsRole == nil {
 						createNSRT, err := m.rtLister.Get("create-ns")
@@ -127,12 +127,14 @@ func (m *manager) ensureGlobalResourcesRolesForPRTB(projectName string, rts map[
 
 		}
 	}
-	if roleVerb == "" {
-		roleVerb = "get"
+
+	getRole := fmt.Sprintf(projectNSGetClusterRoleNameFmt, projectName, projectNSVerbToSuffix["get"])
+	roles.Insert(getRole)
+	if roleVerb != "" {
+		roleSuffix = projectNSVerbToSuffix[roleVerb]
+		role := fmt.Sprintf(projectNSGetClusterRoleNameFmt, projectName, roleSuffix)
+		roles.Insert(role)
 	}
-	roleSuffix = projectNSVerbToSuffix[roleVerb]
-	role := fmt.Sprintf(projectNSGetClusterRoleNameFmt, projectName, roleSuffix)
-	roles.Insert(role)
 
 	for _, rt := range rts {
 		// Get the rules of the RoleTemplate
