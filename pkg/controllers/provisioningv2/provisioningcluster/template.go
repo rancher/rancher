@@ -336,13 +336,10 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 			infraRef = *machinePool.NodeConfig
 		}
 
-		if machinePool.MachineOS == "" {
-			machinePool.MachineOS = capr.DefaultMachineOS
+		machineOS := machinePool.MachineOS
+		if machineOS == "" {
+			machineOS = capr.DefaultMachineOS
 		}
-		if machinePool.MachineDeploymentLabels == nil {
-			machinePool.MachineDeploymentLabels = make(map[string]string)
-		}
-		machinePool.MachineDeploymentLabels[capr.CattleOSLabel] = machinePool.MachineOS
 
 		machineDeploymentLabels := map[string]string{}
 		for k, v := range machinePool.Labels {
@@ -351,6 +348,8 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 		for k, v := range machinePool.MachineDeploymentLabels {
 			machineDeploymentLabels[k] = v
 		}
+
+		machineDeploymentLabels[capr.CattleOSLabel] = machineOS
 
 		machineSpecAnnotations := map[string]string{}
 		// Ignore drain if DrainBeforeDelete is unset
@@ -426,11 +425,7 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 			machineDeployment.Spec.Template.Labels[capr.WorkerRoleLabel] = "true"
 		}
 
-		if len(machinePool.MachineOS) > 0 {
-			machineDeployment.Spec.Template.Labels[capr.CattleOSLabel] = machinePool.MachineOS
-		} else {
-			machineDeployment.Spec.Template.Labels[capr.CattleOSLabel] = capr.DefaultMachineOS
-		}
+		machineDeployment.Spec.Template.Labels[capr.CattleOSLabel] = machineOS
 
 		if len(machinePool.Labels) > 0 {
 			for k, v := range machinePool.Labels {
