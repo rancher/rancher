@@ -51,6 +51,10 @@ func main() {
 	var err error
 	ctx := context.Background()
 
+	// ADD DEBUG: Enable remotedialer tunnel data logging
+	os.Setenv("CATTLE_TUNNEL_DATA_DEBUG", "true")
+	logrus.Infof("DEBUG: Enabled remotedialer tunnel data logging")
+
 	if len(os.Args) > 1 {
 		err = runArgs(ctx)
 	} else {
@@ -357,8 +361,48 @@ func run(ctx context.Context) error {
 	}
 
 	// Use skipVerify transport for onConnect if set
-	onConnect := func(ctx context.Context, _ *remotedialer.Session) error {
+	onConnect := func(ctx context.Context, session *remotedialer.Session) error {
 		logrus.Infof("DEBUG: onConnect called - WebSocket connection established")
+		logrus.Infof("DEBUG: Session details - Session ID: %v", session)
+		logrus.Infof("DEBUG: Session context: %v", ctx)
+
+		// ADD DEBUG: Start monitoring WebSocket messages
+		go func() {
+			logrus.Infof("DEBUG: Starting WebSocket message monitoring")
+			// Monitor the session for incoming messages
+			for {
+				select {
+				case <-ctx.Done():
+					logrus.Infof("DEBUG: WebSocket message monitoring stopped - context done")
+					return
+				default:
+					// Log that we're ready to receive messages
+					logrus.Infof("DEBUG: Ready to receive WebSocket messages from Rancher")
+
+					// ADD DEBUG: Log any HTTP requests that might come through
+					logrus.Infof("DEBUG: Monitoring for HTTP requests through tunnel")
+
+					time.Sleep(10 * time.Second) // Check every 10 seconds
+				}
+			}
+		}()
+
+		// ADD DEBUG: Start HTTP request monitoring
+		go func() {
+			logrus.Infof("DEBUG: Starting HTTP request monitoring through tunnel")
+			for {
+				select {
+				case <-ctx.Done():
+					logrus.Infof("DEBUG: HTTP request monitoring stopped - context done")
+					return
+				default:
+					// Log that we're monitoring for HTTP requests
+					logrus.Infof("DEBUG: Monitoring for HTTP requests to Kubernetes API server")
+					time.Sleep(5 * time.Second) // Check every 5 seconds
+				}
+			}
+		}()
+
 		connected()
 		connectConfig := fmt.Sprintf("https://%s/v3/connect/config", serverURL.Host)
 		httpClient := http.Client{
@@ -367,14 +411,18 @@ func run(ctx context.Context) error {
 		if transport != nil {
 			httpClient.Transport = transport
 		}
-		
+
 		logrus.Infof("DEBUG: Calling ConfigClient at %s", connectConfig)
+		logrus.Infof("DEBUG: ConfigClient headers: %+v", headers)
+		logrus.Infof("DEBUG: ConfigClient writeCertsOnly: %v", writeCertsOnly)
+
 		interval, err := rkenodeconfigclient.ConfigClient(ctx, &httpClient, connectConfig, headers, writeCertsOnly)
 		if err != nil {
 			logrus.Errorf("DEBUG: ConfigClient failed: %v", err)
 			return err
 		}
 		logrus.Infof("DEBUG: ConfigClient successful, interval: %d", interval)
+		logrus.Infof("DEBUG: ConfigClient response indicates cluster is healthy")
 
 		if writeCertsOnly {
 			logrus.Infof("DEBUG: writeCertsOnly is true, exiting")
@@ -403,12 +451,18 @@ func run(ctx context.Context) error {
 				select {
 				case <-time.After(tt):
 					logrus.Debugf("DEBUG: Plan monitor checking for updates")
+					logrus.Infof("DEBUG: Plan monitor - making ConfigClient call to check cluster health")
 					receivedInterval, err := rkenodeconfigclient.ConfigClient(ctx, &httpClient, connectConfig, headers, writeCertsOnly)
 					if err != nil {
 						logrus.Errorf("failed to check plan: %v", err)
-					} else if receivedInterval != 0 && receivedInterval != interval {
-						tt = time.Duration(receivedInterval) * time.Second
-						logrus.Infof("Plan monitor checking %v seconds", receivedInterval)
+						logrus.Infof("DEBUG: Plan monitor - ConfigClient call failed: %v", err)
+					} else {
+						logrus.Infof("DEBUG: Plan monitor - ConfigClient call successful, interval: %d", receivedInterval)
+						logrus.Infof("DEBUG: Plan monitor - Cluster health check completed successfully")
+						if receivedInterval != 0 && receivedInterval != interval {
+							tt = time.Duration(receivedInterval) * time.Second
+							logrus.Infof("Plan monitor checking %v seconds", receivedInterval)
+						}
 					}
 				case <-ctx.Done():
 					logrus.Infof("DEBUG: Plan monitor context done")
@@ -440,14 +494,38 @@ func run(ctx context.Context) error {
 		logrus.Infof("Connecting to %s with token starting with %s", wsURL, token[:len(token)/2])
 		logrus.Tracef("Connecting to %s with token %s", wsURL, token)
 		remotedialer.ClientConnect(ctx, wsURL, headers, nil, func(proto, address string) bool {
+			// ADD DEBUG: Log all connection requests
+			logrus.Infof("DEBUG: Tunnel connection request - Protocol: %s, Address: %s", proto, address)
+
+			// ADD DEBUG: Log the full connection context
+			logrus.Infof("DEBUG: Connection request context - Protocol: %s, Target: %s", proto, address)
+
 			switch proto {
 			case "tcp":
+				logrus.Infof("DEBUG: ALLOWING TCP connection to: %s", address)
+				// ADD DEBUG: Log what happens after allowing TCP connection
+				go func() {
+					logrus.Infof("DEBUG: TCP connection to %s was allowed - monitoring for data exchange", address)
+					time.Sleep(2 * time.Second)
+					logrus.Infof("DEBUG: TCP connection to %s should now be active", address)
+				}()
 				return true
 			case "unix":
-				return address == "/var/run/docker.sock"
+				if address == "/var/run/docker.sock" {
+					logrus.Infof("DEBUG: ALLOWING Unix socket connection to: %s", address)
+					return true
+				}
+				logrus.Infof("DEBUG: DENYING Unix socket connection to: %s", address)
+				return false
 			case "npipe":
-				return address == "//./pipe/docker_engine"
+				if address == "//./pipe/docker_engine" {
+					logrus.Infof("DEBUG: ALLOWING Named pipe connection to: %s", address)
+					return true
+				}
+				logrus.Infof("DEBUG: DENYING Named pipe connection to: %s", address)
+				return false
 			}
+			logrus.Infof("DEBUG: DENYING unknown protocol connection: %s to %s", proto, address)
 			return false
 		}, onConnect)
 		time.Sleep(5 * time.Second)

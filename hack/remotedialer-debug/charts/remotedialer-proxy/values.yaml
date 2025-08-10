@@ -1,0 +1,36 @@
+# Default values for remotedialer-proxy.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: rancher/remotedialer-proxy
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+namespaceOverride: ""
+roleOverride: ""
+
+# prefix name used in deployment, role, rolebinding and other k8s resources
+apiExtensionName: ""
+
+serviceAccount:
+  name: ""
+
+service:
+  type: ClusterIP
+  httpsPort: 5555
+  proxyPort: 6666
+  peerPort: 6666
+  caName: "api-extension-ca-name"
+  certCAName: "api-extension-cert-ca-name"
+  tlsName: "api-extension-tls-name"
+  certCAName: "api-extension-ca"
+
+global:
+  cattle:
+    systemDefaultRegistry: ""

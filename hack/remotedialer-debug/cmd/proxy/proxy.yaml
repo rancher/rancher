@@ -1,0 +1,93 @@
+#FIXME This is temporary file. This should be converted into Helm Charts in the charts repo.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: remotedialer-proxy
+  namespace: cattle-system
+  labels:
+    app: remotedialer-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: remotedialer-proxy
+  template:
+    metadata:
+      labels:
+        app: remotedialer-proxy
+    spec:
+      containers:
+      - name: remotedialer-proxy
+        image: rancher/remotedialer-proxy:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: TLS_NAME
+          value: "remotedialer-proxy"
+        - name: CA_NAME
+          value: "remotedialer-proxy-ca"
+        - name: CERT_CA_NAMESPACE
+          value: "cattle-system"
+        - name: CERT_CA_NAME
+          value: "remotedialer-proxy-cert"
+        - name: SECRET
+          value: "secret"  # X-Tunnel-ID header secret
+        - name: PROXY_PORT
+          value: "6666"             # The proxy TCP port for kube-apiserver traffic
+        - name: PEER_PORT
+          value: "8888"             # The port used to connect to the special "imperative API" server behind the remotedialer
+        - name: HTTPS_PORT
+          value: "8443"             # The dynamiclistener HTTPS port for /connect
+        ports:
+        - containerPort: 6666
+          name: proxy
+        - containerPort: 8443
+          name: https
+        - containerPort: 8888
+          name: peer
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: remotedialer-proxy
+  namespace: cattle-system
+  labels:
+    app: remotedialer-proxy
+spec:
+  type: ClusterIP
+  selector:
+    app: remotedialer-proxy
+  ports:
+    - name: proxy
+      port: 6666
+      targetPort: proxy
+    - name: https
+      port: 8443
+      targetPort: https
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: remotedialer-proxy-secret-access
+  namespace: cattle-system
+rules:
+- apiGroups: [""]              
+  resources: ["secrets"]      
+  verbs: ["get", "create", "update"]  
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: remotedialer-proxy-secret-access-binding
+  namespace: cattle-system
+subjects:
+- kind: ServiceAccount
+  name: default                
+  namespace: cattle-system     
+roleRef:
+  kind: Role
+  name: remotedialer-proxy-secret-access
+  apiGroup: rbac.authorization.k8s.io

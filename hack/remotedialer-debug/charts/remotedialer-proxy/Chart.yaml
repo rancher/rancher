@@ -1,0 +1,15 @@
+apiVersion: v2
+name: remotedialer-proxy
+description: creates a bridge between k8s api-server and imperative api when Rancher is outside of the cluster  
+type: application
+version: 0.0.1
+appVersion: 0.0.1
+annotations:
+  catalog.cattle.io/certified: rancher
+  catalog.cattle.io/hidden: "true"
+  catalog.cattle.io/namespace: cattle-system
+  catalog.cattle.io/release-name: remotedialer-proxy
+  catalog.cattle.io/os: linux
+  catalog.cattle.io/permits-os: linux,windows
+  catalog.cattle.io/rancher-version: ">= 2.11.0-0"
+  catalog.cattle.io/managed: "true"

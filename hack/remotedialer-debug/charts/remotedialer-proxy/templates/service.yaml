@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "remotedialer-proxy.name" . }}
+  labels:
+    {{- include "remotedialer-proxy.labels" . | nindent 4 }}
+  namespace: {{ include "remotedialer-proxy.namespace" . }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.httpsPort }}
+      targetPort: https
+      protocol: TCP
+      name: https
+    - port: {{ .Values.service.proxyPort }}
+      targetPort: proxy
+      protocol: TCP
+      name: proxy
+  selector:
+    {{- include "remotedialer-proxy.selectorLabels" . | nindent 4 }}

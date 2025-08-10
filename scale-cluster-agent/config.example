@@ -1,15 +1,53 @@
-# Scale Cluster Agent Configuration
-# Copy this file to ~/.scale-cluster-agent/config and customize the values
+# Rancher Server Configuration
+rancher_url: "https://green-cluster.shen.nu"
+rancher_token: "token-xb8fs:7fx9fjjjmr5w5t44hcbcghpnc9ctn6m7s9b7fl2hp572q6jms5b2vf"
+rancher_ca_cert: "/path/to/rancher-ca.crt"  # Optional: CA certificate for Rancher server
 
-# Rancher server URL (required)
-RancherURL: "https://your-rancher-server.com/"
+# Agent Configuration
+agent_id: "scale-cluster-agent-001"
+agent_name: "Scale Cluster Agent"
+log_level: "info"  # debug, info, warn, error
 
-# Bearer token for Rancher API access (required)
-# Get this from Rancher UI: User -> API & Keys -> Add Key
-BearerToken: "token-xxxxx:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+# Cluster Configuration
+clusters:
+  - name: "cluster-1"
+    display_name: "Production Cluster 1"
+    description: "Production cluster for web applications"
+    k8s_version: "v1.28.0"
+    node_count: 5
+    region: "us-west-2"
+    labels:
+      environment: "production"
+      team: "platform"
+    
+  - name: "cluster-2"
+    display_name: "Staging Cluster 2"
+    description: "Staging cluster for testing"
+    k8s_version: "v1.28.0"
+    node_count: 3
+    region: "us-west-2"
+    labels:
+      environment: "staging"
+      team: "platform"
 
-# HTTP server port for REST API (optional, default: 9090)
-ListenPort: 9090
+# Mock Server Configuration
+mock_server:
+  enabled: true
+  port_range_start: 30000
+  port_range_end: 31000
+  tls_enabled: true
+  certificate_authority: "/path/to/ca.crt"  # Optional: Custom CA certificate
+  private_key: "/path/to/private.key"      # Optional: Custom private key
 
-# Log level: debug, info, warn, error (optional, default: info)
-LogLevel: "info" 
+# Connection Settings
+connection:
+  timeout: 30s
+  keep_alive: true
+  max_retries: 3
+  retry_delay: 5s
+
+# Logging Configuration
+logging:
+  format: "json"  # json, text
+  output: "stdout"  # stdout, stderr, file
+  file_path: "/var/log/scale-cluster-agent.log"  # Only used if output is "file" 

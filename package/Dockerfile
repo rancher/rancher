@@ -320,6 +320,7 @@ WORKDIR /app
 COPY go.mod go.sum .
 COPY pkg/apis/go.mod pkg/apis/go.sum pkg/apis/
 COPY pkg/client/go.mod pkg/client/go.sum pkg/client/
+COPY hack/remotedialer-debug/ hack/remotedialer-debug/
 RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
 RUN --mount=type=cache,target=/root/.cache,id=rancher cd pkg/apis && go mod download
 RUN --mount=type=cache,target=/root/.cache,id=rancher cd pkg/client && go mod download

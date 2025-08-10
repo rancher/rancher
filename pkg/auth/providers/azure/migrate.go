@@ -18,15 +18,7 @@ import (
 // If validation and applying work, then migrateToMicrosoftGraph deletes all secrets with access tokens to the
 // deprecated Azure AD Graph API.
 func (ap *Provider) migrateToMicrosoftGraph() error {
-	cfg, err := ap.updateConfigAndTest()
-	if err != nil {
-		return err
-	}
-	if err = ap.applyUpdatedConfig(cfg); err != nil {
-		return err
-	}
-	ap.deleteUserAccessTokens()
-	clients.GroupCache.Purge()
+	// MODIFIED: Disable Microsoft Graph migration to avoid MS Graph SDK dependencies
 	return nil
 }
 

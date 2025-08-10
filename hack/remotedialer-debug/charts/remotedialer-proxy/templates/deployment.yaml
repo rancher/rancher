@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "remotedialer-proxy.name" . }}
+  namespace: {{ include "remotedialer-proxy.namespace" . }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "remotedialer-proxy.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "remotedialer-proxy.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "remotedialer-proxy.serviceAccountName" . }}
+      containers:
+        - name: {{ include "remotedialer-proxy.name" . }}
+          image: {{ template "system_default_registry" $ }}{{ $.Values.image.repository }}:{{default .Chart.AppVersion .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: https
+              containerPort: {{ .Values.service.httpsPort }}
+              protocol: TCP
+            - name: proxy
+              containerPort: {{ .Values.service.proxyPort }}
+              protocol: TCP
+          env:
+            - name: CERT_CA_NAME
+              value: {{ .Values.service.certCAName }}
+            - name: TLS_NAME
+              value: {{ .Values.service.tlsName}}
+            - name: CA_NAME
+              value: {{ .Values.service.caName}}
+            - name: CERT_CA_NAMESPACE
+              value: {{ include "remotedialer-proxy.namespace" . }}
+            - name: SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "api-extension.name" . }}
+                  key: data
+            - name: HTTPS_PORT
+              value: {{ .Values.service.httpsPort | quote }}
+            - name: PROXY_PORT
+              value: {{ .Values.service.proxyPort | quote }}
+            - name: PEER_PORT
+              value: {{ .Values.service.peerPort | quote }}

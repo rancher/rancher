@@ -1,147 +1,162 @@
-name: "{{cluster-name}}"
-nodes:
-  - name: "{{cluster-name}}-node1"
-    status: "Ready"
-    roles: ["control-plane", "etcd", "master"]
-    age: "42h"
-    version: "v1.28.5+k3s1"
-    internalIP: "10.244.244.1"
-    externalIP: "<none>"
-    osImage: "0.0.0-poc-k3s-june11-aca5d463-dirty-2025-07-31.04.42-kubevirt-amd64"
-    kernelVersion: "6.1.112-linuxkit-63f4d774fbc8"
-    containerRuntime: "containerd://1.7.11-k3s2"
-    capacity:
-      cpu: "4"
-      memory: "8Gi"
-      pods: "110"
-    allocatable:
-      cpu: "3800m"
-      memory: "7Gi"
-      pods: "110"
-  - name: "{{cluster-name}}-node2"
-    status: "Ready"
-    roles: ["control-plane", "etcd", "master"]
-    age: "39h"
-    version: "v1.28.5+k3s1"
-    internalIP: "10.244.244.3"
-    externalIP: "<none>"
-    osImage: "0.0.0-poc-k3s-june11-aca5d463-dirty-2025-07-31.04.42-kubevirt-amd64"
-    kernelVersion: "6.1.112-linuxkit-63f4d774fbc8"
-    containerRuntime: "containerd://1.7.11-k3s2"
-    capacity:
-      cpu: "4"
-      memory: "8Gi"
-      pods: "110"
-    allocatable:
-      cpu: "3800m"
-      memory: "7Gi"
-      pods: "110"
-
-pods:
-  - name: "coredns-6799fbcd5-lgj8v"
-    namespace: "kube-system"
-    status: "Running"
-    ready: "1/1"
-    restarts: 3
-    age: "42h"
-    ip: "10.42.0.97"
-    node: "{{cluster-name}}-node1"
-    labels:
-      k8s-app: "kube-dns"
-  - name: "traefik-f4564c4f4-xz9t5"
-    namespace: "kube-system"
-    status: "Running"
-    ready: "1/1"
-    restarts: 3
-    age: "42h"
-    ip: "10.42.0.105"
-    node: "{{cluster-name}}-node1"
-    labels:
-      app.kubernetes.io/name: "traefik"
-  - name: "nginx-deployment-7d4cd48b5c-abc12"
-    namespace: "default"
-    status: "Running"
-    ready: "3/3"
-    restarts: 0
-    age: "2h"
-    ip: "10.42.1.10"
-    node: "{{cluster-name}}-node2"
-    labels:
-      app: "nginx"
-  - name: "grafana-6b8c5d4f3e-def34"
-    namespace: "monitoring"
-    status: "Running"
-    ready: "1/1"
-    restarts: 1
-    age: "1h"
-    ip: "10.42.2.15"
-    node: "{{cluster-name}}-node1"
-    labels:
-      app: "grafana"
-
-services:
-  - name: "kubernetes"
-    namespace: "default"
-    type: "ClusterIP"
-    clusterIP: "10.43.0.1"
-    externalIP: "<none>"
-    ports: "443/TCP"
-    age: "42h"
-  - name: "kube-dns"
-    namespace: "kube-system"
-    type: "ClusterIP"
-    clusterIP: "10.43.0.10"
-    externalIP: "<none>"
-    ports: "53/UDP,53/TCP,9153/TCP"
-    age: "42h"
-    labels:
-      k8s-app: "kube-dns"
-  - name: "traefik"
-    namespace: "kube-system"
-    type: "LoadBalancer"
-    clusterIP: "10.43.185.148"
-    externalIP: "10.244.244.1,10.244.244.3"
-    ports: "80:32522/TCP,443:32443/TCP"
-    age: "42h"
-    labels:
-      app.kubernetes.io/name: "traefik"
-
-secrets:
-  - name: "default-token-abc12"
-    namespace: "default"
-    type: "kubernetes.io/service-account-token"
-    data: 3
-    age: "42h"
-  - name: "rancher-token-def34"
-    namespace: "cattle-system"
-    type: "kubernetes.io/service-account-token"
-    data: 3
-    age: "42h"
-
-configmaps:
-  - name: "kube-root-ca.crt"
-    namespace: "default"
-    data: 1
-    age: "42h"
-  - name: "traefik-config"
-    namespace: "kube-system"
-    data: 2
-    age: "42h"
-
-deployments:
-  - name: "nginx-deployment"
-    namespace: "default"
-    ready: "3"
-    upToDate: "3"
-    available: "3"
-    age: "2h"
-    labels:
-      app: "nginx"
-  - name: "grafana"
-    namespace: "monitoring"
-    ready: "1"
-    upToDate: "1"
-    available: "1"
-    age: "1h"
-    labels:
-      app: "grafana" 
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cattle-system
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cattle-cluster-agent
+  namespace: cattle-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cattle-cluster-agent
+rules:
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cattle-cluster-agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cattle-cluster-agent
+subjects:
+- kind: ServiceAccount
+  name: cattle-cluster-agent
+  namespace: cattle-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cattle-cluster-agent
+  namespace: cattle-system
+  labels:
+    app: cattle-cluster-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cattle-cluster-agent
+  template:
+    metadata:
+      labels:
+        app: cattle-cluster-agent
+    spec:
+      serviceAccountName: cattle-cluster-agent
+      containers:
+      - name: agent
+        image: rancher/rancher-agent:v2.8.0
+        env:
+        - name: CATTLE_SERVER
+          value: "https://your-rancher-server.com"
+        - name: CATTLE_TOKEN
+          value: "your-cluster-token"
+        - name: CATTLE_CA_CHECKSUM
+          value: ""
+        - name: CATTLE_CLUSTER
+          value: "true"
+        - name: CATTLE_K8S_MANAGED
+          value: "true"
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+        volumeMounts:
+        - name: cattle-state
+          mountPath: /var/lib/rancher/state
+        - name: cattle-credential
+          mountPath: /var/lib/rancher/cred
+        - name: k8s-ssl
+          mountPath: /etc/kubernetes/ssl
+        - name: machine-state
+          mountPath: /var/lib/rancher/state/share
+        - name: cattle-token
+          mountPath: /var/lib/rancher/cred
+        - name: cattle-ca-additional
+          mountPath: /etc/kubernetes/ssl/ca-additional.pem
+          subPath: ca-additional.pem
+        - name: cattle-ca-additional
+          mountPath: /etc/kubernetes/ssl/ca.pem
+          subPath: ca.pem
+        - name: cattle-ca-additional
+          mountPath: /etc/kubernetes/ssl/cert.pem
+          subPath: cert.pem
+        - name: cattle-ca-additional
+          mountPath: /etc/kubernetes/ssl/key.pem
+          subPath: key.pem
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: cattle-state
+        emptyDir: {}
+      - name: cattle-credential
+        emptyDir: {}
+      - name: k8s-ssl
+        emptyDir: {}
+      - name: machine-state
+        emptyDir: {}
+      - name: cattle-token
+        secret:
+          secretName: cattle-token
+      - name: cattle-ca-additional
+        secret:
+          secretName: cattle-ca-additional
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cattle-token
+  namespace: cattle-system
+type: Opaque
+data:
+  token: ""  # Base64 encoded cluster token
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cattle-ca-additional
+  namespace: cattle-system
+type: Opaque
+data:
+  ca-additional.pem: ""  # Base64 encoded CA certificate
+  ca.pem: ""             # Base64 encoded CA certificate
+  cert.pem: ""           # Base64 encoded client certificate
+  key.pem: ""            # Base64 encoded client private key
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cattle-cluster-agent
+  namespace: cattle-system
+  labels:
+    app: cattle-cluster-agent
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+    name: http
+  selector:
+    app: cattle-cluster-agent
+  type: ClusterIP 

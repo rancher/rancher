@@ -85,12 +85,15 @@ type handler struct {
 }
 
 func (h *handler) startRancher() {
+	logrus.Infof("DEBUG: startRancher() called")
+
 	if features.ProvisioningPreBootstrap.Enabled() {
 		logrus.Debugf("not starting embedded rancher due to pre-bootstrap...")
 		return
 	}
 
 	clientConfig := kubeconfig.GetNonInteractiveClientConfig("")
+	logrus.Infof("DEBUG: Creating embedded Rancher server with ports 80 and 443")
 	server, err := rancher.New(h.ctx, clientConfig, &rancher.Options{
 		HTTPListenPort:  80,
 		HTTPSListenPort: 443,
@@ -101,7 +104,12 @@ func (h *handler) startRancher() {
 	if err != nil {
 		logrus.Fatalf("Embedded rancher failed to initialize: %v", err)
 	}
+	logrus.Infof("DEBUG: Embedded Rancher server created successfully")
+
 	go func() {
+		logrus.Infof("DEBUG: Starting embedded Rancher server on ports 80 and 443")
+
+		// Start the server with the original handler
 		err = server.ListenAndServe(h.ctx)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
@@ -114,6 +122,10 @@ func (h *handler) startRancher() {
 			}
 		}
 	}()
+	logrus.Infof("DEBUG: Embedded Rancher server started in background")
+
+	// Log that we're ready to handle HTTP requests
+	logrus.Infof("DEBUG: Ready to handle HTTP requests through the embedded server")
 }
 
 func (h *handler) OnChange(key string, service *corev1.Service) (*corev1.Service, error) {

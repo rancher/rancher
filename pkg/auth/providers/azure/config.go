@@ -30,8 +30,9 @@ func authProviderEnabled(config *v32.AzureADConfig) bool {
 
 // IsConfigDeprecated returns true if a given Azure AD auth config specifies the old,
 // deprecated authentication flow via the Azure AD Graph.
+// MODIFIED: Always return true to avoid Microsoft Graph SDK dependencies
 func IsConfigDeprecated(cfg *v32.AzureADConfig) bool {
-	return authProviderEnabled(cfg) && !configHasNewFlowAnnotation(cfg)
+	return authProviderEnabled(cfg) // Always use deprecated client to avoid MS Graph SDK
 }
 
 func configHasNewFlowAnnotation(cfg *v32.AzureADConfig) bool {

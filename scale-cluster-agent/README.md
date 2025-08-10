@@ -1,180 +1,171 @@
 # Scale Cluster Agent
 
-A standalone program that simulates Kubernetes cluster agents for Rancher server scalability testing. This agent connects to a Rancher server via WebSocket and sends fake cluster information to simulate thousands of managed clusters.
-
-## Overview
-
-The Scale Cluster Agent is designed to help test Rancher server's scalability by creating virtual clusters that appear as real Kubernetes clusters to the Rancher management interface. It maintains WebSocket connections to the Rancher server and periodically reports cluster information including nodes, pods, services, secrets, and other Kubernetes resources.
+A simulated Kubernetes cluster agent that can register multiple clusters with a Rancher server. This agent creates mock Kubernetes API servers for each cluster and registers them with Rancher, bringing them to 'Active' state.
 
 ## Features
 
-- **Standalone Operation**: Runs as a standalone program without requiring a Kubernetes cluster
-- **WebSocket Communication**: Connects to Rancher server using the same WebSocket protocol as real cluster agents
-- **REST API**: Provides HTTP endpoints for cluster management operations
-- **Template-based Clusters**: Uses YAML templates to generate cluster configurations
-- **Scalable Testing**: Can simulate thousands of clusters for performance testing
-- **Configurable**: Supports configuration files for Rancher server connection and cluster templates
+- **HTTPS/TLS Support**: All mock Kubernetes API servers run with HTTPS/TLS using self-signed certificates
+- **Multiple Cluster Management**: Simulate multiple Kubernetes clusters simultaneously
+- **Rancher Integration**: Automatically register clusters with Rancher server
+- **Mock Kubernetes API**: Full Kubernetes API simulation with health checks, nodes, pods, services, etc.
+- **Configurable**: YAML-based configuration for easy customization
+- **REST API**: HTTP API for managing clusters and monitoring status
 
 ## Architecture
 
-The agent consists of several key components:
+The Scale Cluster Agent consists of several components:
 
-1. **WebSocket Client**: Maintains persistent connection to Rancher server
-2. **HTTP Server**: Provides REST API for cluster management
-3. **Cluster Manager**: Manages virtual cluster instances and their data
-4. **Template Engine**: Generates cluster configurations from templates
-5. **Configuration Manager**: Handles configuration loading and validation
+1. **Main Agent**: Manages the overall lifecycle and provides REST API
+2. **Mock Server Manager**: Creates and manages mock Kubernetes API servers
+3. **Mock Kubernetes API Servers**: Simulate real Kubernetes clusters with HTTPS/TLS
+4. **Rancher Integration**: Registers clusters with Rancher server
 
-## Installation
+## Configuration
 
-### Prerequisites
+Create a `config.yaml` file with the following structure:
 
-- Go 1.23 or later
-- Access to a Rancher server instance
-- Bearer token for Rancher API access
-
-### Building
-
-```bash
-# Clone the repository
-git clone <repository-url>
-cd rancher/scale-cluster-agent
-
-# Build the binary
-go build -o bin/scale-cluster-agent main.go
-```
-
-### Configuration
-
-1. Create the configuration directory:
-```bash
-mkdir -p ~/.scale-cluster-agent/config
-```
-
-2. Create the main configuration file `~/.scale-cluster-agent/config`:
 ```yaml
-RancherURL: https://your-rancher-server.com/
-BearerToken: token-xxxxx:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-ListenPort: 9090
-LogLevel: info
-```
+# Rancher Server Configuration
+rancher_server:
+  url: "https://your-rancher-server.com"
+  token: "your-rancher-token"
+  ca_cert: ""  # Optional: CA certificate for Rancher server
+  insecure: false  # Set to true to skip TLS verification
 
-3. (Optional) Create a custom cluster template `~/.scale-cluster-agent/config/cluster.yaml`:
-```yaml
-name: "{{cluster-name}}"
-nodes:
-  - name: "{{cluster-name}}-node1"
-    status: "Ready"
-    roles: ["control-plane", "etcd", "master"]
-    # ... more configuration
+# Agent Configuration
+agent:
+  id: "scale-cluster-agent-001"
+  name: "Scale Cluster Agent"
+  listen_port: 9090
+
+# Cluster Configuration
+clusters:
+  - name: "cluster-1"
+    display_name: "Production Cluster 1"
+    description: "Production cluster for web applications"
+    k8s_version: "v1.28.0"
+    node_count: 5
+    region: "us-west-2"
+    labels:
+      environment: "production"
+      team: "platform"
+
+# Mock Server Configuration
+mock_server:
+  enabled: true
+  port_range_start: 30000
+  port_range_end: 31000
+  tls_enabled: true
+
+# Connection Settings
+connection:
+  timeout: "30s"
+  keep_alive: true
+  max_retries: 3
+  retry_delay: "5s"
+
+# Logging Configuration
+logging:
+  format: "info"  # debug, info, warn, error
+  output: "stdout"
 ```
 
 ## Usage
 
-### Starting the Agent
+### 1. Build the Agent
 
 ```bash
-# Run the agent
-./bin/scale-cluster-agent
+cd scale-cluster-agent
+go build -o scale-cluster-agent main.go
+```
+
+### 2. Configure the Agent
+
+Copy the example configuration and customize it:
+
+```bash
+cp config.example config.yaml
+# Edit config.yaml with your Rancher server details
+```
+
+### 3. Run the Agent
+
+```bash
+nohup ./bin/scale-cluster-agent > scale-agent-debug-$(date +%Y%m%d-%H%M%S).log 2>&1 &
 ```
 
 The agent will:
-1. Load configuration from `~/.scale-cluster-agent/config`
-2. Establish WebSocket connection to Rancher server
-3. Start HTTP server on the configured port
-4. Begin reporting cluster information
+- Start the main HTTP server on the configured port
+- Create mock Kubernetes API servers for each configured cluster
+- Each mock server runs on HTTPS with self-signed certificates
+- Register clusters with Rancher server
 
-### REST API Endpoints
+### 4. Monitor and Manage Clusters
 
-#### Health Check
-```bash
-GET /health
-```
-Returns agent status and cluster count.
-
-#### Create Cluster
-```bash
-POST /clusters
-Content-Type: application/json
-
-{
-  "name": "test-cluster-001"
-}
-```
-
-#### List Clusters
-```bash
-GET /clusters
-```
-Returns list of all managed clusters.
-
-#### Delete Cluster
-```bash
-DELETE /clusters/{name}
-```
-
-### Example Usage
+The agent provides a REST API for cluster management:
 
 ```bash
-# Create a new cluster
-curl -X POST http://localhost:9090/clusters \
-  -H "Content-Type: application/json" \
-  -d '{"name": "test-cluster-001"}'
+# Check agent health
+curl http://localhost:9090/health
 
 # List all clusters
 curl http://localhost:9090/clusters
 
-# Check agent health
-curl http://localhost:9090/health
+# Get cluster status
+curl http://localhost:9090/clusters/cluster-1/status
 
-# Delete a cluster
-curl -X DELETE http://localhost:9090/clusters/test-cluster-001
+# Register a cluster with Rancher
+curl -X POST http://localhost:9090/clusters/cluster-1/register
+
+# Create a new cluster
+curl -X POST http://localhost:9090/clusters \
+  -H "Content-Type: application/json" \
+  -d '{"name": "new-cluster"}'
 ```
 
-## Cluster Template
+## Mock Kubernetes API Servers
 
-The cluster template defines the structure and default values for simulated clusters. The template uses placeholders that are replaced with actual values when creating clusters:
+Each cluster gets its own mock Kubernetes API server that:
 
-- `{{cluster-name}}`: Replaced with the actual cluster name
+- Runs on HTTPS with self-signed certificates
+- Responds to standard Kubernetes API endpoints
+- Simulates cluster resources (nodes, pods, services, etc.)
+- Maintains persistent connections like real Kubernetes clusters
+- Provides health checks and readiness probes
 
-### Template Structure
+### Supported Endpoints
 
-```yaml
-name: "{{cluster-name}}"
-nodes:
-  - name: "{{cluster-name}}-node1"
-    status: "Ready"
-    roles: ["control-plane", "etcd", "master"]
-    # ... node configuration
+- `/healthz` - Health check endpoint
+- `/readyz` - Readiness check endpoint
+- `/api/v1/nodes` - Node information
+- `/api/v1/pods` - Pod information
+- `/api/v1/services` - Service information
+- `/api/v1/namespaces` - Namespace information
+- `/api/v1/secrets` - Secret information
+- `/api/v1/configmaps` - ConfigMap information
 
-pods:
-  - name: "coredns-6799fbcd5-lgj8v"
-    namespace: "kube-system"
-    # ... pod configuration
+## Rancher Integration
 
-services:
-  - name: "kubernetes"
-    namespace: "default"
-    # ... service configuration
+The agent automatically:
 
-# ... other resource types
-```
+1. Creates clusters in Rancher via the v3 API
+2. Configures cluster metadata and labels
+3. Sets up proper cluster registration
+4. Brings clusters to 'Active' state
 
-## Configuration Options
+### Cluster Registration Process
 
-### Main Configuration (`~/.scale-cluster-agent/config`)
+1. **Create Cluster**: Agent creates cluster in Rancher via API
+2. **Mock Server**: Starts HTTPS mock Kubernetes API server
+3. **Rancher Connection**: Rancher connects to mock server for cluster management
+4. **Active State**: Cluster reaches 'Active' state in Rancher
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `RancherURL` | Rancher server URL | Required |
-| `BearerToken` | Rancher API bearer token | Required |
-| `ListenPort` | HTTP server port | 9090 |
-| `LogLevel` | Logging level (debug, info, warn, error) | info |
+## Security Features
 
-### Environment Variables
-
-- `SCALE_AGENT_CONFIG_DIR`: Override configuration directory path
-- `SCALE_AGENT_LOG_LEVEL`: Override log level
+- **HTTPS/TLS**: All mock servers use HTTPS with TLS 1.2+
+- **Self-Signed Certificates**: Automatically generated per cluster
+- **Certificate Validation**: Proper certificate chain and validation
+- **Secure Cipher Suites**: Modern, secure cipher suite selection
 
 ## Development
 
@@ -182,105 +173,59 @@ services:
 
 ```
 scale-cluster-agent/
-├── main.go              # Main application entry point
-├── go.mod               # Go module definition
-├── go.sum               # Go module checksums
-├── cluster.yaml         # Sample cluster template
-└── README.md           # This file
+├── main.go              # Main application code
+├── config.yaml          # Configuration file
+├── config.example       # Example configuration
+├── cluster.yaml         # Cluster template
+├── README.md            # This file
+└── IMPLEMENTATION.md    # Implementation details
 ```
 
-### Building for Development
+### Key Components
+
+- **MockServerManager**: Manages mock Kubernetes API servers
+- **MockServer**: Individual mock Kubernetes API server
+- **ScaleAgent**: Main agent that orchestrates everything
+- **Configuration**: YAML-based configuration system
+
+### Building and Testing
 
 ```bash
-# Install dependencies
-go mod tidy
+# Build
+go build -o scale-cluster-agent main.go
 
-# Run with debug logging
-LOG_LEVEL=debug go run main.go
-
-# Build with specific version
-go build -ldflags "-X main.version=1.0.0" -o bin/scale-cluster-agent main.go
-```
-
-### Testing
-
-```bash
-# Run tests
+# Run tests (if available)
 go test ./...
 
-# Run with coverage
-go test -cover ./...
+# Run with debug logging
+LOG_LEVEL=debug ./scale-cluster-agent
 ```
-
-## Integration with Rancher
-
-The Scale Cluster Agent integrates with Rancher by:
-
-1. **WebSocket Connection**: Establishes persistent WebSocket connection to Rancher server
-2. **Authentication**: Uses bearer token for API authentication
-3. **Cluster Registration**: Registers virtual clusters with Rancher
-4. **Data Reporting**: Periodically sends cluster resource information
-5. **Lifecycle Management**: Handles cluster creation and deletion
-
-### Rancher Server Requirements
-
-- Rancher v2.6+ (tested with v2.11.3)
-- API access enabled
-- Valid bearer token with cluster management permissions
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Connection Failed**
-   - Verify Rancher server URL is accessible
-   - Check bearer token is valid and not expired
-   - Ensure network connectivity
+1. **Port Conflicts**: Ensure port ranges don't conflict with existing services
+2. **Certificate Issues**: Mock servers generate self-signed certificates automatically
+3. **Rancher Connection**: Verify Rancher server URL and token are correct
+4. **HTTPS Issues**: Ensure TLS is properly configured in Rancher
 
-2. **Cluster Creation Fails**
-   - Verify cluster name is unique
-   - Check Rancher API permissions
-   - Review server logs for errors
+### Logs
 
-3. **WebSocket Disconnection**
-   - Agent automatically reconnects every 5 seconds
-   - Check Rancher server WebSocket endpoint
-   - Verify firewall settings
+The agent provides detailed logging for debugging:
 
-### Logging
+- Mock server creation and management
+- Rancher API interactions
+- Cluster registration status
+- HTTPS/TLS connection details
 
-The agent uses structured logging with different levels:
+### Health Checks
 
-- `debug`: Detailed debugging information
-- `info`: General operational information
-- `warn`: Warning messages
-- `error`: Error conditions
+Monitor the agent's health:
 
-### Monitoring
-
-Monitor the agent using:
-
-- Health check endpoint: `GET /health`
-- Application logs
-- Rancher server cluster list
-- System resource usage
-
-## Security Considerations
-
-- Store bearer tokens securely
-- Use HTTPS for Rancher server connections
-- Restrict access to agent HTTP endpoints
-- Regularly rotate API tokens
-- Monitor for unauthorized cluster creation
-
-## Performance
-
-The agent is designed for scalability testing:
-
-- Supports thousands of virtual clusters
-- Efficient memory usage with template-based generation
-- Configurable reporting intervals
-- Minimal CPU and network overhead
+```bash
+curl http://localhost:9090/health
+```
 
 ## Contributing
 
@@ -292,13 +237,12 @@ The agent is designed for scalability testing:
 
 ## License
 
-This project is licensed under the Apache License 2.0.
+This project is part of the Rancher ecosystem and follows the same licensing terms.
 
 ## Support
 
 For issues and questions:
-
-1. Check the troubleshooting section
-2. Review Rancher documentation
-3. Open an issue in the repository
-4. Contact the development team 
+- Check the logs for detailed error messages
+- Verify configuration settings
+- Ensure Rancher server is accessible
+- Check network connectivity and firewall rules 
