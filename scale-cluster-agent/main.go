@@ -1,14 +1,20 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/big"
 	"net"
 	"net/http"
 	"net/url"
@@ -141,6 +147,9 @@ type ScaleAgent struct {
 	forwarderMutex    sync.RWMutex              // Protect port forwarders
 	nextPort          int                       // Next available port for clusters
 	portMutex         sync.Mutex                // Protect port allocation
+	firstClusterConnected bool // track first fake cluster connection
+	mockCertPEM           []byte
+	nameCounters       map[string]int // track next suffix per base name
 }
 
 type CreateClusterRequest struct {
@@ -192,6 +201,7 @@ func main() {
 		mockServers:       make(map[string]*http.Server),
 		portForwarders:    make(map[string]*PortForwarder),
 		nextPort:          1, // Start from port 8001
+		nameCounters:      make(map[string]int),
 	}
 
 	// Load cluster template
@@ -609,262 +619,65 @@ func (a *ScaleAgent) connectClusterToRancher(clusterName, clusterID string, clus
 	// - address: Kubernetes API server address (e.g., "10.43.0.1:443")
 	// - caCert: Base64-encoded CA certificate
 	// - token: Service account token
+	// Start mock HTTPS API server once on localhost:4567
+	if len(a.mockCertPEM) == 0 {
+		certPEM, _, cert, err := generateSelfSignedCert("localhost")
+		if err != nil {
+			logrus.Errorf("cert generation failed: %v", err)
+			return
+		}
+		a.mockCertPEM = certPEM
+		apiAddr := "127.0.0.1:4567"
+		go a.startMockHTTPSAPIServer(apiAddr, cert, clusterName)
+	}
+	localAPI := "127.0.0.1:4567"
+	caB64 := base64.StdEncoding.EncodeToString(a.mockCertPEM)
 	clusterParams := map[string]interface{}{
-		"address": "10.43.0.1:443",                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    // Simulated Kubernetes API server address
-		"caCert":  "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUJkekNDQVIyZ0F3SUJBZ0lCQURBS0JnZ3Foa2pPUFFRREFqQWpNU0V3SHdZRFZRUUREQmhyTTNNdGMyVnkKZG1WeUxXTmhRREUzTlRNNU1qY3pOVEl3SGhjTk1qVXdOek14TURJd01qTXlXaGNOTXpVd056STVNREl3TWpNeQpXakFqTVNFd0h3WURWUVFEREJock0zTXRjMlZ5ZG1WeUxXTmhRREUzTlRNNU1qY3pOVEl3V1RBVEJnY3Foa2pPClBRSUJCZ2dxaGtqT1BRTUJCd05DQUFUK0tDazFjWkE0Z1pyOGJEV0JSWFNtSEZpZGZ0UFBYRm82VUorM0RCTWgKTUJocVBuSVFWcjRxR25SbXRuL3hNd3ViZzV3a2FlNXhDWWZNU0R2aGJxcVBvMEl3UURBT0JnTlZIUThCQWY4RQpCQU1DQXFRd0R3WURWUjBUQVFIL0JBVXdBd0VCL3pBZEJnTlZIUTRFRmdRVXBpcWMwazEwSXVKVnZ1dzBhaHgyCi9uSHl3TFF3Q2dZSUtvWkl6ajBFQXdJRFNBQXdSUUlnS0ZiSWJhKzd0Tm9CVWZvVis3dEdEN3FRTWdjVEgyeXkKU2pKYTFOODNkNW9DSVFEWEZ4VERELzhQNFF3WDNsRDg0ZU9wQlVTMENZZC8zNXdPb2JaT3VVNWUxUT09Ci0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K",                                                                                                                                                         // Simulated CA cert
-		"token":   "eyJhbGciOiJSUzI1NiIsImtpZCI6InBlSXFkTGYwVmVfZVVqUGNKZzFYSUExV25XbGtRSDd5bnNyZTcwTWQ2bncifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJjYXR0bGUtc3lzdGVtIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZWNyZXQubmFtZSI6ImNhdHRsZS10b2tlbi1ubnF4cSIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VydmljZS1hY2NvdW50Lm5hbWUiOiJjYXR0bGUiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC51aWQiOiI3NGY1NDUzOC1lYjc1LTRkNmItOGVmYy1lZjY4MDQ5MTk4NTQiLCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6Y2F0dGxlLXN5c3RlbTpjYXR0bGUifQ.Ocy7h9xQMbw6xcWvLIKe6icd2P6Vb265UKaNzRdlYTfy704AVU6lCltWm-cb_2ne-5PAvw0AzBCpNoCUhDUFnwgSZnJDpVcAolSyKNJShH2hXnamPRD9s-q-6OtP3fdYe_Ospp_hHhfRF1xpbW9xgx5rdZCNYW5pb_06xtn4X0LzFP9hiD7_B_NgHTB4E-DBfdlj3U8HUmNTyHJTbMxNklGZd1PHKe6eZXqzPBUTFtxLj4dCgDvQh2VgxlA8H6AJlY0zivb6ohnXgpUZ1hzmhScPHgbm9cPAQQji24OZumznAZCWA2B1SS0Wd4GlNcXBZ65Dky_dub2y6MSv-LbpcQ", // Simulated service account token
+		"address": localAPI,
+		"caCert":  caB64,
+		"token":   token,
 	}
-
-	// Match the exact structure returned by cluster.Params()
-	params := map[string]interface{}{
-		"cluster": clusterParams,
-	}
-
-	// Marshal and encode parameters like real agent
-	bytes, err := json.Marshal(params)
+	params := map[string]interface{}{"cluster": clusterParams}
+	payload, err := json.Marshal(params)
 	if err != nil {
-		logrus.Errorf("Failed to marshal params: %v", err)
+		logrus.Errorf("marshal params: %v", err)
 		return
 	}
+	encodedParams := base64.StdEncoding.EncodeToString(payload)
+	logrus.Infof("Prepared tunnel params for %s: %s", clusterName, string(payload))
 
-	// Debug: Log the parameters being sent
-	logrus.Debugf("Cluster parameters: %s", string(bytes))
-	logrus.Debugf("Base64 encoded params: %s", base64.StdEncoding.EncodeToString(bytes))
+	headers := http.Header{}
+	headers.Set("X-API-Tunnel-Token", token)
+	headers.Set("X-API-Tunnel-Params", encodedParams)
 
-	// Use the EXACT header names from real agent logs
-	headers := http.Header{
-		"X-API-Tunnel-Token":  {token},                                    // Use extracted token from import YAML
-		"X-API-Tunnel-Params": {base64.StdEncoding.EncodeToString(bytes)}, // Use correct header name
-	}
-	
-	logrus.Infof("Using token in WebSocket headers: %s", token[:10]+"...")
-
-	// Debug: Log the headers being sent
-	logrus.Debugf("WebSocket headers: X-API-Tunnel-Token=%s, X-API-Tunnel-Params=%s",
-		"",
-		base64.StdEncoding.EncodeToString(bytes)[:20]+"...")
-
-	// Define allow function like real agent
 	allowFunc := func(proto, address string) bool {
-		switch proto {
-		case "tcp":
-			// Allow connections to the Kubernetes API server address and our local server
-			if address == "10.43.0.1:443" {
-				logrus.Infof("Allowing connection to Kubernetes API server: %s", address)
-				return true
-			}
-			// Also allow connections to our local server
-			port := 8000 + len(a.clusters)
-			if address == fmt.Sprintf("127.0.0.1:%d", port) {
-				logrus.Infof("Allowing connection to local API server: %s", address)
-				return true
-			}
-			return true
-		case "unix":
-			return address == "/var/run/docker.sock"
-		case "npipe":
-			return address == "//./pipe/docker_engine"
-		}
-		return false
+		return proto == "tcp" && address == localAPI
 	}
 
-	// Define onConnect function
-	onConnect := func(ctx context.Context, session *remotedialer.Session) error {
-		logrus.Infof("Successfully connected to Rancher for cluster %s", clusterName)
-
-		// Simulate ConfigClient call like the real agent does to get initial configuration
-		connectConfig := fmt.Sprintf("https://%s/v3/connect/config", strings.TrimPrefix(clusterInfo.ClusterID, "https://"))
-
-		logrus.Infof("DEBUG: Simulating ConfigClient call for cluster %s at %s", clusterName, connectConfig)
-		// Simulate successful config response with 30-second interval
-		interval := 30
-		logrus.Infof("DEBUG: ConfigClient simulation successful for cluster %s, interval: %d", clusterName, interval)
-
-		// Simulate rancher.Run() call (like real agent)
-		logrus.Infof("DEBUG: Simulating rancher.Run() for cluster %s", clusterName)
-		time.Sleep(1 * time.Second)
-
-		// Start sending simulated cluster data
-		go a.sendClusterDataViaRemotedialer(clusterName, session, clusterInfo)
-
-		// Start plan monitor like real agent (simplified)
-		go func() {
-			logrus.Infof("DEBUG: Starting plan monitor for cluster %s, checking every %d seconds", clusterName, interval)
-			tt := time.Duration(interval) * time.Second
-			for {
-				select {
-				case <-time.After(tt):
-					// Simulate successful plan check
-					logrus.Debugf("DEBUG: Plan monitor for cluster %s: simulated successful check", clusterName)
-				case <-ctx.Done():
-					logrus.Infof("DEBUG: Plan monitor for cluster %s stopped", clusterName)
-					return
-				}
-			}
-		}()
-
+	onConnect := func(ctx context.Context, s *remotedialer.Session) error {
+		logrus.Infof("WebSocket connected for %s; Rancher should now dial %s", clusterName, localAPI)
 		return nil
 	}
 
-	// Use remotedialer.ClientConnect with cluster-specific credentials
-	logrus.Infof("Attempting WebSocket connection to %s for cluster %s", wsURL, clusterName)
-	remotedialer.ClientConnect(a.ctx, wsURL, headers, nil, allowFunc, onConnect)
-
-	// Start a local server to handle tunneled requests to 10.43.0.1:443
-	// We'll use a unique port for each cluster to avoid conflicts
-	port := 8000 + len(a.clusters)
-	go a.startLocalAPIServer(clusterName, port)
+	logrus.Infof("Connecting with mock address %s", localAPI)
+	go remotedialer.ClientConnect(a.ctx, wsURL, headers, nil, allowFunc, onConnect)
+	a.firstClusterConnected = true
 }
 
 func (a *ScaleAgent) sendClusterDataViaRemotedialer(clusterName string, session *remotedialer.Session, clusterInfo *ClusterInfo) {
 	logrus.Infof("Starting simulated cluster data transmission for %s", clusterName)
 
-	// Simulate Kubernetes API server being available
-	// This is what makes Rancher think the cluster is "active"
-	go a.simulateKubernetesAPIServer(clusterName, session)
-
-	// Keep the connection alive and send periodic updates
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
-
 	for {
 		select {
 		case <-ticker.C:
 			logrus.Debugf("Sending periodic cluster data for %s", clusterName)
-			// Simulate sending cluster metrics/data
 		case <-a.ctx.Done():
 			logrus.Infof("Stopping cluster data transmission for %s", clusterName)
 			return
 		}
 	}
-}
-
-func (a *ScaleAgent) simulateKubernetesAPIServer(clusterName string, session *remotedialer.Session) {
-	logrus.Infof("Starting simulated Kubernetes API server for cluster %s", clusterName)
-
-	// Start a real HTTP server that provides the API endpoints Rancher expects
-	go func() {
-		// Use a unique port for each cluster to avoid conflicts
-		port := 8000 + len(a.clusters)
-
-		// Create a mock Kubernetes API server
-		mux := http.NewServeMux()
-
-		// Health check endpoints that Rancher expects
-		mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
-			logrus.Debugf("Health check request for cluster %s: %s", clusterName, r.URL.Path)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"status":"ok"}`))
-		})
-
-		mux.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
-			logrus.Debugf("Ready check request for cluster %s: %s", clusterName, r.URL.Path)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"status":"ok"}`))
-		})
-
-		// Kubernetes API endpoints
-		mux.HandleFunc("/api/v1", func(w http.ResponseWriter, r *http.Request) {
-			logrus.Debugf("API v1 request for cluster %s: %s", clusterName, r.URL.Path)
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{
-				"kind": "APIResourceList",
-				"apiVersion": "v1",
-				"groupVersion": "v1",
-				"resources": [
-					{"name": "pods", "namespaced": true, "kind": "Pod"},
-					{"name": "services", "namespaced": true, "kind": "Service"},
-					{"name": "nodes", "namespaced": false, "kind": "Node"},
-					{"name": "namespaces", "namespaced": false, "kind": "Namespace"},
-					{"name": "secrets", "namespaced": true, "kind": "Secret"},
-					{"name": "configmaps", "namespaced": true, "kind": "ConfigMap"}
-				]
-			}`))
-		})
-
-		// Root endpoint
-		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			logrus.Debugf("Root request for cluster %s: %s", clusterName, r.URL.Path)
-			if r.URL.Path == "/" {
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusOK)
-				w.Write([]byte(`{
-					"kind": "APIVersions",
-					"versions": ["v1"],
-					"serverAddressByClientCIDRs": [
-						{"clientCIDR": "0.0.0.0/0", "serverAddress": "10.43.0.1:443"}
-					]
-				}`))
-			} else {
-				http.NotFound(w, r)
-			}
-		})
-
-		// Start the server
-		server := &http.Server{
-			Addr:    fmt.Sprintf(":%d", port),
-			Handler: mux,
-		}
-
-		// Store the server reference
-		a.serverMutex.Lock()
-		a.mockServers[clusterName] = server
-		a.serverMutex.Unlock()
-
-		logrus.Infof("Starting mock Kubernetes API server for cluster %s on port %d", clusterName, port)
-
-		// Simulate the embedded Rancher server startup process (like real agent)
-		go func() {
-			logrus.Infof("DEBUG: Simulating embedded Rancher server startup for cluster %s", clusterName)
-
-			// Step 1: Start Service controller (like real agent)
-			logrus.Infof("DEBUG: Starting /v1, Kind=Service controller for cluster %s", clusterName)
-			time.Sleep(1 * time.Second)
-
-			// Step 2: Start API controllers (like real agent)
-			logrus.Infof("DEBUG: Starting API controllers for cluster %s", clusterName)
-			time.Sleep(1 * time.Second)
-
-			// Step 3: Start embedded server (like real agent)
-			logrus.Infof("DEBUG: Starting embedded Rancher server for cluster %s", clusterName)
-			logrus.Infof("DEBUG: Listening on :443 for cluster %s", clusterName)
-			logrus.Infof("DEBUG: Listening on :80 for cluster %s", clusterName)
-			logrus.Infof("DEBUG: Listening on :444 for cluster %s", clusterName)
-			time.Sleep(1 * time.Second)
-
-			// Step 4: Start Steve aggregation (like real agent)
-			logrus.Infof("DEBUG: Starting steve aggregation client for cluster %s", clusterName)
-			time.Sleep(1 * time.Second)
-
-			// Step 5: Win leader election (like real agent)
-			logrus.Infof("DEBUG: Successfully acquired lease kube-system/cattle-controllers for cluster %s", clusterName)
-			time.Sleep(1 * time.Second)
-
-			// Step 6: Start ServiceAccountSecretCleaner (like real agent)
-			logrus.Infof("DEBUG: Starting ServiceAccountSecretCleaner for cluster %s", clusterName)
-			time.Sleep(1 * time.Second)
-
-			// Step 7: Complete Steve auth (like real agent)
-			logrus.Infof("DEBUG: Steve auth startup complete for cluster %s", clusterName)
-
-			logrus.Infof("Simulated embedded Rancher server for cluster %s is now fully operational", clusterName)
-			logrus.Infof("Cluster %s should now appear as 'Active' in Rancher", clusterName)
-		}()
-
-		// Start the HTTP server
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logrus.Errorf("Mock API server error for cluster %s: %v", clusterName, err)
-		}
-	}()
-
-	// Give the embedded server time to start
-	time.Sleep(8 * time.Second)
-
-	logrus.Infof("Simulated Kubernetes API server for cluster %s is now responding to health checks", clusterName)
-	logrus.Infof("Cluster %s should now appear as 'Active' in Rancher", clusterName)
 }
 
 // HTTP handlers
@@ -883,47 +696,69 @@ func (a *ScaleAgent) createClusterHandler(w http.ResponseWriter, r *http.Request
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-
 	if req.Name == "" {
 		http.Error(w, "Cluster name is required", http.StatusBadRequest)
 		return
 	}
 
-	// Check if cluster already exists
-	if _, exists := a.clusters[req.Name]; exists {
-		http.Error(w, "Cluster already exists", http.StatusConflict)
-		return
-	}
+	if a.nameCounters == nil { a.nameCounters = make(map[string]int) }
+	baseName := req.Name
+	attemptName := baseName
+	var clusterID string
+	var err error
+	var clusterInfo *ClusterInfo
 
-	// Create new cluster from template
-	clusterInfo := a.createClusterFromTemplate(req.Name)
+	for attempt := 0; attempt < 15; attempt++ { // more attempts for deterministic suffixes
+		// If in-memory duplicate, increment suffix
+		if _, exists := a.clusters[attemptName]; exists {
+			idx := a.nameCounters[baseName]
+			idx++
+			a.nameCounters[baseName] = idx
+			attemptName = fmt.Sprintf("%s-%d", baseName, idx)
+		}
 
-	// Create cluster in Rancher
-	clusterID, err := a.createClusterInRancher(req.Name)
-	if err != nil {
+		clusterInfo = a.createClusterFromTemplate(attemptName)
+		clusterID, err = a.createClusterInRancher(attemptName)
+		if err == nil {
+			break
+		}
+		if strings.Contains(err.Error(), "\"code\":\"NotUnique\"") {
+			idx := a.nameCounters[baseName]
+			idx++
+			a.nameCounters[baseName] = idx
+			old := attemptName
+			attemptName = fmt.Sprintf("%s-%d", baseName, idx)
+			logrus.Warnf("Cluster name '%s' not unique, retrying with '%s'", old, attemptName)
+			continue
+		}
 		logrus.Errorf("Failed to create cluster in Rancher: %v", err)
 		http.Error(w, "Failed to create cluster", http.StatusInternalServerError)
 		return
 	}
 
-	// Store the real cluster ID
+	if err != nil {
+		http.Error(w, "Failed to create cluster after retries", http.StatusInternalServerError)
+		return
+	}
+
 	clusterInfo.ClusterID = clusterID
-	a.clusters[req.Name] = clusterInfo
-
-	// Log that we now have clusters and will start WebSocket connection
-	if len(a.clusters) == 2 { // template + 1 cluster
-		logrus.Info("First cluster created, WebSocket connection to Rancher will start")
+	clusterInfo.Name = attemptName
+	if attemptName != baseName {
+		logrus.Infof("Cluster name adjusted from %s to unique %s", baseName, attemptName)
 	}
+	if a.clusters == nil { a.clusters = map[string]*ClusterInfo{} }
+	if attemptName == "template" { attemptName = attemptName + "-real" }
+	if a.clusters[attemptName] != nil { logrus.Warnf("Overwriting existing simulated cluster entry for %s", attemptName) }
+	a.clusters[attemptName] = clusterInfo
 
-	response := CreateClusterResponse{
-		Success:   true,
-		Message:   fmt.Sprintf("Cluster %s created successfully", req.Name),
-		ClusterID: clusterID,
-	}
+	if len(a.clusters) == 2 { logrus.Info("First cluster created, WebSocket connection to Rancher will start") }
 
+	response := CreateClusterResponse{ Success: true, Message: fmt.Sprintf("Cluster %s created successfully", attemptName), ClusterID: clusterID }
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(response)
+
+	if len(a.clusters) == 2 { go func(ci *ClusterInfo) { time.Sleep(2 * time.Second); logrus.Infof("[single-cluster] Initiating first fake cluster websocket flow for %s", ci.Name); a.connectClusterToRancher(ci.Name, ci.ClusterID, ci) }(clusterInfo) }
 }
 
 func (a *ScaleAgent) listClustersHandler(w http.ResponseWriter, r *http.Request) {
@@ -1283,196 +1118,133 @@ func (a *ScaleAgent) extractClusterCredentials(importYAML string) (string, strin
 	return token, url, nil
 }
 
-// startLocalAPIServer starts a local HTTP server to handle tunneled requests to 10.43.0.1:443
-func (a *ScaleAgent) startLocalAPIServer(clusterName string, port int) {
-	addr := fmt.Sprintf("127.0.0.1:%d", port)
+// Deprecated: legacy startLocalAPIServer replaced by mock HTTPS server.
+func (a *ScaleAgent) startLocalAPIServer(clusterName string, port int) { logrus.Debugf("startLocalAPIServer deprecated: cluster=%s port=%d", clusterName, port) }
 
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		logrus.Errorf("Failed to start local API server for cluster %s: %v", clusterName, err)
-		return
+// Forward declarations (ensure functions exist before use)
+// generateSelfSignedCert and startMockHTTPSAPIServer are implemented later in file.
+func generateSelfSignedCert(host string) ([]byte, []byte, tls.Certificate, error) {
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil { return nil, nil, tls.Certificate{}, fmt.Errorf("generate key: %w", err) }
+	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	if err != nil { return nil, nil, tls.Certificate{}, fmt.Errorf("serial: %w", err) }
+	tmpl := x509.Certificate{
+		SerialNumber: serialNumber,
+		Subject: pkix.Name{CommonName: host, Organization: []string{"scale-cluster-agent"}},
+		DNSNames:    []string{"localhost", host},
+		IPAddresses: []net.IP{net.ParseIP("127.0.0.1")},
+		NotBefore:   time.Now().Add(-time.Hour),
+		NotAfter:    time.Now().Add(365 * 24 * time.Hour),
+		KeyUsage:    x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
+		IsCA:        true,
+		BasicConstraintsValid: true,
 	}
-	defer listener.Close()
+	derBytes, err := x509.CreateCertificate(rand.Reader, &tmpl, &tmpl, &priv.PublicKey, priv)
+	if err != nil { return nil, nil, tls.Certificate{}, fmt.Errorf("create cert: %w", err) }
+	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
+	crt, err := tls.X509KeyPair(certPEM, keyPEM)
+	if err != nil { return nil, nil, tls.Certificate{}, fmt.Errorf("x509 key pair: %w", err) }
+	return certPEM, keyPEM, crt, nil
+}
 
-	logrus.Infof("Started local API server for cluster %s on %s", clusterName, addr)
-
-	// Add the server address to the allowFunc so remotedialer can connect to it
-	a.connMutex.Lock()
-	a.activeConnections[clusterName] = true
-	a.connMutex.Unlock()
-
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			logrus.Errorf("Failed to accept connection for cluster %s: %v", clusterName, err)
-			continue
-		}
-
-		go func() {
-			defer conn.Close()
-
-			// Read the HTTP request
-			reader := bufio.NewReader(conn)
-			request, err := reader.ReadString('\n')
-			if err != nil {
-				logrus.Errorf("Failed to read request for cluster %s: %v", clusterName, err)
-				return
-			}
-
-			logrus.Infof("Received request for cluster %s: %s", clusterName, strings.TrimSpace(request))
-
-			// Parse the request line
-			parts := strings.Fields(request)
-			if len(parts) < 2 {
-				logrus.Errorf("Invalid request format for cluster %s: %s", clusterName, request)
-				return
-			}
-
-			method := parts[0]
-			path := parts[1]
-
-			logrus.Infof("Processing %s %s for cluster %s", method, path, clusterName)
-
-			// Handle different API endpoints
-			var response string
-			switch path {
-			case "/api/v1/namespaces/kube-system":
-				response = `HTTP/1.1 200 OK
-Content-Type: application/json
-Content-Length: 234
-
-{
-	"kind": "Namespace",
-	"apiVersion": "v1",
-	"metadata": {
-		"name": "kube-system",
-		"uid": "cluster-` + clusterName + `-kube-system",
-		"resourceVersion": "1",
-		"creationTimestamp": "2025-08-03T00:00:00Z"
-	},
-	"spec": {
-		"finalizers": ["kubernetes"]
-	},
-	"status": {
-		"phase": "Active"
-	}
-}`
-
-			case "/healthz":
-				response = `HTTP/1.1 200 OK
-Content-Type: application/json
-Content-Length: 15
-
-{"status":"ok"}`
-
-			case "/readyz":
-				response = `HTTP/1.1 200 OK
-Content-Type: application/json
-Content-Length: 15
-
-{"status":"ok"}`
-
-			case "/api/v1":
-				response = `HTTP/1.1 200 OK
-Content-Type: application/json
-Content-Length: 234
-
-{
-	"kind": "APIResourceList",
-	"apiVersion": "v1",
-	"groupVersion": "v1",
-	"resources": [
-		{"name": "pods", "namespaced": true, "kind": "Pod"},
-		{"name": "services", "namespaced": true, "kind": "Service"},
-		{"name": "nodes", "namespaced": false, "kind": "Node"},
-		{"name": "namespaces", "namespaced": false, "kind": "Namespace"},
-		{"name": "secrets", "namespaced": true, "kind": "Secret"},
-		{"name": "configmaps", "namespaced": true, "kind": "ConfigMap"}
-	]
-}`
-
-			case "/api/v1/secrets":
-				response = `HTTP/1.1 200 OK
-Content-Type: application/json
-Content-Length: 234
-
-{
-	"kind": "SecretList",
-	"apiVersion": "v1",
-	"metadata": {
-		"resourceVersion": "1"
-	},
-	"items": [
-		{
-			"kind": "Secret",
-			"apiVersion": "v1",
-			"metadata": {
-				"name": "default-token-abc123",
-				"namespace": "default",
-				"uid": "secret-` + clusterName + `-default-token",
-				"resourceVersion": "1"
-			},
-			"type": "kubernetes.io/service-account-token",
-			"data": {
-				"token": "ZXhhbXBsZS10b2tlbg==",
-				"ca.crt": "ZXhhbXBsZS1jYS1jZXJ0",
-				"namespace": "ZGVmYXVsdA=="
-			}
-		}
-	]
-}`
-
-			case "/api/v1/namespaces/default/secrets":
-				response = `HTTP/1.1 200 OK
-Content-Type: application/json
-Content-Length: 234
-
-{
-	"kind": "SecretList",
-	"apiVersion": "v1",
-	"metadata": {
-		"resourceVersion": "1"
-	},
-	"items": [
-		{
-			"kind": "Secret",
-			"apiVersion": "v1",
-			"metadata": {
-				"name": "default-token-abc123",
-				"namespace": "default",
-				"uid": "secret-` + clusterName + `-default-token",
-				"resourceVersion": "1"
-			},
-			"type": "kubernetes.io/service-account-token",
-			"data": {
-				"token": "ZXhhbXBsZS10b2tlbg==",
-				"ca.crt": "ZXhhbXBsZS1jYS1jZXJ0",
-				"namespace": "ZGVmYXVsdA=="
-			}
-		}
-	]
-}`
-
-			default:
-				logrus.Infof("Unknown endpoint %s for cluster %s, returning 404", path, clusterName)
-				response = `HTTP/1.1 404 Not Found
-Content-Type: application/json
-Content-Length: 123
-
-{
-	"kind": "Status",
-	"apiVersion": "v1",
-	"metadata": {},
-	"status": "Failure",
-	"message": "endpoint not found",
-	"reason": "NotFound",
-	"code": 404
-}`
-			}
-
-			// Write the response
-			conn.Write([]byte(response))
-			logrus.Infof("Sent response for %s %s to cluster %s", method, path, clusterName)
-		}()
-	}
+func (a *ScaleAgent) startMockHTTPSAPIServer(addr string, cert tls.Certificate, clusterName string) {
+    namespaces := map[string]map[string]interface{}{}
+    serviceAccounts := map[string]map[string]interface{}{}
+    secrets := map[string]map[string]interface{}{}
+    clusterRoles := map[string]interface{}{}
+    clusterRoleBindings := map[string]interface{}{}
+    ensureNS := func(ns string) {
+        if _, ok := namespaces[ns]; !ok {
+            namespaces[ns] = map[string]interface{}{ "apiVersion":"v1","kind":"Namespace","metadata":map[string]interface{}{"name":ns},"status":map[string]interface{}{"phase":"Active"} }
+        }
+        if _, ok := serviceAccounts[ns]; !ok { serviceAccounts[ns] = map[string]interface{}{} }
+        if _, ok := secrets[ns]; !ok { secrets[ns] = map[string]interface{}{} }
+    }
+    ensureNS("kube-system"); ensureNS("cattle-impersonation-system")
+    mux := http.NewServeMux()
+    logReq := func(h http.HandlerFunc) http.HandlerFunc { return func(w http.ResponseWriter, r *http.Request){ logrus.Debugf("MOCK API %s %s (cluster=%s)", r.Method, r.URL.Path, clusterName); h(w,r) } }
+    writeJSON := func(w http.ResponseWriter, status int, obj interface{}) { w.Header().Set("Content-Type","application/json"); w.WriteHeader(status); _ = json.NewEncoder(w).Encode(obj) }
+    genUID := func(name string) string { return fmt.Sprintf("%s-%d", name, time.Now().UnixNano()) }
+    // Basic endpoints
+    mux.HandleFunc("/healthz", logReq(func(w http.ResponseWriter, r *http.Request){ writeJSON(w,200,map[string]string{"status":"ok"}) }))
+    mux.HandleFunc("/readyz", logReq(func(w http.ResponseWriter, r *http.Request){ writeJSON(w,200,map[string]string{"status":"ok"}) }))
+    mux.HandleFunc("/livez", logReq(func(w http.ResponseWriter, r *http.Request){ w.WriteHeader(200); _,_ = w.Write([]byte("ok")) }))
+    mux.HandleFunc("/version", logReq(func(w http.ResponseWriter, r *http.Request){ writeJSON(w,200,map[string]string{"major":"1","minor":"28","gitVersion":"v1.28.5","platform":"linux/amd64"}) }))
+    mux.HandleFunc("/api", logReq(func(w http.ResponseWriter, r *http.Request){ writeJSON(w,200,map[string]interface{}{"kind":"APIVersions","versions":[]string{"v1"}}) }))
+    mux.HandleFunc("/api/v1", logReq(func(w http.ResponseWriter, r *http.Request){ writeJSON(w,200,map[string]interface{}{"kind":"APIResourceList","apiVersion":"v1","groupVersion":"v1","resources":[]map[string]interface{}{{"name":"pods","namespaced":true,"kind":"Pod"},{"name":"services","namespaced":true,"kind":"Service"},{"name":"nodes","namespaced":false,"kind":"Node"},{"name":"namespaces","namespaced":false,"kind":"Namespace"},{"name":"serviceaccounts","namespaced":true,"kind":"ServiceAccount"},{"name":"secrets","namespaced":true,"kind":"Secret"}}}) }))
+    mux.HandleFunc("/apis", logReq(func(w http.ResponseWriter, r *http.Request){ writeJSON(w,200,map[string]interface{}{"kind":"APIGroupList","apiVersion":"v1","groups":[]map[string]interface{}{{"name":"rbac.authorization.k8s.io","versions":[]map[string]string{{"groupVersion":"rbac.authorization.k8s.io/v1","version":"v1"}},"preferredVersion":map[string]string{"groupVersion":"rbac.authorization.k8s.io/v1","version":"v1"}},{"name":"apps","versions":[]map[string]string{{"groupVersion":"apps/v1","version":"v1"}},"preferredVersion":map[string]string{"groupVersion":"apps/v1","version":"v1"}}}}) }))
+    mux.HandleFunc("/apis/apps", logReq(func(w http.ResponseWriter, r *http.Request){ writeJSON(w,200,map[string]interface{}{"kind":"APIGroup","apiVersion":"v1","name":"apps","versions":[]map[string]string{{"groupVersion":"apps/v1","version":"v1"}},"preferredVersion":map[string]string{"groupVersion":"apps/v1","version":"v1"}}) }))
+    mux.HandleFunc("/apis/apps/v1", logReq(func(w http.ResponseWriter, r *http.Request){ writeJSON(w,200,map[string]interface{}{"kind":"APIResourceList","apiVersion":"v1","groupVersion":"apps/v1","resources":[]map[string]interface{}{{"name":"deployments","namespaced":true,"kind":"Deployment"}}}) }))
+    // RBAC
+    mux.HandleFunc("/apis/rbac.authorization.k8s.io/v1/clusterroles", logReq(func(w http.ResponseWriter, r *http.Request){ switch r.Method {case http.MethodGet: items:=[]interface{}{}; for _,cr:= range clusterRoles { items=append(items,cr)}; writeJSON(w,200,map[string]interface{}{"kind":"ClusterRoleList","apiVersion":"rbac.authorization.k8s.io/v1","items":items}); case http.MethodPost: var obj map[string]interface{}; _=json.NewDecoder(r.Body).Decode(&obj); md,_:=obj["metadata"].(map[string]interface{}); if md==nil { md=map[string]interface{}{} }; name,_:=md["name"].(string); if name=="" { name=fmt.Sprintf("cr-%d",time.Now().UnixNano()) }; if _,ex:=clusterRoles[name]; ex { writeJSON(w,409,map[string]interface{}{"kind":"Status","code":409,"reason":"AlreadyExists"}); return }; md["name"]=name; md["uid"]=genUID(name); md["creationTimestamp"]=time.Now().UTC().Format(time.RFC3339); obj["apiVersion"]="rbac.authorization.k8s.io/v1"; obj["kind"]="ClusterRole"; obj["metadata"]=md; clusterRoles[name]=obj; writeJSON(w,201,obj); default: w.WriteHeader(405)} }))
+    mux.HandleFunc("/apis/rbac.authorization.k8s.io/v1/clusterrolebindings", logReq(func(w http.ResponseWriter, r *http.Request){ switch r.Method {case http.MethodGet: items:=[]interface{}{}; for _,crb:= range clusterRoleBindings { items=append(items,crb)}; writeJSON(w,200,map[string]interface{}{"kind":"ClusterRoleBindingList","apiVersion":"rbac.authorization.k8s.io/v1","items":items}); case http.MethodPost: var obj map[string]interface{}; _=json.NewDecoder(r.Body).Decode(&obj); md,_:=obj["metadata"].(map[string]interface{}); if md==nil { md=map[string]interface{}{} }; name,_:=md["name"].(string); if name=="" { name=fmt.Sprintf("crb-%d",time.Now().UnixNano()) }; if _,ex:=clusterRoleBindings[name]; ex { writeJSON(w,409,map[string]interface{}{"kind":"Status","code":409,"reason":"AlreadyExists"}); return }; md["name"]=name; md["uid"]=genUID(name); md["creationTimestamp"]=time.Now().UTC().Format(time.RFC3339); obj["apiVersion"]="rbac.authorization.k8s.io/v1"; obj["kind"]="ClusterRoleBinding"; obj["metadata"]=md; clusterRoleBindings[name]=obj; writeJSON(w,201,obj); default: w.WriteHeader(405)} }))
+    mux.HandleFunc("/apis/rbac.authorization.k8s.io/v1/roles", logReq(func(w http.ResponseWriter, r *http.Request){ writeJSON(w,200,map[string]interface{}{"kind":"RoleList","apiVersion":"rbac.authorization.k8s.io/v1","items":[]interface{}{}}) }))
+    mux.HandleFunc("/apis/rbac.authorization.k8s.io/v1/rolebindings", logReq(func(w http.ResponseWriter, r *http.Request){ writeJSON(w,200,map[string]interface{}{"kind":"RoleBindingList","apiVersion":"rbac.authorization.k8s.io/v1","items":[]interface{}{}}) }))
+    // Namespaces list/create
+    mux.HandleFunc("/api/v1/namespaces", logReq(func(w http.ResponseWriter, r *http.Request){ switch r.Method {case http.MethodGet: items:=[]interface{}{}; for _,nsObj:= range namespaces { items=append(items,nsObj)}; writeJSON(w,200,map[string]interface{}{"kind":"NamespaceList","apiVersion":"v1","items":items}); case http.MethodPost: var obj map[string]interface{}; _=json.NewDecoder(r.Body).Decode(&obj); md,_:=obj["metadata"].(map[string]interface{}); if md==nil { md=map[string]interface{}{} }; name,_:=md["name"].(string); if name=="" { name=fmt.Sprintf("ns-%d",time.Now().UnixNano()) }; if _,ex:=namespaces[name]; ex { writeJSON(w,409,map[string]interface{}{"kind":"Status","code":409,"reason":"AlreadyExists"}); return }; ensureNS(name); writeJSON(w,201,namespaces[name]); default: w.WriteHeader(405)} }))
+    // Namespaced resources & namespace GET by name
+    mux.HandleFunc("/api/v1/namespaces/", logReq(func(w http.ResponseWriter, r *http.Request){ parts:=strings.Split(strings.TrimPrefix(r.URL.Path,"/api/v1/namespaces/"),"/")
+        if len(parts)==1 || parts[1]=="" { // namespace by name
+            if r.Method!=http.MethodGet { http.NotFound(w,r); return }
+            name := strings.TrimSuffix(parts[0],"/")
+            if ns,ok:=namespaces[name]; ok { writeJSON(w,200,ns); return }
+            writeJSON(w,404,map[string]interface{}{"kind":"Status","apiVersion":"v1","status":"Failure","reason":"NotFound","message":fmt.Sprintf("namespaces \"%s\" not found",name),"code":404}); return }
+        ns := parts[0]; ensureNS(ns)
+        if len(parts) >= 2 {
+            res := parts[1]
+            switch res {
+            case "serviceaccounts":
+                saMap := serviceAccounts[ns]
+                switch r.Method {
+                case http.MethodGet:
+                    items := []interface{}{}
+                    for _, v := range saMap { items = append(items, v) }
+                    writeJSON(w,200,map[string]interface{}{"kind":"ServiceAccountList","apiVersion":"v1","items":items}); return
+                case http.MethodPost:
+                    var obj map[string]interface{}; _=json.NewDecoder(r.Body).Decode(&obj)
+                    md,_:=obj["metadata"].(map[string]interface{}); if md==nil { md=map[string]interface{}{} }
+                    name,_:=md["name"].(string); if name=="" { name=fmt.Sprintf("sa-%d",time.Now().UnixNano()) }
+                    if _,exists:=saMap[name]; exists { writeJSON(w,409,map[string]interface{}{"kind":"Status","code":409,"reason":"AlreadyExists"}); return }
+                    md["name"],md["uid"],md["creationTimestamp"]=name,genUID(name),time.Now().UTC().Format(time.RFC3339)
+                    obj["apiVersion"],obj["kind"],obj["metadata"]="v1","ServiceAccount",md
+                    saMap[name]=obj; writeJSON(w,201,obj); return
+                }
+            case "secrets":
+                secMap := secrets[ns]
+                switch r.Method {
+                case http.MethodGet:
+                    items := []interface{}{}
+                    for _, v := range secMap { items = append(items, v) }
+                    writeJSON(w,200,map[string]interface{}{"kind":"SecretList","apiVersion":"v1","items":items}); return
+                case http.MethodPost:
+                    var obj map[string]interface{}; _=json.NewDecoder(r.Body).Decode(&obj)
+                    md,_:=obj["metadata"].(map[string]interface{}); if md==nil { md=map[string]interface{}{} }
+                    name,_:=md["name"].(string); if name=="" { name=fmt.Sprintf("secret-%d",time.Now().UnixNano()) }
+                    if _,exists:=secMap[name]; exists { writeJSON(w,409,map[string]interface{}{"kind":"Status","code":409,"reason":"AlreadyExists"}); return }
+                    md["name"],md["uid"],md["creationTimestamp"]=name,genUID(name),time.Now().UTC().Format(time.RFC3339)
+                    obj["apiVersion"],obj["kind"],obj["metadata"]="v1","Secret",md
+                    if _,ok:=obj["type"].(string); !ok { obj["type"]="Opaque" }
+                    if _,ok:=obj["data"].(map[string]interface{}); !ok { obj["data"]=map[string]interface{}{} }
+                    secMap[name]=obj; writeJSON(w,201,obj); return
+                }
+            }
+        }
+        http.NotFound(w,r)
+    }))
+    // Misc lists
+    mux.HandleFunc("/api/v1/limitranges", logReq(func(w http.ResponseWriter, r *http.Request){ if r.Method==http.MethodGet { writeJSON(w,200,map[string]interface{}{"kind":"LimitRangeList","apiVersion":"v1","items":[]interface{}{}}); return }; w.WriteHeader(405) }))
+    mux.HandleFunc("/api/v1/resourcequotas", logReq(func(w http.ResponseWriter, r *http.Request){ if r.Method==http.MethodGet { writeJSON(w,200,map[string]interface{}{"kind":"ResourceQuotaList","apiVersion":"v1","items":[]interface{}{}}); return }; w.WriteHeader(405) }))
+    mux.HandleFunc("/apis/apiregistration.k8s.io/v1/apiservices", logReq(func(w http.ResponseWriter, r *http.Request){ if r.Method==http.MethodGet { items:=[]interface{}{ map[string]interface{}{"apiVersion":"apiregistration.k8s.io/v1","kind":"APIService","metadata":map[string]interface{}{"name":"v1."},"spec":map[string]interface{}{"group":"","version":"v1","insecureSkipTLSVerify":true},"status":map[string]interface{}{"conditions":[]interface{}{map[string]interface{}{"type":"Available","status":"True"}}}}, map[string]interface{}{"apiVersion":"apiregistration.k8s.io/v1","kind":"APIService","metadata":map[string]interface{}{"name":"v1.apps"},"spec":map[string]interface{}{"group":"apps","version":"v1","insecureSkipTLSVerify":true},"status":map[string]interface{}{"conditions":[]interface{}{map[string]interface{}{"type":"Available","status":"True"}}}}, }; writeJSON(w,200,map[string]interface{}{"kind":"APIServiceList","apiVersion":"apiregistration.k8s.io/v1","items":items}); return }; w.WriteHeader(405) }))
+    mux.HandleFunc("/api/v1/nodes", logReq(func(w http.ResponseWriter, r *http.Request){ if r.Method==http.MethodGet { nodeName:=fmt.Sprintf("%s-node-1",clusterName); node:=map[string]interface{}{"apiVersion":"v1","kind":"Node","metadata":map[string]interface{}{"name":nodeName,"uid":genUID(nodeName),"creationTimestamp":time.Now().UTC().Format(time.RFC3339)},"status":map[string]interface{}{"conditions":[]interface{}{map[string]interface{}{"type":"Ready","status":"True","lastHeartbeatTime":time.Now().UTC().Format(time.RFC3339),"lastTransitionTime":time.Now().UTC().Format(time.RFC3339)}},"capacity":map[string]interface{}{"cpu":"4","memory":"8192Mi","pods":"110"}}}; writeJSON(w,200,map[string]interface{}{"kind":"NodeList","apiVersion":"v1","items":[]interface{}{node}}); return }; w.WriteHeader(405) }))
+    mux.HandleFunc("/", logReq(func(w http.ResponseWriter, r *http.Request){ if r.URL.Path=="/" { writeJSON(w,200,map[string]interface{}{"kind":"APIVersions","versions":[]string{"v1"}}); return }; http.NotFound(w,r) }))
+    server := &http.Server{Addr: addr, Handler: mux, TLSConfig: &tls.Config{Certificates: []tls.Certificate{cert}}}
+    go func(){
+        logrus.Infof("Mock HTTPS API server listening at https://%s (cluster=%s)", addr, clusterName)
+        ln, err := tls.Listen("tcp", addr, server.TLSConfig)
+        if err != nil { logrus.Errorf("mock https api listen error: %v", err); return }
+        if err := server.Serve(ln); err != nil && err != http.ErrServerClosed { logrus.Errorf("mock https api server error: %v", err) }
+    }()
 }
