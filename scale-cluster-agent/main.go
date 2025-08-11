@@ -11,6 +11,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"io"
@@ -28,8 +29,6 @@ import (
 	"sync"
 	"syscall"
 	"time"
-
-	"errors"
 
 	"github.com/gorilla/mux"
 	"github.com/rancher/remotedialer"
@@ -1225,6 +1224,19 @@ func (a *ScaleAgent) startMockHTTPSAPIServer(addr string, cert tls.Certificate, 
 		defer stateMu.Unlock()
 		if _, ok := namespaces[ns]; !ok {
 			namespaces[ns] = map[string]interface{}{ "apiVersion":"v1","kind":"Namespace","metadata":map[string]interface{}{"name":ns,"uid":genUID(ns),"creationTimestamp":now(),"resourceVersion":nextRV()},"status":map[string]interface{}{"phase":"Active"} }
+			// auto-create default serviceaccount + token secret to satisfy Rancher defaultSvcAccountHandler
+			if _, ok := serviceAccounts[ns]; !ok { serviceAccounts[ns] = map[string]interface{}{} }
+			if _, ok := secrets[ns]; !ok { secrets[ns] = map[string]interface{}{} }
+			if _, exists := serviceAccounts[ns]["default"]; !exists {
+				sa := map[string]interface{}{ "apiVersion":"v1","kind":"ServiceAccount","metadata":map[string]interface{}{"name":"default","namespace":ns,"uid":genUID(ns+"-sa-default"),"creationTimestamp":now(),"resourceVersion":nextRV()},"secrets": []interface{}{} }
+				serviceAccounts[ns]["default"] = sa
+				// create token secret manually (avoid recursive locking)
+				secName := fmt.Sprintf("default-token-%s", randSuffix(5))
+				data := map[string]interface{}{ "token": base64.StdEncoding.EncodeToString([]byte("tok-"+randSuffix(32))), "ca.crt": base64.StdEncoding.EncodeToString([]byte(string(a.mockCertPEM))), "namespace": base64.StdEncoding.EncodeToString([]byte(ns)) }
+				sec := map[string]interface{}{ "apiVersion":"v1","kind":"Secret","metadata":map[string]interface{}{"name":secName,"namespace":ns,"uid":genUID(ns+"-secret-"+secName),"creationTimestamp":now(),"annotations":map[string]interface{}{"kubernetes.io/service-account.name":"default","kubernetes.io/service-account.uid":genUID("sa-default")},"resourceVersion":nextRV()},"type":"kubernetes.io/service-account-token","data":data }
+				secrets[ns][secName] = sec
+				sa["secrets"] = append(sa["secrets"].([]interface{}), map[string]interface{}{"name":secName})
+			}
 		}
 		if _, ok := serviceAccounts[ns]; !ok { serviceAccounts[ns] = map[string]interface{}{} }
 		if _, ok := secrets[ns]; !ok { secrets[ns] = map[string]interface{}{} }
@@ -1308,6 +1320,8 @@ func (a *ScaleAgent) startMockHTTPSAPIServer(addr string, cert tls.Certificate, 
     createServiceAccount("cattle-system","cattle")
     createServiceAccount("cattle-fleet-system","fleet-agent")
     createServiceAccount("cattle-impersonation-system","cattle-impersonation-user-8kn8j")
+	// Pre-create token secret for impersonation SA so Rancher doesn't wait on token controller behavior
+	createSecret("cattle-impersonation-system","cattle-impersonation-user-8kn8j-token-seeded","kubernetes.io/service-account-token", map[string]string{"token":"token"}, map[string]string{"kubernetes.io/service-account.name":"cattle-impersonation-user-8kn8j"})
     createSecret("cattle-system","cattle-token-abcde","kubernetes.io/service-account-token", map[string]string{"token":"token"}, map[string]string{"kubernetes.io/service-account.name":"cattle"})
     createSecret("cattle-system","cattle-credentials-mock","Opaque", map[string]string{"username":"admin","password":"password"}, nil)
     createClusterRole("cattle-admin", []interface{}{map[string]interface{}{"apiGroups":[]interface{}{"*"},"resources":[]interface{}{"*"},"verbs":[]interface{}{"*"}}})
@@ -1318,14 +1332,26 @@ func (a *ScaleAgent) startMockHTTPSAPIServer(addr string, cert tls.Certificate, 
     logReq := func(h http.HandlerFunc) http.HandlerFunc { return func(w http.ResponseWriter, r *http.Request){ logrus.Debugf("MOCK API %s %s (cluster=%s)", r.Method, r.URL.Path, clusterName); h(w,r) } }
     writeJSON := func(w http.ResponseWriter, status int, obj interface{}) { w.Header().Set("Content-Type","application/json"); w.WriteHeader(status); _ = json.NewEncoder(w).Encode(obj) }
 
-    writeWatchStream := func(w http.ResponseWriter, r *http.Request, items []map[string]interface{}) {
-        w.Header().Set("Content-Type","application/json")
-        flusher, ok := w.(http.Flusher); if !ok { writeJSON(w,500,map[string]string{"error":"stream not supported"}); return }
-        enc := json.NewEncoder(w)
-        for _, obj := range items { enc.Encode(map[string]interface{}{ "type":"ADDED", "object": obj }) }
-        flusher.Flush()
-        <-r.Context().Done() // keep open until client closes
-    }
+	writeWatchStream := func(w http.ResponseWriter, r *http.Request, items []map[string]interface{}) {
+		w.Header().Set("Content-Type","application/json")
+		flusher, ok := w.(http.Flusher); if !ok { writeJSON(w,500,map[string]string{"error":"stream not supported"}); return }
+		enc := json.NewEncoder(w)
+		for _, obj := range items {
+			enc.Encode(map[string]interface{}{ "type":"ADDED", "object": obj })
+			// Immediately follow with a synthetic MODIFIED for token secrets and serviceaccounts so Rancher sees a population change.
+			if k, _ := obj["kind"].(string); k == "Secret" || k == "ServiceAccount" {
+				if k == "Secret" {
+					if t, ok2 := obj["type"].(string); ok2 && t == "kubernetes.io/service-account-token" {
+						enc.Encode(map[string]interface{}{ "type":"MODIFIED", "object": obj })
+					}
+				} else if k == "ServiceAccount" {
+					enc.Encode(map[string]interface{}{ "type":"MODIFIED", "object": obj })
+				}
+			}
+		}
+		flusher.Flush()
+		<-r.Context().Done() // keep open until client closes
+	}
     isWatch := func(r *http.Request) bool { return r.URL.Query().Get("watch") == "true" }
 
     // RBAC APIResourceList
@@ -1515,8 +1541,8 @@ func (a *ScaleAgent) startMockHTTPSAPIServer(addr string, cert tls.Certificate, 
 				if err := json.NewDecoder(r.Body).Decode(&obj); err!=nil { stateMu.Unlock(); writeJSON(w,400,map[string]string{"error":"bad json"}); return }
 				md,_ := obj["metadata"].(map[string]interface{}); if md==nil { md = map[string]interface{}{}; obj["metadata"]=md }
 				md["name"]=ns
-				// preserve existing resourceVersion if present
-				if existing, ok := nsObj["metadata"].(map[string]interface{}); ok { if rv,ok2:=existing["resourceVersion"]; ok2 { md["resourceVersion"]=rv } }
+				// bump resourceVersion to satisfy optimistic concurrency expectations
+				md["resourceVersion"] = nextRV()
 				namespaces[ns] = map[string]interface{}{ "apiVersion":"v1","kind":"Namespace","metadata":md,"status":map[string]interface{}{"phase":"Active"} }
 				updated := namespaces[ns]
 				stateMu.Unlock()
@@ -1529,6 +1555,70 @@ func (a *ScaleAgent) startMockHTTPSAPIServer(addr string, cert tls.Certificate, 
 		ensureNS(ns)
 		switch res {
 		case "serviceaccounts":
+			// Allow GET of individual service account: /api/v1/namespaces/{ns}/serviceaccounts/{name}
+			if len(parts) >= 3 && parts[2] != "" {
+				name := parts[2]
+					if r.Method == http.MethodGet {
+						stateMu.RLock(); objRaw, ok := serviceAccounts[ns][name]; stateMu.RUnlock()
+						if !ok { http.NotFound(w,r); return }
+						writeJSON(w,200,objRaw); return
+					}
+					if r.Method == http.MethodPut || r.Method == http.MethodPatch {
+						// Accept any PUT/PATCH as a no-op update/upsert. Rancher uses this to "ensure" the SA exists.
+						var incoming map[string]interface{}
+						if err := json.NewDecoder(r.Body).Decode(&incoming); err != nil {
+							// even if bad JSON, just ensure object exists
+							logrus.Debugf("MOCK API PUT serviceaccount bad json (ns=%s name=%s): %v", ns, name, err)
+						}
+						// Inline mutation under single lock; avoid calling helper creators (they lock internally) to prevent deadlocks.
+						stateMu.Lock()
+						objRaw, ok := serviceAccounts[ns][name]
+						if !ok {
+							// create new SA struct
+							objRaw = map[string]interface{}{
+								"apiVersion":"v1","kind":"ServiceAccount",
+								"metadata":map[string]interface{}{"name":name,"namespace":ns,"uid":genUID(ns+"-sa-"+name),"creationTimestamp":now(),"resourceVersion":nextRV()},
+								"secrets": []interface{}{},
+							}
+							serviceAccounts[ns][name] = objRaw
+						} else if objMap, ok2 := objRaw.(map[string]interface{}); ok2 {
+							// merge metadata
+							mdExisting, _ := objMap["metadata"].(map[string]interface{})
+							if mdExisting == nil { mdExisting = map[string]interface{}{}; objMap["metadata"] = mdExisting }
+							if incoming != nil { if mdIn, ok3 := incoming["metadata"].(map[string]interface{}); ok3 { for k,v := range mdIn { mdExisting[k] = v } } }
+							mdExisting["name"] = name
+							mdExisting["namespace"] = ns
+							mdExisting["resourceVersion"] = nextRV()
+						}
+						// Ensure token secret exists
+						if _, ok2 := secrets[ns]; !ok2 { secrets[ns] = map[string]interface{}{} }
+						foundToken := false
+						for _, s := range secrets[ns] {
+							if sm, ok3 := s.(map[string]interface{}); ok3 {
+								if mdAny, ok4 := sm["metadata"].(map[string]interface{}); ok4 {
+									if anns, ok5 := mdAny["annotations"].(map[string]interface{}); ok5 {
+										if san, ok6 := anns["kubernetes.io/service-account.name"].(string); ok6 && san == name { foundToken = true; break }
+									}
+								}
+							}
+						}
+						if !foundToken {
+							secName := fmt.Sprintf("%s-token-%s", name, randSuffix(5))
+							data := map[string]interface{}{ "token": base64.StdEncoding.EncodeToString([]byte("tok-"+randSuffix(32))), "ca.crt": base64.StdEncoding.EncodeToString([]byte(string(a.mockCertPEM))), "namespace": base64.StdEncoding.EncodeToString([]byte(ns)) }
+							ann := map[string]interface{}{"kubernetes.io/service-account.name":name,"kubernetes.io/service-account.uid":genUID("sa-"+name)}
+							sec := map[string]interface{}{"apiVersion":"v1","kind":"Secret","metadata":map[string]interface{}{"name":secName,"namespace":ns,"uid":genUID(ns+"-secret-"+secName),"creationTimestamp":now(),"annotations":ann,"resourceVersion":nextRV()},"type":"kubernetes.io/service-account-token","data":data}
+							secrets[ns][secName] = sec
+							// link to SA
+							if saMap, ok3 := serviceAccounts[ns][name].(map[string]interface{}); ok3 {
+								if arr, ok4 := saMap["secrets"].([]interface{}); ok4 { saMap["secrets"] = append(arr, map[string]interface{}{"name":secName}) } else { saMap["secrets"] = []interface{}{map[string]interface{}{"name":secName}} }
+							}
+						}
+						ret := serviceAccounts[ns][name]
+						stateMu.Unlock()
+						writeJSON(w,200,ret); return
+					}
+					writeJSON(w,405,map[string]string{"error":"method not allowed"}); return
+			}
 			if r.Method == http.MethodPost {
 				var obj map[string]interface{}; if err:= json.NewDecoder(r.Body).Decode(&obj); err!=nil { writeJSON(w,400,map[string]string{"error":"bad json"}); return }
 				md,_ := obj["metadata"].(map[string]interface{}); if md==nil { md=map[string]interface{}{}; obj["metadata"]=md }
@@ -1543,15 +1633,94 @@ func (a *ScaleAgent) startMockHTTPSAPIServer(addr string, cert tls.Certificate, 
 			stateMu.RLock(); items := []interface{}{}; for _, sa := range serviceAccounts[ns] { items=append(items, sa) }; stateMu.RUnlock()
 			writeJSON(w,200,map[string]interface{}{"kind":"ServiceAccountList","apiVersion":"v1","items":items}); return
 		case "secrets":
+			// GET individual secret: /api/v1/namespaces/{ns}/secrets/{name}
+			if len(parts) >= 3 && parts[2] != "" {
+				name := parts[2]
+				if r.Method == http.MethodGet {
+					stateMu.Lock(); objRaw, ok := secrets[ns][name]
+					if !ok { stateMu.Unlock(); http.NotFound(w,r); return }
+					// Lazy populate if SA annotation exists or token secret type missing fields
+					if secMap, ok2 := objRaw.(map[string]interface{}); ok2 {
+						md, _ := secMap["metadata"].(map[string]interface{})
+						ann, _ := md["annotations"].(map[string]interface{})
+						if t, ok3 := secMap["type"].(string); (ok3 && t == "kubernetes.io/service-account-token") || (ann != nil && ann["kubernetes.io/service-account.name"] != nil) {
+							if _, ok3 := secMap["type"].(string); !ok3 || secMap["type"].(string) == "Opaque" { secMap["type"] = "kubernetes.io/service-account-token" }
+							dataMap, _ := secMap["data"].(map[string]interface{})
+							if dataMap == nil { dataMap = map[string]interface{}{}; secMap["data"] = dataMap }
+							if _, hasTok := dataMap["token"]; !hasTok { dataMap["token"] = base64.StdEncoding.EncodeToString([]byte("tok-"+randSuffix(32))) }
+							if _, hasCA := dataMap["ca.crt"]; !hasCA { dataMap["ca.crt"] = base64.StdEncoding.EncodeToString([]byte(string(a.mockCertPEM))) }
+							if _, hasNS := dataMap["namespace"]; !hasNS { dataMap["namespace"] = base64.StdEncoding.EncodeToString([]byte(ns)) }
+							if md != nil { md["resourceVersion"] = nextRV() }
+						}
+					}
+					ret := secrets[ns][name]
+					stateMu.Unlock()
+					writeJSON(w,200,ret); return
+				}
+				if r.Method == http.MethodPut || r.Method == http.MethodPatch {
+					var incoming map[string]interface{}
+					_ = json.NewDecoder(r.Body).Decode(&incoming) // ignore errors
+					stateMu.Lock(); objRaw, ok := secrets[ns][name]
+					if !ok {
+						objRaw = map[string]interface{}{"apiVersion":"v1","kind":"Secret","metadata":map[string]interface{}{"name":name,"namespace":ns,"uid":genUID(ns+"-secret-"+name),"creationTimestamp":now(),"resourceVersion":nextRV()},"type":"Opaque","data":map[string]interface{}{}}
+						secrets[ns][name] = objRaw
+					}
+					if secMap, ok2 := objRaw.(map[string]interface{}); ok2 {
+						md, _ := secMap["metadata"].(map[string]interface{})
+						if md == nil { md = map[string]interface{}{"name":name,"namespace":ns}; secMap["metadata"] = md }
+						if incoming != nil { if incMD, ok3 := incoming["metadata"].(map[string]interface{}); ok3 { for k,v := range incMD { md[k]=v } } }
+						md["resourceVersion"] = nextRV()
+						ann, _ := md["annotations"].(map[string]interface{})
+						if ann != nil && ann["kubernetes.io/service-account.name"] != nil {
+							secMap["type"] = "kubernetes.io/service-account-token"
+							dataMap, _ := secMap["data"].(map[string]interface{})
+							if dataMap == nil { dataMap = map[string]interface{}{}; secMap["data"] = dataMap }
+							if _, hasTok := dataMap["token"]; !hasTok { dataMap["token"] = base64.StdEncoding.EncodeToString([]byte("tok-"+randSuffix(32))) }
+							if _, hasCA := dataMap["ca.crt"]; !hasCA { dataMap["ca.crt"] = base64.StdEncoding.EncodeToString([]byte(string(a.mockCertPEM))) }
+							if _, hasNS := dataMap["namespace"]; !hasNS { dataMap["namespace"] = base64.StdEncoding.EncodeToString([]byte(ns)) }
+						}
+					}
+					ret := secrets[ns][name]
+					stateMu.Unlock()
+					writeJSON(w,200,ret); return
+				}
+				writeJSON(w,405,map[string]string{"error":"method not allowed"}); return
+			}
 			if r.Method == http.MethodPost {
-				var obj map[string]interface{}; if err:= json.NewDecoder(r.Body).Decode(&obj); err!=nil { writeJSON(w,400,map[string]string{"error":"bad json"}); return }
+				var obj map[string]interface{}; if err:= json.NewDecoder(r.Body).Decode(&obj); err!=nil { // still return success stub to unblock controllers
+					sec := createSecret(ns, "", "Opaque", map[string]string{"note":"auto-created"}, nil)
+					writeJSON(w,201,sec); return }
 				md,_ := obj["metadata"].(map[string]interface{}); if md==nil { md=map[string]interface{}{}; obj["metadata"]=md }
 				name,_ := md["name"].(string)
+				if name=="" { if gn,_ := md["generateName"].(string); gn!="" { name = gn + randSuffix(5) } }
 				typ,_ := obj["type"].(string); if typ=="" { typ="Opaque" }
 				data := map[string]string{}
 				if rawData, ok := obj["data"].(map[string]interface{}); ok { for k,v := range rawData { if s, ok2 := v.(string); ok2 { data[k]=s } } }
 				annIn := map[string]string{}
 				if mdAnn, ok := md["annotations"].(map[string]interface{}); ok { for k,v := range mdAnn { if s,ok2 := v.(string); ok2 { annIn[k]=s } } }
+				// debug: ensure we never proceed with empty name after generation fallback
+				if name=="" { logrus.Debugf("MOCK API generating fallback secret name (ns=%s) annotations=%v", ns, annIn); }
+				// If impersonation secret, ensure service account exists first
+				if ns == "cattle-impersonation-system" {
+					if saName, ok := annIn["kubernetes.io/service-account.name"]; ok {
+						// auto-create SA if missing
+						stateMu.RLock(); _, exists := serviceAccounts[ns][saName]; stateMu.RUnlock()
+						if !exists { createServiceAccount(ns, saName) }
+						// Force type upgrade & populate token data immediately so Rancher doesn't wait.
+						if typ == "Opaque" { typ = "kubernetes.io/service-account-token" }
+						if typ == "kubernetes.io/service-account-token" {
+							if _, ok := data["token"]; !ok { data["token"] = "tok-" + randSuffix(32) }
+							if _, ok := data["ca.crt"]; !ok { data["ca.crt"] = string(a.mockCertPEM) }
+							if _, ok := data["namespace"]; !ok { data["namespace"] = ns }
+						}
+					} else {
+						// Fallback: Rancher sometimes creates placeholder Opaque secret first, without SA annotation; still emit a token so controllers progress.
+						if typ == "Opaque" { typ = "kubernetes.io/service-account-token" }
+						if _, ok := data["token"]; !ok { data["token"] = "tok-" + randSuffix(32) }
+						if _, ok := data["ca.crt"]; !ok { data["ca.crt"] = string(a.mockCertPEM) }
+						if _, ok := data["namespace"]; !ok { data["namespace"] = ns }
+					}
+				}
 				sec := createSecret(ns,name,typ,data,annIn)
 				writeJSON(w,201,sec); return
 			}
