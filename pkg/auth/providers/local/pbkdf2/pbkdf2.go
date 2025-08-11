@@ -10,10 +10,8 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -142,19 +140,8 @@ func (p *Pbkdf2) VerifyAndUpdatePassword(userId string, currentPassword, newPass
 // if the password stored is using the legacy hashing algorithm (bcrypt) it will be updated to PBKDF2.
 func (p *Pbkdf2) VerifyPassword(user *v3.User, password string) error {
 	secret, err := p.secretLister.Get(LocalUserPasswordsNamespace, user.Name)
-	if err != nil && !apierrors.IsNotFound(err) {
+	if err != nil {
 		return fmt.Errorf("failed to get password secret: %w", err)
-	}
-	if apierrors.IsNotFound(err) {
-		if user.Password == "" {
-			return fmt.Errorf("failed to get password")
-		}
-		// This will only be reached if migration failed. This code will be removed in 2.14
-		logrus.Warn("Using old password field. Check if User migration failed!")
-		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)); err != nil {
-			return err
-		}
-		return nil
 	}
 
 	switch secret.Annotations[passwordHashAnnotation] {
@@ -196,7 +183,7 @@ func (p *Pbkdf2) VerifyPassword(user *v3.User, password string) error {
 			},
 			{
 				Op:    "replace",
-				Path:  "/metadata/annotations/" + passwordHashAnnotation,
+				Path:  "/metadata/annotations/cattle.io~1password-hash",
 				Value: pbkdf2sha3512Hash,
 			},
 		})
