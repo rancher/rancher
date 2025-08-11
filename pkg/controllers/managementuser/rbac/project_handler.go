@@ -67,14 +67,14 @@ func (p *pLifecycle) Remove(project *v3.Project) (runtime.Object, error) {
 
 		err := p.m.workload.RBAC.ClusterRoles("").Delete(roleName, &metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
-			return project, err
+			return nil, err
 		}
 	}
 
 	projectID := project.Namespace + ":" + project.Name
 	namespaces, err := p.m.nsIndexer.ByIndex(namespace.NsByProjectIndex, projectID)
 	if err != nil {
-		return project, err
+		return nil, err
 	}
 
 	var returnErrors error
@@ -84,7 +84,7 @@ func (p *pLifecycle) Remove(project *v3.Project) (runtime.Object, error) {
 		if _, ok := namespace.Annotations["field.cattle.io/creatorId"]; ok {
 			err := p.m.workload.Core.Namespaces("").Delete(namespace.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
-				return project, err
+				return nil, err
 			}
 		} else {
 			namespace = namespace.DeepCopy()
@@ -92,7 +92,7 @@ func (p *pLifecycle) Remove(project *v3.Project) (runtime.Object, error) {
 				delete(namespace.Annotations, projectIDAnnotation)
 				_, err := p.m.workload.Core.Namespaces("").Update(namespace)
 				if err != nil {
-					return project, err
+					return nil, err
 				}
 			}
 		}
@@ -100,7 +100,7 @@ func (p *pLifecycle) Remove(project *v3.Project) (runtime.Object, error) {
 		// remove project scoped secrets if they exist
 		secrets, err := p.secretClient.List(namespace.Name, metav1.ListOptions{LabelSelector: secret.ProjectScopedSecretLabel + "=" + project.Name})
 		if err != nil {
-			return project, fmt.Errorf("failed to list project scoped secrets: %w", err)
+			return nil, fmt.Errorf("failed to list project scoped secrets: %w", err)
 		}
 		for _, secret := range secrets.Items {
 			err := p.secretClient.Delete(namespace.Name, secret.Name, &metav1.DeleteOptions{})
@@ -111,7 +111,7 @@ func (p *pLifecycle) Remove(project *v3.Project) (runtime.Object, error) {
 		}
 	}
 
-	return project, returnErrors
+	return nil, returnErrors
 }
 
 func (p *pLifecycle) ensureNamespacesAssigned(project *v3.Project) error {
