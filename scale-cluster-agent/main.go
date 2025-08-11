@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
+	crand "crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
@@ -12,24 +12,28 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"io/ioutil"
 	"math/big"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	"errors"
+
 	"github.com/gorilla/mux"
 	"github.com/rancher/remotedialer"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -162,6 +166,8 @@ type CreateClusterResponse struct {
 	ClusterID string `json:"cluster_id,omitempty"`
 }
 
+func init(){ rand.Seed(time.Now().UnixNano()) }
+
 func main() {
 	// Setup logging
 	logrus.SetFormatter(&logrus.TextFormatter{
@@ -261,15 +267,42 @@ func loadConfig() (*Config, error) {
 
 	configPath := filepath.Join(homeDir, ".scale-cluster-agent", "config", "config")
 
-	// Read config file
+	var config Config
 	data, err := os.ReadFile(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read config file %s: %v", configPath, err)
-	}
-
-	var config Config
-	if err := yaml.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("failed to parse config file %s: %v\nPlease ensure the file is in valid YAML format. Example:\nRancherURL: \"https://your-rancher-server.com/\"\nBearerToken: \"your-token-here\"\nListenPort: 9090\nLogLevel: \"info\"", configPath, err)
+		if os.IsNotExist(err) {
+			// Use environment fallback
+			config.RancherURL = os.Getenv("RANCHER_URL")
+			config.BearerToken = os.Getenv("RANCHER_TOKEN")
+			portStr := os.Getenv("SCALE_AGENT_PORT")
+			if portStr != "" { if p, perr := strconv.Atoi(portStr); perr == nil { config.ListenPort = p } }
+			config.LogLevel = os.Getenv("SCALE_AGENT_LOG")
+			if config.RancherURL == "" { config.RancherURL = "https://rancher.invalid" }
+			if config.ListenPort == 0 { config.ListenPort = 9090 }
+			if config.LogLevel == "" { config.LogLevel = "debug" }
+			logrus.Warnf("Config file %s not found; using environment/default values", configPath)
+		} else {
+			return nil, fmt.Errorf("failed to read config file %s: %v", configPath, err)
+		}
+	} else {
+		if err := json.Unmarshal(data, &config); err != nil {
+			// very naive key:value fallback
+			lines := strings.Split(string(data), "\n")
+			for _, l := range lines {
+				l = strings.TrimSpace(l)
+				if l == "" || strings.HasPrefix(l, "#") { continue }
+				parts := strings.SplitN(l, ":", 2)
+				if len(parts) != 2 { continue }
+				k := strings.TrimSpace(parts[0])
+				v := strings.Trim(strings.TrimSpace(parts[1]), "\"'")
+				switch k {
+				case "RancherURL": config.RancherURL = v
+				case "BearerToken": config.BearerToken = v
+				case "ListenPort": if p,err := strconv.Atoi(v); err==nil { config.ListenPort = p }
+				case "LogLevel": config.LogLevel = v
+				}
+			}
+		}
 	}
 
 	// Validate required fields
@@ -288,6 +321,7 @@ func loadConfig() (*Config, error) {
 		config.LogLevel = "info"
 	}
 
+	logrus.Infof("Using config: RancherURL=%s ListenPort=%d LogLevel=%s", config.RancherURL, config.ListenPort, config.LogLevel)
 	return &config, nil
 }
 
@@ -307,10 +341,10 @@ func (a *ScaleAgent) loadClusterTemplate() error {
 	}
 
 	var clusterInfo ClusterInfo
-	if err := yaml.Unmarshal(data, &clusterInfo); err != nil {
-		return fmt.Errorf("failed to parse cluster template: %v", err)
+	if err := json.Unmarshal(data, &clusterInfo); err != nil {
+		logrus.Warnf("Failed to parse cluster template (%v). Falling back to built-in default template", err)
+		return a.createDefaultClusterTemplate()
 	}
-
 	// Store as template
 	a.clusters["template"] = &clusterInfo
 	return nil
@@ -629,6 +663,11 @@ func (a *ScaleAgent) connectClusterToRancher(clusterName, clusterID string, clus
 		a.mockCertPEM = certPEM
 		apiAddr := "127.0.0.1:4567"
 		go a.startMockHTTPSAPIServer(apiAddr, cert, clusterName)
+		if err := waitForPort(apiAddr, 5*time.Second); err != nil {
+			logrus.Errorf("mock API never became ready at %s: %v", apiAddr, err)
+			return
+		}
+		logrus.Infof("Mock API ready at https://%s", apiAddr)
 	}
 	localAPI := "127.0.0.1:4567"
 	caB64 := base64.StdEncoding.EncodeToString(a.mockCertPEM)
@@ -656,11 +695,27 @@ func (a *ScaleAgent) connectClusterToRancher(clusterName, clusterID string, clus
 
 	onConnect := func(ctx context.Context, s *remotedialer.Session) error {
 		logrus.Infof("WebSocket connected for %s; Rancher should now dial %s", clusterName, localAPI)
+		go a.patchClusterActive(clusterID)
 		return nil
 	}
 
 	logrus.Infof("Connecting with mock address %s", localAPI)
-	go remotedialer.ClientConnect(a.ctx, wsURL, headers, nil, allowFunc, onConnect)
+	go func(){
+		backoff := time.Second
+		for {
+			ctx, cancel := context.WithCancel(a.ctx)
+			var once sync.Once
+			remotedialer.ClientConnect(ctx, wsURL, headers, nil, allowFunc, func(c context.Context, s *remotedialer.Session) error {
+				once.Do(func(){ backoff = time.Second })
+				return onConnect(c,s)
+			})
+			cancel()
+			if a.ctx.Err()!=nil { return }
+			if backoff < 30*time.Second { backoff *= 2 }
+			logrus.Infof("[%s] remotedialer reconnecting in %s", clusterName, backoff)
+			time.Sleep(backoff)
+		}
+	}()
 	a.firstClusterConnected = true
 }
 
@@ -781,8 +836,7 @@ func (a *ScaleAgent) deleteClusterHandler(w http.ResponseWriter, r *http.Request
 	clusterName := vars["name"]
 
 	if clusterName == "template" {
-		http.Error(w, "Cannot delete template cluster", http.StatusBadRequest)
-		return
+	
 	}
 
 	if _, exists := a.clusters[clusterName]; !exists {
@@ -1124,10 +1178,10 @@ func (a *ScaleAgent) startLocalAPIServer(clusterName string, port int) { logrus.
 // Forward declarations (ensure functions exist before use)
 // generateSelfSignedCert and startMockHTTPSAPIServer are implemented later in file.
 func generateSelfSignedCert(host string) ([]byte, []byte, tls.Certificate, error) {
-	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	priv, err := rsa.GenerateKey(crand.Reader, 2048)
 	if err != nil { return nil, nil, tls.Certificate{}, fmt.Errorf("generate key: %w", err) }
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
-	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	serialNumber, err := crand.Int(crand.Reader, serialNumberLimit)
 	if err != nil { return nil, nil, tls.Certificate{}, fmt.Errorf("serial: %w", err) }
 	tmpl := x509.Certificate{
 		SerialNumber: serialNumber,
@@ -1141,7 +1195,7 @@ func generateSelfSignedCert(host string) ([]byte, []byte, tls.Certificate, error
 		IsCA:        true,
 		BasicConstraintsValid: true,
 	}
-	derBytes, err := x509.CreateCertificate(rand.Reader, &tmpl, &tmpl, &priv.PublicKey, priv)
+	derBytes, err := x509.CreateCertificate(crand.Reader, &tmpl, &tmpl, &priv.PublicKey, priv)
 	if err != nil { return nil, nil, tls.Certificate{}, fmt.Errorf("create cert: %w", err) }
 	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
 	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
@@ -1151,100 +1205,454 @@ func generateSelfSignedCert(host string) ([]byte, []byte, tls.Certificate, error
 }
 
 func (a *ScaleAgent) startMockHTTPSAPIServer(addr string, cert tls.Certificate, clusterName string) {
+    // --- state stores ---
     namespaces := map[string]map[string]interface{}{}
     serviceAccounts := map[string]map[string]interface{}{}
     secrets := map[string]map[string]interface{}{}
-    clusterRoles := map[string]interface{}{}
-    clusterRoleBindings := map[string]interface{}{}
-    ensureNS := func(ns string) {
-        if _, ok := namespaces[ns]; !ok {
-            namespaces[ns] = map[string]interface{}{ "apiVersion":"v1","kind":"Namespace","metadata":map[string]interface{}{"name":ns},"status":map[string]interface{}{"phase":"Active"} }
-        }
-        if _, ok := serviceAccounts[ns]; !ok { serviceAccounts[ns] = map[string]interface{}{} }
-        if _, ok := secrets[ns]; !ok { secrets[ns] = map[string]interface{}{} }
-    }
-    ensureNS("kube-system"); ensureNS("cattle-impersonation-system")
-    mux := http.NewServeMux()
+    clusterRoles := map[string]map[string]interface{}{}
+    clusterRoleBindings := map[string]map[string]interface{}{}
+    roles := map[string]map[string]map[string]interface{}{}          // ns -> name -> role
+    roleBindings := map[string]map[string]map[string]interface{}{}    // ns -> name -> rolebinding
+	var stateMu sync.RWMutex
+    var rv uint64 = 1
+    nextRV := func() string { rv++; return fmt.Sprintf("%d", rv) }
+
+    randSuffix := func(n int) string { letters := []rune("abcdefghijklmnopqrstuvwxyz0123456789"); b := make([]rune, n); for i:=range b { b[i] = letters[rand.Intn(len(letters))] }; return string(b) }
+	genUID := func(name string) string { return fmt.Sprintf("%s-%x", name, fnvHash(name)) }
+    now := func() string { return time.Now().UTC().Format(time.RFC3339) }
+	ensureNS := func(ns string) {
+		stateMu.Lock()
+		defer stateMu.Unlock()
+		if _, ok := namespaces[ns]; !ok {
+			namespaces[ns] = map[string]interface{}{ "apiVersion":"v1","kind":"Namespace","metadata":map[string]interface{}{"name":ns,"uid":genUID(ns),"creationTimestamp":now(),"resourceVersion":nextRV()},"status":map[string]interface{}{"phase":"Active"} }
+		}
+		if _, ok := serviceAccounts[ns]; !ok { serviceAccounts[ns] = map[string]interface{}{} }
+		if _, ok := secrets[ns]; !ok { secrets[ns] = map[string]interface{}{} }
+		if _, ok := roles[ns]; !ok { roles[ns] = map[string]map[string]interface{}{} }
+		if _, ok := roleBindings[ns]; !ok { roleBindings[ns] = map[string]map[string]interface{}{} }
+	}
+    for _, ns := range []string{"kube-system","cattle-system","cattle-impersonation-system","cattle-fleet-system"} { ensureNS(ns) }
+
+	createRole := func(ns, name string, rules []interface{}) map[string]interface{} {
+		ensureNS(ns)
+		stateMu.Lock(); defer stateMu.Unlock()
+		r := map[string]interface{}{"apiVersion":"rbac.authorization.k8s.io/v1","kind":"Role","metadata":map[string]interface{}{"name":name,"namespace":ns,"uid":genUID("role-"+ns+"-"+name),"creationTimestamp":now(),"resourceVersion":nextRV()},"rules":rules}
+		roles[ns][name] = r
+		return r
+	}
+	createRoleBinding := func(ns, name, roleName, saNS, saName string) map[string]interface{} {
+		ensureNS(ns)
+		stateMu.Lock(); defer stateMu.Unlock()
+		rb := map[string]interface{}{"apiVersion":"rbac.authorization.k8s.io/v1","kind":"RoleBinding","metadata":map[string]interface{}{"name":name,"namespace":ns,"uid":genUID("rb-"+ns+"-"+name),"creationTimestamp":now(),"resourceVersion":nextRV()},"roleRef":map[string]interface{}{"apiGroup":"rbac.authorization.k8s.io","kind":"Role","name":roleName},"subjects":[]interface{}{map[string]interface{}{"kind":"ServiceAccount","name":saName,"namespace":saNS}}}
+		roleBindings[ns][name] = rb
+		return rb
+	}
+    createRole("cattle-system","cattle-minimal", []interface{}{map[string]interface{}{"apiGroups":[]interface{}{""},"resources":[]interface{}{"secrets","serviceaccounts"},"verbs":[]interface{}{"get","list","watch"}}})
+
+	createServiceAccount := func(ns, name string) map[string]interface{} {
+		ensureNS(ns)
+		stateMu.Lock(); defer stateMu.Unlock()
+		sa := map[string]interface{}{
+			"apiVersion":"v1","kind":"ServiceAccount","metadata":map[string]interface{}{"name":name,"namespace":ns,"uid":genUID(ns+"-sa-"+name),"creationTimestamp":now(),"resourceVersion":nextRV()},
+			"secrets": []interface{}{},
+		}
+		serviceAccounts[ns][name] = sa
+		return sa
+	}
+	createSecret := func(ns, name, secretType string, data map[string]string, annotations map[string]string) map[string]interface{} {
+		ensureNS(ns)
+		stateMu.Lock(); defer stateMu.Unlock()
+		if annotations == nil { annotations = map[string]string{} }
+		if name == "" { if sa,ok := annotations["kubernetes.io/service-account.name"]; ok { name = fmt.Sprintf("%s-token-%s", sa, randSuffix(5)) } }
+		if name == "" { name = "secret-" + randSuffix(6) }
+		// augment impersonation/service-account token secrets
+		if secretType == "kubernetes.io/service-account-token" {
+			if sa, ok := annotations["kubernetes.io/service-account.name"]; ok {
+				if _, ok2 := annotations["kubernetes.io/service-account.uid"]; !ok2 { annotations["kubernetes.io/service-account.uid"] = genUID("sa-"+sa) }
+			}
+			if data == nil { data = map[string]string{} }
+			if _, ok := data["token"]; !ok { data["token"] = "tok-"+randSuffix(32) }
+			if _, ok := data["ca.crt"]; !ok { data["ca.crt"] = string(a.mockCertPEM) }
+			if _, ok := data["namespace"]; !ok { data["namespace"] = ns }
+		}
+		d := map[string]interface{}{}
+		for k,v := range data { d[k] = base64.StdEncoding.EncodeToString([]byte(v)) }
+		ann := map[string]interface{}{}; for k,v := range annotations { ann[k] = v }
+		sec := map[string]interface{}{"apiVersion":"v1","kind":"Secret","metadata":map[string]interface{}{"name":name,"namespace":ns,"uid":genUID(ns+"-secret-"+name),"creationTimestamp":now(),"annotations":ann,"resourceVersion":nextRV()},"type":secretType,"data":d}
+		secrets[ns][name] = sec
+		if secretType == "kubernetes.io/service-account-token" {
+			if saName, ok := annotations["kubernetes.io/service-account.name"]; ok {
+				if saObjRaw, ok2 := serviceAccounts[ns][saName]; ok2 {
+					if saMap, ok3 := saObjRaw.(map[string]interface{}); ok3 {
+						if arr, ok4 := saMap["secrets"].([]interface{}); ok4 { saMap["secrets"] = append(arr, map[string]interface{}{"name":name}) } else { saMap["secrets"] = []interface{}{map[string]interface{}{"name":name}} }
+					}
+				}
+			}
+		}
+		return sec
+	}
+	createClusterRole := func(name string, rules []interface{}) map[string]interface{} {
+		stateMu.Lock(); defer stateMu.Unlock()
+		cr := map[string]interface{}{"apiVersion":"rbac.authorization.k8s.io/v1","kind":"ClusterRole","metadata":map[string]interface{}{"name":name,"uid":genUID("cr-"+name),"creationTimestamp":now(),"resourceVersion":nextRV()},"rules":rules}
+		clusterRoles[name] = cr
+		return cr
+	}
+	createClusterRoleBinding := func(name, roleName, saNS, saName string) map[string]interface{} {
+		stateMu.Lock(); defer stateMu.Unlock()
+		crb := map[string]interface{}{"apiVersion":"rbac.authorization.k8s.io/v1","kind":"ClusterRoleBinding","metadata":map[string]interface{}{"name":name,"uid":genUID("crb-"+name),"creationTimestamp":now(),"resourceVersion":nextRV()},"roleRef":map[string]interface{}{"apiGroup":"rbac.authorization.k8s.io","kind":"ClusterRole","name":roleName},"subjects":[]interface{}{map[string]interface{}{"kind":"ServiceAccount","name":saName,"namespace":saNS}}}
+		clusterRoleBindings[name] = crb
+		return crb
+	}
+
+    // seed minimal objects
+    createServiceAccount("cattle-system","cattle")
+    createServiceAccount("cattle-fleet-system","fleet-agent")
+    createServiceAccount("cattle-impersonation-system","cattle-impersonation-user-8kn8j")
+    createSecret("cattle-system","cattle-token-abcde","kubernetes.io/service-account-token", map[string]string{"token":"token"}, map[string]string{"kubernetes.io/service-account.name":"cattle"})
+    createSecret("cattle-system","cattle-credentials-mock","Opaque", map[string]string{"username":"admin","password":"password"}, nil)
+    createClusterRole("cattle-admin", []interface{}{map[string]interface{}{"apiGroups":[]interface{}{"*"},"resources":[]interface{}{"*"},"verbs":[]interface{}{"*"}}})
+    createClusterRole("cluster-admin", []interface{}{map[string]interface{}{"apiGroups":[]interface{}{"*"},"resources":[]interface{}{"*"},"verbs":[]interface{}{"*"}}})
+    createClusterRoleBinding("cattle-admin-binding","cattle-admin","cattle-system","cattle")
+
+    muxLocal := http.NewServeMux()
     logReq := func(h http.HandlerFunc) http.HandlerFunc { return func(w http.ResponseWriter, r *http.Request){ logrus.Debugf("MOCK API %s %s (cluster=%s)", r.Method, r.URL.Path, clusterName); h(w,r) } }
     writeJSON := func(w http.ResponseWriter, status int, obj interface{}) { w.Header().Set("Content-Type","application/json"); w.WriteHeader(status); _ = json.NewEncoder(w).Encode(obj) }
-    genUID := func(name string) string { return fmt.Sprintf("%s-%d", name, time.Now().UnixNano()) }
-    // Basic endpoints
-    mux.HandleFunc("/healthz", logReq(func(w http.ResponseWriter, r *http.Request){ writeJSON(w,200,map[string]string{"status":"ok"}) }))
-    mux.HandleFunc("/readyz", logReq(func(w http.ResponseWriter, r *http.Request){ writeJSON(w,200,map[string]string{"status":"ok"}) }))
-    mux.HandleFunc("/livez", logReq(func(w http.ResponseWriter, r *http.Request){ w.WriteHeader(200); _,_ = w.Write([]byte("ok")) }))
-    mux.HandleFunc("/version", logReq(func(w http.ResponseWriter, r *http.Request){ writeJSON(w,200,map[string]string{"major":"1","minor":"28","gitVersion":"v1.28.5","platform":"linux/amd64"}) }))
-    mux.HandleFunc("/api", logReq(func(w http.ResponseWriter, r *http.Request){ writeJSON(w,200,map[string]interface{}{"kind":"APIVersions","versions":[]string{"v1"}}) }))
-    mux.HandleFunc("/api/v1", logReq(func(w http.ResponseWriter, r *http.Request){ writeJSON(w,200,map[string]interface{}{"kind":"APIResourceList","apiVersion":"v1","groupVersion":"v1","resources":[]map[string]interface{}{{"name":"pods","namespaced":true,"kind":"Pod"},{"name":"services","namespaced":true,"kind":"Service"},{"name":"nodes","namespaced":false,"kind":"Node"},{"name":"namespaces","namespaced":false,"kind":"Namespace"},{"name":"serviceaccounts","namespaced":true,"kind":"ServiceAccount"},{"name":"secrets","namespaced":true,"kind":"Secret"}}}) }))
-    mux.HandleFunc("/apis", logReq(func(w http.ResponseWriter, r *http.Request){ writeJSON(w,200,map[string]interface{}{"kind":"APIGroupList","apiVersion":"v1","groups":[]map[string]interface{}{{"name":"rbac.authorization.k8s.io","versions":[]map[string]string{{"groupVersion":"rbac.authorization.k8s.io/v1","version":"v1"}},"preferredVersion":map[string]string{"groupVersion":"rbac.authorization.k8s.io/v1","version":"v1"}},{"name":"apps","versions":[]map[string]string{{"groupVersion":"apps/v1","version":"v1"}},"preferredVersion":map[string]string{"groupVersion":"apps/v1","version":"v1"}}}}) }))
-    mux.HandleFunc("/apis/apps", logReq(func(w http.ResponseWriter, r *http.Request){ writeJSON(w,200,map[string]interface{}{"kind":"APIGroup","apiVersion":"v1","name":"apps","versions":[]map[string]string{{"groupVersion":"apps/v1","version":"v1"}},"preferredVersion":map[string]string{"groupVersion":"apps/v1","version":"v1"}}) }))
-    mux.HandleFunc("/apis/apps/v1", logReq(func(w http.ResponseWriter, r *http.Request){ writeJSON(w,200,map[string]interface{}{"kind":"APIResourceList","apiVersion":"v1","groupVersion":"apps/v1","resources":[]map[string]interface{}{{"name":"deployments","namespaced":true,"kind":"Deployment"}}}) }))
-    // RBAC
-    mux.HandleFunc("/apis/rbac.authorization.k8s.io/v1/clusterroles", logReq(func(w http.ResponseWriter, r *http.Request){ switch r.Method {case http.MethodGet: items:=[]interface{}{}; for _,cr:= range clusterRoles { items=append(items,cr)}; writeJSON(w,200,map[string]interface{}{"kind":"ClusterRoleList","apiVersion":"rbac.authorization.k8s.io/v1","items":items}); case http.MethodPost: var obj map[string]interface{}; _=json.NewDecoder(r.Body).Decode(&obj); md,_:=obj["metadata"].(map[string]interface{}); if md==nil { md=map[string]interface{}{} }; name,_:=md["name"].(string); if name=="" { name=fmt.Sprintf("cr-%d",time.Now().UnixNano()) }; if _,ex:=clusterRoles[name]; ex { writeJSON(w,409,map[string]interface{}{"kind":"Status","code":409,"reason":"AlreadyExists"}); return }; md["name"]=name; md["uid"]=genUID(name); md["creationTimestamp"]=time.Now().UTC().Format(time.RFC3339); obj["apiVersion"]="rbac.authorization.k8s.io/v1"; obj["kind"]="ClusterRole"; obj["metadata"]=md; clusterRoles[name]=obj; writeJSON(w,201,obj); default: w.WriteHeader(405)} }))
-    mux.HandleFunc("/apis/rbac.authorization.k8s.io/v1/clusterrolebindings", logReq(func(w http.ResponseWriter, r *http.Request){ switch r.Method {case http.MethodGet: items:=[]interface{}{}; for _,crb:= range clusterRoleBindings { items=append(items,crb)}; writeJSON(w,200,map[string]interface{}{"kind":"ClusterRoleBindingList","apiVersion":"rbac.authorization.k8s.io/v1","items":items}); case http.MethodPost: var obj map[string]interface{}; _=json.NewDecoder(r.Body).Decode(&obj); md,_:=obj["metadata"].(map[string]interface{}); if md==nil { md=map[string]interface{}{} }; name,_:=md["name"].(string); if name=="" { name=fmt.Sprintf("crb-%d",time.Now().UnixNano()) }; if _,ex:=clusterRoleBindings[name]; ex { writeJSON(w,409,map[string]interface{}{"kind":"Status","code":409,"reason":"AlreadyExists"}); return }; md["name"]=name; md["uid"]=genUID(name); md["creationTimestamp"]=time.Now().UTC().Format(time.RFC3339); obj["apiVersion"]="rbac.authorization.k8s.io/v1"; obj["kind"]="ClusterRoleBinding"; obj["metadata"]=md; clusterRoleBindings[name]=obj; writeJSON(w,201,obj); default: w.WriteHeader(405)} }))
-    mux.HandleFunc("/apis/rbac.authorization.k8s.io/v1/roles", logReq(func(w http.ResponseWriter, r *http.Request){ writeJSON(w,200,map[string]interface{}{"kind":"RoleList","apiVersion":"rbac.authorization.k8s.io/v1","items":[]interface{}{}}) }))
-    mux.HandleFunc("/apis/rbac.authorization.k8s.io/v1/rolebindings", logReq(func(w http.ResponseWriter, r *http.Request){ writeJSON(w,200,map[string]interface{}{"kind":"RoleBindingList","apiVersion":"rbac.authorization.k8s.io/v1","items":[]interface{}{}}) }))
-    // Namespaces list/create
-    mux.HandleFunc("/api/v1/namespaces", logReq(func(w http.ResponseWriter, r *http.Request){ switch r.Method {case http.MethodGet: items:=[]interface{}{}; for _,nsObj:= range namespaces { items=append(items,nsObj)}; writeJSON(w,200,map[string]interface{}{"kind":"NamespaceList","apiVersion":"v1","items":items}); case http.MethodPost: var obj map[string]interface{}; _=json.NewDecoder(r.Body).Decode(&obj); md,_:=obj["metadata"].(map[string]interface{}); if md==nil { md=map[string]interface{}{} }; name,_:=md["name"].(string); if name=="" { name=fmt.Sprintf("ns-%d",time.Now().UnixNano()) }; if _,ex:=namespaces[name]; ex { writeJSON(w,409,map[string]interface{}{"kind":"Status","code":409,"reason":"AlreadyExists"}); return }; ensureNS(name); writeJSON(w,201,namespaces[name]); default: w.WriteHeader(405)} }))
-    // Namespaced resources & namespace GET by name
-    mux.HandleFunc("/api/v1/namespaces/", logReq(func(w http.ResponseWriter, r *http.Request){ parts:=strings.Split(strings.TrimPrefix(r.URL.Path,"/api/v1/namespaces/"),"/")
-        if len(parts)==1 || parts[1]=="" { // namespace by name
-            if r.Method!=http.MethodGet { http.NotFound(w,r); return }
-            name := strings.TrimSuffix(parts[0],"/")
-            if ns,ok:=namespaces[name]; ok { writeJSON(w,200,ns); return }
-            writeJSON(w,404,map[string]interface{}{"kind":"Status","apiVersion":"v1","status":"Failure","reason":"NotFound","message":fmt.Sprintf("namespaces \"%s\" not found",name),"code":404}); return }
-        ns := parts[0]; ensureNS(ns)
-        if len(parts) >= 2 {
-            res := parts[1]
-            switch res {
-            case "serviceaccounts":
-                saMap := serviceAccounts[ns]
-                switch r.Method {
-                case http.MethodGet:
-                    items := []interface{}{}
-                    for _, v := range saMap { items = append(items, v) }
-                    writeJSON(w,200,map[string]interface{}{"kind":"ServiceAccountList","apiVersion":"v1","items":items}); return
-                case http.MethodPost:
-                    var obj map[string]interface{}; _=json.NewDecoder(r.Body).Decode(&obj)
-                    md,_:=obj["metadata"].(map[string]interface{}); if md==nil { md=map[string]interface{}{} }
-                    name,_:=md["name"].(string); if name=="" { name=fmt.Sprintf("sa-%d",time.Now().UnixNano()) }
-                    if _,exists:=saMap[name]; exists { writeJSON(w,409,map[string]interface{}{"kind":"Status","code":409,"reason":"AlreadyExists"}); return }
-                    md["name"],md["uid"],md["creationTimestamp"]=name,genUID(name),time.Now().UTC().Format(time.RFC3339)
-                    obj["apiVersion"],obj["kind"],obj["metadata"]="v1","ServiceAccount",md
-                    saMap[name]=obj; writeJSON(w,201,obj); return
-                }
-            case "secrets":
-                secMap := secrets[ns]
-                switch r.Method {
-                case http.MethodGet:
-                    items := []interface{}{}
-                    for _, v := range secMap { items = append(items, v) }
-                    writeJSON(w,200,map[string]interface{}{"kind":"SecretList","apiVersion":"v1","items":items}); return
-                case http.MethodPost:
-                    var obj map[string]interface{}; _=json.NewDecoder(r.Body).Decode(&obj)
-                    md,_:=obj["metadata"].(map[string]interface{}); if md==nil { md=map[string]interface{}{} }
-                    name,_:=md["name"].(string); if name=="" { name=fmt.Sprintf("secret-%d",time.Now().UnixNano()) }
-                    if _,exists:=secMap[name]; exists { writeJSON(w,409,map[string]interface{}{"kind":"Status","code":409,"reason":"AlreadyExists"}); return }
-                    md["name"],md["uid"],md["creationTimestamp"]=name,genUID(name),time.Now().UTC().Format(time.RFC3339)
-                    obj["apiVersion"],obj["kind"],obj["metadata"]="v1","Secret",md
-                    if _,ok:=obj["type"].(string); !ok { obj["type"]="Opaque" }
-                    if _,ok:=obj["data"].(map[string]interface{}); !ok { obj["data"]=map[string]interface{}{} }
-                    secMap[name]=obj; writeJSON(w,201,obj); return
-                }
-            }
-        }
-        http.NotFound(w,r)
+
+    writeWatchStream := func(w http.ResponseWriter, r *http.Request, items []map[string]interface{}) {
+        w.Header().Set("Content-Type","application/json")
+        flusher, ok := w.(http.Flusher); if !ok { writeJSON(w,500,map[string]string{"error":"stream not supported"}); return }
+        enc := json.NewEncoder(w)
+        for _, obj := range items { enc.Encode(map[string]interface{}{ "type":"ADDED", "object": obj }) }
+        flusher.Flush()
+        <-r.Context().Done() // keep open until client closes
+    }
+    isWatch := func(r *http.Request) bool { return r.URL.Query().Get("watch") == "true" }
+
+    // RBAC APIResourceList
+    muxLocal.HandleFunc("/apis/rbac.authorization.k8s.io/v1", logReq(func(w http.ResponseWriter, r *http.Request){
+        writeJSON(w,200,map[string]interface{}{"kind":"APIResourceList","apiVersion":"v1","groupVersion":"rbac.authorization.k8s.io/v1","resources":[]map[string]interface{}{
+            {"name":"clusterroles","namespaced":false,"kind":"ClusterRole"},
+            {"name":"clusterrolebindings","namespaced":false,"kind":"ClusterRoleBinding"},
+            {"name":"roles","namespaced":true,"kind":"Role"},
+            {"name":"rolebindings","namespaced":true,"kind":"RoleBinding"},
+        }})
     }))
-    // Misc lists
-    mux.HandleFunc("/api/v1/limitranges", logReq(func(w http.ResponseWriter, r *http.Request){ if r.Method==http.MethodGet { writeJSON(w,200,map[string]interface{}{"kind":"LimitRangeList","apiVersion":"v1","items":[]interface{}{}}); return }; w.WriteHeader(405) }))
-    mux.HandleFunc("/api/v1/resourcequotas", logReq(func(w http.ResponseWriter, r *http.Request){ if r.Method==http.MethodGet { writeJSON(w,200,map[string]interface{}{"kind":"ResourceQuotaList","apiVersion":"v1","items":[]interface{}{}}); return }; w.WriteHeader(405) }))
-    mux.HandleFunc("/apis/apiregistration.k8s.io/v1/apiservices", logReq(func(w http.ResponseWriter, r *http.Request){ if r.Method==http.MethodGet { items:=[]interface{}{ map[string]interface{}{"apiVersion":"apiregistration.k8s.io/v1","kind":"APIService","metadata":map[string]interface{}{"name":"v1."},"spec":map[string]interface{}{"group":"","version":"v1","insecureSkipTLSVerify":true},"status":map[string]interface{}{"conditions":[]interface{}{map[string]interface{}{"type":"Available","status":"True"}}}}, map[string]interface{}{"apiVersion":"apiregistration.k8s.io/v1","kind":"APIService","metadata":map[string]interface{}{"name":"v1.apps"},"spec":map[string]interface{}{"group":"apps","version":"v1","insecureSkipTLSVerify":true},"status":map[string]interface{}{"conditions":[]interface{}{map[string]interface{}{"type":"Available","status":"True"}}}}, }; writeJSON(w,200,map[string]interface{}{"kind":"APIServiceList","apiVersion":"apiregistration.k8s.io/v1","items":items}); return }; w.WriteHeader(405) }))
-    mux.HandleFunc("/api/v1/nodes", logReq(func(w http.ResponseWriter, r *http.Request){ if r.Method==http.MethodGet { nodeName:=fmt.Sprintf("%s-node-1",clusterName); node:=map[string]interface{}{"apiVersion":"v1","kind":"Node","metadata":map[string]interface{}{"name":nodeName,"uid":genUID(nodeName),"creationTimestamp":time.Now().UTC().Format(time.RFC3339)},"status":map[string]interface{}{"conditions":[]interface{}{map[string]interface{}{"type":"Ready","status":"True","lastHeartbeatTime":time.Now().UTC().Format(time.RFC3339),"lastTransitionTime":time.Now().UTC().Format(time.RFC3339)}},"capacity":map[string]interface{}{"cpu":"4","memory":"8192Mi","pods":"110"}}}; writeJSON(w,200,map[string]interface{}{"kind":"NodeList","apiVersion":"v1","items":[]interface{}{node}}); return }; w.WriteHeader(405) }))
-    mux.HandleFunc("/", logReq(func(w http.ResponseWriter, r *http.Request){ if r.URL.Path=="/" { writeJSON(w,200,map[string]interface{}{"kind":"APIVersions","versions":[]string{"v1"}}); return }; http.NotFound(w,r) }))
-    server := &http.Server{Addr: addr, Handler: mux, TLSConfig: &tls.Config{Certificates: []tls.Certificate{cert}}}
-    go func(){
-        logrus.Infof("Mock HTTPS API server listening at https://%s (cluster=%s)", addr, clusterName)
-        ln, err := tls.Listen("tcp", addr, server.TLSConfig)
-        if err != nil { logrus.Errorf("mock https api listen error: %v", err); return }
-        if err := server.Serve(ln); err != nil && err != http.ErrServerClosed { logrus.Errorf("mock https api server error: %v", err) }
-    }()
+
+    // cluster-scope roles aggregate list/watch
+	muxLocal.HandleFunc("/apis/rbac.authorization.k8s.io/v1/roles", logReq(func(w http.ResponseWriter, r *http.Request){
+		if isWatch(r) { stateMu.RLock(); items := []map[string]interface{}{}; for _, m := range roles { for _, role := range m { items = append(items, role) } }; stateMu.RUnlock(); writeWatchStream(w,r,items); return }
+		stateMu.RLock(); items := []interface{}{}; for _, m := range roles { for _, role := range m { items = append(items, role) } }; stateMu.RUnlock()
+		writeJSON(w,200,map[string]interface{}{"kind":"RoleList","apiVersion":"rbac.authorization.k8s.io/v1","resources":[]map[string]interface{}{}})
+	}))
+    muxLocal.HandleFunc("/apis/rbac.authorization.k8s.io/v1/rolebindings", logReq(func(w http.ResponseWriter, r *http.Request){
+        if isWatch(r) {
+            items := []map[string]interface{}{}
+            for _, m := range roleBindings { for _, rb := range m { items = append(items, rb) } }
+            writeWatchStream(w,r,items); return
+        }
+        items := []interface{}{}
+        for _, m := range roleBindings { for _, rb := range m { items = append(items, rb) } }
+        writeJSON(w,200,map[string]interface{}{"kind":"RoleBindingList","apiVersion":"rbac.authorization.k8s.io/v1","items":items})
+    }))
+
+    // Namespaced RBAC resources
+    muxLocal.HandleFunc("/apis/rbac.authorization.k8s.io/v1/namespaces/", logReq(func(w http.ResponseWriter, r *http.Request){
+        rest := strings.TrimPrefix(r.URL.Path, "/apis/rbac.authorization.k8s.io/v1/namespaces/")
+        parts := strings.Split(rest, "/")
+        if len(parts) < 2 { http.NotFound(w,r); return }
+        ns, res := parts[0], parts[1]
+        ensureNS(ns)
+        switch res {
+        case "roles":
+            if r.Method == http.MethodPost {
+                var obj map[string]interface{}; if err:= json.NewDecoder(r.Body).Decode(&obj); err!=nil { writeJSON(w,400,map[string]string{"error":"bad json"}); return }
+                md,_ := obj["metadata"].(map[string]interface{}); if md==nil { md=map[string]interface{}{}; obj["metadata"]=md }
+                name,_ := md["name"].(string); if name=="" { if gn,_ := md["generateName"].(string); gn!="" { name = gn + randSuffix(5); md["name"]=name } }
+                if name=="" { writeJSON(w,400,map[string]string{"error":"name required"}); return }
+                rules,_ := obj["rules"].([]interface{})
+                role := createRole(ns,name,rules)
+                writeJSON(w,201,role); return
+            }
+			if isWatch(r) { stateMu.RLock(); items:=[]map[string]interface{}{}; for _, role := range roles[ns] { items=append(items,role) }; stateMu.RUnlock(); writeWatchStream(w,r,items); return }
+			stateMu.RLock(); items := []interface{}{}; for _, role := range roles[ns] { items=append(items, role) }; stateMu.RUnlock(); writeJSON(w,200,map[string]interface{}{"kind":"RoleList","apiVersion":"rbac.authorization.k8s.io/v1","items":items}); return
+        case "rolebindings":
+            if r.Method == http.MethodPost {
+                var obj map[string]interface{}; if err:= json.NewDecoder(r.Body).Decode(&obj); err!=nil { writeJSON(w,400,map[string]string{"error":"bad json"}); return }
+                md,_ := obj["metadata"].(map[string]interface{}); if md==nil { md=map[string]interface{}{}; obj["metadata"]=md }
+                name,_ := md["name"].(string); if name=="" { if gn,_ := md["generateName"].(string); gn!="" { name = gn + randSuffix(5); md["name"]=name } }
+                if name=="" { writeJSON(w,400,map[string]string{"error":"name required"}); return }
+                roleRef,_ := obj["roleRef"].(map[string]interface{}); roleName,_ := roleRef["name"].(string)
+                subjects,_ := obj["subjects"].([]interface{})
+                saNS, saName := ns, "cattle"
+                if len(subjects)>0 { if subj,ok := subjects[0].(map[string]interface{}); ok { if n,ok2:=subj["name"].(string); ok2 { saName=n }; if nns,ok2:=subj["namespace"].(string); ok2 { saNS=nns } } }
+                rb := createRoleBinding(ns,name,roleName,saNS,saName)
+                writeJSON(w,201,rb); return
+            }
+			if isWatch(r) { stateMu.RLock(); items:=[]map[string]interface{}{}; for _, rb := range roleBindings[ns] { items=append(items,rb) }; stateMu.RUnlock(); writeWatchStream(w,r,items); return }
+			stateMu.RLock(); items := []interface{}{}; for _, rb := range roleBindings[ns] { items=append(items, rb) }; stateMu.RUnlock(); writeJSON(w,200,map[string]interface{}{"kind":"RoleBindingList","apiVersion":"rbac.authorization.k8s.io/v1","items":items}); return
+        default:
+            http.NotFound(w,r)
+        }
+    }))
+
+	// ---- Core discovery endpoints ----
+	muxLocal.HandleFunc("/version", logReq(func(w http.ResponseWriter, r *http.Request){
+		writeJSON(w,200,map[string]interface{}{ "major":"1","minor":"24","gitVersion":"v1.24.0-mock","platform":"linux/amd64" })
+	}))
+	muxLocal.HandleFunc("/api", logReq(func(w http.ResponseWriter, r *http.Request){
+		writeJSON(w,200,map[string]interface{}{"kind":"APIVersions","versions":[]string{"v1"}})
+	}))
+	muxLocal.HandleFunc("/apis", logReq(func(w http.ResponseWriter, r *http.Request){
+		writeJSON(w,200,map[string]interface{}{"kind":"APIGroupList","apiVersion":"v1","groups":[]interface{}{
+			map[string]interface{}{ "name":"rbac.authorization.k8s.io","versions":[]interface{}{map[string]interface{}{"groupVersion":"rbac.authorization.k8s.io/v1","version":"v1"}},"preferredVersion":map[string]interface{}{"groupVersion":"rbac.authorization.k8s.io/v1","version":"v1"}},
+			map[string]interface{}{ "name":"apiregistration.k8s.io","versions":[]interface{}{map[string]interface{}{"groupVersion":"apiregistration.k8s.io/v1","version":"v1"}},"preferredVersion":map[string]interface{}{"groupVersion":"apiregistration.k8s.io/v1","version":"v1"}},
+		}})
+	}))
+	muxLocal.HandleFunc("/apis/apiregistration.k8s.io/v1", logReq(func(w http.ResponseWriter, r *http.Request){
+		writeJSON(w,200,map[string]interface{}{"kind":"APIResourceList","apiVersion":"v1","groupVersion":"apiregistration.k8s.io/v1","resources":[]map[string]interface{}{
+			{"name":"apiservices","namespaced":false,"kind":"APIService"},
+		}})
+	}))
+	muxLocal.HandleFunc("/apis/apiregistration.k8s.io/v1/apiservices", logReq(func(w http.ResponseWriter, r *http.Request){
+		if isWatch(r) { writeWatchStream(w,r,[]map[string]interface{}{}); return }
+		writeJSON(w,200,map[string]interface{}{"kind":"APIServiceList","apiVersion":"apiregistration.k8s.io/v1","items":[]interface{}{}})
+	}))
+	muxLocal.HandleFunc("/api/v1", logReq(func(w http.ResponseWriter, r *http.Request){
+		writeJSON(w,200,map[string]interface{}{"kind":"APIResourceList","apiVersion":"v1","groupVersion":"v1","resources":[]map[string]interface{}{
+			{"name":"namespaces","namespaced":false,"kind":"Namespace"},
+			{"name":"serviceaccounts","namespaced":true,"kind":"ServiceAccount"},
+			{"name":"secrets","namespaced":true,"kind":"Secret"},
+			{"name":"resourcequotas","namespaced":true,"kind":"ResourceQuota"},
+			{"name":"limitranges","namespaced":true,"kind":"LimitRange"},
+			{"name":"nodes","namespaced":false,"kind":"Node"},
+		}})
+	}))
+
+	// ---- Cluster-scoped RBAC list/create/watch ----
+	muxLocal.HandleFunc("/apis/rbac.authorization.k8s.io/v1/clusterroles", logReq(func(w http.ResponseWriter, r *http.Request){
+		if r.Method == http.MethodPost {
+			var obj map[string]interface{}; if err:= json.NewDecoder(r.Body).Decode(&obj); err!=nil { writeJSON(w,400,map[string]string{"error":"bad json"}); return }
+			md,_ := obj["metadata"].(map[string]interface{}); if md==nil { md=map[string]interface{}{}; obj["metadata"]=md }
+			name,_ := md["name"].(string); if name=="" { if gn,_ := md["generateName"].(string); gn!="" { name = gn + randSuffix(5); md["name"]=name } }
+			if name=="" { writeJSON(w,400,map[string]string{"error":"name required"}); return }
+			rules,_ := obj["rules"].([]interface{})
+			cr := createClusterRole(name,rules)
+			writeJSON(w,201,cr); return
+		}
+		if isWatch(r) {
+			stateMu.RLock(); items:=[]map[string]interface{}{}; for _, cr := range clusterRoles { items=append(items,cr) }; stateMu.RUnlock(); writeWatchStream(w,r,items); return }
+		stateMu.RLock(); items := []interface{}{}; for _, cr := range clusterRoles { items=append(items,cr) }; stateMu.RUnlock()
+		writeJSON(w,200,map[string]interface{}{"kind":"ClusterRoleList","apiVersion":"rbac.authorization.k8s.io/v1","items":items})
+	}))
+	muxLocal.HandleFunc("/apis/rbac.authorization.k8s.io/v1/clusterrolebindings", logReq(func(w http.ResponseWriter, r *http.Request){
+		if r.Method == http.MethodPost {
+			var obj map[string]interface{}; if err:= json.NewDecoder(r.Body).Decode(&obj); err!=nil { writeJSON(w,400,map[string]string{"error":"bad json"}); return }
+			md,_ := obj["metadata"].(map[string]interface{}); if md==nil { md=map[string]interface{}{}; obj["metadata"]=md }
+			name,_ := md["name"].(string); if name=="" { if gn,_ := md["generateName"].(string); gn!="" { name = gn + randSuffix(5); md["name"]=name } }
+			if name=="" { writeJSON(w,400,map[string]string{"error":"name required"}); return }
+			roleRef,_ := obj["roleRef"].(map[string]interface{}); roleName,_ := roleRef["name"].(string)
+			subjects,_ := obj["subjects"].([]interface{})
+			saNS, saName := "cattle-system", "cattle"
+			if len(subjects)>0 { if subj,ok := subjects[0].(map[string]interface{}); ok { if n,ok2:=subj["name"].(string); ok2 { saName=n }; if nns,ok2:=subj["namespace"].(string); ok2 { saNS=nns } } }
+			crb := createClusterRoleBinding(name,roleName,saNS,saName)
+			writeJSON(w,201,crb); return
+		}
+		if isWatch(r) { stateMu.RLock(); items:=[]map[string]interface{}{}; for _, crb := range clusterRoleBindings { items=append(items,crb) }; stateMu.RUnlock(); writeWatchStream(w,r,items); return }
+		stateMu.RLock(); items := []interface{}{}; for _, crb := range clusterRoleBindings { items=append(items,crb) }; stateMu.RUnlock()
+		writeJSON(w,200,map[string]interface{}{"kind":"ClusterRoleBindingList","apiVersion":"rbac.authorization.k8s.io/v1","items":items})
+	}))
+
+	// ---- Core resource handlers ----
+
+	// Minimal OpenAPI v2 spec endpoint (Kubernetes normally serves a large document). Rancher just needs a 200 with JSON.
+	muxLocal.HandleFunc("/openapi/v2", logReq(func(w http.ResponseWriter, r *http.Request){
+		if r.Method != http.MethodGet { w.WriteHeader(405); return }
+		w.Header().Set("Content-Type", "application/json")
+		// Extremely reduced spec: only declares a few core objects we fake. Enough to unblock validation.
+		io.WriteString(w, `{
+	"swagger":"2.0",
+	"info":{"title":"Kubernetes","version":"v1.29.0"},
+	"paths":{
+	  "/api/v1/namespaces":{},
+	  "/api/v1/namespaces/{name}":{},
+	  "/api/v1/namespaces/{namespace}/secrets":{},
+	  "/api/v1/namespaces/{namespace}/serviceaccounts":{},
+	  "/apis/rbac.authorization.k8s.io/v1/clusterroles":{},
+	  "/apis/rbac.authorization.k8s.io/v1/clusterrolebindings":{}
+	},
+	"definitions":{
+	  "io.k8s.api.core.v1.Namespace":{ "type":"object","properties":{"metadata":{"type":"object"}}},
+	  "io.k8s.api.core.v1.Secret":{ "type":"object","properties":{"metadata":{"type":"object"},"data":{"type":"object"}}},
+	  "io.k8s.api.core.v1.ServiceAccount":{ "type":"object","properties":{"metadata":{"type":"object"}}},
+	  "io.k8s.api.rbac.v1.ClusterRole":{ "type":"object","properties":{"metadata":{"type":"object"}}},
+	  "io.k8s.api.rbac.v1.ClusterRoleBinding":{ "type":"object","properties":{"metadata":{"type":"object"}}}
+	}
+	}`)
+	}))
+
+	muxLocal.HandleFunc("/api/v1/namespaces", logReq(func(w http.ResponseWriter, r *http.Request){
+		if isWatch(r) { stateMu.RLock(); items:=[]map[string]interface{}{}; for _, nsObj := range namespaces { items=append(items, nsObj) }; stateMu.RUnlock(); writeWatchStream(w,r,items); return }
+		stateMu.RLock(); items := []interface{}{}; for _, nsObj := range namespaces { items=append(items, nsObj) }; stateMu.RUnlock()
+		writeJSON(w,200,map[string]interface{}{"kind":"NamespaceList","apiVersion":"v1","items":items})
+	}))
+	// Namespaced core resources
+	muxLocal.HandleFunc("/api/v1/namespaces/", logReq(func(w http.ResponseWriter, r *http.Request){
+		rest := strings.TrimPrefix(r.URL.Path, "/api/v1/namespaces/")
+		parts := strings.Split(rest, "/")
+		// Handle direct namespace object: /api/v1/namespaces/{name}
+		if len(parts) == 1 || parts[1] == "" { // trailing slash optional
+			ns := strings.TrimSuffix(parts[0], "/")
+			if ns == "" { http.NotFound(w,r); return }
+			ensureNS(ns)
+			stateMu.Lock()
+			nsObj := namespaces[ns]
+			if r.Method == http.MethodGet {
+				stateMu.Unlock()
+				writeJSON(w,200,nsObj); return
+			}
+			if r.Method == http.MethodPut || r.Method==http.MethodPatch {
+				var obj map[string]interface{}
+				if err := json.NewDecoder(r.Body).Decode(&obj); err!=nil { stateMu.Unlock(); writeJSON(w,400,map[string]string{"error":"bad json"}); return }
+				md,_ := obj["metadata"].(map[string]interface{}); if md==nil { md = map[string]interface{}{}; obj["metadata"]=md }
+				md["name"]=ns
+				// preserve existing resourceVersion if present
+				if existing, ok := nsObj["metadata"].(map[string]interface{}); ok { if rv,ok2:=existing["resourceVersion"]; ok2 { md["resourceVersion"]=rv } }
+				namespaces[ns] = map[string]interface{}{ "apiVersion":"v1","kind":"Namespace","metadata":md,"status":map[string]interface{}{"phase":"Active"} }
+				updated := namespaces[ns]
+				stateMu.Unlock()
+				writeJSON(w,200,updated); return
+			}
+			stateMu.Unlock()
+			writeJSON(w,405,map[string]string{"error":"method not allowed"}); return
+		}
+		ns, res := parts[0], parts[1]
+		ensureNS(ns)
+		switch res {
+		case "serviceaccounts":
+			if r.Method == http.MethodPost {
+				var obj map[string]interface{}; if err:= json.NewDecoder(r.Body).Decode(&obj); err!=nil { writeJSON(w,400,map[string]string{"error":"bad json"}); return }
+				md,_ := obj["metadata"].(map[string]interface{}); if md==nil { md=map[string]interface{}{}; obj["metadata"]=md }
+				name,_ := md["name"].(string); if name=="" { if gn,_ := md["generateName"].(string); gn!="" { name = gn + randSuffix(5); md["name"]=name } }
+				if name=="" { writeJSON(w,400,map[string]string{"error":"name required"}); return }
+				sa := createServiceAccount(ns,name)
+				// auto token secret
+				createSecret(ns, "", "kubernetes.io/service-account-token", map[string]string{"token":"token"}, map[string]string{"kubernetes.io/service-account.name":name})
+				writeJSON(w,201,sa); return
+			}
+			if isWatch(r) { stateMu.RLock(); items:=[]map[string]interface{}{}; for _, sa := range serviceAccounts[ns] { if m,ok:=sa.(map[string]interface{}); ok { items=append(items,m) } }; stateMu.RUnlock(); writeWatchStream(w,r,items); return }
+			stateMu.RLock(); items := []interface{}{}; for _, sa := range serviceAccounts[ns] { items=append(items, sa) }; stateMu.RUnlock()
+			writeJSON(w,200,map[string]interface{}{"kind":"ServiceAccountList","apiVersion":"v1","items":items}); return
+		case "secrets":
+			if r.Method == http.MethodPost {
+				var obj map[string]interface{}; if err:= json.NewDecoder(r.Body).Decode(&obj); err!=nil { writeJSON(w,400,map[string]string{"error":"bad json"}); return }
+				md,_ := obj["metadata"].(map[string]interface{}); if md==nil { md=map[string]interface{}{}; obj["metadata"]=md }
+				name,_ := md["name"].(string)
+				typ,_ := obj["type"].(string); if typ=="" { typ="Opaque" }
+				data := map[string]string{}
+				if rawData, ok := obj["data"].(map[string]interface{}); ok { for k,v := range rawData { if s, ok2 := v.(string); ok2 { data[k]=s } } }
+				annIn := map[string]string{}
+				if mdAnn, ok := md["annotations"].(map[string]interface{}); ok { for k,v := range mdAnn { if s,ok2 := v.(string); ok2 { annIn[k]=s } } }
+				sec := createSecret(ns,name,typ,data,annIn)
+				writeJSON(w,201,sec); return
+			}
+			if isWatch(r) { stateMu.RLock(); items:=[]map[string]interface{}{}; for _, s := range secrets[ns] { if m,ok:=s.(map[string]interface{}); ok { items=append(items,m) } }; stateMu.RUnlock(); writeWatchStream(w,r,items); return }
+			stateMu.RLock(); items := []interface{}{}; for _, s := range secrets[ns] { items=append(items, s) }; stateMu.RUnlock()
+			writeJSON(w,200,map[string]interface{}{"kind":"SecretList","apiVersion":"v1","items":items}); return
+		case "resourcequotas":
+			if isWatch(r) { writeWatchStream(w,r,[]map[string]interface{}{}); return }
+			writeJSON(w,200,map[string]interface{}{"kind":"ResourceQuotaList","apiVersion":"v1","items":[]interface{}{}}); return
+		case "limitranges":
+			if isWatch(r) { writeWatchStream(w,r,[]map[string]interface{}{}); return }
+			writeJSON(w,200,map[string]interface{}{"kind":"LimitRangeList","apiVersion":"v1","items":[]interface{}{}}); return
+		default:
+			http.NotFound(w,r)
+		}
+	}))
+	// cluster-wide list across namespaces for namespaced resources
+	muxLocal.HandleFunc("/api/v1/resourcequotas", logReq(func(w http.ResponseWriter, r *http.Request){
+		if isWatch(r) { writeWatchStream(w,r,[]map[string]interface{}{}); return }
+		writeJSON(w,200,map[string]interface{}{"kind":"ResourceQuotaList","apiVersion":"v1","items":[]interface{}{}})
+	}))
+	muxLocal.HandleFunc("/api/v1/limitranges", logReq(func(w http.ResponseWriter, r *http.Request){
+		if isWatch(r) { writeWatchStream(w,r,[]map[string]interface{}{}); return }
+		writeJSON(w,200,map[string]interface{}{"kind":"LimitRangeList","apiVersion":"v1","items":[]interface{}{}})
+	}))
+	// Cluster-scope core lists
+	muxLocal.HandleFunc("/api/v1/serviceaccounts", logReq(func(w http.ResponseWriter, r *http.Request){
+		if isWatch(r) { stateMu.RLock(); items:=[]map[string]interface{}{}; for _, nsMap := range serviceAccounts { for _, sa := range nsMap { if m,ok:=sa.(map[string]interface{}); ok { items=append(items,m) } } }; stateMu.RUnlock(); writeWatchStream(w,r,items); return }
+		stateMu.RLock(); items := []interface{}{}; for _, nsMap := range serviceAccounts { for _, sa := range nsMap { items=append(items,sa) } }; stateMu.RUnlock()
+		writeJSON(w,200,map[string]interface{}{"kind":"ServiceAccountList","apiVersion":"v1","items":items})
+	}))
+	muxLocal.HandleFunc("/api/v1/secrets", logReq(func(w http.ResponseWriter, r *http.Request){
+		if isWatch(r) { stateMu.RLock(); items:=[]map[string]interface{}{}; for _, nsMap := range secrets { for _, s := range nsMap { if m,ok:=s.(map[string]interface{}); ok { items=append(items,m) } } }; stateMu.RUnlock(); writeWatchStream(w,r,items); return }
+		stateMu.RLock(); items := []interface{}{}; for _, nsMap := range secrets { for _, s := range nsMap { items=append(items,s) } }; stateMu.RUnlock()
+		writeJSON(w,200,map[string]interface{}{"kind":"SecretList","apiVersion":"v1","items":items})
+	}))
+	// Nodes
+	nodeObj := map[string]interface{}{"apiVersion":"v1","kind":"Node","metadata":map[string]interface{}{"name":"mock-node","uid":genUID("node-mock-node"),"creationTimestamp":now(),"resourceVersion":nextRV()},"status":map[string]interface{}{"conditions":[]interface{}{}}}
+	muxLocal.HandleFunc("/api/v1/nodes", logReq(func(w http.ResponseWriter, r *http.Request){
+		if isWatch(r) { writeWatchStream(w,r,[]map[string]interface{}{nodeObj}); return }
+		writeJSON(w,200,map[string]interface{}{"kind":"NodeList","apiVersion":"v1","items":[]interface{}{nodeObj}})
+	}))
+
+	// Start HTTPS server
+	go func(){
+		ln, err := net.Listen("tcp", addr)
+		if err != nil { logrus.Errorf("mock api listen error: %v", err); return }
+		tlsCfg := &tls.Config{Certificates: []tls.Certificate{cert}}
+		srv := &http.Server{Handler: muxLocal, TLSConfig: tlsCfg}
+		logrus.Infof("Mock kube API serving on https://%s (cluster=%s)", addr, clusterName)
+		if err := srv.Serve(tls.NewListener(ln, tlsCfg)); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logrus.Errorf("mock api server error: %v", err)
+		}
+	}()
 }
+
+// waitForPort tries to connect until timeout.
+func waitForPort(address string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	for {
+		conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 500 * time.Millisecond}, "tcp", address, &tls.Config{InsecureSkipVerify: true})
+		if err == nil {
+			conn.Close(); return nil
+		}
+		if time.Now().After(deadline) { return fmt.Errorf("port %s not ready: %w", address, err) }
+		time.Sleep(200 * time.Millisecond)
+	}
+}
+
+// patchClusterActive best-effort activation (placeholder; Rancher may require action endpoint)
+func (a *ScaleAgent) patchClusterActive(clusterID string) {
+	if clusterID == "" || a.config == nil { return }
+	base := strings.TrimRight(a.config.RancherURL, "/")
+	client := &http.Client{ Timeout: 15 * time.Second }
+	// 1. GET cluster to inspect actions
+	getURL := fmt.Sprintf("%s/v3/clusters/%s", base, clusterID)
+	req, _ := http.NewRequest("GET", getURL, nil)
+	req.Header.Set("Authorization", "Bearer "+a.config.BearerToken)
+	resp, err := client.Do(req)
+	if err != nil { logrus.Debugf("cluster get failed: %v", err); return }
+	body, _ := io.ReadAll(resp.Body); resp.Body.Close()
+	if resp.StatusCode != 200 { logrus.Debugf("cluster get status=%d body=%s", resp.StatusCode, string(body)); return }
+	var cluster map[string]interface{}
+	if err := json.Unmarshal(body, &cluster); err != nil { logrus.Debugf("cluster json decode: %v", err); return }
+	// check actions.activate
+	if act, ok := cluster["actions"].(map[string]interface{}); ok {
+		if activateURL, ok2 := act["activate"].(string); ok2 {
+			req2, _ := http.NewRequest("POST", activateURL, nil)
+			req2.Header.Set("Authorization", "Bearer "+a.config.BearerToken)
+			resp2, err2 := client.Do(req2)
+			if err2 == nil { b2,_ := io.ReadAll(resp2.Body); resp2.Body.Close(); logrus.Debugf("activate POST status=%d body=%s", resp2.StatusCode, string(b2)) }
+			return
+		}
+	}
+	// fallback: PUT minimal transition state if allowed (may fail; ignore)
+	spec := map[string]interface{}{"id":clusterID, "type":"cluster", "name": clusterID, "state":"active"}
+	putBody, _ := json.Marshal(spec)
+	req3, _ := http.NewRequest("PUT", getURL, bytes.NewReader(putBody))
+	req3.Header.Set("Authorization", "Bearer "+a.config.BearerToken)
+	req3.Header.Set("Content-Type", "application/json")
+	if resp3, err3 := client.Do(req3); err3 == nil { b3,_ := io.ReadAll(resp3.Body); resp3.Body.Close(); logrus.Debugf("activate PUT status=%d body=%s", resp3.StatusCode, string(b3)) }
+}
+
+func fnvHash(s string) uint32 { h := fnv.New32a(); _, _ = h.Write([]byte(s)); return h.Sum32() }
