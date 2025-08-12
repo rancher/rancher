@@ -139,7 +139,26 @@ var DriverData = map[string]DriverDataConfig{
 
 func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver(Amazonec2driver, "local://", "", "",
-		[]string{"iam.amazonaws.com", "iam.us-gov.amazonaws.com", "iam.%.amazonaws.com.cn", "ec2.%.amazonaws.com", "ec2.%.amazonaws.com.cn", "eks.%.amazonaws.com", "eks.%.amazonaws.com.cn", "kms.%.amazonaws.com", "kms.%.amazonaws.com.cn"},
+		[]string{
+			// https://docs.aws.amazon.com/general/latest/gr/iam-service.html
+			"iam.amazonaws.com",
+			"iam.us-gov.amazonaws.com",
+			"iam.%.amazonaws.com.cn",
+			// https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_dual-stack_endpoint_support.html
+			"iam.global.api.aws",
+			// https://docs.aws.amazon.com/general/latest/gr/ec2-service.html
+			"ec2.%.amazonaws.com",
+			"ec2.%.amazonaws.com.cn",
+			"ec2.%.api.aws",
+			// https://docs.aws.amazon.com/general/latest/gr/eks.html
+			"eks.%.amazonaws.com",
+			"eks.%.amazonaws.com.cn",
+			"eks.%.api.aws",
+			// https://docs.aws.amazon.com/general/latest/gr/kms.html
+			"kms.%.amazonaws.com",
+			"kms.%.amazonaws.com.cn",
+			"kms.%.api.aws",
+		},
 		true, true, true, nil, management); err != nil {
 		return err
 	}
@@ -171,7 +190,7 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	linodeDriverURL := fmt.Sprintf("https://github.com/linode/docker-machine-driver-linode/releases/download/v0.1.15/docker-machine-driver-linode_linux-%s.zip", runtime.GOARCH)
 	linodeDriverChecksum := "26a71dbbc2f5249a66716cad586c3b4048d3cd9e67c0527442c374dd5dcf1c41"
 	if runtime.GOARCH == "arm64" {
-		//overwrite arm driver version here
+		// overwrite arm driver version here
 		linodeDriverChecksum = "3b1ed74291cbf581c0f8a63d878d79e1fe3b443387c1c0bb8b1d078a78db8bc4"
 	}
 	if err := addMachineDriver(Linodedriver, linodeDriverURL, "/assets/rancher-ui-driver-linode/component.js", linodeDriverChecksum, []string{"api.linode.com"}, linodeBuiltin, linodeBuiltin, false, nil, management); err != nil {
