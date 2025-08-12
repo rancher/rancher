@@ -1,4 +1,4 @@
-name: "Build the prime artifacts index"
+name: "Build the artifacts index"
 description: "Build and upload the artifacts index and invalidate the cloudfront cache"
 runs:
   using: "composite"
@@ -9,7 +9,7 @@ runs:
       run: |
         echo "ARTIFACTS_INDEX=${{ runner.temp }}/artifacts-index" >> $GITHUB_OUTPUT
     - name: setup ecm-distro-tools
-      uses: rancher/ecm-distro-tools@ab64b6c7139c945a7af97d1179dc1e2e81cefb6e # v0.52.1
+      uses: rancher/ecm-distro-tools@3fb58c0204d3fc185516c175b6c58adc3089bb86 # v0.55.0
     - name: Build Artifacts Index
       shell: bash
       run: |
@@ -22,6 +22,10 @@ runs:
         release generate rancher artifacts-index --config "$ECM_CONFIG" --write-path ${{ steps.vars.outputs.ARTIFACTS_INDEX }} --ignore-versions v2.6.4
     - name: Upload Artifacts Index
       shell: bash
+      env:
+        AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
+        ARTIFACTS_BUCKET_NAME: ${{ env.ARTIFACTS_BUCKET_NAME }}
       run: |
         aws s3 cp ${{ steps.vars.outputs.ARTIFACTS_INDEX }}/index.html s3://${{ env.ARTIFACTS_BUCKET_NAME }}/index.html
         aws s3 cp ${{ steps.vars.outputs.ARTIFACTS_INDEX }}/index-prerelease.html s3://${{ env.ARTIFACTS_BUCKET_NAME }}/index-prerelease.html
@@ -30,6 +34,7 @@ runs:
       env:
         AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID_CACHE_INVALIDATION }}
         AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY_CACHE_INVALIDATION }}
+        ARTIFACTS_DISTRIBUTION_ID: ${{ env.ARTIFACTS_DISTRIBUTION_ID }}
       run: |
         aws cloudfront create-invalidation --distribution-id ${{ env.ARTIFACTS_DISTRIBUTION_ID }} --paths "/*"
 
