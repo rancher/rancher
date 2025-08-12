@@ -80,6 +80,40 @@ type handler struct {
 	capiMachinesCache capicontrollers.MachineCache
 }
 
+func handlerWithoutCAPI(clients *wrangler.Context, kubeconfigManager *kubeconfig.Manager) *handler {
+	return &handler{
+		mgmtClusterCache:      clients.Mgmt.Cluster().Cache(),
+		mgmtClusters:          clients.Mgmt.Cluster(),
+		clusterTokenCache:     clients.Mgmt.ClusterRegistrationToken().Cache(),
+		clusterTokens:         clients.Mgmt.ClusterRegistrationToken(),
+		featureCache:          clients.Mgmt.Feature().Cache(),
+		featureClient:         clients.Mgmt.Feature(),
+		clusters:              clients.Provisioning.Cluster(),
+		clusterCache:          clients.Provisioning.Cluster().Cache(),
+		rkeControlPlanes:      clients.RKE.RKEControlPlane(),
+		rkeControlPlanesCache: clients.RKE.RKEControlPlane().Cache(),
+		secretCache:           clients.Core.Secret().Cache(),
+		kubeconfigManager:     kubeconfigManager,
+		apply: clients.Apply.WithCacheTypes(
+			clients.Provisioning.Cluster(),
+			clients.Mgmt.Cluster()),
+	}
+}
+
+func EarlyRegister(ctx context.Context, clients *wrangler.Context, kubeconfigManager *kubeconfig.Manager) {
+	h := handlerWithoutCAPI(clients, kubeconfigManager)
+	// Register a generating handler in order to generate clusters.provisioning.cattle.io/v1 objects based on
+	// clusters.management.cattle.io/v3 (legacy) cluster objects. Do this as early as possible to ensure
+	// the UI shows the local cluster, even if CAPI is not fully ready.
+	mgmtcontrollers.RegisterClusterGeneratingHandler(ctx,
+		clients.Mgmt.Cluster(),
+		clients.Apply.WithCacheTypes(clients.Provisioning.Cluster()),
+		"",
+		"provisioning-cluster-create",
+		h.generateProvisioningClusterFromLegacyCluster,
+		nil)
+}
+
 func Register(
 	ctx context.Context,
 	clients *wrangler.Context, kubeconfigManager *kubeconfig.Manager) {
@@ -103,16 +137,6 @@ func Register(
 			clients.Provisioning.Cluster(),
 			clients.Mgmt.Cluster()),
 	}
-
-	// Register a generating handler in order to generate clusters.provisioning.cattle.io/v1 objects based on
-	// clusters.management.cattle.io/v3 (legacy) cluster objects.
-	mgmtcontrollers.RegisterClusterGeneratingHandler(ctx,
-		clients.Mgmt.Cluster(),
-		clients.Apply.WithCacheTypes(clients.Provisioning.Cluster()),
-		"",
-		"provisioning-cluster-create",
-		h.generateProvisioningClusterFromLegacyCluster,
-		nil)
 
 	clusterCreateApply := clients.Apply.WithCacheTypes(clients.Mgmt.Cluster(),
 		clients.Mgmt.ClusterRegistrationToken(),
