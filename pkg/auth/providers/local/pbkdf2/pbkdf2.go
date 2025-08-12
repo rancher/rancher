@@ -7,6 +7,7 @@ import (
 	"crypto/sha3"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -183,7 +184,7 @@ func (p *Pbkdf2) VerifyPassword(user *v3.User, password string) error {
 			},
 			{
 				Op:    "replace",
-				Path:  "/metadata/annotations/cattle.io~1password-hash",
+				Path:  "/metadata/annotations/" + rfc6901PathEscape(passwordHashAnnotation),
 				Value: pbkdf2sha3512Hash,
 			},
 		})
@@ -213,4 +214,8 @@ func generateSalt() ([]byte, error) {
 	}
 
 	return salt, nil
+}
+
+func rfc6901PathEscape(s string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(s, "~", "~0"), "/", "~1")
 }

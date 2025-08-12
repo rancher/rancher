@@ -478,6 +478,84 @@ func TestUpdated(t *testing.T) {
 			},
 			expectedError: true,
 		},
+		{
+			name: "local user password is updated when secret already exists",
+			inputUser: &v3.User{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "testuser",
+					Annotations: map[string]string{project_cluster.CreatorIDAnnotation: "creator"},
+				},
+				PrincipalIDs: []string{"local://testuser"},
+				Password:     "password",
+			},
+			mockSetup: func(
+				secrets *wranglerfake.MockControllerInterface[*v1.Secret, *v1.SecretList],
+				scache *wranglerfake.MockCacheInterface[*v1.Secret],
+				support *exttokens.MocktimeHandler,
+				users *wranglerfake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList]) {
+				mockUserManager.EXPECT().
+					CreateNewUserClusterRoleBinding("testuser", defaultCRTB.UID).
+					Return(nil)
+				secrets.EXPECT().
+					List("cattle-tokens", gomock.Any()).
+					Return(&v1.SecretList{}, nil).
+					AnyTimes()
+				secrets.EXPECT().Create(&v1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "testuser",
+						Namespace: pbkdf2.LocalUserPasswordsNamespace,
+						Annotations: map[string]string{
+							passwordHashAnnotation: bcryptHash,
+						},
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Name:       "testuser",
+								APIVersion: "management.cattle.io/v3",
+								Kind:       "User",
+							},
+						},
+					},
+					Data: map[string][]byte{
+						"password": []byte("password"),
+					},
+				}).Return(nil, errors.NewAlreadyExists(schema.GroupResource{}, ""))
+				secrets.EXPECT().Update(&v1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "testuser",
+						Namespace: pbkdf2.LocalUserPasswordsNamespace,
+						Annotations: map[string]string{
+							passwordHashAnnotation: bcryptHash,
+						},
+						OwnerReferences: []metav1.OwnerReference{
+							{
+								Name:       "testuser",
+								APIVersion: "management.cattle.io/v3",
+								Kind:       "User",
+							},
+						},
+					},
+					Data: map[string][]byte{
+						"password": []byte("password"),
+					},
+				})
+				users.EXPECT().Update(&v3.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        "testuser",
+						Annotations: map[string]string{project_cluster.CreatorIDAnnotation: "creator"},
+					},
+					PrincipalIDs: []string{"local://testuser"},
+					Password:     "",
+				})
+			},
+			expectedUser: &v3.User{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "testuser",
+					Annotations: map[string]string{project_cluster.CreatorIDAnnotation: "creator"},
+				},
+				PrincipalIDs: []string{"local://testuser"},
+			},
+			expectedError: false,
+		},
 	}
 
 	for _, tt := range tests {

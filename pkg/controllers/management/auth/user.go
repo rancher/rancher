@@ -532,7 +532,7 @@ func (l *userLifecycle) removeLegacyFinalizers(user *v3.User) (*v3.User, error) 
 
 func (l *userLifecycle) migrateLocalUserIfNeeded(user *v3.User) error {
 	if user.Password != "" {
-		_, err := l.secrets.Create(&corev1.Secret{
+		passwordSecret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      user.Name,
 				Namespace: pbkdf2.LocalUserPasswordsNamespace,
@@ -551,14 +551,21 @@ func (l *userLifecycle) migrateLocalUserIfNeeded(user *v3.User) error {
 			Data: map[string][]byte{
 				"password": []byte(user.Password),
 			},
-		})
-		if err != nil && !errors.IsAlreadyExists(err) {
-			return err
+		}
+		_, err := l.secrets.Create(passwordSecret)
+		if err != nil {
+			if !errors.IsAlreadyExists(err) {
+				return fmt.Errorf("failed to create password secret: %w", err)
+			}
+			_, err = l.secrets.Update(passwordSecret)
+			if err != nil {
+				return fmt.Errorf("failed to update password secret: %w", err)
+			}
 		}
 		user.Password = ""
 		_, err = l.users.Update(user)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to update user: %w", err)
 		}
 	}
 
