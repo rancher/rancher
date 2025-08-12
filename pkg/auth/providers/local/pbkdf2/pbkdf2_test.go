@@ -11,9 +11,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"golang.org/x/crypto/bcrypt"
 	"k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -543,7 +541,6 @@ func TestVerifyPassword(t *testing.T) {
 	fakePasswordHash := "fake-password-hash"
 	fakePasswordSalt := "fake-password-salt"
 	bcryptHashPassword, _ := bcrypt.GenerateFromPassword([]byte(fakePassword), bcrypt.DefaultCost)
-	bcryptAnotherHashPassword, _ := bcrypt.GenerateFromPassword([]byte("another-password"), bcrypt.DefaultCost)
 
 	tests := map[string]struct {
 		user               *v3.User
@@ -588,42 +585,6 @@ func TestVerifyPassword(t *testing.T) {
 			mockSecretClient: func() *fake.MockClientInterface[*v1.Secret, *v1.SecretList] {
 				return fake.NewMockClientInterface[*v1.Secret, *v1.SecretList](ctlr)
 			},
-		},
-		"legacy password field": {
-			user: &v3.User{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: fakeUserID,
-				},
-				Password: string(bcryptHashPassword),
-			},
-			password: fakePassword,
-			mockSecretCache: func() *fake.MockCacheInterface[*v1.Secret] {
-				mock := fake.NewMockCacheInterface[*v1.Secret](ctlr)
-				mock.EXPECT().Get(LocalUserPasswordsNamespace, fakeUserID).Return(nil, apierrors.NewNotFound(schema.GroupResource{}, ""))
-
-				return mock
-			},
-			mockSecretClient: func() *fake.MockClientInterface[*v1.Secret, *v1.SecretList] {
-				return fake.NewMockClientInterface[*v1.Secret, *v1.SecretList](ctlr)
-			},
-		},
-		"can't use legacy password if password is empty": {
-			user: &v3.User{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: fakeUserID,
-				},
-			},
-			password: "",
-			mockSecretCache: func() *fake.MockCacheInterface[*v1.Secret] {
-				mock := fake.NewMockCacheInterface[*v1.Secret](ctlr)
-				mock.EXPECT().Get(LocalUserPasswordsNamespace, fakeUserID).Return(nil, apierrors.NewNotFound(schema.GroupResource{}, ""))
-
-				return mock
-			},
-			mockSecretClient: func() *fake.MockClientInterface[*v1.Secret, *v1.SecretList] {
-				return fake.NewMockClientInterface[*v1.Secret, *v1.SecretList](ctlr)
-			},
-			expectErrorMessage: "failed to get password",
 		},
 		"valid bcrypt password is migrated": {
 			user: &v3.User{
@@ -675,7 +636,7 @@ func TestVerifyPassword(t *testing.T) {
 					},
 					{
 						Op:    "replace",
-						Path:  "/metadata/annotations/" + passwordHashAnnotation,
+						Path:  "/metadata/annotations/cattle.io~1password-hash",
 						Value: pbkdf2sha3512Hash,
 					},
 				})
@@ -738,25 +699,6 @@ func TestVerifyPassword(t *testing.T) {
 						"password": bcryptHashPassword,
 					},
 				}, nil)
-
-				return mock
-			},
-			mockSecretClient: func() *fake.MockClientInterface[*v1.Secret, *v1.SecretList] {
-				return fake.NewMockClientInterface[*v1.Secret, *v1.SecretList](ctlr)
-			},
-			expectErrorMessage: bcrypt.ErrMismatchedHashAndPassword.Error(),
-		},
-		"invalid legacy password": {
-			user: &v3.User{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: fakeUserID,
-				},
-				Password: string(bcryptAnotherHashPassword),
-			},
-			password: fakePassword,
-			mockSecretCache: func() *fake.MockCacheInterface[*v1.Secret] {
-				mock := fake.NewMockCacheInterface[*v1.Secret](ctlr)
-				mock.EXPECT().Get(LocalUserPasswordsNamespace, fakeUserID).Return(nil, apierrors.NewNotFound(schema.GroupResource{}, ""))
 
 				return mock
 			},
