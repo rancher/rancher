@@ -451,7 +451,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 		return nil
 	})
 
-	r.Wrangler.OnLeader(func(ctx context.Context) error {
+	r.Wrangler.OnLeaderOrDie("rancher-start", func(ctx context.Context) error {
 		errChan := r.Wrangler.DeferredCAPIRegistration.DeferFuncWithError(r.Wrangler, runMigrations)
 		select {
 		case err, ok := <-errChan:
