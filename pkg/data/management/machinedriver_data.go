@@ -144,6 +144,8 @@ func addMachineDrivers(management *config.ManagementContext) error {
 			"iam.amazonaws.com",
 			"iam.us-gov.amazonaws.com",
 			"iam.%.amazonaws.com.cn",
+			// https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_dual-stack_endpoint_support.html
+			"iam.global.api.aws",
 			// https://docs.aws.amazon.com/general/latest/gr/ec2-service.html
 			"ec2.%.amazonaws.com",
 			"ec2.%.amazonaws.com.cn",
