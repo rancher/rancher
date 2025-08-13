@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/gorilla/mux"
 	"github.com/rancher/norman/store/proxy"
@@ -19,9 +20,11 @@ import (
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/utils"
 	"github.com/rancher/rancher/pkg/wrangler"
 	steveauth "github.com/rancher/steve/pkg/auth"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/rest"
 )
@@ -96,8 +99,16 @@ func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext) 
 
 	root := mux.NewRouter()
 	root.UseEncodedPath()
-	root.PathPrefix("/v3-public").Handler(publicAPI)
-	root.PathPrefix("/v1-saml").Handler(saml)
+
+	apiLimit, err := quantityAsInt64(getEnvWithDefault("CATTLE_AUTH_API_BODY_LIMIT", "1Mi"), 1024*1024)
+	if err != nil {
+		return nil, err
+	}
+	logrus.Infof("Configuring auth server API body limit to %v bytes", apiLimit)
+
+	limitingHandler := utils.APIBodyLimitingHandler(apiLimit)
+	root.PathPrefix("/v3-public").Handler(limitingHandler(publicAPI))
+	root.PathPrefix("/v1-saml").Handler(limitingHandler(saml))
 	root.NotFoundHandler = privateAPI
 
 	return func(next http.Handler) http.Handler {
@@ -182,4 +193,26 @@ func SetXAPICattleAuthHeader(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(rw, req)
 	})
+}
+
+func quantityAsInt64(s string, d int64) (int64, error) {
+	i, err := resource.ParseQuantity(s)
+	if err != nil {
+		return 0, fmt.Errorf("parsing setting: %w", err)
+	}
+
+	q, ok := i.AsInt64()
+	if ok {
+		return q, nil
+	}
+
+	return d, nil
+}
+
+func getEnvWithDefault(key, defaultValue string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+
+	return defaultValue
 }
