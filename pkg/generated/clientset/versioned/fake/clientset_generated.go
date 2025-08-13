@@ -26,8 +26,8 @@ import (
 	fakeprovisioningv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/provisioning.cattle.io/v1/fake"
 	rkev1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/rke.cattle.io/v1"
 	fakerkev1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/rke.cattle.io/v1/fake"
-	sccv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/scc.cattle.io/v1"
-	fakesccv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/scc.cattle.io/v1/fake"
+	telemetryv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/telemetry.cattle.io/v1"
+	faketelemetryv1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/telemetry.cattle.io/v1/fake"
 	upgradev1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1"
 	fakeupgradev1 "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1/fake"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -111,9 +111,9 @@ func (c *Clientset) RkeV1() rkev1.RkeV1Interface {
 	return &fakerkev1.FakeRkeV1{Fake: &c.Fake}
 }
 
-// SccV1 retrieves the SccV1Client
-func (c *Clientset) SccV1() sccv1.SccV1Interface {
-	return &fakesccv1.FakeSccV1{Fake: &c.Fake}
+// TelemetryV1 retrieves the TelemetryV1Client
+func (c *Clientset) TelemetryV1() telemetryv1.TelemetryV1Interface {
+	return &faketelemetryv1.FakeTelemetryV1{Fake: &c.Fake}
 }
 
 // UpgradeV1 retrieves the UpgradeV1Client

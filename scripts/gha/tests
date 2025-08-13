@@ -130,8 +130,7 @@ echo "Waiting up to 5 minutes for rancher-provisioning-capi deployment"
   --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
   --message "rancher-provisioning-capi was not available after {{elapsed}} seconds" `# Print this progress message` \
   --exit-command "dump_rancher_logs" `# Dump logs to find out why capi-controller-manager did not start` \
-  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -n cattle-provisioning-capi-system deploy/capi-controller-manager  &>/dev/null"
-
+  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -n cattle-provisioning-capi-system deploy/capi-controller-manager &>/dev/null"
 
 echo Running integrationsetup
 export CATTLE_TEST_CONFIG=$(pwd)/config.yaml # used by integration tests and test setup

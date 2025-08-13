@@ -909,8 +909,12 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 			continue
 		}
 
+		// capi.Machine CRD has ObservedGeneration field in its status.
+		opts := &summary.SummarizeOptions{
+			HasObservedGeneration: true,
+		}
 		// The Reconciled condition should be removed when summarizing so that the messages are not duplicated.
-		summary := summary.Summarize(removeReconciledCondition(r.entry.Machine))
+		summary := summary.SummarizeWithOptions(removeReconciledCondition(r.entry.Machine), opts)
 		if summary.Error {
 			errMachines = append(errMachines, r.entry.Machine.Name)
 		}
@@ -1192,6 +1196,9 @@ func (p *Planner) ensureRKEStateSecret(controlPlane *rkev1.RKEControlPlane, newC
 						Name:       controlPlane.Name,
 						UID:        controlPlane.UID,
 					},
+				},
+				Labels: map[string]string{
+					capr.BackupLabel: "true",
 				},
 			},
 			Data: map[string][]byte{

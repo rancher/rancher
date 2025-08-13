@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/scc"
+	"github.com/rancher/rancher/pkg/telemetry"
+	"github.com/rancher/rancher/pkg/telemetry/initcond"
 
 	"github.com/Masterminds/semver/v3"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
@@ -48,6 +50,7 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/pkg/settings"
+	telemetrycontrollers "github.com/rancher/rancher/pkg/telemetry/controllers"
 	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/ui"
@@ -106,13 +109,14 @@ type Options struct {
 }
 
 type Rancher struct {
-	Auth       steveauth.Middleware
-	Handler    http.Handler
-	Wrangler   *wrangler.Context
-	Steve      *steveserver.Server
-	auditLog   *audit.Writer
-	authServer *auth.Server
-	opts       *Options
+	Auth             steveauth.Middleware
+	Handler          http.Handler
+	Wrangler         *wrangler.Context
+	Steve            *steveserver.Server
+	auditLog         *audit.Writer
+	telemetryManager telemetry.TelemetryExporterManager
+	authServer       *auth.Server
+	opts             *Options
 
 	aggregationRegistrationTimeout time.Duration
 	kubeAggregationReadyChan       <-chan struct{}
@@ -329,7 +333,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	auditFilter := audit.NewAuditLogMiddleware(auditLogWriter)
 	aggregationMiddleware := aggregation.NewMiddleware(ctx, wranglerContext.Mgmt.APIService(), wranglerContext.TunnelServer)
 
-	wranglerContext.OnLeader(func(ctx context.Context) error {
+	wranglerContext.OnLeaderOrDie("rancher-new", func(ctx context.Context) error {
 		serviceaccounttoken.StartServiceAccountSecretCleaner(
 			ctx,
 			wranglerContext.Core.Secret().Cache(),
@@ -337,6 +341,15 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 			wranglerContext.K8s.CoreV1())
 		return nil
 	})
+
+	var telemetryManager telemetry.TelemetryExporterManager
+	if !features.MCMAgent.Enabled() {
+		telG := telemetry.NewTelemetryGatherer(
+			wranglerContext.Mgmt.Cluster().Cache(),
+			wranglerContext.Mgmt.Node().Cache(),
+		)
+		telemetryManager = telemetry.NewTelemetryExporterManager(telG, time.Second*10)
+	}
 
 	return &Rancher{
 		Auth: authServer.Authenticator.Chain(
@@ -359,6 +372,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		Steve:                          steve,
 		auditLog:                       auditLogWriter,
 		authServer:                     authServer,
+		telemetryManager:               telemetryManager,
 		opts:                           opts,
 		aggregationRegistrationTimeout: opts.AggregationRegistrationTimeout,
 		kubeAggregationReadyChan:       kubeAggregationReadyChan,
@@ -423,23 +437,40 @@ func (r *Rancher) Start(ctx context.Context) error {
 		}
 	}
 
-	r.Wrangler.OnLeader(func(ctx context.Context) error {
+	r.Wrangler.OnLeaderOrDie("rancher-start", func(ctx context.Context) error {
 		if err := dashboarddata.Add(ctx, r.Wrangler, localClusterEnabled(r.opts), r.opts.AddLocal == "false", r.opts.Embedded); err != nil {
 			return err
 		}
+
 		if err := r.Wrangler.StartWithTransaction(ctx, func(ctx context.Context) error {
 			return dashboard.Register(ctx, r.Wrangler, r.opts.Embedded, r.opts.ClusterRegistry)
 		}); err != nil {
 			return err
 		}
 
-		return runMigrations(r.Wrangler)
+		return nil
 	})
 
-	if features.RancherSCCRegistrationExtension.Enabled() {
-		r.Wrangler.OnLeader(func(ctx context.Context) error {
+	r.Wrangler.OnLeaderOrDie("rancher-start", func(ctx context.Context) error {
+		errChan := r.Wrangler.DeferredCAPIRegistration.DeferFuncWithError(r.Wrangler, runMigrations)
+		select {
+		case err, ok := <-errChan:
+			if !ok {
+				return nil
+			}
+			return err
+		}
+	})
+
+	if !features.MCMAgent.Enabled() && features.RancherSCCRegistrationExtension.Enabled() {
+		r.Wrangler.OnLeaderOrDie("rancher-start", func(ctx context.Context) error {
+			// TODO: pull this out of here if/when other features depend on the SecretRequest controllers
+			if err := telemetrycontrollers.RegisterControllers(ctx, r.Wrangler, r.telemetryManager); err != nil {
+				return err
+			}
 			logrus.Debug("[rancher::Start] starting RancherSCCRegistrationExtension")
-			return scc.Setup(ctx, r.Wrangler)
+
+			return scc.StartDeployer(ctx, r.Wrangler)
 		})
 	}
 
@@ -447,11 +478,43 @@ func (r *Rancher) Start(ctx context.Context) error {
 		return err
 	}
 
-	r.Wrangler.OnLeader(r.authServer.OnLeader)
+	r.Wrangler.OnLeaderOrDie("rancher-start", r.authServer.OnLeader)
 
 	r.auditLog.Start(ctx)
 
+	if !features.MCMAgent.Enabled() {
+		r.startTelemetryManager(context.TODO())
+	}
 	return r.Wrangler.Start(ctx)
+}
+
+func (r *Rancher) startTelemetryManager(ctx context.Context) {
+	if r.telemetryManager == nil {
+		logrus.Info("telemetry manager not enabled")
+	}
+
+	initChan := make(chan struct{})
+	initInfo := &initcond.InitInfo{}
+	go func() {
+		initcond.WaitForInfo(r.Wrangler, initInfo, initChan)
+	}()
+	go func() {
+		logrus.Info("waiting for telemetry manager to start...")
+		<-initChan
+		log := logrus.WithFields(
+			logrus.Fields{
+				"server-url":      initInfo.ServerURL,
+				"cluster-uuid":    initInfo.ClusterUUID,
+				"install-uuid":    initInfo.InstallUUID,
+				"rancher-version": initInfo.RancherVersion,
+				"git-hash":        initInfo.GitHash,
+			},
+		)
+		if err := r.telemetryManager.Start(ctx, *initInfo); err != nil {
+			log.Errorf("failed to start telemetry manager : %s", err)
+		}
+		log.Info("telemetry manager started")
+	}()
 }
 
 func (r *Rancher) ListenAndServe(ctx context.Context) error {

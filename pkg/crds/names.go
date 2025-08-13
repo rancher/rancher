@@ -34,9 +34,8 @@ func RequiredCRDs() []string {
 	if features.OIDCProvider.Enabled() {
 		requiredCRDS = append(requiredCRDS, OIDCClientCRD()...)
 	}
-	if features.RancherSCCRegistrationExtension.Enabled() {
-		requiredCRDS = append(requiredCRDS, SCCRegistrationCRDs()...)
-	}
+
+	requiredCRDS = append(requiredCRDS, TelemetryCRDs()...)
 
 	// get unique CRDs so they aren't registered twice
 	uniqueCRDs := make([]string, 0, len(requiredCRDS))
@@ -192,10 +191,10 @@ func OIDCClientCRD() []string {
 	}
 }
 
-// SCCRegistrationCRDs returns a list of required CRD names needed for SCC Registration features
-func SCCRegistrationCRDs() []string {
+// TelemetryCRDs returns a list of required CRD names needed for rancher telemetry
+func TelemetryCRDs() []string {
 	return []string{
-		"registrations.scc.cattle.io",
+		"secretrequests.telemetry.cattle.io",
 	}
 }
 
@@ -262,7 +261,6 @@ var MigratedResources = map[string]bool{
 	"projectroletemplatebindings.management.cattle.io":                true,
 	"projects.management.cattle.io":                                   true,
 	"rancherusernotifications.management.cattle.io":                   false,
-	"registrations.scc.cattle.io":                                     true,
 	"rkebootstraps.rke.cattle.io":                                     true,
 	"rkebootstraptemplates.rke.cattle.io":                             true,
 	"rkeclusters.rke.cattle.io":                                       true,
@@ -270,6 +268,7 @@ var MigratedResources = map[string]bool{
 	"roletemplates.management.cattle.io":                              true,
 	"samlproviders.management.cattle.io":                              false,
 	"samltokens.management.cattle.io":                                 false,
+	"secretrequests.telemetry.cattle.io":                              true,
 	"serviceaccounttokens.project.cattle.io":                          false,
 	"settings.management.cattle.io":                                   false,
 	"sshauths.project.cattle.io":                                      false,

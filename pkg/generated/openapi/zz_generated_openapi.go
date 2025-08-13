@@ -52,12 +52,10 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.UserActivity":                        schema_pkg_apis_extcattleio_v1_UserActivity(ref),
 		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.UserActivityList":                    schema_pkg_apis_extcattleio_v1_UserActivityList(ref),
 		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.UserActivityStatus":                  schema_pkg_apis_extcattleio_v1_UserActivityStatus(ref),
-		"github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1.Registration":                        schema_pkg_apis_scccattleio_v1_Registration(ref),
-		"github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1.RegistrationList":                    schema_pkg_apis_scccattleio_v1_RegistrationList(ref),
-		"github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1.RegistrationRequest":                 schema_pkg_apis_scccattleio_v1_RegistrationRequest(ref),
-		"github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1.RegistrationSpec":                    schema_pkg_apis_scccattleio_v1_RegistrationSpec(ref),
-		"github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1.RegistrationStatus":                  schema_pkg_apis_scccattleio_v1_RegistrationStatus(ref),
-		"github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1.SystemActivationState":               schema_pkg_apis_scccattleio_v1_SystemActivationState(ref),
+		"github.com/rancher/rancher/pkg/apis/telemetry.cattle.io/v1.SecretRequest":                 schema_pkg_apis_telemetrycattleio_v1_SecretRequest(ref),
+		"github.com/rancher/rancher/pkg/apis/telemetry.cattle.io/v1.SecretRequestList":             schema_pkg_apis_telemetrycattleio_v1_SecretRequestList(ref),
+		"github.com/rancher/rancher/pkg/apis/telemetry.cattle.io/v1.SecretRequestSpec":             schema_pkg_apis_telemetrycattleio_v1_SecretRequestSpec(ref),
+		"github.com/rancher/rancher/pkg/apis/telemetry.cattle.io/v1.SecretRequestStatus":           schema_pkg_apis_telemetrycattleio_v1_SecretRequestStatus(ref),
 		"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroup":                                            schema_pkg_apis_meta_v1_APIGroup(ref),
 		"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroupList":                                        schema_pkg_apis_meta_v1_APIGroupList(ref),
 		"k8s.io/apimachinery/pkg/apis/meta/v1.APIResource":                                         schema_pkg_apis_meta_v1_APIResource(ref),
@@ -1213,7 +1211,7 @@ func schema_pkg_apis_extcattleio_v1_UserActivityStatus(ref common.ReferenceCallb
 	}
 }
 
-func schema_pkg_apis_scccattleio_v1_Registration(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_telemetrycattleio_v1_SecretRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -1242,28 +1240,28 @@ func schema_pkg_apis_scccattleio_v1_Registration(ref common.ReferenceCallback) c
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Default: map[string]interface{}{},
-							Ref:     ref("github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1.RegistrationSpec"),
+							Ref:     ref("github.com/rancher/rancher/pkg/apis/telemetry.cattle.io/v1.SecretRequestSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Default: map[string]interface{}{},
-							Ref:     ref("github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1.RegistrationStatus"),
+							Ref:     ref("github.com/rancher/rancher/pkg/apis/telemetry.cattle.io/v1.SecretRequestStatus"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1.RegistrationSpec", "github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1.RegistrationStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"github.com/rancher/rancher/pkg/apis/telemetry.cattle.io/v1.SecretRequestSpec", "github.com/rancher/rancher/pkg/apis/telemetry.cattle.io/v1.SecretRequestStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 
-func schema_pkg_apis_scccattleio_v1_RegistrationList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_telemetrycattleio_v1_SecretRequestList(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Description: "RegistrationList is a list of Registration resources",
+				Description: "SecretRequestList is a list of SecretRequest resources",
 				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
 					"kind": {
@@ -1293,7 +1291,7 @@ func schema_pkg_apis_scccattleio_v1_RegistrationList(ref common.ReferenceCallbac
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1.Registration"),
+										Ref:     ref("github.com/rancher/rancher/pkg/apis/telemetry.cattle.io/v1.SecretRequest"),
 									},
 								},
 							},
@@ -1304,33 +1302,32 @@ func schema_pkg_apis_scccattleio_v1_RegistrationList(ref common.ReferenceCallbac
 			},
 		},
 		Dependencies: []string{
-			"github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1.Registration", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+			"github.com/rancher/rancher/pkg/apis/telemetry.cattle.io/v1.SecretRequest", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
 	}
 }
 
-func schema_pkg_apis_scccattleio_v1_RegistrationRequest(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_telemetrycattleio_v1_SecretRequestSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
-				Type: []string{"object"},
+				Description: "SecretRequestSpec defines the secret type being requested, and the target where the secret will be created",
+				Type:        []string{"object"},
 				Properties: map[string]spec.Schema{
-					"registrationCodeSecretRef": {
+					"secretType": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/api/core/v1.SecretReference"),
+							Default: "",
+							Type:    []string{"string"},
+							Format:  "",
 						},
 					},
-					"registrationAPIUrl": {
+					"targetSecretRef": {
 						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
-						},
-					},
-					"registrationAPICertificateSecretRef": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/api/core/v1.SecretReference"),
+							Description: "This is directly tied to instances of secrets that are registered.",
+							Ref:         ref("k8s.io/api/core/v1.SecretReference"),
 						},
 					},
 				},
+				Required: []string{"secretType", "targetSecretRef"},
 			},
 		},
 		Dependencies: []string{
@@ -1338,46 +1335,7 @@ func schema_pkg_apis_scccattleio_v1_RegistrationRequest(ref common.ReferenceCall
 	}
 }
 
-func schema_pkg_apis_scccattleio_v1_RegistrationSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Description: "RegistrationSpec is a description of a registration config",
-				Type:        []string{"object"},
-				Properties: map[string]spec.Schema{
-					"mode": {
-						SchemaProps: spec.SchemaProps{
-							Default: "",
-							Type:    []string{"string"},
-							Format:  "",
-						},
-					},
-					"registrationRequest": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1.RegistrationRequest"),
-						},
-					},
-					"offlineRegistrationCertificateSecretRef": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/api/core/v1.SecretReference"),
-						},
-					},
-					"syncNow": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"boolean"},
-							Format: "",
-						},
-					},
-				},
-				Required: []string{"mode"},
-			},
-		},
-		Dependencies: []string{
-			"github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1.RegistrationRequest", "k8s.io/api/core/v1.SecretReference"},
-	}
-}
-
-func schema_pkg_apis_scccattleio_v1_RegistrationStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+func schema_pkg_apis_telemetrycattleio_v1_SecretRequestStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
 	return common.OpenAPIDefinition{
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -1406,82 +1364,16 @@ func schema_pkg_apis_scccattleio_v1_RegistrationStatus(ref common.ReferenceCallb
 							},
 						},
 					},
-					"registrationProcessedTS": {
+					"lastSyncTS": {
 						SchemaProps: spec.SchemaProps{
 							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
-						},
-					},
-					"sccSystemId": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"integer"},
-							Format: "int32",
-						},
-					},
-					"registeredProduct": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
-						},
-					},
-					"registrationExpiresAt": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
-						},
-					},
-					"activationStatus": {
-						SchemaProps: spec.SchemaProps{
-							Default: map[string]interface{}{},
-							Ref:     ref("github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1.SystemActivationState"),
-						},
-					},
-					"systemCredentialsSecretRef": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/api/core/v1.SecretReference"),
-						},
-					},
-					"offlineRegistrationRequest": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/api/core/v1.SecretReference"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/rancher/rancher/pkg/apis/scc.cattle.io/v1.SystemActivationState", "github.com/rancher/wrangler/v3/pkg/genericcondition.GenericCondition", "k8s.io/api/core/v1.SecretReference", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
-	}
-}
-
-func schema_pkg_apis_scccattleio_v1_SystemActivationState(ref common.ReferenceCallback) common.OpenAPIDefinition {
-	return common.OpenAPIDefinition{
-		Schema: spec.Schema{
-			SchemaProps: spec.SchemaProps{
-				Type: []string{"object"},
-				Properties: map[string]spec.Schema{
-					"activated": {
-						SchemaProps: spec.SchemaProps{
-							Default: false,
-							Type:    []string{"boolean"},
-							Format:  "",
-						},
-					},
-					"lastValidatedTS": {
-						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
-						},
-					},
-					"systemUrl": {
-						SchemaProps: spec.SchemaProps{
-							Type:   []string{"string"},
-							Format: "",
-						},
-					},
-				},
-				Required: []string{"activated"},
-			},
-		},
-		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+			"github.com/rancher/wrangler/v3/pkg/genericcondition.GenericCondition", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
 	}
 }
 

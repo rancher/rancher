@@ -9,7 +9,6 @@ replace (
 	github.com/docker/distribution => github.com/docker/distribution v2.8.2+incompatible // rancher-machine requires a replace is set
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
-
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.58.0
@@ -75,12 +74,19 @@ require (
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.4.2
 	github.com/Masterminds/semver/v3 v3.3.0
 	github.com/Masterminds/sprig/v3 v3.3.0
-	github.com/SUSE/connect-ng v1.14.0
+	github.com/alibabacloud-go/cs-20151215/v5 v5.9.5
+	github.com/alibabacloud-go/darabonba-openapi/v2 v2.1.8
+	github.com/alibabacloud-go/ecs-20140526/v7 v7.0.13
+	github.com/alibabacloud-go/resourcemanager-20200331/v3 v3.3.0
+	github.com/alibabacloud-go/tea v1.3.9
+	github.com/alibabacloud-go/vpc-20160428/v6 v6.12.8
+	github.com/aliyun/credentials-go v1.4.6
 	github.com/aws/aws-sdk-go v1.55.5
 	github.com/aws/aws-sdk-go-v2 v1.36.5
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.70
 	github.com/aws/aws-sdk-go-v2/service/eks v1.66.1
 	github.com/blang/semver v3.5.1+incompatible
+	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/coreos/go-oidc/v3 v3.9.0
 	github.com/coreos/go-semver v0.3.1
 	github.com/creasty/defaults v1.5.2
@@ -133,12 +139,12 @@ require (
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.5.0-rc.1
 	github.com/rancher/rke v1.8.0-rc.4
-	github.com/rancher/shepherd v0.0.0-20250411212007-f3f2fd268849
-	github.com/rancher/steve v0.7.0
+	github.com/rancher/shepherd v0.0.0-20250808210055-4a60b0f66c6b
+	github.com/rancher/steve v0.7.4
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20250710162344-185ff9f785cd
-	github.com/rancher/tests/actions v0.0.0-20250505204226-5b136337f7c5
+	github.com/rancher/tests/actions v0.0.0-20250807173558-2c59b0d9801c
 	github.com/rancher/wrangler v1.1.2
-	github.com/rancher/wrangler/v3 v3.2.2
+	github.com/rancher/wrangler/v3 v3.2.3-rc.3
 	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
@@ -190,6 +196,11 @@ require (
 	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/ProtonMail/go-crypto v1.1.3 // indirect
+	github.com/alibabacloud-go/alibabacloud-gateway-spi v0.0.5 // indirect
+	github.com/alibabacloud-go/debug v1.0.1 // indirect
+	github.com/alibabacloud-go/endpoint-util v1.1.0 // indirect
+	github.com/alibabacloud-go/openapi-util v0.1.1 // indirect
+	github.com/alibabacloud-go/tea-utils/v2 v2.0.7 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.29.17 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.32 // indirect
@@ -205,8 +216,8 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.30.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.34.0 // indirect
 	github.com/aws/smithy-go v1.22.4 // indirect
-	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cjlapao/common-go v0.0.39 // indirect
+	github.com/clbanning/mxj/v2 v2.7.0 // indirect
 	github.com/cloudflare/circl v1.6.1 // indirect
 	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
@@ -228,6 +239,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
+	github.com/kr/fs v0.1.0 // indirect
 	github.com/kubereboot/kured v1.13.1 // indirect
 	github.com/microsoft/kiota-authentication-azure-go v1.1.0 // indirect
 	github.com/microsoft/kiota-http-go v1.4.4 // indirect
@@ -238,12 +250,14 @@ require (
 	github.com/ncruces/go-strftime v0.1.9 // indirect
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
+	github.com/pkg/sftp v1.13.5 // indirect
 	github.com/prometheus/common v0.62.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
 	github.com/skeema/knownhosts v1.3.0 // indirect
 	github.com/std-uritemplate/std-uritemplate/go v0.0.57 // indirect
 	github.com/stoewer/go-strcase v1.3.0 // indirect
+	github.com/tjfoc/gmsm v1.4.1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
@@ -252,19 +266,20 @@ require (
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.33.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.3 // indirect
-	golang.org/x/exp v0.0.0-20250408133849-7e4ce0ab07d0 // indirect
+	golang.org/x/exp v0.0.0-20250620022241-b7579e27df2b // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250505200425-f936aa4a68b2 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250603155806-513f23925822 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
+	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	k8s.io/controller-manager v0.0.0 // indirect
 	k8s.io/gengo v0.0.0-20250130153323-76c5745d3511 // indirect
 	k8s.io/gengo/v2 v2.0.0-20250207200755-1244d31929d7 // indirect
 	k8s.io/kms v0.33.2 // indirect
-	modernc.org/libc v1.65.10 // indirect
+	modernc.org/libc v1.66.3 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.38.0 // indirect
+	modernc.org/sqlite v1.38.2 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 )
 

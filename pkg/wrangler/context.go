@@ -6,11 +6,10 @@ package wrangler
 import (
 	"context"
 	"fmt"
-	"github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io"
-	sccv1 "github.com/rancher/rancher/pkg/generated/controllers/scc.cattle.io/v1"
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	fleetv1alpha1api "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/lasso/pkg/controller"
@@ -42,6 +41,8 @@ import (
 	provisioningv1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/generated/controllers/telemetry.cattle.io"
+	telemetryv1 "github.com/rancher/rancher/pkg/generated/controllers/telemetry.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/generated/controllers/upgrade.cattle.io"
 	plancontrolers "github.com/rancher/rancher/pkg/generated/controllers/upgrade.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/peermanager"
@@ -114,6 +115,8 @@ func init() {
 type Context struct {
 	RESTConfig *rest.Config
 
+	DeferredCAPIRegistration *DeferredCAPIRegistration
+
 	Apply               apply.Apply
 	Dynamic             *dynamic.Controller
 	CAPI                capicontrollers.Interface
@@ -137,7 +140,7 @@ type Context struct {
 	CRD                 crdv1.Interface
 	K8s                 *kubernetes.Clientset
 	Plan                plancontrolers.Interface
-	SCC                 sccv1.Interface
+	Telemetry           telemetryv1.Interface
 
 	ASL                     accesscontrol.AccessSetLookup
 	ClientConfig            clientcmd.ClientConfig
@@ -167,7 +170,7 @@ type Context struct {
 	api          *apiregistration.Factory
 	crd          *apiextensions.Factory
 	plan         *upgrade.Factory
-	sccReg       *scc.Factory
+	telemetry    *telemetry.Factory
 
 	started bool
 }
@@ -181,8 +184,8 @@ type MultiClusterManager interface {
 	K8sClient(clusterName string) (kubernetes.Interface, error)
 }
 
-func (w *Context) OnLeader(f func(ctx context.Context) error) {
-	w.leadership.OnLeader(f)
+func (w *Context) OnLeaderOrDie(name string, f func(ctx context.Context) error) {
+	w.leadership.OnLeaderOrDie(name, f)
 }
 
 func (w *Context) StartWithTransaction(ctx context.Context, f func(context.Context) error) (err error) {
@@ -201,6 +204,32 @@ func (w *Context) StartWithTransaction(ctx context.Context, f func(context.Conte
 	w.ControllerFactory.SharedCacheFactory().WaitForCacheSync(ctx)
 	transaction.Commit()
 	return w.Start(ctx)
+}
+
+func (w *Context) StartSharedFactoryWithTransaction(ctx context.Context, f func(context.Context) error) (err error) {
+	w.controllerLock.Lock()
+	defer w.controllerLock.Unlock()
+
+	transaction := controller.NewHandlerTransaction(ctx)
+	if err := f(transaction); err != nil {
+		transaction.Rollback()
+		return err
+	}
+
+	ctx = metrics.WithContextID(ctx, "wranglercontext")
+	if err := w.ControllerFactory.SharedCacheFactory().Start(ctx); err != nil {
+		transaction.Rollback()
+		return err
+	}
+
+	w.ControllerFactory.SharedCacheFactory().WaitForCacheSync(ctx)
+	transaction.Commit()
+
+	if err := w.ControllerFactory.Start(ctx, 50); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (w *Context) Start(ctx context.Context) error {
@@ -247,7 +276,6 @@ func (w *Context) WithAgent(userAgent string) *Context {
 		wContextCopy.Apply = applyWithAgent
 	}
 	wContextCopy.Dynamic = dynamic.New(wContextCopy.K8s.Discovery())
-	wContextCopy.CAPI = wContextCopy.capi.WithAgent(userAgent).V1beta1()
 	wContextCopy.RKE = wContextCopy.rke.WithAgent(userAgent).V1()
 	wContextCopy.Mgmt = wContextCopy.mgmt.WithAgent(userAgent).V3()
 	wContextCopy.Apps = wContextCopy.apps.WithAgent(userAgent).V1()
@@ -262,9 +290,29 @@ func (w *Context) WithAgent(userAgent string) *Context {
 	wContextCopy.API = wContextCopy.api.WithAgent(userAgent).V1()
 	wContextCopy.CRD = wContextCopy.crd.WithAgent(userAgent).V1()
 	wContextCopy.Plan = wContextCopy.plan.WithAgent(userAgent).V1()
-	wContextCopy.SCC = wContextCopy.sccReg.WithAgent(userAgent).V1()
+	if w.DeferredCAPIRegistration.CAPIInitialized {
+		wContextCopy.CAPI = wContextCopy.capi.WithAgent(userAgent).V1beta1()
+	} else {
+		go wContextCopy.BackfillCAPI(&wContextCopy)
+	}
 
 	return &wContextCopy
+}
+
+func (w *Context) BackfillCAPI(cpy *Context) {
+	printCapi := false
+	for {
+		if w.DeferredCAPIRegistration.CAPIInitialized {
+			if printCapi {
+				logrus.Trace("CAPI was initialized, retroactively adding to copy")
+			}
+			w.CAPI = cpy.CAPI
+			return
+		}
+		printCapi = true
+		logrus.Trace("Waiting for CAPI to be initialized before populating CAPI clients in copy")
+		time.Sleep(time.Second * 2)
+	}
 }
 
 func enableProtobuf(cfg *rest.Config) *rest.Config {
@@ -325,11 +373,6 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		return nil, err
 	}
 
-	capi, err := capi.NewFactoryFromConfigWithOptions(restConfig, opts)
-	if err != nil {
-		return nil, err
-	}
-
 	rke, err := rke.NewFactoryFromConfigWithOptions(restConfig, opts)
 	if err != nil {
 		return nil, err
@@ -370,7 +413,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		return nil, err
 	}
 
-	scc, err := scc.NewFactoryFromConfigWithOptions(restConfig, opts)
+	telemetry, err := telemetry.NewFactoryFromConfigWithOptions(restConfig, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -424,7 +467,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 	}
 
 	leadership := leader.NewManager("", "cattle-controllers", k8s)
-	leadership.OnLeader(func(ctx context.Context) error {
+	leadership.OnLeaderOrDie("wrangler-newContext", func(ctx context.Context) error {
 		if peerManager != nil {
 			peerManager.Leader()
 		}
@@ -435,7 +478,6 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		Apply:                   apply,
 		SharedControllerFactory: controllerFactory,
 		Dynamic:                 dynamic.New(k8s.Discovery()),
-		CAPI:                    capi.Cluster().V1beta1(),
 		RKE:                     rke.Rke().V1(),
 		Mgmt:                    mgmt.Management().V3(),
 		Apps:                    apps.Apps().V1(),
@@ -466,7 +508,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		TunnelAuthorizer:        tunnelAuth,
 		TunnelServer:            tunnelServer,
 		Plan:                    plan.Upgrade().V1(),
-		SCC:                     scc.Scc().V1(),
+		Telemetry:               telemetry.Telemetry().V1(),
 
 		mgmt:         mgmt,
 		apps:         apps,
@@ -479,12 +521,20 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		core:         core,
 		api:          api,
 		crd:          crd,
-		capi:         capi,
 		rke:          rke,
 		rbac:         rbac,
 		plan:         plan,
-		sccReg:       scc,
+		telemetry:    telemetry,
+
+		DeferredCAPIRegistration: &DeferredCAPIRegistration{
+			wg:              &sync.WaitGroup{},
+			CAPIInitialized: false,
+		},
 	}
+
+	// back-fill the context with the CAPI factory when the relevant
+	// CRDs are available
+	go wContext.ManageDeferredCAPIContext(ctx)
 
 	return wContext, nil
 }

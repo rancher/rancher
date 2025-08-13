@@ -7,11 +7,13 @@ import (
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers"
 	"github.com/rancher/rancher/pkg/controllers/management/auth/project_cluster"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	wranglerv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -47,11 +49,13 @@ type userLifecycle struct {
 }
 
 const (
-	crtbByUserRefKey  = "auth.management.cattle.io/crtb-by-user-ref"
-	prtbByUserRefKey  = "auth.management.cattle.io/prtb-by-user-ref"
-	grbByUserRefKey   = "auth.management.cattle.io/grb-by-user-ref"
-	tokenByUserRefKey = "auth.management.cattle.io/token-by-user-ref"
-	userController    = "mgmt-auth-users-controller"
+	crtbByUserRefKey       = "auth.management.cattle.io/crtb-by-user-ref"
+	prtbByUserRefKey       = "auth.management.cattle.io/prtb-by-user-ref"
+	grbByUserRefKey        = "auth.management.cattle.io/grb-by-user-ref"
+	tokenByUserRefKey      = "auth.management.cattle.io/token-by-user-ref"
+	userController         = "mgmt-auth-users-controller"
+	passwordHashAnnotation = "cattle.io/password-hash"
+	bcryptHash             = "bcrypt"
 )
 
 func newUserLifecycle(management *config.ManagementContext, clusterManager *clustermanager.Manager) *userLifecycle {
@@ -166,6 +170,11 @@ func (l *userLifecycle) Create(user *v3.User) (runtime.Object, error) {
 }
 
 func (l *userLifecycle) Updated(user *v3.User) (runtime.Object, error) {
+	// Migrate local users as part of the password field deprecation in the User resource. Password are now stored in secrets.
+	if err := l.migrateLocalUserIfNeeded(user); err != nil {
+		return nil, err
+	}
+
 	err := l.userManager.CreateNewUserClusterRoleBinding(user.Name, user.UID)
 	if err != nil {
 		return nil, err
@@ -519,4 +528,46 @@ func (l *userLifecycle) removeLegacyFinalizers(user *v3.User) (*v3.User, error) 
 		}
 	}
 	return user, nil
+}
+
+func (l *userLifecycle) migrateLocalUserIfNeeded(user *v3.User) error {
+	if user.Password != "" {
+		passwordSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      user.Name,
+				Namespace: pbkdf2.LocalUserPasswordsNamespace,
+				Annotations: map[string]string{
+					passwordHashAnnotation: bcryptHash,
+				},
+				OwnerReferences: []metav1.OwnerReference{
+					{
+						Name:       user.Name,
+						UID:        user.UID,
+						APIVersion: "management.cattle.io/v3",
+						Kind:       "User",
+					},
+				},
+			},
+			Data: map[string][]byte{
+				"password": []byte(user.Password),
+			},
+		}
+		_, err := l.secrets.Create(passwordSecret)
+		if err != nil {
+			if !errors.IsAlreadyExists(err) {
+				return fmt.Errorf("failed to create password secret: %w", err)
+			}
+			_, err = l.secrets.Update(passwordSecret)
+			if err != nil {
+				return fmt.Errorf("failed to update password secret: %w", err)
+			}
+		}
+		user.Password = ""
+		_, err = l.users.Update(user)
+		if err != nil {
+			return fmt.Errorf("failed to update user: %w", err)
+		}
+	}
+
+	return nil
 }

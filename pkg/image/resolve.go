@@ -96,6 +96,7 @@ func setRequirementImages(osType OSType, imagesSet map[string]map[string]struct{
 	coreLabel := "core"
 	switch osType {
 	case Linux:
+		addSourceToImage(imagesSet, settings.SCCOperatorImage.Get(), coreLabel)
 		addSourceToImage(imagesSet, settings.ShellImage.Get(), coreLabel)
 		addSourceToImage(imagesSet, settings.MachineProvisionImage.Get(), coreLabel)
 		addSourceToImage(imagesSet, "rancher/mirrored-bci-busybox:15.6.24.2", coreLabel)
