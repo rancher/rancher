@@ -2621,9 +2621,6 @@ func (s *steveAPITestSuite) TestList() {
 			if s.clusterID == "local" {
 				curlURL, err := getCurlURL(client, test.namespace, test.query)
 				require.NoError(s.T(), err)
-				if strings.Contains(test.query, "sort=") {
-					fmt.Println("stop here for ", test.query)
-				}
 				if containsSortName.MatchString(test.query) && !containsSortNamespace.MatchString(test.query) {
 					// We're getting objects with the same name returned in random order based on namespace,
 					// so save them consistently w.r.t their namespace
