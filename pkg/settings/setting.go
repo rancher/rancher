@@ -16,6 +16,7 @@ import (
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 const (
@@ -380,6 +381,11 @@ var (
 	SQLCacheGCKeepCount = NewSetting("sql-cache-gc-keep-count", "1000")
 
 	SCCOperatorImage = NewSetting("scc-operator-image", buildconfig.DefaultSccOperatorImage)
+
+	// This is the limit for request bodies sent to /v3-public/* endpoints in
+	// bytes.
+	// The default = 1MiB
+	APIBodyLimit = NewSetting("public-api-body-limit", "1Mi")
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.
@@ -517,6 +523,28 @@ func (s Setting) GetInt() int {
 		return 0
 	}
 	return i
+}
+
+// GetQuantityAsInt64 will return the currently stored value of the setting as an int64
+// parsed from a Kubernetes Quantity format string.
+//
+// See https://pkg.go.dev/k8s.io/apimachinery/pkg/api/resource#ParseQuantity for
+// format details.
+//
+// If the quantity cannot be expressed as an int64 d will be returned.
+func (s Setting) GetQuantityAsInt64(d int64) (int64, error) {
+	v := s.Get()
+	i, err := resource.ParseQuantity(v)
+	if err != nil {
+		return 0, fmt.Errorf("parsing setting: %w", err)
+	}
+
+	q, ok := i.AsInt64()
+	if ok {
+		return q, nil
+	}
+
+	return d, nil
 }
 
 // SetProvider will set the given provider as the global provider for all settings.
