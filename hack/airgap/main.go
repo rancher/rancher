@@ -55,13 +55,13 @@ func main() {
 	f.StringVar(&output, "output", "", "target file to be generated")
 	err := f.Parse(os.Args[1:])
 	if err != nil {
-		fmt.Println("failed to parse args %q: %v", os.Args, err)
+		fmt.Printf("failed to parse args %q: %v\n", os.Args, err)
 		os.Exit(1)
 	}
 
 	err = Save(version, output)
 	if err != nil {
-		fmt.Println("failed to save tarball: %v", err)
+		fmt.Printf("failed to save tarball: %v\n", err)
 		os.Exit(1)
 	}
 }
