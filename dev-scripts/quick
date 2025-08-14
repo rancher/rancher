@@ -11,6 +11,7 @@ TAG="${TAG:-$(grep -m1 ' TAG:' .github/workflows/pull-request.yml | sed -e 's/^[
 OS="${OS:-linux}"
 ARCH="${ARCH:-amd64}"
 REPO="${REPO:-rancher}"
+BINARY_DEBUG=${BINARY_DEBUG:-false}
 CATTLE_K3S_VERSION=$(grep -m1 'ENV CATTLE_K3S_VERSION=' package/Dockerfile | cut -d '=' -f2)
 CATTLE_KDM_BRANCH=$(grep -m1 'ARG CATTLE_KDM_BRANCH=' package/Dockerfile | cut -d '=' -f2)
 CATTLE_RANCHER_WEBHOOK_VERSION=$(grep -m1 'webhookVersion' build.yaml | cut -d ' ' -f2)
@@ -43,6 +44,12 @@ BUILD_ARGS+=("--build-arg=CATTLE_FLEET_VERSION=${CATTLE_FLEET_VERSION}")
 BUILD_ARGS+=("--build-arg=CATTLE_HELM_VERSION=${CATTLE_HELM_VERSION}")
 BUILD_ARGS+=("--build-arg=RANCHER_TAG=${TAG}")
 BUILD_ARGS+=("--build-arg=RANCHER_REPO=${REPO}")
+if [ "$BINARY_DEBUG" = true ]; then
+  # Remove -s (strip symbols)
+  BUILD_ARGS+=("--build-arg=LINKFLAGS=-extldflags -static")
+  # Disable compiler optimizations
+  BUILD_ARGS+=("--build-arg=GCFLAGS=all=-N -l")
+fi
 
 # because macos doesn't have realpath apparently
 abs_path() {
