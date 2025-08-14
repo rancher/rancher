@@ -215,6 +215,7 @@ func PerformSamlLogin(name string, apiContext *types.APIContext, input interface
 		// userID is not needed for login. It's only needed for testAndEnable
 		idpRedirectURL, err := provider.HandleSamlLogin(apiContext.Response, apiContext.Request, "")
 		if err != nil {
+			logrus.Errorf("SAML [PerformSamlLogin]: Id Provider            (%v) aborted", name)
 			return err
 		}
 		logrus.Debugf("SAML [PerformSamlLogin]: Redirecting to the identity provider login page at %v", idpRedirectURL)
@@ -224,8 +225,12 @@ func PerformSamlLogin(name string, apiContext *types.APIContext, input interface
 		}
 
 		apiContext.WriteResponse(http.StatusOK, data)
+
+		logrus.Debugf("SAML [PerformSamlLogin]: Id Provider            (%v) responded", name)
 		return nil
 	}
+
+	logrus.Debugf("SAML [PerformSamlLogin]: Id Provider            (%v) undefined, ignored", name)
 	return nil
 }
 

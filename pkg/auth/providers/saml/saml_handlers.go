@@ -19,7 +19,9 @@ const rancherUserID = "rancherUserID"
 func (s *Provider) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	serviceProvider := s.serviceProvider
 
-	log.Debugf("SAML [ServeHTTP]: Received %q %q", r.Method, r.URL)
+	log.Debugf("SAML [ServeHTTP]: Received %q %q %q", r.Method, r.Host, r.URL)
+	log.Debugf("SAML [ServeHTTP]: Origin   %v", r.Header.Get("origin"))
+	log.Debugf("SAML [ServeHTTP]: Referer  %v", r.Header.Get("referer"))
 
 	r.ParseForm()
 
@@ -35,8 +37,12 @@ func (s *Provider) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == serviceProvider.AcsURL.Path {
 		log.Debugf("SAML [ServeHTTP]: assertion processing started")
 
+		possibleRequestsIDs := s.getPossibleRequestIDs(r)
+
+		log.Debugf("SAML [ServeHTTP]: expecting requests (%+v)", possibleRequestsIDs)
+
 		r.ParseForm()
-		assertion, err := serviceProvider.ParseResponse(r, s.getPossibleRequestIDs(r))
+		assertion, err := serviceProvider.ParseResponse(r, possibleRequestsIDs)
 
 		if err != nil {
 			log.Debugf("SAML [ServeHTTP]: assertion validation failed: %q", err)
@@ -84,6 +90,9 @@ func (s *Provider) getPossibleRequestIDs(r *http.Request) []string {
 		if strings.HasPrefix(name, "Rancher_") {
 			continue
 		}
+
+		log.Debugf("SAML [gPRIDs]: process (%v) := (%v)", name, value)
+
 		jwtParser := jwt.Parser{
 			ValidMethods: []string{jwt.SigningMethodHS256.Name},
 		}
@@ -92,12 +101,21 @@ func (s *Provider) getPossibleRequestIDs(r *http.Request) []string {
 			return secretBlock, nil
 		})
 		if err != nil || !token.Valid {
-			log.Debugf("... invalid token %s", err)
+			log.Debugf("SAML [gPRIDs]: (%v) := (%v), invalid token: '%s'", name, value, err)
 			continue
 		}
+
+		log.Debugf("SAML [gPRIDs]: got token (%v)", token)
+
 		claims := token.Claims.(jwt.MapClaims)
+
+		log.Debugf("SAML [gPRIDs]: added id claim (%v)", claims["id"].(string))
+
 		rv = append(rv, claims["id"].(string))
 	}
+
+	log.Debugf("SAML [gPRIDs]: have %d ids", len(rv))
+
 	return rv
 }
 
@@ -108,11 +126,14 @@ func (s *Provider) HandleSamlLogin(w http.ResponseWriter, r *http.Request, userI
 		return "", fmt.Errorf("don't wrap Middleware with RequireAccount")
 	}
 
+	log.Debugf("SAML [HandleSamlLogin]: User '%s'", userID)
+
 	binding := saml.HTTPRedirectBinding
 	bindingLocation := serviceProvider.GetSSOBindingLocation(binding)
 
 	req, err := serviceProvider.MakeAuthenticationRequest(bindingLocation, binding, saml.HTTPPostBinding)
 	if err != nil {
+		log.Errorf("SAML [HandleSamlLogin]: User '%s' MAR error: %v", userID, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return "", err
 	}
@@ -130,8 +151,11 @@ func (s *Provider) HandleSamlLogin(w http.ResponseWriter, r *http.Request, userI
 		claims[rancherUserID] = userID
 	}
 
+	log.Debugf("SAML [HandleSamlLogin]: User '%s', relay id claim %s", userID, req.ID)
+
 	signedState, err := state.SignedString(secretBlock)
 	if err != nil {
+		log.Errorf("SAML [HandleSamlLogin]: User '%s' Sign error: %v", userID, err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return "", err
 	}
@@ -140,8 +164,11 @@ func (s *Provider) HandleSamlLogin(w http.ResponseWriter, r *http.Request, userI
 
 	redirectURL, err := req.Redirect(relayState, serviceProvider)
 	if err != nil {
+		log.Errorf("SAML [HandleSamlLogin]: User '%s' Redir error: %v", userID, err)
 		return "", err
 	}
+
+	log.Debugf("SAML [HandleSamlLogin]: User '%s' done, redirect", userID)
 
 	return redirectURL.String(), nil
 }

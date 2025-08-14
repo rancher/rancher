@@ -47,7 +47,7 @@ func (s *Provider) testAndEnable(actionName string, action *types.Action, reques
 		return err
 	}
 
-	logrus.Debug("SAML [testAndEnable]: Initializing SAML service provider")
+	logrus.Debugf("SAML [testAndEnable]: Initializing SAML service provider '%v'", s.name)
 	err = InitializeSamlServiceProvider(samlConfig, s.name)
 	if err != nil {
 		return err
@@ -69,6 +69,7 @@ func (s *Provider) testAndEnable(actionName string, action *types.Action, reques
 
 	idpRedirectURL, err := provider.HandleSamlLogin(request.Response, request.Request, provider.userMGR.GetUser(request))
 	if err != nil {
+		logrus.Errorf("SAML [testAndEnable]: Aborting provider %v: %v", s.name, err)
 		return err
 	}
 	logrus.Debugf("SAML [testAndEnable]: Redirecting to the identity provider login page at %v", idpRedirectURL)
