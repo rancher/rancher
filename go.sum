@@ -771,8 +771,8 @@ github.com/rancher/tests/actions v0.0.0-20250807173558-2c59b0d9801c h1:7mKf6cD6p
 github.com/rancher/tests/actions v0.0.0-20250807173558-2c59b0d9801c/go.mod h1:zaFGR0ZuMwoeS6TJRfxl3wBi2W6HyuZg5JqSSHBlrd0=
 github.com/rancher/wrangler v1.1.2 h1:oXbXo9k7y/H4drUpb4RM1c++vT9O3rpoNEfyusGykiU=
 github.com/rancher/wrangler v1.1.2/go.mod h1:2k9MyhlBdjcutcBGoOJSUAz0HgDAXnMjv81d3n/AaQc=
-github.com/rancher/wrangler/v3 v3.2.3-rc.2 h1:CnbO8lT8ZwQF4PfrptfCwmYLfQBQR9BRxGvOtEiZZKU=
-github.com/rancher/wrangler/v3 v3.2.3-rc.2/go.mod h1:TA1QuuQxrtn/kmJbBLW/l24IcfHBmSXBa9an3IRlqQQ=
+github.com/rancher/wrangler/v3 v3.2.3-rc.3 h1:goHRK3e5WBPDBsomoGYKRkA7wYDWm7+c+00fffhtjbM=
+github.com/rancher/wrangler/v3 v3.2.3-rc.3/go.mod h1:TA1QuuQxrtn/kmJbBLW/l24IcfHBmSXBa9an3IRlqQQ=
 github.com/redis/go-redis/extra/rediscmd/v9 v9.0.5 h1:EaDatTxkdHG+U3Bk4EUr+DZ7fOGwTfezUiUJMaIcaho=
 github.com/redis/go-redis/extra/rediscmd/v9 v9.0.5/go.mod h1:fyalQWdtzDBECAQFBJuQe5bzQ02jGd5Qcbgb97Flm7U=
 github.com/redis/go-redis/extra/redisotel/v9 v9.0.5 h1:EfpWLLCyXw8PSM2/XNJLjI3Pb27yVE+gIAfeqp8LUCc=
