@@ -385,7 +385,7 @@ func ApiServiceCertListener(provider dynamiccertificates.SNICertKeyContentProvid
 
 		caBundle, _ := provider.CurrentCertKeyContent()
 		if err := CreateOrUpdateAPIService(apiservice, caBundle); err != nil {
-			logrus.WithError(err).Errorf("failed to update api service %s", err)
+			logrus.WithError(err).Error("failed to update api service")
 		}
 	})
 }
