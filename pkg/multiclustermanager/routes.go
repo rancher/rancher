@@ -2,6 +2,7 @@ package multiclustermanager
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -30,11 +31,14 @@ import (
 	"github.com/rancher/rancher/pkg/multiclustermanager/whitelist"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/rkenodeconfigserver"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/telemetry"
 	"github.com/rancher/rancher/pkg/tunnelserver/mcmauthorizer"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/utils"
 	"github.com/rancher/rancher/pkg/version"
 	"github.com/rancher/steve/pkg/auth"
+	"github.com/sirupsen/logrus"
 )
 
 func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcmauthorizer.Authorizer, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) (func(http.Handler) http.Handler, error) {
@@ -71,6 +75,13 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	// Unauthenticated routes
 	unauthed := mux.NewRouter()
 	unauthed.UseEncodedPath()
+
+	publicLimit, err := settings.APIBodyLimit.GetQuantityAsInt64(1024 * 1024)
+	if err != nil {
+		return nil, fmt.Errorf("parsing the public API body limit: %w", err)
+	}
+	logrus.Infof("Configuring public API body limit to %v bytes", publicLimit)
+	limitingHandler := utils.APIBodyLimitingHandler(publicLimit)
 
 	unauthed.Path("/").MatcherFunc(parse.MatchNotBrowser).Handler(managementAPI)
 	unauthed.Handle("/v3/connect/config", connectConfigHandler)
@@ -137,7 +148,7 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 
 	return func(next http.Handler) http.Handler {
 		metricsAuthed.NotFoundHandler = next
-		return unauthed
+		return limitingHandler(unauthed)
 	}, nil
 }
 
