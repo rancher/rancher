@@ -97,8 +97,7 @@ func (w *Context) createCAPIFactoryAndStart(ctx context.Context) {
 
 	err = w.DeferredCAPIRegistration.invokePools(ctx, w)
 	if err != nil {
-		// TODO: We shouldn't panic. Right?
-		panic(err)
+		logrus.Fatalf("[deferred-capi] Error invoking pools: %v", err)
 	}
 
 	if err := w.SharedControllerFactory.Start(ctx, 50); err != nil {
