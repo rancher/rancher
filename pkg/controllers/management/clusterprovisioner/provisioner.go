@@ -438,9 +438,13 @@ func (p *Provisioner) reconcileCluster(cluster *apimgmtv3.Cluster, create bool) 
 	p.setGenericConfigs(cluster)
 
 	// Compute the new spec from the cluster resource.
-	spec, _, err := p.getSpec(cluster)
+	spec, configChanged, err := p.getSpec(cluster)
 	if err != nil {
 		return cluster, err
+	}
+
+	if !configChanged {
+		return cluster, nil
 	}
 
 	if ok, delay := p.backoffFailure(cluster, spec); ok {
