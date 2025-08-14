@@ -5,9 +5,19 @@ go 1.24.0
 toolchain go1.24.5
 
 replace (
-	k8s.io/api => k8s.io/api v0.32.2
+	cel.dev/expr => cel.dev/expr v0.19.0
+	github.com/google/cel-go => github.com/google/cel-go v0.22.0
+	github.com/grpc-ecosystem/grpc-gateway/v2 => github.com/grpc-ecosystem/grpc-gateway/v2 v2.20.0
+	github.com/klauspost/compress => github.com/klauspost/compress v1.17.9
+
+	github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.20.5
+	github.com/prometheus/common => github.com/prometheus/common v0.55.0
+	github.com/rancher/lasso => github.com/rancher/lasso v0.2.2
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace => go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.28.0
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc => go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.27.0
+	k8s.io/api => k8s.io/api v0.32.4
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.32.2
-	k8s.io/apimachinery => k8s.io/apimachinery v0.32.2
+	k8s.io/apimachinery => k8s.io/apimachinery v0.32.4
 	k8s.io/apiserver => k8s.io/apiserver v0.32.2
 	k8s.io/cli-runtime => k8s.io/cli-runtime v0.32.2
 	k8s.io/client-go => k8s.io/client-go v0.32.2
@@ -23,9 +33,11 @@ replace (
 	k8s.io/dynamic-resource-allocation => k8s.io/dynamic-resource-allocation v0.32.2
 	k8s.io/endpointslice => k8s.io/endpointslice v0.32.2
 	k8s.io/externaljwt => k8s.io/externaljwt v0.32.2
+	k8s.io/gengo/v2 => k8s.io/gengo/v2 v2.0.0-20240911193312-2b36238f13e9
 	k8s.io/kms => k8s.io/kms v0.32.2
 	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.32.2
 	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.32.2
+	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20241105132330-32ad38e42d3f
 	k8s.io/kube-proxy => k8s.io/kube-proxy v0.32.2
 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.32.2
 	k8s.io/kubectl => k8s.io/kubectl v0.32.2
@@ -36,6 +48,8 @@ replace (
 	k8s.io/mount-utils => k8s.io/mount-utils v0.32.2
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.32.2
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.32.2
+	sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.0
+	sigs.k8s.io/structured-merge-diff/v4 => sigs.k8s.io/structured-merge-diff/v4 v4.4.3
 )
 
 require (
@@ -45,10 +59,10 @@ require (
 	github.com/rancher/gke-operator v1.11.5-rc.1
 	github.com/rancher/norman v0.5.2
 	github.com/rancher/rke v1.8.5
-	github.com/rancher/wrangler/v3 v3.2.1
+	github.com/rancher/wrangler/v3 v3.2.3-rc.3
 	github.com/sirupsen/logrus v1.9.3
-	k8s.io/api v0.32.4
-	k8s.io/apimachinery v0.32.4
+	k8s.io/api v0.33.1
+	k8s.io/apimachinery v0.33.1
 	sigs.k8s.io/cluster-api v1.9.5
 )
 
@@ -79,11 +93,11 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/prometheus/client_golang v1.20.5 // indirect
+	github.com/prometheus/client_golang v1.22.0 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
-	github.com/prometheus/common v0.55.0 // indirect
+	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
-	github.com/rancher/lasso v0.2.2 // indirect
+	github.com/rancher/lasso v0.2.3 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/spf13/cobra v1.8.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
@@ -101,15 +115,15 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/apiextensions-apiserver v0.32.2 // indirect
-	k8s.io/apiserver v0.32.2 // indirect
+	k8s.io/apiextensions-apiserver v0.33.1 // indirect
+	k8s.io/apiserver v0.33.1 // indirect
 	k8s.io/client-go v12.0.0+incompatible // indirect
-	k8s.io/component-base v0.32.2 // indirect
+	k8s.io/component-base v0.33.1 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
-	k8s.io/kube-openapi v0.0.0-20241105132330-32ad38e42d3f // indirect
+	k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a9a2ff // indirect
 	k8s.io/kubernetes v1.32.1 // indirect
 	k8s.io/utils v0.0.0-20250502105355-0f33e8f1c979 // indirect
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
-	sigs.k8s.io/structured-merge-diff/v4 v4.4.3 // indirect
+	sigs.k8s.io/structured-merge-diff/v4 v4.6.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
