@@ -211,7 +211,7 @@ RANCHER_RUN_PID=$!
 trap cleanup exit
 
 echo "Waiting for Rancher to be healthy"
-./scripts/retry --sleep 2 --timeout 300 "curl -sf -o /dev/null http://localhost:8080/ping"
+./scripts/retry --sleep 2 --exit-command "dump_rancher_logs" --timeout 300 "curl -sf -o /dev/null http://localhost:8080/ping" \
 
 # The remotedialer-proxy is pulled in by the api-extension deployment
 echo "Waiting up to 5 minutes for the api-extension deployment"
