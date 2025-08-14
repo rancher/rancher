@@ -443,6 +443,7 @@ func (p *Provisioner) reconcileCluster(cluster *apimgmtv3.Cluster, create bool) 
 		return cluster, err
 	}
 
+	logrus.Infof("testing")
 	if ok, delay := p.backoffFailure(cluster, spec); ok {
 		return cluster, &controller.ForgetError{Err: fmt.Errorf("backing off failure, delay: %v", delay)}
 	}
