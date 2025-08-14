@@ -6,7 +6,7 @@ toolchain go1.24.5
 
 replace (
 	cel.dev/expr => cel.dev/expr v0.19.0
-	github.com/google/cel-go => github.com/google/cel-go v0.19.0
+	github.com/google/cel-go => github.com/google/cel-go v0.22.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 => github.com/grpc-ecosystem/grpc-gateway/v2 v2.20.0
 	github.com/klauspost/compress => github.com/klauspost/compress v1.17.9
 
@@ -15,9 +15,9 @@ replace (
 	github.com/rancher/lasso => github.com/rancher/lasso v0.2.2
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace => go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.28.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc => go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.27.0
-	k8s.io/api => k8s.io/api v0.32.2
+	k8s.io/api => k8s.io/api v0.32.4
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.32.2
-	k8s.io/apimachinery => k8s.io/apimachinery v0.32.2
+	k8s.io/apimachinery => k8s.io/apimachinery v0.32.4
 	k8s.io/apiserver => k8s.io/apiserver v0.32.2
 	k8s.io/cli-runtime => k8s.io/cli-runtime v0.32.2
 	k8s.io/client-go => k8s.io/client-go v0.32.2
@@ -37,6 +37,7 @@ replace (
 	k8s.io/kms => k8s.io/kms v0.32.2
 	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.32.2
 	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.32.2
+	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20241105132330-32ad38e42d3f
 	k8s.io/kube-proxy => k8s.io/kube-proxy v0.32.2
 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.32.2
 	k8s.io/kubectl => k8s.io/kubectl v0.32.2
@@ -123,7 +124,6 @@ require (
 	k8s.io/kubernetes v1.32.1 // indirect
 	k8s.io/utils v0.0.0-20250502105355-0f33e8f1c979 // indirect
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
-	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.6.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
