@@ -1,0 +1,48 @@
+name: Publish Provisioning Tests Results
+on:
+  workflow_run:
+    workflows: ["Build Pull Request"]
+    types:
+      - completed
+permissions: {}
+
+jobs:
+  publish-provisioning-test-results:
+    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
+    if: github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure'
+    permissions:
+      checks: write
+      pull-requests: write
+      actions: read
+    steps:
+      - name: mkdir test-results
+        run: mkdir -p /tmp/test-results
+
+      - name: Download All XML Test Reports
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          # needed per https://github.com/orgs/community/discussions/106300#discussioncomment-8369881
+          github-token: ${{ github.token }}
+          merge-multiple: true
+          path: /tmp/test-results/
+          name: "XML Results"
+
+      - name: Download the Event File
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          merge-multiple: true
+          path: /tmp/test-results/
+          name: "Event File"
+
+      - name: Publish Test Results
+        uses: rancher/publish-unit-test-result-action/linux@3a74b2957438d0b6e2e61d67b05318aa25c9e6c6
+        if: (!cancelled())
+        with:
+          check_name: Provisioning Tests Results
+          commit: ${{ github.event.workflow_run.head_sha }}
+          event_name: ${{ github.event.workflow_run.event }}
+          event_file: /tmp/test-results/event.json
+          files: "/tmp/test-results/*.xml"
