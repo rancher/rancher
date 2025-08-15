@@ -85,7 +85,7 @@ func (h handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 type wrapWriter struct {
 	next http.ResponseWriter
 
-	wroteHeader bool
+	hijacked bool
 
 	wroteBody bool
 	buf       bytes.Buffer
@@ -98,7 +98,6 @@ func (w *wrapWriter) Header() http.Header {
 }
 
 func (w *wrapWriter) WriteHeader(statusCode int) {
-	w.wroteHeader = true
 	w.statusCode = statusCode
 }
 
@@ -108,6 +107,8 @@ func (w *wrapWriter) Write(body []byte) (int, error) {
 }
 
 func (w *wrapWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	w.hijacked = true
+
 	if hijacker, ok := w.next.(http.Hijacker); ok {
 		return hijacker.Hijack()
 	}
@@ -131,6 +132,10 @@ func (w *wrapWriter) Flush() {
 }
 
 func (w *wrapWriter) Apply() {
+	if w.hijacked {
+		return
+	}
+
 	w.next.WriteHeader(w.statusCode)
 	w.next.Write(w.buf.Bytes())
 }
