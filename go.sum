@@ -729,8 +729,8 @@ github.com/prometheus/procfs v0.15.1 h1:YagwOFzUgYfKKHX6Dr+sHT7km/hxC76UB0leargg
 github.com/prometheus/procfs v0.15.1/go.mod h1:fB45yRUv8NstnjriLhBQLuOUt+WW4BsoGhij/e3PBqk=
 github.com/rancher/aks-operator v1.12.0 h1:ua3jHCX1AtF2eFx7XBmqeGFEVFwbd9WckRMkR9Gc018=
 github.com/rancher/aks-operator v1.12.0/go.mod h1:tgoEZKKWIwgydqoqAyTKv4jw7nrp4uVgjtSQjbtPH4Q=
-github.com/rancher/apiserver v0.7.0 h1:8N9XQXurELdZ3nfU5WKwgwDcYOoixNfpdpMbLZ4rrnM=
-github.com/rancher/apiserver v0.7.0/go.mod h1:9b/n58YT7S8bMFEyr1v7xzL72qwZKQQJK2Ir6lMT8Yk=
+github.com/rancher/apiserver v0.7.2 h1:mDgVHgDF0DJ2AmN6KGzdlk1ueAJJJGYOrJhXG+1LNn8=
+github.com/rancher/apiserver v0.7.2/go.mod h1:9b/n58YT7S8bMFEyr1v7xzL72qwZKQQJK2Ir6lMT8Yk=
 github.com/rancher/channelserver v0.7.0 h1:ZN5o8aD4mD31uhjEEW2e9yQXa3eOb+4Cp6DcWm7W/Lc=
 github.com/rancher/channelserver v0.7.0/go.mod h1:Mwd7hlMSu9X4FnZKj+0mA5ak8nTyJZtZsVX33G62Gzc=
 github.com/rancher/dynamiclistener v0.7.0 h1:+jyfZ4lVamc1UbKWo8V8dhSPtCgRZYaY8nm7wiHeko4=
@@ -763,8 +763,8 @@ github.com/rancher/saml v0.4.14-rancher3 h1:2NN6cPqm9FJeiT25x8+gLHWGdulsEak33cHR
 github.com/rancher/saml v0.4.14-rancher3/go.mod h1:S4+611dxnKt8z/ulbvaJzcgSHsuhjVc1QHNTcr1R7Fw=
 github.com/rancher/shepherd v0.0.0-20250808210055-4a60b0f66c6b h1:QIC9NNyUroMFInTwPYaJM27eb8xihHHOnamykw/TOMc=
 github.com/rancher/shepherd v0.0.0-20250808210055-4a60b0f66c6b/go.mod h1:GzGXUZYnFmXho1GyvkrGFQawAuHvvC7VDHjHOGnHEIM=
-github.com/rancher/steve v0.7.4 h1:uOpbWxa5fzbiCYETaXUhLdBZeY12Jw2I+JwD0xnDWvU=
-github.com/rancher/steve v0.7.4/go.mod h1:/IH+uMCnW/lE1Syz5jgLc1W6QqpPWv117MBFEL9kg5A=
+github.com/rancher/steve v0.7.8 h1:oDh5XlrN+kEhhIusMBqh+52dhDs0k2Y1ud3y3rjvK1Y=
+github.com/rancher/steve v0.7.8/go.mod h1:O4ZebgmHiR4LnmeM3vIW9VjpzGPLqHmImflmj44G1No=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20250710162344-185ff9f785cd h1:M3oVcVktMhNk8l3ZRW94kroqzWzE/VGbZfLw/F0rw5Y=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20250710162344-185ff9f785cd/go.mod h1:VfRrgue4yl6O0GYakMGYgyByu7ySooPQWWRxTt2MIEI=
 github.com/rancher/tests/actions v0.0.0-20250807173558-2c59b0d9801c h1:7mKf6cD6pis1OSOpDa26uzesU08w2olenDjSd6o3a80=
