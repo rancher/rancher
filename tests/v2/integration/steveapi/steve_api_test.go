@@ -18,6 +18,11 @@ import (
 
 	"github.com/rancher/rancher/pkg/api/scheme"
 	"github.com/rancher/rancher/pkg/features"
+	kubenamespaces "github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/namespaces"
+	"github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/rbac"
+	"github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/secrets"
+	stevesecrets "github.com/rancher/rancher/tests/v2/integration/actions/secrets"
+	"github.com/rancher/rancher/tests/v2/integration/actions/serviceaccounts"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	clientv1 "github.com/rancher/shepherd/clients/rancher/v1"
@@ -27,12 +32,8 @@ import (
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
 	"github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
-	kubenamespaces "github.com/rancher/tests/actions/kubeapi/namespaces"
-	"github.com/rancher/tests/actions/kubeapi/rbac"
-	"github.com/rancher/tests/actions/kubeapi/secrets"
-	"github.com/rancher/tests/actions/namespaces"
-	stevesecrets "github.com/rancher/tests/actions/secrets"
-	"github.com/rancher/tests/actions/serviceaccounts"
+
+	"github.com/rancher/rancher/tests/v2/integration/actions/namespaces"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -999,7 +1000,7 @@ func (s *steveAPITestSuite) TestList() {
 			user:        "user-a",
 			namespace:   "test-ns-2",
 			query:       "filter=metadata.annotations[management.cattle.io/project-scoped-secret-copy]=potatoes",
-			expect: []map[string]string{ },
+			expect:      []map[string]string{},
 		},
 		{
 			description: "user:user-a,namespace:none,query:sort=metadata.name",
