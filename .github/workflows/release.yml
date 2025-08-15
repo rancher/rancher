@@ -205,7 +205,7 @@ jobs:
       - name: build artifacts index
         env:
           ARTIFACTS_DISTRIBUTION_ID: EUK3RJTBZG1QG
-        uses: ./.github/actions/build-artifacts-index
+        uses: ./.github/actions/images-files/build-artifacts-index
   notify-release:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
     container: registry.suse.com/bci/bci-base:15.7
