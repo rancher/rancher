@@ -5,6 +5,7 @@
   ],
   "baseBranches": [
     "main",
+    "release/v2.12",
     "release/v2.11",
     "release/v2.10",
     "release/v2.9"
@@ -13,6 +14,10 @@
   "prConcurrentLimit": 4,
   "prCreation": "status-success",
   "packageRules": [
+    {
+      "matchBaseBranches": ["release/v2.12"],
+      "extends": ["github>rancher/renovate-config//rancher-2.12#release"]
+    },
     {
       "matchBaseBranches": ["release/v2.11"],
       "extends": ["github>rancher/renovate-config//rancher-2.11#release"]
