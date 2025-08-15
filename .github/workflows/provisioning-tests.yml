@@ -87,3 +87,48 @@ jobs:
           V2PROV_TEST_DIST: "${{ matrix.V2PROV_TEST_DIST }}"
           CATTLE_FEATURES: "${{ matrix.CATTLE_FEATURES }}"
           CATTLE_AGENT_IMAGE: "${{ env.IMAGE_AGENT}}:${{ env.TAG }}"
+      - name: Rename Test Output
+        id: test_output
+        run: |
+          export TESTSUITE="$(echo '${{ matrix.V2PROV_TEST_RUN_REGEX }}' | tr -d '()|^.*$')"
+          echo "suite=${TESTSUITE}" >> $GITHUB_OUTPUT
+          # need sudo due to this being created in the dapper container
+          sudo mv /tmp/out.json /tmp/report-${{ matrix.V2PROV_TEST_DIST }}-$TESTSUITE.json
+      - name: Upload JSON Test Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: "JSON Results ${{ matrix.V2PROV_TEST_DIST }} ${{ steps.test_output.outputs.suite }}"
+          path: "/tmp/report-${{ matrix.V2PROV_TEST_DIST }}-${{ steps.test_output.outputs.suite }}.json"
+
+  convert-to-xml:
+    needs: [provisioning_tests]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install golang
+        run: |
+          sudo apt-get update -qq && sudo apt-get -yqq install golang
+      - name: Fetch Raw JSON output
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: /tmp/test-results/
+      - name: Convert test results to XML
+        run: |
+          for file in $(ls /tmp/test-results/report-*.json); do
+             echo "Processing $file..."
+             go run github.com/jstemmer/go-junit-report/v2@latest -parser gojson < $file > $(sed 's/json/xml/g' <<<$file)
+          done
+      - name: Upload XML Test Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: XML Results
+          path: "/tmp/test-results/report-*.xml"
+
+  event-file:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Upload GH Event File
+        uses: actions/upload-artifact@v4
+        with:
+          name: Event File
+          path: ${{ github.event_path }}
