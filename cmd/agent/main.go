@@ -40,6 +40,12 @@ var (
 	VERSION = "dev"
 )
 
+// rancherStarted prevents duplicate embedded Rancher server startup during WebSocket reconnections
+var rancherStarted bool
+
+// rancherRunFunc allows mocking rancher.Run for testing
+var rancherRunFunc = rancher.Run
+
 const (
 	Token          = "X-API-Tunnel-Token"
 	Params         = "X-API-Tunnel-Params"
@@ -262,15 +268,25 @@ func run(ctx context.Context) error {
 	}
 
 	onConnect := func(ctx context.Context, _ *remotedialer.Session) error {
+		logrus.Info("WebSocket connection established")
 		connected()
 
 		if writeCertsOnly {
 			exitCertWriter(ctx)
 		}
 
-		err = rancher.Run(topContext)
-		if err != nil {
-			logrus.Fatal(err)
+		// Only start embedded Rancher server once to prevent conflicts during reconnections
+		if !rancherStarted {
+			logrus.Info("Starting embedded Rancher server")
+			err = rancherRunFunc(topContext)
+			if err != nil {
+				logrus.Errorf("Failed to start embedded Rancher server: %v", err)
+				return err
+			}
+			rancherStarted = true
+			logrus.Info("Embedded Rancher server started successfully")
+		} else {
+			logrus.Info("WebSocket reconnected - embedded Rancher server already running")
 		}
 		return nil
 	}
@@ -298,6 +314,7 @@ func run(ctx context.Context) error {
 			}
 			return false
 		}, onConnect)
+		logrus.Warn("WebSocket connection lost, attempting reconnection in 5 seconds")
 		time.Sleep(5 * time.Second)
 	}
 }
