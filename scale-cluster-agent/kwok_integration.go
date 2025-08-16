@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -206,44 +207,88 @@ func (km *KWOKClusterManager) CreateCluster(clusterName, clusterID string, confi
 
 // createKWOKCluster creates a kwok cluster using kwokctl
 func (km *KWOKClusterManager) createKWOKCluster(clusterName string, port int) error {
-	logrus.Infof("DEBUG: createKWOKCluster called for %s on port %d", clusterName, port)
-
-	// Create cluster with binary runtime (lightweight)
+	// Use secure mode instead of insecure mode with binary runtime
 	cmd := exec.Command(km.kwokctlPath, "create", "cluster",
 		"--name", clusterName,
-		"--runtime", "binary",
 		"--kube-apiserver-port", strconv.Itoa(port),
-		"--etcd-port", strconv.Itoa(port+1),
-		"--kube-controller-manager-port", strconv.Itoa(port+2),
-		"--kube-scheduler-port", strconv.Itoa(port+3),
-		"--controller-port", strconv.Itoa(port+4),
-	)
+		"--runtime", "binary",
+		"--kwok-controller-binary", km.kwokPath)
 
-	logrus.Infof("DEBUG: About to execute kwokctl create cluster command")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	// Let KWOK use default ports for other components
+	// Remove other port definitions to let KWOK use defaults
 
-	if err := cmd.Run(); err != nil {
-		logrus.Errorf("DEBUG: kwokctl create cluster failed: %v", err)
-		return fmt.Errorf("kwokctl create cluster failed: %v", err)
-	}
-	logrus.Infof("DEBUG: Successfully created kwok cluster %s", clusterName)
-
-	// Modify the kwok.yaml to enable anonymous authentication
-	if err := km.modifyKWOKConfigForAnonymousAuth(clusterName); err != nil {
-		logrus.Warnf("Failed to modify KWOK config for anonymous auth: %v", err)
-		// Continue anyway, as this is not critical
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to create KWOK cluster: %v, output: %s", err, string(output))
 	}
 
-	// Start the cluster
-	cmd = exec.Command(km.kwokctlPath, "start", "cluster", "--name", clusterName)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	logrus.Infof("KWOK cluster created successfully: %s", string(output))
 
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("kwokctl start cluster failed: %v", err)
+	// Apply anonymous service account for testing
+	if err := km.applyAnonymousServiceAccount(clusterName); err != nil {
+		logrus.Warnf("Failed to apply anonymous service account: %v", err)
 	}
 
+	return nil
+}
+
+// applyAnonymousServiceAccount applies the anonymous service account YAML to allow unauthenticated access
+func (km *KWOKClusterManager) applyAnonymousServiceAccount(clusterName string) error {
+	anonymousYAML := `apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: anonymous-access
+rules:
+- apiGroups: [""]
+  resources: ["*"]
+  verbs: ["*"]
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["*"]
+- nonResourceURLs: ["*"]
+  verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: anonymous-access-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: anonymous-access
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: User
+  name: system:anonymous`
+
+	// Save YAML to temporary file
+	tmpFile, err := ioutil.TempFile("", "anonymous-access-*.yaml")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	if _, err := tmpFile.WriteString(anonymousYAML); err != nil {
+		return fmt.Errorf("failed to write YAML: %v", err)
+	}
+	tmpFile.Close()
+
+	// Apply using kubectl
+	cmd := exec.Command(km.kwokctlPath, "get", "kubeconfig", "--name", clusterName)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to get kubeconfig: %v, output: %s", err, string(output))
+	}
+
+	// Apply the YAML
+	applyCmd := exec.Command("kubectl", "--kubeconfig", "-", "apply", "-f", tmpFile.Name())
+	applyCmd.Stdin = strings.NewReader(string(output))
+	applyOutput, err := applyCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to apply anonymous service account: %v, output: %s", err, string(applyOutput))
+	}
+
+	logrus.Infof("Anonymous service account applied successfully: %s", string(applyOutput))
 	return nil
 }
 
@@ -372,14 +417,14 @@ rules:
 
 ---
 
-# Binds the anonymous role to the "system:unauthenticated" group
+# Binds the anonymous role to the "system:anonymous" user
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: anonymous-reader-binding
 subjects:
-- kind: Group
-  name: system:unauthenticated
+- kind: User
+  name: system:anonymous
   apiGroup: rbac.authorization.k8s.io
 roleRef:
   kind: ClusterRole

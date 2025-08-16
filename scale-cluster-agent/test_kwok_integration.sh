@@ -384,3 +384,5 @@ fi
 echo ""
 echo "Test logs saved to: scale-agent-test.log"
 echo "KWOK cluster logs available in: ~/.kwok/clusters/"
+
+
