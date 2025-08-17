@@ -1833,6 +1833,7 @@ func (a *ScaleAgent) startMockHTTPSAPIServer(addr string, cert tls.Certificate, 
 		stateMu.Lock()
 		defer stateMu.Unlock()
 		if _, ok := namespaces[ns]; !ok {
+			// Only create namespace if it doesn't exist
 			namespaces[ns] = map[string]interface{}{"apiVersion": "v1", "kind": "Namespace", "metadata": map[string]interface{}{"name": ns, "uid": genUID(ns), "creationTimestamp": now(), "resourceVersion": nextRV()}, "status": map[string]interface{}{"phase": "Active"}}
 			// auto-create default serviceaccount + token secret to satisfy Rancher defaultSvcAccountHandler
 			if _, ok := serviceAccounts[ns]; !ok {
@@ -1852,6 +1853,7 @@ func (a *ScaleAgent) startMockHTTPSAPIServer(addr string, cert tls.Certificate, 
 				sa["secrets"] = append(sa["secrets"].([]interface{}), map[string]interface{}{"name": secName})
 			}
 		}
+		// Always ensure the supporting maps exist (but don't modify existing namespace objects)
 		if _, ok := serviceAccounts[ns]; !ok {
 			serviceAccounts[ns] = map[string]interface{}{}
 		}
@@ -2080,10 +2082,59 @@ func (a *ScaleAgent) startMockHTTPSAPIServer(addr string, cert tls.Certificate, 
 
 	// Namespaced RBAC resources
 	muxLocal.HandleFunc("/apis/rbac.authorization.k8s.io/v1/namespaces/", logReq(func(w http.ResponseWriter, r *http.Request) {
+		logrus.Debugf("🔍 NAMESPACE HANDLER: %s %s", r.Method, r.URL.Path)
+
 		rest := strings.TrimPrefix(r.URL.Path, "/apis/rbac.authorization.k8s.io/v1/namespaces/")
 		parts := strings.Split(rest, "/")
-		if len(parts) < 2 {
-			http.NotFound(w, r)
+		logrus.Debugf("🔍 NAMESPACE PARTS: %v", parts)
+
+		// Handle direct namespace object: /api/v1/namespaces/{name}
+		if len(parts) == 1 || parts[1] == "" { // trailing slash optional
+			ns := strings.TrimSuffix(parts[0], "/")
+			if ns == "" {
+				logrus.Debugf("🔍 NAMESPACE: empty namespace name")
+				http.NotFound(w, r)
+				return
+			}
+
+			logrus.Debugf("🔍 NAMESPACE: handling namespace '%s' with method %s", ns, r.Method)
+			ensureNS(ns)
+
+			stateMu.Lock()
+			nsObj := namespaces[ns]
+			if r.Method == http.MethodGet {
+				logrus.Debugf("🔍 NAMESPACE: GET namespace '%s' - returning object", ns)
+				stateMu.Unlock()
+				writeJSON(w, 200, nsObj)
+				return
+			}
+			if r.Method == http.MethodPut || r.Method == http.MethodPatch {
+				logrus.Debugf("🔍 NAMESPACE: %s namespace '%s' - updating object", r.Method, ns)
+				var obj map[string]interface{}
+				if err := json.NewDecoder(r.Body).Decode(&obj); err != nil {
+					stateMu.Unlock()
+					logrus.Errorf("🔍 NAMESPACE: failed to decode %s request: %v", r.Method, err)
+					writeJSON(w, 400, map[string]string{"error": "bad json"})
+					return
+				}
+				md, _ := obj["metadata"].(map[string]interface{})
+				if md == nil {
+					md = map[string]interface{}{}
+					obj["metadata"] = md
+				}
+				md["name"] = ns
+				// bump resourceVersion to satisfy optimistic concurrency expectations
+				md["resourceVersion"] = nextRV()
+				namespaces[ns] = map[string]interface{}{"apiVersion": "v1", "kind": "Namespace", "metadata": md, "status": map[string]interface{}{"phase": "Active"}}
+				updated := namespaces[ns]
+				stateMu.Unlock()
+				logrus.Debugf("🔍 NAMESPACE: %s namespace '%s' - update successful", r.Method, ns)
+				writeJSON(w, 200, updated)
+				return
+			}
+			stateMu.Unlock()
+			logrus.Debugf("🔍 NAMESPACE: method %s not allowed for namespace '%s'", r.Method, ns)
+			writeJSON(w, 405, map[string]string{"error": "method not allowed"})
 			return
 		}
 		ns, res := parts[0], parts[1]
@@ -2374,6 +2425,49 @@ func (a *ScaleAgent) startMockHTTPSAPIServer(addr string, cert tls.Certificate, 
 	}))
 
 	muxLocal.HandleFunc("/api/v1/namespaces", logReq(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			// Handle namespace creation
+			var obj map[string]interface{}
+			if err := json.NewDecoder(r.Body).Decode(&obj); err != nil {
+				writeJSON(w, 400, map[string]string{"error": "bad json"})
+				return
+			}
+
+			md, _ := obj["metadata"].(map[string]interface{})
+			if md == nil {
+				writeJSON(w, 400, map[string]string{"error": "metadata required"})
+				return
+			}
+
+			name, _ := md["name"].(string)
+			if name == "" {
+				writeJSON(w, 400, map[string]string{"error": "name required"})
+				return
+			}
+
+			// Create the namespace
+			ensureNS(name)
+
+			// Update with any additional metadata from the request
+			stateMu.Lock()
+			if nsMd, ok := namespaces[name]["metadata"].(map[string]interface{}); ok {
+				// Merge metadata from request
+				for k, v := range md {
+					if k != "name" && k != "namespace" { // Don't override these
+						nsMd[k] = v
+					}
+				}
+				// Ensure required fields
+				nsMd["name"] = name
+				nsMd["namespace"] = name
+				nsMd["resourceVersion"] = nextRV()
+			}
+			stateMu.Unlock()
+
+			writeJSON(w, 201, namespaces[name])
+			return
+		}
+
 		if isWatch(r) {
 			stateMu.RLock()
 			items := []map[string]interface{}{}
@@ -2394,27 +2488,38 @@ func (a *ScaleAgent) startMockHTTPSAPIServer(addr string, cert tls.Certificate, 
 	}))
 	// Namespaced core resources
 	muxLocal.HandleFunc("/api/v1/namespaces/", logReq(func(w http.ResponseWriter, r *http.Request) {
+		logrus.Debugf("🔍 NAMESPACE HANDLER: %s %s", r.Method, r.URL.Path)
+
 		rest := strings.TrimPrefix(r.URL.Path, "/api/v1/namespaces/")
 		parts := strings.Split(rest, "/")
+		logrus.Debugf("🔍 NAMESPACE PARTS: %v", parts)
+
 		// Handle direct namespace object: /api/v1/namespaces/{name}
 		if len(parts) == 1 || parts[1] == "" { // trailing slash optional
 			ns := strings.TrimSuffix(parts[0], "/")
 			if ns == "" {
+				logrus.Debugf("🔍 NAMESPACE: empty namespace name")
 				http.NotFound(w, r)
 				return
 			}
+
+			logrus.Debugf("🔍 NAMESPACE: handling namespace '%s' with method %s", ns, r.Method)
 			ensureNS(ns)
+
 			stateMu.Lock()
 			nsObj := namespaces[ns]
 			if r.Method == http.MethodGet {
+				logrus.Debugf("🔍 NAMESPACE: GET namespace '%s' - returning object", ns)
 				stateMu.Unlock()
 				writeJSON(w, 200, nsObj)
 				return
 			}
 			if r.Method == http.MethodPut || r.Method == http.MethodPatch {
+				logrus.Debugf("🔍 NAMESPACE: %s namespace '%s' - updating object", r.Method, ns)
 				var obj map[string]interface{}
 				if err := json.NewDecoder(r.Body).Decode(&obj); err != nil {
 					stateMu.Unlock()
+					logrus.Errorf("🔍 NAMESPACE: failed to decode %s request: %v", r.Method, err)
 					writeJSON(w, 400, map[string]string{"error": "bad json"})
 					return
 				}
@@ -2429,10 +2534,12 @@ func (a *ScaleAgent) startMockHTTPSAPIServer(addr string, cert tls.Certificate, 
 				namespaces[ns] = map[string]interface{}{"apiVersion": "v1", "kind": "Namespace", "metadata": md, "status": map[string]interface{}{"phase": "Active"}}
 				updated := namespaces[ns]
 				stateMu.Unlock()
+				logrus.Debugf("🔍 NAMESPACE: %s namespace '%s' - update successful", r.Method, ns)
 				writeJSON(w, 200, updated)
 				return
 			}
 			stateMu.Unlock()
+			logrus.Debugf("🔍 NAMESPACE: method %s not allowed for namespace '%s'", r.Method, ns)
 			writeJSON(w, 405, map[string]string{"error": "method not allowed"})
 			return
 		}
@@ -2974,7 +3081,7 @@ func (dc *debugConn) Read(b []byte) (n int, err error) {
 	if err != nil {
 		logrus.Errorf("🔄 REMOTEDIALER DEBUG: [%s] Read error: %v", dc.cluster, err)
 	} else if n > 0 {
-		logrus.Infof("🔄 REMOTEDIALER DEBUG: [%s] Read %d bytes from %s://%s", dc.cluster, n, dc.proto, dc.address)
+		logrus.Infof("�� REMOTEDIALER DEBUG: [%s] Read %d bytes from %s://%s", dc.cluster, n, dc.proto, dc.address)
 		// Log first 100 characters of data for debugging
 		if n > 0 && n <= 100 {
 			logrus.Infof("🔄 REMOTEDIALER DEBUG: [%s] Data: %s", dc.cluster, string(b[:n]))
