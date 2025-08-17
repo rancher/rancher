@@ -2,7 +2,7 @@ module github.com/rancher/rancher/pkg/client
 
 go 1.24.0
 
-toolchain go1.24.5
+toolchain go1.24.6
 
 replace github.com/rancher/wrangler/v3 => github.com/rancher/wrangler/v3 v3.2.2
 
