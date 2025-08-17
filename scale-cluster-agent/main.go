@@ -3017,6 +3017,7 @@ func randSuffix(n int) string {
 }
 
 // getTokenFromAPI gets the CA certificate and service account token from the KWOK cluster
+// This implements the exact same logic as the real agent using kubectl commands
 func (a *ScaleAgent) getTokenFromAPI(clusterID string) ([]byte, []byte, error) {
 	// Find the KWOK cluster
 	var kwokCluster *KWOKCluster
@@ -3038,7 +3039,7 @@ func (a *ScaleAgent) getTokenFromAPI(clusterID string) ([]byte, []byte, error) {
 		return nil, nil, fmt.Errorf("failed to get kubeconfig: %v, output: %s", err, string(output))
 	}
 
-	// Parse the kubeconfig
+	// Parse the kubeconfig to get CA certificate
 	var kubeconfig struct {
 		Clusters []struct {
 			Cluster struct {
@@ -3047,12 +3048,6 @@ func (a *ScaleAgent) getTokenFromAPI(clusterID string) ([]byte, []byte, error) {
 				Server                   string `yaml:"server"`
 			} `yaml:"cluster"`
 		} `yaml:"clusters"`
-		Users []struct {
-			User struct {
-				ClientCertificateData string `yaml:"client-certificate-data"`
-				ClientKeyData         string `yaml:"client-key-data"`
-			} `yaml:"user"`
-		} `yaml:"users"`
 	}
 
 	if err := yaml.Unmarshal(output, &kubeconfig); err != nil {
@@ -3081,13 +3076,142 @@ func (a *ScaleAgent) getTokenFromAPI(clusterID string) ([]byte, []byte, error) {
 		return nil, nil, fmt.Errorf("no CA certificate found in kubeconfig (neither base64 data nor file path)")
 	}
 
-	// For now, generate a mock token since we need to extract the real service account token
-	// TODO: Extract real service account token from the cluster
-	token := fmt.Sprintf("kwok-token-%s-%s", clusterID, randSuffix(32))
+	// Now implement the exact same logic as the real agent using kubectl commands
+	// 1. Create a temporary kubeconfig file
+	tmpFile, err := ioutil.TempFile("", "kubeconfig-*.yaml")
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create temp kubeconfig file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
 
-	logrus.Infof("Successfully extracted CA certificate (%d bytes) and generated token for cluster %s", len(caCert), clusterID)
+	if _, err := tmpFile.Write(output); err != nil {
+		return nil, nil, fmt.Errorf("failed to write kubeconfig to temp file: %v", err)
+	}
+	tmpFile.Close()
 
-	return caCert, []byte(token), nil
+	// 2. Check if the cattle service account exists
+	checkCmd := exec.Command("kubectl", "--kubeconfig", tmpFile.Name(), "get", "serviceaccount", "cattle", "-n", "cattle-system")
+	if err := checkCmd.Run(); err != nil {
+		return nil, nil, fmt.Errorf("cattle service account not found in cattle-system namespace: %v", err)
+	}
+
+	// 3. Get the service account UID for the secret template
+	getUIDCmd := exec.Command("kubectl", "--kubeconfig", tmpFile.Name(), "get", "serviceaccount", "cattle", "-n", "cattle-system", "-o", "jsonpath={.metadata.uid}")
+	uidOutput, err := getUIDCmd.CombinedOutput()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get service account UID: %v, output: %s", err, string(uidOutput))
+	}
+	saUID := strings.TrimSpace(string(uidOutput))
+
+	// 4. Check for existing service account token secret
+	listCmd := exec.Command("kubectl", "--kubeconfig", tmpFile.Name(), "get", "secrets", "-n", "cattle-system", "-l", "cattle.io/service-account.name=cattle", "-o", "json")
+	listOutput, err := listCmd.CombinedOutput()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to list secrets for cattle service account: %v, output: %s", err, string(listOutput))
+	}
+
+	var secretList struct {
+		Items []struct {
+			Metadata struct {
+				Name string `json:"name"`
+			} `json:"metadata"`
+			Type string            `json:"type"`
+			Data map[string]string `json:"data"`
+		} `json:"items"`
+	}
+
+	if err := json.Unmarshal(listOutput, &secretList); err != nil {
+		return nil, nil, fmt.Errorf("failed to parse secret list: %v", err)
+	}
+
+	// 5. Look for existing service account token secret
+	var token []byte
+	var secretName string
+	for _, secret := range secretList.Items {
+		if secret.Type == "kubernetes.io/service-account-token" {
+			if tokenData, exists := secret.Data["token"]; exists && tokenData != "" {
+				token, err = base64.StdEncoding.DecodeString(tokenData)
+				if err != nil {
+					continue
+				}
+				secretName = secret.Metadata.Name
+				logrus.Infof("Found existing service account token secret: %s", secretName)
+				break
+			}
+		}
+	}
+
+	// 6. If no existing token, create a new service account token secret (like the real agent does)
+	if len(token) == 0 {
+		logrus.Infof("No existing service account token found, creating new one...")
+
+		// Create a secret template (like SecretTemplate in the real agent)
+		secretName = fmt.Sprintf("cattle-token-%s", randSuffix(5))
+		secretYAML := fmt.Sprintf(`apiVersion: v1
+kind: Secret
+metadata:
+  name: %s
+  namespace: cattle-system
+  annotations:
+    kubernetes.io/service-account.name: cattle
+    kubernetes.io/service-account.uid: %s
+  labels:
+    cattle.io/service-account.name: cattle
+type: kubernetes.io/service-account-token
+data:
+  token: ""
+  ca.crt: ""
+  namespace: "Y2F0dGxlLXN5c3RlbQ=="`, secretName, saUID)
+
+		// Save secret YAML to temp file
+		secretTmpFile, err := ioutil.TempFile("", "secret-*.yaml")
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create temp secret file: %v", err)
+		}
+		defer os.Remove(secretTmpFile.Name())
+
+		if _, err := secretTmpFile.WriteString(secretYAML); err != nil {
+			return nil, nil, fmt.Errorf("failed to write secret YAML: %v", err)
+		}
+		secretTmpFile.Close()
+
+		// Apply the secret
+		applyCmd := exec.Command("kubectl", "--kubeconfig", tmpFile.Name(), "apply", "-f", secretTmpFile.Name())
+		if err := applyCmd.Run(); err != nil {
+			return nil, nil, fmt.Errorf("failed to create service account token secret: %v", err)
+		}
+
+		// Wait for the token to be populated by Kubernetes (like the real agent does)
+		logrus.Infof("Waiting for Kubernetes to populate the service account token...")
+		for i := 0; i < 30; i++ { // Wait up to 30 seconds
+			time.Sleep(1 * time.Second)
+
+			// Check if token is populated
+			getCmd := exec.Command("kubectl", "--kubeconfig", tmpFile.Name(), "get", "secret", secretName, "-n", "cattle-system", "-o", "jsonpath={.data.token}")
+			tokenOutput, err := getCmd.CombinedOutput()
+			if err == nil && len(tokenOutput) > 0 {
+				token, err = base64.StdEncoding.DecodeString(string(tokenOutput))
+				if err == nil && len(token) > 0 {
+					logrus.Infof("Successfully got service account token from newly created secret")
+					break
+				}
+			}
+		}
+
+		if len(token) == 0 {
+			return nil, nil, fmt.Errorf("failed to get service account token after creating secret")
+		}
+
+		// 7. Update the service account to reference this secret (like the real agent does)
+		patchCmd := exec.Command("kubectl", "--kubeconfig", tmpFile.Name(), "patch", "serviceaccount", "cattle", "-n", "cattle-system", "-p", fmt.Sprintf(`{"metadata":{"annotations":{"rancher.io/service-account.secret-ref":"cattle-system/%s"}}}`, secretName))
+		if err := patchCmd.Run(); err != nil {
+			logrus.Warnf("Failed to update service account annotation: %v", err)
+		}
+	}
+
+	logrus.Infof("Successfully extracted CA certificate (%d bytes) and real service account token (%d bytes) for cluster %s", len(caCert), len(token), clusterID)
+
+	return caCert, token, nil
 }
 
 // getClusterParams gets the cluster parameters using the real agent's approach

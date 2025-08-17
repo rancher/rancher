@@ -273,16 +273,27 @@ subjects:
 	}
 	tmpFile.Close()
 
-	// Apply using kubectl
+	// Get kubeconfig and save to temporary file
 	cmd := exec.Command(km.kwokctlPath, "get", "kubeconfig", "--name", clusterName)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to get kubeconfig: %v, output: %s", err, string(output))
 	}
 
-	// Apply the YAML
-	applyCmd := exec.Command("kubectl", "--kubeconfig", "-", "apply", "-f", tmpFile.Name())
-	applyCmd.Stdin = strings.NewReader(string(output))
+	// Save kubeconfig to temporary file
+	kubeconfigFile, err := ioutil.TempFile("", "kubeconfig-*.yaml")
+	if err != nil {
+		return fmt.Errorf("failed to create kubeconfig temp file: %v", err)
+	}
+	defer os.Remove(kubeconfigFile.Name())
+
+	if _, err := kubeconfigFile.Write(output); err != nil {
+		return fmt.Errorf("failed to write kubeconfig: %v", err)
+	}
+	kubeconfigFile.Close()
+
+	// Apply the YAML using the kubeconfig file
+	applyCmd := exec.Command("kubectl", "--kubeconfig", kubeconfigFile.Name(), "apply", "-f", tmpFile.Name())
 	applyOutput, err := applyCmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to apply anonymous service account: %v, output: %s", err, string(applyOutput))
