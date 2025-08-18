@@ -102,11 +102,12 @@ jobs:
 
   convert-to-xml:
     needs: [provisioning_tests]
-    runs-on: ubuntu-latest
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: registry.suse.com/bci/bci-base:15.7
     steps:
       - name: Install golang
         run: |
-          sudo apt-get update -qq && sudo apt-get -yqq install golang
+          zypper --non-interactive install golang
       - name: Fetch Raw JSON output
         uses: actions/download-artifact@v4
         with:
@@ -125,7 +126,8 @@ jobs:
           path: "/tmp/test-results/report-*.xml"
 
   event-file:
-    runs-on: ubuntu-latest
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: registry.suse.com/bci/bci-base:15.7
     steps:
       - name: Upload GH Event File
         uses: actions/upload-artifact@v4
