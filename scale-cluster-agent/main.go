@@ -148,24 +148,20 @@ type ScaleAgent struct {
 	httpServer            *http.Server
 	ctx                   context.Context
 	cancel                context.CancelFunc
-	activeConnections     map[string]bool               // Track active connections to prevent duplicates
-	connMutex             sync.RWMutex                  // Protect connection tracking
-	connectionCancels     map[string]context.CancelFunc // Track cancel funcs for WS per cluster
-	cancelMutex           sync.RWMutex                  // Protect connectionCancels
-	tokenCache            map[string]string             // Cache cluster registration tokens
-	tokenMutex            sync.RWMutex                  // Protect token cache
-	mockServers           map[string]*http.Server       // Track mock API servers per cluster
-	serverMutex           sync.RWMutex                  // Protect mock servers
-	portForwarders        map[string]*PortForwarder     // Track port forwarders per cluster
-	forwarderMutex        sync.RWMutex                  // Protect port forwarders
-	nextPort              int                           // Next available port for clusters
-	portMutex             sync.Mutex                    // Protect port allocation
-	firstClusterConnected bool                          // track first fake cluster connection
+	activeConnections     map[string]bool           // Track active connections to prevent duplicates
+	connMutex             sync.RWMutex              // Protect connection tracking
+	tokenCache            map[string]string         // Cache cluster registration tokens
+	tokenMutex            sync.RWMutex              // Protect token cache
+	mockServers           map[string]*http.Server   // Track mock API servers per cluster
+	serverMutex           sync.RWMutex              // Protect mock servers
+	portForwarders        map[string]*PortForwarder // Track port forwarders per cluster
+	forwarderMutex        sync.RWMutex              // Protect port forwarders
+	nextPort              int                       // Next available port for clusters
+	portMutex             sync.Mutex                // Protect port allocation
+	firstClusterConnected bool                      // track first fake cluster connection
 	mockCertPEM           []byte
 	nameCounters          map[string]int      // track next suffix per base name
 	kwokManager           *KWOKClusterManager // Manage KWOK clusters
-	restartSimulated      map[string]bool     // Ensure we only simulate restart once per cluster
-	restartMutex          sync.RWMutex        // Protect restartSimulated
 }
 
 type CreateClusterRequest struct {
@@ -215,15 +211,11 @@ func main() {
 		cancel:            cancel,
 		activeConnections: make(map[string]bool),
 		connMutex:         sync.RWMutex{},
-		connectionCancels: make(map[string]context.CancelFunc),
-		cancelMutex:       sync.RWMutex{},
 		tokenCache:        make(map[string]string),
 		mockServers:       make(map[string]*http.Server),
 		portForwarders:    make(map[string]*PortForwarder),
 		nextPort:          1, // Start from port 8001
 		nameCounters:      make(map[string]int),
-		restartSimulated:  make(map[string]bool),
-		restartMutex:      sync.RWMutex{},
 	}
 
 	// Initialize KWOK cluster manager with absolute paths
@@ -894,10 +886,6 @@ func (a *ScaleAgent) connectClusterToRancher(clusterName, clusterID string, clus
 		backoff := time.Second
 		for {
 			ctx, cancel := context.WithCancel(a.ctx)
-			// store cancel so we can force drop WS later
-			a.cancelMutex.Lock()
-			a.connectionCancels[clusterName] = cancel
-			a.cancelMutex.Unlock()
 
 			// Check if we've exceeded max attempts
 			if connectionAttempts >= maxAttempts {
@@ -1697,63 +1685,11 @@ func (a *ScaleAgent) waitForClusterActiveAndConnect(clusterName, clusterID strin
 	}
 	logrus.Infof("🔄 REAL-AGENT: Service account is ready")
 
-	// Step 2: Check if this is first-time setup or reconnection
-	logrus.Infof("🔄 REAL-AGENT: Step 2 - Checking if this is first-time setup or reconnection")
-	isReconnection := a.isClusterReconnection(clusterID)
-	
-	if isReconnection {
-		logrus.Infof("🔄 REAL-AGENT: This is a reconnection - resuming normal operation")
-		a.resumeNormalOperation(clusterName, clusterID)
-		return
-	}
+	// Step 2: Initial agent deployment completed - now follow REAL agent pattern
+	logrus.Infof("🔄 REAL-AGENT: Step 2 - Initial agent deployment completed, now implementing REAL agent logic")
 
-	logrus.Infof("🔄 REAL-AGENT: This is first-time setup - proceeding with full lifecycle")
-
-	// Step 3: Initial agent deployment completed. Simulate real cluster-agent pod restart once.
-	logrus.Infof("🔄 REAL-AGENT: Step 3 - Initial agent deployment completed")
-
-	// Simulate pod restart only once per cluster
-	a.restartMutex.Lock()
-	_, alreadySimulated := a.restartSimulated[clusterID]
-	if !alreadySimulated {
-		a.restartSimulated[clusterID] = true
-	}
-	a.restartMutex.Unlock()
-
-	if !alreadySimulated {
-		logrus.Infof("🔄 REAL-AGENT: Simulating cluster-agent pod restart to mirror real lifecycle")
-		// 1) Force-drop current WS (if any)
-		a.cancelMutex.RLock()
-		if c, ok := a.connectionCancels[clusterName]; ok {
-			logrus.Infof("🔄 REAL-AGENT: Cancelling existing WebSocket context for %s", clusterName)
-			c()
-		}
-		a.cancelMutex.RUnlock()
-		// 2) Delete cluster-agent pod and wait for new one
-		if err := a.deleteClusterAgentPod(clusterID); err != nil {
-			logrus.Warnf("🔄 REAL-AGENT: Failed to delete cluster-agent pod: %v", err)
-		} else {
-			if err := a.waitForClusterAgentPodReady(clusterID); err != nil {
-				logrus.Warnf("🔄 REAL-AGENT: New cluster-agent pod not ready: %v", err)
-			}
-		}
-		// 3) Clear active flag so reconnect path can run if needed
-		a.connMutex.Lock()
-		delete(a.activeConnections, clusterName)
-		a.connMutex.Unlock()
-		logrus.Infof("🔄 REAL-AGENT: Pod restart simulation completed; continuing")
-	}
-
-	// Step 4: Wait for cluster to be fully registered with Rancher before calling ConfigClient
-	logrus.Infof("🔄 REAL-AGENT: Step 4 - Waiting for cluster to be fully registered with Rancher")
-	if err := a.waitForClusterFullyRegistered(clusterID); err != nil {
-		logrus.Errorf("🔄 REAL-AGENT: Failed to wait for cluster to be fully registered: %v", err)
-		return
-	}
-	logrus.Infof("🔄 REAL-AGENT: Cluster is fully registered with Rancher")
-
-	// Step 5: Call ConfigClient (like real agent does in onConnect)
-	logrus.Infof("🔄 REAL-AGENT: Step 5 - Calling ConfigClient (like real agent)")
+	// Step 3: Call ConfigClient (like real agent does in onConnect)
+	logrus.Infof("🔄 REAL-AGENT: Step 3 - Calling ConfigClient (like real agent)")
 	rancherURL, err := url.Parse(a.config.RancherURL)
 	if err != nil {
 		logrus.Errorf("🔄 REAL-AGENT: Failed to parse Rancher URL: %v", err)
@@ -1770,12 +1706,12 @@ func (a *ScaleAgent) waitForClusterActiveAndConnect(clusterName, clusterID strin
 	// Call ConfigClient exactly like real agent does
 	go a.callConfigClientForCluster(clusterID, rancherURL.Host, rancherToken)
 
-	// Step 6: Implement rancher.Run() equivalent (like real agent does)
-	logrus.Infof("🔄 REAL-AGENT: Step 6 - Implementing rancher.Run() equivalent (like real agent)")
+	// Step 4: Implement rancher.Run() equivalent (like real agent does)
+	logrus.Infof("🔄 REAL-AGENT: Step 4 - Implementing rancher.Run() equivalent (like real agent)")
 	go a.implementRancherRunEquivalent(clusterName, clusterID)
 
-	// Step 7: Start plan monitor (like real agent does)
-	logrus.Infof("🔄 REAL-AGENT: Step 7 - Starting plan monitor (like real agent)")
+	// Step 5: Start plan monitor (like real agent does)
+	logrus.Infof("🔄 REAL-AGENT: Step 5 - Starting plan monitor (like real agent)")
 	go a.startPlanMonitor(clusterID, rancherURL.Host, rancherToken)
 
 	logrus.Infof("🔄 REAL-AGENT: REAL agent lifecycle completed for cluster %s - agent now running indefinitely like real agents", clusterName)
@@ -1895,127 +1831,6 @@ func (a *ScaleAgent) waitForClusterAgentPodReady(clusterID string) error {
 			logrus.Debugf("🔄 AGENT-LIFECYCLE: Waiting for cluster-agent pod to be ready...")
 		}
 	}
-}
-
-// waitForClusterFullyRegistered waits for the cluster to be fully registered with Rancher
-// This prevents calling ConfigClient before the cluster is ready
-func (a *ScaleAgent) waitForClusterFullyRegistered(clusterID string) error {
-	logrus.Infof("🔄 REAL-AGENT: Waiting for cluster %s to be fully registered with Rancher", clusterID)
-
-	// Wait up to 5 minutes for the cluster to be fully registered
-	timeout := time.After(5 * time.Minute)
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-timeout:
-			return fmt.Errorf("timeout waiting for cluster to be fully registered")
-		case <-ticker.C:
-			// Check if the cluster is in "active" state in Rancher
-			cluster, err := a.getClusterFromRancher(clusterID)
-			if err != nil {
-				logrus.Debugf("🔄 REAL-AGENT: Failed to get cluster from Rancher: %v", err)
-				continue
-			}
-
-			// Check if the cluster is active
-			if cluster.Status == "active" {
-				logrus.Infof("🔄 REAL-AGENT: Cluster %s is now active in Rancher", clusterID)
-				return nil
-			}
-
-			logrus.Debugf("🔄 REAL-AGENT: Cluster %s state: %s, waiting for 'active'", clusterID, cluster.Status)
-		}
-	}
-}
-
-// getClusterFromRancher gets the cluster information from Rancher API
-func (a *ScaleAgent) getClusterFromRancher(clusterID string) (*ClusterInfo, error) {
-	url := fmt.Sprintf("%s/v3/clusters/%s", strings.TrimRight(a.config.RancherURL, "/"), clusterID)
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %v", err)
-	}
-
-	// Use the admin token for authentication
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", a.config.BearerToken))
-
-	httpClient := http.Client{
-		Timeout: 30 * time.Second,
-	}
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("request failed: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %v", err)
-	}
-
-	var cluster ClusterInfo
-	if err := json.Unmarshal(body, &cluster); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %v", err)
-	}
-
-	return &cluster, nil
-}
-
-// isClusterReconnection checks if this is a reconnection vs first-time setup
-func (a *ScaleAgent) isClusterReconnection(clusterID string) bool {
-	logrus.Infof("🔄 REAL-AGENT: Checking if cluster %s is a reconnection", clusterID)
-	
-	// Check if cluster already exists in Rancher
-	cluster, err := a.getClusterFromRancher(clusterID)
-	if err != nil {
-		logrus.Debugf("🔄 REAL-AGENT: Failed to get cluster from Rancher: %v", err)
-		return false
-	}
-
-	// If cluster exists and has a status, it's likely a reconnection
-	if cluster.ClusterID != "" && cluster.Status != "" {
-		logrus.Infof("🔄 REAL-AGENT: Cluster %s exists in Rancher (status: %s) - this is a reconnection", clusterID, cluster.Status)
-		return true
-	}
-
-	logrus.Infof("🔄 REAL-AGENT: Cluster %s not found in Rancher - this is first-time setup", clusterID)
-	return false
-}
-
-// resumeNormalOperation resumes normal agent operation after reconnection
-func (a *ScaleAgent) resumeNormalOperation(clusterName, clusterID string) {
-	logrus.Infof("🔄 REAL-AGENT: Resuming normal operation for cluster %s after reconnection", clusterName)
-
-	// Get cluster token for operations
-	rancherToken, err := a.getClusterToken(clusterID)
-	if err != nil {
-		logrus.Errorf("🔄 REAL-AGENT: Failed to get cluster token for resuming operation: %v", err)
-		return
-	}
-
-	rancherURL, err := url.Parse(a.config.RancherURL)
-	if err != nil {
-		logrus.Errorf("🔄 REAL-AGENT: Failed to parse Rancher URL: %v", err)
-		return
-	}
-
-	// Resume rancher.Run() equivalent (like real agent does)
-	logrus.Infof("🔄 REAL-AGENT: Resuming rancher.Run() equivalent for cluster %s", clusterName)
-	go a.implementRancherRunEquivalent(clusterName, clusterID)
-
-	// Resume plan monitor (like real agent does)
-	logrus.Infof("🔄 REAL-AGENT: Resuming plan monitor for cluster %s", clusterID)
-	go a.startPlanMonitor(clusterID, rancherURL.Host, rancherToken)
-
-	logrus.Infof("🔄 REAL-AGENT: Normal operation resumed for cluster %s - agent now running like real agents", clusterName)
 }
 
 // connectClusterToRancherWithRealAgentLogic establishes WebSocket connection following real agent pattern
@@ -2153,16 +1968,8 @@ func (a *ScaleAgent) connectClusterToRancherWithRealAgentLogic(clusterName, clus
 
 		logrus.Infof("✅ AGENT-LIFECYCLE: Cluster %s successfully connected to Rancher via WebSocket tunnel", clusterName)
 
-		// Check if this is a reconnection vs first-time connection
-		if a.isClusterReconnection(clusterID) {
-			logrus.Infof("🔄 AGENT-LIFECYCLE: This is a reconnection for cluster %s - resuming normal operation", clusterName)
-			// Don't call ConfigClient again - just resume normal operation
-			go a.resumeNormalOperation(clusterName, clusterID)
-		} else {
-			logrus.Infof("🔄 AGENT-LIFECYCLE: This is first-time connection for cluster %s - starting full lifecycle", clusterName)
-			// Call the real agent's ConfigClient to get configuration (like real agent does)
-			go a.callConfigClientForCluster(clusterID, rancherURL.Host, rancherToken)
-		}
+		// Call the real agent's ConfigClient to get configuration (like real agent does)
+		go a.callConfigClientForCluster(clusterID, rancherURL.Host, rancherToken)
 
 		// Note: We don't call patchClusterActive here because we're following the real agent lifecycle
 		// The cluster will become active through the proper agent lifecycle, not manual activation
@@ -2233,7 +2040,6 @@ func (a *ScaleAgent) callConfigClientForCluster(clusterID, rancherHost, token st
 		return
 	}
 
-	// Send headers exactly like real agent does
 	headers := http.Header{}
 	headers.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 	headers.Set("X-API-Tunnel-Token", token)
@@ -2323,19 +2129,8 @@ func (a *ScaleAgent) startPlanMonitor(clusterID, rancherHost, token string) {
 		case <-ticker.C:
 			logrus.Debugf("🔄 REAL-AGENT: Plan monitor checking cluster %s health (like real agent)", clusterID)
 
-			// Only call ConfigClient if cluster is active (to prevent 404 loops)
-			cluster, err := a.getClusterFromRancher(clusterID)
-			if err != nil {
-				logrus.Debugf("🔄 REAL-AGENT: Failed to get cluster status for plan monitor: %v", err)
-				continue
-			}
-
-			if cluster.Status == "active" {
-				// Make ConfigClient call to check cluster health (like real agent does)
-				go a.callConfigClientForCluster(clusterID, rancherHost, token)
-			} else {
-				logrus.Debugf("🔄 REAL-AGENT: Cluster %s not active yet (status: %s), skipping ConfigClient call", clusterID, cluster.Status)
-			}
+			// Make ConfigClient call to check cluster health (like real agent does)
+			go a.callConfigClientForCluster(clusterID, rancherHost, token)
 
 		case <-a.ctx.Done():
 			logrus.Infof("🔄 REAL-AGENT: Plan monitor stopped for cluster %s due to context cancellation", clusterID)
