@@ -127,7 +127,20 @@ func (cd *clusterDeploy) sync(key string, cluster *apimgmtv3.Cluster) (runtime.O
 }
 
 func (cd *clusterDeploy) doSync(cluster *apimgmtv3.Cluster) error {
-	logrus.Tracef("clusterDeploy: doSync called for cluster [%s]", cluster.Name)
+	logrus.Debugf("🔍 CLUSTER-DEPLOY: Starting sync for cluster %s (driver: %s)", cluster.Name, cluster.Status.Driver)
+
+	if cluster == nil {
+		logrus.Debugf("🔍 CLUSTER-DEPLOY: Cluster is nil, skipping")
+		return nil
+	}
+
+	if cluster.DeletionTimestamp != nil {
+		logrus.Debugf("🔍 CLUSTER-DEPLOY: Cluster %s is being deleted, skipping", cluster.Name)
+		return nil
+	}
+
+	logrus.Debugf("🔍 CLUSTER-DEPLOY: Cluster %s driver: %s, provider: %s",
+		cluster.Name, cluster.Status.Driver, cluster.Status.Provider)
 
 	if !apimgmtv3.ClusterConditionProvisioned.IsTrue(cluster) {
 		logrus.Tracef("clusterDeploy: doSync: cluster [%s] is not yet provisioned (ClusterConditionProvisioned is not True)", cluster.Name)
@@ -141,50 +154,73 @@ func (cd *clusterDeploy) doSync(cluster *apimgmtv3.Cluster) error {
 	if err != nil {
 		return err
 	}
+
+	// Check if API is up
+	logrus.Debugf("🔍 CLUSTER-DEPLOY: Checking if API is up for cluster %s", cluster.Name)
 	if err := healthsyncer.IsAPIUp(cd.ctx, uc.K8sClient.CoreV1().Namespaces()); err != nil {
-		logrus.Tracef("clusterDeploy: doSync: cannot connect to API for cluster [%s]", cluster.Name)
+		logrus.Errorf("🔍 CLUSTER-DEPLOY: API health check FAILED for cluster %s: %v", cluster.Name, err)
 		return ErrCantConnectToAPI
+	}
+	logrus.Infof("🔍 CLUSTER-DEPLOY: API health check PASSED for cluster %s", cluster.Name)
+
+	// Log cluster conditions after health check
+	logrus.Debugf("🔍 CLUSTER-DEPLOY: Cluster %s conditions after health check:", cluster.Name)
+	for _, condition := range cluster.Status.Conditions {
+		logrus.Debugf("🔍 CLUSTER-DEPLOY:   - %s: %s (reason: %s, message: %s)",
+			condition.Type, condition.Status, condition.Reason, condition.Message)
 	}
 
 	nodes, err := cd.nodeLister.List(cluster.Name, labels.Everything())
 	if err != nil {
+		logrus.Errorf("🔍 CLUSTER-DEPLOY: Failed to list nodes for cluster %s: %v", cluster.Name, err)
 		return err
 	}
-	logrus.Tracef("clusterDeploy: doSync: found [%d] nodes for cluster [%s]", len(nodes), cluster.Name)
+	logrus.Debugf("🔍 CLUSTER-DEPLOY: Found %d nodes for cluster %s", len(nodes), cluster.Name)
 
 	if len(nodes) == 0 {
+		logrus.Debugf("🔍 CLUSTER-DEPLOY: No nodes found for cluster %s, skipping further processing", cluster.Name)
 		return nil
 	}
 
+	// Create system account
+	logrus.Debugf("🔍 CLUSTER-DEPLOY: Creating system account for cluster %s", cluster.Name)
 	_, err = apimgmtv3.ClusterConditionSystemAccountCreated.DoUntilTrue(cluster, func() (runtime.Object, error) {
-		logrus.Tracef("clusterDeploy: doSync: Creating SystemAccount for cluster [%s]", cluster.Name)
+		logrus.Debugf("🔍 CLUSTER-DEPLOY: Creating SystemAccount for cluster %s", cluster.Name)
 		return cluster, cd.systemAccountManager.CreateSystemAccount(cluster)
 	})
 	if err != nil {
+		logrus.Errorf("🔍 CLUSTER-DEPLOY: Failed to create system account for cluster %s: %v", cluster.Name, err)
 		return err
 	}
+	logrus.Infof("🔍 CLUSTER-DEPLOY: System account created successfully for cluster %s", cluster.Name)
 
+	// Check agent image caching
 	if cluster.Status.AgentImage != "" && !agentImagesCached(cluster.Name) {
+		logrus.Debugf("🔍 CLUSTER-DEPLOY: Caching agent images for cluster %s", cluster.Name)
 		if err := cd.cacheAgentImages(cluster.Name); err != nil {
+			logrus.Errorf("🔍 CLUSTER-DEPLOY: Failed to cache agent images for cluster %s: %v", cluster.Name, err)
 			return err
 		}
+		logrus.Debugf("🔍 CLUSTER-DEPLOY: Agent images cached successfully for cluster %s", cluster.Name)
 	}
 
+	// Check control plane taints caching
 	if !controlPlaneTaintsCached(cluster.Name) {
+		logrus.Debugf("🔍 CLUSTER-DEPLOY: Caching control plane taints for cluster %s", cluster.Name)
 		if err := cd.cacheControlPlaneTaints(cluster.Name); err != nil {
+			logrus.Errorf("🔍 CLUSTER-DEPLOY: Failed to cache control plane taints for cluster %s: %v", cluster.Name, err)
 			return err
 		}
+		logrus.Debugf("🔍 CLUSTER-DEPLOY: Control plane taints cached successfully for cluster %s", cluster.Name)
 	}
 
-	err = cd.managePodDisruptionBudget(cluster)
-	if err != nil {
+	// Deploy agent
+	logrus.Debugf("🔍 CLUSTER-DEPLOY: Starting agent deployment for cluster %s", cluster.Name)
+	if err := cd.deployAgent(cluster); err != nil {
+		logrus.Errorf("🔍 CLUSTER-DEPLOY: Failed to deploy agent for cluster %s: %v", cluster.Name, err)
 		return err
 	}
-
-	err = cd.deployAgent(cluster)
-	if err != nil {
-		return err
-	}
+	logrus.Infof("🔍 CLUSTER-DEPLOY: Agent deployment completed successfully for cluster %s", cluster.Name)
 
 	return cd.setNetworkPolicyAnn(cluster)
 }
@@ -417,7 +453,10 @@ func (cd *clusterDeploy) ensurePriorityClass(cluster *apimgmtv3.Cluster, kubeCon
 }
 
 func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
+	logrus.Debugf("🔍 DEPLOY-AGENT: Starting agent deployment for cluster %s", cluster.Name)
+
 	if cluster.Spec.Internal {
+		logrus.Debugf("🔍 DEPLOY-AGENT: Cluster %s is internal, skipping agent deployment", cluster.Name)
 		return nil
 	}
 
@@ -425,32 +464,43 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 	desiredAuth := systemtemplate.GetDesiredAuthImage(cluster)
 	desiredFeatures := systemtemplate.GetDesiredFeatures(cluster)
 
-	logrus.Tracef("clusterDeploy: deployAgent: desiredFeatures is [%v] for cluster [%s]", desiredFeatures, cluster.Name)
+	logrus.Debugf("🔍 DEPLOY-AGENT: Cluster %s - desiredAgent: %s, desiredAuth: %s, desiredFeatures: %v",
+		cluster.Name, desiredAgent, desiredAuth, desiredFeatures)
 
 	desiredTaints, err := cd.getControlPlaneTaints(cluster.Name)
 	if err != nil {
+		logrus.Errorf("🔍 DEPLOY-AGENT: Failed to get control plane taints for cluster %s: %v", cluster.Name, err)
 		return err
 	}
-	logrus.Tracef("clusterDeploy: deployAgent: desiredTaints is [%v] for cluster [%s]", desiredTaints, cluster.Name)
+	logrus.Debugf("🔍 DEPLOY-AGENT: Cluster %s - desiredTaints: %v", cluster.Name, desiredTaints)
 
 	pcChanged, pcCreated, pcDeleted, err := cd.managePriorityClass(cluster)
 	if err != nil {
+		logrus.Errorf("🔍 DEPLOY-AGENT: Failed to manage priority class for cluster %s: %v", cluster.Name, err)
 		return err
 	}
+	logrus.Debugf("🔍 DEPLOY-AGENT: Cluster %s - priority class changes: changed=%v, created=%v, deleted=%v",
+		cluster.Name, pcChanged, pcCreated, pcDeleted)
 
 	shouldRedeployAgent := redeployAgent(cluster, desiredAgent, desiredAuth, desiredFeatures, desiredTaints)
 	agentManifestChanged := shouldRedeployAgent || pcDeleted || pcCreated
 	if !agentManifestChanged && !pcChanged {
+		logrus.Debugf("🔍 DEPLOY-AGENT: No agent manifest changes detected for cluster %s, skipping deployment", cluster.Name)
 		return nil
 	}
 
+	logrus.Debugf("🔍 DEPLOY-AGENT: Agent manifest changes detected for cluster %s, proceeding with deployment", cluster.Name)
+
 	kubeConfig, tokenName, err := cd.getKubeConfig(cluster)
 	if err != nil {
+		logrus.Errorf("🔍 DEPLOY-AGENT: Failed to get kubeconfig for cluster %s: %v", cluster.Name, err)
 		return err
 	}
+	logrus.Debugf("🔍 DEPLOY-AGENT: Got kubeconfig for cluster %s, token: %s", cluster.Name, tokenName)
+
 	defer func() {
 		if err := cd.mgmt.SystemTokens.DeleteToken(tokenName); err != nil {
-			logrus.Errorf("cleanup for clusterdeploy token [%s] failed, will not retry: %v", tokenName, err)
+			logrus.Errorf("🔍 DEPLOY-AGENT: Cleanup for clusterdeploy token [%s] failed, will not retry: %v", tokenName, err)
 		}
 	}()
 

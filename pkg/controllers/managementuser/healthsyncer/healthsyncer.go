@@ -132,12 +132,20 @@ func (h *HealthSyncer) getComponentStatus(cluster *v3.Cluster) error {
 // It gets a namespace from the API, even if not found, it means the API is up.
 // It returns nil if the API is up, otherwise it returns an error.
 func IsAPIUp(ctx context.Context, ns typedv1.NamespaceInterface) error {
+	logrus.Debugf("🔍 HEALTHSYNCER: Starting API health check")
+
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
+	// Try to get the kube-system namespace as a health check
+	logrus.Debugf("🔍 HEALTHSYNCER: Attempting to GET /api/v1/namespaces/kube-system with 5s timeout")
+
 	if _, err := ns.Get(ctx, "kube-system", metav1.GetOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		logrus.Errorf("🔍 HEALTHSYNCER: API health check FAILED with error: %v", err)
 		return err
 	}
+
+	logrus.Debugf("🔍 HEALTHSYNCER: API health check PASSED - kube-system namespace accessible or not found (both are OK)")
 	return nil
 }
 
