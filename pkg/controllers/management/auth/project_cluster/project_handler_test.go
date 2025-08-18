@@ -1,6 +1,7 @@
 package project_cluster
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -12,7 +13,9 @@ import (
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	fakeClientset "k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
 )
 
 const clusterID = "test-cluster"
@@ -196,6 +199,69 @@ func TestRemove(t *testing.T) {
 	require.Len(t, clientset.Fake.Actions(), 2, "expected exactly two actions to be recorded")
 	require.NoError(t, err)
 	require.NotNil(t, Obj)
+	// Since Remove returns the original project after deleting, assert the returned object equals original project
+	assert.Equal(t, project, Obj)
+}
+
+func TestRemoveDifferentBackingNamespace(t *testing.T) {
+	namespace := &corev1.Namespace{
+		ObjectMeta: v1.ObjectMeta{
+			Name: "diff-remove",
+		},
+	}
+	// Create a fake clientset using the fake package.
+	clientset := fakeClientset.NewSimpleClientset(namespace)
+	fakeNSClient := clientset.CoreV1().Namespaces()
+
+	lifecycle := &projectLifecycle{
+		nsClient: fakeNSClient,
+	}
+	project := &v3.Project{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "p-remove",
+			Namespace: "test-namespace",
+		},
+		Status: v3.ProjectStatus{
+			BackingNamespace: "diff-remove",
+		},
+	}
+	Obj, err := lifecycle.Remove(project)
+	require.NoError(t, err)
+	require.NotNil(t, Obj)
+	// Since the namespace exists in the cache, a GET & DELETE call should be recorded
+	require.Len(t, clientset.Fake.Actions(), 2, "expected exactly two actions to be recorded")
+	// Since Remove returns the original project after deleting, assert the returned object equals original project
+	assert.Equal(t, project, Obj)
+}
+
+func TestRemoveWithDeleteError(t *testing.T) {
+	namespace := &corev1.Namespace{
+		ObjectMeta: v1.ObjectMeta{
+			Name: "p-remove",
+		},
+	}
+	// Create a fake clientset using the fake package.
+	clientset := fakeClientset.NewSimpleClientset(namespace)
+	fakeNSClient := clientset.CoreV1().Namespaces()
+	clientset.PrependReactor("delete", "namespaces", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+		return true, nil, fmt.Errorf("simulated delete error: namespace deletion failed")
+	})
+
+	lifecycle := &projectLifecycle{
+		nsClient: fakeNSClient,
+	}
+	project := &v3.Project{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "p-remove",
+			Namespace: "test-namespace",
+		},
+	}
+	Obj, err := lifecycle.Remove(project)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "simulated delete error", "error should contain the simulated failure message")
+	require.NotNil(t, Obj)
+	// Since the namespace exists in the cache, a GET & DELETE call should be recorded
+	require.Len(t, clientset.Fake.Actions(), 2, "expected exactly two actions to be recorded")
 	// Since Remove returns the original project after deleting, assert the returned object equals original project
 	assert.Equal(t, project, Obj)
 }
