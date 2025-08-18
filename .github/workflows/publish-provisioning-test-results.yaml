@@ -8,13 +8,22 @@ permissions: {}
 
 jobs:
   publish-provisioning-test-results:
-    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: registry.suse.com/bci/bci-base:15.7
     if: github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure'
     permissions:
       checks: write
       pull-requests: write
       actions: read
     steps:
+      - name: Install Python Deps
+        run: |
+          # install python
+          zypper --non-interactive install python311 python311-pip python311-virtualenv
+
+          # set python as the default python (essentially just a symlink)
+          update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
+
       - name: mkdir test-results
         run: mkdir -p /tmp/test-results
 
