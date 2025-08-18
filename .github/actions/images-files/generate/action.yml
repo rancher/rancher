@@ -8,7 +8,7 @@ runs:
     - id: env 
       name: Setup Dependencies Env Variables
       uses: ./.github/actions/setup-build-env
-    - uses: actions/setup-go@v5
+    - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
       with:
         go-version: '${{ steps.env.outputs.GO_VERSION }}'
     - name: Download data.json
