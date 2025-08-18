@@ -44,17 +44,21 @@ func New(auth Authorizer, errorWriter ErrorWriter) *Server {
 }
 
 func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	logrus.Debugf("🔍 REMOTEDIALER: HTTP request received: %s %s", req.Method, req.URL.Path)
+
 	clientKey, authed, peer, err := s.auth(req)
 	if err != nil {
+		logrus.Errorf("🔍 REMOTEDIALER: Authentication failed: %v", err)
 		s.errorWriter(rw, req, 400, err)
 		return
 	}
 	if !authed {
+		logrus.Errorf("🔍 REMOTEDIALER: Authentication denied for client: %s", clientKey)
 		s.errorWriter(rw, req, 401, errFailedAuth)
 		return
 	}
 
-	logrus.Infof("Handling backend connection request [%s]", clientKey)
+	logrus.Infof("🔍 REMOTEDIALER: Handling backend connection request [%s] (peer: %v)", clientKey, peer)
 
 	upgrader := websocket.Upgrader{
 		HandshakeTimeout: 5 * time.Second,
@@ -64,18 +68,26 @@ func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	wsConn, err := upgrader.Upgrade(rw, req, nil)
 	if err != nil {
+		logrus.Errorf("🔍 REMOTEDIALER: WebSocket upgrade failed for client [%s]: %v", clientKey, err)
 		s.errorWriter(rw, req, 400, errors.Wrapf(err, "Error during upgrade for host [%v]", clientKey))
 		return
 	}
 
+	logrus.Infof("🔍 REMOTEDIALER: WebSocket connection established for client [%s]", clientKey)
+
 	session := s.sessions.add(clientKey, wsConn, peer)
 	session.auth = s.ClientConnectAuthorizer
-	defer s.sessions.remove(session)
+	defer func() {
+		logrus.Infof("🔍 REMOTEDIALER: Removing session for client [%s]", clientKey)
+		s.sessions.remove(session)
+	}()
 
 	code, err := session.Serve(req.Context())
 	if err != nil {
 		// Hijacked so we can't write to the client
-		logrus.Infof("error in remotedialer server [%d]: %v", code, err)
+		logrus.Infof("🔍 REMOTEDIALER: Session error for client [%s]: code=%d, error=%v", clientKey, code, err)
+	} else {
+		logrus.Infof("🔍 REMOTEDIALER: Session completed normally for client [%s]", clientKey)
 	}
 }
 
