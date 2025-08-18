@@ -380,6 +380,9 @@ func TestShouldSkip(t *testing.T) {
 	}{
 		{
 			name: "Should skip if resourceVersion don't match",
+			timeNow: func() time.Time {
+				return time.Date(2024, 04, 23, 10, 1, 0, 0, time.UTC)
+			},
 			newClusterRepoController: func(ctrl *gomock.Controller) *fake.MockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList] {
 				mockController := fake.NewMockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList](ctrl)
 				mockController.EXPECT().Get("clusterRepo", metav1.GetOptions{}).Return(&catalog.ClusterRepo{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "2"}}, nil)

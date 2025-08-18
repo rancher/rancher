@@ -138,6 +138,7 @@ func (r *repoHandler) ClusterRepoOnChange(key string, repo *catalog.ClusterRepo)
 
 	// If repo is disabled, then don't update the clusterrepo
 	if repo.Spec.Enabled != nil && !*repo.Spec.Enabled {
+		logrus.Infof("skipping repo %s because it is disabled", repo.Name)
 		return setErrorCondition(repo, err, newStatus, interval, ociCondition, r.clusterRepos)
 	}
 
@@ -413,9 +414,11 @@ func shouldSkip(clusterRepo *catalog.ClusterRepo,
 	interval time.Duration,
 	controller catalogcontrollers.ClusterRepoController,
 	newStatus *catalog.RepoStatus) bool {
+	now := timeNow().UTC()
 	// this is to prevent the handler from making calls when the crd is outdated.
 	updatedRepo, err := controller.Get(clusterRepo.Name, metav1.GetOptions{})
 	if err == nil && updatedRepo.ResourceVersion != clusterRepo.ResourceVersion {
+		logrus.Infof("Skipping handler for clusterrepo %s because the resource version has changed from %s to %s", clusterRepo.Name, clusterRepo.ResourceVersion, updatedRepo.ResourceVersion)
 		return true
 	}
 
@@ -427,7 +430,8 @@ func shouldSkip(clusterRepo *catalog.ClusterRepo,
 
 	// The handler is triggered immediately after any changes, including when updating the number of retries done.
 	// This check is to prevent the handler from executing before the backoff time has passed
-	if !newStatus.NextRetryAt.IsZero() && newStatus.NextRetryAt.Time.After(timeNow().UTC()) {
+	if !newStatus.NextRetryAt.IsZero() && newStatus.NextRetryAt.Time.After(now) {
+		logrus.Infof("Skipping handler for clusterrepo %s because the next retry time is %s and now is %s", clusterRepo.Name, newStatus.NextRetryAt.Time, now)
 		return true
 	}
 
@@ -440,8 +444,8 @@ func shouldSkip(clusterRepo *catalog.ClusterRepo,
 
 	if (newStatus.NumberOfRetries > policy.MaxRetry || newStatus.NumberOfRetries == 0) && // checks if it's not retrying
 		clusterRepo.Generation == newStatus.ObservedGeneration && // checks if the generation has not changed
-		downloadedUpdateTime.Add(interval).After(timeNow().UTC()) { // checks if the interval has not passed
-
+		downloadedUpdateTime.Add(interval).After(now) { // checks if the interval has not passed
+		logrus.Infof("Skipping handler for clusterrepo %s. NumberOfRetries is %d, MaxRetry is %d, ClusterRepo Generation is %d, ObservedGeneration is %d, LastUpdated plus interval is %s, now is %s", clusterRepo.Name, newStatus.NumberOfRetries, policy.MaxRetry, clusterRepo.Generation, newStatus.ObservedGeneration, downloadedUpdateTime.Add(interval), now)
 		controller.EnqueueAfter(clusterRepo.Name, interval)
 		return true
 	}
