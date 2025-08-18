@@ -993,6 +993,7 @@ func (c *ClusterRepoTestSuite) testClusterRepoRetries(params ClusterRepoParams) 
 
 	if err != nil {
 		logrus.Infof("ClusterRepo Status Details:")
+		logrus.Infof("ResourceVersion: %s", cr.ResourceVersion)
 		logrus.Infof("Conditions: %+v", cr.Status.Conditions)
 		logrus.Infof("NumberOfRetries: %d", cr.Status.NumberOfRetries)
 		logrus.Infof("DownloadTime: %s", cr.Status.DownloadTime)
