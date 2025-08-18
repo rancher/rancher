@@ -26,7 +26,7 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/github/pr-actions-write-app/credentials privateKey | PRIVATE_KEY
 
       - name: "Create temporary token"
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b # v2
         id: app-token
         with:
           app-id: ${{ env.APP_ID }}
@@ -39,7 +39,7 @@ jobs:
           echo "APP_ID=" >> $GITHUB_ENV
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
         with:
           fetch-depth: 1
 

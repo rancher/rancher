@@ -39,7 +39,7 @@ jobs:
       id-token: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
       - id: env 
         name: Setup Dependencies Env Variables
         uses: ./.github/actions/setup-build-env
@@ -58,11 +58,11 @@ jobs:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/google-auth/rancher/credentials token | GOOGLE_AUTH ;
       - name: Authenticate with Google Cloud
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@6fc4af4b145ae7821d527454aa9bd537d1f2dc5f # v2
         with:
           credentials_json: ${{ env.GOOGLE_AUTH }}
       - name: Upload
-        uses: google-github-actions/upload-cloud-storage@v2
+        uses: google-github-actions/upload-cloud-storage@386ab77f37fdf51c0e38b3d229fad286861cc0d0 # v2
         with:
           destination: releases.rancher.com/server-charts
           path: ./bin/chart
@@ -80,7 +80,7 @@ jobs:
       id-token: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
       - name: Update readme to new stable
         shell: bash
         run: |
@@ -109,7 +109,7 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/github/app-credentials appId | APP_ID ;
             secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY
       - name: Create App Token
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
         id: app-token
         with:
           app-id: ${{ env.APP_ID }}
