@@ -28,3 +28,5 @@ require (
 	k8s.io/klog/v2 v2.130.1 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 )
+
+replace github.com/rancher/norman => github.com/tomleb/rancher-norman v0.0.0-20250818201406-5756c192085b

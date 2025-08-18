@@ -753,8 +753,6 @@ github.com/rancher/machine v0.15.0-rancher131 h1:/CfIdKVe/0HcI9njKl/DB+OiayNGS+v
 github.com/rancher/machine v0.15.0-rancher131/go.mod h1:6hHF1520bEHY0z+qqv0e1IrMM/JRO+3UuS9obe2iGLk=
 github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77 h1:k+vzmkZQsH06rZnDr+phskSixG9ByNj9gVdzHcc8nxw=
 github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77/go.mod h1:wpITyDPTi/Na5h73XkbuEf2AP9fbgrIGqqxVzFhYD6U=
-github.com/rancher/norman v0.7.0 h1:duBZxekBj13k/2RTyWKZgV/ntXkIXm0sRKqwFO8ui+I=
-github.com/rancher/norman v0.7.0/go.mod h1:IOQn3CNCms6UK72QHujesLKedqZh4+SP8/FDEFc+7Ns=
 github.com/rancher/remotedialer v0.5.0-rc.1 h1:LfoFuaSKYovxbq5ZY1M3mi9szZLwHjW0H0a1Wco+LVU=
 github.com/rancher/remotedialer v0.5.0-rc.1/go.mod h1:hpx8oaoxXyy8yHMWH5Iv8GcdVlYEYYzgVNjeXZrhv8E=
 github.com/rancher/rke v1.8.0-rc.4 h1:jowVyaF3LsJonC7vNsAwWf3MONHAtEFUD/j3UzNSE5U=
@@ -850,6 +848,8 @@ github.com/tjfoc/gmsm v1.4.1 h1:aMe1GlZb+0bLjn+cKTPEvvn9oUEBlJitaZiiBwsbgho=
 github.com/tjfoc/gmsm v1.4.1/go.mod h1:j4INPkHWMrhJb38G+J6W4Tw0AbuN8Thu3PbdVYhVcTE=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20220101234140-673ab2c3ae75 h1:6fotK7otjonDflCTK0BCfls4SPy3NcCVb5dqqmbRknE=
 github.com/tmc/grpc-websocket-proxy v0.0.0-20220101234140-673ab2c3ae75/go.mod h1:KO6IkyS8Y3j8OdNO85qEYBsRPuteD+YciPomcXdrMnk=
+github.com/tomleb/rancher-norman v0.0.0-20250818201406-5756c192085b h1:K2ThXhh4Rk9HrypV+bEx09JABsy6ThBoHk/HWZhasXo=
+github.com/tomleb/rancher-norman v0.0.0-20250818201406-5756c192085b/go.mod h1:IOQn3CNCms6UK72QHujesLKedqZh4+SP8/FDEFc+7Ns=
 github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80 h1:nrZ3ySNYwJbSpD6ce9duiP+QkD3JuLCcWkdaehUS/3Y=
 github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80/go.mod h1:iFyPdL66DjUD96XmzVL3ZntbzcflLnznH0fr99w5VqE=
 github.com/urfave/cli v1.22.16 h1:MH0k6uJxdwdeWQTwhSO42Pwr4YLrNLwBtg1MRgTqPdQ=

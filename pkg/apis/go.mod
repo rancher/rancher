@@ -107,3 +107,5 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.6.0 // indirect
 	sigs.k8s.io/yaml v1.5.0 // indirect
 )
+
+replace github.com/rancher/norman => github.com/tomleb/rancher-norman v0.0.0-20250818201406-5756c192085b
