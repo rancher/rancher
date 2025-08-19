@@ -106,6 +106,7 @@ func newMCM(ctx context.Context, wranglerContext *wrangler.Context, cfg *Options
 		return nil, err
 	}
 
+	logrus.Info("router")
 	router, err := router(ctx, cfg.LocalClusterEnabled, tunnelAuthorizer, scaledContext, clusterManager)
 	if err != nil {
 		return nil, err

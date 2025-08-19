@@ -436,6 +436,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 		// Registers handlers for all rancher replicas running in the local cluster, but not downstream agents
 		nodedriver.Register(ctx, r.Wrangler)
 		kontainerdrivermetadata.Register(ctx, r.Wrangler)
+		logrus.Info("Start MCM.Start()")
 		if err := r.Wrangler.MultiClusterManager.Start(ctx); err != nil {
 			return err
 		}
