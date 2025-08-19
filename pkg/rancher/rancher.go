@@ -268,6 +268,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	}
 
 	gcInterval, gcKeepCount := getSQLCacheGCValues(wranglerContext)
+	logrus.Info("HITHERE before steveserver.New")
 	steve, err := steveserver.New(ctx, restConfig, &steveserver.Options{
 		ServerVersion:   settings.ServerVersion.Get(),
 		Controllers:     steveControllers,
@@ -286,6 +287,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	if err != nil {
 		return nil, err
 	}
+	logrus.Info("HITHERE after steveserver.New")
 
 	clusterProxy, err := proxy.NewProxyMiddleware(wranglerContext.K8s.AuthorizationV1(),
 		wranglerContext.TunnelServer.Dialer,
@@ -297,7 +299,9 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
+	logrus.Info("HITHERE steveapi.AdditionalAPIsPreMCM")
 	additionalAPIPreMCM := steveapi.AdditionalAPIsPreMCM(wranglerContext)
+	logrus.Info("HITHERE steveapi.AdditionalAPIs")
 	additionalAPI, err := steveapi.AdditionalAPIs(ctx, wranglerContext, steve)
 	if err != nil {
 		return nil, err
@@ -330,9 +334,11 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		}
 	}
 
+	logrus.Info("HITHERE stuff")
 	auditFilter := audit.NewAuditLogMiddleware(auditLogWriter)
 	aggregationMiddleware := aggregation.NewMiddleware(ctx, wranglerContext.Mgmt.APIService(), wranglerContext.TunnelServer)
 
+	logrus.Info("HITHERE onleader")
 	wranglerContext.OnLeaderOrDie("rancher-new", func(ctx context.Context) error {
 		serviceaccounttoken.StartServiceAccountSecretCleaner(
 			ctx,
