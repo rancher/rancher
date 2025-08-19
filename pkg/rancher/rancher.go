@@ -334,11 +334,9 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		}
 	}
 
-	logrus.Info("HITHERE stuff")
 	auditFilter := audit.NewAuditLogMiddleware(auditLogWriter)
 	aggregationMiddleware := aggregation.NewMiddleware(ctx, wranglerContext.Mgmt.APIService(), wranglerContext.TunnelServer)
 
-	logrus.Info("HITHERE onleader")
 	wranglerContext.OnLeaderOrDie("rancher-new", func(ctx context.Context) error {
 		serviceaccounttoken.StartServiceAccountSecretCleaner(
 			ctx,
