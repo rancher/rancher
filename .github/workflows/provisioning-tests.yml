@@ -93,7 +93,7 @@ jobs:
           export TESTSUITE="$(echo '${{ matrix.V2PROV_TEST_RUN_REGEX }}' | tr -d '()|^.*$')"
           echo "suite=${TESTSUITE}" >> $GITHUB_OUTPUT
           # need sudo due to this being created in the dapper container
-          sudo mv /tmp/out.json /tmp/report-${{ matrix.V2PROV_TEST_DIST }}-$TESTSUITE.json
+          sudo mv ./build/out.json /tmp/report-${{ matrix.V2PROV_TEST_DIST }}-$TESTSUITE.json
       - name: Upload JSON Test Results
         uses: actions/upload-artifact@v4
         with:
