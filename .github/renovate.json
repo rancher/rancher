@@ -1,7 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "github>rancher/renovate-config//rancher-main#release"
+    "github>rancher/renovate-config//rancher-main#make_sure_k8s_provides_a_version"
   ],
   "baseBranchPatterns": [
     "main",
@@ -19,7 +19,7 @@
         "release/v2.12"
       ],
       "extends": [
-        "github>rancher/renovate-config//rancher-2.12#release"
+        "github>rancher/renovate-config//rancher-2.12#make_sure_k8s_provides_a_version"
       ]
     },
     {
@@ -27,7 +27,7 @@
         "release/v2.11"
       ],
       "extends": [
-        "github>rancher/renovate-config//rancher-2.11#release"
+        "github>rancher/renovate-config//rancher-2.11#make_sure_k8s_provides_a_version"
       ]
     },
     {
@@ -35,7 +35,7 @@
         "release/v2.10"
       ],
       "extends": [
-        "github>rancher/renovate-config//rancher-2.10#release"
+        "github>rancher/renovate-config//rancher-2.10#make_sure_k8s_provides_a_version"
       ]
     },
     {
@@ -43,7 +43,7 @@
         "release/v2.9"
       ],
       "extends": [
-        "github>rancher/renovate-config//rancher-2.9#release"
+        "github>rancher/renovate-config//rancher-2.9#make_sure_k8s_provides_a_version"
       ]
     }
   ]
