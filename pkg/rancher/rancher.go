@@ -385,7 +385,7 @@ func getSQLCacheGCValues(wranglerContext *wrangler.Context) (time.Duration, int)
 	gcIntervalSetting, err := wranglerContext.Mgmt.Setting().Get(settings.SQLCacheGCInterval.Name, metav1.GetOptions{})
 	if err != nil {
 		logrus.Warnf("Unable to fetch %s setting (will use default): %v", settings.SQLCacheGCInterval.Name, err)
-	} else {
+	} else if gcIntervalSetting.Value != "" {
 		dur, err := time.ParseDuration(gcIntervalSetting.Value)
 		if err != nil {
 			logrus.Warnf("Invalid GC interval %q: %v", gcIntervalSetting.Value, err)
@@ -398,7 +398,7 @@ func getSQLCacheGCValues(wranglerContext *wrangler.Context) (time.Duration, int)
 	gcKeepCountSetting, err := wranglerContext.Mgmt.Setting().Get(settings.SQLCacheGCKeepCount.Name, metav1.GetOptions{})
 	if err != nil {
 		logrus.Warnf("Unable to fetch %s setting (will use default): %v", settings.SQLCacheGCKeepCount.Name, err)
-	} else {
+	} else if gcKeepCountSetting.Value != "" {
 		count, err := strconv.Atoi(gcKeepCountSetting.Value)
 		if err != nil {
 			logrus.Warnf("Invalid GC keep count %q: %v", gcKeepCountSetting.Value, err)
