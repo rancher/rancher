@@ -82,6 +82,9 @@ func main() {
 		portForwarders:    make(map[string]*PortForwarder),
 		nextPort:          1, // Start from port 8001
 		nameCounters:      make(map[string]int),
+		connecting:        make(map[string]bool),
+		lastConnectAttempt:   make(map[string]time.Time),
+		lastCAConnectAttempt: make(map[string]time.Time),
 	}
 
 	// Start local ping server for stv-cluster health checks
@@ -615,6 +618,17 @@ func (a *ScaleAgent) extractServiceAccountTokenFromKWOKCluster(kwokCluster *KWOK
 }
 
 func (a *ScaleAgent) connectClusterToRancher(clusterName, clusterID string, clusterInfo *ClusterInfo) {
+	// Simple throttle: avoid attempting connects more than once every 5 seconds per cluster
+	a.connMutex.Lock()
+	last := a.lastConnectAttempt[clusterName]
+	if time.Since(last) < 5*time.Second {
+		a.connMutex.Unlock()
+		logrus.Debugf("[%s] Skipping connect attempt (throttled)", clusterName)
+		return
+	}
+	a.lastConnectAttempt[clusterName] = time.Now()
+	a.connMutex.Unlock()
+
 	// Check if already connected to prevent multiple connections
 	a.connMutex.Lock()
 	if a.activeConnections[clusterName] {
@@ -799,6 +813,9 @@ func (a *ScaleAgent) connectClusterToRancher(clusterName, clusterID string, clus
 			}
 			logrus.Infof("[%s] remotedialer reconnecting in %s (attempt %d/%d)", clusterName, backoff, connectionAttempts+1, maxAttempts)
 			time.Sleep(backoff)
+			a.connMutex.Lock()
+			a.lastConnectAttempt[clusterName] = time.Now()
+			a.connMutex.Unlock()
 		}
 	}()
 	a.firstClusterConnected = true
@@ -875,7 +892,7 @@ func (a *ScaleAgent) createClusterHandler(w http.ResponseWriter, r *http.Request
 		time.Sleep(2 * time.Second)
 		logrus.Infof("Starting complete cluster setup for %s", ci.Name)
 
-		// Step 1: Create KWOK cluster first
+		// Step 1: Create KWOK cluster while concurrently fetching import YAML from Rancher
 		ci.Status = "creating_kwok"
 		// Get the cluster info from our stored clusters
 		clusterInfo, exists := a.clusters[ci.Name]
@@ -884,27 +901,45 @@ func (a *ScaleAgent) createClusterHandler(w http.ResponseWriter, r *http.Request
 			ci.Status = "failed"
 			return
 		}
-		// Use the existing KWOK manager to create the cluster
-		if _, err := a.kwokManager.CreateCluster(ci.Name, ci.ClusterID, clusterInfo); err != nil {
-			logrus.Errorf("Failed to create KWOK cluster for %s: %v", ci.Name, err)
-			ci.Status = "failed"
-			return
-		}
 
-		// Step 2: Wait a moment for the KWOK cluster to be fully registered
-		logrus.Infof("Waiting for KWOK cluster to be fully registered...")
-		time.Sleep(3 * time.Second)
+		var (
+			kwokErr error
+			importYAML string
+			yamlErr error
+		)
+		doneKWOK := make(chan struct{})
+		doneYAML := make(chan struct{})
 
-		// Step 3: Get the import YAML from Rancher
+		// Create KWOK cluster
+		go func() {
+			defer close(doneKWOK)
+			if _, err := a.kwokManager.CreateCluster(ci.Name, ci.ClusterID, clusterInfo); err != nil {
+				kwokErr = err
+			}
+		}()
+
+		// Fetch YAML in parallel
 		ci.Status = "getting_yaml"
-		importYAML, err := a.getImportYAML(ci.ClusterID)
-		if err != nil {
-			logrus.Errorf("Failed to get import YAML for %s: %v", ci.Name, err)
+		go func() {
+			defer close(doneYAML)
+			importYAML, yamlErr = a.getImportYAML(ci.ClusterID)
+		}()
+
+		// Wait for both
+		<-doneKWOK
+		<-doneYAML
+		if kwokErr != nil {
+			logrus.Errorf("Failed to create KWOK cluster for %s: %v", ci.Name, kwokErr)
+			ci.Status = "failed"
+			return
+		}
+		if yamlErr != nil {
+			logrus.Errorf("Failed to get import YAML for %s: %v", ci.Name, yamlErr)
 			ci.Status = "failed"
 			return
 		}
 
-		// Step 4: Apply the import YAML to the KWOK cluster
+		// Step 2: Apply the import YAML to the KWOK cluster
 		ci.Status = "applying_yaml"
 		if err := a.applyImportYAMLToKWOKCluster(ci.ClusterID, importYAML); err != nil {
 			logrus.Errorf("Failed to apply import YAML to KWOK cluster for %s: %v", ci.Name, err)
@@ -912,7 +947,7 @@ func (a *ScaleAgent) createClusterHandler(w http.ResponseWriter, r *http.Request
 			return
 		}
 
-		// Step 5: Wait for service account to be ready
+		// Step 3: Wait for service account to be ready (fast-SA path)
 		ci.Status = "waiting_service_account"
 		if err := a.waitForServiceAccountReady(ci.ClusterID); err != nil {
 			logrus.Errorf("Failed to wait for service account ready for %s: %v", ci.Name, err)
@@ -920,7 +955,7 @@ func (a *ScaleAgent) createClusterHandler(w http.ResponseWriter, r *http.Request
 			return
 		}
 
-		// Step 6: Test critical API endpoints to ensure they work
+		// Step 4: Test critical API endpoints to ensure they work
 		ci.Status = "testing_api"
 		if err := a.testCriticalAPIEndpoints(ci.ClusterID); err != nil {
 			logrus.Errorf("Failed to test critical API endpoints for %s: %v", ci.Name, err)
@@ -928,7 +963,7 @@ func (a *ScaleAgent) createClusterHandler(w http.ResponseWriter, r *http.Request
 			return
 		}
 
-		// Step 7: Mark cluster as ready and establish WebSocket connection
+		// Step 5: Mark cluster as ready and establish WebSocket connection
 		ci.Status = "ready"
 		logrus.Infof("All tests passed! Service account ready and API endpoints working. Establishing WebSocket connection for cluster %s", ci.Name)
 		a.connectClusterToRancher(ci.Name, ci.ClusterID, ci)
@@ -1208,9 +1243,9 @@ func (a *ScaleAgent) waitForServiceAccountReady(clusterID string) error {
 	// Get the kubeconfig path for the KWOK cluster using the actual KWOK cluster name
 	kubeconfigPath := filepath.Join(os.Getenv("HOME"), ".kwok", "clusters", kwokCluster.Name, "kubeconfig.yaml")
 
-	// Wait up to 2 minutes for the service account/credentials to be ready
-	timeout := time.After(2 * time.Minute)
-	ticker := time.NewTicker(5 * time.Second)
+	// Wait up to 60 seconds for the ServiceAccount itself to exist; token will be fetched via TokenRequest fast-path
+	timeout := time.After(60 * time.Second)
+	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
 	for {
@@ -1218,26 +1253,11 @@ func (a *ScaleAgent) waitForServiceAccountReady(clusterID string) error {
 		case <-timeout:
 			return fmt.Errorf("timeout waiting for service account to be ready in KWOK cluster %s", kwokCluster.Name)
 		case <-ticker.C:
-			// 1) Fast path: does the cattle SA exist in cattle-system?
+			// Only check that the ServiceAccount exists; token will be acquired via TokenRequest
 			saCmd := exec.Command("kubectl", "--kubeconfig", kubeconfigPath, "get", "serviceaccount", "cattle", "-n", "cattle-system")
 			if err := saCmd.Run(); err == nil {
-				logrus.Infof("ServiceAccount cattle exists in cattle-system")
-				// 2) Robust path: did the import YAML create the cattle-credentials-* secret yet?
-				secCmd := exec.Command("kubectl", "--kubeconfig", kubeconfigPath, "get", "secrets", "-n", "cattle-system", "-o", "jsonpath={.items[*].metadata.name}")
-				secOut, err := secCmd.CombinedOutput()
-				if err != nil {
-					logrus.Debugf("Secret listing failed: %v, output: %s", err, string(secOut))
-					continue
-				}
-				names := strings.Fields(string(secOut))
-				for _, n := range names {
-					if strings.HasPrefix(n, "cattle-credentials-") {
-						logrus.Infof("Found credentials secret %s; service account is ready in KWOK cluster %s", n, kwokCluster.Name)
-						return nil
-					}
-				}
-				logrus.Debugf("cattle SA exists but credentials secret not found yet in KWOK cluster %s", kwokCluster.Name)
-				continue
+				logrus.Infof("ServiceAccount cattle exists in cattle-system; proceeding")
+				return nil
 			}
 
 			logrus.Debugf("Service account not ready yet in KWOK cluster %s", kwokCluster.Name)
@@ -1435,6 +1455,16 @@ func (a *ScaleAgent) getKWOKClusterByID(clusterID string) *KWOKCluster {
 // URL: wss://<rancherHost>/v3/connect?clusterId=<clusterID>
 // Auth: Authorization: Bearer <cattle-credentials token from KWOK>
 func (a *ScaleAgent) startClusterAgentTunnel(clusterName, clusterID string) error {
+	// Throttle duplicate attempts for downstream tunnel
+	a.caMutex.Lock()
+	last := a.lastCAConnectAttempt[clusterName]
+	if time.Since(last) < 5*time.Second {
+		a.caMutex.Unlock()
+		logrus.Debugf("CLUSTER-AGENT: Skipping connect attempt for %s (throttled)", clusterName)
+		return nil
+	}
+	a.lastCAConnectAttempt[clusterName] = time.Now()
+	a.caMutex.Unlock()
 	// Prevent duplicates per clusterName
 	a.caMutex.Lock()
 	if a.clusterAgentSessions[clusterName] {
@@ -1780,52 +1810,46 @@ func (a *ScaleAgent) callConfigClientForCluster(clusterID, rancherHost, registra
 	// Add the rkenodeconfigclient.Params header like real agent does
 	headers.Set("X-API-Tunnel-Params", base64.StdEncoding.EncodeToString(payload))
 
-	httpClient := http.Client{
-		Timeout: 300 * time.Second,
+	// Quick retry loop with jitter for early 404s
+	httpClient := http.Client{Timeout: 30 * time.Second}
+	maxAttempts := 6
+	baseDelay := 500 * time.Millisecond
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		req, err := http.NewRequest("GET", connectConfig, nil)
+		if err != nil {
+			logrus.Errorf("🔄 REAL-AGENT: Failed to create ConfigClient request: %v", err)
+			return
+		}
+		req.Header = headers
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			logrus.Warnf("🔄 REAL-AGENT: ConfigClient request attempt %d failed: %v", attempt, err)
+		} else {
+			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			logrus.Infof("🔄 REAL-AGENT: ConfigClient response (attempt %d) for cluster %s: status=%d, body=%s", attempt, clusterID, resp.StatusCode, string(body))
+			if resp.StatusCode == 404 {
+				// not ready yet; will retry
+			} else {
+				// Parse interval if present and return
+				var configResp map[string]interface{}
+				if err := json.Unmarshal(body, &configResp); err == nil {
+					if interval, ok := configResp["interval"].(float64); ok {
+						logrus.Infof("🔄 REAL-AGENT: ConfigClient returned interval: %v seconds", interval)
+					}
+				}
+				return
+			}
+		}
+		// jittered backoff: 0.5s, 0.75s, 1.1s, ... capped ~5s
+		mult := 1.0 + (rand.Float64() * 0.5)
+		delay := time.Duration(float64(baseDelay) * mult * float64(attempt))
+		if delay > 5*time.Second {
+			delay = 5 * time.Second
+		}
+		time.Sleep(delay)
 	}
-
-	req, err := http.NewRequest("GET", connectConfig, nil)
-	if err != nil {
-		logrus.Errorf("🔄 REAL-AGENT: Failed to create ConfigClient request: %v", err)
-		return
-	}
-
-	req.Header = headers
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		logrus.Errorf("🔄 REAL-AGENT: ConfigClient request failed: %v", err)
-		return
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		logrus.Errorf("🔄 REAL-AGENT: Failed to read ConfigClient response: %v", err)
-		return
-	}
-
-	logrus.Infof("🔄 REAL-AGENT: ConfigClient response for cluster %s: status=%d, body=%s", clusterID, resp.StatusCode, string(body))
-
-	// Handle 404 errors gracefully - cluster not ready yet
-	if resp.StatusCode == 404 {
-		logrus.Debugf("🔄 REAL-AGENT: ConfigClient returned 404 - cluster %s not ready yet, will retry later", clusterID)
-		return
-	}
-
-	// Parse the response to get the interval (like real agent does)
-	var configResp map[string]interface{}
-	if err := json.Unmarshal(body, &configResp); err != nil {
-		logrus.Errorf("🔄 REAL-AGENT: Failed to parse ConfigClient response: %v", err)
-		return
-	}
-
-	// Extract interval if present (like real agent does)
-	if interval, ok := configResp["interval"].(float64); ok {
-		logrus.Infof("🔄 REAL-AGENT: ConfigClient returned interval: %v seconds", interval)
-	} else {
-		logrus.Infof("🔄 REAL-AGENT: ConfigClient response processed successfully")
-	}
+	logrus.Debugf("🔄 REAL-AGENT: ConfigClient quick retries exhausted for cluster %s; will try again later", clusterID)
 }
 
 // implementRancherRunEquivalent implements the equivalent of rancher.Run() from real agent
@@ -2896,117 +2920,52 @@ func (a *ScaleAgent) getTokenFromAPI(clusterID string) ([]byte, []byte, error) {
 		return nil, nil, fmt.Errorf("cattle service account not found in cattle-system namespace: %v", err)
 	}
 
-	// 3. Get the service account UID for the secret template
-	getUIDCmd := exec.Command("kubectl", "--kubeconfig", tmpFile.Name(), "get", "serviceaccount", "cattle", "-n", "cattle-system", "-o", "jsonpath={.metadata.uid}")
-	uidOutput, err := getUIDCmd.CombinedOutput()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get service account UID: %v, output: %s", err, string(uidOutput))
-	}
-	saUID := strings.TrimSpace(string(uidOutput))
-
-	// 4. Check for existing service account token secret
-	listCmd := exec.Command("kubectl", "--kubeconfig", tmpFile.Name(), "get", "secrets", "-n", "cattle-system", "-l", "cattle.io/service-account.name=cattle", "-o", "json")
-	listOutput, err := listCmd.CombinedOutput()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to list secrets for cattle service account: %v, output: %s", err, string(listOutput))
-	}
-
-	var secretList struct {
-		Items []struct {
-			Metadata struct {
-				Name string `json:"name"`
-			} `json:"metadata"`
-			Type string            `json:"type"`
-			Data map[string]string `json:"data"`
-		} `json:"items"`
-	}
-
-	if err := json.Unmarshal(listOutput, &secretList); err != nil {
-		return nil, nil, fmt.Errorf("failed to parse secret list: %v", err)
-	}
-
-	// 5. Look for existing service account token secret
+	// 3. Fast path: request a token immediately using TokenRequest API via kubectl create token
 	var token []byte
-	var secretName string
-	for _, secret := range secretList.Items {
-		if secret.Type == "kubernetes.io/service-account-token" {
-			if tokenData, exists := secret.Data["token"]; exists && tokenData != "" {
-				token, err = base64.StdEncoding.DecodeString(tokenData)
-				if err != nil {
-					continue
-				}
-				secretName = secret.Metadata.Name
-				logrus.Infof("Found existing service account token secret: %s", secretName)
-				break
+	{
+		cmd := exec.Command("kubectl", "--kubeconfig", tmpFile.Name(), "-n", "cattle-system", "create", "token", "cattle")
+		out, err := cmd.CombinedOutput()
+		if err == nil {
+			t := strings.TrimSpace(string(out))
+			if t != "" {
+				token = []byte(t)
+				logrus.Infof("Obtained service account token via TokenRequest fast path")
 			}
+		} else {
+			logrus.Debugf("TokenRequest fast path failed: %v, output: %s", err, string(out))
 		}
 	}
-
-	// 6. If no existing token, create a new service account token secret (like the real agent does)
+	// 5. Fallback: scan existing secrets only if fast path not available
 	if len(token) == 0 {
-		logrus.Infof("No existing service account token found, creating new one...")
-
-		// Create a secret template (like SecretTemplate in the real agent)
-		secretName = fmt.Sprintf("cattle-token-%s", randSuffix(5))
-		secretYAML := fmt.Sprintf(`apiVersion: v1
-kind: Secret
-metadata:
-  name: %s
-  namespace: cattle-system
-  annotations:
-    kubernetes.io/service-account.name: cattle
-    kubernetes.io/service-account.uid: %s
-  labels:
-    cattle.io/service-account.name: cattle
-type: kubernetes.io/service-account-token
-data:
-  token: ""
-  ca.crt: ""
-  namespace: "Y2F0dGxlLXN5c3RlbQ=="`, secretName, saUID)
-
-		// Save secret YAML to temp file
-		secretTmpFile, err := ioutil.TempFile("", "secret-*.yaml")
+		listCmd := exec.Command("kubectl", "--kubeconfig", tmpFile.Name(), "get", "secrets", "-n", "cattle-system", "-l", "cattle.io/service-account.name=cattle", "-o", "json")
+		listOutput, err := listCmd.CombinedOutput()
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to create temp secret file: %v", err)
+			return nil, nil, fmt.Errorf("failed to list secrets for cattle service account: %v, output: %s", err, string(listOutput))
 		}
-		defer os.Remove(secretTmpFile.Name())
-
-		if _, err := secretTmpFile.WriteString(secretYAML); err != nil {
-			return nil, nil, fmt.Errorf("failed to write secret YAML: %v", err)
+		var secretList struct {
+			Items []struct {
+				Metadata struct { Name string `json:"name"` } `json:"metadata"`
+				Type string            `json:"type"`
+				Data map[string]string `json:"data"`
+			} `json:"items"`
 		}
-		secretTmpFile.Close()
-
-		// Apply the secret
-		applyCmd := exec.Command("kubectl", "--kubeconfig", tmpFile.Name(), "apply", "-f", secretTmpFile.Name())
-		if err := applyCmd.Run(); err != nil {
-			return nil, nil, fmt.Errorf("failed to create service account token secret: %v", err)
+		if err := json.Unmarshal(listOutput, &secretList); err != nil {
+			return nil, nil, fmt.Errorf("failed to parse secret list: %v", err)
 		}
-
-		// Wait for the token to be populated by Kubernetes (like the real agent does)
-		logrus.Infof("Waiting for Kubernetes to populate the service account token...")
-		for i := 0; i < 30; i++ { // Wait up to 30 seconds
-			time.Sleep(1 * time.Second)
-
-			// Check if token is populated
-			getCmd := exec.Command("kubectl", "--kubeconfig", tmpFile.Name(), "get", "secret", secretName, "-n", "cattle-system", "-o", "jsonpath={.data.token}")
-			tokenOutput, err := getCmd.CombinedOutput()
-			if err == nil && len(tokenOutput) > 0 {
-				token, err = base64.StdEncoding.DecodeString(string(tokenOutput))
-				if err == nil && len(token) > 0 {
-					logrus.Infof("Successfully got service account token from newly created secret")
-					break
+		for _, secret := range secretList.Items {
+			if secret.Type == "kubernetes.io/service-account-token" {
+				if tokenData, exists := secret.Data["token"]; exists && tokenData != "" {
+					t, err := base64.StdEncoding.DecodeString(tokenData)
+					if err == nil && len(t) > 0 {
+						token = t
+						logrus.Infof("Found existing service account token secret: %s", secret.Metadata.Name)
+						break
+					}
 				}
 			}
 		}
-
 		if len(token) == 0 {
-			return nil, nil, fmt.Errorf("failed to get service account token after creating secret")
-		}
-
-		// 7. Update the service account to reference this secret (like the real agent does)
-		patchCmd := exec.Command("kubectl", "--kubeconfig", tmpFile.Name(), "patch", "serviceaccount", "cattle", "-n", "cattle-system", "-p", fmt.Sprintf(`{"metadata":{"annotations":{"rancher.io/service-account.secret-ref":"cattle-system/%s"}}}`, secretName))
-		if err := patchCmd.Run(); err != nil {
-			logrus.Warnf("Failed to update service account annotation: %v", err)
+			return nil, nil, fmt.Errorf("no service account token available (TokenRequest failed and no populated secret found)")
 		}
 	}
 
