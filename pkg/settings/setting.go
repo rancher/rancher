@@ -177,9 +177,7 @@ var (
 	DeleteInactiveUserAfter = NewSetting("delete-inactive-user-after", "")
 
 	// DeleteInfraMachineOnFailureAfter is the duration after which a machine job that failed to provision a machine will be deleted.
-	// The value should be expressed in valid time.Duration units and truncated to a second e.g. "600s". See https://pkg.go.dev/time#ParseDuration
-	// If the value is empty or zero, the job will not be deleted.
-	// If the value is negative, the job will be deleted immediately.
+	// The value should be expressed in valid time.Duration units. See https://pkg.go.dev/time#ParseDuration
 	DeleteInfraMachineOnFailureAfter = NewSetting("delete-infra-machine-on-failure-after", "0s")
 
 	// UserRetentionDryRun determines if the user retention process should actually disable and delete users.
