@@ -278,7 +278,7 @@ func TestGetJobFailureTime(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := getJobFailureTime(tc.job)
+			got, err := jobFailureTime(tc.job)
 			if tc.expectedError == nil {
 				assert.Nil(t, err)
 				assert.Equal(t, tc.expectedTime, got)
@@ -353,8 +353,8 @@ func TestGetInfraDeleteAction(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			settings.DeleteMachineJobOnFailureAfter.Set(tc.deleteOnFailureAfter)
-			gotAction, _, gotError := getInfraDeletionAction(tc.job)
+			settings.DeleteInfraMachineOnFailureAfter.Set(tc.deleteOnFailureAfter)
+			gotAction, _, gotError := infraMachineDeletionEnqueueingTime(tc.job)
 			assert.Equal(t, tc.expectedAction, gotAction)
 			assert.Nil(t, gotError)
 		})
