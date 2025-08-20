@@ -40,7 +40,7 @@ jobs:
       REGISTRY: "172.17.0.2:5000"
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
       - name: testdata
         run: mkdir -p build/testdata
       - name: Install Dapper
@@ -53,7 +53,7 @@ jobs:
           sudo systemctl restart docker
           sudo docker info
       - name: Download Docker images artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: "/tmp"
           merge-multiple: true

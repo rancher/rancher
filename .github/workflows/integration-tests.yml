@@ -23,7 +23,7 @@ jobs:
       K3D_VERSION: v5.7.1
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
       - name: Configure Docker for cgroupfs
         run: |
           echo '{"exec-opts": ["native.cgroupdriver=cgroupfs"]}'| sudo tee /etc/docker/daemon.json
@@ -34,7 +34,7 @@ jobs:
         name: Setup Dependencies Env Variables
         uses: ./.github/actions/setup-build-env
       - name: Download Docker images artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: "/tmp"
           merge-multiple: true
@@ -85,7 +85,7 @@ jobs:
           mkdir -p bin
           curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data.json > bin/data.json
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
         with:
           go-version: "${{ env.GOLANG_VERSION }}"
       - name: Build Integration Setup
