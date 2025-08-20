@@ -30,11 +30,9 @@ import (
 	"github.com/rancher/rancher/pkg/catalogv2/helmop"
 	"github.com/rancher/rancher/pkg/catalogv2/system"
 	"github.com/rancher/rancher/pkg/controllers"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
-	capi "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io"
-	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
-	extv1 "github.com/rancher/rancher/pkg/generated/controllers/ext.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io"
 	fleetv1alpha1 "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io"
@@ -132,7 +130,8 @@ func init() {
 type Context struct {
 	RESTConfig *rest.Config
 
-	DeferredCAPIRegistration *DeferredRegistration[*CAPIContext, *DeferredCAPIInitializer]
+	DeferredCAPIRegistration   *DeferredRegistration[*CAPIContext, *DeferredCAPIInitializer]
+	DeferredEXTAPIRegistration *DeferredRegistration[*EXTAPIContext, *DeferredEXTAPIInitializer]
 
 	Apply               apply.Apply
 	Dynamic             *dynamic.Controller
@@ -186,10 +185,6 @@ type Context struct {
 	crd          *apiextensions.Factory
 	plan         *upgrade.Factory
 	telemetry    *telemetry.Factory
-
-	// exp API support
-	Ext     extv1.Interface // delayed initialization, see pkg/ext/extension_apiserver.go
-	extLock *sync.Mutex
 
 	started bool
 }
@@ -313,7 +308,7 @@ func (w *Context) Start(ctx context.Context) error {
 }
 
 // WithAgent returns a shallow copy of the Context that has been configured to use a user agent in its
-// clients that is the given userAgent appended to "rancher-%s-%s".
+// clients that is the configured server-version and given userAgent insert into "rancher-%s-%s".
 func (w *Context) WithAgent(userAgent string) *Context {
 	userAgent = fmt.Sprintf("rancher-%s-%s", settings.ServerVersion.Get(), userAgent)
 	wContextCopy := *w
@@ -371,6 +366,9 @@ func NewPrimaryContext(ctx context.Context, clientConfig clientcmd.ClientConfig,
 	}
 
 	wCtx.DeferredCAPIRegistration.Manage(ctx)
+	if features.ExtTokens.Enabled() {
+		wCtx.DeferredEXTAPIRegistration.Manage(ctx)
+	}
 	return wCtx, nil
 }
 
@@ -580,33 +578,9 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 	}
 
 	wContext.DeferredCAPIRegistration = NewDeferredRegistration[*CAPIContext, *DeferredCAPIInitializer](wContext, NewCAPIInitializer(wContext), "deferred-capi")
+	wContext.DeferredEXTAPIRegistration = NewDeferredRegistration[*EXTAPIContext, *DeferredEXTAPIInitializer](wContext, NewEXTAPIInitializer(wContext), "deferred-ext")
 
 	return wContext, nil
-}
-
-// InitExtAPI safely initializes the Ext API component of the context with the
-// provided extension interface. Access to the component is serialized.
-func InitExtAPI(context *Context, ext extv1.Interface) {
-	context.extLock.Lock()
-	defer context.extLock.Unlock()
-	context.Ext = ext
-}
-
-// GetExtAPI safely retrieves the Ext API component of the context. Access to
-// the component is serialized. The function waits until the component is
-// initialized before returning. During the wait InitExtAPI has access.
-func GetExtAPI(context *Context) extv1.Interface {
-	context.extLock.Lock()
-	defer context.extLock.Unlock()
-
-	// wait for initialization, if not yet done
-	for context.Ext == nil {
-		context.extLock.Unlock()
-		time.Sleep(time.Second)
-		context.extLock.Lock()
-	}
-
-	return context.Ext
 }
 
 type noopMCM struct {
