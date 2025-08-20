@@ -13,6 +13,7 @@ import (
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 )
@@ -51,6 +52,18 @@ func RegisterIndexers(scaledContext *config.ScaledContext) error {
 // Register sets up cluster initializations to run when the cluster has started.
 func Register(ctx context.Context, cluster *config.UserContext) {
 	starter := cluster.DeferredStart(ctx, func(ctx context.Context) error {
+		// For ext token support we have to defer further until the EXT
+		// API is ready as well
+		if features.ExtTokens.Enabled() {
+			logrus.Debugf("[deferred-extapi] cluster auth token controllers - deferred setup")
+			w := cluster.Management.Wrangler
+			w.DeferredEXTAPIRegistration.DeferFunc(w, func(w *wrangler.Context) {
+				logrus.Debugf("[deferred-extapi/run] %p GREEN - cluster auth token - controllers", w)
+				registerDeferred(ctx, cluster)
+			})
+			return nil
+		}
+
 		registerDeferred(ctx, cluster)
 		return nil
 	})
@@ -69,7 +82,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 // registerDeferred sets up the handlers for the incoming cluster which sync
 // tokens (v3 and ext) to the cluster auth tokens in the remote.
 func registerDeferred(ctx context.Context, cluster *config.UserContext) {
-	ext := wrangler.GetExtAPI(cluster.Management.Wrangler)
+	ext := cluster.Management.Wrangler.Ext
 
 	tokenInformer := cluster.Management.Management.Tokens("").Controller().Informer()
 	tokenCache := cluster.Management.Wrangler.Mgmt.Token().Cache()
