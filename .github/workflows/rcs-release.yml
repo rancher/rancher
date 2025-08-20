@@ -26,7 +26,7 @@ jobs:
       OS: ${{ matrix.os }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
       - name: setup and build
         uses: ./.github/actions/build-images/server
   build-agent:
@@ -47,7 +47,7 @@ jobs:
       REGISTRY: "127.0.0.1:5000"
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
       - name: setup and build
         uses: ./.github/actions/build-images/agent
   integration-tests:
@@ -70,7 +70,7 @@ jobs:
       OS: ${{ matrix.os }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@main
         with:
@@ -100,7 +100,7 @@ jobs:
       - name: Git safe directory
         run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@main
         with:
@@ -125,7 +125,7 @@ jobs:
       id-token: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@main
         with:
@@ -143,7 +143,7 @@ jobs:
       id-token: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@main
         with:
@@ -167,7 +167,7 @@ jobs:
       OS: ${{ matrix.os }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@main
         with:
@@ -185,7 +185,7 @@ jobs:
       id-token: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@main
         with:
@@ -206,7 +206,7 @@ jobs:
       ARTIFACTS_BASE_DIR: "bin"
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
       - name: generate
         uses: ./.github/actions/images-files/generate
       - name: Load Secrets from Vault
