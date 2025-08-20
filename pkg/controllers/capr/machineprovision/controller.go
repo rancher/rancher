@@ -663,10 +663,22 @@ func infraMachineDeletionEnqueueingTime(job *batchv1.Job) (time.Duration, error)
 		return 0, err
 	}
 
+	// example:
+	// deleteOnFailureAfter is 5 minutes
+	// currentTime is 10:10
+	// failureTime is 10:07
+	// timeSinceFailure will be 3 minutes
+	// so we need to enqueue to 2 minutes from now.
+
+	// if deleteOnFailureAfter is 0 or negative, it will always return 0 as time
+	// because the timeSinceFailure will always be greater than deleteOnFailureAfter
+	// so it will be deleted immediately
+
+	// if the user wants a long time for debugging, it can put long hours (eg: 100h)
+	// then the infraMachine will take longer to be deleted (but it will, one time)
 	currentTime := time.Now()
 	timeSinceFailure := currentTime.Sub(failedTime)
 
-	// based on the time remaining, validate if we must delete or enqueue the infra machine
 	if timeSinceFailure.Seconds() >= deleteOnFailureAfter.Seconds() {
 		return 0, nil
 	} else {
