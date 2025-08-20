@@ -14,6 +14,3 @@ NodeDriver.management.cattle.io
 Project.management.cattle.io
 ProjectRoleTemplateBinding.management.cattle.io
 RoleTemplate.management.cattle.io
-
-CustomMachine.rke.cattle.io
-ETCDSnapshot.rke.cattle.io
