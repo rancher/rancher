@@ -13,6 +13,7 @@ import (
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 )
@@ -51,7 +52,17 @@ func RegisterIndexers(scaledContext *config.ScaledContext) error {
 // Register sets up cluster initializations to run when the cluster has started.
 func Register(ctx context.Context, cluster *config.UserContext) {
 	starter := cluster.DeferredStart(ctx, func(ctx context.Context) error {
-		registerDeferred(ctx, cluster)
+		// For ext token support we have to defer further until the EXT API is ready as well
+		if features.ExtTokens.Enabled() {
+			logrus.Debugf("[deferred-ext] cluster auth token controllers - deferred setup")
+			cluster.Management.Wrangler.DeferredEXTAPIRegistration.DeferFunc(func(w *wrangler.EXTAPIContext) {
+				logrus.Debugf("[deferred-ext/run] %p GREEN - cluster auth token - controllers", w)
+				registerDeferred(ctx, cluster, w)
+			})
+			return nil
+		}
+
+		registerDeferred(ctx, cluster, nil)
 		return nil
 	})
 
@@ -68,9 +79,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 
 // registerDeferred sets up the handlers for the incoming cluster which sync
 // tokens (v3 and ext) to the cluster auth tokens in the remote.
-func registerDeferred(ctx context.Context, cluster *config.UserContext) {
-	ext := wrangler.GetExtAPI(cluster.Management.Wrangler)
-
+func registerDeferred(ctx context.Context, cluster *config.UserContext, extAPIContext *wrangler.EXTAPIContext) {
 	tokenInformer := cluster.Management.Management.Tokens("").Controller().Informer()
 	tokenCache := cluster.Management.Wrangler.Mgmt.Token().Cache()
 	tokenClient := cluster.Management.Wrangler.Mgmt.Token()
@@ -117,8 +126,9 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 		handler)
 
 	if features.ExtTokens.Enabled() {
-		handler.extTokenIndexer = ext.Token().Informer().GetIndexer()
-		eTokenLifecycle(ctx, ext.Token(), extTokenController, clusterName, handler)
+		extToken := extAPIContext.Ext.Token()
+		handler.extTokenIndexer = extToken.Informer().GetIndexer()
+		eTokenLifecycle(ctx, extToken, extTokenController, clusterName, handler)
 	}
 
 	cluster.Management.Management.Users("").AddHandler(ctx, userController, (&userHandler{
@@ -145,7 +155,7 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	}
 
 	if features.ExtTokens.Enabled() {
-		catHandler.eTokenCache = ext.Token().Cache()
+		catHandler.eTokenCache = extAPIContext.Ext.Token().Cache()
 		catHandler.eTokenStore = extstore.NewSystemFromWrangler(cluster.Management.Wrangler)
 	}
 
