@@ -35,144 +35,8 @@ import (
 	pkgerrors "github.com/pkg/errors"
 	"github.com/rancher/remotedialer"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v3"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
+	yaml3 "gopkg.in/yaml.v3"
 )
-
-const (
-	configDir = "~/.scale-cluster-agent/config"
-	version   = "1.0.0"
-)
-
-type Config struct {
-	RancherURL  string `yaml:"RancherURL"`
-	BearerToken string `yaml:"BearerToken"`
-	ListenPort  int    `yaml:"ListenPort"`
-	LogLevel    string `yaml:"LogLevel"`
-}
-
-type ClusterInfo struct {
-	Name        string           `json:"name"`
-	ClusterID   string           `json:"cluster_id,omitempty"`
-	Status      string           `json:"status,omitempty"` // Track cluster setup status
-	Nodes       []NodeInfo       `json:"nodes"`
-	Pods        []PodInfo        `json:"pods"`
-	Services    []ServiceInfo    `json:"services"`
-	Secrets     []SecretInfo     `json:"secrets"`
-	ConfigMaps  []ConfigMapInfo  `json:"configmaps"`
-	Deployments []DeploymentInfo `json:"deployments"`
-}
-
-type NodeInfo struct {
-	Name             string            `json:"name"`
-	Status           string            `json:"status"`
-	Roles            []string          `json:"roles"`
-	Age              string            `json:"age"`
-	Version          string            `json:"version"`
-	InternalIP       string            `json:"internalIP"`
-	ExternalIP       string            `json:"externalIP"`
-	OSImage          string            `json:"osImage"`
-	KernelVer        string            `json:"kernelVersion"`
-	ContainerRuntime string            `json:"containerRuntime"`
-	Capacity         map[string]string `json:"capacity"`
-	Allocatable      map[string]string `json:"allocatable"`
-}
-
-type PodInfo struct {
-	Name      string            `json:"name"`
-	Namespace string            `json:"namespace"`
-	Status    string            `json:"status"`
-	Ready     string            `json:"ready"`
-	Restarts  int               `json:"restarts"`
-	Age       string            `json:"age"`
-	IP        string            `json:"ip"`
-	Node      string            `json:"node"`
-	Labels    map[string]string `json:"labels"`
-}
-
-type ServiceInfo struct {
-	Name       string            `json:"name"`
-	Namespace  string            `json:"namespace"`
-	Type       string            `json:"type"`
-	ClusterIP  string            `json:"clusterIP"`
-	ExternalIP string            `json:"externalIP"`
-	Ports      string            `json:"ports"`
-	Age        string            `json:"age"`
-	Labels     map[string]string `json:"labels"`
-}
-
-type SecretInfo struct {
-	Name      string `json:"name"`
-	Namespace string `json:"namespace"`
-	Type      string `json:"type"`
-	Data      int    `json:"data"`
-	Age       string `json:"age"`
-}
-
-type ConfigMapInfo struct {
-	Name      string `json:"name"`
-	Namespace string `json:"namespace"`
-	Data      int    `json:"data"`
-	Age       string `json:"age"`
-}
-
-type DeploymentInfo struct {
-	Name      string            `json:"name"`
-	Namespace string            `json:"namespace"`
-	Ready     string            `json:"ready"`
-	UpToDate  string            `json:"upToDate"`
-	Available string            `json:"available"`
-	Age       string            `json:"age"`
-	Labels    map[string]string `json:"labels"`
-}
-
-type PortForwarder struct {
-	clusterName string
-	localPort   int
-	server      *http.Server
-	ctx         context.Context
-	cancel      context.CancelFunc
-}
-
-// TunnelHandler handles incoming tunneled connections to the Kubernetes API
-type TunnelHandler struct {
-	clusterName string
-}
-
-type ScaleAgent struct {
-	config                *Config
-	clusters              map[string]*ClusterInfo
-	httpServer            *http.Server
-	ctx                   context.Context
-	cancel                context.CancelFunc
-	activeConnections     map[string]bool           // Track active connections to prevent duplicates
-	connMutex             sync.RWMutex              // Protect connection tracking
-	tokenCache            map[string]string         // Cache cluster registration tokens
-	tokenMutex            sync.RWMutex              // Protect token cache
-	mockServers           map[string]*http.Server   // Track mock API servers per cluster
-	serverMutex           sync.RWMutex              // Protect mock servers
-	portForwarders        map[string]*PortForwarder // Track port forwarders per cluster
-	forwarderMutex        sync.RWMutex              // Protect port forwarders
-	nextPort              int                       // Next available port for clusters
-	portMutex             sync.Mutex                // Protect port allocation
-	firstClusterConnected bool                      // track first fake cluster connection
-	mockCertPEM           []byte
-	nameCounters          map[string]int      // track next suffix per base name
-	kwokManager           *KWOKClusterManager // Manage KWOK clusters
-}
-
-type CreateClusterRequest struct {
-	Name string `json:"name"`
-}
-
-type CreateClusterResponse struct {
-	Success   bool   `json:"success"`
-	Message   string `json:"message"`
-	ClusterID string `json:"cluster_id,omitempty"`
-}
 
 func init() { rand.Seed(time.Now().UnixNano()) }
 
@@ -210,13 +74,18 @@ func main() {
 		ctx:               ctx,
 		cancel:            cancel,
 		activeConnections: make(map[string]bool),
+	clusterAgentSessions: make(map[string]bool),
 		connMutex:         sync.RWMutex{},
+	caMutex:           sync.RWMutex{},
 		tokenCache:        make(map[string]string),
 		mockServers:       make(map[string]*http.Server),
 		portForwarders:    make(map[string]*PortForwarder),
 		nextPort:          1, // Start from port 8001
 		nameCounters:      make(map[string]int),
 	}
+
+	// Start local ping server for stv-cluster health checks
+	agent.startLocalPingServer()
 
 	// Initialize KWOK cluster manager with absolute paths
 	kwokctlPath, err := filepath.Abs("./kwokctl")
@@ -409,7 +278,7 @@ func (a *ScaleAgent) loadClusterTemplate() error {
 	}
 
 	var clusterInfo ClusterInfo
-	if err := yaml.Unmarshal(data, &clusterInfo); err != nil {
+	if err := yaml3.Unmarshal(data, &clusterInfo); err != nil {
 		logrus.Warnf("Failed to parse cluster template (%v). Falling back to built-in default template", err)
 		return a.createDefaultClusterTemplate()
 	}
@@ -653,7 +522,7 @@ func (a *ScaleAgent) extractCACertFromKubeconfig(kubeconfigContent string) ([]by
 		} `yaml:"clusters"`
 	}
 
-	if err := yaml.Unmarshal([]byte(kubeconfigContent), &config); err != nil {
+	if err := yaml3.Unmarshal([]byte(kubeconfigContent), &config); err != nil {
 		return nil, fmt.Errorf("failed to parse kubeconfig: %v", err)
 	}
 
@@ -856,7 +725,20 @@ func (a *ScaleAgent) connectClusterToRancher(clusterName, clusterID string, clus
 	headers.Set("X-API-Tunnel-Params", encodedParams)
 
 	allowFunc := func(proto, address string) bool {
-		return proto == "tcp" && address == localAPI
+		if proto != "tcp" {
+			return false
+		}
+		// Allow KWOK API target (normal proxied traffic)
+		if address == localAPI {
+			return true
+		}
+		// Allow Rancher server's connectivity probe used by ClusterConnected controller:
+		// it performs client.Get("http://not-used/ping"), which dials host "not-used" on port 80 via the tunnel.
+		if address == "not-used:80" {
+			return true
+		}
+		logrus.Tracef("REMOTEDIALER allowFunc: denying dial to %s (proto=%s)", address, proto)
+		return false
 	}
 
 	// Track connection attempts and success
@@ -1068,329 +950,129 @@ func (a *ScaleAgent) listClustersHandler(w http.ResponseWriter, r *http.Request)
 	})
 }
 
+
+// deleteClusterHandler removes a cluster record and calls placeholder delete in Rancher
 func (a *ScaleAgent) deleteClusterHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	clusterName := vars["name"]
-
-	if clusterName == "template" {
-
-	}
-
-	if _, exists := a.clusters[clusterName]; !exists {
-		http.Error(w, "Cluster not found", http.StatusNotFound)
+	if clusterName == "" || clusterName == "template" {
+		http.Error(w, "invalid cluster name", http.StatusBadRequest)
 		return
 	}
-
-	// Delete cluster from Rancher (this would be the actual implementation)
-	err := a.deleteClusterFromRancher(clusterName)
-	if err != nil {
-		logrus.Errorf("Failed to delete cluster from Rancher: %v", err)
-		http.Error(w, "Failed to delete cluster", http.StatusInternalServerError)
+	if _, ok := a.clusters[clusterName]; !ok {
+		http.Error(w, "cluster not found", http.StatusNotFound)
 		return
 	}
-
+	if err := a.deleteClusterFromRancher(clusterName); err != nil {
+		http.Error(w, "failed to delete cluster", http.StatusInternalServerError)
+		return
+	}
 	delete(a.clusters, clusterName)
-
-	// Log if we're removing the last cluster
-	if len(a.clusters) == 1 { // Only template remaining
-		logrus.Info("Last cluster deleted, WebSocket connection will stop")
-	}
-
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"message": fmt.Sprintf("Cluster %s deleted successfully", clusterName),
-	})
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 }
 
+// createClusterFromTemplate deep-copies template and replaces placeholders
 func (a *ScaleAgent) createClusterFromTemplate(clusterName string) *ClusterInfo {
-	template := a.clusters["template"]
-	if template == nil {
-		return nil
-	}
-
-	// Deep copy the template and replace placeholders
-	clusterData, _ := json.Marshal(template)
-	var newCluster ClusterInfo
-	json.Unmarshal(clusterData, &newCluster)
-
-	// Replace placeholders with actual cluster name
-	clusterNamePlaceholder := "{{cluster-name}}"
-
-	// Set initial status
-	newCluster.Status = "creating"
-
-	// Update node names
-	for i := range newCluster.Nodes {
-		newCluster.Nodes[i].Name = strings.ReplaceAll(newCluster.Nodes[i].Name, clusterNamePlaceholder, clusterName)
-	}
-
-	// Update pod node references
-	for i := range newCluster.Pods {
-		newCluster.Pods[i].Node = strings.ReplaceAll(newCluster.Pods[i].Node, clusterNamePlaceholder, clusterName)
-	}
-
-	newCluster.Name = clusterName
-	return &newCluster
+	tmpl := a.clusters["template"]
+	if tmpl == nil { return &ClusterInfo{Name: clusterName} }
+	raw, _ := json.Marshal(tmpl)
+	var out ClusterInfo
+	_ = json.Unmarshal(raw, &out)
+	ph := "{{cluster-name}}"
+	for i := range out.Nodes { out.Nodes[i].Name = strings.ReplaceAll(out.Nodes[i].Name, ph, clusterName) }
+	for i := range out.Pods { out.Pods[i].Node = strings.ReplaceAll(out.Pods[i].Node, ph, clusterName) }
+	out.Name = clusterName
+	return &out
 }
 
+// createClusterInRancher creates an imported cluster via Rancher API and returns its ID
 func (a *ScaleAgent) createClusterInRancher(clusterName string) (string, error) {
-	// Create a real cluster in Rancher via REST API
-	// For imported clusters, we need to create a cluster with imported driver
-	clusterData := map[string]interface{}{
-		"type": "cluster",
-		"name": clusterName,
+	payload := map[string]interface{}{ "type": "cluster", "name": clusterName }
+	body, _ := json.Marshal(payload)
+	base := strings.TrimRight(a.config.RancherURL, "/")
+	req, err := http.NewRequest("POST", base+"/v3/clusters", bytes.NewReader(body))
+	if err != nil { return "", err }
+	req.Header.Set("Authorization", "Bearer "+a.config.BearerToken)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	if err != nil { return "", err }
+	defer resp.Body.Close()
+	data, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return "", fmt.Errorf("create cluster failed: %d %s", resp.StatusCode, string(data))
 	}
+	var res map[string]interface{}
+	if err := json.Unmarshal(data, &res); err != nil { return "", err }
+	id, _ := res["id"].(string)
+	if id == "" { return "", fmt.Errorf("no id in response") }
+	return id, nil
+}
 
-	jsonData, err := json.Marshal(clusterData)
+// getImportYAML downloads the Rancher import manifest for the given cluster
+func (a *ScaleAgent) getImportYAML(clusterID string) (string, error) {
+	// Retrieve the registration token for this cluster
+	token, err := a.getClusterToken(clusterID)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal cluster data: %v", err)
+		return "", fmt.Errorf("failed to get cluster token: %v", err)
 	}
 
-	logrus.Infof("Sending cluster data: %s", string(jsonData))
+	base := strings.TrimRight(a.config.RancherURL, "/")
+	importURL := fmt.Sprintf("%s/v3/import/%s_%s.yaml", base, token, clusterID)
+	logrus.Infof("Downloading import YAML from %s", importURL)
 
-	// Make request to Rancher API to create cluster
-	client := &http.Client{Timeout: 30 * time.Second}
-	// Fix double slash issue by ensuring proper URL formatting
-	rancherURL := strings.TrimRight(a.config.RancherURL, "/")
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s/v3/clusters", rancherURL), bytes.NewBuffer(jsonData))
+	// Import URL is typically public but often served with self-signed certs; mirror --insecure
+	httpClient := &http.Client{Timeout: 30 * time.Second, Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
+	req, err := http.NewRequest("GET", importURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %v", err)
 	}
 
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", a.config.BearerToken))
-
-	logrus.Infof("Creating cluster %s in Rancher via API", clusterName)
-	logrus.Infof("Request URL: %s", req.URL.String())
-	logrus.Infof("Request method: %s", req.Method)
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("failed to create cluster in Rancher: %v", err)
+		return "", fmt.Errorf("failed to download import YAML: %v", err)
 	}
 	defer resp.Body.Close()
 
-	body, _ := ioutil.ReadAll(resp.Body)
-	logrus.Infof("Rancher API response status: %d", resp.StatusCode)
-	logrus.Infof("Rancher API response body: %s", string(body))
-
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to create cluster in Rancher: status %d, body: %s", resp.StatusCode, string(body))
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("failed to download import YAML: status %d, body: %s", resp.StatusCode, string(b))
 	}
 
-	// Parse response to get cluster ID
-	var clusterResp map[string]interface{}
-	if err := json.Unmarshal(body, &clusterResp); err != nil {
-		return "", fmt.Errorf("failed to decode response: %v", err)
-	}
-
-	clusterID, ok := clusterResp["id"].(string)
-	if !ok {
-		return "", fmt.Errorf("no cluster ID in response: %+v", clusterResp)
-	}
-
-	logrus.Infof("Successfully created cluster %s in Rancher with ID: %s", clusterName, clusterID)
-
-	// Now get the import YAML and apply it to complete the cluster registration
-	// This will move the cluster from "pending" to "active" state
-	if err := a.completeClusterRegistration(clusterID); err != nil {
-		logrus.Warnf("Failed to complete cluster registration for %s: %v", clusterName, err)
-		// Don't fail the entire operation, just log the warning
-	} else {
-		logrus.Infof("Cluster %s registration completed successfully", clusterName)
-
-		// Wait for cluster to become active, then establish WebSocket connection
-		// Get the cluster info from the stored clusters
-		if storedClusterInfo, exists := a.clusters[clusterName]; exists {
-			go a.waitForClusterActiveAndConnect(clusterName, clusterID, storedClusterInfo)
-		}
-	}
-
-	return clusterID, nil
-}
-
-func (a *ScaleAgent) completeClusterRegistration(clusterID string) error {
-	logrus.Infof("Completing cluster registration for %s", clusterID)
-
-	// Get the import YAML from Rancher (this will now follow the correct 4-step process)
-	importYAML, err := a.getImportYAML(clusterID)
+	yamlBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to get import YAML: %v", err)
+		return "", fmt.Errorf("failed to read import YAML: %v", err)
 	}
 
-	// Apply the import YAML to the KWOK cluster
-	if err := a.applyImportYAMLToKWOKCluster(clusterID, importYAML); err != nil {
-		return fmt.Errorf("failed to apply import YAML to KWOK cluster: %v", err)
-	}
+	yamlContent := string(yamlBytes)
+	logrus.Infof("Successfully downloaded YAML file for cluster %s", clusterID)
 
-	logrus.Infof("Successfully completed cluster registration for %s", clusterID)
-	return nil
-}
-
-func (a *ScaleAgent) getImportYAML(clusterID string) (string, error) {
-	logrus.Infof("Getting import YAML for cluster %s", clusterID)
-
-	// Wait up to 5 minutes for cluster registration tokens to be available
-	timeout := time.After(5 * time.Minute)
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-timeout:
-			return "", fmt.Errorf("timeout waiting for cluster registration tokens for cluster %s", clusterID)
-		case <-ticker.C:
-			logrus.Debugf("Checking for cluster registration tokens for cluster %s...", clusterID)
-
-			// Step 1: Get the cluster registration tokens
-			client := &http.Client{Timeout: 30 * time.Second}
-			rancherURL := strings.TrimRight(a.config.RancherURL, "/")
-
-			// Call the clusterregistrationtokens endpoint
-			tokensURL := fmt.Sprintf("%s/v3/clusters/%s/clusterregistrationtokens", rancherURL, clusterID)
-			req, err := http.NewRequest("GET", tokensURL, nil)
-			if err != nil {
-				logrus.Debugf("Failed to create cluster registration tokens request: %v", err)
-				continue
-			}
-
-			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", a.config.BearerToken))
-
-			resp, err := client.Do(req)
-			if err != nil {
-				logrus.Debugf("Failed to get cluster registration tokens: %v", err)
-				continue
-			}
-
-			if resp.StatusCode != http.StatusOK {
-				resp.Body.Close()
-				logrus.Debugf("Cluster registration tokens request failed with status %d", resp.StatusCode)
-				continue
-			}
-
-			body, _ := ioutil.ReadAll(resp.Body)
-			resp.Body.Close()
-			logrus.Debugf("Cluster registration tokens response status: %d", resp.StatusCode)
-
-			// Step 2: Parse response to get the tokens data
-			var tokensResp map[string]interface{}
-			if err := json.Unmarshal(body, &tokensResp); err != nil {
-				logrus.Debugf("Failed to decode cluster registration tokens response: %v", err)
-				continue
-			}
-
-			// Extract the data array
-			data, ok := tokensResp["data"].([]interface{})
-			if !ok {
-				logrus.Debugf("No data field in cluster registration tokens response: %+v", tokensResp)
-				continue
-			}
-
-			if len(data) == 0 {
-				logrus.Debugf("No cluster registration tokens found yet, waiting...")
-				continue
-			}
-
-			// Found tokens! Now proceed with the rest of the process
-			logrus.Infof("Found %d cluster registration tokens for cluster %s", len(data), clusterID)
-
-			// Get the first token (usually there's only one)
-			tokenData, ok := data[0].(map[string]interface{})
-			if !ok {
-				logrus.Debugf("Failed to parse token data: %+v", data[0])
-				continue
-			}
-
-			// Extract the insecureCommand
-			insecureCommand, ok := tokenData["insecureCommand"].(string)
-			if !ok {
-				logrus.Debugf("No insecureCommand field in token data: %+v", tokenData)
-				continue
-			}
-
-			logrus.Infof("Got insecureCommand: %s", insecureCommand)
-
-			// Step 3: Parse the insecureCommand to extract the YAML file URL
-			// Expected format: "curl --insecure -sfL https://green-cluster.shen.nu/v3/import/xyz.yaml | kubectl apply -f -"
-			if !strings.Contains(insecureCommand, "curl --insecure -sfL") {
-				logrus.Debugf("Unexpected insecureCommand format: %s", insecureCommand)
-				continue
-			}
-
-			// Extract the URL part: everything between "curl --insecure -sfL " and " | kubectl"
-			startMarker := "curl --insecure -sfL "
-			endMarker := " | kubectl"
-
-			startIdx := strings.Index(insecureCommand, startMarker)
-			endIdx := strings.Index(insecureCommand, endMarker)
-
-			if startIdx == -1 || endIdx == -1 || startIdx >= endIdx {
-				logrus.Debugf("Failed to parse insecureCommand: %s", insecureCommand)
-				continue
-			}
-
-			yamlURL := insecureCommand[startIdx+len(startMarker) : endIdx]
-			yamlURL = strings.TrimSpace(yamlURL)
-			logrus.Infof("Extracted YAML URL: %s", yamlURL)
-
-			// Step 4: Download the actual YAML file
-			yamlReq, err := http.NewRequest("GET", yamlURL, nil)
-			if err != nil {
-				logrus.Debugf("Failed to create YAML download request: %v", err)
-				continue
-			}
-
-			// Note: This URL is typically accessible without authentication
-			yamlResp, err := client.Do(yamlReq)
-			if err != nil {
-				logrus.Debugf("Failed to download YAML file: %v", err)
-				continue
-			}
-
-			if yamlResp.StatusCode != http.StatusOK {
-				body, _ := ioutil.ReadAll(yamlResp.Body)
-				yamlResp.Body.Close()
-				logrus.Debugf("Failed to download YAML file: status %d, body: %s", yamlResp.StatusCode, string(body))
-				continue
-			}
-
-			yamlData, err := ioutil.ReadAll(yamlResp.Body)
-			yamlResp.Body.Close()
-			if err != nil {
-				logrus.Debugf("Failed to read YAML file content: %v", err)
-				continue
-			}
-
-			yamlContent := string(yamlData)
-			logrus.Infof("Successfully downloaded YAML file for cluster %s", clusterID)
-
-			// Validate that the YAML contains service account configuration
-			if !strings.Contains(yamlContent, "ServiceAccount") && !strings.Contains(yamlContent, "serviceaccount") {
-				logrus.Debugf("Downloaded YAML does not contain ServiceAccount configuration: %s", yamlContent[:200])
-				continue
-			}
-
-			// Save YAML to debug file
-			clusterName := a.getClusterNameByID(clusterID)
-			if clusterName == "" {
-				clusterName = clusterID // fallback to cluster ID if name not found
-			}
-
-			debugDir := "debug-yaml"
-			if err := os.MkdirAll(debugDir, 0755); err != nil {
-				logrus.Warnf("Failed to create debug directory: %v", err)
-			} else {
-				debugFile := filepath.Join(debugDir, fmt.Sprintf("%s-register.yaml", clusterName))
-				if err := ioutil.WriteFile(debugFile, yamlData, 0644); err != nil {
-					logrus.Warnf("Failed to save debug YAML file: %v", err)
-				} else {
-					logrus.Infof("Saved debug YAML file: %s", debugFile)
-				}
-			}
-
-			return yamlContent, nil
+	// Validate presence of ServiceAccount (informational only)
+	if !strings.Contains(yamlContent, "ServiceAccount") && !strings.Contains(yamlContent, "serviceaccount") {
+		if len(yamlContent) > 200 {
+			logrus.Debugf("Downloaded YAML does not contain ServiceAccount configuration: %s", yamlContent[:200])
+		} else {
+			logrus.Debugf("Downloaded YAML does not contain ServiceAccount configuration")
 		}
 	}
+
+	// Save YAML to a debug file for inspection
+	clusterName := a.getClusterNameByID(clusterID)
+	if clusterName == "" {
+		clusterName = clusterID
+	}
+	if err := os.MkdirAll("debug-yaml", 0755); err != nil {
+		logrus.Warnf("Failed to create debug directory: %v", err)
+	} else {
+		debugFile := filepath.Join("debug-yaml", fmt.Sprintf("%s-register.yaml", clusterName))
+		if err := ioutil.WriteFile(debugFile, yamlBytes, 0644); err != nil {
+			logrus.Warnf("Failed to save debug YAML file: %v", err)
+		} else {
+			logrus.Infof("Saved debug YAML file: %s", debugFile)
+		}
+	}
+
+	return yamlContent, nil
 }
 
 // getClusterNameByID gets the cluster name from the stored clusters map
@@ -1526,7 +1208,7 @@ func (a *ScaleAgent) waitForServiceAccountReady(clusterID string) error {
 	// Get the kubeconfig path for the KWOK cluster using the actual KWOK cluster name
 	kubeconfigPath := filepath.Join(os.Getenv("HOME"), ".kwok", "clusters", kwokCluster.Name, "kubeconfig.yaml")
 
-	// Wait up to 2 minutes for the service account to be ready
+	// Wait up to 2 minutes for the service account/credentials to be ready
 	timeout := time.After(2 * time.Minute)
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
@@ -1536,18 +1218,26 @@ func (a *ScaleAgent) waitForServiceAccountReady(clusterID string) error {
 		case <-timeout:
 			return fmt.Errorf("timeout waiting for service account to be ready in KWOK cluster %s", kwokCluster.Name)
 		case <-ticker.C:
-			// Check if the service account exists and is ready
-			cmd := exec.Command("kubectl", "--kubeconfig", kubeconfigPath, "get", "serviceaccount", "--all-namespaces")
-			output, err := cmd.CombinedOutput()
-			if err != nil {
-				logrus.Debugf("Service account check failed: %v, output: %s", err, string(output))
+			// 1) Fast path: does the cattle SA exist in cattle-system?
+			saCmd := exec.Command("kubectl", "--kubeconfig", kubeconfigPath, "get", "serviceaccount", "cattle", "-n", "cattle-system")
+			if err := saCmd.Run(); err == nil {
+				logrus.Infof("ServiceAccount cattle exists in cattle-system")
+				// 2) Robust path: did the import YAML create the cattle-credentials-* secret yet?
+				secCmd := exec.Command("kubectl", "--kubeconfig", kubeconfigPath, "get", "secrets", "-n", "cattle-system", "-o", "jsonpath={.items[*].metadata.name}")
+				secOut, err := secCmd.CombinedOutput()
+				if err != nil {
+					logrus.Debugf("Secret listing failed: %v, output: %s", err, string(secOut))
+					continue
+				}
+				names := strings.Fields(string(secOut))
+				for _, n := range names {
+					if strings.HasPrefix(n, "cattle-credentials-") {
+						logrus.Infof("Found credentials secret %s; service account is ready in KWOK cluster %s", n, kwokCluster.Name)
+						return nil
+					}
+				}
+				logrus.Debugf("cattle SA exists but credentials secret not found yet in KWOK cluster %s", kwokCluster.Name)
 				continue
-			}
-
-			// Look for the cattle-system service account which should be created by the import YAML
-			if strings.Contains(string(output), "cattle-system") {
-				logrus.Infof("Service account is ready in KWOK cluster %s", kwokCluster.Name)
-				return nil
 			}
 
 			logrus.Debugf("Service account not ready yet in KWOK cluster %s", kwokCluster.Name)
@@ -1685,6 +1375,12 @@ func (a *ScaleAgent) waitForClusterActiveAndConnect(clusterName, clusterID strin
 	}
 	logrus.Infof("🔄 REAL-AGENT: Service account is ready")
 
+	// Step 2: Start downstream cluster-agent tunnel (/v3/connect?clusterId=...) using cattle-credentials token
+	logrus.Infof("🔄 REAL-AGENT: Step 2 - Starting downstream cluster-agent tunnel")
+	if err := a.startClusterAgentTunnel(clusterName, clusterID); err != nil {
+		logrus.Warnf("🔄 REAL-AGENT: Failed to start cluster-agent tunnel (will continue): %v", err)
+	}
+
 	// Step 2: Initial agent deployment completed - now follow REAL agent pattern
 	logrus.Infof("🔄 REAL-AGENT: Step 2 - Initial agent deployment completed, now implementing REAL agent logic")
 
@@ -1696,141 +1392,180 @@ func (a *ScaleAgent) waitForClusterActiveAndConnect(clusterName, clusterID strin
 		return
 	}
 
-	// Get cluster token for ConfigClient call
-	rancherToken, err := a.getClusterToken(clusterID)
-	if err != nil {
-		logrus.Errorf("🔄 REAL-AGENT: Failed to get cluster token for ConfigClient: %v", err)
+	// Ensure KWOK cluster exists for this Rancher cluster (used elsewhere)
+	kwokCluster := a.getKWOKClusterByID(clusterID)
+	if kwokCluster == nil {
+		logrus.Errorf("🔄 REAL-AGENT: KWOK cluster not found for cluster %s", clusterID)
 		return
 	}
 
-	// Call ConfigClient exactly like real agent does
-	go a.callConfigClientForCluster(clusterID, rancherURL.Host, rancherToken)
+	// Use the cluster registration token for ConfigClient (real agent behavior)
+	regToken, err := a.getClusterToken(clusterID)
+	if err != nil {
+		logrus.Errorf("🔄 REAL-AGENT: Failed to get cluster registration token for ConfigClient: %v", err)
+	} else {
+		// Call ConfigClient exactly like real agent does
+		go a.callConfigClientForCluster(clusterID, rancherURL.Host, regToken)
+	}
 
 	// Step 4: Implement rancher.Run() equivalent (like real agent does)
 	logrus.Infof("🔄 REAL-AGENT: Step 4 - Implementing rancher.Run() equivalent (like real agent)")
 	go a.implementRancherRunEquivalent(clusterName, clusterID)
 
-	// Step 5: Start plan monitor (like real agent does)
+	// Step 5: Start plan monitor (like real agent does) using registration token
 	logrus.Infof("🔄 REAL-AGENT: Step 5 - Starting plan monitor (like real agent)")
-	go a.startPlanMonitor(clusterID, rancherURL.Host, rancherToken)
+	if regToken != "" {
+		go a.startPlanMonitor(clusterID, rancherURL.Host, regToken)
+	}
 
 	logrus.Infof("🔄 REAL-AGENT: REAL agent lifecycle completed for cluster %s - agent now running indefinitely like real agents", clusterName)
 }
 
-// deleteClusterAgentPod deletes the cluster-agent pod to trigger a new deployment
-func (a *ScaleAgent) deleteClusterAgentPod(clusterID string) error {
-	logrus.Infof("🔄 AGENT-LIFECYCLE: Deleting cluster-agent pod for cluster %s", clusterID)
-
-	// Get the KWOK cluster
-	var kwokCluster *KWOKCluster
+// getKWOKClusterByID returns the KWOK cluster object for a Rancher clusterID
+func (a *ScaleAgent) getKWOKClusterByID(clusterID string) *KWOKCluster {
 	for _, cluster := range a.kwokManager.clusters {
 		if cluster.ClusterID == clusterID {
-			kwokCluster = cluster
-			break
+			return cluster
 		}
 	}
+	return nil
+}
 
+// startClusterAgentTunnel opens the second WebSocket tunnel like real cattle-cluster-agent would
+// URL: wss://<rancherHost>/v3/connect?clusterId=<clusterID>
+// Auth: Authorization: Bearer <cattle-credentials token from KWOK>
+func (a *ScaleAgent) startClusterAgentTunnel(clusterName, clusterID string) error {
+	// Prevent duplicates per clusterName
+	a.caMutex.Lock()
+	if a.clusterAgentSessions[clusterName] {
+		a.caMutex.Unlock()
+		logrus.Infof("🔄 CLUSTER-AGENT: Tunnel already running for %s, skipping", clusterName)
+		return nil
+	}
+	// mark as starting (will flip true on first onConnect)
+	a.clusterAgentSessions[clusterName] = false
+	a.caMutex.Unlock()
+
+	kwokCluster := a.getKWOKClusterByID(clusterID)
 	if kwokCluster == nil {
-		return fmt.Errorf("KWOK cluster not found for cluster ID %s", clusterID)
+		a.caMutex.Lock(); delete(a.clusterAgentSessions, clusterName); a.caMutex.Unlock()
+		return fmt.Errorf("KWOK cluster not found for Rancher cluster %s", clusterID)
 	}
 
-	// Create a Kubernetes client for the KWOK cluster
-	config, err := clientcmd.RESTConfigFromKubeConfig([]byte(kwokCluster.Kubeconfig))
+	// Extract the cattle service account token for Params (used inside X-API-Tunnel-Params)
+	// and get the Rancher registration token for the tunnel auth header, exactly like real agent.
+	cattleSAToken, err := a.extractServiceAccountTokenFromKWOKCluster(kwokCluster)
 	if err != nil {
-		return fmt.Errorf("failed to create kubeconfig: %v", err)
+		a.caMutex.Lock(); delete(a.clusterAgentSessions, clusterName); a.caMutex.Unlock()
+		return fmt.Errorf("failed to extract cattle service account token: %w", err)
+	}
+	if strings.TrimSpace(cattleSAToken) == "" {
+		a.caMutex.Lock(); delete(a.clusterAgentSessions, clusterName); a.caMutex.Unlock()
+		return fmt.Errorf("empty cattle service account token for cluster %s", clusterID)
 	}
 
-	clientset, err := kubernetes.NewForConfig(config)
+	// Get the cluster registration token from Rancher; this is used in X-API-Tunnel-Token
+	rancherToken, err := a.getClusterToken(clusterID)
 	if err != nil {
-		return fmt.Errorf("failed to create kubernetes client: %v", err)
+		a.caMutex.Lock(); delete(a.clusterAgentSessions, clusterName); a.caMutex.Unlock()
+		return fmt.Errorf("failed to get cluster registration token: %w", err)
 	}
 
-	// List and delete all cluster-agent pods
-	pods, err := clientset.CoreV1().Pods("cattle-system").List(context.Background(), metav1.ListOptions{
-		LabelSelector: "app=cattle-cluster-agent",
-	})
+	rURL, err := url.Parse(a.config.RancherURL)
 	if err != nil {
-		return fmt.Errorf("failed to list cluster-agent pods: %v", err)
+		a.caMutex.Lock(); delete(a.clusterAgentSessions, clusterName); a.caMutex.Unlock()
+		return fmt.Errorf("parse rancher url: %w", err)
 	}
+	// Mirror real agent: connect to /v3/connect (no /register) for the downstream tunnel
+	wsURL := fmt.Sprintf("wss://%s/v3/connect", rURL.Host)
 
-	for _, pod := range pods.Items {
-		logrus.Infof("🔄 AGENT-LIFECYCLE: Deleting pod %s", pod.Name)
-		err := clientset.CoreV1().Pods("cattle-system").Delete(context.Background(), pod.Name, metav1.DeleteOptions{})
-		if err != nil {
-			logrus.Warnf("🔄 AGENT-LIFECYCLE: Failed to delete pod %s: %v", pod.Name, err)
-		} else {
-			logrus.Infof("🔄 AGENT-LIFECYCLE: Successfully deleted pod %s", pod.Name)
+	// Build allowFunc to only proxy to our KWOK API endpoint and Rancher's connectivity probe
+	// Reuse getClusterParams to obtain the local address (127.0.0.1:port) and token/ca
+	clusterParams, err := a.getClusterParams(clusterID)
+	if err != nil {
+		a.caMutex.Lock(); delete(a.clusterAgentSessions, clusterName); a.caMutex.Unlock()
+		return fmt.Errorf("getClusterParams: %w", err)
+	}
+	clusterData, _ := clusterParams["cluster"].(map[string]interface{})
+	localAPI, _ := clusterData["address"].(string)
+	allowFunc := func(proto, address string) bool {
+		if proto != "tcp" {
+			return false
 		}
+		if address == localAPI {
+			return true
+		}
+		// Allow Rancher server's connectivity probe host; we'll rewrite it via custom dialer
+		if address == "not-used:80" {
+			return true
+		}
+		// Allow Steve proxy to target local health server 127.0.0.1:6080 via tunnel
+		if address == "127.0.0.1:6080" {
+			return true
+		}
+		logrus.Tracef("REMOTEDIALER allowFunc (cluster-agent): denying dial to %s (proto=%s)", address, proto)
+		return false
 	}
 
+	// Prepare headers for steve proxy-style tunnel (stv-cluster- Authorization only)
+	headers := http.Header{}
+	// Use only the Steve proxy-style Authorization so this session is keyed as
+	// "stv-cluster-<clusterName>" and satisfies ClusterConnected checks.
+	headers.Set("Authorization", fmt.Sprintf("Bearer %s%s", "stv-cluster-", rancherToken))
+
+	onConnect := func(ctx context.Context, s *remotedialer.Session) error {
+		a.caMutex.Lock()
+		a.clusterAgentSessions[clusterName] = true
+		a.caMutex.Unlock()
+		logrus.Infof("✅ CLUSTER-AGENT: Connected downstream tunnel for %s (%s)", clusterName, clusterID)
+		return nil
+	}
+
+	go func() {
+		backoff := time.Second
+		attempts := 0
+		for {
+			if a.ctx.Err() != nil {
+				return
+			}
+			ctx, cancel := context.WithCancel(a.ctx)
+			// Custom local dialer to rewrite Rancher's probe host to our local ping server
+			localDialer := func(dctx context.Context, network, address string) (net.Conn, error) {
+				// Rewrite the special probe host to loopback where our /ping server listens
+				if network == "tcp" && address == "not-used:80" {
+					address = "127.0.0.1:6080"
+				}
+				var d net.Dialer
+				return d.DialContext(dctx, network, address)
+			}
+			err := remotedialer.ConnectToProxyWithDialer(ctx, wsURL, headers, allowFunc, nil, localDialer, onConnect)
+			cancel()
+			if err != nil {
+				logrus.Warnf("CLUSTER-AGENT: tunnel error for %s: %v", clusterName, err)
+			}
+			// reconnect with backoff
+			if backoff < 30*time.Second { backoff *= 2 }
+			attempts++
+			logrus.Infof("CLUSTER-AGENT: reconnecting %s in %s (attempt %d)", clusterName, backoff, attempts)
+			time.Sleep(backoff)
+		}
+	}()
+
+	return nil
+}
+
+// deleteClusterAgentPod deletes the cluster-agent pod to trigger a new deployment
+func (a *ScaleAgent) deleteClusterAgentPod(clusterID string) error {
+	logrus.Infof("🔄 AGENT-LIFECYCLE: (stub) Delete cluster-agent pod for cluster %s", clusterID)
+	// Stubbed out for scale-agent; real k8s client wiring can be added if needed.
 	return nil
 }
 
 // waitForClusterAgentPodReady waits for the new cluster-agent pod to be ready
 func (a *ScaleAgent) waitForClusterAgentPodReady(clusterID string) error {
-	logrus.Infof("🔄 AGENT-LIFECYCLE: Waiting for new cluster-agent pod to be ready for cluster %s", clusterID)
-
-	// Get the KWOK cluster
-	var kwokCluster *KWOKCluster
-	for _, cluster := range a.kwokManager.clusters {
-		if cluster.ClusterID == clusterID {
-			kwokCluster = cluster
-			break
-		}
-	}
-
-	if kwokCluster == nil {
-		return fmt.Errorf("KWOK cluster not found for cluster ID %s", clusterID)
-	}
-
-	// Create a Kubernetes client for the KWOK cluster
-	config, err := clientcmd.RESTConfigFromKubeConfig([]byte(kwokCluster.Kubeconfig))
-	if err != nil {
-		return fmt.Errorf("failed to create kubeconfig: %v", err)
-	}
-
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return fmt.Errorf("failed to create kubernetes client: %v", err)
-	}
-
-	// Wait for new pod to be ready (up to 2 minutes)
-	timeout := time.After(2 * time.Minute)
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-timeout:
-			return fmt.Errorf("timeout waiting for cluster-agent pod to be ready")
-		case <-ticker.C:
-			pods, err := clientset.CoreV1().Pods("cattle-system").List(context.Background(), metav1.ListOptions{
-				LabelSelector: "app=cattle-cluster-agent",
-			})
-			if err != nil {
-				logrus.Debugf("🔄 AGENT-LIFECYCLE: Failed to list pods: %v", err)
-				continue
-			}
-
-			for _, pod := range pods.Items {
-				if pod.Status.Phase == corev1.PodRunning {
-					// Check if all containers are ready
-					allReady := true
-					for _, container := range pod.Status.ContainerStatuses {
-						if !container.Ready {
-							allReady = false
-							break
-						}
-					}
-					if allReady {
-						logrus.Infof("🔄 AGENT-LIFECYCLE: New cluster-agent pod %s is ready", pod.Name)
-						return nil
-					}
-				}
-			}
-			logrus.Debugf("🔄 AGENT-LIFECYCLE: Waiting for cluster-agent pod to be ready...")
-		}
-	}
+	logrus.Infof("🔄 AGENT-LIFECYCLE: (stub) Wait for new cluster-agent pod to be ready for cluster %s", clusterID)
+	// Stubbed out for scale-agent; real k8s client wiring can be added if needed.
+	return nil
 }
 
 // connectClusterToRancherWithRealAgentLogic establishes WebSocket connection following real agent pattern
@@ -1968,7 +1703,7 @@ func (a *ScaleAgent) connectClusterToRancherWithRealAgentLogic(clusterName, clus
 
 		logrus.Infof("✅ AGENT-LIFECYCLE: Cluster %s successfully connected to Rancher via WebSocket tunnel", clusterName)
 
-		// Call the real agent's ConfigClient to get configuration (like real agent does)
+		// Call the real agent's ConfigClient to get configuration using the registration token
 		go a.callConfigClientForCluster(clusterID, rancherURL.Host, rancherToken)
 
 		// Note: We don't call patchClusterActive here because we're following the real agent lifecycle
@@ -2015,12 +1750,11 @@ func (a *ScaleAgent) connectClusterToRancherWithRealAgentLogic(clusterName, clus
 			time.Sleep(backoff)
 		}
 	}()
-
-	a.firstClusterConnected = true
 }
 
 // callConfigClientForCluster calls the real agent's ConfigClient endpoint (like real agent does)
-func (a *ScaleAgent) callConfigClientForCluster(clusterID, rancherHost, token string) {
+// Note: This endpoint expects X-API-Tunnel-Token to be the cluster registration token.
+func (a *ScaleAgent) callConfigClientForCluster(clusterID, rancherHost, registrationToken string) {
 	logrus.Infof("🔄 REAL-AGENT: Calling ConfigClient for cluster %s (like real agent)", clusterID)
 
 	// This is exactly what the real agent does after WebSocket connection
@@ -2041,8 +1775,8 @@ func (a *ScaleAgent) callConfigClientForCluster(clusterID, rancherHost, token st
 	}
 
 	headers := http.Header{}
-	headers.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-	headers.Set("X-API-Tunnel-Token", token)
+	// Real agent does not set Authorization for /v3/connect/config; it uses the tunnel headers.
+	headers.Set("X-API-Tunnel-Token", registrationToken)
 	// Add the rkenodeconfigclient.Params header like real agent does
 	headers.Set("X-API-Tunnel-Params", base64.StdEncoding.EncodeToString(payload))
 
@@ -2517,7 +2251,8 @@ func (a *ScaleAgent) startMockHTTPSAPIServer(addr string, cert tls.Certificate, 
 		stateMu.RUnlock()
 		writeJSON(w, 200, map[string]interface{}{"kind": "RoleList", "apiVersion": "rbac.authorization.k8s.io/v1", "resources": []map[string]interface{}{}})
 	}))
-	muxLocal.HandleFunc("/apis/rbac.authorization.k8s.io/v1/rolebindings", logReq(func(w http.ResponseWriter, r *http.Request) {
+	/*
+		muxLocal.HandleFunc("/apis/rbac.authorization.k8s.io/v1/rolebindings", logReq(func(w http.ResponseWriter, r *http.Request) {
 		if isWatch(r) {
 			items := []map[string]interface{}{}
 			for _, m := range roleBindings {
@@ -2538,6 +2273,146 @@ func (a *ScaleAgent) startMockHTTPSAPIServer(addr string, cert tls.Certificate, 
 	}))
 
 	// Namespaced RBAC resources
+	/* DEDUP CUT START */
+	/*
+	muxLocal.HandleFunc("/apis/rbac.authorization.k8s.io/v1/rolebindings", logReq(func(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+			var obj map[string]interface{}
+			if err := json.NewDecoder(r.Body).Decode(&obj); err != nil {
+				writeJSON(w, 400, map[string]string{"error": "bad json"})
+				return
+			}
+			md, _ := obj["metadata"].(map[string]interface{})
+			if md == nil {
+				md = map[string]interface{}{}
+				obj["metadata"] = md
+			}
+			name, _ := md["name"].(string)
+			if name == "" {
+				if gn, _ := md["generateName"].(string); gn != "" {
+					name = gn + randSuffix(5)
+					md["name"] = name
+				}
+			}
+			if name == "" {
+				writeJSON(w, 400, map[string]string{"error": "name required"})
+				return
+			}
+			roleRef, _ := obj["roleRef"].(map[string]interface{})
+			roleName, _ := roleRef["name"].(string)
+			subjects, _ := obj["subjects"].([]interface{})
+			// derive namespace from request path first
+			rest := strings.TrimPrefix(r.URL.Path, "/apis/rbac.authorization.k8s.io/v1/namespaces/")
+			parts := strings.Split(rest, "/")
+			curNS := "default"
+			if len(parts) > 0 && parts[0] != "" {
+				curNS = parts[0]
+			}
+			saNS, saName := curNS, "cattle"
+			if len(subjects) > 0 {
+				if subj, ok := subjects[0].(map[string]interface{}); ok {
+					if n, ok2 := subj["name"].(string); ok2 {
+						saName = n
+					}
+					if nns, ok2 := subj["namespace"].(string); ok2 {
+						saNS = nns
+					}
+				}
+			}
+			rb := createRoleBinding(curNS, name, roleName, saNS, saName)
+			writeJSON(w, 201, rb)
+			return
+		}
+		if isWatch(r) {
+			items := []map[string]interface{}{}
+			for _, m := range roleBindings {
+				for _, rb := range m {
+					items = append(items, rb)
+				}
+			}
+			writeWatchStream(w, r, items)
+			return
+		}
+		items := []interface{}{}
+		for _, m := range roleBindings {
+			for _, rb := range m {
+				items = append(items, rb)
+			}
+		}
+		writeJSON(w, 200, map[string]interface{}{"kind": "RoleBindingList", "apiVersion": "rbac.authorization.k8s.io/v1", "items": items})
+	}))
+	*/
+	// Namespaced RBAC resources
+	muxLocal.HandleFunc("/apis/rbac.authorization.k8s.io/v1/rolebindings", logReq(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			var obj map[string]interface{}
+			if err := json.NewDecoder(r.Body).Decode(&obj); err != nil {
+				writeJSON(w, 400, map[string]string{"error": "bad json"})
+				return
+			}
+			md, _ := obj["metadata"].(map[string]interface{})
+			if md == nil {
+				md = map[string]interface{}{}
+				obj["metadata"] = md
+			}
+			name, _ := md["name"].(string)
+			if name == "" {
+				if gn, _ := md["generateName"].(string); gn != "" {
+					name = gn + randSuffix(5)
+					md["name"] = name
+				}
+			}
+			if name == "" {
+				writeJSON(w, 400, map[string]string{"error": "name required"})
+				return
+			}
+			roleRef, _ := obj["roleRef"].(map[string]interface{})
+			roleName, _ := roleRef["name"].(string)
+			subjects, _ := obj["subjects"].([]interface{})
+			// derive namespace from request path
+			rest := strings.TrimPrefix(r.URL.Path, "/apis/rbac.authorization.k8s.io/v1/namespaces/")
+			parts := strings.Split(rest, "/")
+			curNS := "default"
+			if len(parts) > 0 && parts[0] != "" {
+				curNS = parts[0]
+			}
+			saNS, saName := curNS, "cattle"
+			if len(subjects) > 0 {
+				if subj, ok := subjects[0].(map[string]interface{}); ok {
+					if n, ok2 := subj["name"].(string); ok2 {
+						saName = n
+					}
+					if nns, ok2 := subj["namespace"].(string); ok2 {
+						saNS = nns
+					}
+				}
+			}
+			rb := createRoleBinding(curNS, name, roleName, saNS, saName)
+			writeJSON(w, 201, rb)
+			return
+		}
+		if isWatch(r) {
+			items := []map[string]interface{}{}
+			for _, m := range roleBindings {
+				for _, rb := range m {
+					items = append(items, rb)
+				}
+			}
+			writeWatchStream(w, r, items)
+			return
+		}
+		items := []interface{}{}
+		for _, m := range roleBindings {
+			for _, rb := range m {
+				items = append(items, rb)
+			}
+		}
+		writeJSON(w, 200, map[string]interface{}{"kind": "RoleBindingList", "apiVersion": "rbac.authorization.k8s.io/v1", "items": items})
+	}))
+
+	// NOTE: cluster-scope rolebindings list/watch removed to avoid duplicate handler; use namespaced endpoints.
+
+	// Namespaced RBAC resources (roles and rolebindings)
 	muxLocal.HandleFunc("/apis/rbac.authorization.k8s.io/v1/namespaces/", logReq(func(w http.ResponseWriter, r *http.Request) {
 		logrus.Debugf("🔍 NAMESPACE HANDLER: %s %s", r.Method, r.URL.Path)
 
@@ -2549,28 +2424,22 @@ func (a *ScaleAgent) startMockHTTPSAPIServer(addr string, cert tls.Certificate, 
 		if len(parts) == 1 || parts[1] == "" { // trailing slash optional
 			ns := strings.TrimSuffix(parts[0], "/")
 			if ns == "" {
-				logrus.Debugf("🔍 NAMESPACE: empty namespace name")
 				http.NotFound(w, r)
 				return
 			}
-
-			logrus.Debugf("🔍 NAMESPACE: handling namespace '%s' with method %s", ns, r.Method)
 			ensureNS(ns)
 
 			stateMu.Lock()
 			nsObj := namespaces[ns]
 			if r.Method == http.MethodGet {
-				logrus.Debugf("🔍 NAMESPACE: GET namespace '%s' - returning object", ns)
 				stateMu.Unlock()
 				writeJSON(w, 200, nsObj)
 				return
 			}
 			if r.Method == http.MethodPut || r.Method == http.MethodPatch {
-				logrus.Debugf("🔍 NAMESPACE: %s namespace '%s' - updating object", r.Method, ns)
 				var obj map[string]interface{}
 				if err := json.NewDecoder(r.Body).Decode(&obj); err != nil {
 					stateMu.Unlock()
-					logrus.Errorf("🔍 NAMESPACE: failed to decode %s request: %v", r.Method, err)
 					writeJSON(w, 400, map[string]string{"error": "bad json"})
 					return
 				}
@@ -2580,20 +2449,18 @@ func (a *ScaleAgent) startMockHTTPSAPIServer(addr string, cert tls.Certificate, 
 					obj["metadata"] = md
 				}
 				md["name"] = ns
-				// bump resourceVersion to satisfy optimistic concurrency expectations
 				md["resourceVersion"] = nextRV()
 				namespaces[ns] = map[string]interface{}{"apiVersion": "v1", "kind": "Namespace", "metadata": md, "status": map[string]interface{}{"phase": "Active"}}
 				updated := namespaces[ns]
 				stateMu.Unlock()
-				logrus.Debugf("🔍 NAMESPACE: %s namespace '%s' - update successful", r.Method, ns)
 				writeJSON(w, 200, updated)
 				return
 			}
 			stateMu.Unlock()
-			logrus.Debugf("🔍 NAMESPACE: method %s not allowed for namespace '%s'", r.Method, ns)
 			writeJSON(w, 405, map[string]string{"error": "method not allowed"})
 			return
 		}
+
 		ns, res := parts[0], parts[1]
 		ensureNS(ns)
 		switch res {
@@ -2641,8 +2508,9 @@ func (a *ScaleAgent) startMockHTTPSAPIServer(addr string, cert tls.Certificate, 
 				items = append(items, role)
 			}
 			stateMu.RUnlock()
-			writeJSON(w, 200, map[string]interface{}{"kind": "RoleList", "apiVersion": "rbac.authorization.k8s.io/v1", "items": items})
+			writeJSON(w, 200, map[string]interface{}{"kind": "RoleList", "apiVersion": "rbac.authorization.k8s.io/v1", "resources": []map[string]interface{}{}})
 			return
+
 		case "rolebindings":
 			if r.Method == http.MethodPost {
 				var obj map[string]interface{}
@@ -2687,8 +2555,10 @@ func (a *ScaleAgent) startMockHTTPSAPIServer(addr string, cert tls.Certificate, 
 			if isWatch(r) {
 				stateMu.RLock()
 				items := []map[string]interface{}{}
-				for _, rb := range roleBindings[ns] {
-					items = append(items, rb)
+				if m, ok := roleBindings[ns]; ok {
+					for _, rb := range m {
+						items = append(items, rb)
+					}
 				}
 				stateMu.RUnlock()
 				writeWatchStream(w, r, items)
@@ -2696,671 +2566,20 @@ func (a *ScaleAgent) startMockHTTPSAPIServer(addr string, cert tls.Certificate, 
 			}
 			stateMu.RLock()
 			items := []interface{}{}
-			for _, rb := range roleBindings[ns] {
-				items = append(items, rb)
+			if m, ok := roleBindings[ns]; ok {
+				for _, rb := range m {
+					items = append(items, rb)
+				}
 			}
 			stateMu.RUnlock()
 			writeJSON(w, 200, map[string]interface{}{"kind": "RoleBindingList", "apiVersion": "rbac.authorization.k8s.io/v1", "items": items})
 			return
 		default:
 			http.NotFound(w, r)
+			return
 		}
 	}))
 
-	// ---- Core discovery endpoints ----
-	muxLocal.HandleFunc("/version", logReq(func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, 200, map[string]interface{}{"major": "1", "minor": "24", "gitVersion": "v1.24.0-mock", "platform": "linux/amd64"})
-	}))
-	muxLocal.HandleFunc("/api", logReq(func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, 200, map[string]interface{}{"kind": "APIVersions", "versions": []string{"v1"}})
-	}))
-	muxLocal.HandleFunc("/apis", logReq(func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, 200, map[string]interface{}{"kind": "APIGroupList", "apiVersion": "v1", "groups": []interface{}{
-			map[string]interface{}{"name": "rbac.authorization.k8s.io", "versions": []interface{}{map[string]interface{}{"groupVersion": "rbac.authorization.k8s.io/v1", "version": "v1"}}, "preferredVersion": map[string]interface{}{"groupVersion": "rbac.authorization.k8s.io/v1", "version": "v1"}},
-			map[string]interface{}{"name": "apiregistration.k8s.io", "versions": []interface{}{map[string]interface{}{"groupVersion": "apiregistration.k8s.io/v1", "version": "v1"}}, "preferredVersion": map[string]interface{}{"groupVersion": "apiregistration.k8s.io/v1", "version": "v1"}},
-		}})
-	}))
-	muxLocal.HandleFunc("/apis/apiregistration.k8s.io/v1", logReq(func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, 200, map[string]interface{}{"kind": "APIResourceList", "apiVersion": "v1", "groupVersion": "apiregistration.k8s.io/v1", "resources": []map[string]interface{}{
-			{"name": "apiservices", "namespaced": false, "kind": "APIService"},
-		}})
-	}))
-	muxLocal.HandleFunc("/apis/apiregistration.k8s.io/v1/apiservices", logReq(func(w http.ResponseWriter, r *http.Request) {
-		if isWatch(r) {
-			writeWatchStream(w, r, []map[string]interface{}{})
-			return
-		}
-		writeJSON(w, 200, map[string]interface{}{"kind": "APIServiceList", "apiVersion": "apiregistration.k8s.io/v1", "items": []interface{}{}})
-	}))
-	muxLocal.HandleFunc("/api/v1", logReq(func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, 200, map[string]interface{}{"kind": "APIResourceList", "apiVersion": "v1", "groupVersion": "v1", "resources": []map[string]interface{}{
-			{"name": "namespaces", "namespaced": false, "kind": "Namespace"},
-			{"name": "serviceaccounts", "namespaced": true, "kind": "ServiceAccount"},
-			{"name": "secrets", "namespaced": true, "kind": "Secret"},
-			{"name": "resourcequotas", "namespaced": true, "kind": "ResourceQuota"},
-			{"name": "limitranges", "namespaced": true, "kind": "LimitRange"},
-			{"name": "nodes", "namespaced": false, "kind": "Node"},
-		}})
-	}))
-
-	// ---- Cluster-scoped RBAC list/create/watch ----
-	muxLocal.HandleFunc("/apis/rbac.authorization.k8s.io/v1/clusterroles", logReq(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
-			var obj map[string]interface{}
-			if err := json.NewDecoder(r.Body).Decode(&obj); err != nil {
-				writeJSON(w, 400, map[string]string{"error": "bad json"})
-				return
-			}
-			md, _ := obj["metadata"].(map[string]interface{})
-			if md == nil {
-				md = map[string]interface{}{}
-				obj["metadata"] = md
-			}
-			name, _ := md["name"].(string)
-			if name == "" {
-				if gn, _ := md["generateName"].(string); gn != "" {
-					name = gn + randSuffix(5)
-					md["name"] = name
-				}
-			}
-			if name == "" {
-				writeJSON(w, 400, map[string]string{"error": "name required"})
-				return
-			}
-			rules, _ := obj["rules"].([]interface{})
-			cr := createClusterRole(name, rules)
-			writeJSON(w, 201, cr)
-			return
-		}
-		if isWatch(r) {
-			stateMu.RLock()
-			items := []map[string]interface{}{}
-			for _, cr := range clusterRoles {
-				items = append(items, cr)
-			}
-			stateMu.RUnlock()
-			writeWatchStream(w, r, items)
-			return
-		}
-		stateMu.RLock()
-		items := []interface{}{}
-		for _, cr := range clusterRoles {
-			items = append(items, cr)
-		}
-		stateMu.RUnlock()
-		writeJSON(w, 200, map[string]interface{}{"kind": "ClusterRoleList", "apiVersion": "rbac.authorization.k8s.io/v1", "items": items})
-	}))
-	muxLocal.HandleFunc("/apis/rbac.authorization.k8s.io/v1/clusterrolebindings", logReq(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
-			var obj map[string]interface{}
-			if err := json.NewDecoder(r.Body).Decode(&obj); err != nil {
-				writeJSON(w, 400, map[string]string{"error": "bad json"})
-				return
-			}
-			md, _ := obj["metadata"].(map[string]interface{})
-			if md == nil {
-				md = map[string]interface{}{}
-				obj["metadata"] = md
-			}
-			name, _ := md["name"].(string)
-			if name == "" {
-				if gn, _ := md["generateName"].(string); gn != "" {
-					name = gn + randSuffix(5)
-					md["name"] = name
-				}
-			}
-			if name == "" {
-				writeJSON(w, 400, map[string]string{"error": "name required"})
-				return
-			}
-			roleRef, _ := obj["roleRef"].(map[string]interface{})
-			roleName, _ := roleRef["name"].(string)
-			subjects, _ := obj["subjects"].([]interface{})
-			saNS, saName := "cattle-system", "cattle"
-			if len(subjects) > 0 {
-				if subj, ok := subjects[0].(map[string]interface{}); ok {
-					if n, ok2 := subj["name"].(string); ok2 {
-						saName = n
-					}
-					if nns, ok2 := subj["namespace"].(string); ok2 {
-						saNS = nns
-					}
-				}
-			}
-			crb := createClusterRoleBinding(name, roleName, saNS, saName)
-			writeJSON(w, 201, crb)
-			return
-		}
-		if isWatch(r) {
-			stateMu.RLock()
-			items := []map[string]interface{}{}
-			for _, crb := range clusterRoleBindings {
-				items = append(items, crb)
-			}
-			stateMu.RUnlock()
-			writeWatchStream(w, r, items)
-			return
-		}
-		stateMu.RLock()
-		items := []interface{}{}
-		for _, crb := range clusterRoleBindings {
-			items = append(items, crb)
-		}
-		stateMu.RUnlock()
-		writeJSON(w, 200, map[string]interface{}{"kind": "ClusterRoleBindingList", "apiVersion": "rbac.authorization.k8s.io/v1", "items": items})
-	}))
-
-	// ---- Core resource handlers ----
-
-	// Minimal OpenAPI v2 spec endpoint (Kubernetes normally serves a large document). Rancher just needs a 200 with JSON.
-	muxLocal.HandleFunc("/openapi/v2", logReq(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			w.WriteHeader(405)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		// Extremely reduced spec: only declares a few core objects we fake. Enough to unblock validation.
-		io.WriteString(w, `{
-	"swagger":"2.0",
-	"info":{"title":"Kubernetes","version":"v1.29.0"},
-	"paths":{
-	  "/api/v1/namespaces":{},
-	  "/api/v1/namespaces/{name}":{},
-	  "/api/v1/namespaces/{namespace}/secrets":{},
-	  "/api/v1/namespaces/{namespace}/serviceaccounts":{},
-	  "/apis/rbac.authorization.k8s.io/v1/clusterroles":{},
-	  "/apis/rbac.authorization.k8s.io/v1/clusterrolebindings":{}
-	},
-	"definitions":{
-	  "io.k8s.api.core.v1.Namespace":{ "type":"object","properties":{"metadata":{"type":"object"}}},
-	  "io.k8s.api.core.v1.Secret":{ "type":"object","properties":{"metadata":{"type":"object"},"data":{"type":"object"}}},
-	  "io.k8s.api.core.v1.ServiceAccount":{ "type":"object","properties":{"metadata":{"type":"object"}}},
-	  "io.k8s.api.rbac.v1.ClusterRole":{ "type":"object","properties":{"metadata":{"type":"object"}}},
-	  "io.k8s.api.rbac.v1.ClusterRoleBinding":{ "type":"object","properties":{"metadata":{"type":"object"}}}
-	}
-	}`)
-	}))
-
-	muxLocal.HandleFunc("/api/v1/namespaces", logReq(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
-			// Handle namespace creation
-			var obj map[string]interface{}
-			if err := json.NewDecoder(r.Body).Decode(&obj); err != nil {
-				writeJSON(w, 400, map[string]string{"error": "bad json"})
-				return
-			}
-
-			md, _ := obj["metadata"].(map[string]interface{})
-			if md == nil {
-				writeJSON(w, 400, map[string]string{"error": "metadata required"})
-				return
-			}
-
-			name, _ := md["name"].(string)
-			if name == "" {
-				writeJSON(w, 400, map[string]string{"error": "name required"})
-				return
-			}
-
-			// Create the namespace
-			ensureNS(name)
-
-			// Update with any additional metadata from the request
-			stateMu.Lock()
-			if nsMd, ok := namespaces[name]["metadata"].(map[string]interface{}); ok {
-				// Merge metadata from request
-				for k, v := range md {
-					if k != "name" && k != "namespace" { // Don't override these
-						nsMd[k] = v
-					}
-				}
-				// Ensure required fields
-				nsMd["name"] = name
-				nsMd["namespace"] = name
-				nsMd["resourceVersion"] = nextRV()
-			}
-			stateMu.Unlock()
-
-			writeJSON(w, 201, namespaces[name])
-			return
-		}
-
-		if isWatch(r) {
-			stateMu.RLock()
-			items := []map[string]interface{}{}
-			for _, nsObj := range namespaces {
-				items = append(items, nsObj)
-			}
-			stateMu.RUnlock()
-			writeWatchStream(w, r, items)
-			return
-		}
-		stateMu.RLock()
-		items := []interface{}{}
-		for _, nsObj := range namespaces {
-			items = append(items, nsObj)
-		}
-		stateMu.RUnlock()
-		writeJSON(w, 200, map[string]interface{}{"kind": "NamespaceList", "apiVersion": "v1", "items": items})
-	}))
-	// Namespaced core resources
-	muxLocal.HandleFunc("/api/v1/namespaces/", logReq(func(w http.ResponseWriter, r *http.Request) {
-		logrus.Debugf("🔍 NAMESPACE HANDLER: %s %s", r.Method, r.URL.Path)
-
-		rest := strings.TrimPrefix(r.URL.Path, "/api/v1/namespaces/")
-		parts := strings.Split(rest, "/")
-		logrus.Debugf("🔍 NAMESPACE PARTS: %v", parts)
-
-		// Handle direct namespace object: /api/v1/namespaces/{name}
-		if len(parts) == 1 || parts[1] == "" { // trailing slash optional
-			ns := strings.TrimSuffix(parts[0], "/")
-			if ns == "" {
-				logrus.Debugf("🔍 NAMESPACE: empty namespace name")
-				http.NotFound(w, r)
-				return
-			}
-
-			logrus.Debugf("🔍 NAMESPACE: handling namespace '%s' with method %s", ns, r.Method)
-			ensureNS(ns)
-
-			stateMu.Lock()
-			nsObj := namespaces[ns]
-			if r.Method == http.MethodGet {
-				logrus.Debugf("🔍 NAMESPACE: GET namespace '%s' - returning object", ns)
-				stateMu.Unlock()
-				writeJSON(w, 200, nsObj)
-				return
-			}
-			if r.Method == http.MethodPut || r.Method == http.MethodPatch {
-				logrus.Debugf("🔍 NAMESPACE: %s namespace '%s' - updating object", r.Method, ns)
-				var obj map[string]interface{}
-				if err := json.NewDecoder(r.Body).Decode(&obj); err != nil {
-					stateMu.Unlock()
-					logrus.Errorf("🔍 NAMESPACE: failed to decode %s request: %v", r.Method, err)
-					writeJSON(w, 400, map[string]string{"error": "bad json"})
-					return
-				}
-				md, _ := obj["metadata"].(map[string]interface{})
-				if md == nil {
-					md = map[string]interface{}{}
-					obj["metadata"] = md
-				}
-				md["name"] = ns
-				// bump resourceVersion to satisfy optimistic concurrency expectations
-				md["resourceVersion"] = nextRV()
-				namespaces[ns] = map[string]interface{}{"apiVersion": "v1", "kind": "Namespace", "metadata": md, "status": map[string]interface{}{"phase": "Active"}}
-				updated := namespaces[ns]
-				stateMu.Unlock()
-				logrus.Debugf("🔍 NAMESPACE: %s namespace '%s' - update successful", r.Method, ns)
-				writeJSON(w, 200, updated)
-				return
-			}
-			stateMu.Unlock()
-			logrus.Debugf("🔍 NAMESPACE: method %s not allowed for namespace '%s'", r.Method, ns)
-			writeJSON(w, 405, map[string]string{"error": "method not allowed"})
-			return
-		}
-		ns, res := parts[0], parts[1]
-		ensureNS(ns)
-		switch res {
-		case "serviceaccounts":
-			// Allow GET of individual service account: /api/v1/namespaces/{ns}/serviceaccounts/{name}
-			if len(parts) >= 3 && parts[2] != "" {
-				name := parts[2]
-				if r.Method == http.MethodGet {
-					stateMu.RLock()
-					objRaw, ok := serviceAccounts[ns][name]
-					stateMu.RUnlock()
-					if !ok {
-						http.NotFound(w, r)
-						return
-					}
-					writeJSON(w, 200, objRaw)
-					return
-				}
-				if r.Method == http.MethodPut || r.Method == http.MethodPatch {
-					// Accept any PUT/PATCH as a no-op update/upsert. Rancher uses this to "ensure" the SA exists.
-					var incoming map[string]interface{}
-					if err := json.NewDecoder(r.Body).Decode(&incoming); err != nil {
-						// even if bad JSON, just ensure object exists
-						logrus.Debugf("MOCK API PUT serviceaccount bad json (ns=%s name=%s): %v", ns, name, err)
-					}
-					// Inline mutation under single lock; avoid calling helper creators (they lock internally) to prevent deadlocks.
-					stateMu.Lock()
-					objRaw, ok := serviceAccounts[ns][name]
-					if !ok {
-						// create new SA struct
-						objRaw = map[string]interface{}{
-							"apiVersion": "v1", "kind": "ServiceAccount",
-							"metadata": map[string]interface{}{"name": name, "namespace": ns, "uid": genUID(ns + "-sa-" + name), "creationTimestamp": now(), "resourceVersion": nextRV()},
-							"secrets":  []interface{}{},
-						}
-						serviceAccounts[ns][name] = objRaw
-					} else if objMap, ok2 := objRaw.(map[string]interface{}); ok2 {
-						// merge metadata
-						mdExisting, _ := objMap["metadata"].(map[string]interface{})
-						if mdExisting == nil {
-							mdExisting = map[string]interface{}{}
-							objMap["metadata"] = mdExisting
-						}
-						if incoming != nil {
-							if mdIn, ok3 := incoming["metadata"].(map[string]interface{}); ok3 {
-								for k, v := range mdIn {
-									mdExisting[k] = v
-								}
-							}
-						}
-						mdExisting["name"] = name
-						mdExisting["namespace"] = ns
-						mdExisting["resourceVersion"] = nextRV()
-					}
-					// Ensure token secret exists
-					if _, ok2 := secrets[ns]; !ok2 {
-						secrets[ns] = map[string]interface{}{}
-					}
-					foundToken := false
-					for _, s := range secrets[ns] {
-						if sm, ok3 := s.(map[string]interface{}); ok3 {
-							if mdAny, ok4 := sm["metadata"].(map[string]interface{}); ok4 {
-								if anns, ok5 := mdAny["annotations"].(map[string]interface{}); ok5 {
-									if san, ok6 := anns["kubernetes.io/service-account.name"].(string); ok6 && san == name {
-										foundToken = true
-										break
-									}
-								}
-							}
-						}
-					}
-					if !foundToken {
-						secName := fmt.Sprintf("%s-token-%s", name, randSuffix(5))
-						data := map[string]interface{}{"token": base64.StdEncoding.EncodeToString([]byte("tok-" + randSuffix(32))), "ca.crt": base64.StdEncoding.EncodeToString([]byte(string(a.mockCertPEM))), "namespace": base64.StdEncoding.EncodeToString([]byte(ns))}
-						ann := map[string]interface{}{"kubernetes.io/service-account.name": name, "kubernetes.io/service-account.uid": genUID("sa-" + name)}
-						sec := map[string]interface{}{"apiVersion": "v1", "kind": "Secret", "metadata": map[string]interface{}{"name": secName, "namespace": ns, "uid": genUID(ns + "-secret-" + secName), "creationTimestamp": now(), "annotations": ann, "resourceVersion": nextRV()}, "type": "kubernetes.io/service-account-token", "data": data}
-						secrets[ns][secName] = sec
-						// link to SA
-						if saMap, ok3 := serviceAccounts[ns][name].(map[string]interface{}); ok3 {
-							if arr, ok4 := saMap["secrets"].([]interface{}); ok4 {
-								saMap["secrets"] = append(arr, map[string]interface{}{"name": secName})
-							} else {
-								saMap["secrets"] = []interface{}{map[string]interface{}{"name": secName}}
-							}
-						}
-					}
-					ret := serviceAccounts[ns][name]
-					stateMu.Unlock()
-					writeJSON(w, 200, ret)
-					return
-				}
-				writeJSON(w, 405, map[string]string{"error": "method not allowed"})
-				return
-			}
-			if r.Method == http.MethodPost {
-				var obj map[string]interface{}
-				if err := json.NewDecoder(r.Body).Decode(&obj); err != nil {
-					writeJSON(w, 400, map[string]string{"error": "bad json"})
-					return
-				}
-				md, _ := obj["metadata"].(map[string]interface{})
-				if md == nil {
-					md = map[string]interface{}{}
-					obj["metadata"] = md
-				}
-				name, _ := md["name"].(string)
-				if name == "" {
-					if gn, _ := md["generateName"].(string); gn != "" {
-						name = gn + randSuffix(5)
-						md["name"] = name
-					}
-				}
-				if name == "" {
-					writeJSON(w, 400, map[string]string{"error": "name required"})
-					return
-				}
-				sa := createServiceAccount(ns, name)
-				// auto token secret
-				createSecret(ns, "", "kubernetes.io/service-account-token", map[string]string{"token": "token"}, map[string]string{"kubernetes.io/service-account.name": name})
-				writeJSON(w, 201, sa)
-				return
-			}
-			if isWatch(r) {
-				stateMu.RLock()
-				items := []map[string]interface{}{}
-				for _, sa := range serviceAccounts[ns] {
-					if m, ok := sa.(map[string]interface{}); ok {
-						items = append(items, m)
-					}
-				}
-				stateMu.RUnlock()
-				writeWatchStream(w, r, items)
-				return
-			}
-			stateMu.RLock()
-			items := []interface{}{}
-			for _, sa := range serviceAccounts[ns] {
-				items = append(items, sa)
-			}
-			stateMu.RUnlock()
-			writeJSON(w, 200, map[string]interface{}{"kind": "ServiceAccountList", "apiVersion": "v1", "items": items})
-			return
-		case "secrets":
-			// GET individual secret: /api/v1/namespaces/{ns}/secrets/{name}
-			if len(parts) >= 3 && parts[2] != "" {
-				name := parts[2]
-				if r.Method == http.MethodGet {
-					stateMu.Lock()
-					objRaw, ok := secrets[ns][name]
-					if !ok {
-						stateMu.Unlock()
-						http.NotFound(w, r)
-						return
-					}
-					// Lazy populate if SA annotation exists or token secret type missing fields
-					if secMap, ok2 := objRaw.(map[string]interface{}); ok2 {
-						md, _ := secMap["metadata"].(map[string]interface{})
-						ann, _ := md["annotations"].(map[string]interface{})
-						if t, ok3 := secMap["type"].(string); (ok3 && t == "kubernetes.io/service-account-token") || (ann != nil && ann["kubernetes.io/service-account.name"] != nil) {
-							if _, ok3 := secMap["type"].(string); !ok3 || secMap["type"].(string) == "Opaque" {
-								secMap["type"] = "kubernetes.io/service-account-token"
-							}
-							dataMap, _ := secMap["data"].(map[string]interface{})
-							if dataMap == nil {
-								dataMap = map[string]interface{}{}
-								secMap["data"] = dataMap
-							}
-							if _, hasTok := dataMap["token"]; !hasTok {
-								dataMap["token"] = base64.StdEncoding.EncodeToString([]byte("tok-" + randSuffix(32)))
-							}
-							if _, hasCA := dataMap["ca.crt"]; !hasCA {
-								dataMap["ca.crt"] = base64.StdEncoding.EncodeToString([]byte(string(a.mockCertPEM)))
-							}
-							if _, hasNS := dataMap["namespace"]; !hasNS {
-								dataMap["namespace"] = base64.StdEncoding.EncodeToString([]byte(ns))
-							}
-							if md != nil {
-								md["resourceVersion"] = nextRV()
-							}
-						}
-					}
-					ret := secrets[ns][name]
-					stateMu.Unlock()
-					writeJSON(w, 200, ret)
-					return
-				}
-				if r.Method == http.MethodPut || r.Method == http.MethodPatch {
-					var incoming map[string]interface{}
-					_ = json.NewDecoder(r.Body).Decode(&incoming) // ignore errors
-					stateMu.Lock()
-					objRaw, ok := secrets[ns][name]
-					if !ok {
-						objRaw = map[string]interface{}{"apiVersion": "v1", "kind": "Secret", "metadata": map[string]interface{}{"name": name, "namespace": ns, "uid": genUID(ns + "-secret-" + name), "creationTimestamp": now(), "resourceVersion": nextRV()}, "type": "Opaque", "data": map[string]interface{}{}}
-						secrets[ns][name] = objRaw
-					}
-					if secMap, ok2 := objRaw.(map[string]interface{}); ok2 {
-						md, _ := secMap["metadata"].(map[string]interface{})
-						if md == nil {
-							md = map[string]interface{}{"name": name, "namespace": ns}
-							secMap["metadata"] = md
-						}
-						if incoming != nil {
-							if incMD, ok3 := incoming["metadata"].(map[string]interface{}); ok3 {
-								for k, v := range incMD {
-									md[k] = v
-								}
-							}
-						}
-						md["resourceVersion"] = nextRV()
-						ann, _ := md["annotations"].(map[string]interface{})
-						if ann != nil && ann["kubernetes.io/service-account.name"] != nil {
-							secMap["type"] = "kubernetes.io/service-account-token"
-							dataMap, _ := secMap["data"].(map[string]interface{})
-							if dataMap == nil {
-								dataMap = map[string]interface{}{}
-								secMap["data"] = dataMap
-							}
-							if _, hasTok := dataMap["token"]; !hasTok {
-								dataMap["token"] = base64.StdEncoding.EncodeToString([]byte("tok-" + randSuffix(32)))
-							}
-							if _, hasCA := dataMap["ca.crt"]; !hasCA {
-								dataMap["ca.crt"] = base64.StdEncoding.EncodeToString([]byte(string(a.mockCertPEM)))
-							}
-							if _, hasNS := dataMap["namespace"]; !hasNS {
-								dataMap["namespace"] = base64.StdEncoding.EncodeToString([]byte(ns))
-							}
-						}
-					}
-					ret := secrets[ns][name]
-					stateMu.Unlock()
-					writeJSON(w, 200, ret)
-					return
-				}
-				writeJSON(w, 405, map[string]string{"error": "method not allowed"})
-				return
-			}
-			if r.Method == http.MethodPost {
-				var obj map[string]interface{}
-				if err := json.NewDecoder(r.Body).Decode(&obj); err != nil { // still return success stub to unblock controllers
-					sec := createSecret(ns, "", "Opaque", map[string]string{"note": "auto-created"}, nil)
-					writeJSON(w, 201, sec)
-					return
-				}
-				md, _ := obj["metadata"].(map[string]interface{})
-				if md == nil {
-					md = map[string]interface{}{}
-					obj["metadata"] = md
-				}
-				name, _ := md["name"].(string)
-				if name == "" {
-					if gn, _ := md["generateName"].(string); gn != "" {
-						name = gn + randSuffix(5)
-					}
-				}
-				typ, _ := obj["type"].(string)
-				if typ == "" {
-					typ = "Opaque"
-				}
-				data := map[string]string{}
-				if rawData, ok := obj["data"].(map[string]interface{}); ok {
-					for k, v := range rawData {
-						if s, ok2 := v.(string); ok2 {
-							data[k] = s
-						}
-					}
-				}
-				annIn := map[string]string{}
-				if mdAnn, ok := md["annotations"].(map[string]interface{}); ok {
-					for k, v := range mdAnn {
-						if s, ok2 := v.(string); ok2 {
-							annIn[k] = s
-						}
-					}
-				}
-				// debug: ensure we never proceed with empty name after generation fallback
-				if name == "" {
-					logrus.Debugf("MOCK API generating fallback secret name (ns=%s) annotations=%v", ns, annIn)
-				}
-				// If impersonation secret, ensure service account exists first
-				if ns == "cattle-impersonation-system" {
-					if saName, ok := annIn["kubernetes.io/service-account.name"]; ok {
-						// auto-create SA if missing
-						stateMu.RLock()
-						_, exists := serviceAccounts[ns][saName]
-						stateMu.RUnlock()
-						if !exists {
-							createServiceAccount(ns, saName)
-						}
-						// Force type upgrade & populate token data immediately so Rancher doesn't wait.
-						if typ == "Opaque" {
-							typ = "kubernetes.io/service-account-token"
-						}
-						if typ == "kubernetes.io/service-account-token" {
-							if _, ok := data["token"]; !ok {
-								data["token"] = "tok-" + randSuffix(32)
-							}
-							if _, ok := data["ca.crt"]; !ok {
-								data["ca.crt"] = string(a.mockCertPEM)
-							}
-							if _, ok := data["namespace"]; !ok {
-								data["namespace"] = ns
-							}
-						}
-					} else {
-						// Fallback: Rancher sometimes creates placeholder Opaque secret first, without SA annotation; still emit a token so controllers progress.
-						if typ == "Opaque" {
-							typ = "kubernetes.io/service-account-token"
-						}
-						if _, ok := data["token"]; !ok {
-							data["token"] = "tok-" + randSuffix(32)
-						}
-						if _, ok := data["ca.crt"]; !ok {
-							data["ca.crt"] = string(a.mockCertPEM)
-						}
-						if _, ok := data["namespace"]; !ok {
-							data["namespace"] = ns
-						}
-					}
-				}
-				sec := createSecret(ns, name, typ, data, annIn)
-				writeJSON(w, 201, sec)
-				return
-			}
-			if isWatch(r) {
-				stateMu.RLock()
-				items := []map[string]interface{}{}
-				for _, s := range secrets[ns] {
-					if m, ok := s.(map[string]interface{}); ok {
-						items = append(items, m)
-					}
-				}
-				stateMu.RUnlock()
-				writeWatchStream(w, r, items)
-				return
-			}
-			stateMu.RLock()
-			items := []interface{}{}
-			for _, s := range secrets[ns] {
-				items = append(items, s)
-			}
-			stateMu.RUnlock()
-			writeJSON(w, 200, map[string]interface{}{"kind": "SecretList", "apiVersion": "v1", "items": items})
-			return
-		case "resourcequotas":
-			if isWatch(r) {
-				writeWatchStream(w, r, []map[string]interface{}{})
-				return
-			}
-			writeJSON(w, 200, map[string]interface{}{"kind": "ResourceQuotaList", "apiVersion": "v1", "items": []interface{}{}})
-			return
-		case "limitranges":
-			if isWatch(r) {
-				writeWatchStream(w, r, []map[string]interface{}{})
-				return
-			}
-			writeJSON(w, 200, map[string]interface{}{"kind": "LimitRangeList", "apiVersion": "v1", "items": []interface{}{}})
-			return
-		default:
-			http.NotFound(w, r)
-		}
-	}))
 	// cluster-wide list across namespaces for namespaced resources
 	muxLocal.HandleFunc("/api/v1/resourcequotas", logReq(func(w http.ResponseWriter, r *http.Request) {
 		if isWatch(r) {
@@ -3451,6 +2670,24 @@ func (a *ScaleAgent) startMockHTTPSAPIServer(addr string, cert tls.Certificate, 
 			logrus.Errorf("mock api server error: %v", err)
 		}
 	}()
+}
+
+func (a *ScaleAgent) startLocalPingServer() {
+    a.httpServerOnce.Do(func() {
+        mux := http.NewServeMux()
+        mux.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
+            w.WriteHeader(http.StatusOK)
+            _, _ = w.Write([]byte("pong"))
+        })
+        srv := &http.Server{Addr: "127.0.0.1:6080", Handler: mux}
+        a.httpServer = srv
+        go func() {
+            if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+                logrus.Errorf("local ping server failed: %v", err)
+            }
+        }()
+        logrus.Infof("Started local ping server on 127.0.0.1:6080 for /ping healthchecks")
+    })
 }
 
 // waitForPort tries to connect until timeout.
@@ -3614,7 +2851,7 @@ func (a *ScaleAgent) getTokenFromAPI(clusterID string) ([]byte, []byte, error) {
 		} `yaml:"clusters"`
 	}
 
-	if err := yaml.Unmarshal(output, &kubeconfig); err != nil {
+	if err := yaml3.Unmarshal(output, &kubeconfig); err != nil {
 		return nil, nil, fmt.Errorf("failed to parse kubeconfig: %v", err)
 	}
 
