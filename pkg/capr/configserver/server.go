@@ -88,7 +88,9 @@ func New(clients *wrangler.Context) *RKE2ConfigServer {
 		k8s:                      clients.K8s,
 	}
 
+	logrus.Info("HITHERE Enter DeferCAPIResources")
 	configSrv.DeferCAPIResources(clients)
+	logrus.Info("HITHERE Exit DeferCAPIResources")
 
 	return configSrv
 }

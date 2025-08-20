@@ -140,6 +140,8 @@ func (d *DeferredCAPIRegistration) invokePools(ctx context.Context, clients *Con
 }
 
 func (d *DeferredCAPIRegistration) DeferFunc(clients *Context, f func(clients *Context)) {
+	logrus.Info("HITHERE Begin DeferredCAPIRegistration.DeferFunc")
+	defer logrus.Info("HITHERE Exit DeferredCAPIRegistration.DeferFunc")
 	d.lock.Lock()
 	defer d.lock.Unlock()
 	if d.CAPIInitialized {
@@ -151,6 +153,8 @@ func (d *DeferredCAPIRegistration) DeferFunc(clients *Context, f func(clients *C
 }
 
 func (d *DeferredCAPIRegistration) DeferFuncWithError(clients *Context, f func(wrangler *Context) error) chan error {
+	logrus.Info("HITHERE Begin DeferredCAPIRegistration.DeferFuncWithError")
+	defer logrus.Info("HITHERE Exit DeferredCAPIRegistration.DeferFuncWithError")
 	errChan := make(chan error, 1)
 	go func(errs chan error) {
 		d.wg.Wait()
@@ -165,6 +169,8 @@ func (d *DeferredCAPIRegistration) DeferFuncWithError(clients *Context, f func(w
 }
 
 func (d *DeferredCAPIRegistration) DeferRegistration(ctx context.Context, clients *Context, register func(ctx context.Context, clients *Context) error) error {
+	logrus.Info("HITHERE Begin DeferredCAPIRegistration.DeferRegistration")
+	defer logrus.Info("HITHERE Exit DeferredCAPIRegistration.DeferRegistration")
 	d.lock.Lock()
 	defer d.lock.Unlock()
 	d.wg.Add(1)

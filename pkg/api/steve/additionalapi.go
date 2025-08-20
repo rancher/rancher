@@ -18,11 +18,14 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	steve "github.com/rancher/steve/pkg/server"
+	"github.com/sirupsen/logrus"
 )
 
 func AdditionalAPIsPreMCM(config *wrangler.Context) func(http.Handler) http.Handler {
 	if features.RKE2.Enabled() {
+		logrus.Info("Enter configserver.New")
 		connectHandler := configserver.New(config)
+		logrus.Info("Exit configserver.New")
 		mux := gmux.NewRouter()
 		mux.UseEncodedPath()
 		mux.Handle(configserver.ConnectAgent, connectHandler)
