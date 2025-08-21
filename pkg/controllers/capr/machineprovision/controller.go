@@ -565,28 +565,22 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 		return obj, err
 	}
 
-	jobName := infra.data.String("status", "jobName")
-	if jobName == "" {
-		return obj, nil
-	}
-
-	job, err := h.jobs.Get(infra.meta.GetNamespace(), jobName)
-	if apierrors.IsNotFound(err) {
-		return h.dynamic.UpdateStatus(&unstructured.Unstructured{
-			Object: infra.data,
-		})
-	} else if err != nil {
-		return obj, err
-	}
-
 	if failure {
 		// validate if we need to delete, enqueue or do nothing with the infraMachine if it fails
-		enqueueTime, err := infraMachineDeletionEnqueueingTime(job)
-		if err != nil {
-			logrus.Errorf("[machineprovision] %s/%s: Failed to get infra machine deletion action %s...", infra.meta.GetNamespace(), infra.meta.GetName(), err.Error())
-			return obj, err
+		jobName := infra.data.String("status", "jobName")
+		if jobName == "" {
+			return obj, nil
 		}
 
+		job, err := h.jobs.Get(infra.meta.GetNamespace(), jobName)
+		if apierrors.IsNotFound(err) {
+			return h.dynamic.UpdateStatus(&unstructured.Unstructured{
+				Object: infra.data,
+			})
+		} else if err != nil {
+			return obj, err
+		}
+		enqueueTime := infraMachineDeletionEnqueueingTime(job)
 		if enqueueTime > 0 {
 			logrus.Infof("[machineprovision] %s/%s: Failed to create infrastructure for machine %s enqueueing deletion after %d...", infra.meta.GetNamespace(), infra.meta.GetName(), machine.Name, enqueueTime)
 			h.EnqueueAfter(infra, enqueueTime)
@@ -619,6 +613,19 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 		})
 	}
 
+	jobName := infra.data.String("status", "jobName")
+	if jobName == "" {
+		return obj, nil
+	}
+
+	job, err := h.jobs.Get(infra.meta.GetNamespace(), jobName)
+	if apierrors.IsNotFound(err) {
+		return h.dynamic.UpdateStatus(&unstructured.Unstructured{
+			Object: infra.data,
+		})
+	} else if err != nil {
+		return obj, err
+	}
 	newStatus, err := h.getMachineStatus(job)
 	if err != nil {
 		return obj, err
@@ -648,19 +655,19 @@ func jobFailureTime(job *batchv1.Job) *time.Time {
 // infraMachineDeletionEnqueueingTime determines the duration we want to
 // keep the infraMachine alive for debugging purposes
 // based on job failure time and configured deletion settings.
-func infraMachineDeletionEnqueueingTime(job *batchv1.Job) (time.Duration, error) {
+func infraMachineDeletionEnqueueingTime(job *batchv1.Job) time.Duration {
 
 	deleteOnFailureAfter, err := time.ParseDuration(settings.DeleteInfraMachineOnFailureAfter.Get())
 	if err != nil {
 		logrus.Errorf("[machineprovision] error parsing the '%s' field: %v, defaulting to 0", settings.DeleteInfraMachineOnFailureAfter.Name, err)
-		return 0, nil
+		return 0
 	}
 
 	// get the job failure time to calculate the time since failure
 	failedTime := jobFailureTime(job)
 	if failedTime == nil {
 		logrus.Errorf("[machineprovision] error getting the failure time for the job '%s', defualting to 0: %v", job.Name, err)
-		return 0, nil
+		return 0
 	}
 
 	// example:
@@ -680,9 +687,9 @@ func infraMachineDeletionEnqueueingTime(job *batchv1.Job) (time.Duration, error)
 	timeSinceFailure := currentTime.Sub(*failedTime)
 
 	if timeSinceFailure.Seconds() >= deleteOnFailureAfter.Seconds() {
-		return 0, nil
+		return 0
 	} else {
-		return deleteOnFailureAfter - timeSinceFailure, nil
+		return deleteOnFailureAfter - timeSinceFailure
 	}
 }
 
