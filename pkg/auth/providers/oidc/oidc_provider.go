@@ -56,14 +56,12 @@ type OpenIDCProvider struct {
 }
 
 type ClaimInfo struct {
-	Subject           string   `json:"sub"`
-	Name              string   `json:"name"`
-	PreferredUsername string   `json:"preferred_username"`
-	GivenName         string   `json:"given_name"`
-	FamilyName        string   `json:"family_name"`
-	Email             string   `json:"email"`
-	Groups            []string `json:"groups"`
-	FullGroupPath     []string `json:"full_group_path"`
+	Subject       string   `json:"sub"`
+	Name          string   `json:"name"`
+	Email         string   `json:"email"`
+	Groups        []string `json:"groups"`
+	FullGroupPath []string `json:"full_group_path"`
+
 	// https://openid.net/specs/openid-connect-core-1_0.html#rfc.section.2
 	ACR   string   `json:"acr"`
 	Roles []string `json:"roles"`
