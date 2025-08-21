@@ -635,14 +635,14 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 	})
 }
 
-// jobFailureTime returns the failedTime of the job. If no Job failure found, returns an error
-func jobFailureTime(job *batchv1.Job) (time.Time, error) {
+// jobFailureTime returns the failedTime of the job. If no Job failure found, returns nil
+func jobFailureTime(job *batchv1.Job) *time.Time {
 	for _, jobCondition := range job.Status.Conditions {
 		if jobCondition.Type == batchv1.JobFailed && jobCondition.Status == corev1.ConditionTrue {
-			return jobCondition.LastTransitionTime.Time, nil
+			return &jobCondition.LastTransitionTime.Time
 		}
 	}
-	return time.Time{}, errors.New("job failure condition not found")
+	return nil
 }
 
 // infraMachineDeletionEnqueueingTime determines the duration we want to
@@ -652,15 +652,15 @@ func infraMachineDeletionEnqueueingTime(job *batchv1.Job) (time.Duration, error)
 
 	deleteOnFailureAfter, err := time.ParseDuration(settings.DeleteInfraMachineOnFailureAfter.Get())
 	if err != nil {
-		logrus.Errorf("[machineprovision] error parsing the 'deleteOnFailureAfter' field: %v", err)
-		return 0, err
+		logrus.Errorf("[machineprovision] error parsing the '%s' field: %v, defaulting to 0", settings.DeleteInfraMachineOnFailureAfter.Name, err)
+		return 0, nil
 	}
 
 	// get the job failure time to calculate the time since failure
-	failedTime, err := jobFailureTime(job)
-	if err != nil {
-		logrus.Errorf("[machineprovision] error getting the job failure time: %v", err)
-		return 0, err
+	failedTime := jobFailureTime(job)
+	if failedTime == nil {
+		logrus.Errorf("[machineprovision] error getting the failure time for the job '%s', defualting to 0: %v", job.Name, err)
+		return 0, nil
 	}
 
 	// example:
@@ -677,7 +677,7 @@ func infraMachineDeletionEnqueueingTime(job *batchv1.Job) (time.Duration, error)
 	// if the user wants a long time for debugging, it can put long hours (eg: 100h)
 	// then the infraMachine will take longer to be deleted (but it will, one time)
 	currentTime := time.Now()
-	timeSinceFailure := currentTime.Sub(failedTime)
+	timeSinceFailure := currentTime.Sub(*failedTime)
 
 	if timeSinceFailure.Seconds() >= deleteOnFailureAfter.Seconds() {
 		return 0, nil
