@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -13,7 +14,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v3"
+	yaml3 "gopkg.in/yaml.v3"
 )
 
 // KWOKClusterManager manages multiple kwok clusters
@@ -95,7 +96,7 @@ func (km *KWOKClusterManager) readClusterConfig(clusterName string) (*ClusterCon
 	configContent := strings.ReplaceAll(string(data), "{{cluster-name}}", clusterName)
 
 	var config ClusterConfig
-	if err := yaml.Unmarshal([]byte(configContent), &config); err != nil {
+	if err := yaml3.Unmarshal([]byte(configContent), &config); err != nil {
 		return nil, fmt.Errorf("failed to parse cluster config: %v", err)
 	}
 
@@ -169,6 +170,12 @@ func (km *KWOKClusterManager) CreateCluster(clusterName, clusterID string, confi
 	}
 	logrus.Infof("DEBUG: Cluster %s connectivity test passed!", kwokClusterName)
 
+
+	// Apply anonymous service account AFTER readiness to avoid validation/openapi errors
+	if err := km.applyAnonymousServiceAccount(kwokClusterName); err != nil {
+		logrus.Warnf("Failed to apply anonymous service account: %v", err)
+	}
+
 	// Get kubeconfig
 	kubeconfig, err := km.getKubeconfig(kwokClusterName)
 	if err != nil {
@@ -205,6 +212,39 @@ func (km *KWOKClusterManager) CreateCluster(clusterName, clusterID string, confi
 	return cluster, nil
 }
 
+// ApplyPostReadyTuning restarts the cluster with low-memory flags after registration to minimize downtime impact.
+func (km *KWOKClusterManager) ApplyPostReadyTuning(clusterID string) {
+	cluster, ok := km.GetCluster(clusterID)
+	if !ok || cluster == nil {
+		logrus.Debugf("ApplyPostReadyTuning: cluster %s not found", clusterID)
+		return
+	}
+	name := cluster.Name
+	// Ensure kwok.yaml has desired flags and components removed
+	if err := km.modifyKWOKConfigForLowMemory(name); err != nil {
+		logrus.Warnf("Post-ready tuning: modify kwok.yaml failed: %v", err)
+		return
+	}
+	// Stop/start cluster to apply apiserver flags
+	logrus.Infof("Post-ready tuning: restarting cluster %s to apply low-memory apiserver flags", name)
+	stopCmd := exec.Command(km.kwokctlPath, "stop", "cluster", "--name", name)
+	stopCmd.Env = append(os.Environ(), "GOMEMLIMIT=100MiB", "GOGC=25")
+	if out, err := stopCmd.CombinedOutput(); err != nil {
+		logrus.Warnf("Post-ready tuning: stop failed: %v, out=%s", err, string(out))
+	}
+	startCmd := exec.Command(km.kwokctlPath, "start", "cluster", "--name", name)
+	startCmd.Env = append(os.Environ(), "GOMEMLIMIT=100MiB", "GOGC=25")
+	if out, err := startCmd.CombinedOutput(); err != nil {
+		logrus.Warnf("Post-ready tuning: start failed: %v, out=%s", err, string(out))
+	} else {
+		logrus.Infof("Post-ready tuning applied and cluster %s restarted", name)
+		// As a safety, kill scheduler/controller again if spawned
+		if err := km.killSchedulerAndController(name); err != nil {
+			logrus.Debugf("Post-ready process trim: %v", err)
+		}
+	}
+}
+
 // createKWOKCluster creates a kwok cluster using kwokctl
 func (km *KWOKClusterManager) createKWOKCluster(clusterName string, port int) error {
 	// Use secure mode instead of insecure mode with binary runtime
@@ -217,6 +257,14 @@ func (km *KWOKClusterManager) createKWOKCluster(clusterName string, port int) er
 	// Let KWOK use default ports for other components
 	// Remove other port definitions to let KWOK use defaults
 
+	// Apply conservative Go memory limits to all child binaries spawned by kwokctl.
+	// This helps bound kube-apiserver/controller/scheduler RSS on small laptops.
+	// Target: apiserver ~100MB, controller ~40–60MB (actual will vary with load).
+	cmd.Env = append(os.Environ(),
+		"GOMEMLIMIT=100MiB", // cap Go heap for all spawned binaries
+		"GOGC=25",           // aggressive GC to keep RSS low
+	)
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to create KWOK cluster: %v, output: %s", err, string(output))
@@ -224,11 +272,51 @@ func (km *KWOKClusterManager) createKWOKCluster(clusterName string, port int) er
 
 	logrus.Infof("KWOK cluster created successfully: %s", string(output))
 
-	// Apply anonymous service account for testing
-	if err := km.applyAnonymousServiceAccount(clusterName); err != nil {
-		logrus.Warnf("Failed to apply anonymous service account: %v", err)
-	}
+	// Defer tuning to post-ready stage to avoid disrupting initial readiness.
 
+	return nil
+}
+
+// killSchedulerAndController finds and terminates kube-scheduler and kube-controller-manager
+// processes that belong to the given KWOK cluster (by matching the cluster path in command line).
+func (km *KWOKClusterManager) killSchedulerAndController(clusterName string) error {
+	clusterPath := filepath.Join(os.Getenv("HOME"), ".kwok", "clusters", clusterName)
+	psCmd := exec.Command("ps", "-axo", "pid,command")
+	out, err := psCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("ps failed: %w", err)
+	}
+	lines := strings.Split(string(out), "\n")
+	var killed int
+	for _, l := range lines {
+		if !strings.Contains(l, clusterPath) {
+			continue
+		}
+		if !(strings.Contains(l, "/bin/kube-scheduler") || strings.Contains(l, "/bin/kube-controller-manager")) {
+			continue
+		}
+		fields := strings.Fields(l)
+		if len(fields) < 1 {
+			continue
+		}
+		pidStr := fields[0]
+		pid, perr := strconv.Atoi(pidStr)
+		if perr != nil {
+			continue
+		}
+		// Prefer SIGTERM first
+		if p, perr := os.FindProcess(pid); perr == nil {
+			_ = p.Signal(os.Interrupt) // gentle
+			time.Sleep(500 * time.Millisecond)
+			// Hard kill if still present
+			_ = p.Kill()
+			killed++
+			logrus.Infof("Terminated component PID %d for cluster %s: %s", pid, clusterName, l)
+		}
+	}
+	if killed == 0 {
+		return errors.New("no scheduler/controller processes matched; nothing to kill")
+	}
 	return nil
 }
 
@@ -292,15 +380,25 @@ subjects:
 	}
 	kubeconfigFile.Close()
 
-	// Apply the YAML using the kubeconfig file
-	applyCmd := exec.Command("kubectl", "--kubeconfig", kubeconfigFile.Name(), "apply", "-f", tmpFile.Name())
-	applyOutput, err := applyCmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to apply anonymous service account: %v, output: %s", err, string(applyOutput))
+	// Apply the YAML using the kubeconfig file with retries and relaxed validation
+	var lastErr error
+	for attempt := 1; attempt <= 5; attempt++ {
+		applyCmd := exec.Command("kubectl",
+			"--kubeconfig", kubeconfigFile.Name(),
+			"--insecure-skip-tls-verify",
+			"apply", "-f", tmpFile.Name(),
+			"--validate=false",
+		)
+		applyOutput, err := applyCmd.CombinedOutput()
+		if err == nil {
+			logrus.Infof("Anonymous service account applied successfully: %s", string(applyOutput))
+			return nil
+		}
+		lastErr = fmt.Errorf("apply attempt %d failed: %v, output: %s", attempt, err, string(applyOutput))
+		logrus.Debugf("Retrying anonymous SA apply: %v", lastErr)
+		time.Sleep(2 * time.Second)
 	}
-
-	logrus.Infof("Anonymous service account applied successfully: %s", string(applyOutput))
-	return nil
+	return fmt.Errorf("failed to apply anonymous service account after retries: %v", lastErr)
 }
 
 // waitForClusterReady waits for the cluster to become ready
@@ -362,12 +460,15 @@ func (km *KWOKClusterManager) testClusterConnectivity(clusterName string) error 
 func (km *KWOKClusterManager) deleteKWOKCluster(clusterName string) error {
 	// Stop the cluster
 	cmd := exec.Command(km.kwokctlPath, "stop", "cluster", "--name", clusterName)
+	// use same env so child processes inherit limits (mostly no-op for stop)
+	cmd.Env = append(os.Environ(), "GOMEMLIMIT=100MiB", "GOGC=25")
 	if err := cmd.Run(); err != nil {
 		logrus.Warnf("Failed to stop cluster %s during cleanup: %v", clusterName, err)
 	}
 
 	// Delete the cluster
 	cmd = exec.Command(km.kwokctlPath, "delete", "cluster", "--name", clusterName)
+	cmd.Env = append(os.Environ(), "GOMEMLIMIT=100MiB", "GOGC=25")
 	if err := cmd.Run(); err != nil {
 		logrus.Warnf("Failed to delete cluster %s during cleanup: %v", clusterName, err)
 	}
@@ -887,13 +988,300 @@ func (km *KWOKClusterManager) Cleanup() {
 		logrus.Infof("Cleaning up KWOK cluster %s for Rancher cluster %s", cluster.Name, clusterID)
 
 		// Stop the cluster
-		cmd := exec.Command(km.kwokctlPath, "stop", "cluster", "--name", cluster.Name)
+	cmd := exec.Command(km.kwokctlPath, "stop", "cluster", "--name", cluster.Name)
+	cmd.Env = append(os.Environ(), "GOMEMLIMIT=100MiB", "GOGC=25")
 		cmd.Run() // Ignore errors during cleanup
 
 		// Delete the cluster
-		cmd = exec.Command(km.kwokctlPath, "delete", "cluster", "--name", cluster.Name)
+	cmd = exec.Command(km.kwokctlPath, "delete", "cluster", "--name", cluster.Name)
+	cmd.Env = append(os.Environ(), "GOMEMLIMIT=100MiB", "GOGC=25")
 		cmd.Run() // Ignore errors during cleanup
 	}
 
 	km.clusters = make(map[string]*KWOKCluster)
+}
+
+// modifyKWOKConfigForLowMemory appends conservative low-memory flags to component args in kwok.yaml
+// and leaves existing args intact. It aims to reduce kube-apiserver RSS (~100MB target) and
+// controller/scheduler RSS with minimal functional impact.
+func (km *KWOKClusterManager) modifyKWOKConfigForLowMemory(clusterName string) error {
+	// Load kwok.yaml
+	kwokConfigPath := filepath.Join(os.Getenv("HOME"), ".kwok", "clusters", clusterName, "kwok.yaml")
+	data, err := os.ReadFile(kwokConfigPath)
+	if err != nil {
+		return fmt.Errorf("failed to read kwok.yaml: %v", err)
+	}
+
+	// Unmarshal into a generic map to preserve unknown fields
+	var doc map[string]interface{}
+	if err := yaml3.Unmarshal(data, &doc); err != nil {
+		return fmt.Errorf("failed to parse kwok.yaml: %v", err)
+	}
+
+	// Fetch components list
+	compsVal, ok := doc["components"]
+	if !ok {
+		return fmt.Errorf("kwok.yaml missing 'components' section")
+	}
+
+	comps, ok := compsVal.([]interface{})
+	if !ok {
+		return fmt.Errorf("kwok.yaml 'components' is not a list")
+	}
+
+	// Desired flags for apiserver
+	apiServerDesired := []string{
+		"--profiling=false",
+		"--watch-cache=false",
+		"--event-ttl=5m",
+		"--max-requests-inflight=100",
+		"--max-mutating-requests-inflight=25",
+		"--default-watch-cache-size=0",
+		"--min-request-timeout=1800",
+		"--enable-aggregator-routing=false",
+		"--request-timeout=1m",
+		"--runtime-config=api/all=false,core/v1=true,rbac.authorization.k8s.io/v1=true,apiextensions.k8s.io/v1=true,coordination.k8s.io/v1=true,authentication.k8s.io/v1=true,authorization.k8s.io/v1=true",
+		"--enable-admission-plugins=NamespaceLifecycle",
+		"--disable-admission-plugins=MutatingAdmissionWebhook,ValidatingAdmissionWebhook,NodeRestriction,ServiceAccount,ResourceQuota,LimitRanger,DefaultStorageClass,DefaultTolerationSeconds,PodSecurity,EventRateLimit,StorageObjectInUseProtection,PodNodeSelector,PodTolerationRestriction,PersistentVolumeLabel",
+	}
+
+	// Helper to normalize []interface{} to []string
+	toStrings := func(in []interface{}) []string {
+		out := make([]string, 0, len(in))
+		for _, v := range in {
+			if s, ok := v.(string); ok {
+				out = append(out, s)
+			}
+		}
+		return out
+	}
+
+	// Helper to convert []string to []interface{}
+	toInterfaces := func(in []string) []interface{} {
+		out := make([]interface{}, 0, len(in))
+		for _, s := range in {
+			out = append(out, s)
+		}
+		return out
+	}
+
+	// Helper: ensure flags present, removing existing with same prefix to avoid conflicts
+	ensureFlags := func(existing []string, desired []string) []string {
+		// Build map of prefixes for desired flags (up to '=' if present)
+		prefix := func(s string) string {
+			if idx := strings.IndexByte(s, '='); idx > 0 {
+				return s[:idx]
+			}
+			return s
+		}
+		desiredSet := map[string]string{}
+		for _, d := range desired {
+			desiredSet[prefix(d)] = d
+		}
+		// Keep existing that don't conflict
+		merged := make([]string, 0, len(existing)+len(desired))
+		for _, e := range existing {
+			if _, conflict := desiredSet[prefix(e)]; !conflict {
+				merged = append(merged, e)
+			}
+		}
+		// Append desired in order
+		merged = append(merged, desired...)
+		return merged
+	}
+
+	// Build a new components list, removing scheduler and controller-manager
+	newComps := make([]interface{}, 0, len(comps))
+	for _, c := range comps {
+		cm, ok := c.(map[string]interface{})
+		if !ok {
+			// Preserve unrecognized entries
+			newComps = append(newComps, c)
+			continue
+		}
+		nameAny, hasName := cm["name"]
+		name, _ := nameAny.(string)
+		if hasName {
+			if name == "kube-scheduler" || name == "kube-controller-manager" {
+				// drop it
+				continue
+			}
+			if name == "kube-apiserver" {
+				// Inject/ensure low-memory flags
+				if argsAny, ok := cm["args"]; ok {
+					if argsSlice, ok := argsAny.([]interface{}); ok {
+						existing := toStrings(argsSlice)
+						cm["args"] = toInterfaces(ensureFlags(existing, apiServerDesired))
+					}
+				} else {
+					cm["args"] = toInterfaces(apiServerDesired)
+				}
+			}
+		}
+		newComps = append(newComps, cm)
+	}
+	doc["components"] = newComps
+
+	// Marshal back to YAML
+	out, err := yaml3.Marshal(doc)
+	if err != nil {
+		return fmt.Errorf("failed to marshal tuned kwok.yaml: %v", err)
+	}
+	if err := os.WriteFile(kwokConfigPath, out, 0644); err != nil {
+		return fmt.Errorf("failed to write tuned kwok.yaml: %v", err)
+	}
+
+	logrus.Infof("Applied low-memory tuning to %s (removed scheduler/controller, tuned apiserver flags)", kwokConfigPath)
+
+	// Additionally update metadata.yaml which controls component processes under kwokctl
+	if err := km.tuneKWOKMetadata(clusterName); err != nil {
+		logrus.Warnf("Failed tuning metadata.yaml: %v", err)
+	}
+	return nil
+}
+
+// tuneKWOKMetadata updates ~/.kwok/clusters/<name>/metadata.yaml to remove scheduler/controller
+// and inject low-memory flags into kube-apiserver. It supports two shapes: components list, or
+// top-level kubeApiserver/kubeControllerManager/kubeScheduler keys.
+func (km *KWOKClusterManager) tuneKWOKMetadata(clusterName string) error {
+	metaPath := filepath.Join(os.Getenv("HOME"), ".kwok", "clusters", clusterName, "metadata.yaml")
+	data, err := os.ReadFile(metaPath)
+	if err != nil {
+		// metadata.yaml may not exist in some KWOK versions; not fatal
+		return fmt.Errorf("read metadata.yaml: %w", err)
+	}
+
+	var doc map[string]interface{}
+	if err := yaml3.Unmarshal(data, &doc); err != nil {
+		return fmt.Errorf("parse metadata.yaml: %w", err)
+	}
+
+	// helper conversions
+	toStrings := func(in []interface{}) []string {
+		out := make([]string, 0, len(in))
+		for _, v := range in {
+			if s, ok := v.(string); ok {
+				out = append(out, s)
+			}
+		}
+		return out
+	}
+	toInterfaces := func(in []string) []interface{} {
+		out := make([]interface{}, 0, len(in))
+		for _, s := range in {
+			out = append(out, s)
+		}
+		return out
+	}
+	prefix := func(s string) string {
+		if idx := strings.IndexByte(s, '='); idx > 0 {
+			return s[:idx]
+		}
+		return s
+	}
+	ensureFlags := func(existing []string, desired []string) []string {
+		desiredSet := map[string]string{}
+		for _, d := range desired {
+			desiredSet[prefix(d)] = d
+		}
+		merged := make([]string, 0, len(existing)+len(desired))
+		for _, e := range existing {
+			if _, conflict := desiredSet[prefix(e)]; !conflict {
+				merged = append(merged, e)
+			}
+		}
+		merged = append(merged, desired...)
+		return merged
+	}
+
+	apiServerDesired := []string{
+		"--profiling=false",
+		"--watch-cache=false",
+		"--event-ttl=5m",
+		"--max-requests-inflight=100",
+		"--max-mutating-requests-inflight=25",
+		"--default-watch-cache-size=0",
+		"--min-request-timeout=1800",
+		"--enable-aggregator-routing=false",
+		"--request-timeout=1m",
+		"--runtime-config=api/all=false,core/v1=true,rbac.authorization.k8s.io/v1=true,apiextensions.k8s.io/v1=true,coordination.k8s.io/v1=true,authentication.k8s.io/v1=true,authorization.k8s.io/v1=true",
+		"--enable-admission-plugins=NamespaceLifecycle",
+		"--disable-admission-plugins=MutatingAdmissionWebhook,ValidatingAdmissionWebhook,NodeRestriction,ServiceAccount,ResourceQuota,LimitRanger,DefaultStorageClass,DefaultTolerationSeconds,PodSecurity,EventRateLimit,StorageObjectInUseProtection,PodNodeSelector,PodTolerationRestriction,PersistentVolumeLabel",
+	}
+
+	updated := false
+
+	// Case 1: components list
+	if compsAny, ok := doc["components"]; ok {
+		if comps, ok := compsAny.([]interface{}); ok {
+			newComps := make([]interface{}, 0, len(comps))
+			for _, c := range comps {
+				cm, ok := c.(map[string]interface{})
+				if !ok {
+					newComps = append(newComps, c)
+					continue
+				}
+				name, _ := cm["name"].(string)
+				switch name {
+				case "kube-scheduler", "kube-controller-manager":
+					updated = true
+					continue // drop
+				case "kube-apiserver":
+					if argsAny, ok := cm["args"]; ok {
+						if argsSlice, ok := argsAny.([]interface{}); ok {
+							existing := toStrings(argsSlice)
+							cm["args"] = toInterfaces(ensureFlags(existing, apiServerDesired))
+							updated = true
+						}
+					} else {
+						cm["args"] = toInterfaces(apiServerDesired)
+						updated = true
+					}
+				}
+				newComps = append(newComps, cm)
+			}
+			doc["components"] = newComps
+		}
+	}
+
+	// Case 2: top-level component keys
+	if apAny, ok := doc["kubeApiserver"]; ok {
+		if ap, ok := apAny.(map[string]interface{}); ok {
+			if argsAny, ok := ap["args"]; ok {
+				if argsSlice, ok := argsAny.([]interface{}); ok {
+					existing := toStrings(argsSlice)
+					ap["args"] = toInterfaces(ensureFlags(existing, apiServerDesired))
+					doc["kubeApiserver"] = ap
+					updated = true
+				}
+			} else {
+				ap["args"] = toInterfaces(apiServerDesired)
+				doc["kubeApiserver"] = ap
+				updated = true
+			}
+		}
+	}
+	// Remove scheduler/controller if present
+	if _, ok := doc["kubeScheduler"]; ok {
+		delete(doc, "kubeScheduler")
+		updated = true
+	}
+	if _, ok := doc["kubeControllerManager"]; ok {
+		delete(doc, "kubeControllerManager")
+		updated = true
+	}
+
+	if !updated {
+		return fmt.Errorf("no changes applied to metadata.yaml (unexpected schema)")
+	}
+
+	out, err := yaml3.Marshal(doc)
+	if err != nil {
+		return fmt.Errorf("marshal metadata.yaml: %w", err)
+	}
+	if err := os.WriteFile(metaPath, out, 0644); err != nil {
+		return fmt.Errorf("write metadata.yaml: %w", err)
+	}
+	logrus.Infof("Applied low-memory tuning to %s (removed scheduler/controller, tuned apiserver)", metaPath)
+	return nil
 }

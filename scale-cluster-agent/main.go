@@ -967,6 +967,8 @@ func (a *ScaleAgent) createClusterHandler(w http.ResponseWriter, r *http.Request
 		ci.Status = "ready"
 		logrus.Infof("All tests passed! Service account ready and API endpoints working. Establishing WebSocket connection for cluster %s", ci.Name)
 		a.connectClusterToRancher(ci.Name, ci.ClusterID, ci)
+
+		// Keep running processes unchanged to preserve prior memory profile
 	}(clusterInfo)
 }
 
