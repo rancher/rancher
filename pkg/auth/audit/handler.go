@@ -49,9 +49,11 @@ type wrapWriter struct {
 }
 
 func (w *wrapWriter) WriteHeader(statusCode int) {
-	w.statusCode = statusCode
 	w.ResponseWriter.WriteHeader(statusCode)
-	w.headerWrote = true
+	if !w.headerWrote {
+		w.statusCode = statusCode
+		w.headerWrote = true
+	}
 }
 
 func (w *wrapWriter) Write(body []byte) (int, error) {
