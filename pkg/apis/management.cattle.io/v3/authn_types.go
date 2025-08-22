@@ -610,7 +610,6 @@ type OIDCConfig struct {
 	Certificate        string `json:"certificate,omitempty"`
 	PrivateKey         string `json:"privateKey,omitempty" norman:"type=password"`
 	GroupSearchEnabled *bool  `json:"groupSearchEnabled"`
-	GroupsClaim        string `json:"groupsClaim,omitempty"`
 	// Scopes is expected to be a space delimited list of scopes
 	Scopes string `json:"scope,omitempty"`
 	// AcrValue is expected to be string containing the required ACR value
@@ -628,6 +627,15 @@ type OIDCConfig struct {
 	// When set `Logout All` is the only kind of logout accepted. A regular
 	// logout request will be rejected.
 	LogoutAllForced bool `json:"logoutAllForced,omitempty"`
+
+	// GroupsClaim is used instead of groups
+	GroupsClaim string `json:"groupsClaim,omitempty"`
+
+	// NameClaim is used instead instead of the name claim.
+	NameClaim string `json:"nameClaim,omitempty"`
+
+	// EmailClaim is used instead of email
+	EmailClaim string `json:"emailClaim,omitempty"`
 }
 
 type OIDCTestOutput struct {

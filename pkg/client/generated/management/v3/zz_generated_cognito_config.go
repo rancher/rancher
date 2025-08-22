@@ -12,6 +12,7 @@ const (
 	CognitoConfigFieldClientSecret        = "clientSecret"
 	CognitoConfigFieldCreated             = "created"
 	CognitoConfigFieldCreatorID           = "creatorId"
+	CognitoConfigFieldEmailClaim          = "emailClaim"
 	CognitoConfigFieldEnabled             = "enabled"
 	CognitoConfigFieldEndSessionEndpoint  = "endSessionEndpoint"
 	CognitoConfigFieldGroupSearchEnabled  = "groupSearchEnabled"
@@ -23,6 +24,7 @@ const (
 	CognitoConfigFieldLogoutAllForced     = "logoutAllForced"
 	CognitoConfigFieldLogoutAllSupported  = "logoutAllSupported"
 	CognitoConfigFieldName                = "name"
+	CognitoConfigFieldNameClaim           = "nameClaim"
 	CognitoConfigFieldOwnerReferences     = "ownerReferences"
 	CognitoConfigFieldPrivateKey          = "privateKey"
 	CognitoConfigFieldRancherURL          = "rancherUrl"
@@ -46,6 +48,7 @@ type CognitoConfig struct {
 	ClientSecret        string            `json:"clientSecret,omitempty" yaml:"clientSecret,omitempty"`
 	Created             string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID           string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	EmailClaim          string            `json:"emailClaim,omitempty" yaml:"emailClaim,omitempty"`
 	Enabled             bool              `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	EndSessionEndpoint  string            `json:"endSessionEndpoint,omitempty" yaml:"endSessionEndpoint,omitempty"`
 	GroupSearchEnabled  *bool             `json:"groupSearchEnabled,omitempty" yaml:"groupSearchEnabled,omitempty"`
@@ -57,6 +60,7 @@ type CognitoConfig struct {
 	LogoutAllForced     bool              `json:"logoutAllForced,omitempty" yaml:"logoutAllForced,omitempty"`
 	LogoutAllSupported  bool              `json:"logoutAllSupported,omitempty" yaml:"logoutAllSupported,omitempty"`
 	Name                string            `json:"name,omitempty" yaml:"name,omitempty"`
+	NameClaim           string            `json:"nameClaim,omitempty" yaml:"nameClaim,omitempty"`
 	OwnerReferences     []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	PrivateKey          string            `json:"privateKey,omitempty" yaml:"privateKey,omitempty"`
 	RancherURL          string            `json:"rancherUrl,omitempty" yaml:"rancherUrl,omitempty"`
