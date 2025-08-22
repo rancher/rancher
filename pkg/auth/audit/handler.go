@@ -56,7 +56,7 @@ func (w *wrapWriter) WriteHeader(statusCode int) {
 
 func (w *wrapWriter) Write(body []byte) (int, error) {
 	if !w.headerWrote {
-		logrus.Warn("Audit log writing implicit OK because callee never called `WriteHeader`")
+		logrus.Warn("Audit log writing implicit OK because callee never called `WriteHeader` before calling Write")
 		w.WriteHeader(http.StatusOK)
 	}
 	n, err := w.ResponseWriter.Write(body)

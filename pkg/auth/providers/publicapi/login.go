@@ -87,6 +87,9 @@ func (h *loginHandler) login(actionName string, action *types.Action, request *t
 			HttpOnly: true,
 		}
 		http.SetCookie(w, tokenCookie)
+		w.WriteHeader(http.StatusNoContent)
+
+		return nil
 	} else if responseType == "saml" {
 		return nil
 	} else {
