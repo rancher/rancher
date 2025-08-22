@@ -19,7 +19,7 @@ jobs:
       - name: Install Python Deps
         run: |
           # install python
-          zypper --non-interactive install python311 python311-pip python311-virtualenv
+          zypper --non-interactive install python311 python311-pip python311-virtualenv which
 
           # set python as the default python (essentially just a symlink)
           update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
