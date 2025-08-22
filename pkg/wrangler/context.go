@@ -340,7 +340,7 @@ func (w *Context) WithAgent(userAgent string) *Context {
 		wContextCopy.CAPI = wContextCopy.capi.WithAgent(userAgent).V1beta1()
 	} else {
 		wContextCopy.DeferredCAPIRegistration.DeferFunc(&wContextCopy, func(clients *Context) {
-			wContextCopy.CAPI = clients.capi.WithAgent(userAgent).V1beta1()
+			wContextCopy.CAPI = wContextCopy.capi.WithAgent(userAgent).V1beta1()
 		})
 	}
 

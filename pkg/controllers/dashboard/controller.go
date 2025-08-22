@@ -2,7 +2,6 @@ package dashboard
 
 import (
 	"context"
-	"github.com/sirupsen/logrus"
 
 	"github.com/rancher/rancher/pkg/controllers/capr"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
@@ -24,6 +23,7 @@ import (
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/needacert"
+	"github.com/sirupsen/logrus"
 )
 
 func Register(ctx context.Context, clients *wrangler.Context, embedded bool, registryOverride string) error {
