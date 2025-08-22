@@ -336,6 +336,12 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 			infraRef = *machinePool.NodeConfig
 		}
 
+		// The MachineOS field is used below to set the cattle.io/os label in the
+		// machine template, which is used by the planner and for the bootstrap
+		// secret.
+		//
+		// The label will default to linux when MachineOS is unset. For windows,
+		// MachineOS must be set by the user in the cluster machine pool spec.
 		machineOS := machinePool.MachineOS
 		if machineOS == "" {
 			machineOS = capr.DefaultMachineOS
