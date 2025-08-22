@@ -40,7 +40,8 @@ type LoggingHandler struct {
 type wrapWriter struct {
 	http.ResponseWriter
 
-	hijacked bool
+	hijacked    bool
+	headerWrote bool
 
 	statusCode   int
 	bytesWritten int
@@ -50,9 +51,14 @@ type wrapWriter struct {
 func (w *wrapWriter) WriteHeader(statusCode int) {
 	w.statusCode = statusCode
 	w.ResponseWriter.WriteHeader(statusCode)
+	w.headerWrote = true
 }
 
 func (w *wrapWriter) Write(body []byte) (int, error) {
+	if !w.headerWrote {
+		logrus.Warn("Audit log writing implicit OK because callee never called `WriteHeader`")
+		w.WriteHeader(http.StatusOK)
+	}
 	n, err := w.ResponseWriter.Write(body)
 	w.bytesWritten += n
 	w.buf.Write(body)

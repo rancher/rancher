@@ -24,6 +24,7 @@ func GetAuditLoggerMiddleware(auditLog *LoggingHandler) func(next http.Handler) 
 
 			wrappedRw := &wrapWriter{
 				ResponseWriter: rw,
+				headerWrote:    false,
 				statusCode:     http.StatusTeapot, // Default status should never matter so it can be nonsense; controversial, but it serves as our canary in the coal mine. If we see teapots we KNOW we have bugs somewhere.
 			}
 
