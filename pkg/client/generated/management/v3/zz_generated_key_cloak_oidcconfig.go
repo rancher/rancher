@@ -12,6 +12,7 @@ const (
 	KeyCloakOIDCConfigFieldClientSecret        = "clientSecret"
 	KeyCloakOIDCConfigFieldCreated             = "created"
 	KeyCloakOIDCConfigFieldCreatorID           = "creatorId"
+	KeyCloakOIDCConfigFieldEmailClaim          = "emailClaim"
 	KeyCloakOIDCConfigFieldEnabled             = "enabled"
 	KeyCloakOIDCConfigFieldGroupSearchEnabled  = "groupSearchEnabled"
 	KeyCloakOIDCConfigFieldGroupsClaim         = "groupsClaim"
@@ -20,6 +21,7 @@ const (
 	KeyCloakOIDCConfigFieldLabels              = "labels"
 	KeyCloakOIDCConfigFieldLogoutAllSupported  = "logoutAllSupported"
 	KeyCloakOIDCConfigFieldName                = "name"
+	KeyCloakOIDCConfigFieldNameClaim           = "nameClaim"
 	KeyCloakOIDCConfigFieldOwnerReferences     = "ownerReferences"
 	KeyCloakOIDCConfigFieldPrivateKey          = "privateKey"
 	KeyCloakOIDCConfigFieldRancherURL          = "rancherUrl"
@@ -43,6 +45,7 @@ type KeyCloakOIDCConfig struct {
 	ClientSecret        string            `json:"clientSecret,omitempty" yaml:"clientSecret,omitempty"`
 	Created             string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID           string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	EmailClaim          string            `json:"emailClaim,omitempty" yaml:"emailClaim,omitempty"`
 	Enabled             bool              `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	GroupSearchEnabled  *bool             `json:"groupSearchEnabled,omitempty" yaml:"groupSearchEnabled,omitempty"`
 	GroupsClaim         string            `json:"groupsClaim,omitempty" yaml:"groupsClaim,omitempty"`
@@ -51,6 +54,7 @@ type KeyCloakOIDCConfig struct {
 	Labels              map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	LogoutAllSupported  bool              `json:"logoutAllSupported,omitempty" yaml:"logoutAllSupported,omitempty"`
 	Name                string            `json:"name,omitempty" yaml:"name,omitempty"`
+	NameClaim           string            `json:"nameClaim,omitempty" yaml:"nameClaim,omitempty"`
 	OwnerReferences     []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	PrivateKey          string            `json:"privateKey,omitempty" yaml:"privateKey,omitempty"`
 	RancherURL          string            `json:"rancherUrl,omitempty" yaml:"rancherUrl,omitempty"`

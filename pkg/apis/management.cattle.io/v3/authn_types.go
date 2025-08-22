@@ -610,11 +610,21 @@ type OIDCConfig struct {
 	Certificate        string `json:"certificate,omitempty"`
 	PrivateKey         string `json:"privateKey,omitempty" norman:"type=password"`
 	GroupSearchEnabled *bool  `json:"groupSearchEnabled"`
-	GroupsClaim        string `json:"groupsClaim,omitempty"`
 	// Scopes is expected to be a space delimited list of scopes
 	Scopes string `json:"scope,omitempty"`
 	// AcrValue is expected to be string containing the required ACR value
 	AcrValue string `json:"acrValue,omitempty"`
+
+	// These are custom claim names
+	// GroupsClaim is used instead of groups
+	GroupsClaim string `json:"groupsClaim,omitempty"`
+
+	// NameClaim is used instead instead of the Name or Email as the
+	// Name for the user.
+	NameClaim string `json:"nameClaim,omitempty"`
+
+	// EmailClaim is used instead of email
+	EmailClaim string `json:"emailClaim,omitempty"`
 }
 
 type OIDCTestOutput struct {

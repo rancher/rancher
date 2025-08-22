@@ -417,16 +417,11 @@ func (o *OpenIDCProvider) getUserInfoFromAuthCode(ctx *context.Context, config *
 
 	// read groups from GroupsClaim if provided
 	if config.GroupsClaim != "" {
-		var mapClaims jwt.MapClaims
-		err = idToken.Claims(&mapClaims)
+		groupsClaim, err := getValueFromClaims[[]any](idToken, config.GroupsClaim)
 		if err != nil {
 			return userInfo, oauth2Token, fmt.Errorf("failed to parse groups claims: %w", err)
 		}
-		groupsClaim, ok := mapClaims[config.GroupsClaim].([]interface{})
-		if !ok {
-			logrus.Warn("failed to use custom groups claim")
-		} else {
-			logrus.Debugf("using custom groups claim")
+		if len(groupsClaim) > 0 {
 			var groups []string
 			for _, g := range groupsClaim {
 				group, ok := g.(string)
@@ -437,6 +432,24 @@ func (o *OpenIDCProvider) getUserInfoFromAuthCode(ctx *context.Context, config *
 			}
 			claimInfo.Groups = groups
 		}
+	}
+
+	// read name from nameClaim if provided
+	if config.NameClaim != "" {
+		nameClaim, err := getValueFromClaims[string](idToken, config.NameClaim)
+		if err != nil {
+			return userInfo, oauth2Token, fmt.Errorf("failed to parse claims: %w", err)
+		}
+		claimInfo.Name = nameClaim
+	}
+
+	// read email from emailClaim if provided
+	if config.EmailClaim != "" {
+		emailClaim, err := getValueFromClaims[string](idToken, config.EmailClaim)
+		if err != nil {
+			return userInfo, oauth2Token, fmt.Errorf("failed to parse claims: %w", err)
+		}
+		claimInfo.Email = emailClaim
 	}
 
 	// Valid will return false if access token is expired
@@ -687,4 +700,21 @@ func parseACRFromAccessToken(accessToken string) (string, error) {
 		return "", fmt.Errorf("ACR claim invalid or not found in token: (acr=%v)", claims["acr"])
 	}
 	return acrValue, nil
+}
+
+func getValueFromClaims[T any](idToken *oidc.IDToken, name string) (T, error) {
+	var mapClaims jwt.MapClaims
+	err := idToken.Claims(&mapClaims)
+	if err != nil {
+		var empty T
+		return empty, fmt.Errorf("failed to parse claims: %w", err)
+	}
+	claim, ok := mapClaims[name].(T)
+	if !ok {
+		logrus.Warnf("failed to use custom %s claim", name)
+	} else {
+		logrus.Debugf("using custom %s claim", name)
+	}
+
+	return claim, nil
 }
