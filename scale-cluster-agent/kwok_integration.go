@@ -1285,3 +1285,72 @@ func (km *KWOKClusterManager) tuneKWOKMetadata(clusterName string) error {
 	logrus.Infof("Applied low-memory tuning to %s (removed scheduler/controller, tuned apiserver)", metaPath)
 	return nil
 }
+
+// RestoreClusterRecord scans ~/.kwok for an existing cluster and inserts it into memory.
+// If kwokName is provided, it will try that first; otherwise it scans for rancher-<clusterID>-*.
+func (km *KWOKClusterManager) RestoreClusterRecord(clusterID string, kwokName string) (*KWOKCluster, error) {
+    km.clusterMutex.Lock()
+    defer km.clusterMutex.Unlock()
+
+    // already present
+    if c, ok := km.clusters[clusterID]; ok {
+        return c, nil
+    }
+
+    home := os.Getenv("HOME")
+    clustersDir := filepath.Join(home, ".kwok", "clusters")
+
+    // helper to attempt load by a specific directory name
+    tryLoad := func(dirName string) (*KWOKCluster, error) {
+        // expected naming rancher-<clusterID>-<port>
+        parts := strings.Split(dirName, "-")
+        if len(parts) < 3 {
+            return nil, fmt.Errorf("unexpected kwok dir format: %s", dirName)
+        }
+        // parse port (last part)
+        p, err := strconv.Atoi(parts[len(parts)-1])
+        if err != nil {
+            return nil, fmt.Errorf("parse port: %w", err)
+        }
+        kubeconfigPath := filepath.Join(clustersDir, dirName, "kubeconfig.yaml")
+        if _, err := os.Stat(kubeconfigPath); err != nil {
+            return nil, fmt.Errorf("missing kubeconfig: %w", err)
+        }
+        c := &KWOKCluster{
+            Name:       dirName,
+            ClusterID:  clusterID,
+            Port:       p,
+            Kubeconfig: kubeconfigPath,
+            Status:     "Ready",
+            CreatedAt:  time.Now(),
+        }
+        km.clusters[clusterID] = c
+        return c, nil
+    }
+
+    if kwokName != "" {
+        if c, err := tryLoad(kwokName); err == nil {
+            return c, nil
+        }
+    }
+
+    // scan directories
+    entries, err := os.ReadDir(clustersDir)
+    if err != nil {
+        return nil, fmt.Errorf("read kwok clusters dir: %w", err)
+    }
+    for _, e := range entries {
+        if !e.IsDir() { continue }
+        name := e.Name()
+        if !strings.HasPrefix(name, "rancher-") { continue }
+        // reconstruct cluster id from name parts (drop last port part)
+        parts := strings.Split(name, "-")
+        if len(parts) < 3 { continue }
+        cid := strings.Join(parts[1:len(parts)-1], "-")
+        if cid != clusterID { continue }
+        if c, err := tryLoad(name); err == nil {
+            return c, nil
+        }
+    }
+    return nil, fmt.Errorf("no existing kwok dir found for %s", clusterID)
+}

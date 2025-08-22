@@ -74,9 +74,9 @@ func main() {
 		ctx:               ctx,
 		cancel:            cancel,
 		activeConnections: make(map[string]bool),
-	clusterAgentSessions: make(map[string]bool),
+		clusterAgentSessions: make(map[string]bool),
 		connMutex:         sync.RWMutex{},
-	caMutex:           sync.RWMutex{},
+		caMutex:           sync.RWMutex{},
 		tokenCache:        make(map[string]string),
 		mockServers:       make(map[string]*http.Server),
 		portForwarders:    make(map[string]*PortForwarder),
@@ -105,10 +105,27 @@ func main() {
 
 	agent.kwokManager = NewKWOKClusterManager(kwokctlPath, kwokPath, 8001)
 
+	// Attempt to load previous state (clusters + kwok mappings)
+	if err := agent.LoadState(); err != nil {
+		logrus.Warnf("Failed to load persisted state: %v", err)
+	}
+
 	// Load cluster template
 	err = agent.loadClusterTemplate()
 	if err != nil {
 		logrus.Fatalf("Failed to load cluster template: %v", err)
+	}
+
+	// If any restored clusters are ready, kick off reconnects
+	for name, ci := range agent.clusters {
+		if name == "template" { continue }
+		if ci.ClusterID != "" {
+			if ci.Status == "ready" {
+				go agent.connectClusterToRancher(name, ci.ClusterID, ci)
+			} else {
+				logrus.Debugf("Restored cluster %s in status %s; will connect when ready", name, ci.Status)
+			}
+		}
 	}
 
 	// Setup HTTP server
@@ -881,6 +898,9 @@ func (a *ScaleAgent) createClusterHandler(w http.ResponseWriter, r *http.Request
 	}
 	a.clusters[req.Name] = clusterInfo
 
+	// Persist immediately
+	_ = a.SaveState()
+
 	// Send response
 	response := CreateClusterResponse{Success: true, Message: fmt.Sprintf("Cluster %s created successfully", req.Name), ClusterID: clusterID}
 	w.Header().Set("Content-Type", "application/json")
@@ -965,6 +985,8 @@ func (a *ScaleAgent) createClusterHandler(w http.ResponseWriter, r *http.Request
 
 		// Step 5: Mark cluster as ready and establish WebSocket connection
 		ci.Status = "ready"
+		// Persist status change
+		_ = a.SaveState()
 		logrus.Infof("All tests passed! Service account ready and API endpoints working. Establishing WebSocket connection for cluster %s", ci.Name)
 		a.connectClusterToRancher(ci.Name, ci.ClusterID, ci)
 
@@ -1005,6 +1027,8 @@ func (a *ScaleAgent) deleteClusterHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 	delete(a.clusters, clusterName)
+	// Persist after deletion
+	_ = a.SaveState()
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
 }
