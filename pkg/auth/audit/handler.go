@@ -55,6 +55,7 @@ func (w *wrapWriter) WriteHeader(statusCode int) {
 func (w *wrapWriter) Write(body []byte) (int, error) {
 	n, err := w.ResponseWriter.Write(body)
 	w.bytesWritten += n
+	w.buf.Write(body)
 	return n, err
 }
 
