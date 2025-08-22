@@ -82,6 +82,9 @@ func (w *wrapWriter) CloseNotify() <-chan bool {
 
 func (w *wrapWriter) Flush() {
 	if flusher, ok := w.ResponseWriter.(http.Flusher); ok {
+		if !w.headerWrote {
+			w.WriteHeader(http.StatusOK)
+		}
 		flusher.Flush()
 	}
 	logrus.Errorf("Upstream ResponseWriter of type %v does not implement http.Flusher", reflect.TypeOf(w.ResponseWriter))
