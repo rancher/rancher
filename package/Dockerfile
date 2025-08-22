@@ -17,7 +17,7 @@ ARG CHART_DEFAULT_BRANCH=dev-v2.13
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ARG CATTLE_KDM_BRANCH=dev-v2.12
+ARG CATTLE_KDM_BRANCH=dev-v2.13
 ARG VERSION=${VERSION}
 
 FROM --platform=$BUILDPLATFORM ${GODEP_APISERVER} AS godep-apiserver
@@ -363,11 +363,12 @@ ARG COMMIT
 ARG TAGS="k8s"
 ARG LINKFLAGS="-extldflags -static -s"
 ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X github.com/rancher/rancher/pkg/version.GitCommit=${COMMIT} ${LINKFLAGS}"
+ARG GCFLAGS
 ARG TARGETOS
 ARG TARGETARCH
 COPY pkg/ pkg/
 COPY main.go ./
-RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o /app/rancher
+RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/rancher
 
 # Output just the server binary
 FROM scratch AS server-binary
@@ -379,11 +380,12 @@ ARG VERSION
 ARG TAGS="k8s"
 ARG LINKFLAGS="-extldflags -static -s"
 ARG LDFLAGS="-X main.VERSION=${VERSION} $LINKFLAGS"
+ARG GCFLAGS
 ARG TARGETOS
 ARG TARGETARCH
 COPY cmd/ cmd/
 COPY pkg/ pkg/
-RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o /app/agent ./cmd/agent
+RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/agent ./cmd/agent
 
 
 FROM base AS server

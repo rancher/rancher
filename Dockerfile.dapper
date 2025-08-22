@@ -9,7 +9,7 @@ ENV HELM_UNITTEST_VERSION=0.3.2
 ENV K3D_VERSION=v5.7.1
 
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ENV CATTLE_KDM_BRANCH=dev-v2.12
+ENV CATTLE_KDM_BRANCH=dev-v2.13
 
 RUN zypper -n install gcc binutils glibc-devel-static ca-certificates git-core wget curl unzip tar vim less file xz gzip sed gawk iproute2 iptables jq skopeo
 # use containerd from k3s image, not from bci
@@ -86,7 +86,7 @@ ENV DAPPER_OUTPUT="./bin ./dist ./go.mod ./go.sum ./pkg/apis/go.mod ./pkg/apis/g
 ENV DAPPER_DOCKER_SOCKET=true
 ARG CI
 ARG DRONE_BUILD_NUMBER
-ENV DAPPER_RUN_ARGS="-v rancher2-go16-pkg-1:/go/pkg -v rancher2-go16-cache-1:/root/.cache/go-build --privileged --label CI=${CI} --label DRONE_BUILD_NUMBER=${DRONE_BUILD_NUMBER}"
+ENV DAPPER_RUN_ARGS="-v ./build:/tmp -v rancher2-go16-pkg-1:/go/pkg -v rancher2-go16-cache-1:/root/.cache/go-build --privileged --label CI=${CI} --label DRONE_BUILD_NUMBER=${DRONE_BUILD_NUMBER}"
 ENV GOCACHE=/root/.cache/go-build
 ENV HOME=${DAPPER_SOURCE}
 

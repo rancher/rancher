@@ -278,8 +278,6 @@ spec:
         volumeMounts:
         - name: k8s-ssl
           mountPath: /etc/kubernetes
-        securityContext:
-          privileged: true
       {{- if .PrivateRegistryConfig}}
       imagePullSecrets:
       - name: cattle-private-registry
