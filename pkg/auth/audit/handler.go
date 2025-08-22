@@ -88,6 +88,7 @@ func (w *wrapWriter) Flush() {
 			w.WriteHeader(http.StatusOK)
 		}
 		flusher.Flush()
+		return
 	}
 	logrus.Errorf("Upstream ResponseWriter of type %v does not implement http.Flusher", reflect.TypeOf(w.ResponseWriter))
 }
