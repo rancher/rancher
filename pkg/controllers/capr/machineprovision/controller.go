@@ -643,7 +643,7 @@ func jobFailureTime(job *batchv1.Job) *time.Time {
 // infraMachineDeletionEnqueueingTime determines the duration we want to
 // keep the infraMachine alive for debugging purposes
 // based on job failure time and configured deletion settings.
-func (h handler) infraMachineDeletionEnqueueingTime(infra *infraObject) (time.Duration, error) {
+func (h *handler) infraMachineDeletionEnqueueingTime(infra *infraObject) (time.Duration, error) {
 
 	deleteInfraTimeSetting := settings.DeleteInfraMachineOnFailureAfter.Get()
 
