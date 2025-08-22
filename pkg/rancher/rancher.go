@@ -463,7 +463,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 	})
 
 	if !features.MCMAgent.Enabled() && features.RancherSCCRegistrationExtension.Enabled() {
-		r.Wrangler.OnLeaderOrDie("rancher-start::MCMAgent", func(ctx context.Context) error {
+		r.Wrangler.OnLeaderOrDie("rancher-start::RancherSCCRegistration", func(ctx context.Context) error {
 			// TODO: pull this out of here if/when other features depend on the SecretRequest controllers
 			if err := telemetrycontrollers.RegisterControllers(ctx, r.Wrangler, r.telemetryManager); err != nil {
 				return err
