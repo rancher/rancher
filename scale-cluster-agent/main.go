@@ -151,6 +151,9 @@ func main() {
 	// Start websocket connection to Rancher only when we have clusters
 	go agent.startWebSocketConnection()
 
+	// Watch for Rancher-side deletions and clean up local state
+	go agent.startRancherDeletionWatcher()
+
 	// Start periodic cleanup of old KWOK clusters
 	go func() {
 		ticker := time.NewTicker(5 * time.Minute) // Clean up every 5 minutes
@@ -1923,11 +1926,108 @@ func (a *ScaleAgent) startPlanMonitor(clusterID, rancherHost, token string) {
 	}
 }
 
-func (a *ScaleAgent) deleteClusterFromRancher(clusterName string) error {
-	// This is a placeholder implementation
-	// In a real implementation, you would make HTTP request to Rancher API to delete cluster
+// startRancherDeletionWatcher polls Rancher for clusters and removes any locally tracked
+// clusters that were deleted on the server side. It mirrors real agent semantics where
+// the local agent tears down when the cluster is removed in Rancher.
+func (a *ScaleAgent) startRancherDeletionWatcher() {
+	ticker := time.NewTicker(60 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-a.ctx.Done():
+			return
+		case <-ticker.C:
+			a.reconcileRancherDeletions()
+		}
+	}
+}
 
-	logrus.Infof("Deleting cluster %s from Rancher", clusterName)
+func (a *ScaleAgent) reconcileRancherDeletions() {
+	// Fetch current clusters from Rancher
+	base := strings.TrimRight(a.config.RancherURL, "/")
+	req, err := http.NewRequest("GET", base+"/v3/clusters", nil)
+	if err != nil {
+		logrus.Debugf("deletion watcher: request build error: %v", err)
+		return
+	}
+	req.Header.Set("Authorization", "Bearer "+a.config.BearerToken)
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	if err != nil {
+		logrus.Debugf("deletion watcher: list clusters error: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		logrus.Debugf("deletion watcher: list clusters status %d: %s", resp.StatusCode, string(b))
+		return
+	}
+	var list struct{
+		Data []struct{ ID, Name string } `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		logrus.Debugf("deletion watcher: decode error: %v", err)
+		return
+	}
+	existing := make(map[string]bool, len(list.Data))
+	for _, c := range list.Data { existing[c.ID] = true }
+
+	// Compare with local and delete any that no longer exist in Rancher
+	toDelete := []string{}
+	for name, ci := range a.clusters {
+		if name == "template" || ci.ClusterID == "" { continue }
+		if !existing[ci.ClusterID] {
+			toDelete = append(toDelete, name)
+		}
+	}
+	for _, name := range toDelete {
+		ci := a.clusters[name]
+		logrus.Infof("Detected Rancher-side deletion of cluster %s (%s); cleaning up locally", name, ci.ClusterID)
+		// stop tunnel if any
+		a.connMutex.Lock()
+		// best-effort: our previous revision used connectCancels; if present, cancel
+		if a.connectCancels != nil {
+			if cancel, ok := a.connectCancels[name]; ok {
+				cancel()
+				delete(a.connectCancels, name)
+			}
+		}
+		delete(a.activeConnections, name)
+		delete(a.connecting, name)
+		a.connMutex.Unlock()
+		// delete KWOK cluster
+		if a.kwokManager != nil && ci.ClusterID != "" {
+			_ = a.kwokManager.DeleteCluster(ci.ClusterID)
+		}
+		// remove from memory and persist
+		delete(a.clusters, name)
+		_ = a.SaveState()
+	}
+}
+
+func (a *ScaleAgent) deleteClusterFromRancher(clusterName string) error {
+	// Find cluster ID by name from our map
+	ci, ok := a.clusters[clusterName]
+	if !ok || ci.ClusterID == "" {
+		return fmt.Errorf("cluster %s not found", clusterName)
+	}
+	clusterID := ci.ClusterID
+	base := strings.TrimRight(a.config.RancherURL, "/")
+	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/v3/clusters/%s", base, clusterID), nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+a.config.BearerToken)
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusAccepted {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("delete cluster failed: %d %s", resp.StatusCode, string(b))
+	}
+	logrus.Infof("Deleted cluster %s (%s) from Rancher", clusterName, clusterID)
 	return nil
 }
 
