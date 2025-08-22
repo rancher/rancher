@@ -328,7 +328,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		}
 	}
 
-	auditFilter := audit.NewAuditLogMiddleware(auditLogWriter)
+	auditLogMiddleware := audit.NewAuditLogMiddleware(auditLogWriter)
 	aggregationMiddleware := aggregation.NewMiddleware(ctx, wranglerContext.Mgmt.APIService(), wranglerContext.TunnelServer)
 
 	wranglerContext.OnLeader(func(ctx context.Context) error {
@@ -351,7 +351,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 
 	return &Rancher{
 		Auth: authServer.Authenticator.Chain(
-			auditFilter),
+			auditLogMiddleware),
 		Handler: responsewriter.Chain{
 			auth.SetXAPICattleAuthHeader,
 			responsewriter.ContentTypeOptions,
