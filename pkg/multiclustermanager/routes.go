@@ -41,26 +41,33 @@ import (
 )
 
 func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcmauthorizer.Authorizer, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) (func(http.Handler) http.Handler, error) {
+	logrus.Info("HITHERE inside router")
 	var (
 		k8sProxy       = k8sProxyPkg.New(scaledContext, scaledContext.Dialer, clusterManager)
 		connectHandler = scaledContext.Dialer.(*rancherdialer.Factory).TunnelServer
 		clusterImport  = clusterregistrationtokens.ClusterImport{Clusters: scaledContext.Management.Clusters("")}
 	)
 
+	logrus.Info("HITHERE before tokens.NewAPIHandler")
 	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext, norman.ConfigureAPIUI)
 	if err != nil {
 		return nil, err
 	}
+	logrus.Info("HITHERE after tokens.NewAPIHandler")
 
+	logrus.Info("HITHERE before publicapi.NewHandler")
 	publicAPI, err := publicapi.NewHandler(ctx, scaledContext, norman.ConfigureAPIUI)
 	if err != nil {
 		return nil, err
 	}
+	logrus.Info("HITHERE after publicapi.NewHandler")
 
+	logrus.Info("HITHERE before managementapi.New")
 	managementAPI, err := managementapi.New(ctx, scaledContext, clusterManager, k8sProxy, localClusterEnabled)
 	if err != nil {
 		return nil, err
 	}
+	logrus.Info("HITHERE after managementapi.New")
 
 	metaProxy, err := httpproxy.NewProxy("/proxy/", whitelist.Proxy.Get, scaledContext)
 	if err != nil {
