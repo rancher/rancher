@@ -2,6 +2,8 @@ package wrangler
 
 import (
 	"context"
+	"reflect"
+	"runtime"
 	"sync"
 	"time"
 
@@ -136,9 +138,9 @@ func (d *DeferredRegistration) invokePools(ctx context.Context, clients *Context
 	}
 
 	for _, f := range d.funcs {
-		logrus.Debugf("[deferred-registration] %p run  func  %v", clients, f)
+		logrus.Debugf("[deferred-registration] %p run  func  %v", clients, fn(f))
 		f(clients)
-		logrus.Debugf("[deferred-registration] %p done func %v", clients, f)
+		logrus.Debugf("[deferred-registration] %p done func %v", clients, fn(f))
 		d.wg.Done() // [1]
 	}
 
@@ -158,15 +160,15 @@ func (d *DeferredRegistration) DeferFunc(clients *Context, f func(clients *Conte
 	defer d.mutex.Unlock()
 
 	if !d.Initialized {
-		logrus.Debugf("[deferred-registration] %p defer func %v", clients, f)
+		logrus.Debugf("[deferred-registration] %p defer func %v", clients, fn(f))
 		d.wg.Add(1) // Released at [1]
 		d.funcs = append(d.funcs, f)
 		return
 	}
 
-	logrus.Debugf("[deferred-registration] %p imm run func  %v", clients, f)
+	logrus.Debugf("[deferred-registration] %p imm run func  %v", clients, fn(f))
 	f(clients)
-	logrus.Debugf("[deferred-registration] %p imm done func %v", clients, f)
+	logrus.Debugf("[deferred-registration] %p imm done func %v", clients, fn(f))
 }
 
 // DeferFuncWithError registers a function to be invoked when `d` requirements
@@ -205,12 +207,12 @@ func (d *DeferredRegistration) DeferRegistration(ctx context.Context, clients *C
 	d.wg.Add(1) // Released at [2], inside `invokeRegistrationFuncs`, now or deferred
 
 	if !d.Initialized {
-		logrus.Debugf("[deferred-registration] %p defer registration %v", clients, register)
+		logrus.Debugf("[deferred-registration] %p defer registration %v", clients, fn(register))
 		d.registrationFuncs = append(d.registrationFuncs, register)
 		return nil
 	}
 
-	logrus.Debugf("[deferred-registration] %p immediate registration %v", clients, register)
+	logrus.Debugf("[deferred-registration] %p immediate registration %v", clients, fn(register))
 
 	invoked, err := func() (bool, error) {
 		clients.controllerLock.Lock()
@@ -252,13 +254,17 @@ func (d *DeferredRegistration) DeferRegistration(ctx context.Context, clients *C
 func (d *DeferredRegistration) invokeRegistrationFuncs(transaction context.Context, clients *Context,
 	f []func(ctx context.Context, clients *Context) error) error {
 	for _, register := range f {
-		logrus.Debugf("[deferred-registration] %p run registration  %v", clients, register)
+		logrus.Debugf("[deferred-registration] %p run registration  %v", clients, fn(register))
 		if err := register(transaction, clients); err != nil {
-			logrus.Debugf("[deferred-registration] %p fail registration %v, err", clients, register, err)
+			logrus.Debugf("[deferred-registration] %p fail registration %v, error: %v", clients, fn(register), err)
 			return err
 		}
-		logrus.Debugf("[deferred-registration] %p done registration %v", clients, register)
+		logrus.Debugf("[deferred-registration] %p done registration %v", clients, fn(register))
 		d.wg.Done() // [2]
 	}
 	return nil
+}
+
+func fn(i interface{}) string {
+	return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
 }
