@@ -490,6 +490,16 @@ func GatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 		}
 	}
 
+	// collect the logs of the capi-controller-manager pods
+	capiPods, newErr := clients.Core.Pod().List("cattle-provisioning-capi-system", metav1.ListOptions{})
+	if newErr != nil {
+		logrus.Errorf("failed to list capi-controller-manager capiPods: %v", newErr)
+	} else {
+		for _, pod := range capiPods.Items {
+			podLogs[pod.Name] = populatePodLogs(clients, nil, pod.Namespace, pod.Name)
+		}
+	}
+
 	rkeBootstrapTemplates, newErr := clients.RKE.RKEBootstrapTemplate().List(c.Namespace, metav1.ListOptions{
 		LabelSelector: "cluster.x-k8s.io/cluster-name=" + c.Name,
 	})
