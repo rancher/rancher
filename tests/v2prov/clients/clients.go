@@ -4,9 +4,13 @@ import (
 	"context"
 	"time"
 
+	capi "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io"
+	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/kubeconfig"
 	"github.com/rancher/wrangler/v3/pkg/ratelimit"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/clientcmd"
@@ -15,6 +19,9 @@ import (
 type Clients struct {
 	*wrangler.Context
 	Dynamic dynamic.Interface
+
+	capi *capi.Factory
+	CAPI capicontrollers.Interface
 
 	// Ctx is canceled when the Close() is called
 	Ctx     context.Context
@@ -70,6 +77,16 @@ func NewForConfig(ctx context.Context, config clientcmd.ClientConfig) (*Clients,
 		return nil, err
 	}
 
+	// CAPI CRDs are a prerequisite to running prov v2 tests
+	opts := &generic.FactoryOptions{
+		SharedControllerFactory: wranglerCtx.ControllerFactory,
+	}
+
+	capi, err := capi.NewFactoryFromConfigWithOptions(wranglerCtx.RESTConfig, opts)
+	if err != nil {
+		logrus.Fatalf("Encountered unexpected panic while creating capi factory: %v", err)
+	}
+
 	dynamic, err := dynamic.NewForConfig(rest)
 	if err != nil {
 		cancel()
@@ -79,7 +96,11 @@ func NewForConfig(ctx context.Context, config clientcmd.ClientConfig) (*Clients,
 	return &Clients{
 		Context: wranglerCtx,
 		Dynamic: dynamic,
-		Ctx:     ctx,
-		cancel:  cancel,
+
+		capi: capi,
+		CAPI: capi.Cluster().V1beta1(),
+
+		Ctx:    ctx,
+		cancel: cancel,
 	}, nil
 }

@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"sync"
-	"time"
 
 	fleetv1alpha1api "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/lasso/pkg/controller"
@@ -105,6 +104,8 @@ var (
 	AddToScheme = localSchemeBuilder.AddToScheme
 	Scheme      = runtime.NewScheme()
 )
+
+const defaultControllerWorkerCount = 50
 
 func init() {
 	metav1.AddToGroupVersion(Scheme, schema.GroupVersion{Version: "v1"})
@@ -206,7 +207,7 @@ func (w *Context) StartWithTransaction(ctx context.Context, f func(context.Conte
 	return w.Start(ctx)
 }
 
-func (w *Context) StartSharedFactoryWithTransaction(ctx context.Context, f func(context.Context) error) (err error) {
+func (w *Context) StartFactoryWithTransaction(ctx context.Context, f func(context.Context) error) (err error) {
 	w.controllerLock.Lock()
 	defer w.controllerLock.Unlock()
 
@@ -225,7 +226,7 @@ func (w *Context) StartSharedFactoryWithTransaction(ctx context.Context, f func(
 	w.ControllerFactory.SharedCacheFactory().WaitForCacheSync(ctx)
 	transaction.Commit()
 
-	if err := w.ControllerFactory.Start(ctx, 50); err != nil {
+	if err := w.ControllerFactory.Start(ctx, defaultControllerWorkerCount); err != nil {
 		return err
 	}
 
@@ -244,10 +245,11 @@ func (w *Context) Start(ctx context.Context) error {
 		w.started = true
 	}
 
-	if err := w.ControllerFactory.Start(ctx, 50); err != nil {
+	if err := w.ControllerFactory.Start(ctx, defaultControllerWorkerCount); err != nil {
 		return err
 	}
 	w.leadership.Start(ctx)
+	logrus.Trace("Wrangler context has started")
 	return nil
 }
 
@@ -290,29 +292,16 @@ func (w *Context) WithAgent(userAgent string) *Context {
 	wContextCopy.API = wContextCopy.api.WithAgent(userAgent).V1()
 	wContextCopy.CRD = wContextCopy.crd.WithAgent(userAgent).V1()
 	wContextCopy.Plan = wContextCopy.plan.WithAgent(userAgent).V1()
-	if w.DeferredCAPIRegistration.CAPIInitialized {
+
+	if w.DeferredCAPIRegistration.CAPIInitialized() {
 		wContextCopy.CAPI = wContextCopy.capi.WithAgent(userAgent).V1beta1()
 	} else {
-		go wContextCopy.BackfillCAPI(&wContextCopy)
+		wContextCopy.DeferredCAPIRegistration.DeferFunc(&wContextCopy, func(clients *Context) {
+			wContextCopy.CAPI = wContextCopy.capi.WithAgent(userAgent).V1beta1()
+		})
 	}
 
 	return &wContextCopy
-}
-
-func (w *Context) BackfillCAPI(cpy *Context) {
-	printCapi := false
-	for {
-		if w.DeferredCAPIRegistration.CAPIInitialized {
-			if printCapi {
-				logrus.Trace("CAPI was initialized, retroactively adding to copy")
-			}
-			w.CAPI = cpy.CAPI
-			return
-		}
-		printCapi = true
-		logrus.Trace("Waiting for CAPI to be initialized before populating CAPI clients in copy")
-		time.Sleep(time.Second * 2)
-	}
 }
 
 func enableProtobuf(cfg *rest.Config) *rest.Config {
@@ -527,14 +516,9 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		telemetry:    telemetry,
 
 		DeferredCAPIRegistration: &DeferredCAPIRegistration{
-			wg:              &sync.WaitGroup{},
-			CAPIInitialized: false,
+			wg: &sync.WaitGroup{},
 		},
 	}
-
-	// back-fill the context with the CAPI factory when the relevant
-	// CRDs are available
-	go wContext.ManageDeferredCAPIContext(ctx)
 
 	return wContext, nil
 }

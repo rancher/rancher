@@ -21,7 +21,6 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/pkg/wrangler"
-	wrangler2 "github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -88,22 +87,22 @@ func New(clients *wrangler.Context) *RKE2ConfigServer {
 		k8s:                      clients.K8s,
 	}
 
-	configSrv.DeferCAPIResources(clients)
-
+	go configSrv.DeferCAPIResources(clients)
 	return configSrv
 }
 
-func (r *RKE2ConfigServer) DeferCAPIResources(wrangler *wrangler.Context) {
-	wrangler.DeferredCAPIRegistration.DeferFunc(wrangler, func(wrangler *wrangler2.Context) {
-		r.machineCache = wrangler.CAPI.Machine().Cache()
-		r.machines = wrangler.CAPI.Machine()
+func (r *RKE2ConfigServer) DeferCAPIResources(clients *wrangler.Context) {
+	clients.DeferredCAPIRegistration.DeferFunc(clients, func(clients *wrangler.Context) {
+		r.machineCache = clients.CAPI.Machine().Cache()
+		r.machines = clients.CAPI.Machine()
 		r.capiAvailable = true
+		logrus.Debug("[rke2ConfigServer] Initialized CAPI clients after deferred func execution")
 	})
 }
 
 func (r *RKE2ConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if !r.capiAvailable {
-		logrus.Debugf("[rke2configserver] CAPI not ready yet")
+		logrus.Debug("[rke2ConfigServer] CAPI not ready yet")
 		rw.WriteHeader(http.StatusServiceUnavailable)
 		rw.Header().Set("Retry-After", "5")
 		return
