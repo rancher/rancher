@@ -185,6 +185,8 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY ;
       - name: publish to gh
         uses: ./.github/actions/images-files/publish-gh
+      - name: publish to aws
+        uses: ./.github/actions/images-files/publish-aws
   docker-image-digests:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
     container: registry.suse.com/bci/bci-base:15.7
