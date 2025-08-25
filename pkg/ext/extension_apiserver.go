@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken"
 	extstores "github.com/rancher/rancher/pkg/ext/stores"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -233,7 +234,7 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 			// we just want to expose these. Note /api is needed for client-go's
 			// discovery even though not strictly necessary
 			maybeAllowed := false
-			allowedPathsPrefix := []string{"/api", "/apis", "/openapi/v2", "/openapi/v3"}
+			allowedPathsPrefix := []string{"/api", "/apis", "/openapi/v2", "/openapi/v3", "/version"}
 			for _, path := range allowedPathsPrefix {
 				if strings.HasPrefix(a.GetPath(), path) {
 					maybeAllowed = true
@@ -242,7 +243,7 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 			}
 
 			if !maybeAllowed {
-				return authorizer.DecisionDeny, "only /api, /apis, /openapi/v2 and /openapi/v3 supported", nil
+				return authorizer.DecisionDeny, "only /api, /apis, /openapi/v2, /openapi/v3, and /version supported", nil
 			}
 
 			return aslAuthorizer.Authorize(ctx, a)
@@ -257,6 +258,17 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 
 	if err = extstores.InstallStores(extensionAPIServer, wranglerContext, scheme); err != nil {
 		return nil, fmt.Errorf("failed to install stores: %w", err)
+	}
+
+	if features.ExtTokens.Enabled() {
+		// deferred ext controller setup ...
+		wranglerContext.DeferredEXTAPIRegistration.DeferFunc(wranglerContext, func(w *wrangler.Context) {
+			logrus.Debugf("[deferred-extapi/run] %p GREEN - cluster auth token - register ext token indexers", w)
+
+			if err := clusterauthtoken.RegisterExtIndexers(w.Ext); err != nil {
+				panic(err)
+			}
+		})
 	}
 
 	return extensionAPIServer, nil
