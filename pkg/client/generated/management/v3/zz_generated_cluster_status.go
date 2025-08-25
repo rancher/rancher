@@ -8,6 +8,7 @@ const (
 	ClusterStatusFieldAPIEndpoint                                = "apiEndpoint"
 	ClusterStatusFieldAgentFeatures                              = "agentFeatures"
 	ClusterStatusFieldAgentImage                                 = "agentImage"
+	ClusterStatusFieldAliStatus                                  = "aliStatus"
 	ClusterStatusFieldAllocatable                                = "allocatable"
 	ClusterStatusFieldAppliedAgentEnvVars                        = "appliedAgentEnvVars"
 	ClusterStatusFieldAppliedClusterAgentDeploymentCustomization = "appliedClusterAgentDeploymentCustomization"
@@ -50,6 +51,7 @@ type ClusterStatus struct {
 	APIEndpoint                                string                        `json:"apiEndpoint,omitempty" yaml:"apiEndpoint,omitempty"`
 	AgentFeatures                              map[string]bool               `json:"agentFeatures,omitempty" yaml:"agentFeatures,omitempty"`
 	AgentImage                                 string                        `json:"agentImage,omitempty" yaml:"agentImage,omitempty"`
+	AliStatus                                  *AliStatus                    `json:"aliStatus,omitempty" yaml:"aliStatus,omitempty"`
 	Allocatable                                map[string]string             `json:"allocatable,omitempty" yaml:"allocatable,omitempty"`
 	AppliedAgentEnvVars                        []EnvVar                      `json:"appliedAgentEnvVars,omitempty" yaml:"appliedAgentEnvVars,omitempty"`
 	AppliedClusterAgentDeploymentCustomization *AgentDeploymentCustomization `json:"appliedClusterAgentDeploymentCustomization,omitempty" yaml:"appliedClusterAgentDeploymentCustomization,omitempty"`

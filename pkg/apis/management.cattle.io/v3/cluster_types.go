@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	aksv1 "github.com/rancher/aks-operator/pkg/apis/aks.cattle.io/v1"
+	aliv1 "github.com/rancher/ali-operator/pkg/apis/ali.cattle.io/v1"
 	eksv1 "github.com/rancher/eks-operator/pkg/apis/eks.cattle.io/v1"
 	gkev1 "github.com/rancher/gke-operator/pkg/apis/gke.cattle.io/v1"
 	"github.com/rancher/norman/condition"
@@ -81,6 +82,7 @@ const (
 	ClusterDriverAKS      = "AKS"
 	ClusterDriverEKS      = "EKS"
 	ClusterDriverGKE      = "GKE"
+	ClusterDriverAlibaba  = "AlibabaCloud"
 	ClusterDriverRancherD = "rancherd"
 
 	ClusterPrivateRegistrySecret = "PrivateRegistrySecret"
@@ -159,6 +161,7 @@ type ClusterSpec struct {
 	AKSConfig                           *aksv1.AKSClusterConfigSpec `json:"aksConfig,omitempty"`
 	EKSConfig                           *eksv1.EKSClusterConfigSpec `json:"eksConfig,omitempty"`
 	GKEConfig                           *gkev1.GKEClusterConfigSpec `json:"gkeConfig,omitempty"`
+	AliConfig                           *aliv1.AliClusterConfigSpec `json:"aliConfig,omitempty"`
 	ClusterTemplateName                 string                      `json:"clusterTemplateName,omitempty" norman:"type=reference[clusterTemplate],nocreate,noupdate"`
 	ClusterTemplateRevisionName         string                      `json:"clusterTemplateRevisionName,omitempty" norman:"type=reference[clusterTemplateRevision]"`
 	ClusterTemplateAnswers              Answer                      `json:"answers,omitempty"`
@@ -218,6 +221,7 @@ type ClusterStatus struct {
 	AKSStatus                  AKSStatus                 `json:"aksStatus,omitempty" norman:"nocreate,noupdate"`
 	EKSStatus                  EKSStatus                 `json:"eksStatus,omitempty" norman:"nocreate,noupdate"`
 	GKEStatus                  GKEStatus                 `json:"gkeStatus,omitempty" norman:"nocreate,noupdate"`
+	AliStatus                  AliStatus                 `json:"aliStatus,omitempty" norman:"nocreate,noupdate"`
 	PrivateRegistrySecret      string                    `json:"privateRegistrySecret,omitempty" norman:"nocreate,noupdate"` // Deprecated: use ClusterSpec.ClusterSecrets.PrivateRegistrySecret instead
 	S3CredentialSecret         string                    `json:"s3CredentialSecret,omitempty" norman:"nocreate,noupdate"`    // Deprecated: use ClusterSpec.ClusterSecrets.S3CredentialSecret instead
 	WeavePasswordSecret        string                    `json:"weavePasswordSecret,omitempty" norman:"nocreate,noupdate"`   // Deprecated: use ClusterSpec.ClusterSecrets.WeavePasswordSecret instead
@@ -417,6 +421,11 @@ type EKSStatus struct {
 
 type GKEStatus struct {
 	UpstreamSpec          *gkev1.GKEClusterConfigSpec `json:"upstreamSpec"`
+	PrivateRequiresTunnel *bool                       `json:"privateRequiresTunnel"`
+}
+
+type AliStatus struct {
+	UpstreamSpec          *aliv1.AliClusterConfigSpec `json:"upstreamSpec"`
 	PrivateRequiresTunnel *bool                       `json:"privateRequiresTunnel"`
 }
 

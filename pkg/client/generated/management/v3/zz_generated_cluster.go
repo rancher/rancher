@@ -15,6 +15,8 @@ const (
 	ClusterFieldAgentFeatures                                        = "agentFeatures"
 	ClusterFieldAgentImage                                           = "agentImage"
 	ClusterFieldAgentImageOverride                                   = "agentImageOverride"
+	ClusterFieldAliConfig                                            = "aliConfig"
+	ClusterFieldAliStatus                                            = "aliStatus"
 	ClusterFieldAllocatable                                          = "allocatable"
 	ClusterFieldAnnotations                                          = "annotations"
 	ClusterFieldAppliedAgentEnvVars                                  = "appliedAgentEnvVars"
@@ -96,6 +98,8 @@ type Cluster struct {
 	AgentFeatures                                        map[string]bool                `json:"agentFeatures,omitempty" yaml:"agentFeatures,omitempty"`
 	AgentImage                                           string                         `json:"agentImage,omitempty" yaml:"agentImage,omitempty"`
 	AgentImageOverride                                   string                         `json:"agentImageOverride,omitempty" yaml:"agentImageOverride,omitempty"`
+	AliConfig                                            *AliClusterConfigSpec          `json:"aliConfig,omitempty" yaml:"aliConfig,omitempty"`
+	AliStatus                                            *AliStatus                     `json:"aliStatus,omitempty" yaml:"aliStatus,omitempty"`
 	Allocatable                                          map[string]string              `json:"allocatable,omitempty" yaml:"allocatable,omitempty"`
 	Annotations                                          map[string]string              `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	AppliedAgentEnvVars                                  []EnvVar                       `json:"appliedAgentEnvVars,omitempty" yaml:"appliedAgentEnvVars,omitempty"`

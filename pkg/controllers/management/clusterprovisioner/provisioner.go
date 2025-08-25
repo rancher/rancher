@@ -79,6 +79,9 @@ func skipOperatorCluster(action string, cluster *apimgmtv3.Cluster) bool {
 	case cluster.Spec.GKEConfig != nil:
 		logrus.Debugf(msgFmt, "GKE", cluster.Name, "gke", action)
 		return true
+	case cluster.Spec.AliConfig != nil:
+		logrus.Debugf(msgFmt, "Alibaba", cluster.Name, "ali", action)
+		return true
 	default:
 		return false
 	}
