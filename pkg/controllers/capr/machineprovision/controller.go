@@ -566,7 +566,7 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 	}
 
 	if failure {
-		// validate if we need to delete, enqueue or do nothing with the infraMachine if it fails
+		// check if we need to delete or enqueue the capi machine if it fails
 		enqueueTime, err := h.infraMachineDeletionEnqueueingTime(infra)
 		if err != nil {
 			return obj, err
@@ -574,11 +574,13 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 		if enqueueTime == 0 {
 			logrus.Infof("[machineprovision] %s/%s: Failed to create infrastructure for machine %s, deleting and recreating...", infra.meta.GetNamespace(), infra.meta.GetName(), machine.Name)
 			err = h.machineClient.Delete(machine.Namespace, machine.Name, &metav1.DeleteOptions{})
+			if err != nil {
+				return obj, err
+			}
 		} else {
-			logrus.Infof("[machineprovision] %s/%s: Failed to create infrastructure for machine %s enqueueing deletion after %d...", infra.meta.GetNamespace(), infra.meta.GetName(), machine.Name, enqueueTime)
+			logrus.Infof("[machineprovision] %s/%s: Failed to create infrastructure for machine %s enqueueing deletion after %s seconds...", infra.meta.GetNamespace(), infra.meta.GetName(), machine.Name, enqueueTime.Round(time.Second).String())
 			h.EnqueueAfter(infra, enqueueTime)
 		}
-		return obj, err
 	}
 
 	if err = reconcileStatus(infra.data, state); err != nil {
@@ -634,7 +636,8 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 func jobFailureTime(job *batchv1.Job) *time.Time {
 	for _, jobCondition := range job.Status.Conditions {
 		if jobCondition.Type == batchv1.JobFailed && jobCondition.Status == corev1.ConditionTrue {
-			return &jobCondition.LastTransitionTime.Time
+			t := jobCondition.LastTransitionTime.Time
+			return &t
 		}
 	}
 	return nil
@@ -652,38 +655,33 @@ func (h *handler) infraMachineDeletionEnqueueingTime(infra *infraObject) (time.D
 		return 0, nil
 	}
 
-	// parsing setting to time.Duration
 	deleteOnFailureAfter, err := time.ParseDuration(deleteInfraTimeSetting)
 	if err != nil {
-		logrus.Errorf("[machineprovision] error parsing the '%s' field: %v, defaulting to 0", settings.DeleteInfraMachineOnFailureAfter.Name, err)
+		logrus.Errorf("[machineprovision] %s/%s: error parsing the '%s' setting: %v, returning 0", infra.meta.GetNamespace(), infra.meta.GetName(), settings.DeleteInfraMachineOnFailureAfter.Name, err)
 		return 0, nil
 	}
 
-	// negative, nothing to do
 	if deleteOnFailureAfter < 0 {
 		return 0, nil
 	}
 
-	// fetch the job of an infraMachine
 	jobName := infra.data.String("status", "jobName")
 	if jobName == "" {
-		logrus.Warnf("[machineprovision] warning: no job name found on infraMachine, defaulting to 0 %s/%s", infra.meta.GetNamespace(), infra.meta.GetName())
+		logrus.Warnf("[machineprovision] %s/%s: no job name found on infraMachine, returning 0", infra.meta.GetNamespace(), infra.meta.GetName())
 		return 0, nil
 	}
 
 	job, err := h.jobs.Get(infra.meta.GetNamespace(), jobName)
 	if apierrors.IsNotFound(err) {
-		logrus.Warnf("[machineprovision] warning: job %s not found, defaulting to 0 %s/%s", jobName, infra.meta.GetNamespace(), infra.meta.GetName())
+		logrus.Warnf("[machineprovision] %s/%s: job %s not found, returning 0", infra.meta.GetNamespace(), infra.meta.GetName(), jobName)
 		return 0, nil
 	} else if err != nil {
-		// return error to be handled
 		return 0, err
 	}
 
-	// get the job failure time to calculate the time since failure
 	failedTime := jobFailureTime(job)
 	if failedTime == nil {
-		logrus.Warnf("[machineprovision] error getting the failure time for the job '%s', defaulting to 0: %v", job.Name, err)
+		logrus.Warnf("[machineprovision] %s/%s: error getting the failure time for job '%s', returning 0: %v", infra.meta.GetNamespace(), infra.meta.GetName(), job.Name, err)
 		return 0, nil
 	}
 
@@ -694,12 +692,10 @@ func (h *handler) infraMachineDeletionEnqueueingTime(infra *infraObject) (time.D
 	// timeSinceFailure will be 3 minutes
 	// so we need to enqueue to 2 minutes from now.
 
-	// if the user wants a long time for debugging, it can put long hours (eg: 100h)
-	// then the infraMachine will take longer to be deleted (but it will, one time)
 	currentTime := time.Now()
 	timeSinceFailure := currentTime.Sub(*failedTime)
 
-	if timeSinceFailure.Seconds() >= deleteOnFailureAfter.Seconds() {
+	if timeSinceFailure >= deleteOnFailureAfter {
 		return 0, nil
 	} else {
 		return deleteOnFailureAfter - timeSinceFailure, nil
