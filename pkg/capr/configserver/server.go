@@ -21,7 +21,6 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/pkg/wrangler"
-	wrangler2 "github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -93,10 +92,10 @@ func New(clients *wrangler.Context) *RKE2ConfigServer {
 	return configSrv
 }
 
-func (r *RKE2ConfigServer) DeferCAPIResources(wrangler *wrangler.Context) {
-	wrangler.DeferredCAPIRegistration.DeferFunc(wrangler, func(wrangler *wrangler2.Context) {
-		r.machineCache = wrangler.CAPI.Machine().Cache()
-		r.machines = wrangler.CAPI.Machine()
+func (r *RKE2ConfigServer) DeferCAPIResources(clients *wrangler.Context) {
+	clients.DeferredCAPIRegistration.DeferFunc(clients, func(clients *wrangler.Context) {
+		r.machineCache = clients.CAPI.Machine().Cache()
+		r.machines = clients.CAPI.Machine()
 		r.capiAvailable = true
 	})
 }
