@@ -75,10 +75,10 @@ require (
 	github.com/Masterminds/semver/v3 v3.3.0
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/alibabacloud-go/cs-20151215/v5 v5.9.5
-	github.com/alibabacloud-go/darabonba-openapi/v2 v2.1.8
+	github.com/alibabacloud-go/darabonba-openapi/v2 v2.1.11
 	github.com/alibabacloud-go/ecs-20140526/v7 v7.0.13
 	github.com/alibabacloud-go/resourcemanager-20200331/v3 v3.3.0
-	github.com/alibabacloud-go/tea v1.3.9
+	github.com/alibabacloud-go/tea v1.3.11
 	github.com/alibabacloud-go/vpc-20160428/v6 v6.12.8
 	github.com/aliyun/credentials-go v1.4.6
 	github.com/aws/aws-sdk-go v1.55.5
