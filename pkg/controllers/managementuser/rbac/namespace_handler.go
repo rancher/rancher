@@ -2,6 +2,7 @@ package rbac
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -34,8 +35,9 @@ const (
 )
 
 var projectNSVerbToSuffix = map[string]string{
-	"get":             "readonly",
-	projectNSEditVerb: "edit",
+	"get": "readonly",
+	//projectNSEditVerb: "edit",
+	manageNSVerb: "manage",
 }
 var defaultProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/default-project": "true"})
 var systemProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/system-project": "true"})
@@ -121,8 +123,10 @@ func (n *nsLifecycle) syncNS(obj *v1.Namespace) (bool, error) {
 		return false, fmt.Errorf("ensuring PRTBs are added to namespace %s: %w", obj.Name, err)
 	}
 
-	if err := n.reconcileNamespaceProjectClusterRole(obj); err != nil {
-		return false, fmt.Errorf("reconciling namespace %s project cluster roles: %w", obj.Name, err)
+	for verb, name := range projectNSVerbToSuffix {
+		if err := n.reconcileNamespaceProjectClusterRole(obj, verb); err != nil {
+			return false, fmt.Errorf("reconciling namespace %s project cluster roles for '%s' failed: %w", obj.Name, name, err)
+		}
 	}
 
 	return hasPRTBs, nil
@@ -331,121 +335,129 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 // function ensures that a ClusterRole exists for the project that grants get access to the
 // namespaces in the project. A corresponding PRTB handler will ensure that a binding to this
 // ClusterRole exists for every project member
-func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace) error {
-	for verb, name := range projectNSVerbToSuffix {
-		var desiredRole string
-		var projectName string
-		if ns.DeletionTimestamp == nil {
-			if parts := strings.SplitN(ns.Annotations[projectIDAnnotation], ":", 2); len(parts) == 2 && len(parts[1]) > 0 {
-				projectName = parts[1]
-				desiredRole = fmt.Sprintf(projectNSGetClusterRoleNameFmt, parts[1], name)
+func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace, verb string) error {
+	var desiredRole string
+	var projectName string
+	if ns.DeletionTimestamp == nil {
+		if parts := strings.SplitN(ns.Annotations[projectIDAnnotation], ":", 2); len(parts) == 2 && len(parts[1]) > 0 {
+			projectName = parts[1]
+			desiredRole = fmt.Sprintf(projectNSGetClusterRoleNameFmt, parts[1], projectNSVerbToSuffix[verb])
+		}
+	}
+
+	clusterRoles, err := n.m.crIndexer.ByIndex(crByNSIndex, ns.Name)
+	if err != nil {
+		return err
+	}
+
+	roleCli := n.m.clusterRoles
+	nsInDesiredRole := false
+	for _, c := range clusterRoles {
+		cr, ok := c.(*rbacv1.ClusterRole)
+		if !ok {
+			return errors.Errorf("%v is not a ClusterRole", c)
+		}
+
+		if cr.Name == desiredRole {
+			for _, rule := range cr.Rules {
+				if slices.Contains(rule.ResourceNames, ns.Name) {
+					nsInDesiredRole = true
+					continue
+				}
+			}
+			// move to next iteration if namespace is in desiredRole
+			if nsInDesiredRole {
+				continue
 			}
 		}
 
-		clusterRoles, err := n.m.crIndexer.ByIndex(crByNSIndex, ns.Name)
-		if err != nil {
+		// This ClusterRole has a reference to the namespace, but is not the desired role. Namespace has been moved; remove it from this ClusterRole
+		undesiredRole := cr.DeepCopy()
+		modified := false
+		for i := range undesiredRole.Rules {
+			r := &undesiredRole.Rules[i]
+			if slice.ContainsString(r.Verbs, verb) && slice.ContainsString(r.Resources, "namespaces") && slice.ContainsString(r.ResourceNames, ns.Name) {
+				modified = true
+				resNames := r.ResourceNames
+				for i := len(resNames) - 1; i >= 0; i-- {
+					if resNames[i] == ns.Name {
+						resNames = append(resNames[:i], resNames[i+1:]...)
+					}
+				}
+				r.ResourceNames = resNames
+			}
+		}
+
+		//if ResourceNames is empty, delete the rule and delete the role if no rules exist
+		toDeleteRules := 0
+		for _, rule := range undesiredRole.Rules {
+			if len(rule.ResourceNames) == 0 {
+				toDeleteRules++
+			}
+		}
+		if toDeleteRules == len(undesiredRole.Rules) {
+			logrus.Infof("Deleting ClusterRole %s", undesiredRole.Name)
+			if err = roleCli.Delete(undesiredRole.Name, &metav1.DeleteOptions{}); err != nil {
+				return err
+			}
+			continue
+		} else if toDeleteRules != 0 {
+			var updatedRules []rbacv1.PolicyRule
+			for _, rule := range undesiredRole.Rules {
+				if len(rule.ResourceNames) != 0 {
+					updatedRules = append(updatedRules, rule)
+				}
+			}
+			undesiredRole.Rules = updatedRules
+		}
+		if modified {
+			if _, err = roleCli.Update(undesiredRole); err != nil {
+				return err
+			}
+		}
+	}
+
+	if !nsInDesiredRole && desiredRole != "" {
+		mustUpdate := true
+		cr, err := n.m.crLister.Get(desiredRole)
+		if err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}
 
-		roleCli := n.m.clusterRoles
-		nsInDesiredRole := false
-		for _, c := range clusterRoles {
-			cr, ok := c.(*rbacv1.ClusterRole)
-			if !ok {
-				return errors.Errorf("%v is not a ClusterRole", c)
-			}
-
-			if cr.Name == desiredRole {
-				nsInDesiredRole = true
-				continue
-			}
-
-			// This ClusterRole has a reference to the namespace, but is not the desired role. Namespace has been moved; remove it from this ClusterRole
-			undesiredRole := cr.DeepCopy()
-			modified := false
-			for i := range undesiredRole.Rules {
-				r := &undesiredRole.Rules[i]
-				if slice.ContainsString(r.Verbs, verb) && slice.ContainsString(r.Resources, "namespaces") && slice.ContainsString(r.ResourceNames, ns.Name) {
-					modified = true
-					resNames := r.ResourceNames
-					for i := len(resNames) - 1; i >= 0; i-- {
-						if resNames[i] == ns.Name {
-							resNames = append(resNames[:i], resNames[i+1:]...)
-						}
-					}
-					r.ResourceNames = resNames
-				}
-			}
-			//if ResourceNames is empty, delete the rule and delete the role if no rules exist
-			toDeleteRules := 0
-			for _, rule := range undesiredRole.Rules {
-				if len(rule.ResourceNames) == 0 {
-					toDeleteRules++
-				}
-			}
-			if toDeleteRules == len(undesiredRole.Rules) {
-				logrus.Infof("Deleting ClusterRole %s", undesiredRole.Name)
-				if err = roleCli.Delete(undesiredRole.Name, &metav1.DeleteOptions{}); err != nil {
-					return err
-				}
-				continue
-			} else if toDeleteRules != 0 {
-				var updatedRules []rbacv1.PolicyRule
-				for _, rule := range undesiredRole.Rules {
-					if len(rule.ResourceNames) != 0 {
-						updatedRules = append(updatedRules, rule)
-					}
-				}
-				undesiredRole.Rules = updatedRules
-			}
-			if modified {
-				if _, err = roleCli.Update(undesiredRole); err != nil {
-					return err
-				}
-			}
+		// Create new role
+		if cr == nil {
+			return n.m.createProjectNSRole(desiredRole, verb, ns.Name, projectName)
 		}
 
-		if !nsInDesiredRole && desiredRole != "" {
-			mustUpdate := true
-			cr, err := n.m.crLister.Get(desiredRole)
-			if err != nil && !apierrors.IsNotFound(err) {
-				return err
+		// Check to see if retrieved role has the namespace (small chance cache could have been updated)
+		for _, r := range cr.Rules {
+			if slice.ContainsString(r.Verbs, verb) && slice.ContainsString(r.Resources, "namespaces") && slice.ContainsString(r.ResourceNames, ns.Name) {
+				// ns already in the role, nothing to do
+				mustUpdate = false
 			}
-
-			// Create new role
-			if cr == nil {
-				return n.m.createProjectNSRole(desiredRole, verb, ns.Name, projectName)
-			}
-
-			// Check to see if retrieved role has the namespace (small chance cache could have been updated)
-			for _, r := range cr.Rules {
-				if slice.ContainsString(r.Verbs, verb) && slice.ContainsString(r.Resources, "namespaces") && slice.ContainsString(r.ResourceNames, ns.Name) {
-					// ns already in the role, nothing to do
-					mustUpdate = false
+		}
+		if mustUpdate && verb != manageNSVerb {
+			cr = cr.DeepCopy()
+			appendedToExisting := false
+			for i := range cr.Rules {
+				r := &cr.Rules[i]
+				if slice.ContainsString(r.Verbs, verb) && slice.ContainsString(r.Resources, "namespaces") {
+					r.ResourceNames = append(r.ResourceNames, ns.Name)
+					appendedToExisting = true
+					break
 				}
 			}
-			if mustUpdate {
-				cr = cr.DeepCopy()
-				appendedToExisting := false
-				for i := range cr.Rules {
-					r := &cr.Rules[i]
-					if slice.ContainsString(r.Verbs, verb) && slice.ContainsString(r.Resources, "namespaces") {
-						r.ResourceNames = append(r.ResourceNames, ns.Name)
-						appendedToExisting = true
-						break
-					}
-				}
 
-				if !appendedToExisting {
-					cr.Rules = append(cr.Rules, rbacv1.PolicyRule{
-						APIGroups:     []string{""},
-						Verbs:         []string{verb},
-						Resources:     []string{"namespaces"},
-						ResourceNames: []string{ns.Name},
-					})
-				}
+			if !appendedToExisting {
+				cr.Rules = append(cr.Rules, rbacv1.PolicyRule{
+					APIGroups:     []string{""},
+					Verbs:         []string{verb},
+					Resources:     []string{"namespaces"},
+					ResourceNames: []string{ns.Name},
+				})
+			}
 
-				_, err = roleCli.Update(cr)
+			if _, err = roleCli.Update(cr); err != nil {
 				return err
 			}
 		}
@@ -463,7 +475,7 @@ func (m *manager) createProjectNSRole(roleName, verb, ns, projectName string) er
 			Annotations: map[string]string{projectNSAnn: roleName},
 		},
 	}
-	if ns != "" {
+	if ns != "" && verb == "get" {
 		cr.Rules = []rbacv1.PolicyRule{
 			{
 				APIGroups:     []string{""},
@@ -474,8 +486,9 @@ func (m *manager) createProjectNSRole(roleName, verb, ns, projectName string) er
 		}
 	}
 	// the verbs passed into this function come from projectNSVerbToSuffix which only contains two verbs, one for read
-	// permissions and one for write. Only the write permission should get the manage-ns verb
-	if verb == projectNSEditVerb {
+	// permissions and one for managing namespaces. Only the managing namespace permission should get the manage-ns verb
+	// for project resource.
+	if verb == manageNSVerb {
 		cr = addManageNSPermission(cr, projectName)
 	}
 	_, err := roleCli.Create(cr)
@@ -615,10 +628,12 @@ func (n *nsLifecycle) asyncCleanupRBAC(namespaceName string) {
 			if err != nil {
 				if apierrors.IsNotFound(err) {
 					// Namespace is fully deleted, clean up RBAC
-					err := n.reconcileNamespaceProjectClusterRole(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespaceName}})
-					if err != nil {
-						logrus.Errorf("error cleaning up RBAC for namespace %s: %v", namespaceName, err)
-						return true, err
+					for verb, name := range projectNSVerbToSuffix {
+						err := n.reconcileNamespaceProjectClusterRole(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespaceName}}, verb)
+						if err != nil {
+							logrus.Errorf("error cleaning up %s RBAC for namespace %s: %v", name, namespaceName, err)
+							return true, err
+						}
 					}
 					logrus.Debugf("successfully cleaned up RBAC for namespace %s", namespaceName)
 					return true, nil

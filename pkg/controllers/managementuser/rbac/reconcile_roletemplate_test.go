@@ -64,9 +64,9 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 			},
 		},
 		{
-			description:   "namespace create rule should grant create-ns and a namespaces-edit role",
+			description:   "namespace create rule should grant create-ns, namespace-manage and namespace-readonly role",
 			projectName:   "testproject",
-			expectedRoles: []string{"create-ns", "testproject-namespaces-edit"},
+			expectedRoles: []string{"create-ns", "testproject-namespaces-manage", "testproject-namespaces-readonly"},
 			roleTemplates: map[string]*v3.RoleTemplate{
 				"testrt2": {
 					ObjectMeta: metav1.ObjectMeta{
@@ -180,7 +180,7 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 		{
 			description:   "* resources and * APIGroup should only result in namespace-readonly and promoted role",
 			projectName:   "testproject",
-			expectedRoles: []string{"create-ns", "testproject-namespaces-edit", "testrt8-promoted"},
+			expectedRoles: []string{"create-ns", "testproject-namespaces-manage", "testproject-namespaces-readonly", "testrt8-promoted"},
 			roleTemplates: map[string]*v3.RoleTemplate{
 				"testrt8": {
 					ObjectMeta: metav1.ObjectMeta{
@@ -199,7 +199,7 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 		{
 			description:   "* resources and core (\"\") APIGroup should only result in namespace-readonly and promoted role",
 			projectName:   "testproject",
-			expectedRoles: []string{"create-ns", "testproject-namespaces-edit", "testrt9-promoted"},
+			expectedRoles: []string{"create-ns", "testproject-namespaces-manage", "testproject-namespaces-readonly", "testrt9-promoted"},
 			roleTemplates: map[string]*v3.RoleTemplate{
 				"testrt9": {
 					ObjectMeta: metav1.ObjectMeta{
