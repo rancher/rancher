@@ -8,6 +8,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
 
+      # https://github.com/golang/go/issues/75031
+      - name: Set toolchain version
+        run: go env -w GOTOOLCHAIN=go1.25.0+auto
+
       - name: Run unit tests
         run: go test -cover -tags=test ./pkg/...
 
