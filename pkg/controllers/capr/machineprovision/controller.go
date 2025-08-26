@@ -571,16 +571,14 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 		if err != nil {
 			return obj, err
 		}
-		if enqueueTime == 0 {
-			logrus.Infof("[machineprovision] %s/%s: Failed to create infrastructure for machine %s, deleting and recreating...", infra.meta.GetNamespace(), infra.meta.GetName(), machine.Name)
-			err = h.machineClient.Delete(machine.Namespace, machine.Name, &metav1.DeleteOptions{})
-			if err != nil {
-				return obj, err
-			}
-		} else {
+		if enqueueTime > 0 {
 			logrus.Infof("[machineprovision] %s/%s: Failed to create infrastructure for machine %s enqueueing deletion after %s seconds...", infra.meta.GetNamespace(), infra.meta.GetName(), machine.Name, enqueueTime.Round(time.Second).String())
 			h.EnqueueAfter(infra, enqueueTime)
 			return obj, nil
+		}
+		logrus.Infof("[machineprovision] %s/%s: Failed to create infrastructure for machine %s, deleting and recreating...", infra.meta.GetNamespace(), infra.meta.GetName(), machine.Name)
+		if err = h.machineClient.Delete(machine.Namespace, machine.Name, &metav1.DeleteOptions{}); err != nil {
+			return obj, err
 		}
 	}
 
@@ -682,7 +680,7 @@ func (h *handler) infraMachineDeletionEnqueueingTime(infra *infraObject) (time.D
 
 	failedTime := jobFailureTime(job)
 	if failedTime == nil {
-		logrus.Warnf("[machineprovision] %s/%s: error getting the failure time for job '%s', returning 0: %v", infra.meta.GetNamespace(), infra.meta.GetName(), job.Name, err)
+		logrus.Warnf("[machineprovision] %s/%s: error getting the failure time for job '%s', returning 0", infra.meta.GetNamespace(), infra.meta.GetName(), job.Name)
 		return 0, nil
 	}
 
