@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"maps"
+	"os"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -23,6 +24,7 @@ type SCCOperatorParams struct {
 	RefreshHash string
 
 	SCCOperatorImage string
+	ExtraEnvs        map[string]string
 }
 
 func ExtractSccOperatorParams() (*SCCOperatorParams, error) {
@@ -38,12 +40,30 @@ func ExtractSccOperatorParams() (*SCCOperatorParams, error) {
 		rancherVersion:      version.Version,
 		rancherGitCommit:    version.GitCommit,
 		SCCOperatorImage:    settings.FullSCCOperatorImage(),
+		ExtraEnvs:           collectSCCEnvVars(),
 	}
 	if err := params.setConfigHash(); err != nil {
 		return nil, err
 	}
 
 	return params, nil
+}
+
+func collectSCCEnvVars() map[string]string {
+	envVars := map[string]string{}
+	copyEnvIfSet(envVars, "CATTLE_DEV_MODE")
+	copyEnvIfSet(envVars, "CATTLE_TRACE")
+	copyEnvIfSet(envVars, "RANCHER_TRACE")
+	copyEnvIfSet(envVars, "CATTLE_DEBUG")
+	copyEnvIfSet(envVars, "RANCHER_DEBUG")
+
+	return envVars
+}
+
+func copyEnvIfSet(envVars map[string]string, key string) {
+	if val := os.Getenv(key); val != "" {
+		envVars[key] = val
+	}
 }
 
 // setConfigHash generates a hash based on the relevant configuration details
@@ -161,7 +181,21 @@ func (p *SCCOperatorParams) preparePodSpec() corev1.PodSpec {
 				Name:            "scc-operator",
 				Image:           p.SCCOperatorImage,
 				ImagePullPolicy: corev1.PullIfNotPresent,
+				Env:             p.prepareEnvVars(),
 			},
 		},
 	}
+}
+
+func (p *SCCOperatorParams) prepareEnvVars() []corev1.EnvVar {
+	var envVars []corev1.EnvVar
+
+	for k, v := range p.ExtraEnvs {
+		envVars = append(envVars, corev1.EnvVar{
+			Name:  k,
+			Value: v,
+		})
+	}
+
+	return envVars
 }
