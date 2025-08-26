@@ -109,7 +109,7 @@ func (m *manager) ensureGlobalResourcesRolesForPRTB(projectName string, rts map[
 			hasNamespaceResources := slice.ContainsString(rule.Resources, "namespaces") || slice.ContainsString(rule.Resources, "*")
 			hasNamespaceGroup := slice.ContainsString(rule.APIGroups, "") || slice.ContainsString(rule.APIGroups, "*")
 			if hasNamespaceGroup && hasNamespaceResources && len(rule.ResourceNames) == 0 {
-				if !slice.ContainsString(rule.Verbs, "get") || !slice.ContainsString(rule.Verbs, "list") || !slice.ContainsString(rule.Verbs, "watch") {
+				if !hasReadVerbs(rule.Verbs) {
 					roleVerb = manageNSVerb
 					roles.Insert("create-ns")
 					if nsRole, _ := m.crLister.Get("create-ns"); nsRole == nil {
@@ -171,4 +171,14 @@ func (m *manager) ensureGlobalResourcesRolesForPRTB(projectName string, rts map[
 	}
 
 	return sets.List(roles), nil
+}
+
+func hasReadVerbs(ruleVerbs []string) bool {
+	readVerbs := []string{"get", "list", "watch"}
+	for _, verb := range readVerbs {
+		if slice.ContainsString(ruleVerbs, verb) {
+			return true
+		}
+	}
+	return false
 }

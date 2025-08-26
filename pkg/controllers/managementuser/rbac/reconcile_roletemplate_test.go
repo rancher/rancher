@@ -178,7 +178,7 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 			},
 		},
 		{
-			description:   "* resources and * APIGroup should only result in namespace-readonly and promoted role",
+			description:   "* resources and * APIGroup should result in namespaces-manage, namespace-readonly and promoted role",
 			projectName:   "testproject",
 			expectedRoles: []string{"create-ns", "testproject-namespaces-manage", "testproject-namespaces-readonly", "testrt8-promoted"},
 			roleTemplates: map[string]*v3.RoleTemplate{
@@ -197,7 +197,7 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 			},
 		},
 		{
-			description:   "* resources and core (\"\") APIGroup should only result in namespace-readonly and promoted role",
+			description:   "* resources and core (\"\") APIGroup should result in namespace-manage, namespace-readonly and promoted role",
 			projectName:   "testproject",
 			expectedRoles: []string{"create-ns", "testproject-namespaces-manage", "testproject-namespaces-readonly", "testrt9-promoted"},
 			roleTemplates: map[string]*v3.RoleTemplate{
@@ -268,6 +268,63 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 						},
 					},
 					External: true,
+				},
+			},
+		},
+		{
+			description:   "only get permissions",
+			projectName:   "testproject",
+			expectedRoles: []string{"testproject-namespaces-readonly"},
+			roleTemplates: map[string]*v3.RoleTemplate{
+				"testrt": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "testrt",
+					},
+					Rules: []v1.PolicyRule{
+						{
+							Verbs:     []string{"get"},
+							APIGroups: []string{""},
+							Resources: []string{"namespaces"},
+						},
+					},
+				},
+			},
+		},
+		{
+			description:   "only watch permissions",
+			projectName:   "testproject",
+			expectedRoles: []string{"testproject-namespaces-readonly"},
+			roleTemplates: map[string]*v3.RoleTemplate{
+				"testrt": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "testrt",
+					},
+					Rules: []v1.PolicyRule{
+						{
+							Verbs:     []string{"watch"},
+							APIGroups: []string{""},
+							Resources: []string{"namespaces"},
+						},
+					},
+				},
+			},
+		},
+		{
+			description:   "list & watch permissions",
+			projectName:   "testproject",
+			expectedRoles: []string{"testproject-namespaces-readonly"},
+			roleTemplates: map[string]*v3.RoleTemplate{
+				"testrt": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "testrt",
+					},
+					Rules: []v1.PolicyRule{
+						{
+							Verbs:     []string{"list", "watch"},
+							APIGroups: []string{""},
+							Resources: []string{"namespaces"},
+						},
+					},
 				},
 			},
 		},
