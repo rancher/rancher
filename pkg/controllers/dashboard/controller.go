@@ -69,7 +69,7 @@ func Register(ctx context.Context, clients *wrangler.Context, embedded bool, reg
 		clusterindex.Register(ctx, clients)
 		cluster.EarlyRegister(ctx, clients, kubeconfigManager)
 		// defer registration of controllers which have CAPI clients or use CAPI caches
-		if err := clients.DeferredCAPIRegistration.DeferRegistration(ctx, clients, func(ctx context.Context, clients *wrangler.Context) error {
+		clients.DeferredCAPIRegistration.DeferRegistration(func(ctx context.Context, clients *wrangler.Context) error {
 			provisioningv2.Register(ctx, clients, kubeconfigManager)
 			if features.RKE2.Enabled() {
 				if err := capr.Register(ctx, clients, kubeconfigManager); err != nil {
@@ -77,9 +77,7 @@ func Register(ctx context.Context, clients *wrangler.Context, embedded bool, reg
 				}
 			}
 			return nil
-		}); err != nil {
-			return err
-		}
+		})
 	}
 
 	// In the case where Rancher is embedded and running in the Harvester local cluster,

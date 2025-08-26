@@ -92,7 +92,7 @@ func New(clients *wrangler.Context) *RKE2ConfigServer {
 }
 
 func (r *RKE2ConfigServer) DeferCAPIResources(clients *wrangler.Context) {
-	clients.DeferredCAPIRegistration.DeferFunc(clients, func(clients *wrangler.Context) {
+	clients.DeferredCAPIRegistration.DeferFunc(func(clients *wrangler.Context) {
 		r.machineCache = clients.CAPI.Machine().Cache()
 		r.machines = clients.CAPI.Machine()
 		r.capiAvailable = true

@@ -10,7 +10,6 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/kubeconfig"
 	"github.com/rancher/wrangler/v3/pkg/ratelimit"
-	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/clientcmd"
@@ -84,7 +83,8 @@ func NewForConfig(ctx context.Context, config clientcmd.ClientConfig) (*Clients,
 
 	capi, err := capi.NewFactoryFromConfigWithOptions(wranglerCtx.RESTConfig, opts)
 	if err != nil {
-		logrus.Fatalf("Encountered unexpected panic while creating capi factory: %v", err)
+		cancel()
+		return nil, err
 	}
 
 	dynamic, err := dynamic.NewForConfig(rest)

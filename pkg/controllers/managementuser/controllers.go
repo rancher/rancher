@@ -3,7 +3,6 @@ package managementuser
 import (
 	"context"
 	"fmt"
-
 	"github.com/k3s-io/api/pkg/generated/controllers/k3s.cattle.io"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementlegacy/compose/common"
@@ -34,20 +33,18 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	healthsyncer.Register(ctx, cluster)
 	networkpolicy.Register(ctx, cluster)
 
-	if err := mgmt.Wrangler.DeferredCAPIRegistration.DeferRegistration(ctx, mgmt.Wrangler, func(ctx context.Context, _ *wrangler.Context) error {
+	mgmt.Wrangler.DeferredCAPIRegistration.DeferRegistration(func(_ context.Context, _ *wrangler.Context) error {
 		nodesyncer.Register(ctx, cluster, kubeConfigGetter)
 		return nil
-	}); err != nil {
-		return err
-	}
+	})
 
 	secret.Register(ctx, mgmt, cluster, clusterRec)
 	resourcequota.Register(ctx, cluster)
 	windows.Register(ctx, clusterRec, cluster)
 	nsserviceaccount.Register(ctx, cluster)
 
-	if err := mgmt.Wrangler.DeferredCAPIRegistration.DeferRegistration(ctx, mgmt.Wrangler, func(ctx context.Context, _ *wrangler.Context) error {
-		if features.RKE2.Enabled() {
+	if features.RKE2.Enabled() {
+		mgmt.Wrangler.DeferredCAPIRegistration.DeferRegistration(func(_ context.Context, _ *wrangler.Context) error {
 			// Just register the snapshot controller if the cluster is administrated by rancher.
 			if clusterRec.Annotations["provisioning.cattle.io/administrated"] == "true" {
 				if features.Provisioningv2ETCDSnapshotBackPopulation.Enabled() {
@@ -62,11 +59,9 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 					cluster.Plan.V1().Plan(),
 					cluster.Management.Wrangler.RKE.RKEControlPlane())
 			}
-			machinerole.Register(ctx, cluster)
-		}
-		return nil
-	}); err != nil {
-		return err
+			return nil
+		})
+		machinerole.Register(ctx, cluster)
 	}
 
 	registerImpersonationCaches(cluster)

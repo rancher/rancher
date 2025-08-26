@@ -336,13 +336,9 @@ func (w *Context) WithAgent(userAgent string) *Context {
 	wContextCopy.CRD = wContextCopy.crd.WithAgent(userAgent).V1()
 	wContextCopy.Plan = wContextCopy.plan.WithAgent(userAgent).V1()
 
-	if w.DeferredCAPIRegistration.CAPIInitialized() {
-		wContextCopy.CAPI = wContextCopy.capi.WithAgent(userAgent).V1beta1()
-	} else {
-		wContextCopy.DeferredCAPIRegistration.DeferFunc(&wContextCopy, func(clients *Context) {
-			wContextCopy.CAPI = wContextCopy.capi.WithAgent(userAgent).V1beta1()
-		})
-	}
+	wContextCopy.DeferredCAPIRegistration.DeferFunc(func(clients *Context) {
+		wContextCopy.CAPI = clients.capi.WithAgent(userAgent).V1beta1()
+	})
 
 	return &wContextCopy
 }
@@ -352,6 +348,18 @@ func enableProtobuf(cfg *rest.Config) *rest.Config {
 	cpy.AcceptContentTypes = "application/vnd.kubernetes.protobuf, application/json"
 	cpy.ContentType = "application/json"
 	return cpy
+}
+
+// NewPrimaryContext returns a Context which has one or more deferred registration handlers configured. If a new Context
+// is only needed for its clients, NewContext should be used instead.
+func NewPrimaryContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restConfig *rest.Config) (*Context, error) {
+	wCtx, err := NewContext(ctx, clientConfig, restConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	wCtx.manageDeferredCAPIContext(ctx)
+	return wCtx, nil
 }
 
 func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restConfig *rest.Config) (*Context, error) {
@@ -557,11 +565,9 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		rbac:         rbac,
 		plan:         plan,
 		telemetry:    telemetry,
-
-		DeferredCAPIRegistration: &DeferredCAPIRegistration{
-			wg: &sync.WaitGroup{},
-		},
 	}
+
+	wContext.DeferredCAPIRegistration = newDeferredCAPIRegistration(wContext)
 
 	return wContext, nil
 }
