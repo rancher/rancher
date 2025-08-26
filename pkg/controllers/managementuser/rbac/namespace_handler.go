@@ -31,12 +31,11 @@ const (
 	projectNSAnn                   = "authz.cluster.auth.io/project-namespaces"
 	initialRoleCondition           = "InitialRolesPopulated"
 	manageNSVerb                   = "manage-namespaces"
-	projectNSEditVerb              = "*"
+	getVerb                        = "get"
 )
 
 var projectNSVerbToSuffix = map[string]string{
-	"get": "readonly",
-	//projectNSEditVerb: "edit",
+	getVerb:      "readonly",
 	manageNSVerb: "manage",
 }
 var defaultProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/default-project": "true"})
@@ -331,10 +330,10 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 	return hasPRTBs, nil
 }
 
-// To ensure that all users in a project can do a GET on the namespaces in that project, this
-// function ensures that a ClusterRole exists for the project that grants get access to the
-// namespaces in the project. A corresponding PRTB handler will ensure that a binding to this
-// ClusterRole exists for every project member
+// reconcileNamespaceProjectClusterRole creates and maintains two default ClusterRoles for each project:
+// 1. "readonly" role - read access (get) to project namespaces. (dynamically updated as namespaces are added)
+// 2. "manage" role - namespace management permissions for the project.
+// A corresponding PRTB handler ensures that a binding to these ClusterRoles exists for every project member.
 func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace, verb string) error {
 	var desiredRole string
 	var projectName string
@@ -475,21 +474,22 @@ func (m *manager) createProjectNSRole(roleName, verb, ns, projectName string) er
 			Annotations: map[string]string{projectNSAnn: roleName},
 		},
 	}
-	if ns != "" && verb == "get" {
-		cr.Rules = []rbacv1.PolicyRule{
-			{
-				APIGroups:     []string{""},
-				Verbs:         []string{verb},
-				Resources:     []string{"namespaces"},
-				ResourceNames: []string{ns},
-			},
-		}
-	}
-	// the verbs passed into this function come from projectNSVerbToSuffix which only contains two verbs, one for read
-	// permissions and one for managing namespaces. Only the managing namespace permission should get the manage-ns verb
-	// for project resource.
-	if verb == manageNSVerb {
+	switch verb {
+	case manageNSVerb:
 		cr = addManageNSPermission(cr, projectName)
+	case getVerb:
+		if ns != "" {
+			cr.Rules = []rbacv1.PolicyRule{
+				{
+					APIGroups:     []string{""},
+					Verbs:         []string{verb},
+					Resources:     []string{"namespaces"},
+					ResourceNames: []string{ns},
+				},
+			}
+		}
+	default:
+		return fmt.Errorf("unsupported verb: %s", verb)
 	}
 	_, err := roleCli.Create(cr)
 	return err
@@ -541,7 +541,7 @@ func crByNS(obj interface{}) ([]string, error) {
 
 	var result []string
 	for _, r := range cr.Rules {
-		if slice.ContainsString(r.Resources, "namespaces") && (slice.ContainsString(r.Verbs, "get") || slice.ContainsString(r.Verbs, "*")) {
+		if slice.ContainsString(r.Resources, "namespaces") && (slice.ContainsString(r.Verbs, getVerb) || slice.ContainsString(r.Verbs, "*")) {
 			result = append(result, r.ResourceNames...)
 		}
 	}
