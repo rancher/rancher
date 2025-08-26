@@ -230,6 +230,7 @@ func run(cli *cli.Context, cfg rancher.Options) error {
 	if err != nil {
 		return err
 	}
+	logrus.Info("Done with rancher.New")
 
 	return server.ListenAndServe(ctx)
 }

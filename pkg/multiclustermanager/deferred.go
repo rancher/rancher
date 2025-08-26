@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -59,10 +60,13 @@ func (s *DeferredServer) NormanSchemas() *types.Schemas {
 }
 
 func (s *DeferredServer) Start(ctx context.Context) error {
+	logrus.Info("HITHERE Locking")
 	s.Lock()
+	logrus.Info("HITHERE Locked")
 	defer s.Unlock()
 
 	if s.mcm != nil {
+		logrus.Info("HITHERE bye")
 		return nil
 	}
 
@@ -71,7 +75,9 @@ func (s *DeferredServer) Start(ctx context.Context) error {
 		err error
 	)
 
+	logrus.Info("HITHERE StartWithTransaction")
 	err = s.wrangler.StartWithTransaction(ctx, func(ctx context.Context) error {
+		logrus.Info("HITHERE calling newMCM")
 		mcm, err = newMCM(ctx, s.wrangler, s.opts)
 		if err != nil {
 			return err

@@ -268,6 +268,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	}
 
 	gcInterval, gcKeepCount := getSQLCacheGCValues(wranglerContext)
+	logrus.Info("HITHERE before steveserver.New")
 	steve, err := steveserver.New(ctx, restConfig, &steveserver.Options{
 		ServerVersion:   settings.ServerVersion.Get(),
 		Controllers:     steveControllers,
@@ -286,6 +287,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	if err != nil {
 		return nil, err
 	}
+	logrus.Info("HITHERE after steveserver.New")
 
 	clusterProxy, err := proxy.NewProxyMiddleware(wranglerContext.K8s.AuthorizationV1(),
 		wranglerContext.TunnelServer.Dialer,
@@ -297,7 +299,9 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
+	logrus.Info("HITHERE steveapi.AdditionalAPIsPreMCM")
 	additionalAPIPreMCM := steveapi.AdditionalAPIsPreMCM(wranglerContext)
+	logrus.Info("HITHERE steveapi.AdditionalAPIs")
 	additionalAPI, err := steveapi.AdditionalAPIs(ctx, wranglerContext, steve)
 	if err != nil {
 		return nil, err
@@ -432,6 +436,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 		// Registers handlers for all rancher replicas running in the local cluster, but not downstream agents
 		nodedriver.Register(ctx, r.Wrangler)
 		kontainerdrivermetadata.Register(ctx, r.Wrangler)
+		logrus.Info("Start MCM.Start()")
 		if err := r.Wrangler.MultiClusterManager.Start(ctx); err != nil {
 			return err
 		}

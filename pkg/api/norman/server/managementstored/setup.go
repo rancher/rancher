@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/customization/globalrolebinding"
 	"github.com/rancher/rancher/pkg/api/norman/customization/kontainerdriver"
 	"github.com/rancher/rancher/pkg/api/norman/customization/node"
+	"github.com/sirupsen/logrus"
 
 	projectaction "github.com/rancher/rancher/pkg/api/norman/customization/project"
 	"github.com/rancher/rancher/pkg/api/norman/customization/roletemplate"
@@ -56,6 +57,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 
 	factory := &crd.Factory{ClientGetter: apiContext.ClientGetter}
 
+	logrus.Infof("Creating a bunch of norman CRDs")
 	factory.BatchCreateCRDs(ctx, config.ManagementStorageContext, scheme.Scheme, schemas, &managementschema.Version,
 		client.AuthConfigType,
 		client.ClusterRegistrationTokenType,
@@ -93,6 +95,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 	if err := factory.BatchWait(); err != nil {
 		return err
 	}
+	logrus.Infof("Done waiting create all norman CRDs")
 
 	Clusters(ctx, schemas, apiContext, clusterManager, k8sProxy)
 	ClusterRoleTemplateBinding(schemas, apiContext)
