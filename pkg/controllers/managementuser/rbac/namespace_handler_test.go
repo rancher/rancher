@@ -52,7 +52,6 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 	getCR := createClusterRoleForProject("p-123xyz", testNamespace1.Name, "get")
 	updateGetCR := addNamespaceToClusterRole(testNamespace2.Name, "get", getCR.DeepCopy())
 	manageCR := createClusterRoleForProject("p-123xyz", testNamespace1.Name, manageNSVerb)
-	updateManageCR := addNamespaceToClusterRole(testNamespace2.Name, manageNSVerb, manageCR.DeepCopy())
 	noResourceNameCR := createClusterRoleForProject("p-123xyz", unrelatedNamespace.Name, "get")
 	tests := []struct {
 		name                 string
@@ -184,19 +183,14 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 			wantErr:              false,
 		},
 		{
-			name:      "update get & manage-ns role",
+			// manage-ns role is applied at the project level. It's not expected be updated per namespace reconciliation.
+			name:      "update get & no change to existing manage-ns role",
 			namespace: &testNamespace2,
 			roleVerb:  []string{"get", manageNSVerb},
 			setupCRController: func(c *wfakes.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList], finalRoles *[]*rbacv1.ClusterRole, deletedRoleNames *[]string) {
 				c.EXPECT().Update(gomock.Any()).DoAndReturn(
 					func(cr *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
 						updated := updateGetCR.DeepCopy()
-						*finalRoles = append(*finalRoles, updated)
-						return updated, nil
-					})
-				c.EXPECT().Update(gomock.Any()).DoAndReturn(
-					func(cr *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
-						updated := updateManageCR.DeepCopy()
 						*finalRoles = append(*finalRoles, updated)
 						return updated, nil
 					})
@@ -214,7 +208,6 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 			},
 			wantRoles: []*rbacv1.ClusterRole{
 				updateGetCR,
-				updateManageCR,
 			},
 			wantDeletedRoleNames: []string{},
 			wantErr:              false,
@@ -402,14 +395,14 @@ func TestCreateProjectNSRole(t *testing.T) {
 			},
 		},
 		{
-			description: "create edit role",
-			verb:        "*",
+			description: "create manage role",
+			verb:        "manage-namespaces",
 			projectName: "p-123xyz",
 			expectedCR: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "p-123xyz-namespaces-edit",
+					Name: "p-123xyz-namespaces-manage",
 					Annotations: map[string]string{
-						projectNSAnn: "p-123xyz-namespaces-edit",
+						projectNSAnn: "p-123xyz-namespaces-manage",
 					},
 				},
 				Rules: []rbacv1.PolicyRule{
@@ -424,13 +417,13 @@ func TestCreateProjectNSRole(t *testing.T) {
 		},
 		{
 			description: "do not change role if already exists and return AlreadyExists error",
-			verb:        "*",
+			verb:        "manage-namespaces",
 			projectName: "p-123xyz",
 			expectedCR: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "p-123xyz-namespaces-edit",
+					Name: "p-123xyz-namespaces-manage",
 					Annotations: map[string]string{
-						projectNSAnn: "p-123xyz-namespaces-edit",
+						projectNSAnn: "p-123xyz-namespaces-manage",
 					},
 				},
 				Rules: []rbacv1.PolicyRule{
@@ -444,9 +437,9 @@ func TestCreateProjectNSRole(t *testing.T) {
 			},
 			startingCR: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "p-123xyz-namespaces-edit",
+					Name: "p-123xyz-namespaces-manage",
 					Annotations: map[string]string{
-						projectNSAnn: "p-123xyz-namespaces-edit",
+						projectNSAnn: "p-123xyz-namespaces-manage",
 					},
 				},
 				Rules: []rbacv1.PolicyRule{
@@ -458,11 +451,11 @@ func TestCreateProjectNSRole(t *testing.T) {
 					},
 				},
 			},
-			expectedErr: `roletemplates.management.cattle.io "p-123xyz-namespaces-edit" already exists`,
+			expectedErr: `roletemplates.management.cattle.io "p-123xyz-namespaces-manage" already exists`,
 		},
 		{
 			description: "test should return non-AlreadyExists error",
-			verb:        "*",
+			verb:        "manage-namespaces",
 			projectName: "p-123xyz",
 			createError: errors.NewInternalError(fmt.Errorf("some error")),
 			expectedErr: "Internal error occurred: some error",
