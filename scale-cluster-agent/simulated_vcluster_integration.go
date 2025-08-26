@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/tls"
-	"encoding/base64"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -391,11 +390,8 @@ func (svm *SimulatedVClusterManager) generateKubeconfig(clusterName, clusterDir 
 		Users:          []userBlock{{Name: "user", User: map[string]string{"token": "placeholder-token"}}},
 	}
 	cfg.Clusters[0].Cluster.Server = "https://127.0.0.1:PORT"
+	// Use insecure-skip-tls-verify for the simulator and DO NOT set CA data simultaneously to avoid kubectl error
 	cfg.Clusters[0].Cluster.InsecureSkipTLSVerify = true
-	// Embed real self-signed CA PEM from disk
-	if caPEM, err := os.ReadFile(filepath.Join(clusterDir, "pki", "ca.crt")); err == nil {
-		cfg.Clusters[0].Cluster.CertificateAuthorityData = base64.StdEncoding.EncodeToString(caPEM)
-	}
 	cfg.Contexts[0].Context.Cluster = cfg.Clusters[0].Name
 	cfg.Contexts[0].Context.User = cfg.Users[0].Name
 
@@ -459,10 +455,8 @@ func (svm *SimulatedVClusterManager) generateKubeconfigWithServer(clusterName, c
 		Users:          []userBlock{{Name: "user", User: map[string]string{"token": "placeholder-token"}}},
 	}
 	cfg.Clusters[0].Cluster.Server = serverURL
+	// Use insecure-skip-tls-verify for the simulator and DO NOT set CA data simultaneously to avoid kubectl error
 	cfg.Clusters[0].Cluster.InsecureSkipTLSVerify = true
-	if caPEM, err := os.ReadFile(filepath.Join(clusterDir, "pki", "ca.crt")); err == nil {
-		cfg.Clusters[0].Cluster.CertificateAuthorityData = base64.StdEncoding.EncodeToString(caPEM)
-	}
 	cfg.Contexts[0].Context.Cluster = cfg.Clusters[0].Name
 	cfg.Contexts[0].Context.User = cfg.Users[0].Name
 

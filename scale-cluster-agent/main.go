@@ -25,6 +25,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -2841,6 +2842,90 @@ func (a *ScaleAgent) startMockHTTPSAPIServer(addr string, cert tls.Certificate, 
 		_, _ = w.Write([]byte("ok"))
 	}))
 
+	// Kubernetes discovery endpoints
+	// /version used by client-go Discovery().ServerVersion(); include "+k3s" so provider detector can classify
+	muxLocal.HandleFunc("/version", logReq(authWrap(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, 200, map[string]interface{}{
+			"major":        "1",
+			"minor":        "28",
+			"gitVersion":   "v1.28.1+k3s1",
+			"gitCommit":    "mock",
+			"gitTreeState": "clean",
+			"buildDate":    time.Now().UTC().Format(time.RFC3339),
+			"goVersion":    runtime.Version(),
+			"compiler":     "gc",
+			"platform":     runtime.GOOS + "/" + runtime.GOARCH,
+		})
+	})))
+
+	// /api returns core versions supported
+	muxLocal.HandleFunc("/api", logReq(authWrap(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, 200, map[string]interface{}{
+			"kind": "APIVersions",
+			"versions": []string{"v1"},
+			"serverAddressByClientCIDRs": []interface{}{},
+		})
+	})))
+
+	// /apis returns group list (minimal)
+	muxLocal.HandleFunc("/apis", logReq(authWrap(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, 200, map[string]interface{}{
+			"kind":       "APIGroupList",
+			"apiVersion": "v1",
+			"groups": []map[string]interface{}{
+				{
+					"name": "rbac.authorization.k8s.io",
+					"versions": []map[string]interface{}{{
+						"groupVersion": "rbac.authorization.k8s.io/v1",
+						"version":      "v1",
+					}},
+					"preferredVersion": map[string]interface{}{
+						"groupVersion": "rbac.authorization.k8s.io/v1",
+						"version":      "v1",
+					},
+				},
+			},
+		})
+	})))
+
+	// Generic discovery for any "/apis/{group}/{version}" — reply with empty resource list to avoid 404s
+	muxLocal.HandleFunc("/apis/", logReq(authWrap(func(w http.ResponseWriter, r *http.Request) {
+		// skip if exact handlers exist above (Go mux uses most-specific match first)
+		// parse /apis/{group}/{version}
+		rest := strings.TrimPrefix(r.URL.Path, "/apis/")
+		parts := strings.Split(rest, "/")
+		if len(parts) >= 2 && parts[0] != "" && parts[1] != "" {
+			group := parts[0]
+			version := parts[1]
+			writeJSON(w, 200, map[string]interface{}{
+				"kind":         "APIResourceList",
+				"apiVersion":   "v1",
+				"groupVersion": group + "/" + version,
+				"resources":    []interface{}{},
+			})
+			return
+		}
+		http.NotFound(w, r)
+	})))
+
+	// /api/v1 discovery for core resources referenced elsewhere
+	muxLocal.HandleFunc("/api/v1", logReq(authWrap(func(w http.ResponseWriter, r *http.Request) {
+		resources := []map[string]interface{}{
+			{"name": "namespaces", "namespaced": false, "kind": "Namespace"},
+			{"name": "serviceaccounts", "namespaced": true, "kind": "ServiceAccount"},
+			{"name": "secrets", "namespaced": true, "kind": "Secret"},
+			{"name": "nodes", "namespaced": false, "kind": "Node"},
+			{"name": "resourcequotas", "namespaced": true, "kind": "ResourceQuota"},
+			{"name": "limitranges", "namespaced": true, "kind": "LimitRange"},
+		}
+		writeJSON(w, 200, map[string]interface{}{
+			"kind":         "APIResourceList",
+			"apiVersion":   "v1",
+			"groupVersion": "v1",
+			"resources":    resources,
+		})
+	})))
+
 	// Core: namespaces list
 	muxLocal.HandleFunc("/api/v1/namespaces", logReq(authWrap(func(w http.ResponseWriter, r *http.Request) {
 		if isWatch(r) {
@@ -3379,6 +3464,12 @@ func (a *ScaleAgent) startMockHTTPSAPIServer(addr string, cert tls.Certificate, 
 		}
 		writeJSON(w, 200, map[string]interface{}{"kind": "NodeList", "apiVersion": "v1", "items": []interface{}{nodeObj}})
 	})))
+
+	// Catch-all 404 logger to pinpoint missing endpoints
+	muxLocal.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		logrus.Warnf("MOCK API 404 %s %s (cluster=%s)", r.Method, r.URL.Path, clusterName)
+		http.NotFound(w, r)
+	})
 
 	// Start HTTPS server
 	go func() {
