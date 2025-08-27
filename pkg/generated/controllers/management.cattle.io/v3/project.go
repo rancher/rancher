@@ -36,12 +36,12 @@ import (
 
 // ProjectController interface for managing Project resources.
 type ProjectController interface {
-	generic.ControllerInterface[*v3.Project, *v3.ProjectList]
+	generic.ControllerInterfaceContext[*v3.Project, *v3.ProjectList]
 }
 
 // ProjectClient interface for managing Project resources in Kubernetes.
 type ProjectClient interface {
-	generic.ClientInterface[*v3.Project, *v3.ProjectList]
+	generic.ClientInterfaceContext[*v3.Project, *v3.ProjectList]
 }
 
 // ProjectCache interface for retrieving Project resources in memory.

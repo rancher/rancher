@@ -25,12 +25,12 @@ import (
 
 // GroupController interface for managing Group resources.
 type GroupController interface {
-	generic.NonNamespacedControllerInterface[*v3.Group, *v3.GroupList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.Group, *v3.GroupList]
 }
 
 // GroupClient interface for managing Group resources in Kubernetes.
 type GroupClient interface {
-	generic.NonNamespacedClientInterface[*v3.Group, *v3.GroupList]
+	generic.NonNamespacedClientInterfaceContext[*v3.Group, *v3.GroupList]
 }
 
 // GroupCache interface for retrieving Group resources in memory.

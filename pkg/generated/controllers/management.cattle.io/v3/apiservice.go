@@ -36,12 +36,12 @@ import (
 
 // APIServiceController interface for managing APIService resources.
 type APIServiceController interface {
-	generic.NonNamespacedControllerInterface[*v3.APIService, *v3.APIServiceList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.APIService, *v3.APIServiceList]
 }
 
 // APIServiceClient interface for managing APIService resources in Kubernetes.
 type APIServiceClient interface {
-	generic.NonNamespacedClientInterface[*v3.APIService, *v3.APIServiceList]
+	generic.NonNamespacedClientInterfaceContext[*v3.APIService, *v3.APIServiceList]
 }
 
 // APIServiceCache interface for retrieving APIService resources in memory.

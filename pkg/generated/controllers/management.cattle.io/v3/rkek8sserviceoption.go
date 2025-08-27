@@ -25,12 +25,12 @@ import (
 
 // RkeK8sServiceOptionController interface for managing RkeK8sServiceOption resources.
 type RkeK8sServiceOptionController interface {
-	generic.ControllerInterface[*v3.RkeK8sServiceOption, *v3.RkeK8sServiceOptionList]
+	generic.ControllerInterfaceContext[*v3.RkeK8sServiceOption, *v3.RkeK8sServiceOptionList]
 }
 
 // RkeK8sServiceOptionClient interface for managing RkeK8sServiceOption resources in Kubernetes.
 type RkeK8sServiceOptionClient interface {
-	generic.ClientInterface[*v3.RkeK8sServiceOption, *v3.RkeK8sServiceOptionList]
+	generic.ClientInterfaceContext[*v3.RkeK8sServiceOption, *v3.RkeK8sServiceOptionList]
 }
 
 // RkeK8sServiceOptionCache interface for retrieving RkeK8sServiceOption resources in memory.

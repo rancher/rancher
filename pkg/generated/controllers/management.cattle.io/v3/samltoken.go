@@ -25,12 +25,12 @@ import (
 
 // SamlTokenController interface for managing SamlToken resources.
 type SamlTokenController interface {
-	generic.NonNamespacedControllerInterface[*v3.SamlToken, *v3.SamlTokenList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.SamlToken, *v3.SamlTokenList]
 }
 
 // SamlTokenClient interface for managing SamlToken resources in Kubernetes.
 type SamlTokenClient interface {
-	generic.NonNamespacedClientInterface[*v3.SamlToken, *v3.SamlTokenList]
+	generic.NonNamespacedClientInterfaceContext[*v3.SamlToken, *v3.SamlTokenList]
 }
 
 // SamlTokenCache interface for retrieving SamlToken resources in memory.

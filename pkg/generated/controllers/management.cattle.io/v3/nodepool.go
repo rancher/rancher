@@ -36,12 +36,12 @@ import (
 
 // NodePoolController interface for managing NodePool resources.
 type NodePoolController interface {
-	generic.ControllerInterface[*v3.NodePool, *v3.NodePoolList]
+	generic.ControllerInterfaceContext[*v3.NodePool, *v3.NodePoolList]
 }
 
 // NodePoolClient interface for managing NodePool resources in Kubernetes.
 type NodePoolClient interface {
-	generic.ClientInterface[*v3.NodePool, *v3.NodePoolList]
+	generic.ClientInterfaceContext[*v3.NodePool, *v3.NodePoolList]
 }
 
 // NodePoolCache interface for retrieving NodePool resources in memory.

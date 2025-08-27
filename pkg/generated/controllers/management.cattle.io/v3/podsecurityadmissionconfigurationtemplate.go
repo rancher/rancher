@@ -25,12 +25,12 @@ import (
 
 // PodSecurityAdmissionConfigurationTemplateController interface for managing PodSecurityAdmissionConfigurationTemplate resources.
 type PodSecurityAdmissionConfigurationTemplateController interface {
-	generic.NonNamespacedControllerInterface[*v3.PodSecurityAdmissionConfigurationTemplate, *v3.PodSecurityAdmissionConfigurationTemplateList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.PodSecurityAdmissionConfigurationTemplate, *v3.PodSecurityAdmissionConfigurationTemplateList]
 }
 
 // PodSecurityAdmissionConfigurationTemplateClient interface for managing PodSecurityAdmissionConfigurationTemplate resources in Kubernetes.
 type PodSecurityAdmissionConfigurationTemplateClient interface {
-	generic.NonNamespacedClientInterface[*v3.PodSecurityAdmissionConfigurationTemplate, *v3.PodSecurityAdmissionConfigurationTemplateList]
+	generic.NonNamespacedClientInterfaceContext[*v3.PodSecurityAdmissionConfigurationTemplate, *v3.PodSecurityAdmissionConfigurationTemplateList]
 }
 
 // PodSecurityAdmissionConfigurationTemplateCache interface for retrieving PodSecurityAdmissionConfigurationTemplate resources in memory.

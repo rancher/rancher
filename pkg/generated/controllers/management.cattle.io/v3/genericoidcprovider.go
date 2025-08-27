@@ -25,12 +25,12 @@ import (
 
 // GenericOIDCProviderController interface for managing GenericOIDCProvider resources.
 type GenericOIDCProviderController interface {
-	generic.NonNamespacedControllerInterface[*v3.GenericOIDCProvider, *v3.GenericOIDCProviderList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.GenericOIDCProvider, *v3.GenericOIDCProviderList]
 }
 
 // GenericOIDCProviderClient interface for managing GenericOIDCProvider resources in Kubernetes.
 type GenericOIDCProviderClient interface {
-	generic.NonNamespacedClientInterface[*v3.GenericOIDCProvider, *v3.GenericOIDCProviderList]
+	generic.NonNamespacedClientInterfaceContext[*v3.GenericOIDCProvider, *v3.GenericOIDCProviderList]
 }
 
 // GenericOIDCProviderCache interface for retrieving GenericOIDCProvider resources in memory.

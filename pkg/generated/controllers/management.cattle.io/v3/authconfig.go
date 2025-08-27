@@ -36,12 +36,12 @@ import (
 
 // AuthConfigController interface for managing AuthConfig resources.
 type AuthConfigController interface {
-	generic.NonNamespacedControllerInterface[*v3.AuthConfig, *v3.AuthConfigList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.AuthConfig, *v3.AuthConfigList]
 }
 
 // AuthConfigClient interface for managing AuthConfig resources in Kubernetes.
 type AuthConfigClient interface {
-	generic.NonNamespacedClientInterface[*v3.AuthConfig, *v3.AuthConfigList]
+	generic.NonNamespacedClientInterfaceContext[*v3.AuthConfig, *v3.AuthConfigList]
 }
 
 // AuthConfigCache interface for retrieving AuthConfig resources in memory.

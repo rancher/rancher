@@ -36,12 +36,12 @@ import (
 
 // DynamicSchemaController interface for managing DynamicSchema resources.
 type DynamicSchemaController interface {
-	generic.NonNamespacedControllerInterface[*v3.DynamicSchema, *v3.DynamicSchemaList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.DynamicSchema, *v3.DynamicSchemaList]
 }
 
 // DynamicSchemaClient interface for managing DynamicSchema resources in Kubernetes.
 type DynamicSchemaClient interface {
-	generic.NonNamespacedClientInterface[*v3.DynamicSchema, *v3.DynamicSchemaList]
+	generic.NonNamespacedClientInterfaceContext[*v3.DynamicSchema, *v3.DynamicSchemaList]
 }
 
 // DynamicSchemaCache interface for retrieving DynamicSchema resources in memory.

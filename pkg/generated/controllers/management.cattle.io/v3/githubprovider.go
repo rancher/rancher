@@ -25,12 +25,12 @@ import (
 
 // GithubProviderController interface for managing GithubProvider resources.
 type GithubProviderController interface {
-	generic.NonNamespacedControllerInterface[*v3.GithubProvider, *v3.GithubProviderList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.GithubProvider, *v3.GithubProviderList]
 }
 
 // GithubProviderClient interface for managing GithubProvider resources in Kubernetes.
 type GithubProviderClient interface {
-	generic.NonNamespacedClientInterface[*v3.GithubProvider, *v3.GithubProviderList]
+	generic.NonNamespacedClientInterfaceContext[*v3.GithubProvider, *v3.GithubProviderList]
 }
 
 // GithubProviderCache interface for retrieving GithubProvider resources in memory.

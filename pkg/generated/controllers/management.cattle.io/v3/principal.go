@@ -25,12 +25,12 @@ import (
 
 // PrincipalController interface for managing Principal resources.
 type PrincipalController interface {
-	generic.NonNamespacedControllerInterface[*v3.Principal, *v3.PrincipalList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.Principal, *v3.PrincipalList]
 }
 
 // PrincipalClient interface for managing Principal resources in Kubernetes.
 type PrincipalClient interface {
-	generic.NonNamespacedClientInterface[*v3.Principal, *v3.PrincipalList]
+	generic.NonNamespacedClientInterfaceContext[*v3.Principal, *v3.PrincipalList]
 }
 
 // PrincipalCache interface for retrieving Principal resources in memory.

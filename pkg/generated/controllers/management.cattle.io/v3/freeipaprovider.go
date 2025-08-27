@@ -25,12 +25,12 @@ import (
 
 // FreeIpaProviderController interface for managing FreeIpaProvider resources.
 type FreeIpaProviderController interface {
-	generic.NonNamespacedControllerInterface[*v3.FreeIpaProvider, *v3.FreeIpaProviderList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.FreeIpaProvider, *v3.FreeIpaProviderList]
 }
 
 // FreeIpaProviderClient interface for managing FreeIpaProvider resources in Kubernetes.
 type FreeIpaProviderClient interface {
-	generic.NonNamespacedClientInterface[*v3.FreeIpaProvider, *v3.FreeIpaProviderList]
+	generic.NonNamespacedClientInterfaceContext[*v3.FreeIpaProvider, *v3.FreeIpaProviderList]
 }
 
 // FreeIpaProviderCache interface for retrieving FreeIpaProvider resources in memory.

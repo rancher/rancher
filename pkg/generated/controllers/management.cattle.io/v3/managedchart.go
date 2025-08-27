@@ -36,12 +36,12 @@ import (
 
 // ManagedChartController interface for managing ManagedChart resources.
 type ManagedChartController interface {
-	generic.ControllerInterface[*v3.ManagedChart, *v3.ManagedChartList]
+	generic.ControllerInterfaceContext[*v3.ManagedChart, *v3.ManagedChartList]
 }
 
 // ManagedChartClient interface for managing ManagedChart resources in Kubernetes.
 type ManagedChartClient interface {
-	generic.ClientInterface[*v3.ManagedChart, *v3.ManagedChartList]
+	generic.ClientInterfaceContext[*v3.ManagedChart, *v3.ManagedChartList]
 }
 
 // ManagedChartCache interface for retrieving ManagedChart resources in memory.

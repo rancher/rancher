@@ -25,12 +25,12 @@ import (
 
 // SettingController interface for managing Setting resources.
 type SettingController interface {
-	generic.NonNamespacedControllerInterface[*v3.Setting, *v3.SettingList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.Setting, *v3.SettingList]
 }
 
 // SettingClient interface for managing Setting resources in Kubernetes.
 type SettingClient interface {
-	generic.NonNamespacedClientInterface[*v3.Setting, *v3.SettingList]
+	generic.NonNamespacedClientInterfaceContext[*v3.Setting, *v3.SettingList]
 }
 
 // SettingCache interface for retrieving Setting resources in memory.

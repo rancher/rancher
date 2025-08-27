@@ -25,12 +25,12 @@ import (
 
 // ProjectNetworkPolicyController interface for managing ProjectNetworkPolicy resources.
 type ProjectNetworkPolicyController interface {
-	generic.ControllerInterface[*v3.ProjectNetworkPolicy, *v3.ProjectNetworkPolicyList]
+	generic.ControllerInterfaceContext[*v3.ProjectNetworkPolicy, *v3.ProjectNetworkPolicyList]
 }
 
 // ProjectNetworkPolicyClient interface for managing ProjectNetworkPolicy resources in Kubernetes.
 type ProjectNetworkPolicyClient interface {
-	generic.ClientInterface[*v3.ProjectNetworkPolicy, *v3.ProjectNetworkPolicyList]
+	generic.ClientInterfaceContext[*v3.ProjectNetworkPolicy, *v3.ProjectNetworkPolicyList]
 }
 
 // ProjectNetworkPolicyCache interface for retrieving ProjectNetworkPolicy resources in memory.

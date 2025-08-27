@@ -36,12 +36,12 @@ import (
 
 // KontainerDriverController interface for managing KontainerDriver resources.
 type KontainerDriverController interface {
-	generic.NonNamespacedControllerInterface[*v3.KontainerDriver, *v3.KontainerDriverList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.KontainerDriver, *v3.KontainerDriverList]
 }
 
 // KontainerDriverClient interface for managing KontainerDriver resources in Kubernetes.
 type KontainerDriverClient interface {
-	generic.NonNamespacedClientInterface[*v3.KontainerDriver, *v3.KontainerDriverList]
+	generic.NonNamespacedClientInterfaceContext[*v3.KontainerDriver, *v3.KontainerDriverList]
 }
 
 // KontainerDriverCache interface for retrieving KontainerDriver resources in memory.

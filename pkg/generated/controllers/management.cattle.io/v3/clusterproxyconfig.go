@@ -25,12 +25,12 @@ import (
 
 // ClusterProxyConfigController interface for managing ClusterProxyConfig resources.
 type ClusterProxyConfigController interface {
-	generic.ControllerInterface[*v3.ClusterProxyConfig, *v3.ClusterProxyConfigList]
+	generic.ControllerInterfaceContext[*v3.ClusterProxyConfig, *v3.ClusterProxyConfigList]
 }
 
 // ClusterProxyConfigClient interface for managing ClusterProxyConfig resources in Kubernetes.
 type ClusterProxyConfigClient interface {
-	generic.ClientInterface[*v3.ClusterProxyConfig, *v3.ClusterProxyConfigList]
+	generic.ClientInterfaceContext[*v3.ClusterProxyConfig, *v3.ClusterProxyConfigList]
 }
 
 // ClusterProxyConfigCache interface for retrieving ClusterProxyConfig resources in memory.

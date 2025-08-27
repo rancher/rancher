@@ -25,12 +25,12 @@ import (
 
 // ClusterTemplateController interface for managing ClusterTemplate resources.
 type ClusterTemplateController interface {
-	generic.ControllerInterface[*v3.ClusterTemplate, *v3.ClusterTemplateList]
+	generic.ControllerInterfaceContext[*v3.ClusterTemplate, *v3.ClusterTemplateList]
 }
 
 // ClusterTemplateClient interface for managing ClusterTemplate resources in Kubernetes.
 type ClusterTemplateClient interface {
-	generic.ClientInterface[*v3.ClusterTemplate, *v3.ClusterTemplateList]
+	generic.ClientInterfaceContext[*v3.ClusterTemplate, *v3.ClusterTemplateList]
 }
 
 // ClusterTemplateCache interface for retrieving ClusterTemplate resources in memory.

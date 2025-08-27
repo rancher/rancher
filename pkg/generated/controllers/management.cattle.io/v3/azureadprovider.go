@@ -25,12 +25,12 @@ import (
 
 // AzureADProviderController interface for managing AzureADProvider resources.
 type AzureADProviderController interface {
-	generic.NonNamespacedControllerInterface[*v3.AzureADProvider, *v3.AzureADProviderList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.AzureADProvider, *v3.AzureADProviderList]
 }
 
 // AzureADProviderClient interface for managing AzureADProvider resources in Kubernetes.
 type AzureADProviderClient interface {
-	generic.NonNamespacedClientInterface[*v3.AzureADProvider, *v3.AzureADProviderList]
+	generic.NonNamespacedClientInterfaceContext[*v3.AzureADProvider, *v3.AzureADProviderList]
 }
 
 // AzureADProviderCache interface for retrieving AzureADProvider resources in memory.

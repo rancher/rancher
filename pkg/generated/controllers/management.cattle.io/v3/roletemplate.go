@@ -25,12 +25,12 @@ import (
 
 // RoleTemplateController interface for managing RoleTemplate resources.
 type RoleTemplateController interface {
-	generic.NonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.RoleTemplate, *v3.RoleTemplateList]
 }
 
 // RoleTemplateClient interface for managing RoleTemplate resources in Kubernetes.
 type RoleTemplateClient interface {
-	generic.NonNamespacedClientInterface[*v3.RoleTemplate, *v3.RoleTemplateList]
+	generic.NonNamespacedClientInterfaceContext[*v3.RoleTemplate, *v3.RoleTemplateList]
 }
 
 // RoleTemplateCache interface for retrieving RoleTemplate resources in memory.

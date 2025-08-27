@@ -25,12 +25,12 @@ import (
 
 // SamlProviderController interface for managing SamlProvider resources.
 type SamlProviderController interface {
-	generic.NonNamespacedControllerInterface[*v3.SamlProvider, *v3.SamlProviderList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.SamlProvider, *v3.SamlProviderList]
 }
 
 // SamlProviderClient interface for managing SamlProvider resources in Kubernetes.
 type SamlProviderClient interface {
-	generic.NonNamespacedClientInterface[*v3.SamlProvider, *v3.SamlProviderList]
+	generic.NonNamespacedClientInterfaceContext[*v3.SamlProvider, *v3.SamlProviderList]
 }
 
 // SamlProviderCache interface for retrieving SamlProvider resources in memory.
