@@ -245,8 +245,7 @@ func (g *ghAppProvider) SearchPrincipals(searchKey, principalType string, token 
 
 	var principals []v3.Principal
 	ctx := context.Background()
-	// TODO: Should this search within the orgs that a user is a member of?
-	// It was discussed that we'd search with the credentials of the app.
+
 	users, err := g.githubClient.searchUsers(ctx, searchKey, principalType, config)
 	if err != nil {
 		return nil, err
@@ -421,7 +420,6 @@ func (g *ghAppProvider) saveGithubAppConfig(config *cattlev3.GithubAppConfig) er
 
 func getAppDataWithConfig(ctx context.Context, config *cattlev3.GithubAppConfig) (*gitHubAppData, error) {
 	appID, err := strconv.ParseInt(config.AppID, 10, 64)
-	// TODO: test
 	if err != nil {
 		return nil, fmt.Errorf("parsing GitHub App ID: %w", err)
 	}
@@ -456,6 +454,10 @@ func chooseClientID(host string, sourceConfig *cattlev3.GithubAppConfig) *cattle
 	return &config
 }
 
+// This parses a Principal ID of the form provider_group://<external-id> and
+// returns "group" and the external ID value as an integer.
+//
+// IDs not matching will result in an error.
 func parsePrincipalID(s string) (kind string, id int, err error) {
 	parts := strings.SplitN(s, ":", 2)
 	if len(parts) != 2 {

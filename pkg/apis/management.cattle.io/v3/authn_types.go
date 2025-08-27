@@ -352,7 +352,7 @@ type GithubConfig struct {
 	ClientID     string `json:"clientId,omitempty" norman:"required"`
 	ClientSecret string `json:"clientSecret,omitempty" norman:"required,type=password"`
 
-	// AdditionalClientIDs is a map of clientID to client secrets
+	// AdditionalClientIDs is a map of clientIDs to client secrets
 	AdditionalClientIDs map[string]string `json:"additionalClientIds,omitempty" norman:"nocreate,noupdate"`
 	HostnameToClientID  map[string]string `json:"hostnameToClientId,omitempty" norman:"nocreate,noupdate"`
 }
@@ -383,7 +383,7 @@ type GithubAppConfig struct {
 	ClientID     string `json:"clientId,omitempty" norman:"required"`
 	ClientSecret string `json:"clientSecret,omitempty" norman:"required,type=password"`
 
-	// AdditionalClientIDs is a map of clientID to client secrets
+	// AdditionalClientIDs is a map of clientIDs to client secrets
 	AdditionalClientIDs map[string]string `json:"additionalClientIds,omitempty" norman:"nocreate,noupdate"`
 	HostnameToClientID  map[string]string `json:"hostnameToClientId,omitempty" norman:"nocreate,noupdate"`
 
@@ -391,7 +391,7 @@ type GithubAppConfig struct {
 	AppID string `json:"appId,omitempty" norman:"required"`
 
 	// The Installation ID to query (this will be bound to a specific
-	// Organization) and without it, we query all installations for for the App.
+	// Organization) and without it, we query all installations for the App.
 	InstallationID string `json:"installationId,omitempty"`
 
 	// PrivateKey is a PEM format private key for signing requests.
