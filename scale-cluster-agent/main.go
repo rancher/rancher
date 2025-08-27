@@ -705,12 +705,13 @@ func (a *ScaleAgent) connectClusterToRancher(clusterName, clusterID string, clus
 	// Simple throttle: avoid attempting connects more than once every 5 seconds per cluster
 	a.connMutex.Lock()
 	last := a.lastConnectAttempt[clusterName]
-	if time.Since(last) < 5*time.Second {
+	throttled := time.Since(last) < 5*time.Second
+	if throttled {
 		a.connMutex.Unlock()
 		logrus.Debugf("[%s] Skipping connect attempt (throttled)", clusterName)
 		return
 	}
-	a.lastConnectAttempt[clusterName] = time.Now()
+	// Don't record lastConnectAttempt until we confirm local API readiness below.
 	a.connMutex.Unlock()
 
 	// Check if already connected to prevent multiple connections
@@ -820,6 +821,34 @@ func (a *ScaleAgent) connectClusterToRancher(clusterName, clusterID string, clus
 		return
 	}
 
+	// Ensure the local API endpoint is reachable before attempting to register/connect.
+	// Poll /healthz for a short period.
+	ready := false
+	{
+		client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}, Timeout: 200 * time.Millisecond}
+		deadline := time.Now().Add(10 * time.Second)
+		for time.Now().Before(deadline) {
+			resp, err := client.Get(fmt.Sprintf("https://%s/healthz", localAPI))
+			if err == nil {
+				if resp.Body != nil { resp.Body.Close() }
+				ready = true
+				break
+			}
+			time.Sleep(200 * time.Millisecond)
+		}
+	}
+	if !ready {
+		logrus.Warnf("Local API %s not ready; delaying Rancher registration for cluster %s", localAPI, clusterName)
+		// Schedule a retry after the throttle window to avoid immediate skip
+		time.AfterFunc(5*time.Second, func() { a.connectClusterToRancher(clusterName, clusterID, clusterInfo) })
+		return
+	}
+
+	// Record attempt time now that we're proceeding.
+	a.connMutex.Lock()
+	a.lastConnectAttempt[clusterName] = time.Now()
+	a.connMutex.Unlock()
+
 	headers := http.Header{}
 	headers.Set("X-API-Tunnel-Token", rancherToken) // Valid token for WebSocket connection to Rancher
 	headers.Set("X-API-Tunnel-Params", encodedParams)
@@ -828,16 +857,33 @@ func (a *ScaleAgent) connectClusterToRancher(clusterName, clusterID string, clus
 		if proto != "tcp" {
 			return false
 		}
-		// Allow KWOK API target (normal proxied traffic)
+		// Allow exact KWOK API target (normal proxied traffic)
 		if address == localAPI {
 			return true
+		}
+		// Also allow common localhost variants that resolve to the same port to avoid false negatives
+		// when Rancher dials using a different hostname but identical port.
+		// localAPI is in form "127.0.0.1:<port>".
+		if host, portStr, err := net.SplitHostPort(localAPI); err == nil {
+			_, wantPortErr := strconv.Atoi(portStr)
+			if wantPortErr == nil {
+				if ah, ap, aerr := net.SplitHostPort(address); aerr == nil {
+					if ap == portStr {
+						// Accept localhost, 127.0.0.1, or ::1 when port matches
+						if ah == host || ah == "127.0.0.1" || ah == "localhost" || ah == "::1" {
+							return true
+						}
+					}
+				}
+			}
 		}
 		// Allow Rancher server's connectivity probe used by ClusterConnected controller:
 		// it performs client.Get("http://not-used/ping"), which dials host "not-used" on port 80 via the tunnel.
 		if address == "not-used:80" {
 			return true
 		}
-		logrus.Tracef("REMOTEDIALER allowFunc: denying dial to %s (proto=%s)", address, proto)
+		// Promote to info so we can see unexpected dials without enabling trace everywhere
+		logrus.Infof("REMOTEDIALER allowFunc: denying dial to %s (proto=%s); expected API %s", address, proto, localAPI)
 		return false
 	}
 
@@ -2440,54 +2486,106 @@ func (a *ScaleAgent) deleteClusterFromRancher(clusterName string) error {
 func (a *ScaleAgent) getClusterToken(clusterID string) (string, error) {
 	logrus.Infof("Getting cluster token for cluster %s", clusterID)
 
-	// Get the cluster registration tokens for this cluster
-	url := fmt.Sprintf("%s/v3/clusters/%s/clusterregistrationtokens", strings.TrimRight(a.config.RancherURL, "/"), clusterID)
+	// Helper HTTP client (skip TLS verify for test envs)
+	client := &http.Client{Timeout: 30 * time.Second, Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
 
-	req, err := http.NewRequest("GET", url, nil)
+	// Step 1: Try to list existing registration tokens
+	listURL := fmt.Sprintf("%s/v3/clusters/%s/clusterregistrationtokens", strings.TrimRight(a.config.RancherURL, "/"), clusterID)
+	req, err := http.NewRequest("GET", listURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %v", err)
 	}
-
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", a.config.BearerToken))
 	req.Header.Set("Content-Type", "application/json")
 
-	// Use a sane timeout and skip TLS verify like we do for YAML download,
-	// since many Rancher test envs use self-signed certs.
-	client := &http.Client{Timeout: 30 * time.Second, Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to get cluster registration tokens: %v", err)
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		body, _ := io.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("failed to get cluster registration tokens: status %d, body: %s", resp.StatusCode, string(body))
 	}
 
-	var tokensResponse struct {
-		Data []struct {
-			Token string `json:"token"`
-		} `json:"data"`
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read response body: %v", err)
-	}
-
+	// Response model
+	type tokenItem struct{ Token string `json:"token"` }
+	var tokensResponse struct{ Data []tokenItem `json:"data"` }
 	if err := json.Unmarshal(body, &tokensResponse); err != nil {
 		return "", fmt.Errorf("failed to parse tokens response: %v", err)
 	}
 
-	if len(tokensResponse.Data) == 0 {
-		return "", fmt.Errorf("no tokens found for cluster %s", clusterID)
+	// If we already have a token, return it
+	if len(tokensResponse.Data) > 0 && tokensResponse.Data[0].Token != "" {
+		token := tokensResponse.Data[0].Token
+		if len(token) > 10 {
+			logrus.Infof("Got token for cluster %s: %s", clusterID, token[:10]+"...")
+		} else {
+			logrus.Infof("Got token for cluster %s", clusterID)
+		}
+		return token, nil
 	}
 
-	token := tokensResponse.Data[0].Token
-	logrus.Infof("Got token for cluster %s: %s", clusterID, token[:10]+"...")
+	// Step 2: None found — request Rancher to create one
+	createURL := fmt.Sprintf("%s/v3/clusterregistrationtokens", strings.TrimRight(a.config.RancherURL, "/"))
+	payload := map[string]interface{}{
+		"type":      "clusterRegistrationToken",
+		"clusterId": clusterID,
+	}
+	payloadBytes, _ := json.Marshal(payload)
+	creq, err := http.NewRequest("POST", createURL, bytes.NewReader(payloadBytes))
+	if err != nil {
+		return "", fmt.Errorf("failed to create registration token request: %v", err)
+	}
+	creq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", a.config.BearerToken))
+	creq.Header.Set("Content-Type", "application/json")
+	logrus.Infof("No registration token found; creating one for cluster %s", clusterID)
+	cresp, err := client.Do(creq)
+	if err != nil {
+		return "", fmt.Errorf("failed to create cluster registration token: %v", err)
+	}
+	cbody, _ := io.ReadAll(cresp.Body)
+	cresp.Body.Close()
+	if cresp.StatusCode != http.StatusOK && cresp.StatusCode != http.StatusCreated && cresp.StatusCode != http.StatusAccepted {
+		return "", fmt.Errorf("create registration token failed: status %d, body: %s", cresp.StatusCode, string(cbody))
+	}
 
-	return token, nil
+	// Step 3: Poll until token appears
+	deadline := time.Now().Add(60 * time.Second)
+	for attempt := 1; time.Now().Before(deadline); attempt++ {
+		time.Sleep(2 * time.Second)
+		req2, _ := http.NewRequest("GET", listURL, nil)
+		req2.Header.Set("Authorization", fmt.Sprintf("Bearer %s", a.config.BearerToken))
+		req2.Header.Set("Content-Type", "application/json")
+		resp2, err2 := client.Do(req2)
+		if err2 != nil {
+			logrus.Debugf("retry %d: tokens GET error: %v", attempt, err2)
+			continue
+		}
+		b2, _ := io.ReadAll(resp2.Body)
+		resp2.Body.Close()
+		if resp2.StatusCode != http.StatusOK {
+			logrus.Debugf("retry %d: tokens GET status %d: %s", attempt, resp2.StatusCode, string(b2))
+			continue
+		}
+		var tr2 struct{ Data []tokenItem `json:"data"` }
+		if err := json.Unmarshal(b2, &tr2); err != nil {
+			logrus.Debugf("retry %d: parse error: %v", attempt, err)
+			continue
+		}
+		if len(tr2.Data) > 0 && tr2.Data[0].Token != "" {
+			token := tr2.Data[0].Token
+			if len(token) > 10 {
+				logrus.Infof("Got token for cluster %s after create: %s", clusterID, token[:10]+"...")
+			} else {
+				logrus.Infof("Got token for cluster %s after create", clusterID)
+			}
+			return token, nil
+		}
+		logrus.Debugf("retry %d: token not available yet for cluster %s", attempt, clusterID)
+	}
+
+	return "", fmt.Errorf("no registration token became available for cluster %s within timeout", clusterID)
 }
 
 // extractClusterCredentials extracts token and URL from import YAML (like real agent)

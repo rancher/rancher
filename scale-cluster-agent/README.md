@@ -201,6 +201,48 @@ go test ./...
 LOG_LEVEL=debug ./scale-cluster-agent
 ```
 
+## Simulated Kubernetes API server (standalone)
+
+This repository includes a lightweight simulated Kubernetes API server used during development and Rancher integration testing.
+
+- Location: `cmd/simulated-apiserver`
+- Purpose: Emulate a minimal K8s API needed by Rancher (discovery, core/v1, RBAC, ServiceAccounts/Secrets, list/watch, health endpoints).
+
+### Quick start
+
+1) Run the server locally (HTTPS with a self-signed cert):
+
+```bash
+go run ./cmd/simulated-apiserver -port 7443
+```
+
+2) Probe readiness and a few endpoints (use `-k` with curl to skip TLS verification):
+
+```bash
+curl -sk https://127.0.0.1:7443/readyz
+curl -sk https://127.0.0.1:7443/api
+curl -sk https://127.0.0.1:7443/api/v1
+```
+
+### Integration tests
+
+Run the end-to-end integration test suite for the simulated API server:
+
+```bash
+go test ./cmd/simulated-apiserver -run TestSimAPIServer_Integration -v
+```
+
+What it covers (high level):
+
+- Health and OpenAPI stubs (/readyz, /openapi/*)
+- Discovery for core and group APIs
+- Namespaces and Nodes lists/gets
+- ServiceAccount and Secret lifecycle (including token Secret auto-creation and linkage)
+- Field selectors for lists (e.g., metadata.name, type)
+- Basic list/watch streaming semantics
+
+If you see timeouts, ensure no previous server instance is holding the port and re-run the tests.
+
 ## Troubleshooting
 
 ### Common Issues

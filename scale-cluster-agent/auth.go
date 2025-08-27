@@ -1,17 +1,17 @@
 package main
 
 import (
-    "crypto/rand"
-    "crypto/rsa"
-    "crypto/x509"
-    "encoding/pem"
-    "errors"
-    "fmt"
-    "os"
-    "path/filepath"
-    "time"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"time"
 
-    jwt "github.com/golang-jwt/jwt/v5"
+	jwt "github.com/golang-jwt/jwt/v5"
 )
 
 // ensureSAKeypairForCluster loads or creates an RSA keypair used to mint service-account-like JWTs

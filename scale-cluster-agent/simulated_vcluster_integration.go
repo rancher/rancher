@@ -1,14 +1,17 @@
 package main
 
 import (
-	"crypto/tls"
+	"bufio"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"math/big"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -236,32 +239,126 @@ func (svm *SimulatedVClusterManager) startSimulatedVCluster(clusterName string) 
 		return 0, nil, fmt.Errorf("failed to create clusters directory: %v", err)
 	}
 
-	// Resolve binary path and check existence for clearer errors
-	binPath := "./simulated-apiserver"
-	if abs, err := filepath.Abs(binPath); err == nil {
-		binPath = abs
+	// Resolve binary path and check existence for clearer errors.
+	// Priority:
+	// 1) SIM_APISERVER_BIN env var
+	// 2) ./simulated-apiserver
+	// 3) ./cmd/simulated-apiserver/simulated-apiserver
+	// If not found, attempt to build: `go build -o ./simulated-apiserver ./cmd/simulated-apiserver`.
+	binPath := os.Getenv("SIM_APISERVER_BIN")
+	candidatePaths := []string{}
+	if binPath != "" {
+		candidatePaths = append(candidatePaths, binPath)
 	}
-	if _, err := os.Stat(binPath); err != nil {
-		return 0, nil, fmt.Errorf("simulated-apiserver binary not found at %s: %v", binPath, err)
+	candidatePaths = append(candidatePaths,
+		"./simulated-apiserver",
+		"./cmd/simulated-apiserver/simulated-apiserver",
+	)
+
+	resolved := ""
+	for _, p := range candidatePaths {
+		if p == "" { continue }
+		abs := p
+		if v, err := filepath.Abs(p); err == nil { abs = v }
+		if st, err := os.Stat(abs); err == nil && !st.IsDir() {
+			resolved = abs
+			break
+		}
 	}
+
+	if resolved == "" {
+		// Try to build the binary into repo root for predictable path
+		buildOut := "./simulated-apiserver"
+		if v, err := filepath.Abs(buildOut); err == nil { buildOut = v }
+		logrus.Infof("simulated-apiserver binary not found; attempting to build to %s", buildOut)
+		buildCmd := exec.Command("go", "build", "-o", buildOut, "./cmd/simulated-apiserver")
+		buildCmd.Env = os.Environ()
+		buildCmd.Stdout = os.Stdout
+		buildCmd.Stderr = os.Stderr
+		if err := buildCmd.Run(); err != nil {
+			return 0, nil, fmt.Errorf("failed to build simulated-apiserver: %v", err)
+		}
+		if st, err := os.Stat(buildOut); err == nil && !st.IsDir() {
+			resolved = buildOut
+		}
+	}
+
+	if resolved == "" {
+		return 0, nil, fmt.Errorf("simulated-apiserver binary could not be located or built; tried SIM_APISERVER_BIN, ./simulated-apiserver, and ./cmd/simulated-apiserver/simulated-apiserver")
+	}
+	binPath = resolved
+	logrus.Infof("Using simulated-apiserver binary: %s", binPath)
 	cmd := exec.Command(binPath,
 		"--port", strconv.Itoa(port),
 		"--db", fmt.Sprintf("clusters/%s.db", clusterName))
 
-	// Apply conservative Go memory limits
+	// Apply conservative Go memory limits and enable debug logging for visibility
 	cmd.Env = append(os.Environ(),
 		"GOMEMLIMIT=50MiB", // Ultra-low memory target
 		"GOGC=25",          // Aggressive GC
+		"SIM_APISERVER_DEBUG=1",
 	)
+
+	// Pipe simulator stdout/stderr into our logs and files for full visibility
+	stdout, err := cmd.StdoutPipe()
+	if err != nil { return 0, nil, fmt.Errorf("stdout pipe: %v", err) }
+	stderr, err := cmd.StderrPipe()
+	if err != nil { return 0, nil, fmt.Errorf("stderr pipe: %v", err) }
+
+	// Ensure cluster dir exists and open log files
+	clusterDir := filepath.Join(os.Getenv("HOME"), ".kwok", "clusters", clusterName)
+	if err := os.MkdirAll(clusterDir, 0755); err != nil {
+		return 0, nil, fmt.Errorf("cluster dir: %v", err)
+	}
+	stdoutFile, err := os.OpenFile(filepath.Join(clusterDir, "sim-apiserver-stdout.log"), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil { return 0, nil, fmt.Errorf("open stdout log: %v", err) }
+	stderrFile, err := os.OpenFile(filepath.Join(clusterDir, "sim-apiserver-stderr.log"), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil { return 0, nil, fmt.Errorf("open stderr log: %v", err) }
 
 	// Start the process
 	if err := cmd.Start(); err != nil {
 		return 0, nil, fmt.Errorf("failed to start simulated-apiserver: %v", err)
 	}
-	// Caller will record cmd and port into the cluster map entry
-	// Small readiness delay to let the listener come up before first kubectl calls
-	time.Sleep(300 * time.Millisecond)
-	logrus.Infof("Simulated-vcluster cluster started successfully on port %d", port)
+
+	// Fan-in stdout/stderr to per-cluster log files only (avoid polluting agent logs)
+	go func() {
+		defer stdoutFile.Close()
+		scanner := bufio.NewScanner(stdout)
+		for scanner.Scan() {
+			line := scanner.Text()
+			_, _ = stdoutFile.WriteString(time.Now().Format(time.RFC3339) + " " + line + "\n")
+		}
+	}()
+	go func() {
+		defer stderrFile.Close()
+		scanner := bufio.NewScanner(stderr)
+		for scanner.Scan() {
+			line := scanner.Text()
+			_, _ = stderrFile.WriteString(time.Now().Format(time.RFC3339) + " " + line + "\n")
+		}
+	}()
+	// Readiness: poll /healthz briefly; if not ready yet, warn and continue.
+	// CreateSimulatedVCluster() will perform a second, longer readiness check.
+	ready := false
+	for i := 0; i < 10; i++ { // ~2s
+		client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}, Timeout: 200 * time.Millisecond}
+		resp, err := client.Get(fmt.Sprintf("https://127.0.0.1:%d/healthz", port))
+		if err == nil {
+			if resp.Body != nil { resp.Body.Close() }
+			ready = true
+			break
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if !ready {
+		logrus.Warnf("simulated-apiserver on port %d not yet ready after short wait; continuing and will re-check later", port)
+	} else {
+		logrus.Infof("Simulated-vcluster cluster started successfully on port %d", port)
+	}
+	// Persist selected port to cluster dir for diagnostics
+	if err := os.MkdirAll(clusterDir, 0755); err == nil {
+		_ = os.WriteFile(filepath.Join(clusterDir, "port"), []byte(strconv.Itoa(port)), 0644)
+	}
 	return port, cmd, nil
 }
 
@@ -297,6 +394,17 @@ func (svm *SimulatedVClusterManager) getSimulatedVClusterKubeconfig(clusterName 
 
 // findAvailablePort finds an available port starting from basePort
 func (svm *SimulatedVClusterManager) findAvailablePort() int {
+	// Scan from nextPort upward to find a free localhost TCP port
+	for p := svm.nextPort; p < svm.nextPort+10000; p++ {
+		l, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", p))
+		if err != nil {
+			continue
+		}
+		_ = l.Close()
+		svm.nextPort = p + 1
+		return p
+	}
+	// Fallback: return and hope for the best
 	port := svm.nextPort
 	svm.nextPort++
 	return port
@@ -390,8 +498,11 @@ func (svm *SimulatedVClusterManager) generateKubeconfig(clusterName, clusterDir 
 		Users:          []userBlock{{Name: "user", User: map[string]string{"token": "placeholder-token"}}},
 	}
 	cfg.Clusters[0].Cluster.Server = "https://127.0.0.1:PORT"
-	// Use insecure-skip-tls-verify for the simulator and DO NOT set CA data simultaneously to avoid kubectl error
 	cfg.Clusters[0].Cluster.InsecureSkipTLSVerify = true
+	// Embed real self-signed CA PEM from disk
+	if caPEM, err := os.ReadFile(filepath.Join(clusterDir, "pki", "ca.crt")); err == nil {
+		cfg.Clusters[0].Cluster.CertificateAuthorityData = base64.StdEncoding.EncodeToString(caPEM)
+	}
 	cfg.Contexts[0].Context.Cluster = cfg.Clusters[0].Name
 	cfg.Contexts[0].Context.User = cfg.Users[0].Name
 
@@ -455,8 +566,10 @@ func (svm *SimulatedVClusterManager) generateKubeconfigWithServer(clusterName, c
 		Users:          []userBlock{{Name: "user", User: map[string]string{"token": "placeholder-token"}}},
 	}
 	cfg.Clusters[0].Cluster.Server = serverURL
-	// Use insecure-skip-tls-verify for the simulator and DO NOT set CA data simultaneously to avoid kubectl error
 	cfg.Clusters[0].Cluster.InsecureSkipTLSVerify = true
+	if caPEM, err := os.ReadFile(filepath.Join(clusterDir, "pki", "ca.crt")); err == nil {
+		cfg.Clusters[0].Cluster.CertificateAuthorityData = base64.StdEncoding.EncodeToString(caPEM)
+	}
 	cfg.Contexts[0].Context.Cluster = cfg.Clusters[0].Name
 	cfg.Contexts[0].Context.User = cfg.Users[0].Name
 
