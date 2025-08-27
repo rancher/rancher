@@ -25,12 +25,12 @@ import (
 
 // RancherUserNotificationController interface for managing RancherUserNotification resources.
 type RancherUserNotificationController interface {
-	generic.NonNamespacedControllerInterface[*v3.RancherUserNotification, *v3.RancherUserNotificationList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.RancherUserNotification, *v3.RancherUserNotificationList]
 }
 
 // RancherUserNotificationClient interface for managing RancherUserNotification resources in Kubernetes.
 type RancherUserNotificationClient interface {
-	generic.NonNamespacedClientInterface[*v3.RancherUserNotification, *v3.RancherUserNotificationList]
+	generic.NonNamespacedClientInterfaceContext[*v3.RancherUserNotification, *v3.RancherUserNotificationList]
 }
 
 // RancherUserNotificationCache interface for retrieving RancherUserNotification resources in memory.

@@ -25,12 +25,12 @@ import (
 
 // UserAttributeController interface for managing UserAttribute resources.
 type UserAttributeController interface {
-	generic.NonNamespacedControllerInterface[*v3.UserAttribute, *v3.UserAttributeList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.UserAttribute, *v3.UserAttributeList]
 }
 
 // UserAttributeClient interface for managing UserAttribute resources in Kubernetes.
 type UserAttributeClient interface {
-	generic.NonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList]
+	generic.NonNamespacedClientInterfaceContext[*v3.UserAttribute, *v3.UserAttributeList]
 }
 
 // UserAttributeCache interface for retrieving UserAttribute resources in memory.

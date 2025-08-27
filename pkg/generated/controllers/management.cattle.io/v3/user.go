@@ -36,12 +36,12 @@ import (
 
 // UserController interface for managing User resources.
 type UserController interface {
-	generic.NonNamespacedControllerInterface[*v3.User, *v3.UserList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.User, *v3.UserList]
 }
 
 // UserClient interface for managing User resources in Kubernetes.
 type UserClient interface {
-	generic.NonNamespacedClientInterface[*v3.User, *v3.UserList]
+	generic.NonNamespacedClientInterfaceContext[*v3.User, *v3.UserList]
 }
 
 // UserCache interface for retrieving User resources in memory.

@@ -36,12 +36,12 @@ import (
 
 // NodeDriverController interface for managing NodeDriver resources.
 type NodeDriverController interface {
-	generic.NonNamespacedControllerInterface[*v3.NodeDriver, *v3.NodeDriverList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.NodeDriver, *v3.NodeDriverList]
 }
 
 // NodeDriverClient interface for managing NodeDriver resources in Kubernetes.
 type NodeDriverClient interface {
-	generic.NonNamespacedClientInterface[*v3.NodeDriver, *v3.NodeDriverList]
+	generic.NonNamespacedClientInterfaceContext[*v3.NodeDriver, *v3.NodeDriverList]
 }
 
 // NodeDriverCache interface for retrieving NodeDriver resources in memory.

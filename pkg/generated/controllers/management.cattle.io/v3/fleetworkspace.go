@@ -36,12 +36,12 @@ import (
 
 // FleetWorkspaceController interface for managing FleetWorkspace resources.
 type FleetWorkspaceController interface {
-	generic.NonNamespacedControllerInterface[*v3.FleetWorkspace, *v3.FleetWorkspaceList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.FleetWorkspace, *v3.FleetWorkspaceList]
 }
 
 // FleetWorkspaceClient interface for managing FleetWorkspace resources in Kubernetes.
 type FleetWorkspaceClient interface {
-	generic.NonNamespacedClientInterface[*v3.FleetWorkspace, *v3.FleetWorkspaceList]
+	generic.NonNamespacedClientInterfaceContext[*v3.FleetWorkspace, *v3.FleetWorkspaceList]
 }
 
 // FleetWorkspaceCache interface for retrieving FleetWorkspace resources in memory.

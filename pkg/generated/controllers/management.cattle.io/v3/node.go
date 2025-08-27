@@ -36,12 +36,12 @@ import (
 
 // NodeController interface for managing Node resources.
 type NodeController interface {
-	generic.ControllerInterface[*v3.Node, *v3.NodeList]
+	generic.ControllerInterfaceContext[*v3.Node, *v3.NodeList]
 }
 
 // NodeClient interface for managing Node resources in Kubernetes.
 type NodeClient interface {
-	generic.ClientInterface[*v3.Node, *v3.NodeList]
+	generic.ClientInterfaceContext[*v3.Node, *v3.NodeList]
 }
 
 // NodeCache interface for retrieving Node resources in memory.

@@ -36,12 +36,12 @@ import (
 
 // GlobalRoleBindingController interface for managing GlobalRoleBinding resources.
 type GlobalRoleBindingController interface {
-	generic.NonNamespacedControllerInterface[*v3.GlobalRoleBinding, *v3.GlobalRoleBindingList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.GlobalRoleBinding, *v3.GlobalRoleBindingList]
 }
 
 // GlobalRoleBindingClient interface for managing GlobalRoleBinding resources in Kubernetes.
 type GlobalRoleBindingClient interface {
-	generic.NonNamespacedClientInterface[*v3.GlobalRoleBinding, *v3.GlobalRoleBindingList]
+	generic.NonNamespacedClientInterfaceContext[*v3.GlobalRoleBinding, *v3.GlobalRoleBindingList]
 }
 
 // GlobalRoleBindingCache interface for retrieving GlobalRoleBinding resources in memory.

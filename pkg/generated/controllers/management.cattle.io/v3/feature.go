@@ -36,12 +36,12 @@ import (
 
 // FeatureController interface for managing Feature resources.
 type FeatureController interface {
-	generic.NonNamespacedControllerInterface[*v3.Feature, *v3.FeatureList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.Feature, *v3.FeatureList]
 }
 
 // FeatureClient interface for managing Feature resources in Kubernetes.
 type FeatureClient interface {
-	generic.NonNamespacedClientInterface[*v3.Feature, *v3.FeatureList]
+	generic.NonNamespacedClientInterfaceContext[*v3.Feature, *v3.FeatureList]
 }
 
 // FeatureCache interface for retrieving Feature resources in memory.

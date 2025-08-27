@@ -36,12 +36,12 @@ import (
 
 // NodeTemplateController interface for managing NodeTemplate resources.
 type NodeTemplateController interface {
-	generic.ControllerInterface[*v3.NodeTemplate, *v3.NodeTemplateList]
+	generic.ControllerInterfaceContext[*v3.NodeTemplate, *v3.NodeTemplateList]
 }
 
 // NodeTemplateClient interface for managing NodeTemplate resources in Kubernetes.
 type NodeTemplateClient interface {
-	generic.ClientInterface[*v3.NodeTemplate, *v3.NodeTemplateList]
+	generic.ClientInterfaceContext[*v3.NodeTemplate, *v3.NodeTemplateList]
 }
 
 // NodeTemplateCache interface for retrieving NodeTemplate resources in memory.

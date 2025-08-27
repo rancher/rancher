@@ -25,12 +25,12 @@ import (
 
 // GoogleOAuthProviderController interface for managing GoogleOAuthProvider resources.
 type GoogleOAuthProviderController interface {
-	generic.NonNamespacedControllerInterface[*v3.GoogleOAuthProvider, *v3.GoogleOAuthProviderList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.GoogleOAuthProvider, *v3.GoogleOAuthProviderList]
 }
 
 // GoogleOAuthProviderClient interface for managing GoogleOAuthProvider resources in Kubernetes.
 type GoogleOAuthProviderClient interface {
-	generic.NonNamespacedClientInterface[*v3.GoogleOAuthProvider, *v3.GoogleOAuthProviderList]
+	generic.NonNamespacedClientInterfaceContext[*v3.GoogleOAuthProvider, *v3.GoogleOAuthProviderList]
 }
 
 // GoogleOAuthProviderCache interface for retrieving GoogleOAuthProvider resources in memory.

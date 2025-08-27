@@ -36,12 +36,12 @@ import (
 
 // GlobalRoleController interface for managing GlobalRole resources.
 type GlobalRoleController interface {
-	generic.NonNamespacedControllerInterface[*v3.GlobalRole, *v3.GlobalRoleList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.GlobalRole, *v3.GlobalRoleList]
 }
 
 // GlobalRoleClient interface for managing GlobalRole resources in Kubernetes.
 type GlobalRoleClient interface {
-	generic.NonNamespacedClientInterface[*v3.GlobalRole, *v3.GlobalRoleList]
+	generic.NonNamespacedClientInterfaceContext[*v3.GlobalRole, *v3.GlobalRoleList]
 }
 
 // GlobalRoleCache interface for retrieving GlobalRole resources in memory.

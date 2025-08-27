@@ -36,12 +36,12 @@ import (
 
 // OIDCClientController interface for managing OIDCClient resources.
 type OIDCClientController interface {
-	generic.NonNamespacedControllerInterface[*v3.OIDCClient, *v3.OIDCClientList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.OIDCClient, *v3.OIDCClientList]
 }
 
 // OIDCClientClient interface for managing OIDCClient resources in Kubernetes.
 type OIDCClientClient interface {
-	generic.NonNamespacedClientInterface[*v3.OIDCClient, *v3.OIDCClientList]
+	generic.NonNamespacedClientInterfaceContext[*v3.OIDCClient, *v3.OIDCClientList]
 }
 
 // OIDCClientCache interface for retrieving OIDCClient resources in memory.

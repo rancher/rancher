@@ -36,12 +36,12 @@ import (
 
 // ClusterController interface for managing Cluster resources.
 type ClusterController interface {
-	generic.NonNamespacedControllerInterface[*v3.Cluster, *v3.ClusterList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.Cluster, *v3.ClusterList]
 }
 
 // ClusterClient interface for managing Cluster resources in Kubernetes.
 type ClusterClient interface {
-	generic.NonNamespacedClientInterface[*v3.Cluster, *v3.ClusterList]
+	generic.NonNamespacedClientInterfaceContext[*v3.Cluster, *v3.ClusterList]
 }
 
 // ClusterCache interface for retrieving Cluster resources in memory.

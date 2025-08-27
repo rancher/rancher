@@ -36,12 +36,12 @@ import (
 
 // ComposeConfigController interface for managing ComposeConfig resources.
 type ComposeConfigController interface {
-	generic.NonNamespacedControllerInterface[*v3.ComposeConfig, *v3.ComposeConfigList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.ComposeConfig, *v3.ComposeConfigList]
 }
 
 // ComposeConfigClient interface for managing ComposeConfig resources in Kubernetes.
 type ComposeConfigClient interface {
-	generic.NonNamespacedClientInterface[*v3.ComposeConfig, *v3.ComposeConfigList]
+	generic.NonNamespacedClientInterfaceContext[*v3.ComposeConfig, *v3.ComposeConfigList]
 }
 
 // ComposeConfigCache interface for retrieving ComposeConfig resources in memory.
