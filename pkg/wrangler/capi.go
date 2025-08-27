@@ -48,11 +48,12 @@ func (w *Context) manageDeferredCAPIContext(ctx context.Context) {
 
 		w.capi = capi
 		w.CAPI = capi.Cluster().V1beta1()
+		close(w.DeferredCAPIRegistration.ready)
 
 		go func() {
-			err = w.DeferredCAPIRegistration.run(ctx)
+			err = w.DeferredCAPIRegistration.runAsync(ctx)
 			if err != nil {
-				logrus.Fatalf("failed to run deferred capi registration: %v", err)
+				logrus.Fatalf("failed to run asynchronous loop during deferred capi registration: %v", err)
 			}
 		}()
 
@@ -69,17 +70,17 @@ func capiCRDsReady(crdCache wapiextv1.CustomResourceDefinitionCache) bool {
 		"machinehealthchecks.cluster.x-k8s.io",
 	}
 
-	logrus.Debug("[deferred-capi] Checking CAPI CRDs availability and establishment status")
+	logrus.Tracef("[deferred-capi] Checking CAPI CRDs availability and establishment status")
 	allCRDsReady := true
 	for _, crdName := range requiredCRDs {
 		crd, err := crdCache.Get(crdName)
 		if err != nil {
 			if errors.IsNotFound(err) {
-				logrus.Debugf("[deferred-capi] CRD %s not found, continuing to wait", crdName)
+				logrus.Tracef("[deferred-capi] CRD %s not found, continuing to wait", crdName)
 				allCRDsReady = false
 				break
 			}
-			logrus.Debugf("[deferred-capi] Error checking for CAPI CRD %s: %v", crdName, err)
+			logrus.Errorf("[deferred-capi] Error checking for CAPI CRD %s: %v", crdName, err)
 			allCRDsReady = false
 			break
 		}
@@ -93,20 +94,20 @@ func capiCRDsReady(crdCache wapiextv1.CustomResourceDefinitionCache) bool {
 		}
 
 		if !established {
-			logrus.Debugf("[deferred-capi] CRD %s exists but is not yet established, continuing to wait", crdName)
+			logrus.Tracef("[deferred-capi] CRD %s exists but is not yet established, continuing to wait", crdName)
 			allCRDsReady = false
 			break
 		}
 
-		logrus.Debugf("[deferred-capi] CRD %s is available and established", crdName)
+		logrus.Tracef("[deferred-capi] CRD %s is available and established", crdName)
 	}
 
 	return allCRDsReady
 }
 
 type DeferredCAPIRegistration struct {
-	wg    *sync.WaitGroup
 	mutex sync.Mutex
+	ready chan struct{}
 
 	clients           *Context
 	registrationFuncs chan func(ctx context.Context, clients *Context) error
@@ -116,12 +117,13 @@ type DeferredCAPIRegistration struct {
 func newDeferredCAPIRegistration(clients *Context) *DeferredCAPIRegistration {
 	return &DeferredCAPIRegistration{
 		clients:           clients,
+		ready:             make(chan struct{}),
 		registrationFuncs: make(chan func(ctx context.Context, clients *Context) error, 100),
 		funcs:             make(chan func(clients *Context), 100),
 	}
 }
 
-func (d *DeferredCAPIRegistration) run(ctx context.Context) error {
+func (d *DeferredCAPIRegistration) runAsync(ctx context.Context) error {
 	for {
 		select {
 		case f := <-d.registrationFuncs:
@@ -171,4 +173,19 @@ func (d *DeferredCAPIRegistration) DeferFuncWithError(f func(wrangler *Context) 
 func (d *DeferredCAPIRegistration) DeferRegistration(register func(ctx context.Context, clients *Context) error) {
 	logrus.Debug("[deferred-capi - DeferRegistration] Adding registration function to pool")
 	d.registrationFuncs <- register
+}
+
+// WaitForRegistration blocks until DeferredCAPIRegistration has fully initialized the CAPI factory and clients. Blocking on initialization may be
+// required when working with contexts which utilize factories running independently of the primary wrangler context, or if explicit error handling is required.
+func (d *DeferredCAPIRegistration) WaitForRegistration(ctx context.Context, register func(ctx context.Context, clients *Context) error) error {
+	logrus.Debug("[deferred-capi - WaitForRegistration] Adding registration function to pool")
+
+	<-d.ready
+
+	err := register(ctx, d.clients)
+	if err != nil {
+		return fmt.Errorf("failed to invoke reg func: %w", err)
+	}
+
+	return nil
 }

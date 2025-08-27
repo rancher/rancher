@@ -3,6 +3,7 @@ package managementuser
 import (
 	"context"
 	"fmt"
+
 	"github.com/k3s-io/api/pkg/generated/controllers/k3s.cattle.io"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementlegacy/compose/common"
@@ -33,10 +34,12 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	healthsyncer.Register(ctx, cluster)
 	networkpolicy.Register(ctx, cluster)
 
-	mgmt.Wrangler.DeferredCAPIRegistration.DeferRegistration(func(_ context.Context, _ *wrangler.Context) error {
+	if err := mgmt.Wrangler.DeferredCAPIRegistration.WaitForRegistration(ctx, func(_ context.Context, _ *wrangler.Context) error {
 		nodesyncer.Register(ctx, cluster, kubeConfigGetter)
 		return nil
-	})
+	}); err != nil {
+		return err
+	}
 
 	secret.Register(ctx, mgmt, cluster, clusterRec)
 	resourcequota.Register(ctx, cluster)
@@ -44,7 +47,11 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	nsserviceaccount.Register(ctx, cluster)
 
 	if features.RKE2.Enabled() {
-		mgmt.Wrangler.DeferredCAPIRegistration.DeferRegistration(func(_ context.Context, _ *wrangler.Context) error {
+		// This call intentionally blocks. Deferring it will cause a race between the DeferredCAPI registration loop
+		// and the starting of the user context factories. This often leads to etcd snapshots not functioning, as the back populate
+		// handlers may not be registered. This will only block for a meaningful amount of time when creating the local v3 cluster, on
+		// an initial install / setup.
+		if err := mgmt.Wrangler.DeferredCAPIRegistration.WaitForRegistration(ctx, func(_ context.Context, _ *wrangler.Context) error {
 			// Just register the snapshot controller if the cluster is administrated by rancher.
 			if clusterRec.Annotations["provisioning.cattle.io/administrated"] == "true" {
 				if features.Provisioningv2ETCDSnapshotBackPopulation.Enabled() {
@@ -60,7 +67,9 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 					cluster.Management.Wrangler.RKE.RKEControlPlane())
 			}
 			return nil
-		})
+		}); err != nil {
+			return err
+		}
 		machinerole.Register(ctx, cluster)
 	}
 
