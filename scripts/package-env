@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cd "$(dirname $0)/.."
+cd $(git rev-parse --show-toplevel) | exit
 
 source scripts/version
 source scripts/export-config
@@ -10,9 +10,9 @@ CHART_REPO_DIR=build/charts
 REGISTRY=${REGISTRY/:-""/}
 export IMAGE=${REGISTRY}${REPO}/rancher:${TAG}
 export AGENT_IMAGE=${REPO}/rancher-agent:${TAG}
-export SYSTEM_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_SYSTEM_AGENT_VERSION" ../package/Dockerfile | awk -F'=' '{ print $NF }')-suc
+export SYSTEM_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_SYSTEM_AGENT_VERSION" package/Dockerfile | awk -F'=' '{ print $NF }')-suc
 export SYSTEM_AGENT_UPGRADE_IMAGE=${REPO}/system-agent:${SYSTEM_AGENT_UPGRADE_TAG}
-export WINS_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_WINS_AGENT_VERSION" ../package/Dockerfile | awk -F'=' '{ print $NF }')
+export WINS_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_WINS_AGENT_VERSION" package/Dockerfile | awk -F'=' '{ print $NF }')
 export WINS_AGENT_UPGRADE_IMAGE=${REPO}/wins:${WINS_AGENT_UPGRADE_TAG}
 export CATTLE_KDM_BRANCH=$(grep -m1 'ARG CATTLE_KDM_BRANCH=' package/Dockerfile | cut -d '=' -f2)
 export CATTLE_K3S_VERSION=$(grep -m1 'ENV CATTLE_K3S_VERSION=' package/Dockerfile | cut -d '=' -f2)
