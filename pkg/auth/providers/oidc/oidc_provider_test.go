@@ -276,7 +276,7 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 			ctx := context.TODO()
 			claimInfo := &ClaimInfo{}
 
-			userInfo, token, idToken, err := o.getUserInfoFromAuthCode(&ctx, test.config(port), test.authCode, claimInfo, userId)
+			userInfo, token, err := o.getUserInfoFromAuthCode(&ctx, test.config(port), test.authCode, claimInfo, userId)
 
 			if test.expectedErrorMessage != "" {
 				assert.ErrorContains(t, err, test.expectedErrorMessage)
@@ -288,7 +288,6 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 				assert.Equal(t, test.expectedUserInfoSubject, userInfo.Subject)
 				assert.Equal(t, test.expectedUserInfoClaimInfo, claims)
 				assert.Equal(t, oidcResp.token.AccessToken, token.AccessToken) //token should be the same as the one returned by the mock oidc server.
-				assert.NotEmpty(t, idToken)                                    // the token is generated each time.
 			}
 		})
 	}
@@ -525,8 +524,6 @@ func TestLogout(t *testing.T) {
 			require.NoError(t, err)
 
 			req := httptest.NewRequest(http.MethodPost, "/logout", bytes.NewReader(b))
-			req.AddCookie(&http.Cookie{Name: "R_OIDC_ID", Value: "test-id-token"})
-
 			nr := &normanRecorder{}
 			apiContext := &types.APIContext{
 				Method:         req.Method,
@@ -558,8 +555,6 @@ func TestLogoutAll(t *testing.T) {
 	require.NoError(t, err)
 
 	req := httptest.NewRequest(http.MethodPost, "/logout", bytes.NewReader(b))
-	req.AddCookie(&http.Cookie{Name: "R_OIDC_ID", Value: "test-id-token"})
-
 	nr := &normanRecorder{}
 	apiContext := &types.APIContext{
 		Method:         req.Method,
@@ -570,7 +565,7 @@ func TestLogoutAll(t *testing.T) {
 
 	require.NoError(t, o.LogoutAll(apiContext, testToken))
 	wantData := map[string]any{
-		"idpRedirectUrl": "http://localhost:8090/user/logout?id_token_hint=test-id-token&post_logout_redirect_uri=https%3A%2F%2Fexample.com%2Flogged-out",
+		"idpRedirectUrl": "http://localhost:8090/user/logout?client_id=test&post_logout_redirect_uri=https%3A%2F%2Fexample.com%2Flogged-out",
 		"type":           "oidcConfigLogoutOutput",
 	}
 	require.Equal(t, []normanResponse{{code: http.StatusOK, data: wantData}}, nr.responses)
@@ -592,7 +587,6 @@ func TestLogoutAllNoEndSessionEndpoint(t *testing.T) {
 	})
 	require.NoError(t, err)
 	req := httptest.NewRequest(http.MethodPost, "/logout", bytes.NewReader(b))
-	req.AddCookie(&http.Cookie{Name: "R_OIDC_ID", Value: "test-id-token"})
 
 	nr := &normanRecorder{}
 	apiContext := &types.APIContext{
@@ -605,42 +599,6 @@ func TestLogoutAllNoEndSessionEndpoint(t *testing.T) {
 	require.NoError(t, o.LogoutAll(apiContext, testToken))
 	wantData := map[string]any{
 		"idpRedirectUrl": "",
-		"type":           "oidcConfigLogoutOutput",
-	}
-	require.Equal(t, []normanResponse{{code: http.StatusOK, data: wantData}}, nr.responses)
-}
-
-func TestLogoutAllNoIDToken(t *testing.T) {
-	const (
-		userId       string = "testing-user"
-		providerName string = "oidc"
-	)
-	oidcConfig := newOIDCConfig("8090", func(s *v3.OIDCConfig) {
-		s.EndSessionEndpoint = "http://localhost:8090/user/logout"
-	})
-
-	testToken := &v3.Token{UserID: userId, AuthProvider: providerName}
-	o := OpenIDCProvider{
-		Name:      providerName,
-		GetConfig: func() (*v3.OIDCConfig, error) { return oidcConfig, nil },
-	}
-	b, err := json.Marshal(&v3.OIDCConfigLogoutInput{
-		FinalRedirectURL: "https://example.com/logged-out",
-	})
-	require.NoError(t, err)
-	req := httptest.NewRequest(http.MethodPost, "/logout", bytes.NewReader(b))
-
-	nr := &normanRecorder{}
-	apiContext := &types.APIContext{
-		Method:         req.Method,
-		Request:        req,
-		Query:          url.Values{},
-		ResponseWriter: nr,
-	}
-
-	require.NoError(t, o.LogoutAll(apiContext, testToken))
-	wantData := map[string]any{
-		"idpRedirectUrl": "http://localhost:8090/user/logout?post_logout_redirect_uri=https%3A%2F%2Fexample.com%2Flogged-out",
 		"type":           "oidcConfigLogoutOutput",
 	}
 	require.Equal(t, []normanResponse{{code: http.StatusOK, data: wantData}}, nr.responses)

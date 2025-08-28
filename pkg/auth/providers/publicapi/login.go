@@ -201,7 +201,7 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	}
 
 	ctx := context.WithValue(request.Request.Context(), util.RequestKey, request.Request)
-	userPrincipal, groupPrincipals, providerToken, err = providers.AuthenticateUser(ctx, request, input, providerName)
+	userPrincipal, groupPrincipals, providerToken, err = providers.AuthenticateUser(ctx, input, providerName)
 	if err != nil {
 		return v3.Token{}, "", "", err
 	}

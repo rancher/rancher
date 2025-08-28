@@ -77,7 +77,7 @@ func (ap *Provider) GetName() string {
 	return Name
 }
 
-func (ap *Provider) AuthenticateUser(ctx context.Context, _ *types.APIContext, input interface{}) (v3.Principal, []v3.Principal, string, error) {
+func (ap *Provider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
 	login, ok := input.(*v32.AzureADLogin)
 	if !ok {
 		return v3.Principal{}, nil, "", errors.New("unexpected input type")

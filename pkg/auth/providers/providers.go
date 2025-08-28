@@ -208,8 +208,8 @@ func IsValidUserExtraAttribute(key string) bool {
 	return false
 }
 
-func AuthenticateUser(ctx context.Context, apiContext *types.APIContext, input interface{}, providerName string) (v3.Principal, []v3.Principal, string, error) {
-	return Providers[providerName].AuthenticateUser(ctx, apiContext, input)
+func AuthenticateUser(ctx context.Context, input interface{}, providerName string) (v3.Principal, []v3.Principal, string, error) {
+	return Providers[providerName].AuthenticateUser(ctx, input)
 }
 
 func GetPrincipal(principalID string, myToken accessor.TokenAccessor) (v3.Principal, error) {

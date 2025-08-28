@@ -106,7 +106,7 @@ func (o *OpenIDCProvider) TestAndApply(request *types.APIContext) error {
 	oidcConfig.Issuer = issuerURL.String()
 
 	// call provider
-	userPrincipal, groupPrincipals, providerToken, _, err := o.LoginUser(request.Request.Context(), oidcLogin, &oidcConfig, request)
+	userPrincipal, groupPrincipals, providerToken, _, err := o.LoginUser(request.Request.Context(), oidcLogin, &oidcConfig)
 	if err != nil {
 		if httperror.IsAPIError(err) {
 			return err
