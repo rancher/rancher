@@ -43,7 +43,9 @@ func (h *handler) initializeCRDs(crdClient apiextcontrollers.CustomResourceDefin
 		if match == nil {
 			continue
 		}
+		h.resourcesLock.Lock()
 		h.modifyResources(*match, true)
+		h.resourcesLock.Unlock()
 	}
 
 	return nil
@@ -76,20 +78,39 @@ func crdToResourceMatch(crd *apiextv1.CustomResourceDefinition) *resourceMatch {
 }
 
 func (h *handler) gvkMatcher(gvk schema.GroupVersionKind) bool {
-	h.resourcesLock.RLock()
-	defer h.resourcesLock.RUnlock()
-	_, ok := h.resources[gvk]
-	return ok
-}
-
-func (h *handler) modifyResources(resource resourceMatch, addResource bool) {
 	h.resourcesLock.Lock()
 	defer h.resourcesLock.Unlock()
+	known, ok := h.knownResources[gvk]
+	if !ok {
+		crds, err := h.crdCache.List(labels.SelectorFromSet(map[string]string{clusterIndexedLabel: "true"}))
+		if err != nil {
+			return false
+		}
+		for _, crd := range crds {
+			if crd.Spec.Group != gvk.Group || crd.Spec.Names.Kind != gvk.Kind {
+				continue
+			}
+			match := crdToResourceMatch(crd)
+			if match == nil {
+				continue
+			}
+			h.modifyResources(*match, true)
+			return h.knownResources[gvk]
+		}
+		h.knownResources[gvk] = false
+	}
+	return known
+}
+
+// The resourcesLock must be acquired prior to calling modifyResources.
+func (h *handler) modifyResources(resource resourceMatch, addResource bool) {
 	_, resourceExists := h.resources[resource.GVK]
 	if addResource && !resourceExists {
 		h.resources[resource.GVK] = resource
+		h.knownResources[resource.GVK] = true
 	} else if !addResource && resourceExists {
 		delete(h.resources, resource.GVK)
+		h.knownResources[resource.GVK] = false
 	} else {
 		return
 	}
@@ -110,7 +131,9 @@ func (h *handler) OnCRD(key string, crd *apiextv1.CustomResourceDefinition) (*ap
 	}
 
 	if resourceMatch := crdToResourceMatch(crd); resourceMatch != nil {
+		h.resourcesLock.Lock()
 		h.modifyResources(*resourceMatch, crd.DeletionTimestamp.IsZero())
+		h.resourcesLock.Unlock()
 	}
 
 	return crd, nil

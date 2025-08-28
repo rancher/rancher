@@ -49,6 +49,7 @@ type handler struct {
 	crdCache                             apiextcontrollers.CustomResourceDefinitionCache
 	dynamic                              *dynamic.Controller
 	resources                            map[schema.GroupVersionKind]resourceMatch
+	knownResources                       map[schema.GroupVersionKind]bool
 	resourcesList                        []resourceMatch
 	resourcesLock                        sync.RWMutex
 	apply                                apply.Apply
@@ -88,6 +89,7 @@ func Register(ctx context.Context, clients *wrangler.Context, management *config
 			clients.Mgmt.ClusterRoleTemplateBinding(),
 			clients.RBAC.RoleBinding()),
 		resources:              map[schema.GroupVersionKind]resourceMatch{},
+		knownResources:         map[schema.GroupVersionKind]bool{},
 		provisioningClusterGVK: clusterGVK,
 	}
 
