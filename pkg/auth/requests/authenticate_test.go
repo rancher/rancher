@@ -73,7 +73,7 @@ func (p *fakeProvider) GetName() string {
 	return p.name
 }
 
-func (p *fakeProvider) AuthenticateUser(ctx context.Context, _ *types.APIContext, input interface{}) (v3.Principal, []v3.Principal, string, error) {
+func (p *fakeProvider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
 	panic("not implemented")
 }
 

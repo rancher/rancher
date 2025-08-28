@@ -38,7 +38,6 @@ func TestLogoutAll(t *testing.T) {
 	require.NoError(t, err)
 
 	req := httptest.NewRequest(http.MethodPost, "/logout", bytes.NewReader(b))
-	req.AddCookie(&http.Cookie{Name: "R_OIDC_ID", Value: "test-id-token"})
 
 	nr := &normanRecorder{}
 	apiContext := &types.APIContext{
@@ -77,7 +76,6 @@ func TestLogoutAllNoEndSessionEndpoint(t *testing.T) {
 	})
 	require.NoError(t, err)
 	req := httptest.NewRequest(http.MethodPost, "/logout", bytes.NewReader(b))
-	req.AddCookie(&http.Cookie{Name: "R_OIDC_ID", Value: "test-id-token"})
 
 	nr := &normanRecorder{}
 	apiContext := &types.APIContext{
@@ -90,48 +88,6 @@ func TestLogoutAllNoEndSessionEndpoint(t *testing.T) {
 	require.NoError(t, o.LogoutAll(apiContext, testToken))
 	wantData := map[string]any{
 		"idpRedirectUrl": "",
-		"type":           "oidcConfigLogoutOutput",
-	}
-	require.Equal(t, []normanResponse{{code: http.StatusOK, data: wantData}}, nr.responses)
-}
-
-// The Cognito logout endpoint doesn't use the ID token.
-func TestLogoutAllNoIDToken(t *testing.T) {
-	const (
-		userId       string = "testing-user"
-		providerName string = "oidc"
-	)
-	oidcConfig := newOIDCConfig("8090", func(s *v3.OIDCConfig) {
-		s.EndSessionEndpoint = "http://localhost:8090/user/logout"
-	})
-
-	testToken := &v3.Token{UserID: userId, AuthProvider: providerName}
-	o := CognitoProvider{
-		GenOIDCProvider: genericoidc.GenOIDCProvider{
-			oidc.OpenIDCProvider{
-				Name:      providerName,
-				GetConfig: func() (*v3.OIDCConfig, error) { return oidcConfig, nil },
-			},
-		},
-	}
-
-	b, err := json.Marshal(&v3.OIDCConfigLogoutInput{
-		FinalRedirectURL: "https://example.com/logged-out",
-	})
-	require.NoError(t, err)
-	req := httptest.NewRequest(http.MethodPost, "/logout", bytes.NewReader(b))
-
-	nr := &normanRecorder{}
-	apiContext := &types.APIContext{
-		Method:         req.Method,
-		Request:        req,
-		Query:          url.Values{},
-		ResponseWriter: nr,
-	}
-
-	require.NoError(t, o.LogoutAll(apiContext, testToken))
-	wantData := map[string]any{
-		"idpRedirectUrl": "http://localhost:8090/user/logout?client_id=test&logout_uri=https%3A%2F%2Fexample.com%2Flogged-out",
 		"type":           "oidcConfigLogoutOutput",
 	}
 	require.Equal(t, []normanResponse{{code: http.StatusOK, data: wantData}}, nr.responses)
@@ -177,8 +133,6 @@ func TestLogout(t *testing.T) {
 			require.NoError(t, err)
 
 			req := httptest.NewRequest(http.MethodPost, "/logout", bytes.NewReader(b))
-			req.AddCookie(&http.Cookie{Name: "R_OIDC_ID", Value: "test-id-token"})
-
 			nr := &normanRecorder{}
 			apiContext := &types.APIContext{
 				Method:         req.Method,

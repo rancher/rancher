@@ -49,7 +49,7 @@ const (
 )
 
 var (
-	toDeleteCookies = []string{CookieName, CSRFCookie, IDTokenCookieName}
+	toDeleteCookies = []string{CookieName, CSRFCookie}
 	onLogoutAll     LogoutAllFunc
 	onLogout        LogoutFunc
 )

@@ -44,9 +44,9 @@ func (m *MockAuthProvider) EXPECT() *MockAuthProviderMockRecorder {
 }
 
 // AuthenticateUser mocks base method.
-func (m *MockAuthProvider) AuthenticateUser(ctx context.Context, apiContext *types.APIContext, input any) (v3.Principal, []v3.Principal, string, error) {
+func (m *MockAuthProvider) AuthenticateUser(ctx context.Context, input any) (v3.Principal, []v3.Principal, string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AuthenticateUser", ctx, apiContext, input)
+	ret := m.ctrl.Call(m, "AuthenticateUser", ctx, input)
 	ret0, _ := ret[0].(v3.Principal)
 	ret1, _ := ret[1].([]v3.Principal)
 	ret2, _ := ret[2].(string)
@@ -55,9 +55,9 @@ func (m *MockAuthProvider) AuthenticateUser(ctx context.Context, apiContext *typ
 }
 
 // AuthenticateUser indicates an expected call of AuthenticateUser.
-func (mr *MockAuthProviderMockRecorder) AuthenticateUser(ctx, apiContext, input any) *gomock.Call {
+func (mr *MockAuthProviderMockRecorder) AuthenticateUser(ctx, input any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AuthenticateUser", reflect.TypeOf((*MockAuthProvider)(nil).AuthenticateUser), ctx, apiContext, input)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AuthenticateUser", reflect.TypeOf((*MockAuthProvider)(nil).AuthenticateUser), ctx, input)
 }
 
 // CanAccessWithGroupProviders mocks base method.

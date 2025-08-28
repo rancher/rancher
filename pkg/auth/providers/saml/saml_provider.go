@@ -104,7 +104,7 @@ func (s *Provider) TransformToAuthProvider(authConfig map[string]interface{}) (m
 	return p, nil
 }
 
-func (s *Provider) AuthenticateUser(ctx context.Context, _ *types.APIContext, input interface{}) (v3.Principal, []v3.Principal, string, error) {
+func (s *Provider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
 	return v3.Principal{}, nil, "", fmt.Errorf("SAML providers do not implement Authenticate User API")
 }
 
