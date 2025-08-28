@@ -76,7 +76,9 @@ jobs:
 
       - name: Create and push empty commit
         run: |
-          git commit --allow-empty -m "Empty commit"
+          touch trigger_ci
+          git add trigger_ci
+          git commit -m "Add trigger_ci file for CI testing"
           git push origin ${{ steps.branch-setup.outputs.branch }}
 
       - name: Create draft PR
