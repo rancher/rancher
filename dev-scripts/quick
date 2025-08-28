@@ -5,12 +5,12 @@
 set -eo pipefail
 set -x
 
+# variables
+BINARY_DEBUG=${BINARY_DEBUG:-false}
+COMMIT=$(git rev-parse --short HEAD)
 TAG="${TAG:-$(grep -m1 ' TAG:' .github/workflows/pull-request.yml | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e "s/\${{ github.sha }}/$COMMIT/g" | cut -d' ' -f2)}"
 
 source scripts/package-env
-
-# variables
-BINARY_DEBUG=${BINARY_DEBUG:-false}
 
 BUILD_ARGS=()
 BUILD_ARGS+=("--build-arg=VERSION=${TAG}")
