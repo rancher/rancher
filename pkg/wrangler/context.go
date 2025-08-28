@@ -225,7 +225,7 @@ func (w *Context) checkGVK(ctx context.Context, gvk schema.GroupVersionKind) err
 	}
 
 	if !enabled {
-		return fmt.Errorf("crd '%s' has not served versions")
+		return fmt.Errorf("crd '%s' has no served versions", gvk.String())
 	}
 
 	return nil
