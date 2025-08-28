@@ -1,27 +1,35 @@
 #!/bin/bash
 
-ARCH=${ARCH:-"amd64"}
+cd "$(dirname $0)/.."
+
+source scripts/version
+source scripts/export-config
+
 CHART_REPO_DIR=build/charts
-CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH:-"dev-v2.13"}
 
-REGISTRY=${REGISTRY/:-""}
-IMAGE=${REGISTRY}${REPO}/rancher:${TAG}
-AGENT_IMAGE=${REPO}/rancher-agent:${AGENT_TAG}
-SYSTEM_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_SYSTEM_AGENT_VERSION" ../package/Dockerfile | awk -F'=' '{ print $NF }')-suc
-SYSTEM_AGENT_UPGRADE_IMAGE=${REPO}/system-agent:${SYSTEM_AGENT_UPGRADE_TAG}
-WINS_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_WINS_AGENT_VERSION" ../package/Dockerfile | awk -F'=' '{ print $NF }')
-WINS_AGENT_UPGRADE_IMAGE=${REPO}/wins:${WINS_AGENT_UPGRADE_TAG}
+REGISTRY=${REGISTRY/:-""/}
+export IMAGE=${REGISTRY}${REPO}/rancher:${TAG}
+export AGENT_IMAGE=${REPO}/rancher-agent:${TAG}
+export SYSTEM_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_SYSTEM_AGENT_VERSION" ../package/Dockerfile | awk -F'=' '{ print $NF }')-suc
+export SYSTEM_AGENT_UPGRADE_IMAGE=${REPO}/system-agent:${SYSTEM_AGENT_UPGRADE_TAG}
+export WINS_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_WINS_AGENT_VERSION" ../package/Dockerfile | awk -F'=' '{ print $NF }')
+export WINS_AGENT_UPGRADE_IMAGE=${REPO}/wins:${WINS_AGENT_UPGRADE_TAG}
+export CATTLE_KDM_BRANCH=$(grep -m1 'ARG CATTLE_KDM_BRANCH=' package/Dockerfile | cut -d '=' -f2)
+export CATTLE_K3S_VERSION=$(grep -m1 'ENV CATTLE_K3S_VERSION=' package/Dockerfile | cut -d '=' -f2)
+export HELM_VERSION=$(grep -m1 'ENV HELM_VERSION=' package/Dockerfile.installer | cut -d '=' -f2)
+export GO_VERSION=$(grep -m1 'golang:' package/Dockerfile | cut -d ':' -f2 | cut -d ' ' -f1)
+export HELM_UNITTEST_VERSION=$(grep -m1 'ENV HELM_UNITTEST_VERSION=' Dockerfile.dapper | cut -d '=' -f2)
+export CATTLE_HELM_VERSION=$(grep -m1 'ENV CATTLE_HELM_VERSION=' package/Dockerfile | cut -d '=' -f2)
+export CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH:-$(grep -m1 'ENV CHART_DEFAULT_BRANCH=' package/Dockerfile | cut -d '=' -f2)}
 
-# Query KDM data for RKE2 released versions where server args are defined.
-RKE2_RELEASE_VERSIONS=$(jq -r '[.rke2.releases[] | select(.serverArgs) | .version] | join(" ")' ../bin/data.json)
-# Convert versions with build metadata into valid image tags (replace + for -) and construct an array of tags.
-RKE2_RELEASE_TAGS=( $(echo $RKE2_RELEASE_VERSIONS | tr + -) )
-# Prefix image repo and name to tags.
-SYSTEM_AGENT_INSTALLER_RKE2_IMAGES=( "${RKE2_RELEASE_TAGS[@]/#/${REPO}/system-agent-installer-rke2:}" )
-
-# Query KDM data for K3S released versions where server args are defined.
-K3S_RELEASE_VERSIONS=$(jq -r '[.k3s.releases[] | select(.serverArgs) | .version] | join(" ")' ../bin/data.json)
-# Convert versions with build metadata into valid image tags (replace + for -) and construct an array of tags.
-K3S_RELEASE_TAGS=( $(echo $K3S_RELEASE_VERSIONS | tr + -) )
-# Prefix image repo and name to tags.
-SYSTEM_AGENT_INSTALLER_K3S_IMAGES=( "${K3S_RELEASE_TAGS[@]/#/${REPO}/system-agent-installer-k3s:}" )
+export REPO=${REPO}
+export TAG=${TAG}
+export COMMIT=${COMMIT}
+export ARCH=${ARCH}
+export OS=${OS}
+export CATTLE_RANCHER_WEBHOOK_VERSION=${CATTLE_RANCHER_WEBHOOK_VERSION}
+export CATTLE_REMOTEDIALER_PROXY_VERSION=${CATTLE_REMOTEDIALER_PROXY_VERSION}
+export CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=${CATTLE_RANCHER_PROVISIONING_CAPI_VERSION}
+export CATTLE_CSP_ADAPTER_MIN_VERSION=${CATTLE_CSP_ADAPTER_MIN_VERSION}
+export CATTLE_DEFAULT_SHELL_VERSION=${CATTLE_DEFAULT_SHELL_VERSION}
+export CATTLE_FLEET_VERSION=${CATTLE_FLEET_VERSION}
