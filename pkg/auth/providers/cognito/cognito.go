@@ -55,21 +55,21 @@ func (c *CognitoProvider) GetName() string {
 
 func (s *CognitoProvider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
 	providerName := token.GetAuthProvider()
-	logrus.Debugf("OpenIDCProvider [logout]: triggered by provider %s", providerName)
+	logrus.Debugf("CognitoProvider [logout]: triggered by provider %s", providerName)
 	oidcConfig, err := s.GetConfig()
 	if err != nil {
 		return fmt.Errorf("getting config for OIDC Logout: %w", err)
 	}
 	if oidcConfig.LogoutAllForced {
-		logrus.Debugf("OpenIDCProvider [logout]: Rancher provider resource `%v` configured for forced SLO, rejecting regular logout", providerName)
-		return fmt.Errorf("OpenIDCProvider [logout]: Rancher provider resource `%v` configured for forced SLO, rejecting regular logout", providerName)
+		logrus.Debugf("CognitoProvider [logout]: Rancher provider resource `%v` configured for forced SLO, rejecting regular logout", providerName)
+		return fmt.Errorf("CognitoProvider [logout]: Rancher provider resource `%v` configured for forced SLO, rejecting regular logout", providerName)
 	}
 
 	return nil
 }
 
 func (s *CognitoProvider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
-	logrus.Debugf("OpenIDCProvider [logout]: triggered by provider %s", token.GetAuthProvider())
+	logrus.Debugf("CognitoProvider [logout-all]: triggered by provider %s", token.GetAuthProvider())
 	oidcConfig, err := s.GetConfig()
 	if err != nil {
 		return err

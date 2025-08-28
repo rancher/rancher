@@ -140,7 +140,7 @@ func toBasicLogin(input interface{}) (*v3.BasicLogin, error) {
 
 // AuthenticateUser takes in a context and user credentials, and authenticates the user against an LDAP server.
 // Returns principal, slice of group principals, and any errors encountered.
-func (p *ldapProvider) AuthenticateUser(ctx context.Context, _ *types.APIContext, input interface{}) (v3.Principal, []v3.Principal, string, error) {
+func (p *ldapProvider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
 	login, err := toBasicLogin(input)
 	if err != nil {
 		return v3.Principal{}, nil, "", err
