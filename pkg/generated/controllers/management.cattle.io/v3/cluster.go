@@ -50,10 +50,10 @@ type ClusterCache interface {
 }
 
 // ClusterStatusHandler is executed for every added or modified Cluster. Should return the new status to be updated
-type ClusterStatusHandler func(obj *v3.Cluster, status v3.ClusterStatus) (v3.ClusterStatus, error)
+type ClusterStatusHandler func(ctx context.Context, obj *v3.Cluster, status v3.ClusterStatus) (v3.ClusterStatus, error)
 
 // ClusterGeneratingHandler is the top-level handler that is executed for every Cluster event. It extends ClusterStatusHandler by a returning a slice of child objects to be passed to apply.Apply
-type ClusterGeneratingHandler func(obj *v3.Cluster, status v3.ClusterStatus) ([]runtime.Object, v3.ClusterStatus, error)
+type ClusterGeneratingHandler func(ctx context.Context, obj *v3.Cluster, status v3.ClusterStatus) ([]runtime.Object, v3.ClusterStatus, error)
 
 // RegisterClusterStatusHandler configures a ClusterController to execute a ClusterStatusHandler for every events observed.
 // If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
@@ -63,7 +63,7 @@ func RegisterClusterStatusHandler(ctx context.Context, controller ClusterControl
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerContextToHandlerContext(statusHandler.sync))
 }
 
 // RegisterClusterGeneratingHandler configures a ClusterController to execute a ClusterGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
@@ -90,14 +90,14 @@ type clusterStatusHandler struct {
 }
 
 // sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
-func (a *clusterStatusHandler) sync(key string, obj *v3.Cluster) (*v3.Cluster, error) {
+func (a *clusterStatusHandler) sync(ctx context.Context, key string, obj *v3.Cluster) (*v3.Cluster, error) {
 	if obj == nil {
 		return obj, nil
 	}
 
 	origStatus := obj.Status.DeepCopy()
 	obj = obj.DeepCopy()
-	newStatus, err := a.handler(obj, obj.Status)
+	newStatus, err := a.handler(ctx, obj, obj.Status)
 	if err != nil {
 		// Revert to old status on error
 		newStatus = *origStatus.DeepCopy()
@@ -118,7 +118,7 @@ func (a *clusterStatusHandler) sync(key string, obj *v3.Cluster) (*v3.Cluster, e
 
 		var newErr error
 		obj.Status = newStatus
-		newObj, newErr := a.client.UpdateStatus(obj)
+		newObj, newErr := a.client.UpdateStatus(ctx, obj)
 		if err == nil {
 			err = newErr
 		}
@@ -139,7 +139,7 @@ type clusterGeneratingHandler struct {
 }
 
 // Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
-func (a *clusterGeneratingHandler) Remove(key string, obj *v3.Cluster) (*v3.Cluster, error) {
+func (a *clusterGeneratingHandler) Remove(ctx context.Context, key string, obj *v3.Cluster) (*v3.Cluster, error) {
 	if obj != nil {
 		return obj, nil
 	}
@@ -159,12 +159,12 @@ func (a *clusterGeneratingHandler) Remove(key string, obj *v3.Cluster) (*v3.Clus
 }
 
 // Handle executes the configured ClusterGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
-func (a *clusterGeneratingHandler) Handle(obj *v3.Cluster, status v3.ClusterStatus) (v3.ClusterStatus, error) {
+func (a *clusterGeneratingHandler) Handle(ctx context.Context, obj *v3.Cluster, status v3.ClusterStatus) (v3.ClusterStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
 	}
 
-	objs, newStatus, err := a.ClusterGeneratingHandler(obj, status)
+	objs, newStatus, err := a.ClusterGeneratingHandler(ctx, obj, status)
 	if err != nil {
 		return newStatus, err
 	}

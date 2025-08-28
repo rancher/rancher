@@ -50,10 +50,10 @@ type ManagedChartCache interface {
 }
 
 // ManagedChartStatusHandler is executed for every added or modified ManagedChart. Should return the new status to be updated
-type ManagedChartStatusHandler func(obj *v3.ManagedChart, status v3.ManagedChartStatus) (v3.ManagedChartStatus, error)
+type ManagedChartStatusHandler func(ctx context.Context, obj *v3.ManagedChart, status v3.ManagedChartStatus) (v3.ManagedChartStatus, error)
 
 // ManagedChartGeneratingHandler is the top-level handler that is executed for every ManagedChart event. It extends ManagedChartStatusHandler by a returning a slice of child objects to be passed to apply.Apply
-type ManagedChartGeneratingHandler func(obj *v3.ManagedChart, status v3.ManagedChartStatus) ([]runtime.Object, v3.ManagedChartStatus, error)
+type ManagedChartGeneratingHandler func(ctx context.Context, obj *v3.ManagedChart, status v3.ManagedChartStatus) ([]runtime.Object, v3.ManagedChartStatus, error)
 
 // RegisterManagedChartStatusHandler configures a ManagedChartController to execute a ManagedChartStatusHandler for every events observed.
 // If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
@@ -63,7 +63,7 @@ func RegisterManagedChartStatusHandler(ctx context.Context, controller ManagedCh
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerContextToHandlerContext(statusHandler.sync))
 }
 
 // RegisterManagedChartGeneratingHandler configures a ManagedChartController to execute a ManagedChartGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
@@ -90,14 +90,14 @@ type managedChartStatusHandler struct {
 }
 
 // sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
-func (a *managedChartStatusHandler) sync(key string, obj *v3.ManagedChart) (*v3.ManagedChart, error) {
+func (a *managedChartStatusHandler) sync(ctx context.Context, key string, obj *v3.ManagedChart) (*v3.ManagedChart, error) {
 	if obj == nil {
 		return obj, nil
 	}
 
 	origStatus := obj.Status.DeepCopy()
 	obj = obj.DeepCopy()
-	newStatus, err := a.handler(obj, obj.Status)
+	newStatus, err := a.handler(ctx, obj, obj.Status)
 	if err != nil {
 		// Revert to old status on error
 		newStatus = *origStatus.DeepCopy()
@@ -118,7 +118,7 @@ func (a *managedChartStatusHandler) sync(key string, obj *v3.ManagedChart) (*v3.
 
 		var newErr error
 		obj.Status = newStatus
-		newObj, newErr := a.client.UpdateStatus(obj)
+		newObj, newErr := a.client.UpdateStatus(ctx, obj)
 		if err == nil {
 			err = newErr
 		}
@@ -139,7 +139,7 @@ type managedChartGeneratingHandler struct {
 }
 
 // Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
-func (a *managedChartGeneratingHandler) Remove(key string, obj *v3.ManagedChart) (*v3.ManagedChart, error) {
+func (a *managedChartGeneratingHandler) Remove(ctx context.Context, key string, obj *v3.ManagedChart) (*v3.ManagedChart, error) {
 	if obj != nil {
 		return obj, nil
 	}
@@ -159,12 +159,12 @@ func (a *managedChartGeneratingHandler) Remove(key string, obj *v3.ManagedChart)
 }
 
 // Handle executes the configured ManagedChartGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
-func (a *managedChartGeneratingHandler) Handle(obj *v3.ManagedChart, status v3.ManagedChartStatus) (v3.ManagedChartStatus, error) {
+func (a *managedChartGeneratingHandler) Handle(ctx context.Context, obj *v3.ManagedChart, status v3.ManagedChartStatus) (v3.ManagedChartStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
 	}
 
-	objs, newStatus, err := a.ManagedChartGeneratingHandler(obj, status)
+	objs, newStatus, err := a.ManagedChartGeneratingHandler(ctx, obj, status)
 	if err != nil {
 		return newStatus, err
 	}

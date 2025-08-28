@@ -50,10 +50,10 @@ type FleetWorkspaceCache interface {
 }
 
 // FleetWorkspaceStatusHandler is executed for every added or modified FleetWorkspace. Should return the new status to be updated
-type FleetWorkspaceStatusHandler func(obj *v3.FleetWorkspace, status v3.FleetWorkspaceStatus) (v3.FleetWorkspaceStatus, error)
+type FleetWorkspaceStatusHandler func(ctx context.Context, obj *v3.FleetWorkspace, status v3.FleetWorkspaceStatus) (v3.FleetWorkspaceStatus, error)
 
 // FleetWorkspaceGeneratingHandler is the top-level handler that is executed for every FleetWorkspace event. It extends FleetWorkspaceStatusHandler by a returning a slice of child objects to be passed to apply.Apply
-type FleetWorkspaceGeneratingHandler func(obj *v3.FleetWorkspace, status v3.FleetWorkspaceStatus) ([]runtime.Object, v3.FleetWorkspaceStatus, error)
+type FleetWorkspaceGeneratingHandler func(ctx context.Context, obj *v3.FleetWorkspace, status v3.FleetWorkspaceStatus) ([]runtime.Object, v3.FleetWorkspaceStatus, error)
 
 // RegisterFleetWorkspaceStatusHandler configures a FleetWorkspaceController to execute a FleetWorkspaceStatusHandler for every events observed.
 // If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
@@ -63,7 +63,7 @@ func RegisterFleetWorkspaceStatusHandler(ctx context.Context, controller FleetWo
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerContextToHandlerContext(statusHandler.sync))
 }
 
 // RegisterFleetWorkspaceGeneratingHandler configures a FleetWorkspaceController to execute a FleetWorkspaceGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
@@ -90,14 +90,14 @@ type fleetWorkspaceStatusHandler struct {
 }
 
 // sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
-func (a *fleetWorkspaceStatusHandler) sync(key string, obj *v3.FleetWorkspace) (*v3.FleetWorkspace, error) {
+func (a *fleetWorkspaceStatusHandler) sync(ctx context.Context, key string, obj *v3.FleetWorkspace) (*v3.FleetWorkspace, error) {
 	if obj == nil {
 		return obj, nil
 	}
 
 	origStatus := obj.Status.DeepCopy()
 	obj = obj.DeepCopy()
-	newStatus, err := a.handler(obj, obj.Status)
+	newStatus, err := a.handler(ctx, obj, obj.Status)
 	if err != nil {
 		// Revert to old status on error
 		newStatus = *origStatus.DeepCopy()
@@ -118,7 +118,7 @@ func (a *fleetWorkspaceStatusHandler) sync(key string, obj *v3.FleetWorkspace) (
 
 		var newErr error
 		obj.Status = newStatus
-		newObj, newErr := a.client.UpdateStatus(obj)
+		newObj, newErr := a.client.UpdateStatus(ctx, obj)
 		if err == nil {
 			err = newErr
 		}
@@ -139,7 +139,7 @@ type fleetWorkspaceGeneratingHandler struct {
 }
 
 // Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
-func (a *fleetWorkspaceGeneratingHandler) Remove(key string, obj *v3.FleetWorkspace) (*v3.FleetWorkspace, error) {
+func (a *fleetWorkspaceGeneratingHandler) Remove(ctx context.Context, key string, obj *v3.FleetWorkspace) (*v3.FleetWorkspace, error) {
 	if obj != nil {
 		return obj, nil
 	}
@@ -159,12 +159,12 @@ func (a *fleetWorkspaceGeneratingHandler) Remove(key string, obj *v3.FleetWorksp
 }
 
 // Handle executes the configured FleetWorkspaceGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
-func (a *fleetWorkspaceGeneratingHandler) Handle(obj *v3.FleetWorkspace, status v3.FleetWorkspaceStatus) (v3.FleetWorkspaceStatus, error) {
+func (a *fleetWorkspaceGeneratingHandler) Handle(ctx context.Context, obj *v3.FleetWorkspace, status v3.FleetWorkspaceStatus) (v3.FleetWorkspaceStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
 	}
 
-	objs, newStatus, err := a.FleetWorkspaceGeneratingHandler(obj, status)
+	objs, newStatus, err := a.FleetWorkspaceGeneratingHandler(ctx, obj, status)
 	if err != nil {
 		return newStatus, err
 	}

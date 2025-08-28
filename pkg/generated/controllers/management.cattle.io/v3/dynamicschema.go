@@ -50,10 +50,10 @@ type DynamicSchemaCache interface {
 }
 
 // DynamicSchemaStatusHandler is executed for every added or modified DynamicSchema. Should return the new status to be updated
-type DynamicSchemaStatusHandler func(obj *v3.DynamicSchema, status v3.DynamicSchemaStatus) (v3.DynamicSchemaStatus, error)
+type DynamicSchemaStatusHandler func(ctx context.Context, obj *v3.DynamicSchema, status v3.DynamicSchemaStatus) (v3.DynamicSchemaStatus, error)
 
 // DynamicSchemaGeneratingHandler is the top-level handler that is executed for every DynamicSchema event. It extends DynamicSchemaStatusHandler by a returning a slice of child objects to be passed to apply.Apply
-type DynamicSchemaGeneratingHandler func(obj *v3.DynamicSchema, status v3.DynamicSchemaStatus) ([]runtime.Object, v3.DynamicSchemaStatus, error)
+type DynamicSchemaGeneratingHandler func(ctx context.Context, obj *v3.DynamicSchema, status v3.DynamicSchemaStatus) ([]runtime.Object, v3.DynamicSchemaStatus, error)
 
 // RegisterDynamicSchemaStatusHandler configures a DynamicSchemaController to execute a DynamicSchemaStatusHandler for every events observed.
 // If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
@@ -63,7 +63,7 @@ func RegisterDynamicSchemaStatusHandler(ctx context.Context, controller DynamicS
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerContextToHandlerContext(statusHandler.sync))
 }
 
 // RegisterDynamicSchemaGeneratingHandler configures a DynamicSchemaController to execute a DynamicSchemaGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
@@ -90,14 +90,14 @@ type dynamicSchemaStatusHandler struct {
 }
 
 // sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
-func (a *dynamicSchemaStatusHandler) sync(key string, obj *v3.DynamicSchema) (*v3.DynamicSchema, error) {
+func (a *dynamicSchemaStatusHandler) sync(ctx context.Context, key string, obj *v3.DynamicSchema) (*v3.DynamicSchema, error) {
 	if obj == nil {
 		return obj, nil
 	}
 
 	origStatus := obj.Status.DeepCopy()
 	obj = obj.DeepCopy()
-	newStatus, err := a.handler(obj, obj.Status)
+	newStatus, err := a.handler(ctx, obj, obj.Status)
 	if err != nil {
 		// Revert to old status on error
 		newStatus = *origStatus.DeepCopy()
@@ -118,7 +118,7 @@ func (a *dynamicSchemaStatusHandler) sync(key string, obj *v3.DynamicSchema) (*v
 
 		var newErr error
 		obj.Status = newStatus
-		newObj, newErr := a.client.UpdateStatus(obj)
+		newObj, newErr := a.client.UpdateStatus(ctx, obj)
 		if err == nil {
 			err = newErr
 		}
@@ -139,7 +139,7 @@ type dynamicSchemaGeneratingHandler struct {
 }
 
 // Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
-func (a *dynamicSchemaGeneratingHandler) Remove(key string, obj *v3.DynamicSchema) (*v3.DynamicSchema, error) {
+func (a *dynamicSchemaGeneratingHandler) Remove(ctx context.Context, key string, obj *v3.DynamicSchema) (*v3.DynamicSchema, error) {
 	if obj != nil {
 		return obj, nil
 	}
@@ -159,12 +159,12 @@ func (a *dynamicSchemaGeneratingHandler) Remove(key string, obj *v3.DynamicSchem
 }
 
 // Handle executes the configured DynamicSchemaGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
-func (a *dynamicSchemaGeneratingHandler) Handle(obj *v3.DynamicSchema, status v3.DynamicSchemaStatus) (v3.DynamicSchemaStatus, error) {
+func (a *dynamicSchemaGeneratingHandler) Handle(ctx context.Context, obj *v3.DynamicSchema, status v3.DynamicSchemaStatus) (v3.DynamicSchemaStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
 	}
 
-	objs, newStatus, err := a.DynamicSchemaGeneratingHandler(obj, status)
+	objs, newStatus, err := a.DynamicSchemaGeneratingHandler(ctx, obj, status)
 	if err != nil {
 		return newStatus, err
 	}

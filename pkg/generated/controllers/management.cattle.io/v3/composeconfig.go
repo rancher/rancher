@@ -50,10 +50,10 @@ type ComposeConfigCache interface {
 }
 
 // ComposeConfigStatusHandler is executed for every added or modified ComposeConfig. Should return the new status to be updated
-type ComposeConfigStatusHandler func(obj *v3.ComposeConfig, status v3.ComposeStatus) (v3.ComposeStatus, error)
+type ComposeConfigStatusHandler func(ctx context.Context, obj *v3.ComposeConfig, status v3.ComposeStatus) (v3.ComposeStatus, error)
 
 // ComposeConfigGeneratingHandler is the top-level handler that is executed for every ComposeConfig event. It extends ComposeConfigStatusHandler by a returning a slice of child objects to be passed to apply.Apply
-type ComposeConfigGeneratingHandler func(obj *v3.ComposeConfig, status v3.ComposeStatus) ([]runtime.Object, v3.ComposeStatus, error)
+type ComposeConfigGeneratingHandler func(ctx context.Context, obj *v3.ComposeConfig, status v3.ComposeStatus) ([]runtime.Object, v3.ComposeStatus, error)
 
 // RegisterComposeConfigStatusHandler configures a ComposeConfigController to execute a ComposeConfigStatusHandler for every events observed.
 // If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
@@ -63,7 +63,7 @@ func RegisterComposeConfigStatusHandler(ctx context.Context, controller ComposeC
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerContextToHandlerContext(statusHandler.sync))
 }
 
 // RegisterComposeConfigGeneratingHandler configures a ComposeConfigController to execute a ComposeConfigGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
@@ -90,14 +90,14 @@ type composeConfigStatusHandler struct {
 }
 
 // sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
-func (a *composeConfigStatusHandler) sync(key string, obj *v3.ComposeConfig) (*v3.ComposeConfig, error) {
+func (a *composeConfigStatusHandler) sync(ctx context.Context, key string, obj *v3.ComposeConfig) (*v3.ComposeConfig, error) {
 	if obj == nil {
 		return obj, nil
 	}
 
 	origStatus := obj.Status.DeepCopy()
 	obj = obj.DeepCopy()
-	newStatus, err := a.handler(obj, obj.Status)
+	newStatus, err := a.handler(ctx, obj, obj.Status)
 	if err != nil {
 		// Revert to old status on error
 		newStatus = *origStatus.DeepCopy()
@@ -118,7 +118,7 @@ func (a *composeConfigStatusHandler) sync(key string, obj *v3.ComposeConfig) (*v
 
 		var newErr error
 		obj.Status = newStatus
-		newObj, newErr := a.client.UpdateStatus(obj)
+		newObj, newErr := a.client.UpdateStatus(ctx, obj)
 		if err == nil {
 			err = newErr
 		}
@@ -139,7 +139,7 @@ type composeConfigGeneratingHandler struct {
 }
 
 // Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
-func (a *composeConfigGeneratingHandler) Remove(key string, obj *v3.ComposeConfig) (*v3.ComposeConfig, error) {
+func (a *composeConfigGeneratingHandler) Remove(ctx context.Context, key string, obj *v3.ComposeConfig) (*v3.ComposeConfig, error) {
 	if obj != nil {
 		return obj, nil
 	}
@@ -159,12 +159,12 @@ func (a *composeConfigGeneratingHandler) Remove(key string, obj *v3.ComposeConfi
 }
 
 // Handle executes the configured ComposeConfigGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
-func (a *composeConfigGeneratingHandler) Handle(obj *v3.ComposeConfig, status v3.ComposeStatus) (v3.ComposeStatus, error) {
+func (a *composeConfigGeneratingHandler) Handle(ctx context.Context, obj *v3.ComposeConfig, status v3.ComposeStatus) (v3.ComposeStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
 	}
 
-	objs, newStatus, err := a.ComposeConfigGeneratingHandler(obj, status)
+	objs, newStatus, err := a.ComposeConfigGeneratingHandler(ctx, obj, status)
 	if err != nil {
 		return newStatus, err
 	}

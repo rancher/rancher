@@ -50,10 +50,10 @@ type KontainerDriverCache interface {
 }
 
 // KontainerDriverStatusHandler is executed for every added or modified KontainerDriver. Should return the new status to be updated
-type KontainerDriverStatusHandler func(obj *v3.KontainerDriver, status v3.KontainerDriverStatus) (v3.KontainerDriverStatus, error)
+type KontainerDriverStatusHandler func(ctx context.Context, obj *v3.KontainerDriver, status v3.KontainerDriverStatus) (v3.KontainerDriverStatus, error)
 
 // KontainerDriverGeneratingHandler is the top-level handler that is executed for every KontainerDriver event. It extends KontainerDriverStatusHandler by a returning a slice of child objects to be passed to apply.Apply
-type KontainerDriverGeneratingHandler func(obj *v3.KontainerDriver, status v3.KontainerDriverStatus) ([]runtime.Object, v3.KontainerDriverStatus, error)
+type KontainerDriverGeneratingHandler func(ctx context.Context, obj *v3.KontainerDriver, status v3.KontainerDriverStatus) ([]runtime.Object, v3.KontainerDriverStatus, error)
 
 // RegisterKontainerDriverStatusHandler configures a KontainerDriverController to execute a KontainerDriverStatusHandler for every events observed.
 // If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
@@ -63,7 +63,7 @@ func RegisterKontainerDriverStatusHandler(ctx context.Context, controller Kontai
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerContextToHandlerContext(statusHandler.sync))
 }
 
 // RegisterKontainerDriverGeneratingHandler configures a KontainerDriverController to execute a KontainerDriverGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
@@ -90,14 +90,14 @@ type kontainerDriverStatusHandler struct {
 }
 
 // sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
-func (a *kontainerDriverStatusHandler) sync(key string, obj *v3.KontainerDriver) (*v3.KontainerDriver, error) {
+func (a *kontainerDriverStatusHandler) sync(ctx context.Context, key string, obj *v3.KontainerDriver) (*v3.KontainerDriver, error) {
 	if obj == nil {
 		return obj, nil
 	}
 
 	origStatus := obj.Status.DeepCopy()
 	obj = obj.DeepCopy()
-	newStatus, err := a.handler(obj, obj.Status)
+	newStatus, err := a.handler(ctx, obj, obj.Status)
 	if err != nil {
 		// Revert to old status on error
 		newStatus = *origStatus.DeepCopy()
@@ -118,7 +118,7 @@ func (a *kontainerDriverStatusHandler) sync(key string, obj *v3.KontainerDriver)
 
 		var newErr error
 		obj.Status = newStatus
-		newObj, newErr := a.client.UpdateStatus(obj)
+		newObj, newErr := a.client.UpdateStatus(ctx, obj)
 		if err == nil {
 			err = newErr
 		}
@@ -139,7 +139,7 @@ type kontainerDriverGeneratingHandler struct {
 }
 
 // Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
-func (a *kontainerDriverGeneratingHandler) Remove(key string, obj *v3.KontainerDriver) (*v3.KontainerDriver, error) {
+func (a *kontainerDriverGeneratingHandler) Remove(ctx context.Context, key string, obj *v3.KontainerDriver) (*v3.KontainerDriver, error) {
 	if obj != nil {
 		return obj, nil
 	}
@@ -159,12 +159,12 @@ func (a *kontainerDriverGeneratingHandler) Remove(key string, obj *v3.KontainerD
 }
 
 // Handle executes the configured KontainerDriverGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
-func (a *kontainerDriverGeneratingHandler) Handle(obj *v3.KontainerDriver, status v3.KontainerDriverStatus) (v3.KontainerDriverStatus, error) {
+func (a *kontainerDriverGeneratingHandler) Handle(ctx context.Context, obj *v3.KontainerDriver, status v3.KontainerDriverStatus) (v3.KontainerDriverStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
 	}
 
-	objs, newStatus, err := a.KontainerDriverGeneratingHandler(obj, status)
+	objs, newStatus, err := a.KontainerDriverGeneratingHandler(ctx, obj, status)
 	if err != nil {
 		return newStatus, err
 	}

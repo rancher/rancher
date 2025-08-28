@@ -50,10 +50,10 @@ type APIServiceCache interface {
 }
 
 // APIServiceStatusHandler is executed for every added or modified APIService. Should return the new status to be updated
-type APIServiceStatusHandler func(obj *v3.APIService, status v3.APIServiceStatus) (v3.APIServiceStatus, error)
+type APIServiceStatusHandler func(ctx context.Context, obj *v3.APIService, status v3.APIServiceStatus) (v3.APIServiceStatus, error)
 
 // APIServiceGeneratingHandler is the top-level handler that is executed for every APIService event. It extends APIServiceStatusHandler by a returning a slice of child objects to be passed to apply.Apply
-type APIServiceGeneratingHandler func(obj *v3.APIService, status v3.APIServiceStatus) ([]runtime.Object, v3.APIServiceStatus, error)
+type APIServiceGeneratingHandler func(ctx context.Context, obj *v3.APIService, status v3.APIServiceStatus) ([]runtime.Object, v3.APIServiceStatus, error)
 
 // RegisterAPIServiceStatusHandler configures a APIServiceController to execute a APIServiceStatusHandler for every events observed.
 // If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
@@ -63,7 +63,7 @@ func RegisterAPIServiceStatusHandler(ctx context.Context, controller APIServiceC
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerContextToHandlerContext(statusHandler.sync))
 }
 
 // RegisterAPIServiceGeneratingHandler configures a APIServiceController to execute a APIServiceGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
@@ -90,14 +90,14 @@ type aPIServiceStatusHandler struct {
 }
 
 // sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
-func (a *aPIServiceStatusHandler) sync(key string, obj *v3.APIService) (*v3.APIService, error) {
+func (a *aPIServiceStatusHandler) sync(ctx context.Context, key string, obj *v3.APIService) (*v3.APIService, error) {
 	if obj == nil {
 		return obj, nil
 	}
 
 	origStatus := obj.Status.DeepCopy()
 	obj = obj.DeepCopy()
-	newStatus, err := a.handler(obj, obj.Status)
+	newStatus, err := a.handler(ctx, obj, obj.Status)
 	if err != nil {
 		// Revert to old status on error
 		newStatus = *origStatus.DeepCopy()
@@ -118,7 +118,7 @@ func (a *aPIServiceStatusHandler) sync(key string, obj *v3.APIService) (*v3.APIS
 
 		var newErr error
 		obj.Status = newStatus
-		newObj, newErr := a.client.UpdateStatus(obj)
+		newObj, newErr := a.client.UpdateStatus(ctx, obj)
 		if err == nil {
 			err = newErr
 		}
@@ -139,7 +139,7 @@ type aPIServiceGeneratingHandler struct {
 }
 
 // Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
-func (a *aPIServiceGeneratingHandler) Remove(key string, obj *v3.APIService) (*v3.APIService, error) {
+func (a *aPIServiceGeneratingHandler) Remove(ctx context.Context, key string, obj *v3.APIService) (*v3.APIService, error) {
 	if obj != nil {
 		return obj, nil
 	}
@@ -159,12 +159,12 @@ func (a *aPIServiceGeneratingHandler) Remove(key string, obj *v3.APIService) (*v
 }
 
 // Handle executes the configured APIServiceGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
-func (a *aPIServiceGeneratingHandler) Handle(obj *v3.APIService, status v3.APIServiceStatus) (v3.APIServiceStatus, error) {
+func (a *aPIServiceGeneratingHandler) Handle(ctx context.Context, obj *v3.APIService, status v3.APIServiceStatus) (v3.APIServiceStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
 	}
 
-	objs, newStatus, err := a.APIServiceGeneratingHandler(obj, status)
+	objs, newStatus, err := a.APIServiceGeneratingHandler(ctx, obj, status)
 	if err != nil {
 		return newStatus, err
 	}

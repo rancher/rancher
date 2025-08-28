@@ -50,10 +50,10 @@ type NodePoolCache interface {
 }
 
 // NodePoolStatusHandler is executed for every added or modified NodePool. Should return the new status to be updated
-type NodePoolStatusHandler func(obj *v3.NodePool, status v3.NodePoolStatus) (v3.NodePoolStatus, error)
+type NodePoolStatusHandler func(ctx context.Context, obj *v3.NodePool, status v3.NodePoolStatus) (v3.NodePoolStatus, error)
 
 // NodePoolGeneratingHandler is the top-level handler that is executed for every NodePool event. It extends NodePoolStatusHandler by a returning a slice of child objects to be passed to apply.Apply
-type NodePoolGeneratingHandler func(obj *v3.NodePool, status v3.NodePoolStatus) ([]runtime.Object, v3.NodePoolStatus, error)
+type NodePoolGeneratingHandler func(ctx context.Context, obj *v3.NodePool, status v3.NodePoolStatus) ([]runtime.Object, v3.NodePoolStatus, error)
 
 // RegisterNodePoolStatusHandler configures a NodePoolController to execute a NodePoolStatusHandler for every events observed.
 // If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
@@ -63,7 +63,7 @@ func RegisterNodePoolStatusHandler(ctx context.Context, controller NodePoolContr
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerContextToHandlerContext(statusHandler.sync))
 }
 
 // RegisterNodePoolGeneratingHandler configures a NodePoolController to execute a NodePoolGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
@@ -90,14 +90,14 @@ type nodePoolStatusHandler struct {
 }
 
 // sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
-func (a *nodePoolStatusHandler) sync(key string, obj *v3.NodePool) (*v3.NodePool, error) {
+func (a *nodePoolStatusHandler) sync(ctx context.Context, key string, obj *v3.NodePool) (*v3.NodePool, error) {
 	if obj == nil {
 		return obj, nil
 	}
 
 	origStatus := obj.Status.DeepCopy()
 	obj = obj.DeepCopy()
-	newStatus, err := a.handler(obj, obj.Status)
+	newStatus, err := a.handler(ctx, obj, obj.Status)
 	if err != nil {
 		// Revert to old status on error
 		newStatus = *origStatus.DeepCopy()
@@ -118,7 +118,7 @@ func (a *nodePoolStatusHandler) sync(key string, obj *v3.NodePool) (*v3.NodePool
 
 		var newErr error
 		obj.Status = newStatus
-		newObj, newErr := a.client.UpdateStatus(obj)
+		newObj, newErr := a.client.UpdateStatus(ctx, obj)
 		if err == nil {
 			err = newErr
 		}
@@ -139,7 +139,7 @@ type nodePoolGeneratingHandler struct {
 }
 
 // Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
-func (a *nodePoolGeneratingHandler) Remove(key string, obj *v3.NodePool) (*v3.NodePool, error) {
+func (a *nodePoolGeneratingHandler) Remove(ctx context.Context, key string, obj *v3.NodePool) (*v3.NodePool, error) {
 	if obj != nil {
 		return obj, nil
 	}
@@ -159,12 +159,12 @@ func (a *nodePoolGeneratingHandler) Remove(key string, obj *v3.NodePool) (*v3.No
 }
 
 // Handle executes the configured NodePoolGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
-func (a *nodePoolGeneratingHandler) Handle(obj *v3.NodePool, status v3.NodePoolStatus) (v3.NodePoolStatus, error) {
+func (a *nodePoolGeneratingHandler) Handle(ctx context.Context, obj *v3.NodePool, status v3.NodePoolStatus) (v3.NodePoolStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
 	}
 
-	objs, newStatus, err := a.NodePoolGeneratingHandler(obj, status)
+	objs, newStatus, err := a.NodePoolGeneratingHandler(ctx, obj, status)
 	if err != nil {
 		return newStatus, err
 	}
