@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -349,7 +350,7 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding, 
 	}
 
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		crtbToUpdate, updateErr := c.crtbClient.Get(binding.Namespace, binding.Name, metav1.GetOptions{})
+		crtbToUpdate, updateErr := c.crtbClient.Get(context.TODO(), binding.Namespace, binding.Name, metav1.GetOptions{})
 		if updateErr != nil {
 			return updateErr
 		}
@@ -357,7 +358,7 @@ func (c *crtbLifecycle) reconcileLabels(binding *v3.ClusterRoleTemplateBinding, 
 			crtbToUpdate.Labels = make(map[string]string)
 		}
 		crtbToUpdate.Labels[RtbCrbRbLabelsUpdated] = "true"
-		_, err := c.crtbClient.Update(crtbToUpdate)
+		_, err := c.crtbClient.Update(context.TODO(), crtbToUpdate)
 		return err
 	})
 	if retryErr != nil {
@@ -395,7 +396,7 @@ func (c *crtbLifecycle) updateStatus(crtb *v3.ClusterRoleTemplateBinding, localC
 		crtbFromCluster.Status.LastUpdateTime = timeNow().Format(time.RFC3339)
 		crtbFromCluster.Status.ObservedGenerationLocal = crtb.ObjectMeta.Generation
 		crtbFromCluster.Status.LocalConditions = localConditions
-		crtbFromCluster, err = c.crtbClient.UpdateStatus(crtbFromCluster)
+		crtbFromCluster, err = c.crtbClient.UpdateStatus(context.TODO(), crtbFromCluster)
 		if err != nil {
 			return err
 		}

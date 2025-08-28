@@ -20,7 +20,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		return []string{obj.Status.ClusterName}, nil
 	})
 
-	relatedresource.Watch(ctx, "cluster-v1-trigger", func(namespace, name string, obj runtime.Object) (result []relatedresource.Key, _ error) {
+	relatedresource.WatchContext(ctx, "cluster-v1-trigger", func(namespace, name string, obj runtime.Object) (result []relatedresource.Key, _ error) {
 		clusters, err := clusterCache.GetByIndex(ClusterV1ByClusterV3Reference, name)
 		if err != nil {
 			return nil, err

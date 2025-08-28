@@ -1,6 +1,7 @@
 package common
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/base32"
 	"encoding/json"
@@ -150,7 +151,7 @@ func (m *userManager) SetPrincipalOnCurrentUser(apiContext *types.APIContext, pr
 }
 
 func (m *userManager) SetPrincipalOnCurrentUserByUserID(userID string, principal v3.Principal) (*v3.User, error) {
-	user, err := m.users.Get(userID, v1.GetOptions{})
+	user, err := m.users.Get(context.TODO(), userID, v1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +177,7 @@ func (m *userManager) SetPrincipalOnCurrentUserByUserID(userID string, principal
 	if !slice.ContainsString(user.PrincipalIDs, principal.Name) {
 		user.PrincipalIDs = append(user.PrincipalIDs, principal.Name)
 		logrus.Infof("Updating user %v. Adding principal", user.Name)
-		return m.users.Update(user)
+		return m.users.Update(context.TODO(), user)
 	}
 	return user, nil
 }
@@ -254,7 +255,7 @@ func (m *userManager) EnsureClusterToken(clusterName string, input user.TokenInp
 			return "", nil, err
 		}
 		if err == nil {
-			if err := m.tokens.Delete(token.Name, &v1.DeleteOptions{}); err != nil {
+			if err := m.tokens.Delete(context.TODO(), token.Name, &v1.DeleteOptions{}); err != nil {
 				return "", nil, err
 			}
 		}
@@ -304,7 +305,7 @@ func (m *userManager) EnsureClusterToken(clusterName string, input user.TokenInp
 	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
 		// Backoff was added here because it is possible the token is in the process of deleting.
 		// This should cause the create to retry until the delete is finished.
-		newToken, err := m.tokens.Create(token)
+		newToken, err := m.tokens.Create(context.TODO(), token)
 		if err != nil {
 			if apierrors.IsAlreadyExists(err) {
 				return false, nil
@@ -355,7 +356,7 @@ func (m *userManager) GetKubeconfigToken(clusterName, tokenName, description, ki
 	}
 
 	randomizedTokenName, createdTokenValue := tokens.SplitTokenParts(fullCreatedToken)
-	token, err := m.tokens.Get(randomizedTokenName, v1.GetOptions{})
+	token, err := m.tokens.Get(context.TODO(), randomizedTokenName, v1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, createdTokenValue, err
 	}
@@ -368,14 +369,14 @@ func (m *userManager) GetKubeconfigToken(clusterName, tokenName, description, ki
 	tokenCopy := token.DeepCopy()
 	tokenUtil.SetTokenExpiresAt(tokenCopy)
 
-	token, err = m.tokens.Update(tokenCopy)
+	token, err = m.tokens.Update(context.TODO(), tokenCopy)
 	if err != nil {
 		if !apierrors.IsConflict(err) {
 			return nil, "", fmt.Errorf("getToken: updating token [%s] failed [%v]", randomizedTokenName, err)
 		}
 
 		err = wait.ExponentialBackoff(backoff, func() (bool, error) {
-			token, err = m.tokens.Get(randomizedTokenName, v1.GetOptions{})
+			token, err = m.tokens.Get(context.TODO(), randomizedTokenName, v1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -384,7 +385,7 @@ func (m *userManager) GetKubeconfigToken(clusterName, tokenName, description, ki
 				tokenCopy := token.DeepCopy()
 				tokenUtil.SetTokenExpiresAt(tokenCopy)
 
-				token, err = m.tokens.Update(tokenCopy)
+				token, err = m.tokens.Update(context.TODO(), tokenCopy)
 				if err != nil {
 					logrus.Debugf("getToken: updating token [%s] failed [%v]", randomizedTokenName, err)
 					if apierrors.IsConflict(err) {
@@ -427,7 +428,7 @@ func (m *userManager) EnsureUser(principalName, displayName string) (*v3.User, e
 	if user != nil {
 		if displayName != "" && user.DisplayName == "" {
 			user.DisplayName = displayName
-			if _, err := m.users.Update(user); err != nil {
+			if _, err := m.users.Update(context.TODO(), user); err != nil {
 				return nil, err
 			}
 		}
@@ -470,7 +471,7 @@ func (m *userManager) EnsureUser(principalName, displayName string) (*v3.User, e
 			PrincipalIDs: []string{principalName},
 		}
 
-		user, err = m.users.Create(user)
+		user, err = m.users.Create(context.TODO(), user)
 		if err != nil {
 			return nil, err
 		}
@@ -595,7 +596,7 @@ func (m *userManager) createUsersBindings(user *v3.User) error {
 	var createdRoles []string
 	for _, role := range roleMap["required"] {
 		if !slice.ContainsString(existingGRB, role) {
-			_, err := m.globalRoleBindings.Create(&v3.GlobalRoleBinding{
+			_, err := m.globalRoleBindings.Create(context.TODO(), &v3.GlobalRoleBinding{
 				ObjectMeta: v1.ObjectMeta{
 					GenerateName: "grb-",
 				},
@@ -621,7 +622,7 @@ func (m *userManager) createUsersBindings(user *v3.User) error {
 	sleepTime := 100
 	// The user needs updated so keep trying if there is a conflict
 	for i := 0; i <= 3; i++ {
-		user, err = m.users.Get(user.Name, v1.GetOptions{})
+		user, err = m.users.Get(context.TODO(), user.Name, v1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -632,7 +633,7 @@ func (m *userManager) createUsersBindings(user *v3.User) error {
 			v3.UserConditionInitialRolesPopulated.True(user)
 		}
 
-		_, err = m.users.Update(user)
+		_, err = m.users.Update(context.TODO(), user)
 		if err != nil {
 			if apierrors.IsConflict(err) {
 				// Conflict on the user, sleep and try again
@@ -693,7 +694,7 @@ func (m *userManager) GetUserByPrincipalID(principalName string) (*v3.User, erro
 }
 
 func (m *userManager) DeleteToken(tokenName string) error {
-	return m.tokens.Delete(tokenName, &v1.DeleteOptions{})
+	return m.tokens.Delete(context.TODO(), tokenName, &v1.DeleteOptions{})
 }
 
 func (m *userManager) checkCache(principalName string) (*v3.User, error) {
@@ -742,7 +743,7 @@ func (m *userManager) checkLabels(principalName string) (*v3.User, labels.Set, e
 		encodedPrincipalID = encodedPrincipalID[:63]
 	}
 	set := labels.Set(map[string]string{encodedPrincipalID: "hashed-principal-name"})
-	users, err := m.users.List(v1.ListOptions{LabelSelector: set.String()})
+	users, err := m.users.List(context.TODO(), v1.ListOptions{LabelSelector: set.String()})
 	if err != nil {
 		return nil, nil, err
 	}

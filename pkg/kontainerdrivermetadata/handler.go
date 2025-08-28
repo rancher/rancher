@@ -35,7 +35,7 @@ func Register(ctx context.Context, wContext *wrangler.Context) {
 	wContext.Mgmt.Setting().OnChange(ctx, "rke-metadata-handler", m.sync)
 }
 
-func (m *MetadataController) sync(_ string, setting *v3.Setting) (*v3.Setting, error) {
+func (m *MetadataController) sync(_ context.Context, _ string, setting *v3.Setting) (*v3.Setting, error) {
 	if setting == nil || (setting.Name != settings.RkeMetadataConfig.Name) {
 		return nil, nil
 	}

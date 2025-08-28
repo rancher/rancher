@@ -84,7 +84,7 @@ func (h *handler) OnRepoChange(key string, _ *v1.ClusterRepo) (*v1.ClusterRepo, 
 	return nil, nil
 }
 
-func (h *handler) OnChange(mcc *v3.ManagedChart, status v3.ManagedChartStatus) ([]runtime.Object, v3.ManagedChartStatus, error) {
+func (h *handler) OnChange(_ context.Context, mcc *v3.ManagedChart, status v3.ManagedChartStatus) ([]runtime.Object, v3.ManagedChartStatus, error) {
 	chart, err := h.charts.Chart("", mcc.Spec.RepoName, mcc.Spec.Chart, mcc.Spec.Version, true)
 	if err != nil {
 		return nil, status, err

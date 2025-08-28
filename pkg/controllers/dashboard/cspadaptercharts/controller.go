@@ -32,7 +32,7 @@ type handler struct {
 	adapterUtil *cspadapter.ChartUtil
 }
 
-func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error) {
+func (h *handler) onSetting(_ context.Context, key string, setting *v3.Setting) (*v3.Setting, error) {
 	if setting == nil || setting.Name != settings.CSPAdapterMinVersion.Name {
 		// we only need to check for changes to the CSPAdapterMinVersion setting, ignore any others
 		return setting, nil

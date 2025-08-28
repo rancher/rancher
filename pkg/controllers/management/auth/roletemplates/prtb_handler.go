@@ -1,6 +1,7 @@
 package roletemplates
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -40,7 +41,7 @@ func newPRTBHandler(management *config.ManagementContext) *prtbHandler {
 //   - Create the specified user if it doesn't already exist.
 //   - Create the membership bindings to give access to the cluster.
 //   - Create a binding to the project management role if it exists.
-func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
+func (p *prtbHandler) OnChange(_ context.Context, _ string, prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
 	if prtb == nil || prtb.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -58,7 +59,7 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 }
 
 // OnRemove deletes Role Bindings that are owned by the PRTB. It also removes the membership binding if no other PRTBs give membership access.
-func (p *prtbHandler) OnRemove(_ string, prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
+func (p *prtbHandler) OnRemove(_ context.Context, _ string, prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
 	if prtb == nil {
 		return nil, nil
 	}
@@ -100,7 +101,7 @@ func (p *prtbHandler) reconcileSubject(binding *v3.ProjectRoleTemplateBinding) (
 	}
 
 	if binding.UserPrincipalName == "" {
-		u, err := p.userController.Get(binding.UserName, metav1.GetOptions{})
+		u, err := p.userController.Get(context.TODO(), binding.UserName, metav1.GetOptions{})
 		if err != nil {
 			return binding, err
 		}
@@ -117,7 +118,7 @@ func (p *prtbHandler) reconcileSubject(binding *v3.ProjectRoleTemplateBinding) (
 
 // reconcileMembershipBindings ensures that the user is given the right membership binding to the project and cluster.
 func (p *prtbHandler) reconcileMembershipBindings(prtb *v3.ProjectRoleTemplateBinding) error {
-	rt, err := p.rtController.Get(prtb.RoleTemplateName, metav1.GetOptions{})
+	rt, err := p.rtController.Get(context.TODO(), prtb.RoleTemplateName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}

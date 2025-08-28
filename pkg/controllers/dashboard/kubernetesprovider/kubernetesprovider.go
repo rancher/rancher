@@ -35,7 +35,7 @@ func Register(ctx context.Context,
 	clusters.OnChange(ctx, "kubernetes-provider", h.OnChange)
 }
 
-func (h *handler) OnChange(key string, cluster *v3.Cluster) (*v3.Cluster, error) {
+func (h *handler) OnChange(_ context.Context, key string, cluster *v3.Cluster) (*v3.Cluster, error) {
 	if cluster == nil || (cluster.Status.Provider != "" && cluster.Labels[ProviderKey] != "") {
 		// if cluster has windows enabled and provider is not rke.windows, continue to detect if it has windows nodes
 		if cluster == nil || !cluster.Spec.WindowsPreferedCluster || cluster.Status.Provider == "rke.windows" {
@@ -74,5 +74,5 @@ func (h *handler) OnChange(key string, cluster *v3.Cluster) (*v3.Cluster, error)
 	}
 	cluster.Labels[ProviderKey] = provider
 	cluster.Status.Provider = provider
-	return h.clusters.Update(cluster)
+	return h.clusters.Update(context.TODO(), cluster)
 }
