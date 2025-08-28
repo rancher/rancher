@@ -65,6 +65,8 @@ if [ -z "$ARCH" ]; then
     ARCH=amd64
 fi
 
+OS="${OS:-linux}"
+
 SUFFIX=""
 [ "${ARCH}" != "amd64" ] && SUFFIX="_${ARCH}"
 
