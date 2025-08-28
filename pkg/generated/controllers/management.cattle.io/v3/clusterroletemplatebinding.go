@@ -50,10 +50,10 @@ type ClusterRoleTemplateBindingCache interface {
 }
 
 // ClusterRoleTemplateBindingStatusHandler is executed for every added or modified ClusterRoleTemplateBinding. Should return the new status to be updated
-type ClusterRoleTemplateBindingStatusHandler func(obj *v3.ClusterRoleTemplateBinding, status v3.ClusterRoleTemplateBindingStatus) (v3.ClusterRoleTemplateBindingStatus, error)
+type ClusterRoleTemplateBindingStatusHandler func(ctx context.Context, obj *v3.ClusterRoleTemplateBinding, status v3.ClusterRoleTemplateBindingStatus) (v3.ClusterRoleTemplateBindingStatus, error)
 
 // ClusterRoleTemplateBindingGeneratingHandler is the top-level handler that is executed for every ClusterRoleTemplateBinding event. It extends ClusterRoleTemplateBindingStatusHandler by a returning a slice of child objects to be passed to apply.Apply
-type ClusterRoleTemplateBindingGeneratingHandler func(obj *v3.ClusterRoleTemplateBinding, status v3.ClusterRoleTemplateBindingStatus) ([]runtime.Object, v3.ClusterRoleTemplateBindingStatus, error)
+type ClusterRoleTemplateBindingGeneratingHandler func(ctx context.Context, obj *v3.ClusterRoleTemplateBinding, status v3.ClusterRoleTemplateBindingStatus) ([]runtime.Object, v3.ClusterRoleTemplateBindingStatus, error)
 
 // RegisterClusterRoleTemplateBindingStatusHandler configures a ClusterRoleTemplateBindingController to execute a ClusterRoleTemplateBindingStatusHandler for every events observed.
 // If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
@@ -63,7 +63,7 @@ func RegisterClusterRoleTemplateBindingStatusHandler(ctx context.Context, contro
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerContextToHandlerContext(statusHandler.sync))
 }
 
 // RegisterClusterRoleTemplateBindingGeneratingHandler configures a ClusterRoleTemplateBindingController to execute a ClusterRoleTemplateBindingGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
@@ -90,14 +90,14 @@ type clusterRoleTemplateBindingStatusHandler struct {
 }
 
 // sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
-func (a *clusterRoleTemplateBindingStatusHandler) sync(key string, obj *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+func (a *clusterRoleTemplateBindingStatusHandler) sync(ctx context.Context, key string, obj *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
 	if obj == nil {
 		return obj, nil
 	}
 
 	origStatus := obj.Status.DeepCopy()
 	obj = obj.DeepCopy()
-	newStatus, err := a.handler(obj, obj.Status)
+	newStatus, err := a.handler(ctx, obj, obj.Status)
 	if err != nil {
 		// Revert to old status on error
 		newStatus = *origStatus.DeepCopy()
@@ -118,7 +118,7 @@ func (a *clusterRoleTemplateBindingStatusHandler) sync(key string, obj *v3.Clust
 
 		var newErr error
 		obj.Status = newStatus
-		newObj, newErr := a.client.UpdateStatus(obj)
+		newObj, newErr := a.client.UpdateStatus(ctx, obj)
 		if err == nil {
 			err = newErr
 		}
@@ -139,7 +139,7 @@ type clusterRoleTemplateBindingGeneratingHandler struct {
 }
 
 // Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
-func (a *clusterRoleTemplateBindingGeneratingHandler) Remove(key string, obj *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+func (a *clusterRoleTemplateBindingGeneratingHandler) Remove(ctx context.Context, key string, obj *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
 	if obj != nil {
 		return obj, nil
 	}
@@ -159,12 +159,12 @@ func (a *clusterRoleTemplateBindingGeneratingHandler) Remove(key string, obj *v3
 }
 
 // Handle executes the configured ClusterRoleTemplateBindingGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
-func (a *clusterRoleTemplateBindingGeneratingHandler) Handle(obj *v3.ClusterRoleTemplateBinding, status v3.ClusterRoleTemplateBindingStatus) (v3.ClusterRoleTemplateBindingStatus, error) {
+func (a *clusterRoleTemplateBindingGeneratingHandler) Handle(ctx context.Context, obj *v3.ClusterRoleTemplateBinding, status v3.ClusterRoleTemplateBindingStatus) (v3.ClusterRoleTemplateBindingStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
 	}
 
-	objs, newStatus, err := a.ClusterRoleTemplateBindingGeneratingHandler(obj, status)
+	objs, newStatus, err := a.ClusterRoleTemplateBindingGeneratingHandler(ctx, obj, status)
 	if err != nil {
 		return newStatus, err
 	}

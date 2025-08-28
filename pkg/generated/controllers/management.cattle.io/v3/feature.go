@@ -50,10 +50,10 @@ type FeatureCache interface {
 }
 
 // FeatureStatusHandler is executed for every added or modified Feature. Should return the new status to be updated
-type FeatureStatusHandler func(obj *v3.Feature, status v3.FeatureStatus) (v3.FeatureStatus, error)
+type FeatureStatusHandler func(ctx context.Context, obj *v3.Feature, status v3.FeatureStatus) (v3.FeatureStatus, error)
 
 // FeatureGeneratingHandler is the top-level handler that is executed for every Feature event. It extends FeatureStatusHandler by a returning a slice of child objects to be passed to apply.Apply
-type FeatureGeneratingHandler func(obj *v3.Feature, status v3.FeatureStatus) ([]runtime.Object, v3.FeatureStatus, error)
+type FeatureGeneratingHandler func(ctx context.Context, obj *v3.Feature, status v3.FeatureStatus) ([]runtime.Object, v3.FeatureStatus, error)
 
 // RegisterFeatureStatusHandler configures a FeatureController to execute a FeatureStatusHandler for every events observed.
 // If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
@@ -63,7 +63,7 @@ func RegisterFeatureStatusHandler(ctx context.Context, controller FeatureControl
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerContextToHandlerContext(statusHandler.sync))
 }
 
 // RegisterFeatureGeneratingHandler configures a FeatureController to execute a FeatureGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
@@ -90,14 +90,14 @@ type featureStatusHandler struct {
 }
 
 // sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
-func (a *featureStatusHandler) sync(key string, obj *v3.Feature) (*v3.Feature, error) {
+func (a *featureStatusHandler) sync(ctx context.Context, key string, obj *v3.Feature) (*v3.Feature, error) {
 	if obj == nil {
 		return obj, nil
 	}
 
 	origStatus := obj.Status.DeepCopy()
 	obj = obj.DeepCopy()
-	newStatus, err := a.handler(obj, obj.Status)
+	newStatus, err := a.handler(ctx, obj, obj.Status)
 	if err != nil {
 		// Revert to old status on error
 		newStatus = *origStatus.DeepCopy()
@@ -118,7 +118,7 @@ func (a *featureStatusHandler) sync(key string, obj *v3.Feature) (*v3.Feature, e
 
 		var newErr error
 		obj.Status = newStatus
-		newObj, newErr := a.client.UpdateStatus(obj)
+		newObj, newErr := a.client.UpdateStatus(ctx, obj)
 		if err == nil {
 			err = newErr
 		}
@@ -139,7 +139,7 @@ type featureGeneratingHandler struct {
 }
 
 // Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
-func (a *featureGeneratingHandler) Remove(key string, obj *v3.Feature) (*v3.Feature, error) {
+func (a *featureGeneratingHandler) Remove(ctx context.Context, key string, obj *v3.Feature) (*v3.Feature, error) {
 	if obj != nil {
 		return obj, nil
 	}
@@ -159,12 +159,12 @@ func (a *featureGeneratingHandler) Remove(key string, obj *v3.Feature) (*v3.Feat
 }
 
 // Handle executes the configured FeatureGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
-func (a *featureGeneratingHandler) Handle(obj *v3.Feature, status v3.FeatureStatus) (v3.FeatureStatus, error) {
+func (a *featureGeneratingHandler) Handle(ctx context.Context, obj *v3.Feature, status v3.FeatureStatus) (v3.FeatureStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
 	}
 
-	objs, newStatus, err := a.FeatureGeneratingHandler(obj, status)
+	objs, newStatus, err := a.FeatureGeneratingHandler(ctx, obj, status)
 	if err != nil {
 		return newStatus, err
 	}

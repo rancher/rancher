@@ -50,10 +50,10 @@ type NodeTemplateCache interface {
 }
 
 // NodeTemplateStatusHandler is executed for every added or modified NodeTemplate. Should return the new status to be updated
-type NodeTemplateStatusHandler func(obj *v3.NodeTemplate, status v3.NodeTemplateStatus) (v3.NodeTemplateStatus, error)
+type NodeTemplateStatusHandler func(ctx context.Context, obj *v3.NodeTemplate, status v3.NodeTemplateStatus) (v3.NodeTemplateStatus, error)
 
 // NodeTemplateGeneratingHandler is the top-level handler that is executed for every NodeTemplate event. It extends NodeTemplateStatusHandler by a returning a slice of child objects to be passed to apply.Apply
-type NodeTemplateGeneratingHandler func(obj *v3.NodeTemplate, status v3.NodeTemplateStatus) ([]runtime.Object, v3.NodeTemplateStatus, error)
+type NodeTemplateGeneratingHandler func(ctx context.Context, obj *v3.NodeTemplate, status v3.NodeTemplateStatus) ([]runtime.Object, v3.NodeTemplateStatus, error)
 
 // RegisterNodeTemplateStatusHandler configures a NodeTemplateController to execute a NodeTemplateStatusHandler for every events observed.
 // If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
@@ -63,7 +63,7 @@ func RegisterNodeTemplateStatusHandler(ctx context.Context, controller NodeTempl
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerContextToHandlerContext(statusHandler.sync))
 }
 
 // RegisterNodeTemplateGeneratingHandler configures a NodeTemplateController to execute a NodeTemplateGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
@@ -90,14 +90,14 @@ type nodeTemplateStatusHandler struct {
 }
 
 // sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
-func (a *nodeTemplateStatusHandler) sync(key string, obj *v3.NodeTemplate) (*v3.NodeTemplate, error) {
+func (a *nodeTemplateStatusHandler) sync(ctx context.Context, key string, obj *v3.NodeTemplate) (*v3.NodeTemplate, error) {
 	if obj == nil {
 		return obj, nil
 	}
 
 	origStatus := obj.Status.DeepCopy()
 	obj = obj.DeepCopy()
-	newStatus, err := a.handler(obj, obj.Status)
+	newStatus, err := a.handler(ctx, obj, obj.Status)
 	if err != nil {
 		// Revert to old status on error
 		newStatus = *origStatus.DeepCopy()
@@ -118,7 +118,7 @@ func (a *nodeTemplateStatusHandler) sync(key string, obj *v3.NodeTemplate) (*v3.
 
 		var newErr error
 		obj.Status = newStatus
-		newObj, newErr := a.client.UpdateStatus(obj)
+		newObj, newErr := a.client.UpdateStatus(ctx, obj)
 		if err == nil {
 			err = newErr
 		}
@@ -139,7 +139,7 @@ type nodeTemplateGeneratingHandler struct {
 }
 
 // Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
-func (a *nodeTemplateGeneratingHandler) Remove(key string, obj *v3.NodeTemplate) (*v3.NodeTemplate, error) {
+func (a *nodeTemplateGeneratingHandler) Remove(ctx context.Context, key string, obj *v3.NodeTemplate) (*v3.NodeTemplate, error) {
 	if obj != nil {
 		return obj, nil
 	}
@@ -159,12 +159,12 @@ func (a *nodeTemplateGeneratingHandler) Remove(key string, obj *v3.NodeTemplate)
 }
 
 // Handle executes the configured NodeTemplateGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
-func (a *nodeTemplateGeneratingHandler) Handle(obj *v3.NodeTemplate, status v3.NodeTemplateStatus) (v3.NodeTemplateStatus, error) {
+func (a *nodeTemplateGeneratingHandler) Handle(ctx context.Context, obj *v3.NodeTemplate, status v3.NodeTemplateStatus) (v3.NodeTemplateStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
 	}
 
-	objs, newStatus, err := a.NodeTemplateGeneratingHandler(obj, status)
+	objs, newStatus, err := a.NodeTemplateGeneratingHandler(ctx, obj, status)
 	if err != nil {
 		return newStatus, err
 	}

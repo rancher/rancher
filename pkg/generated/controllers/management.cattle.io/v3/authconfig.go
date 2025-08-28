@@ -50,10 +50,10 @@ type AuthConfigCache interface {
 }
 
 // AuthConfigStatusHandler is executed for every added or modified AuthConfig. Should return the new status to be updated
-type AuthConfigStatusHandler func(obj *v3.AuthConfig, status v3.AuthConfigStatus) (v3.AuthConfigStatus, error)
+type AuthConfigStatusHandler func(ctx context.Context, obj *v3.AuthConfig, status v3.AuthConfigStatus) (v3.AuthConfigStatus, error)
 
 // AuthConfigGeneratingHandler is the top-level handler that is executed for every AuthConfig event. It extends AuthConfigStatusHandler by a returning a slice of child objects to be passed to apply.Apply
-type AuthConfigGeneratingHandler func(obj *v3.AuthConfig, status v3.AuthConfigStatus) ([]runtime.Object, v3.AuthConfigStatus, error)
+type AuthConfigGeneratingHandler func(ctx context.Context, obj *v3.AuthConfig, status v3.AuthConfigStatus) ([]runtime.Object, v3.AuthConfigStatus, error)
 
 // RegisterAuthConfigStatusHandler configures a AuthConfigController to execute a AuthConfigStatusHandler for every events observed.
 // If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
@@ -63,7 +63,7 @@ func RegisterAuthConfigStatusHandler(ctx context.Context, controller AuthConfigC
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerContextToHandlerContext(statusHandler.sync))
 }
 
 // RegisterAuthConfigGeneratingHandler configures a AuthConfigController to execute a AuthConfigGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
@@ -90,14 +90,14 @@ type authConfigStatusHandler struct {
 }
 
 // sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
-func (a *authConfigStatusHandler) sync(key string, obj *v3.AuthConfig) (*v3.AuthConfig, error) {
+func (a *authConfigStatusHandler) sync(ctx context.Context, key string, obj *v3.AuthConfig) (*v3.AuthConfig, error) {
 	if obj == nil {
 		return obj, nil
 	}
 
 	origStatus := obj.Status.DeepCopy()
 	obj = obj.DeepCopy()
-	newStatus, err := a.handler(obj, obj.Status)
+	newStatus, err := a.handler(ctx, obj, obj.Status)
 	if err != nil {
 		// Revert to old status on error
 		newStatus = *origStatus.DeepCopy()
@@ -118,7 +118,7 @@ func (a *authConfigStatusHandler) sync(key string, obj *v3.AuthConfig) (*v3.Auth
 
 		var newErr error
 		obj.Status = newStatus
-		newObj, newErr := a.client.UpdateStatus(obj)
+		newObj, newErr := a.client.UpdateStatus(ctx, obj)
 		if err == nil {
 			err = newErr
 		}
@@ -139,7 +139,7 @@ type authConfigGeneratingHandler struct {
 }
 
 // Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
-func (a *authConfigGeneratingHandler) Remove(key string, obj *v3.AuthConfig) (*v3.AuthConfig, error) {
+func (a *authConfigGeneratingHandler) Remove(ctx context.Context, key string, obj *v3.AuthConfig) (*v3.AuthConfig, error) {
 	if obj != nil {
 		return obj, nil
 	}
@@ -159,12 +159,12 @@ func (a *authConfigGeneratingHandler) Remove(key string, obj *v3.AuthConfig) (*v
 }
 
 // Handle executes the configured AuthConfigGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
-func (a *authConfigGeneratingHandler) Handle(obj *v3.AuthConfig, status v3.AuthConfigStatus) (v3.AuthConfigStatus, error) {
+func (a *authConfigGeneratingHandler) Handle(ctx context.Context, obj *v3.AuthConfig, status v3.AuthConfigStatus) (v3.AuthConfigStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
 	}
 
-	objs, newStatus, err := a.AuthConfigGeneratingHandler(obj, status)
+	objs, newStatus, err := a.AuthConfigGeneratingHandler(ctx, obj, status)
 	if err != nil {
 		return newStatus, err
 	}

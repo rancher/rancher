@@ -50,10 +50,10 @@ type OIDCClientCache interface {
 }
 
 // OIDCClientStatusHandler is executed for every added or modified OIDCClient. Should return the new status to be updated
-type OIDCClientStatusHandler func(obj *v3.OIDCClient, status v3.OIDCClientStatus) (v3.OIDCClientStatus, error)
+type OIDCClientStatusHandler func(ctx context.Context, obj *v3.OIDCClient, status v3.OIDCClientStatus) (v3.OIDCClientStatus, error)
 
 // OIDCClientGeneratingHandler is the top-level handler that is executed for every OIDCClient event. It extends OIDCClientStatusHandler by a returning a slice of child objects to be passed to apply.Apply
-type OIDCClientGeneratingHandler func(obj *v3.OIDCClient, status v3.OIDCClientStatus) ([]runtime.Object, v3.OIDCClientStatus, error)
+type OIDCClientGeneratingHandler func(ctx context.Context, obj *v3.OIDCClient, status v3.OIDCClientStatus) ([]runtime.Object, v3.OIDCClientStatus, error)
 
 // RegisterOIDCClientStatusHandler configures a OIDCClientController to execute a OIDCClientStatusHandler for every events observed.
 // If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
@@ -63,7 +63,7 @@ func RegisterOIDCClientStatusHandler(ctx context.Context, controller OIDCClientC
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerContextToHandlerContext(statusHandler.sync))
 }
 
 // RegisterOIDCClientGeneratingHandler configures a OIDCClientController to execute a OIDCClientGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
@@ -90,14 +90,14 @@ type oIDCClientStatusHandler struct {
 }
 
 // sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
-func (a *oIDCClientStatusHandler) sync(key string, obj *v3.OIDCClient) (*v3.OIDCClient, error) {
+func (a *oIDCClientStatusHandler) sync(ctx context.Context, key string, obj *v3.OIDCClient) (*v3.OIDCClient, error) {
 	if obj == nil {
 		return obj, nil
 	}
 
 	origStatus := obj.Status.DeepCopy()
 	obj = obj.DeepCopy()
-	newStatus, err := a.handler(obj, obj.Status)
+	newStatus, err := a.handler(ctx, obj, obj.Status)
 	if err != nil {
 		// Revert to old status on error
 		newStatus = *origStatus.DeepCopy()
@@ -118,7 +118,7 @@ func (a *oIDCClientStatusHandler) sync(key string, obj *v3.OIDCClient) (*v3.OIDC
 
 		var newErr error
 		obj.Status = newStatus
-		newObj, newErr := a.client.UpdateStatus(obj)
+		newObj, newErr := a.client.UpdateStatus(ctx, obj)
 		if err == nil {
 			err = newErr
 		}
@@ -139,7 +139,7 @@ type oIDCClientGeneratingHandler struct {
 }
 
 // Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
-func (a *oIDCClientGeneratingHandler) Remove(key string, obj *v3.OIDCClient) (*v3.OIDCClient, error) {
+func (a *oIDCClientGeneratingHandler) Remove(ctx context.Context, key string, obj *v3.OIDCClient) (*v3.OIDCClient, error) {
 	if obj != nil {
 		return obj, nil
 	}
@@ -159,12 +159,12 @@ func (a *oIDCClientGeneratingHandler) Remove(key string, obj *v3.OIDCClient) (*v
 }
 
 // Handle executes the configured OIDCClientGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
-func (a *oIDCClientGeneratingHandler) Handle(obj *v3.OIDCClient, status v3.OIDCClientStatus) (v3.OIDCClientStatus, error) {
+func (a *oIDCClientGeneratingHandler) Handle(ctx context.Context, obj *v3.OIDCClient, status v3.OIDCClientStatus) (v3.OIDCClientStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
 	}
 
-	objs, newStatus, err := a.OIDCClientGeneratingHandler(obj, status)
+	objs, newStatus, err := a.OIDCClientGeneratingHandler(ctx, obj, status)
 	if err != nil {
 		return newStatus, err
 	}

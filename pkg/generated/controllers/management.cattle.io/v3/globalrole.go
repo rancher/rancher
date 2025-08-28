@@ -50,10 +50,10 @@ type GlobalRoleCache interface {
 }
 
 // GlobalRoleStatusHandler is executed for every added or modified GlobalRole. Should return the new status to be updated
-type GlobalRoleStatusHandler func(obj *v3.GlobalRole, status v3.GlobalRoleStatus) (v3.GlobalRoleStatus, error)
+type GlobalRoleStatusHandler func(ctx context.Context, obj *v3.GlobalRole, status v3.GlobalRoleStatus) (v3.GlobalRoleStatus, error)
 
 // GlobalRoleGeneratingHandler is the top-level handler that is executed for every GlobalRole event. It extends GlobalRoleStatusHandler by a returning a slice of child objects to be passed to apply.Apply
-type GlobalRoleGeneratingHandler func(obj *v3.GlobalRole, status v3.GlobalRoleStatus) ([]runtime.Object, v3.GlobalRoleStatus, error)
+type GlobalRoleGeneratingHandler func(ctx context.Context, obj *v3.GlobalRole, status v3.GlobalRoleStatus) ([]runtime.Object, v3.GlobalRoleStatus, error)
 
 // RegisterGlobalRoleStatusHandler configures a GlobalRoleController to execute a GlobalRoleStatusHandler for every events observed.
 // If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
@@ -63,7 +63,7 @@ func RegisterGlobalRoleStatusHandler(ctx context.Context, controller GlobalRoleC
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerContextToHandlerContext(statusHandler.sync))
 }
 
 // RegisterGlobalRoleGeneratingHandler configures a GlobalRoleController to execute a GlobalRoleGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
@@ -90,14 +90,14 @@ type globalRoleStatusHandler struct {
 }
 
 // sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
-func (a *globalRoleStatusHandler) sync(key string, obj *v3.GlobalRole) (*v3.GlobalRole, error) {
+func (a *globalRoleStatusHandler) sync(ctx context.Context, key string, obj *v3.GlobalRole) (*v3.GlobalRole, error) {
 	if obj == nil {
 		return obj, nil
 	}
 
 	origStatus := obj.Status.DeepCopy()
 	obj = obj.DeepCopy()
-	newStatus, err := a.handler(obj, obj.Status)
+	newStatus, err := a.handler(ctx, obj, obj.Status)
 	if err != nil {
 		// Revert to old status on error
 		newStatus = *origStatus.DeepCopy()
@@ -118,7 +118,7 @@ func (a *globalRoleStatusHandler) sync(key string, obj *v3.GlobalRole) (*v3.Glob
 
 		var newErr error
 		obj.Status = newStatus
-		newObj, newErr := a.client.UpdateStatus(obj)
+		newObj, newErr := a.client.UpdateStatus(ctx, obj)
 		if err == nil {
 			err = newErr
 		}
@@ -139,7 +139,7 @@ type globalRoleGeneratingHandler struct {
 }
 
 // Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
-func (a *globalRoleGeneratingHandler) Remove(key string, obj *v3.GlobalRole) (*v3.GlobalRole, error) {
+func (a *globalRoleGeneratingHandler) Remove(ctx context.Context, key string, obj *v3.GlobalRole) (*v3.GlobalRole, error) {
 	if obj != nil {
 		return obj, nil
 	}
@@ -159,12 +159,12 @@ func (a *globalRoleGeneratingHandler) Remove(key string, obj *v3.GlobalRole) (*v
 }
 
 // Handle executes the configured GlobalRoleGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
-func (a *globalRoleGeneratingHandler) Handle(obj *v3.GlobalRole, status v3.GlobalRoleStatus) (v3.GlobalRoleStatus, error) {
+func (a *globalRoleGeneratingHandler) Handle(ctx context.Context, obj *v3.GlobalRole, status v3.GlobalRoleStatus) (v3.GlobalRoleStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
 	}
 
-	objs, newStatus, err := a.GlobalRoleGeneratingHandler(obj, status)
+	objs, newStatus, err := a.GlobalRoleGeneratingHandler(ctx, obj, status)
 	if err != nil {
 		return newStatus, err
 	}

@@ -50,10 +50,10 @@ type ProjectCache interface {
 }
 
 // ProjectStatusHandler is executed for every added or modified Project. Should return the new status to be updated
-type ProjectStatusHandler func(obj *v3.Project, status v3.ProjectStatus) (v3.ProjectStatus, error)
+type ProjectStatusHandler func(ctx context.Context, obj *v3.Project, status v3.ProjectStatus) (v3.ProjectStatus, error)
 
 // ProjectGeneratingHandler is the top-level handler that is executed for every Project event. It extends ProjectStatusHandler by a returning a slice of child objects to be passed to apply.Apply
-type ProjectGeneratingHandler func(obj *v3.Project, status v3.ProjectStatus) ([]runtime.Object, v3.ProjectStatus, error)
+type ProjectGeneratingHandler func(ctx context.Context, obj *v3.Project, status v3.ProjectStatus) ([]runtime.Object, v3.ProjectStatus, error)
 
 // RegisterProjectStatusHandler configures a ProjectController to execute a ProjectStatusHandler for every events observed.
 // If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
@@ -63,7 +63,7 @@ func RegisterProjectStatusHandler(ctx context.Context, controller ProjectControl
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerContextToHandlerContext(statusHandler.sync))
 }
 
 // RegisterProjectGeneratingHandler configures a ProjectController to execute a ProjectGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
@@ -90,14 +90,14 @@ type projectStatusHandler struct {
 }
 
 // sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
-func (a *projectStatusHandler) sync(key string, obj *v3.Project) (*v3.Project, error) {
+func (a *projectStatusHandler) sync(ctx context.Context, key string, obj *v3.Project) (*v3.Project, error) {
 	if obj == nil {
 		return obj, nil
 	}
 
 	origStatus := obj.Status.DeepCopy()
 	obj = obj.DeepCopy()
-	newStatus, err := a.handler(obj, obj.Status)
+	newStatus, err := a.handler(ctx, obj, obj.Status)
 	if err != nil {
 		// Revert to old status on error
 		newStatus = *origStatus.DeepCopy()
@@ -118,7 +118,7 @@ func (a *projectStatusHandler) sync(key string, obj *v3.Project) (*v3.Project, e
 
 		var newErr error
 		obj.Status = newStatus
-		newObj, newErr := a.client.UpdateStatus(obj)
+		newObj, newErr := a.client.UpdateStatus(ctx, obj)
 		if err == nil {
 			err = newErr
 		}
@@ -139,7 +139,7 @@ type projectGeneratingHandler struct {
 }
 
 // Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
-func (a *projectGeneratingHandler) Remove(key string, obj *v3.Project) (*v3.Project, error) {
+func (a *projectGeneratingHandler) Remove(ctx context.Context, key string, obj *v3.Project) (*v3.Project, error) {
 	if obj != nil {
 		return obj, nil
 	}
@@ -159,12 +159,12 @@ func (a *projectGeneratingHandler) Remove(key string, obj *v3.Project) (*v3.Proj
 }
 
 // Handle executes the configured ProjectGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
-func (a *projectGeneratingHandler) Handle(obj *v3.Project, status v3.ProjectStatus) (v3.ProjectStatus, error) {
+func (a *projectGeneratingHandler) Handle(ctx context.Context, obj *v3.Project, status v3.ProjectStatus) (v3.ProjectStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
 	}
 
-	objs, newStatus, err := a.ProjectGeneratingHandler(obj, status)
+	objs, newStatus, err := a.ProjectGeneratingHandler(ctx, obj, status)
 	if err != nil {
 		return newStatus, err
 	}

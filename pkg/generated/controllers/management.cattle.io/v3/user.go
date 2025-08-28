@@ -50,10 +50,10 @@ type UserCache interface {
 }
 
 // UserStatusHandler is executed for every added or modified User. Should return the new status to be updated
-type UserStatusHandler func(obj *v3.User, status v3.UserStatus) (v3.UserStatus, error)
+type UserStatusHandler func(ctx context.Context, obj *v3.User, status v3.UserStatus) (v3.UserStatus, error)
 
 // UserGeneratingHandler is the top-level handler that is executed for every User event. It extends UserStatusHandler by a returning a slice of child objects to be passed to apply.Apply
-type UserGeneratingHandler func(obj *v3.User, status v3.UserStatus) ([]runtime.Object, v3.UserStatus, error)
+type UserGeneratingHandler func(ctx context.Context, obj *v3.User, status v3.UserStatus) ([]runtime.Object, v3.UserStatus, error)
 
 // RegisterUserStatusHandler configures a UserController to execute a UserStatusHandler for every events observed.
 // If a non-empty condition is provided, it will be updated in the status conditions for every handler execution
@@ -63,7 +63,7 @@ func RegisterUserStatusHandler(ctx context.Context, controller UserController, c
 		condition: condition,
 		handler:   handler,
 	}
-	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerToHandler(statusHandler.sync))
+	controller.AddGenericHandler(ctx, name, generic.FromObjectHandlerContextToHandlerContext(statusHandler.sync))
 }
 
 // RegisterUserGeneratingHandler configures a UserController to execute a UserGeneratingHandler for every events observed, passing the returned objects to the provided apply.Apply.
@@ -90,14 +90,14 @@ type userStatusHandler struct {
 }
 
 // sync is executed on every resource addition or modification. Executes the configured handlers and sends the updated status to the Kubernetes API
-func (a *userStatusHandler) sync(key string, obj *v3.User) (*v3.User, error) {
+func (a *userStatusHandler) sync(ctx context.Context, key string, obj *v3.User) (*v3.User, error) {
 	if obj == nil {
 		return obj, nil
 	}
 
 	origStatus := obj.Status.DeepCopy()
 	obj = obj.DeepCopy()
-	newStatus, err := a.handler(obj, obj.Status)
+	newStatus, err := a.handler(ctx, obj, obj.Status)
 	if err != nil {
 		// Revert to old status on error
 		newStatus = *origStatus.DeepCopy()
@@ -118,7 +118,7 @@ func (a *userStatusHandler) sync(key string, obj *v3.User) (*v3.User, error) {
 
 		var newErr error
 		obj.Status = newStatus
-		newObj, newErr := a.client.UpdateStatus(obj)
+		newObj, newErr := a.client.UpdateStatus(ctx, obj)
 		if err == nil {
 			err = newErr
 		}
@@ -139,7 +139,7 @@ type userGeneratingHandler struct {
 }
 
 // Remove handles the observed deletion of a resource, cascade deleting every associated resource previously applied
-func (a *userGeneratingHandler) Remove(key string, obj *v3.User) (*v3.User, error) {
+func (a *userGeneratingHandler) Remove(ctx context.Context, key string, obj *v3.User) (*v3.User, error) {
 	if obj != nil {
 		return obj, nil
 	}
@@ -159,12 +159,12 @@ func (a *userGeneratingHandler) Remove(key string, obj *v3.User) (*v3.User, erro
 }
 
 // Handle executes the configured UserGeneratingHandler and pass the resulting objects to apply.Apply, finally returning the new status of the resource
-func (a *userGeneratingHandler) Handle(obj *v3.User, status v3.UserStatus) (v3.UserStatus, error) {
+func (a *userGeneratingHandler) Handle(ctx context.Context, obj *v3.User, status v3.UserStatus) (v3.UserStatus, error) {
 	if !obj.DeletionTimestamp.IsZero() {
 		return status, nil
 	}
 
-	objs, newStatus, err := a.UserGeneratingHandler(obj, status)
+	objs, newStatus, err := a.UserGeneratingHandler(ctx, obj, status)
 	if err != nil {
 		return newStatus, err
 	}
