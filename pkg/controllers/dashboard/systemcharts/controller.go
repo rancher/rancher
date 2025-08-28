@@ -80,9 +80,9 @@ func Register(ctx context.Context, wContext *wrangler.Context, registryOverride 
 	}
 
 	wContext.Catalog.ClusterRepo().OnChange(ctx, "bootstrap-charts", h.onRepo)
-	relatedresource.WatchClusterScoped(ctx, "bootstrap-charts", relatedFeatures, wContext.Catalog.ClusterRepo(), wContext.Mgmt.Feature())
+	relatedresource.WatchClusterScopedContext(ctx, "bootstrap-charts", relatedFeatures, wContext.Catalog.ClusterRepo(), wContext.Mgmt.Feature())
 
-	relatedresource.WatchClusterScoped(ctx, "bootstrap-settings-charts", relatedSettings, wContext.Catalog.ClusterRepo(), wContext.Mgmt.Setting())
+	relatedresource.WatchClusterScopedContext(ctx, "bootstrap-settings-charts", relatedSettings, wContext.Catalog.ClusterRepo(), wContext.Mgmt.Setting())
 
 	// ensure the system charts are installed with the correct values when there are changes to the rancher config map
 	relatedresource.WatchClusterScoped(ctx, "bootstrap-configmap-charts", relatedConfigMaps, wContext.Catalog.ClusterRepo(), wContext.Core.ConfigMap())
@@ -502,7 +502,7 @@ func (h *handler) onPlan(_ string, plan *upgradev1.Plan) (*upgradev1.Plan, error
 // OnCluster enqueues the rancher-charts ClusterRepo to the controller's processing queue when the local cluster is updated.
 // It ensures the timely installation or uninstallation of the system-upgrade-controller app in the local cluster
 // when the "rancher.io/imported-cluster-version-management" annotation is changed.
-func (h *handler) onCluster(_ string, obj *v3.Cluster) (*v3.Cluster, error) {
+func (h *handler) onCluster(_ context.Context, _ string, obj *v3.Cluster) (*v3.Cluster, error) {
 	if !features.MCM.Enabled() {
 		return obj, nil
 	}

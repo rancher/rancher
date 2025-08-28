@@ -21,7 +21,7 @@ func Register(ctx context.Context, wrangler *wrangler.Context) {
 	})
 }
 
-func onChange(_ string, obj *v3.NodeDriver) (*v3.NodeDriver, error) {
+func onChange(_ context.Context, _ string, obj *v3.NodeDriver) (*v3.NodeDriver, error) {
 	if obj == nil {
 		return obj, nil
 	}

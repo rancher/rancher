@@ -1,6 +1,7 @@
 package authprovisioningv2
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -139,7 +140,7 @@ func (h *handler) OnCRD(key string, crd *apiextv1.CustomResourceDefinition) (*ap
 	return crd, nil
 }
 
-func (h *handler) OnClusterObjectChanged(obj runtime.Object) (runtime.Object, error) {
+func (h *handler) OnClusterObjectChanged(_ context.Context, obj runtime.Object) (runtime.Object, error) {
 	clusterNames, err := getObjectClusterNames(obj)
 	if err != nil {
 		return nil, err
@@ -154,7 +155,7 @@ func (h *handler) OnClusterObjectChanged(obj runtime.Object) (runtime.Object, er
 	return obj, nil
 }
 
-func (h *handler) OnChange(key string, rt *v3.RoleTemplate) (*v3.RoleTemplate, error) {
+func (h *handler) OnChange(_ context.Context, key string, rt *v3.RoleTemplate) (*v3.RoleTemplate, error) {
 	if rt != nil {
 		if rt.DeletionTimestamp != nil {
 			return rt, nil

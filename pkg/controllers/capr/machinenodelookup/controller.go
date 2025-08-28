@@ -148,7 +148,7 @@ func (h *handler) associateMachineWithNode(_ string, bootstrap *rkev1.RKEBootstr
 		}
 
 		obj.SetNested(node.Spec.ProviderID, "spec", "providerID")
-		_, err = h.dynamic.Update(&unstructured.Unstructured{
+		_, err = h.dynamic.Update(context.TODO(), &unstructured.Unstructured{
 			Object: obj,
 		})
 		return bootstrap, err

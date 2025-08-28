@@ -1,6 +1,7 @@
 package roletemplates
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -49,7 +50,7 @@ func newCRTBHandler(management *config.ManagementContext) *crtbHandler {
 //   - Create the specified user if it doesn't already exist.
 //   - Create the membership bindings to give access to the cluster.
 //   - Create a binding to the project and cluster management role if it exists.
-func (c *crtbHandler) OnChange(_ string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+func (c *crtbHandler) OnChange(_ context.Context, _ string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
 	if crtb == nil || crtb.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -94,7 +95,7 @@ func (c *crtbHandler) reconcileSubject(binding *v3.ClusterRoleTemplateBinding, l
 	}
 
 	if binding.UserPrincipalName == "" {
-		u, err := c.userController.Get(binding.UserName, metav1.GetOptions{})
+		u, err := c.userController.Get(context.TODO(), binding.UserName, metav1.GetOptions{})
 		if err != nil {
 			c.s.AddCondition(localConditions, condition, failedToGetUser, err)
 			return binding, err
@@ -115,7 +116,7 @@ func (c *crtbHandler) reconcileSubject(binding *v3.ClusterRoleTemplateBinding, l
 // reconcileMemberShipBindings ensures that any needed membership bindings for the cluster exist
 func (c *crtbHandler) reconcileMembershipBindings(crtb *v3.ClusterRoleTemplateBinding, localCondition *[]metav1.Condition) error {
 	condition := metav1.Condition{Type: reconcileMembershipBindings}
-	rt, err := c.rtController.Get(crtb.RoleTemplateName, metav1.GetOptions{})
+	rt, err := c.rtController.Get(context.TODO(), crtb.RoleTemplateName, metav1.GetOptions{})
 	if err != nil {
 		c.s.AddCondition(localCondition, condition, failedToGetRoleTemplate, err)
 		return err
@@ -207,7 +208,7 @@ func (c *crtbHandler) getDesiredClusterRoleBindings(crtb *v3.ClusterRoleTemplate
 }
 
 // OnRemove deletes Cluster Role Bindings that are owned by the CRTB and the membership binding if no other CRTBs give membership access.
-func (c *crtbHandler) OnRemove(_ string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+func (c *crtbHandler) OnRemove(_ context.Context, _ string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
 	if crtb == nil {
 		return nil, nil
 	}
@@ -274,7 +275,7 @@ func (c *crtbHandler) updateStatus(crtb *v3.ClusterRoleTemplateBinding, localCon
 		crtbFromCluster.Status.LastUpdateTime = timeNow().Format(time.RFC3339)
 		crtbFromCluster.Status.ObservedGenerationLocal = crtb.ObjectMeta.Generation
 		crtbFromCluster.Status.LocalConditions = localConditions
-		_, err = c.crtbClient.UpdateStatus(crtbFromCluster)
+		_, err = c.crtbClient.UpdateStatus(context.TODO(), crtbFromCluster)
 		if err != nil {
 			return err
 		}

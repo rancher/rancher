@@ -1,6 +1,7 @@
 package clusterauthtoken
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -62,7 +63,7 @@ func (h *clusterAuthTokenHandler) sync(key string, clusterAuthToken *clusterv3.C
 			return err
 		}
 
-		_, err = h.tokenClient.Patch(token.Name, types.JSONPatchType, patch)
+		_, err = h.tokenClient.Patch(context.TODO(), token.Name, types.JSONPatchType, patch)
 		return err
 	}(); err != nil {
 		return nil, fmt.Errorf("error updating lastUsedAt for token %s: %v", tokenName, err)

@@ -1,6 +1,7 @@
 package project_cluster
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -99,7 +100,7 @@ func (l *projectLifecycle) Sync(key string, orig *apisv3.Project) (runtime.Objec
 	if obj != nil && !reflect.DeepEqual(orig, obj) {
 		logrus.Infof("[%s] Updating project %s", ProjectCreateController, orig.Name)
 		project := obj.(*apisv3.Project)
-		obj, err = l.projects.Update(project)
+		obj, err = l.projects.Update(context.TODO(), project)
 		if err != nil {
 			return nil, err
 		}
@@ -212,7 +213,7 @@ func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object, nsName
 			}
 
 			logrus.Infof("[%s] Creating creator projectRoleTemplateBinding for user %s for project %s", ProjectCreateController, creatorID, project.Name)
-			_, err := l.prtbClient.Create(prtb)
+			_, err := l.prtbClient.Create(context.TODO(), prtb)
 			if err != nil && !apierrors.IsAlreadyExists(err) {
 				return project, err
 			}
@@ -235,7 +236,7 @@ func (l *projectLifecycle) reconcileProjectCreatorRTB(obj runtime.Object, nsName
 			logrus.Infof("[%s] Setting InitialRolesPopulated condition on project %s", ProjectCreateController, project.Name)
 		}
 
-		_, err = l.projects.Update(project)
+		_, err = l.projects.Update(context.TODO(), project)
 
 		return project, err
 	})

@@ -1,6 +1,7 @@
 package project_cluster
 
 import (
+	"context"
 	"errors"
 	"reflect"
 	"strings"
@@ -106,7 +107,7 @@ func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Objec
 	if obj != nil && !reflect.DeepEqual(orig, obj) {
 		logrus.Infof("[%s] Updating cluster %s", ClusterCreateController, orig.Name)
 		cluster := obj.(*apisv3.Cluster)
-		_, err = l.clusterClient.Update(cluster)
+		_, err = l.clusterClient.Update(context.TODO(), cluster)
 		if err != nil {
 			return nil, err
 		}
@@ -127,7 +128,7 @@ func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Objec
 	if obj != nil && !reflect.DeepEqual(orig, obj) {
 		logrus.Infof("[%s] Updating cluster %s", ClusterCreateController, orig.Name)
 		cluster := obj.(*apisv3.Cluster)
-		_, err = l.clusterClient.Update(cluster)
+		_, err = l.clusterClient.Update(context.TODO(), cluster)
 		if err != nil {
 			return nil, err
 		}
@@ -184,7 +185,7 @@ func (l *clusterLifecycle) createProject(name string, cond condition.Cond, obj r
 		}
 
 		// Cache failed, try the API
-		projects2, err := l.projects.List(clusterName, metav1.ListOptions{LabelSelector: labels.String()})
+		projects2, err := l.projects.List(context.TODO(), clusterName, metav1.ListOptions{LabelSelector: labels.String()})
 		if err != nil || len(projects2.Items) > 0 {
 			return obj, err
 		}
@@ -226,7 +227,7 @@ func (l *clusterLifecycle) createProject(name string, cond condition.Cond, obj r
 		project = updated.(*apisv3.Project)
 
 		logrus.Infof("[%s] Creating %s project for cluster %s", ClusterCreateController, name, clusterName)
-		_, err = l.projects.Create(project)
+		_, err = l.projects.Create(context.TODO(), project)
 
 		return obj, err
 	})
@@ -247,7 +248,7 @@ func (l *clusterLifecycle) deleteSystemProject(cluster *apisv3.Cluster, controll
 	var deleteError error
 	for _, p := range projects {
 		logrus.Infof("[%s] Deleting project %s", controller, p.Name)
-		err = bypassClient.Delete(p.Namespace, p.Name, nil)
+		err = bypassClient.Delete(context.TODO(), p.Namespace, p.Name, nil)
 		if err != nil {
 			deleteError = errors.Join(deleteError, fmt.Errorf("[%s] failed to delete project '%s/%s': %w", controller, p.Namespace, p.Name, err))
 		}
@@ -369,7 +370,7 @@ func (l *clusterLifecycle) reconcileClusterCreatorRTB(obj runtime.Object) (runti
 			}
 
 			logrus.Infof("[%s] Creating creator clusterRoleTemplateBinding for user %s for cluster %s", ClusterCreateController, creatorID, cluster.Name)
-			_, err := l.crtbClient.Create(crtb)
+			_, err := l.crtbClient.Create(context.TODO(), crtb)
 			if err != nil && !apierrors.IsAlreadyExists(err) {
 				return obj, err
 			}
@@ -393,7 +394,7 @@ func (l *clusterLifecycle) reconcileClusterCreatorRTB(obj runtime.Object) (runti
 
 func (l *clusterLifecycle) updateClusterAnnotationandCondition(cluster *apisv3.Cluster, annotation string, updateCondition bool) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		c, err := l.clusterClient.Get(cluster.Name, metav1.GetOptions{})
+		c, err := l.clusterClient.Get(context.TODO(), cluster.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -404,7 +405,7 @@ func (l *clusterLifecycle) updateClusterAnnotationandCondition(cluster *apisv3.C
 			apisv3.ClusterConditionInitialRolesPopulated.True(c)
 		}
 
-		_, err = l.clusterClient.Update(c)
+		_, err = l.clusterClient.Update(context.TODO(), c)
 		if err != nil {
 			return err
 		}

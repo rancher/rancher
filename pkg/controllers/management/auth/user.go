@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -381,7 +382,7 @@ func (l *userLifecycle) deleteAllCRTB(crtbs []*v3.ClusterRoleTemplateBinding) er
 	for _, crtb := range crtbs {
 		var err error
 		logrus.Infof("[%v] Deleting clusterRoleTemplateBinding %v for user %v", userController, crtb.Name, crtb.UserName)
-		err = l.crtb.Delete(crtb.Namespace, crtb.Name, &metav1.DeleteOptions{})
+		err = l.crtb.Delete(context.TODO(), crtb.Namespace, crtb.Name, &metav1.DeleteOptions{})
 		if err != nil {
 			return fmt.Errorf("error deleting cluster role: %v", err)
 		}
@@ -394,7 +395,7 @@ func (l *userLifecycle) deleteAllPRTB(prtbs []*v3.ProjectRoleTemplateBinding) er
 	for _, prtb := range prtbs {
 		var err error
 		logrus.Infof("[%v] Deleting projectRoleTemplateBinding %v for user %v", userController, prtb.Name, prtb.UserName)
-		err = l.prtb.Delete(prtb.Namespace, prtb.Name, &metav1.DeleteOptions{})
+		err = l.prtb.Delete(context.TODO(), prtb.Namespace, prtb.Name, &metav1.DeleteOptions{})
 		if err != nil {
 			return fmt.Errorf("error deleting projet role: %v", err)
 		}
@@ -412,7 +413,7 @@ func (l *userLifecycle) deleteAllGRB(grbs []*v3.GlobalRoleBinding) error {
 	}
 	for _, grb := range grbs {
 		logrus.Infof("[%v] Deleting globalRoleBinding %v for user %v", userController, grb.Name, grb.UserName)
-		err = grbClient.Delete(grb.Name, &metav1.DeleteOptions{})
+		err = grbClient.Delete(context.TODO(), grb.Name, &metav1.DeleteOptions{})
 		if err != nil {
 			return fmt.Errorf("error deleting globalRoleBinding %v: %v", grb.Name, err)
 
@@ -455,7 +456,7 @@ func (l *userLifecycle) deleteClusterUserAttributes(username string, tokens []*v
 func (l *userLifecycle) deleteAllTokens(tokens []*v3.Token) error {
 	for _, token := range tokens {
 		logrus.Infof("[%v] Deleting token %v for user %v", userController, token.Name, token.UserID)
-		err := l.tokens.Delete(token.Name, &metav1.DeleteOptions{})
+		err := l.tokens.Delete(context.TODO(), token.Name, &metav1.DeleteOptions{})
 		if err != nil {
 			return fmt.Errorf("error deleting token: %v", err)
 		}
@@ -520,7 +521,7 @@ func (l *userLifecycle) removeLegacyFinalizers(user *v3.User) (*v3.User, error) 
 			finalizers = append(finalizers[:i], finalizers[i+1:]...)
 			user = user.DeepCopy()
 			user.SetFinalizers(finalizers)
-			updatedUser, err := l.users.Update(user)
+			updatedUser, err := l.users.Update(context.TODO(), user)
 			if err != nil {
 				return nil, err
 			}
@@ -563,7 +564,7 @@ func (l *userLifecycle) migrateLocalUserIfNeeded(user *v3.User) error {
 			}
 		}
 		user.Password = ""
-		_, err = l.users.Update(user)
+		_, err = l.users.Update(context.TODO(), user)
 		if err != nil {
 			return fmt.Errorf("failed to update user: %w", err)
 		}

@@ -37,7 +37,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 
 	rkecontrollers.RegisterRKEControlPlaneStatusHandler(ctx, clients.RKE.RKEControlPlane(),
 		"", "rke-control-plane", h.OnChange)
-	relatedresource.Watch(ctx, "rke-control-plane-trigger", h.clusterWatch, clients.RKE.RKEControlPlane(), clients.Mgmt.Cluster())
+	relatedresource.WatchContext(ctx, "rke-control-plane-trigger", h.clusterWatch, clients.RKE.RKEControlPlane(), clients.Mgmt.Cluster())
 
 	clients.RKE.RKEControlPlane().OnRemove(ctx, "rke-control-plane-remove", h.OnRemove)
 }

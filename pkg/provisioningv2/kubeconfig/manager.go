@@ -2,6 +2,7 @@ package kubeconfig
 
 import (
 	"bytes"
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base32"
@@ -159,7 +160,7 @@ func getPrincipalID(clusterNamespace, clusterName string) string {
 func (m *Manager) createUser(principalID, userName string) error {
 	_, err := m.userCache.Get(userName)
 	if apierror.IsNotFound(err) {
-		_, err = m.users.Create(&v3.User{
+		_, err = m.users.Create(context.TODO(), &v3.User{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:   userName,
 				Labels: labelsForUser(principalID),
@@ -173,16 +174,16 @@ func (m *Manager) createUser(principalID, userName string) error {
 }
 
 func (m *Manager) deleteUser(userName string) error {
-	if err := m.users.Delete(userName, nil); err != nil && !apierror.IsNotFound(err) {
+	if err := m.users.Delete(context.TODO(), userName, nil); err != nil && !apierror.IsNotFound(err) {
 		return err
 	}
 	return nil
 }
 
 func (m *Manager) createUserToken(userName string) (string, error) {
-	_, err := m.tokens.Get(userName, metav1.GetOptions{})
+	_, err := m.tokens.Get(context.TODO(), userName, metav1.GetOptions{})
 	if err == nil {
-		err = m.tokens.Delete(userName, nil)
+		err = m.tokens.Delete(context.TODO(), userName, nil)
 	}
 	if err != nil && !apierror.IsNotFound(err) {
 		return "", err
@@ -215,7 +216,7 @@ func (m *Manager) createUserToken(userName string) (string, error) {
 		}
 	}
 
-	_, err = m.tokens.Create(token)
+	_, err = m.tokens.Create(context.TODO(), token)
 	return fmt.Sprintf("%s:%s", userName, tokenValue), err
 }
 

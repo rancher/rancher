@@ -50,7 +50,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 //
 // The logic is triggered on every update to a ClusterRegistrationToken, as the job
 // requires the most recent token to run `kubectl` successfully.
-func (h *handler) onChange(key string, obj *v3apis.ClusterRegistrationToken) (_ *v3apis.ClusterRegistrationToken, err error) {
+func (h *handler) onChange(_ context.Context, key string, obj *v3apis.ClusterRegistrationToken) (_ *v3apis.ClusterRegistrationToken, err error) {
 	if obj == nil || obj.Namespace != "local" || obj.DeletionTimestamp != nil || obj.Status.Token == "" {
 		return obj, nil
 	}

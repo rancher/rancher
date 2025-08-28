@@ -95,7 +95,7 @@ func resetPassword() {
 		fmt.Fprintf(os.Stdout, "New password for default admin user (%v):\n%s\n", admin.Name, pass)
 
 		admin.MustChangePassword = true
-		_, err = wranglerContext.Mgmt.User().Update(&admin)
+		_, err = wranglerContext.Mgmt.User().Update(context.TODO(), &admin)
 		if err != nil {
 			return fmt.Errorf("couldn't update user must change password %w", err)
 		}

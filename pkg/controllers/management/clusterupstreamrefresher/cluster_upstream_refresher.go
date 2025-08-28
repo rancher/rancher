@@ -54,7 +54,7 @@ func Register(ctx context.Context, wContext *wrangler.Context) {
 	wContext.Mgmt.Cluster().OnChange(ctx, "cluster-refresher-controller", c.onClusterChange)
 }
 
-func (c *clusterRefreshController) onClusterChange(key string, cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
+func (c *clusterRefreshController) onClusterChange(_ context.Context, key string, cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
 	if cluster == nil || cluster.DeletionTimestamp != nil {
 		return cluster, nil
 	}
@@ -272,7 +272,7 @@ func (c *clusterRefreshController) updateCluster(cluster *mgmtv3.Cluster) (*mgmt
 	// Update the cluster refresh time.
 	cluster.Annotations[clusterLastRefreshTime] = strconv.FormatInt(time.Now().Unix(), 10)
 
-	return c.clusterClient.Update(cluster)
+	return c.clusterClient.Update(context.TODO(), cluster)
 }
 
 func getComparableUpstreamSpec(secretsCache wranglerv1.SecretCache, secretClient wranglerv1.SecretClient, cluster *mgmtv3.Cluster) (*clusterConfig, error) {

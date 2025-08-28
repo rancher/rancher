@@ -72,7 +72,7 @@ func Register(ctx context.Context, wContext *wrangler.Context) {
 	wContext.Core.Secret().OnChange(ctx, "watch-helm-release", h.onSecretChange)
 }
 
-func (h handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster, error) {
+func (h handler) onClusterChange(_ context.Context, key string, cluster *v3.Cluster) (*v3.Cluster, error) {
 	if cluster == nil {
 		return cluster, nil
 	}

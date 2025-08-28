@@ -382,7 +382,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 // settings aren't initialized yet so we need to use the regular client.
 func getSQLCacheGCValues(wranglerContext *wrangler.Context) (time.Duration, int) {
 	interval, _ := time.ParseDuration(settings.SQLCacheGCInterval.Default)
-	gcIntervalSetting, err := wranglerContext.Mgmt.Setting().Get(settings.SQLCacheGCInterval.Name, metav1.GetOptions{})
+	gcIntervalSetting, err := wranglerContext.Mgmt.Setting().Get(context.TODO(), settings.SQLCacheGCInterval.Name, metav1.GetOptions{})
 	if err != nil {
 		logrus.Warnf("Unable to fetch %s setting (will use default): %v", settings.SQLCacheGCInterval.Name, err)
 	} else if gcIntervalSetting.Value != "" {
@@ -395,7 +395,7 @@ func getSQLCacheGCValues(wranglerContext *wrangler.Context) (time.Duration, int)
 	}
 
 	keepCount, _ := strconv.Atoi(settings.SQLCacheGCKeepCount.Default)
-	gcKeepCountSetting, err := wranglerContext.Mgmt.Setting().Get(settings.SQLCacheGCKeepCount.Name, metav1.GetOptions{})
+	gcKeepCountSetting, err := wranglerContext.Mgmt.Setting().Get(context.TODO(), settings.SQLCacheGCKeepCount.Name, metav1.GetOptions{})
 	if err != nil {
 		logrus.Warnf("Unable to fetch %s setting (will use default): %v", settings.SQLCacheGCKeepCount.Name, err)
 	} else if gcKeepCountSetting.Value != "" {
@@ -876,7 +876,7 @@ func checkForRKE1Resources(wranglerContext *wrangler.Context) ([]string, error) 
 	logrus.Infof("Scanning ClusterTemplates in namespace: %s, group: clustertemplates.management.cattle.io", namespace.GlobalNamespace)
 
 	// Check for RKE1 clusters
-	clusters, err := wranglerContext.Mgmt.Cluster().List(metav1.ListOptions{})
+	clusters, err := wranglerContext.Mgmt.Cluster().List(context.TODO(), metav1.ListOptions{})
 	if k8serror.IsNotFound(err) {
 		clusters = &v3.ClusterList{}
 	} else if err != nil {
@@ -890,7 +890,7 @@ func checkForRKE1Resources(wranglerContext *wrangler.Context) ([]string, error) 
 	}
 
 	// NodeTemplates in the global node template namespace
-	nodeTemplates, err := wranglerContext.Mgmt.NodeTemplate().List(namespace.NodeTemplateGlobalNamespace, metav1.ListOptions{})
+	nodeTemplates, err := wranglerContext.Mgmt.NodeTemplate().List(context.TODO(), namespace.NodeTemplateGlobalNamespace, metav1.ListOptions{})
 
 	if k8serror.IsNotFound(err) {
 		nodeTemplates = &v3.NodeTemplateList{}
@@ -903,7 +903,7 @@ func checkForRKE1Resources(wranglerContext *wrangler.Context) ([]string, error) 
 	}
 
 	// ClusterTemplates in the global namespace
-	clusterTemplates, err := wranglerContext.Mgmt.ClusterTemplate().List(namespace.GlobalNamespace, metav1.ListOptions{})
+	clusterTemplates, err := wranglerContext.Mgmt.ClusterTemplate().List(context.TODO(), namespace.GlobalNamespace, metav1.ListOptions{})
 
 	if k8serror.IsNotFound(err) {
 		clusterTemplates = &v3.ClusterTemplateList{}

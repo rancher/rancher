@@ -130,7 +130,7 @@ func (c *Controller) syncHarvesterToken(key string, secret *v1.Secret) (*v1.Secr
 	}
 
 	for tokenName := range tokenNames {
-		token, err := c.tokenClient.Get(tokenName, metav1.GetOptions{})
+		token, err := c.tokenClient.Get(context.TODO(), tokenName, metav1.GetOptions{})
 		if err != nil {
 			// If we can't own all tokens associated with the kubeconfig, exit early to prevent extending the lifecycle of any.
 			return nil, fmt.Errorf("unable to get token %s for harvester cloud credential secret %s: %w", tokenName, key, err)

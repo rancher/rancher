@@ -108,7 +108,7 @@ func newOrphanBindingsCleanup(restConfig *rest.Config) (*orphanBindingsCleanup, 
 
 // cleanOrphans finds and deletes orphaned bindings
 func (bc *orphanBindingsCleanup) cleanOrphans(dryRun bool) error {
-	prtbs, err := bc.prtbs.List("", metav1.ListOptions{})
+	prtbs, err := bc.prtbs.List(context.TODO(), "", metav1.ListOptions{})
 	if err != nil {
 		return err
 	}

@@ -133,7 +133,7 @@ func (h *handler) addCpTaintsToTolerations(tolerations []corev1.Toleration) ([]c
 	return tolerations, nil
 }
 
-func (h *handler) assignWorkspace(key string, cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
+func (h *handler) assignWorkspace(_ context.Context, key string, cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
 	if cluster == nil {
 		return cluster, nil
 	}
@@ -141,7 +141,7 @@ func (h *handler) assignWorkspace(key string, cluster *apimgmtv3.Cluster) (*apim
 	if cluster.Spec.Internal && cluster.Spec.FleetWorkspaceName == "" {
 		newCluster := cluster.DeepCopy()
 		newCluster.Spec.FleetWorkspaceName = fleetconst.ClustersLocalNamespace
-		return h.clusters.Update(newCluster)
+		return h.clusters.Update(context.TODO(), newCluster)
 	} else if cluster.Spec.Internal {
 		return cluster, nil
 	}
@@ -161,7 +161,7 @@ func (h *handler) assignWorkspace(key string, cluster *apimgmtv3.Cluster) (*apim
 
 		newCluster := cluster.DeepCopy()
 		newCluster.Spec.FleetWorkspaceName = def
-		return h.clusters.Update(newCluster)
+		return h.clusters.Update(context.TODO(), newCluster)
 	}
 
 	return cluster, nil

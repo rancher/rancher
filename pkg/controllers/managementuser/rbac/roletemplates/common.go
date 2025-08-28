@@ -1,6 +1,7 @@
 package roletemplates
 
 import (
+	"context"
 	"fmt"
 
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -82,7 +83,7 @@ func (ih *impersonationHandler) deleteServiceAccountImpersonator(username string
 
 // isRoleTemplateExternal returns the value of RoleTemplate.External
 func isRoleTemplateExternal(rtName string, rtClient mgmtv3.RoleTemplateController) (bool, error) {
-	rt, err := rtClient.Get(rtName, metav1.GetOptions{})
+	rt, err := rtClient.Get(context.TODO(), rtName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return false, nil
 	} else if err != nil {

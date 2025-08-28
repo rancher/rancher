@@ -41,7 +41,7 @@ func RegisterDeployer(
 	}
 
 	// Set up a handler for the SCCOperatorImage setting
-	relatedresource.Watch(ctx, "scc-operator-image-watcher",
+	relatedresource.WatchContext(ctx, "scc-operator-image-watcher",
 		controller.OnRelatedSettings,
 		controller.deployments,
 		settings,

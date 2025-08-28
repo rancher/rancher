@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"context"
 	"time"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -43,12 +44,12 @@ func addLocalCluster(embedded bool, wrangler *wrangler.Context) error {
 
 	var err error
 	err = wait.PollImmediateInfinite(100*time.Millisecond, func() (bool, error) {
-		temporaryCluster, err := wrangler.Mgmt.Cluster().Create(c)
+		temporaryCluster, err := wrangler.Mgmt.Cluster().Create(context.TODO(), c)
 		if err == nil {
 			c = temporaryCluster
 			return true, nil
 		} else if apierrors.IsAlreadyExists(err) {
-			temporaryCluster, err = wrangler.Mgmt.Cluster().Get("local", v1.GetOptions{})
+			temporaryCluster, err = wrangler.Mgmt.Cluster().Get(context.TODO(), "local", v1.GetOptions{})
 			if err == nil {
 				c = temporaryCluster
 				return true, nil
@@ -85,6 +86,6 @@ func addLocalCluster(embedded bool, wrangler *wrangler.Context) error {
 
 func removeLocalCluster(wrangler *wrangler.Context) error {
 	// Ignore error
-	_ = wrangler.Mgmt.Cluster().Delete("local", &v1.DeleteOptions{})
+	_ = wrangler.Mgmt.Cluster().Delete(context.TODO(), "local", &v1.DeleteOptions{})
 	return nil
 }

@@ -2,6 +2,7 @@
 package cleanup
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -102,7 +103,7 @@ func (s *Service) deleteClusterRoleTemplateBindings(config *v3.AuthConfig) error
 	for _, b := range list {
 		providerName := getProviderNameFromPrincipalNames(b.UserPrincipalName, b.GroupPrincipalName)
 		if providerName == config.Name {
-			err := s.clusterRoleTemplateBindingsClient.Delete(b.Namespace, b.Name, &metav1.DeleteOptions{})
+			err := s.clusterRoleTemplateBindingsClient.Delete(context.TODO(), b.Namespace, b.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
@@ -124,7 +125,7 @@ func (s *Service) deleteGlobalRoleBindings(config *v3.AuthConfig) error {
 	for _, b := range list {
 		providerName := getProviderNameFromPrincipalNames(b.GroupPrincipalName)
 		if providerName == config.Name {
-			err := s.globalRoleBindingsClient.Delete(b.Name, &metav1.DeleteOptions{})
+			err := s.globalRoleBindingsClient.Delete(context.TODO(), b.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
@@ -146,7 +147,7 @@ func (s *Service) deleteProjectRoleTemplateBindings(config *v3.AuthConfig) error
 	for _, b := range prtbs {
 		providerName := getProviderNameFromPrincipalNames(b.UserPrincipalName, b.GroupPrincipalName)
 		if providerName == config.Name {
-			err := s.projectRoleTemplateBindingsClient.Delete(b.Namespace, b.Name, &metav1.DeleteOptions{})
+			err := s.projectRoleTemplateBindingsClient.Delete(context.TODO(), b.Namespace, b.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
@@ -167,7 +168,7 @@ func (s *Service) deleteUsers(config *v3.AuthConfig) error {
 	if config == nil {
 		return errAuthConfigNil
 	}
-	users, err := s.userClient.List(metav1.ListOptions{})
+	users, err := s.userClient.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list users: %w", err)
 	}
@@ -181,7 +182,7 @@ func (s *Service) deleteUsers(config *v3.AuthConfig) error {
 				return fmt.Errorf("failed to get user secret: %w", err)
 			}
 			if u.Password == "" && apierrors.IsNotFound(err) {
-				err := s.userClient.Delete(u.Name, &metav1.DeleteOptions{})
+				err := s.userClient.Delete(context.TODO(), u.Name, &metav1.DeleteOptions{})
 				if err != nil && !apierrors.IsNotFound(err) {
 					return err
 				}
@@ -209,7 +210,7 @@ func (s *Service) deleteTokens(config *v3.AuthConfig) error {
 
 	for _, t := range tokens {
 		if t.AuthProvider == config.Name {
-			err := s.tokensClient.Delete(t.Name, &metav1.DeleteOptions{})
+			err := s.tokensClient.Delete(context.TODO(), t.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				return fmt.Errorf("failed deleting token %s while disabling authprovider %s: %w", t.Name, t.AuthProvider, err)
 			}
@@ -239,7 +240,7 @@ func (s *Service) resetLocalUser(user *v3.User) error {
 	}
 
 	user.PrincipalIDs = []string{localID}
-	_, err := s.userClient.Update(user)
+	_, err := s.userClient.Update(context.TODO(), user)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}

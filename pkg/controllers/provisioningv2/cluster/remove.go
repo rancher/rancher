@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -15,7 +16,7 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
-func (h *handler) OnMgmtClusterRemove(_ string, cluster *v3.Cluster) (*v3.Cluster, error) {
+func (h *handler) OnMgmtClusterRemove(_ context.Context, _ string, cluster *v3.Cluster) (*v3.Cluster, error) {
 	provisioningClusters, err := h.clusterCache.GetByIndex(ByCluster, cluster.Name)
 	if err != nil {
 		return nil, err
@@ -62,7 +63,7 @@ func (h *handler) OnClusterRemove(_ string, cluster *v1.Cluster) (*v1.Cluster, e
 func (h *handler) doClusterRemove(cluster *v1.Cluster) func() (string, error) {
 	return func() (string, error) {
 		if cluster.Status.ClusterName != "" {
-			mgmtCluster, err := h.mgmtClusters.Get(cluster.Status.ClusterName, metav1.GetOptions{})
+			mgmtCluster, err := h.mgmtClusters.Get(context.TODO(), cluster.Status.ClusterName, metav1.GetOptions{})
 			if err != nil {
 				// We do nothing if the management cluster does not exist (IsNotFound) because it's been deleted.
 				if !apierrors.IsNotFound(err) {
@@ -73,7 +74,7 @@ func (h *handler) doClusterRemove(cluster *v1.Cluster) func() (string, error) {
 				// namespace. The reason: if there's a mismatch, we know that the provisioning cluster needs to be migrated
 				// because the user moved the Fleet cluster (and provisioning cluster, by extension) to another
 				// FleetWorkspace. Ultimately, the aforementioned cluster objects are re-created in another namespace.
-				err := h.mgmtClusters.Delete(cluster.Status.ClusterName, nil)
+				err := h.mgmtClusters.Delete(context.TODO(), cluster.Status.ClusterName, nil)
 				if err != nil && !apierrors.IsNotFound(err) {
 					return "", err
 				}

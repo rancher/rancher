@@ -114,7 +114,7 @@ func BuildEKSUpstreamSpec(secretClient wranglerv1.SecretClient, cluster *mgmtv3.
 // This function will be run only once during startup by pkg/multiclustermanager/app.go
 func MigrateEksRefreshCronSetting(wContext *wrangler.Context) {
 	settingsClient := wContext.Mgmt.Setting()
-	eksCronSetting, err := settingsClient.Get(eksRefreshCronDeprecated, metav1.GetOptions{})
+	eksCronSetting, err := settingsClient.Get(context.TODO(), eksRefreshCronDeprecated, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		return
 	} else if err != nil {
@@ -144,7 +144,7 @@ func MigrateEksRefreshCronSetting(wContext *wrangler.Context) {
 
 	if eksRefreshSetting.Value != "" || eksCronSetting.Value == "" {
 		eksCronSetting.SetAnnotations(eksCronAnnotate)
-		if _, err = settingsClient.Update(eksCronSetting); err != nil {
+		if _, err = settingsClient.Update(context.TODO(), eksCronSetting); err != nil {
 			logrus.Errorf("Unable to complete EKS cron migration, will attempt at next rancher startup. "+
 				"Error annotating eks-refresh-cron setting: %v", err)
 		}
@@ -167,7 +167,7 @@ func MigrateEksRefreshCronSetting(wContext *wrangler.Context) {
 			"Error updating eks-refresh setting: %v", err)
 	}
 	eksCronSetting.SetAnnotations(eksCronAnnotate)
-	if _, err = settingsClient.Update(eksCronSetting); err != nil {
+	if _, err = settingsClient.Update(context.TODO(), eksCronSetting); err != nil {
 		logrus.Errorf("Unable to complete EKS cron migration, will attempt at next rancher startup. "+
 			"Error annotating eks-refresh-cron setting: %v", err)
 	}

@@ -1,6 +1,7 @@
 package provisioningcluster
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -119,7 +120,7 @@ func takeOwnership(dynamic *dynamic.Controller, cluster *rancherv1.Cluster, node
 		Controller:         &[]bool{true}[0],
 		BlockOwnerDeletion: &[]bool{true}[0],
 	}))
-	_, err = dynamic.Update(nodeConfig)
+	_, err = dynamic.Update(context.TODO(), nodeConfig)
 	return err
 }
 

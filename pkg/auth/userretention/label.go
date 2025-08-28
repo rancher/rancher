@@ -133,7 +133,7 @@ func (l *UserLabeler) setLabelsAndUpdateUser(settings settings, user *mgmtv3.Use
 
 		var err error
 		if userGetTry > 0 { // Refetch only if the first attempt to update failed.
-			user, err = l.users.Get(user.Name, metav1.GetOptions{})
+			user, err = l.users.Get(context.TODO(), user.Name, metav1.GetOptions{})
 			if err != nil {
 				if apierrors.IsNotFound(err) { // The user is no longer, move on.
 					return nil
@@ -149,7 +149,7 @@ func (l *UserLabeler) setLabelsAndUpdateUser(settings settings, user *mgmtv3.Use
 			return nil
 		}
 
-		_, err = l.users.Update(user)
+		_, err = l.users.Update(context.TODO(), user)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				logrus.Errorf("userretention: labeler: error updating user: user not found %s", user.Name)

@@ -74,7 +74,7 @@ func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.M
 	wContext.Mgmt.Cluster().OnChange(ctx, "aks-operator-controller", e.onClusterChange)
 }
 
-func (e *aksOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
+func (e *aksOperatorController) onClusterChange(_ context.Context, _ string, cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
 	if cluster == nil || cluster.DeletionTimestamp != nil || cluster.Spec.AKSConfig == nil {
 		return cluster, nil
 	}
@@ -83,7 +83,7 @@ func (e *aksOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 	if cluster.Status.Driver == "" {
 		cluster = cluster.DeepCopy()
 		cluster.Status.Driver = apimgmtv3.ClusterDriverAKS
-		return e.ClusterClient.Update(cluster)
+		return e.ClusterClient.Update(context.TODO(), cluster)
 	}
 
 	cluster, err := e.CheckCrdReady(cluster, "aks")
@@ -153,7 +153,7 @@ func (e *aksOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 		if cluster.Spec.AKSConfig.Imported && apimgmtv3.ClusterConditionPending.IsUnknown(cluster) {
 			cluster = cluster.DeepCopy()
 			apimgmtv3.ClusterConditionPending.True(cluster)
-			return e.ClusterClient.Update(cluster)
+			return e.ClusterClient.Update(context.TODO(), cluster)
 		}
 
 		cluster, err = e.SetTrue(cluster, apimgmtv3.ClusterConditionProvisioned, "")
@@ -166,7 +166,7 @@ func (e *aksOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 			if ok {
 				cluster = cluster.DeepCopy()
 				cluster.Status.AKSStatus.RBACEnabled = &enabled
-				return e.ClusterClient.Update(cluster)
+				return e.ClusterClient.Update(context.TODO(), cluster)
 			}
 		}
 
@@ -198,7 +198,7 @@ func (e *aksOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 					cluster.Status.ServiceAccountTokenSecret = secret.Name
 					cluster.Status.ServiceAccountToken = ""
 				}
-				return e.ClusterClient.Update(cluster)
+				return e.ClusterClient.Update(context.TODO(), cluster)
 			}
 		}
 
@@ -278,7 +278,7 @@ func (e *aksOperatorController) setInitialUpstreamSpec(cluster *apimgmtv3.Cluste
 	}
 	cluster = cluster.DeepCopy()
 	cluster.Status.AKSStatus.UpstreamSpec = upstreamSpec
-	return e.ClusterClient.Update(cluster)
+	return e.ClusterClient.Update(context.TODO(), cluster)
 }
 
 // updateAKSClusterConfig updates the AKSClusterConfig object's spec with the cluster's AKSConfig if they are not equal..
@@ -355,7 +355,7 @@ func (e *aksOperatorController) generateAndSetServiceAccount(cluster *apimgmtv3.
 	}
 	cluster.Status.ServiceAccountTokenSecret = secret.Name
 	cluster.Status.ServiceAccountToken = ""
-	return e.ClusterClient.Update(cluster)
+	return e.ClusterClient.Update(context.TODO(), cluster)
 }
 
 // buildAKSCCCreateObject returns an object that can be used with the kubernetes dynamic client to
@@ -399,7 +399,7 @@ func (e *aksOperatorController) recordAppliedSpec(cluster *apimgmtv3.Cluster) (*
 
 	cluster = cluster.DeepCopy()
 	cluster.Status.AppliedSpec.AKSConfig = cluster.Spec.AKSConfig
-	return e.ClusterClient.Update(cluster)
+	return e.ClusterClient.Update(context.TODO(), cluster)
 }
 
 var publicDialer = &transport.DialHolder{

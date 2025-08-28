@@ -48,11 +48,11 @@ func Register(ctx context.Context, workload *config.UserContext) {
 // TODO(wrangler/v4): revert to use OnRemove when it supports options (https://github.com/rancher/wrangler/pull/472).
 // OnRemove adds a wrapper around our handlers in order to manage finalizers.
 // We need to filter objects outside of this wrapper if we are going to register the same handler for multiple user contexts
-func scopedOnRemove[T generic.RuntimeMetaObject](ctx context.Context, name string, c generic.ControllerMeta, condition func(object runtime.Object) bool, sync generic.ObjectHandler[T]) {
-	onRemoveHandler := generic.NewRemoveHandler(name, c.Updater(), generic.FromObjectHandlerToHandler(sync))
-	c.AddGenericHandler(ctx, name, func(key string, obj runtime.Object) (runtime.Object, error) {
+func scopedOnRemove[T generic.RuntimeMetaObject](ctx context.Context, name string, c generic.ControllerMetaContext, condition func(object runtime.Object) bool, sync generic.ObjectHandlerContext[T]) {
+	onRemoveHandler := generic.NewRemoveHandlerContext(name, c.Updater(), generic.FromObjectHandlerContextToHandlerContext(sync))
+	c.AddGenericHandler(ctx, name, func(_ context.Context, key string, obj runtime.Object) (runtime.Object, error) {
 		if condition(obj) {
-			return onRemoveHandler(key, obj)
+			return onRemoveHandler(context.TODO(), key, obj)
 		}
 		return obj, nil
 	})

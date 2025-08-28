@@ -168,7 +168,7 @@ func Register(
 	clients.Provisioning.Cluster().OnChange(ctx, "v1-scheduling-customization-backfill", h.updateV1SchedulingCustomization)
 	clients.Mgmt.Cluster().OnChange(ctx, "v3-scheduling-customization-backfill", h.updateV3SchedulingCustomization)
 
-	relatedresource.Watch(ctx, "cluster-watch", h.clusterWatch,
+	relatedresource.WatchContext(ctx, "cluster-watch", h.clusterWatch,
 		clients.Provisioning.Cluster(), clients.Mgmt.Cluster())
 
 	clients.Mgmt.Cluster().OnRemove(ctx, "mgmt-cluster-remove", h.OnMgmtClusterRemove)
@@ -245,7 +245,7 @@ func (h *handler) isLegacyCluster(cluster interface{}) bool {
 // in clusters.management.cattle.io/v3 object. It will not generate a clusters.provisioning.cattle.io/v1 cluster if the
 // cluster FleetWorkspaceName is empty or if the cluster name does not match (c-XXXXX|local) where XXXXX is a random
 // string of characters.
-func (h *handler) generateProvisioningClusterFromLegacyCluster(cluster *v3.Cluster, status v3.ClusterStatus) ([]runtime.Object, v3.ClusterStatus, error) {
+func (h *handler) generateProvisioningClusterFromLegacyCluster(_ context.Context, cluster *v3.Cluster, status v3.ClusterStatus) ([]runtime.Object, v3.ClusterStatus, error) {
 	// Clusters annotated with "provisioning.cattle.io/externally-managed": "true" should get cluster created
 	// when the fleet workspace defaulting is disabled
 	var clusterExternallyManaged bool
@@ -343,13 +343,13 @@ func NormalizeCluster(cluster *v3.Cluster, isImportedCluster bool) (runtime.Obje
 	return &unstructured.Unstructured{Object: data}, nil
 }
 
-func (h *handler) createToken(_ string, cluster *v3.Cluster) (*v3.Cluster, error) {
+func (h *handler) createToken(_ context.Context, _ string, cluster *v3.Cluster) (*v3.Cluster, error) {
 	if cluster == nil {
 		return cluster, nil
 	}
 	_, err := h.clusterTokenCache.Get(cluster.Name, "default-token")
 	if apierror.IsNotFound(err) {
-		_, err = h.clusterTokens.Create(&v3.ClusterRegistrationToken{
+		_, err = h.clusterTokens.Create(context.TODO(), &v3.ClusterRegistrationToken{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      "default-token",
 				Namespace: cluster.Name,
@@ -706,6 +706,6 @@ func (h *handler) updateFeatureLockedValue(lockValueToTrue bool) error {
 		feature.Status.LockedValue = nil
 	}
 
-	_, err = h.featureClient.Update(feature)
+	_, err = h.featureClient.Update(context.TODO(), feature)
 	return err
 }

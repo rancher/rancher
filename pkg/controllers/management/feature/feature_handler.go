@@ -43,7 +43,7 @@ func Register(ctx context.Context, management *config.ManagementContext, wContex
 	wContext.Mgmt.Feature().OnChange(ctx, "feature-handler", h.sync)
 }
 
-func (h *handler) sync(_ string, obj *v3.Feature) (*v3.Feature, error) {
+func (h *handler) sync(_ context.Context, _ string, obj *v3.Feature) (*v3.Feature, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -83,20 +83,20 @@ func (h *handler) syncHarvesterFeature(obj *v3.Feature) error {
 	objCopy.Annotations[v3.ExperimentalFeatureKey] = v3.ExperimentalFeatureValue
 
 	if !reflect.DeepEqual(obj, objCopy) {
-		_, err := h.featuresClient.Update(objCopy)
+		_, err := h.featuresClient.Update(context.TODO(), objCopy)
 		return err
 	}
 
 	// if feature is enabled, ensure harvester feature is also enabled
 	if features.GetFeatureByName(obj.Name).Enabled() {
-		harvesterFeature, err := h.featuresClient.Get(features.Harvester.Name(), metav1.GetOptions{})
+		harvesterFeature, err := h.featuresClient.Get(context.TODO(), features.Harvester.Name(), metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("error fetching feature %s: %w", features.Harvester.Name(), err)
 		}
 		harvesterFeatureCopy := harvesterFeature.DeepCopy()
 		harvesterFeatureCopy.SetValue(true)
 		if !reflect.DeepEqual(harvesterFeature, harvesterFeatureCopy) {
-			if _, err := h.featuresClient.Update(harvesterFeatureCopy); err != nil {
+			if _, err := h.featuresClient.Update(context.TODO(), harvesterFeatureCopy); err != nil {
 				return fmt.Errorf("error updating Harvester feature %s: %w", obj.Name, err)
 			}
 		}
@@ -144,7 +144,7 @@ func (h *handler) syncHarvesterNodeDriver(feature *v3.Feature) error {
 // is disabled.
 func (h *handler) syncHarvesterBaremetalContainerWorkloadFeature(feat *v3.Feature) error {
 	if feat.Spec.Value != nil && !*feat.Spec.Value {
-		baremetal, err := h.featuresClient.Get(features.HarvesterBaremetalContainerWorkload.Name(), metav1.GetOptions{})
+		baremetal, err := h.featuresClient.Get(context.TODO(), features.HarvesterBaremetalContainerWorkload.Name(), metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -152,7 +152,7 @@ func (h *handler) syncHarvesterBaremetalContainerWorkloadFeature(feat *v3.Featur
 		update := baremetal.DeepCopy()
 		update.SetValue(false)
 		if !reflect.DeepEqual(baremetal, update) {
-			if _, err = h.featuresClient.Update(update); err != nil {
+			if _, err = h.featuresClient.Update(context.TODO(), update); err != nil {
 				return err
 			}
 		}
@@ -193,7 +193,7 @@ func (h *handler) setLockedValue(obj *v3.Feature) (*v3.Feature, error) {
 
 	featureCopy := obj.DeepCopy()
 	featureCopy.Status.LockedValue = lockedValueFromSpec
-	return h.featuresClient.Update(featureCopy)
+	return h.featuresClient.Update(context.TODO(), featureCopy)
 }
 
 // EvaluateLockedValueFromSpec evaluates whether updates to a feature's effective value

@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"context"
 	"reflect"
 
 	"github.com/rancher/rancher/pkg/features"
@@ -19,7 +20,7 @@ var (
 )
 
 func AddFleetRoles(wrangler *wrangler.Context) error {
-	f, err := wrangler.Mgmt.Feature().Get("fleet", metav1.GetOptions{})
+	f, err := wrangler.Mgmt.Feature().Get(context.TODO(), "fleet", metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -36,7 +37,7 @@ func AddFleetRoles(wrangler *wrangler.Context) error {
 			}
 		}
 
-		if err := wrangler.Mgmt.APIService().Delete(apiServiceName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+		if err := wrangler.Mgmt.APIService().Delete(context.TODO(), apiServiceName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 			return err
 		}
 

@@ -1,6 +1,7 @@
 package authprovisioningv2
 
 import (
+	"context"
 	"reflect"
 	"time"
 
@@ -17,7 +18,7 @@ const CRTBRoleBindingID = "auth-prov-v2-crtb-rolebinding"
 
 // OnCRTB create a "membership" binding that gives the subject access to the the cluster custom resource itself
 // along with granting any clusterIndexed permissions based on the roleTemplate
-func (h *handler) OnCRTB(key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+func (h *handler) OnCRTB(_ context.Context, key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
 	if crtb == nil || crtb.DeletionTimestamp != nil || crtb.RoleTemplateName == "" || crtb.ClusterName == "" {
 		return crtb, nil
 	}

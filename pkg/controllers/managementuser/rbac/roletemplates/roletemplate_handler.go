@@ -1,6 +1,7 @@
 package roletemplates
 
 import (
+	"context"
 	"slices"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -34,7 +35,7 @@ type roleTemplateHandler struct {
 // For RoleTemplates with the Context == "Project", the additional cluster roles are created:
 //  1. If the RoleTemplate has any rules for Global Resources, make a ClusterRole with those named "RoleTemplateName-promoted"
 //  2. An Aggregating ClusterRole that aggregates all inherited RoleTemplates' promoted Cluster Roles named "RoleTemplateName-promoted-aggregator"
-func (rth *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.RoleTemplate, error) {
+func (rth *roleTemplateHandler) OnChange(_ context.Context, _ string, rt *v3.RoleTemplate) (*v3.RoleTemplate, error) {
 	if rt == nil || rt.DeletionTimestamp != nil {
 		return nil, nil
 	}

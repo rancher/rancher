@@ -14,7 +14,7 @@ import (
 
 func RegisterControllers(ctx context.Context, wContext *wrangler.Context, telemetrManager telemetry.TelemetryExporterManager) error {
 	// TODO(dan): we could do k8s RBAC bindings here instead of this
-	projects, err := wContext.Mgmt.Project().List("local", v1.ListOptions{})
+	projects, err := wContext.Mgmt.Project().List(context.TODO(), "local", v1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to register telemetry controllers: %w", err)
 	}

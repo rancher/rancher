@@ -1,6 +1,7 @@
 package globalroles
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -671,7 +672,7 @@ func (c *globalRoleBindingLifecycle) updateStatus(grb *apisv3.GlobalRoleBinding,
 		grbFromCluster.Status.LastUpdateTime = c.status.TimeNow().Format(time.RFC3339)
 		grbFromCluster.Status.ObservedGenerationLocal = grb.ObjectMeta.Generation
 		grbFromCluster.Status.LocalConditions = localConditions
-		grbFromCluster, err = c.grbClient.UpdateStatus(grbFromCluster)
+		grbFromCluster, err = c.grbClient.UpdateStatus(context.TODO(), grbFromCluster)
 		if err != nil {
 			return err
 		}

@@ -1,6 +1,8 @@
 package features
 
 import (
+	"context"
+
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/imported"
 	managementv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -14,7 +16,7 @@ var (
 )
 
 func MigrateFeatures(featuresClient managementv3.FeatureClient, crdClient v1.CustomResourceDefinitionClient, mgmtClusterClient managementv3.ClusterClient) error {
-	features, err := featuresClient.List(metav1.ListOptions{})
+	features, err := featuresClient.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -39,7 +41,7 @@ func MigrateFeatures(featuresClient managementv3.FeatureClient, crdClient v1.Cus
 	}
 
 	if !hasLegacy {
-		_, err = featuresClient.Create(&v3.Feature{
+		_, err = featuresClient.Create(context.TODO(), &v3.Feature{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: Legacy.Name(),
 			},
@@ -73,7 +75,7 @@ func enableRKE2IfClustersExist(feature *v3.Feature, featuresClient managementv3.
 		return nil
 	}
 
-	clusters, err := mgmtClusterClient.List(metav1.ListOptions{})
+	clusters, err := mgmtClusterClient.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -84,7 +86,7 @@ func enableRKE2IfClustersExist(feature *v3.Feature, featuresClient managementv3.
 			feature.SetValue(true)
 			feature.Status.LockedValue = feature.Spec.Value
 
-			_, err = featuresClient.Update(feature)
+			_, err = featuresClient.Update(context.TODO(), feature)
 			return err
 		}
 	}

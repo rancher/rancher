@@ -1,6 +1,7 @@
 package roletemplates
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -59,7 +60,7 @@ func newPRTBHandler(uc *config.UserContext) *prtbHandler {
 
 // OnChange ensures a Role Binding exists in every project namespace to the RoleTemplate ClusterRole.
 // If there are promoted rules, it creates a second Role Binding in each namaspace to the promoted ClusterRole
-func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
+func (p *prtbHandler) OnChange(_ context.Context, _ string, prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
 	if prtb == nil || prtb.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -145,7 +146,7 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 }
 
 // OnRemove removes all Role Bindings in each project namespace made by the PRTB.
-func (p *prtbHandler) OnRemove(_ string, prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
+func (p *prtbHandler) OnRemove(_ context.Context, _ string, prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
 	// Select all namespaces in project.
 	_, projectName := rbac.GetClusterAndProjectNameFromPRTB(prtb)
 	namespaces, err := p.nsClient.List(metav1.ListOptions{
@@ -200,7 +201,7 @@ func (p *prtbHandler) reconcileClusterRoleBindings(prtb *v3.ProjectRoleTemplateB
 	crbs := []*rbacv1.ClusterRoleBinding{}
 
 	// If the RoleTemplate doesn't exist yet, there's no way to tell if Promoted or Namespace Rules exist
-	rt, err := p.rtClient.Get(prtb.RoleTemplateName, metav1.GetOptions{})
+	rt, err := p.rtClient.Get(context.TODO(), prtb.RoleTemplateName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return nil
 	} else if err != nil {

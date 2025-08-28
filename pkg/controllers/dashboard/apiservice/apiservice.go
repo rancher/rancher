@@ -58,7 +58,7 @@ func Register(ctx context.Context, context *wrangler.Context, embedded bool) {
 		relatedresource.OwnerResolver(false, v3.SchemeGroupVersion.String(), "APIService"),
 		context.Mgmt.APIService(), context.Core.ServiceAccount())
 
-	relatedresource.WatchClusterScoped(ctx, "apiservice-watch-settings", h.resolveSettingToAPIServices,
+	relatedresource.WatchClusterScopedContext(ctx, "apiservice-watch-settings", h.resolveSettingToAPIServices,
 		context.Mgmt.APIService(), context.Mgmt.Setting())
 
 	context.Mgmt.Setting().OnChange(ctx, "apiservice-settings", h.SetupInternalServerURL)
@@ -87,7 +87,7 @@ func (h *handler) resolveSettingToAPIServices(namespace, name string, obj runtim
 	return result, nil
 }
 
-func (h *handler) OnChange(obj *v3.APIService, status v3.APIServiceStatus) ([]runtime.Object, v3.APIServiceStatus, error) {
+func (h *handler) OnChange(_ context.Context, obj *v3.APIService, status v3.APIServiceStatus) ([]runtime.Object, v3.APIServiceStatus, error) {
 	sa := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name.SafeConcatName(obj.Name, "api-service"),

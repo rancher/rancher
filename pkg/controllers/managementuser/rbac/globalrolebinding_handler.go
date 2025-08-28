@@ -1,6 +1,7 @@
 package rbac
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -181,7 +182,7 @@ func (c *grbHandler) updateStatus(grb *apisv3.GlobalRoleBinding, remoteCondition
 		grbFromCluster.Status.LastUpdateTime = c.status.TimeNow().Format(time.RFC3339)
 		grbFromCluster.Status.ObservedGenerationRemote = grb.ObjectMeta.Generation
 		grbFromCluster.Status.RemoteConditions = remoteConditions
-		grbFromCluster, err = c.grbClient.UpdateStatus(grbFromCluster)
+		grbFromCluster, err = c.grbClient.UpdateStatus(context.TODO(), grbFromCluster)
 		if err != nil {
 			return err
 		}

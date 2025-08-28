@@ -1,6 +1,7 @@
 package roletemplates
 
 import (
+	"context"
 	"errors"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -48,7 +49,7 @@ func newRoleTemplateHandler(w *wrangler.Context, clusterManager *clustermanager.
 }
 
 // OnChange creates all management plane cluster roles that will be needed. If there are no management plane rules in the role template, no cluster roles will be created.
-func (r *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.RoleTemplate, error) {
+func (r *roleTemplateHandler) OnChange(_ context.Context, _ string, rt *v3.RoleTemplate) (*v3.RoleTemplate, error) {
 	if rt == nil || rt.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -183,8 +184,8 @@ func (r *roleTemplateHandler) gatherRules(rt *v3.RoleTemplate) ([]rbacv1.PolicyR
 }
 
 // OnRemove deletes all the ClusterRoles created in each cluster for the RoleTemplate
-func (r *roleTemplateHandler) OnRemove(_ string, rt *v3.RoleTemplate) (*v3.RoleTemplate, error) {
-	clusters, err := r.clusterController.List(metav1.ListOptions{})
+func (r *roleTemplateHandler) OnRemove(_ context.Context, _ string, rt *v3.RoleTemplate) (*v3.RoleTemplate, error) {
+	clusters, err := r.clusterController.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

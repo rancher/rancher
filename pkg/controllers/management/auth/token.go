@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"context"
+
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	tokenUtil "github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/features"
@@ -44,7 +46,7 @@ func (t *TokenController) sync(key string, obj *v3.Token) (runtime.Object, error
 				newObj = obj.DeepCopy()
 				newObj.SetFinalizers(finalizers)
 				var err error
-				newObj, err = t.tokens.Update(newObj)
+				newObj, err = t.tokens.Update(context.TODO(), newObj)
 				if err != nil {
 					return obj, err
 				}
@@ -59,7 +61,7 @@ func (t *TokenController) sync(key string, obj *v3.Token) (runtime.Object, error
 		newObj := obj.DeepCopy()
 		var err error
 		tokenUtil.SetTokenExpiresAt(newObj)
-		if newObj, err = t.tokens.Update(newObj); err != nil {
+		if newObj, err = t.tokens.Update(context.TODO(), newObj); err != nil {
 			return obj, err
 		}
 		obj = newObj
@@ -91,7 +93,7 @@ func (t *TokenController) sync(key string, obj *v3.Token) (runtime.Object, error
 		if err != nil {
 			return obj, err
 		}
-		if _, err := t.tokens.Update(newObj); err != nil {
+		if _, err := t.tokens.Update(context.TODO(), newObj); err != nil {
 			return obj, err
 		}
 		obj = newObj
@@ -122,6 +124,6 @@ func (t *TokenController) triggerUserAttributesRefresh(user string) error {
 	}
 
 	userAttribute.NeedsRefresh = true
-	_, err = t.userAttributes.Update(userAttribute)
+	_, err = t.userAttributes.Update(context.TODO(), userAttribute)
 	return err
 }

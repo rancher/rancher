@@ -133,14 +133,14 @@ func Register(ctx context.Context, workload *config.UserContext) {
 	}
 
 	workload.Core.Namespaces("").AddLifecycle(ctx, "namespace-auth", newNamespaceLifecycle(r, sync))
-	relatedresource.WatchClusterScoped(ctx, "enqueue-beneficiary-roletemplates", newRTEnqueueFunc(rtInformer.GetIndexer()),
+	relatedresource.WatchClusterScopedContext(ctx, "enqueue-beneficiary-roletemplates", newRTEnqueueFunc(rtInformer.GetIndexer()),
 		management.Wrangler.Mgmt.RoleTemplate(), management.Wrangler.Mgmt.RoleTemplate())
 
 	nsEnqueuer := nsutils.NsEnqueuer{
 		PrtbCache: prtbInformer.GetIndexer(),
 		NsIndexer: nsInformer.GetIndexer(),
 	}
-	relatedresource.WatchClusterScoped(ctx, "enqueue-namespaces-by-roletemplate", nsEnqueuer.RoleTemplateEnqueueNamespace, workload.Corew.Namespace(), management.Wrangler.Mgmt.RoleTemplate())
+	relatedresource.WatchClusterScopedContext(ctx, "enqueue-namespaces-by-roletemplate", nsEnqueuer.RoleTemplateEnqueueNamespace, workload.Corew.Namespace(), management.Wrangler.Mgmt.RoleTemplate())
 
 	// Only one set of CRTB/PRTB/RoleTemplate controllers should run at a time. Using aggregated cluster roles is currently experimental and only available via feature flags.
 	if features.AggregatedRoleTemplates.Enabled() {

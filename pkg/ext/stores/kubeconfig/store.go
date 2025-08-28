@@ -1342,7 +1342,7 @@ func (s *Store) delete(
 			DryRun:             options.DryRun, // Pass through the dry run flag instead of handling it explicitly.
 		}
 
-		err := s.tokens.Delete(tokenName, delOptions)
+		err := s.tokens.Delete(context.TODO(), tokenName, delOptions)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return nil, false, apierrors.NewInternalError(fmt.Errorf("error deleting token %s for kubeconfig %s: %w", tokenName, configMap.Name, err))
 		}

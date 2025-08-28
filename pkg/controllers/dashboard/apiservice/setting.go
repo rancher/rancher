@@ -1,6 +1,7 @@
 package apiservice
 
 import (
+	"context"
 	"fmt"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -13,7 +14,7 @@ import (
 
 const RancherServiceName = "rancher"
 
-func (h *handler) SetupInternalServerURL(key string, setting *v3.Setting) (*v3.Setting, error) {
+func (h *handler) SetupInternalServerURL(_ context.Context, key string, setting *v3.Setting) (*v3.Setting, error) {
 	if key != settings.ServerURL.Name {
 		return setting, nil
 	}
