@@ -4,10 +4,8 @@ set -e
 echo Starting rancher server
 cd $(dirname $0)/..
 
-CMD=bin/rancher
-if [ ! -x $CMD ]; then
-    ./scripts/build-server
-fi
+# make sure that the rancher binary exists
+./scripts/must-rancher-binary.sh
 
 if [ ! -z $1 ] && ( [ $1 = "--trace" ] || [ $1 = "--info" ] || [ $1 = "--debug" ] ); then
   LOGFLAG=$1
