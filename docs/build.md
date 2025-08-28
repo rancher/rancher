@@ -1,5 +1,6 @@
 ## Build and package configuration
 
+
 Build variables should be defined in a single file,
 so that anyone who wants to build Rancher needs to only edit this file to change configuration and dependency versions.
 
