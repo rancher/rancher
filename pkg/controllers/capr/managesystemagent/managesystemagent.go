@@ -579,7 +579,7 @@ func (h *handler) UninstallFleetBasedApps(_ string, cluster *rancherv1.Cluster) 
 	}
 	if managedChart != nil && managedChart.DeletionTimestamp == nil {
 		logrus.Infof("[managesystemagent] cluster %s/%s: uninstalling the managedChart %s", cluster.Namespace, cluster.Name, sucName)
-		err := h.managedCharts.Delete(managedChart.Namespace, managedChart.Name, &metav1.DeleteOptions{})
+		err := h.managedCharts.Delete(context.TODO(), managedChart.Namespace, managedChart.Name, &metav1.DeleteOptions{})
 		if err == nil {
 			dropAnnotation = true
 		} else if !errors.IsNotFound(err) {

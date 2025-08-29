@@ -25,12 +25,12 @@ import (
 
 // ProjectRoleTemplateBindingController interface for managing ProjectRoleTemplateBinding resources.
 type ProjectRoleTemplateBindingController interface {
-	generic.ControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList]
+	generic.ControllerInterfaceContext[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList]
 }
 
 // ProjectRoleTemplateBindingClient interface for managing ProjectRoleTemplateBinding resources in Kubernetes.
 type ProjectRoleTemplateBindingClient interface {
-	generic.ClientInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList]
+	generic.ClientInterfaceContext[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList]
 }
 
 // ProjectRoleTemplateBindingCache interface for retrieving ProjectRoleTemplateBinding resources in memory.

@@ -25,12 +25,12 @@ import (
 
 // OIDCProviderController interface for managing OIDCProvider resources.
 type OIDCProviderController interface {
-	generic.NonNamespacedControllerInterface[*v3.OIDCProvider, *v3.OIDCProviderList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.OIDCProvider, *v3.OIDCProviderList]
 }
 
 // OIDCProviderClient interface for managing OIDCProvider resources in Kubernetes.
 type OIDCProviderClient interface {
-	generic.NonNamespacedClientInterface[*v3.OIDCProvider, *v3.OIDCProviderList]
+	generic.NonNamespacedClientInterfaceContext[*v3.OIDCProvider, *v3.OIDCProviderList]
 }
 
 // OIDCProviderCache interface for retrieving OIDCProvider resources in memory.

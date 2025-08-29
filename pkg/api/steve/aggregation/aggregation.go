@@ -41,7 +41,7 @@ func NewMiddleware(ctx context.Context, apiServices mgmtcontrollers.APIServiceCo
 		apiServiceCache: apiServices.Cache(),
 		remote:          remotedialer,
 	}
-	relatedresource.WatchClusterScoped(ctx, "aggregation-router", relatedresource.TriggerAllKey,
+	relatedresource.WatchClusterScopedContext(ctx, "aggregation-router", relatedresource.TriggerAllKey,
 		apiServices, apiServices)
 	apiServices.OnChange(ctx, "apiservice-router", handler.OnChange)
 	return handler.Middleware
@@ -114,7 +114,7 @@ func (h *aggregationHandler) makeHandler(uuid string) http.Handler {
 	})
 }
 
-func (h *aggregationHandler) OnChange(key string, obj *v3.APIService) (*v3.APIService, error) {
+func (h *aggregationHandler) OnChange(_ context.Context, key string, obj *v3.APIService) (*v3.APIService, error) {
 	if key != relatedresource.AllKey {
 		return obj, nil
 	}

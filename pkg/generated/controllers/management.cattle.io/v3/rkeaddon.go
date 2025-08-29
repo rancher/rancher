@@ -25,12 +25,12 @@ import (
 
 // RkeAddonController interface for managing RkeAddon resources.
 type RkeAddonController interface {
-	generic.ControllerInterface[*v3.RkeAddon, *v3.RkeAddonList]
+	generic.ControllerInterfaceContext[*v3.RkeAddon, *v3.RkeAddonList]
 }
 
 // RkeAddonClient interface for managing RkeAddon resources in Kubernetes.
 type RkeAddonClient interface {
-	generic.ClientInterface[*v3.RkeAddon, *v3.RkeAddonList]
+	generic.ClientInterfaceContext[*v3.RkeAddon, *v3.RkeAddonList]
 }
 
 // RkeAddonCache interface for retrieving RkeAddon resources in memory.

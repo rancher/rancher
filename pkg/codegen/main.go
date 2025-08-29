@@ -40,6 +40,7 @@ func main() {
 					// All structs with an embedded ObjectMeta field will be picked up
 					"./pkg/apis/management.cattle.io/v3",
 				},
+				WithContext:   true,
 				GenerateTypes: true,
 			},
 			"ui.cattle.io": {

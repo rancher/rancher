@@ -71,7 +71,7 @@ type handler struct {
 	chartsConfig chart.RancherConfigGetter
 }
 
-func (h *handler) onSetting(key string, setting *v3.Setting) (*v3.Setting, error) {
+func (h *handler) onSetting(_ context.Context, key string, setting *v3.Setting) (*v3.Setting, error) {
 	if setting == nil {
 		return nil, nil
 	}

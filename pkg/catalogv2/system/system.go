@@ -124,7 +124,7 @@ func (m *Manager) Start(ctx context.Context) {
 	m.clusterRepos.OnChange(ctx, "catalog-refresh-trigger", m.onTrigger)
 }
 
-func (m *Manager) onSetting(key string, obj *v3.Setting) (*v3.Setting, error) {
+func (m *Manager) onSetting(_ context.Context, key string, obj *v3.Setting) (*v3.Setting, error) {
 	if key != settings.SystemFeatureChartRefreshSeconds.Name {
 		return obj, nil
 	}

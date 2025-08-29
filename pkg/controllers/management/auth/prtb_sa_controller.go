@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"context"
+
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	wranglerv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -35,7 +37,7 @@ func (c prtbServiceAccountController) sync(_ string, prtb *apiv3.ProjectRoleTemp
 			copied.Annotations = make(map[string]string)
 		}
 		copied.Annotations[serviceAccountAnnotation] = copied.ServiceAccount
-		upd, err := c.prtbClient.Update(copied)
+		upd, err := c.prtbClient.Update(context.TODO(), copied)
 		if err != nil {
 			return nil, err
 		}

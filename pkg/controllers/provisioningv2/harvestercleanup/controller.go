@@ -57,7 +57,7 @@ func validGVK(gvk schema.GroupVersionKind) bool {
 // whether the node is only deleted because it is to be redeployed or
 // whether it is to be permanently deleted because the parent cluster is
 // deleted.
-func (h *handler) onChange(obj runtime.Object) (runtime.Object, error) {
+func (h *handler) onChange(_ context.Context, obj runtime.Object) (runtime.Object, error) {
 	if obj == nil {
 		return obj, nil
 	}

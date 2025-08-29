@@ -195,7 +195,7 @@ func (h *handler) modifyClusterCondition(cluster *mgmtv3.Cluster, masterPlan, wo
 			if mgmtv3.ClusterConditionUpgraded.IsTrue(cluster) {
 				mgmtv3.ClusterConditionUpgraded.Unknown(cluster)
 				mgmtv3.ClusterConditionUpgraded.Message(cluster, "cluster is being upgraded")
-				return h.clusterClient.Update(cluster)
+				return h.clusterClient.Update(context.TODO(), cluster)
 			}
 			if mgmtv3.ClusterConditionUpgraded.IsUnknown(cluster) {
 				// remain in upgrading state if we are passed empty plans
@@ -207,7 +207,7 @@ func (h *handler) modifyClusterCondition(cluster *mgmtv3.Cluster, masterPlan, wo
 			// After the plans are removed, indicated by both plans being empty, the cluster's upgrade condition should be set to true.
 			if mgmtv3.ClusterConditionUpgraded.IsUnknown(cluster) {
 				cluster = upgradeDone(cluster)
-				return h.clusterClient.Update(cluster)
+				return h.clusterClient.Update(context.TODO(), cluster)
 			}
 		}
 	}
@@ -261,7 +261,7 @@ func (h *handler) modifyClusterCondition(cluster *mgmtv3.Cluster, masterPlan, wo
 	// if we made it this far nothing is applying
 	// see k3supgrade_handler also
 	cluster = upgradeDone(cluster)
-	return h.clusterClient.Update(cluster)
+	return h.clusterClient.Update(context.TODO(), cluster)
 }
 
 func upgradeDone(cluster *mgmtv3.Cluster) *mgmtv3.Cluster {
@@ -294,6 +294,6 @@ func (h *handler) enqueueOrUpdate(cluster *mgmtv3.Cluster, upgradeMessage string
 	}
 
 	mgmtv3.ClusterConditionUpgraded.Message(cluster, upgradeMessage)
-	return h.clusterClient.Update(cluster)
+	return h.clusterClient.Update(context.TODO(), cluster)
 
 }

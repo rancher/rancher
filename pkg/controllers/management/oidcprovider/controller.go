@@ -61,7 +61,7 @@ func Register(ctx context.Context, wContext *wrangler.Context) {
 }
 
 // onChange sets a new client id in the status field, and creates a k8s with the client secret.
-func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v3.OIDCClient, error) {
+func (c *oidcClientController) onChange(_ context.Context, _ string, oidcClient *v3.OIDCClient) (*v3.OIDCClient, error) {
 	if oidcClient == nil {
 		return nil, nil
 	}
@@ -129,7 +129,7 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 			// delete previously created secret as it will be created when a new clientID is generated in the next reconciliation loop
 			return nil, errors.Join(c.secretClient.Delete(secretNamespace, clientID, &metav1.DeleteOptions{}), fmt.Errorf("failed to create clientID status patch: %w", err))
 		}
-		oidcClient, err = c.oidcClient.Patch(oidcClient.Name, types.MergePatchType, patchBytes, "status")
+		oidcClient, err = c.oidcClient.Patch(context.TODO(), oidcClient.Name, types.MergePatchType, patchBytes, "status")
 		if err != nil {
 			// delete previously created secret as it will be created when a new clientID is generated in the next reconciliation loop
 			return nil, errors.Join(c.secretClient.Delete(secretNamespace, clientID, &metav1.DeleteOptions{}), fmt.Errorf("failed to apply clientID status patch: %w", err))
@@ -161,7 +161,7 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 		}
 		//delete annotation
 		delete(oidcClient.Annotations, createClientSecretAnn)
-		oidcClient, err = c.oidcClient.Update(oidcClient)
+		oidcClient, err = c.oidcClient.Update(context.TODO(), oidcClient)
 		if err != nil {
 			return nil, fmt.Errorf("failed to update OIDC client: %w", err)
 		}
@@ -187,7 +187,7 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 
 		// delete annotation
 		delete(oidcClient.Annotations, regenerateClientSecretAnn)
-		oidcClient, err = c.oidcClient.Update(oidcClient)
+		oidcClient, err = c.oidcClient.Update(context.TODO(), oidcClient)
 		if err != nil {
 			return nil, fmt.Errorf("failed to update OIDC client: %w", err)
 		}
@@ -208,7 +208,7 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 
 		// delete annotation
 		delete(oidcClient.Annotations, removeClientSecretAnn)
-		oidcClient, err = c.oidcClient.Update(oidcClient)
+		oidcClient, err = c.oidcClient.Update(context.TODO(), oidcClient)
 		if err != nil {
 			return nil, fmt.Errorf("failed to update OIDC client: %w", err)
 		}
@@ -251,7 +251,7 @@ func (c *oidcClientController) updateStatusIfNeeded(oidcClient *v3.OIDCClient, s
 		if err != nil {
 			return fmt.Errorf("failed to create status patch: %w", err)
 		}
-		oidcClient, err = c.oidcClient.Patch(oidcClient.Name, types.JSONPatchType, patchBytes, "status")
+		oidcClient, err = c.oidcClient.Patch(context.TODO(), oidcClient.Name, types.JSONPatchType, patchBytes, "status")
 		if err != nil {
 			return fmt.Errorf("failed to apply status patch: %w", err)
 		}

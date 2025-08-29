@@ -154,7 +154,7 @@ func (r *Retention) Run(ctx context.Context) error {
 				logrus.Infof("userretention: deleting user %s", user.Name)
 
 				if !settings.dryRun {
-					err := r.users.Delete(user.Name, &metav1.DeleteOptions{})
+					err := r.users.Delete(context.TODO(), user.Name, &metav1.DeleteOptions{})
 					if err != nil && !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
 						logrus.Errorf("userretention: error deleting user %s: %v", user.Name, err)
 						errCount++
@@ -183,7 +183,7 @@ func (r *Retention) Run(ctx context.Context) error {
 			var err error
 
 			if userGetTry > 0 { // Refetch only if the first attempt to update failed.
-				user, err = r.users.Get(user.Name, metav1.GetOptions{})
+				user, err = r.users.Get(context.TODO(), user.Name, metav1.GetOptions{})
 				if err != nil {
 					if apierrors.IsNotFound(err) { // The user is no longer, move on.
 						return nil
@@ -210,7 +210,7 @@ func (r *Retention) Run(ctx context.Context) error {
 				return nil
 			}
 
-			if _, err = r.users.Update(user); err != nil {
+			if _, err = r.users.Update(context.TODO(), user); err != nil {
 				if apierrors.IsNotFound(err) {
 					logrus.Errorf("userretention: error updating user: user not found %s", user.Name)
 					return nil

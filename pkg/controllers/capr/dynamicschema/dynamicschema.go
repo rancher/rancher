@@ -377,7 +377,7 @@ func getMachineCRD(schemas *schemas.Schemas, sampleProps *apiextv1.JSONSchemaPro
 	return crdObj, nil
 }
 
-func (h *handler) OnChange(obj *v3.DynamicSchema, status v3.DynamicSchemaStatus) ([]runtime.Object, v3.DynamicSchemaStatus, error) {
+func (h *handler) OnChange(_ context.Context, obj *v3.DynamicSchema, status v3.DynamicSchemaStatus) ([]runtime.Object, v3.DynamicSchemaStatus, error) {
 	if obj.Name == "nodetemplateconfig" {
 		all, err := h.schemaCache.List(labels.Everything())
 		if err != nil {

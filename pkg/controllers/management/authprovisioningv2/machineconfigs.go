@@ -1,6 +1,7 @@
 package authprovisioningv2
 
 import (
+	"context"
 	"strings"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -20,7 +21,7 @@ func validMachineConfigGVK(gvk schema.GroupVersionKind) bool {
 		strings.HasSuffix(gvk.Kind, "Config")
 }
 
-func (h *handler) OnMachineConfigChange(obj runtime.Object) (runtime.Object, error) {
+func (h *handler) OnMachineConfigChange(_ context.Context, obj runtime.Object) (runtime.Object, error) {
 	if obj == nil {
 		return nil, nil
 	}
@@ -72,7 +73,7 @@ func (h *handler) OnMachineConfigChange(obj runtime.Object) (runtime.Object, err
 	anns[ownerBindingsAnno] = "true"
 	objData.SetNested(anns, "metadata", "annotations")
 
-	if _, err = h.dynamic.Update(&unstructured.Unstructured{Object: objData}); err != nil {
+	if _, err = h.dynamic.Update(context.TODO(), &unstructured.Unstructured{Object: objData}); err != nil {
 		return nil, err
 	}
 

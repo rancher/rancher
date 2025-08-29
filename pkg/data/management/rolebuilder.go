@@ -1,6 +1,7 @@
 package management
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 
@@ -252,7 +253,7 @@ type gatherExistingFnc[T runtime.Object] func() (ObjectNameMap map[string]T, err
 
 func reconcile[T generic.RuntimeMetaObject, TList runtime.Object](
 	rb *roleBuilder, build buildFnc[T], gatherExisting gatherExistingFnc[T],
-	compareAndModify compareAndModifyFnc[T], client generic.NonNamespacedClientInterface[T, TList]) error {
+	compareAndModify compareAndModifyFnc[T], client generic.NonNamespacedClientInterfaceContext[T, TList]) error {
 	current := rb.first()
 	builtRoles := map[string]T{}
 	for current != nil {
@@ -274,7 +275,7 @@ func reconcile[T generic.RuntimeMetaObject, TList runtime.Object](
 	for name := range existing {
 		if _, ok := builtRoles[name]; !ok {
 			logrus.Infof("Removing %v", name)
-			if err := client.Delete(name, nil); err != nil {
+			if err := client.Delete(context.TODO(), name, nil); err != nil {
 				return errors.Wrapf(err, "couldn't delete %v", name)
 			}
 			delete(existing, name)
@@ -288,7 +289,7 @@ func reconcile[T generic.RuntimeMetaObject, TList runtime.Object](
 				return err
 			}
 			if !equal {
-				if _, err := client.Update(modified); err != nil {
+				if _, err := client.Update(context.TODO(), modified); err != nil {
 					return errors.Wrapf(err, "couldn't update %v", name)
 				}
 			}
@@ -296,7 +297,7 @@ func reconcile[T generic.RuntimeMetaObject, TList runtime.Object](
 		}
 
 		logrus.Infof("Creating %v", name)
-		if _, err := client.Create(gr); err != nil {
+		if _, err := client.Create(context.TODO(), gr); err != nil {
 			return errors.Wrapf(err, "couldn't create %v", name)
 		}
 	}
@@ -322,7 +323,7 @@ func (rb *roleBuilder) reconcileGlobalRoles(grClient wranglerv3.GlobalRoleClient
 
 	gather := func() (map[string]*v3.GlobalRole, error) {
 		set := labels.Set(defaultGRLabel)
-		existingList, err := grClient.List(v1.ListOptions{LabelSelector: set.String()})
+		existingList, err := grClient.List(context.TODO(), v1.ListOptions{LabelSelector: set.String()})
 		if err != nil {
 			return nil, errors.Wrapf(err, "couldn't list globalRoles with selector %s", set)
 		}
@@ -381,7 +382,7 @@ func (rb *roleBuilder) reconcileRoleTemplates(rtClient wranglerv3.RoleTemplateCl
 
 	gather := func() (map[string]*v3.RoleTemplate, error) {
 		set := labels.Set(defaultRTLabel)
-		existingList, err := rtClient.List(v1.ListOptions{LabelSelector: set.String()})
+		existingList, err := rtClient.List(context.TODO(), v1.ListOptions{LabelSelector: set.String()})
 		if err != nil {
 			return nil, errors.Wrapf(err, "couldn't list roleTemplate with selector %s", set)
 		}

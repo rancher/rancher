@@ -25,12 +25,12 @@ import (
 
 // PreferenceController interface for managing Preference resources.
 type PreferenceController interface {
-	generic.ControllerInterface[*v3.Preference, *v3.PreferenceList]
+	generic.ControllerInterfaceContext[*v3.Preference, *v3.PreferenceList]
 }
 
 // PreferenceClient interface for managing Preference resources in Kubernetes.
 type PreferenceClient interface {
-	generic.ClientInterface[*v3.Preference, *v3.PreferenceList]
+	generic.ClientInterfaceContext[*v3.Preference, *v3.PreferenceList]
 }
 
 // PreferenceCache interface for retrieving Preference resources in memory.

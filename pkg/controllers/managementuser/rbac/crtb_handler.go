@@ -1,6 +1,7 @@
 package rbac
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -228,7 +229,7 @@ func (c *crtbLifecycle) reconcileCRTBUserClusterLabels(binding *v3.ClusterRoleTe
 	}
 
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		crtbToUpdate, updateErr := c.crtbClient.Get(binding.Namespace, binding.Name, metav1.GetOptions{})
+		crtbToUpdate, updateErr := c.crtbClient.Get(context.TODO(), binding.Namespace, binding.Name, metav1.GetOptions{})
 		if updateErr != nil {
 			return updateErr
 		}
@@ -236,7 +237,7 @@ func (c *crtbLifecycle) reconcileCRTBUserClusterLabels(binding *v3.ClusterRoleTe
 			crtbToUpdate.Labels = make(map[string]string)
 		}
 		crtbToUpdate.Labels[rtbCrbRbLabelsUpdated] = "true"
-		_, err := c.crtbClient.Update(crtbToUpdate)
+		_, err := c.crtbClient.Update(context.TODO(), crtbToUpdate)
 		return err
 	})
 
@@ -279,7 +280,7 @@ func (c *crtbLifecycle) updateStatus(crtb *v3.ClusterRoleTemplateBinding, remote
 		crtbFromCluster.Status.LastUpdateTime = timeNow().Format(time.RFC3339)
 		crtbFromCluster.Status.ObservedGenerationRemote = crtb.ObjectMeta.Generation
 		crtbFromCluster.Status.RemoteConditions = remoteConditions
-		crtbFromCluster, err = c.crtbClient.UpdateStatus(crtbFromCluster)
+		crtbFromCluster, err = c.crtbClient.UpdateStatus(context.TODO(), crtbFromCluster)
 		if err != nil {
 			return err
 		}

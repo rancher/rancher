@@ -15,7 +15,7 @@ func Register(ctx context.Context, features managementv3.FeatureController) {
 	features.OnChange(ctx, "features-restart-handler", sync)
 }
 
-func sync(_ string, obj *v3.Feature) (*v3.Feature, error) {
+func sync(_ context.Context, _ string, obj *v3.Feature) (*v3.Feature, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return nil, nil
 	}
