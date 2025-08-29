@@ -116,7 +116,7 @@ func init() {
 	utilruntime.Must(AddToScheme(Scheme))
 	utilruntime.Must(schemes.AddToScheme(Scheme))
 
-	if timeout := os.Getenv(cacheSyncTimeoutEnvVar); timeout == "" {
+	if timeout := os.Getenv(cacheSyncTimeoutEnvVar); timeout != "" {
 		var err error
 		if cacheSyncTimeout, err = time.ParseDuration(timeout); err != nil {
 			logrus.Fatalf("env var '%s' is not a valid duration: %s", cacheSyncTimeoutEnvVar, timeout)
