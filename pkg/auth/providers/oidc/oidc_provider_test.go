@@ -1,6 +1,7 @@
 package oidc
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -9,14 +10,18 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"testing"
 	"time"
 
 	"github.com/golang-jwt/jwt"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/norman/types"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	"golang.org/x/oauth2"
 )
@@ -114,7 +119,7 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 		assert.NoError(t, err)
 	}
 	tests := map[string]struct {
-		config                    func(string) *v32.OIDCConfig
+		config                    func(string) *v3.OIDCConfig
 		authCode                  string
 		tokenManagerMock          func(token *Token) tokenManager
 		oidcProviderResponses     func(string) oidcResponses
@@ -124,7 +129,7 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 		expectedErrorMessage      string
 	}{
 		"token is updated and userInfo returned": {
-			config: func(port string) *v32.OIDCConfig {
+			config: func(port string) *v3.OIDCConfig {
 				return newOIDCConfig(port)
 			},
 			tokenManagerMock: func(token *Token) tokenManager {
@@ -151,7 +156,7 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 			},
 		},
 		"get groups with GroupsClaims": {
-			config: func(port string) *v32.OIDCConfig {
+			config: func(port string) *v3.OIDCConfig {
 				c := newOIDCConfig(port)
 				c.GroupsClaim = "custom:groups"
 
@@ -203,8 +208,8 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 		},
 
 		"error - invalid certificate": {
-			config: func(port string) *v32.OIDCConfig {
-				return &v32.OIDCConfig{
+			config: func(port string) *v3.OIDCConfig {
+				return &v3.OIDCConfig{
 					Issuer:      "http://localhost:" + port,
 					ClientID:    "test",
 					JWKSUrl:     "http://localhost:" + port + "/.well-known/jwks.json",
@@ -221,7 +226,7 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 			expectedErrorMessage: "could not parse cert/key pair: tls: failed to find any PEM data in certificate input",
 		},
 		"error - invalid token from server": {
-			config: func(port string) *v32.OIDCConfig {
+			config: func(port string) *v3.OIDCConfig {
 				return newOIDCConfig(port)
 			},
 			tokenManagerMock: func(token *Token) tokenManager {
@@ -236,7 +241,7 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 			expectedErrorMessage: "oidc: malformed jwt",
 		},
 		"error - invalid user response": {
-			config: func(port string) *v32.OIDCConfig {
+			config: func(port string) *v3.OIDCConfig {
 				return newOIDCConfig(port)
 			},
 			tokenManagerMock: func(token *Token) tokenManager {
@@ -266,7 +271,7 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 			defer server.Shutdown(context.TODO())
 			o := OpenIDCProvider{
 				Name:     providerName,
-				TokenMGR: test.tokenManagerMock(oidcResp.token),
+				TokenMgr: test.tokenManagerMock(oidcResp.token),
 			}
 			ctx := context.TODO()
 			claimInfo := &ClaimInfo{}
@@ -301,7 +306,7 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 	}
 
 	tests := map[string]struct {
-		config                func(string) *v32.OIDCConfig
+		config                func(string) *v3.OIDCConfig
 		storedToken           func(string) *oauth2.Token
 		tokenManagerMock      func(token *Token) tokenManager
 		oidcProviderResponses func(string) oidcResponses
@@ -309,7 +314,7 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 		expectedErrorMessage  string
 	}{
 		"get claims with valid token": {
-			config: func(port string) *v32.OIDCConfig {
+			config: func(port string) *v3.OIDCConfig {
 				return newOIDCConfig(port)
 			},
 			storedToken: func(port string) *oauth2.Token {
@@ -341,7 +346,7 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 			},
 		},
 		"token is refreshed and updated when expired": {
-			config: func(port string) *v32.OIDCConfig {
+			config: func(port string) *v3.OIDCConfig {
 				return newOIDCConfig(port)
 			},
 			oidcProviderResponses: func(port string) oidcResponses {
@@ -385,8 +390,8 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 			},
 		},
 		"error - invalid certificate": {
-			config: func(port string) *v32.OIDCConfig {
-				return &v32.OIDCConfig{
+			config: func(port string) *v3.OIDCConfig {
+				return &v3.OIDCConfig{
 					Issuer:      "http://localhost:" + port,
 					ClientID:    "test",
 					JWKSUrl:     "http://localhost:" + port + "/.well-known/jwks.json",
@@ -407,7 +412,7 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 			expectedErrorMessage: "could not parse cert/key pair: tls: failed to find any PEM data in certificate input",
 		},
 		"error - invalid token": {
-			config: func(port string) *v32.OIDCConfig {
+			config: func(port string) *v3.OIDCConfig {
 				return newOIDCConfig(port)
 			},
 			storedToken: func(port string) *oauth2.Token {
@@ -425,7 +430,7 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 			expectedErrorMessage: "oidc: malformed jwt",
 		},
 		"error - invalid user response": {
-			config: func(port string) *v32.OIDCConfig {
+			config: func(port string) *v3.OIDCConfig {
 				return newOIDCConfig(port)
 			},
 			storedToken: func(port string) *oauth2.Token {
@@ -469,7 +474,7 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 			defer server.Shutdown(context.TODO())
 			o := OpenIDCProvider{
 				Name:     providerName,
-				TokenMGR: test.tokenManagerMock(oidcResp.token),
+				TokenMgr: test.tokenManagerMock(oidcResp.token),
 			}
 
 			claimsInfo, err := o.getClaimInfoFromToken(context.TODO(), test.config(port), test.storedToken(port), userId)
@@ -482,6 +487,121 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestLogout(t *testing.T) {
+	const (
+		userId       string = "testing-user"
+		providerName string = "keycloak"
+	)
+
+	logoutTests := map[string]struct {
+		config *v3.OIDCConfig
+		verify func(t require.TestingT, err error, msgAndArgs ...interface{})
+	}{
+		"when logout all is forced": {
+			config: newOIDCConfig("9090", func(s *v3.OIDCConfig) {
+				s.LogoutAllForced = true
+			}),
+			verify: require.Error,
+		},
+		"when logout all is not forced": {
+			config: newOIDCConfig("9090"),
+			verify: require.NoError,
+		},
+	}
+
+	for name, tt := range logoutTests {
+		t.Run(name, func(t *testing.T) {
+			testToken := &v3.Token{UserID: userId, AuthProvider: providerName}
+			o := OpenIDCProvider{
+				Name:      providerName,
+				GetConfig: func() (*v3.OIDCConfig, error) { return tt.config, nil },
+			}
+			b, err := json.Marshal(&v3.OIDCConfigLogoutInput{
+				FinalRedirectURL: "https://example.com/logged-out",
+			})
+			require.NoError(t, err)
+
+			req := httptest.NewRequest(http.MethodPost, "/logout", bytes.NewReader(b))
+			nr := &normanRecorder{}
+			apiContext := &types.APIContext{
+				Method:         req.Method,
+				Request:        req,
+				Query:          url.Values{},
+				ResponseWriter: nr,
+			}
+			tt.verify(t, o.Logout(apiContext, testToken))
+		})
+	}
+}
+
+func TestLogoutAll(t *testing.T) {
+	const (
+		userId       string = "testing-user"
+		providerName string = "keycloak"
+	)
+	oidcConfig := newOIDCConfig("8090", func(s *v3.OIDCConfig) {
+		s.EndSessionEndpoint = "http://localhost:8090/user/logout"
+	})
+	testToken := &v3.Token{UserID: userId, AuthProvider: providerName}
+	o := OpenIDCProvider{
+		Name:      providerName,
+		GetConfig: func() (*v3.OIDCConfig, error) { return oidcConfig, nil },
+	}
+	b, err := json.Marshal(&v3.OIDCConfigLogoutInput{
+		FinalRedirectURL: "https://example.com/logged-out",
+	})
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/logout", bytes.NewReader(b))
+	nr := &normanRecorder{}
+	apiContext := &types.APIContext{
+		Method:         req.Method,
+		Request:        req,
+		Query:          url.Values{},
+		ResponseWriter: nr,
+	}
+
+	require.NoError(t, o.LogoutAll(apiContext, testToken))
+	wantData := map[string]any{
+		"idpRedirectUrl": "http://localhost:8090/user/logout?client_id=test&post_logout_redirect_uri=https%3A%2F%2Fexample.com%2Flogged-out",
+		"type":           "oidcConfigLogoutOutput",
+	}
+	require.Equal(t, []normanResponse{{code: http.StatusOK, data: wantData}}, nr.responses)
+}
+
+func TestLogoutAllNoEndSessionEndpoint(t *testing.T) {
+	const (
+		userId       string = "testing-user"
+		providerName string = "oidc"
+	)
+	oidcConfig := newOIDCConfig("8090")
+	testToken := &v3.Token{UserID: userId, AuthProvider: providerName}
+	o := OpenIDCProvider{
+		Name:      providerName,
+		GetConfig: func() (*v3.OIDCConfig, error) { return oidcConfig, nil },
+	}
+	b, err := json.Marshal(&v3.OIDCConfigLogoutInput{
+		FinalRedirectURL: "https://example.com/logged-out",
+	})
+	require.NoError(t, err)
+	req := httptest.NewRequest(http.MethodPost, "/logout", bytes.NewReader(b))
+
+	nr := &normanRecorder{}
+	apiContext := &types.APIContext{
+		Method:         req.Method,
+		Request:        req,
+		Query:          url.Values{},
+		ResponseWriter: nr,
+	}
+
+	require.NoError(t, o.LogoutAll(apiContext, testToken))
+	wantData := map[string]any{
+		"idpRedirectUrl": "",
+		"type":           "oidcConfigLogoutOutput",
+	}
+	require.Equal(t, []normanResponse{{code: http.StatusOK, data: wantData}}, nr.responses)
 }
 
 // mockOIDCServer creates an http server that mocks an OIDC provider. Responses are passed as a parameter.
@@ -580,8 +700,8 @@ func newOIDCResponses(privateKey *rsa.PrivateKey, port string) oidcResponses {
 	}
 }
 
-func newOIDCConfig(port string) *v32.OIDCConfig {
-	return &v32.OIDCConfig{
+func newOIDCConfig(port string, opts ...func(*v3.OIDCConfig)) *v3.OIDCConfig {
+	cfg := &v3.OIDCConfig{
 		Issuer:           "http://localhost:" + port,
 		ClientID:         "test",
 		JWKSUrl:          "http://localhost:" + port + "/.well-known/jwks.json",
@@ -589,6 +709,12 @@ func newOIDCConfig(port string) *v32.OIDCConfig {
 		TokenEndpoint:    "http://localhost:" + port + "/token",
 		UserInfoEndpoint: "http://localhost:" + port + "/user",
 	}
+
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
+	return cfg
 }
 
 type jsonWebKeySet struct {
@@ -649,4 +775,21 @@ func (m tokenMatcher) String() string {
 
 func EqToken(accessToken string) gomock.Matcher {
 	return tokenMatcher{accessToken}
+}
+
+// normanRecorder is like httptest.ResponseRecorder, but for norman's types.ResponseWriter interface
+type normanRecorder struct {
+	responses []normanResponse
+}
+
+func (n *normanRecorder) Write(_ *types.APIContext, code int, obj interface{}) {
+	n.responses = append(n.responses, normanResponse{
+		code: code,
+		data: obj,
+	})
+}
+
+type normanResponse struct {
+	code int
+	data any
 }
