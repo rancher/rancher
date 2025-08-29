@@ -136,7 +136,7 @@ func (a awsv4) getServiceAndRegion(host string) (string, string) {
 func partitionServiceAndRegion(partition endpoints.Partition, host string) (string, string) {
 	service := ""
 	partitionServices := partition.Services()
-	for _, part := range strings.Split(host, ".") {
+	for part := range strings.SplitSeq(host, ".") {
 		if id := partitionServices[part].ID(); id != "" {
 			service = id
 			break
@@ -149,7 +149,7 @@ func partitionServiceAndRegion(partition endpoints.Partition, host string) (stri
 
 	host = strings.Trim(host, service)
 	serviceRegions := partitionServices[service].Regions()
-	for _, part := range strings.Split(host, ".") {
+	for part := range strings.SplitSeq(host, ".") {
 		if id := serviceRegions[part].ID(); id != "" {
 			return service, id
 		}

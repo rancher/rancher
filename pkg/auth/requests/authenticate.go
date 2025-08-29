@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"strings"
 	"time"
@@ -194,9 +195,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 		common.ExtraRequestTokenID: {token.GetName()},
 		common.ExtraRequestHost:    {req.Host},
 	}
-	for key, value := range getUserExtraInfo(token, authUser, attribs) {
-		extras[key] = value
-	}
+	maps.Copy(extras, getUserExtraInfo(token, authUser, attribs))
 
 	authResp := &AuthenticatorResponse{
 		IsAuthed:      true,

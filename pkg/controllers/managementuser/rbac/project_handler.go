@@ -226,8 +226,8 @@ func getDefaultAndSystemProjectsToNamespaces() (map[string][]string, error) {
 		return nil, fmt.Errorf("failed to load setting %v", settings.SystemNamespaces)
 	}
 
-	splitted := strings.Split(systemNamespacesStr, ",")
-	for _, s := range splitted {
+	splitted := strings.SplitSeq(systemNamespacesStr, ",")
+	for s := range splitted {
 		systemNamespaces = append(systemNamespaces, strings.TrimSpace(s))
 	}
 

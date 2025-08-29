@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"strconv"
 	"sync"
@@ -98,12 +99,8 @@ func GetReleaseConfigByRuntimeAndVersion(ctx context.Context, runtime, kubernete
 		if releaseData.Version == kubernetesVersion {
 			return releaseData
 		}
-		for k, v := range releaseData.ServerArgs {
-			fallBack.ServerArgs[k] = v
-		}
-		for k, v := range releaseData.AgentArgs {
-			fallBack.AgentArgs[k] = v
-		}
+		maps.Copy(fallBack.ServerArgs, releaseData.ServerArgs)
+		maps.Copy(fallBack.AgentArgs, releaseData.AgentArgs)
 	}
 	return fallBack
 }

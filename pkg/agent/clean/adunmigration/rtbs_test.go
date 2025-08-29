@@ -122,7 +122,6 @@ func TestIdentifyCRTBs(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			crtbList := v3.ClusterRoleTemplateBindingList{Items: test.crtbs}
@@ -193,7 +192,6 @@ func TestIdentifyPRTBs(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			prtbList := v3.ProjectRoleTemplateBindingList{Items: test.prtbs}
@@ -234,7 +232,6 @@ func TestIdentifyGRBs(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			grbList := v3.GlobalRoleBindingList{Items: test.grbs}

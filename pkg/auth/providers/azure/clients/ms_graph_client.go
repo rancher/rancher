@@ -494,7 +494,7 @@ func getCustomAuthResult(result confidential.AuthResult) *customAuthResult {
 
 type customAuthResult struct {
 	AccessToken    string    `json:"accessToken,omitempty"`
-	ExpiresOn      time.Time `json:"expiresOn,omitempty"`
+	ExpiresOn      time.Time `json:"expiresOn"`
 	GrantedScopes  []string  `json:"grantedScopes,omitempty"`
 	DeclinedScopes []string  `json:"declinedScopes,omitempty"`
 }

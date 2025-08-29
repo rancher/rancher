@@ -36,7 +36,6 @@ func TestGetUserExternalID(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			externalID := GetUserExternalID(test.username, test.loginDomain)
 			assert.Equal(t, test.want, externalID)

@@ -150,7 +150,7 @@ func StringsToNodeSelectorTerm(exprs []string) []v1.NodeSelectorTerm {
 	for _, inter := range exprs {
 		term := v1.NodeSelectorTerm{}
 
-		for _, expr := range strings.Split(inter, "&&") {
+		for expr := range strings.SplitSeq(inter, "&&") {
 			groups := exprRegexp.FindStringSubmatch(expr)
 			selectorRequirement := v1.NodeSelectorRequirement{}
 

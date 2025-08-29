@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/taints"
 	"io"
 	"io/ioutil"
+	"maps"
 	"net/http"
 	"net/http/httputil"
 	"path/filepath"
@@ -520,9 +521,7 @@ func (c Commands) Render() (map[string][]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		for k, v := range cmdData {
-			data[k] = v
-		}
+		maps.Copy(data, cmdData)
 	}
 
 	return data, nil
@@ -547,8 +546,8 @@ func (c Command) Render(index int) (map[string][]byte, error) {
 	}
 
 	if c.Kustomize {
-		data[fmt.Sprintf("kustomization%s.yaml", fileNumID)] = []byte(fmt.Sprintf(kustomization, fileNumID))
-		data[fmt.Sprintf("transform%s.yaml", fileNumID)] = []byte(fmt.Sprintf(transform, c.ReleaseName))
+		data[fmt.Sprintf("kustomization%s.yaml", fileNumID)] = fmt.Appendf(nil, kustomization, fileNumID)
+		data[fmt.Sprintf("transform%s.yaml", fileNumID)] = fmt.Appendf(nil, transform, c.ReleaseName)
 	}
 
 	return data, nil
@@ -568,9 +567,7 @@ func (c Command) renderArgs() ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		for k, v := range data {
-			dataMap[k] = v
-		}
+		maps.Copy(dataMap, data)
 	}
 
 	delete(dataMap, "annotations")

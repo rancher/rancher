@@ -131,7 +131,6 @@ func (s *simpleManager) startIfNotStarted(ctx context.Context) error {
 	s.exporterMu.Lock()
 	defer s.exporterMu.Unlock()
 	for name, exporter := range s.exporters {
-		exporter := exporter
 		exporter.exp.Register(s.telG)
 		if exporter.running.CompareAndSwap(0, 1) {
 			ctxca, ca := context.WithCancel(ctx)

@@ -4,6 +4,7 @@ package systemcharts
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"slices"
 	"time"
@@ -160,9 +161,7 @@ func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.Cluste
 			installImageOverride = h.registryOverride + "/" + settings.ShellImage.Get()
 		}
 		if chartDef.Values != nil {
-			for k, v := range chartDef.Values() {
-				values[k] = v
-			}
+			maps.Copy(values, chartDef.Values())
 		}
 		// webhook needs to be able to adopt the MutatingWebhookConfiguration which originally wasn't a part of the
 		// chart definition, but is now part of the chart definition

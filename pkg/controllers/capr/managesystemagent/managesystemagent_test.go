@@ -74,7 +74,6 @@ func Test_CurrentVersionResolvesGH5551(t *testing.T) {
 
 	t.Parallel()
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			shouldCreatePlan := CurrentVersionResolvesGH5551(tc.currentVersion)
 			if shouldCreatePlan != tc.expectedResult {

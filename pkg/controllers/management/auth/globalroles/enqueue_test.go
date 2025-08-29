@@ -225,7 +225,6 @@ func Test_enqueueGRBs(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			ctrl := gomock.NewController(t)
@@ -431,7 +430,6 @@ func Test_clusterEnqueueGRs(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			ctrl := gomock.NewController(t)
@@ -553,7 +551,6 @@ func Test_crtbEnqueueGRB(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			ctrl := gomock.NewController(t)
@@ -665,7 +662,6 @@ func Test_roleEnqueueGR(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			ctrl := gomock.NewController(t)
@@ -777,7 +773,6 @@ func Test_roleBindingEnqueueGRB(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			ctrl := gomock.NewController(t)
@@ -886,7 +881,6 @@ func Test_namespaceEnqueueGR(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			ctrl := gomock.NewController(t)
@@ -974,7 +968,6 @@ func TestClusterRoleEnqueueGR(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		test := test
 		t.Run(name, func(t *testing.T) {
 			state := testState{
 				grCacheMock: fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl),
@@ -1057,7 +1050,6 @@ func TestClusterRoleBindingEnqueueGRB(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		test := test
 		t.Run(name, func(t *testing.T) {
 			state := testState{
 				grbCacheMock: fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRoleBinding](ctrl),
@@ -1133,7 +1125,6 @@ func TestFleetWorkspaceEnqueueGRB(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			state := testState{

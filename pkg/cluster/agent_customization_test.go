@@ -92,7 +92,6 @@ func TestAgentCustomization_getPriorityClassValueAndPreemption(t *testing.T) {
 
 	t.Parallel()
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			pcValue, preemption := GetDesiredPriorityClassValueAndPreemption(tt.cluster)
 			assert.Equal(t, tt.expectedPreemption, preemption)
@@ -166,7 +165,6 @@ func TestAgentCustomization_getAgentSchedulingCustomizationStatus(t *testing.T) 
 
 	t.Parallel()
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			returnedStatus := GetAgentSchedulingCustomizationStatus(tt.cluster)
 			assert.Equal(t, returnedStatus, tt.expectedStatus)
@@ -254,7 +252,6 @@ func TestAgentCustomization_agentSchedulingCustomizationEnabled(t *testing.T) {
 
 	t.Parallel()
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			pcEnabled, pdbEnabled := AgentSchedulingCustomizationEnabled(tt.cluster)
 			assert.Equal(t, tt.pcEnabled, pcEnabled)
@@ -332,7 +329,6 @@ func TestAgentCustomization_getAgentSchedulingCustomizationSpec(t *testing.T) {
 
 	t.Parallel()
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			returnedStatus := GetAgentSchedulingCustomizationSpec(tt.cluster)
 			assert.Equal(t, returnedStatus, tt.expectedSpec)
@@ -531,7 +527,6 @@ func TestAgentCustomization_updateAppliedAgentDeploymentCustomization(t *testing
 
 	t.Parallel()
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			UpdateAppliedAgentDeploymentCustomization(tt.cluster)
 			assert.Equal(t, tt.expectedStatus, tt.cluster.Status.AppliedClusterAgentDeploymentCustomization)
@@ -618,7 +613,6 @@ func TestAgentCustomization_getDesiredPodDisruptionBudgetValuesAsString(t *testi
 
 	t.Parallel()
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			minAvailable, maxUnavailable := GetDesiredPodDisruptionBudgetValues(tt.cluster)
 			assert.Equal(t, tt.expectedMinAvailable, minAvailable)
@@ -790,7 +784,6 @@ func TestAgentCustomization_agentSchedulingPodDisruptionBudgetChanged(t *testing
 
 	t.Parallel()
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			pdbUpdated, pdbDeleted := AgentSchedulingPodDisruptionBudgetChanged(tt.cluster)
 			assert.Equal(t, tt.updateExpected, pdbUpdated)
@@ -933,7 +926,6 @@ func TestAgentCustomization_agentSchedulingPriorityClassChanged(t *testing.T) {
 
 	t.Parallel()
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			pcUpdated, pcCreated, pcDeleted := AgentSchedulingPriorityClassChanged(tt.cluster)
 			assert.Equal(t, tt.updateExpected, pcUpdated)
@@ -1170,7 +1162,6 @@ func TestAgentCustomization_agentDeploymentCustomizationChanged(t *testing.T) {
 
 	t.Parallel()
 	for _, tst := range tests {
-		tst := tst
 		t.Run(tst.name, func(t *testing.T) {
 			matches := AgentDeploymentCustomizationChanged(tst.cluster)
 			if matches != tst.expected {

@@ -68,7 +68,7 @@ func (s *ServiceAccountSuite) TestSingleSecretForServiceAccount() {
 
 	// mimic a scenario where multiple func calls for the same SA, and check the resulting Secrets
 	var wg sync.WaitGroup
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()

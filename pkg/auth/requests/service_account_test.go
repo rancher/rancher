@@ -226,7 +226,6 @@ func TestServiceAccountAuthAuthenticate(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		ctrl := gomock.NewController(t)
 		cpsCache := wranglerfake.NewMockCacheInterface[*v3api.ClusterProxyConfig](ctrl)
 		cpsCache.EXPECT().List(gomock.Any(), gomock.Any()).DoAndReturn(func(namespace string, _ labels.Selector) ([]*v3api.ClusterProxyConfig, error) {

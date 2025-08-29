@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"net/netip"
+	"slices"
 	"sort"
 	"strings"
 
@@ -10,13 +11,7 @@ import (
 )
 
 func Contains(collection []string, key string) bool {
-	for _, value := range collection {
-		if value == key {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(collection, key)
 }
 
 func FormatResourceList(resources v1.ResourceList) string {

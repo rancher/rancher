@@ -87,7 +87,7 @@ func findNamespaceCreates(inputYAML string) ([]string, error) {
 }
 
 func waitForNS(nsClient v1.NamespaceInterface, namespaces []string) {
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		allGood := true
 		for _, ns := range namespaces {
 			ns, err := nsClient.Get(ns, v12.GetOptions{})

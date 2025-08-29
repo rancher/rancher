@@ -2,6 +2,7 @@ package rbac
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -177,7 +178,6 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			var newRoles []*rbacv1.ClusterRole
 			var deletedRoleNames []string
@@ -419,24 +419,12 @@ func addNamespaceToClusterRole(namespace string, verb string, clusterRole *rbacv
 	foundIdx := -1
 	// aggregate to a single rule for all NS if we can
 	for i, rule := range clusterRole.Rules {
-		hasApiGroup := false
-		for _, apiGroup := range rule.APIGroups {
-			if apiGroup == "" {
-				hasApiGroup = true
-				break
-			}
-		}
+		hasApiGroup := slices.Contains(rule.APIGroups, "")
 		if !hasApiGroup {
 			continue
 		}
 
-		hasNamespaces := false
-		for _, resource := range rule.Resources {
-			if resource == "namespaces" {
-				hasNamespaces = true
-				break
-			}
-		}
+		hasNamespaces := slices.Contains(rule.Resources, "namespaces")
 		if !hasNamespaces {
 			continue
 		}
@@ -539,7 +527,6 @@ func TestAsyncCleanupRBAC_NamespaceDeleted(t *testing.T) {
 
 	namespaceName := "test-namespace"
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
@@ -664,7 +651,6 @@ func TestEnsurePRTBAddToNamespace(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			crIndexer := &FakeResourceIndexer[*v1.ClusterRole]{
 				resources: map[string][]*v1.ClusterRole{

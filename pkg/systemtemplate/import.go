@@ -137,7 +137,7 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 	cluster *apimgmtv3.Cluster, agentFeatures map[string]bool, taints []corev1.Taint,
 	secretLister v1.SecretLister, pcExists bool) error {
 	var tolerations, agentEnvVars, agentAppendTolerations, agentAffinity, agentResourceRequirements string
-	d := sha256.Sum256([]byte(fmt.Sprintf("%s.%s.%s", url, token, namespace)))
+	d := sha256.Sum256(fmt.Appendf(nil, "%s.%s.%s", url, token, namespace))
 	tokenKey := hex.EncodeToString(d[:])[:10]
 
 	if authImage == "fixed" {

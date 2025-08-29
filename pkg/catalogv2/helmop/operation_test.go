@@ -50,8 +50,8 @@ func Test_Render(t *testing.T) {
 			},
 			expected: map[string][]byte{
 				"operation000":          []byte(strings.Join([]string{"upgrade", "--post-renderer=/home/shell/kustomize.sh", "test1", "/home/shell/helm-run/test-chart-v1.1.0.tgz"}, "\x00")),
-				"kustomization000.yaml": []byte(fmt.Sprintf(kustomization, "000")),
-				"transform000.yaml":     []byte(fmt.Sprintf(transform, "test1")),
+				"kustomization000.yaml": fmt.Appendf(nil, kustomization, "000"),
+				"transform000.yaml":     fmt.Appendf(nil, transform, "test1"),
 				"test-chart-v1.1.0.tgz": []byte("test-chart"),
 			},
 			failMsg: "kustomize enabled test case failed",
@@ -150,8 +150,8 @@ func Test_Render(t *testing.T) {
 			},
 			expected: map[string][]byte{
 				"operation000":          []byte(strings.Join([]string{"upgrade", "--post-renderer=/home/shell/kustomize.sh", "test6", "/home/shell/helm-run/test-chart-v1.1.0.tgz"}, "\x00")),
-				"kustomization000.yaml": []byte(fmt.Sprintf(kustomization, "000")),
-				"transform000.yaml":     []byte(fmt.Sprintf(transform, "test6")),
+				"kustomization000.yaml": fmt.Appendf(nil, kustomization, "000"),
+				"transform000.yaml":     fmt.Appendf(nil, transform, "test6"),
 				"test-chart-v1.1.0.tgz": []byte("test-chart"),
 			},
 			failMsg: "operation toleration test case failed",

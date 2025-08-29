@@ -59,7 +59,7 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 	}
 
 	hasher := sha256.New()
-	hasher.Write([]byte(fmt.Sprintf("system://provisioning/%s/%s", c.Namespace, c.Name)))
+	hasher.Write(fmt.Appendf(nil, "system://provisioning/%s/%s", c.Namespace, c.Name))
 	sha := base32.StdEncoding.WithPadding(-1).EncodeToString(hasher.Sum(nil))[:10]
 	ciSAName := "cattle-impersonation-u-" + strings.ToLower(sha)
 

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"slices"
 	"sort"
 	"time"
 
@@ -459,10 +460,5 @@ func (i *Impersonator) getUser(userInfo user.Info) (user.Info, error) {
 }
 
 func isInList(item string, list []string) bool {
-	for _, s := range list {
-		if item == s {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(list, item)
 }

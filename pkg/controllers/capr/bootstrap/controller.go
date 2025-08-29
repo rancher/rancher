@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"maps"
 	"strings"
 	"time"
 
@@ -392,14 +393,10 @@ func getLabelsAndAnnotationsForPlanSecret(bootstrap *rkev1.RKEBootstrap, machine
 	labels[capr.MachineNameLabel] = machine.Name
 	labels[capr.ClusterNameLabel] = bootstrap.Spec.ClusterName
 	labels[capr.BackupLabel] = "true"
-	for k, v := range bootstrap.Labels {
-		labels[k] = v
-	}
+	maps.Copy(labels, bootstrap.Labels)
 
 	annotations := make(map[string]string, len(bootstrap.Annotations))
-	for k, v := range bootstrap.Annotations {
-		annotations[k] = v
-	}
+	maps.Copy(annotations, bootstrap.Annotations)
 
 	return labels, annotations
 }

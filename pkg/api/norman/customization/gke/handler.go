@@ -302,7 +302,7 @@ func (h *handler) generateAPIContext(req *http.Request) *types.APIContext {
 }
 
 func handleErr(writer http.ResponseWriter, errorCode int, originalErr error) {
-	asJSON := []byte(fmt.Sprintf(`{"error":"%v"}`, originalErr))
+	asJSON := fmt.Appendf(nil, `{"error":"%v"}`, originalErr)
 
 	writer.WriteHeader(errorCode)
 	writer.Write(asJSON)

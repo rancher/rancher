@@ -3,6 +3,7 @@ package namespaces
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/extensions/defaults"
@@ -83,10 +84,8 @@ func CreateNamespace(client *rancher.Client, clusterID, projectName, namespaceNa
 		}
 
 		for _, rule := range clusterRole.Rules {
-			for _, resourceName := range rule.ResourceNames {
-				if resourceName == namespaceName {
-					return true, nil
-				}
+			if slices.Contains(rule.ResourceNames, namespaceName) {
+				return true, nil
 			}
 		}
 		return false, nil

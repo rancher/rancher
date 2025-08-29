@@ -63,8 +63,8 @@ func parseChallenge(header string) (map[string]string, error) {
 	}
 	data := map[string]string{}
 	s = strings.Trim(s[7:], " \n\r\t")
-	terms := strings.Split(s, ", ")
-	for _, term := range terms {
+	terms := strings.SplitSeq(s, ", ")
+	for term := range terms {
 		splitTerm := strings.SplitN(term, "=", 2)
 		data[splitTerm[0]] = strings.Trim(splitTerm[1], "\"")
 	}

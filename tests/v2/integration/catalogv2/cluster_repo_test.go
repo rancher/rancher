@@ -542,7 +542,7 @@ func (c *ClusterRepoTestSuite) TestOCIRepoMultipleChartRepos() {
 	require.NoError(c.T(), err)
 
 	//push testingchart helm chart
-	for i := 0; i < 300; i++ {
+	for i := range 300 {
 		err = AddHelmChart(u, fmt.Sprintf("testingchart-%d", i), "../../../testdata/testingchart-0.1.0.tgz", "0.1.0")
 		require.NoError(c.T(), err)
 	}

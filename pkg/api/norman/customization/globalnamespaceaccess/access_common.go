@@ -391,8 +391,8 @@ func (ma *MemberAccess) getUserFromUserPrincipalID(userPrincipalID string) (*v3.
 
 	if len(usersList.Items) == 0 {
 		// check for local auth principals
-		if strings.HasPrefix(userPrincipalID, localPrincipalPrefix) {
-			userID := strings.TrimPrefix(userPrincipalID, localPrincipalPrefix)
+		if after, ok := strings.CutPrefix(userPrincipalID, localPrincipalPrefix); ok {
+			userID := after
 			user, err := ma.Users.Controller().Lister().Get("", userID)
 			return user, err
 		}

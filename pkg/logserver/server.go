@@ -51,18 +51,18 @@ func (s *Server) loglevel(rw http.ResponseWriter, req *http.Request) {
 	logrus.Debugf("Received loglevel request")
 	if req.Method == http.MethodGet {
 		level := logrus.GetLevel().String()
-		rw.Write([]byte(fmt.Sprintf("%s\n", level)))
+		rw.Write(fmt.Appendf(nil, "%s\n", level))
 	}
 
 	if req.Method == http.MethodPost {
 		if err := req.ParseForm(); err != nil {
 			rw.WriteHeader(http.StatusInternalServerError)
-			rw.Write([]byte(fmt.Sprintf("Failed to parse form: %v\n", err)))
+			rw.Write(fmt.Appendf(nil, "Failed to parse form: %v\n", err))
 		}
 		level, err := logrus.ParseLevel(req.Form.Get("level"))
 		if err != nil {
 			rw.WriteHeader(http.StatusInternalServerError)
-			rw.Write([]byte(fmt.Sprintf("Failed to parse loglevel: %v\n", err)))
+			rw.Write(fmt.Appendf(nil, "Failed to parse loglevel: %v\n", err))
 		} else {
 			logrus.SetLevel(level)
 			rw.Write([]byte("OK\n"))
