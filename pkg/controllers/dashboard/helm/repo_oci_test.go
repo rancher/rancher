@@ -391,7 +391,7 @@ func TestShouldSkip(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "Should skip if nextRetryAt is after time.now()",
+			name: "Should skip if nextRetryAt is one minute after time.now()",
 			timeNow: func() time.Time {
 				return time.Date(2024, 04, 23, 10, 1, 0, 0, time.UTC)
 			},
@@ -402,6 +402,32 @@ func TestShouldSkip(t *testing.T) {
 				return mockController
 			},
 			expected: true,
+		},
+		{
+			name: "Should NOT skip if execution is one second early",
+			timeNow: func() time.Time {
+				return time.Date(2024, 04, 23, 10, 1, 29, 500, time.UTC)
+			},
+			nextRetryAt: metav1.NewTime(time.Date(2024, 04, 23, 10, 1, 30, 500, time.UTC)),
+			newClusterRepoController: func(ctrl *gomock.Controller) *fake.MockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList] {
+				mockController := fake.NewMockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList](ctrl)
+				mockController.EXPECT().Get("clusterRepo", metav1.GetOptions{}).Return(&catalog.ClusterRepo{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}}, nil)
+				return mockController
+			},
+			expected: false,
+		},
+		{
+			name: "Should NOT skip if execution is two second early",
+			timeNow: func() time.Time {
+				return time.Date(2024, 04, 23, 10, 1, 30, 500, time.UTC)
+			},
+			nextRetryAt: metav1.NewTime(time.Date(2024, 04, 23, 10, 1, 32, 500, time.UTC)),
+			newClusterRepoController: func(ctrl *gomock.Controller) *fake.MockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList] {
+				mockController := fake.NewMockNonNamespacedControllerInterface[*catalog.ClusterRepo, *catalog.ClusterRepoList](ctrl)
+				mockController.EXPECT().Get("clusterRepo", metav1.GetOptions{}).Return(&catalog.ClusterRepo{ObjectMeta: metav1.ObjectMeta{ResourceVersion: "1"}}, nil)
+				return mockController
+			},
+			expected: false,
 		},
 		{
 			name: "Should NOT skip if status.ShouldNotSkip is true",

@@ -432,11 +432,10 @@ func shouldSkip(clusterRepo *catalog.ClusterRepo,
 	// The handler is triggered immediately after any changes, including when updating the number of retries done.
 	// This check is to prevent the handler from executing before the backoff time has passed.
 	// There is a 2 seconds margin of error to account for possible early executions by wrangler.
-	if !newStatus.NextRetryAt.IsZero() && newStatus.NextRetryAt.Time.After(now.Add(-2*time.Second)) {
+	if !newStatus.NextRetryAt.IsZero() && newStatus.NextRetryAt.Time.After(now.Add(2*time.Second)) {
 		logrus.Infof("Skipping handler for clusterrepo %s because the next retry time is %s and now is %s", clusterRepo.Name, newStatus.NextRetryAt.Time, now)
 		return true
 	}
-
 	if newStatus.ShouldNotSkip { //checks if we should skip running the handler or not
 		return false
 	}
