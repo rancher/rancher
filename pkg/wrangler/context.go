@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"slices"
 	"sync"
 
 	fleetv1alpha1api "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
@@ -106,7 +107,7 @@ var (
 	Scheme      = runtime.NewScheme()
 
 	cacheSyncTimeoutEnvVar = "CACHE_SYNC_TIMEOUT"
-	cacheSyncTimeout       time.Duration
+	cacheSyncTimeout       = time.Minute * 5
 )
 
 func init() {
@@ -114,14 +115,9 @@ func init() {
 	utilruntime.Must(AddToScheme(Scheme))
 	utilruntime.Must(schemes.AddToScheme(Scheme))
 
-	switch timeout := os.Getenv(cacheSyncTimeoutEnvVar); timeout {
-	case "":
-		cacheSyncTimeout = time.Minute * 5
-
-	default:
+	if timeout := os.Getenv(cacheSyncTimeoutEnvVar); timeout == "" {
 		var err error
-		cacheSyncTimeout, err = time.ParseDuration(timeout)
-		if err != nil {
+		if cacheSyncTimeout, err = time.ParseDuration(timeout); err != nil {
 			logrus.Fatalf("env var '%s' is not a valid duration: %s", cacheSyncTimeoutEnvVar, timeout)
 		}
 	}
@@ -209,13 +205,9 @@ func (w *Context) checkGVK(ctx context.Context, gvk schema.GroupVersionKind) err
 
 	}
 
-	var enabled bool
-	for _, v := range crd.Spec.Versions {
-		if v.Served {
-			enabled = true
-			break
-		}
-	}
+	enabled := slices.ContainsFunc(crd.Spec.Versions, func(v apiextensionsv1.CustomResourceDefinitionVersion) bool {
+		return v.Served
+	})
 
 	if !enabled {
 		return fmt.Errorf("crd '%s' has no served versions", gvk.String())
@@ -237,7 +229,9 @@ func (w *Context) StartWithTransaction(ctx context.Context, f func(context.Conte
 		return err
 	}
 
-	timeoutCtx, _ := context.WithTimeout(ctx, cacheSyncTimeout)
+	timeoutCtx, cancel := context.WithTimeout(ctx, cacheSyncTimeout)
+	defer cancel()
+
 	gvks := w.ControllerFactory.SharedCacheFactory().WaitForCacheSync(timeoutCtx)
 
 	for gvk, isSynced := range gvks {
