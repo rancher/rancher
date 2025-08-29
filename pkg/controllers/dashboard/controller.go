@@ -2,6 +2,7 @@ package dashboard
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/rancher/rancher/pkg/controllers/capr"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
@@ -23,7 +24,6 @@ import (
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/needacert"
-	"github.com/sirupsen/logrus"
 )
 
 func Register(ctx context.Context, clients *wrangler.Context, embedded bool, registryOverride string) error {
@@ -73,7 +73,7 @@ func Register(ctx context.Context, clients *wrangler.Context, embedded bool, reg
 			provisioningv2.Register(ctx, clients, kubeconfigManager)
 			if features.RKE2.Enabled() {
 				if err := capr.Register(ctx, clients, kubeconfigManager); err != nil {
-					logrus.Fatalf("failed to register capr controllers: %v", err)
+					return fmt.Errorf("failed to register capr controllers: %w", err)
 				}
 			}
 			return nil

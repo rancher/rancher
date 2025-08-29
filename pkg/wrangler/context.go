@@ -11,6 +11,7 @@ import (
 	"os"
 	"slices"
 	"sync"
+	"time"
 
 	fleetv1alpha1api "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/lasso/pkg/controller"

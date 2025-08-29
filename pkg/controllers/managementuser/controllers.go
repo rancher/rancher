@@ -39,18 +39,13 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	windows.Register(ctx, clusterRec, cluster)
 	nsserviceaccount.Register(ctx, cluster)
 
-	if mgmt.Wrangler.DeferredCAPIRegistration.Initialized() {
-		nodesyncer.Register(ctx, cluster, kubeConfigGetter)
-		registerProvV2(ctx, cluster, clusterRec)
-	} else {
-		mgmt.Wrangler.DeferredCAPIRegistration.DeferFunc(func(_ *wrangler.Context) {
-			_ = cluster.DeferredStart(ctx, func(ctx context.Context) error {
-				nodesyncer.Register(ctx, cluster, kubeConfigGetter)
-				registerProvV2(ctx, cluster, clusterRec)
-				return nil
-			})()
-		})
-	}
+	mgmt.Wrangler.DeferredCAPIRegistration.DeferFunc(func(_ *wrangler.Context) {
+		_ = cluster.DeferredStart(ctx, func(ctx context.Context) error {
+			nodesyncer.Register(ctx, cluster, kubeConfigGetter)
+			registerProvV2(ctx, cluster, clusterRec)
+			return nil
+		})()
+	})
 
 	registerImpersonationCaches(cluster)
 

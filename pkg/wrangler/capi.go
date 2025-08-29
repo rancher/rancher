@@ -48,12 +48,11 @@ func (w *Context) manageDeferredCAPIContext(ctx context.Context) {
 
 		w.capi = capi
 		w.CAPI = capi.Cluster().V1beta1()
-		w.DeferredCAPIRegistration.ready = true
 
 		go func() {
-			err = w.DeferredCAPIRegistration.runAsync(ctx)
+			err = w.DeferredCAPIRegistration.run(ctx)
 			if err != nil {
-				logrus.Fatalf("failed to run asynchronous loop during deferred capi registration: %v", err)
+				logrus.Fatalf("failed to run loop during deferred capi registration: %v", err)
 			}
 		}()
 
@@ -107,7 +106,6 @@ func capiCRDsReady(crdCache wapiextv1.CustomResourceDefinitionCache) bool {
 
 type DeferredCAPIRegistration struct {
 	mutex sync.Mutex
-	ready bool
 
 	clients           *Context
 	registrationFuncs chan func(ctx context.Context, clients *Context) error
@@ -122,13 +120,7 @@ func newDeferredCAPIRegistration(clients *Context) *DeferredCAPIRegistration {
 	}
 }
 
-func (d *DeferredCAPIRegistration) Initialized() bool {
-	d.mutex.Lock()
-	defer d.mutex.Unlock()
-	return d.ready
-}
-
-func (d *DeferredCAPIRegistration) runAsync(ctx context.Context) error {
+func (d *DeferredCAPIRegistration) run(ctx context.Context) error {
 	for {
 		select {
 		case f := <-d.registrationFuncs:

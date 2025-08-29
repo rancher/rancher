@@ -87,7 +87,7 @@ func New(clients *wrangler.Context) *RKE2ConfigServer {
 		k8s:                      clients.K8s,
 	}
 
-	go configSrv.DeferCAPIResources(clients)
+	configSrv.DeferCAPIResources(clients)
 	return configSrv
 }
 
