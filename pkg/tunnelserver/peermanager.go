@@ -140,7 +140,7 @@ func (p *peerManager) syncService(key string, endpoint *v1.Endpoints) (*v1.Endpo
 		return nil, nil
 	}
 
-	for _, svc := range strings.Split(settings.PeerServices.Get(), ",") {
+	for svc := range strings.SplitSeq(settings.PeerServices.Get(), ",") {
 		if name == strings.TrimSpace(svc) {
 			p.addRemovePeers(endpoint)
 			break

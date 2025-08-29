@@ -277,7 +277,7 @@ func listFamiliesFromProject(ctx context.Context, cap *Capabilities, projects st
 	// ensure we only process each item once, as listing all
 	// images in a project is intensive
 	uniqueProjects := make(map[string]struct{})
-	for _, project := range strings.Split(projects, ",") {
+	for project := range strings.SplitSeq(projects, ",") {
 		uniqueProjects[project] = struct{}{}
 	}
 
@@ -317,7 +317,7 @@ func listImageFamilyForProject(ctx context.Context, cap *Capabilities, imageProj
 	}
 
 	uniqueFamilies := make(map[string]struct{})
-	for _, part := range strings.Split(imageFamilies, ",") {
+	for part := range strings.SplitSeq(imageFamilies, ",") {
 		uniqueFamilies[part] = struct{}{}
 	}
 

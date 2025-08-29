@@ -45,7 +45,6 @@ func TestWorkUnitContainsName(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			result := workUnitContainsName(&workunit, test.query)
@@ -107,7 +106,6 @@ func TestWorkUnitIdentification(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			ldapConnection := mockLdapAlwaysSucceed{}
@@ -280,7 +278,6 @@ func TestWorkUnitDuplicateAgeResolution(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			ldapConnection := mockLdapAlwaysSucceed{}
@@ -366,7 +363,6 @@ func TestWorkUnitConnectionFailures(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			userList := v3.UserList{Items: test.users}

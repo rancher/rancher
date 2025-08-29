@@ -7,6 +7,7 @@ import (
 	"os/user"
 	"path"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -83,13 +84,7 @@ func getCreateFlagsForDriver(driver string) ([]cli.Flag, error) {
 	finalDriverName := driver
 
 	if os.Getenv("CATTLE_DEV_MODE") == "" {
-		core := false
-		for _, coreDriver := range localbinary.CoreDrivers {
-			if coreDriver == driver {
-				core = true
-				break
-			}
-		}
+		core := slices.Contains(localbinary.CoreDrivers, driver)
 		if !core {
 			fullName := fmt.Sprintf("%s%s", drivers.DockerMachineDriverPrefix, driver)
 			finalDriverName = path.Join("/opt/drivers/management-state/bin", fullName)
@@ -160,8 +155,8 @@ func ParseKeyValueString(input string) map[string]string {
 		return result
 	}
 
-	pairs := strings.Split(input, ",")
-	for _, pair := range pairs {
+	pairs := strings.SplitSeq(input, ",")
+	for pair := range pairs {
 		keyVal := strings.Split(pair, ":")
 		key := strings.TrimSpace(keyVal[0])
 		value := strings.TrimSpace(keyVal[1])

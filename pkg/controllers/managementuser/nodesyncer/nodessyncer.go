@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"reflect"
 	"sort"
 	"strings"
@@ -638,21 +639,13 @@ func (m *nodesSyncer) convertNodeToMachine(node *corev1.Node, existing *apimgmtv
 		machine.Status.Limits = corev1.ResourceList{}
 	}
 
-	for name, quantity := range requests {
-		machine.Status.Requested[name] = quantity
-	}
-	for name, quantity := range limits {
-		machine.Status.Limits[name] = quantity
-	}
+	maps.Copy(machine.Status.Requested, requests)
+	maps.Copy(machine.Status.Limits, limits)
 	machine.Status.NodeLabels = make(map[string]string, len(node.Labels))
-	for k, v := range node.Labels {
-		machine.Status.NodeLabels[k] = v
-	}
+	maps.Copy(machine.Status.NodeLabels, node.Labels)
 	determineNodeRoles(machine)
 	machine.Status.NodeAnnotations = make(map[string]string, len(node.Annotations))
-	for k, v := range node.Annotations {
-		machine.Status.NodeAnnotations[k] = v
-	}
+	maps.Copy(machine.Status.NodeAnnotations, node.Annotations)
 	machine.Status.NodeName = node.Name
 	machine.APIVersion = "management.cattle.io/v3"
 	machine.Kind = "Node"

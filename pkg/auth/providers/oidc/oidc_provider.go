@@ -562,8 +562,8 @@ func (o *OpenIDCProvider) getGroupsFromClaimInfo(claimInfo ClaimInfo) []v3.Princ
 
 	if claimInfo.FullGroupPath != nil {
 		for _, groupPath := range claimInfo.FullGroupPath {
-			groupsFromPath := strings.Split(groupPath, "/")
-			for _, group := range groupsFromPath {
+			groupsFromPath := strings.SplitSeq(groupPath, "/")
+			for group := range groupsFromPath {
 				if group != "" {
 					groupPrincipal := o.groupToPrincipal(group)
 					groupPrincipal.MemberOf = true

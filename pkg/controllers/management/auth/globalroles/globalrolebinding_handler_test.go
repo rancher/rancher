@@ -2,6 +2,7 @@ package globalroles
 
 import (
 	"fmt"
+	"maps"
 	"testing"
 	"time"
 
@@ -145,9 +146,7 @@ func TestCreateUpdate(t *testing.T) {
 			"authz.management.cattle.io/crb-name": "cattle-globalrolebinding-" + grb.Name,
 		}
 		for _, o := range others {
-			for k, v := range o {
-				newGRB.Annotations[k] = v
-			}
+			maps.Copy(newGRB.Annotations, o)
 		}
 
 		return newGRB
@@ -1283,7 +1282,6 @@ func TestCreateUpdate(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			grbLifecycle := globalRoleBindingLifecycle{}
@@ -2039,7 +2037,6 @@ func Test_reconcileClusterPermissions(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			ctrl := gomock.NewController(t)
@@ -2679,7 +2676,6 @@ func Test_reconcileNamespacedPermissions(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 

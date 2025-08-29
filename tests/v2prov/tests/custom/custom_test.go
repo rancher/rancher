@@ -118,7 +118,7 @@ func Test_Provisioning_Custom_ThreeNode(t *testing.T) {
 
 	assert.NotEmpty(t, command)
 
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker --etcd --controlplane --label rancher=awesome", map[string]string{"custom-cluster-name": c.Name}, nil)
 		if err != nil {
 			t.Fatal(err)
@@ -182,14 +182,14 @@ func Test_Provisioning_Custom_UniqueRoles(t *testing.T) {
 
 	assert.NotEmpty(t, command)
 
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --etcd", map[string]string{"custom-cluster-name": c.Name}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	for i := 0; i < 1; i++ {
+	for range 1 {
 		_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --controlplane", map[string]string{"custom-cluster-name": c.Name}, nil)
 		if err != nil {
 			t.Fatal(err)
@@ -265,7 +265,7 @@ func Test_Provisioning_Custom_ThreeNodeWithTaints(t *testing.T) {
 
 	assert.NotEmpty(t, command)
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		var taint string
 		// Put a taint on one of the nodes.
 		if i == 1 {

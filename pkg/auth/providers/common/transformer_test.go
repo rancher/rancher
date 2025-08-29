@@ -69,7 +69,6 @@ func TestTransformToAuthProvider(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.desc, func(t *testing.T) {
 			t.Parallel()
 

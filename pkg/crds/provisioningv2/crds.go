@@ -2,6 +2,7 @@ package provisioningv2
 
 import (
 	"embed"
+	"maps"
 
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -54,9 +55,7 @@ func provisioning() []crd.CRD {
 
 func clusterIndexed(c crd.CRD) crd.CRD {
 	newLabels := map[string]string{}
-	for k, v := range c.Labels {
-		newLabels[k] = v
-	}
+	maps.Copy(newLabels, c.Labels)
 	newLabels["auth.cattle.io/cluster-indexed"] = "true"
 	c.Labels = newLabels
 	return c

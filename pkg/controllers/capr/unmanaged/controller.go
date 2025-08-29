@@ -214,7 +214,7 @@ func (h *handler) createMachineObjects(capiCluster *capi.Cluster, machineName st
 	labels[capi.ClusterNameLabel] = capiCluster.Name
 
 	labelsMap := map[string]string{}
-	for _, str := range strings.Split(data.String("labels"), ",") {
+	for str := range strings.SplitSeq(data.String("labels"), ",") {
 		k, v := kv.Split(str, "=")
 		if k == "" {
 			continue

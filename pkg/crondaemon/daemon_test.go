@@ -50,8 +50,7 @@ func (f *fakeCronRunner) Wait() {
 
 func TestNew(t *testing.T) {
 	// This is a slow test that exercises the real cron runner.
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	var ran atomic.Uint32
 
@@ -72,8 +71,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestScheduleAndDisable(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	var (
 		ran        atomic.Uint32
@@ -185,8 +183,7 @@ func TestScheduleAndCancelContext(t *testing.T) {
 }
 
 func TestConcurrentRuns(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	var (
 		ran        atomic.Uint32
@@ -241,8 +238,7 @@ func TestScheduleWithCanceledContext(t *testing.T) {
 }
 
 func TestScheduleWithInvalidCronExpression(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	daemon := &Daemon{
 		ctx: ctx,
@@ -259,8 +255,7 @@ func TestScheduleWithInvalidCronExpression(t *testing.T) {
 }
 
 func TestRescheduleWithInvalidCronExpression(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	var (
 		ran        atomic.Uint32

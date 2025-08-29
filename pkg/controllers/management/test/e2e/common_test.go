@@ -39,7 +39,7 @@ func setupNS(name, projectName string, nsClient v1.NamespaceInterface, c *check.
 			case watchEvent := <-nsWatch.ResultChan():
 				if watch.Deleted == watchEvent.Type || watch.Modified == watchEvent.Type {
 					if ns, ok := watchEvent.Object.(*corev1.Namespace); ok && ns.Name == name {
-						for i := 0; i < 10; i++ {
+						for range 10 {
 							if ns, err := nsClient.Get(context.TODO(), name, metav1.GetOptions{}); err == nil {
 								if ns.Status.Phase == corev1.NamespaceTerminating && len(ns.Spec.Finalizers) == 0 {
 									break Loop

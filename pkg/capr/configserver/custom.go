@@ -132,8 +132,8 @@ func machineRequestSecretName(name string) string {
 func dataFromHeaders(req *http.Request) map[string]interface{} {
 	data := make(map[string]interface{})
 	for k, v := range req.Header {
-		if strings.HasPrefix(k, headerPrefix) {
-			data[strings.ToLower(strings.TrimPrefix(k, headerPrefix))] = v
+		if after, ok := strings.CutPrefix(k, headerPrefix); ok {
+			data[strings.ToLower(after)] = v
 		}
 	}
 

@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"path"
+	"slices"
 	"strings"
 	"time"
 
@@ -758,10 +760,8 @@ func setCondition(dynamic *dynamic.Controller, obj runtime.Object, conditionType
 }
 
 func insertOrUpdateCondition(d data.Object, desiredCondition summary.Condition) (bool, error) {
-	for _, cond := range summary.GetUnstructuredConditions(d) {
-		if desiredCondition.Equals(cond) {
-			return false, nil
-		}
+	if slices.ContainsFunc(summary.GetUnstructuredConditions(d), desiredCondition.Equals) {
+		return false, nil
 	}
 
 	// The conditions must be converted to a map so that DeepCopyJSONValue will
@@ -852,9 +852,7 @@ func (h *handler) constructCertsSecret(machineName, machineNamespace string) (*c
 	}
 
 	if secret, err := h.secrets.Get(namespace.System, "tls-additional"); err == nil {
-		for key, val := range secret.Data {
-			certSecretData[key] = val
-		}
+		maps.Copy(certSecretData, secret.Data)
 	} else if !apierrors.IsNotFound(err) {
 		return nil, err
 	}

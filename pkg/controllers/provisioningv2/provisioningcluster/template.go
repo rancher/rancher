@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"strconv"
 	"strings"
 
@@ -348,12 +349,8 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 		}
 
 		machineDeploymentLabels := map[string]string{}
-		for k, v := range machinePool.Labels {
-			machineDeploymentLabels[k] = v
-		}
-		for k, v := range machinePool.MachineDeploymentLabels {
-			machineDeploymentLabels[k] = v
-		}
+		maps.Copy(machineDeploymentLabels, machinePool.Labels)
+		maps.Copy(machineDeploymentLabels, machinePool.MachineDeploymentLabels)
 
 		machineDeploymentLabels[capr.CattleOSLabel] = machineOS
 
@@ -434,9 +431,7 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 		machineDeployment.Spec.Template.Labels[capr.CattleOSLabel] = machineOS
 
 		if len(machinePool.Labels) > 0 {
-			for k, v := range machinePool.Labels {
-				machineDeployment.Spec.Template.Labels[k] = v
-			}
+			maps.Copy(machineDeployment.Spec.Template.Labels, machinePool.Labels)
 			if err := assign(machineDeployment.Spec.Template.Annotations, capr.LabelsAnnotation, machinePool.Labels); err != nil {
 				return nil, err
 			}

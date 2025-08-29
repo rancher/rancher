@@ -81,7 +81,7 @@ func (s Sha3Hasher) VerifyHash(hash, secretKey string) error {
 		return err
 	}
 	// compare the two
-	hashedSecretKey := sha3.Sum512([]byte(fmt.Sprintf("%s%s", string(decodedSalt), secretKey)))
+	hashedSecretKey := sha3.Sum512(fmt.Appendf(nil, "%s%s", string(decodedSalt), secretKey))
 	if subtle.ConstantTimeCompare(decodedKey, hashedSecretKey[:]) == 0 {
 		return fmt.Errorf("secretKey hash does not match")
 	}

@@ -190,7 +190,6 @@ func TestGenerateMasterPlan(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.expected, generateMasterPlan(tt.version, tt.concurrency, tt.drain, tt.image, "master-plan"))
 		})
@@ -366,7 +365,6 @@ func TestGenerateWorkerPlan(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.expected, generateWorkerPlan(tt.version, tt.concurrency, tt.drain, tt.image, "worker-plan", "master-plan"))
 		})
@@ -509,7 +507,6 @@ func TestConfigureMasterPlan(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			masterPlan := masterPlan
 			assert.Equal(t, tt.expected, configureMasterPlan(masterPlan, tt.version, tt.concurrency, tt.drain, "master-plan"))
@@ -662,7 +659,6 @@ func TestConfigureWorkerPlan(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			workerPlan := workerPlan
 			assert.Equal(t, tt.expected, configureWorkerPlan(workerPlan, tt.version, tt.concurrency, tt.drain, "test-image", "worker-plan", "master-plan"))

@@ -3,6 +3,7 @@ package setting
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/rancher/norman/httperror"
@@ -97,10 +98,8 @@ func validate(id, value string) error {
 		k8sVersion = settings.KubernetesVersion.Get()
 	}
 
-	for _, curr := range k8sCurrVersions {
-		if curr == k8sVersion {
-			return nil
-		}
+	if slices.Contains(k8sCurrVersions, k8sVersion) {
+		return nil
 	}
 
 	return httperror.NewAPIError(httperror.MissingRequired, "default k8s-version must be present in k8s-versions-current")

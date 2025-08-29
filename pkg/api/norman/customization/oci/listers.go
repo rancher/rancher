@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/oracle/oci-go-sdk/common"
@@ -237,12 +238,7 @@ func processNodeOkeImages(provider common.ConfigurationProvider) ([]byte, int, e
 }
 
 func listContains(list []string, entry string) bool {
-	for _, x := range list {
-		if x == entry {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(list, entry)
 }
 
 func getErrorCode(response *http.Response) int {

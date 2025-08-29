@@ -28,7 +28,7 @@ var (
 
 type ScalingGroup struct {
 	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta `json:"metadata"`
 	Spec              interface{} `json:"spec"`
 	Status            interface{} `json:"status"`
 }

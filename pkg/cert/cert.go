@@ -123,7 +123,7 @@ func Info(pemCerts, pemKey string) (*CertificateInfo, error) {
 func fingerprint(data []byte) string {
 	digest := sha1.Sum(data)
 	buf := &bytes.Buffer{}
-	for i := 0; i < len(digest); i++ {
+	for i := range len(digest) {
 		if buf.Len() > 0 {
 			buf.WriteString(":")
 		}

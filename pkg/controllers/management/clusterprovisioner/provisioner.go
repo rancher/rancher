@@ -3,6 +3,7 @@ package clusterprovisioner
 import (
 	"context"
 	"fmt"
+	"maps"
 	"reflect"
 	"strings"
 	"time"
@@ -98,7 +99,7 @@ func (p *Provisioner) Remove(cluster *apimgmtv3.Cluster) (runtime.Object, error)
 		return nil, nil
 	}
 
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		// cluster will be forcefully removed on last attempt
 		err := p.driverRemove(cluster, i == 3)
 		if err == nil {
@@ -503,7 +504,7 @@ func (p *Provisioner) reconcileCluster(cluster *apimgmtv3.Cluster, create bool) 
 	}
 
 	saved := false
-	for i := 0; i < 20; i++ {
+	for range 20 {
 		cluster, err = p.Clusters.Get(cluster.Name, metav1.GetOptions{})
 		if err != nil {
 			return cluster, err
@@ -569,9 +570,7 @@ func (p *Provisioner) setGenericConfigs(cluster *apimgmtv3.Cluster) {
 func copyMap(toCopy apimgmtv3.MapStringInterface) apimgmtv3.MapStringInterface {
 	newMap := apimgmtv3.MapStringInterface{}
 
-	for k, v := range toCopy {
-		newMap[k] = v
-	}
+	maps.Copy(newMap, toCopy)
 
 	return newMap
 }
