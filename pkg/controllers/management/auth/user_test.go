@@ -20,7 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8stypes "k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func Test_hasLocalPrincipalID(t *testing.T) {
@@ -273,7 +273,7 @@ func TestUpdated(t *testing.T) {
 					Name: "testuser",
 				},
 				PrincipalIDs: []string{},
-				Enabled:      pointer.Bool(false),
+				Enabled:      ptr.To(false),
 			},
 			mockSetup: func(
 				secrets *wranglerfake.MockControllerInterface[*v1.Secret, *v1.SecretList],
@@ -292,7 +292,7 @@ func TestUpdated(t *testing.T) {
 				scache.EXPECT().
 					List("cattle-tokens", gomock.Any()).
 					Return([]*v1.Secret{
-						&v1.Secret{
+						{
 							ObjectMeta: metav1.ObjectMeta{
 								Name: "testuser-token",
 							},
@@ -328,7 +328,7 @@ func TestUpdated(t *testing.T) {
 					Name: "testuser",
 				},
 				PrincipalIDs: []string{},
-				Enabled:      pointer.Bool(false),
+				Enabled:      ptr.To(false),
 			},
 			mockSetup: func(
 				secrets *wranglerfake.MockControllerInterface[*v1.Secret, *v1.SecretList],
@@ -598,7 +598,7 @@ func Test_deleteAllCRTB(t *testing.T) {
 		{
 			name: "crtb deleted properly",
 			inputCRTB: []*v3.ClusterRoleTemplateBinding{
-				&v3.ClusterRoleTemplateBinding{
+				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "testuser",
 					},
@@ -612,12 +612,12 @@ func Test_deleteAllCRTB(t *testing.T) {
 		{
 			name: "crtbs deleted properly",
 			inputCRTB: []*v3.ClusterRoleTemplateBinding{
-				&v3.ClusterRoleTemplateBinding{
+				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "testuser",
 					},
 				},
-				&v3.ClusterRoleTemplateBinding{
+				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "testuser-2",
 					},
@@ -631,13 +631,13 @@ func Test_deleteAllCRTB(t *testing.T) {
 		{
 			name: "namespaced crtbs deleted properly",
 			inputCRTB: []*v3.ClusterRoleTemplateBinding{
-				&v3.ClusterRoleTemplateBinding{
+				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "testuser",
 						Namespace: "testnamespace",
 					},
 				},
-				&v3.ClusterRoleTemplateBinding{
+				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "testuser-2",
 						Namespace: "testnamespace",
@@ -652,12 +652,12 @@ func Test_deleteAllCRTB(t *testing.T) {
 		{
 			name: "crtbs (non and namespaced) deleted properly",
 			inputCRTB: []*v3.ClusterRoleTemplateBinding{
-				&v3.ClusterRoleTemplateBinding{
+				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "testuser",
 					},
 				},
-				&v3.ClusterRoleTemplateBinding{
+				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "testuser-2",
 						Namespace: "testnamespace",
@@ -672,12 +672,12 @@ func Test_deleteAllCRTB(t *testing.T) {
 		{
 			name: "crtbs (non and namespaced) not deleted properly",
 			inputCRTB: []*v3.ClusterRoleTemplateBinding{
-				&v3.ClusterRoleTemplateBinding{
+				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "testuser",
 					},
 				},
-				&v3.ClusterRoleTemplateBinding{
+				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "testuser-2",
 						Namespace: "testnamespace",
@@ -695,7 +695,7 @@ func Test_deleteAllCRTB(t *testing.T) {
 		{
 			name: "crtbs not deleted properly",
 			inputCRTB: []*v3.ClusterRoleTemplateBinding{
-				&v3.ClusterRoleTemplateBinding{
+				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "testuser",
 					},
@@ -740,7 +740,7 @@ func Test_deleteAllPRTB(t *testing.T) {
 		{
 			name: "remove namespaced prtb",
 			inputPRTB: []*v3.ProjectRoleTemplateBinding{
-				&v3.ProjectRoleTemplateBinding{
+				{
 					UserName: "testuser",
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "testprtb",
@@ -756,14 +756,14 @@ func Test_deleteAllPRTB(t *testing.T) {
 		{
 			name: "remove all prtb",
 			inputPRTB: []*v3.ProjectRoleTemplateBinding{
-				&v3.ProjectRoleTemplateBinding{
+				{
 					UserName: "testuser",
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "testprtb",
 						Namespace: "testprtbns",
 					},
 				},
-				&v3.ProjectRoleTemplateBinding{
+				{
 					UserName: "testuser2",
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "testprtb2",
@@ -778,7 +778,7 @@ func Test_deleteAllPRTB(t *testing.T) {
 		{
 			name: "error deleting namespaced prtb",
 			inputPRTB: []*v3.ProjectRoleTemplateBinding{
-				&v3.ProjectRoleTemplateBinding{
+				{
 					UserName: "testuser",
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "testprtb",
@@ -794,7 +794,7 @@ func Test_deleteAllPRTB(t *testing.T) {
 		{
 			name: "error deleting prtb",
 			inputPRTB: []*v3.ProjectRoleTemplateBinding{
-				&v3.ProjectRoleTemplateBinding{
+				{
 					UserName: "testuser",
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "testprtb",

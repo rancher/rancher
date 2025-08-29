@@ -17,7 +17,6 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/customization/globalrolebinding"
 	"github.com/rancher/rancher/pkg/api/norman/customization/kontainerdriver"
 	"github.com/rancher/rancher/pkg/api/norman/customization/node"
-
 	projectaction "github.com/rancher/rancher/pkg/api/norman/customization/project"
 	"github.com/rancher/rancher/pkg/api/norman/customization/roletemplate"
 	"github.com/rancher/rancher/pkg/api/norman/customization/roletemplatebinding"
@@ -34,7 +33,6 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/store/scoped"
 	settingstore "github.com/rancher/rancher/pkg/api/norman/store/setting"
 	"github.com/rancher/rancher/pkg/api/scheme"
-	"github.com/rancher/rancher/pkg/auth/api"
 	authapi "github.com/rancher/rancher/pkg/auth/api"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -94,9 +92,10 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		return err
 	}
 
-	Clusters(ctx, schemas, apiContext, clusterManager, k8sProxy)
+	tokenAuthenticator := requests.NewAuthenticator(ctx, clusterrouter.GetClusterID, apiContext)
+
+	Clusters(ctx, schemas, apiContext, clusterManager, k8sProxy, tokenAuthenticator)
 	ClusterRoleTemplateBinding(schemas, apiContext)
-	api.User(ctx, schemas, apiContext)
 	SecretTypes(ctx, schemas, apiContext)
 	Setting(schemas)
 	Feature(schemas, apiContext)
@@ -116,9 +115,9 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 		return err
 	}
 
-	authapi.Setup(ctx, clusterrouter.GetClusterID, apiContext, schemas)
-	authn.SetRTBStore(ctx, schemas.Schema(&managementschema.Version, client.ClusterRoleTemplateBindingType), apiContext)
-	authn.SetRTBStore(ctx, schemas.Schema(&managementschema.Version, client.ProjectRoleTemplateBindingType), apiContext)
+	authapi.Setup(ctx, apiContext, schemas, tokenAuthenticator)
+	authn.SetRTBStore(ctx, schemas.Schema(&managementschema.Version, client.ClusterRoleTemplateBindingType), apiContext, tokenAuthenticator)
+	authn.SetRTBStore(ctx, schemas.Schema(&managementschema.Version, client.ProjectRoleTemplateBindingType), apiContext, tokenAuthenticator)
 	nodeStore.SetupStore(schemas.Schema(&managementschema.Version, client.NodeType))
 	projectaction.SetProjectStore(schemas.Schema(&managementschema.Version, client.ProjectType), apiContext)
 	setupScopedTypes(schemas, apiContext)
@@ -152,7 +151,7 @@ func setupScopedTypes(schemas *types.Schemas, management *config.ScaledContext) 
 	}
 }
 
-func Clusters(ctx context.Context, schemas *types.Schemas, managementContext *config.ScaledContext, clusterManager *clustermanager.Manager, k8sProxy http.Handler) {
+func Clusters(ctx context.Context, schemas *types.Schemas, managementContext *config.ScaledContext, clusterManager *clustermanager.Manager, k8sProxy http.Handler, authToken requests.AuthTokenGetter) {
 	schema := schemas.Schema(&managementschema.Version, client.ClusterType)
 	clusterFormatter := ccluster.NewFormatter(schemas, managementContext)
 	schema.Formatter = clusterFormatter.Formatter
@@ -163,8 +162,9 @@ func Clusters(ctx context.Context, schemas *types.Schemas, managementContext *co
 	handler := ccluster.ActionHandler{
 		NodeLister:     managementContext.Management.Nodes("").Controller().Lister(),
 		UserMgr:        managementContext.UserManager,
+		TokenMgr:       tokens.NewManager(managementContext.Wrangler),
 		ClusterManager: clusterManager,
-		Auth:           requests.NewAuthenticator(ctx, clusterrouter.GetClusterID, managementContext),
+		AuthToken:      authToken,
 	}
 
 	clusterValidator := ccluster.Validator{
@@ -188,7 +188,7 @@ func ClusterRegistrationTokens(schemas *types.Schemas, management *config.Scaled
 
 func Tokens(ctx context.Context, schemas *types.Schemas, mgmt *config.ScaledContext) {
 	schema := schemas.Schema(&managementschema.Version, client.TokenType)
-	manager := tokens.NewManager(ctx, mgmt)
+	manager := tokens.NewManager(mgmt.Wrangler)
 
 	schema.Store = &transform.Store{
 		Store:             schema.Store,

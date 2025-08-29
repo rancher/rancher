@@ -65,7 +65,7 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext, cl
 	c := project_cluster.NewClusterLifecycle(management)
 	u := newUserLifecycle(management, clusterManager)
 	n := newTokenController(management.WithAgent(tokenController))
-	ac := newAuthConfigController(ctx, management, clusterManager.ScaledContext)
+	ac := newAuthConfigController(management, clusterManager.ScaledContext)
 	ua := newUserAttributeController(management.WithAgent(userAttributeController))
 	s := newAuthSettingController(ctx, management)
 	rt := newRoleTemplateLifecycle(management, clusterManager)

@@ -44,7 +44,7 @@ func registerIndexers(scaledContext *config.ScaledContext) error {
 	if err := auth.RegisterIndexers(scaledContext); err != nil {
 		return err
 	}
-	if err := tokens.RegisterIndexer(scaledContext); err != nil {
+	if err := tokens.RegisterIndexer(scaledContext.Wrangler); err != nil {
 		return err
 	}
 
