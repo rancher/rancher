@@ -19,6 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/cognito"
 	"github.com/rancher/rancher/pkg/auth/providers/genericoidc"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
+	"github.com/rancher/rancher/pkg/auth/providers/githubapp"
 	"github.com/rancher/rancher/pkg/auth/providers/googleoauth"
 	"github.com/rancher/rancher/pkg/auth/providers/keycloakoidc"
 	"github.com/rancher/rancher/pkg/auth/providers/ldap"
@@ -138,6 +139,9 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (v3.Token, st
 	case client.GithubProviderType:
 		input = &apiv3.GithubLogin{}
 		providerName = github.Name
+	case client.GithubAppProviderType:
+		input = &apiv3.GithubLogin{}
+		providerName = githubapp.Name
 	case client.ActiveDirectoryProviderType:
 		input = &apiv3.BasicLogin{}
 		providerName = activedirectory.Name

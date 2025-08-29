@@ -52,6 +52,7 @@ type Interface interface {
 	FleetWorkspace() FleetWorkspaceController
 	FreeIpaProvider() FreeIpaProviderController
 	GenericOIDCProvider() GenericOIDCProviderController
+	GithubAppProvider() GithubAppProviderController
 	GithubProvider() GithubProviderController
 	GlobalRole() GlobalRoleController
 	GlobalRoleBinding() GlobalRoleBindingController
@@ -179,6 +180,10 @@ func (v *version) FreeIpaProvider() FreeIpaProviderController {
 
 func (v *version) GenericOIDCProvider() GenericOIDCProviderController {
 	return generic.NewNonNamespacedController[*v3.GenericOIDCProvider, *v3.GenericOIDCProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "GenericOIDCProvider"}, "genericoidcproviders", v.controllerFactory)
+}
+
+func (v *version) GithubAppProvider() GithubAppProviderController {
+	return generic.NewNonNamespacedController[*v3.GithubAppProvider, *v3.GithubAppProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "GithubAppProvider"}, "githubappproviders", v.controllerFactory)
 }
 
 func (v *version) GithubProvider() GithubProviderController {
