@@ -13,7 +13,6 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/clients"
 	"github.com/rancher/rancher/tests/v2prov/cluster"
 	"github.com/rancher/rancher/tests/v2prov/defaults"
-	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -60,24 +59,30 @@ func Test_Operation_SetC_MP_DataDirectories(t *testing.T) {
 
 	machines, err := cluster.Machines(clients, c)
 	if err != nil {
-		logrus.Errorf("failed to get machines for %s/%s to print error: %v", c.Namespace, c.Name, err)
-	} else {
-		for _, machine := range machines.Items {
-			im, newErr := clients.Dynamic.Resource(schema.GroupVersionResource{
-				Group:    machine.Spec.InfrastructureRef.GroupVersionKind().Group,
-				Version:  machine.Spec.InfrastructureRef.GroupVersionKind().Version,
-				Resource: strings.ToLower(fmt.Sprintf("%ss", machine.Spec.InfrastructureRef.GroupVersionKind().Kind)),
-			}).Namespace(machine.Spec.InfrastructureRef.Namespace).Get(context.TODO(), machine.Spec.InfrastructureRef.Name, metav1.GetOptions{})
-			if newErr != nil {
-				logrus.Errorf("failed to get %s %s/%s to print error: %v", machine.Spec.InfrastructureRef.GroupVersionKind().String(), machine.Spec.InfrastructureRef.Namespace, machine.Spec.InfrastructureRef.Name, newErr)
-			} else if machine.Spec.InfrastructureRef.GroupVersionKind().Kind == "PodMachine" {
-				// In the case of a podmachine, the pod name will be strings.ReplaceAll(infra.meta.GetName(), ".", "-")
-				podName := strings.ReplaceAll(im.GetName(), ".", "-")
-				validateDirectory(t, im.GetNamespace(), podName, c.Spec.RKEConfig.DataDirectories.SystemAgent)
-				validateDirectory(t, im.GetNamespace(), podName, c.Spec.RKEConfig.DataDirectories.Provisioning)
-				validateDirectory(t, im.GetNamespace(), podName, c.Spec.RKEConfig.DataDirectories.K8sDistro)
-			}
+		t.Fatal(err)
+	}
+
+	for _, machine := range machines.Items {
+		im, err := clients.Dynamic.Resource(schema.GroupVersionResource{
+			Group:    machine.Spec.InfrastructureRef.GroupVersionKind().Group,
+			Version:  machine.Spec.InfrastructureRef.GroupVersionKind().Version,
+			Resource: strings.ToLower(fmt.Sprintf("%ss", machine.Spec.InfrastructureRef.GroupVersionKind().Kind)),
+		}).Namespace(machine.Spec.InfrastructureRef.Namespace).Get(context.TODO(), machine.Spec.InfrastructureRef.Name, metav1.GetOptions{})
+		if err != nil {
+			t.Fatalf("failed to get %s %s/%s to for validating directories: %v", machine.Spec.InfrastructureRef.GroupVersionKind().String(), machine.Spec.InfrastructureRef.Namespace, machine.Spec.InfrastructureRef.Name, err)
 		}
+
+		// This test is only for clusters provisioned via the pod driver
+		if machine.Spec.InfrastructureRef.GroupVersionKind().Kind != "PodMachine" {
+			continue
+		}
+
+		// In the case of a podmachine, the pod name will be strings.ReplaceAll(infra.meta.GetName(), ".", "-")
+		podName := strings.ReplaceAll(im.GetName(), ".", "-")
+		validateDirectory(t, im.GetNamespace(), podName, c.Spec.RKEConfig.DataDirectories.SystemAgent)
+		validateDirectory(t, im.GetNamespace(), podName, c.Spec.RKEConfig.DataDirectories.Provisioning)
+		validateDirectory(t, im.GetNamespace(), podName, c.Spec.RKEConfig.DataDirectories.K8sDistro)
+
 	}
 }
 
