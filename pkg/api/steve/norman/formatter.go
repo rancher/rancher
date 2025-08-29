@@ -2,6 +2,7 @@ package norman
 
 import (
 	"fmt"
+	"maps"
 	"strings"
 
 	"github.com/rancher/apiserver/pkg/types"
@@ -68,12 +69,8 @@ func (a *LinksAndActionsFormatter) Formatter(request *types.APIRequest, resource
 	}
 
 	schema.Formatter(normanRequest, normanResource)
-	for k, v := range normanResource.Links {
-		resource.Links[k] = v
-	}
-	for k, v := range normanResource.Actions {
-		resource.Actions[k] = v
-	}
+	maps.Copy(resource.Links, normanResource.Links)
+	maps.Copy(resource.Actions, normanResource.Actions)
 }
 
 type accessControlWrapper struct {

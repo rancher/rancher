@@ -2,6 +2,7 @@ package roletemplate
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -36,10 +37,8 @@ func (s *rtStore) Delete(apiContext *types.APIContext, schema *types.Schema, id 
 
 	// check if roletemplate is referenced as parent by any other roletemplate
 	for _, rt := range roleTemplates {
-		for _, parent := range rt.RoleTemplateNames {
-			if parent == id {
-				return nil, httperror.NewAPIError(httperror.Conflict, fmt.Sprintf("roletemplate [%s] cannot be deleted because roletemplate [%s] inherits from it", id, rt.Name))
-			}
+		if slices.Contains(rt.RoleTemplateNames, id) {
+			return nil, httperror.NewAPIError(httperror.Conflict, fmt.Sprintf("roletemplate [%s] cannot be deleted because roletemplate [%s] inherits from it", id, rt.Name))
 		}
 	}
 	return s.Store.Delete(apiContext, schema, id)

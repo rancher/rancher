@@ -3,6 +3,7 @@ package targetworkloadservice
 import (
 	"context"
 	"encoding/json"
+	"maps"
 
 	"k8s.io/apimachinery/pkg/runtime"
 
@@ -196,9 +197,7 @@ func (c *Controller) reconcilePods(key string, obj *corev1.Service, workloadIDs 
 
 func (c *Controller) getPodsForWorkload(workload *util.Workload) ([]*corev1.Pod, error) {
 	set := labels.Set{}
-	for key, val := range workload.SelectorLabels {
-		set[key] = val
-	}
+	maps.Copy(set, workload.SelectorLabels)
 	workloadSelector := labels.SelectorFromSet(set)
 	return c.podLister.List(workload.Namespace, workloadSelector)
 }
@@ -240,9 +239,7 @@ func (c *Controller) updatePods(serviceName string, obj *corev1.Service, workloa
 	// Update the pods with the label
 	for _, pod := range podsToUpdate {
 		toUpdate := pod.DeepCopy()
-		for svcSelectorKey, svcSelectorValue := range obj.Spec.Selector {
-			toUpdate.Labels[svcSelectorKey] = svcSelectorValue
-		}
+		maps.Copy(toUpdate.Labels, obj.Spec.Selector)
 		if _, err := c.pods.Update(toUpdate); err != nil {
 			return nil, errors.Wrapf(err, "Failed to update pod [%s] with workload service selector [%s]",
 				pod.Name, fmt.Sprintf("%s/%s", obj.Namespace, obj.Name))
@@ -288,9 +285,7 @@ func (c *PodController) sync(key string, obj *corev1.Pod) (runtime.Object, error
 			continue
 		}
 
-		for key, value := range workloadService.Spec.Selector {
-			workloadServicesLabels[key] = value
-		}
+		maps.Copy(workloadServicesLabels, workloadService.Spec.Selector)
 	}
 
 	// remove old labels
@@ -305,9 +300,7 @@ func (c *PodController) sync(key string, obj *corev1.Pod) (runtime.Object, error
 	}
 
 	// add new labels
-	for key, value := range workloadServicesLabels {
-		labels[key] = value
-	}
+	maps.Copy(labels, workloadServicesLabels)
 
 	if reflect.DeepEqual(obj.Labels, labels) {
 		return nil, nil

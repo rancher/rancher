@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path"
@@ -61,9 +62,7 @@ func New(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*provisi
 		if cluster.Spec.RKEConfig.MachineGlobalConfig.Data == nil {
 			cluster.Spec.RKEConfig.MachineGlobalConfig.Data = map[string]interface{}{}
 		}
-		for k, v := range defaults.CommonClusterConfig {
-			cluster.Spec.RKEConfig.MachineGlobalConfig.Data[k] = v
-		}
+		maps.Copy(cluster.Spec.RKEConfig.MachineGlobalConfig.Data, defaults.CommonClusterConfig)
 
 		for i, mp := range cluster.Spec.RKEConfig.MachinePools {
 			if mp.NodeConfig == nil {
@@ -339,7 +338,7 @@ func CustomCommand(clients *clients.Clients, c *provisioningv1api.Cluster) (stri
 		return "", err
 	}
 
-	for i := 0; i < 15; i++ {
+	for range 15 {
 		tokens, err := clients.Mgmt.ClusterRegistrationToken().List(c.Status.ClusterName, metav1.ListOptions{})
 		if err != nil || len(tokens.Items) == 0 || tokens.Items[0].Status.NodeCommand == "" {
 			time.Sleep(time.Second)
@@ -391,7 +390,7 @@ func countPodLogRegexOccurances(clients *clients.Clients, podNamespace, podName,
 
 // getPodFileContents executes a corresponding `kubectl cp` and gathers data for the purposes of helping increasing debug data.
 func getPodFileContents(podNamespace, podName, podPath string) (string, error) {
-	destFile := fmt.Sprintf("/tmp/%s", base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s/%s/%s", podNamespace, podName, podPath))))
+	destFile := fmt.Sprintf("/tmp/%s", base64.StdEncoding.EncodeToString(fmt.Appendf(nil, "%s/%s/%s", podNamespace, podName, podPath)))
 	kcp := []string{
 		"-n",
 		podNamespace,

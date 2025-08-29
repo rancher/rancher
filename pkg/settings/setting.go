@@ -650,9 +650,9 @@ func GetRancherVersion() string {
 // the handler function will not be called for it.
 func IterateWhitelistedEnvVars(handler func(name, value string)) {
 	wl := WhitelistEnvironmentVars.Get()
-	envWhiteList := strings.Split(wl, ",")
+	envWhiteList := strings.SplitSeq(wl, ",")
 
-	for _, wlVar := range envWhiteList {
+	for wlVar := range envWhiteList {
 		wlVar = strings.TrimSpace(wlVar)
 		if val := os.Getenv(wlVar); val != "" {
 			handler(wlVar, val)

@@ -72,7 +72,7 @@ func isWebsocket(r *http.Request) bool {
 // headerListContainsValue returns true if the token header with the given name contains token.
 func headerListContainsValue(header http.Header, name string, value string) bool {
 	for _, v := range header[name] {
-		for _, s := range strings.Split(v, ",") {
+		for s := range strings.SplitSeq(v, ",") {
 			if strings.EqualFold(value, strings.TrimSpace(s)) {
 				return true
 			}

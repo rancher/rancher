@@ -276,7 +276,6 @@ func TestIsInstalled(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			installed, version, values, err := desiredVersionAndValues(releases, test.minVersion, test.latestVersion, false, test.desiredValues)
@@ -391,7 +390,6 @@ func TestIsInstalledExactVersion(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			// Note that the minVersion argument must be an empty string.

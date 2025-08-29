@@ -1,7 +1,6 @@
 package telemetry
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -62,8 +61,7 @@ func TestTelemetryManager(t *testing.T) {
 	manager := NewTelemetryExporterManager(telG, time.Millisecond)
 	assert.NotNil(manager)
 
-	ctx, ca := context.WithCancel(context.Background())
-	defer ca()
+	ctx := t.Context()
 	t1 := newTestExporter()
 	t2 := newTestExporter()
 	manager.Register("a1", t1, time.Millisecond*10)
@@ -116,7 +114,6 @@ func TestTelemetryManager(t *testing.T) {
 
 	dynamicIds := []string{"a3", "a4", "a5", "a6", "a7", "a8", "a9"}
 	for _, id := range dynamicIds {
-		id := id
 		go func() {
 			manager.Register(id, newTestExporter(), time.Hour)
 		}()

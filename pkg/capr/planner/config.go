@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash"
+	"maps"
 	"path"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -76,9 +78,7 @@ func addDefaults(config map[string]interface{}, controlPlane *rkev1.RKEControlPl
 }
 
 func addUserConfig(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane, entry *planEntry) error {
-	for k, v := range controlPlane.Spec.MachineGlobalConfig.Data {
-		config[k] = v
-	}
+	maps.Copy(config, controlPlane.Spec.MachineGlobalConfig.Data)
 
 	for _, opts := range controlPlane.Spec.MachineSelectorConfig {
 		sel, err := metav1.LabelSelectorAsSelector(opts.MachineLabelSelector)
@@ -86,9 +86,7 @@ func addUserConfig(config map[string]interface{}, controlPlane *rkev1.RKEControl
 			return err
 		}
 		if opts.MachineLabelSelector == nil || sel.Matches(labels.Set(entry.Machine.Labels)) {
-			for k, v := range opts.Config.Data {
-				config[k] = v
-			}
+			maps.Copy(config, opts.Config.Data)
 		}
 	}
 
@@ -186,7 +184,7 @@ func addLocalClusterAuthenticationEndpointFile(nodePlan plan.NodePlan, controlPl
 	loopbackAddress := capr.GetLoopbackAddress(controlPlane)
 	authFile := path.Join(capr.GetDistroDataDir(controlPlane), authnWebhookFileName)
 	nodePlan.Files = append(nodePlan.Files, plan.File{
-		Content: base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf(AuthnWebhook, loopbackAddress))),
+		Content: base64.StdEncoding.EncodeToString(fmt.Appendf(nil, AuthnWebhook, loopbackAddress)),
 		Path:    authFile,
 	})
 
@@ -240,9 +238,9 @@ func addVSphereCharts(controlPlane *rkev1.RKEControlPlane, entry *planEntry) (ma
 
 type helmChartConfig struct {
 	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	metav1.ObjectMeta `json:"metadata"`
 
-	Spec helmChartConfigSpec `json:"spec,omitempty"`
+	Spec helmChartConfigSpec `json:"spec"`
 }
 
 type helmChartConfigSpec struct {
@@ -474,10 +472,8 @@ func clusterObjectAuthorized(obj runtime.Object, annotation, clusterName string)
 		if len(authorizedClusters) > 0 {
 			annotationValueFound = true
 		}
-		for _, authorizedCluster := range authorizedClusters {
-			if clusterName == authorizedCluster {
-				return true, annotationValueFound
-			}
+		if slices.Contains(authorizedClusters, clusterName) {
+			return true, annotationValueFound
 		}
 	}
 	return false, annotationValueFound

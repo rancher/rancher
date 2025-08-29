@@ -125,7 +125,7 @@ func (s *AuthConfigSuite) TestTokensCleanup() {
 	assert.NoError(t, err)
 
 	// create some tokens for the authProvider
-	for i := 0; i < numOfTokens; i++ {
+	for range numOfTokens {
 		_, err := tokenClient.Create(&v3.Token{
 			ObjectMeta:   metav1.ObjectMeta{GenerateName: "t-"},
 			AuthProvider: authProvider,
@@ -141,7 +141,7 @@ func (s *AuthConfigSuite) TestTokensCleanup() {
 	}
 
 	// and also some local tokens
-	for i := 0; i < numOfTokens; i++ {
+	for range numOfTokens {
 		_, err := tokenClient.Create(&v3.Token{
 			ObjectMeta:   metav1.ObjectMeta{GenerateName: "t-"},
 			AuthProvider: "local",

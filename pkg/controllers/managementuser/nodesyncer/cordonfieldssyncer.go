@@ -115,7 +115,7 @@ func (d *nodeDrain) updateNode(node *v32.Node, updateFunc func(node *v32.Node, o
 	updatedObj, err := d.machines.Update(node)
 	if err != nil && errors.IsConflict(err) {
 		// retrying twelve times, if conflict error still exists, give up
-		for i := 0; i < 12; i++ {
+		for range 12 {
 			latestObj, err := d.machines.Get(node.Name, metav1.GetOptions{})
 			if err != nil {
 				logrus.Warnf("nodeDrain: error fetching node %s", node.Spec.RequestedHostname)

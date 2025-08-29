@@ -71,7 +71,6 @@ func TestReconcileProjectAccessToGlobalResources(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			prtbLifecycle := prtbLifecycle{}
@@ -370,7 +369,6 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			// Create mock controllers
 			crListerMock := wfakes.NewMockNonNamespacedCacheInterface[*v1.ClusterRole](ctrl)

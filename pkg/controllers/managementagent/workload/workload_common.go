@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"strconv"
 	"strings"
 
@@ -486,9 +487,7 @@ func getSelectorLables(s *metav1.LabelSelector) map[string]string {
 		return nil
 	}
 	selectorLabels := map[string]string{}
-	for key, value := range s.MatchLabels {
-		selectorLabels[key] = value
-	}
+	maps.Copy(selectorLabels, s.MatchLabels)
 	return selectorLabels
 }
 
@@ -643,9 +642,7 @@ func (c CommonController) UpdateWorkload(w *Workload, annotations map[string]str
 		if toUpdate.Annotations == nil {
 			toUpdate.Annotations = make(map[string]string)
 		}
-		for key, value := range annotations {
-			toUpdate.Annotations[key] = value
-		}
+		maps.Copy(toUpdate.Annotations, annotations)
 
 		_, err = c.Deployments.Update(toUpdate)
 		if err != nil {
@@ -663,9 +660,7 @@ func (c CommonController) UpdateWorkload(w *Workload, annotations map[string]str
 		if toUpdate.Annotations == nil {
 			toUpdate.Annotations = make(map[string]string)
 		}
-		for key, value := range annotations {
-			toUpdate.Annotations[key] = value
-		}
+		maps.Copy(toUpdate.Annotations, annotations)
 		_, err = c.ReplicationControllers.Update(toUpdate)
 		if err != nil {
 			return err
@@ -682,9 +677,7 @@ func (c CommonController) UpdateWorkload(w *Workload, annotations map[string]str
 		if toUpdate.Annotations == nil {
 			toUpdate.Annotations = make(map[string]string)
 		}
-		for key, value := range annotations {
-			toUpdate.Annotations[key] = value
-		}
+		maps.Copy(toUpdate.Annotations, annotations)
 		_, err = c.ReplicaSets.Update(toUpdate)
 		if err != nil {
 			return err
@@ -701,9 +694,7 @@ func (c CommonController) UpdateWorkload(w *Workload, annotations map[string]str
 		if toUpdate.Annotations == nil {
 			toUpdate.Annotations = make(map[string]string)
 		}
-		for key, value := range annotations {
-			toUpdate.Annotations[key] = value
-		}
+		maps.Copy(toUpdate.Annotations, annotations)
 		_, err = c.DaemonSets.Update(toUpdate)
 		if err != nil {
 			return err
@@ -720,9 +711,7 @@ func (c CommonController) UpdateWorkload(w *Workload, annotations map[string]str
 		if toUpdate.Annotations == nil {
 			toUpdate.Annotations = make(map[string]string)
 		}
-		for key, value := range annotations {
-			toUpdate.Annotations[key] = value
-		}
+		maps.Copy(toUpdate.Annotations, annotations)
 		_, err = c.StatefulSets.Update(toUpdate)
 		if err != nil {
 			return err
@@ -739,9 +728,7 @@ func (c CommonController) UpdateWorkload(w *Workload, annotations map[string]str
 		if toUpdate.Annotations == nil {
 			toUpdate.Annotations = make(map[string]string)
 		}
-		for key, value := range annotations {
-			toUpdate.Annotations[key] = value
-		}
+		maps.Copy(toUpdate.Annotations, annotations)
 		_, err = c.Jobs.Update(toUpdate)
 		if err != nil {
 			return err
@@ -758,9 +745,7 @@ func (c CommonController) UpdateWorkload(w *Workload, annotations map[string]str
 		if toUpdate.Annotations == nil {
 			toUpdate.Annotations = make(map[string]string)
 		}
-		for key, value := range annotations {
-			toUpdate.Annotations[key] = value
-		}
+		maps.Copy(toUpdate.Annotations, annotations)
 		_, err = c.CronJobs.Update(toUpdate)
 		if err != nil {
 			return err

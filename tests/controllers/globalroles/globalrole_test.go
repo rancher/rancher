@@ -239,7 +239,6 @@ func (s *GlobalRoleTestSuite) TestCreateGlobalRole() {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		s.Run(test.name, func() {
 			t := s.T()
 			t.Parallel()

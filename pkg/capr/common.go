@@ -536,10 +536,7 @@ func SafeConcatName(maxLength int, name ...string) string {
 
 	// since we trailingCharacterIndex the string in the middle, the last char may not be compatible with what is expected in k8s
 	// we are checking and if necessary removing the last char
-	trailingCharacterIndex := maxLength - (hashLength + 1)
-	if trailingCharacterIndex < 0 {
-		trailingCharacterIndex = 0
-	}
+	trailingCharacterIndex := max(maxLength-(hashLength+1), 0)
 	c := fullPath[trailingCharacterIndex]
 
 	if 'a' <= c && c <= 'z' || '0' <= c && c <= '9' {

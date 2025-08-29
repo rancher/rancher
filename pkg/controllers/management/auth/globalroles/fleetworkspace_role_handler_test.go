@@ -202,7 +202,6 @@ func TestReconcileFleetPermissions(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			state := testState{
@@ -356,7 +355,6 @@ func TestReconcileFleetPermissions_errors(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		test := test
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			state := testState{

@@ -537,7 +537,7 @@ func crByNS(obj interface{}) ([]string, error) {
 
 func updateStatusAnnotation(hasPRTBs bool, namespace *v1.Namespace, mgr *manager) {
 	if _, ok := namespace.Annotations[projectIDAnnotation]; ok {
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			time.Sleep(time.Millisecond * 500)
 			clusterRoles, err := mgr.crIndexer.ByIndex(crByNSIndex, namespace.Name)
 			if err != nil {
@@ -578,7 +578,7 @@ func updateStatusAnnotation(hasPRTBs bool, namespace *v1.Namespace, mgr *manager
 		}
 	}
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		ns, err := mgr.workload.Core.Namespaces("").Get(namespace.Name, metav1.GetOptions{})
 		if err != nil {
 			logrus.Errorf("error getting ns %v for status update: %v", namespace.Name, err)

@@ -474,7 +474,7 @@ func (m *Lifecycle) createOrUpdateNodeForEmbeddedTypeWithParents(embeddedType, f
 func getCredFields(annotations map[string]string) (map[string]bool, map[string]bool, map[string]bool, map[string]string, map[string]bool) {
 	getMap := func(fields string) map[string]bool {
 		data := map[string]bool{}
-		for _, field := range strings.Split(fields, ",") {
+		for field := range strings.SplitSeq(fields, ",") {
 			data[field] = true
 		}
 		return data

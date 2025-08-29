@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"maps"
 	"regexp"
 	"strconv"
 	"strings"
@@ -538,9 +539,7 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 		newCluster.Name = mgmtName
 	}
 
-	for k, v := range cluster.Annotations {
-		newCluster.Annotations[k] = v
-	}
+	maps.Copy(newCluster.Annotations, cluster.Annotations)
 
 	delete(cluster.Annotations, creatorIDAnn)
 

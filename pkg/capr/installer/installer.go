@@ -114,7 +114,7 @@ func LinuxInstallScript(ctx context.Context, token string, envVars []corev1.EnvV
 	if settings.ServerURL.Get() != "" {
 		server = fmt.Sprintf("CATTLE_SERVER=%s", settings.ServerURL.Get())
 	}
-	return []byte(fmt.Sprintf(`#!/usr/bin/env sh
+	return fmt.Appendf(nil, `#!/usr/bin/env sh
 %s
 %s
 %s
@@ -122,7 +122,7 @@ func LinuxInstallScript(ctx context.Context, token string, envVars []corev1.EnvV
 %s
 
 %s
-`, envVarBuf.String(), binaryURL, server, ca, token, data)), nil
+`, envVarBuf.String(), binaryURL, server, ca, token, data), nil
 }
 
 func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.EnvVar, defaultHost, dataDir string) ([]byte, error) {
@@ -203,7 +203,7 @@ func WindowsInstallScript(ctx context.Context, token string, envVars []corev1.En
 		strictVerify = "true"
 	}
 
-	return []byte(fmt.Sprintf(`%s
+	return fmt.Appendf(nil, `%s
 
 %s
 %s
@@ -220,5 +220,5 @@ $env:STRICT_VERIFY = "%s"
 
 Invoke-WinsInstaller @PSBoundParameters
 exit 0
-`, data, envVarBuf.String(), binaryURL, server, ca, tokenEnvVar, csiProxyURL, csiProxyVersion, dataDir, strictVerify, cattleRoleNone)), nil
+`, data, envVarBuf.String(), binaryURL, server, ca, tokenEnvVar, csiProxyURL, csiProxyVersion, dataDir, strictVerify, cattleRoleNone), nil
 }

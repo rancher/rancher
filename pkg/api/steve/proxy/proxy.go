@@ -37,8 +37,8 @@ type ClusterDialerFactory func(clusterID string) remotedialer.Dialer
 
 func RewriteLocalCluster(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		if strings.HasPrefix(req.URL.Path, "/k8s/clusters/local") {
-			req.URL.Path = strings.TrimPrefix(req.URL.Path, "/k8s/clusters/local")
+		if after, ok := strings.CutPrefix(req.URL.Path, "/k8s/clusters/local"); ok {
+			req.URL.Path = after
 			if req.URL.Path == "" {
 				req.URL.Path = "/"
 			}
@@ -193,7 +193,7 @@ func (h *Handler) dialer(ctx context.Context, network, address string) (net.Conn
 	}
 	dialer := h.dialerFactory("stv-cluster-" + host)
 	var conn net.Conn
-	for i := 0; i < 15; i++ {
+	for i := range 15 {
 		conn, err = dialer(ctx, network, "127.0.0.1:6080")
 		if err != nil && strings.Contains(err.Error(), "failed to find Session for client") {
 			if i < 14 {

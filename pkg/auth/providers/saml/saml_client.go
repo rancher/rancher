@@ -533,7 +533,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 				sha256.New(),
 				rand.Reader,
 				pubKey,
-				[]byte(fmt.Sprintf("%s:%s", token.ObjectMeta.Name, tokenValue)),
+				fmt.Appendf(nil, "%s:%s", token.ObjectMeta.Name, tokenValue),
 				nil)
 			if err != nil {
 				log.Errorf("SAML: getEncryptedToken error %v", err)

@@ -63,7 +63,6 @@ func TestDecodings(t *testing.T) {
 	}
 
 	for _, tc := range tt {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			parsedGUID, err := guid.New(tc.encoded)
 
@@ -118,7 +117,6 @@ func TestParse(t *testing.T) {
 	}
 
 	for _, tc := range tt {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			objectGUID, err := guid.Parse(tc.uuid)
 
@@ -170,7 +168,6 @@ func TestEscape(t *testing.T) {
 	}
 
 	for _, tc := range tt {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			escaped := guid.Escape(tc.objectGUID)
 			assert.Equal(t, tc.escapedGUID, escaped)

@@ -99,7 +99,6 @@ func TestGenOIDCProvider_GetPrincipal(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		g := &GenOIDCProvider{
 			oidc.OpenIDCProvider{
 				Name: Name,
@@ -180,7 +179,6 @@ func TestGenOIDCProvider_GetPrincipalExt(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		g := &GenOIDCProvider{
 			oidc.OpenIDCProvider{
 				Name: Name,
@@ -285,7 +283,6 @@ func TestGenOIDCProvider_SearchPrincipals(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			result, err := g.SearchPrincipals(test.searchValue, test.principalType, &v3.Token{})
@@ -341,7 +338,6 @@ func TestGenOIDCProvider_TransformToAuthProvider(t *testing.T) {
 	provider := &GenOIDCProvider{}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			result, err := provider.TransformToAuthProvider(test.authConfig)

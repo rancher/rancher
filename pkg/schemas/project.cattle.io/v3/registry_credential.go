@@ -42,7 +42,7 @@ func addAuthInfo(data map[string]interface{}) error {
 		if password == "" {
 			continue
 		}
-		auth := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
+		auth := base64.StdEncoding.EncodeToString(fmt.Appendf(nil, "%s:%s", username, password))
 		regCredMap["auth"] = auth
 	}
 

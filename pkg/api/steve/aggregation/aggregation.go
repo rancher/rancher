@@ -96,7 +96,7 @@ func (h *aggregationHandler) makeHandler(uuid string) http.Handler {
 
 	next := proxy.ImpersonatingHandler("", cfg)
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		for i := 0; i < 15; i++ {
+		for range 15 {
 			if !h.remote.HasSession(key) {
 				time.Sleep(time.Second)
 			}

@@ -3,6 +3,7 @@ package image
 import (
 	"fmt"
 	"path"
+	"slices"
 	"sort"
 	"strings"
 
@@ -143,9 +144,7 @@ func generateImageAndSourceLists(imagesSet map[string]map[string]struct{}) ([]st
 	}
 
 	// sort
-	sort.Slice(images, func(i, j int) bool {
-		return images[i] < images[j]
-	})
+	slices.Sort(images)
 
 	for _, image := range images {
 		imagesAndSources = append(imagesAndSources, fmt.Sprintf("%s %s", image, getSourcesList(imagesSet[image])))

@@ -10,7 +10,7 @@ import (
 func SortSchema(schemas map[string]types.Schema) []string {
 	inserted := map[string]bool{}
 	result := []string{}
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		for k, schema := range schemas {
 			if inserted[k] {
 				continue

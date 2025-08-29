@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/mcuadros/go-version"
@@ -615,10 +616,8 @@ func migrateImportedClusterFields(w *wrangler.Context) error {
 }
 
 func insertOrUpdateCondition(d data.Object, desiredCondition summary.Condition) (bool, error) {
-	for _, cond := range summary.GetUnstructuredConditions(d) {
-		if desiredCondition.Equals(cond) {
-			return false, nil
-		}
+	if slices.ContainsFunc(summary.GetUnstructuredConditions(d), desiredCondition.Equals) {
+		return false, nil
 	}
 
 	// The conditions must be converted to a map so that DeepCopyJSONValue will

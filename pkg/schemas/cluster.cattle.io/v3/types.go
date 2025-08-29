@@ -27,7 +27,7 @@ type KubernetesInfo struct {
 }
 
 type NamespaceResourceQuota struct {
-	Limit ResourceQuotaLimit `json:"limit,omitempty"`
+	Limit ResourceQuotaLimit `json:"limit"`
 }
 
 type ResourceQuotaLimit struct {

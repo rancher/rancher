@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"reflect"
 
 	clusterapi "github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/clusters"
@@ -57,9 +58,7 @@ func SecretCopyWithNewData(secret *corev1.Secret, newData map[string][]byte) *co
 		updatedSecretObj.Data = make(map[string][]byte)
 	}
 
-	for key, value := range newData {
-		updatedSecretObj.Data[key] = value
-	}
+	maps.Copy(updatedSecretObj.Data, newData)
 
 	return updatedSecretObj
 }

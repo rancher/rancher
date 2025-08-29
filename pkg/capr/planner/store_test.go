@@ -948,7 +948,6 @@ func TestSetMachineJoinURL(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			mp := newMockPlanner(t, InfoFunctions{
 				SystemAgentImage: func() string { return "system-agent" },

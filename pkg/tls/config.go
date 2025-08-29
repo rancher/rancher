@@ -3,6 +3,7 @@ package tls
 import (
 	"crypto/tls"
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 )
@@ -99,9 +100,7 @@ func validatedCipherSet(ciphers []string, validCiphers map[string]uint16) ([]uin
 func union(cipherSets ...map[string]uint16) map[string]uint16 {
 	result := make(map[string]uint16)
 	for _, set := range cipherSets {
-		for k, v := range set {
-			result[k] = v
-		}
+		maps.Copy(result, set)
 	}
 	return result
 }

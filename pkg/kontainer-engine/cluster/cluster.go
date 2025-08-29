@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	errors2 "errors"
 	"fmt"
+	"maps"
 	"reflect"
 
 	"github.com/rancher/rancher/pkg/kontainer-engine/logstream"
@@ -116,9 +117,7 @@ func (c *Cluster) create(ctx context.Context, clusterInfo *types.ClusterInfo) er
 	}
 
 	// also set metadata value to retrieve the cluster info
-	for k, v := range c.Metadata {
-		driverOpts.StringOptions[k] = v
-	}
+	maps.Copy(driverOpts.StringOptions, c.Metadata)
 
 	if err := c.PersistStore.PersistStatus(*c, Creating); err != nil {
 		return err

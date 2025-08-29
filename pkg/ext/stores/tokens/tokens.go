@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"reflect"
 	"strconv"
 	"strings"
@@ -1448,15 +1449,11 @@ func toSecret(token *ext.Token) (*corev1.Secret, error) {
 
 	if len(token.Annotations) > 0 {
 		secret.Annotations = make(map[string]string)
-		for k, v := range token.Annotations {
-			secret.Annotations[k] = v
-		}
+		maps.Copy(secret.Annotations, token.Annotations)
 	}
 
 	secret.Labels = make(map[string]string)
-	for k, v := range token.Labels {
-		secret.Labels[k] = v
-	}
+	maps.Copy(secret.Labels, token.Labels)
 	secret.Labels[SecretKindLabel] = SecretKindLabelValue
 	secret.Labels[UserIDLabel] = token.Spec.UserID
 	secret.Labels[KindLabel] = token.Spec.Kind

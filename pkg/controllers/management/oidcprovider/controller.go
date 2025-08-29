@@ -170,8 +170,8 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 	// regenerate client secret if the cattle.io/oidc-client-secret-regenerate annotation is present.
 	// client secrets ids are comma separated
 	if clientSecretIDs, ok := oidcClient.Annotations[regenerateClientSecretAnn]; ok {
-		csids := strings.Split(clientSecretIDs, ",")
-		for _, csid := range csids {
+		csids := strings.SplitSeq(clientSecretIDs, ",")
+		for csid := range csids {
 			if _, ok := k8sSecret.Data[csid]; ok {
 				clientSecret, err := c.generator.GenerateClientSecret()
 				if err != nil {
@@ -196,8 +196,8 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 	// remove client secret if the cattle.io/oidc-client-secret-remove annotation is present.
 	// client secrets ids are comma separated
 	if clientSecretIDs, ok := oidcClient.Annotations[removeClientSecretAnn]; ok {
-		csids := strings.Split(clientSecretIDs, ",")
-		for _, csid := range csids {
+		csids := strings.SplitSeq(clientSecretIDs, ",")
+		for csid := range csids {
 			delete(k8sSecret.Data, csid)
 			delete(k8sSecret.Annotations, clientSecretCreatedAtPrefixAnn+csid)
 		}

@@ -304,7 +304,6 @@ func TestReconcileGlobalRole(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			grLifecycle := globalRoleLifecycle{}
@@ -1182,7 +1181,6 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			grLifecycle := globalRoleLifecycle{}
@@ -1292,7 +1290,6 @@ func TestSetGRAsInProgress(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			grLifecycle := globalRoleLifecycle{}
@@ -1478,7 +1475,6 @@ func TestSetGRAsCompleted(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			grLifecycle := globalRoleLifecycle{}
@@ -1554,7 +1550,6 @@ func TestSetGRAsTerminating(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			grLifecycle := globalRoleLifecycle{}

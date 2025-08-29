@@ -225,7 +225,7 @@ func createSHA256Hash(secretKey string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	hash := sha256.Sum256([]byte(fmt.Sprintf("%s%s", salt, secretKey)))
+	hash := sha256.Sum256(fmt.Appendf(nil, "%s%s", salt, secretKey))
 	encSalt := base64.RawStdEncoding.EncodeToString(salt)
 	encKey := base64.RawStdEncoding.EncodeToString(hash[:])
 	return fmt.Sprintf(hashFormat, Version, encSalt, encKey), nil

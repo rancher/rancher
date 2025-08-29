@@ -44,7 +44,6 @@ func TestIsAdUser(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			result := isAdUser(&test.user)
@@ -95,7 +94,6 @@ func TestGetExternalId(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			result, err := getExternalID(test.principalId)
@@ -151,7 +149,6 @@ func TestGetScope(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			result, err := getScope(test.principalId)

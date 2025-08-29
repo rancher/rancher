@@ -4,6 +4,7 @@ package azure
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net/url"
 	"strconv"
 	"strings"
@@ -361,9 +362,7 @@ func (ap *Provider) saveAzureConfigK8s(config *v32.AzureADConfig) error {
 	if config.ObjectMeta.Annotations == nil {
 		config.ObjectMeta.Annotations = map[string]string{}
 	}
-	for k, v := range annotations {
-		config.ObjectMeta.Annotations[k] = v
-	}
+	maps.Copy(config.ObjectMeta.Annotations, annotations)
 
 	field := strings.ToLower(client.AzureADConfigFieldApplicationSecret)
 	name, err := common.CreateOrUpdateSecrets(ap.secrets, config.ApplicationSecret, field, strings.ToLower(config.Type))

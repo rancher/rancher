@@ -68,7 +68,7 @@ func (gc *metricGarbageCollector) metricGarbageCollection() {
 		if err != nil {
 			logrus.Errorf("[metrics-garbage-collector] failed to list endpoints: %s", err)
 		}
-		for _, svc := range strings.Split(settings.PeerServices.Get(), ",") {
+		for svc := range strings.SplitSeq(settings.PeerServices.Get(), ",") {
 			for _, e := range endpoints {
 				// If Endpoint is associated with PeerServices service
 				if e.Name == strings.TrimSpace(svc) {

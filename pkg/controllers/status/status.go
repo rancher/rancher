@@ -76,7 +76,7 @@ func CompareConditions(s1 []metav1.Condition, s2 []metav1.Condition) bool {
 // if condition is the same
 func KeepLastTransitionTimeIfConditionHasNotChanged(conditions []metav1.Condition, conditionsFromCluster []metav1.Condition) {
 	for _, cFromCluster := range conditionsFromCluster {
-		for i := 0; i < len(conditions); i++ {
+		for i := range conditions {
 			c := &conditions[i]
 			if c.Type == cFromCluster.Type &&
 				c.Status == cFromCluster.Status &&

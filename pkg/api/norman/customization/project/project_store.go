@@ -261,7 +261,7 @@ func (s *projectStore) isQuotaFit(apiContext *types.APIContext, nsQuotaLimit *v3
 		return err
 	}
 	var nsLimits []*v32.ResourceQuotaLimit
-	for i := 0; i < namespacesCount; i++ {
+	for range namespacesCount {
 		nsLimits = append(nsLimits, converted)
 	}
 

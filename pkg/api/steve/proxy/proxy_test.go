@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -327,17 +328,15 @@ func (t *testReviewer) Review(sar *authv1.SubjectAccessReview) (*response, *http
 		namespace: sar.Spec.ResourceAttributes.Namespace,
 		name:      sar.Spec.ResourceAttributes.Name,
 	}
-	for _, grant := range t.grants {
-		if grant == sarGrant {
-			return &response{
-				APIVersion: authv1.SchemeGroupVersion.String(),
-				Status: responseStatus{
-					Allowed:         true,
-					Reason:          "user has permissions",
-					EvaluationError: "",
-				},
-			}, nil
-		}
+	if slices.Contains(t.grants, sarGrant) {
+		return &response{
+			APIVersion: authv1.SchemeGroupVersion.String(),
+			Status: responseStatus{
+				Allowed:         true,
+				Reason:          "user has permissions",
+				EvaluationError: "",
+			},
+		}, nil
 	}
 	return &response{
 		APIVersion: authv1.SchemeGroupVersion.String(),

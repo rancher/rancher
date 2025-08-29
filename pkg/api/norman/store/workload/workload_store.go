@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -125,10 +126,8 @@ func (s *CustomizeStore) validateSubPath(subPath string) error {
 		return httperror.NewAPIError(httperror.MissingRequired, fmt.Sprintf("Invalid value: Sub Path in Volume %v must be a relative path", subPath))
 	}
 	parts := strings.Split(subPath, "/")
-	for _, item := range parts {
-		if item == ".." {
-			return httperror.NewAPIError(httperror.MissingRequired, fmt.Sprintf("Invalid value: Sub Path in Volume %v must not contain '..'", subPath))
-		}
+	if slices.Contains(parts, "..") {
+		return httperror.NewAPIError(httperror.MissingRequired, fmt.Sprintf("Invalid value: Sub Path in Volume %v must not contain '..'", subPath))
 	}
 	return nil
 }

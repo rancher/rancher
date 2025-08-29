@@ -74,7 +74,7 @@ func Test_handler_hasClusterAnnotationsAndDeletionTimestamp(t *testing.T) {
 		},
 	}
 	isClusterArg := true
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				// first returned value is always the same role object as the role argument

@@ -57,8 +57,8 @@ func (a arbitrary) sign(req *http.Request, secrets SecretGetter, auth string) er
 	if err != nil {
 		return err
 	}
-	splitHeaders := strings.Split(data["headers"], ",")
-	for _, header := range splitHeaders {
+	splitHeaders := strings.SplitSeq(data["headers"], ",")
+	for header := range splitHeaders {
 		val := strings.SplitN(header, "=", 2)
 		req.Header.Set(val[0], val[1])
 	}

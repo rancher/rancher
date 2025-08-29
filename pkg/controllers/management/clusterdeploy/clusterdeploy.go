@@ -462,7 +462,7 @@ func (cd *clusterDeploy) deployAgent(cluster *apimgmtv3.Cluster) error {
 		}
 		logrus.Tracef("clusterDeploy: deployAgent: agent YAML: %v", string(yaml))
 		var output []byte
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			// This will fail almost always the first time because when we create the namespace in the file it won't have privileges.
 			// This allows for 5*5 seconds for the cluster to be ready to apply the agent YAML before erroring out
 			logrus.Tracef("clusterDeploy: deployAgent: applying agent YAML for cluster [%s], try #%d: %v", cluster.Name, i+1, string(output))

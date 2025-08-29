@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"maps"
 	"net/http"
 
 	"github.com/rancher/norman/types"
@@ -119,9 +120,7 @@ func workloadTypes(schemas *types.Schemas) *types.Schemas {
 					if baseSchema == nil {
 						continue
 					}
-					for name, field := range baseSchema.ResourceFields {
-						schema.ResourceFields[name] = field
-					}
+					maps.Copy(schema.ResourceFields, baseSchema.ResourceFields)
 				}
 				schema.ResourceActions = map[string]types.Action{
 					"rollback": {

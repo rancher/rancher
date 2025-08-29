@@ -5,6 +5,7 @@ import (
 	"encoding/base32"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"reflect"
 	"strings"
 	"time"
@@ -267,9 +268,7 @@ func (m *userManager) EnsureClusterToken(clusterName string, input user.TokenInp
 
 	labels := map[string]string{}
 	if input.Labels != nil {
-		for k, v := range input.Labels {
-			labels[k] = v
-		}
+		maps.Copy(labels, input.Labels)
 	}
 	labels[tokens.UserIDLabel] = input.UserName
 	labels[tokens.TokenKindLabel] = input.Kind

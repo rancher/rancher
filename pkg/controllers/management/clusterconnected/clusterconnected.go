@@ -120,7 +120,7 @@ func (c *checker) updateClusterConnectedCondition(cluster *v3.Cluster, connected
 	if cluster == nil {
 		return fmt.Errorf("cluster cannot be nil")
 	}
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		cluster = cluster.DeepCopy()
 		Connected.SetStatusBool(cluster, connected)
 		if !connected && v3.ClusterConditionProvisioned.IsTrue(cluster) {

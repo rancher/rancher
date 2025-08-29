@@ -3,6 +3,7 @@ package roletemplate
 import (
 	"fmt"
 	"net/http"
+	"slices"
 
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
@@ -60,12 +61,10 @@ func (w Wrapper) Formatter(apiContext *types.APIContext, resource *types.RawReso
 	}
 
 	for _, rt := range roleTemplates {
-		for _, parent := range rt.RoleTemplateNames {
-			if parent == resource.ID {
-				// if another roletemplate inherits from current roletemplate, disable remove
-				delete(resource.Links, "remove")
-				return
-			}
+		if slices.Contains(rt.RoleTemplateNames, resource.ID) {
+			// if another roletemplate inherits from current roletemplate, disable remove
+			delete(resource.Links, "remove")
+			return
 		}
 	}
 }

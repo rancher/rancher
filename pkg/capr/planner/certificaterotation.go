@@ -3,6 +3,7 @@ package planner
 import (
 	"fmt"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -248,12 +249,7 @@ func rotationContainsService(rotation *rkev1.RotateCertificates, service string)
 	if len(rotation.Services) == 0 {
 		return true
 	}
-	for _, desiredService := range rotation.Services {
-		if desiredService == service {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(rotation.Services, service)
 }
 
 // shouldRotateEntry returns true if the rotated services are applicable to the entry's roles.

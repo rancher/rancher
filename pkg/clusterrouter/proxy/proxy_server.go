@@ -110,7 +110,7 @@ func NewLocal(localConfig *rest.Config, cluster *v3.Cluster) (*RemoteService, er
 	if localConfig.BearerToken != "" {
 		rs.localAuth = "Bearer " + localConfig.BearerToken
 	} else if localConfig.Password != "" {
-		rs.localAuth = "Basic " + base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", localConfig.Username, localConfig.Password)))
+		rs.localAuth = "Basic " + base64.StdEncoding.EncodeToString(fmt.Appendf(nil, "%s:%s", localConfig.Username, localConfig.Password))
 	}
 
 	return rs, nil

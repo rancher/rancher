@@ -124,7 +124,7 @@ func (s *userStore) Create(apiContext *types.APIContext, schema *types.Schema, d
 	}
 
 Tries:
-	for x := 0; x < 3; x++ {
+	for x := range 3 {
 		if id, ok := created[types.ResourceFieldID].(string); ok {
 			time.Sleep(time.Duration((x+1)*100) * time.Millisecond)
 

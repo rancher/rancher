@@ -170,7 +170,7 @@ func (f *Factory) clusterDialer(clusterName, address string, retryOnError bool) 
 	}
 
 	logrus.Debugf("No active connection for cluster [%s], will wait for about 30 seconds", cluster.Name)
-	for i := 0; i < 4; i++ {
+	for range 4 {
 		if f.TunnelServer.HasSession(cluster.Name) {
 			logrus.Debugf("Cluster [%s] has reconnected, resuming", cluster.Name)
 			cd := f.TunnelServer.Dialer(cluster.Name)
