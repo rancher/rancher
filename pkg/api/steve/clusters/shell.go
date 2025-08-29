@@ -139,6 +139,12 @@ func (s *shell) createPod(imageOverride string) *v1.Pod {
 					Effect:   "NoSchedule",
 				},
 				{
+					Key:      "node-role.kubernetes.io/control-plane",
+					Operator: "Equal",
+					Value:    "true",
+					Effect:   "NoSchedule",
+				},
+				{
 					Key:      "node-role.kubernetes.io/etcd",
 					Operator: "Equal",
 					Value:    "true",
