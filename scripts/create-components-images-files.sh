@@ -3,11 +3,23 @@
 
 cd $(dirname $0)
 
-source version
-source export-config
 source package-env
 
 cd ../package
+
+# Query KDM data for RKE2 released versions where server args are defined.
+RKE2_RELEASE_VERSIONS=$(jq -r '[.rke2.releases[] | select(.serverArgs) | .version] | join(" ")' bin/data.json)
+# Convert versions with build metadata into valid image tags (replace + for -) and construct an array of tags.
+RKE2_RELEASE_TAGS=($(echo $RKE2_RELEASE_VERSIONS | tr + -))
+# Prefix image repo and name to tags.
+SYSTEM_AGENT_INSTALLER_RKE2_IMAGES=("${RKE2_RELEASE_TAGS[@]/#/${REPO}/system-agent-installer-rke2:}")
+
+# Query KDM data for K3S released versions where server args are defined.
+K3S_RELEASE_VERSIONS=$(jq -r '[.k3s.releases[] | select(.serverArgs) | .version] | join(" ")' bin/data.json)
+# Convert versions with build metadata into valid image tags (replace + for -) and construct an array of tags.
+K3S_RELEASE_TAGS=($(echo $K3S_RELEASE_VERSIONS | tr + -))
+# Prefix image repo and name to tags.
+SYSTEM_AGENT_INSTALLER_K3S_IMAGES=("${K3S_RELEASE_TAGS[@]/#/${REPO}/system-agent-installer-k3s:}")
 
 if [ ${ARCH} == arm64 ]; then
     ETCD_UNSUPPORTED_ARCH=arm64
