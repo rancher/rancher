@@ -293,7 +293,7 @@ func (w *UserContext) deferredStartAsync(ctx context.Context, register func(ctx 
 		transaction.Commit()
 		started = true
 		go func() {
-			// this is make go vet happy that we aren't leaking a context
+			// this is to make go vet happy that we aren't leaking a context
 			<-ctx.Done()
 			cancel()
 		}()

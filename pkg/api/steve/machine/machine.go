@@ -11,7 +11,7 @@ import (
 )
 
 func Register(server *steve.Server, clients *wrangler.Context) {
-	clients.DeferredCAPIRegistration.DeferFunc(clients, func(clients *wrangler.Context) {
+	clients.DeferredCAPIRegistration.DeferFunc(func(clients *wrangler.Context) {
 		sshClient := &sshClient{
 			machines: clients.CAPI.Machine(),
 			secrets:  clients.Core.Secret(),
