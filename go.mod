@@ -47,7 +47,7 @@ replace (
 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.33.2
 	k8s.io/kubectl => k8s.io/kubectl v0.33.2
 	k8s.io/kubelet => k8s.io/kubelet v0.33.2
-	k8s.io/kubernetes => k8s.io/kubernetes v1.33.2
+	k8s.io/kubernetes => k8s.io/kubernetes v1.33.4
 	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.33.2
 	k8s.io/metrics => k8s.io/metrics v0.33.2
 	k8s.io/mount-utils => k8s.io/mount-utils v0.33.2
@@ -174,7 +174,7 @@ require (
 	k8s.io/kube-aggregator v0.33.2
 	k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a9a2ff
 	k8s.io/kubectl v0.33.2
-	k8s.io/kubernetes v1.33.2
+	k8s.io/kubernetes v1.33.4
 	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397
 	oras.land/oras-go/v2 v2.6.0
 	sigs.k8s.io/aws-iam-authenticator v0.6.17
