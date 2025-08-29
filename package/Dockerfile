@@ -166,7 +166,7 @@ ENV LINODE_UI_DRIVER_VERSION=v0.7.0
 # For displaying Helm version in the UI only.
 ENV CATTLE_HELM_VERSION=v3.18.3-rancher1
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
-ENV DOCKER_MACHINE_HARVESTER_VERSION=v1.0.2
+ENV DOCKER_MACHINE_HARVESTER_VERSION=v1.0.3
 ENV CATTLE_KDM_BRANCH=${CATTLE_KDM_BRANCH}
 ENV CATTLE_WINS_AGENT_VERSION=v0.5.2
 ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT=https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
@@ -475,11 +475,11 @@ COPY package/loglevel package/run.sh package/kubectl-shell.sh package/shell-setu
 WORKDIR /var/lib/rancher
 
 LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/rancher/ui/master/public/assets/images/logos/welcome-cow.svg" \
-      "io.artifacthub.package.readme-url"="https://raw.githubusercontent.com/rancher/rancher/${VERSION}/README.md" \
-      "org.opencontainers.image.description"="Rancher Manager Agent: complete container management platform." \
-      "org.opencontainers.image.title"="Rancher Manager Agent: complete container management platform." \
-      "org.opencontainers.image.source"="https://github.com/rancher/rancher" \
-      "org.opencontainers.image.version"=${VERSION} \
-      "org.opensuse.reference"=rancher/rancher-agent:${VERSION}
+    "io.artifacthub.package.readme-url"="https://raw.githubusercontent.com/rancher/rancher/${VERSION}/README.md" \
+    "org.opencontainers.image.description"="Rancher Manager Agent: complete container management platform." \
+    "org.opencontainers.image.title"="Rancher Manager Agent: complete container management platform." \
+    "org.opencontainers.image.source"="https://github.com/rancher/rancher" \
+    "org.opencontainers.image.version"=${VERSION} \
+    "org.opensuse.reference"=rancher/rancher-agent:${VERSION}
 
 ENTRYPOINT ["run.sh"]
