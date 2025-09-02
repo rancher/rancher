@@ -64,7 +64,9 @@ type ClaimInfo struct {
 	Email             string   `json:"email"`
 	Groups            []string `json:"groups"`
 	FullGroupPath     []string `json:"full_group_path"`
-	ACR               string   `json:"acr"`
+	// https://openid.net/specs/openid-connect-core-1_0.html#rfc.section.2
+	ACR   string   `json:"acr"`
+	Roles []string `json:"roles"`
 }
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
@@ -79,11 +81,11 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 	}
 }
 
-func (o *OpenIDCProvider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (o *OpenIDCProvider) LogoutAll(apiContext *types.APIContext, _ accessor.TokenAccessor) error {
 	return nil
 }
 
-func (o *OpenIDCProvider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (o *OpenIDCProvider) Logout(apiContext *types.APIContext, _ accessor.TokenAccessor) error {
 	return nil
 }
 
@@ -560,7 +562,15 @@ func ConfigToOauthConfig(endpoint oauth2.Endpoint, config *v32.OIDCConfig) oauth
 func (o *OpenIDCProvider) getGroupsFromClaimInfo(claimInfo ClaimInfo) []v3.Principal {
 	var groupPrincipals []v3.Principal
 
+	// If full_group_path is provided, it takes precedence over groups.
+	// full_group_path is expected to be a list of paths separated by '/'.
+	// Each path element is treated as a separate group.
+	// For example, if full_group_path contains "/group1/group2" and "/group3",
+	// the resulting groups will be "group1", "group2", and "group3".
+	//
+	// This allows for hierarchical group structures to be flattened into individual group memberships.
 	if claimInfo.FullGroupPath != nil {
+		logrus.Debugf("[generic oidc] using full_group_path claim")
 		for _, groupPath := range claimInfo.FullGroupPath {
 			groupsFromPath := strings.Split(groupPath, "/")
 			for _, group := range groupsFromPath {
@@ -572,8 +582,21 @@ func (o *OpenIDCProvider) getGroupsFromClaimInfo(claimInfo ClaimInfo) []v3.Princ
 			}
 		}
 	} else {
+		logrus.Debugf("[generic oidc] using groups claim")
 		for _, group := range claimInfo.Groups {
 			groupPrincipal := o.groupToPrincipal(group)
+			groupPrincipal.MemberOf = true
+			groupPrincipals = append(groupPrincipals, groupPrincipal)
+		}
+	}
+
+	// If Roles are provided these are added as additional group principals.
+	//
+	// This is done to support identity providers like Azure AD.
+	if claimInfo.Roles != nil {
+		logrus.Debugf("[generic oidc] using roles claim")
+		for _, role := range claimInfo.Roles {
+			groupPrincipal := o.groupToPrincipal(role)
 			groupPrincipal.MemberOf = true
 			groupPrincipals = append(groupPrincipals, groupPrincipal)
 		}
