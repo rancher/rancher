@@ -236,7 +236,13 @@ func (p *rotatingSNIProvider) Run(stopChan <-chan struct{}) error {
 			}
 		case event, ok := <-watcher.ResultChan():
 			if !ok || event.Type == watch.Error {
-				logrus.Errorf("watcher channel closed: %v", event.Object)
+				switch obj := event.Object.(type) {
+				case *metav1.Status:
+					logrus.Errorf("watcher channel closed: %s", obj.Message)
+				default:
+					logrus.Errorf("watcher channel closed: %v", obj)
+				}
+
 				return nil
 			}
 
