@@ -4,8 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	v1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
 	"github.com/stretchr/testify/assert"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -313,20 +312,3 @@ func TestUpdated(t *testing.T) {
 		})
 	}
 }
-
-type fakeRBAC struct {
-	clusterRoleFake        fakes.ClusterRoleInterfaceMock
-	clusterRoleBindingFake fakes.ClusterRoleBindingInterfaceMock
-	roleFake               fakes.RoleInterfaceMock
-	roleBindingFake        fakes.RoleBindingInterfaceMock
-}
-
-func (f *fakeRBAC) ClusterRoles(namespace string) v1.ClusterRoleInterface { return &f.clusterRoleFake }
-
-func (f *fakeRBAC) ClusterRoleBindings(namespace string) v1.ClusterRoleBindingInterface {
-	return &f.clusterRoleBindingFake
-}
-
-func (f *fakeRBAC) Roles(namespace string) v1.RoleInterface { return &f.roleFake }
-
-func (f *fakeRBAC) RoleBindings(namespace string) v1.RoleBindingInterface { return &f.roleBindingFake }

@@ -1,29 +1,36 @@
 package rbac
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/managementuser/secret"
 	"github.com/rancher/rancher/pkg/namespace"
 	projectpkg "github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/settings"
+	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 )
 
-func newProjectLifecycle(r *manager) *pLifecycle {
-	return &pLifecycle{m: r}
+func newProjectLifecycle(r *manager, secretClient wcorev1.SecretClient) *pLifecycle {
+	return &pLifecycle{
+		m:            r,
+		secretClient: secretClient,
+	}
 }
 
 type pLifecycle struct {
-	m *manager
+	m            *manager
+	secretClient wcorev1.SecretClient
 }
 
 func (p *pLifecycle) Create(project *v3.Project) (runtime.Object, error) {
@@ -58,24 +65,26 @@ func (p *pLifecycle) Remove(project *v3.Project) (runtime.Object, error) {
 	for _, suffix := range projectNSVerbToSuffix {
 		roleName := fmt.Sprintf(projectNSGetClusterRoleNameFmt, project.Name, suffix)
 
-		err := p.m.workload.RBAC.ClusterRoles("").Delete(roleName, &v1.DeleteOptions{})
+		err := p.m.workload.RBAC.ClusterRoles("").Delete(roleName, &metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
-			return project, err
+			return nil, err
 		}
 	}
 
 	projectID := project.Namespace + ":" + project.Name
 	namespaces, err := p.m.nsIndexer.ByIndex(namespace.NsByProjectIndex, projectID)
 	if err != nil {
-		return project, err
+		return nil, err
 	}
+
+	var returnErrors error
 
 	for _, o := range namespaces {
 		namespace, _ := o.(*corev1.Namespace)
 		if _, ok := namespace.Annotations["field.cattle.io/creatorId"]; ok {
-			err := p.m.workload.Core.Namespaces("").Delete(namespace.Name, &v1.DeleteOptions{})
+			err := p.m.workload.Core.Namespaces("").Delete(namespace.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
-				return project, err
+				return nil, err
 			}
 		} else {
 			namespace = namespace.DeepCopy()
@@ -83,13 +92,26 @@ func (p *pLifecycle) Remove(project *v3.Project) (runtime.Object, error) {
 				delete(namespace.Annotations, projectIDAnnotation)
 				_, err := p.m.workload.Core.Namespaces("").Update(namespace)
 				if err != nil {
-					return project, err
+					return nil, err
 				}
+			}
+		}
+
+		// remove project scoped secrets if they exist
+		secrets, err := p.secretClient.List(namespace.Name, metav1.ListOptions{LabelSelector: secret.ProjectScopedSecretLabel + "=" + project.Name})
+		if err != nil {
+			return nil, fmt.Errorf("failed to list project scoped secrets: %w", err)
+		}
+		for _, secret := range secrets.Items {
+			err := p.secretClient.Delete(namespace.Name, secret.Name, &metav1.DeleteOptions{})
+			if err != nil && !apierrors.IsNotFound(err) {
+				logrus.Errorf("failed to delete project scoped secret %s/%s: %v", namespace.Name, secret.Name, err)
+				returnErrors = errors.Join(returnErrors, err)
 			}
 		}
 	}
 
-	return nil, nil
+	return nil, returnErrors
 }
 
 func (p *pLifecycle) ensureNamespacesAssigned(project *v3.Project) error {
@@ -121,14 +143,14 @@ func (p *pLifecycle) ensureNamespacesAssigned(project *v3.Project) error {
 }
 
 func (p *pLifecycle) ensureDefaultNamespaceAssigned(project *v3.Project) error {
-	_, err := v32.ProjectConditionDefaultNamespacesAssigned.DoUntilTrue(project, func() (runtime.Object, error) {
+	_, err := v3.ProjectConditionDefaultNamespacesAssigned.DoUntilTrue(project, func() (runtime.Object, error) {
 		return nil, p.assignNamespacesToProject(project, projectpkg.Default)
 	})
 	return err
 }
 
 func (p *pLifecycle) ensureSystemNamespaceAssigned(project *v3.Project) error {
-	_, err := v32.ProjectConditionSystemNamespacesAssigned.DoUntilTrue(project, func() (runtime.Object, error) {
+	_, err := v3.ProjectConditionSystemNamespacesAssigned.DoUntilTrue(project, func() (runtime.Object, error) {
 		return nil, p.assignNamespacesToProject(project, projectpkg.System)
 	})
 	return err
@@ -151,7 +173,7 @@ func (p *pLifecycle) ensureNamespaceRolesUpdated(project *v3.Project) error {
 	manageNSRecord := authorizer.AttributesRecord{
 		Verb:            manageNSVerb,
 		APIGroup:        management.GroupName,
-		Resource:        v32.ProjectResourceName,
+		Resource:        v3.ProjectResourceName,
 		Name:            project.Name,
 		ResourceRequest: true,
 	}
