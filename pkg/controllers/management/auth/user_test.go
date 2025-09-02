@@ -569,7 +569,7 @@ func TestUpdated(t *testing.T) {
 
 			timer := exttokens.NewMocktimeHandler(ctrl)
 
-			store := exttokens.NewSystem(nil, nil, secrets, users, nil, timer, nil, nil)
+			store := exttokens.NewSystem(nil, nil, secrets, users, nil, nil, timer, nil, nil)
 			ul.extTokenStore = store
 			ul.secrets = secrets
 			ul.secretsLister = scache

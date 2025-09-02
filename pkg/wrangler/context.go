@@ -20,6 +20,7 @@ import (
 	"github.com/rancher/norman/types"
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	clusterv3api "github.com/rancher/rancher/pkg/apis/cluster.cattle.io/v3"
+	extv1api "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	managementv3api "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	projectv3api "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	provisioningv1api "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
@@ -33,6 +34,8 @@ import (
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	capi "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	ext "github.com/rancher/rancher/pkg/generated/controllers/ext.cattle.io"
+	extv1 "github.com/rancher/rancher/pkg/generated/controllers/ext.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io"
 	fleetv1alpha1 "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io"
@@ -103,6 +106,7 @@ var (
 		apiextensionsv1.AddToScheme,
 		apiregistrationv12.AddToScheme,
 		catalogv1.AddToScheme,
+		extv1api.AddToScheme,
 	}
 	AddToScheme = localSchemeBuilder.AddToScheme
 	Scheme      = runtime.NewScheme()
@@ -110,6 +114,8 @@ var (
 	cacheSyncTimeoutEnvVar = "CACHE_SYNC_TIMEOUT"
 	cacheSyncTimeout       = time.Minute * 5
 )
+
+const defaultControllerWorkerCount = 50
 
 func init() {
 	metav1.AddToGroupVersion(Scheme, schema.GroupVersion{Version: "v1"})
@@ -127,7 +133,8 @@ func init() {
 type Context struct {
 	RESTConfig *rest.Config
 
-	DeferredCAPIRegistration *DeferredCAPIRegistration
+	DeferredCAPIRegistration   *DeferredCAPIRegistration
+	DeferredEXTAPIRegistration *DeferredRegistration
 
 	Apply               apply.Apply
 	Dynamic             *dynamic.Controller
@@ -183,6 +190,10 @@ type Context struct {
 	crd          *apiextensions.Factory
 	plan         *upgrade.Factory
 	telemetry    *telemetry.Factory
+
+	// EXT API support
+	Ext extv1.Interface
+	ext *ext.Factory
 
 	started bool
 }
@@ -268,7 +279,7 @@ func (w *Context) StartSharedFactoryWithTransaction(ctx context.Context, f func(
 	w.ControllerFactory.SharedCacheFactory().WaitForCacheSync(ctx)
 	transaction.Commit()
 
-	if err := w.ControllerFactory.Start(ctx, 50); err != nil {
+	if err := w.ControllerFactory.Start(ctx, defaultControllerWorkerCount); err != nil {
 		return err
 	}
 
@@ -287,7 +298,7 @@ func (w *Context) Start(ctx context.Context) error {
 		w.started = true
 	}
 
-	if err := w.ControllerFactory.Start(ctx, 50); err != nil {
+	if err := w.ControllerFactory.Start(ctx, defaultControllerWorkerCount); err != nil {
 		return err
 	}
 	w.leadership.Start(ctx)
@@ -295,7 +306,7 @@ func (w *Context) Start(ctx context.Context) error {
 }
 
 // WithAgent returns a shallow copy of the Context that has been configured to use a user agent in its
-// clients that is the given userAgent appended to "rancher-%s-%s".
+// clients that is the configured server-version and given userAgent insert into "rancher-%s-%s".
 func (w *Context) WithAgent(userAgent string) *Context {
 	userAgent = fmt.Sprintf("rancher-%s-%s", settings.ServerVersion.Get(), userAgent)
 	wContextCopy := *w
@@ -333,11 +344,17 @@ func (w *Context) WithAgent(userAgent string) *Context {
 	wContextCopy.API = wContextCopy.api.WithAgent(userAgent).V1()
 	wContextCopy.CRD = wContextCopy.crd.WithAgent(userAgent).V1()
 	wContextCopy.Plan = wContextCopy.plan.WithAgent(userAgent).V1()
+
 	if w.DeferredCAPIRegistration.CAPIInitialized {
 		wContextCopy.CAPI = wContextCopy.capi.WithAgent(userAgent).V1beta1()
 	} else {
 		go wContextCopy.BackfillCAPI(&wContextCopy)
 	}
+
+	w.DeferredEXTAPIRegistration.DeferFunc(&wContextCopy, func(copy *Context) {
+		logrus.Tracef("[deferred-extapi/run] %p EXT fill copy %p", w, &wContextCopy)
+		wContextCopy.Ext = w.ext.WithAgent(userAgent).V1()
+	})
 
 	return &wContextCopy
 }
@@ -572,6 +589,10 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		DeferredCAPIRegistration: &DeferredCAPIRegistration{
 			wg:              &sync.WaitGroup{},
 			CAPIInitialized: false,
+		},
+
+		DeferredEXTAPIRegistration: &DeferredRegistration{
+			wg: &sync.WaitGroup{},
 		},
 	}
 
