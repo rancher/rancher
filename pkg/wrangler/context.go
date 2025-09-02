@@ -130,6 +130,7 @@ type Context struct {
 	RESTConfig *rest.Config
 
 	DeferredCAPIRegistration *DeferredCAPIRegistration
+	capiMutex                sync.Mutex
 
 	Apply               apply.Apply
 	Dynamic             *dynamic.Controller
@@ -338,6 +339,9 @@ func (w *Context) WithAgent(userAgent string) *Context {
 	wContextCopy.Plan = wContextCopy.plan.WithAgent(userAgent).V1()
 
 	wContextCopy.DeferredCAPIRegistration.DeferFunc(func(clients *Context) {
+		clients.capiMutex.Lock()
+		defer clients.capiMutex.Unlock()
+
 		wContextCopy.CAPI = clients.capi.WithAgent(userAgent).V1beta1()
 	})
 
@@ -566,6 +570,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		rbac:         rbac,
 		plan:         plan,
 		telemetry:    telemetry,
+		capiMutex:    sync.Mutex{},
 	}
 
 	wContext.DeferredCAPIRegistration = newDeferredCAPIRegistration(wContext)

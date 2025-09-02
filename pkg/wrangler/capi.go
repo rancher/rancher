@@ -46,6 +46,9 @@ func (w *Context) manageDeferredCAPIContext(ctx context.Context) {
 		w.DeferredCAPIRegistration.mutex.Lock()
 		defer w.DeferredCAPIRegistration.mutex.Unlock()
 
+		w.capiMutex.Lock()
+		defer w.capiMutex.Unlock()
+
 		w.capi = capi
 		w.CAPI = capi.Cluster().V1beta1()
 
