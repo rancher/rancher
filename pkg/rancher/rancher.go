@@ -146,7 +146,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
-	wranglerContext, err := wrangler.NewContext(ctx, clientConfg, restConfig)
+	wranglerContext, err := wrangler.NewPrimaryContext(ctx, clientConfg, restConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -452,11 +452,11 @@ func (r *Rancher) Start(ctx context.Context) error {
 			return err
 		}
 
-		return nil
+		return runMigrations(r.Wrangler)
 	})
 
 	r.Wrangler.OnLeader(func(ctx context.Context) error {
-		errChan := r.Wrangler.DeferredCAPIRegistration.DeferFuncWithError(r.Wrangler, runMigrations)
+		errChan := r.Wrangler.DeferredCAPIRegistration.DeferFuncWithError(runRKE2Migrations)
 		select {
 		case err, ok := <-errChan:
 			if !ok {

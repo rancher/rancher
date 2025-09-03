@@ -111,6 +111,8 @@ var (
 	cacheSyncTimeout       = time.Minute * 5
 )
 
+const defaultControllerWorkerCount = 50
+
 func init() {
 	metav1.AddToGroupVersion(Scheme, schema.GroupVersion{Version: "v1"})
 	utilruntime.Must(AddToScheme(Scheme))
@@ -128,6 +130,7 @@ type Context struct {
 	RESTConfig *rest.Config
 
 	DeferredCAPIRegistration *DeferredCAPIRegistration
+	capiMutex                sync.Mutex
 
 	Apply               apply.Apply
 	Dynamic             *dynamic.Controller
@@ -249,7 +252,7 @@ func (w *Context) StartWithTransaction(ctx context.Context, f func(context.Conte
 	return w.Start(ctx)
 }
 
-func (w *Context) StartSharedFactoryWithTransaction(ctx context.Context, f func(context.Context) error) (err error) {
+func (w *Context) StartFactoryWithTransaction(ctx context.Context, f func(context.Context) error) (err error) {
 	w.controllerLock.Lock()
 	defer w.controllerLock.Unlock()
 
@@ -268,7 +271,7 @@ func (w *Context) StartSharedFactoryWithTransaction(ctx context.Context, f func(
 	w.ControllerFactory.SharedCacheFactory().WaitForCacheSync(ctx)
 	transaction.Commit()
 
-	if err := w.ControllerFactory.Start(ctx, 50); err != nil {
+	if err := w.ControllerFactory.Start(ctx, defaultControllerWorkerCount); err != nil {
 		return err
 	}
 
@@ -287,10 +290,11 @@ func (w *Context) Start(ctx context.Context) error {
 		w.started = true
 	}
 
-	if err := w.ControllerFactory.Start(ctx, 50); err != nil {
+	if err := w.ControllerFactory.Start(ctx, defaultControllerWorkerCount); err != nil {
 		return err
 	}
 	w.leadership.Start(ctx)
+	logrus.Trace("Wrangler context has started")
 	return nil
 }
 
@@ -333,29 +337,15 @@ func (w *Context) WithAgent(userAgent string) *Context {
 	wContextCopy.API = wContextCopy.api.WithAgent(userAgent).V1()
 	wContextCopy.CRD = wContextCopy.crd.WithAgent(userAgent).V1()
 	wContextCopy.Plan = wContextCopy.plan.WithAgent(userAgent).V1()
-	if w.DeferredCAPIRegistration.CAPIInitialized {
-		wContextCopy.CAPI = wContextCopy.capi.WithAgent(userAgent).V1beta1()
-	} else {
-		go wContextCopy.BackfillCAPI(&wContextCopy)
-	}
+
+	wContextCopy.DeferredCAPIRegistration.DeferFunc(func(clients *Context) {
+		clients.capiMutex.Lock()
+		defer clients.capiMutex.Unlock()
+
+		wContextCopy.CAPI = clients.capi.WithAgent(userAgent).V1beta1()
+	})
 
 	return &wContextCopy
-}
-
-func (w *Context) BackfillCAPI(cpy *Context) {
-	printCapi := false
-	for {
-		if w.DeferredCAPIRegistration.CAPIInitialized {
-			if printCapi {
-				logrus.Trace("CAPI was initialized, retroactively adding to copy")
-			}
-			w.CAPI = cpy.CAPI
-			return
-		}
-		printCapi = true
-		logrus.Trace("Waiting for CAPI to be initialized before populating CAPI clients in copy")
-		time.Sleep(time.Second * 2)
-	}
 }
 
 func enableProtobuf(cfg *rest.Config) *rest.Config {
@@ -363,6 +353,18 @@ func enableProtobuf(cfg *rest.Config) *rest.Config {
 	cpy.AcceptContentTypes = "application/vnd.kubernetes.protobuf, application/json"
 	cpy.ContentType = "application/json"
 	return cpy
+}
+
+// NewPrimaryContext returns a Context which has one or more deferred registration handlers configured. If a new Context
+// is only needed for its clients, NewContext should be used instead.
+func NewPrimaryContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restConfig *rest.Config) (*Context, error) {
+	wCtx, err := NewContext(ctx, clientConfig, restConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	wCtx.manageDeferredCAPIContext(ctx)
+	return wCtx, nil
 }
 
 func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restConfig *rest.Config) (*Context, error) {
@@ -568,16 +570,10 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		rbac:         rbac,
 		plan:         plan,
 		telemetry:    telemetry,
-
-		DeferredCAPIRegistration: &DeferredCAPIRegistration{
-			wg:              &sync.WaitGroup{},
-			CAPIInitialized: false,
-		},
+		capiMutex:    sync.Mutex{},
 	}
 
-	// back-fill the context with the CAPI factory when the relevant
-	// CRDs are available
-	go wContext.ManageDeferredCAPIContext(ctx)
+	wContext.DeferredCAPIRegistration = newDeferredCAPIRegistration(wContext)
 
 	return wContext, nil
 }
