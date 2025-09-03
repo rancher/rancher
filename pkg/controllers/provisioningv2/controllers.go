@@ -17,7 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 )
 
-func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager *kubeconfig.Manager) {
+func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigManager *kubeconfig.Manager) {
 	cluster.Register(ctx, clients, kubeconfigManager)
 	if features.MCM.Enabled() {
 		secret.Register(ctx, clients)

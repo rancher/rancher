@@ -101,7 +101,7 @@ type handler struct {
 	kubeconfigManager   *kubeconfig.Manager
 }
 
-func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager *kubeconfig.Manager) {
+func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigManager *kubeconfig.Manager) {
 	h := &handler{
 		ctx: ctx,
 		apply: clients.Apply.WithCacheTypes(clients.Core.Secret(),

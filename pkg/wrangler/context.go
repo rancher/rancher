@@ -31,8 +31,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers"
 	"github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
-	capi "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io"
-	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	"github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io"
 	fleetv1alpha1 "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io"
@@ -129,12 +127,10 @@ func init() {
 type Context struct {
 	RESTConfig *rest.Config
 
-	DeferredCAPIRegistration *DeferredCAPIRegistration
-	capiMutex                *sync.Mutex
+	DeferredCAPIRegistration *DeferredRegistration[*CAPIContext, *DeferredCAPIInitializer]
 
 	Apply               apply.Apply
 	Dynamic             *dynamic.Controller
-	CAPI                capicontrollers.Interface
 	RKE                 rkecontrollers.Interface
 	Mgmt                managementv3.Interface
 	Apps                appsv1.Interface
@@ -176,7 +172,6 @@ type Context struct {
 	ctlg         *catalog.Factory
 	adminReg     *admissionreg.Factory
 	apps         *apps.Factory
-	capi         *capi.Factory
 	rke          *rke.Factory
 	fleet        *fleet.Factory
 	provisioning *provisioning.Factory
@@ -303,7 +298,6 @@ func (w *Context) Start(ctx context.Context) error {
 func (w *Context) WithAgent(userAgent string) *Context {
 	userAgent = fmt.Sprintf("rancher-%s-%s", settings.ServerVersion.Get(), userAgent)
 	wContextCopy := *w
-	wContextCopy.capiMutex = &sync.Mutex{}
 	restConfigCopy := &rest.Config{}
 	if w.RESTConfig != nil {
 		*restConfigCopy = *w.RESTConfig
@@ -339,13 +333,6 @@ func (w *Context) WithAgent(userAgent string) *Context {
 	wContextCopy.CRD = wContextCopy.crd.WithAgent(userAgent).V1()
 	wContextCopy.Plan = wContextCopy.plan.WithAgent(userAgent).V1()
 
-	wContextCopy.DeferredCAPIRegistration.DeferFunc(func(clients *Context) {
-		clients.capiMutex.Lock()
-		defer clients.capiMutex.Unlock()
-
-		wContextCopy.CAPI = clients.capi.WithAgent(userAgent).V1beta1()
-	})
-
 	return &wContextCopy
 }
 
@@ -364,7 +351,7 @@ func NewPrimaryContext(ctx context.Context, clientConfig clientcmd.ClientConfig,
 		return nil, err
 	}
 
-	wCtx.manageDeferredCAPIContext(ctx)
+	wCtx.DeferredCAPIRegistration.Manage(ctx)
 	return wCtx, nil
 }
 
@@ -571,10 +558,9 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		rbac:         rbac,
 		plan:         plan,
 		telemetry:    telemetry,
-		capiMutex:    &sync.Mutex{},
 	}
 
-	wContext.DeferredCAPIRegistration = newDeferredCAPIRegistration(wContext)
+	wContext.DeferredCAPIRegistration = NewDeferredRegistration[*CAPIContext, *DeferredCAPIInitializer](wContext, NewCAPIInitializer())
 
 	return wContext, nil
 }
