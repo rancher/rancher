@@ -74,6 +74,14 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 		}
 	}
 
+	if err := migrateImportedClusterFields(wranglerContext); err != nil {
+		return err
+	}
+
+	return rkeResourcesCleanup(wranglerContext)
+}
+
+func runRKE2Migrations(wranglerContext *wrangler.Context) error {
 	if features.RKE2.Enabled() {
 		// must migrate system agent data directory first, since update requests will be rejected by webhook if
 		// "CATTLE_AGENT_VAR_DIR" is set within AgentEnvVars.
@@ -90,12 +98,7 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 			return err
 		}
 	}
-
-	if err := migrateImportedClusterFields(wranglerContext); err != nil {
-		return err
-	}
-
-	return rkeResourcesCleanup(wranglerContext)
+	return nil
 }
 
 func getConfigMap(configMapController controllerv1.ConfigMapController, configMapName string) (*v1.ConfigMap, error) {
