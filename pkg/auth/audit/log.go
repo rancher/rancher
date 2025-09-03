@@ -137,8 +137,8 @@ func newLog(
 		RequestTimestamp:  reqTimestamp,
 		ResponseTimestamp: respTimestamp,
 
-		RequestHeader:  req.Header,
-		ResponseHeader: rw.Header(),
+		RequestHeader:  req.Header.Clone(),
+		ResponseHeader: rw.Header().Clone(),
 
 		rawRequestBody:  rawBody,
 		rawResponseBody: rw.buf.Bytes(),

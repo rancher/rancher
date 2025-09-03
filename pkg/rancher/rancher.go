@@ -146,7 +146,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
-	wranglerContext, err := wrangler.NewContext(ctx, clientConfg, restConfig)
+	wranglerContext, err := wrangler.NewPrimaryContext(ctx, clientConfg, restConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -330,7 +330,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		}
 	}
 
-	auditFilter := audit.NewAuditLogMiddleware(auditLogWriter)
+	auditLogMiddleware := audit.NewAuditLogMiddleware(auditLogWriter)
 	aggregationMiddleware := aggregation.NewMiddleware(ctx, wranglerContext.Mgmt.APIService(), wranglerContext.TunnelServer)
 
 	wranglerContext.OnLeaderOrDie("rancher-new", func(ctx context.Context) error {
@@ -353,7 +353,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 
 	return &Rancher{
 		Auth: authServer.Authenticator.Chain(
-			auditFilter),
+			auditLogMiddleware),
 		Handler: responsewriter.Chain{
 			auth.SetXAPICattleAuthHeader,
 			responsewriter.ContentTypeOptions,
@@ -448,11 +448,11 @@ func (r *Rancher) Start(ctx context.Context) error {
 			return err
 		}
 
-		return nil
+		return runMigrations(r.Wrangler)
 	})
 
 	r.Wrangler.OnLeaderOrDie("rancher-start::DefferedCAPIRegistration", func(ctx context.Context) error {
-		errChan := r.Wrangler.DeferredCAPIRegistration.DeferFuncWithError(r.Wrangler, runMigrations)
+		errChan := r.Wrangler.DeferredCAPIRegistration.DeferFuncWithError(runRKE2Migrations)
 		select {
 		case err, ok := <-errChan:
 			if !ok {

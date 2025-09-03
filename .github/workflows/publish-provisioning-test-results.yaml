@@ -19,7 +19,7 @@ jobs:
       - name: Install Python Deps
         run: |
           # install python
-          zypper --non-interactive install python311 python311-pip python311-virtualenv
+          zypper --non-interactive install python311 python311-pip python311-virtualenv which
 
           # set python as the default python (essentially just a symlink)
           update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
@@ -28,7 +28,7 @@ jobs:
         run: mkdir -p /tmp/test-results
 
       - name: Download All XML Test Reports
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           run-id: ${{ github.event.workflow_run.id }}
           # needed per https://github.com/orgs/community/discussions/106300#discussioncomment-8369881
@@ -38,7 +38,7 @@ jobs:
           name: "XML Results"
 
       - name: Download the Event File
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ github.token }}
@@ -47,7 +47,7 @@ jobs:
           name: "Event File"
 
       - name: Publish Test Results
-        uses: rancher/publish-unit-test-result-action/linux@3a74b2957438d0b6e2e61d67b05318aa25c9e6c6
+        uses: rancher/publish-unit-test-result-action/linux@29a85161a9d18bf8cbf186abc523927ce71221b0
         if: (!cancelled())
         with:
           check_name: Provisioning Tests Results

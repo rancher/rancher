@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"sort"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -142,12 +144,14 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 				PreferredUsername: "admin",
 				Groups:            []string{"admingroup"},
 				FullGroupPath:     []string{"/admingroup"},
+				Roles:             []string{"adminrole"},
 			},
 			expectedClaimInfo: &ClaimInfo{
 				Subject:           "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
 				PreferredUsername: "admin",
 				Groups:            []string{"admingroup"},
 				FullGroupPath:     []string{"/admingroup"},
+				Roles:             []string{"adminrole"},
 			},
 		},
 		"get groups with GroupsClaims": {
@@ -338,6 +342,7 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 				PreferredUsername: "admin",
 				Groups:            []string{"admingroup"},
 				FullGroupPath:     []string{"/admingroup"},
+				Roles:             []string{"adminrole"},
 			},
 		},
 		"token is refreshed and updated when expired": {
@@ -376,6 +381,7 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 				PreferredUsername: "admin",
 				Groups:            []string{"admingroup"},
 				FullGroupPath:     []string{"/admingroup"},
+				Roles:             []string{"adminrole"},
 			},
 			tokenManagerMock: func(token *Token) tokenManager {
 				mock := mocks.NewMocktokenManager(ctrl)
@@ -484,6 +490,72 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 	}
 }
 
+func TestGetGroupsFromClaimInfo(t *testing.T) {
+	type args struct {
+		claimInfo ClaimInfo
+	}
+	type want struct {
+		groupNames []string
+	}
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: "get groups from claim info",
+			args: args{
+				claimInfo: ClaimInfo{
+					Groups: []string{"group1", "group2"},
+				},
+			},
+			want: want{
+				groupNames: []string{"group1", "group2"},
+			},
+		},
+		{
+			name: "roles and groups are combined",
+			args: args{
+				claimInfo: ClaimInfo{
+					Groups: []string{"group1", "group2"},
+					Roles:  []string{"role1", "role2"},
+				},
+			},
+			want: want{
+				groupNames: []string{"group1", "group2", "role1", "role2"},
+			},
+		},
+		{
+			name: "just roles",
+			args: args{
+				claimInfo: ClaimInfo{
+					Roles: []string{"role1", "role2"},
+				},
+			},
+			want: want{
+				groupNames: []string{"role1", "role2"},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			o := &OpenIDCProvider{
+				Name: "oidc",
+			}
+			got := o.getGroupsFromClaimInfo(tt.args.claimInfo)
+			var gotGroupNames []string
+			for _, principal := range got {
+				parts := strings.Split(principal.Name, "://")
+				if len(parts) == 2 {
+					gotGroupNames = append(gotGroupNames, parts[1])
+				}
+			}
+			sort.Strings(gotGroupNames)
+			assert.Equal(t, tt.want.groupNames, gotGroupNames)
+		})
+	}
+}
+
 // mockOIDCServer creates an http server that mocks an OIDC provider. Responses are passed as a parameter.
 func mockOIDCServer(listener net.Listener, resp oidcResponses) *http.Server {
 	mux := http.NewServeMux()
@@ -555,8 +627,11 @@ func newOIDCResponses(privateKey *rsa.PrivateKey, port string) oidcResponses {
 				"full_group_path": [
 					"/admingroup"
 				],
+				"roles": [
+					"adminrole"
+				],
 				"preferred_username": "admin"
-              }`,
+      }`,
 		config: providerJSON{
 			Issuer:      "http://localhost:" + port,
 			UserInfoURL: "http://localhost:" + port + "/user",

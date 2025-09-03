@@ -4,6 +4,10 @@ ARG BUILD_WORKDIR=/app
 
 ARG GODEP_APISERVER=scratch
 ARG GODEP_APISERVER_PATH
+ARG GODEP_LASSO=scratch
+ARG GODEP_LASSO_PATH
+ARG GODEP_NORMAN=scratch
+ARG GODEP_NORMAN_PATH
 ARG GODEP_REMOTEDIALER=scratch
 ARG GODEP_REMOTEDIALER_PATH
 ARG GODEP_SHEPHERD=scratch
@@ -21,6 +25,8 @@ ARG CATTLE_KDM_BRANCH=dev-v2.13
 ARG VERSION=${VERSION}
 
 FROM --platform=$BUILDPLATFORM ${GODEP_APISERVER} AS godep-apiserver
+FROM --platform=$BUILDPLATFORM ${GODEP_LASSO} AS godep-lasso
+FROM --platform=$BUILDPLATFORM ${GODEP_NORMAN} AS godep-norman
 FROM --platform=$BUILDPLATFORM ${GODEP_REMOTEDIALER} AS godep-remotedialer
 FROM --platform=$BUILDPLATFORM ${GODEP_SHEPHERD} AS godep-shepherd
 FROM --platform=$BUILDPLATFORM ${GODEP_STEVE} AS godep-steve
@@ -160,7 +166,7 @@ ENV LINODE_UI_DRIVER_VERSION=v0.7.0
 # For displaying Helm version in the UI only.
 ENV CATTLE_HELM_VERSION=v3.18.3-rancher1
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
-ENV DOCKER_MACHINE_HARVESTER_VERSION=v1.0.2
+ENV DOCKER_MACHINE_HARVESTER_VERSION=v1.0.3
 ENV CATTLE_KDM_BRANCH=${CATTLE_KDM_BRANCH}
 ENV CATTLE_WINS_AGENT_VERSION=v0.5.2
 ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT=https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
@@ -340,6 +346,10 @@ ARG BUILD_WORKDIR
 WORKDIR ${BUILD_WORKDIR}
 ARG GODEP_APISERVER_PATH
 COPY --from=godep-apiserver / ${GODEP_APISERVER_PATH}
+ARG GODEP_LASSO_PATH
+COPY --from=godep-lasso / ${GODEP_LASSO_PATH}
+ARG GODEP_NORMAN_PATH
+COPY --from=godep-norman / ${GODEP_NORMAN_PATH}
 ARG GODEP_REMOTEDIALER_PATH
 COPY --from=godep-remotedialer / ${GODEP_REMOTEDIALER_PATH}
 ARG GODEP_SHEPHERD_PATH
@@ -465,11 +475,11 @@ COPY package/loglevel package/run.sh package/kubectl-shell.sh package/shell-setu
 WORKDIR /var/lib/rancher
 
 LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/rancher/ui/master/public/assets/images/logos/welcome-cow.svg" \
-      "io.artifacthub.package.readme-url"="https://raw.githubusercontent.com/rancher/rancher/${VERSION}/README.md" \
-      "org.opencontainers.image.description"="Rancher Manager Agent: complete container management platform." \
-      "org.opencontainers.image.title"="Rancher Manager Agent: complete container management platform." \
-      "org.opencontainers.image.source"="https://github.com/rancher/rancher" \
-      "org.opencontainers.image.version"=${VERSION} \
-      "org.opensuse.reference"=rancher/rancher-agent:${VERSION}
+    "io.artifacthub.package.readme-url"="https://raw.githubusercontent.com/rancher/rancher/${VERSION}/README.md" \
+    "org.opencontainers.image.description"="Rancher Manager Agent: complete container management platform." \
+    "org.opencontainers.image.title"="Rancher Manager Agent: complete container management platform." \
+    "org.opencontainers.image.source"="https://github.com/rancher/rancher" \
+    "org.opencontainers.image.version"=${VERSION} \
+    "org.opensuse.reference"=rancher/rancher-agent:${VERSION}
 
 ENTRYPOINT ["run.sh"]

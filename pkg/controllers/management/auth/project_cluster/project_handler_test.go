@@ -1,14 +1,21 @@
 package project_cluster
 
 import (
+	"fmt"
+	"reflect"
 	"testing"
+	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	fakeClientset "k8s.io/client-go/kubernetes/fake"
+	clienttesting "k8s.io/client-go/testing"
 )
 
 const clusterID = "test-cluster"
@@ -112,4 +119,149 @@ func TestReconcileProjectCreatorRTBNoCreatorRBAC(t *testing.T) {
 	obj, err := lifecycle.reconcileProjectCreatorRTB(project, clusterID)
 	assert.NoError(t, err)
 	assert.NotNil(t, obj)
+}
+
+type fakeSystemAccountManager struct {
+	removedIDs []string
+	removeErr  error
+}
+
+func (f *fakeSystemAccountManager) RemoveSystemAccount(projectID string) error {
+	f.removedIDs = append(f.removedIDs, projectID)
+	return f.removeErr
+}
+
+// Test deletion of system account created for this project when Sync is called with DeletionTimeStamp
+func TestSyncDeleteSystemUser(t *testing.T) {
+	sysMgr := &fakeSystemAccountManager{}
+	// Create a project with a deletion timestamp.
+	now := v1.NewTime(time.Now())
+	proj := &v3.Project{
+		ObjectMeta: v1.ObjectMeta{
+			Name:              "p-deleted",
+			Namespace:         clusterID,
+			DeletionTimestamp: &now,
+		},
+	}
+
+	// Instantiate lifecycle with the fake system account manager.
+	lifecycle := &projectLifecycle{
+		systemAccountManager: sysMgr,
+	}
+
+	// Use a key of format "clusterID/projectID".
+	key := clusterID + "/p-deleted"
+	obj, err := lifecycle.Sync(key, proj)
+	require.NoError(t, err)
+	require.Nil(t, obj)
+	// Check that RemoveSystemAccount was called with the correct projectID.
+	assert.Contains(t, sysMgr.removedIDs, "p-deleted")
+}
+
+// TestCreateAndUpdated verifies that the Create and Updated methods return the original object because they're currently no-op
+func TestCreateAndUpdated(t *testing.T) {
+	lifecycle := &projectLifecycle{}
+	proj := &v3.Project{
+		ObjectMeta: v1.ObjectMeta{
+			Name: "test-project",
+		},
+	}
+	created, err := lifecycle.Create(proj)
+	require.NoError(t, err)
+	require.True(t, reflect.DeepEqual(created, proj), "Create should return the original object")
+
+	updated, err := lifecycle.Updated(proj)
+	require.NoError(t, err)
+	require.True(t, reflect.DeepEqual(updated, proj), "Updated should return the original object")
+}
+
+func TestRemove(t *testing.T) {
+	namespace := &corev1.Namespace{
+		ObjectMeta: v1.ObjectMeta{
+			Name: "p-remove",
+		},
+	}
+	// Create a fake clientset using the fake package.
+	clientset := fakeClientset.NewSimpleClientset(namespace)
+	fakeNSClient := clientset.CoreV1().Namespaces()
+
+	lifecycle := &projectLifecycle{
+		nsClient: fakeNSClient,
+	}
+	project := &v3.Project{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "p-remove",
+			Namespace: "test-namespace",
+		},
+	}
+	Obj, err := lifecycle.Remove(project)
+	// Since the namespace exists in the cache, a GET & DELETE call should be recorded
+	require.Len(t, clientset.Fake.Actions(), 2, "expected exactly two actions to be recorded")
+	require.NoError(t, err)
+	require.NotNil(t, Obj)
+	// Since Remove returns the original project after deleting, assert the returned object equals original project
+	assert.Equal(t, project, Obj)
+}
+
+func TestRemoveDifferentBackingNamespace(t *testing.T) {
+	namespace := &corev1.Namespace{
+		ObjectMeta: v1.ObjectMeta{
+			Name: "diff-remove",
+		},
+	}
+	// Create a fake clientset using the fake package.
+	clientset := fakeClientset.NewSimpleClientset(namespace)
+	fakeNSClient := clientset.CoreV1().Namespaces()
+
+	lifecycle := &projectLifecycle{
+		nsClient: fakeNSClient,
+	}
+	project := &v3.Project{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "p-remove",
+			Namespace: "test-namespace",
+		},
+		Status: v3.ProjectStatus{
+			BackingNamespace: "diff-remove",
+		},
+	}
+	Obj, err := lifecycle.Remove(project)
+	require.NoError(t, err)
+	require.NotNil(t, Obj)
+	// Since the namespace exists in the cache, a GET & DELETE call should be recorded
+	require.Len(t, clientset.Fake.Actions(), 2, "expected exactly two actions to be recorded")
+	// Since Remove returns the original project after deleting, assert the returned object equals original project
+	assert.Equal(t, project, Obj)
+}
+
+func TestRemoveWithDeleteError(t *testing.T) {
+	namespace := &corev1.Namespace{
+		ObjectMeta: v1.ObjectMeta{
+			Name: "p-remove",
+		},
+	}
+	// Create a fake clientset using the fake package.
+	clientset := fakeClientset.NewSimpleClientset(namespace)
+	fakeNSClient := clientset.CoreV1().Namespaces()
+	clientset.PrependReactor("delete", "namespaces", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+		return true, nil, fmt.Errorf("simulated delete error: namespace deletion failed")
+	})
+
+	lifecycle := &projectLifecycle{
+		nsClient: fakeNSClient,
+	}
+	project := &v3.Project{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      "p-remove",
+			Namespace: "test-namespace",
+		},
+	}
+	Obj, err := lifecycle.Remove(project)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "simulated delete error", "error should contain the simulated failure message")
+	require.NotNil(t, Obj)
+	// Since the namespace exists in the cache, a GET & DELETE call should be recorded
+	require.Len(t, clientset.Fake.Actions(), 2, "expected exactly two actions to be recorded")
+	// Since Remove returns the original project after deleting, assert the returned object equals original project
+	assert.Equal(t, project, Obj)
 }
