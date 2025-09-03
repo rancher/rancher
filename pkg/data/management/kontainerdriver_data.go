@@ -76,6 +76,9 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 	}
 
 	creator.deleteRKEKontainerDriver()
+	creator.deleteKontainerDriver("amazonElasticContainerService", "https://drivers.rancher.com")
+	creator.deleteKontainerDriver("googleKubernetesEngine", "https://drivers.rancher.com")
+	creator.deleteKontainerDriver("azureKubernetesService", "https://drivers.rancher.com")
 	creator.deleteKontainerDriver("baiducloudcontainerengine", "https://drivers.rancher.cn")
 	creator.deleteKontainerDriver("aliyunkubernetescontainerservice", "https://drivers.rancher.cn")
 	creator.deleteKontainerDriver("tencentkubernetesengine", "https://drivers.rancher.cn")
