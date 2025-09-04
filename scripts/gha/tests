@@ -35,6 +35,7 @@ REGISTRY=${REGISTRY/-""}
 # copied to the in-cluster registry during test setup below.
 source ./scripts/version
 export CATTLE_AGENT_IMAGE="${REGISTRY}rancher/rancher-agent:${AGENT_TAG}"
+export CATTLE_BOOTSTRAP_PASSWORD="admin"
 echo "Using Rancher agent image $CATTLE_AGENT_IMAGE"
 
 eval "$(grep '^ENV CATTLE_SYSTEM_AGENT' package/Dockerfile | awk '{print "export " $2}')"
