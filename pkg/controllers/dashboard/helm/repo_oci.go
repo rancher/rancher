@@ -198,17 +198,17 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 			if newStatus.NumberOfRetries > retryPolicy.MaxRetry {
 				newStatus.NumberOfRetries = 0
 				newStatus.NextRetryAt = metav1.Time{}
-				return o.setConditionWithInterval(clusterRepo, errResp, newStatus, nil, ociInterval)
+				return o.setConditionWithInterval(clusterRepo, errResp, newStatus, nil, ociInterval.Round(time.Second))
 			}
 		}
-
+		backoff = backoff.Round(time.Second)
 		newStatus.NextRetryAt = metav1.Time{Time: timeNow().UTC().Add(backoff)}
 		return o.setConditionWithInterval(clusterRepo, errResp, newStatus, &backoff, ociInterval)
 
 	}
 	// If there is an error, we wait for the next interval to happen.
 	if err != nil {
-		return o.setConditionWithInterval(clusterRepo, err, newStatus, nil, ociInterval)
+		return o.setConditionWithInterval(clusterRepo, err, newStatus, nil, ociInterval.Round(time.Second))
 	}
 	if index == nil || len(index.Entries) <= 0 {
 		err = errors.New("there are no helm charts in the repository specified")
@@ -253,9 +253,9 @@ func (o *OCIRepohandler) setConditionWithInterval(clusterRepo *catalog.ClusterRe
 	} else {
 		errorMsg = err.Error()
 	}
-	backoffInterval := ociInterval.Round(time.Second)
+	backoffInterval := ociInterval
 	if backoff != nil {
-		backoffInterval = backoff.Round(time.Second)
+		backoffInterval = *backoff
 	}
 	return setConditionWithInterval(clusterRepo, err, newStatus, backoffInterval, ociCondition, errorMsg, o.clusterRepoController)
 }
