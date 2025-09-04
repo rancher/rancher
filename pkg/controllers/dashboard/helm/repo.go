@@ -303,8 +303,9 @@ func (r *repoHandler) download(repository *catalog.ClusterRepo, newStatus *catal
 		if newStatus.NumberOfRetries > retryPolicy.MaxRetry {
 			newStatus.NumberOfRetries = 0
 			newStatus.NextRetryAt = metav1.Time{}
-			return r.setConditionWithInterval(repository, err, newStatus, nil, interval)
+			return r.setConditionWithInterval(repository, err, newStatus, nil, interval.Round(time.Second))
 		}
+		backoff = backoff.Round(time.Second)
 		newStatus.NextRetryAt = metav1.Time{Time: timeNow().UTC().Add(backoff)}
 		return r.setConditionWithInterval(repository, err, newStatus, &backoff, interval)
 	}
@@ -457,9 +458,9 @@ func shouldSkip(clusterRepo *catalog.ClusterRepo,
 // after the interval of 6 hours.
 func (r *repoHandler) setConditionWithInterval(clusterRepo *catalog.ClusterRepo, err error, newStatus *catalog.RepoStatus, backoff *time.Duration, interval time.Duration) (*catalog.ClusterRepo, error) {
 	var msg string
-	backoffInterval := interval.Round(time.Second)
+	backoffInterval := interval
 	if backoff != nil {
-		backoffInterval = backoff.Round(time.Second)
+		backoffInterval = *backoff
 	}
 	msg = fmt.Sprintf("%s. Will retry after %s", err.Error(), backoffInterval)
 
