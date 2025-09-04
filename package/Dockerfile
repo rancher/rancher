@@ -4,6 +4,10 @@ ARG BUILD_WORKDIR=/app
 
 ARG GODEP_APISERVER=scratch
 ARG GODEP_APISERVER_PATH
+ARG GODEP_LASSO=scratch
+ARG GODEP_LASSO_PATH
+ARG GODEP_NORMAN=scratch
+ARG GODEP_NORMAN_PATH
 ARG GODEP_REMOTEDIALER=scratch
 ARG GODEP_REMOTEDIALER_PATH
 ARG GODEP_SHEPHERD=scratch
@@ -17,11 +21,13 @@ ARG CHART_DEFAULT_BRANCH=dev-v2.11
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ARG CATTLE_KDM_BRANCH=dev-v2.11
+ARG CATTLE_KDM_BRANCH=release-v2.11
 
 ARG VERSION=${VERSION}
 
 FROM --platform=$BUILDPLATFORM ${GODEP_APISERVER} AS godep-apiserver
+FROM --platform=$BUILDPLATFORM ${GODEP_LASSO} AS godep-lasso
+FROM --platform=$BUILDPLATFORM ${GODEP_NORMAN} AS godep-norman
 FROM --platform=$BUILDPLATFORM ${GODEP_REMOTEDIALER} AS godep-remotedialer
 FROM --platform=$BUILDPLATFORM ${GODEP_SHEPHERD} AS godep-shepherd
 FROM --platform=$BUILDPLATFORM ${GODEP_STEVE} AS godep-steve
@@ -264,9 +270,9 @@ RUN mkdir -p /var/lib/rancher/k3s/agent/images/ && \
     curl -sfL ${ETCD_URL} | tar xvzf - --strip-components=1 --no-same-owner -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
-ENV CATTLE_UI_VERSION=2.11.4
-ENV CATTLE_DASHBOARD_UI_VERSION=v2.11.4
-ENV CATTLE_CLI_VERSION=v2.11.4
+ENV CATTLE_UI_VERSION=2.11.5
+ENV CATTLE_DASHBOARD_UI_VERSION=v2.11.5
+ENV CATTLE_CLI_VERSION=v2.11.5
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
 ENV CATTLE_BASE_UI_BRAND=
@@ -338,6 +344,10 @@ ARG BUILD_WORKDIR
 WORKDIR ${BUILD_WORKDIR}
 ARG GODEP_APISERVER_PATH
 COPY --from=godep-apiserver / ${GODEP_APISERVER_PATH}
+ARG GODEP_LASSO_PATH
+COPY --from=godep-lasso / ${GODEP_LASSO_PATH}
+ARG GODEP_NORMAN_PATH
+COPY --from=godep-norman / ${GODEP_NORMAN_PATH}
 ARG GODEP_REMOTEDIALER_PATH
 COPY --from=godep-remotedialer / ${GODEP_REMOTEDIALER_PATH}
 ARG GODEP_SHEPHERD_PATH
@@ -368,6 +378,10 @@ ARG TARGETARCH
 COPY pkg/ pkg/
 COPY main.go ./
 RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o /app/rancher
+
+# Output just the server binary
+FROM scratch AS server-binary
+COPY --from=server-build /app/rancher /bin/rancher
 
 
 FROM --platform=$BUILDPLATFORM rancher-go-builder AS agent-build

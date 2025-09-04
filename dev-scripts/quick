@@ -100,6 +100,8 @@ EOF
 }
 
 add_context "github.com/rancher/apiserver" "apiserver-context" "GODEP_APISERVER"
+add_context "github.com/rancher/lasso" "lasso-context" "GODEP_LASSO"
+add_context "github.com/rancher/norman" "norman-context" "GODEP_NORMAN"
 add_context "github.com/rancher/remotedialer" "remotedialer-context" "GODEP_REMOTEDIALER"
 add_context "github.com/rancher/shepherd" "shepherd-context" "GODEP_SHEPHERD"
 add_context "github.com/rancher/steve" "steve-context" "GODEP_STEVE"
@@ -107,6 +109,15 @@ add_context "github.com/rancher/wrangler/v3" "wrangler-context" "GODEP_WRANGLER"
 
 if [ "$needs_workdir" = "true" ]; then
   BUILD_ARGS+=("--build-arg=BUILD_WORKDIR=$PWD")
+fi
+
+if [ "$TARGET" = "binary-server" ]; then
+  docker buildx build \
+    "${BUILD_ARGS[@]}" \
+    --output=type=local,dest=$PWD \
+    --platform="${OS}/${ARCH}" \
+    --target server-binary \
+    --file ./package/Dockerfile .
 fi
 
 if [ -z "$TARGET" ] || [ "$TARGET" = "server" ]; then
