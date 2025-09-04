@@ -130,7 +130,7 @@ type Context struct {
 	RESTConfig *rest.Config
 
 	DeferredCAPIRegistration *DeferredCAPIRegistration
-	capiMutex                sync.Mutex
+	capiMutex                *sync.Mutex
 
 	Apply               apply.Apply
 	Dynamic             *dynamic.Controller
@@ -303,6 +303,7 @@ func (w *Context) Start(ctx context.Context) error {
 func (w *Context) WithAgent(userAgent string) *Context {
 	userAgent = fmt.Sprintf("rancher-%s-%s", settings.ServerVersion.Get(), userAgent)
 	wContextCopy := *w
+	wContextCopy.capiMutex = &sync.Mutex{}
 	restConfigCopy := &rest.Config{}
 	if w.RESTConfig != nil {
 		*restConfigCopy = *w.RESTConfig
@@ -570,7 +571,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		rbac:         rbac,
 		plan:         plan,
 		telemetry:    telemetry,
-		capiMutex:    sync.Mutex{},
+		capiMutex:    &sync.Mutex{},
 	}
 
 	wContext.DeferredCAPIRegistration = newDeferredCAPIRegistration(wContext)
