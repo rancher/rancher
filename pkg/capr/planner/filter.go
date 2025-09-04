@@ -31,13 +31,13 @@ func filterConfigData(config map[string]interface{}, controlPlane *rkev1.RKECont
 	return nil
 }
 
-var removeForDraining = []string{"server"}
+var removeForDraining = []string{"server", "cluster-init"}
 
 func filterDrainData(config map[string]any) map[string]any {
 	filtered := map[string]any{}
 	maps.Copy(filtered, config)
 	for _, key := range removeForDraining {
-		delete(config, key)
+		delete(filtered, key)
 	}
 	return filtered
 }
