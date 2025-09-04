@@ -300,7 +300,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 		}
 	}
 
-	r.Wrangler.OnLeaderOrDie("rancher-start", func(ctx context.Context) error {
+	r.Wrangler.OnLeaderOrDie("rancher-start::dashboarddata", func(ctx context.Context) error {
 		if err := dashboarddata.Add(ctx, r.Wrangler, localClusterEnabled(r.opts), r.opts.AddLocal == "false", r.opts.Embedded); err != nil {
 			return err
 		}
@@ -317,7 +317,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 		return err
 	}
 
-	r.Wrangler.OnLeaderOrDie("rancher-start", r.authServer.OnLeader)
+	r.Wrangler.OnLeaderOrDie("rancher-start::authServer", r.authServer.OnLeader)
 	r.auditLog.Start(ctx)
 
 	return r.Wrangler.Start(ctx)
