@@ -441,7 +441,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 		}
 	}
 
-	r.Wrangler.OnLeader(func(ctx context.Context) error {
+	r.Wrangler.OnLeaderOrDie("rancher-start::dashboarddata", func(ctx context.Context) error {
 		if err := dashboarddata.Add(ctx, r.Wrangler, localClusterEnabled(r.opts), r.opts.AddLocal == "false", r.opts.Embedded); err != nil {
 			return err
 		}
@@ -455,7 +455,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 		return runMigrations(r.Wrangler)
 	})
 
-	r.Wrangler.OnLeader(func(ctx context.Context) error {
+	r.Wrangler.OnLeaderOrDie("rancher-start::DefferedCAPIRegistration", func(ctx context.Context) error {
 		errChan := r.Wrangler.DeferredCAPIRegistration.DeferFuncWithError(runRKE2Migrations)
 		select {
 		case err, ok := <-errChan:
@@ -467,7 +467,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 	})
 
 	if !features.MCMAgent.Enabled() && features.RancherSCCRegistrationExtension.Enabled() {
-		r.Wrangler.OnLeader(func(ctx context.Context) error {
+		r.Wrangler.OnLeaderOrDie("rancher-start::RancherSCCRegistration", func(ctx context.Context) error {
 			// TODO: pull this out of here if/when other features depend on the SecretRequest controllers
 			if err := telemetrycontrollers.RegisterControllers(ctx, r.Wrangler, r.telemetryManager); err != nil {
 				return err
@@ -482,7 +482,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 		return err
 	}
 
-	r.Wrangler.OnLeader(r.authServer.OnLeader)
+	r.Wrangler.OnLeaderOrDie("rancher-start::authServer", r.authServer.OnLeader)
 
 	r.auditLog.Start(ctx)
 
