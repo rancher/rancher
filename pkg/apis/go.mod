@@ -2,23 +2,13 @@ module github.com/rancher/rancher/pkg/apis
 
 go 1.24.0
 
-toolchain go1.24.5
+toolchain go1.24.6
 
 replace (
-	cel.dev/expr => cel.dev/expr v0.19.0
-	github.com/google/cel-go => github.com/google/cel-go v0.22.0
-	github.com/grpc-ecosystem/grpc-gateway/v2 => github.com/grpc-ecosystem/grpc-gateway/v2 v2.20.0
-	github.com/klauspost/compress => github.com/klauspost/compress v1.17.9
-
-	github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.20.5
-	github.com/prometheus/common => github.com/prometheus/common v0.55.0
-	github.com/rancher/lasso => github.com/rancher/lasso v0.2.2
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace => go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.28.0
-	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc => go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.27.0
-	k8s.io/api => k8s.io/api v0.33.1
-	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.33.1
-	k8s.io/apimachinery => k8s.io/apimachinery v0.33.1
-	k8s.io/apiserver => k8s.io/apiserver v0.33.1
+	k8s.io/api => k8s.io/api v0.32.2
+	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.32.2
+	k8s.io/apimachinery => k8s.io/apimachinery v0.32.2
+	k8s.io/apiserver => k8s.io/apiserver v0.32.2
 	k8s.io/cli-runtime => k8s.io/cli-runtime v0.32.2
 	k8s.io/client-go => k8s.io/client-go v0.32.2
 	k8s.io/cloud-provider => k8s.io/cloud-provider v0.32.2
@@ -33,11 +23,9 @@ replace (
 	k8s.io/dynamic-resource-allocation => k8s.io/dynamic-resource-allocation v0.32.2
 	k8s.io/endpointslice => k8s.io/endpointslice v0.32.2
 	k8s.io/externaljwt => k8s.io/externaljwt v0.32.2
-	k8s.io/gengo/v2 => k8s.io/gengo/v2 v2.0.0-20240911193312-2b36238f13e9
 	k8s.io/kms => k8s.io/kms v0.32.2
 	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.32.2
 	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.32.2
-	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20241105132330-32ad38e42d3f
 	k8s.io/kube-proxy => k8s.io/kube-proxy v0.32.2
 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.32.2
 	k8s.io/kubectl => k8s.io/kubectl v0.32.2
@@ -48,18 +36,16 @@ replace (
 	k8s.io/mount-utils => k8s.io/mount-utils v0.32.2
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.32.2
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.32.2
-	sigs.k8s.io/apiserver-network-proxy/konnectivity-client => sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.0
-	sigs.k8s.io/structured-merge-diff/v4 => sigs.k8s.io/structured-merge-diff/v4 v4.4.3
 )
 
 require (
-	github.com/rancher/aks-operator v1.11.5-rc.1
-	github.com/rancher/eks-operator v1.11.5-rc.1
+	github.com/rancher/aks-operator v1.11.5
+	github.com/rancher/eks-operator v1.11.5
 	github.com/rancher/fleet/pkg/apis v0.12.3
-	github.com/rancher/gke-operator v1.11.5-rc.1
+	github.com/rancher/gke-operator v1.11.5
 	github.com/rancher/norman v0.5.2
 	github.com/rancher/rke v1.8.5
-	github.com/rancher/wrangler/v3 v3.2.3-rc.3
+	github.com/rancher/wrangler/v3 v3.2.3
 	github.com/sirupsen/logrus v1.9.3
 	k8s.io/api v0.33.1
 	k8s.io/apimachinery v0.33.1
@@ -87,7 +73,6 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.17.9 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
@@ -98,6 +83,7 @@ require (
 	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/rancher/lasso v0.2.3 // indirect
+	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/spf13/cobra v1.8.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
