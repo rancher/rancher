@@ -3,6 +3,7 @@ package generator
 import (
 	"fmt"
 	"path"
+	"slices"
 	"strings"
 
 	"net/http"
@@ -44,12 +45,7 @@ func hasPost(schema *types.Schema) bool {
 }
 
 func contains(list []string, needle string) bool {
-	for _, i := range list {
-		if i == needle {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(list, needle)
 }
 
 func Generate(schemas *types.Schemas, backendTypes map[string]bool) {

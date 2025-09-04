@@ -571,8 +571,7 @@ func Test_Store_Watch(t *testing.T) {
 		auth.EXPECT().UserName(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(&mockUser{name: properUser}, false, true, nil)
 
-		todo, cancel := context.WithCancel(context.TODO())
-		defer cancel()
+		todo := t.Context()
 
 		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
 		consumer, err := store.watch(todo, &metav1.ListOptions{})

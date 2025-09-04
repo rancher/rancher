@@ -32,8 +32,8 @@ func (h authHeaderHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 
 	// clean extra that is not part of userInfo
 	for header := range req.Header {
-		if strings.HasPrefix(header, "Impersonate-Extra-") {
-			key := strings.TrimPrefix(header, "Impersonate-Extra-")
+		if after, ok := strings.CutPrefix(header, "Impersonate-Extra-"); ok {
+			key := after
 			if !providers.IsValidUserExtraAttribute(key) {
 				req.Header.Del(header)
 			}

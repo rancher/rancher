@@ -29,8 +29,8 @@ const (
 )
 
 type FullState struct {
-	DesiredState State `json:"desiredState,omitempty"`
-	CurrentState State `json:"currentState,omitempty"`
+	DesiredState State `json:"desiredState"`
+	CurrentState State `json:"currentState"`
 }
 
 type State struct {

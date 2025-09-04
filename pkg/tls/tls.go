@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -105,12 +106,12 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 	}
 
 	serverOptions := &server.ListenOpts{
-		Storage:       opts.Storage,
-		Secrets:       opts.Secrets,
-		CAName:        "tls-rancher-internal-ca",
-		CANamespace:   namespace.System,
-		CertNamespace: namespace.System,
-		CertName:      "tls-rancher-internal",
+		Storage:           opts.Storage,
+		Secrets:           opts.Secrets,
+		CAName:            "tls-rancher-internal-ca",
+		CANamespace:       namespace.System,
+		CertNamespace:     namespace.System,
+		CertName:          "tls-rancher-internal",
 		DisplayServerLogs: true,
 	}
 	clusterIP, err := getClusterIP(core.Core().V1().Service())
@@ -180,13 +181,7 @@ func migrateConfig(ctx context.Context, restConfig *rest.Config, opts *server.Li
 
 	for _, k := range known {
 		k = strings.SplitN(k, ":", 2)[0]
-		found := false
-		for _, san := range opts.TLSListenerConfig.SANs {
-			if san == k {
-				found = true
-				break
-			}
-		}
+		found := slices.Contains(opts.TLSListenerConfig.SANs, k)
 		if !found {
 			opts.TLSListenerConfig.SANs = append(opts.TLSListenerConfig.SANs, k)
 		}

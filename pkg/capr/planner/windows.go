@@ -196,11 +196,11 @@ foreach ($path in $restrictedPaths) {
 
 var (
 	setPermissionsWindowsScriptFile = plan.File{
-		Content: base64.StdEncoding.EncodeToString([]byte(
-			fmt.Sprintf(setPermissionsWindowsScript,
+		Content: base64.StdEncoding.EncodeToString(
+			fmt.Appendf(nil, setPermissionsWindowsScript,
 				"c:\\var\\lib\\rancher\\rke2",
 				"c:\\var\\lib\\rancher\\agent",
-				"c:\\var\\lib\\rancher\\capr"))),
+				"c:\\var\\lib\\rancher\\capr")),
 
 		Path: fmt.Sprintf(setPermissionsWindowsScriptPath,
 			"c:\\var\\lib\\rancher\\capr"),

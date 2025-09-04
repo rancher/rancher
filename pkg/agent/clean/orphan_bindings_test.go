@@ -207,7 +207,6 @@ func TestCleanOrphans(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			err := test.client.cleanOrphans(test.dryRun)
@@ -401,7 +400,6 @@ func TestIsOrphanBinding(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			isOrphan := client.isOrphanBinding(test.binding)

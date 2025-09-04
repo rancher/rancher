@@ -64,7 +64,7 @@ func TestOptimisticLocking(t *testing.T) {
 
 		var wg sync.WaitGroup
 		createdSecrets := make(chan corev1.Secret, 10)
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
@@ -88,7 +88,7 @@ func TestOptimisticLocking(t *testing.T) {
 		assert.Equal(t, string(createdSecret.Data["token"]), "this-is-not-a-real-key")
 
 		var createdUIDs []string
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			c := <-createdSecrets
 			if c.ObjectMeta.UID != "" {
 				createdUIDs = append(createdUIDs, string(c.ObjectMeta.UID))

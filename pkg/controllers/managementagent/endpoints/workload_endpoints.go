@@ -3,6 +3,7 @@ package endpoints
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"strings"
 
 	v32 "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
@@ -99,9 +100,7 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 		var newPublicEps []v32.PublicEndpoint
 		for _, svc := range services {
 			set := labels.Set{}
-			for key, val := range svc.Spec.Selector {
-				set[key] = val
-			}
+			maps.Copy(set, svc.Spec.Selector)
 			selector := labels.SelectorFromSet(set)
 			found := false
 			if selector.Matches(labels.Set(w.SelectorLabels)) && !selector.Empty() {
@@ -146,9 +145,7 @@ func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadu
 
 		// 2. Get endpoints from HostPort pods matching the selector
 		set := labels.Set{}
-		for key, val := range w.SelectorLabels {
-			set[key] = val
-		}
+		maps.Copy(set, w.SelectorLabels)
 		pods, err := c.podLister.List(w.Namespace, labels.SelectorFromSet(set))
 		if err != nil {
 			return err

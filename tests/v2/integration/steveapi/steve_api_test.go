@@ -2935,10 +2935,7 @@ func (s *steveAPITestSuite) assertListIsEqual(expectedList []map[string]string, 
 		expectedSubset[i] = vals
 	}
 	assert.Equal(s.T(), expectedSubset, receivedSubset)
-	length := len(expectedList)
-	if length > len(receivedList) {
-		length = len(receivedList)
-	}
+	length := min(len(expectedList), len(receivedList))
 	for i := range length {
 		w := expectedList[i]
 		if name, ok := w["name"]; ok {

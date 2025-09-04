@@ -444,7 +444,6 @@ func Test_rotateCertificatesPlan(t *testing.T) {
 
 	for _, tt := range tests {
 		// copy test case for persistence in parallel runs
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			mockPlanner := newMockPlanner(t, InfoFunctions{
 				SystemAgentImage:      func() string { return "system-agent" },

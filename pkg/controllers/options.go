@@ -35,9 +35,9 @@ func syncOnlyChangedObjects(option controllerContextType) bool {
 	if skipUpdate == "" {
 		return false
 	}
-	parts := strings.Split(skipUpdate, ",")
+	parts := strings.SplitSeq(skipUpdate, ",")
 
-	for _, part := range parts {
+	for part := range parts {
 		if controllerContextType(part) == option {
 			return true
 		}

@@ -191,7 +191,7 @@ func pickImagesFromValuesMap(imagesSet map[string]map[string]struct{}, values ma
 				return
 			}
 		}
-		for _, os := range strings.Split(osList, ",") {
+		for os := range strings.SplitSeq(osList, ",") {
 			os = strings.TrimSpace(os)
 			if strings.EqualFold("windows", os) && osType == Windows {
 				addSourceToImage(imagesSet, imageName, chartNameAndVersion)

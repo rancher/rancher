@@ -53,7 +53,6 @@ func TestGetHasherForHash(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			hasher, err := GetHasherForHash(test.hash)
@@ -97,7 +96,6 @@ func TestGetHashVersion(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			hashVersion, err := GetHashVersion(test.hash)

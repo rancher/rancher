@@ -137,7 +137,6 @@ func TestAuthConfigReset(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.annotationValue, func(t *testing.T) {
 			t.Parallel()
 			config := v3.AuthConfig{
@@ -220,7 +219,6 @@ func TestAuthConfigSync(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			const testConfigName = "testConfig"

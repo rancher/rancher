@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
@@ -362,13 +363,7 @@ func (grb *globalRoleBindingLifecycle) purgeCorruptRoles(wantRTs []string, clust
 	var deleteErr error
 	seenRTs := map[string]struct{}{}
 	for _, crtb := range currentCRTBs {
-		foundRT := false
-		for _, roleTemplate := range wantRTs {
-			if roleTemplate == crtb.RoleTemplateName {
-				foundRT = true
-				break
-			}
-		}
+		foundRT := slices.Contains(wantRTs, crtb.RoleTemplateName)
 		_, seen := seenRTs[crtb.RoleTemplateName]
 		// if the RT isn't one of the ones that we requested, or is corrupt, or refers to the same RT as a prior
 		// valid RT, then we remove it.

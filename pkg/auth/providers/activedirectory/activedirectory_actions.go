@@ -78,7 +78,7 @@ func (p *adProvider) testAndApply(request *types.APIContext) error {
 	}
 
 	if config.UserSearchAttribute != "" {
-		for _, attr := range strings.Split(config.UserSearchAttribute, "|") {
+		for attr := range strings.SplitSeq(config.UserSearchAttribute, "|") {
 			if !ldap.IsValidAttr(attr) {
 				return httperror.NewAPIError(httperror.InvalidBodyContent, "invalid userSearchAttribute")
 			}

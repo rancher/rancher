@@ -344,7 +344,6 @@ func TestOnUpstreamChange(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			h := tt.handlerFunc(ctrl)
@@ -695,7 +694,6 @@ func TestGetCluster(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			cache := fake.NewMockCacheInterface[*provv1.Cluster](ctrl)
@@ -784,7 +782,6 @@ func TestGetSnapshotsFromSnapshotFile(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			cache := fake.NewMockCacheInterface[*rkev1.ETCDSnapshot](ctrl)
@@ -900,7 +897,6 @@ func TestGetMachineFromNode(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			machineCache := fake.NewMockCacheInterface[*capi.Machine](ctrl)
@@ -996,7 +992,6 @@ func TestGetMachineByID(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			machineCache := fake.NewMockCacheInterface[*capi.Machine](ctrl)

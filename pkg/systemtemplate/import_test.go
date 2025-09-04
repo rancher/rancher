@@ -284,7 +284,7 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 
 			assert.Nil(t, err)
 			decoder := scheme.Codecs.UniversalDeserializer()
-			for _, r := range strings.Split(b.String(), "---") {
+			for r := range strings.SplitSeq(b.String(), "---") {
 				if len(r) == 0 {
 					continue
 				}

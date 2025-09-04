@@ -55,7 +55,6 @@ func Test_PreBootstrap_Provisioning_Flow(t *testing.T) {
 
 	// Run each test case in parallel
 	for _, tt := range tests {
-		tt := tt // Capture range variable
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			prebootstrapSetupAndCheck(t, tt.cluster)

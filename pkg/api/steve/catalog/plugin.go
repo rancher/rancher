@@ -10,6 +10,7 @@ import (
 	"net/http/httputil"
 	neturl "net/url"
 	"path/filepath"
+	"slices"
 
 	"github.com/gorilla/mux"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/plugin"
@@ -119,10 +120,5 @@ func isAuthenticated(r *http.Request) bool {
 	if !ok {
 		return false
 	}
-	for _, g := range u.GetGroups() {
-		if g == "system:authenticated" {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(u.GetGroups(), "system:authenticated")
 }

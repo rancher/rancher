@@ -127,8 +127,8 @@ func (c *controller) overrideCapabilities(annotations map[string]string, oldCapa
 
 	var isUpdate bool
 	for annoKey, annoValue := range annotations {
-		if strings.HasPrefix(annoKey, capabilitiesAnnotation) {
-			capability := strings.TrimPrefix(annoKey, capabilitiesAnnotation)
+		if after, ok := strings.CutPrefix(annoKey, capabilitiesAnnotation); ok {
+			capability := after
 			val, err := c.parseResourceInterface(capability, annoValue)
 			if err != nil {
 				return capabilities, err

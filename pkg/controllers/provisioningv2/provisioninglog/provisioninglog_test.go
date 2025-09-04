@@ -15,7 +15,7 @@ func generateTestLog(prefix func(int) string, length int) string {
 	l := make([]byte, 0, length)
 	for i := 0; ; i++ {
 		l = append(l, []byte(prefix(i))...)
-		for j := 0; j < len(runes); j++ {
+		for j := range runes {
 			l = append(l, runes[j])
 		}
 		l = append(l, '\n')
