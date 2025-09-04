@@ -393,7 +393,7 @@ func (g *googleOauthProvider) toPrincipal(principalType string, acct Account, to
 	} else {
 		princ.PrincipalType = "group"
 		if token != nil {
-			princ.MemberOf = g.tokenMGR.IsMemberOf(token, princ)
+			princ.MemberOf = g.userMGR.IsMemberOf(token, princ)
 		}
 	}
 	return princ

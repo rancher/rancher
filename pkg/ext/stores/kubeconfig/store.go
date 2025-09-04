@@ -93,8 +93,8 @@ const (
 
 var gvr = ext.SchemeGroupVersion.WithResource(ext.KubeconfigResourceName)
 
-// userManager abstracts [user.Manager].
-type userManager interface {
+// tokenCreator abstracts [tokens.Manager].
+type tokenCreator interface {
 	EnsureClusterToken(clusterID string, input user.TokenInput) (string, runtime.Object, error)
 	EnsureToken(input user.TokenInput) (string, runtime.Object, error)
 }
@@ -114,7 +114,7 @@ type Store struct {
 	tokenCache          ctrlv3.TokenCache
 	tokens              ctrlv3.TokenClient
 	userCache           ctrlv3.UserCache
-	userMgr             userManager
+	tokenMgr            tokenCreator
 	getCACert           func() string
 	getDefaultTTL       func() (*int64, error)
 	getServerURL        func() string
@@ -123,7 +123,7 @@ type Store struct {
 }
 
 // New creates a new instance of [Store].
-func New(mcmEnabled bool, wranglerContext *wrangler.Context, authorizer authorizer.Authorizer, userMgr userManager) *Store {
+func New(mcmEnabled bool, wranglerContext *wrangler.Context, authorizer authorizer.Authorizer) *Store {
 	store := &Store{
 		mcmEnabled:      mcmEnabled,
 		configMapCache:  wranglerContext.Core.ConfigMap().Cache(),
@@ -134,7 +134,7 @@ func New(mcmEnabled bool, wranglerContext *wrangler.Context, authorizer authoriz
 		tokenCache:      wranglerContext.Mgmt.Token().Cache(),
 		tokens:          wranglerContext.Mgmt.Token(),
 		userCache:       wranglerContext.Mgmt.User().Cache(),
-		userMgr:         userMgr,
+		tokenMgr:        tokens.NewManager(wranglerContext),
 		authorizer:      authorizer,
 		getCACert:       settings.CACerts.Get,
 		getDefaultTTL:   tokens.GetKubeconfigDefaultTokenTTLInMilliSeconds,
@@ -448,7 +448,7 @@ func (s *Store) Create(
 		// Generate a shared token for the default and non-ACE clusters.
 		if !dryRun && generateToken {
 			input := s.createTokenInput(kubeConfigID, userInfo.GetName(), authToken, &ttlMilliseconds)
-			sharedTokenKey, sharedToken, err = s.userMgr.EnsureToken(input)
+			sharedTokenKey, sharedToken, err = s.tokenMgr.EnsureToken(input)
 			if err != nil {
 				conditions = append(conditions, metav1.Condition{
 					Type:               FailedToCreateTokenCond,
@@ -535,7 +535,7 @@ func (s *Store) Create(
 			// Generate a cluster-scoped token for the ACE cluster.
 			if !dryRun && generateToken {
 				input := s.createTokenInput(kubeConfigID, userInfo.GetName(), authToken, &ttlMilliseconds)
-				tokenKey, token, err = s.userMgr.EnsureClusterToken(cluster.Name, input)
+				tokenKey, token, err = s.tokenMgr.EnsureClusterToken(cluster.Name, input)
 				if err != nil {
 					conditions = append(conditions, metav1.Condition{
 						Type:               FailedToCreateTokenCond,

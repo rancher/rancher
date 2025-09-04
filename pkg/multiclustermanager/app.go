@@ -2,6 +2,7 @@ package multiclustermanager
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"sync"
@@ -79,7 +80,7 @@ func BuildScaledContext(ctx context.Context, wranglerContext *wrangler.Context, 
 
 	userManager, err := common.NewUserManager(wranglerContext)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("mcm: error creating user manager: %w", err)
 	}
 
 	scaledContext.UserManager = userManager
@@ -210,7 +211,7 @@ func (m *mcm) Start(ctx context.Context) error {
 
 		go adunmigration.UnmigrateAdGUIDUsersOnce(m.ScaledContext)
 		tokens.StartPurgeDaemon(ctx, management)
-		providerrefresh.StartRefreshDaemon(ctx, m.ScaledContext, management)
+		providerrefresh.StartRefreshDaemon(m.ScaledContext, management)
 		managementdata.CleanupOrphanedSystemUsers(ctx, management)
 		clusterupstreamrefresher.MigrateEksRefreshCronSetting(m.wranglerContext)
 		go managementdata.CleanupDuplicateBindings(m.ScaledContext, m.wranglerContext)
