@@ -8,13 +8,13 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go/aws/endpoints"
-	"github.com/rancher/rancher/pkg/utils"
 )
 
 const (
@@ -95,7 +95,7 @@ func (a awsv4) getServiceAndRegion(host string) (string, string) {
 		// that is global then stop processing partitions. If we carry on processing partitions
 		// for a global service then when new partitions are introduced the signing may break.
 		if service != "" && region == "" {
-			if utils.Contains(globalAWSServices, service) {
+			if slices.Contains(globalAWSServices, service) {
 				break
 			}
 		}
