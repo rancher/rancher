@@ -704,7 +704,7 @@ func Test_Provisioning_Single_Node_All_Roles_Drain(t *testing.T) {
 	c, err = cluster.WaitForCreate(clients, c)
 	require.NoError(t, err)
 
-	// Validate we started with exactly one Machine and capture its template hash
+	// Validate that exactly one Machine and capture its template hash
 	machines, err := cluster.Machines(clients, c)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(machines.Items), "expected exactly one machine initially")
@@ -713,7 +713,7 @@ func Test_Provisioning_Single_Node_All_Roles_Drain(t *testing.T) {
 	oldHash := old.Labels["machine-template-hash"]
 	require.NotEmpty(t, oldHash, "old machine missing template-hash label")
 
-	// Create a fresh machine config we can mutate.
+	// Create a fresh machine config that can be mutated.
 	newCfgRef, err := nodeconfig.NewPodConfig(clients, c.Namespace)
 	require.NoError(t, err)
 
