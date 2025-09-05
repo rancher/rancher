@@ -36,7 +36,7 @@ import (
 
 const UnmanagedMachineKind = "CustomMachine"
 
-func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager *kubeconfig.Manager) {
+func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigManager *kubeconfig.Manager) {
 	h := handler{
 		kubeconfigManager: kubeconfigManager,
 		unmanagedMachine:  clients.RKE.CustomMachine(),

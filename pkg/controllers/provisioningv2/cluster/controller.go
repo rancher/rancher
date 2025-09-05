@@ -116,7 +116,7 @@ func EarlyRegister(ctx context.Context, clients *wrangler.Context, kubeconfigMan
 
 func Register(
 	ctx context.Context,
-	clients *wrangler.Context, kubeconfigManager *kubeconfig.Manager) {
+	clients *wrangler.CAPIContext, kubeconfigManager *kubeconfig.Manager) {
 	h := handler{
 		mgmtClusterCache:      clients.Mgmt.Cluster().Cache(),
 		mgmtClusters:          clients.Mgmt.Cluster(),

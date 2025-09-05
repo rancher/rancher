@@ -24,7 +24,7 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
-func Register(ctx context.Context, clients *wrangler.Context) {
+func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 	h := &handler{
 		clusterCache:              clients.Mgmt.Cluster().Cache(),
 		provClusterCache:          clients.Provisioning.Cluster().Cache(),

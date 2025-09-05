@@ -23,7 +23,7 @@ type handler struct {
 	capiClusterCache capicontrollers.ClusterCache
 }
 
-func Register(ctx context.Context, clients *wrangler.Context) {
+func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 	h := handler{
 		rkeCluster:       clients.RKE.RKECluster(),
 		capiClusterCache: clients.CAPI.Cluster().Cache(),

@@ -65,7 +65,7 @@ type handler struct {
 // the fleetcluster operates on both provisioning and management clusters in Rancher, by way of transformation logic
 // in the provisioningcluster rke2 controller (a clusters.provisioning.cattle.io/v1 object is generated for every
 // corresponding clusters.management.cattle.io/v3 object, if one does not already exist, and vice-versa)
-func Register(ctx context.Context, clients *wrangler.Context) {
+func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 	h := &handler{
 		clientConfig:      clients.ClientConfig,
 		clusters:          clients.Mgmt.Cluster(),

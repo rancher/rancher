@@ -39,10 +39,10 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	windows.Register(ctx, clusterRec, cluster)
 	nsserviceaccount.Register(ctx, cluster)
 
-	mgmt.Wrangler.DeferredCAPIRegistration.DeferFunc(func(_ *wrangler.Context) {
+	mgmt.Wrangler.DeferredCAPIRegistration.DeferFunc(func(capi *wrangler.CAPIContext) {
 		_ = cluster.DeferredStart(ctx, func(ctx context.Context) error {
-			nodesyncer.Register(ctx, cluster, kubeConfigGetter)
-			registerProvV2(ctx, cluster, clusterRec)
+			nodesyncer.Register(ctx, cluster, capi, kubeConfigGetter)
+			registerProvV2(ctx, cluster, capi, clusterRec)
 			return nil
 		})()
 	})
@@ -65,7 +65,7 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	return managementuserlegacy.Register(ctx, mgmt, cluster, clusterRec, kubeConfigGetter)
 }
 
-func registerProvV2(ctx context.Context, cluster *config.UserContext, clusterRec *apimgmtv3.Cluster) {
+func registerProvV2(ctx context.Context, cluster *config.UserContext, capi *wrangler.CAPIContext, clusterRec *apimgmtv3.Cluster) {
 	if !features.RKE2.Enabled() {
 		return
 	}
@@ -74,7 +74,7 @@ func registerProvV2(ctx context.Context, cluster *config.UserContext, clusterRec
 	if clusterRec.Annotations["provisioning.cattle.io/administrated"] == "true" {
 		if features.Provisioningv2ETCDSnapshotBackPopulation.Enabled() {
 			cluster.K3s = k3s.New(cluster.ControllerFactory)
-			snapshotbackpopulate.Register(ctx, cluster)
+			snapshotbackpopulate.Register(ctx, cluster, capi)
 		}
 		cluster.Plan = upgrade.New(cluster.ControllerFactory)
 		rkecontrolplanecondition.Register(ctx,

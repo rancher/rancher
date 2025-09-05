@@ -45,7 +45,7 @@ type handler struct {
 	dynamic             *dynamic.Controller
 }
 
-func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager *kubeconfig.Manager) {
+func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigManager *kubeconfig.Manager) {
 	h := &handler{
 		rancherClusterCache: clients.Provisioning.Cluster().Cache(),
 		machines:            clients.CAPI.Machine(),

@@ -30,7 +30,7 @@ type handler struct {
 	rkeControlPlaneCache rkev1controllers.RKEControlPlaneCache
 }
 
-func Register(ctx context.Context, clients *wrangler.Context) {
+func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 	h := handler{
 		secrets:              clients.Core.Secret(),
 		machinesCache:        clients.CAPI.Machine().Cache(),

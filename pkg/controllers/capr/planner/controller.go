@@ -33,7 +33,7 @@ type handler struct {
 	controlPlanes v1.RKEControlPlaneController
 }
 
-func Register(ctx context.Context, clients *wrangler.Context, planner *caprplanner.Planner) {
+func Register(ctx context.Context, clients *wrangler.CAPIContext, planner *caprplanner.Planner) {
 	h := handler{
 		planner:       planner,
 		controlPlanes: clients.RKE.RKEControlPlane(),
