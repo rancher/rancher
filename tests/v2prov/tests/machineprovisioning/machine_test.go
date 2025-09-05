@@ -653,8 +653,6 @@ func Test_Provisioning_MP_DrainNoDelete(t *testing.T) {
 }
 
 func Test_Provisioning_Single_Node_All_Roles_Drain(t *testing.T) {
-	t.Parallel()
-
 	clients, err := clients.New()
 	require.NoError(t, err)
 	defer clients.Close()
@@ -673,7 +671,7 @@ func Test_Provisioning_Single_Node_All_Roles_Drain(t *testing.T) {
 	}
 
 	// Single-node (cp+etcd+worker) with drain-on-config enabled
-	base := &provisioningv1api.Cluster{
+	provClusterSchema := &provisioningv1api.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-single-node-drain",
 		},
@@ -698,7 +696,7 @@ func Test_Provisioning_Single_Node_All_Roles_Drain(t *testing.T) {
 		},
 	}
 
-	c, err := cluster.New(clients, base)
+	c, err := cluster.New(clients, provClusterSchema)
 	require.NoError(t, err)
 
 	c, err = cluster.WaitForCreate(clients, c)
@@ -709,38 +707,38 @@ func Test_Provisioning_Single_Node_All_Roles_Drain(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 1, len(machines.Items), "expected exactly one machine initially")
 
-	old := machines.Items[0]
-	oldHash := old.Labels["machine-template-hash"]
-	require.NotEmpty(t, oldHash, "old machine missing template-hash label")
+	firstMachine := machines.Items[0]
+	firstMachineHash := firstMachine.Labels["machine-template-hash"]
+	require.NotEmpty(t, firstMachineHash, "firstMachine missing template-hash label")
 
 	// Create a fresh machine config that can be mutated.
 	newCfgRef, err := nodeconfig.NewPodConfig(clients, c.Namespace)
 	require.NoError(t, err)
 
-	gvrPodCfg := schema.GroupVersionResource{
+	gvrPodConfig := schema.GroupVersionResource{
 		Group: "rke-machine-config.cattle.io", Version: "v1", Resource: "podconfigs",
 	}
-	pc, err := clients.Dynamic.Resource(gvrPodCfg).Namespace(c.Namespace).Get(ctx, newCfgRef.Name, metav1.GetOptions{})
+	newPodConfig, err := clients.Dynamic.Resource(gvrPodConfig).Namespace(c.Namespace).Get(ctx, newCfgRef.Name, metav1.GetOptions{})
 	require.NoError(t, err)
 
-	ud, ok := unstructuredString(pc.Object, "userdata")
+	currentUserData, ok := unstructuredString(newPodConfig.Object, "userdata")
 	require.True(t, ok)
 
 	// Force a no-op template diff
-	pc.Object["userdata"] = ud + `# Noop Change`
+	newPodConfig.Object["userdata"] = currentUserData + `# Noop Change`
 
-	_, err = clients.Dynamic.Resource(gvrPodCfg).Namespace(c.Namespace).Update(ctx, pc, metav1.UpdateOptions{})
+	_, err = clients.Dynamic.Resource(gvrPodConfig).Namespace(c.Namespace).Update(ctx, newPodConfig, metav1.UpdateOptions{})
 	require.NoError(t, err)
 
-	cur, err := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
+	provCluster, err := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
 	require.NoError(t, err)
 
-	require.NotNil(t, cur.Spec.RKEConfig)
-	require.GreaterOrEqual(t, len(cur.Spec.RKEConfig.MachinePools), 1)
+	require.NotNil(t, provCluster.Spec.RKEConfig)
+	require.GreaterOrEqual(t, len(provCluster.Spec.RKEConfig.MachinePools), 1)
 
 	// Point the pool at the new PodConfig.
-	cur.Spec.RKEConfig.MachinePools[0].NodeConfig = newCfgRef
-	_, err = clients.Provisioning.Cluster().Update(cur)
+	provCluster.Spec.RKEConfig.MachinePools[0].NodeConfig = newCfgRef
+	_, err = clients.Provisioning.Cluster().Update(provCluster)
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
@@ -748,38 +746,37 @@ func Test_Provisioning_Single_Node_All_Roles_Drain(t *testing.T) {
 		return len(machines.Items) == 2
 	}, 4*time.Minute, 2*time.Second, "never saw 2 nodes after config change")
 
-	var newName string
+	var secondMachineName string
 	require.Eventually(t, func() bool {
 		machines, _ = cluster.Machines(clients, c)
 		for _, m := range machines.Items {
 			hash := m.Labels["machine-template-hash"]
-			if hash != "" && hash != oldHash && m.Status.NodeRef != nil {
-				newName = m.Name
+			if hash != "" && hash != firstMachineHash && m.Status.NodeRef != nil {
+				secondMachineName = m.Name
 				return true
 			}
 		}
 		return false
 	}, 10*time.Minute, 2*time.Second, "no node with new template hash (and NodeRef) appeared")
 
-	// Ensure the new node reaches Ready=True
-	var newNode *corev1.Node
+	// Ensure the second node reaches Ready=True
+	var secondMachineNode *corev1.Node
 	clusterClients, err := clients.ForCluster(c.Namespace, c.Name)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	require.Eventually(t, func() bool {
-		m, err := clients.CAPI.Machine().Get(c.Namespace, newName, metav1.GetOptions{})
+		m, err := clients.CAPI.Machine().Get(c.Namespace, secondMachineName, metav1.GetOptions{})
 		if err != nil || m.Status.NodeRef == nil {
 			return false
 		}
 
-		n, err := clusterClients.Core.Node().Get(m.Status.NodeRef.Name, metav1.GetOptions{})
+		secondMachineNode, err = clusterClients.Core.Node().Get(m.Status.NodeRef.Name, metav1.GetOptions{})
 		if err != nil {
 			return false
 		}
-		newNode = n
-		for _, cond := range n.Status.Conditions {
+		for _, cond := range secondMachineNode.Status.Conditions {
 			if cond.Type == corev1.NodeReady && cond.Status == corev1.ConditionTrue {
 				return true
 			}
@@ -788,16 +785,16 @@ func Test_Provisioning_Single_Node_All_Roles_Drain(t *testing.T) {
 	}, 20*time.Minute, 2*time.Second, "new node never reached Ready=True")
 
 	// Sanity: incoming CP should not be cordoned by Rancher
-	require.False(t, newNode.Spec.Unschedulable, "new node was cordoned; incoming CP should not be drained by Rancher")
+	require.False(t, secondMachineNode.Spec.Unschedulable, "new node was cordoned; incoming controlplane should not be drained by Rancher")
 
 	require.Eventually(t, func() bool {
-		m, err := clients.CAPI.Machine().Get(old.Namespace, old.Name, metav1.GetOptions{})
+		m, err := clients.CAPI.Machine().Get(firstMachine.Namespace, firstMachine.Name, metav1.GetOptions{})
 		if err != nil {
 			// already deleted is also OK
-			return true
+			return apierror.IsNotFound(err)
 		}
 		return !m.DeletionTimestamp.IsZero()
-	}, 10*time.Minute, 2*time.Second, "old node never entered Deleting")
+	}, 10*time.Minute, 2*time.Second, "first machine node never entered Deleting")
 
 	require.Eventually(t, func() bool {
 		ml, _ := cluster.Machines(clients, c)
