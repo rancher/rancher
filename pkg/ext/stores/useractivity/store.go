@@ -188,7 +188,7 @@ func (s *Store) Create(ctx context.Context,
 		if err != nil {
 			return nil, apierrors.NewInternalError(fmt.Errorf("failed to marshall patch data: %w", err))
 		}
-		_, err = s.tokens.Patch(activityToken.GetName(), types.JSONPatchType, patch)
+		_, err = s.tokens.Patch(context.TODO(), activityToken.GetName(), types.JSONPatchType, patch)
 		if err != nil {
 			return nil, apierrors.NewInternalError(fmt.Errorf("failed to store activityLastSeenAt to token %s: %w",
 				activityToken.GetName(), err))

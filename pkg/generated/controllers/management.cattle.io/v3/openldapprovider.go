@@ -25,12 +25,12 @@ import (
 
 // OpenLdapProviderController interface for managing OpenLdapProvider resources.
 type OpenLdapProviderController interface {
-	generic.NonNamespacedControllerInterface[*v3.OpenLdapProvider, *v3.OpenLdapProviderList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.OpenLdapProvider, *v3.OpenLdapProviderList]
 }
 
 // OpenLdapProviderClient interface for managing OpenLdapProvider resources in Kubernetes.
 type OpenLdapProviderClient interface {
-	generic.NonNamespacedClientInterface[*v3.OpenLdapProvider, *v3.OpenLdapProviderList]
+	generic.NonNamespacedClientInterfaceContext[*v3.OpenLdapProvider, *v3.OpenLdapProviderList]
 }
 
 // OpenLdapProviderCache interface for retrieving OpenLdapProvider resources in memory.

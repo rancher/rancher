@@ -134,7 +134,7 @@ func matchRKENodeGroup(gvk schema.GroupVersionKind) bool {
 		strings.HasSuffix(gvk.Kind, "Config")
 }
 
-func (h *handler) infraWatch(obj runtime.Object) (runtime.Object, error) {
+func (h *handler) infraWatch(_ context.Context, obj runtime.Object) (runtime.Object, error) {
 	if obj == nil {
 		return nil, nil
 	}
@@ -358,7 +358,7 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 			}
 			reconcileCondition(mgmtCluster, capr.Updated, rkeCP, capr.Ready)
 			reconcileCondition(mgmtCluster, capr.Provisioned, rkeCP, capr.Provisioned) // This was originally set by checking machine provisioning, but now we simply set it to true.
-			_, err := h.mgmtClusterClient.Update(mgmtCluster)
+			_, err := h.mgmtClusterClient.Update(context.TODO(), mgmtCluster)
 			if err != nil {
 				return nil, status, err
 			}
@@ -442,7 +442,7 @@ func (h *handler) OnRemove(_ string, cluster *rancherv1.Cluster) (*rancherv1.Clu
 		logrus.Errorf("rkecluster %s/%s: error retrieving management cluster during removal of cluster: %v", cluster.Namespace, cluster.Name, err)
 	}
 	if mgmtCluster != nil && reconcileCondition(mgmtCluster, capr.Removed, rkeCP, capr.Removed) {
-		_, err = h.mgmtClusterClient.Update(mgmtCluster)
+		_, err = h.mgmtClusterClient.Update(context.TODO(), mgmtCluster)
 		if apierror.IsNotFound(err) {
 			return cluster, nil
 		} else if err != nil {

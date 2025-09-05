@@ -25,12 +25,12 @@ import (
 
 // AuthTokenController interface for managing AuthToken resources.
 type AuthTokenController interface {
-	generic.NonNamespacedControllerInterface[*v3.AuthToken, *v3.AuthTokenList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.AuthToken, *v3.AuthTokenList]
 }
 
 // AuthTokenClient interface for managing AuthToken resources in Kubernetes.
 type AuthTokenClient interface {
-	generic.NonNamespacedClientInterface[*v3.AuthToken, *v3.AuthTokenList]
+	generic.NonNamespacedClientInterfaceContext[*v3.AuthToken, *v3.AuthTokenList]
 }
 
 // AuthTokenCache interface for retrieving AuthToken resources in memory.

@@ -25,12 +25,12 @@ import (
 
 // CloudCredentialController interface for managing CloudCredential resources.
 type CloudCredentialController interface {
-	generic.ControllerInterface[*v3.CloudCredential, *v3.CloudCredentialList]
+	generic.ControllerInterfaceContext[*v3.CloudCredential, *v3.CloudCredentialList]
 }
 
 // CloudCredentialClient interface for managing CloudCredential resources in Kubernetes.
 type CloudCredentialClient interface {
-	generic.ClientInterface[*v3.CloudCredential, *v3.CloudCredentialList]
+	generic.ClientInterfaceContext[*v3.CloudCredential, *v3.CloudCredentialList]
 }
 
 // CloudCredentialCache interface for retrieving CloudCredential resources in memory.

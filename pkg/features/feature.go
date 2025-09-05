@@ -1,6 +1,7 @@
 package features
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -234,14 +235,14 @@ func InitializeFeatures(featuresClient managementv3.FeatureClient, featureArgs s
 	}
 
 	// external-rules feature flag was removed in 2.9. We need to delete it for users upgrading from 2.8.
-	err := featuresClient.Delete("external-rules", &metav1.DeleteOptions{})
+	err := featuresClient.Delete(context.TODO(), "external-rules", &metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		logrus.Errorf("unable to delete external-rules feature: %v", err)
 	}
 
 	// creates any features in map that do not exist, updates features with new default value
 	for key, f := range features {
-		featureState, err := featuresClient.Get(key, metav1.GetOptions{})
+		featureState, err := featuresClient.Get(context.TODO(), key, metav1.GetOptions{})
 		if err != nil {
 			if !errors.IsNotFound(err) {
 				logrus.Errorf("unable to retrieve feature %s in initialize features: %v", f.name, err)
@@ -266,7 +267,7 @@ func InitializeFeatures(featuresClient managementv3.FeatureClient, featureArgs s
 					newFeature.Status.LockedValue = &f.def
 				}
 
-				if _, err := featuresClient.Create(newFeature); err != nil {
+				if _, err := featuresClient.Create(context.TODO(), newFeature); err != nil {
 					logrus.Errorf("unable to create feature %s in initialize features: %v", f.name, err)
 				}
 			}
@@ -287,7 +288,7 @@ func InitializeFeatures(featuresClient managementv3.FeatureClient, featureArgs s
 				newFeatureState.Status.Description = f.description
 			}
 
-			newFeatureState, err = featuresClient.Update(newFeatureState)
+			newFeatureState, err = featuresClient.Update(context.TODO(), newFeatureState)
 			if err != nil {
 				logrus.Errorf("unable to update feature %s in initialize features: %v", f.name, err)
 				continue
@@ -316,13 +317,13 @@ func SetFeature(featuresClient managementv3.FeatureClient, featureName string, v
 		return nil
 	}
 
-	featureState, err := featuresClient.Get(featureName, metav1.GetOptions{})
+	featureState, err := featuresClient.Get(context.TODO(), featureName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 
 	featureState.Spec.Value = &[]bool{value}[0]
-	if _, err = featuresClient.Update(featureState); err != nil {
+	if _, err = featuresClient.Update(context.TODO(), featureState); err != nil {
 		return err
 	}
 

@@ -233,7 +233,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 				return err
 			}
 
-			_, err = a.tokenClient.Patch(token.GetName(), types.JSONPatchType, patch)
+			_, err = a.tokenClient.Patch(context.TODO(), token.GetName(), types.JSONPatchType, patch)
 			return err
 		case *ext.Token:
 			return a.extTokenStore.UpdateLastUsedAt(token.GetName(), now)
@@ -332,7 +332,7 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 
 	var storedToken *v3.Token
 	if lookupUsingClient {
-		storedToken, err = a.tokenClient.Get(tokenName, metav1.GetOptions{})
+		storedToken, err = a.tokenClient.Get(context.TODO(), tokenName, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return nil, ErrMustAuthenticate

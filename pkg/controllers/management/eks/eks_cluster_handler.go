@@ -85,7 +85,7 @@ func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.M
 	wContext.Mgmt.Cluster().OnChange(ctx, "eks-operator-controller", e.onClusterChange)
 }
 
-func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
+func (e *eksOperatorController) onClusterChange(_ context.Context, key string, cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
 	if cluster == nil || cluster.DeletionTimestamp != nil {
 		return cluster, nil
 	}
@@ -104,7 +104,7 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		cluster = cluster.DeepCopy()
 		cluster.Status.Driver = apimgmtv3.ClusterDriverEKS
 		var err error
-		cluster, err = e.ClusterClient.Update(cluster)
+		cluster, err = e.ClusterClient.Update(context.TODO(), cluster)
 		if err != nil {
 			return cluster, err
 		}
@@ -185,7 +185,7 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		if cluster.Spec.EKSConfig.Imported && apimgmtv3.ClusterConditionPending.IsUnknown(cluster) {
 			cluster = cluster.DeepCopy()
 			apimgmtv3.ClusterConditionPending.True(cluster)
-			cluster, err = e.ClusterClient.Update(cluster)
+			cluster, err = e.ClusterClient.Update(context.TODO(), cluster)
 			if err != nil {
 				return cluster, err
 
@@ -213,7 +213,7 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			if apimgmtv3.ClusterConditionWaiting.GetMessage(cluster) == addNgMessage {
 				cluster = cluster.DeepCopy()
 				apimgmtv3.ClusterConditionWaiting.Message(cluster, "Waiting for API to be available")
-				cluster, err = e.ClusterClient.Update(cluster)
+				cluster, err = e.ClusterClient.Update(context.TODO(), cluster)
 				if err != nil {
 					return cluster, err
 				}
@@ -244,7 +244,7 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 				for _, val := range securityGroups {
 					cluster.Status.EKSStatus.SecurityGroups = append(cluster.Status.EKSStatus.SecurityGroups, val.(string))
 				}
-				cluster, err = e.ClusterClient.Update(cluster)
+				cluster, err = e.ClusterClient.Update(context.TODO(), cluster)
 				if err != nil {
 					return cluster, err
 				}
@@ -275,7 +275,7 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 					cluster.Status.ServiceAccountTokenSecret = secret.Name
 					cluster.Status.ServiceAccountToken = ""
 				}
-				return e.ClusterClient.Update(cluster)
+				return e.ClusterClient.Update(context.TODO(), cluster)
 			}
 			if err != nil {
 				return cluster, err
@@ -307,7 +307,7 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		if managedLaunchTemplateID != "" && cluster.Status.EKSStatus.ManagedLaunchTemplateID != managedLaunchTemplateID {
 			cluster = cluster.DeepCopy()
 			cluster.Status.EKSStatus.ManagedLaunchTemplateID = managedLaunchTemplateID
-			cluster, err = e.ClusterClient.Update(cluster)
+			cluster, err = e.ClusterClient.Update(context.TODO(), cluster)
 			if err != nil {
 				return cluster, err
 			}
@@ -321,7 +321,7 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			}
 			cluster = cluster.DeepCopy()
 			cluster.Status.EKSStatus.ManagedLaunchTemplateVersions = managedLaunchTemplateVersionsToString
-			cluster, err = e.ClusterClient.Update(cluster)
+			cluster, err = e.ClusterClient.Update(context.TODO(), cluster)
 			if err != nil {
 				return cluster, err
 			}
@@ -331,7 +331,7 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		if generatedNodeRole != "" && cluster.Status.EKSStatus.GeneratedNodeRole != generatedNodeRole {
 			cluster = cluster.DeepCopy()
 			cluster.Status.EKSStatus.GeneratedNodeRole = generatedNodeRole
-			cluster, err = e.ClusterClient.Update(cluster)
+			cluster, err = e.ClusterClient.Update(context.TODO(), cluster)
 			if err != nil {
 				return cluster, err
 			}
@@ -394,7 +394,7 @@ func (e *eksOperatorController) setInitialUpstreamSpec(cluster *mgmtv3.Cluster) 
 		return cluster, err
 	}
 	cluster.Status.EKSStatus.UpstreamSpec = upstreamSpec
-	return e.ClusterClient.Update(cluster)
+	return e.ClusterClient.Update(context.TODO(), cluster)
 }
 
 // updateEKSClusterConfig updates the EKSClusterConfig object's spec with the cluster's EKSConfig if they are not equal..
@@ -467,7 +467,7 @@ func (e *eksOperatorController) generateAndSetServiceAccount(cluster *mgmtv3.Clu
 	}
 	cluster.Status.ServiceAccountTokenSecret = secret.Name
 	cluster.Status.ServiceAccountToken = ""
-	return e.ClusterClient.Update(cluster)
+	return e.ClusterClient.Update(context.TODO(), cluster)
 }
 
 // buildEKSCCCreateObject returns an object that can be used with the kubernetes dynamic client to
@@ -511,7 +511,7 @@ func (e *eksOperatorController) recordAppliedSpec(cluster *mgmtv3.Cluster) (*mgm
 
 	cluster = cluster.DeepCopy()
 	cluster.Status.AppliedSpec.EKSConfig = cluster.Spec.EKSConfig
-	return e.ClusterClient.Update(cluster)
+	return e.ClusterClient.Update(context.TODO(), cluster)
 }
 
 var publicDialer = &transport.DialHolder{

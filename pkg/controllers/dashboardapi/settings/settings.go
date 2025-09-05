@@ -4,6 +4,7 @@
 package settings
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -39,7 +40,7 @@ func (s *settingsProvider) Get(name string) string {
 
 	obj, err := s.settingCache.Get(name)
 	if err != nil {
-		val, err := s.settings.Get(name, metav1.GetOptions{})
+		val, err := s.settings.Get(context.TODO(), name, metav1.GetOptions{})
 		if err != nil {
 			return s.fallback[name]
 		}
@@ -58,18 +59,18 @@ func (s *settingsProvider) Set(name, value string) error {
 	if envValue != "" {
 		return fmt.Errorf("setting %s can not be set because it is from environment variable", name)
 	}
-	obj, err := s.settings.Get(name, metav1.GetOptions{})
+	obj, err := s.settings.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
 
 	obj.Value = value
-	_, err = s.settings.Update(obj)
+	_, err = s.settings.Update(context.TODO(), obj)
 	return err
 }
 
 func (s *settingsProvider) SetIfUnset(name, value string) error {
-	obj, err := s.settings.Get(name, metav1.GetOptions{})
+	obj, err := s.settings.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -79,7 +80,7 @@ func (s *settingsProvider) SetIfUnset(name, value string) error {
 	}
 
 	obj.Value = value
-	_, err = s.settings.Update(obj)
+	_, err = s.settings.Update(context.TODO(), obj)
 	return err
 }
 
@@ -98,7 +99,7 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 		key := settings.GetEnvKey(name)
 		envValue, envOk := os.LookupEnv(key)
 
-		obj, err := s.settings.Get(setting.Name, metav1.GetOptions{})
+		obj, err := s.settings.Get(context.TODO(), setting.Name, metav1.GetOptions{})
 		if apierrors.IsNotFound(err) {
 			newSetting := &v3.Setting{
 				ObjectMeta: metav1.ObjectMeta{
@@ -118,7 +119,7 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 			} else {
 				fallback[newSetting.Name] = newSetting.Value
 			}
-			_, err := s.settings.Create(newSetting)
+			_, err := s.settings.Create(context.TODO(), newSetting)
 			// Rancher will race in an HA setup to try and create the settings
 			// so if it exists just move on.
 			if err != nil && !apierrors.IsAlreadyExists(err) {
@@ -154,7 +155,7 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 				fallback[obj.Name] = obj.Value
 			}
 			if update {
-				_, err := s.settings.Update(obj)
+				_, err := s.settings.Update(context.TODO(), obj)
 				if err != nil {
 					return err
 				}
@@ -174,7 +175,7 @@ func (s *settingsProvider) SetAll(settingsMap map[string]settings.Setting) error
 // cleanupUnknownSettings lists all settings in the cluster and deletes all unknown (e.g. deprecated) settings.
 func (s *settingsProvider) cleanupUnknownSettings(settingsMap map[string]settings.Setting) error {
 	// The settings cache is not yet available at this point, thus using the client directly.
-	list, err := s.settings.List(metav1.ListOptions{})
+	list, err := s.settings.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -184,7 +185,7 @@ func (s *settingsProvider) cleanupUnknownSettings(settingsMap map[string]setting
 			continue
 		}
 
-		err = s.settings.Delete(setting.Name, &metav1.DeleteOptions{})
+		err = s.settings.Delete(context.TODO(), setting.Name, &metav1.DeleteOptions{})
 		if err != nil {
 			logrus.Errorf("Error deleting unknown setting %s: %v", setting.Name, err)
 			continue
@@ -199,7 +200,7 @@ func (s *settingsProvider) cleanupUnknownSettings(settingsMap map[string]setting
 // anySettingsInstalled tries to find out if at least one setting is installed as a resource in the cluster.
 // It is used as a way to know if Rancher has been started for the first time.
 func (s *settingsProvider) anySettingsInstalled() (bool, error) {
-	list, err := s.settings.List(metav1.ListOptions{})
+	list, err := s.settings.List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return false, err
 	}

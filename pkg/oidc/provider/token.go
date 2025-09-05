@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"context"
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/hex"
@@ -430,7 +431,7 @@ func (h *tokenHandler) updateClientSecretUsedTimeStamp(oidcClient *v3.OIDCClient
 		return err
 	}
 
-	_, err = h.oidcClient.Patch(oidcClient.Name, types.JSONPatchType, patch)
+	_, err = h.oidcClient.Patch(context.TODO(), oidcClient.Name, types.JSONPatchType, patch)
 
 	return err
 }
@@ -456,7 +457,7 @@ func (h *tokenHandler) addOIDCClientIDToRancherToken(oidcClientName string, ranc
 	if err != nil {
 		return err
 	}
-	_, err = h.tokenClient.Patch(rancherToken.Name, types.JSONPatchType, patch)
+	_, err = h.tokenClient.Patch(context.TODO(), rancherToken.Name, types.JSONPatchType, patch)
 
 	return err
 }

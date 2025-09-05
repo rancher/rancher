@@ -98,217 +98,217 @@ type version struct {
 }
 
 func (v *version) APIService() APIServiceController {
-	return generic.NewNonNamespacedController[*v3.APIService, *v3.APIServiceList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "APIService"}, "apiservices", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.APIService, *v3.APIServiceList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "APIService"}, "apiservices", v.controllerFactory)
 }
 
 func (v *version) ActiveDirectoryProvider() ActiveDirectoryProviderController {
-	return generic.NewNonNamespacedController[*v3.ActiveDirectoryProvider, *v3.ActiveDirectoryProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ActiveDirectoryProvider"}, "activedirectoryproviders", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.ActiveDirectoryProvider, *v3.ActiveDirectoryProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ActiveDirectoryProvider"}, "activedirectoryproviders", v.controllerFactory)
 }
 
 func (v *version) AuthConfig() AuthConfigController {
-	return generic.NewNonNamespacedController[*v3.AuthConfig, *v3.AuthConfigList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "AuthConfig"}, "authconfigs", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.AuthConfig, *v3.AuthConfigList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "AuthConfig"}, "authconfigs", v.controllerFactory)
 }
 
 func (v *version) AuthProvider() AuthProviderController {
-	return generic.NewNonNamespacedController[*v3.AuthProvider, *v3.AuthProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "AuthProvider"}, "authproviders", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.AuthProvider, *v3.AuthProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "AuthProvider"}, "authproviders", v.controllerFactory)
 }
 
 func (v *version) AuthToken() AuthTokenController {
-	return generic.NewNonNamespacedController[*v3.AuthToken, *v3.AuthTokenList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "AuthToken"}, "authtokens", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.AuthToken, *v3.AuthTokenList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "AuthToken"}, "authtokens", v.controllerFactory)
 }
 
 func (v *version) AzureADProvider() AzureADProviderController {
-	return generic.NewNonNamespacedController[*v3.AzureADProvider, *v3.AzureADProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "AzureADProvider"}, "azureadproviders", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.AzureADProvider, *v3.AzureADProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "AzureADProvider"}, "azureadproviders", v.controllerFactory)
 }
 
 func (v *version) CloudCredential() CloudCredentialController {
-	return generic.NewController[*v3.CloudCredential, *v3.CloudCredentialList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "CloudCredential"}, "cloudcredentials", true, v.controllerFactory)
+	return generic.NewControllerContext[*v3.CloudCredential, *v3.CloudCredentialList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "CloudCredential"}, "cloudcredentials", true, v.controllerFactory)
 }
 
 func (v *version) Cluster() ClusterController {
-	return generic.NewNonNamespacedController[*v3.Cluster, *v3.ClusterList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Cluster"}, "clusters", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.Cluster, *v3.ClusterList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Cluster"}, "clusters", v.controllerFactory)
 }
 
 func (v *version) ClusterProxyConfig() ClusterProxyConfigController {
-	return generic.NewController[*v3.ClusterProxyConfig, *v3.ClusterProxyConfigList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterProxyConfig"}, "clusterproxyconfigs", true, v.controllerFactory)
+	return generic.NewControllerContext[*v3.ClusterProxyConfig, *v3.ClusterProxyConfigList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterProxyConfig"}, "clusterproxyconfigs", true, v.controllerFactory)
 }
 
 func (v *version) ClusterRegistrationToken() ClusterRegistrationTokenController {
-	return generic.NewController[*v3.ClusterRegistrationToken, *v3.ClusterRegistrationTokenList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterRegistrationToken"}, "clusterregistrationtokens", true, v.controllerFactory)
+	return generic.NewControllerContext[*v3.ClusterRegistrationToken, *v3.ClusterRegistrationTokenList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterRegistrationToken"}, "clusterregistrationtokens", true, v.controllerFactory)
 }
 
 func (v *version) ClusterRoleTemplateBinding() ClusterRoleTemplateBindingController {
-	return generic.NewController[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterRoleTemplateBinding"}, "clusterroletemplatebindings", true, v.controllerFactory)
+	return generic.NewControllerContext[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterRoleTemplateBinding"}, "clusterroletemplatebindings", true, v.controllerFactory)
 }
 
 func (v *version) ClusterTemplate() ClusterTemplateController {
-	return generic.NewController[*v3.ClusterTemplate, *v3.ClusterTemplateList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterTemplate"}, "clustertemplates", true, v.controllerFactory)
+	return generic.NewControllerContext[*v3.ClusterTemplate, *v3.ClusterTemplateList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterTemplate"}, "clustertemplates", true, v.controllerFactory)
 }
 
 func (v *version) ClusterTemplateRevision() ClusterTemplateRevisionController {
-	return generic.NewController[*v3.ClusterTemplateRevision, *v3.ClusterTemplateRevisionList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterTemplateRevision"}, "clustertemplaterevisions", true, v.controllerFactory)
+	return generic.NewControllerContext[*v3.ClusterTemplateRevision, *v3.ClusterTemplateRevisionList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterTemplateRevision"}, "clustertemplaterevisions", true, v.controllerFactory)
 }
 
 func (v *version) CognitoProvider() CognitoProviderController {
-	return generic.NewNonNamespacedController[*v3.CognitoProvider, *v3.CognitoProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "CognitoProvider"}, "cognitoproviders", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.CognitoProvider, *v3.CognitoProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "CognitoProvider"}, "cognitoproviders", v.controllerFactory)
 }
 
 func (v *version) ComposeConfig() ComposeConfigController {
-	return generic.NewNonNamespacedController[*v3.ComposeConfig, *v3.ComposeConfigList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ComposeConfig"}, "composeconfigs", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.ComposeConfig, *v3.ComposeConfigList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ComposeConfig"}, "composeconfigs", v.controllerFactory)
 }
 
 func (v *version) DynamicSchema() DynamicSchemaController {
-	return generic.NewNonNamespacedController[*v3.DynamicSchema, *v3.DynamicSchemaList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "DynamicSchema"}, "dynamicschemas", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.DynamicSchema, *v3.DynamicSchemaList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "DynamicSchema"}, "dynamicschemas", v.controllerFactory)
 }
 
 func (v *version) EtcdBackup() EtcdBackupController {
-	return generic.NewController[*v3.EtcdBackup, *v3.EtcdBackupList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "EtcdBackup"}, "etcdbackups", true, v.controllerFactory)
+	return generic.NewControllerContext[*v3.EtcdBackup, *v3.EtcdBackupList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "EtcdBackup"}, "etcdbackups", true, v.controllerFactory)
 }
 
 func (v *version) Feature() FeatureController {
-	return generic.NewNonNamespacedController[*v3.Feature, *v3.FeatureList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Feature"}, "features", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.Feature, *v3.FeatureList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Feature"}, "features", v.controllerFactory)
 }
 
 func (v *version) FleetWorkspace() FleetWorkspaceController {
-	return generic.NewNonNamespacedController[*v3.FleetWorkspace, *v3.FleetWorkspaceList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "FleetWorkspace"}, "fleetworkspaces", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.FleetWorkspace, *v3.FleetWorkspaceList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "FleetWorkspace"}, "fleetworkspaces", v.controllerFactory)
 }
 
 func (v *version) FreeIpaProvider() FreeIpaProviderController {
-	return generic.NewNonNamespacedController[*v3.FreeIpaProvider, *v3.FreeIpaProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "FreeIpaProvider"}, "freeipaproviders", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.FreeIpaProvider, *v3.FreeIpaProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "FreeIpaProvider"}, "freeipaproviders", v.controllerFactory)
 }
 
 func (v *version) GenericOIDCProvider() GenericOIDCProviderController {
-	return generic.NewNonNamespacedController[*v3.GenericOIDCProvider, *v3.GenericOIDCProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "GenericOIDCProvider"}, "genericoidcproviders", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.GenericOIDCProvider, *v3.GenericOIDCProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "GenericOIDCProvider"}, "genericoidcproviders", v.controllerFactory)
 }
 
 func (v *version) GithubProvider() GithubProviderController {
-	return generic.NewNonNamespacedController[*v3.GithubProvider, *v3.GithubProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "GithubProvider"}, "githubproviders", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.GithubProvider, *v3.GithubProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "GithubProvider"}, "githubproviders", v.controllerFactory)
 }
 
 func (v *version) GlobalRole() GlobalRoleController {
-	return generic.NewNonNamespacedController[*v3.GlobalRole, *v3.GlobalRoleList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "GlobalRole"}, "globalroles", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.GlobalRole, *v3.GlobalRoleList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "GlobalRole"}, "globalroles", v.controllerFactory)
 }
 
 func (v *version) GlobalRoleBinding() GlobalRoleBindingController {
-	return generic.NewNonNamespacedController[*v3.GlobalRoleBinding, *v3.GlobalRoleBindingList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "GlobalRoleBinding"}, "globalrolebindings", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.GlobalRoleBinding, *v3.GlobalRoleBindingList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "GlobalRoleBinding"}, "globalrolebindings", v.controllerFactory)
 }
 
 func (v *version) GoogleOAuthProvider() GoogleOAuthProviderController {
-	return generic.NewNonNamespacedController[*v3.GoogleOAuthProvider, *v3.GoogleOAuthProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "GoogleOAuthProvider"}, "googleoauthproviders", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.GoogleOAuthProvider, *v3.GoogleOAuthProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "GoogleOAuthProvider"}, "googleoauthproviders", v.controllerFactory)
 }
 
 func (v *version) Group() GroupController {
-	return generic.NewNonNamespacedController[*v3.Group, *v3.GroupList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Group"}, "groups", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.Group, *v3.GroupList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Group"}, "groups", v.controllerFactory)
 }
 
 func (v *version) GroupMember() GroupMemberController {
-	return generic.NewNonNamespacedController[*v3.GroupMember, *v3.GroupMemberList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "GroupMember"}, "groupmembers", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.GroupMember, *v3.GroupMemberList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "GroupMember"}, "groupmembers", v.controllerFactory)
 }
 
 func (v *version) KontainerDriver() KontainerDriverController {
-	return generic.NewNonNamespacedController[*v3.KontainerDriver, *v3.KontainerDriverList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "KontainerDriver"}, "kontainerdrivers", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.KontainerDriver, *v3.KontainerDriverList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "KontainerDriver"}, "kontainerdrivers", v.controllerFactory)
 }
 
 func (v *version) LocalProvider() LocalProviderController {
-	return generic.NewNonNamespacedController[*v3.LocalProvider, *v3.LocalProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "LocalProvider"}, "localproviders", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.LocalProvider, *v3.LocalProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "LocalProvider"}, "localproviders", v.controllerFactory)
 }
 
 func (v *version) ManagedChart() ManagedChartController {
-	return generic.NewController[*v3.ManagedChart, *v3.ManagedChartList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ManagedChart"}, "managedcharts", true, v.controllerFactory)
+	return generic.NewControllerContext[*v3.ManagedChart, *v3.ManagedChartList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ManagedChart"}, "managedcharts", true, v.controllerFactory)
 }
 
 func (v *version) Node() NodeController {
-	return generic.NewController[*v3.Node, *v3.NodeList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Node"}, "nodes", true, v.controllerFactory)
+	return generic.NewControllerContext[*v3.Node, *v3.NodeList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Node"}, "nodes", true, v.controllerFactory)
 }
 
 func (v *version) NodeDriver() NodeDriverController {
-	return generic.NewNonNamespacedController[*v3.NodeDriver, *v3.NodeDriverList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "NodeDriver"}, "nodedrivers", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.NodeDriver, *v3.NodeDriverList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "NodeDriver"}, "nodedrivers", v.controllerFactory)
 }
 
 func (v *version) NodePool() NodePoolController {
-	return generic.NewController[*v3.NodePool, *v3.NodePoolList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "NodePool"}, "nodepools", true, v.controllerFactory)
+	return generic.NewControllerContext[*v3.NodePool, *v3.NodePoolList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "NodePool"}, "nodepools", true, v.controllerFactory)
 }
 
 func (v *version) NodeTemplate() NodeTemplateController {
-	return generic.NewController[*v3.NodeTemplate, *v3.NodeTemplateList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "NodeTemplate"}, "nodetemplates", true, v.controllerFactory)
+	return generic.NewControllerContext[*v3.NodeTemplate, *v3.NodeTemplateList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "NodeTemplate"}, "nodetemplates", true, v.controllerFactory)
 }
 
 func (v *version) OIDCClient() OIDCClientController {
-	return generic.NewNonNamespacedController[*v3.OIDCClient, *v3.OIDCClientList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "OIDCClient"}, "oidcclients", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.OIDCClient, *v3.OIDCClientList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "OIDCClient"}, "oidcclients", v.controllerFactory)
 }
 
 func (v *version) OIDCProvider() OIDCProviderController {
-	return generic.NewNonNamespacedController[*v3.OIDCProvider, *v3.OIDCProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "OIDCProvider"}, "oidcproviders", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.OIDCProvider, *v3.OIDCProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "OIDCProvider"}, "oidcproviders", v.controllerFactory)
 }
 
 func (v *version) OpenLdapProvider() OpenLdapProviderController {
-	return generic.NewNonNamespacedController[*v3.OpenLdapProvider, *v3.OpenLdapProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "OpenLdapProvider"}, "openldapproviders", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.OpenLdapProvider, *v3.OpenLdapProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "OpenLdapProvider"}, "openldapproviders", v.controllerFactory)
 }
 
 func (v *version) PodSecurityAdmissionConfigurationTemplate() PodSecurityAdmissionConfigurationTemplateController {
-	return generic.NewNonNamespacedController[*v3.PodSecurityAdmissionConfigurationTemplate, *v3.PodSecurityAdmissionConfigurationTemplateList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "PodSecurityAdmissionConfigurationTemplate"}, "podsecurityadmissionconfigurationtemplates", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.PodSecurityAdmissionConfigurationTemplate, *v3.PodSecurityAdmissionConfigurationTemplateList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "PodSecurityAdmissionConfigurationTemplate"}, "podsecurityadmissionconfigurationtemplates", v.controllerFactory)
 }
 
 func (v *version) Preference() PreferenceController {
-	return generic.NewController[*v3.Preference, *v3.PreferenceList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Preference"}, "preferences", true, v.controllerFactory)
+	return generic.NewControllerContext[*v3.Preference, *v3.PreferenceList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Preference"}, "preferences", true, v.controllerFactory)
 }
 
 func (v *version) Principal() PrincipalController {
-	return generic.NewNonNamespacedController[*v3.Principal, *v3.PrincipalList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Principal"}, "principals", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.Principal, *v3.PrincipalList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Principal"}, "principals", v.controllerFactory)
 }
 
 func (v *version) Project() ProjectController {
-	return generic.NewController[*v3.Project, *v3.ProjectList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Project"}, "projects", true, v.controllerFactory)
+	return generic.NewControllerContext[*v3.Project, *v3.ProjectList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Project"}, "projects", true, v.controllerFactory)
 }
 
 func (v *version) ProjectNetworkPolicy() ProjectNetworkPolicyController {
-	return generic.NewController[*v3.ProjectNetworkPolicy, *v3.ProjectNetworkPolicyList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ProjectNetworkPolicy"}, "projectnetworkpolicies", true, v.controllerFactory)
+	return generic.NewControllerContext[*v3.ProjectNetworkPolicy, *v3.ProjectNetworkPolicyList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ProjectNetworkPolicy"}, "projectnetworkpolicies", true, v.controllerFactory)
 }
 
 func (v *version) ProjectRoleTemplateBinding() ProjectRoleTemplateBindingController {
-	return generic.NewController[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ProjectRoleTemplateBinding"}, "projectroletemplatebindings", true, v.controllerFactory)
+	return generic.NewControllerContext[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ProjectRoleTemplateBinding"}, "projectroletemplatebindings", true, v.controllerFactory)
 }
 
 func (v *version) RancherUserNotification() RancherUserNotificationController {
-	return generic.NewNonNamespacedController[*v3.RancherUserNotification, *v3.RancherUserNotificationList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "RancherUserNotification"}, "rancherusernotifications", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.RancherUserNotification, *v3.RancherUserNotificationList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "RancherUserNotification"}, "rancherusernotifications", v.controllerFactory)
 }
 
 func (v *version) RkeAddon() RkeAddonController {
-	return generic.NewController[*v3.RkeAddon, *v3.RkeAddonList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "RkeAddon"}, "rkeaddons", true, v.controllerFactory)
+	return generic.NewControllerContext[*v3.RkeAddon, *v3.RkeAddonList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "RkeAddon"}, "rkeaddons", true, v.controllerFactory)
 }
 
 func (v *version) RkeK8sServiceOption() RkeK8sServiceOptionController {
-	return generic.NewController[*v3.RkeK8sServiceOption, *v3.RkeK8sServiceOptionList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "RkeK8sServiceOption"}, "rkek8sserviceoptions", true, v.controllerFactory)
+	return generic.NewControllerContext[*v3.RkeK8sServiceOption, *v3.RkeK8sServiceOptionList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "RkeK8sServiceOption"}, "rkek8sserviceoptions", true, v.controllerFactory)
 }
 
 func (v *version) RkeK8sSystemImage() RkeK8sSystemImageController {
-	return generic.NewController[*v3.RkeK8sSystemImage, *v3.RkeK8sSystemImageList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "RkeK8sSystemImage"}, "rkek8ssystemimages", true, v.controllerFactory)
+	return generic.NewControllerContext[*v3.RkeK8sSystemImage, *v3.RkeK8sSystemImageList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "RkeK8sSystemImage"}, "rkek8ssystemimages", true, v.controllerFactory)
 }
 
 func (v *version) RoleTemplate() RoleTemplateController {
-	return generic.NewNonNamespacedController[*v3.RoleTemplate, *v3.RoleTemplateList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "RoleTemplate"}, "roletemplates", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.RoleTemplate, *v3.RoleTemplateList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "RoleTemplate"}, "roletemplates", v.controllerFactory)
 }
 
 func (v *version) SamlProvider() SamlProviderController {
-	return generic.NewNonNamespacedController[*v3.SamlProvider, *v3.SamlProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "SamlProvider"}, "samlproviders", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.SamlProvider, *v3.SamlProviderList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "SamlProvider"}, "samlproviders", v.controllerFactory)
 }
 
 func (v *version) SamlToken() SamlTokenController {
-	return generic.NewNonNamespacedController[*v3.SamlToken, *v3.SamlTokenList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "SamlToken"}, "samltokens", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.SamlToken, *v3.SamlTokenList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "SamlToken"}, "samltokens", v.controllerFactory)
 }
 
 func (v *version) Setting() SettingController {
-	return generic.NewNonNamespacedController[*v3.Setting, *v3.SettingList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Setting"}, "settings", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.Setting, *v3.SettingList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Setting"}, "settings", v.controllerFactory)
 }
 
 func (v *version) Token() TokenController {
-	return generic.NewNonNamespacedController[*v3.Token, *v3.TokenList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Token"}, "tokens", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.Token, *v3.TokenList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "Token"}, "tokens", v.controllerFactory)
 }
 
 func (v *version) User() UserController {
-	return generic.NewNonNamespacedController[*v3.User, *v3.UserList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "User"}, "users", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.User, *v3.UserList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "User"}, "users", v.controllerFactory)
 }
 
 func (v *version) UserAttribute() UserAttributeController {
-	return generic.NewNonNamespacedController[*v3.UserAttribute, *v3.UserAttributeList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "UserAttribute"}, "userattributes", v.controllerFactory)
+	return generic.NewNonNamespacedControllerContext[*v3.UserAttribute, *v3.UserAttributeList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "UserAttribute"}, "userattributes", v.controllerFactory)
 }

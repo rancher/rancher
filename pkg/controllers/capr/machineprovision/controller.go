@@ -124,7 +124,7 @@ func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager 
 		kubeconfigManager:   kubeconfigManager,
 	}
 
-	removeHandler := generic.NewRemoveHandler("machine-provision-remove", clients.Dynamic.Update, h.OnRemove)
+	removeHandler := generic.NewRemoveHandlerContext("machine-provision-remove", clients.Dynamic.Update, h.OnRemove)
 
 	clients.Dynamic.OnChange(ctx, "machine-provision-remove", validGVK, dynamic.FromKeyHandler(removeHandler))
 	clients.Dynamic.OnChange(ctx, "machine-provision", validGVK, h.OnChange)
@@ -303,7 +303,7 @@ func (h *handler) namespaceIsRemoved(obj runtime.Object) (bool, error) {
 	return ns.DeletionTimestamp != nil, nil
 }
 
-func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, error) {
+func (h *handler) OnRemove(_ context.Context, key string, obj runtime.Object) (runtime.Object, error) {
 	if removed, err := h.namespaceIsRemoved(obj); err != nil || removed {
 		return obj, err
 	}
@@ -498,7 +498,7 @@ func (h *handler) EnqueueAfter(infra *infraObject, duration time.Duration) {
 }
 
 // OnChange is called whenever the infrastructure machine is updated, including when the object is being deleted.
-func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
+func (h *handler) OnChange(_ context.Context, obj runtime.Object) (runtime.Object, error) {
 	infra, err := newInfraObject(obj)
 	if err != nil {
 		return obj, err
@@ -526,7 +526,7 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 		infra.data.SetNested(machine.Name, "metadata", "labels", CapiMachineName)
 		// Return prematurely, we want the caches to be as up-to-date as possible, so that we don't lose changes when
 		// reconciling in the event of other errors
-		return h.dynamic.Update(&unstructured.Unstructured{
+		return h.dynamic.Update(context.TODO(), &unstructured.Unstructured{
 			Object: infra.data,
 		})
 	}

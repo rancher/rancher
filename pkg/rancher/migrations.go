@@ -1,6 +1,7 @@
 package rancher
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -171,7 +172,7 @@ func forceUpgradeLogout(configMapController controllerv1.ConfigMapController, to
 
 	// log out all the dashboard users forcing them to be redirected to the login page
 	for _, token := range allTokens {
-		err = tokenController.Delete(token.ObjectMeta.Name, &metav1.DeleteOptions{})
+		err = tokenController.Delete(context.TODO(), token.ObjectMeta.Name, &metav1.DeleteOptions{})
 		if err != nil && !k8serror.IsNotFound(err) {
 			logrus.Errorf("Failed to delete token [%s] for upgrade forced logout", token.Name)
 		}
@@ -195,7 +196,7 @@ func forceSystemAndDefaultProjectCreation(configMapController controllerv1.Confi
 	}
 
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		localCluster, err := clusterClient.Get("local", metav1.GetOptions{})
+		localCluster, err := clusterClient.Get(context.TODO(), "local", metav1.GetOptions{})
 		if err != nil {
 			if k8serror.IsNotFound(err) {
 				return nil
@@ -206,7 +207,7 @@ func forceSystemAndDefaultProjectCreation(configMapController controllerv1.Confi
 		v32.ClusterConditionDefaultProjectCreated.Unknown(localCluster)
 		v32.ClusterConditionSystemProjectCreated.Unknown(localCluster)
 
-		_, err = clusterClient.Update(localCluster)
+		_, err = clusterClient.Update(context.TODO(), localCluster)
 		return err
 	}); err != nil {
 		return err
@@ -240,7 +241,7 @@ func forceSystemNamespaceAssignment(configMapController controllerv1.ConfigMapCo
 }
 
 func applyProjectConditionForNamespaceAssignment(label string, condition condition.Cond, projectClient v3.ProjectClient) error {
-	projects, err := projectClient.List("", metav1.ListOptions{LabelSelector: label})
+	projects, err := projectClient.List(context.TODO(), "", metav1.ListOptions{LabelSelector: label})
 	if err != nil {
 		return err
 	}
@@ -248,13 +249,13 @@ func applyProjectConditionForNamespaceAssignment(label string, condition conditi
 	for i := range projects.Items {
 		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			p := &projects.Items[i]
-			p, err = projectClient.Get(p.Namespace, p.Name, metav1.GetOptions{})
+			p, err = projectClient.Get(context.TODO(), p.Namespace, p.Name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
 
 			condition.Unknown(p)
-			_, err = projectClient.Update(p)
+			_, err = projectClient.Update(context.TODO(), p)
 			return err
 		}); err != nil {
 			return err
@@ -273,7 +274,7 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) err
 		return nil
 	}
 
-	mgmtClusters, err := w.Mgmt.Cluster().List(metav1.ListOptions{})
+	mgmtClusters, err := w.Mgmt.Cluster().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -416,7 +417,7 @@ func migrateEncryptionKeyRotationLeader(w *wrangler.Context) error {
 		return nil
 	}
 
-	mgmtClusters, err := w.Mgmt.Cluster().List(metav1.ListOptions{})
+	mgmtClusters, err := w.Mgmt.Cluster().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -466,7 +467,7 @@ func migrateMachinePoolsDynamicSchemaLabel(w *wrangler.Context) error {
 		return nil
 	}
 
-	mgmtClusters, err := w.Mgmt.Cluster().List(metav1.ListOptions{})
+	mgmtClusters, err := w.Mgmt.Cluster().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
@@ -504,7 +505,7 @@ func migrateMachinePoolsDynamicSchemaLabel(w *wrangler.Context) error {
 					if apiVersion != capr.DefaultMachineConfigAPIVersion && apiVersion != "" {
 						continue
 					}
-					ds, err := w.Mgmt.DynamicSchema().Get(strings.ToLower(nodeConfig.Kind), metav1.GetOptions{})
+					ds, err := w.Mgmt.DynamicSchema().Get(context.TODO(), strings.ToLower(nodeConfig.Kind), metav1.GetOptions{})
 					if err != nil {
 						return err
 					}
@@ -595,7 +596,7 @@ func migrateImportedClusterFields(w *wrangler.Context) error {
 			// run only for non-legacy imported clusters
 			continue
 		}
-		mgmtCluster, err := w.Mgmt.Cluster().Get(cluster.Status.ClusterName, metav1.GetOptions{})
+		mgmtCluster, err := w.Mgmt.Cluster().Get(context.TODO(), cluster.Status.ClusterName, metav1.GetOptions{})
 		if k8serror.IsNotFound(err) {
 			continue
 		} else if err != nil {
@@ -608,7 +609,7 @@ func migrateImportedClusterFields(w *wrangler.Context) error {
 		clusterCopy.Spec.DesiredAuthImage = ""
 		// managed by Spec.ImportedConfig.PrivateRegistryURL for imported clusters
 		clusterCopy.Spec.ClusterSecrets.PrivateRegistryURL = ""
-		if _, err := w.Mgmt.Cluster().Update(clusterCopy); err != nil {
+		if _, err := w.Mgmt.Cluster().Update(context.TODO(), clusterCopy); err != nil {
 			return err
 		}
 	}

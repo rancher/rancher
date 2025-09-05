@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -74,7 +75,7 @@ func (h *handler) updateV1SchedulingCustomization(_ string, cluster *v1.Cluster)
 // global settings. If the cluster-agent-scheduling-customization feature is disabled, the cluster will be returned unchanged.
 // The provisioning.cattle.io/enable-scheduling-customization annotation can be set to 'true' or 'false', which will add or remove
 // the scheduling customization field as needed. updateV3SchedulingCustomization is intended to handle KEv2 and legacy clusters specifically.
-func (h *handler) updateV3SchedulingCustomization(_ string, cluster *v3.Cluster) (*v3.Cluster, error) {
+func (h *handler) updateV3SchedulingCustomization(_ context.Context, _ string, cluster *v3.Cluster) (*v3.Cluster, error) {
 	if cluster == nil {
 		return nil, nil
 	}
@@ -101,16 +102,16 @@ func (h *handler) updateV3SchedulingCustomization(_ string, cluster *v3.Cluster)
 	if lowerVal == "false" {
 		delete(cluster.ObjectMeta.Annotations, manageSchedulingDefaultsAnn)
 		if cluster.Spec.ClusterAgentDeploymentCustomization == nil {
-			return h.mgmtClusters.Update(cluster)
+			return h.mgmtClusters.Update(context.TODO(), cluster)
 		}
 		cluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization = nil
-		return h.mgmtClusters.Update(cluster)
+		return h.mgmtClusters.Update(context.TODO(), cluster)
 	}
 
 	// annotation was added to a cluster that already has the fields set, we should not override the existing values.
 	if cluster.Spec.ClusterAgentDeploymentCustomization != nil && cluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization != nil {
 		delete(cluster.ObjectMeta.Annotations, manageSchedulingDefaultsAnn)
-		return h.mgmtClusters.Update(cluster)
+		return h.mgmtClusters.Update(context.TODO(), cluster)
 	}
 
 	defaultPC, defaultPDB, err := getDefaultSchedulingCustomization[v3.PriorityClassSpec, v3.PodDisruptionBudgetSpec]()
@@ -128,7 +129,7 @@ func (h *handler) updateV3SchedulingCustomization(_ string, cluster *v3.Cluster)
 	}
 
 	delete(cluster.ObjectMeta.Annotations, manageSchedulingDefaultsAnn)
-	return h.mgmtClusters.Update(cluster)
+	return h.mgmtClusters.Update(context.TODO(), cluster)
 }
 
 func getDefaultSchedulingCustomization[T v1.PriorityClassSpec | v3.PriorityClassSpec, TT v1.PodDisruptionBudgetSpec | v3.PodDisruptionBudgetSpec]() (*T, *TT, error) {

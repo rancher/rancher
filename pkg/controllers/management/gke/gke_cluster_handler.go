@@ -80,7 +80,7 @@ func Register(ctx context.Context, wContext *wrangler.Context, mgmtCtx *config.M
 	wContext.Mgmt.Cluster().OnChange(ctx, "gke-operator-controller", e.onClusterChange)
 }
 
-func (e *gkeOperatorController) onClusterChange(key string, cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
+func (e *gkeOperatorController) onClusterChange(_ context.Context, key string, cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
 	if cluster == nil || cluster.DeletionTimestamp != nil || cluster.Spec.GKEConfig == nil {
 		return cluster, nil
 	}
@@ -90,7 +90,7 @@ func (e *gkeOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 		cluster = cluster.DeepCopy()
 		cluster.Status.Driver = apimgmtv3.ClusterDriverGKE
 		var err error
-		cluster, err = e.ClusterClient.Update(cluster)
+		cluster, err = e.ClusterClient.Update(context.TODO(), cluster)
 		if err != nil {
 			return cluster, err
 		}
@@ -171,7 +171,7 @@ func (e *gkeOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 			if apimgmtv3.ClusterConditionPending.IsUnknown(cluster) {
 				cluster = cluster.DeepCopy()
 				apimgmtv3.ClusterConditionPending.True(cluster)
-				cluster, err = e.ClusterClient.Update(cluster)
+				cluster, err = e.ClusterClient.Update(context.TODO(), cluster)
 				if err != nil {
 					return cluster, err
 				}
@@ -212,7 +212,7 @@ func (e *gkeOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 					cluster.Status.ServiceAccountTokenSecret = secret.Name
 					cluster.Status.ServiceAccountToken = ""
 				}
-				return e.ClusterClient.Update(cluster)
+				return e.ClusterClient.Update(context.TODO(), cluster)
 			}
 		}
 
@@ -305,7 +305,7 @@ func (e *gkeOperatorController) setInitialUpstreamSpec(cluster *mgmtv3.Cluster) 
 		return cluster, err
 	}
 	cluster.Status.GKEStatus.UpstreamSpec = upstreamSpec
-	return e.ClusterClient.Update(cluster)
+	return e.ClusterClient.Update(context.TODO(), cluster)
 }
 
 // updateGKEClusterConfig updates the GKEClusterConfig object's spec with the cluster's GKEConfig if they are not equal.
@@ -378,7 +378,7 @@ func (e *gkeOperatorController) generateAndSetServiceAccount(cluster *mgmtv3.Clu
 	}
 	cluster.Status.ServiceAccountTokenSecret = secret.Name
 	cluster.Status.ServiceAccountToken = ""
-	return e.ClusterClient.Update(cluster)
+	return e.ClusterClient.Update(context.TODO(), cluster)
 }
 
 // buildGKECCCreateObject returns an object that can be used with the kubernetes dynamic client to
@@ -422,7 +422,7 @@ func (e *gkeOperatorController) recordAppliedSpec(cluster *mgmtv3.Cluster) (*mgm
 
 	cluster = cluster.DeepCopy()
 	cluster.Status.AppliedSpec.GKEConfig = cluster.Spec.GKEConfig
-	return e.ClusterClient.Update(cluster)
+	return e.ClusterClient.Update(context.TODO(), cluster)
 }
 
 var publicDialer = &transport.DialHolder{
