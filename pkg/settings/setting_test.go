@@ -150,7 +150,6 @@ func TestGetMachineProvisionImagePullPolicy(t *testing.T) {
 }
 
 func TestGetInt(t *testing.T) {
-	t.Parallel()
 	fakeIntSetting := NewSetting("int", "1")
 	fakeStringSetting := NewSetting("string", "one")
 
@@ -172,7 +171,6 @@ func TestGetInt(t *testing.T) {
 }
 
 func TestGetQuantityAsInt64(t *testing.T) {
-	t.Parallel()
 	fakeLimitSetting := NewSetting("limit", "1Mi")
 
 	val, err := fakeLimitSetting.GetQuantityAsInt64(1000)
