@@ -119,7 +119,7 @@ func (d *DeferredRegistrationSuite) TestDeferFunc() {
 		assert.NoError(d.T(), clients.Core.Namespace().Delete(otherNS, &metav1.DeleteOptions{}))
 	}()
 
-	testDefer := wrangler.NewDeferredRegistration[*testDeferContext, *testDeferInitializer](clients, newTestDeferInitializer())
+	testDefer := wrangler.NewDeferredRegistration[*testDeferContext, *testDeferInitializer](clients, newTestDeferInitializer(), "test-deferred")
 	testDefer.Manage(d.T().Context())
 
 	// need to start the factory after the deferred initializer's
@@ -175,7 +175,7 @@ func (d *DeferredRegistrationSuite) TestDeferFuncWithError() {
 		assert.NoError(d.T(), clients.Core.Namespace().Delete(otherNS, &metav1.DeleteOptions{}))
 	}()
 
-	testDefer := wrangler.NewDeferredRegistration[*testDeferContext, *testDeferInitializer](clients, newTestDeferInitializer())
+	testDefer := wrangler.NewDeferredRegistration[*testDeferContext, *testDeferInitializer](clients, newTestDeferInitializer(), "test-deferred")
 	testDefer.Manage(d.T().Context())
 
 	// need to start the factory after the deferred initializer's

@@ -3,6 +3,8 @@ package wrangler
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"runtime"
 	"sync"
 
 	"github.com/sirupsen/logrus"
@@ -49,11 +51,13 @@ func (b *BaseInitializer[T]) GetClientContext(ctx context.Context) (T, error) {
 }
 
 // DeferredRegistration provides a generic way to defer the execution of functions or registration of
-// event handlers within the primary wrangler context. I represents an implementation of DeferredInitializer,
-// and is used to identify when the deferred functions can be executed. T represents a scoped client
+// event handlers within the primary wrangler context. 'I' represents an implementation of DeferredInitializer,
+// and is used to identify when the deferred functions can be executed. 'T' represents a scoped client
 // context which will be passed to all deferred functions. This context is expected to hold the
-// relevant clients, factories, and other resources which can only be accessed after initialization of I is complete.
+// relevant clients, factories, and other resources which can only be accessed after initialization of 'I' is complete.
 type DeferredRegistration[T any, I DeferredInitializer[T]] struct {
+	Name string
+
 	clientContext     T
 	clientInitializer I
 
@@ -62,8 +66,9 @@ type DeferredRegistration[T any, I DeferredInitializer[T]] struct {
 	funcs             chan func(clients T)
 }
 
-func NewDeferredRegistration[T any, I DeferredInitializer[T]](clients *Context, init I) *DeferredRegistration[T, I] {
+func NewDeferredRegistration[T any, I DeferredInitializer[T]](clients *Context, init I, name string) *DeferredRegistration[T, I] {
 	return &DeferredRegistration[T, I]{
+		Name:              name,
 		clientInitializer: init,
 		clients:           clients,
 		registrationFuncs: make(chan func(ctx context.Context, clients T) error, 100),
@@ -91,6 +96,7 @@ func (d *DeferredRegistration[T, I]) run(ctx context.Context) error {
 	for {
 		select {
 		case f := <-d.registrationFuncs:
+			logrus.Debugf("[%s - DeferRegistration] Executing deferred registration: %s", d.Name, fn(f))
 			if err := d.clients.StartFactoryWithTransaction(ctx, func(ctx context.Context) error {
 				if err := f(ctx, d.clientContext); err != nil {
 					return fmt.Errorf("failed to invoke registration func: %w", err)
@@ -100,6 +106,7 @@ func (d *DeferredRegistration[T, I]) run(ctx context.Context) error {
 				return err
 			}
 		case f := <-d.funcs:
+			logrus.Debugf("[%s - DeferFunc] Executing deferred function: %s", d.Name, fn(f))
 			f(d.clientContext)
 		case <-ctx.Done():
 			return nil
@@ -111,21 +118,22 @@ func (d *DeferredRegistration[T, I]) run(ctx context.Context) error {
 // Calls to DeferFunc are processed in the order they are made. Calls to DeferFunc made after the client context has initialized
 // will execute immediately.
 func (d *DeferredRegistration[T, I]) DeferFunc(f func(clients T)) {
-	logrus.Debug("[DeferFunc] Adding function to pool")
+	logrus.Debugf("[%s - DeferFunc] Adding function to pool: %s", d.Name, fn(f))
 	d.funcs <- f
 }
 
 // DeferFuncWithError creates a new go routine which invokes f once the DeferredInitializer creates the client context.
 // It returns an error channel to indicate if f encountered any errors during execution.
 func (d *DeferredRegistration[T, I]) DeferFuncWithError(f func(wrangler T) error) chan error {
+	logrus.Debugf("[%s - DeferFuncWithError] Adding function to pool: %s", d.Name, fn(f))
 	errChan := make(chan error, 1)
-	d.funcs <- func(clients T) {
+	d.DeferFunc(func(clients T) {
 		defer close(errChan)
 
 		if err := f(clients); err != nil {
 			errChan <- err
 		}
-	}
+	})
 	return errChan
 }
 
@@ -135,6 +143,12 @@ func (d *DeferredRegistration[T, I]) DeferFuncWithError(f func(wrangler T) error
 // Calls to DeferRegistration are processed in the order they are made. Calls to DeferRegistration made after the client context has
 // initialized will execute immediately, and the controller factory will be immediately started.
 func (d *DeferredRegistration[T, I]) DeferRegistration(register func(ctx context.Context, clients T) error) {
-	logrus.Debug("[DeferRegistration] Adding registration function to pool")
+	logrus.Debugf("[%s - DeferRegistration] Adding registration function to pool: %s", d.Name, fn(register))
 	d.registrationFuncs <- register
+}
+
+// fn takes a function pointer (i.e. function name), and returns the function's name as a string.
+// Go reflection is used to determine the value.
+func fn(i interface{}) string {
+	return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
 }
