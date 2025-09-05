@@ -40,6 +40,9 @@ auditLog:
     # options: Always, Never, IfNotPresent
     pullPolicy: "IfNotPresent"
 
+# Timeout for rancher controllers to complete a cache sync. Larger clusters may need to increase this value.
+# cacheSyncTimeout: 5m
+
 # As of Rancher v2.5.0 this flag is deprecated and must be set to 'true' in order for Rancher to start
 addLocal: "true"
 
