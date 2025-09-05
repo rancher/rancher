@@ -9,7 +9,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/rancher/tests/controllers/common"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,27 +36,20 @@ func (d *DeferredRegistrationSuite) SetupSuite() {
 	d.testEnv = &envtest.Environment{}
 
 	restCfg, err := d.testEnv.Start()
-	assert.NoError(d.T(), err)
-	assert.NotNil(d.T(), restCfg)
-	if err != nil {
-		d.T().Fatal(err)
-		return
-	}
+	require.NoError(d.T(), err)
+	require.NotNil(d.T(), restCfg)
 
 	d.rest = restCfg
 }
 
 func (d *DeferredRegistrationSuite) TearDownSuite() {
 	err := d.testEnv.Stop()
-	assert.NoError(d.T(), err)
+	require.NoError(d.T(), err)
 }
 
 func (d *DeferredRegistrationSuite) createClients(ctx context.Context) *wrangler.Context {
 	wranglerContext, err := wrangler.NewContext(ctx, nil, d.rest)
-	assert.NoError(d.T(), err)
-	if err != nil {
-		d.T().Fatal(err)
-	}
+	require.NoError(d.T(), err)
 	return wranglerContext
 }
 
@@ -115,8 +108,8 @@ func (d *DeferredRegistrationSuite) TestDeferFunc() {
 	clients := d.createClients(testCtx)
 	triggerNS, otherNS := newTestNamespaces("testdeferfunc")
 	defer func() {
-		assert.NoError(d.T(), clients.Core.Namespace().Delete(triggerNS, &metav1.DeleteOptions{}))
-		assert.NoError(d.T(), clients.Core.Namespace().Delete(otherNS, &metav1.DeleteOptions{}))
+		require.NoError(d.T(), clients.Core.Namespace().Delete(triggerNS, &metav1.DeleteOptions{}))
+		require.NoError(d.T(), clients.Core.Namespace().Delete(otherNS, &metav1.DeleteOptions{}))
 	}()
 
 	testDefer := wrangler.NewDeferredRegistration[*testDeferContext, *testDeferInitializer](clients, newTestDeferInitializer(), "test-deferred")
@@ -129,15 +122,15 @@ func (d *DeferredRegistrationSuite) TestDeferFunc() {
 	// queue up some deferred functions
 	count := 0
 	testDefer.DeferFunc(func(clients *testDeferContext) {
-		assert.Equal(d.T(), triggerNS, clients.desiredNamespace)
+		require.Equal(d.T(), triggerNS, clients.desiredNamespace)
 		count++
 	})
 	testDefer.DeferFunc(func(clients *testDeferContext) {
-		assert.Equal(d.T(), triggerNS, clients.desiredNamespace)
+		require.Equal(d.T(), triggerNS, clients.desiredNamespace)
 		count++
 	})
 	testDefer.DeferFunc(func(clients *testDeferContext) {
-		assert.Equal(d.T(), triggerNS, clients.desiredNamespace)
+		require.Equal(d.T(), triggerNS, clients.desiredNamespace)
 		count++
 	})
 
@@ -147,9 +140,9 @@ func (d *DeferredRegistrationSuite) TestDeferFunc() {
 			Name: otherNS,
 		},
 	})
-	assert.NoError(d.T(), err)
+	require.NoError(d.T(), err)
 	time.Sleep(time.Millisecond * 100)
-	assert.Equal(d.T(), 0, count)
+	require.Equal(d.T(), 0, count)
 
 	// trigger execution of deferred functions
 	_, err = clients.Core.Namespace().Create(&corev1.Namespace{
@@ -157,11 +150,11 @@ func (d *DeferredRegistrationSuite) TestDeferFunc() {
 			Name: triggerNS,
 		},
 	})
-	assert.NoError(d.T(), err)
+	require.NoError(d.T(), err)
 
 	// wait a bit to allow deferred functions to execute
 	time.Sleep(time.Millisecond * 100)
-	assert.Equal(d.T(), 3, count)
+	require.Equal(d.T(), 3, count)
 }
 
 func (d *DeferredRegistrationSuite) TestDeferFuncWithError() {
@@ -171,8 +164,8 @@ func (d *DeferredRegistrationSuite) TestDeferFuncWithError() {
 	clients := d.createClients(testCtx)
 	triggerNS, otherNS := newTestNamespaces("testdeferwitherror")
 	defer func() {
-		assert.NoError(d.T(), clients.Core.Namespace().Delete(triggerNS, &metav1.DeleteOptions{}))
-		assert.NoError(d.T(), clients.Core.Namespace().Delete(otherNS, &metav1.DeleteOptions{}))
+		require.NoError(d.T(), clients.Core.Namespace().Delete(triggerNS, &metav1.DeleteOptions{}))
+		require.NoError(d.T(), clients.Core.Namespace().Delete(otherNS, &metav1.DeleteOptions{}))
 	}()
 
 	testDefer := wrangler.NewDeferredRegistration[*testDeferContext, *testDeferInitializer](clients, newTestDeferInitializer(), "test-deferred")
@@ -186,19 +179,19 @@ func (d *DeferredRegistrationSuite) TestDeferFuncWithError() {
 	count := 0
 	errCount := 0
 	err1 := testDefer.DeferFuncWithError(func(clients *testDeferContext) error {
-		assert.Equal(d.T(), triggerNS, clients.desiredNamespace)
+		require.Equal(d.T(), triggerNS, clients.desiredNamespace)
 		count++
 		return nil
 	})
 
 	err2 := testDefer.DeferFuncWithError(func(clients *testDeferContext) error {
-		assert.Equal(d.T(), triggerNS, clients.desiredNamespace)
+		require.Equal(d.T(), triggerNS, clients.desiredNamespace)
 		errCount++
 		return fmt.Errorf("fake error")
 	})
 
 	err3 := testDefer.DeferFuncWithError(func(clients *testDeferContext) error {
-		assert.Equal(d.T(), triggerNS, clients.desiredNamespace)
+		require.Equal(d.T(), triggerNS, clients.desiredNamespace)
 		count++
 		return nil
 	})
@@ -209,10 +202,10 @@ func (d *DeferredRegistrationSuite) TestDeferFuncWithError() {
 			Name: otherNS,
 		},
 	})
-	assert.NoError(d.T(), err)
+	require.NoError(d.T(), err)
 	time.Sleep(time.Millisecond * 100)
-	assert.Equal(d.T(), 0, count)
-	assert.Equal(d.T(), 0, errCount)
+	require.Equal(d.T(), 0, count)
+	require.Equal(d.T(), 0, errCount)
 
 	// trigger execution of deferred functions
 	_, err = clients.Core.Namespace().Create(&corev1.Namespace{
@@ -220,22 +213,22 @@ func (d *DeferredRegistrationSuite) TestDeferFuncWithError() {
 			Name: triggerNS,
 		},
 	})
-	assert.NoError(d.T(), err)
+	require.NoError(d.T(), err)
 
 	errOut1, timedOut := getFromChanOrTimeout(err1)
-	assert.False(d.T(), timedOut)
-	assert.NoError(d.T(), errOut1)
+	require.False(d.T(), timedOut)
+	require.NoError(d.T(), errOut1)
 
 	errOut2, timedOut := getFromChanOrTimeout(err2)
-	assert.False(d.T(), timedOut)
-	assert.Error(d.T(), errOut2)
+	require.False(d.T(), timedOut)
+	require.Error(d.T(), errOut2)
 
 	errOut3, timedOut := getFromChanOrTimeout(err3)
-	assert.False(d.T(), timedOut)
-	assert.NoError(d.T(), errOut3)
+	require.False(d.T(), timedOut)
+	require.NoError(d.T(), errOut3)
 
-	assert.Equal(d.T(), 2, count)
-	assert.Equal(d.T(), 1, errCount)
+	require.Equal(d.T(), 2, count)
+	require.Equal(d.T(), 1, errCount)
 }
 
 func getFromChanOrTimeout(errs chan error) (error, bool) {
