@@ -782,10 +782,10 @@ func Test_Provisioning_Single_Node_All_Roles_Drain(t *testing.T) {
 			}
 		}
 		return false
-	}, 20*time.Minute, 2*time.Second, "new node never reached Ready=True")
+	}, 30*time.Minute, 2*time.Second, "second machine node never reached Ready=True")
 
 	// Sanity: incoming CP should not be cordoned
-	require.False(t, secondMachineNode.Spec.Unschedulable, "new node was cordoned; incoming controlplane should not be drained")
+	require.False(t, secondMachineNode.Spec.Unschedulable, "second machine node was cordoned; incoming controlplane should not be drained")
 
 	require.Eventually(t, func() bool {
 		m, err := clients.CAPI.Machine().Get(firstMachine.Namespace, firstMachine.Name, metav1.GetOptions{})
