@@ -3,11 +3,11 @@ package secrets
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/utils"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,7 +32,7 @@ func CleanupClientSecrets(secretInterface wcorev1.SecretController, config *v3.A
 		}
 	}
 
-	if utils.Contains(tokens.PerUserCacheProviders, config.Name) {
+	if slices.Contains(tokens.PerUserCacheProviders, config.Name) {
 		err := CleanupOAuthTokens(secretInterface, config.Name)
 		result = errors.Join(result, err)
 	}
