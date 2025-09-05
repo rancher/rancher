@@ -127,7 +127,7 @@ require (
 	github.com/rancher/gke-operator v1.12.1
 	github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1
 	github.com/rancher/kubernetes-provider-detector v0.1.5
-	github.com/rancher/lasso v0.2.3
+	github.com/rancher/lasso v0.2.4
 	github.com/rancher/machine v0.15.0-rancher131
 	github.com/rancher/norman v0.6.1
 	github.com/rancher/rancher/pkg/client v0.0.0
