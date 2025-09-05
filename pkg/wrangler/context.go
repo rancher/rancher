@@ -177,6 +177,16 @@ type MultiClusterManager interface {
 	K8sClient(clusterName string) (kubernetes.Interface, error)
 }
 
+// OnLeaderOrDie this function will be called when leadership is acquired or die if failed. Eg:
+// Name convention: "file_name-function" or "file_name-function::additional_context".
+// if OnLeaderOrDie is called more than once by the same origin, add an additional context to the name
+// (eg, "rancher-start::dashboarddata")
+// if OnLeaderOrDie is called only once inform the origin
+// (eg,"nodedriver-register")
+func (w *Context) OnLeaderOrDie(name string, f func(ctx context.Context) error) {
+	w.leadership.OnLeaderOrDie(name, f)
+}
+
 func (w *Context) OnLeader(f func(ctx context.Context) error) {
 	w.leadership.OnLeader(f)
 }
@@ -414,7 +424,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 	}
 
 	leadership := leader.NewManager("", "cattle-controllers", k8s)
-	leadership.OnLeader(func(ctx context.Context) error {
+	leadership.OnLeaderOrDie("wrangler-newContext", func(ctx context.Context) error {
 		if peerManager != nil {
 			peerManager.Leader()
 		}
