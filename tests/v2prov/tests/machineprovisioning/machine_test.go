@@ -714,11 +714,6 @@ func Test_Provisioning_Single_Node_All_Roles_Drain(t *testing.T) {
 	require.NotEmpty(t, oldHash, "old machine missing template-hash label")
 
 	// Create a fresh machine config we can mutate.
-	// Rationale:
-	// - The pool rolls only when the referenced machine-config (template) changes,
-	//   which updates the machine-template-hash label.
-	// - Using the Pod driver here gives us a simple config that exposes `userdata`,
-	//   so we can force a harmless template change without altering node behavior.
 	newCfgRef, err := nodeconfig.NewPodConfig(clients, c.Namespace)
 	require.NoError(t, err)
 
@@ -731,10 +726,7 @@ func Test_Provisioning_Single_Node_All_Roles_Drain(t *testing.T) {
 	ud, ok := unstructuredString(pc.Object, "userdata")
 	require.True(t, ok)
 
-	// Force a no-op template diff:
-	// Appending a comment to `userdata` changes the PodConfig spec enough to
-	// produce a new machine-template-hash, which triggers a rollout and exercises
-	// the drain-on-config upgrade flow, without changing runtime behavior.
+	// Force a no-op template diff
 	pc.Object["userdata"] = ud + `# Noop Change`
 
 	_, err = clients.Dynamic.Resource(gvrPodCfg).Namespace(c.Namespace).Update(ctx, pc, metav1.UpdateOptions{})
