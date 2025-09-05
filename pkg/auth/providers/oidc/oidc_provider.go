@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
 	"reflect"
 	"slices"
 	"strings"
@@ -52,7 +54,8 @@ type OpenIDCProvider struct {
 	AuthConfigs v3.AuthConfigInterface
 	Secrets     wcorev1.SecretController
 	UserMGR     user.Manager
-	TokenMGR    tokenManager
+	TokenMgr    tokenManager
+	GetConfig   func() (*v32.OIDCConfig, error)
 }
 
 type ClaimInfo struct {
@@ -64,29 +67,26 @@ type ClaimInfo struct {
 	Email             string   `json:"email"`
 	Groups            []string `json:"groups"`
 	FullGroupPath     []string `json:"full_group_path"`
+
 	// https://openid.net/specs/openid-connect-core-1_0.html#rfc.section.2
-	ACR   string   `json:"acr"`
+	ACR string `json:"acr"`
+
 	Roles []string `json:"roles"`
 }
 
-func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
-	return &OpenIDCProvider{
+func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, TokenMgr *tokens.Manager) common.AuthProvider {
+	p := &OpenIDCProvider{
 		Name:        Name,
 		Type:        client.OIDCConfigType,
 		CTX:         ctx,
 		AuthConfigs: mgmtCtx.Management.AuthConfigs(""),
 		Secrets:     mgmtCtx.Wrangler.Core.Secret(),
 		UserMGR:     userMGR,
-		TokenMGR:    tokenMGR,
+		TokenMgr:    TokenMgr,
 	}
-}
 
-func (o *OpenIDCProvider) LogoutAll(apiContext *types.APIContext, _ accessor.TokenAccessor) error {
-	return nil
-}
-
-func (o *OpenIDCProvider) Logout(apiContext *types.APIContext, _ accessor.TokenAccessor) error {
-	return nil
+	p.GetConfig = p.GetOIDCConfig
+	return p
 }
 
 func (o *OpenIDCProvider) GetName() string {
@@ -114,11 +114,12 @@ func (o *OpenIDCProvider) LoginUser(ctx context.Context, oauthLoginInfo *v32.OID
 	var err error
 
 	if config == nil {
-		config, err = o.GetOIDCConfig()
+		config, err = o.GetConfig()
 		if err != nil {
 			return userPrincipal, nil, "", userClaimInfo, err
 		}
 	}
+
 	userInfo, oauth2Token, err := o.getUserInfoFromAuthCode(&ctx, config, oauthLoginInfo.Code, &userClaimInfo, "")
 	if err != nil {
 		return userPrincipal, groupPrincipals, "", userClaimInfo, err
@@ -141,7 +142,8 @@ func (o *OpenIDCProvider) LoginUser(ctx context.Context, oauthLoginInfo *v32.OID
 	if err != nil {
 		return userPrincipal, groupPrincipals, "", userClaimInfo, err
 	}
-	return userPrincipal, groupPrincipals, string(oauthToken), userClaimInfo, nil
+
+	return userPrincipal, groupPrincipals, string(oauthToken), userClaimInfo, err
 }
 
 func (o *OpenIDCProvider) SearchPrincipals(searchValue, principalType string, token accessor.TokenAccessor) ([]v3.Principal, error) {
@@ -220,7 +222,7 @@ func (o *OpenIDCProvider) getRedirectURL(config map[string]interface{}) string {
 func (o *OpenIDCProvider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
 	var groupPrincipals []v3.Principal
 
-	config, err := o.GetOIDCConfig()
+	config, err := o.GetConfig()
 	if err != nil {
 		logrus.Errorf("[generic oidc] refetchGroupPrincipals: error fetching OIDCConfig: %v", err)
 		return groupPrincipals, err
@@ -244,7 +246,7 @@ func (o *OpenIDCProvider) RefetchGroupPrincipals(principalID string, secret stri
 }
 
 func (o *OpenIDCProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
-	config, err := o.GetOIDCConfig()
+	config, err := o.GetConfig()
 	if err != nil {
 		logrus.Errorf("[generic oidc] canAccessWithGroupProviders: error fetching OIDCConfig: %v", err)
 		return false, err
@@ -297,14 +299,14 @@ func (o *OpenIDCProvider) toPrincipalFromToken(principalType string, princ v3.Pr
 	} else {
 		princ.PrincipalType = GroupType
 		if token != nil {
-			princ.MemberOf = o.TokenMGR.IsMemberOf(token, princ)
+			princ.MemberOf = o.TokenMgr.IsMemberOf(token, princ)
 		}
 	}
 	return princ
 }
 
 func (o *OpenIDCProvider) saveOIDCConfig(config *v32.OIDCConfig) error {
-	storedOidcConfig, err := o.GetOIDCConfig()
+	storedOidcConfig, err := o.GetConfig()
 	if err != nil {
 		return err
 	}
@@ -612,13 +614,13 @@ func (o *OpenIDCProvider) UpdateToken(refreshedToken *oauth2.Token, userID strin
 		return err
 	}
 	logrus.Debugf("[generic oidc] UpdateToken: saving refreshed access token")
-	o.TokenMGR.UpdateSecret(userID, o.Name, string(marshalledToken))
+	o.TokenMgr.UpdateSecret(userID, o.Name, string(marshalledToken))
 	return err
 }
 
 // IsDisabledProvider checks if the OIDC auth provider is currently disabled in Rancher.
 func (o *OpenIDCProvider) IsDisabledProvider() (bool, error) {
-	oidcConfig, err := o.GetOIDCConfig()
+	oidcConfig, err := o.GetConfig()
 	if err != nil {
 		return false, err
 	}
@@ -658,6 +660,77 @@ func (o *OpenIDCProvider) getOIDCProvider(ctx context.Context, oidcConfig *v32.O
 	}
 	// This will perform discovery in the oidc library
 	return oidc.NewProvider(ctx, oidcConfig.Issuer)
+}
+
+func (o *OpenIDCProvider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+	providerName := token.GetAuthProvider()
+	logrus.Debugf("OpenIDCProvider [logout]: triggered by provider %s", providerName)
+	oidcConfig, err := o.GetConfig()
+	if err != nil {
+		return fmt.Errorf("getting config for OIDC Logout: %w", err)
+	}
+	if oidcConfig.LogoutAllForced {
+		logrus.Debugf("OpenIDCProvider [logout]: Rancher provider resource `%v` configured for forced SLO, rejecting regular logout", providerName)
+		return fmt.Errorf("OpenIDCProvider [logout]: Rancher provider resource `%v` configured for forced SLO, rejecting regular logout", providerName)
+	}
+
+	return nil
+}
+
+func (o *OpenIDCProvider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+	logrus.Debugf("OpenIDCProvider [logout-all]: triggered by provider %s", token.GetAuthProvider())
+	oidcConfig, err := o.GetConfig()
+	if err != nil {
+		return err
+	}
+
+	idpRedirectURL, err := o.createIDPRedirectURL(apiContext, oidcConfig)
+	if err != nil {
+		return err
+	}
+
+	data := map[string]interface{}{
+		"idpRedirectUrl": idpRedirectURL,
+		"type":           "oidcConfigLogoutOutput",
+	}
+	apiContext.WriteResponse(http.StatusOK, data)
+
+	return nil
+}
+
+func (o *OpenIDCProvider) createIDPRedirectURL(apiContext *types.APIContext, config *v32.OIDCConfig) (string, error) {
+	if config.EndSessionEndpoint == "" {
+		logrus.Debug("OIDC: LogoutAll not redirecting without endSessionEndpoint")
+		return "", nil
+	}
+
+	idpRedirectURL, err := url.Parse(config.EndSessionEndpoint)
+	if err != nil {
+		logrus.Infof("OIDC: failed parsing end session endpoint: %v", err)
+		return "", err
+	}
+
+	oidcLogout := &v32.OIDCConfigLogoutInput{}
+	r := apiContext.Request
+	if err := json.NewDecoder(r.Body).Decode(oidcLogout); err != nil {
+		return "", httperror.NewAPIError(httperror.InvalidBodyContent,
+			fmt.Sprintf("OIDC: parsing request body: %v", err))
+	}
+
+	// https://openid.net/specs/openid-connect-rpinitiated-1_0.html#rfc.section.2
+	params := idpRedirectURL.Query()
+	// If there's no post_logout_redirect_uri then it will redirect to the
+	// redirect_uri for the client ID (or
+	if oidcLogout.FinalRedirectURL != "" {
+		params.Set("post_logout_redirect_uri", oidcLogout.FinalRedirectURL)
+	}
+
+	// This triggers logout without an id_token_hint.
+	params.Set("client_id", config.ClientID)
+
+	idpRedirectURL.RawQuery = params.Encode()
+
+	return idpRedirectURL.String(), nil
 }
 
 func isValidACR(claimACR string, configuredACR string) bool {
