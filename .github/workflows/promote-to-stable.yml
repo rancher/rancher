@@ -62,7 +62,7 @@ jobs:
         with:
           credentials_json: ${{ env.GOOGLE_AUTH }}
       - name: Upload
-        uses: google-github-actions/upload-cloud-storage@386ab77f37fdf51c0e38b3d229fad286861cc0d0 # v2
+        uses: google-github-actions/upload-cloud-storage@c0f6160ff80057923ff50e5e567695cea181ec23 # v2
         with:
           destination: releases.rancher.com/server-charts
           path: ./bin/chart
