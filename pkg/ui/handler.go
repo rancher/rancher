@@ -16,7 +16,6 @@ var (
 		settings.UIDashboardPath.Get,
 		settings.UIOfflinePreferred.Get)
 	emberIndex = ember.IndexFile()
-	vueIndex   = vue.IndexFile()
 )
 
 func newHandler(
@@ -24,9 +23,10 @@ func newHandler(
 	pathSetting func() string,
 	offlineSetting func() string) *ui.Handler {
 	return ui.NewUIHandler(&ui.Options{
-		Index:          indexSetting,
-		Offline:        offlineSetting,
-		Path:           pathSetting,
-		ReleaseSetting: settings.IsRelease,
+		Index:               indexSetting,
+		Offline:             offlineSetting,
+		Path:                pathSetting,
+		ReleaseSetting:      settings.IsRelease,
+		APIUIVersionSetting: settings.APIUIVersion.Get,
 	})
 }
