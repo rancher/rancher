@@ -47,8 +47,8 @@ require (
 	github.com/rancher/rke v1.8.5
 	github.com/rancher/wrangler/v3 v3.2.3
 	github.com/sirupsen/logrus v1.9.3
-	k8s.io/api v0.33.1
-	k8s.io/apimachinery v0.33.1
+	k8s.io/api v0.33.4
+	k8s.io/apimachinery v0.33.4
 	sigs.k8s.io/cluster-api v1.9.5
 )
 
