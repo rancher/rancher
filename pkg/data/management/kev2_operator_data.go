@@ -55,7 +55,7 @@ func (c *driverCreator) syncKEv2OperatorsSetting() error {
 			if errors.IsNotFound(err) {
 				continue
 			}
-			isActive = false
+			return err
 		} else if driver != nil && !driver.Spec.Active {
 			isActive = false
 		}
