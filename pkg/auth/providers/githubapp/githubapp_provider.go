@@ -39,13 +39,13 @@ const (
 
 type githubClient interface {
 	getAccessToken(ctx context.Context, code string, config *cattlev3.GithubAppConfig) (string, error)
-	getUser(ctx context.Context, githubAccessToken string, config *cattlev3.GithubAppConfig) (Account, error)
-	getOrgsForUser(ctx context.Context, username string, config *cattlev3.GithubAppConfig) ([]Account, error)
-	getTeamsForUser(ctx context.Context, username string, config *cattlev3.GithubAppConfig) ([]Account, error)
-	searchUsers(ctx context.Context, searchTerm, searchType string, config *cattlev3.GithubAppConfig) ([]Account, error)
-	searchTeams(ctx context.Context, searchTerm string, config *cattlev3.GithubAppConfig) ([]Account, error)
-	getUserOrgByID(ctx context.Context, id int, config *cattlev3.GithubAppConfig) (Account, error)
-	getTeamByID(ctx context.Context, id int, config *cattlev3.GithubAppConfig) (Account, error)
+	getUser(ctx context.Context, githubAccessToken string, config *cattlev3.GithubAppConfig) (common.GitHubAccount, error)
+	getOrgsForUser(ctx context.Context, username string, config *cattlev3.GithubAppConfig) ([]common.GitHubAccount, error)
+	getTeamsForUser(ctx context.Context, username string, config *cattlev3.GithubAppConfig) ([]common.GitHubAccount, error)
+	searchUsers(ctx context.Context, searchTerm, searchType string, config *cattlev3.GithubAppConfig) ([]common.GitHubAccount, error)
+	searchTeams(ctx context.Context, searchTerm string, config *cattlev3.GithubAppConfig) ([]common.GitHubAccount, error)
+	getUserOrgByID(ctx context.Context, id int, config *cattlev3.GithubAppConfig) (common.GitHubAccount, error)
+	getTeamByID(ctx context.Context, id int, config *cattlev3.GithubAppConfig) (common.GitHubAccount, error)
 }
 
 type tokensManager interface {
@@ -61,22 +61,19 @@ type userManager interface {
 }
 
 type ghAppProvider struct {
-	ctx           context.Context
-	authConfigs   v3.AuthConfigInterface
-	secrets       wcorev1.SecretController
-	getConfig     func() (*cattlev3.GithubAppConfig, error)
-	githubClient  githubClient
-	userManager   userManager
-	tokenMGR      tokensManager
-	appDataLoader func(ctx context.Context, appID int64, privateKey []byte, installationID int64, endpoint string) (*gitHubAppData, error)
+	authConfigs  v3.AuthConfigInterface
+	secrets      wcorev1.SecretController
+	getConfig    func() (*cattlev3.GithubAppConfig, error)
+	githubClient githubClient
+	userManager  userManager
+	tokenMGR     tokensManager
 }
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userManager user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
 	provider := &ghAppProvider{
-		ctx:          ctx,
 		authConfigs:  mgmtCtx.Management.AuthConfigs(""),
 		secrets:      mgmtCtx.Wrangler.Core.Secret(),
-		githubClient: &githubAppClient{httpClient: http.DefaultClient},
+		githubClient: &githubAppClient{httpClient: common.NewHTTPClientWithTimeouts()},
 		userManager:  userManager,
 		tokenMGR:     tokenMGR,
 	}
@@ -124,7 +121,6 @@ func (g *ghAppProvider) AuthenticateUser(ctx context.Context, input interface{})
 
 func (g *ghAppProvider) LoginUser(host string, githubCredential *cattlev3.GithubLogin, config *cattlev3.GithubAppConfig, test bool) (v3.Principal, []v3.Principal, string, error) {
 	var err error
-
 	if config == nil {
 		config, err = g.getConfig()
 		if err != nil {
@@ -299,7 +295,7 @@ func (g *ghAppProvider) GetPrincipal(principalID string, token accessor.TokenAcc
 	}
 }
 
-func (g *ghAppProvider) toPrincipal(principalType string, acct Account, token accessor.TokenAccessor) v3.Principal {
+func (g *ghAppProvider) toPrincipal(principalType string, acct common.GitHubAccount, token accessor.TokenAccessor) v3.Principal {
 	displayName := acct.Name
 	if displayName == "" {
 		displayName = acct.Login
