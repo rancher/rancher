@@ -15,6 +15,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -142,7 +143,7 @@ func TestGitHubAppData(t *testing.T) {
 		assert.Empty(t, orgs)
 
 		// Does not include the third Organisation
-		want := []Account{
+		want := []common.GitHubAccount{
 			{
 				Login:     "example",
 				ID:        1234567,
@@ -161,12 +162,12 @@ func TestGitHubAppData(t *testing.T) {
 		}
 
 		orgs = data.listOrgsForUser("test-user")
-		slices.SortFunc(orgs, func(a, b Account) int {
+		slices.SortFunc(orgs, func(a, b common.GitHubAccount) int {
 			return strings.Compare(a.Login, b.Login)
 		})
 		assert.Equal(t, want, orgs)
 
-		want = []Account{
+		want = []common.GitHubAccount{
 			{
 				ID:        2345678,
 				Login:     "other-org",
@@ -177,14 +178,14 @@ func TestGitHubAppData(t *testing.T) {
 		}
 
 		orgs = data.listOrgsForUser("test-user2")
-		slices.SortFunc(orgs, func(a, b Account) int {
+		slices.SortFunc(orgs, func(a, b common.GitHubAccount) int {
 			return strings.Compare(a.Login, b.Login)
 		})
 		assert.Equal(t, want, orgs)
 	})
 
 	t.Run("list all orgs", func(t *testing.T) {
-		want := []Account{
+		want := []common.GitHubAccount{
 			{
 				Login:     "example",
 				ID:        1234567,
@@ -209,14 +210,14 @@ func TestGitHubAppData(t *testing.T) {
 			},
 		}
 		orgs := data.listOrgs()
-		slices.SortFunc(orgs, func(a, b Account) int {
+		slices.SortFunc(orgs, func(a, b common.GitHubAccount) int {
 			return strings.Compare(a.Login, b.Login)
 		})
 		assert.Equal(t, want, orgs)
 	})
 
 	t.Run("teams for user", func(t *testing.T) {
-		want := []Account{
+		want := []common.GitHubAccount{
 			{
 				ID:        45678,
 				Login:     "admin-team",
@@ -247,13 +248,13 @@ func TestGitHubAppData(t *testing.T) {
 			},
 		}
 		accounts := data.listTeamsForUser("test-user")
-		slices.SortFunc(accounts, func(a, b Account) int {
+		slices.SortFunc(accounts, func(a, b common.GitHubAccount) int {
 			return strings.Compare(a.Login, b.Login)
 		})
 
 		assert.Equal(t, want, accounts)
 
-		want = []Account{
+		want = []common.GitHubAccount{
 			{
 				ID:        34579,
 				Login:     "admin-team2",
@@ -270,14 +271,14 @@ func TestGitHubAppData(t *testing.T) {
 			},
 		}
 		accounts = data.listTeamsForUser("test-user2")
-		slices.SortFunc(accounts, func(a, b Account) int {
+		slices.SortFunc(accounts, func(a, b common.GitHubAccount) int {
 			return strings.Compare(a.Login, b.Login)
 		})
 		assert.Equal(t, want, accounts)
 	})
 
 	t.Run("list all teams", func(t *testing.T) {
-		want := []Account{
+		want := []common.GitHubAccount{
 			{
 				ID:        45678,
 				Login:     "admin-team",
@@ -309,7 +310,7 @@ func TestGitHubAppData(t *testing.T) {
 		}
 
 		teams := data.listTeams()
-		slices.SortFunc(teams, func(a, b Account) int {
+		slices.SortFunc(teams, func(a, b common.GitHubAccount) int {
 			return strings.Compare(a.Login, b.Login)
 		})
 		assert.Equal(t, want, teams)
@@ -319,7 +320,7 @@ func TestGitHubAppData(t *testing.T) {
 		members := data.searchMembers("unknown")
 		assert.Empty(t, members)
 
-		want := []Account{
+		want := []common.GitHubAccount{
 			{
 				ID:        1002,
 				Login:     "test-user2",
@@ -331,12 +332,12 @@ func TestGitHubAppData(t *testing.T) {
 		}
 
 		members = data.searchMembers("test-user2")
-		slices.SortFunc(members, func(a, b Account) int {
+		slices.SortFunc(members, func(a, b common.GitHubAccount) int {
 			return strings.Compare(a.Login, b.Login)
 		})
 		assert.Equal(t, want, members)
 
-		want = []Account{
+		want = []common.GitHubAccount{
 			{
 				ID:        1001,
 				Login:     "test-user",
@@ -355,7 +356,7 @@ func TestGitHubAppData(t *testing.T) {
 			},
 		}
 		members = data.searchMembers("test-user")
-		slices.SortFunc(members, func(a, b Account) int {
+		slices.SortFunc(members, func(a, b common.GitHubAccount) int {
 			return strings.Compare(a.Login, b.Login)
 		})
 		assert.Equal(t, want, members)
@@ -365,7 +366,7 @@ func TestGitHubAppData(t *testing.T) {
 		teams := data.searchTeams("unknown")
 		assert.Empty(t, teams)
 
-		want := []Account{
+		want := []common.GitHubAccount{
 			{
 				ID:        34567,
 				Login:     "dev-team",
@@ -383,12 +384,12 @@ func TestGitHubAppData(t *testing.T) {
 		}
 
 		teams = data.searchTeams("dev-team")
-		slices.SortFunc(teams, func(a, b Account) int {
+		slices.SortFunc(teams, func(a, b common.GitHubAccount) int {
 			return strings.Compare(a.Login, b.Login)
 		})
 		assert.Equal(t, want, teams)
 
-		want = []Account{
+		want = []common.GitHubAccount{
 			{
 				ID:        23468,
 				Login:     "dev-team2",
@@ -403,7 +404,7 @@ func TestGitHubAppData(t *testing.T) {
 	})
 
 	t.Run("search orgs", func(t *testing.T) {
-		want := []Account{
+		want := []common.GitHubAccount{
 			{
 
 				ID:        2345678,
@@ -414,12 +415,12 @@ func TestGitHubAppData(t *testing.T) {
 			},
 		}
 		orgs := data.searchOrgs("other")
-		slices.SortFunc(orgs, func(a, b Account) int {
+		slices.SortFunc(orgs, func(a, b common.GitHubAccount) int {
 			return strings.Compare(a.Login, b.Login)
 		})
 		assert.Equal(t, want, orgs)
 
-		want = []Account{
+		want = []common.GitHubAccount{
 			{
 				ID:        1234567,
 				Login:     "example",
@@ -436,7 +437,7 @@ func TestGitHubAppData(t *testing.T) {
 			},
 		}
 		orgs = data.searchOrgs("example")
-		slices.SortFunc(orgs, func(a, b Account) int {
+		slices.SortFunc(orgs, func(a, b common.GitHubAccount) int {
 			return strings.Compare(a.Login, b.Login)
 		})
 		assert.Equal(t, want, orgs)
@@ -447,7 +448,7 @@ func TestGitHubAppData(t *testing.T) {
 		assert.Nil(t, unknown)
 
 		member1 := data.findMemberByID(1001)
-		want1 := &Account{
+		want1 := &common.GitHubAccount{
 			ID:        1001,
 			Login:     "test-user",
 			Name:      "Test User",
@@ -458,7 +459,7 @@ func TestGitHubAppData(t *testing.T) {
 		assert.Equal(t, want1, member1)
 
 		member2 := data.findMemberByID(1002)
-		want2 := &Account{
+		want2 := &common.GitHubAccount{
 			ID:        1002,
 			Login:     "test-user2",
 			Name:      "Other User",
@@ -474,7 +475,7 @@ func TestGitHubAppData(t *testing.T) {
 		assert.Nil(t, unknown)
 
 		org1 := data.findOrgByID(1234567)
-		want1 := &Account{
+		want1 := &common.GitHubAccount{
 			Login:     "example",
 			ID:        1234567,
 			Name:      "Example Org",
@@ -484,7 +485,7 @@ func TestGitHubAppData(t *testing.T) {
 		assert.Equal(t, want1, org1)
 
 		org2 := data.findOrgByID(2345678)
-		want2 := &Account{
+		want2 := &common.GitHubAccount{
 			ID:        2345678,
 			Login:     "other-org",
 			Name:      "Other Org",
@@ -553,7 +554,7 @@ func TestTeamDataFromApp(t *testing.T) {
 		}
 		assert.Equal(t, want, data)
 
-		wantTeams := []Account{
+		wantTeams := []common.GitHubAccount{
 			{
 				ID:        12,
 				Login:     "example-team",
@@ -564,7 +565,7 @@ func TestTeamDataFromApp(t *testing.T) {
 		}
 
 		teams := data.listTeamsForUser("test-user")
-		slices.SortFunc(teams, func(a, b Account) int {
+		slices.SortFunc(teams, func(a, b common.GitHubAccount) int {
 			return strings.Compare(a.HTMLURL, b.HTMLURL)
 		})
 		assert.Equal(t, wantTeams, teams)
@@ -638,7 +639,7 @@ func TestTeamDataFromApp(t *testing.T) {
 		}
 		assert.Equal(t, want, data)
 
-		wantTeams := []Account{
+		wantTeams := []common.GitHubAccount{
 			{
 				ID:        12,
 				Login:     "example-team",
@@ -656,7 +657,7 @@ func TestTeamDataFromApp(t *testing.T) {
 		}
 
 		teams := data.listTeamsForUser("test-user")
-		slices.SortFunc(teams, func(a, b Account) int {
+		slices.SortFunc(teams, func(a, b common.GitHubAccount) int {
 			return strings.Compare(a.HTMLURL, b.HTMLURL)
 		})
 		assert.Equal(t, wantTeams, teams)
