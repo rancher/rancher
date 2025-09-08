@@ -347,8 +347,9 @@ type LocalConfig struct {
 type GithubConfig struct {
 	AuthConfig `json:",inline" mapstructure:",squash"`
 
-	Hostname     string `json:"hostname,omitempty" norman:"default=github.com" norman:"required"`
-	TLS          bool   `json:"tls,omitempty" norman:"notnullable,default=true" norman:"required"`
+	Hostname string `json:"hostname,omitempty" norman:"default=github.com,required"`
+	TLS      bool   `json:"tls,omitempty" norman:"notnullable,default=true,required"`
+
 	ClientID     string `json:"clientId,omitempty" norman:"required"`
 	ClientSecret string `json:"clientSecret,omitempty" norman:"required,type=password"`
 
@@ -373,13 +374,14 @@ type GithubConfigApplyInput struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 //
 // GithubAppConfig provides a combination of the GithubConfig and additional
-// fields to configure the app for synchronization of user data.
+// fields to configure the GitHub app for synchronization of user data.
 type GithubAppConfig struct {
 	AuthConfig `json:",inline" mapstructure:",squash"`
 
 	// Hostname is the API server for the GitHub installation.
-	Hostname     string `json:"hostname,omitempty" norman:"default=github.com" norman:"required"`
-	TLS          bool   `json:"tls,omitempty" norman:"notnullable,default=true" norman:"required"`
+	Hostname string `json:"hostname,omitempty" norman:"default=github.com,required"`
+	TLS      bool   `json:"tls,omitempty" norman:"notnullable,default=true,required"`
+
 	ClientID     string `json:"clientId,omitempty" norman:"required"`
 	ClientSecret string `json:"clientSecret,omitempty" norman:"required,type=password"`
 
@@ -395,7 +397,7 @@ type GithubAppConfig struct {
 	InstallationID string `json:"installationId,omitempty"`
 
 	// PrivateKey is a PEM format private key for signing requests.
-	PrivateKey string `json:"privateKey,omitempty" norman:"type=password" norman:"required"`
+	PrivateKey string `json:"privateKey,omitempty" norman:"type=password,required"`
 }
 
 type GithubAppConfigTestOutput struct {

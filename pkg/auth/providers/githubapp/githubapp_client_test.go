@@ -12,8 +12,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-github/v72/github"
+	"github.com/google/go-github/v73/github"
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2"
@@ -60,7 +61,7 @@ func TestGithubAppClientGetUser(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := Account{
+	want := common.GitHubAccount{
 		ID:        1234,
 		Login:     "octocat",
 		Name:      "monalisa octocat",
@@ -92,7 +93,7 @@ func TestGithubAppClientGetOrgsForUser(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []Account{
+	want := []common.GitHubAccount{
 		{
 			ID:        1,
 			Login:     "example-org-1",
@@ -108,7 +109,7 @@ func TestGithubAppClientGetOrgsForUser(t *testing.T) {
 			Type:      "Organization",
 		},
 	}
-	slices.SortFunc(orgs, func(a, b Account) int {
+	slices.SortFunc(orgs, func(a, b common.GitHubAccount) int {
 		return strings.Compare(a.Login, b.Login)
 	})
 	assert.Equal(t, want, orgs)
@@ -130,12 +131,12 @@ func TestGithubAppClientGetOrgsForUserNotProvidingInstallationID(t *testing.T) {
 
 	appClient := githubAppClient{httpClient: http.DefaultClient}
 	orgs, err := appClient.getOrgsForUser(context.Background(), "example", cfg)
-	slices.SortFunc(orgs, func(a, b Account) int {
+	slices.SortFunc(orgs, func(a, b common.GitHubAccount) int {
 		return strings.Compare(a.Login, b.Login)
 	})
 	require.NoError(t, err)
 
-	want := []Account{
+	want := []common.GitHubAccount{
 		{
 			ID:        1,
 			Login:     "example-org-1",
@@ -172,7 +173,7 @@ func TestGithubAppClientGetOrgsForUserProvidingInstallationID(t *testing.T) {
 	appClient := githubAppClient{httpClient: http.DefaultClient}
 	orgs, err := appClient.getOrgsForUser(context.Background(), "example", cfg)
 	require.NoError(t, err)
-	want := []Account{
+	want := []common.GitHubAccount{
 		{
 			ID:        1,
 			Login:     "example-org-1",
@@ -202,7 +203,7 @@ func TestGithubAppClientGetTeamsForUserNotProvidingInstallationID(t *testing.T) 
 	orgs, err := appClient.getTeamsForUser(context.Background(), "octocat", cfg)
 	require.NoError(t, err)
 
-	want := []Account{
+	want := []common.GitHubAccount{
 		{
 			ID:        1215,
 			Login:     "dev-team",
@@ -225,7 +226,7 @@ func TestGithubAppClientGetTeamsForUserNotProvidingInstallationID(t *testing.T) 
 			HTMLURL:   "https://github.com/orgs/example-org-1/test-team",
 		},
 	}
-	slices.SortFunc(orgs, func(a, b Account) int {
+	slices.SortFunc(orgs, func(a, b common.GitHubAccount) int {
 		return cmp.Compare(a.ID, b.ID)
 	})
 	assert.Equal(t, want, orgs)
@@ -250,7 +251,7 @@ func TestGithubAppClientGetTeamsForUserProvidingInstallationID(t *testing.T) {
 	orgs, err := appClient.getTeamsForUser(context.Background(), "octocat", cfg)
 	require.NoError(t, err)
 
-	want := []Account{
+	want := []common.GitHubAccount{
 		{
 			ID:        1215,
 			Login:     "dev-team",
@@ -266,7 +267,7 @@ func TestGithubAppClientGetTeamsForUserProvidingInstallationID(t *testing.T) {
 			HTMLURL:   "https://github.com/orgs/example-org-1/test-team",
 		},
 	}
-	slices.SortFunc(orgs, func(a, b Account) int {
+	slices.SortFunc(orgs, func(a, b common.GitHubAccount) int {
 		return cmp.Compare(a.ID, b.ID)
 	})
 	assert.Equal(t, want, orgs)
