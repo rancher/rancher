@@ -80,7 +80,6 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	p = githubapp.Configure(ctx, mgmt, userMGR, tokenMGR)
 	ProviderNames[githubapp.Name] = true
 	providersWithSecrets[githubapp.Name] = true
-	UnrefreshableProviders[githubapp.Name] = true
 	Providers[githubapp.Name] = p
 	providersByType[client.GithubAppConfigType] = p
 	providersByType[publicclient.GithubAppProviderType] = p
