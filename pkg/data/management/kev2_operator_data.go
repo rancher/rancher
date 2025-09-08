@@ -11,14 +11,15 @@ import (
 )
 
 type KEv2OperatorInfo struct {
-	Name   string `json:"name"`
-	Active bool   `json:"active"`
+	Name          string `json:"name"`
+	OldDriverName string `json:"oldDriverName"`
+	Active        bool   `json:"active"`
 }
 
 var defaultKEv2Operators = map[string]KEv2OperatorInfo{
-	"aks": {Name: "aks", Active: true},
-	"eks": {Name: "eks", Active: true},
-	"gke": {Name: "gke", Active: true},
+	"aks": {Name: "aks", OldDriverName: "azureKubernetesService", Active: true},
+	"eks": {Name: "eks", OldDriverName: "amazonElasticContainerService", Active: true},
+	"gke": {Name: "gke", OldDriverName: "googleElasticContainerService", Active: true},
 }
 
 func addKEv2OperatorSchemas(management *config.ManagementContext) error {
@@ -48,14 +49,15 @@ func (c *driverCreator) syncKEv2OperatorsSetting() error {
 	}
 
 	for operatorKey, operatorInfo := range existingOperators {
-		_, err := c.driversLister.Get("", operatorKey)
+		driver, err := c.driversLister.Get("", operatorInfo.OldDriverName)
 		isActive := true
 		if err != nil {
 			if errors.IsNotFound(err) {
-				isActive = false
-			} else {
-				return fmt.Errorf("error getting KEv1 driver %q: %w", operatorKey, err)
+				continue
 			}
+			isActive = false
+		} else if driver != nil && !driver.Spec.Active {
+			isActive = false
 		}
 
 		if operatorInfo.Active != isActive {
