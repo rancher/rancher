@@ -55,7 +55,6 @@ func (m *fakeTokensManager) UserAttributeCreateOrUpdate(userID, provider string,
 
 func TestLogOutAll(t *testing.T) {
 	provider := ghAppProvider{
-		ctx:          context.Background(),
 		githubClient: &githubAppClient{httpClient: http.DefaultClient},
 		getConfig:    func() (*cattlev3.GithubAppConfig, error) { return nil, nil },
 	}
@@ -66,7 +65,6 @@ func TestLogOutAll(t *testing.T) {
 
 func TestLogOut(t *testing.T) {
 	provider := ghAppProvider{
-		ctx:          context.Background(),
 		githubClient: &githubAppClient{httpClient: http.DefaultClient},
 		getConfig:    func() (*cattlev3.GithubAppConfig, error) { return nil, nil },
 	}
@@ -77,7 +75,6 @@ func TestLogOut(t *testing.T) {
 
 func TestGetName(t *testing.T) {
 	provider := ghAppProvider{
-		ctx:          context.Background(),
 		githubClient: &githubAppClient{httpClient: http.DefaultClient},
 		getConfig:    func() (*cattlev3.GithubAppConfig, error) { return nil, nil },
 	}
@@ -93,7 +90,6 @@ func TestTransformToAuthProvider(t *testing.T) {
 	config := &cattlev3.GithubAppConfig{}
 
 	provider := ghAppProvider{
-		ctx:          context.Background(),
 		githubClient: &githubAppClient{httpClient: http.DefaultClient},
 		getConfig:    func() (*cattlev3.GithubAppConfig, error) { return config, nil },
 	}
@@ -162,7 +158,6 @@ func TestAuthenticateUser(t *testing.T) {
 		PrivateKey:   string(privateKey),
 	}
 	provider := ghAppProvider{
-		ctx:          context.Background(),
 		githubClient: &githubAppClient{httpClient: http.DefaultClient},
 		getConfig:    func() (*cattlev3.GithubAppConfig, error) { return config, nil },
 		userManager:  &fakeUserManager{},
@@ -274,7 +269,6 @@ func TestRefetchGroupPrincipals(t *testing.T) {
 		PrivateKey:   string(privateKey),
 	}
 	provider := ghAppProvider{
-		ctx:          context.Background(),
 		githubClient: &githubAppClient{httpClient: http.DefaultClient},
 		getConfig:    func() (*cattlev3.GithubAppConfig, error) { return config, nil },
 		userManager:  &fakeUserManager{},
@@ -365,7 +359,6 @@ func TestSearchPrincipals(t *testing.T) {
 		PrivateKey:   string(privateKey),
 	}
 	provider := ghAppProvider{
-		ctx:          context.Background(),
 		githubClient: &githubAppClient{httpClient: http.DefaultClient},
 		getConfig:    func() (*cattlev3.GithubAppConfig, error) { return config, nil },
 		userManager:  &fakeUserManager{},
@@ -506,7 +499,6 @@ func TestGetPrincipal(t *testing.T) {
 		PrivateKey:   string(privateKey),
 	}
 	provider := ghAppProvider{
-		ctx:          context.Background(),
 		githubClient: &githubAppClient{httpClient: http.DefaultClient},
 		getConfig:    func() (*cattlev3.GithubAppConfig, error) { return config, nil },
 		userManager:  &fakeUserManager{},
