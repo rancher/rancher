@@ -688,10 +688,11 @@ func (o *OpenIDCProvider) LogoutAll(apiContext *types.APIContext, token accessor
 	if err != nil {
 		return err
 	}
+	logrus.Debug("OpenIDCProvider [logout-all]: triggering logout redirect to ", idpRedirectURL)
 
 	data := map[string]interface{}{
 		"idpRedirectUrl": idpRedirectURL,
-		"type":           "oidcConfigLogoutOutput",
+		"type":           "authConfigLogoutOutput",
 	}
 	apiContext.WriteResponse(http.StatusOK, data)
 
@@ -710,9 +711,9 @@ func (o *OpenIDCProvider) createIDPRedirectURL(apiContext *types.APIContext, con
 		return "", err
 	}
 
-	oidcLogout := &v32.OIDCConfigLogoutInput{}
+	authLogout := &v32.AuthConfigLogoutInput{}
 	r := apiContext.Request
-	if err := json.NewDecoder(r.Body).Decode(oidcLogout); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(authLogout); err != nil {
 		return "", httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("OIDC: parsing request body: %v", err))
 	}
@@ -720,9 +721,9 @@ func (o *OpenIDCProvider) createIDPRedirectURL(apiContext *types.APIContext, con
 	// https://openid.net/specs/openid-connect-rpinitiated-1_0.html#rfc.section.2
 	params := idpRedirectURL.Query()
 	// If there's no post_logout_redirect_uri then it will redirect to the
-	// redirect_uri for the client ID (or
-	if oidcLogout.FinalRedirectURL != "" {
-		params.Set("post_logout_redirect_uri", oidcLogout.FinalRedirectURL)
+	// redirect_uri for the client ID.
+	if authLogout.FinalRedirectURL != "" {
+		params.Set("post_logout_redirect_uri", authLogout.FinalRedirectURL)
 	}
 
 	// This triggers logout without an id_token_hint.

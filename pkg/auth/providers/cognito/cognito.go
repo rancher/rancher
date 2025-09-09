@@ -82,7 +82,7 @@ func (s *CognitoProvider) LogoutAll(apiContext *types.APIContext, token accessor
 
 	data := map[string]interface{}{
 		"idpRedirectUrl": idpRedirectURL,
-		"type":           "oidcConfigLogoutOutput",
+		"type":           "authConfigLogoutOutput",
 	}
 	apiContext.WriteResponse(http.StatusOK, data)
 
@@ -103,16 +103,16 @@ func createIDPRedirectURL(apiContext *types.APIContext, config *v3.OIDCConfig) (
 			fmt.Sprintf("OIDC: parsing end session endpoint: %s", err))
 	}
 
-	oidcLogout := &v3.OIDCConfigLogoutInput{}
+	authLogout := &v3.AuthConfigLogoutInput{}
 	r := apiContext.Request
-	if err := json.NewDecoder(r.Body).Decode(oidcLogout); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(authLogout); err != nil {
 		return "", httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("OIDC: parsing request body: %s", err))
 	}
 
 	params := idpRedirectURL.Query()
 	params.Set("client_id", config.ClientID)
-	params.Set("logout_uri", oidcLogout.FinalRedirectURL)
+	params.Set("logout_uri", authLogout.FinalRedirectURL)
 	idpRedirectURL.RawQuery = params.Encode()
 
 	return idpRedirectURL.String(), nil

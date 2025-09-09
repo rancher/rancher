@@ -560,11 +560,11 @@ type SamlConfigTestOutput struct {
 	IdpRedirectURL string `json:"idpRedirectUrl"`
 }
 
-type SamlConfigLogoutInput struct {
+type AuthConfigLogoutInput struct {
 	FinalRedirectURL string `json:"finalRedirectUrl"`
 }
 
-type SamlConfigLogoutOutput struct {
+type AuthConfigLogoutOutput struct {
 	IdpRedirectURL string `json:"idpRedirectUrl"`
 }
 
@@ -638,14 +638,6 @@ type OIDCApplyInput struct {
 	OIDCConfig OIDCConfig `json:"oidcConfig,omitempty"`
 	Code       string     `json:"code,omitempty"`
 	Enabled    bool       `json:"enabled,omitempty"`
-}
-
-type OIDCConfigLogoutInput struct {
-	FinalRedirectURL string `json:"finalRedirectUrl"`
-}
-
-type OIDCConfigLogoutOutput struct {
-	IdpRedirectURL string `json:"idpRedirectUrl"`
 }
 
 type KeyCloakOIDCConfig struct {

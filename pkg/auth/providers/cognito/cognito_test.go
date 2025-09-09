@@ -32,7 +32,7 @@ func TestLogoutAll(t *testing.T) {
 			},
 		},
 	}
-	b, err := json.Marshal(&v3.OIDCConfigLogoutInput{
+	b, err := json.Marshal(&v3.AuthConfigLogoutInput{
 		FinalRedirectURL: "https://example.com/logged-out",
 	})
 	require.NoError(t, err)
@@ -50,7 +50,7 @@ func TestLogoutAll(t *testing.T) {
 	require.NoError(t, o.LogoutAll(apiContext, testToken))
 	wantData := map[string]any{
 		"idpRedirectUrl": "http://localhost:8090/user/logout?client_id=test&logout_uri=https%3A%2F%2Fexample.com%2Flogged-out",
-		"type":           "oidcConfigLogoutOutput",
+		"type":           "authConfigLogoutOutput",
 	}
 
 	require.Equal(t, []normanResponse{{code: http.StatusOK, data: wantData}}, nr.responses)
@@ -71,7 +71,7 @@ func TestLogoutAllNoEndSessionEndpoint(t *testing.T) {
 			},
 		},
 	}
-	b, err := json.Marshal(&v3.OIDCConfigLogoutInput{
+	b, err := json.Marshal(&v3.AuthConfigLogoutInput{
 		FinalRedirectURL: "https://example.com/logged-out",
 	})
 	require.NoError(t, err)
@@ -88,7 +88,7 @@ func TestLogoutAllNoEndSessionEndpoint(t *testing.T) {
 	require.NoError(t, o.LogoutAll(apiContext, testToken))
 	wantData := map[string]any{
 		"idpRedirectUrl": "",
-		"type":           "oidcConfigLogoutOutput",
+		"type":           "authConfigLogoutOutput",
 	}
 	require.Equal(t, []normanResponse{{code: http.StatusOK, data: wantData}}, nr.responses)
 }
@@ -127,7 +127,7 @@ func TestLogout(t *testing.T) {
 				},
 			}
 
-			b, err := json.Marshal(&v3.OIDCConfigLogoutInput{
+			b, err := json.Marshal(&v3.AuthConfigLogoutInput{
 				FinalRedirectURL: "https://example.com/logged-out",
 			})
 			require.NoError(t, err)
