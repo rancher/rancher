@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 
 	mgmgv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/telemetry"
@@ -12,9 +13,15 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 )
 
-func RegisterControllers(ctx context.Context, wContext *wrangler.Context, telemetrManager telemetry.TelemetryExporterManager) error {
+var systemProjectLabels = labels.Set{
+	"authz.management.cattle.io/system-project": "true",
+}
+
+func RegisterControllers(ctx context.Context, wContext *wrangler.Context, telemetryManager telemetry.TelemetryExporterManager) error {
 	// TODO(dan): we could do k8s RBAC bindings here instead of this
-	projects, err := wContext.Mgmt.Project().List("local", v1.ListOptions{})
+	projects, err := wContext.Mgmt.Project().List("local", v1.ListOptions{
+		LabelSelector: systemProjectLabels.String(),
+	})
 	if err != nil {
 		return fmt.Errorf("failed to register telemetry controllers: %w", err)
 	}
@@ -37,7 +44,7 @@ func RegisterControllers(ctx context.Context, wContext *wrangler.Context, teleme
 		systemProject,
 		wContext.Core.Namespace(),
 		wContext.Core.Secret(),
-		telemetrManager,
+		telemetryManager,
 	)
 
 	return nil
