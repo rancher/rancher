@@ -43,6 +43,11 @@ jobs:
         uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
       - name: testdata
         run: mkdir -p build/testdata
+      - name: Check inotify limits
+        run: |
+          echo "fs.inotify.max_user_instances=$(cat /proc/sys/fs/inotify/max_user_instances)"
+          echo "fs.inotify.max_user_watches=$(cat /proc/sys/fs/inotify/max_user_watches)"
+          echo "fs.file-max=$(cat /proc/sys/fs/file-max)"
       - name: Install Dapper
         run: |
           curl -sL https://releases.rancher.com/dapper/latest/dapper-$(uname -s)-$(uname -m) > ./.dapper
