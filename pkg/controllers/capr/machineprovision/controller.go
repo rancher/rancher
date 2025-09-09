@@ -567,7 +567,8 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 
 	if failure {
 		// check if we need to delete or enqueue the capi machine if it fails
-		enqueueTime, err := h.infraMachineDeletionEnqueueingTime(infra)
+		deleteOnFailureAfter := parseDeleteOnFailureAfterSetting(infra)
+		enqueueTime, err := h.infraMachineDeletionEnqueueingTime(infra, deleteOnFailureAfter)
 		if err != nil {
 			return obj, err
 		}
@@ -631,6 +632,24 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 	})
 }
 
+func parseDeleteOnFailureAfterSetting(infra *infraObject) time.Duration {
+
+	deleteInfraTimeSetting := settings.DeleteInfraMachineOnFailureAfter.Get()
+
+	// default, nothing to do
+	if deleteInfraTimeSetting == "0s" {
+		return 0
+	}
+
+	deleteOnFailureAfter, err := time.ParseDuration(deleteInfraTimeSetting)
+	if err != nil {
+		logrus.Errorf("[machineprovision] %s/%s: error parsing the '%s' setting: %v, returning 0", infra.meta.GetNamespace(), infra.meta.GetName(), settings.DeleteInfraMachineOnFailureAfter.Name, err)
+		return 0
+	}
+
+	return deleteOnFailureAfter
+}
+
 // jobFailureTime returns the failedTime of the job. If no Job failure found, returns nil
 func jobFailureTime(job *batchv1.Job) *time.Time {
 	for _, jobCondition := range job.Status.Conditions {
@@ -645,20 +664,7 @@ func jobFailureTime(job *batchv1.Job) *time.Time {
 // infraMachineDeletionEnqueueingTime determines the duration we want to
 // keep the infraMachine alive for debugging purposes
 // based on job failure time and configured deletion settings.
-func (h *handler) infraMachineDeletionEnqueueingTime(infra *infraObject) (time.Duration, error) {
-
-	deleteInfraTimeSetting := settings.DeleteInfraMachineOnFailureAfter.Get()
-
-	// default, nothing to do
-	if deleteInfraTimeSetting == "0s" {
-		return 0, nil
-	}
-
-	deleteOnFailureAfter, err := time.ParseDuration(deleteInfraTimeSetting)
-	if err != nil {
-		logrus.Errorf("[machineprovision] %s/%s: error parsing the '%s' setting: %v, returning 0", infra.meta.GetNamespace(), infra.meta.GetName(), settings.DeleteInfraMachineOnFailureAfter.Name, err)
-		return 0, nil
-	}
+func (h *handler) infraMachineDeletionEnqueueingTime(infra *infraObject, deleteOnFailureAfter time.Duration) (time.Duration, error) {
 
 	if deleteOnFailureAfter < 0 {
 		return 0, nil
