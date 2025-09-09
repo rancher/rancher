@@ -770,20 +770,23 @@ func Test_Provisioning_Single_Node_All_Roles_Drain(t *testing.T) {
 	require.Eventually(t, func() bool {
 		m, err := clients.CAPI.Machine().Get(c.Namespace, secondMachineName, metav1.GetOptions{})
 		if err != nil || m.Status.NodeRef == nil {
+			t.Logf("Error getting second machine: %+v", err)
 			return false
 		}
 
 		secondMachineNode, err = clusterClients.Core.Node().Get(m.Status.NodeRef.Name, metav1.GetOptions{})
 		if err != nil {
+			t.Logf("Error getting second machine node: %+v", err)
 			return false
 		}
 		for _, cond := range secondMachineNode.Status.Conditions {
 			if cond.Type == corev1.NodeReady && cond.Status == corev1.ConditionTrue {
 				return true
 			}
+			t.Logf("Current Condition: %+v", cond)
 		}
 		return false
-	}, 30*time.Minute, 2*time.Second, "second machine node never reached Ready=True")
+	}, 15*time.Minute, 10*time.Second, "second machine node never reached Ready=True")
 
 	// Sanity: incoming CP should not be cordoned
 	require.False(t, secondMachineNode.Spec.Unschedulable, "second machine node was cordoned; incoming controlplane should not be drained")
