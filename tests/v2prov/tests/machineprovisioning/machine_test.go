@@ -679,6 +679,7 @@ func Test_Provisioning_Single_Node_All_Roles_Drain(t *testing.T) {
 			KubernetesVersion: defaults.SomeK8sVersion,
 			RKEConfig: &provisioningv1api.RKEConfig{
 				ClusterConfiguration: rkev1.ClusterConfiguration{
+					Registries: &rkev1.Registry{},
 					UpgradeStrategy: rkev1.ClusterUpgradeStrategy{
 						ControlPlaneDrainOptions: drainOptions,
 						ControlPlaneConcurrency:  "1",
