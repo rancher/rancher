@@ -18,6 +18,7 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 	management.Wrangler.Mgmt.GlobalRoleBinding().Cache().AddIndexer(grbSafeConcatIndex, grbSafeConcatIndexer)
 	management.Wrangler.Mgmt.GlobalRole().Cache().AddIndexer(grNsIndex, grNsIndexer)
 	management.Wrangler.Mgmt.GlobalRole().Cache().AddIndexer(grSafeConcatIndex, grSafeConcatIndexer)
+	management.Wrangler.Mgmt.GlobalRole().Cache().AddIndexer(grClusterRoleIndex, grClusterRoleIndexer)
 	enqueuer := globalRBACEnqueuer{
 		grbCache:      management.Wrangler.Mgmt.GlobalRoleBinding().Cache(),
 		grCache:       management.Wrangler.Mgmt.GlobalRole().Cache(),

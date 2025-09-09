@@ -153,6 +153,7 @@ func (gr *globalRoleLifecycle) Remove(obj *v3.GlobalRole) (runtime.Object, error
 }
 
 func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole) error {
+	fmt.Println("-----> reconcileGlobalRole triggered")
 	crName := getCRName(globalRole)
 	condition := metav1.Condition{
 		Type: ClusterRoleExists,

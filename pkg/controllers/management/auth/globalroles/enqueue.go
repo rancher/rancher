@@ -20,6 +20,7 @@ const (
 	grbGrIndex                 = "mgmt-auth-grb-gr-idex"
 	grNsIndex                  = "mgmt-auth-gr-ns-index"
 	grSafeConcatIndex          = "mgmt-auth-gr-concat-index"
+	grClusterRoleIndex         = "mgmt-auth-gr-cluster-role-index"
 	grbSafeConcatIndex         = "mgmt-auth-grb-concat-index"
 	grbEnqueuer                = "mgmt-auth-gr-enqueue"
 	clusterGrEnqueuer          = "mgmt-auth-cluster-gr"
@@ -55,6 +56,14 @@ func grbGrIndexer(grb *v3.GlobalRoleBinding) ([]string, error) {
 // grSafeConcatIndexer indexes a GlobalRole by the SafeConcat version of it's name
 func grSafeConcatIndexer(gr *v3.GlobalRole) ([]string, error) {
 	return []string{wrangler.SafeConcatName(gr.Name)}, nil
+}
+
+// grClusterRoleIndexer indexes a GlobalRole by clusterRoles
+func grClusterRoleIndexer(gr *v3.GlobalRole) ([]string, error) {
+	if gr == nil {
+		return nil, nil
+	}
+	return []string{getCRName(gr)}, nil
 }
 
 // grbSafeConcatIndexer indexes a GlobalRoleBinding by the SafeConcat version of it's name
@@ -277,16 +286,22 @@ func (g *globalRBACEnqueuer) clusterRoleEnqueueGR(_, _ string, obj runtime.Objec
 		logrus.Errorf("unable to convert object: %[1]v, type: %[1]T to a ClusterRole", obj)
 		return nil, nil
 	}
-	grOwner, ok := clusterRole.Labels[grOwnerLabel]
-	if !ok {
-		// this clusterRole isn't owned by a GRB, no need to enqueue a GRB
-		logrus.Debugf("clusterRole %s has no associated globalRole label, skipping enqueue", clusterRole.Name)
-		return nil, nil
-	}
-	grs, err := g.grCache.GetByIndex(grSafeConcatIndex, grOwner)
+	//grOwner, ok := clusterRole.Labels[grOwnerLabel]
+	//if !ok {
+	//	// this clusterRole isn't owned by a GRB, no need to enqueue a GRB
+	//	logrus.Debugf("clusterRole %s has no associated globalRole label, skipping enqueue", clusterRole.Name)
+	//	return nil, nil
+	//}
+	//grs, err := g.grCache.GetByIndex(grSafeConcatIndex, grOwner)
+	//if err != nil {
+	//	return nil, fmt.Errorf("unable to get GlobalRole %s for RoleBinding %s: %w", grOwner, clusterRole.Name, err)
+	//}
+	grs, err := g.grCache.GetByIndex(grClusterRoleIndex, clusterRole.Name)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get GlobalRole %s for RoleBinding %s: %w", grOwner, clusterRole.Name, err)
+		return nil, fmt.Errorf("unable to get GlobalRole %s for ClusterRole %s", clusterRole.Name, clusterRole.Name)
 	}
+
+	fmt.Println("---------> inside clusterRoleEnqueueGR, grs: ", grs)
 	grNames := make([]relatedresource.Key, 0, len(grs))
 	for _, gr := range grs {
 		// Set the status as InProgress since we have to reconcile the global role
