@@ -13,7 +13,7 @@ jobs:
       matrix:
         include:
         - V2PROV_TEST_DIST: "k3s"
-          V2PROV_TEST_RUN_REGEX: "Test_Provisioning_Single_Node_All_Roles_Drain"
+          V2PROV_TEST_RUN_REGEX: "^Test_(General|Provisioning|Fleet)_.*$"
         - V2PROV_TEST_DIST: "rke2"
           V2PROV_TEST_RUN_REGEX: "^Test_(General|Provisioning|Fleet)_.*$"
         - V2PROV_TEST_DIST: "k3s"
