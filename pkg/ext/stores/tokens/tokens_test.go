@@ -656,7 +656,7 @@ func Test_Store_Watch(t *testing.T) {
 
 		// bad event to ignore, plus bookmark to see
 		watcher := NewWatcherFor(
-			watch.Event{Object: &corev1.Namespace{}},
+			watch.Event{Object: &corev1.Namespace{}, Type: watch.Added},
 			watch.Event{Object: &properSecret, Type: watch.Bookmark},
 		)
 		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
@@ -691,7 +691,7 @@ func Test_Store_Watch(t *testing.T) {
 
 		// bad event to ignore, plus bookmark to see
 		watcher := NewWatcherFor(
-			watch.Event{Object: &corev1.Secret{}},
+			watch.Event{Object: &corev1.Secret{}, Type: watch.Added},
 			watch.Event{Object: &properSecret, Type: watch.Bookmark},
 		)
 		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
@@ -809,7 +809,7 @@ func Test_Store_Watch(t *testing.T) {
 		consumer.Stop()
 	})
 
-	t.Run("event for error is ignored", func(t *testing.T) {
+	t.Run("event for error is passed as-is", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
@@ -818,10 +818,9 @@ func Test_Store_Watch(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
 
-		// bad event to ignore, plus bookmark to see
+		// error event to see
 		watcher := NewWatcherFor(
 			watch.Event{Object: &corev1.Namespace{}, Type: watch.Error},
-			watch.Event{Object: &properSecret, Type: watch.Bookmark},
 		)
 		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
 			Return(watcher, nil)
@@ -834,11 +833,11 @@ func Test_Store_Watch(t *testing.T) {
 		consumer, err := store.watch(context.TODO(), &metav1.ListOptions{})
 		assert.Nil(t, err)
 
-		// receive bookmark event, preceding bad event is swallowed
+		// receive error event
 		event, more := (<-consumer.ResultChan())
 		assert.True(t, more)
-		assert.Equal(t, watch.Bookmark, event.Type)
-		assert.Equal(t, &ext.Token{ObjectMeta: metav1.ObjectMeta{ResourceVersion: ""}}, event.Object)
+		assert.Equal(t, watch.Error, event.Type)
+		assert.Equal(t, &corev1.Namespace{}, event.Object)
 
 		watcher.Done() // close backend channel - no further events
 		consumer.Stop()
