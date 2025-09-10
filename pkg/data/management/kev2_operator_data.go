@@ -22,7 +22,7 @@ var defaultKEv2Operators = map[string]KEv2OperatorInfo{
 	"gke": {Name: "gke", OldDriverName: "googleElasticContainerService", Active: true},
 }
 
-func addKEv2OperatorSchemas(management *config.ManagementContext) error {
+func syncOperatorDriverActiveState(management *config.ManagementContext) error {
 	creator := driverCreator{
 		driversLister: management.Management.KontainerDrivers("").Controller().Lister(),
 		drivers:       management.Management.KontainerDrivers(""),
@@ -34,7 +34,7 @@ func (c *driverCreator) syncKEv2OperatorsSetting() error {
 	existingSettingJSON := settings.KEv2Operators.Get()
 
 	existingOperators := map[string]KEv2OperatorInfo{}
-	if existingSettingJSON != "" {
+	if existingSettingJSON != "{}" {
 		if err := json.Unmarshal([]byte(existingSettingJSON), &existingOperators); err != nil {
 			existingOperators = map[string]KEv2OperatorInfo{}
 		}
@@ -53,8 +53,12 @@ func (c *driverCreator) syncKEv2OperatorsSetting() error {
 		isActive := true
 		if err != nil {
 			if errors.IsNotFound(err) {
+				// The old KontainerDriver for this operator no longer exists.
+				// This is expected since AKS/EKS/GKE are now managed by their respective operators.
+				// In this case we skip updating status instead of treating it as an error.
 				continue
 			}
+			// Any other error is unexpected and should be returned.
 			return err
 		} else if driver != nil && !driver.Spec.Active {
 			isActive = false
@@ -73,7 +77,7 @@ func (c *driverCreator) syncKEv2OperatorsSetting() error {
 	}
 	updatedSettingJSON := string(updatedSettingBytes)
 
-	if existingSettingJSON == "" || settingChanged || !jsonEqual(existingSettingJSON, updatedSettingJSON) {
+	if existingSettingJSON == "{}" || settingChanged || !jsonEqual(existingSettingJSON, updatedSettingJSON) {
 		settings.KEv2Operators.Set(updatedSettingJSON)
 	}
 
