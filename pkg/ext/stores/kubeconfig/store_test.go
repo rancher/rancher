@@ -13,6 +13,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"math/big"
+	"net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -1625,9 +1626,9 @@ func TestStoreWatch(t *testing.T) {
 		})
 
 		event := <-watcher.ResultChan()
-		assert.Equal(t, watch.Added, event.Type)
+		require.Equal(t, watch.Added, event.Type)
 		k, ok := event.Object.(*ext.Kubeconfig)
-		assert.True(t, ok)
+		require.True(t, ok)
 		assert.Equal(t, configMap1.Name, k.Name)
 
 		configMapWatcher.add(watch.Event{
@@ -1639,9 +1640,9 @@ func TestStoreWatch(t *testing.T) {
 			},
 		})
 		event = <-watcher.ResultChan()
-		assert.Equal(t, watch.Bookmark, event.Type)
+		require.Equal(t, watch.Bookmark, event.Type)
 		k, ok = event.Object.(*ext.Kubeconfig)
-		assert.True(t, ok)
+		require.True(t, ok)
 		assert.Equal(t, "1", k.ResourceVersion)
 
 		configMapWatcher.add(watch.Event{
@@ -1649,9 +1650,9 @@ func TestStoreWatch(t *testing.T) {
 			Object: configMap1,
 		})
 		event = <-watcher.ResultChan()
-		assert.Equal(t, watch.Modified, event.Type)
+		require.Equal(t, watch.Modified, event.Type)
 		k, ok = event.Object.(*ext.Kubeconfig)
-		assert.True(t, ok)
+		require.True(t, ok)
 		assert.Equal(t, configMap1.Name, k.Name)
 
 		configMapWatcher.add(watch.Event{
@@ -1659,21 +1660,43 @@ func TestStoreWatch(t *testing.T) {
 			Object: configMap1,
 		})
 		event = <-watcher.ResultChan()
-		assert.Equal(t, watch.Deleted, event.Type)
+		require.Equal(t, watch.Deleted, event.Type)
 		k, ok = event.Object.(*ext.Kubeconfig)
-		assert.True(t, ok)
+		require.True(t, ok)
 		assert.Equal(t, configMap1.Name, k.Name)
 
-		// Error events are not produced onto the Kubeconfig watcher.
+		statusIn := &metav1.Status{
+			Status:  metav1.StatusFailure,
+			Message: "The resourceVersion for the provided watch is too old.",
+			Reason:  metav1.StatusReasonExpired,
+			Code:    http.StatusGone,
+		}
+
 		configMapWatcher.add(watch.Event{
-			Type: watch.Error,
-			Object: &metav1.Status{
-				Status:  metav1.StatusFailure,
-				Message: "Something went wrong",
-			},
+			Type:   watch.Error,
+			Object: statusIn,
 		})
 
-		// So we add another bookmark to be able to read from the watcher.
+		event = <-watcher.ResultChan()
+		require.Equal(t, watch.Error, event.Type)
+		statusOut, ok := event.Object.(*metav1.Status)
+		require.True(t, ok)
+		require.NotNil(t, statusOut)
+		assert.Equal(t, statusIn.Status, statusOut.Status)
+		assert.Equal(t, statusIn.Message, statusOut.Message)
+		assert.Equal(t, statusIn.Reason, statusOut.Reason)
+		assert.Equal(t, statusIn.Code, statusOut.Code)
+
+		// Not a Status error.
+		configMapWatcher.add(watch.Event{
+			Type: watch.Error,
+		})
+
+		event = <-watcher.ResultChan()
+		require.Equal(t, watch.Error, event.Type)
+		require.Nil(t, event.Object)
+
+		// Add another bookmark after an error event.
 		configMapWatcher.add(watch.Event{
 			Type: watch.Bookmark,
 			Object: &corev1.ConfigMap{
@@ -1683,9 +1706,9 @@ func TestStoreWatch(t *testing.T) {
 			},
 		})
 		event = <-watcher.ResultChan()
-		assert.Equal(t, watch.Bookmark, event.Type)
+		require.Equal(t, watch.Bookmark, event.Type)
 		k, ok = event.Object.(*ext.Kubeconfig)
-		assert.True(t, ok)
+		require.True(t, ok)
 		assert.Equal(t, "2", k.ResourceVersion)
 	})
 
@@ -1726,9 +1749,9 @@ func TestStoreWatch(t *testing.T) {
 		})
 
 		event := <-watcher.ResultChan()
-		assert.Equal(t, watch.Added, event.Type)
+		require.Equal(t, watch.Added, event.Type)
 		k, ok := event.Object.(*ext.Kubeconfig)
-		assert.True(t, ok)
+		require.True(t, ok)
 		assert.Equal(t, configMap1.Name, k.Name)
 	})
 }
