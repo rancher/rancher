@@ -970,7 +970,7 @@ func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 					return
 				}
 
-				var token *ext.Token
+				var obj runtime.Object
 				switch event.Type {
 				case watch.Bookmark:
 					secret, ok := event.Object.(*corev1.Secret)
@@ -979,19 +979,11 @@ func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 						continue
 					}
 
-					token = &ext.Token{
+					obj = &ext.Token{
 						ObjectMeta: metav1.ObjectMeta{
 							ResourceVersion: secret.ResourceVersion,
 						},
 					}
-				case watch.Error:
-					status, ok := event.Object.(*metav1.Status)
-					if ok {
-						logrus.Warnf("tokens: watch: received error event: %s", status.String())
-					} else {
-						logrus.Warnf("tokens: watch: received error event: %s", event.Object.GetObjectKind().GroupVersionKind().String())
-					}
-					continue
 				case watch.Added, watch.Modified, watch.Deleted:
 					secret, ok := event.Object.(*corev1.Secret)
 					if !ok {
@@ -999,7 +991,7 @@ func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 						continue
 					}
 
-					token, err = fromSecret(secret)
+					token, err := fromSecret(secret)
 					if err != nil {
 						logrus.Errorf("tokens: watch: error converting secret '%s' to token: %s", secret.Name, err)
 						continue
@@ -1010,16 +1002,16 @@ func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 					// ListOptionMerge above) takes care of only
 					// asking for owned tokens
 					token.Status.Current = token.Name == authTokenID
-				default:
-					logrus.Warnf("tokens: watch: received and ignored unknown event: '%s'", event.Type)
-					continue
+					obj = token
+				default: // watch.Error
+					obj = event.Object
 				}
 
 				// push to consumer, and terminate ourselves if
 				// the consumer terminated on us
 				if pushed := consumer.addEvent(watch.Event{
 					Type:   event.Type,
-					Object: token,
+					Object: obj,
 				}); !pushed {
 					return
 				}
