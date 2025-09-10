@@ -1687,18 +1687,14 @@ func TestStoreWatch(t *testing.T) {
 		assert.Equal(t, statusIn.Reason, statusOut.Reason)
 		assert.Equal(t, statusIn.Code, statusOut.Code)
 
-		// Unknown error with a nil object, which should not produce an event.
+		// Not a Status error.
 		configMapWatcher.add(watch.Event{
 			Type: watch.Error,
 		})
 
-		select {
-		case event, ok = <-watcher.ResultChan():
-			if ok {
-				require.FailNow(t, "unexpected event: %v", event)
-			}
-		default:
-		}
+		event = <-watcher.ResultChan()
+		require.Equal(t, watch.Error, event.Type)
+		require.Nil(t, event.Object)
 
 		// Add another bookmark after an error event.
 		configMapWatcher.add(watch.Event{

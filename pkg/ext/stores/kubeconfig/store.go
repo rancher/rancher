@@ -1029,20 +1029,6 @@ func (s *Store) Watch(
 							ResourceVersion: configMap.ResourceVersion,
 						},
 					}
-				case watch.Error:
-					status, ok := event.Object.(*metav1.Status)
-					if ok {
-						// Pass through the status errors e.g. 410 Expired.
-						obj = status
-					} else {
-						// Discard unknown error events.
-						msg := "kubeconfig: watch: received unknown error event"
-						if event.Object != nil {
-							msg += ": " + event.Object.GetObjectKind().GroupVersionKind().String()
-						}
-						logrus.Warn(msg)
-						continue
-					}
 				case watch.Added, watch.Modified, watch.Deleted:
 					configMap, ok := event.Object.(*corev1.ConfigMap)
 					if !ok {
@@ -1055,8 +1041,8 @@ func (s *Store) Watch(
 						logrus.Errorf("kubeconfig: watch: error converting configmap %s to kubeconfig: %s", configMap.Name, err)
 						continue
 					}
-				default:
-					logrus.Warnf("kubeconfig: watch: unknown event type %s", event.Type)
+				default: // watch.Error
+					obj = event.Object
 				}
 
 				if !kubeconfigWatch.add(watch.Event{
