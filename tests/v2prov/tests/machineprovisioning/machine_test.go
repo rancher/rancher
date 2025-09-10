@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/nodeconfig"
 	"github.com/rancher/rancher/tests/v2prov/operations"
 	"github.com/rancher/rancher/tests/v2prov/wait"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	errgroup2 "golang.org/x/sync/errgroup"
@@ -679,7 +680,6 @@ func Test_Provisioning_Single_Node_All_Roles_Drain(t *testing.T) {
 			KubernetesVersion: defaults.SomeK8sVersion,
 			RKEConfig: &provisioningv1api.RKEConfig{
 				ClusterConfiguration: rkev1.ClusterConfiguration{
-					Registries: &rkev1.Registry{},
 					UpgradeStrategy: rkev1.ClusterUpgradeStrategy{
 						ControlPlaneDrainOptions: drainOptions,
 						ControlPlaneConcurrency:  "1",
@@ -763,27 +763,25 @@ func Test_Provisioning_Single_Node_All_Roles_Drain(t *testing.T) {
 	// Ensure the second node reaches Ready=True
 	var secondMachineNode *corev1.Node
 	clusterClients, err := clients.ForCluster(c.Namespace, c.Name)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
 		m, err := clients.CAPI.Machine().Get(c.Namespace, secondMachineName, metav1.GetOptions{})
 		if err != nil || m.Status.NodeRef == nil {
-			t.Logf("Error getting second machine: %+v", err)
+			logrus.Errorf("Error getting second machine: %+v", err)
 			return false
 		}
 
 		secondMachineNode, err = clusterClients.Core.Node().Get(m.Status.NodeRef.Name, metav1.GetOptions{})
 		if err != nil {
-			t.Logf("Error getting second machine node: %+v", err)
+			logrus.Errorf("Error getting second machine node: %+v", err)
 			return false
 		}
 		for _, cond := range secondMachineNode.Status.Conditions {
 			if cond.Type == corev1.NodeReady && cond.Status == corev1.ConditionTrue {
 				return true
 			}
-			t.Logf("Current Condition: %+v", cond)
+			logrus.Errorf("Current Condition: %+v", cond)
 		}
 		return false
 	}, 15*time.Minute, 10*time.Second, "second machine node never reached Ready=True")
