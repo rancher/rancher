@@ -737,6 +737,8 @@ func Test_Provisioning_Single_Node_All_Roles_Drain(t *testing.T) {
 	require.NotNil(t, provCluster.Spec.RKEConfig)
 	require.GreaterOrEqual(t, len(provCluster.Spec.RKEConfig.MachinePools), 1)
 
+	time.Sleep(30 * time.Second)
+
 	// Point the pool at the new PodConfig.
 	provCluster.Spec.RKEConfig.MachinePools[0].NodeConfig = newCfgRef
 	_, err = clients.Provisioning.Cluster().Update(provCluster)
