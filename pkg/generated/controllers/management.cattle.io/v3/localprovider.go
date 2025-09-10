@@ -25,12 +25,12 @@ import (
 
 // LocalProviderController interface for managing LocalProvider resources.
 type LocalProviderController interface {
-	generic.NonNamespacedControllerInterface[*v3.LocalProvider, *v3.LocalProviderList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.LocalProvider, *v3.LocalProviderList]
 }
 
 // LocalProviderClient interface for managing LocalProvider resources in Kubernetes.
 type LocalProviderClient interface {
-	generic.NonNamespacedClientInterface[*v3.LocalProvider, *v3.LocalProviderList]
+	generic.NonNamespacedClientInterfaceContext[*v3.LocalProvider, *v3.LocalProviderList]
 }
 
 // LocalProviderCache interface for retrieving LocalProvider resources in memory.

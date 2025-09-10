@@ -1,6 +1,7 @@
 package roletemplates
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -44,7 +45,7 @@ func newCRTBHandler(uc *config.UserContext) *crtbHandler {
 }
 
 // OnChange ensures that the correct ClusterRoleBinding exists for the ClusterRoleTemplateBinding
-func (c *crtbHandler) OnChange(key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+func (c *crtbHandler) OnChange(_ context.Context, key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
 	if crtb == nil || crtb.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -124,7 +125,7 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, rem
 }
 
 // OnRemove deletes all ClusterRoleBindings owned by the ClusterRoleTemplateBinding.
-func (c *crtbHandler) OnRemove(_ string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+func (c *crtbHandler) OnRemove(_ context.Context, _ string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
 	err := c.deleteBindings(crtb, &crtb.Status.RemoteConditions)
 	if err != nil {
 		return crtb, errors.Join(err, c.updateStatus(crtb, crtb.Status.RemoteConditions))
@@ -190,7 +191,7 @@ func (c *crtbHandler) updateStatus(crtb *v3.ClusterRoleTemplateBinding, remoteCo
 		crtbFromCluster.Status.LastUpdateTime = timeNow().Format(time.RFC3339)
 		crtbFromCluster.Status.ObservedGenerationRemote = crtb.ObjectMeta.Generation
 		crtbFromCluster.Status.RemoteConditions = remoteConditions
-		_, err = c.crtbClient.UpdateStatus(crtbFromCluster)
+		_, err = c.crtbClient.UpdateStatus(context.TODO(), crtbFromCluster)
 		if err != nil {
 			return err
 		}

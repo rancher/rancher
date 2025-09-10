@@ -4,7 +4,7 @@ go 1.24.0
 
 toolchain go1.24.5
 
-replace github.com/rancher/wrangler/v3 => github.com/rancher/wrangler/v3 v3.2.2
+replace github.com/rancher/wrangler/v3 => ../../../wrangler
 
 require (
 	github.com/rancher/norman v0.7.0
@@ -28,3 +28,5 @@ require (
 	k8s.io/klog/v2 v2.130.1 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 )
+
+replace github.com/rancher/norman => ../../../norman

@@ -1,6 +1,7 @@
 package globalroles
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -335,7 +336,7 @@ func (gr *globalRoleLifecycle) setGRAsInProgress(globalRole *v3.GlobalRole) erro
 	globalRole.Status.Conditions = []metav1.Condition{}
 	globalRole.Status.Summary = SummaryInProgress
 	globalRole.Status.LastUpdate = time.Now().String()
-	updatedGR, err := gr.grClient.UpdateStatus(globalRole)
+	updatedGR, err := gr.grClient.UpdateStatus(context.TODO(), globalRole)
 	// For future updates, we want the latest version of our GlobalRole
 	*globalRole = *updatedGR
 	return err
@@ -351,7 +352,7 @@ func (gr *globalRoleLifecycle) setGRAsCompleted(globalRole *v3.GlobalRole) error
 	}
 	globalRole.Status.LastUpdate = time.Now().String()
 	globalRole.Status.ObservedGeneration = globalRole.ObjectMeta.Generation
-	_, err := gr.grClient.UpdateStatus(globalRole)
+	_, err := gr.grClient.UpdateStatus(context.TODO(), globalRole)
 	return err
 }
 
@@ -359,7 +360,7 @@ func (gr *globalRoleLifecycle) setGRAsTerminating(globalRole *v3.GlobalRole) err
 	globalRole.Status.Conditions = []metav1.Condition{}
 	globalRole.Status.Summary = SummaryTerminating
 	globalRole.Status.LastUpdate = time.Now().String()
-	_, err := gr.grClient.UpdateStatus(globalRole)
+	_, err := gr.grClient.UpdateStatus(context.TODO(), globalRole)
 	return err
 }
 

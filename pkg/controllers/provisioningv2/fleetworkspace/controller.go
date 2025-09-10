@@ -66,7 +66,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 		})
 }
 
-func (h *handle) OnSetting(key string, setting *mgmt.Setting) (*mgmt.Setting, error) {
+func (h *handle) OnSetting(_ context.Context, key string, setting *mgmt.Setting) (*mgmt.Setting, error) {
 	if setting == nil || setting.Name != "fleet-default-workspace-name" {
 		return setting, nil
 	}
@@ -82,7 +82,7 @@ func (h *handle) OnSetting(key string, setting *mgmt.Setting) (*mgmt.Setting, er
 
 	_, err := h.workspaceCache.Get(value)
 	if apierror.IsNotFound(err) {
-		_, err = h.workspaces.Create(&mgmt.FleetWorkspace{
+		_, err = h.workspaces.Create(context.TODO(), &mgmt.FleetWorkspace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: value,
 			},
@@ -92,7 +92,7 @@ func (h *handle) OnSetting(key string, setting *mgmt.Setting) (*mgmt.Setting, er
 	return setting, err
 }
 
-func (h *handle) OnChange(workspace *mgmt.FleetWorkspace, status mgmt.FleetWorkspaceStatus) ([]runtime.Object, mgmt.FleetWorkspaceStatus, error) {
+func (h *handle) OnChange(_ context.Context, workspace *mgmt.FleetWorkspace, status mgmt.FleetWorkspaceStatus) ([]runtime.Object, mgmt.FleetWorkspaceStatus, error) {
 	if workspace.Annotations[managed] == "false" {
 		return nil, status, nil
 	}
@@ -120,7 +120,7 @@ func (h *handle) onFleetObject(obj runtime.Object) error {
 			return err
 		}
 
-		_, err = h.workspaces.Create(&mgmt.FleetWorkspace{
+		_, err = h.workspaces.Create(context.TODO(), &mgmt.FleetWorkspace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: m.GetNamespace(),
 				OwnerReferences: []metav1.OwnerReference{

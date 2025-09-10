@@ -28,7 +28,7 @@ func Register(ctx context.Context, clients *wrangler.Context) {
 
 }
 
-func (h *handler) onClusterChange(key string, obj *v3.Cluster) (*v3.Cluster, error) {
+func (h *handler) onClusterChange(_ context.Context, key string, obj *v3.Cluster) (*v3.Cluster, error) {
 	if obj == nil {
 		return obj, nil
 	}
@@ -45,7 +45,7 @@ func (h *handler) onClusterChange(key string, obj *v3.Cluster) (*v3.Cluster, err
 	return obj, nil
 }
 
-func (h *handler) onChange(key string, obj *v3.ClusterRegistrationToken) (_ *v3.ClusterRegistrationToken, err error) {
+func (h *handler) onChange(_ context.Context, key string, obj *v3.ClusterRegistrationToken) (_ *v3.ClusterRegistrationToken, err error) {
 	if obj == nil {
 		return obj, nil
 	}
@@ -58,7 +58,7 @@ func (h *handler) onChange(key string, obj *v3.ClusterRegistrationToken) (_ *v3.
 		if !equality.Semantic.DeepEqual(obj.Status, newStatus) {
 			obj = obj.DeepCopy()
 			obj.Status = newStatus
-			return h.clusterRegistrationTokenController.Update(obj)
+			return h.clusterRegistrationTokenController.Update(context.TODO(), obj)
 		}
 		return obj, nil
 	}
@@ -69,5 +69,5 @@ func (h *handler) onChange(key string, obj *v3.ClusterRegistrationToken) (_ *v3.
 		return nil, err
 	}
 
-	return h.clusterRegistrationTokenController.Update(obj)
+	return h.clusterRegistrationTokenController.Update(context.TODO(), obj)
 }

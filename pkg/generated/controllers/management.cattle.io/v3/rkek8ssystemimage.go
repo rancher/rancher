@@ -25,12 +25,12 @@ import (
 
 // RkeK8sSystemImageController interface for managing RkeK8sSystemImage resources.
 type RkeK8sSystemImageController interface {
-	generic.ControllerInterface[*v3.RkeK8sSystemImage, *v3.RkeK8sSystemImageList]
+	generic.ControllerInterfaceContext[*v3.RkeK8sSystemImage, *v3.RkeK8sSystemImageList]
 }
 
 // RkeK8sSystemImageClient interface for managing RkeK8sSystemImage resources in Kubernetes.
 type RkeK8sSystemImageClient interface {
-	generic.ClientInterface[*v3.RkeK8sSystemImage, *v3.RkeK8sSystemImageList]
+	generic.ClientInterfaceContext[*v3.RkeK8sSystemImage, *v3.RkeK8sSystemImageList]
 }
 
 // RkeK8sSystemImageCache interface for retrieving RkeK8sSystemImage resources in memory.

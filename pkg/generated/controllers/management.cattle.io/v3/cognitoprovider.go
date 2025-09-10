@@ -25,12 +25,12 @@ import (
 
 // CognitoProviderController interface for managing CognitoProvider resources.
 type CognitoProviderController interface {
-	generic.NonNamespacedControllerInterface[*v3.CognitoProvider, *v3.CognitoProviderList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.CognitoProvider, *v3.CognitoProviderList]
 }
 
 // CognitoProviderClient interface for managing CognitoProvider resources in Kubernetes.
 type CognitoProviderClient interface {
-	generic.NonNamespacedClientInterface[*v3.CognitoProvider, *v3.CognitoProviderList]
+	generic.NonNamespacedClientInterfaceContext[*v3.CognitoProvider, *v3.CognitoProviderList]
 }
 
 // CognitoProviderCache interface for retrieving CognitoProvider resources in memory.

@@ -23,15 +23,15 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 		grCache:       management.Wrangler.Mgmt.GlobalRole().Cache(),
 		clusterClient: management.Wrangler.Mgmt.Cluster(),
 	}
-	relatedresource.WatchClusterScoped(ctx, grbEnqueuer, enqueuer.enqueueGRBs, management.Wrangler.Mgmt.GlobalRoleBinding(), management.Wrangler.Mgmt.GlobalRole())
-	relatedresource.WatchClusterScoped(ctx, clusterGrEnqueuer, enqueuer.clusterEnqueueGRs, management.Wrangler.Mgmt.GlobalRole(), management.Wrangler.Mgmt.Cluster())
-	relatedresource.WatchClusterScoped(ctx, crtbGRBEnqueuer, enqueuer.crtbEnqueueGRB, management.Wrangler.Mgmt.GlobalRoleBinding(), management.Wrangler.Mgmt.ClusterRoleTemplateBinding())
+	relatedresource.WatchClusterScopedContext(ctx, grbEnqueuer, enqueuer.enqueueGRBs, management.Wrangler.Mgmt.GlobalRoleBinding(), management.Wrangler.Mgmt.GlobalRole())
+	relatedresource.WatchClusterScopedContext(ctx, clusterGrEnqueuer, enqueuer.clusterEnqueueGRs, management.Wrangler.Mgmt.GlobalRole(), management.Wrangler.Mgmt.Cluster())
+	relatedresource.WatchClusterScopedContext(ctx, crtbGRBEnqueuer, enqueuer.crtbEnqueueGRB, management.Wrangler.Mgmt.GlobalRoleBinding(), management.Wrangler.Mgmt.ClusterRoleTemplateBinding())
 
 	relatedresource.WatchClusterScoped(ctx, roleEnqueuer, enqueuer.roleEnqueueGR, management.Wrangler.Mgmt.GlobalRole(), management.Wrangler.RBAC.Role())
 	relatedresource.WatchClusterScoped(ctx, roleBindingEnqueuer, enqueuer.roleBindingEnqueueGRB, management.Wrangler.Mgmt.GlobalRoleBinding(), management.Wrangler.RBAC.RoleBinding())
 	relatedresource.WatchClusterScoped(ctx, namespaceGrEnqueuer, enqueuer.namespaceEnqueueGR, management.Wrangler.Mgmt.GlobalRole(), management.Wrangler.Core.Namespace())
 
-	relatedresource.WatchClusterScoped(ctx, fleetWorkspaceGrbEnqueuer, enqueuer.fleetWorkspaceEnqueueGR, management.Wrangler.Mgmt.GlobalRole(), management.Wrangler.Mgmt.FleetWorkspace())
+	relatedresource.WatchClusterScopedContext(ctx, fleetWorkspaceGrbEnqueuer, enqueuer.fleetWorkspaceEnqueueGR, management.Wrangler.Mgmt.GlobalRole(), management.Wrangler.Mgmt.FleetWorkspace())
 	relatedresource.WatchClusterScoped(ctx, clusterRoleEnqueuer, enqueuer.clusterRoleEnqueueGR, management.Wrangler.Mgmt.GlobalRole(), management.Wrangler.RBAC.ClusterRole())
 	relatedresource.WatchClusterScoped(ctx, clusterRoleBindingEnqueuer, enqueuer.clusterRoleBindingEnqueueGRB, management.Wrangler.Mgmt.GlobalRoleBinding(), management.Wrangler.RBAC.ClusterRoleBinding())
 

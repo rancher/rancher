@@ -98,12 +98,12 @@ func DuplicateBindings(clientConfig *restclient.Config) error {
 }
 
 func (bc *dupeBindingsCleanup) clean() error {
-	crtbs, err := bc.crtbs.List("", metav1.ListOptions{})
+	crtbs, err := bc.crtbs.List(context.TODO(), "", metav1.ListOptions{})
 	if err != nil {
 		return err
 	}
 
-	prtbs, err := bc.prtbs.List("", metav1.ListOptions{})
+	prtbs, err := bc.prtbs.List(context.TODO(), "", metav1.ListOptions{})
 	if err != nil {
 		return err
 	}

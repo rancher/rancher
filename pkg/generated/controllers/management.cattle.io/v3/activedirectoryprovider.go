@@ -25,12 +25,12 @@ import (
 
 // ActiveDirectoryProviderController interface for managing ActiveDirectoryProvider resources.
 type ActiveDirectoryProviderController interface {
-	generic.NonNamespacedControllerInterface[*v3.ActiveDirectoryProvider, *v3.ActiveDirectoryProviderList]
+	generic.NonNamespacedControllerInterfaceContext[*v3.ActiveDirectoryProvider, *v3.ActiveDirectoryProviderList]
 }
 
 // ActiveDirectoryProviderClient interface for managing ActiveDirectoryProvider resources in Kubernetes.
 type ActiveDirectoryProviderClient interface {
-	generic.NonNamespacedClientInterface[*v3.ActiveDirectoryProvider, *v3.ActiveDirectoryProviderList]
+	generic.NonNamespacedClientInterfaceContext[*v3.ActiveDirectoryProvider, *v3.ActiveDirectoryProviderList]
 }
 
 // ActiveDirectoryProviderCache interface for retrieving ActiveDirectoryProvider resources in memory.

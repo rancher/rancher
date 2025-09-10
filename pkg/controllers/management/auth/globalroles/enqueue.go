@@ -1,6 +1,7 @@
 package globalroles
 
 import (
+	"context"
 	"fmt"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -114,7 +115,7 @@ func (g *globalRBACEnqueuer) clusterEnqueueGRs(_, _ string, obj runtime.Object) 
 	// attempt to update the cluster with a sync annotation - this is costly since it will re-enqueue all grs
 	// which inherit cluster permissions, so we try to avoid it. If we can't record the annotation, we still
 	// want to try and sync the permissions.
-	newCluster, err := g.clusterClient.Get(cluster.Name, metav1.GetOptions{})
+	newCluster, err := g.clusterClient.Get(context.TODO(), cluster.Name, metav1.GetOptions{})
 	if err != nil {
 		logrus.Errorf("unable to get cluster %s to add sync annotation, grs will re-enqueue on change: %s", cluster.Name, err.Error())
 		return rolesToSync, nil
@@ -123,7 +124,7 @@ func (g *globalRBACEnqueuer) clusterEnqueueGRs(_, _ string, obj runtime.Object) 
 		newCluster.Annotations = map[string]string{}
 	}
 	newCluster.Annotations[initialSyncAnnotation] = "true"
-	_, err = g.clusterClient.Update(newCluster)
+	_, err = g.clusterClient.Update(context.TODO(), newCluster)
 	if err != nil {
 		logrus.Errorf("unable to update cluster %s with sync annotation, grs will re-enqueue on change: %s", cluster.Name, err.Error())
 	}
