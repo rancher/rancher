@@ -120,6 +120,8 @@ func (e *aliOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 		return cluster, err
 	}
 
+	// fixAliConfig update the clusterID in clusterSpec (cluster.Spec.AliConfig.ClusterID) for cluster that are created with rancher
+	// since this field is only available in AliClusterConfig object after ali-operator creates the cluster, it is needed to be fixed on clusterSpec
 	e.fixAliConfig(cluster, aliClusterConfigDynamic)
 
 	// check for changes between ali spec on cluster and the ali spec on the aliClusterConfig object
