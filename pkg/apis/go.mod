@@ -25,7 +25,7 @@ replace (
 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.30.10
 	k8s.io/kubectl => k8s.io/kubectl v0.30.10
 	k8s.io/kubelet => k8s.io/kubelet v0.30.10
-	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.30.10
+	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.30.14
 	k8s.io/mount-utils => k8s.io/mount-utils v0.30.10
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.30.10
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.30.10
