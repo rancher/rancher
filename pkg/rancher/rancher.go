@@ -469,7 +469,9 @@ func (r *Rancher) Start(ctx context.Context) error {
 	if !features.MCMAgent.Enabled() && features.RancherSCCRegistrationExtension.Enabled() {
 		r.Wrangler.OnLeaderOrDie("rancher-start::RancherSCCRegistration", func(ctx context.Context) error {
 			// TODO: pull this out of here if/when other features depend on the SecretRequest controllers
-			if err := telemetrycontrollers.RegisterControllers(ctx, r.Wrangler, r.telemetryManager); err != nil {
+			if err := r.Wrangler.StartWithTransaction(ctx, func(ctx context.Context) error {
+				return telemetrycontrollers.RegisterControllers(ctx, r.Wrangler, r.telemetryManager)
+			}); err != nil {
 				return err
 			}
 			logrus.Debug("[rancher::Start] starting RancherSCCRegistrationExtension")
