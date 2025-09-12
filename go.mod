@@ -151,7 +151,6 @@ require (
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80
 	github.com/urfave/cli v1.22.16
 	github.com/vmware/govmomi v0.42.0
-	go.uber.org/atomic v1.7.0
 	go.uber.org/mock v0.5.2
 	golang.org/x/crypto v0.40.0
 	golang.org/x/mod v0.25.0
