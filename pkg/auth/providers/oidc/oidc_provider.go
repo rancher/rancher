@@ -713,8 +713,7 @@ func (o *OpenIDCProvider) createIDPRedirectURL(apiContext *types.APIContext, con
 	}
 
 	authLogout := &v32.AuthConfigLogoutInput{}
-	r := apiContext.Request
-	if err := json.NewDecoder(r.Body).Decode(authLogout); err != nil {
+	if err := json.NewDecoder(apiContext.Request.Body).Decode(authLogout); err != nil {
 		return "", httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("OIDC: parsing request body: %v", err))
 	}

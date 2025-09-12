@@ -98,14 +98,13 @@ func createIDPRedirectURL(apiContext *types.APIContext, config *v3.OIDCConfig) (
 
 	idpRedirectURL, err := url.Parse(config.EndSessionEndpoint)
 	if err != nil {
-		logrus.Infof("OIDC: failed parsing end session endpoint: %v", err)
+		logrus.Errorf("OIDC: failed parsing end session endpoint: %v", err)
 		return "", httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("OIDC: parsing end session endpoint: %s", err))
 	}
 
 	authLogout := &v3.AuthConfigLogoutInput{}
-	r := apiContext.Request
-	if err := json.NewDecoder(r.Body).Decode(authLogout); err != nil {
+	if err := json.NewDecoder(apiContext.Request.Body).Decode(authLogout); err != nil {
 		return "", httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("OIDC: parsing request body: %s", err))
 	}
