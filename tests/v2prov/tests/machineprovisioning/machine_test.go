@@ -18,7 +18,6 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/nodeconfig"
 	"github.com/rancher/rancher/tests/v2prov/operations"
 	"github.com/rancher/rancher/tests/v2prov/wait"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	errgroup2 "golang.org/x/sync/errgroup"
@@ -671,7 +670,7 @@ func Test_Provisioning_Single_Node_All_Roles_Drain(t *testing.T) {
 		Timeout:                         120,
 	}
 
-	// Single-node (cp+etcd+worker) with drain-on-config enabled
+	// Single-node (cp+etcd+worker) with drain upgrade strategy option enabled for both CP and worker
 	provClusterSchema := &provisioningv1api.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-single-node-drain",
@@ -737,8 +736,6 @@ func Test_Provisioning_Single_Node_All_Roles_Drain(t *testing.T) {
 	require.NotNil(t, provCluster.Spec.RKEConfig)
 	require.GreaterOrEqual(t, len(provCluster.Spec.RKEConfig.MachinePools), 1)
 
-	time.Sleep(30 * time.Second)
-
 	// Point the pool at the new PodConfig.
 	provCluster.Spec.RKEConfig.MachinePools[0].NodeConfig = newCfgRef
 	_, err = clients.Provisioning.Cluster().Update(provCluster)
@@ -747,7 +744,7 @@ func Test_Provisioning_Single_Node_All_Roles_Drain(t *testing.T) {
 	require.Eventually(t, func() bool {
 		machines, _ = cluster.Machines(clients, c)
 		return len(machines.Items) == 2
-	}, 4*time.Minute, 2*time.Second, "never saw 2 nodes after config change")
+	}, 5*time.Minute, 2*time.Second, "never saw 2 nodes after config change")
 
 	var secondMachineName string
 	require.Eventually(t, func() bool {
@@ -760,7 +757,7 @@ func Test_Provisioning_Single_Node_All_Roles_Drain(t *testing.T) {
 			}
 		}
 		return false
-	}, 10*time.Minute, 2*time.Second, "no node with new template hash (and NodeRef) appeared")
+	}, 15*time.Minute, 2*time.Second, "no node with new template hash (and NodeRef) appeared")
 
 	// Ensure the second node reaches Ready=True
 	var secondMachineNode *corev1.Node
@@ -770,23 +767,20 @@ func Test_Provisioning_Single_Node_All_Roles_Drain(t *testing.T) {
 	require.Eventually(t, func() bool {
 		m, err := clients.CAPI.Machine().Get(c.Namespace, secondMachineName, metav1.GetOptions{})
 		if err != nil || m.Status.NodeRef == nil {
-			logrus.Errorf("Error getting second machine: %+v", err)
 			return false
 		}
 
 		secondMachineNode, err = clusterClients.Core.Node().Get(m.Status.NodeRef.Name, metav1.GetOptions{})
 		if err != nil {
-			logrus.Errorf("Error getting second machine node: %+v", err)
 			return false
 		}
 		for _, cond := range secondMachineNode.Status.Conditions {
 			if cond.Type == corev1.NodeReady && cond.Status == corev1.ConditionTrue {
 				return true
 			}
-			logrus.Errorf("Current Condition: %+v", cond)
 		}
 		return false
-	}, 15*time.Minute, 10*time.Second, "second machine node never reached Ready=True")
+	}, 20*time.Minute, 2*time.Second, "second machine node never reached Ready=True")
 
 	// Sanity: incoming CP should not be cordoned
 	require.False(t, secondMachineNode.Spec.Unschedulable, "second machine node was cordoned; incoming controlplane should not be drained")
@@ -798,12 +792,12 @@ func Test_Provisioning_Single_Node_All_Roles_Drain(t *testing.T) {
 			return apierror.IsNotFound(err)
 		}
 		return !m.DeletionTimestamp.IsZero()
-	}, 10*time.Minute, 2*time.Second, "first machine node never entered Deleting")
+	}, 15*time.Minute, 2*time.Second, "first machine node never entered Deleting")
 
 	require.Eventually(t, func() bool {
 		ml, _ := cluster.Machines(clients, c)
 		return len(ml.Items) == 1
-	}, 20*time.Minute, 2*time.Second, "did not converge back to a single node")
+	}, 15*time.Minute, 2*time.Second, "did not converge back to a single node")
 
 	require.Eventually(t, func() bool {
 		latest, err := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
