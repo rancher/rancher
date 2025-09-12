@@ -20,6 +20,7 @@ import (
 	"github.com/rancher/norman/types"
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	clusterv3api "github.com/rancher/rancher/pkg/apis/cluster.cattle.io/v3"
+	extv1api "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	managementv3api "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	projectv3api "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	provisioningv1api "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
@@ -33,6 +34,8 @@ import (
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	capi "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	ext "github.com/rancher/rancher/pkg/generated/controllers/ext.cattle.io"
+	extv1 "github.com/rancher/rancher/pkg/generated/controllers/ext.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io"
 	fleetv1alpha1 "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io"
@@ -103,6 +106,7 @@ var (
 		apiextensionsv1.AddToScheme,
 		apiregistrationv12.AddToScheme,
 		catalogv1.AddToScheme,
+		extv1api.AddToScheme,
 	}
 	AddToScheme = localSchemeBuilder.AddToScheme
 	Scheme      = runtime.NewScheme()
@@ -129,8 +133,10 @@ func init() {
 type Context struct {
 	RESTConfig *rest.Config
 
-	DeferredCAPIRegistration *DeferredCAPIRegistration
-	capiMutex                *sync.Mutex
+	DeferredCAPIRegistration   *DeferredCAPIRegistration
+	capiMutex                  *sync.Mutex
+	DeferredEXTAPIRegistration *DeferredRegistration
+	extMutex                   *sync.Mutex
 
 	Apply               apply.Apply
 	Dynamic             *dynamic.Controller
@@ -186,6 +192,10 @@ type Context struct {
 	crd          *apiextensions.Factory
 	plan         *upgrade.Factory
 	telemetry    *telemetry.Factory
+
+	// EXT API support
+	Ext extv1.Interface
+	ext *ext.Factory
 
 	started bool
 }
@@ -309,11 +319,13 @@ func (w *Context) Start(ctx context.Context) error {
 }
 
 // WithAgent returns a shallow copy of the Context that has been configured to use a user agent in its
-// clients that is the given userAgent appended to "rancher-%s-%s".
+// clients that is the configured server-version and given userAgent insert into "rancher-%s-%s".
 func (w *Context) WithAgent(userAgent string) *Context {
 	userAgent = fmt.Sprintf("rancher-%s-%s", settings.ServerVersion.Get(), userAgent)
 	wContextCopy := *w
 	wContextCopy.capiMutex = &sync.Mutex{}
+	wContextCopy.extMutex = &sync.Mutex{}
+
 	restConfigCopy := &rest.Config{}
 	if w.RESTConfig != nil {
 		*restConfigCopy = *w.RESTConfig
@@ -356,6 +368,14 @@ func (w *Context) WithAgent(userAgent string) *Context {
 		wContextCopy.CAPI = clients.capi.WithAgent(userAgent).V1beta1()
 	})
 
+	wContextCopy.DeferredEXTAPIRegistration.DeferFunc(func(client *Context) {
+		client.extMutex.Lock()
+		defer client.extMutex.Unlock()
+
+		logrus.Tracef("[deferred-extapi/run] %p EXT fill copy %p", client, &wContextCopy)
+		wContextCopy.Ext = client.ext.WithAgent(userAgent).V1()
+	})
+
 	return &wContextCopy
 }
 
@@ -375,6 +395,7 @@ func NewPrimaryContext(ctx context.Context, clientConfig clientcmd.ClientConfig,
 	}
 
 	wCtx.manageDeferredCAPIContext(ctx)
+	wCtx.manageDeferredEXTAPIContext(ctx)
 	return wCtx, nil
 }
 
@@ -581,10 +602,13 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		rbac:         rbac,
 		plan:         plan,
 		telemetry:    telemetry,
-		capiMutex:    &sync.Mutex{},
+
+		capiMutex: &sync.Mutex{},
+		extMutex:  &sync.Mutex{},
 	}
 
 	wContext.DeferredCAPIRegistration = newDeferredCAPIRegistration(wContext)
+	wContext.DeferredEXTAPIRegistration = newDeferredRegistration(wContext)
 
 	return wContext, nil
 }
