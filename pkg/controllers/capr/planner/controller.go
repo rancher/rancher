@@ -89,7 +89,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext, planner *caprp
 }
 
 func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
-	logrus.Debugf("[planner] rkecluster %s/%s: handler OnChange called", cp.Namespace, cp.Name)
+	logrus.Debugf("[planner] rkecluster %s/%s: handler WaitForClient called", cp.Namespace, cp.Name)
 	if !cp.DeletionTimestamp.IsZero() {
 		return status, nil
 	}

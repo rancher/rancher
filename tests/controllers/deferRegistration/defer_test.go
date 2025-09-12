@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -81,23 +82,42 @@ type testDeferContext struct {
 }
 
 type testDeferInitializer struct {
-	*wrangler.BaseInitializer[*testDeferContext]
+	wCtx *wrangler.Context
 }
 
-func (t testDeferInitializer) OnChange(ctx context.Context, client *wrangler.Context) {
-	client.Core.Namespace().OnChange(ctx, "deferred-namespace-test", func(_ string, namespace *corev1.Namespace) (*corev1.Namespace, error) {
+func (t *testDeferInitializer) WaitForClient(ctx context.Context) (*testDeferContext, error) {
+	ready := make(chan struct{})
+	var desiredNS string
+	var done atomic.Bool
+
+	t.wCtx.Core.Namespace().OnChange(ctx, "deferred-namespace-test", func(_ string, namespace *corev1.Namespace) (*corev1.Namespace, error) {
+		if done.Load() {
+			return namespace, nil
+		}
 		if strings.Contains(namespace.Name, triggerNamespace) && namespace.ObjectMeta.DeletionTimestamp == nil {
-			t.SetClientContext(&testDeferContext{
-				desiredNamespace: namespace.ObjectMeta.Name,
-			})
+			if !done.CompareAndSwap(false, true) {
+				return namespace, nil
+			}
+			desiredNS = namespace.ObjectMeta.Name
+			close(ready)
 		}
 		return namespace, nil
 	})
+
+	select {
+	case <-ready:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+
+	return &testDeferContext{
+		desiredNamespace: desiredNS,
+	}, nil
 }
 
-func newTestDeferInitializer() *testDeferInitializer {
+func newTestDeferInitializer(wCtx *wrangler.Context) *testDeferInitializer {
 	return &testDeferInitializer{
-		BaseInitializer: wrangler.NewBaseInitializer[*testDeferContext](),
+		wCtx: wCtx,
 	}
 }
 
@@ -112,7 +132,7 @@ func (d *DeferredRegistrationSuite) TestDeferFunc() {
 		require.NoError(d.T(), clients.Core.Namespace().Delete(otherNS, &metav1.DeleteOptions{}))
 	}()
 
-	testDefer := wrangler.NewDeferredRegistration[*testDeferContext, *testDeferInitializer](clients, newTestDeferInitializer(), "test-deferred")
+	testDefer := wrangler.NewDeferredRegistration[*testDeferContext, *testDeferInitializer](clients, newTestDeferInitializer(clients), "test-deferred")
 	testDefer.Manage(d.T().Context())
 
 	// need to start the factory after the deferred initializer's
@@ -168,7 +188,7 @@ func (d *DeferredRegistrationSuite) TestDeferFuncWithError() {
 		require.NoError(d.T(), clients.Core.Namespace().Delete(otherNS, &metav1.DeleteOptions{}))
 	}()
 
-	testDefer := wrangler.NewDeferredRegistration[*testDeferContext, *testDeferInitializer](clients, newTestDeferInitializer(), "test-deferred")
+	testDefer := wrangler.NewDeferredRegistration[*testDeferContext, *testDeferInitializer](clients, newTestDeferInitializer(clients), "test-deferred")
 	testDefer.Manage(d.T().Context())
 
 	// need to start the factory after the deferred initializer's

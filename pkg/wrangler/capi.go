@@ -25,48 +25,55 @@ type CAPIContext struct {
 // DeferredCAPIInitializer implements the DeferredInitializer interface
 // and monitors CRDs until all expected CAPI resources have been created.
 type DeferredCAPIInitializer struct {
-	*BaseInitializer[*CAPIContext]
+	context *Context
 }
 
-func NewCAPIInitializer() *DeferredCAPIInitializer {
+func NewCAPIInitializer(clients *Context) *DeferredCAPIInitializer {
 	return &DeferredCAPIInitializer{
-		BaseInitializer: NewBaseInitializer[*CAPIContext](),
+		context: clients,
 	}
 }
 
-func (d *DeferredCAPIInitializer) OnChange(ctx context.Context, c *Context) {
+func (d *DeferredCAPIInitializer) WaitForClient(ctx context.Context) (*CAPIContext, error) {
 	var done atomic.Bool
-	c.CRD.CustomResourceDefinition().OnChange(ctx, "capi-deferred-registration", func(key string, crd *apiextv1.CustomResourceDefinition) (*apiextv1.CustomResourceDefinition, error) {
+	ready := make(chan struct{})
+	d.context.CRD.CustomResourceDefinition().OnChange(ctx, "capi-deferred-registration", func(key string, crd *apiextv1.CustomResourceDefinition) (*apiextv1.CustomResourceDefinition, error) {
 		if done.Load() {
 			return crd, nil
 		}
 
-		if !capiCRDsReady(c.CRD.CustomResourceDefinition().Cache()) {
+		if !capiCRDsReady(d.context.CRD.CustomResourceDefinition().Cache()) {
 			return crd, nil
 		}
 
 		if !done.CompareAndSwap(false, true) {
 			return crd, nil
 		}
-
-		logrus.Info("[deferred-capi - OnChange] initializing CAPI factory")
-		opts := &generic.FactoryOptions{
-			SharedControllerFactory: c.ControllerFactory,
-		}
-
-		capi, err := capi.NewFactoryFromConfigWithOptions(c.RESTConfig, opts)
-		if err != nil {
-			logrus.Fatalf("Encountered unexpected error while creating capi factory: %v", err)
-		}
-
-		d.SetClientContext(&CAPIContext{
-			Context:     c,
-			CAPIFactory: capi,
-			CAPI:        capi.Cluster().V1beta1(),
-		})
-
+		close(ready)
 		return crd, nil
 	})
+
+	select {
+	case <-ready:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+
+	logrus.Info("[deferred-capi - WaitForClient] initializing CAPI factory")
+	opts := &generic.FactoryOptions{
+		SharedControllerFactory: d.context.ControllerFactory,
+	}
+
+	capi, err := capi.NewFactoryFromConfigWithOptions(d.context.RESTConfig, opts)
+	if err != nil {
+		logrus.Fatalf("Encountered unexpected error while creating capi factory: %v", err)
+	}
+
+	return &CAPIContext{
+		Context:     d.context,
+		CAPIFactory: capi,
+		CAPI:        capi.Cluster().V1beta1(),
+	}, nil
 }
 
 func capiCRDsReady(crdCache wapiextv1.CustomResourceDefinitionCache) bool {

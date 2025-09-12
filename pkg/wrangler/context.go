@@ -560,7 +560,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		telemetry:    telemetry,
 	}
 
-	wContext.DeferredCAPIRegistration = NewDeferredRegistration[*CAPIContext, *DeferredCAPIInitializer](wContext, NewCAPIInitializer(), "deferred-capi")
+	wContext.DeferredCAPIRegistration = NewDeferredRegistration[*CAPIContext, *DeferredCAPIInitializer](wContext, NewCAPIInitializer(wContext), "deferred-capi")
 
 	return wContext, nil
 }

@@ -5,49 +5,15 @@ import (
 	"fmt"
 	"reflect"
 	"runtime"
-	"sync"
 
 	"github.com/sirupsen/logrus"
 )
 
 // DeferredInitializer describes how a specific client context (T) will be initialized during startup.
 type DeferredInitializer[T any] interface {
-	// OnChange is used to monitor a condition that must be satisfied before the initialization of
+	// WaitForClient is used to wait for a condition that must be satisfied before the initialization of
 	// the deferred client context. This is typically an event handler watching a k8s resource.
-	OnChange(context.Context, *Context)
-
-	// GetClientContext returns the client context (T) after it has been initialized.
-	GetClientContext(ctx context.Context) (T, error)
-}
-
-func NewBaseInitializer[T any]() *BaseInitializer[T] {
-	return &BaseInitializer[T]{
-		clientCreated: make(chan struct{}),
-	}
-}
-
-// BaseInitializer sets and gets client contexts. This is a utility struct that should
-// be embedded within more specific initializers which implement OnChange.
-type BaseInitializer[T any] struct {
-	clientContext T
-	once          sync.Once
-	clientCreated chan struct{}
-}
-
-func (b *BaseInitializer[T]) SetClientContext(clientContext T) {
-	b.once.Do(func() {
-		b.clientContext = clientContext
-		close(b.clientCreated)
-	})
-}
-
-func (b *BaseInitializer[T]) GetClientContext(ctx context.Context) (T, error) {
-	select {
-	case <-b.clientCreated:
-		return b.clientContext, nil
-	case <-ctx.Done():
-		return b.clientContext, ctx.Err()
-	}
+	WaitForClient(context.Context) (T, error)
 }
 
 // DeferredRegistration provides a generic way to defer the execution of functions or registration of
@@ -78,10 +44,8 @@ func NewDeferredRegistration[T any, I DeferredInitializer[T]](clients *Context, 
 
 func (d *DeferredRegistration[T, I]) Manage(ctx context.Context) {
 	go func() {
-		d.clientInitializer.OnChange(ctx, d.clients)
-
 		var err error
-		d.clientContext, err = d.clientInitializer.GetClientContext(ctx)
+		d.clientContext, err = d.clientInitializer.WaitForClient(ctx)
 		if err != nil {
 			logrus.Fatalf("failed to get client context while managing deferred registration: %v", err)
 		}
@@ -96,7 +60,7 @@ func (d *DeferredRegistration[T, I]) run(ctx context.Context) error {
 	for {
 		select {
 		case f := <-d.registrationFuncs:
-			logrus.Debugf("[%s - DeferRegistration] Executing deferred registration: %s", d.Name, fn(f))
+			logrus.Debugf("[%s - DeferRegistration] Executing deferred registration: %s", d.Name, getFuncName(f))
 			if err := d.clients.StartFactoryWithTransaction(ctx, func(ctx context.Context) error {
 				if err := f(ctx, d.clientContext); err != nil {
 					return fmt.Errorf("failed to invoke registration func: %w", err)
@@ -106,7 +70,7 @@ func (d *DeferredRegistration[T, I]) run(ctx context.Context) error {
 				return err
 			}
 		case f := <-d.funcs:
-			logrus.Debugf("[%s - DeferFunc] Executing deferred function: %s", d.Name, fn(f))
+			logrus.Debugf("[%s - DeferFunc] Executing deferred function: %s", d.Name, getFuncName(f))
 			f(d.clientContext)
 		case <-ctx.Done():
 			return nil
@@ -118,14 +82,14 @@ func (d *DeferredRegistration[T, I]) run(ctx context.Context) error {
 // Calls to DeferFunc are processed in the order they are made. Calls to DeferFunc made after the client context has initialized
 // will execute immediately.
 func (d *DeferredRegistration[T, I]) DeferFunc(f func(clients T)) {
-	logrus.Debugf("[%s - DeferFunc] Adding function to pool: %s", d.Name, fn(f))
+	logrus.Debugf("[%s - DeferFunc] Adding function to pool: %s", d.Name, getFuncName(f))
 	d.funcs <- f
 }
 
 // DeferFuncWithError creates a new go routine which invokes f once the DeferredInitializer creates the client context.
 // It returns an error channel to indicate if f encountered any errors during execution.
 func (d *DeferredRegistration[T, I]) DeferFuncWithError(f func(wrangler T) error) chan error {
-	logrus.Debugf("[%s - DeferFuncWithError] Adding function to pool: %s", d.Name, fn(f))
+	logrus.Debugf("[%s - DeferFuncWithError] Adding function to pool: %s", d.Name, getFuncName(f))
 	errChan := make(chan error, 1)
 	d.DeferFunc(func(clients T) {
 		defer close(errChan)
@@ -143,12 +107,12 @@ func (d *DeferredRegistration[T, I]) DeferFuncWithError(f func(wrangler T) error
 // Calls to DeferRegistration are processed in the order they are made. Calls to DeferRegistration made after the client context has
 // initialized will execute immediately, and the controller factory will be immediately started.
 func (d *DeferredRegistration[T, I]) DeferRegistration(register func(ctx context.Context, clients T) error) {
-	logrus.Debugf("[%s - DeferRegistration] Adding registration function to pool: %s", d.Name, fn(register))
+	logrus.Debugf("[%s - DeferRegistration] Adding registration function to pool: %s", d.Name, getFuncName(register))
 	d.registrationFuncs <- register
 }
 
-// fn takes a function pointer (i.e. function name), and returns the function's name as a string.
+// getFuncName takes a function pointer (i.e. function name), and returns the function's name as a string.
 // Go reflection is used to determine the value.
-func fn(i interface{}) string {
+func getFuncName(i interface{}) string {
 	return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
 }
