@@ -21,6 +21,7 @@ import (
 var OriginMap = map[string]string{
 	"aci-containers-controller":                               "https://github.com/noironetworks/aci-containers",
 	"aci-containers-host":                                     "https://github.com/noironetworks/aci-containers",
+	"appco-redis":                                             "https://github.com/redis/redis",
 	"aks-operator":                                            "https://github.com/rancher/aks-operator",
 	"backup-restore-operator":                                 "https://github.com/rancher/backup-restore-operator",
 	"calico-cni":                                              "https://github.com/rancher/calico-cni",
