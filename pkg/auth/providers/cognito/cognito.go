@@ -75,6 +75,12 @@ func (s *CognitoProvider) LogoutAll(apiContext *types.APIContext, token accessor
 		return err
 	}
 
+	providerName := token.GetAuthProvider()
+	if !oidcConfig.LogoutAllEnabled {
+		logrus.Debugf("CognitoProvider [logout-all]: Rancher provider resource `%v` not configured for SLO", providerName)
+		return fmt.Errorf("CognitoProvider [logout-all]: Rancher provider resource `%v` not configured for SLO", providerName)
+	}
+
 	idpRedirectURL, err := createIDPRedirectURL(apiContext, oidcConfig)
 	if err != nil {
 		return err
@@ -92,21 +98,21 @@ func (s *CognitoProvider) LogoutAll(apiContext *types.APIContext, token accessor
 // Based on https://docs.aws.amazon.com/cognito/latest/developerguide/logout-endpoint.html#get-logout
 func createIDPRedirectURL(apiContext *types.APIContext, config *v3.OIDCConfig) (string, error) {
 	if config.EndSessionEndpoint == "" {
-		logrus.Debug("OIDC: LogoutAll not redirecting without endSessionEndpoint")
+		logrus.Debug("CognitoProvider: LogoutAll not redirecting without endSessionEndpoint")
 		return "", nil
 	}
 
 	idpRedirectURL, err := url.Parse(config.EndSessionEndpoint)
 	if err != nil {
-		logrus.Errorf("OIDC: failed parsing end session endpoint: %v", err)
+		logrus.Errorf("CognitoProvider: failed parsing end session endpoint: %v", err)
 		return "", httperror.NewAPIError(httperror.InvalidBodyContent,
-			fmt.Sprintf("OIDC: parsing end session endpoint: %s", err))
+			fmt.Sprintf("CognitoProvider: parsing end session endpoint: %s", err))
 	}
 
 	authLogout := &v3.AuthConfigLogoutInput{}
 	if err := json.NewDecoder(apiContext.Request.Body).Decode(authLogout); err != nil {
 		return "", httperror.NewAPIError(httperror.InvalidBodyContent,
-			fmt.Sprintf("OIDC: parsing request body: %s", err))
+			fmt.Sprintf("CognitoProvider: parsing request body: %s", err))
 	}
 
 	params := idpRedirectURL.Query()

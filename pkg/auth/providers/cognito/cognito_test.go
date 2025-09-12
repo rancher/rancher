@@ -12,13 +12,50 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/genericoidc"
 	"github.com/rancher/rancher/pkg/auth/providers/oidc"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestLogoutAllWhenNotEnabled(t *testing.T) {
+	const (
+		userId       string = "testing-user"
+		providerName string = "cognito"
+	)
+	oidcConfig := newOIDCConfig("8090", func(s *v3.OIDCConfig) {
+		s.EndSessionEndpoint = "http://localhost:8090/user/logout"
+		s.LogoutAllEnabled = false
+	})
+	testToken := &v3.Token{UserID: userId, AuthProvider: providerName}
+	o := CognitoProvider{
+		GenOIDCProvider: genericoidc.GenOIDCProvider{
+			oidc.OpenIDCProvider{
+				Name:      providerName,
+				GetConfig: func() (*v3.OIDCConfig, error) { return oidcConfig, nil },
+			},
+		},
+	}
+
+	b, err := json.Marshal(&v3.AuthConfigLogoutInput{
+		FinalRedirectURL: "https://example.com/logged-out",
+	})
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/logout", bytes.NewReader(b))
+	nr := &normanRecorder{}
+	apiContext := &types.APIContext{
+		Method:         req.Method,
+		Request:        req,
+		Query:          url.Values{},
+		ResponseWriter: nr,
+	}
+
+	assert.ErrorContains(t, o.LogoutAll(apiContext, testToken), "Rancher provider resource `cognito` not configured for SLO")
+}
 
 func TestLogoutAll(t *testing.T) {
 	const (
 		userId       string = "testing-user"
-		providerName string = "keycloak"
+		providerName string = "cognito"
 	)
 	oidcConfig := newOIDCConfig("8090", func(s *v3.OIDCConfig) {
 		s.EndSessionEndpoint = "http://localhost:8090/user/logout"
@@ -96,7 +133,7 @@ func TestLogoutAllNoEndSessionEndpoint(t *testing.T) {
 func TestLogout(t *testing.T) {
 	const (
 		userId       string = "testing-user"
-		providerName string = "keycloak"
+		providerName string = "cognito"
 	)
 
 	logoutTests := map[string]struct {
@@ -153,6 +190,7 @@ func newOIDCConfig(port string, opts ...func(*v3.OIDCConfig)) *v3.OIDCConfig {
 		AuthEndpoint:     "http://localhost:" + port + "/auth",
 		TokenEndpoint:    "http://localhost:" + port + "/token",
 		UserInfoEndpoint: "http://localhost:" + port + "/user",
+		LogoutAllEnabled: true,
 	}
 
 	for _, opt := range opts {

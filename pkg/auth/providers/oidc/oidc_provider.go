@@ -679,9 +679,16 @@ func (o *OpenIDCProvider) Logout(apiContext *types.APIContext, token accessor.To
 
 func (o *OpenIDCProvider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
 	logrus.Debugf("OpenIDCProvider [logout-all]: triggered by provider %s", token.GetAuthProvider())
+
 	oidcConfig, err := o.GetConfig()
 	if err != nil {
 		return err
+	}
+
+	providerName := token.GetAuthProvider()
+	if !oidcConfig.LogoutAllEnabled {
+		logrus.Debugf("OpenIDCProvider [logout-all]: Rancher provider resource `%v` not configured for SLO", providerName)
+		return fmt.Errorf("OpenIDCProvider [logout-all]: Rancher provider resource `%v` not configured for SLO", providerName)
 	}
 
 	idpRedirectURL, err := o.createIDPRedirectURL(apiContext, oidcConfig)
