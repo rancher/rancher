@@ -709,8 +709,7 @@ func (o *OpenIDCProvider) LogoutAll(apiContext *types.APIContext, token accessor
 
 func (o *OpenIDCProvider) createIDPRedirectURL(apiContext *types.APIContext, config *v32.OIDCConfig) (string, error) {
 	if config.EndSessionEndpoint == "" {
-		logrus.Debug("OpenIDCProvider: [logout-all] not redirecting without endSessionEndpoint")
-		return "", nil
+		return "", httperror.NewAPIError(httperror.ServerError, "LogoutAll triggered with no endSessionEndpoint")
 	}
 
 	idpRedirectURL, err := url.Parse(config.EndSessionEndpoint)

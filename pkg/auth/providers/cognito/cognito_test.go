@@ -122,12 +122,7 @@ func TestLogoutAllNoEndSessionEndpoint(t *testing.T) {
 		ResponseWriter: nr,
 	}
 
-	require.NoError(t, o.LogoutAll(apiContext, testToken))
-	wantData := map[string]any{
-		"idpRedirectUrl": "",
-		"type":           "authConfigLogoutOutput",
-	}
-	require.Equal(t, []normanResponse{{code: http.StatusOK, data: wantData}}, nr.responses)
+	assert.ErrorContains(t, o.LogoutAll(apiContext, testToken), "LogoutAll triggered with no endSessionEndpoint")
 }
 
 func TestLogout(t *testing.T) {
