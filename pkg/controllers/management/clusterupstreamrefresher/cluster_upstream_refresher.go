@@ -9,6 +9,7 @@ import (
 	"time"
 
 	aksv1 "github.com/rancher/aks-operator/pkg/apis/aks.cattle.io/v1"
+	aliv1 "github.com/rancher/ali-operator/pkg/apis/ali.cattle.io/v1"
 	eksv1 "github.com/rancher/eks-operator/pkg/apis/eks.cattle.io/v1"
 	gkev1 "github.com/rancher/gke-operator/pkg/apis/gke.cattle.io/v1"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -40,6 +41,7 @@ type clusterConfig struct {
 	aksConfig *aksv1.AKSClusterConfigSpec
 	eksConfig *eksv1.EKSClusterConfigSpec
 	gkeConfig *gkev1.GKEClusterConfigSpec
+	aliConfig *aliv1.AliClusterConfigSpec
 }
 
 func Register(ctx context.Context, wContext *wrangler.Context) {
@@ -111,6 +113,12 @@ func getProviderAndReadyStatus(cluster *mgmtv3.Cluster) (string, bool) {
 			return apimgmtv3.ClusterDriverGKE, false
 		}
 		return apimgmtv3.ClusterDriverGKE, true
+	case cluster.Spec.AliConfig != nil:
+		if cluster.Status.AliStatus.UpstreamSpec == nil {
+			logrus.Debugf("initial upstream spec for cluster [%s] has not been set by cluster handler yet, skipping", cluster.Name)
+			return apimgmtv3.ClusterDriverAlibaba, false
+		}
+		return apimgmtv3.ClusterDriverAlibaba, true
 	default:
 		return noKEv2Provider, false
 	}
@@ -155,7 +163,7 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 	upstreamConfig, err := getComparableUpstreamSpec(c.secretsCache, c.secretClient, cluster)
 	if err != nil {
 		var syncFailed string
-		if upstreamConfig == nil || (upstreamConfig.gkeConfig == nil && upstreamConfig.eksConfig == nil && upstreamConfig.aksConfig == nil) {
+		if upstreamConfig == nil || (upstreamConfig.gkeConfig == nil && upstreamConfig.eksConfig == nil && upstreamConfig.aksConfig == nil && upstreamConfig.aliConfig == nil) {
 			syncFailed = ": syncing failed"
 		}
 		cluster = cluster.DeepCopy()
@@ -164,7 +172,7 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 
 		// Only continue if one of the configs on upstreamConfig is not nil.
 		// Otherwise, an error occurred and no syncing should occur.
-		if upstreamConfig == nil || (upstreamConfig.gkeConfig == nil && upstreamConfig.eksConfig == nil && upstreamConfig.aksConfig == nil) {
+		if upstreamConfig == nil || (upstreamConfig.gkeConfig == nil && upstreamConfig.eksConfig == nil && upstreamConfig.aksConfig == nil && upstreamConfig.aliConfig == nil) {
 			return c.updateCluster(cluster)
 		}
 	} else if strings.Contains(apimgmtv3.ClusterConditionUpdated.GetMessage(cluster), "[Syncing error") {
@@ -191,6 +199,11 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 		appliedClusterConfig = cluster.Status.AppliedSpec.GKEConfig
 		upstreamClusterConfig = cluster.Status.GKEStatus.UpstreamSpec
 		upstreamSpec = upstreamConfig.gkeConfig
+	case apimgmtv3.ClusterDriverAlibaba:
+		initialClusterConfig = cluster.Spec.AliConfig
+		appliedClusterConfig = cluster.Status.AppliedSpec.AliConfig
+		upstreamClusterConfig = cluster.Status.AliStatus.UpstreamSpec
+		upstreamSpec = upstreamConfig.aliConfig
 	}
 
 	// compare saved cluster.Status...UpstreamSpec with upstreamSpec,
@@ -206,6 +219,8 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 			cluster.Status.EKSStatus.UpstreamSpec = upstreamConfig.eksConfig
 		case apimgmtv3.ClusterDriverGKE:
 			cluster.Status.GKEStatus.UpstreamSpec = upstreamConfig.gkeConfig
+		case apimgmtv3.ClusterDriverAlibaba:
+			cluster.Status.AliStatus.UpstreamSpec = upstreamConfig.aliConfig
 		}
 	}
 
@@ -291,6 +306,10 @@ func getComparableUpstreamSpec(secretsCache wranglerv1.SecretCache, secretClient
 	case apimgmtv3.ClusterDriverGKE:
 		gkeConfig, err := BuildGKEUpstreamSpec(secretsCache, secretClient, cluster)
 		clusterCfg.gkeConfig = gkeConfig
+		return clusterCfg, err
+	case apimgmtv3.ClusterDriverAlibaba:
+		aliConfig, err := BuildAlibabaUpstreamSpec(secretsCache, cluster)
+		clusterCfg.aliConfig = aliConfig
 		return clusterCfg, err
 	default:
 		return nil, fmt.Errorf("unsupported cloud driver")

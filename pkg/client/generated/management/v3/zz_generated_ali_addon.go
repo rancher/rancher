@@ -1,12 +1,12 @@
 package client
 
 const (
-	AddonType        = "addon"
-	AddonFieldConfig = "config"
-	AddonFieldName   = "name"
+	AliAddonType        = "aliAddon"
+	AliAddonFieldConfig = "config"
+	AliAddonFieldName   = "name"
 )
 
-type Addon struct {
+type AliAddon struct {
 	Config string `json:"config,omitempty" yaml:"config,omitempty"`
 	Name   string `json:"name,omitempty" yaml:"name,omitempty"`
 }

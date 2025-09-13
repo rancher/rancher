@@ -93,7 +93,8 @@ func (c *ClusterLifecycleCleanup) Remove(obj *v3.Cluster) (runtime.Object, error
 			(obj.Status.Driver == v32.ClusterDriverImported && !imported.IsAdministratedByProvisioningCluster(obj)) ||
 			(obj.Status.AKSStatus.UpstreamSpec != nil && obj.Status.AKSStatus.UpstreamSpec.Imported) ||
 			(obj.Status.EKSStatus.UpstreamSpec != nil && obj.Status.EKSStatus.UpstreamSpec.Imported) ||
-			(obj.Status.GKEStatus.UpstreamSpec != nil && obj.Status.GKEStatus.UpstreamSpec.Imported) {
+			(obj.Status.GKEStatus.UpstreamSpec != nil && obj.Status.GKEStatus.UpstreamSpec.Imported) ||
+			(obj.Status.AliStatus.UpstreamSpec != nil && obj.Status.AliStatus.UpstreamSpec.Imported) {
 			err = c.cleanupImportedCluster(obj)
 		}
 		if err != nil {
@@ -132,7 +133,7 @@ func (c *ClusterLifecycleCleanup) cleanupLocalCluster(obj *v3.Cluster) error {
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
 	}
-	
+
 	return nil
 }
 

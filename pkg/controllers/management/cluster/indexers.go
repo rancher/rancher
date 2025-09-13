@@ -25,6 +25,10 @@ func byCloudCredentialIndexer(obj *v3.Cluster) ([]string, error) {
 		if obj.Spec.GKEConfig.GoogleCredentialSecret != "" {
 			return []string{obj.Spec.GKEConfig.GoogleCredentialSecret}, nil
 		}
+	case obj.Spec.AliConfig != nil:
+		if obj.Spec.AliConfig.AlibabaCredentialSecret != "" {
+			return []string{obj.Spec.AliConfig.AlibabaCredentialSecret}, nil
+		}
 	}
 	return nil, nil
 }

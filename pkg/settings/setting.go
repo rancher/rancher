@@ -133,6 +133,7 @@ var (
 	EKSUpstreamRefreshCron              = NewSetting("eks-refresh-cron", "*/5 * * * *") // EKSUpstreamRefreshCron is deprecated and will be replaced by EKSUpstreamRefresh
 	EKSUpstreamRefresh                  = NewSetting("eks-refresh", "300")
 	GKEUpstreamRefresh                  = NewSetting("gke-refresh", "300")
+	AlibabaUpstreamRefresh              = NewSetting("alibabacloud-refresh", "300")
 	HideLocalCluster                    = NewSetting("hide-local-cluster", "false")
 	MachineProvisionImage               = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher131")
 	SystemFeatureChartRefreshSeconds    = NewSetting("system-feature-chart-refresh-seconds", "21600")
@@ -212,6 +213,9 @@ var (
 
 	// GkeOperatorVersion is the exact version of the gke-operator and gke-operator-crd chart that Rancher will install.
 	GkeOperatorVersion = NewSetting("gke-operator-version", "")
+
+	// AliOperatorVersion is the exact version of the ali-operator and ali-operator-crd chart that Rancher will install.
+	AliOperatorVersion = NewSetting("ali-operator-version", "")
 
 	// KubeconfigDefaultTokenTTLMinutes is the default time to live applied to kubeconfigs created for users.
 	// This setting will take effect regardless of the kubeconfig-generate-token status.

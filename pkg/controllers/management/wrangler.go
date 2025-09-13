@@ -2,8 +2,10 @@ package management
 
 import (
 	"context"
+
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/aks"
+	"github.com/rancher/rancher/pkg/controllers/management/alibaba"
 	"github.com/rancher/rancher/pkg/controllers/management/authprovisioningv2"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterupstreamrefresher"
 	"github.com/rancher/rancher/pkg/controllers/management/eks"
@@ -21,6 +23,7 @@ func RegisterWrangler(ctx context.Context, wranglerContext *wrangler.Context, ma
 	aks.Register(ctx, wranglerContext, management)
 	eks.Register(ctx, wranglerContext, management)
 	gke.Register(ctx, wranglerContext, management)
+	alibaba.Register(ctx, wranglerContext, management)
 	clusterupstreamrefresher.Register(ctx, wranglerContext)
 
 	feature.Register(ctx, management, wranglerContext)

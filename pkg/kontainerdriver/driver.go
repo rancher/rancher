@@ -29,6 +29,10 @@ func GetDriver(cluster *v3.Cluster, driverLister v3.KontainerDriverLister) (stri
 		return apimgmtv3.ClusterDriverGKE, nil
 	}
 
+	if cluster.Spec.AliConfig != nil {
+		return apimgmtv3.ClusterDriverAlibaba, nil
+	}
+
 	if driver == nil {
 		return "", nil
 	}
