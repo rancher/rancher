@@ -82,7 +82,7 @@ type handler struct {
 	secrets                   corev1controllers.SecretController
 }
 
-func Register(ctx context.Context, clients *wrangler.Context) {
+func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 	h := &handler{
 		clusterRegistrationTokens: clients.Mgmt.ClusterRegistrationToken().Cache(),
 		bundles:                   clients.Fleet.Bundle(),

@@ -24,7 +24,7 @@ type handler struct {
 	apply                     apply.Apply
 }
 
-func Register(ctx context.Context, clients *wrangler.Context) {
+func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 	h := &handler{
 		apply: clients.Apply.WithCacheTypes(
 			clients.Batch.Job(),

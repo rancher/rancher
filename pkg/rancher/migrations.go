@@ -81,7 +81,7 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 	return rkeResourcesCleanup(wranglerContext)
 }
 
-func runRKE2Migrations(wranglerContext *wrangler.Context) error {
+func runRKE2Migrations(wranglerContext *wrangler.CAPIContext) error {
 	if features.RKE2.Enabled() {
 		// must migrate system agent data directory first, since update requests will be rejected by webhook if
 		// "CATTLE_AGENT_VAR_DIR" is set within AgentEnvVars.
@@ -263,7 +263,7 @@ func applyProjectConditionForNamespaceAssignment(label string, condition conditi
 	return nil
 }
 
-func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) error {
+func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.CAPIContext) error {
 	cm, err := getConfigMap(w.Core.ConfigMap(), migrateFromMachineToPlanSecret)
 	if err != nil || cm == nil {
 		return err
@@ -406,7 +406,7 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) err
 	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
 }
 
-func migrateEncryptionKeyRotationLeader(w *wrangler.Context) error {
+func migrateEncryptionKeyRotationLeader(w *wrangler.CAPIContext) error {
 	cm, err := getConfigMap(w.Core.ConfigMap(), migrateEncryptionKeyRotationLeaderToStatus)
 	if err != nil || cm == nil {
 		return err
@@ -456,7 +456,7 @@ func migrateEncryptionKeyRotationLeader(w *wrangler.Context) error {
 	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
 }
 
-func migrateMachinePoolsDynamicSchemaLabel(w *wrangler.Context) error {
+func migrateMachinePoolsDynamicSchemaLabel(w *wrangler.CAPIContext) error {
 	cm, err := getConfigMap(w.Core.ConfigMap(), migrateDynamicSchemaToMachinePools)
 	if err != nil || cm == nil {
 		return err
@@ -529,7 +529,7 @@ func migrateMachinePoolsDynamicSchemaLabel(w *wrangler.Context) error {
 	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
 }
 
-func migrateSystemAgentDataDirectory(w *wrangler.Context) error {
+func migrateSystemAgentDataDirectory(w *wrangler.CAPIContext) error {
 	cm, err := getConfigMap(w.Core.ConfigMap(), migrateSystemAgentVarDirToDataDirectory)
 	if err != nil || cm == nil {
 		return err

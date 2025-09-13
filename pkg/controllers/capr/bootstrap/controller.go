@@ -57,7 +57,7 @@ type handler struct {
 	k8s                 kubernetes.Interface
 }
 
-func Register(ctx context.Context, clients *wrangler.Context) {
+func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 	h := &handler{
 		serviceAccountCache: clients.Core.ServiceAccount().Cache(),
 		secretCache:         clients.Core.Secret().Cache(),

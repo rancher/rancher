@@ -22,6 +22,7 @@ import (
 	provisioningcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkev1controllers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -60,15 +61,15 @@ type handler struct {
 
 // Register sets up the v2provisioning snapshot backpopulate controller. This controller is responsible for monitoring
 // the downstream etcd-snapshots configmap and backpopulating snapshots into etcd snapshot objects in the management cluster.
-func Register(ctx context.Context, userContext *config.UserContext) {
+func Register(ctx context.Context, userContext *config.UserContext, capi *wrangler.CAPIContext) {
 	h := handler{
 		clusterName:                userContext.ClusterName,
 		clusterCache:               userContext.Management.Wrangler.Provisioning.Cluster().Cache(),
 		controlPlaneCache:          userContext.Management.Wrangler.RKE.RKEControlPlane().Cache(),
 		etcdSnapshotCache:          userContext.Management.Wrangler.RKE.ETCDSnapshot().Cache(),
 		etcdSnapshotController:     userContext.Management.Wrangler.RKE.ETCDSnapshot(),
-		machineCache:               userContext.Management.Wrangler.CAPI.Machine().Cache(),
-		capiClusterCache:           userContext.Management.Wrangler.CAPI.Cluster().Cache(),
+		machineCache:               capi.CAPI.Machine().Cache(),
+		capiClusterCache:           capi.CAPI.Cluster().Cache(),
 		etcdSnapshotFileController: userContext.K3s.V1().ETCDSnapshotFile(),
 		etcdSnapshotFileCache:      userContext.K3s.V1().ETCDSnapshotFile().Cache(),
 	}
@@ -109,7 +110,6 @@ func (h *handler) OnUpstreamChange(_ string, snapshot *rkev1.ETCDSnapshot) (*rke
 
 	// Only delete snapshots if the annotation is present: this will allow users to manually create snapshot objects during a DR scenario
 	if snapshot.Annotations == nil || snapshot.Annotations[capr.SnapshotNameAnnotation] == "" {
-		logrus.Debugf("%s local snapshot %s will not be deleted due to missing annotation %s", logPrefix, snapshot.Name, capr.SnapshotNameAnnotation)
 		return snapshot, nil
 	}
 
@@ -379,6 +379,7 @@ func (h *handler) getSnapshotsFromSnapshotFile(cluster *provv1.Cluster, snapshot
 	if err != nil {
 		return nil, err
 	}
+	logrus.Infof("[DEBUG - getSnapshotsFromSnapshotFile] Got snapshots from snapshot file")
 	return snapshots, nil
 }
 

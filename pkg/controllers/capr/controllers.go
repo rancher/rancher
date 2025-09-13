@@ -25,7 +25,7 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 )
 
-func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager *kubeconfig.Manager) error {
+func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigManager *kubeconfig.Manager) error {
 	rkePlanner := planner.New(ctx, clients, planner.InfoFunctions{
 		ImageResolver:           image.ResolveWithControlPlane,
 		ReleaseData:             capr.GetKDMReleaseData,

@@ -543,7 +543,7 @@ func Test_OnChange(t *testing.T) {
 			_, err := r.OnChange("", tt.rt)
 
 			if (err != nil) != tt.wantErr {
-				t.Errorf("roleTemplateHandler.OnChange() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("roleTemplateHandler.WaitForClient() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 		})

@@ -69,7 +69,7 @@ func Register(ctx context.Context, clients *wrangler.Context, embedded bool, reg
 		clusterindex.Register(ctx, clients)
 		cluster.EarlyRegister(ctx, clients, kubeconfigManager)
 		// defer registration of controllers which have CAPI clients or use CAPI caches
-		clients.DeferredCAPIRegistration.DeferRegistration(func(ctx context.Context, clients *wrangler.Context) error {
+		clients.DeferredCAPIRegistration.DeferRegistration(func(ctx context.Context, clients *wrangler.CAPIContext) error {
 			provisioningv2.Register(ctx, clients, kubeconfigManager)
 			if features.RKE2.Enabled() {
 				if err := capr.Register(ctx, clients, kubeconfigManager); err != nil {

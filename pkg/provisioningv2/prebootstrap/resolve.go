@@ -17,7 +17,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func NewRetriever(clients *wrangler.Context) *Retriever {
+func NewRetriever(clients *wrangler.CAPIContext) *Retriever {
 	return &Retriever{
 		mgmtClusterCache:              clients.Mgmt.Cluster().Cache(),
 		clusterRegistrationTokenCache: clients.Mgmt.ClusterRegistrationToken().Cache(),
