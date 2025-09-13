@@ -347,13 +347,13 @@ func tokens(schemas *types.Schemas) *types.Schemas {
 			schema.CollectionActions = map[string]types.Action{
 				"logout": {},
 				"logoutAll": {
-					Input:  "samlConfigLogoutInput",
-					Output: "samlConfigLogoutOutput",
+					Input:  "authConfigLogoutInput",
+					Output: "authConfigLogoutOutput",
 				},
 			}
 		}).
-		MustImport(&Version, v3.SamlConfigLogoutInput{}).
-		MustImport(&Version, v3.SamlConfigLogoutOutput{})
+		MustImport(&Version, v3.AuthConfigLogoutInput{}).
+		MustImport(&Version, v3.AuthConfigLogoutOutput{})
 }
 
 func authnTypes(schemas *types.Schemas) *types.Schemas {

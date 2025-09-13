@@ -81,7 +81,7 @@ type TokenOperations interface {
 
 	CollectionActionLogout(resource *TokenCollection) error
 
-	CollectionActionLogoutAll(resource *TokenCollection, input *SamlConfigLogoutInput) (*SamlConfigLogoutOutput, error)
+	CollectionActionLogoutAll(resource *TokenCollection, input *AuthConfigLogoutInput) (*AuthConfigLogoutOutput, error)
 }
 
 func newTokenClient(apiClient *Client) *TokenClient {
@@ -158,8 +158,8 @@ func (c *TokenClient) CollectionActionLogout(resource *TokenCollection) error {
 	return err
 }
 
-func (c *TokenClient) CollectionActionLogoutAll(resource *TokenCollection, input *SamlConfigLogoutInput) (*SamlConfigLogoutOutput, error) {
-	resp := &SamlConfigLogoutOutput{}
+func (c *TokenClient) CollectionActionLogoutAll(resource *TokenCollection, input *AuthConfigLogoutInput) (*AuthConfigLogoutOutput, error) {
+	resp := &AuthConfigLogoutOutput{}
 	err := c.apiClient.Ops.DoCollectionAction(TokenType, "logoutAll", &resource.Collection, input, resp)
 	return resp, err
 }
