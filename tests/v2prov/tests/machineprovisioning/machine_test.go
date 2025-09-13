@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	provisioningv1api "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -18,6 +19,7 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/operations"
 	"github.com/rancher/rancher/tests/v2prov/wait"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	errgroup2 "golang.org/x/sync/errgroup"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
@@ -648,4 +650,167 @@ func Test_Provisioning_MP_DrainNoDelete(t *testing.T) {
 	assert.False(t, ok)
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	assert.NoError(t, err)
+}
+
+func Test_Provisioning_Single_Node_All_Roles_Drain(t *testing.T) {
+	clients, err := clients.New()
+	require.NoError(t, err)
+	defer clients.Close()
+
+	ctx := clients.Ctx
+
+	drainOptions := rkev1.DrainOptions{
+		Enabled:                         true,
+		DeleteEmptyDirData:              true,
+		DisableEviction:                 false,
+		GracePeriod:                     -1,
+		Force:                           false,
+		IgnoreDaemonSets:                ptr.To(true),
+		SkipWaitForDeleteTimeoutSeconds: 0,
+		Timeout:                         120,
+	}
+
+	// Single-node (cp+etcd+worker) with drain upgrade strategy option enabled for both CP and worker
+	provClusterSchema := &provisioningv1api.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-single-node-drain",
+		},
+		Spec: provisioningv1api.ClusterSpec{
+			KubernetesVersion: defaults.SomeK8sVersion,
+			RKEConfig: &provisioningv1api.RKEConfig{
+				ClusterConfiguration: rkev1.ClusterConfiguration{
+					UpgradeStrategy: rkev1.ClusterUpgradeStrategy{
+						ControlPlaneDrainOptions: drainOptions,
+						ControlPlaneConcurrency:  "1",
+						WorkerDrainOptions:       drainOptions,
+						WorkerConcurrency:        "1",
+					},
+				},
+				MachinePools: []provisioningv1api.RKEMachinePool{{
+					EtcdRole:         true,
+					ControlPlaneRole: true,
+					WorkerRole:       true,
+					Quantity:         &defaults.One,
+				}},
+			},
+		},
+	}
+
+	c, err := cluster.New(clients, provClusterSchema)
+	require.NoError(t, err)
+
+	c, err = cluster.WaitForCreate(clients, c)
+	require.NoError(t, err)
+
+	// Validate that exactly one Machine and capture its template hash
+	machines, err := cluster.Machines(clients, c)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(machines.Items), "expected exactly one machine initially")
+
+	firstMachine := machines.Items[0]
+	firstMachineHash := firstMachine.Labels["machine-template-hash"]
+	require.NotEmpty(t, firstMachineHash, "firstMachine missing template-hash label")
+
+	// Create a fresh machine config that can be mutated.
+	newCfgRef, err := nodeconfig.NewPodConfig(clients, c.Namespace)
+	require.NoError(t, err)
+
+	gvrPodConfig := schema.GroupVersionResource{
+		Group: "rke-machine-config.cattle.io", Version: "v1", Resource: "podconfigs",
+	}
+	newPodConfig, err := clients.Dynamic.Resource(gvrPodConfig).Namespace(c.Namespace).Get(ctx, newCfgRef.Name, metav1.GetOptions{})
+	require.NoError(t, err)
+
+	currentUserData, ok := unstructuredString(newPodConfig.Object, "userdata")
+	require.True(t, ok)
+
+	// Force a no-op template diff
+	newPodConfig.Object["userdata"] = currentUserData + `# Noop Change`
+
+	_, err = clients.Dynamic.Resource(gvrPodConfig).Namespace(c.Namespace).Update(ctx, newPodConfig, metav1.UpdateOptions{})
+	require.NoError(t, err)
+
+	provCluster, err := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
+	require.NoError(t, err)
+
+	require.NotNil(t, provCluster.Spec.RKEConfig)
+	require.GreaterOrEqual(t, len(provCluster.Spec.RKEConfig.MachinePools), 1)
+
+	// Point the pool at the new PodConfig.
+	provCluster.Spec.RKEConfig.MachinePools[0].NodeConfig = newCfgRef
+	_, err = clients.Provisioning.Cluster().Update(provCluster)
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		machines, _ = cluster.Machines(clients, c)
+		return len(machines.Items) == 2
+	}, 5*time.Minute, 2*time.Second, "never saw 2 nodes after config change")
+
+	var secondMachineName string
+	require.Eventually(t, func() bool {
+		machines, _ = cluster.Machines(clients, c)
+		for _, m := range machines.Items {
+			hash := m.Labels["machine-template-hash"]
+			if hash != "" && hash != firstMachineHash && m.Status.NodeRef != nil {
+				secondMachineName = m.Name
+				return true
+			}
+		}
+		return false
+	}, 15*time.Minute, 2*time.Second, "no node with new template hash (and NodeRef) appeared")
+
+	// Ensure the second node reaches Ready=True
+	var secondMachineNode *corev1.Node
+	clusterClients, err := clients.ForCluster(c.Namespace, c.Name)
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		m, err := clients.CAPI.Machine().Get(c.Namespace, secondMachineName, metav1.GetOptions{})
+		if err != nil || m.Status.NodeRef == nil {
+			return false
+		}
+
+		secondMachineNode, err = clusterClients.Core.Node().Get(m.Status.NodeRef.Name, metav1.GetOptions{})
+		if err != nil {
+			return false
+		}
+		for _, cond := range secondMachineNode.Status.Conditions {
+			if cond.Type == corev1.NodeReady && cond.Status == corev1.ConditionTrue {
+				return true
+			}
+		}
+		return false
+	}, 20*time.Minute, 2*time.Second, "second machine node never reached Ready=True")
+
+	// Sanity: incoming CP should not be cordoned
+	require.False(t, secondMachineNode.Spec.Unschedulable, "second machine node was cordoned; incoming controlplane should not be drained")
+
+	require.Eventually(t, func() bool {
+		m, err := clients.CAPI.Machine().Get(firstMachine.Namespace, firstMachine.Name, metav1.GetOptions{})
+		if err != nil {
+			// already deleted is also OK
+			return apierror.IsNotFound(err)
+		}
+		return !m.DeletionTimestamp.IsZero()
+	}, 15*time.Minute, 2*time.Second, "first machine node never entered Deleting")
+
+	require.Eventually(t, func() bool {
+		ml, _ := cluster.Machines(clients, c)
+		return len(ml.Items) == 1
+	}, 15*time.Minute, 2*time.Second, "did not converge back to a single node")
+
+	require.Eventually(t, func() bool {
+		latest, err := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
+		return err == nil && latest.Status.Ready
+	}, 10*time.Minute, 10*time.Second, "cluster did not return to Ready after rollout")
+}
+
+// unstructuredString safely returns a top-level string field from an Unstructured.Object
+func unstructuredString(obj map[string]any, key string) (string, bool) {
+	raw, ok := obj[key]
+	if !ok {
+		return "", false
+	}
+	s, ok2 := raw.(string)
+	return s, ok2
 }
