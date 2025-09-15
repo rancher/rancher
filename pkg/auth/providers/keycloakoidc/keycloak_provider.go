@@ -34,7 +34,7 @@ type keyCloakOIDCProvider struct {
 }
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
-	return &keyCloakOIDCProvider{
+	p := &keyCloakOIDCProvider{
 		oidc.OpenIDCProvider{
 			Name:        Name,
 			Type:        client.KeyCloakOIDCConfigType,
@@ -42,9 +42,11 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 			AuthConfigs: mgmtCtx.Management.AuthConfigs(""),
 			Secrets:     mgmtCtx.Wrangler.Core.Secret(),
 			UserMGR:     userMGR,
-			TokenMGR:    tokenMGR,
+			TokenMgr:    tokenMGR,
 		},
 	}
+	p.GetConfig = p.GetOIDCConfig
+	return p
 }
 
 func (k *keyCloakOIDCProvider) GetName() string {
@@ -121,7 +123,7 @@ func (k *keyCloakOIDCProvider) toPrincipal(principalType string, acct account, t
 		princ.PrincipalType = GroupType
 		princ.ObjectMeta = metav1.ObjectMeta{Name: k.GetName() + "_" + principalType + "://" + acct.Name}
 		if token != nil {
-			princ.MemberOf = k.TokenMGR.IsMemberOf(token, princ)
+			princ.MemberOf = k.TokenMgr.IsMemberOf(token, princ)
 		}
 	}
 	return princ
@@ -158,7 +160,7 @@ func (k *keyCloakOIDCProvider) GetPrincipal(principalID string, token accessor.T
 
 func (k *keyCloakOIDCProvider) getRefreshAndUpdateToken(ctx context.Context, oauthConfig oauth2.Config, token accessor.TokenAccessor) (*oauth2.Token, error) {
 	var oauthToken *oauth2.Token
-	storedOauthToken, err := k.TokenMGR.GetSecret(token.GetUserID(), token.GetAuthProvider(), []accessor.TokenAccessor{token})
+	storedOauthToken, err := k.TokenMgr.GetSecret(token.GetUserID(), token.GetAuthProvider(), []accessor.TokenAccessor{token})
 	if err := json.Unmarshal([]byte(storedOauthToken), &oauthToken); err != nil {
 		return oauthToken, err
 	}

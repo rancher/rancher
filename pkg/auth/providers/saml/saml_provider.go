@@ -144,10 +144,10 @@ func (s *Provider) LogoutAll(apiContext *types.APIContext, token accessor.TokenA
 		return fmt.Errorf("SAML [logout-all]: Rancher provider resource `%v` not configured for SLO", providerName)
 	}
 
-	samlLogout := &v32.SamlConfigLogoutInput{}
+	authLogout := &v32.AuthConfigLogoutInput{}
 
 	r := apiContext.Request
-	if err := json.NewDecoder(r.Body).Decode(samlLogout); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(authLogout); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("SAML: Failed to parse body: %v", err))
 	}
@@ -163,7 +163,7 @@ func (s *Provider) LogoutAll(apiContext *types.APIContext, token accessor.TokenA
 		return fmt.Errorf("SAML [logout-all]: UserAttribute extras contains no username for provider %q", providerName)
 	}
 	userAtProvider := usernames[0]
-	finalRedirectURL := samlLogout.FinalRedirectURL
+	finalRedirectURL := authLogout.FinalRedirectURL
 
 	w := apiContext.Response
 	provider.clientState.SetPath(provider.serviceProvider.SloURL.Path)
@@ -179,7 +179,7 @@ func (s *Provider) LogoutAll(apiContext *types.APIContext, token accessor.TokenA
 
 	data := map[string]interface{}{
 		"idpRedirectUrl": idpRedirectURL,
-		"type":           "samlConfigLogoutOutput",
+		"type":           "authConfigLogoutOutput",
 	}
 
 	apiContext.WriteResponse(http.StatusOK, data)

@@ -560,11 +560,11 @@ type SamlConfigTestOutput struct {
 	IdpRedirectURL string `json:"idpRedirectUrl"`
 }
 
-type SamlConfigLogoutInput struct {
+type AuthConfigLogoutInput struct {
 	FinalRedirectURL string `json:"finalRedirectUrl"`
 }
 
-type SamlConfigLogoutOutput struct {
+type AuthConfigLogoutOutput struct {
 	IdpRedirectURL string `json:"idpRedirectUrl"`
 }
 
@@ -615,6 +615,19 @@ type OIDCConfig struct {
 	Scopes string `json:"scope,omitempty"`
 	// AcrValue is expected to be string containing the required ACR value
 	AcrValue string `json:"acrValue,omitempty"`
+
+	// This is provided by the OIDC Provider - it is the `end_session_uri` from
+	// the discovery data.
+	EndSessionEndpoint string `json:"endSessionEndpoint,omitempty"`
+	// Flag. True when the auth provider is configured to accept a `Logout All`
+	// operation. Can be set if and only if the provider supports `Logout All`
+	// (see AuthConfig.LogoutAllSupported).
+	LogoutAllEnabled bool `json:"logoutAllEnabled,omitempty"`
+
+	// Flag. Can be set if and only if `LogoutAllEnabled` (above) is set.
+	// When set `Logout All` is the only kind of logout accepted. A regular
+	// logout request will be rejected.
+	LogoutAllForced bool `json:"logoutAllForced,omitempty"`
 }
 
 type OIDCTestOutput struct {
