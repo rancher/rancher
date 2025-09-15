@@ -51,10 +51,27 @@ var (
 		"x-api-cattleauth-header": true,
 		"cf-connecting-ip":        true,
 		"cf-ray":                  true,
-		"impersonate-user":        true,
-		"impersonate-group":       true,
+	}
+	badHeaderPrefixes = []string{
+		"impersonate-",
 	}
 )
+
+func isBadHeader(header string) bool {
+	header = strings.ToLower(header)
+
+	if badHeaders[header] {
+		return true
+	}
+
+	for _, prefix := range badHeaderPrefixes {
+		if strings.HasPrefix(header, prefix) {
+			return true
+		}
+	}
+
+	return false
+}
 
 type Supplier func() []string
 
@@ -153,7 +170,6 @@ func (p *proxy) proxy(req *http.Request) error {
 	}
 
 	destURL.RawQuery = req.URL.RawQuery
-
 	destURLHostname := destURL.Hostname()
 
 	if !p.isAllowed(destURLHostname) {
@@ -165,10 +181,12 @@ func (p *proxy) proxy(req *http.Request) error {
 	if req.TLS != nil {
 		headerCopy.Set(ForwardProto, "https")
 	}
+
 	auth := req.Header.Get(APIAuth)
 	cAuth := req.Header.Get(CattleAuth)
-	for name, value := range req.Header {
-		if badHeaders[strings.ToLower(name)] {
+
+	for key, value := range req.Header {
+		if isBadHeader(key) {
 			continue
 		}
 
@@ -176,7 +194,7 @@ func (p *proxy) proxy(req *http.Request) error {
 		for i := range value {
 			copy[i] = strings.TrimPrefix(value[i], "rancher:")
 		}
-		headerCopy[name] = copy
+		headerCopy[key] = copy
 	}
 
 	req.Host = destURLHostname
