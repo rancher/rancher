@@ -163,9 +163,7 @@ func (e *aliOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 			}
 
 			if apimgmtv3.ClusterConditionPending.IsUnknown(cluster) {
-				cluster = cluster.DeepCopy()
-				apimgmtv3.ClusterConditionPending.True(cluster)
-				cluster, err = e.ClusterClient.Update(cluster)
+				cluster, err = e.SetTrue(cluster, apimgmtv3.ClusterConditionPending, "")
 				if err != nil {
 					return cluster, err
 				}
