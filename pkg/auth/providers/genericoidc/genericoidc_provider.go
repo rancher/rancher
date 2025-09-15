@@ -29,7 +29,7 @@ const (
 )
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
-	return &GenOIDCProvider{
+	p := &GenOIDCProvider{
 		baseoidc.OpenIDCProvider{
 			Name:        Name,
 			Type:        client.GenericOIDCConfigType,
@@ -37,9 +37,11 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 			AuthConfigs: mgmtCtx.Management.AuthConfigs(""),
 			Secrets:     mgmtCtx.Wrangler.Core.Secret(),
 			UserMGR:     userMGR,
-			TokenMGR:    tokenMGR,
+			TokenMgr:    tokenMGR,
 		},
 	}
+	p.GetConfig = p.GetOIDCConfig
+	return p
 }
 
 // GetName returns the name of this provider.
@@ -170,7 +172,7 @@ func (g *GenOIDCProvider) toPrincipalFromToken(principalType string, princ v3.Pr
 	} else {
 		princ.PrincipalType = GroupType
 		if token != nil {
-			princ.MemberOf = g.TokenMGR.IsMemberOf(token, princ)
+			princ.MemberOf = g.TokenMgr.IsMemberOf(token, princ)
 		}
 	}
 	return princ
