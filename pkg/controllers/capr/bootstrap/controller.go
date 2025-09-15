@@ -581,8 +581,7 @@ func (h *handler) electionBackoffWait(bootstrap *rkev1.RKEBootstrap, machine *ca
 		return 0, nil
 	}
 
-	// Count etcd machines in the same CAPI cluster that are NOT deleting (excluding this one).
-	otherEtcd := 0
+	// List all the etcd machines in the cluster
 	machines, err := h.machineCache.List(bootstrap.Namespace, labels.SelectorFromSet(labels.Set{
 		capi.ClusterNameLabel: bootstrap.Spec.ClusterName,
 		capr.EtcdRoleLabel:    "true",
@@ -594,20 +593,16 @@ func (h *handler) electionBackoffWait(bootstrap *rkev1.RKEBootstrap, machine *ca
 		return 0, nil
 	}
 
-	// Exactly one of the two should not be deleting, and it must be a different machine.
+	// Find the other etcd machine; if it’s not deleting, we back off.
 	for _, m := range machines {
-		if !m.DeletionTimestamp.IsZero() && m.Name != machine.Name {
-			otherEtcd++
+		if m.DeletionTimestamp.IsZero() && m.Name != machine.Name {
+			// Exactly one remaining etcd member; back off to let leadership settle.
+			since := time.Since(machine.DeletionTimestamp.Time)
+			if since < electionBackoff {
+				return electionBackoff - since, nil
+			}
 		}
 	}
-	if otherEtcd == 0 {
-		return 0, nil
-	}
 
-	// If there's exactly one remaining etcd member, back off to let leadership settle.
-	since := time.Since(machine.DeletionTimestamp.Time)
-	if since < electionBackoff {
-		return electionBackoff - since, nil
-	}
 	return 0, nil
 }
