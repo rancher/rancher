@@ -52,7 +52,7 @@ type handler struct {
 	capiMachineCache  capicontrollers.MachineCache
 }
 
-func Register(ctx context.Context, clients *wrangler.Context) {
+func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 	h := handler{
 		dynamic:           clients.Dynamic,
 		secretCache:       clients.Core.Secret().Cache(),

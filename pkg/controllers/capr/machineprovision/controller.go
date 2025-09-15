@@ -101,7 +101,7 @@ type handler struct {
 	kubeconfigManager   *kubeconfig.Manager
 }
 
-func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager *kubeconfig.Manager) {
+func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigManager *kubeconfig.Manager) {
 	h := &handler{
 		ctx: ctx,
 		apply: clients.Apply.WithCacheTypes(clients.Core.Secret(),
@@ -330,7 +330,7 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 			return obj, err
 		}
 		logrus.Debugf("[machineprovision] create job for %s not finished, job was found and the error was not nil and was not an isnotfound", key)
-		// OnChange handler will not run when the infra machine is being deleted, we have to reconcile here in order to
+		// WaitForClient handler will not run when the infra machine is being deleted, we have to reconcile here in order to
 		// finish the create job, since it has to have completed successfully or never ran for the delete job to run
 		state, _, err := h.run(infra, true)
 		if err != nil {

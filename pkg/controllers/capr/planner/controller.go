@@ -33,7 +33,7 @@ type handler struct {
 	controlPlanes v1.RKEControlPlaneController
 }
 
-func Register(ctx context.Context, clients *wrangler.Context, planner *caprplanner.Planner) {
+func Register(ctx context.Context, clients *wrangler.CAPIContext, planner *caprplanner.Planner) {
 	h := handler{
 		planner:       planner,
 		controlPlanes: clients.RKE.RKEControlPlane(),
@@ -89,7 +89,7 @@ func Register(ctx context.Context, clients *wrangler.Context, planner *caprplann
 }
 
 func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
-	logrus.Debugf("[planner] rkecluster %s/%s: handler OnChange called", cp.Namespace, cp.Name)
+	logrus.Debugf("[planner] rkecluster %s/%s: handler WaitForClient called", cp.Namespace, cp.Name)
 	if !cp.DeletionTimestamp.IsZero() {
 		return status, nil
 	}

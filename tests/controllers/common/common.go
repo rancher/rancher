@@ -34,6 +34,15 @@ func StartNormanControllers(ctx context.Context, t *testing.T, m *config.Managem
 	}
 }
 
+func StartWranglerControllers(ctx context.Context, t *testing.T, w *wrangler.Context, gvk ...schema.GroupVersionKind) {
+	for _, g := range gvk {
+		c, err := w.ControllerFactory.ForKind(g)
+		assert.NoError(t, err)
+		err = c.Start(ctx, 1)
+		assert.NoError(t, err)
+	}
+}
+
 func StartWranglerCaches(ctx context.Context, t *testing.T, w *wrangler.Context, gvk ...schema.GroupVersionKind) {
 	for _, g := range gvk {
 		err := w.ControllerFactory.SharedCacheFactory().StartGVK(ctx, g)
