@@ -6,9 +6,11 @@ import (
 	"reflect"
 	"time"
 
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/clustermanager"
 	mgmtconv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
+	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	wrangler "github.com/rancher/wrangler/v3/pkg/name"
@@ -18,10 +20,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
-
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var (
@@ -61,25 +62,31 @@ type fleetPermissionsRoleHandler interface {
 	reconcileFleetWorkspacePermissions(globalRole *v3.GlobalRole) error
 }
 
-func newGlobalRoleLifecycle(management *config.ManagementContext) *globalRoleLifecycle {
+func newGlobalRoleLifecycle(management *config.ManagementContext, clusterManager *clustermanager.Manager) *globalRoleLifecycle {
 	return &globalRoleLifecycle{
+		clusters:                management.Wrangler.Mgmt.Cluster(),
+		clusterManager:          clusterManager,
 		crLister:                management.RBAC.ClusterRoles("").Controller().Lister(),
 		crClient:                management.RBAC.ClusterRoles(""),
 		nsCache:                 management.Wrangler.Core.Namespace().Cache(),
 		rLister:                 management.RBAC.Roles("").Controller().Lister(),
 		rClient:                 management.RBAC.Roles(""),
 		grClient:                management.Wrangler.Mgmt.GlobalRole(),
+		grbCache:                management.Wrangler.Mgmt.GlobalRoleBinding().Cache(),
 		fleetPermissionsHandler: newFleetWorkspaceRoleHandler(management),
 	}
 }
 
 type globalRoleLifecycle struct {
+	clusters                mgmtconv3.ClusterClient
+	clusterManager          *clustermanager.Manager
 	crLister                rbacv1.ClusterRoleLister
 	crClient                rbacv1.ClusterRoleInterface
 	nsCache                 wcorev1.NamespaceCache
 	rLister                 rbacv1.RoleLister
 	rClient                 rbacv1.RoleInterface
 	grClient                mgmtconv3.GlobalRoleClient
+	grbCache                mgmtconv3.GlobalRoleBindingCache
 	fleetPermissionsHandler fleetPermissionsRoleHandler
 }
 
@@ -119,6 +126,27 @@ func (gr *globalRoleLifecycle) Updated(obj *v3.GlobalRole) (runtime.Object, erro
 }
 
 func (gr *globalRoleLifecycle) Remove(obj *v3.GlobalRole) (runtime.Object, error) {
+	if rbac.IsAdminGlobalRole(obj) {
+		// List globalrolebindings that reference this global role.
+		grbs, err := gr.grbCache.List(labels.Everything())
+		if err != nil {
+			return nil, err
+		}
+
+		var errs error
+		for _, grb := range grbs {
+			if grb.GlobalRoleName == obj.Name {
+				err = DeleteAdminClusterRoleBindings(gr.clusters, gr.clusterManager, grb)
+				if err != nil {
+					errs = errors.Join(errs, fmt.Errorf("failed to delete ClusterRoleBindings for admin GlobalRoleBinding %s: %w", grb.Name, err))
+				}
+			}
+		}
+		if errs != nil {
+			return nil, errs
+		}
+	}
+
 	// Don't need to delete the created ClusterRole or Roles because owner reference will take care of them
 	err := gr.setGRAsTerminating(obj)
 	return nil, err
