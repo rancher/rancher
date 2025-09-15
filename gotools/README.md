@@ -37,7 +37,7 @@ For example, controller-gen was added this way:
 TOOLNAME=controller-gen
 mkdir -p gotools/"$TOOLNAME"
 go mod init -modfile=gotools/"$TOOLNAME"/go.mod github.com/rancher/rancher/gotools/"$TOOLNAME"
-go get -tool -modfile=gotools/"$TOOLNAME"/go.mod sigs.k8s.io/controller-tools/cmd/controller-gen@v0.17.1
+go get -tool -modfile=gotools/"$TOOLNAME"/go.mod sigs.k8s.io/controller-tools/cmd/controller-gen@v0.19.0
 ```
 
 
@@ -50,9 +50,9 @@ TOOLNAME=<tool name>
 go get -tool -modfile=gotools/"$TOOLNAME"/go.mod <module>@<new version>
 ```
 
-For example, to update controller-gen to v0.17.3:
+For example, to update controller-gen to v0.19.0:
 
 ```
 TOOLNAME=controller-gen
-go get -tool -modfile=gotools/"$TOOLNAME"/go.mod sigs.k8s.io/controller-tools/cmd/controller-gen@v0.17.3
+go get -tool -modfile=gotools/"$TOOLNAME"/go.mod sigs.k8s.io/controller-tools/cmd/controller-gen@v0.19.0
 ```
