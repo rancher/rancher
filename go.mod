@@ -74,13 +74,13 @@ require (
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.4.2
 	github.com/Masterminds/semver/v3 v3.3.0
 	github.com/Masterminds/sprig/v3 v3.3.0
-	github.com/alibabacloud-go/cs-20151215/v5 v5.9.5
-	github.com/alibabacloud-go/darabonba-openapi/v2 v2.1.8
+	github.com/alibabacloud-go/cs-20151215/v5 v5.9.7
+	github.com/alibabacloud-go/darabonba-openapi/v2 v2.1.10
 	github.com/alibabacloud-go/ecs-20140526/v7 v7.0.13
 	github.com/alibabacloud-go/resourcemanager-20200331/v3 v3.3.0
-	github.com/alibabacloud-go/tea v1.3.9
+	github.com/alibabacloud-go/tea v1.3.10
 	github.com/alibabacloud-go/vpc-20160428/v6 v6.12.8
-	github.com/aliyun/credentials-go v1.4.6
+	github.com/aliyun/credentials-go v1.4.7
 	github.com/aws/aws-sdk-go v1.55.5
 	github.com/aws/aws-sdk-go-v2 v1.37.2
 	github.com/aws/aws-sdk-go-v2/credentials v1.18.3
@@ -125,6 +125,7 @@ require (
 	github.com/prometheus/client_golang v1.22.0
 	github.com/prometheus/client_model v0.6.1
 	github.com/rancher/aks-operator v1.12.1
+	github.com/rancher/ali-operator v0.0.0-20250910043122-2aba32fbfe4c
 	github.com/rancher/apiserver v0.7.3
 	github.com/rancher/channelserver v0.7.0
 	github.com/rancher/dynamiclistener v0.7.0
@@ -249,7 +250,6 @@ require (
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/prometheus/common v0.62.0 // indirect
-	github.com/rancher/ali-operator v0.0.0-20250820165811-6163f9930e10 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
 	github.com/skeema/knownhosts v1.3.0 // indirect
