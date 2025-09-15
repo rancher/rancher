@@ -1,8 +1,6 @@
 module github.com/rancher/rancher/pkg/apis
 
-go 1.24.0
-
-toolchain go1.24.5
+go 1.25.0
 
 replace (
 	k8s.io/api => k8s.io/api v0.33.2
@@ -38,14 +36,14 @@ require (
 	github.com/rancher/aks-operator v1.12.1
 	github.com/rancher/ali-operator v0.0.0-20250820165811-6163f9930e10
 	github.com/rancher/eks-operator v1.12.1
-	github.com/rancher/fleet/pkg/apis v0.13.0
+	github.com/rancher/fleet/pkg/apis v0.14.0-alpha.2
 	github.com/rancher/gke-operator v1.12.1
 	github.com/rancher/norman v0.7.0
 	github.com/rancher/rke v1.8.0-rc.4
-	github.com/rancher/wrangler/v3 v3.2.4-rc.1
+	github.com/rancher/wrangler/v3 v3.2.4
 	github.com/sirupsen/logrus v1.9.3
-	k8s.io/api v0.33.2
-	k8s.io/apimachinery v0.33.2
+	k8s.io/api v0.34.1
+	k8s.io/apimachinery v0.34.1
 	sigs.k8s.io/cluster-api v1.10.2
 )
 
@@ -56,7 +54,7 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/emicklei/go-restful/v3 v3.12.2 // indirect
 	github.com/evanphx/json-patch v5.9.11+incompatible // indirect
-	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
+	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
@@ -70,7 +68,7 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
-	github.com/modern-go/reflect2 v1.0.2 // indirect
+	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_golang v1.22.0 // indirect
@@ -102,8 +100,8 @@ require (
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a9a2ff // indirect
 	k8s.io/kubernetes v1.33.1 // indirect
-	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738 // indirect
-	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
+	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397 // indirect
+	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.6.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
