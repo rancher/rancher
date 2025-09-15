@@ -15,7 +15,7 @@ type Retriever struct {
 }
 
 // NewRetriever returns a new instance of the systeminfo.Retriever
-func NewRetriever(clients *wrangler.Context) *Retriever {
+func NewRetriever(clients *wrangler.CAPIContext) *Retriever {
 	if clients == nil {
 		return nil
 	}

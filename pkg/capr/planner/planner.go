@@ -146,7 +146,7 @@ type InfoFunctions struct {
 	GetBootstrapManifests   func(plane *rkev1.RKEControlPlane) ([]plan.File, error)
 }
 
-func New(ctx context.Context, clients *wrangler.Context, functions InfoFunctions) *Planner {
+func New(ctx context.Context, clients *wrangler.CAPIContext, functions InfoFunctions) *Planner {
 	clients.Mgmt.ClusterRegistrationToken().Cache().AddIndexer(ClusterRegToken, func(obj *v3.ClusterRegistrationToken) ([]string, error) {
 		return []string{obj.Spec.ClusterName}, nil
 	})

@@ -24,6 +24,7 @@ import (
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/config/systemtokens"
+	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -80,7 +81,7 @@ type nodeDrain struct {
 
 type canChangeValuePolicy func(key string) bool
 
-func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter common.KubeConfigGetter) {
+func Register(ctx context.Context, cluster *config.UserContext, capi *wrangler.CAPIContext, kubeConfigGetter common.KubeConfigGetter) {
 	m := &nodesSyncer{
 		clusterNamespace:     cluster.ClusterName,
 		machines:             cluster.Management.Management.Nodes(cluster.ClusterName),
@@ -90,7 +91,7 @@ func Register(ctx context.Context, cluster *config.UserContext, kubeConfigGetter
 		clusterLister:        cluster.Management.Management.Clusters("").Controller().Lister(),
 		secretLister:         cluster.Management.Core.Secrets("").Controller().Lister(),
 		provClusterCache:     cluster.Management.Wrangler.Provisioning.Cluster().Cache(),
-		capiClusterCache:     cluster.Management.Wrangler.CAPI.Cluster().Cache(),
+		capiClusterCache:     capi.CAPI.Cluster().Cache(),
 		rkeControlPlaneCache: cluster.Management.Wrangler.RKE.RKEControlPlane().Cache(),
 	}
 

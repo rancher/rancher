@@ -27,7 +27,7 @@ var (
 	clusterRegexp = regexp.MustCompile("^c-m-[a-z0-9]{8}$")
 )
 
-func Register(ctx context.Context, clients *wrangler.Context) {
+func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 	h := &handler{
 		configMapsCache: clients.Core.ConfigMap().Cache(),
 		configMaps:      clients.Core.ConfigMap(),
