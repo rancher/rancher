@@ -23,6 +23,7 @@ const (
 	StatefulSetSpecFieldHostPID                              = "hostPID"
 	StatefulSetSpecFieldHostUsers                            = "hostUsers"
 	StatefulSetSpecFieldHostname                             = "hostname"
+	StatefulSetSpecFieldHostnameOverride                     = "hostnameOverride"
 	StatefulSetSpecFieldImagePullSecrets                     = "imagePullSecrets"
 	StatefulSetSpecFieldMaxUnavailable                       = "maxUnavailable"
 	StatefulSetSpecFieldMinReadySeconds                      = "minReadySeconds"
@@ -78,6 +79,7 @@ type StatefulSetSpec struct {
 	HostPID                              bool                                             `json:"hostPID,omitempty" yaml:"hostPID,omitempty"`
 	HostUsers                            *bool                                            `json:"hostUsers,omitempty" yaml:"hostUsers,omitempty"`
 	Hostname                             string                                           `json:"hostname,omitempty" yaml:"hostname,omitempty"`
+	HostnameOverride                     string                                           `json:"hostnameOverride,omitempty" yaml:"hostnameOverride,omitempty"`
 	ImagePullSecrets                     []LocalObjectReference                           `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
 	MaxUnavailable                       intstr.IntOrString                               `json:"maxUnavailable,omitempty" yaml:"maxUnavailable,omitempty"`
 	MinReadySeconds                      int64                                            `json:"minReadySeconds,omitempty" yaml:"minReadySeconds,omitempty"`

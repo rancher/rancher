@@ -19,6 +19,7 @@ const (
 	PodSpecFieldHostPID                       = "hostPID"
 	PodSpecFieldHostUsers                     = "hostUsers"
 	PodSpecFieldHostname                      = "hostname"
+	PodSpecFieldHostnameOverride              = "hostnameOverride"
 	PodSpecFieldImagePullSecrets              = "imagePullSecrets"
 	PodSpecFieldNodeID                        = "nodeId"
 	PodSpecFieldOS                            = "os"
@@ -66,6 +67,7 @@ type PodSpec struct {
 	HostPID                       bool                           `json:"hostPID,omitempty" yaml:"hostPID,omitempty"`
 	HostUsers                     *bool                          `json:"hostUsers,omitempty" yaml:"hostUsers,omitempty"`
 	Hostname                      string                         `json:"hostname,omitempty" yaml:"hostname,omitempty"`
+	HostnameOverride              string                         `json:"hostnameOverride,omitempty" yaml:"hostnameOverride,omitempty"`
 	ImagePullSecrets              []LocalObjectReference         `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
 	NodeID                        string                         `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
 	OS                            *PodOS                         `json:"os,omitempty" yaml:"os,omitempty"`
