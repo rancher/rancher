@@ -50,20 +50,6 @@ const (
 var (
 	Kubernetes125 = semver.MustParse("v1.25.0")
 
-	// GH5551FixedVersions is a slice of rke2 versions
-	// which have resolved GH-5551 for Windows nodes.
-	// ref:  https://github.com/rancher/rke2/issues/5551
-	// The SUC should not deploy plans to Windows nodes
-	// running a version less than the below for each minor.
-	// This check can be removed when 1.31.x is the lowest supported
-	// rke2 version.
-	GH5551FixedVersions = map[int]*semver.Version{
-		30: semver.MustParse("v1.30.4"),
-		29: semver.MustParse("v1.29.8"),
-		28: semver.MustParse("v1.28.13"),
-		27: semver.MustParse("v1.27.16"),
-	}
-
 	// uninstallCounter keeps track of the number of clusters for which the handler is concurrently uninstalling the Fleet-based app.
 	// An atomic integer is used for efficiency, as it is lighter than a traditional lock.
 	uninstallCounter atomic.Int32
@@ -348,15 +334,13 @@ func installer(cluster *rancherv1.Cluster, secretName string) []runtime.Object {
 	}
 	plans = append(plans, plan)
 
-	if CurrentVersionResolvesGH5551(cluster.Spec.KubernetesVersion) {
-		windowsPlan := winsUpgradePlan(cluster, env, secretName)
-		if cluster.Spec.RedeploySystemAgentGeneration != 0 {
-			windowsPlan.Spec.Secrets = append(windowsPlan.Spec.Secrets, upgradev1.SecretSpec{
-				Name: generationSecretName,
-			})
-		}
-		plans = append(plans, windowsPlan)
+	windowsPlan := winsUpgradePlan(cluster, env, secretName)
+	if cluster.Spec.RedeploySystemAgentGeneration != 0 {
+		windowsPlan.Spec.Secrets = append(windowsPlan.Spec.Secrets, upgradev1.SecretSpec{
+			Name: generationSecretName,
+		})
 	}
+	plans = append(plans, windowsPlan)
 
 	objs := []runtime.Object{
 		&corev1.ServiceAccount{
@@ -481,35 +465,6 @@ func toBoolPointer(x bool) *bool {
 
 func toStringPointer(x string) *string {
 	return &x
-}
-
-// CurrentVersionResolvesGH5551 determines if the given rke2 version
-// has fixed the RKE2 bug outlined in GH-5551. Windows SUC plans cannot be delivered
-// to clusters running versions containing this bug. This function can be removed
-// when v1.31.x is the lowest supported version offered by Rancher.
-func CurrentVersionResolvesGH5551(version string) bool {
-
-	// remove leading v and trailing distro identifier
-	v := strings.TrimPrefix(version, "v")
-	verSplit := strings.Split(v, "+")
-	if len(verSplit) != 2 {
-		return false
-	}
-
-	curSemVer, err := semver.NewVersion(verSplit[0])
-	if err != nil {
-		return false
-	}
-
-	minor := curSemVer.Minor()
-	if minor >= 31 {
-		return true
-	}
-	if minor <= 26 {
-		return false
-	}
-
-	return curSemVer.GreaterThanEqual(GH5551FixedVersions[int(minor)])
 }
 
 // UninstallFleetBasedApps handles the removal of Fleet Bundles for both the managed-system-agent and
