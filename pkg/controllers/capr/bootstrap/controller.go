@@ -42,6 +42,7 @@ const (
 	rkeBootstrapName                       = "rke.cattle.io/rkebootstrap-name"
 	capiMachinePreTerminateAnnotation      = "pre-terminate.delete.hook.machine.cluster.x-k8s.io/rke-bootstrap-cleanup"
 	capiMachinePreTerminateAnnotationOwner = "rke-bootstrap-controller"
+	electionBackoff                        = 20 * time.Second
 )
 
 type handler struct {
@@ -519,6 +520,39 @@ func (h *handler) reconcileMachinePreTerminateAnnotation(bootstrap *rkev1.RKEBoo
 					return bootstrap, generic.ErrSkip
 				}
 			}
+		}
+	}
+
+	// Count other etcd machines in this CAPI cluster that are NOT deleting
+	otherEtcdNodeCount := 0
+	machines, err := h.machineCache.List(bootstrap.Namespace, labels.Everything())
+	if err != nil {
+		return bootstrap, err
+	}
+	for _, m := range machines {
+		if m.Name == machine.Name {
+			continue
+		}
+		if m.Spec.ClusterName != bootstrap.Spec.ClusterName {
+			continue
+		}
+		if _, ok := m.Labels[capr.EtcdRoleLabel]; !ok {
+			continue // only etcd machines
+		}
+		if m.DeletionTimestamp.IsZero() {
+			otherEtcdNodeCount++
+		}
+	}
+
+	// If there's a single other etcd machine, wait for electionBackoff before proceeding with removal
+	if otherEtcdNodeCount == 1 {
+		dt := machine.DeletionTimestamp.Time
+		if since := time.Since(dt); since < electionBackoff {
+			wait := electionBackoff - since
+			logrus.Infof("[rkebootstrap] %s/%s: single-remaining etcd; deferring safe removal for %s (until %s) to avoid etcd election race",
+				bootstrap.Namespace, bootstrap.Name, wait.Round(time.Second), dt.Add(electionBackoff).Format(time.RFC3339))
+			h.rkeBootstrap.EnqueueAfter(bootstrap.Namespace, bootstrap.Name, wait)
+			return bootstrap, generic.ErrSkip
 		}
 	}
 
