@@ -20,7 +20,7 @@ jobs:
       - run-id=${{ github.run_id }}
     timeout-minutes: 60
     env:
-      K3D_VERSION: v5.7.1
+      K3D_VERSION: v5.8.3
     steps:
       - name: Checkout code
         uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
