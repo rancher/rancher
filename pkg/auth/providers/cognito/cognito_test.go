@@ -28,7 +28,7 @@ func TestLogoutAllWhenNotEnabled(t *testing.T) {
 	testToken := &v3.Token{UserID: userId, AuthProvider: providerName}
 	o := CognitoProvider{
 		GenOIDCProvider: genericoidc.GenOIDCProvider{
-			oidc.OpenIDCProvider{
+			OpenIDCProvider: oidc.OpenIDCProvider{
 				Name:      providerName,
 				GetConfig: func() (*v3.OIDCConfig, error) { return oidcConfig, nil },
 			},
@@ -63,7 +63,7 @@ func TestLogoutAll(t *testing.T) {
 	testToken := &v3.Token{UserID: userId, AuthProvider: providerName}
 	o := CognitoProvider{
 		GenOIDCProvider: genericoidc.GenOIDCProvider{
-			oidc.OpenIDCProvider{
+			OpenIDCProvider: oidc.OpenIDCProvider{
 				Name:      providerName,
 				GetConfig: func() (*v3.OIDCConfig, error) { return oidcConfig, nil },
 			},
@@ -102,7 +102,7 @@ func TestLogoutAllNoEndSessionEndpoint(t *testing.T) {
 	testToken := &v3.Token{UserID: userId, AuthProvider: providerName}
 	o := CognitoProvider{
 		GenOIDCProvider: genericoidc.GenOIDCProvider{
-			oidc.OpenIDCProvider{
+			OpenIDCProvider: oidc.OpenIDCProvider{
 				Name:      providerName,
 				GetConfig: func() (*v3.OIDCConfig, error) { return oidcConfig, nil },
 			},
@@ -152,7 +152,7 @@ func TestLogout(t *testing.T) {
 			testToken := &v3.Token{UserID: userId, AuthProvider: providerName}
 			o := CognitoProvider{
 				GenOIDCProvider: genericoidc.GenOIDCProvider{
-					oidc.OpenIDCProvider{
+					OpenIDCProvider: oidc.OpenIDCProvider{
 						Name:      providerName,
 						GetConfig: func() (*v3.OIDCConfig, error) { return tt.config, nil },
 					},
