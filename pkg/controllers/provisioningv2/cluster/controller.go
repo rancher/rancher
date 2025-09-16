@@ -305,6 +305,24 @@ func (h *handler) generateProvisioningClusterFromLegacyCluster(cluster *v3.Clust
 		}
 	}
 
+	if cluster.Spec.FleetAgentDeploymentCustomization != nil && cluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization != nil {
+		provCluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization = &v1.AgentSchedulingCustomization{}
+
+		if cluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization.PodDisruptionBudget != nil {
+			provCluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization.PodDisruptionBudget = &v1.PodDisruptionBudgetSpec{
+				MinAvailable:   cluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization.PodDisruptionBudget.MinAvailable,
+				MaxUnavailable: cluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization.PodDisruptionBudget.MaxUnavailable,
+			}
+		}
+
+		if cluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization.PriorityClass != nil {
+			provCluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization.PriorityClass = &v1.PriorityClassSpec{
+				Value:            cluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization.PriorityClass.Value,
+				PreemptionPolicy: cluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization.PriorityClass.PreemptionPolicy,
+			}
+		}
+	}
+
 	return []runtime.Object{
 		provCluster,
 	}, status, nil
