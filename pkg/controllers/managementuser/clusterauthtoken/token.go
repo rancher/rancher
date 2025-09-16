@@ -46,6 +46,8 @@ type tokenHandler struct {
 // extCreate is called when a given ext token is created, and is responsible for
 // updating/creating the ClusterAuthToken in a downstream cluster.
 func (h *tokenHandler) extCreate(token *extv1.Token) (*extv1.Token, error) {
+	logrus.Debugf("[cluster-auth-token-sync] ext CREATE FOR %q INTO %q", token.Name, token.Spec.ClusterName)
+
 	_, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
 	if !errors.IsNotFound(err) {
 		return h.ExtUpdated(token)
@@ -73,6 +75,8 @@ func (h *tokenHandler) extCreate(token *extv1.Token) (*extv1.Token, error) {
 // ExtUpdated is called when a given ext token is modified, and is responsible
 // for updating/creating the ClusterAuthToken in a downstream cluster.
 func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
+	logrus.Debugf("[cluster-auth-token-sync] ext UPDATE FOR %q INTO %q", token.Name, token.Spec.ClusterName)
+
 	clusterAuthToken, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
 	if errors.IsNotFound(err) {
 		return h.extCreate(token)
@@ -133,11 +137,15 @@ func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
 // ExtRemove is called when a given ext token is deleted,
 // and removes the ClusterAuthToken in the downstream cluster.
 func (h *tokenHandler) ExtRemove(token *extv1.Token) (*extv1.Token, error) {
+	logrus.Debugf("[cluster-auth-token-sync] ext REMOVE FOR %q INTO %q", token.Name, token.Spec.ClusterName)
+
 	return nil, h.remove(token.GetName(), token.GetUserID(), extTokenUserClusterKey(token))
 }
 
 // Create is called when a given token is created, and is responsible for creating a ClusterAuthToken in a downstream cluster.
 func (h *tokenHandler) Create(token *managementv3.Token) (runtime.Object, error) {
+	logrus.Debugf("[cluster-auth-token-sync] v3 CREATE FOR %q INTO %q", token.Name, token.ClusterName)
+
 	_, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
 	if !errors.IsNotFound(err) {
 		return h.Updated(token)
@@ -219,6 +227,8 @@ func (h *tokenHandler) createClusterAuthToken(token accessor.TokenAccessor, hash
 // Updated is called when a token is updated, and is responsible for creating/updating the corresponding
 // ClusterAuthTokens in the downstream cluster.
 func (h *tokenHandler) Updated(token *managementv3.Token) (runtime.Object, error) {
+	logrus.Debugf("[cluster-auth-token-sync] v3 UPDATE FOR %q INTO %q", token.Name, token.ClusterName)
+
 	clusterAuthToken, err := h.clusterAuthTokenLister.Get(h.namespace, token.Name)
 	if errors.IsNotFound(err) {
 		return h.Create(token)
@@ -317,6 +327,8 @@ func (h *tokenHandler) Updated(token *managementv3.Token) (runtime.Object, error
 }
 
 func (h *tokenHandler) Remove(token *managementv3.Token) (runtime.Object, error) {
+	logrus.Debugf("[cluster-auth-token-sync] v3 REMOVE FOR %q INTO %q", token.Name, token.ClusterName)
+
 	return nil, h.remove(token.GetName(), token.GetUserID(), tokenUserClusterKey(token))
 }
 

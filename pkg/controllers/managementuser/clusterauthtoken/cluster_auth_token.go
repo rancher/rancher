@@ -27,6 +27,8 @@ type clusterAuthTokenHandler struct {
 
 // Sync ClusterAuthToken back to Token.
 func (h *clusterAuthTokenHandler) sync(key string, clusterAuthToken *clusterv3.ClusterAuthToken) (runtime.Object, error) {
+	logrus.Debugf("[cluster-auth-token-sync] sync %q, c-a-t %p", key, clusterAuthToken)
+
 	if clusterAuthToken == nil || clusterAuthToken.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -38,6 +40,7 @@ func (h *clusterAuthTokenHandler) sync(key string, clusterAuthToken *clusterv3.C
 	}
 
 	tokenName := clusterAuthToken.Name
+	logrus.Debugf("[cluster-auth-token-sync] sync %q, c-a-t %q", key, tokenName)
 
 	// check ext token first, if feature is enabled
 	if h.eTokenCache != nil {

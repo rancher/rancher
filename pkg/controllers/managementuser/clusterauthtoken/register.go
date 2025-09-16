@@ -34,6 +34,7 @@ const (
 // RegisterExtIndexers adds indexing of ext tokens by user and cluster to their
 // controller.
 func RegisterExtIndexers(extAPI ext.Interface) error {
+	logrus.Debugf("[cluster-auth-token-sync] register ext indexer")
 	return extAPI.Token().Informer().
 		AddIndexers(map[string]cache.IndexFunc{
 			tokenByUserAndClusterIndex: extTokenByUserAndCluster,
@@ -43,6 +44,7 @@ func RegisterExtIndexers(extAPI ext.Interface) error {
 // RegisterIndexers adds indexing of v3 tokens by user and cluster to their
 // controller.
 func RegisterIndexers(scaledContext *config.ScaledContext) error {
+	logrus.Debugf("[cluster-auth-token-sync] register v3 indexer")
 	return scaledContext.Management.Tokens("").Controller().Informer().
 		AddIndexers(map[string]cache.IndexFunc{
 			tokenByUserAndClusterIndex: tokenByUserAndCluster,
@@ -189,6 +191,7 @@ func extTokenByUserAndCluster(obj interface{}) ([]string, error) {
 // extTokenUserClusterKey computes the ext token's key for indexing by user and
 // cluster
 func extTokenUserClusterKey(token *extv1.Token) string {
+	logrus.Debugf("[cluster-auth-token-sync] INDEX KEY %s/%s", token.Spec.UserID, token.Spec.ClusterName)
 	return fmt.Sprintf("%s/%s", token.Spec.UserID, token.Spec.ClusterName)
 }
 
@@ -196,27 +199,34 @@ func extTokenUserClusterKey(token *extv1.Token) string {
 // cluster. The handlers sync changes in these tokens to the remote cluster, as
 // cluster auth tokens.
 func eTokenLifecycle(ctx context.Context, tok ext.TokenController, controller, clusterName string, h *tokenHandler) {
+	logrus.Debugf("[cluster-auth-token-sync] WATCH CLUSTER %q", clusterName)
+
 	tok.OnChange(ctx,
 		controller+"-change-"+clusterName,
 		func(key string, obj *extv1.Token) (*extv1.Token, error) {
+			logrus.Debugf("[cluster-auth-token-sync] CLUSTER %q, TOKEN %p", clusterName, obj)
 			// ignore removals
 			if obj == nil {
 				return obj, nil
 			}
+			logrus.Debugf("[cluster-auth-token-sync] CLUSTER %q, TOKEN %q, FOR %q", clusterName, obj.Name, obj.Spec.ClusterName)
 			// handle only tokens referencing the watched cluster
 			if clusterName != obj.Spec.ClusterName {
 				return obj, nil
 			}
+			logrus.Debugf("[cluster-auth-token-sync] CLUSTER %q, TOKEN %q, SYNC DOWN", obj.Name, clusterName)
 			return h.ExtUpdated(obj)
 		})
 
 	tok.OnRemove(ctx,
 		controller+"-remove-"+clusterName,
 		func(key string, obj *extv1.Token) (*extv1.Token, error) {
+			logrus.Debugf("[cluster-auth-token-sync] CLUSTER %q, TOKEN %q, FOR %q", clusterName, obj.Name, obj.Spec.ClusterName)
 			// handle only tokens referencing the watched cluster
 			if clusterName != obj.Spec.ClusterName {
 				return obj, nil
 			}
+			logrus.Debugf("[cluster-auth-token-sync] CLUSTER %q, TOKEN %q, REMOVE DOWN", obj.Name, clusterName)
 			return h.ExtRemove(obj)
 		})
 }
