@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/status"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -88,7 +88,7 @@ type grbHandler struct {
 	status              *status.Status
 }
 
-func (c *grbHandler) sync(key string, obj *apisv3.GlobalRoleBinding) (runtime.Object, error) {
+func (c *grbHandler) sync(key string, obj *apiv3.GlobalRoleBinding) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return obj, nil
 	}
@@ -117,7 +117,7 @@ func (c *grbHandler) sync(key string, obj *apisv3.GlobalRoleBinding) (runtime.Ob
 
 // ensureClusterAdminBinding creates a ClusterRoleBinding for GRB subject to
 // the Kubernetes "cluster-admin" ClusterRole in the downstream cluster.
-func (c *grbHandler) ensureClusterAdminBinding(obj *apisv3.GlobalRoleBinding, conditions *[]metav1.Condition) error {
+func (c *grbHandler) ensureClusterAdminBinding(obj *apiv3.GlobalRoleBinding, conditions *[]metav1.Condition) error {
 	condition := metav1.Condition{Type: clusterAdminRoleExists}
 	bindingName := rbac.GrbCRBName(obj)
 
@@ -136,10 +136,15 @@ func (c *grbHandler) ensureClusterAdminBinding(obj *apisv3.GlobalRoleBinding, co
 	_, err = c.clusterRoleBindings.Create(&v12.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: bindingName,
+			Annotations: map[string]string{
+				rbac.CrbGlobalRoleAnnotation:             obj.GlobalRoleName,
+				rbac.CrbGlobalRoleBindingAnnotation:      obj.Name,
+				rbac.CrbAdminGlobalRoleCheckedAnnotation: "true",
+			},
 		},
 		Subjects: []v12.Subject{rbac.GetGRBSubject(obj)},
 		RoleRef: v12.RoleRef{
-			Name: "cluster-admin",
+			Name: rbac.ClusterAdminRoleName,
 			Kind: "ClusterRole",
 		},
 	})
@@ -153,7 +158,7 @@ func (c *grbHandler) ensureClusterAdminBinding(obj *apisv3.GlobalRoleBinding, co
 }
 
 func grbByUserAndRole(obj interface{}) ([]string, error) {
-	grb, ok := obj.(*apisv3.GlobalRoleBinding)
+	grb, ok := obj.(*apiv3.GlobalRoleBinding)
 	if !ok {
 		return []string{}, nil
 	}
@@ -161,7 +166,7 @@ func grbByUserAndRole(obj interface{}) ([]string, error) {
 	return []string{rbac.GetGRBTargetKey(grb) + "-" + grb.GlobalRoleName}, nil
 }
 
-func (c *grbHandler) updateStatus(grb *apisv3.GlobalRoleBinding, remoteConditions []metav1.Condition) error {
+func (c *grbHandler) updateStatus(grb *apiv3.GlobalRoleBinding, remoteConditions []metav1.Condition) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		grbFromCluster, err := c.grbLister.Get(grb.Name)
 		if err != nil {
@@ -188,10 +193,7 @@ func (c *grbHandler) updateStatus(grb *apisv3.GlobalRoleBinding, remoteCondition
 		grbFromCluster.Status.LastUpdateTime = c.status.TimeNow().Format(time.RFC3339)
 		grbFromCluster.Status.ObservedGenerationRemote = grb.ObjectMeta.Generation
 		grbFromCluster.Status.RemoteConditions = remoteConditions
-		grbFromCluster, err = c.grbClient.UpdateStatus(grbFromCluster)
-		if err != nil {
-			return err
-		}
-		return nil
+		_, err = c.grbClient.UpdateStatus(grbFromCluster)
+		return err
 	})
 }
