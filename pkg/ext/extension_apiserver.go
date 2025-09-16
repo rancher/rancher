@@ -262,9 +262,10 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 
 	if features.ExtTokens.Enabled() {
 		// deferred ext controller setup ...
-		wranglerContext.DeferredEXTAPIRegistration.DeferFunc(func(w *wrangler.EXTAPIContext) {
-			logrus.Debugf("[deferred-ext/run] %p GREEN - cluster auth token - register ext token indexers", w)
-			if err := clusterauthtoken.RegisterExtIndexers(w.Ext); err != nil {
+		logrus.Debug("[deferred-ext/run] DEFER - cluster auth token - register ext token indexers")
+		wranglerContext.DeferredEXTAPIRegistration.DeferFunc(func(extContext *wrangler.EXTAPIContext) {
+			logrus.Debug("[deferred-ext/run] GREEN - cluster auth token - register ext token indexers")
+			if err := clusterauthtoken.RegisterExtIndexers(extContext.Ext); err != nil {
 				panic(err)
 			}
 		})

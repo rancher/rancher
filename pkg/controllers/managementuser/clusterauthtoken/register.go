@@ -54,9 +54,9 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	starter := cluster.DeferredStart(ctx, func(ctx context.Context) error {
 		// For ext token support we have to defer further until the EXT API is ready as well
 		if features.ExtTokens.Enabled() {
-			logrus.Debugf("[deferred-ext] cluster auth token controllers - deferred setup")
+			logrus.Debug("[deferred-ext] DEFER cluster auth token controllers - deferred setup")
 			cluster.Management.Wrangler.DeferredEXTAPIRegistration.DeferFunc(func(w *wrangler.EXTAPIContext) {
-				logrus.Debugf("[deferred-ext/run] %p GREEN - cluster auth token - controllers", w)
+				logrus.Debug("[deferred-ext/run] GREEN - cluster auth token - controllers")
 				registerDeferred(ctx, cluster, w)
 			})
 			return nil
