@@ -10,6 +10,9 @@
     "release/v2.10",
     "release/v2.9"
   ],
+  "ignoreDeps":[
+    "go.qase.io/client"
+  ],
   "prHourlyLimit": 2,
   "prConcurrentLimit": 4,
   "prCreation": "status-success",
