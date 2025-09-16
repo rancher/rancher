@@ -85,10 +85,15 @@ func TestSync(t *testing.T) {
 				assert.Equal(changes.t, changes.createdCRB, &rbacv1.ClusterRoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: rbac.GrbCRBName(grb),
+						Annotations: map[string]string{
+							rbac.CrbGlobalRoleAnnotation:             grb.GlobalRoleName,
+							rbac.CrbGlobalRoleBindingAnnotation:      grb.Name,
+							rbac.CrbAdminGlobalRoleCheckedAnnotation: "true",
+						},
 					},
 					Subjects: []rbacv1.Subject{rbac.GetGRBSubject(grb)},
 					RoleRef: rbacv1.RoleRef{
-						Name: "cluster-admin",
+						Name: rbac.ClusterAdminRoleName,
 						Kind: "ClusterRole",
 					},
 				})
