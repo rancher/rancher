@@ -234,7 +234,7 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 			// we just want to expose these. Note /api is needed for client-go's
 			// discovery even though not strictly necessary
 			maybeAllowed := false
-			allowedPathsPrefix := []string{"/api", "/apis", "/openapi/v2", "/openapi/v3", "/version"}
+			allowedPathsPrefix := []string{"/api", "/apis", "/openapi/v2", "/openapi/v3"}
 			for _, path := range allowedPathsPrefix {
 				if strings.HasPrefix(a.GetPath(), path) {
 					maybeAllowed = true
@@ -243,7 +243,7 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 			}
 
 			if !maybeAllowed {
-				return authorizer.DecisionDeny, "only /api, /apis, /openapi/v2, /openapi/v3, and /version supported", nil
+				return authorizer.DecisionDeny, "only /api, /apis, /openapi/v2, and /openapi/v3 supported", nil
 			}
 
 			return aslAuthorizer.Authorize(ctx, a)
