@@ -2,7 +2,6 @@
   "apiVersion": "aks.cattle.io/v1",
   "kind": "AKSClusterConfig",
   "metadata": {
-    "creationTimestamp": null,
     "name": "c-k4mnv",
     "ownerReferences": [
       {
