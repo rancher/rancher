@@ -2,6 +2,7 @@ package wrangler
 
 import (
 	"context"
+	"fmt"
 	"sync/atomic"
 
 	ext "github.com/rancher/rancher/pkg/generated/controllers/ext.cattle.io"
@@ -18,8 +19,8 @@ import (
 // api-service is detected and established
 type EXTAPIContext struct {
 	*Context
-	Ext extv1.Interface
-	ext *ext.Factory
+	Client  extv1.Interface
+	factory *ext.Factory
 }
 
 // DeferredEXTAPIInitializer implements the DeferredInitializer interface and
@@ -74,13 +75,13 @@ func (d *DeferredEXTAPIInitializer) WaitForClient(ctx context.Context) (*EXTAPIC
 		SharedControllerFactory: d.context.ControllerFactory,
 	})
 	if err != nil {
-		logrus.Fatalf("Encountered unexpected error while creating ext factory: %v", err)
+		return nil, fmt.Errorf("Unexpected error while creating ext factory: %w", err)
 	}
 
 	return &EXTAPIContext{
 		Context: d.context,
-		ext:     ext,
-		Ext:     ext.Ext().V1(),
+		factory: ext,
+		Client:  ext.Ext().V1(),
 	}, nil
 }
 

@@ -21,13 +21,13 @@ type clusterAuthTokenHandler struct {
 	tokenCache  mgmtcontrollers.TokenCache
 	tokenClient mgmtcontrollers.TokenClient
 	// ext token support
-	eTokenCache extcontrollers.TokenCache
-	eTokenStore *extstore.SystemStore
+	extTokenCache extcontrollers.TokenCache
+	extTokenStore *extstore.SystemStore
 }
 
 // Sync ClusterAuthToken back to Token.
 func (h *clusterAuthTokenHandler) sync(key string, clusterAuthToken *clusterv3.ClusterAuthToken) (runtime.Object, error) {
-	logrus.Debugf("[cluster-auth-token-sync] sync %q, c-a-t %p", key, clusterAuthToken)
+	logrus.Debugf("[%s] sync key %q, cluster auth token %p", clusterAuthTokenController, key, clusterAuthToken)
 
 	if clusterAuthToken == nil || clusterAuthToken.DeletionTimestamp != nil {
 		return nil, nil
@@ -40,25 +40,27 @@ func (h *clusterAuthTokenHandler) sync(key string, clusterAuthToken *clusterv3.C
 	}
 
 	tokenName := clusterAuthToken.Name
-	logrus.Debugf("[cluster-auth-token-sync] sync %q, c-a-t %q", key, tokenName)
+	logrus.Debugf("[%s] sync key %q, cluster auth token %q", clusterAuthTokenController, key, tokenName)
 
 	// check ext token first, if feature is enabled
-	if h.eTokenCache != nil {
-		eToken, err := h.eTokenCache.Get(tokenName)
+	if h.extTokenCache != nil {
+		extToken, err := h.extTokenCache.Get(tokenName)
 		if err == nil {
-			// do nothing when token is set and uptodate wrt CAT, or expired
+			// do nothing when the token exists and is either
+			// expired or up to date respective its associated
+			// cluster auth token
 
-			if eToken.Status.LastUsedAt != nil &&
-				eToken.Status.LastUsedAt.After(clusterAuthToken.LastUsedAt.Time) {
+			if extToken.Status.LastUsedAt != nil &&
+				extToken.Status.LastUsedAt.After(clusterAuthToken.LastUsedAt.Time) {
 				return clusterAuthToken, nil // Nothing to do.
 			}
 
-			if eToken.Status.Expired {
+			if extToken.Status.Expired {
 				return clusterAuthToken, nil // Should not update expired token.
 			}
 
-			if err := h.eTokenStore.UpdateLastUsedAt(tokenName, clusterAuthToken.LastUsedAt.Time); err != nil {
-				return nil, fmt.Errorf("error updating lastUsedAt for token %s: %v", tokenName, err)
+			if err := h.extTokenStore.UpdateLastUsedAt(tokenName, clusterAuthToken.LastUsedAt.Time); err != nil {
+				return nil, fmt.Errorf("error updating lastUsedAt for token %s: %w", tokenName, err)
 			}
 
 			logrus.Debugf("[%s] Updated lastUsedAt for token %s", clusterAuthTokenController, tokenName)

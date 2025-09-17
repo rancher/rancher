@@ -12,7 +12,7 @@ import (
 )
 
 // NewClusterAuthToken creates a new cluster auth token from a given token
-// accessor and it's hashed value. Does not create the token in the remote
+// accessor and it's hashed value. It does not create the token in the remote
 // cluster.
 func NewClusterAuthToken(token accessor.TokenAccessor, hashedValue string) *clusterv3.ClusterAuthToken {
 	return &clusterv3.ClusterAuthToken{

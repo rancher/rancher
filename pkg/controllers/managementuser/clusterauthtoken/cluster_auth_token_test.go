@@ -80,13 +80,13 @@ func TestClusterAuthTokenHandlerSync(t *testing.T) {
 		tokenCache.EXPECT().Get(tokenName).
 			Return(nil, apierrors.NewNotFound(schema.GroupResource{}, tokenName)).Times(1)
 
-		eTokenCache := fake.NewMockNonNamespacedCacheInterface[*extv1.Token](ctrl)
-		eTokenCache.EXPECT().Get(tokenName).
+		extTokenCache := fake.NewMockNonNamespacedCacheInterface[*extv1.Token](ctrl)
+		extTokenCache.EXPECT().Get(tokenName).
 			Return(nil, apierrors.NewNotFound(schema.GroupResource{}, tokenName)).Times(1)
 
 		handler := &clusterAuthTokenHandler{
-			tokenCache:  tokenCache,
-			eTokenCache: eTokenCache,
+			tokenCache:    tokenCache,
+			extTokenCache: extTokenCache,
 		}
 
 		lastUsedAt := metav1.NewTime(time.Now())
@@ -106,13 +106,13 @@ func TestClusterAuthTokenHandlerSync(t *testing.T) {
 		tokenCache := fake.NewMockNonNamespacedCacheInterface[*apiv3.Token](ctrl)
 		tokenCache.EXPECT().Get(tokenName).Return(nil, fmt.Errorf("some error")).Times(1)
 
-		eTokenCache := fake.NewMockNonNamespacedCacheInterface[*extv1.Token](ctrl)
-		eTokenCache.EXPECT().Get(tokenName).
+		extTokenCache := fake.NewMockNonNamespacedCacheInterface[*extv1.Token](ctrl)
+		extTokenCache.EXPECT().Get(tokenName).
 			Return(nil, apierrors.NewNotFound(schema.GroupResource{}, tokenName)).Times(1)
 
 		handler := &clusterAuthTokenHandler{
-			tokenCache:  tokenCache,
-			eTokenCache: eTokenCache,
+			tokenCache:    tokenCache,
+			extTokenCache: extTokenCache,
 		}
 
 		lastUsedAt := metav1.NewTime(time.Now())
@@ -129,11 +129,11 @@ func TestClusterAuthTokenHandlerSync(t *testing.T) {
 	})
 
 	t.Run("error getting ext token", func(t *testing.T) {
-		eTokenCache := fake.NewMockNonNamespacedCacheInterface[*extv1.Token](ctrl)
-		eTokenCache.EXPECT().Get(tokenName).Return(nil, fmt.Errorf("some error")).Times(1)
+		extTokenCache := fake.NewMockNonNamespacedCacheInterface[*extv1.Token](ctrl)
+		extTokenCache.EXPECT().Get(tokenName).Return(nil, fmt.Errorf("some error")).Times(1)
 
 		handler := &clusterAuthTokenHandler{
-			eTokenCache: eTokenCache,
+			extTokenCache: extTokenCache,
 		}
 
 		lastUsedAt := metav1.NewTime(time.Now())
@@ -165,13 +165,13 @@ func TestClusterAuthTokenHandlerSync(t *testing.T) {
 			TTLMillis:  now.Sub(tokenCreatedAt.Time).Milliseconds() - 1,
 		}, nil).Times(1)
 
-		eTokenCache := fake.NewMockNonNamespacedCacheInterface[*extv1.Token](ctrl)
-		eTokenCache.EXPECT().Get(tokenName).
+		extTokenCache := fake.NewMockNonNamespacedCacheInterface[*extv1.Token](ctrl)
+		extTokenCache.EXPECT().Get(tokenName).
 			Return(nil, apierrors.NewNotFound(schema.GroupResource{}, tokenName)).Times(1)
 
 		handler := &clusterAuthTokenHandler{
-			tokenCache:  tokenCache,
-			eTokenCache: eTokenCache,
+			tokenCache:    tokenCache,
+			extTokenCache: extTokenCache,
 		}
 
 		obj, err := handler.sync("", &clusterv3.ClusterAuthToken{
@@ -191,8 +191,8 @@ func TestClusterAuthTokenHandlerSync(t *testing.T) {
 		tokenCreatedAt := metav1.NewTime(now.Add(-time.Hour))
 		clusterAuthTokenLastUsedAt := metav1.NewTime(now)
 
-		eTokenCache := fake.NewMockNonNamespacedCacheInterface[*extv1.Token](ctrl)
-		eTokenCache.EXPECT().Get(tokenName).Return(&extv1.Token{
+		extTokenCache := fake.NewMockNonNamespacedCacheInterface[*extv1.Token](ctrl)
+		extTokenCache.EXPECT().Get(tokenName).Return(&extv1.Token{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:              tokenName,
 				CreationTimestamp: tokenCreatedAt,
@@ -207,7 +207,7 @@ func TestClusterAuthTokenHandlerSync(t *testing.T) {
 		}, nil).Times(1)
 
 		handler := &clusterAuthTokenHandler{
-			eTokenCache: eTokenCache,
+			extTokenCache: extTokenCache,
 		}
 
 		obj, err := handler.sync("", &clusterv3.ClusterAuthToken{
@@ -234,13 +234,13 @@ func TestClusterAuthTokenHandlerSync(t *testing.T) {
 			LastUsedAt: &tokenLastUsedAt,
 		}, nil).Times(1)
 
-		eTokenCache := fake.NewMockNonNamespacedCacheInterface[*extv1.Token](ctrl)
-		eTokenCache.EXPECT().Get(tokenName).
+		extTokenCache := fake.NewMockNonNamespacedCacheInterface[*extv1.Token](ctrl)
+		extTokenCache.EXPECT().Get(tokenName).
 			Return(nil, apierrors.NewNotFound(schema.GroupResource{}, tokenName)).Times(1)
 
 		handler := &clusterAuthTokenHandler{
-			tokenCache:  tokenCache,
-			eTokenCache: eTokenCache,
+			tokenCache:    tokenCache,
+			extTokenCache: extTokenCache,
 		}
 
 		obj, err := handler.sync("", &clusterv3.ClusterAuthToken{
@@ -259,8 +259,8 @@ func TestClusterAuthTokenHandlerSync(t *testing.T) {
 		tokenLastUsedAt := metav1.NewTime(now)
 		clusterAuthTokenLastUsedAt := metav1.NewTime(now.Add(-time.Second))
 
-		eTokenCache := fake.NewMockNonNamespacedCacheInterface[*extv1.Token](ctrl)
-		eTokenCache.EXPECT().Get(tokenName).Return(&extv1.Token{
+		extTokenCache := fake.NewMockNonNamespacedCacheInterface[*extv1.Token](ctrl)
+		extTokenCache.EXPECT().Get(tokenName).Return(&extv1.Token{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: tokenName,
 			},
@@ -270,7 +270,7 @@ func TestClusterAuthTokenHandlerSync(t *testing.T) {
 		}, nil).Times(1)
 
 		handler := &clusterAuthTokenHandler{
-			eTokenCache: eTokenCache,
+			extTokenCache: extTokenCache,
 		}
 
 		obj, err := handler.sync("", &clusterv3.ClusterAuthToken{
@@ -300,14 +300,14 @@ func TestClusterAuthTokenHandlerSync(t *testing.T) {
 		tokenClient := fake.NewMockNonNamespacedClientInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
 		tokenClient.EXPECT().Patch(tokenName, gomock.Any(), gomock.Any()).Return(nil, nil).Times(1)
 
-		eTokenCache := fake.NewMockNonNamespacedCacheInterface[*extv1.Token](ctrl)
-		eTokenCache.EXPECT().Get(tokenName).
+		extTokenCache := fake.NewMockNonNamespacedCacheInterface[*extv1.Token](ctrl)
+		extTokenCache.EXPECT().Get(tokenName).
 			Return(nil, apierrors.NewNotFound(schema.GroupResource{}, tokenName)).Times(1)
 
 		handler := &clusterAuthTokenHandler{
-			tokenCache:  tokenCache,
-			tokenClient: tokenClient,
-			eTokenCache: eTokenCache,
+			tokenCache:    tokenCache,
+			tokenClient:   tokenClient,
+			extTokenCache: extTokenCache,
 		}
 
 		obj, err := handler.sync("", &clusterv3.ClusterAuthToken{
@@ -326,8 +326,8 @@ func TestClusterAuthTokenHandlerSync(t *testing.T) {
 		tokenLastUsedAt := metav1.NewTime(now.Add(-time.Second))
 		clusterAuthTokenLastUsedAt := metav1.NewTime(now)
 
-		eTokenCache := fake.NewMockNonNamespacedCacheInterface[*extv1.Token](ctrl)
-		eTokenCache.EXPECT().Get(tokenName).Return(&extv1.Token{
+		extTokenCache := fake.NewMockNonNamespacedCacheInterface[*extv1.Token](ctrl)
+		extTokenCache.EXPECT().Get(tokenName).Return(&extv1.Token{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: tokenName,
 			},
@@ -344,11 +344,11 @@ func TestClusterAuthTokenHandlerSync(t *testing.T) {
 		users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
 		users.EXPECT().Cache().Return(nil)
 
-		eTokenStore := etoken.NewSystem(nil, nil, eSecretClient, users, nil, nil, nil, nil, nil)
+		extTokenStore := etoken.NewSystem(nil, nil, eSecretClient, users, nil, nil, nil, nil, nil)
 
 		handler := &clusterAuthTokenHandler{
-			eTokenCache: eTokenCache,
-			eTokenStore: eTokenStore,
+			extTokenCache: extTokenCache,
+			extTokenStore: extTokenStore,
 		}
 
 		obj, err := handler.sync("", &clusterv3.ClusterAuthToken{
@@ -380,14 +380,14 @@ func TestClusterAuthTokenHandlerSync(t *testing.T) {
 			Patch(tokenName, gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("some error")).
 			Times(1)
 
-		eTokenCache := fake.NewMockNonNamespacedCacheInterface[*extv1.Token](ctrl)
-		eTokenCache.EXPECT().Get(tokenName).
+		extTokenCache := fake.NewMockNonNamespacedCacheInterface[*extv1.Token](ctrl)
+		extTokenCache.EXPECT().Get(tokenName).
 			Return(nil, apierrors.NewNotFound(schema.GroupResource{}, tokenName)).Times(1)
 
 		handler := &clusterAuthTokenHandler{
-			tokenCache:  tokenCache,
-			tokenClient: tokenClient,
-			eTokenCache: eTokenCache,
+			tokenCache:    tokenCache,
+			tokenClient:   tokenClient,
+			extTokenCache: extTokenCache,
 		}
 
 		obj, err := handler.sync("", &clusterv3.ClusterAuthToken{
@@ -406,8 +406,8 @@ func TestClusterAuthTokenHandlerSync(t *testing.T) {
 		tokenLastUsedAt := metav1.NewTime(now.Add(-time.Second))
 		clusterAuthTokenLastUsedAt := metav1.NewTime(now)
 
-		eTokenCache := fake.NewMockNonNamespacedCacheInterface[*extv1.Token](ctrl)
-		eTokenCache.EXPECT().Get(tokenName).Return(&extv1.Token{
+		extTokenCache := fake.NewMockNonNamespacedCacheInterface[*extv1.Token](ctrl)
+		extTokenCache.EXPECT().Get(tokenName).Return(&extv1.Token{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: tokenName,
 			},
@@ -424,11 +424,11 @@ func TestClusterAuthTokenHandlerSync(t *testing.T) {
 		users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
 		users.EXPECT().Cache().Return(nil)
 
-		eTokenStore := etoken.NewSystem(nil, nil, eSecretClient, users, nil, nil, nil, nil, nil)
+		extTokenStore := etoken.NewSystem(nil, nil, eSecretClient, users, nil, nil, nil, nil, nil)
 
 		handler := &clusterAuthTokenHandler{
-			eTokenCache: eTokenCache,
-			eTokenStore: eTokenStore,
+			extTokenCache: extTokenCache,
+			extTokenStore: extTokenStore,
 		}
 
 		obj, err := handler.sync("", &clusterv3.ClusterAuthToken{
