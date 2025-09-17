@@ -25,15 +25,16 @@ import (
 
 func TestStoreCreate(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
-	var mockTokenControllerFake *wranglerfake.MockNonNamespacedControllerInterface[*apiv3.Token, *apiv3.TokenList]
-	var mockTokenCacheFake *wranglerfake.MockNonNamespacedCacheInterface[*apiv3.Token]
-	var mockUserCacheFake *wranglerfake.MockNonNamespacedCacheInterface[*apiv3.User]
-	var secrets *wranglerfake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]
-	var scache *wranglerfake.MockCacheInterface[*corev1.Secret]
-	var users *wranglerfake.MockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList]
-	var store *exttokenstore.SystemStore
+	var (
+		mockTokenControllerFake *wranglerfake.MockNonNamespacedControllerInterface[*apiv3.Token, *apiv3.TokenList]
+		mockTokenCacheFake      *wranglerfake.MockNonNamespacedCacheInterface[*apiv3.Token]
+		mockUserCacheFake       *wranglerfake.MockNonNamespacedCacheInterface[*apiv3.User]
+		secrets                 *wranglerfake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]
+		scache                  *wranglerfake.MockCacheInterface[*corev1.Secret]
+		users                   *wranglerfake.MockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList]
+		store                   *exttokenstore.SystemStore
+	)
 
 	type args struct {
 		ctx          context.Context
@@ -102,7 +103,7 @@ func TestStoreCreate(t *testing.T) {
 					Name: "token-12345",
 				},
 				Status: ext.UserActivityStatus{
-					ExpiresAt: metav1.NewTime(time.Date(2025, 2, 2, 0, 54, 0, 0, &time.Location{})).Format(time.RFC3339),
+					ExpiresAt: metav1.NewTime(time.Date(2025, 2, 1, 16, 54, 0, 0, time.UTC)).Format(time.RFC3339),
 				},
 			},
 			wantErr: false,
@@ -181,7 +182,7 @@ func TestStoreCreate(t *testing.T) {
 					Name: "token-12345",
 				},
 				Status: ext.UserActivityStatus{
-					ExpiresAt: metav1.NewTime(time.Date(2025, 2, 2, 0, 54, 0, 0, &time.Location{})).Format(time.RFC3339),
+					ExpiresAt: metav1.NewTime(time.Date(2025, 2, 1, 16, 54, 0, 0, time.UTC)).Format(time.RFC3339),
 				},
 			},
 			wantErr: false,
@@ -313,12 +314,17 @@ func TestStoreCreate(t *testing.T) {
 					Name: "token-12345",
 				},
 				Status: ext.UserActivityStatus{
-					ExpiresAt: metav1.NewTime(time.Date(2025, 2, 2, 0, 54, 0, 0, &time.Location{})).Format(time.RFC3339),
+					ExpiresAt: metav1.NewTime(time.Date(2025, 2, 1, 16, 54, 0, 0, time.UTC)).Format(time.RFC3339),
 				},
 			},
 			wantErr: false,
 		},
 	}
+
+	mockNow := time.Date(2025, 2, 1, 0, 54, 0, 0, time.UTC)
+	origTimeNow := timeNow
+	timeNow = func() time.Time { return mockNow }
+	defer func() { timeNow = origTimeNow }() // Restore original function after test
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -343,12 +349,6 @@ func TestStoreCreate(t *testing.T) {
 				extTokenStore: store,
 			}
 
-			// Mock the time function
-			mockNow := time.Date(2025, 2, 1, 8, 54, 0, 0, time.UTC)
-			origTimeNow := timeNow
-			timeNow = func() time.Time { return mockNow }
-			defer func() { timeNow = origTimeNow }() // Restore original function after test
-
 			// Setup mocks
 			tt.mockSetup()
 
@@ -370,16 +370,16 @@ func TestStoreCreate(t *testing.T) {
 
 func TestStoreGet(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
-	var mockTokenControllerFake *wranglerfake.MockNonNamespacedControllerInterface[*apiv3.Token, *apiv3.TokenList]
-	var mockTokenCacheFake *wranglerfake.MockNonNamespacedCacheInterface[*apiv3.Token]
-	var mockUserCacheFake *wranglerfake.MockNonNamespacedCacheInterface[*apiv3.User]
-	var secrets *wranglerfake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]
-	var scache *wranglerfake.MockCacheInterface[*corev1.Secret]
-	var users *wranglerfake.MockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList]
-	var store *exttokenstore.SystemStore
-
+	var (
+		mockTokenControllerFake *wranglerfake.MockNonNamespacedControllerInterface[*apiv3.Token, *apiv3.TokenList]
+		mockTokenCacheFake      *wranglerfake.MockNonNamespacedCacheInterface[*apiv3.Token]
+		mockUserCacheFake       *wranglerfake.MockNonNamespacedCacheInterface[*apiv3.User]
+		secrets                 *wranglerfake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]
+		scache                  *wranglerfake.MockCacheInterface[*corev1.Secret]
+		users                   *wranglerfake.MockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList]
+		store                   *exttokenstore.SystemStore
+	)
 	contextBG := context.Background()
 	type args struct {
 		ctx  context.Context
@@ -414,7 +414,7 @@ func TestStoreGet(t *testing.T) {
 					},
 					UserID: "admin",
 					ActivityLastSeenAt: &metav1.Time{
-						Time: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}),
+						Time: time.Date(2025, 1, 31, 0, 44, 0, 0, time.UTC),
 					},
 				}, nil).AnyTimes()
 				mockUserCacheFake.EXPECT().Get(gomock.Any()).Return(
@@ -426,7 +426,7 @@ func TestStoreGet(t *testing.T) {
 					Name: "token-12345",
 				},
 				Status: ext.UserActivityStatus{
-					ExpiresAt: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}).Format(time.RFC3339),
+					ExpiresAt: time.Date(2025, 1, 31, 16, 44, 0, 0, time.UTC).Format(time.RFC3339),
 				},
 			},
 			wantErr: false,
@@ -464,7 +464,7 @@ func TestStoreGet(t *testing.T) {
 						exttokenstore.FieldEnabled:          []byte("true"),
 						exttokenstore.FieldHash:             []byte("kla9jkdmj"),
 						exttokenstore.FieldKind:             []byte(exttokenstore.IsLogin),
-						exttokenstore.FieldLastActivitySeen: []byte("2025-01-31T16:44:00Z"),
+						exttokenstore.FieldLastActivitySeen: []byte("2025-01-31T00:44:00Z"),
 						exttokenstore.FieldLastUpdateTime:   []byte("13:00:05"),
 						exttokenstore.FieldPrincipal:        ePrincipalBytes,
 						exttokenstore.FieldTTL:              []byte("4000"),
@@ -487,7 +487,7 @@ func TestStoreGet(t *testing.T) {
 					Name: "token-12345",
 				},
 				Status: ext.UserActivityStatus{
-					ExpiresAt: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}).Format(time.RFC3339),
+					ExpiresAt: time.Date(2025, 1, 31, 16, 44, 0, 0, time.UTC).Format(time.RFC3339),
 				},
 			},
 			wantErr: false,
@@ -524,7 +524,7 @@ func TestStoreGet(t *testing.T) {
 				mockTokenCacheFake.EXPECT().Get(gomock.Any()).Return(&apiv3.Token{
 					UserID: "token-12345",
 					ActivityLastSeenAt: &metav1.Time{
-						Time: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}),
+						Time: time.Date(2025, 1, 31, 16, 44, 0, 0, time.UTC),
 					},
 				}, nil).AnyTimes()
 			},
@@ -532,6 +532,7 @@ func TestStoreGet(t *testing.T) {
 			wantErr: true,
 		},
 	}
+
 	for _, tt := range tests {
 		mockTokenControllerFake = wranglerfake.NewMockNonNamespacedControllerInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
 		mockTokenCacheFake = wranglerfake.NewMockNonNamespacedCacheInterface[*apiv3.Token](ctrl)
