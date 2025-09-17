@@ -65,7 +65,7 @@ replace (
 
 require (
 	github.com/antihax/optional v1.0.0
-	github.com/rancher/rancher/pkg/apis v0.0.0-20241023011518-955534c18d04
+	github.com/rancher/rancher/pkg/apis v0.0.0-20250806133803-c532a4fed98f
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
 
@@ -142,7 +142,7 @@ require (
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.4.0
 	github.com/rancher/rke v1.7.9
-	github.com/rancher/shepherd v0.0.0-20241217192141-80755a9de656
+	github.com/rancher/shepherd v0.0.0-20250917205520-480245e1f0e4
 	github.com/rancher/steve v0.4.8
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20240301001845-4eacc2dabbde
 	github.com/rancher/wrangler v1.1.2
@@ -373,7 +373,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
-	github.com/moby/spdystream v0.4.0 // indirect
+	github.com/moby/spdystream v0.5.0 // indirect
 	github.com/moby/sys/mount v0.3.3 // indirect
 	github.com/moby/sys/mountinfo v0.7.1 // indirect
 	github.com/moby/term v0.5.0 // indirect
