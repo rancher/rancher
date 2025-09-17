@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/rancher/rancher/pkg/features"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -36,4 +37,9 @@ func IsPlainIPV6(address string) bool {
 		return false
 	}
 	return ipAddr.Is6()
+}
+
+// IsMCMServerOnly identifies when a Rancher instance is configured as an MCM server and not an MCM Agent
+func IsMCMServerOnly() bool {
+	return !features.MCMAgent.Enabled() && features.MCM.Enabled()
 }
