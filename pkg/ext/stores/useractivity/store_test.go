@@ -11,6 +11,7 @@ import (
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"go.uber.org/mock/gomock"
@@ -87,7 +88,7 @@ func TestStoreCreate(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "token-12345",
 							Labels: map[string]string{
-								TokenKind: "session",
+								tokens.TokenKindLabel: "session",
 							},
 						},
 						AuthProvider:  "oidc",
@@ -301,7 +302,7 @@ func TestStoreCreate(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "token-12345",
 							Labels: map[string]string{
-								TokenKind: "session",
+								tokens.TokenKindLabel: "session",
 							},
 						},
 						AuthProvider:  "oidc",
@@ -344,23 +345,19 @@ func TestStoreCreate(t *testing.T) {
 			store = exttokenstore.NewSystem(nil, nil, secrets, users, mockTokenCacheFake, nil, nil, nil)
 
 			uas := &Store{
-				tokens:        mockTokenControllerFake,
-				userCache:     mockUserCacheFake,
-				extTokenStore: store,
+				tokens:                           mockTokenControllerFake,
+				userCache:                        mockUserCacheFake,
+				extTokenStore:                    store,
+				getAuthUserSessionIdleTTLMinutes: func() int { return 960 },
 			}
 
-			// Setup mocks
 			tt.mockSetup()
 
-			// Execute function
 			got, err := uas.Create(tt.args.ctx, tt.args.obj, tt.args.validateFunc, tt.args.options)
-
-			// Validate results
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Store.Create() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Store.Create() = %#v, want %#v", got, tt.want)
 			}
@@ -409,7 +406,7 @@ func TestStoreGet(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "token-12345",
 						Labels: map[string]string{
-							TokenKind: "session",
+							tokens.TokenKindLabel: "session",
 						},
 					},
 					UserID: "admin",
@@ -547,9 +544,10 @@ func TestStoreGet(t *testing.T) {
 		store = exttokenstore.NewSystem(nil, nil, secrets, users, mockTokenCacheFake, nil, nil, nil)
 
 		uas := &Store{
-			tokens:        mockTokenControllerFake,
-			userCache:     mockUserCacheFake,
-			extTokenStore: store,
+			tokens:                           mockTokenControllerFake,
+			userCache:                        mockUserCacheFake,
+			extTokenStore:                    store,
+			getAuthUserSessionIdleTTLMinutes: func() int { return 960 },
 		}
 
 		tt.mockSetup()
