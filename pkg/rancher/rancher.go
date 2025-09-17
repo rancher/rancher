@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/scc"
 	"github.com/rancher/rancher/pkg/telemetry"
 	"github.com/rancher/rancher/pkg/telemetry/initcond"
+	"github.com/rancher/rancher/pkg/utils"
 
 	"github.com/Masterminds/semver/v3"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
@@ -343,7 +344,8 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	})
 
 	var telemetryManager telemetry.TelemetryExporterManager
-	if !features.MCMAgent.Enabled() {
+	// Only run when MCM is enabled but Agent is not - requires MCM for Cluster/Node access; fixes Harvester startup
+	if utils.IsMCMServerOnly() {
 		telG := telemetry.NewTelemetryGatherer(
 			wranglerContext.Mgmt.Cluster().Cache(),
 			wranglerContext.Mgmt.Node().Cache(),
@@ -439,13 +441,13 @@ func (r *Rancher) Start(ctx context.Context) error {
 
 	r.Wrangler.OnLeaderOrDie("rancher-start::dashboarddata", func(ctx context.Context) error {
 		if err := dashboarddata.Add(ctx, r.Wrangler, localClusterEnabled(r.opts), r.opts.AddLocal == "false", r.opts.Embedded); err != nil {
-			return err
+			return errors.New("dashboarddata.Add() failed: " + err.Error())
 		}
 
 		if err := r.Wrangler.StartWithTransaction(ctx, func(ctx context.Context) error {
 			return dashboard.Register(ctx, r.Wrangler, r.opts.Embedded, r.opts.ClusterRegistry)
 		}); err != nil {
-			return err
+			return errors.New("dashboard.Register() failed: " + err.Error())
 		}
 
 		return runMigrations(r.Wrangler)
@@ -462,13 +464,13 @@ func (r *Rancher) Start(ctx context.Context) error {
 		}
 	})
 
-	if !features.MCMAgent.Enabled() && features.RancherSCCRegistrationExtension.Enabled() {
+	if utils.IsMCMServerOnly() && features.RancherSCCRegistrationExtension.Enabled() {
 		r.Wrangler.OnLeaderOrDie("rancher-start::RancherSCCRegistration", func(ctx context.Context) error {
 			// TODO: pull this out of here if/when other features depend on the SecretRequest controllers
 			if err := r.Wrangler.StartWithTransaction(ctx, func(ctx context.Context) error {
 				return telemetrycontrollers.RegisterControllers(ctx, r.Wrangler, r.telemetryManager)
 			}); err != nil {
-				return err
+				return errors.New("telemetrycontrollers.RegisterControllers() failed: " + err.Error())
 			}
 			logrus.Debug("[rancher::Start] starting RancherSCCRegistrationExtension")
 
@@ -484,7 +486,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 
 	r.auditLog.Start(ctx)
 
-	if !features.MCMAgent.Enabled() {
+	if utils.IsMCMServerOnly() {
 		r.startTelemetryManager(context.TODO())
 	}
 	return r.Wrangler.Start(ctx)
@@ -493,6 +495,8 @@ func (r *Rancher) Start(ctx context.Context) error {
 func (r *Rancher) startTelemetryManager(ctx context.Context) {
 	if r.telemetryManager == nil {
 		logrus.Info("telemetry manager not enabled")
+		logrus.Debug("not starting telemetry manager because it is disabled")
+		return
 	}
 
 	initChan := make(chan struct{})
