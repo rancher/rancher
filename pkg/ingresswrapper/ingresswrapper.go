@@ -78,7 +78,7 @@ func ToUnstructured(o interface{}) (map[string]interface{}, error) {
 // it can be handled, and its attributes accessed, in the same way a v1 Ingress
 // resource would be handled.
 type CompatIngress struct {
-	knetworkingv1.Ingress
+	knetworkingv1.Ingress `json:"ingress"`
 }
 
 // ToCompatIngress converts a networking.k8s.io/v1/Ingress or
