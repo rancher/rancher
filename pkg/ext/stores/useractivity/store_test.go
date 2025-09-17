@@ -12,7 +12,6 @@ import (
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
@@ -70,7 +69,7 @@ func TestStoreCreate(t *testing.T) {
 			},
 			mockSetup: func() {
 				gomock.InOrder(
-					mockUserCacheFake.EXPECT().Get("admin").Return(&v3.User{
+					mockUserCacheFake.EXPECT().Get("admin").Return(&apiv3.User{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "admin",
 						},
@@ -81,7 +80,7 @@ func TestStoreCreate(t *testing.T) {
 							Name: "token-12345",
 						},
 						AuthProvider:  "oidc",
-						UserPrincipal: v3.Principal{},
+						UserPrincipal: apiv3.Principal{},
 					}, nil),
 					mockTokenCacheFake.EXPECT().Get("token-12345").Return(&apiv3.Token{
 						ObjectMeta: metav1.ObjectMeta{
@@ -91,7 +90,7 @@ func TestStoreCreate(t *testing.T) {
 							},
 						},
 						AuthProvider:  "oidc",
-						UserPrincipal: v3.Principal{},
+						UserPrincipal: apiv3.Principal{},
 					}, nil),
 					mockTokenControllerFake.EXPECT().
 						Patch("token-12345", types.JSONPatchType, gomock.Any()).
@@ -155,7 +154,7 @@ func TestStoreCreate(t *testing.T) {
 					},
 				}
 				gomock.InOrder(
-					mockUserCacheFake.EXPECT().Get("admin").Return(&v3.User{
+					mockUserCacheFake.EXPECT().Get("admin").Return(&apiv3.User{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "admin",
 						},
@@ -235,7 +234,7 @@ func TestStoreCreate(t *testing.T) {
 			},
 			mockSetup: func() {
 				gomock.InOrder(
-					mockUserCacheFake.EXPECT().Get("admin").Return(&v3.User{
+					mockUserCacheFake.EXPECT().Get("admin").Return(&apiv3.User{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "admin",
 						},
@@ -246,7 +245,7 @@ func TestStoreCreate(t *testing.T) {
 							Name: "token-12345",
 						},
 						AuthProvider:  "oidc",
-						UserPrincipal: v3.Principal{},
+						UserPrincipal: apiv3.Principal{},
 					}, nil),
 
 					mockTokenCacheFake.EXPECT().Get("token-12345").Return(&apiv3.Token{
@@ -254,7 +253,7 @@ func TestStoreCreate(t *testing.T) {
 							Name: "token-12345",
 						},
 						AuthProvider:  "local",
-						UserPrincipal: v3.Principal{},
+						UserPrincipal: apiv3.Principal{},
 					}, nil),
 				)
 			},
@@ -283,7 +282,7 @@ func TestStoreCreate(t *testing.T) {
 			},
 			mockSetup: func() {
 				gomock.InOrder(
-					mockUserCacheFake.EXPECT().Get("admin").Return(&v3.User{
+					mockUserCacheFake.EXPECT().Get("admin").Return(&apiv3.User{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "admin",
 						},
@@ -294,7 +293,7 @@ func TestStoreCreate(t *testing.T) {
 							Name: "token-12345",
 						},
 						AuthProvider:  "oidc",
-						UserPrincipal: v3.Principal{},
+						UserPrincipal: apiv3.Principal{},
 					}, nil),
 
 					mockTokenCacheFake.EXPECT().Get("token-12345").Return(&apiv3.Token{
@@ -305,7 +304,7 @@ func TestStoreCreate(t *testing.T) {
 							},
 						},
 						AuthProvider:  "oidc",
-						UserPrincipal: v3.Principal{},
+						UserPrincipal: apiv3.Principal{},
 					}, nil),
 				)
 			},
@@ -327,7 +326,7 @@ func TestStoreCreate(t *testing.T) {
 
 			mockTokenControllerFake = wranglerfake.NewMockNonNamespacedControllerInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
 			mockTokenCacheFake = wranglerfake.NewMockNonNamespacedCacheInterface[*apiv3.Token](ctrl)
-			mockUserCacheFake = wranglerfake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+			mockUserCacheFake = wranglerfake.NewMockNonNamespacedCacheInterface[*apiv3.User](ctrl)
 
 			secrets = wranglerfake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 			scache = wranglerfake.NewMockCacheInterface[*corev1.Secret](ctrl)
@@ -427,7 +426,7 @@ func TestStoreGet(t *testing.T) {
 					Name: "token-12345",
 				},
 				Status: ext.UserActivityStatus{
-					ExpiresAt: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}).String(),
+					ExpiresAt: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}).Format(time.RFC3339),
 				},
 			},
 			wantErr: false,
@@ -488,7 +487,7 @@ func TestStoreGet(t *testing.T) {
 					Name: "token-12345",
 				},
 				Status: ext.UserActivityStatus{
-					ExpiresAt: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}).String(),
+					ExpiresAt: time.Date(2025, 1, 31, 16, 44, 0, 0, &time.Location{}).Format(time.RFC3339),
 				},
 			},
 			wantErr: false,
@@ -536,7 +535,7 @@ func TestStoreGet(t *testing.T) {
 	for _, tt := range tests {
 		mockTokenControllerFake = wranglerfake.NewMockNonNamespacedControllerInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
 		mockTokenCacheFake = wranglerfake.NewMockNonNamespacedCacheInterface[*apiv3.Token](ctrl)
-		mockUserCacheFake = wranglerfake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		mockUserCacheFake = wranglerfake.NewMockNonNamespacedCacheInterface[*apiv3.User](ctrl)
 
 		secrets = wranglerfake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 		scache = wranglerfake.NewMockCacheInterface[*corev1.Secret](ctrl)

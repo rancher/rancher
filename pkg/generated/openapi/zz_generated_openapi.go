@@ -51,6 +51,7 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenStatus":                         schema_pkg_apis_extcattleio_v1_TokenStatus(ref),
 		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.UserActivity":                        schema_pkg_apis_extcattleio_v1_UserActivity(ref),
 		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.UserActivityList":                    schema_pkg_apis_extcattleio_v1_UserActivityList(ref),
+		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.UserActivitySpec":                    schema_pkg_apis_extcattleio_v1_UserActivitySpec(ref),
 		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.UserActivityStatus":                  schema_pkg_apis_extcattleio_v1_UserActivityStatus(ref),
 		"github.com/rancher/rancher/pkg/apis/telemetry.cattle.io/v1.SecretRequest":                 schema_pkg_apis_telemetrycattleio_v1_SecretRequest(ref),
 		"github.com/rancher/rancher/pkg/apis/telemetry.cattle.io/v1.SecretRequestList":             schema_pkg_apis_telemetrycattleio_v1_SecretRequestList(ref),
@@ -1125,6 +1126,13 @@ func schema_pkg_apis_extcattleio_v1_UserActivity(ref common.ReferenceCallback) c
 							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
 						},
 					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Spec is the desired state of the UserActivity.",
+							Default:     map[string]interface{}{},
+							Ref:         ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.UserActivitySpec"),
+						},
+					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Status is the most recently observed status of the UserActivity.",
@@ -1137,7 +1145,7 @@ func schema_pkg_apis_extcattleio_v1_UserActivity(ref common.ReferenceCallback) c
 			},
 		},
 		Dependencies: []string{
-			"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.UserActivityStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.UserActivitySpec", "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.UserActivityStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 
@@ -1187,6 +1195,27 @@ func schema_pkg_apis_extcattleio_v1_UserActivityList(ref common.ReferenceCallbac
 		},
 		Dependencies: []string{
 			"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.UserActivity", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+	}
+}
+
+func schema_pkg_apis_extcattleio_v1_UserActivitySpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "UserActivitySpec contains the data about the user activity.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"seenAt": {
+						SchemaProps: spec.SchemaProps{
+							Description: "SeenAt is the timestamp of the last user activity.",
+							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
 	}
 }
 

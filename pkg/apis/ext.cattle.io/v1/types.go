@@ -17,8 +17,19 @@ type UserActivity struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
+	// Spec is the desired state of the UserActivity.
+	// +optional
+	Spec UserActivitySpec `json:"spec,omitempty"`
+
 	// Status is the most recently observed status of the UserActivity.
 	Status UserActivityStatus `json:"status"`
+}
+
+// UserActivitySpec contains the data about the user activity.
+type UserActivitySpec struct {
+	// SeenAt is the timestamp of the last user activity.
+	// +optional
+	SeenAt *metav1.Time `json:"seenAt,omitempty"`
 }
 
 // UserActivityStatus defines the most recently observed status of the UserActivity.
