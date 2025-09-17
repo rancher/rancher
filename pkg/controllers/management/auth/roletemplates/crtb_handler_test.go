@@ -14,7 +14,6 @@ import (
 	"go.uber.org/mock/gomock"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type reducedCondition struct {
@@ -444,12 +443,12 @@ func TestUpdateStatus(t *testing.T) {
 
 	crtbSubjectExist := &v3.ClusterRoleTemplateBinding{
 		Status: v3.ClusterRoleTemplateBindingStatus{
-			LocalConditions: []v1.Condition{
+			LocalConditions: []metav1.Condition{
 				{
 					Type:   subjectExists,
-					Status: v1.ConditionTrue,
+					Status: metav1.ConditionTrue,
 					Reason: subjectExists,
-					LastTransitionTime: v1.Time{
+					LastTransitionTime: metav1.Time{
 						Time: mockTime,
 					},
 				},
@@ -459,20 +458,20 @@ func TestUpdateStatus(t *testing.T) {
 	}
 	crtbSubjectAndBindingExist := &v3.ClusterRoleTemplateBinding{
 		Status: v3.ClusterRoleTemplateBindingStatus{
-			LocalConditions: []v1.Condition{
+			LocalConditions: []metav1.Condition{
 				{
 					Type:   subjectExists,
-					Status: v1.ConditionTrue,
+					Status: metav1.ConditionTrue,
 					Reason: subjectExists,
-					LastTransitionTime: v1.Time{
+					LastTransitionTime: metav1.Time{
 						Time: mockTime,
 					},
 				},
 				{
 					Type:   bindingsExists,
-					Status: v1.ConditionTrue,
+					Status: metav1.ConditionTrue,
 					Reason: bindingsExists,
-					LastTransitionTime: v1.Time{
+					LastTransitionTime: metav1.Time{
 						Time: mockTime,
 					},
 				},
@@ -482,12 +481,12 @@ func TestUpdateStatus(t *testing.T) {
 	}
 	crtbSubjectError := &v3.ClusterRoleTemplateBinding{
 		Status: v3.ClusterRoleTemplateBindingStatus{
-			LocalConditions: []v1.Condition{
+			LocalConditions: []metav1.Condition{
 				{
 					Type:   subjectExists,
-					Status: v1.ConditionFalse,
+					Status: metav1.ConditionFalse,
 					Reason: failedToCreateUser,
-					LastTransitionTime: v1.Time{
+					LastTransitionTime: metav1.Time{
 						Time: mockTime,
 					},
 				},
@@ -509,7 +508,7 @@ func TestUpdateStatus(t *testing.T) {
 	tests := map[string]struct {
 		crtb            *v3.ClusterRoleTemplateBinding
 		crtbClient      func(*v3.ClusterRoleTemplateBinding) mgmtv3.ClusterRoleTemplateBindingController
-		localConditions []v1.Condition
+		localConditions []metav1.Condition
 		wantErr         error
 	}{
 		"status updated": {
@@ -518,12 +517,12 @@ func TestUpdateStatus(t *testing.T) {
 				mock := fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
 				mock.EXPECT().UpdateStatus(&v3.ClusterRoleTemplateBinding{
 					Status: v3.ClusterRoleTemplateBindingStatus{
-						LocalConditions: []v1.Condition{
+						LocalConditions: []metav1.Condition{
 							{
 								Type:   subjectExists,
-								Status: v1.ConditionTrue,
+								Status: metav1.ConditionTrue,
 								Reason: subjectExists,
-								LastTransitionTime: v1.Time{
+								LastTransitionTime: metav1.Time{
 									Time: mockTime,
 								},
 							},
@@ -550,12 +549,12 @@ func TestUpdateStatus(t *testing.T) {
 				mock := fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
 				mock.EXPECT().UpdateStatus(&v3.ClusterRoleTemplateBinding{
 					Status: v3.ClusterRoleTemplateBindingStatus{
-						LocalConditions: []v1.Condition{
+						LocalConditions: []metav1.Condition{
 							{
 								Type:   subjectExists,
-								Status: v1.ConditionTrue,
+								Status: metav1.ConditionTrue,
 								Reason: subjectExists,
-								LastTransitionTime: v1.Time{
+								LastTransitionTime: metav1.Time{
 									Time: mockTime,
 								},
 							},
@@ -577,12 +576,12 @@ func TestUpdateStatus(t *testing.T) {
 				mock := fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
 				mock.EXPECT().UpdateStatus(&v3.ClusterRoleTemplateBinding{
 					Status: v3.ClusterRoleTemplateBindingStatus{
-						LocalConditions: []v1.Condition{
+						LocalConditions: []metav1.Condition{
 							{
 								Type:   subjectExists,
-								Status: v1.ConditionFalse,
+								Status: metav1.ConditionFalse,
 								Reason: failedToCreateUser,
-								LastTransitionTime: v1.Time{
+								LastTransitionTime: metav1.Time{
 									Time: mockTime,
 								},
 							},
