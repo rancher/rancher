@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/scc"
 	"github.com/rancher/rancher/pkg/telemetry"
 	"github.com/rancher/rancher/pkg/telemetry/initcond"
+	"github.com/rancher/rancher/pkg/utils"
 
 	"github.com/Masterminds/semver/v3"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
@@ -341,7 +342,8 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	})
 
 	var telemetryManager telemetry.TelemetryExporterManager
-	if !features.MCMAgent.Enabled() {
+	// Only run when MCM is enabled but Agent is not - requires MCM for Cluster/Node access; fixes Harvester startup
+	if utils.IsMCMServerOnly() {
 		telG := telemetry.NewTelemetryGatherer(
 			wranglerContext.Mgmt.Cluster().Cache(),
 			wranglerContext.Mgmt.Node().Cache(),
@@ -443,7 +445,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 		return runMigrations(r.Wrangler)
 	})
 
-	if !features.MCMAgent.Enabled() && features.RancherSCCRegistrationExtension.Enabled() {
+	if utils.IsMCMServerOnly() && features.RancherSCCRegistrationExtension.Enabled() {
 		r.Wrangler.OnLeaderOrDie("rancher-start::RancherSCCRegistration", func(ctx context.Context) error {
 			// TODO: pull this out of here if/when other features depend on the SecretRequest controllers
 			if err := r.Wrangler.StartWithTransaction(ctx, func(ctx context.Context) error {
@@ -465,7 +467,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 
 	r.auditLog.Start(ctx)
 
-	if !features.MCMAgent.Enabled() {
+	if utils.IsMCMServerOnly() {
 		r.startTelemetryManager(context.TODO())
 	}
 	return r.Wrangler.Start(ctx)
