@@ -339,7 +339,7 @@ func Test_crtbHandler_getDesiredClusterRoleBindings(t *testing.T) {
 				"crb-5x2rfzlbvz": {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:   "crb-5x2rfzlbvz",
-						Labels: map[string]string{"authz.cluster.cattle.io/crtb-owner": "test-crtb"},
+						Labels: map[string]string{"authz.cluster.cattle.io/crtb-owner-test-crtb": "true"},
 					},
 					RoleRef: rbacv1.RoleRef{
 						APIGroup: "rbac.authorization.k8s.io",
@@ -361,7 +361,7 @@ func Test_crtbHandler_getDesiredClusterRoleBindings(t *testing.T) {
 				"crb-meemnnklov": {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:   "crb-meemnnklov",
-						Labels: map[string]string{"authz.cluster.cattle.io/crtb-owner": "test-crtb"},
+						Labels: map[string]string{"authz.cluster.cattle.io/crtb-owner-test-crtb": "true"},
 					},
 					RoleRef: rbacv1.RoleRef{
 						APIGroup: "rbac.authorization.k8s.io",
@@ -383,7 +383,7 @@ func Test_crtbHandler_getDesiredClusterRoleBindings(t *testing.T) {
 				"crb-meemnnklov": {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:   "crb-meemnnklov",
-						Labels: map[string]string{"authz.cluster.cattle.io/crtb-owner": "test-crtb"},
+						Labels: map[string]string{"authz.cluster.cattle.io/crtb-owner-test-crtb": "true"},
 					},
 					RoleRef: rbacv1.RoleRef{
 						APIGroup: "rbac.authorization.k8s.io",
@@ -395,7 +395,7 @@ func Test_crtbHandler_getDesiredClusterRoleBindings(t *testing.T) {
 				"crb-5x2rfzlbvz": {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:   "crb-5x2rfzlbvz",
-						Labels: map[string]string{"authz.cluster.cattle.io/crtb-owner": "test-crtb"},
+						Labels: map[string]string{"authz.cluster.cattle.io/crtb-owner-test-crtb": "true"},
 					},
 					RoleRef: rbacv1.RoleRef{
 						APIGroup: "rbac.authorization.k8s.io",
