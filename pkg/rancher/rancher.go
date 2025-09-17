@@ -441,13 +441,13 @@ func (r *Rancher) Start(ctx context.Context) error {
 
 	r.Wrangler.OnLeaderOrDie("rancher-start::dashboarddata", func(ctx context.Context) error {
 		if err := dashboarddata.Add(ctx, r.Wrangler, localClusterEnabled(r.opts), r.opts.AddLocal == "false", r.opts.Embedded); err != nil {
-			return err
+			return errors.New("dashboarddata.Add() failed: " + err.Error())
 		}
 
 		if err := r.Wrangler.StartWithTransaction(ctx, func(ctx context.Context) error {
 			return dashboard.Register(ctx, r.Wrangler, r.opts.Embedded, r.opts.ClusterRegistry)
 		}); err != nil {
-			return err
+			return errors.New("dashboard.Register() failed: " + err.Error())
 		}
 
 		return runMigrations(r.Wrangler)
@@ -470,7 +470,7 @@ func (r *Rancher) Start(ctx context.Context) error {
 			if err := r.Wrangler.StartWithTransaction(ctx, func(ctx context.Context) error {
 				return telemetrycontrollers.RegisterControllers(ctx, r.Wrangler, r.telemetryManager)
 			}); err != nil {
-				return err
+				return errors.New("telemetrycontrollers.RegisterControllers() failed: " + err.Error())
 			}
 			logrus.Debug("[rancher::Start] starting RancherSCCRegistrationExtension")
 
@@ -495,6 +495,8 @@ func (r *Rancher) Start(ctx context.Context) error {
 func (r *Rancher) startTelemetryManager(ctx context.Context) {
 	if r.telemetryManager == nil {
 		logrus.Info("telemetry manager not enabled")
+		logrus.Debug("not starting telemetry manager because it is disabled")
+		return
 	}
 
 	initChan := make(chan struct{})
