@@ -12,7 +12,6 @@ replace (
 	github.com/rancher/dynamiclistener => github.com/swastik959/dynamiclistener v0.0.0-20250915090407-b36b81cce663
 	github.com/rancher/eks-operator => github.com/swastik959/eks-operator v1.12.0-rc.1.0.20250910124202-bb5b085a262f
 	github.com/rancher/gke-operator => github.com/swastik959/gke-operator v0.0.0-20250912111436-fac65da217dc
-
 	github.com/rancher/lasso => github.com/krunalhinguu/lasso v0.0.0-20250904230131-2e5b75853dc0
 	github.com/rancher/machine => github.com/swastik959/machine v0.0.0-20250908090536-340306e4a997
 	github.com/rancher/norman => github.com/swastik959/norman v0.0.0-20250908065538-4a8ca43cc36b
@@ -22,6 +21,7 @@ replace (
 	github.com/rancher/steve => github.com/swastik959/steve v0.0.0-20250915065356-204463c17115
 	github.com/rancher/system-upgrade-controller/pkg/apis => github.com/swastik959/system-upgrade-controller/pkg/apis v0.0.0-20250912110759-e97ffcb1a210
 	github.com/rancher/wrangler/v3 => github.com/krunalhinguu/wrangler/v3 v3.3.1-0.20250905101441-b1b29faa8ccd
+	github.com/stretchr/testify => github.com/stretchr/testify v1.10.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.63.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.63.0
 	go.opentelemetry.io/otel => go.opentelemetry.io/otel v1.38.0
