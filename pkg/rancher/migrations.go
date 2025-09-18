@@ -101,8 +101,10 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 		return err
 	}
 
-	if err := managementNodeCleanup(wranglerContext); err != nil {
-		return err
+	if features.MCM.Enabled() {
+		if err := managementNodeCleanup(wranglerContext); err != nil {
+			return err
+		}
 	}
 
 	return nil
