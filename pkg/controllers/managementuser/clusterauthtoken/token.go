@@ -85,6 +85,21 @@ func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
 		return nil, err
 	}
 
+	forced := false
+	clusterAuthTokenSecret, err := h.clusterSecretLister.Get(h.namespace, common.ClusterAuthTokenSecretName(token.Name))
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return nil, err
+		}
+
+		// While the cluster auth token exists, the associated secret is
+		// missing. Make it now, and force an update later.
+
+		forced = true
+		hashedValue := token.Status.Hash
+		clusterAuthTokenSecret = common.NewClusterAuthTokenSecret(token, hashedValue)
+	}
+
 	err = h.updateClusterUserAttribute(token.GetUserID())
 	if err != nil {
 		return nil, err
@@ -112,20 +127,29 @@ func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
 	if hashVersion == hashers.SHA3Version {
 		// trigger the compare to compare the values of the tokens
 		current.value = token.Status.Hash
-		old.value = clusterAuthToken.SecretKeyHash
+		old.value = common.ClusterAuthTokenSecretValue(clusterAuthTokenSecret)
+	}
+
+	if forced {
+		current.value = common.ClusterAuthTokenSecretValue(clusterAuthTokenSecret)
 	}
 
 	if reflect.DeepEqual(current, old) {
 		return nil, nil
 	}
-	clusterAuthToken.UserName = token.Spec.UserID
-	clusterAuthToken.Enabled = tokenEnabled
-	clusterAuthToken.ExpiresAt = token.Status.ExpiresAt
 
 	// if we were comparing token values, then the token was hashed, so we can update the value downstream
 	if current.value != "" {
-		clusterAuthToken.SecretKeyHash = current.value
+		clusterAuthTokenSecret.Data["hash"] = []byte(current.value)
+		_, err = h.clusterSecret.Update(clusterAuthTokenSecret)
+		if errors.IsNotFound(err) {
+			_, err = h.clusterSecret.Create(clusterAuthTokenSecret)
+		}
 	}
+
+	clusterAuthToken.UserName = token.Spec.UserID
+	clusterAuthToken.Enabled = tokenEnabled
+	clusterAuthToken.ExpiresAt = token.Status.ExpiresAt
 
 	_, err = h.clusterAuthToken.Update(clusterAuthToken)
 	if errors.IsNotFound(err) {
