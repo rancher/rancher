@@ -84,9 +84,8 @@ func (s *Store) Destroy() {
 // Sets the activityLastSeenAt timestamp to the value of spec.seenAt
 // on the session token with the same name as the provided UserActivity's name
 // and returns the expiration timestamp in status.expiresAt.
-// If the spec.seenAt is not provided, the current time is used.
+// If the spec.seenAt is not provided or is in the future the current time is used.
 // If the spec.seenAt is less than the stored activityLastSeenAt, the stored value is not updated.
-// The spec.seenAt value cannot be in the future.
 func (s *Store) Create(ctx context.Context,
 	obj runtime.Object,
 	createValidation rest.ValidateObjectFunc,
