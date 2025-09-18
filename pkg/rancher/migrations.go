@@ -74,6 +74,9 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 		if err := forceSystemNamespaceAssignment(wranglerContext.Core.ConfigMap(), wranglerContext.Mgmt.Project()); err != nil {
 			return err
 		}
+		if err := managementNodeCleanup(wranglerContext); err != nil {
+			return err
+		}
 	}
 
 	if err := migrateImportedClusterFields(wranglerContext); err != nil {
@@ -99,10 +102,6 @@ func runRKE2Migrations(wranglerContext *wrangler.CAPIContext) error {
 		if err := migrateMachinePoolsDynamicSchemaLabel(wranglerContext); err != nil {
 			return err
 		}
-	}
-
-	if err := managementNodeCleanup(wranglerContext); err != nil {
-		return err
 	}
 
 	return nil
