@@ -71,15 +71,15 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 
 	// Handle cluster role bindings for special permissions.
 	if err := p.reconcileClusterRoleBindings(prtb); err != nil {
-		return nil, fmt.Errorf("error reconciling ClusterRoleBindings for ProjectRoleTemplateBinding %s:%w", prtb.Name, err)
+		return nil, fmt.Errorf("error reconciling ClusterRoleBindings for ProjectRoleTemplateBinding %s: %w", prtb.Name, err)
 	}
 
 	if err := p.reconcileNamespaceBindings(prtb); err != nil {
-		return nil, fmt.Errorf("error reconciling Namespace RoleBindings for ProjectRoleTemplateBinding %s:%w", prtb.Name, err)
+		return nil, fmt.Errorf("error reconciling Namespace RoleBindings for ProjectRoleTemplateBinding %s: %w", prtb.Name, err)
 	}
 
 	if err := p.reconcileBindings(prtb); err != nil {
-		return nil, fmt.Errorf("error reconciling RoleBindings for ProjectRoleTemplateBinding %s:%w", prtb.Name, err)
+		return nil, fmt.Errorf("error reconciling RoleBindings for ProjectRoleTemplateBinding %s: %w", prtb.Name, err)
 	}
 
 	// Ensure a service account impersonator exists on the cluster.
