@@ -397,9 +397,24 @@ func TestStoreCreate(t *testing.T) {
 						AuthProvider:  "oidc",
 						UserPrincipal: apiv3.Principal{},
 					}, nil),
+					tokenController.EXPECT().
+						Patch("token-12345", types.JSONPatchType, gomock.Any()).
+						Return(&apiv3.Token{}, nil),
 				)
 			},
-			wantErr: true,
+			want: &ext.UserActivity{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "token-12345",
+				},
+				Spec: ext.UserActivitySpec{
+					SeenAt: &metav1.Time{
+						Time: mockNow.Add(1 * time.Second),
+					},
+				},
+				Status: ext.UserActivityStatus{
+					ExpiresAt: expectedExiresAt.Format(time.RFC3339),
+				},
+			},
 		},
 		{
 			name: "username not found",

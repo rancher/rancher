@@ -149,11 +149,11 @@ func (s *Store) Create(ctx context.Context,
 
 	seen := timeNow()
 	if userActivity.Spec.SeenAt != nil {
-		if userActivity.Spec.SeenAt.After(seen) {
-			// Make sure the idle timeout can't be bypassed by providing a future timestamp.
-			return nil, apierrors.NewBadRequest("seenAt can't be in the future")
+		if userActivity.Spec.SeenAt.Time.Before(seen) {
+			seen = userActivity.Spec.SeenAt.Time
 		}
-		seen = userActivity.Spec.SeenAt.Time
+		// Use the current time if the provided timestamp is in the future
+		// to make sure the idle timeout can't be extended.
 	}
 
 	shouldUpdate := true
