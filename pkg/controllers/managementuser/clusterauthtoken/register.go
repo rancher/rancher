@@ -58,7 +58,6 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 		if features.ExtTokens.Enabled() {
 			logrus.Debug("[deferred-ext] DEFER cluster auth token controllers - deferred setup")
 			cluster.Management.Wrangler.DeferredEXTAPIRegistration.DeferFunc(func(w *wrangler.EXTAPIContext) {
-				logrus.Debug("[deferred-ext/run] GREEN - cluster auth token - controllers")
 				registerDeferred(ctx, cluster, w)
 			})
 			return nil
@@ -191,7 +190,6 @@ func extTokenByUserAndCluster(obj any) ([]string, error) {
 // extTokenUserClusterKey computes the ext token's key for indexing by user and
 // cluster
 func extTokenUserClusterKey(token *extv1.Token) string {
-	logrus.Debugf("[%s] INDEX KEY %s/%s", clusterAuthTokenController, token.Spec.UserID, token.Spec.ClusterName)
 	return fmt.Sprintf("%s/%s", token.Spec.UserID, token.Spec.ClusterName)
 }
 
@@ -204,12 +202,10 @@ func extTokenLifecycle(ctx context.Context, tok ext.TokenController, controller,
 	tok.OnChange(ctx,
 		controller+"-change-"+clusterName,
 		func(key string, obj *extv1.Token) (*extv1.Token, error) {
-			logrus.Debugf("[%s] CLUSTER %q, TOKEN %p", clusterAuthTokenController, clusterName, obj)
 			// ignore removals
 			if obj == nil {
 				return obj, nil
 			}
-			logrus.Debugf("[%s] CLUSTER %q, TOKEN %q, FOR %q", clusterAuthTokenController, clusterName, obj.Name, obj.Spec.ClusterName)
 			// handle only tokens referencing the watched cluster
 			if clusterName != obj.Spec.ClusterName {
 				return obj, nil
@@ -221,7 +217,6 @@ func extTokenLifecycle(ctx context.Context, tok ext.TokenController, controller,
 	tok.OnRemove(ctx,
 		controller+"-remove-"+clusterName,
 		func(key string, obj *extv1.Token) (*extv1.Token, error) {
-			logrus.Debugf("[%s] CLUSTER %q, TOKEN %q, FOR %q", clusterAuthTokenController, clusterName, obj.Name, obj.Spec.ClusterName)
 			// handle only tokens referencing the watched cluster
 			if clusterName != obj.Spec.ClusterName {
 				return obj, nil
