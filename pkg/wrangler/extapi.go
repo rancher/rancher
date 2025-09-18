@@ -108,7 +108,7 @@ func extReady(apiServiceCache wapiregv1.APIServiceCache) bool {
 
 		established := false
 		for _, condition := range apiService.Status.Conditions {
-			if condition.Type == "Available" && condition.Status == "True" {
+			if condition.Type == apiregv1.Available && condition.Status == apiregv1.ConditionTrue {
 				established = true
 				break
 			}

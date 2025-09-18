@@ -124,7 +124,7 @@ func TestClusterAuthTokenHandlerSync(t *testing.T) {
 			Enabled:    true,
 			LastUsedAt: &lastUsedAt,
 		})
-		require.Error(t, err)
+		require.ErrorContains(t, err, "error getting token")
 		require.Nil(t, obj)
 	})
 
@@ -145,7 +145,7 @@ func TestClusterAuthTokenHandlerSync(t *testing.T) {
 			Enabled:    true,
 			LastUsedAt: &lastUsedAt,
 		})
-		require.Error(t, err)
+		require.ErrorContains(t, err, "error getting token")
 		require.Nil(t, obj)
 	})
 
@@ -397,7 +397,7 @@ func TestClusterAuthTokenHandlerSync(t *testing.T) {
 			Enabled:    true,
 			LastUsedAt: &clusterAuthTokenLastUsedAt,
 		})
-		require.Error(t, err)
+		require.ErrorContains(t, err, "error updating lastUsedAt for token")
 		require.Nil(t, obj)
 	})
 
@@ -438,7 +438,7 @@ func TestClusterAuthTokenHandlerSync(t *testing.T) {
 			Enabled:    true,
 			LastUsedAt: &clusterAuthTokenLastUsedAt,
 		})
-		require.Error(t, err)
+		require.ErrorContains(t, err, "error updating lastUsedAt for token")
 		require.Nil(t, obj)
 	})
 }
