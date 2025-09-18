@@ -17,9 +17,10 @@ type KEv2OperatorInfo struct {
 }
 
 var defaultKEv2Operators = map[string]KEv2OperatorInfo{
-	"aks": {Name: "aks", OldDriverName: "azureKubernetesService", Active: true},
-	"eks": {Name: "eks", OldDriverName: "amazonElasticContainerService", Active: true},
-	"gke": {Name: "gke", OldDriverName: "googleElasticContainerService", Active: true},
+	"aks":          {Name: "aks", OldDriverName: "azureKubernetesService", Active: true},
+	"eks":          {Name: "eks", OldDriverName: "amazonElasticContainerService", Active: true},
+	"gke":          {Name: "gke", OldDriverName: "googleElasticContainerService", Active: true},
+	"alibabacloud": {Name: "alibabacloud", OldDriverName: "", Active: false},
 }
 
 func syncOperatorDriverActiveState(management *config.ManagementContext) error {
@@ -49,25 +50,27 @@ func (c *driverCreator) syncKEv2OperatorsSetting() error {
 	}
 
 	for operatorKey, operatorInfo := range existingOperators {
-		driver, err := c.driversLister.Get("", operatorInfo.OldDriverName)
-		isActive := true
-		if err != nil {
-			if errors.IsNotFound(err) {
-				// The old KontainerDriver for this operator no longer exists.
-				// This is expected since AKS/EKS/GKE are now managed by their respective operators.
-				// In this case we skip updating status instead of treating it as an error.
-				continue
+		if operatorInfo.OldDriverName != "" {
+			driver, err := c.driversLister.Get("", operatorInfo.OldDriverName)
+			isActive := true
+			if err != nil {
+				if errors.IsNotFound(err) {
+					// The old KontainerDriver for this operator no longer exists.
+					// This is expected since AKS/EKS/GKE are now managed by their respective operators.
+					// In this case we skip updating status instead of treating it as an error.
+					continue
+				}
+				// Any other error is unexpected and should be returned.
+				return err
+			} else if driver != nil && !driver.Spec.Active {
+				isActive = false
 			}
-			// Any other error is unexpected and should be returned.
-			return err
-		} else if driver != nil && !driver.Spec.Active {
-			isActive = false
-		}
 
-		if operatorInfo.Active != isActive {
-			operatorInfo.Active = isActive
-			existingOperators[operatorKey] = operatorInfo
-			settingChanged = true
+			if operatorInfo.Active != isActive {
+				operatorInfo.Active = isActive
+				existingOperators[operatorKey] = operatorInfo
+				settingChanged = true
+			}
 		}
 	}
 
