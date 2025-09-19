@@ -525,9 +525,9 @@ func BuildClusterRoleBindingFromRTB(rtb metav1.Object, roleRefName string) (*rba
 	var ownerLabel string
 	switch rtb.(type) {
 	case *v3.ProjectRoleTemplateBinding:
-		ownerLabel = PrtbOwnerLabel
+		ownerLabel = GetPRTBOwnerLabel(rtb.GetName())
 	case *v3.ClusterRoleTemplateBinding:
-		ownerLabel = CrtbOwnerLabel
+		ownerLabel = GetCRTBOwnerLabel(rtb.GetName())
 	default:
 		return nil, fmt.Errorf("unrecognized roleTemplateBinding type: %T", rtb)
 	}
@@ -535,7 +535,7 @@ func BuildClusterRoleBindingFromRTB(rtb metav1.Object, roleRefName string) (*rba
 	return &rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   NameForClusterRoleBinding(roleRef, subject),
-			Labels: map[string]string{ownerLabel: rtb.GetName()},
+			Labels: map[string]string{ownerLabel: "true"},
 		},
 		RoleRef:  roleRef,
 		Subjects: []rbacv1.Subject{subject},
@@ -584,22 +584,33 @@ func ProjectManagementPlaneClusterRoleNameFor(s string) string {
 	return name.SafeConcatName(s, projectManagementPlaneSuffix)
 }
 
-func GetRTBOwnerLabel(rtb metav1.Object) string {
+// GetAuthV2OwnerLabel creates the owner label for the RoleTemplateBinding in the style used in pkg/controllers/management/authprovisioningv2.
+// Either:
+//
+//	authz.cluster.cattle.io/crtb-owner: <crtb.Name>
+//	authz.cluster.cattle.io/prtb-owner: <prtb.Name>
+func GetAuthV2OwnerLabel(rtb metav1.Object) string {
 	switch obj := rtb.(type) {
 	case *v3.ProjectRoleTemplateBinding:
-		return GetPRTBOwnerLabel(obj.Name)
+		return PrtbOwnerLabel + "=" + obj.Name
 	case *v3.ClusterRoleTemplateBinding:
-		return GetCRTBOwnerLabel(obj.Name)
+		return CrtbOwnerLabel + "=" + obj.Name
 	}
 	return ""
 }
 
+// GetPRTBOwnerLabel gets the owner label for a PRTB.
+// The label is always authz.cluster.cattle.io/prtb-owner-<prtb.name>: "true"
+// The reason it isn't a key value pair is because we have multiple of these labels on a single RoleBinding/ClusterRoleBinding, so we need unique labels.
 func GetPRTBOwnerLabel(s string) string {
-	return PrtbOwnerLabel + "=" + s
+	return name.SafeConcatName(PrtbOwnerLabel, s)
 }
 
+// GetCRTBOwnerLabel gets the owner label for a CRTB.
+// The label is always authz.cluster.cattle.io/crtb-owner-<crtb.name>: "true"
+// The reason it isn't a key value pair is because we have multiple of these labels on a single RoleBinding/ClusterRoleBinding, so we need unique labels.
 func GetCRTBOwnerLabel(s string) string {
-	return CrtbOwnerLabel + "=" + s
+	return name.SafeConcatName(CrtbOwnerLabel, s)
 }
 
 // GetClusterAndProjectNameFromPRTB gets the cluster and project belonging to a ProjectRoleTemplateBinding.

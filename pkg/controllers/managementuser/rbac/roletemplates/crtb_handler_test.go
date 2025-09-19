@@ -20,7 +20,7 @@ type reducedCondition struct {
 }
 
 var (
-	defaultListOption = metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/crtb-owner=test-crtb"}
+	defaultListOption = metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/crtb-owner-test-crtb"}
 	defaultCRTB       = v3.ClusterRoleTemplateBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-crtb",
@@ -31,7 +31,7 @@ var (
 	defaultCRB = rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   "crb-mggi3adyhn",
-			Labels: map[string]string{"authz.cluster.cattle.io/crtb-owner": "test-crtb"},
+			Labels: map[string]string{"authz.cluster.cattle.io/crtb-owner-test-crtb": "true"},
 		},
 		RoleRef: rbacv1.RoleRef{
 			Kind:     "ClusterRole",
@@ -50,7 +50,7 @@ var (
 	externalCRB = rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   "crb-panishv6ga",
-			Labels: map[string]string{"authz.cluster.cattle.io/crtb-owner": "test-crtb"},
+			Labels: map[string]string{"authz.cluster.cattle.io/crtb-owner-test-crtb": "true"},
 		},
 		RoleRef: rbacv1.RoleRef{
 			Kind:     "ClusterRole",

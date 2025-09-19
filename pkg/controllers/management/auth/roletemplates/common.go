@@ -23,7 +23,6 @@ const (
 const (
 	// Statuses
 	clusterRoleTemplateBindingDelete = "ClusterRoleTemplateBindingDelete"
-	labelsReconciled                 = "LabelsReconciled"
 	removeClusterRoleBindings        = "RemoveClusterRoleBindings"
 	reconcileSubject                 = "ReconcileSubject"
 	reconcileMembershipBindings      = "ReconcileMembershipBindings"
@@ -44,7 +43,6 @@ const (
 	failedToGetRoleTemplate                 = "FailedToGetRoleTemplate"
 	failedToGetUser                         = "FailedToGetUser"
 	failedToListExistingClusterRoleBindings = "FailedToGetExistingClusterRoleBindings"
-	failedToDeleteClusterMembershipBinding  = "FailedToDeleteClusterMembershipBindings"
 )
 
 // createOrUpdateClusterMembershipBinding ensures that the user specified by a CRTB or PRTB has membership to the cluster referenced by the CRTB or PRTB.
@@ -278,7 +276,7 @@ func getRTBLabel(obj metav1.Object) string {
 // The only intentionally created RoleBindings are created by auth provisioning v2 to provide access to the fleet cluster.
 // The creation of those is handled in pkg/controllers/management/authprovisioningv2.
 func removeAuthV2Permissions(obj metav1.Object, rbController crbacv1.RoleBindingController) error {
-	listOptions := metav1.ListOptions{LabelSelector: rbac.GetRTBOwnerLabel(obj)}
+	listOptions := metav1.ListOptions{LabelSelector: rbac.GetAuthV2OwnerLabel(obj)}
 
 	roleBindings, err := rbController.List(fleet.ClustersDefaultNamespace, listOptions)
 	if err != nil {

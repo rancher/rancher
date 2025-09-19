@@ -178,11 +178,11 @@ func Test_reconcileSubject(t *testing.T) {
 }
 
 var (
-	ownerLabel = "authz.cluster.cattle.io/prtb-owner=test-prtb"
+	ownerLabel = "authz.cluster.cattle.io/prtb-owner-test-prtb"
 	defaultCRB = rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   "crb-5x2rfzlbvz",
-			Labels: map[string]string{"authz.cluster.cattle.io/prtb-owner": "test-prtb"},
+			Labels: map[string]string{"authz.cluster.cattle.io/prtb-owner-test-prtb": "true"},
 		},
 		RoleRef: rbacv1.RoleRef{
 			Kind:     "ClusterRole",
