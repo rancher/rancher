@@ -113,6 +113,6 @@ func (d *DeferredRegistration[T, I]) DeferRegistration(register func(ctx context
 
 // getFuncName takes a function pointer (i.e. function name), and returns the function's name as a string.
 // Go reflection is used to determine the value.
-func getFuncName(i interface{}) string {
+func getFuncName(i any) string {
 	return runtime.FuncForPC(reflect.ValueOf(i).Pointer()).Name()
 }

@@ -4,35 +4,35 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	clusterv3 "github.com/rancher/rancher/pkg/generated/norman/cluster.cattle.io/v3"
-	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// NewClusterAuthToken creates a new cluster auth token from a given token.
-// Does not create the token in the remote cluster.
-func NewClusterAuthToken(token *managementv3.Token) *clusterv3.ClusterAuthToken {
-	tokenEnabled := token.Enabled == nil || *token.Enabled
+// NewClusterAuthToken creates a new cluster auth token from a given token
+// accessor and it's hashed value. It does not create the token in the remote
+// cluster.
+func NewClusterAuthToken(token accessor.TokenAccessor, hashedValue string) *clusterv3.ClusterAuthToken {
 	return &clusterv3.ClusterAuthToken{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: token.ObjectMeta.Name,
+			Name: token.GetName(),
 		},
 		TypeMeta: metav1.TypeMeta{
 			Kind: "ClusterAuthToken",
 		},
-		UserName:  token.UserID,
-		ExpiresAt: token.ExpiresAt,
-		Enabled:   tokenEnabled,
+		UserName:  token.GetUserID(),
+		ExpiresAt: token.GetExpiresAt(),
+		Enabled:   token.GetIsEnabled(),
 	}
 }
 
 // NewClusterAuthSecret creates a new secret from the given token and its hash value
 // The cluster auth token is managed separately.
 // Does not create the secret in the remote cluster.
-func NewClusterAuthTokenSecret(token *managementv3.Token, hashedValue string) *corev1.Secret {
-	return NewClusterAuthTokenSecretForName(token.ObjectMeta.Name, hashedValue)
+func NewClusterAuthTokenSecret(token accessor.TokenAccessor, hashedValue string) *corev1.Secret {
+	return NewClusterAuthTokenSecretForName(token.GetName(), hashedValue)
 }
 
 // NewClusterAuthSecret creates a new secret from the given token and its hash value

@@ -20,6 +20,7 @@ import (
 	"github.com/rancher/norman/types"
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	clusterv3api "github.com/rancher/rancher/pkg/apis/cluster.cattle.io/v3"
+	extv1api "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	managementv3api "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	projectv3api "github.com/rancher/rancher/pkg/apis/project.cattle.io/v3"
 	provisioningv1api "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
@@ -29,6 +30,7 @@ import (
 	"github.com/rancher/rancher/pkg/catalogv2/helmop"
 	"github.com/rancher/rancher/pkg/catalogv2/system"
 	"github.com/rancher/rancher/pkg/controllers"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io"
@@ -101,6 +103,7 @@ var (
 		apiextensionsv1.AddToScheme,
 		apiregistrationv12.AddToScheme,
 		catalogv1.AddToScheme,
+		extv1api.AddToScheme,
 	}
 	AddToScheme = localSchemeBuilder.AddToScheme
 	Scheme      = runtime.NewScheme()
@@ -127,7 +130,8 @@ func init() {
 type Context struct {
 	RESTConfig *rest.Config
 
-	DeferredCAPIRegistration *DeferredRegistration[*CAPIContext, *DeferredCAPIInitializer]
+	DeferredCAPIRegistration   *DeferredRegistration[*CAPIContext, *DeferredCAPIInitializer]
+	DeferredEXTAPIRegistration *DeferredRegistration[*EXTAPIContext, *DeferredEXTAPIInitializer]
 
 	Apply               apply.Apply
 	Dynamic             *dynamic.Controller
@@ -304,7 +308,7 @@ func (w *Context) Start(ctx context.Context) error {
 }
 
 // WithAgent returns a shallow copy of the Context that has been configured to use a user agent in its
-// clients that is the given userAgent appended to "rancher-%s-%s".
+// clients that is the configured server-version and given userAgent insert into "rancher-%s-%s".
 func (w *Context) WithAgent(userAgent string) *Context {
 	userAgent = fmt.Sprintf("rancher-%s-%s", settings.ServerVersion.Get(), userAgent)
 	wContextCopy := *w
@@ -362,6 +366,9 @@ func NewPrimaryContext(ctx context.Context, clientConfig clientcmd.ClientConfig,
 	}
 
 	wCtx.DeferredCAPIRegistration.Manage(ctx)
+	if features.ExtTokens.Enabled() {
+		wCtx.DeferredEXTAPIRegistration.Manage(ctx)
+	}
 	return wCtx, nil
 }
 
@@ -571,6 +578,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 	}
 
 	wContext.DeferredCAPIRegistration = NewDeferredRegistration[*CAPIContext, *DeferredCAPIInitializer](wContext, NewCAPIInitializer(wContext), "deferred-capi")
+	wContext.DeferredEXTAPIRegistration = NewDeferredRegistration[*EXTAPIContext, *DeferredEXTAPIInitializer](wContext, NewEXTAPIInitializer(wContext), "deferred-ext")
 
 	return wContext, nil
 }
