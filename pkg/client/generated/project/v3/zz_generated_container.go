@@ -29,6 +29,7 @@ const (
 	ContainerFieldResources                = "resources"
 	ContainerFieldRestartCount             = "restartCount"
 	ContainerFieldRestartPolicy            = "restartPolicy"
+	ContainerFieldRestartPolicyRules       = "restartPolicyRules"
 	ContainerFieldRunAsGroup               = "runAsGroup"
 	ContainerFieldRunAsNonRoot             = "runAsNonRoot"
 	ContainerFieldSeccompProfile           = "seccompProfile"
@@ -77,6 +78,7 @@ type Container struct {
 	Resources                *ResourceRequirements          `json:"resources,omitempty" yaml:"resources,omitempty"`
 	RestartCount             int64                          `json:"restartCount,omitempty" yaml:"restartCount,omitempty"`
 	RestartPolicy            string                         `json:"restartPolicy,omitempty" yaml:"restartPolicy,omitempty"`
+	RestartPolicyRules       []ContainerRestartRule         `json:"restartPolicyRules,omitempty" yaml:"restartPolicyRules,omitempty"`
 	RunAsGroup               *int64                         `json:"runAsGroup,omitempty" yaml:"runAsGroup,omitempty"`
 	RunAsNonRoot             *bool                          `json:"runAsNonRoot,omitempty" yaml:"runAsNonRoot,omitempty"`
 	SeccompProfile           *SeccompProfile                `json:"seccompProfile,omitempty" yaml:"seccompProfile,omitempty"`

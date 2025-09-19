@@ -36,6 +36,7 @@ const (
 	WorkloadFieldHostPID                              = "hostPID"
 	WorkloadFieldHostUsers                            = "hostUsers"
 	WorkloadFieldHostname                             = "hostname"
+	WorkloadFieldHostnameOverride                     = "hostnameOverride"
 	WorkloadFieldImagePullSecrets                     = "imagePullSecrets"
 	WorkloadFieldJobConfig                            = "jobConfig"
 	WorkloadFieldJobStatus                            = "jobStatus"
@@ -133,6 +134,7 @@ type Workload struct {
 	HostPID                              bool                                             `json:"hostPID,omitempty" yaml:"hostPID,omitempty"`
 	HostUsers                            *bool                                            `json:"hostUsers,omitempty" yaml:"hostUsers,omitempty"`
 	Hostname                             string                                           `json:"hostname,omitempty" yaml:"hostname,omitempty"`
+	HostnameOverride                     string                                           `json:"hostnameOverride,omitempty" yaml:"hostnameOverride,omitempty"`
 	ImagePullSecrets                     []LocalObjectReference                           `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
 	JobConfig                            *JobConfig                                       `json:"jobConfig,omitempty" yaml:"jobConfig,omitempty"`
 	JobStatus                            *JobStatus                                       `json:"jobStatus,omitempty" yaml:"jobStatus,omitempty"`
