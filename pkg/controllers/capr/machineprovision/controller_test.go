@@ -2,12 +2,17 @@ package machineprovision
 
 import (
 	"testing"
+	"time"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/wrangler/v3/pkg/data"
+	ctrlfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 func MustStatus(status rkev1.RKEMachineStatus, err error) rkev1.RKEMachineStatus {
@@ -233,6 +238,105 @@ func TestConstructFilesSecret(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			secret := constructFilesSecret(tc.inputAliasedFields, tc.config)
 			assert.Equal(t, tc.expectedSecret, secret)
+		})
+	}
+}
+
+func getJobCache(ctrl *gomock.Controller, t time.Time) *ctrlfake.MockCacheInterface[*batchv1.Job] {
+	job := batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "job",
+			Namespace: "namespace",
+		},
+		Status: batchv1.JobStatus{
+			Conditions: []batchv1.JobCondition{
+				{
+					Type:   batchv1.JobFailed,
+					Status: corev1.ConditionTrue,
+					LastTransitionTime: metav1.Time{
+						Time: t, // 10 minutes ago
+					},
+				},
+			},
+		},
+	}
+
+	mockJobCache := ctrlfake.NewMockCacheInterface[*batchv1.Job](ctrl)
+	mockJobCache.EXPECT().Get("namespace", "job").Return(&job, nil).AnyTimes()
+	return mockJobCache
+}
+
+func getInfraObject(namespace, jobName string) *infraObject {
+	return &infraObject{
+		meta: &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"namespace": namespace,
+				},
+			},
+		},
+		data: data.Object{
+			"status": map[string]interface{}{
+				"jobName": jobName,
+			},
+		},
+	}
+}
+
+func TestInfraMachineDeletionEnqueueTime(t *testing.T) {
+
+	ctrl := gomock.NewController(t)
+
+	testCases := []struct {
+		name         string
+		h            handler
+		setting      string
+		infra        *infraObject
+		expectedTime time.Duration
+	}{
+		{
+			name:         "setting is positive, should delete",
+			h:            handler{jobs: getJobCache(ctrl, time.Now().Add(-10*time.Minute))},
+			setting:      "5m",
+			infra:        getInfraObject("namespace", "job"),
+			expectedTime: 0,
+		},
+		{
+			name:         "settings is zero, should return zero",
+			h:            handler{jobs: getJobCache(ctrl, time.Now().Add(-10*time.Minute))},
+			setting:      "0s",
+			infra:        getInfraObject("namespace", "job"),
+			expectedTime: 0,
+		},
+		{
+			name:         "setting is positive, should enqueue",
+			h:            handler{jobs: getJobCache(ctrl, time.Now().Add(-1*time.Minute))},
+			setting:      "5m",
+			infra:        getInfraObject("namespace", "job"),
+			expectedTime: 4 * time.Minute,
+		},
+		{
+			name:         "setting is negative, should delete",
+			h:            handler{jobs: getJobCache(ctrl, time.Now().Add(-10*time.Minute))},
+			setting:      "-5m",
+			infra:        getInfraObject("namespace", "job"),
+			expectedTime: 0,
+		},
+		{
+			name:         "infra has no job name, should delete",
+			h:            handler{jobs: getJobCache(ctrl, time.Now().Add(-10*time.Minute))},
+			setting:      "-5m",
+			infra:        getInfraObject("namespace", ""),
+			expectedTime: 0,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			settingInDuration, _ := time.ParseDuration(tc.setting)
+			gotTime, err := tc.h.infraMachineDeletionEnqueueingTime(tc.infra, settingInDuration)
+			assert.Nil(t, err)
+			assert.Equal(t, tc.expectedTime.Round(time.Minute), gotTime.Round(time.Minute)) // it is not > exactly < equal, this is why use a round function, eg: 3m59s != 4m0s
 		})
 	}
 }
