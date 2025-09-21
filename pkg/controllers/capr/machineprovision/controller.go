@@ -499,7 +499,6 @@ func (h *handler) doRemove(infra *infraObject) (runtime.Object, error) {
 }
 
 func (h *handler) EnqueueAfter(infra *infraObject, duration time.Duration) {
-	fmt.Println("AAAAA")
 	err := h.dynamic.EnqueueAfter(infra.obj.GetObjectKind().GroupVersionKind(), infra.meta.GetNamespace(), infra.meta.GetName(), duration)
 	if err != nil {
 		logrus.Errorf("[machineprovision] error enqueuing %s %s/%s: %v", infra.obj.GetObjectKind().GroupVersionKind(), infra.meta.GetNamespace(), infra.meta.GetName(), err)
