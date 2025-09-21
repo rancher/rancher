@@ -384,8 +384,8 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 		}
 
 		if shouldCleanupObjects(job, infra.data) {
-			// Calling WithOwner(jobCache).ApplyObjects with no objects here will look for all objects with types passed to
-			// WithCacheTypes above that have an owner label (not owner reference) to the given jobCache. It will compare the existing
+			// Calling WithOwner(obj).ApplyObjects with no objects here will look for all objects with types passed to
+			// WithCacheTypes above that have an owner label (not owner reference) to the given obj. It will compare the existing
 			// objects it finds to the ones that are passed to ApplyObjects (which there are none in this case). The apply
 			// controller will delete all existing objects it finds that are not passed to ApplyObjects. Since no objects are
 			// passed here, it will delete all objects it finds.
