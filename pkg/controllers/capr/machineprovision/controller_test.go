@@ -484,10 +484,10 @@ func newInfra() *infraObject {
 	}
 }
 
-// newTestInfraMachine creates an InfraMachine with a standard Kubernetes object structure.
+// newTestInfraMachine creates an object that will be translated to a infraMachine on the OnChange function
 func newTestInfraMachine(withFailure bool) *unstructured.Unstructured {
 	objectData := map[string]interface{}{
-		"apiVersion": "infrastructure.cluster.x-k8s.io/v1beta1", // Added for completeness
+		"apiVersion": "infrastructure.cluster.x-k8s.io/v1beta1",
 		"kind":       "InfraMachine",
 		"metadata": map[string]interface{}{
 			"namespace": "namespace",
@@ -502,9 +502,6 @@ func newTestInfraMachine(withFailure bool) *unstructured.Unstructured {
 			"labels": map[string]interface{}{
 				"rke.cattle.io/capi-machine-name": "name",
 			},
-		},
-		"spec": map[string]interface{}{
-			// 'spec' would contain the desired state, e.g., instance size, image, etc.
 		},
 	}
 
