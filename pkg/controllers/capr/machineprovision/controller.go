@@ -83,6 +83,14 @@ func newInfraObject(obj runtime.Object) (*infraObject, error) {
 	}, nil
 }
 
+type dynamicController interface {
+	Get(gvk schema.GroupVersionKind, namespace, name string) (runtime.Object, error)
+	Update(obj runtime.Object) (runtime.Object, error)
+	UpdateStatus(obj runtime.Object) (runtime.Object, error)
+	Enqueue(gvk schema.GroupVersionKind, namespace, name string) error
+	EnqueueAfter(gvk schema.GroupVersionKind, namespace, name string, delay time.Duration) error
+}
+
 type handler struct {
 	ctx                 context.Context
 	apply               apply.Apply
@@ -96,7 +104,7 @@ type handler struct {
 	machineSetCache     capicontrollers.MachineSetCache
 	namespaces          corecontrollers.NamespaceCache
 	nodeDriverCache     mgmtcontrollers.NodeDriverCache
-	dynamic             *dynamic.Controller
+	dynamic             dynamicController
 	rancherClusterCache ranchercontrollers.ClusterCache
 	kubeconfigManager   *kubeconfig.Manager
 }
@@ -376,8 +384,8 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 		}
 
 		if shouldCleanupObjects(job, infra.data) {
-			// Calling WithOwner(obj).ApplyObjects with no objects here will look for all objects with types passed to
-			// WithCacheTypes above that have an owner label (not owner reference) to the given obj. It will compare the existing
+			// Calling WithOwner(jobCache).ApplyObjects with no objects here will look for all objects with types passed to
+			// WithCacheTypes above that have an owner label (not owner reference) to the given jobCache. It will compare the existing
 			// objects it finds to the ones that are passed to ApplyObjects (which there are none in this case). The apply
 			// controller will delete all existing objects it finds that are not passed to ApplyObjects. Since no objects are
 			// passed here, it will delete all objects it finds.
@@ -491,6 +499,7 @@ func (h *handler) doRemove(infra *infraObject) (runtime.Object, error) {
 }
 
 func (h *handler) EnqueueAfter(infra *infraObject, duration time.Duration) {
+	fmt.Println("AAAAA")
 	err := h.dynamic.EnqueueAfter(infra.obj.GetObjectKind().GroupVersionKind(), infra.meta.GetNamespace(), infra.meta.GetName(), duration)
 	if err != nil {
 		logrus.Errorf("[machineprovision] error enqueuing %s %s/%s: %v", infra.obj.GetObjectKind().GroupVersionKind(), infra.meta.GetNamespace(), infra.meta.GetName(), err)
@@ -568,12 +577,12 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 	if failure {
 		// check if we need to delete or enqueue the capi machine if it fails
 		deleteOnFailureAfter := parseDeleteOnFailureAfterSetting(infra)
-		enqueueTime, err := h.infraMachineDeletionEnqueueingTime(infra, deleteOnFailureAfter)
+		enqueueTime, err := h.infraMachineDeletionEnqueueingTime(infra, time.Now(), deleteOnFailureAfter)
 		if err != nil {
 			return obj, err
 		}
 		if enqueueTime > 0 {
-			logrus.Infof("[machineprovision] %s/%s: Failed to create infrastructure for machine %s enqueueing deletion after %s seconds...", infra.meta.GetNamespace(), infra.meta.GetName(), machine.Name, enqueueTime.Round(time.Second).String())
+			logrus.Infof("[machineprovision] %s/%s: Failed to create infrastructure for machine %s, enqueueing deletion after %s...", infra.meta.GetNamespace(), infra.meta.GetName(), machine.Name, enqueueTime.String())
 			h.EnqueueAfter(infra, enqueueTime)
 			return obj, nil
 		}
@@ -635,15 +644,9 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 func parseDeleteOnFailureAfterSetting(infra *infraObject) time.Duration {
 
 	deleteInfraTimeSetting := settings.DeleteInfraMachineOnFailureAfter.Get()
-
-	// default, nothing to do
-	if deleteInfraTimeSetting == "0s" {
-		return 0
-	}
-
 	deleteOnFailureAfter, err := time.ParseDuration(deleteInfraTimeSetting)
 	if err != nil {
-		logrus.Errorf("[machineprovision] %s/%s: error parsing the '%s' setting: %v, returning 0", infra.meta.GetNamespace(), infra.meta.GetName(), settings.DeleteInfraMachineOnFailureAfter.Name, err)
+		logrus.Warnf("[machineprovision] %s/%s: error parsing the '%s' setting: %v: %v, returning 0", infra.meta.GetNamespace(), infra.meta.GetName(), settings.DeleteInfraMachineOnFailureAfter.Name, deleteInfraTimeSetting, err)
 		return 0
 	}
 
@@ -662,11 +665,10 @@ func jobFailureTime(job *batchv1.Job) *time.Time {
 }
 
 // infraMachineDeletionEnqueueingTime determines the duration we want to
-// keep the infraMachine alive for debugging purposes
-// based on job failure time and configured deletion settings.
-func (h *handler) infraMachineDeletionEnqueueingTime(infra *infraObject, deleteOnFailureAfter time.Duration) (time.Duration, error) {
+// keep the infraMachine alive based on job failure time and configured deletion settings.
+func (h *handler) infraMachineDeletionEnqueueingTime(infra *infraObject, currentTime time.Time, deleteOnFailureAfter time.Duration) (time.Duration, error) {
 
-	if deleteOnFailureAfter < 0 {
+	if deleteOnFailureAfter <= 0 {
 		return 0, nil
 	}
 
@@ -697,7 +699,6 @@ func (h *handler) infraMachineDeletionEnqueueingTime(infra *infraObject, deleteO
 	// timeSinceFailure will be 3 minutes
 	// so we need to enqueue to 2 minutes from now.
 
-	currentTime := time.Now()
 	timeSinceFailure := currentTime.Sub(*failedTime)
 
 	if timeSinceFailure >= deleteOnFailureAfter {

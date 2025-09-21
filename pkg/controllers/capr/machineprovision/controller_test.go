@@ -4,8 +4,13 @@ import (
 	"testing"
 	"time"
 
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/wrangler/v3/pkg/apply/fake"
 	"github.com/rancher/wrangler/v3/pkg/data"
+	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/batch/v1"
 	ctrlfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -13,6 +18,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capierrors "sigs.k8s.io/cluster-api/errors"
 )
 
 func MustStatus(status rkev1.RKEMachineStatus, err error) rkev1.RKEMachineStatus {
@@ -242,7 +249,201 @@ func TestConstructFilesSecret(t *testing.T) {
 	}
 }
 
-func getJobCache(ctrl *gomock.Controller, t time.Time) *ctrlfake.MockCacheInterface[*batchv1.Job] {
+func TestInfraMachineDeletionEnqueueTime(t *testing.T) {
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	now := time.Now()
+
+	testCases := []struct {
+		name         string
+		h            handler
+		setting      string
+		infra        *infraObject
+		expectedTime time.Duration
+	}{
+		{
+			name:         "setting is positive, should delete",
+			h:            handler{jobs: newJob(ctrl, now.Add(-10*time.Minute))},
+			setting:      "5m",
+			infra:        newInfra(),
+			expectedTime: 0,
+		},
+		{
+			name:         "settings is zero, should return zero",
+			h:            handler{jobs: newJob(ctrl, now.Add(-10*time.Minute))},
+			setting:      "0s",
+			infra:        newInfra(),
+			expectedTime: 0,
+		},
+		{
+			name:         "setting is positive, should enqueue",
+			h:            handler{jobs: newJob(ctrl, now.Add(-1*time.Minute))},
+			setting:      "5m",
+			infra:        newInfra(),
+			expectedTime: 4 * time.Minute,
+		},
+		{
+			name:         "setting is negative, should delete",
+			h:            handler{jobs: newJob(ctrl, now.Add(-10*time.Minute))},
+			setting:      "-5m",
+			infra:        newInfra(),
+			expectedTime: 0,
+		},
+		{
+			name:         "infra has no job name, should delete",
+			h:            handler{jobs: newJob(ctrl, now.Add(-10*time.Minute))},
+			setting:      "-5m",
+			infra:        newInfra(),
+			expectedTime: 0,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			settingInDuration, _ := time.ParseDuration(tc.setting)
+			gotTime, err := tc.h.infraMachineDeletionEnqueueingTime(tc.infra, now, settingInDuration)
+			assert.Nil(t, err)
+			assert.Equal(t, tc.expectedTime, gotTime)
+		})
+	}
+}
+
+func TestOnChange(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	machineCache := ctrlfake.NewMockCacheInterface[*capi.Machine](ctrl)
+	machineCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(newCapiMachine("name", "namespace"), nil).AnyTimes()
+
+	machineClient := ctrlfake.NewMockControllerInterface[*capi.Machine, *capi.MachineList](ctrl)
+
+	clusterCache := ctrlfake.NewMockCacheInterface[*capi.Cluster](ctrl)
+	clusterCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(newCluster("name", "namespace"), nil).AnyTimes()
+
+	nodeDriverCache := ctrlfake.NewMockNonNamespacedCacheInterface[*apimgmtv3.NodeDriver](ctrl)
+	nodeDriverCache.EXPECT().Get(gomock.Any()).Return(&apimgmtv3.NodeDriver{}, nil).AnyTimes()
+
+	dynamicControllerFake := dynamicControllerFake{}
+
+	rancherClusterCache := ctrlfake.NewMockCacheInterface[*rancherv1.Cluster](ctrl)
+	rancherClusterCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(&rancherv1.Cluster{}, nil).AnyTimes()
+
+	secrets := ctrlfake.NewMockCacheInterface[*corev1.Secret](ctrl)
+	secrets.EXPECT().Get(gomock.Any(), gomock.Any()).Return(&corev1.Secret{}, nil).AnyTimes()
+
+	apply := fake.FakeApply{}
+	now := metav1.Now()
+	h := &handler{
+		machineCache:        machineCache,
+		machineClient:       machineClient,
+		capiClusterCache:    clusterCache,
+		nodeDriverCache:     nodeDriverCache,
+		dynamic:             &dynamicControllerFake,
+		rancherClusterCache: rancherClusterCache,
+		secrets:             secrets,
+		apply:               &apply,
+	}
+
+	testCases := []struct {
+		name        string
+		setting     string
+		action      string
+		jobCache    v1.JobCache
+		withFailure bool
+	}{
+		{
+			name:        "setting is positive with failure machine, should delete",
+			setting:     "5m",
+			action:      "delete",
+			jobCache:    newJob(ctrl, now.Add(-10*time.Minute)),
+			withFailure: true,
+		},
+		{
+			name:        "setting is zero, should delete",
+			setting:     "0m",
+			action:      "delete",
+			jobCache:    newJob(ctrl, now.Add(-10*time.Minute)),
+			withFailure: true,
+		},
+		{
+			name:        "object didn't failed, do not delete",
+			setting:     "0m",
+			action:      "nothing",
+			jobCache:    newJob(ctrl, now.Add(-10*time.Minute)),
+			withFailure: false,
+		},
+		{
+			name:        "object failed now and setting is smaller, should enqueue",
+			setting:     "10m",
+			action:      "enqueue",
+			jobCache:    newJob(ctrl, now.Add(-5*time.Minute)),
+			withFailure: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			settings.Setting.Set(settings.DeleteInfraMachineOnFailureAfter, tc.setting)
+			h.jobs = tc.jobCache
+			if tc.action == "delete" {
+				machineClient.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
+			}
+			if tc.action != "delete" {
+				machineClient.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(0)
+			}
+			_, err := h.OnChange(newTestInfraMachine(tc.withFailure)) // call for the tests
+
+			if tc.action == "enqueue" {
+				assert.True(t, dynamicControllerFake.EnqueueAfterCalled)
+			}
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func newCapiMachine(name, namespace string) *capi.Machine {
+	dataSecretName := "a"
+	return &capi.Machine{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels: map[string]string{
+				capi.ClusterNameLabel: name,
+			},
+		},
+		Spec: capi.MachineSpec{
+			Bootstrap: capi.Bootstrap{
+				ConfigRef: &corev1.ObjectReference{
+					APIVersion: "v1",
+				},
+				DataSecretName: &dataSecretName,
+			},
+		},
+	}
+}
+
+func newCluster(name, namespace string) *capi.Cluster {
+	return &capi.Cluster{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: capi.GroupVersion.String(),
+			Kind:       "Cluster",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+			Labels: map[string]string{
+				capi.ClusterNameLabel: name,
+			},
+		},
+		Spec: capi.ClusterSpec{},
+		Status: capi.ClusterStatus{
+			InfrastructureReady: true,
+		},
+	}
+}
+func newJob(ctrl *gomock.Controller, t time.Time) *ctrlfake.MockCacheInterface[*batchv1.Job] {
 	job := batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "job",
@@ -254,7 +455,7 @@ func getJobCache(ctrl *gomock.Controller, t time.Time) *ctrlfake.MockCacheInterf
 					Type:   batchv1.JobFailed,
 					Status: corev1.ConditionTrue,
 					LastTransitionTime: metav1.Time{
-						Time: t, // 10 minutes ago
+						Time: t,
 					},
 				},
 			},
@@ -266,77 +467,55 @@ func getJobCache(ctrl *gomock.Controller, t time.Time) *ctrlfake.MockCacheInterf
 	return mockJobCache
 }
 
-func getInfraObject(namespace, jobName string) *infraObject {
+func newInfra() *infraObject {
 	return &infraObject{
 		meta: &unstructured.Unstructured{
 			Object: map[string]interface{}{
 				"metadata": map[string]interface{}{
-					"namespace": namespace,
+					"namespace": "namespace",
 				},
 			},
 		},
 		data: data.Object{
 			"status": map[string]interface{}{
-				"jobName": jobName,
+				"jobName": "job",
 			},
 		},
 	}
 }
 
-func TestInfraMachineDeletionEnqueueTime(t *testing.T) {
-
-	ctrl := gomock.NewController(t)
-
-	testCases := []struct {
-		name         string
-		h            handler
-		setting      string
-		infra        *infraObject
-		expectedTime time.Duration
-	}{
-		{
-			name:         "setting is positive, should delete",
-			h:            handler{jobs: getJobCache(ctrl, time.Now().Add(-10*time.Minute))},
-			setting:      "5m",
-			infra:        getInfraObject("namespace", "job"),
-			expectedTime: 0,
+// newTestInfraMachine creates an InfraMachine with a standard Kubernetes object structure.
+func newTestInfraMachine(withFailure bool) *unstructured.Unstructured {
+	objectData := map[string]interface{}{
+		"apiVersion": "infrastructure.cluster.x-k8s.io/v1beta1", // Added for completeness
+		"kind":       "InfraMachine",
+		"metadata": map[string]interface{}{
+			"namespace": "namespace",
+			"name":      "name",
+			"ownerReferences": []any{
+				map[string]any{
+					"apiVersion": capi.GroupVersion.String(),
+					"kind":       "Machine",
+					"controller": true,
+				},
+			},
+			"labels": map[string]interface{}{
+				"rke.cattle.io/capi-machine-name": "name",
+			},
 		},
-		{
-			name:         "settings is zero, should return zero",
-			h:            handler{jobs: getJobCache(ctrl, time.Now().Add(-10*time.Minute))},
-			setting:      "0s",
-			infra:        getInfraObject("namespace", "job"),
-			expectedTime: 0,
-		},
-		{
-			name:         "setting is positive, should enqueue",
-			h:            handler{jobs: getJobCache(ctrl, time.Now().Add(-1*time.Minute))},
-			setting:      "5m",
-			infra:        getInfraObject("namespace", "job"),
-			expectedTime: 4 * time.Minute,
-		},
-		{
-			name:         "setting is negative, should delete",
-			h:            handler{jobs: getJobCache(ctrl, time.Now().Add(-10*time.Minute))},
-			setting:      "-5m",
-			infra:        getInfraObject("namespace", "job"),
-			expectedTime: 0,
-		},
-		{
-			name:         "infra has no job name, should delete",
-			h:            handler{jobs: getJobCache(ctrl, time.Now().Add(-10*time.Minute))},
-			setting:      "-5m",
-			infra:        getInfraObject("namespace", ""),
-			expectedTime: 0,
+		"spec": map[string]interface{}{
+			// 'spec' would contain the desired state, e.g., instance size, image, etc.
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			settingInDuration, _ := time.ParseDuration(tc.setting)
-			gotTime, err := tc.h.infraMachineDeletionEnqueueingTime(tc.infra, settingInDuration)
-			assert.Nil(t, err)
-			assert.Equal(t, tc.expectedTime.Round(time.Minute), gotTime.Round(time.Minute)) // it is not > exactly < equal, this is why use a round function, eg: 3m59s != 4m0s
-		})
+	if withFailure {
+		objectData["status"] = map[string]interface{}{
+			"failureReason": string(capierrors.CreateMachineError),
+			"jobName":       "job",
+		}
+	}
+
+	return &unstructured.Unstructured{
+		Object: objectData,
 	}
 }
