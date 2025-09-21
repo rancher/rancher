@@ -9,11 +9,7 @@ import (
 )
 
 type dynamicControllerFake struct {
-	EnqueueAfterCalled    bool
-	EnqueueAfterGVK       schema.GroupVersionKind
-	EnqueueAfterNamespace string
-	EnqueueAfterName      string
-	EnqueueAfterDelay     time.Duration
+	EnqueueAfterCalled int
 }
 
 func (d dynamicControllerFake) Get(gvk schema.GroupVersionKind, namespace, name string) (runtime.Object, error) {
@@ -40,11 +36,6 @@ func (d dynamicControllerFake) Enqueue(gvk schema.GroupVersionKind, namespace, n
 
 func (d *dynamicControllerFake) EnqueueAfter(gvk schema.GroupVersionKind, namespace, name string, delay time.Duration) error {
 
-	d.EnqueueAfterCalled = true
-	d.EnqueueAfterGVK = gvk
-	d.EnqueueAfterNamespace = namespace
-	d.EnqueueAfterName = name
-	d.EnqueueAfterDelay = delay
-
+	d.EnqueueAfterCalled += 1
 	return nil
 }

@@ -396,7 +396,7 @@ func TestOnChange(t *testing.T) {
 			_, err := h.OnChange(newTestInfraMachine(tc.withFailure)) // call for the tests
 
 			if tc.action == "enqueue" {
-				assert.True(t, dynamicControllerFake.EnqueueAfterCalled)
+				assert.Equal(t, 1, dynamicControllerFake.EnqueueAfterCalled)
 			}
 			assert.NoError(t, err)
 		})
