@@ -581,7 +581,7 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 			return obj, err
 		}
 		if enqueueTime > 0 {
-			logrus.Infof("[machineprovision] %s/%s: Failed to create infrastructure for machine %s, enqueueing deletion after %s...", infra.meta.GetNamespace(), infra.meta.GetName(), machine.Name, enqueueTime.String())
+			logrus.Infof("[machineprovision] %s/%s: Failed to create infrastructure for machine %s, enqueueing deletion after %s...", infra.meta.GetNamespace(), infra.meta.GetName(), machine.Name, enqueueTime)
 			h.EnqueueAfter(infra, enqueueTime)
 			return obj, nil
 		}

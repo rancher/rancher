@@ -252,8 +252,6 @@ func TestConstructFilesSecret(t *testing.T) {
 func TestInfraMachineDeletionEnqueueTime(t *testing.T) {
 
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	now := time.Now()
 
 	testCases := []struct {
@@ -312,7 +310,6 @@ func TestInfraMachineDeletionEnqueueTime(t *testing.T) {
 
 func TestOnChange(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	machineCache := ctrlfake.NewMockCacheInterface[*capi.Machine](ctrl)
 	machineCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(newCapiMachine("name", "namespace"), nil).AnyTimes()
@@ -385,7 +382,7 @@ func TestOnChange(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			settings.Setting.Set(settings.DeleteInfraMachineOnFailureAfter, tc.setting)
+			settings.DeleteInfraMachineOnFailureAfter.Set(tc.setting)
 			h.jobs = tc.jobCache
 			if tc.action == "delete" {
 				machineClient.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
