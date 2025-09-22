@@ -16,7 +16,7 @@ import (
 // potential re-execution of commands which must only be run once (etcd operations, etc.)
 // but are not idempotent by default. The command will be reattempted until either it is
 // successful, or the max-failures limit set for the plan is reached. The definition of
-// $CATTLE_AGENT_ATTEMPT_NUMBER can be found in the system-agent repo, but it is effectively
+// $CATTLE_AGENT_ATTEMPT_NUMBER can be found in the system-agent repository, but it is effectively
 // just the plans failure-count + 1.
 const idempotentActionScript = `
 #!/bin/sh

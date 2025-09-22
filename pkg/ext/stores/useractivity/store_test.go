@@ -531,7 +531,7 @@ func TestStoreCreate(t *testing.T) {
 			store := &Store{
 				tokens:                           tokenController,
 				userCache:                        userCache,
-				extTokenStore:                    exttokens.NewSystem(nil, nil, secrets, users, tokenCache, nil, nil, nil),
+				extTokenStore:                    exttokens.NewSystem(nil, nil, secrets, users, tokenCache, nil, nil, nil, nil),
 				getAuthUserSessionIdleTTLMinutes: func() int { return defaultIdleTTL },
 			}
 
@@ -715,7 +715,7 @@ func TestStoreGet(t *testing.T) {
 			store := &Store{
 				tokens:                           tokenController,
 				userCache:                        userCache,
-				extTokenStore:                    exttokens.NewSystem(nil, nil, secrets, users, tokenCache, nil, nil, nil),
+				extTokenStore:                    exttokens.NewSystem(nil, nil, secrets, users, tokenCache, nil, nil, nil, nil),
 				getAuthUserSessionIdleTTLMinutes: func() int { return defaultIdleTTL },
 			}
 

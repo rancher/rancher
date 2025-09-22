@@ -21,6 +21,7 @@ import (
 	"github.com/golang-jwt/jwt"
 	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -145,18 +146,16 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 			},
 			expectedUserInfoSubject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
 			expectedUserInfoClaimInfo: ClaimInfo{
-				Subject:           "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
-				PreferredUsername: "admin",
-				Groups:            []string{"admingroup"},
-				FullGroupPath:     []string{"/admingroup"},
-				Roles:             []string{"adminrole"},
+				Subject:       "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Groups:        []string{"admingroup"},
+				FullGroupPath: []string{"/admingroup"},
+				Roles:         []string{"adminrole"},
 			},
 			expectedClaimInfo: &ClaimInfo{
-				Subject:           "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
-				PreferredUsername: "admin",
-				Groups:            []string{"admingroup"},
-				FullGroupPath:     []string{"/admingroup"},
-				Roles:             []string{"adminrole"},
+				Subject:       "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Groups:        []string{"admingroup"},
+				FullGroupPath: []string{"/admingroup"},
+				Roles:         []string{"adminrole"},
 			},
 		},
 		"get groups with GroupsClaims": {
@@ -188,8 +187,7 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 				}
 				res.token = token
 				res.user = `{
-				"sub": "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
-				"preferred_username": "admin"
+				"sub": "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd"
               }`
 				return res
 			},
@@ -201,16 +199,13 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 			},
 			expectedUserInfoSubject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
 			expectedUserInfoClaimInfo: ClaimInfo{
-				Subject:           "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
-				PreferredUsername: "admin",
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
 			},
 			expectedClaimInfo: &ClaimInfo{
-				Subject:           "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
-				PreferredUsername: "admin",
-				Groups:            []string{"group1", "group2"},
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Groups:  []string{"group1", "group2"},
 			},
 		},
-
 		"error - invalid certificate": {
 			config: func(port string) *v3.OIDCConfig {
 				return &v3.OIDCConfig{
@@ -261,6 +256,106 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 				return resp
 			},
 			expectedErrorMessage: "oidc: failed to decode userinfo",
+		},
+		"display name with custom nameClaim": {
+			config: func(port string) *v32.OIDCConfig {
+				c := newOIDCConfig(port)
+				c.NameClaim = "display_name"
+
+				return c
+			},
+			oidcProviderResponses: func(port string) oidcResponses {
+				res := newOIDCResponses(privateKey, port)
+				tokenJWT := jwt.New(jwt.SigningMethodRS256)
+				tokenJWT.Claims = jwt.MapClaims{
+					"name":         "test_user",
+					"aud":          "test",
+					"exp":          time.Now().Add(5 * time.Minute).Unix(), // expires in the future
+					"email":        "test@example.com",
+					"iss":          "http://localhost:" + port,
+					"display_name": "Test User",
+				}
+				tokenStr, err := tokenJWT.SignedString(privateKey)
+				assert.NoError(t, err)
+
+				token := &Token{
+					Token: oauth2.Token{
+						AccessToken:  tokenStr,
+						Expiry:       time.Now().Add(5 * time.Minute), // expires in the future
+						RefreshToken: tokenStr,
+					},
+					IDToken: tokenStr,
+				}
+				res.token = token
+				res.user = `{
+				"sub": "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd"
+              }`
+				return res
+			},
+			tokenManagerMock: func(token *Token) tokenManager {
+				mock := mocks.NewMocktokenManager(ctrl)
+				mock.EXPECT().UpdateSecret(userId, providerName, EqToken(token.IDToken))
+
+				return mock
+			},
+			expectedUserInfoSubject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			expectedUserInfoClaimInfo: ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			},
+			expectedClaimInfo: &ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Name:    "Test User",
+				Email:   "test@example.com",
+			},
+		},
+		"display name with custom emailClaim": {
+			config: func(port string) *v32.OIDCConfig {
+				c := newOIDCConfig(port)
+				c.EmailClaim = "public_email"
+
+				return c
+			},
+			oidcProviderResponses: func(port string) oidcResponses {
+				res := newOIDCResponses(privateKey, port)
+				tokenJWT := jwt.New(jwt.SigningMethodRS256)
+				tokenJWT.Claims = jwt.MapClaims{
+					"aud":          "test",
+					"exp":          time.Now().Add(5 * time.Minute).Unix(), // expires in the future
+					"email":        "test@dev.example.com",
+					"iss":          "http://localhost:" + port,
+					"public_email": "test.dev@example.com",
+				}
+				tokenStr, err := tokenJWT.SignedString(privateKey)
+				assert.NoError(t, err)
+
+				token := &Token{
+					Token: oauth2.Token{
+						AccessToken:  tokenStr,
+						Expiry:       time.Now().Add(5 * time.Minute), // expires in the future
+						RefreshToken: tokenStr,
+					},
+					IDToken: tokenStr,
+				}
+				res.token = token
+				res.user = `{
+				"sub": "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd"
+              }`
+				return res
+			},
+			tokenManagerMock: func(token *Token) tokenManager {
+				mock := mocks.NewMocktokenManager(ctrl)
+				mock.EXPECT().UpdateSecret(userId, providerName, EqToken(token.IDToken))
+
+				return mock
+			},
+			expectedUserInfoSubject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			expectedUserInfoClaimInfo: ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			},
+			expectedClaimInfo: &ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Email:   "test.dev@example.com",
+			},
 		},
 	}
 
@@ -343,11 +438,10 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 				return mocks.NewMocktokenManager(ctrl)
 			},
 			expectedClaimInfo: &ClaimInfo{
-				Subject:           "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
-				PreferredUsername: "admin",
-				Groups:            []string{"admingroup"},
-				FullGroupPath:     []string{"/admingroup"},
-				Roles:             []string{"adminrole"},
+				Subject:       "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Groups:        []string{"admingroup"},
+				FullGroupPath: []string{"/admingroup"},
+				Roles:         []string{"adminrole"},
 			},
 		},
 		"token is refreshed and updated when expired": {
@@ -382,11 +476,10 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 				}
 			},
 			expectedClaimInfo: &ClaimInfo{
-				Subject:           "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
-				PreferredUsername: "admin",
-				Groups:            []string{"admingroup"},
-				FullGroupPath:     []string{"/admingroup"},
-				Roles:             []string{"adminrole"},
+				Subject:       "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Groups:        []string{"admingroup"},
+				FullGroupPath: []string{"/admingroup"},
+				Roles:         []string{"adminrole"},
 			},
 			tokenManagerMock: func(token *Token) tokenManager {
 				mock := mocks.NewMocktokenManager(ctrl)
@@ -775,8 +868,7 @@ func newOIDCResponses(privateKey *rsa.PrivateKey, port string) oidcResponses {
 				],
 				"roles": [
 					"adminrole"
-				],
-				"preferred_username": "admin"
+				]
       }`,
 		config: providerJSON{
 			Issuer:      "http://localhost:" + port,
