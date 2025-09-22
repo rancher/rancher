@@ -265,35 +265,35 @@ func TestInfraMachineDeletionEnqueueTime(t *testing.T) {
 			name:         "setting is positive, should delete",
 			h:            handler{jobs: newJob(ctrl, now.Add(-10*time.Minute))},
 			setting:      "5m",
-			infra:        newInfra(),
+			infra:        newInfra("jobName"),
 			expectedTime: 0,
 		},
 		{
 			name:         "settings is zero, should return zero",
 			h:            handler{jobs: newJob(ctrl, now.Add(-10*time.Minute))},
 			setting:      "0s",
-			infra:        newInfra(),
+			infra:        newInfra("jobName"),
 			expectedTime: 0,
 		},
 		{
 			name:         "setting is positive, should enqueue",
 			h:            handler{jobs: newJob(ctrl, now.Add(-1*time.Minute))},
 			setting:      "5m",
-			infra:        newInfra(),
+			infra:        newInfra("jobName"),
 			expectedTime: 4 * time.Minute,
 		},
 		{
 			name:         "setting is negative, should delete",
 			h:            handler{jobs: newJob(ctrl, now.Add(-10*time.Minute))},
 			setting:      "-5m",
-			infra:        newInfra(),
+			infra:        newInfra("jobName"),
 			expectedTime: 0,
 		},
 		{
 			name:         "infra has no job name, should delete",
 			h:            handler{jobs: newJob(ctrl, now.Add(-10*time.Minute))},
-			setting:      "-5m",
-			infra:        newInfra(),
+			setting:      "5m",
+			infra:        newInfra(""),
 			expectedTime: 0,
 		},
 	}
@@ -322,8 +322,6 @@ func TestOnChange(t *testing.T) {
 	nodeDriverCache := ctrlfake.NewMockNonNamespacedCacheInterface[*apimgmtv3.NodeDriver](ctrl)
 	nodeDriverCache.EXPECT().Get(gomock.Any()).Return(&apimgmtv3.NodeDriver{}, nil).AnyTimes()
 
-	dynamicControllerFake := dynamicControllerFake{}
-
 	rancherClusterCache := ctrlfake.NewMockCacheInterface[*rancherv1.Cluster](ctrl)
 	rancherClusterCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(&rancherv1.Cluster{}, nil).AnyTimes()
 
@@ -337,7 +335,6 @@ func TestOnChange(t *testing.T) {
 		machineClient:       machineClient,
 		capiClusterCache:    clusterCache,
 		nodeDriverCache:     nodeDriverCache,
-		dynamic:             &dynamicControllerFake,
 		rancherClusterCache: rancherClusterCache,
 		secrets:             secrets,
 		apply:               &apply,
@@ -383,7 +380,11 @@ func TestOnChange(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			settings.DeleteInfraMachineOnFailureAfter.Set(tc.setting)
+
+			dynamicControllerFake := dynamicControllerFake{}
+			h.dynamic = &dynamicControllerFake
 			h.jobs = tc.jobCache
+
 			if tc.action == "delete" {
 				machineClient.EXPECT().Delete(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(1)
 			}
@@ -460,11 +461,11 @@ func newJob(ctrl *gomock.Controller, t time.Time) *ctrlfake.MockCacheInterface[*
 	}
 
 	mockJobCache := ctrlfake.NewMockCacheInterface[*batchv1.Job](ctrl)
-	mockJobCache.EXPECT().Get("namespace", "job").Return(&job, nil).AnyTimes()
+	mockJobCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(&job, nil).AnyTimes()
 	return mockJobCache
 }
 
-func newInfra() *infraObject {
+func newInfra(jobName string) *infraObject {
 	return &infraObject{
 		meta: &unstructured.Unstructured{
 			Object: map[string]interface{}{
@@ -475,7 +476,7 @@ func newInfra() *infraObject {
 		},
 		data: data.Object{
 			"status": map[string]interface{}{
-				"jobName": "job",
+				"jobName": jobName,
 			},
 		},
 	}
