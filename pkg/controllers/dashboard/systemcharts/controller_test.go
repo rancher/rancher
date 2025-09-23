@@ -1069,7 +1069,7 @@ func Test_ChartInstallation(t *testing.T) {
 						},
 					},
 					"image": map[string]interface{}{
-						"repository": "rancher-test.io/rancher/mirrored-cluster-api-controller",
+						"repository": "rancher-test.io/registry.k8s.io/cluster-api/cluster-api-controller",
 					},
 				}
 				mocks.manager.EXPECT().Ensure(
