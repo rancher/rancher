@@ -625,7 +625,7 @@ func Test_Store_Get(t *testing.T) {
 			Get("cattle-tokens", "bogus").
 			Return(fieldSecret, nil)
 
-		store := New(nil, nil, nil, secrets, users, nil, nil, nil, auth)
+		store := New(nil, nil, nil, secrets, users, nil, nil, nil, nil, auth)
 		tok, err := store.Get(context.TODO(), "bogus", &metav1.GetOptions{})
 
 		assert.Nil(t, err)
