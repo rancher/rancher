@@ -576,16 +576,14 @@ func Test_Store_Get(t *testing.T) {
 		).ToJSON()
 		assert.Nil(t, err)
 
-		now, errb := time.Parse(time.RFC3339, "2024-12-06T03:02:01Z")
-		nowT := metav1.NewTime(now)
-		assert.Nil(t, errb)
+		now := metav1.Now()
 
 		fieldSecret := properSecret.DeepCopy()
 		fieldSecret.ObjectMeta.ManagedFields = []metav1.ManagedFieldsEntry{
 			metav1.ManagedFieldsEntry{
 				Manager:    "token",
 				Operation:  "something",
-				Time:       &nowT,
+				Time:       &now,
 				FieldsType: "v1",
 				FieldsV1: &metav1.FieldsV1{
 					Raw: fieldSecretJSON,
@@ -610,7 +608,7 @@ func Test_Store_Get(t *testing.T) {
 			metav1.ManagedFieldsEntry{
 				Manager:    "token",
 				Operation:  "something",
-				Time:       &nowT,
+				Time:       &now,
 				FieldsType: "v1",
 				FieldsV1: &metav1.FieldsV1{
 					Raw: fieldTokenJSON,

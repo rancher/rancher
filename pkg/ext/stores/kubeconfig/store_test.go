@@ -1229,9 +1229,7 @@ func TestStoreGet(t *testing.T) {
 	).ToJSON()
 	assert.Nil(t, err)
 
-	now, errb := time.Parse(time.RFC3339, "2024-12-06T03:02:01Z")
-	nowT := metav1.NewTime(now)
-	assert.Nil(t, errb)
+	now := metav1.Now()
 
 	defaultTTL := int64(43200)
 	configMap := &corev1.ConfigMap{
@@ -1258,7 +1256,7 @@ func TestStoreGet(t *testing.T) {
 				metav1.ManagedFieldsEntry{
 					Manager:    "kubeconfig",
 					Operation:  "something",
-					Time:       &nowT,
+					Time:       &now,
 					FieldsType: "v1",
 					FieldsV1: &metav1.FieldsV1{
 						Raw: fieldMapJSON,
@@ -1288,7 +1286,7 @@ func TestStoreGet(t *testing.T) {
 		metav1.ManagedFieldsEntry{
 			Manager:    "kubeconfig",
 			Operation:  "something",
-			Time:       &nowT,
+			Time:       &now,
 			FieldsType: "v1",
 			FieldsV1: &metav1.FieldsV1{
 				Raw: fieldKCJSON,
