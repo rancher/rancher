@@ -52,10 +52,6 @@ type MapSpec map[string]fieldpath.Path
 // MapManagedFields transform the originManagedFields under the control of the mapSpec.
 func MapManagedFields(mapSpec MapSpec, originManagedFields []metav1.ManagedFieldsEntry) ([]metav1.ManagedFieldsEntry, error) {
 
-	if originManagedFields == nil {
-		return nil, nil
-	}
-
 	size := len(originManagedFields)
 	if size == 0 {
 		return nil, nil
