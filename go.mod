@@ -1,26 +1,26 @@
 module github.com/rancher/rancher
 
-go 1.24.6
+go 1.25.0
 
 replace (
 	github.com/crewjam/saml => github.com/rancher/saml v0.4.14-rancher3
 	github.com/docker/distribution => github.com/docker/distribution v2.8.2+incompatible // rancher-machine requires a replace is set
 	github.com/knative/pkg => github.com/rancher/pkg v0.0.0-20190514055449-b30ab9de040e
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
-	github.com/rancher/aks-operator => github.com/swastik959/aks-operator v0.0.0-20250910123846-0eaa70e95ea0
-	github.com/rancher/apiserver => github.com/swastik959/apiserver v0.0.0-20250910110510-8e01508b9ea1
-	github.com/rancher/dynamiclistener => github.com/swastik959/dynamiclistener v0.0.0-20250915090407-b36b81cce663
-	github.com/rancher/eks-operator => github.com/swastik959/eks-operator v1.12.0-rc.1.0.20250910124202-bb5b085a262f
-	github.com/rancher/gke-operator => github.com/swastik959/gke-operator v0.0.0-20250912111436-fac65da217dc
-	github.com/rancher/lasso => github.com/krunalhinguu/lasso v0.0.0-20250904230131-2e5b75853dc0
-	github.com/rancher/machine => github.com/swastik959/machine v0.0.0-20250908090536-340306e4a997
-	github.com/rancher/norman => github.com/swastik959/norman v0.0.0-20250908065538-4a8ca43cc36b
+	github.com/rancher/aks-operator => github.com/swastik959/aks-operator v0.0.0-20250923123854-318a02401b88
+	github.com/rancher/apiserver => github.com/swastik959/apiserver v0.0.0-20250923123029-b08f8b1048be
+	github.com/rancher/dynamiclistener => github.com/swastik959/dynamiclistener v0.0.0-20250923111444-6a61ff111a8d
+	github.com/rancher/eks-operator => github.com/swastik959/eks-operator v1.12.0-rc.1.0.20250923124031-77b693fcafb3
+	github.com/rancher/gke-operator => github.com/swastik959/gke-operator v0.0.0-20250923123505-c92387290b44
+	github.com/rancher/lasso => github.com/swastik959/lasso v0.0.0-20250923105400-206df1201acf
+	github.com/rancher/machine => github.com/swastik959/machine v0.0.0-20250923113241-611c5ca95b90
+	github.com/rancher/norman => github.com/swastik959/norman v0.0.0-20250923110638-d7a7447b0db1
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
-	github.com/rancher/remotedialer => github.com/swastik959/remotedialer v0.0.0-20250910083847-4e0a13da6780
-	github.com/rancher/steve => github.com/swastik959/steve v0.0.0-20250915065356-204463c17115
-	github.com/rancher/system-upgrade-controller/pkg/apis => github.com/swastik959/system-upgrade-controller/pkg/apis v0.0.0-20250912110759-e97ffcb1a210
-	github.com/rancher/wrangler/v3 => github.com/krunalhinguu/wrangler/v3 v3.3.1-0.20250905101441-b1b29faa8ccd
+	github.com/rancher/remotedialer => github.com/swastik959/remotedialer v0.0.0-20250923111636-90aabc0f59cc
+	github.com/rancher/steve => github.com/swastik959/steve v0.0.0-20250923112957-7cf216a2a663
+	github.com/rancher/system-upgrade-controller/pkg/apis => github.com/swastik959/system-upgrade-controller/pkg/apis v0.0.0-20250923125119-66ccdf6244a6
+	github.com/rancher/wrangler/v3 => github.com/swastik959/wrangler/v3 v3.0.0-20250923110430-072b1beab0de
 	github.com/stretchr/testify => github.com/stretchr/testify v1.10.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.63.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.63.0
@@ -32,40 +32,39 @@ replace (
 	go.qase.io/client => github.com/rancher/qase-go/client v0.0.0-20231114201952-65195ec001fa
 
 	helm.sh/helm/v3 => github.com/rancher/helm/v3 v3.18.3-rancher1
-	k8s.io/api => k8s.io/api v0.34.0
-	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.34.0
-	k8s.io/apimachinery => k8s.io/apimachinery v0.34.0
-	k8s.io/apiserver => k8s.io/apiserver v0.34.0
-	k8s.io/cli-runtime => k8s.io/cli-runtime v0.34.0
-	k8s.io/client-go => k8s.io/client-go v0.34.0
-	k8s.io/cloud-provider => k8s.io/cloud-provider v0.34.0
-	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.34.0
-	k8s.io/code-generator => k8s.io/code-generator v0.34.0
-	k8s.io/component-base => k8s.io/component-base v0.34.0
-	k8s.io/component-helpers => k8s.io/component-helpers v0.34.0
-	k8s.io/controller-manager => k8s.io/controller-manager v0.34.0
-	k8s.io/cri-api => k8s.io/cri-api v0.34.0
-	k8s.io/cri-client => k8s.io/cri-client v0.34.0
-	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.34.0
-	k8s.io/dynamic-resource-allocation => k8s.io/dynamic-resource-allocation v0.34.0
-	k8s.io/endpointslice => k8s.io/endpointslice v0.34.0
-	k8s.io/externaljwt => k8s.io/externaljwt v0.34.0
-	k8s.io/kms => k8s.io/kms v0.34.0
-	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.34.0
-	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.34.0
-	k8s.io/kube-proxy => k8s.io/kube-proxy v0.34.0
-	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.34.0
-	k8s.io/kubectl => k8s.io/kubectl v0.34.0
-	k8s.io/kubelet => k8s.io/kubelet v0.34.0
-	k8s.io/kubernetes => k8s.io/kubernetes v1.34.0
-	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.34.0
-	k8s.io/metrics => k8s.io/metrics v0.34.0
-	k8s.io/mount-utils => k8s.io/mount-utils v0.34.0
-	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.34.0
-	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.34.0
+	k8s.io/api => k8s.io/api v0.34.1
+	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.34.1
+	k8s.io/apimachinery => k8s.io/apimachinery v0.34.1
+	k8s.io/apiserver => k8s.io/apiserver v0.34.1
+	k8s.io/cli-runtime => k8s.io/cli-runtime v0.34.1
+	k8s.io/client-go => k8s.io/client-go v0.34.1
+	k8s.io/cloud-provider => k8s.io/cloud-provider v0.34.1
+	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.34.1
+	k8s.io/code-generator => k8s.io/code-generator v0.34.1
+	k8s.io/component-base => k8s.io/component-base v0.34.1
+	k8s.io/component-helpers => k8s.io/component-helpers v0.34.1
+	k8s.io/controller-manager => k8s.io/controller-manager v0.34.1
+	k8s.io/cri-api => k8s.io/cri-api v0.34.1
+	k8s.io/cri-client => k8s.io/cri-client v0.34.1
+	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.34.1
+	k8s.io/dynamic-resource-allocation => k8s.io/dynamic-resource-allocation v0.34.1
+	k8s.io/endpointslice => k8s.io/endpointslice v0.34.1
+	k8s.io/externaljwt => k8s.io/externaljwt v0.34.1
+	k8s.io/kms => k8s.io/kms v0.34.1
+	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.34.1
+	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.34.1
+	k8s.io/kube-proxy => k8s.io/kube-proxy v0.34.1
+	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.34.1
+	k8s.io/kubectl => k8s.io/kubectl v0.34.1
+	k8s.io/kubelet => k8s.io/kubelet v0.34.1
+	k8s.io/kubernetes => k8s.io/kubernetes v1.34.1
+	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.34.1
+	k8s.io/metrics => k8s.io/metrics v0.34.1
+	k8s.io/mount-utils => k8s.io/mount-utils v0.34.1
+	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.34.1
+	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.34.1
 	oras.land/oras-go => oras.land/oras-go v1.2.2 // for docker 20.10.x compatibility
 	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.10.2
-
 )
 
 require github.com/rancher/rancher/pkg/apis v0.0.0
@@ -176,16 +175,16 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
 	helm.sh/helm/v3 v3.18.3
-	k8s.io/api v0.34.0
-	k8s.io/apiextensions-apiserver v0.34.0
-	k8s.io/apimachinery v0.34.0
-	k8s.io/apiserver v0.34.0
-	k8s.io/cli-runtime v0.34.0
+	k8s.io/api v0.34.1
+	k8s.io/apiextensions-apiserver v0.34.1
+	k8s.io/apimachinery v0.34.1
+	k8s.io/apiserver v0.34.1
+	k8s.io/cli-runtime v0.34.1
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/helm v2.17.0+incompatible
-	k8s.io/kube-aggregator v0.34.0
+	k8s.io/kube-aggregator v0.34.1
 	k8s.io/kube-openapi v0.0.0-20250710124328-f3f2b991d03b
-	k8s.io/kubectl v0.34.0
+	k8s.io/kubectl v0.34.1
 	k8s.io/kubernetes v1.34.0
 	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397
 	oras.land/oras-go/v2 v2.6.0
@@ -286,7 +285,7 @@ require (
 	k8s.io/controller-manager v0.0.0 // indirect
 	k8s.io/gengo v0.0.0-20250130153323-76c5745d3511 // indirect
 	k8s.io/gengo/v2 v2.0.0-20250604051438-85fd79dbfd9f // indirect
-	k8s.io/kms v0.34.0 // indirect
+	k8s.io/kms v0.34.1 // indirect
 	modernc.org/libc v1.66.3 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
@@ -422,9 +421,9 @@ require (
 	google.golang.org/protobuf v1.36.8 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	k8s.io/cluster-bootstrap v0.33.3 // indirect
-	k8s.io/code-generator v0.34.0 // indirect
-	k8s.io/component-base v0.34.0 // indirect
-	k8s.io/component-helpers v0.34.0 // indirect
+	k8s.io/code-generator v0.34.1 // indirect
+	k8s.io/component-base v0.34.1 // indirect
+	k8s.io/component-helpers v0.34.1 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.2 // indirect
 	sigs.k8s.io/cli-utils v0.37.2 // indirect
