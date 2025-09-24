@@ -49,23 +49,19 @@ func InstallStores(
 		logrus.Infof("Feature ext-tokens is disabled")
 	}
 
-	if features.ExtKubeconfigs.Enabled() {
-		userManager, err := common.NewUserManagerNoBindings(wranglerContext)
-		if err != nil {
-			return fmt.Errorf("error getting user manager: %w", err)
-		}
-
-		if err := server.Install(
-			extv1.KubeconfigResourceName,
-			extv1.SchemeGroupVersion.WithKind(kubeconfig.Kind),
-			kubeconfig.New(features.MCM.Enabled(), wranglerContext, server.GetAuthorizer(), userManager),
-		); err != nil {
-			return fmt.Errorf("unable to install kubeconfig store: %w", err)
-		}
-		logrus.Infof("Successfully installed kubeconfig store")
-	} else {
-		logrus.Infof("Feature ext-kubeconfigs is disabled")
+	userManager, err := common.NewUserManagerNoBindings(wranglerContext)
+	if err != nil {
+		return fmt.Errorf("error getting user manager: %w", err)
 	}
+
+	if err := server.Install(
+		extv1.KubeconfigResourceName,
+		extv1.SchemeGroupVersion.WithKind(kubeconfig.Kind),
+		kubeconfig.New(features.MCM.Enabled(), wranglerContext, server.GetAuthorizer(), userManager),
+	); err != nil {
+		return fmt.Errorf("unable to install kubeconfig store: %w", err)
+	}
+	logrus.Infof("Successfully installed kubeconfig store")
 
 	err = server.Install(
 		extv1.PasswordChangeRequestResourceName,

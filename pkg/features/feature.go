@@ -176,12 +176,6 @@ var (
 		isPrime(),
 		false,
 		true)
-	ExtKubeconfigs = newFeature(
-		"ext-kubeconfigs",
-		"Enable Imperative API resource kubeconfigs.ext.cattle.io.",
-		true,
-		false,
-		true)
 	ExtTokens = newFeature(
 		"ext-tokens",
 		"Enable Imperative API resource tokens.ext.cattle.io.",
