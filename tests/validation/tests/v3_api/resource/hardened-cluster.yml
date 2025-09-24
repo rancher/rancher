@@ -29,6 +29,7 @@ services:
              exemptions:
                namespaces: 
                - cattle-provisioning-capi-system
+               - rancher-turtles-system
                - calico-apiserver
                - calico-system
                - cattle-alerting
