@@ -52,7 +52,7 @@ require (
 	github.com/sirupsen/logrus v1.9.3
 	k8s.io/api v0.34.0
 	k8s.io/apimachinery v0.34.0
-	sigs.k8s.io/cluster-api v1.10.2
+	sigs.k8s.io/cluster-api v1.10.6
 )
 
 require (
