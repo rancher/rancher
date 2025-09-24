@@ -1,18 +1,18 @@
 # Rancher Chart files
-chart @rancher/observation-backup
+chart @rancher/orbs
 
 # SCC & Telemetry features
-pkg/apis/telemetry.cattle.io @rancher/observation-backup
-pkg/scc @rancher/observation-backup
-pkg/telemetry @rancher/observation-backup
+pkg/apis/telemetry.cattle.io @rancher/orbs
+pkg/scc @rancher/orbs
+pkg/telemetry @rancher/orbs
 
 # Apps markeplace & ui extensions
-pkg/catalogv2 @rancher/observation-backup
-pkg/api/steve/catalog @rancher/observation-backup
-pkg/apis/catalog.cattle.io @rancher/observation-backup
-pkg/controllers/dashboard/helm @rancher/observation-backup
-pkg/controllers/dashboard/plugin @rancher/observation-backup
-tests/v2/integration/catalogv2 @rancher/observation-backup
+pkg/catalogv2 @rancher/orbs
+pkg/api/steve/catalog @rancher/orbs
+pkg/apis/catalog.cattle.io @rancher/orbs
+pkg/controllers/dashboard/helm @rancher/orbs
+pkg/controllers/dashboard/plugin @rancher/orbs
+tests/v2/integration/catalogv2 @rancher/orbs
 
 # Release workflows
 .github/workflows @rancher/release-team
