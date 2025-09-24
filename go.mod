@@ -64,7 +64,7 @@ replace (
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.34.1
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.34.1
 	oras.land/oras-go => oras.land/oras-go v1.2.2 // for docker 20.10.x compatibility
-	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.10.2
+	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.10.6
 )
 
 require github.com/rancher/rancher/pkg/apis v0.0.0
@@ -189,7 +189,7 @@ require (
 	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397
 	oras.land/oras-go/v2 v2.6.0
 	sigs.k8s.io/aws-iam-authenticator v0.6.17
-	sigs.k8s.io/cluster-api v1.11.1
+	sigs.k8s.io/cluster-api v1.10.6
 	sigs.k8s.io/controller-runtime v0.22.1
 	sigs.k8s.io/yaml v1.6.0
 )
