@@ -36,18 +36,14 @@ func InstallStores(
 	}
 	logrus.Infof("Successfully installed useractivity store")
 
-	if features.ExtTokens.Enabled() {
-		if err := server.Install(
-			tokens.PluralName,
-			tokens.GVK,
-			tokens.NewFromWrangler(wranglerContext, server.GetAuthorizer()),
-		); err != nil {
-			return fmt.Errorf("unable to install %s store: %w", tokens.SingularName, err)
-		}
-		logrus.Infof("Successfully installed token store")
-	} else {
-		logrus.Infof("Feature ext-tokens is disabled")
+	if err := server.Install(
+		tokens.PluralName,
+		tokens.GVK,
+		tokens.NewFromWrangler(wranglerContext, server.GetAuthorizer()),
+	); err != nil {
+		return fmt.Errorf("unable to install %s store: %w", tokens.SingularName, err)
 	}
+	logrus.Infof("Successfully installed token store")
 
 	userManager, err := common.NewUserManagerNoBindings(wranglerContext)
 	if err != nil {
