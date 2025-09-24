@@ -21,7 +21,7 @@ ARG CHART_DEFAULT_BRANCH=dev-v2.13
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ARG CATTLE_KDM_BRANCH=dev-v2.13
+ARG CATTLE_KDM_BRANCH=rancher-1.34
 ARG VERSION=${VERSION}
 
 FROM --platform=$BUILDPLATFORM ${GODEP_APISERVER} AS godep-apiserver
@@ -104,7 +104,7 @@ RUN mkdir -p /var/lib/rancher-data/local-catalogs/v2 && \
 FROM builder AS kdm
 ARG CATTLE_KDM_BRANCH
 RUN mkdir -p /var/lib/rancher-data/driver-metadata && \
-    curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json > /var/lib/rancher-data/driver-metadata/data.json
+    curl -sLf https://raw.githubusercontent.com/swastik959/kontainer-driver-metadata/refs/heads/${CATTLE_KDM_BRANCH}/data/data.json > /var/lib/rancher-data/driver-metadata/data.json
 
 
 FROM builder AS tini
@@ -158,7 +158,7 @@ ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
 ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher133
-ENV CATTLE_K3S_VERSION=v1.33.1+k3s1
+ENV CATTLE_K3S_VERSION=v1.34.1+k3s1
 ENV CATTLE_MACHINE_PROVISION_IMAGE=rancher/machine:${CATTLE_MACHINE_VERSION}
 ENV CATTLE_ETCD_VERSION=v3.5.21
 ENV DOCKER_MACHINE_LINODE_VERSION=v0.1.15
@@ -228,7 +228,7 @@ RUN curl -LO https://github.com/harvester/docker-machine-driver-harvester/releas
 ENV ETCD_URL=https://github.com/etcd-io/etcd/releases/download/${CATTLE_ETCD_VERSION}/etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}.tar.gz
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.33.1-k3s1 \
+COPY --from=rancher/k3s:v1.34.1-k3s1 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \
@@ -333,7 +333,7 @@ ENV ETCD_UNSUPPORTED_ARCH=${ETCD_UNSUPPORTED_ARCH}
 FROM --platform=$BUILDPLATFORM go-builder AS images
 WORKDIR /src
 ENV CGO_ENABLED=1
-ENV CATTLE_K3S_VERSION=v1.33.1+k3s1
+ENV CATTLE_K3S_VERSION=v1.34.1+k3s1
 RUN zypper -n install libbtrfs-devel libgpgme-devel
 COPY hack/airgap/go.mod hack/airgap/go.sum /src/
 RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
