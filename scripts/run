@@ -5,11 +5,10 @@ echo Starting rancher server
 cd $(dirname $0)/..
 
 CMD=bin/rancher
-if [ ! -x $CMD ]; then
-    ./scripts/build-server
-fi
 
-if [ ! -z $1 ] && ( [ $1 = "--trace" ] || [ $1 = "--info" ] || [ $1 = "--debug" ] ); then
+./scripts/must-rancher-binary.sh
+
+if [ ! -z $1 ] && ([ $1 = "--trace" ] || [ $1 = "--info" ] || [ $1 = "--debug" ]); then
   LOGFLAG=$1
 fi
 
@@ -33,7 +32,7 @@ if [ -f /sys/fs/cgroup/cgroup.controllers ] && [ ! -d /sys/fs/cgroup/init ]; the
   # move the processes from the root group to the /init group,
   # otherwise writing subtree_control fails with EBUSY.
   mkdir -p /sys/fs/cgroup/init
-  xargs -rn1 < /sys/fs/cgroup/cgroup.procs > /sys/fs/cgroup/init/cgroup.procs || :
+  xargs -rn1 </sys/fs/cgroup/cgroup.procs >/sys/fs/cgroup/init/cgroup.procs || :
   # enable controllers
   sed -e 's/ / +/g' -e 's/^/+/' <"/sys/fs/cgroup/cgroup.controllers" >"/sys/fs/cgroup/cgroup.subtree_control"
 fi
@@ -61,3 +60,4 @@ if [ $CI ]; then
 fi
 
 exec ../../$CMD $LOGFLAG
+
