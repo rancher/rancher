@@ -93,7 +93,7 @@ var (
 	KubernetesVersionToSystemImages     = NewSetting("k8s-version-to-images", "")
 	KubernetesVersionsCurrent           = NewSetting("k8s-versions-current", "")
 	KubernetesVersionsDeprecated        = NewSetting("k8s-versions-deprecated", "")
-	KDMBranch                           = NewSetting("kdm-branch", "dev-v2.13")
+	KDMBranch                           = NewSetting("kdm-branch", "rancher-1.34")
 	MachineVersion                      = NewSetting("machine-version", "dev")
 	Namespace                           = NewSetting("namespace", os.Getenv("CATTLE_NAMESPACE"))
 	PasswordMinLength                   = NewSetting("password-min-length", "12")
@@ -164,7 +164,7 @@ var (
 
 	// ChartDefaultURL represents the default URL for the system charts repo. It should only be set for test or
 	// debug purposes.
-	ChartDefaultURL = NewSetting("chart-default-url", "https://git.rancher.io/")
+	ChartDefaultURL = NewSetting("chart-default-url", "https://github.com/vardhaman22/rancher-charts")
 	// DisableInactiveUserAfter is the duration a user can be inactive after which it's disabled by the user retention process.
 	// The value should be expressed in valid time.Duration units and truncated to a second e.g. "168h". See https://pkg.go.dev/time#ParseDuration
 	// DisableInactiveUserAfter should be greater than AuthUserSessionTTLMinutes.
@@ -585,7 +585,7 @@ func GetEnvKey(key string) string {
 func getMetadataConfig() string {
 	branch := KDMBranch.Get()
 	data := map[string]interface{}{
-		"url":                      fmt.Sprintf("https://releases.rancher.com/kontainer-driver-metadata/%s/data.json", branch),
+		"url":                      fmt.Sprintf("https://raw.githubusercontent.com/swastik959/kontainer-driver-metadata/refs/heads/%s/data/data.json", branch),
 		"refresh-interval-minutes": "1440",
 	}
 	ans, err := json.Marshal(data)

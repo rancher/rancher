@@ -19,6 +19,7 @@ const (
 	ReplicationControllerSpecFieldHostPID                       = "hostPID"
 	ReplicationControllerSpecFieldHostUsers                     = "hostUsers"
 	ReplicationControllerSpecFieldHostname                      = "hostname"
+	ReplicationControllerSpecFieldHostnameOverride              = "hostnameOverride"
 	ReplicationControllerSpecFieldImagePullSecrets              = "imagePullSecrets"
 	ReplicationControllerSpecFieldNodeID                        = "nodeId"
 	ReplicationControllerSpecFieldOS                            = "os"
@@ -70,6 +71,7 @@ type ReplicationControllerSpec struct {
 	HostPID                       bool                           `json:"hostPID,omitempty" yaml:"hostPID,omitempty"`
 	HostUsers                     *bool                          `json:"hostUsers,omitempty" yaml:"hostUsers,omitempty"`
 	Hostname                      string                         `json:"hostname,omitempty" yaml:"hostname,omitempty"`
+	HostnameOverride              string                         `json:"hostnameOverride,omitempty" yaml:"hostnameOverride,omitempty"`
 	ImagePullSecrets              []LocalObjectReference         `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
 	NodeID                        string                         `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`
 	OS                            *PodOS                         `json:"os,omitempty" yaml:"os,omitempty"`
