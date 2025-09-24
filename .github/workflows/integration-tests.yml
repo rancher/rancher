@@ -83,7 +83,7 @@ jobs:
       - name: KDM data
         run: |
           mkdir -p bin
-          curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data.json > bin/data.json
+          curl -sLf https://raw.githubusercontent.com/swastik959/kontainer-driver-metadata/refs/heads/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data/data.json > bin/data.json
       - name: Set up Go
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
         with:
