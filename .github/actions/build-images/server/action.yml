@@ -31,7 +31,7 @@ runs:
         k3s_version: ${{ steps.env.outputs.CATTLE_K3S_VERSION }}
     - name: Download data.json
       shell: bash
-      run: curl -sLf https://raw.githubusercontent.com/swastik959/kontainer-driver-metadata/refs/heads/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data/data.json > bin/data.json
+      run: curl -sLf https://raw.githubusercontent.com/swastik959/kontainer-driver-metadata/refs/heads/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data/data.json > ./data.json
     - name: Build and export server
       id: build
       uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
