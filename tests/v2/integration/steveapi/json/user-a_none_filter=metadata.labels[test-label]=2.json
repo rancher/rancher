@@ -21,7 +21,7 @@
         "fields": [
           "test2",
           "Opaque",
-          0,
+          23,
           "0s"
         ],
         "labels": {
