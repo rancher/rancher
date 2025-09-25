@@ -121,7 +121,8 @@ privateCA: false
 # comma separated list of domains or ip addresses that will not use the proxy
 noProxy: 127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,.svc,.cluster.local
 
-# Override rancher image location for Air Gap installs
+# Override the name of the Rancher image to pull.
+# To override the registry location use systemDefaultRegistry instead.
 rancherImage: rancher/rancher
 # rancher/rancher image tag. https://hub.docker.com/r/rancher/rancher/tags/
 # Defaults to .Chart.appVersion
@@ -151,6 +152,7 @@ resources: {}
 # - external
 tls: ingress
 
+# Set a custom image registry mirror to pull Rancher images from; useful in air-gapped environments.
 systemDefaultRegistry: ""
 
 # Set to use the packaged system charts
