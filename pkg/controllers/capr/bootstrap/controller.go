@@ -42,6 +42,7 @@ const (
 	rkeBootstrapName                       = "rke.cattle.io/rkebootstrap-name"
 	capiMachinePreTerminateAnnotation      = "pre-terminate.delete.hook.machine.cluster.x-k8s.io/rke-bootstrap-cleanup"
 	capiMachinePreTerminateAnnotationOwner = "rke-bootstrap-controller"
+	electionBackoff                        = 20 * time.Second
 )
 
 type handler struct {
@@ -522,6 +523,16 @@ func (h *handler) reconcileMachinePreTerminateAnnotation(bootstrap *rkev1.RKEBoo
 		}
 	}
 
+	if wait, err := h.electionBackoffWait(bootstrap, machine); err != nil {
+		return bootstrap, err
+	} else if wait > 0 {
+		machineDeletionTime := machine.DeletionTimestamp.Time
+		logrus.Infof("[rkebootstrap] %s/%s: single-remaining etcd; deferring safe removal for %s (until %s) to avoid etcd election race",
+			bootstrap.Namespace, bootstrap.Name, wait.Round(time.Second), machineDeletionTime.Add(electionBackoff).Format(time.RFC3339))
+		h.rkeBootstrap.EnqueueAfter(bootstrap.Namespace, bootstrap.Name, wait)
+		return bootstrap, generic.ErrSkip
+	}
+
 	kcSecret, err := h.secretCache.Get(bootstrap.Namespace, secret.Name(bootstrap.Spec.ClusterName, secret.Kubeconfig))
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -559,4 +570,39 @@ func (h *handler) ensureMachinePreTerminateAnnotationRemoved(bootstrap *rkev1.RK
 		_, err = h.machineClient.Update(machine)
 	}
 	return bootstrap, err
+}
+
+// electionBackoffWait returns how long to defer safe removal when there is
+// exactly one other etcd machine still present which leads to a risky window
+// for leader election. A zero duration means "no backoff".
+func (h *handler) electionBackoffWait(bootstrap *rkev1.RKEBootstrap, machine *capi.Machine) (time.Duration, error) {
+	// Only meaningful when this machine is deleting.
+	if machine == nil || machine.DeletionTimestamp.IsZero() {
+		return 0, nil
+	}
+
+	// List all the etcd machines in the cluster
+	machines, err := h.machineCache.List(bootstrap.Namespace, labels.SelectorFromSet(labels.Set{
+		capi.ClusterNameLabel: bootstrap.Spec.ClusterName,
+		capr.EtcdRoleLabel:    "true",
+	}))
+	if err != nil {
+		return 0, err
+	}
+	if len(machines) != 2 { // Only care about the 2-node transition case.
+		return 0, nil
+	}
+
+	// Find the other etcd machine; if it’s not deleting, we back off.
+	for _, m := range machines {
+		if m.DeletionTimestamp.IsZero() && m.Name != machine.Name {
+			// Exactly one remaining etcd member; back off to let leadership settle.
+			since := time.Since(machine.DeletionTimestamp.Time)
+			if since < electionBackoff {
+				return electionBackoff - since, nil
+			}
+		}
+	}
+
+	return 0, nil
 }
