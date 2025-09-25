@@ -54,7 +54,7 @@ func RegisterIndexers(scaledContext *config.ScaledContext) error {
 func Register(ctx context.Context, cluster *config.UserContext) {
 	starter := cluster.DeferredStart(ctx, func(ctx context.Context) error {
 		// Defer further until the EXT API is ready as well
-		logrus.Debug("[deferred-ext] DEFER cluster auth token controllers - deferred setup")
+		logrus.Debugf("[%s] DEFER cluster auth token controller setup", clusterAuthTokenController)
 		cluster.Management.Wrangler.DeferredEXTAPIRegistration.DeferFunc(func(w *wrangler.EXTAPIContext) {
 			registerDeferred(ctx, cluster, w)
 		})
