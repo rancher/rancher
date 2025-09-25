@@ -142,20 +142,6 @@ func (g *gitHubAppData) listTeams() []common.GitHubAccount {
 	return accounts
 }
 
-// searchMembers returns a set of Accounts derived from all members with a
-// simple string match.
-func (g *gitHubAppData) searchMembers(s string) []common.GitHubAccount {
-	var accounts []common.GitHubAccount
-	for memberLogin, member := range g.members {
-		// TODO: What should this match on?
-		if strings.HasPrefix(memberLogin, s) {
-			accounts = append(accounts, member.toAccount())
-		}
-	}
-
-	return accounts
-}
-
 // searchTeams returns a set of Accounts derived from all teams with a
 // simple string match.
 func (g *gitHubAppData) searchTeams(s string) []common.GitHubAccount {

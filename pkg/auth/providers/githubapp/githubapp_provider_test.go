@@ -165,7 +165,7 @@ func TestAuthenticateUser(t *testing.T) {
 	req, err := http.NewRequest(http.MethodGet, "http://example.com", nil)
 	require.NoError(t, err)
 
-	ctx := context.WithValue(context.Background(), util2.RequestKey, req)
+	ctx := context.WithValue(t.Context(), util2.RequestKey, req)
 	input := &cattlev3.GithubLogin{
 		Code: authCode,
 	}

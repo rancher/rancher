@@ -26,7 +26,7 @@ func TestGithubAppClientGetAccessToken(t *testing.T) {
 	defer srv.Close()
 
 	appClient := githubAppClient{httpClient: http.DefaultClient}
-	token, err := appClient.getAccessToken(context.Background(), "1234567", &mgmtv3.GithubAppConfig{
+	token, err := appClient.getAccessToken(t.Context(), "1234567", &mgmtv3.GithubAppConfig{
 		Hostname:     stripScheme(t, srv),
 		ClientID:     "test_client_id",
 		ClientSecret: "test_client_secret",
@@ -52,11 +52,11 @@ func TestGithubAppClientGetUser(t *testing.T) {
 	}
 
 	appClient := githubAppClient{httpClient: http.DefaultClient}
-	token, err := appClient.getAccessToken(context.Background(), "1234567", cfg)
+	token, err := appClient.getAccessToken(t.Context(), "1234567", cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	account, err := appClient.getUser(context.Background(), token, cfg)
+	account, err := appClient.getUser(t.Context(), token, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestGithubAppClientGetOrgsForUser(t *testing.T) {
 	}
 
 	appClient := githubAppClient{httpClient: http.DefaultClient}
-	orgs, err := appClient.getOrgsForUser(context.Background(), "example", cfg)
+	orgs, err := appClient.getOrgsForUser(t.Context(), "example", cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +130,7 @@ func TestGithubAppClientGetOrgsForUserNotProvidingInstallationID(t *testing.T) {
 	}
 
 	appClient := githubAppClient{httpClient: http.DefaultClient}
-	orgs, err := appClient.getOrgsForUser(context.Background(), "example", cfg)
+	orgs, err := appClient.getOrgsForUser(t.Context(), "example", cfg)
 	slices.SortFunc(orgs, func(a, b common.GitHubAccount) int {
 		return strings.Compare(a.Login, b.Login)
 	})
@@ -171,7 +171,7 @@ func TestGithubAppClientGetOrgsForUserProvidingInstallationID(t *testing.T) {
 	}
 
 	appClient := githubAppClient{httpClient: http.DefaultClient}
-	orgs, err := appClient.getOrgsForUser(context.Background(), "example", cfg)
+	orgs, err := appClient.getOrgsForUser(t.Context(), "example", cfg)
 	require.NoError(t, err)
 	want := []common.GitHubAccount{
 		{
@@ -200,7 +200,7 @@ func TestGithubAppClientGetTeamsForUserNotProvidingInstallationID(t *testing.T) 
 	}
 
 	appClient := githubAppClient{httpClient: http.DefaultClient}
-	orgs, err := appClient.getTeamsForUser(context.Background(), "octocat", cfg)
+	orgs, err := appClient.getTeamsForUser(t.Context(), "octocat", cfg)
 	require.NoError(t, err)
 
 	want := []common.GitHubAccount{
@@ -248,7 +248,7 @@ func TestGithubAppClientGetTeamsForUserProvidingInstallationID(t *testing.T) {
 	}
 
 	appClient := githubAppClient{httpClient: http.DefaultClient}
-	orgs, err := appClient.getTeamsForUser(context.Background(), "octocat", cfg)
+	orgs, err := appClient.getTeamsForUser(t.Context(), "octocat", cfg)
 	require.NoError(t, err)
 
 	want := []common.GitHubAccount{
@@ -313,7 +313,7 @@ func TestGitHubAppClient(t *testing.T) {
 		installationID = i
 	}
 
-	data, err := getDataForApp(context.Background(), appID, privateKey, installationID, "")
+	data, err := getDataForApp(t.Context(), appID, privateKey, installationID, "")
 	require.NoError(t, err)
 
 	assert.NotEmpty(t, data.members)
