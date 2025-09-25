@@ -19,7 +19,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: {{ template "rancher.name" . }}-pre-upgrade
-          image: "{{ include "system_default_registry" . }}{{ .Values.preUpgrade.image.repository }}:{{ .Values.preUpgrade.image.tag }}"
+          image: "{{ printf "%s%s" (include "system_default_registry" .) .Values.preUpgrade.image.repository }}:{{ .Values.preUpgrade.image.tag }}"
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsUser: 0
