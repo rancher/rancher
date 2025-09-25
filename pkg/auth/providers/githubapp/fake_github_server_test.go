@@ -16,6 +16,7 @@ import (
 const (
 	authCodeLifetime    = 5 * time.Minute
 	accessTokenLifetime = 1 * time.Hour
+	bearerPrefix        = "Bearer "
 )
 
 type fakeClientDetails struct {
@@ -343,7 +344,6 @@ func (s *fakeGitHubServer) userinfoHandler(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Extract token
-	const bearerPrefix = "Bearer "
 	if len(authHeader) < len(bearerPrefix) || authHeader[:len(bearerPrefix)] != bearerPrefix {
 		http.Error(w, `{"error": "invalid_token", "message": "Invalid Authorization header format"}`, http.StatusUnauthorized)
 		return
@@ -463,7 +463,6 @@ func (s *fakeGitHubServer) isValidRedirectURI(clientID, redirectURI string) bool
 // GitHub API docs: https://docs.github.com/rest/apps/apps#get-an-installation-for-the-authenticated-app
 func (s *fakeGitHubServer) installationHandler(w http.ResponseWriter, r *http.Request) {
 	s.t.Logf("Received request for %s", r.URL)
-	// TODO: Move this around
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
 		http.Error(w, `{"error": "unauthorized", "message": "Missing Authorization header"}`, http.StatusUnauthorized)
@@ -553,14 +552,12 @@ func (s *fakeGitHubServer) installationHandler(w http.ResponseWriter, r *http.Re
 
 func (s *fakeGitHubServer) installationsHandler(w http.ResponseWriter, r *http.Request) {
 	s.t.Logf("Received request for %s", r.URL)
-	// TODO: Move this around
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
 		http.Error(w, `{"error": "unauthorized", "message": "Missing Authorization header"}`, http.StatusUnauthorized)
 		return
 	}
 
-	const bearerPrefix = "Bearer "
 	if len(authHeader) < len(bearerPrefix) || authHeader[:len(bearerPrefix)] != bearerPrefix {
 		http.Error(w, `{"error": "invalid_token", "message": "Invalid Authorization header format"}`, http.StatusUnauthorized)
 		return

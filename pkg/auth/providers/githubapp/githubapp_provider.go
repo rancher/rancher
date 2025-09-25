@@ -131,8 +131,6 @@ func (g *ghAppProvider) LoginUser(host string, githubCredential *cattlev3.Github
 	config = chooseClientID(host, config)
 	securityCode := githubCredential.Code
 
-	logrus.Info("ghAppProvider.LoginUser")
-
 	ctx := context.Background()
 	accessToken, err := g.githubClient.getAccessToken(ctx, securityCode, config)
 	if err != nil {

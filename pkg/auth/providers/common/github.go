@@ -14,7 +14,7 @@ type GitHubAccount struct {
 	Type      string `json:"type,omitempty"`
 }
 
-// GitHubTeamdefines GitHub team properties.
+// GitHubTeam defines GitHub team properties.
 type GitHubTeam struct {
 	ID           int            `json:"id,omitempty"`
 	Organization map[string]any `json:"organization,omitempty"`
