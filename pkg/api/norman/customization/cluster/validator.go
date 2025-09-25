@@ -686,7 +686,6 @@ func (v *Validator) validateAliConfig(request *types.APIContext, cluster map[str
 	}
 
 	createFromImport := request.Method == http.MethodPost && aliConfig["imported"] == true
-
 	if !createFromImport {
 		if err := validateAliConfigKubernetesVersion(clusterSpec); err != nil {
 			return err
@@ -694,6 +693,16 @@ func (v *Validator) validateAliConfig(request *types.APIContext, cluster map[str
 		if err := validateAliConfigNodePools(clusterSpec); err != nil {
 			return err
 		}
+	} else {
+		// validating clusterId for creation of imported clusters
+		clusterId, ok := aliConfig["clusterId"]
+		if !ok || clusterId == "" {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, "must provide clusterId for imported cluster")
+		}
+	}
+
+	if request.Method != http.MethodPost {
+		return nil
 	}
 
 	if err := validateAliConfigClusterName(v.ClusterClient, clusterSpec); err != nil {
