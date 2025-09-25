@@ -6,7 +6,7 @@ cd $(dirname $0)/../../../../
 source $(dirname $0)/scripts/version
 source $(dirname $0)/scripts/export-config
 
-CATTLE_KDM_BRANCH=release-v2.11
+CATTLE_KDM_BRANCH=dev-v2.11
 
 mkdir -p bin
 
