@@ -65,7 +65,7 @@ replace (
 
 require (
 	github.com/antihax/optional v1.0.0
-	github.com/rancher/rancher/pkg/apis v0.0.0-20241023011518-955534c18d04
+	github.com/rancher/rancher/pkg/apis v0.0.0-20250919133447-0323fc801622
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
 
@@ -142,7 +142,7 @@ require (
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.4.0
 	github.com/rancher/rke v1.7.9
-	github.com/rancher/shepherd v0.0.0-20241217192141-80755a9de656
+	github.com/rancher/shepherd v0.0.0-20250924144246-6552b7382520
 	github.com/rancher/steve v0.4.8
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20240301001845-4eacc2dabbde
 	github.com/rancher/wrangler v1.1.2
@@ -264,7 +264,6 @@ require (
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
-	golang.org/x/tools/go/packages/packagestest v0.1.1-deprecated // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20241113202542-65e8d215514f // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241118233622-e639e219e697 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
