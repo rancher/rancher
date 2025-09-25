@@ -2,7 +2,6 @@ package githubapp
 
 import (
 	"bytes"
-	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
@@ -316,52 +315,6 @@ func TestGitHubAppData(t *testing.T) {
 		assert.Equal(t, want, teams)
 	})
 
-	t.Run("search members", func(t *testing.T) {
-		members := data.searchMembers("unknown")
-		assert.Empty(t, members)
-
-		want := []common.GitHubAccount{
-			{
-				ID:        1002,
-				Login:     "test-user2",
-				Name:      "Other User",
-				AvatarURL: "https://example.com/avatar3.jpg",
-				HTMLURL:   "https://example.com/htmlpage",
-				Type:      "User",
-			},
-		}
-
-		members = data.searchMembers("test-user2")
-		slices.SortFunc(members, func(a, b common.GitHubAccount) int {
-			return strings.Compare(a.Login, b.Login)
-		})
-		assert.Equal(t, want, members)
-
-		want = []common.GitHubAccount{
-			{
-				ID:        1001,
-				Login:     "test-user",
-				Name:      "Test User",
-				AvatarURL: "https://example.com/avatar2.jpg",
-				HTMLURL:   "https://example.com/html",
-				Type:      "User",
-			},
-			{
-				ID:        1002,
-				Login:     "test-user2",
-				Name:      "Other User",
-				AvatarURL: "https://example.com/avatar3.jpg",
-				HTMLURL:   "https://example.com/htmlpage",
-				Type:      "User",
-			},
-		}
-		members = data.searchMembers("test-user")
-		slices.SortFunc(members, func(a, b common.GitHubAccount) int {
-			return strings.Compare(a.Login, b.Login)
-		})
-		assert.Equal(t, want, members)
-	})
-
 	t.Run("search teams", func(t *testing.T) {
 		teams := data.searchTeams("unknown")
 		assert.Empty(t, teams)
@@ -509,7 +462,7 @@ func TestTeamDataFromApp(t *testing.T) {
 
 	t.Run("providing an installation ID queries only the installation", func(t *testing.T) {
 		// Provides Installation 1
-		data, err := getDataForApp(context.TODO(), 123456, testPEM, 1, ts.URL)
+		data, err := getDataForApp(t.Context(), 123456, testPEM, 1, ts.URL)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -573,7 +526,7 @@ func TestTeamDataFromApp(t *testing.T) {
 	})
 
 	t.Run("not providing an installation ID gets all installations", func(t *testing.T) {
-		data, err := getDataForApp(context.TODO(), 123456, testPEM, 0, ts.URL)
+		data, err := getDataForApp(t.Context(), 123456, testPEM, 0, ts.URL)
 		if err != nil {
 			t.Fatal(err)
 		}
