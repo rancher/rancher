@@ -44,6 +44,7 @@ const (
 	migrateSystemAgentVarDirToDataDirectory    = "migratesystemagentvardirtodatadirectory"
 	migrateImportedClusterManagedFields        = "migrateimportedclustermanagedfields"
 	rkeCleanupMigration                        = "rkecleanupmigration"
+	managementNodeCleanupMigration             = "managementnodecleanupmigration"
 	rancherVersionKey                          = "rancherVersion"
 	projectsCreatedKey                         = "projectsCreated"
 	namespacesAssignedKey                      = "namespacesAssigned"
@@ -53,6 +54,7 @@ const (
 	systemAgentVarDirMigratedKey               = "systemAgentVarDirMigrated"
 	importedClusterManagedFieldsMigratedKey    = "importedClusterManagedFieldsMigrated"
 	rkeCleanupCompletedKey                     = "rkecleanupcompleted"
+	managementCleanupCompletedKey              = "managementcleanupcompleted"
 )
 
 var (
@@ -70,6 +72,9 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 
 	if features.MCM.Enabled() {
 		if err := forceSystemNamespaceAssignment(wranglerContext.Core.ConfigMap(), wranglerContext.Mgmt.Project()); err != nil {
+			return err
+		}
+		if err := managementNodeCleanup(wranglerContext); err != nil {
 			return err
 		}
 	}
@@ -98,6 +103,7 @@ func runRKE2Migrations(wranglerContext *wrangler.CAPIContext) error {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -696,5 +702,43 @@ func rkeResourcesCleanup(w *wrangler.Context) error {
 	}
 
 	cm.Data[rkeCleanupCompletedKey] = "true"
+	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
+}
+
+func managementNodeCleanup(w *wrangler.Context) error {
+	cm, err := getConfigMap(w.Core.ConfigMap(), managementNodeCleanupMigration)
+	if err != nil || cm == nil {
+		return err
+	}
+
+	// Check if this migration has already run.
+	if cm.Data[managementCleanupCompletedKey] == "true" {
+		return nil
+	}
+
+	nodes, err := w.Mgmt.Node().List("", metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	for _, node := range nodes.Items {
+		for i, f := range node.Finalizers {
+			if f != "controller.cattle.io/node-controller" {
+				continue
+			}
+
+			node = *node.DeepCopy()
+			node.Finalizers = append(node.Finalizers[:i], node.Finalizers[i+1:]...)
+
+			_, err = w.Mgmt.Node().Update(&node)
+			if err != nil {
+				return err
+			}
+
+			break
+		}
+	}
+
+	cm.Data[managementCleanupCompletedKey] = "true"
 	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
 }
