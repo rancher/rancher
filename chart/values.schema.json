@@ -1,5 +1,8 @@
 {
-  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:rancher:schema:rancher-chart:v1",
+  "title": "Rancher Chart Values",
+  "type": "object",
   "properties": {
     "agentTLSMode": {
       "type": ["string", "null"],
@@ -24,16 +27,6 @@
           "description": "auditLog.enabled must be a boolean"
         }
       }
-    },
-    "busyboxImage": {
-      "type": "string",
-      "description": "[DEPRECATED] This value is deprecated, use `auditLog.image.repository` & `auditLog.image.tag` instead.",
-      "deprecated": true
-    },
-    "busyboxImagePullPolicy": {
-      "type": "string",
-      "description": "[DEPRECATED] This value is deprecated, use `auditLog.image.pullPolicy` instead.",
-      "deprecated": true
     },
     "service": {
       "type": "object",
@@ -60,8 +53,6 @@
     }
   },
   "required": [],
-  "title": "Rancher Chart Values",
-  "type": "object",
   "if": {
     "properties": {
       "service": {
