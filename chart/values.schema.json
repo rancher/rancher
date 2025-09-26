@@ -46,7 +46,7 @@
       "description": "The default rancher ingress configuration",
       "properties": {
         "servicePort": {
-          "type": "number",
+          "type": "integer",
           "enum": [443, 80]
         }
       }
@@ -57,10 +57,9 @@
     "properties": {
       "service": {
         "properties": {
-          "disableHTTP": {
-            "const": true
-          }
-        }
+          "disableHTTP": { "const": true }
+        },
+        "required": ["disableHTTP"]
       }
     }
   },
@@ -69,10 +68,10 @@
       "ingress": {
         "properties": {
           "servicePort": {
-            "const": 443,
-            "errorMessage": "ingress.servicePort must be 443 when service.disableHTTP is true."
+            "enum": [443]
           }
-        }
+        },
+        "required": ["servicePort"]
       }
     }
   }
