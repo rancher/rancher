@@ -170,6 +170,16 @@ add below linux tolerations to workloads could be scheduled to those linux nodes
 {{- include "tpl.url.ensureTrailingSlash" .Values.systemDefaultRegistry -}}
 {{- end -}}
 {{- end -}}
+
+{{- define "defaultOrOverrideRegistry" -}}
+{{- $rootContext := index . 0 -}}
+{{- $inputRegistry := index . 1 | default "" -}}
+{{- if $inputRegistry -}}
+
+{{- $systemDefault := include "system_default_registry" $rootContext | default "" -}}
+
+{{- coalesce (include "tpl.url.ensureTrailingSlash" $inputRegistry) $systemDefault "" -}}
+
 {{- end -}}
 {{- end -}}
 

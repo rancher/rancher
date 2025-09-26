@@ -34,9 +34,11 @@ auditLog:
   # Image for collecting rancher audit logs.
   # Important: update pkg/image/export/resolve.go when this default image is changed, so that it's reflected accordingly in rancher-images.txt generated for air-gapped setups.
   image:
+    # Optional: Image-specific registry override
+    # registry: ""
     repository: "rancher/mirrored-bci-micro"
     tag: 15.6.24.2
-    # Override imagePullPolicy image
+    # Optional: Image-specific pullPolicy Override
     # options: Always, Never, IfNotPresent
     pullPolicy: "IfNotPresent"
 

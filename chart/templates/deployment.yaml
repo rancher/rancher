@@ -230,7 +230,7 @@ spec:
 {{- if eq .Values.auditLog.destination "sidecar" }}
   {{- if .Values.auditLog.enabled }}
       # Make audit logs available for Rancher log collector tools.
-      - image: {{ printf "%s%s" (include "system_default_registry" .) (include "auditLog_image" .) }}
+      - image: {{ printf "%s%s" (include "defaultOrOverrideRegistry" (list . .Values.auditLog.image.registry)) (include "auditLog_image" .) }}
         imagePullPolicy: {{ default .Values.auditLog.image.pullPolicy .Values.busyboxImagePullPolicy }}
         name: {{ template "rancher.name" . }}-audit-log
         command: ["tail"]
