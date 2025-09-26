@@ -194,8 +194,13 @@ customLogos:
 postDelete:
   enabled: true
   image:
+    # Optional: Image-specific registry override
+    # registry: ""
     repository: %POST_DELETE_IMAGE_NAME%
     tag: %POST_DELETE_IMAGE_TAG%
+    # Optional: Image-specific pullPolicy Override
+    # options: Always, Never, IfNotPresent
+    # pullPolicy: "Always"
   namespaceList:
     - cattle-fleet-system
     - cattle-system
@@ -207,8 +212,12 @@ postDelete:
 
 preUpgrade:
   image:
+    # Optional: Image-specific registry override
+    # registry: ""
     repository: %PRE_UPGRADE_IMAGE_NAME%
     tag: %PRE_UPGRADE_IMAGE_TAG%
+    # Optional: Image-specific pull policy override
+    # pullPolicy: "Always"
 
 # Set a bootstrap password. If leave empty, a random password will be generated.
 bootstrapPassword: ""
