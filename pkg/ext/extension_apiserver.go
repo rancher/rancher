@@ -260,15 +260,13 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 		return nil, fmt.Errorf("failed to install stores: %w", err)
 	}
 
-	if features.ExtTokens.Enabled() {
-		// deferred ext controller setup ...
-		logrus.Debug("[deferred-ext/run] DEFER - cluster auth token - register ext token indexers")
-		wranglerContext.DeferredEXTAPIRegistration.DeferFunc(func(extContext *wrangler.EXTAPIContext) {
-			if err := clusterauthtoken.RegisterExtIndexers(extContext.Client); err != nil {
-				logrus.Fatalf("Unexpected error while adding ext indexers: %v", err)
-			}
-		})
-	}
+	// deferred ext controller setup ...
+	logrus.Debug("[deferred-ext/run] DEFER - cluster auth token - register ext token indexers")
+	wranglerContext.DeferredEXTAPIRegistration.DeferFunc(func(extContext *wrangler.EXTAPIContext) {
+		if err := clusterauthtoken.RegisterExtIndexers(extContext.Client); err != nil {
+			logrus.Fatalf("Unexpected error while adding ext indexers: %v", err)
+		}
+	})
 
 	return extensionAPIServer, nil
 }

@@ -30,7 +30,6 @@ import (
 	"github.com/rancher/rancher/pkg/catalogv2/helmop"
 	"github.com/rancher/rancher/pkg/catalogv2/system"
 	"github.com/rancher/rancher/pkg/controllers"
-	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io"
@@ -366,9 +365,7 @@ func NewPrimaryContext(ctx context.Context, clientConfig clientcmd.ClientConfig,
 	}
 
 	wCtx.DeferredCAPIRegistration.Manage(ctx)
-	if features.ExtTokens.Enabled() {
-		wCtx.DeferredEXTAPIRegistration.Manage(ctx)
-	}
+	wCtx.DeferredEXTAPIRegistration.Manage(ctx)
 	return wCtx, nil
 }
 
