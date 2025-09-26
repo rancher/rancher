@@ -738,8 +738,8 @@ github.com/rancher/dynamiclistener v0.7.0 h1:+jyfZ4lVamc1UbKWo8V8dhSPtCgRZYaY8nm
 github.com/rancher/dynamiclistener v0.7.0/go.mod h1:Q2YA42xp7Xc69JiSlJ8GpvLvze261T0iQ/TP4RdMCYk=
 github.com/rancher/eks-operator v1.12.1 h1:ZsaDyQa1Ykrf9b1Ux11DICIV4JXRy14kWKqE0JfAZg0=
 github.com/rancher/eks-operator v1.12.1/go.mod h1:3hz8e7XqekMw/76TShanMS/iMBcQoom2j7/B9nyKbVQ=
-github.com/rancher/fleet/pkg/apis v0.13.0 h1:soXF3cKWD9sMRcX5OlVnOY8aoPr+/FF8DP/zZtLLe3g=
-github.com/rancher/fleet/pkg/apis v0.13.0/go.mod h1:LpFIRtWNJe6Tf4EGJ/brPtutyTUlFj2hJDso1/5CO7Y=
+github.com/rancher/fleet/pkg/apis v0.14.0-alpha.3 h1:SCy+VCww6APf8n9x31sPi/cE6ji9A+uRmS7Qe7I5dVw=
+github.com/rancher/fleet/pkg/apis v0.14.0-alpha.3/go.mod h1:l+30BByeNBbo0AF94+pYW4q/g9U2oM0UkQuriR0bOD4=
 github.com/rancher/gke-operator v1.12.1 h1:zH2DEQsea+kG61cN0+1NWDQp0FyN28o2XIm5ieRLCKU=
 github.com/rancher/gke-operator v1.12.1/go.mod h1:TbOTInXvdC1fPAxj2BHlRIh2j7ezTVQ7eIJW+udz5Xg=
 github.com/rancher/helm/v3 v3.18.3-rancher1 h1:ZiCSY38ZT6iPhFidF378rn2j8UoJp7+JornmjJCEh5w=
@@ -770,8 +770,8 @@ github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20250710162344-185f
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20250710162344-185ff9f785cd/go.mod h1:VfRrgue4yl6O0GYakMGYgyByu7ySooPQWWRxTt2MIEI=
 github.com/rancher/wrangler v1.1.2 h1:oXbXo9k7y/H4drUpb4RM1c++vT9O3rpoNEfyusGykiU=
 github.com/rancher/wrangler v1.1.2/go.mod h1:2k9MyhlBdjcutcBGoOJSUAz0HgDAXnMjv81d3n/AaQc=
-github.com/rancher/wrangler/v3 v3.2.4-rc.1 h1:tOqEaqcc0nsEgYMlaJxW4NFjfPANXJ9W1ejCgsdM0QI=
-github.com/rancher/wrangler/v3 v3.2.4-rc.1/go.mod h1:TA1QuuQxrtn/kmJbBLW/l24IcfHBmSXBa9an3IRlqQQ=
+github.com/rancher/wrangler/v3 v3.2.4 h1:pgpLwsmgQvTSSknxddJDq+ObIiOXFggCWdDyB0z7YcA=
+github.com/rancher/wrangler/v3 v3.2.4/go.mod h1:TA1QuuQxrtn/kmJbBLW/l24IcfHBmSXBa9an3IRlqQQ=
 github.com/redis/go-redis/extra/rediscmd/v9 v9.0.5 h1:EaDatTxkdHG+U3Bk4EUr+DZ7fOGwTfezUiUJMaIcaho=
 github.com/redis/go-redis/extra/rediscmd/v9 v9.0.5/go.mod h1:fyalQWdtzDBECAQFBJuQe5bzQ02jGd5Qcbgb97Flm7U=
 github.com/redis/go-redis/extra/redisotel/v9 v9.0.5 h1:EfpWLLCyXw8PSM2/XNJLjI3Pb27yVE+gIAfeqp8LUCc=
