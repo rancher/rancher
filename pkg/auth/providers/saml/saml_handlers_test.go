@@ -4,13 +4,14 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"github.com/crewjam/saml"
-	"github.com/golang-jwt/jwt"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
+
+	"github.com/crewjam/saml"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestHandleSamlLoginAddsRancherUserIdToCookie(t *testing.T) {
