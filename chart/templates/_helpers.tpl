@@ -1,8 +1,8 @@
 {{/* vim: set filetype=mustache: */}}
 
-{{- define "tpl.url.ensureTrailingSlash" -}}
-{{- $url := . | trimSuffix "/" -}}
-{{- printf "%s/" $url -}}
+{{ define "tpl.url.ensureTrailingSlash" -}}
+{{ $url := . | trimSuffix "/" -}}
+{{ printf "%s/" $url }}
 {{- end -}}
 
 {{ define "tpl.chart.deprecated" -}}
@@ -61,16 +61,7 @@ Prepare the Rancher Image value w/ new fields as opt-in for now.
 {{ if .Values.rancherImage -}}
 {{ .Values.rancherImage -}}
 {{ else -}}
-{{ $reg := default "" (default .Values.systemDefaultRegistry .Values.image.registry) -}}
-{{ if eq "" $reg -}}
-{{ include "rancher.imageRepo" . -}}
-{{ else -}}
-{{ if hasSuffix "/" $reg -}}
-{{ printf "%s%s" $reg (include "rancher.imageRepo" .) -}}
-{{ else -}}
-{{ printf "%s/%s" $reg (include "rancher.imageRepo" .) -}}
-{{ end -}}
-{{ end -}}
+{{ printf "%s%s" (include "defaultOrOverrideRegistry" (list . (default "" .Values.image.registry))) (include "rancher.imageRepo" .) -}}
 {{ end -}}
 {{ end -}}
 
@@ -165,34 +156,32 @@ add below linux tolerations to workloads could be scheduled to those linux nodes
   - windows
 {{- end -}}
 
-{{- define "system_default_registry" -}}
-{{- if .Values.systemDefaultRegistry -}}
-{{- include "tpl.url.ensureTrailingSlash" .Values.systemDefaultRegistry -}}
+{{ define "system_default_registry" -}}
+{{ if .Values.systemDefaultRegistry -}}
+{{ include "tpl.url.ensureTrailingSlash" .Values.systemDefaultRegistry }}
 {{- end -}}
-{{- end -}}
+{{ end -}}
 
-{{- define "defaultOrOverrideRegistry" -}}
-{{- $rootContext := index . 0 -}}
-{{- $inputRegistry := index . 1 | default "" -}}
-{{- if $inputRegistry -}}
-
-{{- $systemDefault := include "system_default_registry" $rootContext | default "" -}}
-
-{{- coalesce (include "tpl.url.ensureTrailingSlash" $inputRegistry) $systemDefault "" -}}
-
-{{- end -}}
+{{ define "defaultOrOverrideRegistry" -}}
+{{ $rootContext := index . 0 -}}
+{{ $inputRegistry := index . 1 | default "" -}}
+{{ if ne $inputRegistry "" -}}
+{{ $inputRegistry = (include "tpl.url.ensureTrailingSlash" $inputRegistry) -}}
+{{ end -}}
+{{ $systemDefault := include "system_default_registry" $rootContext | default "" -}}
+{{ coalesce $inputRegistry $systemDefault "" }}
 {{- end -}}
 
 {{/*
     Select correct auditLog image
 */}}
-{{- define "auditLog_image" -}}
-  {{- if .Values.busyboxImage }}
-    {{- .Values.busyboxImage}}
-  {{- else }}
+{{ define "auditLog.image" -}}
+  {{ if .Values.busyboxImage -}}
+    {{ .Values.busyboxImage -}}
+  {{ else -}}
     {{- .Values.auditLog.image.repository -}}:{{- .Values.auditLog.image.tag -}}
-  {{- end }}
-{{- end -}}
+  {{ end -}}
+{{ end -}}
 
 {{/*
     Determine the registration mode, defaulting to online if not specified
