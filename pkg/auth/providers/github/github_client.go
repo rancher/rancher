@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/sirupsen/logrus"
 	"github.com/tomnomnom/linkheader"
 )
@@ -19,6 +20,10 @@ const (
 	githubAPI             = "https://api.github.com"
 	githubDefaultHostName = "https://github.com"
 )
+
+type searchResult struct {
+	Items []common.GitHubAccount `json:"items"`
+}
 
 // GClient implements a httpclient for github
 type GClient struct {
@@ -58,26 +63,26 @@ func (g *GClient) getAccessToken(code string, config *v32.GithubConfig) (string,
 	return acessToken, nil
 }
 
-func (g *GClient) getUser(githubAccessToken string, config *v32.GithubConfig) (Account, error) {
+func (g *GClient) getUser(githubAccessToken string, config *v32.GithubConfig) (common.GitHubAccount, error) {
 
 	url := g.getURL("USER_INFO", config)
 	b, _, err := g.getFromGithub(githubAccessToken, url)
 	if err != nil {
 		logrus.Errorf("Github getGithubUser: GET url %v received error from github, err: %v", url, err)
-		return Account{}, err
+		return common.GitHubAccount{}, err
 	}
-	var githubAcct Account
+	var githubAcct common.GitHubAccount
 
 	if err := json.Unmarshal(b, &githubAcct); err != nil {
 		logrus.Errorf("Github getGithubUser: error unmarshalling response, err: %v", err)
-		return Account{}, err
+		return common.GitHubAccount{}, err
 	}
 
 	return githubAcct, nil
 }
 
-func (g *GClient) getOrgs(githubAccessToken string, config *v32.GithubConfig) ([]Account, error) {
-	var orgs []Account
+func (g *GClient) getOrgs(githubAccessToken string, config *v32.GithubConfig) ([]common.GitHubAccount, error) {
+	var orgs []common.GitHubAccount
 
 	url := g.getURL("ORG_INFO", config)
 	responses, err := g.paginateGithub(githubAccessToken, url)
@@ -87,7 +92,7 @@ func (g *GClient) getOrgs(githubAccessToken string, config *v32.GithubConfig) ([
 	}
 
 	for _, b := range responses {
-		var orgObjs []Account
+		var orgObjs []common.GitHubAccount
 		if err := json.Unmarshal(b, &orgObjs); err != nil {
 			logrus.Errorf("Github getGithubOrgs: received error unmarshalling org array, err: %v", err)
 			return nil, err
@@ -98,8 +103,8 @@ func (g *GClient) getOrgs(githubAccessToken string, config *v32.GithubConfig) ([
 	return orgs, nil
 }
 
-func (g *GClient) getTeams(githubAccessToken string, config *v32.GithubConfig) ([]Account, error) {
-	var teams []Account
+func (g *GClient) getTeams(githubAccessToken string, config *v32.GithubConfig) ([]common.GitHubAccount, error) {
+	var teams []common.GitHubAccount
 
 	url := g.getURL("TEAMS", config)
 	responses, err := g.paginateGithub(githubAccessToken, url)
@@ -121,7 +126,7 @@ func (g *GClient) getTeams(githubAccessToken string, config *v32.GithubConfig) (
 }
 
 // getOrgTeams returns the teams belonging to an organization.
-func (g *GClient) getOrgTeams(githubAccessToken string, config *v32.GithubConfig, org Account) ([]Account, error) {
+func (g *GClient) getOrgTeams(githubAccessToken string, config *v32.GithubConfig, org common.GitHubAccount) ([]common.GitHubAccount, error) {
 	url := fmt.Sprintf(g.getURL("ORG_TEAMS", config), url.PathEscape(org.Login))
 	responses, err := g.paginateGithub(githubAccessToken, url)
 	if err != nil {
@@ -129,7 +134,7 @@ func (g *GClient) getOrgTeams(githubAccessToken string, config *v32.GithubConfig
 		return nil, err
 	}
 
-	var teams, respTeams []Account
+	var teams, respTeams []common.GitHubAccount
 	for _, response := range responses {
 		respTeams, err = g.getOrgTeamInfo(response, config, org)
 		if err != nil {
@@ -143,9 +148,9 @@ func (g *GClient) getOrgTeams(githubAccessToken string, config *v32.GithubConfig
 }
 
 // getOrgTeamInfo is similar to getTeamInfo but takes an org as an argument.
-func (g *GClient) getOrgTeamInfo(b []byte, config *v32.GithubConfig, org Account) ([]Account, error) {
-	var teams []Account
-	var teamObjs []Team
+func (g *GClient) getOrgTeamInfo(b []byte, config *v32.GithubConfig, org common.GitHubAccount) ([]common.GitHubAccount, error) {
+	var teams []common.GitHubAccount
+	var teamObjs []common.GitHubTeam
 	if err := json.Unmarshal(b, &teamObjs); err != nil {
 		logrus.Errorf("Github getTeamInfo: received error unmarshalling team array, err: %v", err)
 		return teams, err
@@ -153,7 +158,7 @@ func (g *GClient) getOrgTeamInfo(b []byte, config *v32.GithubConfig, org Account
 
 	url := g.getURL("TEAM_PROFILE", config)
 	for _, team := range teamObjs {
-		teams = append(teams, Account{
+		teams = append(teams, common.GitHubAccount{
 			ID:        team.ID,
 			Name:      team.Name,
 			AvatarURL: org.AvatarURL,
@@ -165,9 +170,9 @@ func (g *GClient) getOrgTeamInfo(b []byte, config *v32.GithubConfig, org Account
 	return teams, nil
 }
 
-func (g *GClient) getTeamInfo(b []byte, config *v32.GithubConfig) ([]Account, error) {
-	var teams []Account
-	var teamObjs []Team
+func (g *GClient) getTeamInfo(b []byte, config *v32.GithubConfig) ([]common.GitHubAccount, error) {
+	var teams []common.GitHubAccount
+	var teamObjs []common.GitHubTeam
 	if err := json.Unmarshal(b, &teamObjs); err != nil {
 		logrus.Errorf("Github getTeamInfo: received error unmarshalling team array, err: %v", err)
 		return teams, err
@@ -175,16 +180,14 @@ func (g *GClient) getTeamInfo(b []byte, config *v32.GithubConfig) ([]Account, er
 
 	url := g.getURL("TEAM_PROFILE", config)
 	for _, team := range teamObjs {
-		teamAcct := Account{}
-		team.toGithubAccount(url, &teamAcct)
-		teams = append(teams, teamAcct)
+		teams = append(teams, team.ToGitHubAccount(url))
 	}
 
 	return teams, nil
 }
 
-func (g *GClient) getTeamByID(id string, githubAccessToken string, config *v32.GithubConfig) (Account, error) {
-	var teamAcct Account
+func (g *GClient) getTeamByID(id string, githubAccessToken string, config *v32.GithubConfig) (common.GitHubAccount, error) {
+	var teamAcct common.GitHubAccount
 
 	url := g.getURL("TEAM", config) + id
 	b, _, err := g.getFromGithub(githubAccessToken, url)
@@ -192,15 +195,14 @@ func (g *GClient) getTeamByID(id string, githubAccessToken string, config *v32.G
 		logrus.Errorf("Github getTeamByID: GET url %v received error from github, err: %v", url, err)
 		return teamAcct, err
 	}
-	var teamObj Team
+	var teamObj common.GitHubTeam
 	if err := json.Unmarshal(b, &teamObj); err != nil {
 		logrus.Errorf("Github getTeamByID: received error unmarshalling team array, err: %v", err)
 		return teamAcct, err
 	}
 	url = g.getURL("TEAM_PROFILE", config)
-	teamObj.toGithubAccount(url, &teamAcct)
 
-	return teamAcct, nil
+	return teamObj.ToGitHubAccount(url), nil
 }
 
 func (g *GClient) paginateGithub(githubAccessToken string, url string) ([][]byte, error) {
@@ -234,7 +236,7 @@ func (g *GClient) nextGithubPage(response *http.Response) string {
 	return ""
 }
 
-func (g *GClient) searchUsers(searchTerm, searchType string, githubAccessToken string, config *v32.GithubConfig) ([]Account, error) {
+func (g *GClient) searchUsers(searchTerm, searchType string, githubAccessToken string, config *v32.GithubConfig) ([]common.GitHubAccount, error) {
 	if searchType == "group" {
 		searchType = orgType
 	}
@@ -262,7 +264,7 @@ func (g *GClient) searchUsers(searchTerm, searchType string, githubAccessToken s
 
 // searchTeams searches for teams that match the search term in the organizations the access token has access to.
 // At the moment it only does a case-insensitive prefix match on the team's name.
-func (g *GClient) searchTeams(searchTerm, githubAccessToken string, config *v32.GithubConfig) ([]Account, error) {
+func (g *GClient) searchTeams(searchTerm, githubAccessToken string, config *v32.GithubConfig) ([]common.GitHubAccount, error) {
 	orgs, err := g.getOrgs(githubAccessToken, config)
 	if err != nil {
 		return nil, err
@@ -270,7 +272,7 @@ func (g *GClient) searchTeams(searchTerm, githubAccessToken string, config *v32.
 
 	lowerSearchTerm := strings.ToLower(searchTerm)
 
-	var matches, teams []Account
+	var matches, teams []common.GitHubAccount
 	for _, org := range orgs {
 		teams, err = g.getOrgTeams(githubAccessToken, config, org)
 		if err != nil {
@@ -290,19 +292,19 @@ func (g *GClient) searchTeams(searchTerm, githubAccessToken string, config *v32.
 	return matches, nil
 }
 
-func (g *GClient) getUserOrgByID(id string, githubAccessToken string, config *v32.GithubConfig) (Account, error) {
+func (g *GClient) getUserOrgByID(id string, githubAccessToken string, config *v32.GithubConfig) (common.GitHubAccount, error) {
 	url := g.getURL("USER_INFO", config) + "/" + id
 
 	b, _, err := g.getFromGithub(githubAccessToken, url)
 	if err != nil {
 		logrus.Errorf("Github getUserOrgById: GET url %v received error from github, err: %v", url, err)
-		return Account{}, err
+		return common.GitHubAccount{}, err
 	}
-	var githubAcct Account
+	var githubAcct common.GitHubAccount
 
 	if err := json.Unmarshal(b, &githubAcct); err != nil {
 		logrus.Errorf("Github getUserOrgById: error unmarshalling response, err: %v", err)
-		return Account{}, err
+		return common.GitHubAccount{}, err
 	}
 
 	return githubAcct, nil
