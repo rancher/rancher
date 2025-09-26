@@ -1,5 +1,10 @@
 {{/* vim: set filetype=mustache: */}}
 
+{{- define "tpl.url.ensureTrailingSlash" -}}
+{{- $url := . | trimSuffix "/" -}}
+{{- printf "%s/" $url -}}
+{{- end -}}
+
 {{ define "tpl.chart.deprecated" -}}
 {{ $val := index . 0 -}}
 {{ $name := index . 1 -}}
@@ -162,10 +167,8 @@ add below linux tolerations to workloads could be scheduled to those linux nodes
 
 {{- define "system_default_registry" -}}
 {{- if .Values.systemDefaultRegistry -}}
-  {{- if hasSuffix "/" .Values.systemDefaultRegistry -}}
-    {{- printf "%s" .Values.systemDefaultRegistry -}}
-  {{- else -}}
-    {{- printf "%s/" .Values.systemDefaultRegistry -}}
+{{- include "tpl.url.ensureTrailingSlash" .Values.systemDefaultRegistry -}}
+{{- end -}}
 {{- end -}}
 {{- end -}}
 {{- end -}}
