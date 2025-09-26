@@ -1,5 +1,8 @@
 {
-  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:rancher:schema:rancher-chart:v1",
+  "title": "Rancher Chart Values",
+  "type": "object",
   "properties": {
     "agentTLSMode": {
       "type": ["string", "null"],
@@ -25,16 +28,6 @@
         }
       }
     },
-    "busyboxImage": {
-      "type": "string",
-      "description": "[DEPRECATED] This value is deprecated, use `auditLog.image.repository` & `auditLog.image.tag` instead.",
-      "deprecated": true
-    },
-    "busyboxImagePullPolicy": {
-      "type": "string",
-      "description": "[DEPRECATED] This value is deprecated, use `auditLog.image.pullPolicy` instead.",
-      "deprecated": true
-    },
     "service": {
       "type": "object",
       "description": "The default rancher service configuration",
@@ -53,23 +46,20 @@
       "description": "The default rancher ingress configuration",
       "properties": {
         "servicePort": {
-          "type": "number",
+          "type": "integer",
           "enum": [443, 80]
         }
       }
     }
   },
   "required": [],
-  "title": "Rancher Chart Values",
-  "type": "object",
   "if": {
     "properties": {
       "service": {
         "properties": {
-          "disableHTTP": {
-            "const": true
-          }
-        }
+          "disableHTTP": { "const": true }
+        },
+        "required": ["disableHTTP"]
       }
     }
   },
@@ -78,10 +68,10 @@
       "ingress": {
         "properties": {
           "servicePort": {
-            "const": 443,
-            "errorMessage": "ingress.servicePort must be 443 when service.disableHTTP is true."
+            "enum": [443]
           }
-        }
+        },
+        "required": ["servicePort"]
       }
     }
   }
