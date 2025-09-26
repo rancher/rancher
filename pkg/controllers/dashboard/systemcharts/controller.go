@@ -29,6 +29,7 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	k8sappsv1 "k8s.io/api/apps/v1"
+	kcorev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -55,6 +56,7 @@ var (
 	watchedSettings = map[string]struct{}{
 		settings.RancherWebhookVersion.Name:               {},
 		settings.RancherProvisioningCAPIVersion.Name:      {},
+		settings.RancherTurtlesVersion.Name:               {},
 		settings.SystemDefaultRegistry.Name:               {},
 		settings.ShellImage.Name:                          {},
 		settings.SystemUpgradeControllerChartVersion.Name: {},
@@ -68,6 +70,7 @@ func Register(ctx context.Context, wContext *wrangler.Context, registryOverride 
 	h := &handler{
 		manager:          wContext.SystemChartsManager,
 		namespaces:       wContext.Core.Namespace(),
+		namespaceCache:   wContext.Core.Namespace().Cache(),
 		deployment:       wContext.Apps.Deployment(),
 		deploymentCache:  wContext.Apps.Deployment().Cache(),
 		clusterRepo:      wContext.Catalog.ClusterRepo(),
@@ -91,6 +94,8 @@ func Register(ctx context.Context, wContext *wrangler.Context, registryOverride 
 
 	wContext.Plan.Plan().OnChange(ctx, "monitor-plans", h.onPlan)
 
+	wContext.Core.Namespace().OnChange(ctx, "watch-provisioning-namespaces", h.onNamespace)
+
 	wContext.Mgmt.Cluster().OnChange(ctx, "monitor-local-cluster", h.onCluster)
 	return nil
 }
@@ -98,6 +103,7 @@ func Register(ctx context.Context, wContext *wrangler.Context, registryOverride 
 type handler struct {
 	manager          chart.Manager
 	namespaces       corecontrollers.NamespaceController
+	namespaceCache   corecontrollers.NamespaceCache
 	deployment       deploymentControllers.DeploymentController
 	deploymentCache  deploymentControllers.DeploymentCache
 	clusterRepo      catalogcontrollers.ClusterRepoController
@@ -149,20 +155,31 @@ func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.Cluste
 		}
 		var installImageOverride string
 		if h.registryOverride != "" {
-			imageSettings, ok := values["image"].(map[string]interface{})
-			if !ok {
-				imageSettings = map[string]interface{}{}
-			}
-			if image, ok := primaryImages[chartDef.ChartName]; ok {
+			if chartDef.ChartName == chart.TurtlesChartName {
+				// turtles chart uses a different values structure for image override
+				rtSettings, _ := values["rancherTurtles"].(map[string]interface{})
+				if rtSettings == nil {
+					rtSettings = map[string]interface{}{}
+				}
+				rtImage, _ := rtSettings["image"].(map[string]interface{})
+				if rtImage == nil {
+					rtImage = map[string]interface{}{}
+				}
+				rtImage["repository"] = h.registryOverride + "/rancher/turtles"
+				rtSettings["image"] = rtImage
+				values["rancherTurtles"] = rtSettings
+			} else if image, ok := primaryImages[chartDef.ChartName]; ok {
+				imageSettings, ok := values["image"].(map[string]interface{})
+				if !ok {
+					imageSettings = map[string]interface{}{}
+				}
 				imageSettings["repository"] = h.registryOverride + "/" + image
 				values["image"] = imageSettings
 			}
 			installImageOverride = h.registryOverride + "/" + settings.ShellImage.Get()
 		}
 		if chartDef.Values != nil {
-			for k, v := range chartDef.Values() {
-				values[k] = v
-			}
+			mergeValues(values, chartDef.Values())
 		}
 		// webhook needs to be able to adopt the MutatingWebhookConfiguration which originally wasn't a part of the
 		// chart definition, but is now part of the chart definition
@@ -243,9 +260,63 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 				configMapValues := h.getChartValues(chart.ProvisioningCAPIChartName)
 				return data.MergeMaps(values, configMapValues)
 			},
-			Enabled:         func() bool { return features.EmbeddedClusterAPI.Enabled() },
-			Uninstall:       !features.EmbeddedClusterAPI.Enabled(),
-			RemoveNamespace: !features.EmbeddedClusterAPI.Enabled(),
+			Enabled: func() bool {
+				// Provisioning CAPI is enabled when EmbeddedClusterAPI is on AND Turtles is off,
+				// and only after Turtles namespace is fully deleted to avoid race.
+				if features.EmbeddedClusterAPI.Disabled() || features.Turtles.Enabled() {
+					return false
+				}
+				return h.namespaceGone(namespace.TurtlesNamespace)
+			},
+			Uninstall: func() bool {
+				// Uninstall provisioning CAPI when Turtles is enabled or EmbeddedClusterAPI is disabled.
+				return features.Turtles.Enabled() || features.EmbeddedClusterAPI.Disabled()
+			}(),
+			RemoveNamespace: func() bool {
+				return features.Turtles.Enabled() || features.EmbeddedClusterAPI.Disabled()
+			}(),
+		},
+		{
+			ReleaseNamespace:    namespace.TurtlesNamespace,
+			ReleaseName:         chart.TurtlesChartName,
+			ChartName:           chart.TurtlesChartName,
+			ExactVersionSetting: settings.RancherTurtlesVersion,
+			Values: func() map[string]interface{} {
+				values := map[string]interface{}{}
+				// add priority class value
+				h.setPriorityClass(values, chart.TurtlesChartName)
+				// get custom values for rancher-turtles
+				configMapValues := h.getChartValues(chart.TurtlesChartName)
+				values = data.MergeMaps(values, configMapValues)
+				// force enable the turtles feature flag for no-cert-manager
+				rt, _ := values["rancherTurtles"].(map[string]interface{})
+				if rt == nil {
+					rt = map[string]interface{}{}
+				}
+				featuresMap, _ := rt["features"].(map[string]interface{})
+				if featuresMap == nil {
+					featuresMap = map[string]interface{}{}
+				}
+				noCM, _ := featuresMap["no-cert-manager"].(map[string]interface{})
+				if noCM == nil {
+					noCM = map[string]interface{}{}
+				}
+				noCM["enabled"] = true
+				featuresMap["no-cert-manager"] = noCM
+				rt["features"] = featuresMap
+				values["rancherTurtles"] = rt
+				return values
+			},
+			Enabled: func() bool {
+				// Turtles is enabled by its feature flag and only after Provisioning CAPI namespace is fully deleted
+				// to avoid race during switch.
+				if features.Turtles.Disabled() {
+					return false
+				}
+				return h.namespaceGone(namespace.ProvisioningCAPINamespace)
+			},
+			Uninstall:       features.Turtles.Disabled(),
+			RemoveNamespace: features.Turtles.Disabled(),
 		},
 		{
 			ReleaseNamespace: namespace.System,
@@ -371,6 +442,20 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 				return toUninstall
 			}(),
 		},
+	}
+}
+
+// mergeValues merges key/value pairs from "from" into "into".
+func mergeValues(into map[string]interface{}, from map[string]interface{}) {
+	for k, v := range from {
+		if existing, ok := into[k]; ok {
+			if exMap, exOk := existing.(map[string]interface{}); exOk {
+				if newMap, newOk := v.(map[string]interface{}); newOk {
+					v = data.MergeMaps(exMap, newMap)
+				}
+			}
+		}
+		into[k] = v
 	}
 }
 
@@ -503,7 +588,7 @@ func (h *handler) onPlan(_ string, plan *upgradev1.Plan) (*upgradev1.Plan, error
 // It ensures the timely installation or uninstallation of the system-upgrade-controller app in the local cluster
 // when the "rancher.io/imported-cluster-version-management" annotation is changed.
 func (h *handler) onCluster(_ string, obj *v3.Cluster) (*v3.Cluster, error) {
-	if !features.MCM.Enabled() {
+	if features.MCM.Disabled() {
 		return obj, nil
 	}
 	if obj == nil || obj.DeletionTimestamp != nil || obj.Name != "local" {
@@ -565,9 +650,38 @@ func isInHarvesterLocal() bool {
 	// When Rancher is embedded and running in the Harvester local cluster,
 	// the multi-cluster-management and multi-cluster-management-agent features are disabled,
 	// and the Harvester feature is enabled.
-	if !features.MCMAgent.Enabled() && !features.MCM.Enabled() && features.Harvester.Enabled() {
+	if features.MCMAgent.Disabled() && features.MCM.Disabled() && features.Harvester.Enabled() {
 		logrus.Debugf("Rancher is embedded and running in the Harvester local cluster.")
 		return true
 	}
 	return false
+}
+
+// namespaceGone returns true if the given namespace was deleted
+func (h *handler) namespaceGone(ns string) bool {
+	if ns == "" {
+		return true
+	}
+	_, err := h.namespaceCache.Get(ns)
+	if errors.IsNotFound(err) {
+		return true
+	}
+	if err != nil {
+		logrus.Warnf("[systemcharts] failed to get namespace %s: %v", ns, err)
+	}
+	return false
+}
+
+// onNamespace watches for deletion of namespaces used by Prosivisioning and Turtles charts.
+func (h *handler) onNamespace(_ string, ns *kcorev1.Namespace) (*kcorev1.Namespace, error) {
+	if ns == nil {
+		return ns, nil
+	}
+	if ns.Name != namespace.ProvisioningCAPINamespace && ns.Name != namespace.TurtlesNamespace {
+		return ns, nil
+	}
+
+	logrus.Debugf("[systemcharts] namespace change detected for %s", ns.Name)
+	h.clusterRepo.EnqueueAfter(repoName, 10*time.Second)
+	return ns, nil
 }

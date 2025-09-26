@@ -65,7 +65,7 @@ var (
 	EmbeddedClusterAPI = newFeature(
 		"embedded-cluster-api",
 		"Enable a Rancher-managed instance of cluster-api core controller",
-		true,
+		false,
 		false,
 		false)
 	ManagedSystemUpgradeController = newFeature(
@@ -180,6 +180,12 @@ var (
 		"rancher-scc-registration-extension",
 		"Enable Rancher's SCC registration extension to register the system(s) for customer support",
 		isPrime(),
+		false,
+		true)
+	Turtles = newFeature(
+		"turtles",
+		"Enable Rancher Turtles for managing CAPI lifecycle",
+		true,
 		false,
 		true)
 )
@@ -360,6 +366,11 @@ func applyArgumentDefaults(featureArgs string) error {
 // Enabled returns whether the feature is enabled
 func (f *Feature) Enabled() bool {
 	return f.val
+}
+
+// Disabled returns whether the feature is disabled.
+func (f *Feature) Disabled() bool {
+	return !f.Enabled()
 }
 
 // Disable will disable a feature such that regardless of the user's choice it will always be false
