@@ -31,18 +31,6 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 		return err
 	}
 
-	if err := creator.add("googleKubernetesEngine"); err != nil {
-		return err
-	}
-
-	if err := creator.add("azureKubernetesService"); err != nil {
-		return err
-	}
-
-	if err := creator.add("amazonElasticContainerService"); err != nil {
-		return err
-	}
-
 	if err := creator.addCustomDriver(
 		"oraclecontainerengine",
 		"https://github.com/rancher-plugins/kontainer-engine-driver-oke/releases/download/v1.8.3/kontainer-engine-driver-oke-linux",
@@ -76,6 +64,9 @@ func addKontainerDrivers(management *config.ManagementContext) error {
 	}
 
 	creator.deleteRKEKontainerDriver()
+	creator.deleteKontainerDriver("amazonElasticContainerService", "https://drivers.rancher.com")
+	creator.deleteKontainerDriver("googleKubernetesEngine", "https://drivers.rancher.com")
+	creator.deleteKontainerDriver("azureKubernetesService", "https://drivers.rancher.com")
 	creator.deleteKontainerDriver("baiducloudcontainerengine", "https://drivers.rancher.cn")
 	creator.deleteKontainerDriver("aliyunkubernetescontainerservice", "https://drivers.rancher.cn")
 	creator.deleteKontainerDriver("tencentkubernetesengine", "https://drivers.rancher.cn")
