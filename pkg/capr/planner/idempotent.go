@@ -10,6 +10,14 @@ import (
 	"github.com/rancher/rancher/pkg/capr"
 )
 
+// idempotentActionScript wraps a provided command in additional checks which ensure the command
+// will be attempted until it is successfully run once, and then prevent it from being
+// run again - effectively making arbitrary commands idempotent. This prevents
+// potential re-execution of commands which must only be run once (etcd operations, etc.)
+// but are not idempotent by default. The command will be reattempted until either it is
+// successful, or the max-failures limit set for the plan is reached. The definition of
+// $CATTLE_AGENT_ATTEMPT_NUMBER can be found in the system-agent repository, but it is effectively
+// just the plans failure-count + 1.
 const idempotentActionScript = `
 #!/bin/sh
 
