@@ -2,11 +2,11 @@
 {{ if .Release.IsUpgrade -}}
 {{ $action = "upgraded" -}}
 {{ end -}}
-{{- include "chart.deprecated" (list .Values.busyboxImage ".Values.busyboxImage" "Use `.Values.auditLog.image.repository` & `.Values.auditLog.image.tag` instead.") -}}
-{{- include "chart.replace" (list .Values.busyboxImagePullPolicy ".Values.busyboxImagePullPolicy" ".Values.auditLog.image.pullPolicy") -}}
-{{- include "chart.deprecated" (list .Values.rancherImage ".Values.rancherImage" "Use `.Values.image.repository` & `.Values.image.registry` instead; if you used image name with Registry included you must split them up.") -}}
-{{- include "chart.replace" (list .Values.rancherImageTag ".Values.rancherImageTag" ".Values.image.tag") -}}
-{{- include "chart.replace" (list .Values.rancherImagePullPolicy ".Values.rancherImagePullPolicy" ".Values.image.pullPolicy") -}}
+{{- include "tpl.chart.deprecated" (list .Values.busyboxImage ".Values.busyboxImage" "Use `.Values.auditLog.image.repository` & `.Values.auditLog.image.tag` instead.") -}}
+{{- include "tpl.chart.replace" (list .Values.busyboxImagePullPolicy ".Values.busyboxImagePullPolicy" ".Values.auditLog.image.pullPolicy") -}}
+{{- include "tpl.chart.deprecated" (list .Values.rancherImage ".Values.rancherImage" "Use `.Values.image.repository` & `.Values.image.registry` instead; if you used image name with Registry included you must split them up.") -}}
+{{- include "tpl.chart.replace" (list .Values.rancherImageTag ".Values.rancherImageTag" ".Values.image.tag") -}}
+{{- include "tpl.chart.replace" (list .Values.rancherImagePullPolicy ".Values.rancherImagePullPolicy" ".Values.image.pullPolicy") -}}
 
 
 Rancher Server has been {{ $action }}. Rancher may take several minutes to fully initialize.

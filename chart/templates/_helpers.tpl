@@ -1,6 +1,6 @@
 {{/* vim: set filetype=mustache: */}}
 
-{{ define "chart.deprecated" -}}
+{{ define "tpl.chart.deprecated" -}}
 {{ $val := index . 0 -}}
 {{ $name := index . 1 -}}
 {{ $msg := "" -}}
@@ -12,7 +12,7 @@
 {{ end -}}
 {{ end -}}
 
-{{ define "chart.replace" -}}
+{{ define "tpl.chart.replace" -}}
 {{ $val := index . 0 -}}
 {{ $old := index . 1 -}}
 {{ $new := index . 2 -}}
