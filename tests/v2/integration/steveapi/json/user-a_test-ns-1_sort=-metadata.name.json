@@ -87,7 +87,7 @@
         "fields": [
           "test3",
           "Opaque",
-          0,
+          7,
           "0s"
         ],
         "labels": {
@@ -120,7 +120,7 @@
         "fields": [
           "test2",
           "Opaque",
-          0,
+          23,
           "0s"
         ],
         "labels": {
@@ -153,7 +153,7 @@
         "fields": [
           "test1",
           "Opaque",
-          0,
+          15,
           "0s"
         ],
         "labels": {
