@@ -54,8 +54,6 @@ generated Go [file](../pkg/buildconfig/constants.go). For example:
 
 The following are examples of files that often refer to newly added configuration values:
 
-- [build-server](../scripts/build-server)
-- [build-agent](../scripts/build-agent)
 - [quick](../dev-scripts/quick)
 - [Dockerfile](../package/Dockerfile)
 - [Dockerfile.agent](../package/Dockerfile.agent)
