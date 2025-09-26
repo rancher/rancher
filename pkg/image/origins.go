@@ -115,6 +115,7 @@ var OriginMap = map[string]string{
 	"mirrored-cloud-provider-vsphere-csi-release-syncer":      "https://github.com/kubernetes-sigs/vsphere-csi-driver/tree/master/pkg/syncer",
 	"mirrored-cloud-provider-vsphere":                         "https://github.com/kubernetes/cloud-provider-vsphere",
 	"mirrored-cluster-api-controller":                         "https://github.com/kubernetes-sigs/cluster-api",
+	"cluster-api-controller":                                  "https://github.com/kubernetes-sigs/cluster-api",
 	"mirrored-coredns-coredns":                                "https://github.com/coredns/coredns",
 	"mirrored-coreos-prometheus-config-reloader":              "https://github.com/prometheus-operator/prometheus-operator/pkgs/container/prometheus-config-reloader",
 	"mirrored-coreos-prometheus-operator":                     "https://github.com/prometheus-operator/prometheus-operator",

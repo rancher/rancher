@@ -21,6 +21,7 @@ const (
 	JobTemplateSpecFieldHostPID                       = "hostPID"
 	JobTemplateSpecFieldHostUsers                     = "hostUsers"
 	JobTemplateSpecFieldHostname                      = "hostname"
+	JobTemplateSpecFieldHostnameOverride              = "hostnameOverride"
 	JobTemplateSpecFieldImagePullSecrets              = "imagePullSecrets"
 	JobTemplateSpecFieldJobConfig                     = "jobConfig"
 	JobTemplateSpecFieldJobMetadata                   = "jobMetadata"
@@ -81,6 +82,7 @@ type JobTemplateSpec struct {
 	HostPID                       bool                           `json:"hostPID,omitempty" yaml:"hostPID,omitempty"`
 	HostUsers                     *bool                          `json:"hostUsers,omitempty" yaml:"hostUsers,omitempty"`
 	Hostname                      string                         `json:"hostname,omitempty" yaml:"hostname,omitempty"`
+	HostnameOverride              string                         `json:"hostnameOverride,omitempty" yaml:"hostnameOverride,omitempty"`
 	ImagePullSecrets              []LocalObjectReference         `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
 	JobConfig                     *JobConfig                     `json:"jobConfig,omitempty" yaml:"jobConfig,omitempty"`
 	JobMetadata                   *ObjectMeta                    `json:"jobMetadata,omitempty" yaml:"jobMetadata,omitempty"`
