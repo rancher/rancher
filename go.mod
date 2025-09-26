@@ -9,7 +9,7 @@ replace (
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
 	github.com/rancher/aks-operator => github.com/swastik959/aks-operator v0.0.0-20250923123854-318a02401b88
 	github.com/rancher/apiserver => github.com/swastik959/apiserver v0.0.0-20250923123029-b08f8b1048be
-	github.com/rancher/dynamiclistener => github.com/swastik959/dynamiclistener v0.0.0-20250923111444-6a61ff111a8d
+	github.com/rancher/dynamiclistener => github.com/vardhaman22/dynamiclistener v0.0.0-20250926042256-1d82293e029c
 	github.com/rancher/eks-operator => github.com/swastik959/eks-operator v1.12.0-rc.1.0.20250923124031-77b693fcafb3
 	github.com/rancher/gke-operator => github.com/swastik959/gke-operator v0.0.0-20250923123505-c92387290b44
 	github.com/rancher/lasso => github.com/swastik959/lasso v0.0.0-20250923105400-206df1201acf
@@ -154,7 +154,7 @@ require (
 	github.com/rancher/steve v0.7.17
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20250710162344-185ff9f785cd
 	github.com/rancher/wrangler v1.1.2
-	github.com/rancher/wrangler/v3 v3.2.4-rc.1
+	github.com/rancher/wrangler/v3 v3.2.4
 	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.11.1
