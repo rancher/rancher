@@ -16,11 +16,11 @@ type KEv2OperatorInfo struct {
 	Active        bool   `json:"active"`
 }
 
-var defaultKEv2Operators = map[string]KEv2OperatorInfo{
-	"aks":          {Name: "aks", OldDriverName: "azureKubernetesService", Active: true},
-	"eks":          {Name: "eks", OldDriverName: "amazonElasticContainerService", Active: true},
-	"gke":          {Name: "gke", OldDriverName: "googleElasticContainerService", Active: true},
-	"alibabacloud": {Name: "alibabacloud", OldDriverName: "", Active: false},
+var defaultKEv2Operators = []KEv2OperatorInfo{
+	{Name: "aks", OldDriverName: "azureKubernetesService", Active: true},
+	{Name: "eks", OldDriverName: "amazonElasticContainerService", Active: true},
+	{Name: "gke", OldDriverName: "googleElasticContainerService", Active: true},
+	{Name: "alibabacloud", OldDriverName: "", Active: false},
 }
 
 func syncOperatorDriverActiveState(management *config.ManagementContext) error {
@@ -34,41 +34,46 @@ func syncOperatorDriverActiveState(management *config.ManagementContext) error {
 func (c *driverCreator) syncKEv2OperatorsSetting() error {
 	existingSettingJSON := settings.KEv2Operators.Get()
 
-	existingOperators := map[string]KEv2OperatorInfo{}
-	if existingSettingJSON != "{}" {
+	existingOperators := []KEv2OperatorInfo{}
+	if existingSettingJSON != "{}" && existingSettingJSON != "" {
 		if err := json.Unmarshal([]byte(existingSettingJSON), &existingOperators); err != nil {
-			existingOperators = map[string]KEv2OperatorInfo{}
+			existingOperators = []KEv2OperatorInfo{}
 		}
 	}
 
 	settingChanged := false
-	for key, operator := range defaultKEv2Operators {
-		if _, found := existingOperators[key]; !found {
-			existingOperators[key] = operator
+
+	// Add any missing default operators
+	for _, operator := range defaultKEv2Operators {
+		found := false
+		for _, existing := range existingOperators {
+			if existing.Name == operator.Name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			existingOperators = append(existingOperators, operator)
 			settingChanged = true
 		}
 	}
 
-	for operatorKey, operatorInfo := range existingOperators {
+	// Update Active state based on old drivers
+	for i, operatorInfo := range existingOperators {
 		if operatorInfo.OldDriverName != "" {
 			driver, err := c.driversLister.Get("", operatorInfo.OldDriverName)
 			isActive := true
 			if err != nil {
 				if errors.IsNotFound(err) {
-					// The old KontainerDriver for this operator no longer exists.
-					// This is expected since AKS/EKS/GKE are now managed by their respective operators.
-					// In this case we skip updating status instead of treating it as an error.
 					continue
 				}
-				// Any other error is unexpected and should be returned.
 				return err
 			} else if driver != nil && !driver.Spec.Active {
 				isActive = false
 			}
 
 			if operatorInfo.Active != isActive {
-				operatorInfo.Active = isActive
-				existingOperators[operatorKey] = operatorInfo
+				existingOperators[i].Active = isActive
 				settingChanged = true
 			}
 		}

@@ -99,7 +99,7 @@ var (
 	PasswordMinLength                   = NewSetting("password-min-length", "12")
 	PeerServices                        = NewSetting("peer-service", os.Getenv("CATTLE_PEER_SERVICE"))
 	RkeMetadataConfig                   = NewSetting("rke-metadata-config", getMetadataConfig())
-	KEv2Operators                       = NewSetting("kev2-operators", getKEv2OperatorsConfig())
+	KEv2Operators                       = NewSetting("kev2-operators", "{}")
 	ServerImage                         = NewSetting("server-image", "rancher/rancher")
 	ServerURL                           = NewSetting("server-url", "")
 	ServerVersion                       = NewSetting("server-version", "dev")
@@ -581,16 +581,6 @@ func (s Setting) WithDefaultOnUpgrade(defOnUpgrade string) Setting {
 // GetEnvKey will return the given string formatted as a rancher environmental variable.
 func GetEnvKey(key string) string {
 	return "CATTLE_" + strings.ToUpper(strings.Replace(key, "-", "_", -1))
-}
-
-func getKEv2OperatorsConfig() string {
-	data := map[string]bool{}
-	ans, err := json.Marshal(data)
-	if err != nil {
-		logrus.Errorf("error getting KEv2 operators config: failed to marshal empty object, error: %v", err)
-		return "{}"
-	}
-	return string(ans)
 }
 
 func getMetadataConfig() string {
