@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	jwtv4 "github.com/golang-jwt/jwt/v4"
+	jwtv5 "github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/mux"
 	v3api "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -36,7 +36,7 @@ const (
 func TestIsTokenExpired(t *testing.T) {
 	tests := []struct {
 		name           string
-		expirationTime *jwtv4.NumericDate
+		expirationTime *jwtv5.NumericDate
 		wantExpired    bool
 	}{
 		{
@@ -45,19 +45,19 @@ func TestIsTokenExpired(t *testing.T) {
 		},
 		{
 			name:           "expired token",
-			expirationTime: jwtv4.NewNumericDate(time.Now().Add(-time.Hour)),
+			expirationTime: jwtv5.NewNumericDate(time.Now().Add(-time.Hour)),
 			wantExpired:    true,
 		},
 		{
 			name:           "not expired token",
-			expirationTime: jwtv4.NewNumericDate(time.Now().Add(time.Hour)),
+			expirationTime: jwtv5.NewNumericDate(time.Now().Add(time.Hour)),
 			wantExpired:    false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			testClaim := jwtv4.RegisteredClaims{
+			testClaim := jwtv5.RegisteredClaims{
 				ExpiresAt: tt.expirationTime,
 			}
 			if got := isTokenExpired(testClaim); got != tt.wantExpired {
@@ -84,7 +84,7 @@ func TestServiceAccountAuthAuthenticate(t *testing.T) {
 	}{
 		{
 			name: "everything valid auth succeeds secure mode",
-			token: makeJWT(jwtv4.MapClaims{
+			token: makeJWT(jwtv5.MapClaims{
 				"sub": "system:serviceaccount:vault:token-reviewer",
 				"exp": time.Now().Add(time.Hour).Unix(),
 			}),
@@ -99,7 +99,7 @@ func TestServiceAccountAuthAuthenticate(t *testing.T) {
 		},
 		{
 			name: "everything valid auth succeeds insecure mode",
-			token: makeJWT(jwtv4.MapClaims{
+			token: makeJWT(jwtv5.MapClaims{
 				"sub": "system:serviceaccount:vault:token-reviewer",
 				"exp": time.Now().Add(time.Hour).Unix(),
 			}),
@@ -114,7 +114,7 @@ func TestServiceAccountAuthAuthenticate(t *testing.T) {
 		},
 		{
 			name: "everything valid but tokenreview auth fails",
-			token: makeJWT(jwtv4.MapClaims{
+			token: makeJWT(jwtv5.MapClaims{
 				"sub": "system:serviceaccount:vault:token-reviewer",
 				"exp": time.Now().Add(time.Hour).Unix(),
 			}),
@@ -129,7 +129,7 @@ func TestServiceAccountAuthAuthenticate(t *testing.T) {
 		},
 		{
 			name: "expired token auth fails",
-			token: makeJWT(jwtv4.MapClaims{
+			token: makeJWT(jwtv5.MapClaims{
 				"sub": "system:serviceaccount:vault:token-reviewer",
 				"exp": time.Now().Add(-time.Hour).Unix(),
 			}),
@@ -154,7 +154,7 @@ func TestServiceAccountAuthAuthenticate(t *testing.T) {
 		},
 		{
 			name: "invalid subject in jwt will fail",
-			token: makeJWT(jwtv4.MapClaims{
+			token: makeJWT(jwtv5.MapClaims{
 				"sub": "not-a-sa:totalfail",
 				"exp": time.Now().Add(time.Hour).Unix(),
 			}),
@@ -168,7 +168,7 @@ func TestServiceAccountAuthAuthenticate(t *testing.T) {
 		},
 		{
 			name: "missing clusterid auth fail",
-			token: makeJWT(jwtv4.MapClaims{
+			token: makeJWT(jwtv5.MapClaims{
 				"sub": "system:serviceaccount:vault:token-reviewer",
 				"exp": time.Now().Add(time.Hour).Unix(),
 			}),
@@ -182,7 +182,7 @@ func TestServiceAccountAuthAuthenticate(t *testing.T) {
 		},
 		{
 			name: "everything valid but setting is off auth fails",
-			token: makeJWT(jwtv4.MapClaims{
+			token: makeJWT(jwtv5.MapClaims{
 				"sub": "system:serviceaccount:vault:token-reviewer",
 				"exp": time.Now().Add(time.Hour).Unix(),
 			}),
@@ -196,7 +196,7 @@ func TestServiceAccountAuthAuthenticate(t *testing.T) {
 		},
 		{
 			name: "everything valid but setting is missing auth fails",
-			token: makeJWT(jwtv4.MapClaims{
+			token: makeJWT(jwtv5.MapClaims{
 				"sub": "system:serviceaccount:vault:token-reviewer",
 				"exp": time.Now().Add(time.Hour).Unix(),
 			}),
@@ -210,7 +210,7 @@ func TestServiceAccountAuthAuthenticate(t *testing.T) {
 		},
 		{
 			name: "everything valid auth succeeds for non tokenreview feature enabled",
-			token: makeJWT(jwtv4.MapClaims{
+			token: makeJWT(jwtv5.MapClaims{
 				"sub": "system:serviceaccount:vault:token-reviewer",
 				"exp": time.Now().Add(time.Hour).Unix(),
 			}),
@@ -302,8 +302,8 @@ func generateDownstreamRequest(method string, path string) *http.Request {
 	return req
 }
 
-func makeJWT(claims jwtv4.Claims) string {
-	token := jwtv4.NewWithClaims(jwtv4.SigningMethodHS256, claims)
+func makeJWT(claims jwtv5.Claims) string {
+	token := jwtv5.NewWithClaims(jwtv5.SigningMethodHS256, claims)
 	sampleSecretKey := []byte("testingkeyfortestpurposes")
 	tokenString, _ := token.SignedString(sampleSecretKey)
 	return tokenString

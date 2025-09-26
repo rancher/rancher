@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -776,10 +776,12 @@ func parseACRFromAccessToken(accessToken string) (string, error) {
 	if !ok {
 		return "", errors.New("failed to parse claims in JWT token: invalid jwt.MapClaims format")
 	}
+
 	acrValue, found := claims["acr"].(string)
 	if !found {
 		return "", fmt.Errorf("ACR claim invalid or not found in token: (acr=%v)", claims["acr"])
 	}
+
 	return acrValue, nil
 }
 
