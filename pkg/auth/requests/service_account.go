@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
-	jwtv4 "github.com/golang-jwt/jwt/v4"
+	jwtv5 "github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/mux"
 	authcontext "github.com/rancher/rancher/pkg/auth/context"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -91,8 +92,8 @@ func (t *ServiceAccountAuth) Authenticate(req *http.Request) (user.Info, bool, e
 	// See if the token is a JWT.
 	rawToken := tokens.GetTokenAuthFromRequest(req)
 
-	jwtParser := jwtv4.NewParser(jwtv4.WithoutClaimsValidation())
-	claims := jwtv4.RegisteredClaims{}
+	jwtParser := jwtv5.NewParser(jwtv5.WithoutClaimsValidation())
+	claims := jwtv5.RegisteredClaims{}
 	// Using ParseUnverified is deliberate here to look at the basic info in the token.
 	// Later on, we do a real TokenReview against the downstream cluster to actually verify the JWT.
 	_, _, err = jwtParser.ParseUnverified(rawToken, &claims)
@@ -144,10 +145,16 @@ func (t *ServiceAccountAuth) Authenticate(req *http.Request) (user.Info, bool, e
 	}, tokenReview.Status.Authenticated, nil
 }
 
-// isTokenExpired takes RegisteredClaims JWT and returns true if it is expired, otherwise it returns false.
-func isTokenExpired(claims jwtv4.RegisteredClaims) bool {
-	// Token without an expiration time is not expired.
-	return !claims.VerifyExpiresAt(jwtv4.TimeFunc(), false)
+// isTokenExpired takes RegisteredClaims JWT and returns true if it is expired,
+// otherwise it returns false.
+func isTokenExpired(claims jwtv5.RegisteredClaims) bool {
+	// RegisteredClaims.GetExpirationTime() does not return an error.
+	exp, _ := claims.GetExpirationTime()
+	if exp == nil {
+		return false
+	}
+
+	return time.Now().After(exp.Time)
 }
 
 // convertExtra converts the Extra value from a tokenResponse to map[string][]string

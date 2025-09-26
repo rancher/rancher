@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/crewjam/saml"
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v5"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -84,9 +84,7 @@ func (s *Provider) getPossibleRequestIDs(r *http.Request) []string {
 		if strings.HasPrefix(name, "Rancher_") {
 			continue
 		}
-		jwtParser := jwt.Parser{
-			ValidMethods: []string{jwt.SigningMethodHS256.Name},
-		}
+		jwtParser := newJWTParser()
 		token, err := jwtParser.Parse(value, func(t *jwt.Token) (interface{}, error) {
 			secretBlock := x509.MarshalPKCS1PrivateKey(serviceProvider.Key)
 			return secretBlock, nil

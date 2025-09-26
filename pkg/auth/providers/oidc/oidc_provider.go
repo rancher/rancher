@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -12,7 +13,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -768,6 +769,8 @@ func isValidACR(claimACR string, configuredACR string) bool {
 func parseACRFromAccessToken(accessToken string) (string, error) {
 	var parser jwt.Parser
 	// we already validated the incoming token
+	log.Printf("KEVIN!!!! %q", accessToken)
+
 	token, _, err := parser.ParseUnverified(accessToken, jwt.MapClaims{})
 	if err != nil {
 		return "", fmt.Errorf("failed to parse JWT token: %w", err)
@@ -776,10 +779,12 @@ func parseACRFromAccessToken(accessToken string) (string, error) {
 	if !ok {
 		return "", errors.New("failed to parse claims in JWT token: invalid jwt.MapClaims format")
 	}
+
 	acrValue, found := claims["acr"].(string)
 	if !found {
 		return "", fmt.Errorf("ACR claim invalid or not found in token: (acr=%v)", claims["acr"])
 	}
+
 	return acrValue, nil
 }
 

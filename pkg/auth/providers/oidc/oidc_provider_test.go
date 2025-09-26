@@ -18,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -62,10 +62,11 @@ func Test_validateACR(t *testing.T) {
 }
 
 func TestParseACRFromAccessToken(t *testing.T) {
-	header := base64.URLEncoding.EncodeToString([]byte(`{"alg":"none"}`))
-	validClaims := base64.URLEncoding.EncodeToString([]byte(`{"acr":"example_acr"}`))
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none"}`))
+	suffix := base64.URLEncoding.EncodeToString([]byte(`{}`))
+	validClaims := base64.RawURLEncoding.EncodeToString([]byte(`{"acr":"example_acr"}`))
 	invalidBase64Claims := "invalid_base64_claims"
-	noAcrClaims := base64.URLEncoding.EncodeToString([]byte(`{"sub":"1234567890"}`))
+	noAcrClaims := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"1234567890"}`))
 
 	tests := []struct {
 		name        string
@@ -75,7 +76,7 @@ func TestParseACRFromAccessToken(t *testing.T) {
 	}{
 		{
 			name:        "valid token with ACR",
-			token:       fmt.Sprintf("%s.%s.", header, validClaims),
+			token:       fmt.Sprintf("%s.%s.%s", header, validClaims, suffix),
 			expectedACR: "example_acr",
 		},
 		{
@@ -92,7 +93,7 @@ func TestParseACRFromAccessToken(t *testing.T) {
 		},
 		{
 			name:        "valid token without ACR claim",
-			token:       fmt.Sprintf("%s.%s.", header, noAcrClaims),
+			token:       fmt.Sprintf("%s.%s.suffix", header, noAcrClaims),
 			expectedACR: "",
 			wantError:   true,
 		},
@@ -418,9 +419,10 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 			},
 			storedToken: func(port string) *oauth2.Token {
 				token := jwt.New(jwt.SigningMethodRS256)
-				token.Claims = jwt.StandardClaims{
-					Audience:  "test",
-					ExpiresAt: time.Now().Add(5 * time.Minute).Unix(), // expires in the future
+				token.Claims = jwt.RegisteredClaims{
+					Audience: []string{"test"},
+					// expires in the future
+					ExpiresAt: jwt.NewNumericDate(time.Now().Add(5 * time.Minute)),
 					Issuer:    "http://localhost:" + port,
 				}
 				tokenStr, err := token.SignedString(privateKey)
@@ -428,7 +430,7 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 
 				return &oauth2.Token{
 					AccessToken: tokenStr,
-					Expiry:      time.Now().Add(5 * time.Minute), // expires in the future
+					Expiry:      time.Now().Add(5 * time.Minute),
 				}
 			},
 			oidcProviderResponses: func(port string) oidcResponses {
@@ -453,18 +455,20 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 			},
 			storedToken: func(port string) *oauth2.Token {
 				token := jwt.New(jwt.SigningMethodRS256)
-				token.Claims = jwt.StandardClaims{
-					Audience:  "test",
-					ExpiresAt: time.Unix(0, 0).Unix(), // has expired
+				token.Claims = jwt.RegisteredClaims{
+					Audience:  []string{"test"},
+					ExpiresAt: jwt.NewNumericDate(time.Unix(0, 0)), // has expired
 					Issuer:    "http://localhost:" + port,
 				}
 				tokenStr, err := token.SignedString(privateKey)
 				assert.NoError(t, err)
 				refreshToken := jwt.New(jwt.SigningMethodRS256)
-				refreshToken.Claims = jwt.StandardClaims{
-					Audience:  "test",
-					ExpiresAt: time.Now().Add(5 * time.Minute).Unix(), // expires in the future
-					Issuer:    "http://localhost:" + port,
+				refreshToken.Claims = jwt.RegisteredClaims{
+					Audience: []string{"test"},
+					// expires in the future
+					ExpiresAt: jwt.NewNumericDate(time.Now().Add(5 *
+						time.Minute)),
+					Issuer: "http://localhost:" + port,
 				}
 				refreshTokenStr, err := refreshToken.SignedString(privateKey)
 				assert.NoError(t, err)
@@ -534,10 +538,12 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 			},
 			storedToken: func(port string) *oauth2.Token {
 				token := jwt.New(jwt.SigningMethodRS256)
-				token.Claims = jwt.StandardClaims{
-					Audience:  "test",
-					ExpiresAt: time.Now().Add(5 * time.Minute).Unix(), // expires in the future
-					Issuer:    "http://localhost:" + port,
+				token.Claims = jwt.RegisteredClaims{
+					Audience: []string{"test"},
+					// expires in the future
+					ExpiresAt: jwt.NewNumericDate(time.Now().Add(5 *
+						time.Minute)),
+					Issuer: "http://localhost:" + port,
 				}
 				tokenStr, err := token.SignedString(privateKey)
 				assert.NoError(t, err)
@@ -840,9 +846,10 @@ type Token struct {
 
 func newOIDCResponses(privateKey *rsa.PrivateKey, port string) oidcResponses {
 	jwtToken := jwt.New(jwt.SigningMethodRS256)
-	jwtToken.Claims = jwt.StandardClaims{
-		Audience:  "test",
-		ExpiresAt: time.Now().Add(5 * time.Minute).Unix(), // has expired
+	jwtToken.Claims = jwt.RegisteredClaims{
+		Audience: []string{"test"},
+		// has expired
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(5 * time.Minute)),
 		Issuer:    "http://localhost:" + port,
 	}
 	jwtSrt, _ := jwtToken.SignedString(privateKey)

@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/crewjam/saml"
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/mux"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -598,9 +598,7 @@ func (s *Provider) getUserIdFromRelayStateCookie(r *http.Request) (string, error
 	// The state is stored in a cookie, which has the relay state as the key and a JWT token containing the userID as the value
 	if relayState := r.Form.Get("RelayState"); relayState != "" {
 		relayStateCookie := s.clientState.GetState(r, relayState)
-		jwtParser := jwt.Parser{
-			ValidMethods: []string{jwt.SigningMethodHS256.Name},
-		}
+		jwtParser := newJWTParser()
 		token, err := jwtParser.Parse(relayStateCookie, func(t *jwt.Token) (interface{}, error) {
 			secretBlock := x509.MarshalPKCS1PrivateKey(s.serviceProvider.Key)
 			return secretBlock, nil
@@ -616,4 +614,8 @@ func (s *Provider) getUserIdFromRelayStateCookie(r *http.Request) (string, error
 	}
 
 	return userID, nil
+}
+
+func newJWTParser() *jwt.Parser {
+	return jwt.NewParser(jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Name}))
 }
