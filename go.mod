@@ -18,7 +18,7 @@ replace (
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
 	github.com/rancher/remotedialer => github.com/swastik959/remotedialer v0.0.0-20250923111636-90aabc0f59cc
-	github.com/rancher/shepherd => github.com/vardhaman22/shepherd v0.0.0-20250926055401-6e5ee90011b3
+	github.com/rancher/shepherd => github.com/vardhaman22/shepherd v0.0.0-20250926070708-13ccd0e790cb
 	github.com/rancher/steve => github.com/swastik959/steve v0.0.0-20250923112957-7cf216a2a663
 	github.com/rancher/system-upgrade-controller/pkg/apis => github.com/swastik959/system-upgrade-controller/pkg/apis v0.0.0-20250923125119-66ccdf6244a6
 	github.com/rancher/wrangler/v3 => github.com/swastik959/wrangler/v3 v3.0.0-20250923110430-072b1beab0de
