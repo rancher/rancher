@@ -50,6 +50,48 @@ We truncate at 63 chars because some Kubernetes name fields are limited to this 
 {{- end -}}
 
 {{/*
+Prepare the Rancher Image value w/ new fields as opt-in for now.
+*/}}
+{{ define "rancher.image" -}}
+{{ if .Values.rancherImage -}}
+{{ .Values.rancherImage -}}
+{{ else -}}
+{{ $reg := default "" (default .Values.systemDefaultRegistry .Values.image.registry) -}}
+{{ if eq "" $reg -}}
+{{ include "rancher.imageRepo" . -}}
+{{ else -}}
+{{ if hasSuffix "/" $reg -}}
+{{ printf "%s%s" $reg (include "rancher.imageRepo" .) -}}
+{{ else -}}
+{{ printf "%s/%s" $reg (include "rancher.imageRepo" .) -}}
+{{ end -}}
+{{ end -}}
+{{ end -}}
+{{ end -}}
+
+{{/*
+Prepare the Rancher Image repo value w/ new fields as opt-in for now.
+*/}}
+{{ define "rancher.imageRepo" -}}
+{{ default "rancher/rancher" .Values.image.repository -}}
+{{ end -}}
+
+
+{{/*
+Prepare the Rancher Image Tag value w/ new fields as opt-in for now.
+*/}}
+{{ define "rancher.imageTag" -}}
+{{ default .Chart.AppVersion (default .Values.image.tag (default "" .Values.rancherImageTag)) -}}
+{{ end -}}
+
+{{/*
+Prepare the Rancher Image Pull Policy value w/ new fields as opt-in for now.
+*/}}
+{{ define "rancher.imagePullPolicy" -}}
+{{ default "IfNotPresent" (default .Values.image.pullPolicy (default "" .Values.rancherImagePullPolicy)) -}}
+{{ end -}}
+
+{{/*
 Render Values in configurationSnippet
 */}}
 {{- define "configurationSnippet" -}}

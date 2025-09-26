@@ -71,8 +71,8 @@ spec:
       {{- toYaml .Values.extraTolerations | nindent 8 }}
       {{- end }}
       containers:
-      - image: {{ printf "%s%s" (include "system_default_registry" .) .Values.rancherImage }}:{{ default .Chart.AppVersion .Values.rancherImageTag }}
-        imagePullPolicy: {{ default "IfNotPresent" .Values.rancherImagePullPolicy }}
+      - image: "{{ template "rancher.image" . }}:{{ template "rancher.imageTag" . }}"
+        imagePullPolicy: {{ include "rancher.imagePullPolicy" . }}
         name: {{ template "rancher.name" . }}
         ports:
         - containerPort: 80
