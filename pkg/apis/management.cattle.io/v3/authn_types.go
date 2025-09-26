@@ -102,26 +102,47 @@ func (t *Token) GetExpiresAt() string {
 }
 
 // +genclient
-// +kubebuilder:skipversion
 // +genclient:nonNamespaced
+// +kubebuilder:resource:scope=Cluster
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// User represents a user in Rancher
 type User struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
+	// DisplayName is the user friendly name shown in the UI
+	// +optional
 	DisplayName string `json:"displayName,omitempty"`
+	// Description provides a brief summary about the user
+	// +optional
 	Description string `json:"description"`
-	Username    string `json:"username,omitempty"`
-	// Deprecated. Password are stored in secrets in the cattle-local-user-passwords namespace.
-	Password           string   `json:"password,omitempty" norman:"writeOnly,noupdate"`
-	MustChangePassword bool     `json:"mustChangePassword,omitempty"`
-	PrincipalIDs       []string `json:"principalIds,omitempty" norman:"type=array[reference[principal]]"`
-	// Deprecated. Me is an old field only used in the norman API.
-	Me      bool       `json:"me,omitempty" norman:"nocreate,noupdate"`
-	Enabled *bool      `json:"enabled,omitempty" norman:"default=true"`
-	Spec    UserSpec   `json:"spec,omitempty"`
-	Status  UserStatus `json:"status"`
+	// Username is the unique login identifier for the user
+	// +optional
+	Username string `json:"username,omitempty"`
+	// Deprecated. Password are stored in secrets in the cattle-local-user-passwords namespace
+	// +optional
+	Password string `json:"password,omitempty" norman:"writeOnly,noupdate"`
+	// MustChangePassword is a flag that, if true, forces the user to change their
+	// password upon their next login.
+	// +optional
+	MustChangePassword bool `json:"mustChangePassword,omitempty"`
+	// PrincipalIDs lists the authentication provider identities (e.g. GitHub, Keycloak or Active Directory)
+	// that are associated with this user account.
+	// +optional
+	PrincipalIDs []string `json:"principalIds,omitempty" norman:"type=array[reference[principal]]"`
+	// Deprecated. Me is an old field only used in the norman API
+	// +optional
+	Me bool `json:"me,omitempty" norman:"nocreate,noupdate"`
+	// Enabled indicates whether the user account is active
+	// +optional
+	Enabled *bool `json:"enabled,omitempty" norman:"default=true"`
+	// Spec holds the desired state and configuration for the user
+	// +optional
+	Spec UserSpec `json:"spec,omitempty"`
+	// Status contains the most recent observed state of the user
+	// +optional
+	Status UserStatus `json:"status"`
 }
 
 // IsSystem returns true if the user is a system user.
@@ -141,6 +162,7 @@ func (u *User) IsDefaultAdmin() bool {
 }
 
 type UserStatus struct {
+	// +optional
 	Conditions []UserCondition `json:"conditions"`
 }
 
