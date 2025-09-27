@@ -10,26 +10,13 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/features"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-func getAuthProviderName(principalID string) string {
-	parts := strings.Split(principalID, "://")
-	externalType := parts[0]
-
-	providerParts := strings.Split(externalType, "_")
-	return providerParts[0]
-}
-
-func getUserID(principalID string) string {
-	parts := strings.Split(principalID, "://")
-	return parts[1]
-}
 
 func SplitTokenParts(tokenID string) (string, string) {
 	parts := strings.Split(tokenID, ":")
@@ -39,7 +26,7 @@ func SplitTokenParts(tokenID string) (string, string) {
 	return parts[0], parts[1]
 }
 
-func SetTokenExpiresAt(token *v3.Token) {
+func SetTokenExpiresAt(token *apiv3.Token) {
 	if token.TTLMillis != 0 {
 		created := token.ObjectMeta.CreationTimestamp.Time
 		ttlDuration := time.Duration(token.TTLMillis) * time.Millisecond
@@ -48,7 +35,7 @@ func SetTokenExpiresAt(token *v3.Token) {
 	}
 }
 
-func IsExpired(token v3.Token) bool {
+func IsExpired(token apiv3.Token) bool {
 	if token.TTLMillis == 0 {
 		return false
 	}
@@ -61,12 +48,17 @@ func IsExpired(token v3.Token) bool {
 }
 
 // IsIdleExpired checks if the idle session timeout was reached since last update.
-func IsIdleExpired(token v3.Token, lastTimeActivity metav1.Time) bool {
+func IsIdleExpired(token apiv3.Token, now time.Time) bool {
 	if token.ActivityLastSeenAt.IsZero() {
 		return false
 	}
 
-	return token.ActivityLastSeenAt.Compare(lastTimeActivity.Time) <= 0
+	idleTimeout := settings.AuthUserSessionIdleTTLMinutes.GetInt()
+	if idleTimeout == 0 {
+		return false
+	}
+
+	return now.After(token.ActivityLastSeenAt.Add(time.Duration(idleTimeout) * time.Minute))
 }
 
 func GetTokenAuthFromRequest(req *http.Request) string {
@@ -100,7 +92,7 @@ func GetTokenAuthFromRequest(req *http.Request) string {
 	return tokenAuthValue
 }
 
-func ConvertTokenResource(schema *types.Schema, token v3.Token) (map[string]interface{}, error) {
+func ConvertTokenResource(schema *types.Schema, token apiv3.Token) (map[string]interface{}, error) {
 	tokenData, err := convert.EncodeToMap(token)
 	if err != nil {
 		return nil, err
@@ -114,7 +106,7 @@ func ConvertTokenResource(schema *types.Schema, token v3.Token) (map[string]inte
 	return tokenData, nil
 }
 
-func GetKubeConfigToken(userName, responseType string, userMGR user.Manager, userPrincipal v3.Principal) (*v3.Token, string, error) {
+func GetKubeConfigToken(userName, responseType string, userMGR user.Manager, userPrincipal apiv3.Principal) (*apiv3.Token, string, error) {
 	// create kubeconfig expiring tokens if responseType=kubeconfig in login action vs login tokens for responseType=json
 	clusterID := extractClusterIDFromResponseType(responseType)
 
@@ -141,7 +133,7 @@ func extractClusterIDFromResponseType(responseType string) string {
 }
 
 // Given a stored token with hashed key, check if the provided (unhashed) tokenKey matches and is valid
-func VerifyToken(storedToken *v3.Token, tokenName, tokenKey string) (int, error) {
+func VerifyToken(storedToken *apiv3.Token, tokenName, tokenKey string) (int, error) {
 	invalidAuthTokenErr := errors.New("Invalid auth token value")
 	if storedToken == nil || storedToken.Name != tokenName {
 		return http.StatusUnprocessableEntity, invalidAuthTokenErr
@@ -165,14 +157,14 @@ func VerifyToken(storedToken *v3.Token, tokenName, tokenKey string) (int, error)
 		return http.StatusGone, errors.New("must authenticate")
 	}
 
-	if IsIdleExpired(*storedToken, metav1.Now()) {
+	if IsIdleExpired(*storedToken, time.Now()) {
 		return http.StatusGone, errors.New("must authenticate, idle session timeout expired")
 	}
 	return http.StatusOK, nil
 }
 
 // ConvertTokenKeyToHash takes a token with an un-hashed key and converts it to a hashed key
-func ConvertTokenKeyToHash(token *v3.Token) error {
+func ConvertTokenKeyToHash(token *apiv3.Token) error {
 	if !features.TokenHashing.Enabled() {
 		return nil
 	}
