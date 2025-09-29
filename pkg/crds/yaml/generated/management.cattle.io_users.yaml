@@ -64,10 +64,6 @@ spec:
             items:
               type: string
             type: array
-          spec:
-            description: Spec holds the desired state and configuration for the user.
-              Empty and not in use.
-            type: object
           status:
             description: Status contains the most recent observed state of the user.
             properties:

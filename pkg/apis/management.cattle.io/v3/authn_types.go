@@ -137,9 +137,6 @@ type User struct {
 	// Enabled indicates whether the user account is active.
 	// +optional
 	Enabled *bool `json:"enabled,omitempty" norman:"default=true"`
-	// Spec holds the desired state and configuration for the user. Empty and not in use.
-	// +optional
-	Spec UserSpec `json:"spec,omitempty"`
 	// Status contains the most recent observed state of the user.
 	// +optional
 	Status UserStatus `json:"status"`
@@ -180,8 +177,6 @@ type UserCondition struct {
 	// Human-readable message indicating details about last transition
 	Message string `json:"message,omitempty"`
 }
-
-type UserSpec struct{}
 
 // +genclient
 // +kubebuilder:skipversion
