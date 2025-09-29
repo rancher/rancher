@@ -23,7 +23,7 @@ type reconcileController struct {
 	projects   wmgmtv3.ProjectClient
 }
 
-func (r *reconcileController) reconcileNamespaces(key string, p *apiv3.Project) (runtime.Object, error) {
+func (r *reconcileController) reconcileNamespaces(_ string, p *apiv3.Project) (runtime.Object, error) {
 	if p == nil || p.DeletionTimestamp != nil {
 		return nil, nil
 	}
