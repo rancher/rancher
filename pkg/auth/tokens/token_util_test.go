@@ -4,9 +4,11 @@ import (
 	"testing"
 	"time"
 
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/features"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -20,14 +22,14 @@ func TestVerifyToken(t *testing.T) {
 	// SHA3 hash of tokenKey
 	hashedTokenKey := "$3:1:uFrxm43ggfw:zsN1zEFC7SvABTdR58o7yjIqfrI4cQ/HSYz3jBwwVnx5X+/ph4etGDIU9dvIYuy1IvnYUVe6a/Ar95xE+gfjhA"
 	invalidHashToken := "$-1:111:111"
-	unhashedToken := v3.Token{
+	unhashedToken := apiv3.Token{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: tokenName,
 		},
 		Token:     tokenKey,
 		TTLMillis: 0,
 	}
-	hashedToken := v3.Token{
+	hashedToken := apiv3.Token{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: hashedTokenName,
 			Annotations: map[string]string{
@@ -42,7 +44,7 @@ func TestVerifyToken(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		token     *v3.Token
+		token     *apiv3.Token
 		tokenName string
 		tokenKey  string
 
@@ -134,7 +136,7 @@ func TestVerifyToken(t *testing.T) {
 
 func TestConvertTokenKeyToHash(t *testing.T) {
 	plaintextToken := "cccccccccccccccccccccccccccccccccccccccccccccccccccccc"
-	token := v3.Token{
+	token := apiv3.Token{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-token",
 		},
@@ -144,7 +146,7 @@ func TestConvertTokenKeyToHash(t *testing.T) {
 	tests := []struct {
 		name                string
 		tokenHashingEnabled bool
-		token               *v3.Token
+		token               *apiv3.Token
 
 		wantError            bool
 		wantHashedAnnotation bool
@@ -177,7 +179,7 @@ func TestConvertTokenKeyToHash(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			// token will be modified by the consuming function, deep copy to avoid changing the original token
 			features.TokenHashing.Set(test.tokenHashingEnabled)
-			var testToken *v3.Token
+			var testToken *apiv3.Token
 			if test.token != nil {
 				testToken = test.token.DeepCopy()
 			}
@@ -207,7 +209,7 @@ func TestConvertTokenKeyToHash(t *testing.T) {
 	}
 }
 
-func expireToken(token *v3.Token) *v3.Token {
+func expireToken(token *apiv3.Token) *apiv3.Token {
 	newToken := token.DeepCopy()
 	newToken.CreationTimestamp = metav1.NewTime(time.Now().Add(-time.Second * 10))
 	newToken.TTLMillis = 1
@@ -216,57 +218,56 @@ func expireToken(token *v3.Token) *v3.Token {
 
 func TestIsIdleExpired(t *testing.T) {
 	t.Parallel()
-	type args struct {
-		token            v3.Token
-		lastTimeActivity metav1.Time
-	}
+
+	now := metav1.Now()
+	idleTimeout := settings.AuthUserSessionIdleTTLMinutes.GetInt()
+
+	notExpired := metav1.NewTime(now.Add(-time.Duration(idleTimeout) * time.Minute).Add(time.Second))
+	expired := metav1.NewTime(notExpired.Add(-2 * time.Second))
+	zero := metav1.Time{}
+
 	tests := []struct {
-		name string
-		args args
-		want bool
+		desc               string
+		activityLastSeenAt *metav1.Time
+		expired            bool
 	}{
 		{
-			name: "should not expire",
-			args: args{
-				token: v3.Token{
-					ActivityLastSeenAt: &metav1.Time{
-						Time: time.Date(2025, 2, 5, 13, 10, 0, 0, &time.Location{}),
-					},
-				},
-				lastTimeActivity: metav1.Date(2025, 2, 5, 13, 9, 0, 0, &time.Location{}),
-			},
-			want: false,
+			desc:               "no activity set",
+			activityLastSeenAt: &notExpired,
 		},
 		{
-			name: "should expire",
-			args: args{
-				token: v3.Token{
-					ActivityLastSeenAt: &metav1.Time{
-						Time: time.Date(2025, 2, 5, 13, 10, 0, 0, &time.Location{}),
-					},
-				},
-				lastTimeActivity: metav1.Date(2025, 2, 5, 13, 11, 0, 0, &time.Location{}),
-			},
-			want: true,
+			desc:               "should not expire",
+			activityLastSeenAt: &notExpired,
 		},
 		{
-			name: "should expire (equal values)",
-			args: args{
-				token: v3.Token{
-					ActivityLastSeenAt: &metav1.Time{
-						Time: time.Date(2025, 2, 5, 13, 10, 0, 0, &time.Location{}),
-					},
-				},
-				lastTimeActivity: metav1.Date(2025, 2, 5, 13, 10, 0, 0, &time.Location{}),
-			},
-			want: true,
+			desc:               "about to expire",
+			activityLastSeenAt: &now,
+		},
+		{
+			desc:               "activity not set",
+			activityLastSeenAt: &notExpired,
+		},
+		{
+			desc:               "zero value",
+			activityLastSeenAt: &zero,
+		},
+		{
+			desc:               "expired",
+			activityLastSeenAt: &expired,
+			expired:            true,
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := IsIdleExpired(tt.args.token, tt.args.lastTimeActivity); got != tt.want {
-				t.Errorf("IsIdleExpired() = %v, want %v", got, tt.want)
+		t.Run(tt.desc, func(t *testing.T) {
+			token := &apiv3.Token{}
+			if tt.activityLastSeenAt != nil {
+				token.ActivityLastSeenAt = tt.activityLastSeenAt
 			}
+
+			t.Log("activity", token.ActivityLastSeenAt.Format(time.RFC3339))
+			t.Log("now", now.Format(time.RFC3339))
+
+			assert.Equal(t, tt.expired, IsIdleExpired(token, now.Time))
 		})
 	}
 }

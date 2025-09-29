@@ -2,6 +2,7 @@ package v3
 
 import (
 	"strings"
+	"time"
 
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types"
@@ -99,6 +100,18 @@ func (t *Token) GetCreationTime() metav1.Time {
 
 func (t *Token) GetExpiresAt() string {
 	return t.ExpiresAt
+}
+
+func (t *Token) GetIsExpired() bool {
+	if t.TTLMillis == 0 {
+		return false
+	}
+
+	created := t.ObjectMeta.CreationTimestamp.Time
+	durationElapsed := time.Since(created)
+
+	ttlDuration := time.Duration(t.TTLMillis) * time.Millisecond
+	return durationElapsed.Seconds() >= ttlDuration.Seconds()
 }
 
 // +genclient

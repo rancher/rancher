@@ -84,7 +84,7 @@ func (h *clusterAuthTokenHandler) sync(key string, clusterAuthToken *clusterv3.C
 		return clusterAuthToken, nil // Nothing to do.
 	}
 
-	if tokens.IsExpired(*token) {
+	if tokens.IsExpired(token) {
 		return clusterAuthToken, nil // Should not update expired token.
 	}
 

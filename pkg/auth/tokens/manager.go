@@ -238,7 +238,7 @@ func (m *Manager) getTokens(tokenAuthValue string) ([]v3.Token, int, error) {
 	}
 
 	for _, t := range tokenList.Items {
-		if IsExpired(t) {
+		if IsExpired(&t) {
 			t.Expired = true
 		}
 		tokens = append(tokens, t)
@@ -277,7 +277,7 @@ func (m *Manager) getTokenByID(tokenAuthValue string, tokenID string) (v3.Token,
 		return v3.Token{}, 404, fmt.Errorf("%v not found", tokenID)
 	}
 
-	if IsExpired(*token) {
+	if IsExpired(token) {
 		token.Expired = true
 	}
 

@@ -241,11 +241,11 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 		return fmt.Errorf("unknown token type")
 	}(); err != nil {
 		// Log the error and move on to avoid failing the request.
-		logrus.Errorf("Error updating lastUsedAt for token %s: %v", token.GetName(), err)
+		logrus.Errorf("auth: Error updating lastUsedAt for token %s: %v", token.GetName(), err)
 		return authResp, nil
 	}
 
-	logrus.Debugf("Updated lastUsedAt for token %s", token.GetName())
+	logrus.Debugf("auth: Updated lastUsedAt for token %s", token.GetName())
 	return authResp, nil
 }
 
@@ -344,13 +344,15 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 	}
 
 	if _, err := tokens.VerifyToken(storedToken, tokenName, tokenKey); err != nil {
+		logrus.Debugf("auth: Error verifying token %s: %v", tokenName, err)
 		return nil, errors.Wrapf(ErrMustAuthenticate, "failed to verify token: %v", err)
 	}
 
 	return storedToken, nil
 }
 
-// Given a stored token with hashed key, check if the provided (unhashed) tokenKey matches and is valid
+// Given a stored token with hashed key, check if the provided (unhashed) tokenKey matches and is valid.
+// This must match the logic of [tokens.VerifyToken].
 func extVerifyToken(storedToken *ext.Token, tokenName, tokenKey string) (int, error) {
 	invalidAuthTokenErr := errors.New("invalid token")
 
@@ -371,8 +373,13 @@ func extVerifyToken(storedToken *ext.Token, tokenName, tokenKey string) (int, er
 		return http.StatusUnprocessableEntity, invalidAuthTokenErr
 	}
 
-	if storedToken.Status.Expired {
-		return http.StatusGone, errors.New("must authenticate")
+	if tokens.IsExpired(storedToken) {
+		return http.StatusGone, errors.New("must authenticate, expired")
 	}
+
+	if tokens.IsIdleExpired(storedToken, time.Now()) {
+		return http.StatusGone, errors.New("must authenticate, idle session timeout expired")
+	}
+
 	return http.StatusOK, nil
 }
