@@ -27,13 +27,13 @@ spec:
               More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           description:
-            description: Description provides a brief summary about the user
+            description: Description provides a brief summary about the user.
             type: string
           displayName:
-            description: DisplayName is the user friendly name shown in the UI
+            description: DisplayName is the user friendly name shown in the UI.
             type: string
           enabled:
-            description: Enabled indicates whether the user account is active
+            description: Enabled indicates whether the user account is active.
             type: boolean
           kind:
             description: |-
@@ -44,7 +44,7 @@ spec:
               More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           me:
-            description: Deprecated. Me is an old field only used in the norman API
+            description: Deprecated. Only used by /v3 Rancher API.
             type: boolean
           metadata:
             type: object
@@ -55,7 +55,7 @@ spec:
             type: boolean
           password:
             description: Deprecated. Password are stored in secrets in the cattle-local-user-passwords
-              namespace
+              namespace.
             type: string
           principalIds:
             description: |-
@@ -65,10 +65,11 @@ spec:
               type: string
             type: array
           spec:
-            description: Spec holds the desired state and configuration for the user
+            description: Spec holds the desired state and configuration for the user.
+              Empty and not in use.
             type: object
           status:
-            description: Status contains the most recent observed state of the user
+            description: Status contains the most recent observed state of the user.
             properties:
               conditions:
                 items:
@@ -100,7 +101,7 @@ spec:
                 type: array
             type: object
           username:
-            description: Username is the unique login identifier for the user
+            description: Username is the unique login identifier for the user.
             type: string
         type: object
     served: true
