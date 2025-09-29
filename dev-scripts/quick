@@ -9,7 +9,7 @@ set -x
 COMMIT=$(git rev-parse --short HEAD)
 TAG="${TAG:-$(yq '.env.TAG | sub("-.*", "")' < .github/workflows/pull-request.yml)-${COMMIT}}-head"
 OS="${OS:-linux}"
-ARCH="${ARCH:-amd64}"
+ARCH="${ARCH:-arm64}"
 REPO="${REPO:-rancher}"
 CATTLE_K3S_VERSION=$(grep -m1 'ENV CATTLE_K3S_VERSION' package/Dockerfile | awk '{print $3}')
 CATTLE_KDM_BRANCH=$(grep -m1 'ARG CATTLE_KDM_BRANCH=' package/Dockerfile | cut -d '=' -f2)
