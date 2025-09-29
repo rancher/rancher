@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/settings"
@@ -35,21 +36,16 @@ func SetTokenExpiresAt(token *apiv3.Token) {
 	}
 }
 
-func IsExpired(token apiv3.Token) bool {
-	if token.TTLMillis == 0 {
-		return false
-	}
-
-	created := token.ObjectMeta.CreationTimestamp.Time
-	durationElapsed := time.Since(created)
-
-	ttlDuration := time.Duration(token.TTLMillis) * time.Millisecond
-	return durationElapsed.Seconds() >= ttlDuration.Seconds()
+// IsExpired returns true if the token is expired.
+func IsExpired(token accessor.TokenAccessor) bool {
+	return token.GetIsExpired()
 }
 
-// IsIdleExpired checks if the idle session timeout was reached since last update.
-func IsIdleExpired(token apiv3.Token, now time.Time) bool {
-	if token.ActivityLastSeenAt.IsZero() {
+// IsIdleExpired returns true if last recorded user activity is past the idle timeout.
+func IsIdleExpired(token accessor.TokenAccessor, now time.Time) bool {
+	activityLastSeen := token.GetLastActivitySeen()
+
+	if activityLastSeen.IsZero() {
 		return false
 	}
 
@@ -58,7 +54,7 @@ func IsIdleExpired(token apiv3.Token, now time.Time) bool {
 		return false
 	}
 
-	return now.After(token.ActivityLastSeenAt.Add(time.Duration(idleTimeout) * time.Minute))
+	return now.After(activityLastSeen.Add(time.Duration(idleTimeout) * time.Minute))
 }
 
 func GetTokenAuthFromRequest(req *http.Request) string {
@@ -153,13 +149,14 @@ func VerifyToken(storedToken *apiv3.Token, tokenName, tokenKey string) (int, err
 			return http.StatusUnprocessableEntity, invalidAuthTokenErr
 		}
 	}
-	if IsExpired(*storedToken) {
-		return http.StatusGone, errors.New("must authenticate")
+	if IsExpired(storedToken) {
+		return http.StatusGone, errors.New("must authenticate, expired")
 	}
 
-	if IsIdleExpired(*storedToken, time.Now()) {
+	if IsIdleExpired(storedToken, time.Now()) {
 		return http.StatusGone, errors.New("must authenticate, idle session timeout expired")
 	}
+
 	return http.StatusOK, nil
 }
 

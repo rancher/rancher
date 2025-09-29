@@ -259,7 +259,7 @@ func TestIsIdleExpired(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.desc, func(t *testing.T) {
-			token := apiv3.Token{}
+			token := &apiv3.Token{}
 			if tt.activityLastSeenAt != nil {
 				token.ActivityLastSeenAt = tt.activityLastSeenAt
 			}

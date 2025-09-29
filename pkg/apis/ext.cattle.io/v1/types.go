@@ -213,6 +213,10 @@ func (t *Token) GetExpiresAt() string {
 	return t.Status.ExpiresAt
 }
 
+func (t *Token) GetIsExpired() bool {
+	return t.Status.Expired
+}
+
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
