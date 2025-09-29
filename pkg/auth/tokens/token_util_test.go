@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -263,12 +264,10 @@ func TestIsIdleExpired(t *testing.T) {
 				token.ActivityLastSeenAt = tt.activityLastSeenAt
 			}
 
-			t.Log("now", now.Time.Format(time.RFC3339))
 			t.Log("activity", token.ActivityLastSeenAt.Format(time.RFC3339))
+			t.Log("now", now.Format(time.RFC3339))
 
-			if got, want := IsIdleExpired(token, now.Time), tt.expired; got != want {
-				t.Errorf("Expected %v got %v", want, got)
-			}
+			assert.Equal(t, tt.expired, IsIdleExpired(token, now.Time))
 		})
 	}
 }
