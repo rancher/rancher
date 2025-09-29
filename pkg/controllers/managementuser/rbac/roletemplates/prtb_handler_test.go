@@ -30,7 +30,7 @@ var (
 	defaultRT = v3.RoleTemplate{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-rt"},
 	}
-	promotedCRName = "test-rt-promoted"
+	promotedCRName = "test-rt-promoted-aggregator"
 	errDefault     = fmt.Errorf("error")
 	errNotFound    = apierrors.NewNotFound(schema.GroupResource{}, "error")
 )

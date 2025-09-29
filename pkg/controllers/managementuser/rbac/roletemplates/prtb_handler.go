@@ -407,7 +407,7 @@ func (p *prtbHandler) ensureOnlyDesiredClusterRoleBindingsExists(crbs []*rbacv1.
 
 // doesRoleTemplateHavePromotedRules checks if the PRTB's RoleTemplate has a ClusterRole for promoted rules.
 func (p *prtbHandler) doesRoleTemplateHavePromotedRules(rt *v3.RoleTemplate) (bool, error) {
-	_, err := p.crClient.Get(rbac.PromotedClusterRoleNameFor(rt.Name), metav1.GetOptions{})
+	_, err := p.crClient.Get(rbac.AggregatedClusterRoleNameFor(rbac.PromotedClusterRoleNameFor(rt.Name)), metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return false, err
 	}
