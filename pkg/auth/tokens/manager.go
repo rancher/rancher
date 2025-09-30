@@ -128,7 +128,7 @@ func (m *Manager) createDerivedToken(jsonInput clientv3.Token, tokenAuthValue st
 	}
 
 	var unhashedTokenKey string
-	derivedToken := apiv3.Token{
+	derivedToken := &apiv3.Token{
 		UserPrincipal: token.UserPrincipal,
 		IsDerived:     true,
 		TTLMillis:     tokenTTL.Milliseconds(),
@@ -138,18 +138,18 @@ func (m *Manager) createDerivedToken(jsonInput clientv3.Token, tokenAuthValue st
 		Description:   jsonInput.Description,
 		ClusterName:   jsonInput.ClusterID,
 	}
-	derivedToken, unhashedTokenKey, err = m.createToken(&derivedToken)
+	derivedToken, unhashedTokenKey, err = m.createToken(derivedToken)
 
-	return derivedToken, unhashedTokenKey, 0, err
+	return *derivedToken, unhashedTokenKey, 0, err
 
 }
 
 // createToken returns the token object and it's unhashed token key, which is stored hashed
-func (m *Manager) createToken(k8sToken *apiv3.Token) (apiv3.Token, string, error) {
+func (m *Manager) createToken(k8sToken *apiv3.Token) (*apiv3.Token, string, error) {
 	key, err := randomtoken.Generate()
 	if err != nil {
 		logrus.Errorf("Failed to generate token key: %v", err)
-		return apiv3.Token{}, "", errors.New("failed to generate token key")
+		return nil, "", errors.New("failed to generate token key")
 	}
 
 	if k8sToken.ObjectMeta.Labels == nil {
@@ -162,15 +162,15 @@ func (m *Manager) createToken(k8sToken *apiv3.Token) (apiv3.Token, string, error
 	k8sToken.ObjectMeta.GenerateName = "token-"
 	err = ConvertTokenKeyToHash(k8sToken)
 	if err != nil {
-		return apiv3.Token{}, "", err
+		return nil, "", err
 	}
 	createdToken, err := m.tokens.Create(k8sToken)
 
 	if err != nil {
-		return apiv3.Token{}, "", err
+		return nil, "", err
 	}
 
-	return *createdToken, key, nil
+	return createdToken, key, nil
 }
 
 func (m *Manager) updateToken(token *apiv3.Token) (*apiv3.Token, error) {
@@ -294,7 +294,6 @@ func (m *Manager) deriveToken(request *types.APIContext) error {
 		return httperror.NewAPIError(httperror.InvalidFormat, fmt.Sprintf("%s", err))
 	}
 
-	// create derived token
 	token, unhashedTokenKey, status, err := m.createDerivedToken(jsonInput, tokenAuthValue)
 	if err != nil {
 		logrus.Errorf("deriveToken failed with error: %v", err)
@@ -436,15 +435,16 @@ func (m *Manager) getTokenFromRequest(request *types.APIContext) error {
 		return err
 	}
 
-	//getToken
 	token, status, err := m.getTokenByID(tokenAuthValue, tokenID)
 	if err != nil {
-		logrus.Errorf("GetToken failed with error: %v", err)
-		if status == 0 {
+		switch status {
+		case 0:
 			status = http.StatusInternalServerError
-		} else if status == 410 {
+		case 410:
 			status = http.StatusNotFound
+		default:
 		}
+		logrus.Errorf("GetToken failed with error: %v", err)
 		return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
 	}
 	token.Current = currentAuthToken.Name == token.Name && !currentAuthToken.IsDerived
@@ -561,17 +561,17 @@ func (m *Manager) UpdateSecret(userID, provider, secret string) error {
 // PerUserCacheProviders is a set of provider names for which the token manager creates a per-user login token.
 var PerUserCacheProviders = []string{"github", "azuread", "googleoauth", "oidc", "keycloakoidc"}
 
-func (m *Manager) NewLoginToken(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, ttl int64, description string) (apiv3.Token, string, error) {
+func (m *Manager) NewLoginToken(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, ttl int64, description string) (*apiv3.Token, string, error) {
 	provider := userPrincipal.Provider
 	// Providers that use oauth need to create a secret for storing the access token.
 	if slices.Contains(PerUserCacheProviders, provider) && providerToken != "" {
 		err := m.CreateSecret(userID, provider, providerToken)
 		if err != nil {
-			return apiv3.Token{}, "", fmt.Errorf("unable to create secret: %s", err)
+			return nil, "", fmt.Errorf("unable to create secret: %s", err)
 		}
 	}
 
-	token := &apiv3.Token{
+	return m.createToken(&apiv3.Token{
 		UserPrincipal: userPrincipal,
 		IsDerived:     false,
 		TTLMillis:     ttl,
@@ -583,9 +583,7 @@ func (m *Manager) NewLoginToken(userID string, userPrincipal apiv3.Principal, gr
 				TokenKindLabel: "session",
 			},
 		},
-	}
-
-	return m.createToken(token)
+	})
 }
 
 func (m *Manager) UpdateToken(token *apiv3.Token) (*apiv3.Token, error) {

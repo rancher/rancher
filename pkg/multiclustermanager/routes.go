@@ -52,7 +52,12 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 		return nil, err
 	}
 
-	publicAPI, err := publicapi.NewHandler(ctx, scaledContext, norman.ConfigureAPIUI)
+	v3PublicAPI, err := publicapi.NewV3Handler(ctx, scaledContext, norman.ConfigureAPIUI)
+	if err != nil {
+		return nil, err
+	}
+
+	v1PublicAPI, err := publicapi.NewV1Handler(ctx, scaledContext)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +101,8 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	unauthed.PathPrefix("/v1-{prefix}-release/channel").Handler(channelserver)
 	unauthed.PathPrefix("/v1-{prefix}-release/release").Handler(channelserver)
 	unauthed.PathPrefix("/v1-saml").Handler(saml.AuthHandler())
-	unauthed.PathPrefix("/v3-public").Handler(publicAPI)
+	unauthed.PathPrefix("/v3-public").Handler(v3PublicAPI)
+	unauthed.PathPrefix("/v1-public").Handler(v1PublicAPI)
 
 	// Authenticated routes
 	impersonatingAuth := requests.NewImpersonatingAuth(scaledContext.Wrangler, sar.NewSubjectAccessReview(clusterManager))

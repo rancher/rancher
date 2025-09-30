@@ -68,7 +68,13 @@ func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext, 
 		return nil, err
 	}
 
-	publicAPI, err := publicapi.NewHandler(ctx, scaledContext, norman.ConfigureAPIUI)
+	// Depricated. Use /v1-public instead.
+	v3PublicAPI, err := publicapi.NewV3Handler(ctx, scaledContext, norman.ConfigureAPIUI)
+	if err != nil {
+		return nil, err
+	}
+
+	v1PublicAPI, err := publicapi.NewV1Handler(ctx, scaledContext)
 	if err != nil {
 		return nil, err
 	}
@@ -85,8 +91,9 @@ func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext, 
 	logrus.Infof("Configuring auth server API body limit to %v bytes", apiLimit)
 
 	limitingHandler := utils.APIBodyLimitingHandler(apiLimit)
-	root.PathPrefix("/v3-public").Handler(limitingHandler(publicAPI))
 	root.PathPrefix("/v1-saml").Handler(limitingHandler(saml))
+	root.PathPrefix("/v3-public").Handler(v3PublicAPI) // Deprecated. Use /v1-public instead.
+	root.PathPrefix("/v1-public").Handler(v1PublicAPI)
 	root.NotFoundHandler = privateAPI
 
 	return func(next http.Handler) http.Handler {

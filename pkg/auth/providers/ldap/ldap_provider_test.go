@@ -1,7 +1,6 @@
 package ldap
 
 import (
-	"context"
 	"crypto/x509"
 	"reflect"
 	"testing"
@@ -79,7 +78,6 @@ func TestGetBasicLogin(t *testing.T) {
 
 func TestLdapProviderGetLDAPConfig(t *testing.T) {
 	type fields struct {
-		ctx                   context.Context
 		secrets               wcorev1.SecretController
 		userMGR               user.Manager
 		tokenMGR              *tokens.Manager
@@ -177,7 +175,6 @@ func TestLdapProviderGetLDAPConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			m := mockGenericClient{ObjectMap: tt.objectMap}
 			p := &ldapProvider{
-				ctx:                   tt.fields.ctx,
 				secrets:               tt.fields.secrets,
 				userMGR:               tt.fields.userMGR,
 				tokenMGR:              tt.fields.tokenMGR,

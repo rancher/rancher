@@ -1,6 +1,7 @@
 package googleoauth
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -273,7 +274,9 @@ func (g *googleOauthProvider) getdirectoryServiceFromStoredToken(storedOauthToke
 	if err != nil {
 		return nil, err
 	}
-	adminSvc, err := g.getDirectoryService(g.ctx, config.AdminEmail, []byte(config.ServiceAccountCredential), oauth2Config.TokenSource(g.ctx, &oauthToken))
+
+	ctx := context.TODO()
+	adminSvc, err := g.getDirectoryService(ctx, config.AdminEmail, []byte(config.ServiceAccountCredential), oauth2Config.TokenSource(ctx, &oauthToken))
 	if err != nil {
 		return nil, err
 	}

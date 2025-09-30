@@ -1,7 +1,6 @@
 package github
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -136,7 +135,6 @@ func TestSearchPrincipals(t *testing.T) {
 	}
 
 	provider := ghProvider{
-		ctx:          context.Background(),
 		githubClient: &GClient{httpClient: srv.Client()},
 		getConfig:    func() (*v32.GithubConfig, error) { return config, nil },
 		userMGR:      userManager,
@@ -324,7 +322,6 @@ func TestSearchPrincipalsExt(t *testing.T) {
 	}
 
 	provider := ghProvider{
-		ctx:          context.Background(),
 		githubClient: &GClient{httpClient: srv.Client()},
 		getConfig:    func() (*v32.GithubConfig, error) { return config, nil },
 		userMGR:      userManager,

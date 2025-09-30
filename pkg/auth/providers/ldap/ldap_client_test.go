@@ -5,11 +5,12 @@ import (
 	"testing"
 
 	ldapv3 "github.com/go-ldap/ldap/v3"
-	"github.com/rancher/norman/httperror"
+	"github.com/rancher/apiserver/pkg/apierror"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	ldapFakes "github.com/rancher/rancher/pkg/auth/providers/common/ldap"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	userMocks "github.com/rancher/rancher/pkg/user/mocks"
+	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -209,9 +210,9 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 		_, _, err := provider.loginUser(ldapConn, &credentials, &config)
 		require.Error(t, err)
 
-		herr, ok := err.(*httperror.APIError)
+		herr, ok := err.(*apierror.APIError)
 		require.True(t, ok)
-		require.Equal(t, httperror.Unauthorized, herr.Code)
+		require.Equal(t, validation.Unauthorized, herr.Code)
 
 		require.Len(t, boundCredentials, 1)
 		assert.Equal(t, v3.BasicLogin{Username: saDN, Password: saPassword}, boundCredentials[0])
@@ -258,9 +259,9 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 		_, _, err := provider.loginUser(ldapConn, &credentials, &config)
 		require.Error(t, err)
 
-		herr, ok := err.(*httperror.APIError)
+		herr, ok := err.(*apierror.APIError)
 		require.True(t, ok)
-		require.Equal(t, httperror.PermissionDenied, herr.Code)
+		require.Equal(t, validation.PermissionDenied, herr.Code)
 
 		require.Len(t, boundCredentials, 3)
 	})
@@ -388,9 +389,9 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 		_, _, err := provider.loginUser(ldapConn, &credentials, &config)
 		require.Error(t, err)
 
-		herr, ok := err.(*httperror.APIError)
+		herr, ok := err.(*apierror.APIError)
 		require.True(t, ok)
-		require.Equal(t, httperror.Unauthorized, herr.Code)
+		require.Equal(t, validation.Unauthorized, herr.Code)
 
 		require.Len(t, boundCredentials, 1)
 		assert.Equal(t, v3.BasicLogin{Username: saDN, Password: saPassword}, boundCredentials[0])
@@ -408,9 +409,9 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 		_, _, err := provider.loginUser(ldapConn, &credentials, &config)
 		require.Error(t, err)
 
-		herr, ok := err.(*httperror.APIError)
+		herr, ok := err.(*apierror.APIError)
 		require.True(t, ok)
-		require.Equal(t, httperror.MissingRequired, herr.Code)
+		require.Equal(t, validation.MissingRequired, herr.Code)
 	})
 
 	t.Run("invalid service account credentials", func(t *testing.T) {
@@ -427,9 +428,9 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 		_, _, err := provider.loginUser(ldapConn, &credentials, &config)
 		require.Error(t, err)
 
-		herr, ok := err.(*httperror.APIError)
+		herr, ok := err.(*apierror.APIError)
 		require.True(t, ok)
-		require.Equal(t, httperror.Unauthorized, herr.Code)
+		require.Equal(t, validation.Unauthorized, herr.Code)
 	})
 
 	t.Run("error authenticating service account", func(t *testing.T) {
@@ -446,9 +447,9 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 		_, _, err := provider.loginUser(ldapConn, &credentials, &config)
 		require.Error(t, err)
 
-		herr, ok := err.(*httperror.APIError)
+		herr, ok := err.(*apierror.APIError)
 		require.True(t, ok)
-		require.Equal(t, httperror.ServerError, herr.Code)
+		require.Equal(t, validation.ServerError, herr.Code)
 	})
 
 	t.Run("no user found", func(t *testing.T) {
@@ -460,9 +461,9 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 		_, _, err := provider.loginUser(ldapConn, &credentials, &config)
 		require.Error(t, err)
 
-		herr, ok := err.(*httperror.APIError)
+		herr, ok := err.(*apierror.APIError)
 		require.True(t, ok)
-		require.Equal(t, httperror.Unauthorized, herr.Code)
+		require.Equal(t, validation.Unauthorized, herr.Code)
 	})
 
 	t.Run("multiple users found", func(t *testing.T) {
@@ -480,9 +481,9 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 		_, _, err := provider.loginUser(ldapConn, &credentials, &config)
 		require.Error(t, err)
 
-		herr, ok := err.(*httperror.APIError)
+		herr, ok := err.(*apierror.APIError)
 		require.True(t, ok)
-		require.Equal(t, httperror.Unauthorized, herr.Code)
+		require.Equal(t, validation.Unauthorized, herr.Code)
 	})
 
 	t.Run("error authenticating user", func(t *testing.T) {
@@ -510,9 +511,9 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 		_, _, err := provider.loginUser(ldapConn, &credentials, &config)
 		require.Error(t, err)
 
-		herr, ok := err.(*httperror.APIError)
+		herr, ok := err.(*apierror.APIError)
 		require.True(t, ok)
-		require.Equal(t, httperror.ServerError, herr.Code)
+		require.Equal(t, validation.ServerError, herr.Code)
 	})
 
 	t.Run("error getting user details", func(t *testing.T) {
@@ -539,9 +540,9 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 		_, _, err := provider.loginUser(ldapConn, &credentials, &config)
 		require.Error(t, err)
 
-		herr, ok := err.(*httperror.APIError)
+		herr, ok := err.(*apierror.APIError)
 		require.True(t, ok)
-		require.Equal(t, httperror.Unauthorized, herr.Code)
+		require.Equal(t, validation.Unauthorized, herr.Code)
 	})
 
 	t.Run("empty user details results", func(t *testing.T) {
@@ -563,8 +564,8 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 		_, _, err := provider.loginUser(ldapConn, &credentials, &config)
 		require.Error(t, err)
 
-		herr, ok := err.(*httperror.APIError)
+		herr, ok := err.(*apierror.APIError)
 		require.True(t, ok)
-		require.Equal(t, httperror.Unauthorized, herr.Code)
+		require.Equal(t, validation.Unauthorized, herr.Code)
 	})
 }

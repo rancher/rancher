@@ -7,15 +7,17 @@ import (
 	"unicode"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/apiserver/pkg/apierror"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
+	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/text/runes"
@@ -39,7 +41,7 @@ const (
 var invalidHash, _ = bcrypt.GenerateFromPassword([]byte("invalid"), bcrypt.DefaultCost)
 
 type PasswordVerifier interface {
-	VerifyPassword(user *v3.User, password string) error
+	VerifyPassword(user *apiv3.User, password string) error
 }
 
 type Provider struct {
@@ -93,11 +95,11 @@ func (l *Provider) CustomizeSchema(schema *types.Schema) {
 	schema.ActionHandler = l.actionHandler
 }
 
-func (l *Provider) TransformToAuthProvider(authConfig map[string]interface{}) (map[string]interface{}, error) {
+func (l *Provider) TransformToAuthProvider(authConfig map[string]any) (map[string]any, error) {
 	return common.TransformToAuthProvider(authConfig), nil
 }
 
-func (l *Provider) getUser(username string) (*v3.User, error) {
+func (l *Provider) getUser(username string) (*apiv3.User, error) {
 	objs, err := l.userIndexer.ByIndex(userNameIndex, username)
 
 	if err != nil {
@@ -110,7 +112,7 @@ func (l *Provider) getUser(username string) (*v3.User, error) {
 		return nil, fmt.Errorf("found more than one users with username %v", username)
 	}
 
-	user, ok := objs[0].(*v3.User)
+	user, ok := objs[0].(*apiv3.User)
 
 	if !ok {
 		return nil, fmt.Errorf("fatal error. %v is not a user", objs[0])
@@ -118,28 +120,28 @@ func (l *Provider) getUser(username string) (*v3.User, error) {
 	return user, nil
 }
 
-func (l *Provider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
-	localInput, ok := input.(*v32.BasicLogin)
+func (l *Provider) AuthenticateUser(ctx context.Context, input any) (apiv3.Principal, []apiv3.Principal, string, error) {
+	localInput, ok := input.(*apiv3.BasicLogin)
 	if !ok {
-		return v3.Principal{}, nil, "", httperror.NewAPIError(httperror.ServerError, "Unexpected input type")
+		return apiv3.Principal{}, nil, "", apierror.NewAPIError(validation.ServerError, "Unexpected input type")
 	}
 
 	username := localInput.Username
 	pwd := localInput.Password
 
-	authFailedError := httperror.NewAPIError(httperror.Unauthorized, "authentication failed")
+	authFailedError := apierror.NewAPIError(validation.Unauthorized, "authentication failed")
 	user, err := l.getUser(username)
 	if err != nil {
 		// If the user don't exist the password is evaluated
 		// to avoid user enumeration via timing attack (time based side-channel).
 		bcrypt.CompareHashAndPassword(invalidHash, []byte(pwd))
 		logrus.Debugf("Get User [%s] failed during Authentication: %v", username, err)
-		return v3.Principal{}, nil, "", authFailedError
+		return apiv3.Principal{}, nil, "", authFailedError
 	}
 
 	if err := l.pwdVerifier.VerifyPassword(user, pwd); err != nil {
 		logrus.Debugf("Authentication failed for User [%s]: %v", username, err)
-		return v3.Principal{}, nil, "", authFailedError
+		return apiv3.Principal{}, nil, "", authFailedError
 	}
 
 	principalID := getLocalPrincipalID(user)
@@ -148,13 +150,13 @@ func (l *Provider) AuthenticateUser(ctx context.Context, input interface{}) (v3.
 
 	groupPrincipals, err := l.getGroupPrincipals(user)
 	if err != nil {
-		return v3.Principal{}, nil, "", errors.Wrapf(err, "failed to get groups for %v", user.Name)
+		return apiv3.Principal{}, nil, "", errors.Wrapf(err, "failed to get groups for %v", user.Name)
 	}
 
 	return userPrincipal, groupPrincipals, "", nil
 }
 
-func getLocalPrincipalID(user *v3.User) string {
+func getLocalPrincipalID(user *apiv3.User) string {
 	// TODO error condition handling: no principal, more than one that would match
 	var principalID string
 	for _, p := range user.PrincipalIDs {
@@ -168,17 +170,17 @@ func getLocalPrincipalID(user *v3.User) string {
 	return principalID
 }
 
-func (l *Provider) getGroupPrincipals(user *v3.User) ([]v3.Principal, error) {
-	groupPrincipals := []v3.Principal{}
+func (l *Provider) getGroupPrincipals(user *apiv3.User) ([]apiv3.Principal, error) {
+	groupPrincipals := []apiv3.Principal{}
 
 	for _, pid := range user.PrincipalIDs {
 		objs, err := l.gmIndexer.ByIndex(gmPrincipalIndex, pid)
 		if err != nil {
-			return []v3.Principal{}, err
+			return []apiv3.Principal{}, err
 		}
 
 		for _, o := range objs {
-			gm, ok := o.(*v3.GroupMember)
+			gm, ok := o.(*apiv3.GroupMember)
 			if !ok {
 				continue
 			}
@@ -199,7 +201,7 @@ func (l *Provider) getGroupPrincipals(user *v3.User) ([]v3.Principal, error) {
 	return groupPrincipals, nil
 }
 
-func (l *Provider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
+func (l *Provider) RefetchGroupPrincipals(principalID string, secret string) ([]apiv3.Principal, error) {
 	userID := strings.SplitN(principalID, "://", 2)[1]
 	user, err := l.userLister.Get("", userID)
 	if err != nil {
@@ -209,20 +211,20 @@ func (l *Provider) RefetchGroupPrincipals(principalID string, secret string) ([]
 	return l.getGroupPrincipals(user)
 }
 
-func (l *Provider) SearchPrincipals(searchKey, principalType string, token accessor.TokenAccessor) ([]v3.Principal, error) {
+func (l *Provider) SearchPrincipals(searchKey, principalType string, token accessor.TokenAccessor) ([]apiv3.Principal, error) {
 	return l.SearchPrincipalsDedupe(searchKey, principalType, token, nil)
 }
 
 // SearchPrincipalsDedupe performs principal search, but deduplicates the results against the supplied list (that should have come from other non-local auth providers)
 // This is to avoid getting duplicate search results
-func (l *Provider) SearchPrincipalsDedupe(searchKey, principalType string, token accessor.TokenAccessor, principalsFromOtherProviders []v3.Principal) ([]v3.Principal, error) {
+func (l *Provider) SearchPrincipalsDedupe(searchKey, principalType string, token accessor.TokenAccessor, principalsFromOtherProviders []apiv3.Principal) ([]apiv3.Principal, error) {
 	fromOtherProviders := map[string]bool{}
 	for _, p := range principalsFromOtherProviders {
 		fromOtherProviders[p.Name] = true
 	}
-	var principals []v3.Principal
-	var localUsers []*v3.User
-	var localGroups []*v3.Group
+	var principals []apiv3.Principal
+	var localUsers []*apiv3.User
+	var localGroups []*apiv3.Group
 	var err error
 
 	queryKey := strings.ToLower(searchKey)
@@ -261,12 +263,12 @@ func (l *Provider) SearchPrincipalsDedupe(searchKey, principalType string, token
 	return principals, nil
 }
 
-func (l *Provider) toPrincipal(principalType, displayName, loginName, id string, token accessor.TokenAccessor) v3.Principal {
+func (l *Provider) toPrincipal(principalType, displayName, loginName, id string, token accessor.TokenAccessor) apiv3.Principal {
 	if displayName == "" {
 		displayName = loginName
 	}
 
-	princ := v3.Principal{
+	princ := apiv3.Principal{
 		ObjectMeta:  metav1.ObjectMeta{Name: id},
 		DisplayName: displayName,
 		LoginName:   loginName,
@@ -289,19 +291,19 @@ func (l *Provider) toPrincipal(principalType, displayName, loginName, id string,
 	return princ
 }
 
-func (l *Provider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
+func (l *Provider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
 	// TODO implement group lookup (local groups currently not implemented, so we can skip)
 	// parsing id to get the external id and type. id looks like github_[user|org|team]://12345
 	var name string
 	parts := strings.SplitN(principalID, ":", 2)
 	if len(parts) != 2 {
-		return v3.Principal{}, errors.Errorf("invalid id %v", principalID)
+		return apiv3.Principal{}, errors.Errorf("invalid id %v", principalID)
 	}
 	name = strings.TrimPrefix(parts[1], "//")
 
 	user, err := l.userLister.Get("", name)
 	if err != nil {
-		return v3.Principal{}, err
+		return apiv3.Principal{}, err
 	}
 
 	princID := getLocalPrincipalID(user)
@@ -309,9 +311,9 @@ func (l *Provider) GetPrincipal(principalID string, token accessor.TokenAccessor
 	return princ, nil
 }
 
-func (l *Provider) listAllUsersAndGroups(searchKey string) ([]*v3.User, []*v3.Group, error) {
-	var localUsers []*v3.User
-	var localGroups []*v3.Group
+func (l *Provider) listAllUsersAndGroups(searchKey string) ([]*apiv3.User, []*apiv3.Group, error) {
+	var localUsers []*apiv3.User
+	var localGroups []*apiv3.Group
 
 	allUsers, err := l.userLister.List("", labels.NewSelector())
 	if err != nil {
@@ -339,9 +341,9 @@ func (l *Provider) listAllUsersAndGroups(searchKey string) ([]*v3.User, []*v3.Gr
 	return localUsers, localGroups, err
 }
 
-func (l *Provider) listUsersAndGroupsByIndex(searchKey string) ([]*v3.User, []*v3.Group, error) {
-	var localUsers []*v3.User
-	var localGroups []*v3.Group
+func (l *Provider) listUsersAndGroupsByIndex(searchKey string) ([]*apiv3.User, []*apiv3.Group, error) {
+	var localUsers []*apiv3.User
+	var localGroups []*apiv3.Group
 	var err error
 
 	objs, err := l.userIndexer.ByIndex(userSearchIndex, searchKey)
@@ -351,7 +353,7 @@ func (l *Provider) listUsersAndGroupsByIndex(searchKey string) ([]*v3.User, []*v
 	}
 
 	for _, obj := range objs {
-		user, ok := obj.(*v3.User)
+		user, ok := obj.(*apiv3.User)
 		if !ok {
 			logrus.Errorf("User isnt a user %v", obj)
 			return localUsers, localGroups, err
@@ -366,7 +368,7 @@ func (l *Provider) listUsersAndGroupsByIndex(searchKey string) ([]*v3.User, []*v
 	}
 
 	for _, obj := range groupObjs {
-		group, ok := obj.(*v3.Group)
+		group, ok := obj.(*apiv3.Group)
 		if !ok {
 			logrus.Errorf("Object isnt a group %v", obj)
 			return localUsers, localGroups, err
@@ -381,24 +383,24 @@ func (l *Provider) actionHandler(actionName string, action *types.Action, reques
 	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }
 
-func userNameIndexer(obj interface{}) ([]string, error) {
-	user, ok := obj.(*v3.User)
+func userNameIndexer(obj any) ([]string, error) {
+	user, ok := obj.(*apiv3.User)
 	if !ok {
 		return []string{}, nil
 	}
 	return []string{user.Username}, nil
 }
 
-func gmPIdIndexer(obj interface{}) ([]string, error) {
-	gm, ok := obj.(*v3.GroupMember)
+func gmPIdIndexer(obj any) ([]string, error) {
+	gm, ok := obj.(*apiv3.GroupMember)
 	if !ok {
 		return []string{}, nil
 	}
 	return []string{gm.PrincipalID}, nil
 }
 
-func userSearchIndexer(obj interface{}) ([]string, error) {
-	user, ok := obj.(*v3.User)
+func userSearchIndexer(obj any) ([]string, error) {
+	user, ok := obj.(*apiv3.User)
 	if !ok {
 		return []string{}, nil
 	}
@@ -425,8 +427,8 @@ func userSearchIndexer(obj interface{}) ([]string, error) {
 	return fieldIndexes.UnsortedList(), nil
 }
 
-func groupSearchIndexer(obj interface{}) ([]string, error) {
-	group, ok := obj.(*v3.Group)
+func groupSearchIndexer(obj any) ([]string, error) {
+	group, ok := obj.(*apiv3.Group)
 	if !ok {
 		return []string{}, nil
 	}
@@ -454,7 +456,7 @@ func indexField(field string, maxIndex int) []string {
 	return fieldIndexes
 }
 
-func (l *Provider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
+func (l *Provider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []apiv3.Principal) (bool, error) {
 	userID := strings.TrimPrefix(userPrincipalID, Name+"://")
 	user, err := l.userLister.Get("", userID)
 	if err != nil {
@@ -474,7 +476,7 @@ func (l *Provider) CanAccessWithGroupProviders(userPrincipalID string, groupPrin
 	return false, nil
 }
 
-func (l *Provider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
+func (l *Provider) GetUserExtraAttributes(userPrincipal apiv3.Principal) map[string][]string {
 	return common.GetCommonUserExtraAttributes(userPrincipal)
 }
 
@@ -485,11 +487,11 @@ func (l *Provider) IsDisabledProvider() (bool, error) {
 }
 
 // CleanupResources deletes resources associated with the local auth provider.
-func (l *Provider) CleanupResources(*v3.AuthConfig) error {
+func (l *Provider) CleanupResources(*apiv3.AuthConfig) error {
 	return nil
 }
 
-func userMatchesSearchKey(user *v3.User, searchKey string) bool {
+func userMatchesSearchKey(user *apiv3.User, searchKey string) bool {
 	normalizedDisplayName := strings.ToLower(normalizeWhitespace(simplifyString(user.DisplayName)))
 	normalizedSearchKey := strings.ToLower(normalizeWhitespace(simplifyString(searchKey)))
 

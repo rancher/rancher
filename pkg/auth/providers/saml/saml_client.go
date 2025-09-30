@@ -21,10 +21,9 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/mux"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
 	dsig "github.com/russellhaering/goxmldsig"
 	log "github.com/sirupsen/logrus"
@@ -51,7 +50,7 @@ const loginPath = "/login?"
 // InitializeSamlServiceProvider validates changes to SamlConfig structures and
 // creates or updates the associated in-memory information. It is called from the
 // auth samlconfig controller when a SAML configuration was changed.
-func InitializeSamlServiceProvider(configToSet *v32.SamlConfig, name string) error {
+func InitializeSamlServiceProvider(configToSet *apiv3.SamlConfig, name string) error {
 
 	initMu.Lock()
 	defer initMu.Unlock()
@@ -254,16 +253,16 @@ func AuthHandler() http.Handler {
 	return root
 }
 
-func (s *Provider) getSamlPrincipals(config *v32.SamlConfig, samlData map[string][]string) (v3.Principal, []v3.Principal, error) {
-	var userPrincipal v3.Principal
-	var groupPrincipals []v3.Principal
+func (s *Provider) getSamlPrincipals(config *apiv3.SamlConfig, samlData map[string][]string) (apiv3.Principal, []apiv3.Principal, error) {
+	var userPrincipal apiv3.Principal
+	var groupPrincipals []apiv3.Principal
 	uid, ok := samlData[config.UIDField]
 	if !ok {
 		// UID field provided by user is actually not there in SAMLResponse, without this we cannot differentiate between users and create separate principals
 		return userPrincipal, groupPrincipals, fmt.Errorf("SAML: Unique ID field is not provided in SAML Response")
 	}
 
-	userPrincipal = v3.Principal{
+	userPrincipal = apiv3.Principal{
 		ObjectMeta:    metav1.ObjectMeta{Name: s.userType + "://" + uid[0]},
 		Provider:      s.name,
 		PrincipalType: "user",
@@ -283,7 +282,7 @@ func (s *Provider) getSamlPrincipals(config *v32.SamlConfig, samlData map[string
 	groups, ok := samlData[config.GroupsField]
 	if ok {
 		for _, group := range groups {
-			group := v3.Principal{
+			group := apiv3.Principal{
 				ObjectMeta:    metav1.ObjectMeta{Name: s.groupType + "://" + group},
 				DisplayName:   group,
 				Provider:      s.name,
@@ -355,8 +354,8 @@ func (s *Provider) FinalizeSamlLogout(w http.ResponseWriter, r *http.Request) {
 
 // HandleSamlAssertion processes/handles the assertion obtained by the POST to /saml/acs from IdP
 func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, assertion *saml.Assertion) {
-	var groupPrincipals []v3.Principal
-	var userPrincipal v3.Principal
+	var groupPrincipals []apiv3.Principal
+	var userPrincipal apiv3.Principal
 	var userID string
 	redirectURL := s.clientState.GetState(r, "Rancher_FinalRedirectURL")
 	rancherAction := s.clientState.GetState(r, "Rancher_Action")
@@ -543,7 +542,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 			}
 			encoded := base64.StdEncoding.EncodeToString(encryptedToken)
 
-			samlToken := &v3.SamlToken{
+			samlToken := &apiv3.SamlToken{
 				Token:     encoded,
 				ExpiresAt: token.ExpiresAt,
 				ObjectMeta: metav1.ObjectMeta{
@@ -569,8 +568,8 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	}
 }
 
-func (s *Provider) setRancherToken(w http.ResponseWriter, tokenMGR *tokens.Manager, userID string, userPrincipal v3.Principal,
-	groupPrincipals []v3.Principal, isSecure bool) error {
+func (s *Provider) setRancherToken(w http.ResponseWriter, tokenMGR *tokens.Manager, userID string, userPrincipal apiv3.Principal,
+	groupPrincipals []apiv3.Principal, isSecure bool) error {
 	authTimeout := settings.AuthUserSessionTTLMinutes.Get()
 	var ttl int64
 	if minutes, err := strconv.ParseInt(authTimeout, 10, 64); err == nil {

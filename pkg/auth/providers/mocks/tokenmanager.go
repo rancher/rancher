@@ -13,8 +13,8 @@ import (
 	reflect "reflect"
 
 	types "github.com/rancher/norman/types"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	accessor "github.com/rancher/rancher/pkg/auth/accessor"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	gomock "go.uber.org/mock/gomock"
 )
 

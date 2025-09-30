@@ -10,9 +10,10 @@ import (
 
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/pkg/errors"
+	"github.com/rancher/apiserver/pkg/apierror"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/azure/clients"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
@@ -24,6 +25,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,7 +41,6 @@ type unstructuredGetter interface {
 }
 
 type Provider struct {
-	ctx         context.Context
 	authConfigs v3.AuthConfigInterface
 	Retriever   unstructuredGetter
 	secrets     wcorev1.SecretController
@@ -47,7 +48,7 @@ type Provider struct {
 	tokenMGR    *tokens.Manager
 }
 
-func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
+func Configure(mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
 	var err error
 	clients.GroupCache, err = lru.New(settings.AzureGroupCacheSize.GetInt())
 	if err != nil {
@@ -56,7 +57,6 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 	}
 
 	return &Provider{
-		ctx:         ctx,
 		Retriever:   mgmtCtx.Management.AuthConfigs("").ObjectClient().UnstructuredClient(),
 		authConfigs: mgmtCtx.Management.AuthConfigs(""),
 		secrets:     mgmtCtx.Wrangler.Core.Secret(),
@@ -77,19 +77,19 @@ func (ap *Provider) GetName() string {
 	return Name
 }
 
-func (ap *Provider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
-	login, ok := input.(*v32.AzureADLogin)
+func (ap *Provider) AuthenticateUser(ctx context.Context, input interface{}) (apiv3.Principal, []apiv3.Principal, string, error) {
+	login, ok := input.(*apiv3.AzureADLogin)
 	if !ok {
-		return v3.Principal{}, nil, "", errors.New("unexpected input type")
+		return apiv3.Principal{}, nil, "", errors.New("unexpected input type")
 	}
 	cfg, err := ap.GetAzureConfigK8s()
 	if err != nil {
-		return v3.Principal{}, nil, "", err
+		return apiv3.Principal{}, nil, "", err
 	}
 	return ap.loginUser(cfg, login, false)
 }
 
-func (ap *Provider) RefetchGroupPrincipals(principalID, secret string) ([]v3.Principal, error) {
+func (ap *Provider) RefetchGroupPrincipals(principalID, secret string) ([]apiv3.Principal, error) {
 	cfg, err := ap.GetAzureConfigK8s()
 	if err != nil {
 		return nil, err
@@ -126,12 +126,12 @@ func (ap *Provider) RefetchGroupPrincipals(principalID, secret string) ([]v3.Pri
 	return groupPrincipals, nil
 }
 
-func (ap *Provider) SearchPrincipals(name, principalType string, token accessor.TokenAccessor) ([]v3.Principal, error) {
+func (ap *Provider) SearchPrincipals(name, principalType string, token accessor.TokenAccessor) ([]apiv3.Principal, error) {
 	cfg, err := ap.GetAzureConfigK8s()
 	if err != nil {
 		return nil, err
 	}
-	var principals []v3.Principal
+	var principals []apiv3.Principal
 
 	azureClient, err := ap.newAzureClientFromToken(cfg, token)
 	if err != nil {
@@ -164,12 +164,12 @@ func (ap *Provider) SearchPrincipals(name, principalType string, token accessor.
 	return principals, ap.updateToken(azureClient, token)
 }
 
-func (ap *Provider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
-	var principal v3.Principal
+func (ap *Provider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
+	var principal apiv3.Principal
 	var err error
 	cfg, err := ap.GetAzureConfigK8s()
 	if err != nil {
-		return v3.Principal{}, err
+		return apiv3.Principal{}, err
 	}
 
 	azureClient, err := ap.newAzureClientFromToken(cfg, token)
@@ -179,7 +179,7 @@ func (ap *Provider) GetPrincipal(principalID string, token accessor.TokenAccesso
 
 	parsed, err := clients.ParsePrincipalID(principalID)
 	if err != nil {
-		return v3.Principal{}, httperror.NewAPIError(httperror.NotFound, "invalid principal")
+		return apiv3.Principal{}, httperror.NewAPIError(httperror.NotFound, "invalid principal")
 	}
 
 	switch parsed["type"] {
@@ -190,7 +190,7 @@ func (ap *Provider) GetPrincipal(principalID string, token accessor.TokenAccesso
 	}
 
 	if err != nil {
-		return v3.Principal{}, err
+		return apiv3.Principal{}, err
 	}
 
 	return principal, ap.updateToken(azureClient, token)
@@ -264,15 +264,15 @@ func (ap *Provider) TransformToAuthProvider(
 	return p, nil
 }
 
-func (ap *Provider) loginUser(config *v32.AzureADConfig, azureCredential *v32.AzureADLogin, test bool) (v3.Principal, []v3.Principal, string, error) {
+func (ap *Provider) loginUser(config *apiv3.AzureADConfig, azureCredential *apiv3.AzureADLogin, test bool) (apiv3.Principal, []apiv3.Principal, string, error) {
 	var useDeprecatedAzureADClient = IsConfigDeprecated(config)
 	azureClient, err := clients.NewAzureClientFromCredential(config, useDeprecatedAzureADClient, azureCredential, ap.secrets)
 	if err != nil {
-		return v3.Principal{}, nil, "", err
+		return apiv3.Principal{}, nil, "", err
 	}
 	userPrincipal, groupPrincipals, providerToken, err := azureClient.LoginUser(config, azureCredential)
 	if err != nil {
-		return v3.Principal{}, nil, "", err
+		return apiv3.Principal{}, nil, "", err
 	}
 	testAllowedPrincipals := config.AllowedPrincipalIDs
 	if test && config.AccessMode == "restricted" {
@@ -281,34 +281,34 @@ func (ap *Provider) loginUser(config *v32.AzureADConfig, azureCredential *v32.Az
 
 	allowed, err := ap.userMGR.CheckAccess(config.AccessMode, testAllowedPrincipals, userPrincipal.Name, groupPrincipals)
 	if err != nil {
-		return v3.Principal{}, nil, "", err
+		return apiv3.Principal{}, nil, "", err
 	}
 	if !allowed {
-		return v3.Principal{}, nil, "", httperror.NewAPIError(httperror.Unauthorized, "unauthorized")
+		return apiv3.Principal{}, nil, "", apierror.NewAPIError(validation.Unauthorized, "unauthorized")
 	}
 
 	return userPrincipal, groupPrincipals, providerToken, nil
 }
 
-func (ap *Provider) getUserPrincipal(client clients.AzureClient, principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
+func (ap *Provider) getUserPrincipal(client clients.AzureClient, principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
 	principal, err := client.GetUser(principalID)
 	if err != nil {
-		return v3.Principal{}, httperror.NewAPIError(httperror.NotFound, err.Error())
+		return apiv3.Principal{}, httperror.NewAPIError(httperror.NotFound, err.Error())
 	}
 	principal.Me = common.SamePrincipal(token.GetUserPrincipal(), principal)
 	return principal, nil
 }
 
-func (ap *Provider) getGroupPrincipal(client clients.AzureClient, id string, token accessor.TokenAccessor) (v3.Principal, error) {
+func (ap *Provider) getGroupPrincipal(client clients.AzureClient, id string, token accessor.TokenAccessor) (apiv3.Principal, error) {
 	principal, err := client.GetGroup(id)
 	if err != nil {
-		return v3.Principal{}, httperror.NewAPIError(httperror.NotFound, err.Error())
+		return apiv3.Principal{}, httperror.NewAPIError(httperror.NotFound, err.Error())
 	}
 	principal.MemberOf = ap.userMGR.IsMemberOf(token, principal)
 	return principal, nil
 }
 
-func (ap *Provider) searchUserPrincipalsByName(client clients.AzureClient, name string, token accessor.TokenAccessor) ([]v3.Principal, error) {
+func (ap *Provider) searchUserPrincipalsByName(client clients.AzureClient, name string, token accessor.TokenAccessor) ([]apiv3.Principal, error) {
 	filter := fmt.Sprintf("startswith(userPrincipalName,'%[1]s') or startswith(displayName,'%[1]s') or startswith(givenName,'%[1]s') or startswith(surname,'%[1]s')", name)
 	principals, err := client.ListUsers(filter)
 	if err != nil {
@@ -320,7 +320,7 @@ func (ap *Provider) searchUserPrincipalsByName(client clients.AzureClient, name 
 	return principals, nil
 }
 
-func (ap *Provider) searchGroupPrincipalsByName(client clients.AzureClient, name string, token accessor.TokenAccessor) ([]v3.Principal, error) {
+func (ap *Provider) searchGroupPrincipalsByName(client clients.AzureClient, name string, token accessor.TokenAccessor) ([]apiv3.Principal, error) {
 	filter := fmt.Sprintf("startswith(displayName,'%[1]s') or startswith(mail,'%[1]s') or startswith(mailNickname,'%[1]s')", name)
 	principals, err := client.ListGroups(filter)
 	if err != nil {
@@ -332,7 +332,7 @@ func (ap *Provider) searchGroupPrincipalsByName(client clients.AzureClient, name
 	return principals, nil
 }
 
-func (ap *Provider) newAzureClientFromToken(cfg *v32.AzureADConfig, token accessor.TokenAccessor) (clients.AzureClient, error) {
+func (ap *Provider) newAzureClientFromToken(cfg *apiv3.AzureADConfig, token accessor.TokenAccessor) (clients.AzureClient, error) {
 	var secret string
 	var deprecated = IsConfigDeprecated(cfg)
 	if deprecated {
@@ -345,7 +345,7 @@ func (ap *Provider) newAzureClientFromToken(cfg *v32.AzureADConfig, token access
 	return clients.NewAzureClientFromSecret(cfg, deprecated, secret, ap.secrets)
 }
 
-func (ap *Provider) saveAzureConfigK8s(config *v32.AzureADConfig) error {
+func (ap *Provider) saveAzureConfigK8s(config *apiv3.AzureADConfig) error {
 	// Copy the annotations.
 	annotations := config.ObjectMeta.Annotations
 	storedAzureConfig, err := ap.GetAzureConfigK8s()
@@ -381,7 +381,7 @@ func (ap *Provider) saveAzureConfigK8s(config *v32.AzureADConfig) error {
 	return nil
 }
 
-func (ap *Provider) GetAzureConfigK8s() (*v32.AzureADConfig, error) {
+func (ap *Provider) GetAzureConfigK8s() (*apiv3.AzureADConfig, error) {
 	authConfigObj, err := ap.Retriever.Get(Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve AzureADConfig, error: %v", err)
@@ -393,7 +393,7 @@ func (ap *Provider) GetAzureConfigK8s() (*v32.AzureADConfig, error) {
 	}
 	storedAzureADConfigMap := u.UnstructuredContent()
 
-	storedAzureADConfig := &v32.AzureADConfig{}
+	storedAzureADConfig := &apiv3.AzureADConfig{}
 	err = common.Decode(storedAzureADConfigMap, storedAzureADConfig)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode Azure Config: %w", err)
@@ -449,7 +449,7 @@ func (ap *Provider) updateToken(client clients.AzureClient, token accessor.Token
 }
 
 func formAzureRedirectURL(config map[string]interface{}) string {
-	var ac v32.AzureADConfig
+	var ac apiv3.AzureADConfig
 	err := common.Decode(config, &ac)
 	if err == nil {
 		// Extract the annotations from the map. This is needed because of the type structure of
@@ -508,7 +508,7 @@ func parseAnnotations(metadata map[string]interface{}) map[string]string {
 	return annotations
 }
 
-func (ap *Provider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
+func (ap *Provider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []apiv3.Principal) (bool, error) {
 	cfg, err := ap.GetAzureConfigK8s()
 	if err != nil {
 		logrus.Errorf("Error fetching azure config: %v", err)
@@ -539,7 +539,7 @@ func UpdateGroupCacheSize(size string) {
 	clients.GroupCache.Resize(i)
 }
 
-func (ap *Provider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
+func (ap *Provider) GetUserExtraAttributes(userPrincipal apiv3.Principal) map[string][]string {
 	return common.GetCommonUserExtraAttributes(userPrincipal)
 }
 
