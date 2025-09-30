@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/genericoidc"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
+	"github.com/rancher/rancher/pkg/auth/providers/githubapp"
 	"github.com/rancher/rancher/pkg/auth/providers/googleoauth"
 	"github.com/rancher/rancher/pkg/auth/providers/keycloakoidc"
 	"github.com/rancher/rancher/pkg/auth/providers/ldap"
@@ -75,6 +76,13 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	Providers[github.Name] = p
 	providersByType[client.GithubConfigType] = p
 	providersByType[publicclient.GithubProviderType] = p
+
+	p = githubapp.Configure(ctx, mgmt, userMGR, tokenMGR)
+	ProviderNames[githubapp.Name] = true
+	providersWithSecrets[githubapp.Name] = true
+	Providers[githubapp.Name] = p
+	providersByType[client.GithubAppConfigType] = p
+	providersByType[publicclient.GithubAppProviderType] = p
 
 	p = azure.Configure(ctx, mgmt, userMGR, tokenMGR)
 	ProviderNames[azure.Name] = true

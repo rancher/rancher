@@ -13,6 +13,7 @@ import (
 
 var authConfigTypes = []string{
 	client.GithubConfigType,
+	client.GithubAppConfigType,
 	client.LocalConfigType,
 	client.ActiveDirectoryConfigType,
 	client.AzureADConfigType,
