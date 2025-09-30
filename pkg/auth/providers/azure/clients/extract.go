@@ -6,13 +6,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Azure/go-autorest/autorest/adal"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 )
 
 // GetPrincipalID attempts to extract the ID of either a user or group from the principal value.
-func GetPrincipalID(principal v3.Principal) string {
-	name := principal.ObjectMeta.Name
+func GetPrincipalID(principal v32.Principal) string {
+	name := principal.Name
 	if parts := strings.Split(name, "//"); len(parts) > 1 {
 		return parts[1]
 	}
@@ -64,13 +63,4 @@ func ParsePrincipalID(principalID string) (map[string]string, error) {
 	parsed["type"] = pparts[1]
 
 	return parsed, nil
-}
-
-func unmarshalADALToken(secret string) (adal.Token, error) {
-	var azureToken adal.Token
-	err := json.Unmarshal([]byte(secret), &azureToken)
-	if err != nil {
-		return azureToken, err
-	}
-	return azureToken, nil
 }

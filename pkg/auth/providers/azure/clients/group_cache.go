@@ -4,7 +4,7 @@ import (
 	"time"
 
 	lru "github.com/hashicorp/golang-lru"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -13,14 +13,14 @@ import (
 var GroupCache *lru.Cache
 
 type userPrincipalsClient interface {
-	GetGroup(id string) (v3.Principal, error)
+	GetGroup(id string) (v32.Principal, error)
 }
 
 // UserGroupsToPrincipals attempts to convert a value representing a collection of groups to a slice of principal values.
 // It also stores group values in an in-memory cache for faster subsequent access.
-func UserGroupsToPrincipals(azureClient userPrincipalsClient, groupNames []string) ([]v3.Principal, error) {
+func UserGroupsToPrincipals(azureClient userPrincipalsClient, groupNames []string) ([]v32.Principal, error) {
 	var tasksManager errgroup.Group
-	groupPrincipals := make([]v3.Principal, len(groupNames))
+	groupPrincipals := make([]v32.Principal, len(groupNames))
 
 	start := time.Now()
 	logrus.Debug("[AZURE_PROVIDER] Started gathering users groups")
@@ -34,7 +34,7 @@ func UserGroupsToPrincipals(azureClient userPrincipalsClient, groupNames []strin
 		groupID := id
 
 		if principal, ok := GroupCache.Get(groupID); ok {
-			p, ok := principal.(v3.Principal)
+			p, ok := principal.(v32.Principal)
 			if !ok {
 				logrus.Errorf("failed to convert a cached group to principal")
 				continue
