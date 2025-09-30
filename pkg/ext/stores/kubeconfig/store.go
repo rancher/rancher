@@ -1043,6 +1043,9 @@ func (s *Store) Watch(
 							ResourceVersion: configMap.ResourceVersion,
 						},
 					}
+				case watch.Error:
+					// Pass through the errors e.g. 410 Expired.
+					obj = event.Object
 				case watch.Added, watch.Modified, watch.Deleted:
 					configMap, ok := event.Object.(*corev1.ConfigMap)
 					if !ok {

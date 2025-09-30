@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/httperror"
+	"github.com/rancher/apiserver/pkg/apierror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -22,6 +22,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,7 +39,6 @@ type tokensManager interface {
 }
 
 type ghProvider struct {
-	ctx          context.Context
 	authConfigs  v3.AuthConfigInterface
 	secrets      wcorev1.SecretController
 	getConfig    func() (*v32.GithubConfig, error)
@@ -47,13 +47,12 @@ type ghProvider struct {
 	tokenMGR     tokensManager
 }
 
-func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
+func Configure(mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
 	githubClient := &GClient{
 		httpClient: common.NewHTTPClientWithTimeouts(),
 	}
 
 	provider := &ghProvider{
-		ctx:          ctx,
 		authConfigs:  mgmtCtx.Management.AuthConfigs(""),
 		secrets:      mgmtCtx.Wrangler.Core.Secret(),
 		githubClient: githubClient,
@@ -240,7 +239,7 @@ func (g *ghProvider) LoginUser(host string, githubCredential *v32.GithubLogin, c
 		return v3.Principal{}, nil, "", err
 	}
 	if !allowed {
-		return v3.Principal{}, nil, "", httperror.NewAPIError(httperror.Unauthorized, "unauthorized")
+		return v3.Principal{}, nil, "", apierror.NewAPIError(validation.Unauthorized, "unauthorized")
 	}
 
 	return userPrincipal, groupPrincipals, accessToken, nil

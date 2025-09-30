@@ -6,11 +6,11 @@ import (
 
 	"github.com/rancher/norman/types"
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/ldap"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/stretchr/testify/assert"
@@ -32,7 +32,7 @@ func TestConfiguredOktaProviderContainsLdapProvider(t *testing.T) {
 	mgmtCtx.Wrangler = wranglerContext
 
 	tokenMGR := tokens.NewManager(wranglerContext)
-	provider, ok := Configure(ctx, mgmtCtx, mgmtCtx.UserManager, tokenMGR, "okta").(*Provider)
+	provider, ok := Configure(mgmtCtx, mgmtCtx.UserManager, tokenMGR, "okta").(*Provider)
 	require.True(t, ok, "Failed to Configure a valid Provider")
 
 	assert.True(t, provider.hasLdapGroupSearch(), "Missing LDAP group search capability for okta provider")
@@ -103,7 +103,7 @@ func TestSearchPrincipals(t *testing.T) {
 				},
 			}
 
-			results, err := provider.SearchPrincipals(tt.searchKey, tt.principalType, &v3.Token{})
+			results, err := provider.SearchPrincipals(tt.searchKey, tt.principalType, &apiv3.Token{})
 			require.NoError(t, err)
 			require.Len(t, results, len(tt.principals))
 			for _, principal := range results {
@@ -153,16 +153,16 @@ func (p *mockLdapProvider) GetName() string {
 	return p.providerName
 }
 
-func (p *mockLdapProvider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
+func (p *mockLdapProvider) AuthenticateUser(ctx context.Context, input interface{}) (apiv3.Principal, []apiv3.Principal, string, error) {
 	panic("AuthenticateUser Unimplemented!")
 }
 
-func (p *mockLdapProvider) SearchPrincipals(name, principalType string, myToken accessor.TokenAccessor) ([]v3.Principal, error) {
+func (p *mockLdapProvider) SearchPrincipals(name, principalType string, myToken accessor.TokenAccessor) ([]apiv3.Principal, error) {
 	if !p.isLdapConfigured {
 		return nil, ldap.ErrorNotConfigured{}
 	}
 
-	return []v3.Principal{{
+	return []apiv3.Principal{{
 		ObjectMeta:    metav1.ObjectMeta{Name: p.providerName + "_" + principalType + "://alice"},
 		DisplayName:   "Alice",
 		LoginName:     "alice",
@@ -176,7 +176,7 @@ func (p *mockLdapProvider) CustomizeSchema(schema *types.Schema) {
 	panic("CustomizeSchema Unimplemented!")
 }
 
-func (p *mockLdapProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
+func (p *mockLdapProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
 	panic("GetPrincipal Unimplemented!")
 }
 
@@ -184,15 +184,15 @@ func (p *mockLdapProvider) TransformToAuthProvider(authConfig map[string]interfa
 	panic("TransformToAuthProvider Unimplemented!")
 }
 
-func (p *mockLdapProvider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
+func (p *mockLdapProvider) RefetchGroupPrincipals(principalID string, secret string) ([]apiv3.Principal, error) {
 	panic("RefetchGroupPrincipals Unimplemented!")
 }
 
-func (p *mockLdapProvider) CanAccessWithGroupProviders(userPrincipalID string, groups []v3.Principal) (bool, error) {
+func (p *mockLdapProvider) CanAccessWithGroupProviders(userPrincipalID string, groups []apiv3.Principal) (bool, error) {
 	panic("CanAccessWithGroupProviders Unimplemented!")
 }
 
-func (p *mockLdapProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
+func (p *mockLdapProvider) GetUserExtraAttributes(userPrincipal apiv3.Principal) map[string][]string {
 	panic("GetUserExtraAttributes Unimplemented!")
 }
 

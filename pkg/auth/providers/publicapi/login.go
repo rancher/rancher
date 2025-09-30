@@ -3,13 +3,13 @@ package publicapi
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/rancher/apiserver/pkg/apierror"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -30,7 +30,6 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/auth/util"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3public"
-	schema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3public"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -51,16 +50,92 @@ func newLoginHandler(mgmt *config.ScaledContext) *loginHandler {
 	}
 }
 
+type kubeconfigTokenGetter interface {
+	GetKubeconfigToken(clusterName, tokenName, description, kind, userName string, userPrincipal apiv3.Principal) (*apiv3.Token, string, error)
+}
+
 type loginHandler struct {
 	scaledContext         *config.ScaledContext
 	kubeconfigTokenGetter kubeconfigTokenGetter
 	ensureUser            func(principalName, displayName string) (*apiv3.User, error)
 	ensureUserAttribute   func(userID, provider string, groupPrincipals []apiv3.Principal, userExtraInfo map[string][]string, loginTime ...time.Time) error
-	newLoginToken         func(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, ttl int64, description string) (apiv3.Token, string, error)
+	newLoginToken         func(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, ttl int64, description string) (*apiv3.Token, string, error)
 }
 
-type kubeconfigTokenGetter interface {
-	GetKubeconfigToken(clusterName, tokenName, description, kind, userName string, userPrincipal apiv3.Principal) (*apiv3.Token, string, error)
+func newV1LoginHandler(scaledContext *config.ScaledContext) *v1LoginHandler {
+	return &v1LoginHandler{
+		h: newLoginHandler(scaledContext),
+	}
+}
+
+type v1LoginHandler struct {
+	h *loginHandler
+}
+
+func (h *v1LoginHandler) login(w http.ResponseWriter, r *http.Request) {
+	bytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		logrus.Errorf("login: Error reading request body: %s", err)
+		http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity)
+		return
+	}
+
+	generic := &apiv3.GenericLogin{}
+	err = json.Unmarshal(bytes, generic)
+	if err != nil {
+		logrus.Errorf("login: Error unmarshalling generic login request: %s", err)
+		http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity)
+		return
+	}
+
+	input := providerInputForType(generic.Type)
+	err = json.Unmarshal(bytes, input)
+	if err != nil {
+		logrus.Errorf("login: Error unmarshalling provider specific login request %T: %s", input, err)
+		http.Error(w, "", http.StatusUnprocessableEntity)
+		return
+	}
+
+	h.h.login(w, r, input)
+}
+
+func newV3LoginHandler(scaledContext *config.ScaledContext) *v3LoginHandler {
+	return &v3LoginHandler{
+		h: newLoginHandler(scaledContext),
+	}
+}
+
+type v3LoginHandler struct {
+	h *loginHandler
+}
+
+func (h *v3LoginHandler) login(actionName string, action *types.Action, request *types.APIContext) error {
+	if actionName != "login" {
+		return httperror.NewAPIError(httperror.ActionNotAvailable, "")
+	}
+
+	bytes, err := io.ReadAll(request.Request.Body)
+	if err != nil {
+		logrus.Errorf("login: Error reading request body: %s", err)
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "")
+	}
+
+	generic := &apiv3.GenericLogin{}
+	err = json.Unmarshal(bytes, generic)
+	if err != nil {
+		logrus.Errorf("login: Error unmarshalling generic login request: %s", err)
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "")
+	}
+
+	input := providerInputForType(request.Type)
+	err = json.Unmarshal(bytes, input)
+	if err != nil {
+		logrus.Errorf("login: Error unmarshalling provider specific login request %T: %s", input, err)
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "")
+	}
+
+	h.h.login(request.Response, request.Request, input)
+	return nil
 }
 
 const (
@@ -68,153 +143,124 @@ const (
 	CookieResponseType = "cookie"
 )
 
-func (h *loginHandler) login(actionName string, action *types.Action, request *types.APIContext) error {
-	if actionName != "login" {
-		return httperror.NewAPIError(httperror.ActionNotAvailable, "")
-	}
-
-	token, unhashedTokenKey, responseType, err := h.createLoginToken(request)
-	if err != nil {
-		// If the user fails to authenticate, hide the details of the exact error.
-		// Bad credentials will already be APIErrors. Otherwise, return a generic error message.
-		if httperror.IsAPIError(err) {
-			return err
-		}
-
-		return httperror.WrapAPIError(err, httperror.ServerError, "Server error while authenticating")
-	}
-
-	switch responseType {
-	case CookieResponseType:
-		tokenCookie := &http.Cookie{
-			Name:     CookieName,
-			Value:    token.ObjectMeta.Name + ":" + unhashedTokenKey,
-			Secure:   true,
-			Path:     "/",
-			HttpOnly: true,
-		}
-		http.SetCookie(request.Response, tokenCookie)
-	case SAMLResponseType: // Do nothing.
-	default:
-		tokenData, err := tokens.ConvertTokenResource(request.Schemas.Schema(&schema.PublicVersion, client.TokenType), token)
-		if err != nil {
-			return httperror.WrapAPIError(err, httperror.ServerError, "Server error while authenticating")
-		}
-		tokenData["token"] = token.ObjectMeta.Name + ":" + unhashedTokenKey
-		request.WriteResponse(http.StatusCreated, tokenData)
-	}
-
-	return nil
+type loginAccessor interface {
+	GetType() string
+	GetTTL() int64
+	GetDescription() string
+	GetResponseType() string
+	GetName() string
 }
 
-// createLoginToken returns token, unhashed token key (where applicable), responseType and error
-func (h *loginHandler) createLoginToken(request *types.APIContext) (apiv3.Token, string, string, error) {
-	logrus.Debugf("Creating a login token")
-
-	bytes, err := io.ReadAll(request.Request.Body)
-	if err != nil {
-		logrus.Errorf("Error reading request body: %v", err)
-		return apiv3.Token{}, "", "", httperror.NewAPIError(httperror.InvalidBodyContent, "")
-	}
-
-	generic := &apiv3.GenericLogin{}
-	err = json.Unmarshal(bytes, generic)
-	if err != nil {
-		logrus.Errorf("Error unmarshalling GenericLogin: %v", err)
-		return apiv3.Token{}, "", "", httperror.NewAPIError(httperror.InvalidBodyContent, "")
-	}
-	responseType := generic.ResponseType
-	description := generic.Description
-	ttl := generic.TTLMillis
-
-	authTimeout := settings.AuthUserSessionTTLMinutes.Get()
-	if minutes, err := strconv.ParseInt(authTimeout, 10, 64); err == nil {
-		ttl = minutes * 60 * 1000
-	}
-
-	var (
-		input          any
-		providerName   string
-		isSAMLProvider bool
-	)
-	switch request.Type {
+func providerInputForType(providerType string) loginAccessor {
+	switch providerType {
 	case client.LocalProviderType:
-		input = &apiv3.BasicLogin{}
-		providerName = local.Name
+		return &apiv3.BasicLogin{
+			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: local.Name},
+		}
 	case client.GithubProviderType:
-		input = &apiv3.GithubLogin{}
-		providerName = github.Name
+		return &apiv3.GithubLogin{
+			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: github.Name},
+		}
 	case client.GithubAppProviderType:
-		input = &apiv3.GithubLogin{}
-		providerName = githubapp.Name
+		return &apiv3.GithubLogin{
+			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: githubapp.Name},
+		}
 	case client.ActiveDirectoryProviderType:
-		input = &apiv3.BasicLogin{}
-		providerName = activedirectory.Name
+		return &apiv3.BasicLogin{
+			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: activedirectory.Name},
+		}
 	case client.AzureADProviderType:
-		input = &apiv3.AzureADLogin{}
-		providerName = azure.Name
+		return &apiv3.AzureADLogin{
+			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: azure.Name},
+		}
 	case client.OpenLdapProviderType:
-		input = &apiv3.BasicLogin{}
-		providerName = ldap.OpenLdapName
+		return &apiv3.BasicLogin{
+			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: ldap.OpenLdapName},
+		}
 	case client.FreeIpaProviderType:
-		input = &apiv3.BasicLogin{}
-		providerName = ldap.FreeIpaName
+		return &apiv3.BasicLogin{
+			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: ldap.FreeIpaName},
+		}
 	case client.PingProviderType:
-		input = &apiv3.SamlLoginInput{}
-		providerName = saml.PingName
-		isSAMLProvider = true
+		return &apiv3.SamlLoginInput{
+			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: saml.PingName},
+		}
+		// isSAMLProvider = true
 	case client.ADFSProviderType:
-		input = &apiv3.SamlLoginInput{}
-		providerName = saml.ADFSName
-		isSAMLProvider = true
+		return &apiv3.SamlLoginInput{
+			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: saml.ADFSName},
+		}
+		// isSAMLProvider = true
 	case client.KeyCloakProviderType:
-		input = &apiv3.SamlLoginInput{}
-		providerName = saml.KeyCloakName
-		isSAMLProvider = true
+		return &apiv3.SamlLoginInput{
+			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: saml.KeyCloakName},
+		}
+		// isSAMLProvider = true
 	case client.OKTAProviderType:
-		input = &apiv3.SamlLoginInput{}
-		providerName = saml.OKTAName
-		isSAMLProvider = true
+		return &apiv3.SamlLoginInput{
+			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: saml.OKTAName},
+		}
+		// isSAMLProvider = true
 	case client.ShibbolethProviderType:
-		input = &apiv3.SamlLoginInput{}
-		providerName = saml.ShibbolethName
-		isSAMLProvider = true
+		return &apiv3.SamlLoginInput{
+			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: saml.ShibbolethName},
+		}
+		// isSAMLProvider = true
 	case client.GoogleOAuthProviderType:
-		input = &apiv3.GoogleOauthLogin{}
-		providerName = googleoauth.Name
+		return &apiv3.GoogleOauthLogin{
+			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: googleoauth.Name},
+		}
 	case client.OIDCProviderType:
-		input = &apiv3.OIDCLogin{}
-		providerName = oidc.Name
+		return &apiv3.OIDCLogin{
+			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: oidc.Name},
+		}
 	case client.KeyCloakOIDCProviderType:
-		input = &apiv3.OIDCLogin{}
-		providerName = keycloakoidc.Name
+		return &apiv3.OIDCLogin{
+			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: keycloakoidc.Name},
+		}
 	case client.GenericOIDCProviderType:
-		input = &apiv3.OIDCLogin{}
-		providerName = genericoidc.Name
+		return &apiv3.OIDCLogin{
+			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: genericoidc.Name},
+		}
 	case client.CognitoProviderType:
-		input = &apiv3.OIDCLogin{}
-		providerName = cognito.Name
+		return &apiv3.OIDCLogin{
+			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: cognito.Name},
+		}
 	default:
-		return apiv3.Token{}, "", "", httperror.NewAPIError(httperror.ServerError, "unknown authentication provider")
+		return nil
+	}
+}
+
+func (h *loginHandler) login(w http.ResponseWriter, r *http.Request, input loginAccessor) {
+	if input == nil {
+		logrus.Errorf("login: Unknown authentication provider '%s'", input.GetType())
+		http.Error(w, "Unknown authentication provider ", http.StatusBadRequest)
+		return
 	}
 
-	err = json.Unmarshal(bytes, input)
-	if err != nil {
-		logrus.Errorf("Error unmarshalling %T: %v", input, err)
-		return apiv3.Token{}, "", "", httperror.NewAPIError(httperror.InvalidBodyContent, "")
-	}
-
-	if isSAMLProvider {
+	if providers.IsSAMLProviderType(input.GetType()) {
 		// SAML's login flow is different. Unlike other providers it gets the logged in user's data
-		// via a POST from the identity provider on a separate endpoint.
-		err = saml.PerformSamlLogin(providerName, request, input)
-		return apiv3.Token{}, "", SAMLResponseType, err
+		// via the POST from the identity provider on a separate endpoint.
+		saml.PerformSamlLogin(r, w, input.GetName(), input)
+		return
 	}
 
-	ctx := context.WithValue(request.Request.Context(), util.RequestKey, request.Request)
-	userPrincipal, groupPrincipals, providerToken, err := providers.AuthenticateUser(ctx, input, providerName)
+	ctx := context.WithValue(r.Context(), util.RequestKey, r)
+	userPrincipal, groupPrincipals, providerToken, err := providers.AuthenticateUser(ctx, input, input.GetName())
 	if err != nil {
-		return apiv3.Token{}, "", "", err
+		status := http.StatusInternalServerError
+		message := http.StatusText(status)
+		if apierror.IsAPIError(err) {
+			aerr := err.(*apierror.APIError)
+			status = aerr.Code.Status
+			message = aerr.Message
+		} else {
+			logrus.Errorf("login: Error authenticating user: %s", err)
+		}
+
+		http.Error(w, message, status)
+
+		return
 	}
 
 	displayName := userPrincipal.DisplayName
@@ -237,7 +283,7 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (apiv3.Token,
 
 		user, err = h.ensureUser(userPrincipal.Name, displayName)
 		if err != nil {
-			logrus.Warnf("Error creating or updating user for %s, retrying: %v", userPrincipal.Name, err)
+			logrus.Warnf("login: Error creating or updating user for %s, retrying: %s", userPrincipal.Name, err)
 			return false, nil
 		}
 
@@ -246,37 +292,93 @@ func (h *loginHandler) createLoginToken(request *types.APIContext) (apiv3.Token,
 		}
 
 		loginTime := time.Now()
-		userExtraInfo := providers.GetUserExtraAttributes(providerName, userPrincipal)
+		userExtraInfo := providers.GetUserExtraAttributes(input.GetName(), userPrincipal)
 		err = h.ensureUserAttribute(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo, loginTime)
 		if err != nil {
-			logrus.Warnf("Error creating or updating userAttribute for %s, retrying: %v", userPrincipal.Name, err)
+			logrus.Warnf("login: Error creating or updating userAttribute for %s, retrying: %s", userPrincipal.Name, err)
 			return false, nil
 		}
 
 		return true, nil
 	})
 	if err != nil {
-		return apiv3.Token{}, "", "", fmt.Errorf("error creating or updating user and/or userAttribute for %s: %w", userPrincipal.Name, err)
+		logrus.Errorf("login: Error creating or updating user and/or userAttribute for %s: %s", userPrincipal.Name, err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+
 	}
 
 	if !user.GetEnabled() {
-		return apiv3.Token{}, "", "", httperror.NewAPIError(httperror.PermissionDenied, "Permission Denied")
+		http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+		return
 	}
 
+	responseType := input.GetResponseType()
+	description := input.GetDescription()
+	ttl := input.GetTTL()
+
+	authTimeout := settings.AuthUserSessionTTLMinutes.Get()
+	if minutes, err := strconv.ParseInt(authTimeout, 10, 64); err == nil {
+		ttl = minutes * 60 * 1000
+	}
+
+	var (
+		token    *apiv3.Token
+		tokenKey string
+	)
 	if strings.HasPrefix(responseType, tokens.KubeconfigResponseType) {
-		token, tokenKey, err := tokens.GetKubeConfigToken(user.Name, responseType, h.kubeconfigTokenGetter, userPrincipal)
+		token, tokenKey, err = tokens.GetKubeConfigToken(user.Name, responseType, h.kubeconfigTokenGetter, userPrincipal)
 		if err != nil {
-			return apiv3.Token{}, "", "", err
+			logrus.Errorf("login: Error generating kubeconfig token: %s", err)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
 		}
-
-		return *token, tokenKey, responseType, nil
+	} else {
+		// Is it possible that a session token is requested but the response type is not cookie?
+		token, tokenKey, err = h.newLoginToken(user.Name, userPrincipal, groupPrincipals, providerToken, ttl, description)
+		if err != nil {
+			logrus.Errorf("login: Error creating login token for user %s: %v", user.Name, err)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
 	}
 
-	token, tokenKey, err := h.newLoginToken(user.Name, userPrincipal, groupPrincipals, providerToken, ttl, description)
+	bearerToken := token.Name + ":" + tokenKey
+
+	if responseType == CookieResponseType {
+		tokenCookie := &http.Cookie{
+			Name:     CookieName,
+			Value:    bearerToken,
+			Secure:   true,
+			Path:     "/",
+			HttpOnly: true,
+		}
+		http.SetCookie(w, tokenCookie)
+
+		return
+	}
+
+	token = token.DeepCopy()
+	tokens.SetTokenExpiresAt(token)
+
+	// tokenData, err := tokens.ConvertTokenResource(request.Schemas.Schema(&schema.PublicVersion, client.TokenType), token)
+	// if err != nil {
+	// 	return httperror.WrapAPIError(err, httperror.ServerError, "Server error while authenticating")
+	// }
+	// tokenData["token"] = token.Name + ":" + unhashedTokenKey
+
+	// TODO: I think we shouldn't return all the token details including principal ids.
+	// The only thing that is used beside the token key itself is its expiration time.
+	tokenData := map[string]any{
+		"token":     bearerToken,
+		"expiresAt": token.ExpiresAt,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	err = json.NewEncoder(w).Encode(tokenData)
 	if err != nil {
-		logrus.Errorf("Error creating login token for user %s: %v", user.Name, err)
-		return apiv3.Token{}, "", "", err
+		logrus.Errorf("login: Error writing response: %v", err)
+		return
 	}
-
-	return token, tokenKey, responseType, err
 }
