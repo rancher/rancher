@@ -239,7 +239,7 @@ func (s *OIDCProviderSuite) TestOIDCAuthorizationCodeFlow() {
 		clientID = oidcClient.Status.ClientID
 		assert.NotEmpty(c, clientID)
 		secret, err := s.wranglerContext.Core.Secret().Get(clientSecretsNamespace, clientID, metav1.GetOptions{})
-		assert.NoError(s.T(), err)
+		assert.NoError(c, err)
 		clientSecret = string(secret.Data["client-secret-1"])
 		assert.NotEmpty(c, clientSecret)
 	}, duration, tick)
