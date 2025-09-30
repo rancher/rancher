@@ -8,8 +8,10 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	"github.com/rancher/rancher/pkg/features"
+	scc "github.com/rancher/rancher/pkg/scc/consts"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/utils"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -73,6 +75,17 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		rb.addRole("Manage OIDC Clients", "manage-oidc-clients").
 			addRule().apiGroups("management.cattle.io").resources("oidcclients").verbs("get", "list", "patch", "create", "update", "watch", "delete", "deletecollection")
 	}
+
+	if utils.IsMCMServerOnly() && features.RancherSCCRegistrationExtension.Enabled() {
+		rb.addRole("Manage Registrations", "registrations-manage").
+			addRule().apiGroups("scc.cattle.io").resources("*").verbs("*").
+			addNamespacedRule(scc.DefaultSCCNamespace).addRule().apiGroups("*").resources("*").verbs("*")
+
+		rb.addRole("View Registrations", "registrations-view").
+			addRule().apiGroups("scc.cattle.io").resources("*").verbs("get", "list", "watch", "update").
+			addNamespacedRule(scc.DefaultSCCNamespace).addRule().apiGroups("*").resources("*").verbs("get", "list", "watch", "update")
+	}
+
 	rb.addRole("Admin", "admin").
 		addRule().apiGroups("*").resources("*").verbs("*").
 		addRule().apiGroups().nonResourceURLs("*").verbs("*")
