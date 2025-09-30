@@ -4,9 +4,7 @@ import (
 	"os"
 	"testing"
 
-	apismgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
@@ -45,7 +43,7 @@ func TestMSGraphClient_GetUser(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := mgmtv3.Principal{
+	want := v32.Principal{
 		PrincipalType: "user",
 		Provider:      Name,
 		ObjectMeta: metav1.ObjectMeta{
@@ -71,11 +69,6 @@ func TestMSGraphClient_ListUsers(t *testing.T) {
 	users, err := client.ListUsers("")
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	var displayNames []string
-	for _, v := range users {
-		displayNames = append(displayNames, v.DisplayName)
 	}
 
 	// Note these can change because of changes in the remote service
@@ -106,7 +99,7 @@ func TestMSGraphClient_GetGroup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := mgmtv3.Principal{
+	want := v32.Principal{
 		PrincipalType: "group",
 		Provider:      Name,
 		ObjectMeta: metav1.ObjectMeta{
@@ -218,7 +211,7 @@ func TestMSGraphClient_GetUser_China(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := mgmtv3.Principal{
+	want := v32.Principal{
 		PrincipalType: "user",
 		Provider:      Name,
 		ObjectMeta: metav1.ObjectMeta{
@@ -247,10 +240,6 @@ func TestMSGraphClient_ListUsers_China(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var displayNames []string
-	for _, v := range users {
-		displayNames = append(displayNames, v.DisplayName)
-	}
 	assert.Len(t, users, 12)
 }
 
@@ -278,7 +267,7 @@ func TestMSGraphClient_GetGroup_China(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := mgmtv3.Principal{
+	want := v32.Principal{
 		PrincipalType: "group",
 		Provider:      Name,
 		ObjectMeta: metav1.ObjectMeta{
@@ -397,7 +386,7 @@ func newTestClientWithSecretsClient(t *testing.T, secrets wcorev1.SecretControll
 		graphEndpoint = "https://microsoftgraph.chinacloudapi.cn"
 	}
 
-	client, err := NewMSGraphClient(&apismgmtv3.AzureADConfig{
+	client, err := NewMSGraphClient(&v32.AzureADConfig{
 		Endpoint:          endpoint,
 		GraphEndpoint:     graphEndpoint,
 		TenantID:          tenantID,
@@ -471,7 +460,7 @@ func newTestSecretsClient(ctrl *gomock.Controller) *wranglerfake.MockControllerI
 func TestUserToPrincipal(t *testing.T) {
 	principalTests := map[string]struct {
 		user azureUserObject
-		want v3.Principal
+		want v32.Principal
 	}{
 		"complete user": {
 			user: fakeUser{
@@ -479,7 +468,7 @@ func TestUserToPrincipal(t *testing.T) {
 				displayName:   ptr.To("Test User"),
 				principalName: ptr.To("testuser"),
 			},
-			want: v3.Principal{
+			want: v32.Principal{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "azuread_user://3f2504e0-4f89-11d3-9a0c-0305e82c3301",
 				},
@@ -494,7 +483,7 @@ func TestUserToPrincipal(t *testing.T) {
 				id:            ptr.To("3f2504e0-4f89-11d3-9a0c-0305e82c3301"),
 				principalName: ptr.To("testuser"),
 			},
-			want: v3.Principal{
+			want: v32.Principal{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "azuread_user://3f2504e0-4f89-11d3-9a0c-0305e82c3301",
 				},
@@ -508,7 +497,7 @@ func TestUserToPrincipal(t *testing.T) {
 				id:          ptr.To("3f2504e0-4f89-11d3-9a0c-0305e82c3301"),
 				displayName: ptr.To("Test User"),
 			},
-			want: v3.Principal{
+			want: v32.Principal{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "azuread_user://3f2504e0-4f89-11d3-9a0c-0305e82c3301",
 				},
@@ -521,7 +510,7 @@ func TestUserToPrincipal(t *testing.T) {
 			user: fakeUser{
 				id: ptr.To("3f2504e0-4f89-11d3-9a0c-0305e82c3301"),
 			},
-			want: v3.Principal{
+			want: v32.Principal{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "azuread_user://3f2504e0-4f89-11d3-9a0c-0305e82c3301",
 				},
