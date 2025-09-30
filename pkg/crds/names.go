@@ -277,7 +277,7 @@ var MigratedResources = map[string]bool{
 	"templateversions.management.cattle.io":                           false,
 	"tokens.management.cattle.io":                                     false,
 	"userattributes.management.cattle.io":                             false,
-	"users.management.cattle.io":                                      false,
+	"users.management.cattle.io":                                      true,
 	"uiplugins.catalog.cattle.io":                                     true,
 	"workloads.project.cattle.io":                                     false,
 }
