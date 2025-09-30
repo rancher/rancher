@@ -71,8 +71,8 @@ spec:
       {{- toYaml .Values.extraTolerations | nindent 8 }}
       {{- end }}
       containers:
-      - image: {{ .Values.rancherImage }}:{{ default .Chart.AppVersion .Values.rancherImageTag }}
-        imagePullPolicy: {{ default "IfNotPresent" .Values.rancherImagePullPolicy }}
+      - image: "{{ template "rancher.image" . }}:{{ template "rancher.imageTag" . }}"
+        imagePullPolicy: {{ include "rancher.imagePullPolicy" . }}
         name: {{ template "rancher.name" . }}
         ports:
         - containerPort: 80
@@ -230,7 +230,7 @@ spec:
 {{- if eq .Values.auditLog.destination "sidecar" }}
   {{- if .Values.auditLog.enabled }}
       # Make audit logs available for Rancher log collector tools.
-      - image: {{ include "auditLog_image" . }}
+      - image: "{{ printf "%s%s" (include "defaultOrOverrideRegistry" (list . (default "" .Values.auditLog.image.registry))) (include "auditLog.image" .) }}"
         imagePullPolicy: {{ default .Values.auditLog.image.pullPolicy .Values.busyboxImagePullPolicy }}
         name: {{ template "rancher.name" . }}-audit-log
         command: ["tail"]

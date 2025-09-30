@@ -2,9 +2,16 @@
 {{ if .Release.IsUpgrade -}}
 {{ $action = "upgraded" -}}
 {{ end -}}
-Rancher Server has been {{ $action }}.
+{{- include "tpl.chart.deprecated" (list .Values.busyboxImage ".Values.busyboxImage" "Use `.Values.auditLog.image.repository` & `.Values.auditLog.image.tag` instead.") -}}
+{{- include "tpl.chart.replace" (list .Values.busyboxImagePullPolicy ".Values.busyboxImagePullPolicy" ".Values.auditLog.image.pullPolicy") -}}
+{{- include "tpl.chart.deprecated" (list .Values.rancherImage ".Values.rancherImage" "Use `.Values.image.repository` & `.Values.image.registry` instead; if you used image name with Registry included you must split them up.") -}}
+{{- include "tpl.chart.replace" (list .Values.rancherImageTag ".Values.rancherImageTag" ".Values.image.tag") -}}
+{{- include "tpl.chart.replace" (list .Values.rancherImagePullPolicy ".Values.rancherImagePullPolicy" ".Values.image.pullPolicy") -}}
 
-NOTE: Rancher may take several minutes to fully initialize. Please standby while Certificates are being issued, Containers are started and the Ingress rule comes up.
+
+Rancher Server has been {{ $action }}. Rancher may take several minutes to fully initialize.
+
+Please standby while Certificates are being issued, Containers are started and the Ingress rule comes up.
 
 Check out our docs at https://rancher.com/docs/
 

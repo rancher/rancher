@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -e
 
+file="$(git rev-parse --show-toplevel)/build.yaml"
+DEFAULT_SHELL_IMAGE=$(grep -m1 'defaultShellVersion' "$file" | cut -d ' ' -f2)
+rancher_shell_image_name=$(echo "${DEFAULT_SHELL_IMAGE}" | cut -d ":" -f 1) || ""
+rancher_shell_image_tag=$(echo "${DEFAULT_SHELL_IMAGE}" | cut -d ":" -f 2) || ""
+
 function is_gnu_sed(){
   sed --version >/dev/null 2>&1
 }
@@ -57,10 +62,10 @@ echo "Preparing Rancher Chart for release: ${CHART_VERSION}"
 
 sed_i_wrapper -i -e "s/%VERSION%/${CHART_VERSION}/g" ./chart/Chart.yaml
 sed_i_wrapper -i -e "s/%APP_VERSION%/${APP_VERSION}/g" ./chart/Chart.yaml
-sed_i_wrapper -i -e "s@%POST_DELETE_IMAGE_NAME%@${test_image}@g" ./chart/values.yaml
-sed_i_wrapper -i -e "s/%POST_DELETE_IMAGE_TAG%/${APP_VERSION}/g" ./chart/values.yaml
-sed_i_wrapper -i -e "s@%PRE_UPGRADE_IMAGE_NAME%@${test_image}@g" ./chart/values.yaml
-sed_i_wrapper -i -e "s/%PRE_UPGRADE_IMAGE_TAG%/${APP_VERSION}/g" ./chart/values.yaml
+sed_i_wrapper -i -e "s@%POST_DELETE_IMAGE_NAME%@${rancher_shell_image_name}@g" ./chart/values.yaml
+sed_i_wrapper -i -e "s/%POST_DELETE_IMAGE_TAG%/${rancher_shell_image_tag}/g" ./chart/values.yaml
+sed_i_wrapper -i -e "s@%PRE_UPGRADE_IMAGE_NAME%@${rancher_shell_image_name}@g" ./chart/values.yaml
+sed_i_wrapper -i -e "s/%PRE_UPGRADE_IMAGE_TAG%/${rancher_shell_image_tag}/g" ./chart/values.yaml
 
 if [[ $REPO != "rancher" ]]; then
   sed_i_wrapper -i -e "s#rancherImage: rancher/rancher#rancherImage: ${test_image}#g" ./chart/values.yaml
