@@ -687,7 +687,7 @@ func (m *Manager) userAttributeChanged(attribs *v32.UserAttribute, provider stri
 }
 
 // PerUserCacheProviders is a set of provider names for which the token manager creates a per-user login token.
-var PerUserCacheProviders = []string{"github", "azuread", "googleoauth", "oidc", "keycloakoidc", "genericoidc", "cognito"}
+var PerUserCacheProviders = []string{"github", "azuread", "googleoauth", "oidc", "keycloakoidc"}
 
 func (m *Manager) NewLoginToken(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int64, description string) (v3.Token, string, error) {
 	provider := userPrincipal.Provider
