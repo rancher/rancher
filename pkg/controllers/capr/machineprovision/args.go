@@ -41,7 +41,10 @@ const (
 )
 
 var (
-	regExHyphen     = regexp.MustCompile("([a-z])([A-Z])")
+	// two valid cases:
+	// - ipv6AddressCount -> ipv6-address-count or ipv6_address_count
+	// - sshUser          -> ssh-user           or ssh_user
+	regExHyphen     = regexp.MustCompile("([a-z0-9])([A-Z])")
 	envNameOverride = map[string]string{
 		"amazonec2":       "AWS",
 		"rackspace":       "OS",
