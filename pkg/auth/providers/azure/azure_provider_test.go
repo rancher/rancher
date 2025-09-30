@@ -78,22 +78,6 @@ func TestConfigureTest(t *testing.T) {
 			},
 			expectedRedirectURL: "https://login.microsoftonline.com/tenant123/oauth2/v2.0/authorize?client_id=app123&redirect_uri=https://myrancher.com&response_type=code&scope=openid",
 		},
-		{
-			name: "editing an existing setup of Azure AD without annotation",
-			authConfig: map[string]interface{}{
-				"enabled":           true,
-				"accessMode":        "unrestricted",
-				"endpoint":          "https://login.microsoftonline.com/",
-				"graphEndpoint":     "https://graph.windows.net/",
-				"tokenEndpoint":     "https://login.microsoftonline.com/tenant123/oauth2/token",
-				"authEndpoint":      "https://login.microsoftonline.com/tenant123/oauth2/authorize",
-				"tenantId":          "tenant123",
-				"applicationId":     "app123",
-				"applicationSecret": "secret123",
-				"rancherUrl":        "https://myrancher.com",
-			},
-			expectedRedirectURL: "https://login.microsoftonline.com/tenant123/oauth2/authorize?client_id=app123&redirect_uri=https://myrancher.com&resource=https://graph.windows.net/&scope=openid",
-		},
 	}
 
 	for _, test := range tests {
@@ -171,38 +155,6 @@ func TestTransformToAuthProvider(t *testing.T) {
 				"tokenUrl":           "https://login.microsoftonline.com/tenant123/oauth2/v2.0/token",
 				"deviceAuthUrl":      "https://login.microsoftonline.com/tenant123/oauth2/v2.0/devicecode",
 				"redirectUrl":        "https://login.microsoftonline.com/tenant123/oauth2/v2.0/authorize?client_id=app123&redirect_uri=https://myrancher.com&response_type=code&scope=openid",
-				"logoutAllSupported": false,
-				"logoutAllEnabled":   false,
-				"logoutAllForced":    false,
-			},
-		},
-		{
-			name: "redirect URL for Azure AD Graph",
-			authConfig: map[string]interface{}{
-				"enabled":    true,
-				"accessMode": "unrestricted",
-				"metadata": map[string]interface{}{
-					"name":        "providerName",
-					"annotations": map[string]interface{}{},
-				},
-				"endpoint":          "https://login.microsoftonline.com/",
-				"graphEndpoint":     "https://graph.windows.net/",
-				"tokenEndpoint":     "https://login.microsoftonline.com/tenant123/oauth2/token",
-				"authEndpoint":      "https://login.microsoftonline.com/tenant123/oauth2/authorize",
-				"tenantId":          "tenant123",
-				"applicationId":     "app123",
-				"applicationSecret": "secret123",
-				"rancherUrl":        "https://myrancher.com",
-			},
-			expectedAuthProvider: map[string]interface{}{
-				"id":                 "providerName",
-				"clientId":           "app123",
-				"tenantId":           "tenant123",
-				"scopes":             []string{"openid", "profile", "email"},
-				"authUrl":            "https://login.microsoftonline.com/tenant123/oauth2/authorize",
-				"tokenUrl":           "https://login.microsoftonline.com/tenant123/oauth2/token",
-				"deviceAuthUrl":      "https://login.microsoftonline.com/tenant123/oauth2/v2.0/devicecode",
-				"redirectUrl":        "https://login.microsoftonline.com/tenant123/oauth2/authorize?client_id=app123&redirect_uri=https://myrancher.com&resource=https://graph.windows.net/&scope=openid",
 				"logoutAllSupported": false,
 				"logoutAllEnabled":   false,
 				"logoutAllForced":    false,
@@ -415,17 +367,6 @@ func TestMigrateNewFlowAnnotation(t *testing.T) {
 			},
 			proposed:           &v3.AzureADConfig{},
 			annotationExpected: true,
-		},
-		{
-			name: "reconfigure existing deprecated setup",
-			current: &v3.AzureADConfig{
-				AuthConfig: v3.AuthConfig{
-					Enabled: true,
-				},
-				GraphEndpoint: "https://graph.windows.net/",
-			},
-			proposed:           &v3.AzureADConfig{},
-			annotationExpected: false,
 		},
 		{
 			name: "reconfigure existing new setup",

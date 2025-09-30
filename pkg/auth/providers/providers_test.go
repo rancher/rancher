@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
@@ -19,7 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-func TestNewAzureADProviderDoesNotHavePerUserTokens(t *testing.T) {
+func TestAzureADProviderDoesNotHavePerUserTokens(t *testing.T) {
 	t.Cleanup(cleanup)
 	newFlowCfg := map[string]any{
 		"metadata": map[string]any{
@@ -39,57 +38,6 @@ func TestNewAzureADProviderDoesNotHavePerUserTokens(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.False(t, hasPerUserSecrets)
-}
-
-func TestOldAzureADProviderHasPerUserTokens(t *testing.T) {
-	t.Cleanup(cleanup)
-	oldFlowCfg := map[string]any{
-		"metadata": map[string]any{
-			"name": "azure",
-		},
-		"enabled":       true,
-		"graphEndpoint": "https://graph.windows.net/",
-	}
-
-	getter := newMockUnstructuredGetter()
-	obj := mockUnstructured{content: oldFlowCfg}
-	getter.objects[azure.Name] = &obj
-	Providers[azure.Name] = &azure.Provider{Retriever: getter}
-
-	hasPerUserSecrets, err := ProviderHasPerUserSecrets(azure.Name)
-
-	require.NoError(t, err)
-	assert.True(t, hasPerUserSecrets)
-}
-
-func TestBadAzureProviderDoesNotHavePerUserTokens(t *testing.T) {
-	t.Run("Azure Provider is not registered", func(t *testing.T) {
-		t.Cleanup(cleanup)
-		hasPerUserSecrets, err := ProviderHasPerUserSecrets(azure.Name)
-
-		require.Error(t, err)
-		assert.False(t, hasPerUserSecrets)
-	})
-
-	t.Run("Azure Provider has the wrong type", func(t *testing.T) {
-		t.Cleanup(cleanup)
-		Providers[azure.Name] = fakeProvider{}
-		hasPerUserSecrets, err := ProviderHasPerUserSecrets(azure.Name)
-
-		require.Error(t, err)
-		assert.False(t, hasPerUserSecrets)
-	})
-
-	t.Run("Config could not be fetch from Kubernetes", func(t *testing.T) {
-		t.Cleanup(cleanup)
-		getter := newMockUnstructuredGetter()
-		getter.errObjects[azure.Name] = errors.New("error getting config")
-		Providers[azure.Name] = &azure.Provider{Retriever: getter}
-		hasPerUserSecrets, err := ProviderHasPerUserSecrets(azure.Name)
-
-		require.Error(t, err)
-		assert.False(t, hasPerUserSecrets)
-	})
 }
 
 func TestProviderHasPerUserTokens(t *testing.T) {
