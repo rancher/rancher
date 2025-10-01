@@ -6,7 +6,7 @@ cd $(dirname $0)/..
 
 CMD=bin/rancher
 
-./scripts/must-rancher-binary.sh
+./dev-scripts/must-rancher-binary.sh
 
 if [ ! -z $1 ] && ( [ $1 = "--trace" ] || [ $1 = "--info" ] || [ $1 = "--debug" ] ); then
   LOGFLAG=$1
