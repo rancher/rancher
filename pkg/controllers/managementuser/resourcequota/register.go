@@ -70,7 +70,7 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 
 	reset := &quotaResetController{
 		nsIndexer:  nsInformer.GetIndexer(),
-		namespaces: cluster.Core.Namespaces(""),
+		namespaces: cluster.Management.Wrangler.Core.Namespace(),
 	}
 	cluster.Management.Management.Projects(cluster.ClusterName).AddHandler(ctx, "namespaceResourceQuotaResetController", reset.resetNamespaceQuota)
 }
