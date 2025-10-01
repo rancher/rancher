@@ -334,7 +334,6 @@ func (h *loginHandler) login(w http.ResponseWriter, r *http.Request, input login
 			return
 		}
 	} else {
-		// Is it possible that a session token is requested but the response type is not cookie?
 		token, tokenKey, err = h.newLoginToken(user.Name, userPrincipal, groupPrincipals, providerToken, ttl, description)
 		if err != nil {
 			logrus.Errorf("login: Error creating login token for user %s: %v", user.Name, err)
