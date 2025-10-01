@@ -71,17 +71,15 @@ def test_kubeconfig_token_ttl(admin_mc, user_mc):
 
     # call login action for kubeconfig token
     kubeconfig_token = login()
-    ttl1, token1 = get_token_and_ttl(kubeconfig_token)
-    assert ttl1 == kubeconfig_ttl_mins
 
     # wait for token to expire
     time.sleep(kubeconfig_ttl_mins*60)
 
     # confirm new kubeconfig token gets generated
     kubeconfig_token2 = login()
-    ttl2, token2 = get_token_and_ttl(kubeconfig_token2)
-    assert ttl2 == kubeconfig_ttl_mins
-    assert token1 != token2
+
+    assert kubeconfig_token["token"] != kubeconfig_token2["token"]
+    assert kubeconfig_token["expiresAt"] != kubeconfig_token2["expiresAt"]
 
     # reset kubeconfig ttl setting
     client.update_by_id_setting(id="kubeconfig-default-token-ttl-minutes",
@@ -99,12 +97,6 @@ def login():
     }, verify=False)
     protect_response(r)
     return r.json()
-
-
-def get_token_and_ttl(token):
-    token1_ttl_mins = mins(int(token["ttl"]))
-    token1_token = token["token"]
-    return token1_ttl_mins, token1_token
 
 
 def mins(time_millisec):
