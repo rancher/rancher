@@ -192,7 +192,7 @@ push_cattle_agent_image()
 
 # Get the rancher binary ready
 #
-./scripts/must-rancher-binary.sh
+./dev-scripts/must-rancher-binary.sh
 
 # uncomment to get startup logs. Don't leave them on because it slows drone down too
 # much
