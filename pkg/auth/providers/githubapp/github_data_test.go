@@ -319,7 +319,7 @@ func TestGitHubAppData(t *testing.T) {
 		teams := data.searchTeams("unknown")
 		assert.Empty(t, teams)
 
-		want := []common.GitHubAccount{
+		devTeams := []common.GitHubAccount{
 			{
 				ID:        34567,
 				Login:     "dev-team",
@@ -340,6 +340,19 @@ func TestGitHubAppData(t *testing.T) {
 		slices.SortFunc(teams, func(a, b common.GitHubAccount) int {
 			return strings.Compare(a.Login, b.Login)
 		})
+		assert.Equal(t, devTeams, teams)
+
+		want := []common.GitHubAccount{
+			{
+				ID:        23468,
+				Login:     "dev-team2",
+				Name:      "dev team 2",
+				AvatarURL: "https://example.com/avatar2.jpg",
+				HTMLURL:   "https://example.com/org/other-org/team/dev-team2",
+			},
+		}
+
+		teams = data.searchTeams("dev-team2")
 		assert.Equal(t, want, teams)
 
 		want = []common.GitHubAccount{
@@ -352,8 +365,12 @@ func TestGitHubAppData(t *testing.T) {
 			},
 		}
 
-		teams = data.searchTeams("dev-team2")
-		assert.Equal(t, want, teams)
+		// searching is case-insensitive
+		teams = data.searchTeams("Dev")
+		slices.SortFunc(teams, func(a, b common.GitHubAccount) int {
+			return strings.Compare(a.Login, b.Login)
+		})
+		assert.Equal(t, devTeams, teams)
 	})
 
 	t.Run("search orgs", func(t *testing.T) {

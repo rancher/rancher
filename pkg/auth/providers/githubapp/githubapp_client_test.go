@@ -40,7 +40,6 @@ func TestGithubAppClientGetAccessToken(t *testing.T) {
 	}
 }
 
-// TODO: Test with invalid token
 func TestGithubAppClientGetUser(t *testing.T) {
 	srv := httptest.NewServer(newFakeGitHubServer(t,
 		withTestCode("test_client_id", "1234567", "http://localhost:3000/callback", "testing")))
@@ -71,6 +70,21 @@ func TestGithubAppClientGetUser(t *testing.T) {
 	}
 
 	assert.Equal(t, want, account)
+}
+
+func TestGithubAppClientGetUserWithInvalidToken(t *testing.T) {
+	srv := httptest.NewServer(newFakeGitHubServer(t,
+		withTestCode("test_client_id", "1234567", "http://localhost:3000/callback", "testing")))
+	defer srv.Close()
+	cfg := &mgmtv3.GithubAppConfig{
+		Hostname:     stripScheme(t, srv),
+		ClientID:     "test_client_id",
+		ClientSecret: "test_client_secret",
+	}
+
+	appClient := githubAppClient{httpClient: http.DefaultClient}
+	_, err := appClient.getUser(t.Context(), "invalid token", cfg)
+	assert.ErrorContains(t, err, "Access token is invalid or expired")
 }
 
 func TestGithubAppClientGetOrgsForUser(t *testing.T) {

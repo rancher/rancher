@@ -149,8 +149,7 @@ func (g *gitHubAppData) searchTeams(s string) []common.GitHubAccount {
 
 	for _, org := range g.orgs {
 		for _, team := range org.teams {
-			// TODO: What should this match on?
-			if strings.HasPrefix(team.login, s) {
+			if hasInsensitivePrefix(team.login, s) {
 				accounts = append(accounts, common.GitHubAccount{Name: team.name, Login: team.login, AvatarURL: org.avatarURL, ID: team.id, HTMLURL: team.htmlURL})
 			}
 		}
@@ -165,8 +164,7 @@ func (g *gitHubAppData) searchOrgs(s string) []common.GitHubAccount {
 	var accounts []common.GitHubAccount
 
 	for orgName, org := range g.orgs {
-		// TODO: What should this match on?
-		if strings.HasPrefix(orgName, s) {
+		if hasInsensitivePrefix(orgName, s) {
 			accounts = append(accounts, common.GitHubAccount{Name: org.name, Login: org.login, AvatarURL: org.avatarURL, ID: org.id, HTMLURL: org.htmlURL, Type: "Organization"})
 		}
 	}
@@ -457,4 +455,8 @@ func getInstallationClient(ctx context.Context, appID int64, privateKey []byte, 
 	// Should this choose randomly?
 	selectedInstallationID := *installations[0].ID
 	return newClientForInstallation(ctx, appClient, selectedInstallationID, endpoint)
+}
+
+func hasInsensitivePrefix(s, prefix string) bool {
+	return strings.HasPrefix(strings.ToLower(s), strings.ToLower(prefix))
 }

@@ -82,10 +82,17 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userManager u
 	return provider
 }
 
+// LogoutAll is not implemented in the GitHubApp provider because we don't
+// currently terminate the OAuth session.
+//
+// We might choose to do this in future:
+// https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/token-expiration-and-revocation#token-revoked-by-the-oauth-app
 func (g *ghAppProvider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
 	return nil
 }
 
+// Logout is not implemented in the GitHubApp provider because we don't
+// differentiate between Logout and LogoutAll in this provider.
 func (g *ghAppProvider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
 	return nil
 }
@@ -194,14 +201,12 @@ func (g *ghAppProvider) RefetchGroupPrincipals(principalID string, _ string) ([]
 }
 
 func (g *ghAppProvider) getGroupPrincipals(principalID string, config *cattlev3.GithubAppConfig) ([]v3.Principal, error) {
-	// Should this check for a user Principal?
 	_, id, err := parsePrincipalID(principalID)
 	if err != nil {
 		return nil, err
 	}
 
 	var groupPrincipals []v3.Principal
-
 	data, err := getAppDataWithConfig(context.Background(), config)
 	if err != nil {
 		return nil, err
@@ -329,11 +334,8 @@ func (g *ghAppProvider) CanAccessWithGroupProviders(userPrincipalID string, grou
 		logrus.Errorf("Error fetching github config: %v", err)
 		return false, err
 	}
-	allowed, err := g.userManager.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipalID, groupPrincipals)
-	if err != nil {
-		return false, err
-	}
-	return allowed, nil
+
+	return g.userManager.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipalID, groupPrincipals)
 }
 
 func (g *ghAppProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
@@ -448,7 +450,7 @@ func chooseClientID(host string, sourceConfig *cattlev3.GithubAppConfig) *cattle
 	return &config
 }
 
-// This parses a Principal ID of the form provider_group://<external-id> and
+// parsePrincipalID parses a Principal ID of the form provider_group://<external-id> and
 // returns "group" and the external ID value as an integer.
 //
 // IDs not matching will result in an error.
