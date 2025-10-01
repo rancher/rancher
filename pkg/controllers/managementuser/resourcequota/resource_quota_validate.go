@@ -3,10 +3,12 @@ package resourcequota
 import (
 	"fmt"
 
-	v3b "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	wmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+
 	"github.com/sirupsen/logrus"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientcache "k8s.io/client-go/tools/cache"
@@ -18,10 +20,10 @@ import (
 type reconcileController struct {
 	namespaces v1.NamespaceInterface
 	nsIndexer  clientcache.Indexer
-	projects   v3.ProjectInterface
+	projects   wmgmtv3.ProjectClient
 }
 
-func (r *reconcileController) reconcileNamespaces(key string, p *v3.Project) (runtime.Object, error) {
+func (r *reconcileController) reconcileNamespaces(key string, p *apiv3.Project) (runtime.Object, error) {
 	if p == nil || p.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -34,7 +36,7 @@ func (r *reconcileController) reconcileNamespaces(key string, p *v3.Project) (ru
 	// with no namespaces used-limit has to be empty. because there is
 	// nothing which can be used without namespaces. therefore squash
 	// non-empty used-limits, if present.
-	empty := v3b.ResourceQuotaLimit{}
+	empty := apiv3.ResourceQuotaLimit{}
 	if len(namespaces) == 0 &&
 		p.Spec.ResourceQuota != nil &&
 		p.Spec.ResourceQuota.UsedLimit != empty {
