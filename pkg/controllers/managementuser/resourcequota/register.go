@@ -52,7 +52,7 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	cluster.Core.Namespaces("").AddHandler(ctx, "resourceQuotaSyncController", sync.syncResourceQuota)
 
 	reconcile := &reconcileController{
-		namespaces: cluster.Core.Namespaces(""),
+		namespaces: cluster.Management.Wrangler.Core.Namespace(),
 		nsIndexer:  nsInformer.GetIndexer(),
 		projects:   cluster.Management.Wrangler.Mgmt.Project(),
 	}

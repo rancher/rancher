@@ -5,7 +5,7 @@ import (
 
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	wmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 
 	"github.com/sirupsen/logrus"
 
@@ -18,7 +18,7 @@ import (
 // of the project so they get a chance to reconcile the resource quotas. for
 // projects without namespaces it ensures that their usedLimit is empty
 type reconcileController struct {
-	namespaces v1.NamespaceInterface
+	namespaces wcorev1.NamespaceController
 	nsIndexer  clientcache.Indexer
 	projects   wmgmtv3.ProjectClient
 }
@@ -54,7 +54,7 @@ func (r *reconcileController) reconcileNamespaces(key string, p *apiv3.Project) 
 
 	for _, n := range namespaces {
 		ns := n.(*corev1.Namespace)
-		r.namespaces.Controller().Enqueue("", ns.Name)
+		r.namespaces.Enqueue(ns.Name)
 	}
 	return nil, nil
 }
