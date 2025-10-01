@@ -17,6 +17,7 @@ const (
 	authCodeLifetime    = 5 * time.Minute
 	accessTokenLifetime = 1 * time.Hour
 	bearerPrefix        = "Bearer "
+	tokenPrefix         = "token "
 )
 
 type fakeClientDetails struct {
@@ -381,12 +382,11 @@ func (s *fakeGitHubServer) userHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	const bearerPrefix = "token "
-	if len(authHeader) < len(bearerPrefix) || authHeader[:len(bearerPrefix)] != bearerPrefix {
+	if len(authHeader) < len(tokenPrefix) || authHeader[:len(tokenPrefix)] != tokenPrefix {
 		http.Error(w, `{"error": "invalid_token", "message": "Invalid Authorization header format"}`, http.StatusUnauthorized)
 		return
 	}
-	accessToken := authHeader[len(bearerPrefix):]
+	accessToken := authHeader[len(tokenPrefix):]
 
 	tokenData, ok := s.accessTokens[accessToken]
 	if !ok || tokenData.Expiry.Before(time.Now()) {
@@ -469,7 +469,6 @@ func (s *fakeGitHubServer) installationHandler(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	const bearerPrefix = "Bearer "
 	if len(authHeader) < len(bearerPrefix) || authHeader[:len(bearerPrefix)] != bearerPrefix {
 		http.Error(w, `{"error": "invalid_token", "message": "Invalid Authorization header format"}`, http.StatusUnauthorized)
 		return
@@ -612,7 +611,6 @@ func (s *fakeGitHubServer) installationTokenHandler(w http.ResponseWriter, r *ht
 		return
 	}
 
-	const bearerPrefix = "Bearer "
 	if len(authHeader) < len(bearerPrefix) || authHeader[:len(bearerPrefix)] != bearerPrefix {
 		http.Error(w, `{"error": "invalid_token", "message": "Invalid Authorization header format"}`, http.StatusUnauthorized)
 		return
@@ -705,7 +703,6 @@ func (s *fakeGitHubServer) organizationTeamsHandler(w http.ResponseWriter, r *ht
 		return
 	}
 
-	const bearerPrefix = "Bearer "
 	if len(authHeader) < len(bearerPrefix) || authHeader[:len(bearerPrefix)] != bearerPrefix {
 		http.Error(w, `{"error": "invalid_token", "message": "Invalid Authorization header format"}`, http.StatusUnauthorized)
 		return
@@ -755,7 +752,6 @@ func (s *fakeGitHubServer) organizationTeamMembersHandler(w http.ResponseWriter,
 		return
 	}
 
-	const bearerPrefix = "Bearer "
 	if len(authHeader) < len(bearerPrefix) || authHeader[:len(bearerPrefix)] != bearerPrefix {
 		http.Error(w, `{"error": "invalid_token", "message": "Invalid Authorization header format"}`, http.StatusUnauthorized)
 		return
@@ -811,7 +807,6 @@ func (s *fakeGitHubServer) verifyInstallationToken(r *http.Request, w http.Respo
 		return false
 	}
 
-	const bearerPrefix = "Bearer "
 	if len(authHeader) < len(bearerPrefix) || authHeader[:len(bearerPrefix)] != bearerPrefix {
 		http.Error(w, `{"error": "invalid_token", "message": "Invalid Authorization header format"}`, http.StatusUnauthorized)
 		return false

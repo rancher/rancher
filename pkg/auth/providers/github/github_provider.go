@@ -417,11 +417,8 @@ func (g *ghProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPr
 		logrus.Errorf("Error fetching github config: %v", err)
 		return false, err
 	}
-	allowed, err := g.userMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipalID, groupPrincipals)
-	if err != nil {
-		return false, err
-	}
-	return allowed, nil
+
+	return g.userMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipalID, groupPrincipals)
 }
 
 func (g *ghProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {

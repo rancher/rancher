@@ -578,7 +578,6 @@ func TestParsePrincipalIDErrors(t *testing.T) {
 
 	for _, tt := range parseTests {
 		_, _, err := parsePrincipalID(tt)
-
 		assert.ErrorContains(t, err, "invalid id "+tt)
 	}
 }
