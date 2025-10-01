@@ -361,14 +361,7 @@ func (h *loginHandler) login(w http.ResponseWriter, r *http.Request, input login
 	token = token.DeepCopy()
 	tokens.SetTokenExpiresAt(token)
 
-	// tokenData, err := tokens.ConvertTokenResource(request.Schemas.Schema(&schema.PublicVersion, client.TokenType), token)
-	// if err != nil {
-	// 	return httperror.WrapAPIError(err, httperror.ServerError, "Server error while authenticating")
-	// }
-	// tokenData["token"] = token.Name + ":" + unhashedTokenKey
-
-	// TODO: I think we shouldn't return all the token details including principal ids.
-	// The only thing that is used beside the token key itself is its expiration time.
+	// Only return details that are actually used.
 	tokenData := map[string]any{
 		"token":     bearerToken,
 		"expiresAt": token.ExpiresAt,
