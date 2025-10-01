@@ -330,7 +330,6 @@ type AuthConfigConditions struct {
 
 // +genclient
 // +kubebuilder:skipversion
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type SamlToken struct {
