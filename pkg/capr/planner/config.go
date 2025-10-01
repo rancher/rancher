@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"hash"
 	"path"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -357,26 +358,6 @@ func addToken(config map[string]interface{}, entry *planEntry, tokensSecret plan
 }
 
 func addAddresses(secrets corecontrollers.SecretCache, config map[string]interface{}, entry *planEntry) error {
-	// Helpers
-	firstNonEmpty := func(a, b string) string {
-		if a != "" {
-			return a
-		}
-		return b
-	}
-	appendNonEmptyUnique := func(m map[string]interface{}, key, val string) {
-		if val == "" {
-			return
-		}
-		cur := convert.ToStringSlice(m[key])
-		for _, existing := range cur {
-			if existing == val {
-				return
-			}
-		}
-		m[key] = append(cur, val)
-	}
-
 	internalIPAddress := entry.Metadata.Annotations[capr.InternalAddressAnnotation]
 	ipAddress := entry.Metadata.Annotations[capr.AddressAnnotation]
 	internalAddressProvided, addressProvided := internalIPAddress != "", ipAddress != ""
@@ -411,7 +392,10 @@ func addAddresses(secrets corecontrollers.SecretCache, config map[string]interfa
 	}
 
 	// Prefer the public IPv4 address from rancher-machine or the registration command, fall back to the IPv6 address
-	externalIP := firstNonEmpty(ipAddress, ipv6)
+	externalIP := ipAddress
+	if externalIP == "" {
+		externalIP = ipv6
+	}
 	setNodeExternalIP := externalIP != "" && internalIPAddress != "" && externalIP != internalIPAddress
 
 	// on control-plane nodes with distinct internal/external, advertise the internal
@@ -429,14 +413,24 @@ func addAddresses(secrets corecontrollers.SecretCache, config map[string]interfa
 		// The public IPv4 address cannot be disabled. Therefore, if --private-network is not enabled, the public IPv4
 		// address needs to be set to the node-ip to maintain alignment with cluster-cidr and server-cidr in dual-stack mode.
 		// This also implies that an IPv6-only DO node driver cluster is not possible.
-		appendNonEmptyUnique(config, "node-ip", firstNonEmpty(internalIPAddress, ipAddress))
+		toAdd := internalIPAddress
+		if toAdd == "" {
+			toAdd = ipAddress
+		}
+		if toAdd != "" && !slices.Contains(convert.ToStringSlice(config["node-ip"]), toAdd) {
+			config["node-ip"] = append(convert.ToStringSlice(config["node-ip"]), toAdd)
+		}
 	default:
 		// Always include the internal node IP when it is available.
-		appendNonEmptyUnique(config, "node-ip", internalIPAddress)
+		if internalIPAddress != "" && !slices.Contains(convert.ToStringSlice(config["node-ip"]), internalIPAddress) {
+			config["node-ip"] = append(convert.ToStringSlice(config["node-ip"]), internalIPAddress)
+		}
 	}
 
 	// In IPv6-only clusters, the IPv6 address should be used as both the internal and external node IP
-	appendNonEmptyUnique(config, "node-ip", ipv6)
+	if ipv6 != "" && !slices.Contains(convert.ToStringSlice(config["node-ip"]), ipv6) {
+		config["node-ip"] = append(convert.ToStringSlice(config["node-ip"]), ipv6)
+	}
 
 	// Cloud provider, if set, will handle external IP
 	// If no cloud provider is set, assign node-external-ip in any of the following cases:
@@ -444,8 +438,12 @@ func addAddresses(secrets corecontrollers.SecretCache, config map[string]interfa
 	// - both public and private IPs are available and differ
 	// - an IPv6 address is available for IPv6-only or dual-stack cluster
 	if convert.ToString(config["cloud-provider-name"]) == "" && (addressProvided || setNodeExternalIP || ipv6 != "") {
-		appendNonEmptyUnique(config, "node-external-ip", ipAddress)
-		appendNonEmptyUnique(config, "node-external-ip", ipv6)
+		if ipAddress != "" && !slices.Contains(convert.ToStringSlice(config["node-external-ip"]), ipAddress) {
+			config["node-external-ip"] = append(convert.ToStringSlice(config["node-external-ip"]), ipAddress)
+		}
+		if ipv6 != "" && !slices.Contains(convert.ToStringSlice(config["node-external-ip"]), ipv6) {
+			config["node-external-ip"] = append(convert.ToStringSlice(config["node-external-ip"]), ipv6)
+		}
 	}
 
 	return nil
