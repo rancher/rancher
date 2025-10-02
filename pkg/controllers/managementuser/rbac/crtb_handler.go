@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/controllers/status"
+	rbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 
 	controllersv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	typesrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
@@ -45,8 +45,8 @@ func newCRTBLifecycle(m *manager, management *config.ManagementContext) *crtbLif
 	return &crtbLifecycle{
 		m:          m,
 		rtLister:   management.Management.RoleTemplates("").Controller().Lister(),
-		crbLister:  m.workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
-		crbClient:  m.workload.RBAC.ClusterRoleBindings(""),
+		crbLister:  m.workload.RBACw.ClusterRoleBinding().Cache(),
+		crbClient:  m.workload.RBACw.ClusterRoleBinding(),
 		crtbClient: management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
 		crtbCache:  management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
 		s:          status.NewStatus(),
@@ -56,8 +56,8 @@ func newCRTBLifecycle(m *manager, management *config.ManagementContext) *crtbLif
 type crtbLifecycle struct {
 	m          managerInterface
 	rtLister   v3.RoleTemplateLister
-	crbLister  typesrbacv1.ClusterRoleBindingLister
-	crbClient  typesrbacv1.ClusterRoleBindingInterface
+	crbLister  rbacv1.ClusterRoleBindingCache
+	crbClient  rbacv1.ClusterRoleBindingClient
 	crtbClient controllersv3.ClusterRoleTemplateBindingController
 	crtbCache  controllersv3.ClusterRoleTemplateBindingCache
 	s          *status.Status
@@ -152,7 +152,7 @@ func (c *crtbLifecycle) ensureCRTBDelete(binding *v3.ClusterRoleTemplateBinding,
 	condition := metav1.Condition{Type: clusterRoleTemplateBindingDelete}
 
 	set := labels.Set(map[string]string{rtbOwnerLabel: pkgrbac.GetRTBLabel(binding.ObjectMeta)})
-	rbs, err := c.crbLister.List("", set.AsSelector())
+	rbs, err := c.crbLister.List(set.AsSelector())
 	if err != nil {
 		c.s.AddCondition(remoteConditions, condition, failedToListCRBs, err)
 		return fmt.Errorf("couldn't list clusterrolebindings with selector %s: %w", set.AsSelector(), err)

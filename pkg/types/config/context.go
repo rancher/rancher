@@ -219,7 +219,6 @@ type UserContext struct {
 	Catalog        catalog.Interface
 	Project        projectv3.Interface
 	Core           corev1.Interface
-	RBAC           rbacv1.Interface
 	Extensions     extv1beta1.Interface
 	BatchV1        batchv1.Interface
 	Networking     knetworkingv1.Interface
@@ -313,7 +312,6 @@ func (w *UserContext) UserOnlyContext() *UserOnlyContext {
 		Apps:        w.Apps,
 		Project:     w.Project,
 		Core:        w.Core,
-		RBAC:        w.RBAC,
 		Extensions:  w.Extensions,
 		Networking:  w.Networking,
 		BatchV1:     w.BatchV1,
@@ -338,7 +336,6 @@ type UserOnlyContext struct {
 	Autoscaling     autoscaling.Interface
 	Project         projectv3.Interface
 	Core            corev1.Interface
-	RBAC            rbacv1.Interface
 	Extensions      extv1beta1.Interface
 	BatchV1         batchv1.Interface
 	Networking      knetworkingv1.Interface
@@ -440,7 +437,6 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 	context.Core = corev1.NewFromControllerFactory(controllerFactory)
 	context.Project = projectv3.NewFromControllerFactory(controllerFactory)
 	context.Storage = storagev1.NewFromControllerFactory(controllerFactory)
-	context.RBAC = rbacv1.NewFromControllerFactory(controllerFactory)
 	context.Networking = knetworkingv1.NewFromControllerFactory(controllerFactory)
 	context.Extensions = extv1beta1.NewFromControllerFactory(controllerFactory)
 	context.BatchV1 = batchv1.NewFromControllerFactory(controllerFactory)
@@ -526,7 +522,6 @@ func NewUserOnlyContext(config *wrangler.Context) (*UserOnlyContext, error) {
 	context.Core = corev1.NewFromControllerFactory(context.ControllerFactory)
 	context.Project = projectv3.NewFromControllerFactory(context.ControllerFactory)
 	context.Storage = storagev1.NewFromControllerFactory(context.ControllerFactory)
-	context.RBAC = rbacv1.NewFromControllerFactory(context.ControllerFactory)
 	context.Extensions = extv1beta1.NewFromControllerFactory(context.ControllerFactory)
 	context.BatchV1 = batchv1.NewFromControllerFactory(context.ControllerFactory)
 	context.Autoscaling = autoscaling.NewFromControllerFactory(context.ControllerFactory)
