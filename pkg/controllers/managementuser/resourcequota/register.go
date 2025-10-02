@@ -41,29 +41,28 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	}
 	nsInformer.AddIndexers(nsIndexers)
 	sync := &SyncController{
-		Namespaces:          cluster.Management.Wrangler.Core.Namespace(),
 		NsIndexer:           nsInformer.GetIndexer(),
+		Namespaces:          cluster.Management.Wrangler.Core.Namespace(),
+		ProjectGetter:       cluster.Management.Wrangler.Mgmt.Project(),
 		ResourceQuotas:      cluster.Core.ResourceQuotas(""),
 		ResourceQuotaLister: cluster.Core.ResourceQuotas("").Controller().Lister(),
 		LimitRange:          cluster.Core.LimitRanges(""),
 		LimitRangeLister:    cluster.Core.LimitRanges("").Controller().Lister(),
-		ProjectLister:       cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister(),
 	}
 	cluster.Core.Namespaces("").AddHandler(ctx, "resourceQuotaSyncController", sync.syncResourceQuota)
 
 	reconcile := &reconcileController{
-		namespaces: cluster.Management.Wrangler.Core.Namespace(),
 		nsIndexer:  nsInformer.GetIndexer(),
+		namespaces: cluster.Management.Wrangler.Core.Namespace(),
 		projects:   cluster.Management.Wrangler.Mgmt.Project(),
 	}
 
 	cluster.Management.Management.Projects(cluster.ClusterName).AddHandler(ctx, "resourceQuotaNamespacesReconcileController", reconcile.reconcileNamespaces)
 
 	calculate := &calculateLimitController{
-		nsIndexer:     nsInformer.GetIndexer(),
-		projectLister: cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister(),
-		projects:      cluster.Management.Management.Projects(cluster.ClusterName),
-		clusterName:   cluster.ClusterName,
+		nsIndexer:   nsInformer.GetIndexer(),
+		projects:    cluster.Management.Wrangler.Mgmt.Project(),
+		clusterName: cluster.ClusterName,
 	}
 	cluster.Core.Namespaces("").AddHandler(ctx, "resourceQuotaUsedLimitController", calculate.calculateResourceQuotaUsed)
 	cluster.Management.Management.Projects(cluster.ClusterName).AddHandler(ctx, "resourceQuotaProjectUsedLimitController", calculate.calculateResourceQuotaUsedProject)
