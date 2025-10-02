@@ -13,7 +13,10 @@ import (
 	namespaceutil "github.com/rancher/rancher/pkg/namespace"
 	validate "github.com/rancher/rancher/pkg/resourcequota"
 	"github.com/rancher/rancher/pkg/utils"
+	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+
 	"github.com/sirupsen/logrus"
+
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,7 +40,7 @@ defined in namespace.resourceQuota
 */
 type SyncController struct {
 	ProjectLister       v3.ProjectLister
-	Namespaces          v1.NamespaceInterface
+	Namespaces          wcorev1.NamespaceController
 	ResourceQuotas      v1.ResourceQuotaInterface
 	ResourceQuotaLister v1.ResourceQuotaLister
 	LimitRange          v1.LimitRangeInterface

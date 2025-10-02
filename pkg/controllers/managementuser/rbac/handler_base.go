@@ -123,7 +123,7 @@ func Register(ctx context.Context, workload *config.UserContext) {
 	management.Management.GlobalRoleBindings("").AddHandler(ctx, grbHandlerName, newGlobalRoleBindingHandler(workload))
 
 	sync := &resourcequota.SyncController{
-		Namespaces:          workload.Core.Namespaces(""),
+		Namespaces:          workload.Management.Wrangler.Core.Namespace(),
 		NsIndexer:           nsInformer.GetIndexer(),
 		ResourceQuotas:      workload.Core.ResourceQuotas(""),
 		ResourceQuotaLister: workload.Core.ResourceQuotas("").Controller().Lister(),

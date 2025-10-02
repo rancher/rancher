@@ -41,7 +41,7 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	}
 	nsInformer.AddIndexers(nsIndexers)
 	sync := &SyncController{
-		Namespaces:          cluster.Core.Namespaces(""),
+		Namespaces:          cluster.Management.Wrangler.Core.Namespace(),
 		NsIndexer:           nsInformer.GetIndexer(),
 		ResourceQuotas:      cluster.Core.ResourceQuotas(""),
 		ResourceQuotaLister: cluster.Core.ResourceQuotas("").Controller().Lister(),
