@@ -42,7 +42,7 @@ const (
 	CrtbOwnerLabel                    = "authz.cluster.cattle.io/crtb-owner"
 	PrtbOwnerLabel                    = "authz.cluster.cattle.io/prtb-owner"
 	AggregationLabel                  = "management.cattle.io/aggregates"
-	clusterRoleOwnerAnnotation        = "authz.cluster.cattle.io/clusterrole-owner"
+	ClusterRoleOwnerLabel             = "authz.cluster.cattle.io/clusterrole-owner"
 	aggregatorSuffix                  = "aggregator"
 	promotedSuffix                    = "promoted"
 	namespaceSuffix                   = "namespaces"
@@ -433,9 +433,9 @@ func AreClusterRolesSame(currentCR, wantedCR *rbacv1.ClusterRole) (bool, *rbacv1
 			currentCR.Rules = nil
 		}
 	}
-	if got, want := currentCR.Annotations[clusterRoleOwnerAnnotation], wantedCR.Annotations[clusterRoleOwnerAnnotation]; got != want {
+	if got, want := currentCR.Labels[ClusterRoleOwnerLabel], wantedCR.Labels[ClusterRoleOwnerLabel]; got != want {
 		same = false
-		metav1.SetMetaDataAnnotation(&currentCR.ObjectMeta, clusterRoleOwnerAnnotation, want)
+		metav1.SetMetaDataLabel(&currentCR.ObjectMeta, ClusterRoleOwnerLabel, want)
 	}
 	if got, want := currentCR.Labels[AggregationLabel], wantedCR.Labels[AggregationLabel]; got != want {
 		same = false
@@ -461,9 +461,11 @@ func DeleteResource[T generic.RuntimeMetaObject, TList runtime.Object](name stri
 func BuildClusterRole(name, ownerName string, rules []rbacv1.PolicyRule) *rbacv1.ClusterRole {
 	return &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        name,
-			Labels:      map[string]string{AggregationLabel: name},
-			Annotations: map[string]string{clusterRoleOwnerAnnotation: ownerName},
+			Name: name,
+			Labels: map[string]string{
+				AggregationLabel:      name,
+				ClusterRoleOwnerLabel: ownerName,
+			},
 		},
 		Rules: rules,
 	}
@@ -491,12 +493,12 @@ func BuildAggregatingClusterRole(rt *v3.RoleTemplate, nameTransformer func(strin
 	return &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: aggregatingCRName,
-			// Label so other cluster roles can aggregate this one
 			Labels: map[string]string{
+				// Label so other cluster roles can aggregate this one
 				AggregationLabel: aggregatingCRName,
+				// Label to identify who owns this cluster role
+				ClusterRoleOwnerLabel: ownerName,
 			},
-			// Annotation to identify which role template owns the cluster role
-			Annotations: map[string]string{clusterRoleOwnerAnnotation: ownerName},
 		},
 		AggregationRule: &rbacv1.AggregationRule{
 			ClusterRoleSelectors: roleTemplateLabels,
@@ -611,6 +613,11 @@ func GetPRTBOwnerLabel(s string) string {
 // The reason it isn't a key value pair is because we have multiple of these labels on a single RoleBinding/ClusterRoleBinding, so we need unique labels.
 func GetCRTBOwnerLabel(s string) string {
 	return name.SafeConcatName(CrtbOwnerLabel, s)
+}
+
+// GetClusterRoleOwnerLabel gets the owner label for a ClusterRole.
+func GetClusterRoleOwnerLabel(s string) string {
+	return ClusterRoleOwnerLabel + "=" + s
 }
 
 // GetClusterAndProjectNameFromPRTB gets the cluster and project belonging to a ProjectRoleTemplateBinding.

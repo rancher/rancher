@@ -2,6 +2,7 @@ package roletemplates
 
 import (
 	"errors"
+	"slices"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
@@ -53,37 +54,62 @@ func (r *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.RoleT
 		return nil, nil
 	}
 
+	return rt, r.reconcileClusterRoles(rt)
+}
+
+// reconcileClusterRoles is responsible for ensuring the right set of Cluster Roles exist. It deletes any owned by the Role Template that shouldn't exist.
+func (r *roleTemplateHandler) reconcileClusterRoles(rt *v3.RoleTemplate) error {
 	rules, err := r.gatherRules(rt)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	clusterRoles, err := r.getClusterRoles(rt, rules)
+	desiredCRs, err := r.buildClusterRoles(rt, rules)
 	if err != nil {
-		return nil, err
+		return err
+	}
+	addOwnerReferenceToClusterRole(desiredCRs, rt)
+
+	currentCRs, err := r.crController.List(metav1.ListOptions{LabelSelector: rbac.GetClusterRoleOwnerLabel(rt.Name)})
+	if err != nil {
+		return err
 	}
 
-	// Add an owner reference so the cluster role deletion gets handled automatically.
+	var returnedError error
+	// Remove any Cluster Roles owned by this RoleTemplate that should not exist
+	for _, currentCR := range currentCRs.Items {
+		if !slices.ContainsFunc(desiredCRs, func(desiredCR *rbacv1.ClusterRole) bool {
+			return desiredCR.Name == currentCR.Name
+		}) {
+			if err := rbac.DeleteResource(currentCR.Name, r.crController); err != nil {
+				returnedError = errors.Join(returnedError, err)
+			}
+		}
+	}
+
+	// Create or update the desired CRs
+	for _, cr := range desiredCRs {
+		if err := rbac.CreateOrUpdateResource(cr, r.crController, rbac.AreClusterRolesSame); err != nil {
+			returnedError = errors.Join(returnedError, err)
+		}
+	}
+	return returnedError
+}
+
+func addOwnerReferenceToClusterRole(cr []*rbacv1.ClusterRole, rt *v3.RoleTemplate) {
 	ownerReferences := []metav1.OwnerReference{{
 		Name:       rt.Name,
 		APIVersion: rt.APIVersion,
 		Kind:       rt.Kind,
 		UID:        rt.UID,
 	}}
-
-	for _, cr := range clusterRoles {
-		cr.OwnerReferences = ownerReferences
-		if err := rbac.CreateOrUpdateResource(cr, r.crController, rbac.AreClusterRolesSame); err != nil {
-			return nil, err
-		}
+	for _, c := range cr {
+		c.OwnerReferences = ownerReferences
 	}
-
-	return rt, nil
 }
 
 // getClusterRoles gets all the management plane cluster roles needed for this RoleTemplate.
-func (r *roleTemplateHandler) getClusterRoles(rt *v3.RoleTemplate, rules []rbacv1.PolicyRule) ([]*rbacv1.ClusterRole, error) {
-
+func (r *roleTemplateHandler) buildClusterRoles(rt *v3.RoleTemplate, rules []rbacv1.PolicyRule) ([]*rbacv1.ClusterRole, error) {
 	var clusterRoles []*rbacv1.ClusterRole
 	if rt.Context == "cluster" {
 		clusterScopedPrivileges := getManagementPlaneRules(rules, clusterManagementPlaneResources)
