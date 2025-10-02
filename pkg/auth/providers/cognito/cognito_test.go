@@ -133,7 +133,7 @@ func TestLogout(t *testing.T) {
 
 	logoutTests := map[string]struct {
 		config *v3.OIDCConfig
-		verify func(t require.TestingT, err error, msgAndArgs ...interface{})
+		verify func(t require.TestingT, err error, msgAndArgs ...any)
 	}{
 		"when logout all is forced": {
 			config: newOIDCConfig("9090", func(s *v3.OIDCConfig) {
@@ -200,7 +200,7 @@ type normanRecorder struct {
 	responses []normanResponse
 }
 
-func (n *normanRecorder) Write(_ *types.APIContext, code int, obj interface{}) {
+func (n *normanRecorder) Write(_ *types.APIContext, code int, obj any) {
 	n.responses = append(n.responses, normanResponse{
 		code: code,
 		data: obj,

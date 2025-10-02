@@ -11,13 +11,13 @@ func TestTransformToAuthProvider(t *testing.T) {
 
 	tests := []struct {
 		desc       string
-		authConfig map[string]interface{}
-		provider   map[string]interface{}
+		authConfig map[string]any
+		provider   map[string]any
 	}{
 		{
 			desc: "Logout fields are set",
-			authConfig: map[string]interface{}{
-				"metadata": map[string]interface{}{
+			authConfig: map[string]any{
+				"metadata": map[string]any{
 					"name": "okta",
 				},
 				"type":               "oktaConfig",
@@ -25,7 +25,7 @@ func TestTransformToAuthProvider(t *testing.T) {
 				"logoutAllEnabled":   true,
 				"logoutAllForced":    true,
 			},
-			provider: map[string]interface{}{
+			provider: map[string]any{
 				"id":                 "okta",
 				"type":               "oktaProvider",
 				"logoutAllSupported": true,
@@ -35,13 +35,13 @@ func TestTransformToAuthProvider(t *testing.T) {
 		},
 		{
 			desc: "No logout fields are set",
-			authConfig: map[string]interface{}{
-				"metadata": map[string]interface{}{
+			authConfig: map[string]any{
+				"metadata": map[string]any{
 					"name": "okta",
 				},
 				"type": "oktaConfig",
 			},
-			provider: map[string]interface{}{
+			provider: map[string]any{
 				"id":                 "okta",
 				"type":               "oktaProvider",
 				"logoutAllSupported": false,
@@ -51,14 +51,14 @@ func TestTransformToAuthProvider(t *testing.T) {
 		},
 		{
 			desc: "Only logoutAllSupported is set",
-			authConfig: map[string]interface{}{
-				"metadata": map[string]interface{}{
+			authConfig: map[string]any{
+				"metadata": map[string]any{
 					"name": "okta",
 				},
 				"type":               "oktaConfig",
 				"logoutAllSupported": true,
 			},
-			provider: map[string]interface{}{
+			provider: map[string]any{
 				"id":                 "okta",
 				"type":               "oktaProvider",
 				"logoutAllSupported": true,

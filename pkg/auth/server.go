@@ -15,7 +15,6 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	"github.com/rancher/rancher/pkg/clusterrouter"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/utils"
@@ -51,7 +50,7 @@ func NewHeaderAuth() (*Server, error) {
 }
 
 func NewServer(ctx context.Context, wContext *wrangler.Context, scaledContext *config.ScaledContext, authenticator requests.Authenticator) (*Server, error) {
-	authManagement, err := newAPIManagement(ctx, scaledContext)
+	authManagement, err := newAPIManagement(ctx, scaledContext, authenticator)
 	if err != nil {
 		return nil, err
 	}
@@ -63,13 +62,19 @@ func NewServer(ctx context.Context, wContext *wrangler.Context, scaledContext *c
 	}, nil
 }
 
-func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext) (steveauth.Middleware, error) {
-	privateAPI, err := newPrivateAPI(ctx, scaledContext)
+func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext, authToken requests.AuthTokenGetter) (steveauth.Middleware, error) {
+	privateAPI, err := newPrivateAPI(ctx, scaledContext, authToken)
 	if err != nil {
 		return nil, err
 	}
 
-	publicAPI, err := publicapi.NewHandler(ctx, scaledContext, norman.ConfigureAPIUI)
+	// Depricated. Use /v1-public instead.
+	v3PublicAPI, err := publicapi.NewV3Handler(ctx, scaledContext, norman.ConfigureAPIUI)
+	if err != nil {
+		return nil, err
+	}
+
+	v1PublicAPI, err := publicapi.NewV1Handler(ctx, scaledContext)
 	if err != nil {
 		return nil, err
 	}
@@ -86,8 +91,9 @@ func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext) 
 	logrus.Infof("Configuring auth server API body limit to %v bytes", apiLimit)
 
 	limitingHandler := utils.APIBodyLimitingHandler(apiLimit)
-	root.PathPrefix("/v3-public").Handler(limitingHandler(publicAPI))
 	root.PathPrefix("/v1-saml").Handler(limitingHandler(saml))
+	root.PathPrefix("/v3-public").Handler(v3PublicAPI) // Deprecated. Use /v1-public instead.
+	root.PathPrefix("/v1-public").Handler(v1PublicAPI)
 	root.NotFoundHandler = privateAPI
 
 	return func(next http.Handler) http.Handler {
@@ -96,13 +102,13 @@ func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext) 
 	}, nil
 }
 
-func newPrivateAPI(ctx context.Context, scaledContext *config.ScaledContext) (*mux.Router, error) {
-	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext, norman.ConfigureAPIUI)
+func newPrivateAPI(ctx context.Context, scaledContext *config.ScaledContext, authToken requests.AuthTokenGetter) (*mux.Router, error) {
+	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext.Wrangler, norman.ConfigureAPIUI)
 	if err != nil {
 		return nil, err
 	}
 
-	otherAPIs, err := api.NewNormanServer(ctx, clusterrouter.GetClusterID, scaledContext)
+	otherAPIs, err := api.NewNormanServer(ctx, scaledContext, authToken)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +141,7 @@ func (s *Server) OnLeader(ctx context.Context) error {
 	}
 
 	tokens.StartPurgeDaemon(ctx, management)
-	providerrefresh.StartRefreshDaemon(ctx, s.scaledContext, management)
+	providerrefresh.StartRefreshDaemon(s.scaledContext, management)
 	logrus.Infof("Steve auth startup complete")
 	return nil
 }

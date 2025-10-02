@@ -31,13 +31,14 @@ func (g *ghProvider) actionHandler(actionName string, action *types.Action, requ
 		return nil
 	}
 
-	if actionName == "configureTest" {
+	switch actionName {
+	case "configureTest":
 		return g.configureTest(request)
-	} else if actionName == "testAndApply" {
+	case "testAndApply":
 		return g.testAndApply(request)
+	default:
+		return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 	}
-
-	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }
 
 func (g *ghProvider) configureTest(request *types.APIContext) error {
@@ -48,7 +49,7 @@ func (g *ghProvider) configureTest(request *types.APIContext) error {
 	}
 	redirectURL := formGithubRedirectURL(githubConfig)
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"redirectUrl": redirectURL,
 		"type":        "githubConfigTestOutput",
 	}
@@ -61,7 +62,7 @@ func formGithubRedirectURL(githubConfig *v32.GithubConfig) string {
 	return githubRedirectURL(githubConfig.Hostname, githubConfig.ClientID, githubConfig.TLS)
 }
 
-func formGithubRedirectURLFromMap(config map[string]interface{}) string {
+func formGithubRedirectURLFromMap(config map[string]any) string {
 	hostname, _ := config[client.GithubConfigFieldHostname].(string)
 	clientID, _ := config[client.GithubConfigFieldClientID].(string)
 	tls, _ := config[client.GithubConfigFieldTLS].(bool)
@@ -134,7 +135,7 @@ func (g *ghProvider) testAndApply(request *types.APIContext) error {
 
 	userExtraInfo := g.GetUserExtraAttributes(userPrincipal)
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return g.tokenMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
+		return g.userMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
 	}); err != nil {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to create or update userAttribute: %v", err))
 	}

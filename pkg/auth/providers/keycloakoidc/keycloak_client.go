@@ -3,14 +3,14 @@ package keycloakoidc
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
 
@@ -38,7 +38,7 @@ type KeyCloakClient struct {
 	httpClient *http.Client
 }
 
-func (k *KeyCloakClient) searchPrincipals(searchTerm, principalType string, config *v32.OIDCConfig) ([]account, error) {
+func (k *KeyCloakClient) searchPrincipals(searchTerm, principalType string, config *apiv3.OIDCConfig) ([]account, error) {
 	var accounts []account
 	sURL, err := getSearchURL(config.Issuer)
 	if err != nil {
@@ -66,7 +66,7 @@ func (k *KeyCloakClient) searchPrincipals(searchTerm, principalType string, conf
 	//checking the GroupSearchEnabled flag to ensure group principals are not returned if group mappers
 	//are not enabled. If group mappers are not enabled, it doesn't make sense to return groups as
 	//principals that could be authorized.
-	if (principalType == "" || principalType == GroupType) && *config.GroupSearchEnabled == true {
+	if (principalType == "" || principalType == GroupType) && *config.GroupSearchEnabled {
 		groupAccounts, err := k.groupSearch(searchTerm, sURL)
 		if err != nil {
 			return accounts, err
@@ -126,7 +126,7 @@ func getSubGroups(group Group) []Group {
 	return groups
 }
 
-func (k *KeyCloakClient) getFromKeyCloakByID(principalID, principalType string, config *v32.OIDCConfig) (account, error) {
+func (k *KeyCloakClient) getFromKeyCloakByID(principalID, principalType string, config *apiv3.OIDCConfig) (account, error) {
 	var searchResult account
 
 	if principalID == "" {
@@ -198,7 +198,7 @@ func (k *KeyCloakClient) getFromKeyCloak(url string) ([]byte, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return b, err
 	}

@@ -7,6 +7,7 @@ import (
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/controllers/status"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -55,7 +56,14 @@ func New(wranglerContext *wrangler.Context, authorizer authorizer.Authorizer) (*
 	if err != nil {
 		return nil, err
 	}
-	userAuthRefresher := providerrefresh.NewUserAuthRefresher(context.TODO(), scaledContext)
+
+	userManager, err := common.NewUserManagerNoBindings(wranglerContext)
+	if err != nil {
+		return nil, err
+	}
+	scaledContext.UserManager = userManager
+
+	userAuthRefresher := providerrefresh.NewUserAuthRefresher(scaledContext)
 	store := Store{
 		userAuthRefresher: userAuthRefresher,
 		authorizer:        authorizer,
@@ -144,8 +152,9 @@ func (s *Store) Create(
 
 	objGroupMembershipRefreshRequest.Status = ext.GroupMembershipRefreshRequestStatus{
 		Conditions: []metav1.Condition{{
-			Type:   "UserRefreshInitiated",
-			Status: metav1.ConditionTrue,
+			LastTransitionTime: metav1.Now(),
+			Type:               "UserRefreshInitiated",
+			Status:             metav1.ConditionTrue,
 		}},
 		Summary: status.SummaryCompleted,
 	}
