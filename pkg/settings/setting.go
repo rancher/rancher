@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -27,7 +26,6 @@ const (
 )
 
 var (
-	releasePattern = regexp.MustCompile("^v[0-9]")
 	settings       = map[string]Setting{}
 	provider       Provider
 	InjectDefaults string
