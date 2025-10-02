@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/pkg/types/config"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	rbaccontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -38,6 +39,10 @@ type Impersonator struct {
 	clusterContext      *config.UserContext
 	userLister          v3.UserLister
 	userAttributeLister v3.UserAttributeLister
+	crClient            rbaccontrollers.ClusterRoleClient
+	crCache             rbaccontrollers.ClusterRoleCache
+	crbClient           rbaccontrollers.ClusterRoleBindingClient
+	crbCache            rbaccontrollers.ClusterRoleBindingCache
 	secretsCache        corecontrollers.SecretCache
 }
 
@@ -47,6 +52,10 @@ func New(userInfo user.Info, clusterContext *config.UserContext) (Impersonator, 
 		clusterContext:      clusterContext,
 		userLister:          clusterContext.Management.Management.Users("").Controller().Lister(),
 		userAttributeLister: clusterContext.Management.Management.UserAttributes("").Controller().Lister(),
+		crClient:            clusterContext.RBACw.ClusterRole(),
+		crCache:             clusterContext.RBACw.ClusterRole().Cache(),
+		crbClient:           clusterContext.RBACw.ClusterRoleBinding(),
+		crbCache:            clusterContext.RBACw.ClusterRoleBinding().Cache(),
 		secretsCache:        clusterContext.Corew.Secret().Cache(),
 	}
 	user, err := impersonator.getUser(userInfo)
@@ -204,7 +213,7 @@ func (i *Impersonator) checkAndUpdateRole(rules []rbacv1.PolicyRule) (*rbacv1.Cl
 	var role *rbacv1.ClusterRole
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		var err error
-		role, err = i.clusterContext.RBAC.ClusterRoles("").Controller().Lister().Get("", name)
+		role, err = i.crCache.Get(name)
 		if apierrors.IsNotFound(err) {
 			return nil
 		}
@@ -213,7 +222,7 @@ func (i *Impersonator) checkAndUpdateRole(rules []rbacv1.PolicyRule) (*rbacv1.Cl
 		}
 		if !reflect.DeepEqual(role.Rules, rules) {
 			role.Rules = rules
-			role, err = i.clusterContext.RBAC.ClusterRoles("").Update(role)
+			role, err = i.crClient.Update(role)
 			return err
 		}
 		return nil
@@ -227,10 +236,10 @@ func (i *Impersonator) checkAndUpdateRole(rules []rbacv1.PolicyRule) (*rbacv1.Cl
 
 func (i *Impersonator) createRole(rules []rbacv1.PolicyRule) (*rbacv1.ClusterRole, error) {
 	name := ImpersonationPrefix + i.user.GetUID()
-	role, err := i.clusterContext.RBAC.ClusterRoles("").Controller().Lister().Get("", name)
+	role, err := i.crCache.Get(name)
 	if apierrors.IsNotFound(err) {
 		logrus.Debugf("impersonation: creating role %s", name)
-		role, err = i.clusterContext.RBAC.ClusterRoles("").Create(&rbacv1.ClusterRole{
+		role, err = i.crClient.Create(&rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: ImpersonationPrefix + i.user.GetUID(),
 				Labels: map[string]string{
@@ -242,7 +251,7 @@ func (i *Impersonator) createRole(rules []rbacv1.PolicyRule) (*rbacv1.ClusterRol
 		})
 		if apierrors.IsAlreadyExists(err) {
 			// in case cache isn't synced yet, use raw client
-			return i.clusterContext.RBAC.ClusterRoles("").Get(name, metav1.GetOptions{})
+			return i.crClient.Get(name, metav1.GetOptions{})
 		}
 		return role, nil
 	}
@@ -303,15 +312,15 @@ func (i *Impersonator) rulesForUser() []rbacv1.PolicyRule {
 
 func (i *Impersonator) getRoleBinding() (*rbacv1.ClusterRoleBinding, error) {
 	name := ImpersonationPrefix + i.user.GetUID()
-	return i.clusterContext.RBAC.ClusterRoleBindings("").Controller().Lister().Get("", name)
+	return i.crbCache.Get(name)
 }
 
 func (i *Impersonator) createRoleBinding(role *rbacv1.ClusterRole, sa *corev1.ServiceAccount) error {
 	name := ImpersonationPrefix + i.user.GetUID()
-	_, err := i.clusterContext.RBAC.ClusterRoleBindings("").Controller().Lister().Get("", name)
+	_, err := i.crbCache.Get(name)
 	if apierrors.IsNotFound(err) {
 		logrus.Debugf("impersonation: creating role binding %s", name)
-		_, err = i.clusterContext.RBAC.ClusterRoleBindings("").Create(&rbacv1.ClusterRoleBinding{
+		_, err = i.crbClient.Create(&rbacv1.ClusterRoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
 				// Use the clusterrole as the owner for the purposes of automatic cleanup

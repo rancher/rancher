@@ -65,7 +65,7 @@ func (p *pLifecycle) Remove(project *v3.Project) (runtime.Object, error) {
 	for _, suffix := range projectNSVerbToSuffix {
 		roleName := fmt.Sprintf(projectNSGetClusterRoleNameFmt, project.Name, suffix)
 
-		err := p.m.workload.RBAC.ClusterRoles("").Delete(roleName, &metav1.DeleteOptions{})
+		err := p.m.workload.RBACw.ClusterRole().Delete(roleName, &metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			return nil, err
 		}

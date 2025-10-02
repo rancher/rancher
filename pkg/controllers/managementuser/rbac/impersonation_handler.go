@@ -36,7 +36,7 @@ func (m *manager) deleteServiceAccountImpersonator(username string) error {
 	}
 	roleName := impersonation.ImpersonationPrefix + username
 	logrus.Debugf("deleting service account impersonator for %s", username)
-	err = m.workload.RBAC.ClusterRoles("").Delete(roleName, &metav1.DeleteOptions{})
+	err = m.workload.RBACw.ClusterRole().Delete(roleName, &metav1.DeleteOptions{})
 	if apierrors.IsNotFound(err) {
 		return nil
 	}

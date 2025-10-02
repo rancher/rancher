@@ -7,6 +7,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac/roletemplates"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
+	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -19,7 +20,7 @@ func (m *manager) reconcileProjectAccessToGlobalResources(binding *v3.ProjectRol
 		return nil, nil
 	}
 
-	bindingCli := m.workload.RBAC.ClusterRoleBindings("")
+	var bindingCli wrbacv1.ClusterRoleBindingClient = m.workload.RBACw.ClusterRoleBinding()
 
 	rtbUID := pkgrbac.GetRTBLabel(binding.ObjectMeta)
 	subject, err := pkgrbac.BuildSubjectFromRTB(binding)

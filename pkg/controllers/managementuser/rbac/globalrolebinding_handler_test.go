@@ -219,12 +219,12 @@ func TestSync(t *testing.T) {
 				test.stateSetup(state)
 			}
 			h := grbHandler{
-				clusterRoleBindings: crbClientMock,
-				crbLister:           crbListerMock,
-				grLister:            grListerMock,
-				grbLister:           grbListerMock,
-				grbClient:           grbClientMock,
-				status:              status,
+				crbClient: crbClientMock,
+				crbLister: crbListerMock,
+				grLister:  grListerMock,
+				grbLister: grbListerMock,
+				grbClient: grbClientMock,
+				status:    status,
 			}
 
 			_, err := h.sync("", test.grb.DeepCopy())
