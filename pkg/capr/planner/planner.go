@@ -422,7 +422,9 @@ func (p *Planner) fullReconcile(cp *rkev1.RKEControlPlane, status rkev1.RKEContr
 	}
 
 	// Process all nodes that are ONLY windows worker nodes.
-	err = p.reconcile(cp, clusterSecretTokens, plan, false, workerTier, isOnlyWindowsWorker, isInitNodeOrDeleting, workerConcurrency, "", workerDrainOptions, 5, 5)
+	// We attempt the plan 5 times before marking it as failed
+	// to allow transient errors to potentially resolve.
+	err = p.reconcile(cp, clusterSecretTokens, plan, false, workerTier, isOnlyWindowsWorker, isInitNodeOrDeleting, workerConcurrency, "", workerDrainOptions, -1, 5)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
 		return status, err
