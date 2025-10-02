@@ -68,7 +68,7 @@ func Register(ctx context.Context, workload *config.UserContext) {
 	crtbInformer := workload.Management.Management.ClusterRoleTemplateBindings("").Controller().Informer()
 
 	// Index for looking up namespaces by projectID annotation
-	nsInformer := workload.Core.Namespaces("").Controller().Informer()
+	nsInformer := workload.Management.Wrangler.Core.Namespace().Informer()
 	nsIndexers := map[string]cache.IndexFunc{
 		nsutils.NsByProjectIndex: nsutils.NsByProjectID,
 	}

@@ -35,7 +35,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 
 func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	// Index for looking up Namespaces by projectID annotation
-	nsInformer := cluster.Core.Namespaces("").Controller().Informer()
+	nsInformer := cluster.Management.Wrangler.Core.Namespace().Informer()
 	nsIndexers := map[string]cache.IndexFunc{
 		nsByProjectIndex: nsByProjectID,
 	}
