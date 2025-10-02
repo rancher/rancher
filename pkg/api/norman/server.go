@@ -22,7 +22,7 @@ func ConfigureAPIUI(server *normanapi.Server) {
 func cssURL() string {
 	switch settings.UIOfflinePreferred.Get() {
 	case "dynamic":
-		if !settings.IsRelease() {
+		if !settings.ServerVersionHasReleasePrefixExcludesHead() {
 			return ""
 		}
 	case "false":
@@ -34,7 +34,7 @@ func cssURL() string {
 func jsURL() string {
 	switch settings.UIOfflinePreferred.Get() {
 	case "dynamic":
-		if !settings.IsRelease() {
+		if !settings.ServerVersionHasReleasePrefixExcludesHead() {
 			return ""
 		}
 	case "false":

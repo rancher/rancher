@@ -5,6 +5,8 @@ import (
 	"github.com/rancher/steve/pkg/ui"
 )
 
+var rancherVersionIsRelease = settings.ServerVersionHasReleasePrefixExcludesHead
+
 var (
 	ember = newHandler(settings.UIIndex.Get,
 		settings.UIPath.Get,
@@ -26,7 +28,7 @@ func newHandler(
 		Index:               indexSetting,
 		Offline:             offlineSetting,
 		Path:                pathSetting,
-		ReleaseSetting:      settings.IsRelease,
+		ReleaseSetting:      rancherVersionIsRelease,
 		APIUIVersionSetting: settings.APIUIVersion.Get,
 	})
 }
