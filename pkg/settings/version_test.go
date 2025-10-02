@@ -32,11 +32,12 @@ func TestIsRelease(t *testing.T) {
 
 func TestGetRancherVersion(t *testing.T) {
 	inputs := map[string]string{
-		"dev-version":    RancherVersionDev,
-		"master-version": RancherVersionDev,
-		"version-head":   RancherVersionDev,
-		"v2.7.X":         "2.7.X",
-		"2.7.X":          "2.7.X",
+		"dev-version":           RancherVersionDev,
+		"master-version":        RancherVersionDev,
+		"version-head":          RancherVersionDev,
+		"v2.12-dev-someGitHash": RancherVersionDev,
+		"v2.7.X":                "2.7.X",
+		"2.7.X":                 "2.7.X",
 	}
 
 	for key, value := range inputs {
@@ -81,6 +82,11 @@ func TestIsReleaseServerVersion(t *testing.T) {
 		{
 			"Empty version",
 			"",
+			false,
+		},
+		{
+			"Prerelease Dev Build",
+			"v2.12-dev-someGitHash",
 			false,
 		},
 	}
