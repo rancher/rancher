@@ -18,6 +18,6 @@ const (
 	SingleStackIPv6Preference = NetworkingStackPreference("ipv6")
 
 	// DefaultStackPreference is the stack preference used when no preference is defined, or is invalid. Defaults to
-	// "127.0.0.1" to support existing behavior.
-	DefaultStackPreference = SingleStackIPv4Preference
+	// "localhost" to support both single-stack and dual-stack environment
+	DefaultStackPreference = DualStackPreference
 )

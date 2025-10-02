@@ -82,7 +82,7 @@ require (
 	github.com/alibabacloud-go/tea v1.3.10
 	github.com/alibabacloud-go/vpc-20160428/v6 v6.12.8
 	github.com/aliyun/credentials-go v1.4.7
-	github.com/aws/aws-sdk-go v1.55.5
+	github.com/aws/aws-sdk-go v1.55.8
 	github.com/aws/aws-sdk-go-v2 v1.37.2
 	github.com/aws/aws-sdk-go-v2/credentials v1.18.3
 	github.com/aws/aws-sdk-go-v2/service/eks v1.67.1
@@ -134,7 +134,7 @@ require (
 	github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1
 	github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae75779379
 	github.com/rancher/lasso v0.2.5-rc.1
-	github.com/rancher/machine v0.15.0-rancher133
+	github.com/rancher/machine v0.15.0-rancher134
 	github.com/rancher/norman v0.7.0
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.5.1-rc.1
