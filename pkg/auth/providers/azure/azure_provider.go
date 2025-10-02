@@ -77,7 +77,7 @@ func (ap *Provider) GetName() string {
 	return Name
 }
 
-func (ap *Provider) AuthenticateUser(ctx context.Context, input interface{}) (apiv3.Principal, []apiv3.Principal, string, error) {
+func (ap *Provider) AuthenticateUser(ctx context.Context, input any) (apiv3.Principal, []apiv3.Principal, string, error) {
 	login, ok := input.(*apiv3.AzureADLogin)
 	if !ok {
 		return apiv3.Principal{}, nil, "", errors.New("unexpected input type")
@@ -202,8 +202,8 @@ func (ap *Provider) CustomizeSchema(schema *types.Schema) {
 }
 
 func (ap *Provider) TransformToAuthProvider(
-	authConfig map[string]interface{},
-) (map[string]interface{}, error) {
+	authConfig map[string]any,
+) (map[string]any, error) {
 	p := common.TransformToAuthProvider(authConfig)
 	p[publicclient.AzureADProviderFieldRedirectURL] = formAzureRedirectURL(authConfig)
 
@@ -218,7 +218,7 @@ func (ap *Provider) TransformToAuthProvider(
 	baseEndpoint, _ := authConfig["endpoint"].(string)
 
 	// getString will return the string value from the map, or a blank string if the value is not a string
-	getString := func(data map[string]interface{}, key string) string {
+	getString := func(data map[string]any, key string) string {
 		v, ok := data[key]
 		if !ok {
 			return ""
@@ -433,7 +433,7 @@ func (ap *Provider) updateToken(client clients.AzureClient, token accessor.Token
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// providerToken doesn't exist as a secret, update on token.
-			if current, ok := token.GetProviderInfo()["access_token"]; ok && current != current {
+			if providerToken, ok := token.GetProviderInfo()["access_token"]; ok && providerToken != current {
 				token.GetProviderInfo()["access_token"] = current
 			}
 			return nil
@@ -448,7 +448,7 @@ func (ap *Provider) updateToken(client clients.AzureClient, token accessor.Token
 	return ap.tokenMGR.UpdateSecret(token.GetUserID(), token.GetAuthProvider(), current)
 }
 
-func formAzureRedirectURL(config map[string]interface{}) string {
+func formAzureRedirectURL(config map[string]any) string {
 	var ac apiv3.AzureADConfig
 	err := common.Decode(config, &ac)
 	if err == nil {
@@ -483,17 +483,17 @@ func formAzureRedirectURL(config map[string]interface{}) string {
 // In these two cases, the structure of the config is different.
 // In the former, it's "metadata.annotations.[map of annotations]".
 // In the latter, it's "annotations.[map of annotations]". The function tries to find the annotations in either structure.
-func extractAnnotationsFromAuthConfig(config map[string]interface{}) map[string]string {
-	if metadata, ok := config["metadata"].(map[string]interface{}); ok {
+func extractAnnotationsFromAuthConfig(config map[string]any) map[string]string {
+	if metadata, ok := config["metadata"].(map[string]any); ok {
 		return parseAnnotations(metadata)
 	}
 	logrus.Info("Failed to decode the 'metadata' field of the AuthConfig. Attempting to decode 'annotations' at the top level.")
 	return parseAnnotations(config)
 }
 
-func parseAnnotations(metadata map[string]interface{}) map[string]string {
+func parseAnnotations(metadata map[string]any) map[string]string {
 	annotations := make(map[string]string)
-	rawAnnotations, ok := metadata["annotations"].(map[string]interface{})
+	rawAnnotations, ok := metadata["annotations"].(map[string]any)
 	if !ok {
 		logrus.Info("Failed to decode the 'annotations' field of the AuthConfig.")
 		return annotations

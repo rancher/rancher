@@ -10,7 +10,7 @@ import (
 	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/azure/clients"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
@@ -36,15 +36,16 @@ func (ap *Provider) actionHandler(actionName string, action *types.Action, reque
 		return nil
 	}
 
-	if actionName == "configureTest" {
+	switch actionName {
+	case "configureTest":
 		return ap.ConfigureTest(request)
-	} else if actionName == "testAndApply" {
+	case "testAndApply":
 		return ap.testAndApply(request)
-	} else if actionName == "upgrade" {
+	case "upgrade":
 		return ap.migrateToMicrosoftGraph()
+	default:
+		return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 	}
-
-	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }
 
 func (ap *Provider) ConfigureTest(request *types.APIContext) error {
@@ -55,7 +56,7 @@ func (ap *Provider) ConfigureTest(request *types.APIContext) error {
 		return err
 	}
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"redirectUrl": formAzureRedirectURL(input),
 		"type":        "azureADConfigTestOutput",
 	}
@@ -76,7 +77,7 @@ func (ap *Provider) testAndApply(request *types.APIContext) error {
 		}
 	}()
 
-	azureADConfigApplyInput := &v32.AzureADConfigApplyInput{}
+	azureADConfigApplyInput := &apiv3.AzureADConfigApplyInput{}
 	if err := json.NewDecoder(request.Request.Body).Decode(azureADConfigApplyInput); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("Failed to parse body: %v", err))
@@ -91,7 +92,7 @@ func (ap *Provider) testAndApply(request *types.APIContext) error {
 	}
 	migrateNewFlowAnnotation(currentConfig, azureADConfig)
 
-	azureLogin := &v32.AzureADLogin{
+	azureLogin := &apiv3.AzureADLogin{
 		Code: azureADConfigApplyInput.Code,
 	}
 
@@ -134,7 +135,7 @@ func (ap *Provider) testAndApply(request *types.APIContext) error {
 
 // Check the current auth config and make sure that the proposed one submitted through the API has up-to-date annotations.
 // Rancher relies on GraphEndpointMigratedAnnotation to choose the right authentication flow and Graph API.
-func migrateNewFlowAnnotation(current, proposed *v32.AzureADConfig) {
+func migrateNewFlowAnnotation(current, proposed *apiv3.AzureADConfig) {
 	if IsConfigDeprecated(current) {
 		return
 	}

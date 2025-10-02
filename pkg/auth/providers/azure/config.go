@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 )
 
@@ -13,9 +13,8 @@ const (
 	globalMSGraphEndpoint      = "https://graph.microsoft.com"
 	chinaAzureADGraphEndpoint  = "https://graph.chinacloudapi.cn/"
 	chinaMSGraphEndpoint       = "https://microsoftgraph.chinacloudapi.cn"
-
-	chinaAzureADLoginEndpoint = "https://login.chinacloudapi.cn/"
-	chinaAzureMSLoginEndpoint = "https://login.partner.microsoftonline.cn/"
+	chinaAzureADLoginEndpoint  = "https://login.chinacloudapi.cn/"
+	chinaAzureMSLoginEndpoint  = "https://login.partner.microsoftonline.cn/"
 )
 
 // GraphEndpointMigratedAnnotation is the main piece of data based on which Rancher decides to use either the
@@ -24,24 +23,24 @@ const (
 // then Rancher uses the old, deprecated flow. If the annotation is present and set to "true", Rancher uses the new flow.
 const GraphEndpointMigratedAnnotation = "auth.cattle.io/azuread-endpoint-migrated"
 
-func authProviderEnabled(config *v32.AzureADConfig) bool {
+func authProviderEnabled(config *apiv3.AzureADConfig) bool {
 	return config.Enabled && config.GraphEndpoint != ""
 }
 
 // IsConfigDeprecated returns true if a given Azure AD auth config specifies the old,
 // deprecated authentication flow via the Azure AD Graph.
-func IsConfigDeprecated(cfg *v32.AzureADConfig) bool {
+func IsConfigDeprecated(cfg *apiv3.AzureADConfig) bool {
 	return authProviderEnabled(cfg) && !configHasNewFlowAnnotation(cfg)
 }
 
-func configHasNewFlowAnnotation(cfg *v32.AzureADConfig) bool {
+func configHasNewFlowAnnotation(cfg *apiv3.AzureADConfig) bool {
 	if cfg.ObjectMeta.Annotations != nil {
 		return cfg.ObjectMeta.Annotations[GraphEndpointMigratedAnnotation] == "true"
 	}
 	return false
 }
 
-func updateAzureADEndpoints(c *v32.AzureADConfig) {
+func updateAzureADEndpoints(c *apiv3.AzureADConfig) {
 	if isConfigForChina(c) {
 		updateEndpointsForChina(c)
 	} else {
@@ -49,11 +48,11 @@ func updateAzureADEndpoints(c *v32.AzureADConfig) {
 	}
 }
 
-func isConfigForChina(c *v32.AzureADConfig) bool {
+func isConfigForChina(c *apiv3.AzureADConfig) bool {
 	return strings.HasSuffix(c.GraphEndpoint, ".cn") || strings.HasSuffix(c.GraphEndpoint, ".cn/")
 }
 
-func updateEndpointsForGlobal(c *v32.AzureADConfig) {
+func updateEndpointsForGlobal(c *apiv3.AzureADConfig) {
 	if c.GraphEndpoint != globalAzureADGraphEndpoint {
 		logrus.Infof("Refusing to upgrade because the Graph Endpoint %s is not deprecated.", c.GraphEndpoint)
 		return
@@ -66,7 +65,7 @@ func updateEndpointsForGlobal(c *v32.AzureADConfig) {
 	c.DeviceAuthEndpoint = fmt.Sprintf("%s%s/oauth2/v2.0/devicecode", c.Endpoint, c.TenantID)
 }
 
-func updateEndpointsForChina(c *v32.AzureADConfig) {
+func updateEndpointsForChina(c *apiv3.AzureADConfig) {
 	if c.GraphEndpoint != chinaAzureADGraphEndpoint {
 		logrus.Infof("Refusing to upgrade because the Graph Endpoint %s is not deprecated.", c.GraphEndpoint)
 		return

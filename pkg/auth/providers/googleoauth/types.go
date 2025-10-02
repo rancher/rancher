@@ -1,6 +1,6 @@
 package googleoauth
 
-// Account defines properties an account on github has
+// Account defines properties of a Google account.
 type Account struct {
 	Email           string `json:"email,omitempty"`
 	Name            string `json:"name,omitempty"`

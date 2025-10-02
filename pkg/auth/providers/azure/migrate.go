@@ -2,7 +2,7 @@ package azure
 
 import (
 	"github.com/rancher/norman/httperror"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/api/secrets"
 	"github.com/rancher/rancher/pkg/auth/providers/azure/clients"
 	"github.com/sirupsen/logrus"
@@ -30,7 +30,7 @@ func (ap *Provider) migrateToMicrosoftGraph() error {
 	return nil
 }
 
-func (ap *Provider) updateConfigAndTest() (*v32.AzureADConfig, error) {
+func (ap *Provider) updateConfigAndTest() (*apiv3.AzureADConfig, error) {
 	cfg, err := ap.GetAzureConfigK8s()
 	if err != nil {
 		return nil, err
@@ -50,7 +50,7 @@ func (ap *Provider) updateConfigAndTest() (*v32.AzureADConfig, error) {
 	return cfg, nil
 }
 
-func (ap *Provider) applyUpdatedConfig(cfg *v32.AzureADConfig) error {
+func (ap *Provider) applyUpdatedConfig(cfg *apiv3.AzureADConfig) error {
 	if cfg.ObjectMeta.Annotations == nil {
 		cfg.ObjectMeta.Annotations = make(map[string]string)
 	}

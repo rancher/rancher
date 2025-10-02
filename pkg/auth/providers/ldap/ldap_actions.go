@@ -32,15 +32,16 @@ func (p *ldapProvider) actionHandler(actionName string, action *types.Action, re
 		return nil
 	}
 
-	if actionName == "testAndApply" {
+	switch actionName {
+	case "testAndApply":
 		return p.testAndApply(request)
+	default:
+		return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 	}
-
-	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }
 
 func (p *ldapProvider) testAndApply(request *types.APIContext) error {
-	var input map[string]interface{}
+	var input map[string]any
 	var err error
 	input, err = handler.ParseAndValidateActionBody(request, request.Schemas.Schema(&managementschema.Version,
 		p.testAndApplyInputType))

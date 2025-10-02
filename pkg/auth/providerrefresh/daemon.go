@@ -5,10 +5,10 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/robfig/cron"
 	"github.com/sirupsen/logrus"
@@ -76,7 +76,7 @@ func RefreshAllForCron() {
 	ref.refreshAll(false)
 }
 
-func RefreshAttributes(attribs *v3.UserAttribute) (*v3.UserAttribute, error) {
+func RefreshAttributes(attribs *apiv3.UserAttribute) (*apiv3.UserAttribute, error) {
 	if ref == nil {
 		return nil, errors.Errorf("refresh daemon not yet initialized")
 	}

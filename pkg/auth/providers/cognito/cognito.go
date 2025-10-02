@@ -86,7 +86,7 @@ func (s *CognitoProvider) LogoutAll(apiContext *types.APIContext, token accessor
 		return err
 	}
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"idpRedirectUrl": idpRedirectURL,
 		"type":           "authConfigLogoutOutput",
 	}

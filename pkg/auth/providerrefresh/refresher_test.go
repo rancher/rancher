@@ -9,7 +9,7 @@ import (
 
 	"github.com/rancher/norman/types"
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
@@ -30,7 +30,7 @@ func TestRefreshAttributes(t *testing.T) {
 	var tokenUpdateCalled bool
 	var tokenDeleteCalled bool
 
-	userLocal := v3.User{
+	userLocal := apiv3.User{
 		ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
 		Username:   "admin",
 		PrincipalIDs: []string{
@@ -38,7 +38,7 @@ func TestRefreshAttributes(t *testing.T) {
 		},
 	}
 
-	userShibboleth := v3.User{
+	userShibboleth := apiv3.User{
 		ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
 		Username:   "admin",
 		PrincipalIDs: []string{
@@ -46,24 +46,24 @@ func TestRefreshAttributes(t *testing.T) {
 		},
 	}
 
-	attribsIn := v3.UserAttribute{
+	attribsIn := apiv3.UserAttribute{
 		ObjectMeta:      metav1.ObjectMeta{Name: "user-abcde"},
-		GroupPrincipals: map[string]v3.Principals{},
+		GroupPrincipals: map[string]apiv3.Principals{},
 		ExtraByProvider: map[string]map[string][]string{},
 	}
 
-	wantNoExtra := v3.UserAttribute{
+	wantNoExtra := apiv3.UserAttribute{
 		ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
-		GroupPrincipals: map[string]v3.Principals{
+		GroupPrincipals: map[string]apiv3.Principals{
 			"local":      {},
 			"shibboleth": {},
 		},
 		ExtraByProvider: map[string]map[string][]string{},
 	}
 
-	wantLocal := v3.UserAttribute{
+	wantLocal := apiv3.UserAttribute{
 		ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
-		GroupPrincipals: map[string]v3.Principals{
+		GroupPrincipals: map[string]apiv3.Principals{
 			"local":      {},
 			"shibboleth": {},
 		},
@@ -75,9 +75,9 @@ func TestRefreshAttributes(t *testing.T) {
 		},
 	}
 
-	wantShibboleth := v3.UserAttribute{
+	wantShibboleth := apiv3.UserAttribute{
 		ObjectMeta: metav1.ObjectMeta{Name: "user-abcde"},
-		GroupPrincipals: map[string]v3.Principals{
+		GroupPrincipals: map[string]apiv3.Principals{
 			"local":      {},
 			"shibboleth": {},
 		},
@@ -89,11 +89,11 @@ func TestRefreshAttributes(t *testing.T) {
 		},
 	}
 
-	loginTokenLocal := v3.Token{
+	loginTokenLocal := apiv3.Token{
 		UserID:       "user-abcde",
 		IsDerived:    false,
 		AuthProvider: providers.LocalProvider,
-		UserPrincipal: v3.Principal{
+		UserPrincipal: apiv3.Principal{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "local://user-abcde",
 			},
@@ -109,11 +109,11 @@ func TestRefreshAttributes(t *testing.T) {
 	derivedTokenLocal := loginTokenLocal
 	derivedTokenLocal.IsDerived = true
 
-	derivedTokenShibboleth := v3.Token{
+	derivedTokenShibboleth := apiv3.Token{
 		UserID:       "user-abcde",
 		IsDerived:    true,
 		AuthProvider: saml.ShibbolethName,
-		UserPrincipal: v3.Principal{
+		UserPrincipal: apiv3.Principal{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "shibboleth_user://user1",
 			},
@@ -328,15 +328,15 @@ func TestRefreshAttributes(t *testing.T) {
 
 	tests := []struct {
 		name                  string
-		user                  *v3.User
-		attribs               *v3.UserAttribute // argument to refreshAttributes
+		user                  *apiv3.User
+		attribs               *apiv3.UserAttribute // argument to refreshAttributes
 		providerDisabled      bool
 		providerDisabledError error
-		tokens                []*v3.Token
+		tokens                []*apiv3.Token
 		eTokens               []*ext.Token
 		enabled               bool
 		deleted               bool
-		want                  *v3.UserAttribute // result expected from refreshAttributes
+		want                  *apiv3.UserAttribute // result expected from refreshAttributes
 		eTokenSetup           func(
 			secrets *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList],
 			scache *fake.MockCacheInterface[*corev1.Secret])
@@ -345,7 +345,7 @@ func TestRefreshAttributes(t *testing.T) {
 			name:        "local user no tokens",
 			user:        &userLocal,
 			attribs:     &attribsIn,
-			tokens:      []*v3.Token{},
+			tokens:      []*apiv3.Token{},
 			eTokens:     []*ext.Token{},
 			enabled:     true,
 			want:        &wantNoExtra,
@@ -356,7 +356,7 @@ func TestRefreshAttributes(t *testing.T) {
 			name:        "local user with login token",
 			user:        &userLocal,
 			attribs:     &attribsIn,
-			tokens:      []*v3.Token{&loginTokenLocal},
+			tokens:      []*apiv3.Token{&loginTokenLocal},
 			enabled:     true,
 			want:        &wantLocal,
 			eTokenSetup: eTokenSetupEmpty,
@@ -374,7 +374,7 @@ func TestRefreshAttributes(t *testing.T) {
 			name:        "local user with derived token",
 			user:        &userLocal,
 			attribs:     &attribsIn,
-			tokens:      []*v3.Token{&derivedTokenLocal},
+			tokens:      []*apiv3.Token{&derivedTokenLocal},
 			enabled:     true,
 			want:        &wantLocal,
 			eTokenSetup: eTokenSetupEmpty,
@@ -392,7 +392,7 @@ func TestRefreshAttributes(t *testing.T) {
 			name:        "user with derived token disabled in provider",
 			user:        &userLocal,
 			attribs:     &attribsIn,
-			tokens:      []*v3.Token{&derivedTokenLocal},
+			tokens:      []*apiv3.Token{&derivedTokenLocal},
 			enabled:     false,
 			want:        &wantNoExtra,
 			eTokenSetup: eTokenSetupEmpty,
@@ -410,7 +410,7 @@ func TestRefreshAttributes(t *testing.T) {
 			name:        "user with login and derived tokens",
 			user:        &userLocal,
 			attribs:     &attribsIn,
-			tokens:      []*v3.Token{&loginTokenLocal, &derivedTokenLocal},
+			tokens:      []*apiv3.Token{&loginTokenLocal, &derivedTokenLocal},
 			enabled:     true,
 			want:        &wantLocal,
 			eTokenSetup: eTokenSetupEmpty,
@@ -428,7 +428,7 @@ func TestRefreshAttributes(t *testing.T) {
 			name:        "shibboleth user",
 			user:        &userShibboleth,
 			attribs:     &attribsIn,
-			tokens:      []*v3.Token{&derivedTokenShibboleth},
+			tokens:      []*apiv3.Token{&derivedTokenShibboleth},
 			enabled:     true,
 			want:        &wantShibboleth,
 			eTokenSetup: eTokenSetupEmpty,
@@ -446,7 +446,7 @@ func TestRefreshAttributes(t *testing.T) {
 			name:             "disabled provider, disabled/deleted tokens",
 			user:             &userLocal,
 			attribs:          &attribsIn,
-			tokens:           []*v3.Token{&loginTokenLocal, &derivedTokenLocal},
+			tokens:           []*apiv3.Token{&loginTokenLocal, &derivedTokenLocal},
 			want:             &wantNoExtra,
 			eTokenSetup:      eTokenSetupEmpty,
 			providerDisabled: true,
@@ -468,7 +468,7 @@ func TestRefreshAttributes(t *testing.T) {
 			name:                  "error in determining if provider is disabled, tokens left unchanged",
 			user:                  &userLocal,
 			attribs:               &attribsIn,
-			tokens:                []*v3.Token{&loginTokenLocal, &derivedTokenLocal},
+			tokens:                []*apiv3.Token{&loginTokenLocal, &derivedTokenLocal},
 			want:                  &wantLocal,
 			eTokenSetup:           eTokenSetupEmpty,
 			providerDisabled:      true,
@@ -511,7 +511,7 @@ func TestRefreshAttributes(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 			scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
-			users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+			users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
 
 			users.EXPECT().Cache().Return(nil)
 			secrets.EXPECT().Cache().Return(scache)
@@ -537,20 +537,20 @@ func TestRefreshAttributes(t *testing.T) {
 				tt.eTokenSetup(secrets, scache)
 			}
 
-			tokenClient := fake.NewMockNonNamespacedClientInterface[*v3.Token, *v3.TokenList](ctrl)
-			tokenClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(token *v3.Token) (*v3.Token, error) {
+			tokenClient := fake.NewMockNonNamespacedClientInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
+			tokenClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(token *apiv3.Token) (*apiv3.Token, error) {
 				tokenUpdateCalled = true
 				return token.DeepCopy(), nil
 			}).AnyTimes()
 
 			r := &refresher{
 				tokenLister: &fakes.TokenListerMock{
-					ListFunc: func(_ string, _ labels.Selector) ([]*v3.Token, error) {
+					ListFunc: func(_ string, _ labels.Selector) ([]*apiv3.Token, error) {
 						return tt.tokens, nil
 					},
 				},
 				userLister: &fakes.UserListerMock{
-					GetFunc: func(_, _ string) (*v3.User, error) {
+					GetFunc: func(_, _ string) (*apiv3.User, error) {
 						return tt.user, nil
 					},
 				},
@@ -640,7 +640,7 @@ func TestGetPrincipalIDForProvider(t *testing.T) {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			user := v3.User{
+			user := apiv3.User{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: testUserUsername,
 				},
@@ -674,15 +674,15 @@ func (p *mockLocalProvider) GetName() string {
 	panic("not implemented")
 }
 
-func (p *mockLocalProvider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
+func (p *mockLocalProvider) AuthenticateUser(ctx context.Context, input any) (apiv3.Principal, []apiv3.Principal, string, error) {
 	panic("not implemented")
 }
 
-func (p *mockLocalProvider) SearchPrincipals(name, principalType string, myToken accessor.TokenAccessor) ([]v3.Principal, error) {
+func (p *mockLocalProvider) SearchPrincipals(name, principalType string, myToken accessor.TokenAccessor) ([]apiv3.Principal, error) {
 	panic("not implemented")
 }
 
-func (p *mockLocalProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
+func (p *mockLocalProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
 	return token.GetUserPrincipal(), nil
 }
 
@@ -690,26 +690,26 @@ func (p *mockLocalProvider) CustomizeSchema(schema *types.Schema) {
 	panic("not implemented")
 }
 
-func (p *mockLocalProvider) TransformToAuthProvider(authConfig map[string]interface{}) (map[string]interface{}, error) {
+func (p *mockLocalProvider) TransformToAuthProvider(authConfig map[string]any) (map[string]any, error) {
 	panic("not implemented")
 }
 
-func (p *mockLocalProvider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
-	return []v3.Principal{}, nil
+func (p *mockLocalProvider) RefetchGroupPrincipals(principalID string, secret string) ([]apiv3.Principal, error) {
+	return []apiv3.Principal{}, nil
 }
 
-func (p *mockLocalProvider) CanAccessWithGroupProviders(userPrincipalID string, groups []v3.Principal) (bool, error) {
+func (p *mockLocalProvider) CanAccessWithGroupProviders(userPrincipalID string, groups []apiv3.Principal) (bool, error) {
 	return p.canAccess, nil
 }
 
-func (p *mockLocalProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
+func (p *mockLocalProvider) GetUserExtraAttributes(userPrincipal apiv3.Principal) map[string][]string {
 	return map[string][]string{
 		common.UserAttributePrincipalID: {userPrincipal.ExtraInfo[common.UserAttributePrincipalID]},
 		common.UserAttributeUserName:    {userPrincipal.ExtraInfo[common.UserAttributeUserName]},
 	}
 }
 
-func (p *mockLocalProvider) CleanupResources(*v3.AuthConfig) error {
+func (p *mockLocalProvider) CleanupResources(*apiv3.AuthConfig) error {
 	return nil
 }
 
@@ -734,15 +734,15 @@ func (p *mockShibbolethProvider) GetName() string {
 	panic("not implemented")
 }
 
-func (p *mockShibbolethProvider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
+func (p *mockShibbolethProvider) AuthenticateUser(ctx context.Context, input any) (apiv3.Principal, []apiv3.Principal, string, error) {
 	panic("not implemented")
 }
 
-func (p *mockShibbolethProvider) SearchPrincipals(name, principalType string, myToken accessor.TokenAccessor) ([]v3.Principal, error) {
+func (p *mockShibbolethProvider) SearchPrincipals(name, principalType string, myToken accessor.TokenAccessor) ([]apiv3.Principal, error) {
 	panic("not implemented")
 }
 
-func (p *mockShibbolethProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
+func (p *mockShibbolethProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
 	return token.GetUserPrincipal(), nil
 }
 
@@ -750,25 +750,25 @@ func (p *mockShibbolethProvider) CustomizeSchema(schema *types.Schema) {
 	panic("not implemented")
 }
 
-func (p *mockShibbolethProvider) TransformToAuthProvider(authConfig map[string]interface{}) (map[string]interface{}, error) {
+func (p *mockShibbolethProvider) TransformToAuthProvider(authConfig map[string]any) (map[string]any, error) {
 	panic("not implemented")
 }
 
-func (p *mockShibbolethProvider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
-	return []v3.Principal{}, errors.New("Not implemented")
+func (p *mockShibbolethProvider) RefetchGroupPrincipals(principalID string, secret string) ([]apiv3.Principal, error) {
+	return []apiv3.Principal{}, errors.New("Not implemented")
 }
 
-func (p *mockShibbolethProvider) CanAccessWithGroupProviders(userPrincipalID string, groups []v3.Principal) (bool, error) {
+func (p *mockShibbolethProvider) CanAccessWithGroupProviders(userPrincipalID string, groups []apiv3.Principal) (bool, error) {
 	return true, nil
 }
 
-func (p *mockShibbolethProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
+func (p *mockShibbolethProvider) GetUserExtraAttributes(userPrincipal apiv3.Principal) map[string][]string {
 	return map[string][]string{
 		common.UserAttributePrincipalID: {userPrincipal.ExtraInfo[common.UserAttributePrincipalID]},
 		common.UserAttributeUserName:    {userPrincipal.ExtraInfo[common.UserAttributeUserName]},
 	}
 }
 
-func (p *mockShibbolethProvider) CleanupResources(*v3.AuthConfig) error {
+func (p *mockShibbolethProvider) CleanupResources(*apiv3.AuthConfig) error {
 	return nil
 }
