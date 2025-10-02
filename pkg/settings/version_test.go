@@ -46,3 +46,47 @@ func TestGetRancherVersion(t *testing.T) {
 		assert.Equal(t, value, result)
 	}
 }
+
+func TestIsReleaseServerVersion(t *testing.T) {
+	tests := []struct {
+		name          string
+		serverVersion string
+		want          bool
+	}{
+		{
+			"Normal SemVer",
+			"v2.13.99",
+			true,
+		},
+		{
+			"Normal SemVer wo v prefix",
+			"2.13.99",
+			true,
+		},
+		{
+			"Prerelease head",
+			"v2.12-head",
+			false,
+		},
+		{
+			"Prerelease main",
+			"head-main",
+			false,
+		},
+		{
+			"Dev build",
+			"dev-someGitHash",
+			false,
+		},
+		{
+			"Empty version",
+			"",
+			false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, IsReleaseServerVersion(tt.serverVersion), "IsReleaseServerVersion(%v)", tt.serverVersion)
+		})
+	}
+}
