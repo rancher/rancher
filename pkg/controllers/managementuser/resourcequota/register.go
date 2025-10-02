@@ -54,6 +54,7 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	reconcile := &reconcileController{
 		namespaces: cluster.Core.Namespaces(""),
 		nsIndexer:  nsInformer.GetIndexer(),
+		projects:   cluster.Management.Wrangler.Mgmt.Project(),
 	}
 
 	cluster.Management.Management.Projects(cluster.ClusterName).AddHandler(ctx, "resourceQuotaNamespacesReconcileController", reconcile.reconcileNamespaces)
