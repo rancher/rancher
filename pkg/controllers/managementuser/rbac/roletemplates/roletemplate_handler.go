@@ -13,8 +13,7 @@ import (
 )
 
 const (
-	clusterRoleOwnerAnnotation = "authz.cluster.cattle.io/clusterrole-owner"
-	projectContext             = "project"
+	projectContext = "project"
 )
 
 func newRoleTemplateHandler(uc *config.UserContext) *roleTemplateHandler {
