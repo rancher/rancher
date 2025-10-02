@@ -133,7 +133,7 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 	projectManagementRoleName := rbac.ProjectManagementPlaneClusterRoleNameFor(prtb.RoleTemplateName)
 
 	// If there is no project management plane role, no need to create a binding for it
-	_, err := p.crController.Get(projectManagementRoleName, metav1.GetOptions{})
+	_, err := p.crController.Get(rbac.AggregatedClusterRoleNameFor(projectManagementRoleName), metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return nil
 	}
