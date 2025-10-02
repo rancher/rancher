@@ -62,7 +62,7 @@ func GatherTargetImagesAndSources(chartsPath string, imagesFromArgs []string) (I
 		return ImageTargetsAndSources{}, fmt.Errorf("no tag defining current Rancher version, cannot gather target images and sources")
 	}
 
-	if !img.IsValidSemver(rancherVersion) || !settings.IsReleaseServerVersion(rancherVersion) {
+	if !img.IsValidSemver(rancherVersion) || !settings.IsVersionRelease(rancherVersion) {
 		rancherVersion = settings.RancherVersionDev
 	}
 	rancherVersion = strings.TrimPrefix(rancherVersion, "v")

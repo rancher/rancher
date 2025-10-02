@@ -86,7 +86,7 @@ func TestIsReleaseServerVersion(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, IsReleaseServerVersion(tt.serverVersion), "IsReleaseServerVersion(%v)", tt.serverVersion)
+			assert.Equalf(t, tt.want, IsVersionRelease(tt.serverVersion), "IsVersionRelease(%v)", tt.serverVersion)
 		})
 	}
 }
