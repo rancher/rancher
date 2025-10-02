@@ -1,0 +1,23 @@
+name: '{{ .k8s_k3s.manifest }}'
+pipelineid: '{{ .k8s_k3s.pipelineid }}'
+
+autodiscovery:
+  scmid: 'default'
+  actionid: 'rancher-pr'
+  groupby: all
+  crawlers:
+    golang:
+      versionfilter:
+        kind: semver
+        pattern: '{{ .k8s.deps }}'
+      only:
+        - modules:
+            '^k8s\.io\/.*': ''
+      ignore:
+        - modules:
+            '^k8s\.io\/client-go': ''
+            '^k8s\.io\/kubernetes': ''
+            '^k8s\.io\/kube-openapi': ''
+            '^k8s\.io\/legacy-cloud-providers': ''
+            '^k8s\.io\/helm': ''
+            '^k8s\.io\/utils': ''

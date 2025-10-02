@@ -1,0 +1,48 @@
+name: '{{ .k8s_k3s.manifest }}'
+pipelineid: update-k8s-k3s-versions
+
+conditions:
+  check-dockerfile-k3s-cattle-version:
+    name: 'Check if ENV CATTLE_K3S_VERSION is set in Dockerfiles'
+    kind: file
+    scmid: 'default'
+    disablesourceinput: true
+    spec:
+      files:
+        - 'Dockerfile.dapper'
+        - 'package/Dockerfile'
+      matchpattern: 'ENV[\s\t]+CATTLE_K3S_VERSION[=\s]\S+'
+
+  check-dockerfile-k3s-image:
+    name: 'Check if rancher/k3s image is set in Dockerfiles'
+    kind: file
+    scmid: 'default'
+    disablesourceinput: true
+    spec:
+      files:
+        - 'Dockerfile.dapper'
+        - 'package/Dockerfile'
+      matchpattern: 'COPY[\s\t]+--from=rancher/k3s:\S+'
+
+targets:
+  update-dockerfile-k3s-cattle-version:
+    name: 'Update ENV CATTLE_K3S_VERSION to {{ .k3s.release }} in Dockerfiles'
+    kind: file
+    scmid: 'default'
+    spec:
+      files:
+        - 'Dockerfile.dapper'
+        - 'package/Dockerfile'
+      matchpattern: 'ENV[\s\t]+CATTLE_K3S_VERSION[=\s]+\S+'
+      replacepattern: 'ENV CATTLE_K3S_VERSION={{ .k3s.release }}'
+
+  update-dockerfile-k3s-image-version:
+    name: 'Update rancher/k3s image to {{ .k3s.image }} in Dockerfiles'
+    kind: file
+    scmid: 'default'
+    spec:
+      files:
+        - 'Dockerfile.dapper'
+        - 'package/Dockerfile'
+      matchpattern: 'COPY[\s\t]+--from=rancher/k3s:\S+'
+      replacepattern: 'COPY --from=rancher/k3s:{{ .k3s.image }}'

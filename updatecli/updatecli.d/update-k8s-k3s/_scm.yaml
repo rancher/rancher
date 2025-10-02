@@ -1,0 +1,32 @@
+# This is a partial file (prefixed with _) that allows to reuse the scm and
+# action configurations.
+
+scms:
+  default:
+    kind: github
+    spec:
+      owner: '{{ .scm.owner }}'
+      repository: '{{ .scm.repo }}'
+      branch: '{{ .scm.branch }}'
+      user: '{{ .scm.user }}'
+      email: '{{ .scm.email }}'
+      username: '{{ .scm.username }}'
+      token: '{{ requiredEnv .scm.token }}'
+      commitusingapi: {{ .scm.commitusingapi }}
+      commitmessage:
+        squash: {{ .scm.commitmessage.squash }}
+        type: '{{ .k8s_k3s.commitmessage.type }}'
+        scope: '{{ .k8s_k3s.commitmessage.scope }}'
+        title: 'Bump patch versions of K8s and K3s'
+        body: 'Bump patch versions of K8s to {{ .k8s.main }} and K3s to {{ .k3s.release }}.'
+
+actions:
+  rancher-pr:
+    kind: github/pullrequest
+    scmid: 'default'
+    spec:
+      labels:
+        - 'dependencies'
+      mergemethod: '{{ .scm.mergemethod }}'
+      title: '[{{ .scm.branch }}] Bump K8s to `{{ .k8s.main }}` and K3s to `{{ .k3s.release }}`'
+      description: 'Bump patch versions of K8s to `{{ .k8s.main }}` and K3s to `{{ .k3s.release }}`.'
