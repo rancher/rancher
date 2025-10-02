@@ -36,6 +36,7 @@ import (
 	"github.com/rancher/rancher/pkg/catalogv2/oci"
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/settings"
+	rancherSemver "github.com/rancher/rancher/pkg/version/semver"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	"github.com/sirupsen/logrus"
@@ -456,11 +457,13 @@ func isRancherAndBundledCatalog(repo repoDef) bool {
 // skipIndexFiltering returns true if the helm index filtering should be skipped.
 func skipIndexFiltering() bool {
 	serverVersion := settings.ServerVersion.Get()
+	version := rancherSemver.Version(serverVersion)
 
 	// If the server version is a release or a release candidate (rc), we don't skip filtering.
-	if settings.IsRelease() || strings.Contains(serverVersion, "-rc") {
+	if (version.HasReleasePrefix() && !strings.Contains(serverVersion, "head")) || version.IsRC() {
 		return false
 	}
+
 	// If setting is true, we skip filtering.
 	return settings.SkipHelmIndexFiltering.Get() == "true"
 }
