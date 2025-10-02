@@ -75,13 +75,6 @@ require (
 	github.com/AzureAD/microsoft-authentication-library-for-go v1.4.2
 	github.com/Masterminds/semver/v3 v3.3.0
 	github.com/Masterminds/sprig/v3 v3.3.0
-	github.com/alibabacloud-go/cs-20151215/v5 v5.9.7
-	github.com/alibabacloud-go/darabonba-openapi/v2 v2.1.10
-	github.com/alibabacloud-go/ecs-20140526/v7 v7.0.13
-	github.com/alibabacloud-go/resourcemanager-20200331/v3 v3.3.0
-	github.com/alibabacloud-go/tea v1.3.10
-	github.com/alibabacloud-go/vpc-20160428/v6 v6.12.8
-	github.com/aliyun/credentials-go v1.4.7
 	github.com/aws/aws-sdk-go v1.55.5
 	github.com/aws/aws-sdk-go-v2 v1.37.2
 	github.com/aws/aws-sdk-go-v2/credentials v1.18.3
@@ -135,6 +128,7 @@ require (
 	github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae75779379
 	github.com/rancher/lasso v0.2.5-rc.1
 	github.com/rancher/machine v0.15.0-rancher133
+	github.com/rancher/muchang v0.0.0-20250924102543-edfa278ae47f
 	github.com/rancher/norman v0.7.0
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.5.1-rc.1
@@ -196,10 +190,12 @@ require (
 	github.com/NYTimes/gziphandler v1.1.1 // indirect
 	github.com/ProtonMail/go-crypto v1.1.3 // indirect
 	github.com/alibabacloud-go/alibabacloud-gateway-spi v0.0.5 // indirect
+	github.com/alibabacloud-go/cs-20151215/v5 v5.9.7 // indirect
+	github.com/alibabacloud-go/darabonba-openapi/v2 v2.1.10 // indirect
 	github.com/alibabacloud-go/debug v1.0.1 // indirect
-	github.com/alibabacloud-go/endpoint-util v1.1.0 // indirect
-	github.com/alibabacloud-go/openapi-util v0.1.1 // indirect
+	github.com/alibabacloud-go/tea v1.3.10 // indirect
 	github.com/alibabacloud-go/tea-utils/v2 v2.0.7 // indirect
+	github.com/aliyun/credentials-go v1.4.7 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.0 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.30.3 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.2 // indirect
