@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_IsRelease(t *testing.T) {
+func Test_ServerVersionHasReleasePrefixExcludesHead(t *testing.T) {
 	inputs := map[string]bool{
 		"dev":         false,
 		"master-head": false,
@@ -25,7 +25,7 @@ func Test_IsRelease(t *testing.T) {
 		if err := ServerVersion.Set(key); err != nil {
 			t.Errorf("Encountered error while setting temp version: %v\n", err)
 		}
-		result := IsRelease()
+		result := ServerVersionHasReleasePrefixExcludesHead()
 		a.Equal(value, result, fmt.Sprintf("Expected value [%t] for key [%s]. Got value [%t]", value, key, result))
 	}
 }

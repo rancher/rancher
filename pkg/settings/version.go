@@ -6,9 +6,12 @@ import (
 	"github.com/rancher/rancher/pkg/version/semver"
 )
 
-// IsRelease returns true if the running server is a released version of rancher.
-func IsRelease() bool {
-	return !strings.Contains(ServerVersion.Get(), "head") && releasePattern.MatchString(ServerVersion.Get())
+// ServerVersionHasReleasePrefixExcludesHead returns true if the running server has the release prefix `v` and doesn't include `head`.
+// This function is primarily used by the UI to know when to use local (to rancher image) assets or web assets
+func ServerVersionHasReleasePrefixExcludesHead() bool {
+	serverVersion := ServerVersion.Get()
+	version := semver.Version(serverVersion)
+	return version.HasReleasePrefix() && !strings.Contains(serverVersion, "head")
 }
 
 func IsVersionRelease(version string) bool {
