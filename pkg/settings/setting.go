@@ -99,6 +99,7 @@ var (
 	PasswordMinLength                   = NewSetting("password-min-length", "12")
 	PeerServices                        = NewSetting("peer-service", os.Getenv("CATTLE_PEER_SERVICE"))
 	RkeMetadataConfig                   = NewSetting("rke-metadata-config", getMetadataConfig())
+	KEv2Operators                       = NewSetting("kev2-operators", "{}")
 	ServerImage                         = NewSetting("server-image", "rancher/rancher")
 	ServerURL                           = NewSetting("server-url", "")
 	ServerVersion                       = NewSetting("server-version", "dev")
