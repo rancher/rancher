@@ -354,6 +354,12 @@ var (
 	// UIPreferred Ensure that the new Dashboard is the default UI.
 	UIPreferred = NewSetting("ui-preferred", "vue")
 
+	// UIContentEnabled - configure UI Dynamic Content (true, log or debug)
+	UIContentEnabled = NewSetting("ui-content-enabled", "true")
+
+	// UIContentEndpoint - configure custom endpoint for UI Dynamic Content data
+	UIContentEndpoint = NewSetting("ui-content-endpoint", "")
+
 	// SkipHostedClusterChartInstallation controls whether the hosted cluster chart is installed on the server. Defaults to false.
 	// This setting is for development purposes only.
 	SkipHostedClusterChartInstallation = NewSetting("skip-hosted-cluster-chart-installation", os.Getenv("CATTLE_SKIP_HOSTED_CLUSTER_CHART_INSTALLATION"))
