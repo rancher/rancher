@@ -192,20 +192,7 @@ push_cattle_agent_image()
 
 # Get the rancher binary ready
 #
-# This needs to happen before build_and_run_rancher is executed in the background.
-# Otherwise, build_and_run_rancher will also compile Rancher, overly elongating the
-# time before Rancher is ready and therefore causing flakiness of the health check below.
-
-if ! docker image inspect rancher/rancher:$TAG >/dev/null 2>&1 ; then
-    echo "building rancher from source - no preloaded container image available"
-    ./scripts/build-server
-else
-    # otherwise just copy it from the artifacts that are already there. neat!
-    echo "pulling bin/rancher from preloaded container image"
-    container_id=$(docker create rancher/rancher:$TAG)
-    docker cp $container_id:/usr/bin/rancher bin/rancher
-    docker rm $container_id
-fi
+./dev-scripts/must-rancher-binary.sh
 
 # uncomment to get startup logs. Don't leave them on because it slows drone down too
 # much
