@@ -15,8 +15,6 @@ $(TARGETS): .dapper
 		./.dapper $@; \
 	fi
 
-.DEFAULT_GOAL := ci
-
 quick-agent:
 	@$(MAKE) quick TARGET="agent"
 
