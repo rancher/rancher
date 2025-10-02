@@ -47,7 +47,7 @@ func TestHandleSamlLoginAddsRancherUserIdToCookie(t *testing.T) {
 	cookie, err := http.ParseSetCookie(w.Header().Get("Set-Cookie"))
 	assert.NoError(t, err)
 	assert.Equal(t, "saml_"+relayState, cookie.Name)
-	token, err := jwt.Parse(cookie.Value, func(token *jwt.Token) (interface{}, error) {
+	token, err := jwt.Parse(cookie.Value, func(token *jwt.Token) (any, error) {
 		secretBlock := x509.MarshalPKCS1PrivateKey(serviceProvider.Key)
 		return secretBlock, nil
 	})

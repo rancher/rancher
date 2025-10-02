@@ -20,7 +20,7 @@ func GetPrincipalID(principal v3.Principal) string {
 
 // ExtractFieldFromJWT attempts to extract a value from a JWT by field name.
 // It does not make assumptions about the type of the return value, so the caller is responsible for handling that.
-func ExtractFieldFromJWT(tokenString string, fieldID string) (interface{}, error) {
+func ExtractFieldFromJWT(tokenString string, fieldID string) (any, error) {
 	pieces := strings.Split(tokenString, ".")
 	if len(pieces) != 3 {
 		return "", fmt.Errorf("invalid token")
@@ -30,7 +30,7 @@ func ExtractFieldFromJWT(tokenString string, fieldID string) (interface{}, error
 		return "", fmt.Errorf("error decoding token")
 	}
 
-	var data map[string]interface{}
+	var data map[string]any
 	err = json.Unmarshal(decoded, &data)
 	if err != nil {
 		return "", fmt.Errorf("error unmarshaling token")

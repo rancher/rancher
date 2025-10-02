@@ -153,7 +153,7 @@ func (p *mockLdapProvider) GetName() string {
 	return p.providerName
 }
 
-func (p *mockLdapProvider) AuthenticateUser(ctx context.Context, input interface{}) (apiv3.Principal, []apiv3.Principal, string, error) {
+func (p *mockLdapProvider) AuthenticateUser(ctx context.Context, input any) (apiv3.Principal, []apiv3.Principal, string, error) {
 	panic("AuthenticateUser Unimplemented!")
 }
 
@@ -180,7 +180,7 @@ func (p *mockLdapProvider) GetPrincipal(principalID string, token accessor.Token
 	panic("GetPrincipal Unimplemented!")
 }
 
-func (p *mockLdapProvider) TransformToAuthProvider(authConfig map[string]interface{}) (map[string]interface{}, error) {
+func (p *mockLdapProvider) TransformToAuthProvider(authConfig map[string]any) (map[string]any, error) {
 	panic("TransformToAuthProvider Unimplemented!")
 }
 

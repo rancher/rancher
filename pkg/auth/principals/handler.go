@@ -14,15 +14,14 @@ import (
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/requests"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
 type principalsHandler struct {
-	principalsClient   v3.PrincipalInterface
 	getAuthTokenGroups func(token accessor.TokenAccessor) []apiv3.Principal
-	tokensClient       v3.TokenInterface
+	tokensClient       mgmtv3.TokenClient
 	authToken          requests.AuthTokenGetter
 	ac                 types.AccessControl
 }
@@ -30,8 +29,7 @@ type principalsHandler struct {
 func newPrincipalsHandler(ctx context.Context, mgmt *config.ScaledContext, authToken requests.AuthTokenGetter) *principalsHandler {
 	providers.Configure(ctx, mgmt)
 	return &principalsHandler{
-		principalsClient:   mgmt.Management.Principals(""),
-		tokensClient:       mgmt.Management.Tokens(""),
+		tokensClient:       mgmt.Wrangler.Mgmt.Token(),
 		authToken:          authToken,
 		getAuthTokenGroups: mgmt.UserManager.GetGroupsForTokenAuthProvider,
 		ac:                 mgmt.AccessControl,
@@ -58,7 +56,7 @@ func (h *principalsHandler) actions(actionName string, action *types.Action, api
 		return err
 	}
 
-	var principals []map[string]interface{}
+	var principals []map[string]any
 	for _, p := range ps {
 		x, err := convertPrincipal(apiContext.Schema, p)
 		if err != nil {
@@ -75,7 +73,7 @@ func (h *principalsHandler) actions(actionName string, action *types.Action, api
 }
 
 func (h *principalsHandler) list(apiContext *types.APIContext, next types.RequestHandler) error {
-	var principals []map[string]interface{}
+	var principals []map[string]any
 
 	token, err := h.getToken(apiContext.Request)
 	if err != nil {
@@ -123,7 +121,7 @@ func (h *principalsHandler) list(apiContext *types.APIContext, next types.Reques
 	return nil
 }
 
-func convertPrincipal(schema *types.Schema, principal v3.Principal) (map[string]interface{}, error) {
+func convertPrincipal(schema *types.Schema, principal apiv3.Principal) (map[string]any, error) {
 	data, err := convert.EncodeToMap(principal)
 	if err != nil {
 		return nil, err

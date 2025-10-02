@@ -65,7 +65,7 @@ func Configure(mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *to
 	}
 }
 
-func (g *googleOauthProvider) AuthenticateUser(ctx context.Context, input interface{}) (apiv3.Principal, []apiv3.Principal, string, error) {
+func (g *googleOauthProvider) AuthenticateUser(ctx context.Context, input any) (apiv3.Principal, []apiv3.Principal, string, error) {
 	login, ok := input.(*apiv3.GoogleOauthLogin)
 	if !ok {
 		return apiv3.Principal{}, nil, "", fmt.Errorf("unexpected input type")
@@ -250,7 +250,7 @@ func (g *googleOauthProvider) CustomizeSchema(schema *types.Schema) {
 	schema.Formatter = g.formatter
 }
 
-func (g *googleOauthProvider) TransformToAuthProvider(authConfig map[string]interface{}) (map[string]interface{}, error) {
+func (g *googleOauthProvider) TransformToAuthProvider(authConfig map[string]any) (map[string]any, error) {
 	p := common.TransformToAuthProvider(authConfig)
 	val, err := g.formGoogleOAuthRedirectURLFromMap(authConfig)
 	if err != nil {

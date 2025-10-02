@@ -708,7 +708,7 @@ func (o *OpenIDCProvider) LogoutAll(apiContext *types.APIContext, token accessor
 	}
 	logrus.Debug("OpenIDCProvider [logout-all]: triggering logout redirect to ", idpRedirectURL)
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"idpRedirectUrl": idpRedirectURL,
 		"type":           "authConfigLogoutOutput",
 	}

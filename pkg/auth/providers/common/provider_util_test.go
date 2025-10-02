@@ -1,13 +1,14 @@
 package common_test
 
 import (
+	"testing"
+	"time"
+
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"testing"
-	"time"
 )
 
 func TestDecode(t *testing.T) {
@@ -42,8 +43,8 @@ func TestDecode(t *testing.T) {
 			err := common.Decode(tt.input, tt.output)
 			assert.Equal(t, err != nil, tt.wantErr)
 			if !tt.wantErr {
-				inputMap, _ := tt.input.(map[string]interface{})
-				inputMeta, _ := inputMap["metadata"].(map[string]interface{})
+				inputMap, _ := tt.input.(map[string]any)
+				inputMeta, _ := inputMap["metadata"].(map[string]any)
 				outputConfig, _ := tt.output.(*apimgmtv3.AuthConfig)
 				// Spot check some fields, creationtimestamp is critical though as it's the
 				// main reason we are using a customized decoder.

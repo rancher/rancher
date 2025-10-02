@@ -81,21 +81,13 @@ func (m *mockUnstructuredGetter) Get(name string, _ metav1.GetOptions) (runtime.
 	return nil, fmt.Errorf("object %s not found", name)
 }
 
-func (m *mockUnstructuredGetter) addObject(name string, object runtime.Object) {
-	m.objects[name] = object
-}
-
-func (m *mockUnstructuredGetter) addErr(name string, err error) {
-	m.errObjects[name] = err
-}
-
 type mockUnstructured struct {
-	content map[string]interface{}
+	content map[string]any
 }
 
 func (m *mockUnstructured) NewEmptyInstance() runtime.Unstructured                 { return nil }
-func (m *mockUnstructured) UnstructuredContent() map[string]interface{}            { return m.content }
-func (m *mockUnstructured) SetUnstructuredContent(input map[string]interface{})    { m.content = input }
+func (m *mockUnstructured) UnstructuredContent() map[string]any                    { return m.content }
+func (m *mockUnstructured) SetUnstructuredContent(input map[string]any)            { m.content = input }
 func (m *mockUnstructured) IsList() bool                                           { return false }
 func (m *mockUnstructured) EachListItem(func(runtime.Object) error) error          { return nil }
 func (m *mockUnstructured) EachListItemWithAlloc(func(runtime.Object) error) error { return nil }
@@ -116,7 +108,7 @@ func (f fakeProvider) GetName() string {
 	panic("implement me")
 }
 
-func (f fakeProvider) AuthenticateUser(_ context.Context, _ interface{}) (v3.Principal, []v3.Principal, string, error) {
+func (f fakeProvider) AuthenticateUser(_ context.Context, _ any) (v3.Principal, []v3.Principal, string, error) {
 	panic("implement me")
 }
 
@@ -132,7 +124,7 @@ func (f fakeProvider) CustomizeSchema(_ *types.Schema) {
 	panic("implement me")
 }
 
-func (f fakeProvider) TransformToAuthProvider(_ map[string]interface{}) (map[string]interface{}, error) {
+func (f fakeProvider) TransformToAuthProvider(_ map[string]any) (map[string]any, error) {
 	panic("implement me")
 }
 

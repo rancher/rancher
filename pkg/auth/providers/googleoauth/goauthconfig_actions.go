@@ -8,7 +8,7 @@ import (
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"golang.org/x/oauth2"
@@ -31,16 +31,18 @@ func (g *googleOauthProvider) actionHandler(actionName string, action *types.Act
 		return nil
 	}
 
-	if actionName == "configureTest" {
+	switch actionName {
+	case "configureTest":
 		return g.configureTest(request)
-	} else if actionName == "testAndApply" {
+	case "testAndApply":
 		return g.testAndApply(request)
+	default:
+		return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 	}
-	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }
 
 func (g *googleOauthProvider) configureTest(request *types.APIContext) error {
-	goauthConfig := &v32.GoogleOauthConfig{}
+	goauthConfig := &apiv3.GoogleOauthConfig{}
 	if err := json.NewDecoder(request.Request.Body).Decode(goauthConfig); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("[Google OAuth] configureTest: Failed to parse body: %v", err))
@@ -51,7 +53,7 @@ func (g *googleOauthProvider) configureTest(request *types.APIContext) error {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("[Google OAuth] configureTest: Failed to form redirect URL with error: %v", err))
 	}
-	data := map[string]interface{}{
+	data := map[string]any{
 		"redirectUrl": redirectURL,
 		"type":        "googleOAuthConfigTestOutput",
 	}
@@ -60,15 +62,15 @@ func (g *googleOauthProvider) configureTest(request *types.APIContext) error {
 }
 
 func (g *googleOauthProvider) testAndApply(request *types.APIContext) error {
-	var googleOAuthConfig v32.GoogleOauthConfig
-	googleOAuthConfigApplyInput := &v32.GoogleOauthConfigApplyInput{}
+	var googleOAuthConfig apiv3.GoogleOauthConfig
+	googleOAuthConfigApplyInput := &apiv3.GoogleOauthConfigApplyInput{}
 	if err := json.NewDecoder(request.Request.Body).Decode(googleOAuthConfigApplyInput); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("[Google OAuth] testAndApply: Failed to parse body: %v", err))
 	}
 
 	googleOAuthConfig = googleOAuthConfigApplyInput.GoogleOauthConfig
-	googleLogin := &v32.GoogleOauthLogin{
+	googleLogin := &apiv3.GoogleOauthLogin{
 		Code: googleOAuthConfigApplyInput.Code,
 	}
 
@@ -121,11 +123,11 @@ func (g *googleOauthProvider) testAndApply(request *types.APIContext) error {
 
 }
 
-func (g *googleOauthProvider) formGoogleOAuthRedirectURL(goauthConfig *v32.GoogleOauthConfig) (string, error) {
+func (g *googleOauthProvider) formGoogleOAuthRedirectURL(goauthConfig *apiv3.GoogleOauthConfig) (string, error) {
 	return g.getRedirectURL([]byte(goauthConfig.OauthCredential))
 }
 
-func (g *googleOauthProvider) formGoogleOAuthRedirectURLFromMap(config map[string]interface{}) (string, error) {
+func (g *googleOauthProvider) formGoogleOAuthRedirectURLFromMap(config map[string]any) (string, error) {
 	clientCreds, ok := config[client.GoogleOauthConfigFieldOauthCredential].(string)
 	if !ok {
 		return "", fmt.Errorf("[Google OAuth] formGoogleOAuthRedirectURLFromMap: no creds file present")

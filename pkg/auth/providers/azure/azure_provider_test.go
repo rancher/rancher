@@ -20,14 +20,14 @@ func TestConfigureTest(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name                string
-		authConfig          map[string]interface{}
+		authConfig          map[string]any
 		expectedRedirectURL string
 	}{
 		{
 			name: "initial setup of Azure AD with Microsoft Graph",
-			authConfig: map[string]interface{}{
+			authConfig: map[string]any{
 				"accessMode": "unrestricted",
-				"annotations": map[string]interface{}{
+				"annotations": map[string]any{
 					"auth.cattle.io/azuread-endpoint-migrated": "true",
 				},
 				"enabled":           false,
@@ -44,9 +44,9 @@ func TestConfigureTest(t *testing.T) {
 		},
 		{
 			name: "attempt to initially setup Azure AD with deprecated Azure AD Graph",
-			authConfig: map[string]interface{}{
+			authConfig: map[string]any{
 				"accessMode":        "unrestricted",
-				"annotations":       map[string]interface{}{},
+				"annotations":       map[string]any{},
 				"enabled":           false,
 				"endpoint":          "https://login.microsoftonline.com/",
 				"graphEndpoint":     "https://graph.windows.net/",
@@ -61,10 +61,10 @@ func TestConfigureTest(t *testing.T) {
 		},
 		{
 			name: "editing an existing setup of Azure AD",
-			authConfig: map[string]interface{}{
+			authConfig: map[string]any{
 				"enabled":    true,
 				"accessMode": "unrestricted",
-				"annotations": map[string]interface{}{
+				"annotations": map[string]any{
 					"auth.cattle.io/azuread-endpoint-migrated": "true",
 				},
 				"endpoint":          "https://login.microsoftonline.com/",
@@ -123,17 +123,17 @@ func TestTransformToAuthProvider(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name                 string
-		authConfig           map[string]interface{}
-		expectedAuthProvider map[string]interface{}
+		authConfig           map[string]any
+		expectedAuthProvider map[string]any
 	}{
 		{
 			name: "redirect URL for Microsoft Graph",
-			authConfig: map[string]interface{}{
+			authConfig: map[string]any{
 				"enabled":    true,
 				"accessMode": "unrestricted",
-				"metadata": map[string]interface{}{
+				"metadata": map[string]any{
 					"name": "providerName",
-					"annotations": map[string]interface{}{
+					"annotations": map[string]any{
 						"auth.cattle.io/azuread-endpoint-migrated": "true",
 					},
 				},
@@ -146,7 +146,7 @@ func TestTransformToAuthProvider(t *testing.T) {
 				"applicationSecret": "secret123",
 				"rancherUrl":        "https://myrancher.com",
 			},
-			expectedAuthProvider: map[string]interface{}{
+			expectedAuthProvider: map[string]any{
 				"id":                 "providerName",
 				"clientId":           "app123",
 				"tenantId":           "tenant123",
@@ -162,11 +162,11 @@ func TestTransformToAuthProvider(t *testing.T) {
 		},
 		{
 			name: "redirect URL for disabled auth provider with annotation",
-			authConfig: map[string]interface{}{
+			authConfig: map[string]any{
 				"accessMode": "unrestricted",
-				"metadata": map[string]interface{}{
+				"metadata": map[string]any{
 					"name": "providerName",
-					"annotations": map[string]interface{}{
+					"annotations": map[string]any{
 						"auth.cattle.io/azuread-endpoint-migrated": "true",
 					},
 				},
@@ -179,7 +179,7 @@ func TestTransformToAuthProvider(t *testing.T) {
 				"applicationSecret": "secret123",
 				"rancherUrl":        "https://myrancher.com",
 			},
-			expectedAuthProvider: map[string]interface{}{
+			expectedAuthProvider: map[string]any{
 				"id":                 "providerName",
 				"clientId":           "app123",
 				"tenantId":           "tenant123",
@@ -195,12 +195,12 @@ func TestTransformToAuthProvider(t *testing.T) {
 		},
 		{
 			name: "redirect URL for disabled auth provider without annotation",
-			authConfig: map[string]interface{}{
+			authConfig: map[string]any{
 				"enabled":    false, // Here, enabled is set to false explicitly.
 				"accessMode": "unrestricted",
-				"metadata": map[string]interface{}{
+				"metadata": map[string]any{
 					"name":        "providerName",
-					"annotations": map[string]interface{}{},
+					"annotations": map[string]any{},
 				},
 				"endpoint":          "https://login.microsoftonline.com/",
 				"graphEndpoint":     "https://graph.windows.net/",
@@ -211,7 +211,7 @@ func TestTransformToAuthProvider(t *testing.T) {
 				"applicationSecret": "secret123",
 				"rancherUrl":        "https://myrancher.com",
 			},
-			expectedAuthProvider: map[string]interface{}{
+			expectedAuthProvider: map[string]any{
 				"id":                 "providerName",
 				"clientId":           "app123",
 				"tenantId":           "tenant123",
@@ -227,12 +227,12 @@ func TestTransformToAuthProvider(t *testing.T) {
 		},
 		{
 			name: "oauth URLs from default endpoint",
-			authConfig: map[string]interface{}{
+			authConfig: map[string]any{
 				"enabled":    false, // Here, enabled is set to false explicitly.
 				"accessMode": "unrestricted",
-				"metadata": map[string]interface{}{
+				"metadata": map[string]any{
 					"name":        "providerName",
-					"annotations": map[string]interface{}{},
+					"annotations": map[string]any{},
 				},
 				"endpoint":          "https://login.microsoftonline.com/",
 				"graphEndpoint":     "https://graph.windows.net/",
@@ -242,7 +242,7 @@ func TestTransformToAuthProvider(t *testing.T) {
 				"applicationSecret": "secret123",
 				"rancherUrl":        "https://myrancher.com",
 			},
-			expectedAuthProvider: map[string]interface{}{
+			expectedAuthProvider: map[string]any{
 				"id":                 "providerName",
 				"clientId":           "app123",
 				"tenantId":           "tenant123",
@@ -258,12 +258,12 @@ func TestTransformToAuthProvider(t *testing.T) {
 		},
 		{
 			name: "oauth URLs from custom endpoint and no oauth URLs",
-			authConfig: map[string]interface{}{
+			authConfig: map[string]any{
 				"enabled":    false, // Here, enabled is set to false explicitly.
 				"accessMode": "unrestricted",
-				"metadata": map[string]interface{}{
+				"metadata": map[string]any{
 					"name":        "providerName",
-					"annotations": map[string]interface{}{},
+					"annotations": map[string]any{},
 				},
 				"endpoint":          "https://myendpoint.com/",
 				"graphEndpoint":     "https://graph.windows.net/",
@@ -273,7 +273,7 @@ func TestTransformToAuthProvider(t *testing.T) {
 				"applicationSecret": "secret123",
 				"rancherUrl":        "https://myrancher.com",
 			},
-			expectedAuthProvider: map[string]interface{}{
+			expectedAuthProvider: map[string]any{
 				"id":                 "providerName",
 				"clientId":           "app123",
 				"tenantId":           "tenant123",
@@ -289,12 +289,12 @@ func TestTransformToAuthProvider(t *testing.T) {
 		},
 		{
 			name: "oauth URLs from custom URLs",
-			authConfig: map[string]interface{}{
+			authConfig: map[string]any{
 				"enabled":    false, // Here, enabled is set to false explicitly.
 				"accessMode": "unrestricted",
-				"metadata": map[string]interface{}{
+				"metadata": map[string]any{
 					"name":        "providerName",
-					"annotations": map[string]interface{}{},
+					"annotations": map[string]any{},
 				},
 				"endpoint":           "https://login.microsoftonline.com/",
 				"graphEndpoint":      "https://graph.windows.net/",
@@ -306,7 +306,7 @@ func TestTransformToAuthProvider(t *testing.T) {
 				"applicationSecret":  "secret123",
 				"rancherUrl":         "https://myrancher.com",
 			},
-			expectedAuthProvider: map[string]interface{}{
+			expectedAuthProvider: map[string]any{
 				"id":                 "providerName",
 				"clientId":           "app123",
 				"tenantId":           "tenant123",

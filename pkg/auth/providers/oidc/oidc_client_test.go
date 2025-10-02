@@ -191,7 +191,7 @@ func TestAddCertKeyToContext(t *testing.T) {
 func TestFetchAuthURL(t *testing.T) {
 	testCases := []struct {
 		name         string
-		config       map[string]interface{}
+		config       map[string]any
 		mockResponse string
 		mockStatus   int
 		expectedURL  string
@@ -199,7 +199,7 @@ func TestFetchAuthURL(t *testing.T) {
 	}{
 		{
 			name: "AuthEndpoint already configured",
-			config: map[string]interface{}{
+			config: map[string]any{
 				"authEndpoint": "https://ranchertest.io/auth",
 			},
 			expectedURL: "https://ranchertest.io/auth",
@@ -207,7 +207,7 @@ func TestFetchAuthURL(t *testing.T) {
 		},
 		{
 			name: "Issuer URL provided, valid discovery document",
-			config: map[string]interface{}{
+			config: map[string]any{
 				"issuer": "https://ranchertest.io",
 			},
 			mockResponse: `{"authorization_endpoint": "https://ranchertest.io/auth"}`,
@@ -217,7 +217,7 @@ func TestFetchAuthURL(t *testing.T) {
 		},
 		{
 			name: "Issuer URL provided, invalid discovery document",
-			config: map[string]interface{}{
+			config: map[string]any{
 				"issuer": "https://ranchertest.io",
 			},
 			mockResponse: `{"authorization_endpoi": "https://ranchertest.io/auth"}`,
@@ -227,7 +227,7 @@ func TestFetchAuthURL(t *testing.T) {
 		},
 		{
 			name: "Issuer URL provided, error fetching discovery document",
-			config: map[string]interface{}{
+			config: map[string]any{
 				"issuer": "https://ranchertest.io",
 			},
 			mockResponse: `Internal Server Error`,
@@ -237,7 +237,7 @@ func TestFetchAuthURL(t *testing.T) {
 		},
 		{
 			name:        "Both authEndpoint and issuerURL missing",
-			config:      map[string]interface{}{},
+			config:      map[string]any{},
 			expectedURL: "",
 			expectError: true,
 		},

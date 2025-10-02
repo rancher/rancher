@@ -76,7 +76,7 @@ func (ap *Provider) GetName() string {
 	return Name
 }
 
-func (ap *Provider) AuthenticateUser(ctx context.Context, input interface{}) (apiv3.Principal, []apiv3.Principal, string, error) {
+func (ap *Provider) AuthenticateUser(ctx context.Context, input any) (apiv3.Principal, []apiv3.Principal, string, error) {
 	login, ok := input.(*apiv3.AzureADLogin)
 	if !ok {
 		return apiv3.Principal{}, nil, "", errors.New("unexpected input type")
@@ -201,8 +201,8 @@ func (ap *Provider) CustomizeSchema(schema *types.Schema) {
 }
 
 func (ap *Provider) TransformToAuthProvider(
-	authConfig map[string]interface{},
-) (map[string]interface{}, error) {
+	authConfig map[string]any,
+) (map[string]any, error) {
 	p := common.TransformToAuthProvider(authConfig)
 	p[publicclient.AzureADProviderFieldRedirectURL] = formAzureRedirectURL(authConfig)
 
@@ -217,7 +217,7 @@ func (ap *Provider) TransformToAuthProvider(
 	baseEndpoint, _ := authConfig["endpoint"].(string)
 
 	// getString will return the string value from the map, or a blank string if the value is not a string
-	getString := func(data map[string]interface{}, key string) string {
+	getString := func(data map[string]any, key string) string {
 		v, ok := data[key]
 		if !ok {
 			return ""

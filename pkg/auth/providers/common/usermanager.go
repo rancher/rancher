@@ -766,7 +766,7 @@ func (m *userManager) checkLabels(principalName string) (*v3.User, labels.Set, e
 	return match, set, nil
 }
 
-func userByPrincipal(obj interface{}) ([]string, error) {
+func userByPrincipal(obj any) ([]string, error) {
 	u, ok := obj.(*v3.User)
 	if !ok {
 		return []string{}, nil
@@ -786,7 +786,7 @@ func userByPrincipal(obj interface{}) ([]string, error) {
 	return append(u.PrincipalIDs, "local://"+u.Name), nil
 }
 
-func crtbsByPrincipalAndUser(obj interface{}) ([]string, error) {
+func crtbsByPrincipalAndUser(obj any) ([]string, error) {
 	var principals []string
 	b, ok := obj.(*v3.ClusterRoleTemplateBinding)
 	if !ok {
@@ -804,7 +804,7 @@ func crtbsByPrincipalAndUser(obj interface{}) ([]string, error) {
 	return principals, nil
 }
 
-func prtbsByPrincipalAndUser(obj interface{}) ([]string, error) {
+func prtbsByPrincipalAndUser(obj any) ([]string, error) {
 	var principals []string
 	b, ok := obj.(*v3.ProjectRoleTemplateBinding)
 	if !ok {
@@ -822,7 +822,7 @@ func prtbsByPrincipalAndUser(obj interface{}) ([]string, error) {
 	return principals, nil
 }
 
-func grbByUser(obj interface{}) ([]string, error) {
+func grbByUser(obj any) ([]string, error) {
 	grb, ok := obj.(*v3.GlobalRoleBinding)
 	if !ok {
 		return []string{}, nil

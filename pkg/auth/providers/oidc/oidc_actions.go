@@ -12,7 +12,7 @@ import (
 	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
@@ -36,13 +36,14 @@ func (o *OpenIDCProvider) ActionHandler(actionName string, action *types.Action,
 		return nil
 	}
 
-	if actionName == "configureTest" {
+	switch actionName {
+	case "configureTest":
 		return o.ConfigureTest(request)
-	} else if actionName == "testAndApply" {
+	case "testAndApply":
 		return o.TestAndApply(request)
+	default:
+		return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 	}
-
-	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }
 
 func (o *OpenIDCProvider) ConfigureTest(request *types.APIContext) error {
@@ -53,7 +54,7 @@ func (o *OpenIDCProvider) ConfigureTest(request *types.APIContext) error {
 		return err
 	}
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"redirectUrl": o.getRedirectURL(input),
 		"type":        "OIDCTestOutput",
 	}
@@ -66,8 +67,8 @@ func (o *OpenIDCProvider) ConfigureTest(request *types.APIContext) error {
 // If the verification succeed, creates a Token to access the provider.
 // It returns an error in case of failure.
 func (o *OpenIDCProvider) TestAndApply(request *types.APIContext) error {
-	var oidcConfig v32.OIDCConfig
-	oidcConfigApplyInput := &v32.OIDCApplyInput{}
+	var oidcConfig apiv3.OIDCConfig
+	oidcConfigApplyInput := &apiv3.OIDCApplyInput{}
 
 	if err := json.NewDecoder(request.Request.Body).Decode(oidcConfigApplyInput); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
@@ -85,7 +86,7 @@ func (o *OpenIDCProvider) TestAndApply(request *types.APIContext) error {
 	if oidcConfig.Type == client.CognitoConfigType {
 		oidcConfig.GroupsClaim = cognitoGroupsClaim
 	}
-	oidcLogin := &v32.OIDCLogin{
+	oidcLogin := &apiv3.OIDCLogin{
 		Code: oidcConfigApplyInput.Code,
 	}
 

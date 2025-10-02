@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/rancher/norman/types"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
 	"github.com/rancher/rancher/pkg/auth/providers/azure"
@@ -24,7 +25,6 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	publicclient "github.com/rancher/rancher/pkg/client/generated/management/v3public"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 )
 
@@ -273,11 +273,11 @@ func IsValidUserExtraAttribute(key string) bool {
 	return false
 }
 
-func AuthenticateUser(ctx context.Context, input interface{}, providerName string) (v3.Principal, []v3.Principal, string, error) {
+func AuthenticateUser(ctx context.Context, input any, providerName string) (apiv3.Principal, []apiv3.Principal, string, error) {
 	return Providers[providerName].AuthenticateUser(ctx, input)
 }
 
-func GetPrincipal(principalID string, myToken accessor.TokenAccessor) (v3.Principal, error) {
+func GetPrincipal(principalID string, myToken accessor.TokenAccessor) (apiv3.Principal, error) {
 	principal, err := Providers[myToken.GetAuthProvider()].GetPrincipal(principalID, myToken)
 
 	if err != nil && myToken.GetAuthProvider() != LocalProvider {
@@ -290,13 +290,13 @@ func GetPrincipal(principalID string, myToken accessor.TokenAccessor) (v3.Princi
 	return principal, err
 }
 
-func SearchPrincipals(name, principalType string, myToken accessor.TokenAccessor) ([]v3.Principal, error) {
+func SearchPrincipals(name, principalType string, myToken accessor.TokenAccessor) ([]apiv3.Principal, error) {
 	ap := myToken.GetAuthProvider()
 	if ap == "" {
-		return []v3.Principal{}, fmt.Errorf("[SearchPrincipals] no authProvider specified in token")
+		return []apiv3.Principal{}, fmt.Errorf("[SearchPrincipals] no authProvider specified in token")
 	}
 	if Providers[ap] == nil {
-		return []v3.Principal{}, fmt.Errorf("[SearchPrincipals] authProvider %v not initialized", ap)
+		return []apiv3.Principal{}, fmt.Errorf("[SearchPrincipals] authProvider %v not initialized", ap)
 	}
 	principals, err := Providers[ap].SearchPrincipals(name, principalType, myToken)
 	if err != nil {
@@ -315,15 +315,15 @@ func SearchPrincipals(name, principalType string, myToken accessor.TokenAccessor
 	return principals, err
 }
 
-func CanAccessWithGroupProviders(providerName string, userPrincipalID string, groups []v3.Principal) (bool, error) {
+func CanAccessWithGroupProviders(providerName string, userPrincipalID string, groups []apiv3.Principal) (bool, error) {
 	return Providers[providerName].CanAccessWithGroupProviders(userPrincipalID, groups)
 }
 
-func RefetchGroupPrincipals(principalID string, providerName string, secret string) ([]v3.Principal, error) {
+func RefetchGroupPrincipals(principalID string, providerName string, secret string) ([]apiv3.Principal, error) {
 	return Providers[providerName].RefetchGroupPrincipals(principalID, secret)
 }
 
-func GetUserExtraAttributes(providerName string, userPrincipal v3.Principal) map[string][]string {
+func GetUserExtraAttributes(providerName string, userPrincipal apiv3.Principal) map[string][]string {
 	return Providers[providerName].GetUserExtraAttributes(userPrincipal)
 }
 

@@ -10,7 +10,7 @@ import (
 	"github.com/rancher/norman/api/handler"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/azure/clients"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
@@ -56,7 +56,7 @@ func (ap *Provider) ConfigureTest(request *types.APIContext) error {
 		return err
 	}
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"redirectUrl": formAzureRedirectURL(input),
 		"type":        "azureADConfigTestOutput",
 	}
@@ -77,7 +77,7 @@ func (ap *Provider) testAndApply(request *types.APIContext) error {
 		}
 	}()
 
-	azureADConfigApplyInput := &v32.AzureADConfigApplyInput{}
+	azureADConfigApplyInput := &apiv3.AzureADConfigApplyInput{}
 	if err := json.NewDecoder(request.Request.Body).Decode(azureADConfigApplyInput); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("Failed to parse body: %v", err))
@@ -92,7 +92,7 @@ func (ap *Provider) testAndApply(request *types.APIContext) error {
 	}
 	migrateNewFlowAnnotation(currentConfig, azureADConfig)
 
-	azureLogin := &v32.AzureADLogin{
+	azureLogin := &apiv3.AzureADLogin{
 		Code: azureADConfigApplyInput.Code,
 	}
 
@@ -135,7 +135,7 @@ func (ap *Provider) testAndApply(request *types.APIContext) error {
 
 // Check the current auth config and make sure that the proposed one submitted through the API has up-to-date annotations.
 // Rancher relies on GraphEndpointMigratedAnnotation to choose the right authentication flow and Graph API.
-func migrateNewFlowAnnotation(current, proposed *v32.AzureADConfig) {
+func migrateNewFlowAnnotation(current, proposed *apiv3.AzureADConfig) {
 	// This covers the case where admins upgrade Rancher to v2.6.7+ without having used Azure AD as the auth provider.
 	// In 2.6.7+, whether Azure AD is later registered or not, Rancher on startup creates the annotation on the template auth config.
 	// But in the case where the auth config had been created on Rancher startup prior to v2.6.7, the annotation would be missing.

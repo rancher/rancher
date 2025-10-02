@@ -599,7 +599,7 @@ func (s *Provider) getUserIdFromRelayStateCookie(r *http.Request) (string, error
 	if relayState := r.Form.Get("RelayState"); relayState != "" {
 		relayStateCookie := s.clientState.GetState(r, relayState)
 		jwtParser := newJWTParser()
-		token, err := jwtParser.Parse(relayStateCookie, func(t *jwt.Token) (interface{}, error) {
+		token, err := jwtParser.Parse(relayStateCookie, func(t *jwt.Token) (any, error) {
 			secretBlock := x509.MarshalPKCS1PrivateKey(s.serviceProvider.Key)
 			return secretBlock, nil
 		})

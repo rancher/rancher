@@ -5,10 +5,9 @@ import (
 	"testing"
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
-	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/oidc"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -17,15 +16,15 @@ func TestGenOIDCProvider_GetPrincipal(t *testing.T) {
 	tests := []struct {
 		name        string
 		principalID string
-		token       v3.Token
-		want        v3.Principal
+		token       apiv3.Token
+		want        apiv3.Principal
 		wantErr     bool
 	}{
 		{
 			name:        "fetch principal for current user",
 			principalID: "genericoidc_user://1234567",
-			token: v3.Token{
-				UserPrincipal: apimgmtv3.Principal{
+			token: apiv3.Token{
+				UserPrincipal: apiv3.Principal{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "genericoidc_user://1234567",
 					},
@@ -35,7 +34,7 @@ func TestGenOIDCProvider_GetPrincipal(t *testing.T) {
 					Me:            true,
 				},
 			},
-			want: v3.Principal{
+			want: apiv3.Principal{
 				TypeMeta: metav1.TypeMeta{},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "genericoidc_user://1234567",
@@ -51,8 +50,8 @@ func TestGenOIDCProvider_GetPrincipal(t *testing.T) {
 		{
 			name:        "fetch principal for user other than self",
 			principalID: "genericoidc_user://9876543",
-			token: v3.Token{
-				UserPrincipal: apimgmtv3.Principal{
+			token: apiv3.Token{
+				UserPrincipal: apiv3.Principal{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "genericoidc_user://1234567",
 					},
@@ -62,7 +61,7 @@ func TestGenOIDCProvider_GetPrincipal(t *testing.T) {
 					Me:            false,
 				},
 			},
-			want: v3.Principal{
+			want: apiv3.Principal{
 				TypeMeta: metav1.TypeMeta{},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "genericoidc_user://9876543",
@@ -78,7 +77,7 @@ func TestGenOIDCProvider_GetPrincipal(t *testing.T) {
 		{
 			name:        "fetch principal token is nil",
 			principalID: "genericoidc_user://9876543",
-			want: v3.Principal{
+			want: apiv3.Principal{
 				TypeMeta: metav1.TypeMeta{},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "genericoidc_user://9876543",
@@ -94,7 +93,7 @@ func TestGenOIDCProvider_GetPrincipal(t *testing.T) {
 		{
 			name:        "fetch principal called with empty principal",
 			principalID: "",
-			want:        v3.Principal{},
+			want:        apiv3.Principal{},
 			wantErr:     true,
 		},
 	}
@@ -125,7 +124,7 @@ func TestGenOIDCProvider_GetPrincipalExt(t *testing.T) {
 		name        string
 		principalID string
 		token       ext.Token
-		want        v3.Principal
+		want        apiv3.Principal
 		wantErr     bool
 	}{
 		// Note: ext tokens do not have `Me` information. current/other not distinguishable.
@@ -143,7 +142,7 @@ func TestGenOIDCProvider_GetPrincipalExt(t *testing.T) {
 					},
 				},
 			},
-			want: v3.Principal{
+			want: apiv3.Principal{
 				TypeMeta: metav1.TypeMeta{},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "genericoidc_user://1234567",
@@ -159,7 +158,7 @@ func TestGenOIDCProvider_GetPrincipalExt(t *testing.T) {
 		{
 			name:        "fetch principal token is nil",
 			principalID: "genericoidc_user://9876543",
-			want: v3.Principal{
+			want: apiv3.Principal{
 				TypeMeta: metav1.TypeMeta{},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "genericoidc_user://9876543",
@@ -175,7 +174,7 @@ func TestGenOIDCProvider_GetPrincipalExt(t *testing.T) {
 		{
 			name:        "fetch principal called with empty principal",
 			principalID: "",
-			want:        v3.Principal{},
+			want:        apiv3.Principal{},
 			wantErr:     true,
 		},
 	}
@@ -201,13 +200,13 @@ func TestGenOIDCProvider_SearchPrincipals(t *testing.T) {
 		name          string
 		searchValue   string
 		principalType string
-		expected      []v3.Principal
+		expected      []apiv3.Principal
 	}{
 		{
 			name:          "test search for user principal",
 			searchValue:   "user1",
 			principalType: UserType,
-			expected: []v3.Principal{
+			expected: []apiv3.Principal{
 				{
 					ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_user://user1"},
 					DisplayName:   "user1",
@@ -220,7 +219,7 @@ func TestGenOIDCProvider_SearchPrincipals(t *testing.T) {
 		{
 			name:        "test search for user principal with empty principaltype",
 			searchValue: "user1",
-			expected: []v3.Principal{
+			expected: []apiv3.Principal{
 				{
 					ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_user://user1"},
 					DisplayName:   "user1",
@@ -238,7 +237,7 @@ func TestGenOIDCProvider_SearchPrincipals(t *testing.T) {
 		},
 		{
 			name: "test search for user principal with empty principaltype and searchval",
-			expected: []v3.Principal{
+			expected: []apiv3.Principal{
 				{
 					ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_user://"},
 					PrincipalType: UserType,
@@ -255,7 +254,7 @@ func TestGenOIDCProvider_SearchPrincipals(t *testing.T) {
 			name:          "test search for group principal",
 			searchValue:   "group1",
 			principalType: GroupType,
-			expected: []v3.Principal{
+			expected: []apiv3.Principal{
 				{
 					ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_group://group1"},
 					DisplayName:   "group1",
@@ -267,7 +266,7 @@ func TestGenOIDCProvider_SearchPrincipals(t *testing.T) {
 		{
 			name:          "test search for group principal with empty searchval",
 			principalType: GroupType,
-			expected: []v3.Principal{
+			expected: []apiv3.Principal{
 				{
 					ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_group://"},
 					PrincipalType: GroupType,
@@ -288,7 +287,7 @@ func TestGenOIDCProvider_SearchPrincipals(t *testing.T) {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			result, err := g.SearchPrincipals(test.searchValue, test.principalType, &v3.Token{})
+			result, err := g.SearchPrincipals(test.searchValue, test.principalType, &apiv3.Token{})
 			if err != nil {
 				t.Errorf("SearchPrincipals() returned an error: %v", err)
 			}
@@ -316,19 +315,19 @@ func TestGenOIDCProvider_SearchPrincipals(t *testing.T) {
 func TestGenOIDCProvider_TransformToAuthProvider(t *testing.T) {
 	tests := []struct {
 		name       string
-		authConfig map[string]interface{}
-		expected   map[string]interface{}
+		authConfig map[string]any
+		expected   map[string]any
 	}{
 		{
 			name: "Test with valid authConfig",
-			authConfig: map[string]interface{}{
+			authConfig: map[string]any{
 				"clientId":     "client123",
 				"rancherUrl":   "https://example.com/callback",
 				"scope":        "openid profile email",
 				"issuer":       "https://ranchertest.io/issuer",
 				"authEndpoint": "https://ranchertest.io/auth",
 			},
-			expected: map[string]interface{}{
+			expected: map[string]any{
 				"redirectUrl":        "https://ranchertest.io/auth?client_id=client123&response_type=code&redirect_uri=https://example.com/callback",
 				"scopes":             "openid profile email",
 				"logoutAllSupported": false,
