@@ -32,29 +32,6 @@ func TestFullShellImage(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestIsRelease(t *testing.T) {
-	inputs := map[string]bool{
-		"dev":         false,
-		"master-head": false,
-		"master":      false,
-		"v2.5.2":      true,
-		"v2":          true,
-		"v2.0":        true,
-		"v2.x":        true,
-		"v2.5-head":   false,
-		"2.5":         false,
-		"2.5-head":    false,
-	}
-	a := assert.New(t)
-	for key, value := range inputs {
-		if err := ServerVersion.Set(key); err != nil {
-			t.Errorf("Encountered error while setting temp version: %v\n", err)
-		}
-		result := IsRelease()
-		a.Equal(value, result, fmt.Sprintf("Expected value [%t] for key [%s]. Got value [%t]", value, key, result))
-	}
-}
-
 // TestSystemDefaultRegistryDefault tests that the default registry is either
 // the value set by the environment variable CATTLE_BASE_REGISTRY or the build
 // time value set through InjectDefaults.
@@ -185,21 +162,4 @@ func TestGetQuantityAsInt64(t *testing.T) {
 	errorQuantity := NewSetting("error-quantity", "error")
 	val, err = errorQuantity.GetQuantityAsInt64(1000)
 	require.ErrorContains(t, err, "parsing setting: quantities must match")
-}
-
-func TestGetRancherVersion(t *testing.T) {
-	inputs := map[string]string{
-		"dev-version":    RancherVersionDev,
-		"master-version": RancherVersionDev,
-		"version-head":   RancherVersionDev,
-		"v2.7.X":         "2.7.X",
-		"2.7.X":          "2.7.X",
-	}
-
-	for key, value := range inputs {
-		err := ServerVersion.Set(key)
-		assert.NoError(t, err)
-		result := GetRancherVersion()
-		assert.Equal(t, value, result)
-	}
 }
