@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestIsRelease(t *testing.T) {
+func Test_IsRelease(t *testing.T) {
 	inputs := map[string]bool{
 		"dev":         false,
 		"master-head": false,
@@ -30,14 +30,16 @@ func TestIsRelease(t *testing.T) {
 	}
 }
 
-func TestGetRancherVersion(t *testing.T) {
+func Test_GetRancherVersion(t *testing.T) {
 	inputs := map[string]string{
 		"dev-version":           RancherVersionDev,
 		"master-version":        RancherVersionDev,
 		"version-head":          RancherVersionDev,
 		"v2.12-dev-someGitHash": RancherVersionDev,
-		"v2.7.X":                "2.7.X",
-		"2.7.X":                 "2.7.X",
+		"v2.7.X":                RancherVersionDev,
+		"2.7.X":                 RancherVersionDev,
+		"v2.7.0":                "2.7.0",
+		"2.7.0":                 "2.7.0",
 	}
 
 	for key, value := range inputs {
@@ -48,7 +50,7 @@ func TestGetRancherVersion(t *testing.T) {
 	}
 }
 
-func TestIsReleaseServerVersion(t *testing.T) {
+func Test_IsVersionRelease(t *testing.T) {
 	tests := []struct {
 		name          string
 		serverVersion string
@@ -65,8 +67,18 @@ func TestIsReleaseServerVersion(t *testing.T) {
 			true,
 		},
 		{
-			"Prerelease head",
+			"Prerelease head wo patch",
 			"v2.12-head",
+			false,
+		},
+		{
+			"Prerelease head",
+			"v2.12.0-head",
+			false,
+		},
+		{
+			"Prerelease head wo v prefix",
+			"2.12.0-head",
 			false,
 		},
 		{
@@ -93,6 +105,26 @@ func TestIsReleaseServerVersion(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equalf(t, tt.want, IsVersionRelease(tt.serverVersion), "IsVersionRelease(%v)", tt.serverVersion)
+		})
+	}
+}
+
+func Test_ServerVersionOrFallback(t *testing.T) {
+	tests := map[string]string{
+		"":                      RancherVersionDev,
+		"dev-version":           RancherVersionDev,
+		"master-version":        RancherVersionDev,
+		"version-head":          RancherVersionDev,
+		"v2.12-dev-someGitHash": RancherVersionDev,
+		"v2.7.X":                RancherVersionDev,
+		"2.7.X":                 RancherVersionDev,
+		"v2.7.0":                "2.7.0",
+		"2.7.0":                 "2.7.0",
+	}
+
+	for input, expected := range tests {
+		t.Run(fmt.Sprintf("%s => %s", input, expected), func(t *testing.T) {
+			assert.Equalf(t, expected, ServerVersionOrFallback(input), "ServerVersionOrFallback(%s)", input)
 		})
 	}
 }

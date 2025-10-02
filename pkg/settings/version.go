@@ -1,6 +1,10 @@
 package settings
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/rancher/rancher/pkg/version/semver"
+)
 
 // IsRelease returns true if the running server is a released version of rancher.
 func IsRelease() bool {
@@ -8,21 +12,19 @@ func IsRelease() bool {
 }
 
 func IsVersionRelease(version string) bool {
-	if strings.HasPrefix(version, "dev") ||
-		strings.HasPrefix(version, "master") ||
-		version == "" ||
-		strings.HasSuffix(version, "-head") ||
-		strings.HasSuffix(version, "-main") {
-		return false
-	}
-	return true
+	semVer := semver.Version(version)
+	return !semVer.IsDev()
 }
 
-// GetRancherVersion will return the stored server version without the 'v' prefix.
-func GetRancherVersion() string {
-	rancherVersion := ServerVersion.Get()
-	if !IsVersionRelease(rancherVersion) {
+// ServerVersionOrFallback verifies the input is a release semver and returns it (without v prefix) or the RancherVersionDev value.
+func ServerVersionOrFallback(version string) string {
+	if !IsVersionRelease(version) {
 		return RancherVersionDev
 	}
-	return strings.TrimPrefix(rancherVersion, "v")
+	return strings.TrimPrefix(version, "v")
+}
+
+// GetRancherVersion will return the stored server version without the 'v' prefix (or the fallback value).
+func GetRancherVersion() string {
+	return ServerVersionOrFallback(ServerVersion.Get())
 }
