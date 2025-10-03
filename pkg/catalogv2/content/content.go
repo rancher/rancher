@@ -460,7 +460,7 @@ func skipIndexFiltering() bool {
 	version := rancherSemver.Version(serverVersion)
 
 	// If the server version is a release or a release candidate (rc), we don't skip filtering.
-	if (version.HasReleasePrefix() && !strings.Contains(serverVersion, "head")) || version.IsRC() {
+	if settings.ServerVersionHasReleasePrefixExcludesHead() || version.IsRC() {
 		return false
 	}
 
