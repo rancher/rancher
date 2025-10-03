@@ -120,6 +120,7 @@ func Register(ctx context.Context, workload *config.UserContext) error {
 		rbLister:            workload.RBACw.RoleBinding().Cache(),
 		crLister:            workload.RBACw.ClusterRole().Cache(),
 		crbLister:           workload.RBACw.ClusterRoleBinding().Cache(),
+		roleBindings:        workload.RBACw.RoleBinding(),
 		clusterRoles:        workload.RBACw.ClusterRole(),
 		clusterRoleBindings: workload.RBACw.ClusterRoleBinding(),
 		nsLister:            workload.Core.Namespaces("").Controller().Lister(),
