@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 )
 
 // GetPrincipalID attempts to extract the ID of either a user or group from the principal value.
-func GetPrincipalID(principal v32.Principal) string {
+func GetPrincipalID(principal v3.Principal) string {
 	name := principal.Name
 	if parts := strings.Split(name, "//"); len(parts) > 1 {
 		return parts[1]
