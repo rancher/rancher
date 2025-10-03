@@ -30,7 +30,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
@@ -105,12 +104,12 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 	}
 
 	serverOptions := &server.ListenOpts{
-		Storage:       opts.Storage,
-		Secrets:       opts.Secrets,
-		CAName:        "tls-rancher-internal-ca",
-		CANamespace:   namespace.System,
-		CertNamespace: namespace.System,
-		CertName:      "tls-rancher-internal",
+		Storage:           opts.Storage,
+		Secrets:           opts.Secrets,
+		CAName:            "tls-rancher-internal-ca",
+		CANamespace:       namespace.System,
+		CertNamespace:     namespace.System,
+		CertName:          "tls-rancher-internal",
 		DisplayServerLogs: true,
 	}
 	clusterIP, err := getClusterIP(core.Core().V1().Service())
@@ -238,9 +237,12 @@ func readConfig(secrets corev1controllers.SecretController, acmeDomains []string
 	}
 
 	sans := []string{"localhost", "127.0.0.1", "rancher.cattle-system"}
-	ip, err := net.ChooseHostInterface()
-	if err == nil {
-		sans = append(sans, ip.String())
+
+	// Add server-url hostname if configured
+	if serverURL := settings.ServerURL.Get(); serverURL != "" {
+		if u, err := url.Parse(serverURL); err == nil && u.Hostname() != "" {
+			sans = append(sans, u.Hostname())
+		}
 	}
 
 	opts := &server.ListenOpts{
@@ -250,10 +252,14 @@ func readConfig(secrets corev1controllers.SecretController, acmeDomains []string
 		CertNamespace: "cattle-system",
 		AcmeDomains:   acmeDomains,
 		TLSListenerConfig: dynamiclistener.Config{
-			TLSConfig:             tlsConfig,
-			ExpirationDaysCheck:   expiration,
-			SANs:                  sans,
-			FilterCN:              filterCN,
+			TLSConfig:           tlsConfig,
+			ExpirationDaysCheck: expiration,
+			SANs:                sans,
+			FilterCN: func(cns ...string) []string {
+				// reject all dynamic CNs
+				logrus.Infof("FilterCN: Rejecting dynamic CNs: %v", cns)
+				return []string{}
+			},
 			CloseConnOnCertChange: true,
 		},
 	}
@@ -368,23 +374,6 @@ func collectNodeIPs(nodeController corev1controllers.NodeController) ([]string, 
 	}
 
 	return nodeIPs, nil
-}
-
-func filterCN(cns ...string) []string {
-	serverURL := settings.ServerURL.Get()
-	if serverURL == "" {
-		return cns
-	}
-	u, err := url.Parse(serverURL)
-	if err != nil {
-		logrus.Errorf("invalid server-url, can not parse %s: %v", serverURL, err)
-		return cns
-	}
-	host := u.Hostname()
-	if host != "" {
-		return []string{host}
-	}
-	return cns
 }
 
 func fileExists(path string) bool {
