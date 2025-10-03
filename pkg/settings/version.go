@@ -16,7 +16,7 @@ func ServerVersionHasReleasePrefixExcludesHead() bool {
 
 func IsVersionRelease(version string) bool {
 	semVer := semver.Version(version)
-	return !semVer.IsDev()
+	return !semVer.IsDevOrPrerelease()
 }
 
 // ServerVersionOrFallback verifies the input is a release semver and returns it (without v prefix) or the RancherVersionDev value.

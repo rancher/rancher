@@ -25,8 +25,8 @@ func (v Version) HasBranchPrefix() bool {
 	return branchReleasePattern.MatchString(string(v))
 }
 
-// IsDev validates the value is a valid SemVer and does not container a "Prerelease" section
-func (v Version) IsDev() bool {
+// IsDevOrPrerelease reports if the version is a non-stable, dev, or pre-release build.
+func (v Version) IsDevOrPrerelease() bool {
 	if v == "dev" {
 		return true
 	}
@@ -36,7 +36,7 @@ func (v Version) IsDev() bool {
 		semVersion.Prerelease() != "" // When the version includes pre-release assume dev
 }
 
-// IsRC validates the value a "Prerelease" matching the "RC" variety
+// IsRC validates the version is SemVer with a "Prerelease" matching the "RC" variety
 func (v Version) IsRC() bool {
 	semVersion, err := semver.NewVersion(string(v))
 	if err != nil {
