@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestRancherVersions(t *testing.T) {
+func TestIsDev(t *testing.T) {
 	t.Parallel()
 	asserts := assert.New(t)
 
