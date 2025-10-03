@@ -30,7 +30,9 @@ import (
 )
 
 func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext, clusterRec *apimgmtv3.Cluster, kubeConfigGetter common.KubeConfigGetter) error {
-	rbac.Register(ctx, cluster)
+	if err := rbac.Register(ctx, cluster); err != nil {
+		return err
+	}
 	healthsyncer.Register(ctx, cluster)
 	networkpolicy.Register(ctx, cluster)
 
@@ -89,10 +91,10 @@ func registerProvV2(ctx context.Context, cluster *config.UserContext, capi *wran
 
 func RegisterFollower(cluster *config.UserContext) error {
 	registerImpersonationCaches(cluster)
-	cluster.RBAC.ClusterRoleBindings("").Controller()
-	cluster.RBAC.ClusterRoles("").Controller()
-	cluster.RBAC.RoleBindings("").Controller()
-	cluster.RBAC.Roles("").Controller()
+	cluster.RBACw.ClusterRoleBinding().Informer()
+	cluster.RBACw.ClusterRole().Informer()
+	cluster.RBACw.RoleBinding().Informer()
+	cluster.RBACw.Role().Informer()
 	return nil
 }
 

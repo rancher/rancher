@@ -6,11 +6,10 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type crHandler struct {
-	clusterRoles       wrbacv1.ClusterRoleController
+	clusterRoles       wrbacv1.ClusterRoleClient
 	roleTemplateLister mgmtv3.RoleTemplateCache
 }
 
@@ -23,7 +22,7 @@ func newClusterRoleHandler(r *manager) *crHandler {
 
 // sync validates that a clusterRole's parent roleTemplate still exists in management
 // and will remove the clusterRole if the roleTemplate no longer exists.
-func (c *crHandler) sync(key string, obj *rbacv1.ClusterRole) (runtime.Object, error) {
+func (c *crHandler) sync(key string, obj *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
 	if key == "" || obj == nil {
 		return nil, nil
 	}

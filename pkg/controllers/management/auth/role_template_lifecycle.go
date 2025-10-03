@@ -89,7 +89,7 @@ func (rtl *roleTemplateLifecycle) Remove(obj *v3.RoleTemplate) (runtime.Object, 
 			continue
 		}
 
-		b, err := userContext.RBAC.ClusterRoles("").Controller().Lister().Get("", obj.Name)
+		b, err := userContext.RBACw.ClusterRole().Cache().Get(obj.Name)
 		if err != nil {
 			// User context clusterRole doesn't exist
 			if !apierrors.IsNotFound(err) {
@@ -98,7 +98,7 @@ func (rtl *roleTemplateLifecycle) Remove(obj *v3.RoleTemplate) (runtime.Object, 
 			continue
 		}
 
-		err = userContext.RBAC.ClusterRoles("").Delete(b.Name, &metav1.DeleteOptions{})
+		err = userContext.RBACw.ClusterRole().Delete(b.Name, &metav1.DeleteOptions{})
 		if err != nil {
 			// User context clusterRole doesn't exist
 			if !apierrors.IsNotFound(err) {

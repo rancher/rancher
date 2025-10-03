@@ -36,7 +36,7 @@ func DeleteAdminClusterRoleBindings(
 			continue
 		}
 
-		crb, err := userContext.RBAC.ClusterRoleBindings("").Controller().Lister().Get("", crbName)
+		crb, err := userContext.RBACw.ClusterRoleBinding().Cache().Get(crbName)
 		if err != nil {
 			if !apierrors.IsNotFound(err) {
 				errs = errors.Join(errs, fmt.Errorf("can't get ClusterRoleBinding %s for cluster %s: %w", crbName, cluster.Name, err))
@@ -46,7 +46,7 @@ func DeleteAdminClusterRoleBindings(
 
 		logrus.Infof("Deleting ClusterRoleBinding %s for admin GlobalRoleBinding %s for cluster %s", crbName, grb.Name, cluster.Name)
 
-		err = userContext.RBAC.ClusterRoleBindings("").Delete(crb.Name, &metav1.DeleteOptions{})
+		err = userContext.RBACw.ClusterRoleBinding().Delete(crb.Name, &metav1.DeleteOptions{})
 		if err != nil {
 			if !apierrors.IsNotFound(err) {
 				errs = errors.Join(errs, fmt.Errorf("can't delete admin ClusterRoleBinding %s for cluster %s: %w", crbName, cluster.Name, err))

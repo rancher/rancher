@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/types/convert"
 	wranglerv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac/roletemplates"
@@ -15,7 +15,6 @@ import (
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	typescorev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	typesrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	nsutils "github.com/rancher/rancher/pkg/namespace"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -30,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -54,7 +54,10 @@ const (
 	rolesCircularHardLimit = 500
 )
 
-func Register(ctx context.Context, workload *config.UserContext) {
+// RoleTemplate indexers are registered in the management (upstream) context, shared by all UserContext, so only register once
+var registerRTIndexersOnce sync.Once
+
+func Register(ctx context.Context, workload *config.UserContext) error {
 	management := workload.Management.WithAgent("rbac-handler-base")
 
 	// Add cache informer to project role template bindings
@@ -69,31 +72,42 @@ func Register(ctx context.Context, workload *config.UserContext) {
 
 	// Index for looking up namespaces by projectID annotation
 	nsInformer := workload.Core.Namespaces("").Controller().Informer()
-	nsIndexers := map[string]cache.IndexFunc{
+	nsIndexers := cache.Indexers{
 		nsutils.NsByProjectIndex: nsutils.NsByProjectID,
 	}
-	nsInformer.AddIndexers(nsIndexers)
+	if err := nsInformer.AddIndexers(nsIndexers); err != nil {
+		return err
+	}
 
 	// Get ClusterRoles by the namespaces the authorizes because they are in a project
-	crInformer := workload.RBAC.ClusterRoles("").Controller().Informer()
-	crIndexers := map[string]cache.IndexFunc{
+	crInformer := workload.RBACw.ClusterRole().Informer()
+	crIndexers := cache.Indexers{
 		crByNSIndex: crByNS,
 	}
-	crInformer.AddIndexers(crIndexers)
+	if err := crInformer.AddIndexers(crIndexers); err != nil {
+		return err
+	}
 
 	// Get ClusterRoleBindings by subject name and kind
-	crbInformer := workload.RBAC.ClusterRoleBindings("").Controller().Informer()
-	crbIndexers := map[string]cache.IndexFunc{
+	crbInformer := workload.RBACw.ClusterRoleBinding().Informer()
+	crbIndexers := cache.Indexers{
 		crbByRoleAndSubjectIndex: crbByRoleAndSubject,
 	}
-	crbInformer.AddIndexers(crbIndexers)
+	if err := crbInformer.AddIndexers(crbIndexers); err != nil {
+		return err
+	}
 
 	// Get RoleTemplates by RoleTemplate they inherit from
 	rtInformer := workload.Management.Wrangler.Mgmt.RoleTemplate().Informer()
-	rtIndexers := map[string]cache.IndexFunc{
-		rtByInheritedRTsIndex: rtByInterhitedRTs,
+	var err error
+	registerRTIndexersOnce.Do(func() {
+		err = rtInformer.AddIndexers(cache.Indexers{
+			rtByInheritedRTsIndex: rtByInterhitedRTs,
+		})
+	})
+	if err != nil {
+		return err
 	}
-	rtInformer.AddIndexers(rtIndexers)
 
 	r := &manager{
 		workload:            workload,
@@ -103,11 +117,12 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		crIndexer:           crInformer.GetIndexer(),
 		crbIndexer:          crbInformer.GetIndexer(),
 		rtLister:            management.Wrangler.Mgmt.RoleTemplate().Cache(),
-		rbLister:            workload.RBAC.RoleBindings("").Controller().Lister(),
-		crbLister:           workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
+		rbLister:            workload.RBACw.RoleBinding().Cache(),
 		crLister:            workload.RBACw.ClusterRole().Cache(),
+		crbLister:           workload.RBACw.ClusterRoleBinding().Cache(),
+		roleBindings:        workload.RBACw.RoleBinding(),
 		clusterRoles:        workload.RBACw.ClusterRole(),
-		clusterRoleBindings: workload.RBAC.ClusterRoleBindings(""),
+		clusterRoleBindings: workload.RBACw.ClusterRoleBinding(),
 		nsLister:            workload.Core.Namespaces("").Controller().Lister(),
 		nsController:        workload.Core.Namespaces("").Controller(),
 		clusterLister:       management.Management.Clusters("").Controller().Lister(),
@@ -117,8 +132,8 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		clusterName:         workload.ClusterName,
 	}
 	management.Management.Projects(workload.ClusterName).AddClusterScopedLifecycle(ctx, "project-namespace-auth", workload.ClusterName, newProjectLifecycle(r, workload.Corew.Secret()))
-	workload.RBAC.ClusterRoles("").AddHandler(ctx, "cluster-clusterrole-sync", newClusterRoleHandler(r).sync)
-	workload.RBAC.ClusterRoleBindings("").AddHandler(ctx, "legacy-crb-cleaner-sync", newLegacyCRBCleaner(r).sync)
+	workload.RBACw.ClusterRole().OnChange(ctx, "cluster-clusterrole-sync", newClusterRoleHandler(r).sync)
+	workload.RBACw.ClusterRoleBinding().OnChange(ctx, "legacy-crb-cleaner-sync", newLegacyCRBCleaner(r).sync)
 	management.Management.Clusters("").AddHandler(ctx, "global-admin-cluster-sync", newClusterHandler(workload))
 	management.Management.GlobalRoleBindings("").AddHandler(ctx, grbHandlerName, newGlobalRoleBindingHandler(workload))
 
@@ -150,6 +165,7 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		management.Management.ClusterRoleTemplateBindings("").AddClusterScopedLifecycle(ctx, "cluster-crtb-sync", workload.ClusterName, newCRTBLifecycle(r, management))
 		management.Management.RoleTemplates("").AddHandler(ctx, "cluster-roletemplate-sync", newRTLifecycle(r))
 	}
+	return nil
 }
 
 type managerInterface interface {
@@ -173,10 +189,11 @@ type manager struct {
 	crIndexer           cache.Indexer
 	crbIndexer          cache.Indexer
 	crLister            wrbacv1.ClusterRoleCache
-	clusterRoles        wrbacv1.ClusterRoleController
-	crbLister           typesrbacv1.ClusterRoleBindingLister
-	clusterRoleBindings typesrbacv1.ClusterRoleBindingInterface
-	rbLister            typesrbacv1.RoleBindingLister
+	clusterRoles        wrbacv1.ClusterRoleClient
+	crbLister           wrbacv1.ClusterRoleBindingCache
+	clusterRoleBindings wrbacv1.ClusterRoleBindingClient
+	rbLister            wrbacv1.RoleBindingCache
+	roleBindings        wrbacv1.RoleBindingClient
 	nsLister            typescorev1.NamespaceLister
 	nsController        typescorev1.NamespaceController
 	clusterLister       v3.ClusterLister
@@ -318,8 +335,8 @@ func (m *manager) ensureClusterBindings(roles map[string]*v3.RoleTemplate, bindi
 		}
 	}
 
-	list := func(ns string, selector labels.Selector) ([]interface{}, error) {
-		currentRBs, err := m.crbLister.List(ns, selector)
+	list := func(_ string, selector labels.Selector) ([]interface{}, error) {
+		currentRBs, err := m.crbLister.List(selector)
 		if err != nil {
 			return nil, err
 		}
@@ -335,16 +352,24 @@ func (m *manager) ensureClusterBindings(roles map[string]*v3.RoleTemplate, bindi
 		return crb.Name, crb.RoleRef.Name, crb.Subjects
 	}
 
-	return m.ensureBindings("", roles, binding, m.workload.RBAC.ClusterRoleBindings("").ObjectClient(), create, list, convert)
+	deleteFunc := func(name string) error {
+		logrus.Infof("Deleting clusterRoleBinding %v", name)
+		err := m.workload.RBACw.ClusterRoleBinding().Delete(name, &metav1.DeleteOptions{})
+		return client.IgnoreNotFound(err)
+	}
+
+	return m.ensureBindings("", roles, binding, deleteFunc, create, list, convert)
 }
 
 func (m *manager) ensureProjectRoleBindings(ns string, roles map[string]*v3.RoleTemplate, binding *v3.ProjectRoleTemplateBinding) error {
 	create := func(objectMeta metav1.ObjectMeta, subjects []rbacv1.Subject, roleRef rbacv1.RoleRef) runtime.Object {
-		return &rbacv1.RoleBinding{
+		rb := &rbacv1.RoleBinding{
 			ObjectMeta: objectMeta,
 			Subjects:   subjects,
 			RoleRef:    roleRef,
 		}
+		rb.SetNamespace(ns)
+		return rb
 	}
 
 	list := func(ns string, selector labels.Selector) ([]interface{}, error) {
@@ -364,15 +389,23 @@ func (m *manager) ensureProjectRoleBindings(ns string, roles map[string]*v3.Role
 		return rb.Name, rb.RoleRef.Name, rb.Subjects
 	}
 
-	return m.ensureBindings(ns, roles, binding, m.workload.RBAC.RoleBindings(ns).ObjectClient(), create, list, convert)
+	deleteFunc := func(name string) error {
+		logrus.Infof("Deleting roleBinding %v", name)
+		err := m.workload.RBACw.RoleBinding().Delete(ns, name, &metav1.DeleteOptions{})
+		return client.IgnoreNotFound(err)
+	}
+
+	return m.ensureBindings(ns, roles, binding, deleteFunc, create, list, convert)
 }
+
+type deleteFn func(name string) error
 
 type createFn func(objectMeta metav1.ObjectMeta, subjects []rbacv1.Subject, roleRef rbacv1.RoleRef) runtime.Object
 type listFn func(ns string, selector labels.Selector) ([]interface{}, error)
 type convertFn func(i interface{}) (string, string, []rbacv1.Subject)
 
-func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, binding metav1.Object, client *objectclient.ObjectClient,
-	create createFn, list listFn, convert convertFn) error {
+func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, binding metav1.Object,
+	deleteFunc deleteFn, create createFn, list listFn, convert convertFn) error {
 	objMeta := meta.AsPartialObjectMetadata(binding).ObjectMeta
 
 	desiredRBs := map[string]runtime.Object{}
@@ -416,10 +449,10 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 	for key, rb := range desiredRBs {
 		switch roleBinding := rb.(type) {
 		case *rbacv1.RoleBinding:
-			_, err := m.workload.RBAC.RoleBindings("").Controller().Lister().Get(ns, roleBinding.Name)
+			_, err := m.rbLister.Get(ns, roleBinding.Name)
 			if apierrors.IsNotFound(err) {
 				logrus.Infof("Creating roleBinding %v in %s", key, ns)
-				_, err := m.workload.RBAC.RoleBindings(ns).Create(roleBinding)
+				_, err := m.roleBindings.Create(roleBinding)
 				if err != nil && !apierrors.IsAlreadyExists(err) {
 					return err
 				}
@@ -428,7 +461,7 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 			}
 		case *rbacv1.ClusterRoleBinding:
 			logrus.Infof("Creating clusterRoleBinding %v", key)
-			_, err := m.workload.RBAC.ClusterRoleBindings("").Create(roleBinding)
+			_, err := m.workload.RBACw.ClusterRoleBinding().Create(roleBinding)
 			if err != nil && !apierrors.IsAlreadyExists(err) {
 				return err
 			}
@@ -436,8 +469,7 @@ func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, b
 	}
 
 	for name := range rbsToDelete {
-		logrus.Infof("Deleting roleBinding %v", name)
-		if err := client.Delete(name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+		if err := deleteFunc(name); err != nil {
 			return err
 		}
 	}
