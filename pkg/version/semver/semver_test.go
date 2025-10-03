@@ -1,170 +1,195 @@
 package semver
 
 import (
-	"fmt"
-	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestIsDev(t *testing.T) {
+type testExpectations struct {
+	isDevOrPrerelease      bool
+	isRC                   bool
+	hasReleasePrefix       bool
+	hasBranchReleasePrefix bool
+}
+
+type genericRancherExampleCases struct {
+	name         string
+	version      string
+	expectations testExpectations
+}
+
+var exampleRancherVersions = []genericRancherExampleCases{
+	{
+		"Current Alpha",
+		"v2.12.3-alpha1",
+		testExpectations{
+			true,
+			false,
+			true,
+			false,
+		},
+	},
+	{
+		"New Style Alpha",
+		"v2.13.3-alpha.1",
+		testExpectations{
+			true,
+			false,
+			true,
+			false,
+		},
+	},
+	{
+		"RC Build (old)",
+		"v2.12.3-rc1",
+		testExpectations{
+			true,
+			true,
+			true,
+			false,
+		},
+	},
+	{
+		"RC Build (new)",
+		"v2.12.3-rc.1",
+		testExpectations{
+			true,
+			true,
+			true,
+			false,
+		},
+	},
+	{
+		"Stable Build",
+		"v2.12.3",
+		testExpectations{
+			false,
+			false,
+			true,
+			false,
+		},
+	},
+	{
+		"Hotfix Build",
+		"v2.12.0-hotfix-b112.1",
+		testExpectations{
+			true,
+			false,
+			true,
+			false,
+		},
+	},
+	{
+		"Dev IDE",
+		"dev",
+		testExpectations{
+			true,
+			false,
+			false,
+			false,
+		},
+	},
+	{
+		"Dev Build/Head Images",
+		"v2.12-207d1eaa2-head",
+		testExpectations{
+			true,
+			false,
+			true,
+			false,
+		},
+	},
+	{
+		"Manual Build Large Patch wo v prefix",
+		"2.13.9999",
+		testExpectations{
+			false,
+			false,
+			false,
+			false,
+		},
+	},
+	{
+		"Patch with x",
+		"v2.7.x",
+		testExpectations{
+			true,
+			false,
+			true,
+			false,
+		},
+	},
+	{
+		"Branch release prefix",
+		"v2.x",
+		testExpectations{
+			true,
+			false,
+			true,
+			true,
+		},
+	},
+	{
+		"Branch release prefix w prerelease",
+		"v3.x-something",
+		testExpectations{
+			true,
+			false,
+			true,
+			true,
+		},
+	},
+	{
+		"Branch release head",
+		"v3.x-head",
+		testExpectations{
+			true,
+			false,
+			true,
+			true,
+		},
+	},
+}
+
+func Test_IsDevOrPrerelease(t *testing.T) {
 	t.Parallel()
 	asserts := assert.New(t)
 
-	var tests = []struct {
-		name     string
-		input    string
-		expected bool
-	}{
-		{
-			"Dev IDE",
-			"dev",
-			true,
-		},
-		{
-			"Dev Build/Head Images",
-			"v2.12-207d1eaa2-head",
-			true,
-		},
-		{
-			"Alpha Build",
-			"v2.12.1-alpha4",
-			true,
-		},
-		{
-			"Release",
-			"v2.12.1",
-			false,
-		},
-		{
-			"Manual Override",
-			"2.13.99",
-			false,
-		},
-	}
-
-	for _, tt := range tests {
+	for _, tt := range exampleRancherVersions {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			testVersion := Version(tt.input)
-			asserts.Equal(tt.expected, testVersion.IsDev())
+			testVersion := Version(tt.version)
+			asserts.Equal(tt.expectations.isDevOrPrerelease, testVersion.IsDevOrPrerelease())
 		})
 	}
 }
 
 func TestVersion_IsRC(t *testing.T) {
-	tests := []struct {
-		name string
-		v    Version
-		want bool
-	}{
-		{
-			"Dev IDE",
-			Version("dev"),
-			false,
-		},
-		{
-			"Release Version",
-			Version("v2.13.99"),
-			false,
-		},
-		{
-			"Release Version wo v prefix",
-			Version("2.13.99"),
-			false,
-		},
-		{
-			"RC version",
-			Version("2.13.99-rc.1"),
-			true,
-		},
-		{
-			"Non-RC Prerelease version",
-			Version("2.13.99-alpha.1"),
-			false,
-		},
-		{
-			"Dev Build/Head Images",
-			"v2.12-207d1eaa2-head",
-			false,
-		},
-		{
-			"Very big RC version",
-			Version("2.13.99-rc.92654891"),
-			true,
-		},
-	}
-	for _, tt := range tests {
+	for _, tt := range exampleRancherVersions {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, tt.v.IsRC(), "IsRC()")
+			t.Parallel()
+			version := Version(tt.version)
+			assert.Equalf(t, tt.expectations.isRC, version.IsRC(), "Version(%s).IsRC()", tt.version)
 		})
 	}
 }
 
 func TestVersion_HasReleasePrefix(t *testing.T) {
-	tests := []struct {
-		name string
-		v    Version
-		want bool
-	}{
-		{
-			"Dev IDE",
-			"dev",
-			false,
-		},
-		{
-			"Dev Build/Head Images",
-			"v2.12-207d1eaa2-head",
-			true,
-		},
-		{
-			"Alpha Build",
-			"v2.12.1-alpha4",
-			true,
-		},
-		{
-			"Release",
-			"v2.12.1",
-			true,
-		},
-		{
-			"Manual Override",
-			"2.13.99",
-			false,
-		},
-		{
-			"Patch with x",
-			"v2.7.x",
-			true,
-		},
-	}
-	for _, tt := range tests {
+	for _, tt := range exampleRancherVersions {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, tt.v.HasReleasePrefix(), "HasReleasePrefix()")
+			t.Parallel()
+			version := Version(tt.version)
+			assert.Equalf(t, tt.expectations.hasReleasePrefix, version.HasReleasePrefix(), "Version(%s).HasReleasePrefix()", tt.version)
 		})
 	}
 }
 
-func TestHasBranchPrefix(t *testing.T) {
-	tests := map[string]bool{
-		"":                      false,
-		"dev-version":           false,
-		"master-version":        false,
-		"version-head":          false,
-		"v2.12-dev-someGitHash": false,
-		"v2.7.X":                false,
-		"2.7.X":                 false,
-		"v2.7.0":                false,
-		"2.7.0":                 false,
-		"v3.x-something":        true,
-		"v2.x":                  true,
-	}
-
-	for input, expected := range tests {
-		t.Run(fmt.Sprintf("%s => %s", input, strconv.FormatBool(expected)), func(t *testing.T) {
-			version := Version(input)
-			assert.Equalf(t, expected, version.HasBranchPrefix(), "Version(%s).HasBranchPrefix()", input)
+func Test_HasBranchReleasePrefix(t *testing.T) {
+	for _, tt := range exampleRancherVersions {
+		t.Run(tt.name, func(t *testing.T) {
+			version := Version(tt.version)
+			assert.Equalf(t, tt.expectations.hasBranchReleasePrefix, version.HasBranchReleasePrefix(), "Version(%s).HasBranchReleasePrefix()", tt.version)
 		})
 	}
 }

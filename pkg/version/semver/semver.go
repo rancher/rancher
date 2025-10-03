@@ -20,8 +20,8 @@ func (v Version) HasReleasePrefix() bool {
 	return releasePattern.MatchString(string(v))
 }
 
-// HasBranchPrefix validates the value as having a minor version set to `x`
-func (v Version) HasBranchPrefix() bool {
+// HasBranchReleasePrefix validates the value as having a minor version set to `x`
+func (v Version) HasBranchReleasePrefix() bool {
 	return branchReleasePattern.MatchString(string(v))
 }
 
