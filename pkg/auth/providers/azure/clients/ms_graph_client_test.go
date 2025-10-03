@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
@@ -43,7 +43,7 @@ func TestMSGraphClient_GetUser(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := v32.Principal{
+	want := v3.Principal{
 		PrincipalType: "user",
 		Provider:      Name,
 		ObjectMeta: metav1.ObjectMeta{
@@ -99,7 +99,7 @@ func TestMSGraphClient_GetGroup(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := v32.Principal{
+	want := v3.Principal{
 		PrincipalType: "group",
 		Provider:      Name,
 		ObjectMeta: metav1.ObjectMeta{
@@ -211,7 +211,7 @@ func TestMSGraphClient_GetUser_China(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := v32.Principal{
+	want := v3.Principal{
 		PrincipalType: "user",
 		Provider:      Name,
 		ObjectMeta: metav1.ObjectMeta{
@@ -267,7 +267,7 @@ func TestMSGraphClient_GetGroup_China(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := v32.Principal{
+	want := v3.Principal{
 		PrincipalType: "group",
 		Provider:      Name,
 		ObjectMeta: metav1.ObjectMeta{
@@ -386,7 +386,7 @@ func newTestClientWithSecretsClient(t *testing.T, secrets wcorev1.SecretControll
 		graphEndpoint = "https://microsoftgraph.chinacloudapi.cn"
 	}
 
-	client, err := NewMSGraphClient(&v32.AzureADConfig{
+	client, err := NewMSGraphClient(&v3.AzureADConfig{
 		Endpoint:          endpoint,
 		GraphEndpoint:     graphEndpoint,
 		TenantID:          tenantID,
@@ -460,7 +460,7 @@ func newTestSecretsClient(ctrl *gomock.Controller) *wranglerfake.MockControllerI
 func TestUserToPrincipal(t *testing.T) {
 	principalTests := map[string]struct {
 		user azureUserObject
-		want v32.Principal
+		want v3.Principal
 	}{
 		"complete user": {
 			user: fakeUser{
@@ -468,7 +468,7 @@ func TestUserToPrincipal(t *testing.T) {
 				displayName:   ptr.To("Test User"),
 				principalName: ptr.To("testuser"),
 			},
-			want: v32.Principal{
+			want: v3.Principal{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "azuread_user://3f2504e0-4f89-11d3-9a0c-0305e82c3301",
 				},
@@ -483,7 +483,7 @@ func TestUserToPrincipal(t *testing.T) {
 				id:            ptr.To("3f2504e0-4f89-11d3-9a0c-0305e82c3301"),
 				principalName: ptr.To("testuser"),
 			},
-			want: v32.Principal{
+			want: v3.Principal{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "azuread_user://3f2504e0-4f89-11d3-9a0c-0305e82c3301",
 				},
@@ -497,7 +497,7 @@ func TestUserToPrincipal(t *testing.T) {
 				id:          ptr.To("3f2504e0-4f89-11d3-9a0c-0305e82c3301"),
 				displayName: ptr.To("Test User"),
 			},
-			want: v32.Principal{
+			want: v3.Principal{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "azuread_user://3f2504e0-4f89-11d3-9a0c-0305e82c3301",
 				},
@@ -510,7 +510,7 @@ func TestUserToPrincipal(t *testing.T) {
 			user: fakeUser{
 				id: ptr.To("3f2504e0-4f89-11d3-9a0c-0305e82c3301"),
 			},
-			want: v32.Principal{
+			want: v3.Principal{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "azuread_user://3f2504e0-4f89-11d3-9a0c-0305e82c3301",
 				},

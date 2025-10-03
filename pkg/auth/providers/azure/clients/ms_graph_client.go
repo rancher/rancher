@@ -20,7 +20,7 @@ import (
 	"github.com/microsoftgraph/msgraph-sdk-go/models"
 	"github.com/microsoftgraph/msgraph-sdk-go/models/odataerrors"
 	msgraphusers "github.com/microsoftgraph/msgraph-sdk-go/users"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
@@ -43,7 +43,7 @@ const (
 // It first tries to fetch the token from the refresh token, if the access token is found in the database.
 // If that fails, it tries to acquire it directly from the auth provider with the credential (application secret in Azure).
 // It also checks that the access token has the necessary permissions.
-func NewMSGraphClient(config *v32.AzureADConfig, secrets wcorev1.SecretController) (*AzureMSGraphClient, error) {
+func NewMSGraphClient(config *v3.AzureADConfig, secrets wcorev1.SecretController) (*AzureMSGraphClient, error) {
 	cred, err := confidential.NewCredFromSecret(config.ApplicationSecret)
 	if err != nil {
 		return nil, fmt.Errorf("could not create a cred from a secret: %w", err)
@@ -116,18 +116,18 @@ type AzureMSGraphClient struct {
 }
 
 // GetUser takes a user ID and fetches the user principal from the Microsoft Graph API.
-func (c AzureMSGraphClient) GetUser(userID string) (v32.Principal, error) {
+func (c AzureMSGraphClient) GetUser(userID string) (v3.Principal, error) {
 	logrus.Debugf("[%s] GetUser %s", providerLogPrefix, userID)
 	result, err := c.GraphClient.Users().ByUserId(userID).Get(context.Background(), nil)
 	if err != nil {
-		return v32.Principal{}, fmt.Errorf("getting user by ID: %w", getMSGraphErrorData(err))
+		return v3.Principal{}, fmt.Errorf("getting user by ID: %w", getMSGraphErrorData(err))
 	}
 
 	return userToPrincipal(result), nil
 }
 
 // ListUsers fetches all user principals in a directory from the Microsoft Graph API.
-func (c AzureMSGraphClient) ListUsers(filter string) ([]v32.Principal, error) {
+func (c AzureMSGraphClient) ListUsers(filter string) ([]v3.Principal, error) {
 	logrus.Debugf("[%s] ListUsers %s", providerLogPrefix, filter)
 	result, err := c.GraphClient.Users().Get(context.Background(), &msgraphusers.UsersRequestBuilderGetRequestConfiguration{
 		QueryParameters: &msgraphusers.UsersRequestBuilderGetQueryParameters{
@@ -143,7 +143,7 @@ func (c AzureMSGraphClient) ListUsers(filter string) ([]v32.Principal, error) {
 		return nil, fmt.Errorf("iterating over user list: %w", getMSGraphErrorData(err))
 	}
 
-	var users []v32.Principal
+	var users []v3.Principal
 	err = pageIterator.Iterate(context.Background(), func(user models.Userable) bool {
 		users = append(users, userToPrincipal(user))
 		return true
@@ -153,18 +153,18 @@ func (c AzureMSGraphClient) ListUsers(filter string) ([]v32.Principal, error) {
 }
 
 // GetGroup takes a group ID and fetches the group principal from the Microsoft Graph API.
-func (c AzureMSGraphClient) GetGroup(groupID string) (v32.Principal, error) {
+func (c AzureMSGraphClient) GetGroup(groupID string) (v3.Principal, error) {
 	logrus.Debugf("[%s] GetGroup %s", providerLogPrefix, groupID)
 	result, err := c.GraphClient.Groups().ByGroupId(groupID).Get(context.Background(), nil)
 	if err != nil {
-		return v32.Principal{}, fmt.Errorf("getting group by ID: %w", getMSGraphErrorData(err))
+		return v3.Principal{}, fmt.Errorf("getting group by ID: %w", getMSGraphErrorData(err))
 	}
 
 	return groupToPrincipal(result), nil
 }
 
 // ListGroups fetches all group principals in a directory from the Microsoft Graph API.
-func (c AzureMSGraphClient) ListGroups(filter string) ([]v32.Principal, error) {
+func (c AzureMSGraphClient) ListGroups(filter string) ([]v3.Principal, error) {
 	logrus.Debugf("[%s] ListGroups %s", providerLogPrefix, filter)
 	result, err := c.GraphClient.Groups().Get(context.Background(), &msgraphgroups.GroupsRequestBuilderGetRequestConfiguration{
 		QueryParameters: &msgraphgroups.GroupsRequestBuilderGetQueryParameters{
@@ -180,7 +180,7 @@ func (c AzureMSGraphClient) ListGroups(filter string) ([]v32.Principal, error) {
 		return nil, fmt.Errorf("iterating over group list: %w", getMSGraphErrorData(err))
 	}
 
-	var groups []v32.Principal
+	var groups []v3.Principal
 	err = pageIterator.Iterate(context.Background(), func(group models.Groupable) bool {
 		groups = append(groups, groupToPrincipal(group))
 		return true
@@ -251,12 +251,12 @@ func (c AzureMSGraphClient) listGroupMemberships(ctx context.Context, userID str
 
 // LoginUser verifies the user and fetches the user principal, user's group principals. It deliberately does not return
 // the provider access token because the client itself handles its caching and does not need to return it.
-func (c AzureMSGraphClient) LoginUser(config *v32.AzureADConfig, credential *v32.AzureADLogin) (v32.Principal, []v32.Principal, string, error) {
+func (c AzureMSGraphClient) LoginUser(config *v3.AzureADConfig, credential *v3.AzureADLogin) (v3.Principal, []v3.Principal, string, error) {
 	logrus.Debugf("[%s] Started token swap with AzureAD", providerLogPrefix)
 
 	oid, err := c.getOIDFromLogin(config, credential)
 	if err != nil {
-		return v32.Principal{}, nil, "", err
+		return v3.Principal{}, nil, "", err
 	}
 
 	logrus.Debugf("[%s] Completed token swap with AzureAD", providerLogPrefix)
@@ -264,20 +264,20 @@ func (c AzureMSGraphClient) LoginUser(config *v32.AzureADConfig, credential *v32
 	logrus.Debugf("[%s] Started getting user info from AzureAD", providerLogPrefix)
 	userPrincipal, err := c.GetUser(oid)
 	if err != nil {
-		return v32.Principal{}, nil, "", fmt.Errorf("getting UserInfo from Azure: %w", err)
+		return v3.Principal{}, nil, "", fmt.Errorf("getting UserInfo from Azure: %w", err)
 	}
 	userPrincipal.Me = true
 	logrus.Debugf("[%s] Completed getting user info from AzureAD", providerLogPrefix)
 
 	groupPrincipals, err := c.listGroupPrincipals(context.Background(), userPrincipal, config.GroupMembershipFilter)
 	if err != nil {
-		return v32.Principal{}, nil, "", err
+		return v3.Principal{}, nil, "", err
 	}
 
 	return userPrincipal, groupPrincipals, "", nil
 }
 
-func (c AzureMSGraphClient) listGroupPrincipals(ctx context.Context, userPrincipal v32.Principal, filter string) ([]v32.Principal, error) {
+func (c AzureMSGraphClient) listGroupPrincipals(ctx context.Context, userPrincipal v3.Principal, filter string) ([]v3.Principal, error) {
 	var groups []string
 	err := c.listGroupMemberships(ctx, GetPrincipalID(userPrincipal), filter, func(g *models.Group) {
 		if id := g.GetId(); id != nil && g.GetDisplayName() != nil && g.GetSecurityEnabled() != nil {
@@ -296,7 +296,7 @@ func (c AzureMSGraphClient) listGroupPrincipals(ctx context.Context, userPrincip
 	return groupPrincipals, nil
 }
 
-func (c AzureMSGraphClient) getOIDFromLogin(config *v32.AzureADConfig, credential *v32.AzureADLogin) (string, error) {
+func (c AzureMSGraphClient) getOIDFromLogin(config *v3.AzureADConfig, credential *v3.AzureADLogin) (string, error) {
 	if credential.IDToken != "" {
 		// Acquire the OID from the IDToken to verify the user
 		oidFromToken, err := oidFromIDToken(credential.IDToken, config)
@@ -338,8 +338,8 @@ type azureUserObject interface {
 	GetUserPrincipalName() *string
 }
 
-func userToPrincipal(user azureUserObject) v32.Principal {
-	return v32.Principal{
+func userToPrincipal(user azureUserObject) v3.Principal {
+	return v3.Principal{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: Name + "_user://" + *user.GetId(),
 		},
@@ -350,8 +350,8 @@ func userToPrincipal(user azureUserObject) v32.Principal {
 	}
 }
 
-func groupToPrincipal(group azureObject) v32.Principal {
-	return v32.Principal{
+func groupToPrincipal(group azureObject) v3.Principal {
+	return v3.Principal{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: Name + "_group://" + *group.GetId(),
 		},
@@ -362,7 +362,7 @@ func groupToPrincipal(group azureObject) v32.Principal {
 }
 
 // oidFromIDToken verifies the IDToken, returning the user OID
-func oidFromIDToken(token string, config *v32.AzureADConfig) (string, error) {
+func oidFromIDToken(token string, config *v3.AzureADConfig) (string, error) {
 	issuer, err := url.JoinPath(config.Endpoint, config.TenantID, "/v2.0")
 	if err != nil {
 		return "", fmt.Errorf("joining issuer path: %w", err)
@@ -397,7 +397,7 @@ func oidFromIDToken(token string, config *v32.AzureADConfig) (string, error) {
 }
 
 // oidFromAuthCode exchanges the AuthCode for a IDToken, returning the user OID
-func oidFromAuthCode(token string, config *v32.AzureADConfig) (string, error) {
+func oidFromAuthCode(token string, config *v3.AzureADConfig) (string, error) {
 	cred, err := confidential.NewCredFromSecret(config.ApplicationSecret)
 	if err != nil {
 		return "", fmt.Errorf("could not create a cred from a secret: %w", err)
