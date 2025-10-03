@@ -88,7 +88,7 @@ func Test_reconcileGlobalRoles(t *testing.T) {
 		InheritedClusterRoles: []string{"cluster-admin"},
 		Builtin:               true,
 	}
-	inheritedClusterRoleWithFleetdGR := &v3.GlobalRole{
+	inheritedClusterRoleWithFleetGR := &v3.GlobalRole{
 		ObjectMeta: v1.ObjectMeta{
 			Name: "inherited-cluster-role-with-fleet-gr",
 		},
@@ -226,18 +226,18 @@ func Test_reconcileGlobalRoles(t *testing.T) {
 		},
 		{
 			name:        "Create GR with Inherited cluster role and fleet",
-			grsToCreate: []*v3.GlobalRole{inheritedClusterRoleWithFleetdGR},
+			grsToCreate: []*v3.GlobalRole{inheritedClusterRoleWithFleetGR},
 			setup: func(mocks testMocks) {
 				mocks.grClientMock.EXPECT().List(gomock.Any()).Return(&v3.GlobalRoleList{}, nil)
 				mocks.grClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.grClientMock, nil)
-				mocks.grClientMock.EXPECT().Create(ObjectMatcher(inheritedClusterRoleWithFleetdGR)).DoAndReturn(
+				mocks.grClientMock.EXPECT().Create(ObjectMatcher(inheritedClusterRoleWithFleetGR)).DoAndReturn(
 					func(toCreate *v3.GlobalRole) (*v3.GlobalRole, error) {
-						require.EqualValues(mocks.t, inheritedClusterRoleWithFleetdGR.Rules, toCreate.Rules, "roleBuilder did not attempt to create the correct role")
-						require.EqualValues(mocks.t, inheritedClusterRoleWithFleetdGR.Name, toCreate.Name, "roleBuilder did not attempt to create the correct role")
-						require.EqualValues(mocks.t, inheritedClusterRoleWithFleetdGR.DisplayName, toCreate.DisplayName, "roleBuilder did not attempt to create the correct role")
-						require.EqualValues(mocks.t, inheritedClusterRoleWithFleetdGR.NamespacedRules, toCreate.NamespacedRules, "roleBuilder did not attempt to create the correct role")
-						require.EqualValues(mocks.t, inheritedClusterRoleWithFleetdGR.InheritedClusterRoles, toCreate.InheritedClusterRoles, "roleBuilder failed InheritedClusterRoles")
-						require.EqualValues(mocks.t, inheritedClusterRoleWithFleetdGR.InheritedFleetWorkspacePermissions, toCreate.InheritedFleetWorkspacePermissions, "roleBuilder failed InheritedFleetWorkspacePermissions")
+						require.EqualValues(mocks.t, inheritedClusterRoleWithFleetGR.Rules, toCreate.Rules, "roleBuilder did not attempt to create the correct role")
+						require.EqualValues(mocks.t, inheritedClusterRoleWithFleetGR.Name, toCreate.Name, "roleBuilder did not attempt to create the correct role")
+						require.EqualValues(mocks.t, inheritedClusterRoleWithFleetGR.DisplayName, toCreate.DisplayName, "roleBuilder did not attempt to create the correct role")
+						require.EqualValues(mocks.t, inheritedClusterRoleWithFleetGR.NamespacedRules, toCreate.NamespacedRules, "roleBuilder did not attempt to create the correct role")
+						require.EqualValues(mocks.t, inheritedClusterRoleWithFleetGR.InheritedClusterRoles, toCreate.InheritedClusterRoles, "roleBuilder failed InheritedClusterRoles")
+						require.EqualValues(mocks.t, inheritedClusterRoleWithFleetGR.InheritedFleetWorkspacePermissions, toCreate.InheritedFleetWorkspacePermissions, "roleBuilder failed InheritedFleetWorkspacePermissions")
 						return toCreate, nil
 					})
 			},
