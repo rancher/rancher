@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
@@ -53,6 +54,9 @@ const (
 	rolesCircularHardLimit = 500
 )
 
+// RoleTemplate indexers are registered in the management (upstream) context, shared by all UserContext, so only register once
+var registerRTIndexersOnce sync.Once
+
 func Register(ctx context.Context, workload *config.UserContext) error {
 	management := workload.Management.WithAgent("rbac-handler-base")
 
@@ -95,10 +99,13 @@ func Register(ctx context.Context, workload *config.UserContext) error {
 
 	// Get RoleTemplates by RoleTemplate they inherit from
 	rtInformer := workload.Management.Wrangler.Mgmt.RoleTemplate().Informer()
-	rtIndexers := cache.Indexers{
-		rtByInheritedRTsIndex: rtByInterhitedRTs,
-	}
-	if err := rtInformer.AddIndexers(rtIndexers); err != nil {
+	var err error
+	registerRTIndexersOnce.Do(func() {
+		err = rtInformer.AddIndexers(cache.Indexers{
+			rtByInheritedRTsIndex: rtByInterhitedRTs,
+		})
+	})
+	if err != nil {
 		return err
 	}
 
