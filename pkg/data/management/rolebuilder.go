@@ -212,6 +212,16 @@ func (r *ruleBuilder) setRoleTemplateNames(names ...string) *roleBuilder {
 	return r.rb.setRoleTemplateNames(names...)
 }
 
+func (r *ruleBuilder) setInheritedClusterRoles(roles ...string) *ruleBuilder {
+	r.rb.inheritedClusterRoles = roles
+	return r
+}
+
+func (r *ruleBuilder) setInheritedFleetWorkspacePermissions(permissions *v3.FleetWorkspacePermission) *ruleBuilder {
+	r.rb.inheritedFleetWorkspacePermissions = permissions
+	return r
+}
+
 func (r *ruleBuilder) reconcileGlobalRoles(grClient wranglerv3.GlobalRoleClient) error {
 	return r.rb.reconcileGlobalRoles(grClient)
 }
