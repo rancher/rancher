@@ -79,6 +79,34 @@ func Test_reconcileGlobalRoles(t *testing.T) {
 		},
 		Builtin: true,
 	}
+	inheritedClusterRoledGR := &v3.GlobalRole{
+		ObjectMeta: v1.ObjectMeta{
+			Name: "inherited-cluster-role-gr",
+		},
+		DisplayName:           "inheritedClusterRoledGR",
+		Rules:                 []rbacv1.PolicyRule{ruleReadPods},
+		InheritedClusterRoles: []string{"cluster-admin"},
+		Builtin:               true,
+	}
+	inheritedClusterRoleWithFleetGR := &v3.GlobalRole{
+		ObjectMeta: v1.ObjectMeta{
+			Name: "inherited-cluster-role-with-fleet-gr",
+		},
+		DisplayName:           "inheritedClusterRoledWithFleetGR",
+		Rules:                 []rbacv1.PolicyRule{ruleReadPods},
+		InheritedClusterRoles: []string{"cluster-owner"},
+		InheritedFleetWorkspacePermissions: &v3.FleetWorkspacePermission{
+			ResourceRules: []rbacv1.PolicyRule{
+				{
+					APIGroups: []string{"fleet.cattle.io"},
+					Resources: []string{"clusters", "gitrepos", "bundles", "bundledeployments", "clustergroups"},
+					Verbs:     []string{"*"},
+				},
+			},
+			WorkspaceVerbs: []string{"get", "list"},
+		},
+		Builtin: true,
+	}
 	tests := []struct {
 		name        string
 		grsToCreate []*v3.GlobalRole
@@ -156,6 +184,60 @@ func Test_reconcileGlobalRoles(t *testing.T) {
 						require.EqualValues(mocks.t, namespacedGR.Name, toCreate.Name, "roleBuilder did not attempt to create the correct role")
 						require.EqualValues(mocks.t, namespacedGR.DisplayName, toCreate.DisplayName, "roleBuilder did not attempt to create the correct role")
 						require.EqualValues(mocks.t, namespacedGR.NamespacedRules, toCreate.NamespacedRules, "roleBuilder did not attempt to create the correct role")
+						return toCreate, nil
+					})
+			},
+		},
+		{
+			name:        "Ensure fleet and cluster-roles nil",
+			grsToCreate: []*v3.GlobalRole{namespacedGR},
+			setup: func(mocks testMocks) {
+				mocks.grClientMock.EXPECT().List(gomock.Any()).Return(&v3.GlobalRoleList{}, nil)
+				mocks.grClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.grClientMock, nil)
+				mocks.grClientMock.EXPECT().Create(ObjectMatcher(namespacedGR)).DoAndReturn(
+					func(toCreate *v3.GlobalRole) (*v3.GlobalRole, error) {
+						require.EqualValues(mocks.t, namespacedGR.Rules, toCreate.Rules, "roleBuilder did not attempt to create the correct role")
+						require.EqualValues(mocks.t, namespacedGR.Name, toCreate.Name, "roleBuilder did not attempt to create the correct role")
+						require.EqualValues(mocks.t, namespacedGR.DisplayName, toCreate.DisplayName, "roleBuilder did not attempt to create the correct role")
+						require.EqualValues(mocks.t, namespacedGR.NamespacedRules, toCreate.NamespacedRules, "roleBuilder did not attempt to create the correct role")
+						require.Nil(mocks.t, toCreate.InheritedClusterRoles, "InheritedClusterRoles should be nil")
+						require.Nil(mocks.t, toCreate.InheritedFleetWorkspacePermissions, "InheritedFleetWorkspacePermissions should be nil")
+						return toCreate, nil
+					})
+			},
+		},
+		{
+			name:        "Create GR with Inherited cluster role",
+			grsToCreate: []*v3.GlobalRole{inheritedClusterRoledGR},
+			setup: func(mocks testMocks) {
+				mocks.grClientMock.EXPECT().List(gomock.Any()).Return(&v3.GlobalRoleList{}, nil)
+				mocks.grClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.grClientMock, nil)
+				mocks.grClientMock.EXPECT().Create(ObjectMatcher(inheritedClusterRoledGR)).DoAndReturn(
+					func(toCreate *v3.GlobalRole) (*v3.GlobalRole, error) {
+						require.EqualValues(mocks.t, inheritedClusterRoledGR.Rules, toCreate.Rules, "roleBuilder did not attempt to create the correct role")
+						require.EqualValues(mocks.t, inheritedClusterRoledGR.Name, toCreate.Name, "roleBuilder did not attempt to create the correct role")
+						require.EqualValues(mocks.t, inheritedClusterRoledGR.DisplayName, toCreate.DisplayName, "roleBuilder did not attempt to create the correct role")
+						require.EqualValues(mocks.t, inheritedClusterRoledGR.NamespacedRules, toCreate.NamespacedRules, "roleBuilder did not attempt to create the correct role")
+						require.EqualValues(mocks.t, inheritedClusterRoledGR.InheritedClusterRoles, toCreate.InheritedClusterRoles, "roleBuilder failed InheritedClusterRoles")
+						require.Nil(mocks.t, toCreate.InheritedFleetWorkspacePermissions, "roleBuilder failed InheritedFleetWorkspacePermissions")
+						return toCreate, nil
+					})
+			},
+		},
+		{
+			name:        "Create GR with Inherited cluster role and fleet",
+			grsToCreate: []*v3.GlobalRole{inheritedClusterRoleWithFleetGR},
+			setup: func(mocks testMocks) {
+				mocks.grClientMock.EXPECT().List(gomock.Any()).Return(&v3.GlobalRoleList{}, nil)
+				mocks.grClientMock.EXPECT().WithImpersonation(controllers.WebhookImpersonation()).Return(mocks.grClientMock, nil)
+				mocks.grClientMock.EXPECT().Create(ObjectMatcher(inheritedClusterRoleWithFleetGR)).DoAndReturn(
+					func(toCreate *v3.GlobalRole) (*v3.GlobalRole, error) {
+						require.EqualValues(mocks.t, inheritedClusterRoleWithFleetGR.Rules, toCreate.Rules, "roleBuilder did not attempt to create the correct role")
+						require.EqualValues(mocks.t, inheritedClusterRoleWithFleetGR.Name, toCreate.Name, "roleBuilder did not attempt to create the correct role")
+						require.EqualValues(mocks.t, inheritedClusterRoleWithFleetGR.DisplayName, toCreate.DisplayName, "roleBuilder did not attempt to create the correct role")
+						require.EqualValues(mocks.t, inheritedClusterRoleWithFleetGR.NamespacedRules, toCreate.NamespacedRules, "roleBuilder did not attempt to create the correct role")
+						require.EqualValues(mocks.t, inheritedClusterRoleWithFleetGR.InheritedClusterRoles, toCreate.InheritedClusterRoles, "roleBuilder failed InheritedClusterRoles")
+						require.EqualValues(mocks.t, inheritedClusterRoleWithFleetGR.InheritedFleetWorkspacePermissions, toCreate.InheritedFleetWorkspacePermissions, "roleBuilder failed InheritedFleetWorkspacePermissions")
 						return toCreate, nil
 					})
 			},
@@ -635,6 +717,8 @@ func addGlobalRole(builder *roleBuilder, roles ...*v3.GlobalRole) {
 		r := builder.addRole(gr.DisplayName, gr.Name)
 		addRules(r, gr.Rules...)
 		addNamespacedRules(builder, gr.NamespacedRules)
+		builder.setInheritedClusterRoles(gr.InheritedClusterRoles...)
+		builder.setInheritedFleetWorkspacePermissions(gr.InheritedFleetWorkspacePermissions)
 	}
 }
 
