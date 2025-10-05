@@ -3,7 +3,7 @@ pipelineid: '{{ .k8s_k3s.pipelineid }}'
 
 sources:
   rancher-go-mod-k8s:
-    name: 'Get K8s version in go.mod'
+    name: 'Get K8s <major>.<minor> version in go.mod'
     kind: golang/gomod
     scmid: 'default'
     spec:
@@ -12,7 +12,7 @@ sources:
       - find: 'v\d+\.\d+'
 
   k8s-release:
-    name: 'Get latest upstream K8s version for {{ source "rancher-go-mod-k8s" }} patch version'
+    name: 'Get latest upstream K8s patch version for {{ source "rancher-go-mod-k8s" }}'
     kind: githubrelease
     spec:
       owner: '{{ .repos.k8s.owner }}'

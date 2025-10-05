@@ -43,7 +43,7 @@ its main purpose.
 
 Local testing of manifests require:
 
-1. The updatecli binary that can be download from
+1. The updatecli binary that can be downloaded from
 [updatecli/updatecli#releases]. Test only with the latest stable version.
    1. Always run locally with the command `diff`, that will show the changes
 without actually applying them.
