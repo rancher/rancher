@@ -44,9 +44,7 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	steve "github.com/rancher/steve/pkg/server"
 	"github.com/rancher/wrangler/v3/pkg/generated/controllers/core"
-	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac"
-	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
@@ -223,7 +221,6 @@ type UserContext struct {
 	Autoscaling    autoscaling.Interface
 	Catalog        catalog.Interface
 	Project        projectv3.Interface
-	Core           corev1.Interface
 	Extensions     extv1beta1.Interface
 	BatchV1        batchv1.Interface
 	Networking     knetworkingv1.Interface
@@ -231,8 +228,9 @@ type UserContext struct {
 	Storage        storagev1.Interface
 	Plan           upgrade.Interface // the field is initialized only for rancher-provisioned rke2/k3s cluster
 
-	RBACw wrbacv1.Interface
-	Corew wcorev1.Interface
+	// these interfaces are a subset of the original APIs, restricting their access in order to prevent accidentally adding new downstream caches
+	RBACw rbacInterface
+	Corew coreInterface
 
 	K3s k3s.Interface
 
@@ -304,26 +302,6 @@ func (w *UserContext) deferredStartAsync(ctx context.Context, register func(ctx 
 			cancel()
 		}()
 		return nil
-	}
-}
-
-func (w *UserContext) UserOnlyContext() *UserOnlyContext {
-	return &UserOnlyContext{
-		Schemas:           w.Management.Schemas,
-		ClusterName:       w.ClusterName,
-		RESTConfig:        w.RESTConfig,
-		UnversionedClient: w.UnversionedClient,
-		K8sClient:         w.K8sClient,
-
-		Autoscaling: w.Autoscaling,
-		Apps:        w.Apps,
-		Project:     w.Project,
-		Core:        w.Core,
-		Extensions:  w.Extensions,
-		Networking:  w.Networking,
-		BatchV1:     w.BatchV1,
-		Cluster:     w.Cluster,
-		Storage:     w.Storage,
 	}
 }
 
@@ -436,7 +414,6 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 	}
 
 	context.Apps = appsv1.NewFromControllerFactory(controllerFactory)
-	context.Core = corev1.NewFromControllerFactory(controllerFactory)
 	context.Project = projectv3.NewFromControllerFactory(controllerFactory)
 	context.Storage = storagev1.NewFromControllerFactory(controllerFactory)
 	context.Networking = knetworkingv1.NewFromControllerFactory(controllerFactory)
@@ -460,7 +437,7 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 	if err != nil {
 		return nil, err
 	}
-	context.Corew = corew.Core().V1()
+	context.Corew = coreInterface{corew}
 
 	ctlg, err := catalog.NewFactoryFromConfigWithOptions(&context.RESTConfig, &catalog.FactoryOptions{SharedControllerFactory: controllerFactory})
 	if err != nil {

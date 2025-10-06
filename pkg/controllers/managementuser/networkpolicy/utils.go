@@ -5,8 +5,8 @@ import (
 
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
-	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	wcore "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -18,8 +18,8 @@ func isNetworkPolicyDisabled(clusterNamespace string, clusterLister v3.ClusterLi
 	return !convert.ToBool(cluster.Annotations[netPolAnnotation]), nil
 }
 
-func isNamespaceMoved(namespace string, nsLister v1.NamespaceLister) (bool, error) {
-	ns, err := nsLister.Get("", namespace)
+func isNamespaceMoved(namespace string, nsLister wcore.NamespaceCache) (bool, error) {
+	ns, err := nsLister.Get(namespace)
 	if err != nil {
 		return false, fmt.Errorf("error getting ns %v", err)
 	}

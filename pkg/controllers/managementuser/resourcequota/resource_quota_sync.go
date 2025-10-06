@@ -13,6 +13,7 @@ import (
 	namespaceutil "github.com/rancher/rancher/pkg/namespace"
 	validate "github.com/rancher/rancher/pkg/resourcequota"
 	"github.com/rancher/rancher/pkg/utils"
+	corew "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -37,15 +38,15 @@ defined in namespace.resourceQuota
 */
 type SyncController struct {
 	ProjectLister       v3.ProjectLister
-	Namespaces          v1.NamespaceInterface
-	ResourceQuotas      v1.ResourceQuotaInterface
-	ResourceQuotaLister v1.ResourceQuotaLister
-	LimitRange          v1.LimitRangeInterface
-	LimitRangeLister    v1.LimitRangeLister
+	Namespaces          corew.NamespaceClient
+	ResourceQuotas      corew.ResourceQuotaClient
+	ResourceQuotaLister corew.ResourceQuotaCache
+	LimitRange          corew.LimitRangeClient
+	LimitRangeLister    corew.LimitRangeCache
 	NsIndexer           clientcache.Indexer
 }
 
-func (c *SyncController) syncResourceQuota(key string, ns *corev1.Namespace) (runtime.Object, error) {
+func (c *SyncController) syncResourceQuota(_ string, ns *corev1.Namespace) (*corev1.Namespace, error) {
 	if ns == nil || ns.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -212,12 +213,12 @@ func (c *SyncController) updateDefaultLimitRange(limitRange *corev1.LimitRange, 
 
 func (c *SyncController) deleteResourceQuota(quota *corev1.ResourceQuota) error {
 	logrus.Infof("Deleting default resource quota for namespace %v", quota.Namespace)
-	return c.ResourceQuotas.DeleteNamespaced(quota.Namespace, quota.Name, &metav1.DeleteOptions{})
+	return c.ResourceQuotas.Delete(quota.Namespace, quota.Name, &metav1.DeleteOptions{})
 }
 
 func (c *SyncController) deleteDefaultLimitRange(limitRange *corev1.LimitRange) error {
 	logrus.Infof("Deleting limit range %v for namespace %v", limitRange.Name, limitRange.Namespace)
-	return c.LimitRange.DeleteNamespaced(limitRange.Namespace, limitRange.Name, &metav1.DeleteOptions{})
+	return c.LimitRange.Delete(limitRange.Namespace, limitRange.Name, &metav1.DeleteOptions{})
 }
 
 func (c *SyncController) getExistingResourceQuota(ns *corev1.Namespace) (*corev1.ResourceQuota, error) {

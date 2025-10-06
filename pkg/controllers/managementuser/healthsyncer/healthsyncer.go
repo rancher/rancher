@@ -14,9 +14,9 @@ import (
 	"github.com/rancher/norman/types/slice"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
-	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/ticker"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
@@ -52,8 +52,7 @@ type HealthSyncer struct {
 	clusterName       string
 	clusterLister     v3.ClusterLister
 	clusters          v3.ClusterInterface
-	componentStatuses corev1.ComponentStatusInterface
-	namespaces        corev1.NamespaceInterface
+	componentStatuses generic.NonNamespacedClientInterface[*v1.ComponentStatus, *v1.ComponentStatusList]
 	k8s               kubernetes.Interface
 }
 
@@ -63,8 +62,7 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		clusterName:       workload.ClusterName,
 		clusterLister:     workload.Management.Management.Clusters("").Controller().Lister(),
 		clusters:          workload.Management.Management.Clusters(""),
-		componentStatuses: workload.Core.ComponentStatuses(""),
-		namespaces:        workload.Core.Namespaces(""),
+		componentStatuses: workload.Corew.ComponentStatus(),
 		k8s:               workload.K8sClient,
 	}
 
@@ -102,6 +100,7 @@ func (h *HealthSyncer) getComponentStatus(cluster *v3.Cluster) error {
 		return condition.Error("ComponentStatusFetchingFailure", fmt.Errorf("Failed to parse cluster k8s version %s",
 			cluster.Status.Version.String()))
 	}
+
 	if componentStatusDisabledRange(k8sVersion) {
 		return nil
 	}

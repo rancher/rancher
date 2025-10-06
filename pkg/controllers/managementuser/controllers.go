@@ -62,7 +62,7 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	cluster.APIAggregation.APIServices("").Controller()
 
 	if clusterRec.Spec.LocalClusterAuthEndpoint.Enabled {
-		err := clusterauthtoken.CRDSetup(ctx, cluster.UserOnlyContext())
+		err := clusterauthtoken.CRDSetup(ctx, cluster.RESTConfig, cluster.Management.Schemas)
 		if err != nil {
 			return err
 		}
@@ -96,7 +96,7 @@ func registerProvV2(ctx context.Context, cluster *config.UserContext, capi *wran
 
 // RegisterCaches initializes caches early in the initialization process to have them available as soon as possible (instead of on demand when Lister/Cache or Controller are called)
 func RegisterCaches(cluster *config.UserContext) {
-	cluster.Core.Namespaces("").Controller()
+	cluster.Corew.Namespace().Informer()
 	cluster.RBACw.ClusterRoleBinding().Informer()
 	cluster.RBACw.ClusterRole().Informer()
 	cluster.RBACw.RoleBinding().Informer()
