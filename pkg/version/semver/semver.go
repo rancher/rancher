@@ -36,7 +36,11 @@ func (v Version) IsDevOrPrerelease() bool {
 		semVersion.Prerelease() != "" // When the version includes pre-release assume dev
 }
 
-// IsRC validates the version is SemVer with a "Prerelease" matching the "RC" variety
+// IsRC validates the version is SemVer with a "Prerelease" matching only the "RC" variety
+//
+// This helper was added to replicate existing behaviour that treats "RC" builds as "pre-stable".
+// Whereas other releases with Prerelease value included are treated as "unstable".
+// This is used by the content catalog to ensure that RC builds have the same catalog logic as a release.
 func (v Version) IsRC() bool {
 	semVersion, err := semver.NewVersion(string(v))
 	if err != nil {
