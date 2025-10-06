@@ -291,7 +291,11 @@ func InitializeFeatures(featuresClient managementv3.FeatureClient, featureArgs s
 			if newVal == nil {
 				newVal = featureState.Spec.Value
 			}
-			f.Set(newVal)
+			if newVal == nil {
+				f.Unset()
+			} else {
+				f.Set(*newVal)
+			}
 		}
 	}
 }
@@ -393,8 +397,12 @@ func (f *Feature) Dynamic() bool {
 	return f.dynamic
 }
 
-func (f *Feature) Set(val *bool) {
-	f.val = val
+func (f *Feature) Set(val bool) {
+	f.val = &val
+}
+
+func (f *Feature) Unset() {
+	f.val = nil
 }
 
 func (f *Feature) Name() string {
