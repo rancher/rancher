@@ -1,0 +1,102 @@
+name: '{{ .k8s_k3s.manifest }}'
+pipelineid: '{{ .k8s_k3s.pipelineid }}'
+
+sources:
+  rancher-go-mod-k8s:
+    name: 'Get K8s <major>.<minor> version in go.mod'
+    kind: golang/gomod
+    scmid: 'default'
+    spec:
+      module: 'k8s.io/kubernetes'
+    transformers:
+      - find: 'v\d+\.\d+'
+
+  k8s-release:
+    name: 'Get latest upstream K8s patch version for {{ source "rancher-go-mod-k8s" }}'
+    kind: githubrelease
+    spec:
+      owner: '{{ .repos.k8s.owner }}'
+      repository: '{{ .repos.k8s.repo }}'
+      key: tagname
+      typefilter:
+        release: true
+      username: '{{ .scm.username }}'
+      token: '{{ requiredEnv .scm.token }}'
+      versionfilter:
+        kind: semver
+        pattern: '~{{ source "rancher-go-mod-k8s" }}'
+
+  k3s-release:
+    name: 'Check if K3s {{ source "k8s-release" }} release is available'
+    kind: githubrelease
+    spec:
+      owner: '{{ .repos.k3s.owner }}'
+      repository: '{{ .repos.k3s.repo }}'
+      key: tagname
+      typefilter:
+        release: true
+      username: '{{ .scm.username }}'
+      token: '{{ requiredEnv .scm.token }}'
+      versionfilter:
+        kind: regex
+        pattern: '{{ source "k8s-release" }}'
+    transformers:
+      - replacer:
+          from: '+'
+          to: '-'
+
+conditions:
+  check-upstream-k3s-image-tag:
+    name: 'Check if K3s image for {{ source "k3s-release" }} release is available'
+    kind: dockerimage
+    sourceid: 'k3s-release'
+    spec:
+      image: 'rancher/k3s'
+      tag: '{{ source "k3s-release" }}'
+
+targets:
+  update-k8s-main:
+    name: 'Update K8s main config version'
+    kind: yaml
+    scmid: 'default'
+    sourceid: k8s-release
+    spec:
+      file: '{{ .config.versions }}'
+      key: '$.k8s.main'
+
+  update-k8s-deps:
+    name: 'Update K8s dep config version'
+    kind: yaml
+    scmid: 'default'
+    sourceid: k8s-release
+    spec:
+      file: '{{ .config.versions }}'
+      key: '$.k8s.deps'
+    transformers:
+      - trimprefix: 'v'
+      - findsubmatch:
+          pattern: '\d+(.\d+.\d+)'
+          captureindex: 1
+      - addprefix: 'v0'
+
+  update-k3s-release:
+    name: 'Update K3s release config version'
+    kind: yaml
+    scmid: 'default'
+    sourceid: k3s-release
+    spec:
+      file: '{{ .config.versions }}'
+      key: '$.k3s.release'
+    transformers:
+      - replacer:
+          from: '-'
+          to: '+'
+
+  update-k3s-image:
+    name: 'Update K3s image config version'
+    kind: yaml
+    scmid: 'default'
+    sourceid: k3s-release
+    spec:
+      file: '{{ .config.versions }}'
+      key: '$.k3s.image'
