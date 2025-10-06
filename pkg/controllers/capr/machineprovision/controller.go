@@ -642,10 +642,10 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 
 func parseDeleteOnFailureAfterSetting(infra *infraObject) time.Duration {
 
-	deleteInfraTimeSetting := settings.DeleteInfraMachineOnFailureAfter.Get()
+	deleteInfraTimeSetting := settings.DeleteMachineOnFailureAfter.Get()
 	deleteOnFailureAfter, err := time.ParseDuration(deleteInfraTimeSetting)
 	if err != nil {
-		logrus.Warnf("[machineprovision] %s/%s: error parsing the '%s' setting: %v: %v, returning 0", infra.meta.GetNamespace(), infra.meta.GetName(), settings.DeleteInfraMachineOnFailureAfter.Name, deleteInfraTimeSetting, err)
+		logrus.Warnf("[machineprovision] %s/%s: error parsing the '%s' setting: %v: %v, returning 0", infra.meta.GetNamespace(), infra.meta.GetName(), settings.DeleteMachineOnFailureAfter.Name, deleteInfraTimeSetting, err)
 		return 0
 	}
 

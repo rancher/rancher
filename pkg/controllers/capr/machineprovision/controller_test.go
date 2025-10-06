@@ -379,7 +379,7 @@ func TestOnChange(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			settings.DeleteInfraMachineOnFailureAfter.Set(tc.setting)
+			settings.DeleteMachineOnFailureAfter.Set(tc.setting)
 
 			dynamicControllerFake := dynamicControllerFake{}
 			h.dynamic = &dynamicControllerFake
