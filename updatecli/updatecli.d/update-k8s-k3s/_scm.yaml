@@ -27,6 +27,9 @@ actions:
     spec:
       labels:
         - 'dependencies'
+      reviewers:
+        - 'rancher/infracloud-team'
+        - 'rancher/rancher-team-2-hostbusters-dev'
       mergemethod: '{{ .scm.mergemethod }}'
       title: '[{{ .scm.branch }}] Bump K8s to `{{ .k8s.main }}` and K3s to `{{ .k3s.release }}`'
       description: 'Bump patch versions of K8s to `{{ .k8s.main }}` and K3s to `{{ .k3s.release }}`.'
