@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/rancher/norman/types"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/mocks"
 	"github.com/stretchr/testify/assert"
@@ -27,7 +26,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-func Test_validateACR(t *testing.T) {
+func TestValidateACR(t *testing.T) {
 	tests := []struct {
 		name          string
 		claimACR      string
@@ -756,7 +755,6 @@ func TestLogoutAll(t *testing.T) {
 	require.NoError(t, o.LogoutAll(w, r, testToken))
 
 	require.Equal(t, http.StatusOK, w.Code)
-
 	wantData := map[string]any{
 		"idpRedirectUrl": "http://localhost:8090/user/logout?client_id=test&post_logout_redirect_uri=https%3A%2F%2Fexample.com%2Flogged-out",
 		"type":           "authConfigLogoutOutput",
@@ -964,21 +962,4 @@ func (m tokenMatcher) String() string {
 
 func EqToken(accessToken string) gomock.Matcher {
 	return tokenMatcher{accessToken}
-}
-
-// normanRecorder is like httptest.ResponseRecorder, but for norman's types.ResponseWriter interface
-type normanRecorder struct {
-	responses []normanResponse
-}
-
-func (n *normanRecorder) Write(_ *types.APIContext, code int, obj any) {
-	n.responses = append(n.responses, normanResponse{
-		code: code,
-		data: obj,
-	})
-}
-
-type normanResponse struct {
-	code int
-	data any
 }
