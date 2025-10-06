@@ -51,7 +51,11 @@ func ReconcileFeatures(obj *v3.Feature) bool {
 	if newVal == nil {
 		newVal = obj.Spec.Value
 	}
-	feature.Set(newVal)
+	if newVal == nil {
+		feature.Unset()
+	} else {
+		feature.Set(*newVal)
+	}
 
 	return false
 }
