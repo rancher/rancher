@@ -64,11 +64,11 @@ func Configure(mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *to
 	return provider
 }
 
-func (g *ghProvider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (g *ghProvider) LogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	return nil
 }
 
-func (g *ghProvider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (g *ghProvider) Logout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	return nil
 }
 

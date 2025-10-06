@@ -3,10 +3,10 @@ package providers
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"sync"
 
-	"github.com/rancher/norman/types"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
@@ -113,10 +113,6 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 
 	userMGR := mgmt.UserManager
 	tokenMGR := tokens.NewManager(mgmt.Wrangler)
-
-	// TODO: refactor to eliminate the need for these callbacks, which exist to avoid the import cycle.
-	tokens.OnLogoutAll(ProviderLogoutAll)
-	tokens.OnLogout(ProviderLogout)
 
 	var p common.AuthProvider
 
@@ -232,7 +228,7 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 
 }
 
-func ProviderLogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func ProviderLogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	apName := token.GetAuthProvider()
 	if apName == "" {
 		return nil
@@ -242,10 +238,10 @@ func ProviderLogoutAll(apiContext *types.APIContext, token accessor.TokenAccesso
 	if err != nil {
 		return err
 	}
-	return ap.LogoutAll(apiContext, token)
+	return ap.LogoutAll(w, r, token)
 }
 
-func ProviderLogout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func ProviderLogout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	apName := token.GetAuthProvider()
 	if apName == "" {
 		return nil
@@ -255,7 +251,7 @@ func ProviderLogout(apiContext *types.APIContext, token accessor.TokenAccessor) 
 	if err != nil {
 		return err
 	}
-	return ap.Logout(apiContext, token)
+	return ap.Logout(w, r, token)
 }
 
 func IsValidUserExtraAttribute(key string) bool {

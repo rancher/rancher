@@ -5,13 +5,13 @@ import (
 	"encoding/base32"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"reflect"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/slice"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
@@ -133,8 +133,8 @@ type userManager struct {
 	rbacClient               wrangrbacv1.Interface
 }
 
-func (m *userManager) SetPrincipalOnCurrentUser(apiContext *types.APIContext, principal v3.Principal) (*v3.User, error) {
-	userID := m.GetUser(apiContext)
+func (m *userManager) SetPrincipalOnCurrentUser(r *http.Request, principal v3.Principal) (*v3.User, error) {
+	userID := m.GetUser(r)
 	if userID == "" {
 		return nil, errors.New("user not provided")
 	}
@@ -174,8 +174,8 @@ func (m *userManager) SetPrincipalOnCurrentUserByUserID(userID string, principal
 	return user, nil
 }
 
-func (m *userManager) GetUser(apiContext *types.APIContext) string {
-	return apiContext.Request.Header.Get(userAuthHeader)
+func (m *userManager) GetUser(r *http.Request) string {
+	return r.Header.Get(userAuthHeader)
 }
 
 // checkis if the supplied principal can login based on the accessMode and allowed principals

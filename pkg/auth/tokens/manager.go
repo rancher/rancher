@@ -47,12 +47,6 @@ const (
 	KubeconfigResponseType = "kubeconfig"
 )
 
-var (
-	toDeleteCookies = []string{CookieName, CSRFCookie}
-	onLogoutAll     LogoutAllFunc
-	onLogout        LogoutFunc
-)
-
 func RegisterIndexer(wContext *wrangler.Context) error {
 	informer := wContext.Mgmt.User().Informer()
 	return informer.AddIndexers(map[string]cache.IndexFunc{userPrincipalIndex: userPrincipalIndexer})
@@ -69,18 +63,6 @@ func NewManager(wContext *wrangler.Context) *Manager {
 	}
 }
 
-// OnLogoutAll registers a callback function to invoke when processing the norman action `logoutAll`.
-// Note: Callbacks set at runtime are used because a direct call causes circular package imports.
-func OnLogoutAll(logoutAllFunc LogoutAllFunc) {
-	onLogoutAll = logoutAllFunc
-}
-
-// OnLogout registers a callback function to invoke when processing the norman action `logout`.
-// Note: Callbacks set at runtime are used because a direct call causes circular package imports.
-func OnLogout(logoutFunc LogoutFunc) {
-	onLogout = logoutFunc
-}
-
 type Manager struct {
 	tokens       ctrlv3.TokenClient
 	tokenCache   ctrlv3.TokenCache
@@ -89,20 +71,6 @@ type Manager struct {
 	secrets      ctrlv1.SecretClient
 	secretCache  ctrlv1.SecretCache
 }
-
-type (
-	// LogoutAllFunc is the signature of the callback function to invoke when
-	// processing the norman action `logoutAll`.
-	LogoutAllFunc func(apiContext *types.APIContext, token accessor.TokenAccessor) error
-
-	// LogoutFunc is the signature of the callback function to invoke when
-	// processing the norman action `logout`.
-	LogoutFunc func(apiContext *types.APIContext, token accessor.TokenAccessor) error
-
-	// Note: We use callback functions to link the token manager to the SAML
-	// providers at runtime because a static function call set at compile time
-	// is not possible. It would cause circular package imports.
-)
 
 func userPrincipalIndexer(obj interface{}) ([]string, error) {
 	user, ok := obj.(*apiv3.User)
@@ -117,7 +85,7 @@ func userPrincipalIndexer(obj interface{}) ([]string, error) {
 func (m *Manager) createDerivedToken(jsonInput clientv3.Token, tokenAuthValue string) (apiv3.Token, string, int, error) {
 	logrus.Debug("Create Derived Token Invoked")
 
-	token, _, err := m.getToken(tokenAuthValue)
+	token, _, err := m.GetToken(tokenAuthValue)
 	if err != nil {
 		return apiv3.Token{}, "", http.StatusUnauthorized, err
 	}
@@ -177,7 +145,7 @@ func (m *Manager) updateToken(token *apiv3.Token) (*apiv3.Token, error) {
 	return m.tokens.Update(token)
 }
 
-func (m *Manager) getToken(tokenAuthValue string) (*apiv3.Token, int, error) {
+func (m *Manager) GetToken(tokenAuthValue string) (*apiv3.Token, int, error) {
 	tokenName, tokenKey := SplitTokenParts(tokenAuthValue)
 
 	lookupUsingClient := false
@@ -215,7 +183,7 @@ func (m *Manager) getTokens(tokenAuthValue string) ([]apiv3.Token, int, error) {
 	logrus.Debug("LIST Tokens Invoked")
 	tokens := make([]apiv3.Token, 0)
 
-	storedToken, _, err := m.getToken(tokenAuthValue)
+	storedToken, _, err := m.GetToken(tokenAuthValue)
 	if err != nil {
 		return tokens, 401, err
 	}
@@ -236,7 +204,7 @@ func (m *Manager) getTokens(tokenAuthValue string) ([]apiv3.Token, int, error) {
 	return tokens, 0, nil
 }
 
-func (m *Manager) deleteTokenByName(tokenName string) (int, error) {
+func (m *Manager) DeleteTokenByName(tokenName string) (int, error) {
 	err := m.tokens.Delete(tokenName, &metav1.DeleteOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -253,7 +221,7 @@ func (m *Manager) getTokenByID(tokenAuthValue string, tokenID string) (apiv3.Tok
 	logrus.Debug("GET Token Invoked")
 	token := &apiv3.Token{}
 
-	storedToken, _, err := m.getToken(tokenAuthValue)
+	storedToken, _, err := m.GetToken(tokenAuthValue)
 	if err != nil {
 		return *token, http.StatusUnauthorized, err
 	}
@@ -333,7 +301,7 @@ func (m *Manager) listTokens(request *types.APIContext) error {
 		return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
 	}
 
-	currentAuthToken, _, err := m.getToken(tokenAuthValue)
+	currentAuthToken, _, err := m.GetToken(tokenAuthValue)
 	if err != nil {
 		return err
 	}
@@ -353,71 +321,6 @@ func (m *Manager) listTokens(request *types.APIContext) error {
 	return nil
 }
 
-func (m *Manager) logout(actionName string, request *types.APIContext) error {
-	r := request.Request
-	w := request.Response
-
-	tokenAuthValue := GetTokenAuthFromRequest(r)
-	if tokenAuthValue == "" {
-		// no cookie or auth header, cannot authenticate
-		return httperror.NewAPIErrorLong(http.StatusUnauthorized, util.GetHTTPErrorCode(http.StatusUnauthorized), "No valid token cookie or auth header")
-	}
-
-	isSecure := false
-	if r.URL.Scheme == "https" {
-		isSecure = true
-	}
-
-	for _, cookieName := range toDeleteCookies {
-		tokenCookie := &http.Cookie{
-			Name:     cookieName,
-			Value:    "",
-			Secure:   isSecure,
-			Path:     "/",
-			HttpOnly: true,
-			MaxAge:   -1,
-			Expires:  time.Date(1982, time.February, 10, 23, 0, 0, 0, time.UTC),
-		}
-		http.SetCookie(w, tokenCookie)
-	}
-	w.Header().Add("Content-type", "application/json")
-
-	storedToken, status, err := m.getToken(tokenAuthValue)
-	if err != nil {
-		logrus.Errorf("getToken failed with error: %v", err)
-		if status == http.StatusNotFound {
-			// 0
-			status = http.StatusInternalServerError
-			return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), err.Error())
-		} else if status != http.StatusGone {
-			// 401
-			return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), err.Error())
-		}
-	}
-
-	switch actionName {
-	case "logoutAll":
-		err := onLogoutAll(request, storedToken)
-		if err != nil {
-			return err
-		}
-	case "logout":
-		err := onLogout(request, storedToken)
-		if err != nil {
-			return err
-		}
-	default:
-	}
-
-	status, err = m.deleteTokenByName(storedToken.Name)
-	if err != nil {
-		logrus.Errorf("deleteTokenByName failed with error: %v", err)
-		return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
-	}
-
-	return nil
-}
-
 func (m *Manager) getTokenFromRequest(request *types.APIContext) error {
 	// TODO switch to X-API-UserId header
 	r := request.Request
@@ -430,7 +333,7 @@ func (m *Manager) getTokenFromRequest(request *types.APIContext) error {
 
 	tokenID := request.ID
 
-	currentAuthToken, _, err := m.getToken(tokenAuthValue)
+	currentAuthToken, _, err := m.GetToken(tokenAuthValue)
 	if err != nil {
 		return err
 	}
@@ -479,7 +382,7 @@ func (m *Manager) removeToken(request *types.APIContext) error {
 		}
 	}
 
-	currentAuthToken, _, err := m.getToken(tokenAuthValue)
+	currentAuthToken, _, err := m.GetToken(tokenAuthValue)
 	if err != nil {
 		return err
 	}
@@ -488,7 +391,7 @@ func (m *Manager) removeToken(request *types.APIContext) error {
 		return httperror.NewAPIErrorLong(http.StatusBadRequest, util.GetHTTPErrorCode(http.StatusBadRequest), "Cannot delete token for current session. Use logout instead")
 	}
 
-	if _, err := m.deleteTokenByName(t.Name); err != nil {
+	if _, err := m.DeleteTokenByName(t.Name); err != nil {
 		return err
 	}
 
@@ -628,7 +531,7 @@ func (m *Manager) TokenStreamTransformer(
 		return nil, httperror.NewAPIErrorLong(http.StatusUnauthorized, util.GetHTTPErrorCode(http.StatusUnauthorized), "[TokenStreamTransformer] failed: No valid token cookie or auth header")
 	}
 
-	storedToken, code, err := m.getToken(tokenAuthValue)
+	storedToken, code, err := m.GetToken(tokenAuthValue)
 	if err != nil {
 		return nil, httperror.NewAPIErrorLong(code, http.StatusText(code), fmt.Sprintf("[TokenStreamTransformer] failed: %s", err.Error()))
 	}

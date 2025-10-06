@@ -107,7 +107,7 @@ func (s *Provider) AuthenticateUser(ctx context.Context, input any) (apiv3.Princ
 }
 
 // Logout guards against a regular logout when the system has SLO, i.e. LogoutAll forced.
-func (s *Provider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (s *Provider) Logout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	providerName := token.GetAuthProvider()
 
 	logrus.Debugf("SAML [logout]: triggered by provider %s", providerName)
@@ -126,7 +126,7 @@ func (s *Provider) Logout(apiContext *types.APIContext, token accessor.TokenAcce
 	return nil
 }
 
-func (s *Provider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (s *Provider) LogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	providerName := token.GetAuthProvider()
 
 	logrus.Debugf("SAML [logout-all]: triggered by provider %s", providerName)
@@ -144,13 +144,12 @@ func (s *Provider) LogoutAll(apiContext *types.APIContext, token accessor.TokenA
 
 	authLogout := &apiv3.AuthConfigLogoutInput{}
 
-	r := apiContext.Request
 	if err := json.NewDecoder(r.Body).Decode(authLogout); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("SAML: Failed to parse body: %v", err))
 	}
 
-	userName := provider.userMGR.GetUser(apiContext)
+	userName := provider.userMGR.GetUser(r)
 	userAttributes, _, err := provider.userMGR.EnsureAndGetUserAttribute(userName)
 	if err != nil {
 		return err
@@ -163,7 +162,6 @@ func (s *Provider) LogoutAll(apiContext *types.APIContext, token accessor.TokenA
 	userAtProvider := usernames[0]
 	finalRedirectURL := authLogout.FinalRedirectURL
 
-	w := apiContext.Response
 	provider.clientState.SetPath(provider.serviceProvider.SloURL.Path)
 	provider.clientState.SetState(w, r, "Rancher_FinalRedirectURL", finalRedirectURL)
 	provider.clientState.SetState(w, r, "Rancher_Action", "logout-all")
@@ -180,8 +178,8 @@ func (s *Provider) LogoutAll(apiContext *types.APIContext, token accessor.TokenA
 		"type":           "authConfigLogoutOutput",
 	}
 
-	apiContext.WriteResponse(http.StatusOK, data)
-	return nil
+	w.Header().Set("Content-Type", "application/json")
+	return json.NewEncoder(w).Encode(data)
 }
 
 func PerformSamlLogin(r *http.Request, w http.ResponseWriter, name string, input any) error {

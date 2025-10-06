@@ -2,6 +2,7 @@ package saml
 
 import (
 	"context"
+	"net/http"
 	"testing"
 
 	"github.com/rancher/norman/types"
@@ -141,11 +142,11 @@ type mockLdapProvider struct {
 	isLdapConfigured bool
 }
 
-func (p *mockLdapProvider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (p *mockLdapProvider) Logout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	panic("not implemented")
 }
 
-func (p *mockLdapProvider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (p *mockLdapProvider) LogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	panic("not implemented")
 }
 

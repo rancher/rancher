@@ -101,7 +101,7 @@ func (g *googleOauthProvider) testAndApply(request *types.APIContext) error {
 		return fmt.Errorf("[Google OAuth] testAndApply: server error while authenticating: %v", err)
 	}
 	// if this works, save google oauth CR adding enabled flag
-	user, err := g.userMGR.SetPrincipalOnCurrentUser(request, userPrincipal)
+	user, err := g.userMGR.SetPrincipalOnCurrentUser(request.Request, userPrincipal)
 	if err != nil {
 		return err
 	}

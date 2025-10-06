@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman"
 	"github.com/rancher/rancher/pkg/auth/api"
 	"github.com/rancher/rancher/pkg/auth/data"
+	"github.com/rancher/rancher/pkg/auth/logout"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/providers/publicapi"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
@@ -103,7 +104,9 @@ func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext, 
 }
 
 func newPrivateAPI(ctx context.Context, scaledContext *config.ScaledContext, authToken requests.AuthTokenGetter) (*mux.Router, error) {
-	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext.Wrangler, norman.ConfigureAPIUI)
+	logout := logout.NewHandler(ctx, tokens.NewManager(scaledContext.Wrangler))
+
+	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext.Wrangler, logout, norman.ConfigureAPIUI)
 	if err != nil {
 		return nil, err
 	}

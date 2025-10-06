@@ -3,6 +3,7 @@ package local
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"unicode"
 
@@ -79,11 +80,11 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMgr user.
 	return l
 }
 
-func (l *Provider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (l *Provider) LogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	return nil
 }
 
-func (l *Provider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (l *Provider) Logout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	return nil
 }
 

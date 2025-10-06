@@ -1,9 +1,9 @@
 package user
 
 import (
+	"net/http"
 	"time"
 
-	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	apitypes "k8s.io/apimachinery/pkg/types"
@@ -22,8 +22,8 @@ type TokenInput struct {
 }
 
 type Manager interface {
-	SetPrincipalOnCurrentUser(apiContext *types.APIContext, principal v3.Principal) (*v3.User, error)
-	GetUser(apiContext *types.APIContext) string
+	SetPrincipalOnCurrentUser(r *http.Request, principal v3.Principal) (*v3.User, error)
+	GetUser(r *http.Request) string
 	EnsureUser(principalName, displayName string) (*v3.User, error)
 	CheckAccess(accessMode string, allowedPrincipalIDs []string, userPrincipalID string, groups []v3.Principal) (bool, error)
 	SetPrincipalOnCurrentUserByUserID(userID string, principal v3.Principal) (*v3.User, error)

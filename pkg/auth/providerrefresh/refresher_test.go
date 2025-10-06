@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/rancher/norman/types"
@@ -662,11 +663,11 @@ func (p *mockLocalProvider) IsDisabledProvider() (bool, error) {
 	return p.disabled, p.disabledErr
 }
 
-func (p *mockLocalProvider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (p *mockLocalProvider) Logout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	panic("not implemented")
 }
 
-func (p *mockLocalProvider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (p *mockLocalProvider) LogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	panic("not implemented")
 }
 
@@ -722,11 +723,11 @@ func (p *mockShibbolethProvider) IsDisabledProvider() (bool, error) {
 	return p.enabled, p.enabledErr
 }
 
-func (p *mockShibbolethProvider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (p *mockShibbolethProvider) Logout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	panic("not implemented")
 }
 
-func (p *mockShibbolethProvider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (p *mockShibbolethProvider) LogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	panic("not implemented")
 }
 

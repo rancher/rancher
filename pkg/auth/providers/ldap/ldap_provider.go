@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -57,7 +58,7 @@ var (
 )
 
 type userManager interface {
-	SetPrincipalOnCurrentUser(apiContext *types.APIContext, principal v3.Principal) (*v3.User, error)
+	SetPrincipalOnCurrentUser(r *http.Request, principal v3.Principal) (*v3.User, error)
 	CheckAccess(accessMode string, allowedPrincipalIDs []string, userPrincipalID string, groups []v3.Principal) (bool, error)
 	UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, userExtraInfo map[string][]string, loginTime ...time.Time) error
 }
@@ -106,11 +107,11 @@ func IsNotConfigured(err error) bool {
 	return errors.Is(err, ErrorNotConfigured{})
 }
 
-func (p *ldapProvider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (p *ldapProvider) LogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	return nil
 }
 
-func (p *ldapProvider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (p *ldapProvider) Logout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	return nil
 }
 

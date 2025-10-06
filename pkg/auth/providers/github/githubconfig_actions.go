@@ -122,7 +122,7 @@ func (g *ghProvider) testAndApply(request *types.APIContext) error {
 	}
 
 	// if this works, save githubConfig CR adding enabled flag
-	user, err := g.userMGR.SetPrincipalOnCurrentUser(request, userPrincipal)
+	user, err := g.userMGR.SetPrincipalOnCurrentUser(request.Request, userPrincipal)
 	if err != nil {
 		return err
 	}

@@ -113,7 +113,7 @@ func (ap *Provider) testAndApply(request *types.APIContext) error {
 		return errors.Wrap(err, "server error while authenticating")
 	}
 
-	user, err := ap.userMGR.SetPrincipalOnCurrentUser(request, userPrincipal)
+	user, err := ap.userMGR.SetPrincipalOnCurrentUser(request.Request, userPrincipal)
 	if err != nil {
 		return err
 	}
