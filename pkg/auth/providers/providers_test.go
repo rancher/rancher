@@ -3,6 +3,7 @@ package providers
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/rancher/norman/types"
@@ -96,11 +97,11 @@ func (m *mockUnstructured) DeepCopyObject() runtime.Object                      
 
 type fakeProvider struct{}
 
-func (f fakeProvider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (f fakeProvider) Logout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	panic("not implemented")
 }
 
-func (f fakeProvider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (f fakeProvider) LogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	panic("not implemented")
 }
 

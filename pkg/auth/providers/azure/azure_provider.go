@@ -4,6 +4,7 @@ package azure
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -64,11 +65,11 @@ func Configure(mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *to
 	}
 }
 
-func (ap *Provider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (ap *Provider) LogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	return nil
 }
 
-func (ap *Provider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (ap *Provider) Logout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	return nil
 }
 

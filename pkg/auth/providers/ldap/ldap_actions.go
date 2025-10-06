@@ -157,7 +157,7 @@ func (p *ldapProvider) testAndApply(request *types.APIContext) error {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to save %s config: %v", p.providerName, err))
 	}
 
-	user, err := p.userMGR.SetPrincipalOnCurrentUser(request, userPrincipal)
+	user, err := p.userMGR.SetPrincipalOnCurrentUser(request.Request, userPrincipal)
 	if err != nil {
 		return err
 	}

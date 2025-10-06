@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/x509"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -66,11 +67,11 @@ func Configure(mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *to
 	}
 }
 
-func (p *adProvider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (p *adProvider) LogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	return nil
 }
 
-func (p *adProvider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (p *adProvider) Logout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	return nil
 }
 

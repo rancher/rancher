@@ -11,6 +11,7 @@ package mocks
 
 import (
 	context "context"
+	http "net/http"
 	reflect "reflect"
 
 	types "github.com/rancher/norman/types"
@@ -146,31 +147,31 @@ func (mr *MockAuthProviderMockRecorder) IsDisabledProvider() *gomock.Call {
 }
 
 // Logout mocks base method.
-func (m *MockAuthProvider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (m *MockAuthProvider) Logout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Logout", apiContext, token)
+	ret := m.ctrl.Call(m, "Logout", w, r, token)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Logout indicates an expected call of Logout.
-func (mr *MockAuthProviderMockRecorder) Logout(apiContext, token any) *gomock.Call {
+func (mr *MockAuthProviderMockRecorder) Logout(w, r, token any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Logout", reflect.TypeOf((*MockAuthProvider)(nil).Logout), apiContext, token)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Logout", reflect.TypeOf((*MockAuthProvider)(nil).Logout), w, r, token)
 }
 
 // LogoutAll mocks base method.
-func (m *MockAuthProvider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (m *MockAuthProvider) LogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "LogoutAll", apiContext, token)
+	ret := m.ctrl.Call(m, "LogoutAll", w, r, token)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // LogoutAll indicates an expected call of LogoutAll.
-func (mr *MockAuthProviderMockRecorder) LogoutAll(apiContext, token any) *gomock.Call {
+func (mr *MockAuthProviderMockRecorder) LogoutAll(w, r, token any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LogoutAll", reflect.TypeOf((*MockAuthProvider)(nil).LogoutAll), apiContext, token)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LogoutAll", reflect.TypeOf((*MockAuthProvider)(nil).LogoutAll), w, r, token)
 }
 
 // RefetchGroupPrincipals mocks base method.

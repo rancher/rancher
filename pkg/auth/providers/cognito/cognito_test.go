@@ -49,7 +49,7 @@ func TestLogoutAllWhenNotEnabled(t *testing.T) {
 		ResponseWriter: nr,
 	}
 
-	assert.ErrorContains(t, o.LogoutAll(apiContext, testToken), "Rancher provider resource `cognito` not configured for SLO")
+	assert.ErrorContains(t, o.LogoutAll(apiContext.Response, apiContext.Request, testToken), "Rancher provider resource `cognito` not configured for SLO")
 }
 
 func TestLogoutAll(t *testing.T) {
@@ -84,7 +84,7 @@ func TestLogoutAll(t *testing.T) {
 		ResponseWriter: nr,
 	}
 
-	require.NoError(t, o.LogoutAll(apiContext, testToken))
+	require.NoError(t, o.LogoutAll(apiContext.Response, apiContext.Request, testToken))
 	wantData := map[string]any{
 		"idpRedirectUrl": "http://localhost:8090/user/logout?client_id=test&logout_uri=https%3A%2F%2Fexample.com%2Flogged-out",
 		"type":           "authConfigLogoutOutput",
@@ -122,7 +122,7 @@ func TestLogoutAllNoEndSessionEndpoint(t *testing.T) {
 		ResponseWriter: nr,
 	}
 
-	assert.ErrorContains(t, o.LogoutAll(apiContext, testToken), "LogoutAll triggered with no endSessionEndpoint")
+	assert.ErrorContains(t, o.LogoutAll(apiContext.Response, apiContext.Request, testToken), "LogoutAll triggered with no endSessionEndpoint")
 }
 
 func TestLogout(t *testing.T) {
@@ -172,7 +172,7 @@ func TestLogout(t *testing.T) {
 				Query:          url.Values{},
 				ResponseWriter: nr,
 			}
-			tt.verify(t, o.Logout(apiContext, testToken))
+			tt.verify(t, o.Logout(apiContext.Response, apiContext.Request, testToken))
 		})
 	}
 }

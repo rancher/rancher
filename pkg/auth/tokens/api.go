@@ -23,9 +23,11 @@ const (
 
 type ServerOption func(server *normanapi.Server)
 
-func NewAPIHandler(ctx context.Context, wContext *wrangler.Context, opts ...ServerOption) (http.Handler, error) {
+func NewAPIHandler(ctx context.Context, wContext *wrangler.Context, logout http.Handler, opts ...ServerOption) (http.Handler, error) {
+	tokenMgr := NewManager(wContext)
 	api := &tokenAPI{
-		mgr: NewManager(wContext),
+		mgr:           tokenMgr,
+		logoutHandler: logout,
 	}
 
 	schemas := types.NewSchemas().AddSchemas(managementSchema.TokenSchemas)
@@ -53,14 +55,17 @@ func NewAPIHandler(ctx context.Context, wContext *wrangler.Context, opts ...Serv
 }
 
 type tokenAPI struct {
-	mgr *Manager
+	mgr           *Manager
+	logoutHandler http.Handler
 }
 
 func (t *tokenAPI) tokenActionHandler(actionName string, action *types.Action, request *types.APIContext) error {
 	logrus.Debugf("TokenActionHandler called for action %v", actionName)
 	if actionName == "logout" || actionName == "logoutAll" {
-		return t.mgr.logout(actionName, request)
+		t.logoutHandler.ServeHTTP(request.Response, request.Request)
+		return nil
 	}
+
 	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }
 

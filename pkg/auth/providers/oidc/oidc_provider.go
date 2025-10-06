@@ -673,7 +673,7 @@ func (o *OpenIDCProvider) getOIDCProvider(ctx context.Context, oidcConfig *apiv3
 	return oidc.NewProvider(ctx, oidcConfig.Issuer)
 }
 
-func (o *OpenIDCProvider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (o *OpenIDCProvider) Logout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	providerName := token.GetAuthProvider()
 	logrus.Debugf("OpenIDCProvider [logout]: triggered by provider %s", providerName)
 	oidcConfig, err := o.GetConfig()
@@ -688,7 +688,7 @@ func (o *OpenIDCProvider) Logout(apiContext *types.APIContext, token accessor.To
 	return nil
 }
 
-func (o *OpenIDCProvider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (o *OpenIDCProvider) LogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	logrus.Debugf("OpenIDCProvider [logout-all]: triggered by provider %s", token.GetAuthProvider())
 
 	oidcConfig, err := o.GetConfig()
@@ -702,7 +702,7 @@ func (o *OpenIDCProvider) LogoutAll(apiContext *types.APIContext, token accessor
 		return fmt.Errorf("OpenIDCProvider [logout-all]: Rancher provider resource `%v` not configured for SLO", providerName)
 	}
 
-	idpRedirectURL, err := o.createIDPRedirectURL(apiContext, oidcConfig)
+	idpRedirectURL, err := o.createIDPRedirectURL(r, oidcConfig)
 	if err != nil {
 		return err
 	}
@@ -712,13 +712,14 @@ func (o *OpenIDCProvider) LogoutAll(apiContext *types.APIContext, token accessor
 		"idpRedirectUrl": idpRedirectURL,
 		"type":           "authConfigLogoutOutput",
 	}
-	apiContext.WriteResponse(http.StatusOK, data)
-	logrus.Debug("OpenIDCProvider [logout-all]: redirect written")
 
-	return nil
+	logrus.Debug("OpenIDCProvider [logout-all]: writing redirect")
+
+	w.Header().Set("Content-Type", "application/json")
+	return json.NewEncoder(w).Encode(data)
 }
 
-func (o *OpenIDCProvider) createIDPRedirectURL(apiContext *types.APIContext, config *apiv3.OIDCConfig) (string, error) {
+func (o *OpenIDCProvider) createIDPRedirectURL(r *http.Request, config *apiv3.OIDCConfig) (string, error) {
 	if config.EndSessionEndpoint == "" {
 		return "", httperror.NewAPIError(httperror.ServerError, "LogoutAll triggered with no endSessionEndpoint")
 	}
@@ -730,7 +731,7 @@ func (o *OpenIDCProvider) createIDPRedirectURL(apiContext *types.APIContext, con
 	}
 
 	authLogout := &apiv3.AuthConfigLogoutInput{}
-	if err := json.NewDecoder(apiContext.Request.Body).Decode(authLogout); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(authLogout); err != nil {
 		return "", httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("OIDC: parsing request body: %v", err))
 	}

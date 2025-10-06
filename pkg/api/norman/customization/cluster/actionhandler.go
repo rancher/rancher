@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -17,7 +18,7 @@ import (
 )
 
 type userManager interface {
-	GetUser(apiContext *types.APIContext) string
+	GetUser(r *http.Request) string
 }
 
 type tokenManager interface {
@@ -77,7 +78,7 @@ func (a ActionHandler) ensureToken(apiContext *types.APIContext) (string, error)
 
 // createTokenInput will create the input for a new kubeconfig token with the default TTL.
 func (a ActionHandler) createTokenInput(apiContext *types.APIContext) (user.TokenInput, error) {
-	userName := a.UserMgr.GetUser(apiContext)
+	userName := a.UserMgr.GetUser(apiContext.Request)
 	tokenNamePrefix := fmt.Sprintf("kubeconfig-%s", userName)
 
 	authToken, err := a.AuthToken.TokenFromRequest(apiContext.Request)

@@ -66,7 +66,7 @@ func (s *Provider) testAndEnable(request *types.APIContext) error {
 	provider.clientState.SetState(request.Response, request.Request, "Rancher_FinalRedirectURL", finalRedirectURL)
 	provider.clientState.SetState(request.Response, request.Request, "Rancher_Action", testAndEnableAction)
 
-	idpRedirectURL, err := provider.HandleSamlLogin(request.Response, request.Request, provider.userMGR.GetUser(request))
+	idpRedirectURL, err := provider.HandleSamlLogin(request.Response, request.Request, provider.userMGR.GetUser(request.Request))
 	if err != nil {
 		return err
 	}

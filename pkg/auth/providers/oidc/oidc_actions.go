@@ -114,7 +114,7 @@ func (o *OpenIDCProvider) TestAndApply(request *types.APIContext) error {
 		}
 		return errors.Wrap(err, "[generic oidc]: server error while authenticating")
 	}
-	user, err := o.UserMGR.SetPrincipalOnCurrentUser(request, userPrincipal)
+	user, err := o.UserMGR.SetPrincipalOnCurrentUser(request.Request, userPrincipal)
 	if err != nil {
 		return err
 	}

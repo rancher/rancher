@@ -233,11 +233,11 @@ func (g *googleOauthProvider) GetPrincipal(principalID string, token accessor.To
 	}
 }
 
-func (g *googleOauthProvider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (g *googleOauthProvider) LogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	return nil
 }
 
-func (g *googleOauthProvider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (g *googleOauthProvider) Logout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	return nil
 }
 

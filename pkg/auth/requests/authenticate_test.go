@@ -61,11 +61,11 @@ func (p *fakeProvider) IsDisabledProvider() (bool, error) {
 	return p.disabled, nil
 }
 
-func (p *fakeProvider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (p *fakeProvider) Logout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	panic("not implemented")
 }
 
-func (p *fakeProvider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (p *fakeProvider) LogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	panic("not implemented")
 }
 

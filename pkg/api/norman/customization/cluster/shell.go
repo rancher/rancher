@@ -33,7 +33,7 @@ func (s *ShellLinkHandler) LinkHandler(apiContext *types.APIContext, next types.
 	userManager := context.Management.UserManager
 	tokenManager := tokens.NewManager(s.ClusterManager.ScaledContext.Wrangler)
 
-	userID := userManager.GetUser(apiContext)
+	userID := userManager.GetUser(apiContext.Request)
 
 	var shellTTL int64
 	if minutes, err := strconv.ParseInt(settings.AuthUserSessionTTLMinutes.Get(), 10, 64); err == nil {

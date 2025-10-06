@@ -10,14 +10,14 @@
 package mocks
 
 import (
+	http "net/http"
 	reflect "reflect"
 	time "time"
 
-	types "github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	accessor "github.com/rancher/rancher/pkg/auth/accessor"
 	gomock "go.uber.org/mock/gomock"
-	types0 "k8s.io/apimachinery/pkg/types"
+	types "k8s.io/apimachinery/pkg/types"
 )
 
 // MockManager is a mock of Manager interface.
@@ -60,7 +60,7 @@ func (mr *MockManagerMockRecorder) CheckAccess(accessMode, allowedPrincipalIDs, 
 }
 
 // CreateNewUserClusterRoleBinding mocks base method.
-func (m *MockManager) CreateNewUserClusterRoleBinding(userName string, userUID types0.UID) error {
+func (m *MockManager) CreateNewUserClusterRoleBinding(userName string, userUID types.UID) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateNewUserClusterRoleBinding", userName, userUID)
 	ret0, _ := ret[0].(error)
@@ -119,17 +119,17 @@ func (mr *MockManagerMockRecorder) GetGroupsForTokenAuthProvider(token any) *gom
 }
 
 // GetUser mocks base method.
-func (m *MockManager) GetUser(apiContext *types.APIContext) string {
+func (m *MockManager) GetUser(r *http.Request) string {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetUser", apiContext)
+	ret := m.ctrl.Call(m, "GetUser", r)
 	ret0, _ := ret[0].(string)
 	return ret0
 }
 
 // GetUser indicates an expected call of GetUser.
-func (mr *MockManagerMockRecorder) GetUser(apiContext any) *gomock.Call {
+func (mr *MockManagerMockRecorder) GetUser(r any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUser", reflect.TypeOf((*MockManager)(nil).GetUser), apiContext)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUser", reflect.TypeOf((*MockManager)(nil).GetUser), r)
 }
 
 // GetUserByPrincipalID mocks base method.
@@ -162,18 +162,18 @@ func (mr *MockManagerMockRecorder) IsMemberOf(token, group any) *gomock.Call {
 }
 
 // SetPrincipalOnCurrentUser mocks base method.
-func (m *MockManager) SetPrincipalOnCurrentUser(apiContext *types.APIContext, principal v3.Principal) (*v3.User, error) {
+func (m *MockManager) SetPrincipalOnCurrentUser(r *http.Request, principal v3.Principal) (*v3.User, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetPrincipalOnCurrentUser", apiContext, principal)
+	ret := m.ctrl.Call(m, "SetPrincipalOnCurrentUser", r, principal)
 	ret0, _ := ret[0].(*v3.User)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // SetPrincipalOnCurrentUser indicates an expected call of SetPrincipalOnCurrentUser.
-func (mr *MockManagerMockRecorder) SetPrincipalOnCurrentUser(apiContext, principal any) *gomock.Call {
+func (mr *MockManagerMockRecorder) SetPrincipalOnCurrentUser(r, principal any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPrincipalOnCurrentUser", reflect.TypeOf((*MockManager)(nil).SetPrincipalOnCurrentUser), apiContext, principal)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPrincipalOnCurrentUser", reflect.TypeOf((*MockManager)(nil).SetPrincipalOnCurrentUser), r, principal)
 }
 
 // SetPrincipalOnCurrentUserByUserID mocks base method.
