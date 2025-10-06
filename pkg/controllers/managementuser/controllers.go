@@ -57,7 +57,7 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	cluster.APIAggregation.APIServices("").Controller()
 
 	if clusterRec.Spec.LocalClusterAuthEndpoint.Enabled {
-		err := clusterauthtoken.CRDSetup(ctx, cluster.UserOnlyContext())
+		err := clusterauthtoken.CRDSetup(ctx, cluster.RESTConfig, cluster.Management.Schemas)
 		if err != nil {
 			return err
 		}
@@ -109,9 +109,9 @@ func registerImpersonationCaches(cluster *config.UserContext) {
 		Version: "v1",
 		Kind:    "ServiceAccount",
 	}] = impersonation.ImpersonationNamespace
-	cluster.Core.Secrets("").Controller()
-	cluster.Core.ServiceAccounts("").Controller()
-	cluster.Core.Namespaces("").Controller()
+	cluster.Corew.Secret().Informer()
+	cluster.Corew.ServiceAccount().Informer()
+	cluster.Corew.Namespace().Informer()
 }
 
 // PreBootstrap is a list of functions that _need_ to be run before the rest of the controllers start

@@ -7,6 +7,7 @@ import (
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
+	wcore "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
@@ -100,7 +101,7 @@ func GetNodeByNodeName(nodes []*v3.Node, nodeName string) *v3.Node {
 	return nil
 }
 
-func GetNodeForMachine(machine *v3.Node, nodeLister v1.NodeLister) (*corev1.Node, error) {
+func GetNodeForMachine(machine *v3.Node, nodeLister wcore.NodeCache) (*corev1.Node, error) {
 	nodeName := ""
 	if machine.Labels != nil {
 		nodeName = machine.Labels[LabelNodeName]
@@ -109,7 +110,7 @@ func GetNodeForMachine(machine *v3.Node, nodeLister v1.NodeLister) (*corev1.Node
 	var err error
 	if nodeName != "" {
 		var node *corev1.Node
-		node, err = nodeLister.Get("", nodeName)
+		node, err = nodeLister.Get(nodeName)
 		if err != nil && !apierrors.IsNotFound(err) {
 			return nil, err
 
@@ -120,7 +121,7 @@ func GetNodeForMachine(machine *v3.Node, nodeLister v1.NodeLister) (*corev1.Node
 	}
 
 	if len(nodes) == 0 {
-		nodes, err = nodeLister.List("", labels.NewSelector())
+		nodes, err = nodeLister.List(labels.NewSelector())
 		if err != nil {
 			return nil, err
 		}

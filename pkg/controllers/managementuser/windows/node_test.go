@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"testing"
 
-	apicorev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	fakes1 "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
+	corew "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -62,8 +63,9 @@ func Test_nodeController(t *testing.T) {
 			shouldCall: false,
 		},
 	}
+	ctrl := gomock.NewController(t)
 	n := &NodeTaintsController{
-		nodeClient: NewNodeInterface(cases),
+		nodeClient: newNodeClientMock(ctrl, cases),
 	}
 	for _, c := range cases {
 		_, err := n.sync(c.node.Name, c.node)
@@ -72,16 +74,16 @@ func Test_nodeController(t *testing.T) {
 	}
 }
 
-func NewNodeInterface(cases []*testcase) apicorev1.NodeInterface {
-	return &fakes1.NodeInterfaceMock{
-		UpdateFunc: func(in1 *v1.Node) (*v1.Node, error) {
-			for _, c := range cases {
-				if c.node.Name == in1.Name {
-					c.called = true
-					return in1, nil
-				}
+func newNodeClientMock(ctrl *gomock.Controller, cases []*testcase) corew.NodeClient {
+	client := fake.NewMockNonNamespacedClientInterface[*v1.Node, *v1.NodeList](ctrl)
+	client.EXPECT().Update(gomock.Any()).DoAndReturn(func(in1 *v1.Node) (*v1.Node, error) {
+		for _, c := range cases {
+			if c.node.Name == in1.Name {
+				c.called = true
+				return in1, nil
 			}
-			return in1, fmt.Errorf("case not found, %+v", in1)
-		},
-	}
+		}
+		return in1, fmt.Errorf("case not found, %+v", in1)
+	}).AnyTimes()
+	return client
 }
