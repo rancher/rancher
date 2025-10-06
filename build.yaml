@@ -1,5 +1,5 @@
 webhookVersion: 108.0.0+up0.9.0-rc.7
-remoteDialerProxyVersion: 106.0.1+up0.5.0
+remoteDialerProxyVersion: 106.0.2+up0.6.0-rc.4
 provisioningCAPIVersion: 107.0.0+up0.8.0
 turtlesVersion: 108.0.0+up0.25.0-rc.2
 cspAdapterMinVersion: 107.0.0+up7.0.0-rc.1
