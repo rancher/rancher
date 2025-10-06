@@ -154,19 +154,20 @@ var exampleRancherVersions = []genericRancherExampleCases{
 
 func Test_IsDevOrPrerelease(t *testing.T) {
 	t.Parallel()
-	asserts := assert.New(t)
-
 	for _, tt := range exampleRancherVersions {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			testVersion := Version(tt.version)
-			asserts.Equal(tt.expectations.isDevOrPrerelease, testVersion.IsDevOrPrerelease())
+			assert.Equal(t, tt.expectations.isDevOrPrerelease, testVersion.IsDevOrPrerelease())
 		})
 	}
 }
 
 func TestVersion_IsRC(t *testing.T) {
+	t.Parallel()
 	for _, tt := range exampleRancherVersions {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			version := Version(tt.version)
@@ -176,7 +177,9 @@ func TestVersion_IsRC(t *testing.T) {
 }
 
 func TestVersion_HasReleasePrefix(t *testing.T) {
+	t.Parallel()
 	for _, tt := range exampleRancherVersions {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			version := Version(tt.version)

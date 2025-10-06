@@ -157,6 +157,7 @@ func Test_ServerVersionHasReleasePrefixExcludesHead(t *testing.T) {
 
 func Test_GetRancherVersion(t *testing.T) {
 	for _, tt := range exampleRancherVersions {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			err := ServerVersion.Set(tt.version)
 			assert.NoError(t, err)
@@ -168,6 +169,7 @@ func Test_GetRancherVersion(t *testing.T) {
 
 func Test_IsVersionRelease(t *testing.T) {
 	for _, tt := range exampleRancherVersions {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equalf(t, tt.expectations.isVersionRelease, IsVersionRelease(tt.version), "IsVersionRelease(%v)", tt.version)
 		})
@@ -176,6 +178,7 @@ func Test_IsVersionRelease(t *testing.T) {
 
 func Test_ServerVersionOrFallback(t *testing.T) {
 	for _, tt := range exampleRancherVersions {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equalf(t, tt.expectations.getRancherVersion, ServerVersionOrFallback(tt.version), "ServerVersionOrFallback(%s)", tt.version)
 		})

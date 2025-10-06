@@ -38,6 +38,7 @@ func TestVersionServeHTTP(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setPrime()
 			defer tt.cleanup()
