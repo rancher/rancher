@@ -241,6 +241,11 @@ func AuthHandler() http.Handler {
 	// ?? can a multi-initialization leave a structure behind which does not
 	//    have handlers, yet is the one known to and used by the overall
 	//    dispatch ??
+
+	if root != nil {
+		return root
+	}
+
 	root = mux.NewRouter()
 
 	root.Methods("POST").Path("/v1-saml/ping/saml/acs").Name("PingACS")
