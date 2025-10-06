@@ -121,13 +121,13 @@ require (
 	github.com/pborman/uuid v1.2.1
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus-operator/prometheus-operator/pkg/apis/monitoring v0.52.0
-	github.com/prometheus/client_golang v1.22.0
-	github.com/prometheus/client_model v0.6.1
+	github.com/prometheus/client_golang v1.23.0
+	github.com/prometheus/client_model v0.6.2
 	github.com/rancher/aks-operator v1.12.1
 	github.com/rancher/ali-operator v0.0.0-20250910043122-2aba32fbfe4c
 	github.com/rancher/apiserver v0.7.3
 	github.com/rancher/channelserver v0.7.0
-	github.com/rancher/dynamiclistener v0.7.0
+	github.com/rancher/dynamiclistener v0.7.2-rc1
 	github.com/rancher/eks-operator v1.12.1
 	github.com/rancher/fleet/pkg/apis v0.14.0-alpha.3
 	github.com/rancher/gke-operator v1.12.1
@@ -137,7 +137,8 @@ require (
 	github.com/rancher/machine v0.15.0-rancher134
 	github.com/rancher/norman v0.7.0
 	github.com/rancher/rancher/pkg/client v0.0.0
-	github.com/rancher/remotedialer v0.5.1-rc.1
+	github.com/rancher/remotedialer v0.6.0-rc.1
+	github.com/rancher/remotedialer-proxy v0.6.0-rc.4
 	github.com/rancher/rke v1.8.0-rc.4
 	github.com/rancher/shepherd v0.0.0-20251003202915-131297166ece
 	github.com/rancher/steve v0.7.18
@@ -249,7 +250,7 @@ require (
 	github.com/ncruces/go-strftime v0.1.9 // indirect
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
-	github.com/prometheus/common v0.62.0 // indirect
+	github.com/prometheus/common v0.65.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
 	github.com/skeema/knownhosts v1.3.0 // indirect
@@ -376,7 +377,7 @@ require (
 	github.com/onsi/gomega v1.38.0 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/prometheus/procfs v0.15.1 // indirect
+	github.com/prometheus/procfs v0.17.0 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/rubenv/sql-migrate v1.8.0 // indirect
@@ -416,7 +417,7 @@ require (
 	k8s.io/klog/v2 v2.130.1 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.31.2 // indirect
 	sigs.k8s.io/cli-utils v0.37.2 // indirect
-	sigs.k8s.io/json v0.0.0-20241014173422-cfa47c3a1cc8 // indirect
+	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/kustomize/api v0.19.0 // indirect
 	sigs.k8s.io/kustomize/kyaml v0.19.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.6.0 // indirect
