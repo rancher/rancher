@@ -11,7 +11,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -659,6 +658,11 @@ func TestGetGroupsFromClaimInfo(t *testing.T) {
 	}
 }
 
+const (
+	logoutPath    = "/v3/tokens?action=logout"
+	logoutAllPath = "/v3/tokens?action=logoutAll"
+)
+
 func TestLogout(t *testing.T) {
 	const (
 		userId       string = "testing-user"
@@ -693,15 +697,10 @@ func TestLogout(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			req := httptest.NewRequest(http.MethodPost, "/logout", bytes.NewReader(b))
-			nr := &normanRecorder{}
-			apiContext := &types.APIContext{
-				Method:         req.Method,
-				Request:        req,
-				Query:          url.Values{},
-				ResponseWriter: nr,
-			}
-			tt.verify(t, o.Logout(apiContext.Response, apiContext.Request, testToken))
+			r := httptest.NewRequest(http.MethodPost, logoutPath, bytes.NewReader(b))
+			w := httptest.NewRecorder()
+
+			tt.verify(t, o.Logout(w, r, testToken))
 		})
 	}
 }
@@ -711,6 +710,7 @@ func TestLogoutAllWhenNotEnabled(t *testing.T) {
 		userId       string = "testing-user"
 		providerName string = "keycloak"
 	)
+
 	oidcConfig := newOIDCConfig("8090", func(s *apiv3.OIDCConfig) {
 		s.EndSessionEndpoint = "http://localhost:8090/user/logout"
 		s.LogoutAllEnabled = false
@@ -725,16 +725,10 @@ func TestLogoutAllWhenNotEnabled(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	req := httptest.NewRequest(http.MethodPost, "/logout", bytes.NewReader(b))
-	nr := &normanRecorder{}
-	apiContext := &types.APIContext{
-		Method:         req.Method,
-		Request:        req,
-		Query:          url.Values{},
-		ResponseWriter: nr,
-	}
+	r := httptest.NewRequest(http.MethodPost, logoutPath, bytes.NewReader(b))
+	w := httptest.NewRecorder()
 
-	assert.ErrorContains(t, o.LogoutAll(apiContext.Response, apiContext.Request, testToken), "Rancher provider resource `keycloak` not configured for SLO")
+	assert.ErrorContains(t, o.LogoutAll(w, r, testToken), "Rancher provider resource `keycloak` not configured for SLO")
 }
 
 func TestLogoutAll(t *testing.T) {
@@ -742,6 +736,7 @@ func TestLogoutAll(t *testing.T) {
 		userId       string = "testing-user"
 		providerName string = "keycloak"
 	)
+
 	oidcConfig := newOIDCConfig("8090", func(s *apiv3.OIDCConfig) {
 		s.EndSessionEndpoint = "http://localhost:8090/user/logout"
 	})
@@ -755,21 +750,20 @@ func TestLogoutAll(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	req := httptest.NewRequest(http.MethodPost, "/logout", bytes.NewReader(b))
-	nr := &normanRecorder{}
-	apiContext := &types.APIContext{
-		Method:         req.Method,
-		Request:        req,
-		Query:          url.Values{},
-		ResponseWriter: nr,
-	}
+	r := httptest.NewRequest(http.MethodPost, logoutAllPath, bytes.NewReader(b))
+	w := httptest.NewRecorder()
 
-	require.NoError(t, o.LogoutAll(apiContext.Response, apiContext.Request, testToken))
+	require.NoError(t, o.LogoutAll(w, r, testToken))
+
+	require.Equal(t, http.StatusOK, w.Code)
+
 	wantData := map[string]any{
 		"idpRedirectUrl": "http://localhost:8090/user/logout?client_id=test&post_logout_redirect_uri=https%3A%2F%2Fexample.com%2Flogged-out",
 		"type":           "authConfigLogoutOutput",
 	}
-	require.Equal(t, []normanResponse{{code: http.StatusOK, data: wantData}}, nr.responses)
+	gotData := map[string]any{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &gotData))
+	assert.Equal(t, wantData, gotData)
 }
 
 func TestLogoutAllNoEndSessionEndpoint(t *testing.T) {
@@ -777,6 +771,7 @@ func TestLogoutAllNoEndSessionEndpoint(t *testing.T) {
 		userId       string = "testing-user"
 		providerName string = "oidc"
 	)
+
 	oidcConfig := newOIDCConfig("8090")
 	testToken := &apiv3.Token{UserID: userId, AuthProvider: providerName}
 	o := OpenIDCProvider{
@@ -787,17 +782,11 @@ func TestLogoutAllNoEndSessionEndpoint(t *testing.T) {
 		FinalRedirectURL: "https://example.com/logged-out",
 	})
 	require.NoError(t, err)
-	req := httptest.NewRequest(http.MethodPost, "/logout", bytes.NewReader(b))
 
-	nr := &normanRecorder{}
-	apiContext := &types.APIContext{
-		Method:         req.Method,
-		Request:        req,
-		Query:          url.Values{},
-		ResponseWriter: nr,
-	}
+	r := httptest.NewRequest(http.MethodPost, "/v3/tokens?action=logoutAll", bytes.NewReader(b))
+	w := httptest.NewRecorder()
 
-	assert.ErrorContains(t, o.LogoutAll(apiContext.Response, apiContext.Request, testToken), "LogoutAll triggered with no endSessionEndpoint")
+	assert.ErrorContains(t, o.LogoutAll(w, r, testToken), "LogoutAll triggered with no endSessionEndpoint")
 }
 
 // mockOIDCServer creates an http server that mocks an OIDC provider. Responses are passed as a parameter.
