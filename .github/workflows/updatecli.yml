@@ -14,7 +14,7 @@ permissions:
 jobs:
   updatecli:
     runs-on: ubuntu-latest
-    timeout-minutes: 600
+    timeout-minutes: 120
     if: github.ref == 'refs/heads/main'
     steps:
       - name: Checkout
