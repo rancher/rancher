@@ -3,8 +3,8 @@ package feature
 import (
 	"testing"
 
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/features"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -22,12 +22,21 @@ func TestReconcileFeatures(t *testing.T) {
 	feature := features.GetFeatureByName(mockFeature.Name)
 	assert.Equal(false, feature.Enabled())
 
-	err := ReconcileFeatures(&mockFeature, false)
-	assert.Nil(err)
+	needsRestart := ReconcileFeatures(&mockFeature)
+	assert.False(needsRestart)
 	assert.Equal(false, feature.Enabled())
 
-	err = ReconcileFeatures(&mockFeature, true)
-	assert.Error(err)
+	mockFeatureWithTrueValue := mockFeature.DeepCopy()
+	trueVal := true
+	mockFeatureWithTrueValue.Spec.Value = &trueVal
+	needsRestart = ReconcileFeatures(mockFeatureWithTrueValue)
+	assert.True(needsRestart)
+	assert.Equal(false, feature.Enabled())
+
+	mockFeatureWithTrueLockedValue := mockFeature.DeepCopy()
+	mockFeatureWithTrueLockedValue.Status.LockedValue = &trueVal
+	needsRestart = ReconcileFeatures(mockFeatureWithTrueLockedValue)
+	assert.True(needsRestart)
 	assert.Equal(false, feature.Enabled())
 
 	// testing a dynamic feature
@@ -35,16 +44,23 @@ func TestReconcileFeatures(t *testing.T) {
 		ObjectMeta: v1.ObjectMeta{
 			Name: "istio-virtual-service-ui",
 		},
+		Spec: v3.FeatureSpec{
+			Value: &trueVal,
+		},
 	}
 
 	feature = features.GetFeatureByName(mockFeature.Name)
 	assert.Equal(true, feature.Enabled())
 
-	err = ReconcileFeatures(&mockFeature, true)
-	assert.Nil(err)
+	needsRestart = ReconcileFeatures(&mockFeature)
+	assert.False(needsRestart)
 	assert.Equal(true, feature.Enabled())
 
-	err = ReconcileFeatures(&mockFeature, false)
-	assert.Nil(err)
+	falseValue := false
+	mockFeatureWithFalseValue := mockFeature.DeepCopy()
+	mockFeatureWithFalseValue.Spec.Value = &falseValue
+	needsRestart = ReconcileFeatures(mockFeatureWithFalseValue)
+	assert.False(needsRestart)
 	assert.Equal(false, feature.Enabled())
+
 }
