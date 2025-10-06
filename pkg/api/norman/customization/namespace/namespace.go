@@ -89,7 +89,7 @@ func (w ActionWrapper) ActionHandler(actionName string, action *types.Action, ap
 				return errors.Errorf("can't move namespace. Project %s has resource quota set", project.Spec.DisplayName)
 			}
 		}
-		nsClient := userContext.Core.Namespaces("")
+		nsClient := userContext.Corew.Namespace()
 		ns, err := nsClient.Get(apiContext.ID, metav1.GetOptions{})
 		if err != nil {
 			if !kerrors.IsNotFound(err) {

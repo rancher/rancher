@@ -12,9 +12,9 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/imported"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
 	rancherv1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
-	typescorev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rnetworkingv1 "github.com/rancher/rancher/pkg/generated/norman/networking.k8s.io/v1"
+	wcore "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 
 	cluster2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	"github.com/sirupsen/logrus"
@@ -45,9 +45,8 @@ var ErrNodeNotFound = errors.New("node not found")
 type netpolMgr struct {
 	clusterLister    v3.ClusterLister
 	clusters         rancherv1.ClusterCache
-	nsLister         typescorev1.NamespaceLister
-	nodeLister       typescorev1.NodeLister
-	pods             typescorev1.PodInterface
+	nsLister         wcore.NamespaceCache
+	nodeLister       wcore.NodeCache
 	projects         v3.ProjectInterface
 	npLister         rnetworkingv1.NetworkPolicyLister
 	npClient         rnetworkingv1.Interface
@@ -104,7 +103,7 @@ func (npmgr *netpolMgr) programNetworkPolicy(projectID string, clusterNamespace 
 	logrus.Debugf("netpolMgr: programNetworkPolicy: projectID=%v", projectID)
 	// Get namespaces belonging to project
 	set := labels.Set(map[string]string{nslabels.ProjectIDFieldLabel: projectID})
-	namespaces, err := npmgr.nsLister.List("", set.AsSelector())
+	namespaces, err := npmgr.nsLister.List(set.AsSelector())
 	if err != nil {
 		return fmt.Errorf("netpolMgr: couldn't list namespaces with projectID %v err=%v", projectID, err)
 	}
@@ -183,7 +182,7 @@ const (
 )
 
 func (npmgr *netpolMgr) handleHostNetwork(clusterNamespace string) error {
-	nodes, err := npmgr.nodeLister.List("", labels.Everything())
+	nodes, err := npmgr.nodeLister.List(labels.Everything())
 	if err != nil {
 		return fmt.Errorf("couldn't list nodes err=%v", err)
 	}
@@ -254,7 +253,7 @@ func (npmgr *netpolMgr) handleHostNetwork(clusterNamespace string) error {
 		return np.Spec.Ingress[0].From[i].IPBlock.CIDR < np.Spec.Ingress[0].From[j].IPBlock.CIDR
 	})
 
-	namespaces, err := npmgr.nsLister.List("", labels.Everything())
+	namespaces, err := npmgr.nsLister.List(labels.Everything())
 	if err != nil {
 		return fmt.Errorf("couldn't list namespaces err=%v", err)
 	}
@@ -380,7 +379,7 @@ func (npmgr *netpolMgr) getSystemNSInfo(clusterNamespace string) (map[string]boo
 		return nil, systemProjectID, fmt.Errorf("sytemNamespaces: system project id cannot be empty")
 	}
 	set = labels.Set(map[string]string{nslabels.ProjectIDFieldLabel: systemProjectID})
-	namespaces, err := npmgr.nsLister.List("", set.AsSelector())
+	namespaces, err := npmgr.nsLister.List(set.AsSelector())
 	if err != nil {
 		return nil, systemProjectID,
 			fmt.Errorf("sytemNamespaces: couldn't list namespaces err=%v", err)
@@ -507,7 +506,7 @@ func (npmgr *netpolMgr) SyncDefaultNetworkPolicies(key string, np *rnetworkingv1
 			return nil, fmt.Errorf("netpolMgr: SyncDefaultNetworkPolicies: error handling host network policy: %v", err)
 		}
 	} else {
-		namespace, err := npmgr.nsLister.Get("", nsName)
+		namespace, err := npmgr.nsLister.Get(nsName)
 		if err != nil {
 			return nil, fmt.Errorf("netpolMgr: SyncDefaultNetworkPolicies: failed to get namespace %s: %v", nsName, err)
 		}

@@ -11,6 +11,8 @@ import (
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 )
 
+const namespace = "test-namespace"
+
 func getToken() managementv3.Token {
 	longPassword := strings.Repeat("A", 72)
 	token := managementv3.Token{
@@ -26,7 +28,7 @@ func TestValidUser(t *testing.T) {
 	hashedValue, err := hasher.CreateHash(token.Token)
 	assert.NoError(t, err, "got an error but did not expect one")
 	clusterAuthToken := NewClusterAuthToken(&token, hashedValue)
-	clusterAuthTokenSecret := NewClusterAuthTokenSecret(&token, hashedValue)
+	clusterAuthTokenSecret := NewClusterAuthTokenSecret(namespace, &token, hashedValue)
 	err, migrate := VerifyClusterAuthToken(token.Token, clusterAuthToken, clusterAuthTokenSecret)
 	assert.Nil(t, err)
 	assert.False(t, migrate)
@@ -58,7 +60,7 @@ func TestInvalidPassword(t *testing.T) {
 	hashedValue, err := hasher.CreateHash(token.Token)
 	assert.NoError(t, err, "got an error but did not expect one")
 	clusterAuthToken := NewClusterAuthToken(&token, hashedValue)
-	clusterAuthTokenSecret := NewClusterAuthTokenSecret(&token, hashedValue)
+	clusterAuthTokenSecret := NewClusterAuthTokenSecret(namespace, &token, hashedValue)
 	err, migrate := VerifyClusterAuthToken(token.Token+":wrong!", clusterAuthToken, clusterAuthTokenSecret)
 	assert.NotNil(t, err)
 	assert.False(t, migrate)
@@ -71,7 +73,7 @@ func TestExpired(t *testing.T) {
 	assert.NoError(t, err, "got an error but did not expect one")
 	token.ExpiresAt = time.Now().Add(-time.Minute).Format(time.RFC3339)
 	clusterAuthToken := NewClusterAuthToken(&token, hashedValue)
-	clusterAuthTokenSecret := NewClusterAuthTokenSecret(&token, hashedValue)
+	clusterAuthTokenSecret := NewClusterAuthTokenSecret(namespace, &token, hashedValue)
 	err, migrate := VerifyClusterAuthToken(token.Token, clusterAuthToken, clusterAuthTokenSecret)
 	assert.NotNil(t, err)
 	assert.False(t, migrate)
@@ -84,7 +86,7 @@ func TestNotExpired(t *testing.T) {
 	assert.NoError(t, err, "got an error but did not expect one")
 	token.ExpiresAt = time.Now().Add(time.Minute).Format(time.RFC3339)
 	clusterAuthToken := NewClusterAuthToken(&token, hashedValue)
-	clusterAuthTokenSecret := NewClusterAuthTokenSecret(&token, hashedValue)
+	clusterAuthTokenSecret := NewClusterAuthTokenSecret(namespace, &token, hashedValue)
 	err, migrate := VerifyClusterAuthToken(token.Token, clusterAuthToken, clusterAuthTokenSecret)
 	assert.Nil(t, err)
 	assert.False(t, migrate)
@@ -97,7 +99,7 @@ func TestInvalidExpiresAt(t *testing.T) {
 	assert.NoError(t, err, "got an error but did not expect one")
 	token.ExpiresAt = "some invalid time stamp"
 	clusterAuthToken := NewClusterAuthToken(&token, hashedValue)
-	clusterAuthTokenSecret := NewClusterAuthTokenSecret(&token, hashedValue)
+	clusterAuthTokenSecret := NewClusterAuthTokenSecret(namespace, &token, hashedValue)
 	err, migrate := VerifyClusterAuthToken(token.Token, clusterAuthToken, clusterAuthTokenSecret)
 	assert.NotNil(t, err)
 	assert.False(t, migrate)

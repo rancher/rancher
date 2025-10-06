@@ -2,6 +2,7 @@ package rbac
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -21,7 +22,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -31,6 +31,10 @@ const (
 	initialRoleCondition           = "InitialRolesPopulated"
 	manageNSVerb                   = "manage-namespaces"
 	projectNSEditVerb              = "*"
+
+	// compatibility with previous norman lifecycle implementation, now implemented inside OnChange's handler
+	normanLifecycleAnnotation = "lifecycle.cattle.io/create.namespace-auth"
+	normanLifecycleFinalizer  = "controller.cattle.io/namespace-auth"
 )
 
 var projectNSVerbToSuffix = map[string]string{
@@ -53,7 +57,44 @@ type nsLifecycle struct {
 	rq *resourcequota.SyncController
 }
 
-func (n *nsLifecycle) Create(obj *v1.Namespace) (runtime.Object, error) {
+// onChange implements the same functionality as the previous norman-based nsLifecycle:
+// - First ever reconciliation triggers onCreate, after which an annotation is added to mark this event.
+// - Following reconciliations observer this annotation and run a regular update instead
+// - A finalizer is also used to block deletion and trigger cleanup,
+// The original annotation and finalizer keys from norman are used to preserve backwards compatibility
+func (n *nsLifecycle) onChange(_ string, obj *v1.Namespace) (*v1.Namespace, error) {
+	if obj == nil {
+		return nil, nil
+	}
+
+	if obj.DeletionTimestamp != nil {
+		if !slices.Contains(obj.GetFinalizers(), normanLifecycleFinalizer) {
+			// already finalized
+			return obj, nil
+		}
+		return n.onRemove(obj)
+	}
+
+	if obj.Annotations[normanLifecycleAnnotation] != "true" {
+		return n.onCreate(obj)
+	}
+
+	_, err := n.syncNS(obj)
+	return obj, err
+}
+
+func (n *nsLifecycle) removeFinalizer(obj *v1.Namespace) (*v1.Namespace, error) {
+	if obj == nil {
+		return nil, nil
+	}
+	if x := slices.Index(obj.GetFinalizers(), normanLifecycleFinalizer); x >= 0 {
+		obj.Finalizers = slices.Delete(obj.Finalizers, x, x+1)
+		return n.m.namespaces.Update(obj)
+	}
+	return obj, nil
+}
+
+func (n *nsLifecycle) onCreate(obj *v1.Namespace) (*v1.Namespace, error) {
 	obj, err := n.resourceQuotaInit(obj)
 	if err != nil {
 		return obj, err
@@ -68,9 +109,19 @@ func (n *nsLifecycle) Create(obj *v1.Namespace) (runtime.Object, error) {
 		return obj, err
 	}
 
+	// mark as initialized on success
+	if obj.Annotations == nil {
+		obj.Annotations = map[string]string{}
+	}
+	obj.Annotations[normanLifecycleAnnotation] = "true"
+	obj, err = n.m.namespaces.Update(obj)
+	if err != nil {
+		return obj, err
+	}
+
 	go updateStatusAnnotation(hasPRTBs, obj.DeepCopy(), n.m)
 
-	return obj, err
+	return obj, nil
 }
 
 func (n *nsLifecycle) resourceQuotaInit(obj *v1.Namespace) (*v1.Namespace, error) {
@@ -81,13 +132,13 @@ func (n *nsLifecycle) resourceQuotaInit(obj *v1.Namespace) (*v1.Namespace, error
 	return nil, err
 }
 
-func (n *nsLifecycle) Updated(obj *v1.Namespace) (runtime.Object, error) {
-	_, err := n.syncNS(obj)
-	return obj, err
-}
-
-func (n *nsLifecycle) Remove(obj *v1.Namespace) (runtime.Object, error) {
+func (n *nsLifecycle) onRemove(obj *v1.Namespace) (*v1.Namespace, error) {
 	n.asyncCleanupRBAC(obj.Name)
+
+	obj, err := n.removeFinalizer(obj)
+	if err != nil {
+		return nil, fmt.Errorf("failed to remove finalizer: %v", err)
+	}
 	return obj, nil
 }
 
@@ -129,6 +180,10 @@ func (n *nsLifecycle) syncNS(obj *v1.Namespace) (bool, error) {
 }
 
 func (n *nsLifecycle) assignToInitialProject(ns *v1.Namespace) error {
+	if ns.Annotations[projectIDAnnotation] != "" {
+		return nil
+	}
+
 	initialProjectsToNamespaces, err := getDefaultAndSystemProjectsToNamespaces()
 	if err != nil {
 		return fmt.Errorf("assigning namespace %s to initial projects: %w", ns.Name, err)
@@ -136,10 +191,6 @@ func (n *nsLifecycle) assignToInitialProject(ns *v1.Namespace) error {
 	for projectName, namespaces := range initialProjectsToNamespaces {
 		for _, nsToCheck := range namespaces {
 			if nsToCheck == ns.Name {
-				projectID := ns.Annotations[projectIDAnnotation]
-				if projectID != "" {
-					return nil
-				}
 				projects, err := n.m.projectLister.List(n.m.clusterName, initialProjectToLabels[projectName].AsSelector())
 				if err != nil {
 					return fmt.Errorf("listing projects for cluster %s: %w", n.m.clusterName, err)
@@ -577,7 +628,7 @@ func updateStatusAnnotation(hasPRTBs bool, namespace *v1.Namespace, mgr *manager
 	}
 
 	for i := 0; i < 10; i++ {
-		ns, err := mgr.workload.Core.Namespaces("").Get(namespace.Name, metav1.GetOptions{})
+		ns, err := mgr.namespaces.Get(namespace.Name, metav1.GetOptions{})
 		if err != nil {
 			logrus.Errorf("error getting ns %v for status update: %v", namespace.Name, err)
 			return
@@ -586,7 +637,7 @@ func updateStatusAnnotation(hasPRTBs bool, namespace *v1.Namespace, mgr *manager
 			logrus.Warnf("fail to set %v condition on ns %v: %v", initialRoleCondition, namespace.Name, err)
 			continue
 		}
-		_, err = mgr.workload.Core.Namespaces("").Update(ns)
+		_, err = mgr.namespaces.Update(ns)
 		if err == nil {
 			break
 		}
@@ -609,7 +660,7 @@ func (n *nsLifecycle) asyncCleanupRBAC(namespaceName string) {
 		}
 
 		err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-			_, err := n.m.nsLister.Get("", namespaceName)
+			_, err := n.m.nsLister.Get(namespaceName)
 			if err != nil {
 				if apierrors.IsNotFound(err) {
 					// Namespace is fully deleted, clean up RBAC

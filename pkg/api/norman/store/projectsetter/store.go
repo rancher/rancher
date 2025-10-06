@@ -6,7 +6,6 @@ import (
 	"github.com/rancher/norman/types/convert"
 	client "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
-	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/project"
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -90,7 +89,7 @@ func (p projectSetter) setOptionsNamespaces(apiContext *types.APIContext, opt *t
 		return err
 	}
 
-	namespaces, err := clusterContext.Core.Namespaces("").Controller().Lister().List("", labels.NewSelector())
+	namespaces, err := clusterContext.Corew.Namespace().Cache().List(labels.NewSelector())
 	if err != nil {
 		return err
 	}
@@ -140,7 +139,12 @@ func (t *transformer) stream(apiContext *types.APIContext, schema *types.Schema,
 	}), nil
 }
 
-func (t *transformer) lister(apiContext *types.APIContext, schema *types.Schema) v1.NamespaceLister {
+type namespaceLister interface {
+	List(selector labels.Selector) ([]*k8sv1.Namespace, error)
+	Get(name string) (*k8sv1.Namespace, error)
+}
+
+func (t *transformer) lister(apiContext *types.APIContext, schema *types.Schema) namespaceLister {
 	if _, ok := schema.ResourceFields[client.NamespaceFieldProjectID]; !ok || schema.ID == client.NamespaceType {
 		return nil
 	}
@@ -155,7 +159,7 @@ func (t *transformer) lister(apiContext *types.APIContext, schema *types.Schema)
 		return nil
 	}
 
-	return clusterContext.Core.Namespaces("").Controller().Lister()
+	return clusterContext.Corew.Namespace().Cache()
 }
 
 func (t *transformer) lookupAndSetProjectID(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) {
@@ -167,7 +171,7 @@ func (t *transformer) lookupAndSetProjectID(apiContext *types.APIContext, schema
 	setProjectID(namespaceLister, data)
 }
 
-func setProjectID(namespaceLister v1.NamespaceLister, data map[string]interface{}) {
+func setProjectID(namespaceLister namespaceLister, data map[string]interface{}) {
 	if data == nil {
 		return
 	}
@@ -178,7 +182,7 @@ func setProjectID(namespaceLister v1.NamespaceLister, data map[string]interface{
 		return
 	}
 
-	nsObj, err := namespaceLister.Get("", ns)
+	nsObj, err := namespaceLister.Get(ns)
 	if err != nil {
 		return
 	}

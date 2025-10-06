@@ -2,8 +2,8 @@ package clusterauthtoken
 
 import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken/common"
-	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	wcore "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,8 +12,8 @@ import (
 
 type settingHandler struct {
 	namespace              string
-	clusterConfigMap       corev1.ConfigMapInterface
-	clusterConfigMapLister corev1.ConfigMapLister
+	clusterConfigMap       wcore.ConfigMapClient
+	clusterConfigMapLister wcore.ConfigMapCache
 	settingInterface       managementv3.SettingInterface
 }
 
@@ -36,7 +36,7 @@ func (h *settingHandler) Sync(key string, setting *managementv3.Setting) (runtim
 				break
 			}
 		}
-		err := h.clusterConfigMap.Delete(setting.Name, &metav1.DeleteOptions{})
+		err := h.clusterConfigMap.Delete(h.namespace, setting.Name, &metav1.DeleteOptions{})
 		return nil, err
 	}
 	if setting.Name != common.AuthProviderRefreshDebounceSettingName {
@@ -47,7 +47,8 @@ func (h *settingHandler) Sync(key string, setting *managementv3.Setting) (runtim
 	if errors.IsNotFound(err) {
 		NewConfig := &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: setting.Name,
+				Name:      setting.Name,
+				Namespace: h.namespace,
 			},
 			TypeMeta: metav1.TypeMeta{
 				Kind: "ConfigMap",

@@ -10,7 +10,7 @@ import (
 	yaml2 "github.com/ghodss/yaml"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
-	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
+	corew "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	v12 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -86,7 +86,7 @@ func findNamespaceCreates(inputYAML string) ([]string, error) {
 	return newNamespaces, nil
 }
 
-func waitForNS(nsClient v1.NamespaceInterface, namespaces []string) {
+func waitForNS(nsClient corew.NamespaceClient, namespaces []string) {
 	for i := 0; i < 3; i++ {
 		allGood := true
 		for _, ns := range namespaces {

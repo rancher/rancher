@@ -7,14 +7,13 @@ import (
 
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nsserviceaccount"
-	rv1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/project"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
+	corew "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
@@ -23,7 +22,7 @@ const (
 )
 
 type defaultSvcAccountHandler struct {
-	namespaces    rv1.NamespaceInterface
+	namespaces    corew.NamespaceClient
 	projectLister v3.ProjectLister
 	clusterName   string
 }
@@ -31,14 +30,14 @@ type defaultSvcAccountHandler struct {
 func Register(ctx context.Context, cluster *config.UserContext) {
 	logrus.Debugf("Registering defaultSvcAccountHandler for checking default service account of system namespaces")
 	nsh := &defaultSvcAccountHandler{
-		namespaces:    cluster.Core.Namespaces(""),
+		namespaces:    cluster.Corew.Namespace(),
 		clusterName:   cluster.ClusterName,
 		projectLister: cluster.Management.Management.Projects("").Controller().Lister(),
 	}
-	cluster.Core.Namespaces("").AddHandler(ctx, "defaultSvcAccountHandler", nsh.Sync)
+	cluster.Corew.Namespace().OnChange(ctx, "defaultSvcAccountHandler", nsh.Sync)
 }
 
-func (nsh *defaultSvcAccountHandler) Sync(key string, ns *corev1.Namespace) (runtime.Object, error) {
+func (nsh *defaultSvcAccountHandler) Sync(key string, ns *corev1.Namespace) (*corev1.Namespace, error) {
 	if ns == nil || ns.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -51,7 +50,7 @@ func (nsh *defaultSvcAccountHandler) Sync(key string, ns *corev1.Namespace) (run
 	return ret, err
 }
 
-func (nsh *defaultSvcAccountHandler) handleIfSystemNSDefaultSA(ns *corev1.Namespace) (runtime.Object, error) {
+func (nsh *defaultSvcAccountHandler) handleIfSystemNSDefaultSA(ns *corev1.Namespace) (*corev1.Namespace, error) {
 	namespace := ns.Name
 	proj, err := project.GetSystemProject(nsh.clusterName, nsh.projectLister)
 	if err != nil {

@@ -3,11 +3,10 @@ package windows
 import (
 	"fmt"
 
-	apicorev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/taints"
+	corew "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var (
@@ -26,10 +25,10 @@ var (
 // NodeTaintsController This controller will only run on the cluster with windowsPreferred is true.
 // It will add taints to the v1.Node.Spec.Taints to the nodes with label kubernetes.io/os=linux.
 type NodeTaintsController struct {
-	nodeClient apicorev1.NodeInterface
+	nodeClient corew.NodeClient
 }
 
-func (n *NodeTaintsController) sync(key string, obj *v1.Node) (runtime.Object, error) {
+func (n *NodeTaintsController) sync(_ string, obj *v1.Node) (*v1.Node, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return obj, nil
 	}
