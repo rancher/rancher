@@ -19,6 +19,9 @@ scm:
   mergemethod: 'squash'
 
 repos:
+  harvester_docker_machine:
+    owner: 'harvester'
+    repo: 'docker-machine-driver-harvester'
   k3s:
     owner: 'k3s-io'
     repo: 'k3s'
@@ -31,6 +34,13 @@ repos:
   wins:
     owner: 'rancher'
     repo: 'wins'
+
+harvester_docker_machine:
+  manifest: 'Update Harvester Docker machine driver version'
+  pipelineid: 'update-harvester-docker-machine-version'
+  commitmessage:
+    type: 'deps'
+    scope: 'harvester-docker-machine'
 
 k8s_k3s:
   manifest: 'Update K8s and K3s patch versions'
