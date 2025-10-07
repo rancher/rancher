@@ -24,6 +24,10 @@ quick-server:
 quick-binary-server:
 	@$(MAKE) quick TARGET="binary-server"
 
+provisioning-tests: .dapper
+	@$(MAKE) quick-binary-server
+	./.dapper provisioning-tests
+
 $(DEV_TARGETS):
 	./dev-scripts/$@
 
