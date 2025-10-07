@@ -14,7 +14,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
 	clientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
@@ -35,13 +34,13 @@ const (
 type secretLister func(namespace string, selector labels.Selector) ([]*corev1.Secret, error)
 
 // EnsureSecretForServiceAccount gets or creates a service account token Secret for the provided Service Account.
-func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrollers.SecretCache, clientSet kubernetes.Interface, sa *corev1.ServiceAccount) (*corev1.Secret, error) {
+func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrollers.SecretCache, secretsGetter clientv1.SecretsGetter, saGetter clientv1.ServiceAccountsGetter, sa *corev1.ServiceAccount) (*corev1.Secret, error) {
 	if sa == nil {
 		return nil, fmt.Errorf("could not ensure secret for invalid service account")
 	}
 	logrus.Tracef("EnsureSecretForServiceAccount for %s", logKeyFromObject(sa))
 
-	secretClient := clientSet.CoreV1().Secrets(sa.Namespace)
+	secretClient := secretsGetter.Secrets(sa.Namespace)
 	var secretLister secretLister
 	if secretsCache != nil {
 		secretLister = secretsCache.List
@@ -72,7 +71,7 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrol
 			return nil, err
 		}
 
-		sa, updated, err := annotateSAWithSecret(ctx, sa, secret, clientSet.CoreV1().ServiceAccounts(sa.Namespace), secretClient)
+		sa, updated, err := annotateSAWithSecret(ctx, sa, secret, saGetter.ServiceAccounts(sa.Namespace), secretClient)
 		if err != nil {
 			return nil, err
 		}
@@ -83,7 +82,7 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrol
 				return nil, err
 			}
 
-			secret, err = clientSet.CoreV1().Secrets(secretRef.Namespace).Get(ctx, secretRef.Name, metav1.GetOptions{})
+			secret, err = secretsGetter.Secrets(secretRef.Namespace).Get(ctx, secretRef.Name, metav1.GetOptions{})
 			if err != nil {
 				return nil, fmt.Errorf("reloading referenced secret for SA %s: %w", logKeyFromObject(sa), err)
 			}
@@ -303,16 +302,13 @@ func logKeyFromObject(obj metav1.Object) string {
 }
 
 func secretRefFromSA(sa *corev1.ServiceAccount) (*types.NamespacedName, error) {
-	if sa.Annotations == nil {
-		return nil, nil
+	ann := sa.Annotations[ServiceAccountSecretRefAnnotation]
+	if ann == "" {
+		return nil, fmt.Errorf("ServiceAccount %q is missing the annotation %q", logKeyFromObject(sa), ServiceAccountSecretRefAnnotation)
 	}
-	if ann := sa.Annotations[ServiceAccountSecretRefAnnotation]; ann != "" {
-		elements := strings.Split(ann, "/")
-		if len(elements) != 2 {
-			return nil, fmt.Errorf("too many elements parsing ServiceAccount secret reference: %s", ann)
-		}
-		return &types.NamespacedName{Namespace: elements[0], Name: elements[1]}, nil
+	elements := strings.Split(ann, "/")
+	if len(elements) != 2 {
+		return nil, fmt.Errorf("too many elements parsing ServiceAccount secret reference: %s", ann)
 	}
-
-	return nil, nil
+	return &types.NamespacedName{Namespace: elements[0], Name: elements[1]}, nil
 }

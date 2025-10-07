@@ -7,6 +7,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/status"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/impersonation"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
@@ -26,13 +27,18 @@ type crtbHandler struct {
 	clusterName          string
 }
 
-func newCRTBHandler(uc *config.UserContext) *crtbHandler {
+func newCRTBHandler(uc *config.UserContext) (*crtbHandler, error) {
+	impersonator, err := impersonation.ForCluster(uc)
+	if err != nil {
+		return nil, err
+	}
 	return &crtbHandler{
 		impersonationHandler: &impersonationHandler{
-			userContext: uc,
-			crClient:    uc.RBACw.ClusterRole(),
-			crtbCache:   uc.Management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
-			prtbCache:   uc.Management.Wrangler.Mgmt.ProjectRoleTemplateBinding().Cache(),
+			clusterName:  uc.ClusterName,
+			impersonator: impersonator,
+			crClient:     uc.RBACw.ClusterRole(),
+			crtbCache:    uc.Management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
+			prtbCache:    uc.Management.Wrangler.Mgmt.ProjectRoleTemplateBinding().Cache(),
 		},
 		crbClient:   uc.RBACw.ClusterRoleBinding(),
 		crtbCache:   uc.Management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
@@ -40,7 +46,7 @@ func newCRTBHandler(uc *config.UserContext) *crtbHandler {
 		rtClient:    uc.Management.Wrangler.Mgmt.RoleTemplate(),
 		s:           status.NewStatus(),
 		clusterName: uc.ClusterName,
-	}
+	}, nil
 }
 
 // OnChange ensures that the correct ClusterRoleBinding exists for the ClusterRoleTemplateBinding
