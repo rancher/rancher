@@ -20,19 +20,21 @@ var defaultGRLabel = map[string]string{"authz.management.cattle.io/bootstrapping
 var defaultRTLabel = map[string]string{"authz.management.cattle.io/bootstrapping": "default-roletemplate"}
 
 type roleBuilder struct {
-	previous          *roleBuilder
-	next              *roleBuilder
-	name              string
-	displayName       string
-	context           string
-	builtin           bool
-	external          bool
-	hidden            bool
-	administrative    bool
-	roleTemplateNames []string
-	rules             []*ruleBuilder
-	namespacedRules   []*namespacedRuleBuilder
-	externalRules     []*ruleBuilder
+	previous                           *roleBuilder
+	next                               *roleBuilder
+	name                               string
+	displayName                        string
+	context                            string
+	builtin                            bool
+	external                           bool
+	hidden                             bool
+	administrative                     bool
+	roleTemplateNames                  []string
+	rules                              []*ruleBuilder
+	namespacedRules                    []*namespacedRuleBuilder
+	externalRules                      []*ruleBuilder
+	inheritedClusterRoles              []string
+	inheritedFleetWorkspacePermissions *v3.FleetWorkspacePermission
 }
 
 func (rb *roleBuilder) String() string {
@@ -100,6 +102,16 @@ func (rb *roleBuilder) addNamespacedRule(namespace string) *namespacedRuleBuilde
 
 func (rb *roleBuilder) setRoleTemplateNames(names ...string) *roleBuilder {
 	rb.roleTemplateNames = names
+	return rb
+}
+
+func (rb *roleBuilder) setInheritedClusterRoles(roles ...string) *roleBuilder {
+	rb.inheritedClusterRoles = roles
+	return rb
+}
+
+func (rb *roleBuilder) setInheritedFleetWorkspacePermissions(permissions *v3.FleetWorkspacePermission) *roleBuilder {
+	rb.inheritedFleetWorkspacePermissions = permissions
 	return rb
 }
 
@@ -198,6 +210,16 @@ func (r *ruleBuilder) addExternalRule() *ruleBuilder {
 
 func (r *ruleBuilder) setRoleTemplateNames(names ...string) *roleBuilder {
 	return r.rb.setRoleTemplateNames(names...)
+}
+
+func (r *ruleBuilder) setInheritedClusterRoles(roles ...string) *ruleBuilder {
+	r.rb.inheritedClusterRoles = roles
+	return r
+}
+
+func (r *ruleBuilder) setInheritedFleetWorkspacePermissions(permissions *v3.FleetWorkspacePermission) *ruleBuilder {
+	r.rb.inheritedFleetWorkspacePermissions = permissions
+	return r
 }
 
 func (r *ruleBuilder) reconcileGlobalRoles(grClient wranglerv3.GlobalRoleClient) error {
@@ -312,10 +334,12 @@ func (rb *roleBuilder) reconcileGlobalRoles(grClient wranglerv3.GlobalRoleClient
 				Name:   current.name,
 				Labels: defaultGRLabel,
 			},
-			DisplayName:     current.displayName,
-			Rules:           current.policyRules(),
-			Builtin:         current.builtin,
-			NamespacedRules: current.namespacedPolicyRules(),
+			DisplayName:                        current.displayName,
+			Rules:                              current.policyRules(),
+			Builtin:                            current.builtin,
+			NamespacedRules:                    current.namespacedPolicyRules(),
+			InheritedClusterRoles:              current.inheritedClusterRoles,
+			InheritedFleetWorkspacePermissions: current.inheritedFleetWorkspacePermissions,
 		}
 		return gr.Name, gr, nil
 	}
@@ -337,12 +361,18 @@ func (rb *roleBuilder) reconcileGlobalRoles(grClient wranglerv3.GlobalRoleClient
 
 	compareAndMod := func(haveGR *v3.GlobalRole, wantGR *v3.GlobalRole) (bool, *v3.GlobalRole, error) {
 		builtin := haveGR.Builtin == wantGR.Builtin
-		equal := builtin && haveGR.DisplayName == wantGR.DisplayName && reflect.DeepEqual(haveGR.Rules, wantGR.Rules) && reflect.DeepEqual(haveGR.NamespacedRules, wantGR.NamespacedRules)
+		equal := builtin && haveGR.DisplayName == wantGR.DisplayName &&
+			reflect.DeepEqual(haveGR.Rules, wantGR.Rules) &&
+			reflect.DeepEqual(haveGR.NamespacedRules, wantGR.NamespacedRules) &&
+			reflect.DeepEqual(haveGR.InheritedClusterRoles, wantGR.InheritedClusterRoles) &&
+			reflect.DeepEqual(haveGR.InheritedFleetWorkspacePermissions, wantGR.InheritedFleetWorkspacePermissions)
 
 		haveGR.DisplayName = wantGR.DisplayName
 		haveGR.Rules = wantGR.Rules
 		haveGR.NamespacedRules = wantGR.NamespacedRules
 		haveGR.Builtin = wantGR.Builtin
+		haveGR.InheritedClusterRoles = wantGR.InheritedClusterRoles
+		haveGR.InheritedFleetWorkspacePermissions = wantGR.InheritedFleetWorkspacePermissions
 
 		return equal, haveGR, nil
 	}
