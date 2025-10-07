@@ -96,7 +96,7 @@ func (c *rtSync) syncRT(template *v3.RoleTemplate, prtbs []any, crtbs []any) err
 
 		rtbNsAndName := rbac.GetRTBLabel(prtb.ObjectMeta)
 		set := labels.Set(map[string]string{rtbNsAndName: owner})
-		existingCrbs, err := c.m.crbLister.List("", set.AsSelector())
+		existingCrbs, err := c.m.crbLister.List(set.AsSelector())
 		if err != nil {
 			return err
 		}
