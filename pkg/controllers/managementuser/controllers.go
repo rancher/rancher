@@ -51,7 +51,9 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 
 	registerImpersonationCaches(cluster)
 
-	cavalidator.Register(ctx, cluster)
+	if err := cavalidator.Register(ctx, cluster); err != nil {
+		return err
+	}
 
 	// register controller for API
 	cluster.APIAggregation.APIServices("").Controller()

@@ -33,7 +33,6 @@ import (
 	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	storagev1 "github.com/rancher/rancher/pkg/generated/norman/storage.k8s.io/v1"
-	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/peermanager"
 	clusterSchema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
 	managementSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
@@ -51,16 +50,11 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8dynamic "k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-)
-
-const (
-	stvAggregationSecretName = "stv-aggregation"
 )
 
 var (
@@ -233,8 +227,10 @@ type UserContext struct {
 
 	KindNamespaces map[schema.GroupVersionKind]string
 
-	caValidatorControllerFactory controller.SharedControllerFactory
-	CAValidatorSecret            wcorev1.SecretController
+	extraControllerFactoriesMutex sync.Mutex
+	extraControllerFactories      map[string]controller.SharedControllerFactory
+	// startContext stores the context used to start the all controller factories, allowing to register even if Start was already called
+	startContext context.Context
 }
 
 // WithAgent returns a shallow copy of the Context that has been configured to use a user agent in its
@@ -475,33 +471,57 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 		return nil, err
 	}
 
-	// We want to avoid keeping in the cache all Secrets so we use a separate controller factory that only watches a single Secret
-	//
-	// The default controller factory restricts downstream Secret caches to the impersonation namespace only, see https://github.com/rancher/rancher/issues/46827
-	caValidatorControllerFactory := newCAValidatorControllerFactory(clientFactory)
-	context.caValidatorControllerFactory = caValidatorControllerFactory
-	caValidatorOpts := &generic.FactoryOptions{
-		SharedControllerFactory: caValidatorControllerFactory,
-	}
-	caValidatorCorew, err := core.NewFactoryFromConfigWithOptions(&context.RESTConfig, caValidatorOpts)
-	if err != nil {
-		return nil, err
-	}
-	context.CAValidatorSecret = caValidatorCorew.Core().V1().Secret()
-
 	return context, err
 }
 
-func (w *UserContext) Start(ctx context.Context) error {
+func (w *UserContext) Start(pctx context.Context) error {
+	w.extraControllerFactoriesMutex.Lock()
+	defer w.extraControllerFactoriesMutex.Unlock()
+
 	logrus.Info("Starting cluster controllers for ", w.ClusterName)
 	if err := w.Management.ControllerFactory.Start(w.runContext, 50); err != nil {
 		return err
 	}
-	ctx = metrics.WithContextID(ctx, fmt.Sprintf("usercontext_%s", w.ClusterName))
+	ctx := metrics.WithContextID(pctx, fmt.Sprintf("usercontext_%s", w.ClusterName))
 	if err := w.ControllerFactory.Start(ctx, 5); err != nil {
 		return err
 	}
-	return w.caValidatorControllerFactory.Start(ctx, 1)
+
+	for name, factory := range w.extraControllerFactories {
+		ctx := metrics.WithContextID(pctx, fmt.Sprintf("usercontext_%s_%s", name, w.ClusterName))
+		if err := factory.Start(ctx, 1); err != nil {
+			return err
+		}
+	}
+
+	w.startContext = pctx
+	return nil
+}
+
+// RegisterExtraControllerFactory allows starting dedicated controller factories together with the default ones.
+// This should be only used in extraordinary cases, for which the default controllers/caches are not suitable.
+func (w *UserContext) RegisterExtraControllerFactory(name string, factory controller.SharedControllerFactory) error {
+	w.extraControllerFactoriesMutex.Lock()
+	defer w.extraControllerFactoriesMutex.Unlock()
+
+	if _, ok := w.extraControllerFactories[name]; ok {
+		return fmt.Errorf("duplicate extra controller factory %q in UserContext for cluster %q", name, w.ClusterName)
+	}
+
+	// Start have already been called, allow to register new controller factories even then
+	if w.startContext != nil {
+		ctx := metrics.WithContextID(w.startContext, fmt.Sprintf("usercontext_%s_%s", name, w.ClusterName))
+		if err := factory.Start(ctx, 1); err != nil {
+			return err
+		}
+	}
+
+	if w.extraControllerFactories == nil {
+		w.extraControllerFactories = make(map[string]controller.SharedControllerFactory)
+	}
+	w.extraControllerFactories[name] = factory
+
+	return nil
 }
 
 func NewUserOnlyContext(config *wrangler.Context) (*UserOnlyContext, error) {
@@ -545,18 +565,4 @@ func (w *UserOnlyContext) Start(ctx context.Context) error {
 	logrus.Info("Starting workload controllers")
 	ctx = metrics.WithContextID(ctx, fmt.Sprintf("useronlycontext_%s", w.ClusterName))
 	return w.ControllerFactory.Start(ctx, 5)
-}
-
-func newCAValidatorControllerFactory(clientFactory client.SharedClientFactory) controller.SharedControllerFactory {
-	caValidatorCacheFactory := cache.NewSharedCachedFactory(clientFactory, &cache.SharedCacheFactoryOptions{
-		KindTweakList: map[schema.GroupVersionKind]cache.TweakListOptionsFunc{
-			corev1.SchemeGroupVersion.WithKind("Secret"): func(opts *metav1.ListOptions) {
-				opts.FieldSelector = fmt.Sprintf("metadata.namespace=%s,metadata.name=%s", namespace.System, stvAggregationSecretName)
-			},
-		},
-	})
-
-	caValidatorFactoryOpts := controllers.GetOptsFromEnv(controllers.User)
-	caValidatorControllerFactory := controller.NewSharedControllerFactory(caValidatorCacheFactory, caValidatorFactoryOpts)
-	return caValidatorControllerFactory
 }
