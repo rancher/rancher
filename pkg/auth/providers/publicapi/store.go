@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/norman/types"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/util"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -122,6 +123,7 @@ func transformToAuthToken(token *apiv3.SamlToken) map[string]any {
 type v1AuthProviderStore struct {
 	authConfigCache         mgmtv3.AuthConfigCache
 	authConfigsUnstructured dynamic.ResourceInterface
+	getProviderByType       func(string) common.AuthProvider
 }
 
 func newV1AuthProviderStore(wContext *wrangler.Context) (*v1AuthProviderStore, error) {
@@ -137,6 +139,7 @@ func newV1AuthProviderStore(wContext *wrangler.Context) (*v1AuthProviderStore, e
 			Version:  "v3",
 			Resource: "authconfigs",
 		}),
+		getProviderByType: providers.GetProviderByType,
 	}, nil
 }
 
@@ -167,7 +170,7 @@ func (s *v1AuthProviderStore) List() http.Handler {
 
 			raw.Object[".host"] = util.GetHost(r)
 
-			authProvider, err := providers.GetProviderByType(authConfig.Type).TransformToAuthProvider(raw.Object)
+			authProvider, err := s.getProviderByType(authConfig.Type).TransformToAuthProvider(raw.Object)
 			if err != nil {
 				logrus.Errorf("v1AuthProviderStore: Getting authprovider %s: %s", authConfig.Type, err)
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)

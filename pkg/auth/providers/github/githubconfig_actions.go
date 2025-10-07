@@ -16,13 +16,13 @@ import (
 	"k8s.io/client-go/util/retry"
 )
 
-func (g *ghProvider) formatter(apiContext *types.APIContext, resource *types.RawResource) {
+func (g *Provider) formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	common.AddCommonActions(apiContext, resource)
 	resource.AddAction(apiContext, "configureTest")
 	resource.AddAction(apiContext, "testAndApply")
 }
 
-func (g *ghProvider) actionHandler(actionName string, action *types.Action, request *types.APIContext) error {
+func (g *Provider) actionHandler(actionName string, action *types.Action, request *types.APIContext) error {
 	handled, err := common.HandleCommonAction(actionName, action, request, Name, g.authConfigs)
 	if err != nil {
 		return err
@@ -41,7 +41,7 @@ func (g *ghProvider) actionHandler(actionName string, action *types.Action, requ
 	}
 }
 
-func (g *ghProvider) configureTest(request *types.APIContext) error {
+func (g *Provider) configureTest(request *types.APIContext) error {
 	githubConfig := &v32.GithubConfig{}
 	if err := json.NewDecoder(request.Request.Body).Decode(githubConfig); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
@@ -90,7 +90,7 @@ func githubRedirectURL(hostname, clientID string, tls bool) string {
 	return redirect
 }
 
-func (g *ghProvider) testAndApply(request *types.APIContext) error {
+func (g *Provider) testAndApply(request *types.APIContext) error {
 	var githubConfig v32.GithubConfig
 	githubConfigApplyInput := &v32.GithubConfigApplyInput{}
 
