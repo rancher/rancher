@@ -252,6 +252,7 @@ var OriginMap = map[string]string{
 	"system-upgrade-controller":                               "https://github.com/rancher/system-upgrade-controller",
 	"tekton-utils":                                            "https://github.com/rancher/build-tekton",
 	"thanosio-thanos":                                         "https://github.com/thanos-io/thanos",
+	"turtles":                                                 "https://github.com/rancher/turtles",
 	"ui-plugin-operator":                                      "https://github.com/rancher/ui-plugin-operator",
 	"ui-plugin-catalog":                                       "https://github.com/rancher/ui-plugin-charts",
 	"weave-kube":                                              "https://github.com/weaveworks-experiments/weave-kube",
