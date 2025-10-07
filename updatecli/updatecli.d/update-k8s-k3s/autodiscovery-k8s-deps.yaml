@@ -15,7 +15,6 @@ autodiscovery:
             '^k8s\.io\/.*': ''
       ignore:
         - modules:
-            '^k8s\.io\/client-go': ''
             '^k8s\.io\/kubernetes': ''
             '^k8s\.io\/kube-openapi': ''
             '^k8s\.io\/legacy-cloud-providers': ''
