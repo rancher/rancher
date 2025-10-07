@@ -34,24 +34,21 @@ const (
 )
 
 type impersonationHandler struct {
-	userContext *config.UserContext
-	crtbCache   mgmtv3.ClusterRoleTemplateBindingCache
-	prtbCache   mgmtv3.ProjectRoleTemplateBindingCache
-	crClient    rbacv1.ClusterRoleController
+	clusterName  string
+	impersonator config.Impersonator
+	crtbCache    mgmtv3.ClusterRoleTemplateBindingCache
+	prtbCache    mgmtv3.ProjectRoleTemplateBindingCache
+	crClient     rbacv1.ClusterRoleController
 }
 
 // ensureServiceAccountImpersonator ensures a Service Account Impersonator exists for a given user. If not it creates one.
 func (ih *impersonationHandler) ensureServiceAccountImpersonator(username string) error {
 	logrus.Debugf("ensuring service account impersonator for %s", username)
-	i, err := impersonation.New(&user.DefaultInfo{UID: username}, ih.userContext)
+	err := ih.impersonator.SetUpImpersonation(&user.DefaultInfo{UID: username})
 	if apierrors.IsNotFound(err) {
 		logrus.Warnf("could not find user %s, will not create impersonation account on cluster", username)
 		return nil
 	}
-	if err != nil {
-		return err
-	}
-	_, err = i.SetUpImpersonation()
 	return err
 }
 
@@ -59,7 +56,7 @@ func (ih *impersonationHandler) ensureServiceAccountImpersonator(username string
 // Currently uses custom indexers to get CRTBs and PRTBs. Once Rancher's minimum support is >1.31,
 // the indexers can be replaced by crd selectable fields https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#crd-selectable-fields
 func (ih *impersonationHandler) deleteServiceAccountImpersonator(username string) error {
-	indexKey := name.SafeConcatName(ih.userContext.ClusterName, username)
+	indexKey := name.SafeConcatName(ih.clusterName, username)
 	crtbs, err := ih.crtbCache.GetByIndex(crtbByUsernameIndex, indexKey)
 	if err != nil {
 		return err

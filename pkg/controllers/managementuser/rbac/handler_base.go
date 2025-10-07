@@ -15,6 +15,7 @@ import (
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	typescorev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/impersonation"
 	nsutils "github.com/rancher/rancher/pkg/namespace"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -60,6 +61,11 @@ var registerRTIndexersOnce sync.Once
 func Register(ctx context.Context, workload *config.UserContext) error {
 	management := workload.Management.WithAgent("rbac-handler-base")
 
+	impersonator, err := impersonation.ForCluster(workload)
+	if err != nil {
+		return err
+	}
+
 	// Add cache informer to project role template bindings
 	prtbInformer := workload.Management.Management.ProjectRoleTemplateBindings("").Controller().Informer()
 	prtbIndexers := map[string]cache.IndexFunc{
@@ -99,7 +105,6 @@ func Register(ctx context.Context, workload *config.UserContext) error {
 
 	// Get RoleTemplates by RoleTemplate they inherit from
 	rtInformer := workload.Management.Wrangler.Mgmt.RoleTemplate().Informer()
-	var err error
 	registerRTIndexersOnce.Do(func() {
 		err = rtInformer.AddIndexers(cache.Indexers{
 			rtByInheritedRTsIndex: rtByInterhitedRTs,
@@ -111,6 +116,7 @@ func Register(ctx context.Context, workload *config.UserContext) error {
 
 	r := &manager{
 		workload:            workload,
+		impersonator:        impersonator,
 		prtbIndexer:         prtbInformer.GetIndexer(),
 		crtbIndexer:         crtbInformer.GetIndexer(),
 		nsIndexer:           nsInformer.GetIndexer(),
@@ -159,7 +165,9 @@ func Register(ctx context.Context, workload *config.UserContext) error {
 
 	// Only one set of CRTB/PRTB/RoleTemplate controllers should run at a time. Using aggregated cluster roles is currently experimental and only available via feature flags.
 	if features.AggregatedRoleTemplates.Enabled() {
-		roletemplates.Register(ctx, workload)
+		if err := roletemplates.Register(ctx, workload); err != nil {
+			return err
+		}
 	} else {
 		management.Management.ProjectRoleTemplateBindings("").AddClusterScopedLifecycle(ctx, "cluster-prtb-sync", workload.ClusterName, newPRTBLifecycle(r, management, nsInformer))
 		management.Management.ClusterRoleTemplateBindings("").AddClusterScopedLifecycle(ctx, "cluster-crtb-sync", workload.ClusterName, newCRTBLifecycle(r, management))
@@ -182,6 +190,7 @@ type managerInterface interface {
 
 type manager struct {
 	workload            *config.UserContext
+	impersonator        config.Impersonator
 	rtLister            mgmtv3.RoleTemplateCache
 	prtbIndexer         cache.Indexer
 	crtbIndexer         cache.Indexer

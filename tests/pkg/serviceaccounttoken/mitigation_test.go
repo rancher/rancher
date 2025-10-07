@@ -68,7 +68,7 @@ func TestOptimisticLocking(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.TODO(), nil, clientSet, sa)
+				secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.TODO(), nil, clientSet.CoreV1(), clientSet.CoreV1(), sa)
 				assert.NoError(t, err)
 				assert.NotNil(t, secret)
 				createdSecrets <- *secret

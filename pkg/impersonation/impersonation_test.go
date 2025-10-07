@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	authcommon "github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/stretchr/testify/assert"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -45,8 +45,8 @@ func TestImpersonatorGetUser(t *testing.T) {
 					"system:cattle:authenticated",
 				},
 				Extra: map[string][]string{
-					authcommon.UserAttributeUserName:    {"Default Admin"},
-					authcommon.UserAttributePrincipalID: {"local://user-abcde"},
+					common.UserAttributeUserName:    {"Default Admin"},
+					common.UserAttributePrincipalID: {"local://user-abcde"},
 				},
 			},
 		},
@@ -72,8 +72,8 @@ func TestImpersonatorGetUser(t *testing.T) {
 					"system:cattle:authenticated",
 				},
 				Extra: map[string][]string{
-					authcommon.UserAttributeUserName:    {"System account for Cluster c-abcde"},
-					authcommon.UserAttributePrincipalID: {"local://u-system"},
+					common.UserAttributeUserName:    {"System account for Cluster c-abcde"},
+					common.UserAttributePrincipalID: {"local://u-system"},
 				},
 			},
 		},
@@ -142,18 +142,18 @@ func TestImpersonatorGetUser(t *testing.T) {
 					},
 					ExtraByProvider: map[string]map[string][]string{
 						"github": {
-							authcommon.UserAttributeUserName: {
+							common.UserAttributeUserName: {
 								"user1",
 							},
-							authcommon.UserAttributePrincipalID: {
+							common.UserAttributePrincipalID: {
 								"github_user://890",
 							},
 						},
 						"openldap": {
-							authcommon.UserAttributeUserName: {
+							common.UserAttributeUserName: {
 								"admin",
 							},
-							authcommon.UserAttributePrincipalID: {
+							common.UserAttributePrincipalID: {
 								"openldap_user://uid=user1,dc=example,dc=org",
 							},
 						},
@@ -172,11 +172,11 @@ func TestImpersonatorGetUser(t *testing.T) {
 					"system:cattle:authenticated",
 				},
 				Extra: map[string][]string{
-					authcommon.UserAttributeUserName: {
+					common.UserAttributeUserName: {
 						"admin",
 						"user1",
 					},
-					authcommon.UserAttributePrincipalID: {
+					common.UserAttributePrincipalID: {
 						"github_user://890",
 						"openldap_user://uid=user1,dc=example,dc=org",
 					},
@@ -187,7 +187,7 @@ func TestImpersonatorGetUser(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			impersonator := Impersonator{
+			impersonator := impersonator{
 				userLister: &fakes.UserListerMock{
 					GetFunc: tt.userGetFunc,
 				},
@@ -203,20 +203,17 @@ func TestImpersonatorGetUser(t *testing.T) {
 }
 
 func TestImpersonatorRulesForUser(t *testing.T) {
-	impersonator := Impersonator{
-		user: &user.DefaultInfo{
-			UID:    "u-s857n",
-			Name:   "u-s857n",
-			Groups: []string{"system:authenticated", "system:cattle:authenticated"},
-			Extra: map[string][]string{
-				authcommon.UserAttributePrincipalID: {"local://u-s857n"},
-				authcommon.UserAttributeUserName:    {"test"},
-				authcommon.ExtraRequestTokenID:      {"kubeconfig-u-s857nk2bxr"},
-				authcommon.ExtraRequestHost:         {"rancher.example.com"},
-			},
+	userInfo := &user.DefaultInfo{
+		UID:    "u-s857n",
+		Name:   "u-s857n",
+		Groups: []string{"system:authenticated", "system:cattle:authenticated"},
+		Extra: map[string][]string{
+			common.UserAttributePrincipalID: {"local://u-s857n"},
+			common.UserAttributeUserName:    {"test"},
+			common.ExtraRequestTokenID:      {"kubeconfig-u-s857nk2bxr"},
+			common.ExtraRequestHost:         {"rancher.example.com"},
 		},
 	}
-
 	want := []rbacv1.PolicyRule{
 		{
 			Verbs:         []string{"impersonate"},
@@ -227,12 +224,12 @@ func TestImpersonatorRulesForUser(t *testing.T) {
 		{
 			Verbs:     []string{"impersonate"},
 			APIGroups: []string{"authentication.k8s.io"},
-			Resources: []string{"userextras/" + authcommon.ExtraRequestTokenID},
+			Resources: []string{"userextras/" + common.ExtraRequestTokenID},
 		},
 		{
 			Verbs:     []string{"impersonate"},
 			APIGroups: []string{"authentication.k8s.io"},
-			Resources: []string{"userextras/" + authcommon.ExtraRequestHost},
+			Resources: []string{"userextras/" + common.ExtraRequestHost},
 		},
 		{
 			Verbs:         []string{"impersonate"},
@@ -243,17 +240,18 @@ func TestImpersonatorRulesForUser(t *testing.T) {
 		{
 			Verbs:         []string{"impersonate"},
 			APIGroups:     []string{"authentication.k8s.io"},
-			Resources:     []string{"userextras/" + authcommon.UserAttributePrincipalID},
+			Resources:     []string{"userextras/" + common.UserAttributePrincipalID},
 			ResourceNames: []string{"local://u-s857n"},
 		},
 		{
 			Verbs:         []string{"impersonate"},
 			APIGroups:     []string{"authentication.k8s.io"},
-			Resources:     []string{"userextras/" + authcommon.UserAttributeUserName},
+			Resources:     []string{"userextras/" + common.UserAttributeUserName},
 			ResourceNames: []string{"test"},
 		},
 	}
 
-	got := impersonator.rulesForUser()
+	var i impersonator
+	got := i.rulesForUser(userInfo)
 	assert.Equal(t, want, got)
 }

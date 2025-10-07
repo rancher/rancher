@@ -52,6 +52,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	k8sauthuser "k8s.io/apiserver/pkg/authentication/user"
 	k8dynamic "k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -197,6 +198,12 @@ type ManagementContext struct {
 	Wrangler   *wrangler.Context
 }
 
+type Impersonator interface {
+	// SetUpImpersonation creates a service account on a cluster with a clusterrole and clusterrolebinding allowing it to impersonate a Rancher user.
+	SetUpImpersonation(k8sauthuser.Info) error
+	GetToken(k8sauthuser.Info) (string, error)
+}
+
 type UserContext struct {
 	Management        *ManagementContext
 	ClusterName       string
@@ -206,6 +213,8 @@ type UserContext struct {
 	APIExtClient      clientset.Interface
 	K8sClient         kubernetes.Interface
 	runContext        context.Context
+
+	Impersonator Impersonator
 
 	APIAggregation apiregistrationv1.Interface
 	Apps           appsv1.Interface
@@ -391,10 +400,11 @@ func newManagementContext(c *ScaledContext) (*ManagementContext, error) {
 func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterName string) (*UserContext, error) {
 	var err error
 	context := &UserContext{
-		RESTConfig:     *steve.RestConfigDefaults(&config),
-		ClusterName:    clusterName,
-		runContext:     scaledContext.RunContext,
-		KindNamespaces: map[schema.GroupVersionKind]string{},
+		RESTConfig:               *steve.RestConfigDefaults(&config),
+		ClusterName:              clusterName,
+		runContext:               scaledContext.RunContext,
+		KindNamespaces:           map[schema.GroupVersionKind]string{},
+		extraControllerFactories: map[string]controller.SharedControllerFactory{},
 	}
 
 	context.Management, err = scaledContext.NewManagementContext()
