@@ -133,7 +133,7 @@ func TestSearchPrincipals(t *testing.T) {
 		Hostname: srvURL.Host,
 	}
 
-	provider := ghProvider{
+	provider := Provider{
 		githubClient: &GClient{httpClient: srv.Client()},
 		getConfig:    func() (*apiv3.GithubConfig, error) { return config, nil },
 		userMGR:      userManager,
@@ -320,7 +320,7 @@ func TestSearchPrincipalsExt(t *testing.T) {
 		Hostname: srvURL.Host,
 	}
 
-	provider := ghProvider{
+	provider := Provider{
 		githubClient: &GClient{httpClient: srv.Client()},
 		getConfig:    func() (*apiv3.GithubConfig, error) { return config, nil },
 		userMGR:      userManager,
