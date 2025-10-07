@@ -8,9 +8,9 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/status"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
+	rbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/sirupsen/logrus"
 	v12 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -63,9 +63,9 @@ func RegisterIndexers(scaledContext *config.ScaledContext) error {
 func newGlobalRoleBindingHandler(workload *config.UserContext) v3.GlobalRoleBindingHandlerFunc {
 
 	h := &grbHandler{
-		clusterName:         workload.ClusterName,
-		clusterRoleBindings: workload.RBAC.ClusterRoleBindings(""),
-		crbLister:           workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
+		clusterName: workload.ClusterName,
+		crbClient:   workload.RBACw.ClusterRoleBinding(),
+		crbLister:   workload.RBACw.ClusterRoleBinding().Cache(),
 		// The following clients/controllers all point at the management cluster
 		grLister:  workload.Management.Management.GlobalRoles("").Controller().Lister(),
 		grbLister: workload.Management.Wrangler.Mgmt.GlobalRoleBinding().Cache(),
@@ -79,16 +79,16 @@ func newGlobalRoleBindingHandler(workload *config.UserContext) v3.GlobalRoleBind
 // grbHandler ensures the global admins have full access to every cluster. If a globalRoleBinding is created that uses
 // the admin role, then the user in that binding gets a clusterRoleBinding in every user cluster to the cluster-admin role
 type grbHandler struct {
-	clusterName         string
-	clusterRoleBindings rbacv1.ClusterRoleBindingInterface
-	crbLister           rbacv1.ClusterRoleBindingLister
-	grLister            v3.GlobalRoleLister
-	grbLister           mgmtv3.GlobalRoleBindingCache
-	grbClient           mgmtv3.GlobalRoleBindingController
-	status              *status.Status
+	clusterName string
+	crbClient   rbacv1.ClusterRoleBindingClient
+	crbLister   rbacv1.ClusterRoleBindingCache
+	grLister    v3.GlobalRoleLister
+	grbLister   mgmtv3.GlobalRoleBindingCache
+	grbClient   mgmtv3.GlobalRoleBindingController
+	status      *status.Status
 }
 
-func (c *grbHandler) sync(key string, obj *apisv3.GlobalRoleBinding) (runtime.Object, error) {
+func (c *grbHandler) sync(_ string, obj *apisv3.GlobalRoleBinding) (runtime.Object, error) {
 	if obj == nil || obj.DeletionTimestamp != nil {
 		return obj, nil
 	}
@@ -120,8 +120,7 @@ func (c *grbHandler) sync(key string, obj *apisv3.GlobalRoleBinding) (runtime.Ob
 func (c *grbHandler) ensureClusterAdminBinding(obj *apisv3.GlobalRoleBinding, conditions *[]metav1.Condition) error {
 	condition := metav1.Condition{Type: clusterAdminRoleExists}
 	bindingName := rbac.GrbCRBName(obj)
-
-	_, err := c.crbLister.Get("", bindingName)
+	_, err := c.crbLister.Get(bindingName)
 	if err != nil && !apierrors.IsNotFound(err) {
 		c.status.AddCondition(conditions, condition, failedToGetClusterRoleBinding, err)
 		return fmt.Errorf("failed to get ClusterRoleBinding '%s' from the cache: %w", bindingName, err)
@@ -133,7 +132,7 @@ func (c *grbHandler) ensureClusterAdminBinding(obj *apisv3.GlobalRoleBinding, co
 		return nil
 	}
 
-	_, err = c.clusterRoleBindings.Create(&v12.ClusterRoleBinding{
+	_, err = c.crbClient.Create(&v12.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: bindingName,
 		},

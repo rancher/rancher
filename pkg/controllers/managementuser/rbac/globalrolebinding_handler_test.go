@@ -8,7 +8,6 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/status"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
-	rbacFakes "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
@@ -34,8 +33,8 @@ func TestSync(t *testing.T) {
 	}
 	type grbTestState struct {
 		grListerMock  *fakes.GlobalRoleListerMock
-		crbListerMock *rbacFakes.ClusterRoleBindingListerMock
-		crbClientMock *rbacFakes.ClusterRoleBindingInterfaceMock
+		crbListerMock *fake.MockNonNamespacedCacheInterface[*rbacv1.ClusterRoleBinding]
+		crbClientMock *fake.MockNonNamespacedClientInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]
 		grbListerMock *fake.MockNonNamespacedCacheInterface[*v3.GlobalRoleBinding]
 		grbClientMock *fake.MockNonNamespacedControllerInterface[*v3.GlobalRoleBinding, *v3.GlobalRoleBindingList]
 		stateChanges  *grbTestStateChanges
@@ -50,13 +49,13 @@ func TestSync(t *testing.T) {
 		"admin role creation": {
 			grb: grb,
 			stateSetup: func(state *grbTestState) {
-				state.crbClientMock.CreateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
+				state.crbClientMock.EXPECT().Create(gomock.Any()).DoAndReturn(func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
 					state.stateChanges.createdCRB = crb
 					return crb, nil
-				}
-				state.crbListerMock.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
+				})
+				state.crbListerMock.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*rbacv1.ClusterRoleBinding, error) {
 					return nil, errors.NewNotFound(schema.GroupResource{}, "")
-				}
+				})
 				state.grListerMock.GetFunc = func(namespace string, name string) (*v3.GlobalRole, error) {
 					return &apisv3.GlobalRole{
 						ObjectMeta: metav1.ObjectMeta{
@@ -98,9 +97,9 @@ func TestSync(t *testing.T) {
 		"admin role already exists": {
 			grb: grb,
 			stateSetup: func(state *grbTestState) {
-				state.crbListerMock.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
+				state.crbListerMock.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*rbacv1.ClusterRoleBinding, error) {
 					return &rbacv1.ClusterRoleBinding{}, nil
-				}
+				})
 				state.grListerMock.GetFunc = func(namespace string, name string) (*v3.GlobalRole, error) {
 					return &apisv3.GlobalRole{
 						ObjectMeta: metav1.ObjectMeta{
@@ -156,9 +155,7 @@ func TestSync(t *testing.T) {
 		"error getting ClusterRoleBinding": {
 			grb: grb,
 			stateSetup: func(state *grbTestState) {
-				state.crbListerMock.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
-					return nil, err
-				}
+				state.crbListerMock.EXPECT().Get(gomock.Any()).Return(nil, err)
 				state.grListerMock.GetFunc = func(namespace string, name string) (*v3.GlobalRole, error) {
 					return &apisv3.GlobalRole{
 						ObjectMeta: metav1.ObjectMeta{
@@ -173,12 +170,8 @@ func TestSync(t *testing.T) {
 		"error creating ClusterRole": {
 			grb: grb,
 			stateSetup: func(state *grbTestState) {
-				state.crbClientMock.CreateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
-					return nil, err
-				}
-				state.crbListerMock.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
-					return nil, errors.NewNotFound(schema.GroupResource{}, "")
-				}
+				state.crbClientMock.EXPECT().Create(gomock.Any()).Return(nil, err)
+				state.crbListerMock.EXPECT().Get(gomock.Any()).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
 				state.grListerMock.GetFunc = func(namespace string, name string) (*v3.GlobalRole, error) {
 					return &apisv3.GlobalRole{
 						ObjectMeta: metav1.ObjectMeta{
@@ -197,8 +190,8 @@ func TestSync(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			grListerMock := &fakes.GlobalRoleListerMock{}
-			crbListerMock := &rbacFakes.ClusterRoleBindingListerMock{}
-			crbClientMock := &rbacFakes.ClusterRoleBindingInterfaceMock{}
+			crbListerMock := fake.NewMockNonNamespacedCacheInterface[*rbacv1.ClusterRoleBinding](ctrl)
+			crbClientMock := fake.NewMockNonNamespacedClientInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl)
 			grbListerMock := fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRoleBinding](ctrl)
 			grbClientMock := fake.NewMockNonNamespacedControllerInterface[*v3.GlobalRoleBinding, *v3.GlobalRoleBindingList](ctrl)
 
@@ -219,12 +212,12 @@ func TestSync(t *testing.T) {
 				test.stateSetup(state)
 			}
 			h := grbHandler{
-				clusterRoleBindings: crbClientMock,
-				crbLister:           crbListerMock,
-				grLister:            grListerMock,
-				grbLister:           grbListerMock,
-				grbClient:           grbClientMock,
-				status:              status,
+				crbClient: crbClientMock,
+				crbLister: crbListerMock,
+				grLister:  grListerMock,
+				grbLister: grbListerMock,
+				grbClient: grbClientMock,
+				status:    status,
 			}
 
 			_, err := h.sync("", test.grb.DeepCopy())

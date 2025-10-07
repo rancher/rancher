@@ -16,8 +16,7 @@ const (
 
 func Register(ctx context.Context, cluster *config.UserContext) {
 	starter := cluster.DeferredStart(ctx, func(ctx context.Context) error {
-		registerDeferred(ctx, cluster)
-		return nil
+		return registerDeferred(ctx, cluster)
 	})
 
 	projects := cluster.Management.Management.Projects(cluster.ClusterName)
@@ -33,26 +32,28 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 
 }
 
-func registerDeferred(ctx context.Context, cluster *config.UserContext) {
+func registerDeferred(ctx context.Context, cluster *config.UserContext) error {
 	// Index for looking up Namespaces by projectID annotation
-	nsInformer := cluster.Core.Namespaces("").Controller().Informer()
+	nsInformer := cluster.Corew.Namespace().Informer()
 	nsIndexers := map[string]cache.IndexFunc{
 		nsByProjectIndex: nsByProjectID,
 	}
-	nsInformer.AddIndexers(nsIndexers)
+	if err := nsInformer.AddIndexers(nsIndexers); err != nil {
+		return err
+	}
 	sync := &SyncController{
-		Namespaces:          cluster.Core.Namespaces(""),
+		Namespaces:          cluster.Corew.Namespace(),
 		NsIndexer:           nsInformer.GetIndexer(),
-		ResourceQuotas:      cluster.Core.ResourceQuotas(""),
-		ResourceQuotaLister: cluster.Core.ResourceQuotas("").Controller().Lister(),
-		LimitRange:          cluster.Core.LimitRanges(""),
-		LimitRangeLister:    cluster.Core.LimitRanges("").Controller().Lister(),
+		ResourceQuotas:      cluster.Corew.ResourceQuota(),
+		ResourceQuotaLister: cluster.Corew.ResourceQuota().Cache(),
+		LimitRange:          cluster.Corew.LimitRange(),
+		LimitRangeLister:    cluster.Corew.LimitRange().Cache(),
 		ProjectLister:       cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister(),
 	}
-	cluster.Core.Namespaces("").AddHandler(ctx, "resourceQuotaSyncController", sync.syncResourceQuota)
+	cluster.Corew.Namespace().OnChange(ctx, "resourceQuotaSyncController", sync.syncResourceQuota)
 
 	reconcile := &reconcileController{
-		namespaces: cluster.Core.Namespaces(""),
+		namespaces: cluster.Corew.Namespace(),
 		nsIndexer:  nsInformer.GetIndexer(),
 	}
 
@@ -64,14 +65,16 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 		projects:      cluster.Management.Management.Projects(cluster.ClusterName),
 		clusterName:   cluster.ClusterName,
 	}
-	cluster.Core.Namespaces("").AddHandler(ctx, "resourceQuotaUsedLimitController", calculate.calculateResourceQuotaUsed)
+	cluster.Corew.Namespace().OnChange(ctx, "resourceQuotaUsedLimitController", calculate.calculateResourceQuotaUsed)
 	cluster.Management.Management.Projects(cluster.ClusterName).AddHandler(ctx, "resourceQuotaProjectUsedLimitController", calculate.calculateResourceQuotaUsedProject)
 
 	reset := &quotaResetController{
 		nsIndexer:  nsInformer.GetIndexer(),
-		namespaces: cluster.Core.Namespaces(""),
+		namespaces: cluster.Corew.Namespace(),
 	}
 	cluster.Management.Management.Projects(cluster.ClusterName).AddHandler(ctx, "namespaceResourceQuotaResetController", reset.resetNamespaceQuota)
+
+	return nil
 }
 
 func nsByProjectID(obj interface{}) ([]string, error) {

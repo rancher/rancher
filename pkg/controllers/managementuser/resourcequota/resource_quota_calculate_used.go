@@ -26,7 +26,7 @@ type calculateLimitController struct {
 	clusterName   string
 }
 
-func (c *calculateLimitController) calculateResourceQuotaUsed(key string, ns *corev1.Namespace) (runtime.Object, error) {
+func (c *calculateLimitController) calculateResourceQuotaUsed(_ string, ns *corev1.Namespace) (*corev1.Namespace, error) {
 	if ns == nil {
 		return nil, nil
 	}

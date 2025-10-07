@@ -30,7 +30,9 @@ import (
 )
 
 func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext, clusterRec *apimgmtv3.Cluster, kubeConfigGetter common.KubeConfigGetter) error {
-	rbac.Register(ctx, cluster)
+	if err := rbac.Register(ctx, cluster); err != nil {
+		return err
+	}
 	healthsyncer.Register(ctx, cluster)
 	networkpolicy.Register(ctx, cluster)
 
@@ -55,7 +57,7 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	cluster.APIAggregation.APIServices("").Controller()
 
 	if clusterRec.Spec.LocalClusterAuthEndpoint.Enabled {
-		err := clusterauthtoken.CRDSetup(ctx, cluster.UserOnlyContext())
+		err := clusterauthtoken.CRDSetup(ctx, cluster.RESTConfig, cluster.Management.Schemas)
 		if err != nil {
 			return err
 		}
@@ -89,10 +91,10 @@ func registerProvV2(ctx context.Context, cluster *config.UserContext, capi *wran
 
 func RegisterFollower(cluster *config.UserContext) error {
 	registerImpersonationCaches(cluster)
-	cluster.RBAC.ClusterRoleBindings("").Controller()
-	cluster.RBAC.ClusterRoles("").Controller()
-	cluster.RBAC.RoleBindings("").Controller()
-	cluster.RBAC.Roles("").Controller()
+	cluster.RBACw.ClusterRoleBinding().Informer()
+	cluster.RBACw.ClusterRole().Informer()
+	cluster.RBACw.RoleBinding().Informer()
+	cluster.RBACw.Role().Informer()
 	return nil
 }
 
@@ -107,9 +109,9 @@ func registerImpersonationCaches(cluster *config.UserContext) {
 		Version: "v1",
 		Kind:    "ServiceAccount",
 	}] = impersonation.ImpersonationNamespace
-	cluster.Core.Secrets("").Controller()
-	cluster.Core.ServiceAccounts("").Controller()
-	cluster.Core.Namespaces("").Controller()
+	cluster.Corew.Secret().Informer()
+	cluster.Corew.ServiceAccount().Informer()
+	cluster.Corew.Namespace().Informer()
 }
 
 // PreBootstrap is a list of functions that _need_ to be run before the rest of the controllers start

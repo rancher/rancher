@@ -10,10 +10,10 @@ import (
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	typesrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/namespace"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
+	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -35,12 +35,12 @@ func newPRTBLifecycle(m *manager, management *config.ManagementContext, nsInform
 		m:          m,
 		rtLister:   management.Management.RoleTemplates("").Controller().Lister(),
 		nsIndexer:  nsInformer.GetIndexer(),
-		rbLister:   m.workload.RBAC.RoleBindings("").Controller().Lister(),
-		rbClient:   m.workload.RBAC.RoleBindings(""),
-		crbLister:  m.workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
-		crbClient:  m.workload.RBAC.ClusterRoleBindings(""),
-		crClient:   m.workload.RBAC.ClusterRoles(""),
-		crLister:   m.workload.RBAC.ClusterRoles("").Controller().Lister(),
+		rbLister:   m.workload.RBACw.RoleBinding().Cache(),
+		rbClient:   m.workload.RBACw.RoleBinding(),
+		crbLister:  m.workload.RBACw.ClusterRoleBinding().Cache(),
+		crbClient:  m.workload.RBACw.ClusterRoleBinding(),
+		crClient:   m.workload.RBACw.ClusterRole(),
+		crLister:   m.workload.RBACw.ClusterRole().Cache(),
 		prtbClient: management.Management.ProjectRoleTemplateBindings(""),
 	}
 }
@@ -49,12 +49,12 @@ type prtbLifecycle struct {
 	m          managerInterface
 	rtLister   v3.RoleTemplateLister
 	nsIndexer  cache.Indexer
-	rbLister   typesrbacv1.RoleBindingLister
-	rbClient   typesrbacv1.RoleBindingInterface
-	crbLister  typesrbacv1.ClusterRoleBindingLister
-	crbClient  typesrbacv1.ClusterRoleBindingInterface
-	crClient   typesrbacv1.ClusterRoleInterface
-	crLister   typesrbacv1.ClusterRoleLister
+	rbLister   wrbacv1.RoleBindingCache
+	rbClient   wrbacv1.RoleBindingClient
+	crbLister  wrbacv1.ClusterRoleBindingCache
+	crbClient  wrbacv1.ClusterRoleBindingClient
+	crClient   wrbacv1.ClusterRoleClient
+	crLister   wrbacv1.ClusterRoleCache
 	prtbClient v3.ProjectRoleTemplateBindingInterface
 }
 
@@ -163,7 +163,7 @@ func (p *prtbLifecycle) ensurePSAPermissions(binding *v3.ProjectRoleTemplateBind
 
 	// ensure ClusterRole exists with correct updatepsa rules
 	psaCRWanted := addUpdatepsaClusterRole(projectName)
-	psaCR, err := p.crLister.Get("", psaCRWanted.Name)
+	psaCR, err := p.crLister.Get(psaCRWanted.Name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// create ClusterRole if it doesn't exist
@@ -235,7 +235,7 @@ func (p *prtbLifecycle) ensurePRTBDelete(binding *v3.ProjectRoleTemplateBinding)
 		}
 
 		for _, rb := range rbs {
-			if err := p.rbClient.DeleteNamespaced(ns.Name, rb.Name, &metav1.DeleteOptions{}); err != nil {
+			if err := p.rbClient.Delete(ns.Name, rb.Name, &metav1.DeleteOptions{}); err != nil {
 				if !apierrors.IsNotFound(err) {
 					return fmt.Errorf("error deleting rolebinding %v: %w", rb.Name, err)
 				}
@@ -339,7 +339,7 @@ func (p *prtbLifecycle) reconcileProjectAccessToGlobalResources(binding *v3.Proj
 func (p *prtbLifecycle) reconcileProjectAccessToGlobalResourcesForDelete(binding *v3.ProjectRoleTemplateBinding) error {
 	rtbNsAndName := pkgrbac.GetRTBLabel(binding.ObjectMeta)
 	set := labels.Set(map[string]string{rtbNsAndName: owner})
-	crbs, err := p.crbLister.List("", set.AsSelector())
+	crbs, err := p.crbLister.List(set.AsSelector())
 	if err != nil {
 		return err
 	}
@@ -531,7 +531,7 @@ func (p *prtbLifecycle) reconcilePRTBUserClusterLabels(binding *v3.ProjectRoleTe
 	}
 	for _, rb := range rbs {
 		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			rbToUpdate, updateErr := p.rbClient.GetNamespaced(rb.Namespace, rb.Name, metav1.GetOptions{})
+			rbToUpdate, updateErr := p.rbClient.Get(rb.Namespace, rb.Name, metav1.GetOptions{})
 			if updateErr != nil {
 				return updateErr
 			}

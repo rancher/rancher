@@ -38,18 +38,18 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	mgmtClusters := cluster.Management.Management.Clusters("")
 	clusters := cluster.Management.Wrangler.Provisioning.Cluster().Cache()
 
-	nodeLister := cluster.Core.Nodes("").Controller().Lister()
-	nsLister := cluster.Core.Namespaces("").Controller().Lister()
-	nses := cluster.Core.Namespaces("")
-	serviceLister := cluster.Core.Services("").Controller().Lister()
-	services := cluster.Core.Services("")
-	podLister := cluster.Core.Pods("").Controller().Lister()
-	pods := cluster.Core.Pods("")
+	nodeLister := cluster.Corew.Node().Cache()
+	nsLister := cluster.Corew.Namespace().Cache()
+	nses := cluster.Corew.Namespace()
+	serviceLister := cluster.Corew.Service().Cache()
+	services := cluster.Corew.Service()
+	podLister := cluster.Corew.Pod().Cache()
+	pods := cluster.Corew.Pod()
 
 	npLister := cluster.Networking.NetworkPolicies("").Controller().Lister()
 	npClient := cluster.Networking
 
-	npmgr := &netpolMgr{clusterLister, clusters, nsLister, nodeLister, pods, projects,
+	npmgr := &netpolMgr{clusterLister, clusters, nsLister, nodeLister, projects,
 		npLister, npClient, projectLister, cluster.ClusterName}
 	ps := &projectSyncer{pnpLister, pnps, projects, clusterLister, cluster.ClusterName}
 	nss := &nsSyncer{npmgr, clusterLister, serviceLister, podLister,
@@ -65,9 +65,9 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 
 	projects.Controller().AddClusterScopedHandler(ctx, "projectSyncer", cluster.ClusterName, ps.Sync)
 	pnps.AddClusterScopedHandler(ctx, "projectNetworkPolicySyncer", cluster.ClusterName, pnpsyncer.Sync)
-	nses.AddHandler(ctx, "namespaceLifecycle", nss.Sync)
-	pods.AddHandler(ctx, "podHandler", podHandler.Sync)
-	services.AddHandler(ctx, "serviceHandler", serviceHandler.Sync)
+	nses.OnChange(ctx, "namespaceLifecycle", nss.Sync)
+	pods.OnChange(ctx, "podHandler", podHandler.Sync)
+	services.OnChange(ctx, "serviceHandler", serviceHandler.Sync)
 
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler(ctx, "nodeHandler", nodeHandler.Sync)
 	mgmtClusters.AddHandler(ctx, "clusterHandler", clusterHandler.Sync)

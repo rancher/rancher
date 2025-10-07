@@ -9,13 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/apimachinery/pkg/runtime"
-
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
-	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	corew "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -49,16 +47,18 @@ var (
 )
 
 type ResourceSyncController struct {
-	upstreamSecrets   v1.SecretInterface
-	downstreamSecrets v1.SecretInterface
+	namespace         string
+	upstreamSecrets   corew.SecretClient
+	downstreamSecrets corew.SecretClient
 	clusterName       string
 	clusterId         string
 }
 
 func Bootstrap(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext, clusterRec *apimgmtv3.Cluster) error {
 	c := &ResourceSyncController{
-		upstreamSecrets:   mgmt.Core.Secrets(clusterRec.Spec.FleetWorkspaceName),
-		downstreamSecrets: cluster.Core.Secrets(""),
+		namespace:         clusterRec.Spec.FleetWorkspaceName,
+		upstreamSecrets:   mgmt.Wrangler.Core.Secret(),
+		downstreamSecrets: cluster.Corew.Secret(),
 		clusterName:       clusterRec.Spec.DisplayName,
 		clusterId:         clusterRec.Name,
 	}
@@ -70,19 +70,20 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	RegisterProjectScopedSecretHandler(ctx, cluster)
 
 	resourceSyncController := &ResourceSyncController{
-		upstreamSecrets:   mgmt.Core.Secrets(clusterRec.Spec.FleetWorkspaceName),
-		downstreamSecrets: cluster.Core.Secrets(""),
+		namespace:         clusterRec.Spec.FleetWorkspaceName,
+		upstreamSecrets:   mgmt.Wrangler.Core.Secret(),
+		downstreamSecrets: cluster.Corew.Secret(),
 		clusterName:       clusterRec.Spec.DisplayName,
 		clusterId:         clusterRec.Name,
 	}
 
-	resourceSyncController.upstreamSecrets.AddHandler(ctx, "secret-resource-synced", resourceSyncController.sync)
+	mgmt.Wrangler.Core.Secret().OnChange(ctx, "secret-resource-synced", resourceSyncController.sync)
 }
 
 func (c *ResourceSyncController) bootstrap(mgmtClusterClient v3.ClusterInterface, mgmtCluster *apimgmtv3.Cluster) error {
-	secrets, err := c.upstreamSecrets.List(metav1.ListOptions{})
+	secrets, err := c.upstreamSecrets.List(c.namespace, metav1.ListOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to list secrets in %v namespace: %w", mgmtCluster.Spec.FleetWorkspaceName, err)
+		return fmt.Errorf("failed to list secrets in %v namespace: %w", c.namespace, err)
 	}
 
 	logrus.Debugf("[pre-bootstrap][secrets] looking for secrets-to synchronize to cluster %v", c.clusterName)
@@ -157,8 +158,8 @@ func (c *ResourceSyncController) removeClusterIdFromSecretData(sec *corev1.Secre
 	return sec
 }
 
-func (c *ResourceSyncController) sync(key string, obj *corev1.Secret) (runtime.Object, error) {
-	if obj == nil {
+func (c *ResourceSyncController) sync(_ string, obj *corev1.Secret) (*corev1.Secret, error) {
+	if obj == nil || obj.Namespace != c.namespace {
 		return nil, nil
 	}
 
@@ -179,7 +180,7 @@ func (c *ResourceSyncController) sync(key string, obj *corev1.Secret) (runtime.O
 
 	var targetSecret *corev1.Secret
 	var err error
-	if targetSecret, err = c.downstreamSecrets.GetNamespaced(ns, name, metav1.GetOptions{}); err != nil && !errors.IsNotFound(err) {
+	if targetSecret, err = c.downstreamSecrets.Get(ns, name, metav1.GetOptions{}); err != nil && !errors.IsNotFound(err) {
 		return nil, fmt.Errorf("failed to get downstream secret %v/%v in cluster %v: %w", ns, name, c.clusterName, err)
 	}
 

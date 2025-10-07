@@ -6,9 +6,9 @@ import (
 	"github.com/rancher/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/nodesyncer"
-	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	wcore "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -18,8 +18,8 @@ import (
 type clusterHandler struct {
 	cluster          *config.UserContext
 	pnpLister        v3.ProjectNetworkPolicyLister
-	podLister        v1.PodLister
-	serviceLister    v1.ServiceLister
+	podLister        wcore.PodCache
+	serviceLister    wcore.ServiceCache
 	pLister          v3.ProjectLister
 	clusters         v3.ClusterInterface
 	pnps             v3.ProjectNetworkPolicyInterface
@@ -93,7 +93,7 @@ func (ch *clusterHandler) createNetworkPolicies(cluster *v3.Cluster) error {
 	}
 
 	//hostPort
-	pods, err := ch.podLister.List("", labels.NewSelector())
+	pods, err := ch.podLister.List(metav1.NamespaceAll, labels.NewSelector())
 	if err != nil {
 		return fmt.Errorf("podLister: %v", err)
 	}
@@ -103,12 +103,12 @@ func (ch *clusterHandler) createNetworkPolicies(cluster *v3.Cluster) error {
 			continue
 		}
 		if hostPortPod(pod) {
-			ch.cluster.Core.Pods("").Controller().Enqueue(pod.Namespace, pod.Name)
+			ch.cluster.Corew.Pod().Enqueue(pod.Namespace, pod.Name)
 		}
 	}
 
 	// nodePort
-	svcs, err := ch.serviceLister.List("", labels.NewSelector())
+	svcs, err := ch.serviceLister.List(metav1.NamespaceAll, labels.NewSelector())
 	if err != nil {
 		return err
 	}
@@ -117,7 +117,7 @@ func (ch *clusterHandler) createNetworkPolicies(cluster *v3.Cluster) error {
 			continue
 		}
 		if nodePortService(svc) {
-			ch.cluster.Core.Services("").Controller().Enqueue(svc.Namespace, svc.Name)
+			ch.cluster.Corew.Service().Enqueue(svc.Namespace, svc.Name)
 		}
 	}
 
