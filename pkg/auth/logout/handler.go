@@ -6,16 +6,13 @@ import (
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/sirupsen/logrus"
 )
 
-func NewHandler(ctx context.Context, tokenMgr tokenManager) http.Handler {
-	return &handler{
-		tokenMgr: tokenMgr,
-	}
-}
+var cookieUnsetTimestamp = time.Date(1982, time.February, 10, 23, 0, 0, 0, time.UTC)
 
 type tokenManager interface {
 	GetToken(token string) (*v3.Token, int, error)
@@ -23,7 +20,17 @@ type tokenManager interface {
 }
 
 type handler struct {
-	tokenMgr tokenManager
+	tokenMgr  tokenManager
+	logout    func(http.ResponseWriter, *http.Request, accessor.TokenAccessor) error
+	logoutAll func(http.ResponseWriter, *http.Request, accessor.TokenAccessor) error
+}
+
+func NewHandler(ctx context.Context, tokenMgr tokenManager) http.Handler {
+	return &handler{
+		tokenMgr:  tokenMgr,
+		logoutAll: providers.ProviderLogoutAll,
+		logout:    providers.ProviderLogout,
+	}
 }
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -46,7 +53,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			Path:     "/",
 			HttpOnly: true,
 			MaxAge:   -1,
-			Expires:  time.Date(1982, time.February, 10, 23, 0, 0, 0, time.UTC),
+			Expires:  cookieUnsetTimestamp,
 		}
 		http.SetCookie(w, tokenCookie)
 	}
@@ -69,9 +76,9 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	isLogoutAll := r.URL.Query().Has("all") || r.URL.Query().Has("logoutAll")
 
 	if isLogoutAll {
-		err = providers.ProviderLogoutAll(w, r, storedToken)
+		err = h.logoutAll(w, r, storedToken)
 	} else {
-		err = providers.ProviderLogout(w, r, storedToken)
+		err = h.logout(w, r, storedToken)
 	}
 	if err != nil {
 		logrus.Errorf("logout: provider logout: %v", err)
@@ -79,8 +86,12 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	status, err = h.tokenMgr.DeleteTokenByName(storedToken.Name)
-	if err != nil {
+	if status == http.StatusGone {
+		return
+	}
+
+	_, err = h.tokenMgr.DeleteTokenByName(storedToken.Name)
+	if err != nil { // NotFound is already handled by DeleteTokenByName.
 		logrus.Errorf("logout: deleting session token %s: %v", storedToken.Name, err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 	}
