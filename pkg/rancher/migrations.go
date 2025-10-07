@@ -23,6 +23,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/mod/semver"
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -722,23 +723,39 @@ func managementNodeCleanup(w *wrangler.Context) error {
 	}
 
 	for _, node := range nodes.Items {
-		for i, f := range node.Finalizers {
-			if f != "controller.cattle.io/node-controller" {
-				continue
-			}
-
-			node = *node.DeepCopy()
-			node.Finalizers = append(node.Finalizers[:i], node.Finalizers[i+1:]...)
-
-			_, err = w.Mgmt.Node().Update(&node)
-			if err != nil {
-				return err
-			}
-
-			break
+		if err := cleanupNodeFinalizers(w, node.Namespace, node.Name); err != nil {
+			return err
 		}
 	}
 
 	cm.Data[managementCleanupCompletedKey] = "true"
 	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
+}
+
+func cleanupNodeFinalizers(w *wrangler.Context, nodeNamespace, nodeName string) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		node, err := w.Mgmt.Node().Get(nodeNamespace, nodeName, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		finalizers := make([]string, 0, len(node.Finalizers))
+		for _, f := range node.Finalizers {
+			if f != "controller.cattle.io/node-controller" {
+				finalizers = append(finalizers, f)
+			}
+		}
+		if len(finalizers) == len(node.Finalizers) {
+			return nil
+		}
+		node = node.DeepCopy()
+		node.Finalizers = finalizers
+		_, err = w.Mgmt.Node().Update(node)
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	})
 }
