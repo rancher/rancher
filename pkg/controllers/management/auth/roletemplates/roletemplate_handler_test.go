@@ -31,6 +31,86 @@ var (
 		Verbs:     []string{"get"},
 		Resources: []string{"clusterroletemplatebindings"},
 	}
+	listOptions = metav1.ListOptions{
+		LabelSelector: "authz.cluster.cattle.io/clusterrole-owner=test-rt",
+	}
+	terminatingRoleTemplate = v3.RoleTemplate{
+		ObjectMeta: metav1.ObjectMeta{
+			DeletionTimestamp: &metav1.Time{Time: time.Now()},
+		},
+	}
+	defaultRoleTemplate = v3.RoleTemplate{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "roletemplate",
+			APIVersion: "management.cattle.io",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-rt",
+			UID:  "UID123",
+		},
+	}
+	defaultOwnerReference = metav1.OwnerReference{
+		Name:       "test-rt",
+		Kind:       "roletemplate",
+		APIVersion: "management.cattle.io",
+		UID:        "UID123",
+	}
+	projectManagementClusterRole = rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "test-rt-project-mgmt",
+			OwnerReferences: []metav1.OwnerReference{defaultOwnerReference},
+			Labels: map[string]string{
+				"management.cattle.io/aggregates":           "test-rt-project-mgmt",
+				"authz.cluster.cattle.io/clusterrole-owner": "test-rt",
+			},
+		},
+		Rules: []rbacv1.PolicyRule{getPRTBS},
+	}
+	projectManagementAggregatingClusterRole = rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "test-rt-project-mgmt-aggregator",
+			OwnerReferences: []metav1.OwnerReference{defaultOwnerReference},
+			Labels: map[string]string{
+				"management.cattle.io/aggregates":           "test-rt-project-mgmt-aggregator",
+				"authz.cluster.cattle.io/clusterrole-owner": "test-rt",
+			},
+		},
+		AggregationRule: &rbacv1.AggregationRule{
+			ClusterRoleSelectors: []metav1.LabelSelector{
+				{
+					MatchLabels: map[string]string{"management.cattle.io/aggregates": "test-rt-project-mgmt"},
+				},
+			},
+		},
+	}
+	clusterManagementClusterRole = rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "test-rt-cluster-mgmt",
+			OwnerReferences: []metav1.OwnerReference{defaultOwnerReference},
+			Labels: map[string]string{
+				"management.cattle.io/aggregates":           "test-rt-cluster-mgmt",
+				"authz.cluster.cattle.io/clusterrole-owner": "test-rt",
+			},
+		},
+		Rules: []rbacv1.PolicyRule{getCRTBs},
+	}
+	clusterManagementAggregatingClusterRole = rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            "test-rt-cluster-mgmt-aggregator",
+			OwnerReferences: []metav1.OwnerReference{defaultOwnerReference},
+			Labels: map[string]string{
+				"management.cattle.io/aggregates":           "test-rt-cluster-mgmt-aggregator",
+				"authz.cluster.cattle.io/clusterrole-owner": "test-rt",
+			},
+		},
+		AggregationRule: &rbacv1.AggregationRule{
+			ClusterRoleSelectors: []metav1.LabelSelector{
+				{
+					MatchLabels: map[string]string{"management.cattle.io/aggregates": "test-rt-cluster-mgmt"},
+				},
+			},
+		},
+	}
 )
 
 func Test_OnChange(t *testing.T) {
@@ -47,194 +127,143 @@ func Test_OnChange(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "exit early when roletemplate is terminating",
-			rt: &v3.RoleTemplate{
-				ObjectMeta: metav1.ObjectMeta{
-					DeletionTimestamp: &metav1.Time{Time: time.Now()},
-				},
-			},
+			name:    "exit early when roletemplate is terminating",
+			rt:      terminatingRoleTemplate.DeepCopy(),
 			wantErr: false,
 		},
 		{
 			name: "project RT with no management plane privileges doesn't create CRs",
 			rt: &v3.RoleTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-rt",
+				},
 				Context: "project",
 				Rules:   []rbacv1.PolicyRule{getRoleTemplates},
+			},
+			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().List(listOptions).Return(&rbacv1.ClusterRoleList{}, nil)
 			},
 		},
 		{
 			name: "project RT with management plane privileges creates CRs",
 			rt: &v3.RoleTemplate{
-				Context: "project",
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "roletemplate",
-					APIVersion: "management.cattle.io",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-rt",
-					UID:  "UID123",
-				},
-				Rules: []rbacv1.PolicyRule{getPRTBS},
+				ObjectMeta: defaultRoleTemplate.ObjectMeta,
+				Context:    "project",
+				TypeMeta:   defaultRoleTemplate.TypeMeta,
+				Rules:      []rbacv1.PolicyRule{getPRTBS},
 			},
 			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().List(listOptions).Return(&rbacv1.ClusterRoleList{}, nil)
 				m.EXPECT().Get("test-rt-project-mgmt", metav1.GetOptions{}).Return(nil, errNotFound)
-				m.EXPECT().Create(&rbacv1.ClusterRole{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "test-rt-project-mgmt",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Name:       "test-rt",
-								Kind:       "roletemplate",
-								APIVersion: "management.cattle.io",
-								UID:        "UID123",
-							},
-						},
-						Labels:      map[string]string{"management.cattle.io/aggregates": "test-rt-project-mgmt"},
-						Annotations: map[string]string{"authz.cluster.cattle.io/clusterrole-owner": "test-rt"},
-					},
-					Rules: []rbacv1.PolicyRule{getPRTBS},
-				}).Return(nil, nil)
+				m.EXPECT().Create(projectManagementClusterRole.DeepCopy()).Return(nil, nil)
 				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, errNotFound)
-				m.EXPECT().Create(&rbacv1.ClusterRole{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "test-rt-project-mgmt-aggregator",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Name:       "test-rt",
-								Kind:       "roletemplate",
-								APIVersion: "management.cattle.io",
-								UID:        "UID123",
-							},
-						},
-						Labels:      map[string]string{"management.cattle.io/aggregates": "test-rt-project-mgmt-aggregator"},
-						Annotations: map[string]string{"authz.cluster.cattle.io/clusterrole-owner": "test-rt"},
-					},
-					AggregationRule: &rbacv1.AggregationRule{
-						ClusterRoleSelectors: []metav1.LabelSelector{
-							{
-								MatchLabels: map[string]string{"management.cattle.io/aggregates": "test-rt-project-mgmt"},
-							},
-						},
-					},
-				}).Return(nil, nil)
+				m.EXPECT().Create(projectManagementAggregatingClusterRole.DeepCopy()).Return(nil, nil)
 			},
 		},
 		{
 			name: "cluster RT with no management plane privileges doesn't create CRs",
 			rt: &v3.RoleTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-rt",
+				},
 				Context: "cluster",
 				Rules:   []rbacv1.PolicyRule{getRoleTemplates},
+			},
+			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().List(listOptions).Return(&rbacv1.ClusterRoleList{}, nil)
 			},
 		},
 		{
 			name: "cluster RT with management plane privileges creates CRs",
 			rt: &v3.RoleTemplate{
-				Context: "cluster",
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "roletemplate",
-					APIVersion: "management.cattle.io",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-rt",
-					UID:  "UID123",
-				},
-				Rules: []rbacv1.PolicyRule{getCRTBs, getPRTBS},
+				ObjectMeta: defaultRoleTemplate.ObjectMeta,
+				Context:    "cluster",
+				TypeMeta:   defaultRoleTemplate.TypeMeta,
+				Rules:      []rbacv1.PolicyRule{getCRTBs, getPRTBS},
 			},
 			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().List(listOptions).Return(&rbacv1.ClusterRoleList{}, nil)
 				m.EXPECT().Get("test-rt-cluster-mgmt", metav1.GetOptions{}).Return(nil, errNotFound)
-				m.EXPECT().Create(&rbacv1.ClusterRole{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "test-rt-cluster-mgmt",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Name:       "test-rt",
-								Kind:       "roletemplate",
-								APIVersion: "management.cattle.io",
-								UID:        "UID123",
-							},
-						},
-						Labels:      map[string]string{"management.cattle.io/aggregates": "test-rt-cluster-mgmt"},
-						Annotations: map[string]string{"authz.cluster.cattle.io/clusterrole-owner": "test-rt"},
-					},
-					Rules: []rbacv1.PolicyRule{getCRTBs},
-				}).Return(nil, nil)
+				m.EXPECT().Create(clusterManagementClusterRole.DeepCopy()).Return(nil, nil)
 				m.EXPECT().Get("test-rt-cluster-mgmt-aggregator", metav1.GetOptions{}).Return(nil, errNotFound)
-				m.EXPECT().Create(&rbacv1.ClusterRole{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "test-rt-cluster-mgmt-aggregator",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Name:       "test-rt",
-								Kind:       "roletemplate",
-								APIVersion: "management.cattle.io",
-								UID:        "UID123",
-							},
-						},
-						Labels:      map[string]string{"management.cattle.io/aggregates": "test-rt-cluster-mgmt-aggregator"},
-						Annotations: map[string]string{"authz.cluster.cattle.io/clusterrole-owner": "test-rt"},
-					},
-					AggregationRule: &rbacv1.AggregationRule{
-						ClusterRoleSelectors: []metav1.LabelSelector{
-							{
-								MatchLabels: map[string]string{"management.cattle.io/aggregates": "test-rt-cluster-mgmt"},
-							},
-						},
-					},
-				}).Return(nil, nil)
+				m.EXPECT().Create(clusterManagementAggregatingClusterRole.DeepCopy()).Return(nil, nil)
 				m.EXPECT().Get("test-rt-project-mgmt", metav1.GetOptions{}).Return(nil, errNotFound).AnyTimes()
-				m.EXPECT().Create(&rbacv1.ClusterRole{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "test-rt-project-mgmt",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Name:       "test-rt",
-								Kind:       "roletemplate",
-								APIVersion: "management.cattle.io",
-								UID:        "UID123",
-							},
-						},
-						Labels:      map[string]string{"management.cattle.io/aggregates": "test-rt-project-mgmt"},
-						Annotations: map[string]string{"authz.cluster.cattle.io/clusterrole-owner": "test-rt"},
-					},
-					Rules: []rbacv1.PolicyRule{getPRTBS},
-				}).Return(nil, nil)
+				m.EXPECT().Create(projectManagementClusterRole.DeepCopy()).Return(nil, nil)
 				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, errNotFound)
-				m.EXPECT().Create(&rbacv1.ClusterRole{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "test-rt-project-mgmt-aggregator",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Name:       "test-rt",
-								Kind:       "roletemplate",
-								APIVersion: "management.cattle.io",
-								UID:        "UID123",
-							},
-						},
-						Labels:      map[string]string{"management.cattle.io/aggregates": "test-rt-project-mgmt-aggregator"},
-						Annotations: map[string]string{"authz.cluster.cattle.io/clusterrole-owner": "test-rt"},
-					},
-					AggregationRule: &rbacv1.AggregationRule{
-						ClusterRoleSelectors: []metav1.LabelSelector{
-							{
-								MatchLabels: map[string]string{"management.cattle.io/aggregates": "test-rt-project-mgmt"},
-							},
-						},
-					},
-				}).Return(nil, nil)
+				m.EXPECT().Create(projectManagementAggregatingClusterRole.DeepCopy()).Return(nil, nil)
 			},
+		},
+		{
+			name: "update existing cluster roles",
+			rt: &v3.RoleTemplate{
+				ObjectMeta: defaultRoleTemplate.ObjectMeta,
+				Context:    "project",
+				TypeMeta:   defaultRoleTemplate.TypeMeta,
+				Rules:      []rbacv1.PolicyRule{getPRTBS},
+			},
+			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().List(listOptions).Return(&rbacv1.ClusterRoleList{
+					Items: []rbacv1.ClusterRole{},
+				}, nil)
+				existingCR := projectManagementClusterRole.DeepCopy()
+				existingCR.Rules = []rbacv1.PolicyRule{} // Make it different
+				m.EXPECT().Get("test-rt-project-mgmt", metav1.GetOptions{}).Return(existingCR, nil).AnyTimes()
+				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(projectManagementAggregatingClusterRole.DeepCopy(), nil)
+				m.EXPECT().Update(projectManagementClusterRole.DeepCopy()).Return(nil, nil).AnyTimes()
+			},
+		},
+		{
+			name: "error updating existing cluster roles",
+			rt: &v3.RoleTemplate{
+				ObjectMeta: defaultRoleTemplate.ObjectMeta,
+				Context:    "project",
+				TypeMeta:   defaultRoleTemplate.TypeMeta,
+				Rules:      []rbacv1.PolicyRule{getPRTBS},
+			},
+			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().List(listOptions).Return(&rbacv1.ClusterRoleList{
+					Items: []rbacv1.ClusterRole{},
+				}, nil)
+				existingCR := projectManagementClusterRole.DeepCopy()
+				existingCR.Rules = []rbacv1.PolicyRule{} // Make it different
+				m.EXPECT().Get("test-rt-project-mgmt", metav1.GetOptions{}).Return(existingCR, nil).AnyTimes()
+				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(projectManagementAggregatingClusterRole.DeepCopy(), nil)
+				m.EXPECT().Update(projectManagementClusterRole.DeepCopy()).Return(nil, errDefault).AnyTimes()
+			},
+			wantErr: true,
+		},
+		{
+			name: "roletemplate changes from having mgmt rules to not having them",
+			rt: &v3.RoleTemplate{
+				ObjectMeta: defaultRoleTemplate.ObjectMeta,
+				Context:    "project",
+				TypeMeta:   defaultRoleTemplate.TypeMeta,
+				Rules:      []rbacv1.PolicyRule{getRoleTemplates}, // No mgmt plane rules
+			},
+			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().List(listOptions).Return(&rbacv1.ClusterRoleList{
+					Items: []rbacv1.ClusterRole{*projectManagementClusterRole.DeepCopy()},
+				}, nil)
+				m.EXPECT().Delete(projectManagementClusterRole.Name, &metav1.DeleteOptions{}).Return(nil)
+			},
+		},
+		{
+			name: "error getting external cluster role rules",
+			rt: &v3.RoleTemplate{
+				ObjectMeta: defaultRoleTemplate.ObjectMeta,
+				External:   true,
+			},
+			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(nil, errDefault)
+			},
+			wantErr: true,
 		},
 		{
 			name: "use external rules over rules",
 			rt: &v3.RoleTemplate{
-				Context: "project",
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "roletemplate",
-					APIVersion: "management.cattle.io",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-rt",
-					UID:  "UID123",
-				},
+				ObjectMeta:    defaultRoleTemplate.ObjectMeta,
+				Context:       "project",
+				TypeMeta:      defaultRoleTemplate.TypeMeta,
 				External:      true,
 				ExternalRules: []rbacv1.PolicyRule{getPRTBS},
 				Rules: []rbacv1.PolicyRule{
@@ -246,125 +275,44 @@ func Test_OnChange(t *testing.T) {
 				},
 			},
 			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().List(listOptions).Return(&rbacv1.ClusterRoleList{}, nil)
 				m.EXPECT().Get("test-rt-project-mgmt", metav1.GetOptions{}).Return(nil, errNotFound)
-				m.EXPECT().Create(&rbacv1.ClusterRole{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "test-rt-project-mgmt",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Name:       "test-rt",
-								Kind:       "roletemplate",
-								APIVersion: "management.cattle.io",
-								UID:        "UID123",
-							},
-						},
-						Labels:      map[string]string{"management.cattle.io/aggregates": "test-rt-project-mgmt"},
-						Annotations: map[string]string{"authz.cluster.cattle.io/clusterrole-owner": "test-rt"},
-					},
-					Rules: []rbacv1.PolicyRule{getPRTBS},
-				}).Return(nil, nil)
+				m.EXPECT().Create(projectManagementClusterRole.DeepCopy()).Return(nil, nil)
 				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, errNotFound)
-				m.EXPECT().Create(&rbacv1.ClusterRole{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "test-rt-project-mgmt-aggregator",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Name:       "test-rt",
-								Kind:       "roletemplate",
-								APIVersion: "management.cattle.io",
-								UID:        "UID123",
-							},
-						},
-						Labels:      map[string]string{"management.cattle.io/aggregates": "test-rt-project-mgmt-aggregator"},
-						Annotations: map[string]string{"authz.cluster.cattle.io/clusterrole-owner": "test-rt"},
-					},
-					AggregationRule: &rbacv1.AggregationRule{
-						ClusterRoleSelectors: []metav1.LabelSelector{
-							{
-								MatchLabels: map[string]string{"management.cattle.io/aggregates": "test-rt-project-mgmt"},
-							},
-						},
-					},
-				}).Return(nil, nil)
+				m.EXPECT().Create(projectManagementAggregatingClusterRole.DeepCopy()).Return(nil, nil)
 			},
 		},
 		{
 			name: "use external cluster role rules over rules",
 			rt: &v3.RoleTemplate{
-				Context: "project",
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "roletemplate",
-					APIVersion: "management.cattle.io",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-rt",
-					UID:  "UID123",
-				},
-				External: true,
-				Rules:    []rbacv1.PolicyRule{getRoleTemplates},
+				ObjectMeta: defaultRoleTemplate.ObjectMeta,
+				Context:    "project",
+				TypeMeta:   defaultRoleTemplate.TypeMeta,
+				External:   true,
+				Rules:      []rbacv1.PolicyRule{getRoleTemplates},
 			},
 			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().List(listOptions).Return(&rbacv1.ClusterRoleList{}, nil)
 				m.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(&rbacv1.ClusterRole{
 					Rules: []rbacv1.PolicyRule{getPRTBS},
 				}, nil)
 				m.EXPECT().Get("test-rt-project-mgmt", metav1.GetOptions{}).Return(nil, errNotFound)
-				m.EXPECT().Create(&rbacv1.ClusterRole{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "test-rt-project-mgmt",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Name:       "test-rt",
-								Kind:       "roletemplate",
-								APIVersion: "management.cattle.io",
-								UID:        "UID123",
-							},
-						},
-						Labels:      map[string]string{"management.cattle.io/aggregates": "test-rt-project-mgmt"},
-						Annotations: map[string]string{"authz.cluster.cattle.io/clusterrole-owner": "test-rt"},
-					},
-					Rules: []rbacv1.PolicyRule{getPRTBS},
-				}).Return(nil, nil)
+				m.EXPECT().Create(projectManagementClusterRole.DeepCopy()).Return(nil, nil)
 				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, errNotFound)
-				m.EXPECT().Create(&rbacv1.ClusterRole{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "test-rt-project-mgmt-aggregator",
-						OwnerReferences: []metav1.OwnerReference{
-							{
-								Name:       "test-rt",
-								Kind:       "roletemplate",
-								APIVersion: "management.cattle.io",
-								UID:        "UID123",
-							},
-						},
-						Labels:      map[string]string{"management.cattle.io/aggregates": "test-rt-project-mgmt-aggregator"},
-						Annotations: map[string]string{"authz.cluster.cattle.io/clusterrole-owner": "test-rt"},
-					},
-					AggregationRule: &rbacv1.AggregationRule{
-						ClusterRoleSelectors: []metav1.LabelSelector{
-							{
-								MatchLabels: map[string]string{"management.cattle.io/aggregates": "test-rt-project-mgmt"},
-							},
-						},
-					},
-				}).Return(nil, nil)
+				m.EXPECT().Create(projectManagementAggregatingClusterRole.DeepCopy()).Return(nil, nil)
 			},
 		},
 		{
 			name: "inheriting mgmt plane rules, cluster role",
 			rt: &v3.RoleTemplate{
-				Context: "cluster",
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "roletemplate",
-					APIVersion: "management.cattle.io",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-rt",
-					UID:  "UID123",
-				},
+				ObjectMeta:        defaultRoleTemplate.ObjectMeta,
+				Context:           "cluster",
+				TypeMeta:          defaultRoleTemplate.TypeMeta,
 				Rules:             []rbacv1.PolicyRule{getRoleTemplates},
 				RoleTemplateNames: []string{"child-rt"},
 			},
 			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().List(listOptions).Return(&rbacv1.ClusterRoleList{}, nil)
 				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, errNotFound)
 				m.EXPECT().Get("child-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(&rbacv1.ClusterRole{}, nil)
 				m.EXPECT().Create(&rbacv1.ClusterRole{
@@ -378,8 +326,10 @@ func Test_OnChange(t *testing.T) {
 								UID:        "UID123",
 							},
 						},
-						Labels:      map[string]string{"management.cattle.io/aggregates": "test-rt-project-mgmt-aggregator"},
-						Annotations: map[string]string{"authz.cluster.cattle.io/clusterrole-owner": "test-rt"},
+						Labels: map[string]string{
+							"management.cattle.io/aggregates":           "test-rt-project-mgmt-aggregator",
+							"authz.cluster.cattle.io/clusterrole-owner": "test-rt",
+						},
 					},
 					AggregationRule: &rbacv1.AggregationRule{
 						ClusterRoleSelectors: []metav1.LabelSelector{
@@ -405,8 +355,10 @@ func Test_OnChange(t *testing.T) {
 								UID:        "UID123",
 							},
 						},
-						Labels:      map[string]string{"management.cattle.io/aggregates": "test-rt-cluster-mgmt-aggregator"},
-						Annotations: map[string]string{"authz.cluster.cattle.io/clusterrole-owner": "test-rt"},
+						Labels: map[string]string{
+							"management.cattle.io/aggregates":           "test-rt-cluster-mgmt-aggregator",
+							"authz.cluster.cattle.io/clusterrole-owner": "test-rt",
+						},
 					},
 					AggregationRule: &rbacv1.AggregationRule{
 						ClusterRoleSelectors: []metav1.LabelSelector{
@@ -424,19 +376,14 @@ func Test_OnChange(t *testing.T) {
 		{
 			name: "inheriting mgmt plane rules, project role",
 			rt: &v3.RoleTemplate{
-				Context: "project",
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "roletemplate",
-					APIVersion: "management.cattle.io",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-rt",
-					UID:  "UID123",
-				},
+				ObjectMeta:        defaultRoleTemplate.ObjectMeta,
+				Context:           "project",
+				TypeMeta:          defaultRoleTemplate.TypeMeta,
 				Rules:             []rbacv1.PolicyRule{getRoleTemplates},
 				RoleTemplateNames: []string{"child-rt"},
 			},
 			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().List(listOptions).Return(&rbacv1.ClusterRoleList{}, nil)
 				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, errNotFound)
 				m.EXPECT().Get("child-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(&rbacv1.ClusterRole{}, nil)
 				m.EXPECT().Create(&rbacv1.ClusterRole{
@@ -450,8 +397,10 @@ func Test_OnChange(t *testing.T) {
 								UID:        "UID123",
 							},
 						},
-						Labels:      map[string]string{"management.cattle.io/aggregates": "test-rt-project-mgmt-aggregator"},
-						Annotations: map[string]string{"authz.cluster.cattle.io/clusterrole-owner": "test-rt"},
+						Labels: map[string]string{
+							"management.cattle.io/aggregates":           "test-rt-project-mgmt-aggregator",
+							"authz.cluster.cattle.io/clusterrole-owner": "test-rt",
+						},
 					},
 					AggregationRule: &rbacv1.AggregationRule{
 						ClusterRoleSelectors: []metav1.LabelSelector{
@@ -469,19 +418,14 @@ func Test_OnChange(t *testing.T) {
 		{
 			name: "inherited roles have no mgmt plane rules",
 			rt: &v3.RoleTemplate{
-				Context: "cluster",
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "roletemplate",
-					APIVersion: "management.cattle.io",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-rt",
-					UID:  "UID123",
-				},
+				ObjectMeta:        defaultRoleTemplate.ObjectMeta,
+				Context:           "cluster",
+				TypeMeta:          defaultRoleTemplate.TypeMeta,
 				Rules:             []rbacv1.PolicyRule{getRoleTemplates},
 				RoleTemplateNames: []string{"child-rt"},
 			},
 			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().List(listOptions).Return(&rbacv1.ClusterRoleList{}, nil)
 				m.EXPECT().Get("child-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, errNotFound)
 				m.EXPECT().Get("child-rt-cluster-mgmt-aggregator", metav1.GetOptions{}).Return(nil, errNotFound)
 			},
@@ -489,15 +433,9 @@ func Test_OnChange(t *testing.T) {
 		{
 			name: "error getting inherited project mgmt role",
 			rt: &v3.RoleTemplate{
-				Context: "cluster",
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "roletemplate",
-					APIVersion: "management.cattle.io",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-rt",
-					UID:  "UID123",
-				},
+				ObjectMeta:        defaultRoleTemplate.ObjectMeta,
+				Context:           "cluster",
+				TypeMeta:          defaultRoleTemplate.TypeMeta,
 				Rules:             []rbacv1.PolicyRule{getRoleTemplates},
 				RoleTemplateNames: []string{"child-rt"},
 			},
@@ -510,20 +448,77 @@ func Test_OnChange(t *testing.T) {
 		{
 			name: "error getting inherited cluster mgmt role",
 			rt: &v3.RoleTemplate{
-				Context: "cluster",
-				TypeMeta: metav1.TypeMeta{
-					Kind:       "roletemplate",
-					APIVersion: "management.cattle.io",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-rt",
-					UID:  "UID123",
-				},
+				ObjectMeta:        defaultRoleTemplate.ObjectMeta,
+				Context:           "cluster",
+				TypeMeta:          defaultRoleTemplate.TypeMeta,
 				Rules:             []rbacv1.PolicyRule{getRoleTemplates},
 				RoleTemplateNames: []string{"child-rt"},
 			},
 			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
 				m.EXPECT().Get("child-rt-cluster-mgmt-aggregator", metav1.GetOptions{}).Return(nil, errDefault)
+			},
+			wantErr: true,
+		},
+		{
+			name: "error listing cluster roles",
+			rt: &v3.RoleTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-rt",
+				},
+				Context: "project",
+				Rules:   []rbacv1.PolicyRule{getRoleTemplates},
+			},
+			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().List(listOptions).Return(&rbacv1.ClusterRoleList{}, errDefault)
+			},
+			wantErr: true,
+		},
+		{
+			name: "remove cluster roles that should not exist",
+			rt: &v3.RoleTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-rt",
+				},
+				Context: "project",
+				Rules:   []rbacv1.PolicyRule{getRoleTemplates},
+			},
+			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().List(listOptions).Return(&rbacv1.ClusterRoleList{
+					Items: []rbacv1.ClusterRole{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "bad-cr"},
+						},
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "bad-cr2"},
+						},
+					},
+				}, nil)
+				m.EXPECT().Delete("bad-cr", &metav1.DeleteOptions{}).Return(nil)
+				m.EXPECT().Delete("bad-cr2", &metav1.DeleteOptions{}).Return(nil)
+			},
+		},
+		{
+			name: "error deleting cluster roles, non blocking",
+			rt: &v3.RoleTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-rt",
+				},
+				Context: "project",
+				Rules:   []rbacv1.PolicyRule{getRoleTemplates},
+			},
+			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().List(listOptions).Return(&rbacv1.ClusterRoleList{
+					Items: []rbacv1.ClusterRole{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "bad-cr"},
+						},
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "bad-cr2"},
+						},
+					},
+				}, nil)
+				m.EXPECT().Delete("bad-cr", &metav1.DeleteOptions{}).Return(errDefault)
+				m.EXPECT().Delete("bad-cr2", &metav1.DeleteOptions{}).Return(errDefault)
 			},
 			wantErr: true,
 		},
