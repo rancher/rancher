@@ -317,9 +317,6 @@ func (w *UserContext) UserOnlyContext() *UserOnlyContext {
 		BatchV1:     w.BatchV1,
 		Cluster:     w.Cluster,
 		Storage:     w.Storage,
-
-		caValidatorControllerFactory: w.caValidatorControllerFactory,
-		CAValidatorSecret:            w.CAValidatorSecret,
 	}
 }
 
@@ -341,9 +338,6 @@ type UserOnlyContext struct {
 	Networking      knetworkingv1.Interface
 	Cluster         clusterv3.Interface
 	Storage         storagev1.Interface
-
-	caValidatorControllerFactory controller.SharedControllerFactory
-	CAValidatorSecret            wcorev1.SecretController
 }
 
 func newManagementContext(c *ScaledContext) (*ManagementContext, error) {
@@ -543,23 +537,6 @@ func NewUserOnlyContext(config *wrangler.Context) (*UserOnlyContext, error) {
 		AddSchemas(managementSchema.Schemas).
 		AddSchemas(clusterSchema.Schemas).
 		AddSchemas(projectSchema.Schemas)
-
-	clientFactory, err := client.NewSharedClientFactory(enableProtobuf(&context.RESTConfig), &client.SharedClientFactoryOptions{
-		Scheme: wrangler.Scheme,
-	})
-	if err != nil {
-		return nil, err
-	}
-	caValidatorControllerFactory := newCAValidatorControllerFactory(clientFactory)
-	context.caValidatorControllerFactory = caValidatorControllerFactory
-	caValidatorOpts := &generic.FactoryOptions{
-		SharedControllerFactory: caValidatorControllerFactory,
-	}
-	caValidatorCorew, err := core.NewFactoryFromConfigWithOptions(&context.RESTConfig, caValidatorOpts)
-	if err != nil {
-		return nil, err
-	}
-	context.CAValidatorSecret = caValidatorCorew.Core().V1().Secret()
 
 	return context, err
 }
