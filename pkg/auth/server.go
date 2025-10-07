@@ -93,11 +93,13 @@ func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext) 
 	}
 
 	saml := saml.AuthHandler()
+	logrus.Debugf("SAML [newAPIManagement]: mux root %p", saml)
 
 	root := mux.NewRouter()
 	root.UseEncodedPath()
 	root.PathPrefix("/v3-public").Handler(publicAPI)
 	root.PathPrefix("/v1-saml").Handler(saml)
+	logrus.Debugf("SAML [newAPIManagement]: mux root %p now set", saml)
 	root.NotFoundHandler = privateAPI
 
 	return func(next http.Handler) http.Handler {
