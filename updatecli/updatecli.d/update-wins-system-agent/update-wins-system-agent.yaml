@@ -1,0 +1,121 @@
+name: '{{ .wins_system_agent.manifest }}'
+pipelineid: '{{ .wins_system_agent.pipelineid }}'
+
+scms:
+  default:
+    kind: github
+    spec:
+      owner: '{{ .scm.owner }}'
+      repository: '{{ .scm.repo }}'
+      branch: '{{ .scm.branch }}'
+      user: '{{ .scm.user }}'
+      email: '{{ .scm.email }}'
+      username: '{{ .scm.username }}'
+      token: '{{ requiredEnv .scm.token }}'
+      commitusingapi: {{ .scm.commitusingapi }}
+      commitmessage:
+        squash: {{ .scm.commitmessage.squash }}
+        type: '{{ .wins_system_agent.commitmessage.type }}'
+        scope: '{{ .wins_system_agent.commitmessage.scope }}'
+        title: 'Bump versions of Wins and System Agent'
+        body: 'Bump versions of Wins to {{ source "wins-release" }} and System Agent to {{ source "system-agent-release" }}.'
+
+actions:
+  rancher-pr:
+    kind: github/pullrequest
+    scmid: 'default'
+    spec:
+      labels:
+        - 'dependencies'
+      reviewers:
+        - 'rancher/rancher-team-2-hostbusters-dev'
+      mergemethod: '{{ .scm.mergemethod }}'
+      title: '[{{ .scm.branch }}] Bump Wins to {{ source "wins-release" }} and System Agent to {{ source "system-agent-release" }}.'
+      description: 'Bump patch versions of Wins to {{ source "wins-release" }} and System Agent to {{ source "system-agent-release" }}.'
+
+sources:
+  wins-release:
+    name: 'Get latest upstream Wins version'
+    kind: githubrelease
+    spec:
+      owner: '{{ .repos.wins.owner }}'
+      repository: '{{ .repos.wins.repo }}'
+      key: tagname
+      typefilter:
+        latest: true
+      username: '{{ .scm.username }}'
+      token: '{{ requiredEnv .scm.token }}'
+
+  system-agent-release:
+    name: 'Get latest upstream System Agent version'
+    kind: githubrelease
+    spec:
+      owner: '{{ .repos.system_agent.owner }}'
+      repository: '{{ .repos.system_agent.repo }}'
+      key: tagname
+      typefilter:
+        latest: true
+      username: '{{ .scm.username }}'
+      token: '{{ requiredEnv .scm.token }}'
+
+conditions:
+  check-dockerfile-wins-version:
+    name: 'Check if ENV CATTLE_WINS_AGENT_VERSION is set in Dockerfile'
+    kind: file
+    scmid: 'default'
+    disablesourceinput: true
+    spec:
+      files:
+        - 'package/Dockerfile'
+      matchpattern: '(?:ENV|ARG)[\s\t]+CATTLE_WINS_AGENT_VERSION[=\s]\S+'
+
+  check-dockerfile-system-agent-version:
+    name: 'Check if ENV CATTLE_SYSTEM_AGENT_VERSION is set in Dockerfile'
+    kind: file
+    scmid: 'default'
+    disablesourceinput: true
+    spec:
+      files:
+        - 'package/Dockerfile'
+      matchpattern: '(?:ENV|ARG)[\s\t]+CATTLE_SYSTEM_AGENT_VERSION[=\s]\S+'
+
+targets:
+  update-dockerfile-wins-release:
+    name: 'Update ENV CATTLE_WINS_AGENT_VERSION to {{ source "wins-release" }} in Dockerfile'
+    kind: file
+    scmid: 'default'
+    sourceid: 'wins-release'
+    spec:
+      file: 'package/Dockerfile'
+      matchpattern: '(ENV|ARG)[\s\t]+CATTLE_WINS_AGENT_VERSION[=\s]\S+'
+      replacepattern: '$1 CATTLE_WINS_AGENT_VERSION={{ source "wins-release" }}'
+
+  update-dockerfile-system-agent-release:
+    name: 'Update ENV CATTLE_SYSTEM_AGENT_VERSION to {{ source "system-agent-release" }} in Dockerfile'
+    kind: file
+    scmid: 'default'
+    sourceid: 'system-agent-release'
+    spec:
+      file: 'package/Dockerfile'
+      matchpattern: '(ENV|ARG)[\s\t]+CATTLE_SYSTEM_AGENT_VERSION[=\s]\S+'
+      replacepattern: '$1 CATTLE_SYSTEM_AGENT_VERSION={{ source "system-agent-release" }}'
+
+  update-pkg-settings-wins-release:
+    name: 'Update Wins to {{ source "wins-release" }} in pkg/settings/setting.go'
+    kind: file
+    scmid: 'default'
+    sourceid: 'wins-release'
+    spec:
+      file: 'pkg/settings/setting.go'
+      matchpattern: 'https://raw.githubusercontent.com/rancher/wins/v\S+/install.ps1'
+      replacepattern: 'https://raw.githubusercontent.com/rancher/wins/{{ source "wins-release" }}/install.ps1'
+
+  update-pkg-settings-system-agent-release:
+    name: 'Update System Agent to {{ source "system-agent-release" }} in pkg/settings/setting.go'
+    kind: file
+    scmid: 'default'
+    sourceid: 'system-agent-release'
+    spec:
+      file: 'pkg/settings/setting.go'
+      matchpattern: 'https://github.com/rancher/system-agent/releases/download/v\S+/install.sh'
+      replacepattern: 'https://github.com/rancher/system-agent/releases/download/{{ source "system-agent-release" }}/install.sh'

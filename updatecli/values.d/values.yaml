@@ -25,6 +25,12 @@ repos:
   k8s:
     owner: 'kubernetes'
     repo: 'kubernetes'
+  system_agent:
+    owner: 'rancher'
+    repo: 'system-agent'
+  wins:
+    owner: 'rancher'
+    repo: 'wins'
 
 k8s_k3s:
   manifest: 'Update K8s and K3s patch versions'
@@ -32,3 +38,10 @@ k8s_k3s:
   commitmessage:
     type: 'deps'
     scope: 'k8s and k3s'
+
+wins_system_agent:
+  manifest: 'Update Wins and System Agent patch versions'
+  pipelineid: 'update-wins-system-agent-version'
+  commitmessage:
+    type: 'deps'
+    scope: 'wins and system-agent'
