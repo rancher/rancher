@@ -7,10 +7,7 @@ fi
 
 if ! docker image inspect "rancher/rancher:$TAG" >/dev/null 2>&1; then
   echo "building rancher from source - no preloaded container image available"
-  (
-    cd "$(dirname "$0")/.." || exit
-    make quick-binary-server
-  )
+  make -C .. quick-binary-server
 else
   # otherwise just copy it from the artifacts that are already there. neat!
   echo "pulling bin/rancher from preloaded container image"
