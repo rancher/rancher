@@ -109,7 +109,8 @@ func (m *manager) ensureGlobalResourcesRolesForPRTB(projectName string, rts map[
 			hasNamespaceResources := slice.ContainsString(rule.Resources, "namespaces") || slice.ContainsString(rule.Resources, "*")
 			hasNamespaceGroup := slice.ContainsString(rule.APIGroups, "") || slice.ContainsString(rule.APIGroups, "*")
 			if hasNamespaceGroup && hasNamespaceResources && len(rule.ResourceNames) == 0 {
-				if !hasReadVerbs(rule.Verbs) {
+				readVerbs := sets.New("get", "list", "watch")
+				if !readVerbs.HasAny(rule.Verbs...) {
 					roleVerb = manageNSVerb
 				}
 				if slice.ContainsString(rule.Verbs, "*") || slice.ContainsString(rule.Verbs, "create") {
@@ -129,7 +130,7 @@ func (m *manager) ensureGlobalResourcesRolesForPRTB(projectName string, rts map[
 		}
 	}
 
-	getRole := fmt.Sprintf(projectNSGetClusterRoleNameFmt, projectName, projectNSVerbToSuffix["get"])
+	getRole := fmt.Sprintf(projectNSGetClusterRoleNameFmt, projectName, projectNSVerbToSuffix[getVerb])
 	roles.Insert(getRole)
 	if roleVerb != "" {
 		roleSuffix = projectNSVerbToSuffix[roleVerb]
@@ -172,14 +173,4 @@ func (m *manager) ensureGlobalResourcesRolesForPRTB(projectName string, rts map[
 	}
 
 	return sets.List(roles), nil
-}
-
-func hasReadVerbs(ruleVerbs []string) bool {
-	readVerbs := []string{"get", "list", "watch"}
-	for _, verb := range readVerbs {
-		if slice.ContainsString(ruleVerbs, verb) {
-			return true
-		}
-	}
-	return false
 }
