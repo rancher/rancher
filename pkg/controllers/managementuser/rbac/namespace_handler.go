@@ -380,6 +380,60 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 	return hasPRTBs, nil
 }
 
+// nsInRole checks whether the given namespace name exists in the ResourceNames
+// of any rule within the specified ClusterRole. Returns true if found.
+func nsInRole(cr *rbacv1.ClusterRole, role, nsName string) bool {
+	if cr.Name == role {
+		for _, rule := range cr.Rules {
+			if slices.Contains(rule.ResourceNames, nsName) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// removeNSFromRules removes the given namespace name from the ResourceNames field of rules matching the specified verb
+// and "namespaces" resource in the ClusterRole.
+// It returns the count of rules that should be deleted and a boolean indicating if any modifications were made.
+func removeNSFromRules(cr *rbacv1.ClusterRole, verb, nsName string) (bool, bool) {
+	modified := false
+	toDeleteRules := 0
+	for i := range cr.Rules {
+		r := &cr.Rules[i]
+		if slice.ContainsString(r.Verbs, verb) && slice.ContainsString(r.Resources, "namespaces") && slice.ContainsString(r.ResourceNames, nsName) {
+			modified = true
+			resNames := r.ResourceNames
+			for i := len(resNames) - 1; i >= 0; i-- {
+				if resNames[i] == nsName {
+					resNames = append(resNames[:i], resNames[i+1:]...)
+				}
+			}
+			r.ResourceNames = resNames
+		}
+		// Mark rule for deletion if it no longer references any namespace.
+		if len(r.ResourceNames) == 0 {
+			toDeleteRules++
+		}
+	}
+
+	// If all rules are marked for deletion, remove the entire ClusterRole.
+	// Otherwise, update it to retain only rules with non-empty ResourceNames.
+	if toDeleteRules == len(cr.Rules) {
+		return true, modified
+	} else if toDeleteRules != 0 {
+		var updatedRules []rbacv1.PolicyRule
+		for _, rule := range cr.Rules {
+			if len(rule.ResourceNames) != 0 {
+				updatedRules = append(updatedRules, rule)
+			}
+		}
+		cr.Rules = updatedRules
+	}
+
+	return false, modified
+}
+
 // reconcileNamespaceProjectClusterRole creates and maintains two default ClusterRoles for each project:
 // 1. "readonly" role - read access (get) to project namespaces. (dynamically updated as namespaces are added)
 // 2. "manage" role - namespace management permissions for the project.
@@ -407,57 +461,19 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace, ver
 			return errors.Errorf("%v is not a ClusterRole", c)
 		}
 
-		if cr.Name == desiredRole {
-			for _, rule := range cr.Rules {
-				if slices.Contains(rule.ResourceNames, ns.Name) {
-					nsInDesiredRole = true
-					continue
-				}
-			}
-			// move to next iteration if namespace is in desiredRole
-			if nsInDesiredRole {
-				continue
-			}
+		if nsInDesiredRole = nsInRole(cr, desiredRole, ns.Name); nsInDesiredRole {
+			continue
 		}
 
 		// This ClusterRole has a reference to the namespace, but is not the desired role. Namespace has been moved; remove it from this ClusterRole
 		undesiredRole := cr.DeepCopy()
-		modified := false
-		for i := range undesiredRole.Rules {
-			r := &undesiredRole.Rules[i]
-			if slice.ContainsString(r.Verbs, verb) && slice.ContainsString(r.Resources, "namespaces") && slice.ContainsString(r.ResourceNames, ns.Name) {
-				modified = true
-				resNames := r.ResourceNames
-				for i := len(resNames) - 1; i >= 0; i-- {
-					if resNames[i] == ns.Name {
-						resNames = append(resNames[:i], resNames[i+1:]...)
-					}
-				}
-				r.ResourceNames = resNames
-			}
-		}
-
-		//if ResourceNames is empty, delete the rule and delete the role if no rules exist
-		toDeleteRules := 0
-		for _, rule := range undesiredRole.Rules {
-			if len(rule.ResourceNames) == 0 {
-				toDeleteRules++
-			}
-		}
-		if toDeleteRules == len(undesiredRole.Rules) {
+		deleteRule, modified := removeNSFromRules(undesiredRole, verb, ns.Name)
+		if deleteRule {
 			logrus.Infof("Deleting ClusterRole %s", undesiredRole.Name)
 			if err = roleCli.Delete(undesiredRole.Name, &metav1.DeleteOptions{}); err != nil {
 				return err
 			}
 			continue
-		} else if toDeleteRules != 0 {
-			var updatedRules []rbacv1.PolicyRule
-			for _, rule := range undesiredRole.Rules {
-				if len(rule.ResourceNames) != 0 {
-					updatedRules = append(updatedRules, rule)
-				}
-			}
-			undesiredRole.Rules = updatedRules
 		}
 		if modified {
 			if _, err = roleCli.Update(undesiredRole); err != nil {
