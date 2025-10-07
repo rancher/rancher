@@ -33,14 +33,18 @@ type TokenAccessor interface {
 	// use the `Get` prefix because it existed before and changing it was
 	// deemed to risky.
 	ObjClusterName() string
-	// GetUserPrincipal returns the data of the controlling principal
+	// GetUserPrincipal returns the data of the controlling principal.
 	GetUserPrincipal() v3.Principal
 	// GetGroupPrincipals returns a slice of group principal information.
 	GetGroupPrincipals() []v3.Principal
 	// GetLastUsedAt returns the time of the token's last use.
 	GetLastUsedAt() *metav1.Time
-	// GetLastActivitySeen returns the time of the last recorded activity for the token
+	// GetLastActivitySeen returns the time of the last recorded user activity for the session token.
 	GetLastActivitySeen() *metav1.Time
-	// GetCreationTime returns the creation time of the token
+	// GetCreationTime returns the creation time of the token.
 	GetCreationTime() metav1.Time
+	// GetExpiresAt returns the Expiration time of the token, as string.
+	GetExpiresAt() string
+	// GetIsExpired returns true if the token is expired.
+	GetIsExpired() bool
 }

@@ -60,6 +60,10 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 		return err
 	}
 
+	if err := v.validateAliConfig(request, data, &clusterSpec); err != nil {
+		return err
+	}
+
 	return v.validateGKEConfig(request, data, &clusterSpec)
 }
 
@@ -653,6 +657,126 @@ func validateGKEClusterName(client v3.ClusterInterface, spec *v32.ClusterSpec) e
 func validateGKEPrivateClusterConfig(spec *v32.ClusterSpec) error {
 	if spec.GKEConfig.PrivateClusterConfig != nil && spec.GKEConfig.PrivateClusterConfig.EnablePrivateEndpoint && !spec.GKEConfig.PrivateClusterConfig.EnablePrivateNodes {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("private endpoint requires private nodes"))
+	}
+	return nil
+}
+
+func (v *Validator) validateAliConfig(request *types.APIContext, cluster map[string]interface{}, clusterSpec *v32.ClusterSpec) error {
+	aliConfig, ok := cluster["aliConfig"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+
+	var prevCluster *v32.Cluster
+
+	if request.Method == http.MethodPut {
+		var err error
+		prevCluster, err = v.ClusterLister.Get("", request.ID)
+		if err != nil {
+			return err
+		}
+	}
+
+	// check user's access to cloud credential
+	if alibabaCredential, ok := aliConfig["alibabaCredentialSecret"].(string); ok && (prevCluster == nil || alibabaCredential != prevCluster.Spec.AliConfig.AlibabaCredentialSecret) {
+		// Only check that the user has access to the credential if the credential is being changed.
+		if err := validateCredentialAuth(request, alibabaCredential); err != nil {
+			return err
+		}
+	}
+
+	createFromImport := request.Method == http.MethodPost && aliConfig["imported"] == true
+	if !createFromImport {
+		if err := validateAliConfigKubernetesVersion(clusterSpec); err != nil {
+			return err
+		}
+		if err := validateAliConfigNodePools(clusterSpec); err != nil {
+			return err
+		}
+	} else {
+		// validating clusterId for creation of imported clusters
+		clusterId, ok := aliConfig["clusterId"]
+		if !ok || clusterId == "" {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, "must provide clusterId for imported cluster")
+		}
+	}
+
+	if request.Method != http.MethodPost {
+		return nil
+	}
+
+	if err := validateAliConfigClusterName(v.ClusterClient, clusterSpec); err != nil {
+		return err
+	}
+
+	region, regionOk := aliConfig["regionId"]
+	if !regionOk || region == "" {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "must provide region")
+	}
+
+	return nil
+}
+
+// validateAliConfigKubernetesVersion checks whether a kubernetes version is provided
+func validateAliConfigKubernetesVersion(spec *v32.ClusterSpec) error {
+	clusterVersion := spec.AliConfig.KubernetesVersion
+	if clusterVersion == "" {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "cluster kubernetes version cannot be empty string")
+	}
+
+	return nil
+}
+
+// validateAliConfigNodePools checks whether a given NodePool is valid or not.
+// More involved validation is performed in the ali-operator.
+func validateAliConfigNodePools(spec *v32.ClusterSpec) error {
+	nodePools := spec.AliConfig.NodePools
+	if nodePools == nil {
+		return nil
+	}
+	if len(nodePools) == 0 {
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "must have at least one nodepool")
+	}
+
+	for _, np := range nodePools {
+		if np.Name == "" {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, "nodePool Name cannot be an empty string")
+		}
+		if np.ImageID == "" {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, "nodePool ImageId cannot be an empty string")
+		}
+		if np.ImageType == "" {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, "nodePool ImageType cannot be an empty string")
+		}
+	}
+
+	return nil
+}
+
+func validateAliConfigClusterName(client v3.ClusterInterface, spec *v32.ClusterSpec) error {
+	// validate cluster does not reference an AKS cluster that is already backed by a Rancher cluster
+	name := spec.AliConfig.ClusterName
+	region := spec.AliConfig.RegionID
+	msgSuffix := fmt.Sprintf("in region [%s]", region)
+
+	// cluster client is being used instead of lister to avoid the use of an outdated cache
+	clusters, err := client.List(metav1.ListOptions{})
+	if err != nil {
+		return httperror.NewAPIError(httperror.ServerError, "failed to confirm clusterName is unique among Rancher Alibaba clusters "+msgSuffix)
+	}
+
+	for _, cluster := range clusters.Items {
+		if cluster.Spec.AliConfig == nil {
+			continue
+		}
+		if name != cluster.Spec.AliConfig.ClusterName {
+			continue
+		}
+		if region != "" && region != cluster.Spec.AliConfig.RegionID {
+			continue
+		}
+
+		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for Alibaba cluster [%s] "+msgSuffix, name))
 	}
 	return nil
 }

@@ -92,6 +92,9 @@ const (
 	MachineTemplateClonedFromKindAnn         = "rke.cattle.io/cloned-from-kind"
 	MachineTemplateClonedFromNameAnn         = "rke.cattle.io/cloned-from-name"
 
+	// Label added to secrets to make sure they are included in backups when created in a namespace other than fleet-default
+	BackupLabel = "resources.cattle.io/backup"
+
 	CattleOSLabel    = "cattle.io/os"
 	DefaultMachineOS = "linux"
 	WindowsMachineOS = "windows"

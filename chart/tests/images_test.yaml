@@ -1,0 +1,42 @@
+suite: Test Chart Images
+tests:
+  - it: "should correctly set image for deployment.yaml"
+    templates:
+      - deployment.yaml
+    set:
+      systemDefaultRegistry: "registry.company.com"
+      rancherImageTag: "v1.0.0-testing"
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: "registry.company.com/rancher/rancher:v1.0.0-testing"
+  - it: "should correctly set image for pre-upgrade-hook-job.yaml"
+    templates:
+      - pre-upgrade-hook-job.yaml
+    set:
+      systemDefaultRegistry: "registry.company.com"
+      preUpgrade:
+        image:
+          tag: "v1.0.0-testing"
+    asserts:
+      - isKind:
+          of: Job
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: "registry.company.com/rancher/shell:v1.0.0-testing"
+  - it: "should correctly set image for post-delete-hook-job.yaml"
+    templates:
+      - post-delete-hook-job.yaml
+    set:
+      systemDefaultRegistry: "registry.company.com"
+      postDelete:
+        image:
+          tag: "v1.0.0-testing"
+    asserts:
+      - isKind:
+          of: Job
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: "registry.company.com/rancher/shell:v1.0.0-testing"

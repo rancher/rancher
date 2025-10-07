@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	extstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
+	extcontrollers "github.com/rancher/rancher/pkg/generated/controllers/ext.cattle.io/v1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	clusterv3 "github.com/rancher/rancher/pkg/generated/norman/cluster.cattle.io/v3"
 	"github.com/sirupsen/logrus"
@@ -15,8 +17,12 @@ import (
 )
 
 type clusterAuthTokenHandler struct {
+	// v3 token support
 	tokenCache  mgmtcontrollers.TokenCache
 	tokenClient mgmtcontrollers.TokenClient
+	// ext token support
+	extTokenCache extcontrollers.TokenCache
+	extTokenStore *extstore.SystemStore
 }
 
 // Sync ClusterAuthToken back to Token.
@@ -32,6 +38,40 @@ func (h *clusterAuthTokenHandler) sync(key string, clusterAuthToken *clusterv3.C
 	}
 
 	tokenName := clusterAuthToken.Name
+	logrus.Debugf("[%s] sync key %q, cluster auth token %q", clusterAuthTokenController, key, tokenName)
+
+	// check ext token first, if feature is enabled
+	if h.extTokenCache != nil {
+		extToken, err := h.extTokenCache.Get(tokenName)
+		if err == nil {
+			// do nothing when the token exists and is either
+			// expired or up to date respective its associated
+			// cluster auth token
+
+			if extToken.Status.LastUsedAt != nil &&
+				extToken.Status.LastUsedAt.After(clusterAuthToken.LastUsedAt.Time) {
+				return clusterAuthToken, nil // Nothing to do.
+			}
+
+			if extToken.Status.Expired {
+				return clusterAuthToken, nil // Should not update expired token.
+			}
+
+			if err := h.extTokenStore.UpdateLastUsedAt(tokenName, clusterAuthToken.LastUsedAt.Time); err != nil {
+				return nil, fmt.Errorf("error updating lastUsedAt for token %s: %w", tokenName, err)
+			}
+
+			logrus.Debugf("[%s] Updated lastUsedAt for token %s", clusterAuthTokenController, tokenName)
+
+			return clusterAuthToken, nil
+		} else {
+			if !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
+				return nil, fmt.Errorf("error getting token %s: %w", tokenName, err)
+			}
+		}
+	}
+
+	// and v3 token as fallback
 	token, err := h.tokenCache.Get(tokenName)
 	if err != nil {
 		if apierrors.IsNotFound(err) || apierrors.IsGone(err) {
@@ -44,7 +84,7 @@ func (h *clusterAuthTokenHandler) sync(key string, clusterAuthToken *clusterv3.C
 		return clusterAuthToken, nil // Nothing to do.
 	}
 
-	if tokens.IsExpired(*token) {
+	if tokens.IsExpired(token) {
 		return clusterAuthToken, nil // Should not update expired token.
 	}
 

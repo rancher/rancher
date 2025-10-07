@@ -2,6 +2,7 @@ package v3
 
 import (
 	"strings"
+	"time"
 
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types"
@@ -97,27 +98,61 @@ func (t *Token) GetCreationTime() metav1.Time {
 	return t.CreationTimestamp
 }
 
+func (t *Token) GetExpiresAt() string {
+	return t.ExpiresAt
+}
+
+func (t *Token) GetIsExpired() bool {
+	if t.TTLMillis == 0 {
+		return false
+	}
+
+	created := t.ObjectMeta.CreationTimestamp.Time
+	durationElapsed := time.Since(created)
+
+	ttlDuration := time.Duration(t.TTLMillis) * time.Millisecond
+	return durationElapsed.Seconds() >= ttlDuration.Seconds()
+}
+
 // +genclient
-// +kubebuilder:skipversion
 // +genclient:nonNamespaced
+// +kubebuilder:resource:scope=Cluster
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// User represents a user in Rancher
 type User struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
+	// DisplayName is the user friendly name shown in the UI.
+	// +optional
 	DisplayName string `json:"displayName,omitempty"`
+	// Description provides a brief summary about the user.
+	// +optional
 	Description string `json:"description"`
-	Username    string `json:"username,omitempty"`
+	// Username is the unique login identifier for the user.
+	// +optional
+	Username string `json:"username,omitempty"`
 	// Deprecated. Password are stored in secrets in the cattle-local-user-passwords namespace.
-	Password           string   `json:"password,omitempty" norman:"writeOnly,noupdate"`
-	MustChangePassword bool     `json:"mustChangePassword,omitempty"`
-	PrincipalIDs       []string `json:"principalIds,omitempty" norman:"type=array[reference[principal]]"`
-	// Deprecated. Me is an old field only used in the norman API.
-	Me      bool       `json:"me,omitempty" norman:"nocreate,noupdate"`
-	Enabled *bool      `json:"enabled,omitempty" norman:"default=true"`
-	Spec    UserSpec   `json:"spec,omitempty"`
-	Status  UserStatus `json:"status"`
+	// +optional
+	Password string `json:"password,omitempty" norman:"writeOnly,noupdate"`
+	// MustChangePassword is a flag that, if true, forces the user to change their
+	// password upon their next login.
+	// +optional
+	MustChangePassword bool `json:"mustChangePassword,omitempty"`
+	// PrincipalIDs lists the authentication provider identities (e.g. GitHub, Keycloak or Active Directory)
+	// that are associated with this user account.
+	// +optional
+	PrincipalIDs []string `json:"principalIds,omitempty" norman:"type=array[reference[principal]]"`
+	// Deprecated. Only used by /v3 Rancher API.
+	// +optional
+	Me bool `json:"me,omitempty" norman:"nocreate,noupdate"`
+	// Enabled indicates whether the user account is active.
+	// +optional
+	Enabled *bool `json:"enabled,omitempty" norman:"default=true"`
+	// Status contains the most recent observed state of the user.
+	// +optional
+	Status UserStatus `json:"status"`
 }
 
 // IsSystem returns true if the user is a system user.
@@ -137,6 +172,7 @@ func (u *User) IsDefaultAdmin() bool {
 }
 
 type UserStatus struct {
+	// +optional
 	Conditions []UserCondition `json:"conditions"`
 }
 
@@ -154,8 +190,6 @@ type UserCondition struct {
 	// Human-readable message indicating details about last transition
 	Message string `json:"message,omitempty"`
 }
-
-type UserSpec struct{}
 
 // +genclient
 // +kubebuilder:skipversion
@@ -560,11 +594,11 @@ type SamlConfigTestOutput struct {
 	IdpRedirectURL string `json:"idpRedirectUrl"`
 }
 
-type SamlConfigLogoutInput struct {
+type AuthConfigLogoutInput struct {
 	FinalRedirectURL string `json:"finalRedirectUrl"`
 }
 
-type SamlConfigLogoutOutput struct {
+type AuthConfigLogoutOutput struct {
 	IdpRedirectURL string `json:"idpRedirectUrl"`
 }
 
@@ -610,11 +644,32 @@ type OIDCConfig struct {
 	Certificate        string `json:"certificate,omitempty"`
 	PrivateKey         string `json:"privateKey,omitempty" norman:"type=password"`
 	GroupSearchEnabled *bool  `json:"groupSearchEnabled"`
-	GroupsClaim        string `json:"groupsClaim,omitempty"`
 	// Scopes is expected to be a space delimited list of scopes
 	Scopes string `json:"scope,omitempty"`
 	// AcrValue is expected to be string containing the required ACR value
 	AcrValue string `json:"acrValue,omitempty"`
+
+	// This is provided by the OIDC Provider - it is the `end_session_uri` from
+	// the discovery data.
+	EndSessionEndpoint string `json:"endSessionEndpoint,omitempty"`
+	// Flag. True when the auth provider is configured to accept a `Logout All`
+	// operation. Can be set if and only if the provider supports `Logout All`
+	// (see AuthConfig.LogoutAllSupported).
+	LogoutAllEnabled bool `json:"logoutAllEnabled,omitempty"`
+
+	// Flag. Can be set if and only if `LogoutAllEnabled` (above) is set.
+	// When set `Logout All` is the only kind of logout accepted. A regular
+	// logout request will be rejected.
+	LogoutAllForced bool `json:"logoutAllForced,omitempty"`
+
+	// GroupsClaim is used instead of groups
+	GroupsClaim string `json:"groupsClaim,omitempty"`
+
+	// NameClaim is used instead instead of the name claim.
+	NameClaim string `json:"nameClaim,omitempty"`
+
+	// EmailClaim is used instead of email
+	EmailClaim string `json:"emailClaim,omitempty"`
 }
 
 type OIDCTestOutput struct {

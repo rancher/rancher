@@ -13,7 +13,6 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	v32 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	normanv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
 	"github.com/rancher/wrangler/pkg/name"
 	k8srbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
@@ -32,6 +31,7 @@ const (
 	ProjectID                         = "projectId"
 	ClusterID                         = "clusterId"
 	GlobalAdmin                       = "admin"
+	globalAdminCRBPrefix              = "globaladmin-"
 	GlobalRestrictedAdmin             = "restricted-admin"
 	ClusterCRDsClusterRole            = "cluster-crd-clusterRole"
 	RestrictedAdminClusterRoleBinding = "restricted-admin-rb-cluster"
@@ -124,7 +124,7 @@ func BuildSubjectFromRTB(object metav1.Object) (rbacv1.Subject, error) {
 }
 
 func GrbCRBName(grb *v3.GlobalRoleBinding) string {
-	return "globaladmin-" + GetGRBTargetKey(grb)
+	return globalAdminCRBPrefix + GetGRBTargetKey(grb)
 }
 
 // GetGRBSubject creates and returns a subject that is
@@ -304,16 +304,36 @@ func isRuleInTargetAPIGroup(rule rbacv1.PolicyRule) bool {
 	return false
 }
 
-// IsAdminGlobalRole detects whether a GlobalRole has admin permissions or not.
-func IsAdminGlobalRole(rtName string, grLister normanv3.GlobalRoleLister) (bool, error) {
-	gr, err := grLister.Get("", rtName)
-	if err != nil {
-		return false, err
+// IsAdminGlobalRole returns true is a GlobalRole has admin permissions.
+// A global role is considered to have admin permissions if it is the built-in admin role
+// or it gives full access to all resources and non-resource URLs, as in:
+// apiVersion: management.cattle.io/v3
+// displayName: custom-admin
+// kind: GlobalRole
+// metadata:
+//
+//	name: custom-admin
+//
+// rules:
+// - apiGroups:
+//   - '*'
+//     resources:
+//   - '*'
+//     verbs:
+//   - '*'
+//
+// - nonResourceURLs:
+//   - '*'
+//     verbs:
+//   - '*'
+func IsAdminGlobalRole(gr *v3.GlobalRole) bool {
+	if gr == nil {
+		return false
 	}
 
-	// global role is builtin admin role
+	// Global role is the built-in admin role.
 	if gr.Builtin && gr.Name == GlobalAdmin {
-		return true, nil
+		return true
 	}
 
 	var hasResourceRule, hasNonResourceRule bool
@@ -328,12 +348,8 @@ func IsAdminGlobalRole(rtName string, grLister normanv3.GlobalRoleLister) (bool,
 		}
 	}
 
-	// global role has an admin resource rule, and admin nonResourceURLs rule
-	if hasResourceRule && hasNonResourceRule {
-		return true, nil
-	}
-
-	return false, nil
+	// Global role gives full access to all resources and non-resource URLs.
+	return hasResourceRule && hasNonResourceRule
 }
 
 // CreateOrUpdateResource creates or updates the given non-namespaced resource
@@ -509,9 +525,9 @@ func BuildClusterRoleBindingFromRTB(rtb metav1.Object, roleRefName string) (*rba
 	var ownerLabel string
 	switch rtb.(type) {
 	case *v3.ProjectRoleTemplateBinding:
-		ownerLabel = PrtbOwnerLabel
+		ownerLabel = GetPRTBOwnerLabel(rtb.GetName())
 	case *v3.ClusterRoleTemplateBinding:
-		ownerLabel = CrtbOwnerLabel
+		ownerLabel = GetCRTBOwnerLabel(rtb.GetName())
 	default:
 		return nil, fmt.Errorf("unrecognized roleTemplateBinding type: %T", rtb)
 	}
@@ -519,7 +535,7 @@ func BuildClusterRoleBindingFromRTB(rtb metav1.Object, roleRefName string) (*rba
 	return &rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   NameForClusterRoleBinding(roleRef, subject),
-			Labels: map[string]string{ownerLabel: rtb.GetName()},
+			Labels: map[string]string{ownerLabel: "true"},
 		},
 		RoleRef:  roleRef,
 		Subjects: []rbacv1.Subject{subject},
@@ -568,22 +584,33 @@ func ProjectManagementPlaneClusterRoleNameFor(s string) string {
 	return name.SafeConcatName(s, projectManagementPlaneSuffix)
 }
 
-func GetRTBOwnerLabel(rtb metav1.Object) string {
+// GetAuthV2OwnerLabel creates the owner label for the RoleTemplateBinding in the style used in pkg/controllers/management/authprovisioningv2.
+// Either:
+//
+//	authz.cluster.cattle.io/crtb-owner: <crtb.Name>
+//	authz.cluster.cattle.io/prtb-owner: <prtb.Name>
+func GetAuthV2OwnerLabel(rtb metav1.Object) string {
 	switch obj := rtb.(type) {
 	case *v3.ProjectRoleTemplateBinding:
-		return GetPRTBOwnerLabel(obj.Name)
+		return PrtbOwnerLabel + "=" + obj.Name
 	case *v3.ClusterRoleTemplateBinding:
-		return GetCRTBOwnerLabel(obj.Name)
+		return CrtbOwnerLabel + "=" + obj.Name
 	}
 	return ""
 }
 
+// GetPRTBOwnerLabel gets the owner label for a PRTB.
+// The label is always authz.cluster.cattle.io/prtb-owner-<prtb.name>: "true"
+// The reason it isn't a key value pair is because we have multiple of these labels on a single RoleBinding/ClusterRoleBinding, so we need unique labels.
 func GetPRTBOwnerLabel(s string) string {
-	return PrtbOwnerLabel + "=" + s
+	return name.SafeConcatName(PrtbOwnerLabel, s)
 }
 
+// GetCRTBOwnerLabel gets the owner label for a CRTB.
+// The label is always authz.cluster.cattle.io/crtb-owner-<crtb.name>: "true"
+// The reason it isn't a key value pair is because we have multiple of these labels on a single RoleBinding/ClusterRoleBinding, so we need unique labels.
 func GetCRTBOwnerLabel(s string) string {
-	return CrtbOwnerLabel + "=" + s
+	return name.SafeConcatName(CrtbOwnerLabel, s)
 }
 
 // GetClusterAndProjectNameFromPRTB gets the cluster and project belonging to a ProjectRoleTemplateBinding.

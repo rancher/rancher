@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -21,11 +22,9 @@ import (
 )
 
 const (
-	prtbOwnerLabel      = "authz.cluster.cattle.io/prtb-owner"
 	projectIDAnnotation = "field.cattle.io/projectId"
 	namespaceReadOnly   = "namespaces-readonly"
 	namespaceEdit       = "namespaces-edit"
-	namespacePSA        = "namespaces-psa"
 	namespacesCreate    = "create-ns"
 	updatePSAVerb       = "updatepsa"
 )
@@ -72,11 +71,15 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 
 	// Handle cluster role bindings for special permissions.
 	if err := p.reconcileClusterRoleBindings(prtb); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error reconciling ClusterRoleBindings for ProjectRoleTemplateBinding %s: %w", prtb.Name, err)
+	}
+
+	if err := p.reconcileNamespaceBindings(prtb); err != nil {
+		return nil, fmt.Errorf("error reconciling Namespace RoleBindings for ProjectRoleTemplateBinding %s: %w", prtb.Name, err)
 	}
 
 	if err := p.reconcileBindings(prtb); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error reconciling RoleBindings for ProjectRoleTemplateBinding %s: %w", prtb.Name, err)
 	}
 
 	// Ensure a service account impersonator exists on the cluster.
@@ -129,7 +132,7 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 		rb := &rbacv1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      rbac.NameForRoleBinding(namespace.Name, roleRef, subject),
-				Labels:    map[string]string{rbac.PrtbOwnerLabel: prtb.Name},
+				Labels:    map[string]string{rbac.GetPRTBOwnerLabel(prtb.Name): "true"},
 				Namespace: namespace.Name,
 			},
 			RoleRef:  roleRef,
@@ -155,12 +158,13 @@ func (p *prtbHandler) OnRemove(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 		return nil, err
 	}
 
-	lo := metav1.ListOptions{LabelSelector: rbac.GetPRTBOwnerLabel(prtb.Name)}
+	prtbOwnerLabel := rbac.GetPRTBOwnerLabel(prtb.Name)
+	listOptions := metav1.ListOptions{LabelSelector: prtbOwnerLabel}
 
 	var returnError error
 	// Remove all role bindings.
 	for _, n := range namespaces.Items {
-		rbs, err := p.rbClient.List(n.Name, lo)
+		rbs, err := p.rbClient.List(n.Name, listOptions)
 		if err != nil {
 			return nil, err
 		}
@@ -173,11 +177,29 @@ func (p *prtbHandler) OnRemove(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 	}
 
 	// Remove all cluster role bindings.
-	crbs, err := p.crbClient.List(lo)
+	crbs, err := p.crbClient.List(listOptions)
 	if err != nil {
 		return nil, err
 	}
 	for _, crb := range crbs.Items {
+		// Check if the CRB is owned by another PRTB
+		// This can happen if the CRB is reused like the namespace access CRB
+		crbOwnedByAnotherPRTB := false
+		delete(crb.Labels, prtbOwnerLabel)
+		for label := range crb.Labels {
+			if strings.HasPrefix(label, rbac.PrtbOwnerLabel) {
+				crbOwnedByAnotherPRTB = true
+				break
+			}
+		}
+		// In the case where it is shared, only update the CRB with the ownership label removed
+		if crbOwnedByAnotherPRTB {
+			_, err = p.crbClient.Update(&crb)
+			returnError = errors.Join(returnError, err)
+			continue
+		}
+
+		// If there are no other owners, delete the CRB
 		err = p.crbClient.Delete(crb.Name, &metav1.DeleteOptions{})
 		if err != nil && !apierrors.IsNotFound(err) {
 			returnError = errors.Join(returnError, err)
@@ -232,11 +254,47 @@ func (p *prtbHandler) reconcileClusterRoleBindings(prtb *v3.ProjectRoleTemplateB
 	return p.ensureOnlyDesiredClusterRoleBindingsExists(crbs, rbac.GetPRTBOwnerLabel(prtb.Name))
 }
 
+// reconcileNamespaceBindings ensures that the PRTB has created ClusterRoleBindings to the ClusterRoles responsible
+// for providing access to each of the namespaces within the project.
+func (p *prtbHandler) reconcileNamespaceBindings(prtb *v3.ProjectRoleTemplateBinding) error {
+	namespaceBindings, err := p.buildNamespaceBindings(prtb)
+	if err != nil {
+		return err
+	}
+
+	var returnedErr error
+	for _, namespaceBinding := range namespaceBindings {
+		existingCRB, err := p.crbClient.Get(namespaceBinding.Name, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			_, err = p.crbClient.Create(namespaceBinding)
+			returnedErr = errors.Join(returnedErr, err)
+			continue
+		} else if err != nil {
+			returnedErr = errors.Join(returnedErr, err)
+			continue
+		}
+
+		if existingCRB.Labels == nil {
+			existingCRB.Labels = map[string]string{}
+		}
+
+		// The binding already exists. Make sure it references this PRTB
+		if _, ok := existingCRB.Labels[rbac.GetPRTBOwnerLabel(prtb.Name)]; !ok {
+			existingCRB.Labels[rbac.GetPRTBOwnerLabel(prtb.Name)] = "true"
+			_, err := p.crbClient.Update(existingCRB)
+			returnedErr = errors.Join(returnedErr, err)
+
+		}
+	}
+
+	return returnedErr
+}
+
 // buildNamespaceBindings builds the Cluster Role Bindings used to provide access to the project's namespaces.
 func (p *prtbHandler) buildNamespaceBindings(prtb *v3.ProjectRoleTemplateBinding) ([]*rbacv1.ClusterRoleBinding, error) {
 	cr, err := p.crClient.Get(rbac.AggregatedClusterRoleNameFor(prtb.RoleTemplateName), metav1.GetOptions{})
 	// With no CR the namespace bindings can't be created
-	if apierrors.IsNotFound(err) || cr == nil {
+	if apierrors.IsNotFound(err) {
 		return nil, nil
 	} else if err != nil {
 		return nil, err
@@ -339,7 +397,8 @@ func (p *prtbHandler) ensureOnlyDesiredClusterRoleBindingsExists(crbs []*rbacv1.
 
 	// Any remaining ClusterRoleBindings in the desiredCRBs get created.
 	for _, crb := range desiredCRBs {
-		if _, err := p.crbClient.Create(crb); err != nil {
+		// It's possible the CRB was already created, so ignore AlreadyExists errors
+		if _, err := p.crbClient.Create(crb); err != nil && !apierrors.IsAlreadyExists(err) {
 			return err
 		}
 	}
@@ -348,7 +407,7 @@ func (p *prtbHandler) ensureOnlyDesiredClusterRoleBindingsExists(crbs []*rbacv1.
 
 // doesRoleTemplateHavePromotedRules checks if the PRTB's RoleTemplate has a ClusterRole for promoted rules.
 func (p *prtbHandler) doesRoleTemplateHavePromotedRules(rt *v3.RoleTemplate) (bool, error) {
-	_, err := p.crClient.Get(rbac.PromotedClusterRoleNameFor(rt.Name), metav1.GetOptions{})
+	_, err := p.crClient.Get(rbac.AggregatedClusterRoleNameFor(rbac.PromotedClusterRoleNameFor(rt.Name)), metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return false, err
 	}

@@ -176,18 +176,6 @@ var (
 		isPrime(),
 		false,
 		true)
-	ExtKubeconfigs = newFeature(
-		"ext-kubeconfigs",
-		"Enable Imperative API resource kubeconfigs.ext.cattle.io.",
-		true,
-		false,
-		true)
-	ExtTokens = newFeature(
-		"ext-tokens",
-		"Enable Imperative API resource tokens.ext.cattle.io.",
-		true,
-		false,
-		true)
 	RancherSCCRegistrationExtension = newFeature(
 		"rancher-scc-registration-extension",
 		"Enable Rancher's SCC registration extension to register the system(s) for customer support",
@@ -195,6 +183,16 @@ var (
 		false,
 		true)
 )
+
+func ListEnabled() []string {
+	ret := []string{}
+	for _, f := range features {
+		if f.Enabled() {
+			ret = append(ret, f.name)
+		}
+	}
+	return ret
+}
 
 type Feature struct {
 	name        string

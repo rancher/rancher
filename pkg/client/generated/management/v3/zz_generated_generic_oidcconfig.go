@@ -12,14 +12,19 @@ const (
 	GenericOIDCConfigFieldClientSecret        = "clientSecret"
 	GenericOIDCConfigFieldCreated             = "created"
 	GenericOIDCConfigFieldCreatorID           = "creatorId"
+	GenericOIDCConfigFieldEmailClaim          = "emailClaim"
 	GenericOIDCConfigFieldEnabled             = "enabled"
+	GenericOIDCConfigFieldEndSessionEndpoint  = "endSessionEndpoint"
 	GenericOIDCConfigFieldGroupSearchEnabled  = "groupSearchEnabled"
 	GenericOIDCConfigFieldGroupsClaim         = "groupsClaim"
 	GenericOIDCConfigFieldIssuer              = "issuer"
 	GenericOIDCConfigFieldJWKSUrl             = "jwksUrl"
 	GenericOIDCConfigFieldLabels              = "labels"
+	GenericOIDCConfigFieldLogoutAllEnabled    = "logoutAllEnabled"
+	GenericOIDCConfigFieldLogoutAllForced     = "logoutAllForced"
 	GenericOIDCConfigFieldLogoutAllSupported  = "logoutAllSupported"
 	GenericOIDCConfigFieldName                = "name"
+	GenericOIDCConfigFieldNameClaim           = "nameClaim"
 	GenericOIDCConfigFieldOwnerReferences     = "ownerReferences"
 	GenericOIDCConfigFieldPrivateKey          = "privateKey"
 	GenericOIDCConfigFieldRancherURL          = "rancherUrl"
@@ -43,14 +48,19 @@ type GenericOIDCConfig struct {
 	ClientSecret        string            `json:"clientSecret,omitempty" yaml:"clientSecret,omitempty"`
 	Created             string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID           string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	EmailClaim          string            `json:"emailClaim,omitempty" yaml:"emailClaim,omitempty"`
 	Enabled             bool              `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+	EndSessionEndpoint  string            `json:"endSessionEndpoint,omitempty" yaml:"endSessionEndpoint,omitempty"`
 	GroupSearchEnabled  *bool             `json:"groupSearchEnabled,omitempty" yaml:"groupSearchEnabled,omitempty"`
 	GroupsClaim         string            `json:"groupsClaim,omitempty" yaml:"groupsClaim,omitempty"`
 	Issuer              string            `json:"issuer,omitempty" yaml:"issuer,omitempty"`
 	JWKSUrl             string            `json:"jwksUrl,omitempty" yaml:"jwksUrl,omitempty"`
 	Labels              map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
+	LogoutAllEnabled    bool              `json:"logoutAllEnabled,omitempty" yaml:"logoutAllEnabled,omitempty"`
+	LogoutAllForced     bool              `json:"logoutAllForced,omitempty" yaml:"logoutAllForced,omitempty"`
 	LogoutAllSupported  bool              `json:"logoutAllSupported,omitempty" yaml:"logoutAllSupported,omitempty"`
 	Name                string            `json:"name,omitempty" yaml:"name,omitempty"`
+	NameClaim           string            `json:"nameClaim,omitempty" yaml:"nameClaim,omitempty"`
 	OwnerReferences     []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	PrivateKey          string            `json:"privateKey,omitempty" yaml:"privateKey,omitempty"`
 	RancherURL          string            `json:"rancherUrl,omitempty" yaml:"rancherUrl,omitempty"`

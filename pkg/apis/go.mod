@@ -26,7 +26,7 @@ replace (
 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.33.2
 	k8s.io/kubectl => k8s.io/kubectl v0.33.2
 	k8s.io/kubelet => k8s.io/kubelet v0.33.2
-	k8s.io/kubernetes => k8s.io/kubernetes v1.33.2
+	k8s.io/kubernetes => k8s.io/kubernetes v1.33.4
 	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.33.2
 	k8s.io/metrics => k8s.io/metrics v0.33.2
 	k8s.io/mount-utils => k8s.io/mount-utils v0.33.2
@@ -35,13 +35,14 @@ replace (
 )
 
 require (
-	github.com/rancher/aks-operator v1.12.0
-	github.com/rancher/eks-operator v1.12.0
-	github.com/rancher/fleet/pkg/apis v0.13.0
-	github.com/rancher/gke-operator v1.12.0
+	github.com/rancher/aks-operator v1.12.1
+	github.com/rancher/ali-operator v0.0.0-20250910043122-2aba32fbfe4c
+	github.com/rancher/eks-operator v1.12.1
+	github.com/rancher/fleet/pkg/apis v0.14.0-alpha.3
+	github.com/rancher/gke-operator v1.12.1
 	github.com/rancher/norman v0.7.0
 	github.com/rancher/rke v1.8.0-rc.4
-	github.com/rancher/wrangler/v3 v3.2.2
+	github.com/rancher/wrangler/v3 v3.2.4
 	github.com/sirupsen/logrus v1.9.3
 	k8s.io/api v0.33.2
 	k8s.io/apimachinery v0.33.2
@@ -57,7 +58,7 @@ require (
 	github.com/evanphx/json-patch v5.9.11+incompatible // indirect
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
-	github.com/go-logr/logr v1.4.2 // indirect
+	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
 	github.com/go-openapi/jsonreference v0.21.0 // indirect
 	github.com/go-openapi/swag v0.23.0 // indirect
@@ -105,5 +106,5 @@ require (
 	sigs.k8s.io/json v0.0.0-20241010143419-9aa6b5e7a4b3 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.6.0 // indirect
-	sigs.k8s.io/yaml v1.5.0 // indirect
+	sigs.k8s.io/yaml v1.6.0 // indirect
 )

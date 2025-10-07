@@ -41,7 +41,10 @@ const (
 )
 
 var (
-	regExHyphen     = regexp.MustCompile("([a-z])([A-Z])")
+	// two valid cases:
+	// - ipv6AddressCount -> ipv6-address-count or ipv6_address_count
+	// - sshUser          -> ssh-user           or ssh_user
+	regExHyphen     = regexp.MustCompile("([a-z0-9])([A-Z])")
 	envNameOverride = map[string]string{
 		"amazonec2":       "AWS",
 		"rackspace":       "OS",
@@ -96,6 +99,9 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]any, d
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      wranglername.SafeConcatName(infra.meta.GetName(), "machine", "driver", "secret"),
 			Namespace: infra.meta.GetNamespace(),
+			Labels: map[string]string{
+				capr.BackupLabel: "true",
+			},
 		},
 		Data: getWhitelistedEnvVars(),
 	}

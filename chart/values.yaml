@@ -34,11 +34,16 @@ auditLog:
   # Image for collecting rancher audit logs.
   # Important: update pkg/image/export/resolve.go when this default image is changed, so that it's reflected accordingly in rancher-images.txt generated for air-gapped setups.
   image:
+    # Optional: Image-specific registry override
+    # registry: ""
     repository: "rancher/mirrored-bci-micro"
     tag: 15.6.24.2
-    # Override imagePullPolicy image
+    # Optional: Image-specific pullPolicy Override
     # options: Always, Never, IfNotPresent
     pullPolicy: "IfNotPresent"
+
+# Timeout for rancher controllers to complete a cache sync. Larger clusters may need to increase this value.
+# cacheSyncTimeout: 5m
 
 # As of Rancher v2.5.0 this flag is deprecated and must be set to 'true' in order for Rancher to start
 addLocal: "true"
@@ -118,12 +123,23 @@ privateCA: false
 # comma separated list of domains or ip addresses that will not use the proxy
 noProxy: 127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,.svc,.cluster.local
 
-# Override rancher image location for Air Gap installs
-rancherImage: rancher/rancher
+# Rancher image configuration
+image:
+  # Optional: Image-specific registry override
+  # registry: ""
+  repository: rancher/rancher
+  # Defaults to .Chart.appVersion
+  # rancher/rancher image tag. https://hub.docker.com/r/rancher/rancher/tags/
+  tag: ""
+  pullPolicy: IfNotPresent
+
+## Deprecation Notice: `rancherImage`, `rancherImageTag`,  and `rancherImagePullPolicy` are deprecated - use `image.*` fields instead.
+# Override the name of the Rancher image to pull.
+# To override the registry location use systemDefaultRegistry instead.
+# rancherImage: ""
 # rancher/rancher image tag. https://hub.docker.com/r/rancher/rancher/tags/
 # Defaults to .Chart.appVersion
 # rancherImageTag: v2.0.7
-
 # Override imagePullPolicy for rancher server images
 # options: Always, Never, IfNotPresent
 # Defaults to IfNotPresent
@@ -148,6 +164,7 @@ resources: {}
 # - external
 tls: ingress
 
+# Set a custom image registry mirror to pull Rancher images from; useful in air-gapped environments.
 systemDefaultRegistry: ""
 
 # Set to use the packaged system charts
@@ -177,8 +194,13 @@ customLogos:
 postDelete:
   enabled: true
   image:
+    # Optional: Image-specific registry override
+    # registry: ""
     repository: %POST_DELETE_IMAGE_NAME%
     tag: %POST_DELETE_IMAGE_TAG%
+    # Optional: Image-specific pullPolicy Override
+    # options: Always, Never, IfNotPresent
+    # pullPolicy: "Always"
   namespaceList:
     - cattle-fleet-system
     - cattle-system
@@ -190,8 +212,12 @@ postDelete:
 
 preUpgrade:
   image:
+    # Optional: Image-specific registry override
+    # registry: ""
     repository: %PRE_UPGRADE_IMAGE_NAME%
     tag: %PRE_UPGRADE_IMAGE_TAG%
+    # Optional: Image-specific pull policy override
+    # pullPolicy: "Always"
 
 # Set a bootstrap password. If leave empty, a random password will be generated.
 bootstrapPassword: ""

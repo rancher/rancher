@@ -83,6 +83,14 @@ func newInfraObject(obj runtime.Object) (*infraObject, error) {
 	}, nil
 }
 
+type dynamicController interface {
+	Get(gvk schema.GroupVersionKind, namespace, name string) (runtime.Object, error)
+	Update(obj runtime.Object) (runtime.Object, error)
+	UpdateStatus(obj runtime.Object) (runtime.Object, error)
+	Enqueue(gvk schema.GroupVersionKind, namespace, name string) error
+	EnqueueAfter(gvk schema.GroupVersionKind, namespace, name string, delay time.Duration) error
+}
+
 type handler struct {
 	ctx                 context.Context
 	apply               apply.Apply
@@ -96,12 +104,12 @@ type handler struct {
 	machineSetCache     capicontrollers.MachineSetCache
 	namespaces          corecontrollers.NamespaceCache
 	nodeDriverCache     mgmtcontrollers.NodeDriverCache
-	dynamic             *dynamic.Controller
+	dynamic             dynamicController
 	rancherClusterCache ranchercontrollers.ClusterCache
 	kubeconfigManager   *kubeconfig.Manager
 }
 
-func Register(ctx context.Context, clients *wrangler.Context, kubeconfigManager *kubeconfig.Manager) {
+func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigManager *kubeconfig.Manager) {
 	h := &handler{
 		ctx: ctx,
 		apply: clients.Apply.WithCacheTypes(clients.Core.Secret(),
@@ -330,7 +338,7 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 			return obj, err
 		}
 		logrus.Debugf("[machineprovision] create job for %s not finished, job was found and the error was not nil and was not an isnotfound", key)
-		// OnChange handler will not run when the infra machine is being deleted, we have to reconcile here in order to
+		// WaitForClient handler will not run when the infra machine is being deleted, we have to reconcile here in order to
 		// finish the create job, since it has to have completed successfully or never ran for the delete job to run
 		state, _, err := h.run(infra, true)
 		if err != nil {
@@ -566,6 +574,17 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 	}
 
 	if failure {
+		// check if we need to delete or enqueue the capi machine if it fails
+		deleteOnFailureAfter := parseDeleteOnFailureAfterSetting(infra)
+		enqueueTime, err := h.infraMachineDeletionEnqueueingTime(infra, time.Now(), deleteOnFailureAfter)
+		if err != nil {
+			return obj, err
+		}
+		if enqueueTime > 0 {
+			logrus.Infof("[machineprovision] %s/%s: Failed to create infrastructure for machine %s, enqueueing deletion after %s...", infra.meta.GetNamespace(), infra.meta.GetName(), machine.Name, enqueueTime)
+			h.EnqueueAfter(infra, enqueueTime)
+			return obj, nil
+		}
 		logrus.Infof("[machineprovision] %s/%s: Failed to create infrastructure for machine %s, deleting and recreating...", infra.meta.GetNamespace(), infra.meta.GetName(), machine.Name)
 		if err = h.machineClient.Delete(machine.Namespace, machine.Name, &metav1.DeleteOptions{}); err != nil {
 			return obj, err
@@ -605,7 +624,6 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 	} else if err != nil {
 		return obj, err
 	}
-
 	newStatus, err := h.getMachineStatus(job)
 	if err != nil {
 		return obj, err
@@ -620,6 +638,73 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 	return h.dynamic.UpdateStatus(&unstructured.Unstructured{
 		Object: infra.data,
 	})
+}
+
+func parseDeleteOnFailureAfterSetting(infra *infraObject) time.Duration {
+
+	deleteInfraTimeSetting := settings.DeleteInfraMachineOnFailureAfter.Get()
+	deleteOnFailureAfter, err := time.ParseDuration(deleteInfraTimeSetting)
+	if err != nil {
+		logrus.Warnf("[machineprovision] %s/%s: error parsing the '%s' setting: %v: %v, returning 0", infra.meta.GetNamespace(), infra.meta.GetName(), settings.DeleteInfraMachineOnFailureAfter.Name, deleteInfraTimeSetting, err)
+		return 0
+	}
+
+	return deleteOnFailureAfter
+}
+
+// jobFailureTime returns the failedTime of the job. If no Job failure found, returns nil
+func jobFailureTime(job *batchv1.Job) *time.Time {
+	for _, jobCondition := range job.Status.Conditions {
+		if jobCondition.Type == batchv1.JobFailed && jobCondition.Status == corev1.ConditionTrue {
+			t := jobCondition.LastTransitionTime.Time
+			return &t
+		}
+	}
+	return nil
+}
+
+// infraMachineDeletionEnqueueingTime determines the duration we want to
+// keep the infraMachine alive based on job failure time and configured deletion settings.
+func (h *handler) infraMachineDeletionEnqueueingTime(infra *infraObject, currentTime time.Time, deleteOnFailureAfter time.Duration) (time.Duration, error) {
+
+	if deleteOnFailureAfter <= 0 {
+		return 0, nil
+	}
+
+	jobName := infra.data.String("status", "jobName")
+	if jobName == "" {
+		logrus.Warnf("[machineprovision] %s/%s: no job name found on infraMachine, returning 0", infra.meta.GetNamespace(), infra.meta.GetName())
+		return 0, nil
+	}
+
+	job, err := h.jobs.Get(infra.meta.GetNamespace(), jobName)
+	if apierrors.IsNotFound(err) {
+		logrus.Warnf("[machineprovision] %s/%s: job %s not found, returning 0", infra.meta.GetNamespace(), infra.meta.GetName(), jobName)
+		return 0, nil
+	} else if err != nil {
+		return 0, err
+	}
+
+	failedTime := jobFailureTime(job)
+	if failedTime == nil {
+		logrus.Warnf("[machineprovision] %s/%s: error getting the failure time for job '%s', returning 0", infra.meta.GetNamespace(), infra.meta.GetName(), job.Name)
+		return 0, nil
+	}
+
+	// example:
+	// deleteOnFailureAfter is 5 minutes
+	// currentTime is 10:10
+	// failureTime is 10:07
+	// timeSinceFailure will be 3 minutes
+	// so we need to enqueue to 2 minutes from now.
+
+	timeSinceFailure := currentTime.Sub(*failedTime)
+
+	if timeSinceFailure >= deleteOnFailureAfter {
+		return 0, nil
+	} else {
+		return deleteOnFailureAfter - timeSinceFailure, nil
+	}
 }
 
 func (h *handler) run(infra *infraObject, create bool) (rkev1.RKEMachineStatus, bool, error) {
@@ -653,7 +738,7 @@ func (h *handler) run(infra *infraObject, create bool) (rkev1.RKEMachineStatus, 
 		ready = cond.Status() == "True" && args.String("providerID") != ""
 	}
 
-	if err := h.apply.WithOwner(infra.obj).ApplyObjects(objects((ready || failure) && create, dArgs)...); err != nil {
+	if err := h.apply.WithOwner(infra.obj).ApplyObjects(objects(ready && create, dArgs)...); err != nil {
 		return rkev1.RKEMachineStatus{}, failure, err
 	}
 

@@ -3,27 +3,51 @@
   "extends": [
     "github>rancher/renovate-config//rancher-main#release"
   ],
-  "baseBranches": [
+  "baseBranchPatterns": [
     "main",
+    "release/v2.12",
     "release/v2.11",
     "release/v2.10",
     "release/v2.9"
+  ],
+  "ignoreDeps":[
+    "go.qase.io/client"
   ],
   "prHourlyLimit": 2,
   "prConcurrentLimit": 4,
   "prCreation": "status-success",
   "packageRules": [
     {
-      "matchBaseBranches": ["release/v2.11"],
-      "extends": ["github>rancher/renovate-config//rancher-2.11#release"]
+      "matchBaseBranches": [
+        "release/v2.12"
+      ],
+      "extends": [
+        "github>rancher/renovate-config//rancher-2.12#release"
+      ]
     },
     {
-      "matchBaseBranches": ["release/v2.10"],
-      "extends": ["github>rancher/renovate-config//rancher-2.10#release"]
+      "matchBaseBranches": [
+        "release/v2.11"
+      ],
+      "extends": [
+        "github>rancher/renovate-config//rancher-2.11#release"
+      ]
     },
     {
-      "matchBaseBranches": ["release/v2.9"],
-      "extends": ["github>rancher/renovate-config//rancher-2.9#release"]
+      "matchBaseBranches": [
+        "release/v2.10"
+      ],
+      "extends": [
+        "github>rancher/renovate-config//rancher-2.10#release"
+      ]
+    },
+    {
+      "matchBaseBranches": [
+        "release/v2.9"
+      ],
+      "extends": [
+        "github>rancher/renovate-config//rancher-2.9#release"
+      ]
     }
   ]
 }

@@ -79,6 +79,9 @@ func skipOperatorCluster(action string, cluster *apimgmtv3.Cluster) bool {
 	case cluster.Spec.GKEConfig != nil:
 		logrus.Debugf(msgFmt, "GKE", cluster.Name, "gke", action)
 		return true
+	case cluster.Spec.AliConfig != nil:
+		logrus.Debugf(msgFmt, "Alibaba", cluster.Name, "ali", action)
+		return true
 	default:
 		return false
 	}
@@ -438,9 +441,13 @@ func (p *Provisioner) reconcileCluster(cluster *apimgmtv3.Cluster, create bool) 
 	p.setGenericConfigs(cluster)
 
 	// Compute the new spec from the cluster resource.
-	spec, _, err := p.getSpec(cluster)
+	spec, configChanged, err := p.getSpec(cluster)
 	if err != nil {
 		return cluster, err
+	}
+
+	if !configChanged {
+		return cluster, nil
 	}
 
 	if ok, delay := p.backoffFailure(cluster, spec); ok {

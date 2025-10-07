@@ -1,0 +1,15 @@
+name: '{{ .k8s_k3s.manifest }}'
+pipelineid: '{{ .k8s_k3s.pipelineid }}'
+
+autodiscovery:
+  scmid: 'default'
+  actionid: 'rancher-pr'
+  groupby: all
+  crawlers:
+    golang:
+      versionfilter:
+        kind: semver
+        pattern: '{{ .k8s.main }}'
+      only:
+        - modules:
+            'k8s.io/kubernetes': ''

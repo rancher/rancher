@@ -40,7 +40,7 @@ jobs:
       REGISTRY: "172.17.0.2:5000"
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
       - name: testdata
         run: mkdir -p build/testdata
       - name: Install Dapper
@@ -53,7 +53,7 @@ jobs:
           sudo systemctl restart docker
           sudo docker info
       - name: Download Docker images artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: "/tmp"
           merge-multiple: true
@@ -87,3 +87,54 @@ jobs:
           V2PROV_TEST_DIST: "${{ matrix.V2PROV_TEST_DIST }}"
           CATTLE_FEATURES: "${{ matrix.CATTLE_FEATURES }}"
           CATTLE_AGENT_IMAGE: "${{ env.IMAGE_AGENT}}:${{ env.TAG }}"
+      - name: Rename JSON test output & generate plain text version for debugging
+        id: test_output
+        run: |
+          export TESTSUITE="$(echo '${{ matrix.V2PROV_TEST_RUN_REGEX }}' | sed 's/Test//' | tr -d '()|_^.*$')"
+          echo "suite=${TESTSUITE}" >> $GITHUB_OUTPUT
+          # need sudo due to this being created in the dapper container
+          sudo mv ./build/out.json /tmp/report-${{ matrix.V2PROV_TEST_DIST }}-$TESTSUITE.json
+
+          cat /tmp/report-${{ matrix.V2PROV_TEST_DIST }}-$TESTSUITE.json | \
+            sed '/^go:/d' | \
+            jq -sr '.[] | .Output' > /tmp/report-${{ matrix.V2PROV_TEST_DIST }}-$TESTSUITE.txt
+      - name: Upload JSON and Plain Text Test Results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: "Test Results ${{ matrix.V2PROV_TEST_DIST }} ${{ steps.test_output.outputs.suite }}"
+          path: "/tmp/report-${{ matrix.V2PROV_TEST_DIST }}-${{ steps.test_output.outputs.suite }}.*"
+
+  convert-to-xml:
+    needs: [provisioning_tests]
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: registry.suse.com/bci/bci-base:15.7
+    steps:
+      - name: Install golang
+        run: |
+          zypper --non-interactive install golang
+      - name: Fetch Raw JSON output
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          merge-multiple: true
+          path: /tmp/test-results/
+      - name: Convert test results to XML
+        run: |
+          for file in $(ls /tmp/test-results/report-*.json); do
+             echo "Processing $file..."
+             go run github.com/jstemmer/go-junit-report/v2@latest -parser gojson < $file > $(sed 's/json/xml/g' <<<$file)
+          done
+      - name: Upload XML Test Results
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: XML Results
+          path: "/tmp/test-results/report-*.xml"
+
+  event-file:
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: registry.suse.com/bci/bci-base:15.7
+    steps:
+      - name: Upload GH Event File
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: Event File
+          path: ${{ github.event_path }}

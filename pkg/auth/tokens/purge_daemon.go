@@ -41,7 +41,7 @@ func (p *purger) purge() {
 
 	var count int
 	for _, token := range allTokens {
-		if IsExpired(*token) {
+		if IsExpired(token) {
 			err = p.tokens.Delete(token.ObjectMeta.Name, &metav1.DeleteOptions{})
 			if err != nil && !clientbase.IsNotFound(err) {
 				logrus.Errorf("Error: while deleting expired token %v: %v", err, token.ObjectMeta.Name)

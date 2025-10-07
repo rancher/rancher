@@ -25,6 +25,7 @@ import (
 	"github.com/rancher/rancher/pkg/generated/controllers/upgrade.cattle.io"
 	"github.com/rancher/rancher/pkg/impersonation"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/wrangler"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -32,29 +33,20 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	rbac.Register(ctx, cluster)
 	healthsyncer.Register(ctx, cluster)
 	networkpolicy.Register(ctx, cluster)
-	nodesyncer.Register(ctx, cluster, kubeConfigGetter)
+
 	secret.Register(ctx, mgmt, cluster, clusterRec)
 	resourcequota.Register(ctx, cluster)
 	windows.Register(ctx, clusterRec, cluster)
 	nsserviceaccount.Register(ctx, cluster)
-	if features.RKE2.Enabled() {
-		// Just register the snapshot controller if the cluster is administrated by rancher.
-		if clusterRec.Annotations["provisioning.cattle.io/administrated"] == "true" {
-			if features.Provisioningv2ETCDSnapshotBackPopulation.Enabled() {
-				cluster.K3s = k3s.New(cluster.ControllerFactory)
-				snapshotbackpopulate.Register(ctx, cluster)
-			}
-			cluster.Plan = upgrade.New(cluster.ControllerFactory)
-			rkecontrolplanecondition.Register(ctx,
-				cluster.ClusterName,
-				cluster.Management.Wrangler.Provisioning.Cluster().Cache(),
-				cluster.Catalog.V1().App(),
-				cluster.Plan.V1().Plan(),
-				cluster.Management.Wrangler.RKE.RKEControlPlane())
-		}
 
-		machinerole.Register(ctx, cluster)
-	}
+	mgmt.Wrangler.DeferredCAPIRegistration.DeferFunc(func(capi *wrangler.CAPIContext) {
+		_ = cluster.DeferredStart(ctx, func(ctx context.Context) error {
+			nodesyncer.Register(ctx, cluster, capi, kubeConfigGetter)
+			registerProvV2(ctx, cluster, capi, clusterRec)
+			return nil
+		})()
+	})
+
 	registerImpersonationCaches(cluster)
 
 	cavalidator.Register(ctx, cluster)
@@ -71,6 +63,28 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	}
 
 	return managementuserlegacy.Register(ctx, mgmt, cluster, clusterRec, kubeConfigGetter)
+}
+
+func registerProvV2(ctx context.Context, cluster *config.UserContext, capi *wrangler.CAPIContext, clusterRec *apimgmtv3.Cluster) {
+	if !features.RKE2.Enabled() {
+		return
+	}
+
+	// Just register the snapshot controller if the cluster is administrated by rancher.
+	if clusterRec.Annotations["provisioning.cattle.io/administrated"] == "true" {
+		if features.Provisioningv2ETCDSnapshotBackPopulation.Enabled() {
+			cluster.K3s = k3s.New(cluster.ControllerFactory)
+			snapshotbackpopulate.Register(ctx, cluster, capi)
+		}
+		cluster.Plan = upgrade.New(cluster.ControllerFactory)
+		rkecontrolplanecondition.Register(ctx,
+			cluster.ClusterName,
+			cluster.Management.Wrangler.Provisioning.Cluster().Cache(),
+			cluster.Catalog.V1().App(),
+			cluster.Plan.V1().Plan(),
+			cluster.Management.Wrangler.RKE.RKEControlPlane())
+	}
+	machinerole.Register(ctx, cluster)
 }
 
 func RegisterFollower(cluster *config.UserContext) error {

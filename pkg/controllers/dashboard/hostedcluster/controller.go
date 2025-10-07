@@ -51,6 +51,16 @@ var (
 		ReleaseName:      "rancher-gke-operator",
 		ChartName:        "rancher-gke-operator",
 	}
+	AliOperatorCrdChart = chart.Definition{
+		ReleaseNamespace: "cattle-system",
+		ReleaseName:      "rancher-ali-operator-crd",
+		ChartName:        "rancher-ali-operator-crd",
+	}
+	AliOperatorChart = chart.Definition{
+		ReleaseNamespace: "cattle-system",
+		ReleaseName:      "rancher-ali-operator",
+		ChartName:        "rancher-ali-operator",
+	}
 )
 
 type handler struct {
@@ -107,6 +117,13 @@ func (h handler) onClusterChange(key string, cluster *v3.Cluster) (*v3.Cluster, 
 		if gkeOperatorVersion := settings.GkeOperatorVersion.Get(); gkeOperatorVersion != "" {
 			toInstallCrdChartVersion = gkeOperatorVersion
 			toInstallChartVersion = gkeOperatorVersion
+		}
+	} else if cluster.Spec.AliConfig != nil {
+		toInstallCrdChart = &AliOperatorCrdChart
+		toInstallChart = &AliOperatorChart
+		if aliOperatorVersion := settings.AliOperatorVersion.Get(); aliOperatorVersion != "" {
+			toInstallCrdChartVersion = aliOperatorVersion
+			toInstallChartVersion = aliOperatorVersion
 		}
 	}
 

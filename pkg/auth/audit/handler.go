@@ -3,7 +3,6 @@ package audit
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -11,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rancher/steve/pkg/auth"
 	"github.com/sirupsen/logrus"
 )
 
@@ -22,115 +22,77 @@ type userKey string
 
 var userKeyValue userKey = "audit_user"
 
-func NewAuditLogMiddleware(writer *Writer) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return handler{
-			next:    next,
-			writer:  writer,
-			errMap:  make(map[string]time.Time),
-			errLock: &sync.Mutex{},
-		}
-	}
+func NewAuditLogMiddleware(writer *Writer) auth.Middleware {
+	return GetAuditLoggerMiddleware(&LoggingHandler{
+		writer:  writer,
+		errMap:  make(map[string]time.Time),
+		errLock: &sync.Mutex{},
+	})
 }
 
-type handler struct {
-	next   http.Handler
+type LoggingHandler struct {
 	writer *Writer
 
 	errMap  map[string]time.Time
 	errLock *sync.Mutex
 }
 
-func (h handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	if h.writer == nil {
-		h.next.ServeHTTP(rw, req)
-		return
-	}
-
-	reqTimestamp := time.Now().Format(time.RFC3339)
-
-	user := getUserInfo(req)
-
-	context := context.WithValue(req.Context(), userKeyValue, user)
-	req = req.WithContext(context)
-
-	wr := &wrapWriter{
-		next: rw,
-
-		statusCode: http.StatusOK,
-	}
-	rawBody, userName := copyReqBody(req)
-	h.next.ServeHTTP(wr, req)
-	wr.Apply()
-
-	respTimestamp := time.Now().Format(time.RFC3339)
-
-	log := newLog(user, req, wr, reqTimestamp, respTimestamp, rawBody, userName)
-
-	if err := h.writer.Write(log); err != nil {
-		// Locking after next is called to avoid performance hits on the request.
-		h.errLock.Lock()
-		defer h.errLock.Unlock()
-
-		// Only log duplicate error messages at most every errorDebounceTime.
-		// This is to prevent the rancher logs from being flooded with error messages
-		// when the log path is invalid or any other error that will always cause a write to fail.
-		if lastSeen, ok := h.errMap[err.Error()]; !ok || time.Since(lastSeen) > errorDebounceTime {
-			logrus.Warnf("Failed to write audit log: %s", err)
-			h.errMap[err.Error()] = time.Now()
-		}
-	}
-}
-
 type wrapWriter struct {
-	next http.ResponseWriter
+	http.ResponseWriter
 
-	wroteHeader bool
+	hijacked    bool
+	headerWrote bool
 
-	wroteBody bool
-	buf       bytes.Buffer
-
-	statusCode int
-}
-
-func (w *wrapWriter) Header() http.Header {
-	return w.next.Header()
+	statusCode   int
+	bytesWritten int
+	buf          bytes.Buffer
 }
 
 func (w *wrapWriter) WriteHeader(statusCode int) {
-	w.wroteHeader = true
-	w.statusCode = statusCode
+	w.ResponseWriter.WriteHeader(statusCode)
+	if !w.headerWrote {
+		w.statusCode = statusCode
+		w.headerWrote = true
+	}
 }
 
 func (w *wrapWriter) Write(body []byte) (int, error) {
-	w.wroteBody = true
-	return w.buf.Write(body)
+	if !w.headerWrote {
+		w.WriteHeader(http.StatusOK)
+	}
+	n, err := w.ResponseWriter.Write(body)
+	w.bytesWritten += n
+	w.buf.Write(body)
+	return n, err
 }
 
 func (w *wrapWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	if hijacker, ok := w.next.(http.Hijacker); ok {
+	if hijacker, ok := w.ResponseWriter.(http.Hijacker); ok {
+		w.hijacked = true
 		return hijacker.Hijack()
 	}
-	return nil, nil, fmt.Errorf("upstream ResponseWriter of type %v does not implement http.Hijacker", reflect.TypeOf(w.next))
+	return nil, nil, fmt.Errorf("upstream ResponseWriter of type %v does not implement http.Hijacker", reflect.TypeOf(w.ResponseWriter))
 }
 
 func (w *wrapWriter) CloseNotify() <-chan bool {
-	if cn, ok := w.next.(http.CloseNotifier); ok {
+	if cn, ok := w.ResponseWriter.(http.CloseNotifier); ok {
 		return cn.CloseNotify()
 	}
-	logrus.Errorf("Upstream ResponseWriter of type %v does not implement http.CloseNotifier", reflect.TypeOf(w.next))
+	logrus.Errorf("Upstream ResponseWriter of type %v does not implement http.CloseNotifier", reflect.TypeOf(w.ResponseWriter))
 	return make(<-chan bool)
 }
 
 func (w *wrapWriter) Flush() {
-	if f, ok := w.next.(http.Flusher); ok {
-		f.Flush()
+	if flusher, ok := w.ResponseWriter.(http.Flusher); ok {
+		if !w.headerWrote {
+			w.WriteHeader(http.StatusOK)
+		}
+		flusher.Flush()
 		return
 	}
-	logrus.Errorf("Upstream ResponseWriter of type %v does not implement http.Flusher", reflect.TypeOf(w.next))
+	logrus.Errorf("Upstream ResponseWriter of type %v does not implement http.Flusher", reflect.TypeOf(w.ResponseWriter))
 }
 
-func (w *wrapWriter) Apply() {
-	w.next.WriteHeader(w.statusCode)
-	w.next.Write(w.buf.Bytes())
-}
+var _ http.ResponseWriter = (*wrapWriter)(nil)
+var _ http.Hijacker = (*wrapWriter)(nil)
+var _ http.Flusher = (*wrapWriter)(nil)

@@ -1,0 +1,6 @@
+k8s:
+  main: v1.33.4
+  deps: v0.33.4
+k3s:
+  release: v1.33.1+k3s1
+  image: v1.33.1-k3s1

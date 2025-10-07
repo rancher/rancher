@@ -31,6 +31,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/cavalidator"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/logserver"
+	"github.com/rancher/rancher/pkg/utils"
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/wrangler/v3/pkg/signals"
 	"github.com/sirupsen/logrus"
@@ -280,7 +281,11 @@ func run(ctx context.Context) error {
 	}()
 
 	for {
-		wsURL := fmt.Sprintf("wss://%s/v3/connect", serverURL.Host)
+		safeHost := serverURL.Host
+		if utils.IsPlainIPV6(safeHost) {
+			safeHost = fmt.Sprintf("[%s]", safeHost)
+		}
+		wsURL := fmt.Sprintf("wss://%s/v3/connect", safeHost)
 		if !isConnect() {
 			wsURL += "/register"
 		}

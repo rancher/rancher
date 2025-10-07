@@ -16,10 +16,11 @@ import (
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 const (
-	RancherVersionDev                 = "2.12.99"
+	RancherVersionDev                 = "2.13.99"
 	DefaultMaxUIPluginFileSizeInBytes = 30 * 1024 * 1024 // 30MB
 	AgentTLSModeStrict                = "strict"
 	AgentTLSModeSystemStore           = "system-store"
@@ -54,6 +55,8 @@ var (
 		"cattle-csp-adapter-system",
 		"calico-apiserver",
 		"cattle-elemental-system",
+		"cattle-scc-system",
+		"cattle-telemetry-system",
 		"cattle-local-user-passwords",
 		"cattle-tokens",
 	}
@@ -90,7 +93,7 @@ var (
 	KubernetesVersionToSystemImages     = NewSetting("k8s-version-to-images", "")
 	KubernetesVersionsCurrent           = NewSetting("k8s-versions-current", "")
 	KubernetesVersionsDeprecated        = NewSetting("k8s-versions-deprecated", "")
-	KDMBranch                           = NewSetting("kdm-branch", "dev-v2.12")
+	KDMBranch                           = NewSetting("kdm-branch", "dev-v2.13")
 	MachineVersion                      = NewSetting("machine-version", "dev")
 	Namespace                           = NewSetting("namespace", os.Getenv("CATTLE_NAMESPACE"))
 	PasswordMinLength                   = NewSetting("password-min-length", "12")
@@ -103,8 +106,8 @@ var (
 	WinsAgentVersion                    = NewSetting("wins-agent-version", "")
 	CSIProxyAgentVersion                = NewSetting("csi-proxy-agent-version", "")
 	CSIProxyAgentURL                    = NewSetting("csi-proxy-agent-url", "https://acs-mirror.azureedge.net/csi-proxy/%[1]s/binaries/csi-proxy-%[1]s.tar.gz")
-	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://github.com/rancher/system-agent/releases/download/v0.3.13/install.sh") // To ensure consistency between SystemAgentInstallScript default value and CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT to utilize the local system-agent-install.sh script when both values are equal.
-	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.5.2/install.ps1")
+	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://github.com/rancher/system-agent/releases/download/v0.3.14-rc.2/install.sh") // To ensure consistency between SystemAgentInstallScript default value and CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT to utilize the local system-agent-install.sh script when both values are equal.
+	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.5.3-rc.2/install.ps1")
 	SystemAgentInstallerImage           = NewSetting("system-agent-installer-image", "") // Defined via environment variable
 	SystemAgentUpgradeImage             = NewSetting("system-agent-upgrade-image", "")   // Defined via environment variable
 	WinsAgentUpgradeImage               = NewSetting("wins-agent-upgrade-image", "")
@@ -120,7 +123,7 @@ var (
 	ClusterTemplateEnforcement          = NewSetting("cluster-template-enforcement", "false")
 	InitialDockerRootDir                = NewSetting("initial-docker-root-dir", "/var/lib/docker")
 	SystemCatalog                       = NewSetting("system-catalog", "external") // Options are 'external' or 'bundled'
-	ChartDefaultBranch                  = NewSetting("chart-default-branch", "dev-v2.12")
+	ChartDefaultBranch                  = NewSetting("chart-default-branch", "dev-v2.13")
 	SystemManagedChartsOperationTimeout = NewSetting("system-managed-charts-operation-timeout", "300s")
 	FleetDefaultWorkspaceName           = NewSetting("fleet-default-workspace-name", fleetconst.ClustersDefaultNamespace) // fleetWorkspaceName to assign to clusters with none
 	ShellImage                          = NewSetting("shell-image", buildconfig.DefaultShellVersion)
@@ -130,8 +133,9 @@ var (
 	EKSUpstreamRefreshCron              = NewSetting("eks-refresh-cron", "*/5 * * * *") // EKSUpstreamRefreshCron is deprecated and will be replaced by EKSUpstreamRefresh
 	EKSUpstreamRefresh                  = NewSetting("eks-refresh", "300")
 	GKEUpstreamRefresh                  = NewSetting("gke-refresh", "300")
+	AlibabaUpstreamRefresh              = NewSetting("alibabacloud-refresh", "300")
 	HideLocalCluster                    = NewSetting("hide-local-cluster", "false")
-	MachineProvisionImage               = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher131")
+	MachineProvisionImage               = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher134")
 	SystemFeatureChartRefreshSeconds    = NewSetting("system-feature-chart-refresh-seconds", "21600")
 	ClusterAgentDefaultAffinity         = NewSetting("cluster-agent-default-affinity", ClusterAgentAffinity)
 	FleetAgentDefaultAffinity           = NewSetting("fleet-agent-default-affinity", FleetAgentAffinity)
@@ -173,6 +177,10 @@ var (
 	// An empty string or a zero value means the feature is disabled.
 	DeleteInactiveUserAfter = NewSetting("delete-inactive-user-after", "")
 
+	// DeleteInfraMachineOnFailureAfter is the duration after which a machine job that failed to provision a machine will be deleted.
+	// The value should be expressed in valid time.Duration units. See https://pkg.go.dev/time#ParseDuration
+	DeleteInfraMachineOnFailureAfter = NewSetting("delete-infra-machine-on-failure-after", "0s")
+
 	// UserRetentionDryRun determines if the user retention process should actually disable and delete users.
 	// Valid values are "true" and "false". An empty string means "false".
 	UserRetentionDryRun = NewSetting("user-retention-dry-run", "false")
@@ -210,6 +218,9 @@ var (
 	// GkeOperatorVersion is the exact version of the gke-operator and gke-operator-crd chart that Rancher will install.
 	GkeOperatorVersion = NewSetting("gke-operator-version", "")
 
+	// AliOperatorVersion is the exact version of the ali-operator and ali-operator-crd chart that Rancher will install.
+	AliOperatorVersion = NewSetting("ali-operator-version", "")
+
 	// KubeconfigDefaultTokenTTLMinutes is the default time to live applied to kubeconfigs created for users.
 	// This setting will take effect regardless of the kubeconfig-generate-token status.
 	KubeconfigDefaultTokenTTLMinutes = NewSetting("kubeconfig-default-token-ttl-minutes", "43200") // 30 days
@@ -240,6 +251,9 @@ var (
 	// RKE2ChartDefaultURL represents the default URL for the RKE2 charts repo. It should only be set for test or
 	// debug purposes.
 	RKE2ChartDefaultURL = NewSetting("rke2-chart-default-url", "https://git.rancher.io/")
+
+	// SkipHelmIndexFiltering flag that tells Rancher to skip filtering charts in helm index. Only works in -head or dev versions.
+	SkipHelmIndexFiltering = NewSetting("skip-helm-index-filtering", "true")
 
 	// S3BucketCheckTimeout is the timeout for checking if an s3 bucket for etcd backups exists,
 	// in the go duration string format.
@@ -373,11 +387,23 @@ var (
 
 	SQLCacheGCInterval  = NewSetting("sql-cache-gc-interval", "15m")
 	SQLCacheGCKeepCount = NewSetting("sql-cache-gc-keep-count", "1000")
+
+	SCCOperatorImage = NewSetting("scc-operator-image", buildconfig.DefaultSccOperatorImage)
+
+	// This is the limit for request bodies sent to /v3-public/* endpoints in
+	// bytes.
+	// The default = 1MiB
+	APIBodyLimit = NewSetting("public-api-body-limit", "1Mi")
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.
 func FullShellImage() string {
 	return PrefixPrivateRegistry(ShellImage.Get())
+}
+
+// FullSCCOperatorImage returns the full private registry name of the rancher shell image.
+func FullSCCOperatorImage() string {
+	return PrefixPrivateRegistry(SCCOperatorImage.Get())
 }
 
 // PrefixPrivateRegistry prefixes the given image name with the stored private registry path.
@@ -505,6 +531,28 @@ func (s Setting) GetInt() int {
 		return 0
 	}
 	return i
+}
+
+// GetQuantityAsInt64 will return the currently stored value of the setting as an int64
+// parsed from a Kubernetes Quantity format string.
+//
+// See https://pkg.go.dev/k8s.io/apimachinery/pkg/api/resource#ParseQuantity for
+// format details.
+//
+// If the quantity cannot be expressed as an int64 d will be returned.
+func (s Setting) GetQuantityAsInt64(d int64) (int64, error) {
+	v := s.Get()
+	i, err := resource.ParseQuantity(v)
+	if err != nil {
+		return 0, fmt.Errorf("parsing setting: %w", err)
+	}
+
+	q, ok := i.AsInt64()
+	if ok {
+		return q, nil
+	}
+
+	return d, nil
 }
 
 // SetProvider will set the given provider as the global provider for all settings.

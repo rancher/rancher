@@ -62,7 +62,7 @@ func HelmClient(secret *corev1.Secret, caBundle []byte, insecureSkipTLSVerify bo
 
 	// Wrap the transport with a custom RoundTripper to set the User-Agent header
 	client.Transport = &roundtripper.UserAgent{
-		UserAgent: fmt.Sprintf("%s/%s %s", "go-rancher", settings.ServerVersion.Get(), "(HTTP-based Helm Repository)"),
+		UserAgent: fmt.Sprintf("%s/%s/%s %s", "go", "rancher", settings.ServerVersion.Get(), "(HTTP-based Helm Repository)"),
 		Next:      client.Transport,
 	}
 

@@ -1,0 +1,86 @@
+name: "updatecli"
+
+on:
+  schedule:
+    # Runs daily at 12:00 UTC.
+    - cron: '0 12 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+jobs:
+  updatecli:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Install updatecli
+        uses: updatecli/updatecli-action@57aa8966d4d775cb1420b90c270ba97a4b5abe47 # v2.93.0
+
+      - name: Install Go
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Delete leftover updatecli branches
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr list \
+            --search "is:closed is:pr head:updatecli_" \
+            --json headRefName \
+            --jq ".[].headRefName" | sort -u > closed_prs_branches.txt
+          gh pr list \
+            --search "is:open is:pr head:updatecli_" \
+            --json headRefName \
+            --jq ".[].headRefName" | sort -u > open_prs_branches.txt
+          for branch in $(comm -23 closed_prs_branches.txt open_prs_branches.txt); do
+            if (git ls-remote --exit-code --heads origin "${branch}"); then
+              echo "Deleting leftover updatecli branch - ${branch}";
+              git push origin --delete "${branch}";
+            fi
+          done
+
+      - name: Get App secrets
+        uses: rancher-eio/read-vault-secrets@main
+        with:
+          # We use Renovate's App token, because it has the same permissions
+          # needed and serve the same purpose.
+          secrets: |
+            secret/data/github/org/rancher/github/renovate-rancher appId      | APP_ID ;
+            secret/data/github/org/rancher/github/renovate-rancher privateKey | PRIVATE_KEY
+
+      - name: Create App token
+        uses: actions/create-github-app-token@67018539274d69449ef7c02e8e71183d1719ab42 # v2.1.4
+        id: app-token
+        with:
+          app-id: ${{ env.APP_ID }}
+          private-key: ${{ env.PRIVATE_KEY }}
+
+      - name: Apply updatecli
+        env:
+          UPDATECLI_GITHUB_ACTOR: ${{ github.actor }}
+          UPDATECLI_GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          # Never use '--debug' or 'manifest show' options, because they will
+          # leak the GH token.
+          #
+          # We run a first apply to update versions.yaml with the needed K8s
+          # and K3s versions. This is currently a workaround for the
+          # autodiscovery module (to be removed once
+          # https://github.com/updatecli/updatecli/issues/6076 is implemented).
+          updatecli apply --values updatecli/values.d/values.yaml   \
+                          --values updatecli/values.d/versions.yaml \
+                          --config updatecli/updatecli.d/update-versions-config-yaml/
+          # Copy the updated versions.yaml to updatecli's folder.
+          cp /tmp/updatecli/github/rancher/rancher/updatecli/values.d/versions.yaml updatecli/values.d/versions.yaml
+          # This apply is responsible for updating the dependencies.
+          updatecli apply --clean --values updatecli/values.d/values.yaml   \
+                                  --values updatecli/values.d/versions.yaml \
+                                  --config updatecli/updatecli.d/update-k8s-k3s/

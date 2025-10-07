@@ -9,6 +9,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -149,7 +150,6 @@ func TestGetMachineProvisionImagePullPolicy(t *testing.T) {
 }
 
 func TestGetInt(t *testing.T) {
-	t.Parallel()
 	fakeIntSetting := NewSetting("int", "1")
 	fakeStringSetting := NewSetting("string", "one")
 
@@ -168,6 +168,23 @@ func TestGetInt(t *testing.T) {
 	err = fakeStringSetting.Set("two")
 	assert.NoError(t, err)
 	assert.Equal(t, 0, fakeStringSetting.GetInt())
+}
+
+func TestGetQuantityAsInt64(t *testing.T) {
+	fakeLimitSetting := NewSetting("limit", "1Mi")
+
+	val, err := fakeLimitSetting.GetQuantityAsInt64(1000)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1024*1024), val)
+
+	badQuantity := NewSetting("bad-quantity", "9223372036854775807")
+	val, err = badQuantity.GetQuantityAsInt64(1000)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1000), val)
+
+	errorQuantity := NewSetting("error-quantity", "error")
+	val, err = errorQuantity.GetQuantityAsInt64(1000)
+	require.ErrorContains(t, err, "parsing setting: quantities must match")
 }
 
 func TestGetRancherVersion(t *testing.T) {

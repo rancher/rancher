@@ -2,14 +2,14 @@ FROM registry.suse.com/bci/golang:1.24
 
 ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
-ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher131
+ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher134
 ENV CATTLE_K3S_VERSION=v1.33.1+k3s1
 ENV HELM_UNITTEST_VERSION=0.3.2
 # k3d ci version
 ENV K3D_VERSION=v5.7.1
 
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ENV CATTLE_KDM_BRANCH=dev-v2.12
+ENV CATTLE_KDM_BRANCH=dev-v2.13
 
 RUN zypper -n install gcc binutils glibc-devel-static ca-certificates git-core wget curl unzip tar vim less file xz gzip sed gawk iproute2 iptables jq skopeo
 # use containerd from k3s image, not from bci
@@ -27,10 +27,6 @@ ENV GOLANGCI_LINT=v1.59.0
 RUN if [ "${ARCH}" == "amd64" ]; then \
         curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s "${GOLANGCI_LINT}"; \
     fi
-
-# Tool for CRD generation.
-ENV CONTROLLER_GEN_VERSION=v0.17.1
-RUN go install sigs.k8s.io/controller-tools/cmd/controller-gen@${CONTROLLER_GEN_VERSION}
 
 # Set up K3s: copy the necessary binaries from the K3s image.
 COPY --from=rancher/k3s:v1.33.1-k3s1 \
@@ -90,7 +86,7 @@ ENV DAPPER_OUTPUT="./bin ./dist ./go.mod ./go.sum ./pkg/apis/go.mod ./pkg/apis/g
 ENV DAPPER_DOCKER_SOCKET=true
 ARG CI
 ARG DRONE_BUILD_NUMBER
-ENV DAPPER_RUN_ARGS="-v rancher2-go16-pkg-1:/go/pkg -v rancher2-go16-cache-1:/root/.cache/go-build --privileged --label CI=${CI} --label DRONE_BUILD_NUMBER=${DRONE_BUILD_NUMBER}"
+ENV DAPPER_RUN_ARGS="-v ./build:/tmp -v rancher2-go16-pkg-1:/go/pkg -v rancher2-go16-cache-1:/root/.cache/go-build --privileged --label CI=${CI} --label DRONE_BUILD_NUMBER=${DRONE_BUILD_NUMBER}"
 ENV GOCACHE=/root/.cache/go-build
 ENV HOME=${DAPPER_SOURCE}
 

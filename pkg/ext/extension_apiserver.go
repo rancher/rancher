@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken"
 	extstores "github.com/rancher/rancher/pkg/ext/stores"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -242,7 +243,7 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 			}
 
 			if !maybeAllowed {
-				return authorizer.DecisionDeny, "only /api, /apis, /openapi/v2 and /openapi/v3 supported", nil
+				return authorizer.DecisionDeny, "only /api, /apis, /openapi/v2, and /openapi/v3 supported", nil
 			}
 
 			return aslAuthorizer.Authorize(ctx, a)
@@ -258,6 +259,14 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 	if err = extstores.InstallStores(extensionAPIServer, wranglerContext, scheme); err != nil {
 		return nil, fmt.Errorf("failed to install stores: %w", err)
 	}
+
+	// deferred ext controller setup ...
+	logrus.Debug("[deferred-ext/run] DEFER - cluster auth token - register ext token indexers")
+	wranglerContext.DeferredEXTAPIRegistration.DeferFunc(func(extContext *wrangler.EXTAPIContext) {
+		if err := clusterauthtoken.RegisterExtIndexers(extContext.Client); err != nil {
+			logrus.Fatalf("Unexpected error while adding ext indexers: %v", err)
+		}
+	})
 
 	return extensionAPIServer, nil
 }

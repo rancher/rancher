@@ -1,6 +1,7 @@
 package oidc
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -9,14 +10,21 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"sort"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/rancher/norman/types"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	"golang.org/x/oauth2"
 )
@@ -53,11 +61,12 @@ func Test_validateACR(t *testing.T) {
 	}
 }
 
-func TestParseACRFromToken(t *testing.T) {
-	header := base64.URLEncoding.EncodeToString([]byte(`{"alg":"none"}`))
-	validClaims := base64.URLEncoding.EncodeToString([]byte(`{"acr":"example_acr"}`))
+func TestParseACRFromAccessToken(t *testing.T) {
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none"}`))
+	suffix := base64.URLEncoding.EncodeToString([]byte(`{}`))
+	validClaims := base64.RawURLEncoding.EncodeToString([]byte(`{"acr":"example_acr"}`))
 	invalidBase64Claims := "invalid_base64_claims"
-	noAcrClaims := base64.URLEncoding.EncodeToString([]byte(`{"sub":"1234567890"}`))
+	noAcrClaims := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"1234567890"}`))
 
 	tests := []struct {
 		name        string
@@ -67,7 +76,7 @@ func TestParseACRFromToken(t *testing.T) {
 	}{
 		{
 			name:        "valid token with ACR",
-			token:       fmt.Sprintf("%s.%s.", header, validClaims),
+			token:       fmt.Sprintf("%s.%s.%s", header, validClaims, suffix),
 			expectedACR: "example_acr",
 		},
 		{
@@ -84,7 +93,7 @@ func TestParseACRFromToken(t *testing.T) {
 		},
 		{
 			name:        "valid token without ACR claim",
-			token:       fmt.Sprintf("%s.%s.", header, noAcrClaims),
+			token:       fmt.Sprintf("%s.%s.suffix", header, noAcrClaims),
 			expectedACR: "",
 			wantError:   true,
 		},
@@ -114,7 +123,7 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 		assert.NoError(t, err)
 	}
 	tests := map[string]struct {
-		config                    func(string) *v32.OIDCConfig
+		config                    func(string) *v3.OIDCConfig
 		authCode                  string
 		tokenManagerMock          func(token *Token) tokenManager
 		oidcProviderResponses     func(string) oidcResponses
@@ -124,7 +133,7 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 		expectedErrorMessage      string
 	}{
 		"token is updated and userInfo returned": {
-			config: func(port string) *v32.OIDCConfig {
+			config: func(port string) *v3.OIDCConfig {
 				return newOIDCConfig(port)
 			},
 			tokenManagerMock: func(token *Token) tokenManager {
@@ -138,20 +147,20 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 			},
 			expectedUserInfoSubject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
 			expectedUserInfoClaimInfo: ClaimInfo{
-				Subject:           "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
-				PreferredUsername: "admin",
-				Groups:            []string{"admingroup"},
-				FullGroupPath:     []string{"/admingroup"},
+				Subject:       "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Groups:        []string{"admingroup"},
+				FullGroupPath: []string{"/admingroup"},
+				Roles:         []string{"adminrole"},
 			},
 			expectedClaimInfo: &ClaimInfo{
-				Subject:           "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
-				PreferredUsername: "admin",
-				Groups:            []string{"admingroup"},
-				FullGroupPath:     []string{"/admingroup"},
+				Subject:       "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Groups:        []string{"admingroup"},
+				FullGroupPath: []string{"/admingroup"},
+				Roles:         []string{"adminrole"},
 			},
 		},
 		"get groups with GroupsClaims": {
-			config: func(port string) *v32.OIDCConfig {
+			config: func(port string) *v3.OIDCConfig {
 				c := newOIDCConfig(port)
 				c.GroupsClaim = "custom:groups"
 
@@ -179,8 +188,7 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 				}
 				res.token = token
 				res.user = `{
-				"sub": "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
-				"preferred_username": "admin"
+				"sub": "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd"
               }`
 				return res
 			},
@@ -192,19 +200,16 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 			},
 			expectedUserInfoSubject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
 			expectedUserInfoClaimInfo: ClaimInfo{
-				Subject:           "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
-				PreferredUsername: "admin",
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
 			},
 			expectedClaimInfo: &ClaimInfo{
-				Subject:           "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
-				PreferredUsername: "admin",
-				Groups:            []string{"group1", "group2"},
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Groups:  []string{"group1", "group2"},
 			},
 		},
-
 		"error - invalid certificate": {
-			config: func(port string) *v32.OIDCConfig {
-				return &v32.OIDCConfig{
+			config: func(port string) *v3.OIDCConfig {
+				return &v3.OIDCConfig{
 					Issuer:      "http://localhost:" + port,
 					ClientID:    "test",
 					JWKSUrl:     "http://localhost:" + port + "/.well-known/jwks.json",
@@ -221,7 +226,7 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 			expectedErrorMessage: "could not parse cert/key pair: tls: failed to find any PEM data in certificate input",
 		},
 		"error - invalid token from server": {
-			config: func(port string) *v32.OIDCConfig {
+			config: func(port string) *v3.OIDCConfig {
 				return newOIDCConfig(port)
 			},
 			tokenManagerMock: func(token *Token) tokenManager {
@@ -236,7 +241,7 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 			expectedErrorMessage: "oidc: malformed jwt",
 		},
 		"error - invalid user response": {
-			config: func(port string) *v32.OIDCConfig {
+			config: func(port string) *v3.OIDCConfig {
 				return newOIDCConfig(port)
 			},
 			tokenManagerMock: func(token *Token) tokenManager {
@@ -253,6 +258,106 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 			},
 			expectedErrorMessage: "oidc: failed to decode userinfo",
 		},
+		"display name with custom nameClaim": {
+			config: func(port string) *v32.OIDCConfig {
+				c := newOIDCConfig(port)
+				c.NameClaim = "display_name"
+
+				return c
+			},
+			oidcProviderResponses: func(port string) oidcResponses {
+				res := newOIDCResponses(privateKey, port)
+				tokenJWT := jwt.New(jwt.SigningMethodRS256)
+				tokenJWT.Claims = jwt.MapClaims{
+					"name":         "test_user",
+					"aud":          "test",
+					"exp":          time.Now().Add(5 * time.Minute).Unix(), // expires in the future
+					"email":        "test@example.com",
+					"iss":          "http://localhost:" + port,
+					"display_name": "Test User",
+				}
+				tokenStr, err := tokenJWT.SignedString(privateKey)
+				assert.NoError(t, err)
+
+				token := &Token{
+					Token: oauth2.Token{
+						AccessToken:  tokenStr,
+						Expiry:       time.Now().Add(5 * time.Minute), // expires in the future
+						RefreshToken: tokenStr,
+					},
+					IDToken: tokenStr,
+				}
+				res.token = token
+				res.user = `{
+				"sub": "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd"
+              }`
+				return res
+			},
+			tokenManagerMock: func(token *Token) tokenManager {
+				mock := mocks.NewMocktokenManager(ctrl)
+				mock.EXPECT().UpdateSecret(userId, providerName, EqToken(token.IDToken))
+
+				return mock
+			},
+			expectedUserInfoSubject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			expectedUserInfoClaimInfo: ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			},
+			expectedClaimInfo: &ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Name:    "Test User",
+				Email:   "test@example.com",
+			},
+		},
+		"display name with custom emailClaim": {
+			config: func(port string) *v32.OIDCConfig {
+				c := newOIDCConfig(port)
+				c.EmailClaim = "public_email"
+
+				return c
+			},
+			oidcProviderResponses: func(port string) oidcResponses {
+				res := newOIDCResponses(privateKey, port)
+				tokenJWT := jwt.New(jwt.SigningMethodRS256)
+				tokenJWT.Claims = jwt.MapClaims{
+					"aud":          "test",
+					"exp":          time.Now().Add(5 * time.Minute).Unix(), // expires in the future
+					"email":        "test@dev.example.com",
+					"iss":          "http://localhost:" + port,
+					"public_email": "test.dev@example.com",
+				}
+				tokenStr, err := tokenJWT.SignedString(privateKey)
+				assert.NoError(t, err)
+
+				token := &Token{
+					Token: oauth2.Token{
+						AccessToken:  tokenStr,
+						Expiry:       time.Now().Add(5 * time.Minute), // expires in the future
+						RefreshToken: tokenStr,
+					},
+					IDToken: tokenStr,
+				}
+				res.token = token
+				res.user = `{
+				"sub": "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd"
+              }`
+				return res
+			},
+			tokenManagerMock: func(token *Token) tokenManager {
+				mock := mocks.NewMocktokenManager(ctrl)
+				mock.EXPECT().UpdateSecret(userId, providerName, EqToken(token.IDToken))
+
+				return mock
+			},
+			expectedUserInfoSubject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			expectedUserInfoClaimInfo: ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+			},
+			expectedClaimInfo: &ClaimInfo{
+				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Email:   "test.dev@example.com",
+			},
+		},
 	}
 
 	for name, test := range tests {
@@ -266,7 +371,7 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 			defer server.Shutdown(context.TODO())
 			o := OpenIDCProvider{
 				Name:     providerName,
-				TokenMGR: test.tokenManagerMock(oidcResp.token),
+				TokenMgr: test.tokenManagerMock(oidcResp.token),
 			}
 			ctx := context.TODO()
 			claimInfo := &ClaimInfo{}
@@ -301,7 +406,7 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 	}
 
 	tests := map[string]struct {
-		config                func(string) *v32.OIDCConfig
+		config                func(string) *v3.OIDCConfig
 		storedToken           func(string) *oauth2.Token
 		tokenManagerMock      func(token *Token) tokenManager
 		oidcProviderResponses func(string) oidcResponses
@@ -309,14 +414,15 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 		expectedErrorMessage  string
 	}{
 		"get claims with valid token": {
-			config: func(port string) *v32.OIDCConfig {
+			config: func(port string) *v3.OIDCConfig {
 				return newOIDCConfig(port)
 			},
 			storedToken: func(port string) *oauth2.Token {
 				token := jwt.New(jwt.SigningMethodRS256)
-				token.Claims = jwt.StandardClaims{
-					Audience:  "test",
-					ExpiresAt: time.Now().Add(5 * time.Minute).Unix(), // expires in the future
+				token.Claims = jwt.RegisteredClaims{
+					Audience: []string{"test"},
+					// expires in the future
+					ExpiresAt: jwt.NewNumericDate(time.Now().Add(5 * time.Minute)),
 					Issuer:    "http://localhost:" + port,
 				}
 				tokenStr, err := token.SignedString(privateKey)
@@ -324,7 +430,7 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 
 				return &oauth2.Token{
 					AccessToken: tokenStr,
-					Expiry:      time.Now().Add(5 * time.Minute), // expires in the future
+					Expiry:      time.Now().Add(5 * time.Minute),
 				}
 			},
 			oidcProviderResponses: func(port string) oidcResponses {
@@ -334,14 +440,14 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 				return mocks.NewMocktokenManager(ctrl)
 			},
 			expectedClaimInfo: &ClaimInfo{
-				Subject:           "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
-				PreferredUsername: "admin",
-				Groups:            []string{"admingroup"},
-				FullGroupPath:     []string{"/admingroup"},
+				Subject:       "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Groups:        []string{"admingroup"},
+				FullGroupPath: []string{"/admingroup"},
+				Roles:         []string{"adminrole"},
 			},
 		},
 		"token is refreshed and updated when expired": {
-			config: func(port string) *v32.OIDCConfig {
+			config: func(port string) *v3.OIDCConfig {
 				return newOIDCConfig(port)
 			},
 			oidcProviderResponses: func(port string) oidcResponses {
@@ -349,18 +455,20 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 			},
 			storedToken: func(port string) *oauth2.Token {
 				token := jwt.New(jwt.SigningMethodRS256)
-				token.Claims = jwt.StandardClaims{
-					Audience:  "test",
-					ExpiresAt: time.Unix(0, 0).Unix(), // has expired
+				token.Claims = jwt.RegisteredClaims{
+					Audience:  []string{"test"},
+					ExpiresAt: jwt.NewNumericDate(time.Unix(0, 0)), // has expired
 					Issuer:    "http://localhost:" + port,
 				}
 				tokenStr, err := token.SignedString(privateKey)
 				assert.NoError(t, err)
 				refreshToken := jwt.New(jwt.SigningMethodRS256)
-				refreshToken.Claims = jwt.StandardClaims{
-					Audience:  "test",
-					ExpiresAt: time.Now().Add(5 * time.Minute).Unix(), // expires in the future
-					Issuer:    "http://localhost:" + port,
+				refreshToken.Claims = jwt.RegisteredClaims{
+					Audience: []string{"test"},
+					// expires in the future
+					ExpiresAt: jwt.NewNumericDate(time.Now().Add(5 *
+						time.Minute)),
+					Issuer: "http://localhost:" + port,
 				}
 				refreshTokenStr, err := refreshToken.SignedString(privateKey)
 				assert.NoError(t, err)
@@ -372,10 +480,10 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 				}
 			},
 			expectedClaimInfo: &ClaimInfo{
-				Subject:           "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
-				PreferredUsername: "admin",
-				Groups:            []string{"admingroup"},
-				FullGroupPath:     []string{"/admingroup"},
+				Subject:       "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
+				Groups:        []string{"admingroup"},
+				FullGroupPath: []string{"/admingroup"},
+				Roles:         []string{"adminrole"},
 			},
 			tokenManagerMock: func(token *Token) tokenManager {
 				mock := mocks.NewMocktokenManager(ctrl)
@@ -385,8 +493,8 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 			},
 		},
 		"error - invalid certificate": {
-			config: func(port string) *v32.OIDCConfig {
-				return &v32.OIDCConfig{
+			config: func(port string) *v3.OIDCConfig {
+				return &v3.OIDCConfig{
 					Issuer:      "http://localhost:" + port,
 					ClientID:    "test",
 					JWKSUrl:     "http://localhost:" + port + "/.well-known/jwks.json",
@@ -407,7 +515,7 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 			expectedErrorMessage: "could not parse cert/key pair: tls: failed to find any PEM data in certificate input",
 		},
 		"error - invalid token": {
-			config: func(port string) *v32.OIDCConfig {
+			config: func(port string) *v3.OIDCConfig {
 				return newOIDCConfig(port)
 			},
 			storedToken: func(port string) *oauth2.Token {
@@ -425,15 +533,17 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 			expectedErrorMessage: "oidc: malformed jwt",
 		},
 		"error - invalid user response": {
-			config: func(port string) *v32.OIDCConfig {
+			config: func(port string) *v3.OIDCConfig {
 				return newOIDCConfig(port)
 			},
 			storedToken: func(port string) *oauth2.Token {
 				token := jwt.New(jwt.SigningMethodRS256)
-				token.Claims = jwt.StandardClaims{
-					Audience:  "test",
-					ExpiresAt: time.Now().Add(5 * time.Minute).Unix(), // expires in the future
-					Issuer:    "http://localhost:" + port,
+				token.Claims = jwt.RegisteredClaims{
+					Audience: []string{"test"},
+					// expires in the future
+					ExpiresAt: jwt.NewNumericDate(time.Now().Add(5 *
+						time.Minute)),
+					Issuer: "http://localhost:" + port,
 				}
 				tokenStr, err := token.SignedString(privateKey)
 				assert.NoError(t, err)
@@ -469,7 +579,7 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 			defer server.Shutdown(context.TODO())
 			o := OpenIDCProvider{
 				Name:     providerName,
-				TokenMGR: test.tokenManagerMock(oidcResp.token),
+				TokenMgr: test.tokenManagerMock(oidcResp.token),
 			}
 
 			claimsInfo, err := o.getClaimInfoFromToken(context.TODO(), test.config(port), test.storedToken(port), userId)
@@ -482,6 +592,213 @@ func TestGetClaimInfoFromToken(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetGroupsFromClaimInfo(t *testing.T) {
+	type args struct {
+		claimInfo ClaimInfo
+	}
+	type want struct {
+		groupNames []string
+	}
+	tests := []struct {
+		name string
+		args args
+		want want
+	}{
+		{
+			name: "get groups from claim info",
+			args: args{
+				claimInfo: ClaimInfo{
+					Groups: []string{"group1", "group2"},
+				},
+			},
+			want: want{
+				groupNames: []string{"group1", "group2"},
+			},
+		},
+		{
+			name: "roles and groups are combined",
+			args: args{
+				claimInfo: ClaimInfo{
+					Groups: []string{"group1", "group2"},
+					Roles:  []string{"role1", "role2"},
+				},
+			},
+			want: want{
+				groupNames: []string{"group1", "group2", "role1", "role2"},
+			},
+		},
+		{
+			name: "just roles",
+			args: args{
+				claimInfo: ClaimInfo{
+					Roles: []string{"role1", "role2"},
+				},
+			},
+			want: want{
+				groupNames: []string{"role1", "role2"},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			o := &OpenIDCProvider{
+				Name: "oidc",
+			}
+			got := o.getGroupsFromClaimInfo(tt.args.claimInfo)
+			var gotGroupNames []string
+			for _, principal := range got {
+				parts := strings.Split(principal.Name, "://")
+				if len(parts) == 2 {
+					gotGroupNames = append(gotGroupNames, parts[1])
+				}
+			}
+			sort.Strings(gotGroupNames)
+			assert.Equal(t, tt.want.groupNames, gotGroupNames)
+		})
+	}
+}
+
+func TestLogout(t *testing.T) {
+	const (
+		userId       string = "testing-user"
+		providerName string = "keycloak"
+	)
+
+	logoutTests := map[string]struct {
+		config *v3.OIDCConfig
+		verify func(t require.TestingT, err error, msgAndArgs ...interface{})
+	}{
+		"when logout all is forced": {
+			config: newOIDCConfig("9090", func(s *v3.OIDCConfig) {
+				s.LogoutAllForced = true
+			}),
+			verify: require.Error,
+		},
+		"when logout all is not forced": {
+			config: newOIDCConfig("9090"),
+			verify: require.NoError,
+		},
+	}
+
+	for name, tt := range logoutTests {
+		t.Run(name, func(t *testing.T) {
+			testToken := &v3.Token{UserID: userId, AuthProvider: providerName}
+			o := OpenIDCProvider{
+				Name:      providerName,
+				GetConfig: func() (*v3.OIDCConfig, error) { return tt.config, nil },
+			}
+			b, err := json.Marshal(&v3.AuthConfigLogoutInput{
+				FinalRedirectURL: "https://example.com/logged-out",
+			})
+			require.NoError(t, err)
+
+			req := httptest.NewRequest(http.MethodPost, "/logout", bytes.NewReader(b))
+			nr := &normanRecorder{}
+			apiContext := &types.APIContext{
+				Method:         req.Method,
+				Request:        req,
+				Query:          url.Values{},
+				ResponseWriter: nr,
+			}
+			tt.verify(t, o.Logout(apiContext, testToken))
+		})
+	}
+}
+
+func TestLogoutAllWhenNotEnabled(t *testing.T) {
+	const (
+		userId       string = "testing-user"
+		providerName string = "keycloak"
+	)
+	oidcConfig := newOIDCConfig("8090", func(s *v3.OIDCConfig) {
+		s.EndSessionEndpoint = "http://localhost:8090/user/logout"
+		s.LogoutAllEnabled = false
+	})
+	testToken := &v3.Token{UserID: userId, AuthProvider: providerName}
+	o := OpenIDCProvider{
+		Name:      providerName,
+		GetConfig: func() (*v3.OIDCConfig, error) { return oidcConfig, nil },
+	}
+	b, err := json.Marshal(&v3.AuthConfigLogoutInput{
+		FinalRedirectURL: "https://example.com/logged-out",
+	})
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/logout", bytes.NewReader(b))
+	nr := &normanRecorder{}
+	apiContext := &types.APIContext{
+		Method:         req.Method,
+		Request:        req,
+		Query:          url.Values{},
+		ResponseWriter: nr,
+	}
+
+	assert.ErrorContains(t, o.LogoutAll(apiContext, testToken), "Rancher provider resource `keycloak` not configured for SLO")
+}
+
+func TestLogoutAll(t *testing.T) {
+	const (
+		userId       string = "testing-user"
+		providerName string = "keycloak"
+	)
+	oidcConfig := newOIDCConfig("8090", func(s *v3.OIDCConfig) {
+		s.EndSessionEndpoint = "http://localhost:8090/user/logout"
+	})
+	testToken := &v3.Token{UserID: userId, AuthProvider: providerName}
+	o := OpenIDCProvider{
+		Name:      providerName,
+		GetConfig: func() (*v3.OIDCConfig, error) { return oidcConfig, nil },
+	}
+	b, err := json.Marshal(&v3.AuthConfigLogoutInput{
+		FinalRedirectURL: "https://example.com/logged-out",
+	})
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodPost, "/logout", bytes.NewReader(b))
+	nr := &normanRecorder{}
+	apiContext := &types.APIContext{
+		Method:         req.Method,
+		Request:        req,
+		Query:          url.Values{},
+		ResponseWriter: nr,
+	}
+
+	require.NoError(t, o.LogoutAll(apiContext, testToken))
+	wantData := map[string]any{
+		"idpRedirectUrl": "http://localhost:8090/user/logout?client_id=test&post_logout_redirect_uri=https%3A%2F%2Fexample.com%2Flogged-out",
+		"type":           "authConfigLogoutOutput",
+	}
+	require.Equal(t, []normanResponse{{code: http.StatusOK, data: wantData}}, nr.responses)
+}
+
+func TestLogoutAllNoEndSessionEndpoint(t *testing.T) {
+	const (
+		userId       string = "testing-user"
+		providerName string = "oidc"
+	)
+	oidcConfig := newOIDCConfig("8090")
+	testToken := &v3.Token{UserID: userId, AuthProvider: providerName}
+	o := OpenIDCProvider{
+		Name:      providerName,
+		GetConfig: func() (*v3.OIDCConfig, error) { return oidcConfig, nil },
+	}
+	b, err := json.Marshal(&v3.AuthConfigLogoutInput{
+		FinalRedirectURL: "https://example.com/logged-out",
+	})
+	require.NoError(t, err)
+	req := httptest.NewRequest(http.MethodPost, "/logout", bytes.NewReader(b))
+
+	nr := &normanRecorder{}
+	apiContext := &types.APIContext{
+		Method:         req.Method,
+		Request:        req,
+		Query:          url.Values{},
+		ResponseWriter: nr,
+	}
+
+	assert.ErrorContains(t, o.LogoutAll(apiContext, testToken), "LogoutAll triggered with no endSessionEndpoint")
 }
 
 // mockOIDCServer creates an http server that mocks an OIDC provider. Responses are passed as a parameter.
@@ -529,9 +846,10 @@ type Token struct {
 
 func newOIDCResponses(privateKey *rsa.PrivateKey, port string) oidcResponses {
 	jwtToken := jwt.New(jwt.SigningMethodRS256)
-	jwtToken.Claims = jwt.StandardClaims{
-		Audience:  "test",
-		ExpiresAt: time.Now().Add(5 * time.Minute).Unix(), // has expired
+	jwtToken.Claims = jwt.RegisteredClaims{
+		Audience: []string{"test"},
+		// has expired
+		ExpiresAt: jwt.NewNumericDate(time.Now().Add(5 * time.Minute)),
 		Issuer:    "http://localhost:" + port,
 	}
 	jwtSrt, _ := jwtToken.SignedString(privateKey)
@@ -555,8 +873,10 @@ func newOIDCResponses(privateKey *rsa.PrivateKey, port string) oidcResponses {
 				"full_group_path": [
 					"/admingroup"
 				],
-				"preferred_username": "admin"
-              }`,
+				"roles": [
+					"adminrole"
+				]
+      }`,
 		config: providerJSON{
 			Issuer:      "http://localhost:" + port,
 			UserInfoURL: "http://localhost:" + port + "/user",
@@ -580,15 +900,22 @@ func newOIDCResponses(privateKey *rsa.PrivateKey, port string) oidcResponses {
 	}
 }
 
-func newOIDCConfig(port string) *v32.OIDCConfig {
-	return &v32.OIDCConfig{
+func newOIDCConfig(port string, opts ...func(*v3.OIDCConfig)) *v3.OIDCConfig {
+	cfg := &v3.OIDCConfig{
 		Issuer:           "http://localhost:" + port,
 		ClientID:         "test",
 		JWKSUrl:          "http://localhost:" + port + "/.well-known/jwks.json",
 		AuthEndpoint:     "http://localhost:" + port + "/auth",
 		TokenEndpoint:    "http://localhost:" + port + "/token",
 		UserInfoEndpoint: "http://localhost:" + port + "/user",
+		LogoutAllEnabled: true,
 	}
+
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
+	return cfg
 }
 
 type jsonWebKeySet struct {
@@ -649,4 +976,21 @@ func (m tokenMatcher) String() string {
 
 func EqToken(accessToken string) gomock.Matcher {
 	return tokenMatcher{accessToken}
+}
+
+// normanRecorder is like httptest.ResponseRecorder, but for norman's types.ResponseWriter interface
+type normanRecorder struct {
+	responses []normanResponse
+}
+
+func (n *normanRecorder) Write(_ *types.APIContext, code int, obj interface{}) {
+	n.responses = append(n.responses, normanResponse{
+		code: code,
+		data: obj,
+	})
+}
+
+type normanResponse struct {
+	code int
+	data any
 }

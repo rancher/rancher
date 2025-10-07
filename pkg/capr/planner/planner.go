@@ -20,7 +20,6 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/rancher/pkg/controllers/capr/managesystemagent"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	ranchercontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
@@ -146,7 +145,7 @@ type InfoFunctions struct {
 	GetBootstrapManifests   func(plane *rkev1.RKEControlPlane) ([]plan.File, error)
 }
 
-func New(ctx context.Context, clients *wrangler.Context, functions InfoFunctions) *Planner {
+func New(ctx context.Context, clients *wrangler.CAPIContext, functions InfoFunctions) *Planner {
 	clients.Mgmt.ClusterRegistrationToken().Cache().AddIndexer(ClusterRegToken, func(obj *v3.ClusterRegistrationToken) ([]string, error) {
 		return []string{obj.Spec.ClusterName}, nil
 	})
@@ -372,7 +371,7 @@ func (p *Planner) fullReconcile(cp *rkev1.RKEControlPlane, status rkev1.RKEContr
 	}
 
 	// select all etcd and then filter to just initNodes so that unavailable count is correct
-	err = p.reconcile(cp, clusterSecretTokens, plan, true, bootstrapTier, isEtcd, isNotInitNodeOrIsDeleting, "1", "", controlPlaneDrainOptions, -1, 1, false)
+	err = p.reconcile(cp, clusterSecretTokens, plan, true, bootstrapTier, isEtcd, isNotInitNodeOrIsDeleting, "1", "", controlPlaneDrainOptions, -1, 1)
 	capr.Bootstrapped.True(&status)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
@@ -391,14 +390,14 @@ func (p *Planner) fullReconcile(cp *rkev1.RKEControlPlane, status rkev1.RKEContr
 	}
 
 	// Process all nodes that have the etcd role and are NOT an init node or deleting. Only process 1 node at a time.
-	err = p.reconcile(cp, clusterSecretTokens, plan, true, etcdTier, isEtcd, isInitNodeOrDeleting, "1", joinServer, controlPlaneDrainOptions, -1, 1, false)
+	err = p.reconcile(cp, clusterSecretTokens, plan, true, etcdTier, isEtcd, isInitNodeOrDeleting, "1", joinServer, controlPlaneDrainOptions, -1, 1)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
 		return status, err
 	}
 
 	// Process all nodes that have the controlplane role and are NOT an init node or deleting.
-	err = p.reconcile(cp, clusterSecretTokens, plan, true, controlPlaneTier, isControlPlane, isInitNodeOrDeleting, controlPlaneConcurrency, joinServer, controlPlaneDrainOptions, -1, 1, false)
+	err = p.reconcile(cp, clusterSecretTokens, plan, true, controlPlaneTier, isControlPlane, isInitNodeOrDeleting, controlPlaneConcurrency, joinServer, controlPlaneDrainOptions, -1, 1)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
 		return status, err
@@ -416,30 +415,16 @@ func (p *Planner) fullReconcile(cp *rkev1.RKEControlPlane, status rkev1.RKEContr
 	}
 
 	// Process all nodes that are ONLY linux worker nodes.
-	err = p.reconcile(cp, clusterSecretTokens, plan, false, workerTier, isOnlyLinuxWorker, isInitNodeOrDeleting, workerConcurrency, "", workerDrainOptions, -1, 1, false)
+	err = p.reconcile(cp, clusterSecretTokens, plan, false, workerTier, isOnlyLinuxWorker, isInitNodeOrDeleting, workerConcurrency, "", workerDrainOptions, -1, 1)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
 		return status, err
 	}
 
 	// Process all nodes that are ONLY windows worker nodes.
-	resetFailureCountOnRestart := false
-	windowsMaxFailures := -1
-	windowsMaxFailureThreshold := 1
-	// This conditional can be removed once the minimum version of rke2
-	// supported by Rancher is v1.31.0, and '5' can then always be passed
-	// to 'reconcile' when processing Windows node plans.
-	if managesystemagent.CurrentVersionResolvesGH5551(cp.Spec.KubernetesVersion) {
-		// In some circumstances plans may temporarily fail to complete on Windows nodes
-		// due to factors out of Ranchers control. This is particularly prevalent for the Windows
-		// installation plan, but could occur for other Windows specific plans too.
-		// In these cases, Rancher should re-run the plan again to circumvent any transient errors.
-		windowsMaxFailures = 5
-		windowsMaxFailureThreshold = 5
-		resetFailureCountOnRestart = true
-	}
-
-	err = p.reconcile(cp, clusterSecretTokens, plan, false, workerTier, isOnlyWindowsWorker, isInitNodeOrDeleting, workerConcurrency, "", workerDrainOptions, windowsMaxFailures, windowsMaxFailureThreshold, resetFailureCountOnRestart)
+	// We attempt the plan 5 times before marking it as failed
+	// to allow transient errors to potentially resolve.
+	err = p.reconcile(cp, clusterSecretTokens, plan, false, workerTier, isOnlyWindowsWorker, isInitNodeOrDeleting, workerConcurrency, "", workerDrainOptions, -1, 5)
 	firstIgnoreError, err = ignoreErrors(firstIgnoreError, err)
 	if err != nil {
 		return status, err
@@ -856,7 +841,8 @@ type reconcilable struct {
 	minorChange bool
 }
 
-func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan, required bool, tierName string, include, exclude roleFilter, maxUnavailable, forcedJoinURL string, drainOptions rkev1.DrainOptions, maxFailures, failureThreshold int, resetFailureCountOnSystemAgentRestart bool) error {
+func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, clusterPlan *plan.Plan, required bool, tierName string,
+	include, exclude roleFilter, maxUnavailable, forcedJoinURL string, drainOptions rkev1.DrainOptions, maxFailures, failureThreshold int) error {
 	var (
 		ready, outOfSync, nonReady, errMachines, draining, uncordoned []string
 		messages                                                      = map[string][]string{}
@@ -881,7 +867,6 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 		if err != nil {
 			return err
 		}
-		plan.ResetFailureCountOnSystemAgentRestart = resetFailureCountOnSystemAgentRestart
 		reconcilables = append(reconcilables, &reconcilable{
 			entry:       entry,
 			desiredPlan: plan,
@@ -909,8 +894,12 @@ func (p *Planner) reconcile(controlPlane *rkev1.RKEControlPlane, tokensSecret pl
 			continue
 		}
 
+		// capi.Machine CRD has ObservedGeneration field in its status.
+		opts := &summary.SummarizeOptions{
+			HasObservedGeneration: true,
+		}
 		// The Reconciled condition should be removed when summarizing so that the messages are not duplicated.
-		summary := summary.Summarize(removeReconciledCondition(r.entry.Machine))
+		summary := summary.SummarizeWithOptions(removeReconciledCondition(r.entry.Machine), opts)
 		if summary.Error {
 			errMachines = append(errMachines, r.entry.Machine.Name)
 		}
@@ -1192,6 +1181,9 @@ func (p *Planner) ensureRKEStateSecret(controlPlane *rkev1.RKEControlPlane, newC
 						Name:       controlPlane.Name,
 						UID:        controlPlane.UID,
 					},
+				},
+				Labels: map[string]string{
+					capr.BackupLabel: "true",
 				},
 			},
 			Data: map[string][]byte{

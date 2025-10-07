@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rancher/tests/actions/kubeapi/resourcequotas"
-	"github.com/rancher/tests/actions/namespaces"
+	"github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/resourcequotas"
+	"github.com/rancher/rancher/tests/v2/integration/actions/namespaces"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	"github.com/rancher/shepherd/extensions/defaults"

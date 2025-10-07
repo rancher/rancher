@@ -4,6 +4,10 @@ ARG BUILD_WORKDIR=/app
 
 ARG GODEP_APISERVER=scratch
 ARG GODEP_APISERVER_PATH
+ARG GODEP_LASSO=scratch
+ARG GODEP_LASSO_PATH
+ARG GODEP_NORMAN=scratch
+ARG GODEP_NORMAN_PATH
 ARG GODEP_REMOTEDIALER=scratch
 ARG GODEP_REMOTEDIALER_PATH
 ARG GODEP_SHEPHERD=scratch
@@ -13,14 +17,16 @@ ARG GODEP_STEVE_PATH
 ARG GODEP_WRANGLER=scratch
 ARG GODEP_WRANGLER_PATH
 
-ARG CHART_DEFAULT_BRANCH=dev-v2.12
+ARG CHART_DEFAULT_BRANCH=dev-v2.13
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ARG CATTLE_KDM_BRANCH=dev-v2.12
+ARG CATTLE_KDM_BRANCH=dev-v2.13
 ARG VERSION=${VERSION}
 
 FROM --platform=$BUILDPLATFORM ${GODEP_APISERVER} AS godep-apiserver
+FROM --platform=$BUILDPLATFORM ${GODEP_LASSO} AS godep-lasso
+FROM --platform=$BUILDPLATFORM ${GODEP_NORMAN} AS godep-norman
 FROM --platform=$BUILDPLATFORM ${GODEP_REMOTEDIALER} AS godep-remotedialer
 FROM --platform=$BUILDPLATFORM ${GODEP_SHEPHERD} AS godep-shepherd
 FROM --platform=$BUILDPLATFORM ${GODEP_STEVE} AS godep-steve
@@ -151,7 +157,7 @@ ARG CATTLE_KDM_BRANCH
 ENV CATTLE_CHART_DEFAULT_BRANCH=$CHART_DEFAULT_BRANCH
 ENV CATTLE_PARTNER_CHART_DEFAULT_BRANCH=$PARTNER_CHART_DEFAULT_BRANCH
 ENV CATTLE_RKE2_CHART_DEFAULT_BRANCH=$RKE2_CHART_DEFAULT_BRANCH
-ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher131
+ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher134
 ENV CATTLE_K3S_VERSION=v1.33.1+k3s1
 ENV CATTLE_MACHINE_PROVISION_IMAGE=rancher/machine:${CATTLE_MACHINE_VERSION}
 ENV CATTLE_ETCD_VERSION=v3.5.21
@@ -160,15 +166,15 @@ ENV LINODE_UI_DRIVER_VERSION=v0.7.0
 # For displaying Helm version in the UI only.
 ENV CATTLE_HELM_VERSION=v3.18.3-rancher1
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
-ENV DOCKER_MACHINE_HARVESTER_VERSION=v1.0.2
+ENV DOCKER_MACHINE_HARVESTER_VERSION=v1.0.3
 ENV CATTLE_KDM_BRANCH=${CATTLE_KDM_BRANCH}
-ENV CATTLE_WINS_AGENT_VERSION=v0.5.2
+ENV CATTLE_WINS_AGENT_VERSION=v0.5.3-rc.2
 ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT=https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
 ENV CATTLE_WINS_AGENT_UNINSTALL_SCRIPT=https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/uninstall.ps1
 ENV CATTLE_WINS_AGENT_UPGRADE_IMAGE=rancher/wins:${CATTLE_WINS_AGENT_VERSION}
 ENV CATTLE_CSI_PROXY_AGENT_VERSION=v1.1.3
 # make sure the CATTLE_SYSTEM_AGENT_VERSION is consistent with tests/v2/codecoverage/package/Dockerfile
-ENV CATTLE_SYSTEM_AGENT_VERSION=v0.3.13
+ENV CATTLE_SYSTEM_AGENT_VERSION=v0.3.14-rc.2
 ENV CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX=https://github.com/rancher/system-agent/releases/download
 ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE=rancher/system-agent:${CATTLE_SYSTEM_AGENT_VERSION}-suc
 ENV CATTLE_SYSTEM_AGENT_INSTALLER_IMAGE=rancher/system-agent-installer-
@@ -184,7 +190,8 @@ ARG CATTLE_EKS_OPERATOR_VERSION
 ENV CATTLE_EKS_OPERATOR_VERSION=$CATTLE_EKS_OPERATOR_VERSION
 ARG CATTLE_GKE_OPERATOR_VERSION
 ENV CATTLE_GKE_OPERATOR_VERSION=$CATTLE_GKE_OPERATOR_VERSION
-
+ARG CATTLE_ALI_OPERATOR_VERSION
+ENV CATTLE_ALI_OPERATOR_VERSION=$CATTLE_ALI_OPERATOR_VERSION
 # System charts minimal version
 # Deprecated in favor of CATTLE_FLEET_VERSION.
 ENV CATTLE_FLEET_MIN_VERSION=""
@@ -196,6 +203,8 @@ ARG CATTLE_REMOTEDIALER_PROXY_VERSION
 ENV CATTLE_REMOTEDIALER_PROXY_VERSION=$CATTLE_REMOTEDIALER_PROXY_VERSION
 ARG CATTLE_RANCHER_PROVISIONING_CAPI_VERSION
 ENV CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$CATTLE_RANCHER_PROVISIONING_CAPI_VERSION
+ARG CATTLE_RANCHER_TURTLES_VERSION
+ENV CATTLE_RANCHER_TURTLES_VERSION=$CATTLE_RANCHER_TURTLES_VERSION
 ARG CATTLE_CSP_ADAPTER_MIN_VERSION
 ENV CATTLE_CSP_ADAPTER_MIN_VERSION=$CATTLE_CSP_ADAPTER_MIN_VERSION
 
@@ -265,8 +274,8 @@ RUN mkdir -p /var/lib/rancher/k3s/agent/images/ && \
     curl -sfL ${ETCD_URL} | tar xvzf - --strip-components=1 --no-same-owner -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
-ENV CATTLE_UI_VERSION=2.12.0-alpha14
-ENV CATTLE_DASHBOARD_UI_VERSION=v2.12.0-alpha14
+ENV CATTLE_UI_VERSION=2.13.0-alpha1
+ENV CATTLE_DASHBOARD_UI_VERSION=v2.13.0-alpha1
 
 ENV CATTLE_CLI_VERSION=v2.12.0-rc.1
 
@@ -340,6 +349,10 @@ ARG BUILD_WORKDIR
 WORKDIR ${BUILD_WORKDIR}
 ARG GODEP_APISERVER_PATH
 COPY --from=godep-apiserver / ${GODEP_APISERVER_PATH}
+ARG GODEP_LASSO_PATH
+COPY --from=godep-lasso / ${GODEP_LASSO_PATH}
+ARG GODEP_NORMAN_PATH
+COPY --from=godep-norman / ${GODEP_NORMAN_PATH}
 ARG GODEP_REMOTEDIALER_PATH
 COPY --from=godep-remotedialer / ${GODEP_REMOTEDIALER_PATH}
 ARG GODEP_SHEPHERD_PATH
@@ -363,11 +376,12 @@ ARG COMMIT
 ARG TAGS="k8s"
 ARG LINKFLAGS="-extldflags -static -s"
 ARG LDFLAGS="-X github.com/rancher/rancher/pkg/version.Version=${VERSION} -X github.com/rancher/rancher/pkg/version.GitCommit=${COMMIT} ${LINKFLAGS}"
+ARG GCFLAGS
 ARG TARGETOS
 ARG TARGETARCH
 COPY pkg/ pkg/
 COPY main.go ./
-RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o /app/rancher
+RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/rancher
 
 # Output just the server binary
 FROM scratch AS server-binary
@@ -379,11 +393,12 @@ ARG VERSION
 ARG TAGS="k8s"
 ARG LINKFLAGS="-extldflags -static -s"
 ARG LDFLAGS="-X main.VERSION=${VERSION} $LINKFLAGS"
+ARG GCFLAGS
 ARG TARGETOS
 ARG TARGETARCH
 COPY cmd/ cmd/
 COPY pkg/ pkg/
-RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" -o /app/agent ./cmd/agent
+RUN --mount=type=cache,target=/root/.cache,id=rancher GOOS=$TARGETOS GOARCH=$TARGETARCH go build -tags "${TAGS}" -ldflags "${LDFLAGS}" ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /app/agent ./cmd/agent
 
 
 FROM base AS server
@@ -452,6 +467,8 @@ ARG CATTLE_RANCHER_WEBHOOK_VERSION
 ENV CATTLE_RANCHER_WEBHOOK_VERSION=$CATTLE_RANCHER_WEBHOOK_VERSION
 ARG CATTLE_RANCHER_PROVISIONING_CAPI_VERSION
 ENV CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$CATTLE_RANCHER_PROVISIONING_CAPI_VERSION
+ARG CATTLE_RANCHER_TURTLES_VERSION
+ENV CATTLE_RANCHER_TURTLES_VERSION=$CATTLE_RANCHER_TURTLES_VERSION
 ENV SSL_CERT_DIR=/etc/kubernetes/ssl/certs
 COPY --from=rancher-charts /var/lib/rancher-data/local-catalogs/v2/rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721 /var/lib/rancher-data/local-catalogs/v2/rancher-charts/4b40cac650031b74776e87c1a726b0484d0877c3ec137da0872547ff9b73a721
 COPY --from=partner-charts /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974 /var/lib/rancher-data/local-catalogs/v2/rancher-partner-charts/8f17acdce9bffd6e05a58a3798840e408c4ea71783381ecd2e9af30baad65974
@@ -463,11 +480,11 @@ COPY package/loglevel package/run.sh package/kubectl-shell.sh package/shell-setu
 WORKDIR /var/lib/rancher
 
 LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/rancher/ui/master/public/assets/images/logos/welcome-cow.svg" \
-      "io.artifacthub.package.readme-url"="https://raw.githubusercontent.com/rancher/rancher/${VERSION}/README.md" \
-      "org.opencontainers.image.description"="Rancher Manager Agent: complete container management platform." \
-      "org.opencontainers.image.title"="Rancher Manager Agent: complete container management platform." \
-      "org.opencontainers.image.source"="https://github.com/rancher/rancher" \
-      "org.opencontainers.image.version"=${VERSION} \
-      "org.opensuse.reference"=rancher/rancher-agent:${VERSION}
+    "io.artifacthub.package.readme-url"="https://raw.githubusercontent.com/rancher/rancher/${VERSION}/README.md" \
+    "org.opencontainers.image.description"="Rancher Manager Agent: complete container management platform." \
+    "org.opencontainers.image.title"="Rancher Manager Agent: complete container management platform." \
+    "org.opencontainers.image.source"="https://github.com/rancher/rancher" \
+    "org.opencontainers.image.version"=${VERSION} \
+    "org.opensuse.reference"=rancher/rancher-agent:${VERSION}
 
 ENTRYPOINT ["run.sh"]

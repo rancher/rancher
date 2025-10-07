@@ -1,0 +1,34 @@
+config:
+  versions: 'updatecli/values.d/versions.yaml'
+
+scm:
+  user: 'github-actions[bot]'
+  email: '41898282+github-actions[bot]@users.noreply.github.com'
+  username: 'UPDATECLI_GITHUB_ACTOR'
+  token: 'UPDATECLI_GITHUB_TOKEN'
+  owner: 'rancher'
+  repo: 'rancher'
+  branch: 'main'
+  # This option allows for the commits to be signed (verified). However, the
+  # GraphQL API doesn't allow the commits to be squashed. For the moment we
+  # prefer to squash them in order to reduce the noise given the amount of
+  # commits that are done for the updates.
+  commitusingapi: false
+  commitmessage:
+    squash: true
+  mergemethod: 'squash'
+
+repos:
+  k3s:
+    owner: 'k3s-io'
+    repo: 'k3s'
+  k8s:
+    owner: 'kubernetes'
+    repo: 'kubernetes'
+
+k8s_k3s:
+  manifest: 'Update K8s and K3s patch versions'
+  pipelineid: 'update-k8s-k3s-versions'
+  commitmessage:
+    type: 'deps'
+    scope: 'k8s and k3s'

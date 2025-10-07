@@ -7,9 +7,9 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"path/filepath"
 	"time"
@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/rancher/pkg/capr"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	"github.com/rancher/rancher/pkg/utils"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"golang.org/x/crypto/ssh"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -82,7 +83,19 @@ func (s *sshClient) shell(apiRequest *types.APIRequest) error {
 		return err
 	}
 
-	addr := fmt.Sprintf("%s:%d", machineInfo.Driver.IPAddress, machineInfo.Driver.SSHPort)
+	// preference: IPv4 address, then IPv6 address
+	address := machineInfo.Driver.IPAddress
+	if address == "" {
+		address = machineInfo.Driver.IPv6Address
+	}
+	if address == "" {
+		return errors.New("could not determine machine address")
+	}
+	if utils.IsPlainIPV6(address) {
+		address = fmt.Sprintf("[%s]", address)
+	}
+
+	addr := fmt.Sprintf("%s:%d", address, machineInfo.Driver.SSHPort)
 	client, err := ssh.Dial("tcp", addr, &ssh.ClientConfig{
 		User: machineInfo.Driver.SSHUser,
 		Auth: []ssh.AuthMethod{
@@ -170,6 +183,7 @@ type machineInfo struct {
 
 type machineConfig struct {
 	IPAddress   string
+	IPv6Address string
 	SSHUser     string
 	SSHPort     int
 	MachineName string
@@ -203,7 +217,7 @@ func (s *sshClient) getSSHKey(machineNamespace, machineName string) (*machineInf
 			return nil, err
 		}
 
-		data, err := ioutil.ReadAll(tar)
+		data, err := io.ReadAll(tar)
 		if err != nil {
 			return nil, err
 		}

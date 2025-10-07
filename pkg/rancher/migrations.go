@@ -44,6 +44,7 @@ const (
 	migrateSystemAgentVarDirToDataDirectory    = "migratesystemagentvardirtodatadirectory"
 	migrateImportedClusterManagedFields        = "migrateimportedclustermanagedfields"
 	rkeCleanupMigration                        = "rkecleanupmigration"
+	managementNodeCleanupMigration             = "managementnodecleanupmigration"
 	rancherVersionKey                          = "rancherVersion"
 	projectsCreatedKey                         = "projectsCreated"
 	namespacesAssignedKey                      = "namespacesAssigned"
@@ -53,6 +54,7 @@ const (
 	systemAgentVarDirMigratedKey               = "systemAgentVarDirMigrated"
 	importedClusterManagedFieldsMigratedKey    = "importedClusterManagedFieldsMigrated"
 	rkeCleanupCompletedKey                     = "rkecleanupcompleted"
+	managementCleanupCompletedKey              = "managementcleanupcompleted"
 )
 
 var (
@@ -72,8 +74,19 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 		if err := forceSystemNamespaceAssignment(wranglerContext.Core.ConfigMap(), wranglerContext.Mgmt.Project()); err != nil {
 			return err
 		}
+		if err := managementNodeCleanup(wranglerContext); err != nil {
+			return err
+		}
 	}
 
+	if err := migrateImportedClusterFields(wranglerContext); err != nil {
+		return err
+	}
+
+	return rkeResourcesCleanup(wranglerContext)
+}
+
+func runRKE2Migrations(wranglerContext *wrangler.CAPIContext) error {
 	if features.RKE2.Enabled() {
 		// must migrate system agent data directory first, since update requests will be rejected by webhook if
 		// "CATTLE_AGENT_VAR_DIR" is set within AgentEnvVars.
@@ -91,11 +104,7 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 		}
 	}
 
-	if err := migrateImportedClusterFields(wranglerContext); err != nil {
-		return err
-	}
-
-	return rkeResourcesCleanup(wranglerContext)
+	return nil
 }
 
 func getConfigMap(configMapController controllerv1.ConfigMapController, configMapName string) (*v1.ConfigMap, error) {
@@ -260,7 +269,7 @@ func applyProjectConditionForNamespaceAssignment(label string, condition conditi
 	return nil
 }
 
-func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) error {
+func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.CAPIContext) error {
 	cm, err := getConfigMap(w.Core.ConfigMap(), migrateFromMachineToPlanSecret)
 	if err != nil || cm == nil {
 		return err
@@ -403,7 +412,7 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.Context) err
 	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
 }
 
-func migrateEncryptionKeyRotationLeader(w *wrangler.Context) error {
+func migrateEncryptionKeyRotationLeader(w *wrangler.CAPIContext) error {
 	cm, err := getConfigMap(w.Core.ConfigMap(), migrateEncryptionKeyRotationLeaderToStatus)
 	if err != nil || cm == nil {
 		return err
@@ -453,7 +462,7 @@ func migrateEncryptionKeyRotationLeader(w *wrangler.Context) error {
 	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
 }
 
-func migrateMachinePoolsDynamicSchemaLabel(w *wrangler.Context) error {
+func migrateMachinePoolsDynamicSchemaLabel(w *wrangler.CAPIContext) error {
 	cm, err := getConfigMap(w.Core.ConfigMap(), migrateDynamicSchemaToMachinePools)
 	if err != nil || cm == nil {
 		return err
@@ -526,7 +535,7 @@ func migrateMachinePoolsDynamicSchemaLabel(w *wrangler.Context) error {
 	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
 }
 
-func migrateSystemAgentDataDirectory(w *wrangler.Context) error {
+func migrateSystemAgentDataDirectory(w *wrangler.CAPIContext) error {
 	cm, err := getConfigMap(w.Core.ConfigMap(), migrateSystemAgentVarDirToDataDirectory)
 	if err != nil || cm == nil {
 		return err
@@ -693,5 +702,43 @@ func rkeResourcesCleanup(w *wrangler.Context) error {
 	}
 
 	cm.Data[rkeCleanupCompletedKey] = "true"
+	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
+}
+
+func managementNodeCleanup(w *wrangler.Context) error {
+	cm, err := getConfigMap(w.Core.ConfigMap(), managementNodeCleanupMigration)
+	if err != nil || cm == nil {
+		return err
+	}
+
+	// Check if this migration has already run.
+	if cm.Data[managementCleanupCompletedKey] == "true" {
+		return nil
+	}
+
+	nodes, err := w.Mgmt.Node().List("", metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	for _, node := range nodes.Items {
+		for i, f := range node.Finalizers {
+			if f != "controller.cattle.io/node-controller" {
+				continue
+			}
+
+			node = *node.DeepCopy()
+			node.Finalizers = append(node.Finalizers[:i], node.Finalizers[i+1:]...)
+
+			_, err = w.Mgmt.Node().Update(&node)
+			if err != nil {
+				return err
+			}
+
+			break
+		}
+	}
+
+	cm.Data[managementCleanupCompletedKey] = "true"
 	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
 }

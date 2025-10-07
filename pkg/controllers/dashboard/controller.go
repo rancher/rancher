@@ -2,6 +2,7 @@ package dashboard
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/rancher/rancher/pkg/controllers/capr"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
@@ -18,59 +19,65 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rkecontrolplanecondition"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/needacert"
 )
 
-func Register(ctx context.Context, wrangler *wrangler.Context, embedded bool, registryOverride string) error {
-	helm.Register(ctx, wrangler)
+func Register(ctx context.Context, clients *wrangler.Context, embedded bool, registryOverride string) error {
+	helm.Register(ctx, clients)
 	kubernetesprovider.Register(ctx,
-		wrangler.Mgmt.Cluster(),
-		wrangler.K8s,
-		wrangler.MultiClusterManager)
-	apiservice.Register(ctx, wrangler, embedded)
+		clients.Mgmt.Cluster(),
+		clients.K8s,
+		clients.MultiClusterManager)
+	apiservice.Register(ctx, clients, embedded)
 	needacert.Register(ctx,
-		wrangler.Core.Secret(),
-		wrangler.Core.Service(),
-		wrangler.Admission.MutatingWebhookConfiguration(),
-		wrangler.Admission.ValidatingWebhookConfiguration(),
-		wrangler.CRD.CustomResourceDefinition())
-	scaleavailable.Register(ctx, wrangler)
-	if err := systemcharts.Register(ctx, wrangler, registryOverride); err != nil {
+		clients.Core.Secret(),
+		clients.Core.Service(),
+		clients.Admission.MutatingWebhookConfiguration(),
+		clients.Admission.ValidatingWebhookConfiguration(),
+		clients.CRD.CustomResourceDefinition())
+	scaleavailable.Register(ctx, clients)
+	if err := systemcharts.Register(ctx, clients, registryOverride); err != nil {
 		return err
 	}
 
-	if err := cspadaptercharts.Register(ctx, wrangler); err != nil {
+	if err := cspadaptercharts.Register(ctx, clients); err != nil {
 		return err
 	}
 
-	clusterconnected.Register(ctx, wrangler)
+	clusterconnected.Register(ctx, clients)
 
 	if features.MCM.Enabled() {
-		hostedcluster.Register(ctx, wrangler)
+		hostedcluster.Register(ctx, clients)
 	}
 
 	if features.Fleet.Enabled() {
-		if err := fleetcharts.Register(ctx, wrangler); err != nil {
+		if err := fleetcharts.Register(ctx, clients); err != nil {
 			return err
 		}
 	}
 
 	if features.ProvisioningV2.Enabled() || features.MCM.Enabled() {
-		clusterregistrationtoken.Register(ctx, wrangler)
+		clusterregistrationtoken.Register(ctx, clients)
 	}
 
 	if features.ProvisioningV2.Enabled() {
-		kubeconfigManager := kubeconfig.New(wrangler)
-		clusterindex.Register(ctx, wrangler)
-		provisioningv2.Register(ctx, wrangler, kubeconfigManager)
-		if features.RKE2.Enabled() {
-			if err := capr.Register(ctx, wrangler, kubeconfigManager); err != nil {
-				return err
+		kubeconfigManager := kubeconfig.New(clients)
+		clusterindex.Register(ctx, clients)
+		cluster.EarlyRegister(ctx, clients, kubeconfigManager)
+		// defer registration of controllers which have CAPI clients or use CAPI caches
+		clients.DeferredCAPIRegistration.DeferRegistration(func(ctx context.Context, clients *wrangler.CAPIContext) error {
+			provisioningv2.Register(ctx, clients, kubeconfigManager)
+			if features.RKE2.Enabled() {
+				if err := capr.Register(ctx, clients, kubeconfigManager); err != nil {
+					return fmt.Errorf("failed to register capr controllers: %w", err)
+				}
 			}
-		}
+			return nil
+		})
 	}
 
 	// In the case where Rancher is embedded and running in the Harvester local cluster,
@@ -80,14 +87,14 @@ func Register(ctx context.Context, wrangler *wrangler.Context, embedded bool, re
 	if !features.MCMAgent.Enabled() && !features.MCM.Enabled() && features.Harvester.Enabled() {
 		rkecontrolplanecondition.Register(ctx,
 			"local",
-			wrangler.Provisioning.Cluster().Cache(),
-			wrangler.Catalog.App(),
-			wrangler.Plan.Plan(),
-			wrangler.RKE.RKEControlPlane())
+			clients.Provisioning.Cluster().Cache(),
+			clients.Catalog.App(),
+			clients.Plan.Plan(),
+			clients.RKE.RKEControlPlane())
 	}
 
 	if features.MCMAgent.Enabled() || features.MCM.Enabled() {
-		err := mcmagent.Register(ctx, wrangler)
+		err := mcmagent.Register(ctx, clients)
 		if err != nil {
 			return err
 		}

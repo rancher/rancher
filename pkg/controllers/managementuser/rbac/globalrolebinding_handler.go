@@ -93,15 +93,21 @@ func (c *grbHandler) sync(key string, obj *apisv3.GlobalRoleBinding) (runtime.Ob
 		return obj, nil
 	}
 	var remoteConditions []metav1.Condition
-	isAdmin, err := rbac.IsAdminGlobalRole(obj.GlobalRoleName, c.grLister)
+
+	gr, err := c.grLister.Get("", obj.GlobalRoleName)
 	if err != nil {
-		return nil, err
+		if apierrors.IsNotFound(err) {
+			return obj, nil
+		} else {
+			return nil, err
+		}
 	}
-	if !isAdmin {
+
+	if !rbac.IsAdminGlobalRole(gr) {
 		return obj, nil
 	}
 
-	logrus.Debugf("%v is an admin role", obj.GlobalRoleName)
+	logrus.Debugf("%s is an admin role", obj.GlobalRoleName)
 	if err := c.ensureClusterAdminBinding(obj, &remoteConditions); err != nil {
 		return nil, err
 	}
@@ -114,6 +120,7 @@ func (c *grbHandler) sync(key string, obj *apisv3.GlobalRoleBinding) (runtime.Ob
 func (c *grbHandler) ensureClusterAdminBinding(obj *apisv3.GlobalRoleBinding, conditions *[]metav1.Condition) error {
 	condition := metav1.Condition{Type: clusterAdminRoleExists}
 	bindingName := rbac.GrbCRBName(obj)
+
 	_, err := c.crbLister.Get("", bindingName)
 	if err != nil && !apierrors.IsNotFound(err) {
 		c.status.AddCondition(conditions, condition, failedToGetClusterRoleBinding, err)

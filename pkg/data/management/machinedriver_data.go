@@ -139,7 +139,26 @@ var DriverData = map[string]DriverDataConfig{
 
 func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver(Amazonec2driver, "local://", "", "",
-		[]string{"iam.amazonaws.com", "iam.us-gov.amazonaws.com", "iam.%.amazonaws.com.cn", "ec2.%.amazonaws.com", "ec2.%.amazonaws.com.cn", "eks.%.amazonaws.com", "eks.%.amazonaws.com.cn", "kms.%.amazonaws.com", "kms.%.amazonaws.com.cn"},
+		[]string{
+			// https://docs.aws.amazon.com/general/latest/gr/iam-service.html
+			"iam.amazonaws.com",
+			"iam.us-gov.amazonaws.com",
+			"iam.%.amazonaws.com.cn",
+			// https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_dual-stack_endpoint_support.html
+			"iam.global.api.aws",
+			// https://docs.aws.amazon.com/general/latest/gr/ec2-service.html
+			"ec2.%.amazonaws.com",
+			"ec2.%.amazonaws.com.cn",
+			"ec2.%.api.aws",
+			// https://docs.aws.amazon.com/general/latest/gr/eks.html
+			"eks.%.amazonaws.com",
+			"eks.%.amazonaws.com.cn",
+			"eks.%.api.aws",
+			// https://docs.aws.amazon.com/general/latest/gr/kms.html
+			"kms.%.amazonaws.com",
+			"kms.%.amazonaws.com.cn",
+			"kms.%.api.aws",
+		},
 		true, true, true, nil, management); err != nil {
 		return err
 	}
@@ -171,7 +190,7 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	linodeDriverURL := fmt.Sprintf("https://github.com/linode/docker-machine-driver-linode/releases/download/v0.1.15/docker-machine-driver-linode_linux-%s.zip", runtime.GOARCH)
 	linodeDriverChecksum := "26a71dbbc2f5249a66716cad586c3b4048d3cd9e67c0527442c374dd5dcf1c41"
 	if runtime.GOARCH == "arm64" {
-		//overwrite arm driver version here
+		// overwrite arm driver version here
 		linodeDriverChecksum = "3b1ed74291cbf581c0f8a63d878d79e1fe3b443387c1c0bb8b1d078a78db8bc4"
 	}
 	if err := addMachineDriver(Linodedriver, linodeDriverURL, "/assets/rancher-ui-driver-linode/component.js", linodeDriverChecksum, []string{"api.linode.com"}, linodeBuiltin, linodeBuiltin, false, nil, management); err != nil {
@@ -198,7 +217,7 @@ func addMachineDrivers(management *config.ManagementContext) error {
 	if err := addMachineDriver(SoftLayerDriver, "local://", "", "", nil, false, true, false, nil, management); err != nil {
 		return err
 	}
-	if err := addMachineDriver(NutanixDriver, "https://github.com/nutanix/docker-machine/releases/download/v3.6.0/docker-machine-driver-nutanix", "https://nutanix.github.io/rancher-ui-driver/v3.6.0/component.js", "d9710fe31a1357d1bbd57539a4b0b00e3ab3550fcaeffea18cbc145cb4e9b22f", []string{"nutanix.github.io"}, false, false, false, nil, management); err != nil {
+	if err := addMachineDriver(NutanixDriver, "https://github.com/nutanix/docker-machine/releases/download/v3.7.0/docker-machine-driver-nutanix", "https://nutanix.github.io/rancher-ui-driver/v3.7.0/component.js", "2f70c4bdccd3c5e68bd8c32aadb5b525275a3cda5799f29736f37bdd168caa94", []string{"nutanix.github.io"}, false, false, false, nil, management); err != nil {
 		return err
 	}
 	if err := addMachineDriver(OutscaleDriver, "https://github.com/outscale/docker-machine-driver-outscale/releases/download/v0.2.0/docker-machine-driver-outscale_0.2.0_linux_amd64.zip", "https://oos.eu-west-2.outscale.com/rancher-ui-driver-outscale/v0.2.0/component.js", "bb539ed4e2b0f1a1083b29cbdbab59bde3efed0a3145fefc0b2f47026c48bfe0", []string{"oos.eu-west-2.outscale.com"}, false, false, false, nil, management); err != nil {
@@ -216,10 +235,10 @@ func addMachineDrivers(management *config.ManagementContext) error {
 
 func AddHarvesterMachineDriver(mgmt *config.ManagementContext) error {
 	// make sure the version number is consistent with the one at Line 40 of package/Dockerfile
-	harvesterDriverVersion := "v1.0.2"
+	harvesterDriverVersion := "v1.0.3"
 	harvesterDriverChecksums := map[string]string{
-		"amd64": "a238768f343e9f6fa2403219a02311f9d52a5b72d39bf74a6ecd99e90d6f5c4c",
-		"arm64": "4c18edc9e9fcaa4870481efc4d218a6be69e35a4f9243896ca3a1e3b7dcdd789",
+		"amd64": "cd380ba3f33f104523420d973c4dd724a0973bceec0b303f348ca03d446af506",
+		"arm64": "e9f853eeedcec687f618286f8ff45ba694cdc71ece9cf11600de931afa204779",
 	}
 
 	harvesterDriverURL := fmt.Sprintf("https://github.com/harvester/docker-machine-driver-harvester/releases/download/%s/docker-machine-driver-harvester-%s.tar.gz",
