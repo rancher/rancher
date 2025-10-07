@@ -1,0 +1,50 @@
+name: '{{ .k8s_k3s.manifest }}'
+pipelineid: update-k8s-k3s-versions
+
+conditions:
+  check-dockerfile-kubectl-version:
+    name: 'Check if ENV|ARG KUBECTL_VERSION is set in Dockerfiles'
+    kind: file
+    scmid: 'default'
+    disablesourceinput: true
+    spec:
+      files:
+        - 'package/Dockerfile'
+        - 'tests/validation/Dockerfile.rke'
+        - 'tests/validation/Dockerfile.v3api'
+      matchpattern: '(?:ENV|ARG)[\s\t]+KUBECTL_VERSION[=\s]\S+'
+
+  check-shell-script-kubectl-version:
+    name: 'Check if KUBECTL_VERSION is set in shell scripts'
+    kind: file
+    scmid: 'default'
+    disablesourceinput: true
+    spec:
+      files:
+        - 'tests/validation/tests/rke/scripts/build.sh'
+        - 'tests/validation/tests/v3_api/scripts/build.sh'
+      matchpattern: 'KUBECTL_VERSION="\${KUBECTL_VERSION:-\S+}"'
+
+targets:
+  update-dockerfile-kubectl-version:
+    name: 'Update ENV|ARG KUBECTL_VERSION to {{ .k8s.main }} in Dockerfiles'
+    kind: file
+    scmid: 'default'
+    spec:
+      files:
+        - 'package/Dockerfile'
+        - 'tests/validation/Dockerfile.rke'
+        - 'tests/validation/Dockerfile.v3api'
+      matchpattern: '(ENV|ARG)[\s\t]+KUBECTL_VERSION[=\s]\S+'
+      replacepattern: '$1 KUBECTL_VERSION={{ .k8s.main }}'
+
+  update-shell-script-kubectl-version:
+    name: 'Update KUBECTL_VERSION to {{ .k8s.main }} in shell scripts'
+    kind: file
+    scmid: 'default'
+    spec:
+      files:
+        - 'tests/validation/tests/rke/scripts/build.sh'
+        - 'tests/validation/tests/v3_api/scripts/build.sh'
+      matchpattern: 'KUBECTL_VERSION="\${KUBECTL_VERSION:-\S+}"'
+      replacepattern: 'KUBECTL_VERSION="${KUBECTL_VERSION:-{{ .k8s.main }}}"'
