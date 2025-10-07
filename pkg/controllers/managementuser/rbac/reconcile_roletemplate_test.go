@@ -272,7 +272,7 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 			},
 		},
 		{
-			description:   "only get permissions",
+			description:   "returns readOnly role for only get permission",
 			projectName:   "testproject",
 			expectedRoles: []string{"testproject-namespaces-readonly"},
 			roleTemplates: map[string]*v3.RoleTemplate{
@@ -291,7 +291,7 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 			},
 		},
 		{
-			description:   "only watch permissions",
+			description:   "returns readOnly role for only watch permission",
 			projectName:   "testproject",
 			expectedRoles: []string{"testproject-namespaces-readonly"},
 			roleTemplates: map[string]*v3.RoleTemplate{
@@ -310,7 +310,7 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 			},
 		},
 		{
-			description:   "list & watch permissions",
+			description:   "returns readOnly role for list & watch permission",
 			projectName:   "testproject",
 			expectedRoles: []string{"testproject-namespaces-readonly"},
 			roleTemplates: map[string]*v3.RoleTemplate{
@@ -329,7 +329,7 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 			},
 		},
 		{
-			description:   "only delete permissions",
+			description:   "returns readOnly & manageNamespace role for delete permission",
 			projectName:   "testproject",
 			expectedRoles: []string{"testproject-namespaces-manage", "testproject-namespaces-readonly"},
 			roleTemplates: map[string]*v3.RoleTemplate{
@@ -340,6 +340,25 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 					Rules: []v1.PolicyRule{
 						{
 							Verbs:     []string{"delete"},
+							APIGroups: []string{""},
+							Resources: []string{"namespaces"},
+						},
+					},
+				},
+			},
+		},
+		{
+			description:   "returns readOnly & manageNamespace role for edit & read permissions",
+			projectName:   "testproject",
+			expectedRoles: []string{"testproject-namespaces-manage", "testproject-namespaces-readonly"},
+			roleTemplates: map[string]*v3.RoleTemplate{
+				"testRT": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "testDeleteRT",
+					},
+					Rules: []v1.PolicyRule{
+						{
+							Verbs:     []string{"edit", "get"},
 							APIGroups: []string{""},
 							Resources: []string{"namespaces"},
 						},
