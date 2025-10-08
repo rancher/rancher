@@ -356,14 +356,18 @@ func RequireRestarts(f *Feature, obj *v3.Feature) bool {
 		val = obj.Spec.Value
 	}
 
-	switch {
-	case val == nil && f.val == nil:
-		return false
-	case val != nil && f.val != nil:
-		return *val != *f.val
-	default:
-		return true
+	if val == nil {
+		// val was already nil, so no changes here
+		if f.val == nil {
+			return false
+		}
+
+		// we're unsetting val, let's check if the previous value was
+		// the same as the default
+		return *f.val != f.def
 	}
+
+	return *val != f.Enabled()
 }
 
 // Dynamic returns whether the feature is dynamic. Rancher must be restarted when
