@@ -20,11 +20,11 @@ func sync(_ string, obj *v3.Feature) (*v3.Feature, error) {
 		return nil, nil
 	}
 
-	needsRestart := ReconcileFeatures(obj)
+	newVal, needsRestart := ReconcileFeatures(obj)
 	if needsRestart {
 		time.Sleep(3 * time.Second)
-		logrus.Infof("feature flag [%s] value has changed, rancher must be restarted", obj.Name)
-		os.Exit(0)
+		logrus.Infof("feature flag [%s] value has changed (new value=%v), rancher must be restarted", obj.Name, newVal)
+		os.Exit(1)
 	}
 
 	return obj, nil
@@ -35,16 +35,16 @@ func sync(_ string, obj *v3.Feature) (*v3.Feature, error) {
 //
 // It returns whether Rancher must be restarted. This is the case when (1) the
 // feature is non-dynamic and (2) the value was changed.
-func ReconcileFeatures(obj *v3.Feature) bool {
+func ReconcileFeatures(obj *v3.Feature) (*bool, bool) {
 	feature := features.GetFeatureByName(obj.Name)
 
 	// possible feature watch renamed, or no longer used by rancher
 	if feature == nil {
-		return false
+		return nil, false
 	}
 
 	if features.RequireRestarts(feature, obj) {
-		return true
+		return nil, true
 	}
 
 	newVal := obj.Status.LockedValue
@@ -57,5 +57,5 @@ func ReconcileFeatures(obj *v3.Feature) bool {
 		feature.Set(*newVal)
 	}
 
-	return false
+	return newVal, false
 }
