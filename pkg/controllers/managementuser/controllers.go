@@ -26,7 +26,6 @@ import (
 	"github.com/rancher/rancher/pkg/impersonation"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.UserContext, clusterRec *apimgmtv3.Cluster, kubeConfigGetter common.KubeConfigGetter) error {
@@ -49,7 +48,11 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 		})()
 	})
 
-	registerImpersonationCaches(cluster)
+	RegisterCaches(cluster)
+	// early request an impersonator for initializing it
+	if _, err := impersonation.ForCluster(cluster); err != nil {
+		return err
+	}
 
 	if err := cavalidator.Register(ctx, cluster); err != nil {
 		return err
@@ -91,29 +94,13 @@ func registerProvV2(ctx context.Context, cluster *config.UserContext, capi *wran
 	machinerole.Register(ctx, cluster)
 }
 
-func RegisterFollower(cluster *config.UserContext) error {
-	registerImpersonationCaches(cluster)
+// RegisterCaches initializes caches early in the initialization process to have them available as soon as possible (instead of on demand when Lister/Cache or Controller are called)
+func RegisterCaches(cluster *config.UserContext) {
+	cluster.Core.Namespaces("").Controller()
 	cluster.RBACw.ClusterRoleBinding().Informer()
 	cluster.RBACw.ClusterRole().Informer()
 	cluster.RBACw.RoleBinding().Informer()
 	cluster.RBACw.Role().Informer()
-	return nil
-}
-
-// registerImpersonationCaches configures the context to only cache impersonation-related secrets and service accounts
-// it then ensures all the necessary caches are started.
-func registerImpersonationCaches(cluster *config.UserContext) {
-	cluster.KindNamespaces[schema.GroupVersionKind{
-		Version: "v1",
-		Kind:    "Secret",
-	}] = impersonation.ImpersonationNamespace
-	cluster.KindNamespaces[schema.GroupVersionKind{
-		Version: "v1",
-		Kind:    "ServiceAccount",
-	}] = impersonation.ImpersonationNamespace
-	cluster.Core.Secrets("").Controller()
-	cluster.Core.ServiceAccounts("").Controller()
-	cluster.Core.Namespaces("").Controller()
 }
 
 // PreBootstrap is a list of functions that _need_ to be run before the rest of the controllers start

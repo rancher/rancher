@@ -40,8 +40,7 @@ func Register(ctx context.Context, downstream *config.UserContext) error {
 	}
 
 	// We want to avoid keeping in the cache all Secrets so we use a separate controller factory that only watches a single Secret
-	//
-	// The default controller factory restricts downstream Secret caches to the impersonation namespace only, see https://github.com/rancher/rancher/issues/46827
+	// The default controller factory does not allow caching downstream secrets, see https://github.com/rancher/rancher/issues/46827
 	clientFactory := downstream.ControllerFactory.SharedCacheFactory().SharedClientFactory()
 	secrets, controllerFactory := newDedicatedSecretsController(clientFactory)
 	if err := downstream.RegisterExtraControllerFactory("cavalidator", controllerFactory); err != nil {
