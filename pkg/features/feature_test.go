@@ -1,6 +1,7 @@
 package features
 
 import (
+	"fmt"
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -73,423 +74,116 @@ func TestRequireRestarts(t *testing.T) {
 	trueVal := true
 	falseVal := false
 
+	boolStr := func(b *bool) string {
+		if b == nil {
+			return "nil"
+		}
+		return fmt.Sprintf("%v", *b)
+	}
+
 	tests := []struct {
-		name       string
-		feature    *Feature
-		featureObj *v3.Feature
-		expected   bool
+		def             bool
+		val             *bool
+		specVal         *bool
+		lockedVal       *bool
+		expectedRestart bool
 	}{
-		{
-			name: "non-dynamic no change",
-			feature: &Feature{
-				def: true,
-			},
-			featureObj: &v3.Feature{
-				ObjectMeta: metav1.ObjectMeta{},
-				Status: v3.FeatureStatus{
-					Default: true,
-				},
-			},
-		},
-		{
-			name: "non-dynamic change value true to false",
-			feature: &Feature{
-				def: true,
-				val: &trueVal,
-			},
-			featureObj: &v3.Feature{
-				ObjectMeta: metav1.ObjectMeta{},
-				Spec: v3.FeatureSpec{
-					Value: &falseVal,
-				},
-				Status: v3.FeatureStatus{
-					Default: true,
-				},
-			},
-			expected: true,
-		},
-		{
-			name: "non-dynamic change value true to nil",
-			feature: &Feature{
-				def: true,
-				val: &trueVal,
-			},
-			featureObj: &v3.Feature{
-				ObjectMeta: metav1.ObjectMeta{},
-				Spec: v3.FeatureSpec{
-					Value: nil,
-				},
-				Status: v3.FeatureStatus{
-					Default: true,
-				},
-			},
-			expected: true,
-		},
-		{
-			name: "non-dynamic change value false to true",
-			feature: &Feature{
-				def: true,
-				val: &falseVal,
-			},
-			featureObj: &v3.Feature{
-				ObjectMeta: metav1.ObjectMeta{},
-				Spec: v3.FeatureSpec{
-					Value: &trueVal,
-				},
-				Status: v3.FeatureStatus{
-					Default: true,
-				},
-			},
-			expected: true,
-		},
-		{
-			name: "non-dynamic change value false to nil",
-			feature: &Feature{
-				def: true,
-				val: &falseVal,
-			},
-			featureObj: &v3.Feature{
-				ObjectMeta: metav1.ObjectMeta{},
-				Spec: v3.FeatureSpec{
-					Value: nil,
-				},
-				Status: v3.FeatureStatus{
-					Default: true,
-				},
-			},
-			expected: true,
-		},
-		{
-			name: "non-dynamic change default true to false",
-			feature: &Feature{
-				def: true,
-			},
-			featureObj: &v3.Feature{
-				ObjectMeta: metav1.ObjectMeta{},
-				Status: v3.FeatureStatus{
-					Default: false,
-				},
-			},
-		},
-		{
-			name: "non-dynamic change default false to true",
-			feature: &Feature{
-				def: false,
-			},
-			featureObj: &v3.Feature{
-				ObjectMeta: metav1.ObjectMeta{},
-				Status: v3.FeatureStatus{
-					Default: true,
-				},
-			},
-		},
-		{
-			name: "non-dynamic change default false to true with value set",
-			feature: &Feature{
-				def: false,
-				val: &trueVal,
-			},
-			featureObj: &v3.Feature{
-				ObjectMeta: metav1.ObjectMeta{},
-				Spec: v3.FeatureSpec{
-					Value: &trueVal,
-				},
-				Status: v3.FeatureStatus{
-					Default: true,
-				},
-			},
-		},
-		{
-			name: "non-dynamic change lockedvalue true to false",
-			feature: &Feature{
-				def: true,
-				val: &trueVal,
-			},
-			featureObj: &v3.Feature{
-				ObjectMeta: metav1.ObjectMeta{},
-				Status: v3.FeatureStatus{
-					Default:     true,
-					LockedValue: &falseVal,
-				},
-			},
-			expected: true,
-		},
-		{
-			name: "non-dynamic change lockedvalue true to nil",
-			feature: &Feature{
-				def: true,
-				val: &trueVal,
-			},
-			featureObj: &v3.Feature{
-				ObjectMeta: metav1.ObjectMeta{},
-				Status: v3.FeatureStatus{
-					Default:     true,
-					LockedValue: nil,
-				},
-			},
-			expected: true,
-		},
-		{
-			name: "non-dynamic change lockedvalue false to true",
-			feature: &Feature{
-				def: true,
-				val: &falseVal,
-			},
-			featureObj: &v3.Feature{
-				ObjectMeta: metav1.ObjectMeta{},
-				Status: v3.FeatureStatus{
-					Default:     true,
-					LockedValue: &trueVal,
-				},
-			},
-			expected: true,
-		},
-		{
-			name: "non-dynamic change lockedvalue false to nil",
-			feature: &Feature{
-				def: true,
-				val: &falseVal,
-			},
-			featureObj: &v3.Feature{
-				ObjectMeta: metav1.ObjectMeta{},
-				Status: v3.FeatureStatus{
-					Default:     true,
-					LockedValue: nil,
-				},
-			},
-			expected: true,
-		},
-		{
-			name: "non-dynamic change default false to true with lockedvalue set",
-			feature: &Feature{
-				def: false,
-				val: &trueVal,
-			},
-			featureObj: &v3.Feature{
-				ObjectMeta: metav1.ObjectMeta{},
-				Status: v3.FeatureStatus{
-					Default:     true,
-					LockedValue: &trueVal,
-				},
-			},
-		},
-		{
-			name: "dynamic no change",
-			feature: &Feature{
-				def:     true,
-				dynamic: true,
-			},
-			featureObj: &v3.Feature{
-				ObjectMeta: metav1.ObjectMeta{},
-				Status: v3.FeatureStatus{
-					Default: true,
-					Dynamic: true,
-				},
-			},
-		},
-		{
-			name: "dynamic change value true to false",
-			feature: &Feature{
-				def:     true,
-				dynamic: true,
-				val:     &trueVal,
-			},
-			featureObj: &v3.Feature{
-				ObjectMeta: metav1.ObjectMeta{},
-				Spec: v3.FeatureSpec{
-					Value: &falseVal,
-				},
-				Status: v3.FeatureStatus{
-					Default: true,
-					Dynamic: true,
-				},
-			},
-		},
-		{
-			name: "dynamic change value true to nil",
-			feature: &Feature{
-				def:     true,
-				dynamic: true,
-				val:     &trueVal,
-			},
-			featureObj: &v3.Feature{
-				ObjectMeta: metav1.ObjectMeta{},
-				Spec: v3.FeatureSpec{
-					Value: nil,
-				},
-				Status: v3.FeatureStatus{
-					Default: true,
-					Dynamic: true,
-				},
-			},
-		},
-		{
-			name: "dynamic change value false to true",
-			feature: &Feature{
-				def:     true,
-				dynamic: true,
-				val:     &falseVal,
-			},
-			featureObj: &v3.Feature{
-				ObjectMeta: metav1.ObjectMeta{},
-				Spec: v3.FeatureSpec{
-					Value: &trueVal,
-				},
-				Status: v3.FeatureStatus{
-					Default: true,
-					Dynamic: true,
-				},
-			},
-		},
-		{
-			name: "dynamic change value false to nil",
-			feature: &Feature{
-				def:     true,
-				dynamic: true,
-				val:     &falseVal,
-			},
-			featureObj: &v3.Feature{
-				ObjectMeta: metav1.ObjectMeta{},
-				Spec: v3.FeatureSpec{
-					Value: nil,
-				},
-				Status: v3.FeatureStatus{
-					Default: true,
-					Dynamic: true,
-				},
-			},
-		},
-		{
-			name: "dynamic change default true to false",
-			feature: &Feature{
-				def:     true,
-				dynamic: true,
-			},
-			featureObj: &v3.Feature{
-				ObjectMeta: metav1.ObjectMeta{},
-				Status: v3.FeatureStatus{
-					Default: false,
-					Dynamic: true,
-				},
-			},
-		},
-		{
-			name: "dynamic change default false to true",
-			feature: &Feature{
-				def:     false,
-				dynamic: true,
-			},
-			featureObj: &v3.Feature{
-				ObjectMeta: metav1.ObjectMeta{},
-				Status: v3.FeatureStatus{
-					Default: true,
-					Dynamic: true,
-				},
-			},
-		},
-		{
-			name: "dynamic change default false to true with value set",
-			feature: &Feature{
-				def:     false,
-				dynamic: true,
-				val:     &trueVal,
-			},
-			featureObj: &v3.Feature{
-				ObjectMeta: metav1.ObjectMeta{},
-				Spec: v3.FeatureSpec{
-					Value: &trueVal,
-				},
-				Status: v3.FeatureStatus{
-					Default: true,
-					Dynamic: true,
-				},
-			},
-		},
-		{
-			name: "dynamic change lockedvalue true to false",
-			feature: &Feature{
-				def:     true,
-				dynamic: true,
-				val:     &trueVal,
-			},
-			featureObj: &v3.Feature{
-				ObjectMeta: metav1.ObjectMeta{},
-				Status: v3.FeatureStatus{
-					Default:     true,
-					Dynamic:     true,
-					LockedValue: &falseVal,
-				},
-			},
-		},
-		{
-			name: "dynamic change lockedvalue true to nil",
-			feature: &Feature{
-				def:     true,
-				dynamic: true,
-				val:     &trueVal,
-			},
-			featureObj: &v3.Feature{
-				ObjectMeta: metav1.ObjectMeta{},
-				Status: v3.FeatureStatus{
-					Default:     true,
-					Dynamic:     true,
-					LockedValue: nil,
-				},
-			},
-		},
-		{
-			name: "dynamic change lockedvalue false to true",
-			feature: &Feature{
-				def:     true,
-				dynamic: true,
-				val:     &falseVal,
-			},
-			featureObj: &v3.Feature{
-				ObjectMeta: metav1.ObjectMeta{},
-				Status: v3.FeatureStatus{
-					Default:     true,
-					Dynamic:     true,
-					LockedValue: &trueVal,
-				},
-			},
-		},
-		{
-			name: "dynamic change lockedvalue false to nil",
-			feature: &Feature{
-				def:     true,
-				dynamic: true,
-				val:     &falseVal,
-			},
-			featureObj: &v3.Feature{
-				ObjectMeta: metav1.ObjectMeta{},
-				Status: v3.FeatureStatus{
-					Default:     true,
-					Dynamic:     true,
-					LockedValue: nil,
-				},
-			},
-		},
-		{
-			name: "dynamic change default false to true with lockedvalue set",
-			feature: &Feature{
-				def:     false,
-				dynamic: true,
-				val:     &trueVal,
-			},
-			featureObj: &v3.Feature{
-				ObjectMeta: metav1.ObjectMeta{},
-				Status: v3.FeatureStatus{
-					Default:     true,
-					Dynamic:     true,
-					LockedValue: &trueVal,
-				},
-			},
-		},
+		// Default false, .spec.value
+		// Unset case
+		{def: false, val: nil},
+		{def: false, val: &trueVal, expectedRestart: true},
+		{def: false, val: &falseVal},
+		// Set to true case
+		{def: false, val: nil, specVal: &trueVal, expectedRestart: true},
+		{def: false, val: &trueVal, specVal: &trueVal},
+		{def: false, val: &falseVal, specVal: &trueVal, expectedRestart: true},
+		// Set to false case
+		{def: false, val: nil, specVal: &falseVal},
+		{def: false, val: &falseVal, specVal: &falseVal},
+		{def: false, val: &trueVal, specVal: &falseVal, expectedRestart: true},
+
+		// Default true, .spec.value
+		// Unset case
+		{def: true, val: nil},
+		{def: true, val: &trueVal},
+		{def: true, val: &falseVal, expectedRestart: true},
+		// Set to true case
+		{def: true, val: nil, specVal: &trueVal},
+		{def: true, val: &trueVal, specVal: &trueVal},
+		{def: true, val: &falseVal, specVal: &trueVal, expectedRestart: true},
+		// Set to false case
+		{def: true, val: nil, specVal: &falseVal, expectedRestart: true},
+		{def: true, val: &falseVal, specVal: &falseVal},
+		{def: true, val: &trueVal, specVal: &falseVal, expectedRestart: true},
+
+		// Default false, .status.lockedValue
+		// Unset case
+		{def: false, val: nil},
+		{def: false, val: &trueVal, expectedRestart: true},
+		{def: false, val: &falseVal},
+		// Set to true case
+		{def: false, val: nil, lockedVal: &trueVal, expectedRestart: true},
+		{def: false, val: &trueVal, lockedVal: &trueVal},
+		{def: false, val: &falseVal, lockedVal: &trueVal, expectedRestart: true},
+		// Set to false case
+		{def: false, val: nil, lockedVal: &falseVal},
+		{def: false, val: &falseVal, lockedVal: &falseVal},
+		{def: false, val: &trueVal, lockedVal: &falseVal, expectedRestart: true},
+
+		// Default true, .status.lockedValue
+		// Unset case
+		{def: true, val: nil},
+		{def: true, val: &trueVal},
+		{def: true, val: &falseVal, expectedRestart: true},
+		// Set to true case
+		{def: true, val: nil, lockedVal: &trueVal},
+		{def: true, val: &trueVal, lockedVal: &trueVal},
+		{def: true, val: &falseVal, lockedVal: &trueVal, expectedRestart: true},
+		// Set to false case
+		{def: true, val: nil, lockedVal: &falseVal, expectedRestart: true},
+		{def: true, val: &falseVal, lockedVal: &falseVal},
+		{def: true, val: &trueVal, lockedVal: &falseVal, expectedRestart: true},
 	}
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			needsRestart := RequireRestarts(test.feature, test.featureObj)
-			assert.Equal(t, test.expected, needsRestart)
+		name := fmt.Sprintf("non-dynamic,def=%v,val=%s,specVal=%s,lockedVal=%s", test.def, boolStr(test.val), boolStr(test.specVal), boolStr(test.lockedVal))
+		t.Run(name, func(t *testing.T) {
+			feat := &Feature{
+				dynamic: false,
+				def:     test.def,
+				val:     test.val,
+			}
+			featureObj := &v3.Feature{
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec: v3.FeatureSpec{
+					Value: test.specVal,
+				},
+				Status: v3.FeatureStatus{
+					LockedValue: test.lockedVal,
+				},
+			}
+			needsRestart := RequireRestarts(feat, featureObj)
+			assert.Equal(t, test.expectedRestart, needsRestart)
+		})
+	}
+	for _, test := range tests {
+		name := fmt.Sprintf("dynamic,def=%v,val=%s,specVal=%s,lockedVal=%s", test.def, boolStr(test.val), boolStr(test.specVal), boolStr(test.lockedVal))
+		t.Run(name, func(t *testing.T) {
+			feat := &Feature{
+				dynamic: true,
+				def:     test.def,
+				val:     test.val,
+			}
+			featureObj := &v3.Feature{
+				ObjectMeta: metav1.ObjectMeta{},
+				Spec: v3.FeatureSpec{
+					Value: test.specVal,
+				},
+				Status: v3.FeatureStatus{
+					LockedValue: test.lockedVal,
+				},
+			}
+			needsRestart := RequireRestarts(feat, featureObj)
+			assert.False(t, needsRestart)
 		})
 	}
 }
