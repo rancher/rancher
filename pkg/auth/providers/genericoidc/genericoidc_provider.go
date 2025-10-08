@@ -120,12 +120,6 @@ func (g *GenOIDCProvider) TransformToAuthProvider(authConfig map[string]interfac
 	return p, nil
 }
 
-// RefetchGroupPrincipals retrieves updated group information for a user from the OIDC provider.
-func (g *GenOIDCProvider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
-	// Use the base OIDC provider's RefetchGroupPrincipals method
-	return g.OpenIDCProvider.RefetchGroupPrincipals(principalID, secret)
-}
-
 // groupToPrincipal takes a bare group name and turns it into a v3.Principal group object by filling-in other fields
 // with basic provider information.
 func (g *GenOIDCProvider) groupToPrincipal(groupName string) v3.Principal {
