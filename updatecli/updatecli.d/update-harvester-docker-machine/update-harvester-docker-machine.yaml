@@ -1,0 +1,153 @@
+name: '{{ .harvester_docker_machine.manifest }}'
+pipelineid: '{{ .harvester_docker_machine.pipelineid }}'
+
+scms:
+  default:
+    kind: github
+    spec:
+      owner: '{{ .scm.owner }}'
+      repository: '{{ .scm.repo }}'
+      branch: '{{ .scm.branch }}'
+      user: '{{ .scm.user }}'
+      email: '{{ .scm.email }}'
+      username: '{{ .scm.username }}'
+      token: '{{ requiredEnv .scm.token }}'
+      commitusingapi: {{ .scm.commitusingapi }}
+      commitmessage:
+        squash: {{ .scm.commitmessage.squash }}
+        type: '{{ .harvester_docker_machine.commitmessage.type }}'
+        scope: '{{ .harvester_docker_machine.commitmessage.scope }}'
+        title: 'Bump patch version of Harvester Docker machine driver to {{ source "harvester-docker-machine-release" }}'
+
+actions:
+  rancher-pr:
+    kind: github/pullrequest
+    scmid: 'default'
+    spec:
+      labels:
+        - 'dependencies'
+      mergemethod: '{{ .scm.mergemethod }}'
+      title: '[{{ .scm.branch }}] Bump Harvester Docker machine driver to `{{ source "harvester-docker-machine-release" }}`'
+      description: 'Bump patch versions of Harvester Docker machine driver to `{{ source "harvester-docker-machine-release" }}`'
+
+sources:
+  check-dockerfile-harvester-docker-machine:
+    name: 'Check current version of ENV DOCKER_MACHINE_HARVESTER_VERSION in package/Dockerfile'
+    kind: file
+    scmid: 'default'
+    spec:
+      file: 'package/Dockerfile'
+      matchpattern: 'ENV[\s\t+]DOCKER_MACHINE_HARVESTER_VERSION=\S+'
+    transformers:
+      - find: 'v\d+\.\d+\.\d+'
+
+  get-sha256-binary-amd64-current-version:
+    name: 'Get the sha256sum of Harvester Docker machine driver for {{ source "check-dockerfile-harvester-docker-machine" }} for amd64'
+    kind: shell
+    sourceid: 'check-dockerfile-harvester-docker-machine'
+    spec:
+      command: 'curl -sL https://github.com/{{ .repos.harvester_docker_machine.owner }}/{{ .repos.harvester_docker_machine.repo }}/releases/download/{{ source "check-dockerfile-harvester-docker-machine" }}/docker-machine-driver-harvester-amd64.tar.gz | sha256sum'
+    transformers:
+      - find: '\S+'
+
+  get-sha256-binary-arm64-current-version:
+    name: 'Get the sha256sum of Harvester Docker machine driver for {{ source "check-dockerfile-harvester-docker-machine" }} for arm64'
+    kind: shell
+    sourceid: 'check-dockerfile-harvester-docker-machine'
+    spec:
+      command: 'curl -sL https://github.com/{{ .repos.harvester_docker_machine.owner }}/{{ .repos.harvester_docker_machine.repo }}/releases/download/{{ source "check-dockerfile-harvester-docker-machine" }}/docker-machine-driver-harvester-arm64.tar.gz | sha256sum'
+    transformers:
+      - find: '\S+'
+
+  harvester-docker-machine-release:
+    name: 'Get latest upstream Harvester Docker machine version for {{ source "check-dockerfile-harvester-docker-machine" }} patch version'
+    kind: githubrelease
+    sourceid: 'check-dockerfile-harvester-docker-machine'
+    spec:
+      owner: '{{ .repos.harvester_docker_machine.owner }}'
+      repository: '{{ .repos.harvester_docker_machine.repo }}'
+      key: tagname
+      typefilter:
+        release: true
+      username: '{{ .scm.username }}'
+      token: '{{ requiredEnv .scm.token }}'
+      versionfilter:
+        kind: semver
+        pattern: '~{{ source "check-dockerfile-harvester-docker-machine" }}'
+
+  get-sha256-binary-amd64-next-version:
+    name: 'Get the sha256sum of Harvester Docker machine driver for {{ source "harvester-docker-machine-release" }} for amd64'
+    kind: shell
+    sourceid: 'harvester-docker-machine-release'
+    spec:
+      command: 'curl -sL https://github.com/{{ .repos.harvester_docker_machine.owner }}/{{ .repos.harvester_docker_machine.repo }}/releases/download/{{ source "harvester-docker-machine-release" }}/docker-machine-driver-harvester-amd64.tar.gz | sha256sum'
+    transformers:
+      - find: '\S+'
+
+  get-sha256-binary-arm64-next-version:
+    name: 'Get the sha256sum of Harvester Docker machine driver for {{ source "harvester-docker-machine-release" }} for arm64'
+    kind: shell
+    sourceid: 'harvester-docker-machine-release'
+    spec:
+      command: 'curl -sL https://github.com/{{ .repos.harvester_docker_machine.owner }}/{{ .repos.harvester_docker_machine.repo }}/releases/download/{{ source "harvester-docker-machine-release" }}/docker-machine-driver-harvester-arm64.tar.gz | sha256sum'
+    transformers:
+      - find: '\S+'
+
+targets:
+  update-dockerfile-version:
+    name: 'Update ENV DOCKER_MACHINE_HARVESTER_VERSION to {{ source "harvester-docker-machine-release" }} in Dockerfile'
+    kind: dockerfile
+    scmid: 'default'
+    sourceid: 'harvester-docker-machine-release'
+    spec:
+      file: 'package/Dockerfile'
+      instruction:
+        keyword: "ENV"
+        matcher: "DOCKER_MACHINE_HARVESTER_VERSION"
+
+  update-machine-driver-version:
+    name: 'Update Harvester Docker machine {{ source "harvester-docker-machine-release" }} in machine driver file'
+    kind: file
+    scmid: 'default'
+    sourceid: 'harvester-docker-machine-release'
+    spec:
+      file: 'pkg/data/management/machinedriver_data.go'
+      matchpattern: 'harvesterDriverVersion[\s\t]+:=[\s\t]+"{{ source "check-dockerfile-harvester-docker-machine" }}"'
+      replacepattern: 'harvesterDriverVersion := "{{ source "harvester-docker-machine-release" }}"'
+
+  update-machine-driver-amd64-sha:
+    name: 'Update Harvester Docker machine amd64 sha in machine driver file'
+    kind: file
+    scmid: 'default'
+    disablesourceinput: true
+    spec:
+      file: 'pkg/data/management/machinedriver_data.go'
+      matchpattern: '"amd64":[\s\t]+"{{ source "get-sha256-binary-amd64-current-version" }}",'
+      replacepattern: '"amd64": "{{ source "get-sha256-binary-amd64-next-version" }}",'
+
+  update-machine-driver-arm64-sha:
+    name: 'Update Harvester Docker machine arm64 sha in machine driver file'
+    kind: file
+    scmid: 'default'
+    disablesourceinput: true
+    spec:
+      file: 'pkg/data/management/machinedriver_data.go'
+      matchpattern: '"arm64":[\s\t]+"{{ source "get-sha256-binary-arm64-current-version" }}",'
+      replacepattern: '"arm64": "{{ source "get-sha256-binary-arm64-next-version" }}",'
+
+  go-fmt:
+    name: 'Run go fmt in machine driver file'
+    dependson:
+      - 'update-machine-driver-version' 
+      - 'update-machine-driver-amd64-sha'
+      - 'update-machine-driver-arm64-sha'
+    kind: shell
+    scmid: 'default'
+    disablesourceinput: true
+    spec:
+      command: 'go fmt pkg/data/management/machinedriver_data.go'
+      changedif:
+        kind: file/checksum
+        spec:
+          files:
+            - 'pkg/data/management/machinedriver_data.go'
