@@ -177,9 +177,9 @@ var (
 	// An empty string or a zero value means the feature is disabled.
 	DeleteInactiveUserAfter = NewSetting("delete-inactive-user-after", "")
 
-	// DeleteInfraMachineOnFailureAfter is the duration after which a machine job that failed to provision a machine will be deleted.
+	// DeleteMachineOnFailureAfter is the duration after which a machine job that failed to provision a machine will be deleted.
 	// The value should be expressed in valid time.Duration units. See https://pkg.go.dev/time#ParseDuration
-	DeleteInfraMachineOnFailureAfter = NewSetting("delete-infra-machine-on-failure-after", "0s")
+	DeleteMachineOnFailureAfter = NewSetting("delete-machine-on-failure-after", "0s")
 
 	// UserRetentionDryRun determines if the user retention process should actually disable and delete users.
 	// Valid values are "true" and "false". An empty string means "false".
