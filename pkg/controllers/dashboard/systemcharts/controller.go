@@ -29,6 +29,7 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
 	k8sappsv1 "k8s.io/api/apps/v1"
+	kcorev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -51,10 +52,12 @@ var (
 		chart.WebhookChartName:           "rancher/rancher-webhook",
 		chart.ProvisioningCAPIChartName:  "rancher/mirrored-cluster-api-controller",
 		chart.RemoteDialerProxyChartName: "rancher/remotedialer-proxy",
+		chart.TurtlesChartName:           "rancher/turtles",
 	}
 	watchedSettings = map[string]struct{}{
 		settings.RancherWebhookVersion.Name:               {},
 		settings.RancherProvisioningCAPIVersion.Name:      {},
+		settings.RancherTurtlesVersion.Name:               {},
 		settings.SystemDefaultRegistry.Name:               {},
 		settings.ShellImage.Name:                          {},
 		settings.SystemUpgradeControllerChartVersion.Name: {},
@@ -68,6 +71,7 @@ func Register(ctx context.Context, wContext *wrangler.Context, registryOverride 
 	h := &handler{
 		manager:          wContext.SystemChartsManager,
 		namespaces:       wContext.Core.Namespace(),
+		namespaceCache:   wContext.Core.Namespace().Cache(),
 		deployment:       wContext.Apps.Deployment(),
 		deploymentCache:  wContext.Apps.Deployment().Cache(),
 		clusterRepo:      wContext.Catalog.ClusterRepo(),
@@ -91,6 +95,8 @@ func Register(ctx context.Context, wContext *wrangler.Context, registryOverride 
 
 	wContext.Plan.Plan().OnChange(ctx, "monitor-plans", h.onPlan)
 
+	wContext.Core.Namespace().OnChange(ctx, "watch-provisioning-namespaces", h.onNamespace)
+
 	wContext.Mgmt.Cluster().OnChange(ctx, "monitor-local-cluster", h.onCluster)
 	return nil
 }
@@ -98,6 +104,7 @@ func Register(ctx context.Context, wContext *wrangler.Context, registryOverride 
 type handler struct {
 	manager          chart.Manager
 	namespaces       corecontrollers.NamespaceController
+	namespaceCache   corecontrollers.NamespaceCache
 	deployment       deploymentControllers.DeploymentController
 	deploymentCache  deploymentControllers.DeploymentCache
 	clusterRepo      catalogcontrollers.ClusterRepoController
@@ -243,9 +250,51 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 				configMapValues := h.getChartValues(chart.ProvisioningCAPIChartName)
 				return data.MergeMaps(values, configMapValues)
 			},
-			Enabled:         func() bool { return features.EmbeddedClusterAPI.Enabled() },
-			Uninstall:       !features.EmbeddedClusterAPI.Enabled(),
-			RemoveNamespace: !features.EmbeddedClusterAPI.Enabled(),
+			Enabled: func() bool {
+				// Provisioning CAPI is enabled when EmbeddedClusterAPI is on AND Turtles is off,
+				// and only after Turtles namespace is fully deleted to avoid race.
+				if !features.EmbeddedClusterAPI.Enabled() || features.Turtles.Enabled() {
+					return false
+				}
+				return h.namespaceGone(namespace.TurtlesNamespace)
+			},
+			Uninstall: func() bool {
+				// Uninstall provisioning CAPI when Turtles is enabled or EmbeddedClusterAPI is disabled.
+				return features.Turtles.Enabled() || !features.EmbeddedClusterAPI.Enabled()
+			}(),
+			RemoveNamespace: func() bool {
+				return features.Turtles.Enabled() || !features.EmbeddedClusterAPI.Enabled()
+			}(),
+		},
+		{
+			ReleaseNamespace:    namespace.TurtlesNamespace,
+			ReleaseName:         chart.TurtlesChartName,
+			ChartName:           chart.TurtlesChartName,
+			ExactVersionSetting: settings.RancherTurtlesVersion,
+			Values: func() map[string]interface{} {
+				values := map[string]interface{}{
+					"features": map[string]interface{}{
+						"no-cert-manager": map[string]interface{}{
+							"enabled": true,
+						},
+					},
+				}
+				// add priority class value
+				h.setPriorityClass(values, chart.TurtlesChartName)
+				// get custom values for rancher-turtles
+				configMapValues := h.getChartValues(chart.TurtlesChartName)
+				return data.MergeMaps(values, configMapValues)
+			},
+			Enabled: func() bool {
+				// Turtles is enabled by its feature flag and only after Provisioning CAPI namespace is fully deleted
+				// to avoid race during switch.
+				if !features.Turtles.Enabled() {
+					return false
+				}
+				return h.namespaceGone(namespace.ProvisioningCAPINamespace)
+			},
+			Uninstall:       !features.Turtles.Enabled(),
+			RemoveNamespace: !features.Turtles.Enabled(),
 		},
 		{
 			ReleaseNamespace: namespace.System,
@@ -570,4 +619,33 @@ func isInHarvesterLocal() bool {
 		return true
 	}
 	return false
+}
+
+// namespaceGone returns true if the given namespace was deleted
+func (h *handler) namespaceGone(ns string) bool {
+	if ns == "" {
+		return true
+	}
+	_, err := h.namespaceCache.Get(ns)
+	if errors.IsNotFound(err) {
+		return true
+	}
+	if err != nil {
+		logrus.Warnf("[systemcharts] failed to get namespace %s: %v", ns, err)
+	}
+	return false
+}
+
+// onNamespace watches for deletion of namespaces used by Provisioning and Turtles charts.
+func (h *handler) onNamespace(_ string, ns *kcorev1.Namespace) (*kcorev1.Namespace, error) {
+	if ns == nil {
+		return ns, nil
+	}
+	if ns.Name != namespace.ProvisioningCAPINamespace && ns.Name != namespace.TurtlesNamespace {
+		return ns, nil
+	}
+
+	logrus.Debugf("[systemcharts] namespace change detected for %s", ns.Name)
+	h.clusterRepo.EnqueueAfter(repoName, 10*time.Second)
+	return ns, nil
 }

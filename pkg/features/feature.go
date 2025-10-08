@@ -65,7 +65,7 @@ var (
 	EmbeddedClusterAPI = newFeature(
 		"embedded-cluster-api",
 		"Enable a Rancher-managed instance of cluster-api core controller",
-		true,
+		false,
 		false,
 		false)
 	ManagedSystemUpgradeController = newFeature(
@@ -180,6 +180,12 @@ var (
 		"rancher-scc-registration-extension",
 		"Enable Rancher's SCC registration extension to register the system(s) for customer support",
 		isPrime(),
+		false,
+		true)
+	Turtles = newFeature(
+		"turtles",
+		"Enable Rancher Turtles for managing CAPI lifecycle",
+		true,
 		false,
 		true)
 )

@@ -62,6 +62,7 @@ var (
 		"cattle-logging",
 		"cattle-fleet-system",
 		"cattle-provisioning-capi-system",
+		"rancher-turtles-system",
 		"cattle-impersonation-system",
 	}
 

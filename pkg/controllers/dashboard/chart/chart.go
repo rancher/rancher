@@ -25,6 +25,9 @@ const (
 	// ProvisioningCAPIChartName name of the chart for rancher-provisioning-capi.
 	ProvisioningCAPIChartName = "rancher-provisioning-capi"
 
+	// TurtlesChartName name of the chart for rancher-turtles.
+	TurtlesChartName = "rancher-turtles"
+
 	// SystemUpgradeControllerChartName name of the chart system-upgrade-controller
 	SystemUpgradeControllerChartName = "system-upgrade-controller"
 
