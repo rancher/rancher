@@ -28,6 +28,10 @@ provisioning-tests: .dapper
 	@$(MAKE) quick-binary-server
 	./.dapper provisioning-tests
 
+test: .dapper
+	@$(MAKE) quick-binary-server
+	./.dapper test
+
 $(DEV_TARGETS):
 	./dev-scripts/$@
 
