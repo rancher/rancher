@@ -69,7 +69,7 @@ func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext, 
 		return nil, err
 	}
 
-	// Depricated. Use /v1-public instead.
+	// Deprecated. Use /v1-public instead.
 	v3PublicAPI, err := publicapi.NewV3Handler(ctx, scaledContext, norman.ConfigureAPIUI)
 	if err != nil {
 		return nil, err
