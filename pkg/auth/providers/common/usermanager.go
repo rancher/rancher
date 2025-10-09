@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -405,26 +405,23 @@ func (m *userManager) UserAttributeCreateOrUpdate(userID, provider string, group
 }
 
 func (m *userManager) userAttributeChanged(attribs *v3.UserAttribute, provider string, extraInfo map[string][]string, groupPrincipals []v3.Principal) bool {
-	oldSet := []string{}
-	newSet := []string{}
-
 	if len(attribs.GroupPrincipals[provider].Items) != len(groupPrincipals) {
 		return true
 	}
 
+	var oldSet, newSet []string
 	for _, principal := range attribs.GroupPrincipals[provider].Items {
 		oldSet = append(oldSet, principal.ObjectMeta.Name)
 	}
 	for _, principal := range groupPrincipals {
 		newSet = append(newSet, principal.ObjectMeta.Name)
 	}
-	sort.Strings(oldSet)
-	sort.Strings(newSet)
 
-	for i := range oldSet {
-		if oldSet[i] != newSet[i] {
-			return true
-		}
+	slices.Sort(oldSet)
+	slices.Sort(newSet)
+
+	if !slices.Equal(oldSet, newSet) {
+		return true
 	}
 
 	if attribs.ExtraByProvider == nil && extraInfo != nil {
