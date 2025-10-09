@@ -3,7 +3,6 @@ package clusterauthtoken
 import (
 	"context"
 	"fmt"
-	"sync/atomic"
 
 	lassocache "github.com/rancher/lasso/pkg/cache"
 	"github.com/rancher/lasso/pkg/client"
@@ -60,34 +59,24 @@ func RegisterIndexers(scaledContext *config.ScaledContext) error {
 
 // Register sets up cluster initializations to run when the cluster has started.
 func Register(ctx context.Context, cluster *config.UserContext) {
-	// Delay the starter execution as much as possible, by checking for this variable that will be flipped when it's ready
-	// We'll block on waiting for the actual deferred registration to be executed to check if there was an error
-	var extAPIReady atomic.Bool
-	cluster.Management.Wrangler.DeferredEXTAPIRegistration.DeferFunc(func(w *wrangler.EXTAPIContext) {
-		extAPIReady.Store(true)
-	})
-	starter := cluster.DeferredStart(ctx, func(ctx context.Context) error {
-		// Defer further until the EXT API is ready as well
-		logrus.Debugf("[%s] DEFER cluster auth token controller setup", clusterAuthTokenController)
-		err := <-cluster.Management.Wrangler.DeferredEXTAPIRegistration.DeferFuncWithError(func(w *wrangler.EXTAPIContext) error {
-			return registerDeferred(ctx, cluster, w)
-		})
-		if err != nil {
-			logrus.Errorf("[%s] Failed to register controller: %v", clusterAuthTokenController, err)
-			return err
-		}
-		return nil
-	})
-
+	// Defer until the EXT API is ready
 	clusters := cluster.Management.Management.Clusters("")
-	clusters.AddHandler(ctx, clusterController, func(key string, obj *v3.Cluster) (runtime.Object, error) {
-		if obj != nil &&
-			obj.Name == cluster.ClusterName &&
-			obj.Spec.LocalClusterAuthEndpoint.Enabled &&
-			extAPIReady.Load() {
-			return obj, starter()
-		}
-		return obj, nil
+	cluster.Management.Wrangler.DeferredEXTAPIRegistration.DeferFunc(func(w *wrangler.EXTAPIContext) {
+		starter := cluster.DeferredStart(ctx, func(ctx context.Context) error {
+			if err := registerDeferred(ctx, cluster, w); err != nil {
+				logrus.Errorf("[%s] Failed to register controller: %v", clusterAuthTokenController, err)
+				return err
+			}
+			return nil
+		})
+		clusters.AddHandler(ctx, clusterController, func(key string, obj *v3.Cluster) (runtime.Object, error) {
+			if obj != nil &&
+				obj.Name == cluster.ClusterName &&
+				obj.Spec.LocalClusterAuthEndpoint.Enabled {
+				return obj, starter()
+			}
+			return obj, nil
+		})
 	})
 }
 
