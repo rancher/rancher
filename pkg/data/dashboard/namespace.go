@@ -12,6 +12,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+const (
+	k8sManagedLabel = "app.kubernetes.io/managed-by"
+)
+
 func addCattleGlobalNamespaces(ctx context.Context, k8s kubernetes.Interface) error {
 	if features.Fleet.Enabled() {
 		_, err := k8s.CoreV1().Namespaces().Get(ctx, fleetconst.ClustersLocalNamespace, metav1.GetOptions{})
@@ -19,6 +23,9 @@ func addCattleGlobalNamespaces(ctx context.Context, k8s kubernetes.Interface) er
 			_, err = k8s.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: fleetconst.ClustersLocalNamespace,
+					Labels: map[string]string{
+						k8sManagedLabel: "rancher",
+					},
 				},
 			}, metav1.CreateOptions{})
 		}
@@ -31,6 +38,9 @@ func addCattleGlobalNamespaces(ctx context.Context, k8s kubernetes.Interface) er
 		_, err = k8s.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: namespace.System,
+				Labels: map[string]string{
+					k8sManagedLabel: "rancher",
+				},
 			},
 		}, metav1.CreateOptions{})
 	}
@@ -43,6 +53,9 @@ func addCattleGlobalNamespaces(ctx context.Context, k8s kubernetes.Interface) er
 			_, err = k8s.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: namespace.UIPluginNamespace,
+					Labels: map[string]string{
+						k8sManagedLabel: "rancher",
+					},
 				},
 			}, metav1.CreateOptions{})
 		}
