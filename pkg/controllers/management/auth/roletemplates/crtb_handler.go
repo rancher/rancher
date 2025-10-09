@@ -178,10 +178,10 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, loc
 func (c *crtbHandler) getDesiredClusterRoleBindings(crtb *v3.ClusterRoleTemplateBinding) (map[string]*rbacv1.ClusterRoleBinding, error) {
 	desiredCRBs := map[string]*rbacv1.ClusterRoleBinding{}
 	// Check if there is a project management role to bind to
-	projectMagementRoleName := rbac.ProjectManagementPlaneClusterRoleNameFor(crtb.RoleTemplateName)
-	cr, err := c.crController.Get(projectMagementRoleName, metav1.GetOptions{})
+	projectManagementRoleName := rbac.ProjectManagementPlaneClusterRoleNameFor(crtb.RoleTemplateName)
+	cr, err := c.crController.Get(rbac.AggregatedClusterRoleNameFor(projectManagementRoleName), metav1.GetOptions{})
 	if err == nil && cr != nil {
-		crb, err := rbac.BuildAggregatingClusterRoleBindingFromRTB(crtb, projectMagementRoleName)
+		crb, err := rbac.BuildAggregatingClusterRoleBindingFromRTB(crtb, projectManagementRoleName)
 		if err != nil {
 			return nil, err
 		}
@@ -192,7 +192,7 @@ func (c *crtbHandler) getDesiredClusterRoleBindings(crtb *v3.ClusterRoleTemplate
 
 	// Check if there is a cluster management role to bind to
 	clusterManagementRoleName := rbac.ClusterManagementPlaneClusterRoleNameFor(crtb.RoleTemplateName)
-	cr, err = c.crController.Get(clusterManagementRoleName, metav1.GetOptions{})
+	cr, err = c.crController.Get(rbac.AggregatedClusterRoleNameFor(clusterManagementRoleName), metav1.GetOptions{})
 	if err == nil && cr != nil {
 		crb, err := rbac.BuildAggregatingClusterRoleBindingFromRTB(crtb, clusterManagementRoleName)
 		if err != nil {

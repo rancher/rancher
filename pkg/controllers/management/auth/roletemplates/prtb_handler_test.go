@@ -212,7 +212,7 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "error getting cluster role",
 			setupCRController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
-				m.EXPECT().Get("test-rt-project-mgmt", metav1.GetOptions{}).Return(nil, fmt.Errorf("error"))
+				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, fmt.Errorf("error"))
 			},
 			prtb: &v3.ProjectRoleTemplateBinding{
 				RoleTemplateName: "test-rt",
@@ -222,7 +222,7 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "no error when cluster role doesn't exist",
 			setupCRController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
-				m.EXPECT().Get("test-rt-project-mgmt", metav1.GetOptions{}).Return(nil, errNotFound)
+				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, errNotFound)
 			},
 			prtb: &v3.ProjectRoleTemplateBinding{
 				RoleTemplateName: "test-rt",
@@ -232,7 +232,7 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "error building clusterrolebinding",
 			setupCRController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
-				m.EXPECT().Get("test-rt-project-mgmt", metav1.GetOptions{}).Return(nil, nil)
+				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, nil)
 			},
 			prtb: &v3.ProjectRoleTemplateBinding{
 				RoleTemplateName: "test-rt",
@@ -242,7 +242,7 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "error listing clusterrolebindings",
 			setupCRController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
-				m.EXPECT().Get("test-rt-project-mgmt", metav1.GetOptions{}).Return(nil, nil)
+				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, nil)
 			},
 			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				m.EXPECT().List(metav1.ListOptions{LabelSelector: ownerLabel}).Return(nil, errDefault)
@@ -257,7 +257,7 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "error listing clusterrolebindings",
 			setupCRController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
-				m.EXPECT().Get("test-rt-project-mgmt", metav1.GetOptions{}).Return(nil, nil)
+				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, nil)
 			},
 			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				m.EXPECT().List(metav1.ListOptions{LabelSelector: ownerLabel}).Return(nil, errDefault)
@@ -272,7 +272,7 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "error deleting unwanted clusterrolebindings",
 			setupCRController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
-				m.EXPECT().Get("test-rt-project-mgmt", metav1.GetOptions{}).Return(nil, nil)
+				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, nil)
 			},
 			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				m.EXPECT().List(metav1.ListOptions{LabelSelector: ownerLabel}).Return(&rbacv1.ClusterRoleBindingList{
@@ -294,7 +294,7 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "CRB already exists",
 			setupCRController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
-				m.EXPECT().Get("test-rt-project-mgmt", metav1.GetOptions{}).Return(nil, nil)
+				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, nil)
 			},
 			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				m.EXPECT().List(metav1.ListOptions{LabelSelector: ownerLabel}).Return(&rbacv1.ClusterRoleBindingList{
@@ -310,7 +310,7 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "CRB already exists with extra bad CRBs",
 			setupCRController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
-				m.EXPECT().Get("test-rt-project-mgmt", metav1.GetOptions{}).Return(nil, nil)
+				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, nil)
 			},
 			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				m.EXPECT().List(metav1.ListOptions{LabelSelector: ownerLabel}).Return(&rbacv1.ClusterRoleBindingList{
@@ -332,7 +332,7 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "CRB needs to be created",
 			setupCRController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
-				m.EXPECT().Get("test-rt-project-mgmt", metav1.GetOptions{}).Return(nil, nil)
+				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, nil)
 			},
 			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				m.EXPECT().List(metav1.ListOptions{LabelSelector: ownerLabel}).Return(&rbacv1.ClusterRoleBindingList{
@@ -349,7 +349,7 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "error creating CRB",
 			setupCRController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
-				m.EXPECT().Get("test-rt-project-mgmt", metav1.GetOptions{}).Return(nil, nil)
+				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, nil)
 			},
 			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				m.EXPECT().List(metav1.ListOptions{LabelSelector: ownerLabel}).Return(&rbacv1.ClusterRoleBindingList{
