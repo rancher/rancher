@@ -97,7 +97,12 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	unauthed.Handle("/rancherversion", version.NewVersionHandler())
 	unauthed.PathPrefix("/v1-{prefix}-release/channel").Handler(channelserver)
 	unauthed.PathPrefix("/v1-{prefix}-release/release").Handler(channelserver)
-	unauthed.PathPrefix("/v1-saml").Handler(saml.AuthHandler())
+
+	samlMux := saml.AuthHandler()
+	logrus.Debugf("SAML [newMCM]: mux root %p", samlMux)
+	unauthed.PathPrefix("/v1-saml").Handler(samlMux)
+	logrus.Debugf("SAML [newMCM]: mux root %p now set", samlMux)
+
 	unauthed.PathPrefix("/v3-public").Handler(publicAPI)
 
 	// Authenticated routes
