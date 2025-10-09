@@ -61,26 +61,34 @@ eval "$(grep '^ENV CATTLE_KDM_BRANCH' package/Dockerfile | awk '{print "export "
 
 export CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$(yq '.provisioningCAPIVersion' < build.yaml)
 
-
-K3S_PINNED_VERSION="v1.30.14+k3s2"
-RKE2_PINNED_VERSION="v1.30.14+rke2r2"
-
 if [ -z "${SOME_K8S_VERSION:-}" ]; then
-# Only set SOME_K8S_VERSION if it is empty — for KDM-driven provisioning tests this value
-# should already be populated.
+# Only resolve SOME_K8S_VERSION if it’s empty — KDM-driven runs may set it upstream.
 # Prime context:
-# KDM "latest" may be a Prime-only release. Selecting it without Prime configuration causes
-# provisioning to pull images that aren’t available in the community registry.
-# To keep CI deterministic and non-prime-safe, we pin a version per DIST (k3s/rke2) below.
+# "Latest" in KDM can be Prime-only. To avoid unintentionally selecting a Prime-only
+# release when the job isn't configured for Prime, this script FIRST honors per-distro
+# pins provided by the workflow (K3S_PINNED_VERSION / RKE2_PINNED_VERSION). If no pin is set
+# for the current DIST, we fall back to the latest from KDM’s data.json for the
+# referenced KDM branch.
   case "${DIST}" in
     k3s)
-      export SOME_K8S_VERSION="${K3S_PINNED_VERSION}"
+      if [ -n "${K3S_PINNED_VERSION:-}" ]; then
+        export SOME_K8S_VERSION="${K3S_PINNED_VERSION}"
+        echo "Resolved ${DIST} to pinned version ${K3S_PINNED_VERSION}"
+      fi
       ;;
     rke2)
-      export SOME_K8S_VERSION="${RKE2_PINNED_VERSION}"
+      if [ -n "${RKE2_PINNED_VERSION:-}" ]; then
+        export SOME_K8S_VERSION="${RKE2_PINNED_VERSION}"
+        echo "Resolved ${DIST} to pinned version ${RKE2_PINNED_VERSION}"
+      fi
       ;;
   esac
-  echo "Pinned ${DIST} to ${SOME_K8S_VERSION}"
+fi
+
+# Fallback: use the latest release for this $DIST from KDM data.json
+if [ -z "${SOME_K8S_VERSION:-}" ]; then
+  export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/release-v2.9/data/data.json | jq -r ".$DIST.releases[-1].version")
+  echo "Resolved ${DIST} to latest version ${SOME_K8S_VERSION}"
 fi
 
 if [ -z "${CATTLE_CHART_DEFAULT_URL}" ]; then
