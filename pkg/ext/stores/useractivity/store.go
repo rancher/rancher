@@ -359,6 +359,11 @@ func validateToken(authToken, token accessor.TokenAccessor) error {
 		return apierrors.NewForbidden(gvr.GroupResource(), "", fmt.Errorf("activity token %s is disabled", token.GetName()))
 	}
 
+	// We can't update expired token.
+	if token.GetIsExpired() {
+		return apierrors.NewForbidden(gvr.GroupResource(), "", fmt.Errorf("activity token %s is expired", token.GetName()))
+	}
+
 	return nil
 }
 
