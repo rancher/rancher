@@ -102,7 +102,7 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext, extAPICo
 	userAttributeLister := cluster.Management.Management.UserAttributes("").Controller().Lister()
 	settingInterface := cluster.Management.Management.Settings("")
 
-	// We want to avoid keeping in the cache all Secrets so we use a separate controller factory that only watches a single namespace
+	// We use a separate controller factory that only watches a single namespace. This ensures that the cache does not contain all the secrets, just those of that namespace.
 	// The default controller factory does not allow caching secrets for all namespaces, see https://github.com/rancher/rancher/issues/46827
 	clientFactory := cluster.ControllerFactory.SharedCacheFactory().SharedClientFactory()
 	clusterSecretLister, controllerFactory := newDedicatedSecretsCache(clientFactory, namespace)
