@@ -14,6 +14,7 @@ import (
 	clusterv3 "github.com/rancher/rancher/pkg/generated/norman/cluster.cattle.io/v3"
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -40,7 +41,7 @@ type tokenHandler struct {
 	userLister                 managementv3.UserLister
 	userAttributeLister        managementv3.UserAttributeLister
 	clusterSecret              corev1.SecretInterface
-	clusterSecretLister        corev1.SecretLister
+	clusterSecretLister        corecontrollers.SecretCache
 }
 
 // extCreate is called when a given ext token is created, and is responsible for
