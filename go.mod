@@ -7,6 +7,9 @@ toolchain go1.24.7
 // steve hotfix: https://github.com/rancher/steve/compare/v0.6.40...aruiz14:steve:hotfix-v2.12.2-hotfix-84f0?expand=0
 replace github.com/rancher/steve => github.com/aruiz14/steve v0.0.0-20251009080254-96a79cbfd7e6
 
+// apiserver hotfix: https://github.com/rancher/apiserver/compare/v0.6.3...aruiz14:apiserver:hotfix-v2.12.2-hotfix-84f0?expand=0
+replace github.com/rancher/apiserver => github.com/aruiz14/apiserver v0.0.0-20251023150147-ad18a2ce05e2
+
 replace (
 	github.com/crewjam/saml => github.com/rancher/saml v0.4.14-rancher3
 	github.com/docker/distribution => github.com/docker/distribution v2.8.2+incompatible // rancher-machine requires a replace is set
