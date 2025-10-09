@@ -36,17 +36,17 @@ import (
 
 // PasswordChangeRequestController interface for managing PasswordChangeRequest resources.
 type PasswordChangeRequestController interface {
-	generic.ControllerInterface[*v1.PasswordChangeRequest, *v1.PasswordChangeRequestList]
+	generic.NonNamespacedControllerInterface[*v1.PasswordChangeRequest, *v1.PasswordChangeRequestList]
 }
 
 // PasswordChangeRequestClient interface for managing PasswordChangeRequest resources in Kubernetes.
 type PasswordChangeRequestClient interface {
-	generic.ClientInterface[*v1.PasswordChangeRequest, *v1.PasswordChangeRequestList]
+	generic.NonNamespacedClientInterface[*v1.PasswordChangeRequest, *v1.PasswordChangeRequestList]
 }
 
 // PasswordChangeRequestCache interface for retrieving PasswordChangeRequest resources in memory.
 type PasswordChangeRequestCache interface {
-	generic.CacheInterface[*v1.PasswordChangeRequest]
+	generic.NonNamespacedCacheInterface[*v1.PasswordChangeRequest]
 }
 
 // PasswordChangeRequestStatusHandler is executed for every added or modified PasswordChangeRequest. Should return the new status to be updated

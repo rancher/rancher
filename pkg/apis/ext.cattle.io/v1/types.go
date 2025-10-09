@@ -274,6 +274,7 @@ type KubeconfigStatus struct {
 }
 
 // +genclient
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // GroupMembershipRefreshRequest is used to initiate a user refresh action.
@@ -305,6 +306,7 @@ type GroupMembershipRefreshRequestStatus struct {
 }
 
 // +genclient
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PasswordChangeRequest is used to change the password for a local user.
@@ -340,6 +342,7 @@ type PasswordChangeRequestStatus struct {
 }
 
 // +genclient
+// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // SelfUser is used to retrieve the current user information.
