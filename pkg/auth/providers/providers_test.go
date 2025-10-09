@@ -19,7 +19,49 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-func TestAzureADProviderDoesNotHavePerUserTokens(t *testing.T) {
+func TestIsSAMLProvider(t *testing.T) {
+	tests := []struct {
+		provider string
+		isSAML   bool
+	}{
+		{
+			provider: "pingProvider",
+			isSAML:   true,
+		},
+		{
+			provider: "adfsProvider",
+			isSAML:   true,
+		},
+		{
+			provider: "keyCloakProvider",
+			isSAML:   true,
+		},
+		{
+			provider: "oktaProvider",
+			isSAML:   true,
+		},
+		{
+			provider: "shibbolethProvider",
+			isSAML:   true,
+		},
+		{
+			provider: "githubProvider",
+			isSAML:   false,
+		},
+		{
+			provider: "localProvider",
+			isSAML:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.provider, func(t *testing.T) {
+			assert.Equal(t, tt.isSAML, IsSAMLProviderType(tt.provider))
+		})
+	}
+}
+
+func TestNewAzureADProviderDoesNotHavePerUserTokens(t *testing.T) {
 	t.Cleanup(cleanup)
 	newFlowCfg := map[string]any{
 		"metadata": map[string]any{
