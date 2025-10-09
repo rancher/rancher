@@ -20,22 +20,25 @@ func TestReconcileFeatures(t *testing.T) {
 	}
 
 	feature := features.GetFeatureByName(mockFeature.Name)
-	assert.Equal(false, feature.Enabled())
+	assert.False(feature.Enabled())
 
-	needsRestart := ReconcileFeatures(&mockFeature)
+	newVal, needsRestart := ReconcileFeatures(&mockFeature)
+	assert.Nil(newVal)
 	assert.False(needsRestart)
 	assert.Equal(false, feature.Enabled())
 
 	mockFeatureWithTrueValue := mockFeature.DeepCopy()
 	trueVal := true
 	mockFeatureWithTrueValue.Spec.Value = &trueVal
-	needsRestart = ReconcileFeatures(mockFeatureWithTrueValue)
+	newVal, needsRestart = ReconcileFeatures(mockFeatureWithTrueValue)
+	assert.True(*newVal)
 	assert.True(needsRestart)
 	assert.Equal(false, feature.Enabled())
 
 	mockFeatureWithTrueLockedValue := mockFeature.DeepCopy()
 	mockFeatureWithTrueLockedValue.Status.LockedValue = &trueVal
-	needsRestart = ReconcileFeatures(mockFeatureWithTrueLockedValue)
+	newVal, needsRestart = ReconcileFeatures(mockFeatureWithTrueLockedValue)
+	assert.True(*newVal)
 	assert.True(needsRestart)
 	assert.Equal(false, feature.Enabled())
 
@@ -52,14 +55,16 @@ func TestReconcileFeatures(t *testing.T) {
 	feature = features.GetFeatureByName(mockFeature.Name)
 	assert.Equal(true, feature.Enabled())
 
-	needsRestart = ReconcileFeatures(&mockFeature)
+	newVal, needsRestart = ReconcileFeatures(&mockFeature)
+	assert.True(*newVal)
 	assert.False(needsRestart)
 	assert.Equal(true, feature.Enabled())
 
 	falseValue := false
 	mockFeatureWithFalseValue := mockFeature.DeepCopy()
 	mockFeatureWithFalseValue.Spec.Value = &falseValue
-	needsRestart = ReconcileFeatures(mockFeatureWithFalseValue)
+	newVal, needsRestart = ReconcileFeatures(mockFeatureWithFalseValue)
+	assert.False(*newVal)
 	assert.False(needsRestart)
 	assert.Equal(false, feature.Enabled())
 

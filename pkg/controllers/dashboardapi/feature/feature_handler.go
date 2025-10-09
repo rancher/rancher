@@ -33,8 +33,8 @@ func sync(_ string, obj *v3.Feature) (*v3.Feature, error) {
 // ReconcileFeatures updates the feature stored in-memory from the feature that
 // is in etcd.
 //
-// It returns whether Rancher must be restarted. This is the case when (1) the
-// feature is non-dynamic and (2) the value was changed.
+// It returns the new value and whether Rancher must be restarted. This is the
+// case when (1) the feature is non-dynamic and (2) the value was changed.
 func ReconcileFeatures(obj *v3.Feature) (*bool, bool) {
 	feature := features.GetFeatureByName(obj.Name)
 
@@ -43,14 +43,15 @@ func ReconcileFeatures(obj *v3.Feature) (*bool, bool) {
 		return nil, false
 	}
 
-	if features.RequireRestarts(feature, obj) {
-		return nil, true
-	}
-
 	newVal := obj.Status.LockedValue
 	if newVal == nil {
 		newVal = obj.Spec.Value
 	}
+
+	if features.RequireRestarts(feature, obj) {
+		return newVal, true
+	}
+
 	if newVal == nil {
 		feature.Unset()
 	} else {
