@@ -3,17 +3,25 @@ package clusterauthtoken
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 
+	lassocache "github.com/rancher/lasso/pkg/cache"
+	"github.com/rancher/lasso/pkg/client"
+	"github.com/rancher/lasso/pkg/controller"
 	extv1 "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken/common"
 	extstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	ext "github.com/rancher/rancher/pkg/generated/controllers/ext.cattle.io/v1"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
+	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -52,12 +60,22 @@ func RegisterIndexers(scaledContext *config.ScaledContext) error {
 
 // Register sets up cluster initializations to run when the cluster has started.
 func Register(ctx context.Context, cluster *config.UserContext) {
+	// Delay the starter execution as much as possible, by checking for this variable that will be flipped when it's ready
+	// We'll block on waiting for the actual deferred registration to be executed to check if there was an error
+	var extAPIReady atomic.Bool
+	cluster.Management.Wrangler.DeferredEXTAPIRegistration.DeferFunc(func(w *wrangler.EXTAPIContext) {
+		extAPIReady.Store(true)
+	})
 	starter := cluster.DeferredStart(ctx, func(ctx context.Context) error {
 		// Defer further until the EXT API is ready as well
 		logrus.Debugf("[%s] DEFER cluster auth token controller setup", clusterAuthTokenController)
-		cluster.Management.Wrangler.DeferredEXTAPIRegistration.DeferFunc(func(w *wrangler.EXTAPIContext) {
-			registerDeferred(ctx, cluster, w)
+		err := <-cluster.Management.Wrangler.DeferredEXTAPIRegistration.DeferFuncWithError(func(w *wrangler.EXTAPIContext) error {
+			return registerDeferred(ctx, cluster, w)
 		})
+		if err != nil {
+			logrus.Errorf("[%s] Failed to register controller: %v", clusterAuthTokenController, err)
+			return err
+		}
 		return nil
 	})
 
@@ -65,7 +83,8 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 	clusters.AddHandler(ctx, clusterController, func(key string, obj *v3.Cluster) (runtime.Object, error) {
 		if obj != nil &&
 			obj.Name == cluster.ClusterName &&
-			obj.Spec.LocalClusterAuthEndpoint.Enabled {
+			obj.Spec.LocalClusterAuthEndpoint.Enabled &&
+			extAPIReady.Load() {
 			return obj, starter()
 		}
 		return obj, nil
@@ -74,7 +93,7 @@ func Register(ctx context.Context, cluster *config.UserContext) {
 
 // registerDeferred sets up the handlers for the new remote cluster which sync
 // tokens (v3 and ext) to the cluster auth tokens in that remote.
-func registerDeferred(ctx context.Context, cluster *config.UserContext, extAPIContext *wrangler.EXTAPIContext) {
+func registerDeferred(ctx context.Context, cluster *config.UserContext, extAPIContext *wrangler.EXTAPIContext) error {
 	tokenInformer := cluster.Management.Management.Tokens("").Controller().Informer()
 	tokenCache := cluster.Management.Wrangler.Mgmt.Token().Cache()
 	tokenClient := cluster.Management.Wrangler.Mgmt.Token()
@@ -88,12 +107,19 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext, extAPICo
 	clusterConfigMap := cluster.Core.ConfigMaps(namespace)
 	clusterConfigMapLister := cluster.Core.ConfigMaps(namespace).Controller().Lister()
 	clusterSecret := cluster.Core.Secrets(namespace)
-	clusterSecretLister := cluster.Core.Secrets(namespace).Controller().Lister()
 	tokenIndexer := tokenInformer.GetIndexer()
 	userLister := cluster.Management.Management.Users("").Controller().Lister()
 	userAttribute := cluster.Management.Management.UserAttributes("")
 	userAttributeLister := cluster.Management.Management.UserAttributes("").Controller().Lister()
 	settingInterface := cluster.Management.Management.Settings("")
+
+	// We want to avoid keeping in the cache all Secrets so we use a separate controller factory that only watches a single namespace
+	// The default controller factory does not allow caching secrets for all namespaces, see https://github.com/rancher/rancher/issues/46827
+	clientFactory := cluster.ControllerFactory.SharedCacheFactory().SharedClientFactory()
+	clusterSecretLister, controllerFactory := newDedicatedSecretsCache(clientFactory, namespace)
+	if err := cluster.RegisterExtraControllerFactory("clusterauthtoken", controllerFactory); err != nil {
+		return err
+	}
 
 	cluster.Management.Management.Settings("").AddHandler(ctx, settingController, (&settingHandler{
 		namespace,
@@ -151,6 +177,19 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext, extAPICo
 	catHandler.extTokenStore = extstore.NewSystemFromWrangler(cluster.Management.Wrangler)
 
 	cluster.Cluster.ClusterAuthTokens(namespace).AddHandler(ctx, clusterAuthTokenController, catHandler.sync)
+
+	return nil
+}
+
+func newDedicatedSecretsCache(clientFactory client.SharedClientFactory, namespace string) (corecontrollers.SecretCache, controller.SharedControllerFactory) {
+	cacheFactory := lassocache.NewSharedCachedFactory(clientFactory, &lassocache.SharedCacheFactoryOptions{
+		KindNamespace: map[schema.GroupVersionKind]string{
+			corev1.SchemeGroupVersion.WithKind("Secret"): namespace,
+		},
+	})
+
+	controllerFactory := controller.NewSharedControllerFactory(cacheFactory, controllers.GetOptsFromEnv(controllers.User))
+	return corecontrollers.New(controllerFactory).Secret().Cache(), controllerFactory
 }
 
 // tokenUserClusterKey computes the v3 token's key for indexing by user and
