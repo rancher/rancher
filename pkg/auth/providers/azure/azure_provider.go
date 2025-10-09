@@ -34,7 +34,7 @@ import (
 )
 
 const (
-	Name = clients.Name
+	Name = "azuread"
 )
 
 type unstructuredGetter interface {
