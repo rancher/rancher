@@ -1,0 +1,138 @@
+apiVersion: management.cattle.io/v3
+kind: Cluster
+metadata:
+  name: c-abcde
+  uid: "a1b2c3d4-e5f6-a7b8-c9d0-e1f2a3b4c5d6"
+spec:
+  displayName: test-cluster
+  aliConfig:
+    clusterName: "test-cluster"
+    clusterType: "ManagedKubernetes"
+    kubernetesVersion: "1.32.7-aliyun.1"
+    endpointPublicAccess: true
+    imported: false
+    regionId: "eu-central-1"
+    vpcId: "test-vpc-id"
+    podVswitchIds:
+      - "vsw-1"
+      - "vsw-2"
+    vswitchIds:
+      - "vsw-1"
+      - "vsw-2"
+    alibabaCredentialSecret: "cattle-global-data:cc-rf224"
+    addons:
+      - name: "terway-eniip"
+    snatEntry: true
+    serviceCidr: "192.168.0.0/16"
+    resourceGroupId: "rg-1"
+    proxyMode: "ipvs"
+    nodePools:
+      - name: "np-1"
+        instanceTypes:
+          - "ecs.c7.xlarge"
+          - "ecs.c7a.xlarge"
+        systemDiskCategory: "cloud_essd"
+        systemDiskSize: 20
+        dataDisks:
+          - category: "cloud_essd"
+            size: 40
+            encrypted: "false"
+        desiredSize: 3 # changed from 2
+        imageId: "aliyun_3_x64_20G_alibase_20241218.vhd"
+        imageType: "AliyunLinux3"
+        runtime: "containerd"
+        runtimeVersion: "1.6.38"
+        vswitchIds:
+          - "vsw-1"
+          - "vsw-2"
+status:
+  driver: Alibaba
+  aliStatus:
+    upstreamSpec:
+      clusterName: "test-cluster"
+      clusterType: "ManagedKubernetes"
+      kubernetesVersion: "1.32.7-aliyun.1"
+      endpointPublicAccess: true
+      imported: false
+      regionId: "eu-central-1"
+      vpcId: "test-vpc-id"
+      podVswitchIds:
+        - "vsw-1"
+        - "vsw-2"
+      vswitchIds:
+        - "vsw-1"
+        - "vsw-2"
+      alibabaCredentialSecret: "cattle-global-data:cc-rf224"
+      addons:
+        - name: "terway-eniip"
+      snatEntry: true
+      serviceCidr: "192.168.0.0/16"
+      resourceGroupId: "rg-1"
+      proxyMode: "ipvs"
+      nodePools:
+        - name: "np-1"
+          instanceTypes:
+            - "ecs.c7.xlarge"
+            - "ecs.c7a.xlarge"
+          systemDiskCategory: "cloud_essd"
+          systemDiskSize: 20
+          dataDisks:
+            - category: "cloud_essd"
+              size: 40
+              encrypted: "false"
+          desiredSize: 2
+          imageId: "aliyun_3_x64_20G_alibase_20241218.vhd"
+          imageType: "AliyunLinux3"
+          runtime: "containerd"
+          runtimeVersion: "1.6.38"
+          vswitchIds:
+            - "vsw-1"
+            - "vsw-2"
+  appliedSpec:
+    aliConfig:
+      clusterName: "test-cluster"
+      clusterType: "ManagedKubernetes"
+      kubernetesVersion: "1.32.7-aliyun.1"
+      endpointPublicAccess: true
+      imported: false
+      regionId: "eu-central-1"
+      vpcId: "test-vpc-id"
+      podVswitchIds:
+        - "vsw-1"
+        - "vsw-2"
+      vswitchIds:
+        - "vsw-1"
+        - "vsw-2"
+      alibabaCredentialSecret: "cattle-global-data:cc-rf224"
+      addons:
+        - name: "terway-eniip"
+      snatEntry: true
+      serviceCidr: "192.168.0.0/16"
+      resourceGroupId: "rg-1"
+      proxyMode: "ipvs"
+      nodePools:
+        - name: "np-1"
+          instanceTypes:
+            - "ecs.c7.xlarge"
+            - "ecs.c7a.xlarge"
+          systemDiskCategory: "cloud_essd"
+          systemDiskSize: 20
+          dataDisks:
+            - category: "cloud_essd"
+              size: 40
+              encrypted: "false"
+          desiredSize: 2
+          imageId: "aliyun_3_x64_20G_alibase_20241218.vhd"
+          imageType: "AliyunLinux3"
+          runtime: "containerd"
+          runtimeVersion: "1.6.38"
+          vswitchIds:
+            - "vsw-1"
+            - "vsw-2"
+  conditions:
+    - lastUpdateTime: "2022-08-08T10:54:05-04:00"
+      status: "True"
+      type: Provisioned
+    - lastUpdateTime: "2022-08-08T11:05:13-04:00"
+      status: Unknown
+      type: Updated
