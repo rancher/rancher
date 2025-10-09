@@ -50,7 +50,7 @@ type version struct {
 }
 
 func (v *version) GroupMembershipRefreshRequest() GroupMembershipRefreshRequestController {
-	return generic.NewController[*v1.GroupMembershipRefreshRequest, *v1.GroupMembershipRefreshRequestList](schema.GroupVersionKind{Group: "ext.cattle.io", Version: "v1", Kind: "GroupMembershipRefreshRequest"}, "groupmembershiprefreshrequests", true, v.controllerFactory)
+	return generic.NewNonNamespacedController[*v1.GroupMembershipRefreshRequest, *v1.GroupMembershipRefreshRequestList](schema.GroupVersionKind{Group: "ext.cattle.io", Version: "v1", Kind: "GroupMembershipRefreshRequest"}, "groupmembershiprefreshrequests", v.controllerFactory)
 }
 
 func (v *version) Kubeconfig() KubeconfigController {
@@ -58,11 +58,11 @@ func (v *version) Kubeconfig() KubeconfigController {
 }
 
 func (v *version) PasswordChangeRequest() PasswordChangeRequestController {
-	return generic.NewController[*v1.PasswordChangeRequest, *v1.PasswordChangeRequestList](schema.GroupVersionKind{Group: "ext.cattle.io", Version: "v1", Kind: "PasswordChangeRequest"}, "passwordchangerequests", true, v.controllerFactory)
+	return generic.NewNonNamespacedController[*v1.PasswordChangeRequest, *v1.PasswordChangeRequestList](schema.GroupVersionKind{Group: "ext.cattle.io", Version: "v1", Kind: "PasswordChangeRequest"}, "passwordchangerequests", v.controllerFactory)
 }
 
 func (v *version) SelfUser() SelfUserController {
-	return generic.NewController[*v1.SelfUser, *v1.SelfUserList](schema.GroupVersionKind{Group: "ext.cattle.io", Version: "v1", Kind: "SelfUser"}, "selfusers", true, v.controllerFactory)
+	return generic.NewNonNamespacedController[*v1.SelfUser, *v1.SelfUserList](schema.GroupVersionKind{Group: "ext.cattle.io", Version: "v1", Kind: "SelfUser"}, "selfusers", v.controllerFactory)
 }
 
 func (v *version) Token() TokenController {

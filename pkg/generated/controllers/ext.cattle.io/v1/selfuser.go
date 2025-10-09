@@ -36,17 +36,17 @@ import (
 
 // SelfUserController interface for managing SelfUser resources.
 type SelfUserController interface {
-	generic.ControllerInterface[*v1.SelfUser, *v1.SelfUserList]
+	generic.NonNamespacedControllerInterface[*v1.SelfUser, *v1.SelfUserList]
 }
 
 // SelfUserClient interface for managing SelfUser resources in Kubernetes.
 type SelfUserClient interface {
-	generic.ClientInterface[*v1.SelfUser, *v1.SelfUserList]
+	generic.NonNamespacedClientInterface[*v1.SelfUser, *v1.SelfUserList]
 }
 
 // SelfUserCache interface for retrieving SelfUser resources in memory.
 type SelfUserCache interface {
-	generic.CacheInterface[*v1.SelfUser]
+	generic.NonNamespacedCacheInterface[*v1.SelfUser]
 }
 
 // SelfUserStatusHandler is executed for every added or modified SelfUser. Should return the new status to be updated
