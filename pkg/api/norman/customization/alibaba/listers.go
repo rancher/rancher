@@ -8,13 +8,14 @@ import (
 	"strconv"
 	"strings"
 
-	cs "github.com/alibabacloud-go/cs-20151215/v5/client"
-	ecs "github.com/alibabacloud-go/ecs-20140526/v7/client"
-	resourcemanager "github.com/alibabacloud-go/resourcemanager-20200331/v3/client"
-	vpc "github.com/alibabacloud-go/vpc-20160428/v6/client"
+	cs "github.com/rancher/muchang/cs/client"
+	ecs "github.com/rancher/muchang/ecs/client"
+	resourcemanager "github.com/rancher/muchang/resourcemanager/client"
+	vpc "github.com/rancher/muchang/vpc/client"
 	"github.com/sirupsen/logrus"
 
-	"github.com/alibabacloud-go/tea/tea"
+	"github.com/rancher/muchang/utils/tea"
+	"github.com/rancher/muchang/utils/tea/dara"
 	"github.com/rancher/norman/httperror"
 )
 
@@ -45,7 +46,8 @@ func describeClusters(capabilities *Capabilities, req *http.Request) ([]byte, in
 		request.ClusterType = &clusterType
 	}
 
-	resp, err := client.DescribeClustersForRegion(&capabilities.RegionID, request)
+	resp, err := client.DescribeClustersForRegionWithContext(req.Context(), &capabilities.RegionID,
+		request, map[string]*string{}, &dara.RuntimeOptions{})
 	if err != nil {
 		status, err := handleSDKError(err)
 		return nil, status, err
@@ -74,7 +76,7 @@ func describeRegions(capabilities *Capabilities, req *http.Request) ([]byte, int
 		request.AcceptLanguage = &acceptLanguage
 	}
 
-	response, err := client.DescribeRegions(request)
+	response, err := client.DescribeRegionsWithContext(req.Context(), request, &dara.RuntimeOptions{})
 	if err != nil {
 		status, err := handleSDKError(err)
 		return nil, status, err
@@ -110,7 +112,7 @@ func describeInstanceTypes(capabilities *Capabilities, req *http.Request) ([]byt
 		request.MaxResults = &maxResultsVal
 	}
 
-	resp, err := client.DescribeInstanceTypes(request)
+	resp, err := client.DescribeInstanceTypesWithContext(req.Context(), request, &dara.RuntimeOptions{})
 	if err != nil {
 		status, err := handleSDKError(err)
 		return nil, status, err
@@ -142,7 +144,7 @@ func describeKeyPairs(capabilities *Capabilities, req *http.Request) ([]byte, in
 		request.ResourceGroupId = &resourceGroupID
 	}
 
-	resp, err := client.DescribeKeyPairs(request)
+	resp, err := client.DescribeKeyPairsWithContext(req.Context(), request, &dara.RuntimeOptions{})
 	if err != nil {
 		status, err := handleSDKError(err)
 		return nil, status, err
@@ -189,7 +191,7 @@ func describeAvailableResource(capabilities *Capabilities, req *http.Request) ([
 		request.InstanceType = &instanceType
 	}
 
-	resp, err := client.DescribeAvailableResource(request)
+	resp, err := client.DescribeAvailableResourceWithContext(req.Context(), request, &dara.RuntimeOptions{})
 	if err != nil {
 		status, err := handleSDKError(err)
 		return nil, status, err
@@ -248,7 +250,7 @@ func describeVpcs(capabilities *Capabilities, req *http.Request) ([]byte, int, e
 		request.ResourceGroupId = &resourceGroupID
 	}
 
-	resp, err := client.DescribeVpcs(request)
+	resp, err := client.DescribeVpcsWithContext(req.Context(), request, &dara.RuntimeOptions{})
 	if err != nil {
 		status, err := handleSDKError(err)
 		return nil, status, err
@@ -289,7 +291,7 @@ func describeVSwitches(capabilities *Capabilities, req *http.Request) ([]byte, i
 		request.ResourceGroupId = &resourceGroupID
 	}
 
-	resp, err := client.DescribeVSwitches(request)
+	resp, err := client.DescribeVSwitchesWithContext(req.Context(), request, &dara.RuntimeOptions{})
 	if err != nil {
 		status, err := handleSDKError(err)
 		return nil, status, err
@@ -374,7 +376,7 @@ func describeKubernetesMetadata(capabilities *Capabilities, req *http.Request) (
 		request.QueryUpgradableVersion = tea.Bool(getUpgradableVersionsVal)
 	}
 
-	resp, err := client.DescribeKubernetesVersionMetadata(request)
+	resp, err := client.DescribeKubernetesVersionMetadataWithContext(req.Context(), request, map[string]*string{}, &dara.RuntimeOptions{})
 	if err != nil {
 		status, err := handleSDKError(err)
 		return nil, status, err
@@ -407,7 +409,7 @@ func describeZones(capabilities *Capabilities, req *http.Request) ([]byte, int, 
 		request.AcceptLanguage = &acceptLanguage
 	}
 
-	response, err := client.DescribeZones(request)
+	response, err := client.DescribeZonesWithContext(req.Context(), request, &dara.RuntimeOptions{})
 	if err != nil {
 		status, err := handleSDKError(err)
 		return nil, status, err
@@ -440,7 +442,7 @@ func describeImageSupportedInstanceTypes(capabilities *Capabilities, req *http.R
 		request.ActionType = &action
 	}
 
-	resp, err := client.DescribeImageSupportInstanceTypes(request)
+	resp, err := client.DescribeImageSupportInstanceTypesWithContext(req.Context(), request, &dara.RuntimeOptions{})
 	if err != nil {
 		status, err := handleSDKError(err)
 		return nil, status, err

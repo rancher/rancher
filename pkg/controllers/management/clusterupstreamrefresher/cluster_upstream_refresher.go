@@ -272,6 +272,11 @@ func (c *clusterRefreshController) refreshClusterUpstreamSpec(cluster *mgmtv3.Cl
 			if err != nil {
 				return cluster, err
 			}
+		case apimgmtv3.ClusterDriverAlibaba:
+			err = runtime.DefaultUnstructuredConverter.FromUnstructured(specMap, cluster.Spec.AliConfig)
+			if err != nil {
+				return cluster, err
+			}
 		}
 	} else {
 		logrus.Debugf("cluster [%s] matches upstream, skipping spec sync", cluster.Name)

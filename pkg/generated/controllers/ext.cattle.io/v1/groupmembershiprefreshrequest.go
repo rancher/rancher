@@ -36,17 +36,17 @@ import (
 
 // GroupMembershipRefreshRequestController interface for managing GroupMembershipRefreshRequest resources.
 type GroupMembershipRefreshRequestController interface {
-	generic.ControllerInterface[*v1.GroupMembershipRefreshRequest, *v1.GroupMembershipRefreshRequestList]
+	generic.NonNamespacedControllerInterface[*v1.GroupMembershipRefreshRequest, *v1.GroupMembershipRefreshRequestList]
 }
 
 // GroupMembershipRefreshRequestClient interface for managing GroupMembershipRefreshRequest resources in Kubernetes.
 type GroupMembershipRefreshRequestClient interface {
-	generic.ClientInterface[*v1.GroupMembershipRefreshRequest, *v1.GroupMembershipRefreshRequestList]
+	generic.NonNamespacedClientInterface[*v1.GroupMembershipRefreshRequest, *v1.GroupMembershipRefreshRequestList]
 }
 
 // GroupMembershipRefreshRequestCache interface for retrieving GroupMembershipRefreshRequest resources in memory.
 type GroupMembershipRefreshRequestCache interface {
-	generic.CacheInterface[*v1.GroupMembershipRefreshRequest]
+	generic.NonNamespacedCacheInterface[*v1.GroupMembershipRefreshRequest]
 }
 
 // GroupMembershipRefreshRequestStatusHandler is executed for every added or modified GroupMembershipRefreshRequest. Should return the new status to be updated

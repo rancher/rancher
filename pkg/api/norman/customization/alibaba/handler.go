@@ -7,17 +7,18 @@ import (
 	"io"
 	"net/http"
 
-	cs "github.com/alibabacloud-go/cs-20151215/v5/client"
-	openapi "github.com/alibabacloud-go/darabonba-openapi/v2/client"
-	ecs "github.com/alibabacloud-go/ecs-20140526/v7/client"
-	resourcemanager "github.com/alibabacloud-go/resourcemanager-20200331/v3/client"
-	vpc "github.com/alibabacloud-go/vpc-20160428/v6/client"
+	cs "github.com/rancher/muchang/cs/client"
+	openapi "github.com/rancher/muchang/darabonba-openapi/client"
+	ecs "github.com/rancher/muchang/ecs/client"
+	resourcemanager "github.com/rancher/muchang/resourcemanager/client"
+	vpc "github.com/rancher/muchang/vpc/client"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	schema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 
-	"github.com/alibabacloud-go/tea/tea"
-	credential "github.com/aliyun/credentials-go/credentials"
 	"github.com/gorilla/mux"
+	credential "github.com/rancher/muchang/credentials"
+	"github.com/rancher/muchang/utils/tea"
+	"github.com/rancher/muchang/utils/tea/dara"
 	"github.com/rancher/norman/api/access"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -95,7 +96,8 @@ func (h *handler) ServeHTTP(writer http.ResponseWriter, req *http.Request) {
 	)
 
 	regionID := req.URL.Query().Get("regionId")
-	if regionID == "" {
+	// regionID required for all other operations except alibabaRegions
+	if regionID == "" && resourceType != "alibabaRegions" {
 		util.ReturnHTTPError(writer, req, http.StatusBadRequest, "regionId not set")
 		return
 	}
@@ -215,7 +217,7 @@ func (h *handler) checkCredentials(req *http.Request) (int, error) {
 		request.AcceptLanguage = &cred.AcceptLanguage
 	}
 
-	_, err = client.DescribeRegions(request)
+	_, err = client.DescribeRegionsWithContext(req.Context(), request, &dara.RuntimeOptions{})
 	if err != nil {
 
 		logrus.Debugf("[alibaba-handler] error call describeRegions: %v", err)
