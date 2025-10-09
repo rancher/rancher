@@ -1,43 +1,10 @@
 {
   "actions": {},
-  "count": 4,
+  "count": 3,
   "createTypes": {
     "secret": "https://rancherurl/v1/secrets"
   },
   "data": [
-    {
-      "actions": null,
-      "apiVersion": "v1",
-      "id": "test-ns-1/test2",
-      "kind": "Secret",
-      "links": {
-        "patch": "https://rancherurl/v1/secrets/test-ns-1/test2",
-        "remove": "https://rancherurl/v1/secrets/test-ns-1/test2",
-        "self": "https://rancherurl/v1/secrets/test-ns-1/test2",
-        "update": "https://rancherurl/v1/secrets/test-ns-1/test2",
-        "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test2"
-      },
-      "metadata": {
-        "fields": [
-          "test2",
-          "Opaque",
-          23,
-          "0s"
-        ],
-        "labels": {
-          "test-label": "2",
-          "test.cattle.io/steveapi": "nondeterministicid"
-        },
-        "name": "test2",
-        "namespace": "test-ns-1",
-        "resourceVersion": "1000",
-        "state": {
-          "message": "Resource is always ready",
-          "name": "active"
-        }
-      },
-      "type": "secret"
-    },
     {
       "actions": null,
       "apiVersion": "v1",
@@ -74,27 +41,26 @@
     {
       "actions": null,
       "apiVersion": "v1",
-      "id": "test-ns-1/test4",
+      "id": "test-ns-1/test1",
       "kind": "Secret",
       "links": {
-        "patch": "https://rancherurl/v1/secrets/test-ns-1/test4",
-        "remove": "https://rancherurl/v1/secrets/test-ns-1/test4",
-        "self": "https://rancherurl/v1/secrets/test-ns-1/test4",
-        "update": "https://rancherurl/v1/secrets/test-ns-1/test4",
-        "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test4"
+        "patch": "https://rancherurl/v1/secrets/test-ns-1/test1",
+        "remove": "https://rancherurl/v1/secrets/test-ns-1/test1",
+        "self": "https://rancherurl/v1/secrets/test-ns-1/test1",
+        "update": "https://rancherurl/v1/secrets/test-ns-1/test1",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test1"
       },
       "metadata": {
         "fields": [
-          "test4",
+          "test1",
           "Opaque",
-          0,
+          15,
           "0s"
         ],
         "labels": {
-          "test-label-gte": "3",
           "test.cattle.io/steveapi": "nondeterministicid"
         },
-        "name": "test4",
+        "name": "test1",
         "namespace": "test-ns-1",
         "resourceVersion": "1000",
         "state": {
@@ -107,27 +73,27 @@
     {
       "actions": null,
       "apiVersion": "v1",
-      "id": "test-ns-1/test5",
+      "id": "test-ns-1/test2",
       "kind": "Secret",
       "links": {
-        "patch": "https://rancherurl/v1/secrets/test-ns-1/test5",
-        "remove": "https://rancherurl/v1/secrets/test-ns-1/test5",
-        "self": "https://rancherurl/v1/secrets/test-ns-1/test5",
-        "update": "https://rancherurl/v1/secrets/test-ns-1/test5",
-        "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test5"
+        "patch": "https://rancherurl/v1/secrets/test-ns-1/test2",
+        "remove": "https://rancherurl/v1/secrets/test-ns-1/test2",
+        "self": "https://rancherurl/v1/secrets/test-ns-1/test2",
+        "update": "https://rancherurl/v1/secrets/test-ns-1/test2",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test2"
       },
       "metadata": {
         "fields": [
-          "test5",
+          "test2",
           "Opaque",
-          0,
+          23,
           "0s"
         ],
         "labels": {
-          "test-label-gte": "3",
+          "test-label": "2",
           "test.cattle.io/steveapi": "nondeterministicid"
         },
-        "name": "test5",
+        "name": "test2",
         "namespace": "test-ns-1",
         "resourceVersion": "1000",
         "state": {
@@ -139,7 +105,7 @@
     }
   ],
   "links": {
-    "self": "https://rancherurl/v1/secrets"
+    "self": "https://rancherurl/v1/secrets/test-ns-1"
   },
   "resourceType": "secret",
   "revision": "100",
