@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -ex
 
 if  [ -n "$CATTLE_KDM_BRANCH" ]; then
     curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json > bin/data.json
@@ -7,9 +7,9 @@ elif [ ! -e bin/data.json ] && [ -e kontainer-driver-metadata/data/data.json ]; 
     cp kontainer-driver-metadata/data/data.json bin/data.json
 fi
 
-source dev-scripts/images-origins-env.sh
 source scripts/version
 source scripts/package-env
+source dev-scripts/images-origins-env.sh
 
 scripts/k3s-images.sh
 cp bin/data.json bin/rancher-data.json
