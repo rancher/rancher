@@ -5,9 +5,19 @@ on:
     # Runs daily at 12:00 UTC.
     - cron: '0 12 * * *'
   workflow_dispatch:
+    inputs:
+      target:
+        description: 'Select which updatecli workflow to run or `all` to run all updates.'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - 'all'
+          - 'harvester-docker-machine'
+          - 'wins-system-agent'
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
   pull-requests: write
 
@@ -70,23 +80,17 @@ jobs:
         run: |
           # Never use '--debug' or 'manifest show' options, because they will
           # leak the GH token.
-          #
-          # We run a first apply to update versions.yaml with the needed K8s
-          # and K3s versions. This is currently a workaround for the
-          # autodiscovery module (to be removed once
-          # https://github.com/updatecli/updatecli/issues/6076 is implemented).
-          #updatecli apply --values updatecli/values.d/values.yaml   \
-          #                --values updatecli/values.d/versions.yaml \
-          #                --config updatecli/updatecli.d/update-versions-config-yaml/
-          ## Copy the updated versions.yaml to updatecli's folder.
-          #cp /tmp/updatecli/github/rancher/rancher/updatecli/values.d/versions.yaml updatecli/values.d/versions.yaml
-          ## This apply is responsible for updating the dependencies.
-          #updatecli apply --clean --values updatecli/values.d/values.yaml   \
-          #                        --values updatecli/values.d/versions.yaml \
-          #                        --config updatecli/updatecli.d/update-k8s-k3s/
-          updatecli apply --clean --values updatecli/values.d/values.yaml \
-                                  --values updatecli/values.d/versions.yaml \
-                                  --config updatecli/updatecli.d/update-wins-system-agent/
-          updatecli apply --clean --values updatecli/values.d/values.yaml   \
-                                  --values updatecli/values.d/versions.yaml \
-                                  --config updatecli/updatecli.d/update-harvester-docker-machine/
+          if [[ "${GITHUB_EVENT_NAME}" = "schedule" ]] ||
+             ([[ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]] && [[ "${{ inputs.target }}" = "all" ]]);
+          then
+            echo "Running updatecli on all targets"
+            updatecli apply --clean --values updatecli/values.d/values.yaml \
+                                    --config updatecli/updatecli.d/
+          elif [[ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]];
+          then
+            echo "Running updatecli on ${{ inputs.target }} target"
+            updatecli apply --clean --values updatecli/values.d/values.yaml \
+                                    --config "updatecli/updatecli.d/update-${{ inputs.target }}/"
+          else
+            echo "Invalid event name or target"
+          fi
