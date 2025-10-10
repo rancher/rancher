@@ -138,13 +138,13 @@ func Register(ctx context.Context, workload *config.UserContext) error {
 	management.Management.GlobalRoleBindings("").AddHandler(ctx, grbHandlerName, newGlobalRoleBindingHandler(workload))
 
 	sync := &resourcequota.SyncController{
-		Namespaces:          workload.Core.Namespaces(""),
 		NsIndexer:           nsInformer.GetIndexer(),
+		Namespaces:          workload.Management.Wrangler.Core.Namespace(),
+		ProjectGetter:       workload.Management.Wrangler.Mgmt.Project(),
 		ResourceQuotas:      workload.Core.ResourceQuotas(""),
 		ResourceQuotaLister: workload.Core.ResourceQuotas("").Controller().Lister(),
 		LimitRange:          workload.Core.LimitRanges(""),
 		LimitRangeLister:    workload.Core.LimitRanges("").Controller().Lister(),
-		ProjectLister:       management.Management.Projects(workload.ClusterName).Controller().Lister(),
 	}
 
 	workload.Core.Namespaces("").AddLifecycle(ctx, "namespace-auth", newNamespaceLifecycle(r, sync))
