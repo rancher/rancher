@@ -1,4 +1,5 @@
 ./bin
+!./bin/rancher
 ./.dapper
 ./build
 ./dist
