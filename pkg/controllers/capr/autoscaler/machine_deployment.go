@@ -1,9 +1,13 @@
 package autoscaler
 
 import (
+	"fmt"
+
 	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	v1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
@@ -11,12 +15,14 @@ import (
 type machineDeploymentReplicaOverrider struct {
 	clusterCache  v1.ClusterCache
 	clusterClient v1.ClusterClient
+
+	capiClusterCache v1beta1.ClusterCache
 }
 
 // syncMachinePoolReplicas synchronizes machine pool replicas between the capi MachineDeployment and v2prov Cluster object's machinePool field.
 // it searches through the list of machinePools and finds the matching one which corresponds to the one the cluster-autoscaler updated, and then updates the quantity field. this triggers a scale up.
 func (s *machineDeploymentReplicaOverrider) syncMachinePoolReplicas(_ string, md *capi.MachineDeployment) (*capi.MachineDeployment, error) {
-	if md == nil {
+	if md == nil || md.DeletionTimestamp != nil {
 		return md, nil
 	}
 
@@ -32,10 +38,30 @@ func (s *machineDeploymentReplicaOverrider) syncMachinePoolReplicas(_ string, md
 		return md, nil
 	}
 
-	logrus.Debugf("Getting cluster %s/%s", md.Namespace, clusterName)
-	cluster, err := s.clusterCache.Get(md.Namespace, clusterName)
+	logrus.Debugf("Getting CAPI Cluster %v/%v", md.Namespace, clusterName)
+	capiCluster, err := s.capiClusterCache.Get(md.Namespace, clusterName)
 	if err != nil {
-		logrus.Errorf("Error getting cluster %s/%s: %v", md.Namespace, clusterName, err)
+		logrus.Errorf("Error getting capi cluster %v/%v: %v", md.Namespace, clusterName, err)
+		return md, err
+	}
+
+	v2provClusterName := ""
+	for _, owner := range capiCluster.OwnerReferences {
+		if owner.APIVersion != "provisioning.cattle.io/v1" && owner.Kind != "Cluster" {
+			continue
+		}
+
+		v2provClusterName = owner.Name
+	}
+
+	if v2provClusterName == "" {
+		return md, fmt.Errorf("failed to find provisioning cluster object for machinedeployment %v/%v", md.Namespace, md.Name)
+	}
+
+	logrus.Debugf("Getting cluster %s/%s", md.Namespace, v2provClusterName)
+	cluster, err := s.clusterCache.Get(md.Namespace, v2provClusterName)
+	if err != nil {
+		logrus.Errorf("Error getting cluster %s/%s: %v", md.Namespace, v2provClusterName, err)
 		return md, err
 	}
 
@@ -58,6 +84,7 @@ func (s *machineDeploymentReplicaOverrider) syncMachinePoolReplicas(_ string, md
 			logrus.Infof("Updating cluster %s/%s machine pool %s quantity from %d to %d",
 				cluster.Namespace, cluster.Name, machinePoolName,
 				*cluster.Spec.RKEConfig.MachinePools[i].Quantity, *md.Spec.Replicas)
+			cluster = cluster.DeepCopy()
 			cluster.Spec.RKEConfig.MachinePools[i].Quantity = md.Spec.Replicas
 			needUpdate = true
 		}
@@ -65,9 +92,12 @@ func (s *machineDeploymentReplicaOverrider) syncMachinePoolReplicas(_ string, md
 
 	if needUpdate {
 		logrus.Debugf("Updating cluster %s/%s", cluster.Namespace, cluster.Name)
-		err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		err := wait.ExponentialBackoff(retry.DefaultBackoff, func() (done bool, err error) {
 			_, err = s.clusterClient.Update(cluster)
-			return err
+			if err != nil {
+				return false, nil
+			}
+			return true, nil
 		})
 		if err != nil {
 			logrus.Warnf("Failed to update cluster %s/%s to match machineDeployment! %v",

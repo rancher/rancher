@@ -103,17 +103,14 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 		return nil, nil
 	}, clients.Provisioning.Cluster(), clients.RKE.RKEControlPlane())
 
-	relatedresource.Watch(ctx, "machinedeployment-cluster-trigger", func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
-		if md, ok := obj.(*capi.MachineDeployment); ok &&
-			md.Annotations["cluster.x-k8s.io/cluster-api-autoscaler-node-group-min-size"] != "" &&
-			md.Annotations["cluster.x-k8s.io/cluster-api-autoscaler-node-group-max-size"] != "" {
-			return []relatedresource.Key{{
-				Namespace: namespace,
-				Name:      md.Spec.ClusterName,
-			}}, nil
-		}
-		return nil, nil
-	}, clients.Provisioning.Cluster(), clients.CAPI.MachineDeployment())
+	if features.ClusterAutoscaling.Enabled() {
+		relatedresource.Watch(ctx,
+			"machinedeployment-provisioning-cluster-trigger",
+			triggerProvisioningClusterOnMachineDeploymentUpdate(clients),
+			clients.Provisioning.Cluster(),
+			clients.CAPI.MachineDeployment(),
+		)
+	}
 
 	clients.Provisioning.Cluster().OnChange(ctx, "provisioning-cluster-change", h.OnChange)
 	clients.Provisioning.Cluster().OnRemove(ctx, "rke-cluster-remove", h.OnRemove)
@@ -472,4 +469,37 @@ func (h *handler) OnRemove(_ string, cluster *rancherv1.Cluster) (*rancherv1.Clu
 		}
 	}
 	return cluster, generic.ErrSkip
+}
+
+// triggerProvisioningClusterOnMachineDeploymentUpdate returns a function that triggers
+// provisioning cluster updates on machine deployment changes. notably it follows the chain of
+// machineDeployment -> cluster -> owner refererence -> prov cluster name in order to trigger the correct provisioning cluster
+func triggerProvisioningClusterOnMachineDeploymentUpdate(clients *wrangler.CAPIContext) func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
+	return func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
+		if md, ok := obj.(*capi.MachineDeployment); ok &&
+			md.Annotations[capi.AutoscalerMinSizeAnnotation] != "" && md.Annotations[capi.AutoscalerMaxSizeAnnotation] != "" {
+			capiClusterName := md.Spec.Template.Labels[capi.ClusterNameLabel]
+			capiCluster, err := clients.CAPI.Cluster().Cache().Get(namespace, capiClusterName)
+			if err != nil {
+				return nil, fmt.Errorf("failed to find capi cluster for machinedeployment %v/%v: %v", md.Namespace, md.Name, err)
+			}
+
+			v2provClusterName := ""
+			for _, owner := range capiCluster.OwnerReferences {
+				if owner.APIVersion != "provisioning.cattle.io/v1" && owner.Kind != "Cluster" {
+					continue
+				}
+				v2provClusterName = owner.Name
+			}
+			if v2provClusterName == "" {
+				return nil, fmt.Errorf("failed to find provisioning cluster object for machinedeployment %v/%v", md.Namespace, md.Name)
+			}
+
+			return []relatedresource.Key{{
+				Namespace: namespace,
+				Name:      v2provClusterName,
+			}}, nil
+		}
+		return nil, nil
+	}
 }

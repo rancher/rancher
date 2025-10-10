@@ -26,8 +26,8 @@ import (
 type autoscalerHandler struct {
 	capiCluster v1beta1.ClusterCache
 
-	v2provClusterClient v2provcontrollers.ClusterClient
-	v2provClusterCache  v2provcontrollers.ClusterCache
+	clusterClient v2provcontrollers.ClusterClient
+	clusterCache  v2provcontrollers.ClusterCache
 
 	machineDeploymentCache v1beta1.MachineDeploymentCache
 	machineCache           v1beta1.MachineCache
@@ -51,9 +51,14 @@ type autoscalerHandler struct {
 }
 
 func Register(ctx context.Context, clients *wrangler.CAPIContext) {
+	// only run these handlers if autoscaling is enabled
+	if !features.ClusterAutoscaling.Enabled() {
+		return
+	}
+
 	h := &autoscalerHandler{
-		v2provClusterClient: clients.Provisioning.Cluster(),
-		v2provClusterCache:  clients.Provisioning.Cluster().Cache(),
+		clusterClient: clients.Provisioning.Cluster(),
+		clusterCache:  clients.Provisioning.Cluster().Cache(),
 
 		machineDeploymentCache: clients.CAPI.MachineDeployment().Cache(),
 		machineCache:           clients.CAPI.Machine().Cache(),
@@ -83,8 +88,9 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 	clients.Fleet.HelmOp().OnChange(ctx, "autoscaler-status-sync", h.syncHelmOpStatus)
 
 	s := machineDeploymentReplicaOverrider{
-		clusterCache:  clients.Provisioning.Cluster().Cache(),
-		clusterClient: clients.Provisioning.Cluster(),
+		clusterCache:     clients.Provisioning.Cluster().Cache(),
+		clusterClient:    clients.Provisioning.Cluster(),
+		capiClusterCache: clients.CAPI.Cluster().Cache(),
 	}
 
 	clients.CAPI.MachineDeployment().OnChange(ctx, "machinedeployment-replica-sync", s.syncMachinePoolReplicas)
@@ -93,151 +99,149 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 // OnChange checks if a capi cluster has the autoscaler-enabled annotation as well as any machinedeployments which
 // are set up for autoscaling. if so it does the dance of setting up a rancher user with appropriate rbac and
 // deploys the cluster-autoscaler chart to the downstream cluster once the cluster is ready.
-func (h *autoscalerHandler) OnChange(_ string, cluster *capi.Cluster) (*capi.Cluster, error) {
-	if cluster == nil || cluster.DeletionTimestamp != nil {
-		return cluster, nil
-	}
-
-	if !features.Autoscaling.Enabled() {
-		return cluster, nil
+func (h *autoscalerHandler) OnChange(_ string, capiCluster *capi.Cluster) (*capi.Cluster, error) {
+	if capiCluster == nil || capiCluster.DeletionTimestamp != nil {
+		return capiCluster, nil
 	}
 
 	if settings.ClusterAutoscalerChartRepo.Get() == "" {
 		logrus.Infof("[autoscaler] no chart repo configured for autoscaler - cannot configure")
-		return cluster, nil
+		return capiCluster, nil
 	}
 
-	v2provCluster, err := h.v2provClusterCache.Get(cluster.Namespace, cluster.Name)
+	cluster, err := h.clusterCache.Get(capiCluster.Namespace, capiCluster.Name)
 	if err != nil {
-		logrus.Infof("failed to find v2prov cluster object for %v/%v", cluster.Namespace, cluster.Name)
-		return cluster, nil
+		logrus.Infof("failed to find v2prov cluster object for %v/%v", capiCluster.Namespace, capiCluster.Name)
+		return capiCluster, nil
 	}
+
+	cluster = cluster.DeepCopy()
 
 	// the only thing we're really syncing back to the rancher v2prov cluster object is the status - so just always do that on the way out
-	capr.Autoscaler.CreateUnknownIfNotExists(v2provCluster)
-	defer h.v2provClusterClient.UpdateStatus(v2provCluster)
+	capr.ClusterAutoscalerDeploymentReady.CreateUnknownIfNotExists(cluster)
+	defer h.clusterClient.UpdateStatus(cluster)
 
-	if !capr.Ready.IsTrue(v2provCluster) {
-		capr.Autoscaler.Unknown(v2provCluster)
-		capr.Autoscaler.Message(v2provCluster, "[Waiting] cluster is not ready")
-		return cluster, nil
+	if !capr.Ready.IsTrue(cluster) {
+		capr.ClusterAutoscalerDeploymentReady.Unknown(cluster)
+		capr.ClusterAutoscalerDeploymentReady.Message(cluster, "[Waiting] cluster is not ready")
+		return capiCluster, nil
 	}
 
-	version, err := semver.NewVersion(v2provCluster.Spec.KubernetesVersion)
+	version, err := semver.NewVersion(cluster.Spec.KubernetesVersion)
 	if err != nil {
 		return nil, err
 	}
 
 	// scale autoscaler down to zero if autoscaling was "ready" and the annotation is present.
-	if v2provCluster.Annotations[capr.AutoscalerPausedAnnotation] != "" {
+	if cluster.Annotations[capr.ClusterAutoscalerPausedAnnotation] != "" {
 		// autoscaler is paused and we already marked it false, so just return.
-		if capr.Autoscaler.IsFalse(v2provCluster) {
-			return cluster, nil
+		if capr.ClusterAutoscalerDeploymentReady.IsFalse(cluster) {
+			return capiCluster, nil
 		}
 
 		// scales cluster-autoscaler helm chart down to 0 replicas
-		err := h.ensureFleetHelmOp(cluster, int(version.Minor()), 0)
-		capr.Autoscaler.False(v2provCluster)
-		capr.Autoscaler.Message(v2provCluster, "autoscaling paused at cluster level")
+		err := h.ensureFleetHelmOp(capiCluster, int(version.Minor()), 0)
+		capr.ClusterAutoscalerDeploymentReady.False(cluster)
+		capr.ClusterAutoscalerDeploymentReady.Message(cluster, "autoscaling paused at cluster level")
 
-		return cluster, err
+		return capiCluster, err
 	}
 
-	mds, err := h.machineDeploymentCache.List(cluster.Namespace, labels.SelectorFromSet(labels.Set{
-		capi.ClusterNameLabel: cluster.Name,
+	mds, err := h.machineDeploymentCache.List(capiCluster.Namespace, labels.SelectorFromSet(labels.Set{
+		capi.ClusterNameLabel: capiCluster.Name,
 	}))
 	if err != nil {
-		logrus.Warnf("[autoscaler] failed to list machinedeployments for capi cluster %v/%v", cluster.Namespace, cluster.Name)
-		return cluster, nil
+		logrus.Warnf("[autoscaler] failed to list machinedeployments for capi cluster %v/%v", capiCluster.Namespace, capiCluster.Name)
+		return capiCluster, nil
 	}
 
-	machines, err := h.machineCache.List(cluster.Namespace, labels.SelectorFromSet(labels.Set{
-		capi.ClusterNameLabel: cluster.Name,
+	machines, err := h.machineCache.List(capiCluster.Namespace, labels.SelectorFromSet(labels.Set{
+		capi.ClusterNameLabel: capiCluster.Name,
 	}))
 	if err != nil {
-		logrus.Warnf("[autoscaler] failed to list machines for capi cluster %v/%v", cluster.Namespace, cluster.Name)
-		return cluster, nil
+		logrus.Warnf("[autoscaler] failed to list machines for capi cluster %v/%v", capiCluster.Namespace, capiCluster.Name)
+		return capiCluster, nil
 	}
 
-	// if the cluster has autoscaling disabled and the Autoscaling condition is True it must have been disabled, so lets uninstall the chart
-	if !capr.AutoscalerEnabledByCAPI(cluster, mds) && capr.Autoscaler.IsTrue(v2provCluster) {
-		err := h.uninstallHelmOp(cluster)
+	// if the cluster has autoscaling disabled and the ClusterAutoscaling condition is True it must have been disabled, so lets uninstall the chart
+	if !capr.AutoscalerEnabledByCAPI(capiCluster, mds) && capr.ClusterAutoscalerDeploymentReady.IsTrue(cluster) {
+		err := h.uninstallHelmOp(capiCluster)
 		if err != nil {
-			logrus.Warnf("failed to delete helmop for cluster %v/%v", cluster.Namespace, cluster.Name)
+			logrus.Warnf("failed to delete helmop for cluster %v/%v", capiCluster.Namespace, capiCluster.Name)
 			return nil, err
 		}
 
 		// remove the condition as well - like it was never there.
-		v2provCluster.Status.Conditions = slices.DeleteFunc(v2provCluster.Status.Conditions, func(condition genericcondition.GenericCondition) bool {
-			return condition.Type == string(capr.Autoscaler)
+		cluster.Status.Conditions = slices.DeleteFunc(cluster.Status.Conditions, func(condition genericcondition.GenericCondition) bool {
+			return condition.Type == string(capr.ClusterAutoscalerDeploymentReady)
 		})
 
-		return cluster, nil
+		return capiCluster, nil
 	}
 
-	if !capr.AutoscalerEnabledByCAPI(cluster, mds) {
+	if !capr.AutoscalerEnabledByCAPI(capiCluster, mds) {
 		logrus.Tracef("[autoscaler] No machine pools are configured for autoscaling - not setting up")
-		return cluster, nil
+		return capiCluster, nil
 	}
 
 	if err := validateAutoscalerAnnotations(mds); err != nil {
-		capr.Autoscaler.False(v2provCluster)
-		capr.Autoscaler.Message(v2provCluster, err.Error())
-		return cluster, err
+		capr.ClusterAutoscalerDeploymentReady.False(cluster)
+		capr.ClusterAutoscalerDeploymentReady.Message(cluster, err.Error())
+		return capiCluster, err
 	}
 
-	logrus.Infof("[autoscaler] Cluster %s/%s is ready and has autoscaler enabled for at least one machine pool", cluster.Namespace, cluster.Name)
+	logrus.Infof("[autoscaler] Cluster %s/%s is ready and has autoscaler enabled for at least one machine pool", capiCluster.Namespace, capiCluster.Name)
 
-	user, err := h.ensureUser(cluster)
+	user, err := h.ensureUser(capiCluster)
 	if err != nil {
-		capr.Autoscaler.False(v2provCluster)
-		capr.Autoscaler.Message(v2provCluster, "failed to create autoscaler user")
-		logrus.Errorf("[autoscaler] Failed to create user for cluster %s/%s: %v", cluster.Namespace, cluster.Name, err)
-		return cluster, err
+		capr.ClusterAutoscalerDeploymentReady.False(cluster)
+		capr.ClusterAutoscalerDeploymentReady.Message(cluster, "failed to create autoscaler user")
+		logrus.Errorf("[autoscaler] Failed to create user for cluster %s/%s: %v", capiCluster.Namespace, capiCluster.Name, err)
+		return capiCluster, err
 	}
 
-	globalRole, err := h.ensureGlobalRole(cluster, mds, machines)
+	globalRole, err := h.ensureGlobalRole(capiCluster, mds, machines)
 	if err != nil {
-		capr.Autoscaler.False(v2provCluster)
-		capr.Autoscaler.Message(v2provCluster, "failed to create global role")
-		logrus.Errorf("[autoscaler] Failed to create global role for cluster %s/%s: %v", cluster.Namespace, cluster.Name, err)
-		return cluster, err
+		capr.ClusterAutoscalerDeploymentReady.False(cluster)
+		capr.ClusterAutoscalerDeploymentReady.Message(cluster, "failed to create global role")
+		logrus.Errorf("[autoscaler] Failed to create global role for cluster %s/%s: %v", capiCluster.Namespace, capiCluster.Name, err)
+		return capiCluster, err
 	}
 
-	err = h.ensureGlobalRoleBinding(cluster, user.Username, globalRole.Name)
+	err = h.ensureGlobalRoleBinding(capiCluster, user.Username, globalRole.Name)
 	if err != nil {
-		capr.Autoscaler.False(v2provCluster)
-		capr.Autoscaler.Message(v2provCluster, "failed to create global role binding")
-		logrus.Errorf("[autoscaler] Failed to create global role binding for cluster %s/%s: %v", cluster.Namespace, cluster.Name, err)
-		return cluster, err
+		capr.ClusterAutoscalerDeploymentReady.False(cluster)
+		capr.ClusterAutoscalerDeploymentReady.Message(cluster, "failed to create global role binding")
+		logrus.Errorf("[autoscaler] Failed to create global role binding for cluster %s/%s: %v", capiCluster.Namespace, capiCluster.Name, err)
+		return capiCluster, err
 	}
 
-	token, err := h.ensureUserToken(cluster, autoscalerUserName(cluster))
+	token, err := h.ensureUserToken(capiCluster, autoscalerUserName(capiCluster))
 	if err != nil {
-		capr.Autoscaler.False(v2provCluster)
-		capr.Autoscaler.Message(v2provCluster, "failed to create user token")
+		capr.ClusterAutoscalerDeploymentReady.False(cluster)
+		capr.ClusterAutoscalerDeploymentReady.Message(cluster, "failed to create user token")
 		logrus.Errorf("[autoscaler] Failed to create token for user %s: %v", user.Username, err)
-		return cluster, err
+		return capiCluster, err
 	}
 
-	err = h.createKubeConfigSecretUsingTemplate(cluster, token)
+	err = h.createKubeConfigSecretUsingTemplate(capiCluster, token)
 	if err != nil {
-		capr.Autoscaler.False(v2provCluster)
-		capr.Autoscaler.Message(v2provCluster, "failed to create autoscaler kubeconfig")
-		logrus.Errorf("[autoscaler] Failed to create kubeconfig secret for cluster %s/%s: %v", cluster.Namespace, cluster.Name, err)
-		return cluster, err
+		capr.ClusterAutoscalerDeploymentReady.False(cluster)
+		capr.ClusterAutoscalerDeploymentReady.Message(cluster, "failed to create autoscaler kubeconfig")
+		logrus.Errorf("[autoscaler] Failed to create kubeconfig secret for cluster %s/%s: %v", capiCluster.Namespace, capiCluster.Name, err)
+		return capiCluster, err
 	}
 
-	err = h.ensureFleetHelmOp(cluster, int(version.Minor()), 1)
+	err = h.ensureFleetHelmOp(capiCluster, int(version.Minor()), 1)
 	if err != nil {
-		capr.Autoscaler.False(v2provCluster)
-		capr.Autoscaler.Message(v2provCluster, "failed to create autoscaler HelmOp")
-		logrus.Errorf("[autoscaler] failed to create fleet-managed autoscaler helmop for cluster %v/%v: %v", cluster.Namespace, cluster.Name, err)
-		return cluster, err
+		capr.ClusterAutoscalerDeploymentReady.False(cluster)
+		capr.ClusterAutoscalerDeploymentReady.Message(cluster, "failed to create autoscaler HelmOp")
+		logrus.Errorf("[autoscaler] failed to create fleet-managed autoscaler helmop for cluster %v/%v: %v", capiCluster.Namespace, capiCluster.Name, err)
+		return capiCluster, err
 	}
 
-	h.helmOp.Enqueue(cluster.Namespace, helmOpName(cluster))
-	return cluster, nil
+	h.helmOp.Enqueue(capiCluster.Namespace, helmOpName(capiCluster))
+	return capiCluster, nil
 }
 
 func validateAutoscalerAnnotations(mds []*capi.MachineDeployment) error {
@@ -285,30 +289,30 @@ func (h *autoscalerHandler) syncHelmOpStatus(_ string, helmOp *fleet.HelmOp) (*f
 		return helmOp, nil
 	}
 
-	cluster, err := h.v2provClusterCache.Get(helmOp.Namespace, helmOp.Labels[capi.ClusterNameLabel])
+	cluster, err := h.clusterCache.Get(helmOp.Namespace, helmOp.Labels[capi.ClusterNameLabel])
 	if err != nil {
 		return helmOp, err
 	}
 
-	defer h.v2provClusterClient.UpdateStatus(cluster)
+	defer h.clusterClient.UpdateStatus(cluster)
 
 	// looks like deployment completed successfully.
 	if helmOp.Status.Summary.DesiredReady == helmOp.Status.Summary.Ready {
-		capr.Autoscaler.True(cluster)
-		capr.Autoscaler.Message(cluster, "")
+		capr.ClusterAutoscalerDeploymentReady.True(cluster)
+		capr.ClusterAutoscalerDeploymentReady.Message(cluster, "")
 		return helmOp, nil
 	}
 
 	if helmOp.Status.Summary.WaitApplied > 0 {
-		capr.Autoscaler.False(cluster)
-		capr.Autoscaler.Message(cluster, "[Waiting] autoscaler deployment pending")
+		capr.ClusterAutoscalerDeploymentReady.False(cluster)
+		capr.ClusterAutoscalerDeploymentReady.Message(cluster, "[Waiting] autoscaler deployment pending")
 		return helmOp, nil
 	}
 
 	if helmOp.Status.Summary.ErrApplied > 0 {
 		nonReadyResource := helmOp.Status.Summary.NonReadyResources[0].Message
-		capr.Autoscaler.Unknown(cluster)
-		capr.Autoscaler.Message(cluster, "error encountered while deploying cluster-autoscaler: "+nonReadyResource)
+		capr.ClusterAutoscalerDeploymentReady.Unknown(cluster)
+		capr.ClusterAutoscalerDeploymentReady.Message(cluster, "error encountered while deploying cluster-autoscaler: "+nonReadyResource)
 		return helmOp, nil
 	}
 

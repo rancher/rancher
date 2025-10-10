@@ -580,12 +580,14 @@ func capiCluster(cluster *rancherv1.Cluster, rkeControlPlane *rkev1.RKEControlPl
 		panic(err)
 	}
 
-	// telling the autoscaling controllers in rancher to function - this is controlled by an annotation on the provisioning cluster "pausing" the autoscaling as well as any of the RKEMachinePool objects having autoscaler values set
+	// telling the autoscaling controllers in rancher to function - this is
+	// controlled by an annotation on the provisioning cluster "pausing" the
+	//autoscaling as well as any of the RKEMachinePool objects having autoscaler values set
 	var annotations map[string]string
-	if cluster.Annotations[capr.AutoscalerPausedAnnotation] == "" &&
+	if cluster.Annotations[capr.ClusterAutoscalerPausedAnnotation] == "" &&
 		capr.AutoscalerEnabledByProvisioningCluster(cluster) {
 		annotations = map[string]string{
-			capr.AutoscalerEnabledAnnotation: "true",
+			capr.ClusterAutoscalerEnabledAnnotation: "true",
 		}
 	}
 
