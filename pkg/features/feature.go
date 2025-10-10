@@ -192,7 +192,7 @@ var (
 		"cluster-autoscaling",
 		"Enable Rancher cluster-autoscaler support",
 		isPrime(),
-		true,
+		false,
 		true,
 	)
 )
