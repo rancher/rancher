@@ -7,14 +7,17 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	"github.com/rancher/rancher/pkg/features"
-	"github.com/rancher/wrangler/pkg/randomtoken"
 	"github.com/rancher/wrangler/v3/pkg/ticker"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+)
+
+const (
+	renewalCheckInterval = 24 * time.Hour
+	renewalThreshold     = 7 * 24 * time.Hour
 )
 
 // startTokenRenewal begins the background token renewal process
@@ -66,7 +69,7 @@ func (h *autoscalerHandler) checkAndRenewTokens() error {
 }
 
 func (h *autoscalerHandler) findAutoscalerTokens() ([]v3.Token, error) {
-	selector := labels.Set{tokenKindLabel: "autoscaler"}.AsSelector()
+	selector := labels.Set{tokens.TokenKindLabel: "autoscaler"}.AsSelector()
 
 	tokenList, err := h.token.List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil {
@@ -84,32 +87,9 @@ func (h *autoscalerHandler) renewToken(token *v3.Token) error {
 		return fmt.Errorf("failed to delete old token %s: %w", token.Name, err)
 	}
 
-	// Generate new token value
-	tokenValue, err := randomtoken.Generate()
+	newToken, err := generateToken(token.UserID, token.Labels[capi.ClusterNameLabel], token.OwnerReferences)
 	if err != nil {
-		return fmt.Errorf("failed to generate token key: %w", err)
-	}
-
-	// Create new token with same properties but new TTL
-	newToken := &v3.Token{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:            token.Name,
-			Labels:          token.Labels,
-			Annotations:     token.Annotations,
-			OwnerReferences: token.OwnerReferences,
-		},
-		UserID:       token.UserID,
-		AuthProvider: token.AuthProvider,
-		IsDerived:    token.IsDerived,
-		Token:        tokenValue,
-		TTLMillis:    autoscalerTokenTTL.Milliseconds(),
-	}
-
-	if features.TokenHashing.Enabled() {
-		err := tokens.ConvertTokenKeyToHash(newToken)
-		if err != nil {
-			return fmt.Errorf("unable to hash token: %w", err)
-		}
+		return err
 	}
 
 	_, err = h.token.Create(newToken)
@@ -117,30 +97,34 @@ func (h *autoscalerHandler) renewToken(token *v3.Token) error {
 		return fmt.Errorf("failed to create renewed token %s: %w", token.Name, err)
 	}
 
-	// Update the kubeconfig secret with the new token
-	// We need to find the cluster associated with this token to update the secret
-	clusterName := token.Labels[capi.ClusterNameLabel]
-	if clusterName == "" {
+	if token.Labels == nil {
 		logrus.Errorf("[autoscaler] Token %s is missing capi cluster label, cannot update kubeconfig secret", token.Name)
-	} else {
-		// Find the capi cluster to update the secret
-		// Since clusters are cluster-scoped, we use "" as namespace and filter by label selector
-		clusters, err := h.capiCluster.List("", labels.SelectorFromSet(labels.Set{
-			capi.ClusterNameLabel: clusterName,
-		}))
+		return fmt.Errorf("token %s is missing capi cluster label, cannot update kubeconfig secret", token.Name)
+	}
 
+	// Update the kubeconfig secret with the new token
+
+	clusterName := token.Labels[capi.ClusterNameLabel]
+
+	// Find the capi cluster to update the secret
+	// Since clusters are cluster-scoped, we use "" as namespace and filter by label selector
+	clusters, err := h.capiCluster.List("", labels.SelectorFromSet(labels.Set{
+		capi.ClusterNameLabel: clusterName,
+	}))
+
+	if err != nil {
+		logrus.Errorf("[autoscaler] Failed to list clusters for token %s: %v", token.Name, err)
+		return fmt.Errorf("failed to list clusters for token %s: %v", token.Name, err)
+	} else if len(clusters) == 0 {
+		logrus.Errorf("[autoscaler] No cluster found for token %s with name %s", token.Name, clusterName)
+		return fmt.Errorf("no cluster found for token %s with name %s", token.Name, clusterName)
+	} else {
+		// Use the first matching cluster to update the secret
+		cluster := clusters[0]
+		err = h.updateKubeConfigSecretWithToken(cluster, fmt.Sprintf("%s:%s", token.UserID, newToken.Token))
 		if err != nil {
-			logrus.Errorf("[autoscaler] Failed to list clusters for token %s: %v", token.Name, err)
-		} else if len(clusters) == 0 {
-			logrus.Errorf("[autoscaler] No cluster found for token %s with name %s", token.Name, clusterName)
-		} else {
-			// Use the first matching cluster to update the secret
-			cluster := clusters[0]
-			err = h.updateKubeConfigSecretWithToken(cluster, fmt.Sprintf("%s:%s", token.UserID, newToken.Token))
-			if err != nil {
-				logrus.Errorf("[autoscaler] Failed to update kubeconfig secret for cluster %s/%s: %v", cluster.Namespace, cluster.Name, err)
-				// Don't return the error here as the token was renewed successfully
-			}
+			logrus.Errorf("[autoscaler] Failed to update kubeconfig secret for cluster %s/%s: %v", cluster.Namespace, cluster.Name, err)
+			return fmt.Errorf("failed to update kubeconfig secret for cluster %s/%s: %v", cluster.Namespace, cluster.Name, err)
 		}
 	}
 
@@ -153,7 +137,7 @@ func (h *autoscalerHandler) updateKubeConfigSecretWithToken(cluster *capi.Cluste
 	secretName := kubeconfigSecretName(cluster)
 
 	// Get the existing secret
-	existingSecret, err := h.secretsCache.Get(cluster.Namespace, secretName)
+	secret, err := h.secretsCache.Get(cluster.Namespace, secretName)
 	if err != nil {
 		return fmt.Errorf("failed to get existing kubeconfig secret %s/%s: %w", cluster.Namespace, secretName, err)
 	}
@@ -164,11 +148,12 @@ func (h *autoscalerHandler) updateKubeConfigSecretWithToken(cluster *capi.Cluste
 	}
 
 	// Update both the full kubeconfig and the token field
-	existingSecret.Data["value"] = data
-	existingSecret.Data["token"] = []byte(token)
+	secret.DeepCopy()
+	secret.Data["value"] = data
+	secret.Data["token"] = []byte(token)
 
 	// Update the secret
-	_, err = h.secrets.Update(existingSecret)
+	_, err = h.secrets.Update(secret)
 	if err != nil {
 		return fmt.Errorf("failed to update kubeconfig secret %s/%s: %w", cluster.Namespace, secretName, err)
 	}

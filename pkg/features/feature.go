@@ -188,8 +188,8 @@ var (
 		true,
 		false,
 		true)
-	Autoscaling = newFeature(
-		"autoscaling",
+	ClusterAutoscaling = newFeature(
+		"cluster-autoscaling",
 		"Enable Rancher cluster-autoscaler support",
 		isPrime(),
 		true,

@@ -4,11 +4,16 @@ import (
 	"fmt"
 	"strings"
 
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/tokens"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/pkg/name"
+	"github.com/rancher/wrangler/v3/pkg/randomtoken"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/utils/ptr"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
@@ -43,8 +48,8 @@ func ownerReference(cluster *capi.Cluster) []metav1.OwnerReference {
 		Kind:               cluster.Kind,
 		Name:               cluster.Name,
 		UID:                cluster.UID,
-		Controller:         &[]bool{true}[0],
-		BlockOwnerDeletion: &[]bool{true}[0],
+		Controller:         ptr.To(true),
+		BlockOwnerDeletion: ptr.To(true),
 	}}
 }
 
@@ -77,4 +82,38 @@ func generateKubeconfig(token string) ([]byte, error) {
 	}
 
 	return data, nil
+}
+
+func generateToken(username, clusterName string, owner []metav1.OwnerReference) (*v3.Token, error) {
+	// Generate new token value
+	tokenValue, err := randomtoken.Generate()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate token key: %w", err)
+	}
+
+	token := &v3.Token{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: username,
+			Labels: map[string]string{
+				tokens.UserIDLabel:    username,
+				tokens.TokenKindLabel: "autoscaler",
+				capi.ClusterNameLabel: clusterName,
+			},
+			Annotations:     map[string]string{},
+			OwnerReferences: owner,
+		},
+		UserID:       username,
+		AuthProvider: "local",
+		IsDerived:    true,
+		Token:        tokenValue,
+		TTLMillis:    autoscalerTokenTTL.Milliseconds(),
+	}
+
+	if features.TokenHashing.Enabled() {
+		err := tokens.ConvertTokenKeyToHash(token)
+		if err != nil {
+			return nil, fmt.Errorf("unable to hash token: %w", err)
+		}
+	}
+	return token, nil
 }

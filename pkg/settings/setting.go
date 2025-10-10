@@ -250,7 +250,7 @@ var (
 	// RancherTurtlesVersion is the exact version of the rancher-turtles chart that Rancher will install.
 	RancherTurtlesVersion = NewSetting("rancher-turtles-version", "")
 
-	// ClusterAutoscalerChartRepo represents where the cluster-autoscaler chart will be pulled from for the downstream clustesr
+	// ClusterAutoscalerChartRepo represents where the cluster-autoscaler chart will be pulled from for the downstream cluster(s)
 	ClusterAutoscalerChartRepo = NewSetting("cluster-autoscaler-chart-repo", "")
 
 	// RKE2ChartDefaultBranch represents the default branch for the RKE2 charts repo.
