@@ -16,7 +16,7 @@ runs:
     - name: Setup Environment Variables
       uses: ./.github/actions/setup-tag-env
     - name: Setup ecm-distro-tools
-      uses: rancher/ecm-distro-tools@e88a79431368edc34a06961e32a4c52961ea5c82 # v0.57.1
+      uses: rancher/ecm-distro-tools@16a1fda753df5ceafafbb05831d75c7eb459c351 # v0.58.4
     - name: Create base dir
       shell: bash
       run: mkdir -p "$ARTIFACTS_BASE_DIR"
