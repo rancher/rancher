@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
  set -e
 
-cd $(dirname $0)
+cd "$(dirname $0)/.." || exit
 
-source version
-source export-config
-source package-env
+source scripts/version
+source scripts/export-config
+source scripts/package-env
+source dev-scripts/images-origins-env.sh
 
-cd ../package
+cd package
 
 if [ ${ARCH} == arm64 ]; then
     ETCD_UNSUPPORTED_ARCH=arm64
@@ -26,10 +27,18 @@ if [ ! -d $SMALL_FORK_REPO_DIR ]; then
     git clone --branch main https://github.com/rancher/charts-small-fork $SMALL_FORK_REPO_DIR
 fi
 
-if [ ${ARCH} == amd64 ]; then
-    # Move this out of ARCH check for local dev on non-amd64 hardware.
-    TAG=$TAG REPO=${REPO} go run ../pkg/image/export/main.go $SYSTEM_CHART_REPO_DIR $CHART_REPO_DIR $IMAGE $AGENT_IMAGE $SYSTEM_AGENT_UPGRADE_IMAGE $WINS_AGENT_UPGRADE_IMAGE ${SYSTEM_AGENT_INSTALLER_RKE2_IMAGES[@]} ${SYSTEM_AGENT_INSTALLER_K3S_IMAGES[@]}
+if [ ${ARCH} != amd64 ]; then
+    exit 1 
 fi
+go run ../pkg/image/export/main.go \
+  $SYSTEM_CHART_REPO_DIR \
+  $CHART_REPO_DIR \
+  $IMAGE \
+  $AGENT_IMAGE \
+  $SYSTEM_AGENT_UPGRADE_IMAGE \
+  $WINS_AGENT_UPGRADE_IMAGE \
+  ${SYSTEM_AGENT_INSTALLER_RKE2_IMAGES[@]} \
+  ${SYSTEM_AGENT_INSTALLER_K3S_IMAGES[@]}
 
 # Create components file used for pre-release notes
 ../scripts/create-components-file.sh
