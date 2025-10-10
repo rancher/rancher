@@ -20,6 +20,7 @@ import (
 	"github.com/rancher/channelserver/pkg/model"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/channelserver"
@@ -103,18 +104,22 @@ const (
 	RKEMachineAPIVersion           = "rke-machine.cattle.io/v1"
 	RKEAPIVersion                  = "rke.cattle.io/v1"
 
-	Provisioned                  = condition.Cond("Provisioned")
-	Stable                       = condition.Cond("Stable") // The Stable condition is used to indicate whether we can safely copy the v3 management cluster Ready condition to the v1 object.
-	Updated                      = condition.Cond("Updated")
-	Reconciled                   = condition.Cond("Reconciled")
-	Ready                        = condition.Cond("Ready")
-	Waiting                      = condition.Cond("Waiting")
-	Pending                      = condition.Cond("Pending")
-	Removed                      = condition.Cond("Removed")
-	PlanApplied                  = condition.Cond("PlanApplied")
-	InfrastructureReady          = condition.Cond(capi.InfrastructureReadyCondition)
-	SystemUpgradeControllerReady = condition.Cond("SystemUpgradeControllerReady")
-	Bootstrapped                 = condition.Cond("Bootstrapped")
+	Provisioned                      = condition.Cond("Provisioned")
+	Stable                           = condition.Cond("Stable") // The Stable condition is used to indicate whether we can safely copy the v3 management cluster Ready condition to the v1 object.
+	Updated                          = condition.Cond("Updated")
+	Reconciled                       = condition.Cond("Reconciled")
+	Ready                            = condition.Cond("Ready")
+	Waiting                          = condition.Cond("Waiting")
+	Pending                          = condition.Cond("Pending")
+	Removed                          = condition.Cond("Removed")
+	PlanApplied                      = condition.Cond("PlanApplied")
+	InfrastructureReady              = condition.Cond(capi.InfrastructureReadyCondition)
+	SystemUpgradeControllerReady     = condition.Cond("SystemUpgradeControllerReady")
+	Bootstrapped                     = condition.Cond("Bootstrapped")
+	ClusterAutoscalerDeploymentReady = condition.Cond("ClusterAutoscalerDeploymentReady")
+
+	ClusterAutoscalerEnabledAnnotation = "provisioning.cattle.io/cluster-autoscaler-enabled"
+	ClusterAutoscalerPausedAnnotation  = "provisioning.cattle.io/cluster-autoscaler-paused"
 
 	RuntimeK3S  = "k3s"
 	RuntimeRKE2 = "rke2"
@@ -646,6 +651,37 @@ func PreBootstrap(mgmtCluster *v3.Cluster) bool {
 	}
 
 	return !v3.ClusterConditionPreBootstrapped.IsTrue(mgmtCluster)
+}
+
+func AutoscalerEnabledByCAPI(cluster *capi.Cluster, mds []*capi.MachineDeployment) bool {
+	// first see if the autoscaling is "on" for the capi cluster
+	if cluster.Annotations[ClusterAutoscalerEnabledAnnotation] != "true" {
+		return false
+	}
+
+	// then check to see if there are actually any of the appropriate annotations on the machineDeployments
+	for _, md := range mds {
+		if md.Annotations[capi.AutoscalerMinSizeAnnotation] != "" &&
+			md.Annotations[capi.AutoscalerMaxSizeAnnotation] != "" {
+			return true
+		}
+	}
+
+	return false
+}
+
+func AutoscalerEnabledByProvisioningCluster(cluster *v1.Cluster) bool {
+	if cluster.Spec.RKEConfig == nil || len(cluster.Spec.RKEConfig.MachinePools) == 0 {
+		return false
+	}
+
+	for _, pool := range cluster.Spec.RKEConfig.MachinePools {
+		if pool.AutoscalingMinSize != nil && pool.AutoscalingMaxSize != nil {
+			return true
+		}
+	}
+
+	return false
 }
 
 // FormatWindowsEnvVar accepts a corev1.EnvVar and returns a string to be used in either

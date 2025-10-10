@@ -93,6 +93,7 @@ func main() {
 					fleet.Bundle{},
 					fleet.Cluster{},
 					fleet.ClusterGroup{},
+					fleet.HelmOp{},
 				},
 			},
 			"rke.cattle.io": {
