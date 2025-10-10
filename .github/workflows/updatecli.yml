@@ -90,7 +90,7 @@ jobs:
           then
             echo "Running updatecli on ${{ inputs.target }} target"
             updatecli apply --clean --values updatecli/values.d/values.yaml \
-                                    --config updatecli/updatecli.d/update-${{ inputs.target }}/
+                                    --config "updatecli/updatecli.d/update-${{ inputs.target }}/"
           else
             echo "Invalid event name or target"
           fi
