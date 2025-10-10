@@ -8,9 +8,11 @@ import (
 
 	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/pkg/errors"
+	"github.com/rancher/apiserver/pkg/apierror"
 	"github.com/rancher/norman/httperror"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
+	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -21,7 +23,7 @@ func (p *ldapProvider) loginUser(lConn ldapv3.Client, credentials *v3.BasicLogin
 	logrus.Debug("Now generating Ldap token")
 
 	if credentials.Password == "" {
-		return v3.Principal{}, nil, httperror.NewAPIError(httperror.MissingRequired, "password not provided")
+		return v3.Principal{}, nil, apierror.NewAPIError(validation.MissingRequired, "password not provided")
 	}
 
 	err := ldap.AuthenticateServiceAccountUser(config.ServiceAccountPassword, config.ServiceAccountDistinguishedName, "", lConn)
@@ -33,7 +35,7 @@ func (p *ldapProvider) loginUser(lConn ldapv3.Client, credentials *v3.BasicLogin
 		// Make sure user login filter contains a valid LDAP query expression
 		// before interpolating it into the search filter.
 		if _, err = ldapv3.CompileFilter(config.UserLoginFilter); err != nil {
-			return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.InvalidOption, "invalid userLoginFilter")
+			return v3.Principal{}, nil, apierror.WrapAPIError(err, validation.InvalidOption, "invalid userLoginFilter")
 		}
 	}
 
@@ -61,7 +63,7 @@ func (p *ldapProvider) loginUser(lConn ldapv3.Client, credentials *v3.BasicLogin
 		}
 	}
 	if err != nil {
-		return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "Unauthorized")
+		return v3.Principal{}, nil, apierror.WrapAPIError(err, validation.Unauthorized, "Unauthorized")
 	}
 
 	logrus.Debug("Binding username password")
@@ -69,15 +71,15 @@ func (p *ldapProvider) loginUser(lConn ldapv3.Client, credentials *v3.BasicLogin
 	err = lConn.Bind(userDN, credentials.Password)
 	if err != nil {
 		if ldapv3.IsErrorWithCode(err, ldapv3.LDAPResultInvalidCredentials) {
-			return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "Unauthorized")
+			return v3.Principal{}, nil, apierror.WrapAPIError(err, validation.Unauthorized, "Unauthorized")
 		}
-		return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.ServerError, "server error while authenticating")
+		return v3.Principal{}, nil, apierror.WrapAPIError(err, validation.ServerError, "server error while authenticating")
 	}
 
 	if config.SearchUsingServiceAccount {
 		err = ldap.AuthenticateServiceAccountUser(config.ServiceAccountPassword, config.ServiceAccountDistinguishedName, "", lConn)
 		if err != nil {
-			return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed")
+			return v3.Principal{}, nil, apierror.WrapAPIError(err, validation.Unauthorized, "authentication failed")
 		}
 	}
 
@@ -89,11 +91,11 @@ func (p *ldapProvider) loginUser(lConn ldapv3.Client, credentials *v3.BasicLogin
 
 	opResult, err := lConn.Search(searchOpRequest)
 	if err != nil {
-		return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed") // need to reload this error
+		return v3.Principal{}, nil, apierror.WrapAPIError(err, validation.Unauthorized, "authentication failed") // need to reload this error
 	}
 
 	if len(opResult.Entries) < 1 {
-		return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "Cannot locate user information for "+searchOpRequest.Filter)
+		return v3.Principal{}, nil, apierror.WrapAPIError(err, validation.Unauthorized, "Cannot locate user information for "+searchOpRequest.Filter)
 	}
 
 	userPrincipal, groupPrincipals, err := p.getPrincipalsFromSearchResult(result, opResult, config, lConn)
@@ -106,7 +108,7 @@ func (p *ldapProvider) loginUser(lConn ldapv3.Client, credentials *v3.BasicLogin
 		return v3.Principal{}, nil, err
 	}
 	if !allowed {
-		return v3.Principal{}, nil, httperror.NewAPIError(httperror.PermissionDenied, "Permission denied")
+		return v3.Principal{}, nil, apierror.NewAPIError(validation.PermissionDenied, "Permission denied")
 	}
 
 	return userPrincipal, groupPrincipals, err

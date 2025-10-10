@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -12,15 +13,26 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/user"
+	"k8s.io/apimachinery/pkg/runtime"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
+
+type userManager interface {
+	GetUser(r *http.Request) string
+}
+
+type tokenManager interface {
+	EnsureToken(input user.TokenInput) (string, runtime.Object, error)
+	EnsureClusterToken(clusterName string, input user.TokenInput) (string, runtime.Object, error)
+}
 
 // ActionHandler used for performing various cluster actions.
 type ActionHandler struct {
 	NodeLister     v3.NodeLister
-	UserMgr        user.Manager
+	UserMgr        userManager
+	TokenMgr       tokenManager
 	ClusterManager *clustermanager.Manager
-	Auth           requests.Authenticator
+	AuthToken      requests.AuthTokenGetter
 }
 
 // ClusterActionHandler runs the handler for the provided cluster action in the given context.
@@ -41,7 +53,7 @@ func (a ActionHandler) ensureClusterToken(clusterID string, apiContext *types.AP
 		return "", err
 	}
 
-	tokenKey, _, err := a.UserMgr.EnsureClusterToken(clusterID, input)
+	tokenKey, _, err := a.TokenMgr.EnsureClusterToken(clusterID, input)
 	if err != nil {
 		return "", err
 	}
@@ -56,7 +68,7 @@ func (a ActionHandler) ensureToken(apiContext *types.APIContext) (string, error)
 		return "", err
 	}
 
-	tokenKey, _, err := a.UserMgr.EnsureToken(input)
+	tokenKey, _, err := a.TokenMgr.EnsureToken(input)
 	if err != nil {
 		return "", err
 	}
@@ -66,10 +78,10 @@ func (a ActionHandler) ensureToken(apiContext *types.APIContext) (string, error)
 
 // createTokenInput will create the input for a new kubeconfig token with the default TTL.
 func (a ActionHandler) createTokenInput(apiContext *types.APIContext) (user.TokenInput, error) {
-	userName := a.UserMgr.GetUser(apiContext)
+	userName := a.UserMgr.GetUser(apiContext.Request)
 	tokenNamePrefix := fmt.Sprintf("kubeconfig-%s", userName)
 
-	authToken, err := a.Auth.TokenFromRequest(apiContext.Request)
+	authToken, err := a.AuthToken.TokenFromRequest(apiContext.Request)
 	if err != nil {
 		return user.TokenInput{}, err
 	}

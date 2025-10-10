@@ -20,10 +20,10 @@ type Account struct {
 
 // Team defines properties a team on github has
 type Team struct {
-	ID           int                    `json:"id,omitempty"`
-	Organization map[string]interface{} `json:"organization,omitempty"`
-	Name         string                 `json:"name,omitempty"`
-	Slug         string                 `json:"slug,omitempty"`
+	ID           int            `json:"id,omitempty"`
+	Organization map[string]any `json:"organization,omitempty"`
+	Name         string         `json:"name,omitempty"`
+	Slug         string         `json:"slug,omitempty"`
 }
 
 func (t *Team) toGithubAccount(url string, account *Account) {

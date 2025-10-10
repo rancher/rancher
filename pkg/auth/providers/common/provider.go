@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -27,11 +28,11 @@ const (
 // AuthProvider allows to authenticate a user and search for user and group principals.
 type AuthProvider interface {
 	GetName() string
-	AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error)
+	AuthenticateUser(ctx context.Context, input any) (v3.Principal, []v3.Principal, string, error)
 	SearchPrincipals(name, principalType string, myToken accessor.TokenAccessor) ([]v3.Principal, error)
 	GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error)
 	CustomizeSchema(schema *types.Schema)
-	TransformToAuthProvider(authConfig map[string]interface{}) (map[string]interface{}, error)
+	TransformToAuthProvider(authConfig map[string]any) (map[string]any, error)
 	RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error)
 	CanAccessWithGroupProviders(userPrincipalID string, groups []v3.Principal) (bool, error)
 	// GetUserExtraAttributes retrieves the extra attributes from the specified principal.
@@ -41,9 +42,9 @@ type AuthProvider interface {
 
 	// LogoutAll implements the "logout-all" action for the provider, if supported. If
 	// "logout-all" is not supported do nothing and return nil.
-	LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error
+	LogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error
 
 	// Logout implements a guard against invoking the "logout" action when "logout-all" is
 	// forced. If "logout-all" is not supported by the provider do nothing and return nil.
-	Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error
+	Logout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error
 }

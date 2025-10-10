@@ -10,14 +10,14 @@
 package mocks
 
 import (
+	http "net/http"
 	reflect "reflect"
+	time "time"
 
-	types "github.com/rancher/norman/types"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	user "github.com/rancher/rancher/pkg/user"
+	accessor "github.com/rancher/rancher/pkg/auth/accessor"
 	gomock "go.uber.org/mock/gomock"
-	runtime "k8s.io/apimachinery/pkg/runtime"
-	types0 "k8s.io/apimachinery/pkg/types"
+	types "k8s.io/apimachinery/pkg/types"
 )
 
 // MockManager is a mock of Manager interface.
@@ -60,7 +60,7 @@ func (mr *MockManagerMockRecorder) CheckAccess(accessMode, allowedPrincipalIDs, 
 }
 
 // CreateNewUserClusterRoleBinding mocks base method.
-func (m *MockManager) CreateNewUserClusterRoleBinding(userName string, userUID types0.UID) error {
+func (m *MockManager) CreateNewUserClusterRoleBinding(userName string, userUID types.UID) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateNewUserClusterRoleBinding", userName, userUID)
 	ret0, _ := ret[0].(error)
@@ -73,50 +73,20 @@ func (mr *MockManagerMockRecorder) CreateNewUserClusterRoleBinding(userName, use
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateNewUserClusterRoleBinding", reflect.TypeOf((*MockManager)(nil).CreateNewUserClusterRoleBinding), userName, userUID)
 }
 
-// DeleteToken mocks base method.
-func (m *MockManager) DeleteToken(tokenName string) error {
+// EnsureAndGetUserAttribute mocks base method.
+func (m *MockManager) EnsureAndGetUserAttribute(userID string) (*v3.UserAttribute, bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteToken", tokenName)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// DeleteToken indicates an expected call of DeleteToken.
-func (mr *MockManagerMockRecorder) DeleteToken(tokenName any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteToken", reflect.TypeOf((*MockManager)(nil).DeleteToken), tokenName)
-}
-
-// EnsureClusterToken mocks base method.
-func (m *MockManager) EnsureClusterToken(clusterName string, input user.TokenInput) (string, runtime.Object, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EnsureClusterToken", clusterName, input)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(runtime.Object)
+	ret := m.ctrl.Call(m, "EnsureAndGetUserAttribute", userID)
+	ret0, _ := ret[0].(*v3.UserAttribute)
+	ret1, _ := ret[1].(bool)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
 }
 
-// EnsureClusterToken indicates an expected call of EnsureClusterToken.
-func (mr *MockManagerMockRecorder) EnsureClusterToken(clusterName, input any) *gomock.Call {
+// EnsureAndGetUserAttribute indicates an expected call of EnsureAndGetUserAttribute.
+func (mr *MockManagerMockRecorder) EnsureAndGetUserAttribute(userID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureClusterToken", reflect.TypeOf((*MockManager)(nil).EnsureClusterToken), clusterName, input)
-}
-
-// EnsureToken mocks base method.
-func (m *MockManager) EnsureToken(input user.TokenInput) (string, runtime.Object, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EnsureToken", input)
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(runtime.Object)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
-}
-
-// EnsureToken indicates an expected call of EnsureToken.
-func (mr *MockManagerMockRecorder) EnsureToken(input any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureToken", reflect.TypeOf((*MockManager)(nil).EnsureToken), input)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureAndGetUserAttribute", reflect.TypeOf((*MockManager)(nil).EnsureAndGetUserAttribute), userID)
 }
 
 // EnsureUser mocks base method.
@@ -134,34 +104,32 @@ func (mr *MockManagerMockRecorder) EnsureUser(principalName, displayName any) *g
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureUser", reflect.TypeOf((*MockManager)(nil).EnsureUser), principalName, displayName)
 }
 
-// GetKubeconfigToken mocks base method.
-func (m *MockManager) GetKubeconfigToken(clusterName, tokenName, description, kind, userName string, userPrincipal v3.Principal) (*v3.Token, string, error) {
+// GetGroupsForTokenAuthProvider mocks base method.
+func (m *MockManager) GetGroupsForTokenAuthProvider(token accessor.TokenAccessor) []v3.Principal {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetKubeconfigToken", clusterName, tokenName, description, kind, userName, userPrincipal)
-	ret0, _ := ret[0].(*v3.Token)
-	ret1, _ := ret[1].(string)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
+	ret := m.ctrl.Call(m, "GetGroupsForTokenAuthProvider", token)
+	ret0, _ := ret[0].([]v3.Principal)
+	return ret0
 }
 
-// GetKubeconfigToken indicates an expected call of GetKubeconfigToken.
-func (mr *MockManagerMockRecorder) GetKubeconfigToken(clusterName, tokenName, description, kind, userName, userPrincipal any) *gomock.Call {
+// GetGroupsForTokenAuthProvider indicates an expected call of GetGroupsForTokenAuthProvider.
+func (mr *MockManagerMockRecorder) GetGroupsForTokenAuthProvider(token any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetKubeconfigToken", reflect.TypeOf((*MockManager)(nil).GetKubeconfigToken), clusterName, tokenName, description, kind, userName, userPrincipal)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetGroupsForTokenAuthProvider", reflect.TypeOf((*MockManager)(nil).GetGroupsForTokenAuthProvider), token)
 }
 
 // GetUser mocks base method.
-func (m *MockManager) GetUser(apiContext *types.APIContext) string {
+func (m *MockManager) GetUser(r *http.Request) string {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetUser", apiContext)
+	ret := m.ctrl.Call(m, "GetUser", r)
 	ret0, _ := ret[0].(string)
 	return ret0
 }
 
 // GetUser indicates an expected call of GetUser.
-func (mr *MockManagerMockRecorder) GetUser(apiContext any) *gomock.Call {
+func (mr *MockManagerMockRecorder) GetUser(r any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUser", reflect.TypeOf((*MockManager)(nil).GetUser), apiContext)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUser", reflect.TypeOf((*MockManager)(nil).GetUser), r)
 }
 
 // GetUserByPrincipalID mocks base method.
@@ -179,19 +147,33 @@ func (mr *MockManagerMockRecorder) GetUserByPrincipalID(principalName any) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserByPrincipalID", reflect.TypeOf((*MockManager)(nil).GetUserByPrincipalID), principalName)
 }
 
-// SetPrincipalOnCurrentUser mocks base method.
-func (m *MockManager) SetPrincipalOnCurrentUser(apiContext *types.APIContext, principal v3.Principal) (*v3.User, error) {
+// IsMemberOf mocks base method.
+func (m *MockManager) IsMemberOf(token accessor.TokenAccessor, group v3.Principal) bool {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetPrincipalOnCurrentUser", apiContext, principal)
+	ret := m.ctrl.Call(m, "IsMemberOf", token, group)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// IsMemberOf indicates an expected call of IsMemberOf.
+func (mr *MockManagerMockRecorder) IsMemberOf(token, group any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsMemberOf", reflect.TypeOf((*MockManager)(nil).IsMemberOf), token, group)
+}
+
+// SetPrincipalOnCurrentUser mocks base method.
+func (m *MockManager) SetPrincipalOnCurrentUser(r *http.Request, principal v3.Principal) (*v3.User, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetPrincipalOnCurrentUser", r, principal)
 	ret0, _ := ret[0].(*v3.User)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // SetPrincipalOnCurrentUser indicates an expected call of SetPrincipalOnCurrentUser.
-func (mr *MockManagerMockRecorder) SetPrincipalOnCurrentUser(apiContext, principal any) *gomock.Call {
+func (mr *MockManagerMockRecorder) SetPrincipalOnCurrentUser(r, principal any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPrincipalOnCurrentUser", reflect.TypeOf((*MockManager)(nil).SetPrincipalOnCurrentUser), apiContext, principal)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPrincipalOnCurrentUser", reflect.TypeOf((*MockManager)(nil).SetPrincipalOnCurrentUser), r, principal)
 }
 
 // SetPrincipalOnCurrentUserByUserID mocks base method.
@@ -207,4 +189,23 @@ func (m *MockManager) SetPrincipalOnCurrentUserByUserID(userID string, principal
 func (mr *MockManagerMockRecorder) SetPrincipalOnCurrentUserByUserID(userID, principal any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPrincipalOnCurrentUserByUserID", reflect.TypeOf((*MockManager)(nil).SetPrincipalOnCurrentUserByUserID), userID, principal)
+}
+
+// UserAttributeCreateOrUpdate mocks base method.
+func (m *MockManager) UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, userExtraInfo map[string][]string, loginTime ...time.Time) error {
+	m.ctrl.T.Helper()
+	varargs := []any{userID, provider, groupPrincipals, userExtraInfo}
+	for _, a := range loginTime {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "UserAttributeCreateOrUpdate", varargs...)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UserAttributeCreateOrUpdate indicates an expected call of UserAttributeCreateOrUpdate.
+func (mr *MockManagerMockRecorder) UserAttributeCreateOrUpdate(userID, provider, groupPrincipals, userExtraInfo any, loginTime ...any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]any{userID, provider, groupPrincipals, userExtraInfo}, loginTime...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserAttributeCreateOrUpdate", reflect.TypeOf((*MockManager)(nil).UserAttributeCreateOrUpdate), varargs...)
 }

@@ -11,11 +11,10 @@ package mocks
 
 import (
 	reflect "reflect"
-	time "time"
 
 	types "github.com/rancher/norman/types"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	accessor "github.com/rancher/rancher/pkg/auth/accessor"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -72,20 +71,6 @@ func (mr *MocktokenManagerMockRecorder) GetSecret(userID, provider, fallbackToke
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSecret", reflect.TypeOf((*MocktokenManager)(nil).GetSecret), userID, provider, fallbackTokens)
 }
 
-// IsMemberOf mocks base method.
-func (m *MocktokenManager) IsMemberOf(token accessor.TokenAccessor, group v3.Principal) bool {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IsMemberOf", token, group)
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-// IsMemberOf indicates an expected call of IsMemberOf.
-func (mr *MocktokenManagerMockRecorder) IsMemberOf(token, group any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsMemberOf", reflect.TypeOf((*MocktokenManager)(nil).IsMemberOf), token, group)
-}
-
 // UpdateSecret mocks base method.
 func (m *MocktokenManager) UpdateSecret(userID, provider, secret string) error {
 	m.ctrl.T.Helper()
@@ -98,23 +83,4 @@ func (m *MocktokenManager) UpdateSecret(userID, provider, secret string) error {
 func (mr *MocktokenManagerMockRecorder) UpdateSecret(userID, provider, secret any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateSecret", reflect.TypeOf((*MocktokenManager)(nil).UpdateSecret), userID, provider, secret)
-}
-
-// UserAttributeCreateOrUpdate mocks base method.
-func (m *MocktokenManager) UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, userExtraInfo map[string][]string, loginTime ...time.Time) error {
-	m.ctrl.T.Helper()
-	varargs := []any{userID, provider, groupPrincipals, userExtraInfo}
-	for _, a := range loginTime {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "UserAttributeCreateOrUpdate", varargs...)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// UserAttributeCreateOrUpdate indicates an expected call of UserAttributeCreateOrUpdate.
-func (mr *MocktokenManagerMockRecorder) UserAttributeCreateOrUpdate(userID, provider, groupPrincipals, userExtraInfo any, loginTime ...any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]any{userID, provider, groupPrincipals, userExtraInfo}, loginTime...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UserAttributeCreateOrUpdate", reflect.TypeOf((*MocktokenManager)(nil).UserAttributeCreateOrUpdate), varargs...)
 }

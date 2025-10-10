@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	localprovider "github.com/rancher/rancher/pkg/auth/providers/local"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/user"
@@ -30,8 +31,9 @@ func (s *ShellLinkHandler) LinkHandler(apiContext *types.APIContext, next types.
 		return err
 	}
 	userManager := context.Management.UserManager
+	tokenManager := tokens.NewManager(s.ClusterManager.ScaledContext.Wrangler)
 
-	userID := userManager.GetUser(apiContext)
+	userID := userManager.GetUser(apiContext.Request)
 
 	var shellTTL int64
 	if minutes, err := strconv.ParseInt(settings.AuthUserSessionTTLMinutes.Get(), 10, 64); err == nil {
@@ -46,7 +48,7 @@ func (s *ShellLinkHandler) LinkHandler(apiContext *types.APIContext, next types.
 		TTL:          &shellTTL,
 		Randomize:    true,
 	}
-	tokenKey, _, err := userManager.EnsureToken(input)
+	tokenKey, _, err := tokenManager.EnsureToken(input)
 	if err != nil {
 		return err
 	}

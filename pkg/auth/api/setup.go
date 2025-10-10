@@ -21,8 +21,8 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 )
 
-func Setup(ctx context.Context, clusterRouter requests.ClusterRouter, scaledContext *config.ScaledContext, schemas *types.Schemas) {
-	principals.Schema(ctx, clusterRouter, scaledContext, schemas)
+func Setup(ctx context.Context, scaledContext *config.ScaledContext, schemas *types.Schemas, authToken requests.AuthTokenGetter) {
+	principals.Schema(ctx, scaledContext, schemas, authToken)
 	providers.SetupAuthConfig(ctx, scaledContext, schemas)
 	user.SetUserStore(schemas.Schema(&managementschema.Version, client.UserType), scaledContext)
 	User(ctx, schemas, scaledContext)
@@ -35,7 +35,7 @@ func User(ctx context.Context, schemas *types.Schemas, management *config.Scaled
 	handler := &user.Handler{
 		UserClient:               management.Management.Users(""),
 		GlobalRoleBindingsClient: management.Management.GlobalRoleBindings(""),
-		UserAuthRefresher:        providerrefresh.NewUserAuthRefresher(ctx, management),
+		UserAuthRefresher:        providerrefresh.NewUserAuthRefresher(management),
 		ExtTokenStore:            extTokenStore,
 		SecretLister:             management.Wrangler.Core.Secret().Cache(),
 		SecretClient:             management.Wrangler.Core.Secret(),
@@ -47,13 +47,13 @@ func User(ctx context.Context, schemas *types.Schemas, management *config.Scaled
 	schema.ActionHandler = handler.Actions
 }
 
-func NewNormanServer(ctx context.Context, clusterRouter requests.ClusterRouter, scaledContext *config.ScaledContext) (http.Handler, error) {
+func NewNormanServer(ctx context.Context, scaledContext *config.ScaledContext, authToken requests.AuthTokenGetter) (http.Handler, error) {
 	schemas, err := newSchemas(ctx, scaledContext)
 	if err != nil {
 		return nil, err
 	}
 
-	Setup(ctx, clusterRouter, scaledContext, schemas)
+	Setup(ctx, scaledContext, schemas, authToken)
 
 	server := normanapi.NewAPIServer()
 	if err := server.AddSchemas(schemas); err != nil {

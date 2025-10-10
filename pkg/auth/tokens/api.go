@@ -9,7 +9,7 @@ import (
 	"github.com/rancher/norman/types"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	managementSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/sirupsen/logrus"
 )
 
@@ -21,15 +21,13 @@ const (
 	CSRFCookie      = "CSRF"
 )
 
-var crdVersions = []*types.APIVersion{
-	&managementSchema.Version,
-}
-
 type ServerOption func(server *normanapi.Server)
 
-func NewAPIHandler(ctx context.Context, apiContext *config.ScaledContext, opts ...ServerOption) (http.Handler, error) {
+func NewAPIHandler(ctx context.Context, wContext *wrangler.Context, logout http.Handler, opts ...ServerOption) (http.Handler, error) {
+	tokenMgr := NewManager(wContext)
 	api := &tokenAPI{
-		mgr: NewManager(ctx, apiContext),
+		mgr:           tokenMgr,
+		logoutHandler: logout,
 	}
 
 	schemas := types.NewSchemas().AddSchemas(managementSchema.TokenSchemas)
@@ -57,14 +55,17 @@ func NewAPIHandler(ctx context.Context, apiContext *config.ScaledContext, opts .
 }
 
 type tokenAPI struct {
-	mgr *Manager
+	mgr           *Manager
+	logoutHandler http.Handler
 }
 
 func (t *tokenAPI) tokenActionHandler(actionName string, action *types.Action, request *types.APIContext) error {
 	logrus.Debugf("TokenActionHandler called for action %v", actionName)
 	if actionName == "logout" || actionName == "logoutAll" {
-		return t.mgr.logout(actionName, action, request)
+		t.logoutHandler.ServeHTTP(request.Response, request.Request)
+		return nil
 	}
+
 	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }
 

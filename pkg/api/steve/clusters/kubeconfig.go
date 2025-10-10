@@ -18,8 +18,8 @@ import (
 )
 
 type kubeconfigDownload struct {
-	userMgr user.Manager
-	auth    requests.Authenticator
+	tokenMgr  *tokens.Manager
+	authToken requests.AuthTokenGetter
 }
 
 func (k kubeconfigDownload) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
@@ -80,7 +80,7 @@ func (k kubeconfigDownload) ensureToken(userName string, req *http.Request) (str
 		return "", fmt.Errorf("failed to get default token TTL: %w", err)
 	}
 
-	authToken, err := k.auth.TokenFromRequest(req)
+	authToken, err := k.authToken.TokenFromRequest(req)
 	if err != nil {
 		return "", err
 	}
@@ -97,7 +97,7 @@ func (k kubeconfigDownload) ensureToken(userName string, req *http.Request) (str
 		UserPrincipal: authToken.GetUserPrincipal(),
 	}
 
-	tokenKey, _, err := k.userMgr.EnsureToken(input)
+	tokenKey, _, err := k.tokenMgr.EnsureToken(input)
 	if err != nil {
 		return "", err
 	}

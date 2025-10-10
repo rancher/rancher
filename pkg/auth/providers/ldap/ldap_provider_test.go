@@ -1,7 +1,6 @@
 package ldap
 
 import (
-	"context"
 	"crypto/x509"
 	"reflect"
 	"testing"
@@ -28,7 +27,7 @@ var (
 
 func TestGetBasicLogin(t *testing.T) {
 	type args struct {
-		input interface{}
+		input any
 	}
 	tests := []struct {
 		name      string
@@ -79,7 +78,6 @@ func TestGetBasicLogin(t *testing.T) {
 
 func TestLdapProviderGetLDAPConfig(t *testing.T) {
 	type fields struct {
-		ctx                   context.Context
 		secrets               wcorev1.SecretController
 		userMGR               user.Manager
 		tokenMGR              *tokens.Manager
@@ -92,7 +90,7 @@ func TestLdapProviderGetLDAPConfig(t *testing.T) {
 	}
 	tests := []struct {
 		name                 string
-		objectMap            map[string]interface{}
+		objectMap            map[string]any
 		fields               fields
 		wantStoredLdapConfig *v3.LdapConfig
 		wantCaPool           *x509.CertPool
@@ -109,7 +107,7 @@ func TestLdapProviderGetLDAPConfig(t *testing.T) {
 					Certificate: DummyCerts,
 				},
 			},
-			objectMap: map[string]interface{}{
+			objectMap: map[string]any{
 				"Certificate": DummyCerts,
 			},
 			wantCaPool: x509.NewCertPool(),
@@ -120,7 +118,7 @@ func TestLdapProviderGetLDAPConfig(t *testing.T) {
 			fields: fields{
 				providerName: "okta",
 			},
-			objectMap: map[string]interface{}{
+			objectMap: map[string]any{
 				"openLdapConfig": nil,
 			},
 			wantErr: true,
@@ -130,7 +128,7 @@ func TestLdapProviderGetLDAPConfig(t *testing.T) {
 			fields: fields{
 				providerName: "okta",
 			},
-			objectMap: map[string]interface{}{},
+			objectMap: map[string]any{},
 			wantErr:   true,
 		},
 		{
@@ -138,8 +136,8 @@ func TestLdapProviderGetLDAPConfig(t *testing.T) {
 			fields: fields{
 				providerName: "okta",
 			},
-			objectMap: map[string]interface{}{
-				"openLdapConfig": map[string]interface{}{
+			objectMap: map[string]any{
+				"openLdapConfig": map[string]any{
 					"servers": []string{},
 				},
 			},
@@ -157,8 +155,8 @@ func TestLdapProviderGetLDAPConfig(t *testing.T) {
 				caPool:       x509.NewCertPool(),
 				certs:        DummyCerts,
 			},
-			objectMap: map[string]interface{}{
-				"openLdapConfig": map[string]interface{}{
+			objectMap: map[string]any{
+				"openLdapConfig": map[string]any{
 					"Certificate": DummyCerts,
 					"servers":     []string{"server1"},
 				},
@@ -177,7 +175,6 @@ func TestLdapProviderGetLDAPConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			m := mockGenericClient{ObjectMap: tt.objectMap}
 			p := &ldapProvider{
-				ctx:                   tt.fields.ctx,
 				secrets:               tt.fields.secrets,
 				userMGR:               tt.fields.userMGR,
 				tokenMGR:              tt.fields.tokenMGR,
@@ -204,7 +201,7 @@ func TestLdapProviderGetLDAPConfig(t *testing.T) {
 }
 
 type mockGenericClient struct {
-	ObjectMap map[string]interface{}
+	ObjectMap map[string]any
 }
 
 func (m mockGenericClient) UnstructuredClient() objectclient.GenericClient {

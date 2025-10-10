@@ -11,8 +11,9 @@ import (
 
 	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/httperror"
+	"github.com/rancher/apiserver/pkg/apierror"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -139,15 +140,15 @@ func GetAttributeValuesByName(search []*ldapv3.EntryAttribute, attributeName str
 func AuthenticateServiceAccountUser(serviceAccountPassword string, serviceAccountUsername string, defaultLoginDomain string, lConn ldapv3.Client) error {
 	logrus.Debug("Binding service account username password")
 	if serviceAccountPassword == "" {
-		return httperror.NewAPIError(httperror.MissingRequired, "service account password not provided")
+		return apierror.NewAPIError(validation.MissingRequired, "service account password not provided")
 	}
 	sausername := GetUserExternalID(serviceAccountUsername, defaultLoginDomain)
 	err := lConn.Bind(sausername, serviceAccountPassword)
 	if err != nil {
 		if ldapv3.IsErrorWithCode(err, ldapv3.LDAPResultInvalidCredentials) {
-			return httperror.WrapAPIError(err, httperror.Unauthorized, "authentication failed")
+			return apierror.WrapAPIError(err, validation.Unauthorized, "authentication failed")
 		}
-		return httperror.WrapAPIError(err, httperror.ServerError, "server error while authenticating")
+		return apierror.WrapAPIError(err, validation.ServerError, "server error while authenticating")
 	}
 
 	return nil

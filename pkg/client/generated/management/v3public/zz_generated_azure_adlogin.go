@@ -7,6 +7,7 @@ const (
 	AzureADLoginFieldIDToken      = "id_token"
 	AzureADLoginFieldResponseType = "responseType"
 	AzureADLoginFieldTTLMillis    = "ttl"
+	AzureADLoginFieldType         = "type"
 )
 
 type AzureADLogin struct {
@@ -15,4 +16,5 @@ type AzureADLogin struct {
 	IDToken      string `json:"id_token,omitempty" yaml:"id_token,omitempty"`
 	ResponseType string `json:"responseType,omitempty" yaml:"responseType,omitempty"`
 	TTLMillis    int64  `json:"ttl,omitempty" yaml:"ttl,omitempty"`
+	Type         string `json:"type,omitempty" yaml:"type,omitempty"`
 }
