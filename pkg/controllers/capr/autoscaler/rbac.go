@@ -163,19 +163,19 @@ func (h *autoscalerHandler) ensureUserToken(cluster *capi.Cluster, username stri
 }
 
 // createKubeConfigSecretUsingTemplate creates a kubeconfig secret string given a cluster and token
-func (h *autoscalerHandler) createKubeConfigSecretUsingTemplate(cluster *capi.Cluster, token string) error {
+func (h *autoscalerHandler) createKubeConfigSecretUsingTemplate(cluster *capi.Cluster, token string) (*corev1.Secret, error) {
 	s, err := h.secretsCache.Get(cluster.Namespace, kubeconfigSecretName(cluster))
 	if err != nil && !errors.IsNotFound(err) {
-		return err
+		return nil, err
 	}
 
 	if s != nil {
-		return nil
+		return s, nil
 	}
 
 	data, err := generateKubeconfig(token)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	secret := &corev1.Secret{
@@ -200,6 +200,5 @@ func (h *autoscalerHandler) createKubeConfigSecretUsingTemplate(cluster *capi.Cl
 		},
 	}
 
-	_, err = h.secrets.Create(secret)
-	return err
+	return h.secrets.Create(secret)
 }

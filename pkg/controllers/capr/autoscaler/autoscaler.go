@@ -127,9 +127,15 @@ func (h *autoscalerHandler) OnChange(_ string, capiCluster *capi.Cluster) (*capi
 		return capiCluster, nil
 	}
 
-	version, err := semver.NewVersion(cluster.Spec.KubernetesVersion)
-	if err != nil {
-		return nil, err
+	k8sminor := 0
+	if cluster.Spec.KubernetesVersion != "" {
+		version, err := semver.NewVersion(cluster.Spec.KubernetesVersion)
+		if err != nil {
+			return nil, err
+		}
+		k8sminor = int(version.Minor())
+	} else {
+		logrus.Infof("[autoscaler] no kubernetes version set for cluster %v/%v - latest version of cluster-autoscaler chart will be installed", cluster.Namespace, cluster.Name)
 	}
 
 	// scale autoscaler down to zero if autoscaling was "ready" and the annotation is present.
@@ -139,12 +145,21 @@ func (h *autoscalerHandler) OnChange(_ string, capiCluster *capi.Cluster) (*capi
 			return capiCluster, nil
 		}
 
+		secret, err := h.secretsCache.Get(cluster.Namespace, kubeconfigSecretName(capiCluster))
+		if err != nil {
+			return capiCluster, err
+		}
+
 		// scales cluster-autoscaler helm chart down to 0 replicas
-		err := h.ensureFleetHelmOp(capiCluster, int(version.Minor()), 0)
+		err = h.ensureFleetHelmOp(capiCluster, secret.ResourceVersion, k8sminor, 0)
+		if err != nil {
+			return capiCluster, err
+		}
+
 		capr.ClusterAutoscalerDeploymentReady.False(cluster)
 		capr.ClusterAutoscalerDeploymentReady.Message(cluster, "autoscaling paused at cluster level")
 
-		return capiCluster, err
+		return capiCluster, nil
 	}
 
 	mds, err := h.machineDeploymentCache.List(capiCluster.Namespace, labels.SelectorFromSet(labels.Set{
@@ -216,7 +231,7 @@ func (h *autoscalerHandler) OnChange(_ string, capiCluster *capi.Cluster) (*capi
 		return capiCluster, err
 	}
 
-	token, err := h.ensureUserToken(capiCluster, autoscalerUserName(capiCluster))
+	tokenStr, err := h.ensureUserToken(capiCluster, autoscalerUserName(capiCluster))
 	if err != nil {
 		capr.ClusterAutoscalerDeploymentReady.False(cluster)
 		capr.ClusterAutoscalerDeploymentReady.Message(cluster, "failed to create user token")
@@ -224,7 +239,7 @@ func (h *autoscalerHandler) OnChange(_ string, capiCluster *capi.Cluster) (*capi
 		return capiCluster, err
 	}
 
-	err = h.createKubeConfigSecretUsingTemplate(capiCluster, token)
+	kubeconfig, err := h.createKubeConfigSecretUsingTemplate(capiCluster, tokenStr)
 	if err != nil {
 		capr.ClusterAutoscalerDeploymentReady.False(cluster)
 		capr.ClusterAutoscalerDeploymentReady.Message(cluster, "failed to create autoscaler kubeconfig")
@@ -232,7 +247,7 @@ func (h *autoscalerHandler) OnChange(_ string, capiCluster *capi.Cluster) (*capi
 		return capiCluster, err
 	}
 
-	err = h.ensureFleetHelmOp(capiCluster, int(version.Minor()), 1)
+	err = h.ensureFleetHelmOp(capiCluster, kubeconfig.ResourceVersion, k8sminor, 1)
 	if err != nil {
 		capr.ClusterAutoscalerDeploymentReady.False(cluster)
 		capr.ClusterAutoscalerDeploymentReady.Message(cluster, "failed to create autoscaler HelmOp")
@@ -294,6 +309,7 @@ func (h *autoscalerHandler) syncHelmOpStatus(_ string, helmOp *fleet.HelmOp) (*f
 		return helmOp, err
 	}
 
+	cluster = cluster.DeepCopy()
 	defer h.clusterClient.UpdateStatus(cluster)
 
 	// looks like deployment completed successfully.

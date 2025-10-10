@@ -8,13 +8,18 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
+// hardcoded k8s minor <-> chart version mapping, adding new versions here will automatically
+// rollout updates to all clusters on rancher upgrade (e.g. setting a new minor version)
 var chartVersions = map[int]string{
 	33: "9.50.1",
 	32: "9.46.6",
 	31: "9.44.0",
 }
 
-func (h *autoscalerHandler) ensureFleetHelmOp(cluster *capi.Cluster, k8sMinorVersion, replicaCount int) error {
+// ensureFleetHelmOp creates or updates a Helm operation for cluster autoscaler.
+// one key parameter here is the kubeconfigVersion which is legitimately just involved to
+// force a re-rollout of the downstream cluster-autoscaler deployment on token-rotation.
+func (h *autoscalerHandler) ensureFleetHelmOp(cluster *capi.Cluster, kubeconfigVersion string, k8sMinorVersion, replicaCount int) error {
 	bundle := fleet.HelmOpSpec{
 		BundleSpec: fleet.BundleSpec{
 			Targets: []fleet.BundleTarget{
@@ -47,6 +52,11 @@ func (h *autoscalerHandler) ensureFleetHelmOp(cluster *capi.Cluster, k8sMinorVer
 							},
 							"extraArgs": map[string]any{
 								"v": 2,
+							},
+							"extraEnv": map[string]any{
+								// not necessary for functionality - only needed for lifecycle tracking
+								// e.g. new rollout whenever kubeconfig updates.
+								"RANCHER_AUTOSCALER_KUBECONFIG_VERSION": kubeconfigVersion,
 							},
 						},
 					},
