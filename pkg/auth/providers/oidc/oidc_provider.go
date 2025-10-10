@@ -465,7 +465,7 @@ func (o *OpenIDCProvider) getUserInfoFromAuthCode(ctx *context.Context, config *
 	}
 
 	if config.AcrValue != "" {
-		acrValue, err := parseACRFromAccessToken(oauth2Token.AccessToken)
+		acrValue, err := parseACRFromToken(rawIDToken)
 		if err != nil {
 			return userInfo, oauth2Token, err
 		}
@@ -521,16 +521,33 @@ func (o *OpenIDCProvider) getClaimInfoFromToken(ctx context.Context, config *v32
 		token = reusedToken
 	}
 
-	idToken, err := verifier.Verify(updatedContext, token.AccessToken)
-	if err != nil {
-		return nil, fmt.Errorf("failed to verify ID token: %w", err)
+	// Try to get the ID token from the oauth2 token first
+	rawIDToken, hasIDToken := token.Extra("id_token").(string)
+
+	var idToken *oidc.IDToken
+
+	if hasIDToken {
+		// If we have an ID token, use it (this is the correct approach)
+		idToken, err = verifier.Verify(updatedContext, rawIDToken)
+		if err != nil {
+			return nil, fmt.Errorf("failed to verify ID token: %w", err)
+		}
+	} else {
+		// Fallback for backward compatibility - try to verify access token as ID token
+		// This handles cases where the token doesn't have ID token in Extra (like some test scenarios)
+		idToken, err = verifier.Verify(updatedContext, token.AccessToken)
+		if err != nil {
+			return nil, fmt.Errorf("failed to verify token: %w", err)
+		}
+		rawIDToken = token.AccessToken // Use access token for ACR validation if no ID token
 	}
+
 	if err := idToken.Claims(&claimInfo); err != nil {
 		return nil, fmt.Errorf("failed to parse claims: %w", err)
 	}
 
 	if config.AcrValue != "" {
-		acrValue, err := parseACRFromAccessToken(token.AccessToken)
+		acrValue, err := parseACRFromToken(rawIDToken)
 		if err != nil {
 			return nil, err
 		}
@@ -765,14 +782,14 @@ func isValidACR(claimACR string, configuredACR string) bool {
 	return true
 }
 
-func parseACRFromAccessToken(accessToken string) (string, error) {
+func parseACRFromToken(token string) (string, error) {
 	var parser jwt.Parser
 	// we already validated the incoming token
-	token, _, err := parser.ParseUnverified(accessToken, jwt.MapClaims{})
+	parsedToken, _, err := parser.ParseUnverified(token, jwt.MapClaims{})
 	if err != nil {
 		return "", fmt.Errorf("failed to parse JWT token: %w", err)
 	}
-	claims, ok := token.Claims.(jwt.MapClaims)
+	claims, ok := parsedToken.Claims.(jwt.MapClaims)
 	if !ok {
 		return "", errors.New("failed to parse claims in JWT token: invalid jwt.MapClaims format")
 	}
