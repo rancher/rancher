@@ -40,7 +40,7 @@ require (
 	github.com/rancher/eks-operator v1.12.1
 	github.com/rancher/fleet/pkg/apis v0.14.0-alpha.3
 	github.com/rancher/gke-operator v1.12.1
-	github.com/rancher/norman v0.7.0
+	github.com/rancher/norman v0.7.1-0.20251002202451-d14394e537ab
 	github.com/rancher/rke v1.8.0-rc.4
 	github.com/rancher/wrangler/v3 v3.3.1
 	github.com/sirupsen/logrus v1.9.3
@@ -91,7 +91,7 @@ require (
 	golang.org/x/term v0.35.0 // indirect
 	golang.org/x/text v0.29.0 // indirect
 	golang.org/x/time v0.12.0 // indirect
-	google.golang.org/protobuf v1.36.6 // indirect
+	google.golang.org/protobuf v1.36.9 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
