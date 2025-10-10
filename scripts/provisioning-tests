@@ -63,6 +63,7 @@ export CATTLE_FEATURES=${CATTLE_FEATURES}
 # Tell Rancher to use the recently-built Rancher cluster agent image. This image is built as part of CI and will be
 # copied to the in-cluster registry during test setup below.
 source ./scripts/version
+source ./scripts/pacakge-env
 
 # defaulting to :head (matching the hardcoded value within rancher) if CATTLE_AGENT_IMAGE or TAG is not specified
 if [ $TAG = "dev" ]; then
@@ -91,13 +92,6 @@ eval "$(grep '^ENV CATTLE_SYSTEM_AGENT_DOWNLOAD_PREFIX' package/Dockerfile | awk
 eval "$(grep '^ENV CATTLE_SYSTEM_AGENT_VERSION' package/Dockerfile | awk '{print "export " $2}')"
 eval "$(grep '^ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE' package/Dockerfile | awk '{print "export " $2}')"
 
-export CATTLE_RANCHER_WEBHOOK_VERSION=$(grep -m1 'webhookVersion' build.yaml | cut -d ' ' -f2)
-export CATTLE_REMOTEDIALER_PROXY_VERSION=$(grep -m1 'remoteDialerProxyVersion' build.yaml | cut -d ' ' -f2)
-export CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$(grep -m1 'provisioningCAPIVersion' build.yaml | cut -d ' ' -f2)
-export CATTLE_RANCHER_TURTLES_VERSION=$(grep -m1 'turtlesVersion' build.yaml | cut -d ' ' -f2)
-export CATTLE_CSP_ADAPTER_MIN_VERSION=$(grep -m1 'cspAdapterMinVersion' build.yaml | cut -d ' ' -f2)
-export CATTLE_FLEET_VERSION=$(grep -m1 'fleetVersion' build.yaml | cut -d ' ' -f2)
-
 if [ -z "${SOME_K8S_VERSION}" ]; then
 # Only set SOME_K8S_VERSION if it is empty -- for KDM provisioning tests, this value should already be populated
 # Get the last release for $DIST, which is usually the latest version or an experimental version.
@@ -105,7 +99,7 @@ if [ -z "${SOME_K8S_VERSION}" ]; then
 # https://github.com/rancher/rancher/issues/36827 has added appDefaults. We do not use appDefaults
 # here for simplicity's sake, as it requires semver parsing & matching. The last release should
 # be good enough for our needs.
-  export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.13/data/data.json | jq -r ".$DIST.releases[-1].version")
+  export SOME_K8S_VERSION=$(curl -sS "https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data/data.json" | jq -r ".$DIST.releases[-1].version")
 fi
 
 if [ -z "${CATTLE_CHART_DEFAULT_URL}" ]; then
