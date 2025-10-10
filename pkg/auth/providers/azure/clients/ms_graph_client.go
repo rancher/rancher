@@ -15,15 +15,13 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	abstractions "github.com/microsoft/kiota-abstractions-go"
 	msgraphsdk "github.com/microsoftgraph/msgraph-sdk-go"
-	msgraphsdkgo "github.com/microsoftgraph/msgraph-sdk-go"
 	msgraphcore "github.com/microsoftgraph/msgraph-sdk-go-core"
 	msgraphgroups "github.com/microsoftgraph/msgraph-sdk-go/groups"
 	"github.com/microsoftgraph/msgraph-sdk-go/models"
 	"github.com/microsoftgraph/msgraph-sdk-go/models/odataerrors"
 	msgraphusers "github.com/microsoftgraph/msgraph-sdk-go/users"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,7 +43,7 @@ const (
 // It first tries to fetch the token from the refresh token, if the access token is found in the database.
 // If that fails, it tries to acquire it directly from the auth provider with the credential (application secret in Azure).
 // It also checks that the access token has the necessary permissions.
-func NewMSGraphClient(config *v32.AzureADConfig, secrets wcorev1.SecretController) (*AzureMSGraphClient, error) {
+func NewMSGraphClient(config *v3.AzureADConfig, secrets wcorev1.SecretController) (*AzureMSGraphClient, error) {
 	cred, err := confidential.NewCredFromSecret(config.ApplicationSecret)
 	if err != nil {
 		return nil, fmt.Errorf("could not create a cred from a secret: %w", err)
@@ -114,7 +112,7 @@ type AzureMSGraphClient struct {
 	authResult         *customAuthResult
 	ConfidentialClient confidential.Client
 
-	GraphClient *msgraphsdkgo.GraphServiceClient
+	GraphClient *msgraphsdk.GraphServiceClient
 }
 
 // GetUser takes a user ID and fetches the user principal from the Microsoft Graph API.
@@ -253,7 +251,7 @@ func (c AzureMSGraphClient) listGroupMemberships(ctx context.Context, userID str
 
 // LoginUser verifies the user and fetches the user principal, user's group principals. It deliberately does not return
 // the provider access token because the client itself handles its caching and does not need to return it.
-func (c AzureMSGraphClient) LoginUser(config *v32.AzureADConfig, credential *v32.AzureADLogin) (v3.Principal, []v3.Principal, string, error) {
+func (c AzureMSGraphClient) LoginUser(config *v3.AzureADConfig, credential *v3.AzureADLogin) (v3.Principal, []v3.Principal, string, error) {
 	logrus.Debugf("[%s] Started token swap with AzureAD", providerLogPrefix)
 
 	oid, err := c.getOIDFromLogin(config, credential)
@@ -298,7 +296,7 @@ func (c AzureMSGraphClient) listGroupPrincipals(ctx context.Context, userPrincip
 	return groupPrincipals, nil
 }
 
-func (c AzureMSGraphClient) getOIDFromLogin(config *v32.AzureADConfig, credential *v32.AzureADLogin) (string, error) {
+func (c AzureMSGraphClient) getOIDFromLogin(config *v3.AzureADConfig, credential *v3.AzureADLogin) (string, error) {
 	if credential.IDToken != "" {
 		// Acquire the OID from the IDToken to verify the user
 		oidFromToken, err := oidFromIDToken(credential.IDToken, config)
@@ -364,7 +362,7 @@ func groupToPrincipal(group azureObject) v3.Principal {
 }
 
 // oidFromIDToken verifies the IDToken, returning the user OID
-func oidFromIDToken(token string, config *v32.AzureADConfig) (string, error) {
+func oidFromIDToken(token string, config *v3.AzureADConfig) (string, error) {
 	issuer, err := url.JoinPath(config.Endpoint, config.TenantID, "/v2.0")
 	if err != nil {
 		return "", fmt.Errorf("joining issuer path: %w", err)
@@ -399,7 +397,7 @@ func oidFromIDToken(token string, config *v32.AzureADConfig) (string, error) {
 }
 
 // oidFromAuthCode exchanges the AuthCode for a IDToken, returning the user OID
-func oidFromAuthCode(token string, config *v32.AzureADConfig) (string, error) {
+func oidFromAuthCode(token string, config *v3.AzureADConfig) (string, error) {
 	cred, err := confidential.NewCredFromSecret(config.ApplicationSecret)
 	if err != nil {
 		return "", fmt.Errorf("could not create a cred from a secret: %w", err)
