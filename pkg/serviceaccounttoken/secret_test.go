@@ -189,7 +189,7 @@ func TestEnsureSecretForServiceAccount(t *testing.T) {
 					return true, ret, nil
 				},
 			)
-			got, gotErr := EnsureSecretForServiceAccount(context.Background(), nil, k8sClient, tt.sa.DeepCopy())
+			got, gotErr := EnsureSecretForServiceAccount(context.Background(), nil, k8sClient.CoreV1(), k8sClient.CoreV1(), tt.sa.DeepCopy())
 			if tt.wantErr {
 				assert.Error(t, gotErr)
 				return
