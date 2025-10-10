@@ -1,25 +1,30 @@
 #!/bin/bash
 set -e
-cd $(dirname $0)
 
 if  [ -n "$CATTLE_KDM_BRANCH" ]; then
-    curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json > ../bin/data.json
-elif [ ! -e ../bin/data.json ] && [ -e ../kontainer-driver-metadata/data/data.json ]; then
-    cp ../kontainer-driver-metadata/data/data.json ../bin/data.json
+    curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json > bin/data.json
+elif [ ! -e bin/data.json ] && [ -e kontainer-driver-metadata/data/data.json ]; then
+    cp kontainer-driver-metadata/data/data.json bin/data.json
 fi
 
-source version
-source package-env
+source dev-scripts/images-origins-env.sh
+source scripts/version
+source scripts/package-env
 
-cd ../package
-../scripts/k3s-images.sh
-
-cp ../bin/data.json ../bin/rancher-data.json
-
-cd ../bin
+scripts/k3s-images.sh
+cp bin/data.json bin/rancher-data.json
+cd bin
 
 if [ ! -d $CHART_REPO_DIR ]; then
     git clone --branch $CHART_DEFAULT_BRANCH https://github.com/rancher/charts $CHART_REPO_DIR
 fi
 
-TAG=$TAG REPO=${REPO} go run ../pkg/image/origins/main.go $SYSTEM_CHART_REPO_DIR $CHART_REPO_DIR $IMAGE $AGENT_IMAGE $SYSTEM_AGENT_UPGRADE_IMAGE $WINS_AGENT_UPGRADE_IMAGE ${SYSTEM_AGENT_INSTALLER_RKE2_IMAGES[@]} ${SYSTEM_AGENT_INSTALLER_K3S_IMAGES[@]}
+go run ../pkg/image/origins/main.go \
+  $SYSTEM_CHART_REPO_DIR \
+  $CHART_REPO_DIR \
+  $IMAGE \
+  $AGENT_IMAGE \
+  $SYSTEM_AGENT_UPGRADE_IMAGE \
+  $WINS_AGENT_UPGRADE_IMAGE \
+  ${SYSTEM_AGENT_INSTALLER_RKE2_IMAGES[@]} \
+  ${SYSTEM_AGENT_INSTALLER_K3S_IMAGES[@]}
