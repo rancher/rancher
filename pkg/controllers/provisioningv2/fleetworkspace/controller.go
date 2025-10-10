@@ -142,6 +142,8 @@ func (h *handle) onFleetObject(obj runtime.Object) error {
 		if err != nil {
 			return fmt.Errorf("creating fleetworkspace: %w", err)
 		}
+
+		return nil
 	}
 
 	return err
