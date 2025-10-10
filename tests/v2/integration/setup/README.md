@@ -24,10 +24,10 @@ curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=v5.8.
 
 If you are developing Rancher, you should build your own `rancher/rancher` and `rancher/rancher-agent` images.
 
-To get the correct versions for dependencies, you can source the `export-config` script. You will also need the git commit hash.
+To get the correct versions for dependencies, you can source the `package-env` script. You will also need the git commit hash.
 ```bash
 # From the root of the rancher/rancher repository
-source ./scripts/export-config
+source ./scripts/package-env
 export COMMIT=$(git rev-parse --short HEAD)
 export DEV_TAG=dev # or any other tag for your development images
 export ARCH=amd64 # or arm64

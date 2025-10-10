@@ -4,7 +4,6 @@
 cd "$(dirname $0)/.." || exit
 
 source scripts/version
-source scripts/export-config
 source scripts/package-env
 source dev-scripts/images-origins-env.sh
 

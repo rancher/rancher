@@ -26,7 +26,7 @@ Add it to [build.yaml](../build.yaml). For example:
 webhookVersion: 2.0.6+up0.3.6-rc1
 ```
 
-Then update the [export-config](../scripts/export-config) script.
+Then update the [package-env](../scripts/package-env) script.
 
 ```
 export CATTLE_RANCHER_WEBHOOK_VERSION=$(grep -m1 'webhookVersion' < "$file" | cut -d ' ' -f2)
