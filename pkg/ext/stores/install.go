@@ -29,7 +29,7 @@ func InstallStores(
 	err := server.Install(
 		extv1.UserActivityResourceName,
 		useractivity.GVK,
-		useractivity.New(wranglerContext),
+		useractivity.New(wranglerContext, server.GetAuthorizer()),
 	)
 	if err != nil {
 		return fmt.Errorf("unable to install useractivity store: %w", err)
