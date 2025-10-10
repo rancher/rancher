@@ -54,3 +54,5 @@ jobs:
           V2PROV_TEST_RUN_REGEX: "${{ matrix.V2PROV_TEST_RUN_REGEX }}"
           V2PROV_TEST_DIST: "${{ matrix.V2PROV_TEST_DIST }}"
           CATTLE_FEATURES: "${{ matrix.CATTLE_FEATURES }}"
+          K3S_PINNED_VERSION: "v1.30.14+k3s2"
+          RKE2_PINNED_VERSION: "v1.30.14+rke2r2"
