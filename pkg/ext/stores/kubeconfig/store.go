@@ -49,6 +49,7 @@ import (
 	"k8s.io/client-go/features"
 	"k8s.io/kubernetes/pkg/printers"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 const (
@@ -744,6 +745,13 @@ func (s *Store) toConfigMap(kubeconfig *ext.Kubeconfig) (*corev1.ConfigMap, erro
 		configMap.Data[StatusTokensField] = string(serialized)
 	}
 
+	var err error
+	configMap.ObjectMeta.ManagedFields, err = extcommon.MapManagedFields(mapFromKubeconfig,
+		kubeconfig.ObjectMeta.ManagedFields)
+	if err != nil {
+		return nil, fmt.Errorf("failed to map kubeconfig managed-fields: %w", err)
+	}
+
 	return configMap, nil
 }
 
@@ -795,6 +803,12 @@ func (s *Store) fromConfigMap(configMap *corev1.ConfigMap) (*ext.Kubeconfig, err
 		if err != nil {
 			return nil, fmt.Errorf("error unmarshaling status.tokens for %s: %w", configMap.Name, err)
 		}
+	}
+
+	kubeconfig.ObjectMeta.ManagedFields, err = extcommon.MapManagedFields(mapFromConfigMap,
+		kubeconfig.ObjectMeta.ManagedFields)
+	if err != nil {
+		return nil, fmt.Errorf("failed to map configmap managed-fields: %w", err)
 	}
 
 	return kubeconfig, nil
@@ -1475,4 +1489,41 @@ var (
 	_ rest.Scoper                   = &Store{}
 	_ rest.SingularNameProvider     = &Store{}
 	_ rest.GroupVersionKindProvider = &Store{}
+)
+
+var (
+	pathCMData                  = fieldpath.MakePathOrDie("data")
+	pathCMClustersField         = fieldpath.MakePathOrDie("data", "clusters")
+	pathCMCurrentContextField   = fieldpath.MakePathOrDie("data", "current-context")
+	pathCMDescriptionField      = fieldpath.MakePathOrDie("data", "description")
+	pathCMTTLField              = fieldpath.MakePathOrDie("data", "ttl")
+	pathCMStatusConditionsField = fieldpath.MakePathOrDie("data", "status-conditions")
+	pathCMStatusSummaryField    = fieldpath.MakePathOrDie("data", "status-summary")
+	pathCMStatusTokensField     = fieldpath.MakePathOrDie("data", "status-tokens")
+
+	pathCMLabelKind = fieldpath.MakePathOrDie("metadata", "labels", KindLabel)
+
+	pathKConfigClustersField       = fieldpath.MakePathOrDie("spec", "clusters")
+	pathKConfigCurrentContextField = fieldpath.MakePathOrDie("spec", "currentContext")
+	pathKConfigDescriptionField    = fieldpath.MakePathOrDie("spec", "description")
+	pathKConfigTTLField            = fieldpath.MakePathOrDie("spec", "ttl")
+
+	mapFromConfigMap = extcommon.MapSpec{
+		pathCMData.String():                  nil,
+		pathCMClustersField.String():         pathKConfigClustersField,
+		pathCMCurrentContextField.String():   pathKConfigCurrentContextField,
+		pathCMDescriptionField.String():      pathKConfigDescriptionField,
+		pathCMTTLField.String():              pathKConfigTTLField,
+		pathCMStatusConditionsField.String(): nil,
+		pathCMStatusSummaryField.String():    nil,
+		pathCMStatusTokensField.String():     nil,
+		pathCMLabelKind.String():             nil,
+	}
+
+	mapFromKubeconfig = extcommon.MapSpec{
+		pathKConfigClustersField.String():       pathCMClustersField,
+		pathKConfigCurrentContextField.String(): pathCMCurrentContextField,
+		pathKConfigDescriptionField.String():    pathCMDescriptionField,
+		pathKConfigTTLField.String():            pathCMTTLField,
+	}
 )
