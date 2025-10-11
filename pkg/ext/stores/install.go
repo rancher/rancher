@@ -43,47 +43,53 @@ func InstallStores(
 	); err != nil {
 		return fmt.Errorf("unable to install %s store: %w", tokens.SingularName, err)
 	}
-	logrus.Infof("Successfully installed token store")
+	logrus.Infof("Successfully installed %s store", tokens.SingularName)
 
 	userManager, err := common.NewUserManagerNoBindings(wranglerContext)
 	if err != nil {
 		return fmt.Errorf("error getting user manager: %w", err)
 	}
 
-	if err := server.Install(
+	if err = server.Install(
 		extv1.KubeconfigResourceName,
 		extv1.SchemeGroupVersion.WithKind(kubeconfig.Kind),
 		kubeconfig.New(features.MCM.Enabled(), wranglerContext, server.GetAuthorizer(), userManager),
 	); err != nil {
-		return fmt.Errorf("unable to install kubeconfig store: %w", err)
+		return fmt.Errorf("unable to install %s store: %w", kubeconfig.Singular, err)
 	}
-	logrus.Infof("Successfully installed kubeconfig store")
+	logrus.Infof("Successfully installed %s store", kubeconfig.Singular)
 
-	err = server.Install(
+	if err = server.Install(
 		extv1.PasswordChangeRequestResourceName,
 		passwordchangerequest.GVK,
-		passwordchangerequest.New(wranglerContext, server.GetAuthorizer()))
-	if err != nil {
+		passwordchangerequest.New(wranglerContext, server.GetAuthorizer()),
+	); err != nil {
 		return fmt.Errorf("unable to install %s store: %w", passwordchangerequest.SingularName, err)
 	}
+	logrus.Infof("Successfully installed %s store", passwordchangerequest.SingularName)
+
 	groupMembershipRefreshStore, err := groupmembershiprefreshrequest.New(wranglerContext, server.GetAuthorizer())
 	if err != nil {
 		return fmt.Errorf("unable to create %s store: %w", groupmembershiprefreshrequest.SingularName, err)
 	}
-	err = server.Install(
+
+	if err = server.Install(
 		extv1.GroupMembershipRefreshRequestResourceName,
 		groupmembershiprefreshrequest.GVK,
-		groupMembershipRefreshStore)
-	if err != nil {
+		groupMembershipRefreshStore,
+	); err != nil {
 		return fmt.Errorf("unable to install %s store: %w", groupmembershiprefreshrequest.SingularName, err)
 	}
-	err = server.Install(
+	logrus.Infof("Successfully installed %s store", groupmembershiprefreshrequest.SingularName)
+
+	if err = server.Install(
 		extv1.SelfUserResourceName,
 		selfuser.GVK,
-		selfuser.New())
-	if err != nil {
+		selfuser.New(),
+	); err != nil {
 		return fmt.Errorf("unable to install %s store: %w", selfuser.SingularName, err)
 	}
+	logrus.Infof("Successfully installed %s store", selfuser.SingularName)
 
 	return nil
 }
