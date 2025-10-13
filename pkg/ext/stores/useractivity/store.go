@@ -3,6 +3,7 @@ package useractivity
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/tokens"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
@@ -120,7 +122,7 @@ func (s *Store) Get(ctx context.Context,
 		}
 	}
 
-	if err = validateToken(authToken, token); err != nil {
+	if err = validateToken(authToken, token, timeNow()); err != nil {
 		return nil, err
 	}
 
@@ -204,17 +206,18 @@ func (s *Store) Update(
 		}
 	}
 
-	if err = validateToken(authToken, token); err != nil {
+	now := timeNow()
+
+	if err = validateToken(authToken, token, now); err != nil {
 		return nil, false, err
 	}
 
-	seen := timeNow()
-	if userActivity.Spec.SeenAt != nil {
-		if userActivity.Spec.SeenAt.Time.Before(seen) {
-			seen = userActivity.Spec.SeenAt.Time
-		}
-		// Use the current time if the provided timestamp is in the future.
+	// Default to the current timestamp.
+	seen := now
+	if userActivity.Spec.SeenAt != nil && userActivity.Spec.SeenAt.Time.Before(now) {
+		// Use the provided seenAt timestamp only if it's not in the future.
 		// This is to make sure the idle timeout can't be extended.
+		seen = userActivity.Spec.SeenAt.Time
 	}
 
 	shouldUpdate := true
@@ -330,38 +333,41 @@ func first(values []string) string {
 	return ""
 }
 
-func validateToken(authToken, token accessor.TokenAccessor) error {
+func validateToken(authToken, token accessor.TokenAccessor, now time.Time) error {
 	// Verify auth and activity token have the same user ID.
 	if authToken.GetUserID() != token.GetUserID() {
-		return apierrors.NewForbidden(gvr.GroupResource(), "",
-			fmt.Errorf("request token %s and activity token %s have different users", authToken.GetName(), token.GetName()))
+		return apierrors.NewForbidden(gvr.GroupResource(), token.GetName(), errors.New("token users don't match"))
 	}
 
 	// Verify auth and activity token has the same auth provider.
 	if authToken.GetAuthProvider() != token.GetAuthProvider() {
-		return apierrors.NewForbidden(gvr.GroupResource(), "",
-			fmt.Errorf("request token %s and activity token %s have different auth providers", authToken.GetName(), token.GetName()))
+		return apierrors.NewForbidden(gvr.GroupResource(), token.GetName(), errors.New("auth provider doesn't match"))
 	}
 
 	// Verify auth and activity token has the same auth user principal.
 	if authToken.GetUserPrincipal().Name != token.GetUserPrincipal().Name {
-		return apierrors.NewForbidden(gvr.GroupResource(), "",
-			fmt.Errorf("request token %s and activity token %s have different user principals", authToken.GetName(), token.GetName()))
+		return apierrors.NewForbidden(gvr.GroupResource(), token.GetName(), errors.New("user principal doesn't match"))
 	}
 
 	// Verify that activity token is a session token.
 	if token.GetIsDerived() {
-		return apierrors.NewForbidden(gvr.GroupResource(), "", fmt.Errorf("activity token %s is not a session token", token.GetName()))
+		return apierrors.NewForbidden(gvr.GroupResource(), token.GetName(), errors.New("not a session token"))
 	}
 
 	// We can't update disabled token.
 	if !token.GetIsEnabled() {
-		return apierrors.NewForbidden(gvr.GroupResource(), "", fmt.Errorf("activity token %s is disabled", token.GetName()))
+		return apierrors.NewForbidden(gvr.GroupResource(), token.GetName(), errors.New("token is disabled"))
 	}
 
 	// We can't update expired token.
 	if token.GetIsExpired() {
-		return apierrors.NewForbidden(gvr.GroupResource(), "", fmt.Errorf("activity token %s is expired", token.GetName()))
+		return apierrors.NewForbidden(gvr.GroupResource(), token.GetName(), errors.New("token is expired"))
+	}
+
+	// We can't update the token if the idle timeout has expired.
+	// This is to prevent reviving previously expired session.
+	if tokens.IsIdleExpired(token, now) {
+		return apierrors.NewForbidden(gvr.GroupResource(), token.GetName(), errors.New("session idle timeout expired"))
 	}
 
 	return nil

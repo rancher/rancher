@@ -5,55 +5,57 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"testing"
 	"time"
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
+	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
-	"github.com/rancher/rancher/pkg/auth/tokens"
+	authTokens "github.com/rancher/rancher/pkg/auth/tokens"
 	exttokens "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	fake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	k8suser "k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/apiserver/pkg/registry/rest"
 )
 
 const defaultIdleTTL = 960
 
 var (
+	tokenID           = "token-12345"
+	tokenTTL          = int64(57600000) // 16 hours
 	uid               = types.UID("07306f53-a3df-4608-ae02-d6595a24c17d")
-	creationTimestamp = metav1.NewTime(time.Date(2025, 2, 1, 0, 50, 0, 0, time.UTC))
+	now               = time.Now().UTC().Truncate(time.Second)
+	creationTimestamp = metav1.NewTime(now.Add(-1 * time.Hour))
 	ctxAdmin          = request.WithUser(context.Background(), &k8suser.DefaultInfo{
 		Name:   "admin",
 		Groups: []string{GroupCattleAuthenticated},
 		Extra: map[string][]string{
-			common.ExtraRequestTokenID: {"token-12345"},
+			common.ExtraRequestTokenID: {tokenID},
 		},
 	})
-	mockNow          = time.Date(2025, 2, 1, 0, 54, 0, 0, time.UTC)
-	expectedExiresAt = metav1.NewTime(mockNow.Add(defaultIdleTTL * time.Minute))
-	userActivity     = &ext.UserActivity{
+	sessionLabel = map[string]string{
+		authTokens.TokenKindLabel: "session",
+	}
+	userActivity = &ext.UserActivity{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "token-12345",
+			CreationTimestamp: creationTimestamp,
+			UID:               uid,
+			Name:              tokenID,
 		},
 	}
-	wantUserActivity = &ext.UserActivity{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "token-12345",
-		},
-		Status: ext.UserActivityStatus{
-			ExpiresAt: expectedExiresAt.Format(time.RFC3339),
-		},
-	}
-
 	commonAuthorizer = authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
 		switch a.GetUser().GetName() {
 		case "admin":
@@ -64,579 +66,573 @@ var (
 	})
 )
 
-// func TestStoreCreate(t *testing.T) {
-// 	ctrl := gomock.NewController(t)
+type fakeUpdatedObjectInfo struct {
+	obj runtime.Object
+	err error
+}
 
-// 	var (
-// 		tokenController *fake.MockNonNamespacedControllerInterface[*apiv3.Token, *apiv3.TokenList]
-// 		tokenCache      *fake.MockNonNamespacedCacheInterface[*apiv3.Token]
-// 		userCache       *fake.MockNonNamespacedCacheInterface[*apiv3.User]
-// 		secrets         *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]
-// 		secretCache     *fake.MockCacheInterface[*corev1.Secret]
-// 		users           *fake.MockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList]
-// 	)
+func (i *fakeUpdatedObjectInfo) Preconditions() *metav1.Preconditions {
+	return nil
+}
 
-// 	type args struct {
-// 		ctx          context.Context
-// 		obj          *ext.UserActivity
-// 		validateFunc rest.ValidateObjectFunc
-// 		options      *metav1.CreateOptions
-// 	}
+func (i *fakeUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj runtime.Object) (newObj runtime.Object, err error) {
+	return i.obj, i.err
+}
 
-// 	tests := []struct {
-// 		name      string
-// 		args      args
-// 		mockSetup func()
-// 		want      runtime.Object
-// 		wantErr   bool
-// 	}{
-// 		{
-// 			name: "no seenAt provided",
-// 			args: args{
-// 				ctx: ctxAdmin,
-// 				obj: userActivity,
-// 			},
-// 			mockSetup: func() {
-// 				gomock.InOrder(
-// 					userCache.EXPECT().Get("admin").Return(&apiv3.User{
-// 						ObjectMeta: metav1.ObjectMeta{
-// 							Name: "admin",
-// 						},
-// 					}, nil),
+func TestStoreUpdate(t *testing.T) {
+	t.Parallel()
 
-// 					tokenCache.EXPECT().Get("token-12345").Return(&apiv3.Token{
-// 						ObjectMeta: metav1.ObjectMeta{
-// 							Name: "token-12345",
-// 						},
-// 						AuthProvider:  "oidc",
-// 						UserPrincipal: apiv3.Principal{},
-// 					}, nil),
-// 					tokenCache.EXPECT().Get("token-12345").Return(&apiv3.Token{
-// 						ObjectMeta: metav1.ObjectMeta{
-// 							Name: "token-12345",
-// 							Labels: map[string]string{
-// 								tokens.TokenKindLabel: "session",
-// 							},
-// 						},
-// 						AuthProvider:  "oidc",
-// 						UserPrincipal: apiv3.Principal{},
-// 					}, nil),
-// 					tokenController.EXPECT().
-// 						Patch("token-12345", types.JSONPatchType, gomock.Any()).
-// 						Return(&apiv3.Token{}, nil),
-// 				)
-// 			},
-// 			want: wantUserActivity,
-// 		},
-// 		{
-// 			name: "no seenAt provided, ext token",
-// 			args: args{
-// 				ctx: ctxAdmin,
-// 				obj: userActivity,
-// 			},
-// 			mockSetup: func() {
-// 				ePrincipal := ext.TokenPrincipal{
-// 					Name:        "world",
-// 					Provider:    "oidc",
-// 					DisplayName: "",
-// 					LoginName:   "hello",
-// 				}
-// 				ePrincipalBytes, _ := json.Marshal(ePrincipal)
-// 				eSecret := corev1.Secret{
-// 					ObjectMeta: metav1.ObjectMeta{
-// 						Name: "token-12345",
-// 						Labels: map[string]string{
-// 							exttokens.UserIDLabel:     "admin",
-// 							exttokens.SecretKindLabel: exttokens.SecretKindLabelValue,
-// 						},
-// 					},
-// 					Data: map[string][]byte{
-// 						exttokens.FieldDescription:    []byte(""),
-// 						exttokens.FieldEnabled:        []byte("true"),
-// 						exttokens.FieldHash:           []byte("kla9jkdmj"),
-// 						exttokens.FieldKind:           []byte(exttokens.IsLogin),
-// 						exttokens.FieldLastUpdateTime: []byte("13:00:05"),
-// 						exttokens.FieldPrincipal:      ePrincipalBytes,
-// 						exttokens.FieldTTL:            []byte("4000"),
-// 						exttokens.FieldUID:            []byte("2905498-kafld-lkad"),
-// 						exttokens.FieldUserID:         []byte("lkajdlksjlkds"),
-// 					},
-// 				}
-// 				gomock.InOrder(
-// 					userCache.EXPECT().Get("admin").Return(&apiv3.User{
-// 						ObjectMeta: metav1.ObjectMeta{
-// 							Name: "admin",
-// 						},
-// 					}, nil),
-// 					tokenCache.EXPECT().Get("token-12345").
-// 						Return(nil, fmt.Errorf("some error")),
-// 					secretCache.EXPECT().
-// 						Get("cattle-tokens", "token-12345").
-// 						Return(&eSecret, nil),
-// 					tokenCache.EXPECT().Get("token-12345").
-// 						Return(nil, fmt.Errorf("some error")),
-// 					secretCache.EXPECT().
-// 						Get("cattle-tokens", "token-12345").
-// 						Return(&eSecret, nil),
-// 					secrets.EXPECT().Patch("cattle-tokens", "token-12345", types.JSONPatchType, gomock.Any()).
-// 						DoAndReturn(func(space, name string, pt types.PatchType, data []byte, subresources ...any) (*ext.Token, error) {
-// 							// patchData = data
-// 							return nil, nil
-// 						}).Times(1),
-// 				)
-// 			},
-// 			want: wantUserActivity,
-// 		},
-// 		{
-// 			name: "seenAt is greater than lastSeenAt",
-// 			args: args{
-// 				ctx: ctxAdmin,
-// 				obj: &ext.UserActivity{
-// 					ObjectMeta: metav1.ObjectMeta{
-// 						Name: "token-12345",
-// 					},
-// 					Spec: ext.UserActivitySpec{
-// 						SeenAt: &metav1.Time{
-// 							Time: mockNow.Add(-5 * time.Minute),
-// 						},
-// 					},
-// 				},
-// 			},
-// 			mockSetup: func() {
-// 				gomock.InOrder(
-// 					userCache.EXPECT().Get("admin").Return(&apiv3.User{
-// 						ObjectMeta: metav1.ObjectMeta{
-// 							Name: "admin",
-// 						},
-// 					}, nil),
-
-// 					tokenCache.EXPECT().Get("token-12345").Return(&apiv3.Token{
-// 						ObjectMeta: metav1.ObjectMeta{
-// 							Name: "token-12345",
-// 						},
-// 						AuthProvider:  "oidc",
-// 						UserPrincipal: apiv3.Principal{},
-// 					}, nil),
-// 					tokenCache.EXPECT().Get("token-12345").Return(&apiv3.Token{
-// 						ObjectMeta: metav1.ObjectMeta{
-// 							Name: "token-12345",
-// 							Labels: map[string]string{
-// 								tokens.TokenKindLabel: "session",
-// 							},
-// 						},
-// 						ActivityLastSeenAt: &metav1.Time{
-// 							Time: mockNow.Add(-10 * time.Minute),
-// 						},
-// 						AuthProvider:  "oidc",
-// 						UserPrincipal: apiv3.Principal{},
-// 					}, nil),
-// 					tokenController.EXPECT().
-// 						Patch("token-12345", types.JSONPatchType, gomock.Any()).
-// 						Return(&apiv3.Token{}, nil),
-// 				)
-// 			},
-// 			want: &ext.UserActivity{
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name: "token-12345",
-// 				},
-// 				Spec: ext.UserActivitySpec{
-// 					SeenAt: &metav1.Time{
-// 						Time: mockNow.Add(-5 * time.Minute),
-// 					},
-// 				},
-// 				Status: ext.UserActivityStatus{
-// 					ExpiresAt: mockNow.Add((defaultIdleTTL - 5) * time.Minute).Format(time.RFC3339),
-// 				},
-// 			},
-// 		},
-// 		{
-// 			name: "seenAt is set, no lastSeenAt",
-// 			args: args{
-// 				ctx: ctxAdmin,
-// 				obj: &ext.UserActivity{
-// 					ObjectMeta: metav1.ObjectMeta{
-// 						Name: "token-12345",
-// 					},
-// 					Spec: ext.UserActivitySpec{
-// 						SeenAt: &metav1.Time{
-// 							Time: mockNow.Add(-5 * time.Minute),
-// 						},
-// 					},
-// 				},
-// 			},
-// 			mockSetup: func() {
-// 				gomock.InOrder(
-// 					userCache.EXPECT().Get("admin").Return(&apiv3.User{
-// 						ObjectMeta: metav1.ObjectMeta{
-// 							Name: "admin",
-// 						},
-// 					}, nil),
-
-// 					tokenCache.EXPECT().Get("token-12345").Return(&apiv3.Token{
-// 						ObjectMeta: metav1.ObjectMeta{
-// 							Name: "token-12345",
-// 						},
-// 						AuthProvider:  "oidc",
-// 						UserPrincipal: apiv3.Principal{},
-// 					}, nil),
-// 					tokenCache.EXPECT().Get("token-12345").Return(&apiv3.Token{
-// 						ObjectMeta: metav1.ObjectMeta{
-// 							Name: "token-12345",
-// 							Labels: map[string]string{
-// 								tokens.TokenKindLabel: "session",
-// 							},
-// 						},
-// 						AuthProvider:  "oidc",
-// 						UserPrincipal: apiv3.Principal{},
-// 					}, nil),
-// 					tokenController.EXPECT().
-// 						Patch("token-12345", types.JSONPatchType, gomock.Any()).
-// 						Return(&apiv3.Token{}, nil),
-// 				)
-// 			},
-// 			want: &ext.UserActivity{
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name: "token-12345",
-// 				},
-// 				Spec: ext.UserActivitySpec{
-// 					SeenAt: &metav1.Time{
-// 						Time: mockNow.Add(-5 * time.Minute),
-// 					},
-// 				},
-// 				Status: ext.UserActivityStatus{
-// 					ExpiresAt: mockNow.Add((defaultIdleTTL - 5) * time.Minute).Format(time.RFC3339),
-// 				},
-// 			},
-// 		},
-// 		{
-// 			name: "seenAt is less than lastSeenAt",
-// 			args: args{
-// 				ctx: ctxAdmin,
-// 				obj: &ext.UserActivity{
-// 					ObjectMeta: metav1.ObjectMeta{
-// 						Name: "token-12345",
-// 					},
-// 					Spec: ext.UserActivitySpec{
-// 						SeenAt: &metav1.Time{
-// 							Time: mockNow.Add(-10 * time.Minute),
-// 						},
-// 					},
-// 				},
-// 			},
-// 			mockSetup: func() {
-// 				gomock.InOrder(
-// 					userCache.EXPECT().Get("admin").Return(&apiv3.User{
-// 						ObjectMeta: metav1.ObjectMeta{
-// 							Name: "admin",
-// 						},
-// 					}, nil),
-
-// 					tokenCache.EXPECT().Get("token-12345").Return(&apiv3.Token{
-// 						ObjectMeta: metav1.ObjectMeta{
-// 							Name: "token-12345",
-// 						},
-// 						AuthProvider:  "oidc",
-// 						UserPrincipal: apiv3.Principal{},
-// 					}, nil),
-// 					tokenCache.EXPECT().Get("token-12345").Return(&apiv3.Token{
-// 						ObjectMeta: metav1.ObjectMeta{
-// 							Name: "token-12345",
-// 							Labels: map[string]string{
-// 								tokens.TokenKindLabel: "session",
-// 							},
-// 						},
-// 						ActivityLastSeenAt: &metav1.Time{
-// 							Time: mockNow.Add(-5 * time.Minute),
-// 						},
-// 						AuthProvider:  "oidc",
-// 						UserPrincipal: apiv3.Principal{},
-// 					}, nil),
-// 				)
-// 			},
-// 			want: &ext.UserActivity{
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name: "token-12345",
-// 				},
-// 				Spec: ext.UserActivitySpec{
-// 					SeenAt: &metav1.Time{
-// 						Time: mockNow.Add(-10 * time.Minute),
-// 					},
-// 				},
-// 				Status: ext.UserActivityStatus{
-// 					ExpiresAt: mockNow.Add((defaultIdleTTL - 5) * time.Minute).Format(time.RFC3339),
-// 				},
-// 			},
-// 		},
-// 		{
-// 			name: "seenAt is in the future",
-// 			args: args{
-// 				ctx: ctxAdmin,
-// 				obj: &ext.UserActivity{
-// 					ObjectMeta: metav1.ObjectMeta{
-// 						Name: "token-12345",
-// 					},
-// 					Spec: ext.UserActivitySpec{
-// 						SeenAt: &metav1.Time{
-// 							Time: mockNow.Add(1 * time.Second),
-// 						},
-// 					},
-// 				},
-// 			},
-// 			mockSetup: func() {
-// 				gomock.InOrder(
-// 					userCache.EXPECT().Get("admin").Return(&apiv3.User{
-// 						ObjectMeta: metav1.ObjectMeta{
-// 							Name: "admin",
-// 						},
-// 					}, nil),
-
-// 					tokenCache.EXPECT().Get("token-12345").Return(&apiv3.Token{
-// 						ObjectMeta: metav1.ObjectMeta{
-// 							Name: "token-12345",
-// 						},
-// 						AuthProvider:  "oidc",
-// 						UserPrincipal: apiv3.Principal{},
-// 					}, nil),
-// 					tokenCache.EXPECT().Get("token-12345").Return(&apiv3.Token{
-// 						ObjectMeta: metav1.ObjectMeta{
-// 							Name: "token-12345",
-// 							Labels: map[string]string{
-// 								tokens.TokenKindLabel: "session",
-// 							},
-// 						},
-// 						ActivityLastSeenAt: &metav1.Time{
-// 							Time: mockNow.Add(-5 * time.Minute),
-// 						},
-// 						AuthProvider:  "oidc",
-// 						UserPrincipal: apiv3.Principal{},
-// 					}, nil),
-// 					tokenController.EXPECT().
-// 						Patch("token-12345", types.JSONPatchType, gomock.Any()).
-// 						Return(&apiv3.Token{}, nil),
-// 				)
-// 			},
-// 			want: &ext.UserActivity{
-// 				ObjectMeta: metav1.ObjectMeta{
-// 					Name: "token-12345",
-// 				},
-// 				Spec: ext.UserActivitySpec{
-// 					SeenAt: &metav1.Time{
-// 						Time: mockNow.Add(1 * time.Second),
-// 					},
-// 				},
-// 				Status: ext.UserActivityStatus{
-// 					ExpiresAt: expectedExiresAt.Format(time.RFC3339),
-// 				},
-// 			},
-// 		},
-// 		{
-// 			name: "username not found",
-// 			args: args{
-// 				ctx: request.WithUser(context.Background(), &k8suser.DefaultInfo{
-// 					Name:   "user-xyz",
-// 					Groups: []string{GroupCattleAuthenticated},
-// 					Extra: map[string][]string{
-// 						common.ExtraRequestTokenID: {"token-12345"},
-// 					},
-// 				}),
-// 				obj: userActivity,
-// 			},
-// 			mockSetup: func() {
-// 				gomock.InOrder(
-// 					userCache.EXPECT().Get("user-xyz").Return(
-// 						nil, fmt.Errorf("user not found"),
-// 					),
-// 				)
-// 			},
-// 			wantErr: true,
-// 		},
-// 		{
-// 			name: "tokens dont match",
-// 			args: args{
-// 				ctx: ctxAdmin,
-// 				obj: userActivity,
-// 			},
-// 			mockSetup: func() {
-// 				gomock.InOrder(
-// 					userCache.EXPECT().Get("admin").Return(&apiv3.User{
-// 						ObjectMeta: metav1.ObjectMeta{
-// 							Name: "admin",
-// 						},
-// 					}, nil),
-
-// 					tokenCache.EXPECT().Get("token-12345").Return(&apiv3.Token{
-// 						ObjectMeta: metav1.ObjectMeta{
-// 							Name: "token-12345",
-// 						},
-// 						AuthProvider:  "oidc",
-// 						UserPrincipal: apiv3.Principal{},
-// 					}, nil),
-
-// 					tokenCache.EXPECT().Get("token-12345").Return(&apiv3.Token{
-// 						ObjectMeta: metav1.ObjectMeta{
-// 							Name: "token-12345",
-// 						},
-// 						AuthProvider:  "local",
-// 						UserPrincipal: apiv3.Principal{},
-// 					}, nil),
-// 				)
-// 			},
-// 			wantErr: true,
-// 		},
-// 		{
-// 			name: "dry run",
-// 			args: args{
-// 				ctx: ctxAdmin,
-// 				obj: userActivity,
-// 				options: &metav1.CreateOptions{
-// 					DryRun: []string{metav1.DryRunAll},
-// 				},
-// 			},
-// 			mockSetup: func() {
-// 				gomock.InOrder(
-// 					userCache.EXPECT().Get("admin").Return(&apiv3.User{
-// 						ObjectMeta: metav1.ObjectMeta{
-// 							Name: "admin",
-// 						},
-// 					}, nil),
-
-// 					tokenCache.EXPECT().Get("token-12345").Return(&apiv3.Token{
-// 						ObjectMeta: metav1.ObjectMeta{
-// 							Name: "token-12345",
-// 						},
-// 						AuthProvider:  "oidc",
-// 						UserPrincipal: apiv3.Principal{},
-// 					}, nil),
-
-// 					tokenCache.EXPECT().Get("token-12345").Return(&apiv3.Token{
-// 						ObjectMeta: metav1.ObjectMeta{
-// 							Name: "token-12345",
-// 							Labels: map[string]string{
-// 								tokens.TokenKindLabel: "session",
-// 							},
-// 						},
-// 						AuthProvider:  "oidc",
-// 						UserPrincipal: apiv3.Principal{},
-// 					}, nil),
-// 				)
-// 			},
-// 			want: wantUserActivity,
-// 		},
-// 	}
-
-// 	origTimeNow := timeNow
-// 	timeNow = func() time.Time { return mockNow }
-// 	defer func() { timeNow = origTimeNow }() // Restore original function after test
-
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			tokenController = fake.NewMockNonNamespacedControllerInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
-// 			tokenCache = fake.NewMockNonNamespacedCacheInterface[*apiv3.Token](ctrl)
-// 			userCache = fake.NewMockNonNamespacedCacheInterface[*apiv3.User](ctrl)
-// 			secrets = fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
-// 			secretCache = fake.NewMockCacheInterface[*corev1.Secret](ctrl)
-// 			users = fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
-// 			users.EXPECT().Cache().Return(nil)
-// 			secrets.EXPECT().Cache().Return(secretCache)
-
-// 			tt.mockSetup()
-
-// 			store := &Store{
-// 				tokens:                           tokenController,
-// 				userCache:                        userCache,
-// 				extTokenStore:                    exttokens.NewSystem(nil, nil, secrets, users, tokenCache, nil, nil, nil, nil),
-// 				getAuthUserSessionIdleTTLMinutes: func() int { return defaultIdleTTL },
-// 			}
-
-// 			got, err := store.Create(tt.args.ctx, tt.args.obj, tt.args.validateFunc, tt.args.options)
-// 			if (err != nil) != tt.wantErr {
-// 				t.Errorf("Got error %v want %v", err, tt.wantErr)
-// 				return
-// 			}
-// 			if !reflect.DeepEqual(got, tt.want) {
-// 				t.Errorf("Got\n %#v\nwant\n%#v", got, tt.want)
-// 			}
-// 		})
-// 	}
-// }
-
-func TestStoreGet(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	var (
-		tokenController *fake.MockNonNamespacedControllerInterface[*apiv3.Token, *apiv3.TokenList]
-		tokenCache      *fake.MockNonNamespacedCacheInterface[*apiv3.Token]
-		userCache       *fake.MockNonNamespacedCacheInterface[*apiv3.User]
-		secrets         *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]
-		secretCache     *fake.MockCacheInterface[*corev1.Secret]
-		users           *fake.MockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList]
+		tokens      *fake.MockNonNamespacedClientInterface[*apiv3.Token, *apiv3.TokenList]
+		tokenCache  *fake.MockNonNamespacedCacheInterface[*apiv3.Token]
+		userCache   *fake.MockNonNamespacedCacheInterface[*apiv3.User]
+		secrets     *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]
+		secretCache *fake.MockCacheInterface[*corev1.Secret]
+		users       *fake.MockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList]
 	)
 
-	type args struct {
-		ctx  context.Context
-		name string
+	expectedExiresAt := metav1.NewTime(now.Add(defaultIdleTTL * time.Minute))
+	wantUserActivity := &ext.UserActivity{
+		ObjectMeta: metav1.ObjectMeta{
+			CreationTimestamp: creationTimestamp,
+			UID:               uid,
+			Name:              tokenID,
+		},
+		Status: ext.UserActivityStatus{
+			ExpiresAt: expectedExiresAt.Format(time.RFC3339),
+		},
 	}
+
 	tests := []struct {
-		name      string
-		args      args
-		mockSetup func()
-		want      runtime.Object
-		wantErr   bool
+		desc       string
+		ctx        context.Context
+		objInfo    func() rest.UpdatedObjectInfo
+		options    *metav1.UpdateOptions
+		setupMocks func()
+		want       func() runtime.Object
+		wantErr    bool
 	}{
 		{
-			name: "valid useractivity retrieved",
-			args: args{
-				ctx:  ctxAdmin,
-				name: "token-12345",
+			desc:    "lastSeen is not set and no seenAt provided",
+			ctx:     ctxAdmin,
+			objInfo: func() rest.UpdatedObjectInfo { return &fakeUpdatedObjectInfo{obj: userActivity} },
+			setupMocks: func() {
+				gomock.InOrder(
+					userCache.EXPECT().Get("admin").Return(&apiv3.User{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "admin",
+						},
+					}, nil),
+					tokenCache.EXPECT().Get(tokenID).Return(&apiv3.Token{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: tokenID,
+						},
+						AuthProvider:  "oidc",
+						UserPrincipal: apiv3.Principal{},
+					}, nil),
+					tokenCache.EXPECT().Get(tokenID).Return(&apiv3.Token{
+						ObjectMeta: metav1.ObjectMeta{
+							CreationTimestamp: creationTimestamp,
+							Name:              tokenID,
+							Labels:            sessionLabel,
+						},
+						AuthProvider:  "oidc",
+						TTLMillis:     tokenTTL,
+						UserPrincipal: apiv3.Principal{},
+					}, nil),
+					tokens.EXPECT().
+						Patch(tokenID, types.JSONPatchType, gomock.Any()).
+						Return(&apiv3.Token{}, nil),
+				)
 			},
-			mockSetup: func() {
+			want: func() runtime.Object { return wantUserActivity },
+		},
+		{
+			desc:    "no seenAt provided, ext token",
+			ctx:     ctxAdmin,
+			objInfo: func() rest.UpdatedObjectInfo { return &fakeUpdatedObjectInfo{obj: userActivity} },
+			setupMocks: func() {
+				principalBytes, _ := json.Marshal(ext.TokenPrincipal{
+					Name:        "world",
+					Provider:    "oidc",
+					DisplayName: "",
+					LoginName:   "hello",
+				})
+				eSecret := corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						CreationTimestamp: creationTimestamp,
+						Name:              tokenID,
+						Labels: map[string]string{
+							exttokens.UserIDLabel:     "admin",
+							exttokens.SecretKindLabel: exttokens.SecretKindLabelValue,
+						},
+					},
+					Data: map[string][]byte{
+						exttokens.FieldDescription:    []byte(""),
+						exttokens.FieldEnabled:        []byte("true"),
+						exttokens.FieldHash:           []byte("kla9jkdmj"),
+						exttokens.FieldKind:           []byte(exttokens.IsLogin),
+						exttokens.FieldLastUpdateTime: []byte(creationTimestamp.Format(time.RFC3339)),
+						exttokens.FieldTTL:            []byte(strconv.FormatInt(tokenTTL, 10)),
+						exttokens.FieldUID:            []byte(uid),
+						exttokens.FieldUserID:         []byte("lkajdlksjlkds"),
+						exttokens.FieldPrincipal:      principalBytes,
+					},
+				}
+				gomock.InOrder(
+					userCache.EXPECT().Get("admin").Return(&apiv3.User{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "admin",
+						},
+					}, nil),
+					tokenCache.EXPECT().Get(tokenID).
+						Return(nil, fmt.Errorf("some error")),
+					secretCache.EXPECT().
+						Get("cattle-tokens", tokenID).
+						Return(&eSecret, nil),
+					tokenCache.EXPECT().Get(tokenID).
+						Return(nil, fmt.Errorf("some error")),
+					secretCache.EXPECT().
+						Get("cattle-tokens", tokenID).
+						Return(&eSecret, nil),
+					secrets.EXPECT().Patch("cattle-tokens", tokenID, types.JSONPatchType, gomock.Any()).
+						DoAndReturn(func(space, name string, pt types.PatchType, data []byte, subresources ...any) (*ext.Token, error) {
+							// patchData = data
+							return nil, nil
+						}).Times(1),
+				)
+			},
+			want: func() runtime.Object { return wantUserActivity },
+		},
+		{
+			desc: "seenAt is greater than lastSeenAt",
+			ctx:  ctxAdmin,
+			objInfo: func() rest.UpdatedObjectInfo {
+				seenAt := metav1.NewTime(now.Add(-5 * time.Minute))
+				userActivity := userActivity.DeepCopy()
+				userActivity.Spec.SeenAt = &seenAt
+				return &fakeUpdatedObjectInfo{obj: userActivity}
+			},
+			setupMocks: func() {
+				gomock.InOrder(
+					userCache.EXPECT().Get("admin").Return(&apiv3.User{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "admin",
+						},
+					}, nil),
+
+					tokenCache.EXPECT().Get(tokenID).Return(&apiv3.Token{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: tokenID,
+						},
+						AuthProvider:  "oidc",
+						UserPrincipal: apiv3.Principal{},
+					}, nil),
+					tokenCache.EXPECT().Get(tokenID).Return(&apiv3.Token{
+						ObjectMeta: metav1.ObjectMeta{
+							CreationTimestamp: creationTimestamp,
+							Name:              tokenID,
+							Labels:            sessionLabel,
+						},
+						ActivityLastSeenAt: &metav1.Time{
+							Time: now.Add(-10 * time.Minute),
+						},
+						AuthProvider:  "oidc",
+						TTLMillis:     tokenTTL,
+						UserPrincipal: apiv3.Principal{},
+					}, nil),
+					tokens.EXPECT().Patch(tokenID, types.JSONPatchType, gomock.Any()).Return(&apiv3.Token{}, nil),
+				)
+			},
+			want: func() runtime.Object {
+				seenAt := metav1.NewTime(now.Add(-5 * time.Minute))
+				wantUserActivity := wantUserActivity.DeepCopy()
+				wantUserActivity.Spec.SeenAt = &seenAt
+				wantUserActivity.Status.ExpiresAt = now.Add((defaultIdleTTL - 5) * time.Minute).Format(time.RFC3339)
+				return wantUserActivity
+			},
+		},
+		{
+			desc: "seenAt is provided, lastSeenAt is not set",
+			ctx:  ctxAdmin,
+			objInfo: func() rest.UpdatedObjectInfo {
+				seenAt := metav1.NewTime(now.Add(-5 * time.Minute))
+				userActivity := userActivity.DeepCopy()
+				userActivity.Spec.SeenAt = &seenAt
+				return &fakeUpdatedObjectInfo{obj: userActivity}
+			},
+			setupMocks: func() {
+				gomock.InOrder(
+					userCache.EXPECT().Get("admin").Return(&apiv3.User{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "admin",
+						},
+					}, nil),
+
+					tokenCache.EXPECT().Get(tokenID).Return(&apiv3.Token{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: tokenID,
+						},
+						AuthProvider:  "oidc",
+						UserPrincipal: apiv3.Principal{},
+					}, nil),
+					tokenCache.EXPECT().Get(tokenID).Return(&apiv3.Token{
+						ObjectMeta: metav1.ObjectMeta{
+							CreationTimestamp: creationTimestamp,
+							Name:              tokenID,
+							Labels:            sessionLabel,
+						},
+						AuthProvider:  "oidc",
+						TTLMillis:     tokenTTL,
+						UserPrincipal: apiv3.Principal{},
+					}, nil),
+					tokens.EXPECT().Patch(tokenID, types.JSONPatchType, gomock.Any()).Return(&apiv3.Token{}, nil),
+				)
+			},
+			want: func() runtime.Object {
+				seenAt := metav1.NewTime(now.Add(-5 * time.Minute))
+				wantUserActivity := wantUserActivity.DeepCopy()
+				wantUserActivity.Spec.SeenAt = &seenAt
+				wantUserActivity.Status.ExpiresAt = now.Add((defaultIdleTTL - 5) * time.Minute).Format(time.RFC3339)
+				return wantUserActivity
+			},
+		},
+		{
+			desc: "seenAt is less than lastSeenAt",
+			ctx:  ctxAdmin,
+			objInfo: func() rest.UpdatedObjectInfo {
+				userActivity := userActivity.DeepCopy()
+				seenAt := metav1.NewTime(now.Add(-10 * time.Minute))
+				userActivity.Spec.SeenAt = &seenAt
+				return &fakeUpdatedObjectInfo{obj: userActivity}
+			},
+			setupMocks: func() {
+				gomock.InOrder(
+					userCache.EXPECT().Get("admin").Return(&apiv3.User{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "admin",
+						},
+					}, nil),
+
+					tokenCache.EXPECT().Get(tokenID).Return(&apiv3.Token{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: tokenID,
+						},
+						AuthProvider:  "oidc",
+						UserPrincipal: apiv3.Principal{},
+					}, nil),
+					tokenCache.EXPECT().Get(tokenID).Return(&apiv3.Token{
+						ObjectMeta: metav1.ObjectMeta{
+							CreationTimestamp: creationTimestamp,
+							Name:              tokenID,
+							Labels:            sessionLabel,
+						},
+						ActivityLastSeenAt: &metav1.Time{
+							Time: now.Add(-5 * time.Minute),
+						},
+						AuthProvider:  "oidc",
+						TTLMillis:     tokenTTL,
+						UserPrincipal: apiv3.Principal{},
+					}, nil),
+				)
+			},
+			want: func() runtime.Object {
+				seenAt := metav1.NewTime(now.Add(-10 * time.Minute))
+				wantUserActivity := wantUserActivity.DeepCopy()
+				wantUserActivity.Spec.SeenAt = &seenAt
+				wantUserActivity.Status.ExpiresAt = now.Add((defaultIdleTTL - 5) * time.Minute).Format(time.RFC3339)
+				return wantUserActivity
+			},
+		},
+		{
+			desc: "seenAt is in the future",
+			ctx:  ctxAdmin,
+			objInfo: func() rest.UpdatedObjectInfo {
+				seenAt := metav1.NewTime(now.Add(1 * time.Second))
+				userActivity := userActivity.DeepCopy()
+				userActivity.Spec.SeenAt = &seenAt
+				return &fakeUpdatedObjectInfo{obj: userActivity}
+			},
+			setupMocks: func() {
+				gomock.InOrder(
+					userCache.EXPECT().Get("admin").Return(&apiv3.User{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "admin",
+						},
+					}, nil),
+
+					tokenCache.EXPECT().Get(tokenID).Return(&apiv3.Token{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: tokenID,
+						},
+						AuthProvider:  "oidc",
+						UserPrincipal: apiv3.Principal{},
+					}, nil),
+					tokenCache.EXPECT().Get(tokenID).Return(&apiv3.Token{
+						ObjectMeta: metav1.ObjectMeta{
+							CreationTimestamp: creationTimestamp,
+							Name:              tokenID,
+							Labels:            sessionLabel,
+						},
+						ActivityLastSeenAt: &metav1.Time{
+							Time: now.Add(-5 * time.Minute),
+						},
+						AuthProvider:  "oidc",
+						TTLMillis:     tokenTTL,
+						UserPrincipal: apiv3.Principal{},
+					}, nil),
+					tokens.EXPECT().Patch(tokenID, types.JSONPatchType, gomock.Any()).Return(&apiv3.Token{}, nil),
+				)
+			},
+			want: func() runtime.Object {
+				seenAt := metav1.NewTime(now.Add(1 * time.Second))
+				wantUserActivity := wantUserActivity.DeepCopy()
+				wantUserActivity.Spec.SeenAt = &seenAt
+				return wantUserActivity
+			},
+		},
+		{
+			desc: "requestor user not found",
+			ctx: request.WithUser(context.Background(), &k8suser.DefaultInfo{
+				Name:   "user-xyz",
+				Groups: []string{GroupCattleAuthenticated},
+				Extra: map[string][]string{
+					common.ExtraRequestTokenID: {tokenID},
+				},
+			}),
+			objInfo: func() rest.UpdatedObjectInfo { return &fakeUpdatedObjectInfo{obj: userActivity} },
+			setupMocks: func() {
+				gomock.InOrder(
+					userCache.EXPECT().Get("user-xyz").Return(
+						nil, apierrors.NewNotFound(schema.GroupResource{Group: mgmt.GroupName, Resource: "users"}, "user-xyz"),
+					),
+				)
+			},
+			wantErr: true,
+		},
+		{
+			desc:    "tokens' auth providers don't match",
+			ctx:     ctxAdmin,
+			objInfo: func() rest.UpdatedObjectInfo { return &fakeUpdatedObjectInfo{obj: userActivity} },
+			setupMocks: func() {
+				gomock.InOrder(
+					userCache.EXPECT().Get("admin").Return(&apiv3.User{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "admin",
+						},
+					}, nil),
+
+					tokenCache.EXPECT().Get(tokenID).Return(&apiv3.Token{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: tokenID,
+						},
+						AuthProvider:  "oidc",
+						UserPrincipal: apiv3.Principal{},
+					}, nil),
+
+					tokenCache.EXPECT().Get(tokenID).Return(&apiv3.Token{
+						ObjectMeta: metav1.ObjectMeta{
+							CreationTimestamp: creationTimestamp,
+							Name:              tokenID,
+							Labels:            sessionLabel,
+						},
+						AuthProvider:  "local",
+						TTLMillis:     tokenTTL,
+						UserPrincipal: apiv3.Principal{},
+					}, nil),
+				)
+			},
+			wantErr: true,
+		},
+		{
+			desc:    "dry run",
+			ctx:     ctxAdmin,
+			objInfo: func() rest.UpdatedObjectInfo { return &fakeUpdatedObjectInfo{obj: userActivity} },
+			options: &metav1.UpdateOptions{
+				DryRun: []string{metav1.DryRunAll},
+			},
+			setupMocks: func() {
+				gomock.InOrder(
+					userCache.EXPECT().Get("admin").Return(&apiv3.User{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "admin",
+						},
+					}, nil),
+
+					tokenCache.EXPECT().Get(tokenID).Return(&apiv3.Token{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: tokenID,
+						},
+						AuthProvider:  "oidc",
+						UserPrincipal: apiv3.Principal{},
+					}, nil),
+
+					tokenCache.EXPECT().Get(tokenID).Return(&apiv3.Token{
+						ObjectMeta: metav1.ObjectMeta{
+							CreationTimestamp: creationTimestamp,
+							Name:              tokenID,
+							Labels:            sessionLabel,
+						},
+						AuthProvider:  "oidc",
+						TTLMillis:     tokenTTL,
+						UserPrincipal: apiv3.Principal{},
+					}, nil),
+				)
+			},
+			want: func() runtime.Object { return wantUserActivity },
+		},
+	}
+
+	origTimeNow := timeNow
+	timeNow = func() time.Time { return now }
+	defer func() { timeNow = origTimeNow }() // Restore original function after test
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			tokens = fake.NewMockNonNamespacedClientInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
+			tokenCache = fake.NewMockNonNamespacedCacheInterface[*apiv3.Token](ctrl)
+			userCache = fake.NewMockNonNamespacedCacheInterface[*apiv3.User](ctrl)
+			secrets = fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+			secretCache = fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+			users = fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+			users.EXPECT().Cache().Return(nil)
+			secrets.EXPECT().Cache().Return(secretCache)
+
+			tt.setupMocks()
+
+			store := &Store{
+				authorizer:                       commonAuthorizer,
+				tokens:                           tokens,
+				userCache:                        userCache,
+				extTokenStore:                    exttokens.NewSystem(nil, nil, secrets, users, tokenCache, nil, nil, nil, nil),
+				getAuthUserSessionIdleTTLMinutes: func() int { return defaultIdleTTL },
+			}
+
+			var validateFuncCalled bool
+			validateFunc := func(ctx context.Context, obj, old runtime.Object) error {
+				validateFuncCalled = true
+				return nil
+			}
+
+			got, created, err := store.Update(tt.ctx, tokenID, tt.objInfo(), nil, validateFunc, false, tt.options)
+			require.False(t, created) // Should always be false.
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.want(), got)
+			assert.True(t, validateFuncCalled)
+		})
+	}
+}
+
+func TestStoreGet(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+
+	var (
+		tokens      *fake.MockNonNamespacedControllerInterface[*apiv3.Token, *apiv3.TokenList]
+		tokenCache  *fake.MockNonNamespacedCacheInterface[*apiv3.Token]
+		userCache   *fake.MockNonNamespacedCacheInterface[*apiv3.User]
+		secrets     *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]
+		secretCache *fake.MockCacheInterface[*corev1.Secret]
+		users       *fake.MockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList]
+	)
+
+	wantUserActivity := &ext.UserActivity{
+		ObjectMeta: metav1.ObjectMeta{
+			CreationTimestamp: creationTimestamp,
+			UID:               uid,
+			Name:              tokenID,
+		},
+		Spec: ext.UserActivitySpec{
+			SeenAt: &metav1.Time{Time: now.Add(-5 * time.Minute)},
+		},
+		Status: ext.UserActivityStatus{
+			ExpiresAt: now.Add((defaultIdleTTL - 5) * time.Minute).Format(time.RFC3339),
+		},
+	}
+
+	tests := []struct {
+		desc       string
+		ctx        context.Context
+		name       string
+		setupMocks func()
+		want       runtime.Object
+		wantErr    bool
+	}{
+		{
+			desc: "no lastSeenAt is set",
+			ctx:  ctxAdmin,
+			name: tokenID,
+			setupMocks: func() {
 				tokenCache.EXPECT().Get(gomock.Any()).Return(&apiv3.Token{
 					ObjectMeta: metav1.ObjectMeta{
 						CreationTimestamp: creationTimestamp,
 						UID:               uid,
-						Name:              "token-12345",
+						Name:              tokenID,
 						Labels: map[string]string{
-							tokens.TokenKindLabel: "session",
+							authTokens.TokenKindLabel: "session",
 						},
 					},
-					UserID:             "admin",
-					ActivityLastSeenAt: &metav1.Time{Time: time.Date(2025, 1, 31, 0, 44, 0, 0, time.UTC)},
+					UserID:    "admin",
+					TTLMillis: tokenTTL,
 				}, nil).AnyTimes()
 			},
 			want: &ext.UserActivity{
 				ObjectMeta: metav1.ObjectMeta{
 					CreationTimestamp: creationTimestamp,
 					UID:               uid,
-					Name:              "token-12345",
-				},
-				Spec: ext.UserActivitySpec{
-					SeenAt: &metav1.Time{Time: time.Date(2025, 1, 31, 0, 44, 0, 0, time.UTC)},
-				},
-				Status: ext.UserActivityStatus{
-					ExpiresAt: time.Date(2025, 1, 31, 16, 44, 0, 0, time.UTC).Format(time.RFC3339),
+					Name:              tokenID,
 				},
 			},
 			wantErr: false,
 		},
 		{
-			name: "valid useractivity retrieved, ext token",
-			args: args{
-				ctx:  ctxAdmin,
-				name: "token-12345",
+			desc: "lastSeenAt is set",
+			ctx:  ctxAdmin,
+			name: tokenID,
+			setupMocks: func() {
+				tokenCache.EXPECT().Get(gomock.Any()).Return(&apiv3.Token{
+					ObjectMeta: metav1.ObjectMeta{
+						CreationTimestamp: creationTimestamp,
+						UID:               uid,
+						Name:              tokenID,
+						Labels: map[string]string{
+							authTokens.TokenKindLabel: "session",
+						},
+					},
+					ActivityLastSeenAt: &metav1.Time{
+						Time: now.Add(-5 * time.Minute),
+					},
+					UserID:    "admin",
+					TTLMillis: tokenTTL,
+				}, nil).AnyTimes()
 			},
-			mockSetup: func() {
-				ePrincipal := ext.TokenPrincipal{
+			want:    wantUserActivity,
+			wantErr: false,
+		},
+		{
+			desc: "lastSeenAt is set, ext token",
+			ctx:  ctxAdmin,
+			name: tokenID,
+			setupMocks: func() {
+				principalBytes, _ := json.Marshal(ext.TokenPrincipal{
 					Name:        "world",
 					Provider:    "oidc",
 					DisplayName: "",
 					LoginName:   "hello",
-				}
-				ePrincipalBytes, _ := json.Marshal(ePrincipal)
+				})
 				eSecret := corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						CreationTimestamp: creationTimestamp,
 						UID:               uid,
-						Name:              "token-12345",
+						Name:              tokenID,
 						Labels: map[string]string{
 							exttokens.UserIDLabel:     "admin",
 							exttokens.SecretKindLabel: exttokens.SecretKindLabelValue,
@@ -647,69 +643,47 @@ func TestStoreGet(t *testing.T) {
 						exttokens.FieldEnabled:          []byte("true"),
 						exttokens.FieldHash:             []byte("kla9jkdmj"),
 						exttokens.FieldKind:             []byte(exttokens.IsLogin),
-						exttokens.FieldLastActivitySeen: []byte("2025-01-31T00:44:00Z"),
-						exttokens.FieldLastUpdateTime:   []byte("13:00:05"),
-						exttokens.FieldPrincipal:        ePrincipalBytes,
-						exttokens.FieldTTL:              []byte("4000"),
+						exttokens.FieldLastActivitySeen: []byte(now.Add(-5 * time.Minute).Format(time.RFC3339)),
+						exttokens.FieldLastUpdateTime:   []byte(creationTimestamp.Format(time.RFC3339)),
+						exttokens.FieldPrincipal:        principalBytes,
+						exttokens.FieldTTL:              []byte(strconv.FormatInt(tokenTTL, 10)),
 						exttokens.FieldUID:              []byte(uid),
 						exttokens.FieldUserID:           []byte("lkajdlksjlkds"),
 					},
 				}
 
-				tokenCache.EXPECT().Get(gomock.Any()).
-					Return(nil, fmt.Errorf("some error")).
-					AnyTimes()
-				secretCache.EXPECT().Get("cattle-tokens", gomock.Any()).
-					Return(&eSecret, nil).
-					AnyTimes()
+				tokenCache.EXPECT().Get(gomock.Any()).Return(nil, fmt.Errorf("some error")).AnyTimes()
+				secretCache.EXPECT().Get("cattle-tokens", gomock.Any()).Return(&eSecret, nil).AnyTimes()
 			},
-			want: &ext.UserActivity{
-				ObjectMeta: metav1.ObjectMeta{
-					CreationTimestamp: creationTimestamp,
-					UID:               uid,
-					Name:              "token-12345",
-				},
-				Spec: ext.UserActivitySpec{
-					SeenAt: &metav1.Time{Time: time.Date(2025, 1, 31, 0, 44, 0, 0, time.UTC)},
-				},
-				Status: ext.UserActivityStatus{
-					ExpiresAt: time.Date(2025, 1, 31, 16, 44, 0, 0, time.UTC).Format(time.RFC3339),
-				},
-			},
+			want:    wantUserActivity,
 			wantErr: false,
 		},
 		{
-			name: "invalid useractivity name",
-			args: args{
-				ctx:  context.Background(),
-				name: "ua_admin_token_12345",
-			},
-			mockSetup: func() {},
-			want:      nil,
-			wantErr:   true,
+			desc:       "invalid useractivity name",
+			ctx:        context.Background(),
+			name:       "ua_admin_token_12345",
+			setupMocks: func() {},
+			want:       nil,
+			wantErr:    true,
 		},
 		{
-			name: "invalid token retrieved",
-			args: args{
-				ctx:  context.Background(),
-				name: "ua_admin_token-12345",
-			},
-			mockSetup: func() {
+			desc: "invalid token retrieved",
+			ctx:  context.Background(),
+			name: "ua_admin_token-12345",
+			setupMocks: func() {
 				tokenCache.EXPECT().Get(gomock.Any()).Return(nil, errors.New("invalid token name")).AnyTimes()
 			},
 			want:    nil,
 			wantErr: true,
 		},
 		{
-			name: "invalid user name retrieved",
-			args: args{
-				ctx:  context.Background(),
-				name: "ua_user1_token-12345",
-			},
-			mockSetup: func() {
+			desc: "invalid user name retrieved",
+			ctx:  context.Background(),
+			name: "ua_user1_token-12345",
+			setupMocks: func() {
 				tokenCache.EXPECT().Get(gomock.Any()).Return(&apiv3.Token{
-					UserID:             "token-12345",
-					ActivityLastSeenAt: &metav1.Time{Time: time.Date(2025, 1, 31, 16, 44, 0, 0, time.UTC)},
+					UserID:             tokenID,
+					ActivityLastSeenAt: &metav1.Time{Time: now.Add(-5 * time.Minute)},
 				}, nil).AnyTimes()
 			},
 			want:    nil,
@@ -718,8 +692,8 @@ func TestStoreGet(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tokenController = fake.NewMockNonNamespacedControllerInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
+		t.Run(tt.desc, func(t *testing.T) {
+			tokens = fake.NewMockNonNamespacedControllerInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
 			tokenCache = fake.NewMockNonNamespacedCacheInterface[*apiv3.Token](ctrl)
 			secrets = fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 			secretCache = fake.NewMockCacheInterface[*corev1.Secret](ctrl)
@@ -729,17 +703,17 @@ func TestStoreGet(t *testing.T) {
 			users.EXPECT().Cache().Return(userCache)
 			secrets.EXPECT().Cache().Return(secretCache)
 
-			tt.mockSetup()
+			tt.setupMocks()
 
 			store := &Store{
 				authorizer:                       commonAuthorizer,
-				tokens:                           tokenController,
+				tokens:                           tokens,
 				userCache:                        userCache,
 				extTokenStore:                    exttokens.NewSystem(nil, nil, secrets, users, tokenCache, nil, nil, nil, nil),
 				getAuthUserSessionIdleTTLMinutes: func() int { return defaultIdleTTL },
 			}
 
-			got, err := store.Get(tt.args.ctx, tt.args.name, &metav1.GetOptions{})
+			got, err := store.Get(tt.ctx, tt.name, &metav1.GetOptions{})
 			if tt.wantErr {
 				require.Error(t, err)
 				return
