@@ -43,9 +43,9 @@ func (ap *Provider) actionHandler(actionName string, action *types.Action, reque
 		return ap.ConfigureTest(request)
 	case "testAndApply":
 		return ap.testAndApply(request)
+	default:
+		return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 	}
-
-	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }
 
 func (ap *Provider) ConfigureTest(request *types.APIContext) error {
