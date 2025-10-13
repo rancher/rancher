@@ -168,7 +168,7 @@ func redactSecret(log *log) error {
 	}
 
 	if strings.Contains(log.RequestURI, "secrets") || pairMatches(log.ResponseBody, checkForBasetype(secretBaseType)) {
-		redactDataFromBody(log, log.RequestBody, "SecretList")
+		redactDataFromBody(log, log.ResponseBody, "SecretList")
 	}
 
 	return nil
