@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+current_dir=$(pwd)
 cd $(git rev-parse --show-toplevel) || exit
 
 source scripts/version
@@ -47,3 +48,5 @@ check_missing "HELM_UNITTEST_VERSION"
 check_missing "ARCH"
 check_missing "TAG"
 check_missing "REPO"
+
+cd "$current_dir" || exit

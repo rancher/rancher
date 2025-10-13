@@ -1,10 +1,12 @@
 #!/bin/bash
 set -ex
 
-if  [ -n "$CATTLE_KDM_BRANCH" ]; then
-    curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json > bin/data.json
+cd "$(dirname $0)/.."
+
+if [ -n "$CATTLE_KDM_BRANCH" ]; then
+  curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json >bin/data.json
 elif [ ! -e bin/data.json ] && [ -e kontainer-driver-metadata/data/data.json ]; then
-    cp kontainer-driver-metadata/data/data.json bin/data.json
+  cp kontainer-driver-metadata/data/data.json bin/data.json
 fi
 
 source scripts/version
@@ -16,7 +18,7 @@ cp bin/data.json bin/rancher-data.json
 cd bin
 
 if [ ! -d $CHART_REPO_DIR ]; then
-    git clone --branch $CHART_DEFAULT_BRANCH https://github.com/rancher/charts $CHART_REPO_DIR
+  git clone --branch $CHART_DEFAULT_BRANCH https://github.com/rancher/charts $CHART_REPO_DIR
 fi
 
 go run ../pkg/image/origins/main.go \
