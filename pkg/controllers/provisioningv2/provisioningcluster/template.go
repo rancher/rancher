@@ -580,15 +580,31 @@ func capiCluster(cluster *rancherv1.Cluster, rkeControlPlane *rkev1.RKEControlPl
 		panic(err)
 	}
 
-	// telling the autoscaling controllers in rancher to function - this is
-	// controlled by an annotation on the provisioning cluster "pausing" the
-	//autoscaling as well as any of the RKEMachinePool objects having autoscaler values set
-	var annotations map[string]string
+	///////////////////////////
+	// the autoscaler goodies
+	///////////////////////////
+	// this is the part that makes the autoscaler controller fire.
+	//
+	// if the pause annotation doesn't exist and at least one of the RKEMachinePools has autoscaling enabled
+	// then the appropriate annotations are rendered in the capi.Cluster annotations
+	// - capr.AutoscalerEnabledAnnotation
+	// - capr.ClusterAutoscalerKubernetesVersion
+	//
+	// if the pause annotation is present, then it just sets the enabled annotation to `paused` in order
+	// to signify the scale-to-zero behavior on the cluster-autoscaler deployment running in the downstream
+	// cluster.
+	annotations := map[string]string{}
 	if cluster.Annotations[capr.ClusterAutoscalerPausedAnnotation] == "" &&
 		capr.AutoscalerEnabledByProvisioningCluster(cluster) {
-		annotations = map[string]string{
-			capr.ClusterAutoscalerEnabledAnnotation: "true",
+		annotations[capr.ClusterAutoscalerEnabledAnnotation] = "true"
+
+		// if the kubernetes version is set, pass it down to the cluster object as well for the
+		// autoscaler to compute the helm chart version from.
+		if cluster.Spec.RKEConfig != nil && cluster.Spec.KubernetesVersion != "" {
+			annotations[capr.ClusterAutoscalerKubernetesVersion] = cluster.Spec.KubernetesVersion
 		}
+	} else if cluster.Annotations[capr.ClusterAutoscalerPausedAnnotation] != "" {
+		annotations[capr.ClusterAutoscalerEnabledAnnotation] = "paused"
 	}
 
 	apiVersion, kind := gvk.ToAPIVersionAndKind()

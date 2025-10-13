@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Masterminds/semver/v3"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/wrangler/v3/pkg/ticker"
@@ -23,6 +22,7 @@ const (
 )
 
 var (
+	// Label selector to identify tokens created by the autoscaler controller
 	autoscalerTokenSelector = labels.Set{tokens.TokenKindLabel: "autoscaler"}.AsSelector().String()
 )
 
@@ -132,20 +132,8 @@ func (h *autoscalerHandler) renewToken(token *v3.Token) error {
 		return fmt.Errorf("failed to update kubeconfig secret for cluster %s/%s: %v", capiCluster.Namespace, capiCluster.Name, err)
 	}
 
-	cluster, err := h.clusterCache.Get(capiCluster.Namespace, capiCluster.OwnerReferences[0].Name)
-	if err != nil {
-		logrus.Errorf("[autoscaler] Failed to find v2prov cluster for capi cluster %s/%s: %v", capiCluster.Namespace, capiCluster.Name, err)
-		return fmt.Errorf("failed to update kubeconfig secret for cluster %s/%s: %v", capiCluster.Namespace, capiCluster.Name, err)
-	}
-
-	k8sminor := 0
-	if cluster.Spec.KubernetesVersion != "" {
-		version, _ := semver.NewVersion(cluster.Spec.KubernetesVersion)
-		k8sminor = int(version.Minor())
-	}
-
 	// then re-rollout the cluster-autoscaler helm chart with the new kubeconfig resource version
-	err = h.ensureFleetHelmOp(capiCluster, kubeconfig.ResourceVersion, k8sminor, 1)
+	err = h.ensureFleetHelmOp(capiCluster, kubeconfig.ResourceVersion, 1)
 	if err != nil {
 		return err
 	}

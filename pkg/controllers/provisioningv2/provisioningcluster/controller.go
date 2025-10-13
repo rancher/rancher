@@ -492,7 +492,8 @@ func triggerProvisioningClusterOnMachineDeploymentUpdate(clients *wrangler.CAPIC
 				v2provClusterName = owner.Name
 			}
 			if v2provClusterName == "" {
-				return nil, fmt.Errorf("failed to find provisioning cluster object for machinedeployment %v/%v", md.Namespace, md.Name)
+				// if no v2prov cluster available - just return.
+				return []relatedresource.Key{}, nil
 			}
 
 			return []relatedresource.Key{{

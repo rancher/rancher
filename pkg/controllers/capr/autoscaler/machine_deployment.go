@@ -20,7 +20,7 @@ type machineDeploymentReplicaOverrider struct {
 }
 
 // syncMachinePoolReplicas synchronizes machine pool replicas between the capi MachineDeployment and v2prov Cluster object's machinePool field.
-// it searches through the list of machinePools and finds the matching one which corresponds to the one the cluster-autoscaler updated, and then updates the quantity field. this triggers a scale up.
+// it searches through the list of machinePools and finds the matching one which corresponds to the one the cluster-autoscaler updated, and then updates the quantity field. this triggers a scale up (or scale down).
 func (s *machineDeploymentReplicaOverrider) syncMachinePoolReplicas(_ string, md *capi.MachineDeployment) (*capi.MachineDeployment, error) {
 	if md == nil || md.DeletionTimestamp != nil {
 		return md, nil
@@ -100,8 +100,8 @@ func (s *machineDeploymentReplicaOverrider) syncMachinePoolReplicas(_ string, md
 			return true, nil
 		})
 		if err != nil {
-			logrus.Warnf("Failed to update cluster %s/%s to match machineDeployment! %v",
-				cluster.Namespace, cluster.Name, err)
+			logrus.Warnf("Failed to update cluster %s/%s machine pool %s to match machineDeployment: %v",
+				cluster.Namespace, cluster.Name, machinePoolName, err)
 			return md, err
 		}
 

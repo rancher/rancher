@@ -20,12 +20,12 @@ import (
 	"github.com/rancher/channelserver/pkg/model"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
-	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/channelserver"
 	"github.com/rancher/rancher/pkg/features"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/wrangler/v3/pkg/condition"
@@ -104,22 +104,32 @@ const (
 	RKEMachineAPIVersion           = "rke-machine.cattle.io/v1"
 	RKEAPIVersion                  = "rke.cattle.io/v1"
 
-	Provisioned                      = condition.Cond("Provisioned")
-	Stable                           = condition.Cond("Stable") // The Stable condition is used to indicate whether we can safely copy the v3 management cluster Ready condition to the v1 object.
-	Updated                          = condition.Cond("Updated")
-	Reconciled                       = condition.Cond("Reconciled")
-	Ready                            = condition.Cond("Ready")
-	Waiting                          = condition.Cond("Waiting")
-	Pending                          = condition.Cond("Pending")
-	Removed                          = condition.Cond("Removed")
-	PlanApplied                      = condition.Cond("PlanApplied")
-	InfrastructureReady              = condition.Cond(capi.InfrastructureReadyCondition)
-	SystemUpgradeControllerReady     = condition.Cond("SystemUpgradeControllerReady")
-	Bootstrapped                     = condition.Cond("Bootstrapped")
+	Provisioned                  = condition.Cond("Provisioned")
+	Stable                       = condition.Cond("Stable") // The Stable condition is used to indicate whether we can safely copy the v3 management cluster Ready condition to the v1 object.
+	Updated                      = condition.Cond("Updated")
+	Reconciled                   = condition.Cond("Reconciled")
+	Ready                        = condition.Cond("Ready")
+	Waiting                      = condition.Cond("Waiting")
+	Pending                      = condition.Cond("Pending")
+	Removed                      = condition.Cond("Removed")
+	PlanApplied                  = condition.Cond("PlanApplied")
+	InfrastructureReady          = condition.Cond(capi.InfrastructureReadyCondition)
+	SystemUpgradeControllerReady = condition.Cond("SystemUpgradeControllerReady")
+	Bootstrapped                 = condition.Cond("Bootstrapped")
+	// ClusterAutoscalerDeploymentReady is a condition that indicates whether the cluster autoscaler deployment is ready
 	ClusterAutoscalerDeploymentReady = condition.Cond("ClusterAutoscalerDeploymentReady")
 
+	// ClusterAutoscalerEnabledAnnotation is an annotation used to enable cluster autoscaling for a cluster.
+	// this is set on the CAPI Cluster object in order to trigger the controllers to set up the autoscaler
+	// dependencies and install the chart.
 	ClusterAutoscalerEnabledAnnotation = "provisioning.cattle.io/cluster-autoscaler-enabled"
-	ClusterAutoscalerPausedAnnotation  = "provisioning.cattle.io/cluster-autoscaler-paused"
+
+	// ClusterAutoscalerKubernetesVersion is an annotation for the cluster-autoscaler to
+	ClusterAutoscalerKubernetesVersion = "provisioning.cattle.io/cluster-autoscaler-kubernetes-version"
+
+	// ClusterAutoscalerPausedAnnotation is an annotation used to pause cluster autoscaling for a cluster
+	// it triggers a scale-down of the cluster-autoscaler chart in the downstream cluster
+	ClusterAutoscalerPausedAnnotation = "provisioning.cattle.io/cluster-autoscaler-paused"
 
 	RuntimeK3S  = "k3s"
 	RuntimeRKE2 = "rke2"
@@ -217,6 +227,18 @@ func GetKDMReleaseData(ctx context.Context, controlPlane *rkev1.RKEControlPlane)
 		return nil
 	}
 	return &release
+}
+
+func GetProvisioningClusterFromCAPICluster(cluster *capi.Cluster, clusterCache provcontrollers.ClusterCache) (*provv1.Cluster, error) {
+	for _, owner := range cluster.OwnerReferences {
+		if owner.APIVersion != "provisioning.cattle.io/v1" && owner.Kind != "Cluster" {
+			continue
+		}
+
+		return clusterCache.Get(cluster.Namespace, owner.Name)
+	}
+
+	return nil, fmt.Errorf("cluster not found")
 }
 
 // GetFeatureVersion retrieves a feature version (string) for a given controlPlane based on the version/runtime of the project. It will return 0.0.0 (semver) if the KDM data is valid, but the featureVersion isn't defined.
@@ -670,7 +692,7 @@ func AutoscalerEnabledByCAPI(cluster *capi.Cluster, mds []*capi.MachineDeploymen
 	return false
 }
 
-func AutoscalerEnabledByProvisioningCluster(cluster *v1.Cluster) bool {
+func AutoscalerEnabledByProvisioningCluster(cluster *provv1.Cluster) bool {
 	if cluster.Spec.RKEConfig == nil || len(cluster.Spec.RKEConfig.MachinePools) == 0 {
 		return false
 	}

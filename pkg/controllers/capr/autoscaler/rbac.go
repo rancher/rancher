@@ -16,6 +16,7 @@ const (
 	autoscalerTokenTTL = 30 * 24 * time.Hour
 )
 
+// Ensures the user for the given cluster is created or retrieved from cache.
 func (h *autoscalerHandler) ensureUser(cluster *capi.Cluster) (*v3.User, error) {
 	u, err := h.userCache.Get(autoscalerUserName(cluster))
 	if err != nil && !errors.IsNotFound(err) {
@@ -40,6 +41,7 @@ func (h *autoscalerHandler) ensureUser(cluster *capi.Cluster) (*v3.User, error) 
 	return user, nil
 }
 
+// Ensures a GlobalRole is created or updated with appropriate rules for cluster and machine access.
 func (h *autoscalerHandler) ensureGlobalRole(cluster *capi.Cluster, mds []*capi.MachineDeployment, machines []*capi.Machine) (*v3.GlobalRole, error) {
 	mdResourceNames := make([]string, len(mds))
 	machineResourceNames := make([]string, len(machines))
@@ -135,13 +137,13 @@ func (h *autoscalerHandler) ensureGlobalRoleBinding(cluster *capi.Cluster, usern
 			grb.UserName = username
 			grb.GlobalRoleName = globalRoleName
 			_, err = h.globalRoleBinding.Update(grb)
-			return err
 		}
 	}
 
 	return err
 }
 
+// Ensures a user token is available for the given cluster and username
 func (h *autoscalerHandler) ensureUserToken(cluster *capi.Cluster, username string) (string, error) {
 	t, err := h.tokenCache.Get(username)
 	if err != nil && !errors.IsNotFound(err) {
@@ -201,4 +203,65 @@ func (h *autoscalerHandler) createKubeConfigSecretUsingTemplate(cluster *capi.Cl
 	}
 
 	return h.secrets.Create(secret)
+}
+
+// cleanup removes all autoscaler-related rbac resources for a given cluster
+func (h *autoscalerHandler) cleanupRbac(cluster *capi.Cluster) error {
+	var errs []error
+
+	// Delete the user if it exists
+	userName := autoscalerUserName(cluster)
+	if _, err := h.userCache.Get(userName); err == nil {
+		if err := h.user.Delete(userName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+			errs = append(errs, fmt.Errorf("failed to delete user %s: %w", userName, err))
+		}
+	} else if !errors.IsNotFound(err) {
+		errs = append(errs, fmt.Errorf("failed to check existence of user %s: %w", userName, err))
+	}
+
+	// Delete the global role if it exists
+	globalRoleName := globalRoleName(cluster)
+	if _, err := h.globalRoleCache.Get(globalRoleName); err == nil {
+		if err := h.globalRole.Delete(globalRoleName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+			errs = append(errs, fmt.Errorf("failed to delete global role %s: %w", globalRoleName, err))
+		}
+	} else if !errors.IsNotFound(err) {
+		errs = append(errs, fmt.Errorf("failed to check existence of global role %s: %w", globalRoleName, err))
+	}
+
+	// Delete the global role binding if it exists
+	globalRoleBindingName := globalRoleBindingName(cluster)
+	if _, err := h.globalRoleBindingCache.Get(globalRoleBindingName); err == nil {
+		if err := h.globalRoleBinding.Delete(globalRoleBindingName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+			errs = append(errs, fmt.Errorf("failed to delete global role binding %s: %w", globalRoleBindingName, err))
+		}
+	} else if !errors.IsNotFound(err) {
+		errs = append(errs, fmt.Errorf("failed to check existence of global role binding %s: %w", globalRoleBindingName, err))
+	}
+
+	// Delete the token if it exists
+	if _, err := h.tokenCache.Get(userName); err == nil {
+		if err := h.token.Delete(userName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+			errs = append(errs, fmt.Errorf("failed to delete token for user %s: %w", userName, err))
+		}
+	} else if !errors.IsNotFound(err) {
+		errs = append(errs, fmt.Errorf("failed to check existence of token for user %s: %w", userName, err))
+	}
+
+	// Delete the kubeconfig secret if it exists
+	secretName := kubeconfigSecretName(cluster)
+	if _, err := h.secretsCache.Get(cluster.Namespace, secretName); err == nil {
+		if err := h.secrets.Delete(cluster.Namespace, secretName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+			errs = append(errs, fmt.Errorf("failed to delete secret %s in namespace %s: %w", secretName, cluster.Namespace, err))
+		}
+	} else if !errors.IsNotFound(err) {
+		errs = append(errs, fmt.Errorf("failed to check existence of secret %s in namespace %s: %w", secretName, cluster.Namespace, err))
+	}
+
+	// Return combined errors if any occurred
+	if len(errs) > 0 {
+		return fmt.Errorf("encountered %d errors during cleanup: %v", len(errs), errs)
+	}
+
+	return nil
 }

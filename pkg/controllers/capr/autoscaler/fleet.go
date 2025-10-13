@@ -1,6 +1,8 @@
 package autoscaler
 
 import (
+	"fmt"
+
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/settings"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -19,7 +21,7 @@ var chartVersions = map[int]string{
 // ensureFleetHelmOp creates or updates a Helm operation for cluster autoscaler.
 // one key parameter here is the kubeconfigVersion which is legitimately just involved to
 // force a re-rollout of the downstream cluster-autoscaler deployment on token-rotation.
-func (h *autoscalerHandler) ensureFleetHelmOp(cluster *capi.Cluster, kubeconfigVersion string, k8sMinorVersion, replicaCount int) error {
+func (h *autoscalerHandler) ensureFleetHelmOp(cluster *capi.Cluster, kubeconfigVersion string, replicaCount int) error {
 	bundle := fleet.HelmOpSpec{
 		BundleSpec: fleet.BundleSpec{
 			Targets: []fleet.BundleTarget{
@@ -31,7 +33,7 @@ func (h *autoscalerHandler) ensureFleetHelmOp(cluster *capi.Cluster, kubeconfigV
 				DefaultNamespace: "kube-system",
 				Helm: &fleet.HelmOptions{
 					Chart:       "cluster-autoscaler",
-					Version:     chartVersions[k8sMinorVersion],
+					Version:     helmChartVersionForCapiCluster(cluster),
 					Repo:        settings.ClusterAutoscalerChartRepo.Get(),
 					ReleaseName: "cluster-autoscaler",
 					Values: &fleet.GenericMap{
@@ -89,11 +91,29 @@ func (h *autoscalerHandler) ensureFleetHelmOp(cluster *capi.Cluster, kubeconfigV
 	return err
 }
 
-func (h *autoscalerHandler) uninstallHelmOp(cluster *capi.Cluster) error {
-	helmOp, err := h.helmOpCache.Get(cluster.Namespace, helmOpName(cluster))
-	if err != nil {
-		return err
+// cleanup removes all fleet-related resources for a given cluster
+func (h *autoscalerHandler) cleanupFleet(cluster *capi.Cluster) error {
+	var errs []error
+
+	// Delete the Helm operation if it exists
+	helmOpName := helmOpName(cluster)
+	if _, err := h.helmOpCache.Get(cluster.Namespace, helmOpName); err == nil {
+		if err := h.helmOp.Delete(cluster.Namespace, helmOpName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+			errs = append(errs, fmt.Errorf("failed to delete Helm operation %s in namespace %s: %w", helmOpName, cluster.Namespace, err))
+		}
+	} else if !errors.IsNotFound(err) {
+		errs = append(errs, fmt.Errorf("failed to check existence of Helm operation %s in namespace %s: %w", helmOpName, cluster.Namespace, err))
 	}
 
-	return h.helmOp.Delete(helmOp.Namespace, helmOp.Name, &metav1.DeleteOptions{})
+	// Return combined errors if any occurred
+	if len(errs) > 0 {
+		return fmt.Errorf("encountered %d errors during fleet cleanup: %v", len(errs), errs)
+	}
+
+	return nil
+}
+
+// Returns the Helm chart version for cluster autoscaler based on the Kubernetes minor version of the cluster.
+func helmChartVersionForCapiCluster(cluster *capi.Cluster) string {
+	return chartVersions[k8sMinorVersion(cluster)]
 }
