@@ -174,6 +174,7 @@ require (
 	sigs.k8s.io/aws-iam-authenticator v0.6.17
 	sigs.k8s.io/cluster-api v1.10.6
 	sigs.k8s.io/controller-runtime v0.22.2
+	sigs.k8s.io/structured-merge-diff/v4 v4.6.0
 	sigs.k8s.io/yaml v1.6.0
 )
 

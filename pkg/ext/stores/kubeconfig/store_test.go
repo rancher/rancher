@@ -46,6 +46,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubernetes/pkg/printers"
 	"k8s.io/utils/ptr"
+	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 var (
@@ -1213,6 +1214,23 @@ func TestStoreGet(t *testing.T) {
 		}
 	}).AnyTimes()
 
+	fieldMapJSON, err := fieldpath.NewSet(
+		pathCMData,
+		pathCMClustersField,
+		pathCMCurrentContextField,
+		pathCMDescriptionField,
+		pathCMTTLField,
+		pathCMStatusConditionsField,
+		pathCMStatusSummaryField,
+		pathCMStatusTokensField,
+		pathCMLabelKind,
+		fieldpath.MakePathOrDie("metadata"),
+		fieldpath.MakePathOrDie("type"),
+	).ToJSON()
+	assert.Nil(t, err)
+
+	now := metav1.Now()
+
 	defaultTTL := int64(43200)
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1234,12 +1252,45 @@ func TestStoreGet(t *testing.T) {
 					UID:        uuid.NewUUID(),
 				},
 			},
+			ManagedFields: []metav1.ManagedFieldsEntry{
+				metav1.ManagedFieldsEntry{
+					Manager:    "kubeconfig",
+					Operation:  "something",
+					Time:       &now,
+					FieldsType: "v1",
+					FieldsV1: &metav1.FieldsV1{
+						Raw: fieldMapJSON,
+					},
+				},
+			},
 		},
 		Data: map[string]string{
 			TTLField:            strconv.FormatInt(defaultTTL, 10),
 			DescriptionField:    "test",
 			CurrentContextField: "c-m-tbgzfbgf",
 			ClustersField:       `["c-m-tbgzfbgf","c-m-bxn2p7w6"]`,
+		},
+	}
+
+	fieldKCJSON, err := fieldpath.NewSet(
+		pathKConfigClustersField,
+		pathKConfigCurrentContextField,
+		pathKConfigDescriptionField,
+		pathKConfigTTLField,
+		fieldpath.MakePathOrDie("metadata"),
+		fieldpath.MakePathOrDie("type"),
+	).ToJSON()
+	assert.Nil(t, err)
+
+	kcFields := []metav1.ManagedFieldsEntry{
+		metav1.ManagedFieldsEntry{
+			Manager:    "kubeconfig",
+			Operation:  "something",
+			Time:       &now,
+			FieldsType: "v1",
+			FieldsV1: &metav1.FieldsV1{
+				Raw: fieldKCJSON,
+			},
 		},
 	}
 
@@ -1300,6 +1351,8 @@ func TestStoreGet(t *testing.T) {
 		clustersValue, err := json.Marshal(kubeconfig.Spec.Clusters)
 		require.NoError(t, err)
 		assert.Equal(t, string(clustersValue), configMap.Data[ClustersField])
+
+		assert.Equal(t, kubeconfig.ObjectMeta.ManagedFields, kcFields)
 	})
 
 	t.Run("user gets kubeconfig", func(t *testing.T) {
