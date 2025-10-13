@@ -22,6 +22,7 @@ const (
 	CronJobSpecFieldHostPID                       = "hostPID"
 	CronJobSpecFieldHostUsers                     = "hostUsers"
 	CronJobSpecFieldHostname                      = "hostname"
+	CronJobSpecFieldHostnameOverride              = "hostnameOverride"
 	CronJobSpecFieldImagePullSecrets              = "imagePullSecrets"
 	CronJobSpecFieldManagedBy                     = "managedBy"
 	CronJobSpecFieldMaxFailedIndexes              = "maxFailedIndexes"
@@ -81,6 +82,7 @@ type CronJobSpec struct {
 	HostPID                       bool                           `json:"hostPID,omitempty" yaml:"hostPID,omitempty"`
 	HostUsers                     *bool                          `json:"hostUsers,omitempty" yaml:"hostUsers,omitempty"`
 	Hostname                      string                         `json:"hostname,omitempty" yaml:"hostname,omitempty"`
+	HostnameOverride              string                         `json:"hostnameOverride,omitempty" yaml:"hostnameOverride,omitempty"`
 	ImagePullSecrets              []LocalObjectReference         `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
 	ManagedBy                     string                         `json:"managedBy,omitempty" yaml:"managedBy,omitempty"`
 	MaxFailedIndexes              *int64                         `json:"maxFailedIndexes,omitempty" yaml:"maxFailedIndexes,omitempty"`

@@ -102,33 +102,33 @@ func (mr *MockOperationClientMockRecorder) AddCpTaintsToTolerations(tolerations 
 }
 
 // Uninstall mocks base method.
-func (m *MockOperationClient) Uninstall(ctx context.Context, user user.Info, namespace, name string, options io.Reader, imageOverride string) (*v1.Operation, error) {
+func (m *MockOperationClient) Uninstall(ctx context.Context, arg1 user.Info, namespace, name string, options io.Reader, imageOverride string) (*v1.Operation, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Uninstall", ctx, user, namespace, name, options, imageOverride)
+	ret := m.ctrl.Call(m, "Uninstall", ctx, arg1, namespace, name, options, imageOverride)
 	ret0, _ := ret[0].(*v1.Operation)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Uninstall indicates an expected call of Uninstall.
-func (mr *MockOperationClientMockRecorder) Uninstall(ctx, user, namespace, name, options, imageOverride any) *gomock.Call {
+func (mr *MockOperationClientMockRecorder) Uninstall(ctx, arg1, namespace, name, options, imageOverride any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Uninstall", reflect.TypeOf((*MockOperationClient)(nil).Uninstall), ctx, user, namespace, name, options, imageOverride)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Uninstall", reflect.TypeOf((*MockOperationClient)(nil).Uninstall), ctx, arg1, namespace, name, options, imageOverride)
 }
 
 // Upgrade mocks base method.
-func (m *MockOperationClient) Upgrade(ctx context.Context, user user.Info, namespace, name string, options io.Reader, imageOverride string) (*v1.Operation, error) {
+func (m *MockOperationClient) Upgrade(ctx context.Context, arg1 user.Info, namespace, name string, options io.Reader, imageOverride string) (*v1.Operation, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Upgrade", ctx, user, namespace, name, options, imageOverride)
+	ret := m.ctrl.Call(m, "Upgrade", ctx, arg1, namespace, name, options, imageOverride)
 	ret0, _ := ret[0].(*v1.Operation)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Upgrade indicates an expected call of Upgrade.
-func (mr *MockOperationClientMockRecorder) Upgrade(ctx, user, namespace, name, options, imageOverride any) *gomock.Call {
+func (mr *MockOperationClientMockRecorder) Upgrade(ctx, arg1, namespace, name, options, imageOverride any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Upgrade", reflect.TypeOf((*MockOperationClient)(nil).Upgrade), ctx, user, namespace, name, options, imageOverride)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Upgrade", reflect.TypeOf((*MockOperationClient)(nil).Upgrade), ctx, arg1, namespace, name, options, imageOverride)
 }
 
 // MockHelmClient is a mock of HelmClient interface.
