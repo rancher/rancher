@@ -16,7 +16,6 @@ import (
 	catalogv1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/catalogv2/oci/capturewindowclient"
 	"github.com/rancher/rancher/pkg/catalogv2/roundtripper"
-	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	helmregistry "helm.sh/helm/v3/pkg/registry"
@@ -227,7 +226,7 @@ func (o *Client) SetAuthClient() error {
 	}
 
 	o.HTTPClient.Transport = &roundtripper.UserAgent{
-		UserAgent: fmt.Sprintf("%s/%s/%s %s", "go", "rancher", settings.ServerVersion.Get(), "(OCI-based Helm Repository)"),
+		UserAgent: roundtripper.BuildUserAgent("go", "(OCI-based Helm Repository)"),
 		Next:      o.HTTPClient.Transport,
 	}
 

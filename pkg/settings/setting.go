@@ -102,6 +102,7 @@ var (
 	ServerImage                         = NewSetting("server-image", "rancher/rancher")
 	ServerURL                           = NewSetting("server-url", "")
 	ServerVersion                       = NewSetting("server-version", "dev")
+	ServerVersionType                   = NewSetting("server-version-type", getVersionType())
 	SystemAgentVersion                  = NewSetting("system-agent-version", "")
 	WinsAgentVersion                    = NewSetting("wins-agent-version", "")
 	CSIProxyAgentVersion                = NewSetting("csi-proxy-agent-version", "")
@@ -601,6 +602,14 @@ func getMetadataConfig() string {
 		return ""
 	}
 	return string(ans)
+}
+
+func getVersionType() string {
+	versionType := os.Getenv("RANCHER_VERSION_TYPE")
+	if versionType == "" {
+		return "dev"
+	}
+	return versionType
 }
 
 // GetSettingByID returns a setting that is stored with the given id.

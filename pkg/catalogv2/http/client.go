@@ -3,7 +3,6 @@ package http
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -11,7 +10,6 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/catalogv2/roundtripper"
-	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -62,7 +60,7 @@ func HelmClient(secret *corev1.Secret, caBundle []byte, insecureSkipTLSVerify bo
 
 	// Wrap the transport with a custom RoundTripper to set the User-Agent header
 	client.Transport = &roundtripper.UserAgent{
-		UserAgent: fmt.Sprintf("%s/%s/%s %s", "go", "rancher", settings.ServerVersion.Get(), "(HTTP-based Helm Repository)"),
+		UserAgent: roundtripper.BuildUserAgent("go", "(HTTP-based Helm Repository)"),
 		Next:      client.Transport,
 	}
 
