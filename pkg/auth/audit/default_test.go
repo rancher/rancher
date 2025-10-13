@@ -43,11 +43,12 @@ func TestDefaultPolicies(t *testing.T) {
 	machineDataWant[len(machineDataWant)-1] = byte('}')
 
 	type testCase struct {
-		Name         string
-		Uri          string
-		Headers      http.Header
-		Body         []byte
-		ExpectedBody []byte
+		Name            string
+		Uri             string
+		Headers         http.Header
+		ExpectedHeaders http.Header
+		Body            []byte
+		ExpectedBody    []byte
 	}
 
 	cases := []testCase{
@@ -467,6 +468,7 @@ func TestDefaultPolicies(t *testing.T) {
 			Body:         []byte(`{"metadata":{"namespace":"default","name":"my_configmap"},"data":{"foo":"c3VwZXIgc2VjcmV0IGRhdGE=\\", "bar": "U3VwZXIgU2VjcmV0IERhdGEK"}, "accessToken" : "fake_access_token"}`),
 			ExpectedBody: []byte(fmt.Sprintf(`{"metadata":{"namespace":"default","name":"my_configmap"},"data":"%s", "accessToken" : "%[1]s"}`, redacted)),
 		},
+
 		{
 			Name:         "With config map list data",
 			Uri:          "/configmaps",
@@ -509,6 +511,20 @@ func TestDefaultPolicies(t *testing.T) {
 			Body:         []byte(`{"normalField": "some data", "manifestUrl": "https://localhost:8443/v3/import/abcd.yaml", "insecureWindowsNodeCommand": "curl https://localhost:8443/v3/import/abcd.yaml", "insecureNodeCommand": "curl https://localhost:8443/v3/import/abcd.yaml", "insecureCommand": "curl https://localhost:8443/v3/import/abcd.yaml", "command": "curl https://localhost:8443/v3/import/abcd.yaml", "windowsNodeCommand": "curl https://localhost:8443/v3/import/abcd.yaml"}`),
 			ExpectedBody: []byte(fmt.Sprintf(`{"normalField": "some data", "manifestUrl": "%s", "insecureWindowsNodeCommand": "%[1]s", "insecureNodeCommand": "%[1]s", "insecureCommand": "%[1]s", "command": "%[1]s", "windowsNodeCommand": "%[1]s"}`, redacted)),
 		},
+		{
+			Name:            "With redactable Referer header",
+			Headers:         http.Header{"Content-Type": {contentTypeJSON}, "Referer": {"/v3/import/redactMe.yaml"}},
+			ExpectedHeaders: http.Header{"Content-Type": {contentTypeJSON}, "Referer": {"/v3/import/[redacted]"}},
+			Body:            []byte(`{"normalField": "some data", "manifestUrl": "https://localhost:8443/v3/import/abcd.yaml", "insecureWindowsNodeCommand": "curl https://localhost:8443/v3/import/abcd.yaml", "insecureNodeCommand": "curl https://localhost:8443/v3/import/abcd.yaml", "insecureCommand": "curl https://localhost:8443/v3/import/abcd.yaml", "command": "curl https://localhost:8443/v3/import/abcd.yaml", "windowsNodeCommand": "curl https://localhost:8443/v3/import/abcd.yaml"}`),
+			ExpectedBody:    []byte(fmt.Sprintf(`{"normalField": "some data", "manifestUrl": "%s", "insecureWindowsNodeCommand": "%[1]s", "insecureNodeCommand": "%[1]s", "insecureCommand": "%[1]s", "command": "%[1]s", "windowsNodeCommand": "%[1]s"}`, redacted)),
+		},
+		{
+			Name:            "With non-redactable Referrer header",
+			Headers:         http.Header{"Content-Type": {contentTypeJSON}, "Referrer": {"/v3/import/redactMe.yaml"}},
+			ExpectedHeaders: http.Header{"Content-Type": {contentTypeJSON}, "Referrer": {"/v3/import/redactMe.yaml"}},
+			Body:            []byte(`{"normalField": "some data", "manifestUrl": "https://localhost:8443/v3/import/abcd.yaml", "insecureWindowsNodeCommand": "curl https://localhost:8443/v3/import/abcd.yaml", "insecureNodeCommand": "curl https://localhost:8443/v3/import/abcd.yaml", "insecureCommand": "curl https://localhost:8443/v3/import/abcd.yaml", "command": "curl https://localhost:8443/v3/import/abcd.yaml", "windowsNodeCommand": "curl https://localhost:8443/v3/import/abcd.yaml"}`),
+			ExpectedBody:    []byte(fmt.Sprintf(`{"normalField": "some data", "manifestUrl": "%s", "insecureWindowsNodeCommand": "%[1]s", "insecureNodeCommand": "%[1]s", "insecureCommand": "%[1]s", "command": "%[1]s", "windowsNodeCommand": "%[1]s"}`, redacted)),
+		},
 	}
 
 	buffer := bytes.NewBuffer(nil)
@@ -539,6 +555,11 @@ func TestDefaultPolicies(t *testing.T) {
 			assert.NoError(t, err)
 
 			assert.Equal(t, expected, actual)
+
+			if c.ExpectedHeaders != nil {
+				actualHeaders := log.RequestHeader
+				assert.Equal(t, c.ExpectedHeaders, actualHeaders)
+			}
 
 			buffer.Reset()
 		})
