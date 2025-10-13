@@ -108,21 +108,31 @@ func (gr *globalRoleLifecycle) Create(obj *v3.GlobalRole) (runtime.Object, error
 }
 
 func (gr *globalRoleLifecycle) Updated(obj *v3.GlobalRole) (runtime.Object, error) {
+	//if err := gr.checkRequiredResources(obj); err != nil {
+	//	if err := gr.setGRAsInProgress(obj); err != nil {
+	//		return nil, fmt.Errorf("error setting status to InProgress: %v", err)
+	//	}
+	//}
+
 	// ObjectMeta.Generation does not get updated when the Status is updated.
 	// If only the status has been updated and we have finished updating the status (status.Summary != "InProgress")
 	// we don't need to perform a reconcile as nothing has changed.
-	if obj.Status.ObservedGeneration == obj.ObjectMeta.Generation && obj.Status.Summary != SummaryInProgress {
-		return obj, nil
-	}
+	//if obj.Status.ObservedGeneration == obj.ObjectMeta.Generation && obj.Status.Summary != SummaryInProgress {
+	//	return obj, nil
+	//}
 
-	returnError := errors.Join(
-		gr.setGRAsInProgress(obj), // set GR status to "in progress" while the underlying roles get added
-		gr.reconcileGlobalRole(obj),
-		gr.reconcileNamespacedRoles(obj),
-		gr.fleetPermissionsHandler.reconcileFleetWorkspacePermissions(obj),
-		gr.setGRAsCompleted(obj),
-	)
-	return nil, returnError
+	err := gr.checkRequiredResources(obj)
+	if apierrors.IsNotFound(err) || obj.Status.ObservedGeneration != obj.ObjectMeta.Generation {
+		returnError := errors.Join(
+			gr.setGRAsInProgress(obj), // set GR status to "in progress" while the underlying roles get added
+			gr.reconcileGlobalRole(obj),
+			gr.reconcileNamespacedRoles(obj),
+			gr.fleetPermissionsHandler.reconcileFleetWorkspacePermissions(obj),
+			gr.setGRAsCompleted(obj),
+		)
+		return nil, returnError
+	}
+	return obj, nil
 }
 
 func (gr *globalRoleLifecycle) Remove(obj *v3.GlobalRole) (runtime.Object, error) {
@@ -152,8 +162,17 @@ func (gr *globalRoleLifecycle) Remove(obj *v3.GlobalRole) (runtime.Object, error
 	return nil, err
 }
 
+func (gr *globalRoleLifecycle) checkRequiredResources(globalRole *v3.GlobalRole) error {
+	// Check if ClusterRole exists and is up-to-date
+	crName := getCRName(globalRole)
+	_, err := gr.crLister.Get("", crName)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return fmt.Errorf("error checking ClusterRole %s: %w", crName, err)
+	}
+	return err
+}
+
 func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole) error {
-	fmt.Println("-----> reconcileGlobalRole triggered")
 	crName := getCRName(globalRole)
 	condition := metav1.Condition{
 		Type: ClusterRoleExists,

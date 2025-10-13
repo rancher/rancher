@@ -301,7 +301,6 @@ func (g *globalRBACEnqueuer) clusterRoleEnqueueGR(_, _ string, obj runtime.Objec
 		return nil, fmt.Errorf("unable to get GlobalRole %s for ClusterRole %s", clusterRole.Name, clusterRole.Name)
 	}
 
-	fmt.Println("---------> inside clusterRoleEnqueueGR, grs: ", grs)
 	grNames := make([]relatedresource.Key, 0, len(grs))
 	for _, gr := range grs {
 		// Set the status as InProgress since we have to reconcile the global role
