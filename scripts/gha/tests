@@ -131,8 +131,8 @@ echo "Waiting up to 5 minutes for rancher-turtles deployment"
   --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
   --message "rancher-turtles was not available after {{elapsed}} seconds" `# Print this progress message` \
   --exit-command "dump_rancher_logs" `# Dump logs to find out why turtles did not start` \
-  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml get ns rancher-turtles-system &>/dev/null \
-    && kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n rancher-turtles-system deploy/rancher-turtles-controller-manager &>/dev/null"
+  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml get ns cattle-turtles-system &>/dev/null \
+    && kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-turtles-system deploy/rancher-turtles-controller-manager &>/dev/null"
 
 echo Running integrationsetup
 export CATTLE_TEST_CONFIG=$(pwd)/config.yaml # used by integration tests and test setup

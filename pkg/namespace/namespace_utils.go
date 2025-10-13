@@ -14,7 +14,7 @@ const (
 	GlobalNamespace             = "cattle-global-data"
 	NodeTemplateGlobalNamespace = "cattle-global-nt"
 	ProvisioningCAPINamespace   = "cattle-provisioning-capi-system"
-	TurtlesNamespace            = "rancher-turtles-system"
+	TurtlesNamespace            = "cattle-turtles-system"
 )
 
 func SetNamespaceCondition(namespace *v1.Namespace, d time.Duration, conditionType string, conditionStatus bool, message string) error {

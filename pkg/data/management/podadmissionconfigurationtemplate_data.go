@@ -36,7 +36,7 @@ var FeatureAppNS = []string{
 	"cattle-ui-plugin-system",         // UI Plugin System
 	"tigera-operator",                 // RKE2 restricted PSA Config, source: https://github.com/rancher/rke2/blob/34633dcc188d3a79744636fe21529ef6f5d64d71/pkg/rke2/psa.go#L58
 	"cattle-provisioning-capi-system", // CAPI core controller manager
-	"rancher-turtles-system",          // Turtles core controller manager
+	"cattle-turtles-system",           // Turtles core controller manager
 }
 
 // addDefaultPodSecurityAdmissionConfigurationTemplates creates or updates the default PSACTs with the builtin templates.
