@@ -86,28 +86,28 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "de4c14250ecab17d8f14f5e42d6c9096318e49ba8621f3e2e4b4bac7c6f15f80",
+				"cattle-cluster-agent": "0ced645edfc4a11bdbf1731fc97ea76c69d5da0f691a395293df4cc6b6ce9e8c",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
-				"proxy-clusterrole-kubeapiserver": "0d28ae2947ce0c5faef85ff59169a5f65e0490552bf9cb00f29a98eb97a02a7e",
-				"cattle-admin":                    "009abecc023b1e4ac1bc35e4153ef4492b2bc66a5972df9c5617a38f587c3f42",
+				"proxy-clusterrole-kubeapiserver": "0b1d7f692252b3f498855fa24f669499ba1c061d0ae0eab0db2bb570bc25e63c",
+				"cattle-admin":                    "d2b6b43774ce046f3e4e157b94167d6be596d697c3c9411d4ef4d6f29c2d5fde",
 			},
 			expectedClusterRoleBindingHashes: map[string]string{
-				"proxy-role-binding-kubernetes-master": "0df909395597974e60d905e9860bc0a02367bd2df74528d430c635c3f7afdeb0",
-				"cattle-admin-binding":                 "0da37cf0d4c4b4d068a3000967c4e37d11e1cecd126779633095dbe30b39c6ba",
+				"proxy-role-binding-kubernetes-master": "8e33b2e67243b5a87012489fcd12b4e805c6b6b3c3c2bb4063eee04ca7bc372e",
+				"cattle-admin-binding":                 "d646e3b685d8f931a11f4938e4c95a97151286fa391ef03898e6d44f6827cf16",
 			},
 			expectedNamespaceHashes: map[string]string{
-				"cattle-system": "fd527fed9cae2e8b27f9610d64e9476e692a3dfde42954aeaecba450fe2b9571",
+				"cattle-system": "53b1582048d8703999612a3b41f7301b4136e8dd3041d57e9a59c97e76dfa564",
 			},
 			expectedServiceHashes: map[string]string{
-				"cattle-cluster-agent": "9512a8430f6d32f31eac6e4446724dc5a336c3d9c8147c824f2734c2f8afe792",
+				"cattle-cluster-agent": "03b629bf7287d1a70f31fdf138ea5ec38201040e757b21a808ea0d413e27d65f",
 			},
 			expectedServiceAccountHashes: map[string]string{
-				"cattle": "5cf160de85eaef5de9ce917130c64c23e91836920f7e9b2e2d7a8be8290079f2",
+				"cattle": "ba41ec07896a1e2d2319c0ca1405c81faf4ad4c7c0a3c183909860531863202b",
 			},
 			expectedSecretHashes: map[string]string{
-				"cattle-credentials-5ec1f7e700": "b2ec2a5655ff908557b5a46695be7429c9eb5bf32c799e37832e57405ce54f46",
+				"cattle-credentials-5ec1f7e700": "38a97eb12e58ccc7ab0b07c8730e0c61fe71f8197aa98ac509431ff265cb2861",
 			},
 		},
 		{
@@ -140,31 +140,31 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "de4c14250ecab17d8f14f5e42d6c9096318e49ba8621f3e2e4b4bac7c6f15f80",
+				"cattle-cluster-agent": "0ced645edfc4a11bdbf1731fc97ea76c69d5da0f691a395293df4cc6b6ce9e8c",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
-				"proxy-clusterrole-kubeapiserver": "0d28ae2947ce0c5faef85ff59169a5f65e0490552bf9cb00f29a98eb97a02a7e",
-				"cattle-admin":                    "009abecc023b1e4ac1bc35e4153ef4492b2bc66a5972df9c5617a38f587c3f42",
+				"proxy-clusterrole-kubeapiserver": "0b1d7f692252b3f498855fa24f669499ba1c061d0ae0eab0db2bb570bc25e63c",
+				"cattle-admin":                    "d2b6b43774ce046f3e4e157b94167d6be596d697c3c9411d4ef4d6f29c2d5fde",
 			},
 			expectedClusterRoleBindingHashes: map[string]string{
-				"proxy-role-binding-kubernetes-master": "0df909395597974e60d905e9860bc0a02367bd2df74528d430c635c3f7afdeb0",
-				"cattle-admin-binding":                 "0da37cf0d4c4b4d068a3000967c4e37d11e1cecd126779633095dbe30b39c6ba",
+				"proxy-role-binding-kubernetes-master": "8e33b2e67243b5a87012489fcd12b4e805c6b6b3c3c2bb4063eee04ca7bc372e",
+				"cattle-admin-binding":                 "d646e3b685d8f931a11f4938e4c95a97151286fa391ef03898e6d44f6827cf16",
 			},
 			expectedNamespaceHashes: map[string]string{
-				"cattle-system": "fd527fed9cae2e8b27f9610d64e9476e692a3dfde42954aeaecba450fe2b9571",
+				"cattle-system": "53b1582048d8703999612a3b41f7301b4136e8dd3041d57e9a59c97e76dfa564",
 			},
 			expectedServiceHashes: map[string]string{
-				"cattle-cluster-agent": "9512a8430f6d32f31eac6e4446724dc5a336c3d9c8147c824f2734c2f8afe792",
+				"cattle-cluster-agent": "03b629bf7287d1a70f31fdf138ea5ec38201040e757b21a808ea0d413e27d65f",
 			},
 			expectedServiceAccountHashes: map[string]string{
-				"cattle": "5cf160de85eaef5de9ce917130c64c23e91836920f7e9b2e2d7a8be8290079f2",
+				"cattle": "ba41ec07896a1e2d2319c0ca1405c81faf4ad4c7c0a3c183909860531863202b",
 			},
 			expectedSecretHashes: map[string]string{
-				"cattle-credentials-5ec1f7e700": "b2ec2a5655ff908557b5a46695be7429c9eb5bf32c799e37832e57405ce54f46",
+				"cattle-credentials-5ec1f7e700": "38a97eb12e58ccc7ab0b07c8730e0c61fe71f8197aa98ac509431ff265cb2861",
 			},
 			expectedPodDisruptionBudgetHashes: map[string]string{
-				"cattle-cluster-agent-pod-disruption-budget": "89bb4831cc31587904eaacb4d6d395b33984c8940b7a3e71e3066788a805e483",
+				"cattle-cluster-agent-pod-disruption-budget": "20b6f53d3abf11951c4cca848ef12e27d3cb46f8f619f2ca2205e2111bc86ee7",
 			},
 		},
 		{
@@ -197,31 +197,31 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 				},
 			},
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "acefadd59268701232c3226bd5d435bba3fa0e449eda5b5858af17c910ed994f",
+				"cattle-cluster-agent": "04e8f9817b3d89a8b7302329bc4447fa70eb43d19051f4bc068bd47e26fa4e61",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
-				"proxy-clusterrole-kubeapiserver": "0d28ae2947ce0c5faef85ff59169a5f65e0490552bf9cb00f29a98eb97a02a7e",
-				"cattle-admin":                    "009abecc023b1e4ac1bc35e4153ef4492b2bc66a5972df9c5617a38f587c3f42",
+				"proxy-clusterrole-kubeapiserver": "0b1d7f692252b3f498855fa24f669499ba1c061d0ae0eab0db2bb570bc25e63c",
+				"cattle-admin":                    "d2b6b43774ce046f3e4e157b94167d6be596d697c3c9411d4ef4d6f29c2d5fde",
 			},
 			expectedClusterRoleBindingHashes: map[string]string{
-				"proxy-role-binding-kubernetes-master": "0df909395597974e60d905e9860bc0a02367bd2df74528d430c635c3f7afdeb0",
-				"cattle-admin-binding":                 "0da37cf0d4c4b4d068a3000967c4e37d11e1cecd126779633095dbe30b39c6ba",
+				"proxy-role-binding-kubernetes-master": "8e33b2e67243b5a87012489fcd12b4e805c6b6b3c3c2bb4063eee04ca7bc372e",
+				"cattle-admin-binding":                 "d646e3b685d8f931a11f4938e4c95a97151286fa391ef03898e6d44f6827cf16",
 			},
 			expectedNamespaceHashes: map[string]string{
-				"cattle-system": "fd527fed9cae2e8b27f9610d64e9476e692a3dfde42954aeaecba450fe2b9571",
+				"cattle-system": "53b1582048d8703999612a3b41f7301b4136e8dd3041d57e9a59c97e76dfa564",
 			},
 			expectedServiceHashes: map[string]string{
-				"cattle-cluster-agent": "9512a8430f6d32f31eac6e4446724dc5a336c3d9c8147c824f2734c2f8afe792",
+				"cattle-cluster-agent": "03b629bf7287d1a70f31fdf138ea5ec38201040e757b21a808ea0d413e27d65f",
 			},
 			expectedServiceAccountHashes: map[string]string{
-				"cattle": "5cf160de85eaef5de9ce917130c64c23e91836920f7e9b2e2d7a8be8290079f2",
+				"cattle": "ba41ec07896a1e2d2319c0ca1405c81faf4ad4c7c0a3c183909860531863202b",
 			},
 			expectedSecretHashes: map[string]string{
-				"cattle-credentials-5ec1f7e700": "b2ec2a5655ff908557b5a46695be7429c9eb5bf32c799e37832e57405ce54f46",
+				"cattle-credentials-5ec1f7e700": "38a97eb12e58ccc7ab0b07c8730e0c61fe71f8197aa98ac509431ff265cb2861",
 			},
 			expectedPodDisruptionBudgetHashes: map[string]string{
-				"cattle-cluster-agent-pod-disruption-budget": "89bb4831cc31587904eaacb4d6d395b33984c8940b7a3e71e3066788a805e483",
+				"cattle-cluster-agent-pod-disruption-budget": "20b6f53d3abf11951c4cca848ef12e27d3cb46f8f619f2ca2205e2111bc86ee7",
 			},
 		},
 		{
@@ -245,28 +245,28 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 			token:      "some-dummy-token",
 			agentImage: "my/agent:image",
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "8e648ee72f5f35e48c67ce914d4cbcc1b1ec23543c6a3c10a4e494c2078ef7c5",
+				"cattle-cluster-agent": "b4ffce8a1fc601ce95f599332de597de478a2244fc6bac3b7dc6204416dfb550",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{
-				"proxy-clusterrole-kubeapiserver": "0d28ae2947ce0c5faef85ff59169a5f65e0490552bf9cb00f29a98eb97a02a7e",
-				"cattle-admin":                    "009abecc023b1e4ac1bc35e4153ef4492b2bc66a5972df9c5617a38f587c3f42",
+				"proxy-clusterrole-kubeapiserver": "0b1d7f692252b3f498855fa24f669499ba1c061d0ae0eab0db2bb570bc25e63c",
+				"cattle-admin":                    "d2b6b43774ce046f3e4e157b94167d6be596d697c3c9411d4ef4d6f29c2d5fde",
 			},
 			expectedClusterRoleBindingHashes: map[string]string{
-				"proxy-role-binding-kubernetes-master": "0df909395597974e60d905e9860bc0a02367bd2df74528d430c635c3f7afdeb0",
-				"cattle-admin-binding":                 "0da37cf0d4c4b4d068a3000967c4e37d11e1cecd126779633095dbe30b39c6ba",
+				"proxy-role-binding-kubernetes-master": "8e33b2e67243b5a87012489fcd12b4e805c6b6b3c3c2bb4063eee04ca7bc372e",
+				"cattle-admin-binding":                 "d646e3b685d8f931a11f4938e4c95a97151286fa391ef03898e6d44f6827cf16",
 			},
 			expectedNamespaceHashes: map[string]string{
-				"cattle-system": "fd527fed9cae2e8b27f9610d64e9476e692a3dfde42954aeaecba450fe2b9571",
+				"cattle-system": "53b1582048d8703999612a3b41f7301b4136e8dd3041d57e9a59c97e76dfa564",
 			},
 			expectedServiceHashes: map[string]string{
-				"cattle-cluster-agent": "9512a8430f6d32f31eac6e4446724dc5a336c3d9c8147c824f2734c2f8afe792",
+				"cattle-cluster-agent": "03b629bf7287d1a70f31fdf138ea5ec38201040e757b21a808ea0d413e27d65f",
 			},
 			expectedServiceAccountHashes: map[string]string{
-				"cattle": "5cf160de85eaef5de9ce917130c64c23e91836920f7e9b2e2d7a8be8290079f2",
+				"cattle": "ba41ec07896a1e2d2319c0ca1405c81faf4ad4c7c0a3c183909860531863202b",
 			},
 			expectedSecretHashes: map[string]string{
-				"cattle-credentials-d23bc3c633": "3d45d058d965019241aca1fe9f9658aafab23acd85466569dab40414611f6fa7",
+				"cattle-credentials-d23bc3c633": "17d3bba8f79a57797638bedb21c08c0d0349a27899932cb6e07e107f067b2897",
 			},
 		},
 	}

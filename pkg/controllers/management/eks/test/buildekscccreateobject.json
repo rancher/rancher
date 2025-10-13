@@ -2,7 +2,6 @@
   "apiVersion": "eks.cattle.io/v1",
   "kind": "EKSClusterConfig",
   "metadata": {
-    "creationTimestamp": null,
     "name": "c-r64vb",
     "ownerReferences": [
       {
