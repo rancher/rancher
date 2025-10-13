@@ -337,38 +337,31 @@ func first(values []string) string {
 }
 
 func validateToken(authToken, token accessor.TokenAccessor, now time.Time) error {
-	// Verify auth and activity token have the same user ID.
 	if authToken.GetUserID() != token.GetUserID() {
 		return apierrors.NewForbidden(gvr.GroupResource(), token.GetName(), errors.New("users don't match"))
 	}
 
-	// Verify auth and activity token has the same auth provider.
 	if authToken.GetAuthProvider() != token.GetAuthProvider() {
 		return apierrors.NewForbidden(gvr.GroupResource(), token.GetName(), errors.New("auth providers don't match"))
 	}
 
-	// Verify auth and activity token has the same auth user principal.
 	if authToken.GetUserPrincipal().Name != token.GetUserPrincipal().Name {
 		return apierrors.NewForbidden(gvr.GroupResource(), token.GetName(), errors.New("user principals don't match"))
 	}
 
-	// Verify that activity token is a session token.
-	if token.GetIsDerived() {
+	if token.GetIsDerived() { // Not a session token.
 		return apierrors.NewForbidden(gvr.GroupResource(), token.GetName(), errors.New("not a session token"))
 	}
 
-	// We can't update disabled token.
 	if !token.GetIsEnabled() {
 		return apierrors.NewForbidden(gvr.GroupResource(), token.GetName(), errors.New("token is disabled"))
 	}
 
-	// We can't update expired token.
 	if token.GetIsExpired() {
 		return apierrors.NewForbidden(gvr.GroupResource(), token.GetName(), errors.New("token is expired"))
 	}
 
-	// We can't update the token if the idle timeout has expired.
-	// This is to prevent reviving previously expired session.
+	// Don't revive the session if the idle timeout has alredy expired.
 	if tokens.IsIdleExpired(token, now) {
 		return apierrors.NewForbidden(gvr.GroupResource(), token.GetName(), errors.New("session idle timeout expired"))
 	}
