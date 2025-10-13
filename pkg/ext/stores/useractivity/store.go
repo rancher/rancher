@@ -82,10 +82,9 @@ func (s *Store) New() runtime.Object {
 // Destroy implements [rest.Storage]
 func (s *Store) Destroy() {}
 
-// Get implements [rest.Getter]
-// Get returns the UserActivity based on the token name.
-// It is used to know, from the frontend, how much time
-// remains before the idle timeout triggers.
+// Get implements [rest.Getter] and returns the UserActivity for a session token.
+// The status.expiresAt tells when the idle timeout expires for the session.
+// The spec.seenAt is calculated using the token's activityLastSeenAt value and the idle timeout setting.
 func (s *Store) Get(ctx context.Context,
 	name string,
 	options *metav1.GetOptions,
@@ -126,7 +125,7 @@ func (s *Store) Get(ctx context.Context,
 		return nil, err
 	}
 
-	idleTimeout := settings.AuthUserSessionIdleTTLMinutes.GetInt()
+	idleTimeout := s.getAuthUserSessionIdleTTLMinutes()
 
 	userActivity, err := s.fromToken(token, idleTimeout)
 	if err != nil {
@@ -136,7 +135,11 @@ func (s *Store) Get(ctx context.Context,
 	return userActivity, nil
 }
 
-// Update implements [rest.Updater]
+// Update implements [rest.Updater] and sets the activityLastSeenAt of the session token
+// to the provided spec.seenAt value or the current timestamp if omitted or if the spec.seenAt
+// is in the future.
+// If the spec.seenAt is before the current activityLastSeenAt, the latter is not updated.
+// It returns Unauthorized if the session token itself and/or the session idle timeout has expired.
 func (s *Store) Update(
 	ctx context.Context,
 	name string,
@@ -179,7 +182,7 @@ func (s *Store) Update(
 	}
 
 	// Maintain the same idle timeout value when reading and updating the UserActivity.
-	idleTimeout := settings.AuthUserSessionIdleTTLMinutes.GetInt()
+	idleTimeout := s.getAuthUserSessionIdleTTLMinutes()
 	oldUserActivity, err := s.fromToken(token, idleTimeout)
 	if err != nil {
 		return nil, false, apierrors.NewInternalError(fmt.Errorf("error creating useractivity from token %s: %w", name, err))
@@ -208,7 +211,7 @@ func (s *Store) Update(
 
 	now := timeNow()
 
-	if err = validateToken(authToken, token, now); err != nil {
+	if err = validateToken(authToken, token, now); err != nil { // Always returns an apierror.
 		return nil, false, err
 	}
 
@@ -336,17 +339,17 @@ func first(values []string) string {
 func validateToken(authToken, token accessor.TokenAccessor, now time.Time) error {
 	// Verify auth and activity token have the same user ID.
 	if authToken.GetUserID() != token.GetUserID() {
-		return apierrors.NewForbidden(gvr.GroupResource(), token.GetName(), errors.New("token users don't match"))
+		return apierrors.NewForbidden(gvr.GroupResource(), token.GetName(), errors.New("users don't match"))
 	}
 
 	// Verify auth and activity token has the same auth provider.
 	if authToken.GetAuthProvider() != token.GetAuthProvider() {
-		return apierrors.NewForbidden(gvr.GroupResource(), token.GetName(), errors.New("auth provider doesn't match"))
+		return apierrors.NewForbidden(gvr.GroupResource(), token.GetName(), errors.New("auth providers don't match"))
 	}
 
 	// Verify auth and activity token has the same auth user principal.
 	if authToken.GetUserPrincipal().Name != token.GetUserPrincipal().Name {
-		return apierrors.NewForbidden(gvr.GroupResource(), token.GetName(), errors.New("user principal doesn't match"))
+		return apierrors.NewForbidden(gvr.GroupResource(), token.GetName(), errors.New("user principals don't match"))
 	}
 
 	// Verify that activity token is a session token.

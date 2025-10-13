@@ -29,9 +29,10 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
+	"k8s.io/utils/ptr"
 )
 
-const defaultIdleTTL = 960
+const defaultIdleTTL = 960 // 16 hours
 
 var (
 	tokenID           = "token-12345"
@@ -112,7 +113,7 @@ func TestStoreUpdate(t *testing.T) {
 		options    *metav1.UpdateOptions
 		setupMocks func()
 		want       func() runtime.Object
-		wantErr    bool
+		wantErr    string
 	}{
 		{
 			desc:    "lastSeen is not set and no seenAt provided",
@@ -394,7 +395,7 @@ func TestStoreUpdate(t *testing.T) {
 			},
 		},
 		{
-			desc: "requestor user not found",
+			desc: "user doesn't exist",
 			ctx: request.WithUser(context.Background(), &k8suser.DefaultInfo{
 				Name:   "user-xyz",
 				Groups: []string{GroupCattleAuthenticated},
@@ -410,10 +411,10 @@ func TestStoreUpdate(t *testing.T) {
 					),
 				)
 			},
-			wantErr: true,
+			wantErr: "user user-xyz is not a Rancher user",
 		},
 		{
-			desc:    "tokens' auth providers don't match",
+			desc:    "auth providers don't match",
 			ctx:     ctxAdmin,
 			objInfo: func() rest.UpdatedObjectInfo { return &fakeUpdatedObjectInfo{obj: userActivity} },
 			setupMocks: func() {
@@ -444,7 +445,147 @@ func TestStoreUpdate(t *testing.T) {
 					}, nil),
 				)
 			},
-			wantErr: true,
+			wantErr: "auth providers don't match",
+		},
+		{
+			desc:    "token is disabled",
+			ctx:     ctxAdmin,
+			objInfo: func() rest.UpdatedObjectInfo { return &fakeUpdatedObjectInfo{obj: userActivity} },
+			setupMocks: func() {
+				gomock.InOrder(
+					userCache.EXPECT().Get("admin").Return(&apiv3.User{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "admin",
+						},
+					}, nil),
+
+					tokenCache.EXPECT().Get(tokenID).Return(&apiv3.Token{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: tokenID,
+						},
+						AuthProvider:  "oidc",
+						UserPrincipal: apiv3.Principal{},
+					}, nil),
+
+					tokenCache.EXPECT().Get(tokenID).Return(&apiv3.Token{
+						ObjectMeta: metav1.ObjectMeta{
+							CreationTimestamp: creationTimestamp,
+							Name:              tokenID,
+							Labels:            sessionLabel,
+						},
+						AuthProvider:  "oidc",
+						Enabled:       ptr.To(false),
+						TTLMillis:     tokenTTL,
+						UserPrincipal: apiv3.Principal{},
+					}, nil),
+				)
+			},
+			wantErr: "token is disabled",
+		},
+		{
+			desc:    "not a session token",
+			ctx:     ctxAdmin,
+			objInfo: func() rest.UpdatedObjectInfo { return &fakeUpdatedObjectInfo{obj: userActivity} },
+			setupMocks: func() {
+				gomock.InOrder(
+					userCache.EXPECT().Get("admin").Return(&apiv3.User{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "admin",
+						},
+					}, nil),
+
+					tokenCache.EXPECT().Get(tokenID).Return(&apiv3.Token{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: tokenID,
+						},
+						AuthProvider:  "oidc",
+						UserPrincipal: apiv3.Principal{},
+					}, nil),
+
+					tokenCache.EXPECT().Get(tokenID).Return(&apiv3.Token{
+						ObjectMeta: metav1.ObjectMeta{
+							CreationTimestamp: creationTimestamp,
+							Name:              tokenID,
+						},
+						AuthProvider:  "oidc",
+						IsDerived:     true, // Not a session token.
+						TTLMillis:     tokenTTL,
+						UserPrincipal: apiv3.Principal{},
+					}, nil),
+				)
+			},
+			wantErr: "not a session token",
+		},
+		{
+			desc:    "session token has expired",
+			ctx:     ctxAdmin,
+			objInfo: func() rest.UpdatedObjectInfo { return &fakeUpdatedObjectInfo{obj: userActivity} },
+			setupMocks: func() {
+				gomock.InOrder(
+					userCache.EXPECT().Get("admin").Return(&apiv3.User{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "admin",
+						},
+					}, nil),
+
+					tokenCache.EXPECT().Get(tokenID).Return(&apiv3.Token{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: tokenID,
+						},
+						AuthProvider:  "oidc",
+						UserPrincipal: apiv3.Principal{},
+					}, nil),
+
+					tokenCache.EXPECT().Get(tokenID).Return(&apiv3.Token{
+						ObjectMeta: metav1.ObjectMeta{
+							CreationTimestamp: metav1.NewTime(now.Add(-(defaultIdleTTL + 10) * time.Minute)),
+							Name:              tokenID,
+							Labels:            sessionLabel,
+						},
+						AuthProvider:  "oidc",
+						TTLMillis:     tokenTTL,
+						UserPrincipal: apiv3.Principal{},
+					}, nil),
+				)
+			},
+			wantErr: "token is expired",
+		},
+		{
+			desc:    "session idle timeout has expired",
+			ctx:     ctxAdmin,
+			objInfo: func() rest.UpdatedObjectInfo { return &fakeUpdatedObjectInfo{obj: userActivity} },
+			setupMocks: func() {
+				gomock.InOrder(
+					userCache.EXPECT().Get("admin").Return(&apiv3.User{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "admin",
+						},
+					}, nil),
+
+					tokenCache.EXPECT().Get(tokenID).Return(&apiv3.Token{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: tokenID,
+						},
+						AuthProvider:  "oidc",
+						UserPrincipal: apiv3.Principal{},
+					}, nil),
+
+					tokenCache.EXPECT().Get(tokenID).Return(&apiv3.Token{
+						ObjectMeta: metav1.ObjectMeta{
+							CreationTimestamp: metav1.NewTime(now.Add(-(defaultIdleTTL + 10) * time.Minute)),
+							Name:              tokenID,
+							Labels:            sessionLabel,
+						},
+						ActivityLastSeenAt: &metav1.Time{
+							Time: now.Add(-(defaultIdleTTL + 1) * time.Minute),
+						},
+						AuthProvider:  "oidc",
+						TTLMillis:     tokenTTL + 1200000, // +20 min to avoid token expire before idle timeout.
+						UserPrincipal: apiv3.Principal{},
+					}, nil),
+				)
+			},
+			wantErr: "session idle timeout expired",
 		},
 		{
 			desc:    "dry run",
@@ -518,8 +659,9 @@ func TestStoreUpdate(t *testing.T) {
 
 			got, created, err := store.Update(tt.ctx, tokenID, tt.objInfo(), nil, validateFunc, false, tt.options)
 			require.False(t, created) // Should always be false.
-			if tt.wantErr {
+			if tt.wantErr != "" {
 				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.wantErr)
 				return
 			}
 
