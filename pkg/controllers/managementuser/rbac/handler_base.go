@@ -166,7 +166,7 @@ func Register(ctx context.Context, workload *config.UserContext) error {
 	// Only one set of CRTB/PRTB/RoleTemplate controllers should run at a time. Using aggregated cluster roles is currently experimental and only available via feature flags.
 	if features.AggregatedRoleTemplates.Enabled() {
 		if err := roletemplates.Register(ctx, workload); err != nil {
-			return err
+			return fmt.Errorf("registering role template controllers: %w", err)
 		}
 	} else {
 		management.Management.ProjectRoleTemplateBindings("").AddClusterScopedLifecycle(ctx, "cluster-prtb-sync", workload.ClusterName, newPRTBLifecycle(r, management, nsInformer))

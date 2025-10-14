@@ -348,7 +348,7 @@ func getImpersonatorAccountToken(user user.Info, clusterContextGetter ClusterCon
 	}
 	impersonator, err := impersonation.ForCluster(clusterContext)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("unable to create impersonator for cluster %q: %w", clusterName, err)
 	}
 	saToken, err := impersonator.GetToken(user)
 	if err != nil {

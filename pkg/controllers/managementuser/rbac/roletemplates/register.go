@@ -2,6 +2,7 @@ package roletemplates
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -35,14 +36,14 @@ func Register(ctx context.Context, workload *config.UserContext) error {
 
 	c, err := newCRTBHandler(workload)
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot create clusterroletemplatebinding handler: %w", err)
 	}
 	management.Wrangler.Mgmt.ClusterRoleTemplateBinding().OnChange(ctx, crtbChangeHandler, c.OnChange)
 	scopedOnRemove(ctx, crtbRemoveHandler, management.Wrangler.Mgmt.ClusterRoleTemplateBinding(), crtbForCluster(workload.ClusterName), c.OnRemove)
 
 	p, err := newPRTBHandler(workload)
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot create projectroletemplatebinding handler: %w", err)
 	}
 	management.Wrangler.Mgmt.ProjectRoleTemplateBinding().OnChange(ctx, prtbChangeHandler, p.OnChange)
 	scopedOnRemove(ctx, prtbRemoveHandler, management.Wrangler.Mgmt.ProjectRoleTemplateBinding(), prtbForCluster(workload.ClusterName), p.OnRemove)

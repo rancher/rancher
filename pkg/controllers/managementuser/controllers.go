@@ -51,7 +51,7 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 	RegisterCaches(cluster)
 	// early request an impersonator for initializing it
 	if _, err := impersonation.ForCluster(cluster); err != nil {
-		return err
+		return fmt.Errorf("unable to create impersonator for cluster %q: %w", cluster.ClusterName, err)
 	}
 
 	if err := cavalidator.Register(ctx, cluster); err != nil {

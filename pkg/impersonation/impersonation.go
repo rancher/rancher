@@ -77,7 +77,7 @@ func ForCluster(clusterContext *config.UserContext) (config.Impersonator, error)
 	// Use a dedicated cache factory, restricting cached secrets and svcaccounts only to the impersonation namespace
 	factory := newControllerFactory(clusterContext.ControllerFactory.SharedCacheFactory().SharedClientFactory())
 	if err := clusterContext.RegisterExtraControllerFactory("impersonation", factory); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("registering impersonation controller factory: %w", err)
 	}
 	dedicatedCoreFactory := corecontrollers.New(factory)
 
