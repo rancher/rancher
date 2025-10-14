@@ -24,6 +24,7 @@ const (
 	DaemonSetSpecFieldHostPID                       = "hostPID"
 	DaemonSetSpecFieldHostUsers                     = "hostUsers"
 	DaemonSetSpecFieldHostname                      = "hostname"
+	DaemonSetSpecFieldHostnameOverride              = "hostnameOverride"
 	DaemonSetSpecFieldImagePullSecrets              = "imagePullSecrets"
 	DaemonSetSpecFieldMaxSurge                      = "maxSurge"
 	DaemonSetSpecFieldNodeID                        = "nodeId"
@@ -75,6 +76,7 @@ type DaemonSetSpec struct {
 	HostPID                       bool                           `json:"hostPID,omitempty" yaml:"hostPID,omitempty"`
 	HostUsers                     *bool                          `json:"hostUsers,omitempty" yaml:"hostUsers,omitempty"`
 	Hostname                      string                         `json:"hostname,omitempty" yaml:"hostname,omitempty"`
+	HostnameOverride              string                         `json:"hostnameOverride,omitempty" yaml:"hostnameOverride,omitempty"`
 	ImagePullSecrets              []LocalObjectReference         `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
 	MaxSurge                      intstr.IntOrString             `json:"maxSurge,omitempty" yaml:"maxSurge,omitempty"`
 	NodeID                        string                         `json:"nodeId,omitempty" yaml:"nodeId,omitempty"`

@@ -28,6 +28,7 @@ const (
 	StatefulSetFieldHostPID                              = "hostPID"
 	StatefulSetFieldHostUsers                            = "hostUsers"
 	StatefulSetFieldHostname                             = "hostname"
+	StatefulSetFieldHostnameOverride                     = "hostnameOverride"
 	StatefulSetFieldImagePullSecrets                     = "imagePullSecrets"
 	StatefulSetFieldLabels                               = "labels"
 	StatefulSetFieldMaxUnavailable                       = "maxUnavailable"
@@ -101,6 +102,7 @@ type StatefulSet struct {
 	HostPID                              bool                                             `json:"hostPID,omitempty" yaml:"hostPID,omitempty"`
 	HostUsers                            *bool                                            `json:"hostUsers,omitempty" yaml:"hostUsers,omitempty"`
 	Hostname                             string                                           `json:"hostname,omitempty" yaml:"hostname,omitempty"`
+	HostnameOverride                     string                                           `json:"hostnameOverride,omitempty" yaml:"hostnameOverride,omitempty"`
 	ImagePullSecrets                     []LocalObjectReference                           `json:"imagePullSecrets,omitempty" yaml:"imagePullSecrets,omitempty"`
 	Labels                               map[string]string                                `json:"labels,omitempty" yaml:"labels,omitempty"`
 	MaxUnavailable                       intstr.IntOrString                               `json:"maxUnavailable,omitempty" yaml:"maxUnavailable,omitempty"`

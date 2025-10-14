@@ -1,9 +1,10 @@
 package capr
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	"reflect"
 	"testing"
+
+	corev1 "k8s.io/api/core/v1"
 
 	"github.com/pkg/errors"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"

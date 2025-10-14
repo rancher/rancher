@@ -3,7 +3,6 @@
   "apiVersion": "gke.cattle.io/v1",
   "metadata": {
     "name": "c-5tzkk",
-    "creationTimestamp": null,
     "ownerReferences": [
       {
         "apiVersion": "management.cattle.io/v3",
