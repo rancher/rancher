@@ -358,95 +358,139 @@ func addToken(config map[string]interface{}, entry *planEntry, tokensSecret plan
 }
 
 func addAddresses(secrets corecontrollers.SecretCache, config map[string]interface{}, entry *planEntry) error {
-	internalIPAddress := entry.Metadata.Annotations[capr.InternalAddressAnnotation]
-	ipAddress := entry.Metadata.Annotations[capr.AddressAnnotation]
-	internalAddressProvided, addressProvided := internalIPAddress != "", ipAddress != ""
-
-	var ipv6, driverName string
-
-	// If this is a provisioned node (not a custom node), then get the IP addresses from the machine driver config.
-	if entry.Machine.Spec.InfrastructureRef.APIVersion == capr.RKEMachineAPIVersion && (!internalAddressProvided || !addressProvided) {
-		secret, err := secrets.Get(entry.Machine.Spec.InfrastructureRef.Namespace, capr.MachineStateSecretName(entry.Machine.Spec.InfrastructureRef.Name))
-		if apierrors.IsNotFound(err) || (secret != nil && len(secret.Data["extractedConfig"]) == 0) {
-			return errIgnore(fmt.Sprintf("waiting for machine %s/%s driver config to be saved", entry.Machine.Namespace, entry.Machine.Name))
-		} else if err != nil {
-			return fmt.Errorf("error getting machine state secret for machine %s/%s: %w", entry.Machine.Namespace, entry.Machine.Name, err)
-		}
-
-		driverConfig, err := nodeconfig.ExtractConfigJSON(base64.StdEncoding.EncodeToString(secret.Data["extractedConfig"]))
-		if err != nil {
-			return fmt.Errorf("error getting machine state JSON for machine %s/%s: %w", entry.Machine.Namespace, entry.Machine.Name, err)
-		}
-		if len(driverConfig) == 0 {
-			return fmt.Errorf("machine state JSON is empty for machine %s/%s", entry.Machine.Namespace, entry.Machine.Name)
-		}
-
-		if !addressProvided {
-			ipAddress = convert.ToString(values.GetValueN(driverConfig, "Driver", "IPAddress"))
-		}
-		if !internalAddressProvided {
-			internalIPAddress = convert.ToString(values.GetValueN(driverConfig, "Driver", "PrivateIPAddress"))
-		}
-		ipv6 = convert.ToString(values.GetValueN(driverConfig, "Driver", "IPv6Address"))
-		driverName = convert.ToString(values.GetValueN(driverConfig, "DriverName"))
+	info, err := getMachineNetworkInfo(secrets, entry)
+	if err != nil {
+		return err
 	}
 
-	// Prefer the public IPv4 address from rancher-machine or the registration command, fall back to the IPv6 address
-	externalIP := ipAddress
-	if externalIP == "" {
-		externalIP = ipv6
-	}
-	setNodeExternalIP := externalIP != "" && internalIPAddress != "" && externalIP != internalIPAddress
+	updateConfigWithAddresses(config, info)
+	return nil
+}
 
-	// on control-plane nodes with distinct internal/external, advertise the internal
-	if setNodeExternalIP && !isOnlyWorker(entry) {
-		config["advertise-address"] = internalIPAddress
-		config["tls-san"] = append(convert.ToStringSlice(config["tls-san"]), ipAddress)
+// machineNetworkInfo contains all addresses and driver details needed to update a node's configuration.
+type machineNetworkInfo struct {
+	InternalAddresses []string
+	ExternalAddresses []string
+	IPv6Address       string
+	DriverName        string
+}
+
+// getMachineNetworkInfo retrieves IP address information and the driver name for a given machine entry.
+// It first checks annotations, if needed fetches the machine state secret to extract addresses from the driver config.
+func getMachineNetworkInfo(secrets corecontrollers.SecretCache, entry *planEntry) (*machineNetworkInfo, error) {
+	info := &machineNetworkInfo{}
+	if ips := entry.Metadata.Annotations[capr.InternalAddressAnnotation]; ips != "" {
+		for _, ip := range strings.Split(ips, ",") {
+			if ip != "" {
+				info.InternalAddresses = append(info.InternalAddresses, strings.TrimSpace(ip))
+			}
+		}
+	}
+	if ips := entry.Metadata.Annotations[capr.AddressAnnotation]; ips != "" {
+		for _, ip := range strings.Split(ips, ",") {
+			if ip != "" {
+				info.ExternalAddresses = append(info.ExternalAddresses, strings.TrimSpace(ip))
+			}
+		}
 	}
 
-	switch driverName {
+	internalProvided := len(info.InternalAddresses) > 0
+	externalProvided := len(info.ExternalAddresses) > 0
+
+	// Skip secret lookup for custom nodes or when both addresses are already provided
+	if entry.Machine.Spec.InfrastructureRef.APIVersion != capr.RKEMachineAPIVersion || (internalProvided && externalProvided) {
+		return info, nil
+	}
+
+	secret, err := secrets.Get(entry.Machine.Spec.InfrastructureRef.Namespace, capr.MachineStateSecretName(entry.Machine.Spec.InfrastructureRef.Name))
+	if apierrors.IsNotFound(err) || (secret != nil && len(secret.Data["extractedConfig"]) == 0) {
+		return nil, errIgnore(fmt.Sprintf("waiting for machine %s/%s driver config to be saved", entry.Machine.Namespace, entry.Machine.Name))
+	} else if err != nil {
+		return nil, fmt.Errorf("error getting machine state secret for machine %s/%s: %w", entry.Machine.Namespace, entry.Machine.Name, err)
+	}
+
+	if secret == nil {
+		return nil, fmt.Errorf("machine state secret for machine %s/%s not found", entry.Machine.Namespace, entry.Machine.Name)
+	}
+
+	driverConfig, err := nodeconfig.ExtractConfigJSON(base64.StdEncoding.EncodeToString(secret.Data["extractedConfig"]))
+	if err != nil {
+		return nil, fmt.Errorf("error getting machine state JSON for machine %s/%s: %w", entry.Machine.Namespace, entry.Machine.Name, err)
+	}
+	if len(driverConfig) == 0 {
+		return nil, fmt.Errorf("machine state JSON is empty for %s/%s", entry.Machine.Namespace, entry.Machine.Name)
+	}
+
+	if !externalProvided {
+		if ip := convert.ToString(values.GetValueN(driverConfig, "Driver", "IPAddress")); ip != "" {
+			info.ExternalAddresses = []string{ip}
+		}
+	}
+	if !internalProvided {
+		if ip := convert.ToString(values.GetValueN(driverConfig, "Driver", "PrivateIPAddress")); ip != "" {
+			info.InternalAddresses = []string{ip}
+		}
+	}
+	info.IPv6Address = convert.ToString(values.GetValueN(driverConfig, "Driver", "IPv6Address"))
+	info.DriverName = convert.ToString(values.GetValueN(driverConfig, "DriverName"))
+
+	return info, nil
+}
+
+// updateConfigWithAddresses mutates the node configuration map based on the provided network information.
+// As long as Rancher sets the node-ip and node-external-ip properly, RKE2/K3s will automatically
+// determine the appropriate advertise-address and tls-san values.
+func updateConfigWithAddresses(config map[string]interface{}, info *machineNetworkInfo) {
+	nodeIPs := convert.ToStringSlice(config["node-ip"])
+	var toAdd []string
+
+	switch info.DriverName {
 	case management.PodDriver:
-		// Skip setting node-ip due to a bug in the pod node driver, which assigns the IPAddress
+		// Skip setting IP due to a bug in the pod node driver, which assigns the IPAddress
 		// from the first pod in the namespace instead of the intended target pod.
 		// RKE2/k3s can detect the correct node IP when it is not set.
+		return
+
 	case management.DigitalOceandriver:
 		// The public IPv4 address cannot be disabled. Therefore, if --private-network is not enabled, the public IPv4
 		// address needs to be set to the node-ip to maintain alignment with cluster-cidr and server-cidr in dual-stack mode.
 		// This also implies that an IPv6-only DO node driver cluster is not possible.
-		toAdd := internalIPAddress
-		if toAdd == "" {
-			toAdd = ipAddress
+		toAdd = info.InternalAddresses
+		if len(toAdd) == 0 {
+			toAdd = info.ExternalAddresses
 		}
-		if toAdd != "" && !slices.Contains(convert.ToStringSlice(config["node-ip"]), toAdd) {
-			config["node-ip"] = append(convert.ToStringSlice(config["node-ip"]), toAdd)
-		}
+
 	default:
-		// Always include the internal node IP when it is available.
-		if internalIPAddress != "" && !slices.Contains(convert.ToStringSlice(config["node-ip"]), internalIPAddress) {
-			config["node-ip"] = append(convert.ToStringSlice(config["node-ip"]), internalIPAddress)
+		// Always include the internal node IPs when they are available.
+		toAdd = info.InternalAddresses
+	}
+
+	if len(toAdd) > 0 {
+		for _, ip := range toAdd {
+			if ip != "" && !slices.Contains(nodeIPs, ip) {
+				nodeIPs = append(nodeIPs, ip)
+			}
 		}
 	}
 
-	// In IPv6-only clusters, the IPv6 address should be used as both the internal and external node IP
-	if ipv6 != "" && !slices.Contains(convert.ToStringSlice(config["node-ip"]), ipv6) {
-		config["node-ip"] = append(convert.ToStringSlice(config["node-ip"]), ipv6)
+	if info.IPv6Address != "" && !slices.Contains(nodeIPs, info.IPv6Address) {
+		nodeIPs = append(nodeIPs, info.IPv6Address)
 	}
 
-	// Cloud provider, if set, will handle external IP
-	// If no cloud provider is set, assign node-external-ip in any of the following cases:
-	// - a public IP is available
-	// - both public and private IPs are available and differ
-	// - an IPv6 address is available for IPv6-only or dual-stack cluster
-	if convert.ToString(config["cloud-provider-name"]) == "" && (addressProvided || setNodeExternalIP || ipv6 != "") {
-		if ipAddress != "" && !slices.Contains(convert.ToStringSlice(config["node-external-ip"]), ipAddress) {
-			config["node-external-ip"] = append(convert.ToStringSlice(config["node-external-ip"]), ipAddress)
-		}
-		if ipv6 != "" && !slices.Contains(convert.ToStringSlice(config["node-external-ip"]), ipv6) {
-			config["node-external-ip"] = append(convert.ToStringSlice(config["node-external-ip"]), ipv6)
-		}
-	}
+	config["node-ip"] = nodeIPs
 
-	return nil
+	// If a cloud provider is configured, it will manage the external IP.
+	// If no cloud provider is set, assign node-external-ip if public IPs are available,
+	// and have not already been assigned to node-ip.
+	if convert.ToString(config["cloud-provider-name"]) == "" {
+		nodeExternalIPs := convert.ToStringSlice(config["node-external-ip"])
+		for _, ip := range info.ExternalAddresses {
+			if ip != "" && !slices.Contains(nodeExternalIPs, ip) && !slices.Contains(nodeIPs, ip) {
+				nodeExternalIPs = append(nodeExternalIPs, ip)
+			}
+		}
+		config["node-external-ip"] = nodeExternalIPs
+	}
 }
 
 func addLabels(config map[string]interface{}, entry *planEntry) error {
