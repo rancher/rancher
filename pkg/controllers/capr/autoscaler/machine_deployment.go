@@ -1,8 +1,6 @@
 package autoscaler
 
 import (
-	"fmt"
-
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	v1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
@@ -45,23 +43,9 @@ func (s *machineDeploymentReplicaOverrider) syncMachinePoolReplicas(_ string, md
 		return md, err
 	}
 
-	v2provClusterName := ""
-	for _, owner := range capiCluster.OwnerReferences {
-		if owner.APIVersion != "provisioning.cattle.io/v1" && owner.Kind != "Cluster" {
-			continue
-		}
-
-		v2provClusterName = owner.Name
-	}
-
-	if v2provClusterName == "" {
-		return md, fmt.Errorf("failed to find provisioning cluster object for machinedeployment %v/%v", md.Namespace, md.Name)
-	}
-
-	logrus.Debugf("Getting cluster %s/%s", md.Namespace, v2provClusterName)
-	cluster, err := s.clusterCache.Get(md.Namespace, v2provClusterName)
+	logrus.Debugf("Getting v2prov cluster capi cluster %s/%s", capiCluster.Namespace, capiCluster.Name)
+	cluster, err := capr.GetProvisioningClusterFromCAPICluster(capiCluster, s.clusterCache)
 	if err != nil {
-		logrus.Errorf("Error getting cluster %s/%s: %v", md.Namespace, v2provClusterName, err)
 		return md, err
 	}
 

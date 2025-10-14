@@ -112,7 +112,7 @@ func (h *autoscalerHandler) renewToken(token *v3.Token) error {
 
 	// Find the capi cluster to update the secret
 	// Since clusters are cluster-scoped, we use "" as namespace and filter by label selector
-	clusters, err := h.capiCluster.List("", labels.SelectorFromSet(labels.Set{
+	clusters, err := h.capiClusterCache.List("", labels.SelectorFromSet(labels.Set{
 		capi.ClusterNameLabel: clusterName,
 	}))
 
@@ -147,7 +147,7 @@ func (h *autoscalerHandler) updateKubeConfigSecretWithToken(cluster *capi.Cluste
 	secretName := kubeconfigSecretName(cluster)
 
 	// Get the existing secret
-	secret, err := h.secretsCache.Get(cluster.Namespace, secretName)
+	secret, err := h.secretCache.Get(cluster.Namespace, secretName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get existing kubeconfig secret %s/%s: %w", cluster.Namespace, secretName, err)
 	}
@@ -163,7 +163,7 @@ func (h *autoscalerHandler) updateKubeConfigSecretWithToken(cluster *capi.Cluste
 	secret.Data["token"] = []byte(token)
 
 	// Update the secret
-	kubeconfig, err := h.secrets.Update(secret)
+	kubeconfig, err := h.secret.Update(secret)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update kubeconfig secret %s/%s: %w", cluster.Namespace, secretName, err)
 	}

@@ -238,7 +238,7 @@ func GetProvisioningClusterFromCAPICluster(cluster *capi.Cluster, clusterCache p
 		return clusterCache.Get(cluster.Namespace, owner.Name)
 	}
 
-	return nil, fmt.Errorf("cluster not found")
+	return nil, nil
 }
 
 // GetFeatureVersion retrieves a feature version (string) for a given controlPlane based on the version/runtime of the project. It will return 0.0.0 (semver) if the KDM data is valid, but the featureVersion isn't defined.

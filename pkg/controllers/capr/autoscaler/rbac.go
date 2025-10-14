@@ -166,7 +166,7 @@ func (h *autoscalerHandler) ensureUserToken(cluster *capi.Cluster, username stri
 
 // createKubeConfigSecretUsingTemplate creates a kubeconfig secret string given a cluster and token
 func (h *autoscalerHandler) createKubeConfigSecretUsingTemplate(cluster *capi.Cluster, token string) (*corev1.Secret, error) {
-	s, err := h.secretsCache.Get(cluster.Namespace, kubeconfigSecretName(cluster))
+	s, err := h.secretCache.Get(cluster.Namespace, kubeconfigSecretName(cluster))
 	if err != nil && !errors.IsNotFound(err) {
 		return nil, err
 	}
@@ -202,11 +202,11 @@ func (h *autoscalerHandler) createKubeConfigSecretUsingTemplate(cluster *capi.Cl
 		},
 	}
 
-	return h.secrets.Create(secret)
+	return h.secret.Create(secret)
 }
 
 // cleanup removes all autoscaler-related rbac resources for a given cluster
-func (h *autoscalerHandler) cleanupRbac(cluster *capi.Cluster) error {
+func (h *autoscalerHandler) cleanupRBAC(cluster *capi.Cluster) error {
 	var errs []error
 
 	// Delete the user if it exists
@@ -250,8 +250,8 @@ func (h *autoscalerHandler) cleanupRbac(cluster *capi.Cluster) error {
 
 	// Delete the kubeconfig secret if it exists
 	secretName := kubeconfigSecretName(cluster)
-	if _, err := h.secretsCache.Get(cluster.Namespace, secretName); err == nil {
-		if err := h.secrets.Delete(cluster.Namespace, secretName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+	if _, err := h.secretCache.Get(cluster.Namespace, secretName); err == nil {
+		if err := h.secret.Delete(cluster.Namespace, secretName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 			errs = append(errs, fmt.Errorf("failed to delete secret %s in namespace %s: %w", secretName, cluster.Namespace, err))
 		}
 	} else if !errors.IsNotFound(err) {

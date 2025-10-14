@@ -3,11 +3,10 @@ package autoscaler
 import (
 	"context"
 	"errors"
-	"fmt"
 	"reflect"
-	"strconv"
 
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
+	"github.com/rancher/lasso/pkg/dynamic"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
@@ -23,23 +22,17 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
-var (
-	// two pre-canned in order to stop execution during the autoscale main controller
-	uninstalled = errors.New("autoscaler uninstalled")
-	paused      = errors.New("autoscaler paused")
-)
-
 type autoscalerHandler struct {
-	capiCluster v1beta1.ClusterCache
+	capiClusterCache           v1beta1.ClusterCache
+	capiMachineCache           v1beta1.MachineCache
+	capiMachineDeploymentCache v1beta1.MachineDeploymentCache
 
 	clusterClient v2provcontrollers.ClusterClient
 	clusterCache  v2provcontrollers.ClusterCache
 
-	machineDeploymentCache v1beta1.MachineDeploymentCache
-	machineCache           v1beta1.MachineCache
+	globalRole      mgmtcontrollers.GlobalRoleClient
+	globalRoleCache mgmtcontrollers.GlobalRoleCache
 
-	globalRole             mgmtcontrollers.GlobalRoleClient
-	globalRoleCache        mgmtcontrollers.GlobalRoleCache
 	globalRoleBinding      mgmtcontrollers.GlobalRoleBindingClient
 	globalRoleBindingCache mgmtcontrollers.GlobalRoleBindingCache
 
@@ -49,11 +42,13 @@ type autoscalerHandler struct {
 	token      mgmtcontrollers.TokenClient
 	tokenCache mgmtcontrollers.TokenCache
 
-	secrets      wranglerv1.SecretController
-	secretsCache wranglerv1.SecretCache
+	secret      wranglerv1.SecretController
+	secretCache wranglerv1.SecretCache
 
 	helmOp      fleetcontrollers.HelmOpController
 	helmOpCache fleetcontrollers.HelmOpCache
+
+	dynamicClient *dynamic.Controller
 }
 
 func Register(ctx context.Context, clients *wrangler.CAPIContext) {
@@ -62,6 +57,8 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 		return
 	}
 
+	// warn the user if they have the autoscaling feature-flag enabled but no chart repo set,
+	// then do not run the controller.
 	if settings.ClusterAutoscalerChartRepo.Get() == "" {
 		logrus.Warnf("[autoscaler] no chart repo configured for autoscaler - cannot enable autoscaling!")
 		return
@@ -71,8 +68,9 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 		clusterClient: clients.Provisioning.Cluster(),
 		clusterCache:  clients.Provisioning.Cluster().Cache(),
 
-		machineDeploymentCache: clients.CAPI.MachineDeployment().Cache(),
-		machineCache:           clients.CAPI.Machine().Cache(),
+		capiClusterCache:           clients.CAPI.Cluster().Cache(),
+		capiMachineCache:           clients.CAPI.Machine().Cache(),
+		capiMachineDeploymentCache: clients.CAPI.MachineDeployment().Cache(),
 
 		globalRole:             clients.Mgmt.GlobalRole(),
 		globalRoleCache:        clients.Mgmt.GlobalRole().Cache(),
@@ -85,11 +83,13 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 		token:      clients.Mgmt.Token(),
 		tokenCache: clients.Mgmt.Token().Cache(),
 
-		secrets:      clients.Core.Secret(),
-		secretsCache: clients.Core.Secret().Cache(),
+		secret:      clients.Core.Secret(),
+		secretCache: clients.Core.Secret().Cache(),
 
 		helmOp:      clients.Fleet.HelmOp(),
 		helmOpCache: clients.Fleet.HelmOp().Cache(),
+
+		dynamicClient: clients.Dynamic,
 	}
 
 	// Start background token renewal process, runs daily to refresh tokens that expire within a month.
@@ -116,35 +116,33 @@ func (h *autoscalerHandler) OnChange(_ string, cluster *capi.Cluster) (*capi.Clu
 	}
 
 	// fetch appropriate capi resources related to this cluster (machineDeployments + machines)
-	mds, err := h.machineDeploymentCache.List(cluster.Namespace, labels.SelectorFromSet(labels.Set{capi.ClusterNameLabel: cluster.Name}))
+	mds, err := h.capiMachineDeploymentCache.List(cluster.Namespace, labels.SelectorFromSet(labels.Set{capi.ClusterNameLabel: cluster.Name}))
 	if err != nil {
 		logrus.Warnf("[autoscaler] failed to list machinedeployments for capi cluster %v/%v", cluster.Namespace, cluster.Name)
 		return cluster, err
 	}
 
-	machines, err := h.machineCache.List(cluster.Namespace, labels.SelectorFromSet(labels.Set{capi.ClusterNameLabel: cluster.Name}))
+	machines, err := h.capiMachineCache.List(cluster.Namespace, labels.SelectorFromSet(labels.Set{capi.ClusterNameLabel: cluster.Name}))
 	if err != nil {
 		logrus.Warnf("[autoscaler] failed to list machines for capi cluster %v/%v", cluster.Namespace, cluster.Name)
 		return cluster, err
 	}
 
-	// Handle cluster readiness check
-	if autoscalingEnabled, err := h.isAutoscalingEnabled(cluster, mds); err != nil {
-		return cluster, err
-	} else if !autoscalingEnabled {
+	// we have to check if autoscaling is paused first before removing resources
+	//
+	// if it isn't paused, then just check if autoscaling is enabled.
+	// if cluster doesn't have autoscaling enabled, just ensure all resources are gone.
+	//
+	// if both of these pass, ensure the autoscaler is set up to function.
+	if autoscalingPaused(cluster) {
+		return cluster, h.pauseAutoscaling(cluster)
+	} else if autoscalingEnabled := h.isAutoscalingEnabled(cluster, mds); !autoscalingEnabled {
 		err := h.handleUninstall(cluster)
 		if err != nil {
 			logrus.Debugf("[autoscaler] failed to cleanup autoscaler resources for %v/%v: %v", cluster.Namespace, cluster.Name, err)
 		}
 
 		return cluster, nil
-	}
-
-	err = h.handlePaused(cluster)
-	if errors.Is(err, paused) {
-		return cluster, nil
-	} else if err != nil {
-		return cluster, err
 	}
 
 	// Setup RBAC (user, role, role binding, token)
@@ -158,40 +156,39 @@ func (h *autoscalerHandler) OnChange(_ string, cluster *capi.Cluster) (*capi.Clu
 		return cluster, err
 	}
 
+	// enqueue the helmop in order to force a status-update on the v2prov cluster object (if it exists) from the helmOp
+	h.helmOp.Enqueue(cluster.Namespace, helmOpName(cluster))
+
 	return cluster, nil
 }
 
 // isAutoscalingEnabled checks if autoscaling is enabled for the cluster and validates annotations
-func (h *autoscalerHandler) isAutoscalingEnabled(cluster *capi.Cluster, mds []*capi.MachineDeployment) (bool, error) {
+func (h *autoscalerHandler) isAutoscalingEnabled(cluster *capi.Cluster, mds []*capi.MachineDeployment) bool {
 	if !capr.AutoscalerEnabledByCAPI(cluster, mds) {
-		logrus.Tracef("[autoscaler] No machine pools are configured for autoscaling - not setting up")
-		return false, nil
-	}
-
-	if err := validateAutoscalerAnnotations(mds); err != nil {
-		return false, err
+		return false
 	}
 
 	logrus.Infof("[autoscaler] Cluster %s/%s is ready and has autoscaler enabled for at least one machine pool", cluster.Namespace, cluster.Name)
-	return true, nil
+	return true
 }
 
-// handlePaused checks to see if the cluster-autoscaler needs to be paused and does that if so
-func (h *autoscalerHandler) handlePaused(cluster *capi.Cluster) error {
+// Returns true if the cluster autoscaler is paused at the cluster annotation level
+func autoscalingPaused(cluster *capi.Cluster) bool {
+	return cluster.Annotations[capr.ClusterAutoscalerEnabledAnnotation] == "paused"
+}
+
+// pauseAutoscaling checks to see if the cluster-autoscaler needs to be paused and does that if so
+func (h *autoscalerHandler) pauseAutoscaling(cluster *capi.Cluster) error {
 	// scale autoscaler down to zero if autoscaling is set to "pause"
-	if cluster.Annotations[capr.ClusterAutoscalerEnabledAnnotation] == "paused" {
-		secret, err := h.secretsCache.Get(cluster.Namespace, kubeconfigSecretName(cluster))
-		if err != nil {
-			return err
-		}
+	secret, err := h.secretCache.Get(cluster.Namespace, kubeconfigSecretName(cluster))
+	if err != nil {
+		return err
+	}
 
-		// scales cluster-autoscaler helm chart down to 0 replicas
-		err = h.ensureFleetHelmOp(cluster, secret.ResourceVersion, 0)
-		if err != nil {
-			return err
-		}
-
-		return paused
+	// scales cluster-autoscaler helm chart down to 0 replicas
+	err = h.ensureFleetHelmOp(cluster, secret.ResourceVersion, 0)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -199,7 +196,7 @@ func (h *autoscalerHandler) handlePaused(cluster *capi.Cluster) error {
 
 // handleUninstall cleans up RBAC and Fleet resources for the given cluster.
 func (h *autoscalerHandler) handleUninstall(cluster *capi.Cluster) error {
-	return errors.Join(h.cleanupRbac(cluster), h.cleanupFleet(cluster))
+	return errors.Join(h.cleanupRBAC(cluster), h.cleanupFleet(cluster))
 }
 
 // setupRBAC handles user/token creation and RBAC setup
@@ -249,47 +246,7 @@ func (h *autoscalerHandler) deployChart(capiCluster *capi.Cluster, kubeconfig *v
 		return err
 	}
 
-	h.helmOp.Enqueue(capiCluster.Namespace, helmOpName(capiCluster))
-
 	return nil
-}
-
-// these are validated by the webhook too - but doesn't hurt to double-validate.
-func validateAutoscalerAnnotations(mds []*capi.MachineDeployment) error {
-	for _, md := range mds {
-		minSizeStr := md.Annotations[capi.AutoscalerMinSizeAnnotation]
-		maxSizeStr := md.Annotations[capi.AutoscalerMaxSizeAnnotation]
-
-		// not enabled for this machineDeployment
-		if minSizeStr == "" && maxSizeStr == "" {
-			return nil
-		}
-
-		minSize, _ := strconv.Atoi(minSizeStr)
-		maxSize, _ := strconv.Atoi(maxSizeStr)
-
-		if minSize > maxSize {
-			return fmt.Errorf("cluster %s/%s pool %v has min size (%d) greater than max size (%d)", md.Namespace, md.Spec.ClusterName, md.Name, minSize, maxSize)
-		}
-
-		if !hasMinNodes(minSize, md.Spec.Template.Labels[capr.EtcdRoleLabel] != "", md.Spec.Template.Labels[capr.ControlPlaneRoleLabel] != "") {
-			return fmt.Errorf("cluster %s/%s pool %v has controlplane/etcd role and has minimum of 0 nodes, 1 node is required", md.Namespace, md.Spec.ClusterName, md.Name)
-		}
-	}
-
-	return nil
-}
-
-// hasMinNodes checks if minimum node requirements are met based on pool roles.
-func hasMinNodes(minSize int, etcdRole, controlPlaneRole bool) bool {
-	switch {
-	case etcdRole:
-		return minSize > 0
-	case controlPlaneRole:
-		return minSize > 0
-	default:
-		return true
-	}
 }
 
 // Syncs the Helm operation status with the cluster's provisioning status based on deployment progress
@@ -302,11 +259,21 @@ func (h *autoscalerHandler) syncHelmOpStatus(_ string, helmOp *fleet.HelmOp) (*f
 		return helmOp, nil
 	}
 
-	cluster, err := h.clusterCache.Get(helmOp.Namespace, helmOp.Labels[capi.ClusterNameLabel])
+	capiCluster, err := h.capiClusterCache.Get(helmOp.Namespace, helmOp.Labels[capi.ClusterNameLabel])
 	if err != nil {
 		return helmOp, err
 	}
 
+	cluster, err := capr.GetProvisioningClusterFromCAPICluster(capiCluster, h.clusterCache)
+	// if there is not a provisioning cluster associated with this helmop its fine - just a non-v2prov cluster
+	if err != nil && cluster == nil {
+		return helmOp, nil
+	} else if err != nil {
+		return helmOp, err
+	}
+
+	// not populating the status condition on the cluster until the actual cluster is ready and the helm
+	// operation will be progressing
 	if !capr.Ready.IsTrue(cluster) {
 		return helmOp, nil
 	}
@@ -318,14 +285,10 @@ func (h *autoscalerHandler) syncHelmOpStatus(_ string, helmOp *fleet.HelmOp) (*f
 	if helmOp.Status.Summary.DesiredReady == helmOp.Status.Summary.Ready {
 		capr.ClusterAutoscalerDeploymentReady.True(cluster)
 		capr.ClusterAutoscalerDeploymentReady.Message(cluster, "")
-	}
-
-	if helmOp.Status.Summary.WaitApplied > 0 {
+	} else if helmOp.Status.Summary.WaitApplied > 0 {
 		capr.ClusterAutoscalerDeploymentReady.False(cluster)
 		capr.ClusterAutoscalerDeploymentReady.Message(cluster, "[Waiting] autoscaler deployment pending")
-	}
-
-	if helmOp.Status.Summary.ErrApplied > 0 {
+	} else if helmOp.Status.Summary.ErrApplied > 0 {
 		nonReadyResource := helmOp.Status.Summary.NonReadyResources[0].Message
 		capr.ClusterAutoscalerDeploymentReady.Unknown(cluster)
 		capr.ClusterAutoscalerDeploymentReady.Message(cluster, "error encountered while deploying cluster-autoscaler: "+nonReadyResource)
@@ -336,6 +299,7 @@ func (h *autoscalerHandler) syncHelmOpStatus(_ string, helmOp *fleet.HelmOp) (*f
 		_, err = h.clusterClient.UpdateStatus(cluster)
 		if err != nil {
 			logrus.Debugf("[autoscaler] failed to update provisioning cluster status: %v", err)
+			h.helmOp.Enqueue(helmOp.Namespace, helmOp.Name)
 		}
 	}
 

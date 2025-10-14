@@ -2,11 +2,17 @@ package autoscaler
 
 import (
 	"fmt"
+	"reflect"
 
+	"github.com/Masterminds/semver/v3"
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
+	rke "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
@@ -33,7 +39,7 @@ func (h *autoscalerHandler) ensureFleetHelmOp(cluster *capi.Cluster, kubeconfigV
 				DefaultNamespace: "kube-system",
 				Helm: &fleet.HelmOptions{
 					Chart:       "cluster-autoscaler",
-					Version:     helmChartVersionForCapiCluster(cluster),
+					Version:     h.resolveHelmChartVersion(cluster),
 					Repo:        settings.ClusterAutoscalerChartRepo.Get(),
 					ReleaseName: "cluster-autoscaler",
 					Values: &fleet.GenericMap{
@@ -82,10 +88,11 @@ func (h *autoscalerHandler) ensureFleetHelmOp(cluster *capi.Cluster, kubeconfigV
 		})
 		return err
 	} else if err == nil {
-		helmOp = helmOp.DeepCopy()
-		helmOp.Spec = bundle
-		_, err = h.helmOp.Update(helmOp)
-		return err
+		if !reflect.DeepEqual(bundle, helmOp.Spec) {
+			helmOp = helmOp.DeepCopy()
+			helmOp.Spec = bundle
+			_, err = h.helmOp.Update(helmOp)
+		}
 	}
 
 	return err
@@ -114,6 +121,54 @@ func (h *autoscalerHandler) cleanupFleet(cluster *capi.Cluster) error {
 }
 
 // Returns the Helm chart version for cluster autoscaler based on the Kubernetes minor version of the cluster.
-func helmChartVersionForCapiCluster(cluster *capi.Cluster) string {
-	return chartVersions[k8sMinorVersion(cluster)]
+func (h *autoscalerHandler) resolveHelmChartVersion(cluster *capi.Cluster) string {
+	return chartVersions[h.getKubernetesMinorVersion(cluster)]
+}
+
+func (h *autoscalerHandler) getKubernetesMinorVersion(cluster *capi.Cluster) int {
+	cp, err := h.dynamicClient.Get(
+		cluster.Spec.ControlPlaneRef.GroupVersionKind(),
+		cluster.Spec.ControlPlaneRef.Namespace,
+		cluster.Spec.ControlPlaneRef.Name)
+	if err != nil {
+		logrus.Debugf("[autoscaler] no control-plane found for cluster %v/%v - latest version of cluster-autoscaler chart will be installed", cluster.Namespace, cluster.Name)
+		return 0
+	}
+
+	k8sVersionStr := ""
+
+	// handle v2prov not adhering to capi for the `Version` field
+	apiVersion, _ := cp.GetObjectKind().GroupVersionKind().ToAPIVersionAndKind()
+	if apiVersion == "rke.cattle.io/v1" {
+		obj, ok := cp.(*rke.RKEControlPlane)
+		if !ok {
+			return 0
+		}
+		k8sVersionStr = obj.Spec.KubernetesVersion
+	} else {
+		obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(cp)
+		if err != nil {
+			logrus.Debugf("[autoscaler] failed to convert object to unstructured for cluster %v/%v - latest version of cluster-autoscaler chart will be installed", cluster.Namespace, cluster.Name)
+			return 0
+		}
+
+		v, ok, err := unstructured.NestedFieldNoCopy(obj, "spec", "version")
+		if !ok || err != nil {
+			logrus.Debugf("[autoscaler] failed to get CAPI version field from unstructured object for cluster %v/%v: ok=%v, err=%v", cluster.Namespace, cluster.Name, ok, err)
+			return 0
+		}
+		k8sVersionStr, ok = v.(string)
+		if !ok {
+			logrus.Debugf("[autoscaler] failed to convert version field to string for cluster %v/%v: type assertion failed", cluster.Namespace, cluster.Name)
+			return 0
+		}
+	}
+
+	version, err := semver.NewVersion(k8sVersionStr)
+	if err != nil {
+		logrus.Debugf("[autoscaler] failed to parse kubernetes version '%s' for cluster %v/%v: %v", k8sVersionStr, cluster.Namespace, cluster.Name, err)
+		return 0
+	}
+
+	return int(version.Minor())
 }
