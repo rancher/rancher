@@ -56,7 +56,6 @@ func TestCreate(t *testing.T) {
 		wantErr    string
 	}{
 		{
-
 			desc: "password changed for the same user",
 			obj: &ext.PasswordChangeRequest{
 				Spec: ext.PasswordChangeRequestSpec{

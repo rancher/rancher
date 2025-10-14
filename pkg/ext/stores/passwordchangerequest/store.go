@@ -125,8 +125,8 @@ func (s *Store) Create(
 	}
 
 	// Password must be at least the minimum required length.
-	if utf8.RuneCountInString(req.Spec.NewPassword) < s.getPasswordMinLength() {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("password must be at least %d characters", settings.PasswordMinLength.GetInt()))
+	if minLength := s.getPasswordMinLength(); utf8.RuneCountInString(req.Spec.NewPassword) < minLength {
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("password must be at least %d characters", minLength))
 	}
 
 	user, err := s.userCache.Get(req.Spec.UserID)
