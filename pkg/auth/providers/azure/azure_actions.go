@@ -20,6 +20,8 @@ import (
 	"k8s.io/client-go/util/retry"
 )
 
+const GraphEndpointMigratedAnnotation = "auth.cattle.io/azuread-endpoint-migrated"
+
 func (ap *Provider) formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	common.AddCommonActions(apiContext, resource)
 	resource.AddAction(apiContext, "configureTest")
@@ -36,15 +38,14 @@ func (ap *Provider) actionHandler(actionName string, action *types.Action, reque
 		return nil
 	}
 
-	if actionName == "configureTest" {
+	switch actionName {
+	case "configureTest":
 		return ap.ConfigureTest(request)
-	} else if actionName == "testAndApply" {
+	case "testAndApply":
 		return ap.testAndApply(request)
-	} else if actionName == "upgrade" {
-		return ap.migrateToMicrosoftGraph()
+	default:
+		return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 	}
-
-	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }
 
 func (ap *Provider) ConfigureTest(request *types.APIContext) error {
@@ -135,16 +136,13 @@ func (ap *Provider) testAndApply(request *types.APIContext) error {
 // Check the current auth config and make sure that the proposed one submitted through the API has up-to-date annotations.
 // Rancher relies on GraphEndpointMigratedAnnotation to choose the right authentication flow and Graph API.
 func migrateNewFlowAnnotation(current, proposed *v32.AzureADConfig) {
-	if IsConfigDeprecated(current) {
-		return
-	}
 	// This covers the case where admins upgrade Rancher to v2.6.7+ without having used Azure AD as the auth provider.
 	// In 2.6.7+, whether Azure AD is later registered or not, Rancher on startup creates the annotation on the template auth config.
 	// But in the case where the auth config had been created on Rancher startup prior to v2.6.7, the annotation would be missing.
 	// This ensures the annotation is set on initial attempt to set up Azure AD.
 	// This also covers the case where admins want to reconfigure a v2.6.7+ new auth flow setup with a new secret or app.
-	if proposed.ObjectMeta.Annotations == nil {
-		proposed.ObjectMeta.Annotations = make(map[string]string)
+	if proposed.Annotations == nil {
+		proposed.Annotations = make(map[string]string)
 	}
-	proposed.ObjectMeta.Annotations[GraphEndpointMigratedAnnotation] = "true"
+	proposed.Annotations[GraphEndpointMigratedAnnotation] = "true"
 }
