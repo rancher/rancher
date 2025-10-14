@@ -7,7 +7,6 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
-	wfakes "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -23,7 +22,7 @@ var (
 	errExpected     = fmt.Errorf("expected test error")
 )
 
-func Test_clusterHandler_sync(t *testing.T) {
+func TestClusterHandlerSync(t *testing.T) {
 	testGrbs := []*v32.GlobalRoleBinding{
 		{ObjectMeta: metav1.ObjectMeta{Name: "GRB1"}, GlobalRoleName: rbac.GlobalAdmin},
 		{ObjectMeta: metav1.ObjectMeta{Name: "GRB2"}, GlobalRoleName: rbac.GlobalAdmin},
@@ -300,8 +299,8 @@ func newMocks(t *testing.T) *testMocks {
 	return &testMocks{
 		t:           t,
 		mockCluster: NewMockClusterInterface(ctrl),
-		mockInt:     wfakes.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl),
-		mockLister:  wfakes.NewMockNonNamespacedCacheInterface[*rbacv1.ClusterRoleBinding](ctrl),
+		mockInt:     fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl),
+		mockLister:  fake.NewMockNonNamespacedCacheInterface[*rbacv1.ClusterRoleBinding](ctrl),
 		mockCache:   mockIndexer,
 	}
 }
