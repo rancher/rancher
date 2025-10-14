@@ -420,6 +420,24 @@ func authnTypes(schemas *types.Schemas) *types.Schemas {
 		}).
 		MustImport(&Version, v3.GithubConfigTestOutput{}).
 		MustImport(&Version, v3.GithubConfigApplyInput{}).
+		//GithubApp Config
+		MustImportAndCustomize(&Version, v3.GithubAppConfig{}, func(schema *types.Schema) {
+			schema.BaseType = "authConfig"
+			schema.ResourceActions = map[string]types.Action{
+				"disable": {},
+				"configureTest": {
+					Input:  "githubAppConfig",
+					Output: "githubAppConfigTestOutput",
+				},
+				"testAndApply": {
+					Input: "githubAppConfigApplyInput",
+				},
+			}
+			schema.CollectionMethods = []string{}
+			schema.ResourceMethods = []string{http.MethodGet, http.MethodPut}
+		}).
+		MustImport(&Version, v3.GithubAppConfigTestOutput{}).
+		MustImport(&Version, v3.GithubAppConfigApplyInput{}).
 		//AzureAD Config
 		MustImportAndCustomize(&Version, v3.AzureADConfig{}, func(schema *types.Schema) {
 			schema.BaseType = "authConfig"

@@ -52,7 +52,7 @@ type ghProvider struct {
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
 	githubClient := &GClient{
-		httpClient: &http.Client{},
+		httpClient: common.NewHTTPClientWithTimeouts(),
 	}
 
 	provider := &ghProvider{
@@ -361,7 +361,7 @@ func (g *ghProvider) GetPrincipal(principalID string, token accessor.TokenAccess
 	}
 
 	principalType := parts[1]
-	var acct Account
+	var acct common.GitHubAccount
 	switch principalType {
 	case userType, orgType:
 		acct, err = g.githubClient.getUserOrgByID(externalID, accessToken, config)
@@ -381,7 +381,7 @@ func (g *ghProvider) GetPrincipal(principalID string, token accessor.TokenAccess
 	return princ, nil
 }
 
-func (g *ghProvider) toPrincipal(principalType string, acct Account, token accessor.TokenAccessor) v3.Principal {
+func (g *ghProvider) toPrincipal(principalType string, acct common.GitHubAccount, token accessor.TokenAccessor) v3.Principal {
 	displayName := acct.Name
 	if displayName == "" {
 		displayName = acct.Login
@@ -417,11 +417,8 @@ func (g *ghProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPr
 		logrus.Errorf("Error fetching github config: %v", err)
 		return false, err
 	}
-	allowed, err := g.userMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipalID, groupPrincipals)
-	if err != nil {
-		return false, err
-	}
-	return allowed, nil
+
+	return g.userMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipalID, groupPrincipals)
 }
 
 func (g *ghProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {

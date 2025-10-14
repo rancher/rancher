@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/genericoidc"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
+	"github.com/rancher/rancher/pkg/auth/providers/githubapp"
 	"github.com/rancher/rancher/pkg/auth/providers/googleoauth"
 	"github.com/rancher/rancher/pkg/auth/providers/keycloakoidc"
 	"github.com/rancher/rancher/pkg/auth/providers/ldap"
@@ -75,6 +76,13 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	Providers[github.Name] = p
 	providersByType[client.GithubConfigType] = p
 	providersByType[publicclient.GithubProviderType] = p
+
+	p = githubapp.Configure(ctx, mgmt, userMGR, tokenMGR)
+	ProviderNames[githubapp.Name] = true
+	providersWithSecrets[githubapp.Name] = true
+	Providers[githubapp.Name] = p
+	providersByType[client.GithubAppConfigType] = p
+	providersByType[publicclient.GithubAppProviderType] = p
 
 	p = azure.Configure(ctx, mgmt, userMGR, tokenMGR)
 	ProviderNames[azure.Name] = true
@@ -272,25 +280,5 @@ func IsDisabledProvider(providerName string) (bool, error) {
 
 // ProviderHasPerUserSecrets returns true if a given provider is known to use per-user auth tokens stored in secrets.
 func ProviderHasPerUserSecrets(providerName string) (bool, error) {
-	// For Azure AD, check if it's configured to use the new or old flow. Only the old flow via Azure AD Graph uses per-user secrets.
-	if providerName == azure.Name {
-		p, ok := Providers[azure.Name]
-		if !ok {
-			return false, fmt.Errorf("error determining if auth provider uses per-user tokens: provider %s is unknown to Rancher", providerName)
-		}
-
-		azureProvider, ok := p.(*azure.Provider)
-		if !ok {
-			return false, fmt.Errorf("error determining if Azure AD auth provider uses per-user tokens: provider's type is invalid")
-		}
-
-		cfg, err := azureProvider.GetAzureConfigK8s()
-		if err != nil {
-			return false, fmt.Errorf("error determining if Azure AD auth provider uses per-user tokens because of an error to fetch its config: %w", err)
-		}
-
-		return azure.IsConfigDeprecated(cfg), nil
-	}
-
 	return providersWithSecrets[providerName], nil
 }

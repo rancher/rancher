@@ -4,6 +4,8 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.1
+  labels:
+    auth.cattle.io/cluster-indexed: "true"
   name: etcdsnapshots.rke.cattle.io
 spec:
   group: rke.cattle.io
