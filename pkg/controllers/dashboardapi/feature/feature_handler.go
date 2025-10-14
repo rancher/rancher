@@ -2,6 +2,7 @@ package feature
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"time"
 
@@ -23,11 +24,18 @@ func sync(_ string, obj *v3.Feature) (*v3.Feature, error) {
 	newVal, needsRestart := ReconcileFeatures(obj)
 	if needsRestart {
 		time.Sleep(3 * time.Second)
-		logrus.Infof("feature flag [%s] value has changed (new value=%v), rancher must be restarted", obj.Name, newVal)
+		logrus.Infof("feature flag [%s] value has changed (new value=%v), rancher must be restarted", obj.Name, ptrBoolToString(newVal))
 		os.Exit(1)
 	}
 
 	return obj, nil
+}
+
+func ptrBoolToString(val *bool) string {
+	if val == nil {
+		return "nil"
+	}
+	return fmt.Sprintf("%v", *val)
 }
 
 // ReconcileFeatures updates the feature stored in-memory from the feature that
