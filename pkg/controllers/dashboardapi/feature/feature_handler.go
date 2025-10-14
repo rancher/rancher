@@ -25,7 +25,7 @@ func sync(_ string, obj *v3.Feature) (*v3.Feature, error) {
 	if needsRestart {
 		time.Sleep(3 * time.Second)
 		logrus.Infof("feature flag [%s] value has changed (new value=%v), rancher must be restarted", obj.Name, ptrBoolToString(newVal))
-		os.Exit(1)
+		os.Exit(0)
 	}
 
 	return obj, nil
