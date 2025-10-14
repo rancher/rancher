@@ -143,6 +143,8 @@ type TokenStatus struct {
 	// LastActivitySeen is the timestamp of the last time user activity
 	// (mouse movement, interaction, ...) was reported for the token.
 	LastActivitySeen *metav1.Time `json:"lastActivitySeen,omitempty"`
+	// Fully formed bearer token that is ready to use in the Authorization header to authenticate to Rancher.
+	BearerToken string `json:"bearerToken,omitempty"`
 }
 
 // Implement the TokenAccessor interface
