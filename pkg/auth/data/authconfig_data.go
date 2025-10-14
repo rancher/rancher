@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/cognito"
 	"github.com/rancher/rancher/pkg/auth/providers/genericoidc"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
+	"github.com/rancher/rancher/pkg/auth/providers/githubapp"
 	"github.com/rancher/rancher/pkg/auth/providers/googleoauth"
 	"github.com/rancher/rancher/pkg/auth/providers/keycloakoidc"
 	"github.com/rancher/rancher/pkg/auth/providers/ldap"
@@ -25,6 +26,10 @@ import (
 
 func AuthConfigs(management *config.ManagementContext) error {
 	if err := addAuthConfig(github.Name, client.GithubConfigType, false, management); err != nil {
+		return err
+	}
+
+	if err := addAuthConfig(githubapp.Name, client.GithubAppConfigType, false, management); err != nil {
 		return err
 	}
 

@@ -383,6 +383,23 @@ func NewGenericOIDCProvider(namespace, name string, obj GenericOIDCProvider) *Ge
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// GithubAppProviderList is a list of GithubAppProvider resources
+type GithubAppProviderList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []GithubAppProvider `json:"items"`
+}
+
+func NewGithubAppProvider(namespace, name string, obj GithubAppProvider) *GithubAppProvider {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("GithubAppProvider").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // GithubProviderList is a list of GithubProvider resources
 type GithubProviderList struct {
 	metav1.TypeMeta `json:",inline"`
