@@ -7,9 +7,10 @@ import (
 	"unicode/utf8"
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
+	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	"github.com/rancher/rancher/pkg/controllers/status"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -46,8 +47,10 @@ type PasswordUpdater interface {
 // +k8s:deepcopy-gen=false
 
 type Store struct {
-	authorizer authorizer.Authorizer
-	pwdUpdater PasswordUpdater
+	authorizer           authorizer.Authorizer
+	pwdUpdater           PasswordUpdater
+	userCache            mgmtv3.UserCache
+	getPasswordMinLength func() int
 }
 
 // +k8s:openapi-gen=false
@@ -58,11 +61,12 @@ type Store struct {
 func New(wranglerContext *wrangler.Context, authorizer authorizer.Authorizer) *Store {
 	pwdManager := pbkdf2.New(wranglerContext.Core.Secret().Cache(), wranglerContext.Core.Secret())
 
-	store := Store{
-		pwdUpdater: pwdManager,
-		authorizer: authorizer,
+	return &Store{
+		pwdUpdater:           pwdManager,
+		authorizer:           authorizer,
+		userCache:            wranglerContext.Mgmt.User().Cache(),
+		getPasswordMinLength: settings.PasswordMinLength.GetInt,
 	}
-	return &store
 }
 
 // GroupVersionKind implements [rest.GroupVersionKindProvider], a required interface.
@@ -95,30 +99,50 @@ func (s *Store) Create(
 	ctx context.Context,
 	obj runtime.Object,
 	createValidation rest.ValidateObjectFunc,
-	options *metav1.CreateOptions) (runtime.Object, error) {
+	options *metav1.CreateOptions,
+) (runtime.Object, error) {
 	if createValidation != nil {
 		err := createValidation(ctx, obj)
 		if err != nil {
 			return obj, err
 		}
 	}
-	dryRun := options != nil && len(options.DryRun) > 0 && options.DryRun[0] == metav1.DryRunAll
-
-	objPasswordChangeRequest, ok := obj.(*ext.PasswordChangeRequest)
-	if !ok {
-		var zeroT *ext.PasswordChangeRequest
-		return nil, apierrors.NewInternalError(fmt.Errorf("expected %T but got %T",
-			zeroT, obj))
-	}
 
 	userInfo, ok := request.UserFrom(ctx)
 	if !ok {
 		return nil, apierrors.NewInternalError(fmt.Errorf("can't get user info from context"))
 	}
-	err := validatePassword(objPasswordChangeRequest.Spec.NewPassword, settings.PasswordMinLength.GetInt())
-	if err != nil {
-		return nil, apierrors.NewBadRequest(fmt.Sprintf("error validating password: %s", err.Error()))
+
+	req, ok := obj.(*ext.PasswordChangeRequest)
+	if !ok {
+		var zeroT *ext.PasswordChangeRequest
+		return nil, apierrors.NewInternalError(fmt.Errorf("expected %T but got %T", zeroT, obj))
 	}
+
+	// UserID is required.
+	if req.Spec.UserID == "" {
+		return nil, apierrors.NewBadRequest("userID is required")
+	}
+
+	// Password must be at least the minimum required length.
+	if minLength := s.getPasswordMinLength(); utf8.RuneCountInString(req.Spec.NewPassword) < minLength {
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("password must be at least %d characters", minLength))
+	}
+
+	user, err := s.userCache.Get(req.Spec.UserID)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, apierrors.NewBadRequest(fmt.Sprintf("user %s not found", req.Spec.UserID))
+		}
+		return nil, apierrors.NewInternalError(fmt.Errorf("can't get user %s: %w", req.Spec.UserID, err))
+	}
+
+	// Password must not be the same as the username.
+	if req.Spec.NewPassword == user.Username {
+		return nil, apierrors.NewBadRequest("password cannot be the same as the username")
+	}
+
+	dryRun := options != nil && len(options.DryRun) > 0 && options.DryRun[0] == metav1.DryRunAll
 
 	if dryRun {
 		return obj, nil
@@ -132,43 +156,44 @@ func (s *Store) Create(
 	// Checking the current password is only required if the user doesn't have permissions on update on users and update
 	// secrets in the cattle-local-user-passwords namespace.
 	if canUpdateAnyPassword {
-		err := s.pwdUpdater.UpdatePassword(objPasswordChangeRequest.Spec.UserID, objPasswordChangeRequest.Spec.NewPassword)
+		err := s.pwdUpdater.UpdatePassword(req.Spec.UserID, req.Spec.NewPassword)
 		if err != nil {
 			return nil, apierrors.NewUnauthorized(fmt.Sprintf("error checking permissions %s", err.Error()))
 		}
 
-		objPasswordChangeRequest.Status = ext.PasswordChangeRequestStatus{
+		req.Status = ext.PasswordChangeRequestStatus{
 			Conditions: []metav1.Condition{
 				{
 					Type:   "PasswordUpdated",
-					Status: "True",
+					Status: metav1.ConditionTrue,
 				},
 			},
 			Summary: status.SummaryCompleted,
 		}
 
-		return objPasswordChangeRequest, nil
+		return req, nil
 	}
 
-	if userInfo.GetName() == objPasswordChangeRequest.Spec.UserID {
-		err := s.pwdUpdater.VerifyAndUpdatePassword(objPasswordChangeRequest.Spec.UserID, objPasswordChangeRequest.Spec.CurrentPassword, objPasswordChangeRequest.Spec.NewPassword)
+	// Ordinary users can only change their own password and must provide their current password.
+	if userInfo.GetName() == req.Spec.UserID {
+		err := s.pwdUpdater.VerifyAndUpdatePassword(req.Spec.UserID, req.Spec.CurrentPassword, req.Spec.NewPassword)
 		if err != nil {
 			return nil, apierrors.NewInternalError(fmt.Errorf("error updating password: %w", err))
 		}
-		objPasswordChangeRequest.Status = ext.PasswordChangeRequestStatus{
+		req.Status = ext.PasswordChangeRequestStatus{
 			Conditions: []metav1.Condition{
 				{
 					Type:   "PasswordUpdated",
-					Status: "True",
+					Status: metav1.ConditionTrue,
 				},
 			},
 			Summary: status.SummaryCompleted,
 		}
 
-		return objPasswordChangeRequest, nil
+		return req, nil
 	}
 
-	return objPasswordChangeRequest, apierrors.NewUnauthorized("not authorized to update password")
+	return req, apierrors.NewUnauthorized("not authorized to update password")
 }
 
 // canUpdateAnyPassword verifies the user can update users and secrets in the cattle-local-user-passwords namespace.
@@ -176,8 +201,8 @@ func (s *Store) canUpdateAnyPassword(ctx context.Context, userInfo user.Info) (b
 	decision, _, err := s.authorizer.Authorize(ctx, &authorizer.AttributesRecord{
 		User:            userInfo,
 		Verb:            "update",
-		APIGroup:        v3.GroupName,
-		APIVersion:      v3.Version,
+		APIGroup:        mgmt.GroupName,
+		APIVersion:      "v3",
 		Resource:        "users",
 		ResourceRequest: true,
 	})
@@ -200,13 +225,4 @@ func (s *Store) canUpdateAnyPassword(ctx context.Context, userInfo user.Info) (b
 	}
 
 	return decision == authorizer.DecisionAllow, nil
-}
-
-// validatePassword will ensure a password is at least the minimum required length in runes,
-func validatePassword(password string, minPassLen int) error {
-	if utf8.RuneCountInString(password) < minPassLen {
-		return fmt.Errorf("password must be at least %v characters", minPassLen)
-	}
-
-	return nil
 }
