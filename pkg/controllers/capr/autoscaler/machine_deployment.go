@@ -40,13 +40,13 @@ func (s *machineDeploymentReplicaOverrider) syncMachinePoolReplicas(_ string, md
 	capiCluster, err := s.capiClusterCache.Get(md.Namespace, clusterName)
 	if err != nil {
 		logrus.Errorf("Error getting capi cluster %v/%v: %v", md.Namespace, clusterName, err)
-		return md, err
+		return nil, err
 	}
 
 	logrus.Debugf("Getting v2prov cluster capi cluster %s/%s", capiCluster.Namespace, capiCluster.Name)
 	cluster, err := capr.GetProvisioningClusterFromCAPICluster(capiCluster, s.clusterCache)
 	if err != nil {
-		return md, err
+		return nil, err
 	}
 
 	if cluster.Spec.RKEConfig == nil || cluster.Spec.RKEConfig.MachinePools == nil || len(cluster.Spec.RKEConfig.MachinePools) == 0 {
@@ -54,6 +54,7 @@ func (s *machineDeploymentReplicaOverrider) syncMachinePoolReplicas(_ string, md
 	}
 
 	needUpdate := false
+	cluster = cluster.DeepCopy()
 	for i := range cluster.Spec.RKEConfig.MachinePools {
 		if !(cluster.Spec.RKEConfig.MachinePools[i].Name == machinePoolName) {
 			continue
@@ -68,7 +69,6 @@ func (s *machineDeploymentReplicaOverrider) syncMachinePoolReplicas(_ string, md
 			logrus.Infof("Updating cluster %s/%s machine pool %s quantity from %d to %d",
 				cluster.Namespace, cluster.Name, machinePoolName,
 				*cluster.Spec.RKEConfig.MachinePools[i].Quantity, *md.Spec.Replicas)
-			cluster = cluster.DeepCopy()
 			cluster.Spec.RKEConfig.MachinePools[i].Quantity = md.Spec.Replicas
 			needUpdate = true
 		}
@@ -86,7 +86,7 @@ func (s *machineDeploymentReplicaOverrider) syncMachinePoolReplicas(_ string, md
 		if err != nil {
 			logrus.Warnf("Failed to update cluster %s/%s machine pool %s to match machineDeployment: %v",
 				cluster.Namespace, cluster.Name, machinePoolName, err)
-			return md, err
+			return nil, err
 		}
 
 		logrus.Debugf("Successfully updated cluster %s/%s", cluster.Namespace, cluster.Name)

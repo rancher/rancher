@@ -580,15 +580,10 @@ func capiCluster(cluster *rancherv1.Cluster, rkeControlPlane *rkev1.RKEControlPl
 		panic(err)
 	}
 
-	///////////////////////////
-	// the autoscaler goodies
-	///////////////////////////
-	// this is the part that makes the autoscaler controller fire.
-	//
-	// if the pause annotation doesn't exist and at least one of the RKEMachinePools has autoscaling enabled
+	// Configure autoscaler annotations for the cluster
+	// If the pause annotation doesn't exist and at least one of the RKEMachinePools has autoscaling enabled
 	// then capr.AutoscalerEnabledAnnotation is rendered in the capi.Cluster annotations
-	//
-	// if the pause annotation is present, then it just sets the enabled annotation to `paused` in order
+	// If the pause annotation is present, then it just sets the enabled annotation to `paused` in order
 	// to signify the scale-to-zero behavior on the cluster-autoscaler deployment running in the downstream
 	// cluster.
 	annotations := map[string]string{}
@@ -596,7 +591,7 @@ func capiCluster(cluster *rancherv1.Cluster, rkeControlPlane *rkev1.RKEControlPl
 		capr.AutoscalerEnabledByProvisioningCluster(cluster) {
 		annotations[capr.ClusterAutoscalerEnabledAnnotation] = "true"
 	} else if cluster.Annotations[capr.ClusterAutoscalerPausedAnnotation] != "" {
-		annotations[capr.ClusterAutoscalerEnabledAnnotation] = "paused"
+		annotations[capr.ClusterAutoscalerPausedAnnotation] = "true"
 	}
 
 	apiVersion, kind := gvk.ToAPIVersionAndKind()

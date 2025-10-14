@@ -16,12 +16,12 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
-// hardcoded k8s minor <-> chart version mapping, adding new versions here will automatically
+// hardcoded k8s minor <-> image tag mapping, adding new versions here will automatically
 // rollout updates to all clusters on rancher upgrade (e.g. setting a new minor version)
-var chartVersions = map[int]string{
-	33: "9.50.1",
-	32: "9.46.6",
-	31: "9.44.0",
+var imageTagVersions = map[int]string{
+	33: "v1.34.0",
+	32: "v1.33.0",
+	31: "v1.32.0",
 }
 
 // ensureFleetHelmOp creates or updates a Helm operation for cluster autoscaler.
@@ -39,12 +39,16 @@ func (h *autoscalerHandler) ensureFleetHelmOp(cluster *capi.Cluster, kubeconfigV
 				DefaultNamespace: "kube-system",
 				Helm: &fleet.HelmOptions{
 					Chart:       "cluster-autoscaler",
-					Version:     h.resolveHelmChartVersion(cluster),
+					Version:     settings.ClusterAutoscalerChartVersion.Get(),
 					Repo:        settings.ClusterAutoscalerChartRepo.Get(),
 					ReleaseName: "cluster-autoscaler",
 					Values: &fleet.GenericMap{
 						Data: map[string]any{
 							"replicaCount": replicaCount,
+							"image": map[string]any{
+								"repository": settings.ClusterAutoscalerImageRepository.Get(),
+								"tag":        h.resolveHelmChartVersion(cluster),
+							},
 							"autoDiscovery": map[string]any{
 								"clusterName": cluster.Name,
 								"namespace":   cluster.Namespace,
@@ -120,9 +124,15 @@ func (h *autoscalerHandler) cleanupFleet(cluster *capi.Cluster) error {
 	return nil
 }
 
-// Returns the Helm chart version for cluster autoscaler based on the Kubernetes minor version of the cluster.
+// Returns the cluster-autoscaler image version for cluster autoscaler based on the Kubernetes minor version of the cluster.
 func (h *autoscalerHandler) resolveHelmChartVersion(cluster *capi.Cluster) string {
-	return chartVersions[h.getKubernetesMinorVersion(cluster)]
+	minorVersion := h.getKubernetesMinorVersion(cluster)
+	version, exists := imageTagVersions[minorVersion]
+	if !exists || version == "" {
+		logrus.Debugf("[autoscaler] no chart version found for kubernetes minor version %d - latest version of cluster-autoscaler chart will be installed", minorVersion)
+		return ""
+	}
+	return version
 }
 
 func (h *autoscalerHandler) getKubernetesMinorVersion(cluster *capi.Cluster) int {

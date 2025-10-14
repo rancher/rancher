@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"time"
 
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/lasso/pkg/dynamic"
@@ -108,7 +109,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 }
 
 // OnChange checks if a capi cluster has the autoscaler-enabled annotation as well as any machinedeployments which
-// are set up for autoscaling. if so it does the dance of setting up a rancher user with appropriate rbac and
+// are set up for autoscaling. If so it does the dance of setting up a rancher user with appropriate rbac and
 // deploys the cluster-autoscaler chart to the downstream cluster once the cluster is ready.
 func (h *autoscalerHandler) OnChange(_ string, cluster *capi.Cluster) (*capi.Cluster, error) {
 	if cluster == nil || cluster.DeletionTimestamp != nil {
@@ -118,14 +119,14 @@ func (h *autoscalerHandler) OnChange(_ string, cluster *capi.Cluster) (*capi.Clu
 	// fetch appropriate capi resources related to this cluster (machineDeployments + machines)
 	mds, err := h.capiMachineDeploymentCache.List(cluster.Namespace, labels.SelectorFromSet(labels.Set{capi.ClusterNameLabel: cluster.Name}))
 	if err != nil {
-		logrus.Warnf("[autoscaler] failed to list machinedeployments for capi cluster %v/%v", cluster.Namespace, cluster.Name)
-		return cluster, err
+		logrus.Warnf("[autoscaler] failed to list machinedeployments for capi cluster %s/%s", cluster.Namespace, cluster.Name)
+		return nil, err
 	}
 
 	machines, err := h.capiMachineCache.List(cluster.Namespace, labels.SelectorFromSet(labels.Set{capi.ClusterNameLabel: cluster.Name}))
 	if err != nil {
-		logrus.Warnf("[autoscaler] failed to list machines for capi cluster %v/%v", cluster.Namespace, cluster.Name)
-		return cluster, err
+		logrus.Warnf("[autoscaler] failed to list machines for capi cluster %s/%s", cluster.Namespace, cluster.Name)
+		return nil, err
 	}
 
 	// we have to check if autoscaling is paused first before removing resources
@@ -135,7 +136,12 @@ func (h *autoscalerHandler) OnChange(_ string, cluster *capi.Cluster) (*capi.Clu
 	//
 	// if both of these pass, ensure the autoscaler is set up to function.
 	if autoscalingPaused(cluster) {
-		return cluster, h.pauseAutoscaling(cluster)
+		err := h.pauseAutoscaling(cluster)
+		if err != nil {
+			logrus.Debugf("[autoscaler] failed to pause autoscaling for %v/%v: %v", cluster.Namespace, cluster.Name, err)
+			return nil, err
+		}
+		return cluster, nil
 	} else if autoscalingEnabled := h.isAutoscalingEnabled(cluster, mds); !autoscalingEnabled {
 		err := h.handleUninstall(cluster)
 		if err != nil {
@@ -157,7 +163,7 @@ func (h *autoscalerHandler) OnChange(_ string, cluster *capi.Cluster) (*capi.Clu
 	}
 
 	// enqueue the helmop in order to force a status-update on the v2prov cluster object (if it exists) from the helmOp
-	h.helmOp.Enqueue(cluster.Namespace, helmOpName(cluster))
+	h.helmOp.EnqueueAfter(cluster.Namespace, helmOpName(cluster), 5*time.Second)
 
 	return cluster, nil
 }
@@ -174,7 +180,7 @@ func (h *autoscalerHandler) isAutoscalingEnabled(cluster *capi.Cluster, mds []*c
 
 // Returns true if the cluster autoscaler is paused at the cluster annotation level
 func autoscalingPaused(cluster *capi.Cluster) bool {
-	return cluster.Annotations[capr.ClusterAutoscalerEnabledAnnotation] == "paused"
+	return cluster.Annotations[capr.ClusterAutoscalerPausedAnnotation] == "true"
 }
 
 // pauseAutoscaling checks to see if the cluster-autoscaler needs to be paused and does that if so
@@ -227,7 +233,7 @@ func (h *autoscalerHandler) setupRBAC(capiCluster *capi.Cluster, mds []*capi.Mac
 		return nil, err
 	}
 
-	kubeconfig, err := h.createKubeConfigSecretUsingTemplate(capiCluster, tokenStr)
+	kubeconfig, err := h.ensureKubeconfigSecretUsingTemplate(capiCluster, tokenStr)
 	if err != nil {
 		logrus.Errorf("[autoscaler] Failed to create kubeconfig secret for cluster %s/%s: %v", capiCluster.Namespace, capiCluster.Name, err)
 		return nil, err
@@ -299,7 +305,7 @@ func (h *autoscalerHandler) syncHelmOpStatus(_ string, helmOp *fleet.HelmOp) (*f
 		_, err = h.clusterClient.UpdateStatus(cluster)
 		if err != nil {
 			logrus.Debugf("[autoscaler] failed to update provisioning cluster status: %v", err)
-			h.helmOp.Enqueue(helmOp.Namespace, helmOp.Name)
+			h.helmOp.EnqueueAfter(helmOp.Namespace, helmOp.Name, 5*time.Second)
 		}
 	}
 

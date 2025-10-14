@@ -253,6 +253,12 @@ var (
 	// ClusterAutoscalerChartRepo represents where the cluster-autoscaler chart will be pulled from for the downstream cluster(s)
 	ClusterAutoscalerChartRepo = NewSetting("cluster-autoscaler-chart-repo", "")
 
+	// ClusterAutoscalerImageRepository represents the default image repository for the cluster autoscaler
+	ClusterAutoscalerImageRepository = NewSetting("cluster-autoscaler-image-repository", "registry.k8s.io/autoscaling/cluster-autoscaler")
+
+	// ClusterAutoscalerChartVersion is the version of the cluster-autosacler helm chart to install in the downstream cluster(s)
+	ClusterAutoscalerChartVersion = NewSetting("cluster-autoscaler-chart-version", "9.50.1")
+
 	// RKE2ChartDefaultBranch represents the default branch for the RKE2 charts repo.
 	RKE2ChartDefaultBranch = NewSetting("rke2-chart-default-branch", "main")
 

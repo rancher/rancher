@@ -86,7 +86,7 @@ func (h *autoscalerHandler) findAutoscalerTokens() ([]v3.Token, error) {
 // renewToken creates a new token to replace an expired one
 func (h *autoscalerHandler) renewToken(token *v3.Token) error {
 	// Delete the old token
-	err := h.token.Delete(token.Name, nil)
+	err := h.token.Delete(token.Name, &metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		return fmt.Errorf("failed to delete old token %s: %w", token.Name, err)
 	}
@@ -101,13 +101,7 @@ func (h *autoscalerHandler) renewToken(token *v3.Token) error {
 		return fmt.Errorf("failed to create renewed token %s: %w", token.Name, err)
 	}
 
-	if token.Labels == nil {
-		logrus.Errorf("[autoscaler] Token %s is missing capi cluster label, cannot update kubeconfig secret", token.Name)
-		return fmt.Errorf("token %s is missing capi cluster label, cannot update kubeconfig secret", token.Name)
-	}
-
 	// Update the kubeconfig secret with the new token
-
 	clusterName := token.Labels[capi.ClusterNameLabel]
 
 	// Find the capi cluster to update the secret

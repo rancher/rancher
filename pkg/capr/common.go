@@ -124,9 +124,6 @@ const (
 	// dependencies and install the chart.
 	ClusterAutoscalerEnabledAnnotation = "provisioning.cattle.io/cluster-autoscaler-enabled"
 
-	// ClusterAutoscalerKubernetesVersion is an annotation for the cluster-autoscaler to
-	ClusterAutoscalerKubernetesVersion = "provisioning.cattle.io/cluster-autoscaler-kubernetes-version"
-
 	// ClusterAutoscalerPausedAnnotation is an annotation used to pause cluster autoscaling for a cluster
 	// it triggers a scale-down of the cluster-autoscaler chart in the downstream cluster
 	ClusterAutoscalerPausedAnnotation = "provisioning.cattle.io/cluster-autoscaler-paused"
@@ -230,15 +227,23 @@ func GetKDMReleaseData(ctx context.Context, controlPlane *rkev1.RKEControlPlane)
 }
 
 func GetProvisioningClusterFromCAPICluster(cluster *capi.Cluster, clusterCache provcontrollers.ClusterCache) (*provv1.Cluster, error) {
+	var (
+		target *provv1.Cluster
+		err    error
+	)
+
 	for _, owner := range cluster.OwnerReferences {
 		if owner.APIVersion != "provisioning.cattle.io/v1" && owner.Kind != "Cluster" {
 			continue
 		}
-
-		return clusterCache.Get(cluster.Namespace, owner.Name)
+		target, err = clusterCache.Get(cluster.Namespace, owner.Name)
+		break
+	}
+	if err != nil {
+		return nil, err
 	}
 
-	return nil, nil
+	return target, nil
 }
 
 // GetFeatureVersion retrieves a feature version (string) for a given controlPlane based on the version/runtime of the project. It will return 0.0.0 (semver) if the KDM data is valid, but the featureVersion isn't defined.

@@ -12,7 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 type autoscalerSuite struct {
@@ -20,9 +20,9 @@ type autoscalerSuite struct {
 
 	mockCtrl                   *gomock.Controller
 	h                          *autoscalerHandler
-	capiClusterCache           *fake.MockCacheInterface[*v1beta1.Cluster]
-	capiMachineCache           *fake.MockCacheInterface[*v1beta1.Machine]
-	capiMachineDeploymentCache *fake.MockCacheInterface[*v1beta1.MachineDeployment]
+	capiClusterCache           *fake.MockCacheInterface[*capi.Cluster]
+	capiMachineCache           *fake.MockCacheInterface[*capi.Machine]
+	capiMachineDeploymentCache *fake.MockCacheInterface[*capi.MachineDeployment]
 	clusterClient              *fake.MockClientInterface[*provv1.Cluster, *provv1.ClusterList]
 	clusterCache               *fake.MockCacheInterface[*provv1.Cluster]
 	globalRole                 *fake.MockNonNamespacedClientInterface[*v3.GlobalRole, *v3.GlobalRoleList]
@@ -48,9 +48,9 @@ func (s *autoscalerSuite) SetupTest() {
 	s.mockCtrl = gomock.NewController(s.T())
 
 	// Create mock caches and clients using the correct types from the autoscaler.go file
-	s.capiClusterCache = fake.NewMockCacheInterface[*v1beta1.Cluster](s.mockCtrl)
-	s.capiMachineCache = fake.NewMockCacheInterface[*v1beta1.Machine](s.mockCtrl)
-	s.capiMachineDeploymentCache = fake.NewMockCacheInterface[*v1beta1.MachineDeployment](s.mockCtrl)
+	s.capiClusterCache = fake.NewMockCacheInterface[*capi.Cluster](s.mockCtrl)
+	s.capiMachineCache = fake.NewMockCacheInterface[*capi.Machine](s.mockCtrl)
+	s.capiMachineDeploymentCache = fake.NewMockCacheInterface[*capi.MachineDeployment](s.mockCtrl)
 	s.clusterClient = fake.NewMockClientInterface[*provv1.Cluster, *provv1.ClusterList](s.mockCtrl)
 	s.clusterCache = fake.NewMockCacheInterface[*provv1.Cluster](s.mockCtrl)
 	s.globalRole = fake.NewMockNonNamespacedClientInterface[*v3.GlobalRole, *v3.GlobalRoleList](s.mockCtrl)

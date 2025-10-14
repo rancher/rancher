@@ -24,6 +24,7 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/errors"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -473,7 +474,7 @@ func (h *handler) OnRemove(_ string, cluster *rancherv1.Cluster) (*rancherv1.Clu
 
 // triggerProvisioningClusterOnMachineDeploymentUpdate returns a function that triggers
 // provisioning cluster updates on machine deployment changes. notably it follows the chain of
-// machineDeployment -> cluster -> owner refererence -> prov cluster name in order to trigger the correct provisioning cluster
+// machineDeployment -> cluster -> owner reference -> prov cluster name in order to trigger the correct provisioning cluster
 func triggerProvisioningClusterOnMachineDeploymentUpdate(clients *wrangler.CAPIContext) func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
 	return func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
 		if md, ok := obj.(*capi.MachineDeployment); ok &&
@@ -484,21 +485,15 @@ func triggerProvisioningClusterOnMachineDeploymentUpdate(clients *wrangler.CAPIC
 				return nil, fmt.Errorf("failed to find capi cluster for machinedeployment %v/%v: %v", md.Namespace, md.Name, err)
 			}
 
-			v2provClusterName := ""
-			for _, owner := range capiCluster.OwnerReferences {
-				if owner.APIVersion != "provisioning.cattle.io/v1" && owner.Kind != "Cluster" {
-					continue
-				}
-				v2provClusterName = owner.Name
-			}
-			if v2provClusterName == "" {
+			cluster, err := capr.GetProvisioningClusterFromCAPICluster(capiCluster, clients.Provisioning.Cluster().Cache())
+			if errors.IsNotFound(err) {
 				// if no v2prov cluster available - just return.
 				return []relatedresource.Key{}, nil
 			}
 
 			return []relatedresource.Key{{
 				Namespace: namespace,
-				Name:      v2provClusterName,
+				Name:      cluster.Name,
 			}}, nil
 		}
 		return nil, nil

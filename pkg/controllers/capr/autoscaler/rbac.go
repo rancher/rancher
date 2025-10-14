@@ -152,7 +152,7 @@ func (h *autoscalerHandler) ensureUserToken(cluster *capi.Cluster, username stri
 
 	// token already exists - so just return the token string.
 	if t != nil {
-		return fmt.Sprintf("%s:%s", username, t.Token), err
+		return fmt.Sprintf("%s:%s", username, t.Token), nil
 	}
 
 	token, err := generateToken(username, cluster.Name, ownerReference(cluster))
@@ -161,11 +161,15 @@ func (h *autoscalerHandler) ensureUserToken(cluster *capi.Cluster, username stri
 	}
 
 	_, err = h.token.Create(token)
-	return fmt.Sprintf("%s:%s", username, token.Token), err
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s:%s", username, token.Token), nil
 }
 
-// createKubeConfigSecretUsingTemplate creates a kubeconfig secret string given a cluster and token
-func (h *autoscalerHandler) createKubeConfigSecretUsingTemplate(cluster *capi.Cluster, token string) (*corev1.Secret, error) {
+// ensureKubeconfigSecretUsingTemplate creates a kubeconfig secret string given a cluster and token
+func (h *autoscalerHandler) ensureKubeconfigSecretUsingTemplate(cluster *capi.Cluster, token string) (*corev1.Secret, error) {
 	s, err := h.secretCache.Get(cluster.Namespace, kubeconfigSecretName(cluster))
 	if err != nil && !errors.IsNotFound(err) {
 		return nil, err
