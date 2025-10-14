@@ -8,6 +8,7 @@ import (
 
 	jsonpath "github.com/rancher/jsonpath/pkg"
 	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/settings"
 )
 
 const (
@@ -168,7 +169,7 @@ func redactSecret(log *log) error {
 	}
 
 	if strings.Contains(log.RequestURI, "secrets") || pairMatches(log.ResponseBody, checkForBasetype(secretBaseType)) {
-		redactDataFromBody(log, log.RequestBody, "SecretList")
+		redactDataFromBody(log, log.ResponseBody, "SecretList")
 	}
 
 	return nil
@@ -231,10 +232,53 @@ func regexRedactor(patterns []string) (Redactor, error) {
 	}), nil
 }
 
+const (
+	redactPrefix      = "/v3/import"
+	redactedImportUrl = redactPrefix + "/" + redacted
+	refererHeader     = "Referer"
+)
+
 func redactImportUrl(l *log) error {
-	if strings.HasPrefix(l.RequestURI, "/v3/import") {
-		l.RequestURI = "/v3/import/" + redacted
+	l.RequestURI = redactImportUrlPath(l.RequestURI)
+
+	if err := redactImportUrlHeader(l, refererHeader); err != nil {
+		return err
 	}
 
 	return nil
+}
+
+func redactImportUrlPath(path string) string {
+	if strings.HasPrefix(path, redactPrefix) {
+		return redactedImportUrl
+	}
+
+	return path
+}
+
+func redactImportUrlHeader(l *log, headerName string) error {
+	referrer, ok := l.RequestHeader[headerName]
+	if !ok {
+		return nil
+	}
+	l.RequestHeader.Del(headerName)
+
+	for _, ref := range referrer {
+		l.RequestHeader.Add(headerName, redactImportUrlString(ref))
+	}
+
+	return nil
+}
+
+func redactImportUrlString(urlIn string) string {
+	serverUrl := settings.ServerURL.Get()
+	redactIndex := strings.Index(urlIn, serverUrl)
+	if redactIndex == -1 {
+		return urlIn
+	}
+
+	pathIndex := redactIndex + len(serverUrl)
+	urlPath := urlIn[pathIndex:]
+
+	return urlIn[:pathIndex] + redactImportUrlPath(urlPath)
 }
