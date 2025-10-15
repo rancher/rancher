@@ -15,7 +15,7 @@ WINS_AGENT_UPGRADE_IMAGE=${REPO}/wins:${WINS_AGENT_UPGRADE_TAG}
 # Query KDM data for RKE2 released versions where server args are defined.
 RKE2_RELEASE_VERSIONS=$(jq -r 'def semver_array: (if startswith("v") then ltrimstr("v") else . end) | split(".") | map(tonumber? // .);
 
-  "v1.31.0" as $min_version | ($min_version | semver_array) as $target_array |
+  "v1.32.0" as $min_version | ($min_version | semver_array) as $target_array |
 
   [.rke2.releases[] | select(.serverArgs) | .version | select( semver_array >= $target_array ) ] | join(" ")' ../bin/data.json)
 # Convert versions with build metadata into valid image tags (replace + for -) and construct an array of tags.
@@ -26,7 +26,7 @@ SYSTEM_AGENT_INSTALLER_RKE2_IMAGES=( "${RKE2_RELEASE_TAGS[@]/#/${REPO}/system-ag
 # Query KDM data for K3S released versions where server args are defined.
 K3S_RELEASE_VERSIONS=$(jq -r 'def semver_array: (if startswith("v") then ltrimstr("v") else . end) | split(".") | map(tonumber? // .);
 
-  "v1.31.0" as $min_version | ($min_version | semver_array) as $target_array |
+  "v1.32.0" as $min_version | ($min_version | semver_array) as $target_array |
 
   [.k3s.releases[] | select(.serverArgs) | .version | select( semver_array >= $target_array ) ] | join(" ")' ../bin/data.json)
 # Convert versions with build metadata into valid image tags (replace + for -) and construct an array of tags.

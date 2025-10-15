@@ -82,7 +82,7 @@ func GatherTargetImagesAndSources(chartsPath string, imagesFromArgs []string) (I
 
 	mink8sVersion := &semver.Version{
 		Major: 1,
-		Minor: 31,
+		Minor: 32,
 		Patch: 0,
 	}
 
