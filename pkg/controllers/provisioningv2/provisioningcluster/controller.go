@@ -500,6 +500,6 @@ func triggerProvisioningClusterOnMachineDeploymentUpdate(clients *wrangler.CAPIC
 				Name:      cluster.Name,
 			}}, nil
 		}
-		return nil, nil
+		return []relatedresource.Key{}, nil
 	}
 }

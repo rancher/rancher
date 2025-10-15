@@ -140,14 +140,14 @@ func (h *autoscalerHandler) OnChange(_ string, cluster *capi.Cluster) (*capi.Clu
 	if autoscalingPaused(cluster) {
 		err := h.pauseAutoscaling(cluster)
 		if err != nil {
-			logrus.Debugf("[autoscaler] failed to pause autoscaling for %v/%v: %v", cluster.Namespace, cluster.Name, err)
+			logrus.Debugf("[autoscaler] failed to pause autoscaling for %s/%s: %v", cluster.Namespace, cluster.Name, err)
 			return nil, err
 		}
 		return cluster, nil
 	} else if autoscalingEnabled := h.isAutoscalingEnabled(cluster, mds); !autoscalingEnabled {
 		err := h.handleUninstall(cluster)
 		if err != nil {
-			logrus.Debugf("[autoscaler] failed to cleanup autoscaler resources for %v/%v: %v", cluster.Namespace, cluster.Name, err)
+			logrus.Debugf("[autoscaler] failed to cleanup autoscaler resources for %s/%s: %v", cluster.Namespace, cluster.Name, err)
 		}
 
 		return cluster, nil
@@ -250,7 +250,7 @@ func (h *autoscalerHandler) deployChart(capiCluster *capi.Cluster, kubeconfig *v
 
 	err := h.ensureFleetHelmOp(capiCluster, kubeconfig.ResourceVersion, 1)
 	if err != nil {
-		logrus.Errorf("[autoscaler] failed to create fleet-managed autoscaler helmop for cluster %v/%v: %v", capiCluster.Namespace, capiCluster.Name, err)
+		logrus.Errorf("[autoscaler] failed to create fleet-managed autoscaler helmop for cluster %s/%s: %v", capiCluster.Namespace, capiCluster.Name, err)
 		return err
 	}
 

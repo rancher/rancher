@@ -254,9 +254,6 @@ var (
 	// can be an OCI image path or a regular helm repo.
 	ClusterAutoscalerChartRepository = NewSetting("cluster-autoscaler-chart-repository", "")
 
-	// ClusterAutoscalerChartVersion is the version of the cluster-autoscaler helm chart to install in the downstream cluster(s)
-	ClusterAutoscalerChartVersion = NewSetting("cluster-autoscaler-chart-version", "9.50.1")
-
 	// ClusterAutoscalerImage represents the default image repository for the cluster autoscaler
 	ClusterAutoscalerImage = NewSetting("cluster-autoscaler-image", "")
 

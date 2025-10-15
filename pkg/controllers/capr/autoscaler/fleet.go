@@ -9,6 +9,7 @@ import (
 	"github.com/docker/distribution/reference"
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	rke "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/buildconfig"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -41,7 +42,7 @@ func (h *autoscalerHandler) ensureFleetHelmOp(cluster *capi.Cluster, kubeconfigV
 				DefaultNamespace: "kube-system",
 				Helm: &fleet.HelmOptions{
 					Chart:       getChartName(),
-					Version:     settings.ClusterAutoscalerChartVersion.Get(),
+					Version:     buildconfig.ClusterAutoscalerChartVersion,
 					Repo:        settings.ClusterAutoscalerChartRepository.Get(),
 					ReleaseName: "cluster-autoscaler",
 					Values: &fleet.GenericMap{
@@ -167,7 +168,7 @@ func (h *autoscalerHandler) getKubernetesMinorVersion(cluster *capi.Cluster) int
 		cluster.Spec.ControlPlaneRef.Namespace,
 		cluster.Spec.ControlPlaneRef.Name)
 	if err != nil {
-		logrus.Debugf("[autoscaler] no control-plane found for cluster %v/%v - latest version of cluster-autoscaler chart will be installed", cluster.Namespace, cluster.Name)
+		logrus.Debugf("[autoscaler] no control-plane found for cluster %s/%s - latest version of cluster-autoscaler chart will be installed", cluster.Namespace, cluster.Name)
 		return 0
 	}
 
@@ -184,25 +185,25 @@ func (h *autoscalerHandler) getKubernetesMinorVersion(cluster *capi.Cluster) int
 	} else {
 		obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(cp)
 		if err != nil {
-			logrus.Debugf("[autoscaler] failed to convert object to unstructured for cluster %v/%v - latest version of cluster-autoscaler chart will be installed", cluster.Namespace, cluster.Name)
+			logrus.Debugf("[autoscaler] failed to convert object to unstructured for cluster %s/%s - latest version of cluster-autoscaler chart will be installed", cluster.Namespace, cluster.Name)
 			return 0
 		}
 
 		v, ok, err := unstructured.NestedFieldNoCopy(obj, "spec", "version")
 		if !ok || err != nil {
-			logrus.Debugf("[autoscaler] failed to get CAPI version field from unstructured object for cluster %v/%v: ok=%v, err=%v", cluster.Namespace, cluster.Name, ok, err)
+			logrus.Debugf("[autoscaler] failed to get CAPI version field from unstructured object for cluster %s/%s: ok=%v, err=%v", cluster.Namespace, cluster.Name, ok, err)
 			return 0
 		}
 		k8sVersionStr, ok = v.(string)
 		if !ok {
-			logrus.Debugf("[autoscaler] failed to convert version field to string for cluster %v/%v: type assertion failed", cluster.Namespace, cluster.Name)
+			logrus.Debugf("[autoscaler] failed to convert version field to string for cluster %s/%s: type assertion failed", cluster.Namespace, cluster.Name)
 			return 0
 		}
 	}
 
 	version, err := semver.NewVersion(k8sVersionStr)
 	if err != nil {
-		logrus.Debugf("[autoscaler] failed to parse kubernetes version '%s' for cluster %v/%v: %v", k8sVersionStr, cluster.Namespace, cluster.Name, err)
+		logrus.Debugf("[autoscaler] failed to parse kubernetes version '%s' for cluster %s/%s: %v", k8sVersionStr, cluster.Namespace, cluster.Name, err)
 		return 0
 	}
 

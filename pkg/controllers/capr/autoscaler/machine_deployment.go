@@ -36,10 +36,10 @@ func (s *machineDeploymentReplicaOverrider) syncMachinePoolReplicas(_ string, md
 		return md, nil
 	}
 
-	logrus.Debugf("Getting CAPI Cluster %v/%v", md.Namespace, clusterName)
+	logrus.Debugf("Getting CAPI Cluster %s/%s", md.Namespace, clusterName)
 	capiCluster, err := s.capiClusterCache.Get(md.Namespace, clusterName)
 	if err != nil {
-		logrus.Errorf("Error getting capi cluster %v/%v: %v", md.Namespace, clusterName, err)
+		logrus.Errorf("Error getting capi cluster %s/%s: %v", md.Namespace, clusterName, err)
 		return nil, err
 	}
 
