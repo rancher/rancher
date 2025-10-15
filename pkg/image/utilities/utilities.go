@@ -80,15 +80,15 @@ func GatherTargetImagesAndSources(chartsPath string, imagesFromArgs []string) (I
 		return ImageTargetsAndSources{}, fmt.Errorf("could not load KDM data: %w", err)
 	}
 
-	k8sVersion1_21_0 := &semver.Version{
+	mink8sVersion := &semver.Version{
 		Major: 1,
-		Minor: 21,
+		Minor: 31,
 		Patch: 0,
 	}
 
 	externalLinuxImages := make(map[string][]string)
 
-	k3sUpgradeImages, err := ext.GetExternalImages(rancherVersion, data.K3S, ext.K3S, k8sVersion1_21_0, img.Linux)
+	k3sUpgradeImages, err := ext.GetExternalImages(rancherVersion, data.K3S, ext.K3S, mink8sVersion, img.Linux)
 	if err != nil {
 		return ImageTargetsAndSources{}, fmt.Errorf("%s: %w", "could not get external images for K3s", err)
 	}
@@ -96,9 +96,9 @@ func GatherTargetImagesAndSources(chartsPath string, imagesFromArgs []string) (I
 		externalLinuxImages["k3sUpgrade"] = k3sUpgradeImages
 	}
 
-	// RKE2 Provisioning will only be supported on Kubernetes v1.21+. In addition, only RKE2
-	// releases corresponding to Kubernetes v1.21+ include the "rke2-images-all.linux-amd64.txt" file that we need.
-	rke2LinuxImages, err := ext.GetExternalImages(rancherVersion, data.RKE2, ext.RKE2, k8sVersion1_21_0, img.Linux)
+	// RKE2 Provisioning is supported based on the support matrix. Refer to:
+	// https://www.suse.com/suse-rancher/support-matrix/all-supported-versions/rancher-v2-12-2/
+	rke2LinuxImages, err := ext.GetExternalImages(rancherVersion, data.RKE2, ext.RKE2, mink8sVersion, img.Linux)
 	if err != nil {
 		return ImageTargetsAndSources{}, fmt.Errorf("%s: %w", "could not get external images for RKE2", err)
 	}
