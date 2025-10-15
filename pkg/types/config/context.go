@@ -198,9 +198,11 @@ type ManagementContext struct {
 	Wrangler   *wrangler.Context
 }
 
+// Impersonator allows managing user impersonation for a given cluster
 type Impersonator interface {
 	// SetUpImpersonation creates a service account on a cluster with a clusterrole and clusterrolebinding allowing it to impersonate a Rancher user.
 	SetUpImpersonation(k8sauthuser.Info) error
+	// GetToken retrieves the impersonated ServiceAccount token for an upstream user
 	GetToken(k8sauthuser.Info) (string, error)
 }
 
