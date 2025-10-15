@@ -86,8 +86,6 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	ProviderNames[githubapp.Name] = true
 	providersWithSecrets[githubapp.Name] = true
 	Providers[githubapp.Name] = p
-	providersByType[client.GithubAppConfigType] = p
-	providersByType[publicclient.GithubAppProviderType] = p
 
 	p = azure.Configure(mgmt, userMGR, tokenMGR)
 	ProviderNames[azure.Name] = true
