@@ -17,7 +17,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/catalogv2/roundtripper"
-	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
@@ -188,7 +187,7 @@ func (g *git) httpClientWithCreds() (*http.Client, error) {
 
 	// Wrap the transport with a custom RoundTripper to set the User-Agent header
 	client.Transport = &roundtripper.UserAgent{
-		UserAgent: fmt.Sprintf("%s/%s/%s %s", "go", "rancher", settings.ServerVersion.Get(), "(Git-based Helm Repository)"),
+		UserAgent: roundtripper.BuildUserAgent("go", "(Git-based Helm Repository)"),
 		Next:      client.Transport,
 	}
 
@@ -326,7 +325,7 @@ func (g *git) gitCmd(output io.Writer, args ...string) error {
 	kv := fmt.Sprintf("credential.helper=%s", `/bin/sh -c 'echo "password=$GIT_PASSWORD"'`)
 	cmd := exec.Command("git", append([]string{"-c", kv}, args...)...)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("GIT_PASSWORD=%s", g.password))
-	userAgentValue := fmt.Sprintf("%s/%s/%s %s", "git", "rancher", settings.ServerVersion.Get(), "(Git-based Helm Repository)")
+	userAgentValue := roundtripper.BuildUserAgent("git", "(Git-based Helm Repository)")
 	cmd.Env = append(cmd.Env, fmt.Sprintf("GIT_HTTP_USER_AGENT=%s", userAgentValue))
 
 	stderrBuf := &bytes.Buffer{}

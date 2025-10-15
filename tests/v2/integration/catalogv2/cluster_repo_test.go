@@ -166,7 +166,13 @@ func StartHTTPRepository(c *ClusterRepoTestSuite) *httptest.Server {
 			serverVersion.Value = serverVersion.Default
 		}
 
-		assert.Equal(c.T(), r.Header.Get("User-Agent"), fmt.Sprintf("%s/%s/%s %s", "go", "rancher", serverVersion.Value, "(HTTP-based Helm Repository)"))
+		serverVersionType, err := c.client.Management.Setting.ByID("server-version-type")
+		assert.NoError(c.T(), err)
+		if serverVersionType.Value == "" {
+			serverVersionType.Value = serverVersionType.Default
+		}
+
+		assert.Equal(c.T(), r.Header.Get("User-Agent"), fmt.Sprintf("%s/%s/%s/%s %s", "go", "rancher", serverVersionType.Value, serverVersion.Value, "(HTTP-based Helm Repository)"))
 		http.StripPrefix("/", http.FileServer(http.Dir(repositoryDirectory))).ServeHTTP(w, r)
 	}))
 
