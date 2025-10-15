@@ -1097,6 +1097,13 @@ func schema_pkg_apis_extcattleio_v1_TokenStatus(ref common.ReferenceCallback) co
 							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
 						},
 					},
+					"bearerToken": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Fully formed bearer token that is ready to use in the Authorization header to authenticate to Rancher.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 				},
 				Required: []string{"current", "expired", "expiresAt", "lastUpdateTime"},
 			},

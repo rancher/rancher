@@ -22,14 +22,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/structured-merge-diff/v4/fieldpath"
 )
 
 var (
-	// enabledUser
 	enabledUser = &v3.User{
-		Enabled: pointer.Bool(true),
+		Enabled: ptr.To(true),
 	}
 	// use for disabled tokens
 
@@ -98,7 +97,7 @@ var (
 			UserID:        properUser,
 			Description:   "",
 			TTL:           4000,
-			Enabled:       pointer.Bool(false),
+			Enabled:       ptr.To(false),
 			Kind:          "session",
 			UserPrincipal: properPrincipal,
 		},
@@ -194,7 +193,7 @@ func init() {
 	properTokenCurrent.Status.Current = true
 }
 
-func Test_ttlGreater(t *testing.T) {
+func TestTTLGreater(t *testing.T) {
 
 	tests := []struct {
 		name string
@@ -242,7 +241,7 @@ func Test_ttlGreater(t *testing.T) {
 	}
 }
 
-func Test_Store_New(t *testing.T) {
+func TestStoreNew(t *testing.T) {
 	t.Parallel()
 
 	store := &Store{}
@@ -251,7 +250,7 @@ func Test_Store_New(t *testing.T) {
 	assert.IsType(t, &ext.Token{}, obj)
 }
 
-func Test_Store_NewList(t *testing.T) {
+func TestStoreNewList(t *testing.T) {
 	store := &Store{}
 	obj := store.NewList()
 	require.NotNil(t, obj)
@@ -261,17 +260,17 @@ func Test_Store_NewList(t *testing.T) {
 	assert.Nil(t, list.Items)
 }
 
-func Test_Store_GetSingularName(t *testing.T) {
+func TestStoreGetSingularName(t *testing.T) {
 	store := &Store{}
 	assert.Equal(t, SingularName, store.GetSingularName())
 }
 
-func Test_Store_NamespaceScoped(t *testing.T) {
+func TestStoreNamespaceScoped(t *testing.T) {
 	store := &Store{}
 	assert.False(t, store.NamespaceScoped())
 }
 
-func Test_Store_GroupVersionKind(t *testing.T) {
+func TestStoreGroupVersionKind(t *testing.T) {
 	store := &Store{}
 	assert.Equal(t, GVK, store.GroupVersionKind(ext.SchemeGroupVersion))
 }
@@ -282,14 +281,13 @@ func TestStoreDeleteCollection(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	t.Run("admin deletes a user's tokens with a label", func(t *testing.T) {
-
 		var deleteValidationCalledTimes int
 		deleteValidation := func(ctx context.Context, obj runtime.Object) error {
 			deleteValidationCalledTimes++
 			return nil
 		}
 		deleteOptions := &metav1.DeleteOptions{
-			GracePeriodSeconds: pointer.Int64(60),
+			GracePeriodSeconds: ptr.To(int64(60)),
 		}
 		listOptions := &metainternalversion.ListOptions{
 			LabelSelector: labels.Set{
@@ -342,7 +340,7 @@ func TestStoreDeleteCollection(t *testing.T) {
 	})
 }
 
-func Test_Store_Delete(t *testing.T) {
+func TestStoreDelete(t *testing.T) {
 	// The majority of the code is tested later, in Test_SystemStore_Delete
 	// Here we test the actions and checks done before delegation to the
 	// embedded system store
@@ -479,7 +477,7 @@ func Test_Store_Delete(t *testing.T) {
 	})
 }
 
-func Test_Store_Get(t *testing.T) {
+func TestStoreGet(t *testing.T) {
 	// The majority of the code is tested later, in Test_SystemStore_Get
 	// Here we only test the permission checks done after delegation to the
 	// embedded system store
@@ -605,7 +603,7 @@ func Test_Store_Get(t *testing.T) {
 
 		fieldToken := properTokenCurrent.DeepCopy()
 		fieldToken.ObjectMeta.ManagedFields = []metav1.ManagedFieldsEntry{
-			metav1.ManagedFieldsEntry{
+			{
 				Manager:    "token",
 				Operation:  "something",
 				Time:       &now,
@@ -633,12 +631,11 @@ func Test_Store_Get(t *testing.T) {
 	})
 }
 
-func Test_Store_Watch(t *testing.T) {
-	// This test suite is a bit special, as it is not table driven like all other suites coming
-	// after it.  This is done because we need stronger control about the environment the
-	// various store calls are in, i.e. the channels involved, the context, and the goroutine
-	// internal to `Watch`.
-
+// This test suite is a bit special, as it is not table driven like all other suites coming
+// after it.  This is done because we need stronger control about the environment the
+// various store calls are in, i.e. the channels involved, the context, and the goroutine
+// internal to `Watch`.
+func TestStoreWatch(t *testing.T) {
 	t.Run("backend watch creation error fails early", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
@@ -991,7 +988,7 @@ func Test_Store_Watch(t *testing.T) {
 	})
 }
 
-func Test_Store_Create(t *testing.T) {
+func TestStoreCreate(t *testing.T) {
 	tests := []struct {
 		name       string                // test name
 		err        error                 // expected op result, error
@@ -1082,7 +1079,7 @@ func Test_Store_Create(t *testing.T) {
 
 				users.EXPECT().Get("world").
 					Return(&v3.User{
-						Enabled: pointer.Bool(false),
+						Enabled: ptr.To(false),
 					}, nil)
 			},
 		},
@@ -1196,7 +1193,7 @@ func Test_Store_Create(t *testing.T) {
 					Return(&v3.User{
 						DisplayName: "worldwide",
 						Username:    "wide",
-						Enabled:     pointer.Bool(true),
+						Enabled:     ptr.To(true),
 					}, nil)
 
 				// Fake value and hash
@@ -1245,7 +1242,7 @@ func Test_Store_Create(t *testing.T) {
 					Return(&v3.User{
 						DisplayName: "worldwide",
 						Username:    "wide",
-						Enabled:     pointer.Bool(true),
+						Enabled:     ptr.To(true),
 					}, nil)
 
 				// Fake value and hash
@@ -1294,7 +1291,7 @@ func Test_Store_Create(t *testing.T) {
 					Return(&v3.User{
 						DisplayName: "worldwide",
 						Username:    "wide",
-						Enabled:     pointer.Bool(true),
+						Enabled:     ptr.To(true),
 					}, nil)
 
 				// Fake value and hash
@@ -1351,7 +1348,7 @@ func Test_Store_Create(t *testing.T) {
 					Return(&v3.User{
 						DisplayName: "worldwide",
 						Username:    "wide",
-						Enabled:     pointer.Bool(true),
+						Enabled:     ptr.To(true),
 					}, nil)
 
 				// Fake value and hash -- See rtok below
@@ -1369,6 +1366,7 @@ func Test_Store_Create(t *testing.T) {
 				copy := properToken.DeepCopy()
 				copy.Status.Hash = ""
 				copy.Status.Value = "94084kdlafj43"
+				copy.Status.BearerToken = fmt.Sprintf("ext/%s:%s", copy.Name, copy.Status.Value)
 				return copy
 			}(),
 		},
@@ -1412,7 +1410,7 @@ func Test_Store_Create(t *testing.T) {
 	}
 }
 
-func Test_SystemStore_List(t *testing.T) {
+func TestSystemStoreList(t *testing.T) {
 	tests := []struct {
 		name       string              // test name
 		user       string              // user making request
@@ -1457,7 +1455,7 @@ func Test_SystemStore_List(t *testing.T) {
 				ListMeta: metav1.ListMeta{
 					ResourceVersion:    "1",
 					Continue:           "true",
-					RemainingItemCount: pointer.Int64(2),
+					RemainingItemCount: ptr.To(int64(2)),
 				},
 				Items: []ext.Token{
 					properToken,
@@ -1470,7 +1468,7 @@ func Test_SystemStore_List(t *testing.T) {
 						ListMeta: metav1.ListMeta{
 							ResourceVersion:    "1",
 							Continue:           "true",
-							RemainingItemCount: pointer.Int64(2),
+							RemainingItemCount: ptr.To(int64(2)),
 						},
 						Items: []corev1.Secret{
 							properSecret,
@@ -1572,7 +1570,7 @@ func Test_SystemStore_List(t *testing.T) {
 	}
 }
 
-func Test_SystemStore_Delete(t *testing.T) {
+func TestSystemStoreDelete(t *testing.T) {
 	tests := []struct {
 		name       string                // test name
 		token      string                // name of token to delete
@@ -1642,7 +1640,7 @@ func Test_SystemStore_Delete(t *testing.T) {
 	}
 }
 
-func Test_SystemStore_UpdateLastUsedAt(t *testing.T) {
+func TestSystemStoreUpdateLastUsedAt(t *testing.T) {
 	t.Run("patch last-used-at, ok", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
@@ -1695,7 +1693,7 @@ func Test_SystemStore_UpdateLastUsedAt(t *testing.T) {
 	})
 }
 
-func Test_SystemStore_UpdateLastActivitySeen(t *testing.T) {
+func TestSystemStoreUpdateLastActivitySeen(t *testing.T) {
 	t.Run("patch last-activity-seen, ok", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
@@ -1748,7 +1746,7 @@ func Test_SystemStore_UpdateLastActivitySeen(t *testing.T) {
 	})
 }
 
-func Test_SystemStore_Update(t *testing.T) {
+func TestSystemStoreUpdate(t *testing.T) {
 	tests := []struct {
 		name       string                // test name
 		fullPerm   bool                  // permission level: full or not
@@ -2065,7 +2063,7 @@ func Test_SystemStore_Update(t *testing.T) {
 	}
 }
 
-func Test_SystemStore_Get(t *testing.T) {
+func TestSystemStoreGet(t *testing.T) {
 	tests := []struct {
 		name       string             // test name
 		tokname    string             // name of token to retrieve
@@ -2249,7 +2247,7 @@ func Test_SystemStore_Get(t *testing.T) {
 					UserID:        properUser,
 					Description:   "",
 					TTL:           4000,
-					Enabled:       pointer.Bool(false),
+					Enabled:       ptr.To(false),
 					Kind:          "session",
 					UserPrincipal: properPrincipal,
 				},
@@ -2291,10 +2289,6 @@ func Test_SystemStore_Get(t *testing.T) {
 	}
 }
 
-// helpers
-
-// implementation of the k8s user info interface for mocking
-
 type mockUser struct {
 	name string
 }
@@ -2314,8 +2308,6 @@ func (u *mockUser) GetGroups() []string {
 func (u *mockUser) GetExtra() map[string][]string {
 	return map[string][]string{}
 }
-
-// implementation of the k8s watch interface for mocking
 
 func NewWatcherFor(e ...watch.Event) *mockWatch {
 	ch := make(chan watch.Event, len(e))
@@ -2339,5 +2331,4 @@ func (w *mockWatch) ResultChan() <-chan watch.Event {
 	return w.ch
 }
 
-func (w *mockWatch) Stop() {
-}
+func (w *mockWatch) Stop() {}

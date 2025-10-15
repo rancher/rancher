@@ -440,6 +440,7 @@ func (t *Store) Get(
 
 	token.Status.Current = token.Name == authTokenID
 	token.Status.Value = ""
+	token.Status.BearerToken = ""
 
 	return token, nil
 }
@@ -754,13 +755,14 @@ func (t *SystemStore) Create(ctx context.Context, group schema.GroupResource, to
 			newSecret.Name, err))
 	}
 
-	// The newly created token is not the request token
+	// The newly created token is not the request token.
 	newToken.Status.Current = false
 
-	// users don't care about the hashed value, just the secret
-	// here is the only place the secret is returned and disclosed.
+	// Users don't care about the hashed value, just the secret
 	newToken.Status.Hash = ""
+	// This is the only place where the secret value is returned.
 	newToken.Status.Value = tokenValue
+	newToken.Status.BearerToken = fmt.Sprintf("ext/%s:%s", newToken.Name, tokenValue)
 
 	return newToken, nil
 }
@@ -773,6 +775,7 @@ func (t *SystemStore) Delete(name string, options *metav1.DeleteOptions) error {
 	if apierrors.IsNotFound(err) {
 		return nil
 	}
+
 	return apierrors.NewInternalError(fmt.Errorf("failed to delete token %s: %w", name, err))
 }
 
@@ -795,6 +798,8 @@ func (t *SystemStore) Get(name, authTokenID string, options *metav1.GetOptions) 
 
 	token.Status.Current = token.Name == authTokenID
 	token.Status.Value = ""
+	token.Status.BearerToken = ""
+
 	return token, nil
 }
 
@@ -955,10 +960,9 @@ func (t *SystemStore) update(authTokenID string, fullPermission bool, oldToken, 
 	}
 
 	// Keep the status of the resource unchanged, never store a token value, etc.
-	// IOW changes to hash, value, etc. are all ignored without a peep.
 	token.Status = oldToken.Status
 	token.Status.Value = ""
-	// Refresh time of last update to current.
+	token.Status.BearerToken = ""
 	token.Status.LastUpdateTime = t.timer.Now()
 
 	secret, err := toSecret(token)
