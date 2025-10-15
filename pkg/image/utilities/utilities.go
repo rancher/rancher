@@ -88,6 +88,8 @@ func GatherTargetImagesAndSources(chartsPath string, imagesFromArgs []string) (I
 
 	externalLinuxImages := make(map[string][]string)
 
+	// RKE2/k3s provisioning is supported based on the support matrix. Refer to:
+	// https://www.suse.com/suse-rancher/support-matrix/all-supported-versions
 	k3sUpgradeImages, err := ext.GetExternalImages(rancherVersion, data.K3S, ext.K3S, mink8sVersion, img.Linux)
 	if err != nil {
 		return ImageTargetsAndSources{}, fmt.Errorf("%s: %w", "could not get external images for K3s", err)
@@ -96,8 +98,6 @@ func GatherTargetImagesAndSources(chartsPath string, imagesFromArgs []string) (I
 		externalLinuxImages["k3sUpgrade"] = k3sUpgradeImages
 	}
 
-	// RKE2 Provisioning is supported based on the support matrix. Refer to:
-	// https://www.suse.com/suse-rancher/support-matrix/all-supported-versions/rancher-v2-12-2/
 	rke2LinuxImages, err := ext.GetExternalImages(rancherVersion, data.RKE2, ext.RKE2, mink8sVersion, img.Linux)
 	if err != nil {
 		return ImageTargetsAndSources{}, fmt.Errorf("%s: %w", "could not get external images for RKE2", err)
