@@ -480,9 +480,13 @@ func triggerProvisioningClusterOnMachineDeploymentUpdate(clients *wrangler.CAPIC
 		if md, ok := obj.(*capi.MachineDeployment); ok &&
 			md.Annotations[capi.AutoscalerMinSizeAnnotation] != "" && md.Annotations[capi.AutoscalerMaxSizeAnnotation] != "" {
 			capiClusterName := md.Spec.Template.Labels[capi.ClusterNameLabel]
+			if capiClusterName == "" {
+				return nil, nil
+			}
+
 			capiCluster, err := clients.CAPI.Cluster().Cache().Get(namespace, capiClusterName)
 			if err != nil {
-				return nil, fmt.Errorf("failed to find capi cluster for machinedeployment %v/%v: %v", md.Namespace, md.Name, err)
+				return nil, fmt.Errorf("failed to find capi cluster for machinedeployment %s/%s: %w", md.Namespace, md.Name, err)
 			}
 
 			cluster, err := capr.GetProvisioningClusterFromCAPICluster(capiCluster, clients.Provisioning.Cluster().Cache())

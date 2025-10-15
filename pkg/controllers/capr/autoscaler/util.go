@@ -4,15 +4,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Masterminds/semver/v3"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/pkg/name"
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
-	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -54,21 +51,6 @@ func ownerReference(cluster *capi.Cluster) []metav1.OwnerReference {
 		Controller:         ptr.To(true),
 		BlockOwnerDeletion: ptr.To(true),
 	}}
-}
-
-func k8sMinorVersion(capiCluster *capi.Cluster) int {
-	k8sMinor := 0
-	if capiCluster.Annotations != nil && capiCluster.Annotations[capr.ClusterAutoscalerKubernetesVersion] != "" {
-		version, err := semver.NewVersion(capiCluster.Annotations[capr.ClusterAutoscalerKubernetesVersion])
-		if err != nil {
-			return 0
-		}
-		k8sMinor = int(version.Minor())
-	} else {
-		logrus.Infof("[autoscaler] no kubernetes version set for cluster %v/%v - latest version of cluster-autoscaler chart will be installed", capiCluster.Namespace, capiCluster.Name)
-	}
-
-	return k8sMinor
 }
 
 // Generates a kubeconfig YAML string using the provided token and server URL settings.

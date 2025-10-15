@@ -3,8 +3,10 @@ package autoscaler
 import (
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/docker/distribution/reference"
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	rke "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/settings"
@@ -19,9 +21,9 @@ import (
 // hardcoded k8s minor <-> image tag mapping, adding new versions here will automatically
 // rollout updates to all clusters on rancher upgrade (e.g. setting a new minor version)
 var imageTagVersions = map[int]string{
-	33: "v1.34.0",
-	32: "v1.33.0",
-	31: "v1.32.0",
+	34: "1.34.0-3.4",
+	33: "1.33.0-3.3",
+	32: "1.32.3-1.5",
 }
 
 // ensureFleetHelmOp creates or updates a Helm operation for cluster autoscaler.
@@ -38,17 +40,14 @@ func (h *autoscalerHandler) ensureFleetHelmOp(cluster *capi.Cluster, kubeconfigV
 			BundleDeploymentOptions: fleet.BundleDeploymentOptions{
 				DefaultNamespace: "kube-system",
 				Helm: &fleet.HelmOptions{
-					Chart:       "cluster-autoscaler",
+					Chart:       getChartName(),
 					Version:     settings.ClusterAutoscalerChartVersion.Get(),
-					Repo:        settings.ClusterAutoscalerChartRepo.Get(),
+					Repo:        settings.ClusterAutoscalerChartRepository.Get(),
 					ReleaseName: "cluster-autoscaler",
 					Values: &fleet.GenericMap{
 						Data: map[string]any{
 							"replicaCount": replicaCount,
-							"image": map[string]any{
-								"repository": settings.ClusterAutoscalerImageRepository.Get(),
-								"tag":        h.resolveHelmChartVersion(cluster),
-							},
+							"image":        h.getChartImageSettings(cluster),
 							"autoDiscovery": map[string]any{
 								"clusterName": cluster.Name,
 								"namespace":   cluster.Namespace,
@@ -102,30 +101,8 @@ func (h *autoscalerHandler) ensureFleetHelmOp(cluster *capi.Cluster, kubeconfigV
 	return err
 }
 
-// cleanup removes all fleet-related resources for a given cluster
-func (h *autoscalerHandler) cleanupFleet(cluster *capi.Cluster) error {
-	var errs []error
-
-	// Delete the Helm operation if it exists
-	helmOpName := helmOpName(cluster)
-	if _, err := h.helmOpCache.Get(cluster.Namespace, helmOpName); err == nil {
-		if err := h.helmOp.Delete(cluster.Namespace, helmOpName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
-			errs = append(errs, fmt.Errorf("failed to delete Helm operation %s in namespace %s: %w", helmOpName, cluster.Namespace, err))
-		}
-	} else if !errors.IsNotFound(err) {
-		errs = append(errs, fmt.Errorf("failed to check existence of Helm operation %s in namespace %s: %w", helmOpName, cluster.Namespace, err))
-	}
-
-	// Return combined errors if any occurred
-	if len(errs) > 0 {
-		return fmt.Errorf("encountered %d errors during fleet cleanup: %v", len(errs), errs)
-	}
-
-	return nil
-}
-
 // Returns the cluster-autoscaler image version for cluster autoscaler based on the Kubernetes minor version of the cluster.
-func (h *autoscalerHandler) resolveHelmChartVersion(cluster *capi.Cluster) string {
+func (h *autoscalerHandler) resolveImageTagVersion(cluster *capi.Cluster) string {
 	minorVersion := h.getKubernetesMinorVersion(cluster)
 	version, exists := imageTagVersions[minorVersion]
 	if !exists || version == "" {
@@ -133,6 +110,55 @@ func (h *autoscalerHandler) resolveHelmChartVersion(cluster *capi.Cluster) strin
 		return ""
 	}
 	return version
+}
+
+func (h *autoscalerHandler) getChartImageSettings(cluster *capi.Cluster) map[string]any {
+	// if we don't specify an image - just use whatever is in the chart
+	autoscalerImage := settings.ClusterAutoscalerImage.Get()
+	if autoscalerImage == "" {
+		return map[string]any{}
+	}
+
+	// parse out the image to properly set all the values in the chart
+	imageRef, err := reference.ParseNormalizedNamed(autoscalerImage)
+	if err != nil {
+		return map[string]any{}
+	}
+
+	registry := reference.Domain(imageRef)
+	image := reference.Path(imageRef)
+	tag := reference.TagNameOnly(imageRef)
+
+	// if we are not overriding all the image settings fall back to whatever is in the chart by default
+	if registry == "" && image == "" {
+		return map[string]any{}
+	}
+
+	imageSettings := map[string]any{
+		"repository": image,
+		"registry":   registry,
+	}
+
+	// this handles if we don't have a specific validated tag for the given k8s version - fall back to
+	// the default helm chart tag OR whatever was set on the image (if present)
+	configuredTag := h.resolveImageTagVersion(cluster)
+	if configuredTag != "" {
+		imageSettings["tag"] = configuredTag
+	} else if tag.Name() != "latest" { // tag defaults to latest if not set
+		imageSettings["tag"] = tag.Name()
+	}
+
+	return imageSettings
+}
+
+// Returns the chart name based on the chart repository URL prefix. OCI charts do not need a chart-name as it is referring
+// to an OCI image.
+func getChartName() string {
+	if strings.HasPrefix(settings.ClusterAutoscalerChartRepository.Get(), "oci://") {
+		return ""
+	} else {
+		return "cluster-autoscaler"
+	}
 }
 
 func (h *autoscalerHandler) getKubernetesMinorVersion(cluster *capi.Cluster) int {
@@ -181,4 +207,26 @@ func (h *autoscalerHandler) getKubernetesMinorVersion(cluster *capi.Cluster) int
 	}
 
 	return int(version.Minor())
+}
+
+// cleanup removes all fleet-related resources for a given cluster
+func (h *autoscalerHandler) cleanupFleet(cluster *capi.Cluster) error {
+	var errs []error
+
+	// Delete the Helm operation if it exists
+	helmOpName := helmOpName(cluster)
+	if _, err := h.helmOpCache.Get(cluster.Namespace, helmOpName); err == nil {
+		if err := h.helmOp.Delete(cluster.Namespace, helmOpName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+			errs = append(errs, fmt.Errorf("failed to delete Helm operation %s in namespace %s: %w", helmOpName, cluster.Namespace, err))
+		}
+	} else if !errors.IsNotFound(err) {
+		errs = append(errs, fmt.Errorf("failed to check existence of Helm operation %s in namespace %s: %w", helmOpName, cluster.Namespace, err))
+	}
+
+	// Return combined errors if any occurred
+	if len(errs) > 0 {
+		return fmt.Errorf("encountered %d errors during fleet cleanup: %v", len(errs), errs)
+	}
+
+	return nil
 }

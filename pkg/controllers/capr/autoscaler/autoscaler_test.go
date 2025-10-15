@@ -10,8 +10,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
@@ -92,30 +90,4 @@ func (s *autoscalerSuite) TearDownTest() {
 	if s.mockCtrl != nil {
 		s.mockCtrl.Finish()
 	}
-}
-
-func (s *autoscalerSuite) TestSecretCreation() {
-	// Set up expectation for secret creation
-	testSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-secret",
-			Namespace: "default",
-		},
-		Data: map[string][]byte{
-			"username": []byte("admin"),
-			"password": []byte("password123"),
-		},
-	}
-
-	// Mock the secret cache to return our test secret
-	s.secretCache.EXPECT().List(gomock.Any(), gomock.Any()).Return([]*corev1.Secret{testSecret}, nil).AnyTimes()
-
-	// Test that we can retrieve a secret successfully
-	secrets, err := s.h.secretCache.List("default", labels.Everything())
-	s.Require().NoError(err, "Should be able to list secrets")
-	s.Require().Len(secrets, 1, "Should have one secret")
-	s.Require().Equal("test-secret", secrets[0].Name, "Secret name should match")
-	s.Require().Equal("default", secrets[0].Namespace, "Secret namespace should match")
-	s.Require().Contains(secrets[0].Data, "username", "Secret should contain username")
-	s.Require().Contains(secrets[0].Data, "password", "Secret should contain password")
 }

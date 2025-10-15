@@ -53,18 +53,6 @@ type autoscalerHandler struct {
 }
 
 func Register(ctx context.Context, clients *wrangler.CAPIContext) {
-	// only run these handlers if autoscaling is enabled
-	if !features.ClusterAutoscaling.Enabled() {
-		return
-	}
-
-	// warn the user if they have the autoscaling feature-flag enabled but no chart repo set,
-	// then do not run the controller.
-	if settings.ClusterAutoscalerChartRepo.Get() == "" {
-		logrus.Warnf("[autoscaler] no chart repo configured for autoscaler - cannot enable autoscaling!")
-		return
-	}
-
 	h := &autoscalerHandler{
 		clusterClient: clients.Provisioning.Cluster(),
 		clusterCache:  clients.Provisioning.Cluster().Cache(),
@@ -91,6 +79,20 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 		helmOpCache: clients.Fleet.HelmOp().Cache(),
 
 		dynamicClient: clients.Dynamic,
+	}
+
+	// only run the "create" handlers if autoscaling is enabled. otherwise only run the cleanup handler
+	// (in case the user disabled autoscaling after having it enabled
+	if !features.ClusterAutoscaling.Enabled() {
+		clients.CAPI.Cluster().OnChange(ctx, "autoscaler-cleanup", h.ensureCleanup)
+		return
+	}
+
+	// warn the user if they have the autoscaling feature-flag enabled but no chart repo set,
+	// then do not run the controller.
+	if settings.ClusterAutoscalerChartRepository.Get() == "" {
+		logrus.Warnf("[autoscaler] no value is set for the cluster-autoscaler-chart-repo Setting  - cannot enable autoscaling!")
+		return
 	}
 
 	// Start background token renewal process, runs daily to refresh tokens that expire within a month.
@@ -154,12 +156,12 @@ func (h *autoscalerHandler) OnChange(_ string, cluster *capi.Cluster) (*capi.Clu
 	// Setup RBAC (user, role, role binding, token)
 	kubeconfig, err := h.setupRBAC(cluster, mds, machines)
 	if err != nil {
-		return cluster, err
+		return nil, err
 	}
 
 	// Deploy the cluster-autoscaler chart
 	if err := h.deployChart(cluster, kubeconfig); err != nil {
-		return cluster, err
+		return nil, err
 	}
 
 	// enqueue the helmop in order to force a status-update on the v2prov cluster object (if it exists) from the helmOp
@@ -267,15 +269,16 @@ func (h *autoscalerHandler) syncHelmOpStatus(_ string, helmOp *fleet.HelmOp) (*f
 
 	capiCluster, err := h.capiClusterCache.Get(helmOp.Namespace, helmOp.Labels[capi.ClusterNameLabel])
 	if err != nil {
-		return helmOp, err
+		return nil, err
 	}
 
 	cluster, err := capr.GetProvisioningClusterFromCAPICluster(capiCluster, h.clusterCache)
 	// if there is not a provisioning cluster associated with this helmop its fine - just a non-v2prov cluster
-	if err != nil && cluster == nil {
+	if err != nil {
+		return nil, err
+	}
+	if cluster == nil {
 		return helmOp, nil
-	} else if err != nil {
-		return helmOp, err
 	}
 
 	// not populating the status condition on the cluster until the actual cluster is ready and the helm
@@ -310,4 +313,13 @@ func (h *autoscalerHandler) syncHelmOpStatus(_ string, helmOp *fleet.HelmOp) (*f
 	}
 
 	return helmOp, nil
+}
+
+func (h *autoscalerHandler) ensureCleanup(_ string, cluster *capi.Cluster) (*capi.Cluster, error) {
+	err := h.handleUninstall(cluster)
+	if err != nil {
+		return nil, err
+	}
+
+	return cluster, nil
 }
