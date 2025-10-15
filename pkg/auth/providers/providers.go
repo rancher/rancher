@@ -34,7 +34,8 @@ var (
 	LocalProvider          = "local"
 	confMu                 sync.Mutex
 	userExtraAttributesMap = map[string]bool{common.UserAttributePrincipalID: true, common.UserAttributeUserName: true}
-	samlProviders          = map[string]bool{
+	// Names of all SAML providers. Used to look up the provider based on the type.
+	samlProviders = map[string]bool{
 		saml.PingName:       true,
 		saml.ADFSName:       true,
 		saml.KeyCloakName:   true,

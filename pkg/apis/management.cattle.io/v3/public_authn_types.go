@@ -59,34 +59,19 @@ type GenericLogin struct {
 	Name         string `json:"-"`
 }
 
-func (g *GenericLogin) GetType() string {
-	if g == nil {
-		return ""
-	}
+func (g GenericLogin) GetType() string {
 	return g.Type
 }
-func (g *GenericLogin) GetTTL() int64 {
-	if g == nil {
-		return 0
-	}
+func (g GenericLogin) GetTTL() int64 {
 	return g.TTLMillis
 }
-func (g *GenericLogin) GetDescription() string {
-	if g == nil {
-		return ""
-	}
+func (g GenericLogin) GetDescription() string {
 	return g.Description
 }
-func (g *GenericLogin) GetResponseType() string {
-	if g == nil {
-		return ""
-	}
+func (g GenericLogin) GetResponseType() string {
 	return g.ResponseType
 }
-func (g *GenericLogin) GetName() string {
-	if g == nil {
-		return ""
-	}
+func (g GenericLogin) GetName() string {
 	return g.Name
 }
 

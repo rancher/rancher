@@ -37,6 +37,8 @@ const (
 	roleTemplatesRequired        = "authz.management.cattle.io/creator-role-bindings"
 )
 
+// NewUserManagerNoBindings creates an instance of userManager
+// without CRTB, PRTB, GRB and CRB informers and clients.
 func NewUserManagerNoBindings(wranglerContext *wrangler.Context) (user.Manager, error) {
 	userInformer := wranglerContext.Mgmt.User().Informer()
 	// registering the same index more than once will cause an error. Since we attempt to register this index in multiple
@@ -60,6 +62,7 @@ func NewUserManagerNoBindings(wranglerContext *wrangler.Context) (user.Manager, 
 	}, nil
 }
 
+// NewUserManagerNoBindings creates an instance of userManager.
 func NewUserManager(wranglerContext *wrangler.Context) (user.Manager, error) {
 	userInformer := wranglerContext.Mgmt.User().Informer()
 	// registering the same index more than once will cause an error. Since we attempt to register this index in multiple

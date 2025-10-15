@@ -57,9 +57,7 @@ func TestLogout(t *testing.T) {
 		return nil
 	}
 
-	checkSuccessResponse := func(t *testing.T, w *httptest.ResponseRecorder) {
-		assert.True(t, logoutCalled)
-		assert.Equal(t, http.StatusOK, w.Result().StatusCode)
+	checkCookiesUnset := func(t *testing.T, w *httptest.ResponseRecorder) {
 		require.Len(t, w.Result().Cookies(), 2)
 		for _, cookie := range w.Result().Cookies() {
 			switch cookie.Name {
@@ -73,6 +71,11 @@ func TestLogout(t *testing.T) {
 				require.FailNow(t, "unexpected cookie "+cookie.Name)
 			}
 		}
+	}
+	checkSuccessResponse := func(t *testing.T, w *httptest.ResponseRecorder) {
+		assert.True(t, logoutCalled)
+		assert.Equal(t, http.StatusOK, w.Result().StatusCode)
+		checkCookiesUnset(t, w)
 	}
 
 	authRequest := func(path string) *http.Request {
@@ -159,6 +162,7 @@ func TestLogout(t *testing.T) {
 			h.ServeHTTP(w, r)
 
 			assert.Equal(t, statusOut, w.Result().StatusCode)
+			checkCookiesUnset(t, w)
 			assert.Equal(t, statusOut == http.StatusOK, logoutCalled)
 		}
 	})
@@ -205,6 +209,7 @@ func TestLogout(t *testing.T) {
 		h.ServeHTTP(w, r)
 
 		assert.Equal(t, http.StatusInternalServerError, w.Result().StatusCode)
+		checkCookiesUnset(t, w)
 		assert.True(t, logoutCalled)
 	})
 }

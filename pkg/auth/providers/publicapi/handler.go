@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 )
 
+// NewV1Handler returns an http handler for /v1-public endpoints.
 func NewV1Handler(ctx context.Context, scaledContext *config.ScaledContext) (http.Handler, error) {
 	providerStore, err := newV1AuthProviderStore(scaledContext.Wrangler)
 	if err != nil {
@@ -23,16 +24,18 @@ func NewV1Handler(ctx context.Context, scaledContext *config.ScaledContext) (htt
 	authTokenStore := newV1AuthTokenStore(scaledContext.Wrangler)
 
 	r := mux.NewRouter()
-	r.Methods(http.MethodGet).Path("/v1-public/authproviders").Handler(providerStore.List())
+	r.Methods(http.MethodGet).Path("/v1-public/authproviders").HandlerFunc(providerStore.List)
 	r.Methods(http.MethodPost).Path("/v1-public/login").HandlerFunc(newV1LoginHandler(scaledContext).login)
-	r.Methods(http.MethodGet).Path("/v1-public/authtokens/{id}").Handler(authTokenStore.Get())
-	r.Methods(http.MethodDelete).Path("/v1-public/authtokens/{id}").Handler(authTokenStore.Delete())
+	r.Methods(http.MethodGet).Path("/v1-public/authtokens/{id}").HandlerFunc(authTokenStore.Get)
+	r.Methods(http.MethodDelete).Path("/v1-public/authtokens/{id}").HandlerFunc(authTokenStore.Delete)
 
 	return r, nil
 }
 
 type ServerOption func(server *normanapi.Server)
 
+// NewV3Handler returns an http handler for /v3-public endpoints.
+// Deprecated. Use NewV1Handler instead. Will be removed in future releases.
 func NewV3Handler(ctx context.Context, mgmtCtx *config.ScaledContext, opts ...ServerOption) (http.Handler, error) {
 	schemas := types.NewSchemas().AddSchemas(publicSchema.PublicSchemas)
 	if err := authProviderSchemas(mgmtCtx, schemas); err != nil {

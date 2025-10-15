@@ -105,7 +105,7 @@ func TestV1AuthProviderStoreList(t *testing.T) {
 	r := httptest.NewRequest("GET", "/v1-public/authproviders", nil)
 	w := httptest.NewRecorder()
 
-	store.List().ServeHTTP(w, r)
+	store.List(w, r)
 	require.Equal(t, 200, w.Result().StatusCode)
 	require.Equal(t, "application/json", w.Result().Header.Get("Content-Type"))
 	gotPayload := map[string]any{}
@@ -153,7 +153,7 @@ func TestV1AuthTokenStoreGet(t *testing.T) {
 	r = mux.SetURLVars(r, map[string]string{"id": tokenID})
 	w := httptest.NewRecorder()
 
-	store.Get().ServeHTTP(w, r)
+	store.Get(w, r)
 	require.Equal(t, 200, w.Result().StatusCode)
 	require.Equal(t, "application/json", w.Result().Header.Get("Content-Type"))
 	gotPayload := map[string]any{}
@@ -180,6 +180,6 @@ func TestV1AuthTokenStoreDelete(t *testing.T) {
 	r = mux.SetURLVars(r, map[string]string{"id": tokenID})
 	w := httptest.NewRecorder()
 
-	store.Delete().ServeHTTP(w, r)
+	store.Delete(w, r)
 	require.Equal(t, 200, w.Result().StatusCode)
 }
