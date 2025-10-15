@@ -1,0 +1,11 @@
+helm upgrade --install rancher ./chart \
+--namespace cattle-system \
+--set hostname=a40900e75b37b4ffe887eaac2ca43364-2037708301.us-east-2.elb.amazonaws.com \
+--set bootstrapPassword=R@ncher1234! \
+--set extraEnv\[0\].name="CATTLE_PROMETHEUS_METRICS" --set-string extraEnv\[0\].value=true \
+--set extraEnv\[1\].name="CATTLE_SERVER_URL" --set-string extraEnv\[1\].value="https://a40900e75b37b4ffe887eaac2ca43364-2037708301.us-east-2.elb.amazonaws.com" \
+--set ingress.ingressClassName=nginx \
+--set global.cattle.psp.enabled=false \
+--set installCRDs="true" \
+--set rancherImage="gbuenodevsuse/rancher" \
+--set rancherImageTag="v2.13.0-test2"
