@@ -2,6 +2,7 @@ package tokens
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -113,17 +114,6 @@ var (
 	// Note: Setup is done in `init()` below.
 	properTokenCurrent ext.Token
 
-	dummyToken = ext.Token{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "bogus",
-			Labels: map[string]string{
-				UserIDLabel:     properUser,
-				SecretKindLabel: SecretKindLabelValue,
-			},
-			UID: "bombastic",
-		},
-	}
-
 	// ttlPlusSecret is the properSecret with extended ttl
 	ttlPlusSecret = corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -194,7 +184,6 @@ func init() {
 }
 
 func TestTTLGreater(t *testing.T) {
-
 	tests := []struct {
 		name string
 		a    int64
@@ -578,7 +567,7 @@ func TestStoreGet(t *testing.T) {
 
 		fieldSecret := properSecret.DeepCopy()
 		fieldSecret.ObjectMeta.ManagedFields = []metav1.ManagedFieldsEntry{
-			metav1.ManagedFieldsEntry{
+			{
 				Manager:    "token",
 				Operation:  "something",
 				Time:       &now,
@@ -1694,55 +1683,85 @@ func TestSystemStoreUpdateLastUsedAt(t *testing.T) {
 }
 
 func TestSystemStoreUpdateLastActivitySeen(t *testing.T) {
+	tokenID := "token-psc9k"
+	secretUID := types.UID("cc965dfc-1d39-485c-ab12-40b0adf78d0b")
+	tokenUID := types.UID("07306f53-a3df-4608-ae02-d6595a24c17d")
+
 	t.Run("patch last-activity-seen, ok", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
-		// assemble and configure store from mock clients ...
-		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
-		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+		now := time.Now().UTC()
+		var patchData []byte
 
+		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 		users.EXPECT().Cache().Return(nil)
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 		secrets.EXPECT().Cache().Return(nil)
+		secrets.EXPECT().Patch(TokenNamespace, tokenID, types.JSONPatchType, gomock.Any()).
+			DoAndReturn(func(space, name string, pt types.PatchType, data []byte, subresources ...any) (*corev1.Secret, error) {
+				patchData = data
+				return &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						CreationTimestamp: metav1.NewTime(now.Add(-2 * time.Hour)),
+						Name:              tokenID,
+						Labels: map[string]string{
+							UserIDLabel:     properUser,
+							SecretKindLabel: SecretKindLabelValue,
+						},
+						ResourceVersion: "1",
+						UID:             secretUID,
+					},
+					Data: map[string][]byte{
+						FieldDescription:      []byte(""),
+						FieldEnabled:          []byte("true"),
+						FieldHash:             []byte("kla9jkdmj"),
+						FieldKind:             []byte(IsLogin),
+						FieldLastUpdateTime:   []byte(now.Add(-time.Hour).Format(time.RFC3339)),
+						FieldPrincipal:        properPrincipalBytes,
+						FieldTTL:              []byte("4000"),
+						FieldUID:              []byte(tokenUID),
+						FieldUserID:           []byte(properUser),
+						FieldLastActivitySeen: []byte(now.Add(-10 * time.Minute).Format(time.RFC3339)),
+					},
+				}, nil
+			}).Times(1)
 
 		store := NewSystem(nil, nil, secrets, users, nil, nil, nil, nil, nil)
 
-		var patchData []byte
-		secrets.EXPECT().Patch("cattle-tokens", "atoken", types.JSONPatchType, gomock.Any()).
-			DoAndReturn(func(space, name string, pt types.PatchType, data []byte, subresources ...any) (*ext.Token, error) {
-				patchData = data
-				return nil, nil
-			}).Times(1)
+		token, err := store.UpdateLastActivitySeen(tokenID, now)
+		require.NoError(t, err)
+		require.NotNil(t, token)
 
-		now, nerr := time.Parse(time.RFC3339, "2024-12-06T03:02:01Z")
-		assert.NoError(t, nerr)
-
-		err := store.UpdateLastActivitySeen("atoken", now)
-		assert.NoError(t, err)
 		require.NotEmpty(t, patchData)
-		require.Equal(t,
-			`[{"op":"replace","path":"/data/last-activity-seen","value":"MjAyNC0xMi0wNlQwMzowMjowMVo="}]`,
-			string(patchData))
+		patch := []struct {
+			Op    string `json:"op"`
+			Path  string `json:"path"`
+			Value any    `json:"value"`
+		}{}
+		require.NoError(t, json.Unmarshal(patchData, &patch))
+		require.Len(t, patch, 1)
+		assert.Equal(t, "replace", patch[0].Op)
+		assert.Equal(t, "/data/last-activity-seen", patch[0].Path)
+		assert.Equal(t, base64.StdEncoding.EncodeToString([]byte(now.Format(time.RFC3339))), patch[0].Value)
 	})
 
 	t.Run("patch last-activity-seen, error", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
-		// assemble and configure store from mock clients ...
-		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 		users := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
-
 		users.EXPECT().Cache().Return(nil)
+		secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 		secrets.EXPECT().Cache().Return(nil)
-
-		store := NewSystem(nil, nil, secrets, users, nil, nil, nil, nil, nil)
-
-		secrets.EXPECT().Patch("cattle-tokens", "atoken", types.JSONPatchType, gomock.Any()).
+		secrets.EXPECT().Patch(TokenNamespace, tokenID, types.JSONPatchType, gomock.Any()).
 			Return(nil, fmt.Errorf("some error")).
 			Times(1)
 
-		now, _ := time.Parse(time.RFC3339, "2024-12-06T03:00:00")
-		err := store.UpdateLastActivitySeen("atoken", now)
-		assert.Equal(t, fmt.Errorf("some error"), err)
+		store := NewSystem(nil, nil, secrets, users, nil, nil, nil, nil, nil)
+
+		token, err := store.UpdateLastActivitySeen(tokenID, time.Now().UTC())
+		require.Error(t, err)
+		require.Nil(t, token)
+		assert.Contains(t, err.Error(), "some error")
 	})
 }
 

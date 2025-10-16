@@ -1015,7 +1015,7 @@ func (t *SystemStore) UpdateLastUsedAt(name string, now time.Time) error {
 
 // UpdateLastActivitySeen patches the last-activity-seen information of the token.
 // Called from the ext user activity store.
-func (t *SystemStore) UpdateLastActivitySeen(name string, now time.Time) error {
+func (t *SystemStore) UpdateLastActivitySeen(name string, now time.Time) (*ext.Token, error) {
 	// Operate directly on the backend secret holding the token
 	nowEncoded := base64.StdEncoding.EncodeToString([]byte(now.Format(time.RFC3339)))
 	patch, err := json.Marshal([]struct {
@@ -1028,11 +1028,20 @@ func (t *SystemStore) UpdateLastActivitySeen(name string, now time.Time) error {
 		Value: nowEncoded,
 	}})
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("failed to marchal the patch: %w", err)
 	}
 
-	_, err = t.secretClient.Patch(TokenNamespace, name, types.JSONPatchType, patch)
-	return err
+	patched, err := t.secretClient.Patch(TokenNamespace, name, types.JSONPatchType, patch)
+	if err != nil {
+		return nil, fmt.Errorf("failed to patch the token to set last activity seen: %w", err)
+	}
+
+	token, err := fromSecret(patched)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get token from secret: %w", err)
+	}
+
+	return token, nil
 }
 
 // Disable patches the enabled flag of the token.
