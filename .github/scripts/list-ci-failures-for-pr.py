@@ -295,6 +295,7 @@ def main():
     parser = argparse.ArgumentParser(description="Lists failed GitHub Actions workflow attempts for a specific Pull Request")
     parser.add_argument("pr_number", type=int, help="PR number to analyze")
     parser.add_argument("--repo", help="Repository in owner/name format (can also be set via REPOSITORY environment variable)")
+    parser.add_argument("--max-attempts", type=int, help="Maximum number of CI attempts (can also be set via MAX_CI_ATTEMPTS environment variable)")
 
     args = parser.parse_args()
 
@@ -309,6 +310,13 @@ def main():
         print("Error: Repository must be in the format 'owner/name'")
         sys.exit(1)
 
+    max_ci_attempts = args.max_attempts or os.environ.get("MAX_CI_ATTEMPTS")
+    if max_ci_attempts:
+        try:
+            max_ci_attempts = int(max_ci_attempts)
+        except ValueError:
+            max_ci_attempts = None
+
     markdown_output = []
     markdown_output.append(f"# CI Failures")
 
@@ -321,7 +329,19 @@ def main():
 
     failed_attempts.sort(key=lambda x: (x["workflow_name"], x["attempt_number"]))
 
-    markdown_output.append(f"Found **{len(failed_attempts)}** failed workflow {('attempt' if len(failed_attempts) == 1 else 'attempts')}:")
+    # Calculate unique attempt numbers that had failures
+    unique_failed_attempts = sorted(set(attempt["attempt_number"] for attempt in failed_attempts))
+    num_failed_attempts = len(unique_failed_attempts)
+    num_failed_jobs = len(failed_attempts)
+
+    if max_ci_attempts:
+        summary = f"**{num_failed_attempts}/{max_ci_attempts}** CI run attempts had failures"
+    else:
+        summary = f"**{num_failed_attempts}** CI run {'attempt' if num_failed_attempts == 1 else 'attempts'} had failures"
+
+    summary += f" with **{num_failed_jobs}** failed {'job' if num_failed_jobs == 1 else 'jobs'} total"
+
+    markdown_output.append(summary)
     markdown_output.append("\n---\n")
 
     for attempt in failed_attempts:
