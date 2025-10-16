@@ -481,7 +481,7 @@ func triggerProvisioningClusterOnMachineDeploymentUpdate(clients *wrangler.CAPIC
 			md.Annotations[capi.AutoscalerMinSizeAnnotation] != "" && md.Annotations[capi.AutoscalerMaxSizeAnnotation] != "" {
 			capiClusterName := md.Spec.Template.Labels[capi.ClusterNameLabel]
 			if capiClusterName == "" {
-				return nil, nil
+				return []relatedresource.Key{}, nil
 			}
 
 			capiCluster, err := clients.CAPI.Cluster().Cache().Get(namespace, capiClusterName)

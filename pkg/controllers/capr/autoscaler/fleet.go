@@ -21,6 +21,9 @@ import (
 
 // hardcoded k8s minor <-> image tag mapping, adding new versions here will automatically
 // rollout updates to all clusters on rancher upgrade (e.g. setting a new minor version)
+//
+// NOTE: When updating the chart version in build.yaml you will need to update this mapping
+// if adding support for a new minor k8s verison
 var imageTagVersions = map[int]string{
 	34: "1.34.0-3.4",
 	33: "1.33.0-3.3",
