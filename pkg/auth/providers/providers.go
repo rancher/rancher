@@ -168,7 +168,6 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	p = genericoidc.Configure(ctx, mgmt, userMGR, tokenMGR)
 	ProviderNames[genericoidc.Name] = true
 	providersWithSecrets[genericoidc.Name] = true
-	UnrefreshableProviders[genericoidc.Name] = true
 	Providers[genericoidc.Name] = p
 	providersByType[client.GenericOIDCConfigType] = p
 	providersByType[publicclient.GenericOIDCProviderType] = p
@@ -176,7 +175,6 @@ func Configure(ctx context.Context, mgmt *config.ScaledContext) {
 	p = cognito.Configure(ctx, mgmt, userMGR, tokenMGR)
 	ProviderNames[cognito.Name] = true
 	providersWithSecrets[cognito.Name] = true
-	UnrefreshableProviders[cognito.Name] = true
 	Providers[cognito.Name] = p
 	providersByType[client.CognitoConfigType] = p
 	providersByType[publicclient.CognitoProviderType] = p
