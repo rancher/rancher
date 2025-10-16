@@ -1028,7 +1028,7 @@ func (t *SystemStore) UpdateLastActivitySeen(name string, now time.Time) (*ext.T
 		Value: nowEncoded,
 	}})
 	if err != nil {
-		return nil, fmt.Errorf("failed to marchal the patch: %w", err)
+		return nil, fmt.Errorf("failed to marshal the patch: %w", err)
 	}
 
 	patched, err := t.secretClient.Patch(TokenNamespace, name, types.JSONPatchType, patch)
