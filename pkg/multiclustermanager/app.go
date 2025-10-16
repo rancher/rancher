@@ -2,18 +2,15 @@ package multiclustermanager
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"sync"
 	"time"
 
-	"github.com/rancher/rancher/pkg/agent/clean/adunmigration"
-
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
-	"github.com/sirupsen/logrus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
+	"github.com/rancher/rancher/pkg/agent/clean/adunmigration"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -31,6 +28,8 @@ import (
 	"github.com/rancher/rancher/pkg/tunnelserver/mcmauthorizer"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type Options struct {
@@ -79,7 +78,7 @@ func BuildScaledContext(ctx context.Context, wranglerContext *wrangler.Context, 
 
 	userManager, err := common.NewUserManager(wranglerContext)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, fmt.Errorf("mcm: error creating user manager: %w", err)
 	}
 
 	scaledContext.UserManager = userManager
@@ -101,12 +100,12 @@ func BuildScaledContext(ctx context.Context, wranglerContext *wrangler.Context, 
 }
 
 func newMCM(ctx context.Context, wranglerContext *wrangler.Context, cfg *Options) (*mcm, error) {
-	scaledContext, clusterManager, tunnelAuthorizer, err := BuildScaledContext(ctx, wranglerContext, cfg)
+	scaledContext, clusterManager, _, err := BuildScaledContext(ctx, wranglerContext, cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	router, err := router(ctx, cfg.LocalClusterEnabled, tunnelAuthorizer, scaledContext, clusterManager)
+	router, err := router(ctx, cfg.LocalClusterEnabled, scaledContext, clusterManager)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +209,7 @@ func (m *mcm) Start(ctx context.Context) error {
 
 		go adunmigration.UnmigrateAdGUIDUsersOnce(m.ScaledContext)
 		tokens.StartPurgeDaemon(ctx, management)
-		providerrefresh.StartRefreshDaemon(ctx, m.ScaledContext, management)
+		providerrefresh.StartRefreshDaemon(m.ScaledContext, management)
 		managementdata.CleanupOrphanedSystemUsers(ctx, management)
 		clusterupstreamrefresher.MigrateEksRefreshCronSetting(m.wranglerContext)
 		go managementdata.CleanupDuplicateBindings(m.ScaledContext, m.wranglerContext)

@@ -6,6 +6,7 @@ const (
 	GoogleOauthLoginFieldDescription  = "description"
 	GoogleOauthLoginFieldResponseType = "responseType"
 	GoogleOauthLoginFieldTTLMillis    = "ttl"
+	GoogleOauthLoginFieldType         = "type"
 )
 
 type GoogleOauthLogin struct {
@@ -13,4 +14,5 @@ type GoogleOauthLogin struct {
 	Description  string `json:"description,omitempty" yaml:"description,omitempty"`
 	ResponseType string `json:"responseType,omitempty" yaml:"responseType,omitempty"`
 	TTLMillis    int64  `json:"ttl,omitempty" yaml:"ttl,omitempty"`
+	Type         string `json:"type,omitempty" yaml:"type,omitempty"`
 }

@@ -10,19 +10,19 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"k8s.io/client-go/util/retry"
 )
 
-func (g *ghAppProvider) formatter(apiContext *types.APIContext, resource *types.RawResource) {
+func (g *Provider) formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	common.AddCommonActions(apiContext, resource)
 	resource.AddAction(apiContext, "configureTest")
 	resource.AddAction(apiContext, "testAndApply")
 }
 
-func (g *ghAppProvider) actionHandler(actionName string, action *types.Action, request *types.APIContext) error {
+func (g *Provider) actionHandler(actionName string, action *types.Action, request *types.APIContext) error {
 	handled, err := common.HandleCommonAction(actionName, action, request, Name, g.authConfigs)
 	if err != nil {
 		return err
@@ -31,24 +31,25 @@ func (g *ghAppProvider) actionHandler(actionName string, action *types.Action, r
 		return nil
 	}
 
-	if actionName == "configureTest" {
+	switch actionName {
+	case "configureTest":
 		return g.configureTest(request)
-	} else if actionName == "testAndApply" {
+	case "testAndApply":
 		return g.testAndApply(request)
+	default:
+		return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 	}
-
-	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }
 
-func (g *ghAppProvider) configureTest(request *types.APIContext) error {
-	githubConfig := &v32.GithubConfig{}
+func (g *Provider) configureTest(request *types.APIContext) error {
+	githubConfig := &apiv3.GithubConfig{}
 	if err := json.NewDecoder(request.Request.Body).Decode(githubConfig); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("Failed to parse body: %v", err))
 	}
 	redirectURL := formGithubRedirectURL(githubConfig)
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"redirectUrl": redirectURL,
 		"type":        "githubConfigTestOutput",
 	}
@@ -57,11 +58,11 @@ func (g *ghAppProvider) configureTest(request *types.APIContext) error {
 	return nil
 }
 
-func formGithubRedirectURL(githubConfig *v32.GithubConfig) string {
+func formGithubRedirectURL(githubConfig *apiv3.GithubConfig) string {
 	return githubRedirectURL(githubConfig.Hostname, githubConfig.ClientID, githubConfig.TLS)
 }
 
-func formGithubRedirectURLFromMap(config map[string]interface{}) string {
+func formGithubRedirectURLFromMap(config map[string]any) string {
 	hostname, _ := config[client.GithubConfigFieldHostname].(string)
 	clientID, _ := config[client.GithubConfigFieldClientID].(string)
 	tls, _ := config[client.GithubConfigFieldTLS].(bool)
@@ -90,16 +91,16 @@ func githubRedirectURL(hostname, clientID string, tls bool) string {
 	return redirect
 }
 
-func (g *ghAppProvider) testAndApply(request *types.APIContext) error {
-	var githubConfig v32.GithubAppConfig
-	githubConfigApplyInput := &v32.GithubAppConfigApplyInput{}
+func (g *Provider) testAndApply(request *types.APIContext) error {
+	var githubConfig apiv3.GithubAppConfig
+	githubConfigApplyInput := &apiv3.GithubAppConfigApplyInput{}
 
 	if err := json.NewDecoder(request.Request.Body).Decode(githubConfigApplyInput); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("Failed to parse body: %v", err))
 	}
 	githubConfig = githubConfigApplyInput.GithubConfig
-	githubLogin := &v32.GithubLogin{
+	githubLogin := &apiv3.GithubLogin{
 		Code: githubConfigApplyInput.Code,
 	}
 
@@ -122,7 +123,7 @@ func (g *ghAppProvider) testAndApply(request *types.APIContext) error {
 	}
 
 	// if this works, save githubConfig CR adding enabled flag
-	user, err := g.userManager.SetPrincipalOnCurrentUser(request, userPrincipal)
+	user, err := g.userManager.SetPrincipalOnCurrentUser(request.Request, userPrincipal)
 	if err != nil {
 		return err
 	}
@@ -135,7 +136,7 @@ func (g *ghAppProvider) testAndApply(request *types.APIContext) error {
 
 	userExtraInfo := g.GetUserExtraAttributes(userPrincipal)
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return g.tokenMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
+		return g.userManager.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
 	}); err != nil {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to create or update userAttribute: %v", err))
 	}

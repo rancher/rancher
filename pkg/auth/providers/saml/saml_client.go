@@ -21,15 +21,13 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/mux"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/auth/tokens"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
 	dsig "github.com/russellhaering/goxmldsig"
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -52,7 +50,7 @@ const loginPath = "/login?"
 // InitializeSamlServiceProvider validates changes to SamlConfig structures and
 // creates or updates the associated in-memory information. It is called from the
 // auth samlconfig controller when a SAML configuration was changed.
-func InitializeSamlServiceProvider(configToSet *v32.SamlConfig, name string) error {
+func InitializeSamlServiceProvider(configToSet *apiv3.SamlConfig, name string) error {
 
 	initMu.Lock()
 	defer initMu.Unlock()
@@ -255,16 +253,16 @@ func AuthHandler() http.Handler {
 	return root
 }
 
-func (s *Provider) getSamlPrincipals(config *v32.SamlConfig, samlData map[string][]string) (v3.Principal, []v3.Principal, error) {
-	var userPrincipal v3.Principal
-	var groupPrincipals []v3.Principal
+func (s *Provider) getSamlPrincipals(config *apiv3.SamlConfig, samlData map[string][]string) (apiv3.Principal, []apiv3.Principal, error) {
+	var userPrincipal apiv3.Principal
+	var groupPrincipals []apiv3.Principal
 	uid, ok := samlData[config.UIDField]
 	if !ok {
 		// UID field provided by user is actually not there in SAMLResponse, without this we cannot differentiate between users and create separate principals
 		return userPrincipal, groupPrincipals, fmt.Errorf("SAML: Unique ID field is not provided in SAML Response")
 	}
 
-	userPrincipal = v3.Principal{
+	userPrincipal = apiv3.Principal{
 		ObjectMeta:    metav1.ObjectMeta{Name: s.userType + "://" + uid[0]},
 		Provider:      s.name,
 		PrincipalType: "user",
@@ -284,7 +282,7 @@ func (s *Provider) getSamlPrincipals(config *v32.SamlConfig, samlData map[string
 	groups, ok := samlData[config.GroupsField]
 	if ok {
 		for _, group := range groups {
-			group := v3.Principal{
+			group := apiv3.Principal{
 				ObjectMeta:    metav1.ObjectMeta{Name: s.groupType + "://" + group},
 				DisplayName:   group,
 				Provider:      s.name,
@@ -356,18 +354,19 @@ func (s *Provider) FinalizeSamlLogout(w http.ResponseWriter, r *http.Request) {
 
 // HandleSamlAssertion processes/handles the assertion obtained by the POST to /saml/acs from IdP
 func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, assertion *saml.Assertion) {
-	var groupPrincipals []v3.Principal
-	var userPrincipal v3.Principal
+	var groupPrincipals []apiv3.Principal
+	var userPrincipal apiv3.Principal
 	var userID string
 	redirectURL := s.clientState.GetState(r, "Rancher_FinalRedirectURL")
 	rancherAction := s.clientState.GetState(r, "Rancher_Action")
 
-	if rancherAction == loginAction {
+	switch rancherAction {
+	case loginAction:
 		if !strings.Contains(redirectURL, dashboardAuthPath) {
 			redirectURL += dashboardAuthPath
 		}
 		redirectURL += loginPath
-	} else if rancherAction == testAndEnableAction {
+	case testAndEnableAction:
 		var err error
 		userID, err = s.getUserIdFromRelayStateCookie(r)
 		if err != nil {
@@ -377,6 +376,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 		}
 		// the first query param is config=saml_provider_name set by UI
 		redirectURL += "&"
+	default:
 	}
 	if relayState := r.Form.Get("RelayState"); relayState != "" {
 		// delete the cookie
@@ -485,7 +485,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	loginTime := time.Now()
 	userExtraInfo := s.GetUserExtraAttributes(userPrincipal)
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return s.tokenMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo, loginTime)
+		return s.userMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo, loginTime)
 	}); err != nil {
 		log.Errorf("SAML: Failed creating or updating userAttribute with error: %v", err)
 		http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
@@ -509,7 +509,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 			responseType := s.clientState.GetState(r, "Rancher_ResponseType")
 			publicKey := s.clientState.GetState(r, "Rancher_PublicKey")
 
-			token, tokenValue, err := tokens.GetKubeConfigToken(user.Name, responseType, s.userMGR, userPrincipal)
+			token, tokenValue, err := tokens.GetKubeConfigToken(user.Name, responseType, s.tokenMGR, userPrincipal)
 			if err != nil {
 				log.Errorf("SAML: getToken error %v", err)
 				http.Redirect(w, r, redirectURL+"errorCode=500", http.StatusFound)
@@ -542,10 +542,10 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 			}
 			encoded := base64.StdEncoding.EncodeToString(encryptedToken)
 
-			samlToken := &v3.SamlToken{
+			samlToken := &apiv3.SamlToken{
 				Token:     encoded,
 				ExpiresAt: token.ExpiresAt,
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Name:      requestID,
 					Namespace: namespace.GlobalNamespace,
 				},
@@ -568,8 +568,8 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 	}
 }
 
-func (s *Provider) setRancherToken(w http.ResponseWriter, tokenMGR *tokens.Manager, userID string, userPrincipal v3.Principal,
-	groupPrincipals []v3.Principal, isSecure bool) error {
+func (s *Provider) setRancherToken(w http.ResponseWriter, tokenMGR *tokens.Manager, userID string, userPrincipal apiv3.Principal,
+	groupPrincipals []apiv3.Principal, isSecure bool) error {
 	authTimeout := settings.AuthUserSessionTTLMinutes.Get()
 	var ttl int64
 	if minutes, err := strconv.ParseInt(authTimeout, 10, 64); err == nil {
@@ -599,7 +599,7 @@ func (s *Provider) getUserIdFromRelayStateCookie(r *http.Request) (string, error
 	if relayState := r.Form.Get("RelayState"); relayState != "" {
 		relayStateCookie := s.clientState.GetState(r, relayState)
 		jwtParser := newJWTParser()
-		token, err := jwtParser.Parse(relayStateCookie, func(t *jwt.Token) (interface{}, error) {
+		token, err := jwtParser.Parse(relayStateCookie, func(t *jwt.Token) (any, error) {
 			secretBlock := x509.MarshalPKCS1PrivateKey(s.serviceProvider.Key)
 			return secretBlock, nil
 		})

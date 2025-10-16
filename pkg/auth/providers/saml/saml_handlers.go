@@ -85,7 +85,7 @@ func (s *Provider) getPossibleRequestIDs(r *http.Request) []string {
 			continue
 		}
 		jwtParser := newJWTParser()
-		token, err := jwtParser.Parse(value, func(t *jwt.Token) (interface{}, error) {
+		token, err := jwtParser.Parse(value, func(t *jwt.Token) (any, error) {
 			secretBlock := x509.MarshalPKCS1PrivateKey(serviceProvider.Key)
 			return secretBlock, nil
 		})

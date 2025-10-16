@@ -273,7 +273,7 @@ func newTestUserIndexer(indexed ...*v3.User) cache.Indexer {
 	return indexer
 }
 
-func newTestGroupIndexer(indexed ...v3.Group) cache.Indexer {
+func newTestGroupIndexer(_ ...v3.Group) cache.Indexer {
 	return cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{
 		groupSearchIndex: groupSearchIndexer,
 	})

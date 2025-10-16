@@ -11,7 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/api/secrets"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
@@ -39,7 +39,6 @@ const (
 )
 
 type Provider struct {
-	ctx             context.Context
 	authConfigs     v3.AuthConfigInterface
 	secrets         wcorev1.SecretController
 	samlTokens      v3.SamlTokenInterface
@@ -57,9 +56,8 @@ type Provider struct {
 
 var SamlProviders = make(map[string]*Provider)
 
-func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager, name string) common.AuthProvider {
-	samlp := &Provider{
-		ctx:         ctx,
+func Configure(mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager, name string) common.AuthProvider {
+	provider := &Provider{
 		authConfigs: mgmtCtx.Management.AuthConfigs(""),
 		secrets:     mgmtCtx.Wrangler.Core.Secret(),
 		samlTokens:  mgmtCtx.Management.SamlTokens(""),
@@ -70,12 +68,12 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 		groupType:   name + "_group",
 	}
 
-	if samlp.hasLdapGroupSearch() {
-		samlp.ldapProvider = ldap.Configure(ctx, mgmtCtx, userMGR, tokenMGR, name)
+	if provider.hasLdapGroupSearch() {
+		provider.ldapProvider = ldap.Configure(mgmtCtx, userMGR, tokenMGR, name)
 	}
 
-	SamlProviders[name] = samlp
-	return samlp
+	SamlProviders[name] = provider
+	return provider
 }
 
 func (s *Provider) GetName() string {
@@ -87,7 +85,7 @@ func (s *Provider) CustomizeSchema(schema *types.Schema) {
 	schema.Formatter = s.formatter
 }
 
-func (s *Provider) TransformToAuthProvider(authConfig map[string]interface{}) (map[string]interface{}, error) {
+func (s *Provider) TransformToAuthProvider(authConfig map[string]any) (map[string]any, error) {
 	p := common.TransformToAuthProvider(authConfig)
 	switch s.name {
 	case PingName:
@@ -104,12 +102,12 @@ func (s *Provider) TransformToAuthProvider(authConfig map[string]interface{}) (m
 	return p, nil
 }
 
-func (s *Provider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
-	return v3.Principal{}, nil, "", fmt.Errorf("SAML providers do not implement Authenticate User API")
+func (s *Provider) AuthenticateUser(ctx context.Context, input any) (apiv3.Principal, []apiv3.Principal, string, error) {
+	return apiv3.Principal{}, nil, "", fmt.Errorf("SAML providers do not implement Authenticate User API")
 }
 
 // Logout guards against a regular logout when the system has SLO, i.e. LogoutAll forced.
-func (s *Provider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (s *Provider) Logout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	providerName := token.GetAuthProvider()
 
 	logrus.Debugf("SAML [logout]: triggered by provider %s", providerName)
@@ -128,7 +126,7 @@ func (s *Provider) Logout(apiContext *types.APIContext, token accessor.TokenAcce
 	return nil
 }
 
-func (s *Provider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (s *Provider) LogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	providerName := token.GetAuthProvider()
 
 	logrus.Debugf("SAML [logout-all]: triggered by provider %s", providerName)
@@ -144,28 +142,26 @@ func (s *Provider) LogoutAll(apiContext *types.APIContext, token accessor.TokenA
 		return fmt.Errorf("SAML [logout-all]: Rancher provider resource `%v` not configured for SLO", providerName)
 	}
 
-	authLogout := &v32.AuthConfigLogoutInput{}
+	authLogout := &apiv3.AuthConfigLogoutInput{}
 
-	r := apiContext.Request
 	if err := json.NewDecoder(r.Body).Decode(authLogout); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("SAML: Failed to parse body: %v", err))
 	}
 
-	userName := provider.userMGR.GetUser(apiContext)
-	userAttributes, _, err := provider.tokenMGR.EnsureAndGetUserAttribute(userName)
+	userName := provider.userMGR.GetUser(r)
+	userAttributes, _, err := provider.userMGR.EnsureAndGetUserAttribute(userName)
 	if err != nil {
 		return err
 	}
 
-	usernames, ok := userAttributes.ExtraByProvider[providerName]["username"]
+	usernames := userAttributes.ExtraByProvider[providerName]["username"]
 	if len(usernames) == 0 {
 		return fmt.Errorf("SAML [logout-all]: UserAttribute extras contains no username for provider %q", providerName)
 	}
 	userAtProvider := usernames[0]
 	finalRedirectURL := authLogout.FinalRedirectURL
 
-	w := apiContext.Response
 	provider.clientState.SetPath(provider.serviceProvider.SloURL.Path)
 	provider.clientState.SetState(w, r, "Rancher_FinalRedirectURL", finalRedirectURL)
 	provider.clientState.SetState(w, r, "Rancher_Action", "logout-all")
@@ -177,18 +173,18 @@ func (s *Provider) LogoutAll(apiContext *types.APIContext, token accessor.TokenA
 
 	logrus.Debugf("SAML [logout-all]: Redirecting to the identity provider logout page at %v", idpRedirectURL)
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"idpRedirectUrl": idpRedirectURL,
 		"type":           "authConfigLogoutOutput",
 	}
 
-	apiContext.WriteResponse(http.StatusOK, data)
-	return nil
+	w.Header().Set("Content-Type", "application/json")
+	return json.NewEncoder(w).Encode(data)
 }
 
-func PerformSamlLogin(name string, apiContext *types.APIContext, input interface{}) error {
-	//input will contain the FINAL redirect URL
-	login, ok := input.(*v32.SamlLoginInput)
+func PerformSamlLogin(r *http.Request, w http.ResponseWriter, name string, input any) error {
+	// input will contain the FINAL redirect URL
+	login, ok := input.(*apiv3.SamlLoginInput)
 	if !ok {
 		return errors.New("unexpected input type")
 	}
@@ -207,30 +203,36 @@ func PerformSamlLogin(name string, apiContext *types.APIContext, input interface
 		}
 
 		provider.clientState.SetPath(provider.serviceProvider.AcsURL.Path)
-		provider.clientState.SetState(apiContext.Response, apiContext.Request, "Rancher_FinalRedirectURL", finalRedirectURL)
-		provider.clientState.SetState(apiContext.Response, apiContext.Request, "Rancher_Action", loginAction)
-		provider.clientState.SetState(apiContext.Response, apiContext.Request, "Rancher_PublicKey", login.PublicKey)
-		provider.clientState.SetState(apiContext.Response, apiContext.Request, "Rancher_RequestID", login.RequestID)
-		provider.clientState.SetState(apiContext.Response, apiContext.Request, "Rancher_ResponseType", login.ResponseType)
+		provider.clientState.SetState(w, r, "Rancher_FinalRedirectURL", finalRedirectURL)
+		provider.clientState.SetState(w, r, "Rancher_Action", loginAction)
+		provider.clientState.SetState(w, r, "Rancher_PublicKey", login.PublicKey)
+		provider.clientState.SetState(w, r, "Rancher_RequestID", login.RequestID)
+		provider.clientState.SetState(w, r, "Rancher_ResponseType", login.ResponseType)
 
 		// userID is not needed for login. It's only needed for testAndEnable
-		idpRedirectURL, err := provider.HandleSamlLogin(apiContext.Response, apiContext.Request, "")
+		idpRedirectURL, err := provider.HandleSamlLogin(w, r, "")
 		if err != nil {
 			return err
 		}
+
 		logrus.Debugf("SAML [PerformSamlLogin]: Redirecting to the identity provider login page at %v", idpRedirectURL)
-		data := map[string]interface{}{
+		data := map[string]any{
 			"idpRedirectUrl": idpRedirectURL,
 			"type":           "samlLoginOutput",
 		}
 
-		apiContext.WriteResponse(http.StatusOK, data)
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(data); err != nil {
+			return fmt.Errorf("SAML: Failed to encode samlLoginOutput: %w", err)
+		}
+
 		return nil
 	}
+
 	return nil
 }
 
-func (s *Provider) getSamlConfig() (*v32.SamlConfig, error) {
+func (s *Provider) getSamlConfig() (*apiv3.SamlConfig, error) {
 	authConfigObj, err := s.authConfigs.ObjectClient().UnstructuredClient().Get(s.name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("SAML: failed to retrieve SamlConfig, error: %v", err)
@@ -242,7 +244,7 @@ func (s *Provider) getSamlConfig() (*v32.SamlConfig, error) {
 	}
 	storedSamlConfigMap := u.UnstructuredContent()
 
-	storedSamlConfig := &v32.SamlConfig{}
+	storedSamlConfig := &apiv3.SamlConfig{}
 	err = common.Decode(storedSamlConfigMap, storedSamlConfig)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode Saml Config: %w", err)
@@ -264,7 +266,7 @@ func (s *Provider) getSamlConfig() (*v32.SamlConfig, error) {
 	return storedSamlConfig, nil
 }
 
-func (s *Provider) saveSamlConfig(config *v32.SamlConfig) error {
+func (s *Provider) saveSamlConfig(config *apiv3.SamlConfig) error {
 	var configType string
 
 	storedSamlConfig, err := s.getSamlConfig()
@@ -321,7 +323,7 @@ func (s *Provider) saveSamlConfig(config *v32.SamlConfig) error {
 	return err
 }
 
-func (s *Provider) toPrincipal(principalType string, princ v3.Principal, token accessor.TokenAccessor) v3.Principal {
+func (s *Provider) toPrincipal(principalType string, princ apiv3.Principal, token accessor.TokenAccessor) apiv3.Principal {
 	if principalType == s.userType {
 		princ.PrincipalType = common.UserPrincipalType
 		if token != nil {
@@ -335,14 +337,14 @@ func (s *Provider) toPrincipal(principalType string, princ v3.Principal, token a
 	} else {
 		princ.PrincipalType = common.GroupPrincipalType
 		if token != nil {
-			princ.MemberOf = s.tokenMGR.IsMemberOf(token, princ)
+			princ.MemberOf = s.userMGR.IsMemberOf(token, princ)
 		}
 	}
 
 	return princ
 }
 
-func (s *Provider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
+func (s *Provider) RefetchGroupPrincipals(principalID string, secret string) ([]apiv3.Principal, error) {
 	return nil, errors.New("Not implemented")
 }
 
@@ -350,7 +352,7 @@ func (s *Provider) RefetchGroupPrincipals(principalID string, secret string) ([]
 // Otherwise it returns a "fake" principal of a requested type with the name as the searchKey.
 // If the principalType is empty, both user and group principals are returned.
 // This is done because SAML, in the absence of LDAP, doesn't have a user/group lookup mechanism.
-func (s *Provider) SearchPrincipals(searchKey, principalType string, token accessor.TokenAccessor) ([]v3.Principal, error) {
+func (s *Provider) SearchPrincipals(searchKey, principalType string, token accessor.TokenAccessor) ([]apiv3.Principal, error) {
 	if s.hasLdapGroupSearch() {
 		principals, err := s.ldapProvider.SearchPrincipals(searchKey, principalType, token)
 		// only give response from ldap if it's configured
@@ -359,10 +361,10 @@ func (s *Provider) SearchPrincipals(searchKey, principalType string, token acces
 		}
 	}
 
-	var principals []v3.Principal
+	var principals []apiv3.Principal
 
 	if principalType != common.GroupPrincipalType {
-		principals = append(principals, v3.Principal{
+		principals = append(principals, apiv3.Principal{
 			ObjectMeta:    metav1.ObjectMeta{Name: s.userType + "://" + searchKey},
 			DisplayName:   searchKey,
 			LoginName:     searchKey,
@@ -372,7 +374,7 @@ func (s *Provider) SearchPrincipals(searchKey, principalType string, token acces
 	}
 
 	if principalType != common.UserPrincipalType {
-		principals = append(principals, v3.Principal{
+		principals = append(principals, apiv3.Principal{
 			ObjectMeta:    metav1.ObjectMeta{Name: s.groupType + "://" + searchKey},
 			DisplayName:   searchKey,
 			LoginName:     searchKey,
@@ -384,13 +386,13 @@ func (s *Provider) SearchPrincipals(searchKey, principalType string, token acces
 	return principals, nil
 }
 
-func (s *Provider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
+func (s *Provider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
 	externalID, principalType := splitPrincipalID(principalID)
 	if externalID == "" && principalType == "" {
-		return v3.Principal{}, fmt.Errorf("SAML: invalid id %v", principalID)
+		return apiv3.Principal{}, fmt.Errorf("SAML: invalid id %v", principalID)
 	}
 	if principalType != s.userType && principalType != s.groupType {
-		return v3.Principal{}, fmt.Errorf("SAML: Invalid principal type")
+		return apiv3.Principal{}, fmt.Errorf("SAML: Invalid principal type")
 	}
 
 	if s.hasLdapGroupSearch() {
@@ -401,7 +403,7 @@ func (s *Provider) GetPrincipal(principalID string, token accessor.TokenAccessor
 		}
 	}
 
-	p := v3.Principal{
+	p := apiv3.Principal{
 		ObjectMeta:  metav1.ObjectMeta{Name: principalType + "://" + externalID},
 		DisplayName: externalID,
 		LoginName:   externalID,
@@ -412,12 +414,12 @@ func (s *Provider) GetPrincipal(principalID string, token accessor.TokenAccessor
 	return p, nil
 }
 
-func (s *Provider) isThisUserMe(me, other v3.Principal) bool {
+func (s *Provider) isThisUserMe(me, other apiv3.Principal) bool {
 	return me.ObjectMeta.Name == other.ObjectMeta.Name &&
 		me.PrincipalType == other.PrincipalType
 }
 
-func (s *Provider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
+func (s *Provider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []apiv3.Principal) (bool, error) {
 	config, err := s.getSamlConfig()
 	if err != nil {
 		logrus.Errorf("Error fetching saml config: %v", err)
@@ -430,7 +432,7 @@ func (s *Provider) CanAccessWithGroupProviders(userPrincipalID string, groupPrin
 	return allowed, nil
 }
 
-func formSamlRedirectURLFromMap(config map[string]interface{}, name string) string {
+func formSamlRedirectURLFromMap(config map[string]any, name string) string {
 	var hostname string
 	switch name {
 	case PingName:
@@ -458,7 +460,7 @@ func splitPrincipalID(principalID string) (string, string) {
 	return externalID, parts[0]
 }
 
-func (s *Provider) combineSamlAndLdapConfig(config *v32.SamlConfig) (runtime.Object, error) {
+func (s *Provider) combineSamlAndLdapConfig(config *apiv3.SamlConfig) (runtime.Object, error) {
 	// if errors we might not want to turn on ldap
 	ldapConfig, _, err := ldap.GetLDAPConfig(s.ldapProvider)
 
@@ -479,7 +481,7 @@ func (s *Provider) combineSamlAndLdapConfig(config *v32.SamlConfig) (runtime.Obj
 	}
 
 	var fullConfig runtime.Object
-	samlConfig := v32.SamlConfig{}
+	samlConfig := apiv3.SamlConfig{}
 	config.DeepCopyInto(&samlConfig)
 	switch s.name {
 	case ShibbolethName:
@@ -495,13 +497,13 @@ func (s *Provider) combineSamlAndLdapConfig(config *v32.SamlConfig) (runtime.Obj
 
 		ldapConfig.LdapFields.ServiceAccountPassword = secretName
 		// Set the status for SecretsMigrated to True so it doesn't get re-migrated
-		v32.AuthConfigConditionSecretsMigrated.SetStatus(&samlConfig, "True")
-		fullConfig = &v32.ShibbolethConfig{
+		apiv3.AuthConfigConditionSecretsMigrated.SetStatus(&samlConfig, "True")
+		fullConfig = &apiv3.ShibbolethConfig{
 			SamlConfig:     samlConfig,
 			OpenLdapConfig: ldapConfig.LdapFields,
 		}
 	case OKTAName:
-		fullConfig = &v32.OKTAConfig{
+		fullConfig = &apiv3.OKTAConfig{
 			SamlConfig:     samlConfig,
 			OpenLdapConfig: ldapConfig.LdapFields,
 		}
@@ -514,7 +516,7 @@ func (s *Provider) hasLdapGroupSearch() bool {
 	return ShibbolethName == s.name || OKTAName == s.name
 }
 
-func (s *Provider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
+func (s *Provider) GetUserExtraAttributes(userPrincipal apiv3.Principal) map[string][]string {
 	return common.GetCommonUserExtraAttributes(userPrincipal)
 }
 

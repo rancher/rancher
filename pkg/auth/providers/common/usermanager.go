@@ -5,29 +5,26 @@ import (
 	"encoding/base32"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/slice"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/auth/tokens"
-	tokenUtil "github.com/rancher/rancher/pkg/auth/tokens"
+	"github.com/rancher/rancher/pkg/auth/accessor"
 	wrangmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/rancher/pkg/wrangler"
 	wrangrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
-	"github.com/rancher/wrangler/v3/pkg/randomtoken"
 	"github.com/sirupsen/logrus"
 	k8srbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	apitypes "k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -40,6 +37,8 @@ const (
 	roleTemplatesRequired        = "authz.management.cattle.io/creator-role-bindings"
 )
 
+// NewUserManagerNoBindings creates an instance of userManager
+// without CRTB, PRTB, GRB and CRB informers and clients.
 func NewUserManagerNoBindings(wranglerContext *wrangler.Context) (user.Manager, error) {
 	userInformer := wranglerContext.Mgmt.User().Informer()
 	// registering the same index more than once will cause an error. Since we attempt to register this index in multiple
@@ -54,21 +53,16 @@ func NewUserManagerNoBindings(wranglerContext *wrangler.Context) (user.Manager, 
 	}
 
 	return &userManager{
-		users:       wranglerContext.Mgmt.User(),
-		userIndexer: userInformer.GetIndexer(),
-		tokens:      wranglerContext.Mgmt.Token(),
-		tokenLister: wranglerContext.Mgmt.Token().Cache(),
-		rbacClient:  wranglerContext.RBAC,
+		users:              wranglerContext.Mgmt.User(),
+		userCache:          wranglerContext.Mgmt.User().Cache(),
+		userAttributes:     wranglerContext.Mgmt.UserAttribute(),
+		userAttributeCache: wranglerContext.Mgmt.UserAttribute().Cache(),
+		userIndexer:        userInformer.GetIndexer(),
+		rbacClient:         wranglerContext.RBAC,
 	}, nil
 }
 
-var backoff = wait.Backoff{
-	Duration: 100 * time.Millisecond,
-	Factor:   1,
-	Jitter:   0,
-	Steps:    7,
-}
-
+// NewUserManagerNoBindings creates an instance of userManager.
 func NewUserManager(wranglerContext *wrangler.Context) (user.Manager, error) {
 	userInformer := wranglerContext.Mgmt.User().Informer()
 	// registering the same index more than once will cause an error. Since we attempt to register this index in multiple
@@ -109,11 +103,12 @@ func NewUserManager(wranglerContext *wrangler.Context) (user.Manager, error) {
 	return &userManager{
 		manageBindings:           true,
 		users:                    wranglerContext.Mgmt.User(),
+		userCache:                wranglerContext.Mgmt.User().Cache(),
+		userAttributes:           wranglerContext.Mgmt.UserAttribute(),
+		userAttributeCache:       wranglerContext.Mgmt.UserAttribute().Cache(),
 		userIndexer:              userInformer.GetIndexer(),
 		crtbIndexer:              crtbInformer.GetIndexer(),
 		prtbIndexer:              prtbInformer.GetIndexer(),
-		tokens:                   wranglerContext.Mgmt.Token(),
-		tokenLister:              wranglerContext.Mgmt.Token().Cache(),
 		globalRoleBindings:       wranglerContext.Mgmt.GlobalRoleBinding(),
 		globalRoleLister:         wranglerContext.Mgmt.GlobalRole().Cache(),
 		grbIndexer:               grbInformer.GetIndexer(),
@@ -126,22 +121,23 @@ func NewUserManager(wranglerContext *wrangler.Context) (user.Manager, error) {
 type userManager struct {
 	// manageBinding means whether or not we gr, grb, crtb, and prtb exist in the cluster
 	manageBindings           bool
-	users                    wrangmgmtv3.UserController
-	globalRoleBindings       wrangmgmtv3.GlobalRoleBindingController
+	users                    wrangmgmtv3.UserClient
+	userCache                wrangmgmtv3.UserCache
+	userAttributes           wrangmgmtv3.UserAttributeClient
+	userAttributeCache       wrangmgmtv3.UserAttributeCache
+	globalRoleBindings       wrangmgmtv3.GlobalRoleBindingClient
 	globalRoleLister         wrangmgmtv3.GlobalRoleCache
 	grbIndexer               cache.Indexer
 	userIndexer              cache.Indexer
 	crtbIndexer              cache.Indexer
 	prtbIndexer              cache.Indexer
-	tokenLister              wrangmgmtv3.TokenCache
-	tokens                   wrangmgmtv3.TokenController
 	clusterRoleLister        wrangrbacv1.ClusterRoleCache
 	clusterRoleBindingLister wrangrbacv1.ClusterRoleBindingCache
 	rbacClient               wrangrbacv1.Interface
 }
 
-func (m *userManager) SetPrincipalOnCurrentUser(apiContext *types.APIContext, principal v3.Principal) (*v3.User, error) {
-	userID := m.GetUser(apiContext)
+func (m *userManager) SetPrincipalOnCurrentUser(r *http.Request, principal v3.Principal) (*v3.User, error) {
+	userID := m.GetUser(r)
 	if userID == "" {
 		return nil, errors.New("user not provided")
 	}
@@ -150,7 +146,7 @@ func (m *userManager) SetPrincipalOnCurrentUser(apiContext *types.APIContext, pr
 }
 
 func (m *userManager) SetPrincipalOnCurrentUserByUserID(userID string, principal v3.Principal) (*v3.User, error) {
-	user, err := m.users.Get(userID, v1.GetOptions{})
+	user, err := m.users.Get(userID, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -181,8 +177,8 @@ func (m *userManager) SetPrincipalOnCurrentUserByUserID(userID string, principal
 	return user, nil
 }
 
-func (m *userManager) GetUser(apiContext *types.APIContext) string {
-	return apiContext.Request.Header.Get(userAuthHeader)
+func (m *userManager) GetUser(r *http.Request) string {
+	return r.Header.Get(userAuthHeader)
 }
 
 // checkis if the supplied principal can login based on the accessMode and allowed principals
@@ -234,175 +230,6 @@ func (m *userManager) CheckAccess(accessMode string, allowedPrincipalIDs []strin
 		return false, nil
 	}
 	return false, errors.Errorf("Unsupported accessMode: %v", accessMode)
-}
-
-// creates tokens with 0 ttl and returns token in 'token.Name:token.Token' format
-func (m *userManager) EnsureToken(input user.TokenInput) (string, runtime.Object, error) {
-	return m.EnsureClusterToken("", input)
-}
-
-func (m *userManager) EnsureClusterToken(clusterName string, input user.TokenInput) (string, runtime.Object, error) {
-	if strings.HasPrefix(input.TokenName, "token-") {
-		return "", nil, errors.New("token names can't start with token-")
-	}
-
-	var err error
-	var token *v3.Token
-	if !input.Randomize {
-		token, err = m.tokenLister.Get(input.TokenName)
-		if err != nil && !apierrors.IsNotFound(err) {
-			return "", nil, err
-		}
-		if err == nil {
-			if err := m.tokens.Delete(token.Name, &v1.DeleteOptions{}); err != nil {
-				return "", nil, err
-			}
-		}
-	}
-
-	key, err := randomtoken.Generate()
-	if err != nil {
-		return "", nil, errors.New("failed to generate token key")
-	}
-
-	labels := map[string]string{}
-	if input.Labels != nil {
-		for k, v := range input.Labels {
-			labels[k] = v
-		}
-	}
-	labels[tokens.UserIDLabel] = input.UserName
-	labels[tokens.TokenKindLabel] = input.Kind
-
-	token = &v3.Token{
-		ObjectMeta: v1.ObjectMeta{
-			Name:   input.TokenName,
-			Labels: labels,
-		},
-		TTLMillis:     0,
-		Description:   input.Description,
-		UserID:        input.UserName,
-		AuthProvider:  input.AuthProvider,
-		UserPrincipal: input.UserPrincipal,
-		IsDerived:     true,
-		Token:         key,
-		ClusterName:   clusterName,
-	}
-	if input.TTL != nil {
-		token.TTLMillis = *input.TTL
-	}
-	if input.Randomize {
-		token.ObjectMeta.Name = ""
-		token.ObjectMeta.GenerateName = input.TokenName
-	}
-	err = tokens.ConvertTokenKeyToHash(token)
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to convert token key to hash: %w", err)
-	}
-
-	logrus.Infof("Creating token for user %s", input.UserName)
-	err = wait.ExponentialBackoff(backoff, func() (bool, error) {
-		// Backoff was added here because it is possible the token is in the process of deleting.
-		// This should cause the create to retry until the delete is finished.
-		newToken, err := m.tokens.Create(token)
-		if err != nil {
-			if apierrors.IsAlreadyExists(err) {
-				return false, nil
-			}
-			return false, err
-		}
-		token = newToken
-		return true, nil
-	})
-	if err != nil {
-		return "", nil, err
-	}
-
-	return token.Name + ":" + key, token, nil
-}
-
-// newTokenForKubeconfig creates a new token for a generated kubeconfig.
-func (m *userManager) newTokenForKubeconfig(clusterName, tokenName, description, kind, userName string, userPrincipal v3.Principal) (string, error) {
-	tokenTTL, err := tokens.GetKubeconfigDefaultTokenTTLInMilliSeconds()
-	if err != nil {
-		return "", fmt.Errorf("failed to get default token TTL: %w", err)
-	}
-
-	input := user.TokenInput{
-		TokenName:     tokenName,
-		Description:   description,
-		Kind:          kind,
-		UserName:      userName,
-		AuthProvider:  userPrincipal.Provider,
-		TTL:           tokenTTL,
-		Randomize:     true,
-		UserPrincipal: userPrincipal,
-	}
-
-	tokenKey, _, err := m.EnsureClusterToken(clusterName, input)
-	if err != nil {
-		return "", fmt.Errorf("failed to create token: %w", err)
-	}
-
-	return tokenKey, nil
-}
-
-// GetKubeconfigToken creates a new token for use in a kubeconfig generated through the CLI.
-func (m *userManager) GetKubeconfigToken(clusterName, tokenName, description, kind, userName string, userPrincipal v3.Principal) (*v3.Token, string, error) {
-	fullCreatedToken, err := m.newTokenForKubeconfig(clusterName, tokenName, description, kind, userName, userPrincipal)
-	if err != nil {
-		return nil, "", err
-	}
-
-	randomizedTokenName, createdTokenValue := tokens.SplitTokenParts(fullCreatedToken)
-	token, err := m.tokens.Get(randomizedTokenName, v1.GetOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
-		return nil, createdTokenValue, err
-	}
-
-	if token.ExpiresAt != "" {
-		return token, createdTokenValue, nil
-	}
-
-	// SetTokenExpiresAt requires creationTS, so can only be set post create
-	tokenCopy := token.DeepCopy()
-	tokenUtil.SetTokenExpiresAt(tokenCopy)
-
-	token, err = m.tokens.Update(tokenCopy)
-	if err != nil {
-		if !apierrors.IsConflict(err) {
-			return nil, "", fmt.Errorf("getToken: updating token [%s] failed [%v]", randomizedTokenName, err)
-		}
-
-		err = wait.ExponentialBackoff(backoff, func() (bool, error) {
-			token, err = m.tokens.Get(randomizedTokenName, v1.GetOptions{})
-			if err != nil {
-				return false, err
-			}
-
-			if token.ExpiresAt == "" {
-				tokenCopy := token.DeepCopy()
-				tokenUtil.SetTokenExpiresAt(tokenCopy)
-
-				token, err = m.tokens.Update(tokenCopy)
-				if err != nil {
-					logrus.Debugf("getToken: updating token [%s] failed [%v]", randomizedTokenName, err)
-					if apierrors.IsConflict(err) {
-						return false, nil
-					}
-					return false, err
-				}
-			}
-			return true, nil
-		})
-
-		if err != nil {
-			return nil, "", fmt.Errorf("getToken: retry updating token [%s] failed [%v]", randomizedTokenName, err)
-		}
-	}
-
-	logrus.Debugf("getToken: token %s expiresAt %s", token.Name, token.ExpiresAt)
-	return token, createdTokenValue, nil
 }
 
 func (m *userManager) EnsureUser(principalName, displayName string) (*v3.User, error) {
@@ -461,7 +288,7 @@ func (m *userManager) EnsureUser(principalName, displayName string) (*v3.User, e
 		}
 
 		user = &v3.User{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:        "u-" + strings.ToLower(sha),
 				Labels:      labelSet,
 				Annotations: annotations,
@@ -490,6 +317,180 @@ func (m *userManager) EnsureUser(principalName, displayName string) (*v3.User, e
 	return user, nil
 }
 
+func (m *userManager) EnsureAndGetUserAttribute(userID string) (*v3.UserAttribute, bool, error) {
+	attribs, err := m.userAttributeCache.Get(userID)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, false, err
+	}
+
+	if attribs == nil {
+		attribs, err = m.userAttributes.Get(userID, metav1.GetOptions{})
+		if err != nil && !apierrors.IsNotFound(err) {
+			return nil, false, err
+		}
+	}
+
+	if attribs != nil && attribs.Name != "" {
+		return attribs.DeepCopy(), false, nil
+	}
+
+	user, err := m.userCache.Get(userID)
+	if err != nil {
+		return nil, false, err
+	}
+
+	attribs = &v3.UserAttribute{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: userID,
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: user.APIVersion,
+					Kind:       user.Kind,
+					UID:        user.UID,
+					Name:       user.Name,
+				},
+			},
+		},
+		GroupPrincipals: map[string]v3.Principals{},
+		ExtraByProvider: map[string]map[string][]string{},
+		LastRefresh:     "",
+		NeedsRefresh:    false,
+	}
+
+	return attribs, true, nil
+}
+
+func (m *userManager) UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, userExtraInfo map[string][]string, loginTime ...time.Time) error {
+	attribs, needCreate, err := m.EnsureAndGetUserAttribute(userID)
+	if err != nil {
+		return err
+	}
+
+	if attribs.GroupPrincipals == nil {
+		attribs.GroupPrincipals = make(map[string]v3.Principals)
+	}
+
+	if attribs.ExtraByProvider == nil {
+		attribs.ExtraByProvider = make(map[string]map[string][]string)
+	}
+	if userExtraInfo == nil {
+		userExtraInfo = make(map[string][]string)
+	}
+
+	shouldUpdate := m.userAttributeChanged(attribs, provider, userExtraInfo, groupPrincipals)
+	if len(loginTime) > 0 && !loginTime[0].IsZero() {
+		// Login time is truncated to seconds as the corresponding user label is set as epoch time.
+		lastLogin := metav1.NewTime(loginTime[0].Truncate(time.Second))
+		attribs.LastLogin = &lastLogin
+		shouldUpdate = true
+	}
+
+	attribs.GroupPrincipals[provider] = v3.Principals{Items: groupPrincipals}
+	attribs.ExtraByProvider[provider] = userExtraInfo
+
+	if needCreate {
+		_, err = m.userAttributes.Create(attribs)
+		if err != nil {
+			return fmt.Errorf("failed to create UserAttribute: %w", err)
+		}
+
+		return nil
+	}
+
+	if shouldUpdate {
+		_, err = m.userAttributes.Update(attribs)
+		if err != nil {
+			return fmt.Errorf("failed to update UserAttribute: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (m *userManager) userAttributeChanged(attribs *v3.UserAttribute, provider string, extraInfo map[string][]string, groupPrincipals []v3.Principal) bool {
+	if len(attribs.GroupPrincipals[provider].Items) != len(groupPrincipals) {
+		return true
+	}
+
+	var oldSet, newSet []string
+	for _, principal := range attribs.GroupPrincipals[provider].Items {
+		oldSet = append(oldSet, principal.ObjectMeta.Name)
+	}
+	for _, principal := range groupPrincipals {
+		newSet = append(newSet, principal.ObjectMeta.Name)
+	}
+
+	slices.Sort(oldSet)
+	slices.Sort(newSet)
+
+	if !slices.Equal(oldSet, newSet) {
+		return true
+	}
+
+	if attribs.ExtraByProvider == nil && extraInfo != nil {
+		return true
+	}
+
+	return !reflect.DeepEqual(attribs.ExtraByProvider[provider], extraInfo)
+}
+
+func (m *userManager) IsMemberOf(token accessor.TokenAccessor, group v3.Principal) bool {
+	attribs, err := m.userAttributeCache.Get(token.GetUserID())
+	if err != nil && !apierrors.IsNotFound(err) {
+		logrus.Warnf("Problem getting userAttribute while determining group membership for %v in %v (%v): %v",
+			token.GetUserID(), group.Name, group.DisplayName, err)
+		// if err not nil, then attribs will be nil. So, below code will handle it
+	}
+
+	groups := map[string]bool{}
+	hitProviders := map[string]bool{}
+	if attribs != nil {
+		for provider, gps := range attribs.GroupPrincipals {
+			for _, principal := range gps.Items {
+				hitProviders[provider] = true
+				groups[principal.Name] = true
+			}
+		}
+	}
+
+	// fallback to legacy token groupPrincipals
+	if _, ok := hitProviders[token.GetAuthProvider()]; !ok {
+		for _, principal := range token.GetGroupPrincipals() {
+			groups[principal.Name] = true
+		}
+	}
+
+	return groups[group.Name]
+}
+
+func (m *userManager) GetGroupsForTokenAuthProvider(token accessor.TokenAccessor) []v3.Principal {
+	var groups []v3.Principal
+
+	attribs, err := m.userAttributeCache.Get(token.GetUserID())
+	if err != nil && !apierrors.IsNotFound(err) {
+		logrus.Warnf("Problem getting userAttribute while getting groups for %v: %v", token.GetUserID(), err)
+		// if err is not nil, then attribs will be. So, below code will handle it
+	}
+
+	hitProvider := false
+	if attribs != nil {
+		tokenProvider := token.GetAuthProvider()
+		for provider, y := range attribs.GroupPrincipals {
+			if provider == tokenProvider {
+				hitProvider = true
+				groups = append(groups, y.Items...)
+			}
+		}
+	}
+
+	// fallback to legacy token groupPrincipals
+	if !hitProvider {
+		groups = append(groups, token.GetGroupPrincipals()...)
+	}
+
+	return groups
+}
+
 func (m *userManager) CreateNewUserClusterRoleBinding(userName string, userUID apitypes.UID) error {
 	if !m.manageBindings {
 		return nil
@@ -498,7 +499,7 @@ func (m *userManager) CreateNewUserClusterRoleBinding(userName string, userUID a
 	roleName := userName + "-view"
 	bindingName := "grb-" + roleName
 
-	ownerReference := v1.OwnerReference{
+	ownerReference := metav1.OwnerReference{
 		APIVersion: "management.cattle.io/v3",
 		Kind:       "User",
 		Name:       userName,
@@ -518,9 +519,9 @@ func (m *userManager) CreateNewUserClusterRoleBinding(userName string, userUID a
 			ResourceNames: []string{userName},
 		}
 		role := &k8srbacv1.ClusterRole{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:            roleName,
-				OwnerReferences: []v1.OwnerReference{ownerReference},
+				OwnerReferences: []metav1.OwnerReference{ownerReference},
 			},
 			Rules: []k8srbacv1.PolicyRule{rule},
 		}
@@ -540,12 +541,12 @@ func (m *userManager) CreateNewUserClusterRoleBinding(userName string, userUID a
 		}
 		// ClusterRoleBinding doesn't exit yet, create it.
 		crb := &k8srbacv1.ClusterRoleBinding{
-			ObjectMeta: v1.ObjectMeta{
+			ObjectMeta: metav1.ObjectMeta{
 				Name:            bindingName,
-				OwnerReferences: []v1.OwnerReference{ownerReference},
+				OwnerReferences: []metav1.OwnerReference{ownerReference},
 			},
 			Subjects: []k8srbacv1.Subject{
-				k8srbacv1.Subject{
+				{
 					Kind: "User",
 					Name: userName,
 				},
@@ -596,7 +597,7 @@ func (m *userManager) createUsersBindings(user *v3.User) error {
 	for _, role := range roleMap["required"] {
 		if !slice.ContainsString(existingGRB, role) {
 			_, err := m.globalRoleBindings.Create(&v3.GlobalRoleBinding{
-				ObjectMeta: v1.ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					GenerateName: "grb-",
 				},
 				UserName:       user.Name,
@@ -621,7 +622,7 @@ func (m *userManager) createUsersBindings(user *v3.User) error {
 	sleepTime := 100
 	// The user needs updated so keep trying if there is a conflict
 	for i := 0; i <= 3; i++ {
-		user, err = m.users.Get(user.Name, v1.GetOptions{})
+		user, err = m.users.Get(user.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
@@ -692,9 +693,9 @@ func (m *userManager) GetUserByPrincipalID(principalName string) (*v3.User, erro
 	return user, nil
 }
 
-func (m *userManager) DeleteToken(tokenName string) error {
-	return m.tokens.Delete(tokenName, &v1.DeleteOptions{})
-}
+// func (m *userManager) DeleteToken(tokenName string) error {
+// 	return m.tokens.Delete(tokenName, &v1.DeleteOptions{})
+// }
 
 func (m *userManager) checkCache(principalName string) (*v3.User, error) {
 	users, err := m.userIndexer.ByIndex(userByPrincipalIndex, principalName)
@@ -742,7 +743,7 @@ func (m *userManager) checkLabels(principalName string) (*v3.User, labels.Set, e
 		encodedPrincipalID = encodedPrincipalID[:63]
 	}
 	set := labels.Set(map[string]string{encodedPrincipalID: "hashed-principal-name"})
-	users, err := m.users.List(v1.ListOptions{LabelSelector: set.String()})
+	users, err := m.users.List(metav1.ListOptions{LabelSelector: set.String()})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -765,7 +766,7 @@ func (m *userManager) checkLabels(principalName string) (*v3.User, labels.Set, e
 	return match, set, nil
 }
 
-func userByPrincipal(obj interface{}) ([]string, error) {
+func userByPrincipal(obj any) ([]string, error) {
 	u, ok := obj.(*v3.User)
 	if !ok {
 		return []string{}, nil
@@ -785,7 +786,7 @@ func userByPrincipal(obj interface{}) ([]string, error) {
 	return append(u.PrincipalIDs, "local://"+u.Name), nil
 }
 
-func crtbsByPrincipalAndUser(obj interface{}) ([]string, error) {
+func crtbsByPrincipalAndUser(obj any) ([]string, error) {
 	var principals []string
 	b, ok := obj.(*v3.ClusterRoleTemplateBinding)
 	if !ok {
@@ -803,7 +804,7 @@ func crtbsByPrincipalAndUser(obj interface{}) ([]string, error) {
 	return principals, nil
 }
 
-func prtbsByPrincipalAndUser(obj interface{}) ([]string, error) {
+func prtbsByPrincipalAndUser(obj any) ([]string, error) {
 	var principals []string
 	b, ok := obj.(*v3.ProjectRoleTemplateBinding)
 	if !ok {
@@ -821,7 +822,7 @@ func prtbsByPrincipalAndUser(obj interface{}) ([]string, error) {
 	return principals, nil
 }
 
-func grbByUser(obj interface{}) ([]string, error) {
+func grbByUser(obj any) ([]string, error) {
 	grb, ok := obj.(*v3.GlobalRoleBinding)
 	if !ok {
 		return []string{}, nil

@@ -299,7 +299,7 @@ func (v *version) SamlProvider() SamlProviderController {
 }
 
 func (v *version) SamlToken() SamlTokenController {
-	return generic.NewNonNamespacedController[*v3.SamlToken, *v3.SamlTokenList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "SamlToken"}, "samltokens", v.controllerFactory)
+	return generic.NewController[*v3.SamlToken, *v3.SamlTokenList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "SamlToken"}, "samltokens", true, v.controllerFactory)
 }
 
 func (v *version) Setting() SettingController {

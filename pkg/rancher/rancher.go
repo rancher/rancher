@@ -422,7 +422,12 @@ func (r *Rancher) Start(ctx context.Context) error {
 		return err
 	}
 
-	if err := steveapi.Setup(ctx, r.Steve, r.Wrangler); err != nil {
+	userManager, err := common.NewUserManagerNoBindings(r.Wrangler)
+	if err != nil {
+		return fmt.Errorf("error creating user manager: %w", err)
+	}
+
+	if err := steveapi.Setup(ctx, r.Steve, r.Wrangler, userManager); err != nil {
 		return err
 	}
 

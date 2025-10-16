@@ -9,17 +9,17 @@ import (
 	"github.com/rancher/norman/types/convert"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
-	"github.com/rancher/rancher/pkg/auth/requests"
 	v3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	managementSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/user"
+	userMocks "github.com/rancher/rancher/pkg/user/mocks"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	apitypes "k8s.io/apimachinery/pkg/types"
 )
 
 func TestGenerateKubeconfigActionHandler(t *testing.T) {
@@ -59,11 +59,18 @@ func TestGenerateKubeconfigActionHandler(t *testing.T) {
 		},
 	}
 
+	const (
+		testClusterName = "test-cluster"
+		fakeHost        = "fake-request-host.fake"
+		testUser        = ""
+	)
+
+	ctrl := gomock.NewController(t)
+	userManager := userMocks.NewMockManager(ctrl)
+	userManager.EXPECT().GetUser(gomock.Any()).Return(testUser).AnyTimes()
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			const testClusterName = "test-cluster"
-			const fakeHost = "fake-request-host.fake"
-			const testUser = ""
 			testSchemas := types.NewSchemas().AddSchemas(managementSchema.Schemas)
 			clusterSchema := testSchemas.Schema(&managementSchema.Version, v3.ClusterType)
 			fakeStore := fakeClusterStore{
@@ -87,9 +94,8 @@ func TestGenerateKubeconfigActionHandler(t *testing.T) {
 				Schemas:        testSchemas,
 				Request:        &http.Request{Host: fakeHost},
 			}
-			fakeManager := fakeUserManager{}
-			fakeManager.addUserForContext(apiContext, testUser)
-			fakeAuth := fakeAuthenticator{
+
+			fakeAuth := fakeAuthToken{
 				token: apimgmtv3.Token{
 					AuthProvider: "local",
 					UserPrincipal: apimgmtv3.Principal{
@@ -110,8 +116,9 @@ func TestGenerateKubeconfigActionHandler(t *testing.T) {
 						return nil, test.nodeListerErr
 					},
 				},
-				UserMgr: &fakeManager,
-				Auth:    &fakeAuth,
+				UserMgr:   userManager,
+				TokenMgr:  &fakeTokenManager{},
+				AuthToken: &fakeAuth,
 			}
 			err = handler.GenerateKubeconfigActionHandler("not-used", nil, apiContext)
 			if test.wantErr {
@@ -196,79 +203,30 @@ func (n *normanRecorder) Write(apiContext *types.APIContext, code int, obj inter
 
 const errUserName = "errUser"
 
-// fakeUserManager implements user.Manager
-type fakeUserManager struct {
-	usersForContext map[string]string
-}
-
-// Utility methods helpful for setting up mocks
-func (f *fakeUserManager) addUserForContext(context *types.APIContext, user string) {
-	if f.usersForContext == nil {
-		f.usersForContext = map[string]string{}
-	}
-	f.usersForContext[context.ID] = user
-}
-
-func (f *fakeUserManager) GetUser(apiContext *types.APIContext) string {
-	if f.usersForContext == nil {
-		return errUserName
-	}
-	contextUser, ok := f.usersForContext[apiContext.ID]
-	if !ok {
-		return errUserName
-	}
-	return contextUser
-}
-func (f *fakeUserManager) EnsureToken(input user.TokenInput) (string, runtime.Object, error) {
-	if input.UserName == errUserName {
-		return "", nil, fmt.Errorf("can't generate token for err user")
-	}
-	return input.TokenName + ":" + "tokenvalue", nil, nil
-}
-func (f *fakeUserManager) EnsureClusterToken(clusterName string, input user.TokenInput) (string, runtime.Object, error) {
-	if input.UserName == errUserName {
-		return "", nil, fmt.Errorf("can't generate token for err user")
-	}
-	return input.TokenName + ":" + "tokenvalue", nil, nil
-}
-
-// Remaining functions are only implemented to satisfy the interface
-func (f *fakeUserManager) SetPrincipalOnCurrentUser(apiContext *types.APIContext, principal apimgmtv3.Principal) (*apimgmtv3.User, error) {
-	return nil, nil
-}
-func (f *fakeUserManager) DeleteToken(tokenName string) error { return nil }
-func (f *fakeUserManager) EnsureUser(principalName, displayName string) (*apimgmtv3.User, error) {
-	return nil, nil
-}
-func (f *fakeUserManager) CheckAccess(accessMode string, allowedPrincipalIDs []string, userPrincipalID string, groups []apimgmtv3.Principal) (bool, error) {
-	return false, nil
-}
-func (f *fakeUserManager) SetPrincipalOnCurrentUserByUserID(userID string, principal apimgmtv3.Principal) (*apimgmtv3.User, error) {
-	return nil, nil
-}
-func (f *fakeUserManager) CreateNewUserClusterRoleBinding(userName string, userUID apitypes.UID) error {
-	return nil
-}
-func (f *fakeUserManager) GetUserByPrincipalID(principalName string) (*apimgmtv3.User, error) {
-	return nil, nil
-}
-func (f *fakeUserManager) GetKubeconfigToken(clusterName, tokenName, description, kind, userName string, userPrincipal apimgmtv3.Principal) (*apimgmtv3.Token, string, error) {
-	return nil, "", nil
-}
-
-// fakeAuthenticator implements requests.Authenticator for the purposes of testing
-type fakeAuthenticator struct {
+// fakeAuthToken implements requests.Authenticator for the purposes of testing
+type fakeAuthToken struct {
 	token apimgmtv3.Token
 	err   error
 }
 
-func (f *fakeAuthenticator) TokenFromRequest(req *http.Request) (accessor.TokenAccessor, error) {
+func (f *fakeAuthToken) TokenFromRequest(req *http.Request) (accessor.TokenAccessor, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
 	return &f.token, nil
 }
 
-func (f *fakeAuthenticator) Authenticate(req *http.Request) (*requests.AuthenticatorResponse, error) {
-	return nil, nil
+type fakeTokenManager struct{}
+
+func (f *fakeTokenManager) EnsureToken(input user.TokenInput) (string, runtime.Object, error) {
+	if input.UserName == errUserName {
+		return "", nil, fmt.Errorf("can't generate token for err user")
+	}
+	return input.TokenName + ":" + "tokenvalue", nil, nil
+}
+func (f *fakeTokenManager) EnsureClusterToken(clusterName string, input user.TokenInput) (string, runtime.Object, error) {
+	if input.UserName == errUserName {
+		return "", nil, fmt.Errorf("can't generate token for err user")
+	}
+	return input.TokenName + ":" + "tokenvalue", nil, nil
 }

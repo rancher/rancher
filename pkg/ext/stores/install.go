@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	extv1 "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/ext/stores/groupmembershiprefreshrequest"
 	"github.com/rancher/rancher/pkg/ext/stores/kubeconfig"
 	"github.com/rancher/rancher/pkg/ext/stores/passwordchangerequest"
@@ -45,15 +44,10 @@ func InstallStores(
 	}
 	logrus.Infof("Successfully installed %s store", tokens.SingularName)
 
-	userManager, err := common.NewUserManagerNoBindings(wranglerContext)
-	if err != nil {
-		return fmt.Errorf("error getting user manager: %w", err)
-	}
-
-	if err = server.Install(
+	if err := server.Install(
 		extv1.KubeconfigResourceName,
 		extv1.SchemeGroupVersion.WithKind(kubeconfig.Kind),
-		kubeconfig.New(features.MCM.Enabled(), wranglerContext, server.GetAuthorizer(), userManager),
+		kubeconfig.New(features.MCM.Enabled(), wranglerContext, server.GetAuthorizer()),
 	); err != nil {
 		return fmt.Errorf("unable to install %s store: %w", kubeconfig.Singular, err)
 	}

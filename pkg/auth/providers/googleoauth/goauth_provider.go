@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rancher/norman/httperror"
+	"github.com/rancher/apiserver/pkg/apierror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -21,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -47,17 +48,15 @@ type googleOauthProvider struct {
 	goauthClient *GClient
 	userMGR      user.Manager
 	tokenMGR     *tokens.Manager
-	ctx          context.Context
 }
 
-func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
+func Configure(mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
 	gClient := GClient{
 		httpClient: &http.Client{
 			Timeout: time.Second * 30,
 		},
 	}
 	return &googleOauthProvider{
-		ctx:          ctx,
 		authConfigs:  mgmtCtx.Management.AuthConfigs(""),
 		secrets:      mgmtCtx.Wrangler.Core.Secret(),
 		goauthClient: &gClient,
@@ -66,19 +65,19 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 	}
 }
 
-func (g *googleOauthProvider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
-	login, ok := input.(*v32.GoogleOauthLogin)
+func (g *googleOauthProvider) AuthenticateUser(ctx context.Context, input any) (apiv3.Principal, []apiv3.Principal, string, error) {
+	login, ok := input.(*apiv3.GoogleOauthLogin)
 	if !ok {
-		return v3.Principal{}, nil, "", fmt.Errorf("unexpected input type")
+		return apiv3.Principal{}, nil, "", fmt.Errorf("unexpected input type")
 	}
 	return g.loginUser(ctx, login, nil, false)
 }
 
 // loginUser takes as input the code; gets access_token and refresh_token in exhange; uses access_token to get user info
 // and groups (if allowed); and returns the user and group principals and oauth token
-func (g *googleOauthProvider) loginUser(c context.Context, googleOAuthCredential *v32.GoogleOauthLogin, config *v32.GoogleOauthConfig, testAndEnableAction bool) (v3.Principal, []v3.Principal, string, error) {
-	var groupPrincipals []v3.Principal
-	var userPrincipal v3.Principal
+func (g *googleOauthProvider) loginUser(c context.Context, googleOAuthCredential *apiv3.GoogleOauthLogin, config *apiv3.GoogleOauthConfig, testAndEnableAction bool) (apiv3.Principal, []apiv3.Principal, string, error) {
+	var groupPrincipals []apiv3.Principal
+	var userPrincipal apiv3.Principal
 	var err error
 
 	if config == nil {
@@ -117,7 +116,7 @@ func (g *googleOauthProvider) loginUser(c context.Context, googleOAuthCredential
 		return userPrincipal, groupPrincipals, "", err
 	}
 	if !allowed {
-		return userPrincipal, groupPrincipals, "", httperror.NewAPIError(httperror.Unauthorized, "unauthorized")
+		return userPrincipal, groupPrincipals, "", apierror.NewAPIError(validation.Unauthorized, "unauthorized")
 	}
 
 	// save entire oauthToken because it contains refresh_token and token expiry time
@@ -131,8 +130,8 @@ func (g *googleOauthProvider) loginUser(c context.Context, googleOAuthCredential
 	return userPrincipal, groupPrincipals, string(oauthToken), nil
 }
 
-func (g *googleOauthProvider) SearchPrincipals(searchKey, principalType string, token accessor.TokenAccessor) ([]v3.Principal, error) {
-	var principals []v3.Principal
+func (g *googleOauthProvider) SearchPrincipals(searchKey, principalType string, token accessor.TokenAccessor) ([]apiv3.Principal, error) {
+	var principals []apiv3.Principal
 	var err error
 
 	config, err := g.getGoogleOAuthConfigCR()
@@ -162,8 +161,8 @@ func (g *googleOauthProvider) SearchPrincipals(searchKey, principalType string, 
 	return principals, nil
 }
 
-func (g *googleOauthProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
-	var principal v3.Principal
+func (g *googleOauthProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
+	var principal apiv3.Principal
 	config, err := g.getGoogleOAuthConfigCR()
 	if err != nil {
 		return principal, err
@@ -234,11 +233,11 @@ func (g *googleOauthProvider) GetPrincipal(principalID string, token accessor.To
 	}
 }
 
-func (g *googleOauthProvider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (g *googleOauthProvider) LogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	return nil
 }
 
-func (g *googleOauthProvider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (g *googleOauthProvider) Logout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	return nil
 }
 
@@ -251,7 +250,7 @@ func (g *googleOauthProvider) CustomizeSchema(schema *types.Schema) {
 	schema.Formatter = g.formatter
 }
 
-func (g *googleOauthProvider) TransformToAuthProvider(authConfig map[string]interface{}) (map[string]interface{}, error) {
+func (g *googleOauthProvider) TransformToAuthProvider(authConfig map[string]any) (map[string]any, error) {
 	p := common.TransformToAuthProvider(authConfig)
 	val, err := g.formGoogleOAuthRedirectURLFromMap(authConfig)
 	if err != nil {
@@ -261,8 +260,8 @@ func (g *googleOauthProvider) TransformToAuthProvider(authConfig map[string]inte
 	return p, nil
 }
 
-func (g *googleOauthProvider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
-	var principals []v3.Principal
+func (g *googleOauthProvider) RefetchGroupPrincipals(principalID string, secret string) ([]apiv3.Principal, error) {
+	var principals []apiv3.Principal
 	config, err := g.getGoogleOAuthConfigCR()
 	if err != nil {
 		return principals, err
@@ -287,7 +286,7 @@ func (g *googleOauthProvider) RefetchGroupPrincipals(principalID string, secret 
 	return g.fetchParentGroups(config, groupPrincipals, adminSvc, config.Hostname)
 }
 
-func (g *googleOauthProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
+func (g *googleOauthProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []apiv3.Principal) (bool, error) {
 	config, err := g.getGoogleOAuthConfigCR()
 	if err != nil {
 		logrus.Errorf("Error fetching google OAuth config: %v", err)
@@ -300,7 +299,7 @@ func (g *googleOauthProvider) CanAccessWithGroupProviders(userPrincipalID string
 	return allowed, nil
 }
 
-func (g *googleOauthProvider) getGoogleOAuthConfigCR() (*v32.GoogleOauthConfig, error) {
+func (g *googleOauthProvider) getGoogleOAuthConfigCR() (*apiv3.GoogleOauthConfig, error) {
 	authConfigObj, err := g.authConfigs.ObjectClient().UnstructuredClient().Get(Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve GoogleOAuthConfig, error: %v", err)
@@ -311,7 +310,7 @@ func (g *googleOauthProvider) getGoogleOAuthConfigCR() (*v32.GoogleOauthConfig, 
 	}
 	storedGoogleOAuthConfigMap := u.UnstructuredContent()
 
-	storedGoogleOAuthConfig := &v32.GoogleOauthConfig{}
+	storedGoogleOAuthConfig := &apiv3.GoogleOauthConfig{}
 	err = common.Decode(storedGoogleOAuthConfigMap, storedGoogleOAuthConfig)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode Google Oauth Config: %w", err)
@@ -335,7 +334,7 @@ func (g *googleOauthProvider) getGoogleOAuthConfigCR() (*v32.GoogleOauthConfig, 
 	return storedGoogleOAuthConfig, nil
 }
 
-func (g *googleOauthProvider) saveGoogleOAuthConfigCR(config *v32.GoogleOauthConfig) error {
+func (g *googleOauthProvider) saveGoogleOAuthConfigCR(config *apiv3.GoogleOauthConfig) error {
 	storedGoogleOAuthConfig, err := g.getGoogleOAuthConfigCR()
 	if err != nil {
 		return err
@@ -370,13 +369,13 @@ func (g *googleOauthProvider) saveGoogleOAuthConfigCR(config *v32.GoogleOauthCon
 	return nil
 }
 
-func (g *googleOauthProvider) toPrincipal(principalType string, acct Account, token accessor.TokenAccessor) v3.Principal {
+func (g *googleOauthProvider) toPrincipal(principalType string, acct Account, token accessor.TokenAccessor) apiv3.Principal {
 	displayName := acct.Name
 	if displayName == "" {
 		displayName = acct.Email
 	}
 
-	princ := v3.Principal{
+	princ := apiv3.Principal{
 		ObjectMeta:     metav1.ObjectMeta{Name: Name + "_" + principalType + "://" + acct.SubjectUniqueID},
 		DisplayName:    displayName,
 		LoginName:      acct.Email,
@@ -393,7 +392,7 @@ func (g *googleOauthProvider) toPrincipal(principalType string, acct Account, to
 	} else {
 		princ.PrincipalType = "group"
 		if token != nil {
-			princ.MemberOf = g.tokenMGR.IsMemberOf(token, princ)
+			princ.MemberOf = g.userMGR.IsMemberOf(token, princ)
 		}
 	}
 	return princ
@@ -424,7 +423,7 @@ func (g *googleOauthProvider) getDirectoryService(ctx context.Context, userEmail
 	return srv, nil
 }
 
-func (g *googleOauthProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
+func (g *googleOauthProvider) GetUserExtraAttributes(userPrincipal apiv3.Principal) map[string][]string {
 	return common.GetCommonUserExtraAttributes(userPrincipal)
 }
 

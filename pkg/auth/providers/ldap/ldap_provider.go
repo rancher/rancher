@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -57,17 +58,16 @@ var (
 )
 
 type userManager interface {
-	SetPrincipalOnCurrentUser(apiContext *types.APIContext, principal v3.Principal) (*v3.User, error)
+	SetPrincipalOnCurrentUser(r *http.Request, principal v3.Principal) (*v3.User, error)
 	CheckAccess(accessMode string, allowedPrincipalIDs []string, userPrincipalID string, groups []v3.Principal) (bool, error)
+	UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, userExtraInfo map[string][]string, loginTime ...time.Time) error
 }
 
 type tokenManager interface {
-	UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, userExtraInfo map[string][]string, loginTime ...time.Time) error
 	CreateTokenAndSetCookie(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error
 }
 
 type ldapProvider struct {
-	ctx                   context.Context
 	authConfigs           mgmtv3.AuthConfigInterface
 	secrets               wcorev1.SecretController
 	userMGR               userManager
@@ -80,9 +80,8 @@ type ldapProvider struct {
 	groupScope            string
 }
 
-func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR userManager, tokenMGR tokenManager, providerName string) common.AuthProvider {
+func Configure(mgmtCtx *config.ScaledContext, userMGR userManager, tokenMGR tokenManager, providerName string) common.AuthProvider {
 	return &ldapProvider{
-		ctx:                   ctx,
 		authConfigs:           mgmtCtx.Management.AuthConfigs(""),
 		secrets:               mgmtCtx.Wrangler.Core.Secret(),
 		userMGR:               userMGR,
@@ -108,11 +107,11 @@ func IsNotConfigured(err error) bool {
 	return errors.Is(err, ErrorNotConfigured{})
 }
 
-func (p *ldapProvider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (p *ldapProvider) LogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	return nil
 }
 
-func (p *ldapProvider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (p *ldapProvider) Logout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	return nil
 }
 
@@ -125,12 +124,12 @@ func (p *ldapProvider) CustomizeSchema(schema *types.Schema) {
 	schema.Formatter = p.formatter
 }
 
-func (p *ldapProvider) TransformToAuthProvider(authConfig map[string]interface{}) (map[string]interface{}, error) {
+func (p *ldapProvider) TransformToAuthProvider(authConfig map[string]any) (map[string]any, error) {
 	ldap := common.TransformToAuthProvider(authConfig)
 	return ldap, nil
 }
 
-func toBasicLogin(input interface{}) (*v3.BasicLogin, error) {
+func toBasicLogin(input any) (*v3.BasicLogin, error) {
 	login, ok := input.(*v3.BasicLogin)
 	if !ok {
 		return nil, errors.New("unexpected input type")
@@ -140,7 +139,7 @@ func toBasicLogin(input interface{}) (*v3.BasicLogin, error) {
 
 // AuthenticateUser takes in a context and user credentials, and authenticates the user against an LDAP server.
 // Returns principal, slice of group principals, and any errors encountered.
-func (p *ldapProvider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
+func (p *ldapProvider) AuthenticateUser(ctx context.Context, input any) (v3.Principal, []v3.Principal, string, error) {
 	login, err := toBasicLogin(input)
 	if err != nil {
 		return v3.Principal{}, nil, "", err
@@ -162,7 +161,7 @@ func (p *ldapProvider) AuthenticateUser(ctx context.Context, input interface{}) 
 		return v3.Principal{}, nil, "", err
 	}
 
-	return principal, groupPrincipal, "", err
+	return principal, groupPrincipal, "", nil
 }
 
 // searchKey can be user PrincipalID e.g. shibboleth_user://username with principalType of group for group search by user
@@ -265,7 +264,7 @@ func (p *ldapProvider) getLDAPConfig(genericClient objectclient.GenericClient) (
 			return nil, nil, ErrorNotConfigured{}
 		}
 
-		storedLdapConfigMap = subLdapConfig.(map[string]interface{})
+		storedLdapConfigMap = subLdapConfig.(map[string]any)
 		err = common.Decode(storedLdapConfigMap, storedLdapConfig)
 		if err != nil {
 			return nil, nil, fmt.Errorf("unable to decode Ldap Config: %w", err)

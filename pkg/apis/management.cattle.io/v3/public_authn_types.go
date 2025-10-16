@@ -52,9 +52,27 @@ type AuthToken struct {
 }
 
 type GenericLogin struct {
+	Type         string `json:"type,omitempty"`
 	TTLMillis    int64  `json:"ttl,omitempty"`
 	Description  string `json:"description,omitempty" norman:"type=string,required"`
 	ResponseType string `json:"responseType,omitempty" norman:"type=string,required"` //json or cookie
+	Name         string `json:"-"`
+}
+
+func (g GenericLogin) GetType() string {
+	return g.Type
+}
+func (g GenericLogin) GetTTL() int64 {
+	return g.TTLMillis
+}
+func (g GenericLogin) GetDescription() string {
+	return g.Description
+}
+func (g GenericLogin) GetResponseType() string {
+	return g.ResponseType
+}
+func (g GenericLogin) GetName() string {
+	return g.Name
 }
 
 type BasicLogin struct {
@@ -214,6 +232,7 @@ type OKTAProvider struct {
 }
 
 type SamlLoginInput struct {
+	GenericLogin     `json:",inline"`
 	FinalRedirectURL string `json:"finalRedirectUrl"`
 	RequestID        string `json:"requestId"`
 	PublicKey        string `json:"publicKey"`

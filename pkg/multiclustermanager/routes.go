@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/customization/vsphere"
 	managementapi "github.com/rancher/rancher/pkg/api/norman/server"
 	"github.com/rancher/rancher/pkg/api/steve/supportconfigs"
+	"github.com/rancher/rancher/pkg/auth/logout"
 	"github.com/rancher/rancher/pkg/auth/providers/publicapi"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
 	"github.com/rancher/rancher/pkg/auth/requests"
@@ -32,7 +33,6 @@ import (
 	"github.com/rancher/rancher/pkg/multiclustermanager/whitelist"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rancher/pkg/tunnelserver/mcmauthorizer"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/utils"
 	"github.com/rancher/rancher/pkg/version"
@@ -40,19 +40,26 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcmauthorizer.Authorizer, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) (func(http.Handler) http.Handler, error) {
+func router(ctx context.Context, localClusterEnabled bool, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) (func(http.Handler) http.Handler, error) {
 	var (
 		k8sProxy       = k8sProxyPkg.New(scaledContext, scaledContext.Dialer, clusterManager)
 		connectHandler = scaledContext.Dialer.(*rancherdialer.Factory).TunnelServer
 		clusterImport  = clusterregistrationtokens.ClusterImport{Clusters: scaledContext.Management.Clusters("")}
 	)
 
-	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext, norman.ConfigureAPIUI)
+	logout := logout.NewHandler(ctx, tokens.NewManager(scaledContext.Wrangler))
+
+	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext.Wrangler, logout, norman.ConfigureAPIUI)
 	if err != nil {
 		return nil, err
 	}
 
-	publicAPI, err := publicapi.NewHandler(ctx, scaledContext, norman.ConfigureAPIUI)
+	v3PublicAPI, err := publicapi.NewV3Handler(ctx, scaledContext, norman.ConfigureAPIUI)
+	if err != nil {
+		return nil, err
+	}
+
+	v1PublicAPI, err := publicapi.NewV1Handler(ctx, scaledContext)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +103,8 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	unauthed.PathPrefix("/v1-{prefix}-release/channel").Handler(channelserver)
 	unauthed.PathPrefix("/v1-{prefix}-release/release").Handler(channelserver)
 	unauthed.PathPrefix("/v1-saml").Handler(saml.AuthHandler())
-	unauthed.PathPrefix("/v3-public").Handler(publicAPI)
+	unauthed.PathPrefix("/v3-public").Handler(v3PublicAPI)
+	unauthed.PathPrefix("/v1-public").Handler(v1PublicAPI)
 
 	// Authenticated routes
 	impersonatingAuth := requests.NewImpersonatingAuth(scaledContext.Wrangler, sar.NewSubjectAccessReview(clusterManager))
@@ -128,6 +136,7 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	authed.PathPrefix("/v3/identit").Handler(tokenAPI)
 	authed.PathPrefix("/v3/token").Handler(tokenAPI)
 	authed.PathPrefix("/v3").Handler(managementAPI)
+	authed.Methods(http.MethodPost).Path("/v1/logout").Handler(logout)
 
 	// Metrics authenticated route
 	metricsAuthed := mux.NewRouter()

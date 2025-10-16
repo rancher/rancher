@@ -355,8 +355,8 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 	// validation for creates only
 
 	// validate cluster does not reference an EKS cluster that is already backed by a Rancher cluster
-	name, _ := eksConfig["displayName"]
-	region, _ := eksConfig["region"]
+	name := eksConfig["displayName"]
+	region := eksConfig["region"]
 
 	// cluster client is being used instead of lister to avoid the use of an outdated cache
 	clusters, err := v.ClusterClient.List(metav1.ListOptions{})
@@ -392,8 +392,8 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 }
 
 func validateEKSAccess(request *types.APIContext, eksConfig map[string]interface{}, prevCluster *v3.Cluster) error {
-	publicAccess, _ := eksConfig["publicAccess"]
-	privateAccess, _ := eksConfig["privateAccess"]
+	publicAccess := eksConfig["publicAccess"]
+	privateAccess := eksConfig["privateAccess"]
 	if request.Method != http.MethodPost {
 		if publicAccess == nil {
 			publicAccess = prevCluster.Spec.EKSConfig.PublicAccess
@@ -592,7 +592,7 @@ func validateGKENodePools(spec *v32.ClusterSpec) error {
 		return nil
 	}
 	if len(nodepools) == 0 {
-		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("must have at least one node pool"))
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "must have at least one node pool")
 	}
 
 	var errors []string
@@ -600,7 +600,7 @@ func validateGKENodePools(spec *v32.ClusterSpec) error {
 
 	for _, np := range nodepools {
 		if np.Name == nil || *np.Name == "" {
-			return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("node pool name cannot be empty"))
+			return httperror.NewAPIError(httperror.InvalidBodyContent, "node pool name cannot be empty")
 		}
 
 		version := np.Version
@@ -661,7 +661,7 @@ func validateGKEClusterName(client v3.ClusterInterface, spec *v32.ClusterSpec) e
 
 func validateGKEPrivateClusterConfig(spec *v32.ClusterSpec) error {
 	if spec.GKEConfig.PrivateClusterConfig != nil && spec.GKEConfig.PrivateClusterConfig.EnablePrivateEndpoint && !spec.GKEConfig.PrivateClusterConfig.EnablePrivateNodes {
-		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("private endpoint requires private nodes"))
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "private endpoint requires private nodes")
 	}
 	return nil
 }

@@ -8,13 +8,12 @@ import (
 
 	gooidc "github.com/coreos/go-oidc/v3/oidc"
 	"github.com/pkg/errors"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/oidc"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
@@ -53,7 +52,7 @@ func (k *keyCloakOIDCProvider) GetName() string {
 	return Name
 }
 
-func (k *keyCloakOIDCProvider) newClient(config *v32.OIDCConfig, token accessor.TokenAccessor) (*KeyCloakClient, error) {
+func (k *keyCloakOIDCProvider) newClient(config *apiv3.OIDCConfig, token accessor.TokenAccessor) (*KeyCloakClient, error) {
 	// creating context for new client and for refreshing oauth token if needed
 	ctx, err := oidc.AddCertKeyToContext(context.Background(), config.Certificate, config.PrivateKey)
 	if err != nil {
@@ -76,8 +75,8 @@ func (k *keyCloakOIDCProvider) newClient(config *v32.OIDCConfig, token accessor.
 	return keyCloakClient, err
 }
 
-func (k *keyCloakOIDCProvider) SearchPrincipals(searchValue, principalType string, token accessor.TokenAccessor) ([]v3.Principal, error) {
-	var principals []v3.Principal
+func (k *keyCloakOIDCProvider) SearchPrincipals(searchValue, principalType string, token accessor.TokenAccessor) ([]apiv3.Principal, error) {
+	var principals []apiv3.Principal
 	var err error
 
 	config, err := k.GetOIDCConfig()
@@ -101,12 +100,12 @@ func (k *keyCloakOIDCProvider) SearchPrincipals(searchValue, principalType strin
 	return principals, nil
 }
 
-func (k *keyCloakOIDCProvider) toPrincipal(principalType string, acct account, token accessor.TokenAccessor) v3.Principal {
+func (k *keyCloakOIDCProvider) toPrincipal(principalType string, acct account, token accessor.TokenAccessor) apiv3.Principal {
 	displayName := acct.Name
 	if displayName == "" {
 		displayName = acct.Username
 	}
-	princ := v3.Principal{
+	princ := apiv3.Principal{
 		ObjectMeta:  metav1.ObjectMeta{Name: k.GetName() + "_" + principalType + "://" + acct.ID},
 		DisplayName: displayName,
 		LoginName:   acct.Username,
@@ -123,36 +122,36 @@ func (k *keyCloakOIDCProvider) toPrincipal(principalType string, acct account, t
 		princ.PrincipalType = GroupType
 		princ.ObjectMeta = metav1.ObjectMeta{Name: k.GetName() + "_" + principalType + "://" + acct.Name}
 		if token != nil {
-			princ.MemberOf = k.TokenMgr.IsMemberOf(token, princ)
+			princ.MemberOf = k.UserMGR.IsMemberOf(token, princ)
 		}
 	}
 	return princ
 }
 
-func (k *keyCloakOIDCProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
+func (k *keyCloakOIDCProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
 	config, err := k.GetOIDCConfig()
 	if err != nil {
-		return v3.Principal{}, err
+		return apiv3.Principal{}, err
 	}
 	var externalID string
 	parts := strings.SplitN(principalID, ":", 2)
 	if len(parts) != 2 {
-		return v3.Principal{}, errors.Errorf("invalid id %v", principalID)
+		return apiv3.Principal{}, errors.Errorf("invalid id %v", principalID)
 	}
 	externalID = strings.TrimPrefix(parts[1], "//")
 	parts = strings.SplitN(parts[0], "_", 2)
 	if len(parts) != 2 {
-		return v3.Principal{}, errors.Errorf("invalid id %v", principalID)
+		return apiv3.Principal{}, errors.Errorf("invalid id %v", principalID)
 	}
 	principalType := parts[1]
 	keyCloakClient, err := k.newClient(config, token)
 	if err != nil {
 		logrus.Warnf("[keycloak oidc] GetPrincipal: error creating new http client: %v", err)
-		return v3.Principal{}, err
+		return apiv3.Principal{}, err
 	}
 	acct, err := keyCloakClient.getFromKeyCloakByID(externalID, principalType, config)
 	if err != nil {
-		return v3.Principal{}, err
+		return apiv3.Principal{}, err
 	}
 	princ := k.toPrincipal(principalType, acct, token)
 	return princ, err
