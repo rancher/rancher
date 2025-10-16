@@ -10,7 +10,12 @@ import (
 
 func Add(ctx context.Context, wrangler *wrangler.Context, management *config.ManagementContext) error {
 	_, err := addRoles(wrangler, management)
+
 	if err != nil {
+		return err
+	}
+
+	if err := syncKEv2Operators(management); err != nil {
 		return err
 	}
 

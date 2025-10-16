@@ -234,10 +234,7 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 			return err
 		}
 	} else {
-		if err := clusterController.RegisterFollower(rec.cluster); err != nil {
-			transaction.Rollback()
-			return err
-		}
+		clusterController.RegisterCaches(rec.cluster)
 	}
 
 	done := make(chan error, 1)

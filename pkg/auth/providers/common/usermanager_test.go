@@ -3,13 +3,16 @@ package common
 import (
 	"errors"
 	"testing"
+	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
+	fake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/utils/ptr"
 )
 
 func TestSetPrincipalOnCurrentUserByUserID(t *testing.T) {
@@ -109,7 +112,7 @@ func TestSetPrincipalOnCurrentUserByUserID(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			ctrl := gomock.NewController(t)
-			userControllerMock := wranglerfake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+			userControllerMock := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 			mockUserIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 			indexers := map[string]cache.IndexFunc{
 				userByPrincipalIndex: userByPrincipal,
@@ -213,7 +216,7 @@ func TestCheckAccess(t *testing.T) {
 			}
 			mockUserIndexer.AddIndexers(indexers)
 
-			userControllerMock := wranglerfake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
+			userControllerMock := fake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)
 			um := &userManager{
 				users:       userControllerMock,
 				userIndexer: mockUserIndexer,
@@ -233,4 +236,102 @@ func TestCheckAccess(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUserAttributeCreateOrUpdateSetsLastLoginTime(t *testing.T) {
+	createdUserAttribute := &v3.UserAttribute{}
+	userID := "u-abcdef"
+
+	ctrl := gomock.NewController(t)
+	userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+	userCache.EXPECT().Get(gomock.Any()).Return(&v3.User{
+		ObjectMeta: v1.ObjectMeta{
+			Name: userID,
+		},
+		Enabled: ptr.To(true),
+	}, nil,
+	).AnyTimes()
+
+	userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+	userAttributeCache.EXPECT().Get(gomock.Any()).Return(&v3.UserAttribute{}, nil).AnyTimes()
+
+	userAttributes := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+	userAttributes.EXPECT().Update(gomock.Any()).DoAndReturn(func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
+		return userAttribute.DeepCopy(), nil
+	}).AnyTimes()
+	userAttributes.EXPECT().Create(gomock.Any()).DoAndReturn(func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
+		createdUserAttribute = userAttribute.DeepCopy()
+		return createdUserAttribute, nil
+	}).AnyTimes()
+
+	manager := userManager{
+		userCache:          userCache,
+		userAttributes:     userAttributes,
+		userAttributeCache: userAttributeCache,
+	}
+
+	groupPrincipals := []v3.Principal{}
+	userExtraInfo := map[string][]string{}
+
+	loginTime := time.Now()
+	err := manager.UserAttributeCreateOrUpdate(userID, "provider", groupPrincipals, userExtraInfo, loginTime)
+	assert.NoError(t, err)
+
+	// Make sure login time is set and truncated to seconds.
+	assert.Equal(t, loginTime.Truncate(time.Second), createdUserAttribute.LastLogin.Time)
+}
+
+func TestUserAttributeCreateOrUpdateUpdatesGroups(t *testing.T) {
+	updatedUserAttribute := &v3.UserAttribute{}
+	userID := "u-abcdef"
+
+	ctrl := gomock.NewController(t)
+	userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+	userCache.EXPECT().Get(gomock.Any()).Return(&v3.User{
+		ObjectMeta: v1.ObjectMeta{
+			Name: userID,
+		},
+		Enabled: ptr.To(true),
+	}, nil,
+	).AnyTimes()
+
+	userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+	userAttributeCache.EXPECT().Get(gomock.Any()).Return(&v3.UserAttribute{
+		ObjectMeta: v1.ObjectMeta{
+			Name: userID,
+		},
+	}, nil).AnyTimes()
+
+	userAttributes := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+	userAttributes.EXPECT().Update(gomock.Any()).DoAndReturn(func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
+		updatedUserAttribute = userAttribute.DeepCopy()
+		return updatedUserAttribute, nil
+	}).AnyTimes()
+	userAttributes.EXPECT().Create(gomock.Any()).DoAndReturn(func(userAttribute *v3.UserAttribute) (*v3.UserAttribute, error) {
+		return userAttribute.DeepCopy(), nil
+	}).AnyTimes()
+
+	manager := userManager{
+		userCache:          userCache,
+		userAttributeCache: userAttributeCache,
+		userAttributes:     userAttributes,
+	}
+
+	groupPrincipals := []v3.Principal{
+		{
+			ObjectMeta: v1.ObjectMeta{
+				Name: "group1",
+			},
+		},
+	}
+	userExtraInfo := map[string][]string{}
+
+	err := manager.UserAttributeCreateOrUpdate(userID, "provider", groupPrincipals, userExtraInfo)
+	assert.NoError(t, err)
+
+	require.Len(t, updatedUserAttribute.GroupPrincipals, 1)
+	principals := updatedUserAttribute.GroupPrincipals["provider"]
+	require.NotEmpty(t, principals)
+	require.Len(t, principals.Items, 1)
+	assert.Equal(t, principals.Items[0].Name, "group1")
 }

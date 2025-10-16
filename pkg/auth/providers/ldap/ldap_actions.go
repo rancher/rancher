@@ -32,15 +32,16 @@ func (p *ldapProvider) actionHandler(actionName string, action *types.Action, re
 		return nil
 	}
 
-	if actionName == "testAndApply" {
+	switch actionName {
+	case "testAndApply":
 		return p.testAndApply(request)
+	default:
+		return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 	}
-
-	return httperror.NewAPIError(httperror.ActionNotAvailable, "")
 }
 
 func (p *ldapProvider) testAndApply(request *types.APIContext) error {
-	var input map[string]interface{}
+	var input map[string]any
 	var err error
 	input, err = handler.ParseAndValidateActionBody(request, request.Schemas.Schema(&managementschema.Version,
 		p.testAndApplyInputType))
@@ -156,14 +157,14 @@ func (p *ldapProvider) testAndApply(request *types.APIContext) error {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to save %s config: %v", p.providerName, err))
 	}
 
-	user, err := p.userMGR.SetPrincipalOnCurrentUser(request, userPrincipal)
+	user, err := p.userMGR.SetPrincipalOnCurrentUser(request.Request, userPrincipal)
 	if err != nil {
 		return err
 	}
 
 	userExtraInfo := p.GetUserExtraAttributes(userPrincipal)
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return p.tokenMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
+		return p.userMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
 	}); err != nil {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to create or update userAttribute: %v", err))
 	}

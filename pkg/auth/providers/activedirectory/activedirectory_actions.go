@@ -149,14 +149,14 @@ func (p *adProvider) testAndApply(request *types.APIContext) error {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to save activedirectory config: %v", err))
 	}
 
-	user, err := p.userMGR.SetPrincipalOnCurrentUser(request, userPrincipal)
+	user, err := p.userMGR.SetPrincipalOnCurrentUser(request.Request, userPrincipal)
 	if err != nil {
 		return err
 	}
 
 	userExtraInfo := p.GetUserExtraAttributes(userPrincipal)
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return p.tokenMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
+		return p.userMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
 	}); err != nil {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to create or update userAttribute: %v", err))
 	}

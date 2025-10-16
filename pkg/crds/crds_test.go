@@ -70,6 +70,7 @@ func TestEnsure_MCM(t *testing.T) {
 	migrated := map[string]bool{rtCRD: true, capiCRD: true, grCRD: false}
 	expected := []string{rtCRD, capiCRD}
 	features.EmbeddedClusterAPI.Set(true)
+	features.Turtles.Set(false)
 	features.MCM.Set(true)
 
 	MigratedResources = migrated
@@ -86,6 +87,8 @@ func TestEnsure_NonMCM(t *testing.T) {
 	crdFS = validFS
 
 	features.MCM.Set(false)
+	features.EmbeddedClusterAPI.Set(true)
+	features.Turtles.Set(false)
 	MigratedResources = map[string]bool{rtCRD: true, capiCRD: true, grCRD: false}
 	expected := []string{capiCRD}
 
@@ -94,6 +97,25 @@ func TestEnsure_NonMCM(t *testing.T) {
 	sort.Strings(expected)
 	sort.Strings(testClient.CrdNames)
 	require.Equal(t, expected, testClient.CrdNames, "unexpected CRDs created")
+}
+
+func TestEnsure_TurtlesEnabled(t *testing.T) {
+	defer resetGlobals()
+	testClient := setupFakeClient()
+	crdFS = validFS
+
+	// When Turtles is enabled, CAPI CRDs should not be installed by Rancher
+	features.EmbeddedClusterAPI.Set(true)
+	features.Turtles.Set(true)
+	features.MCM.Set(true)
+	MigratedResources = map[string]bool{rtCRD: true, capiCRD: true, grCRD: false}
+	expected := []string{rtCRD}
+
+	err := EnsureRequired(context.Background(), testClient.client.CustomResourceDefinitions())
+	require.NoError(t, err, "unexpected error when creating yaml")
+	sort.Strings(expected)
+	sort.Strings(testClient.CrdNames)
+	require.Equal(t, expected, testClient.CrdNames, "unexpected CRDs created - CAPI CRDs should not be installed when Turtles is enabled")
 }
 
 func TestEnsure_MissingCRDs(t *testing.T) {
@@ -157,6 +179,7 @@ func TestEnusure_metadata(t *testing.T) {
 	features.MCM.Set(true)
 	features.Fleet.Set(true)
 	features.EmbeddedClusterAPI.Set(true)
+	features.Turtles.Set(false) // Ensure Turtles is disabled so CAPI CRDs are installed
 	features.ProvisioningV2.Set(true)
 
 	err := EnsureRequired(context.Background(), testClient.client.CustomResourceDefinitions())

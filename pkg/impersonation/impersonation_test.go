@@ -187,7 +187,7 @@ func TestImpersonatorGetUser(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			impersonator := Impersonator{
+			impersonator := impersonator{
 				userLister: &fakes.UserListerMock{
 					GetFunc: tt.userGetFunc,
 				},
@@ -203,20 +203,17 @@ func TestImpersonatorGetUser(t *testing.T) {
 }
 
 func TestImpersonatorRulesForUser(t *testing.T) {
-	impersonator := Impersonator{
-		user: &user.DefaultInfo{
-			UID:    "u-s857n",
-			Name:   "u-s857n",
-			Groups: []string{"system:authenticated", "system:cattle:authenticated"},
-			Extra: map[string][]string{
-				authcommon.UserAttributePrincipalID: {"local://u-s857n"},
-				authcommon.UserAttributeUserName:    {"test"},
-				authcommon.ExtraRequestTokenID:      {"kubeconfig-u-s857nk2bxr"},
-				authcommon.ExtraRequestHost:         {"rancher.example.com"},
-			},
+	userInfo := &user.DefaultInfo{
+		UID:    "u-s857n",
+		Name:   "u-s857n",
+		Groups: []string{"system:authenticated", "system:cattle:authenticated"},
+		Extra: map[string][]string{
+			authcommon.UserAttributePrincipalID: {"local://u-s857n"},
+			authcommon.UserAttributeUserName:    {"test"},
+			authcommon.ExtraRequestTokenID:      {"kubeconfig-u-s857nk2bxr"},
+			authcommon.ExtraRequestHost:         {"rancher.example.com"},
 		},
 	}
-
 	want := []rbacv1.PolicyRule{
 		{
 			Verbs:         []string{"impersonate"},
@@ -254,6 +251,7 @@ func TestImpersonatorRulesForUser(t *testing.T) {
 		},
 	}
 
-	got := impersonator.rulesForUser()
+	var i impersonator
+	got := i.rulesForUser(userInfo)
 	assert.Equal(t, want, got)
 }

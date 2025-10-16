@@ -8,10 +8,11 @@ import (
 
 	ldapv3 "github.com/go-ldap/ldap/v3"
 	"github.com/pkg/errors"
-	"github.com/rancher/norman/httperror"
+	"github.com/rancher/apiserver/pkg/apierror"
 	"github.com/rancher/norman/types/slice"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
+	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -23,7 +24,7 @@ func (p *adProvider) loginUser(lConn ldapv3.Client, credentials *v3.BasicLogin, 
 
 	password := credentials.Password
 	if password == "" {
-		return v3.Principal{}, nil, httperror.NewAPIError(httperror.MissingRequired, "password not provided")
+		return v3.Principal{}, nil, apierror.NewAPIError(validation.MissingRequired, "password not provided")
 	}
 
 	sAMAccountName := credentials.Username
@@ -40,7 +41,7 @@ func (p *adProvider) loginUser(lConn ldapv3.Client, credentials *v3.BasicLogin, 
 		// Make sure user login filter contains a valid LDAP query expression
 		// before interpolating it into the search filter.
 		if _, err = ldapv3.CompileFilter(config.UserLoginFilter); err != nil {
-			return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.InvalidOption, "invalid userLoginFilter")
+			return v3.Principal{}, nil, apierror.WrapAPIError(err, validation.InvalidOption, "invalid userLoginFilter")
 		}
 	}
 
@@ -67,7 +68,7 @@ func (p *adProvider) loginUser(lConn ldapv3.Client, credentials *v3.BasicLogin, 
 		}
 	}
 	if err != nil {
-		return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "Unauthorized")
+		return v3.Principal{}, nil, apierror.WrapAPIError(err, validation.Unauthorized, "Unauthorized")
 	}
 
 	logrus.Debug("Binding username password")
@@ -75,9 +76,9 @@ func (p *adProvider) loginUser(lConn ldapv3.Client, credentials *v3.BasicLogin, 
 	err = lConn.Bind(externalID, password)
 	if err != nil {
 		if ldapv3.IsErrorWithCode(err, ldapv3.LDAPResultInvalidCredentials) {
-			return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.Unauthorized, "Unauthorized")
+			return v3.Principal{}, nil, apierror.WrapAPIError(err, validation.Unauthorized, "Unauthorized")
 		}
-		return v3.Principal{}, nil, httperror.WrapAPIError(err, httperror.ServerError, "server error while authenticating")
+		return v3.Principal{}, nil, apierror.WrapAPIError(err, validation.ServerError, "server error while authenticating")
 	}
 
 	userPrincipal, groupPrincipals, err := p.getPrincipalsFromSearchResult(lConn, config, result)
@@ -90,7 +91,7 @@ func (p *adProvider) loginUser(lConn ldapv3.Client, credentials *v3.BasicLogin, 
 		return v3.Principal{}, nil, err
 	}
 	if !allowed {
-		return v3.Principal{}, nil, httperror.NewAPIError(httperror.PermissionDenied, "Permission denied")
+		return v3.Principal{}, nil, apierror.NewAPIError(validation.PermissionDenied, "Permission denied")
 	}
 
 	return userPrincipal, groupPrincipals, err
@@ -289,7 +290,7 @@ func (p *adProvider) getGroupPrincipalsFromSearch(
 
 	result, err := lConn.SearchWithPaging(search, 1000)
 	if err != nil {
-		return groupPrincipals, httperror.WrapAPIError(errors.Wrapf(err, "server returned error for search %s %s: %v", search.BaseDN, search.Filter, err), httperror.ServerError, err.Error())
+		return groupPrincipals, apierror.WrapAPIError(errors.Wrapf(err, "server returned error for search %s %s: %v", search.BaseDN, search.Filter, err), validation.ServerError, err.Error())
 	}
 
 	for _, e := range result.Entries {
@@ -383,9 +384,9 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 	result, err := lConn.Search(search)
 	if err != nil {
 		if ldapErr, ok := err.(*ldapv3.Error); ok && ldapErr.ResultCode == 32 {
-			return nil, httperror.NewAPIError(httperror.NotFound, fmt.Sprintf("%s not found", distinguishedName))
+			return nil, apierror.NewAPIError(validation.NotFound, fmt.Sprintf("%s not found", distinguishedName))
 		}
-		return nil, httperror.WrapAPIError(errors.Wrapf(err, "server returned error for search %v %v: %v", search.BaseDN, filter, err), httperror.ServerError, "Internal server error")
+		return nil, apierror.WrapAPIError(errors.Wrapf(err, "server returned error for search %v %v: %v", search.BaseDN, filter, err), validation.ServerError, "Internal server error")
 	}
 
 	if len(result.Entries) < 1 {

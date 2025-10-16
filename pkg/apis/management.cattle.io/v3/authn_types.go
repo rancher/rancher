@@ -171,6 +171,15 @@ func (u *User) IsDefaultAdmin() bool {
 	return u.Username == "admin"
 }
 
+// GetEnabled returns true if the user is enabled.
+func (u *User) GetEnabled() bool {
+	if u.Enabled == nil {
+		return true // Enabled by default.
+	}
+
+	return *u.Enabled
+}
+
 type UserStatus struct {
 	// +optional
 	Conditions []UserCondition `json:"conditions"`
@@ -321,7 +330,6 @@ type AuthConfigConditions struct {
 
 // +genclient
 // +kubebuilder:skipversion
-// +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 type SamlToken struct {

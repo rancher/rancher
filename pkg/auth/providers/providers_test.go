@@ -3,6 +3,7 @@ package providers
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/rancher/norman/types"
@@ -18,7 +19,49 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-func TestAzureADProviderDoesNotHavePerUserTokens(t *testing.T) {
+func TestIsSAMLProvider(t *testing.T) {
+	tests := []struct {
+		provider string
+		isSAML   bool
+	}{
+		{
+			provider: "pingProvider",
+			isSAML:   true,
+		},
+		{
+			provider: "adfsProvider",
+			isSAML:   true,
+		},
+		{
+			provider: "keyCloakProvider",
+			isSAML:   true,
+		},
+		{
+			provider: "oktaProvider",
+			isSAML:   true,
+		},
+		{
+			provider: "shibbolethProvider",
+			isSAML:   true,
+		},
+		{
+			provider: "githubProvider",
+			isSAML:   false,
+		},
+		{
+			provider: "localProvider",
+			isSAML:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.provider, func(t *testing.T) {
+			assert.Equal(t, tt.isSAML, IsSAMLProviderType(tt.provider))
+		})
+	}
+}
+
+func TestNewAzureADProviderDoesNotHavePerUserTokens(t *testing.T) {
 	t.Cleanup(cleanup)
 	newFlowCfg := map[string]any{
 		"metadata": map[string]any{
@@ -81,21 +124,13 @@ func (m *mockUnstructuredGetter) Get(name string, _ metav1.GetOptions) (runtime.
 	return nil, fmt.Errorf("object %s not found", name)
 }
 
-func (m *mockUnstructuredGetter) addObject(name string, object runtime.Object) {
-	m.objects[name] = object
-}
-
-func (m *mockUnstructuredGetter) addErr(name string, err error) {
-	m.errObjects[name] = err
-}
-
 type mockUnstructured struct {
-	content map[string]interface{}
+	content map[string]any
 }
 
 func (m *mockUnstructured) NewEmptyInstance() runtime.Unstructured                 { return nil }
-func (m *mockUnstructured) UnstructuredContent() map[string]interface{}            { return m.content }
-func (m *mockUnstructured) SetUnstructuredContent(input map[string]interface{})    { m.content = input }
+func (m *mockUnstructured) UnstructuredContent() map[string]any                    { return m.content }
+func (m *mockUnstructured) SetUnstructuredContent(input map[string]any)            { m.content = input }
 func (m *mockUnstructured) IsList() bool                                           { return false }
 func (m *mockUnstructured) EachListItem(func(runtime.Object) error) error          { return nil }
 func (m *mockUnstructured) EachListItemWithAlloc(func(runtime.Object) error) error { return nil }
@@ -104,11 +139,11 @@ func (m *mockUnstructured) DeepCopyObject() runtime.Object                      
 
 type fakeProvider struct{}
 
-func (f fakeProvider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (f fakeProvider) Logout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	panic("not implemented")
 }
 
-func (f fakeProvider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (f fakeProvider) LogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	panic("not implemented")
 }
 
@@ -116,7 +151,7 @@ func (f fakeProvider) GetName() string {
 	panic("implement me")
 }
 
-func (f fakeProvider) AuthenticateUser(_ context.Context, _ interface{}) (v3.Principal, []v3.Principal, string, error) {
+func (f fakeProvider) AuthenticateUser(_ context.Context, _ any) (v3.Principal, []v3.Principal, string, error) {
 	panic("implement me")
 }
 
@@ -132,7 +167,7 @@ func (f fakeProvider) CustomizeSchema(_ *types.Schema) {
 	panic("implement me")
 }
 
-func (f fakeProvider) TransformToAuthProvider(_ map[string]interface{}) (map[string]interface{}, error) {
+func (f fakeProvider) TransformToAuthProvider(_ map[string]any) (map[string]any, error) {
 	panic("implement me")
 }
 

@@ -12,8 +12,7 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v73/github"
-	cattlev3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/sirupsen/logrus"
 	"github.com/tomnomnom/linkheader"
@@ -34,11 +33,7 @@ type githubAppClient struct {
 	httpClient *http.Client
 }
 
-type searchResult struct {
-	Items []common.GitHubAccount `json:"items"`
-}
-
-func (g *githubAppClient) getAccessToken(ctx context.Context, code string, config *mgmtv3.GithubAppConfig) (string, error) {
+func (g *githubAppClient) getAccessToken(ctx context.Context, code string, config *apiv3.GithubAppConfig) (string, error) {
 	form := url.Values{}
 	form.Add("client_id", config.ClientID)
 	form.Add("client_secret", config.ClientSecret)
@@ -52,7 +47,7 @@ func (g *githubAppClient) getAccessToken(ctx context.Context, code string, confi
 	}
 
 	// Decode the response
-	var respMap map[string]interface{}
+	var respMap map[string]any
 
 	if err := json.Unmarshal(b, &respMap); err != nil {
 		return "", fmt.Errorf("github getAccessToken: received error unmarshalling response body, err: %v", err)
@@ -70,7 +65,7 @@ func (g *githubAppClient) getAccessToken(ctx context.Context, code string, confi
 	return acessToken, nil
 }
 
-func (g *githubAppClient) getUser(ctx context.Context, githubAccessToken string, config *mgmtv3.GithubAppConfig) (common.GitHubAccount, error) {
+func (g *githubAppClient) getUser(ctx context.Context, githubAccessToken string, config *apiv3.GithubAppConfig) (common.GitHubAccount, error) {
 	url := getAPIURL("USER_INFO", config)
 	b, _, err := g.getFromGithub(ctx, githubAccessToken, url)
 	if err != nil {
@@ -88,7 +83,7 @@ func (g *githubAppClient) getUser(ctx context.Context, githubAccessToken string,
 }
 
 // TODO: These two need to use the cache.
-func (g *githubAppClient) getOrgsForUser(ctx context.Context, username string, config *mgmtv3.GithubAppConfig) ([]common.GitHubAccount, error) {
+func (g *githubAppClient) getOrgsForUser(ctx context.Context, username string, config *apiv3.GithubAppConfig) ([]common.GitHubAccount, error) {
 	data, err := getGitHubAppDataFromConfig(ctx, config)
 	if err != nil {
 		return nil, err
@@ -97,7 +92,7 @@ func (g *githubAppClient) getOrgsForUser(ctx context.Context, username string, c
 	return data.listOrgsForUser(username), nil
 }
 
-func (g *githubAppClient) getTeamsForUser(ctx context.Context, username string, config *mgmtv3.GithubAppConfig) ([]common.GitHubAccount, error) {
+func (g *githubAppClient) getTeamsForUser(ctx context.Context, username string, config *apiv3.GithubAppConfig) ([]common.GitHubAccount, error) {
 	data, err := getGitHubAppDataFromConfig(ctx, config)
 	if err != nil {
 		return nil, err
@@ -106,7 +101,7 @@ func (g *githubAppClient) getTeamsForUser(ctx context.Context, username string, 
 	return data.listTeamsForUser(username), nil
 }
 
-func (g *githubAppClient) searchUsers(ctx context.Context, searchTerm, searchType string, config *cattlev3.GithubAppConfig) ([]common.GitHubAccount, error) {
+func (g *githubAppClient) searchUsers(ctx context.Context, searchTerm, searchType string, config *apiv3.GithubAppConfig) ([]common.GitHubAccount, error) {
 	client, err := getInstallationClientFromConfig(ctx, config)
 	if err != nil {
 		return nil, err
@@ -143,7 +138,7 @@ func (g *githubAppClient) searchUsers(ctx context.Context, searchTerm, searchTyp
 	return searchResult, nil
 }
 
-func (g *githubAppClient) searchTeams(ctx context.Context, searchTerm string, config *cattlev3.GithubAppConfig) ([]common.GitHubAccount, error) {
+func (g *githubAppClient) searchTeams(ctx context.Context, searchTerm string, config *apiv3.GithubAppConfig) ([]common.GitHubAccount, error) {
 	data, err := getGitHubAppDataFromConfig(ctx, config)
 	if err != nil {
 		return nil, err
@@ -152,11 +147,11 @@ func (g *githubAppClient) searchTeams(ctx context.Context, searchTerm string, co
 	return data.searchTeams(searchTerm), nil
 }
 
-func (g *githubAppClient) getTeamByID(ctx context.Context, id int, config *mgmtv3.GithubAppConfig) (common.GitHubAccount, error) {
+func (g *githubAppClient) getTeamByID(ctx context.Context, id int, config *apiv3.GithubAppConfig) (common.GitHubAccount, error) {
 	return common.GitHubAccount{}, errors.New("fail getTeamByID")
 }
 
-func (g *githubAppClient) getUserOrgByID(ctx context.Context, id int, config *mgmtv3.GithubAppConfig) (common.GitHubAccount, error) {
+func (g *githubAppClient) getUserOrgByID(ctx context.Context, id int, config *apiv3.GithubAppConfig) (common.GitHubAccount, error) {
 	data, err := getGitHubAppDataFromConfig(ctx, config)
 	if err != nil {
 		return common.GitHubAccount{}, err
@@ -243,7 +238,7 @@ func (g *githubAppClient) getFromGithub(ctx context.Context, githubAccessToken s
 	return body, nextURL, nil
 }
 
-func getAPIURL(endpoint string, config *mgmtv3.GithubAppConfig) string {
+func getAPIURL(endpoint string, config *apiv3.GithubAppConfig) string {
 	var hostName, apiEndpoint, toReturn string
 
 	if config.Hostname != "" {
@@ -294,23 +289,6 @@ func getAPIURL(endpoint string, config *mgmtv3.GithubAppConfig) string {
 	return toReturn
 }
 
-func (g *githubAppClient) paginateGithub(ctx context.Context, githubAccessToken string, url string) ([][]byte, error) {
-	var responses [][]byte
-	var err error
-	var response []byte
-
-	nextURL := url
-	for nextURL != "" {
-		response, nextURL, err = g.getFromGithub(ctx, githubAccessToken, nextURL)
-		if err != nil {
-			return nil, err
-		}
-		responses = append(responses, response)
-	}
-
-	return responses, nil
-}
-
 func (g *githubAppClient) nextGithubPage(response *http.Response) string {
 	header := response.Header.Get("link")
 
@@ -327,7 +305,7 @@ func (g *githubAppClient) nextGithubPage(response *http.Response) string {
 }
 
 // TODO: Move this into a method on the struct and cache!
-func getGitHubAppDataFromConfig(ctx context.Context, config *mgmtv3.GithubAppConfig) (*gitHubAppData, error) {
+func getGitHubAppDataFromConfig(ctx context.Context, config *apiv3.GithubAppConfig) (*gitHubAppData, error) {
 	appID, installationID, err := getInstallationAndAppIDFromConfig(config)
 	if err != nil {
 		return nil, err
@@ -337,7 +315,7 @@ func getGitHubAppDataFromConfig(ctx context.Context, config *mgmtv3.GithubAppCon
 }
 
 // TODO: Move this into a method on the struct and cache!
-func getInstallationClientFromConfig(ctx context.Context, config *mgmtv3.GithubAppConfig) (*github.Client, error) {
+func getInstallationClientFromConfig(ctx context.Context, config *apiv3.GithubAppConfig) (*github.Client, error) {
 	appID, installationID, err := getInstallationAndAppIDFromConfig(config)
 	if err != nil {
 		return nil, err
@@ -346,7 +324,7 @@ func getInstallationClientFromConfig(ctx context.Context, config *mgmtv3.GithubA
 	return getInstallationClient(ctx, appID, []byte(config.PrivateKey), installationID, getAPIURL("", config))
 }
 
-func getInstallationAndAppIDFromConfig(config *mgmtv3.GithubAppConfig) (int64, int64, error) {
+func getInstallationAndAppIDFromConfig(config *apiv3.GithubAppConfig) (int64, int64, error) {
 	appID, err := strconv.ParseInt(config.AppID, 10, 64)
 	if err != nil {
 		return 0, 0, fmt.Errorf("parsing AppID: %w", err)

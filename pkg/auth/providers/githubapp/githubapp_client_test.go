@@ -13,11 +13,10 @@ import (
 	"testing"
 
 	"github.com/google/go-github/v73/github"
-	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/oauth2"
 )
 
 func TestGithubAppClientGetAccessToken(t *testing.T) {
@@ -26,7 +25,7 @@ func TestGithubAppClientGetAccessToken(t *testing.T) {
 	defer srv.Close()
 
 	appClient := githubAppClient{httpClient: http.DefaultClient}
-	token, err := appClient.getAccessToken(t.Context(), "1234567", &mgmtv3.GithubAppConfig{
+	token, err := appClient.getAccessToken(t.Context(), "1234567", &apiv3.GithubAppConfig{
 		Hostname:     stripScheme(t, srv),
 		ClientID:     "test_client_id",
 		ClientSecret: "test_client_secret",
@@ -44,7 +43,7 @@ func TestGithubAppClientGetUser(t *testing.T) {
 	srv := httptest.NewServer(newFakeGitHubServer(t,
 		withTestCode("test_client_id", "1234567", "http://localhost:3000/callback", "testing")))
 	defer srv.Close()
-	cfg := &mgmtv3.GithubAppConfig{
+	cfg := &apiv3.GithubAppConfig{
 		Hostname:     stripScheme(t, srv),
 		ClientID:     "test_client_id",
 		ClientSecret: "test_client_secret",
@@ -76,7 +75,7 @@ func TestGithubAppClientGetUserWithInvalidToken(t *testing.T) {
 	srv := httptest.NewServer(newFakeGitHubServer(t,
 		withTestCode("test_client_id", "1234567", "http://localhost:3000/callback", "testing")))
 	defer srv.Close()
-	cfg := &mgmtv3.GithubAppConfig{
+	cfg := &apiv3.GithubAppConfig{
 		Hostname:     stripScheme(t, srv),
 		ClientID:     "test_client_id",
 		ClientSecret: "test_client_secret",
@@ -94,7 +93,7 @@ func TestGithubAppClientGetOrgsForUser(t *testing.T) {
 		withPrivateKey("23456", privateKey),
 	))
 	defer srv.Close()
-	cfg := &mgmtv3.GithubAppConfig{
+	cfg := &apiv3.GithubAppConfig{
 		Hostname:     stripScheme(t, srv),
 		ClientID:     "test_client_id",
 		ClientSecret: "test_client_secret",
@@ -135,7 +134,7 @@ func TestGithubAppClientGetOrgsForUserNotProvidingInstallationID(t *testing.T) {
 		withTestCode("test_client_id", "1234567", "http://localhost:3000/callback", "testing"),
 		withPrivateKey("1234567", cert)))
 	defer srv.Close()
-	cfg := &mgmtv3.GithubAppConfig{
+	cfg := &apiv3.GithubAppConfig{
 		Hostname:     stripScheme(t, srv),
 		ClientID:     "test_client_id",
 		ClientSecret: "test_client_secret",
@@ -175,7 +174,7 @@ func TestGithubAppClientGetOrgsForUserProvidingInstallationID(t *testing.T) {
 		withTestCode("test_client_id", "1234567", "http://localhost:3000/callback", "testing"),
 		withPrivateKey("1234567", cert)))
 	defer srv.Close()
-	cfg := &mgmtv3.GithubAppConfig{
+	cfg := &apiv3.GithubAppConfig{
 		Hostname:       stripScheme(t, srv),
 		ClientID:       "test_client_id",
 		ClientSecret:   "test_client_secret",
@@ -205,7 +204,7 @@ func TestGithubAppClientGetTeamsForUserNotProvidingInstallationID(t *testing.T) 
 		withTestCode("test_client_id", "1234567", "http://localhost:3000/callback", "testing"),
 		withPrivateKey("1234567", cert)))
 	defer srv.Close()
-	cfg := &mgmtv3.GithubAppConfig{
+	cfg := &apiv3.GithubAppConfig{
 		Hostname:     stripScheme(t, srv),
 		ClientID:     "test_client_id",
 		ClientSecret: "test_client_secret",
@@ -252,7 +251,7 @@ func TestGithubAppClientGetTeamsForUserProvidingInstallationID(t *testing.T) {
 		withTestCode("test_client_id", "1234567", "http://localhost:3000/callback", "testing"),
 		withPrivateKey("1234567", cert)))
 	defer srv.Close()
-	cfg := &mgmtv3.GithubAppConfig{
+	cfg := &apiv3.GithubAppConfig{
 		Hostname:       stripScheme(t, srv),
 		ClientID:       "test_client_id",
 		ClientSecret:   "test_client_secret",
@@ -294,19 +293,6 @@ func stripScheme(t *testing.T, ts *httptest.Server) string {
 	}
 
 	return parsed.Host
-}
-
-func newOAuthConf(url string) *oauth2.Config {
-	return &oauth2.Config{
-		ClientID:     "test_client_id",
-		ClientSecret: "test_client_secret",
-		RedirectURL:  "http://localhost:3000/callback",
-		Scopes:       []string{"email", "profile"},
-		Endpoint: oauth2.Endpoint{
-			AuthURL:  url + "/auth",
-			TokenURL: url + "/token",
-		},
-	}
 }
 
 // This will communicate with GitHub using the provided credentials.

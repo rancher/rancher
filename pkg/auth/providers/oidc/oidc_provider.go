@@ -9,15 +9,15 @@ import (
 	"reflect"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/errors"
+	"github.com/rancher/apiserver/pkg/apierror"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -27,6 +27,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,10 +41,8 @@ const (
 )
 
 type tokenManager interface {
-	IsMemberOf(token accessor.TokenAccessor, group v3.Principal) bool
 	UpdateSecret(userID, provider, secret string) error
-	UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, userExtraInfo map[string][]string, loginTime ...time.Time) error
-	CreateTokenAndSetCookie(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error
+	CreateTokenAndSetCookie(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error
 	GetSecret(userID string, provider string, fallbackTokens []accessor.TokenAccessor) (string, error)
 }
 
@@ -55,7 +54,7 @@ type OpenIDCProvider struct {
 	Secrets     wcorev1.SecretController
 	UserMGR     user.Manager
 	TokenMgr    tokenManager
-	GetConfig   func() (*v32.OIDCConfig, error)
+	GetConfig   func() (*apiv3.OIDCConfig, error)
 }
 
 type ClaimInfo struct {
@@ -95,18 +94,18 @@ func (o *OpenIDCProvider) CustomizeSchema(schema *types.Schema) {
 	schema.Formatter = o.Formatter
 }
 
-func (o *OpenIDCProvider) AuthenticateUser(ctx context.Context, input interface{}) (v3.Principal, []v3.Principal, string, error) {
-	login, ok := input.(*v32.OIDCLogin)
+func (o *OpenIDCProvider) AuthenticateUser(ctx context.Context, input any) (apiv3.Principal, []apiv3.Principal, string, error) {
+	login, ok := input.(*apiv3.OIDCLogin)
 	if !ok {
-		return v3.Principal{}, nil, "", fmt.Errorf("unexpected input type")
+		return apiv3.Principal{}, nil, "", fmt.Errorf("unexpected input type")
 	}
 	userPrincipal, groupPrincipals, providerToken, _, err := o.LoginUser(ctx, login, nil)
 	return userPrincipal, groupPrincipals, providerToken, err
 }
 
-func (o *OpenIDCProvider) LoginUser(ctx context.Context, oauthLoginInfo *v32.OIDCLogin, config *v32.OIDCConfig) (v3.Principal, []v3.Principal, string, ClaimInfo, error) {
-	var userPrincipal v3.Principal
-	var groupPrincipals []v3.Principal
+func (o *OpenIDCProvider) LoginUser(ctx context.Context, oauthLoginInfo *apiv3.OIDCLogin, config *apiv3.OIDCConfig) (apiv3.Principal, []apiv3.Principal, string, ClaimInfo, error) {
+	var userPrincipal apiv3.Principal
+	var groupPrincipals []apiv3.Principal
 	var userClaimInfo ClaimInfo
 	var err error
 
@@ -131,7 +130,7 @@ func (o *OpenIDCProvider) LoginUser(ctx context.Context, oauthLoginInfo *v32.OID
 		return userPrincipal, groupPrincipals, "", userClaimInfo, err
 	}
 	if !allowed {
-		return userPrincipal, groupPrincipals, "", userClaimInfo, httperror.NewAPIError(httperror.Unauthorized, "unauthorized")
+		return userPrincipal, groupPrincipals, "", userClaimInfo, apierror.NewAPIError(validation.Unauthorized, "unauthorized")
 	}
 	// save entire oauthToken because it contains refresh_token and token expiry time
 	// will use with oauth2.Client and with TokenSource to ensure auto refresh of tokens occurs for api calls
@@ -143,14 +142,14 @@ func (o *OpenIDCProvider) LoginUser(ctx context.Context, oauthLoginInfo *v32.OID
 	return userPrincipal, groupPrincipals, string(oauthToken), userClaimInfo, err
 }
 
-func (o *OpenIDCProvider) SearchPrincipals(searchValue, principalType string, token accessor.TokenAccessor) ([]v3.Principal, error) {
-	var principals []v3.Principal
+func (o *OpenIDCProvider) SearchPrincipals(searchValue, principalType string, token accessor.TokenAccessor) ([]apiv3.Principal, error) {
+	var principals []apiv3.Principal
 
 	if principalType == "" {
 		principalType = UserType
 	}
 
-	p := v3.Principal{
+	p := apiv3.Principal{
 		ObjectMeta:    metav1.ObjectMeta{Name: o.Name + "_" + principalType + "://" + searchValue},
 		DisplayName:   searchValue,
 		LoginName:     searchValue,
@@ -162,8 +161,8 @@ func (o *OpenIDCProvider) SearchPrincipals(searchValue, principalType string, to
 	return principals, nil
 }
 
-func (o *OpenIDCProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
-	var p v3.Principal
+func (o *OpenIDCProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
+	var p apiv3.Principal
 
 	// parsing id to get the external id and type. Example oidc_<user|group>://<user sub | group name>
 	var externalID string
@@ -185,7 +184,7 @@ func (o *OpenIDCProvider) GetPrincipal(principalID string, token accessor.TokenA
 		return p, fmt.Errorf("invalid principal type")
 	}
 	if principalID == UserType {
-		p = v3.Principal{
+		p = apiv3.Principal{
 			ObjectMeta:    metav1.ObjectMeta{Name: principalType + "://" + externalID},
 			DisplayName:   externalID,
 			LoginName:     externalID,
@@ -199,13 +198,13 @@ func (o *OpenIDCProvider) GetPrincipal(principalID string, token accessor.TokenA
 	return p, nil
 }
 
-func (o *OpenIDCProvider) TransformToAuthProvider(authConfig map[string]interface{}) (map[string]interface{}, error) {
+func (o *OpenIDCProvider) TransformToAuthProvider(authConfig map[string]any) (map[string]any, error) {
 	p := common.TransformToAuthProvider(authConfig)
 	p[publicclient.OIDCProviderFieldRedirectURL] = o.getRedirectURL(authConfig)
 	return p, nil
 }
 
-func (o *OpenIDCProvider) getRedirectURL(config map[string]interface{}) string {
+func (o *OpenIDCProvider) getRedirectURL(config map[string]any) string {
 	authURL, _ := FetchAuthURL(config)
 
 	return fmt.Sprintf(
@@ -216,8 +215,8 @@ func (o *OpenIDCProvider) getRedirectURL(config map[string]interface{}) string {
 	)
 }
 
-func (o *OpenIDCProvider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
-	var groupPrincipals []v3.Principal
+func (o *OpenIDCProvider) RefetchGroupPrincipals(principalID string, secret string) ([]apiv3.Principal, error) {
+	var groupPrincipals []apiv3.Principal
 
 	config, err := o.GetConfig()
 	if err != nil {
@@ -255,12 +254,12 @@ func (o *OpenIDCProvider) CanAccessWithGroupProviders(userPrincipalID string, gr
 	return allowed, nil
 }
 
-func (o *OpenIDCProvider) userToPrincipal(userInfo *oidc.UserInfo, claimInfo ClaimInfo) v3.Principal {
+func (o *OpenIDCProvider) userToPrincipal(userInfo *oidc.UserInfo, claimInfo ClaimInfo) apiv3.Principal {
 	displayName := claimInfo.Name
 	if displayName == "" {
 		displayName = userInfo.Email
 	}
-	p := v3.Principal{
+	p := apiv3.Principal{
 		ObjectMeta:    metav1.ObjectMeta{Name: o.Name + "_" + UserType + "://" + userInfo.Subject},
 		DisplayName:   displayName,
 		LoginName:     userInfo.Email,
@@ -271,8 +270,8 @@ func (o *OpenIDCProvider) userToPrincipal(userInfo *oidc.UserInfo, claimInfo Cla
 	return p
 }
 
-func (o *OpenIDCProvider) groupToPrincipal(groupName string) v3.Principal {
-	p := v3.Principal{
+func (o *OpenIDCProvider) groupToPrincipal(groupName string) apiv3.Principal {
+	p := apiv3.Principal{
 		ObjectMeta:    metav1.ObjectMeta{Name: o.Name + "_" + GroupType + "://" + groupName},
 		DisplayName:   groupName,
 		Provider:      o.Name,
@@ -282,7 +281,7 @@ func (o *OpenIDCProvider) groupToPrincipal(groupName string) v3.Principal {
 	return p
 }
 
-func (o *OpenIDCProvider) toPrincipalFromToken(principalType string, princ v3.Principal, token accessor.TokenAccessor) v3.Principal {
+func (o *OpenIDCProvider) toPrincipalFromToken(principalType string, princ apiv3.Principal, token accessor.TokenAccessor) apiv3.Principal {
 	if principalType == UserType {
 		princ.PrincipalType = UserType
 		if token != nil {
@@ -296,13 +295,13 @@ func (o *OpenIDCProvider) toPrincipalFromToken(principalType string, princ v3.Pr
 	} else {
 		princ.PrincipalType = GroupType
 		if token != nil {
-			princ.MemberOf = o.TokenMgr.IsMemberOf(token, princ)
+			princ.MemberOf = o.UserMGR.IsMemberOf(token, princ)
 		}
 	}
 	return princ
 }
 
-func (o *OpenIDCProvider) saveOIDCConfig(config *v32.OIDCConfig) error {
+func (o *OpenIDCProvider) saveOIDCConfig(config *apiv3.OIDCConfig) error {
 	storedOidcConfig, err := o.GetConfig()
 	if err != nil {
 		return err
@@ -333,7 +332,7 @@ func (o *OpenIDCProvider) saveOIDCConfig(config *v32.OIDCConfig) error {
 	return err
 }
 
-func (o *OpenIDCProvider) GetOIDCConfig() (*v32.OIDCConfig, error) {
+func (o *OpenIDCProvider) GetOIDCConfig() (*apiv3.OIDCConfig, error) {
 	authConfigObj, err := o.AuthConfigs.ObjectClient().UnstructuredClient().Get(o.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve OIDCConfig, error: %v", err)
@@ -345,7 +344,7 @@ func (o *OpenIDCProvider) GetOIDCConfig() (*v32.OIDCConfig, error) {
 	}
 	storedOidcConfigMap := u.UnstructuredContent()
 
-	storedOidcConfig := &v32.OIDCConfig{}
+	storedOidcConfig := &apiv3.OIDCConfig{}
 	err = common.Decode(storedOidcConfigMap, storedOidcConfig)
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode OidcConfig: %w", err)
@@ -371,15 +370,15 @@ func (o *OpenIDCProvider) GetOIDCConfig() (*v32.OIDCConfig, error) {
 	return storedOidcConfig, nil
 }
 
-func (o *OpenIDCProvider) IsThisUserMe(me, other v3.Principal) bool {
+func (o *OpenIDCProvider) IsThisUserMe(me, other apiv3.Principal) bool {
 	return common.SamePrincipal(me, other)
 }
 
-func (o *OpenIDCProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[string][]string {
+func (o *OpenIDCProvider) GetUserExtraAttributes(userPrincipal apiv3.Principal) map[string][]string {
 	return common.GetCommonUserExtraAttributes(userPrincipal)
 }
 
-func (o *OpenIDCProvider) getUserInfoFromAuthCode(ctx *context.Context, config *v32.OIDCConfig, authCode string, claimInfo *ClaimInfo, userName string) (*oidc.UserInfo, *oauth2.Token, error) {
+func (o *OpenIDCProvider) getUserInfoFromAuthCode(ctx *context.Context, config *apiv3.OIDCConfig, authCode string, claimInfo *ClaimInfo, userName string) (*oidc.UserInfo, *oauth2.Token, error) {
 	var userInfo *oidc.UserInfo
 	var oauth2Token *oauth2.Token
 	var err error
@@ -486,7 +485,7 @@ func (o *OpenIDCProvider) getUserInfoFromAuthCode(ctx *context.Context, config *
 	return userInfo, oauth2Token, nil
 }
 
-func (o *OpenIDCProvider) getClaimInfoFromToken(ctx context.Context, config *v32.OIDCConfig, token *oauth2.Token, userName string) (*ClaimInfo, error) {
+func (o *OpenIDCProvider) getClaimInfoFromToken(ctx context.Context, config *apiv3.OIDCConfig, token *oauth2.Token, userName string) (*ClaimInfo, error) {
 	var userInfo *oidc.UserInfo
 	var err error
 	var claimInfo *ClaimInfo
@@ -551,7 +550,7 @@ func (o *OpenIDCProvider) getClaimInfoFromToken(ctx context.Context, config *v32
 	return claimInfo, nil
 }
 
-func ConfigToOauthConfig(endpoint oauth2.Endpoint, config *v32.OIDCConfig) oauth2.Config {
+func ConfigToOauthConfig(endpoint oauth2.Endpoint, config *apiv3.OIDCConfig) oauth2.Config {
 	var finalScopes []string
 	hasOIDCScope := strings.Contains(config.Scopes, oidc.ScopeOpenID)
 	// scopes must be space separated in string when passed into the api
@@ -573,8 +572,8 @@ func ConfigToOauthConfig(endpoint oauth2.Endpoint, config *v32.OIDCConfig) oauth
 	}
 }
 
-func (o *OpenIDCProvider) getGroupsFromClaimInfo(claimInfo ClaimInfo) []v3.Principal {
-	var groupPrincipals []v3.Principal
+func (o *OpenIDCProvider) getGroupsFromClaimInfo(claimInfo ClaimInfo) []apiv3.Principal {
+	var groupPrincipals []apiv3.Principal
 
 	// If full_group_path is provided, it takes precedence over groups.
 	// full_group_path is expected to be a list of paths separated by '/'.
@@ -639,7 +638,7 @@ func (o *OpenIDCProvider) IsDisabledProvider() (bool, error) {
 	return !oidcConfig.Enabled, nil
 }
 
-func (o *OpenIDCProvider) getOIDCProvider(ctx context.Context, oidcConfig *v32.OIDCConfig) (*oidc.Provider, error) {
+func (o *OpenIDCProvider) getOIDCProvider(ctx context.Context, oidcConfig *apiv3.OIDCConfig) (*oidc.Provider, error) {
 	oidcFields := map[string]string{
 		client.OIDCConfigFieldIssuer:           oidcConfig.Issuer,
 		client.OIDCConfigFieldAuthEndpoint:     oidcConfig.AuthEndpoint,
@@ -674,7 +673,7 @@ func (o *OpenIDCProvider) getOIDCProvider(ctx context.Context, oidcConfig *v32.O
 	return oidc.NewProvider(ctx, oidcConfig.Issuer)
 }
 
-func (o *OpenIDCProvider) Logout(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (o *OpenIDCProvider) Logout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	providerName := token.GetAuthProvider()
 	logrus.Debugf("OpenIDCProvider [logout]: triggered by provider %s", providerName)
 	oidcConfig, err := o.GetConfig()
@@ -689,7 +688,7 @@ func (o *OpenIDCProvider) Logout(apiContext *types.APIContext, token accessor.To
 	return nil
 }
 
-func (o *OpenIDCProvider) LogoutAll(apiContext *types.APIContext, token accessor.TokenAccessor) error {
+func (o *OpenIDCProvider) LogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	logrus.Debugf("OpenIDCProvider [logout-all]: triggered by provider %s", token.GetAuthProvider())
 
 	oidcConfig, err := o.GetConfig()
@@ -703,23 +702,24 @@ func (o *OpenIDCProvider) LogoutAll(apiContext *types.APIContext, token accessor
 		return fmt.Errorf("OpenIDCProvider [logout-all]: Rancher provider resource `%v` not configured for SLO", providerName)
 	}
 
-	idpRedirectURL, err := o.createIDPRedirectURL(apiContext, oidcConfig)
+	idpRedirectURL, err := o.createIDPRedirectURL(r, oidcConfig)
 	if err != nil {
 		return err
 	}
 	logrus.Debug("OpenIDCProvider [logout-all]: triggering logout redirect to ", idpRedirectURL)
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"idpRedirectUrl": idpRedirectURL,
 		"type":           "authConfigLogoutOutput",
 	}
-	apiContext.WriteResponse(http.StatusOK, data)
-	logrus.Debug("OpenIDCProvider [logout-all]: redirect written")
 
-	return nil
+	logrus.Debug("OpenIDCProvider [logout-all]: writing redirect")
+
+	w.Header().Set("Content-Type", "application/json")
+	return json.NewEncoder(w).Encode(data)
 }
 
-func (o *OpenIDCProvider) createIDPRedirectURL(apiContext *types.APIContext, config *v32.OIDCConfig) (string, error) {
+func (o *OpenIDCProvider) createIDPRedirectURL(r *http.Request, config *apiv3.OIDCConfig) (string, error) {
 	if config.EndSessionEndpoint == "" {
 		return "", httperror.NewAPIError(httperror.ServerError, "LogoutAll triggered with no endSessionEndpoint")
 	}
@@ -730,8 +730,8 @@ func (o *OpenIDCProvider) createIDPRedirectURL(apiContext *types.APIContext, con
 		return "", err
 	}
 
-	authLogout := &v32.AuthConfigLogoutInput{}
-	if err := json.NewDecoder(apiContext.Request.Body).Decode(authLogout); err != nil {
+	authLogout := &apiv3.AuthConfigLogoutInput{}
+	if err := json.NewDecoder(r.Body).Decode(authLogout); err != nil {
 		return "", httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("OIDC: parsing request body: %v", err))
 	}

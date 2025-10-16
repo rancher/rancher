@@ -99,6 +99,7 @@ var (
 	PasswordMinLength                   = NewSetting("password-min-length", "12")
 	PeerServices                        = NewSetting("peer-service", os.Getenv("CATTLE_PEER_SERVICE"))
 	RkeMetadataConfig                   = NewSetting("rke-metadata-config", getMetadataConfig())
+	KEv2Operators                       = NewSetting("kev2-operators", "{}")
 	ServerImage                         = NewSetting("server-image", "rancher/rancher")
 	ServerURL                           = NewSetting("server-url", "")
 	ServerVersion                       = NewSetting("server-version", "dev")
@@ -107,8 +108,8 @@ var (
 	WinsAgentVersion                    = NewSetting("wins-agent-version", "")
 	CSIProxyAgentVersion                = NewSetting("csi-proxy-agent-version", "")
 	CSIProxyAgentURL                    = NewSetting("csi-proxy-agent-url", "https://acs-mirror.azureedge.net/csi-proxy/%[1]s/binaries/csi-proxy-%[1]s.tar.gz")
-	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://github.com/rancher/system-agent/releases/download/v0.3.14-rc.3/install.sh") // To ensure consistency between SystemAgentInstallScript default value and CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT to utilize the local system-agent-install.sh script when both values are equal.
-	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.5.3-rc.3/install.ps1")
+	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://github.com/rancher/system-agent/releases/download/v0.3.14-rc.4/install.sh") // To ensure consistency between SystemAgentInstallScript default value and CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT to utilize the local system-agent-install.sh script when both values are equal.
+	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.5.3-rc.4/install.ps1")
 	SystemAgentInstallerImage           = NewSetting("system-agent-installer-image", "") // Defined via environment variable
 	SystemAgentUpgradeImage             = NewSetting("system-agent-upgrade-image", "")   // Defined via environment variable
 	WinsAgentUpgradeImage               = NewSetting("wins-agent-upgrade-image", "")
@@ -357,6 +358,12 @@ var (
 
 	// UIPreferred Ensure that the new Dashboard is the default UI.
 	UIPreferred = NewSetting("ui-preferred", "vue")
+
+	// UIContentEnabled - configure UI Dynamic Content (true, log or debug)
+	UIContentEnabled = NewSetting("ui-content-enabled", "true")
+
+	// UIContentEndpoint - configure custom endpoint for UI Dynamic Content data
+	UIContentEndpoint = NewSetting("ui-content-endpoint", "")
 
 	// SkipHostedClusterChartInstallation controls whether the hosted cluster chart is installed on the server. Defaults to false.
 	// This setting is for development purposes only.

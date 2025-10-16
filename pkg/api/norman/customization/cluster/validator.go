@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	"github.com/rancher/rancher/pkg/data/management"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/service"
 	mgmtSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
@@ -38,6 +39,10 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 
 	if err := convert.ToObj(data, &clientClusterSpec); err != nil {
 		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "Client cluster spec conversion error")
+	}
+
+	if err := validateKeV2ClusterRequest(&clusterSpec); err != nil {
+		return err
 	}
 
 	if err := v.validateLocalClusterAuthEndpoint(request, &clusterSpec); err != nil {
@@ -350,8 +355,8 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 	// validation for creates only
 
 	// validate cluster does not reference an EKS cluster that is already backed by a Rancher cluster
-	name, _ := eksConfig["displayName"]
-	region, _ := eksConfig["region"]
+	name := eksConfig["displayName"]
+	region := eksConfig["region"]
 
 	// cluster client is being used instead of lister to avoid the use of an outdated cache
 	clusters, err := v.ClusterClient.List(metav1.ListOptions{})
@@ -387,8 +392,8 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 }
 
 func validateEKSAccess(request *types.APIContext, eksConfig map[string]interface{}, prevCluster *v3.Cluster) error {
-	publicAccess, _ := eksConfig["publicAccess"]
-	privateAccess, _ := eksConfig["privateAccess"]
+	publicAccess := eksConfig["publicAccess"]
+	privateAccess := eksConfig["privateAccess"]
 	if request.Method != http.MethodPost {
 		if publicAccess == nil {
 			publicAccess = prevCluster.Spec.EKSConfig.PublicAccess
@@ -587,7 +592,7 @@ func validateGKENodePools(spec *v32.ClusterSpec) error {
 		return nil
 	}
 	if len(nodepools) == 0 {
-		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("must have at least one node pool"))
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "must have at least one node pool")
 	}
 
 	var errors []string
@@ -595,7 +600,7 @@ func validateGKENodePools(spec *v32.ClusterSpec) error {
 
 	for _, np := range nodepools {
 		if np.Name == nil || *np.Name == "" {
-			return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("node pool name cannot be empty"))
+			return httperror.NewAPIError(httperror.InvalidBodyContent, "node pool name cannot be empty")
 		}
 
 		version := np.Version
@@ -656,7 +661,7 @@ func validateGKEClusterName(client v3.ClusterInterface, spec *v32.ClusterSpec) e
 
 func validateGKEPrivateClusterConfig(spec *v32.ClusterSpec) error {
 	if spec.GKEConfig.PrivateClusterConfig != nil && spec.GKEConfig.PrivateClusterConfig.EnablePrivateEndpoint && !spec.GKEConfig.PrivateClusterConfig.EnablePrivateNodes {
-		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("private endpoint requires private nodes"))
+		return httperror.NewAPIError(httperror.InvalidBodyContent, "private endpoint requires private nodes")
 	}
 	return nil
 }
@@ -778,5 +783,31 @@ func validateAliConfigClusterName(client v3.ClusterInterface, spec *v32.ClusterS
 
 		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for Alibaba cluster [%s] "+msgSuffix, name))
 	}
+	return nil
+}
+
+func validateKeV2ClusterRequest(clusterSpec *v32.ClusterSpec) error {
+	kev2OperatorsData := management.GetKEv2OperatorsSettingData()
+	for _, operatorData := range kev2OperatorsData {
+		switch operatorData.Name {
+		case management.AlibabaOperator:
+			if !operatorData.Active && clusterSpec.AliConfig != nil {
+				return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("alibaba operator is inactive"))
+			}
+		case management.EKSOperator:
+			if !operatorData.Active && clusterSpec.EKSConfig != nil {
+				return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("eks operator is inactive"))
+			}
+		case management.GKEOperator:
+			if !operatorData.Active && clusterSpec.GKEConfig != nil {
+				return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("gke operator is inactive"))
+			}
+		case management.AKSOperator:
+			if !operatorData.Active && clusterSpec.AKSConfig != nil {
+				return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("aks operator is inactive"))
+			}
+		}
+	}
+
 	return nil
 }

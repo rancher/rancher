@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/impersonation"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -39,13 +40,18 @@ type prtbHandler struct {
 	clusterName          string
 }
 
-func newPRTBHandler(uc *config.UserContext) *prtbHandler {
+func newPRTBHandler(uc *config.UserContext) (*prtbHandler, error) {
+	impersonator, err := impersonation.ForCluster(uc)
+	if err != nil {
+		return nil, err
+	}
 	return &prtbHandler{
 		impersonationHandler: impersonationHandler{
-			userContext: uc,
-			crClient:    uc.RBACw.ClusterRole(),
-			crtbCache:   uc.Management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
-			prtbCache:   uc.Management.Wrangler.Mgmt.ProjectRoleTemplateBinding().Cache(),
+			clusterName:  uc.ClusterName,
+			impersonator: impersonator,
+			crClient:     uc.RBACw.ClusterRole(),
+			crtbCache:    uc.Management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
+			prtbCache:    uc.Management.Wrangler.Mgmt.ProjectRoleTemplateBinding().Cache(),
 		},
 		crClient:    uc.RBACw.ClusterRole(),
 		crbClient:   uc.RBACw.ClusterRoleBinding(),
@@ -53,7 +59,7 @@ func newPRTBHandler(uc *config.UserContext) *prtbHandler {
 		nsClient:    uc.Corew.Namespace(),
 		rbClient:    uc.RBACw.RoleBinding(),
 		clusterName: uc.ClusterName,
-	}
+	}, nil
 }
 
 // OnChange ensures a Role Binding exists in every project namespace to the RoleTemplate ClusterRole.

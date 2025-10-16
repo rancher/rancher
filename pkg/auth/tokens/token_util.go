@@ -15,7 +15,6 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/settings"
-	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
 )
 
@@ -102,7 +101,11 @@ func ConvertTokenResource(schema *types.Schema, token apiv3.Token) (map[string]i
 	return tokenData, nil
 }
 
-func GetKubeConfigToken(userName, responseType string, userMGR user.Manager, userPrincipal apiv3.Principal) (*apiv3.Token, string, error) {
+type kubeconfigTokenGetter interface {
+	GetKubeconfigToken(clusterName, tokenName, description, kind, userName string, userPrincipal apiv3.Principal) (*apiv3.Token, string, error)
+}
+
+func GetKubeConfigToken(userName, responseType string, kubeconfigTokenGetter kubeconfigTokenGetter, userPrincipal apiv3.Principal) (*apiv3.Token, string, error) {
 	// create kubeconfig expiring tokens if responseType=kubeconfig in login action vs login tokens for responseType=json
 	clusterID := extractClusterIDFromResponseType(responseType)
 
@@ -112,7 +115,7 @@ func GetKubeConfigToken(userName, responseType string, userMGR user.Manager, use
 		name = fmt.Sprintf("kubeconfig-%s.%s", userName, clusterID)
 	}
 
-	token, tokenVal, err := userMGR.GetKubeconfigToken(clusterID, name, "Kubeconfig token", "kubeconfig", userName, userPrincipal)
+	token, tokenVal, err := kubeconfigTokenGetter.GetKubeconfigToken(clusterID, name, "Kubeconfig token", "kubeconfig", userName, userPrincipal)
 	if err != nil {
 		return nil, "", err
 	}

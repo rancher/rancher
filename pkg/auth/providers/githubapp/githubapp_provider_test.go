@@ -9,74 +9,40 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rancher/norman/types"
-	cattlev3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	util2 "github.com/rancher/rancher/pkg/auth/util"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	publicclient "github.com/rancher/rancher/pkg/client/generated/management/v3public"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type fakeTokensManager struct {
-	getSecretFunc               func(userID string, provider string, fallbackTokens []accessor.TokenAccessor) (string, error)
-	isMemberOfFunc              func(token accessor.TokenAccessor, group v3.Principal) bool
-	createTokenAndSetCookieFunc func(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error
-}
-
-func (m *fakeTokensManager) GetSecret(userID string, provider string, fallbackTokens []accessor.TokenAccessor) (string, error) {
-	if m.getSecretFunc != nil {
-		return m.getSecretFunc(userID, provider, fallbackTokens)
-	}
-	return "", nil
-}
-
-func (m *fakeTokensManager) IsMemberOf(token accessor.TokenAccessor, group v3.Principal) bool {
-	if m.isMemberOfFunc != nil {
-		return m.isMemberOfFunc(token, group)
-	}
-	return false
-}
-
-func (m *fakeTokensManager) CreateTokenAndSetCookie(userID string, userPrincipal v3.Principal, groupPrincipals []v3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error {
-	if m.createTokenAndSetCookieFunc != nil {
-		return m.createTokenAndSetCookieFunc(userID, userPrincipal, groupPrincipals, providerToken, ttl, description, request)
-	}
-	return nil
-}
-
-func (m *fakeTokensManager) UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []v3.Principal, userExtraInfo map[string][]string, loginTime ...time.Time) error {
-	return nil
-}
-
 func TestLogOutAll(t *testing.T) {
-	provider := ghAppProvider{
+	provider := Provider{
 		githubClient: &githubAppClient{httpClient: http.DefaultClient},
-		getConfig:    func() (*cattlev3.GithubAppConfig, error) { return nil, nil },
+		getConfig:    func() (*apiv3.GithubAppConfig, error) { return nil, nil },
 	}
 
 	// LogoutAll does nothing in this case and does not fail.
-	require.NoError(t, provider.LogoutAll(nil, nil))
+	require.NoError(t, provider.LogoutAll(nil, nil, nil))
 }
 
 func TestLogOut(t *testing.T) {
-	provider := ghAppProvider{
+	provider := Provider{
 		githubClient: &githubAppClient{httpClient: http.DefaultClient},
-		getConfig:    func() (*cattlev3.GithubAppConfig, error) { return nil, nil },
+		getConfig:    func() (*apiv3.GithubAppConfig, error) { return nil, nil },
 	}
 
 	// Logout does nothing in this case and does not fail.
-	require.NoError(t, provider.Logout(nil, nil))
+	require.NoError(t, provider.Logout(nil, nil, nil))
 }
 
 func TestGetName(t *testing.T) {
-	provider := ghAppProvider{
+	provider := Provider{
 		githubClient: &githubAppClient{httpClient: http.DefaultClient},
-		getConfig:    func() (*cattlev3.GithubAppConfig, error) { return nil, nil },
+		getConfig:    func() (*apiv3.GithubAppConfig, error) { return nil, nil },
 	}
 
 	assert.Equal(t, Name, provider.GetName())
@@ -87,11 +53,11 @@ func TestCustomizeSchema(t *testing.T) {
 }
 
 func TestTransformToAuthProvider(t *testing.T) {
-	config := &cattlev3.GithubAppConfig{}
+	config := &apiv3.GithubAppConfig{}
 
-	provider := ghAppProvider{
+	provider := Provider{
 		githubClient: &githubAppClient{httpClient: http.DefaultClient},
-		getConfig:    func() (*cattlev3.GithubAppConfig, error) { return config, nil },
+		getConfig:    func() (*apiv3.GithubAppConfig, error) { return config, nil },
 	}
 
 	t.Run("when no alternative client_id is provided for hostname", func(t *testing.T) {
@@ -150,29 +116,29 @@ func TestAuthenticateUser(t *testing.T) {
 	))
 	defer srv.Close()
 
-	config := &mgmtv3.GithubAppConfig{
+	config := &apiv3.GithubAppConfig{
 		Hostname:     stripScheme(t, srv),
 		ClientID:     "test_client_id",
 		ClientSecret: "test_client_secret",
 		AppID:        appID,
 		PrivateKey:   string(privateKey),
 	}
-	provider := ghAppProvider{
+	provider := Provider{
 		githubClient: &githubAppClient{httpClient: http.DefaultClient},
-		getConfig:    func() (*cattlev3.GithubAppConfig, error) { return config, nil },
+		getConfig:    func() (*apiv3.GithubAppConfig, error) { return config, nil },
 		userManager:  &fakeUserManager{},
 	}
 	req, err := http.NewRequest(http.MethodGet, "http://example.com", nil)
 	require.NoError(t, err)
 
 	ctx := context.WithValue(t.Context(), util2.RequestKey, req)
-	input := &cattlev3.GithubLogin{
+	input := &apiv3.GithubLogin{
 		Code: authCode,
 	}
 	userPrincipal, groupPrincipals, token, err := provider.AuthenticateUser(ctx, input)
 	require.NoError(t, err)
 
-	wantUser := v3.Principal{
+	wantUser := apiv3.Principal{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "githubapp_user://1234",
 		},
@@ -185,7 +151,7 @@ func TestAuthenticateUser(t *testing.T) {
 	}
 	assert.Equal(t, wantUser, userPrincipal)
 
-	wantGroups := []v3.Principal{
+	wantGroups := []apiv3.Principal{
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "githubapp_org://1",
@@ -242,7 +208,7 @@ func TestAuthenticateUser(t *testing.T) {
 		},
 	}
 
-	slices.SortFunc(groupPrincipals, func(a, b v3.Principal) int {
+	slices.SortFunc(groupPrincipals, func(a, b apiv3.Principal) int {
 		return strings.Compare(a.ObjectMeta.Name, b.ObjectMeta.Name)
 	})
 
@@ -261,23 +227,23 @@ func TestRefetchGroupPrincipals(t *testing.T) {
 	))
 	defer srv.Close()
 
-	config := &mgmtv3.GithubAppConfig{
+	config := &apiv3.GithubAppConfig{
 		Hostname:     stripScheme(t, srv),
 		ClientID:     "test_client_id",
 		ClientSecret: "test_client_secret",
 		AppID:        appID,
 		PrivateKey:   string(privateKey),
 	}
-	provider := ghAppProvider{
+	provider := Provider{
 		githubClient: &githubAppClient{httpClient: http.DefaultClient},
-		getConfig:    func() (*cattlev3.GithubAppConfig, error) { return config, nil },
+		getConfig:    func() (*apiv3.GithubAppConfig, error) { return config, nil },
 		userManager:  &fakeUserManager{},
 	}
 
 	principals, err := provider.RefetchGroupPrincipals("githubapp_user://1234", "unused parameter")
 	require.NoError(t, err)
 
-	want := []v3.Principal{
+	want := []apiv3.Principal{
 		{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "githubapp_org://1",
@@ -334,7 +300,7 @@ func TestRefetchGroupPrincipals(t *testing.T) {
 			Provider:       "githubapp",
 		},
 	}
-	slices.SortFunc(principals, func(a, b v3.Principal) int {
+	slices.SortFunc(principals, func(a, b apiv3.Principal) int {
 		return strings.Compare(a.ObjectMeta.Name, b.ObjectMeta.Name)
 	})
 	assert.Equal(t, want, principals)
@@ -351,28 +317,28 @@ func TestSearchPrincipals(t *testing.T) {
 	))
 	defer srv.Close()
 
-	config := &mgmtv3.GithubAppConfig{
+	config := &apiv3.GithubAppConfig{
 		Hostname:     stripScheme(t, srv),
 		ClientID:     "test_client_id",
 		ClientSecret: "test_client_secret",
 		AppID:        appID,
 		PrivateKey:   string(privateKey),
 	}
-	provider := ghAppProvider{
+	provider := Provider{
 		githubClient: &githubAppClient{httpClient: http.DefaultClient},
-		getConfig:    func() (*cattlev3.GithubAppConfig, error) { return config, nil },
+		getConfig:    func() (*apiv3.GithubAppConfig, error) { return config, nil },
 		userManager:  &fakeUserManager{},
 	}
 
 	searchTests := map[string]struct {
 		key           string
 		principalType string
-		want          []v3.Principal
+		want          []apiv3.Principal
 	}{
 		"searching for users": {
 			"octocat",
 			"user",
-			[]v3.Principal{
+			[]apiv3.Principal{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "githubapp_user://1234",
@@ -388,7 +354,7 @@ func TestSearchPrincipals(t *testing.T) {
 		"searching for groups includes orgs": {
 			"example-org-2",
 			"group",
-			[]v3.Principal{
+			[]apiv3.Principal{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "githubapp_org://2",
@@ -404,7 +370,7 @@ func TestSearchPrincipals(t *testing.T) {
 		"searching for groups finds teams": {
 			"dev",
 			"group",
-			[]v3.Principal{
+			[]apiv3.Principal{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "githubapp_team://1215",
@@ -430,7 +396,7 @@ func TestSearchPrincipals(t *testing.T) {
 		"searching includes org and user": {
 			"example",
 			"user",
-			[]v3.Principal{
+			[]apiv3.Principal{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "githubapp_org://1",
@@ -470,7 +436,7 @@ func TestSearchPrincipals(t *testing.T) {
 			accts, err := provider.SearchPrincipals(tt.key, tt.principalType, nil)
 			require.NoError(t, err)
 
-			slices.SortFunc(accts, func(a, b v3.Principal) int {
+			slices.SortFunc(accts, func(a, b apiv3.Principal) int {
 				return strings.Compare(a.ObjectMeta.Name, b.ObjectMeta.Name)
 			})
 
@@ -491,26 +457,26 @@ func TestGetPrincipal(t *testing.T) {
 	))
 	defer srv.Close()
 
-	config := &mgmtv3.GithubAppConfig{
+	config := &apiv3.GithubAppConfig{
 		Hostname:     stripScheme(t, srv),
 		ClientID:     "test_client_id",
 		ClientSecret: "test_client_secret",
 		AppID:        appID,
 		PrivateKey:   string(privateKey),
 	}
-	provider := ghAppProvider{
+	provider := Provider{
 		githubClient: &githubAppClient{httpClient: http.DefaultClient},
-		getConfig:    func() (*cattlev3.GithubAppConfig, error) { return config, nil },
+		getConfig:    func() (*apiv3.GithubAppConfig, error) { return config, nil },
 		userManager:  &fakeUserManager{},
 	}
 
 	principalTests := map[string]struct {
 		principalID string
-		want        v3.Principal
+		want        apiv3.Principal
 	}{
 		"existing user": {
 			"githubapp_user://1234",
-			v3.Principal{
+			apiv3.Principal{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "githubapp_user://1234",
 				},
@@ -523,7 +489,7 @@ func TestGetPrincipal(t *testing.T) {
 		},
 		"existing org": {
 			"githubapp_org://1",
-			v3.Principal{
+			apiv3.Principal{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "githubapp_org://1",
 				},
@@ -585,10 +551,18 @@ func TestParsePrincipalIDErrors(t *testing.T) {
 type fakeUserManager struct {
 }
 
-func (f *fakeUserManager) CheckAccess(accessMode string, allowedPrincipalIDs []string, userPrincipalID string, groups []v3.Principal) (bool, error) {
+func (f *fakeUserManager) CheckAccess(accessMode string, allowedPrincipalIDs []string, userPrincipalID string, groups []apiv3.Principal) (bool, error) {
 	return true, nil
 }
 
-func (f *fakeUserManager) SetPrincipalOnCurrentUser(apiContext *types.APIContext, principal v3.Principal) (*v3.User, error) {
+func (f *fakeUserManager) SetPrincipalOnCurrentUser(r *http.Request, principal apiv3.Principal) (*apiv3.User, error) {
 	return nil, nil
+}
+
+func (f *fakeUserManager) IsMemberOf(token accessor.TokenAccessor, group apiv3.Principal) bool {
+	return true
+}
+
+func (f *fakeUserManager) UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []apiv3.Principal, userExtraInfo map[string][]string, loginTime ...time.Time) error {
+	return nil
 }

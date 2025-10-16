@@ -46,8 +46,8 @@ func TestGitHubAppData(t *testing.T) {
 				htmlURL:   "https://example.com/html",
 			},
 			orgs: map[string][]string{
-				"example":   []string{"dev-team", "example"},
-				"other-org": []string{"dev-team2", "admin-team2"},
+				"example":   {"dev-team", "example"},
+				"other-org": {"dev-team2", "admin-team2"},
 			},
 		}
 		assert.Equal(t, want, data.members["test-user"])
@@ -64,7 +64,7 @@ func TestGitHubAppData(t *testing.T) {
 				},
 
 				teams: map[string]orgTeam{
-					"admin-team": orgTeam{
+					"admin-team": {
 						gitHubObject: gitHubObject{
 							id:        45678,
 							avatarURL: "https://example.com/avatar.jpg",
@@ -74,7 +74,7 @@ func TestGitHubAppData(t *testing.T) {
 						},
 						members: []string{},
 					},
-					"dev-team": orgTeam{
+					"dev-team": {
 						gitHubObject: gitHubObject{
 							id:        34567,
 							avatarURL: "https://example.com/avatar.jpg",
@@ -355,16 +355,6 @@ func TestGitHubAppData(t *testing.T) {
 		teams = data.searchTeams("dev-team2")
 		assert.Equal(t, want, teams)
 
-		want = []common.GitHubAccount{
-			{
-				ID:        23468,
-				Login:     "dev-team2",
-				Name:      "dev team 2",
-				AvatarURL: "https://example.com/avatar2.jpg",
-				HTMLURL:   "https://example.com/org/other-org/team/dev-team2",
-			},
-		}
-
 		// searching is case-insensitive
 		teams = data.searchTeams("Dev")
 		slices.SortFunc(teams, func(a, b common.GitHubAccount) int {
@@ -517,7 +507,7 @@ func TestTeamDataFromApp(t *testing.T) {
 						htmlURL:   "https://example.com/",
 					},
 					orgs: map[string][]string{
-						"example-org-1": []string{"example-team"},
+						"example-org-1": {"example-team"},
 					},
 				},
 			},
@@ -592,7 +582,7 @@ func TestTeamDataFromApp(t *testing.T) {
 				},
 			},
 			members: map[string]member{
-				"test-user": member{
+				"test-user": {
 					gitHubObject: gitHubObject{
 						id:        1,
 						name:      "Test User",
@@ -601,8 +591,8 @@ func TestTeamDataFromApp(t *testing.T) {
 						htmlURL:   "https://example.com/",
 					},
 					orgs: map[string][]string{
-						"example-org-1": []string{"example-team"},
-						"example-org-2": []string{"example-team"},
+						"example-org-1": {"example-team"},
+						"example-org-2": {"example-team"},
 					},
 				},
 			},
