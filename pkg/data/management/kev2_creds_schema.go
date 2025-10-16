@@ -16,16 +16,11 @@ const (
 	cloudCredentialSchemaID  = "cloudCredential"
 )
 
-// operator names
-const (
-	alibabaOperator = "alibaba"
-)
-
 type CredentialFields map[string]v32.Field
 
 // Credential Fields data for KEv2 Operators which don't have a corresponding node driver.
 var KEv2OperatorsCredentialFields = map[string]CredentialFields{
-	alibabaOperator: {
+	AlibabaOperator: {
 		"accessKeyId": v32.Field{
 			Create: true,
 			Update: true,

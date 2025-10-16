@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	"github.com/rancher/rancher/pkg/data/management"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainer-engine/service"
 	mgmtSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
@@ -38,6 +39,10 @@ func (v *Validator) Validator(request *types.APIContext, schema *types.Schema, d
 
 	if err := convert.ToObj(data, &clientClusterSpec); err != nil {
 		return httperror.WrapAPIError(err, httperror.InvalidBodyContent, "Client cluster spec conversion error")
+	}
+
+	if err := validateKeV2ClusterRequest(&clusterSpec); err != nil {
+		return err
 	}
 
 	if err := v.validateLocalClusterAuthEndpoint(request, &clusterSpec); err != nil {
@@ -778,5 +783,31 @@ func validateAliConfigClusterName(client v3.ClusterInterface, spec *v32.ClusterS
 
 		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for Alibaba cluster [%s] "+msgSuffix, name))
 	}
+	return nil
+}
+
+func validateKeV2ClusterRequest(clusterSpec *v32.ClusterSpec) error {
+	kev2OperatorsData := management.GetKEv2OperatorsSettingData()
+	for _, operatorData := range kev2OperatorsData {
+		switch operatorData.Name {
+		case management.AlibabaOperator:
+			if !operatorData.Active && clusterSpec.AliConfig != nil {
+				return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("alibaba operator is inactive"))
+			}
+		case management.EKSOperator:
+			if !operatorData.Active && clusterSpec.EKSConfig != nil {
+				return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("eks operator is inactive"))
+			}
+		case management.GKEOperator:
+			if !operatorData.Active && clusterSpec.GKEConfig != nil {
+				return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("gke operator is inactive"))
+			}
+		case management.AKSOperator:
+			if !operatorData.Active && clusterSpec.AKSConfig != nil {
+				return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("aks operator is inactive"))
+			}
+		}
+	}
+
 	return nil
 }
