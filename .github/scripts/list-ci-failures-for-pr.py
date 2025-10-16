@@ -34,8 +34,9 @@ def get_job_logs(repo_owner, repo_name, job_id):
     logs_response = make_github_request(logs_url)
 
     if logs_response.status_code != 200:
-        print(f"Error fetching logs for job {job_id}: {logs_response.status_code}")
-        return "Unable to fetch logs"
+        # Don't print error for common cases like 404 (logs not available)
+        # This can happen for re-run jobs or expired logs
+        return None
 
     return logs_response.text
 
@@ -121,7 +122,12 @@ def process_job(repo_owner, repo_name, job, run_data, attempt_number):
        (run_data.get("status") == "in_progress" and job.get("status") == "completed" and job.get("conclusion") != "success"):
 
         job_logs = get_job_logs(repo_owner, repo_name, job["id"])
-        failure_lines = extract_failure_lines(job_logs)
+
+        if job_logs is None:
+            failure_lines = []
+        else:
+            failure_lines = extract_failure_lines(job_logs)
+
         log_url = f"https://github.com/{repo_owner}/{repo_name}/actions/runs/{run_data['id']}/job/{job['id']}"
 
         return {
@@ -237,7 +243,7 @@ def get_failed_workflows(repo_owner, repo_name, pr_number):
         return []
 
     failed_attempts = []
-    job_attempt_map = {}
+    seen_job_ids = set()
 
     with ThreadPoolExecutor(max_workers=min(10, len(all_attempts))) as executor:
         futures = {
@@ -250,12 +256,10 @@ def get_failed_workflows(repo_owner, repo_name, pr_number):
                 attempt_results = future.result()
                 for result in attempt_results:
                     job_id = result.get("job_id")
-                    job_attempt = result.get("attempt_number")
-
-                    if job_id not in job_attempt_map or job_attempt > job_attempt_map[job_id]:
-                        job_attempt_map[job_id] = job_attempt
+                    # Avoid duplicate job_ids
+                    if job_id not in seen_job_ids:
+                        seen_job_ids.add(job_id)
                         result["base_branch"] = base_branch
-                        failed_attempts = [fa for fa in failed_attempts if fa.get("job_id") != job_id]
                         failed_attempts.append(result)
             except Exception as exc:
                 workflow_name, attempt_num = futures[future]
