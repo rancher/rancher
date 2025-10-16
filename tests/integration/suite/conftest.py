@@ -29,6 +29,7 @@ SERVER_URL = os.environ.get('CATTLE_TEST_URL', 'https://' + IP + ':443')
 SERVER_PASSWORD = os.environ.get('RANCHER_SERVER_PASSWORD', 'admin')
 BASE_URL = SERVER_URL + '/v3'
 AUTH_URL = BASE_URL + '-public/localproviders/local?action=login'
+AUTH_URL_V1 = SERVER_URL + '/v1-public/login'
 DEFAULT_TIMEOUT = 120
 DEFAULT_CATALOG = "https://github.com/rancher/integration-test-charts"
 WAIT_HTTP_ERROR_CODES = [404, 405]
