@@ -211,7 +211,7 @@ type Feature struct {
 	description string
 	// val is the effective value- it is equal to default until explicitly changed.
 	// The order of precedence is lockedValue > value > default
-	val *bool
+	val bool
 	// default value of feature
 	def bool
 	// if a feature is not dynamic, then rancher must be restarted when the value is changed
@@ -293,15 +293,20 @@ func InitializeFeatures(featuresClient managementv3.FeatureClient, featureArgs s
 				continue
 			}
 
-			newVal := newFeatureState.Status.LockedValue
-			if newVal == nil {
-				newVal = featureState.Spec.Value
+			if newFeatureState.Status.LockedValue != nil {
+				f.Set(*newFeatureState.Status.LockedValue)
+				continue
 			}
-			if newVal == nil {
-				f.Unset()
-			} else {
-				f.Set(*newVal)
+
+			if featureState.Spec.Value == nil {
+				continue
 			}
+
+			if *featureState.Spec.Value == f.val {
+				continue
+			}
+
+			f.Set(*featureState.Spec.Value)
 		}
 	}
 }
@@ -358,6 +363,7 @@ func applyArgumentDefaults(featureArgs string) error {
 	// only want to apply defaults once all args have been parsed and validated
 	for k, v := range applyFeatureDefaults {
 		features[k].def = v
+		features[k].val = v
 	}
 
 	return nil
@@ -365,54 +371,24 @@ func applyArgumentDefaults(featureArgs string) error {
 
 // Enabled returns whether the feature is enabled
 func (f *Feature) Enabled() bool {
-	if f.val != nil {
-		return *f.val
-	}
-	return f.def
+	return f.val
 }
 
-// RequireRestarts determines whether a Rancher restart is necessary. This is
-// the case when (1) the feature is non-dynamic and (2) when the value (.spec.value or .status.lockedValue)
-// was changed by a user.
-//
-// Rancher does not require restart when only the default value changes because
-// this only happens during an upgrade.
-func RequireRestarts(f *Feature, obj *v3.Feature) bool {
-	if f.Dynamic() {
-		return false
-	}
-
-	val := obj.Status.LockedValue
-	if val == nil {
-		val = obj.Spec.Value
-	}
-
-	if val == nil {
-		// val was already nil, so no changes here
-		if f.val == nil {
-			return false
-		}
-
-		// we're unsetting val, let's check if the previous value was
-		// the same as the default
-		return *f.val != f.def
-	}
-
-	return *val != f.Enabled()
+// Disable will disable a feature such that regardless of the user's choice it will always be false
+func (f *Feature) Disable() {
+	f.val = false
+	f.def = false
+	delete(features, f.name)
 }
 
 // Dynamic returns whether the feature is dynamic. Rancher must be restarted when
-// a non-dynamic feature's value is changed (excluding a default value change)
+// a non-dynamic feature's effective value is changed.
 func (f *Feature) Dynamic() bool {
 	return f.dynamic
 }
 
 func (f *Feature) Set(val bool) {
-	f.val = &val
-}
-
-func (f *Feature) Unset() {
-	f.val = nil
+	f.val = val
 }
 
 func (f *Feature) Name() string {
@@ -447,6 +423,7 @@ func newFeature(name, description string, def, dynamic, install bool) *Feature {
 		name:        name,
 		description: description,
 		def:         def,
+		val:         def,
 		dynamic:     dynamic,
 		install:     install,
 	}
