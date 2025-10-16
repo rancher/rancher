@@ -316,6 +316,10 @@ func (h *autoscalerHandler) syncHelmOpStatus(_ string, helmOp *fleet.HelmOp) (*f
 }
 
 func (h *autoscalerHandler) ensureCleanup(_ string, cluster *capi.Cluster) (*capi.Cluster, error) {
+	if cluster == nil || cluster.DeletionTimestamp != nil {
+		return cluster, nil
+	}
+
 	err := h.handleUninstall(cluster)
 	if err != nil {
 		return nil, err
