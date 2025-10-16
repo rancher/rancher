@@ -117,10 +117,18 @@ def extract_failure_lines(log_content, max_lines=10):
     return list(reversed(failure_lines))
 
 def process_job(repo_owner, repo_name, job, run_data, attempt_number):
-    if (job.get("conclusion") in ["failure", "timed_out", "action_required"]) or \
-       (job.get("status") == "completed" and job.get("conclusion") != "success") or \
-       (run_data.get("status") == "in_progress" and job.get("status") == "completed" and job.get("conclusion") != "success"):
+    conclusion = job.get("conclusion")
+    status = job.get("status")
 
+    if conclusion in ["success", "skipped", "cancelled", "neutral"]:
+        return None
+
+    is_failed = (
+        conclusion in ["failure", "timed_out", "action_required"] or
+        (status == "completed" and conclusion not in ["success", "skipped", "cancelled", "neutral"])
+    )
+
+    if is_failed:
         job_logs = get_job_logs(repo_owner, repo_name, job["id"])
 
         if job_logs is None:
