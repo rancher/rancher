@@ -12,7 +12,7 @@ func RequiredCRDs() []string {
 		if features.RKE2.Enabled() {
 			requiredCRDS = append(requiredCRDS, RKE2CRDs()...)
 		}
-		if features.EmbeddedClusterAPI.Enabled() {
+		if features.EmbeddedClusterAPI.Enabled() && !features.Turtles.Enabled() {
 			requiredCRDS = append(requiredCRDS, CAPICRDs()...)
 		}
 		if features.Fleet.Enabled() {

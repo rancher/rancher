@@ -33,7 +33,7 @@ func List() (result []crd.CRD) {
 	if features.RKE2.Enabled() {
 		result = append(result, rke2()...)
 	}
-	if features.EmbeddedClusterAPI.Enabled() {
+	if features.EmbeddedClusterAPI.Enabled() && !features.Turtles.Enabled() {
 		result = append(result, capi()...)
 	}
 	return
@@ -115,7 +115,7 @@ func rke2() []crd.CRD {
 }
 
 func Webhooks() []runtime.Object {
-	if features.EmbeddedClusterAPI.Enabled() {
+	if features.EmbeddedClusterAPI.Enabled() && !features.Turtles.Enabled() {
 		return capiWebhooks()
 	}
 	return nil
