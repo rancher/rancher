@@ -3,7 +3,6 @@ package feature
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -21,50 +20,49 @@ func sync(_ string, obj *v3.Feature) (*v3.Feature, error) {
 		return nil, nil
 	}
 
-	newVal, needsRestart := ReconcileFeatures(obj)
-	if needsRestart {
+	val := getEffectiveValue(obj)
+	if err := ReconcileFeatures(obj, val); err != nil {
 		time.Sleep(3 * time.Second)
-		logrus.Infof("feature flag [%s] value has changed (new value=%v), rancher must be restarted", obj.Name, ptrBoolToString(newVal))
-		os.Exit(0)
+		logrus.Fatalf("%v", err)
 	}
 
 	return obj, nil
 }
 
-func ptrBoolToString(val *bool) string {
-	if val == nil {
-		return "nil"
+// getEffectiveValue considers a feature's default, value, and locked value to determine
+// its effective value.
+func getEffectiveValue(obj *v3.Feature) bool {
+	val := obj.Status.Default
+	if obj.Spec.Value != nil {
+		val = *obj.Spec.Value
 	}
-	return fmt.Sprintf("%v", *val)
+	if obj.Status.LockedValue != nil {
+		val = *obj.Status.LockedValue
+	}
+	return val
 }
 
-// ReconcileFeatures updates the feature stored in-memory from the feature that
-// is in etcd.
-//
-// It returns the new value and whether Rancher must be restarted. This is the
-// case when (1) the feature is non-dynamic and (2) the value was changed.
-func ReconcileFeatures(obj *v3.Feature) (*bool, bool) {
+// ReconcileFeatures returns an error if the feature value in memory does
+// not match the feature value in etcd AND the feature is non-dynamic.
+// Otherwise, the feature value in memory is reconciled and no error is
+// returned.
+func ReconcileFeatures(obj *v3.Feature, newVal bool) error {
 	feature := features.GetFeatureByName(obj.Name)
 
 	// possible feature watch renamed, or no longer used by rancher
 	if feature == nil {
-		return nil, false
+		return nil
 	}
 
-	newVal := obj.Status.LockedValue
-	if newVal == nil {
-		newVal = obj.Spec.Value
+	if newVal == feature.Enabled() {
+		return nil
 	}
 
-	if features.RequireRestarts(feature, obj) {
-		return newVal, true
+	if !feature.Dynamic() {
+		return fmt.Errorf("feature flag [%s] value has changed, rancher must be restarted", obj.Name)
 	}
 
-	if newVal == nil {
-		feature.Unset()
-	} else {
-		feature.Set(*newVal)
-	}
+	feature.Set(newVal)
 
-	return newVal, false
+	return nil
 }
