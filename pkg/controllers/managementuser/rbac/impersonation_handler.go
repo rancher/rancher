@@ -10,15 +10,11 @@ import (
 
 func (m *manager) ensureServiceAccountImpersonator(username string) error {
 	logrus.Debugf("ensuring service account impersonator for %s", username)
-	i, err := impersonation.New(&user.DefaultInfo{UID: username}, m.workload)
+	err := m.impersonator.SetUpImpersonation(&user.DefaultInfo{UID: username})
 	if apierrors.IsNotFound(err) {
 		logrus.Warnf("could not find user %s, will not create impersonation account on cluster", username)
 		return nil
 	}
-	if err != nil {
-		return err
-	}
-	_, err = i.SetUpImpersonation()
 	return err
 }
 

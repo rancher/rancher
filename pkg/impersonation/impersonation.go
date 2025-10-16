@@ -8,7 +8,11 @@ import (
 	"sort"
 	"time"
 
-	authcommon "github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/lasso/pkg/cache"
+	"github.com/rancher/lasso/pkg/client"
+	"github.com/rancher/lasso/pkg/controller"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/controllers"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -20,8 +24,10 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/user"
+	clientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -33,55 +39,91 @@ const (
 	ImpersonationPrefix = "cattle-impersonation-"
 )
 
-// Impersonator contains data for the user being impersonated.
-type Impersonator struct {
-	user                user.Info
-	clusterContext      *config.UserContext
-	userLister          v3.UserLister
-	userAttributeLister v3.UserAttributeLister
-	crClient            rbaccontrollers.ClusterRoleClient
-	crCache             rbaccontrollers.ClusterRoleCache
-	crbClient           rbaccontrollers.ClusterRoleBindingClient
-	crbCache            rbaccontrollers.ClusterRoleBindingCache
-	secretsCache        corecontrollers.SecretCache
+// impersonator implements the config.Impersonator interface: user impersonations against a certain cluster
+type impersonator struct {
+	userLister               v3.UserLister
+	userAttributeLister      v3.UserAttributeLister
+	secretsCache             corecontrollers.SecretCache
+	namespaceCache           corecontrollers.NamespaceCache
+	svcAccountCache          corecontrollers.ServiceAccountCache
+	svcAccountClient         corecontrollers.ServiceAccountClient
+	namespaceClient          corecontrollers.NamespaceClient
+	clusterRoleCache         rbaccontrollers.ClusterRoleCache
+	clusterRoleClient        rbaccontrollers.ClusterRoleClient
+	clusterRoleBindingCache  rbaccontrollers.ClusterRoleBindingCache
+	clusterRoleBindingClient rbaccontrollers.ClusterRoleBindingClient
+	// used in serviceaccounttoken.EnsureSecretForServiceAccount
+	secretsGetter    clientv1.SecretsGetter
+	svcAccountGetter clientv1.ServiceAccountsGetter
 }
 
-// New creates an Impersonator from a kubernetes user.Info object and a UserContext for the cluster.
-func New(userInfo user.Info, clusterContext *config.UserContext) (Impersonator, error) {
-	impersonator := Impersonator{
-		clusterContext:      clusterContext,
-		userLister:          clusterContext.Management.Management.Users("").Controller().Lister(),
-		userAttributeLister: clusterContext.Management.Management.UserAttributes("").Controller().Lister(),
-		crClient:            clusterContext.RBACw.ClusterRole(),
-		crCache:             clusterContext.RBACw.ClusterRole().Cache(),
-		crbClient:           clusterContext.RBACw.ClusterRoleBinding(),
-		crbCache:            clusterContext.RBACw.ClusterRoleBinding().Cache(),
-		secretsCache:        clusterContext.Corew.Secret().Cache(),
-	}
-	user, err := impersonator.getUser(userInfo)
-	impersonator.user = user
-	if err != nil {
-		return Impersonator{}, err
-	}
-
-	return impersonator, nil
+func newControllerFactory(clientFactory client.SharedClientFactory) controller.SharedControllerFactory {
+	cacheFactory := cache.NewSharedCachedFactory(clientFactory, &cache.SharedCacheFactoryOptions{
+		KindNamespace: map[schema.GroupVersionKind]string{
+			corev1.SchemeGroupVersion.WithKind("Secret"):         ImpersonationNamespace,
+			corev1.SchemeGroupVersion.WithKind("ServiceAccount"): ImpersonationNamespace,
+		},
+	})
+	factoryOpts := controllers.GetOptsFromEnv(controllers.User)
+	return controller.NewSharedControllerFactory(cacheFactory, factoryOpts)
 }
 
-// SetUpImpersonation creates a service account on a cluster with a clusterrole and clusterrolebinding allowing it to impersonate a Rancher user.
-// Returns a reference to the service account, which can be used by GetToken to retrieve the account token, or an error if creating any of the resources failed.
-func (i *Impersonator) SetUpImpersonation() (*corev1.ServiceAccount, error) {
-	rules := i.rulesForUser()
-	logrus.Tracef("impersonation: checking role for user %s", i.user.GetName())
-	role, err := i.checkAndUpdateRole(rules)
+// ForCluster creates a config.Impersonator (or returns an existing one) for a given clusterContext
+func ForCluster(clusterContext *config.UserContext) (config.Impersonator, error) {
+	if clusterContext.Impersonator != nil {
+		return clusterContext.Impersonator, nil
+	}
+
+	// Use a dedicated cache factory, restricting cached secrets and svcaccounts only to the impersonation namespace
+	factory := newControllerFactory(clusterContext.ControllerFactory.SharedCacheFactory().SharedClientFactory())
+	if err := clusterContext.RegisterExtraControllerFactory("impersonation", factory); err != nil {
+		return nil, fmt.Errorf("registering impersonation controller factory: %w", err)
+	}
+	dedicatedCoreFactory := corecontrollers.New(factory)
+
+	clusterContext.Impersonator = &impersonator{
+		userLister:               clusterContext.Management.Management.Users("").Controller().Lister(),
+		userAttributeLister:      clusterContext.Management.Management.UserAttributes("").Controller().Lister(),
+		namespaceCache:           clusterContext.Corew.Namespace().Cache(),
+		namespaceClient:          clusterContext.Corew.Namespace(),
+		secretsCache:             dedicatedCoreFactory.Secret().Cache(),
+		svcAccountCache:          dedicatedCoreFactory.ServiceAccount().Cache(),
+		svcAccountClient:         clusterContext.Corew.ServiceAccount(),
+		clusterRoleCache:         clusterContext.RBACw.ClusterRole().Cache(),
+		clusterRoleClient:        clusterContext.RBACw.ClusterRole(),
+		clusterRoleBindingCache:  clusterContext.RBACw.ClusterRoleBinding().Cache(),
+		clusterRoleBindingClient: clusterContext.RBACw.ClusterRoleBinding(),
+		secretsGetter:            clusterContext.K8sClient.CoreV1(),
+		svcAccountGetter:         clusterContext.K8sClient.CoreV1(),
+	}
+
+	return clusterContext.Impersonator, nil
+}
+
+func (i *impersonator) SetUpImpersonation(userInfo user.Info) error {
+	_, err := i.setup(userInfo)
+	return err
+}
+
+// setup ensures all necessary resources are created and returns the ServiceAccount whose token can be used for impersonation.
+func (i *impersonator) setup(userInfo user.Info) (*corev1.ServiceAccount, error) {
+	userInfo, err := i.getUser(userInfo)
 	if err != nil {
 		return nil, err
 	}
-	roleBinding, err := i.getRoleBinding()
+	name := ImpersonationPrefix + userInfo.GetUID()
+	rules := i.rulesForUser(userInfo)
+	logrus.Tracef("impersonation: checking role for user %s", userInfo.GetName())
+	role, err := i.checkAndUpdateRole(name, rules)
+	if err != nil {
+		return nil, err
+	}
+	roleBinding, err := i.getRoleBinding(name)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
 	}
 	if role != nil && roleBinding != nil {
-		sa, err := i.getServiceAccount()
+		sa, err := i.getServiceAccount(name)
 		// in case the role exists but we were interrupted before creating the service account, proceed to create resources
 		if err == nil || !apierrors.IsNotFound(err) {
 			return sa, err
@@ -92,28 +134,33 @@ func (i *Impersonator) SetUpImpersonation() (*corev1.ServiceAccount, error) {
 	if err != nil {
 		return nil, err
 	}
-	logrus.Tracef("impersonation: creating role for user %s", i.user.GetName())
-	role, err = i.createRole(rules)
+	logrus.Tracef("impersonation: creating role for user %s", userInfo.GetName())
+	role, err = i.createRole(name, rules)
 	if err != nil {
 		return nil, err
 	}
-	logrus.Tracef("impersonation: creating service account for user %s", i.user.GetName())
-	sa, err := i.createServiceAccount(role)
+	logrus.Tracef("impersonation: creating service account for user %s", userInfo.GetName())
+	sa, err := i.createServiceAccount(name, role)
 	if err != nil {
 		return nil, err
 	}
-	logrus.Tracef("impersonation: creating role binding for user %s", i.user.GetName())
-	err = i.createRoleBinding(role, sa)
+	logrus.Tracef("impersonation: creating role binding for user %s", userInfo.GetName())
+	err = i.createRoleBinding(name, role, sa)
 	if err != nil {
 		return nil, err
 	}
-	logrus.Tracef("impersonation: waiting for service account to become active for user %s", i.user.GetName())
+	logrus.Tracef("impersonation: waiting for service account to become active for user %s", userInfo.GetName())
 	return i.waitForServiceAccount(sa)
 }
 
 // GetToken accepts a service account and returns the service account's token.
-func (i *Impersonator) GetToken(sa *corev1.ServiceAccount) (string, error) {
-	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), i.secretsCache, i.clusterContext.K8sClient, sa)
+func (i *impersonator) GetToken(userInfo user.Info) (string, error) {
+	sa, err := i.setup(userInfo)
+	if err != nil {
+		return "", fmt.Errorf("error setting up impersonation for user %s: %w", userInfo.GetUID(), err)
+	}
+
+	secret, err := serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), i.secretsCache, i.secretsGetter, i.svcAccountGetter, sa)
 	if err != nil {
 		return "", fmt.Errorf("error getting secret: %w", err)
 	}
@@ -124,18 +171,12 @@ func (i *Impersonator) GetToken(sa *corev1.ServiceAccount) (string, error) {
 	return string(token), nil
 }
 
-func (i *Impersonator) getServiceAccount() (*corev1.ServiceAccount, error) {
-	name := ImpersonationPrefix + i.user.GetUID()
-	sa, err := i.clusterContext.Core.ServiceAccounts("").Controller().Lister().Get(ImpersonationNamespace, name)
+func (i *impersonator) getServiceAccount(name string) (*corev1.ServiceAccount, error) {
+	sa, err := i.svcAccountCache.Get(ImpersonationNamespace, name)
 	if err != nil {
 		if logrus.GetLevel() >= logrus.TraceLevel {
 			logrus.Tracef("impersonation: error getting service account %s/%s: %v", ImpersonationNamespace, name, err)
-			sas, debugErr := i.clusterContext.Core.ServiceAccounts("").Controller().Lister().List(ImpersonationNamespace, labels.NewSelector())
-			if i.clusterContext == nil {
-				logrus.Tracef("impersonation: cluster context is empty")
-			} else {
-				logrus.Tracef("impersonation: using context for cluster %s", i.clusterContext.ClusterName)
-			}
+			sas, debugErr := i.svcAccountCache.List(ImpersonationNamespace, labels.NewSelector())
 			if debugErr != nil {
 				logrus.Tracef("impersonation: encountered error listing cached service accounts: %v", debugErr)
 			} else {
@@ -147,17 +188,17 @@ func (i *Impersonator) getServiceAccount() (*corev1.ServiceAccount, error) {
 	return sa, nil
 }
 
-func (i *Impersonator) createServiceAccount(role *rbacv1.ClusterRole) (*corev1.ServiceAccount, error) {
-	name := ImpersonationPrefix + i.user.GetUID()
-	sa, err := i.clusterContext.Core.ServiceAccounts("").Controller().Lister().Get(ImpersonationNamespace, name)
+func (i *impersonator) createServiceAccount(name string, role *rbacv1.ClusterRole) (*corev1.ServiceAccount, error) {
+	sa, err := i.svcAccountCache.Get(ImpersonationNamespace, name)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, fmt.Errorf("impersonation: error getting service account [%s:%s]: %w", ImpersonationNamespace, name, err)
 	}
 	if apierrors.IsNotFound(err) {
 		logrus.Debugf("impersonation: creating service account %s", name)
-		sa, err = i.clusterContext.Core.ServiceAccounts(ImpersonationNamespace).Create(&corev1.ServiceAccount{
+		sa, err = i.svcAccountClient.Create(&corev1.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: name,
+				Name:      name,
+				Namespace: ImpersonationNamespace,
 				Labels: map[string]string{
 					impersonationLabel: "true",
 				},
@@ -172,25 +213,25 @@ func (i *Impersonator) createServiceAccount(role *rbacv1.ClusterRole) (*corev1.S
 		})
 		if apierrors.IsAlreadyExists(err) {
 			// in case cache isn't synced yet, use raw client
-			sa, err = i.clusterContext.Core.ServiceAccounts(ImpersonationNamespace).Get(name, metav1.GetOptions{})
+			sa, err = i.svcAccountClient.Get(ImpersonationNamespace, name, metav1.GetOptions{})
 		}
 		if err != nil {
 			return nil, fmt.Errorf("impersonation: error getting service account [%s:%s]: %w", ImpersonationNamespace, name, err)
 		}
 	}
 	// create secret for service account if it was not automatically generated
-	_, err = serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), i.secretsCache, i.clusterContext.K8sClient, sa)
+	_, err = serviceaccounttoken.EnsureSecretForServiceAccount(context.Background(), i.secretsCache, i.secretsGetter, i.svcAccountGetter, sa)
 	if err != nil {
 		return nil, fmt.Errorf("impersonation: error ensuring secret for service account %s: %w", name, err)
 	}
 	return sa, nil
 }
 
-func (i *Impersonator) createNamespace() error {
-	_, err := i.clusterContext.Core.Namespaces("").Controller().Lister().Get("", ImpersonationNamespace)
+func (i *impersonator) createNamespace() error {
+	_, err := i.namespaceCache.Get(ImpersonationNamespace)
 	if apierrors.IsNotFound(err) {
 		logrus.Debugf("impersonation: creating namespace %s", ImpersonationNamespace)
-		_, err = i.clusterContext.Core.Namespaces("").Create(&corev1.Namespace{
+		_, err = i.namespaceClient.Create(&corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: ImpersonationNamespace,
 				Labels: map[string]string{
@@ -208,12 +249,11 @@ func (i *Impersonator) createNamespace() error {
 // checkAndUpdateRole checks whether the impersonation clusterrole already exists and whether it has the correct rules.
 // If the role does not exist, the method returns nil for the role and createRole must be called.
 // If the role does exist, the rules are updated if necessary and a reference to the role is returned.
-func (i *Impersonator) checkAndUpdateRole(rules []rbacv1.PolicyRule) (*rbacv1.ClusterRole, error) {
-	name := ImpersonationPrefix + i.user.GetUID()
+func (i *impersonator) checkAndUpdateRole(name string, rules []rbacv1.PolicyRule) (*rbacv1.ClusterRole, error) {
 	var role *rbacv1.ClusterRole
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		var err error
-		role, err = i.crCache.Get(name)
+		role, err = i.clusterRoleCache.Get(name)
 		if apierrors.IsNotFound(err) {
 			return nil
 		}
@@ -222,7 +262,7 @@ func (i *Impersonator) checkAndUpdateRole(rules []rbacv1.PolicyRule) (*rbacv1.Cl
 		}
 		if !reflect.DeepEqual(role.Rules, rules) {
 			role.Rules = rules
-			role, err = i.crClient.Update(role)
+			role, err = i.clusterRoleClient.Update(role)
 			return err
 		}
 		return nil
@@ -234,14 +274,13 @@ func (i *Impersonator) checkAndUpdateRole(rules []rbacv1.PolicyRule) (*rbacv1.Cl
 	return role, nil
 }
 
-func (i *Impersonator) createRole(rules []rbacv1.PolicyRule) (*rbacv1.ClusterRole, error) {
-	name := ImpersonationPrefix + i.user.GetUID()
-	role, err := i.crCache.Get(name)
+func (i *impersonator) createRole(name string, rules []rbacv1.PolicyRule) (*rbacv1.ClusterRole, error) {
+	role, err := i.clusterRoleCache.Get(name)
 	if apierrors.IsNotFound(err) {
 		logrus.Debugf("impersonation: creating role %s", name)
-		role, err = i.crClient.Create(&rbacv1.ClusterRole{
+		role, err = i.clusterRoleClient.Create(&rbacv1.ClusterRole{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: ImpersonationPrefix + i.user.GetUID(),
+				Name: name,
 				Labels: map[string]string{
 					impersonationLabel: "true",
 				},
@@ -251,36 +290,36 @@ func (i *Impersonator) createRole(rules []rbacv1.PolicyRule) (*rbacv1.ClusterRol
 		})
 		if apierrors.IsAlreadyExists(err) {
 			// in case cache isn't synced yet, use raw client
-			return i.crClient.Get(name, metav1.GetOptions{})
+			return i.clusterRoleClient.Get(name, metav1.GetOptions{})
 		}
 		return role, nil
 	}
 	return role, err
 }
 
-func (i *Impersonator) rulesForUser() []rbacv1.PolicyRule {
+func (i *impersonator) rulesForUser(userInfo user.Info) []rbacv1.PolicyRule {
 	rules := []rbacv1.PolicyRule{
 		{
 			Verbs:         []string{"impersonate"},
 			APIGroups:     []string{""},
 			Resources:     []string{"users"},
-			ResourceNames: []string{i.user.GetUID()},
+			ResourceNames: []string{userInfo.GetUID()},
 		},
 		{
 			Verbs:     []string{"impersonate"},
 			APIGroups: []string{"authentication.k8s.io"},
-			Resources: []string{"userextras/" + authcommon.ExtraRequestTokenID},
+			Resources: []string{"userextras/" + common.ExtraRequestTokenID},
 			// Note that to avoid constantly updating the ClusterRole we allow all values here.
 			// The check for the token ownership is done by the impersonation authenticator.
 		},
 		{
 			Verbs:     []string{"impersonate"},
 			APIGroups: []string{"authentication.k8s.io"},
-			Resources: []string{"userextras/" + authcommon.ExtraRequestHost},
+			Resources: []string{"userextras/" + common.ExtraRequestHost},
 		},
 	}
 
-	if groups := i.user.GetGroups(); len(groups) > 0 {
+	if groups := userInfo.GetGroups(); len(groups) > 0 {
 		rules = append(rules, rbacv1.PolicyRule{
 			Verbs:         []string{"impersonate"},
 			APIGroups:     []string{""},
@@ -289,20 +328,20 @@ func (i *Impersonator) rulesForUser() []rbacv1.PolicyRule {
 		})
 	}
 
-	extras := i.user.GetExtra()
-	if principalids, ok := extras[authcommon.UserAttributePrincipalID]; ok {
+	extras := userInfo.GetExtra()
+	if principalids, ok := extras[common.UserAttributePrincipalID]; ok {
 		rules = append(rules, rbacv1.PolicyRule{
 			Verbs:         []string{"impersonate"},
 			APIGroups:     []string{"authentication.k8s.io"},
-			Resources:     []string{"userextras/" + authcommon.UserAttributePrincipalID},
+			Resources:     []string{"userextras/" + common.UserAttributePrincipalID},
 			ResourceNames: principalids,
 		})
 	}
-	if usernames, ok := extras[authcommon.UserAttributeUserName]; ok {
+	if usernames, ok := extras[common.UserAttributeUserName]; ok {
 		rules = append(rules, rbacv1.PolicyRule{
 			Verbs:         []string{"impersonate"},
 			APIGroups:     []string{"authentication.k8s.io"},
-			Resources:     []string{"userextras/" + authcommon.UserAttributeUserName},
+			Resources:     []string{"userextras/" + common.UserAttributeUserName},
 			ResourceNames: usernames,
 		})
 	}
@@ -310,17 +349,15 @@ func (i *Impersonator) rulesForUser() []rbacv1.PolicyRule {
 	return rules
 }
 
-func (i *Impersonator) getRoleBinding() (*rbacv1.ClusterRoleBinding, error) {
-	name := ImpersonationPrefix + i.user.GetUID()
-	return i.crbCache.Get(name)
+func (i *impersonator) getRoleBinding(name string) (*rbacv1.ClusterRoleBinding, error) {
+	return i.clusterRoleBindingCache.Get(name)
 }
 
-func (i *Impersonator) createRoleBinding(role *rbacv1.ClusterRole, sa *corev1.ServiceAccount) error {
-	name := ImpersonationPrefix + i.user.GetUID()
-	_, err := i.crbCache.Get(name)
+func (i *impersonator) createRoleBinding(name string, role *rbacv1.ClusterRole, sa *corev1.ServiceAccount) error {
+	_, err := i.clusterRoleBindingCache.Get(name)
 	if apierrors.IsNotFound(err) {
 		logrus.Debugf("impersonation: creating role binding %s", name)
-		_, err = i.crbClient.Create(&rbacv1.ClusterRoleBinding{
+		_, err = i.clusterRoleBindingClient.Create(&rbacv1.ClusterRoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
 				// Use the clusterrole as the owner for the purposes of automatic cleanup
@@ -355,7 +392,7 @@ func (i *Impersonator) createRoleBinding(role *rbacv1.ClusterRole, sa *corev1.Se
 	return err
 }
 
-func (i *Impersonator) waitForServiceAccount(sa *corev1.ServiceAccount) (*corev1.ServiceAccount, error) {
+func (i *impersonator) waitForServiceAccount(sa *corev1.ServiceAccount) (*corev1.ServiceAccount, error) {
 	logrus.Debugf("impersonation: waiting for service account %s/%s to be ready", sa.Namespace, sa.Name)
 	backoff := wait.Backoff{
 		Duration: 200 * time.Millisecond,
@@ -366,14 +403,14 @@ func (i *Impersonator) waitForServiceAccount(sa *corev1.ServiceAccount) (*corev1
 	var ret *corev1.ServiceAccount
 	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
 		var err error
-		ret, err = i.clusterContext.Core.ServiceAccounts("").Controller().Lister().Get(ImpersonationNamespace, sa.Name)
+		ret, err = i.svcAccountCache.Get(ImpersonationNamespace, sa.Name)
 		if apierrors.IsNotFound(err) {
 			return false, nil
 		}
 		if err != nil {
 			return false, err
 		}
-		secret, err := serviceaccounttoken.ServiceAccountSecret(context.Background(), sa, i.secretsCache.List, i.clusterContext.K8sClient.CoreV1().Secrets(sa.Namespace))
+		secret, err := serviceaccounttoken.ServiceAccountSecret(context.Background(), sa, i.secretsCache.List, i.secretsGetter.Secrets(sa.Namespace))
 		if err != nil {
 			return false, err
 		}
@@ -388,12 +425,7 @@ func (i *Impersonator) waitForServiceAccount(sa *corev1.ServiceAccount) (*corev1
 	if err != nil {
 		if logrus.GetLevel() >= logrus.TraceLevel {
 			logrus.Tracef("impersonation: error waiting for service account %s/%s: %v", sa.Namespace, sa.Name, err)
-			sas, debugErr := i.clusterContext.Core.ServiceAccounts("").Controller().Lister().List(ImpersonationNamespace, labels.NewSelector())
-			if i.clusterContext == nil {
-				logrus.Tracef("impersonation: cluster context is empty")
-			} else {
-				logrus.Tracef("impersonation: using context for cluster %s", i.clusterContext.ClusterName)
-			}
+			sas, debugErr := i.svcAccountCache.List(ImpersonationNamespace, labels.NewSelector())
 			if debugErr != nil {
 				logrus.Tracef("impersonation: encountered error listing cached service accounts: %v", debugErr)
 			} else {
@@ -405,7 +437,7 @@ func (i *Impersonator) waitForServiceAccount(sa *corev1.ServiceAccount) (*corev1
 	return ret, nil
 }
 
-func (i *Impersonator) getUser(userInfo user.Info) (user.Info, error) {
+func (i *impersonator) getUser(userInfo user.Info) (user.Info, error) {
 	u, err := i.userLister.Get("", userInfo.GetUID())
 	if err != nil {
 		return &user.DefaultInfo{}, err
@@ -421,10 +453,10 @@ func (i *Impersonator) getUser(userInfo user.Info) (user.Info, error) {
 		// See https://github.com/rancher/rancher/blob/7ce603ea90ca656f5baa29b0149c19c8d7f73e8f/pkg/auth/requests/authenticate.go#L185-L194
 		// If the extras are not in userattributes, use displayName and principalIDs from the user.
 		if u.DisplayName != "" {
-			extras[authcommon.UserAttributeUserName] = []string{u.DisplayName}
+			extras[common.UserAttributeUserName] = []string{u.DisplayName}
 		}
 		if len(u.PrincipalIDs) > 0 {
-			extras[authcommon.UserAttributePrincipalID] = u.PrincipalIDs
+			extras[common.UserAttributePrincipalID] = u.PrincipalIDs
 		}
 	} else { // real users have groups and extras in userattributes
 		for _, gps := range attribs.GroupPrincipals {
@@ -435,36 +467,35 @@ func (i *Impersonator) getUser(userInfo user.Info) (user.Info, error) {
 			}
 		}
 		for _, exs := range attribs.ExtraByProvider {
-			if usernames, ok := exs[authcommon.UserAttributeUserName]; ok && len(usernames) > 0 {
-				if _, ok := extras[authcommon.UserAttributeUserName]; !ok {
-					extras[authcommon.UserAttributeUserName] = make([]string, 0)
+			if usernames, ok := exs[common.UserAttributeUserName]; ok && len(usernames) > 0 {
+				if _, ok := extras[common.UserAttributeUserName]; !ok {
+					extras[common.UserAttributeUserName] = make([]string, 0)
 				}
-				extras[authcommon.UserAttributeUserName] = append(extras[authcommon.UserAttributeUserName], usernames...)
+				extras[common.UserAttributeUserName] = append(extras[common.UserAttributeUserName], usernames...)
 			}
-			if principalids, ok := exs[authcommon.UserAttributePrincipalID]; ok && len(principalids) > 0 {
-				if _, ok := extras[authcommon.UserAttributePrincipalID]; !ok {
-					extras[authcommon.UserAttributePrincipalID] = make([]string, 0)
+			if principalids, ok := exs[common.UserAttributePrincipalID]; ok && len(principalids) > 0 {
+				if _, ok := extras[common.UserAttributePrincipalID]; !ok {
+					extras[common.UserAttributePrincipalID] = make([]string, 0)
 				}
-				extras[authcommon.UserAttributePrincipalID] = append(extras[authcommon.UserAttributePrincipalID], principalids...)
+				extras[common.UserAttributePrincipalID] = append(extras[common.UserAttributePrincipalID], principalids...)
 			}
 		}
 	}
 	// sort to make comparable
 	sort.Strings(groups)
-	if _, ok := extras[authcommon.UserAttributeUserName]; ok {
-		sort.Strings(extras[authcommon.UserAttributeUserName])
+	if _, ok := extras[common.UserAttributeUserName]; ok {
+		sort.Strings(extras[common.UserAttributeUserName])
 	}
-	if _, ok := extras[authcommon.UserAttributePrincipalID]; ok {
-		sort.Strings(extras[authcommon.UserAttributePrincipalID])
+	if _, ok := extras[common.UserAttributePrincipalID]; ok {
+		sort.Strings(extras[common.UserAttributePrincipalID])
 	}
 
-	user := &user.DefaultInfo{
+	return &user.DefaultInfo{
 		UID:    u.GetName(),
 		Name:   u.Username,
 		Groups: groups,
 		Extra:  extras,
-	}
-	return user, nil
+	}, nil
 }
 
 func isInList(item string, list []string) bool {
