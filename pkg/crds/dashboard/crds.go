@@ -26,6 +26,7 @@ var (
 		"bundles.fleet.cattle.io":       fleetv1alpha1api.Bundle{},
 		"clusters.fleet.cattle.io":      fleetv1alpha1api.Cluster{},
 		"clustergroups.fleet.cattle.io": fleetv1alpha1api.ClusterGroup{},
+		"helmops.fleet.cattle.io":       fleetv1alpha1api.HelmOp{},
 	}
 )
 

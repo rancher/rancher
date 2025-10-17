@@ -2593,6 +2593,20 @@ spec:
                       description: RKEMachinePool is the configuration for a RKE2/K3s
                         machine pool within a provisioning cluster.
                       properties:
+                        autoscalingMaxSize:
+                          description: |-
+                            AutoscalingMaxSize is the autoscaler max node size, this maps
+                            to the autoscaling annotations which are mapped to the CAPI machineDeployment object
+                          format: int32
+                          nullable: true
+                          type: integer
+                        autoscalingMinSize:
+                          description: |-
+                            AutoscalingMinSize is the autoscaler min node size, this maps
+                            to the autoscaling annotations which are mapped to the CAPI machineDeployment object
+                          format: int32
+                          nullable: true
+                          type: integer
                         cloudCredentialSecretName:
                           description: |-
                             CloudCredentialSecretName is the id of the secret used to provision
@@ -2882,6 +2896,16 @@ spec:
                       - machineConfigRef
                       - name
                       type: object
+                      x-kubernetes-validations:
+                      - message: AutoscalingMinSize must be greater than 0 when EtcdRole
+                          or ControlPlaneRole are true
+                        rule: '!self.etcdRole && !self.controlPlaneRole || !has(self.autoscalingMinSize)
+                          || self.autoscalingMinSize > 0'
+                      - message: AutoscalingMinSize must be less than or equal to
+                          AutoscalingMaxSize when both are non-zero
+                        rule: '!has(self.autoscalingMaxSize) || !has(self.autoscalingMinSize)
+                          || self.autoscalingMaxSize == 0 || self.autoscalingMinSize
+                          == 0 || self.autoscalingMinSize <= self.autoscalingMaxSize'
                     maxItems: 1000
                     nullable: true
                     type: array

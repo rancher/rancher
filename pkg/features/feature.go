@@ -188,6 +188,13 @@ var (
 		true,
 		false,
 		true)
+	ClusterAutoscaling = newFeature(
+		"cluster-autoscaling",
+		"Enable Rancher cluster-autoscaler support",
+		isPrime(),
+		false,
+		true,
+	)
 )
 
 func ListEnabled() []string {

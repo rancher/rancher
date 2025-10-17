@@ -163,6 +163,8 @@ type RKEConfig struct {
 }
 
 // RKEMachinePool is the configuration for a RKE2/K3s machine pool within a provisioning cluster.
+// +kubebuilder:validation:XValidation:rule="!self.etcdRole && !self.controlPlaneRole || !has(self.autoscalingMinSize) || self.autoscalingMinSize > 0", message="AutoscalingMinSize must be greater than 0 when EtcdRole or ControlPlaneRole are true"
+// +kubebuilder:validation:XValidation:rule="!has(self.autoscalingMaxSize) || !has(self.autoscalingMinSize) || self.autoscalingMaxSize == 0 || self.autoscalingMinSize == 0 || self.autoscalingMinSize <= self.autoscalingMaxSize", message="AutoscalingMinSize must be less than or equal to AutoscalingMaxSize when both are non-zero"
 type RKEMachinePool struct {
 	rkev1.RKECommonNodeConfig `json:",inline"`
 
@@ -247,6 +249,18 @@ type RKEMachinePool struct {
 	// +nullable
 	// +optional
 	MachineDeploymentAnnotations map[string]string `json:"machineDeploymentAnnotations,omitempty"`
+
+	// AutoscalingMinSize is the autoscaler min node size, this maps
+	// to the autoscaling annotations which are mapped to the CAPI machineDeployment object
+	// +nullable
+	// +optional
+	AutoscalingMinSize *int32 `json:"autoscalingMinSize,omitempty"`
+
+	// AutoscalingMaxSize is the autoscaler max node size, this maps
+	// to the autoscaling annotations which are mapped to the CAPI machineDeployment object
+	// +nullable
+	// +optional
+	AutoscalingMaxSize *int32 `json:"autoscalingMaxSize,omitempty"`
 
 	// NodeStartupTimeout allows setting the maximum time for
 	// MachineHealthCheck to consider a Machine unhealthy if a corresponding
