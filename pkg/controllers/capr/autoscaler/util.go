@@ -19,26 +19,26 @@ import (
 
 // autoscalerUserName generates the autoscaler-specific name for a cluster
 func autoscalerUserName(cluster *capi.Cluster) string {
-	return name.SafeConcatName(cluster.Name, "autoscaler")
+	return name.SafeConcatName(cluster.Namespace, cluster.Name, "autoscaler")
 }
 
 // globalRoleName generates the global role name for a cluster
 func globalRoleName(cluster *capi.Cluster) string {
-	return name.SafeConcatName(cluster.Name, "autoscaler", "global", "role")
+	return name.SafeConcatName(cluster.Namespace, cluster.Name, "autoscaler", "global", "role")
 }
 
 // globalRoleBindingName generates the global role binding name for a cluster
 func globalRoleBindingName(cluster *capi.Cluster) string {
-	return name.SafeConcatName(cluster.Name, "autoscaler", "global", "rolebinding")
+	return name.SafeConcatName(cluster.Namespace, cluster.Name, "autoscaler", "global", "rolebinding")
 }
 
 // kubeconfigSecretName generates the autoscaler kubeconfig secret name for a v2provClusterClient
 func kubeconfigSecretName(cluster *capi.Cluster) string {
-	return name.SafeConcatName(cluster.Name, "autoscaler", "kubeconfig")
+	return name.SafeConcatName(cluster.Namespace, cluster.Name, "autoscaler", "kubeconfig")
 }
 
 func helmOpName(cluster *capi.Cluster) string {
-	return name.SafeConcatName("autoscaler", cluster.Name)
+	return name.SafeConcatName("autoscaler", cluster.Namespace, cluster.Name)
 }
 
 // ownerReference creates an owner reference from a cluster

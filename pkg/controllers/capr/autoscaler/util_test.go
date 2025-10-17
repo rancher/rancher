@@ -1,6 +1,7 @@
 package autoscaler
 
 import (
+	"reflect"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,28 +18,31 @@ func TestAutoscalerUserName(t *testing.T) {
 			name: "basic cluster name",
 			cluster: &capi.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-cluster",
+					Name:      "test-cluster",
+					Namespace: "default",
 				},
 			},
-			expected: "test-cluster-autoscaler",
+			expected: "default-test-cluster-autoscaler",
 		},
 		{
 			name: "cluster with special characters",
 			cluster: &capi.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-cluster-123",
+					Name:      "test-cluster-123",
+					Namespace: "production",
 				},
 			},
-			expected: "test-cluster-123-autoscaler",
+			expected: "production-test-cluster-123-autoscaler",
 		},
 		{
 			name: "empty cluster name",
 			cluster: &capi.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "",
+					Name:      "",
+					Namespace: "test-ns",
 				},
 			},
-			expected: "-autoscaler",
+			expected: "test-ns--autoscaler",
 		},
 	}
 
@@ -62,28 +66,31 @@ func TestGlobalRoleName(t *testing.T) {
 			name: "basic cluster name",
 			cluster: &capi.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-cluster",
+					Name:      "test-cluster",
+					Namespace: "default",
 				},
 			},
-			expected: "test-cluster-autoscaler-global-role",
+			expected: "default-test-cluster-autoscaler-global-role",
 		},
 		{
 			name: "cluster with special characters",
 			cluster: &capi.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "prod-cluster-2023",
+					Name:      "prod-cluster-2023",
+					Namespace: "production",
 				},
 			},
-			expected: "prod-cluster-2023-autoscaler-global-role",
+			expected: "production-prod-cluster-2023-autoscaler-global-role",
 		},
 		{
 			name: "empty cluster name",
 			cluster: &capi.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "",
+					Name:      "",
+					Namespace: "test-ns",
 				},
 			},
-			expected: "-autoscaler-global-role",
+			expected: "test-ns--autoscaler-global-role",
 		},
 	}
 
@@ -107,28 +114,31 @@ func TestGlobalRoleBindingName(t *testing.T) {
 			name: "basic cluster name",
 			cluster: &capi.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-cluster",
+					Name:      "test-cluster",
+					Namespace: "default",
 				},
 			},
-			expected: "test-cluster-autoscaler-global-rolebinding",
+			expected: "default-test-cluster-autoscaler-global-rolebinding",
 		},
 		{
 			name: "cluster with special characters",
 			cluster: &capi.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "staging-cluster-v2",
+					Name:      "staging-cluster-v2",
+					Namespace: "staging",
 				},
 			},
-			expected: "staging-cluster-v2-autoscaler-global-rolebinding",
+			expected: "staging-staging-cluster-v2-autoscaler-global-rolebinding",
 		},
 		{
 			name: "empty cluster name",
 			cluster: &capi.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "",
+					Name:      "",
+					Namespace: "test-ns",
 				},
 			},
-			expected: "-autoscaler-global-rolebinding",
+			expected: "test-ns--autoscaler-global-rolebinding",
 		},
 	}
 
@@ -174,19 +184,8 @@ func TestOwnerReference(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := ownerReference(tt.cluster)
-			if len(result) != len(tt.expected) {
-				t.Errorf("ownerReference() length = %v, want %v", len(result), len(tt.expected))
-				return
-			}
-			for i := range result {
-				if result[i].APIVersion != tt.expected[i].APIVersion ||
-					result[i].Kind != tt.expected[i].Kind ||
-					result[i].Name != tt.expected[i].Name ||
-					result[i].UID != tt.expected[i].UID ||
-					*result[i].Controller != *tt.expected[i].Controller ||
-					*result[i].BlockOwnerDeletion != *tt.expected[i].BlockOwnerDeletion {
-					t.Errorf("ownerReference()[%d] = %+v, want %+v", i, result[i], tt.expected[i])
-				}
+			if !reflect.DeepEqual(result, tt.expected) {
+				t.Errorf("ownerReference() = %+v, want %+v", result, tt.expected)
 			}
 		})
 	}
@@ -202,28 +201,31 @@ func TestKubeconfigSecretName(t *testing.T) {
 			name: "basic cluster name",
 			cluster: &capi.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-cluster",
+					Name:      "test-cluster",
+					Namespace: "default",
 				},
 			},
-			expected: "test-cluster-autoscaler-kubeconfig",
+			expected: "default-test-cluster-autoscaler-kubeconfig",
 		},
 		{
 			name: "cluster with special characters",
 			cluster: &capi.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "prod-cluster-2023",
+					Name:      "prod-cluster-2023",
+					Namespace: "production",
 				},
 			},
-			expected: "prod-cluster-2023-autoscaler-kubeconfig",
+			expected: "production-prod-cluster-2023-autoscaler-kubeconfig",
 		},
 		{
 			name: "empty cluster name",
 			cluster: &capi.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "",
+					Name:      "",
+					Namespace: "test-ns",
 				},
 			},
-			expected: "-autoscaler-kubeconfig",
+			expected: "test-ns--autoscaler-kubeconfig",
 		},
 	}
 
@@ -232,6 +234,54 @@ func TestKubeconfigSecretName(t *testing.T) {
 			result := kubeconfigSecretName(tt.cluster)
 			if result != tt.expected {
 				t.Errorf("kubeconfigSecretName() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestHelmOpName(t *testing.T) {
+	tests := []struct {
+		name     string
+		cluster  *capi.Cluster
+		expected string
+	}{
+		{
+			name: "basic cluster name",
+			cluster: &capi.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "default",
+				},
+			},
+			expected: "autoscaler-default-test-cluster",
+		},
+		{
+			name: "cluster with special characters",
+			cluster: &capi.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "prod-cluster-2023",
+					Namespace: "production",
+				},
+			},
+			expected: "autoscaler-production-prod-cluster-2023",
+		},
+		{
+			name: "empty cluster name",
+			cluster: &capi.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "",
+					Namespace: "test-ns",
+				},
+			},
+			expected: "autoscaler-test-ns-",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := helmOpName(tt.cluster)
+			if result != tt.expected {
+				t.Errorf("helmOpName() = %v, want %v", result, tt.expected)
 			}
 		})
 	}

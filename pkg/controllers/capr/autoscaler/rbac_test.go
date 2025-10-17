@@ -31,7 +31,7 @@ func (s *autoscalerSuite) TestEnsureUser_UserDoesNotExist() {
 		},
 		Username: autoscalerUserName(testCluster),
 	}
-	s.user.EXPECT().Create(gomock.AssignableToTypeOf(&v3.User{})).Return(expectedUser, nil)
+	s.userClient.EXPECT().Create(gomock.AssignableToTypeOf(&v3.User{})).Return(expectedUser, nil)
 
 	// Call ensureUser and verify it creates the user
 	user, err := s.h.ensureUser(testCluster)
@@ -150,7 +150,7 @@ func (s *autoscalerSuite) TestEnsureGlobalRole_RoleDoesNotExist() {
 			},
 		},
 	}
-	s.globalRole.EXPECT().Create(gomock.AssignableToTypeOf(&v3.GlobalRole{})).Return(expectedRole, nil)
+	s.globalRoleClient.EXPECT().Create(gomock.AssignableToTypeOf(&v3.GlobalRole{})).Return(expectedRole, nil)
 
 	// Call ensureGlobalRole and verify it creates the role
 	role, err := s.h.ensureGlobalRole(testCluster, testMachineDeployments, testMachines)
@@ -235,7 +235,7 @@ func (s *autoscalerSuite) TestEnsureGlobalRole_RoleAlreadyExists() {
 			Verbs: []string{"get", "list", "watch"},
 		},
 	}
-	s.globalRole.EXPECT().Update(expectedUpdatedRole).Return(expectedUpdatedRole, nil)
+	s.globalRoleClient.EXPECT().Update(expectedUpdatedRole).Return(expectedUpdatedRole, nil)
 
 	// Call ensureGlobalRole and verify it updates the existing role
 	role, err := s.h.ensureGlobalRole(testCluster, testMachineDeployments, testMachines)
@@ -269,7 +269,7 @@ func (s *autoscalerSuite) TestEnsureGlobalRoleBinding_BindingDoesNotExist() {
 		GlobalRoleName: globalRoleName,
 		UserName:       username,
 	}
-	s.globalRoleBinding.EXPECT().Create(gomock.AssignableToTypeOf(&v3.GlobalRoleBinding{})).Return(expectedBinding, nil)
+	s.globalRoleBindingClient.EXPECT().Create(gomock.AssignableToTypeOf(&v3.GlobalRoleBinding{})).Return(expectedBinding, nil)
 
 	// Call ensureGlobalRoleBinding and verify it creates the binding
 	err := s.h.ensureGlobalRoleBinding(testCluster, username, globalRoleName)
@@ -331,7 +331,7 @@ func (s *autoscalerSuite) TestEnsureGlobalRoleBinding_BindingAlreadyExistsWithDi
 	expectedUpdatedBinding := existingBinding.DeepCopy()
 	expectedUpdatedBinding.UserName = username
 	expectedUpdatedBinding.GlobalRoleName = globalRoleName
-	s.globalRoleBinding.EXPECT().Update(expectedUpdatedBinding).Return(expectedUpdatedBinding, nil)
+	s.globalRoleBindingClient.EXPECT().Update(expectedUpdatedBinding).Return(expectedUpdatedBinding, nil)
 
 	// Call ensureGlobalRoleBinding and verify it updates the binding
 	err := s.h.ensureGlobalRoleBinding(testCluster, username, globalRoleName)
@@ -353,7 +353,7 @@ func (s *autoscalerSuite) TestEnsureUserToken_TokenDoesNotExist() {
 	s.tokenCache.EXPECT().Get(username).Return(nil, errors.NewNotFound(v3.Resource("token"), "token"))
 
 	// Mock token creation - we can't predict the random token value, so just check that Create is called
-	s.token.EXPECT().Create(gomock.AssignableToTypeOf(&v3.Token{})).DoAndReturn(func(token *v3.Token) (*v3.Token, error) {
+	s.tokenClient.EXPECT().Create(gomock.AssignableToTypeOf(&v3.Token{})).DoAndReturn(func(token *v3.Token) (*v3.Token, error) {
 		// Verify the generated token has the correct structure
 		s.Require().Equal(username, token.Name, "Token name should match username")
 		s.Require().Equal(username, token.UserID, "Token UserID should match username")
@@ -447,7 +447,7 @@ func (s *autoscalerSuite) TestCreateKubeConfigSecretUsingTemplate_SecretDoesNotE
 	actualKubeconfigData, err := generateKubeconfig(testToken)
 	s.Require().NoError(err, "Should not error generating kubeconfig")
 
-	s.secret.EXPECT().Create(gomock.AssignableToTypeOf(&corev1.Secret{})).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
+	s.secretClient.EXPECT().Create(gomock.AssignableToTypeOf(&corev1.Secret{})).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
 		// Verify the secret has the correct structure
 		s.Require().Equal(testCluster.Namespace, secret.Namespace, "Secret namespace should match cluster namespace")
 		s.Require().Equal(kubeconfigSecretName(testCluster), secret.Name, "Secret name should match expected kubeconfig secret name")

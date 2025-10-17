@@ -2,6 +2,7 @@ package autoscaler
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -16,7 +17,11 @@ const (
 	autoscalerTokenTTL = 30 * 24 * time.Hour
 )
 
-// Ensures the user for the given cluster is created or retrieved from cache.
+// ensureUser ensures the user for the given cluster is created or retrieved from cache.
+// It first checks if a user with the autoscaler username already exists. If found,
+// it returns the existing user. If not found, it creates a new user with the
+// appropriate owner references pointing to the cluster.
+// Returns the user object or an error if the operation fails.
 func (h *autoscalerHandler) ensureUser(cluster *capi.Cluster) (*v3.User, error) {
 	u, err := h.userCache.Get(autoscalerUserName(cluster))
 	if err != nil && !errors.IsNotFound(err) {
@@ -27,7 +32,7 @@ func (h *autoscalerHandler) ensureUser(cluster *capi.Cluster) (*v3.User, error) 
 		return u, err
 	}
 
-	user, err := h.user.Create(&v3.User{
+	user, err := h.userClient.Create(&v3.User{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            autoscalerUserName(cluster),
 			OwnerReferences: ownerReference(cluster),
@@ -41,7 +46,11 @@ func (h *autoscalerHandler) ensureUser(cluster *capi.Cluster) (*v3.User, error) 
 	return user, nil
 }
 
-// Ensures a GlobalRole is created or updated with appropriate rules for cluster and machine access.
+// ensureGlobalRole ensures a GlobalRole is created or updated with appropriate rules for cluster and machine access.
+// It gathers all machine deployment and machine resource names, then constructs namespaced rules for write access
+// to the cluster namespace and global rules for read access to all CAPI objects. If the role doesn't exist,
+// it creates a new one. If it exists but has different rules, it updates the role with the new rules.
+// Returns the global role object or an error if the operation fails.
 func (h *autoscalerHandler) ensureGlobalRole(cluster *capi.Cluster, mds []*capi.MachineDeployment, machines []*capi.Machine) (*v3.GlobalRole, error) {
 	mdResourceNames := make([]string, len(mds))
 	machineResourceNames := make([]string, len(machines))
@@ -98,7 +107,7 @@ func (h *autoscalerHandler) ensureGlobalRole(cluster *capi.Cluster, mds []*capi.
 
 	// if the role doesn't exist just create it
 	if errors.IsNotFound(err) {
-		return h.globalRole.Create(
+		return h.globalRoleClient.Create(
 			&v3.GlobalRole{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:            globalRoleName(cluster),
@@ -109,21 +118,28 @@ func (h *autoscalerHandler) ensureGlobalRole(cluster *capi.Cluster, mds []*capi.
 				Rules:           rules,
 			})
 	} else if err == nil {
-		// otherwise, update the computed rules associated with this cluster
-		globalRole = globalRole.DeepCopy()
-		globalRole.NamespacedRules = namespacedRules
-		globalRole.Rules = rules
-		return h.globalRole.Update(globalRole)
+		// otherwise, check if we need to update the computed rules associated with this cluster
+		if !reflect.DeepEqual(globalRole.NamespacedRules, namespacedRules) || !reflect.DeepEqual(globalRole.Rules, rules) {
+			globalRole = globalRole.DeepCopy()
+			globalRole.NamespacedRules = namespacedRules
+			globalRole.Rules = rules
+			return h.globalRoleClient.Update(globalRole)
+		}
+		return globalRole, nil
 	} else {
 		return nil, err
 	}
 }
 
+// ensureGlobalRoleBinding ensures a GlobalRoleBinding exists between the specified user and global role.
+// It checks if a binding with the same name already exists. If not found, it creates a new binding.
+// If found but has different user or role names, it updates the existing binding.
+// Returns an error if the create or update operation fails.
 func (h *autoscalerHandler) ensureGlobalRoleBinding(cluster *capi.Cluster, username, globalRoleName string) error {
 	grb, err := h.globalRoleBindingCache.Get(globalRoleBindingName(cluster))
 
 	if errors.IsNotFound(err) {
-		_, err = h.globalRoleBinding.Create(&v3.GlobalRoleBinding{
+		_, err = h.globalRoleBindingClient.Create(&v3.GlobalRoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:            globalRoleBindingName(cluster),
 				OwnerReferences: ownerReference(cluster),
@@ -136,14 +152,18 @@ func (h *autoscalerHandler) ensureGlobalRoleBinding(cluster *capi.Cluster, usern
 			grb = grb.DeepCopy()
 			grb.UserName = username
 			grb.GlobalRoleName = globalRoleName
-			_, err = h.globalRoleBinding.Update(grb)
+			_, err = h.globalRoleBindingClient.Update(grb)
 		}
 	}
 
 	return err
 }
 
-// Ensures a user token is available for the given cluster and username
+// ensureUserToken ensures a user token is available for the given cluster and username.
+// It first checks if a token already exists for the user. If found, it returns the existing token
+// in the format "username:token". If not found, it generates a new token with appropriate labels
+// and owner references, then creates it in the system.
+// Returns the token string in "username:token" format or an error if the operation fails.
 func (h *autoscalerHandler) ensureUserToken(cluster *capi.Cluster, username string) (string, error) {
 	t, err := h.tokenCache.Get(username)
 	if err != nil && !errors.IsNotFound(err) {
@@ -160,7 +180,7 @@ func (h *autoscalerHandler) ensureUserToken(cluster *capi.Cluster, username stri
 		return "", err
 	}
 
-	_, err = h.token.Create(token)
+	_, err = h.tokenClient.Create(token)
 	if err != nil {
 		return "", err
 	}
@@ -168,7 +188,11 @@ func (h *autoscalerHandler) ensureUserToken(cluster *capi.Cluster, username stri
 	return fmt.Sprintf("%s:%s", username, token.Token), nil
 }
 
-// ensureKubeconfigSecretUsingTemplate creates a kubeconfig secret string given a cluster and token
+// ensureKubeconfigSecretUsingTemplate ensures a kubeconfig secret exists for the given cluster and token.
+// It first checks if a secret with the autoscaler kubeconfig name already exists. If found, it returns
+// the existing secret. If not found, it creates a new secret with the generated kubeconfig data,
+// appropriate annotations for synchronization, and labels for identification.
+// Returns the secret object or an error if the operation fails.
 func (h *autoscalerHandler) ensureKubeconfigSecretUsingTemplate(cluster *capi.Cluster, token string) (*corev1.Secret, error) {
 	s, err := h.secretCache.Get(cluster.Namespace, kubeconfigSecretName(cluster))
 	if err != nil && !errors.IsNotFound(err) {
@@ -206,17 +230,21 @@ func (h *autoscalerHandler) ensureKubeconfigSecretUsingTemplate(cluster *capi.Cl
 		},
 	}
 
-	return h.secret.Create(secret)
+	return h.secretClient.Create(secret)
 }
 
-// cleanup removes all autoscaler-related rbac resources for a given cluster
+// cleanupRBAC removes all autoscaler-related RBAC resources for a given cluster.
+// It attempts to delete the user, global role, global role binding, token, and kubeconfig secret
+// associated with the cluster. The deletion is performed safely - it only deletes resources
+// that exist and collects any errors that occur during the process.
+// Returns a combined error if any deletions fail, or nil if all operations succeed.
 func (h *autoscalerHandler) cleanupRBAC(cluster *capi.Cluster) error {
 	var errs []error
 
 	// Delete the user if it exists
 	userName := autoscalerUserName(cluster)
 	if _, err := h.userCache.Get(userName); err == nil {
-		if err := h.user.Delete(userName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+		if err := h.userClient.Delete(userName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 			errs = append(errs, fmt.Errorf("failed to delete user %s: %w", userName, err))
 		}
 	} else if !errors.IsNotFound(err) {
@@ -226,7 +254,7 @@ func (h *autoscalerHandler) cleanupRBAC(cluster *capi.Cluster) error {
 	// Delete the global role if it exists
 	globalRoleName := globalRoleName(cluster)
 	if _, err := h.globalRoleCache.Get(globalRoleName); err == nil {
-		if err := h.globalRole.Delete(globalRoleName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+		if err := h.globalRoleClient.Delete(globalRoleName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 			errs = append(errs, fmt.Errorf("failed to delete global role %s: %w", globalRoleName, err))
 		}
 	} else if !errors.IsNotFound(err) {
@@ -236,7 +264,7 @@ func (h *autoscalerHandler) cleanupRBAC(cluster *capi.Cluster) error {
 	// Delete the global role binding if it exists
 	globalRoleBindingName := globalRoleBindingName(cluster)
 	if _, err := h.globalRoleBindingCache.Get(globalRoleBindingName); err == nil {
-		if err := h.globalRoleBinding.Delete(globalRoleBindingName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+		if err := h.globalRoleBindingClient.Delete(globalRoleBindingName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 			errs = append(errs, fmt.Errorf("failed to delete global role binding %s: %w", globalRoleBindingName, err))
 		}
 	} else if !errors.IsNotFound(err) {
@@ -245,7 +273,7 @@ func (h *autoscalerHandler) cleanupRBAC(cluster *capi.Cluster) error {
 
 	// Delete the token if it exists
 	if _, err := h.tokenCache.Get(userName); err == nil {
-		if err := h.token.Delete(userName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+		if err := h.tokenClient.Delete(userName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 			errs = append(errs, fmt.Errorf("failed to delete token for user %s: %w", userName, err))
 		}
 	} else if !errors.IsNotFound(err) {
@@ -255,7 +283,7 @@ func (h *autoscalerHandler) cleanupRBAC(cluster *capi.Cluster) error {
 	// Delete the kubeconfig secret if it exists
 	secretName := kubeconfigSecretName(cluster)
 	if _, err := h.secretCache.Get(cluster.Namespace, secretName); err == nil {
-		if err := h.secret.Delete(cluster.Namespace, secretName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+		if err := h.secretClient.Delete(cluster.Namespace, secretName, &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 			errs = append(errs, fmt.Errorf("failed to delete secret %s in namespace %s: %w", secretName, cluster.Namespace, err))
 		}
 	} else if !errors.IsNotFound(err) {

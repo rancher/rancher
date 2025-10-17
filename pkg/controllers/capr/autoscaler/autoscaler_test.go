@@ -25,15 +25,15 @@ type autoscalerSuite struct {
 	capiMachineDeploymentCache *fake.MockCacheInterface[*capi.MachineDeployment]
 	clusterClient              *fake.MockClientInterface[*provv1.Cluster, *provv1.ClusterList]
 	clusterCache               *fake.MockCacheInterface[*provv1.Cluster]
-	globalRole                 *fake.MockNonNamespacedClientInterface[*v3.GlobalRole, *v3.GlobalRoleList]
+	globalRoleClient           *fake.MockNonNamespacedClientInterface[*v3.GlobalRole, *v3.GlobalRoleList]
 	globalRoleCache            *fake.MockNonNamespacedCacheInterface[*v3.GlobalRole]
-	globalRoleBinding          *fake.MockNonNamespacedClientInterface[*v3.GlobalRoleBinding, *v3.GlobalRoleBindingList]
+	globalRoleBindingClient    *fake.MockNonNamespacedClientInterface[*v3.GlobalRoleBinding, *v3.GlobalRoleBindingList]
 	globalRoleBindingCache     *fake.MockNonNamespacedCacheInterface[*v3.GlobalRoleBinding]
-	user                       *fake.MockNonNamespacedClientInterface[*v3.User, *v3.UserList]
+	userClient                 *fake.MockNonNamespacedClientInterface[*v3.User, *v3.UserList]
 	userCache                  *fake.MockNonNamespacedCacheInterface[*v3.User]
-	token                      *fake.MockNonNamespacedClientInterface[*v3.Token, *v3.TokenList]
+	tokenClient                *fake.MockNonNamespacedClientInterface[*v3.Token, *v3.TokenList]
 	tokenCache                 *fake.MockNonNamespacedCacheInterface[*v3.Token]
-	secret                     *fake.MockControllerInterface[*corev1.Secret, *corev1.SecretList]
+	secretClient               *fake.MockClientInterface[*corev1.Secret, *corev1.SecretList]
 	secretCache                *fake.MockCacheInterface[*corev1.Secret]
 	helmOp                     *fake.MockControllerInterface[*fleet.HelmOp, *fleet.HelmOpList]
 	helmOpCache                *fake.MockCacheInterface[*fleet.HelmOp]
@@ -53,15 +53,15 @@ func (s *autoscalerSuite) SetupTest() {
 	s.capiMachineDeploymentCache = fake.NewMockCacheInterface[*capi.MachineDeployment](s.mockCtrl)
 	s.clusterClient = fake.NewMockClientInterface[*provv1.Cluster, *provv1.ClusterList](s.mockCtrl)
 	s.clusterCache = fake.NewMockCacheInterface[*provv1.Cluster](s.mockCtrl)
-	s.globalRole = fake.NewMockNonNamespacedClientInterface[*v3.GlobalRole, *v3.GlobalRoleList](s.mockCtrl)
+	s.globalRoleClient = fake.NewMockNonNamespacedClientInterface[*v3.GlobalRole, *v3.GlobalRoleList](s.mockCtrl)
 	s.globalRoleCache = fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](s.mockCtrl)
-	s.globalRoleBinding = fake.NewMockNonNamespacedClientInterface[*v3.GlobalRoleBinding, *v3.GlobalRoleBindingList](s.mockCtrl)
+	s.globalRoleBindingClient = fake.NewMockNonNamespacedClientInterface[*v3.GlobalRoleBinding, *v3.GlobalRoleBindingList](s.mockCtrl)
 	s.globalRoleBindingCache = fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRoleBinding](s.mockCtrl)
-	s.user = fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](s.mockCtrl)
+	s.userClient = fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](s.mockCtrl)
 	s.userCache = fake.NewMockNonNamespacedCacheInterface[*v3.User](s.mockCtrl)
-	s.token = fake.NewMockNonNamespacedClientInterface[*v3.Token, *v3.TokenList](s.mockCtrl)
+	s.tokenClient = fake.NewMockNonNamespacedClientInterface[*v3.Token, *v3.TokenList](s.mockCtrl)
 	s.tokenCache = fake.NewMockNonNamespacedCacheInterface[*v3.Token](s.mockCtrl)
-	s.secret = fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](s.mockCtrl)
+	s.secretClient = fake.NewMockClientInterface[*corev1.Secret, *corev1.SecretList](s.mockCtrl)
 	s.secretCache = fake.NewMockCacheInterface[*corev1.Secret](s.mockCtrl)
 	s.helmOp = fake.NewMockControllerInterface[*fleet.HelmOp, *fleet.HelmOpList](s.mockCtrl)
 	s.helmOpCache = fake.NewMockCacheInterface[*fleet.HelmOp](s.mockCtrl)
@@ -72,15 +72,15 @@ func (s *autoscalerSuite) SetupTest() {
 		capiMachineDeploymentCache: s.capiMachineDeploymentCache,
 		clusterClient:              s.clusterClient,
 		clusterCache:               s.clusterCache,
-		globalRole:                 s.globalRole,
+		globalRoleClient:           s.globalRoleClient,
 		globalRoleCache:            s.globalRoleCache,
-		globalRoleBinding:          s.globalRoleBinding,
+		globalRoleBindingClient:    s.globalRoleBindingClient,
 		globalRoleBindingCache:     s.globalRoleBindingCache,
-		user:                       s.user,
+		userClient:                 s.userClient,
 		userCache:                  s.userCache,
-		token:                      s.token,
+		tokenClient:                s.tokenClient,
 		tokenCache:                 s.tokenCache,
-		secret:                     s.secret,
+		secretClient:               s.secretClient,
 		secretCache:                s.secretCache,
 		helmOp:                     s.helmOp,
 		helmOpCache:                s.helmOpCache,

@@ -31,20 +31,20 @@ type autoscalerHandler struct {
 	clusterClient v2provcontrollers.ClusterClient
 	clusterCache  v2provcontrollers.ClusterCache
 
-	globalRole      mgmtcontrollers.GlobalRoleClient
-	globalRoleCache mgmtcontrollers.GlobalRoleCache
+	globalRoleClient mgmtcontrollers.GlobalRoleClient
+	globalRoleCache  mgmtcontrollers.GlobalRoleCache
 
-	globalRoleBinding      mgmtcontrollers.GlobalRoleBindingClient
-	globalRoleBindingCache mgmtcontrollers.GlobalRoleBindingCache
+	globalRoleBindingClient mgmtcontrollers.GlobalRoleBindingClient
+	globalRoleBindingCache  mgmtcontrollers.GlobalRoleBindingCache
 
-	user      mgmtcontrollers.UserClient
-	userCache mgmtcontrollers.UserCache
+	userClient mgmtcontrollers.UserClient
+	userCache  mgmtcontrollers.UserCache
 
-	token      mgmtcontrollers.TokenClient
-	tokenCache mgmtcontrollers.TokenCache
+	tokenClient mgmtcontrollers.TokenClient
+	tokenCache  mgmtcontrollers.TokenCache
 
-	secret      wranglerv1.SecretController
-	secretCache wranglerv1.SecretCache
+	secretClient wranglerv1.SecretClient
+	secretCache  wranglerv1.SecretCache
 
 	helmOp      fleetcontrollers.HelmOpController
 	helmOpCache fleetcontrollers.HelmOpCache
@@ -61,19 +61,19 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 		capiMachineCache:           clients.CAPI.Machine().Cache(),
 		capiMachineDeploymentCache: clients.CAPI.MachineDeployment().Cache(),
 
-		globalRole:             clients.Mgmt.GlobalRole(),
-		globalRoleCache:        clients.Mgmt.GlobalRole().Cache(),
-		globalRoleBinding:      clients.Mgmt.GlobalRoleBinding(),
-		globalRoleBindingCache: clients.Mgmt.GlobalRoleBinding().Cache(),
+		globalRoleClient:        clients.Mgmt.GlobalRole(),
+		globalRoleCache:         clients.Mgmt.GlobalRole().Cache(),
+		globalRoleBindingClient: clients.Mgmt.GlobalRoleBinding(),
+		globalRoleBindingCache:  clients.Mgmt.GlobalRoleBinding().Cache(),
 
-		user:      clients.Mgmt.User(),
-		userCache: clients.Mgmt.User().Cache(),
+		userClient: clients.Mgmt.User(),
+		userCache:  clients.Mgmt.User().Cache(),
 
-		token:      clients.Mgmt.Token(),
-		tokenCache: clients.Mgmt.Token().Cache(),
+		tokenClient: clients.Mgmt.Token(),
+		tokenCache:  clients.Mgmt.Token().Cache(),
 
-		secret:      clients.Core.Secret(),
-		secretCache: clients.Core.Secret().Cache(),
+		secretClient: clients.Core.Secret(),
+		secretCache:  clients.Core.Secret().Cache(),
 
 		helmOp:      clients.Fleet.HelmOp(),
 		helmOpCache: clients.Fleet.HelmOp().Cache(),
@@ -110,9 +110,12 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 	clients.CAPI.MachineDeployment().OnChange(ctx, "machinedeployment-replica-sync", s.syncMachinePoolReplicas)
 }
 
-// OnChange checks if a capi cluster has the autoscaler-enabled annotation as well as any machinedeployments which
-// are set up for autoscaling. If so it does the dance of setting up a rancher user with appropriate rbac and
-// deploys the cluster-autoscaler chart to the downstream cluster once the cluster is ready.
+// OnChange handles changes to CAPI clusters and manages autoscaler deployment.
+// It checks if a cluster has autoscaling enabled and appropriate machine deployments,
+// then sets up RBAC resources (user, role, role binding, token) and deploys the
+// cluster-autoscaler chart. If autoscaling is paused, it scales down the autoscaler.
+// If autoscaling is disabled, it cleans up all autoscaler resources.
+// Returns the modified cluster or an error if any operation fails.
 func (h *autoscalerHandler) OnChange(_ string, cluster *capi.Cluster) (*capi.Cluster, error) {
 	if cluster == nil || cluster.DeletionTimestamp != nil {
 		return cluster, nil
@@ -170,7 +173,10 @@ func (h *autoscalerHandler) OnChange(_ string, cluster *capi.Cluster) (*capi.Clu
 	return cluster, nil
 }
 
-// isAutoscalingEnabled checks if autoscaling is enabled for the cluster and validates annotations
+// isAutoscalingEnabled checks if autoscaling is enabled for the cluster and validates annotations.
+// It verifies that the cluster has the autoscaler-enabled annotation set to true and that
+// at least one machine deployment has both min-size and max-size annotations properly configured.
+// Returns true if autoscaling should be enabled, false otherwise.
 func (h *autoscalerHandler) isAutoscalingEnabled(cluster *capi.Cluster, mds []*capi.MachineDeployment) bool {
 	if !capr.AutoscalerEnabledByCAPI(cluster, mds) {
 		return false
@@ -180,12 +186,17 @@ func (h *autoscalerHandler) isAutoscalingEnabled(cluster *capi.Cluster, mds []*c
 	return true
 }
 
-// Returns true if the cluster autoscaler is paused at the cluster annotation level
+// autoscalingPaused returns true if the cluster autoscaler is paused at the cluster annotation level.
+// It checks for the presence of the "provisioning.cattle.io/cluster-autoscaler-paused" annotation
+// set to "true". This allows users to temporarily disable autoscaling without removing the configuration.
 func autoscalingPaused(cluster *capi.Cluster) bool {
 	return cluster.Annotations[capr.ClusterAutoscalerPausedAnnotation] == "true"
 }
 
-// pauseAutoscaling checks to see if the cluster-autoscaler needs to be paused and does that if so
+// pauseAutoscaling scales down the cluster-autoscaler to zero replicas if autoscaling is paused.
+// It retrieves the existing kubeconfig secret and ensures the Fleet HelmOp for the cluster-autoscaler
+// is scaled to 0 replicas, effectively pausing the autoscaler while maintaining all configuration.
+// Returns an error if the secret retrieval or HelmOp scaling fails.
 func (h *autoscalerHandler) pauseAutoscaling(cluster *capi.Cluster) error {
 	// scale autoscaler down to zero if autoscaling is set to "pause"
 	secret, err := h.secretCache.Get(cluster.Namespace, kubeconfigSecretName(cluster))
@@ -202,12 +213,20 @@ func (h *autoscalerHandler) pauseAutoscaling(cluster *capi.Cluster) error {
 	return nil
 }
 
-// handleUninstall cleans up RBAC and Fleet resources for the given cluster.
+// handleUninstall cleans up all autoscaler-related resources for the given cluster.
+// It removes RBAC resources (user, role, role binding, token) and Fleet-managed
+// resources (HelmOp) associated with the cluster. This is called when autoscaling
+// is disabled or when the cluster is being deleted.
+// Returns a combined error if any cleanup operations fail.
 func (h *autoscalerHandler) handleUninstall(cluster *capi.Cluster) error {
 	return errors.Join(h.cleanupRBAC(cluster), h.cleanupFleet(cluster))
 }
 
-// setupRBAC handles user/token creation and RBAC setup
+// setupRBAC handles the complete RBAC setup for cluster autoscaling.
+// It creates or retrieves the autoscaler user, ensures the global role with appropriate
+// permissions exists, creates the global role binding between user and role, generates
+// a token for the user, and creates the kubeconfig secret. Returns the kubeconfig
+// secret that will be used to deploy the cluster-autoscaler chart.
 func (h *autoscalerHandler) setupRBAC(capiCluster *capi.Cluster, mds []*capi.MachineDeployment, machines []*capi.Machine) (*v1.Secret, error) {
 	logrus.Infof("[autoscaler] setting up rbac resources for cluster %s/%s", capiCluster.Namespace, capiCluster.Name)
 
@@ -244,7 +263,11 @@ func (h *autoscalerHandler) setupRBAC(capiCluster *capi.Cluster, mds []*capi.Mac
 	return kubeconfig, nil
 }
 
-// deployChart handles the deployment of the cluster-autoscaler chart
+// deployChart handles the deployment of the cluster-autoscaler chart to the target cluster.
+// It creates a Fleet HelmOp with the provided kubeconfig secret reference, which will
+// deploy the cluster-autoscaler chart to the downstream cluster. The HelmOp is created
+// with 1 replica to enable autoscaling.
+// Returns an error if the HelmOp creation fails.
 func (h *autoscalerHandler) deployChart(capiCluster *capi.Cluster, kubeconfig *v1.Secret) error {
 	logrus.Infof("[autoscaler] deploying cluster-autoscaler helm chart for cluster %s/%s", capiCluster.Namespace, capiCluster.Name)
 
@@ -257,7 +280,11 @@ func (h *autoscalerHandler) deployChart(capiCluster *capi.Cluster, kubeconfig *v
 	return nil
 }
 
-// Syncs the Helm operation status with the cluster's provisioning status based on deployment progress
+// syncHelmOpStatus synchronizes the Helm operation status with the cluster's provisioning status.
+// It monitors the HelmOp deployment progress and updates the corresponding provisioning cluster's
+// status conditions based on the HelmOp state (ready, waiting, or error). This ensures that
+// the cluster status accurately reflects the autoscaler deployment state.
+// Returns the modified HelmOp or an error if status synchronization fails.
 func (h *autoscalerHandler) syncHelmOpStatus(_ string, helmOp *fleet.HelmOp) (*fleet.HelmOp, error) {
 	if helmOp == nil || helmOp.DeletionTimestamp != nil {
 		return helmOp, nil
@@ -315,6 +342,10 @@ func (h *autoscalerHandler) syncHelmOpStatus(_ string, helmOp *fleet.HelmOp) (*f
 	return helmOp, nil
 }
 
+// ensureCleanup ensures all autoscaler resources are cleaned up when the autoscaling feature is disabled.
+// This handler is registered only when ClusterAutoscaling.Enabled() returns false. It removes all
+// RBAC and Fleet resources associated with the cluster to prevent resource leakage when autoscaling
+// is disabled but clusters still exist.
 func (h *autoscalerHandler) ensureCleanup(_ string, cluster *capi.Cluster) (*capi.Cluster, error) {
 	if cluster == nil || cluster.DeletionTimestamp != nil {
 		return cluster, nil

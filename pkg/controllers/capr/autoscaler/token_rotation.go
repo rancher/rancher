@@ -26,7 +26,9 @@ var (
 	autoscalerTokenSelector = labels.Set{tokens.TokenKindLabel: "autoscaler"}.AsSelector().String()
 )
 
-// startTokenRenewal begins the background token renewal process
+// startTokenRenewal begins the background token renewal process.
+// It starts a goroutine that periodically checks for expiring tokens and renews them.
+// The renewal check runs every 24 hours and renews tokens that expire within 7 days.
 func (h *autoscalerHandler) startTokenRenewal(ctx context.Context) {
 	go func() {
 		for range ticker.Context(ctx, renewalCheckInterval) {
@@ -37,7 +39,10 @@ func (h *autoscalerHandler) startTokenRenewal(ctx context.Context) {
 	}()
 }
 
-// checkAndRenewTokens finds and renews expiring autoscaler token
+// checkAndRenewTokens finds and renews expiring autoscaler tokens.
+// It lists all tokens with the "autoscaler" label, checks their expiration dates,
+// and renews any tokens that are within the renewal threshold (7 days from now).
+// Returns an error if the token listing or renewal process fails.
 func (h *autoscalerHandler) checkAndRenewTokens() error {
 	tokens, err := h.findAutoscalerTokens()
 	if err != nil {
@@ -74,8 +79,11 @@ func (h *autoscalerHandler) checkAndRenewTokens() error {
 	return nil
 }
 
+// findAutoscalerTokens retrieves all tokens created by the autoscaler controller.
+// It uses a label selector to filter tokens with the "autoscaler" token kind.
+// Returns a slice of tokens or an error if the listing operation fails.
 func (h *autoscalerHandler) findAutoscalerTokens() ([]v3.Token, error) {
-	tokenList, err := h.token.List(metav1.ListOptions{LabelSelector: autoscalerTokenSelector})
+	tokenList, err := h.tokenClient.List(metav1.ListOptions{LabelSelector: autoscalerTokenSelector})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list autoscaler token: %w", err)
 	}
@@ -83,10 +91,14 @@ func (h *autoscalerHandler) findAutoscalerTokens() ([]v3.Token, error) {
 	return tokenList.Items, nil
 }
 
-// renewToken creates a new token to replace an expired one
+// renewToken creates a new token to replace an expired one.
+// It deletes the old token, generates a new token with the same user ID and cluster name,
+// updates the associated kubeconfig secret with the new token, and ensures the
+// cluster-autoscaler helm chart is redeployed with the updated kubeconfig.
+// Returns an error if any step in the renewal process fails.
 func (h *autoscalerHandler) renewToken(token *v3.Token) error {
 	// Delete the old token
-	err := h.token.Delete(token.Name, &metav1.DeleteOptions{})
+	err := h.tokenClient.Delete(token.Name, &metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		return fmt.Errorf("failed to delete old token %s: %w", token.Name, err)
 	}
@@ -96,7 +108,7 @@ func (h *autoscalerHandler) renewToken(token *v3.Token) error {
 		return err
 	}
 
-	token, err = h.token.Create(newToken)
+	token, err = h.tokenClient.Create(newToken)
 	if err != nil {
 		return fmt.Errorf("failed to create renewed token %s: %w", token.Name, err)
 	}
@@ -116,9 +128,12 @@ func (h *autoscalerHandler) renewToken(token *v3.Token) error {
 	} else if len(clusters) == 0 {
 		logrus.Errorf("[autoscaler] No cluster found for token %s with name %s", token.Name, clusterName)
 		return fmt.Errorf("no cluster found for token %s with name %s", token.Name, clusterName)
+	} else if len(clusters) > 1 {
+		logrus.Errorf("[autoscaler] Multiple clusters found for token %s with name %s: %d clusters found", token.Name, clusterName, len(clusters))
+		return fmt.Errorf("multiple clusters found for token %s with name %s: %d clusters found", token.Name, clusterName, len(clusters))
 	}
 
-	// Use the first matching cluster to update the secret
+	// Use the single matching capiCluster to update the secret
 	capiCluster := clusters[0]
 	kubeconfig, err := h.updateKubeConfigSecretWithToken(capiCluster, fmt.Sprintf("%s:%s", token.UserID, newToken.Token))
 	if err != nil {
@@ -136,7 +151,10 @@ func (h *autoscalerHandler) renewToken(token *v3.Token) error {
 	return nil
 }
 
-// updateKubeConfigSecretWithToken updates an existing kubeconfig secret with a new token
+// updateKubeConfigSecretWithToken updates an existing kubeconfig secret with a new token.
+// It retrieves the existing kubeconfig secret for the cluster, generates a new kubeconfig
+// with the provided token, and updates both the full kubeconfig and the token field in the secret.
+// Returns the updated secret or an error if the retrieval or update fails.
 func (h *autoscalerHandler) updateKubeConfigSecretWithToken(cluster *capi.Cluster, token string) (*corev1.Secret, error) {
 	secretName := kubeconfigSecretName(cluster)
 
@@ -157,7 +175,7 @@ func (h *autoscalerHandler) updateKubeConfigSecretWithToken(cluster *capi.Cluste
 	secret.Data["token"] = []byte(token)
 
 	// Update the secret
-	kubeconfig, err := h.secret.Update(secret)
+	kubeconfig, err := h.secretClient.Update(secret)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update kubeconfig secret %s/%s: %w", cluster.Namespace, secretName, err)
 	}
