@@ -226,6 +226,7 @@ func GetKDMReleaseData(ctx context.Context, controlPlane *rkev1.RKEControlPlane)
 	return &release
 }
 
+// GetProvisioningClusterFromCAPICluster finds the provisioning cluster associated with a CAPI cluster by checking its owner references.
 func GetProvisioningClusterFromCAPICluster(cluster *capi.Cluster, clusterCache provcontrollers.ClusterCache) (*provv1.Cluster, error) {
 	var (
 		target *provv1.Cluster
@@ -680,6 +681,9 @@ func PreBootstrap(mgmtCluster *v3.Cluster) bool {
 	return !v3.ClusterConditionPreBootstrapped.IsTrue(mgmtCluster)
 }
 
+// AutoscalerEnabledByCAPI looks at the cluster object for the ClusterAutoscalerEnabledAnnotation, and
+// then checks each MachineDeployment for the capi autoscaler min/max size annotations. It returns true if
+// the cluster has autoscaling enabled + one of the machineDeployments has the min/max annotations.
 func AutoscalerEnabledByCAPI(cluster *capi.Cluster, mds []*capi.MachineDeployment) bool {
 	// first see if the autoscaling is "on" for the capi cluster
 	if cluster.Annotations[ClusterAutoscalerEnabledAnnotation] != "true" {
@@ -697,6 +701,7 @@ func AutoscalerEnabledByCAPI(cluster *capi.Cluster, mds []*capi.MachineDeploymen
 	return false
 }
 
+// AutoscalerEnabledByProvisioningCluster returns true if the autoscaling fields are set on any of the RKEMachinePools
 func AutoscalerEnabledByProvisioningCluster(cluster *provv1.Cluster) bool {
 	if cluster.Spec.RKEConfig == nil || len(cluster.Spec.RKEConfig.MachinePools) == 0 {
 		return false

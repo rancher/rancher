@@ -105,7 +105,7 @@ func (h *autoscalerHandler) ensureFleetHelmOp(cluster *capi.Cluster, kubeconfigV
 	return err
 }
 
-// Returns the cluster-autoscaler image version for cluster autoscaler based on the Kubernetes minor version of the cluster.
+// resolveImageTagVersion returns the cluster-autoscaler image version for cluster autoscaler based on the Kubernetes minor version of the cluster.
 func (h *autoscalerHandler) resolveImageTagVersion(cluster *capi.Cluster) string {
 	minorVersion := h.getKubernetesMinorVersion(cluster)
 	version, exists := imageTagVersions[minorVersion]
@@ -116,6 +116,7 @@ func (h *autoscalerHandler) resolveImageTagVersion(cluster *capi.Cluster) string
 	return version
 }
 
+// getChartImageSettings returns a map of the image settings to pass to the chart, this is based on the kubernetes minor version
 func (h *autoscalerHandler) getChartImageSettings(cluster *capi.Cluster) map[string]any {
 	// if we don't specify an image - just use whatever is in the chart
 	autoscalerImage := settings.ClusterAutoscalerImage.Get()
@@ -156,7 +157,7 @@ func (h *autoscalerHandler) getChartImageSettings(cluster *capi.Cluster) map[str
 	return imageSettings
 }
 
-// Returns the chart name based on the chart repository URL prefix. OCI charts do not need a chart-name as it is referring
+// getChartName returns the cluster-autoscaler chart name based on the chart repository URL prefix. OCI charts do not need a chart-name as it is referring
 // to an OCI image.
 func getChartName() string {
 	if strings.HasPrefix(settings.ClusterAutoscalerChartRepository.Get(), "oci://") {
@@ -166,6 +167,7 @@ func getChartName() string {
 	}
 }
 
+// getKubernetesMinorVersion returns the k8s minor version which is looked up from the controlPlaneRef on the capi object
 func (h *autoscalerHandler) getKubernetesMinorVersion(cluster *capi.Cluster) int {
 	if cluster.Spec.ControlPlaneRef == nil {
 		logrus.Debugf("[autoscaler] no control-plane ref found for cluster %s/%s - latest version of cluster-autoscaler chart will be installed", cluster.Namespace, cluster.Name)
@@ -219,7 +221,7 @@ func (h *autoscalerHandler) getKubernetesMinorVersion(cluster *capi.Cluster) int
 	return int(version.Minor())
 }
 
-// cleanup removes all fleet-related resources for a given cluster
+// cleanupFleet removes all fleet-related resources for a given cluster
 func (h *autoscalerHandler) cleanupFleet(cluster *capi.Cluster) error {
 	var errs []error
 

@@ -53,7 +53,7 @@ func ownerReference(cluster *capi.Cluster) []metav1.OwnerReference {
 	}}
 }
 
-// Generates a kubeconfig YAML string using the provided token and server URL settings.
+// generateKubeconfig generates a kubeconfig YAML string using the provided token and server URL settings.
 func generateKubeconfig(token string) ([]byte, error) {
 	// Update the kubeconfig data with new token
 	serverURL, cacert := settings.InternalServerURL.Get(), settings.CACerts.Get()
@@ -85,7 +85,7 @@ func generateKubeconfig(token string) ([]byte, error) {
 	return data, nil
 }
 
-// Generates a secure token for a user in a specified cluster with given ownership references.
+// generateToken generates a v3.Token for a user in a specified cluster with given ownership references.
 func generateToken(username, clusterName string, owner []metav1.OwnerReference) (*v3.Token, error) {
 	// Generate new token value
 	tokenValue, err := randomtoken.Generate()

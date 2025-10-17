@@ -490,7 +490,7 @@ func triggerProvisioningClusterOnMachineDeploymentUpdate(clients *wrangler.CAPIC
 			}
 
 			cluster, err := capr.GetProvisioningClusterFromCAPICluster(capiCluster, clients.Provisioning.Cluster().Cache())
-			if errors.IsNotFound(err) {
+			if errors.IsNotFound(err) || cluster == nil {
 				// if no v2prov cluster available - just return.
 				return []relatedresource.Key{}, nil
 			}
