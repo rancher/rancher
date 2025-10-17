@@ -7,7 +7,6 @@ import (
 	"time"
 
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
-	"github.com/rancher/lasso/pkg/dynamic"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
@@ -20,8 +19,15 @@ import (
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
+
+// dynamicGetter defines the interface for the Get method from dynamic.Controller
+type dynamicGetter interface {
+	Get(gvk schema.GroupVersionKind, namespace string, name string) (runtime.Object, error)
+}
 
 type autoscalerHandler struct {
 	capiClusterCache           v1beta1.ClusterCache
@@ -49,7 +55,7 @@ type autoscalerHandler struct {
 	helmOp      fleetcontrollers.HelmOpController
 	helmOpCache fleetcontrollers.HelmOpCache
 
-	dynamicClient *dynamic.Controller
+	dynamicClient dynamicGetter
 }
 
 func Register(ctx context.Context, clients *wrangler.CAPIContext) {

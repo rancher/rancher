@@ -124,14 +124,15 @@ func (h *autoscalerHandler) getChartImageSettings(cluster *capi.Cluster) map[str
 	}
 
 	// parse out the image to properly set all the values in the chart
-	imageRef, err := reference.ParseNormalizedNamed(autoscalerImage)
+	imageRef, err := reference.ParseNamed(autoscalerImage)
 	if err != nil {
+		logrus.Debugf("[autoscaler] failed to parse autoscaler image '%s': %v", autoscalerImage, err)
 		return map[string]any{}
 	}
 
 	registry := reference.Domain(imageRef)
 	image := reference.Path(imageRef)
-	tag := reference.TagNameOnly(imageRef)
+	tag, isTagged := imageRef.(reference.NamedTagged)
 
 	// if we are not overriding all the image settings fall back to whatever is in the chart by default
 	if registry == "" && image == "" {
@@ -148,8 +149,8 @@ func (h *autoscalerHandler) getChartImageSettings(cluster *capi.Cluster) map[str
 	configuredTag := h.resolveImageTagVersion(cluster)
 	if configuredTag != "" {
 		imageSettings["tag"] = configuredTag
-	} else if tag.Name() != "latest" { // tag defaults to latest if not set
-		imageSettings["tag"] = tag.Name()
+	} else if isTagged { // tag defaults to latest if not set
+		imageSettings["tag"] = tag.Tag()
 	}
 
 	return imageSettings
@@ -166,6 +167,11 @@ func getChartName() string {
 }
 
 func (h *autoscalerHandler) getKubernetesMinorVersion(cluster *capi.Cluster) int {
+	if cluster.Spec.ControlPlaneRef == nil {
+		logrus.Debugf("[autoscaler] no control-plane ref found for cluster %s/%s - latest version of cluster-autoscaler chart will be installed", cluster.Namespace, cluster.Name)
+		return 0
+	}
+
 	cp, err := h.dynamicClient.Get(
 		cluster.Spec.ControlPlaneRef.GroupVersionKind(),
 		cluster.Spec.ControlPlaneRef.Namespace,

@@ -12,8 +12,27 @@ import (
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
+
+// mockDynamicGetter is a mock implementation of the DynamicClient interface
+type mockDynamicGetter struct {
+	mockCtrl *gomock.Controller
+	getFunc  func(gvk schema.GroupVersionKind, namespace string, name string) (runtime.Object, error)
+}
+
+func (m *mockDynamicGetter) Get(gvk schema.GroupVersionKind, namespace string, name string) (runtime.Object, error) {
+	if m.getFunc != nil {
+		return m.getFunc(gvk, namespace, name)
+	}
+	return nil, nil
+}
+
+func (m *mockDynamicGetter) SetGetFunc(f func(gvk schema.GroupVersionKind, namespace string, name string) (runtime.Object, error)) {
+	m.getFunc = f
+}
 
 type autoscalerSuite struct {
 	suite.Suite
@@ -37,6 +56,7 @@ type autoscalerSuite struct {
 	secretCache                *fake.MockCacheInterface[*corev1.Secret]
 	helmOp                     *fake.MockControllerInterface[*fleet.HelmOp, *fleet.HelmOpList]
 	helmOpCache                *fake.MockCacheInterface[*fleet.HelmOp]
+	dynamicClient              *mockDynamicGetter
 }
 
 func TestAutoscaler(t *testing.T) {
@@ -65,6 +85,7 @@ func (s *autoscalerSuite) SetupTest() {
 	s.secretCache = fake.NewMockCacheInterface[*corev1.Secret](s.mockCtrl)
 	s.helmOp = fake.NewMockControllerInterface[*fleet.HelmOp, *fleet.HelmOpList](s.mockCtrl)
 	s.helmOpCache = fake.NewMockCacheInterface[*fleet.HelmOp](s.mockCtrl)
+	s.dynamicClient = &mockDynamicGetter{mockCtrl: s.mockCtrl}
 
 	s.h = &autoscalerHandler{
 		capiClusterCache:           s.capiClusterCache,
@@ -84,7 +105,7 @@ func (s *autoscalerSuite) SetupTest() {
 		secretCache:                s.secretCache,
 		helmOp:                     s.helmOp,
 		helmOpCache:                s.helmOpCache,
-		dynamicClient:              nil,
+		dynamicClient:              s.dynamicClient,
 	}
 }
 
