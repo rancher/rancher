@@ -119,7 +119,7 @@ require (
 	github.com/rancher/ali-operator v0.0.3-0.20251001142421-ca64da576db5
 	github.com/rancher/apiserver v0.7.6
 	github.com/rancher/channelserver v0.7.0
-	github.com/rancher/dynamiclistener v0.7.2-rc1
+	github.com/rancher/dynamiclistener v0.7.3-rc.1
 	github.com/rancher/eks-operator v1.13.0-rc.1
 	github.com/rancher/fleet/pkg/apis v0.14.0-alpha.3
 	github.com/rancher/gke-operator v1.13.0-rc.1
@@ -134,7 +134,7 @@ require (
 	github.com/rancher/remotedialer-proxy v0.6.0-rc.4
 	github.com/rancher/rke v1.8.0-rc.4
 	github.com/rancher/shepherd v0.0.0-20251015044355-8c54bf0aaf31
-	github.com/rancher/steve v0.7.19
+	github.com/rancher/steve v0.7.20
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20250930163923-f2c9e60b1078
 	github.com/rancher/wrangler v1.1.2
 	github.com/rancher/wrangler/v3 v3.3.1
@@ -169,7 +169,7 @@ require (
 	k8s.io/kube-openapi v0.0.0-20250710124328-f3f2b991d03b
 	k8s.io/kubectl v0.34.1
 	k8s.io/kubernetes v1.34.1
-	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397
+	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4
 	oras.land/oras-go/v2 v2.6.0
 	sigs.k8s.io/aws-iam-authenticator v0.6.17
 	sigs.k8s.io/cluster-api v1.10.6
