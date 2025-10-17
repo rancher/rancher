@@ -5,15 +5,15 @@ import (
 	"testing"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	corew "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
-	"github.com/rancher/wrangler/v3/pkg/generic/fake"
-	"go.uber.org/mock/gomock"
-
-	"github.com/rancher/norman/httperror"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	fake3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/taints"
+
+	"github.com/rancher/norman/httperror"
+	corew "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v3/pkg/generic/fake"
+	"go.uber.org/mock/gomock"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
