@@ -1,12 +1,14 @@
 package projectsetter
 
 import (
-	"github.com/rancher/norman/store/transform"
-	"github.com/rancher/norman/types"
-	"github.com/rancher/norman/types/convert"
 	client "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/project"
+
+	"github.com/rancher/norman/store/transform"
+	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/convert"
+	corew "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -139,12 +141,7 @@ func (t *transformer) stream(apiContext *types.APIContext, schema *types.Schema,
 	}), nil
 }
 
-type namespaceLister interface {
-	List(selector labels.Selector) ([]*k8sv1.Namespace, error)
-	Get(name string) (*k8sv1.Namespace, error)
-}
-
-func (t *transformer) lister(apiContext *types.APIContext, schema *types.Schema) namespaceLister {
+func (t *transformer) lister(apiContext *types.APIContext, schema *types.Schema) corew.NamespaceCache {
 	if _, ok := schema.ResourceFields[client.NamespaceFieldProjectID]; !ok || schema.ID == client.NamespaceType {
 		return nil
 	}
@@ -171,7 +168,7 @@ func (t *transformer) lookupAndSetProjectID(apiContext *types.APIContext, schema
 	setProjectID(namespaceLister, data)
 }
 
-func setProjectID(namespaceLister namespaceLister, data map[string]interface{}) {
+func setProjectID(namespaceLister corew.NamespaceCache, data map[string]interface{}) {
 	if data == nil {
 		return
 	}
