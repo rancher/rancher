@@ -25,6 +25,7 @@ import (
 	"github.com/rancher/rancher/pkg/channelserver"
 	"github.com/rancher/rancher/pkg/features"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/wrangler/v3/pkg/condition"
@@ -115,6 +116,17 @@ const (
 	InfrastructureReady          = condition.Cond(capi.InfrastructureReadyCondition)
 	SystemUpgradeControllerReady = condition.Cond("SystemUpgradeControllerReady")
 	Bootstrapped                 = condition.Cond("Bootstrapped")
+	// ClusterAutoscalerDeploymentReady is a condition that indicates whether the cluster autoscaler deployment is ready
+	ClusterAutoscalerDeploymentReady = condition.Cond("ClusterAutoscalerDeploymentReady")
+
+	// ClusterAutoscalerEnabledAnnotation is an annotation used to enable cluster autoscaling for a cluster.
+	// this is set on the CAPI Cluster object in order to trigger the controllers to set up the autoscaler
+	// dependencies and install the chart.
+	ClusterAutoscalerEnabledAnnotation = "provisioning.cattle.io/cluster-autoscaler-enabled"
+
+	// ClusterAutoscalerPausedAnnotation is an annotation used to pause cluster autoscaling for a cluster
+	// it triggers a scale-down of the cluster-autoscaler chart in the downstream cluster
+	ClusterAutoscalerPausedAnnotation = "provisioning.cattle.io/cluster-autoscaler-paused"
 
 	RuntimeK3S  = "k3s"
 	RuntimeRKE2 = "rke2"
@@ -212,6 +224,27 @@ func GetKDMReleaseData(ctx context.Context, controlPlane *rkev1.RKEControlPlane)
 		return nil
 	}
 	return &release
+}
+
+// GetProvisioningClusterFromCAPICluster finds the provisioning cluster associated with a CAPI cluster by checking its owner references.
+func GetProvisioningClusterFromCAPICluster(cluster *capi.Cluster, clusterCache provcontrollers.ClusterCache) (*provv1.Cluster, error) {
+	var (
+		target *provv1.Cluster
+		err    error
+	)
+
+	for _, owner := range cluster.OwnerReferences {
+		if owner.APIVersion != "provisioning.cattle.io/v1" && owner.Kind != "Cluster" {
+			continue
+		}
+		target, err = clusterCache.Get(cluster.Namespace, owner.Name)
+		break
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return target, nil
 }
 
 // GetFeatureVersion retrieves a feature version (string) for a given controlPlane based on the version/runtime of the project. It will return 0.0.0 (semver) if the KDM data is valid, but the featureVersion isn't defined.
@@ -646,6 +679,41 @@ func PreBootstrap(mgmtCluster *v3.Cluster) bool {
 	}
 
 	return !v3.ClusterConditionPreBootstrapped.IsTrue(mgmtCluster)
+}
+
+// AutoscalerEnabledByCAPI looks at the cluster object for the ClusterAutoscalerEnabledAnnotation, and
+// then checks each MachineDeployment for the capi autoscaler min/max size annotations. It returns true if
+// the cluster has autoscaling enabled + one of the machineDeployments has the min/max annotations.
+func AutoscalerEnabledByCAPI(cluster *capi.Cluster, mds []*capi.MachineDeployment) bool {
+	// first see if the autoscaling is "on" for the capi cluster
+	if cluster.Annotations[ClusterAutoscalerEnabledAnnotation] != "true" {
+		return false
+	}
+
+	// then check to see if there are actually any of the appropriate annotations on the machineDeployments
+	for _, md := range mds {
+		if md.Annotations[capi.AutoscalerMinSizeAnnotation] != "" &&
+			md.Annotations[capi.AutoscalerMaxSizeAnnotation] != "" {
+			return true
+		}
+	}
+
+	return false
+}
+
+// AutoscalerEnabledByProvisioningCluster returns true if the autoscaling fields are set on any of the RKEMachinePools
+func AutoscalerEnabledByProvisioningCluster(cluster *provv1.Cluster) bool {
+	if cluster.Spec.RKEConfig == nil || len(cluster.Spec.RKEConfig.MachinePools) == 0 {
+		return false
+	}
+
+	for _, pool := range cluster.Spec.RKEConfig.MachinePools {
+		if pool.AutoscalingMinSize != nil && pool.AutoscalingMaxSize != nil {
+			return true
+		}
+	}
+
+	return false
 }
 
 // FormatWindowsEnvVar accepts a corev1.EnvVar and returns a string to be used in either

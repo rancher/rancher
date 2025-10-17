@@ -4,13 +4,13 @@ import (
 	"reflect"
 	"testing"
 
-	corev1 "k8s.io/api/core/v1"
-
 	"github.com/pkg/errors"
+	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -403,6 +403,199 @@ func TestFormatWindowsEnvVar(t *testing.T) {
 			if out != tc.ExpectedString {
 				t.Fatalf("Expected %s, got %s", tc.ExpectedString, out)
 			}
+		})
+	}
+}
+
+func TestAutoscalingEnabledByCAPI(t *testing.T) {
+	tests := []struct {
+		name     string
+		cluster  *capi.Cluster
+		mds      []*capi.MachineDeployment
+		expected bool
+	}{
+		{
+			name: "autoscaling enabled with single machine deployment",
+			cluster: &capi.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-cluster",
+					Namespace:   "default",
+					Annotations: map[string]string{ClusterAutoscalerEnabledAnnotation: "true"},
+				},
+			},
+			mds: []*capi.MachineDeployment{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-md",
+						Namespace: "default",
+						Annotations: map[string]string{
+							capi.AutoscalerMinSizeAnnotation: "2",
+							capi.AutoscalerMaxSizeAnnotation: "10",
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "autoscaling enabled with multiple machine deployments where one has autoscaling annotations",
+			cluster: &capi.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-cluster",
+					Namespace:   "default",
+					Annotations: map[string]string{ClusterAutoscalerEnabledAnnotation: "true"},
+				},
+			},
+			mds: []*capi.MachineDeployment{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        "test-md-1",
+						Namespace:   "default",
+						Annotations: map[string]string{},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-md-2",
+						Namespace: "default",
+						Annotations: map[string]string{
+							capi.AutoscalerMinSizeAnnotation: "2",
+							capi.AutoscalerMaxSizeAnnotation: "10",
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "autoscaling disabled when cluster annotation is not set",
+			cluster: &capi.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-cluster",
+					Namespace:   "default",
+					Annotations: map[string]string{},
+				},
+			},
+			mds: []*capi.MachineDeployment{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        "test-md",
+						Namespace:   "default",
+						Annotations: map[string]string{},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "autoscaling disabled when no machine deployments have autoscaling annotations",
+			cluster: &capi.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-cluster",
+					Namespace:   "default",
+					Annotations: map[string]string{ClusterAutoscalerEnabledAnnotation: "true"},
+				},
+			},
+			mds: []*capi.MachineDeployment{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        "test-md-1",
+						Namespace:   "default",
+						Annotations: map[string]string{},
+					},
+				},
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:        "test-md-2",
+						Namespace:   "default",
+						Annotations: map[string]string{capi.AutoscalerMinSizeAnnotation: "2"},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "autoscaling disabled when machine deployments are empty",
+			cluster: &capi.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "test-cluster",
+					Namespace:   "default",
+					Annotations: map[string]string{ClusterAutoscalerEnabledAnnotation: "true"},
+				},
+			},
+			mds:      []*capi.MachineDeployment{},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := AutoscalerEnabledByCAPI(tt.cluster, tt.mds)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestGetProvisioningClusterFromCAPICluster(t *testing.T) {
+	tests := []struct {
+		name        string
+		capiCluster *capi.Cluster
+		cluster     *provv1.Cluster
+		expectedErr error
+	}{
+		{
+			name: "HappyPath_Existing_Cluster",
+			capiCluster: &capi.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "bar",
+					OwnerReferences: []metav1.OwnerReference{{
+						APIVersion: "provisioning.cattle.io/v1",
+						Kind:       "Cluster",
+						Name:       "foo",
+					}},
+				},
+			},
+			cluster: &provv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "bar",
+				},
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "SadPath_No_Cluster",
+			capiCluster: &capi.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "foo",
+					Namespace: "bar",
+					OwnerReferences: []metav1.OwnerReference{{
+						APIVersion: "provisioning.cattle.io/v1",
+						Kind:       "Cluster",
+						Name:       "foo",
+					}},
+				},
+			},
+			expectedErr: errors.New("not found"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			capiCache := fake.NewMockCacheInterface[*provv1.Cluster](ctrl)
+			capiCache.EXPECT().Get(tt.capiCluster.Namespace, tt.capiCluster.Name).Return(tt.cluster, tt.expectedErr).MaxTimes(1)
+
+			cluster, err := GetProvisioningClusterFromCAPICluster(tt.capiCluster, capiCache)
+
+			if err == nil {
+				assert.Nil(t, tt.expectedErr)
+			} else if tt.expectedErr != nil {
+				assert.Equal(t, tt.expectedErr, err)
+			} else {
+				assert.Fail(t, "expected err to be nil, was actually %s", err)
+			}
+			assert.Equal(t, tt.cluster, cluster)
 		})
 	}
 }

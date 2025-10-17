@@ -5,6 +5,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/capr/planner"
+	"github.com/rancher/rancher/pkg/controllers/capr/autoscaler"
 	"github.com/rancher/rancher/pkg/controllers/capr/bootstrap"
 	"github.com/rancher/rancher/pkg/controllers/capr/dynamicschema"
 	"github.com/rancher/rancher/pkg/controllers/capr/machinedrain"
@@ -48,6 +49,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigMana
 	rkecontrolplane.Register(ctx, clients)
 	managesystemagent.Register(ctx, clients)
 	machinedrain.Register(ctx, clients)
+	autoscaler.Register(ctx, clients)
 
 	return nil
 }
