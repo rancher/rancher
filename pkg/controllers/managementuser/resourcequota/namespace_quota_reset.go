@@ -5,7 +5,6 @@ import (
 
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientcache "k8s.io/client-go/tools/cache"

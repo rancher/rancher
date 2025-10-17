@@ -7,11 +7,9 @@ import (
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	wmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func convertResourceListToLimit(rList corev1.ResourceList) (*apiv3.ResourceQuotaLimit, error) {
@@ -154,7 +152,7 @@ func getNamespaceContainerDefaultResourceLimit(ns *corev1.Namespace) string {
 	return ns.Annotations[limitRangeAnnotation]
 }
 
-func getProjectResourceQuotaLimit(ns *corev1.Namespace, projectGetter wmgmtv3.ProjectClient) (*apiv3.ResourceQuotaLimit, string, error) {
+func getProjectResourceQuotaLimit(ns *corev1.Namespace, projectGetter wmgmtv3.ProjectCache) (*apiv3.ResourceQuotaLimit, string, error) {
 	projectID := getProjectID(ns)
 	if projectID == "" {
 		return nil, "", nil
@@ -163,7 +161,7 @@ func getProjectResourceQuotaLimit(ns *corev1.Namespace, projectGetter wmgmtv3.Pr
 	if projectName == "" {
 		return nil, "", nil
 	}
-	project, err := projectGetter.Get(projectNamespace, projectName, metav1.GetOptions{})
+	project, err := projectGetter.Get(projectNamespace, projectName)
 	if err != nil || project.Spec.ResourceQuota == nil {
 		if errors.IsNotFound(err) {
 			// If Rancher is unaware of a project, we should ignore trying to get the resource quota limit
@@ -175,7 +173,7 @@ func getProjectResourceQuotaLimit(ns *corev1.Namespace, projectGetter wmgmtv3.Pr
 	return &project.Spec.ResourceQuota.Limit, projectID, nil
 }
 
-func getProjectNamespaceDefaultQuota(ns *corev1.Namespace, projectGetter wmgmtv3.ProjectClient) (*apiv3.NamespaceResourceQuota, error) {
+func getProjectNamespaceDefaultQuota(ns *corev1.Namespace, projectGetter wmgmtv3.ProjectCache) (*apiv3.NamespaceResourceQuota, error) {
 	projectID := getProjectID(ns)
 	if projectID == "" {
 		return nil, nil
@@ -184,7 +182,7 @@ func getProjectNamespaceDefaultQuota(ns *corev1.Namespace, projectGetter wmgmtv3
 	if projectName == "" {
 		return nil, nil
 	}
-	project, err := projectGetter.Get(projectNamespace, projectName, metav1.GetOptions{})
+	project, err := projectGetter.Get(projectNamespace, projectName)
 	if err != nil || project.Spec.ResourceQuota == nil {
 		if errors.IsNotFound(err) {
 			// If Rancher is unaware of a project, we should ignore trying to get the default namespace quota
@@ -196,7 +194,7 @@ func getProjectNamespaceDefaultQuota(ns *corev1.Namespace, projectGetter wmgmtv3
 	return project.Spec.NamespaceDefaultResourceQuota, nil
 }
 
-func getProjectContainerDefaultLimit(ns *corev1.Namespace, projectGetter wmgmtv3.ProjectClient) (*apiv3.ContainerResourceLimit, error) {
+func getProjectContainerDefaultLimit(ns *corev1.Namespace, projectGetter wmgmtv3.ProjectCache) (*apiv3.ContainerResourceLimit, error) {
 	projectID := getProjectID(ns)
 	if projectID == "" {
 		return nil, nil
@@ -205,7 +203,7 @@ func getProjectContainerDefaultLimit(ns *corev1.Namespace, projectGetter wmgmtv3
 	if projectName == "" {
 		return nil, nil
 	}
-	project, err := projectGetter.Get(projectNamespace, projectName, metav1.GetOptions{})
+	project, err := projectGetter.Get(projectNamespace, projectName)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// If Rancher is unaware of a project, we should ignore trying to get the default container limit

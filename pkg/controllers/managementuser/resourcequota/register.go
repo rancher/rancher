@@ -43,7 +43,7 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) {
 	sync := &SyncController{
 		NsIndexer:           nsInformer.GetIndexer(),
 		Namespaces:          cluster.Management.Wrangler.Core.Namespace(),
-		ProjectGetter:       cluster.Management.Wrangler.Mgmt.Project(),
+		ProjectCache:       cluster.Management.Wrangler.Mgmt.Project().Cache(),
 		ResourceQuotas:      cluster.Core.ResourceQuotas(""),
 		ResourceQuotaLister: cluster.Core.ResourceQuotas("").Controller().Lister(),
 		LimitRange:          cluster.Core.LimitRanges(""),

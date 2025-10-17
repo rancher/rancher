@@ -5,13 +5,11 @@ import (
 	"testing"
 
 	"go.uber.org/mock/gomock"
-
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	corefakev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	corefakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
 	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"

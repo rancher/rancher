@@ -689,9 +689,9 @@ func TestEnsurePRTBAddToNamespace(t *testing.T) {
 					}, name)
 				},
 			)
-			pGetter := wfakes.NewMockClientInterface[*apisV3.Project, *apisV3.ProjectList](ctrl)
-			pGetter.EXPECT().Get(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
-				func(namespace string, name string, options metav1.GetOptions) (*v3.Project, error) {
+			pGetter := wfakes.NewMockCacheInterface[*apisV3.Project](ctrl)
+			pGetter.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(
+				func(namespace string, name string) (*v3.Project, error) {
 					return nil, apierrors.NewNotFound(schema.GroupResource{
 						Group:    "management.cattle.io",
 						Resource: "projects",
@@ -705,7 +705,7 @@ func TestEnsurePRTBAddToNamespace(t *testing.T) {
 					rtLister:    rtLister,
 				},
 				rq: &resourcequota.SyncController{
-					ProjectGetter: pGetter,
+					ProjectCache: pGetter,
 				},
 			}
 			hasPRTBs, err := lifecycle.ensurePRTBAddToNamespace(&corev1.Namespace{
