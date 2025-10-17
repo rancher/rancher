@@ -6,9 +6,7 @@ import (
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	wmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-
 	"github.com/sirupsen/logrus"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientcache "k8s.io/client-go/tools/cache"
@@ -33,8 +31,8 @@ func (r *reconcileController) reconcileNamespaces(_ string, p *apiv3.Project) (r
 		return nil, err
 	}
 
-	// with no namespaces used-limit has to be empty. because there is
-	// nothing which can be used without namespaces. therefore squash
+	// With no namespaces used-limit has to be empty because there is
+	// nothing which can be used without namespaces. Therefore squash
 	// non-empty used-limits, if present.
 	empty := apiv3.ResourceQuotaLimit{}
 	if len(namespaces) == 0 &&

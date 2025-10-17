@@ -123,7 +123,7 @@ func Register(ctx context.Context, workload *config.UserContext) {
 	sync := &resourcequota.SyncController{
 		NsIndexer:           nsInformer.GetIndexer(),
 		Namespaces:          workload.Management.Wrangler.Core.Namespace(),
-		ProjectGetter:       workload.Management.Wrangler.Mgmt.Project(),
+		ProjectCache:       workload.Management.Wrangler.Mgmt.Project().Cache(),
 		ResourceQuotas:      workload.Core.ResourceQuotas(""),
 		ResourceQuotaLister: workload.Core.ResourceQuotas("").Controller().Lister(),
 		LimitRange:          workload.Core.LimitRanges(""),
