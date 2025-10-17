@@ -59,7 +59,7 @@ type nsLifecycle struct {
 
 // onChange implements the same functionality as the previous norman-based nsLifecycle:
 // - First ever reconciliation triggers onCreate, after which an annotation is added to mark this event.
-// - Following reconciliations observer this annotation and run a regular update instead
+// - Following reconciliations observe this annotation and run a regular update instead
 // - A finalizer is also used to block deletion and trigger cleanup,
 // The original annotation and finalizer keys from norman are used to preserve backwards compatibility
 func (n *nsLifecycle) onChange(_ string, obj *v1.Namespace) (*v1.Namespace, error) {
