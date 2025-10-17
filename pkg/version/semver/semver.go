@@ -13,8 +13,9 @@ var (
 
 type Version string
 
-// HasReleasePrefix validates the value against the "legacy" releasePattern
+// HasReleasePrefix validates the value against the "legacy" `releasePattern`.
 // It is not necessarily a valid SemVer, but does have the expected "release prefix".
+// The "legacy" `releasePattern` is simply any number with a "v" prefix - introduced as part of UI air-gap support.
 func (v Version) HasReleasePrefix() bool {
 	return releasePattern.MatchString(string(v))
 }
