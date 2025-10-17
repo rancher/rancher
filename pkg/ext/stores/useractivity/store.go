@@ -234,6 +234,8 @@ func (s *Store) Update(
 
 	expiresAt := seen.Add(time.Minute * time.Duration(idleTimeout)).UTC()
 	userActivity.Status.ExpiresAt = expiresAt.Format(time.RFC3339)
+	// Always return the SeenAt we actually used.
+	userActivity.Spec.SeenAt = &metav1.Time{Time: seen}
 
 	dryRun := options != nil && len(options.DryRun) > 0 && options.DryRun[0] == metav1.DryRunAll
 
@@ -241,6 +243,7 @@ func (s *Store) Update(
 		return userActivity, false, nil
 	}
 
+	var patched accessor.TokenAccessor
 	switch token.(type) {
 	case *apiv3.Token:
 		patch, err := json.Marshal([]struct {
@@ -255,15 +258,23 @@ func (s *Store) Update(
 		if err != nil {
 			return nil, false, apierrors.NewInternalError(fmt.Errorf("failed to marshall patch data: %w", err))
 		}
-		_, err = s.tokens.Patch(token.GetName(), types.JSONPatchType, patch)
+
+		patched, err = s.tokens.Patch(name, types.JSONPatchType, patch)
 		if err != nil {
 			return nil, false, apierrors.NewInternalError(fmt.Errorf("failed to store activityLastSeenAt to token %s: %w", name, err))
 		}
 	case *ext.Token:
-		err := s.extTokenStore.UpdateLastActivitySeen(name, seen)
+		patched, err = s.extTokenStore.UpdateLastActivitySeen(name, seen)
 		if err != nil {
 			return nil, false, apierrors.NewInternalError(fmt.Errorf("failed to store activityLastSeenAt to ext token %s: %w", name, err))
 		}
+	default:
+		return nil, false, apierrors.NewInternalError(fmt.Errorf("unexpected token type %T", token))
+	}
+
+	userActivity, err = s.fromToken(patched, idleTimeout)
+	if err != nil {
+		return nil, false, apierrors.NewInternalError(fmt.Errorf("error creating useractivity from token %s: %w", name, err))
 	}
 
 	return userActivity, false, nil
@@ -285,6 +296,7 @@ func (s *Store) fromToken(obj any, idleTimeout int) (*ext.UserActivity, error) {
 			Name:              token.GetName(),
 			CreationTimestamp: meta.GetCreationTimestamp(),
 			UID:               meta.GetUID(), // Needed for objInfo.UpdatedObject to work.
+			ResourceVersion:   meta.GetResourceVersion(),
 		},
 	}
 
