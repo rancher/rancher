@@ -14,9 +14,7 @@ import (
 	validate "github.com/rancher/rancher/pkg/resourcequota"
 	"github.com/rancher/rancher/pkg/utils"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
-
 	"github.com/sirupsen/logrus"
-
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,7 +37,7 @@ SyncController takes care of creating Kubernetes resource quota based on the res
 defined in namespace.resourceQuota
 */
 type SyncController struct {
-	ProjectGetter       wmgmtv3.ProjectClient
+	ProjectCache        wmgmtv3.ProjectCache
 	Namespaces          wcorev1.NamespaceController
 	ResourceQuotas      v1.ResourceQuotaInterface
 	ResourceQuotaLister v1.ResourceQuotaLister
@@ -259,7 +257,7 @@ func (c *SyncController) deriveRequestedResourceQuota(ns *corev1.Namespace) (*v3
 		return nil, nil, err
 	}
 
-	defaultQuota, err := getProjectNamespaceDefaultQuota(ns, c.ProjectGetter)
+	defaultQuota, err := getProjectNamespaceDefaultQuota(ns, c.ProjectCache)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -321,7 +319,7 @@ func (c *SyncController) validateAndSetNamespaceQuota(ns *corev1.Namespace, quot
 	}
 
 	// get project limit
-	projectLimit, projectID, err := getProjectResourceQuotaLimit(ns, c.ProjectGetter)
+	projectLimit, projectID, err := getProjectResourceQuotaLimit(ns, c.ProjectCache)
 	if err != nil {
 		return false, ns, nil, err
 	}
@@ -405,7 +403,7 @@ func (c *SyncController) getResourceLimitToUpdate(ns *corev1.Namespace) (*corev1
 	if err != nil {
 		return nil, err
 	}
-	projectLimit, err := getProjectContainerDefaultLimit(ns, c.ProjectGetter)
+	projectLimit, err := getProjectContainerDefaultLimit(ns, c.ProjectCache)
 	if err != nil {
 		return nil, err
 	}
