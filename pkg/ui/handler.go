@@ -28,7 +28,7 @@ func newHandler(
 		Index:               indexSetting,
 		Offline:             offlineSetting,
 		Path:                pathSetting,
-		ReleaseSetting:      rancherVersionIsRelease,
+		ReleaseSetting:      settings.ServerVersionHasReleasePrefixExcludesHead,
 		APIUIVersionSetting: settings.APIUIVersion.Get,
 	})
 }
