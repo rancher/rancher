@@ -5,8 +5,6 @@ import (
 	"github.com/rancher/steve/pkg/ui"
 )
 
-var rancherVersionIsRelease = settings.ServerVersionHasReleasePrefixExcludesHead
-
 var (
 	ember = newHandler(settings.UIIndex.Get,
 		settings.UIPath.Get,
