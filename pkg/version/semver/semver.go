@@ -8,8 +8,7 @@ import (
 )
 
 var (
-	releasePattern       = regexp.MustCompile("^v[0-9]")
-	branchReleasePattern = regexp.MustCompile("^v[0-9].x")
+	releasePattern = regexp.MustCompile("^v[0-9]")
 )
 
 type Version string
@@ -18,11 +17,6 @@ type Version string
 // It is not necessarily a valid SemVer, but does have the expected "release prefix".
 func (v Version) HasReleasePrefix() bool {
 	return releasePattern.MatchString(string(v))
-}
-
-// HasBranchReleasePrefix validates the value as having a minor version set to `x`
-func (v Version) HasBranchReleasePrefix() bool {
-	return branchReleasePattern.MatchString(string(v))
 }
 
 // IsDevOrPrerelease reports if the version is a non-stable, dev, or pre-release build.

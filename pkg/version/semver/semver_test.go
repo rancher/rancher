@@ -7,10 +7,9 @@ import (
 )
 
 type testExpectations struct {
-	isDevOrPrerelease      bool
-	isRC                   bool
-	hasReleasePrefix       bool
-	hasBranchReleasePrefix bool
+	isDevOrPrerelease bool
+	isRC              bool
+	hasReleasePrefix  bool
 }
 
 type genericRancherExampleCases struct {
@@ -27,7 +26,6 @@ var exampleRancherVersions = []genericRancherExampleCases{
 			true,
 			false,
 			true,
-			false,
 		},
 	},
 	{
@@ -37,7 +35,6 @@ var exampleRancherVersions = []genericRancherExampleCases{
 			true,
 			false,
 			true,
-			false,
 		},
 	},
 	{
@@ -47,7 +44,6 @@ var exampleRancherVersions = []genericRancherExampleCases{
 			true,
 			true,
 			true,
-			false,
 		},
 	},
 	{
@@ -57,7 +53,6 @@ var exampleRancherVersions = []genericRancherExampleCases{
 			true,
 			true,
 			true,
-			false,
 		},
 	},
 	{
@@ -67,7 +62,6 @@ var exampleRancherVersions = []genericRancherExampleCases{
 			false,
 			false,
 			true,
-			false,
 		},
 	},
 	{
@@ -77,7 +71,6 @@ var exampleRancherVersions = []genericRancherExampleCases{
 			true,
 			false,
 			true,
-			false,
 		},
 	},
 	{
@@ -85,7 +78,6 @@ var exampleRancherVersions = []genericRancherExampleCases{
 		"dev",
 		testExpectations{
 			true,
-			false,
 			false,
 			false,
 		},
@@ -97,7 +89,6 @@ var exampleRancherVersions = []genericRancherExampleCases{
 			true,
 			false,
 			true,
-			false,
 		},
 	},
 	{
@@ -107,47 +98,6 @@ var exampleRancherVersions = []genericRancherExampleCases{
 			false,
 			false,
 			false,
-			false,
-		},
-	},
-	{
-		"Patch with x",
-		"v2.7.x",
-		testExpectations{
-			true,
-			false,
-			true,
-			false,
-		},
-	},
-	{
-		"Branch release prefix",
-		"v2.x",
-		testExpectations{
-			true,
-			false,
-			true,
-			true,
-		},
-	},
-	{
-		"Branch release prefix w prerelease",
-		"v3.x-something",
-		testExpectations{
-			true,
-			false,
-			true,
-			true,
-		},
-	},
-	{
-		"Branch release head",
-		"v3.x-head",
-		testExpectations{
-			true,
-			false,
-			true,
-			true,
 		},
 	},
 }
@@ -184,15 +134,6 @@ func TestVersion_HasReleasePrefix(t *testing.T) {
 			t.Parallel()
 			version := Version(tt.version)
 			assert.Equalf(t, tt.expectations.hasReleasePrefix, version.HasReleasePrefix(), "Version(%s).HasReleasePrefix()", tt.version)
-		})
-	}
-}
-
-func Test_HasBranchReleasePrefix(t *testing.T) {
-	for _, tt := range exampleRancherVersions {
-		t.Run(tt.name, func(t *testing.T) {
-			version := Version(tt.version)
-			assert.Equalf(t, tt.expectations.hasBranchReleasePrefix, version.HasBranchReleasePrefix(), "Version(%s).HasBranchReleasePrefix()", tt.version)
 		})
 	}
 }
