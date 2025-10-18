@@ -4,15 +4,15 @@ import (
 	"encoding/json"
 
 	"github.com/rancher/norman/types/convert"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	wmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-func convertResourceListToLimit(rList corev1.ResourceList) (*v32.ResourceQuotaLimit, error) {
+func convertResourceListToLimit(rList corev1.ResourceList) (*apiv3.ResourceQuotaLimit, error) {
 	converted, err := convert.EncodeToMap(rList)
 	if err != nil {
 		return nil, err
@@ -23,13 +23,13 @@ func convertResourceListToLimit(rList corev1.ResourceList) (*v32.ResourceQuotaLi
 		convertedMap[key] = convert.ToString(value)
 	}
 
-	toReturn := &v32.ResourceQuotaLimit{}
+	toReturn := &apiv3.ResourceQuotaLimit{}
 	err = convert.ToObj(convertedMap, toReturn)
 
 	return toReturn, err
 }
 
-func convertResourceLimitResourceQuotaSpec(limit *v32.ResourceQuotaLimit) (*corev1.ResourceQuotaSpec, error) {
+func convertResourceLimitResourceQuotaSpec(limit *apiv3.ResourceQuotaLimit) (*corev1.ResourceQuotaSpec, error) {
 	converted, err := convertProjectResourceLimitToResourceList(limit)
 	if err != nil {
 		return nil, err
@@ -41,7 +41,7 @@ func convertResourceLimitResourceQuotaSpec(limit *v32.ResourceQuotaLimit) (*core
 }
 
 // convertProjectResourceLimitToResourceList tries to convert a Rancher-defined resource quota limit to its native Kubernetes notation.
-func convertProjectResourceLimitToResourceList(limit *v32.ResourceQuotaLimit) (corev1.ResourceList, error) {
+func convertProjectResourceLimitToResourceList(limit *apiv3.ResourceQuotaLimit) (corev1.ResourceList, error) {
 	in, err := json.Marshal(limit)
 	if err != nil {
 		return nil, err
@@ -71,7 +71,7 @@ func convertProjectResourceLimitToResourceList(limit *v32.ResourceQuotaLimit) (c
 	return limits, nil
 }
 
-func convertContainerResourceLimitToResourceList(limit *v32.ContainerResourceLimit) (corev1.ResourceList, corev1.ResourceList, error) {
+func convertContainerResourceLimitToResourceList(limit *apiv3.ContainerResourceLimit) (corev1.ResourceList, corev1.ResourceList, error) {
 	in, err := json.Marshal(limit)
 	if err != nil {
 		return nil, nil, err
@@ -152,7 +152,7 @@ func getNamespaceContainerDefaultResourceLimit(ns *corev1.Namespace) string {
 	return ns.Annotations[limitRangeAnnotation]
 }
 
-func getProjectResourceQuotaLimit(ns *corev1.Namespace, projectLister v3.ProjectLister) (*v32.ResourceQuotaLimit, string, error) {
+func getProjectResourceQuotaLimit(ns *corev1.Namespace, projectGetter wmgmtv3.ProjectCache) (*apiv3.ResourceQuotaLimit, string, error) {
 	projectID := getProjectID(ns)
 	if projectID == "" {
 		return nil, "", nil
@@ -161,7 +161,7 @@ func getProjectResourceQuotaLimit(ns *corev1.Namespace, projectLister v3.Project
 	if projectName == "" {
 		return nil, "", nil
 	}
-	project, err := projectLister.Get(projectNamespace, projectName)
+	project, err := projectGetter.Get(projectNamespace, projectName)
 	if err != nil || project.Spec.ResourceQuota == nil {
 		if errors.IsNotFound(err) {
 			// If Rancher is unaware of a project, we should ignore trying to get the resource quota limit
@@ -173,7 +173,7 @@ func getProjectResourceQuotaLimit(ns *corev1.Namespace, projectLister v3.Project
 	return &project.Spec.ResourceQuota.Limit, projectID, nil
 }
 
-func getProjectNamespaceDefaultQuota(ns *corev1.Namespace, projectLister v3.ProjectLister) (*v32.NamespaceResourceQuota, error) {
+func getProjectNamespaceDefaultQuota(ns *corev1.Namespace, projectGetter wmgmtv3.ProjectCache) (*apiv3.NamespaceResourceQuota, error) {
 	projectID := getProjectID(ns)
 	if projectID == "" {
 		return nil, nil
@@ -182,7 +182,7 @@ func getProjectNamespaceDefaultQuota(ns *corev1.Namespace, projectLister v3.Proj
 	if projectName == "" {
 		return nil, nil
 	}
-	project, err := projectLister.Get(projectNamespace, projectName)
+	project, err := projectGetter.Get(projectNamespace, projectName)
 	if err != nil || project.Spec.ResourceQuota == nil {
 		if errors.IsNotFound(err) {
 			// If Rancher is unaware of a project, we should ignore trying to get the default namespace quota
@@ -194,7 +194,7 @@ func getProjectNamespaceDefaultQuota(ns *corev1.Namespace, projectLister v3.Proj
 	return project.Spec.NamespaceDefaultResourceQuota, nil
 }
 
-func getProjectContainerDefaultLimit(ns *corev1.Namespace, projectLister v3.ProjectLister) (*v32.ContainerResourceLimit, error) {
+func getProjectContainerDefaultLimit(ns *corev1.Namespace, projectGetter wmgmtv3.ProjectCache) (*apiv3.ContainerResourceLimit, error) {
 	projectID := getProjectID(ns)
 	if projectID == "" {
 		return nil, nil
@@ -203,7 +203,7 @@ func getProjectContainerDefaultLimit(ns *corev1.Namespace, projectLister v3.Proj
 	if projectName == "" {
 		return nil, nil
 	}
-	project, err := projectLister.Get(projectNamespace, projectName)
+	project, err := projectGetter.Get(projectNamespace, projectName)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// If Rancher is unaware of a project, we should ignore trying to get the default container limit
@@ -215,12 +215,12 @@ func getProjectContainerDefaultLimit(ns *corev1.Namespace, projectLister v3.Proj
 	return project.Spec.ContainerDefaultResourceLimit, nil
 }
 
-func getNamespaceResourceQuotaLimit(ns *corev1.Namespace) (*v32.ResourceQuotaLimit, error) {
+func getNamespaceResourceQuotaLimit(ns *corev1.Namespace) (*apiv3.ResourceQuotaLimit, error) {
 	value := getNamespaceResourceQuota(ns)
 	if value == "" {
 		return nil, nil
 	}
-	var nsQuota v32.NamespaceResourceQuota
+	var nsQuota apiv3.NamespaceResourceQuota
 	err := json.Unmarshal([]byte(convert.ToString(value)), &nsQuota)
 	if err != nil {
 		return nil, err
@@ -228,7 +228,7 @@ func getNamespaceResourceQuotaLimit(ns *corev1.Namespace) (*v32.ResourceQuotaLim
 	return &nsQuota.Limit, err
 }
 
-func getNamespaceContainerResourceLimit(ns *corev1.Namespace) (*v32.ContainerResourceLimit, error) {
+func getNamespaceContainerResourceLimit(ns *corev1.Namespace) (*apiv3.ContainerResourceLimit, error) {
 	value := getNamespaceContainerDefaultResourceLimit(ns)
 	// rework after api framework change is done
 	// when annotation field is passed as null, the annotation should be removed
@@ -236,7 +236,7 @@ func getNamespaceContainerResourceLimit(ns *corev1.Namespace) (*v32.ContainerRes
 	if value == "" || value == "null" {
 		return nil, nil
 	}
-	var nsLimit v32.ContainerResourceLimit
+	var nsLimit apiv3.ContainerResourceLimit
 	err := json.Unmarshal([]byte(convert.ToString(value)), &nsLimit)
 	if err != nil {
 		return nil, err
@@ -251,7 +251,7 @@ func getProjectID(ns *corev1.Namespace) string {
 	return ""
 }
 
-func convertPodResourceLimitToLimitRangeSpec(podResourceLimit *v32.ContainerResourceLimit) (*corev1.LimitRangeSpec, error) {
+func convertPodResourceLimitToLimitRangeSpec(podResourceLimit *apiv3.ContainerResourceLimit) (*corev1.LimitRangeSpec, error) {
 	request, limit, err := convertContainerResourceLimitToResourceList(podResourceLimit)
 	if err != nil {
 		return nil, err
