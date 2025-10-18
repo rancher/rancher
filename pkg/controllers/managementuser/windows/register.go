@@ -12,7 +12,7 @@ func Register(ctx context.Context, cluster *v3.Cluster, userContext *config.User
 		return
 	}
 	node := &NodeTaintsController{
-		nodeClient: userContext.Core.Nodes(""),
+		nodeClient: userContext.Corew.Node(),
 	}
-	userContext.Core.Nodes("").AddHandler(ctx, "linux-node-taints-handler", node.sync)
+	userContext.Corew.Node().OnChange(ctx, "linux-node-taints-handler", node.sync)
 }

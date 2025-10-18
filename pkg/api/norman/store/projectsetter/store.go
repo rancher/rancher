@@ -1,13 +1,14 @@
 package projectsetter
 
 import (
+	client "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
+	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/project"
+
 	"github.com/rancher/norman/store/transform"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
-	client "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
-	"github.com/rancher/rancher/pkg/clustermanager"
-	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	"github.com/rancher/rancher/pkg/project"
+	corew "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	k8sv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -90,7 +91,7 @@ func (p projectSetter) setOptionsNamespaces(apiContext *types.APIContext, opt *t
 		return err
 	}
 
-	namespaces, err := clusterContext.Core.Namespaces("").Controller().Lister().List("", labels.NewSelector())
+	namespaces, err := clusterContext.Corew.Namespace().Cache().List(labels.NewSelector())
 	if err != nil {
 		return err
 	}
@@ -140,7 +141,7 @@ func (t *transformer) stream(apiContext *types.APIContext, schema *types.Schema,
 	}), nil
 }
 
-func (t *transformer) lister(apiContext *types.APIContext, schema *types.Schema) v1.NamespaceLister {
+func (t *transformer) lister(apiContext *types.APIContext, schema *types.Schema) corew.NamespaceCache {
 	if _, ok := schema.ResourceFields[client.NamespaceFieldProjectID]; !ok || schema.ID == client.NamespaceType {
 		return nil
 	}
@@ -155,7 +156,7 @@ func (t *transformer) lister(apiContext *types.APIContext, schema *types.Schema)
 		return nil
 	}
 
-	return clusterContext.Core.Namespaces("").Controller().Lister()
+	return clusterContext.Corew.Namespace().Cache()
 }
 
 func (t *transformer) lookupAndSetProjectID(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) {
@@ -167,7 +168,7 @@ func (t *transformer) lookupAndSetProjectID(apiContext *types.APIContext, schema
 	setProjectID(namespaceLister, data)
 }
 
-func setProjectID(namespaceLister v1.NamespaceLister, data map[string]interface{}) {
+func setProjectID(namespaceLister corew.NamespaceCache, data map[string]interface{}) {
 	if data == nil {
 		return
 	}
@@ -178,7 +179,7 @@ func setProjectID(namespaceLister v1.NamespaceLister, data map[string]interface{
 		return
 	}
 
-	nsObj, err := namespaceLister.Get("", ns)
+	nsObj, err := namespaceLister.Get(ns)
 	if err != nil {
 		return
 	}

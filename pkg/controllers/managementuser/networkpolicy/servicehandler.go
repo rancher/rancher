@@ -10,7 +10,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	knetworkingv1 "k8s.io/api/networking/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type serviceHandler struct {
@@ -19,7 +18,7 @@ type serviceHandler struct {
 	clusterNamespace string
 }
 
-func (sh *serviceHandler) Sync(key string, service *corev1.Service) (runtime.Object, error) {
+func (sh *serviceHandler) Sync(_ string, service *corev1.Service) (*corev1.Service, error) {
 	if service == nil || service.DeletionTimestamp != nil {
 		return nil, nil
 	}

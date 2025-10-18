@@ -5,13 +5,12 @@ import (
 
 	"sort"
 
-	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	corew "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	knetworkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -23,12 +22,12 @@ const (
 
 type podHandler struct {
 	npmgr            *netpolMgr
-	pods             v1.PodInterface
+	pods             corew.PodClient
 	clusterLister    v3.ClusterLister
 	clusterNamespace string
 }
 
-func (ph *podHandler) Sync(key string, pod *corev1.Pod) (runtime.Object, error) {
+func (ph *podHandler) Sync(_ string, pod *corev1.Pod) (*corev1.Pod, error) {
 	if pod == nil || pod.DeletionTimestamp != nil {
 		return nil, nil
 	}

@@ -18,13 +18,13 @@ import (
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
-	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/systemaccount"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/types/config/systemtokens"
 	"github.com/rancher/rancher/pkg/wrangler"
+	corew "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -55,11 +55,10 @@ type nodeSyncer struct {
 type nodesSyncer struct {
 	machines             v3.NodeInterface
 	machineLister        v3.NodeLister
-	nodeLister           v1.NodeLister
-	nodeClient           v1.NodeInterface
+	nodeLister           corew.NodeCache
+	nodeClient           corew.NodeClient
 	clusterNamespace     string
 	clusterLister        v3.ClusterLister
-	secretLister         v1.SecretLister
 	provClusterCache     provcontrollers.ClusterCache
 	capiClusterCache     capicontrollers.ClusterCache
 	rkeControlPlaneCache rkecontrollers.RKEControlPlaneCache
@@ -74,7 +73,7 @@ type nodeDrain struct {
 	systemAccountManager *systemaccount.Manager
 	clusterLister        v3.ClusterLister
 	machines             v3.NodeInterface
-	nodeLister           v1.NodeLister
+	nodeLister           corew.NodeCache
 	ctx                  context.Context
 	nodesToContext       map[string]context.CancelFunc
 }
@@ -86,10 +85,9 @@ func Register(ctx context.Context, cluster *config.UserContext, capi *wrangler.C
 		clusterNamespace:     cluster.ClusterName,
 		machines:             cluster.Management.Management.Nodes(cluster.ClusterName),
 		machineLister:        cluster.Management.Management.Nodes(cluster.ClusterName).Controller().Lister(),
-		nodeLister:           cluster.Core.Nodes("").Controller().Lister(),
-		nodeClient:           cluster.Core.Nodes(""),
+		nodeLister:           cluster.Corew.Node().Cache(),
+		nodeClient:           cluster.Corew.Node(),
 		clusterLister:        cluster.Management.Management.Clusters("").Controller().Lister(),
-		secretLister:         cluster.Management.Core.Secrets("").Controller().Lister(),
 		provClusterCache:     cluster.Management.Wrangler.Provisioning.Cluster().Cache(),
 		capiClusterCache:     capi.CAPI.Cluster().Cache(),
 		rkeControlPlaneCache: cluster.Management.Wrangler.RKE.RKEControlPlane().Cache(),
@@ -110,19 +108,19 @@ func Register(ctx context.Context, cluster *config.UserContext, capi *wrangler.C
 		systemAccountManager: systemaccount.NewManager(cluster.Management),
 		clusterLister:        cluster.Management.Management.Clusters("").Controller().Lister(),
 		machines:             cluster.Management.Management.Nodes(cluster.ClusterName),
-		nodeLister:           cluster.Core.Nodes("").Controller().Lister(),
+		nodeLister:           cluster.Corew.Node().Cache(),
 		ctx:                  ctx,
 		nodesToContext:       map[string]context.CancelFunc{},
 	}
 
-	cluster.Core.Nodes("").Controller().AddHandler(ctx, "nodesSyncer", n.sync)
+	cluster.Corew.Node().OnChange(ctx, "nodesSyncer", n.sync)
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler(ctx, "machinesSyncer", m.sync)
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler(ctx, "cordonFieldsSyncer", m.syncCordonFields)
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler(ctx, "drainNodeSyncer", d.drainNode)
 	cluster.Management.Management.Nodes(cluster.ClusterName).Controller().AddHandler(ctx, "machineTaintSyncer", m.syncTaints)
 }
 
-func (n *nodeSyncer) sync(key string, node *corev1.Node) (runtime.Object, error) {
+func (n *nodeSyncer) sync(key string, node *corev1.Node) (*corev1.Node, error) {
 	needUpdate, err := n.needUpdate(key, node)
 	if err != nil {
 		return nil, err
@@ -261,7 +259,7 @@ func (m *nodesSyncer) reconcileAll() error {
 		}
 	}
 
-	nodes, err := m.nodeLister.List("", labels.NewSelector())
+	nodes, err := m.nodeLister.List(labels.NewSelector())
 	if err != nil {
 		return err
 	}

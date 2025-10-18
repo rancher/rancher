@@ -3,8 +3,8 @@ package resourcequota
 import (
 	"fmt"
 
-	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	corew "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientcache "k8s.io/client-go/tools/cache"
@@ -15,7 +15,7 @@ quotaResetController is responsible for resetting resource quota on the namespac
 when project resource quota gets reset
 */
 type quotaResetController struct {
-	namespaces v1.NamespaceInterface
+	namespaces corew.NamespaceClient
 	nsIndexer  clientcache.Indexer
 }
 

@@ -5,13 +5,15 @@ import (
 	"testing"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
-	"github.com/rancher/norman/httperror"
-	fake1 "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	fake3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	nodehelper "github.com/rancher/rancher/pkg/node"
 	"github.com/rancher/rancher/pkg/taints"
+
+	"github.com/rancher/norman/httperror"
+	corew "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v3/pkg/generic/fake"
+	"go.uber.org/mock/gomock"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -116,16 +118,13 @@ func TestSyncNodeTaints(t *testing.T) {
 			},
 		},
 	}
+	ctrl := gomock.NewController(t)
 	syncer := nodesSyncer{
 		machines: &fake3.NodeInterfaceMock{
 			UpdateFunc: getMachineUpdateFunc(t, testCases),
 		},
-		nodeLister: &fake1.NodeListerMock{
-			GetFunc: getNodeListerGetFunc(t, testCases),
-		},
-		nodeClient: &fake1.NodeInterfaceMock{
-			UpdateFunc: getNodeInterfaceUpdateFunc(t, testCases),
-		},
+		nodeLister: getNodeListerMock(t, ctrl, testCases),
+		nodeClient: getNodeClientMock(t, ctrl, testCases),
 	}
 	for _, c := range testCases {
 		if _, err := syncer.syncTaints(c.machine.Name, &c.machine); err != nil {
@@ -152,21 +151,23 @@ func getMachineUpdateFunc(t *testing.T, cases []*syncTaintsTestCase) func(*v3.No
 		return &c.machine, nil
 	}
 }
-
-func getNodeListerGetFunc(t *testing.T, cases []*syncTaintsTestCase) func(string, string) (*v1.Node, error) {
+func getNodeListerMock(t *testing.T, ctrl *gomock.Controller, cases []*syncTaintsTestCase) corew.NodeCache {
 	nodeSet := caseByNode(t, cases)
-	return func(namespace string, name string) (*v1.Node, error) {
+	lister := fake.NewMockNonNamespacedCacheInterface[*v1.Node](ctrl)
+	lister.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v1.Node, error) {
 		c, ok := nodeSet[name]
 		if !ok {
 			return nil, httperror.NewAPIError(httperror.NotFound, fmt.Sprintf("node %s not found", name))
 		}
 		return &c.node, nil
-	}
+	}).AnyTimes()
+	return lister
 }
 
-func getNodeInterfaceUpdateFunc(t *testing.T, cases []*syncTaintsTestCase) func(*v1.Node) (*v1.Node, error) {
+func getNodeClientMock(t *testing.T, ctrl *gomock.Controller, cases []*syncTaintsTestCase) corew.NodeClient {
 	nodeSet := caseByNode(t, cases)
-	return func(in1 *v1.Node) (*v1.Node, error) {
+	client := fake.NewMockNonNamespacedClientInterface[*v1.Node, *v1.NodeList](ctrl)
+	client.EXPECT().Update(gomock.Any()).DoAndReturn(func(in1 *v1.Node) (*v1.Node, error) {
 		c, ok := nodeSet[in1.Name]
 		if !ok {
 			return nil, httperror.NewAPIError(httperror.NotFound, fmt.Sprintf("node %s not found", in1.Name))
@@ -178,7 +179,8 @@ func getNodeInterfaceUpdateFunc(t *testing.T, cases []*syncTaintsTestCase) func(
 		c.nodeUpdated = true
 		c.node = *in1
 		return in1, nil
-	}
+	}).AnyTimes()
+	return client
 }
 
 func caseByMachine(t *testing.T, cases []*syncTaintsTestCase) map[string]*syncTaintsTestCase {
