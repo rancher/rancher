@@ -118,6 +118,7 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           INCLUDE_PATTERNS: ${{ steps.pr-settings.outputs.include_patterns }}
           EXCLUDE_PATTERNS: ${{ steps.pr-settings.outputs.exclude_patterns }}
+          MAX_CI_ATTEMPTS: ${{ steps.pr-settings.outputs.max_attempts }}
         run: |
           PR_NUMBER="${{ steps.find-pr.outputs.pr_number }}"
           BRANCH="${{ steps.find-pr.outputs.branch }}"
