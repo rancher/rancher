@@ -15,8 +15,6 @@ $(TARGETS): .dapper
 		./.dapper $@; \
 	fi
 
-.DEFAULT_GOAL := ci
-
 quick-agent:
 	@$(MAKE) quick TARGET="agent"
 
@@ -25,6 +23,14 @@ quick-server:
 
 quick-binary-server:
 	@$(MAKE) quick TARGET="binary-server"
+
+provisioning-tests: .dapper
+	@$(MAKE) quick-binary-server
+	./.dapper provisioning-tests
+
+test: .dapper
+	@$(MAKE) quick-binary-server
+	./.dapper test
 
 $(DEV_TARGETS):
 	./dev-scripts/$@
