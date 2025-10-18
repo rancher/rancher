@@ -112,6 +112,51 @@ func describeInstanceTypes(capabilities *Capabilities, req *http.Request) ([]byt
 		request.MaxResults = &maxResultsVal
 	}
 
+	cpuArch := req.URL.Query().Get("cpuArch")
+	if cpuArch != "" {
+		request.CpuArchitecture = tea.String(cpuArch)
+	}
+
+	minCPUStr := req.URL.Query().Get("minCpuCores")
+	if minCPUStr != "" {
+		minCPU, err := strconv.ParseInt(minCPUStr, 10, 32)
+		if err != nil {
+			return nil, http.StatusBadRequest, errors.New("invalid value for minCpuCores query param")
+		}
+		minCPU32 := int32(minCPU)
+		request.MinimumCpuCoreCount = &minCPU32
+	}
+
+	maxCPUStr := req.URL.Query().Get("maxCpuCores")
+	if maxCPUStr != "" {
+		maxCPU, err := strconv.ParseInt(maxCPUStr, 10, 32)
+		if err != nil {
+			return nil, http.StatusBadRequest, errors.New("invalid value for maxCpuCores query param")
+		}
+		maxCPU32 := int32(maxCPU)
+		request.MaximumCpuCoreCount = &maxCPU32
+	}
+
+	minMemoryStr := req.URL.Query().Get("minMemorySize")
+	if minMemoryStr != "" {
+		minMemory, err := strconv.ParseFloat(minMemoryStr, 32)
+		if err != nil {
+			return nil, http.StatusBadRequest, errors.New("invalid value for minMemorySize query param")
+		}
+		minMemory32 := float32(minMemory)
+		request.MinimumMemorySize = &minMemory32
+	}
+
+	maxMemoryStr := req.URL.Query().Get("maxMemorySize")
+	if maxMemoryStr != "" {
+		maxMemory, err := strconv.ParseFloat(maxMemoryStr, 32)
+		if err != nil {
+			return nil, http.StatusBadRequest, errors.New("invalid value for maxMemorySize query param")
+		}
+		maxMemory32 := float32(maxMemory)
+		request.MaximumMemorySize = &maxMemory32
+	}
+
 	resp, err := client.DescribeInstanceTypesWithContext(req.Context(), request, &dara.RuntimeOptions{})
 	if err != nil {
 		status, err := handleSDKError(err)
