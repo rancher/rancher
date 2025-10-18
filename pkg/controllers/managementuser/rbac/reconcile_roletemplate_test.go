@@ -64,9 +64,9 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 			},
 		},
 		{
-			description:   "namespace create rule should grant create-ns and a namespaces-edit role",
+			description:   "namespace create rule should grant create-ns, namespace-manage and namespace-readonly role",
 			projectName:   "testproject",
-			expectedRoles: []string{"create-ns", "testproject-namespaces-edit"},
+			expectedRoles: []string{"create-ns", "testproject-namespaces-manage", "testproject-namespaces-readonly"},
 			roleTemplates: map[string]*v3.RoleTemplate{
 				"testrt2": {
 					ObjectMeta: metav1.ObjectMeta{
@@ -178,9 +178,9 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 			},
 		},
 		{
-			description:   "* resources and * APIGroup should only result in namespace-readonly and promoted role",
+			description:   "* resources and * APIGroup should result in namespaces-manage, namespace-readonly and promoted role",
 			projectName:   "testproject",
-			expectedRoles: []string{"create-ns", "testproject-namespaces-edit", "testrt8-promoted"},
+			expectedRoles: []string{"create-ns", "testproject-namespaces-manage", "testproject-namespaces-readonly", "testrt8-promoted"},
 			roleTemplates: map[string]*v3.RoleTemplate{
 				"testrt8": {
 					ObjectMeta: metav1.ObjectMeta{
@@ -197,9 +197,9 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 			},
 		},
 		{
-			description:   "* resources and core (\"\") APIGroup should only result in namespace-readonly and promoted role",
+			description:   "* resources and core (\"\") APIGroup should result in namespace-manage, namespace-readonly and promoted role",
 			projectName:   "testproject",
-			expectedRoles: []string{"create-ns", "testproject-namespaces-edit", "testrt9-promoted"},
+			expectedRoles: []string{"create-ns", "testproject-namespaces-manage", "testproject-namespaces-readonly", "testrt9-promoted"},
 			roleTemplates: map[string]*v3.RoleTemplate{
 				"testrt9": {
 					ObjectMeta: metav1.ObjectMeta{
@@ -268,6 +268,82 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 						},
 					},
 					External: true,
+				},
+			},
+		},
+		{
+			description:   "only get permissions",
+			projectName:   "testproject",
+			expectedRoles: []string{"testproject-namespaces-readonly"},
+			roleTemplates: map[string]*v3.RoleTemplate{
+				"testGetRT": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "testGetRT",
+					},
+					Rules: []v1.PolicyRule{
+						{
+							Verbs:     []string{"get"},
+							APIGroups: []string{""},
+							Resources: []string{"namespaces"},
+						},
+					},
+				},
+			},
+		},
+		{
+			description:   "only watch permissions",
+			projectName:   "testproject",
+			expectedRoles: []string{"testproject-namespaces-readonly"},
+			roleTemplates: map[string]*v3.RoleTemplate{
+				"testReadRT": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "testReadRT",
+					},
+					Rules: []v1.PolicyRule{
+						{
+							Verbs:     []string{"watch"},
+							APIGroups: []string{""},
+							Resources: []string{"namespaces"},
+						},
+					},
+				},
+			},
+		},
+		{
+			description:   "list & watch permissions",
+			projectName:   "testproject",
+			expectedRoles: []string{"testproject-namespaces-readonly"},
+			roleTemplates: map[string]*v3.RoleTemplate{
+				"testReadRT": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "testReadRT",
+					},
+					Rules: []v1.PolicyRule{
+						{
+							Verbs:     []string{"list", "watch"},
+							APIGroups: []string{""},
+							Resources: []string{"namespaces"},
+						},
+					},
+				},
+			},
+		},
+		{
+			description:   "only delete permissions",
+			projectName:   "testproject",
+			expectedRoles: []string{"testproject-namespaces-manage", "testproject-namespaces-readonly"},
+			roleTemplates: map[string]*v3.RoleTemplate{
+				"testDeleteRT": {
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "testDeleteRT",
+					},
+					Rules: []v1.PolicyRule{
+						{
+							Verbs:     []string{"delete"},
+							APIGroups: []string{""},
+							Resources: []string{"namespaces"},
+						},
+					},
 				},
 			},
 		},
