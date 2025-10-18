@@ -27,6 +27,7 @@ user-a,https://rancherurl/v1/secrets?pagesize=8,[json/user-a_none_pagesize=8.jso
 user-a,https://rancherurl/v1/secrets?pagesize=8&page=2&revision=nondeterministicint,[json/user-a_none_pagesize=8&page=2&revision=nondeterministicint.json](json/user-a_none_pagesize=8&page=2&revision=nondeterministicint.json)
 user-a,https://rancherurl/v1/secrets/test-ns-1?pagesize=3,[json/user-a_test-ns-1_pagesize=3.json](json/user-a_test-ns-1_pagesize=3.json)
 user-a,https://rancherurl/v1/secrets/test-ns-1?pagesize=3&page=2&revision=nondeterministicint,[json/user-a_test-ns-1_pagesize=3&page=2&revision=nondeterministicint.json](json/user-a_test-ns-1_pagesize=3&page=2&revision=nondeterministicint.json)
+user-a,https://rancherurl/v1/secrets/test-ns-1?filter=metadata.fields[2]>0&sort=metadata.fields[2],[json/user-a_test-ns-1_filter=metadata.fields[2]>0&sort=metadata.fields[2].json](json/user-a_test-ns-1_filter=metadata.fields[2]>0&sort=metadata.fields[2].json)
 user-b,https://rancherurl/v1/secrets,[json/user-b_none_none.json](json/user-b_none_none.json)
 user-b,https://rancherurl/v1/secrets/test-ns-1,[json/user-b_test-ns-1_none.json](json/user-b_test-ns-1_none.json)
 user-b,https://rancherurl/v1/secrets/test-ns-5,[json/user-b_test-ns-5_none.json](json/user-b_test-ns-5_none.json)
