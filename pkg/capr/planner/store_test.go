@@ -31,9 +31,9 @@ func TestJoinURLFromAddress(t *testing.T) {
 		},
 		{
 			name:     "ipv6",
-			address:  "::ffff:7f00:1",
+			address:  "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
 			port:     9345,
-			expected: "https://[::ffff:7f00:1]:9345",
+			expected: "https://[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:9345",
 		},
 		{
 			name:     "hostname",
@@ -50,7 +50,7 @@ func TestJoinURLFromAddress(t *testing.T) {
 	}
 }
 
-// TestJoinURLReconcilation is a unit test to specifically ensure the join URL annotation is properly reconciled on a plan secret.
+// TestSetMachineJoinURL is a unit test to specifically ensure the join URL annotation is properly reconciled on a plan secret.
 func TestSetMachineJoinURL(t *testing.T) {
 	t.Parallel()
 
@@ -60,8 +60,8 @@ func TestSetMachineJoinURL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// IPv6 expected IP is [::ffff:7f00:1]
-	periodicOutputIPv6, err := base64.StdEncoding.DecodeString("H4sIAAAAAAAAA8WQXYuCQBSG/4p4XTBaCQp7EUqrg6OgpumdzdgyrmY4M5lG/31nC2ph9345N+e8L+fruaq4PHHRV/OSkL5iTLWu6rFsK9X65cxUxkknuLSqEfIi02ixg5NXn/ayhpHtGV69vqAagSDJF6HzuQymXAscNKJkTX0bijzTGq/uKNZNXsQaKHYB8LPVuXjffvtDkaVjmkKER8/IRtgRNxrw1J19jRlhW8jIjUDPB+R0l13SjWj6GLwGMK8NWJmlgmzSOHERDRtGSzcC2EWGP5r7sD7du8OatMhZGygFhrxzEcaQHFLNfPxW9b38TebVhXK7IxICmKlNyXgsMJYIDqKJxDGhdzybnipQHBVT0XRLX1oroGwTW9GBvpAjDiVtJDz2HLGRQkVe7epN7uGYzB+0n9Rf2g/ef/B6+5ebb1+QQBuRMQIAAA==")
+	// IPv6 expected IP is [2001:0db8:85a3:0000:0000:8a2e:0370:7334]
+	periodicOutputIPv6, err := base64.StdEncoding.DecodeString("H4sICGu88mgAA2EAxZFdb4IwGIX/CuF6JoBKIokXDKajsZAh8tE71uLWysRAEajxv6/ORJdsl0t21bfn5D1tnnNScX7gbV2MckLqomlU66Tu849CtX44D2rDSdVyaRUD4CjRKUqB8NjhVd5B6Himx+weMqj5UTYO3N3EF5nuu3CAkU1XDmizRC89VlFszDha6xpKfW2VTI9oubn4HUriIY4BxINnJgOoyHPYYVEdV3ozQNfuA/a4y9ibGbjxOxRVJ7UuYPblNIPl04AiqQksNSygCEnAPBG4Nk3XHc2M/oCSqfbX+b7Y0TTVyfZlPr8yKupaMpJz0VPuVETC1B7UMm/4usVYoty2ZdjuI/qFeVFTBbR7ZabohmVMrKmmbCJHMTRjLCO2OS1lCc0tYiGFgtzX1bN8h2MyurZ2a++ufevtF+7/8+fzJ3uRFQJ5AgAA")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -552,7 +552,7 @@ func TestSetMachineJoinURL(t *testing.T) {
 						capr.InitNodeLabel: "true",
 					},
 					Annotations: map[string]string{
-						capr.JoinURLAnnotation: "https://[::ffff:7f00:1]:6443",
+						capr.JoinURLAnnotation: "https://[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:6443",
 					},
 				},
 				Data: map[string][]byte{
@@ -620,7 +620,7 @@ func TestSetMachineJoinURL(t *testing.T) {
 						capr.InitNodeLabel: "true",
 					},
 					Annotations: map[string]string{
-						capr.JoinURLAnnotation: "https://[::ffff:7f00:1]:9345",
+						capr.JoinURLAnnotation: "https://[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:9345",
 					},
 				},
 				Data: map[string][]byte{
@@ -702,7 +702,10 @@ func TestSetMachineJoinURL(t *testing.T) {
 						Namespace: "test",
 					},
 					Spec: capi.MachineSpec{
-						Bootstrap: capi.Bootstrap{ConfigRef: &corev1.ObjectReference{Kind: "RKEBootstrap", Name: rkeBootstrapName}},
+						Bootstrap: capi.Bootstrap{
+							ConfigRef: &corev1.ObjectReference{
+								Kind: "RKEBootstrap",
+								Name: rkeBootstrapName}},
 					},
 				},
 			},
@@ -747,7 +750,7 @@ func TestSetMachineJoinURL(t *testing.T) {
 						capr.InitNodeLabel: "true",
 					},
 					Annotations: map[string]string{
-						capr.JoinURLAnnotation: "https://[::ffff:7f00:1]:6443",
+						capr.JoinURLAnnotation: "https://[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:6443",
 					},
 				},
 				Data: map[string][]byte{
@@ -873,7 +876,7 @@ func TestSetMachineJoinURL(t *testing.T) {
 						capr.InitNodeLabel: "true",
 					},
 					Annotations: map[string]string{
-						capr.JoinURLAnnotation: "https://[::ffff:7f00:1]:9345",
+						capr.JoinURLAnnotation: "https://[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:9345",
 					},
 				},
 				Data: map[string][]byte{
