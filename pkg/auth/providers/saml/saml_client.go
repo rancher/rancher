@@ -57,6 +57,8 @@ func InitializeSamlServiceProvider(configToSet *v32.SamlConfig, name string) err
 	initMu.Lock()
 	defer initMu.Unlock()
 
+	log.Debugf("SAML [InitializeSamlServiceProvider]: Begin %s", name)
+
 	if configToSet.ResourceVersion == appliedVersion {
 		return nil
 	}
@@ -191,6 +193,8 @@ func InitializeSamlServiceProvider(configToSet *v32.SamlConfig, name string) err
 
 	SamlProviders[name] = provider
 
+	log.Debugf("SAML [InitializeSamlServiceProvider]: Set Handlers for %s on root %p", name, root)
+
 	switch name {
 	case PingName:
 		root.Get("PingACS").HandlerFunc(provider.ServeHTTP)
@@ -219,12 +223,24 @@ func InitializeSamlServiceProvider(configToSet *v32.SamlConfig, name string) err
 		root.Get("ShibbolethMetadata").HandlerFunc(provider.ServeHTTP)
 	}
 
+	log.Debugf("SAML [InitializeSamlServiceProvider]: Handlers for %s on root %p active", name, root)
+
 	appliedVersion = configToSet.ResourceVersion
+
+	log.Debugf("SAML [InitializeSamlServiceProvider]: Done for %s", name)
 
 	return nil
 }
 
 func AuthHandler() http.Handler {
+	// printing mux here to see if there are multiple inititializations
+	log.Debugf("SAML [AuthHandler]: Setting up dispatch, mux is %p", root)
+
+	if root != nil {
+		log.Debugf("SAML [AuthHandler]: Dispatch already exists, mux is %p", root)
+		return root
+	}
+
 	root = mux.NewRouter()
 
 	root.Methods("POST").Path("/v1-saml/ping/saml/acs").Name("PingACS")
@@ -252,6 +268,7 @@ func AuthHandler() http.Handler {
 	root.Methods("GET").Path("/v1-saml/shibboleth/saml/slo").Name("ShibbolethSLOGet")
 	root.Methods("GET").Path("/v1-saml/shibboleth/saml/metadata").Name("ShibbolethMetadata")
 
+	log.Debugf("SAML [AuthHandler]: Dispatch made, mux is %p", root)
 	return root
 }
 
