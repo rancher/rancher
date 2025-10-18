@@ -26,7 +26,7 @@ func newHandler(
 		Index:               indexSetting,
 		Offline:             offlineSetting,
 		Path:                pathSetting,
-		ReleaseSetting:      settings.IsRelease,
+		ReleaseSetting:      settings.ServerVersionHasReleasePrefixExcludesHead,
 		APIUIVersionSetting: settings.APIUIVersion.Get,
 	})
 }
