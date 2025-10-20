@@ -115,7 +115,7 @@ fi
 if [ "$TARGET" = "k3s-images" ]; then
   docker buildx build \
     "${BUILD_ARGS[@]}" \
-    --output=type=local,dest=$PWD \
+    --output=type=local,dest=$PWD/bin \
     --platform="${OS}/${ARCH}" \
     --target k3s-images \
     --file ./package/Dockerfile .
