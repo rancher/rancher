@@ -116,41 +116,36 @@ def extract_failure_lines(log_content, max_lines=10):
 
     return list(reversed(failure_lines))
 
+FAILURE_STATES = {"failure", "timed_out", "stale"}
+
 def process_job(repo_owner, repo_name, job, run_data, attempt_number):
     conclusion = job.get("conclusion")
-    status = job.get("status")
 
-    if conclusion in ["success", "skipped", "cancelled", "neutral"]:
+    # Only process jobs with known failure conclusions
+    if conclusion not in FAILURE_STATES:
         return None
 
-    is_failed = (
-        conclusion in ["failure", "timed_out", "action_required"] or
-        (status == "completed" and conclusion not in ["success", "skipped", "cancelled", "neutral"])
-    )
+    job_logs = get_job_logs(repo_owner, repo_name, job["id"])
 
-    if is_failed:
-        job_logs = get_job_logs(repo_owner, repo_name, job["id"])
+    if job_logs is None:
+        failure_lines = []
+    else:
+        failure_lines = extract_failure_lines(job_logs)
 
-        if job_logs is None:
-            failure_lines = []
-        else:
-            failure_lines = extract_failure_lines(job_logs)
+    log_url = f"https://github.com/{repo_owner}/{repo_name}/actions/runs/{run_data['id']}/job/{job['id']}"
 
-        log_url = f"https://github.com/{repo_owner}/{repo_name}/actions/runs/{run_data['id']}/job/{job['id']}"
-
-        return {
-            "workflow_name": run_data["name"],
-            "job_name": job["name"],
-            "attempt_number": attempt_number,
-            "job_id": job["id"],
-            "log_url": log_url,
-            "failure_lines": failure_lines,
-            "run_id": run_data["id"],
-            "run_number": run_data["run_number"],
-            "created_at": run_data["created_at"],
-            "html_url": run_data["html_url"],
-        }
-    return None
+    return {
+        "workflow_name": run_data["name"],
+        "job_name": job["name"],
+        "attempt_number": attempt_number,
+        "job_id": job["id"],
+        "log_url": log_url,
+        "failure_lines": failure_lines,
+        "run_id": run_data["id"],
+        "run_number": run_data["run_number"],
+        "created_at": run_data["created_at"],
+        "html_url": run_data["html_url"],
+    }
 
 def get_jobs_for_run(repo_owner, repo_name, run_id, attempt_number):
     base_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/actions/runs/{run_id}"
