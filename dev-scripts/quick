@@ -24,14 +24,8 @@ CATTLE_CSP_ADAPTER_MIN_VERSION=$(grep -m1 'cspAdapterMinVersion' build.yaml | cu
 CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$(grep -m1 'provisioningCAPIVersion' build.yaml | cut -d ' ' -f2)
 CATTLE_FLEET_VERSION=$(grep -m1 'fleetVersion' build.yaml | cut -d ' ' -f2)
 
-# download airgap images and export it to a tarball
-curl -Lf https://github.com/rancher/k3s/releases/download/"${CATTLE_K3S_VERSION}"/k3s-images.txt -o ./k3s-images.txt
-AIRGAP_IMAGES=$(grep -e 'docker.io/rancher/mirrored-pause' -e 'docker.io/rancher/mirrored-coredns-coredns' ./k3s-images.txt)
-xargs -n1 docker pull <<< "${AIRGAP_IMAGES}"
-xargs -n2 docker save -o ./k3s-airgap-images.tar <<< "${AIRGAP_IMAGES}"
-
 # download kontainer driver metadata
-curl -sLf https://releases.rancher.com/kontainer-driver-metadata/"${CATTLE_KDM_BRANCH}"/data.json > ./data.json
+curl -sLf https://releases.rancher.com/kontainer-driver-metadata/"${CATTLE_KDM_BRANCH}"/data.json >./data.json
 
 BUILD_ARGS=()
 BUILD_ARGS+=("--build-arg=VERSION=${TAG}")
@@ -109,6 +103,15 @@ add_context "github.com/rancher/wrangler/v3" "wrangler-context" "GODEP_WRANGLER"
 
 if [ "$needs_workdir" = "true" ]; then
   BUILD_ARGS+=("--build-arg=BUILD_WORKDIR=$PWD")
+fi
+
+if [ "$TARGET" = "k3s-images" ]; then
+  docker buildx build \
+    "${BUILD_ARGS[@]}" \
+    --output=type=local,dest=$PWD/bin \
+    --platform="${OS}/${ARCH}" \
+    --target k3s-images \
+    --file ./package/Dockerfile .
 fi
 
 if [ "$TARGET" = "binary-server" ]; then
