@@ -7,9 +7,9 @@ import (
 )
 
 type testExpectations struct {
+	hasReleasePrefix  bool
 	isDevOrPrerelease bool
 	isRC              bool
-	hasReleasePrefix  bool
 }
 
 type genericRancherExampleCases struct {
@@ -24,8 +24,8 @@ var exampleRancherVersions = []genericRancherExampleCases{
 		"v2.12.3-alpha1",
 		testExpectations{
 			true,
-			false,
 			true,
+			false,
 		},
 	},
 	{
@@ -33,8 +33,8 @@ var exampleRancherVersions = []genericRancherExampleCases{
 		"v2.13.3-alpha.1",
 		testExpectations{
 			true,
-			false,
 			true,
+			false,
 		},
 	},
 	{
@@ -59,9 +59,9 @@ var exampleRancherVersions = []genericRancherExampleCases{
 		"Stable Build",
 		"v2.12.3",
 		testExpectations{
-			false,
-			false,
 			true,
+			false,
+			false,
 		},
 	},
 	{
@@ -69,16 +69,16 @@ var exampleRancherVersions = []genericRancherExampleCases{
 		"v2.12.0-hotfix-b112.1",
 		testExpectations{
 			true,
-			false,
 			true,
+			false,
 		},
 	},
 	{
 		"Dev IDE",
 		"dev",
 		testExpectations{
-			true,
 			false,
+			true,
 			false,
 		},
 	},
@@ -87,8 +87,8 @@ var exampleRancherVersions = []genericRancherExampleCases{
 		"v2.12-207d1eaa2-head",
 		testExpectations{
 			true,
-			false,
 			true,
+			false,
 		},
 	},
 	{
@@ -100,6 +100,18 @@ var exampleRancherVersions = []genericRancherExampleCases{
 			false,
 		},
 	},
+}
+
+func TestVersion_HasReleasePrefix(t *testing.T) {
+	t.Parallel()
+	for _, tt := range exampleRancherVersions {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			version := Version(tt.version)
+			assert.Equalf(t, tt.expectations.hasReleasePrefix, version.HasReleasePrefix(), "Version(%s).HasReleasePrefix()", tt.version)
+		})
+	}
 }
 
 func Test_IsDevOrPrerelease(t *testing.T) {
@@ -122,18 +134,6 @@ func TestVersion_IsRC(t *testing.T) {
 			t.Parallel()
 			version := Version(tt.version)
 			assert.Equalf(t, tt.expectations.isRC, version.IsRC(), "Version(%s).IsRC()", tt.version)
-		})
-	}
-}
-
-func TestVersion_HasReleasePrefix(t *testing.T) {
-	t.Parallel()
-	for _, tt := range exampleRancherVersions {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			version := Version(tt.version)
-			assert.Equalf(t, tt.expectations.hasReleasePrefix, version.HasReleasePrefix(), "Version(%s).HasReleasePrefix()", tt.version)
 		})
 	}
 }
