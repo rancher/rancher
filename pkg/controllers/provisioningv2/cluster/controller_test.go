@@ -6,8 +6,10 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -242,6 +244,141 @@ func TestController_createNewCluster(t *testing.T) {
 				assert.Equal(t, getTestClusterAgentCustomizationV3(), legacyCluster.Spec.ClusterAgentDeploymentCustomization)
 				assert.Equal(t, getTestFleetAgentCustomizationV3(), legacyCluster.Spec.FleetAgentDeploymentCustomization)
 			}
+		})
+	}
+}
+
+func Test_byCloudCredentialIndex(t *testing.T) {
+	tests := []struct {
+		name    string
+		cluster v1.Cluster
+		want    []string
+	}{
+		{
+			name:    "no credentials anywhere returns nil",
+			cluster: v1.Cluster{},
+			want:    nil,
+		},
+		{
+			name: "cluster-level only",
+			cluster: v1.Cluster{
+				Spec: v1.ClusterSpec{
+					CloudCredentialSecretName: "cattle-global-data:cc-aaa",
+				},
+			},
+			want: []string{"cattle-global-data:cc-aaa"},
+		},
+		{
+			name: "pool-level only (single pool)",
+			cluster: v1.Cluster{
+				Spec: v1.ClusterSpec{
+					RKEConfig: &v1.RKEConfig{
+						MachinePools: []v1.RKEMachinePool{
+							{
+								Name: "pool-1",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-bbb",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: []string{"cattle-global-data:cc-bbb"},
+		},
+		{
+			name: "both cluster and pool (same cred, dedup)",
+			cluster: v1.Cluster{
+				Spec: v1.ClusterSpec{
+					CloudCredentialSecretName: "cattle-global-data:cc-ccc",
+					RKEConfig: &v1.RKEConfig{
+						MachinePools: []v1.RKEMachinePool{
+							{
+								Name: "pool-a",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-ccc",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: []string{"cattle-global-data:cc-ccc"},
+		},
+		{
+			name: "multiple pools, mixed empty/non-empty",
+			cluster: v1.Cluster{
+				Spec: v1.ClusterSpec{
+					RKEConfig: &v1.RKEConfig{
+						MachinePools: []v1.RKEMachinePool{
+							{
+								Name: "pool-a",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-111",
+								},
+							},
+							{
+								Name: "pool-b",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "",
+								},
+							},
+							{
+								Name: "pool-c",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-222",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: []string{"cattle-global-data:cc-111", "cattle-global-data:cc-222"},
+		},
+		{
+			name: "multiple pools + cluster-level (dedup across many)",
+			cluster: v1.Cluster{
+				Spec: v1.ClusterSpec{
+					CloudCredentialSecretName: "cattle-global-data:cc-xyz",
+					RKEConfig: &v1.RKEConfig{
+						MachinePools: []v1.RKEMachinePool{
+							{
+								Name: "p1",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-xyz",
+								},
+							},
+							{
+								Name: "p2",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-abc",
+								},
+							},
+							{
+								Name: "p3",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: []string{"cattle-global-data:cc-abc", "cattle-global-data:cc-xyz"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := byCloudCredentialIndex(&tc.cluster)
+			require.NoError(t, err)
+
+			assert.ElementsMatch(
+				t,
+				tc.want,
+				got,
+				"credential IDs should match",
+			)
 		})
 	}
 }
