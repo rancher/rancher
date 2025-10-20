@@ -313,7 +313,7 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 
 	var namespace string
 	if parts := strings.SplitN(projectID, ":", 2); len(parts) == 2 && len(parts[1]) > 0 {
-		project, err := n.rq.ProjectLister.Get(parts[0], parts[1])
+		project, err := n.rq.ProjectCache.Get(parts[0], parts[1])
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				logrus.Warnf("Namespace %s references project %s in namespace %s which does not exist", ns.Name, parts[1], parts[0])
