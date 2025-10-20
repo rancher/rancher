@@ -682,3 +682,44 @@ func deleteDir(dir string) error {
 	}
 	return nil
 }
+
+func Test_serverVersionHasReleasePrefixExcludesHeadOrIsRC(t *testing.T) {
+	cases := []struct {
+		input string
+		want  bool
+	}{
+		{
+			input: "v2.13.0",
+			want:  true,
+		},
+		{
+			input: "v2.13.0-rc.1",
+			want:  true,
+		},
+		{
+			input: "2.13.0-rc.1",
+			want:  true,
+		},
+		{
+			input: "2.13.0-beta.1",
+			want:  false,
+		},
+		{
+			input: "v2.13.0-beta.1",
+			want:  true,
+		},
+		{
+			input: "v2.13.0-hash-head",
+			want:  false,
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.input, func(t *testing.T) {
+			_ = settings.ServerVersion.Set(tc.input)
+			result := serverVersionHasReleasePrefixExcludesHeadOrIsRC()
+			assert.Equal(t, tc.want, result)
+		})
+	}
+}

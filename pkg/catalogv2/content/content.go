@@ -456,14 +456,21 @@ func isRancherAndBundledCatalog(repo repoDef) bool {
 
 // skipIndexFiltering returns true if the helm index filtering should be skipped.
 func skipIndexFiltering() bool {
-	serverVersion := settings.ServerVersion.Get()
-	version := rancherSemver.Version(serverVersion)
-
 	// If the server version is a release or a release candidate (rc), we don't skip filtering.
-	if settings.ServerVersionHasReleasePrefixExcludesHead() || version.IsRC() {
+	if serverVersionHasReleasePrefixExcludesHeadOrIsRC() {
 		return false
 	}
 
 	// If setting is true, we skip filtering.
 	return settings.SkipHelmIndexFiltering.Get() == "true"
+}
+
+// serverVersionHasReleasePrefixExcludesHeadOrIsRC fetches the server version and validates the format
+// to verify that the version is either an RC or has the release prefix but is not a head build
+func serverVersionHasReleasePrefixExcludesHeadOrIsRC() bool {
+	serverVersion := settings.ServerVersion.Get()
+	version := rancherSemver.Version(serverVersion)
+
+	return version.IsRC() ||
+		(version.HasReleasePrefix() && !strings.Contains(serverVersion, "head"))
 }
