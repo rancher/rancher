@@ -336,6 +336,10 @@ COPY hack/airgap/ /src/
 RUN --mount=type=cache,target=/root/.cache,id=rancher go build -tags k3s_export -o export-images ./...
 RUN ./export-images -k3s-version ${CATTLE_K3S_VERSION} -output /src/k3s-airgap-images.tar
 
+# Output just k3s images
+FROM scratch AS k3s-images
+COPY --from=images /src/k3s-airgap-images.tar /k3s-airgap-images.tar
+
 # rancher-go-builder is an intermediate stage with go mod ready and Rancher
 # dependencies downloaded. Can be used to build both the Rancher server and agent
 # binaries.

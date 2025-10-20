@@ -26,6 +26,9 @@ quick-server:
 quick-binary-server:
 	@$(MAKE) quick TARGET="binary-server"
 
+quick-k3s-images:
+	@$(MAKE) quick TARGET="k3s-images"
+
 $(DEV_TARGETS):
 	./dev-scripts/$@
 
