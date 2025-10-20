@@ -107,7 +107,7 @@ func TestLogout(t *testing.T) {
 			logoutAll: logoutFunc,
 		}
 
-		for _, url := range []string{"/v1/logout?all", "/v1/logout?logoutAll"} {
+		for _, url := range []string{"/v1/logout?all", "/v3/tokens?action=logoutAll"} {
 			r := authRequest(url)
 			w := httptest.NewRecorder()
 			logoutCalled = false
