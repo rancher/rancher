@@ -1,4 +1,4 @@
-webhookVersion: 108.0.0+up0.9.0-rc.9
+webhookVersion: 108.0.0+up0.9.0-rc.11
 remoteDialerProxyVersion: 106.0.2+up0.6.0-rc.4
 provisioningCAPIVersion: 108.0.0+up0.9.0
 turtlesVersion: 108.0.0+up0.25.0-rc.3
@@ -6,7 +6,6 @@ cspAdapterMinVersion: 108.0.0+up8.0.0-rc.3
 defaultShellVersion: rancher/shell:v0.6.0-rc.1
 fleetVersion: 108.0.0+up0.14.0-alpha.5
 defaultSccOperatorImage: rancher/scc-operator:head
-
 # NOTE: when updating this version, you will also need to update the hardcoded
 # k8s minor <-> image tag mapping in pkg/controllers/capr/autoscaler/fleet.go (imageTagVersions variable).
 # if adding support for a new k8s minor release (e.g. new rancher release)
