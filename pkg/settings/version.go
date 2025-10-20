@@ -14,14 +14,14 @@ func ServerVersionHasReleasePrefixExcludesHead() bool {
 	return version.HasReleasePrefix() && !strings.Contains(serverVersion, "head")
 }
 
-func IsVersionRelease(version string) bool {
+func IsStableVersion(version string) bool {
 	semVer := semver.Version(version)
 	return !semVer.IsDevOrPrerelease()
 }
 
 // ServerVersionOrFallback verifies the input is a release semver and returns it (without v prefix) or the RancherVersionDev value.
 func ServerVersionOrFallback(version string) string {
-	if !IsVersionRelease(version) {
+	if !IsStableVersion(version) {
 		return RancherVersionDev
 	}
 	return strings.TrimPrefix(version, "v")

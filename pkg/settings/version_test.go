@@ -167,11 +167,11 @@ func Test_GetRancherVersion(t *testing.T) {
 	}
 }
 
-func Test_IsVersionRelease(t *testing.T) {
+func Test_IsStableVersion(t *testing.T) {
 	for _, tt := range exampleRancherVersions {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.expectations.isVersionRelease, IsVersionRelease(tt.version), "IsVersionRelease(%v)", tt.version)
+			assert.Equalf(t, tt.expectations.isVersionRelease, IsStableVersion(tt.version), "IsStableVersion(%v)", tt.version)
 		})
 	}
 }
