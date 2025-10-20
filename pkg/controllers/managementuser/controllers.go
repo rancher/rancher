@@ -48,7 +48,8 @@ func Register(ctx context.Context, mgmt *config.ScaledContext, cluster *config.U
 		})()
 	})
 
-	RegisterCaches(cluster)
+	registerCaches(cluster)
+
 	// early request an impersonator for initializing it
 	if _, err := impersonation.ForCluster(cluster); err != nil {
 		return fmt.Errorf("unable to create impersonator for cluster %q: %w", cluster.ClusterName, err)
@@ -94,8 +95,18 @@ func registerProvV2(ctx context.Context, cluster *config.UserContext, capi *wran
 	machinerole.Register(ctx, cluster)
 }
 
-// RegisterCaches initializes caches early in the initialization process to have them available as soon as possible (instead of on demand when Lister/Cache or Controller are called)
-func RegisterCaches(cluster *config.UserContext) {
+func RegisterFollower(cluster *config.UserContext) error {
+	registerCaches(cluster)
+
+	// early request an impersonator for initializing it
+	if _, err := impersonation.ForCluster(cluster); err != nil {
+		return fmt.Errorf("unable to create impersonator for cluster %q: %w", cluster.ClusterName, err)
+	}
+	return nil
+}
+
+// registerCaches initializes caches early in the initialization process to have them available as soon as possible (instead of on demand when Lister/Cache or Controller are called)
+func registerCaches(cluster *config.UserContext) {
 	cluster.Core.Namespaces("").Controller()
 	cluster.RBACw.ClusterRoleBinding().Informer()
 	cluster.RBACw.ClusterRole().Informer()
