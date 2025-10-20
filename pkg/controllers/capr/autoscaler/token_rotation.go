@@ -2,6 +2,7 @@ package autoscaler
 
 import (
 	"context"
+	goerrors "errors"
 	"fmt"
 	"time"
 
@@ -51,6 +52,8 @@ func (h *autoscalerHandler) checkAndRenewTokens() error {
 
 	expiringCount := 0
 
+	processingErrs := make([]error, 0, len(tokens))
+
 	for _, token := range tokens {
 		if token.TTLMillis == 0 {
 			continue // Skip non-expiring token
@@ -58,25 +61,21 @@ func (h *autoscalerHandler) checkAndRenewTokens() error {
 
 		expiresAt, err := time.Parse(time.RFC3339, token.ExpiresAt)
 		if err != nil {
-			logrus.Warnf("invalid token expires at on token %v: %v", token.Name, err)
-			return err
+			logrus.Warnf("[autoscaler] invalid token expires at on token %v: %v", token.Name, err)
+			processingErrs = append(processingErrs, err)
 		}
 
 		if expiresAt.Before(time.Now().Add(renewalThreshold)) {
 			expiringCount++
 			if err := h.renewToken(&token); err != nil {
 				logrus.Errorf("[autoscaler] Failed to renew token %s: %v", token.Name, err)
+				processingErrs = append(processingErrs, err)
 			}
 		}
 	}
 
-	if expiringCount > 0 {
-		logrus.Infof("[autoscaler] Processed %d expiring autoscaler token", expiringCount)
-	} else {
-		logrus.Debugf("[autoscaler] No expiring autoscaler token found")
-	}
-
-	return nil
+	logrus.Infof("[autoscaler] Processed %d expiring autoscaler tokens, renewed %d", len(tokens), expiringCount)
+	return goerrors.Join(processingErrs...)
 }
 
 // findAutoscalerTokens retrieves all tokens created by the autoscaler controller.
@@ -108,9 +107,9 @@ func (h *autoscalerHandler) renewToken(token *v3.Token) error {
 		return err
 	}
 
-	token, err = h.tokenClient.Create(newToken)
+	newToken, err = h.tokenClient.Create(newToken)
 	if err != nil {
-		return fmt.Errorf("failed to create renewed token %s: %w", token.Name, err)
+		return fmt.Errorf("failed to create renewed token: %w", err)
 	}
 
 	// Update the kubeconfig secret with the new token
@@ -123,14 +122,14 @@ func (h *autoscalerHandler) renewToken(token *v3.Token) error {
 	}))
 
 	if err != nil {
-		logrus.Errorf("[autoscaler] Failed to list clusters for token %s: %v", token.Name, err)
-		return fmt.Errorf("failed to list clusters for token %s: %v", token.Name, err)
+		logrus.Errorf("[autoscaler] Failed to list clusters for token %s: %v", newToken.Name, err)
+		return fmt.Errorf("failed to list clusters for token %s: %v", newToken.Name, err)
 	} else if len(clusters) == 0 {
-		logrus.Errorf("[autoscaler] No cluster found for token %s with name %s", token.Name, clusterName)
-		return fmt.Errorf("no cluster found for token %s with name %s", token.Name, clusterName)
+		logrus.Errorf("[autoscaler] No cluster found for token %s with name %s", newToken.Name, clusterName)
+		return fmt.Errorf("no cluster found for token %s with name %s", newToken.Name, clusterName)
 	} else if len(clusters) > 1 {
-		logrus.Errorf("[autoscaler] Multiple clusters found for token %s with name %s: %d clusters found", token.Name, clusterName, len(clusters))
-		return fmt.Errorf("multiple clusters found for token %s with name %s: %d clusters found", token.Name, clusterName, len(clusters))
+		logrus.Errorf("[autoscaler] Multiple clusters found for token %s with name %s: %d clusters found", newToken.Name, clusterName, len(clusters))
+		return fmt.Errorf("multiple clusters found for token %s with name %s: %d clusters found", newToken.Name, clusterName, len(clusters))
 	}
 
 	// Use the single matching capiCluster to update the secret
@@ -147,7 +146,7 @@ func (h *autoscalerHandler) renewToken(token *v3.Token) error {
 		return err
 	}
 
-	logrus.Infof("[autoscaler] Successfully renewed token %s and updated associated kubeconfig secret", token.Name)
+	logrus.Infof("[autoscaler] Successfully renewed token %s and updated associated kubeconfig secret", newToken.Name)
 	return nil
 }
 
@@ -170,7 +169,7 @@ func (h *autoscalerHandler) updateKubeConfigSecretWithToken(cluster *capi.Cluste
 	}
 
 	// Update both the full kubeconfig and the token field
-	secret.DeepCopy()
+	secret = secret.DeepCopy()
 	secret.Data["value"] = data
 	secret.Data["token"] = []byte(token)
 

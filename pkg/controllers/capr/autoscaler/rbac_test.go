@@ -9,6 +9,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
@@ -567,4 +568,680 @@ func (s *autoscalerSuite) TestCreateKubeConfigSecretUsingTemplate_CacheError() {
 	s.Require().Error(err, "Should return error when cache fails")
 	s.Require().Nil(secret, "Should not return secret when cache fails")
 	s.Require().Equal(cacheError, err, "Error should match the cache error")
+}
+
+// Test cases for cleanupRBAC method
+
+func (s *autoscalerSuite) TestCleanupRBAC_HappyPath_SuccessfulCleanup() {
+	// Create test cluster
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+		},
+	}
+
+	// Set up mock expectations for successful deletion of all resources
+	userName := autoscalerUserName(cluster)
+	globalRoleName := globalRoleName(cluster)
+	globalRoleBindingName := globalRoleBindingName(cluster)
+	secretName := kubeconfigSecretName(cluster)
+
+	// User exists and gets deleted successfully
+	s.userCache.EXPECT().Get(userName).Return(&v3.User{}, nil)
+	s.userClient.EXPECT().Delete(userName, gomock.Any()).Return(nil)
+
+	// Global role exists and gets deleted successfully
+	s.globalRoleCache.EXPECT().Get(globalRoleName).Return(&v3.GlobalRole{}, nil)
+	s.globalRoleClient.EXPECT().Delete(globalRoleName, gomock.Any()).Return(nil)
+
+	// Global role binding exists and gets deleted successfully
+	s.globalRoleBindingCache.EXPECT().Get(globalRoleBindingName).Return(&v3.GlobalRoleBinding{}, nil)
+	s.globalRoleBindingClient.EXPECT().Delete(globalRoleBindingName, gomock.Any()).Return(nil)
+
+	// Token exists and gets deleted successfully
+	s.tokenCache.EXPECT().Get(userName).Return(&v3.Token{}, nil)
+	s.tokenClient.EXPECT().Delete(userName, gomock.Any()).Return(nil)
+
+	// Secret exists and gets deleted successfully
+	s.secretCache.EXPECT().Get(cluster.Namespace, secretName).Return(&corev1.Secret{}, nil)
+	s.secretClient.EXPECT().Delete(cluster.Namespace, secretName, gomock.Any()).Return(nil)
+
+	// Call the method
+	err := s.h.cleanupRBAC(cluster)
+
+	// Assert the result
+	s.NoError(err, "Expected no error when successfully cleaning up all RBAC resources")
+}
+
+func (s *autoscalerSuite) TestCleanupRBAC_HappyPath_NoResourcesExist() {
+	// Create test cluster
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+		},
+	}
+
+	userName := autoscalerUserName(cluster)
+	globalRoleName := globalRoleName(cluster)
+	globalRoleBindingName := globalRoleBindingName(cluster)
+	secretName := kubeconfigSecretName(cluster)
+
+	// User doesn't exist
+	s.userCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Global role doesn't exist
+	s.globalRoleCache.EXPECT().Get(globalRoleName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Global role binding doesn't exist
+	s.globalRoleBindingCache.EXPECT().Get(globalRoleBindingName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Token doesn't exist
+	s.tokenCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Secret doesn't exist
+	s.secretCache.EXPECT().Get(cluster.Namespace, secretName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Call the method
+	err := s.h.cleanupRBAC(cluster)
+
+	// Assert the result
+	s.NoError(err, "Expected no error when no RBAC resources exist to clean up")
+}
+
+func (s *autoscalerSuite) TestCleanupRBAC_Error_FailedToDeleteUser() {
+	// Create test cluster
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+		},
+	}
+
+	userName := autoscalerUserName(cluster)
+	globalRoleName := globalRoleName(cluster)
+	globalRoleBindingName := globalRoleBindingName(cluster)
+	secretName := kubeconfigSecretName(cluster)
+
+	deleteError := fmt.Errorf("failed to delete user: access denied")
+
+	// User exists but deletion fails
+	s.userCache.EXPECT().Get(userName).Return(&v3.User{}, nil)
+	s.userClient.EXPECT().Delete(userName, gomock.Any()).Return(deleteError)
+
+	// Global role doesn't exist (should continue despite user deletion failure)
+	s.globalRoleCache.EXPECT().Get(globalRoleName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Global role binding doesn't exist
+	s.globalRoleBindingCache.EXPECT().Get(globalRoleBindingName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Token doesn't exist
+	s.tokenCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Secret doesn't exist
+	s.secretCache.EXPECT().Get(cluster.Namespace, secretName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Call the method
+	err := s.h.cleanupRBAC(cluster)
+
+	// Assert the result
+	s.Error(err, "Expected error when user deletion fails")
+	s.Contains(err.Error(), "encountered 1 errors during cleanup", "Error should mention count of errors")
+	s.Contains(err.Error(), "failed to delete user "+userName, "Error should include user name")
+	s.Contains(err.Error(), "access denied", "Original error should be preserved")
+}
+
+func (s *autoscalerSuite) TestCleanupRBAC_Error_FailedToDeleteGlobalRole() {
+	// Create test cluster
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+		},
+	}
+
+	userName := autoscalerUserName(cluster)
+	globalRoleName := globalRoleName(cluster)
+	globalRoleBindingName := globalRoleBindingName(cluster)
+	secretName := kubeconfigSecretName(cluster)
+
+	deleteError := fmt.Errorf("failed to delete global role: not found")
+
+	// User doesn't exist
+	s.userCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Global role exists but deletion fails
+	s.globalRoleCache.EXPECT().Get(globalRoleName).Return(&v3.GlobalRole{}, nil)
+	s.globalRoleClient.EXPECT().Delete(globalRoleName, gomock.Any()).Return(deleteError)
+
+	// Global role binding doesn't exist
+	s.globalRoleBindingCache.EXPECT().Get(globalRoleBindingName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Token doesn't exist
+	s.tokenCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Secret doesn't exist
+	s.secretCache.EXPECT().Get(cluster.Namespace, secretName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Call the method
+	err := s.h.cleanupRBAC(cluster)
+
+	// Assert the result
+	s.Error(err, "Expected error when global role deletion fails")
+	s.Contains(err.Error(), "encountered 1 errors during cleanup", "Error should mention count of errors")
+	s.Contains(err.Error(), "failed to delete global role "+globalRoleName, "Error should include global role name")
+	s.Contains(err.Error(), "not found", "Original error should be preserved")
+}
+
+func (s *autoscalerSuite) TestCleanupRBAC_Error_FailedToDeleteGlobalRoleBinding() {
+	// Create test cluster
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+		},
+	}
+
+	userName := autoscalerUserName(cluster)
+	globalRoleName := globalRoleName(cluster)
+	globalRoleBindingName := globalRoleBindingName(cluster)
+	secretName := kubeconfigSecretName(cluster)
+
+	deleteError := fmt.Errorf("failed to delete global role binding: conflict")
+
+	// User doesn't exist
+	s.userCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Global role doesn't exist
+	s.globalRoleCache.EXPECT().Get(globalRoleName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Global role binding exists but deletion fails
+	s.globalRoleBindingCache.EXPECT().Get(globalRoleBindingName).Return(&v3.GlobalRoleBinding{}, nil)
+	s.globalRoleBindingClient.EXPECT().Delete(globalRoleBindingName, gomock.Any()).Return(deleteError)
+
+	// Token doesn't exist
+	s.tokenCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Secret doesn't exist
+	s.secretCache.EXPECT().Get(cluster.Namespace, secretName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Call the method
+	err := s.h.cleanupRBAC(cluster)
+
+	// Assert the result
+	s.Error(err, "Expected error when global role binding deletion fails")
+	s.Contains(err.Error(), "encountered 1 errors during cleanup", "Error should mention count of errors")
+	s.Contains(err.Error(), "failed to delete global role binding "+globalRoleBindingName, "Error should include global role binding name")
+	s.Contains(err.Error(), "conflict", "Original error should be preserved")
+}
+
+func (s *autoscalerSuite) TestCleanupRBAC_Error_FailedToDeleteToken() {
+	// Create test cluster
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+		},
+	}
+
+	userName := autoscalerUserName(cluster)
+	globalRoleName := globalRoleName(cluster)
+	globalRoleBindingName := globalRoleBindingName(cluster)
+	secretName := kubeconfigSecretName(cluster)
+
+	deleteError := fmt.Errorf("failed to delete token: forbidden")
+
+	// User doesn't exist
+	s.userCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Global role doesn't exist
+	s.globalRoleCache.EXPECT().Get(globalRoleName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Global role binding doesn't exist
+	s.globalRoleBindingCache.EXPECT().Get(globalRoleBindingName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Token exists but deletion fails
+	s.tokenCache.EXPECT().Get(userName).Return(&v3.Token{}, nil)
+	s.tokenClient.EXPECT().Delete(userName, gomock.Any()).Return(deleteError)
+
+	// Secret doesn't exist
+	s.secretCache.EXPECT().Get(cluster.Namespace, secretName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Call the method
+	err := s.h.cleanupRBAC(cluster)
+
+	// Assert the result
+	s.Error(err, "Expected error when token deletion fails")
+	s.Contains(err.Error(), "encountered 1 errors during cleanup", "Error should mention count of errors")
+	s.Contains(err.Error(), "failed to delete token for user "+userName, "Error should include user name")
+	s.Contains(err.Error(), "forbidden", "Original error should be preserved")
+}
+
+func (s *autoscalerSuite) TestCleanupRBAC_Error_FailedToDeleteSecret() {
+	// Create test cluster
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+		},
+	}
+
+	userName := autoscalerUserName(cluster)
+	globalRoleName := globalRoleName(cluster)
+	globalRoleBindingName := globalRoleBindingName(cluster)
+	secretName := kubeconfigSecretName(cluster)
+
+	deleteError := fmt.Errorf("failed to delete secret: not found")
+
+	// User doesn't exist
+	s.userCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Global role doesn't exist
+	s.globalRoleCache.EXPECT().Get(globalRoleName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Global role binding doesn't exist
+	s.globalRoleBindingCache.EXPECT().Get(globalRoleBindingName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Token doesn't exist
+	s.tokenCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Secret exists but deletion fails
+	s.secretCache.EXPECT().Get(cluster.Namespace, secretName).Return(&corev1.Secret{}, nil)
+	s.secretClient.EXPECT().Delete(cluster.Namespace, secretName, gomock.Any()).Return(deleteError)
+
+	// Call the method
+	err := s.h.cleanupRBAC(cluster)
+
+	// Assert the result
+	s.Error(err, "Expected error when secret deletion fails")
+	s.Contains(err.Error(), "encountered 1 errors during cleanup", "Error should mention count of errors")
+	s.Contains(err.Error(), "failed to delete secret "+secretName+" in namespace "+cluster.Namespace, "Error should include secret name and namespace")
+	s.Contains(err.Error(), "not found", "Original error should be preserved")
+}
+
+func (s *autoscalerSuite) TestCleanupRBAC_Error_MultipleDeletionFailures() {
+	// Create test cluster
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+		},
+	}
+
+	userName := autoscalerUserName(cluster)
+	globalRoleName := globalRoleName(cluster)
+	globalRoleBindingName := globalRoleBindingName(cluster)
+	secretName := kubeconfigSecretName(cluster)
+
+	userDeleteError := fmt.Errorf("failed to delete user: access denied")
+	globalRoleDeleteError := fmt.Errorf("failed to delete global role: not found")
+
+	// User exists but deletion fails
+	s.userCache.EXPECT().Get(userName).Return(&v3.User{}, nil)
+	s.userClient.EXPECT().Delete(userName, gomock.Any()).Return(userDeleteError)
+
+	// Global role exists but deletion fails
+	s.globalRoleCache.EXPECT().Get(globalRoleName).Return(&v3.GlobalRole{}, nil)
+	s.globalRoleClient.EXPECT().Delete(globalRoleName, gomock.Any()).Return(globalRoleDeleteError)
+
+	// Global role binding doesn't exist
+	s.globalRoleBindingCache.EXPECT().Get(globalRoleBindingName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Token doesn't exist
+	s.tokenCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Secret doesn't exist
+	s.secretCache.EXPECT().Get(cluster.Namespace, secretName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Call the method
+	err := s.h.cleanupRBAC(cluster)
+
+	// Assert the result
+	s.Error(err, "Expected error when multiple deletions fail")
+	s.Contains(err.Error(), "encountered 2 errors during cleanup", "Error should mention count of errors")
+	s.Contains(err.Error(), "failed to delete user "+userName, "Error should include user name")
+	s.Contains(err.Error(), "access denied", "First original error should be preserved")
+	s.Contains(err.Error(), "failed to delete global role "+globalRoleName, "Error should include global role name")
+	s.Contains(err.Error(), "not found", "Second original error should be preserved")
+}
+
+func (s *autoscalerSuite) TestCleanupRBAC_Error_FailedToCheckUserExistence() {
+	// Create test cluster
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+		},
+	}
+
+	userName := autoscalerUserName(cluster)
+	globalRoleName := globalRoleName(cluster)
+	globalRoleBindingName := globalRoleBindingName(cluster)
+	secretName := kubeconfigSecretName(cluster)
+
+	checkError := fmt.Errorf("failed to check user existence: network timeout")
+
+	// User cache check fails
+	s.userCache.EXPECT().Get(userName).Return(nil, checkError)
+
+	// Global role doesn't exist (should continue despite user cache failure)
+	s.globalRoleCache.EXPECT().Get(globalRoleName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Global role binding doesn't exist
+	s.globalRoleBindingCache.EXPECT().Get(globalRoleBindingName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Token doesn't exist
+	s.tokenCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Secret doesn't exist
+	s.secretCache.EXPECT().Get(cluster.Namespace, secretName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Call the method
+	err := s.h.cleanupRBAC(cluster)
+
+	// Assert the result
+	s.Error(err, "Expected error when user existence check fails")
+	s.Contains(err.Error(), "encountered 1 errors during cleanup", "Error should mention count of errors")
+	s.Contains(err.Error(), "failed to check existence of user "+userName, "Error should include user name")
+	s.Contains(err.Error(), "network timeout", "Original error should be preserved")
+}
+
+func (s *autoscalerSuite) TestCleanupRBAC_Error_FailedToCheckGlobalRoleExistence() {
+	// Create test cluster
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+		},
+	}
+
+	userName := autoscalerUserName(cluster)
+	globalRoleName := globalRoleName(cluster)
+	globalRoleBindingName := globalRoleBindingName(cluster)
+	secretName := kubeconfigSecretName(cluster)
+
+	checkError := fmt.Errorf("failed to check global role existence: connection refused")
+
+	// User doesn't exist
+	s.userCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Global role cache check fails
+	s.globalRoleCache.EXPECT().Get(globalRoleName).Return(nil, checkError)
+
+	// Global role binding doesn't exist
+	s.globalRoleBindingCache.EXPECT().Get(globalRoleBindingName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Token doesn't exist
+	s.tokenCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Secret doesn't exist
+	s.secretCache.EXPECT().Get(cluster.Namespace, secretName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Call the method
+	err := s.h.cleanupRBAC(cluster)
+
+	// Assert the result
+	s.Error(err, "Expected error when global role existence check fails")
+	s.Contains(err.Error(), "encountered 1 errors during cleanup", "Error should mention count of errors")
+	s.Contains(err.Error(), "failed to check existence of global role "+globalRoleName, "Error should include global role name")
+	s.Contains(err.Error(), "connection refused", "Original error should be preserved")
+}
+
+func (s *autoscalerSuite) TestCleanupRBAC_Error_FailedToCheckGlobalRoleBindingExistence() {
+	// Create test cluster
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+		},
+	}
+
+	userName := autoscalerUserName(cluster)
+	globalRoleName := globalRoleName(cluster)
+	globalRoleBindingName := globalRoleBindingName(cluster)
+	secretName := kubeconfigSecretName(cluster)
+
+	checkError := fmt.Errorf("failed to check global role binding existence: server error")
+
+	// User doesn't exist
+	s.userCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Global role doesn't exist
+	s.globalRoleCache.EXPECT().Get(globalRoleName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Global role binding cache check fails
+	s.globalRoleBindingCache.EXPECT().Get(globalRoleBindingName).Return(nil, checkError)
+
+	// Token doesn't exist
+	s.tokenCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Secret doesn't exist
+	s.secretCache.EXPECT().Get(cluster.Namespace, secretName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Call the method
+	err := s.h.cleanupRBAC(cluster)
+
+	// Assert the result
+	s.Error(err, "Expected error when global role binding existence check fails")
+	s.Contains(err.Error(), "encountered 1 errors during cleanup", "Error should mention count of errors")
+	s.Contains(err.Error(), "failed to check existence of global role binding "+globalRoleBindingName, "Error should include global role binding name")
+	s.Contains(err.Error(), "server error", "Original error should be preserved")
+}
+
+func (s *autoscalerSuite) TestCleanupRBAC_Error_FailedToCheckTokenExistence() {
+	// Create test cluster
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+		},
+	}
+
+	userName := autoscalerUserName(cluster)
+	globalRoleName := globalRoleName(cluster)
+	globalRoleBindingName := globalRoleBindingName(cluster)
+	secretName := kubeconfigSecretName(cluster)
+
+	checkError := fmt.Errorf("failed to check token existence: database error")
+
+	// User doesn't exist
+	s.userCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Global role doesn't exist
+	s.globalRoleCache.EXPECT().Get(globalRoleName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Global role binding doesn't exist
+	s.globalRoleBindingCache.EXPECT().Get(globalRoleBindingName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Token cache check fails
+	s.tokenCache.EXPECT().Get(userName).Return(nil, checkError)
+
+	// Secret doesn't exist
+	s.secretCache.EXPECT().Get(cluster.Namespace, secretName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Call the method
+	err := s.h.cleanupRBAC(cluster)
+
+	// Assert the result
+	s.Error(err, "Expected error when token existence check fails")
+	s.Contains(err.Error(), "encountered 1 errors during cleanup", "Error should mention count of errors")
+	s.Contains(err.Error(), "failed to check existence of token for user "+userName, "Error should include user name")
+	s.Contains(err.Error(), "database error", "Original error should be preserved")
+}
+
+func (s *autoscalerSuite) TestCleanupRBAC_Error_FailedToCheckSecretExistence() {
+	// Create test cluster
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+		},
+	}
+
+	userName := autoscalerUserName(cluster)
+	globalRoleName := globalRoleName(cluster)
+	globalRoleBindingName := globalRoleBindingName(cluster)
+	secretName := kubeconfigSecretName(cluster)
+
+	checkError := fmt.Errorf("failed to check secret existence: API unavailable")
+
+	// User doesn't exist
+	s.userCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Global role doesn't exist
+	s.globalRoleCache.EXPECT().Get(globalRoleName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Global role binding doesn't exist
+	s.globalRoleBindingCache.EXPECT().Get(globalRoleBindingName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Token doesn't exist
+	s.tokenCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Secret cache check fails
+	s.secretCache.EXPECT().Get(cluster.Namespace, secretName).Return(nil, checkError)
+
+	// Call the method
+	err := s.h.cleanupRBAC(cluster)
+
+	// Assert the result
+	s.Error(err, "Expected error when secret existence check fails")
+	s.Contains(err.Error(), "encountered 1 errors during cleanup", "Error should mention count of errors")
+	s.Contains(err.Error(), "failed to check existence of secret "+secretName+" in namespace "+cluster.Namespace, "Error should include secret name and namespace")
+	s.Contains(err.Error(), "API unavailable", "Original error should be preserved")
+}
+
+func (s *autoscalerSuite) TestCleanupRBAC_EdgeCase_ClusterWithEmptyName() {
+	// Create test cluster with empty name
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "",
+			Namespace: "default",
+		},
+	}
+
+	userName := autoscalerUserName(cluster)
+	globalRoleName := globalRoleName(cluster)
+	globalRoleBindingName := globalRoleBindingName(cluster)
+	secretName := kubeconfigSecretName(cluster)
+
+	// All resources don't exist (should handle empty names gracefully)
+	s.userCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	s.globalRoleCache.EXPECT().Get(globalRoleName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	s.globalRoleBindingCache.EXPECT().Get(globalRoleBindingName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	s.tokenCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	s.secretCache.EXPECT().Get(cluster.Namespace, secretName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Call the method
+	err := s.h.cleanupRBAC(cluster)
+
+	// Assert the result
+	s.NoError(err, "Expected no error when cluster has empty name")
+}
+
+func (s *autoscalerSuite) TestCleanupRBAC_EdgeCase_ClusterWithEmptyNamespace() {
+	// Create test cluster with empty namespace
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "",
+		},
+	}
+
+	userName := autoscalerUserName(cluster)
+	globalRoleName := globalRoleName(cluster)
+	globalRoleBindingName := globalRoleBindingName(cluster)
+	secretName := kubeconfigSecretName(cluster)
+
+	// All resources don't exist (should handle empty namespace gracefully)
+	s.userCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	s.globalRoleCache.EXPECT().Get(globalRoleName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	s.globalRoleBindingCache.EXPECT().Get(globalRoleBindingName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	s.tokenCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	s.secretCache.EXPECT().Get(cluster.Namespace, secretName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Call the method
+	err := s.h.cleanupRBAC(cluster)
+
+	// Assert the result
+	s.NoError(err, "Expected no error when cluster has empty namespace")
+}
+
+func (s *autoscalerSuite) TestCleanupRBAC_EdgeCase_ClusterWithSpecialCharacters() {
+	// Create test cluster with special characters in name and namespace
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster-123",
+			Namespace: "test-namespace-456",
+		},
+	}
+
+	userName := autoscalerUserName(cluster)
+	globalRoleName := globalRoleName(cluster)
+	globalRoleBindingName := globalRoleBindingName(cluster)
+	secretName := kubeconfigSecretName(cluster)
+
+	// All resources don't exist (should handle special characters gracefully)
+	s.userCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	s.globalRoleCache.EXPECT().Get(globalRoleName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	s.globalRoleBindingCache.EXPECT().Get(globalRoleBindingName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	s.tokenCache.EXPECT().Get(userName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	s.secretCache.EXPECT().Get(cluster.Namespace, secretName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Call the method
+	err := s.h.cleanupRBAC(cluster)
+
+	// Assert the result
+	s.NoError(err, "Expected no error when cluster has special characters in name and namespace")
+}
+
+func (s *autoscalerSuite) TestCleanupRBAC_EdgeCase_PartialCleanupSuccess() {
+	// Create test cluster
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+		},
+	}
+
+	userName := autoscalerUserName(cluster)
+	globalRoleName := globalRoleName(cluster)
+	globalRoleBindingName := globalRoleBindingName(cluster)
+	secretName := kubeconfigSecretName(cluster)
+
+	// User exists and gets deleted successfully
+	s.userCache.EXPECT().Get(userName).Return(&v3.User{}, nil)
+	s.userClient.EXPECT().Delete(userName, gomock.Any()).Return(nil)
+
+	// Global role exists and gets deleted successfully
+	s.globalRoleCache.EXPECT().Get(globalRoleName).Return(&v3.GlobalRole{}, nil)
+	s.globalRoleClient.EXPECT().Delete(globalRoleName, gomock.Any()).Return(nil)
+
+	// Global role binding doesn't exist
+	s.globalRoleBindingCache.EXPECT().Get(globalRoleBindingName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Token exists and gets deleted successfully
+	s.tokenCache.EXPECT().Get(userName).Return(&v3.Token{}, nil)
+	s.tokenClient.EXPECT().Delete(userName, gomock.Any()).Return(nil)
+
+	// Secret doesn't exist
+	s.secretCache.EXPECT().Get(cluster.Namespace, secretName).Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+
+	// Call the method
+	err := s.h.cleanupRBAC(cluster)
+
+	// Assert the result - should succeed even when some resources don't exist
+	s.NoError(err, "Expected no error when some resources don't exist but others are cleaned up successfully")
 }
