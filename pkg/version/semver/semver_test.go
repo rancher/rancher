@@ -100,6 +100,15 @@ var exampleRancherVersions = []genericRancherExampleCases{
 			false,
 		},
 	},
+	{
+		"Manual Build Large Patch w v prefix",
+		"v2.13.9999",
+		testExpectations{
+			true,
+			false,
+			false,
+		},
+	},
 }
 
 func TestVersion_HasReleasePrefix(t *testing.T) {
