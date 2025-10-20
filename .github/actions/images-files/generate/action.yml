@@ -18,9 +18,9 @@ runs:
         curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data.json > "./$ARTIFACTS_BASE_DIR/data.json"
         cp "./$ARTIFACTS_BASE_DIR/data.json" "./$ARTIFACTS_BASE_DIR/rancher-data.json"
     - name: Create k3s images file
-      uses: ./.github/actions/k3s-images
-      with:
-        k3s_version: ${{ steps.env.outputs.CATTLE_K3S_VERSION }}
+      shell: bash
+      run: |
+        make quick-k3s-images
     - name: Create files
       shell: bash
       run: |
