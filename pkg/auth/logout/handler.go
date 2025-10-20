@@ -70,7 +70,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	isLogoutAll := r.URL.Query().Has("all") || r.URL.Query().Has("logoutAll")
+	isLogoutAll := r.URL.Query().Has("all") || r.URL.Query().Get("action") == "logoutAll"
 
 	if isLogoutAll {
 		err = h.logoutAll(w, r, storedToken)
