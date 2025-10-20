@@ -40,13 +40,6 @@ func GetURLAndInterval() (string, time.Duration) {
 	return url, time.Duration(minutes) * time.Minute
 }
 
-// getChannelServerArg will return with an argument to pass to channel server
-// to indicate the server version that is running. If the current version is
-// not a proper release version, the argument will be set to the dev version.
-func getChannelServerArg() string {
-	return settings.GetRancherVersion()
-}
-
 type DynamicInterval struct {
 	subKey string
 }
@@ -111,8 +104,8 @@ func GetReleaseConfigByRuntime(ctx context.Context, runtime string) *config.Conf
 			config.StringSource("/var/lib/rancher-data/driver-metadata/data.json"),
 		}
 		configs = map[string]*config.Config{
-			"k3s":  config.NewConfig(ctx, "k3s", &DynamicInterval{"k3s"}, getChannelServerArg(), "rancher", urls),
-			"rke2": config.NewConfig(ctx, "rke2", &DynamicInterval{"rke2"}, getChannelServerArg(), "rancher", urls),
+			"k3s":  config.NewConfig(ctx, "k3s", &DynamicInterval{"k3s"}, settings.GetRancherVersion(), "rancher", urls),
+			"rke2": config.NewConfig(ctx, "rke2", &DynamicInterval{"rke2"}, settings.GetRancherVersion(), "rancher", urls),
 		}
 	})
 	return configs[runtime]
