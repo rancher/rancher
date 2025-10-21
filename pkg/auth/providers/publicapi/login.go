@@ -364,6 +364,10 @@ func (h *loginHandler) login(w http.ResponseWriter, r *http.Request, input login
 	tokenData := map[string]any{
 		"token":     bearerToken,
 		"expiresAt": token.ExpiresAt,
+		// The following fields are included for backwards compatibility
+		// with existing v3 clients e.g. the Rancher terraform provider.
+		"baseType": "token",
+		"type":     "token",
 	}
 
 	w.Header().Set("Content-Type", "application/json")
