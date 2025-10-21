@@ -130,13 +130,6 @@ func Test_roletemplateEnqueueCRTBs(t *testing.T) {
 			want:    nil,
 			wantErr: false,
 		},
-		{
-			name:    "invalid object type",
-			obj:     &v3.Cluster{},
-			caches:  caches{},
-			want:    nil,
-			wantErr: false,
-		},
 	}
 	ctrl := gomock.NewController(t)
 	for _, tt := range tests {
@@ -151,7 +144,7 @@ func Test_roletemplateEnqueueCRTBs(t *testing.T) {
 				r.crtbCache = tt.caches.crtbCache(ctrl)
 			}
 
-			got, err := r.roletemplateEnqueueCRTBs("", "", tt.obj)
+			got, err := r.roletemplateEnqueueCRTBs("", "rt-1", tt.obj)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {
@@ -262,13 +255,6 @@ func Test_roletemplateEnqueuePRTBs(t *testing.T) {
 			want:    nil,
 			wantErr: false,
 		},
-		{
-			name:    "invalid object type",
-			obj:     &v3.Cluster{},
-			caches:  caches{},
-			want:    nil,
-			wantErr: false,
-		},
 	}
 	ctrl := gomock.NewController(t)
 	for _, tt := range tests {
@@ -286,7 +272,7 @@ func Test_roletemplateEnqueuePRTBs(t *testing.T) {
 				r.prtbCache = tt.caches.prtbCache(ctrl)
 			}
 
-			got, err := r.roletemplateEnqueuePRTBs("", "", tt.obj)
+			got, err := r.roletemplateEnqueuePRTBs("", "rt-1", tt.obj)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {

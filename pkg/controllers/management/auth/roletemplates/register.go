@@ -4,12 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
-	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -59,13 +57,8 @@ type roletemplateEnqueuer struct {
 }
 
 // roletemplateEnqueuePRTBs enqueues PRTBs that reference the changed RoleTemplate.
-func (r *roletemplateEnqueuer) roletemplateEnqueuePRTBs(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
+func (r *roletemplateEnqueuer) roletemplateEnqueuePRTBs(_, name string, obj runtime.Object) ([]relatedresource.Key, error) {
 	if obj == nil {
-		return nil, nil
-	}
-	rt, ok := obj.(*v3.RoleTemplate)
-	if !ok {
-		logrus.Errorf("unable to convert object: %[1]v, type %[1]T to a RoleTemplate", obj)
 		return nil, nil
 	}
 
@@ -87,7 +80,7 @@ func (r *roletemplateEnqueuer) roletemplateEnqueuePRTBs(_, _ string, obj runtime
 				return nil, fmt.Errorf("unable to list ProjectRoleTemplateBindings in namespace %s: %w", project.GetProjectBackingNamespace(), err)
 			}
 			for _, prtb := range prtbs {
-				if prtb.RoleTemplateName == rt.Name {
+				if prtb.RoleTemplateName == name {
 					keys = append(keys, relatedresource.Key{
 						Name:      prtb.Name,
 						Namespace: prtb.Namespace,
@@ -101,13 +94,8 @@ func (r *roletemplateEnqueuer) roletemplateEnqueuePRTBs(_, _ string, obj runtime
 }
 
 // roletemplateEnqueueCRTBs enqueues CRTBs that reference the changed RoleTemplate.
-func (r *roletemplateEnqueuer) roletemplateEnqueueCRTBs(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
+func (r *roletemplateEnqueuer) roletemplateEnqueueCRTBs(_, name string, obj runtime.Object) ([]relatedresource.Key, error) {
 	if obj == nil {
-		return nil, nil
-	}
-	rt, ok := obj.(*v3.RoleTemplate)
-	if !ok {
-		logrus.Errorf("unable to convert object: %[1]v, type %[1]T to a RoleTemplate", obj)
 		return nil, nil
 	}
 
@@ -117,14 +105,13 @@ func (r *roletemplateEnqueuer) roletemplateEnqueueCRTBs(_, _ string, obj runtime
 	}
 
 	var keys []relatedresource.Key
-
 	for _, cluster := range clusters {
 		crtbs, err := r.crtbCache.List(cluster.Name, labels.Everything())
 		if err != nil {
 			return nil, fmt.Errorf("unable to list ClusterRoleTemplateBindings: %w", err)
 		}
 		for _, crtb := range crtbs {
-			if crtb.RoleTemplateName == rt.Name {
+			if crtb.RoleTemplateName == name {
 				keys = append(keys, relatedresource.Key{
 					Name:      crtb.Name,
 					Namespace: crtb.Namespace,
