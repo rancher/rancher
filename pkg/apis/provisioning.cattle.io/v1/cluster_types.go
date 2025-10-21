@@ -163,7 +163,8 @@ type RKEConfig struct {
 }
 
 // RKEMachinePool is the configuration for a RKE2/K3s machine pool within a provisioning cluster.
-// +kubebuilder:validation:XValidation:rule="!self.etcdRole && !self.controlPlaneRole || !has(self.autoscalingMinSize) || self.autoscalingMinSize > 0", message="AutoscalingMinSize must be greater than 0 when EtcdRole or ControlPlaneRole are true"
+// +kubebuilder:validation:XValidation:rule="!has(self.controlPlaneRole) || !self.controlPlaneRole || !has(self.autoscalingMinSize) || self.autoscalingMinSize > 0", message="AutoscalingMinSize must be greater than 0 when ControlPlaneRole is true"
+// +kubebuilder:validation:XValidation:rule="!has(self.etcdRole) || !self.etcdRole || !has(self.autoscalingMinSize) || self.autoscalingMinSize > 0", message="AutoscalingMinSize must be greater than 0 when EtcdRole is true"
 // +kubebuilder:validation:XValidation:rule="!has(self.autoscalingMaxSize) || !has(self.autoscalingMinSize) || self.autoscalingMaxSize == 0 || self.autoscalingMinSize == 0 || self.autoscalingMinSize <= self.autoscalingMaxSize", message="AutoscalingMinSize must be less than or equal to AutoscalingMaxSize when both are non-zero"
 type RKEMachinePool struct {
 	rkev1.RKECommonNodeConfig `json:",inline"`
