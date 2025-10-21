@@ -711,6 +711,7 @@ func (o *OpenIDCProvider) LogoutAll(w http.ResponseWriter, r *http.Request, toke
 	data := map[string]any{
 		"idpRedirectUrl": idpRedirectURL,
 		"type":           "authConfigLogoutOutput",
+		"baseType":       "authConfigLogoutOutput",
 	}
 
 	logrus.Debug("OpenIDCProvider [logout-all]: writing redirect")
