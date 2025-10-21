@@ -2,6 +2,9 @@ package snapshotbackpopulate
 
 import (
 	"errors"
+	"fmt"
+	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,12 +15,15 @@ import (
 	cluster2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/utils/ptr"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
@@ -613,6 +619,294 @@ func TestOnDownstreamChange(t *testing.T) {
 	assert.NoError(t, err, "It should not return an error when update the snapshot")
 }
 
+func TestOnDownstreamChange_S3FallbackNameGeneration_Metadata_Is_Empty(t *testing.T) {
+	controller := gomock.NewController(t)
+
+	clusterCache := fake.NewMockCacheInterface[*provv1.Cluster](controller)
+	controlPlaneCache := fake.NewMockCacheInterface[*rkev1.RKEControlPlane](controller)
+	etcdSnapshotCache := fake.NewMockCacheInterface[*rkev1.ETCDSnapshot](controller)
+	etcdSnapshotController := fake.NewMockControllerInterface[*rkev1.ETCDSnapshot, *rkev1.ETCDSnapshotList](controller)
+	machineCache := fake.NewMockCacheInterface[*capi.Machine](controller)
+	capiClusterCache := fake.NewMockCacheInterface[*capi.Cluster](controller)
+	etcdSnapshotFileController := fake.NewMockNonNamespacedControllerInterface[*k3s.ETCDSnapshotFile, *k3s.ETCDSnapshotFileList](controller)
+
+	handlerUnderTest := handler{
+		clusterName:                "test-mgmt-cluster",
+		clusterCache:               clusterCache,
+		controlPlaneCache:          controlPlaneCache,
+		etcdSnapshotCache:          etcdSnapshotCache,
+		etcdSnapshotController:     etcdSnapshotController,
+		machineCache:               machineCache,
+		capiClusterCache:           capiClusterCache,
+		etcdSnapshotFileController: etcdSnapshotFileController,
+	}
+
+	provisioningCluster := &provv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test-namespace",
+			Name:      "test-cluster",
+		},
+		Status: provv1.ClusterStatus{
+			ClusterName: "test-mgmt-cluster",
+		},
+	}
+	controlPlane := &rkev1.RKEControlPlane{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test-namespace",
+			Name:      "test-cluster",
+			Labels: map[string]string{
+				capi.ClusterNameLabel: provisioningCluster.Name,
+			},
+		},
+	}
+	capiCluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test-namespace",
+			Name:      "test-cluster",
+		},
+	}
+	machine := &capi.Machine{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test-namespace",
+			Name:      "test-machine",
+			Labels: map[string]string{
+				capi.ClusterNameLabel: provisioningCluster.Name,
+			},
+		},
+		Status: capi.MachineStatus{
+			NodeRef: &corev1.ObjectReference{Name: "cp-0"},
+		},
+	}
+	downstreamSnapshot := &k3s.ETCDSnapshotFile{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "downstream-bad",
+		},
+		Spec: k3s.ETCDSnapshotSpec{
+			SnapshotName: "something.something.-.s3-.com",
+			NodeName:     "cp-0",
+			Location:     "s3://bucket/prefix/key",
+			S3:           &k3s.ETCDSnapshotS3{},
+		},
+		Status: k3s.ETCDSnapshotStatus{
+			CreationTime: &metav1.Time{Time: time.Now()},
+			ReadyToUse:   ptr.To(true),
+		},
+	}
+
+	clusterCache.EXPECT().
+		GetByIndex(cluster2.ByCluster, handlerUnderTest.clusterName).
+		Return([]*provv1.Cluster{provisioningCluster}, nil).
+		Times(1)
+
+	controlPlaneCache.EXPECT().
+		Get(provisioningCluster.Namespace, provisioningCluster.Name).
+		Return(controlPlane, nil).
+		Times(1)
+
+	capiClusterCache.EXPECT().
+		Get(provisioningCluster.Namespace, provisioningCluster.Name).
+		Return(capiCluster, nil).
+		AnyTimes()
+
+	etcdSnapshotCache.EXPECT().
+		GetByIndex(cluster2.ByETCDSnapshotName, "test-namespace/test-cluster/downstream-bad").
+		Return([]*rkev1.ETCDSnapshot{}, nil).
+		Times(1)
+
+	machineCache.EXPECT().
+		List(provisioningCluster.Namespace, gomock.AssignableToTypeOf(labels.Selector(nil))).
+		Return([]*capi.Machine{machine}, nil).
+		AnyTimes()
+
+	var callbackErr error
+	etcdSnapshotController.EXPECT().
+		Create(gomock.Any()).
+		DoAndReturn(func(obj *rkev1.ETCDSnapshot) (*rkev1.ETCDSnapshot, error) {
+			if errs := validation.IsDNS1123Subdomain(obj.Name); len(errs) != 0 {
+				callbackErr = fmt.Errorf("dns1123 failed: %v", errs)
+				return obj, nil
+			}
+
+			if len(obj.Name)+13 > validation.DNS1123SubdomainMaxLength {
+				callbackErr = errors.New("dns1123 failed: too long")
+				return obj, nil
+			}
+
+			annotations := obj.GetAnnotations()
+			require.NotNil(t, annotations)
+			require.Equal(t, downstreamSnapshot.Spec.SnapshotName, annotations[SnapshotOriginalNameKey])
+			require.Equal(t, FallbackGeneratedStrategyName, annotations[SnapshotNameStrategyKey])
+
+			require.Equal(t, "failed", obj.SnapshotFile.Status)
+			require.Contains(t, obj.SnapshotFile.Message, EncodedMetadataIsEmptyMessage)
+
+			return obj, nil
+		}).
+		Times(1)
+
+	_, err := handlerUnderTest.OnDownstreamChange("", downstreamSnapshot)
+	require.NoError(t, err)
+	require.NoError(t, callbackErr)
+}
+
+func TestOnDownstreamChange_Local_Metadata_Is_Empty(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	clusterCache := fake.NewMockCacheInterface[*provv1.Cluster](ctrl)
+	controlPlaneCache := fake.NewMockCacheInterface[*rkev1.RKEControlPlane](ctrl)
+	etcdSnapshotCache := fake.NewMockCacheInterface[*rkev1.ETCDSnapshot](ctrl)
+	etcdSnapshotController := fake.NewMockControllerInterface[*rkev1.ETCDSnapshot, *rkev1.ETCDSnapshotList](ctrl)
+	machineCache := fake.NewMockCacheInterface[*capi.Machine](ctrl)
+	capiClusterCache := fake.NewMockCacheInterface[*capi.Cluster](ctrl)
+	etcdSnapshotFileController := fake.NewMockNonNamespacedControllerInterface[*k3s.ETCDSnapshotFile, *k3s.ETCDSnapshotFileList](ctrl)
+
+	h := handler{
+		clusterName:                "test-mgmt-cluster",
+		clusterCache:               clusterCache,
+		controlPlaneCache:          controlPlaneCache,
+		etcdSnapshotCache:          etcdSnapshotCache,
+		etcdSnapshotController:     etcdSnapshotController,
+		machineCache:               machineCache,
+		capiClusterCache:           capiClusterCache,
+		etcdSnapshotFileController: etcdSnapshotFileController,
+	}
+
+	cluster := &provv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "test-namespace", Name: "test-cluster"},
+		Status:     provv1.ClusterStatus{ClusterName: "test-mgmt-cluster"},
+	}
+	controlPlane := &rkev1.RKEControlPlane{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test-namespace", Name: "test-cluster",
+			Labels: map[string]string{capi.ClusterNameLabel: cluster.Name},
+		},
+	}
+
+	// Local snapshot, empty metadata, ReadyToUse true
+	snap := &k3s.ETCDSnapshotFile{
+		ObjectMeta: metav1.ObjectMeta{Name: "local-empty-metadata"},
+		Spec: k3s.ETCDSnapshotSpec{
+			SnapshotName: "etcd-snapshot-cp-0-1700000000",
+			NodeName:     "cp-0",
+			Location:     "file:///var/lib/rancher/etcd",
+			Metadata:     nil,
+		},
+		Status: k3s.ETCDSnapshotStatus{
+			CreationTime: &metav1.Time{Time: time.Now()},
+			ReadyToUse:   ptr.To(true),
+		},
+	}
+
+	clusterCache.EXPECT().GetByIndex(cluster2.ByCluster, h.clusterName).
+		Return([]*provv1.Cluster{cluster}, nil)
+	controlPlaneCache.EXPECT().Get(cluster.Namespace, cluster.Name).
+		Return(controlPlane, nil)
+	etcdSnapshotCache.EXPECT().
+		GetByIndex(cluster2.ByETCDSnapshotName, "test-namespace/test-cluster/local-empty-metadata").
+		Return([]*rkev1.ETCDSnapshot{}, nil)
+
+	// Machine lookup for local
+	machineCache.EXPECT().
+		List(cluster.Namespace, labels.SelectorFromSet(labels.Set{capi.ClusterNameLabel: cluster.Name})).
+		Return([]*capi.Machine{
+			{Status: capi.MachineStatus{NodeRef: &corev1.ObjectReference{Name: "cp-0"}}},
+		}, nil).
+		AnyTimes()
+
+	etcdSnapshotController.EXPECT().
+		Create(gomock.Any()).
+		DoAndReturn(func(obj *rkev1.ETCDSnapshot) (*rkev1.ETCDSnapshot, error) {
+			require.Equal(t, "failed", obj.SnapshotFile.Status)
+			require.Contains(t, obj.SnapshotFile.Message, EncodedMetadataIsEmptyMessage)
+			return obj, nil
+		})
+
+	_, err := h.OnDownstreamChange("", snap)
+	require.NoError(t, err)
+}
+
+func TestOnDownstreamChange_FallbackNameGeneration_Metadata_Not_Empty(t *testing.T) {
+	controller := gomock.NewController(t)
+
+	clusterCache := fake.NewMockCacheInterface[*provv1.Cluster](controller)
+	controlPlaneCache := fake.NewMockCacheInterface[*rkev1.RKEControlPlane](controller)
+	etcdSnapshotCache := fake.NewMockCacheInterface[*rkev1.ETCDSnapshot](controller)
+	etcdSnapshotController := fake.NewMockControllerInterface[*rkev1.ETCDSnapshot, *rkev1.ETCDSnapshotList](controller)
+	machineCache := fake.NewMockCacheInterface[*capi.Machine](controller)
+	capiClusterCache := fake.NewMockCacheInterface[*capi.Cluster](controller)
+	etcdSnapshotFileController := fake.NewMockNonNamespacedControllerInterface[*k3s.ETCDSnapshotFile, *k3s.ETCDSnapshotFileList](controller)
+
+	h := handler{
+		clusterName:                "test-mgmt-cluster",
+		clusterCache:               clusterCache,
+		controlPlaneCache:          controlPlaneCache,
+		etcdSnapshotCache:          etcdSnapshotCache,
+		etcdSnapshotController:     etcdSnapshotController,
+		machineCache:               machineCache,
+		capiClusterCache:           capiClusterCache,
+		etcdSnapshotFileController: etcdSnapshotFileController,
+	}
+
+	provisioningCluster := &provv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "test-namespace", Name: "test-cluster"},
+		Status:     provv1.ClusterStatus{ClusterName: "test-mgmt-cluster"},
+	}
+	controlPlane := &rkev1.RKEControlPlane{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "test-namespace", Name: "test-cluster",
+			Labels: map[string]string{capi.ClusterNameLabel: provisioningCluster.Name},
+		},
+	}
+	capiCluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "test-namespace", Name: "test-cluster"},
+	}
+
+	// Downstream S3 snapshot WITH metadata
+	downstreamSnapshot := &k3s.ETCDSnapshotFile{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "downstream-bad",
+		},
+		Spec: k3s.ETCDSnapshotSpec{
+			SnapshotName: "something.something.-.s3-.com",
+			NodeName:     "cp-0",
+			Location:     "s3://bucket/prefix/key",
+			S3:           &k3s.ETCDSnapshotS3{},
+			Metadata:     map[string]string{"provisioning-cluster-spec": "compressed-blob"},
+		},
+		Status: k3s.ETCDSnapshotStatus{
+			CreationTime: &metav1.Time{Time: time.Now()},
+			ReadyToUse:   ptr.To(true),
+		},
+	}
+
+	clusterCache.EXPECT().GetByIndex(cluster2.ByCluster, h.clusterName).
+		Return([]*provv1.Cluster{provisioningCluster}, nil)
+	controlPlaneCache.EXPECT().Get(provisioningCluster.Namespace, provisioningCluster.Name).
+		Return(controlPlane, nil)
+	capiClusterCache.EXPECT().Get(provisioningCluster.Namespace, provisioningCluster.Name).
+		Return(capiCluster, nil).
+		AnyTimes()
+	etcdSnapshotCache.EXPECT().
+		GetByIndex(cluster2.ByETCDSnapshotName, "test-namespace/test-cluster/downstream-bad").
+		Return([]*rkev1.ETCDSnapshot{}, nil)
+	machineCache.EXPECT().
+		List(provisioningCluster.Namespace, gomock.AssignableToTypeOf(labels.Selector(nil))).
+		Return([]*capi.Machine{
+			{Status: capi.MachineStatus{NodeRef: &corev1.ObjectReference{Name: "cp-0"}}},
+		}, nil).
+		AnyTimes()
+
+	etcdSnapshotController.EXPECT().
+		Create(gomock.Any()).
+		DoAndReturn(func(obj *rkev1.ETCDSnapshot) (*rkev1.ETCDSnapshot, error) {
+			require.Equal(t, "successful", obj.SnapshotFile.Status)
+			return obj, nil
+		})
+
+	_, err := h.OnDownstreamChange("", downstreamSnapshot)
+	require.NoError(t, err)
+}
+
 func TestGetCluster(t *testing.T) {
 	t.Parallel()
 
@@ -1017,4 +1311,76 @@ func TestGetMachineByID(t *testing.T) {
 
 func TestGetLogPrefix(t *testing.T) {
 	assert.Equal(t, "[snapshotbackpopulate] rkecluster test-namespace/test-cluster:", getLogPrefix(&provv1.Cluster{ObjectMeta: metav1.ObjectMeta{Namespace: "test-namespace", Name: "test-cluster"}}))
+}
+
+func TestGenerateSafeSnapshotName(t *testing.T) {
+	ts := time.Unix(1_700_000_000, 0)
+
+	createEtcdEnapshot := func(name, node, loc string, s3 bool) k3s.ETCDSnapshotSpec {
+		var s3ptr *k3s.ETCDSnapshotS3
+		if s3 {
+			s3ptr = &k3s.ETCDSnapshotS3{}
+		}
+		return k3s.ETCDSnapshotSpec{
+			SnapshotName: name,
+			NodeName:     node,
+			Location:     loc,
+			S3:           s3ptr,
+		}
+	}
+
+	cases := []struct {
+		name             string
+		etcdSnapshotSpec k3s.ETCDSnapshotSpec
+		wantPrefix       string
+	}{
+		{
+			name:             "Local snapshot: invalid chars, node has domain",
+			etcdSnapshotSpec: createEtcdEnapshot("something.something.-.s3-.com", "cp-0.example.com", "file:///var/lib", false),
+			wantPrefix:       "local-etcd-snapshot-cp-0-1700000000-",
+		},
+		{
+			name:             "S3 snapshot: overlength basename",
+			etcdSnapshotSpec: createEtcdEnapshot(strings.Repeat("a", 250), "cp-0", "s3://bucket/prefix", true),
+			wantPrefix:       "s3-etcd-snapshot-cp-0-1700000000-",
+		},
+		{
+			name:             "S3 snapshot: digest depends on location (case A)",
+			etcdSnapshotSpec: createEtcdEnapshot("snapshot", "cp-0", "s3://bucket/prefix/A", true),
+			wantPrefix:       "s3-etcd-snapshot-cp-0-1700000000-",
+		},
+	}
+
+	hex6re := regexp.MustCompile(`^[a-f0-9]{6}$`)
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := generateSafeSnapshotName(&tc.etcdSnapshotSpec, ts)
+
+			require.True(t, strings.HasPrefix(got, tc.wantPrefix), got)
+			require.Equal(t, strings.ToLower(got), got, "name must be lowercase")
+
+			parts := strings.Split(got, "-")
+			require.GreaterOrEqual(t, len(parts), 2)
+			suffix := parts[len(parts)-1]
+			require.Regexp(t, hex6re, suffix, "suffix must be 6 hex chars")
+
+			got2 := generateSafeSnapshotName(&tc.etcdSnapshotSpec, ts)
+			assert.Equal(t, got, got2)
+		})
+	}
+
+	t.Run("Digest differs for different locations", func(t *testing.T) {
+		a := createEtcdEnapshot("snapshot", "cp-0", "s3://bucket/prefix/A", true)
+		b := createEtcdEnapshot("snapshot", "cp-0", "s3://bucket/prefix/B", true)
+
+		gotA := generateSafeSnapshotName(&a, ts)
+		gotB := generateSafeSnapshotName(&b, ts)
+
+		pref := "s3-etcd-snapshot-cp-0-1700000000-"
+		require.True(t, strings.HasPrefix(gotA, pref))
+		require.True(t, strings.HasPrefix(gotB, pref))
+
+		assert.NotEqual(t, gotA, gotB)
+	})
 }
