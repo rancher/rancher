@@ -88,6 +88,7 @@ func (n *nsLifecycle) removeFinalizer(obj *v1.Namespace) (*v1.Namespace, error) 
 		return nil, nil
 	}
 	if x := slices.Index(obj.GetFinalizers(), normanLifecycleFinalizer); x >= 0 {
+		obj = obj.DeepCopy()
 		obj.Finalizers = slices.Delete(obj.Finalizers, x, x+1)
 		return n.m.namespaces.Update(obj)
 	}
@@ -105,6 +106,7 @@ func (n *nsLifecycle) onCreate(obj *v1.Namespace) (*v1.Namespace, error) {
 		return obj, err
 	}
 
+	obj = obj.DeepCopy()
 	if err := n.assignToInitialProject(obj); err != nil {
 		return obj, err
 	}
