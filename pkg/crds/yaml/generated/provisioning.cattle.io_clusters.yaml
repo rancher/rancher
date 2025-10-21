@@ -30,7 +30,7 @@ spec:
       type: date
     - jsonPath: .status.clientSecretName
       name: Kubeconfig
-      type: date
+      type: string
     - jsonPath: .status.ready
       name: Ready
       type: string

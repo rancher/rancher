@@ -518,7 +518,7 @@ type ClusterStatus struct {
 // +kubebuilder:printcolumn:name="Version",type=string,JSONPath=".spec.kubernetesVersion"
 // +kubebuilder:printcolumn:name="Cluster Name",type=string,JSONPath=".status.clusterName"
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=".metadata.creationTimestamp"
-// +kubebuilder:printcolumn:name="Kubeconfig",type=date,JSONPath=".status.clientSecretName"
+// +kubebuilder:printcolumn:name="Kubeconfig",type=string,JSONPath=".status.clientSecretName"
 // +kubebuilder:printcolumn:name="Ready",type=string,JSONPath=".status.ready"
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
