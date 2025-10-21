@@ -366,6 +366,7 @@ func (h *loginHandler) login(w http.ResponseWriter, r *http.Request, input login
 		"expiresAt": token.ExpiresAt,
 		// The following fields are included for backwards compatibility
 		// with existing v3 clients e.g. the Rancher terraform provider.
+		"id":       token.Name,
 		"baseType": "token",
 		"type":     "token",
 	}
