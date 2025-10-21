@@ -10,6 +10,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
@@ -103,32 +104,47 @@ func (h *autoscalerHandler) ensureGlobalRole(cluster *capi.Cluster, mds []*capi.
 		},
 	}
 
-	globalRole, err := h.globalRoleCache.Get(globalRoleName(cluster))
+	var (
+		globalRole *v3.GlobalRole
+		err        error
+	)
 
-	// if the role doesn't exist just create it
-	if errors.IsNotFound(err) {
-		return h.globalRoleClient.Create(
-			&v3.GlobalRole{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:            globalRoleName(cluster),
-					OwnerReferences: ownerReference(cluster),
-				},
-				DisplayName:     fmt.Sprintf("Autoscaler Global Role [%v]", cluster.Name),
-				NamespacedRules: namespacedRules,
-				Rules:           rules,
-			})
-	} else if err == nil {
-		// otherwise, check if we need to update the computed rules associated with this cluster
-		if !reflect.DeepEqual(globalRole.NamespacedRules, namespacedRules) || !reflect.DeepEqual(globalRole.Rules, rules) {
-			globalRole = globalRole.DeepCopy()
-			globalRole.NamespacedRules = namespacedRules
-			globalRole.Rules = rules
-			return h.globalRoleClient.Update(globalRole)
+	// retry on conflict in case the globalrole controller is also modifying this object.
+	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		globalRole, err = h.globalRoleCache.Get(globalRoleName(cluster))
+
+		// if the role doesn't exist just create it
+		if errors.IsNotFound(err) {
+			globalRole, err = h.globalRoleClient.Create(
+				&v3.GlobalRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:            globalRoleName(cluster),
+						OwnerReferences: ownerReference(cluster),
+					},
+					DisplayName:     fmt.Sprintf("Autoscaler Global Role [%v]", cluster.Name),
+					NamespacedRules: namespacedRules,
+					Rules:           rules,
+				})
+
+			return err
+		} else if err == nil {
+			// otherwise, check if we need to update the computed rules associated with this cluster
+			if !reflect.DeepEqual(globalRole.NamespacedRules, namespacedRules) || !reflect.DeepEqual(globalRole.Rules, rules) {
+				globalRole = globalRole.DeepCopy()
+				globalRole.NamespacedRules = namespacedRules
+				globalRole.Rules = rules
+				globalRole, err = h.globalRoleClient.Update(globalRole)
+
+				return err
+			}
+
+			return nil
+		} else {
+			return err
 		}
-		return globalRole, nil
-	} else {
-		return nil, err
-	}
+	})
+
+	return globalRole, err
 }
 
 // ensureGlobalRoleBinding ensures a GlobalRoleBinding exists between the specified user and global role.

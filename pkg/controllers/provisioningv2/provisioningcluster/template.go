@@ -297,9 +297,6 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 
 	machinePoolNames := map[string]bool{}
 	for _, machinePool := range cluster.Spec.RKEConfig.MachinePools {
-		if machinePool.Quantity != nil && *machinePool.Quantity == 0 {
-			continue
-		}
 		if machinePool.Name == "" || machinePool.NodeConfig == nil || machinePool.NodeConfig.Name == "" || machinePool.NodeConfig.Kind == "" {
 			return nil, fmt.Errorf("invalid machinePool [%s] missing name or valid config", machinePool.Name)
 		}
