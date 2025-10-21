@@ -34,8 +34,9 @@ def get_job_logs(repo_owner, repo_name, job_id):
     logs_response = make_github_request(logs_url)
 
     if logs_response.status_code != 200:
-        print(f"Error fetching logs for job {job_id}: {logs_response.status_code}")
-        return "Unable to fetch logs"
+        # Don't print error for common cases like 404 (logs not available)
+        # This can happen for re-run jobs or expired logs
+        return None
 
     return logs_response.text
 
@@ -115,28 +116,36 @@ def extract_failure_lines(log_content, max_lines=10):
 
     return list(reversed(failure_lines))
 
+FAILURE_STATES = {"failure", "timed_out", "stale"}
+
 def process_job(repo_owner, repo_name, job, run_data, attempt_number):
-    if (job.get("conclusion") in ["failure", "timed_out", "action_required"]) or \
-       (job.get("status") == "completed" and job.get("conclusion") != "success") or \
-       (run_data.get("status") == "in_progress" and job.get("status") == "completed" and job.get("conclusion") != "success"):
+    conclusion = job.get("conclusion")
 
-        job_logs = get_job_logs(repo_owner, repo_name, job["id"])
+    # Only process jobs with known failure conclusions
+    if conclusion not in FAILURE_STATES:
+        return None
+
+    job_logs = get_job_logs(repo_owner, repo_name, job["id"])
+
+    if job_logs is None:
+        failure_lines = []
+    else:
         failure_lines = extract_failure_lines(job_logs)
-        log_url = f"https://github.com/{repo_owner}/{repo_name}/actions/runs/{run_data['id']}/job/{job['id']}"
 
-        return {
-            "workflow_name": run_data["name"],
-            "job_name": job["name"],
-            "attempt_number": attempt_number,
-            "job_id": job["id"],
-            "log_url": log_url,
-            "failure_lines": failure_lines,
-            "run_id": run_data["id"],
-            "run_number": run_data["run_number"],
-            "created_at": run_data["created_at"],
-            "html_url": run_data["html_url"],
-        }
-    return None
+    log_url = f"https://github.com/{repo_owner}/{repo_name}/actions/runs/{run_data['id']}/job/{job['id']}"
+
+    return {
+        "workflow_name": run_data["name"],
+        "job_name": job["name"],
+        "attempt_number": attempt_number,
+        "job_id": job["id"],
+        "log_url": log_url,
+        "failure_lines": failure_lines,
+        "run_id": run_data["id"],
+        "run_number": run_data["run_number"],
+        "created_at": run_data["created_at"],
+        "html_url": run_data["html_url"],
+    }
 
 def get_jobs_for_run(repo_owner, repo_name, run_id, attempt_number):
     base_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/actions/runs/{run_id}"
@@ -237,7 +246,7 @@ def get_failed_workflows(repo_owner, repo_name, pr_number):
         return []
 
     failed_attempts = []
-    job_attempt_map = {}
+    seen_job_ids = set()
 
     with ThreadPoolExecutor(max_workers=min(10, len(all_attempts))) as executor:
         futures = {
@@ -250,12 +259,10 @@ def get_failed_workflows(repo_owner, repo_name, pr_number):
                 attempt_results = future.result()
                 for result in attempt_results:
                     job_id = result.get("job_id")
-                    job_attempt = result.get("attempt_number")
-
-                    if job_id not in job_attempt_map or job_attempt > job_attempt_map[job_id]:
-                        job_attempt_map[job_id] = job_attempt
+                    # Avoid duplicate job_ids
+                    if job_id not in seen_job_ids:
+                        seen_job_ids.add(job_id)
                         result["base_branch"] = base_branch
-                        failed_attempts = [fa for fa in failed_attempts if fa.get("job_id") != job_id]
                         failed_attempts.append(result)
             except Exception as exc:
                 workflow_name, attempt_num = futures[future]
@@ -283,6 +290,7 @@ def main():
     parser = argparse.ArgumentParser(description="Lists failed GitHub Actions workflow attempts for a specific Pull Request")
     parser.add_argument("pr_number", type=int, help="PR number to analyze")
     parser.add_argument("--repo", help="Repository in owner/name format (can also be set via REPOSITORY environment variable)")
+    parser.add_argument("--max-attempts", type=int, help="Maximum number of CI attempts (can also be set via MAX_CI_ATTEMPTS environment variable)")
 
     args = parser.parse_args()
 
@@ -297,6 +305,13 @@ def main():
         print("Error: Repository must be in the format 'owner/name'")
         sys.exit(1)
 
+    max_ci_attempts = args.max_attempts or os.environ.get("MAX_CI_ATTEMPTS")
+    if max_ci_attempts:
+        try:
+            max_ci_attempts = int(max_ci_attempts)
+        except ValueError:
+            max_ci_attempts = None
+
     markdown_output = []
     markdown_output.append(f"# CI Failures")
 
@@ -309,7 +324,19 @@ def main():
 
     failed_attempts.sort(key=lambda x: (x["workflow_name"], x["attempt_number"]))
 
-    markdown_output.append(f"Found **{len(failed_attempts)}** failed workflow {('attempt' if len(failed_attempts) == 1 else 'attempts')}:")
+    # Calculate unique attempt numbers that had failures
+    unique_failed_attempts = sorted(set(attempt["attempt_number"] for attempt in failed_attempts))
+    num_failed_attempts = len(unique_failed_attempts)
+    num_failed_jobs = len(failed_attempts)
+
+    if max_ci_attempts:
+        summary = f"**{num_failed_attempts}/{max_ci_attempts}** CI run attempts had failures"
+    else:
+        summary = f"**{num_failed_attempts}** CI run {'attempt' if num_failed_attempts == 1 else 'attempts'} had failures"
+
+    summary += f" with **{num_failed_jobs}** failed {'job' if num_failed_jobs == 1 else 'jobs'} total"
+
+    markdown_output.append(summary)
     markdown_output.append("\n---\n")
 
     for attempt in failed_attempts:
