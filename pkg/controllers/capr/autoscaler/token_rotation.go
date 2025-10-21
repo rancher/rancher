@@ -2,7 +2,7 @@ package autoscaler
 
 import (
 	"context"
-	goerrors "errors"
+	"errors"
 	"fmt"
 	"time"
 
@@ -11,7 +11,7 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/ticker"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -75,7 +75,7 @@ func (h *autoscalerHandler) checkAndRenewTokens() error {
 	}
 
 	logrus.Infof("[autoscaler] Processed %d expiring autoscaler tokens, renewed %d", len(tokens), expiringCount)
-	return goerrors.Join(processingErrs...)
+	return errors.Join(processingErrs...)
 }
 
 // findAutoscalerTokens retrieves all tokens created by the autoscaler controller.
@@ -98,7 +98,7 @@ func (h *autoscalerHandler) findAutoscalerTokens() ([]v3.Token, error) {
 func (h *autoscalerHandler) renewToken(token *v3.Token) error {
 	// Delete the old token
 	err := h.tokenClient.Delete(token.Name, &metav1.DeleteOptions{})
-	if err != nil && !errors.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		return fmt.Errorf("failed to delete old token %s: %w", token.Name, err)
 	}
 
