@@ -455,3 +455,163 @@ func (s *autoscalerSuite) TestCleanupFleet_EdgeCase_GetError() {
 	s.Error(err)
 	s.Contains(err.Error(), "failed to check existence of Helm operation")
 }
+
+// Test cases for cleanupFleet method
+
+func (s *autoscalerSuite) TestCleanupFleet_HappyPath_SuccessfulHelmOpDeletion() {
+	// Create test cluster
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+		},
+	}
+
+	helmOpName := helmOpName(cluster)
+
+	// Set up mock expectations for successful HelmOp deletion
+	s.helmOpCache.EXPECT().Get(cluster.Namespace, helmOpName).Return(&fleet.HelmOp{}, nil)
+	s.helmOp.EXPECT().Delete(cluster.Namespace, helmOpName, &metav1.DeleteOptions{}).Return(nil)
+
+	// Call the method
+	err := s.h.cleanupFleet(cluster)
+
+	// Assert the result
+	s.NoError(err, "Expected no error when successfully cleaning up HelmOp")
+}
+
+func (s *autoscalerSuite) TestCleanupFleet_HappyPath_NoHelmOpExists() {
+	// Create test cluster
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+		},
+	}
+
+	helmOpName := helmOpName(cluster)
+
+	// Set up mock expectations for HelmOp not found
+	s.helmOpCache.EXPECT().Get(cluster.Namespace, helmOpName).Return(nil, errors.NewNotFound(schema.GroupResource{}, "helmop"))
+
+	// Call the method
+	err := s.h.cleanupFleet(cluster)
+
+	// Assert the result - should succeed when HelmOp doesn't exist
+	s.NoError(err, "Expected no error when HelmOp doesn't exist")
+}
+
+func (s *autoscalerSuite) TestCleanupFleet_Error_FailedToDeleteHelmOp() {
+	// Create test cluster
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+		},
+	}
+
+	helmOpName := helmOpName(cluster)
+	deleteError := fmt.Errorf("failed to delete HelmOp: access denied")
+
+	// Set up mock expectations
+	s.helmOpCache.EXPECT().Get(cluster.Namespace, helmOpName).Return(&fleet.HelmOp{}, nil)
+	s.helmOp.EXPECT().Delete(cluster.Namespace, helmOpName, &metav1.DeleteOptions{}).Return(deleteError)
+
+	// Call the method
+	err := s.h.cleanupFleet(cluster)
+
+	// Assert the result
+	s.Error(err, "Expected error when HelmOp deletion fails")
+	s.Contains(err.Error(), "encountered 1 errors during fleet cleanup", "Error should mention count of errors")
+	s.Contains(err.Error(), "failed to delete Helm operation "+helmOpName+" in namespace "+cluster.Namespace, "Error should include HelmOp name and namespace")
+	s.Contains(err.Error(), "access denied", "Original error should be preserved")
+}
+
+func (s *autoscalerSuite) TestCleanupFleet_Error_FailedToCheckHelmOpExistence() {
+	// Create test cluster
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+		},
+	}
+
+	helmOpName := helmOpName(cluster)
+	checkError := fmt.Errorf("failed to check HelmOp existence: network timeout")
+
+	// Set up mock expectations for cache error
+	s.helmOpCache.EXPECT().Get(cluster.Namespace, helmOpName).Return(nil, checkError)
+
+	// Call the method
+	err := s.h.cleanupFleet(cluster)
+
+	// Assert the result
+	s.Error(err, "Expected error when HelmOp existence check fails")
+	s.Contains(err.Error(), "encountered 1 errors during fleet cleanup", "Error should mention count of errors")
+	s.Contains(err.Error(), "failed to check existence of Helm operation "+helmOpName+" in namespace "+cluster.Namespace, "Error should include HelmOp name and namespace")
+	s.Contains(err.Error(), "network timeout", "Original error should be preserved")
+}
+
+func (s *autoscalerSuite) TestCleanupFleet_EdgeCase_ClusterWithEmptyName() {
+	// Create test cluster with empty name
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "",
+			Namespace: "default",
+		},
+	}
+
+	helmOpName := helmOpName(cluster)
+
+	// Set up mock expectations for HelmOp not found (should handle empty names gracefully)
+	s.helmOpCache.EXPECT().Get(cluster.Namespace, helmOpName).Return(nil, errors.NewNotFound(schema.GroupResource{}, "helmop"))
+
+	// Call the method
+	err := s.h.cleanupFleet(cluster)
+
+	// Assert the result
+	s.NoError(err, "Expected no error when cluster has empty name")
+}
+
+func (s *autoscalerSuite) TestCleanupFleet_EdgeCase_ClusterWithEmptyNamespace() {
+	// Create test cluster with empty namespace
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "",
+		},
+	}
+
+	helmOpName := helmOpName(cluster)
+
+	// Set up mock expectations for HelmOp not found (should handle empty namespace gracefully)
+	s.helmOpCache.EXPECT().Get(cluster.Namespace, helmOpName).Return(nil, errors.NewNotFound(schema.GroupResource{}, "helmop"))
+
+	// Call the method
+	err := s.h.cleanupFleet(cluster)
+
+	// Assert the result
+	s.NoError(err, "Expected no error when cluster has empty namespace")
+}
+
+func (s *autoscalerSuite) TestCleanupFleet_EdgeCase_ClusterWithSpecialCharacters() {
+	// Create test cluster with special characters in name and namespace
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster-123",
+			Namespace: "test-namespace-456",
+		},
+	}
+
+	helmOpName := helmOpName(cluster)
+
+	// Set up mock expectations for successful deletion (should handle special characters gracefully)
+	s.helmOpCache.EXPECT().Get(cluster.Namespace, helmOpName).Return(&fleet.HelmOp{}, nil)
+	s.helmOp.EXPECT().Delete(cluster.Namespace, helmOpName, &metav1.DeleteOptions{}).Return(nil)
+
+	// Call the method
+	err := s.h.cleanupFleet(cluster)
+
+	// Assert the result
+	s.NoError(err, "Expected no error when cluster has special characters in name and namespace")
+}
