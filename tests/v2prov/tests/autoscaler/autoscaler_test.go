@@ -1,6 +1,7 @@
 package autoscaler
 
 import (
+	"strings"
 	"testing"
 
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
@@ -9,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 )
 
@@ -640,11 +642,22 @@ func Test_General_RKEMachinePool_Autoscaling_Update_Field_Validation(t *testing.
 				t.Fatalf("Failed to create initial cluster: %v", err)
 			}
 
-			// Update the cluster with the new spec
-			updatedCluster := tc.updateSpec(createdCluster.DeepCopy())
-
-			// Update the cluster in Kubernetes
-			_, err = client.Provisioning.Cluster().Update(updatedCluster)
+			err = retry.OnError(retry.DefaultBackoff,
+				func(err error) bool {
+					// retry if it's a conflict error
+					return strings.Contains(err.Error(), "the object has been modified; please apply your changes to the latest version and try again")
+				},
+				func() error {
+					clusterFromAPIServer, err := client.Provisioning.Cluster().Get(createdCluster.Namespace, createdCluster.Name, metav1.GetOptions{})
+					if err != nil {
+						return err
+					}
+					// Update the cluster with the new spec
+					updatedCluster := tc.updateSpec(clusterFromAPIServer.DeepCopy())
+					// Update the cluster in Kubernetes, retrying on conflict
+					_, err = client.Provisioning.Cluster().Update(updatedCluster)
+					return err
+				})
 			if err != nil && tc.shouldSucceed {
 				t.Fatalf("Expected cluster update to succeed but got error: %v", err)
 			}
