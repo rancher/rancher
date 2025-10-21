@@ -27,6 +27,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth"
 	"github.com/rancher/rancher/pkg/auth/audit"
+	"github.com/rancher/rancher/pkg/auth/cleanup"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	"github.com/rancher/rancher/pkg/auth/requests"
@@ -346,6 +347,12 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 			wranglerContext.Core.ServiceAccount().Cache(),
 			wranglerContext.K8s.CoreV1())
 		return nil
+	})
+
+	wranglerContext.OnLeader(func(context.Context) error {
+		return cleanup.CleanupUnusedSecretTokens(
+			wranglerContext.Core.Secret(),
+		)
 	})
 
 	var telemetryManager telemetry.TelemetryExporterManager
