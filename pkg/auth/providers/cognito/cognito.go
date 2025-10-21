@@ -88,6 +88,7 @@ func (s *CognitoProvider) LogoutAll(w http.ResponseWriter, r *http.Request, toke
 	data := map[string]any{
 		"idpRedirectUrl": idpRedirectURL,
 		"type":           "authConfigLogoutOutput",
+		"baseType":       "authConfigLogoutOutput",
 	}
 
 	w.Header().Set("Content-Type", "application/json")

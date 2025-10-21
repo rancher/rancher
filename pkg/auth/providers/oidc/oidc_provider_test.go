@@ -758,6 +758,7 @@ func TestLogoutAll(t *testing.T) {
 	wantData := map[string]any{
 		"idpRedirectUrl": "http://localhost:8090/user/logout?client_id=test&post_logout_redirect_uri=https%3A%2F%2Fexample.com%2Flogged-out",
 		"type":           "authConfigLogoutOutput",
+		"baseType":       "authConfigLogoutOutput",
 	}
 	gotData := map[string]any{}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &gotData))

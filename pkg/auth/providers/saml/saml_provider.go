@@ -176,6 +176,7 @@ func (s *Provider) LogoutAll(w http.ResponseWriter, r *http.Request, token acces
 	data := map[string]any{
 		"idpRedirectUrl": idpRedirectURL,
 		"type":           "authConfigLogoutOutput",
+		"baseType":       "authConfigLogoutOutput",
 	}
 
 	w.Header().Set("Content-Type", "application/json")
