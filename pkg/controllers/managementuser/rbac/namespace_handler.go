@@ -98,17 +98,17 @@ func (n *nsLifecycle) removeFinalizer(obj *v1.Namespace) (*v1.Namespace, error) 
 func (n *nsLifecycle) onCreate(obj *v1.Namespace) (*v1.Namespace, error) {
 	obj, err := n.resourceQuotaInit(obj)
 	if err != nil {
-		return obj, err
+		return nil, err
 	}
 
 	hasPRTBs, err := n.syncNS(obj)
 	if err != nil {
-		return obj, err
+		return nil, err
 	}
 
 	obj = obj.DeepCopy()
 	if err := n.assignToInitialProject(obj); err != nil {
-		return obj, err
+		return nil, err
 	}
 
 	// mark as initialized on success
@@ -118,7 +118,7 @@ func (n *nsLifecycle) onCreate(obj *v1.Namespace) (*v1.Namespace, error) {
 	obj.Annotations[normanLifecycleAnnotation] = "true"
 	obj, err = n.m.namespaces.Update(obj)
 	if err != nil {
-		return obj, err
+		return nil, err
 	}
 
 	go updateStatusAnnotation(hasPRTBs, obj.DeepCopy(), n.m)
