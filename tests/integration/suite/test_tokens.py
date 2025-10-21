@@ -75,6 +75,8 @@ def test_kubeconfig_token_ttl(admin_mc, user_mc):
     kubeconfig_token = login()
     assert kubeconfig_token["token"] != ""
     assert kubeconfig_token["expiresAt"] != ""
+    assert kubeconfig_token["type"] == "token"
+    assert kubeconfig_token["baseType"] == "token"
 
     # wait for token to expire
     time.sleep(kubeconfig_ttl_mins*60)
