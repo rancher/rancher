@@ -2,7 +2,9 @@ package snapshotbackpopulate
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -29,15 +31,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 var (
-	InvalidKeyChars = regexp.MustCompile(`[^-.a-zA-Z0-9]`)
+	InvalidKeyChars               = regexp.MustCompile(`[^-.a-zA-Z0-9]`)
+	EncodedMetadataIsEmptyMessage = base64.StdEncoding.EncodeToString([]byte("Metadata is empty"))
 )
 
 const (
-	StorageAnnotationKey = "etcdsnapshot.rke.io/storage"
+	StorageAnnotationKey          = "etcdsnapshot.rke.io/storage"
+	SnapshotOriginalNameKey       = "etcdsnapshot.rke.io/original-name"
+	SnapshotNameStrategyKey       = "etcdsnapshot.rke.io/name-strategy"
+	FallbackGeneratedStrategyName = "fallback-generated"
 )
 
 type Storage string
@@ -264,6 +271,28 @@ func (h *handler) OnDownstreamChange(_ string, downstream *k3s.ETCDSnapshotFile)
 	return downstream, err
 }
 
+// generateSafeSnapshotName generates a Kubernetes-safe name for an etcd snapshot.
+// It is meant to be used when your first-choice name (e.g., sanitized SnapshotName + SafeConcatName)
+// fails DNS-1123 validation or length constraints.
+func generateSafeSnapshotName(spec *k3s.ETCDSnapshotSpec, createdAt time.Time) string {
+	base := strings.ToLower(spec.SnapshotName)
+
+	source := "local"
+	if spec.S3 != nil {
+		source = "s3"
+	}
+
+	// Short digest for uniqueness across nodes/locations
+	sum := sha256.Sum256([]byte(spec.NodeName + spec.Location))
+	hex6 := hex.EncodeToString(sum[:])[:6]
+
+	node, _, _ := strings.Cut(spec.NodeName, ".")
+	base = fmt.Sprintf("etcd-snapshot-%s-%d", node, createdAt.Unix())
+
+	// Final base (source + name + short digest). Cluster scoping is done by the caller.
+	return fmt.Sprintf("%s-%s-%s", source, base, hex6)
+}
+
 // populateUpstreamSnapshotFromDownstream sets the labels, annotations, spec and status fields which are governed by the
 // downstream snapshot. Also sets the relevant owner references (machine for local, capi cluster for s3), and
 // namespace/name if the snapshot is being created.
@@ -273,12 +302,31 @@ func (h *handler) populateUpstreamSnapshotFromDownstream(upstream *rkev1.ETCDSna
 		storage = Local
 	}
 
+	var (
+		definitiveName                  string
+		snapshotOriginalNameAnnotations map[string]string
+	)
+
+	base := strings.ToLower(InvalidKeyChars.ReplaceAllString(downstream.Spec.SnapshotName, "-"))
+	candidate := name.SafeConcatName(cluster.Name, base, string(storage))
+	if errs := validation.IsDNS1123Subdomain(candidate); len(errs) != 0 || len(candidate)+13 > validation.DNS1123SubdomainMaxLength {
+		safeSnapshotName := generateSafeSnapshotName(&downstream.Spec, downstream.Status.CreationTime.Time)
+		definitiveName = name.SafeConcatName(cluster.Name, safeSnapshotName)
+
+		snapshotOriginalNameAnnotations = map[string]string{
+			SnapshotOriginalNameKey: downstream.Spec.SnapshotName,
+			SnapshotNameStrategyKey: FallbackGeneratedStrategyName,
+		}
+	} else {
+		definitiveName = candidate
+		snapshotOriginalNameAnnotations = nil
+	}
+
 	if upstream == nil {
-		name := name.SafeConcatName(cluster.Name, strings.ToLower(InvalidKeyChars.ReplaceAllString(downstream.Spec.SnapshotName, "-")), string(storage))
 		upstream = &rkev1.ETCDSnapshot{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: cluster.Namespace,
-				Name:      name,
+				Name:      definitiveName,
 			},
 		}
 	} else {
@@ -292,6 +340,9 @@ func (h *handler) populateUpstreamSnapshotFromDownstream(upstream *rkev1.ETCDSna
 
 	if upstream.Annotations == nil {
 		upstream.Annotations = map[string]string{}
+	}
+	for k, v := range snapshotOriginalNameAnnotations {
+		upstream.Annotations[k] = v
 	}
 	upstream.Annotations[StorageAnnotationKey] = string(storage)
 	upstream.Annotations[capr.SnapshotNameAnnotation] = downstream.Name
@@ -320,6 +371,19 @@ func (h *handler) populateUpstreamSnapshotFromDownstream(upstream *rkev1.ETCDSna
 		upstream.SnapshotFile.Status = "successful"
 	} else {
 		upstream.SnapshotFile.Status = "failed"
+	}
+
+	if len(downstream.Spec.Metadata) == 0 {
+		// Force failed status so this snapshot cannot be restored via Rancher UI
+		upstream.SnapshotFile.Status = "failed"
+		upstream.SnapshotFile.Message = EncodedMetadataIsEmptyMessage
+
+		if upstream.Annotations == nil {
+			upstream.Annotations = map[string]string{}
+		}
+
+		logrus.Warnf("%s snapshot has empty metadata; not restorable via Rancher UI (key=%s, storage=%s)",
+			getLogPrefix(cluster), downstream.Spec.SnapshotName, storage)
 	}
 
 	if storage == Local {
