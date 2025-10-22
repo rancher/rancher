@@ -3,6 +3,7 @@ package autoscaler
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -88,6 +89,19 @@ func (h *autoscalerHandler) ensureGlobalRole(cluster *capi.Cluster, mds []*capi.
 				ResourceNames: machineResourceNames,
 			},
 		},
+	}
+
+	if len(mds) > 0 {
+		// grab the machineTemplate info from the first MachineDeployment, the autoscaler needs access to read the
+		// machineTemplate object associated with the machineDeployment in order to scale from zero.
+
+		infraType := strings.ToLower(mds[0].Spec.Template.Spec.InfrastructureRef.Kind) + "s"
+		infraAPIGroup := strings.Split(mds[0].Spec.Template.Spec.InfrastructureRef.APIVersion, "/")[0]
+		namespacedRules[cluster.Namespace] = append(namespacedRules[cluster.Namespace], rbacv1.PolicyRule{
+			APIGroups: []string{infraAPIGroup},
+			Resources: []string{infraType},
+			Verbs:     []string{"get", "list", "watch"},
+		})
 	}
 
 	// clusterrole for read-access to all capi objects is required
