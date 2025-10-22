@@ -7,11 +7,13 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -20,6 +22,7 @@ import (
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
 	"github.com/rancher/rancher/pkg/utils"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -35,6 +38,9 @@ var upgrader = websocket.Upgrader{
 	Subprotocols:     []string{"base64.channel.k8s.io"},
 	Error:            onError,
 }
+
+// Define a short timeout for the connectivity check.
+const dialTimeout = 5 * time.Second
 
 func onError(rw http.ResponseWriter, _ *http.Request, code int, err error) {
 	rw.WriteHeader(code)
@@ -62,6 +68,44 @@ func (s *sshClient) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 }
 
+// getAccessibleAddress probes the machine's IPv4 and IPv6 addresses to find one that is reachable on the SSH port.
+// It uses a quick TCP dial to check for connectivity before attempting a full SSH handshake.
+func getAccessibleAddress(machineInfo *machineInfo) (string, error) {
+	ipv4 := machineInfo.Driver.IPAddress
+	ipv6 := machineInfo.Driver.IPv6Address
+	name := machineInfo.Driver.MachineName
+
+	if ipv4 == "" && ipv6 == "" {
+		return "", fmt.Errorf("no IP addresses available for machine %s", name)
+	}
+
+	addresses := []string{ipv4, ipv6}
+
+	kubeHost := os.Getenv("KUBERNETES_SERVICE_HOST")
+	if kubeHost != "" && utils.IsPlainIPV6(kubeHost) {
+		addresses = []string{ipv6, ipv4}
+	}
+
+	for _, addr := range addresses {
+		if addr == "" {
+			continue
+		}
+
+		addrWithPort := net.JoinHostPort(addr, strconv.Itoa(machineInfo.Driver.SSHPort))
+
+		conn, err := net.DialTimeout("tcp", addrWithPort, dialTimeout)
+		if err == nil {
+			_ = conn.Close()
+			return addrWithPort, nil
+		}
+		logrus.Debugf("[ssh] Failed to probe machine %s at address %s: %v", name, addrWithPort, err)
+	}
+
+	return "", fmt.Errorf("failed to find an accessible IP address for machine %s", name)
+}
+
+// shell handles the "shell" action on a machine object. It establishes an interactive SSH
+// session to the target machine and proxies it over a WebSocket connection.
 func (s *sshClient) shell(apiRequest *types.APIRequest) error {
 	ctx, cancel := context.WithCancel(apiRequest.Context())
 	defer cancel()
@@ -83,20 +127,13 @@ func (s *sshClient) shell(apiRequest *types.APIRequest) error {
 		return err
 	}
 
-	// preference: IPv4 address, then IPv6 address
-	address := machineInfo.Driver.IPAddress
-	if address == "" {
-		address = machineInfo.Driver.IPv6Address
-	}
-	if address == "" {
-		return errors.New("could not determine machine address")
-	}
-	if utils.IsPlainIPV6(address) {
-		address = fmt.Sprintf("[%s]", address)
+	addrWithPort, err := getAccessibleAddress(machineInfo)
+	if err != nil {
+		return err
 	}
 
-	addr := fmt.Sprintf("%s:%d", address, machineInfo.Driver.SSHPort)
-	client, err := ssh.Dial("tcp", addr, &ssh.ClientConfig{
+	logrus.Debugf("[ssh] Attempting to connect to machine %s via SSH at %s", apiRequest.Name, addrWithPort)
+	client, err := ssh.Dial("tcp", addrWithPort, &ssh.ClientConfig{
 		User: machineInfo.Driver.SSHUser,
 		Auth: []ssh.AuthMethod{
 			ssh.PublicKeys(signer),
@@ -105,7 +142,7 @@ func (s *sshClient) shell(apiRequest *types.APIRequest) error {
 		Timeout:         30 * time.Second,
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to connect to machine %s via SSH: %w", apiRequest.Name, err)
 	}
 	defer client.Close()
 
