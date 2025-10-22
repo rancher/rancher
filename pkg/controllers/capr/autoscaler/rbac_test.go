@@ -176,6 +176,16 @@ func (s *autoscalerSuite) TestEnsureGlobalRole_RoleAlreadyExists() {
 				Name:      "md-1",
 				Namespace: "default",
 			},
+			Spec: capi.MachineDeploymentSpec{
+				Template: capi.MachineTemplateSpec{
+					Spec: capi.MachineSpec{
+						InfrastructureRef: corev1.ObjectReference{
+							Kind:       "TestMachineTemplate",
+							APIVersion: "testing-rke.cattle.com/v1",
+						},
+					},
+				},
+			},
 		},
 	}
 
@@ -221,6 +231,11 @@ func (s *autoscalerSuite) TestEnsureGlobalRole_RoleAlreadyExists() {
 				Resources:     []string{"machines"},
 				Verbs:         []string{"get", "update", "patch"},
 				ResourceNames: []string{"machine-1"},
+			},
+			{
+				APIGroups: []string{"testing-rke.cattle.com"},
+				Resources: []string{"testmachinetemplates"},
+				Verbs:     []string{"get", "list", "watch"},
 			},
 		},
 	}
