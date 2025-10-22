@@ -14,7 +14,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	typescorev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	namespaceutil "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/project"
@@ -134,7 +133,7 @@ func (n *nsLifecycle) removeFinalizer(obj *v1.Namespace) (*v1.Namespace, error) 
 	if x := slices.Index(obj.GetFinalizers(), normanLifecycleFinalizer); x >= 0 {
 		obj = obj.DeepCopy()
 		obj.Finalizers = slices.Delete(obj.Finalizers, x, x+1)
-		return n.m.namespaces.Update(obj)
+		return n.nsClient.Update(obj)
 	}
 	return obj, nil
 }
@@ -160,7 +159,7 @@ func (n *nsLifecycle) onCreate(obj *v1.Namespace) (*v1.Namespace, error) {
 		obj.Annotations = map[string]string{}
 	}
 	obj.Annotations[normanLifecycleAnnotation] = "true"
-	obj, err = n.m.namespaces.Update(obj)
+	obj, err = n.nsClient.Update(obj)
 	if err != nil {
 		return nil, err
 	}
