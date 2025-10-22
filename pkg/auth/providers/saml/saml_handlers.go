@@ -111,9 +111,9 @@ func (s *Provider) HandleSamlLogin(w http.ResponseWriter, r *http.Request, userI
 
 	req, err := serviceProvider.MakeAuthenticationRequest(bindingLocation, binding, saml.HTTPPostBinding)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return "", err
 	}
+
 	// relayState is limited to 80 bytes but also must be integrity protected.
 	// this means that we cannot use a JWT because it is way too long. Instead
 	// we set a cookie that corresponds to the state

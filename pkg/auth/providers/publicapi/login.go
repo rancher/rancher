@@ -31,6 +31,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/util"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3public"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
@@ -76,7 +77,7 @@ func (h *v1LoginHandler) login(w http.ResponseWriter, r *http.Request) {
 	bytes, err := io.ReadAll(r.Body)
 	if err != nil {
 		logrus.Errorf("login: Error reading request body: %s", err)
-		http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity)
+		util.ReturnAPIError(w, apierror.NewAPIError(validation.InvalidBodyContent, ""))
 		return
 	}
 
@@ -84,7 +85,7 @@ func (h *v1LoginHandler) login(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(bytes, generic)
 	if err != nil {
 		logrus.Errorf("login: Error unmarshalling generic login request: %s", err)
-		http.Error(w, http.StatusText(http.StatusUnprocessableEntity), http.StatusUnprocessableEntity)
+		util.ReturnAPIError(w, apierror.NewAPIError(validation.InvalidBodyContent, ""))
 		return
 	}
 
@@ -92,7 +93,7 @@ func (h *v1LoginHandler) login(w http.ResponseWriter, r *http.Request) {
 	err = json.Unmarshal(bytes, input)
 	if err != nil {
 		logrus.Errorf("login: Error unmarshalling provider specific login request %T: %s", input, err)
-		http.Error(w, "", http.StatusUnprocessableEntity)
+		util.ReturnAPIError(w, apierror.NewAPIError(validation.InvalidBodyContent, ""))
 		return
 	}
 
@@ -233,33 +234,31 @@ func providerInputForType(providerType string) loginAccessor {
 
 func (h *loginHandler) login(w http.ResponseWriter, r *http.Request, input loginAccessor) {
 	if input == nil {
-		logrus.Errorf("login: Unknown authentication provider '%s'", input.GetType())
-		http.Error(w, "Unknown authentication provider ", http.StatusBadRequest)
+		logrus.Errorf("login: missing auth provider input")
+		util.ReturnAPIError(w, apierror.NewAPIError(validation.InvalidBodyContent, ""))
 		return
 	}
 
 	if providers.IsSAMLProviderType(input.GetType()) {
 		// SAML's login flow is different. Unlike other providers it gets the logged in user's data
 		// via the POST from the identity provider on a separate endpoint.
-		saml.PerformSamlLogin(r, w, input.GetName(), input)
+		err := saml.PerformSamlLogin(r, w, input.GetName(), input)
+		if err != nil {
+			if !util.IsAPIError(err) {
+				logrus.Errorf("login: Error performing SAML login: %s", err)
+			}
+			util.ReturnAPIError(w, err)
+		}
 		return
 	}
 
 	ctx := context.WithValue(r.Context(), util.RequestKey, r)
 	userPrincipal, groupPrincipals, providerToken, err := providers.AuthenticateUser(ctx, input, input.GetName())
 	if err != nil {
-		status := http.StatusInternalServerError
-		message := http.StatusText(status)
-		if apierror.IsAPIError(err) {
-			aerr := err.(*apierror.APIError)
-			status = aerr.Code.Status
-			message = aerr.Message
-		} else {
+		if !util.IsAPIError(err) {
 			logrus.Errorf("login: Error authenticating user: %s", err)
 		}
-
-		http.Error(w, message, status)
-
+		util.ReturnAPIError(w, err)
 		return
 	}
 
@@ -303,13 +302,13 @@ func (h *loginHandler) login(w http.ResponseWriter, r *http.Request, input login
 	})
 	if err != nil {
 		logrus.Errorf("login: Error creating or updating user and/or userAttribute for %s: %s", userPrincipal.Name, err)
-		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		util.ReturnAPIError(w, apierror.NewAPIError(validation.ServerError, ""))
 		return
 
 	}
 
 	if !user.GetEnabled() {
-		http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+		util.ReturnAPIError(w, apierror.NewAPIError(validation.PermissionDenied, ""))
 		return
 	}
 
@@ -330,14 +329,14 @@ func (h *loginHandler) login(w http.ResponseWriter, r *http.Request, input login
 		token, tokenKey, err = tokens.GetKubeConfigToken(user.Name, responseType, h.kubeconfigTokenGetter, userPrincipal)
 		if err != nil {
 			logrus.Errorf("login: Error generating kubeconfig token: %s", err)
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			util.ReturnAPIError(w, apierror.NewAPIError(validation.ServerError, ""))
 			return
 		}
 	} else {
 		token, tokenKey, err = h.newLoginToken(user.Name, userPrincipal, groupPrincipals, providerToken, ttl, description)
 		if err != nil {
 			logrus.Errorf("login: Error creating login token for user %s: %v", user.Name, err)
-			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			util.ReturnAPIError(w, apierror.NewAPIError(validation.ServerError, ""))
 			return
 		}
 	}
