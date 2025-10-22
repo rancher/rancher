@@ -173,11 +173,7 @@ func (n *nsLifecycle) onCreate(obj *v1.Namespace) (*v1.Namespace, error) {
 }
 
 func (n *nsLifecycle) resourceQuotaInit(obj *v1.Namespace) (*v1.Namespace, error) {
-	ns, err := n.rq.CreateResourceQuota(obj)
-	if ns, ok := ns.(*v1.Namespace); ok {
-		return ns, err
-	}
-	return nil, err
+	return n.rq.CreateResourceQuota(obj)
 }
 
 func (n *nsLifecycle) onRemove(obj *v1.Namespace) (*v1.Namespace, error) {
