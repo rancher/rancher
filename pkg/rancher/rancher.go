@@ -352,6 +352,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	wranglerContext.OnLeader(func(context.Context) error {
 		return cleanup.CleanupUnusedSecretTokens(
 			wranglerContext.Core.Secret(),
+			wranglerContext.Mgmt.AuthConfig(),
 		)
 	})
 
