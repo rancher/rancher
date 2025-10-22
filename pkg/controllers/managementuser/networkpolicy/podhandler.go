@@ -50,30 +50,37 @@ func (ph *podHandler) Sync(_ string, pod *corev1.Pod) (*corev1.Pod, error) {
 		return nil, fmt.Errorf("netpolMgr: podHandler: getSystemNamespaces: err=%v", err)
 	}
 	logrus.Debugf("podHandler: Sync: %+v", *pod)
-	if err := ph.addLabelIfHostPortsPresent(pod, systemNamespaces); err != nil {
+	pod, err = ph.addLabelIfHostPortsPresent(pod, systemNamespaces)
+	if err != nil {
 		return nil, err
 	}
-	return nil, ph.npmgr.hostPortsUpdateHandler(pod, systemNamespaces)
+	if err := ph.npmgr.hostPortsUpdateHandler(pod, systemNamespaces); err != nil {
+		return nil, err
+	}
+	return pod, nil
 }
 
 // k8s native network policy can select pods only using labels,
 // hence need to add a label which can be used to select this pod
 // which has hostPorts
-func (ph *podHandler) addLabelIfHostPortsPresent(pod *corev1.Pod, systemNamespaces map[string]bool) error {
+func (ph *podHandler) addLabelIfHostPortsPresent(pod *corev1.Pod, systemNamespaces map[string]bool) (*corev1.Pod, error) {
 	if pod.Labels != nil {
 		if _, ok := systemNamespaces[pod.Namespace]; ok {
 			if _, ok := pod.Labels[PodNameFieldLabel]; ok {
 				// we don't create network policies in system namespaces, delete label
 				logrus.Debugf("podHandler: addLabelIfHostPortsPresent: deleting podNameFieldLabel %+v in %s", pod.Labels, pod.Namespace)
-				podCopy := pod.DeepCopy()
-				delete(podCopy.Labels, PodNameFieldLabel)
-				_, err := ph.pods.Update(podCopy)
+
+				pod = pod.DeepCopy()
+				delete(pod.Labels, PodNameFieldLabel)
+
+				var err error
+				pod, err = ph.pods.Update(pod)
 				if err != nil {
-					return err
+					return nil, err
 				}
 			}
 			// don't add hostPort label for pods in system namespaces
-			return nil
+			return pod, nil
 		}
 	}
 	hasHostPorts := false
@@ -86,19 +93,22 @@ Loop:
 			}
 		}
 	}
-	if hasHostPorts {
+	if hasHostPorts && pod.Labels[PodNameFieldLabel] != pod.Name {
 		logrus.Debugf("podHandler: addLabelIfHostPortsPresent: pod=%+v has HostPort", *pod)
-		podCopy := pod.DeepCopy()
-		if podCopy.Labels == nil {
-			podCopy.Labels = map[string]string{}
+
+		pod = pod.DeepCopy()
+		if pod.Labels == nil {
+			pod.Labels = map[string]string{}
 		}
-		podCopy.Labels[PodNameFieldLabel] = podCopy.Name
-		_, err := ph.pods.Update(podCopy)
+		pod.Labels[PodNameFieldLabel] = pod.Name
+
+		var err error
+		pod, err = ph.pods.Update(pod)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return pod, nil
 }
 
 func (npmgr *netpolMgr) hostPortsUpdateHandler(pod *corev1.Pod, systemNamespaces map[string]bool) error {
