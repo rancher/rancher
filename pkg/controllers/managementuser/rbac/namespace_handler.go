@@ -122,8 +122,11 @@ func (n *nsLifecycle) onChange(_ string, obj *v1.Namespace) (*v1.Namespace, erro
 		return n.onCreate(obj)
 	}
 
-	_, err := n.syncNS(obj)
-	return obj, err
+	obj, _, err := n.syncNS(obj)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
 }
 
 func (n *nsLifecycle) removeFinalizer(obj *v1.Namespace) (*v1.Namespace, error) {
@@ -144,7 +147,7 @@ func (n *nsLifecycle) onCreate(obj *v1.Namespace) (*v1.Namespace, error) {
 		return nil, err
 	}
 
-	hasPRTBs, err := n.syncNS(obj)
+	obj, hasPRTBs, err := n.syncNS(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +190,8 @@ func (n *nsLifecycle) onRemove(obj *v1.Namespace) (*v1.Namespace, error) {
 	return obj, nil
 }
 
-func (n *nsLifecycle) syncNS(obj *v1.Namespace) (bool, error) {
+func (n *nsLifecycle) syncNS(obj *v1.Namespace) (*v1.Namespace, bool, error) {
+	projectID := obj.Annotations[projectIDAnnotation]
 	// add fleet namespace to system project
 	if IsFleetNamespace(obj) &&
 		// If this is the local cluster, then only move the namespace to ths system project if the projectIDAnnotation is
@@ -195,33 +199,39 @@ func (n *nsLifecycle) syncNS(obj *v1.Namespace) (bool, error) {
 		// then it is likely that local cluster is the tenant cluster in a hosted Rancher setup and the namespace belongs to
 		// the system project for the cluster in the host cluster. Moving it here would only cause the namespace to be
 		// continually moved between projects forever.
-		(n.clusterName != "local" || obj.Annotations[projectIDAnnotation] == "" || strings.HasPrefix(obj.Annotations[projectIDAnnotation], "local")) {
+		(n.clusterName != "local" || projectID == "" || strings.HasPrefix(projectID, "local")) {
 
 		systemProjectName, err := n.GetSystemProjectName()
 		if err != nil {
-			return false, errors.Wrapf(err, "failed to add namespace %s to system project", obj.Name)
+			return nil, false, errors.Wrapf(err, "failed to add namespace %s to system project", obj.Name)
 		}
 
 		// When there is no system project, we should not set this annotation as a result because the project name
 		// is empty. If the annotation already exists, and there is no system project, then we need to delete the
 		// annotation.
+		var desiredProjectID string
 		if systemProjectName != "" {
-			obj.Annotations[projectIDAnnotation] = fmt.Sprintf("%v:%v", n.clusterName, systemProjectName)
-		} else {
-			delete(obj.Annotations, projectIDAnnotation)
+			desiredProjectID = fmt.Sprintf("%v:%v", n.clusterName, systemProjectName)
+		}
+
+		if desiredProjectID != projectID {
+			obj, err = n.setProjectIDAnnotation(obj, desiredProjectID)
+			if err != nil {
+				return nil, false, err
+			}
 		}
 	}
 
 	hasPRTBs, err := n.ensurePRTBAddToNamespace(obj)
 	if err != nil {
-		return false, fmt.Errorf("ensuring PRTBs are added to namespace %s: %w", obj.Name, err)
+		return nil, false, fmt.Errorf("ensuring PRTBs are added to namespace %s: %w", obj.Name, err)
 	}
 
 	if err := n.reconcileNamespaceProjectClusterRole(obj); err != nil {
-		return false, fmt.Errorf("reconciling namespace %s project cluster roles: %w", obj.Name, err)
+		return nil, false, fmt.Errorf("reconciling namespace %s project cluster roles: %w", obj.Name, err)
 	}
 
-	return hasPRTBs, nil
+	return obj, hasPRTBs, nil
 }
 
 func (n *nsLifecycle) assignToInitialProject(ns *v1.Namespace) error {
@@ -725,4 +735,14 @@ func (n *nsLifecycle) asyncCleanupRBAC(namespaceName string) {
 			logrus.Errorf("async cleanup of RBAC for namespace %s failed: %v", namespaceName, err)
 		}
 	}()
+}
+
+func (n *nsLifecycle) setProjectIDAnnotation(obj *v1.Namespace, projectID string) (*v1.Namespace, error) {
+	obj = obj.DeepCopy()
+	if projectID != "" {
+		obj.Annotations[projectIDAnnotation] = projectID
+	} else {
+		delete(obj.Annotations, projectIDAnnotation)
+	}
+	return n.nsClient.Update(obj)
 }
