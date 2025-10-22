@@ -459,6 +459,20 @@ func Test_namespaceHandler_getProjectFromNamespace(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "project not found",
+			namespace: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						projectIDLabel: "c-abc123:p-abc123",
+					},
+				},
+			},
+			setupProjectCache: func(f *fake.MockCacheInterface[*v3.Project]) {
+				f.EXPECT().Get("c-abc123", "p-abc123").Return(nil, errNotFound)
+			},
+			want: nil,
+		},
+		{
 			name: "get a project",
 			namespace: &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
