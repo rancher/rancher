@@ -112,31 +112,6 @@ func EarlyRegister(ctx context.Context, clients *wrangler.Context, kubeconfigMan
 		"provisioning-cluster-create",
 		h.generateProvisioningClusterFromLegacyCluster,
 		nil)
-}
-
-func Register(
-	ctx context.Context,
-	clients *wrangler.CAPIContext, kubeconfigManager *kubeconfig.Manager) {
-	h := handler{
-		mgmtClusterCache:      clients.Mgmt.Cluster().Cache(),
-		mgmtClusters:          clients.Mgmt.Cluster(),
-		clusterTokenCache:     clients.Mgmt.ClusterRegistrationToken().Cache(),
-		clusterTokens:         clients.Mgmt.ClusterRegistrationToken(),
-		featureCache:          clients.Mgmt.Feature().Cache(),
-		featureClient:         clients.Mgmt.Feature(),
-		clusters:              clients.Provisioning.Cluster(),
-		clusterCache:          clients.Provisioning.Cluster().Cache(),
-		rkeControlPlanes:      clients.RKE.RKEControlPlane(),
-		rkeControlPlanesCache: clients.RKE.RKEControlPlane().Cache(),
-		secretCache:           clients.Core.Secret().Cache(),
-		capiClustersCache:     clients.CAPI.Cluster().Cache(),
-		capiClusters:          clients.CAPI.Cluster(),
-		capiMachinesCache:     clients.CAPI.Machine().Cache(),
-		kubeconfigManager:     kubeconfigManager,
-		apply: clients.Apply.WithCacheTypes(
-			clients.Provisioning.Cluster(),
-			clients.Mgmt.Cluster()),
-	}
 
 	clusterCreateApply := clients.Apply.WithCacheTypes(clients.Mgmt.Cluster(),
 		clients.Mgmt.ClusterRegistrationToken(),
@@ -170,6 +145,33 @@ func Register(
 
 	relatedresource.Watch(ctx, "cluster-watch", h.clusterWatch,
 		clients.Provisioning.Cluster(), clients.Mgmt.Cluster())
+}
+
+func Register(
+	ctx context.Context,
+	clients *wrangler.CAPIContext, kubeconfigManager *kubeconfig.Manager) {
+	h := handler{
+		mgmtClusterCache:      clients.Mgmt.Cluster().Cache(),
+		mgmtClusters:          clients.Mgmt.Cluster(),
+		clusterTokenCache:     clients.Mgmt.ClusterRegistrationToken().Cache(),
+		clusterTokens:         clients.Mgmt.ClusterRegistrationToken(),
+		featureCache:          clients.Mgmt.Feature().Cache(),
+		featureClient:         clients.Mgmt.Feature(),
+		clusters:              clients.Provisioning.Cluster(),
+		clusterCache:          clients.Provisioning.Cluster().Cache(),
+		rkeControlPlanes:      clients.RKE.RKEControlPlane(),
+		rkeControlPlanesCache: clients.RKE.RKEControlPlane().Cache(),
+		secretCache:           clients.Core.Secret().Cache(),
+
+		capiClustersCache: clients.CAPI.Cluster().Cache(),
+		capiClusters:      clients.CAPI.Cluster(),
+		capiMachinesCache: clients.CAPI.Machine().Cache(),
+
+		kubeconfigManager: kubeconfigManager,
+		apply: clients.Apply.WithCacheTypes(
+			clients.Provisioning.Cluster(),
+			clients.Mgmt.Cluster()),
+	}
 
 	clients.Mgmt.Cluster().OnRemove(ctx, "mgmt-cluster-remove", h.OnMgmtClusterRemove)
 	clients.Provisioning.Cluster().OnRemove(ctx, "provisioning-cluster-remove", h.OnClusterRemove)
