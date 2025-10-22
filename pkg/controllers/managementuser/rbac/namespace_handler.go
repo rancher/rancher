@@ -13,9 +13,13 @@ import (
 	apisV3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	typescorev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	namespaceutil "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/project"
+	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -23,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/tools/cache"
 )
 
 const (
@@ -49,11 +54,50 @@ var initialProjectToLabels = map[string]labels.Set{
 }
 
 func newNamespaceLifecycle(m *manager, sync *resourcequota.SyncController) *nsLifecycle {
-	return &nsLifecycle{m: m, rq: sync}
+	return &nsLifecycle{
+		clusterName:   m.clusterName,
+		projectLister: m.projectLister,
+		rtLister:      m.rtLister,
+		prtbIndexer:   m.prtbIndexer,
+		crIndexer:     m.crIndexer,
+		crbIndexer:    m.crbIndexer,
+		crClient:      m.clusterRoles,
+		crLister:      m.crLister,
+		rbClient:      m.roleBindings,
+		rbLister:      m.rbLister,
+		nsLister:      m.nsLister,
+		nsClient:      m.namespaces,
+		m:             m,
+		rq:            sync,
+	}
 }
 
 type nsLifecycle struct {
-	m  *manager
+	clusterName string
+
+	// upstream clients/caches
+	projectLister v3.ProjectLister
+	rtLister      mgmtv3.RoleTemplateCache
+	prtbIndexer   cache.Indexer
+
+	// downstream clients/caches
+	crIndexer  cache.Indexer
+	crbIndexer cache.Indexer
+	crClient   wrbacv1.ClusterRoleClient
+	crLister   wrbacv1.ClusterRoleCache
+	rbClient   wrbacv1.RoleBindingClient
+	rbLister   wrbacv1.RoleBindingCache
+	nsLister   wcorev1.NamespaceCache
+	nsClient   wcorev1.NamespaceClient
+
+	// subset of the manager interface, only including the methods that are really used
+	m interface {
+		gatherRoles(rt *v3.RoleTemplate, roleTemplates map[string]*v3.RoleTemplate, depthCounter int) error
+		ensureRoles(rts map[string]*v3.RoleTemplate) error
+		ensureProjectRoleBindings(ns string, roles map[string]*v3.RoleTemplate, binding *v3.ProjectRoleTemplateBinding) error
+		createProjectNSRole(roleName, verb, ns, projectName string) error
+	}
+
 	rq *resourcequota.SyncController
 }
 
@@ -121,7 +165,7 @@ func (n *nsLifecycle) onCreate(obj *v1.Namespace) (*v1.Namespace, error) {
 		return nil, err
 	}
 
-	go updateStatusAnnotation(hasPRTBs, obj.DeepCopy(), n.m)
+	go updateStatusAnnotation(hasPRTBs, obj.DeepCopy(), n.crIndexer, n.crbIndexer, n.rbLister, n.nsClient)
 
 	return obj, nil
 }
@@ -152,7 +196,7 @@ func (n *nsLifecycle) syncNS(obj *v1.Namespace) (bool, error) {
 		// then it is likely that local cluster is the tenant cluster in a hosted Rancher setup and the namespace belongs to
 		// the system project for the cluster in the host cluster. Moving it here would only cause the namespace to be
 		// continually moved between projects forever.
-		(n.m.clusterName != "local" || obj.Annotations[projectIDAnnotation] == "" || strings.HasPrefix(obj.Annotations[projectIDAnnotation], "local")) {
+		(n.clusterName != "local" || obj.Annotations[projectIDAnnotation] == "" || strings.HasPrefix(obj.Annotations[projectIDAnnotation], "local")) {
 
 		systemProjectName, err := n.GetSystemProjectName()
 		if err != nil {
@@ -163,7 +207,7 @@ func (n *nsLifecycle) syncNS(obj *v1.Namespace) (bool, error) {
 		// is empty. If the annotation already exists, and there is no system project, then we need to delete the
 		// annotation.
 		if systemProjectName != "" {
-			obj.Annotations[projectIDAnnotation] = fmt.Sprintf("%v:%v", n.m.clusterName, systemProjectName)
+			obj.Annotations[projectIDAnnotation] = fmt.Sprintf("%v:%v", n.clusterName, systemProjectName)
 		} else {
 			delete(obj.Annotations, projectIDAnnotation)
 		}
@@ -193,15 +237,15 @@ func (n *nsLifecycle) assignToInitialProject(ns *v1.Namespace) error {
 	for projectName, namespaces := range initialProjectsToNamespaces {
 		for _, nsToCheck := range namespaces {
 			if nsToCheck == ns.Name {
-				projects, err := n.m.projectLister.List(n.m.clusterName, initialProjectToLabels[projectName].AsSelector())
+				projects, err := n.projectLister.List(n.clusterName, initialProjectToLabels[projectName].AsSelector())
 				if err != nil {
-					return fmt.Errorf("listing projects for cluster %s: %w", n.m.clusterName, err)
+					return fmt.Errorf("listing projects for cluster %s: %w", n.clusterName, err)
 				}
 				if len(projects) == 0 {
 					continue
 				}
 				if len(projects) > 1 {
-					return fmt.Errorf("cluster [%s] contains more than 1 [%s] project", n.m.clusterName, projectName)
+					return fmt.Errorf("cluster [%s] contains more than 1 [%s] project", n.clusterName, projectName)
 				}
 				if projects[0] == nil {
 					continue
@@ -209,7 +253,7 @@ func (n *nsLifecycle) assignToInitialProject(ns *v1.Namespace) error {
 				if ns.Annotations == nil {
 					ns.Annotations = map[string]string{}
 				}
-				ns.Annotations[projectIDAnnotation] = fmt.Sprintf("%v:%v", n.m.clusterName, projects[0].Name)
+				ns.Annotations[projectIDAnnotation] = fmt.Sprintf("%v:%v", n.clusterName, projects[0].Name)
 			}
 		}
 	}
@@ -218,15 +262,15 @@ func (n *nsLifecycle) assignToInitialProject(ns *v1.Namespace) error {
 }
 
 func (n *nsLifecycle) GetSystemProjectName() (string, error) {
-	projects, err := n.m.projectLister.List(n.m.clusterName, initialProjectToLabels[project.System].AsSelector())
+	projects, err := n.projectLister.List(n.clusterName, initialProjectToLabels[project.System].AsSelector())
 	if err != nil {
-		return "", fmt.Errorf("getting system project name for cluster %s: %w", n.m.clusterName, err)
+		return "", fmt.Errorf("getting system project name for cluster %s: %w", n.clusterName, err)
 	}
 	if len(projects) == 0 {
 		return "", nil
 	}
 	if len(projects) > 1 {
-		return "", fmt.Errorf("cluster [%s] contains more than 1 [%s] project", n.m.clusterName, project.System)
+		return "", fmt.Errorf("cluster [%s] contains more than 1 [%s] project", n.clusterName, project.System)
 	}
 	if projects[0] == nil {
 		return "", nil
@@ -246,11 +290,10 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 		// if namespace does not belong to a project, delete all rolebindings from that namespace that were created for a PRTB
 		// such rolebindings will have the label "authz.cluster.cattle.io/rtb-owner" prior to 2.5 and
 		// "authz.cluster.cattle.io/rtb-owner-updated" 2.5 onwards
-		rbs, err := n.m.rbLister.List(ns.Name, labels.Everything())
+		rbs, err := n.rbLister.List(ns.Name, labels.Everything())
 		if err != nil {
 			return false, errors.Wrapf(err, "couldn't list role bindings in %s", ns.Name)
 		}
-		client := n.m.workload.RBACw.RoleBinding()
 		for _, rb := range rbs {
 			for _, ownerLabel := range []string{
 				rtbOwnerLabelLegacy,
@@ -258,7 +301,7 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 			} {
 				if uid := convert.ToString(rb.Labels[ownerLabel]); uid != "" {
 					logrus.Infof("Deleting role binding %s in %s", rb.Name, ns.Name)
-					if err := client.Delete(ns.Name, rb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+					if err := n.rbClient.Delete(ns.Name, rb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 						return false, errors.Wrapf(err, "couldn't delete role binding %s", rb.Name)
 					}
 				}
@@ -267,7 +310,7 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 		return false, nil
 	}
 
-	prtbs, err := n.m.prtbIndexer.ByIndex(prtbByProjectIndex, projectID)
+	prtbs, err := n.prtbIndexer.ByIndex(prtbByProjectIndex, projectID)
 	if err != nil {
 		return false, errors.Wrapf(err, "couldn't get project role binding templates associated with project id %s", projectID)
 	}
@@ -288,7 +331,7 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 			continue
 		}
 
-		rt, err := n.m.rtLister.Get(prtb.RoleTemplateName)
+		rt, err := n.rtLister.Get(prtb.RoleTemplateName)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				logrus.Warnf("ProjectRoleTemplateBinding %q sets a non-existing role template %q. Skipping.", prtb.Name, prtb.RoleTemplateName)
@@ -326,15 +369,13 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 		return hasPRTBs, nil
 	}
 
-	rbs, err := n.m.rbLister.List(ns.Name, labels.Everything())
+	rbs, err := n.rbLister.List(ns.Name, labels.Everything())
 	if err != nil {
 		return false, errors.Wrapf(err, "couldn't list role bindings in %s", ns.Name)
 	}
-	client := n.m.workload.RBACw.RoleBinding()
-
 	for _, rb := range rbs {
 		if uid := convert.ToString(rb.Labels[rtbOwnerLabelLegacy]); uid != "" {
-			prtbs, err := n.m.prtbIndexer.ByIndex(prtbByUIDIndex, uid)
+			prtbs, err := n.prtbIndexer.ByIndex(prtbByUIDIndex, uid)
 			if err != nil {
 				if apierrors.IsNotFound(err) {
 					continue
@@ -346,7 +387,7 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 				if prtb, ok := prtb.(*v3.ProjectRoleTemplateBinding); ok {
 					if prtb.Namespace != namespace {
 						logrus.Infof("Deleting role binding %s in %s", rb.Name, ns.Name)
-						if err := client.Delete(ns.Name, rb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+						if err := n.rbClient.Delete(ns.Name, rb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 							return false, errors.Wrapf(err, "couldn't delete role binding %s", rb.Name)
 						}
 					}
@@ -355,7 +396,7 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 		}
 
 		if nsAndName := convert.ToString(rb.Labels[rtbOwnerLabel]); nsAndName != "" {
-			prtbs, err := n.m.prtbIndexer.ByIndex(prtbByNsAndNameIndex, nsAndName)
+			prtbs, err := n.prtbIndexer.ByIndex(prtbByNsAndNameIndex, nsAndName)
 			if err != nil {
 				if apierrors.IsNotFound(err) {
 					continue
@@ -367,7 +408,7 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 				if prtb, ok := prtb.(*v3.ProjectRoleTemplateBinding); ok {
 					if prtb.Namespace != namespace {
 						logrus.Infof("Deleting role binding %s in %s", rb.Name, ns.Name)
-						if err := client.Delete(ns.Name, rb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+						if err := n.rbClient.Delete(ns.Name, rb.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 							return false, errors.Wrapf(err, "couldn't delete role binding %s", rb.Name)
 						}
 					}
@@ -393,12 +434,12 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace) err
 			}
 		}
 
-		clusterRoles, err := n.m.crIndexer.ByIndex(crByNSIndex, ns.Name)
+		clusterRoles, err := n.crIndexer.ByIndex(crByNSIndex, ns.Name)
 		if err != nil {
 			return err
 		}
 
-		roleCli := n.m.clusterRoles
+		roleCli := n.crClient
 		nsInDesiredRole := false
 		for _, c := range clusterRoles {
 			cr, ok := c.(*rbacv1.ClusterRole)
@@ -458,7 +499,7 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace) err
 
 		if !nsInDesiredRole && desiredRole != "" {
 			mustUpdate := true
-			cr, err := n.m.crLister.Get(desiredRole)
+			cr, err := n.crLister.Get(desiredRole)
 			if err != nil && !apierrors.IsNotFound(err) {
 				return err
 			}
@@ -586,11 +627,11 @@ func crByNS(obj interface{}) ([]string, error) {
 	return result, nil
 }
 
-func updateStatusAnnotation(hasPRTBs bool, namespace *v1.Namespace, mgr *manager) {
+func updateStatusAnnotation(hasPRTBs bool, namespace *v1.Namespace, crIndexer, crbIndexer cache.Indexer, rbLister wrbacv1.RoleBindingCache, nsClient wcorev1.NamespaceClient) {
 	if _, ok := namespace.Annotations[projectIDAnnotation]; ok {
 		for i := 0; i < 10; i++ {
 			time.Sleep(time.Millisecond * 500)
-			clusterRoles, err := mgr.crIndexer.ByIndex(crByNSIndex, namespace.Name)
+			clusterRoles, err := crIndexer.ByIndex(crByNSIndex, namespace.Name)
 			if err != nil {
 				logrus.Warnf("error getting cluster roles for ns %v for status update: %v", namespace.Name, err)
 				continue
@@ -605,7 +646,7 @@ func updateStatusAnnotation(hasPRTBs bool, namespace *v1.Namespace, mgr *manager
 				for _, crx := range clusterRoles {
 					cr, _ := crx.(*rbacv1.ClusterRole)
 					crbKey := rbRoleSubjectKey(cr.Name, rbacv1.Subject{Kind: "User", Name: creator})
-					crbs, _ := mgr.crbIndexer.ByIndex(crbByRoleAndSubjectIndex, crbKey)
+					crbs, _ := crbIndexer.ByIndex(crbByRoleAndSubjectIndex, crbKey)
 					if len(crbs) > 0 {
 						found = true
 						break
@@ -617,7 +658,7 @@ func updateStatusAnnotation(hasPRTBs bool, namespace *v1.Namespace, mgr *manager
 			}
 
 			if hasPRTBs {
-				bindings, err := mgr.rbLister.List(namespace.Name, labels.Everything())
+				bindings, err := rbLister.List(namespace.Name, labels.Everything())
 				if err != nil {
 					logrus.Warnf("error getting bindings for ns %v for status update: %v", namespace.Name, err)
 					continue
@@ -630,7 +671,7 @@ func updateStatusAnnotation(hasPRTBs bool, namespace *v1.Namespace, mgr *manager
 	}
 
 	for i := 0; i < 10; i++ {
-		ns, err := mgr.namespaces.Get(namespace.Name, metav1.GetOptions{})
+		ns, err := nsClient.Get(namespace.Name, metav1.GetOptions{})
 		if err != nil {
 			logrus.Errorf("error getting ns %v for status update: %v", namespace.Name, err)
 			return
@@ -639,7 +680,7 @@ func updateStatusAnnotation(hasPRTBs bool, namespace *v1.Namespace, mgr *manager
 			logrus.Warnf("fail to set %v condition on ns %v: %v", initialRoleCondition, namespace.Name, err)
 			continue
 		}
-		_, err = mgr.namespaces.Update(ns)
+		_, err = nsClient.Update(ns)
 		if err == nil {
 			break
 		}
@@ -662,7 +703,7 @@ func (n *nsLifecycle) asyncCleanupRBAC(namespaceName string) {
 		}
 
 		err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-			_, err := n.m.nsLister.Get(namespaceName)
+			_, err := n.nsLister.Get(namespaceName)
 			if err != nil {
 				if apierrors.IsNotFound(err) {
 					// Namespace is fully deleted, clean up RBAC

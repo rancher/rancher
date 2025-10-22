@@ -26,6 +26,7 @@ import (
 )
 
 func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
+	const clusterName = "c-123xyz"
 	const namespaceName = "test-ns"
 	ctrl := gomock.NewController(t)
 	tests := []struct {
@@ -232,13 +233,15 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 					return nil
 				},
 			).AnyTimes()
-			lifecycle := nsLifecycle{
-				m: &manager{
+			lifecycle := newNamespaceLifecycle(
+				&manager{
+					clusterName:  clusterName,
 					crLister:     fakeLister,
 					crIndexer:    &indexer,
 					clusterRoles: fakeClusterRoles,
 				},
-			}
+				nil, // not needed
+			)
 			err := lifecycle.reconcileNamespaceProjectClusterRole(&corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: namespaceName,
@@ -518,6 +521,7 @@ func (d *FakeResourceIndexer[T]) AddIndexers(newIndexers cache.Indexers) error {
 }
 
 func TestAsyncCleanupRBAC_NamespaceDeleted(t *testing.T) {
+	const clusterName = "c-123xyz"
 	tests := []struct {
 		name                  string
 		indexedRoles          []*rbacv1.ClusterRole
@@ -593,14 +597,16 @@ func TestAsyncCleanupRBAC_NamespaceDeleted(t *testing.T) {
 					return &v1.ClusterRole{}, nil
 				},
 			).AnyTimes()
-			nsLifecycle := &nsLifecycle{
-				m: &manager{
+			nsLifecycle := newNamespaceLifecycle(
+				&manager{
+					clusterName:  clusterName,
 					nsLister:     namespaceListerMock,
 					crLister:     fakeLister,
 					crIndexer:    &indexer,
 					clusterRoles: fakeClusterRoles,
 				},
-			}
+				nil, // not needed
+			)
 
 			nsLifecycle.asyncCleanupRBAC(namespaceName)
 
@@ -623,6 +629,7 @@ func waitForCondition(t *testing.T, condition func() bool, timeout time.Duration
 }
 
 func TestEnsurePRTBAddToNamespace(t *testing.T) {
+	const clusterName = "c-123xyz"
 	const namespaceName = "test-ns"
 	ctrl := gomock.NewController(t)
 	tests := []struct {
@@ -688,13 +695,14 @@ func TestEnsurePRTBAddToNamespace(t *testing.T) {
 					}, name)
 				},
 			)
-			lifecycle := nsLifecycle{
-				m: &manager{
+			lifecycle := newNamespaceLifecycle(
+				&manager{
+					clusterName: clusterName,
 					crIndexer:   crIndexer,
 					prtbIndexer: prtbIndexer,
 					rtLister:    rtLister,
 				},
-				rq: &resourcequota.SyncController{
+				&resourcequota.SyncController{
 					ProjectLister: &v3fakes.ProjectListerMock{
 						GetFunc: func(namespace string, name string) (*v3.Project, error) {
 							return nil, apierrors.NewNotFound(schema.GroupResource{
@@ -704,7 +712,7 @@ func TestEnsurePRTBAddToNamespace(t *testing.T) {
 						},
 					},
 				},
-			}
+			)
 			hasPRTBs, err := lifecycle.ensurePRTBAddToNamespace(&corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: namespaceName,
