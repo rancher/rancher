@@ -516,7 +516,7 @@ func Test_OnChange(t *testing.T) {
 							ObjectMeta: metav1.ObjectMeta{Name: "test-rt-aggregator"},
 						},
 						{
-							ObjectMeta: metav1.ObjectMeta{Name: "test-rt-promoted-aggregator"},
+							ObjectMeta: metav1.ObjectMeta{Name: "test-rt-promoted"},
 						},
 						{
 							ObjectMeta: metav1.ObjectMeta{Name: "test-rt-promoted-aggregator"},
