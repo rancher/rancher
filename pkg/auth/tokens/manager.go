@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/util"
 	clientv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
@@ -47,6 +48,14 @@ const (
 	KubeconfigResponseType = "kubeconfig"
 )
 
+type tokenClient interface {
+	Create(*v3.Token) (*v3.Token, error)
+	Update(*v3.Token) (*v3.Token, error)
+	Get(string, metav1.GetOptions) (*v3.Token, error)
+	List(metav1.ListOptions) (*v3.TokenList, error)
+	Delete(string, *metav1.DeleteOptions) error
+}
+
 func RegisterIndexer(wContext *wrangler.Context) error {
 	informer := wContext.Mgmt.User().Informer()
 	return informer.AddIndexers(map[string]cache.IndexFunc{userPrincipalIndex: userPrincipalIndexer})
@@ -64,7 +73,7 @@ func NewManager(wContext *wrangler.Context) *Manager {
 }
 
 type Manager struct {
-	tokens       ctrlv3.TokenClient
+	tokens       tokenClient
 	tokenCache   ctrlv3.TokenCache
 	tokenIndexer cache.Indexer
 	userCache    ctrlv3.UserCache
@@ -72,7 +81,7 @@ type Manager struct {
 	secretCache  ctrlv1.SecretCache
 }
 
-func userPrincipalIndexer(obj interface{}) ([]string, error) {
+func userPrincipalIndexer(obj any) ([]string, error) {
 	user, ok := obj.(*apiv3.User)
 	if !ok {
 		return []string{}, nil
@@ -147,8 +156,7 @@ func (m *Manager) updateToken(token *apiv3.Token) (*apiv3.Token, error) {
 
 func (m *Manager) GetToken(tokenAuthValue string) (*apiv3.Token, int, error) {
 	tokenName, tokenKey := SplitTokenParts(tokenAuthValue)
-
-	lookupUsingClient := false
+	var lookupUsingClient bool
 
 	objs, err := m.tokenIndexer.ByIndex(tokenKeyIndex, tokenKey)
 	if err != nil {
@@ -306,7 +314,7 @@ func (m *Manager) listTokens(request *types.APIContext) error {
 		return err
 	}
 
-	tokensFromStore := make([]map[string]interface{}, len(tokens))
+	tokensFromStore := []map[string]any{}
 	for _, token := range tokens {
 		token.Current = currentAuthToken.Name == token.Name && !currentAuthToken.IsDerived
 		tokenData, err := ConvertTokenResource(request.Schema, token)
@@ -350,6 +358,7 @@ func (m *Manager) getTokenFromRequest(request *types.APIContext) error {
 		logrus.Errorf("GetToken failed with error: %v", err)
 		return httperror.NewAPIErrorLong(status, util.GetHTTPErrorCode(status), fmt.Sprintf("%v", err))
 	}
+
 	token.Current = currentAuthToken.Name == token.Name && !currentAuthToken.IsDerived
 	tokenData, err := ConvertTokenResource(request.Schema, token)
 	if err != nil {
@@ -522,9 +531,11 @@ func (m *Manager) CreateTokenAndSetCookie(userID string, userPrincipal apiv3.Pri
 func (m *Manager) TokenStreamTransformer(
 	apiContext *types.APIContext,
 	schema *types.Schema,
-	data chan map[string]interface{},
-	opt *types.QueryOptions) (chan map[string]interface{}, error) {
+	data chan map[string]any,
+	opt *types.QueryOptions,
+) (chan map[string]any, error) {
 	logrus.Debug("TokenStreamTransformer called")
+
 	tokenAuthValue := GetTokenAuthFromRequest(apiContext.Request)
 	if tokenAuthValue == "" {
 		// no cookie or auth header, cannot authenticate
@@ -538,11 +549,16 @@ func (m *Manager) TokenStreamTransformer(
 
 	userID := storedToken.UserID
 
-	return convert.Chan(data, func(data map[string]interface{}) map[string]interface{} {
-		labels, _ := data["labels"].(map[string]interface{})
+	return convert.Chan(data, func(data map[string]any) map[string]any {
+		labels, _ := data["labels"].(map[string]any)
 		if labels[UserIDLabel] != userID {
 			return nil
 		}
+
+		name, _ := data["name"].(string)
+		isDerived, _ := data["isDerived"].(bool)
+		data["current"] = name == storedToken.Name && !isDerived
+
 		return data
 	}), nil
 }
