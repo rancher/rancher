@@ -72,7 +72,7 @@ type Manager struct {
 	secretCache  ctrlv1.SecretCache
 }
 
-func userPrincipalIndexer(obj interface{}) ([]string, error) {
+func userPrincipalIndexer(obj any) ([]string, error) {
 	user, ok := obj.(*apiv3.User)
 	if !ok {
 		return []string{}, nil
@@ -306,7 +306,7 @@ func (m *Manager) listTokens(request *types.APIContext) error {
 		return err
 	}
 
-	tokensFromStore := make([]map[string]interface{}, len(tokens))
+	tokensFromStore := make([]map[string]any, len(tokens))
 	for _, token := range tokens {
 		token.Current = currentAuthToken.Name == token.Name && !currentAuthToken.IsDerived
 		tokenData, err := ConvertTokenResource(request.Schema, token)
@@ -522,9 +522,11 @@ func (m *Manager) CreateTokenAndSetCookie(userID string, userPrincipal apiv3.Pri
 func (m *Manager) TokenStreamTransformer(
 	apiContext *types.APIContext,
 	schema *types.Schema,
-	data chan map[string]interface{},
-	opt *types.QueryOptions) (chan map[string]interface{}, error) {
+	data chan map[string]any,
+	opt *types.QueryOptions,
+) (chan map[string]any, error) {
 	logrus.Debug("TokenStreamTransformer called")
+
 	tokenAuthValue := GetTokenAuthFromRequest(apiContext.Request)
 	if tokenAuthValue == "" {
 		// no cookie or auth header, cannot authenticate
@@ -538,11 +540,16 @@ func (m *Manager) TokenStreamTransformer(
 
 	userID := storedToken.UserID
 
-	return convert.Chan(data, func(data map[string]interface{}) map[string]interface{} {
-		labels, _ := data["labels"].(map[string]interface{})
+	return convert.Chan(data, func(data map[string]any) map[string]any {
+		labels, _ := data["labels"].(map[string]any)
 		if labels[UserIDLabel] != userID {
 			return nil
 		}
+
+		name, _ := data["name"].(string)
+		isDerived, _ := data["isDerived"].(bool)
+		data["current"] = name == storedToken.Name && !isDerived
+
 		return data
 	}), nil
 }
