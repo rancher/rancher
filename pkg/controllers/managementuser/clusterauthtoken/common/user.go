@@ -28,20 +28,21 @@ func NewClusterAuthToken(token accessor.TokenAccessor, hashedValue string) *clus
 	}
 }
 
-// NewClusterAuthSecret creates a new secret from the given token and its hash value
+// NewClusterAuthTokenSecret creates a new secret from the given token and its hash value
 // The cluster auth token is managed separately.
 // Does not create the secret in the remote cluster.
-func NewClusterAuthTokenSecret(token accessor.TokenAccessor, hashedValue string) *corev1.Secret {
-	return NewClusterAuthTokenSecretForName(token.GetName(), hashedValue)
+func NewClusterAuthTokenSecret(ns string, token accessor.TokenAccessor, hashedValue string) *corev1.Secret {
+	return NewClusterAuthTokenSecretForName(ns, token.GetName(), hashedValue)
 }
 
-// NewClusterAuthSecret creates a new secret from the given token and its hash value
+// NewClusterAuthTokenSecretForName creates a new secret from the given token and its hash value
 // The cluster auth token is managed separately.
 // Does not create the secret in the remote cluster.
-func NewClusterAuthTokenSecretForName(name, hashedValue string) *corev1.Secret {
+func NewClusterAuthTokenSecretForName(ns, name, hashedValue string) *corev1.Secret {
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: ClusterAuthTokenSecretName(name),
+			Name:      ClusterAuthTokenSecretName(name),
+			Namespace: ns,
 		},
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: corev1.SchemeGroupVersion.Version,
@@ -59,7 +60,7 @@ func ClusterAuthTokenSecretName(tokenName string) string {
 	return tokenName
 }
 
-// ClusterAuthSecretValue extracts the token hash stored in the secret.
+// ClusterAuthTokenSecretValue extracts the token hash stored in the secret.
 func ClusterAuthTokenSecretValue(clusterAuthSecret *corev1.Secret) string {
 	return string(clusterAuthSecret.Data[ClusterAuthSecretHashField])
 }

@@ -12,7 +12,6 @@ import (
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/generated/norman/cluster.cattle.io/v3/fakes"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	coreFakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	mgmtFakes "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/rancher/wrangler/v3/pkg/generic"
@@ -930,16 +929,16 @@ func runCreateUpdateTest(t *testing.T, testInput *testInput) *testOutput {
 		return testInput.ExistingClusterAuthSecret.DeepCopy(), testInput.ExistingTokenError
 	}).AnyTimes()
 
-	var modifiedSecret *v1.Secret
-	mockSecrets := coreFakes.SecretInterfaceMock{}
-	mockSecrets.UpdateFunc = func(in1 *v1.Secret) (*v1.Secret, error) {
+	var modifiedSecret *corev1.Secret
+	mockSecrets := fake.NewMockClientInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	mockSecrets.EXPECT().Update(gomock.Any()).DoAndReturn(func(in1 *corev1.Secret) (*corev1.Secret, error) {
 		modifiedSecret = in1
 		return in1, testInput.UpdateAuthTokenErr
-	}
-	mockSecrets.CreateFunc = func(in1 *v1.Secret) (*v1.Secret, error) {
+	}).AnyTimes()
+	mockSecrets.EXPECT().Create(gomock.Any()).DoAndReturn(func(in1 *corev1.Secret) (*corev1.Secret, error) {
 		modifiedSecret = in1
-		return in1, nil
-	}
+		return in1, testInput.UpdateAuthTokenErr
+	}).AnyTimes()
 
 	var modifiedToken *clusterv3.ClusterAuthToken
 	var isUpdated bool
@@ -993,7 +992,7 @@ func runCreateUpdateTest(t *testing.T, testInput *testInput) *testOutput {
 		userAttributeLister:        &userAttributeLister,
 		clusterUserAttributeLister: &clusterUserAttributeLister,
 		clusterUserAttribute:       &fakes.ClusterUserAttributeInterfaceMock{},
-		clusterSecret:              &mockSecrets,
+		clusterSecret:              mockSecrets,
 		clusterSecretLister:        mockSecretLister,
 	}
 	var err error
@@ -1069,16 +1068,16 @@ func runExtCreateUpdateTest(t *testing.T, testInput *testExtInput) *testOutput {
 		return testInput.ExistingClusterAuthSecret.DeepCopy(), testInput.ExistingTokenError
 	}).AnyTimes()
 
-	var modifiedSecret *v1.Secret
-	mockSecrets := coreFakes.SecretInterfaceMock{}
-	mockSecrets.UpdateFunc = func(in1 *v1.Secret) (*v1.Secret, error) {
+	var modifiedSecret *corev1.Secret
+	mockSecrets := fake.NewMockClientInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	mockSecrets.EXPECT().Update(gomock.Any()).DoAndReturn(func(in1 *corev1.Secret) (*corev1.Secret, error) {
 		modifiedSecret = in1
 		return in1, testInput.UpdateAuthTokenErr
-	}
-	mockSecrets.CreateFunc = func(in1 *v1.Secret) (*v1.Secret, error) {
+	}).AnyTimes()
+	mockSecrets.EXPECT().Create(gomock.Any()).DoAndReturn(func(in1 *corev1.Secret) (*corev1.Secret, error) {
 		modifiedSecret = in1
-		return in1, nil
-	}
+		return in1, testInput.UpdateAuthTokenErr
+	}).AnyTimes()
 
 	var modifiedToken *clusterv3.ClusterAuthToken
 	var isUpdated bool
@@ -1132,7 +1131,7 @@ func runExtCreateUpdateTest(t *testing.T, testInput *testExtInput) *testOutput {
 		userAttributeLister:        &userAttributeLister,
 		clusterUserAttributeLister: &clusterUserAttributeLister,
 		clusterUserAttribute:       &fakes.ClusterUserAttributeInterfaceMock{},
-		clusterSecret:              &mockSecrets,
+		clusterSecret:              mockSecrets,
 		clusterSecretLister:        mockSecretLister,
 	}
 	var err error

@@ -12,9 +12,8 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken/common"
 	"github.com/rancher/rancher/pkg/features"
 	clusterv3 "github.com/rancher/rancher/pkg/generated/norman/cluster.cattle.io/v3"
-	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	wcore "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -40,8 +39,8 @@ type tokenHandler struct {
 	extTokenIndexer            cache.Indexer
 	userLister                 managementv3.UserLister
 	userAttributeLister        managementv3.UserAttributeLister
-	clusterSecret              corev1.SecretInterface
-	clusterSecretLister        corecontrollers.SecretCache
+	clusterSecret              wcore.SecretClient
+	clusterSecretLister        wcore.SecretCache
 }
 
 // extCreate is called when a given ext token is created, and is responsible for
@@ -98,7 +97,7 @@ func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
 
 		forced = true
 		hashedValue := token.Status.Hash
-		clusterAuthTokenSecret = common.NewClusterAuthTokenSecret(token, hashedValue)
+		clusterAuthTokenSecret = common.NewClusterAuthTokenSecret(h.namespace, token, hashedValue)
 	}
 
 	err = h.updateClusterUserAttribute(token.GetUserID())
@@ -216,7 +215,7 @@ func (h *tokenHandler) createClusterAuthToken(token accessor.TokenAccessor, hash
 	}
 
 	clusterAuthToken := common.NewClusterAuthToken(token, hashedValue)
-	clusterAuthTokenSecret := common.NewClusterAuthTokenSecret(token, hashedValue)
+	clusterAuthTokenSecret := common.NewClusterAuthTokenSecret(h.namespace, token, hashedValue)
 
 	// Creating the secret first, then the token for it. This ensures that
 	// kube-api-auth either sees nothing, or a working combination of
@@ -283,7 +282,7 @@ func (h *tokenHandler) Updated(token *managementv3.Token) (runtime.Object, error
 			hashedValue = hashed
 		}
 
-		clusterAuthTokenSecret = common.NewClusterAuthTokenSecret(token, hashedValue)
+		clusterAuthTokenSecret = common.NewClusterAuthTokenSecret(h.namespace, token, hashedValue)
 	}
 
 	err = h.updateClusterUserAttribute(token.GetUserID())
@@ -372,7 +371,7 @@ func (h *tokenHandler) remove(name, userID, key string) error {
 		}
 	}
 
-	err = h.clusterSecret.Delete(common.ClusterAuthTokenSecretName(name), &metav1.DeleteOptions{})
+	err = h.clusterSecret.Delete(h.namespace, common.ClusterAuthTokenSecretName(name), &metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}

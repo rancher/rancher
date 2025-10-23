@@ -82,7 +82,7 @@ func (p *pLifecycle) Remove(project *v3.Project) (runtime.Object, error) {
 	for _, o := range namespaces {
 		namespace, _ := o.(*corev1.Namespace)
 		if _, ok := namespace.Annotations["field.cattle.io/creatorId"]; ok {
-			err := p.m.workload.Core.Namespaces("").Delete(namespace.Name, &metav1.DeleteOptions{})
+			err := p.m.namespaces.Delete(namespace.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				return nil, err
 			}
@@ -90,7 +90,7 @@ func (p *pLifecycle) Remove(project *v3.Project) (runtime.Object, error) {
 			namespace = namespace.DeepCopy()
 			if namespace.Annotations != nil {
 				delete(namespace.Annotations, projectIDAnnotation)
-				_, err := p.m.workload.Core.Namespaces("").Update(namespace)
+				_, err := p.m.namespaces.Update(namespace)
 				if err != nil {
 					return nil, err
 				}
@@ -195,7 +195,7 @@ func (p *pLifecycle) assignNamespacesToProject(project *v3.Project, projectName 
 		return err
 	}
 	for _, nsName := range initialProjectsToNamespaces[projectName] {
-		ns, err := p.m.nsLister.Get("", nsName)
+		ns, err := p.m.nsLister.Get(nsName)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				continue
@@ -212,7 +212,7 @@ func (p *pLifecycle) assignNamespacesToProject(project *v3.Project, projectName 
 			ns.Annotations = map[string]string{}
 		}
 		ns.Annotations[projectIDAnnotation] = fmt.Sprintf("%v:%v", p.m.clusterName, project.Name)
-		if _, err := p.m.workload.Core.Namespaces(p.m.clusterName).Update(ns); err != nil {
+		if _, err := p.m.namespaces.Update(ns); err != nil {
 			return err
 		}
 	}

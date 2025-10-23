@@ -4,26 +4,25 @@ import (
 	"fmt"
 
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
-	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	wcore "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type nsSyncer struct {
 	npmgr            *netpolMgr
 	clusterLister    v3.ClusterLister
-	serviceLister    v1.ServiceLister
-	podLister        v1.PodLister
-	serviceClient    v1.ServiceInterface
-	podClient        v1.PodInterface
+	serviceLister    wcore.ServiceCache
+	podLister        wcore.PodCache
+	serviceClient    wcore.ServiceController
+	podClient        wcore.PodController
 	clusterNamespace string
 }
 
 // Sync invokes Policy Handler to program the native network policies
-func (nss *nsSyncer) Sync(key string, ns *corev1.Namespace) (runtime.Object, error) {
+func (nss *nsSyncer) Sync(_ string, ns *corev1.Namespace) (*corev1.Namespace, error) {
 	if ns == nil || ns.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -90,7 +89,7 @@ func (nss *nsSyncer) syncNodePortServices(systemNamespaces map[string]bool, nsNa
 			continue
 		}
 		if nodePortService(svc) {
-			nss.serviceClient.Controller().Enqueue(svc.Namespace, svc.Name)
+			nss.serviceClient.Enqueue(svc.Namespace, svc.Name)
 		}
 	}
 	return nil
@@ -108,7 +107,7 @@ func (nss *nsSyncer) syncHostPortPods(systemNamespaces map[string]bool, nsName s
 			continue
 		}
 		if hostPortPod(pod) {
-			nss.podClient.Controller().Enqueue(pod.Namespace, pod.Name)
+			nss.podClient.Enqueue(pod.Namespace, pod.Name)
 		}
 	}
 	return nil

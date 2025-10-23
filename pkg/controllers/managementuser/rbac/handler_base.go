@@ -13,12 +13,12 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
 	"github.com/rancher/rancher/pkg/features"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	typescorev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/impersonation"
 	nsutils "github.com/rancher/rancher/pkg/namespace"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
+	corew "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
@@ -77,7 +77,7 @@ func Register(ctx context.Context, workload *config.UserContext) error {
 	crtbInformer := workload.Management.Management.ClusterRoleTemplateBindings("").Controller().Informer()
 
 	// Index for looking up namespaces by projectID annotation
-	nsInformer := workload.Core.Namespaces("").Controller().Informer()
+	nsInformer := workload.Corew.Namespace().Informer()
 	nsIndexers := cache.Indexers{
 		nsutils.NsByProjectIndex: nsutils.NsByProjectID,
 	}
@@ -129,8 +129,8 @@ func Register(ctx context.Context, workload *config.UserContext) error {
 		roleBindings:        workload.RBACw.RoleBinding(),
 		clusterRoles:        workload.RBACw.ClusterRole(),
 		clusterRoleBindings: workload.RBACw.ClusterRoleBinding(),
-		nsLister:            workload.Core.Namespaces("").Controller().Lister(),
-		nsController:        workload.Core.Namespaces("").Controller(),
+		nsLister:            workload.Corew.Namespace().Cache(),
+		namespaces:          workload.Corew.Namespace(),
 		clusterLister:       management.Management.Clusters("").Controller().Lister(),
 		projectLister:       management.Management.Projects(workload.ClusterName).Controller().Lister(),
 		userLister:          management.Management.Users("").Controller().Lister(),
@@ -144,16 +144,17 @@ func Register(ctx context.Context, workload *config.UserContext) error {
 	management.Management.GlobalRoleBindings("").AddHandler(ctx, grbHandlerName, newGlobalRoleBindingHandler(workload))
 
 	sync := &resourcequota.SyncController{
-		Namespaces:          workload.Core.Namespaces(""),
+		Namespaces:          workload.Corew.Namespace(),
 		NsIndexer:           nsInformer.GetIndexer(),
-		ResourceQuotas:      workload.Core.ResourceQuotas(""),
-		ResourceQuotaLister: workload.Core.ResourceQuotas("").Controller().Lister(),
-		LimitRange:          workload.Core.LimitRanges(""),
-		LimitRangeLister:    workload.Core.LimitRanges("").Controller().Lister(),
+		ResourceQuotas:      workload.Corew.ResourceQuota(),
+		ResourceQuotaLister: workload.Corew.ResourceQuota().Cache(),
+		LimitRange:          workload.Corew.LimitRange(),
+		LimitRangeLister:    workload.Corew.LimitRange().Cache(),
 		ProjectLister:       management.Management.Projects(workload.ClusterName).Controller().Lister(),
 	}
 
-	workload.Core.Namespaces("").AddLifecycle(ctx, "namespace-auth", newNamespaceLifecycle(r, sync))
+	nsLifecycle := newNamespaceLifecycle(r, sync)
+	workload.Corew.Namespace().OnChange(ctx, "namespace-auth", nsLifecycle.onChange)
 	relatedresource.WatchClusterScoped(ctx, "enqueue-beneficiary-roletemplates", newRTEnqueueFunc(rtInformer.GetIndexer()),
 		management.Wrangler.Mgmt.RoleTemplate(), management.Wrangler.Mgmt.RoleTemplate())
 
@@ -203,8 +204,8 @@ type manager struct {
 	clusterRoleBindings wrbacv1.ClusterRoleBindingClient
 	rbLister            wrbacv1.RoleBindingCache
 	roleBindings        wrbacv1.RoleBindingClient
-	nsLister            typescorev1.NamespaceLister
-	nsController        typescorev1.NamespaceController
+	nsLister            corew.NamespaceCache
+	namespaces          corew.NamespaceClient
 	clusterLister       v3.ClusterLister
 	projectLister       v3.ProjectLister
 	userLister          v3.UserLister

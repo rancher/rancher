@@ -12,9 +12,9 @@ import (
 	clusterclient "github.com/rancher/rancher/pkg/client/generated/cluster/v3"
 	mgmtclient "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nslabels"
-	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/kubectl"
 	schema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
+	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -89,13 +89,13 @@ func (a ActionHandler) processYAML(apiContext *types.APIContext, clusterName, pr
 	return nil
 }
 
-func (a ActionHandler) findOrCreateProjectNamespaces(apiContext *types.APIContext, namespaces []string, clusterName, projectName string) (corev1.NamespaceInterface, error) {
+func (a ActionHandler) findOrCreateProjectNamespaces(apiContext *types.APIContext, namespaces []string, clusterName, projectName string) (wcorev1.NamespaceClient, error) {
 	userCtx, err := a.ClusterManager.UserContextNoControllers(clusterName)
 	if err != nil {
 		return nil, err
 	}
 
-	nsClient := userCtx.Core.Namespaces("")
+	nsClient := userCtx.Corew.Namespace()
 
 	for _, ns := range namespaces {
 		nsObj, err := nsClient.Get(ns, v1.GetOptions{})

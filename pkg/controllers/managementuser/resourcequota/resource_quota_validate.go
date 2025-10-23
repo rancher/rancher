@@ -3,8 +3,8 @@ package resourcequota
 import (
 	"fmt"
 
-	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	corew "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientcache "k8s.io/client-go/tools/cache"
@@ -15,7 +15,7 @@ reconcile controller listens on project updates, and enqueues the namespaces of 
 so they get a chance to reconcile the resource quotas
 */
 type reconcileController struct {
-	namespaces v1.NamespaceInterface
+	namespaces corew.NamespaceController
 	nsIndexer  clientcache.Indexer
 }
 
@@ -31,7 +31,7 @@ func (r *reconcileController) reconcileNamespaces(key string, p *v3.Project) (ru
 
 	for _, n := range namespaces {
 		ns := n.(*corev1.Namespace)
-		r.namespaces.Controller().Enqueue("", ns.Name)
+		r.namespaces.Enqueue(ns.Name)
 	}
 	return nil, nil
 }
