@@ -18,6 +18,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var (
+	invalidAuthTokenError = errors.New("invalid auth token value")
+)
+
 func SplitTokenParts(tokenID string) (string, string) {
 	parts := strings.Split(tokenID, ":")
 	if len(parts) != 2 {
@@ -133,10 +137,10 @@ func extractClusterIDFromResponseType(responseType string) string {
 
 // Given a stored token with hashed key, check if the provided (unhashed) tokenKey matches and is valid
 func VerifyToken(storedToken *apiv3.Token, tokenName, tokenKey string) (int, error) {
-	invalidAuthTokenErr := errors.New("Invalid auth token value")
 	if storedToken == nil || storedToken.Name != tokenName {
-		return http.StatusUnprocessableEntity, invalidAuthTokenErr
+		return http.StatusUnprocessableEntity, invalidAuthTokenError
 	}
+
 	if storedToken.Annotations != nil && storedToken.Annotations[TokenHashed] == "true" {
 		hasher, err := hashers.GetHasherForHash(storedToken.Token)
 		if err != nil {
@@ -145,13 +149,14 @@ func VerifyToken(storedToken *apiv3.Token, tokenName, tokenKey string) (int, err
 		}
 		if err := hasher.VerifyHash(storedToken.Token, tokenKey); err != nil {
 			logrus.Errorf("VerifyHash failed with error: %v", err)
-			return http.StatusUnprocessableEntity, invalidAuthTokenErr
+			return http.StatusUnprocessableEntity, invalidAuthTokenError
 		}
 	} else {
 		if storedToken.Token != tokenKey {
-			return http.StatusUnprocessableEntity, invalidAuthTokenErr
+			return http.StatusUnprocessableEntity, invalidAuthTokenError
 		}
 	}
+
 	if IsExpired(storedToken) {
 		return http.StatusGone, errors.New("must authenticate, expired")
 	}

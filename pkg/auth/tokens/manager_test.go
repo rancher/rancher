@@ -1,36 +1,30 @@
 package tokens
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"testing"
 	"time"
 
 	"github.com/rancher/norman/types"
+	"github.com/rancher/norman/types/mapper"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/features"
+
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
-type DummyIndexer struct {
-	cache.Store
-
-	hashedEnabled bool
-}
-
-type TestCase struct {
-	token   string
-	userID  string
-	receive bool
-	err     string
-}
-
 var (
+	// This is shared state across the tests.
 	token       string
 	tokenHashed string
 )
@@ -39,7 +33,93 @@ type TestManager struct {
 	assert       *assert.Assertions
 	tokenManager Manager
 	apiCtx       *types.APIContext
-	testCases    []TestCase
+	testCases    []testCase
+}
+
+func TestListTokens(t *testing.T) {
+	tokenName := "testname"
+	token = mustGenerateRandomToken(t)
+	tokenManager := Manager{
+		tokenIndexer: &dummyIndexer{
+			Store: &cache.FakeCustomStore{},
+		},
+		tokens: &fakeTokenClient{
+			// Two tokens one matches the token and is current
+			// the other token does not match the token and is not current.
+			list: []v3.Token{
+				{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "management.cattle.io/v3",
+						Kind:       "Token",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: tokenName,
+					},
+					AuthProvider: "testing",
+					Token:        token,
+					TTLMillis:    0,
+					UserID:       "u-mo12345",
+				},
+				{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: "management.cattle.io/v3",
+						Kind:       "Token",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "not-" + tokenName,
+					},
+					AuthProvider: "testing",
+					Token:        token,
+					TTLMillis:    0,
+					UserID:       "u-mo12345",
+				},
+			},
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/v3/tokens", nil)
+	w := &normanRecorder{}
+	req.Header.Set("Authorization", "Bearer "+tokenName+":"+token)
+	ac := &types.APIContext{ResponseWriter: w, Request: req, Schema: &types.Schema{Mapper: mapper.NewObject()}}
+
+	if err := tokenManager.listTokens(ac); err != nil {
+		t.Fatal(err)
+	}
+
+	want := []map[string]any{
+		map[string]any{
+			".selfLink":    "",
+			"authProvider": "testing",
+			"current":      true,
+			"description":  "",
+			"expired":      false,
+			"expiresAt":    "",
+			"isDerived":    false,
+			"token":        token,
+			"ttl":          json.Number("0"),
+			"userId":       "u-mo12345",
+			"userPrincipal": map[string]any{
+				"metadata": map[string]any{},
+			},
+		},
+		map[string]any{
+			".selfLink":    "",
+			"authProvider": "testing",
+			"current":      false,
+			"description":  "",
+			"expired":      false,
+			"expiresAt":    "",
+			"isDerived":    false,
+			"token":        token,
+			"ttl":          json.Number("0"),
+			"userId":       "u-mo12345",
+			"userPrincipal": map[string]any{
+				"metadata": map[string]any{},
+			},
+		},
+	}
+	assert.Len(t, w.Responses, 1)
+	assert.Equal(t, want, w.Responses[0].Data)
 }
 
 // TestTokenStreamTransformer validates that the function properly filters data in websocket
@@ -49,7 +129,7 @@ func TestTokenStreamTransformer(t *testing.T) {
 	testManager := TestManager{
 		assert: assert.New(t),
 		tokenManager: Manager{
-			tokenIndexer: &DummyIndexer{
+			tokenIndexer: &dummyIndexer{
 				Store: &cache.FakeCustomStore{},
 			},
 		},
@@ -59,17 +139,12 @@ func TestTokenStreamTransformer(t *testing.T) {
 	}
 
 	var err error
-	token, err = randomtoken.Generate()
-	if err != nil {
-		testManager.assert.FailNow(fmt.Sprintf("unable to generate token for token stream transformer test: %v", err))
-	}
+	token = mustGenerateRandomToken(t)
 	sha256Hasher := hashers.Sha256Hasher{}
 	tokenHashed, err = sha256Hasher.CreateHash(token)
-	if err != nil {
-		testManager.assert.FailNow(fmt.Sprintf("unable to hash token for token stream transformer test: %v", err))
-	}
+	testManager.assert.NoError(err, "unable to hash token for token stream transformer test")
 
-	testManager.testCases = []TestCase{
+	testManager.testCases = []testCase{
 		{
 			token:   "testname:" + token,
 			userID:  "testuser",
@@ -80,19 +155,19 @@ func TestTokenStreamTransformer(t *testing.T) {
 			token:   "testname:testtoken",
 			userID:  "testuser",
 			receive: false,
-			err:     "Invalid auth token value",
+			err:     "invalid auth token value",
 		},
 		{
 			token:   "wrongname:testkey",
 			userID:  "testuser",
 			receive: false,
-			err:     "422: [TokenStreamTransformer] failed: Invalid auth token value",
+			err:     "422: [TokenStreamTransformer] failed: invalid auth token value",
 		},
 		{
 			token:   "testname:wrongkey",
 			userID:  "testname",
 			receive: false,
-			err:     "422: [TokenStreamTransformer] failed: Invalid auth token value",
+			err:     "422: [TokenStreamTransformer] failed: invalid auth token value",
 		},
 		{
 			token:   "testname:" + token,
@@ -108,14 +183,14 @@ func TestTokenStreamTransformer(t *testing.T) {
 		},
 	}
 
-	testManager.runTestCases(false)
-	testManager.runTestCases(true)
+	testManager.runtestCases(false)
+	testManager.runtestCases(true)
 }
 
-func (t *TestManager) runTestCases(hashingEnabled bool) {
+func (t *TestManager) runtestCases(hashingEnabled bool) {
 	features.TokenHashing.Set(hashingEnabled)
 	t.tokenManager = Manager{
-		tokenIndexer: &DummyIndexer{
+		tokenIndexer: &dummyIndexer{
 			Store:         &cache.FakeCustomStore{},
 			hashedEnabled: hashingEnabled,
 		},
@@ -157,19 +232,32 @@ func receivedData(c <-chan map[string]interface{}, t <-chan time.Time, result ch
 	}
 }
 
-func (d *DummyIndexer) Index(indexName string, obj interface{}) ([]interface{}, error) {
+type dummyIndexer struct {
+	cache.Store
+
+	hashedEnabled bool
+}
+
+type testCase struct {
+	token   string
+	userID  string
+	receive bool
+	err     string
+}
+
+func (d *dummyIndexer) Index(indexName string, obj interface{}) ([]interface{}, error) {
 	return nil, nil
 }
 
-func (d *DummyIndexer) IndexKeys(indexName, indexKey string) ([]string, error) {
+func (d *dummyIndexer) IndexKeys(indexName, indexKey string) ([]string, error) {
 	return []string{}, nil
 }
 
-func (d *DummyIndexer) ListIndexFuncValues(indexName string) []string {
+func (d *dummyIndexer) ListIndexFuncValues(indexName string) []string {
 	return []string{}
 }
 
-func (d *DummyIndexer) ByIndex(indexName, indexKey string) ([]interface{}, error) {
+func (d *dummyIndexer) ByIndex(indexName, indexKey string) ([]interface{}, error) {
 	token := &apiv3.Token{
 		Token: token,
 		ObjectMeta: v1.ObjectMeta{
@@ -186,14 +274,67 @@ func (d *DummyIndexer) ByIndex(indexName, indexKey string) ([]interface{}, error
 	}, nil
 }
 
-func (d *DummyIndexer) GetIndexers() cache.Indexers {
+func (d *dummyIndexer) GetIndexers() cache.Indexers {
 	return nil
 }
 
-func (d *DummyIndexer) AddIndexers(newIndexers cache.Indexers) error {
+func (d *dummyIndexer) AddIndexers(newIndexers cache.Indexers) error {
 	return nil
 }
 
-func (d *DummyIndexer) SetTokenHashed(enabled bool) {
+func (d *dummyIndexer) SetTokenHashed(enabled bool) {
 	d.hashedEnabled = enabled
+}
+
+func mustGenerateRandomToken(t *testing.T) string {
+	t.Helper()
+	tok, err := randomtoken.Generate()
+	assert.NoError(t, err, "unable to generate token for token stream transformer test")
+
+	return tok
+}
+
+type fakeTokenClient struct {
+	list []v3.Token
+}
+
+func (f *fakeTokenClient) Create(o *v3.Token) (*v3.Token, error) {
+	return nil, nil
+}
+
+func (f *fakeTokenClient) Get(name string, options metav1.GetOptions) (*v3.Token, error) {
+	return nil, nil
+}
+
+func (f *fakeTokenClient) Delete(name string, options *metav1.DeleteOptions) error {
+	return nil
+}
+
+func (f *fakeTokenClient) List(opts metav1.ListOptions) (*v3.TokenList, error) {
+	return &v3.TokenList{Items: f.list}, nil
+}
+
+func (f *fakeTokenClient) Update(*v3.Token) (*v3.Token, error) {
+	return nil, nil
+}
+
+// TODO: This should be moved to norman _or_ a test package in rancher.
+// normanRecorder is like httptest.ResponseRecorder, but for norman's types.ResponseWriter interface
+type normanRecorder struct {
+	Responses []struct {
+		Code int
+		Data interface{}
+	}
+}
+
+func (n *normanRecorder) Write(apiContext *types.APIContext, code int, obj interface{}) {
+	if obj != nil {
+		n.Responses = append(n.Responses, struct {
+			Code int
+			Data interface{}
+		}{
+			Code: code,
+			Data: obj,
+		})
+	}
 }
