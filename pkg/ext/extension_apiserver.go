@@ -2,7 +2,6 @@ package ext
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -10,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken"
 	extstores "github.com/rancher/rancher/pkg/ext/stores"
 	"github.com/rancher/rancher/pkg/features"
@@ -20,10 +18,10 @@ import (
 	wranglerapiregistrationv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiregistration.k8s.io/v1"
 	wranglercorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -56,11 +54,8 @@ const (
 	// The main kube-apiserver will connect to that port (through a tunnel).
 	Port              = 6666
 	APIServiceName    = "v1.ext.cattle.io"
-	TargetServiceName = "api-extension"
+	TargetServiceName = "imperative-api-extension"
 	Namespace         = "cattle-system"
-
-	LegacySecretName  = "imperative-api-sni-provider-cert-ca"
-	LegacyServiceName = "imperative-api-extension"
 )
 
 func CreateOrUpdateAPIService(apiservice wranglerapiregistrationv1.APIServiceController, caBundle []byte) error {
@@ -83,7 +78,7 @@ func CreateOrUpdateAPIService(apiservice wranglerapiregistrationv1.APIServiceCon
 		},
 	}
 
-	original, err := apiservice.Get(APIServiceName, metav1.GetOptions{})
+	current, err := apiservice.Get(APIServiceName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		if _, err := apiservice.Create(desired); err != nil {
 			return err
@@ -91,22 +86,50 @@ func CreateOrUpdateAPIService(apiservice wranglerapiregistrationv1.APIServiceCon
 	} else if err != nil {
 		return err
 	} else {
-		updateErr := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			current, err := apiservice.Get(APIServiceName, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			modified := current.DeepCopy()
-			modified.Spec = desired.Spec
-			patch, err := makePatchAndUpdate(original, modified, apiservice)
-			if err != nil {
-				logrus.Errorf("error updating APIService %s -> request: %s", APIServiceName, patch)
-				return err
-			}
-			return nil
-		})
-		if updateErr != nil {
-			return fmt.Errorf("failed to update APIService %s after retries: %w", APIServiceName, updateErr)
+		current.Spec = desired.Spec
+
+		if _, err := apiservice.Update(current); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func CreateOrUpdateService(service wranglercorev1.ServiceController, appSelector string) error {
+	if RDPEnabled() {
+		appSelector = "api-extension"
+	}
+
+	desired := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      TargetServiceName,
+			Namespace: Namespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Port: Port,
+				},
+			},
+			Selector: map[string]string{
+				"app": appSelector,
+			},
+		},
+	}
+
+	current, err := service.Get(Namespace, TargetServiceName, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		if _, err := service.Create(desired); err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
+	} else {
+		current.Spec = desired.Spec
+
+		if _, err := service.Update(current); err != nil {
+			return err
 		}
 	}
 
@@ -137,7 +160,7 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 	logrus.Info("creating imperative extension apiserver resources")
 
 	sniProvider, err := NewSNIProviderForCname(
-		"api-extension-sni-provider",
+		"imperative-api-sni-provider",
 		[]string{fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace)},
 		wranglerContext.Core.Secret(),
 	)
@@ -168,6 +191,10 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 	}
 
 	additionalSniProviders = append(additionalSniProviders, sniProvider)
+
+	if err := CreateOrUpdateService(wranglerContext.Core.Service(), opts.AppSelector); err != nil {
+		return nil, fmt.Errorf("failed to create or update APIService: %w", err)
+	}
 
 	defaultAuthenticator, err := steveext.NewDefaultAuthenticator(wranglerContext.K8s)
 	if err != nil {
@@ -289,71 +316,4 @@ func SetAggregationCheck(client wranglerapiregistrationv1.APIServiceClient, valu
 
 		return nil
 	})
-}
-
-func makePatchAndUpdate(original, modified *apiregv1.APIService, apiservice wranglerapiregistrationv1.APIServiceController) ([]byte, error) {
-	originalJSON, err := json.Marshal(original)
-	if err != nil {
-		return nil, err
-	}
-	modifiedJSON, err := json.Marshal(modified)
-	if err != nil {
-		return nil, err
-	}
-	patch, err := jsonpatch.CreateMergePatch(originalJSON, modifiedJSON)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := apiservice.Patch(APIServiceName, types.MergePatchType, patch); err != nil {
-		return patch, err
-	}
-	return patch, nil
-}
-
-func DeleteLegacyServiceAndSecret(apiservice wranglerapiregistrationv1.APIServiceController, secrets wranglercorev1.SecretController) error {
-	logrus.Info("Attempting to delete legacy Service and Secret...")
-
-	// Check if the legacy service exists before attempting to delete to avoid logging "not found" as an error
-	_, err := apiservice.Get(LegacyServiceName, metav1.GetOptions{})
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			// An actual error occurred during Get, so return it
-			return fmt.Errorf("failed to get legacy Service %s/%s: %w", Namespace, LegacyServiceName, err)
-		}
-	} else {
-		// Service found, proceed with deletion
-		logrus.Infof("Deleting legacy Service %s/%s...", Namespace, LegacyServiceName)
-		deleteErr := apiservice.Delete(LegacyServiceName, &metav1.DeleteOptions{})
-		if deleteErr != nil {
-			if !apierrors.IsNotFound(deleteErr) {
-				return fmt.Errorf("failed to delete legacy Service %s/%s: %w", Namespace, LegacyServiceName, deleteErr)
-			}
-			logrus.Infof("Legacy Service %s/%s was already gone.", Namespace, LegacyServiceName)
-		} else {
-			logrus.Infof("Successfully deleted legacy Service %s/%s.", Namespace, LegacyServiceName)
-		}
-	}
-
-	// Check if the legacy secret exists before attempting to delete
-	_, err = secrets.Get(Namespace, LegacySecretName, metav1.GetOptions{})
-	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to get legacy Secret %s/%s: %w", Namespace, LegacySecretName, err)
-		}
-	} else {
-		// Secret found, proceed with deletion
-		logrus.Infof("Deleting legacy Secret %s/%s...", Namespace, LegacySecretName)
-		deleteErr := secrets.Delete(Namespace, LegacySecretName, &metav1.DeleteOptions{})
-		if deleteErr != nil {
-			if !apierrors.IsNotFound(deleteErr) { // Check again in case it was deleted concurrently
-				return fmt.Errorf("failed to delete legacy Secret %s/%s: %w", Namespace, LegacySecretName, deleteErr)
-			}
-			logrus.Infof("Legacy Secret %s/%s was already gone.", Namespace, LegacySecretName)
-		} else {
-			logrus.Infof("Successfully deleted legacy Secret %s/%s.", Namespace, LegacySecretName)
-		}
-	}
-
-	logrus.Info("Finished attempting to delete legacy Service and Secret.")
-	return nil
 }
