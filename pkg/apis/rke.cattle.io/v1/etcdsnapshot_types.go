@@ -66,6 +66,7 @@ type ETCDSnapshotS3 struct {
 // +kubebuilder:resource:path=etcdsnapshots,scope=Namespaced
 // +kubebuilder:subresource:status
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:metadata:labels={"auth.cattle.io/cluster-indexed=true"}
 
 // ETCDSnapshot is the top-level resource representing a snapshot operation.
 type ETCDSnapshot struct {
