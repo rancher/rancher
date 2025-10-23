@@ -136,7 +136,7 @@ func (p *Pbkdf2) UpdatePassword(userId string, newPassword string) error {
 		Value: value,
 	}})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal patch: %w", err)
 	}
 
 	_, err = p.secretClient.Patch(LocalUserPasswordsNamespace, secret.Name, types.JSONPatchType, patch)
