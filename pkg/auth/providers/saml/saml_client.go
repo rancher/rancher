@@ -189,6 +189,8 @@ func InitializeSamlServiceProvider(configToSet *apiv3.SamlConfig, name string) e
 
 	SamlProviders[name] = provider
 
+	log.Debugf("SAML [InitializeSamlServiceProvider]: Set /v1-saml handlers for %s on root %p", name, root)
+
 	switch name {
 	case PingName:
 		root.Get("PingACS").HandlerFunc(provider.ServeHTTP)
@@ -217,12 +219,20 @@ func InitializeSamlServiceProvider(configToSet *apiv3.SamlConfig, name string) e
 		root.Get("ShibbolethMetadata").HandlerFunc(provider.ServeHTTP)
 	}
 
-	appliedVersion = configToSet.ResourceVersion
+	log.Debugf("SAML [InitializeSamlServiceProvider]: /v1-saml handlers for %s on root %p active", name, root)
 
+	appliedVersion = configToSet.ResourceVersion
 	return nil
 }
 
 func AuthHandler() http.Handler {
+	log.Debugf("SAML [AuthHandler]: Setting up /v1-saml routes, mux is %p", root)
+
+	if root != nil {
+		log.Debugf("SAML [AuthHandler]: /v1-saml routes are already set, mux is %p", root)
+		return root
+	}
+
 	root = mux.NewRouter()
 
 	root.Methods("POST").Path("/v1-saml/ping/saml/acs").Name("PingACS")
@@ -250,6 +260,7 @@ func AuthHandler() http.Handler {
 	root.Methods("GET").Path("/v1-saml/shibboleth/saml/slo").Name("ShibbolethSLOGet")
 	root.Methods("GET").Path("/v1-saml/shibboleth/saml/metadata").Name("ShibbolethMetadata")
 
+	log.Debugf("SAML [AuthHandler]: /v1-saml routes made, mux is %p", root)
 	return root
 }
 
