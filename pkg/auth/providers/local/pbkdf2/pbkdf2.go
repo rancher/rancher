@@ -84,39 +84,34 @@ func (p *Pbkdf2) CreatePassword(user *v3.User, password string) error {
 	return nil
 }
 
-// UpdatePassword hashes the provided password using PBKDF2 and updates the secret associated with the specified user
+// UpdatePassword hashes the provided password using PBKDF2 or BCRYPT and
+// updates the secret associated with the specified user. BCRYPT support is
+// needed because the secret may not have been migrated to PBKDF2 at the time
+// the password is changed. This happens when an admin changes the password for
+// a user which has not logged in since the upgrade, leaving its secret to
+// contain a BCRYPT hash.
 func (p *Pbkdf2) UpdatePassword(userId string, newPassword string) error {
 	secret, err := p.secretLister.Get(LocalUserPasswordsNamespace, userId)
 	if err != nil {
 		return fmt.Errorf("failed to get password secret: %w", err)
 	}
-	salt, err := p.saltGenerator()
-	if err != nil {
-		return fmt.Errorf("failed to generate salt: %w", err)
-	}
 
-	var patch []byte
+	var value map[string][]byte
 	switch secret.Annotations[passwordHashAnnotation] {
 	case pbkdf2sha3512Hash:
+		salt, err := p.saltGenerator()
+		if err != nil {
+			return fmt.Errorf("failed to generate salt: %w", err)
+		}
+
 		hashedNewPassword, err := p.hashKey(newPassword, salt, iterations, keyLength)
 		if err != nil {
 			return fmt.Errorf("failed to hash password: %w", err)
 		}
 
-		patch, err = json.Marshal([]struct {
-			Op    string `json:"op"`
-			Path  string `json:"path"`
-			Value any    `json:"value"`
-		}{{
-			Op:   "replace",
-			Path: "/data",
-			Value: map[string][]byte{
-				"password": hashedNewPassword,
-				"salt":     salt,
-			},
-		}})
-		if err != nil {
-			return err
+		value = map[string][]byte{
+			"password": hashedNewPassword,
+			"salt":     salt,
 		}
 	case bcryptHash:
 		hashedNewPassword, err := p.bcryptKey([]byte(newPassword), bcrypt.DefaultCost)
@@ -124,22 +119,24 @@ func (p *Pbkdf2) UpdatePassword(userId string, newPassword string) error {
 			return fmt.Errorf("failed to hash password: %w", err)
 		}
 
-		patch, err = json.Marshal([]struct {
-			Op    string `json:"op"`
-			Path  string `json:"path"`
-			Value any    `json:"value"`
-		}{{
-			Op:   "replace",
-			Path: "/data",
-			Value: map[string][]byte{
-				"password": hashedNewPassword,
-			},
-		}})
-		if err != nil {
-			return err
+		value = map[string][]byte{
+			"password": hashedNewPassword,
 		}
 	default:
 		return fmt.Errorf("unsupported hashing algorithm %q", secret.Annotations[passwordHashAnnotation])
+	}
+
+	patch, err := json.Marshal([]struct {
+		Op    string `json:"op"`
+		Path  string `json:"path"`
+		Value any    `json:"value"`
+	}{{
+		Op:    "replace",
+		Path:  "/data",
+		Value: value,
+	}})
+	if err != nil {
+		return err
 	}
 
 	_, err = p.secretClient.Patch(LocalUserPasswordsNamespace, secret.Name, types.JSONPatchType, patch)
