@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"golang.org/x/crypto/bcrypt"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,6 +31,7 @@ type Pbkdf2 struct {
 	secretLister  v1.SecretCache
 	secretClient  v1.SecretClient
 	hashKey       func(password string, salt []byte, iter, keyLength int) ([]byte, error)
+	bcryptKey     func(password []byte, cost int) ([]byte, error)
 	saltGenerator func() ([]byte, error)
 }
 
@@ -39,6 +40,7 @@ func New(secretLister v1.SecretCache, secretClient v1.SecretClient) *Pbkdf2 {
 		secretLister:  secretLister,
 		secretClient:  secretClient,
 		hashKey:       sha3512Key,
+		bcryptKey:     bcrypt.GenerateFromPassword,
 		saltGenerator: generateSalt,
 	}
 }
@@ -82,20 +84,46 @@ func (p *Pbkdf2) CreatePassword(user *v3.User, password string) error {
 	return nil
 }
 
-// UpdatePassword hashes the provided password using PBKDF2 and updates the secret associated with the specified user
+// UpdatePassword hashes the provided password using PBKDF2 or BCRYPT and
+// updates the secret associated with the specified user. BCRYPT support is
+// needed because the secret may not have been migrated to PBKDF2 at the time
+// the password is changed. This happens when an admin changes the password for
+// a user which has not logged in since the upgrade, leaving its secret to
+// contain a BCRYPT hash.
 func (p *Pbkdf2) UpdatePassword(userId string, newPassword string) error {
 	secret, err := p.secretLister.Get(LocalUserPasswordsNamespace, userId)
 	if err != nil {
 		return fmt.Errorf("failed to get password secret: %w", err)
 	}
-	salt, err := p.saltGenerator()
-	if err != nil {
-		return fmt.Errorf("failed to generate salt: %w", err)
-	}
 
-	hashedNewPassword, err := p.hashKey(newPassword, salt, iterations, keyLength)
-	if err != nil {
-		return fmt.Errorf("failed to hash password: %w", err)
+	var value map[string][]byte
+	switch secret.Annotations[passwordHashAnnotation] {
+	case pbkdf2sha3512Hash:
+		salt, err := p.saltGenerator()
+		if err != nil {
+			return fmt.Errorf("failed to generate salt: %w", err)
+		}
+
+		hashedNewPassword, err := p.hashKey(newPassword, salt, iterations, keyLength)
+		if err != nil {
+			return fmt.Errorf("failed to hash password: %w", err)
+		}
+
+		value = map[string][]byte{
+			"password": hashedNewPassword,
+			"salt":     salt,
+		}
+	case bcryptHash:
+		hashedNewPassword, err := p.bcryptKey([]byte(newPassword), bcrypt.DefaultCost)
+		if err != nil {
+			return fmt.Errorf("failed to hash password: %w", err)
+		}
+
+		value = map[string][]byte{
+			"password": hashedNewPassword,
+		}
+	default:
+		return fmt.Errorf("unsupported hashing algorithm %q", secret.Annotations[passwordHashAnnotation])
 	}
 
 	patch, err := json.Marshal([]struct {
@@ -103,16 +131,14 @@ func (p *Pbkdf2) UpdatePassword(userId string, newPassword string) error {
 		Path  string `json:"path"`
 		Value any    `json:"value"`
 	}{{
-		Op:   "replace",
-		Path: "/data",
-		Value: map[string][]byte{
-			"password": hashedNewPassword,
-			"salt":     salt,
-		},
+		Op:    "replace",
+		Path:  "/data",
+		Value: value,
 	}})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal patch: %w", err)
 	}
+
 	_, err = p.secretClient.Patch(LocalUserPasswordsNamespace, secret.Name, types.JSONPatchType, patch)
 	if err != nil {
 		return fmt.Errorf("failed to patch secret: %w", err)

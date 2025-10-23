@@ -185,11 +185,13 @@ func TestUpdatePassword(t *testing.T) {
 	fakeNewPasswordHash := "fake-new-password-hash"
 	fakePasswordSalt := "fake-password-salt"
 	fakeNewPasswordSalt := "fake-new-password-salt"
+	fakeNewPasswordBcryptHash := "fake-new-password-bcrypt-hash"
 
 	tests := map[string]struct {
 		userID             string
 		password           string
 		mockHashKey        func(password string, salt []byte, iter, keyLength int) ([]byte, error)
+		mockBcryptKey      func(password []byte, cost int) ([]byte, error)
 		mockSecretClient   func() *fake.MockClientInterface[*v1.Secret, *v1.SecretList]
 		mockSecretCache    func() *fake.MockCacheInterface[*v1.Secret]
 		mockSaltGenerator  func() ([]byte, error)
@@ -207,6 +209,9 @@ func TestUpdatePassword(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fakeUserID,
 						Namespace: LocalUserPasswordsNamespace,
+						Annotations: map[string]string{
+							passwordHashAnnotation: pbkdf2sha3512Hash,
+						},
 					},
 					Data: map[string][]byte{
 						"salt": []byte(fakePasswordSalt),
@@ -227,6 +232,48 @@ func TestUpdatePassword(t *testing.T) {
 					Value: map[string][]byte{
 						"password": []byte(fakeNewPasswordHash),
 						"salt":     []byte(fakeNewPasswordSalt),
+					},
+				}})
+				mock.EXPECT().Patch(LocalUserPasswordsNamespace, fakeUserID, types.JSONPatchType, patch).Return(nil, nil)
+
+				return mock
+			},
+			mockSaltGenerator: func() ([]byte, error) {
+				return []byte(fakeNewPasswordSalt), nil
+			},
+		},
+		"the bcrypt secret is updated with the new bcrypt hashed password": {
+			userID:   fakeUserID,
+			password: fakePassword,
+			mockBcryptKey: func(_ []byte, _ int) ([]byte, error) {
+				return []byte(fakeNewPasswordBcryptHash), nil
+			},
+			mockSecretCache: func() *fake.MockCacheInterface[*v1.Secret] {
+				mock := fake.NewMockCacheInterface[*v1.Secret](ctlr)
+				mock.EXPECT().Get(LocalUserPasswordsNamespace, fakeUserID).Return(&v1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      fakeUserID,
+						Namespace: LocalUserPasswordsNamespace,
+						Annotations: map[string]string{
+							passwordHashAnnotation: bcryptHash,
+						},
+					},
+					Data: map[string][]byte{},
+				}, nil)
+
+				return mock
+			},
+			mockSecretClient: func() *fake.MockClientInterface[*v1.Secret, *v1.SecretList] {
+				mock := fake.NewMockClientInterface[*v1.Secret, *v1.SecretList](ctlr)
+				patch, _ := json.Marshal([]struct {
+					Op    string `json:"op"`
+					Path  string `json:"path"`
+					Value any    `json:"value"`
+				}{{
+					Op:   "replace",
+					Path: "/data",
+					Value: map[string][]byte{
+						"password": []byte(fakeNewPasswordBcryptHash),
 					},
 				}})
 				mock.EXPECT().Patch(LocalUserPasswordsNamespace, fakeUserID, types.JSONPatchType, patch).Return(nil, nil)
@@ -266,6 +313,9 @@ func TestUpdatePassword(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fakeUserID,
 						Namespace: LocalUserPasswordsNamespace,
+						Annotations: map[string]string{
+							passwordHashAnnotation: pbkdf2sha3512Hash,
+						},
 					},
 					Data: map[string][]byte{
 						"salt": []byte(fakePasswordSalt),
@@ -294,6 +344,9 @@ func TestUpdatePassword(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fakeUserID,
 						Namespace: LocalUserPasswordsNamespace,
+						Annotations: map[string]string{
+							passwordHashAnnotation: pbkdf2sha3512Hash,
+						},
 					},
 					Data: map[string][]byte{
 						"salt": []byte(fakePasswordSalt),
@@ -334,6 +387,7 @@ func TestUpdatePassword(t *testing.T) {
 				secretClient:  test.mockSecretClient(),
 				secretLister:  test.mockSecretCache(),
 				hashKey:       test.mockHashKey,
+				bcryptKey:     test.mockBcryptKey,
 				saltGenerator: test.mockSaltGenerator,
 			}
 			err := p.UpdatePassword(test.userID, test.password)
@@ -386,6 +440,9 @@ func TestVerifyAndUpdatePassword(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fakeUserID,
 						Namespace: LocalUserPasswordsNamespace,
+						Annotations: map[string]string{
+							passwordHashAnnotation: pbkdf2sha3512Hash,
+						},
 					},
 					Data: map[string][]byte{
 						"salt":     []byte(fakePasswordSalt),
@@ -445,6 +502,9 @@ func TestVerifyAndUpdatePassword(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fakeUserID,
 						Namespace: LocalUserPasswordsNamespace,
+						Annotations: map[string]string{
+							passwordHashAnnotation: pbkdf2sha3512Hash,
+						},
 					},
 					Data: map[string][]byte{
 						"salt": []byte(fakePasswordSalt),
@@ -481,6 +541,9 @@ func TestVerifyAndUpdatePassword(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      fakeUserID,
 						Namespace: LocalUserPasswordsNamespace,
+						Annotations: map[string]string{
+							passwordHashAnnotation: pbkdf2sha3512Hash,
+						},
 					},
 					Data: map[string][]byte{
 						"salt":     []byte(fakePasswordSalt),
