@@ -150,7 +150,23 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 	}
 
 	if taints != nil {
-		tolerations = toYAML(taints)
+		tolerationList := make([]corev1.Toleration, 0, len(taints))
+		for _, taint := range taints {
+			toleration := corev1.Toleration{
+				Key:    taint.Key,
+				Effect: taint.Effect,
+			}
+
+			if taint.Value == "" {
+				toleration.Operator = corev1.TolerationOpExists
+			} else {
+				toleration.Operator = corev1.TolerationOpEqual
+				toleration.Value = taint.Value
+			}
+
+			tolerationList = append(tolerationList, toleration)
+		}
+		tolerations = toYAML(tolerationList)
 	}
 
 	envVars := settings.DefaultAgentSettingsAsEnvVars()
