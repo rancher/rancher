@@ -34,7 +34,7 @@ type handler struct {
 	sampleProps       *apiextv1.JSONSchemaProps
 }
 
-func Register(ctx context.Context, clients *wrangler.CAPIContext) error {
+func Register(ctx context.Context, clients *wrangler.Context) error {
 	sampleProps, err := sample.GetSampleProps()
 	if err != nil {
 		return err
