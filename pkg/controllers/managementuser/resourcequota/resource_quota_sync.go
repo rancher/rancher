@@ -8,8 +8,8 @@ import (
 
 	"github.com/rancher/norman/types/convert"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	wmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	namespaceutil "github.com/rancher/rancher/pkg/namespace"
 	validate "github.com/rancher/rancher/pkg/resourcequota"
 	"github.com/rancher/rancher/pkg/utils"
@@ -36,7 +36,7 @@ SyncController takes care of creating Kubernetes resource quota based on the res
 defined in namespace.resourceQuota
 */
 type SyncController struct {
-	ProjectLister       v3.ProjectLister
+	ProjectCache        wmgmtv3.ProjectCache
 	Namespaces          v1.NamespaceInterface
 	ResourceQuotas      v1.ResourceQuotaInterface
 	ResourceQuotaLister v1.ResourceQuotaLister
@@ -256,7 +256,7 @@ func (c *SyncController) deriveRequestedResourceQuota(ns *corev1.Namespace) (*v3
 		return nil, nil, err
 	}
 
-	defaultQuota, err := getProjectNamespaceDefaultQuota(ns, c.ProjectLister)
+	defaultQuota, err := getProjectNamespaceDefaultQuota(ns, c.ProjectCache)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -318,7 +318,7 @@ func (c *SyncController) validateAndSetNamespaceQuota(ns *corev1.Namespace, quot
 	}
 
 	// get project limit
-	projectLimit, projectID, err := getProjectResourceQuotaLimit(ns, c.ProjectLister)
+	projectLimit, projectID, err := getProjectResourceQuotaLimit(ns, c.ProjectCache)
 	if err != nil {
 		return false, ns, nil, err
 	}
@@ -402,7 +402,7 @@ func (c *SyncController) getResourceLimitToUpdate(ns *corev1.Namespace) (*corev1
 	if err != nil {
 		return nil, err
 	}
-	projectLimit, err := getProjectContainerDefaultLimit(ns, c.ProjectLister)
+	projectLimit, err := getProjectContainerDefaultLimit(ns, c.ProjectCache)
 	if err != nil {
 		return nil, err
 	}
