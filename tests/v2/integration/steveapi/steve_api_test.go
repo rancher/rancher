@@ -352,7 +352,7 @@ func (s *LocalSteveAPITestSuite) TestExtensionAPIServerPostRequests() {
 	}{
 		{
 			name: "post to selfuser",
-			path: "v1/ext.cattle.io.selfuser",
+			path: "/v1/ext.cattle.io.selfuser",
 			body: strings.NewReader(`{"kind":"selfuser"}`),
 
 			expectedBody: regexp.MustCompile(`{"type":"ext.cattle.io.selfuser","links":{"view":"https://` + s.client.WranglerContext.RESTConfig.Host + `/apis/ext.cattle.io/v1/selfusers"},"apiVersion":"ext.cattle.io/v1","kind":"SelfUser","metadata":{"generateName":"e-","managedFields":\[{"apiVersion":"ext.cattle.io/v1","fieldsType":"FieldsV1","fieldsV1":{"f:metadata":{"f:generateName":{}}},"manager":".*","operation":"Update","time":".*"}],"relationships":null,"state":{"error":false,"message":"Resource is current","name":"active","transitioning":false}},"status":{"userID":"user-[a-z0-9]+"}}`),
@@ -362,7 +362,7 @@ func (s *LocalSteveAPITestSuite) TestExtensionAPIServerPostRequests() {
 
 	for _, test := range tests {
 		s.T().Run(test.name, func(t *testing.T) {
-			resp, err := client.Post(fmt.Sprintf("https://%s/%s", s.client.WranglerContext.RESTConfig.Host, test.path), "application/json", test.body)
+			resp, err := client.Post(fmt.Sprintf("https://%s%s", s.client.WranglerContext.RESTConfig.Host, test.path), "application/json", test.body)
 			assert.NoError(t, err)
 
 			body, err := io.ReadAll(resp.Body)
