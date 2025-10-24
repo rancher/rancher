@@ -20,6 +20,7 @@ import (
 	wranglerapiregistrationv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiregistration.k8s.io/v1"
 	wranglercorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -98,7 +99,7 @@ func CreateOrUpdateAPIService(apiservice wranglerapiregistrationv1.APIServiceCon
 			}
 			modified := current.DeepCopy()
 			modified.Spec = desired.Spec
-			patch, err := makePatchAndUpdate(original, modified, apiservice)
+			patch, err := makePatchAndUpdateAPI(original, modified, apiservice)
 			if err != nil {
 				logrus.Errorf("error updating APIService %s -> request: %s", APIServiceName, patch)
 				return err
@@ -167,6 +168,10 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 		return nil, fmt.Errorf("failed to create tcp listener: %w", err)
 	}
 
+	if err := CreateOrUpdateService(wranglerContext.Core.Service(), opts.AppSelector); err != nil {
+		return nil, fmt.Errorf("failed to create or update APIService: %w", err)
+	}
+
 	additionalSniProviders = append(additionalSniProviders, sniProvider)
 
 	defaultAuthenticator, err := steveext.NewDefaultAuthenticator(wranglerContext.K8s)
@@ -221,7 +226,8 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 
 			return aslAuthorizer.Authorize(ctx, a)
 		}),
-		SNICerts: additionalSniProviders,
+		SNICerts:          additionalSniProviders,
+		TargetServiceName: TargetServiceName,
 	}
 
 	extensionAPIServer, err := steveext.NewExtensionAPIServer(scheme, codecs, extOpts)
@@ -291,7 +297,7 @@ func SetAggregationCheck(client wranglerapiregistrationv1.APIServiceClient, valu
 	})
 }
 
-func makePatchAndUpdate(original, modified *apiregv1.APIService, apiservice wranglerapiregistrationv1.APIServiceController) ([]byte, error) {
+func makePatchAndUpdateAPI(original, modified *apiregv1.APIService, apiservice wranglerapiregistrationv1.APIServiceController) ([]byte, error) {
 	originalJSON, err := json.Marshal(original)
 	if err != nil {
 		return nil, err
@@ -305,6 +311,27 @@ func makePatchAndUpdate(original, modified *apiregv1.APIService, apiservice wran
 		return nil, err
 	}
 	if _, err := apiservice.Patch(APIServiceName, types.MergePatchType, patch); err != nil {
+		return patch, err
+	}
+	return patch, nil
+}
+
+func makePatchAndUpdateService(original, modified *corev1.Service, service wranglercorev1.ServiceController) ([]byte, error) {
+	originalJSON, err := json.Marshal(original)
+	if err != nil {
+		return nil, err
+	}
+	modifiedJSON, err := json.Marshal(modified)
+	if err != nil {
+		return nil, err
+	}
+	patch, err := jsonpatch.CreateMergePatch(originalJSON, modifiedJSON)
+	if err != nil {
+		return nil, err
+	}
+	var resources = ""
+
+	if _, err := service.Patch(Namespace, APIServiceName, types.MergePatchType, patch, resources); err != nil {
 		return patch, err
 	}
 	return patch, nil
@@ -355,5 +382,64 @@ func DeleteLegacyServiceAndSecret(apiservice wranglerapiregistrationv1.APIServic
 	}
 
 	logrus.Info("Finished attempting to delete legacy Service and Secret.")
+	return nil
+}
+
+func CreateOrUpdateService(service wranglercorev1.ServiceController, appSelector string) error {
+	if RDPEnabled() {
+		appSelector = "api-extension"
+	}
+
+	desired := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      TargetServiceName,
+			Namespace: Namespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Port: Port,
+				},
+			},
+			Selector: map[string]string{
+				"app": appSelector,
+			},
+		},
+	}
+
+	original, err := service.Get(Namespace, TargetServiceName, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		if !RDPEnabled() {
+			logrus.Warnf("Service %s will be created by rancher helm operations", TargetServiceName)
+			if _, err := service.Create(desired); err != nil {
+				return err
+			}
+		} else {
+			logrus.Warnf("Service %s was not found and it will be create by system-charts", TargetServiceName)
+		}
+	} else if err != nil {
+		return err
+	} else {
+
+		updateErr := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			current, err := service.Get(Namespace, TargetServiceName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			modified := current.DeepCopy()
+			modified.Spec = desired.Spec
+			patch, err := makePatchAndUpdateService(original, modified, service)
+			if err != nil {
+				logrus.Errorf("error updating Service %s -> request: %s", TargetServiceName, patch)
+				return err
+			}
+			return nil
+		})
+		if updateErr != nil {
+			return fmt.Errorf("failed to update Service %s after retries: %w", TargetServiceName, updateErr)
+		}
+
+	}
+
 	return nil
 }
