@@ -150,7 +150,7 @@ func Register(ctx context.Context, workload *config.UserContext) error {
 		ResourceQuotaLister: workload.Corew.ResourceQuota().Cache(),
 		LimitRange:          workload.Corew.LimitRange(),
 		LimitRangeLister:    workload.Corew.LimitRange().Cache(),
-		ProjectLister:       management.Management.Projects(workload.ClusterName).Controller().Lister(),
+		ProjectCache:        management.Wrangler.Mgmt.Project().Cache(),
 	}
 
 	nsLifecycle := newNamespaceLifecycle(r, sync)
