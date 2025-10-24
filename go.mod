@@ -132,7 +132,7 @@ require (
 	github.com/rancher/machine v0.15.0-rancher133
 	github.com/rancher/norman v0.6.1
 	github.com/rancher/rancher/pkg/client v0.0.0
-	github.com/rancher/remotedialer v0.5.1-rc.1
+	github.com/rancher/remotedialer v0.5.1
 	github.com/rancher/rke v1.8.0
 	github.com/rancher/shepherd v0.0.0-20251009190241-9d143f8098e6
 	github.com/rancher/steve v0.6.42

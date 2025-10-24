@@ -21,7 +21,7 @@ ARG CHART_DEFAULT_BRANCH=dev-v2.12
 ARG PARTNER_CHART_DEFAULT_BRANCH=main
 ARG RKE2_CHART_DEFAULT_BRANCH=main
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ARG CATTLE_KDM_BRANCH=dev-v2.12
+ARG CATTLE_KDM_BRANCH=release-v2.12
 ARG VERSION=${VERSION}
 
 FROM --platform=$BUILDPLATFORM ${GODEP_APISERVER} AS godep-apiserver
@@ -269,10 +269,10 @@ RUN mkdir -p /var/lib/rancher/k3s/agent/images/ && \
     curl -sfL ${ETCD_URL} | tar xvzf - --strip-components=1 --no-same-owner -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
-ENV CATTLE_UI_VERSION=2.12.3-alpha2
-ENV CATTLE_DASHBOARD_UI_VERSION=v2.12.3-alpha2
+ENV CATTLE_UI_VERSION=2.12.3
+ENV CATTLE_DASHBOARD_UI_VERSION=v2.12.3
 
-ENV CATTLE_CLI_VERSION=v2.12.2
+ENV CATTLE_CLI_VERSION=v2.12.3
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
 ENV CATTLE_BASE_UI_BRAND=
