@@ -330,7 +330,7 @@ func makePatchAndUpdateService(original, modified *corev1.Service, service wrang
 	}
 	var resources = ""
 
-	if _, err := service.Patch(Namespace, APIServiceName, types.MergePatchType, patch, resources); err != nil {
+	if _, err := service.Patch(Namespace, TargetServiceName, types.MergePatchType, patch, resources); err != nil {
 		return patch, err
 	}
 	return patch, nil
