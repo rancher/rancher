@@ -226,8 +226,7 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 
 			return aslAuthorizer.Authorize(ctx, a)
 		}),
-		SNICerts:          additionalSniProviders,
-		TargetServiceName: TargetServiceName,
+		SNICerts: additionalSniProviders,
 	}
 
 	extensionAPIServer, err := steveext.NewExtensionAPIServer(scheme, codecs, extOpts)
@@ -410,7 +409,7 @@ func CreateOrUpdateService(service wranglercorev1.ServiceController, appSelector
 	original, err := service.Get(Namespace, TargetServiceName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		if !RDPEnabled() {
-			logrus.Warnf("Service %s will be created by rancher helm operations", TargetServiceName)
+			logrus.Warnf("Service %s will be created by rancher", TargetServiceName)
 			if _, err := service.Create(desired); err != nil {
 				return err
 			}
