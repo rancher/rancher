@@ -19,7 +19,6 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	clientcache "k8s.io/client-go/tools/cache"
 )
 
@@ -51,12 +50,13 @@ func (c *SyncController) syncResourceQuota(_ string, ns *corev1.Namespace) (*cor
 		return nil, nil
 	}
 
-	_, err := c.CreateResourceQuota(ns)
+	var err error
+	ns, err = c.CreateResourceQuota(ns)
 	if err != nil {
 		return nil, err
 	}
 
-	return nil, c.createLimitRange(ns)
+	return ns, c.createLimitRange(ns)
 }
 
 func (c *SyncController) createLimitRange(ns *corev1.Namespace) error {
@@ -112,15 +112,15 @@ func limitsChanged(existing []corev1.LimitRangeItem, toUpdate []corev1.LimitRang
 	return false
 }
 
-func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (runtime.Object, error) {
+func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (*corev1.Namespace, error) {
 	existing, err := c.getExistingResourceQuota(ns)
 	if err != nil {
-		return ns, err
+		return nil, err
 	}
 
 	requestedQuotaLimit, newQuotaSpec, err := c.deriveRequestedResourceQuota(ns)
 	if err != nil {
-		return ns, err
+		return nil, err
 	}
 
 	operation := "none"
@@ -136,63 +136,64 @@ func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (runtime.Obje
 		}
 	}
 
-	var updated *corev1.Namespace
 	var operationErr error
 	switch operation {
 	case "create":
-		isFit, updated, exceeded, err := c.validateAndSetNamespaceQuota(ns, &v32.NamespaceResourceQuota{Limit: *requestedQuotaLimit})
+		var isFit bool
+		var exceeded corev1.ResourceList
+		isFit, ns, exceeded, err = c.validateAndSetNamespaceQuota(ns, &v32.NamespaceResourceQuota{Limit: *requestedQuotaLimit})
 		if err != nil {
-			return updated, err
+			return nil, err
 		}
 		if !isFit {
 			// Create a quota with zeros only for overused resources.
 			limit, err := zeroOutResourceQuotaLimit(requestedQuotaLimit, exceeded)
 			if err != nil {
-				return updated, err
+				return nil, err
 			}
 
 			newQuotaSpec, err = convertResourceLimitResourceQuotaSpec(limit)
 			if err != nil {
-				return updated, err
+				return nil, err
 			}
 		}
 		operationErr = c.createResourceQuota(ns, newQuotaSpec)
 	case "update":
-		isFit, upd, _, err := c.validateAndSetNamespaceQuota(ns, &v32.NamespaceResourceQuota{Limit: *requestedQuotaLimit})
+		var isFit bool
+		isFit, ns, _, err = c.validateAndSetNamespaceQuota(ns, &v32.NamespaceResourceQuota{Limit: *requestedQuotaLimit})
 		if err != nil {
-			return upd, err
+			return nil, err
 		}
 		if !isFit {
-			updated = upd
 			break
 		}
 		operationErr = c.updateResourceQuota(existing, newQuotaSpec)
 	case "delete":
-		updatedNs := ns.DeepCopy()
-		delete(updatedNs.Annotations, resourceQuotaAnnotation)
-		updatedNs, err = c.Namespaces.Update(updatedNs)
-		if err != nil {
-			return updatedNs, err
+		if _, ok := ns.Annotations[resourceQuotaAnnotation]; ok {
+			ns = ns.DeepCopy()
+			delete(ns.Annotations, resourceQuotaAnnotation)
+			ns, err = c.Namespaces.Update(ns)
+			if err != nil {
+				return nil, err
+			}
 		}
 		operationErr = c.deleteResourceQuota(existing)
 	}
 
-	if updated == nil {
-		updated = ns
-	}
-
 	if operationErr != nil {
 		logrus.Errorf("Failed to perform operation %q on namespace %q: %v", operation, ns.Name, operationErr)
-		return updated, operationErr
+		return nil, operationErr
 	}
 
 	set, err := namespaceutil.IsNamespaceConditionSet(ns, ResourceQuotaInitCondition, true)
 	if err != nil || set {
-		return updated, err
+		return ns, err
 	}
-	toUpdate := updated.DeepCopy()
-	namespaceutil.SetNamespaceCondition(toUpdate, time.Second*1, ResourceQuotaInitCondition, true, "")
-	return c.Namespaces.Update(toUpdate)
+	ns = ns.DeepCopy()
+	if err := namespaceutil.SetNamespaceCondition(ns, time.Second*1, ResourceQuotaInitCondition, true, ""); err != nil {
+		return nil, err
+	}
+	return c.Namespaces.Update(ns)
 }
 
 func (c *SyncController) updateResourceQuota(quota *corev1.ResourceQuota, spec *corev1.ResourceQuotaSpec) error {

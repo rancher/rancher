@@ -7,7 +7,6 @@ import (
 	"reflect"
 	"slices"
 	"strings"
-	"time"
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
@@ -32,7 +31,6 @@ const (
 	syncPreBootstrapAnnotation = "provisioning.cattle.io/sync-bootstrap"
 	syncNamespaceAnnotation    = "provisioning.cattle.io/sync-target-namespace"
 	syncNameAnnotation         = "provisioning.cattle.io/sync-target-name"
-	syncedAtAnnotation         = "provisioning.cattle.io/synced-at"
 )
 
 var (
@@ -210,7 +208,5 @@ func (c *ResourceSyncController) sync(_ string, obj *corev1.Secret) (*corev1.Sec
 	}
 
 	logrus.Debugf("[resource-sync][secret] successfully synchronized secret %v/%v to %v/%v for cluster %v", obj.Namespace, obj.Name, ns, name, c.clusterName)
-
-	obj.Annotations[syncedAtAnnotation] = time.Now().Format(time.RFC3339)
 	return obj, nil
 }
