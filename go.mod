@@ -116,7 +116,7 @@ require (
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.2
 	github.com/rancher/aks-operator v1.13.0-rc.1
-	github.com/rancher/ali-operator v0.0.3-0.20251001142421-ca64da576db5
+	github.com/rancher/ali-operator v0.0.5
 	github.com/rancher/apiserver v0.7.6
 	github.com/rancher/channelserver v0.7.0
 	github.com/rancher/dynamiclistener v0.7.3-rc.1
@@ -173,7 +173,7 @@ require (
 	oras.land/oras-go/v2 v2.6.0
 	sigs.k8s.io/aws-iam-authenticator v0.6.17
 	sigs.k8s.io/cluster-api v1.10.6
-	sigs.k8s.io/controller-runtime v0.22.2
+	sigs.k8s.io/controller-runtime v0.22.3
 	sigs.k8s.io/structured-merge-diff/v4 v4.6.0
 	sigs.k8s.io/yaml v1.6.0
 )
