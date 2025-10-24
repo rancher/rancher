@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -332,6 +333,42 @@ func (s *LocalSteveAPITestSuite) TestExtensionAPIServerAuthorization() {
 			resp, err := client.Get(fmt.Sprintf("%s/%s", restConfig.Host, test.path))
 			require.NoError(t, err)
 			require.Equal(t, test.expectedStatusCode, resp.StatusCode)
+		})
+	}
+}
+
+func (s *LocalSteveAPITestSuite) TestExtensionAPIServerPostRequests() {
+	client, err := rest.HTTPClientFor(s.client.WranglerContext.RESTConfig)
+	require.NoError(s.T(), err)
+
+	tests := []struct {
+		name string
+		path string
+		body io.Reader
+
+		// expectedBody needs to be a regex to accound for fields in the received body that cannot be reliably dtermined (such as "time" and "manager")
+		expectedBody *regexp.Regexp
+		expectedCode int
+	}{
+		{
+			name: "post to selfuser",
+			path: "v1/ext.cattle.io.selfuser",
+			body: strings.NewReader(`{"kind":"selfuser"}`),
+
+			expectedBody: regexp.MustCompile(`{"type":"ext.cattle.io.selfuser","links":{"view":"https://` + s.client.WranglerContext.RESTConfig.Host + `/apis/ext.cattle.io/v1/selfusers"},"apiVersion":"ext.cattle.io/v1","kind":"SelfUser","metadata":{"generateName":"e-","managedFields":\[{"apiVersion":"ext.cattle.io/v1","fieldsType":"FieldsV1","fieldsV1":{"f:metadata":{"f:generateName":{}}},"manager":".*","operation":"Update","time":".*"}],"relationships":null,"state":{"error":false,"message":"Resource is current","name":"active","transitioning":false}},"status":{"userID":"user-[a-z0-9]+"}}`),
+			expectedCode: http.StatusCreated,
+		},
+	}
+
+	for _, test := range tests {
+		s.T().Run(test.name, func(t *testing.T) {
+			resp, err := client.Post(fmt.Sprintf("https://%s/%s", s.client.WranglerContext.RESTConfig.Host, test.path), "application/json", test.body)
+			assert.NoError(t, err)
+
+			body, err := io.ReadAll(resp.Body)
+			assert.NoError(t, err)
+			assert.Equal(t, test.expectedCode, resp.StatusCode)
+			assert.Regexp(t, test.expectedBody, strings.TrimSpace(string(body)))
 		})
 	}
 }
@@ -2907,6 +2944,7 @@ func (s *steveAPITestSuite) TestCRUD() {
 		assert.Nil(s.T(), readObj)
 	})
 }
+
 func (s *steveAPITestSuite) assertListIsEqual(expectedList []map[string]string, receivedList []clientv1.SteveAPIObject) {
 	assert.Equal(s.T(), len(expectedList), len(receivedList))
 	receivedSubset := make([]map[string]string, len(receivedList))
