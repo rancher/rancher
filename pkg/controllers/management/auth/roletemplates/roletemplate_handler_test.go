@@ -498,6 +498,38 @@ func Test_OnChange(t *testing.T) {
 			},
 		},
 		{
+			name: "dont remove cluster roles from downstream cluster handler",
+			rt: &v3.RoleTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-rt",
+				},
+				Context: "project",
+				Rules:   []rbacv1.PolicyRule{getRoleTemplates},
+			},
+			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().List(listOptions).Return(&rbacv1.ClusterRoleList{
+					Items: []rbacv1.ClusterRole{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "test-rt"},
+						},
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "test-rt-aggregator"},
+						},
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "test-rt-promoted"},
+						},
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "test-rt-promoted-aggregator"},
+						},
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "bad-cr"},
+						},
+					},
+				}, nil)
+				m.EXPECT().Delete("bad-cr", &metav1.DeleteOptions{}).Return(nil)
+			},
+		},
+		{
 			name: "error deleting cluster roles, non blocking",
 			rt: &v3.RoleTemplate{
 				ObjectMeta: metav1.ObjectMeta{

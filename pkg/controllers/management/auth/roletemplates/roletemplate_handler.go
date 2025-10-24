@@ -75,12 +75,27 @@ func (r *roleTemplateHandler) reconcileClusterRoles(rt *v3.RoleTemplate) error {
 		return err
 	}
 
+	// We want to keep desired Cluster Roles from this handler and the Cluster Roles created by the handler in
+	// pkg/controllers/managementuser/rbac/roletemplates/roletemplate_handler.go
+	// These are:
+	//	- Base Cluster Role
+	//  - Aggregating Cluster Role
+	//  - Promoted Cluster Role
+	//  - Aggregating Promoted Cluster Role
+	desiredCRNames := []string{
+		rt.Name,
+		rbac.AggregatedClusterRoleNameFor(rt.Name),
+		rbac.PromotedClusterRoleNameFor(rt.Name),
+		rbac.AggregatedClusterRoleNameFor(rbac.PromotedClusterRoleNameFor(rt.Name)),
+	}
+	for _, desiredCR := range desiredCRs {
+		desiredCRNames = append(desiredCRNames, desiredCR.Name)
+	}
+
 	var returnedError error
 	// Remove any Cluster Roles owned by this RoleTemplate that should not exist
 	for _, currentCR := range currentCRs.Items {
-		if !slices.ContainsFunc(desiredCRs, func(desiredCR *rbacv1.ClusterRole) bool {
-			return desiredCR.Name == currentCR.Name
-		}) {
+		if !slices.Contains(desiredCRNames, currentCR.Name) {
 			if err := rbac.DeleteResource(currentCR.Name, r.crController); err != nil {
 				returnedError = errors.Join(returnedError, err)
 			}
