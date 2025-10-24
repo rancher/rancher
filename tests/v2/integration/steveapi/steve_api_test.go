@@ -566,6 +566,17 @@ type listTestType struct {
 	expectContains bool
 }
 
+var sqlOnlyListTests = []listTestType{
+	{
+		description: "user:user-a,namespace:test-ns-2,query:filter=metadata.annotations[management.cattle.io/project-scoped-secret-copy]=spuds",
+		user:        "user-a",
+		namespace:   "test-ns-2",
+		query:       "filter=metadata.annotations[management.cattle.io/project-scoped-secret-copy]=spuds",
+		expect: []map[string]string{
+			{"name": "test4", "namespace": "test-ns-2"},
+		},
+	},
+}
 var nonSQLListTests = []listTestType{
 	{
 		description: "user:user-a,namespace:none,query:limit=8",
@@ -984,15 +995,6 @@ func (s *steveAPITestSuite) TestList() {
 				{"name": "test3", "namespace": "test-ns-5"},
 				{"name": "test4", "namespace": "test-ns-5"},
 				{"name": "test5", "namespace": "test-ns-5"},
-			},
-		},
-		{
-			description: "user:user-a,namespace:test-ns-2,query:filter=metadata.annotations[management.cattle.io/project-scoped-secret-copy]=spuds",
-			user:        "user-a",
-			namespace:   "test-ns-2",
-			query:       "filter=metadata.annotations[management.cattle.io/project-scoped-secret-copy]=spuds",
-			expect: []map[string]string{
-				{"name": "test4", "namespace": "test-ns-2"},
 			},
 		},
 		{
@@ -2495,6 +2497,7 @@ func (s *steveAPITestSuite) TestList() {
 	if !usingSQLCache {
 		tests = append(tests, nonSQLListTests...)
 	} else {
+		tests = append(tests, sqlOnlyListTests...)
 		// map labelSelector and fieldSelector params to the VAI equivalents
 		// ensure metadata.namespace tests are doing partial matching because
 		// the actual namespaces are given an `auto` prefix and a random suffix
