@@ -220,6 +220,7 @@ func (o *Client) SetAuthClient() error {
 	}
 	baseTransport := http.DefaultTransport.(*http.Transport).Clone()
 	baseTransport.TLSClientConfig = config
+	baseTransport.Proxy = http.ProxyFromEnvironment
 
 	o.HTTPClient = http.Client{
 		Transport: capturewindowclient.NewTransport(baseTransport),

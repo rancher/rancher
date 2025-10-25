@@ -2,11 +2,45 @@ package http
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"net/url"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestHelmClient_RespectsProxyEnv(t *testing.T) {
+	proxyCalled := make(chan struct{}, 1)
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		proxyCalled <- struct{}{}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer proxy.Close()
+
+	os.Setenv("HTTP_PROXY", proxy.URL)
+	os.Setenv("HTTPS_PROXY", proxy.URL)
+	defer os.Unsetenv("HTTP_PROXY")
+	defer os.Unsetenv("HTTPS_PROXY")
+
+	client, err := HelmClient(nil, nil, false, false, "https://example.com")
+	if err != nil {
+		t.Fatalf("HelmClient failed: %v", err)
+	}
+
+	// Perform a dummy HTTP request using the OCI client's configured transport
+	req, _ := http.NewRequest("GET", "https://example.com", nil)
+	_, _ = client.Do(req)
+
+	// Check if proxy was actually used
+	select {
+	case <-proxyCalled:
+		t.Log("HelmClient respected proxy environment")
+	case <-time.After(1 * time.Second):
+		t.Error("HelmClient did not use proxy")
+	}
+}
 
 func TestAttachBasicAuthHeader(t *testing.T) {
 	tests := []struct {
