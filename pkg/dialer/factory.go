@@ -129,7 +129,8 @@ func HasOnlyPrivateAPIEndpoint(cluster *v3.Cluster) bool {
 			*cluster.Status.GKEStatus.PrivateRequiresTunnel
 	case v32.ClusterDriverAlibaba:
 		if cluster.Status.AliStatus.UpstreamSpec != nil &&
-			cluster.Status.AliStatus.UpstreamSpec.EndpointPublicAccess {
+			cluster.Status.AliStatus.UpstreamSpec.EndpointPublicAccess != nil &&
+			*cluster.Status.AliStatus.UpstreamSpec.EndpointPublicAccess {
 			return false
 		}
 		return cluster.Status.AliStatus.PrivateRequiresTunnel != nil &&

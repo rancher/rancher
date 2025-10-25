@@ -35,7 +35,7 @@ type AliClusterConfigSpec struct {
 	ClusterSpec               string        `json:"clusterSpec,omitempty" yaml:"clusterSpec,omitempty"`
 	ClusterType               string        `json:"clusterType,omitempty" yaml:"clusterType,omitempty"`
 	ContainerCIDR             string        `json:"containerCidr,omitempty" yaml:"containerCidr,omitempty"`
-	EndpointPublicAccess      bool          `json:"endpointPublicAccess,omitempty" yaml:"endpointPublicAccess,omitempty"`
+	EndpointPublicAccess      *bool         `json:"endpointPublicAccess,omitempty" yaml:"endpointPublicAccess,omitempty"`
 	Imported                  bool          `json:"imported,omitempty" yaml:"imported,omitempty"`
 	IsEnterpriseSecurityGroup *bool         `json:"isEnterpriseSecurityGroup,omitempty" yaml:"isEnterpriseSecurityGroup,omitempty"`
 	KubernetesVersion         string        `json:"kubernetesVersion,omitempty" yaml:"kubernetesVersion,omitempty"`
@@ -45,7 +45,7 @@ type AliClusterConfigSpec struct {
 	ProxyMode                 string        `json:"proxyMode,omitempty" yaml:"proxyMode,omitempty"`
 	RegionID                  string        `json:"regionId,omitempty" yaml:"regionId,omitempty"`
 	ResourceGroupID           string        `json:"resourceGroupId,omitempty" yaml:"resourceGroupId,omitempty"`
-	SNATEntry                 bool          `json:"snatEntry,omitempty" yaml:"snatEntry,omitempty"`
+	SNATEntry                 *bool         `json:"snatEntry,omitempty" yaml:"snatEntry,omitempty"`
 	SecurityGroupID           string        `json:"securityGroupId,omitempty" yaml:"securityGroupId,omitempty"`
 	ServiceCIDR               string        `json:"serviceCidr,omitempty" yaml:"serviceCidr,omitempty"`
 	VSwitchIDs                []string      `json:"vswitchIds,omitempty" yaml:"vswitchIds,omitempty"`
