@@ -252,10 +252,10 @@ var (
 
 	// ClusterAutoscalerChartRepository represents where the cluster-autoscaler chart will be pulled from for the downstream cluster(s)
 	// can be an OCI image path or a regular helm repo.
-	ClusterAutoscalerChartRepository = NewSetting("cluster-autoscaler-chart-repository", "")
+	ClusterAutoscalerChartRepository = NewSetting("cluster-autoscaler-chart-repository", os.Getenv("CATTLE_CLUSTER_AUTOSCALER_CHART_REPOSITORY"))
 
 	// ClusterAutoscalerImage represents the default image repository for the cluster autoscaler
-	ClusterAutoscalerImage = NewSetting("cluster-autoscaler-image", "")
+	ClusterAutoscalerImage = NewSetting("cluster-autoscaler-image", os.Getenv("CATTLE_CLUSTER_AUTOSCALER_IMAGE"))
 
 	// RKE2ChartDefaultBranch represents the default branch for the RKE2 charts repo.
 	RKE2ChartDefaultBranch = NewSetting("rke2-chart-default-branch", "main")
