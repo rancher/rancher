@@ -2,7 +2,9 @@ package snapshotbackpopulate
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -29,15 +31,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 var (
-	InvalidKeyChars = regexp.MustCompile(`[^-.a-zA-Z0-9]`)
+	InvalidKeyChars               = regexp.MustCompile(`[^-.a-zA-Z0-9]`)
+	EncodedMetadataIsEmptyMessage = base64.StdEncoding.EncodeToString([]byte("Metadata is empty"))
 )
 
 const (
 	StorageAnnotationKey = "etcdsnapshot.rke.io/storage"
+	SnapshotFileNameKey  = "etcdsnapshot.rke.io/snapshot-file-name"
 )
 
 type Storage string
@@ -264,21 +269,50 @@ func (h *handler) OnDownstreamChange(_ string, downstream *k3s.ETCDSnapshotFile)
 	return downstream, err
 }
 
+// generateSafeSnapshotName generates a resource-safe name for an etcd snapshot,
+// following the same logic as k3s/pkg/etcd/snapshot.(*File).GenerateName
+func generateSafeSnapshotName(spec k3s.ETCDSnapshotSpec, createdAt time.Time) string {
+	name := strings.ToLower(spec.SnapshotName)
+
+	storage := Local
+	if spec.S3 != nil {
+		storage = S3
+	}
+
+	nodeName := spec.NodeName
+	digest := sha256.Sum256([]byte(nodeName + spec.Location))
+	hex6 := hex.EncodeToString(digest[:])[:6]
+
+	if errs := validation.IsDNS1123Subdomain(name); len(errs) != 0 || len(name)+13 > validation.DNS1123SubdomainMaxLength {
+		shortHost, _, _ := strings.Cut(nodeName, ".")
+		name = fmt.Sprintf("etcd-snapshot-%s-%d", shortHost, createdAt.Unix())
+	}
+
+	return fmt.Sprintf("%s-%s-%s", storage, name, hex6)
+}
+
 // populateUpstreamSnapshotFromDownstream sets the labels, annotations, spec and status fields which are governed by the
 // downstream snapshot. Also sets the relevant owner references (machine for local, capi cluster for s3), and
 // namespace/name if the snapshot is being created.
-func (h *handler) populateUpstreamSnapshotFromDownstream(upstream *rkev1.ETCDSnapshot, downstream *k3s.ETCDSnapshotFile, cluster *provv1.Cluster, controlPlane *rkev1.RKEControlPlane) (*rkev1.ETCDSnapshot, error) {
+func (h *handler) populateUpstreamSnapshotFromDownstream(
+	upstream *rkev1.ETCDSnapshot,
+	downstream *k3s.ETCDSnapshotFile,
+	cluster *provv1.Cluster,
+	controlPlane *rkev1.RKEControlPlane,
+) (*rkev1.ETCDSnapshot, error) {
 	storage := S3
 	if downstream.Spec.S3 == nil {
 		storage = Local
 	}
 
+	genBase := generateSafeSnapshotName(downstream.Spec, downstream.Status.CreationTime.Time)
+	snapshotName := name.SafeConcatName(cluster.Name, genBase)
+
 	if upstream == nil {
-		name := name.SafeConcatName(cluster.Name, strings.ToLower(InvalidKeyChars.ReplaceAllString(downstream.Spec.SnapshotName, "-")), string(storage))
 		upstream = &rkev1.ETCDSnapshot{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: cluster.Namespace,
-				Name:      name,
+				Name:      snapshotName,
 			},
 		}
 	} else {
@@ -293,7 +327,9 @@ func (h *handler) populateUpstreamSnapshotFromDownstream(upstream *rkev1.ETCDSna
 	if upstream.Annotations == nil {
 		upstream.Annotations = map[string]string{}
 	}
+
 	upstream.Annotations[StorageAnnotationKey] = string(storage)
+	upstream.Annotations[SnapshotFileNameKey] = downstream.Spec.SnapshotName
 	upstream.Annotations[capr.SnapshotNameAnnotation] = downstream.Name
 
 	upstream.Spec.ClusterName = cluster.Name
@@ -320,6 +356,19 @@ func (h *handler) populateUpstreamSnapshotFromDownstream(upstream *rkev1.ETCDSna
 		upstream.SnapshotFile.Status = "successful"
 	} else {
 		upstream.SnapshotFile.Status = "failed"
+	}
+
+	if len(downstream.Spec.Metadata) == 0 {
+		// Force failed status so this snapshot cannot be restored via Rancher UI
+		upstream.SnapshotFile.Status = "failed"
+		upstream.SnapshotFile.Message = EncodedMetadataIsEmptyMessage
+
+		if upstream.Annotations == nil {
+			upstream.Annotations = map[string]string{}
+		}
+
+		logrus.Warnf("%s snapshot has empty metadata; not restorable via Rancher UI (key=%s, storage=%s)",
+			getLogPrefix(cluster), downstream.Spec.SnapshotName, storage)
 	}
 
 	if storage == Local {
