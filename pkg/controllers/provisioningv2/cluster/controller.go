@@ -206,11 +206,34 @@ func byClusterIndex(obj *v1.Cluster) ([]string, error) {
 	return []string{obj.Status.ClusterName}, nil
 }
 
+// byCloudCredentialIndex returns all unique cloud-credential IDs referenced by a provisioning cluster:
+// - spec.cloudCredentialSecretName (cluster-level)
+// - spec.rkeConfig.machinePools[*].cloudCredentialSecretName (per-pool)
 func byCloudCredentialIndex(obj *v1.Cluster) ([]string, error) {
-	if obj.Spec.CloudCredentialSecretName == "" {
+	credentialsSet := make(map[string]struct{})
+
+	if clusterCredential := obj.Spec.CloudCredentialSecretName; clusterCredential != "" {
+		credentialsSet[clusterCredential] = struct{}{}
+	}
+
+	if obj.Spec.RKEConfig != nil {
+		for _, machinePool := range obj.Spec.RKEConfig.MachinePools {
+			if machinePoolCredential := machinePool.CloudCredentialSecretName; machinePoolCredential != "" {
+				credentialsSet[machinePoolCredential] = struct{}{}
+			}
+		}
+	}
+
+	if len(credentialsSet) == 0 {
 		return nil, nil
 	}
-	return []string{obj.Spec.CloudCredentialSecretName}, nil
+
+	credentialSlice := make([]string, 0, len(credentialsSet))
+	for cred := range credentialsSet {
+		credentialSlice = append(credentialSlice, cred)
+	}
+
+	return credentialSlice, nil
 }
 
 func (h *handler) clusterWatch(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
