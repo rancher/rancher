@@ -30,7 +30,7 @@ const (
 	chartByRepo = "chartByRepo"
 )
 
-func Register(ctx context.Context, clients *wrangler.CAPIContext) {
+func Register(ctx context.Context, clients *wrangler.Context) {
 	h := &handler{
 		charts: content.NewManager(
 			clients.K8s.Discovery(),

@@ -19,7 +19,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rkecontrolplanecondition"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2"
-	"github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -67,13 +66,20 @@ func Register(ctx context.Context, clients *wrangler.Context, embedded bool, reg
 	if features.ProvisioningV2.Enabled() {
 		kubeconfigManager := kubeconfig.New(clients)
 		clusterindex.Register(ctx, clients)
-		cluster.EarlyRegister(ctx, clients, kubeconfigManager)
+
+		provisioningv2.EarlyRegister(ctx, clients, kubeconfigManager)
+		if features.RKE2.Enabled() {
+			if err := capr.EarlyRegister(ctx, clients); err != nil {
+				return fmt.Errorf("failed to register capr controllers")
+			}
+		}
+
 		// defer registration of controllers which have CAPI clients or use CAPI caches
 		clients.DeferredCAPIRegistration.DeferRegistration(func(ctx context.Context, clients *wrangler.CAPIContext) error {
 			provisioningv2.Register(ctx, clients, kubeconfigManager)
 			if features.RKE2.Enabled() {
 				if err := capr.Register(ctx, clients, kubeconfigManager); err != nil {
-					return fmt.Errorf("failed to register capr controllers: %w", err)
+					return fmt.Errorf("failed to register deferred capr controllers: %w", err)
 				}
 			}
 			return nil

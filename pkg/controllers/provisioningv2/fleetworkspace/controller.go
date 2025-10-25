@@ -27,7 +27,7 @@ type handle struct {
 	workspaces     mgmtcontrollers.FleetWorkspaceClient
 }
 
-func Register(ctx context.Context, clients *wrangler.CAPIContext) {
+func Register(ctx context.Context, clients *wrangler.Context) {
 	h := &handle{
 		workspaceCache: clients.Mgmt.FleetWorkspace().Cache(),
 		workspaces:     clients.Mgmt.FleetWorkspace(),
