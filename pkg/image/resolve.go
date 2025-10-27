@@ -1,7 +1,10 @@
 package image
 
 import (
+	"bufio"
+	"context"
 	"fmt"
+	"os"
 	"path"
 	"sort"
 	"strings"
@@ -11,6 +14,7 @@ import (
 	util "github.com/rancher/rancher/pkg/cluster"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
+	"oras.land/oras-go/v2/registry/remote"
 )
 
 var Mirrors = map[string]string{}
@@ -56,15 +60,33 @@ func ResolveWithCluster(image string, cluster *v3.Cluster) string {
 // Rancher charts, system images and extension images of Rancher are fetched.
 // GetImages is called during runtime by Rancher catalog package which is deprecated.
 // It is actually used for generation rancher-images.txt for airgap scenarios.
-func GetImages(exportConfig ExportConfig, externalImages map[string][]string, imagesFromArgs []string) ([]string, []string, error) {
+func GetImages(chartsPath string,
+	osType OSType,
+	rancherVersion string,
+	extensionEndpoints []GithubEndpoint,
+	externalImages map[string][]string,
+	imagesFromArgs []string) ([]string, []string, error) {
 	imagesSet := make(map[string]map[string]struct{})
 
-	// fetch images from charts
-	charts := Charts{exportConfig}
-	if err := charts.FetchImages(imagesSet); err != nil {
-		return nil, nil, errors.Wrap(err, "failed to fetch images from charts")
+	chartsPathList := strings.Split(chartsPath, ",")
+	for _, chartPath := range chartsPathList {
+		exportConfig := ExportConfig{
+			ChartsPath:     chartPath,
+			OsType:         osType,
+			RancherVersion: rancherVersion,
+		}
+
+		charts := Charts{exportConfig}
+		if err := charts.FetchImages(imagesSet); err != nil {
+			return nil, nil, errors.Wrap(err, "failed to fetch images from charts")
+		}
 	}
 
+	exportConfig := ExportConfig{
+		OsType:          osType,
+		RancherVersion:  rancherVersion,
+		GithubEndpoints: extensionEndpoints,
+	}
 	// fetch images from extension catalog images
 	extensions := ExtensionsConfig{exportConfig}
 	if err := extensions.FetchExtensionImages(imagesSet); err != nil {
@@ -85,6 +107,67 @@ func GetImages(exportConfig ExportConfig, externalImages map[string][]string, im
 	imagesList, imagesAndSourcesList := generateImageAndSourceLists(imagesSet)
 
 	return imagesList, imagesAndSourcesList, nil
+}
+
+// GetOCIURLs gets list of images/helm artifacts from registry specified.
+func GetOCIURLs(
+	ociChartsPath string,
+	rancherVersion string,
+	osType OSType,
+	externalImages map[string][]string,
+	imagesFromArgs []string,
+	registryHost string) ([]string, []string, error) {
+	registryHost = "registry.suse.com/rancher" // TODO: remove this
+	imagesSet := make(map[string]map[string]struct{})
+
+	file, err := os.Open(ociChartsPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to open OCI charts file: %w", err)
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	ctx := context.Background()
+	for scanner.Scan() {
+		chartName := strings.TrimSpace(scanner.Text())
+		if chartName == "" {
+			continue
+		}
+
+		repos := []string{
+			fmt.Sprintf("%s/charts/%s", registryHost, chartName),
+			fmt.Sprintf("%s/%s", registryHost, chartName),
+		}
+
+		for _, repoPath := range repos {
+			repo, err := remote.NewRepository(repoPath)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to create ORAS repo client for %s: %w", repoPath, err)
+			}
+
+			err = repo.Tags(ctx, "", func(tags []string) error {
+				for _, tag := range tags {
+					parts := strings.SplitN(repoPath, "/", 2)
+					image := fmt.Sprintf("%s:%s", parts[1], tag)
+					addSourceToImage(imagesSet, image, image)
+				}
+				return nil
+			})
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to list tags for %s: %w", repoPath, err)
+			}
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, nil, fmt.Errorf("error reading OCI charts file: %w", err)
+	}
+
+	convertMirroredImages(imagesSet)
+
+	targetImages, targetImageSources := generateImageAndSourceLists(imagesSet)
+
+	return targetImages, targetImageSources, nil
 }
 
 func IsValidSemver(version string) bool {

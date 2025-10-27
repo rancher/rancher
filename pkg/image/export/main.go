@@ -10,16 +10,16 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		log.Fatal("\"main.go\" requires 1 argument. Usage: go run main.go [CHART_PATH] [OPTIONAL]...")
+		log.Fatal("\"main.go\" requires 1 argument. Usage: go run main.go [CHART_PATHS] [OCI_CHART_FILE_PATH]  [OPTIONAL]...")
 	}
 
-	if err := run(os.Args[1], os.Args[2:]); err != nil {
+	if err := run(os.Args[1], os.Args[2], os.Args[3:], os.Getenv("OCI_REGISTRY_HOST")); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func run(chartsPath string, imagesFromArgs []string) error {
-	targetsAndSources, err := utilities.GatherTargetImagesAndSources(chartsPath, imagesFromArgs)
+func run(chartsPath string, ociChartsPath string, imagesFromArgs []string, registryHost string) error {
+	targetsAndSources, err := utilities.GatherTargetImagesAndSources(chartsPath, ociChartsPath, imagesFromArgs, registryHost)
 	if err != nil {
 		return err
 	}
