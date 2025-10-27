@@ -17,6 +17,15 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 )
 
+func EarlyRegister(ctx context.Context, clients *wrangler.Context, kubeconfigManager *kubeconfig.Manager) {
+	if features.Fleet.Enabled() {
+		managedchart.Register(ctx, clients)
+		fleetcluster.Register(ctx, clients)
+		fleetworkspace.Register(ctx, clients)
+	}
+	cluster.EarlyRegister(ctx, clients, kubeconfigManager)
+}
+
 func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigManager *kubeconfig.Manager) {
 	cluster.Register(ctx, clients, kubeconfigManager)
 	if features.MCM.Enabled() {
@@ -25,12 +34,6 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigMana
 	provisioningcluster.Register(ctx, clients)
 	provisioninglog.Register(ctx, clients)
 	machineconfigcleanup.Register(ctx, clients)
-
-	if features.Fleet.Enabled() {
-		managedchart.Register(ctx, clients)
-		fleetcluster.Register(ctx, clients)
-		fleetworkspace.Register(ctx, clients)
-	}
 
 	if features.Harvester.Enabled() {
 		harvestercleanup.Register(ctx, clients)
