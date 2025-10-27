@@ -95,9 +95,6 @@ func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext) 
 		return nil, err
 	}
 
-	saml := saml.AuthHandler()
-	logrus.Debugf("SAML [newAPIManagement]: mux root %p", saml)
-
 	root := mux.NewRouter()
 	root.UseEncodedPath()
 
@@ -109,9 +106,7 @@ func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext) 
 
 	limitingHandler := utils.APIBodyLimitingHandler(apiLimit)
 	root.PathPrefix("/v3-public").Handler(limitingHandler(publicAPI))
-	root.PathPrefix("/v1-saml").Handler(limitingHandler(saml))
-
-	logrus.Debugf("SAML [newAPIManagement]: mux root %p now set", saml)
+	root.PathPrefix("/v1-saml").Handler(limitingHandler(saml.AuthHandler()))
 
 	root.NotFoundHandler = privateAPI
 
