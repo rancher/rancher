@@ -98,7 +98,6 @@ func router(ctx context.Context, localClusterEnabled bool, tunnelAuthorizer *mcm
 	unauthed.PathPrefix("/v1-{prefix}-release/channel").Handler(channelserver)
 	unauthed.PathPrefix("/v1-{prefix}-release/release").Handler(channelserver)
 	unauthed.PathPrefix("/v1-saml").Handler(saml.AuthHandler())
-
 	unauthed.PathPrefix("/v3-public").Handler(publicAPI)
 
 	// Authenticated routes
