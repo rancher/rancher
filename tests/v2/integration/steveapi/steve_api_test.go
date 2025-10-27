@@ -2,6 +2,7 @@ package integration
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/csv"
 	"encoding/json"
@@ -18,6 +19,7 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/api/scheme"
+	extv1 "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/features"
 	kubenamespaces "github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/namespaces"
 	"github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/rbac"
@@ -240,6 +242,7 @@ type steveAPITestSuite struct {
 	userClients       map[string]*rancher.Client
 	lastContinueToken string
 	lastRevision      string
+	// kubeconfig        *extv1.Kubeconfig
 }
 
 type LocalSteveAPITestSuite struct {
@@ -337,7 +340,7 @@ func (s *LocalSteveAPITestSuite) TestExtensionAPIServerAuthorization() {
 	}
 }
 
-func (s *LocalSteveAPITestSuite) TestExtensionAPIServerPostRequests() {
+func (s *LocalSteveAPITestSuite) TestExtensionAPIServerCreateRequests() {
 	client, err := rest.HTTPClientFor(s.client.WranglerContext.RESTConfig)
 	require.NoError(s.T(), err)
 
@@ -346,16 +349,18 @@ func (s *LocalSteveAPITestSuite) TestExtensionAPIServerPostRequests() {
 		path string
 		body io.Reader
 
-		// expectedBody needs to be a regex to accound for fields in the received body that cannot be reliably dtermined (such as "time" and "manager")
-		expectedBody *regexp.Regexp
 		expectedCode int
 	}{
 		{
-			name: "post to selfuser",
-			path: "/v1/ext.cattle.io.selfuser",
-			body: strings.NewReader(`{"kind":"selfuser"}`),
-
-			expectedBody: regexp.MustCompile(`{"type":"ext.cattle.io.selfuser","links":{"view":"https://` + s.client.WranglerContext.RESTConfig.Host + `/apis/ext.cattle.io/v1/selfusers"},"apiVersion":"ext.cattle.io/v1","kind":"SelfUser","metadata":{"generateName":"e-","managedFields":\[{"apiVersion":"ext.cattle.io/v1","fieldsType":"FieldsV1","fieldsV1":{"f:metadata":{"f:generateName":{}}},"manager":".*","operation":"Update","time":".*"}],"relationships":null,"state":{"error":false,"message":"Resource is current","name":"active","transitioning":false}},"status":{"userID":"user-[a-z0-9]+"}}`),
+			name:         "create kubeconfig",
+			path:         "/v1/ext.cattle.io.kubeconfig",
+			body:         strings.NewReader(`{"apiVersion":"ext.cattle.io/v1","kind":"kubeconfig", "metadata": {"name": "test-kubeconfig"}, "spec": {"clusters": ["local"], "currentContent": "local", "description": "kubeconfig for testing new kubeconfigs", "ttl": 100}}`),
+			expectedCode: http.StatusCreated,
+		},
+		{
+			name:         "create self user",
+			path:         "/v1/ext.cattle.io.selfusers",
+			body:         strings.NewReader(`{"apiVersion":"ext.cattle.io/v1","kind":"selfuser"}`),
 			expectedCode: http.StatusCreated,
 		},
 	}
@@ -364,11 +369,106 @@ func (s *LocalSteveAPITestSuite) TestExtensionAPIServerPostRequests() {
 		s.T().Run(test.name, func(t *testing.T) {
 			resp, err := client.Post(fmt.Sprintf("https://%s%s", s.client.WranglerContext.RESTConfig.Host, test.path), "application/json", test.body)
 			assert.NoError(t, err)
+			assert.Equal(t, test.expectedCode, resp.StatusCode)
+		})
+	}
+}
 
-			body, err := io.ReadAll(resp.Body)
+func (s *LocalSteveAPITestSuite) TestExtensionAPIServerUpdateRequests() {
+	client, err := rest.HTTPClientFor(s.client.WranglerContext.RESTConfig)
+	require.NoError(s.T(), err)
+
+	kubeconfig := s.createKubeconfig(client)
+
+	tests := []struct {
+		name         string
+		path         string
+		kubeconfig   extv1.Kubeconfig
+		expectedCode int
+	}{
+		{
+			name: "update kubeconfig",
+			path: "/v1/ext.cattle.io.kubeconfig/" + kubeconfig.Name,
+			kubeconfig: extv1.Kubeconfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            kubeconfig.Name,
+					ResourceVersion: kubeconfig.ResourceVersion,
+				},
+				Spec: extv1.KubeconfigSpec{
+					Clusters:       kubeconfig.Spec.Clusters,
+					CurrentContext: kubeconfig.Spec.CurrentContext,
+					Description:    "kubeconfig updated",
+					TTL:            kubeconfig.Spec.TTL,
+				},
+			},
+			expectedCode: http.StatusOK,
+		},
+		{
+			name: "update non-existant kubeconfig",
+			path: "/v1/ext.cattle.io/kubeconfig/does-not-exist",
+			kubeconfig: extv1.Kubeconfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            kubeconfig.Name,
+					ResourceVersion: kubeconfig.ResourceVersion,
+				},
+				Spec: extv1.KubeconfigSpec{
+					Clusters:       kubeconfig.Spec.Clusters,
+					CurrentContext: kubeconfig.Spec.CurrentContext,
+					Description:    "kubeconfig updated",
+					TTL:            kubeconfig.Spec.TTL,
+				},
+			},
+			expectedCode: http.StatusNotFound,
+		},
+	}
+
+	for _, test := range tests {
+		s.T().Run(test.name, func(t *testing.T) {
+			data, err := json.Marshal(test.kubeconfig)
+			require.NoError(t, err)
+
+			req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("https://%s%s", s.client.WranglerContext.RESTConfig.Host, test.path), bytes.NewBuffer(data))
+			require.NoError(t, err)
+
+			resp, err := client.Do(req)
 			assert.NoError(t, err)
 			assert.Equal(t, test.expectedCode, resp.StatusCode)
-			assert.Regexp(t, test.expectedBody, strings.TrimSpace(string(body)))
+		})
+	}
+}
+
+func (s *LocalSteveAPITestSuite) TestExtensionAPIServerDeleteRequests() {
+	client, err := rest.HTTPClientFor(s.client.WranglerContext.RESTConfig)
+	require.NoError(s.T(), err)
+
+	kubeconfig := s.createKubeconfig(client)
+
+	tests := []struct {
+		name         string
+		path         string
+		expectedCode int
+	}{
+		{
+			name:         "delete kubeconfig",
+			path:         "/v1/ext.cattle.io.kubeconfig/" + kubeconfig.Name,
+			expectedCode: http.StatusNoContent,
+		},
+		{
+			name:         "delete non-existant kubeconfig",
+			path:         "/v1/ext.cattle.io/kubeconfig/does-not-exist",
+			expectedCode: http.StatusNotFound,
+		},
+	}
+
+	for _, test := range tests {
+		s.T().Run(test.name, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("https://%s%s", s.client.WranglerContext.RESTConfig.Host, test.path), nil)
+			require.NoError(t, err)
+
+			resp, err := client.Do(req)
+			assert.NoError(t, err)
+			assert.Equal(t, test.expectedCode, resp.StatusCode)
+
 		})
 	}
 }
@@ -3020,6 +3120,27 @@ func (s *steveAPITestSuite) assertListExcludes(expect []map[string]string, list 
 		}
 	}
 	assert.False(s.T(), found, "list contained unexpected results")
+}
+
+func (s *steveAPITestSuite) createKubeconfig(client *http.Client) *extv1.Kubeconfig {
+	var err error
+
+	if client == nil {
+		client, err = rest.HTTPClientFor(s.client.WranglerContext.RESTConfig)
+		require.NoError(s.T(), err)
+	}
+
+	kubeconfig := &extv1.Kubeconfig{}
+
+	resp, err := client.Post(fmt.Sprintf("https://%s/v1/ext.cattle.io.kubeconfig", s.client.WranglerContext.RESTConfig.Host), "application/json", strings.NewReader(`{"apiVersion":"ext.cattle.io/v1","kind":"kubeconfig", "metadata": {"name": "test-kubeconfig"}, "spec": {"clusters": ["local"], "currentContent": "local", "description": "kubeconfig for testing new kubeconfigs", "ttl": 100}}`))
+	require.NoError(s.T(), err)
+
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(s.T(), err)
+
+	require.NoError(s.T(), json.Unmarshal(body, kubeconfig))
+
+	return kubeconfig
 }
 
 func retryRequest(fn func() error) error {
