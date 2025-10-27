@@ -352,22 +352,43 @@ func (s *LocalSteveAPITestSuite) TestExtensionAPIServerCreateRequests() {
 		expectedCode int
 	}{
 		{
-			name:         "create kubeconfig",
-			path:         "/v1/ext.cattle.io.kubeconfig",
-			body:         strings.NewReader(`{"apiVersion":"ext.cattle.io/v1","kind":"kubeconfig", "metadata": {"name": "test-kubeconfig"}, "spec": {"clusters": ["local"], "currentContent": "local", "description": "kubeconfig for testing new kubeconfigs", "ttl": 100}}`),
+			name: "create kubeconfig",
+			path: "/v1/ext.cattle.io.kubeconfig",
+			body: strings.NewReader(`
+			{
+				"apiVersion":"ext.cattle.io/v1",
+				"kind":"kubeconfig",
+				"metadata": {
+					"name": "test-kubeconfig"
+				},
+				"spec": {
+					"clusters": ["local"],
+					"currentContent": "local",
+					"description": "kubeconfig for testing new kubeconfigs",
+					"ttl": 100
+				}
+			}`),
 			expectedCode: http.StatusCreated,
 		},
 		{
-			name:         "create self user",
-			path:         "/v1/ext.cattle.io.selfusers",
-			body:         strings.NewReader(`{"apiVersion":"ext.cattle.io/v1","kind":"selfuser"}`),
+			name: "create self user",
+			path: "/v1/ext.cattle.io.selfusers",
+			body: strings.NewReader(`
+			{
+				"apiVersion":"ext.cattle.io/v1",
+				"kind":"selfuser"
+			}`),
 			expectedCode: http.StatusCreated,
 		},
 	}
 
 	for _, test := range tests {
 		s.T().Run(test.name, func(t *testing.T) {
-			resp, err := client.Post(fmt.Sprintf("https://%s%s", s.client.WranglerContext.RESTConfig.Host, test.path), "application/json", test.body)
+			resp, err := client.Post(
+				fmt.Sprintf("https://%s%s", s.client.WranglerContext.RESTConfig.Host, test.path),
+				"application/json",
+				test.body,
+			)
 			assert.NoError(t, err)
 			assert.Equal(t, test.expectedCode, resp.StatusCode)
 		})
@@ -468,7 +489,6 @@ func (s *LocalSteveAPITestSuite) TestExtensionAPIServerDeleteRequests() {
 			resp, err := client.Do(req)
 			assert.NoError(t, err)
 			assert.Equal(t, test.expectedCode, resp.StatusCode)
-
 		})
 	}
 }
@@ -3132,7 +3152,24 @@ func (s *steveAPITestSuite) createKubeconfig(client *http.Client) *extv1.Kubecon
 
 	kubeconfig := &extv1.Kubeconfig{}
 
-	resp, err := client.Post(fmt.Sprintf("https://%s/v1/ext.cattle.io.kubeconfig", s.client.WranglerContext.RESTConfig.Host), "application/json", strings.NewReader(`{"apiVersion":"ext.cattle.io/v1","kind":"kubeconfig", "metadata": {"name": "test-kubeconfig"}, "spec": {"clusters": ["local"], "currentContent": "local", "description": "kubeconfig for testing new kubeconfigs", "ttl": 100}}`))
+	resp, err := client.Post(
+		fmt.Sprintf("https://%s/v1/ext.cattle.io.kubeconfig", s.client.WranglerContext.RESTConfig.Host),
+		"application/json",
+		strings.NewReader(`
+		{
+			"apiVersion": "ext.cattle.io/v1",
+			"kind": "kubeconfig",
+			"metadata": {
+				"name": "test-kubeconfig"
+			},
+			"spec": {
+				"clusters": ["local"],
+				"currentContent": "local",
+				"description": "kubeconfig for testing new kubeconfigs",
+				"ttl": 100
+			}
+		}`),
+	)
 	require.NoError(s.T(), err)
 
 	body, err := io.ReadAll(resp.Body)
