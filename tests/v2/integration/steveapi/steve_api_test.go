@@ -242,7 +242,6 @@ type steveAPITestSuite struct {
 	userClients       map[string]*rancher.Client
 	lastContinueToken string
 	lastRevision      string
-	// kubeconfig        *extv1.Kubeconfig
 }
 
 type LocalSteveAPITestSuite struct {
