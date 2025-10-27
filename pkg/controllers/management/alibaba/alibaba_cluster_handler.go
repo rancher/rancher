@@ -179,8 +179,11 @@ func (e *aliOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 			return e.RecordCAAndAPIEndpoint(cluster)
 		}
 
-		if cluster.Status.AliStatus.PrivateRequiresTunnel == nil && !cluster.Status.AliStatus.UpstreamSpec.EndpointPublicAccess {
-			// In this case, the API endpoint is private and it has not been determined if Rancher must tunnel to communicate with it.
+		// In this case, the API endpoint is private and it has not been determined if Rancher must tunnel to communicate with it.
+		if cluster.Status.AliStatus.PrivateRequiresTunnel == nil &&
+			!(cluster.Status.AliStatus.UpstreamSpec != nil &&
+				cluster.Status.AliStatus.UpstreamSpec.EndpointPublicAccess != nil &&
+				*cluster.Status.AliStatus.UpstreamSpec.EndpointPublicAccess) {
 			// Check to see if we can still use the control plane endpoint even though
 			// the cluster has private-only access
 			serviceToken, mustTunnel, err := e.generateSATokenWithPublicAPI(cluster)

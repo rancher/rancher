@@ -23,7 +23,7 @@ const (
 	AliNodePoolFieldScalingType        = "scalingType"
 	AliNodePoolFieldSystemDiskCategory = "systemDiskCategory"
 	AliNodePoolFieldSystemDiskSize     = "systemDiskSize"
-	AliNodePoolFieldVSwitchIDs         = "vSwitchIds"
+	AliNodePoolFieldVSwitchIDs         = "vswitchIds"
 )
 
 type AliNodePool struct {
@@ -48,5 +48,5 @@ type AliNodePool struct {
 	ScalingType        string    `json:"scalingType,omitempty" yaml:"scalingType,omitempty"`
 	SystemDiskCategory string    `json:"systemDiskCategory,omitempty" yaml:"systemDiskCategory,omitempty"`
 	SystemDiskSize     int64     `json:"systemDiskSize,omitempty" yaml:"systemDiskSize,omitempty"`
-	VSwitchIDs         []string  `json:"vSwitchIds,omitempty" yaml:"vSwitchIds,omitempty"`
+	VSwitchIDs         []string  `json:"vswitchIds,omitempty" yaml:"vswitchIds,omitempty"`
 }
