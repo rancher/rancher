@@ -152,32 +152,32 @@ func TestGetImages(t *testing.T) {
 	}()
 
 	tests := []struct {
-		name         string
-		expected     []string
-		notExpected  []string
-		exportConfig ExportConfig
+		name            string
+		chartsPath      string
+		rancherVersion  string
+		OsType          OSType
+		GithubEndpoints []GithubEndpoint
+		expected        []string
+		notExpected     []string
 	}{
 		{
-			name: "exportConfig is completely empty",
-			exportConfig: ExportConfig{
-				ChartsPath:      "",
-				OsType:          Linux,
-				RancherVersion:  "",
-				GithubEndpoints: []GithubEndpoint{},
-			},
-			expected:    []string{},
-			notExpected: []string{"rancher/ui-plugin-catalog"},
+			name:            "exportConfig is completely empty",
+			chartsPath:      "",
+			OsType:          Linux,
+			rancherVersion:  "",
+			GithubEndpoints: []GithubEndpoint{},
+			expected:        []string{},
+			notExpected:     []string{"rancher/ui-plugin-catalog"},
 		},
 		{
-			name: "only extensions is set in exportConfig",
-			exportConfig: ExportConfig{
-				ChartsPath:     "",
-				OsType:         Linux,
-				RancherVersion: "",
-				GithubEndpoints: []GithubEndpoint{
-					{URL: server.URL},
-				},
+			name:           "only extensions is set in exportConfig",
+			chartsPath:     "",
+			OsType:         Linux,
+			rancherVersion: "",
+			GithubEndpoints: []GithubEndpoint{
+				{URL: server.URL},
 			},
+
 			expected:    []string{"rancher/ui-plugin-catalog"},
 			notExpected: []string{},
 		},
@@ -185,7 +185,7 @@ func TestGetImages(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			imagesList, _, err := GetImages(tt.exportConfig, make(map[string][]string), []string{})
+			imagesList, _, err := GetImages(tt.chartsPath, tt.OsType, tt.rancherVersion, tt.GithubEndpoints, make(map[string][]string), []string{})
 			assertlib.NoError(t, err)
 
 			for _, expected := range tt.expected {
