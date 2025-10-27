@@ -95,8 +95,6 @@ func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext) 
 		return nil, err
 	}
 
-	saml := saml.AuthHandler()
-
 	root := mux.NewRouter()
 	root.UseEncodedPath()
 
@@ -108,7 +106,8 @@ func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext) 
 
 	limitingHandler := utils.APIBodyLimitingHandler(apiLimit)
 	root.PathPrefix("/v3-public").Handler(limitingHandler(publicAPI))
-	root.PathPrefix("/v1-saml").Handler(limitingHandler(saml))
+	root.PathPrefix("/v1-saml").Handler(limitingHandler(saml.AuthHandler()))
+
 	root.NotFoundHandler = privateAPI
 
 	return func(next http.Handler) http.Handler {
