@@ -390,6 +390,18 @@ func (g *Provider) getGithubAppConfigCR() (*apiv3.GithubAppConfig, error) {
 		}
 	}
 
+	if storedGithubAppConfig.PrivateKey != "" {
+		data, err := common.ReadFromSecretData(g.secrets, storedGithubAppConfig.PrivateKey)
+		if err != nil {
+			return nil, err
+		}
+		for k, v := range data {
+			if strings.EqualFold(k, client.GithubAppConfigFieldPrivateKey) {
+				storedGithubAppConfig.PrivateKey = string(v)
+			}
+		}
+	}
+
 	return storedGithubAppConfig, nil
 }
 
@@ -409,13 +421,22 @@ func (g *Provider) saveGithubAppConfig(config *apiv3.GithubAppConfig) error {
 	if err != nil {
 		return err
 	}
-
 	config.ClientSecret = name
+
+	privateKeyInfo := convert.ToString(config.PrivateKey)
+	privateKeyField := strings.ToLower(client.GithubAppConfigFieldPrivateKey)
+	privateKeyName, err := common.CreateOrUpdateSecrets(g.secrets, privateKeyInfo, privateKeyField, strings.ToLower(config.Type))
+	if err != nil {
+		return err
+	}
+
+	config.PrivateKey = privateKeyName
 
 	_, err = g.authConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
