@@ -36,4 +36,7 @@ rules:
   - apiGroups: [ "cert-manager.io" ]
     resources: [ "issuers" ]
     verbs: [ "delete" ]
+  - apiGroups: [ "apiregistration.k8s.io" ]
+    resources: [ "apiservices" ]
+    verbs: [ "delete" ]
 {{- end }}
