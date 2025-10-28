@@ -282,11 +282,11 @@ func TestProcessHarvesterCloudCredential(t *testing.T) {
 type fakeInnerStore struct {
 	types.Store
 	deleteCalled bool
-	response     map[string]interface{}
+	response     map[string]any
 	err          error
 }
 
-func (f *fakeInnerStore) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
+func (f *fakeInnerStore) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]any, error) {
 	f.deleteCalled = true
 	return f.response, f.err
 }
@@ -297,7 +297,7 @@ func TestStore_Delete(t *testing.T) {
 	type expect struct {
 		wantAPIError *httperror.APIError
 		wantDelete   bool
-		wantResp     map[string]interface{}
+		wantResp     map[string]any
 	}
 
 	testCases := []struct {
@@ -373,12 +373,12 @@ func TestStore_Delete(t *testing.T) {
 				return cache
 			},
 			inner: fakeInnerStore{
-				response: map[string]interface{}{"ok": true},
+				response: map[string]any{"ok": true},
 			},
 			expected: expect{
 				wantAPIError: nil,
 				wantDelete:   true,
-				wantResp:     map[string]interface{}{"ok": true},
+				wantResp:     map[string]any{"ok": true},
 			},
 		},
 	}

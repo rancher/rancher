@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -181,7 +182,7 @@ func Register(
 func RegisterIndexers(config *wrangler.Context) {
 	config.Provisioning.Cluster().Cache().AddIndexer(ByCluster, byClusterIndex)
 	config.Provisioning.Cluster().Cache().AddIndexer(ByCloudCred, byCloudCredentialIndex)
-	config.Provisioning.Cluster().Cache().AddIndexer(ByMachinePoolCloudCred, ByMachinePoolCloudCredIndex)
+	config.Provisioning.Cluster().Cache().AddIndexer(ByMachinePoolCloudCred, byMachinePoolCloudCredIndex)
 	if features.Provisioningv2ETCDSnapshotBackPopulation.Enabled() {
 		config.RKE.ETCDSnapshot().Cache().AddIndexer(ByETCDSnapshotName, byETCDSnapshotName)
 	}
@@ -217,9 +218,9 @@ func byCloudCredentialIndex(obj *v1.Cluster) ([]string, error) {
 	return []string{obj.Spec.CloudCredentialSecretName}, nil
 }
 
-// ByMachinePoolCloudCredIndex returns all cloud-credential IDs referenced by a machine pool:
+// byMachinePoolCloudCredIndex returns all cloud-credential IDs referenced by a machine pool:
 // - spec.rkeConfig.machinePools[*].cloudCredentialSecretName (per-pool)
-func ByMachinePoolCloudCredIndex(obj *v1.Cluster) ([]string, error) {
+func byMachinePoolCloudCredIndex(obj *v1.Cluster) ([]string, error) {
 	credentialsSet := make(map[string]struct{})
 
 	if obj.Spec.RKEConfig != nil {
@@ -238,6 +239,8 @@ func ByMachinePoolCloudCredIndex(obj *v1.Cluster) ([]string, error) {
 	for cred := range credentialsSet {
 		credentialSlice = append(credentialSlice, cred)
 	}
+
+	sort.Strings(credentialSlice)
 
 	return credentialSlice, nil
 }
