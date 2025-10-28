@@ -104,7 +104,8 @@ func (m *manager) ensureGlobalResourcesRolesForPRTB(projectName string, rts map[
 		return nil, nil
 	}
 
-	var roleVerb, roleSuffix string
+	var roleSuffix string
+	var roleVerb []string
 	for _, r := range rts {
 		for _, rule := range r.Rules {
 			hasNamespaceResources := slice.ContainsString(rule.Resources, "namespaces") || slice.ContainsString(rule.Resources, "*")
@@ -113,10 +114,11 @@ func (m *manager) ensureGlobalResourcesRolesForPRTB(projectName string, rts map[
 				readVerbs := sets.New("get", "list", "watch")
 				ruleVerbs := sets.New(rule.Verbs...)
 				if ruleVerbs.Difference(readVerbs).Len() > 0 {
-					roleVerb = manageNSVerb
+					roleVerb = append(roleVerb, manageNSVerb)
 				}
 				if ruleVerbs.HasAny("*", "create") {
 					roles.Insert("create-ns")
+					roleVerb = append(roleVerb, editVerb)
 					if nsRole, _ := m.crLister.Get("create-ns"); nsRole == nil {
 						createNSRT, err := m.rtLister.Get("create-ns")
 						if err != nil {
@@ -134,8 +136,8 @@ func (m *manager) ensureGlobalResourcesRolesForPRTB(projectName string, rts map[
 
 	getRole := fmt.Sprintf(projectNSGetClusterRoleNameFmt, projectName, projectNSVerbToSuffix[getVerb])
 	roles.Insert(getRole)
-	if roleVerb != "" {
-		roleSuffix = projectNSVerbToSuffix[roleVerb]
+	for _, verb := range roleVerb {
+		roleSuffix = projectNSVerbToSuffix[verb]
 		role := fmt.Sprintf(projectNSGetClusterRoleNameFmt, projectName, roleSuffix)
 		roles.Insert(role)
 	}

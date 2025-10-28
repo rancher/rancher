@@ -31,15 +31,20 @@ const (
 	initialRoleCondition           = "InitialRolesPopulated"
 	manageNSVerb                   = "manage-namespaces"
 	getVerb                        = "get"
+	// "edit" is a readability alias. In RBAC, the edit-level privileges are provided by the "patch" and "update" verbs.
+	editVerb = "edit"
 
 	// compatibility with previous norman lifecycle implementation, now implemented inside OnChange's handler
 	normanLifecycleAnnotation = "lifecycle.cattle.io/create.namespace-auth"
 	normanLifecycleFinalizer  = "controller.cattle.io/namespace-auth"
 )
 
+// editVerbs defines the RBAC verbs corresponding to edit-level permissions.
+var editVerbs = []string{"patch", "update"}
 var projectNSVerbToSuffix = map[string]string{
 	getVerb:      "readonly",
 	manageNSVerb: "manage",
+	editVerb:     "edit",
 }
 var defaultProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/default-project": "true"})
 var systemProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/system-project": "true"})
@@ -456,6 +461,10 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace, ver
 	roleCli := n.m.clusterRoles
 	nsInDesiredRole := false
 	for _, c := range clusterRoles {
+		// project-manage role grants manage-ns permissions across all namespaces, so no specific resourceNames to be added.
+		if verb == manageNSVerb {
+			continue
+		}
 		cr, ok := c.(*rbacv1.ClusterRole)
 		if !ok {
 			return errors.Errorf("%v is not a ClusterRole", c)
@@ -496,7 +505,7 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace, ver
 
 		// Check to see if retrieved role has the namespace (small chance cache could have been updated)
 		for _, r := range cr.Rules {
-			if slice.ContainsString(r.Verbs, verb) && slice.ContainsString(r.Resources, "namespaces") && slice.ContainsString(r.ResourceNames, ns.Name) {
+			if anyVerbMatches(r.Verbs, verb) && slice.ContainsString(r.Resources, "namespaces") && slice.ContainsString(r.ResourceNames, ns.Name) {
 				// ns already in the role, nothing to do
 				mustUpdate = false
 			}
@@ -506,7 +515,7 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace, ver
 			appendedToExisting := false
 			for i := range cr.Rules {
 				r := &cr.Rules[i]
-				if slice.ContainsString(r.Verbs, verb) && slice.ContainsString(r.Resources, "namespaces") {
+				if anyVerbMatches(r.Verbs, verb) && slice.ContainsString(r.Resources, "namespaces") {
 					r.ResourceNames = append(r.ResourceNames, ns.Name)
 					appendedToExisting = true
 					break
@@ -514,9 +523,13 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace, ver
 			}
 
 			if !appendedToExisting {
+				verbs := []string{verb}
+				if verb == editVerb {
+					verbs = editVerbs
+				}
 				cr.Rules = append(cr.Rules, rbacv1.PolicyRule{
 					APIGroups:     []string{""},
-					Verbs:         []string{verb},
+					Verbs:         verbs,
 					Resources:     []string{"namespaces"},
 					ResourceNames: []string{ns.Name},
 				})
@@ -549,6 +562,17 @@ func (m *manager) createProjectNSRole(roleName, verb, ns, projectName string) er
 				{
 					APIGroups:     []string{""},
 					Verbs:         []string{verb},
+					Resources:     []string{"namespaces"},
+					ResourceNames: []string{ns},
+				},
+			}
+		}
+	case editVerb:
+		if ns != "" {
+			cr.Rules = []rbacv1.PolicyRule{
+				{
+					APIGroups:     []string{""},
+					Verbs:         editVerbs,
 					Resources:     []string{"namespaces"},
 					ResourceNames: []string{ns},
 				},
@@ -715,4 +739,18 @@ func (n *nsLifecycle) asyncCleanupRBAC(namespaceName string) {
 			logrus.Errorf("async cleanup of RBAC for namespace %s failed: %v", namespaceName, err)
 		}
 	}()
+}
+
+// anyVerbMatches returns true if the specified verb exists in `rule.Verbs`.
+// When the verb is "edit", it ensures both "patch" and "update" verbs are present, otherwise returns false.
+func anyVerbMatches(ruleVerbs []string, verb string) bool {
+	if verb == editVerb {
+		for _, v := range editVerbs {
+			if !slice.ContainsString(ruleVerbs, v) {
+				return false
+			}
+		}
+		return true
+	}
+	return slice.ContainsString(ruleVerbs, verb)
 }

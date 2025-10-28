@@ -50,6 +50,7 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 	getCR := createClusterRoleForProject("p-123xyz", testNamespace1.Name, "get")
 	updateGetCR := addNamespaceToClusterRole(testNamespace2.Name, "get", getCR.DeepCopy())
 	manageCR := createClusterRoleForProject("p-123xyz", testNamespace1.Name, manageNSVerb)
+	editCR := createClusterRoleForProject("p-123xyz", testNamespace1.Name, editVerb)
 	noResourceNameCR := createClusterRoleForProject("p-123xyz", unrelatedNamespace.Name, "get")
 	tests := []struct {
 		name                 string
@@ -140,6 +141,32 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 			},
 			wantRoles: []*rbacv1.ClusterRole{
 				manageCR,
+			},
+			wantDeletedRoleNames: []string{},
+			wantErr:              false,
+		},
+		{
+			name:      "create edit role",
+			namespace: &testNamespace1,
+			roleVerb:  []string{editVerb},
+			setupCRController: func(c *wfakes.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList], finalRoles *[]*rbacv1.ClusterRole, deletedRoleNames *[]string) {
+				c.EXPECT().Create(gomock.Any()).DoAndReturn(
+					func(cr *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
+						created := editCR.DeepCopy()
+						*finalRoles = append(*finalRoles, created)
+						return created, nil
+					})
+			},
+			setupCRLister: func(l *wfakes.MockNonNamespacedCacheInterface[*rbacv1.ClusterRole]) {
+				l.EXPECT().Get(gomock.Any()).Return(nil, nil)
+			},
+			crIndexer: &FakeResourceIndexer[*rbacv1.ClusterRole]{
+				index:     crByNSIndex,
+				resources: map[string][]*rbacv1.ClusterRole{},
+				err:       nil,
+			},
+			wantRoles: []*rbacv1.ClusterRole{
+				editCR,
 			},
 			wantDeletedRoleNames: []string{},
 			wantErr:              false,
@@ -543,9 +570,15 @@ func addNamespaceToClusterRole(namespace string, verb string, clusterRole *rbacv
 		clusterRole.Rules[foundIdx].ResourceNames = append(clusterRole.Rules[foundIdx].ResourceNames, namespace)
 		return clusterRole
 	}
+
+	verbs := []string{verb}
+	if verb == editVerb {
+		verbs = editVerbs
+	}
+
 	rule := rbacv1.PolicyRule{
 		APIGroups:     []string{""},
-		Verbs:         []string{verb},
+		Verbs:         verbs,
 		Resources:     []string{"namespaces"},
 		ResourceNames: []string{namespace},
 	}
