@@ -79,6 +79,9 @@ done
 echo "Removing Rancher bootstrap secret in the following namespace: ${rancher_namespace}"
 kubectl --ignore-not-found=true delete secret bootstrap-secret -n "${rancher_namespace}"
 
+echo 'Removing Rancher v1.ext.cattle.io APIService'
+kubectl delete apiservice v1.ext.cattle.io
+
 echo "------ Summary ------"
 if [[ ${#succeeded[@]} -ne 0 ]]; then
   echo "Succeeded to uninstall the following apps:" "${succeeded[@]}"
