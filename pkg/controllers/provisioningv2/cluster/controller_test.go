@@ -366,7 +366,7 @@ func Test_byCloudCredentialIndex(t *testing.T) {
 	}
 }
 
-func Test_ByMachinePoolCloudCredIndex(t *testing.T) {
+func Test_byMachinePoolCloudCredIndex(t *testing.T) {
 	tests := []struct {
 		name    string
 		cluster v1.Cluster
@@ -426,6 +426,73 @@ func Test_ByMachinePoolCloudCredIndex(t *testing.T) {
 			want: []string{"cattle-global-data:cc-111", "cattle-global-data:cc-222"},
 		},
 		{
+			name: "multiple pools ensure deterministic order",
+			cluster: v1.Cluster{
+				Spec: v1.ClusterSpec{
+					RKEConfig: &v1.RKEConfig{
+						MachinePools: []v1.RKEMachinePool{
+							{
+								Name: "pool-a",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-111",
+								},
+							},
+							{
+								Name: "pool-b",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-333",
+								},
+							},
+							{
+								Name: "pool-c",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-222",
+								},
+							},
+
+							{
+								Name: "pool-b",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-444",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: []string{"cattle-global-data:cc-111", "cattle-global-data:cc-222", "cattle-global-data:cc-333", "cattle-global-data:cc-444"},
+		},
+		{
+			name: "multiple pools with the same credential",
+			cluster: v1.Cluster{
+				Spec: v1.ClusterSpec{
+					RKEConfig: &v1.RKEConfig{
+						MachinePools: []v1.RKEMachinePool{
+							{
+								Name: "pool-a",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-111",
+								},
+							},
+							{
+								Name: "pool-b",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "",
+								},
+							},
+							{
+								Name: "pool-c",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-111",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: []string{"cattle-global-data:cc-111"},
+		},
+		{
 			name: "cluster-level set but ignored",
 			cluster: v1.Cluster{
 				Spec: v1.ClusterSpec{
@@ -454,9 +521,9 @@ func Test_ByMachinePoolCloudCredIndex(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := ByMachinePoolCloudCredIndex(&tc.cluster)
+			got, err := byMachinePoolCloudCredIndex(&tc.cluster)
 			require.NoError(t, err)
-			assert.ElementsMatch(t, tc.want, got)
+			assert.Equal(t, tc.want, got)
 		})
 	}
 }
