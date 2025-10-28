@@ -8,7 +8,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types/convert"
-	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	apisV3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/resourcequota"
@@ -31,15 +30,20 @@ const (
 	initialRoleCondition           = "InitialRolesPopulated"
 	manageNSVerb                   = "manage-namespaces"
 	getVerb                        = "get"
+	// "edit" is a readability alias. In RBAC, the edit-level privileges are provided by the "patch" and "update" verbs.
+	editVerb = "edit"
 
 	// compatibility with previous norman lifecycle implementation, now implemented inside OnChange's handler
 	normanLifecycleAnnotation = "lifecycle.cattle.io/create.namespace-auth"
 	normanLifecycleFinalizer  = "controller.cattle.io/namespace-auth"
 )
 
+// editVerbs defines the RBAC verbs corresponding to edit-level permissions.
+var editVerbs = []string{"patch", "update"}
 var projectNSVerbToSuffix = map[string]string{
 	getVerb:      "readonly",
 	manageNSVerb: "manage",
+	editVerb:     "edit",
 }
 var defaultProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/default-project": "true"})
 var systemProjectLabels = labels.Set(map[string]string{"authz.management.cattle.io/system-project": "true"})
@@ -315,7 +319,7 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 
 	var namespace string
 	if parts := strings.SplitN(projectID, ":", 2); len(parts) == 2 && len(parts[1]) > 0 {
-		project, err := n.rq.ProjectLister.Get(parts[0], parts[1])
+		project, err := n.rq.ProjectCache.Get(parts[0], parts[1])
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				logrus.Warnf("Namespace %s references project %s in namespace %s which does not exist", ns.Name, parts[1], parts[0])
@@ -383,60 +387,59 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 // nsInRole checks whether the given namespace name exists in the ResourceNames
 // of any rule within the specified ClusterRole. Returns true if found.
 func nsInRole(cr *rbacv1.ClusterRole, role, nsName string) bool {
-	if cr.Name == role {
-		for _, rule := range cr.Rules {
-			if slices.Contains(rule.ResourceNames, nsName) {
-				return true
-			}
+	if cr.Name != role {
+		return false
+	}
+
+	for _, rule := range cr.Rules {
+		if slices.Contains(rule.ResourceNames, nsName) {
+			return true
 		}
 	}
+
 	return false
 }
 
-// removeNSFromRules removes the given namespace name from the ResourceNames field of rules matching the specified verb
-// and "namespaces" resource in the ClusterRole.
-// It returns the count of rules that should be deleted and a boolean indicating if any modifications were made.
-func removeNSFromRules(cr *rbacv1.ClusterRole, verb, nsName string) (bool, bool) {
-	modified := false
-	toDeleteRules := 0
-	for i := range cr.Rules {
-		r := &cr.Rules[i]
-		if slice.ContainsString(r.Verbs, verb) && slice.ContainsString(r.Resources, "namespaces") && slice.ContainsString(r.ResourceNames, nsName) {
-			modified = true
-			resNames := r.ResourceNames
-			for i := len(resNames) - 1; i >= 0; i-- {
-				if resNames[i] == nsName {
-					resNames = append(resNames[:i], resNames[i+1:]...)
-				}
-			}
-			r.ResourceNames = resNames
-		}
-		// Mark rule for deletion if it no longer references any namespace.
-		if len(r.ResourceNames) == 0 {
-			toDeleteRules++
-		}
-	}
+// removeNSFromRules filters the given namespace from the provided list of rules.
+// It returns the updated slice of rules and a boolean indicating if any modification occurred.
+func removeNSFromRules(rules []rbacv1.PolicyRule, verb, nsName string) ([]rbacv1.PolicyRule, bool) {
+	var (
+		modified      bool
+		filteredRules []rbacv1.PolicyRule
+	)
 
-	// If all rules are marked for deletion, remove the entire ClusterRole.
-	// Otherwise, update it to retain only rules with non-empty ResourceNames.
-	if toDeleteRules == len(cr.Rules) {
-		return true, modified
-	} else if toDeleteRules != 0 {
-		var updatedRules []rbacv1.PolicyRule
-		for _, rule := range cr.Rules {
-			if len(rule.ResourceNames) != 0 {
-				updatedRules = append(updatedRules, rule)
+	for _, rule := range rules {
+		if !slices.Contains(rule.Verbs, verb) ||
+			!slices.Contains(rule.Resources, "namespaces") ||
+			!slices.Contains(rule.ResourceNames, nsName) {
+			filteredRules = append(filteredRules, rule)
+			continue
+		}
+
+		modified = true
+
+		// Rebuild the ResourceNames slice excluding the target namespace.
+		newResourceNames := []string{}
+		for _, rName := range rule.ResourceNames {
+			if rName != nsName {
+				newResourceNames = append(newResourceNames, rName)
 			}
 		}
-		cr.Rules = updatedRules
-	}
 
-	return false, modified
+		// Update and retain the rule if it still has ResourceNames
+		if len(newResourceNames) > 0 {
+			rule.ResourceNames = newResourceNames
+			filteredRules = append(filteredRules, rule)
+		}
+	}
+	return filteredRules, modified
 }
 
-// reconcileNamespaceProjectClusterRole creates and maintains two default ClusterRoles for each project:
-// 1. "readonly" role - read access (get) to project namespaces. (dynamically updated as namespaces are added)
+// reconcileNamespaceProjectClusterRole creates and maintains three default ClusterRoles for each project:
+// 1. "readonly" role - read access (get) to project namespaces.
 // 2. "manage" role - namespace management permissions for the project.
+// 3. "edit" role = namespace edit (update/patch) permissions for the project.
+// readonly and edit role are dynamically updated as namespaces are added.
 // A corresponding PRTB handler ensures that a binding to these ClusterRoles exists for every project member.
 func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace, verb string) error {
 	var desiredRole string
@@ -456,6 +459,10 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace, ver
 	roleCli := n.m.clusterRoles
 	nsInDesiredRole := false
 	for _, c := range clusterRoles {
+		// project-manage role grants manage-ns permissions across all namespaces, so no specific resourceNames to be added.
+		if verb == manageNSVerb {
+			break
+		}
 		cr, ok := c.(*rbacv1.ClusterRole)
 		if !ok {
 			return errors.Errorf("%v is not a ClusterRole", c)
@@ -467,8 +474,8 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace, ver
 
 		// This ClusterRole has a reference to the namespace, but is not the desired role. Namespace has been moved; remove it from this ClusterRole
 		undesiredRole := cr.DeepCopy()
-		deleteRule, modified := removeNSFromRules(undesiredRole, verb, ns.Name)
-		if deleteRule {
+		modifiedRules, modified := removeNSFromRules(undesiredRole.Rules, verb, ns.Name)
+		if len(modifiedRules) == 0 {
 			logrus.Infof("Deleting ClusterRole %s", undesiredRole.Name)
 			if err = roleCli.Delete(undesiredRole.Name, &metav1.DeleteOptions{}); err != nil {
 				return err
@@ -476,6 +483,7 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace, ver
 			continue
 		}
 		if modified {
+			undesiredRole.Rules = modifiedRules
 			if _, err = roleCli.Update(undesiredRole); err != nil {
 				return err
 			}
@@ -496,7 +504,7 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace, ver
 
 		// Check to see if retrieved role has the namespace (small chance cache could have been updated)
 		for _, r := range cr.Rules {
-			if slice.ContainsString(r.Verbs, verb) && slice.ContainsString(r.Resources, "namespaces") && slice.ContainsString(r.ResourceNames, ns.Name) {
+			if supportsVerb(r.Verbs, verb) && slices.Contains(r.Resources, "namespaces") && slices.Contains(r.ResourceNames, ns.Name) {
 				// ns already in the role, nothing to do
 				mustUpdate = false
 			}
@@ -505,18 +513,22 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace, ver
 			cr = cr.DeepCopy()
 			appendedToExisting := false
 			for i := range cr.Rules {
-				r := &cr.Rules[i]
-				if slice.ContainsString(r.Verbs, verb) && slice.ContainsString(r.Resources, "namespaces") {
-					r.ResourceNames = append(r.ResourceNames, ns.Name)
+				rule := &cr.Rules[i]
+				if supportsVerb(rule.Verbs, verb) && slices.Contains(rule.Resources, "namespaces") {
+					cr.Rules[i].ResourceNames = append(cr.Rules[i].ResourceNames, ns.Name)
 					appendedToExisting = true
 					break
 				}
 			}
 
 			if !appendedToExisting {
+				verbs := []string{verb}
+				if verb == editVerb {
+					verbs = editVerbs
+				}
 				cr.Rules = append(cr.Rules, rbacv1.PolicyRule{
 					APIGroups:     []string{""},
-					Verbs:         []string{verb},
+					Verbs:         verbs,
 					Resources:     []string{"namespaces"},
 					ResourceNames: []string{ns.Name},
 				})
@@ -549,6 +561,17 @@ func (m *manager) createProjectNSRole(roleName, verb, ns, projectName string) er
 				{
 					APIGroups:     []string{""},
 					Verbs:         []string{verb},
+					Resources:     []string{"namespaces"},
+					ResourceNames: []string{ns},
+				},
+			}
+		}
+	case editVerb:
+		if ns != "" {
+			cr.Rules = []rbacv1.PolicyRule{
+				{
+					APIGroups:     []string{""},
+					Verbs:         editVerbs,
 					Resources:     []string{"namespaces"},
 					ResourceNames: []string{ns},
 				},
@@ -607,7 +630,7 @@ func crByNS(obj interface{}) ([]string, error) {
 
 	var result []string
 	for _, r := range cr.Rules {
-		if slice.ContainsString(r.Resources, "namespaces") && (slice.ContainsString(r.Verbs, getVerb) || slice.ContainsString(r.Verbs, "*")) {
+		if slices.Contains(r.Resources, "namespaces") && (slices.Contains(r.Verbs, getVerb) || slices.Contains(r.Verbs, "*")) {
 			result = append(result, r.ResourceNames...)
 		}
 	}
@@ -715,4 +738,20 @@ func (n *nsLifecycle) asyncCleanupRBAC(namespaceName string) {
 			logrus.Errorf("async cleanup of RBAC for namespace %s failed: %v", namespaceName, err)
 		}
 	}()
+}
+
+// supportsVerb returns true if the specified verb exists in `rule.Verbs`.
+// When the verb is "edit", it ensures both "patch" and "update" verbs are present, otherwise returns false.
+func supportsVerb(ruleVerbs []string, verb string) bool {
+	if verb != editVerb {
+		return slices.Contains(ruleVerbs, verb)
+	}
+
+	for _, v := range editVerbs {
+		if !slices.Contains(ruleVerbs, v) {
+			return false
+		}
+	}
+
+	return true
 }

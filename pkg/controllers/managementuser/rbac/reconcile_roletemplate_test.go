@@ -64,9 +64,9 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 			},
 		},
 		{
-			description:   "namespace create rule should grant create-ns, namespace-manage and namespace-readonly role",
+			description:   "namespace create rule should grant create-ns, namespace-edit, namespace-manage and namespace-readonly role",
 			projectName:   "testproject",
-			expectedRoles: []string{"create-ns", "testproject-namespaces-manage", "testproject-namespaces-readonly"},
+			expectedRoles: []string{"create-ns", "testproject-namespaces-edit", "testproject-namespaces-manage", "testproject-namespaces-readonly"},
 			roleTemplates: map[string]*v3.RoleTemplate{
 				"testrt2": {
 					ObjectMeta: metav1.ObjectMeta{
@@ -178,9 +178,9 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 			},
 		},
 		{
-			description:   "* resources and * APIGroup should result in namespaces-manage, namespace-readonly and promoted role",
+			description:   "* resources and * APIGroup should result in namespace-edit, namespaces-manage, namespace-readonly and promoted role",
 			projectName:   "testproject",
-			expectedRoles: []string{"create-ns", "testproject-namespaces-manage", "testproject-namespaces-readonly", "testrt8-promoted"},
+			expectedRoles: []string{"create-ns", "testproject-namespaces-edit", "testproject-namespaces-manage", "testproject-namespaces-readonly", "testrt8-promoted"},
 			roleTemplates: map[string]*v3.RoleTemplate{
 				"testrt8": {
 					ObjectMeta: metav1.ObjectMeta{
@@ -197,9 +197,9 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 			},
 		},
 		{
-			description:   "* resources and core (\"\") APIGroup should result in namespace-manage, namespace-readonly and promoted role",
+			description:   "* resources and core (\"\") APIGroup should result in namespace-edit, namespace-manage, namespace-readonly and promoted role",
 			projectName:   "testproject",
-			expectedRoles: []string{"create-ns", "testproject-namespaces-manage", "testproject-namespaces-readonly", "testrt9-promoted"},
+			expectedRoles: []string{"create-ns", "testproject-namespaces-edit", "testproject-namespaces-manage", "testproject-namespaces-readonly", "testrt9-promoted"},
 			roleTemplates: map[string]*v3.RoleTemplate{
 				"testrt9": {
 					ObjectMeta: metav1.ObjectMeta{
@@ -348,17 +348,17 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 			},
 		},
 		{
-			description:   "returns readOnly & manageNamespace role for edit & read permissions",
+			description:   "returns edit, readOnly & manageNamespace role for edit & read permissions",
 			projectName:   "testproject",
-			expectedRoles: []string{"testproject-namespaces-manage", "testproject-namespaces-readonly"},
+			expectedRoles: []string{"testproject-namespaces-edit", "testproject-namespaces-manage", "testproject-namespaces-readonly"},
 			roleTemplates: map[string]*v3.RoleTemplate{
 				"testRT": {
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "testDeleteRT",
+						Name: "testEditRT",
 					},
 					Rules: []v1.PolicyRule{
 						{
-							Verbs:     []string{"edit", "get"},
+							Verbs:     []string{"patch", "update", "get"},
 							APIGroups: []string{""},
 							Resources: []string{"namespaces"},
 						},
