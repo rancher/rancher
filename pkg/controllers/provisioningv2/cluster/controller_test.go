@@ -269,7 +269,7 @@ func Test_byCloudCredentialIndex(t *testing.T) {
 			want: []string{"cattle-global-data:cc-aaa"},
 		},
 		{
-			name: "pool-level only (single pool)",
+			name: "pool-level only returns nil",
 			cluster: v1.Cluster{
 				Spec: v1.ClusterSpec{
 					RKEConfig: &v1.RKEConfig{
@@ -284,10 +284,10 @@ func Test_byCloudCredentialIndex(t *testing.T) {
 					},
 				},
 			},
-			want: []string{"cattle-global-data:cc-bbb"},
+			want: nil,
 		},
 		{
-			name: "both cluster and pool (same cred, dedup)",
+			name: "both cluster and pool",
 			cluster: v1.Cluster{
 				Spec: v1.ClusterSpec{
 					CloudCredentialSecretName: "cattle-global-data:cc-ccc",
@@ -306,7 +306,97 @@ func Test_byCloudCredentialIndex(t *testing.T) {
 			want: []string{"cattle-global-data:cc-ccc"},
 		},
 		{
-			name: "multiple pools, mixed empty/non-empty",
+			name: "multiple pools but empty cluster-level return nil",
+			cluster: v1.Cluster{
+				Spec: v1.ClusterSpec{
+					RKEConfig: &v1.RKEConfig{
+						MachinePools: []v1.RKEMachinePool{
+							{
+								Name: "pool-a",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-111",
+								},
+							},
+							{
+								Name: "pool-b",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: nil,
+		},
+		{
+			name: "cluster-level set alongside pools returns only cluster-level",
+			cluster: v1.Cluster{
+				Spec: v1.ClusterSpec{
+					CloudCredentialSecretName: "cattle-global-data:cc-xyz",
+					RKEConfig: &v1.RKEConfig{
+						MachinePools: []v1.RKEMachinePool{
+							{
+								Name: "p1",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-fgh",
+								},
+							},
+							{
+								Name: "p2",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-abc",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: []string{"cattle-global-data:cc-xyz"},
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := byCloudCredentialIndex(&tc.cluster)
+			require.NoError(t, err)
+			assert.ElementsMatch(t, tc.want, got)
+		})
+	}
+}
+
+func Test_ByMachinePoolCloudCredIndex(t *testing.T) {
+	tests := []struct {
+		name    string
+		cluster v1.Cluster
+		want    []string
+	}{
+		{
+			name:    "no pools returns nil",
+			cluster: v1.Cluster{},
+			want:    nil,
+		},
+		{
+			name: "single pool credential",
+			cluster: v1.Cluster{
+				Spec: v1.ClusterSpec{
+					RKEConfig: &v1.RKEConfig{
+						MachinePools: []v1.RKEMachinePool{
+							{
+								Name: "pool-1",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-bbb",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: []string{"cattle-global-data:cc-bbb"},
+		},
+		{
+			name: "multiple pools mixed",
 			cluster: v1.Cluster{
 				Spec: v1.ClusterSpec{
 					RKEConfig: &v1.RKEConfig{
@@ -336,10 +426,10 @@ func Test_byCloudCredentialIndex(t *testing.T) {
 			want: []string{"cattle-global-data:cc-111", "cattle-global-data:cc-222"},
 		},
 		{
-			name: "multiple pools + cluster-level (dedup across many)",
+			name: "cluster-level set but ignored",
 			cluster: v1.Cluster{
 				Spec: v1.ClusterSpec{
-					CloudCredentialSecretName: "cattle-global-data:cc-xyz",
+					CloudCredentialSecretName: "cattle-global-data:cc-fgh",
 					RKEConfig: &v1.RKEConfig{
 						MachinePools: []v1.RKEMachinePool{
 							{
@@ -354,12 +444,6 @@ func Test_byCloudCredentialIndex(t *testing.T) {
 									CloudCredentialSecretName: "cattle-global-data:cc-abc",
 								},
 							},
-							{
-								Name: "p3",
-								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
-									CloudCredentialSecretName: "",
-								},
-							},
 						},
 					},
 				},
@@ -370,15 +454,9 @@ func Test_byCloudCredentialIndex(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := byCloudCredentialIndex(&tc.cluster)
+			got, err := ByMachinePoolCloudCredIndex(&tc.cluster)
 			require.NoError(t, err)
-
-			assert.ElementsMatch(
-				t,
-				tc.want,
-				got,
-				"credential IDs should match",
-			)
+			assert.ElementsMatch(t, tc.want, got)
 		})
 	}
 }
