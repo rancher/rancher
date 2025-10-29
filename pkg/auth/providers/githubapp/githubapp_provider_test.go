@@ -62,10 +62,10 @@ func TestTransformToAuthProvider(t *testing.T) {
 
 	t.Run("when no alternative client_id is provided for hostname", func(t *testing.T) {
 		rawAuthConfig := map[string]any{
-			client.GithubConfigFieldHostname: "suse.com",
-			client.GithubConfigFieldClientID: "test_client_id",
-			client.GithubConfigFieldTLS:      true,
-			".host":                          "example.com",
+			client.GithubAppConfigFieldHostname: "suse.com",
+			client.GithubAppConfigFieldClientID: "test_client_id",
+			client.GithubAppConfigFieldTLS:      true,
+			".host":                             "example.com",
 		}
 
 		transformed, err := provider.TransformToAuthProvider(rawAuthConfig)
@@ -82,10 +82,10 @@ func TestTransformToAuthProvider(t *testing.T) {
 
 	t.Run("when alternative client_id is provided for hostname", func(t *testing.T) {
 		rawAuthConfig := map[string]any{
-			client.GithubConfigFieldHostname: "suse.com",
-			client.GithubConfigFieldClientID: "test_client_id",
-			client.GithubConfigFieldTLS:      true,
-			".host":                          "example.com",
+			client.GithubAppConfigFieldHostname: "suse.com",
+			client.GithubAppConfigFieldClientID: "test_client_id",
+			client.GithubAppConfigFieldTLS:      true,
+			".host":                             "example.com",
 			"hostnameToClientId": map[string]any{
 				"example.com": "other_client_id",
 			},
