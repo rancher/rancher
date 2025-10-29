@@ -108,6 +108,65 @@ func CreateOrUpdateAPIService(apiservice wranglerapiregistrationv1.APIServiceCon
 	return nil
 }
 
+func CreateOrUpdateService(service wranglercorev1.ServiceController, appSelector string) error {
+	if RDPEnabled() {
+		appSelector = "api-extension"
+	}
+
+	desired := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      TargetServiceName,
+			Namespace: Namespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{
+				{
+					Port: Port,
+				},
+			},
+			Selector: map[string]string{
+				"app": appSelector,
+			},
+		},
+	}
+
+	original, err := service.Get(Namespace, TargetServiceName, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		if !RDPEnabled() {
+			logrus.Warnf("Service %s will be created by rancher", TargetServiceName)
+			if _, err := service.Create(desired); err != nil {
+				return err
+			}
+		} else {
+			logrus.Warnf("Service %s was not found and it will be create by system-charts", TargetServiceName)
+		}
+	} else if err != nil {
+		return err
+	} else {
+
+		updateErr := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			current, err := service.Get(Namespace, TargetServiceName, metav1.GetOptions{})
+			if err != nil {
+				return err
+			}
+			modified := current.DeepCopy()
+			modified.Spec = desired.Spec
+			patch, err := makePatchAndUpdateService(original, modified, service)
+			if err != nil {
+				logrus.Errorf("error updating Service %s -> request: %s", TargetServiceName, patch)
+				return err
+			}
+			return nil
+		})
+		if updateErr != nil {
+			return fmt.Errorf("failed to update Service %s after retries: %w", TargetServiceName, updateErr)
+		}
+
+	}
+
+	return nil
+}
+
 func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Context, opts Options) (steveserver.ExtensionAPIServer, error) {
 	// Only the local cluster runs an extension API server
 	if features.MCMAgent.Enabled() {
@@ -379,64 +438,5 @@ func DeleteLegacyServiceAndSecret(apiservice wranglerapiregistrationv1.APIServic
 	}
 
 	logrus.Info("Finished attempting to delete legacy Service and Secret.")
-	return nil
-}
-
-func CreateOrUpdateService(service wranglercorev1.ServiceController, appSelector string) error {
-	if RDPEnabled() {
-		appSelector = "api-extension"
-	}
-
-	desired := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      TargetServiceName,
-			Namespace: Namespace,
-		},
-		Spec: corev1.ServiceSpec{
-			Ports: []corev1.ServicePort{
-				{
-					Port: Port,
-				},
-			},
-			Selector: map[string]string{
-				"app": appSelector,
-			},
-		},
-	}
-
-	original, err := service.Get(Namespace, TargetServiceName, metav1.GetOptions{})
-	if apierrors.IsNotFound(err) {
-		if !RDPEnabled() {
-			logrus.Warnf("Service %s will be created by rancher", TargetServiceName)
-			if _, err := service.Create(desired); err != nil {
-				return err
-			}
-		} else {
-			logrus.Warnf("Service %s was not found and it will be create by system-charts", TargetServiceName)
-		}
-	} else if err != nil {
-		return err
-	} else {
-
-		updateErr := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
-			current, err := service.Get(Namespace, TargetServiceName, metav1.GetOptions{})
-			if err != nil {
-				return err
-			}
-			modified := current.DeepCopy()
-			modified.Spec = desired.Spec
-			patch, err := makePatchAndUpdateService(original, modified, service)
-			if err != nil {
-				logrus.Errorf("error updating Service %s -> request: %s", TargetServiceName, patch)
-				return err
-			}
-			return nil
-		})
-		if updateErr != nil {
-			return fmt.Errorf("failed to update Service %s after retries: %w", TargetServiceName, updateErr)
-		}
-
-	}
-
 	return nil
 }
