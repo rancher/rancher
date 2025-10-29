@@ -326,8 +326,8 @@ github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b/go.mod h1:SBH7ygxi8pfU
 github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da h1:oI5xCqsCo564l8iNU+DwB5epxmsaqB+rhGL0m5jtYqE=
 github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da/go.mod h1:cIg4eruTrX1D+g88fzRXU5OdNfaM+9IcxsU14FzY7Hc=
 github.com/golang/mock v1.1.1/go.mod h1:oTYuIxOrZwtPieC+H1uAHpcLFnEyAGVDL/k47Jfbm0A=
-github.com/golang/mock v1.7.0-rc.1 h1:YojYx61/OLFsiv6Rw1Z96LpldJIy31o+UHmwAUMJ6/U=
-github.com/golang/mock v1.7.0-rc.1/go.mod h1:s42URUywIqd+OcERslBJvOjepvNymP31m3q8d/GkuRs=
+github.com/golang/mock v1.6.0 h1:ErTB+efbowRARo13NNdxyJji2egdxLGQhRaY+DUumQc=
+github.com/golang/mock v1.6.0/go.mod h1:p6yTPP+5HYm5mzsMV8JkE6ZKdX+/wYM6Hr+LicevLPs=
 github.com/golang/protobuf v1.2.0/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
 github.com/golang/protobuf v1.3.2/go.mod h1:6lQm79b+lXiMfvg/cZm0SGofjICqVBUtrP5yJMmIC1U=
 github.com/golang/protobuf v1.3.3/go.mod h1:vzj43D7+SQXF/4pzW/hwtAqwc6iTitCiVSaWz5lYuqw=
@@ -573,8 +573,8 @@ github.com/prometheus/procfs v0.17.0 h1:FuLQ+05u4ZI+SS/w9+BWEM2TXiHKsUQ9TADiRH7D
 github.com/prometheus/procfs v0.17.0/go.mod h1:oPQLaDAMRbA+u8H5Pbfq+dl3VDAvHxMUOVhe0wYB2zw=
 github.com/rancher/aks-operator v1.13.0-rc.1 h1:Vy83SjeSm9q7kI18+nkSOR0hyeydDj398KGTo3XEuS4=
 github.com/rancher/aks-operator v1.13.0-rc.1/go.mod h1:xu0BJ01Ynzs4wLMDf2V5eaazEf1/kndX0AeqqsTFVfQ=
-github.com/rancher/ali-operator v0.0.5 h1:y/Zvf+q1jARqVkIp4iEy/KAs+6UoT7qqWS436kXK3f0=
-github.com/rancher/ali-operator v0.0.5/go.mod h1:6JeGpFPkMTdN9xWlGFvXhrTUEsaYlmC5yWiQckSfXUU=
+github.com/rancher/ali-operator v0.0.6 h1:rk4ce41ONbHcltSdW0KQER7Youtic/zn92V6OOObzek=
+github.com/rancher/ali-operator v0.0.6/go.mod h1:B9QSWkk90zPzMMDJtULkhUdDYeBULzAyO3ZydAyXdVE=
 github.com/rancher/apiserver v0.7.7 h1:OssoQHO33VKJMo3DkKdvdWkaz8+vjnzsgCQoj7WX+8s=
 github.com/rancher/apiserver v0.7.7/go.mod h1:Wb+Z8ktNyIuqt9hw30geFBQFJQucWTqgu6trxxMtcyM=
 github.com/rancher/channelserver v0.7.0 h1:ZN5o8aD4mD31uhjEEW2e9yQXa3eOb+4Cp6DcWm7W/Lc=
