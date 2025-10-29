@@ -73,6 +73,11 @@ type ResourceQuotaLimit struct {
 	// LimitsMemory is the memory limits across all pods in a non-terminal state.
 	// +optional
 	LimitsMemory string `json:"limitsMemory,omitempty"`
+
+	// AnyOther contains any other limits a user may wish to impose beyond
+	// the limits set by the preceding fields. Keys are (parseable as)
+	// resource names, values are (parseable as) resource quantities.
+	AnyOther map[string]string `json:"anyOther,omitempty"`
 }
 
 // ContainerResourceLimit holds quotas limits for individual containers.

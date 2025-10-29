@@ -46,13 +46,30 @@ func convertProjectResourceLimitToResourceList(limit *apiv3.ResourceQuotaLimit) 
 	if err != nil {
 		return nil, err
 	}
-	limitsMap := map[string]string{}
+	limitsMap := map[string]any{}
 	err = json.Unmarshal(in, &limitsMap)
 	if err != nil {
 		return nil, err
 	}
 
 	limits := corev1.ResourceList{}
+
+	// convert the arbitrary set first, ...
+	if anyOther, ok := limitsMap["anyOther"]; ok {
+		delete(limitsMap, "anyOther")
+		for key, value := range anyOther.(map[string]string) {
+			resourceName := corev1.ResourceName(key)
+			resourceQuantity, err := resource.ParseQuantity(value)
+			if err != nil {
+				return nil, err
+			}
+
+			limits[resourceName] = resourceQuantity
+		}
+	}
+
+	// then place the fixed data. this order ensures that in case of
+	// conflicts between arbitrary and fixed data the fixed data wins.
 	for key, value := range limitsMap {
 		var resourceName corev1.ResourceName
 		if val, ok := resourceQuotaConversion[key]; ok {
@@ -61,7 +78,7 @@ func convertProjectResourceLimitToResourceList(limit *apiv3.ResourceQuotaLimit) 
 			resourceName = corev1.ResourceName(key)
 		}
 
-		resourceQuantity, err := resource.ParseQuantity(value)
+		resourceQuantity, err := resource.ParseQuantity(value.(string))
 		if err != nil {
 			return nil, err
 		}
