@@ -52,7 +52,7 @@
         "imageType": "AliyunLinux3",
         "runtime": "containerd",
         "runtimeVersion": "1.6.38",
-        "vSwitchIds": ["vsw-1", "vsw-2"]
+        "vswitchIds": ["vsw-1", "vsw-2"]
       }
     ]
   },

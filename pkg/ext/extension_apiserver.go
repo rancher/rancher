@@ -2,7 +2,6 @@ package ext
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -10,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken"
 	extstores "github.com/rancher/rancher/pkg/ext/stores"
 	"github.com/rancher/rancher/pkg/features"
@@ -24,7 +22,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -57,11 +54,8 @@ const (
 	// The main kube-apiserver will connect to that port (through a tunnel).
 	Port              = 6666
 	APIServiceName    = "v1.ext.cattle.io"
-	TargetServiceName = "api-extension"
+	TargetServiceName = "imperative-api-extension"
 	Namespace         = "cattle-system"
-
-	LegacySecretName  = "imperative-api-sni-provider-cert-ca"
-	LegacyServiceName = "imperative-api-extension"
 )
 
 func CreateOrUpdateAPIService(apiservice wranglerapiregistrationv1.APIServiceController, caBundle []byte) error {
@@ -84,7 +78,7 @@ func CreateOrUpdateAPIService(apiservice wranglerapiregistrationv1.APIServiceCon
 		},
 	}
 
-	original, err := apiservice.Get(APIServiceName, metav1.GetOptions{})
+	current, err := apiservice.Get(APIServiceName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		if _, err := apiservice.Create(desired); err != nil {
 			return err
@@ -138,7 +132,7 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 	logrus.Info("creating imperative extension apiserver resources")
 
 	sniProvider, err := NewSNIProviderForCname(
-		"api-extension-sni-provider",
+		"imperative-api-sni-provider",
 		[]string{fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace)},
 		wranglerContext.Core.Secret(),
 	)
@@ -173,6 +167,10 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 	}
 
 	additionalSniProviders = append(additionalSniProviders, sniProvider)
+
+	if err := CreateOrUpdateService(wranglerContext.Core.Service(), opts.AppSelector); err != nil {
+		return nil, fmt.Errorf("failed to create or update APIService: %w", err)
+	}
 
 	defaultAuthenticator, err := steveext.NewDefaultAuthenticator(wranglerContext.K8s)
 	if err != nil {

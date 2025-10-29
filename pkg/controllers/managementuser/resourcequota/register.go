@@ -48,22 +48,22 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) error {
 		ResourceQuotaLister: cluster.Corew.ResourceQuota().Cache(),
 		LimitRange:          cluster.Corew.LimitRange(),
 		LimitRangeLister:    cluster.Corew.LimitRange().Cache(),
-		ProjectLister:       cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister(),
+		ProjectCache:        cluster.Management.Wrangler.Mgmt.Project().Cache(),
 	}
 	cluster.Corew.Namespace().OnChange(ctx, "resourceQuotaSyncController", sync.syncResourceQuota)
 
 	reconcile := &reconcileController{
 		namespaces: cluster.Corew.Namespace(),
 		nsIndexer:  nsInformer.GetIndexer(),
+		projects:   cluster.Management.Wrangler.Mgmt.Project(),
 	}
 
 	cluster.Management.Management.Projects(cluster.ClusterName).AddHandler(ctx, "resourceQuotaNamespacesReconcileController", reconcile.reconcileNamespaces)
 
 	calculate := &calculateLimitController{
-		nsIndexer:     nsInformer.GetIndexer(),
-		projectLister: cluster.Management.Management.Projects(cluster.ClusterName).Controller().Lister(),
-		projects:      cluster.Management.Management.Projects(cluster.ClusterName),
-		clusterName:   cluster.ClusterName,
+		nsIndexer:   nsInformer.GetIndexer(),
+		projects:    cluster.Management.Wrangler.Mgmt.Project(),
+		clusterName: cluster.ClusterName,
 	}
 	cluster.Corew.Namespace().OnChange(ctx, "resourceQuotaUsedLimitController", calculate.calculateResourceQuotaUsed)
 	cluster.Management.Management.Projects(cluster.ClusterName).AddHandler(ctx, "resourceQuotaProjectUsedLimitController", calculate.calculateResourceQuotaUsedProject)

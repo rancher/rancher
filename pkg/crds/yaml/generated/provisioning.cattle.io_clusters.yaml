@@ -2897,9 +2897,14 @@ spec:
                       - name
                       type: object
                       x-kubernetes-validations:
+                      - message: AutoscalingMinSize must be greater than 0 when ControlPlaneRole
+                          is true
+                        rule: '!has(self.controlPlaneRole) || !self.controlPlaneRole
+                          || !has(self.autoscalingMinSize) || self.autoscalingMinSize
+                          > 0'
                       - message: AutoscalingMinSize must be greater than 0 when EtcdRole
-                          or ControlPlaneRole are true
-                        rule: '!self.etcdRole && !self.controlPlaneRole || !has(self.autoscalingMinSize)
+                          is true
+                        rule: '!has(self.etcdRole) || !self.etcdRole || !has(self.autoscalingMinSize)
                           || self.autoscalingMinSize > 0'
                       - message: AutoscalingMinSize must be less than or equal to
                           AutoscalingMaxSize when both are non-zero

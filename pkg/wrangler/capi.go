@@ -37,6 +37,7 @@ func NewCAPIInitializer(clients *Context) *DeferredCAPIInitializer {
 func (d *DeferredCAPIInitializer) WaitForClient(ctx context.Context) (*CAPIContext, error) {
 	var done atomic.Bool
 	ready := make(chan struct{})
+	logrus.Info("[deferred-capi - WaitForClient] waiting for CAPI CRDs to be established...")
 	d.context.CRD.CustomResourceDefinition().OnChange(ctx, "capi-deferred-registration", func(key string, crd *apiextv1.CustomResourceDefinition) (*apiextv1.CustomResourceDefinition, error) {
 		if done.Load() {
 			return crd, nil
@@ -59,7 +60,7 @@ func (d *DeferredCAPIInitializer) WaitForClient(ctx context.Context) (*CAPIConte
 		return nil, ctx.Err()
 	}
 
-	logrus.Info("[deferred-capi - WaitForClient] initializing CAPI factory")
+	logrus.Info("[deferred-capi - WaitForClient] CRDs found, initializing CAPI factory")
 	opts := &generic.FactoryOptions{
 		SharedControllerFactory: d.context.ControllerFactory,
 	}

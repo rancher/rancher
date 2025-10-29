@@ -9,7 +9,7 @@ var (
 	// TypeToFields associates an Auth Config type with a set of secret names related to the config.
 	TypeToFields = map[string][]string{
 		client.GithubConfigType:          {client.GithubConfigFieldClientSecret},
-		client.GithubAppConfigType:       {client.GithubConfigFieldClientSecret},
+		client.GithubAppConfigType:       {client.GithubAppConfigFieldClientSecret, client.GithubAppConfigFieldPrivateKey},
 		client.ActiveDirectoryConfigType: {client.ActiveDirectoryConfigFieldServiceAccountPassword},
 		client.AzureADConfigType:         {client.AzureADConfigFieldApplicationSecret},
 		client.OpenLdapConfigType:        {client.LdapConfigFieldServiceAccountPassword},
