@@ -187,7 +187,7 @@ var (
 		"Enable Rancher Turtles for managing CAPI lifecycle",
 		true,
 		false,
-		true)
+		false)
 	ClusterAutoscaling = newFeature(
 		"cluster-autoscaling",
 		"Enable Rancher cluster-autoscaler support",

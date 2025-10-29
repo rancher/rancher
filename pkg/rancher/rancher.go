@@ -183,11 +183,6 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	}
 	features.InitializeFeatures(wranglerContext.Mgmt.Feature(), opts.Features)
 
-	// Remove any resources that are dependent on specific features being enabled
-	if err := dashboarddata.EarlyRemove(ctx, wranglerContext.K8s); err != nil {
-		return nil, err
-	}
-
 	kontainerdriver.RegisterIndexers(wranglerContext)
 	managementauth.RegisterWranglerIndexers(wranglerContext)
 
