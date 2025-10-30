@@ -795,9 +795,9 @@ func getValueFromClaims[T any](idToken *oidc.IDToken, name string) (T, error) {
 	}
 	claim, ok := mapClaims[name].(T)
 	if !ok {
-		logrus.Warnf("failed to use custom %s claim", name)
+		logrus.Debugf("OpenIDCProvider: failed to use claim %v", name)
 	} else {
-		logrus.Debugf("using custom %s claim", name)
+		logrus.Debugf("OpenIDCProvider: using claim %v", name)
 	}
 
 	return claim, nil
