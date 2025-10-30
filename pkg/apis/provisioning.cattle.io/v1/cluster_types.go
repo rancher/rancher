@@ -166,6 +166,7 @@ type RKEConfig struct {
 // +kubebuilder:validation:XValidation:rule="!has(self.controlPlaneRole) || !self.controlPlaneRole || !has(self.autoscalingMinSize) || self.autoscalingMinSize > 0", message="AutoscalingMinSize must be greater than 0 when ControlPlaneRole is true"
 // +kubebuilder:validation:XValidation:rule="!has(self.etcdRole) || !self.etcdRole || !has(self.autoscalingMinSize) || self.autoscalingMinSize > 0", message="AutoscalingMinSize must be greater than 0 when EtcdRole is true"
 // +kubebuilder:validation:XValidation:rule="!has(self.autoscalingMaxSize) || !has(self.autoscalingMinSize) || self.autoscalingMinSize <= self.autoscalingMaxSize", message="AutoscalingMinSize must be less than or equal to AutoscalingMaxSize when both are non-nil"
+// +kubebuilder:validation:XValidation:rule="(has(self.autoscalingMinSize) && has(self.autoscalingMaxSize)) || (!has(self.autoscalingMinSize) && !has(self.autoscalingMaxSize))", message="AutoscalingMinSize and AutoscalingMaxSize must both be set if enabling cluster-autoscaling"
 type RKEMachinePool struct {
 	rkev1.RKECommonNodeConfig `json:",inline"`
 
