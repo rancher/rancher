@@ -18,9 +18,18 @@ func convertResourceListToLimit(rList corev1.ResourceList) (*apiv3.ResourceQuota
 		return nil, err
 	}
 
-	convertedMap := map[string]string{}
+	anyOther := map[string]string{}
+	convertedMap := map[string]any{}
 	for key, value := range converted {
+		if val, ok := resourceQuotaReturnConversion[key]; ok {
+			key = val
+		} else {
+			anyOther[key] = convert.ToString(value)
+		}
 		convertedMap[key] = convert.ToString(value)
+	}
+	if len(anyOther) > 0 {
+		convertedMap["anyOther"] = anyOther
 	}
 
 	toReturn := &apiv3.ResourceQuotaLimit{}
@@ -153,6 +162,22 @@ var resourceQuotaConversion = map[string]string{
 	"requestsStorage":        "requests.storage",
 	"limitsCpu":              "limits.cpu",
 	"limitsMemory":           "limits.memory",
+}
+
+var resourceQuotaReturnConversion = map[string]string{
+	"configmaps":             "configMaps",
+	"limits.cpu":             "limitsCpu",
+	"limits.memory":          "limitsMemory",
+	"persistentvolumeclaims": "persistentVolumeClaims",
+	"pods":                   "pods",
+	"replicationcontrollers": "replicationControllers",
+	"requests.cpu":           "requestsCpu",
+	"requests.memory":        "requestsMemory",
+	"requests.storage":       "requestsStorage",
+	"secrets":                "secrets",
+	"services":               "services",
+	"services.loadbalancers": "servicesLoadBalancers",
+	"services.nodeports":     "servicesNodePorts",
 }
 
 func getNamespaceResourceQuota(ns *corev1.Namespace) string {
