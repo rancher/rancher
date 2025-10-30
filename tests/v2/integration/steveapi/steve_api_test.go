@@ -3,6 +3,7 @@ package integration
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/csv"
 	"encoding/json"
@@ -3061,6 +3062,112 @@ func (s *steveAPITestSuite) TestCRUD() {
 		readObj, err = secretClient.ByID(secretObj.ID)
 		require.Error(s.T(), err)
 		assert.Nil(s.T(), readObj)
+	})
+}
+
+func (s *steveAPITestSuite) TestArrayAccess() {
+	subSession := s.session.NewSession()
+	defer subSession.Cleanup()
+
+	client, err := s.client.Steve.ProxyDownstream(s.clusterID)
+	require.NoError(s.T(), err)
+	type podInfo struct {
+		name      string
+		namespace string
+		images    []string
+	}
+
+	s.Run("array-access", func() {
+		t := s.T()
+		podInfoList := make([]podInfo, 0)
+		podClient := client.SteveType("pod")
+		pods, err := podClient.List(nil)
+		require.NoError(t, err)
+		images := make(map[string][]string)
+		for _, steveAPIObject := range pods.Data {
+			podSpec := &corev1.PodSpec{}
+			clientv1.ConvertToK8sType(steveAPIObject.Spec, podSpec)
+			containers := podSpec.Containers
+			id := fmt.Sprintf("%s/%s", steveAPIObject.Namespace, steveAPIObject.Name)
+			for i2, container := range containers {
+				if len(container.Image) > 0 {
+					if _, ok := images[id]; !ok {
+						images[id] = make([]string, 0, len(containers)-i2)
+					}
+					images[id] = append(images[id], container.Image)
+				}
+			}
+			podInfoList = append(podInfoList, podInfo{name: steveAPIObject.Name, namespace: steveAPIObject.Namespace, images: images[id]})
+		}
+		midIndex := len(podInfoList) / 2
+		midPodInfo := podInfoList[midIndex]
+		require.NoError(t, err)
+		v := url.Values{}
+		v.Set("filter", fmt.Sprintf("metadata.name=%s", midPodInfo.name))
+
+		midPods, err := podClient.List(v)
+		require.NoError(t, err)
+
+		require.Equal(t, 1, len(midPods.Data))
+		podObject := &corev1.Pod{}
+		clientv1.ConvertToK8sType(midPods.Data[0], podObject)
+		require.Equal(t, midPodInfo.name, podObject.Name)
+		require.Equal(t, midPodInfo.namespace, podObject.Namespace)
+		require.Equal(t, len(midPodInfo.images), len(podObject.Spec.Containers))
+		for i, ctr := range podObject.Spec.Containers {
+			require.Equal(t, midPodInfo.images[i], ctr.Image)
+		}
+
+		v = url.Values{}
+		v.Set("filter", fmt.Sprintf("spec.containers.image[0]=%s", midPodInfo.images[0]))
+		midPods, err = podClient.List(v)
+		require.NoError(t, err)
+
+		require.Equal(t, 1, len(midPods.Data))
+		podObject = &corev1.Pod{}
+		clientv1.ConvertToK8sType(midPods.Data[0], podObject)
+		require.Equal(t, midPodInfo.name, podObject.Name)
+		require.Equal(t, midPodInfo.namespace, podObject.Namespace)
+		require.Equal(t, midPodInfo.images[0], podObject.Spec.Containers[0].Image)
+
+		v = url.Values{}
+		v.Set("sort", "metadata.name")
+		sortedPods, err := podClient.List(v)
+		require.NoError(t, err)
+		pInfoListByName := slices.SortedStableFunc(slices.Values(podInfoList), func(x, y podInfo) int { return cmp.Compare(x.name, y.name) })
+		require.Equal(t, len(pInfoListByName), len(sortedPods.Data))
+		for i, pod := range sortedPods.Data {
+			podObject := &corev1.Pod{}
+			clientv1.ConvertToK8sType(pod, podObject)
+			require.Equal(t, pInfoListByName[i].name, podObject.Name)
+			require.Equal(t, pInfoListByName[i].namespace, podObject.Namespace)
+			require.Equal(t, len(pInfoListByName[i].images), len(podObject.Spec.Containers))
+			for j, ctr := range podObject.Spec.Containers {
+				require.Equal(t, pInfoListByName[i].images[j], ctr.Image)
+			}
+		}
+
+		v = url.Values{}
+		v.Set("sort", "spec.containers.image[0],metadata.name")
+		sortedPods, err = podClient.List(v)
+		require.NoError(t, err)
+		pInfoListByName = slices.SortedStableFunc(slices.Values(podInfoList), func(x, y podInfo) int {
+			if d := cmp.Compare(x.images[0], y.images[0]); d != 0 {
+				return d
+			}
+			return cmp.Compare(x.name, y.name)
+		})
+		require.Equal(t, len(pInfoListByName), len(sortedPods.Data))
+		for i, pod := range sortedPods.Data {
+			podObject := &corev1.Pod{}
+			clientv1.ConvertToK8sType(pod, podObject)
+			require.Equal(t, pInfoListByName[i].name, podObject.Name)
+			require.Equal(t, pInfoListByName[i].namespace, podObject.Namespace)
+			require.Equal(t, len(pInfoListByName[i].images), len(podObject.Spec.Containers))
+			for j, ctr := range podObject.Spec.Containers {
+				require.Equal(t, pInfoListByName[i].images[j], ctr.Image)
+			}
+		}
 	})
 }
 
