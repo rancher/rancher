@@ -6,13 +6,11 @@ on:
       - "release/v*"
 env:
   COMMIT: ${{ github.sha }}
-  DOCKERIO_REGISTRY: "docker.io"
   AWS_DEFAULT_REGION: "us-east-1"
   REPOSITORY_OWNER: ${{ github.repository_owner }}
   IMAGE: ${{ github.repository_owner }}/rancher
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
-  REGISTRY: "stgregistry.suse.com"
 jobs:
   unit-tests:
     uses: ./.github/workflows/unit-test.yml
@@ -53,29 +51,7 @@ jobs:
         uses: ./.github/actions/build-images/agent
   integration-tests:
     needs: [build-server, build-agent]
-    with:
-      parent_run_id: ${{ github.run_id }}
     uses: ./.github/workflows/integration-tests.yml
-  build-agent-windows:
-    strategy:
-      matrix:
-        os: [windows]
-        version: [2022]
-    runs-on: ${{ matrix.os }}-${{ matrix.version }}
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Load Secrets from Vault
-        uses: rancher-eio/read-vault-secrets@main
-        with:
-          secrets: |
-            secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
-      - name: build
-        uses: ./.github/actions/build-images/agent-windows
   push-images:
     needs: [unit-tests, integration-tests]
     strategy:
@@ -98,6 +74,7 @@ jobs:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
             secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY;
       - name: push
         uses: ./.github/actions/push-images
   merge-server-manifest:
@@ -115,10 +92,11 @@ jobs:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
             secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY;
       - name: merge
         uses: ./.github/actions/merge-manifests/server
   merge-agent-manifest:
-    needs: [push-images, build-agent-windows]
+    needs: [push-images]
     runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
     permissions:
       contents: read
@@ -132,6 +110,7 @@ jobs:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
             secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY;
       - name: merge
         uses: ./.github/actions/merge-manifests/agent
   build-installer:
@@ -156,6 +135,7 @@ jobs:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
             secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY;
       - name: build
         uses: ./.github/actions/build-images/installer
   merge-installer-manifest:
@@ -173,5 +153,6 @@ jobs:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
             secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY;
       - name: merge
         uses: ./.github/actions/merge-manifests/installer

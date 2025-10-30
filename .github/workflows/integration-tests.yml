@@ -1,11 +1,6 @@
 name: Integration Tests
 on:
   workflow_call:
-    inputs:
-      parent_run_id:
-        type: string
-        description: "parent run_id to download images from"
-        required: true
 permissions: {}
 env:
   HOST_ARCH: amd64
@@ -49,7 +44,6 @@ jobs:
       - name: Download Docker images artifact
         uses: actions/download-artifact@v4
         with:
-          run-id: ${{ inputs.parent_run_id }}
           github-token: ${{ github.token }}
           path: "/tmp"
           merge-multiple: true
