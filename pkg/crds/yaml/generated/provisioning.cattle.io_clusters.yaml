@@ -2907,10 +2907,13 @@ spec:
                         rule: '!has(self.etcdRole) || !self.etcdRole || !has(self.autoscalingMinSize)
                           || self.autoscalingMinSize > 0'
                       - message: AutoscalingMinSize must be less than or equal to
-                          AutoscalingMaxSize when both are non-zero
+                          AutoscalingMaxSize when both are non-nil
                         rule: '!has(self.autoscalingMaxSize) || !has(self.autoscalingMinSize)
-                          || self.autoscalingMaxSize == 0 || self.autoscalingMinSize
-                          == 0 || self.autoscalingMinSize <= self.autoscalingMaxSize'
+                          || self.autoscalingMinSize <= self.autoscalingMaxSize'
+                      - message: AutoscalingMinSize and AutoscalingMaxSize must both
+                          be set if enabling cluster-autoscaling
+                        rule: (has(self.autoscalingMinSize) && has(self.autoscalingMaxSize))
+                          || (!has(self.autoscalingMinSize) && !has(self.autoscalingMaxSize))
                     maxItems: 1000
                     nullable: true
                     type: array

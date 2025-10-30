@@ -1,8 +1,8 @@
 package autoscaler
 
 import (
-	"strings"
 	"testing"
+	"time"
 
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/v2prov/clients"
@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 )
@@ -299,7 +300,7 @@ func Test_General_RKEMachinePool_Autoscaling_Field_Validation(t *testing.T) {
 					},
 				}
 			},
-			expectedError: "AutoscalingMinSize must be less than or equal to AutoscalingMaxSize when both are non-zero",
+			expectedError: "AutoscalingMinSize must be less than or equal to AutoscalingMaxSize when both are non-nil",
 			shouldSucceed: false,
 		},
 		{
@@ -325,7 +326,189 @@ func Test_General_RKEMachinePool_Autoscaling_Field_Validation(t *testing.T) {
 					},
 				}
 			},
-			expectedError: "AutoscalingMinSize must be less than or equal to AutoscalingMaxSize when both are non-zero",
+			expectedError: "AutoscalingMinSize must be less than or equal to AutoscalingMaxSize when both are non-nil",
+			shouldSucceed: false,
+		},
+		{
+			name: "Invalid - EtcdRole with AutoscalingMinSize greater than AutoscalingMaxSize and Max set to zero",
+			clusterSpec: func() *v1.Cluster {
+				return &v1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "invalid-etcd-min-max-size-reversed-max-at-zero",
+					},
+					Spec: v1.ClusterSpec{
+						RKEConfig: &v1.RKEConfig{
+							MachinePools: []v1.RKEMachinePool{
+								{
+									Name:               "etcd-pool",
+									EtcdRole:           true,
+									Quantity:           ptr.To[int32](0),
+									AutoscalingMinSize: ptr.To[int32](5),
+									AutoscalingMaxSize: ptr.To[int32](0),
+									NodeConfig:         &corev1.ObjectReference{},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedError: "AutoscalingMinSize must be less than or equal to AutoscalingMaxSize when both are non-nil",
+			shouldSucceed: false,
+		},
+		{
+			name: "Invalid - Create WorkerRole with AutoscalingMinSize present but AutoscalingMaxSize nil",
+			clusterSpec: func() *v1.Cluster {
+				return &v1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "invalid-create-worker-min-size-max-nil",
+					},
+					Spec: v1.ClusterSpec{
+						RKEConfig: &v1.RKEConfig{
+							MachinePools: []v1.RKEMachinePool{
+								{
+									Name:               "worker-pool",
+									WorkerRole:         true,
+									Quantity:           ptr.To[int32](0),
+									AutoscalingMinSize: ptr.To[int32](1),
+									AutoscalingMaxSize: nil,
+									NodeConfig:         &corev1.ObjectReference{},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedError: "AutoscalingMinSize and AutoscalingMaxSize must both be set if enabling cluster-autoscaling",
+			shouldSucceed: false,
+		},
+		{
+			name: "Invalid - Create WorkerRole with AutoscalingMaxSize present but AutoscalingMinSize nil",
+			clusterSpec: func() *v1.Cluster {
+				return &v1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "invalid-create-worker-max-size-min-nil",
+					},
+					Spec: v1.ClusterSpec{
+						RKEConfig: &v1.RKEConfig{
+							MachinePools: []v1.RKEMachinePool{
+								{
+									Name:               "worker-pool",
+									WorkerRole:         true,
+									Quantity:           ptr.To[int32](0),
+									AutoscalingMinSize: nil,
+									AutoscalingMaxSize: ptr.To[int32](3),
+									NodeConfig:         &corev1.ObjectReference{},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedError: "AutoscalingMinSize and AutoscalingMaxSize must both be set if enabling cluster-autoscaling",
+			shouldSucceed: false,
+		},
+		{
+			name: "Invalid - Create EtcdRole with AutoscalingMinSize present but AutoscalingMaxSize nil",
+			clusterSpec: func() *v1.Cluster {
+				return &v1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "invalid-create-etcd-min-size-max-nil",
+					},
+					Spec: v1.ClusterSpec{
+						RKEConfig: &v1.RKEConfig{
+							MachinePools: []v1.RKEMachinePool{
+								{
+									Name:               "etcd-pool",
+									EtcdRole:           true,
+									Quantity:           ptr.To[int32](0),
+									AutoscalingMinSize: ptr.To[int32](1),
+									AutoscalingMaxSize: nil,
+									NodeConfig:         &corev1.ObjectReference{},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedError: "AutoscalingMinSize and AutoscalingMaxSize must both be set if enabling cluster-autoscaling",
+			shouldSucceed: false,
+		},
+		{
+			name: "Invalid - Create EtcdRole with AutoscalingMaxSize present but AutoscalingMinSize nil",
+			clusterSpec: func() *v1.Cluster {
+				return &v1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "invalid-create-etcd-max-size-min-nil",
+					},
+					Spec: v1.ClusterSpec{
+						RKEConfig: &v1.RKEConfig{
+							MachinePools: []v1.RKEMachinePool{
+								{
+									Name:               "etcd-pool",
+									EtcdRole:           true,
+									Quantity:           ptr.To[int32](0),
+									AutoscalingMinSize: nil,
+									AutoscalingMaxSize: ptr.To[int32](3),
+									NodeConfig:         &corev1.ObjectReference{},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedError: "AutoscalingMinSize and AutoscalingMaxSize must both be set if enabling cluster-autoscaling",
+			shouldSucceed: false,
+		},
+		{
+			name: "Invalid - Create ControlPlaneRole with AutoscalingMinSize present but AutoscalingMaxSize nil",
+			clusterSpec: func() *v1.Cluster {
+				return &v1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "invalid-create-controlplane-min-size-max-nil",
+					},
+					Spec: v1.ClusterSpec{
+						RKEConfig: &v1.RKEConfig{
+							MachinePools: []v1.RKEMachinePool{
+								{
+									Name:               "control-plane-pool",
+									ControlPlaneRole:   true,
+									Quantity:           ptr.To[int32](0),
+									AutoscalingMinSize: ptr.To[int32](1),
+									AutoscalingMaxSize: nil,
+									NodeConfig:         &corev1.ObjectReference{},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedError: "AutoscalingMinSize and AutoscalingMaxSize must both be set if enabling cluster-autoscaling",
+			shouldSucceed: false,
+		},
+		{
+			name: "Invalid - Create ControlPlaneRole with AutoscalingMaxSize present but AutoscalingMinSize nil",
+			clusterSpec: func() *v1.Cluster {
+				return &v1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "invalid-create-controlplane-max-size-min-nil",
+					},
+					Spec: v1.ClusterSpec{
+						RKEConfig: &v1.RKEConfig{
+							MachinePools: []v1.RKEMachinePool{
+								{
+									Name:               "control-plane-pool",
+									ControlPlaneRole:   true,
+									Quantity:           ptr.To[int32](0),
+									AutoscalingMinSize: nil,
+									AutoscalingMaxSize: ptr.To[int32](3),
+									NodeConfig:         &corev1.ObjectReference{},
+								},
+							},
+						},
+					},
+				}
+			},
+			expectedError: "AutoscalingMinSize and AutoscalingMaxSize must both be set if enabling cluster-autoscaling",
 			shouldSucceed: false,
 		},
 	}
@@ -479,7 +662,38 @@ func Test_General_RKEMachinePool_Autoscaling_Update_Field_Validation(t *testing.
 				c.Spec.RKEConfig.MachinePools[0].AutoscalingMaxSize = ptr.To[int32](3)
 				return c
 			},
-			expectedError: "AutoscalingMinSize must be less than or equal to AutoscalingMaxSize when both are non-zero",
+			expectedError: "AutoscalingMinSize must be less than or equal to AutoscalingMaxSize when both are non-nil",
+			shouldSucceed: false,
+		},
+		{
+			name: "Invalid - Update from valid to invalid AutoscalingMinSize > AutoscalingMaxSize and max = 0",
+			initialSpec: func() *v1.Cluster {
+				return &v1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "invalid-update-min-max-size-reversed",
+					},
+					Spec: v1.ClusterSpec{
+						RKEConfig: &v1.RKEConfig{
+							MachinePools: []v1.RKEMachinePool{
+								{
+									Name:               "worker-pool",
+									WorkerRole:         true,
+									Quantity:           ptr.To[int32](0),
+									AutoscalingMinSize: ptr.To[int32](1),
+									AutoscalingMaxSize: ptr.To[int32](3),
+									NodeConfig:         &corev1.ObjectReference{},
+								},
+							},
+						},
+					},
+				}
+			},
+			updateSpec: func(c *v1.Cluster) *v1.Cluster {
+				c.Spec.RKEConfig.MachinePools[0].AutoscalingMinSize = ptr.To[int32](5)
+				c.Spec.RKEConfig.MachinePools[0].AutoscalingMaxSize = ptr.To[int32](0)
+				return c
+			},
+			expectedError: "AutoscalingMinSize must be less than or equal to AutoscalingMaxSize when both are non-nil",
 			shouldSucceed: false,
 		},
 		{
@@ -631,6 +845,186 @@ func Test_General_RKEMachinePool_Autoscaling_Update_Field_Validation(t *testing.
 			expectedError: "AutoscalingMinSize must be greater than 0 when EtcdRole is true",
 			shouldSucceed: false,
 		},
+		{
+			name: "Invalid - Update from valid to invalid WorkerRole with AutoscalingMinSize present but AutoscalingMaxSize nil",
+			initialSpec: func() *v1.Cluster {
+				return &v1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "invalid-update-worker-min-size-max-nil",
+					},
+					Spec: v1.ClusterSpec{
+						RKEConfig: &v1.RKEConfig{
+							MachinePools: []v1.RKEMachinePool{
+								{
+									Name:               "worker-pool",
+									WorkerRole:         true,
+									Quantity:           ptr.To[int32](0),
+									AutoscalingMinSize: ptr.To[int32](1),
+									AutoscalingMaxSize: ptr.To[int32](3),
+									NodeConfig:         &corev1.ObjectReference{},
+								},
+							},
+						},
+					},
+				}
+			},
+			updateSpec: func(c *v1.Cluster) *v1.Cluster {
+				c.Spec.RKEConfig.MachinePools[0].AutoscalingMaxSize = nil
+				return c
+			},
+			expectedError: "AutoscalingMinSize and AutoscalingMaxSize must both be set if enabling cluster-autoscaling",
+			shouldSucceed: false,
+		},
+		{
+			name: "Invalid - Update from valid to invalid WorkerRole with AutoscalingMaxSize present but AutoscalingMinSize nil",
+			initialSpec: func() *v1.Cluster {
+				return &v1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "invalid-update-worker-max-size-min-nil",
+					},
+					Spec: v1.ClusterSpec{
+						RKEConfig: &v1.RKEConfig{
+							MachinePools: []v1.RKEMachinePool{
+								{
+									Name:               "worker-pool",
+									WorkerRole:         true,
+									Quantity:           ptr.To[int32](0),
+									AutoscalingMinSize: ptr.To[int32](1),
+									AutoscalingMaxSize: ptr.To[int32](3),
+									NodeConfig:         &corev1.ObjectReference{},
+								},
+							},
+						},
+					},
+				}
+			},
+			updateSpec: func(c *v1.Cluster) *v1.Cluster {
+				c.Spec.RKEConfig.MachinePools[0].AutoscalingMinSize = nil
+				return c
+			},
+			expectedError: "AutoscalingMinSize and AutoscalingMaxSize must both be set if enabling cluster-autoscaling",
+			shouldSucceed: false,
+		},
+		{
+			name: "Invalid - Update from valid to invalid EtcdRole with AutoscalingMinSize present but AutoscalingMaxSize nil",
+			initialSpec: func() *v1.Cluster {
+				return &v1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "invalid-update-etcd-min-size-max-nil",
+					},
+					Spec: v1.ClusterSpec{
+						RKEConfig: &v1.RKEConfig{
+							MachinePools: []v1.RKEMachinePool{
+								{
+									Name:               "etcd-pool",
+									EtcdRole:           true,
+									Quantity:           ptr.To[int32](0),
+									AutoscalingMinSize: ptr.To[int32](1),
+									AutoscalingMaxSize: ptr.To[int32](3),
+									NodeConfig:         &corev1.ObjectReference{},
+								},
+							},
+						},
+					},
+				}
+			},
+			updateSpec: func(c *v1.Cluster) *v1.Cluster {
+				c.Spec.RKEConfig.MachinePools[0].AutoscalingMaxSize = nil
+				return c
+			},
+			expectedError: "AutoscalingMinSize and AutoscalingMaxSize must both be set if enabling cluster-autoscaling",
+			shouldSucceed: false,
+		},
+		{
+			name: "Invalid - Update from valid to invalid EtcdRole with AutoscalingMaxSize present but AutoscalingMinSize nil",
+			initialSpec: func() *v1.Cluster {
+				return &v1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "invalid-update-etcd-max-size-min-nil",
+					},
+					Spec: v1.ClusterSpec{
+						RKEConfig: &v1.RKEConfig{
+							MachinePools: []v1.RKEMachinePool{
+								{
+									Name:               "etcd-pool",
+									EtcdRole:           true,
+									Quantity:           ptr.To[int32](0),
+									AutoscalingMinSize: ptr.To[int32](1),
+									AutoscalingMaxSize: ptr.To[int32](3),
+									NodeConfig:         &corev1.ObjectReference{},
+								},
+							},
+						},
+					},
+				}
+			},
+			updateSpec: func(c *v1.Cluster) *v1.Cluster {
+				c.Spec.RKEConfig.MachinePools[0].AutoscalingMinSize = nil
+				return c
+			},
+			expectedError: "AutoscalingMinSize and AutoscalingMaxSize must both be set if enabling cluster-autoscaling",
+			shouldSucceed: false,
+		},
+		{
+			name: "Invalid - Update from valid to invalid ControlPlaneRole with AutoscalingMinSize present but AutoscalingMaxSize nil",
+			initialSpec: func() *v1.Cluster {
+				return &v1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "invalid-update-controlplane-min-size-max-nil",
+					},
+					Spec: v1.ClusterSpec{
+						RKEConfig: &v1.RKEConfig{
+							MachinePools: []v1.RKEMachinePool{
+								{
+									Name:               "control-plane-pool",
+									ControlPlaneRole:   true,
+									Quantity:           ptr.To[int32](0),
+									AutoscalingMinSize: ptr.To[int32](1),
+									AutoscalingMaxSize: ptr.To[int32](3),
+									NodeConfig:         &corev1.ObjectReference{},
+								},
+							},
+						},
+					},
+				}
+			},
+			updateSpec: func(c *v1.Cluster) *v1.Cluster {
+				c.Spec.RKEConfig.MachinePools[0].AutoscalingMaxSize = nil
+				return c
+			},
+			expectedError: "AutoscalingMinSize and AutoscalingMaxSize must both be set if enabling cluster-autoscaling",
+			shouldSucceed: false,
+		},
+		{
+			name: "Invalid - Update from valid to invalid ControlPlaneRole with AutoscalingMaxSize present but AutoscalingMinSize nil",
+			initialSpec: func() *v1.Cluster {
+				return &v1.Cluster{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "invalid-update-controlplane-max-size-min-nil",
+					},
+					Spec: v1.ClusterSpec{
+						RKEConfig: &v1.RKEConfig{
+							MachinePools: []v1.RKEMachinePool{
+								{
+									Name:               "control-plane-pool",
+									ControlPlaneRole:   true,
+									Quantity:           ptr.To[int32](0),
+									AutoscalingMinSize: ptr.To[int32](1),
+									AutoscalingMaxSize: ptr.To[int32](3),
+									NodeConfig:         &corev1.ObjectReference{},
+								},
+							},
+						},
+					},
+				}
+			},
+			updateSpec: func(c *v1.Cluster) *v1.Cluster {
+				c.Spec.RKEConfig.MachinePools[0].AutoscalingMinSize = nil
+				return c
+			},
+			expectedError: "AutoscalingMinSize and AutoscalingMaxSize must both be set if enabling cluster-autoscaling",
+			shouldSucceed: false,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -642,11 +1036,13 @@ func Test_General_RKEMachinePool_Autoscaling_Update_Field_Validation(t *testing.
 				t.Fatalf("Failed to create initial cluster: %v", err)
 			}
 
-			err = retry.OnError(retry.DefaultBackoff,
-				func(err error) bool {
-					// retry if it's a conflict error
-					return strings.Contains(err.Error(), "the object has been modified; please apply your changes to the latest version and try again")
-				},
+			// using a custom backoff - retrying with retry.DefaultBackoff led to some flakiness.
+			err = retry.RetryOnConflict(wait.Backoff{
+				Duration: 100 * time.Millisecond,
+				Jitter:   0.1,
+				Steps:    5,
+				Cap:      10 * time.Second,
+			},
 				func() error {
 					clusterFromAPIServer, err := client.Provisioning.Cluster().Get(createdCluster.Namespace, createdCluster.Name, metav1.GetOptions{})
 					if err != nil {
