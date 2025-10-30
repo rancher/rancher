@@ -257,7 +257,7 @@ jobs:
     strategy:
       matrix:
         os: [windows]
-        version: [2019, 2022]
+        version: [2022]
     runs-on: ${{ matrix.os }}-${{ matrix.version }}
     permissions:
       contents: read
