@@ -57,9 +57,9 @@ func convertProjectResourceLimitToResourceList(limit *apiv3.ResourceQuotaLimit) 
 	// convert the arbitrary set first, ...
 	if anyOther, ok := limitsMap["anyOther"]; ok {
 		delete(limitsMap, "anyOther")
-		for key, value := range anyOther.(map[string]string) {
+		for key, value := range anyOther.(map[string]any) {
 			resourceName := corev1.ResourceName(key)
-			resourceQuantity, err := resource.ParseQuantity(value)
+			resourceQuantity, err := resource.ParseQuantity(value.(string))
 			if err != nil {
 				return nil, err
 			}
