@@ -1,12 +1,22 @@
 package cred
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 
+	"github.com/rancher/norman/httperror"
+	"github.com/rancher/norman/types"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	prov "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
+	provv1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	corefakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
 	v3fakes "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
+	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -267,4 +277,161 @@ func TestProcessHarvesterCloudCredential(t *testing.T) {
 			}
 		})
 	}
+}
+
+type fakeInnerStore struct {
+	types.Store
+	deleteCalled bool
+	response     map[string]any
+	err          error
+}
+
+func (f *fakeInnerStore) Delete(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]any, error) {
+	f.deleteCalled = true
+	return f.response, f.err
+}
+
+func TestStore_Delete(t *testing.T) {
+	const credID = "cattle-global-data:cc-xyz"
+
+	type expect struct {
+		wantAPIError *httperror.APIError
+		wantDelete   bool
+		wantResp     map[string]any
+	}
+
+	testCases := []struct {
+		name     string
+		setup    func(ctrl *gomock.Controller) provv1.ClusterCache
+		inner    fakeInnerStore
+		expected expect
+	}{
+		{
+			name: "denies when referenced by cluster-level",
+			setup: func(ctrl *gomock.Controller) provv1.ClusterCache {
+				cache := fake.NewMockCacheInterface[*prov.Cluster](ctrl)
+				cache.EXPECT().GetByIndex(cluster.ByCloudCred, credID).
+					Return([]*prov.Cluster{{}}, nil)
+				return cache
+			},
+			expected: expect{
+				wantAPIError: &httperror.APIError{Code: httperror.InvalidAction},
+				wantDelete:   false,
+			},
+		},
+		{
+			name: "denies when referenced by machine-pool",
+			setup: func(ctrl *gomock.Controller) provv1.ClusterCache {
+				cache := fake.NewMockCacheInterface[*prov.Cluster](ctrl)
+				cache.EXPECT().GetByIndex(cluster.ByCloudCred, credID).
+					Return(nil, nil)
+				cache.EXPECT().GetByIndex(cluster.ByMachinePoolCloudCred, credID).
+					Return([]*prov.Cluster{{}}, nil)
+				return cache
+			},
+			expected: expect{
+				wantAPIError: &httperror.APIError{Code: httperror.InvalidAction},
+				wantDelete:   false,
+			},
+		},
+		{
+			name: "server error when cluster-level index fails",
+			setup: func(ctrl *gomock.Controller) provv1.ClusterCache {
+				cache := fake.NewMockCacheInterface[*prov.Cluster](ctrl)
+				cache.EXPECT().GetByIndex(cluster.ByCloudCred, credID).
+					Return(nil, errors.New("boom"))
+				return cache
+			},
+			expected: expect{
+				wantAPIError: &httperror.APIError{Code: httperror.ServerError},
+				wantDelete:   false,
+			},
+		},
+		{
+			name: "server error when machine-pool index fails",
+			setup: func(ctrl *gomock.Controller) provv1.ClusterCache {
+				cache := fake.NewMockCacheInterface[*prov.Cluster](ctrl)
+				cache.EXPECT().GetByIndex(cluster.ByCloudCred, credID).
+					Return(nil, nil)
+				cache.EXPECT().GetByIndex(cluster.ByMachinePoolCloudCred, credID).
+					Return(nil, errors.New("boom2"))
+				return cache
+			},
+			expected: expect{
+				wantAPIError: &httperror.APIError{Code: httperror.ServerError},
+				wantDelete:   false,
+			},
+		},
+		{
+			name: "delegates to inner store when not referenced",
+			setup: func(ctrl *gomock.Controller) provv1.ClusterCache {
+				cache := fake.NewMockCacheInterface[*prov.Cluster](ctrl)
+				cache.EXPECT().GetByIndex(cluster.ByCloudCred, credID).
+					Return(nil, nil)
+				cache.EXPECT().GetByIndex(cluster.ByMachinePoolCloudCred, credID).
+					Return(nil, nil)
+				return cache
+			},
+			inner: fakeInnerStore{
+				response: map[string]any{"ok": true},
+			},
+			expected: expect{
+				wantAPIError: nil,
+				wantDelete:   true,
+				wantResp:     map[string]any{"ok": true},
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			cache := testCase.setup(ctrl)
+			s := &Store{
+				Store:            &testCase.inner,
+				ProvClusterCache: cache,
+			}
+
+			resp, err := s.Delete(nil, nil, credID)
+
+			if testCase.expected.wantAPIError != nil {
+				require.Error(t, err)
+				var apiErr *httperror.APIError
+				require.True(t, errors.As(err, &apiErr), "expected httperror.APIError, got %T", err)
+				assert.Equal(t, testCase.expected.wantAPIError.Code.Status, apiErr.Code.Status)
+				assert.False(t, testCase.inner.deleteCalled, "inner store should not be called on deny/error")
+				return
+			}
+
+			require.NoError(t, err)
+			assert.True(t, testCase.inner.deleteCalled, "inner store should be called")
+			assert.Equal(t, testCase.expected.wantResp, resp)
+		})
+	}
+}
+
+func TestStore_Delete_InnerStoreErrorBubbles(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	const credID = "cattle-global-data:cc-err"
+
+	cache := fake.NewMockCacheInterface[*prov.Cluster](ctrl)
+	cache.EXPECT().GetByIndex(cluster.ByCloudCred, credID).Return(nil, nil)
+	cache.EXPECT().GetByIndex(cluster.ByMachinePoolCloudCred, credID).Return(nil, nil)
+
+	expectedErr := fmt.Errorf("inner-fail")
+
+	inner := &fakeInnerStore{err: expectedErr}
+	s := &Store{
+		Store:            inner,
+		ProvClusterCache: cache,
+	}
+
+	_, err := s.Delete(nil, nil, credID)
+	require.Error(t, err)
+	assert.ErrorIs(t, err, expectedErr)
+	assert.True(t, inner.deleteCalled)
 }

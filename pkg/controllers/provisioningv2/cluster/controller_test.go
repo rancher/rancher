@@ -6,8 +6,10 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -242,6 +244,286 @@ func TestController_createNewCluster(t *testing.T) {
 				assert.Equal(t, getTestClusterAgentCustomizationV3(), legacyCluster.Spec.ClusterAgentDeploymentCustomization)
 				assert.Equal(t, getTestFleetAgentCustomizationV3(), legacyCluster.Spec.FleetAgentDeploymentCustomization)
 			}
+		})
+	}
+}
+
+func Test_byCloudCredentialIndex(t *testing.T) {
+	tests := []struct {
+		name    string
+		cluster v1.Cluster
+		want    []string
+	}{
+		{
+			name:    "no credentials anywhere returns nil",
+			cluster: v1.Cluster{},
+			want:    nil,
+		},
+		{
+			name: "cluster-level only",
+			cluster: v1.Cluster{
+				Spec: v1.ClusterSpec{
+					CloudCredentialSecretName: "cattle-global-data:cc-aaa",
+				},
+			},
+			want: []string{"cattle-global-data:cc-aaa"},
+		},
+		{
+			name: "pool-level only returns nil",
+			cluster: v1.Cluster{
+				Spec: v1.ClusterSpec{
+					RKEConfig: &v1.RKEConfig{
+						MachinePools: []v1.RKEMachinePool{
+							{
+								Name: "pool-1",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-bbb",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: nil,
+		},
+		{
+			name: "both cluster and pool",
+			cluster: v1.Cluster{
+				Spec: v1.ClusterSpec{
+					CloudCredentialSecretName: "cattle-global-data:cc-ccc",
+					RKEConfig: &v1.RKEConfig{
+						MachinePools: []v1.RKEMachinePool{
+							{
+								Name: "pool-a",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-ccc",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: []string{"cattle-global-data:cc-ccc"},
+		},
+		{
+			name: "multiple pools but empty cluster-level return nil",
+			cluster: v1.Cluster{
+				Spec: v1.ClusterSpec{
+					RKEConfig: &v1.RKEConfig{
+						MachinePools: []v1.RKEMachinePool{
+							{
+								Name: "pool-a",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-111",
+								},
+							},
+							{
+								Name: "pool-b",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: nil,
+		},
+		{
+			name: "cluster-level set alongside pools returns only cluster-level",
+			cluster: v1.Cluster{
+				Spec: v1.ClusterSpec{
+					CloudCredentialSecretName: "cattle-global-data:cc-xyz",
+					RKEConfig: &v1.RKEConfig{
+						MachinePools: []v1.RKEMachinePool{
+							{
+								Name: "p1",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-fgh",
+								},
+							},
+							{
+								Name: "p2",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-abc",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: []string{"cattle-global-data:cc-xyz"},
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := byCloudCredentialIndex(&tc.cluster)
+			require.NoError(t, err)
+			assert.ElementsMatch(t, tc.want, got)
+		})
+	}
+}
+
+func Test_byMachinePoolCloudCredIndex(t *testing.T) {
+	tests := []struct {
+		name    string
+		cluster v1.Cluster
+		want    []string
+	}{
+		{
+			name:    "no pools returns nil",
+			cluster: v1.Cluster{},
+			want:    nil,
+		},
+		{
+			name: "single pool credential",
+			cluster: v1.Cluster{
+				Spec: v1.ClusterSpec{
+					RKEConfig: &v1.RKEConfig{
+						MachinePools: []v1.RKEMachinePool{
+							{
+								Name: "pool-1",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-bbb",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: []string{"cattle-global-data:cc-bbb"},
+		},
+		{
+			name: "multiple pools mixed",
+			cluster: v1.Cluster{
+				Spec: v1.ClusterSpec{
+					RKEConfig: &v1.RKEConfig{
+						MachinePools: []v1.RKEMachinePool{
+							{
+								Name: "pool-a",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-111",
+								},
+							},
+							{
+								Name: "pool-b",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "",
+								},
+							},
+							{
+								Name: "pool-c",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-222",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: []string{"cattle-global-data:cc-111", "cattle-global-data:cc-222"},
+		},
+		{
+			name: "multiple pools ensure deterministic order",
+			cluster: v1.Cluster{
+				Spec: v1.ClusterSpec{
+					RKEConfig: &v1.RKEConfig{
+						MachinePools: []v1.RKEMachinePool{
+							{
+								Name: "pool-a",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-111",
+								},
+							},
+							{
+								Name: "pool-b",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-333",
+								},
+							},
+							{
+								Name: "pool-c",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-222",
+								},
+							},
+
+							{
+								Name: "pool-b",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-444",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: []string{"cattle-global-data:cc-111", "cattle-global-data:cc-222", "cattle-global-data:cc-333", "cattle-global-data:cc-444"},
+		},
+		{
+			name: "multiple pools with the same credential",
+			cluster: v1.Cluster{
+				Spec: v1.ClusterSpec{
+					RKEConfig: &v1.RKEConfig{
+						MachinePools: []v1.RKEMachinePool{
+							{
+								Name: "pool-a",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-111",
+								},
+							},
+							{
+								Name: "pool-b",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "",
+								},
+							},
+							{
+								Name: "pool-c",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-111",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: []string{"cattle-global-data:cc-111"},
+		},
+		{
+			name: "cluster-level set but ignored",
+			cluster: v1.Cluster{
+				Spec: v1.ClusterSpec{
+					CloudCredentialSecretName: "cattle-global-data:cc-fgh",
+					RKEConfig: &v1.RKEConfig{
+						MachinePools: []v1.RKEMachinePool{
+							{
+								Name: "p1",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-xyz",
+								},
+							},
+							{
+								Name: "p2",
+								RKECommonNodeConfig: rkev1.RKECommonNodeConfig{
+									CloudCredentialSecretName: "cattle-global-data:cc-abc",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: []string{"cattle-global-data:cc-abc", "cattle-global-data:cc-xyz"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := byMachinePoolCloudCredIndex(&tc.cluster)
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
 		})
 	}
 }
