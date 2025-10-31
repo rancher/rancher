@@ -401,14 +401,14 @@ func DeleteLegacyServiceAndSecret(service wranglercorev1.ServiceController, secr
 	// Check if the legacy service exists before attempting to delete to avoid logging "not found" as an error
 	_, err := service.Get(Namespace, LegacyServiceName, metav1.GetOptions{})
 	if err != nil {
-		logrus.Warnf("failed to get legacy Service %s/%s: %w", Namespace, LegacyServiceName, err)
+		logrus.Warnf("failed to get legacy Service %s/%s: %v", Namespace, LegacyServiceName, err)
 	} else {
 		// Service found, proceed with deletion
 		logrus.Infof("Deleting legacy Service %s/%s...", Namespace, LegacyServiceName)
 		deleteErr := service.Delete(Namespace, LegacyServiceName, &metav1.DeleteOptions{})
 		if deleteErr != nil {
 			if !apierrors.IsNotFound(deleteErr) {
-				logrus.Warnf("failed to delete legacy Service %s/%s: %w", Namespace, LegacyServiceName, deleteErr)
+				logrus.Warnf("failed to delete legacy Service %s/%s: %v", Namespace, LegacyServiceName, deleteErr)
 			}
 			logrus.Infof("Legacy Service %s/%s was already gone.", Namespace, LegacyServiceName)
 		} else {
@@ -419,14 +419,14 @@ func DeleteLegacyServiceAndSecret(service wranglercorev1.ServiceController, secr
 	// Check if the legacy secret exists before attempting to delete
 	_, err = secrets.Get(Namespace, LegacySecretName, metav1.GetOptions{})
 	if err != nil {
-		logrus.Warnf("failed to get legacy Secret %s/%s: %w", Namespace, LegacySecretName, err)
+		logrus.Warnf("failed to get legacy Secret %s/%s: %v", Namespace, LegacySecretName, err)
 	} else {
 		// Secret found, proceed with deletion
 		logrus.Infof("Deleting legacy Secret %s/%s...", Namespace, LegacySecretName)
 		deleteErr := secrets.Delete(Namespace, LegacySecretName, &metav1.DeleteOptions{})
 		if deleteErr != nil {
 			if !apierrors.IsNotFound(deleteErr) {
-				logrus.Warnf("failed to delete legacy Secret %s/%s: %w", Namespace, LegacySecretName, deleteErr)
+				logrus.Warnf("failed to delete legacy Secret %s/%s: %v", Namespace, LegacySecretName, deleteErr)
 			}
 			logrus.Infof("Legacy Secret %s/%s was already gone.", Namespace, LegacySecretName)
 		} else {
