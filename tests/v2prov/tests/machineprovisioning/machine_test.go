@@ -715,19 +715,25 @@ func Test_Provisioning_Single_Node_All_Roles_Drain(t *testing.T) {
 	newCfgRef, err := nodeconfig.NewPodConfig(clients, c.Namespace)
 	require.NoError(t, err)
 
-	gvrPodConfig := schema.GroupVersionResource{
-		Group: "rke-machine-config.cattle.io", Version: "v1", Resource: "podconfigs",
-	}
-	newPodConfig, err := clients.Dynamic.Resource(gvrPodConfig).Namespace(c.Namespace).Get(ctx, newCfgRef.Name, metav1.GetOptions{})
-	require.NoError(t, err)
+	err = retry.OnError(retry.DefaultBackoff, func(err error) bool {
+		return true
+	}, func() error {
+		gvrPodConfig := schema.GroupVersionResource{
+			Group: "rke-machine-config.cattle.io", Version: "v1", Resource: "podconfigs",
+		}
+		newPodConfig, err := clients.Dynamic.Resource(gvrPodConfig).Namespace(c.Namespace).Get(ctx, newCfgRef.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
 
-	currentUserData, ok := unstructuredString(newPodConfig.Object, "userdata")
-	require.True(t, ok)
+		currentUserData, ok := unstructuredString(newPodConfig.Object, "userdata")
+		require.True(t, ok)
+		// Force a no-op template diff
+		newPodConfig.Object["userdata"] = currentUserData + `# Noop Change`
+		_, err = clients.Dynamic.Resource(gvrPodConfig).Namespace(c.Namespace).Update(ctx, newPodConfig, metav1.UpdateOptions{})
+		return err
+	})
 
-	// Force a no-op template diff
-	newPodConfig.Object["userdata"] = currentUserData + `# Noop Change`
-
-	_, err = clients.Dynamic.Resource(gvrPodConfig).Namespace(c.Namespace).Update(ctx, newPodConfig, metav1.UpdateOptions{})
 	require.NoError(t, err)
 
 	provCluster, err := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
