@@ -3079,11 +3079,15 @@ func (s *steveAPITestSuite) TestArrayAccess() {
 
 	s.Run("array-access", func() {
 		t := s.T()
+		if !features.UISQLCache.Enabled() {
+			t.Skip("Skipping test because SQL cache is disabled")
+		}
 		podInfoList := make([]podInfo, 0)
 		podClient := client.SteveType("pod")
 		pods, err := podClient.List(nil)
 		require.NoError(t, err)
 		images := make(map[string][]string)
+		podsByImageMap := make(map[string]map[string]struct{})
 		for _, steveAPIObject := range pods.Data {
 			podSpec := &corev1.PodSpec{}
 			clientv1.ConvertToK8sType(steveAPIObject.Spec, podSpec)
@@ -3095,9 +3099,19 @@ func (s *steveAPITestSuite) TestArrayAccess() {
 						images[id] = make([]string, 0, len(containers)-i2)
 					}
 					images[id] = append(images[id], container.Image)
+					if _, ok := podsByImageMap[container.Image]; !ok {
+						podsByImageMap[container.Image] = make(map[string]struct{})
+					}
+					podsByImageMap[container.Image][id] = struct{}{}
 				}
 			}
 			podInfoList = append(podInfoList, podInfo{name: steveAPIObject.Name, namespace: steveAPIObject.Namespace, images: images[id]})
+		}
+		if len(images) == 0 {
+			t.Skip("Skipping test because no pods have images")
+		}
+		if len(podsByImageMap) == 1 {
+			t.Skip("Skipping test because only one image is used by pods")
 		}
 		midIndex := len(podInfoList) / 2
 		midPodInfo := podInfoList[midIndex]
@@ -3123,12 +3137,21 @@ func (s *steveAPITestSuite) TestArrayAccess() {
 		midPods, err = podClient.List(v)
 		require.NoError(t, err)
 
-		require.Equal(t, 1, len(midPods.Data))
-		podObject = &corev1.Pod{}
-		clientv1.ConvertToK8sType(midPods.Data[0], podObject)
-		require.Equal(t, midPodInfo.name, podObject.Name)
-		require.Equal(t, midPodInfo.namespace, podObject.Namespace)
-		require.Equal(t, midPodInfo.images[0], podObject.Spec.Containers[0].Image)
+		require.Equal(t, len(podsByImageMap[midPodInfo.images[0]]), len(midPods.Data))
+		found := false
+		for _, datapod := range midPods.Data {
+			podObject = &corev1.Pod{}
+			clientv1.ConvertToK8sType(datapod, podObject)
+			if podObject.Name == midPodInfo.name && podObject.Namespace == midPodInfo.namespace {
+				require.Equal(t, len(midPodInfo.images), len(podObject.Spec.Containers))
+				for i, ctr := range podObject.Spec.Containers {
+					require.Equal(t, midPodInfo.images[i], ctr.Image)
+				}
+				found = true
+				break
+			}
+		}
+		require.True(t, found)
 
 		v = url.Values{}
 		v.Set("sort", "metadata.name")
@@ -3152,6 +3175,9 @@ func (s *steveAPITestSuite) TestArrayAccess() {
 		sortedPods, err = podClient.List(v)
 		require.NoError(t, err)
 		pInfoListByName = slices.SortedStableFunc(slices.Values(podInfoList), func(x, y podInfo) int {
+			if len(x.images) == 0 || len(y.images) == 0 {
+				return 0
+			}
 			if d := cmp.Compare(x.images[0], y.images[0]); d != 0 {
 				return d
 			}
