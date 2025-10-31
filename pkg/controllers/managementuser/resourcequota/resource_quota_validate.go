@@ -35,15 +35,14 @@ func (r *reconcileController) reconcileNamespaces(_ string, p *apiv3.Project) (r
 	// With no namespaces used-limit has to be empty because there is
 	// nothing which can be used without namespaces. Therefore squash
 	// non-empty used-limits, if present.
-	empty := apiv3.ResourceQuotaLimit{}
 	if len(namespaces) == 0 &&
 		p.Spec.ResourceQuota != nil &&
-		p.Spec.ResourceQuota.UsedLimit != empty {
+		!isEmpty(&p.Spec.ResourceQuota.UsedLimit) {
 
 		logrus.Warnf("project %q, clearing bogus used-limit", p.Name)
 
 		newP := p.DeepCopy()
-		newP.Spec.ResourceQuota.UsedLimit = empty
+		newP.Spec.ResourceQuota.UsedLimit = apiv3.ResourceQuotaLimit{}
 		_, err := r.projects.Update(newP)
 		if err != nil {
 			logrus.Errorf("project %q, clearing bogus used-limit failed: %q", p.Name, err)
@@ -56,4 +55,50 @@ func (r *reconcileController) reconcileNamespaces(_ string, p *apiv3.Project) (r
 		r.namespaces.Enqueue(ns.Name)
 	}
 	return nil, nil
+}
+
+func isEmpty(rql *apiv3.ResourceQuotaLimit) bool {
+	if rql.ConfigMaps != "" {
+		return false
+	}
+	if rql.LimitsCPU != "" {
+		return false
+	}
+	if rql.LimitsMemory != "" {
+		return false
+	}
+	if rql.PersistentVolumeClaims != "" {
+		return false
+	}
+	if rql.Pods != "" {
+		return false
+	}
+	if rql.ReplicationControllers != "" {
+		return false
+	}
+	if rql.RequestsCPU != "" {
+		return false
+	}
+	if rql.RequestsMemory != "" {
+		return false
+	}
+	if rql.RequestsStorage != "" {
+		return false
+	}
+	if rql.Secrets != "" {
+		return false
+	}
+	if rql.Services != "" {
+		return false
+	}
+	if rql.ServicesLoadBalancers != "" {
+		return false
+	}
+	if rql.ServicesNodePorts != "" {
+		return false
+	}
+	if len(rql.AnyOther) == 0 {
+		return false
+	}
+	return true
 }
