@@ -260,6 +260,38 @@ func TestNewClient(t *testing.T) {
 	}
 }
 
+func TestNewClient_RespectsProxyEnv(t *testing.T) {
+	proxyCalled := make(chan bool, 1)
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		proxyCalled <- true
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("proxied"))
+	}))
+	defer proxy.Close()
+
+	os.Setenv("HTTP_PROXY", proxy.URL)
+	os.Setenv("HTTPS_PROXY", proxy.URL)
+	defer os.Unsetenv("HTTP_PROXY")
+	defer os.Unsetenv("HTTPS_PROXY")
+
+	ociClient, err := NewClient("oci://example.com/charts/etcd:0.1.1", v1.RepoSpec{}, nil)
+	if err != nil {
+		t.Fatalf("NewClient failed: %v", err)
+	}
+
+	// Perform a dummy HTTP request using the OCI client's configured transport
+	req, _ := http.NewRequest("GET", "https://example.com", nil)
+	_, _ = ociClient.HTTPClient.Do(req)
+
+	// Check if proxy was actually used
+	select {
+	case <-proxyCalled:
+		t.Log("proxy env respected by OCI client")
+	case <-time.After(1 * time.Second):
+		t.Error("OCI client did not use proxy")
+	}
+}
+
 func TestFetchChart(t *testing.T) {
 	type testcase struct {
 		name           string
