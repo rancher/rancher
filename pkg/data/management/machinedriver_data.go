@@ -74,6 +74,7 @@ var DriverData = map[string]DriverDataConfig{
 	},
 	ExoscaleDriver: {
 		FileToFieldAliases:      map[string]string{"sshKey": "sshKey", "userdata": "userdata"},
+		PublicCredentialFields:  []string{"apiKey"},
 		PrivateCredentialFields: []string{"apiSecretKey"},
 	},
 	HarvesterDriver: {
