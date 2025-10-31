@@ -158,13 +158,13 @@ func (p *pLifecycle) ensureSystemNamespaceAssigned(project *v3.Project) error {
 
 // ensureNamespaceRolesUpdated makes sure that the namespace roles have up-to-date rules, and issues updates if they don't
 func (p *pLifecycle) ensureNamespaceRolesUpdated(project *v3.Project) error {
-	// right now, only the edit role for namespaces has need of an update
-	suffix := projectNSVerbToSuffix[projectNSEditVerb]
+	// right now, only the manage role for namespaces has need of an update
+	suffix := projectNSVerbToSuffix[manageNSVerb]
 	roleName := fmt.Sprintf(projectNSGetClusterRoleNameFmt, project.Name, suffix)
 	cr, err := p.m.crLister.Get(roleName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			return p.m.createProjectNSRole(roleName, projectNSEditVerb, "", project.Name)
+			return p.m.createProjectNSRole(roleName, manageNSVerb, "", project.Name)
 		}
 		return fmt.Errorf("unable to get backing cluster role for project %s: %w", project.Name, err)
 	}
