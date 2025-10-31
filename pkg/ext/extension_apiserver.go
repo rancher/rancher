@@ -395,20 +395,17 @@ func makePatchAndUpdateService(original, modified *corev1.Service, service wrang
 	return patch, nil
 }
 
-func DeleteLegacyServiceAndSecret(apiservice wranglerapiregistrationv1.APIServiceController, secrets wranglercorev1.SecretController) error {
+func DeleteLegacyServiceAndSecret(service wranglercorev1.ServiceController, secrets wranglercorev1.SecretController) error {
 	logrus.Info("Attempting to delete legacy Service and Secret...")
 
 	// Check if the legacy service exists before attempting to delete to avoid logging "not found" as an error
-	_, err := apiservice.Get(LegacyServiceName, metav1.GetOptions{})
+	_, err := service.Get(Namespace, LegacyServiceName, metav1.GetOptions{})
 	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			// An actual error occurred during Get, so return it
-			return fmt.Errorf("failed to get legacy Service %s/%s: %w", Namespace, LegacyServiceName, err)
-		}
+		return fmt.Errorf("failed to get legacy Service %s/%s: %w", Namespace, LegacyServiceName, err)
 	} else {
 		// Service found, proceed with deletion
 		logrus.Infof("Deleting legacy Service %s/%s...", Namespace, LegacyServiceName)
-		deleteErr := apiservice.Delete(LegacyServiceName, &metav1.DeleteOptions{})
+		deleteErr := service.Delete(Namespace, LegacyServiceName, &metav1.DeleteOptions{})
 		if deleteErr != nil {
 			if !apierrors.IsNotFound(deleteErr) {
 				return fmt.Errorf("failed to delete legacy Service %s/%s: %w", Namespace, LegacyServiceName, deleteErr)
@@ -422,9 +419,7 @@ func DeleteLegacyServiceAndSecret(apiservice wranglerapiregistrationv1.APIServic
 	// Check if the legacy secret exists before attempting to delete
 	_, err = secrets.Get(Namespace, LegacySecretName, metav1.GetOptions{})
 	if err != nil {
-		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to get legacy Secret %s/%s: %w", Namespace, LegacySecretName, err)
-		}
+		return fmt.Errorf("failed to get legacy Secret %s/%s: %w", Namespace, LegacySecretName, err)
 	} else {
 		// Secret found, proceed with deletion
 		logrus.Infof("Deleting legacy Secret %s/%s...", Namespace, LegacySecretName)
