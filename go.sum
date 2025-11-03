@@ -681,8 +681,8 @@ github.com/rancher/saml v0.4.14-rancher3 h1:2NN6cPqm9FJeiT25x8+gLHWGdulsEak33cHR
 github.com/rancher/saml v0.4.14-rancher3/go.mod h1:S4+611dxnKt8z/ulbvaJzcgSHsuhjVc1QHNTcr1R7Fw=
 github.com/rancher/shepherd v0.0.0-20251009190241-9d143f8098e6 h1:HDLIOYbRLyyULoZQReaXjj7zVuWL2pso4iw6jUXK8y4=
 github.com/rancher/shepherd v0.0.0-20251009190241-9d143f8098e6/go.mod h1:f79PzzjS7z3CBSAIMA1sqoJgHKTtTJlyH11KXTw3U1E=
-github.com/rancher/steve v0.6.43 h1:xwQnNhPa4l5fCnU8ctTO74jHwXgcKRt7KZTwgvHzM3M=
-github.com/rancher/steve v0.6.43/go.mod h1:wgn+krsWAnUpdsU57REApYMewZ5+bfErkJ8NeuVyYJY=
+github.com/rancher/steve v0.6.44 h1:iZSbVBoubwlkcy8C5tF1uA/04MMcUGsceZQGlGMHhfA=
+github.com/rancher/steve v0.6.44/go.mod h1:wgn+krsWAnUpdsU57REApYMewZ5+bfErkJ8NeuVyYJY=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20250710162344-185ff9f785cd h1:M3oVcVktMhNk8l3ZRW94kroqzWzE/VGbZfLw/F0rw5Y=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20250710162344-185ff9f785cd/go.mod h1:VfRrgue4yl6O0GYakMGYgyByu7ySooPQWWRxTt2MIEI=
 github.com/rancher/wrangler v1.1.2 h1:oXbXo9k7y/H4drUpb4RM1c++vT9O3rpoNEfyusGykiU=
