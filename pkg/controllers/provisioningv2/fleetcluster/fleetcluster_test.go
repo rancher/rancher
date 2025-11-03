@@ -71,7 +71,22 @@ var (
 			Value:    "value",
 		},
 	}
+	neverPreemptionPolicy      = corev1.PreemptNever
+	preemptLowerPriorityPolicy = corev1.PreemptLowerPriority
 )
+
+func getDefaultFleetAgentSchedulingCustomization() *fleet.AgentSchedulingCustomization {
+	return &fleet.AgentSchedulingCustomization{
+		PriorityClass: &fleet.PriorityClassSpec{
+			Value:            900000000,
+			PreemptionPolicy: &preemptLowerPriorityPolicy,
+		},
+		PodDisruptionBudget: &fleet.PodDisruptionBudgetSpec{
+			MinAvailable:   "1",
+			MaxUnavailable: "0",
+		},
+	}
+}
 
 func TestClusterCustomization(t *testing.T) {
 	require := require.New(t)
@@ -113,7 +128,8 @@ func TestClusterCustomization(t *testing.T) {
 			},
 			&fleet.Cluster{
 				Spec: fleet.ClusterSpec{
-					AgentAffinity: &builtinAffinity,
+					AgentAffinity:                &builtinAffinity,
+					AgentSchedulingCustomization: getDefaultFleetAgentSchedulingCustomization(),
 				},
 			},
 		},
@@ -140,9 +156,10 @@ func TestClusterCustomization(t *testing.T) {
 			},
 			&fleet.Cluster{
 				Spec: fleet.ClusterSpec{
-					AgentAffinity:    &linuxAffinity,
-					AgentResources:   &corev1.ResourceRequirements{},
-					AgentTolerations: []corev1.Toleration{},
+					AgentAffinity:                &linuxAffinity,
+					AgentResources:               &corev1.ResourceRequirements{},
+					AgentTolerations:             []corev1.Toleration{},
+					AgentSchedulingCustomization: getDefaultFleetAgentSchedulingCustomization(),
 				},
 			},
 		},
@@ -169,9 +186,124 @@ func TestClusterCustomization(t *testing.T) {
 			},
 			&fleet.Cluster{
 				Spec: fleet.ClusterSpec{
-					AgentAffinity:    &builtinAffinity,
-					AgentResources:   resourceReq,
-					AgentTolerations: tolerations,
+					AgentAffinity:                &builtinAffinity,
+					AgentResources:               resourceReq,
+					AgentTolerations:             tolerations,
+					AgentSchedulingCustomization: getDefaultFleetAgentSchedulingCustomization(),
+				},
+			},
+		},
+		{
+			"cluster-has-scheduling-customization-with-priority-class",
+			cluster,
+			clusterStatus,
+			map[string]*apimgmtv3.Cluster{
+				"cluster-name": newMgmtCluster(
+					"cluster-name",
+					labels,
+					nil,
+					apimgmtv3.ClusterSpec{
+						FleetWorkspaceName: "fleet-default",
+						ClusterSpecBase: apimgmtv3.ClusterSpecBase{
+							FleetAgentDeploymentCustomization: &apimgmtv3.AgentDeploymentCustomization{
+								SchedulingCustomization: &apimgmtv3.AgentSchedulingCustomization{
+									PriorityClass: &apimgmtv3.PriorityClassSpec{
+										Value:            1000,
+										PreemptionPolicy: &neverPreemptionPolicy,
+									},
+								},
+							},
+						},
+					},
+				),
+			},
+			&fleet.Cluster{
+				Spec: fleet.ClusterSpec{
+					AgentAffinity: &builtinAffinity,
+					AgentSchedulingCustomization: &fleet.AgentSchedulingCustomization{
+						PriorityClass: &fleet.PriorityClassSpec{
+							Value:            1000,
+							PreemptionPolicy: &neverPreemptionPolicy,
+						},
+					},
+				},
+			},
+		},
+		{
+			"cluster-has-scheduling-customization-with-pod-disruption-budget",
+			cluster,
+			clusterStatus,
+			map[string]*apimgmtv3.Cluster{
+				"cluster-name": newMgmtCluster(
+					"cluster-name",
+					labels,
+					nil,
+					apimgmtv3.ClusterSpec{
+						FleetWorkspaceName: "fleet-default",
+						ClusterSpecBase: apimgmtv3.ClusterSpecBase{
+							FleetAgentDeploymentCustomization: &apimgmtv3.AgentDeploymentCustomization{
+								SchedulingCustomization: &apimgmtv3.AgentSchedulingCustomization{
+									PodDisruptionBudget: &apimgmtv3.PodDisruptionBudgetSpec{
+										MinAvailable:   "1",
+										MaxUnavailable: "0",
+									},
+								},
+							},
+						},
+					},
+				),
+			},
+			&fleet.Cluster{
+				Spec: fleet.ClusterSpec{
+					AgentAffinity: &builtinAffinity,
+					AgentSchedulingCustomization: &fleet.AgentSchedulingCustomization{
+						PodDisruptionBudget: &fleet.PodDisruptionBudgetSpec{
+							MinAvailable:   "1",
+							MaxUnavailable: "0",
+						},
+					},
+				},
+			},
+		},
+		{
+			"cluster-has-scheduling-customization-with-both-priority-class-and-pod-disruption-budget",
+			cluster,
+			clusterStatus,
+			map[string]*apimgmtv3.Cluster{
+				"cluster-name": newMgmtCluster(
+					"cluster-name",
+					labels,
+					nil,
+					apimgmtv3.ClusterSpec{
+						FleetWorkspaceName: "fleet-default",
+						ClusterSpecBase: apimgmtv3.ClusterSpecBase{
+							FleetAgentDeploymentCustomization: &apimgmtv3.AgentDeploymentCustomization{
+								SchedulingCustomization: &apimgmtv3.AgentSchedulingCustomization{
+									PriorityClass: &apimgmtv3.PriorityClassSpec{
+										Value:            500,
+										PreemptionPolicy: &preemptLowerPriorityPolicy,
+									},
+									PodDisruptionBudget: &apimgmtv3.PodDisruptionBudgetSpec{
+										MinAvailable: "1",
+									},
+								},
+							},
+						},
+					},
+				),
+			},
+			&fleet.Cluster{
+				Spec: fleet.ClusterSpec{
+					AgentAffinity: &builtinAffinity,
+					AgentSchedulingCustomization: &fleet.AgentSchedulingCustomization{
+						PriorityClass: &fleet.PriorityClassSpec{
+							Value:            500,
+							PreemptionPolicy: &preemptLowerPriorityPolicy,
+						},
+						PodDisruptionBudget: &fleet.PodDisruptionBudgetSpec{
+							MinAvailable: "1",
+						},
+					},
 				},
 			},
 		},
@@ -195,6 +327,7 @@ func TestClusterCustomization(t *testing.T) {
 			require.Equal(tt.expectedFleet.Spec.AgentAffinity, fleetCluster.Spec.AgentAffinity)
 			require.Equal(tt.expectedFleet.Spec.AgentResources, fleetCluster.Spec.AgentResources)
 			require.Equal(tt.expectedFleet.Spec.AgentTolerations, fleetCluster.Spec.AgentTolerations)
+			require.Equal(tt.expectedFleet.Spec.AgentSchedulingCustomization, fleetCluster.Spec.AgentSchedulingCustomization)
 		})
 	}
 }

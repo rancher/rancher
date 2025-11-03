@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
+	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	corev1 "k8s.io/api/core/v1"
@@ -81,6 +82,84 @@ func GetFleetAgentResourceRequirements(cluster *v3.Cluster) *corev1.ResourceRequ
 	}
 
 	return nil
+}
+
+// GetFleetAgentSchedulingCustomization returns scheduling customization (priority class and pod disruption budget)
+// for the fleet agent. If user has defined custom values, those are returned. Otherwise, default values from settings
+// are returned to ensure fleet-agent is prioritized and protected during autoscaling.
+func GetFleetAgentSchedulingCustomization(cluster *v3.Cluster) *v3.AgentSchedulingCustomization {
+	if cluster.Spec.FleetAgentDeploymentCustomization != nil &&
+		cluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization != nil {
+		return cluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization
+	}
+
+	// Return defaults from settings to ensure fleet-agent protection
+	defaults, err := GetFleetAgentSchedulingDefaults()
+	if err != nil {
+		// Log error but don't fail - return nil to allow operation to continue
+		fmt.Printf("Warning: failed to get fleet agent scheduling defaults: %v\n", err)
+		return nil
+	}
+
+	return defaults
+}
+
+// GetFleetAgentSchedulingDefaults reads default fleet agent scheduling customization from settings and returns
+// a populated AgentSchedulingCustomization struct. Returns nil if settings are not configured properly.
+func GetFleetAgentSchedulingDefaults() (*v3.AgentSchedulingCustomization, error) {
+	priorityClassJSON := settings.FleetAgentDefaultPriorityClass.Get()
+	pdbJSON := settings.FleetAgentDefaultPodDisruptionBudget.Get()
+
+	if priorityClassJSON == "" && pdbJSON == "" {
+		return nil, nil
+	}
+
+	schedulingCustomization := &v3.AgentSchedulingCustomization{}
+
+	// Parse priority class from settings
+	if priorityClassJSON != "" {
+		var pcSpec v3.PriorityClassSpec
+		if err := json.Unmarshal([]byte(priorityClassJSON), &pcSpec); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal fleet agent priority class setting: %w", err)
+		}
+		schedulingCustomization.PriorityClass = &pcSpec
+	}
+
+	// Parse pod disruption budget from settings
+	if pdbJSON != "" {
+		var pdbSpec v3.PodDisruptionBudgetSpec
+		if err := json.Unmarshal([]byte(pdbJSON), &pdbSpec); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal fleet agent pod disruption budget setting: %w", err)
+		}
+		schedulingCustomization.PodDisruptionBudget = &pdbSpec
+	}
+
+	return schedulingCustomization, nil
+}
+
+// ConvertToFleetAgentSchedulingCustomization converts Rancher's AgentSchedulingCustomization to Fleet's format.
+func ConvertToFleetAgentSchedulingCustomization(rancherCustomization *v3.AgentSchedulingCustomization) *fleet.AgentSchedulingCustomization {
+	if rancherCustomization == nil {
+		return nil
+	}
+
+	fleetCustomization := &fleet.AgentSchedulingCustomization{}
+
+	if rancherCustomization.PriorityClass != nil {
+		fleetCustomization.PriorityClass = &fleet.PriorityClassSpec{
+			Value:            rancherCustomization.PriorityClass.Value,
+			PreemptionPolicy: rancherCustomization.PriorityClass.PreemptionPolicy,
+		}
+	}
+
+	if rancherCustomization.PodDisruptionBudget != nil {
+		fleetCustomization.PodDisruptionBudget = &fleet.PodDisruptionBudgetSpec{
+			MinAvailable:   rancherCustomization.PodDisruptionBudget.MinAvailable,
+			MaxUnavailable: rancherCustomization.PodDisruptionBudget.MaxUnavailable,
+		}
+	}
+
+	return fleetCustomization
 }
 
 // unmarshalAffinity returns an unmarshalled object of the v1 node affinity. If unable to be unmarshalled, it returns

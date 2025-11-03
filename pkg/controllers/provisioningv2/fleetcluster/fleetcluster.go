@@ -245,6 +245,10 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 		return nil, status, err
 	}
 
+	// Get fleet-agent scheduling customization (priority class and pod disruption budget) to ensure
+	// fleet-agent is prioritized and protected during autoscaling.
+	agentSchedulingCustomization := mgmtcluster.GetFleetAgentSchedulingCustomization(mgmtCluster)
+
 	return append(objs, &fleet.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        cluster.Name,
@@ -253,14 +257,15 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 			Annotations: annotations,
 		},
 		Spec: fleet.ClusterSpec{
-			KubeConfigSecret:          clientSecret,
-			KubeConfigSecretNamespace: cluster.Namespace,
-			AgentEnvVars:              mgmtCluster.Spec.AgentEnvVars,
-			AgentNamespace:            agentNamespace,
-			PrivateRepoURL:            h.getPrivateRepoURL(cluster, mgmtCluster),
-			AgentTolerations:          tolerations,
-			AgentAffinity:             agentAffinity,
-			AgentResources:            mgmtcluster.GetFleetAgentResourceRequirements(mgmtCluster),
+			KubeConfigSecret:             clientSecret,
+			KubeConfigSecretNamespace:    cluster.Namespace,
+			AgentEnvVars:                 mgmtCluster.Spec.AgentEnvVars,
+			AgentNamespace:               agentNamespace,
+			PrivateRepoURL:               h.getPrivateRepoURL(cluster, mgmtCluster),
+			AgentTolerations:             tolerations,
+			AgentAffinity:                agentAffinity,
+			AgentResources:               mgmtcluster.GetFleetAgentResourceRequirements(mgmtCluster),
+			AgentSchedulingCustomization: mgmtcluster.ConvertToFleetAgentSchedulingCustomization(agentSchedulingCustomization),
 		},
 	}), status, nil
 }

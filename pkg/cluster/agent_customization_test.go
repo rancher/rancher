@@ -1368,3 +1368,245 @@ func TestAgentCustomization_getAgentCustomization(t *testing.T) {
 		})
 	}
 }
+
+func TestAgentCustomization_ConvertToFleetAgentSchedulingCustomization(t *testing.T) {
+	neverPreemptionPolicy := corev1.PreemptNever
+	preemptLowerPriorityPolicy := corev1.PreemptLowerPriority
+
+	tests := []struct {
+		name     string
+		input    *v3.AgentSchedulingCustomization
+		expected interface{} // can be nil or *fleet.AgentSchedulingCustomization
+	}{
+		{
+			name:     "nil input returns nil",
+			input:    nil,
+			expected: nil,
+		},
+		{
+			name:     "empty customization returns empty fleet customization",
+			input:    &v3.AgentSchedulingCustomization{},
+			expected: &v3.AgentSchedulingCustomization{},
+		},
+		{
+			name: "priority class only",
+			input: &v3.AgentSchedulingCustomization{
+				PriorityClass: &v3.PriorityClassSpec{
+					Value:            1000,
+					PreemptionPolicy: &neverPreemptionPolicy,
+				},
+			},
+			expected: map[string]interface{}{
+				"priorityClass": map[string]interface{}{
+					"value":            1000,
+					"preemptionPolicy": neverPreemptionPolicy,
+				},
+			},
+		},
+		{
+			name: "pod disruption budget only",
+			input: &v3.AgentSchedulingCustomization{
+				PodDisruptionBudget: &v3.PodDisruptionBudgetSpec{
+					MinAvailable:   "1",
+					MaxUnavailable: "0",
+				},
+			},
+			expected: map[string]interface{}{
+				"podDisruptionBudget": map[string]interface{}{
+					"minAvailable":   "1",
+					"maxUnavailable": "0",
+				},
+			},
+		},
+		{
+			name: "both priority class and pod disruption budget",
+			input: &v3.AgentSchedulingCustomization{
+				PriorityClass: &v3.PriorityClassSpec{
+					Value:            500,
+					PreemptionPolicy: &preemptLowerPriorityPolicy,
+				},
+				PodDisruptionBudget: &v3.PodDisruptionBudgetSpec{
+					MinAvailable: "1",
+				},
+			},
+			expected: map[string]interface{}{
+				"priorityClass": map[string]interface{}{
+					"value":            500,
+					"preemptionPolicy": preemptLowerPriorityPolicy,
+				},
+				"podDisruptionBudget": map[string]interface{}{
+					"minAvailable": "1",
+				},
+			},
+		},
+		{
+			name: "priority class with value only",
+			input: &v3.AgentSchedulingCustomization{
+				PriorityClass: &v3.PriorityClassSpec{
+					Value: 12345,
+				},
+			},
+			expected: map[string]interface{}{
+				"priorityClass": map[string]interface{}{
+					"value": 12345,
+				},
+			},
+		},
+	}
+
+	t.Parallel()
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			result := ConvertToFleetAgentSchedulingCustomization(tt.input)
+
+			if tt.expected == nil {
+				assert.Nil(t, result)
+				return
+			}
+
+			// If expected is empty AgentSchedulingCustomization, just check the result is not nil
+			if emptyCustomization, ok := tt.expected.(*v3.AgentSchedulingCustomization); ok {
+				assert.NotNil(t, result)
+				assert.Equal(t, emptyCustomization.PriorityClass, (*v3.PriorityClassSpec)(nil))
+				assert.Equal(t, emptyCustomization.PodDisruptionBudget, (*v3.PodDisruptionBudgetSpec)(nil))
+				return
+			}
+
+			// Otherwise, check the expected map structure
+			expectedMap := tt.expected.(map[string]interface{})
+
+			if pcMap, hasPriorityClass := expectedMap["priorityClass"]; hasPriorityClass {
+				pc := pcMap.(map[string]interface{})
+				assert.NotNil(t, result.PriorityClass)
+				assert.Equal(t, pc["value"], result.PriorityClass.Value)
+				if preemption, hasPreemption := pc["preemptionPolicy"]; hasPreemption {
+					assert.NotNil(t, result.PriorityClass.PreemptionPolicy)
+					assert.Equal(t, preemption, *result.PriorityClass.PreemptionPolicy)
+				} else {
+					assert.Nil(t, result.PriorityClass.PreemptionPolicy)
+				}
+			} else {
+				assert.Nil(t, result.PriorityClass)
+			}
+
+			if pdbMap, hasPodDisruptionBudget := expectedMap["podDisruptionBudget"]; hasPodDisruptionBudget {
+				pdb := pdbMap.(map[string]interface{})
+				assert.NotNil(t, result.PodDisruptionBudget)
+				if minAvailable, hasMin := pdb["minAvailable"]; hasMin {
+					assert.Equal(t, minAvailable, result.PodDisruptionBudget.MinAvailable)
+				}
+				if maxUnavailable, hasMax := pdb["maxUnavailable"]; hasMax {
+					assert.Equal(t, maxUnavailable, result.PodDisruptionBudget.MaxUnavailable)
+				}
+			} else {
+				assert.Nil(t, result.PodDisruptionBudget)
+			}
+		})
+	}
+}
+
+func TestAgentCustomization_GetFleetAgentSchedulingCustomization(t *testing.T) {
+	neverPreemptionPolicy := corev1.PreemptNever
+	preemptLowerPriorityPolicy := corev1.PreemptLowerPriority
+
+	// Get default values that should be returned when no customization is set
+	defaultSchedulingCustomization := &v3.AgentSchedulingCustomization{
+		PriorityClass: &v3.PriorityClassSpec{
+			Value:            900000000,
+			PreemptionPolicy: &preemptLowerPriorityPolicy,
+		},
+		PodDisruptionBudget: &v3.PodDisruptionBudgetSpec{
+			MinAvailable:   "1",
+			MaxUnavailable: "0",
+		},
+	}
+
+	tests := []struct {
+		name     string
+		cluster  *v3.Cluster
+		expected *v3.AgentSchedulingCustomization
+	}{
+		{
+			name: "no fleet agent deployment customization - returns defaults",
+			cluster: &v3.Cluster{
+				Spec: v3.ClusterSpec{},
+			},
+			expected: defaultSchedulingCustomization,
+		},
+		{
+			name: "fleet agent deployment customization without scheduling customization - returns defaults",
+			cluster: &v3.Cluster{
+				Spec: v3.ClusterSpec{
+					ClusterSpecBase: v3.ClusterSpecBase{
+						FleetAgentDeploymentCustomization: &v3.AgentDeploymentCustomization{
+							AppendTolerations: []corev1.Toleration{},
+						},
+					},
+				},
+			},
+			expected: defaultSchedulingCustomization,
+		},
+		{
+			name: "fleet agent deployment customization with scheduling customization - returns user values",
+			cluster: &v3.Cluster{
+				Spec: v3.ClusterSpec{
+					ClusterSpecBase: v3.ClusterSpecBase{
+						FleetAgentDeploymentCustomization: &v3.AgentDeploymentCustomization{
+							SchedulingCustomization: &v3.AgentSchedulingCustomization{
+								PriorityClass: &v3.PriorityClassSpec{
+									Value:            1000,
+									PreemptionPolicy: &neverPreemptionPolicy,
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: &v3.AgentSchedulingCustomization{
+				PriorityClass: &v3.PriorityClassSpec{
+					Value:            1000,
+					PreemptionPolicy: &neverPreemptionPolicy,
+				},
+			},
+		},
+		{
+			name: "fleet agent deployment customization with complete scheduling customization",
+			cluster: &v3.Cluster{
+				Spec: v3.ClusterSpec{
+					ClusterSpecBase: v3.ClusterSpecBase{
+						FleetAgentDeploymentCustomization: &v3.AgentDeploymentCustomization{
+							SchedulingCustomization: &v3.AgentSchedulingCustomization{
+								PriorityClass: &v3.PriorityClassSpec{
+									Value:            500,
+									PreemptionPolicy: &preemptLowerPriorityPolicy,
+								},
+								PodDisruptionBudget: &v3.PodDisruptionBudgetSpec{
+									MinAvailable: "2",
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: &v3.AgentSchedulingCustomization{
+				PriorityClass: &v3.PriorityClassSpec{
+					Value:            500,
+					PreemptionPolicy: &preemptLowerPriorityPolicy,
+				},
+				PodDisruptionBudget: &v3.PodDisruptionBudgetSpec{
+					MinAvailable: "2",
+				},
+			},
+		},
+	}
+
+	t.Parallel()
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			result := GetFleetAgentSchedulingCustomization(tt.cluster)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
