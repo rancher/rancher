@@ -69,7 +69,8 @@ jobs:
         with:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD
+            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY ;
       - name: push
         uses: ./.github/actions/push-images
   build-publish-chart:
@@ -126,7 +127,7 @@ jobs:
         with:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD
+            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
             secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY ;
       - name: build
         uses: ./.github/actions/build-images/installer
@@ -144,7 +145,7 @@ jobs:
         with:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/stage-registry-username/credentials token | DOCKER_USERNAME ;
-            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD
+            secret/data/github/repo/${{ github.repository }}/stage-registry-password/credentials token | DOCKER_PASSWORD ;
             secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY ;
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
