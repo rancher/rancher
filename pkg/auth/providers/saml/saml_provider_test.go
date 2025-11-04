@@ -154,7 +154,7 @@ func (p *mockLdapProvider) GetName() string {
 	return p.providerName
 }
 
-func (p *mockLdapProvider) AuthenticateUser(ctx context.Context, input any) (apiv3.Principal, []apiv3.Principal, string, error) {
+func (p *mockLdapProvider) AuthenticateUser(http.ResponseWriter, *http.Request, any) (apiv3.Principal, []apiv3.Principal, string, error) {
 	panic("AuthenticateUser Unimplemented!")
 }
 

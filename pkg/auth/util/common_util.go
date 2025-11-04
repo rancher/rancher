@@ -13,8 +13,6 @@ import (
 
 type ContextKey string
 
-const RequestKey = ContextKey("request")
-
 // WriteError write the error message and the http status code in the ResponseWriter
 func WriteError(w http.ResponseWriter, httpStatus int, err error) {
 	w.WriteHeader(httpStatus)
