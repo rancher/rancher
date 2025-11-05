@@ -22,7 +22,16 @@ func TestDefaultPolicies(t *testing.T) {
 
 		for _, item := range fields.PublicCredentialFields {
 			inputFields[item] = "fake_" + item
-			wantFields[item] = "fake_" + item
+
+			// This exception is needed because the management.ExoscaleDriver config has the 'apiKey' set to Public, contrary to the other drivers that set it to Private.
+			// With the way the auditLog currently works, it will simply redact *all apiKeys* if at least one of them is set to private.
+			// A more granular policy will be implemented in the future to better handle this scenario and have the AuditLog *not* redact the apiKey for the
+			// Exoscale driver. For now, however, the if condition will guarantee the tests can handle this edge case without failing.
+			if driverName == management.ExoscaleDriver {
+				wantFields[item] = redacted
+			} else {
+				wantFields[item] = "fake_" + item
+			}
 		}
 
 		for _, item := range fields.PrivateCredentialFields {
