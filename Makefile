@@ -23,6 +23,9 @@ quick-agent:
 quick-server:
 	@$(MAKE) quick TARGET="server"
 
+quick-k3s-images:
+	@$(MAKE) quick TARGET="k3s-images"
+
 $(DEV_TARGETS):
 	./dev-scripts/$@
 

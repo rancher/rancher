@@ -18,21 +18,24 @@ CATTLE_KDM_BRANCH=$(grep -m1 'ARG CATTLE_KDM_BRANCH=' package/Dockerfile | cut -
 
 RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')
 if [[ -z "$RKE_VERSION" ]]; then
-    RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $4}')
+  RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $4}')
 fi
 CATTLE_RANCHER_WEBHOOK_VERSION=$(grep -m1 'webhookVersion' build.yaml | cut -d ' ' -f2)
 CATTLE_CSP_ADAPTER_MIN_VERSION=$(grep -m1 'cspAdapterMinVersion' build.yaml | cut -d ' ' -f2)
 CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$(grep -m1 'provisioningCAPIVersion' build.yaml | cut -d ' ' -f2)
 CATTLE_FLEET_VERSION=$(grep -m1 'fleetVersion' build.yaml | cut -d ' ' -f2)
 
-# download airgap images and export it to a tarball
-curl -Lf https://github.com/rancher/k3s/releases/download/"${CATTLE_K3S_VERSION}"/k3s-images.txt -o ./k3s-images.txt
-AIRGAP_IMAGES=$(grep -e 'docker.io/rancher/mirrored-pause' -e 'docker.io/rancher/mirrored-coredns-coredns' ./k3s-images.txt)
-xargs -n1 docker pull <<< "${AIRGAP_IMAGES}"
-xargs -n2 docker save -o ./k3s-airgap-images.tar <<< "${AIRGAP_IMAGES}"
-
 # download kontainer driver metadata
-curl -sLf https://releases.rancher.com/kontainer-driver-metadata/"${CATTLE_KDM_BRANCH}"/data.json > ./data.json
+curl -sLf https://releases.rancher.com/kontainer-driver-metadata/"${CATTLE_KDM_BRANCH}"/data.json >./data.json
+
+if [ "$TARGET" = "k3s-images" ]; then
+  docker buildx build \
+    "${BUILD_ARGS[@]}" \
+    --output=type=local,dest=$PWD/bin \
+    --platform="${OS}/${ARCH}" \
+    --target k3s-images \
+    --file ./package/Dockerfile .
+fi
 
 if [ -z $TARGET ] || [ $TARGET = "server" ]; then
   # start the builds
