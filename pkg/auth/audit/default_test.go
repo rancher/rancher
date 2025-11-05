@@ -14,14 +14,14 @@ import (
 )
 
 func TestDefaultPolicies(t *testing.T) {
-	machineDataInput, machineDataWant := []byte("{"), []byte("{")
-	addToMachineData := func(item string, redact bool) {
-		machineDataInput = append(machineDataInput, []byte("\""+item+"\" : \"fake_"+item+"\",")...)
 
+	machineDataInputMap, machineDataWantMap := make(map[string]interface{}), make(map[string]interface{})
+	addToMachineData := func(item string, redact bool) {
+		machineDataInputMap[item] = "fake_" + item
 		if redact {
-			machineDataWant = append(machineDataWant, []byte("\""+item+"\" : \""+redacted+"\",")...)
+			machineDataWantMap[item] = redacted
 		} else {
-			machineDataWant = append(machineDataWant, []byte("\""+item+"\" : \"fake_"+item+"\",")...)
+			machineDataWantMap[item] = "fake_" + item
 		}
 	}
 
@@ -29,18 +29,22 @@ func TestDefaultPolicies(t *testing.T) {
 		for _, item := range fields.PublicCredentialFields {
 			addToMachineData(item, false)
 		}
-
 		for _, item := range fields.PrivateCredentialFields {
 			addToMachineData(item, true)
 		}
-
 		for _, item := range fields.PasswordFields {
 			addToMachineData(item, true)
 		}
 	}
 
-	machineDataInput[len(machineDataInput)-1] = byte('}')
-	machineDataWant[len(machineDataWant)-1] = byte('}')
+	machineDataInput, err := json.Marshal(machineDataInputMap)
+	if err != nil {
+		t.Fatalf("failed to marshal machine data input: %v", err)
+	}
+	machineDataWant, err := json.Marshal(machineDataWantMap)
+	if err != nil {
+		t.Fatalf("failed to marshal machine data want: %v", err)
+	}
 
 	type testCase struct {
 		Name            string
