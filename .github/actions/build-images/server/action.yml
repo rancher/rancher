@@ -24,14 +24,7 @@ runs:
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v3
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-    - name: Create k3s images file
-      uses: ./.github/actions/k3s-images
-      with:
-        k3s_version: ${{ steps.env.outputs.CATTLE_K3S_VERSION }}
-    - name: Download data.json
-      shell: bash
-      run: curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data.json > ./data.json
+      uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
     - name: Build and export server
       id: build
       uses: docker/build-push-action@v5
