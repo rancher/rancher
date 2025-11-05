@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 
+	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/auth/globalroles"
 	"github.com/rancher/rancher/pkg/controllers/management/auth/project_cluster"
@@ -57,6 +58,24 @@ func RegisterIndexers(scaledContext *config.ScaledContext) error {
 	return grbInformer.AddIndexers(map[string]cache.IndexFunc{
 		grbByUserRefKey: grbByUserRefFunc,
 	})
+}
+
+func RegisterUserOnly(ctx context.Context, wranglerContext *wrangler.Context) error {
+	scaledContext, err := config.NewScaledContext(*wranglerContext.RESTConfig, &config.ScaleContextOptions{
+		ControllerFactory: wranglerContext.ControllerFactory,
+	})
+	if err != nil {
+		return err
+	}
+	management, err := scaledContext.NewManagementContext()
+	if err != nil {
+		return errors.Wrap(err, "failed to create management context")
+	}
+
+	u := newUserLifecycle(management, nil)
+	management.Management.Users("").AddLifecycle(ctx, userController, u)
+
+	return nil
 }
 
 func RegisterEarly(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {

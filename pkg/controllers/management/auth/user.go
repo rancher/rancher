@@ -426,6 +426,10 @@ func (l *userLifecycle) deleteClusterUserAttributes(username string, tokens []*v
 	if len(tokens) == 0 {
 		return nil
 	}
+	if l.clusterManager == nil {
+		return nil
+	}
+
 	// find the set of clusters associated with a list of tokens
 	set := make(map[string]*v3.Cluster)
 	for _, token := range tokens {

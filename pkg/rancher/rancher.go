@@ -454,6 +454,11 @@ func (r *Rancher) Start(ctx context.Context) error {
 		if err := r.Wrangler.MultiClusterManager.Start(ctx); err != nil {
 			return err
 		}
+	} else {
+		r.Wrangler.OnLeaderOrDie("rancher-start::user/password-migration", func(ctx context.Context) error {
+			// Activate the user controller without a clustr manager, to perform proper password migration.
+			return managementauth.RegisterUserOnly(ctx, r.Wrangler)
+		})
 	}
 
 	r.Wrangler.OnLeaderOrDie("rancher-start::dashboarddata", func(ctx context.Context) error {
