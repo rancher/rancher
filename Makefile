@@ -23,9 +23,6 @@ quick-agent:
 quick-server:
 	@$(MAKE) quick TARGET="server"
 
-quick-binary-server:
-	@$(MAKE) quick TARGET="binary-server"
-
 quick-k3s-images:
 	@$(MAKE) quick TARGET="k3s-images"
 
