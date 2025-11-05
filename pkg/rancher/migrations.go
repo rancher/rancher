@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/user"
 	rancherversion "github.com/rancher/rancher/pkg/version"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/data"
@@ -63,6 +64,10 @@ var (
 )
 
 func runMigrations(wranglerContext *wrangler.Context) error {
+	if err := migrateLocalUserPasswords(wranglerContext); err != nil {
+		return err
+	}
+
 	if err := forceUpgradeLogout(wranglerContext.Core.ConfigMap(), wranglerContext.Mgmt.Token(), "v2.6.0"); err != nil {
 		return err
 	}
@@ -85,6 +90,10 @@ func runMigrations(wranglerContext *wrangler.Context) error {
 	}
 
 	return rkeResourcesCleanup(wranglerContext)
+}
+
+func migrateLocalUserPasswords(wranglerContext *wrangler.Context) error {
+	return user.NewPasswordMigrator(wranglerContext).MigrateAll()
 }
 
 func runRKE2Migrations(wranglerContext *wrangler.CAPIContext) error {

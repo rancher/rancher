@@ -6,14 +6,11 @@ import (
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers"
 	"github.com/rancher/rancher/pkg/controllers/management/auth/project_cluster"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	wranglerv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -25,57 +22,60 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
+type passwordMigrator interface {
+	Migrate(user *v3.User) error
+}
+
 type userLifecycle struct {
-	prtb            wranglerv3.ProjectRoleTemplateBindingController
-	crtb            wranglerv3.ClusterRoleTemplateBindingController
-	grb             wranglerv3.GlobalRoleBindingController
-	users           wranglerv3.UserController
-	tokens          wranglerv3.TokenController
-	namespaces      wcorev1.NamespaceController
-	namespaceLister wcorev1.NamespaceCache
-	secrets         wcorev1.SecretController
-	secretsLister   wcorev1.SecretCache
-	prtbLister      wranglerv3.ProjectRoleTemplateBindingCache
-	crtbLister      wranglerv3.ClusterRoleTemplateBindingCache
-	grbLister       wranglerv3.GlobalRoleBindingCache
-	prtbIndexer     cache.Indexer
-	crtbIndexer     cache.Indexer
-	grbIndexer      cache.Indexer
-	tokenIndexer    cache.Indexer
-	userManager     user.Manager
-	clusterLister   wranglerv3.ClusterCache
-	clusterManager  *clustermanager.Manager
-	extTokenStore   *exttokenstore.SystemStore
+	prtb             wranglerv3.ProjectRoleTemplateBindingController
+	crtb             wranglerv3.ClusterRoleTemplateBindingController
+	grb              wranglerv3.GlobalRoleBindingController
+	users            wranglerv3.UserController
+	tokens           wranglerv3.TokenController
+	namespaces       wcorev1.NamespaceController
+	namespaceLister  wcorev1.NamespaceCache
+	secrets          wcorev1.SecretController
+	secretsLister    wcorev1.SecretCache
+	prtbLister       wranglerv3.ProjectRoleTemplateBindingCache
+	crtbLister       wranglerv3.ClusterRoleTemplateBindingCache
+	grbLister        wranglerv3.GlobalRoleBindingCache
+	prtbIndexer      cache.Indexer
+	crtbIndexer      cache.Indexer
+	grbIndexer       cache.Indexer
+	tokenIndexer     cache.Indexer
+	userManager      user.Manager
+	clusterLister    wranglerv3.ClusterCache
+	clusterManager   *clustermanager.Manager
+	extTokenStore    *exttokenstore.SystemStore
+	passwordMigrator passwordMigrator
 }
 
 const (
-	crtbByUserRefKey       = "auth.management.cattle.io/crtb-by-user-ref"
-	prtbByUserRefKey       = "auth.management.cattle.io/prtb-by-user-ref"
-	grbByUserRefKey        = "auth.management.cattle.io/grb-by-user-ref"
-	tokenByUserRefKey      = "auth.management.cattle.io/token-by-user-ref"
-	userController         = "mgmt-auth-users-controller"
-	passwordHashAnnotation = "cattle.io/password-hash"
-	bcryptHash             = "bcrypt"
+	crtbByUserRefKey  = "auth.management.cattle.io/crtb-by-user-ref"
+	prtbByUserRefKey  = "auth.management.cattle.io/prtb-by-user-ref"
+	grbByUserRefKey   = "auth.management.cattle.io/grb-by-user-ref"
+	tokenByUserRefKey = "auth.management.cattle.io/token-by-user-ref"
+	userController    = "mgmt-auth-users-controller"
 )
 
 func newUserLifecycle(management *config.ManagementContext, clusterManager *clustermanager.Manager) *userLifecycle {
-
 	extTokenStore := exttokenstore.NewSystemFromWrangler(management.Wrangler)
 
 	lfc := &userLifecycle{
-		prtb:            management.Wrangler.Mgmt.ProjectRoleTemplateBinding(),
-		crtb:            management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
-		grb:             management.Wrangler.Mgmt.GlobalRoleBinding(),
-		users:           management.Wrangler.Mgmt.User(),
-		tokens:          management.Wrangler.Mgmt.Token(),
-		namespaces:      management.Wrangler.Core.Namespace(),
-		secrets:         management.Wrangler.Core.Secret(),
-		secretsLister:   management.Wrangler.Core.Secret().Cache(),
-		namespaceLister: management.Wrangler.Core.Namespace().Cache(),
-		userManager:     management.UserManager,
-		clusterLister:   management.Wrangler.Mgmt.Cluster().Cache(),
-		clusterManager:  clusterManager,
-		extTokenStore:   extTokenStore,
+		prtb:             management.Wrangler.Mgmt.ProjectRoleTemplateBinding(),
+		crtb:             management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
+		grb:              management.Wrangler.Mgmt.GlobalRoleBinding(),
+		users:            management.Wrangler.Mgmt.User(),
+		tokens:           management.Wrangler.Mgmt.Token(),
+		namespaces:       management.Wrangler.Core.Namespace(),
+		secrets:          management.Wrangler.Core.Secret(),
+		secretsLister:    management.Wrangler.Core.Secret().Cache(),
+		namespaceLister:  management.Wrangler.Core.Namespace().Cache(),
+		userManager:      management.UserManager,
+		clusterLister:    management.Wrangler.Mgmt.Cluster().Cache(),
+		clusterManager:   clusterManager,
+		extTokenStore:    extTokenStore,
+		passwordMigrator: user.NewPasswordMigrator(management.Wrangler),
 	}
 
 	prtbInformer := management.Management.ProjectRoleTemplateBindings("").Controller().Informer()
@@ -93,7 +93,7 @@ func newUserLifecycle(management *config.ManagementContext, clusterManager *clus
 	return lfc
 }
 
-func grbByUserRefFunc(obj interface{}) ([]string, error) {
+func grbByUserRefFunc(obj any) ([]string, error) {
 	globalRoleBinding, ok := obj.(*v3.GlobalRoleBinding)
 	if !ok {
 		return []string{}, nil
@@ -102,7 +102,7 @@ func grbByUserRefFunc(obj interface{}) ([]string, error) {
 	return []string{globalRoleBinding.UserName}, nil
 }
 
-func prtbByUserRefFunc(obj interface{}) ([]string, error) {
+func prtbByUserRefFunc(obj any) ([]string, error) {
 	projectRoleBinding, ok := obj.(*v3.ProjectRoleTemplateBinding)
 	if !ok || projectRoleBinding.UserName == "" {
 		return []string{}, nil
@@ -111,7 +111,7 @@ func prtbByUserRefFunc(obj interface{}) ([]string, error) {
 	return []string{projectRoleBinding.UserName}, nil
 }
 
-func crtbByUserRefFunc(obj interface{}) ([]string, error) {
+func crtbByUserRefFunc(obj any) ([]string, error) {
 	clusterRoleBinding, ok := obj.(*v3.ClusterRoleTemplateBinding)
 	if !ok || clusterRoleBinding.UserName == "" {
 		return []string{}, nil
@@ -120,7 +120,7 @@ func crtbByUserRefFunc(obj interface{}) ([]string, error) {
 	return []string{clusterRoleBinding.UserName}, nil
 }
 
-func tokenByUserRefFunc(obj interface{}) ([]string, error) {
+func tokenByUserRefFunc(obj any) ([]string, error) {
 	token, ok := obj.(*v3.Token)
 	if !ok {
 		return []string{}, nil
@@ -153,7 +153,7 @@ func (l *userLifecycle) Create(user *v3.User) (runtime.Object, error) {
 	// creatorIDAnn indicates it was created through the API, create the new
 	// user bindings and add the annotation UserConditionInitialRolesPopulated
 	if user.ObjectMeta.Annotations[project_cluster.CreatorIDAnnotation] != "" {
-		u, err := v32.UserConditionInitialRolesPopulated.DoUntilTrue(user, func() (runtime.Object, error) {
+		u, err := v3.UserConditionInitialRolesPopulated.DoUntilTrue(user, func() (runtime.Object, error) {
 			err := l.userManager.CreateNewUserClusterRoleBinding(user.Name, user.UID)
 			if err != nil {
 				return nil, err
@@ -171,8 +171,10 @@ func (l *userLifecycle) Create(user *v3.User) (runtime.Object, error) {
 
 func (l *userLifecycle) Updated(user *v3.User) (runtime.Object, error) {
 	// Migrate local users as part of the password field deprecation in the User resource. Password are now stored in secrets.
-	if err := l.migrateLocalUserIfNeeded(user); err != nil {
-		return nil, err
+	if user.Password != "" {
+		if err := l.passwordMigrator.Migrate(user); err != nil {
+			return nil, err
+		}
 	}
 
 	err := l.userManager.CreateNewUserClusterRoleBinding(user.Name, user.UID)
@@ -184,7 +186,6 @@ func (l *userLifecycle) Updated(user *v3.User) (runtime.Object, error) {
 		// New functionality. Not done for norman tokens, here. See refresher.go which
 		// deletes/disables tokens when a user is disabled. Having it here makes it a more
 		// immediate response to the user's change of status.
-
 		extTokens, err := l.getExtTokensByUserName(user.Name)
 		if err != nil {
 			return nil, err
@@ -528,46 +529,4 @@ func (l *userLifecycle) removeLegacyFinalizers(user *v3.User) (*v3.User, error) 
 		}
 	}
 	return user, nil
-}
-
-func (l *userLifecycle) migrateLocalUserIfNeeded(user *v3.User) error {
-	if user.Password != "" {
-		passwordSecret := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      user.Name,
-				Namespace: pbkdf2.LocalUserPasswordsNamespace,
-				Annotations: map[string]string{
-					passwordHashAnnotation: bcryptHash,
-				},
-				OwnerReferences: []metav1.OwnerReference{
-					{
-						Name:       user.Name,
-						UID:        user.UID,
-						APIVersion: "management.cattle.io/v3",
-						Kind:       "User",
-					},
-				},
-			},
-			Data: map[string][]byte{
-				"password": []byte(user.Password),
-			},
-		}
-		_, err := l.secrets.Create(passwordSecret)
-		if err != nil {
-			if !errors.IsAlreadyExists(err) {
-				return fmt.Errorf("failed to create password secret: %w", err)
-			}
-			_, err = l.secrets.Update(passwordSecret)
-			if err != nil {
-				return fmt.Errorf("failed to update password secret: %w", err)
-			}
-		}
-		user.Password = ""
-		_, err = l.users.Update(user)
-		if err != nil {
-			return fmt.Errorf("failed to update user: %w", err)
-		}
-	}
-
-	return nil
 }
