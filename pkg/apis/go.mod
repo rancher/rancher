@@ -2,7 +2,7 @@ module github.com/rancher/rancher/pkg/apis
 
 go 1.24.0
 
-toolchain go1.24.7
+toolchain go1.24.9
 
 replace (
 	k8s.io/api => k8s.io/api v0.34.1
@@ -32,7 +32,6 @@ replace (
 	k8s.io/mount-utils => k8s.io/mount-utils v0.34.1
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.34.1
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.34.1
-
 )
 
 require (
