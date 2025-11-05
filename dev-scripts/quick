@@ -7,9 +7,7 @@ set -x
 
 # variables
 COMMIT=$(git rev-parse --short HEAD)
-
-TAG="${TAG:-$(grep -m1 ' TAG:' .github/workflows/pull-request.yml | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e "s/\${{ github.sha }}/$COMMIT/g" | cut -d ' ' -f2)}"
-
+TAG="${TAG:-$(grep -m1 ' TAG:' .github/workflows/pull-request.yml | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e "s/\${{ github.sha }}/$COMMIT/g" | cut -d' ' -f2)}"
 OS="${OS:-linux}"
 ARCH="${ARCH:-amd64}"
 REPO="${REPO:-rancher}"
@@ -18,12 +16,19 @@ CATTLE_KDM_BRANCH=$(grep -m1 'ARG CATTLE_KDM_BRANCH=' package/Dockerfile | cut -
 
 RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $2}')
 if [[ -z "$RKE_VERSION" ]]; then
-    RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $4}')
+  RKE_VERSION=$(grep -m1 'github.com/rancher/rke' go.mod | awk '{print $4}')
 fi
 CATTLE_RANCHER_WEBHOOK_VERSION=$(grep -m1 'webhookVersion' build.yaml | cut -d ' ' -f2)
+CATTLE_REMOTEDIALER_PROXY_VERSION=$(grep -m1 'remoteDialerProxyVersion' build.yaml | cut -d ' ' -f2)
 CATTLE_CSP_ADAPTER_MIN_VERSION=$(grep -m1 'cspAdapterMinVersion' build.yaml | cut -d ' ' -f2)
 CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$(grep -m1 'provisioningCAPIVersion' build.yaml | cut -d ' ' -f2)
 CATTLE_FLEET_VERSION=$(grep -m1 'fleetVersion' build.yaml | cut -d ' ' -f2)
+
+# download airgap images and export it to a tarball
+curl -Lf https://github.com/rancher/k3s/releases/download/"${CATTLE_K3S_VERSION}"/k3s-images.txt -o ./k3s-images.txt
+AIRGAP_IMAGES=$(grep -e 'docker.io/rancher/mirrored-pause' -e 'docker.io/rancher/mirrored-coredns-coredns' ./k3s-images.txt)
+xargs -n1 docker pull <<<"${AIRGAP_IMAGES}"
+xargs -n2 docker save -o ./k3s-airgap-images.tar <<<"${AIRGAP_IMAGES}"
 
 # download kontainer driver metadata
 curl -sLf https://releases.rancher.com/kontainer-driver-metadata/"${CATTLE_KDM_BRANCH}"/data.json >./data.json
@@ -37,18 +42,10 @@ BUILD_ARGS+=("--build-arg=RKE_VERSION=${RKE_VERSION}")
 BUILD_ARGS+=("--build-arg=CATTLE_RANCHER_WEBHOOK_VERSION=${CATTLE_RANCHER_WEBHOOK_VERSION}")
 BUILD_ARGS+=("--build-arg=CATTLE_REMOTEDIALER_PROXY_VERSION=${CATTLE_REMOTEDIALER_PROXY_VERSION}")
 BUILD_ARGS+=("--build-arg=CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=${CATTLE_RANCHER_PROVISIONING_CAPI_VERSION}")
-BUILD_ARGS+=("--build-arg=CATTLE_RANCHER_TURTLES_VERSION=${CATTLE_RANCHER_TURTLES_VERSION}")
 BUILD_ARGS+=("--build-arg=CATTLE_CSP_ADAPTER_MIN_VERSION=${CATTLE_CSP_ADAPTER_MIN_VERSION}")
 BUILD_ARGS+=("--build-arg=CATTLE_FLEET_VERSION=${CATTLE_FLEET_VERSION}")
-BUILD_ARGS+=("--build-arg=CATTLE_HELM_VERSION=${CATTLE_HELM_VERSION}")
 BUILD_ARGS+=("--build-arg=RANCHER_TAG=${TAG}")
 BUILD_ARGS+=("--build-arg=RANCHER_REPO=${REPO}")
-if [ "$BINARY_DEBUG" = true ]; then
-  # Remove -s (strip symbols)
-  BUILD_ARGS+=("--build-arg=LINKFLAGS=-extldflags -static")
-  # Disable compiler optimizations
-  BUILD_ARGS+=("--build-arg=GCFLAGS=all=-N -l")
-fi
 
 # because macos doesn't have realpath apparently
 abs_path() {
@@ -88,7 +85,6 @@ add_context() {
     cat <<EOF
 Detected replace directive with path $godep ($path). This directive is not listed under a safe
 prefix path with BUILD_SAFE_DIRS environment variable.
-
 Path you want to use with replace directive must be under a prefix path set in the BUILD_SAFE_DIRS
 env var. Its value should be a colon-separated (:) list of prefix paths.
 For example, for a path of /home/user/sources/steve, you could set BUILD_SAFE_DIRS=/home/user/sources.
@@ -136,37 +132,18 @@ fi
 if [ -z "$TARGET" ] || [ "$TARGET" = "server" ]; then
   # start the builds
   docker buildx build \
-    --build-arg VERSION="${TAG}" \
-    --build-arg ARCH="${ARCH}" \
-    --build-arg IMAGE_REPO="${REPO}" \
-    --build-arg COMMIT="${COMMIT}" \
-    --build-arg RKE_VERSION="${RKE_VERSION}" \
-    --build-arg CATTLE_RANCHER_WEBHOOK_VERSION="${CATTLE_RANCHER_WEBHOOK_VERSION}" \
-    --build-arg CATTLE_RANCHER_PROVISIONING_CAPI_VERSION="${CATTLE_RANCHER_PROVISIONING_CAPI_VERSION}" \
-    --build-arg CATTLE_CSP_ADAPTER_MIN_VERSION="${CATTLE_CSP_ADAPTER_MIN_VERSION}" \
-    --build-arg CATTLE_FLEET_VERSION="${CATTLE_FLEET_VERSION}" \
+    "${BUILD_ARGS[@]}" \
     --tag "${REPO}"/rancher:"${TAG}" \
     --platform="${OS}/${ARCH}" \
     --target server \
     --file ./package/Dockerfile .
 fi
 
-if [ -z $TARGET ] || [ $TARGET = "agent" ]; then
+if [ -z "$TARGET" ] || [ "$TARGET" = "agent" ]; then
   docker buildx build \
-    --build-arg VERSION="${TAG}" \
-    --build-arg ARCH="${ARCH}" \
-    --build-arg RANCHER_TAG="${TAG}" \
-    --build-arg RANCHER_REPO="${REPO}" \
-    --build-arg COMMIT="${COMMIT}" \
-    --build-arg RKE_VERSION="${RKE_VERSION}" \
-    --build-arg CATTLE_RANCHER_WEBHOOK_VERSION="${CATTLE_RANCHER_WEBHOOK_VERSION}" \
-    --build-arg CATTLE_RANCHER_PROVISIONING_CAPI_VERSION="${CATTLE_RANCHER_PROVISIONING_CAPI_VERSION}" \
+    "${BUILD_ARGS[@]}" \
     --tag "${REPO}"/rancher-agent:"${TAG}" \
     --platform="${OS}/${ARCH}" \
     --target agent \
     --file ./package/Dockerfile .
-
-  if [ "$PUSH" = "true" ]; then
-    docker push "${REPO}"/rancher-agent:"${TAG}" &
-  fi
 fi
