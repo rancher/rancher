@@ -15,35 +15,28 @@ import (
 
 func TestDefaultPolicies(t *testing.T) {
 
-	machineDataInputMap, machineDataWantMap := make(map[string]interface{}), make(map[string]interface{})
-	addToMachineData := func(item string, redact bool) {
-		machineDataInputMap[item] = "fake_" + item
-		if redact {
-			machineDataWantMap[item] = redacted
-		} else {
-			machineDataWantMap[item] = "fake_" + item
-		}
-	}
+	machineDataInput, machineDataWant := make(map[string]interface{}), make(map[string]interface{})
+	for driverName, fields := range management.DriverData {
+		inputFields := make(map[string]string)
+		wantFields := make(map[string]string)
 
-	for _, fields := range management.DriverData {
 		for _, item := range fields.PublicCredentialFields {
-			addToMachineData(item, false)
+			inputFields[item] = "fake_" + item
+			wantFields[item] = "fake_" + item
 		}
-		for _, item := range fields.PrivateCredentialFields {
-			addToMachineData(item, true)
-		}
-		for _, item := range fields.PasswordFields {
-			addToMachineData(item, true)
-		}
-	}
 
-	machineDataInput, err := json.Marshal(machineDataInputMap)
-	if err != nil {
-		t.Fatalf("failed to marshal machine data input: %v", err)
-	}
-	machineDataWant, err := json.Marshal(machineDataWantMap)
-	if err != nil {
-		t.Fatalf("failed to marshal machine data want: %v", err)
+		for _, item := range fields.PrivateCredentialFields {
+			inputFields[item] = "fake_" + item
+			wantFields[item] = redacted
+		}
+
+		for _, item := range fields.PasswordFields {
+			inputFields[item] = "fake_" + item
+			wantFields[item] = redacted
+		}
+
+		machineDataInput[driverName] = inputFields
+		machineDataWant[driverName] = wantFields
 	}
 
 	type testCase struct {
@@ -184,12 +177,6 @@ func TestDefaultPolicies(t *testing.T) {
 			ExpectedBody: []byte(fmt.Sprintf(`{"sensitiveData": {"accessToken":"%s","user":"fake_user"}}`, redacted)),
 		},
 		{
-			Name:         "With all machine driver fields",
-			Headers:      http.Header{"Content-Type": {contentTypeJSON}},
-			Body:         machineDataInput,
-			ExpectedBody: machineDataWant,
-		},
-		{
 			Name:         "With no secret uri but secret base type slice",
 			Uri:          `/v3/project/local:p-12345/namespacedcertificates?limit=-1&sort=name`,
 			Headers:      http.Header{"Content-Type": {contentTypeJSON}},
@@ -390,13 +377,6 @@ func TestDefaultPolicies(t *testing.T) {
 		},
 
 		{
-			Name:         "With all machine driver fields",
-			Headers:      http.Header{"Content-Type": {contentTypeJSON}},
-			Body:         machineDataInput,
-			ExpectedBody: machineDataWant,
-		},
-
-		{
 			Name:         "With no secret uri but secret base type slice",
 			Uri:          `/v3/project/local:p-12345/namespacedcertificates?limit=-1&sort=name`,
 			Headers:      http.Header{"Content-Type": {contentTypeJSON}},
@@ -528,6 +508,25 @@ func TestDefaultPolicies(t *testing.T) {
 			Body:            []byte(`{"normalField": "some data", "manifestUrl": "https://localhost:8443/v3/import/abcd.yaml", "insecureWindowsNodeCommand": "curl https://localhost:8443/v3/import/abcd.yaml", "insecureNodeCommand": "curl https://localhost:8443/v3/import/abcd.yaml", "insecureCommand": "curl https://localhost:8443/v3/import/abcd.yaml", "command": "curl https://localhost:8443/v3/import/abcd.yaml", "windowsNodeCommand": "curl https://localhost:8443/v3/import/abcd.yaml"}`),
 			ExpectedBody:    []byte(fmt.Sprintf(`{"normalField": "some data", "manifestUrl": "%s", "insecureWindowsNodeCommand": "%[1]s", "insecureNodeCommand": "%[1]s", "insecureCommand": "%[1]s", "command": "%[1]s", "windowsNodeCommand": "%[1]s"}`, redacted)),
 		},
+	}
+
+	for driverName, expectedFields := range machineDataWant {
+		expectedFieldsBytes, err := json.Marshal(expectedFields)
+		if err != nil {
+			t.Fatalf("failed to marshal expected fields: %v", err)
+		}
+
+		inputFieldsBytes, err := json.Marshal(machineDataInput[driverName])
+		if err != nil {
+			t.Fatalf("failed to marshal input fields: %v", err)
+		}
+
+		cases = append(cases, testCase{
+			Name:         fmt.Sprintf("With machine driver fields for %s", driverName),
+			Headers:      http.Header{"Content-Type": {contentTypeJSON}},
+			Body:         inputFieldsBytes,
+			ExpectedBody: expectedFieldsBytes,
+		})
 	}
 
 	buffer := bytes.NewBuffer(nil)
