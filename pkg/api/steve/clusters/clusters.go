@@ -99,16 +99,5 @@ func Register(ctx context.Context, server *steve.Server, wrangler *wrangler.Cont
 			schema.CollectionMethods = append(schema.CollectionMethods, http.MethodGet)
 		},
 	})
-	server.SchemaFactory.AddTemplate(schema2.Template{
-		Group: "",
-		Kind:  "Namespace",
-		Customize: func(schema *types.APISchema) {
-			// Everybody can list even if they have no list or get privileges. The users
-			// authorization will still be used to determine what can be seen but just
-			// may result in an empty list
-			schema.CollectionMethods = append(schema.CollectionMethods, http.MethodGet)
-		},
-	})
-
 	return nil
 }
