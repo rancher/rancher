@@ -1,6 +1,7 @@
 package providerrefresh
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -674,7 +675,7 @@ func (p *mockLocalProvider) GetName() string {
 	panic("not implemented")
 }
 
-func (p *mockLocalProvider) AuthenticateUser(http.ResponseWriter, *http.Request, any) (apiv3.Principal, []apiv3.Principal, string, error) {
+func (p *mockLocalProvider) AuthenticateUser(ctx context.Context, input any) (apiv3.Principal, []apiv3.Principal, string, error) {
 	panic("not implemented")
 }
 
@@ -734,7 +735,7 @@ func (p *mockShibbolethProvider) GetName() string {
 	panic("not implemented")
 }
 
-func (p *mockShibbolethProvider) AuthenticateUser(http.ResponseWriter, *http.Request, any) (apiv3.Principal, []apiv3.Principal, string, error) {
+func (p *mockShibbolethProvider) AuthenticateUser(ctx context.Context, input any) (apiv3.Principal, []apiv3.Principal, string, error) {
 	panic("not implemented")
 }
 

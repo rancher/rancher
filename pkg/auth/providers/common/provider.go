@@ -1,6 +1,7 @@
 package common
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/rancher/norman/types"
@@ -27,7 +28,7 @@ const (
 // AuthProvider allows to authenticate a user and search for user and group principals.
 type AuthProvider interface {
 	GetName() string
-	AuthenticateUser(w http.ResponseWriter, r *http.Request, input any) (v3.Principal, []v3.Principal, string, error)
+	AuthenticateUser(ctx context.Context, input any) (v3.Principal, []v3.Principal, string, error)
 	SearchPrincipals(name, principalType string, myToken accessor.TokenAccessor) ([]v3.Principal, error)
 	GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error)
 	CustomizeSchema(schema *types.Schema)

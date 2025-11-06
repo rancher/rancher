@@ -1,6 +1,7 @@
 package publicapi
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -251,7 +252,8 @@ func (h *loginHandler) login(w http.ResponseWriter, r *http.Request, input login
 		return
 	}
 
-	userPrincipal, groupPrincipals, providerToken, err := providers.AuthenticateUser(w, r, input, input.GetName())
+	ctx := context.WithValue(r.Context(), util.RequestKey, r)
+	userPrincipal, groupPrincipals, providerToken, err := providers.AuthenticateUser(ctx, input, input.GetName())
 	if err != nil {
 		if !util.IsAPIError(err) {
 			logrus.Errorf("login: Error authenticating user: %s", err)

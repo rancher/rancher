@@ -58,10 +58,10 @@ func TestLogout(t *testing.T) {
 	}
 
 	checkCookiesUnset := func(t *testing.T, w *httptest.ResponseRecorder) {
-		require.Len(t, w.Result().Cookies(), 3)
+		require.Len(t, w.Result().Cookies(), 2)
 		for _, cookie := range w.Result().Cookies() {
 			switch cookie.Name {
-			case tokens.CookieName, tokens.CSRFCookie, tokens.IDTokenCookieName:
+			case tokens.CookieName, tokens.CSRFCookie:
 				assert.Equal(t, "", cookie.Value)
 				assert.Equal(t, -1, cookie.MaxAge)
 				assert.True(t, cookie.HttpOnly)

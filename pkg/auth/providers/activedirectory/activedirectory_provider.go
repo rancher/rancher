@@ -1,6 +1,7 @@
 package activedirectory
 
 import (
+	"context"
 	"crypto/x509"
 	"fmt"
 	"net/http"
@@ -93,7 +94,7 @@ func (p *adProvider) TransformToAuthProvider(authConfig map[string]any) (map[str
 	return ap, nil
 }
 
-func (p *adProvider) AuthenticateUser(_ http.ResponseWriter, _ *http.Request, input any) (v3.Principal, []v3.Principal, string, error) {
+func (p *adProvider) AuthenticateUser(ctx context.Context, input any) (v3.Principal, []v3.Principal, string, error) {
 	login, ok := input.(*v3.BasicLogin)
 	if !ok {
 		return v3.Principal{}, nil, "", errors.New("unexpected input type")

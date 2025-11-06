@@ -42,7 +42,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	isSecure := r.URL.Scheme == "https"
 
-	for _, cookieName := range []string{tokens.CookieName, tokens.CSRFCookie, tokens.IDTokenCookieName} {
+	for _, cookieName := range []string{tokens.CookieName, tokens.CSRFCookie} {
 		tokenCookie := &http.Cookie{
 			Name:     cookieName,
 			Value:    "",

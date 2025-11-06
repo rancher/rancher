@@ -1,6 +1,7 @@
 package saml
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -101,7 +102,7 @@ func (s *Provider) TransformToAuthProvider(authConfig map[string]any) (map[strin
 	return p, nil
 }
 
-func (s *Provider) AuthenticateUser(http.ResponseWriter, *http.Request, any) (apiv3.Principal, []apiv3.Principal, string, error) {
+func (s *Provider) AuthenticateUser(ctx context.Context, input any) (apiv3.Principal, []apiv3.Principal, string, error) {
 	return apiv3.Principal{}, nil, "", fmt.Errorf("SAML providers do not implement Authenticate User API")
 }
 
