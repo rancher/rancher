@@ -97,7 +97,7 @@ func isEmpty(rql *apiv3.ResourceQuotaLimit) bool {
 	if rql.ServicesNodePorts != "" {
 		return false
 	}
-	if len(rql.AnyOther) == 0 {
+	if len(rql.ExtendedLimits) == 0 {
 		return false
 	}
 	return true

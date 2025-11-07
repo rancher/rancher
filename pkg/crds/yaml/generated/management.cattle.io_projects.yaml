@@ -92,18 +92,19 @@ spec:
                     description: Limit is the default quota limits applied to new
                       namespaces.
                     properties:
-                      anyOther:
-                        additionalProperties:
-                          type: string
-                        description: |-
-                          AnyOther contains any other limits a user may wish to impose beyond
-                          the limits set by the preceding fields. Keys are (parseable as)
-                          resource names, values are (parseable as) resource quantities.
-                        type: object
                       configMaps:
                         description: ConfigMaps is the total number of ReplicationControllers
                           that can exist in the namespace.
                         type: string
+                      extendedLimits:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          ExtendedLimits contains additional limits a user may wish to impose
+                          beyond the limits set by the preceding fields. The keys have to be
+                          parseable as resource names, while the values have to be parseable as
+                          resource quantities. See also https://kubernetes.io/docs/concepts/policy/resource-quotas
+                        type: object
                       limitsCpu:
                         description: LimitsCPU is the CPU limits across all pods in
                           a non-terminal state.
@@ -165,18 +166,19 @@ spec:
                     description: Limit is the total allowable quota limits shared
                       by all namespaces in the project.
                     properties:
-                      anyOther:
-                        additionalProperties:
-                          type: string
-                        description: |-
-                          AnyOther contains any other limits a user may wish to impose beyond
-                          the limits set by the preceding fields. Keys are (parseable as)
-                          resource names, values are (parseable as) resource quantities.
-                        type: object
                       configMaps:
                         description: ConfigMaps is the total number of ReplicationControllers
                           that can exist in the namespace.
                         type: string
+                      extendedLimits:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          ExtendedLimits contains additional limits a user may wish to impose
+                          beyond the limits set by the preceding fields. The keys have to be
+                          parseable as resource names, while the values have to be parseable as
+                          resource quantities. See also https://kubernetes.io/docs/concepts/policy/resource-quotas
+                        type: object
                       limitsCpu:
                         description: LimitsCPU is the CPU limits across all pods in
                           a non-terminal state.
@@ -231,18 +233,19 @@ spec:
                     description: UsedLimit is the currently allocated quota for all
                       namespaces in the project.
                     properties:
-                      anyOther:
-                        additionalProperties:
-                          type: string
-                        description: |-
-                          AnyOther contains any other limits a user may wish to impose beyond
-                          the limits set by the preceding fields. Keys are (parseable as)
-                          resource names, values are (parseable as) resource quantities.
-                        type: object
                       configMaps:
                         description: ConfigMaps is the total number of ReplicationControllers
                           that can exist in the namespace.
                         type: string
+                      extendedLimits:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          ExtendedLimits contains additional limits a user may wish to impose
+                          beyond the limits set by the preceding fields. The keys have to be
+                          parseable as resource names, while the values have to be parseable as
+                          resource quantities. See also https://kubernetes.io/docs/concepts/policy/resource-quotas
+                        type: object
                       limitsCpu:
                         description: LimitsCPU is the CPU limits across all pods in
                           a non-terminal state.
