@@ -5,10 +5,7 @@ go 1.24.0
 toolchain go1.24.7
 
 // steve hotfix: https://github.com/rancher/steve/compare/v0.6.42...aruiz14:steve:hotfix-v2.12.3-hotfix-a3c0?expand=0
-replace github.com/rancher/steve => github.com/aruiz14/steve v0.0.0-20251030095249-15b5a127d3a6
-
-// apiserver hotfix: https://github.com/rancher/apiserver/compare/v0.6.3...aruiz14:apiserver:hotfix-v2.12.3-hotfix-a3c0?expand=0
-replace github.com/rancher/apiserver => github.com/aruiz14/apiserver v0.0.0-20251024075036-9d04b3b82f53
+replace github.com/rancher/steve => github.com/aruiz14/steve v0.0.0-20251107161902-643c8a27f091
 
 replace (
 	github.com/crewjam/saml => github.com/rancher/saml v0.4.14-rancher3
@@ -126,7 +123,7 @@ require (
 	github.com/prometheus/client_golang v1.22.0
 	github.com/prometheus/client_model v0.6.1
 	github.com/rancher/aks-operator v1.12.2
-	github.com/rancher/apiserver v0.6.3
+	github.com/rancher/apiserver v0.6.4
 	github.com/rancher/channelserver v0.7.0
 	github.com/rancher/dynamiclistener v0.7.0
 	github.com/rancher/eks-operator v1.12.2
