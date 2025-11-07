@@ -429,11 +429,11 @@ func Test_crtbHandler_getDesiredRoleBindings(t *testing.T) {
 			}
 			got, err := c.getDesiredRoleBindings(tt.crtb)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("crtbHandler.getDesiredClusterRoleBindings() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("crtbHandler.getDesiredRoleBindings() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("crtbHandler.getDesiredClusterRoleBindings() = %v, want %v", got, tt.want)
+				t.Errorf("crtbHandler.getDesiredRoleBindings() = %v, want %v", got, tt.want)
 			}
 		})
 	}
