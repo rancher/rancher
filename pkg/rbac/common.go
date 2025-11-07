@@ -458,6 +458,16 @@ func DeleteResource[T generic.RuntimeMetaObject, TList runtime.Object](name stri
 	return err
 }
 
+// DeleteResource deletes a non namespaced resource
+func DeleteNamespacedResource[T generic.RuntimeMetaObject, TList runtime.Object](namespace, name string, client generic.ClientInterface[T, TList]) error {
+	err := client.Delete(namespace, name, &metav1.DeleteOptions{})
+	// If the resource is already gone, don't treat it as an error
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	return err
+}
+
 // BuildClusterRole creates a cluster role with an aggregation label
 //   - name: name of the cluster role
 //   - ownerName: name of the creator of this cluster role
@@ -508,6 +518,45 @@ func BuildAggregatingClusterRole(rt *v3.RoleTemplate, nameTransformer func(strin
 			ClusterRoleSelectors: roleTemplateLabels,
 		},
 	}
+}
+
+// BuildAggregatingRoleBindingFromRTB returns a RoleBinding for a RTB. It is bound to the Aggregating ClusterRole.
+func BuildAggregatingRoleBindingFromRTB(rtb metav1.Object, roleRefName string) (*rbacv1.RoleBinding, error) {
+	return BuildRoleBindingFromRTB(rtb, AggregatedClusterRoleNameFor(roleRefName))
+}
+
+// BuildRoleBindingFromRTB returns a RoleBinding for a RTB. It is bound to the ClusterRole specified by roleRefName.
+func BuildRoleBindingFromRTB(rtb metav1.Object, roleRefName string) (*rbacv1.RoleBinding, error) {
+	roleRef := rbacv1.RoleRef{
+		APIGroup: rbacv1.GroupName,
+		Kind:     "ClusterRole",
+		Name:     roleRefName,
+	}
+
+	subject, err := BuildSubjectFromRTB(rtb)
+	if err != nil {
+		return nil, err
+	}
+
+	var ownerLabel string
+	switch rtb.(type) {
+	case *v3.ProjectRoleTemplateBinding:
+		ownerLabel = GetPRTBOwnerLabel(rtb.GetName())
+	case *v3.ClusterRoleTemplateBinding:
+		ownerLabel = GetCRTBOwnerLabel(rtb.GetName())
+	default:
+		return nil, fmt.Errorf("unrecognized roleTemplateBinding type: %T", rtb)
+	}
+
+	return &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      NameForRoleBinding(rtb.GetNamespace(), roleRef, subject),
+			Namespace: rtb.GetNamespace(),
+			Labels:    map[string]string{ownerLabel: "true"},
+		},
+		RoleRef:  roleRef,
+		Subjects: []rbacv1.Subject{subject},
+	}, nil
 }
 
 // BuildAggregatingClusterRoleBindingFromRTB returns the ClusterRoleBinding needed for a RTB. It is bound to the Aggregating ClusterRole.
