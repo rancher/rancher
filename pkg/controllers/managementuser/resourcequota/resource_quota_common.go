@@ -2,6 +2,7 @@ package resourcequota
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/rancher/norman/types/convert"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -72,7 +73,7 @@ func convertProjectResourceLimitToResourceList(limit *apiv3.ResourceQuotaLimit) 
 			resourceName := corev1.ResourceName(key)
 			resourceQuantity, err := resource.ParseQuantity(value.(string))
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse value for key %q: %w", key, err)
 			}
 
 			limits[resourceName] = resourceQuantity
