@@ -29,6 +29,7 @@ type InitInfo struct {
 	ServerURL      string
 	RancherVersion string
 	GitHash        string
+	RancherPrime   bool
 }
 
 func (i InitInfo) isReady() bool {
@@ -53,6 +54,7 @@ func getInitInfo(wContext *wrangler.Context) InitInfo {
 		InstallUUID:    installUUID,
 		RancherVersion: rancherVersion,
 		GitHash:        version.GitCommit,
+		RancherPrime:   version.IsPrimeEnv(),
 	}
 }
 

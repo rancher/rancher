@@ -28,6 +28,11 @@ func FriendlyVersion() string {
 	return fmt.Sprintf("%s (%s)", Version, GitCommit)
 }
 
+func IsPrimeEnv() bool {
+	versionType, ok := os.LookupEnv(primeEnv)
+	return ok && versionType == "prime"
+}
+
 type versionHandler struct {
 	info Info
 }
@@ -36,7 +41,7 @@ type versionHandler struct {
 // and uses that along with build-time version information to create an HTTP handler.
 func NewVersionHandler() http.Handler {
 	rancherPrime := "false"
-	if versionType, ok := os.LookupEnv(primeEnv); ok && versionType == "prime" {
+	if IsPrimeEnv() {
 		rancherPrime = "true"
 	}
 	return &versionHandler{info: Info{Version, GitCommit, rancherPrime}}
