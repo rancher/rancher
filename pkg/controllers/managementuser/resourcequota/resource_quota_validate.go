@@ -2,6 +2,7 @@ package resourcequota
 
 import (
 	"fmt"
+	"reflect"
 
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	wmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -58,47 +59,5 @@ func (r *reconcileController) reconcileNamespaces(_ string, p *apiv3.Project) (r
 }
 
 func isEmpty(rql *apiv3.ResourceQuotaLimit) bool {
-	if rql.ConfigMaps != "" {
-		return false
-	}
-	if rql.LimitsCPU != "" {
-		return false
-	}
-	if rql.LimitsMemory != "" {
-		return false
-	}
-	if rql.PersistentVolumeClaims != "" {
-		return false
-	}
-	if rql.Pods != "" {
-		return false
-	}
-	if rql.ReplicationControllers != "" {
-		return false
-	}
-	if rql.RequestsCPU != "" {
-		return false
-	}
-	if rql.RequestsMemory != "" {
-		return false
-	}
-	if rql.RequestsStorage != "" {
-		return false
-	}
-	if rql.Secrets != "" {
-		return false
-	}
-	if rql.Services != "" {
-		return false
-	}
-	if rql.ServicesLoadBalancers != "" {
-		return false
-	}
-	if rql.ServicesNodePorts != "" {
-		return false
-	}
-	if len(rql.ExtendedLimits) == 0 {
-		return false
-	}
-	return true
+	return reflect.ValueOf(rql).IsZero()
 }
