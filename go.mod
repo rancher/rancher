@@ -116,7 +116,7 @@ require (
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.2
 	github.com/rancher/aks-operator v1.13.0-rc.1
-	github.com/rancher/ali-operator v1.13.0-rc.1
+	github.com/rancher/ali-operator v1.13.0-rc.2
 	github.com/rancher/apiserver v0.7.7
 	github.com/rancher/channelserver v0.7.0
 	github.com/rancher/dynamiclistener v0.7.3-rc.1
@@ -127,7 +127,7 @@ require (
 	github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae75779379
 	github.com/rancher/lasso v0.2.5
 	github.com/rancher/machine v0.15.0-rancher137
-	github.com/rancher/muchang v0.0.0-20251013062203-2b2d84128646
+	github.com/rancher/muchang v0.1.0
 	github.com/rancher/norman v0.7.1
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.6.0-rc.1
