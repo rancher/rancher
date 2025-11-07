@@ -575,8 +575,8 @@ github.com/prometheus/procfs v0.17.0 h1:FuLQ+05u4ZI+SS/w9+BWEM2TXiHKsUQ9TADiRH7D
 github.com/prometheus/procfs v0.17.0/go.mod h1:oPQLaDAMRbA+u8H5Pbfq+dl3VDAvHxMUOVhe0wYB2zw=
 github.com/rancher/aks-operator v1.13.0-rc.1 h1:Vy83SjeSm9q7kI18+nkSOR0hyeydDj398KGTo3XEuS4=
 github.com/rancher/aks-operator v1.13.0-rc.1/go.mod h1:xu0BJ01Ynzs4wLMDf2V5eaazEf1/kndX0AeqqsTFVfQ=
-github.com/rancher/ali-operator v1.13.0-rc.1 h1:1LkmCo6M38TKUtKRj36TQU3nijDQLfN8cTXXuGiFjv0=
-github.com/rancher/ali-operator v1.13.0-rc.1/go.mod h1:azJMqAP32vbYAjPGs4LLMYWW5UqvpDbn9IOMoFQoG0M=
+github.com/rancher/ali-operator v1.13.0-rc.2 h1:a0biHGez+Np9XybJVh3yKN4RGPdaCzfM6D6cAXJac6o=
+github.com/rancher/ali-operator v1.13.0-rc.2/go.mod h1:s5HznpxsN9LsgtX6u5UoW9dZNKnDLuXcwzQRAEoDcog=
 github.com/rancher/apiserver v0.7.7 h1:OssoQHO33VKJMo3DkKdvdWkaz8+vjnzsgCQoj7WX+8s=
 github.com/rancher/apiserver v0.7.7/go.mod h1:Wb+Z8ktNyIuqt9hw30geFBQFJQucWTqgu6trxxMtcyM=
 github.com/rancher/channelserver v0.7.0 h1:ZN5o8aD4mD31uhjEEW2e9yQXa3eOb+4Cp6DcWm7W/Lc=
@@ -601,8 +601,8 @@ github.com/rancher/machine v0.15.0-rancher137 h1:KomES1D0LKQ3dE7BbMCXU7SPmF45l+s
 github.com/rancher/machine v0.15.0-rancher137/go.mod h1:2AabuublGVGsYkvDQTm2LECTsRmsjt/3yd+nmYjMLo8=
 github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77 h1:k+vzmkZQsH06rZnDr+phskSixG9ByNj9gVdzHcc8nxw=
 github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77/go.mod h1:wpITyDPTi/Na5h73XkbuEf2AP9fbgrIGqqxVzFhYD6U=
-github.com/rancher/muchang v0.0.0-20251013062203-2b2d84128646 h1:BPwEwQcmtMWghUQDZG10bZgssbXk+7BqeWMNfMMojt4=
-github.com/rancher/muchang v0.0.0-20251013062203-2b2d84128646/go.mod h1:sVg6mngaaZIpSegx/I79rymxm7n5gbI8j5PeoVoIONs=
+github.com/rancher/muchang v0.1.0 h1:Yuu3b7eFRqnnbp6qbLsP/5SY3IKGDj2mUUTzy4AiUVw=
+github.com/rancher/muchang v0.1.0/go.mod h1:sVg6mngaaZIpSegx/I79rymxm7n5gbI8j5PeoVoIONs=
 github.com/rancher/norman v0.7.1 h1:OfmYfN4YeJ4qosXTAbOTPgCrb5GE8W6wFWnDxWcuKCo=
 github.com/rancher/norman v0.7.1/go.mod h1:vZ5qL+eKodJ7zOMQYdl6jwMrSFrqTKpA+KYSFEKew2M=
 github.com/rancher/remotedialer v0.6.0-rc.1 h1:HMwcJjjT4irqM+d++jPcpjoNfhPCaxoHIyPzdpghZhE=
