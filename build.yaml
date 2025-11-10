@@ -2,7 +2,7 @@ webhookVersion: 108.0.0+up0.9.0-rc.14
 remoteDialerProxyVersion: 106.0.2+up0.6.0-rc.4
 provisioningCAPIVersion: 108.0.0+up0.9.0
 turtlesVersion: 108.0.0+up0.25.0-rc.4
-cspAdapterMinVersion: 108.0.0+up8.0.0-rc.3
+cspAdapterMinVersion: 108.0.0+up8.0.0
 defaultShellVersion: rancher/shell:v0.6.0-rc.1
 fleetVersion: 108.0.0+up0.14.0-rc.1
 defaultSccOperatorImage: rancher/scc-operator:v0.3.1-rc.2
