@@ -170,9 +170,12 @@ func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (runtime.Obje
 	case "delete":
 		updatedNs := ns.DeepCopy()
 		delete(updatedNs.Annotations, resourceQuotaAnnotation)
-		updatedNs, err = c.Namespaces.Update(updatedNs)
-		if err != nil {
-			return updatedNs, err
+		// avoid updates if nothing would change
+		if !reflect.DeepEqual(updatedNs, ns) {
+			updatedNs, err = c.Namespaces.Update(updatedNs)
+			if err != nil {
+				return updatedNs, err
+			}
 		}
 		operationErr = c.deleteResourceQuota(existing)
 	}
@@ -192,10 +195,18 @@ func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (runtime.Obje
 	}
 	toUpdate := updated.DeepCopy()
 	namespaceutil.SetNamespaceCondition(toUpdate, time.Second*1, ResourceQuotaInitCondition, true, "")
+	// avoid updates if nothing would change
+	if reflect.DeepEqual(toUpdate, updated) {
+		return updated, nil
+	}
 	return c.Namespaces.Update(toUpdate)
 }
 
 func (c *SyncController) updateResourceQuota(quota *corev1.ResourceQuota, spec *corev1.ResourceQuotaSpec) error {
+	// avoid updates if nothing would change
+	if reflect.DeepEqual(quota.Spec, *spec) {
+		return nil
+	}
 	toUpdate := quota.DeepCopy()
 	toUpdate.Spec = *spec
 	logrus.Infof("Updating default resource quota for namespace %v", toUpdate.Namespace)
@@ -204,6 +215,10 @@ func (c *SyncController) updateResourceQuota(quota *corev1.ResourceQuota, spec *
 }
 
 func (c *SyncController) updateDefaultLimitRange(limitRange *corev1.LimitRange, spec *corev1.LimitRangeSpec) error {
+	// avoid updates if nothing would change
+	if reflect.DeepEqual(limitRange.Spec, *spec) {
+		return nil
+	}
 	toUpdate := limitRange.DeepCopy()
 	toUpdate.Spec = *spec
 	logrus.Infof("Updating default limit range for namespace %v", toUpdate.Namespace)
@@ -338,9 +353,12 @@ func (c *SyncController) validateAndSetNamespaceQuota(ns *corev1.Namespace, quot
 			return false, ns, nil, err
 		}
 		updatedNs.Annotations[resourceQuotaAnnotation] = string(b)
-		updatedNs, err = c.Namespaces.Update(updatedNs)
-		if err != nil {
-			return false, updatedNs, nil, err
+		// avoid updates if nothing would change
+		if !reflect.DeepEqual(updatedNs, ns) {
+			updatedNs, err = c.Namespaces.Update(updatedNs)
+			if err != nil {
+				return false, updatedNs, nil, err
+			}
 		}
 	}
 
@@ -394,6 +412,10 @@ func (c *SyncController) setValidated(ns *corev1.Namespace, value bool, msg stri
 	toUpdate := ns.DeepCopy()
 	if err := namespaceutil.SetNamespaceCondition(toUpdate, time.Second*1, ResourceQuotaValidatedCondition, value, msg); err != nil {
 		return ns, err
+	}
+	// avoid updates if nothing would change
+	if reflect.DeepEqual(toUpdate, ns) {
+		return ns, nil
 	}
 	return c.Namespaces.Update(toUpdate)
 }
