@@ -13,7 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-const extendedLimitsKey = "extendedLimits"
+const extendedKey = "extended"
 
 func convertResourceListToLimit(rList corev1.ResourceList) (*apiv3.ResourceQuotaLimit, error) {
 	converted, err := convert.EncodeToMap(rList)
@@ -21,18 +21,18 @@ func convertResourceListToLimit(rList corev1.ResourceList) (*apiv3.ResourceQuota
 		return nil, err
 	}
 
-	extendedLimits := map[string]string{}
+	extended := map[string]string{}
 	convertedMap := map[string]any{}
 	for key, value := range converted {
 		if val, ok := resourceQuotaReturnConversion[key]; ok {
 			key = val
 		} else {
-			extendedLimits[key] = convert.ToString(value)
+			extended[key] = convert.ToString(value)
 		}
 		convertedMap[key] = convert.ToString(value)
 	}
-	if len(extendedLimits) > 0 {
-		convertedMap[extendedLimitsKey] = extendedLimits
+	if len(extended) > 0 {
+		convertedMap[extendedKey] = extended
 	}
 
 	toReturn := &apiv3.ResourceQuotaLimit{}
@@ -67,9 +67,9 @@ func convertProjectResourceLimitToResourceList(limit *apiv3.ResourceQuotaLimit) 
 	limits := corev1.ResourceList{}
 
 	// convert the arbitrary set first, ...
-	if extendedLimits, ok := limitsMap[extendedLimitsKey]; ok {
-		delete(limitsMap, extendedLimitsKey)
-		for key, value := range extendedLimits.(map[string]any) {
+	if extended, ok := limitsMap[extendedKey]; ok {
+		delete(limitsMap, extendedKey)
+		for key, value := range extended.(map[string]any) {
 			resourceName := corev1.ResourceName(key)
 			resourceQuantity, err := resource.ParseQuantity(value.(string))
 			if err != nil {

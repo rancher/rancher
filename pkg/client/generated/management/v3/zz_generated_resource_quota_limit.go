@@ -3,7 +3,7 @@ package client
 const (
 	ResourceQuotaLimitType                        = "resourceQuotaLimit"
 	ResourceQuotaLimitFieldConfigMaps             = "configMaps"
-	ResourceQuotaLimitFieldExtendedLimits         = "extendedLimits"
+	ResourceQuotaLimitFieldExtended               = "extended"
 	ResourceQuotaLimitFieldLimitsCPU              = "limitsCpu"
 	ResourceQuotaLimitFieldLimitsMemory           = "limitsMemory"
 	ResourceQuotaLimitFieldPersistentVolumeClaims = "persistentVolumeClaims"
@@ -20,7 +20,7 @@ const (
 
 type ResourceQuotaLimit struct {
 	ConfigMaps             string            `json:"configMaps,omitempty" yaml:"configMaps,omitempty"`
-	ExtendedLimits         map[string]string `json:"extendedLimits,omitempty" yaml:"extendedLimits,omitempty"`
+	Extended               map[string]string `json:"extended,omitempty" yaml:"extended,omitempty"`
 	LimitsCPU              string            `json:"limitsCpu,omitempty" yaml:"limitsCpu,omitempty"`
 	LimitsMemory           string            `json:"limitsMemory,omitempty" yaml:"limitsMemory,omitempty"`
 	PersistentVolumeClaims string            `json:"persistentVolumeClaims,omitempty" yaml:"persistentVolumeClaims,omitempty"`

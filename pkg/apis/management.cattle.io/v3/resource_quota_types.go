@@ -74,11 +74,12 @@ type ResourceQuotaLimit struct {
 	// +optional
 	LimitsMemory string `json:"limitsMemory,omitempty"`
 
-	// ExtendedLimits contains additional limits a user may wish to impose
-	// beyond the limits set by the preceding fields. The keys have to be
-	// parseable as resource names, while the values have to be parseable as
-	// resource quantities. See also https://kubernetes.io/docs/concepts/policy/resource-quotas
-	ExtendedLimits map[string]string `json:"extendedLimits,omitempty"`
+	// Extended contains additional limits a user may wish to impose beyond
+	// the limits set by the preceding fields. The keys have to be parseable
+	// as resource names, while the values have to be parseable as resource
+	// quantities. See also
+	// https://kubernetes.io/docs/concepts/policy/resource-quotas
+	Extended map[string]string `json:"extended,omitempty"`
 }
 
 // ContainerResourceLimit holds quotas limits for individual containers.

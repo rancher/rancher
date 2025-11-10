@@ -43,7 +43,7 @@ func TestConvertResourceListToLimit(t *testing.T) {
 			Services:               "11",
 			ServicesLoadBalancers:  "12",
 			ServicesNodePorts:      "13",
-			ExtendedLimits: map[string]string{
+			Extended: map[string]string{
 				"ephemeral-storage": "14",
 			},
 		}, out)
@@ -66,7 +66,7 @@ func TestConvertResourceLimitResourceQuotaSpec(t *testing.T) {
 			Services:               "11",
 			ServicesLoadBalancers:  "12",
 			ServicesNodePorts:      "13",
-			ExtendedLimits: map[string]string{
+			Extended: map[string]string{
 				"ephemeral-storage": "14",
 			},
 		})
@@ -108,7 +108,7 @@ func TestConvertProjectResourceLimitToResourceList(t *testing.T) {
 			Services:               "11",
 			ServicesLoadBalancers:  "12",
 			ServicesNodePorts:      "13",
-			ExtendedLimits: map[string]string{
+			Extended: map[string]string{
 				"ephemeral-storage": "14",
 			},
 		})
