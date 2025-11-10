@@ -31,3 +31,8 @@ sed -i -e "s@%POST_DELETE_IMAGE_NAME%@${rancher_shell_image_name}@g" build/chart
 sed -i -e "s/%POST_DELETE_IMAGE_TAG%/${rancher_shell_image_tag}/g" build/chart/rancher/values.yaml
 sed -i -e "s@%PRE_UPGRADE_IMAGE_NAME%@${rancher_shell_image_name}@g" build/chart/rancher/values.yaml
 sed -i -e "s/%PRE_UPGRADE_IMAGE_TAG%/${rancher_shell_image_tag}/g" build/chart/rancher/values.yaml
+
+if [[ -v REGISTRY ]]; then
+  sed -i "s|systemDefaultRegistry: .*|systemDefaultRegistry: ${REGISTRY}|g" build/chart/rancher/values.yaml
+  sed -i "s/| \`systemDefaultRegistry\`\s*| \"\"\s*|/| \`systemDefaultRegistry\` | \"${REGISTRY}\" |/" build/chart/rancher/README.md
+fi
