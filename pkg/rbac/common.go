@@ -389,23 +389,25 @@ func CreateOrUpdateResource[T generic.RuntimeMetaObject, TList runtime.Object](o
 //   - client is the Wrangler client to use to get/create/update resource.
 //   - areResourcesTheSame is a func that compares two resources and returns (true, nil) if they are equal, and (false, T) when not the same.
 //     T is an updated version of the resource.
-func CreateOrUpdateNamespacedResource[T generic.RuntimeMetaObject, TList runtime.Object](obj T, client generic.ClientInterface[T, TList], areResourcesTheSame func(T, T) (bool, T)) (T, error) {
+func CreateOrUpdateNamespacedResource[T generic.RuntimeMetaObject, TList runtime.Object](obj T, client generic.ClientInterface[T, TList], areResourcesTheSame func(T, T) (bool, T)) error {
 	resource, err := client.Get(obj.GetNamespace(), obj.GetName(), metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			return obj, err
+			return err
 		}
 		// resource doesn't exist, create it
 		logrus.Infof("%T %s being created in namespace %s", obj, obj.GetName(), obj.GetNamespace())
-		return client.Create(obj)
+		_, err := client.Create(obj)
+		return err
 	}
 
 	if same, updatedResource := areResourcesTheSame(resource, obj); !same {
 		logrus.Infof("%T %s in namespace %s needs to be updated", obj, obj.GetName(), obj.GetNamespace())
-		return client.Update(updatedResource)
+		_, err := client.Update(updatedResource)
+		return err
 
 	}
-	return obj, nil
+	return nil
 }
 
 // AreClusterRolesSame returns true if the current ClusterRole has the same fields present in the desired ClusterRole.
@@ -604,9 +606,9 @@ func AreClusterRoleBindingContentsSame(crb1, crb2 *rbacv1.ClusterRoleBinding) bo
 }
 
 // AreRoleBindingsSame compares the Subjects and RoleRef fields of two Cluster Role Bindings.
-func AreRoleBindingContentsSame(rb1, rb2 *rbacv1.RoleBinding) bool {
+func AreRoleBindingContentsSame(rb1, rb2 *rbacv1.RoleBinding) (bool, *rbacv1.RoleBinding) {
 	return equality.Semantic.DeepEqual(rb1.Subjects, rb2.Subjects) &&
-		equality.Semantic.DeepEqual(rb1.RoleRef, rb2.RoleRef)
+		equality.Semantic.DeepEqual(rb1.RoleRef, rb2.RoleRef), rb2
 }
 
 // ClusterRoleNameFor returns safe version of a string to be used for a clusterRoleName

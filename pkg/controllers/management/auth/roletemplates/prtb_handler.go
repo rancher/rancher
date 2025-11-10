@@ -150,7 +150,7 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 
 	var prtbHasBinding bool
 	for _, currentRB := range currentRBs.Items {
-		if rbac.AreRoleBindingContentsSame(&currentRB, rb) {
+		if ok, _ := rbac.AreRoleBindingContentsSame(&currentRB, rb); ok {
 			prtbHasBinding = true
 			continue
 		}
@@ -160,7 +160,7 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 	}
 
 	if !prtbHasBinding {
-		if _, err := p.rbController.Create(rb); err != nil {
+		if err := rbac.CreateOrUpdateNamespacedResource(rb, p.rbController, rbac.AreRoleBindingContentsSame); err != nil {
 			return err
 		}
 	}

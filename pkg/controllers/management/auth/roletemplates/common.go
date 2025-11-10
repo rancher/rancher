@@ -174,7 +174,7 @@ func createOrUpdateProjectMembershipBinding(prtb *v3.ProjectRoleTemplateBinding,
 		return err
 	}
 
-	if !rbac.AreRoleBindingContentsSame(wantedRB, existingRB) {
+	if ok, _ := rbac.AreRoleBindingContentsSame(wantedRB, existingRB); !ok {
 		if err := rbController.Delete(wantedRB.Namespace, wantedRB.Name, &metav1.DeleteOptions{}); err != nil {
 			return err
 		}

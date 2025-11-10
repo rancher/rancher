@@ -149,7 +149,7 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, loc
 
 	for _, currentRB := range currentRBs.Items {
 		if rb, ok := desiredRBs[currentRB.Name]; ok {
-			if rbac.AreRoleBindingContentsSame(&currentRB, rb) {
+			if ok, _ := rbac.AreRoleBindingContentsSame(&currentRB, rb); ok {
 				// If the role binding already exists with the right contents, we can skip creating it.
 				delete(desiredRBs, rb.Name)
 				continue
@@ -164,7 +164,7 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, loc
 
 	// For any role bindings that don't exist, create them
 	for _, rb := range desiredRBs {
-		if _, err := c.rbController.Create(rb); err != nil {
+		if err := rbac.CreateOrUpdateNamespacedResource(rb, c.rbController, rbac.AreRoleBindingContentsSame); err != nil {
 			c.s.AddCondition(localConditions, condition, failedToCreateRoleBinding, err)
 			return err
 		}
@@ -174,7 +174,7 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, loc
 	return nil
 }
 
-// getDesiredClusterRoleBindings checks for project and cluster management roles, and if they exist, builds and returns the needed ClusterRoleBindings
+// getDesiredRoleBindings checks for project and cluster management roles, and if they exist, builds and returns the needed RoleBindings
 func (c *crtbHandler) getDesiredRoleBindings(crtb *v3.ClusterRoleTemplateBinding) (map[string]*rbacv1.RoleBinding, error) {
 	desiredRBs := map[string]*rbacv1.RoleBinding{}
 	// Check if there is a project management role to bind to

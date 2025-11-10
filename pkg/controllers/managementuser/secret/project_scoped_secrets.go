@@ -95,8 +95,8 @@ func (n *namespaceHandler) OnChange(_ string, namespace *corev1.Namespace) (*cor
 	for _, secret := range secrets {
 		secretCopy := getNamespacedSecret(secret, namespace.Name)
 
-		s, err := rbac.CreateOrUpdateNamespacedResource(secretCopy, n.secretClient, areSecretsSame)
-		desiredSecrets.Insert(client.ObjectKeyFromObject(s))
+		err := rbac.CreateOrUpdateNamespacedResource(secretCopy, n.secretClient, areSecretsSame)
+		desiredSecrets.Insert(client.ObjectKeyFromObject(secretCopy))
 		errs = errors.Join(errs, err)
 	}
 	if errs != nil {
