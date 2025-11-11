@@ -408,6 +408,8 @@ def test_perform_workload_action_read_only(admin_mc, admin_pc, remove_resource,
 
     workload = client.reload(workload)
     wait_for_workload(client, workload.id, ns.id)
+
+    workload = client.reload(workload)
     original_rev_id = workload.revisions().data[0].id
 
     # Read-only users should receive a 404 error.
