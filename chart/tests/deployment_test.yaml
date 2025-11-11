@@ -41,19 +41,38 @@ tests:
       content:
         name: CATTLE_NAMESPACE
         value: NAMESPACE
-- it: should Just have default env vars
+- it: should Just have default env vars with default values.yaml
+  set:
+    systemDefaultRegistry: ""
   asserts:
-  - equal:
-      path: spec.template.spec.containers[0].env
-      value:
-      - name: CATTLE_NAMESPACE
-        value: NAMESPACE
-      - name: CATTLE_PEER_SERVICE
-        value: RELEASE-NAME-rancher
-      - name: IMPERATIVE_API_DIRECT
-        value: "true"
-      - name: IMPERATIVE_API_APP_SELECTOR
-        value: RELEASE-NAME-rancher
+    - equal:
+        path: spec.template.spec.containers[0].env
+        value:
+          - name: CATTLE_NAMESPACE
+            value: NAMESPACE
+          - name: CATTLE_PEER_SERVICE
+            value: RELEASE-NAME-rancher
+          - name: IMPERATIVE_API_DIRECT
+            value: "true"
+          - name: IMPERATIVE_API_APP_SELECTOR
+            value: RELEASE-NAME-rancher
+- it: should have systemDefaultRegistry env var set when value is not empty
+  set:
+    systemDefaultRegistry: "suseregistry"
+  asserts:
+    - equal:
+        path: spec.template.spec.containers[0].env
+        value:
+          - name: CATTLE_NAMESPACE
+            value: NAMESPACE
+          - name: CATTLE_PEER_SERVICE
+            value: RELEASE-NAME-rancher
+          - name: CATTLE_SYSTEM_DEFAULT_REGISTRY
+            value: suseregistry
+          - name: IMPERATIVE_API_DIRECT
+            value: "true"
+          - name: IMPERATIVE_API_APP_SELECTOR
+            value: RELEASE-NAME-rancher
 - it: should default imagePullPolicy to IfNotPresent
   asserts:
   - equal:
@@ -68,6 +87,7 @@ tests:
       value: Always
 - it: should set sidecar image as auditLog.image when auditLog.destination is sidecar and auditLog.enabled == true
   set:
+    systemDefaultRegistry: ""
     auditLog:
       enabled: true
       destination: sidecar
@@ -77,6 +97,7 @@ tests:
       value: rancher/mirrored-bci-micro:15.6.24.2
 - it: should override auditLog.image.repository value when auditLog.destination is sidecar and auditLog.enabled == true and both auditLog.image.repository and auditLog.image.tag are set
   set:
+    systemDefaultRegistry: ""
     auditLog:
       destination: sidecar
       enabled: true
@@ -89,6 +110,7 @@ tests:
       value: my.private.repo:5000/rancher/busybox:1.0.1
 - it: deprecated busyboxImage should override auditLog.image.repository image when auditLog.destination is sidecar and auditLog.enabled == true and auditLog.image.repository  and busyboxImage are set
   set:
+    systemDefaultRegistry: ""
     auditLog:
       enabled: true
       destination: sidecar
@@ -226,7 +248,7 @@ tests:
         mountPath: /usr/share/rancher/ui-dashboard/dashboard/_nuxt/assets/images/pl
         name: custom-logos
         subPath: vue
-- it: should mount custom-logos volume with default subpaths if customLogos.enabled and customLogos.volumeKind=persistentVolumeClaim and customLogos.volumeSubpaths.* blank 
+- it: should mount custom-logos volume with default subpaths if customLogos.enabled and customLogos.volumeKind=persistentVolumeClaim and customLogos.volumeSubpaths.* blank
   set:
     customLogos.enabled: true
     customLogos.volumeKind: persistentVolumeClaim
@@ -282,7 +304,7 @@ tests:
         mountPath: /usr/share/rancher/ui-dashboard/dashboard/_nuxt/assets/images/pl
         name: custom-logos
         subPath: vue
-- it: should mount custom-logos volume with default subpaths if customLogos.enabled and customLogos.volumeKind=persistentVolumeClaim and customLogos.volumeName and customLogos.volumeSubpaths.* blank 
+- it: should mount custom-logos volume with default subpaths if customLogos.enabled and customLogos.volumeKind=persistentVolumeClaim and customLogos.volumeName and customLogos.volumeSubpaths.* blank
   set:
     customLogos.enabled: true
     customLogos.volumeKind: configMap
@@ -700,6 +722,7 @@ tests:
             memory: 500Mi
 - it: should set the CACHE_SYNC_TIMEOUT when provided
   set:
+    systemDefaultRegistry: ""
     cacheSyncTimeout: 10m
   asserts:
   - equal:
