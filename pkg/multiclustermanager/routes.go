@@ -27,6 +27,7 @@ import (
 	"github.com/rancher/rancher/pkg/channelserver"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	rancherdialer "github.com/rancher/rancher/pkg/dialer"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/httpproxy"
 	k8sProxyPkg "github.com/rancher/rancher/pkg/k8sproxy"
 	"github.com/rancher/rancher/pkg/metrics"
@@ -103,7 +104,9 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 	unauthed.PathPrefix("/v1-{prefix}-release/channel").Handler(channelserver)
 	unauthed.PathPrefix("/v1-{prefix}-release/release").Handler(channelserver)
 	unauthed.PathPrefix("/v1-saml").Handler(saml.AuthHandler())
-	unauthed.PathPrefix("/v3-public").Handler(v3PublicAPI)
+	if features.V3Public.Enabled() {
+		unauthed.PathPrefix("/v3-public").Handler(v3PublicAPI)
+	}
 	unauthed.PathPrefix("/v1-public").Handler(v1PublicAPI)
 
 	// Authenticated routes
