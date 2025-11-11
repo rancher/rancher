@@ -6,13 +6,12 @@ import (
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 func TestConvertResourceListToLimit(t *testing.T) {
 	t.Run("convertResourceListToLimit", func(t *testing.T) {
-		out, err := convertResourceListToLimit(v1.ResourceList{
+		out, err := convertResourceListToLimit(corev1.ResourceList{
 			"configmaps":             resource.MustParse("1"),
 			"ephemeral-storage":      resource.MustParse("14"),
 			"limits.cpu":             resource.MustParse("2"),
@@ -72,7 +71,7 @@ func TestConvertResourceLimitResourceQuotaSpec(t *testing.T) {
 		})
 		assert.NoError(t, err)
 		assert.Equal(t, &corev1.ResourceQuotaSpec{
-			Hard: v1.ResourceList{
+			Hard: corev1.ResourceList{
 				"configmaps":             resource.MustParse("1"),
 				"ephemeral-storage":      resource.MustParse("14"),
 				"limits.cpu":             resource.MustParse("2"),
@@ -113,7 +112,7 @@ func TestConvertProjectResourceLimitToResourceList(t *testing.T) {
 			},
 		})
 		assert.NoError(t, err)
-		assert.Equal(t, v1.ResourceList{
+		assert.Equal(t, corev1.ResourceList{
 			"configmaps":             resource.MustParse("1"),
 			"ephemeral-storage":      resource.MustParse("14"),
 			"limits.cpu":             resource.MustParse("2"),
@@ -141,11 +140,11 @@ func TestConvertContainerResourceLimitToResourceList(t *testing.T) {
 			RequestsMemory: "8",
 		})
 		assert.NoError(t, err)
-		assert.Equal(t, v1.ResourceList{
+		assert.Equal(t, corev1.ResourceList{
 			"cpu":    resource.MustParse("7"),
 			"memory": resource.MustParse("8"),
 		}, requests)
-		assert.Equal(t, v1.ResourceList{
+		assert.Equal(t, corev1.ResourceList{
 			"cpu":    resource.MustParse("2"),
 			"memory": resource.MustParse("3"),
 		}, limits)
