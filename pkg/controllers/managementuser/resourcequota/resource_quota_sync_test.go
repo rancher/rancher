@@ -6,8 +6,7 @@ import (
 	"testing"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
-
+	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -17,7 +16,7 @@ import (
 func TestSetValidated(t *testing.T) {
 	t.Run("setup changes, second identical not", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		nsMock := wranglerfake.NewMockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList](ctrl)
+		nsMock := fake.NewMockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList](ctrl)
 		nsMock.EXPECT().Update(gomock.Any()).DoAndReturn(func(ns *corev1.Namespace) (*corev1.Namespace, error) {
 			return ns, nil
 		}).Times(1)
@@ -32,7 +31,6 @@ func TestSetValidated(t *testing.T) {
 		// second call makes no difference, does not call client
 		_, err = sc.setValidated(ns, true, "test")
 		assert.NoError(t, err)
-		ctrl.Finish()
 	})
 }
 
@@ -51,26 +49,24 @@ func TestUpdateResourceQuota(t *testing.T) {
 
 	t.Run("no update if no change", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		rqMock := wranglerfake.NewMockControllerInterface[*corev1.ResourceQuota, *corev1.ResourceQuotaList](ctrl)
+		rqMock := fake.NewMockControllerInterface[*corev1.ResourceQuota, *corev1.ResourceQuotaList](ctrl)
 
 		rqMock.EXPECT().Update(gomock.Any()).Return(nil, nil).Times(0)
 		sc := SyncController{ResourceQuotas: rqMock}
 
 		err := sc.updateResourceQuota(&corev1.ResourceQuota{Spec: specA}, &specA)
 		assert.NoError(t, err)
-		ctrl.Finish()
 	})
 
 	t.Run("update for changes", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		rqMock := wranglerfake.NewMockControllerInterface[*corev1.ResourceQuota, *corev1.ResourceQuotaList](ctrl)
+		rqMock := fake.NewMockControllerInterface[*corev1.ResourceQuota, *corev1.ResourceQuotaList](ctrl)
 
 		rqMock.EXPECT().Update(gomock.Any()).Return(nil, nil)
 		sc := SyncController{ResourceQuotas: rqMock}
 
 		err := sc.updateResourceQuota(&corev1.ResourceQuota{Spec: specA}, &specB)
 		assert.NoError(t, err)
-		ctrl.Finish()
 	})
 }
 
@@ -113,26 +109,24 @@ func TestUpdateDefaultLimitRange(t *testing.T) {
 
 	t.Run("no update if no change", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		lrMock := wranglerfake.NewMockControllerInterface[*corev1.LimitRange, *corev1.LimitRangeList](ctrl)
+		lrMock := fake.NewMockControllerInterface[*corev1.LimitRange, *corev1.LimitRangeList](ctrl)
 
 		lrMock.EXPECT().Update(gomock.Any()).Return(nil, nil).Times(0)
 		sc := SyncController{LimitRange: lrMock}
 
 		err := sc.updateDefaultLimitRange(&corev1.LimitRange{Spec: specA}, &specA)
 		assert.NoError(t, err)
-		ctrl.Finish()
 	})
 
 	t.Run("update for changes", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		lrMock := wranglerfake.NewMockControllerInterface[*corev1.LimitRange, *corev1.LimitRangeList](ctrl)
+		lrMock := fake.NewMockControllerInterface[*corev1.LimitRange, *corev1.LimitRangeList](ctrl)
 
 		lrMock.EXPECT().Update(gomock.Any()).Return(nil, nil)
 		sc := SyncController{LimitRange: lrMock}
 
 		err := sc.updateDefaultLimitRange(&corev1.LimitRange{Spec: specA}, &specB)
 		assert.NoError(t, err)
-		ctrl.Finish()
 	})
 }
 
