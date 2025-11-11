@@ -16,6 +16,10 @@ spec:
       labels: {{ include "rancher.preupgradelabels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ template "rancher.fullname" . }}-pre-upgrade
+      {{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+      {{ toYaml .Values.imagePullSecrets | indent 2 }}
+      {{- end }}
       restartPolicy: Never
       containers:
         - name: {{ template "rancher.name" . }}-pre-upgrade

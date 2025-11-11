@@ -1,0 +1,26 @@
+suite: Test Jobs
+
+templates:
+  - post-delete-hook-job.yaml
+  - pre-upgrade-hook-job.yaml
+
+tests:
+  - it: should render imagePullSecrets when set
+    set:
+      postDelete:
+        enabled: true
+        image:
+          registry: "docker.io/"
+          repository: "rancher/rancher"
+          tag: "latest"
+        namespaceList:
+          - "ns1"
+        timeout: 60
+        ignoreTimeoutError: false
+      imagePullSecrets:
+        - name: my-secret
+    asserts:
+      - contains:
+          path: spec.template.spec.imagePullSecrets
+          content:
+            name: my-secret

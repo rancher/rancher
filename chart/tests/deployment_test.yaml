@@ -2,6 +2,15 @@ suite: Test Deployment
 templates:
 - deployment.yaml
 tests:
+- it: should render imagePullSecrets when set
+  set:
+    imagePullSecrets:
+      - name: my-secret
+  asserts:
+    - contains:
+        path: spec.template.spec.imagePullSecrets
+        content:
+          name: my-secret
 - it: should set --add-local=false
   set:
     addLocal: "false"
