@@ -93,7 +93,9 @@ func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext, 
 
 	limitingHandler := utils.APIBodyLimitingHandler(apiLimit)
 	root.PathPrefix("/v1-saml").Handler(limitingHandler(saml))
-	root.PathPrefix("/v3-public").Handler(limitingHandler(v3PublicAPI)) // Deprecated. Use /v1-public instead.
+	if features.V3Public.Enabled() {
+		root.PathPrefix("/v3-public").Handler(limitingHandler(v3PublicAPI)) // Deprecated. Use /v1-public instead.
+	}
 	root.PathPrefix("/v1-public").Handler(limitingHandler(v1PublicAPI))
 	root.NotFoundHandler = privateAPI
 

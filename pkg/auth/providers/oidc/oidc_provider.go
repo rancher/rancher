@@ -35,9 +35,10 @@ import (
 )
 
 const (
-	Name      = "oidc"
-	UserType  = "user"
-	GroupType = "group"
+	Name          = "oidc"
+	UserType      = "user"
+	GroupType     = "group"
+	IDTokenCookie = "R_OIDC_ID"
 )
 
 type tokenManager interface {
@@ -94,16 +95,16 @@ func (o *OpenIDCProvider) CustomizeSchema(schema *types.Schema) {
 	schema.Formatter = o.Formatter
 }
 
-func (o *OpenIDCProvider) AuthenticateUser(ctx context.Context, input any) (apiv3.Principal, []apiv3.Principal, string, error) {
+func (o *OpenIDCProvider) AuthenticateUser(w http.ResponseWriter, req *http.Request, input any) (apiv3.Principal, []apiv3.Principal, string, error) {
 	login, ok := input.(*apiv3.OIDCLogin)
 	if !ok {
 		return apiv3.Principal{}, nil, "", fmt.Errorf("unexpected input type")
 	}
-	userPrincipal, groupPrincipals, providerToken, _, err := o.LoginUser(ctx, login, nil)
+	userPrincipal, groupPrincipals, providerToken, _, err := o.LoginUser(w, req, login, nil)
 	return userPrincipal, groupPrincipals, providerToken, err
 }
 
-func (o *OpenIDCProvider) LoginUser(ctx context.Context, oauthLoginInfo *apiv3.OIDCLogin, config *apiv3.OIDCConfig) (apiv3.Principal, []apiv3.Principal, string, ClaimInfo, error) {
+func (o *OpenIDCProvider) LoginUser(w http.ResponseWriter, req *http.Request, oauthLoginInfo *apiv3.OIDCLogin, config *apiv3.OIDCConfig) (apiv3.Principal, []apiv3.Principal, string, ClaimInfo, error) {
 	var userPrincipal apiv3.Principal
 	var groupPrincipals []apiv3.Principal
 	var userClaimInfo ClaimInfo
@@ -116,7 +117,7 @@ func (o *OpenIDCProvider) LoginUser(ctx context.Context, oauthLoginInfo *apiv3.O
 		}
 	}
 
-	userInfo, oauth2Token, err := o.getUserInfoFromAuthCode(&ctx, config, oauthLoginInfo.Code, &userClaimInfo, "")
+	userInfo, oauth2Token, idToken, err := o.getUserInfoFromAuthCode(req.Context(), config, oauthLoginInfo.Code, &userClaimInfo, "")
 	if err != nil {
 		return userPrincipal, groupPrincipals, "", userClaimInfo, err
 	}
@@ -139,6 +140,7 @@ func (o *OpenIDCProvider) LoginUser(ctx context.Context, oauthLoginInfo *apiv3.O
 		return userPrincipal, groupPrincipals, "", userClaimInfo, err
 	}
 
+	setIDToken(req, w, idToken)
 	return userPrincipal, groupPrincipals, string(oauthToken), userClaimInfo, err
 }
 
@@ -378,48 +380,48 @@ func (o *OpenIDCProvider) GetUserExtraAttributes(userPrincipal apiv3.Principal) 
 	return common.GetCommonUserExtraAttributes(userPrincipal)
 }
 
-func (o *OpenIDCProvider) getUserInfoFromAuthCode(ctx *context.Context, config *apiv3.OIDCConfig, authCode string, claimInfo *ClaimInfo, userName string) (*oidc.UserInfo, *oauth2.Token, error) {
+func (o *OpenIDCProvider) getUserInfoFromAuthCode(ctx context.Context, config *apiv3.OIDCConfig, authCode string, claimInfo *ClaimInfo, userName string) (*oidc.UserInfo, *oauth2.Token, string, error) {
 	var userInfo *oidc.UserInfo
 	var oauth2Token *oauth2.Token
 	var err error
 
-	updatedContext, err := AddCertKeyToContext(*ctx, config.Certificate, config.PrivateKey)
+	updatedContext, err := AddCertKeyToContext(ctx, config.Certificate, config.PrivateKey)
 	if err != nil {
-		return userInfo, oauth2Token, err
+		return userInfo, oauth2Token, "", err
 	}
 
 	provider, err := o.getOIDCProvider(updatedContext, config)
 	if err != nil {
-		return userInfo, oauth2Token, err
+		return userInfo, oauth2Token, "", err
 	}
 	oauthConfig := ConfigToOauthConfig(provider.Endpoint(), config)
 	var verifier = provider.Verifier(&oidc.Config{ClientID: config.ClientID})
 
 	oauth2Token, err = oauthConfig.Exchange(updatedContext, authCode, oauth2.SetAuthURLParam("scope", strings.Join(oauthConfig.Scopes, " ")))
 	if err != nil {
-		return userInfo, oauth2Token, err
+		return userInfo, oauth2Token, "", err
 	}
 
 	// Get the ID token.  The ID token should be there because we require the openid scope.
 	rawIDToken, ok := oauth2Token.Extra("id_token").(string)
 	if !ok {
-		return userInfo, oauth2Token, fmt.Errorf("no id_token field in oauth2 token")
+		return userInfo, oauth2Token, "", fmt.Errorf("no id_token field in oauth2 token")
 	}
 
 	idToken, err := verifier.Verify(updatedContext, rawIDToken)
 	if err != nil {
-		return userInfo, oauth2Token, fmt.Errorf("failed to verify ID token: %w", err)
+		return userInfo, oauth2Token, "", fmt.Errorf("failed to verify ID token: %w", err)
 	}
 
 	if err := idToken.Claims(&claimInfo); err != nil {
-		return userInfo, oauth2Token, fmt.Errorf("failed to parse claims: %w", err)
+		return userInfo, oauth2Token, "", fmt.Errorf("failed to parse claims: %w", err)
 	}
 
 	// read groups from GroupsClaim if provided
 	if config.GroupsClaim != "" {
 		groupsClaim, err := getValueFromClaims[[]any](idToken, config.GroupsClaim)
 		if err != nil {
-			return userInfo, oauth2Token, fmt.Errorf("failed to parse groups claims: %w", err)
+			return userInfo, oauth2Token, "", fmt.Errorf("failed to parse groups claims: %w", err)
 		}
 
 		if len(groupsClaim) > 0 {
@@ -440,7 +442,7 @@ func (o *OpenIDCProvider) getUserInfoFromAuthCode(ctx *context.Context, config *
 	if config.NameClaim != "" {
 		nameClaim, err := getValueFromClaims[string](idToken, config.NameClaim)
 		if err != nil {
-			return userInfo, oauth2Token, fmt.Errorf("failed to parse claims: %w", err)
+			return userInfo, oauth2Token, "", fmt.Errorf("failed to parse claims: %w", err)
 		}
 		claimInfo.Name = nameClaim
 	}
@@ -449,40 +451,40 @@ func (o *OpenIDCProvider) getUserInfoFromAuthCode(ctx *context.Context, config *
 	if config.EmailClaim != "" {
 		emailClaim, err := getValueFromClaims[string](idToken, config.EmailClaim)
 		if err != nil {
-			return userInfo, oauth2Token, fmt.Errorf("failed to parse claims: %w", err)
+			return userInfo, oauth2Token, "", fmt.Errorf("failed to parse claims: %w", err)
 		}
 		claimInfo.Email = emailClaim
 	}
 
 	// Valid will return false if access token is expired
 	if !oauth2Token.Valid() {
-		return userInfo, oauth2Token, fmt.Errorf("not valid token: %w", err)
+		return userInfo, oauth2Token, "", fmt.Errorf("not valid token: %w", err)
 	}
 
 	if err := o.UpdateToken(oauth2Token, userName); err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 
 	if config.AcrValue != "" {
 		acrValue, err := parseACRFromAccessToken(oauth2Token.AccessToken)
 		if err != nil {
-			return userInfo, oauth2Token, err
+			return userInfo, oauth2Token, "", err
 		}
 		if !isValidACR(acrValue, config.AcrValue) {
-			return userInfo, oauth2Token, errors.New("failed to validate ACR")
+			return userInfo, oauth2Token, "", errors.New("failed to validate ACR")
 		}
 	}
 
 	logrus.Debugf("OpenIDCProvider: getUserInfo: getting user info for user %s", userName)
 	userInfo, err = provider.UserInfo(updatedContext, oauthConfig.TokenSource(updatedContext, oauth2Token))
 	if err != nil {
-		return userInfo, oauth2Token, err
+		return userInfo, oauth2Token, "", err
 	}
 	if err := userInfo.Claims(&claimInfo); err != nil {
-		return userInfo, oauth2Token, err
+		return userInfo, oauth2Token, "", err
 	}
 
-	return userInfo, oauth2Token, nil
+	return userInfo, oauth2Token, rawIDToken, nil
 }
 
 func (o *OpenIDCProvider) getClaimInfoFromToken(ctx context.Context, config *apiv3.OIDCConfig, token *oauth2.Token, userName string) (*ClaimInfo, error) {
@@ -727,7 +729,7 @@ func (o *OpenIDCProvider) createIDPRedirectURL(r *http.Request, config *apiv3.OI
 
 	idpRedirectURL, err := url.Parse(config.EndSessionEndpoint)
 	if err != nil {
-		logrus.Infof("OpenIDCProvider: [logout-all] failed parsing end session endpoint: %v", err)
+		logrus.Errorf("OpenIDCProvider: [logout-all] failed parsing end session endpoint: %v", err)
 		return "", err
 	}
 
@@ -743,6 +745,15 @@ func (o *OpenIDCProvider) createIDPRedirectURL(r *http.Request, config *apiv3.OI
 	// redirect_uri for the client ID.
 	if authLogout.FinalRedirectURL != "" {
 		params.Set("post_logout_redirect_uri", authLogout.FinalRedirectURL)
+		logrus.Debugf("OpenIDCProvider: [logout-all] redirecting to %s", authLogout.FinalRedirectURL)
+	}
+
+	idToken := getIDToken(r)
+	// Not sending the ID token is allowed - this means that there has to be a
+	// session between the user's browser and the OP and this should be
+	// terminated.
+	if idToken != "" {
+		params.Set("id_token_hint", idToken)
 	}
 
 	// This triggers logout without an id_token_hint.
@@ -801,4 +812,25 @@ func getValueFromClaims[T any](idToken *oidc.IDToken, name string) (T, error) {
 	}
 
 	return claim, nil
+}
+
+func setIDToken(req *http.Request, w http.ResponseWriter, token string) {
+	isSecure := req.URL.Scheme == "https"
+	tokenCookie := &http.Cookie{
+		Name:     IDTokenCookie,
+		Value:    token,
+		Secure:   isSecure,
+		Path:     "/",
+		HttpOnly: true,
+	}
+	http.SetCookie(w, tokenCookie)
+}
+
+func getIDToken(request *http.Request) string {
+	cookie, err := request.Cookie(IDTokenCookie)
+	if err != nil {
+		return ""
+	}
+
+	return cookie.Value
 }

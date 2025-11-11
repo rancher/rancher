@@ -14,11 +14,12 @@ import (
 )
 
 const (
-	CookieName      = "R_SESS"
-	AuthHeaderName  = "Authorization"
-	AuthValuePrefix = "Bearer"
-	BasicAuthPrefix = "Basic"
-	CSRFCookie      = "CSRF"
+	CookieName        = "R_SESS"
+	AuthHeaderName    = "Authorization"
+	AuthValuePrefix   = "Bearer"
+	BasicAuthPrefix   = "Basic"
+	CSRFCookie        = "CSRF"
+	IDTokenCookieName = "R_OIDC_ID"
 )
 
 type ServerOption func(server *normanapi.Server)

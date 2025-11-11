@@ -45,6 +45,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigMana
 	})
 	if features.MCM.Enabled() {
 		machineprovision.Register(ctx, clients, kubeconfigManager)
+		autoscaler.Register(ctx, clients)
 	}
 	rkecluster.Register(ctx, clients)
 	bootstrap.Register(ctx, clients)
@@ -55,7 +56,6 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigMana
 	rkecontrolplane.Register(ctx, clients)
 	managesystemagent.Register(ctx, clients)
 	machinedrain.Register(ctx, clients)
-	autoscaler.Register(ctx, clients)
 
 	return nil
 }

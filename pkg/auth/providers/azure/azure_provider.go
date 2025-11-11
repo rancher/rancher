@@ -2,7 +2,6 @@
 package azure
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -77,7 +76,7 @@ func (ap *Provider) GetName() string {
 	return Name
 }
 
-func (ap *Provider) AuthenticateUser(ctx context.Context, input any) (apiv3.Principal, []apiv3.Principal, string, error) {
+func (ap *Provider) AuthenticateUser(_ http.ResponseWriter, _ *http.Request, input any) (apiv3.Principal, []apiv3.Principal, string, error) {
 	login, ok := input.(*apiv3.AzureADLogin)
 	if !ok {
 		return apiv3.Principal{}, nil, "", errors.New("unexpected input type")

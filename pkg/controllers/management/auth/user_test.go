@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	"github.com/rancher/rancher/pkg/controllers/management/auth/project_cluster"
 	exttokens "github.com/rancher/rancher/pkg/ext/stores/tokens"
+	"github.com/rancher/rancher/pkg/user"
 	userMocks "github.com/rancher/rancher/pkg/user/mocks"
 	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
@@ -23,7 +24,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-func Test_hasLocalPrincipalID(t *testing.T) {
+func TestHasLocalPrincipalID(t *testing.T) {
 	type args struct {
 		user *v3.User
 	}
@@ -196,13 +197,11 @@ func TestCreate(t *testing.T) {
 
 func TestUpdated(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	mockUserManager := userMocks.NewMockManager(ctrl)
 
 	ul := &userLifecycle{
 		userManager: mockUserManager,
-		// The ext token store is set per test case. enables per-test mock setups
 	}
 
 	tests := []struct {
@@ -409,7 +408,7 @@ func TestUpdated(t *testing.T) {
 						Name:      "testuser",
 						Namespace: pbkdf2.LocalUserPasswordsNamespace,
 						Annotations: map[string]string{
-							passwordHashAnnotation: bcryptHash,
+							user.PasswordHashAnnotation: user.BcryptHash,
 						},
 						OwnerReferences: []metav1.OwnerReference{
 							{
@@ -461,7 +460,7 @@ func TestUpdated(t *testing.T) {
 						Name:      "testuser",
 						Namespace: pbkdf2.LocalUserPasswordsNamespace,
 						Annotations: map[string]string{
-							passwordHashAnnotation: bcryptHash,
+							user.PasswordHashAnnotation: user.BcryptHash,
 						},
 						OwnerReferences: []metav1.OwnerReference{
 							{
@@ -505,7 +504,7 @@ func TestUpdated(t *testing.T) {
 						Name:      "testuser",
 						Namespace: pbkdf2.LocalUserPasswordsNamespace,
 						Annotations: map[string]string{
-							passwordHashAnnotation: bcryptHash,
+							user.PasswordHashAnnotation: user.BcryptHash,
 						},
 						OwnerReferences: []metav1.OwnerReference{
 							{
@@ -524,7 +523,7 @@ func TestUpdated(t *testing.T) {
 						Name:      "testuser",
 						Namespace: pbkdf2.LocalUserPasswordsNamespace,
 						Annotations: map[string]string{
-							passwordHashAnnotation: bcryptHash,
+							user.PasswordHashAnnotation: user.BcryptHash,
 						},
 						OwnerReferences: []metav1.OwnerReference{
 							{
@@ -569,13 +568,17 @@ func TestUpdated(t *testing.T) {
 
 			timer := exttokens.NewMocktimeHandler(ctrl)
 
+			tt.mockSetup(secrets, scache, timer, users)
+
 			store := exttokens.NewSystem(nil, nil, secrets, users, nil, nil, timer, nil, nil)
 			ul.extTokenStore = store
 			ul.secrets = secrets
 			ul.secretsLister = scache
 			ul.users = users
-
-			tt.mockSetup(secrets, scache, timer, users)
+			ul.passwordMigrator = &user.PasswordMigrator{
+				Secrets: secrets,
+				Users:   users,
+			}
 
 			_, err := ul.Updated(tt.inputUser)
 
@@ -588,7 +591,7 @@ func TestUpdated(t *testing.T) {
 	}
 }
 
-func Test_deleteAllCRTB(t *testing.T) {
+func TestDeleteAllCRTB(t *testing.T) {
 	tests := []struct {
 		name          string
 		inputCRTB     []*v3.ClusterRoleTemplateBinding
@@ -730,7 +733,7 @@ func Test_deleteAllCRTB(t *testing.T) {
 	}
 }
 
-func Test_deleteAllPRTB(t *testing.T) {
+func TestDeleteAllPRTB(t *testing.T) {
 	tests := []struct {
 		name          string
 		inputPRTB     []*v3.ProjectRoleTemplateBinding
@@ -829,7 +832,7 @@ func Test_deleteAllPRTB(t *testing.T) {
 	}
 }
 
-func Test_deleteUserNamespace(t *testing.T) {
+func TestDeleteUserNamespace(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	namespaceMock := wranglerfake.NewMockNonNamespacedControllerInterface[*v1.Namespace, *v1.NamespaceList](ctrl)
 	namespaceListerMock := wranglerfake.NewMockNonNamespacedCacheInterface[*v1.Namespace](ctrl)
@@ -911,7 +914,7 @@ func Test_deleteUserNamespace(t *testing.T) {
 	}
 }
 
-func Test_deleteUserSecret(t *testing.T) {
+func TestDeleteUserSecret(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	secretsMock := wranglerfake.NewMockControllerInterface[*v1.Secret, *v1.SecretList](ctrl)
 	secretsListerMock := wranglerfake.NewMockCacheInterface[*v1.Secret](ctrl)
@@ -981,7 +984,7 @@ func Test_deleteUserSecret(t *testing.T) {
 	}
 }
 
-func Test_removeLegacyFinalizers(t *testing.T) {
+func TestRemoveLegacyFinalizers(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	//usersMock := &managementFakes.UserInterfaceMock{}
 	usersMock := wranglerfake.NewMockNonNamespacedControllerInterface[*v3.User, *v3.UserList](ctrl)

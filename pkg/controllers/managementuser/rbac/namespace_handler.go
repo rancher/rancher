@@ -496,8 +496,9 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace) err
 					})
 				}
 
-				_, err = roleCli.Update(cr)
-				return err
+				if _, err := roleCli.Update(cr); err != nil {
+					return err
+				}
 			}
 		}
 	}

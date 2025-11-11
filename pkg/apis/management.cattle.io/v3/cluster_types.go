@@ -82,7 +82,7 @@ const (
 	ClusterDriverAKS      = "AKS"
 	ClusterDriverEKS      = "EKS"
 	ClusterDriverGKE      = "GKE"
-	ClusterDriverAlibaba  = "AlibabaCloud"
+	ClusterDriverAlibaba  = "Alibaba"
 	ClusterDriverRancherD = "rancherd"
 
 	ClusterPrivateRegistrySecret = "PrivateRegistrySecret"

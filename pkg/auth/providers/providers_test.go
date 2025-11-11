@@ -1,7 +1,6 @@
 package providers
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"testing"
@@ -151,7 +150,7 @@ func (f fakeProvider) GetName() string {
 	panic("implement me")
 }
 
-func (f fakeProvider) AuthenticateUser(_ context.Context, _ any) (v3.Principal, []v3.Principal, string, error) {
+func (f fakeProvider) AuthenticateUser(http.ResponseWriter, *http.Request, any) (v3.Principal, []v3.Principal, string, error) {
 	panic("implement me")
 }
 

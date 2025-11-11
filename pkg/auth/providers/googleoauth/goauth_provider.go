@@ -65,12 +65,13 @@ func Configure(mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *to
 	}
 }
 
-func (g *googleOauthProvider) AuthenticateUser(ctx context.Context, input any) (apiv3.Principal, []apiv3.Principal, string, error) {
+func (g *googleOauthProvider) AuthenticateUser(_ http.ResponseWriter, req *http.Request, input any) (apiv3.Principal, []apiv3.Principal, string, error) {
 	login, ok := input.(*apiv3.GoogleOauthLogin)
 	if !ok {
 		return apiv3.Principal{}, nil, "", fmt.Errorf("unexpected input type")
 	}
-	return g.loginUser(ctx, login, nil, false)
+
+	return g.loginUser(req.Context(), login, nil, false)
 }
 
 // loginUser takes as input the code; gets access_token and refresh_token in exhange; uses access_token to get user info

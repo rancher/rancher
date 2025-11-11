@@ -191,8 +191,8 @@ func IsValidUserExtraAttribute(key string) bool {
 	return false
 }
 
-func AuthenticateUser(ctx context.Context, input any, providerName string) (apiv3.Principal, []apiv3.Principal, string, error) {
-	return Providers[providerName].AuthenticateUser(ctx, input)
+func AuthenticateUser(w http.ResponseWriter, req *http.Request, input any, providerName string) (apiv3.Principal, []apiv3.Principal, string, error) {
+	return Providers[providerName].AuthenticateUser(w, req, input)
 }
 
 func GetPrincipal(principalID string, myToken accessor.TokenAccessor) (apiv3.Principal, error) {

@@ -195,6 +195,13 @@ var (
 		false,
 		true,
 	)
+	V3Public = newFeature(
+		"v3-public",
+		"Enable /v3-public API endpoints",
+		true,
+		false,
+		true,
+	)
 )
 
 func ListEnabled() []string {

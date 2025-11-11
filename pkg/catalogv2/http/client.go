@@ -52,6 +52,7 @@ func HelmClient(secret *corev1.Secret, caBundle []byte, insecureSkipTLSVerify bo
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.TLSClientConfig = &tlsConfig
 	transport.TLSClientConfig.InsecureSkipVerify = insecureSkipTLSVerify
+	transport.Proxy = http.ProxyFromEnvironment
 
 	client := &http.Client{
 		Transport: transport,

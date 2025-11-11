@@ -14,33 +14,39 @@ import (
 )
 
 func TestDefaultPolicies(t *testing.T) {
-	machineDataInput, machineDataWant := []byte("{"), []byte("{")
-	addToMachineData := func(item string, redact bool) {
-		machineDataInput = append(machineDataInput, []byte("\""+item+"\" : \"fake_"+item+"\",")...)
 
-		if redact {
-			machineDataWant = append(machineDataWant, []byte("\""+item+"\" : \""+redacted+"\",")...)
-		} else {
-			machineDataWant = append(machineDataWant, []byte("\""+item+"\" : \"fake_"+item+"\",")...)
-		}
-	}
+	machineDataInput, machineDataWant := make(map[string]interface{}), make(map[string]interface{})
+	for driverName, fields := range management.DriverData {
+		inputFields := make(map[string]string)
+		wantFields := make(map[string]string)
 
-	for _, fields := range management.DriverData {
 		for _, item := range fields.PublicCredentialFields {
-			addToMachineData(item, false)
+			inputFields[item] = "fake_" + item
+
+			// This exception is needed because the management.ExoscaleDriver config has the 'apiKey' set to Public, contrary to the other drivers that set it to Private.
+			// With the way the auditLog currently works, it will simply redact *all apiKeys* if at least one of them is set to private.
+			// A more granular policy will be implemented in the future to better handle this scenario and have the AuditLog *not* redact the apiKey for the
+			// Exoscale driver. For now, however, the if condition will guarantee the tests can handle this edge case without failing.
+			if driverName == management.ExoscaleDriver {
+				wantFields[item] = redacted
+			} else {
+				wantFields[item] = "fake_" + item
+			}
 		}
 
 		for _, item := range fields.PrivateCredentialFields {
-			addToMachineData(item, true)
+			inputFields[item] = "fake_" + item
+			wantFields[item] = redacted
 		}
 
 		for _, item := range fields.PasswordFields {
-			addToMachineData(item, true)
+			inputFields[item] = "fake_" + item
+			wantFields[item] = redacted
 		}
-	}
 
-	machineDataInput[len(machineDataInput)-1] = byte('}')
-	machineDataWant[len(machineDataWant)-1] = byte('}')
+		machineDataInput[driverName] = inputFields
+		machineDataWant[driverName] = wantFields
+	}
 
 	type testCase struct {
 		Name            string
@@ -180,12 +186,6 @@ func TestDefaultPolicies(t *testing.T) {
 			ExpectedBody: []byte(fmt.Sprintf(`{"sensitiveData": {"accessToken":"%s","user":"fake_user"}}`, redacted)),
 		},
 		{
-			Name:         "With all machine driver fields",
-			Headers:      http.Header{"Content-Type": {contentTypeJSON}},
-			Body:         machineDataInput,
-			ExpectedBody: machineDataWant,
-		},
-		{
 			Name:         "With no secret uri but secret base type slice",
 			Uri:          `/v3/project/local:p-12345/namespacedcertificates?limit=-1&sort=name`,
 			Headers:      http.Header{"Content-Type": {contentTypeJSON}},
@@ -386,13 +386,6 @@ func TestDefaultPolicies(t *testing.T) {
 		},
 
 		{
-			Name:         "With all machine driver fields",
-			Headers:      http.Header{"Content-Type": {contentTypeJSON}},
-			Body:         machineDataInput,
-			ExpectedBody: machineDataWant,
-		},
-
-		{
 			Name:         "With no secret uri but secret base type slice",
 			Uri:          `/v3/project/local:p-12345/namespacedcertificates?limit=-1&sort=name`,
 			Headers:      http.Header{"Content-Type": {contentTypeJSON}},
@@ -524,6 +517,25 @@ func TestDefaultPolicies(t *testing.T) {
 			Body:            []byte(`{"normalField": "some data", "manifestUrl": "https://localhost:8443/v3/import/abcd.yaml", "insecureWindowsNodeCommand": "curl https://localhost:8443/v3/import/abcd.yaml", "insecureNodeCommand": "curl https://localhost:8443/v3/import/abcd.yaml", "insecureCommand": "curl https://localhost:8443/v3/import/abcd.yaml", "command": "curl https://localhost:8443/v3/import/abcd.yaml", "windowsNodeCommand": "curl https://localhost:8443/v3/import/abcd.yaml"}`),
 			ExpectedBody:    []byte(fmt.Sprintf(`{"normalField": "some data", "manifestUrl": "%s", "insecureWindowsNodeCommand": "%[1]s", "insecureNodeCommand": "%[1]s", "insecureCommand": "%[1]s", "command": "%[1]s", "windowsNodeCommand": "%[1]s"}`, redacted)),
 		},
+	}
+
+	for driverName, expectedFields := range machineDataWant {
+		expectedFieldsBytes, err := json.Marshal(expectedFields)
+		if err != nil {
+			t.Fatalf("failed to marshal expected fields: %v", err)
+		}
+
+		inputFieldsBytes, err := json.Marshal(machineDataInput[driverName])
+		if err != nil {
+			t.Fatalf("failed to marshal input fields: %v", err)
+		}
+
+		cases = append(cases, testCase{
+			Name:         fmt.Sprintf("With machine driver fields for %s", driverName),
+			Headers:      http.Header{"Content-Type": {contentTypeJSON}},
+			Body:         inputFieldsBytes,
+			ExpectedBody: expectedFieldsBytes,
+		})
 	}
 
 	buffer := bytes.NewBuffer(nil)

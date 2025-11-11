@@ -179,6 +179,7 @@ func (g *git) httpClientWithCreds() (*http.Client, error) {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.TLSClientConfig = &tlsConfig
 	transport.TLSClientConfig.InsecureSkipVerify = g.insecureTLSVerify
+	transport.Proxy = http.ProxyFromEnvironment
 
 	client := &http.Client{
 		Transport: transport,

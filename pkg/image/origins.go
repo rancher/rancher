@@ -116,7 +116,6 @@ var OriginMap = map[string]string{
 	"mirrored-cilium-operator-azure":                          "https://github.com/cilium/cilium/tree/master/pkg/azure",
 	"mirrored-cilium-operator-generic":                        "https://github.com/cilium/cilium",
 	"mirrored-cilium-startup-script":                          "https://github.com/cilium/cilium",
-	"mirrored-cloud-provider-vsphere-cpi-release-manager":     "https://github.com/kubernetes/cloud-provider-vsphere/blob/master/cluster/images/controller-manager/Dockerfile",
 	"mirrored-cloud-provider-vsphere-csi-release-driver":      "https://github.com/kubernetes-sigs/vsphere-csi-driver",
 	"mirrored-cloud-provider-vsphere-csi-release-syncer":      "https://github.com/kubernetes-sigs/vsphere-csi-driver/tree/master/pkg/syncer",
 	"mirrored-cloud-provider-vsphere":                         "https://github.com/kubernetes/cloud-provider-vsphere",

@@ -113,18 +113,13 @@ func (g *Provider) TransformToAuthProvider(authConfig map[string]any) (map[strin
 	return p, nil
 }
 
-func (g *Provider) AuthenticateUser(ctx context.Context, input any) (apiv3.Principal, []apiv3.Principal, string, error) {
+func (g *Provider) AuthenticateUser(_ http.ResponseWriter, req *http.Request, input any) (apiv3.Principal, []apiv3.Principal, string, error) {
 	login, ok := input.(*apiv3.GithubLogin)
 	if !ok {
 		return apiv3.Principal{}, nil, "", errors.New("unexpected input type")
 	}
-	host := ""
-	req, ok := ctx.Value(util2.RequestKey).(*http.Request)
-	if ok {
-		host = util2.GetHost(req)
-	}
 
-	return g.LoginUser(host, login, nil, false)
+	return g.LoginUser(util2.GetHost(req), login, nil, false)
 }
 
 func (g *Provider) LoginUser(host string, githubCredential *apiv3.GithubLogin, config *apiv3.GithubAppConfig, test bool) (apiv3.Principal, []apiv3.Principal, string, error) {
