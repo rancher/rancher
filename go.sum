@@ -108,8 +108,8 @@ github.com/antlr4-go/antlr/v4 v4.13.0 h1:lxCg3LAv+EUK6t1i0y1V6/SLeUi0eKEKdhQAlS8
 github.com/antlr4-go/antlr/v4 v4.13.0/go.mod h1:pfChB/xh/Unjila75QW7+VU4TSnWnnk9UTnmpPaOR2g=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPdPJAN/hZIm0C4OItdklCFmMRWYpio=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
-github.com/aruiz14/steve v0.0.0-20251107161902-643c8a27f091 h1:6EXsWZLe280ieOB64V7uAPzUSqnvLU/wOkDhvME3Ddw=
-github.com/aruiz14/steve v0.0.0-20251107161902-643c8a27f091/go.mod h1:UPZYk9YeXS4F14RVAKUX/DqGQqK2Gh3BRfrgWJffmJc=
+github.com/aruiz14/steve v0.0.0-20251111131745-f15520fac9aa h1:fmC/rIVrn3DUDv/zG7lQyTgwLQjP6vv6fsRAXSr0vuY=
+github.com/aruiz14/steve v0.0.0-20251111131745-f15520fac9aa/go.mod h1:UPZYk9YeXS4F14RVAKUX/DqGQqK2Gh3BRfrgWJffmJc=
 github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 h1:DklsrG3dyBCFEj5IhUbnKptjxatkF07cF2ak3yi77so=
 github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2/go.mod h1:WaHUgvxTVq04UNunO+XhnAqY/wQc+bxr74GqbsZ/Jqw=
 github.com/aws/aws-sdk-go v1.55.5 h1:KKUZBfBoyqy5d3swXyiC7Q76ic40rYcbqH7qjh59kzU=

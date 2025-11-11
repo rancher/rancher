@@ -5,7 +5,7 @@ go 1.24.0
 toolchain go1.24.7
 
 // steve hotfix: https://github.com/rancher/steve/compare/v0.6.42...aruiz14:steve:hotfix-v2.12.3-hotfix-a3c0?expand=0
-replace github.com/rancher/steve => github.com/aruiz14/steve v0.0.0-20251107161902-643c8a27f091
+replace github.com/rancher/steve => github.com/aruiz14/steve v0.0.0-20251111131745-f15520fac9aa
 
 replace (
 	github.com/crewjam/saml => github.com/rancher/saml v0.4.14-rancher3
