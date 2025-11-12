@@ -756,11 +756,6 @@ func Test_getManagementPlaneRules(t *testing.T) {
 			managementResources: projectManagementPlaneResources,
 			want: []rbacv1.PolicyRule{
 				{
-					Resources: []string{"apps"},
-					APIGroups: []string{"project.cattle.io"},
-					Verbs:     []string{"*"},
-				},
-				{
 					Resources: []string{"projectroletemplatebindings"},
 					APIGroups: []string{"management.cattle.io"},
 					Verbs:     []string{"*"},

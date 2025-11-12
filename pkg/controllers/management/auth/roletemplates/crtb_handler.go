@@ -132,40 +132,40 @@ func (c *crtbHandler) reconcileMembershipBindings(crtb *v3.ClusterRoleTemplateBi
 }
 
 // reconcileBindings Ensures that all bindings required to provide access to the CRTB either exist or get created.
-// It deletes any of the existing CRBs that are not needed.
+// It deletes any existing role bindings with the CRTB owner label that are not needed.
 func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, localConditions *[]metav1.Condition) error {
 	condition := metav1.Condition{Type: reconcileBindings}
-	desiredCRBs, err := c.getDesiredClusterRoleBindings(crtb)
+	desiredRBs, err := c.getDesiredRoleBindings(crtb)
 	if err != nil {
-		c.s.AddCondition(localConditions, condition, failedToGetDesiredClusterRoleBindings, err)
+		c.s.AddCondition(localConditions, condition, failedToGetDesiredRoleBindings, err)
 		return err
 	}
 
-	currentCRBs, err := c.crbController.List(metav1.ListOptions{LabelSelector: rbac.GetCRTBOwnerLabel(crtb.Name)})
+	currentRBs, err := c.rbController.List(crtb.Namespace, metav1.ListOptions{LabelSelector: rbac.GetCRTBOwnerLabel(crtb.Name)})
 	if err != nil {
-		c.s.AddCondition(localConditions, condition, failedToListExistingClusterRoleBindings, err)
+		c.s.AddCondition(localConditions, condition, failedToListExistingRoleBindings, err)
 		return err
 	}
 
-	for _, currentCRB := range currentCRBs.Items {
-		if crb, ok := desiredCRBs[currentCRB.Name]; ok {
-			if rbac.AreClusterRoleBindingContentsSame(&currentCRB, crb) {
-				// If the cluster role binding already exists with the right contents, we can skip creating it.
-				delete(desiredCRBs, crb.Name)
+	for _, currentRB := range currentRBs.Items {
+		if rb, ok := desiredRBs[currentRB.Name]; ok {
+			if ok, _ := rbac.AreRoleBindingContentsSame(&currentRB, rb); ok {
+				// If the role binding already exists with the right contents, we can skip creating it.
+				delete(desiredRBs, rb.Name)
 				continue
 			}
 		}
-		// If the CRB is not a member of the desired CRBs or has different contents, delete it.
-		if err := c.crbController.Delete(currentCRB.Name, &metav1.DeleteOptions{}); err != nil {
-			c.s.AddCondition(localConditions, condition, failedToDeleteClusterRoleBinding, err)
+		// If the role binding is not a member of the desired role bindings or has different contents, delete it.
+		if err := c.rbController.Delete(currentRB.Namespace, currentRB.Name, &metav1.DeleteOptions{}); err != nil {
+			c.s.AddCondition(localConditions, condition, failedToDeleteRoleBinding, err)
 			return err
 		}
 	}
 
-	// For any CRBs that don't exist, create them
-	for _, crb := range desiredCRBs {
-		if _, err := c.crbController.Create(crb); err != nil {
-			c.s.AddCondition(localConditions, condition, failedToCreateClusterRoleBinding, err)
+	// For any role bindings that don't exist, create them
+	for _, rb := range desiredRBs {
+		if err := rbac.CreateOrUpdateNamespacedResource(rb, c.rbController, rbac.AreRoleBindingContentsSame); err != nil {
+			c.s.AddCondition(localConditions, condition, failedToCreateRoleBinding, err)
 			return err
 		}
 	}
@@ -174,18 +174,18 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, loc
 	return nil
 }
 
-// getDesiredClusterRoleBindings checks for project and cluster management roles, and if they exist, builds and returns the needed ClusterRoleBindings
-func (c *crtbHandler) getDesiredClusterRoleBindings(crtb *v3.ClusterRoleTemplateBinding) (map[string]*rbacv1.ClusterRoleBinding, error) {
-	desiredCRBs := map[string]*rbacv1.ClusterRoleBinding{}
+// getDesiredRoleBindings checks for project and cluster management roles, and if they exist, builds and returns the needed RoleBindings
+func (c *crtbHandler) getDesiredRoleBindings(crtb *v3.ClusterRoleTemplateBinding) (map[string]*rbacv1.RoleBinding, error) {
+	desiredRBs := map[string]*rbacv1.RoleBinding{}
 	// Check if there is a project management role to bind to
 	projectManagementRoleName := rbac.ProjectManagementPlaneClusterRoleNameFor(crtb.RoleTemplateName)
 	cr, err := c.crController.Get(rbac.AggregatedClusterRoleNameFor(projectManagementRoleName), metav1.GetOptions{})
 	if err == nil && cr != nil {
-		crb, err := rbac.BuildAggregatingClusterRoleBindingFromRTB(crtb, projectManagementRoleName)
+		rb, err := rbac.BuildAggregatingRoleBindingFromRTB(crtb, projectManagementRoleName)
 		if err != nil {
 			return nil, err
 		}
-		desiredCRBs[crb.Name] = crb
+		desiredRBs[rb.Name] = rb
 	} else if !apierrors.IsNotFound(err) {
 		return nil, err
 	}
@@ -194,16 +194,16 @@ func (c *crtbHandler) getDesiredClusterRoleBindings(crtb *v3.ClusterRoleTemplate
 	clusterManagementRoleName := rbac.ClusterManagementPlaneClusterRoleNameFor(crtb.RoleTemplateName)
 	cr, err = c.crController.Get(rbac.AggregatedClusterRoleNameFor(clusterManagementRoleName), metav1.GetOptions{})
 	if err == nil && cr != nil {
-		crb, err := rbac.BuildAggregatingClusterRoleBindingFromRTB(crtb, clusterManagementRoleName)
+		rb, err := rbac.BuildAggregatingRoleBindingFromRTB(crtb, clusterManagementRoleName)
 		if err != nil {
 			return nil, err
 		}
-		desiredCRBs[crb.Name] = crb
+		desiredRBs[rb.Name] = rb
 	} else if !apierrors.IsNotFound(err) {
 		return nil, err
 	}
 
-	return desiredCRBs, nil
+	return desiredRBs, nil
 }
 
 // OnRemove deletes Cluster Role Bindings that are owned by the CRTB and the membership binding if no other CRTBs give membership access.
@@ -220,28 +220,28 @@ func (c *crtbHandler) OnRemove(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 	err = removeAuthV2Permissions(crtb, c.rbController)
 	c.s.AddCondition(&crtb.Status.LocalConditions, condition, authv2ProvisioningBindingDeleted, err)
 
-	return crtb, errors.Join(err, c.removeClusterRoleBindings(crtb))
+	return crtb, errors.Join(err, c.removeRoleBindings(crtb))
 }
 
 // removeClusterRoleBindings removes all bindings owned by the CRTB
-func (c *crtbHandler) removeClusterRoleBindings(crtb *v3.ClusterRoleTemplateBinding) error {
-	condition := metav1.Condition{Type: removeClusterRoleBindings}
-	currentCRBs, err := c.crbController.List(metav1.ListOptions{LabelSelector: rbac.GetCRTBOwnerLabel(crtb.Name)})
+func (c *crtbHandler) removeRoleBindings(crtb *v3.ClusterRoleTemplateBinding) error {
+	condition := metav1.Condition{Type: removeRoleBindings}
+	currentRBs, err := c.rbController.List(crtb.Namespace, metav1.ListOptions{LabelSelector: rbac.GetCRTBOwnerLabel(crtb.Name)})
 	if err != nil {
-		c.s.AddCondition(&crtb.Status.LocalConditions, condition, failedToListExistingClusterRoleBindings, err)
+		c.s.AddCondition(&crtb.Status.LocalConditions, condition, failedToListExistingRoleBindings, err)
 		return err
 	}
 
 	var returnErr error
-	for _, crb := range currentCRBs.Items {
-		err = rbac.DeleteResource(crb.Name, c.crbController)
+	for _, rb := range currentRBs.Items {
+		err = rbac.DeleteNamespacedResource(crtb.Namespace, rb.Name, c.rbController)
 		if err != nil {
-			c.s.AddCondition(&crtb.Status.LocalConditions, condition, failedToDeleteClusterRoleBinding, err)
+			c.s.AddCondition(&crtb.Status.LocalConditions, condition, failedToDeleteRoleBinding, err)
 			returnErr = errors.Join(returnErr, err)
 		}
 	}
 
-	c.s.AddCondition(&crtb.Status.LocalConditions, condition, clusterRoleBindingDeleted, returnErr)
+	c.s.AddCondition(&crtb.Status.LocalConditions, condition, roleBindingDeleted, returnErr)
 	return returnErr
 }
 

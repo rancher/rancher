@@ -23,26 +23,26 @@ const (
 const (
 	// Statuses
 	clusterRoleTemplateBindingDelete = "ClusterRoleTemplateBindingDelete"
-	removeClusterRoleBindings        = "RemoveClusterRoleBindings"
+	removeRoleBindings               = "RemoveRoleBindings"
 	reconcileSubject                 = "ReconcileSubject"
 	reconcileMembershipBindings      = "ReconcileMembershipBindings"
 	reconcileBindings                = "ReconcileBindings"
 	// Reasons
-	clusterRoleBindingDeleted               = "ClusterRoleBindingDeleted"
+	roleBindingDeleted                      = "roleBindingDeleted"
 	bindingsExists                          = "BindingsExists"
 	membershipBindingExists                 = "MembershipBindingExists"
 	subjectExists                           = "SubjectExists"
 	crtbHasNoSubject                        = "CRTBHasNoSubject"
 	clusterMembershipBindingDeleted         = "ClusterMembershipBindingDeleted"
 	authv2ProvisioningBindingDeleted        = "AuthV2ProvisioningBindingDeleted"
-	failedToCreateClusterRoleBinding        = "FailedToCreateClusterRoleBinding"
+	failedToCreateRoleBinding               = "FailedToCreateRoleBinding"
 	failedToCreateOrUpdateMembershipBinding = "FailedToCreateOrUpdateMembershipBinding"
 	failedToCreateUser                      = "FailedToCreateUser"
-	failedToDeleteClusterRoleBinding        = "FailedToDeleteClusterRoleBinding"
-	failedToGetDesiredClusterRoleBindings   = "FailedToGetDesiredClusterRoleBindings"
+	failedToDeleteRoleBinding               = "FailedToDeleteRoleBinding"
+	failedToGetDesiredRoleBindings          = "FailedToGetDesiredRoleBindings"
 	failedToGetRoleTemplate                 = "FailedToGetRoleTemplate"
 	failedToGetUser                         = "FailedToGetUser"
-	failedToListExistingClusterRoleBindings = "FailedToGetExistingClusterRoleBindings"
+	failedToListExistingRoleBindings        = "FailedToGetExistingRoleBindings"
 )
 
 // createOrUpdateClusterMembershipBinding ensures that the user specified by a CRTB or PRTB has membership to the cluster referenced by the CRTB or PRTB.
@@ -174,7 +174,7 @@ func createOrUpdateProjectMembershipBinding(prtb *v3.ProjectRoleTemplateBinding,
 		return err
 	}
 
-	if !rbac.AreRoleBindingContentsSame(wantedRB, existingRB) {
+	if ok, _ := rbac.AreRoleBindingContentsSame(wantedRB, existingRB); !ok {
 		if err := rbController.Delete(wantedRB.Namespace, wantedRB.Name, &metav1.DeleteOptions{}); err != nil {
 			return err
 		}

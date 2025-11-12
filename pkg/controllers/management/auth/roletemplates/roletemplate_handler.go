@@ -28,7 +28,6 @@ var (
 		"etcdsnapshots":               "rke.cattle.io",
 	}
 	projectManagementPlaneResources = map[string]string{
-		"apps":                        "project.cattle.io",
 		"projectroletemplatebindings": "management.cattle.io",
 		"secrets":                     "",
 	}

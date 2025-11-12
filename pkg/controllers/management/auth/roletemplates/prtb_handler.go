@@ -11,7 +11,6 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	crbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -67,13 +66,13 @@ func (p *prtbHandler) OnRemove(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 		deleteProjectMembershipBinding(prtb, p.rbController),
 		removeAuthV2Permissions(prtb, p.rbController))
 
-	currentCRBs, err := p.crbController.List(metav1.ListOptions{LabelSelector: rbac.GetPRTBOwnerLabel(prtb.Name)})
+	currentRBs, err := p.rbController.List(prtb.Namespace, metav1.ListOptions{LabelSelector: rbac.GetPRTBOwnerLabel(prtb.Name)})
 	if err != nil {
 		return nil, errors.Join(returnErr, err)
 	}
 
-	for _, crb := range currentCRBs.Items {
-		returnErr = errors.Join(returnErr, rbac.DeleteResource(crb.Name, p.crbController))
+	for _, rb := range currentRBs.Items {
+		returnErr = errors.Join(returnErr, rbac.DeleteNamespacedResource(rb.Namespace, rb.Name, p.rbController))
 	}
 
 	return prtb, returnErr
@@ -126,10 +125,8 @@ func (p *prtbHandler) reconcileMembershipBindings(prtb *v3.ProjectRoleTemplateBi
 		createOrUpdateProjectMembershipBinding(prtb, rt, p.rbController))
 }
 
-// reconcileBindings ensures the right CRB exists for the project management plane role. It deletes any additional unwanted CRBs.
+// reconcileBindings ensures the right Role Binding exists for the project management plane role. It deletes any additional unwanted Role Bindings.
 func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) error {
-	var crb *rbacv1.ClusterRoleBinding
-
 	projectManagementRoleName := rbac.ProjectManagementPlaneClusterRoleNameFor(prtb.RoleTemplateName)
 
 	// If there is no project management plane role, no need to create a binding for it
@@ -141,29 +138,29 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 		return err
 	}
 
-	crb, err = rbac.BuildAggregatingClusterRoleBindingFromRTB(prtb, projectManagementRoleName)
+	rb, err := rbac.BuildAggregatingRoleBindingFromRTB(prtb, projectManagementRoleName)
 	if err != nil {
 		return err
 	}
 
-	currentCRBs, err := p.crbController.List(metav1.ListOptions{LabelSelector: rbac.GetPRTBOwnerLabel(prtb.Name)})
+	currentRBs, err := p.rbController.List(prtb.Namespace, metav1.ListOptions{LabelSelector: rbac.GetPRTBOwnerLabel(prtb.Name)})
 	if err != nil {
 		return err
 	}
 
 	var prtbHasBinding bool
-	for _, currentCRB := range currentCRBs.Items {
-		if rbac.AreClusterRoleBindingContentsSame(&currentCRB, crb) {
+	for _, currentRB := range currentRBs.Items {
+		if ok, _ := rbac.AreRoleBindingContentsSame(&currentRB, rb); ok {
 			prtbHasBinding = true
 			continue
 		}
-		if err := rbac.DeleteResource(currentCRB.Name, p.crbController); err != nil {
+		if err := rbac.DeleteNamespacedResource(currentRB.Namespace, currentRB.Name, p.rbController); err != nil {
 			return err
 		}
 	}
 
 	if !prtbHasBinding {
-		if _, err := p.crbController.Create(crb); err != nil {
+		if err := rbac.CreateOrUpdateNamespacedResource(rb, p.rbController, rbac.AreRoleBindingContentsSame); err != nil {
 			return err
 		}
 	}

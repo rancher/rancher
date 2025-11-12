@@ -179,10 +179,11 @@ func Test_reconcileSubject(t *testing.T) {
 
 var (
 	ownerLabel = "authz.cluster.cattle.io/prtb-owner-test-prtb"
-	defaultCRB = rbacv1.ClusterRoleBinding{
+	defaultRB  = rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   "crb-5x2rfzlbvz",
-			Labels: map[string]string{"authz.cluster.cattle.io/prtb-owner-test-prtb": "true"},
+			Name:      "rb-visjzlqzqw",
+			Namespace: "test-namespace",
+			Labels:    map[string]string{"authz.cluster.cattle.io/prtb-owner-test-prtb": "true"},
 		},
 		RoleRef: rbacv1.RoleRef{
 			Kind:     "ClusterRole",
@@ -198,16 +199,22 @@ var (
 			},
 		},
 	}
+	badRB = rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "bad-crb",
+			Namespace: "test-namespace",
+		},
+	}
 )
 
 func Test_reconcileBindings(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name               string
-		setupCRController  func(*fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList])
-		setupCRBController func(*fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList])
-		prtb               *v3.ProjectRoleTemplateBinding
-		wantErr            bool
+		name              string
+		setupCRController func(*fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList])
+		setupRBController func(*fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList])
+		prtb              *v3.ProjectRoleTemplateBinding
+		wantErr           bool
 	}{
 		{
 			name: "error getting cluster role",
@@ -230,7 +237,7 @@ func Test_reconcileBindings(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "error building clusterrolebinding",
+			name: "error building rolebinding",
 			setupCRController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
 				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, nil)
 			},
@@ -240,128 +247,107 @@ func Test_reconcileBindings(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "error listing clusterrolebindings",
+			name: "error listing rolebindings",
 			setupCRController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
 				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, nil)
 			},
-			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
-				m.EXPECT().List(metav1.ListOptions{LabelSelector: ownerLabel}).Return(nil, errDefault)
+			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
+				m.EXPECT().List("test-namespace", metav1.ListOptions{LabelSelector: ownerLabel}).Return(nil, errDefault)
 			},
-			prtb: &v3.ProjectRoleTemplateBinding{
-				ObjectMeta:       metav1.ObjectMeta{Name: "test-prtb"},
-				UserName:         "test-user",
-				RoleTemplateName: "test-rt",
-			},
+			prtb:    defaultPRTB.DeepCopy(),
 			wantErr: true,
 		},
 		{
-			name: "error listing clusterrolebindings",
+			name: "error listing rolebindings",
 			setupCRController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
 				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, nil)
 			},
-			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
-				m.EXPECT().List(metav1.ListOptions{LabelSelector: ownerLabel}).Return(nil, errDefault)
+			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
+				m.EXPECT().List("test-namespace", metav1.ListOptions{LabelSelector: ownerLabel}).Return(nil, errDefault)
 			},
-			prtb: &v3.ProjectRoleTemplateBinding{
-				ObjectMeta:       metav1.ObjectMeta{Name: "test-prtb"},
-				UserName:         "test-user",
-				RoleTemplateName: "test-rt",
-			},
+			prtb:    defaultPRTB.DeepCopy(),
 			wantErr: true,
 		},
 		{
-			name: "error deleting unwanted clusterrolebindings",
+			name: "error deleting unwanted rolebindings",
 			setupCRController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
 				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, nil)
 			},
-			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
-				m.EXPECT().List(metav1.ListOptions{LabelSelector: ownerLabel}).Return(&rbacv1.ClusterRoleBindingList{
-					Items: []rbacv1.ClusterRoleBinding{
-						{
-							ObjectMeta: metav1.ObjectMeta{Name: "bad-crb"},
-						},
-					},
+			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
+				m.EXPECT().List("test-namespace", metav1.ListOptions{LabelSelector: ownerLabel}).Return(&rbacv1.RoleBindingList{
+					Items: []rbacv1.RoleBinding{badRB},
 				}, nil)
-				m.EXPECT().Delete("bad-crb", &metav1.DeleteOptions{}).Return(errDefault)
+				m.EXPECT().Delete("test-namespace", "bad-crb", &metav1.DeleteOptions{}).Return(errDefault)
 			},
-			prtb: &v3.ProjectRoleTemplateBinding{
-				ObjectMeta:       metav1.ObjectMeta{Name: "test-prtb"},
-				UserName:         "test-user",
-				RoleTemplateName: "test-rt",
-			},
+			prtb:    defaultPRTB.DeepCopy(),
 			wantErr: true,
 		},
 		{
-			name: "CRB already exists",
+			name: "RB already exists",
 			setupCRController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
 				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, nil)
 			},
-			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
-				m.EXPECT().List(metav1.ListOptions{LabelSelector: ownerLabel}).Return(&rbacv1.ClusterRoleBindingList{
-					Items: []rbacv1.ClusterRoleBinding{defaultCRB},
+			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
+				m.EXPECT().List("test-namespace", metav1.ListOptions{LabelSelector: ownerLabel}).Return(&rbacv1.RoleBindingList{
+					Items: []rbacv1.RoleBinding{defaultRB},
 				}, nil)
 			},
-			prtb: &v3.ProjectRoleTemplateBinding{
-				ObjectMeta:       metav1.ObjectMeta{Name: "test-prtb"},
-				UserName:         "test-user",
-				RoleTemplateName: "test-rt",
-			},
+			prtb: defaultPRTB.DeepCopy(),
 		},
 		{
-			name: "CRB already exists with extra bad CRBs",
+			name: "RB already exists with extra bad RBs",
 			setupCRController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
 				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, nil)
 			},
-			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
-				m.EXPECT().List(metav1.ListOptions{LabelSelector: ownerLabel}).Return(&rbacv1.ClusterRoleBindingList{
-					Items: []rbacv1.ClusterRoleBinding{
-						defaultCRB,
-						{
-							ObjectMeta: metav1.ObjectMeta{Name: "bad-crb"},
-						},
-					},
+			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
+				m.EXPECT().List("test-namespace", metav1.ListOptions{LabelSelector: ownerLabel}).Return(&rbacv1.RoleBindingList{
+					Items: []rbacv1.RoleBinding{defaultRB, badRB},
 				}, nil)
-				m.EXPECT().Delete("bad-crb", &metav1.DeleteOptions{}).Return(nil)
+				m.EXPECT().Delete("test-namespace", "bad-crb", &metav1.DeleteOptions{}).Return(nil)
 			},
-			prtb: &v3.ProjectRoleTemplateBinding{
-				ObjectMeta:       metav1.ObjectMeta{Name: "test-prtb"},
-				UserName:         "test-user",
-				RoleTemplateName: "test-rt",
-			},
+			prtb: defaultPRTB.DeepCopy(),
 		},
 		{
-			name: "CRB needs to be created",
+			name: "RB needs to be created",
 			setupCRController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
 				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, nil)
 			},
-			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
-				m.EXPECT().List(metav1.ListOptions{LabelSelector: ownerLabel}).Return(&rbacv1.ClusterRoleBindingList{
-					Items: []rbacv1.ClusterRoleBinding{},
+			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
+				m.EXPECT().List("test-namespace", metav1.ListOptions{LabelSelector: ownerLabel}).Return(&rbacv1.RoleBindingList{
+					Items: []rbacv1.RoleBinding{},
 				}, nil)
-				m.EXPECT().Create(defaultCRB.DeepCopy()).Return(nil, nil)
+				m.EXPECT().Get("test-namespace", defaultRB.Name, metav1.GetOptions{}).Return(nil, errNotFound)
+				m.EXPECT().Create(defaultRB.DeepCopy()).Return(nil, nil)
 			},
-			prtb: &v3.ProjectRoleTemplateBinding{
-				ObjectMeta:       metav1.ObjectMeta{Name: "test-prtb"},
-				UserName:         "test-user",
-				RoleTemplateName: "test-rt",
-			},
+			prtb: defaultPRTB.DeepCopy(),
 		},
 		{
-			name: "error creating CRB",
+			name: "error creating RB",
 			setupCRController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
 				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, nil)
 			},
-			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
-				m.EXPECT().List(metav1.ListOptions{LabelSelector: ownerLabel}).Return(&rbacv1.ClusterRoleBindingList{
-					Items: []rbacv1.ClusterRoleBinding{},
+			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
+				m.EXPECT().List("test-namespace", metav1.ListOptions{LabelSelector: ownerLabel}).Return(&rbacv1.RoleBindingList{
+					Items: []rbacv1.RoleBinding{},
 				}, nil)
-				m.EXPECT().Create(defaultCRB.DeepCopy()).Return(nil, errDefault)
+				m.EXPECT().Get("test-namespace", defaultRB.Name, metav1.GetOptions{}).Return(nil, errNotFound)
+				m.EXPECT().Create(defaultRB.DeepCopy()).Return(nil, errDefault)
 			},
-			prtb: &v3.ProjectRoleTemplateBinding{
-				ObjectMeta:       metav1.ObjectMeta{Name: "test-prtb"},
-				UserName:         "test-user",
-				RoleTemplateName: "test-rt",
+			prtb:    defaultPRTB.DeepCopy(),
+			wantErr: true,
+		},
+		{
+			name: "error getting RB",
+			setupCRController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, nil)
 			},
+			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
+				m.EXPECT().List("test-namespace", metav1.ListOptions{LabelSelector: ownerLabel}).Return(&rbacv1.RoleBindingList{
+					Items: []rbacv1.RoleBinding{},
+				}, nil)
+				m.EXPECT().Get("test-namespace", defaultRB.Name, metav1.GetOptions{}).Return(nil, errDefault)
+			},
+			prtb:    defaultPRTB.DeepCopy(),
 			wantErr: true,
 		},
 	}
@@ -369,9 +355,9 @@ func Test_reconcileBindings(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			crbController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl)
-			if tt.setupCRBController != nil {
-				tt.setupCRBController(crbController)
+			rbController := fake.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl)
+			if tt.setupRBController != nil {
+				tt.setupRBController(rbController)
 			}
 			crController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
 			if tt.setupCRController != nil {
@@ -379,8 +365,8 @@ func Test_reconcileBindings(t *testing.T) {
 			}
 
 			p := &prtbHandler{
-				crbController: crbController,
-				crController:  crController,
+				crController: crController,
+				rbController: rbController,
 			}
 			if err := p.reconcileBindings(tt.prtb); (err != nil) != tt.wantErr {
 				t.Errorf("prtbHandler.reconcileBindings() error = %v, wantErr %v", err, tt.wantErr)
