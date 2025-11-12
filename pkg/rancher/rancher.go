@@ -255,6 +255,10 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		}
 	}
 
+	if err := ext.DeleteLegacyServiceAndSecret(wranglerContext.Core.Service(), wranglerContext.Core.Secret()); err != nil {
+		return nil, fmt.Errorf("failed to delete legacy service and secret: %w", err)
+	}
+
 	extensionOpts := ext.DefaultOptions()
 
 	extensionAPIServer, err := ext.NewExtensionAPIServer(ctx, wranglerContext, extensionOpts)
@@ -334,10 +338,6 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 
 	auditLogMiddleware := audit.NewAuditLogMiddleware(auditLogWriter)
 	aggregationMiddleware := aggregation.NewMiddleware(ctx, wranglerContext.Mgmt.APIService(), wranglerContext.TunnelServer)
-
-	if err := ext.DeleteLegacyServiceAndSecret(wranglerContext.Core.Service(), wranglerContext.Core.Secret()); err != nil {
-		return nil, fmt.Errorf("failed to delete legacy service and secret: %w", err)
-	}
 
 	wranglerContext.OnLeaderOrDie("rancher-new", func(ctx context.Context) error {
 		serviceaccounttoken.StartServiceAccountSecretCleaner(
