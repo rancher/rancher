@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -77,7 +78,24 @@ func Test_Provisioning_MP_SingleNodeAllRolesWithDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	node, err := clusterClients.Core.Node().Get(machines.Items[0].Status.NodeRef.Name, metav1.GetOptions{})
+	var node *corev1.Node
+	backoff := k8swait.Backoff{
+		Steps:    5,
+		Duration: 2 * time.Second,
+		Factor:   1.0,
+		Jitter:   0.5,
+	}
+	err = retry.OnError(backoff, func(e error) bool {
+		return apierror.IsNotFound(e) || apierror.IsUnauthorized(e)
+	}, func() error {
+		var err error
+		node, err = clusterClients.Core.Node().Get(machines.Items[0].Status.NodeRef.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
 	if err != nil {
 		t.Fatal(err)
 	}
