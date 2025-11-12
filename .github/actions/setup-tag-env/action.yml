@@ -6,10 +6,10 @@ runs:
     - shell: bash
       run: |
         ref_name="${{ github.ref_name }}"
-        TAG=v2.13-${{ github.sha }}-head
+        TAG=v2.14-${{ github.sha }}-head
         prefix="release/"
         if [[ "$ref_name" == "main" ]]; then
-          TAG=v2.13-${{ github.sha }}-head
+          TAG=v2.14-${{ github.sha }}-head
           echo "HEAD_TAG=head" >> "$GITHUB_ENV"
         elif [[ "$ref_name" == release/v* ]]; then
           TAG=${ref_name#$prefix}-${{ github.sha }}-head

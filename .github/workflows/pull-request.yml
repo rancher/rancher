@@ -9,8 +9,8 @@ on:
 
 env:
   ARCH: amd64
-  TAG: v2.13-${{ github.sha }}-head
-  GIT_TAG: v2.13-${{ github.sha }}-head
+  TAG: v2.14-${{ github.sha }}-head
+  GIT_TAG: v2.14-${{ github.sha }}-head
   HEAD_TAG: "head"
   COMMIT: ${{ github.sha }}
   REPOSITORY_OWNER: ${{ github.repository_owner }}
