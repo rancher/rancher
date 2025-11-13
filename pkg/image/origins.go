@@ -24,6 +24,7 @@ var OriginMap = map[string]string{
 	"appco-k8s-sidecar":                                       "https://github.com/kiwigrid/k8s-sidecar",
 	"appco-redis":                                             "https://github.com/redis/redis",
 	"aks-operator":                                            "https://github.com/rancher/aks-operator",
+	"appco-kubernetes-cluster-autoscaler":                     "https://github.com/kubernetes/autoscaler",
 	"backup-restore-operator":                                 "https://github.com/rancher/backup-restore-operator",
 	"cnideploy":                                               "https://github.com/containernetworking/plugins",
 	"coreos-kube-state-metrics":                               "https://github.com/kubernetes/kube-state-metrics",
