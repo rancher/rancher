@@ -621,6 +621,24 @@ func (s *steveAPITestSuite) setupSuite(clusterName string) {
 					Name: fmt.Sprintf("test%d", i),
 				},
 			}
+			// Test sorting secrets on metadata.fields[2] (# of secret keys)
+			if name == "test-ns-1" {
+				numKeys := 0
+				if i == 1 {
+					numKeys = 15
+				} else if i == 2 {
+					numKeys = 23
+				} else if i == 3 {
+					numKeys = 7
+				}
+				if numKeys > 0 {
+					obj := map[string][]byte{}
+					for j := 1; j <= numKeys; j++ {
+						obj[fmt.Sprintf("k%d-%d", i, j)] = []byte("whatever")
+					}
+					secret.Data = obj
+				}
+			}
 			labels := map[string]string{steveAPITestLabel: testID}
 			if i == 2 {
 				labels[labelKey] = "2"
@@ -1367,6 +1385,17 @@ func (s *steveAPITestSuite) TestList() {
 			expect: []map[string]string{
 				{"name": "test4", "namespace": "test-ns-1"},
 				{"name": "test5", "namespace": "test-ns-1"},
+			},
+		},
+		{
+			description: "user:user-a,namespace:test-ns-1,query:filter=metadata.fields[2]>0&sort=metadata.fields[2]",
+			user:        "user-a",
+			namespace:   "test-ns-1",
+			query:       "filter=metadata.fields[2]>0&sort=metadata.fields[2]",
+			expect: []map[string]string{
+				{"name": "test3", "namespace": "test-ns-1"},
+				{"name": "test1", "namespace": "test-ns-1"},
+				{"name": "test2", "namespace": "test-ns-1"},
 			},
 		},
 
