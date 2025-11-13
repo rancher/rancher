@@ -2,6 +2,7 @@ package resourcequota
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/rancher/norman/types/convert"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -12,15 +13,26 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
+const extendedKey = "extended"
+
 func convertResourceListToLimit(rList corev1.ResourceList) (*apiv3.ResourceQuotaLimit, error) {
 	converted, err := convert.EncodeToMap(rList)
 	if err != nil {
 		return nil, err
 	}
 
-	convertedMap := map[string]string{}
+	extended := map[string]string{}
+	convertedMap := map[string]any{}
 	for key, value := range converted {
+		if val, ok := resourceQuotaReturnConversion[key]; ok {
+			key = val
+		} else {
+			extended[key] = convert.ToString(value)
+		}
 		convertedMap[key] = convert.ToString(value)
+	}
+	if len(extended) > 0 {
+		convertedMap[extendedKey] = extended
 	}
 
 	toReturn := &apiv3.ResourceQuotaLimit{}
@@ -46,13 +58,30 @@ func convertProjectResourceLimitToResourceList(limit *apiv3.ResourceQuotaLimit) 
 	if err != nil {
 		return nil, err
 	}
-	limitsMap := map[string]string{}
+	limitsMap := map[string]any{}
 	err = json.Unmarshal(in, &limitsMap)
 	if err != nil {
 		return nil, err
 	}
 
 	limits := corev1.ResourceList{}
+
+	// convert the arbitrary set first, ...
+	if extended, ok := limitsMap[extendedKey]; ok {
+		delete(limitsMap, extendedKey)
+		for key, value := range extended.(map[string]any) {
+			resourceName := corev1.ResourceName(key)
+			resourceQuantity, err := resource.ParseQuantity(value.(string))
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse value for key %q: %w", key, err)
+			}
+
+			limits[resourceName] = resourceQuantity
+		}
+	}
+
+	// then place the fixed data. this order ensures that in case of
+	// conflicts between arbitrary and fixed data the fixed data wins.
 	for key, value := range limitsMap {
 		var resourceName corev1.ResourceName
 		if val, ok := resourceQuotaConversion[key]; ok {
@@ -61,7 +90,7 @@ func convertProjectResourceLimitToResourceList(limit *apiv3.ResourceQuotaLimit) 
 			resourceName = corev1.ResourceName(key)
 		}
 
-		resourceQuantity, err := resource.ParseQuantity(value)
+		resourceQuantity, err := resource.ParseQuantity(value.(string))
 		if err != nil {
 			return nil, err
 		}
@@ -136,6 +165,22 @@ var resourceQuotaConversion = map[string]string{
 	"requestsStorage":        "requests.storage",
 	"limitsCpu":              "limits.cpu",
 	"limitsMemory":           "limits.memory",
+}
+
+var resourceQuotaReturnConversion = map[string]string{
+	"configmaps":             "configMaps",
+	"limits.cpu":             "limitsCpu",
+	"limits.memory":          "limitsMemory",
+	"persistentvolumeclaims": "persistentVolumeClaims",
+	"pods":                   "pods",
+	"replicationcontrollers": "replicationControllers",
+	"requests.cpu":           "requestsCpu",
+	"requests.memory":        "requestsMemory",
+	"requests.storage":       "requestsStorage",
+	"secrets":                "secrets",
+	"services":               "services",
+	"services.loadbalancers": "servicesLoadBalancers",
+	"services.nodeports":     "servicesNodePorts",
 }
 
 func getNamespaceResourceQuota(ns *corev1.Namespace) string {

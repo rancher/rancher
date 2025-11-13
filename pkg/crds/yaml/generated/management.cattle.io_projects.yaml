@@ -96,6 +96,16 @@ spec:
                         description: ConfigMaps is the total number of ReplicationControllers
                           that can exist in the namespace.
                         type: string
+                      extended:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Extended contains additional limits a user may wish to impose beyond
+                          the limits set by the preceding fields. The keys have to be parseable
+                          as resource names, while the values have to be parseable as resource
+                          quantities. See also
+                          https://kubernetes.io/docs/concepts/policy/resource-quotas
+                        type: object
                       limitsCpu:
                         description: LimitsCPU is the CPU limits across all pods in
                           a non-terminal state.
@@ -161,6 +171,16 @@ spec:
                         description: ConfigMaps is the total number of ReplicationControllers
                           that can exist in the namespace.
                         type: string
+                      extended:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Extended contains additional limits a user may wish to impose beyond
+                          the limits set by the preceding fields. The keys have to be parseable
+                          as resource names, while the values have to be parseable as resource
+                          quantities. See also
+                          https://kubernetes.io/docs/concepts/policy/resource-quotas
+                        type: object
                       limitsCpu:
                         description: LimitsCPU is the CPU limits across all pods in
                           a non-terminal state.
@@ -219,6 +239,16 @@ spec:
                         description: ConfigMaps is the total number of ReplicationControllers
                           that can exist in the namespace.
                         type: string
+                      extended:
+                        additionalProperties:
+                          type: string
+                        description: |-
+                          Extended contains additional limits a user may wish to impose beyond
+                          the limits set by the preceding fields. The keys have to be parseable
+                          as resource names, while the values have to be parseable as resource
+                          quantities. See also
+                          https://kubernetes.io/docs/concepts/policy/resource-quotas
+                        type: object
                       limitsCpu:
                         description: LimitsCPU is the CPU limits across all pods in
                           a non-terminal state.

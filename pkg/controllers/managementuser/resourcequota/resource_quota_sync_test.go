@@ -1,16 +1,134 @@
 package resourcequota
 
 import (
+	"go.uber.org/mock/gomock"
 	"reflect"
 	"testing"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-
+	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
+
+func TestSetValidated(t *testing.T) {
+	t.Run("setup changes, second identical not", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		nsMock := fake.NewMockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList](ctrl)
+		nsMock.EXPECT().Update(gomock.Any()).DoAndReturn(func(ns *corev1.Namespace) (*corev1.Namespace, error) {
+			return ns, nil
+		}).Times(1)
+		sc := SyncController{Namespaces: nsMock}
+
+		// setup of the condition, single call to client
+		ns := &corev1.Namespace{}
+		ns, err := sc.setValidated(ns, true, "test")
+		assert.NotNil(t, ns)
+		assert.NoError(t, err)
+
+		// second call makes no difference, does not call client
+		_, err = sc.setValidated(ns, true, "test")
+		assert.NoError(t, err)
+	})
+}
+
+func TestUpdateResourceQuota(t *testing.T) {
+	specA := corev1.ResourceQuotaSpec{
+		Hard: corev1.ResourceList{
+			"configmaps": resource.MustParse("1"),
+		},
+	}
+	specB := corev1.ResourceQuotaSpec{
+		Hard: corev1.ResourceList{
+			"configmaps":        resource.MustParse("1"),
+			"ephemeral-storage": resource.MustParse("14"),
+		},
+	}
+
+	t.Run("no update if no change", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		rqMock := fake.NewMockControllerInterface[*corev1.ResourceQuota, *corev1.ResourceQuotaList](ctrl)
+
+		rqMock.EXPECT().Update(gomock.Any()).Return(nil, nil).Times(0)
+		sc := SyncController{ResourceQuotas: rqMock}
+
+		err := sc.updateResourceQuota(&corev1.ResourceQuota{Spec: specA}, &specA)
+		assert.NoError(t, err)
+	})
+
+	t.Run("update for changes", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		rqMock := fake.NewMockControllerInterface[*corev1.ResourceQuota, *corev1.ResourceQuotaList](ctrl)
+
+		rqMock.EXPECT().Update(gomock.Any()).Return(nil, nil)
+		sc := SyncController{ResourceQuotas: rqMock}
+
+		err := sc.updateResourceQuota(&corev1.ResourceQuota{Spec: specA}, &specB)
+		assert.NoError(t, err)
+	})
+}
+
+func TestUpdateDefaultLimitRange(t *testing.T) {
+	specA := corev1.LimitRangeSpec{
+		Limits: []corev1.LimitRangeItem{
+			{
+				Type: corev1.LimitTypePod,
+				Default: corev1.ResourceList{
+					corev1.ResourceCPU: *resource.NewQuantity(1, resource.DecimalSI),
+				},
+				DefaultRequest: corev1.ResourceList{
+					corev1.ResourceCPU: *resource.NewQuantity(1, resource.DecimalSI),
+				},
+			},
+		},
+	}
+	specB := corev1.LimitRangeSpec{
+		Limits: []corev1.LimitRangeItem{
+			{
+				Type: corev1.LimitTypePod,
+				Default: corev1.ResourceList{
+					corev1.ResourceCPU: *resource.NewQuantity(1, resource.DecimalSI),
+				},
+				DefaultRequest: corev1.ResourceList{
+					corev1.ResourceCPU: *resource.NewMilliQuantity(1000, resource.DecimalSI),
+				},
+			},
+			{
+				Type: corev1.LimitTypePod,
+				Default: corev1.ResourceList{
+					corev1.ResourceMemory: *resource.NewQuantity(1, resource.DecimalSI),
+				},
+				DefaultRequest: corev1.ResourceList{
+					corev1.ResourceMemory: *resource.NewQuantity(1, resource.DecimalSI),
+				},
+			},
+		},
+	}
+
+	t.Run("no update if no change", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		lrMock := fake.NewMockControllerInterface[*corev1.LimitRange, *corev1.LimitRangeList](ctrl)
+
+		lrMock.EXPECT().Update(gomock.Any()).Return(nil, nil).Times(0)
+		sc := SyncController{LimitRange: lrMock}
+
+		err := sc.updateDefaultLimitRange(&corev1.LimitRange{Spec: specA}, &specA)
+		assert.NoError(t, err)
+	})
+
+	t.Run("update for changes", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		lrMock := fake.NewMockControllerInterface[*corev1.LimitRange, *corev1.LimitRangeList](ctrl)
+
+		lrMock.EXPECT().Update(gomock.Any()).Return(nil, nil)
+		sc := SyncController{LimitRange: lrMock}
+
+		err := sc.updateDefaultLimitRange(&corev1.LimitRange{Spec: specA}, &specB)
+		assert.NoError(t, err)
+	})
+}
 
 func TestCompleteLimit(t *testing.T) {
 	type input struct {

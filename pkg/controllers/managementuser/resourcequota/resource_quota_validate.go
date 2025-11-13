@@ -2,6 +2,7 @@ package resourcequota
 
 import (
 	"fmt"
+	"reflect"
 
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	wmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -35,15 +36,14 @@ func (r *reconcileController) reconcileNamespaces(_ string, p *apiv3.Project) (r
 	// With no namespaces used-limit has to be empty because there is
 	// nothing which can be used without namespaces. Therefore squash
 	// non-empty used-limits, if present.
-	empty := apiv3.ResourceQuotaLimit{}
 	if len(namespaces) == 0 &&
 		p.Spec.ResourceQuota != nil &&
-		p.Spec.ResourceQuota.UsedLimit != empty {
+		!isEmpty(&p.Spec.ResourceQuota.UsedLimit) {
 
 		logrus.Warnf("project %q, clearing bogus used-limit", p.Name)
 
 		newP := p.DeepCopy()
-		newP.Spec.ResourceQuota.UsedLimit = empty
+		newP.Spec.ResourceQuota.UsedLimit = apiv3.ResourceQuotaLimit{}
 		_, err := r.projects.Update(newP)
 		if err != nil {
 			logrus.Errorf("project %q, clearing bogus used-limit failed: %q", p.Name, err)
@@ -56,4 +56,8 @@ func (r *reconcileController) reconcileNamespaces(_ string, p *apiv3.Project) (r
 		r.namespaces.Enqueue(ns.Name)
 	}
 	return nil, nil
+}
+
+func isEmpty(rql *apiv3.ResourceQuotaLimit) bool {
+	return reflect.ValueOf(rql).IsZero()
 }
