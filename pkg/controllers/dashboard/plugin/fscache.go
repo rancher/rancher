@@ -137,7 +137,7 @@ func (c FSCache) SyncWithIndex(index *SafeIndex, fsCacheFiles []string) error {
 			continue
 		}
 		entry, ok := index.Entries[chartName]
-		if !ok || entry == nil || entry.UIPluginEntry == nil || entry.Version != chartVersion {
+		if !ok || entry == nil || entry.Version != chartVersion {
 			err := c.Delete(chartName, chartVersion)
 			if err != nil {
 				errs = errors.Join(errs, fmt.Errorf("failed to delete cache entry. Error: %w", err))

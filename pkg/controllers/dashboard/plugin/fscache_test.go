@@ -23,7 +23,7 @@ func TestSyncWithIndex(t *testing.T) {
 			Name: "Sync index with FS cache no new entries",
 			CurrentEntries: map[string]*UIPlugin{
 				"test-plugin": {
-					UIPluginEntry: &v1.UIPluginEntry{
+					UIPluginEntry: v1.UIPluginEntry{
 						Name:     "test-plugin",
 						Version:  "0.1.0",
 						Endpoint: "https://test.endpoint.svc",
@@ -36,7 +36,7 @@ func TestSyncWithIndex(t *testing.T) {
 			},
 			ExpectedEntries: map[string]*UIPlugin{
 				"test-plugin": {
-					UIPluginEntry: &v1.UIPluginEntry{
+					UIPluginEntry: v1.UIPluginEntry{
 						Name:     "test-plugin",
 						Version:  "0.1.0",
 						Endpoint: "https://test.endpoint.svc",
@@ -55,7 +55,7 @@ func TestSyncWithIndex(t *testing.T) {
 			Name: "Sync index with FS cache delete old test-plugin-2 entry",
 			CurrentEntries: map[string]*UIPlugin{
 				"test-plugin": {
-					UIPluginEntry: &v1.UIPluginEntry{
+					UIPluginEntry: v1.UIPluginEntry{
 						Name:     "test-plugin",
 						Version:  "0.1.0",
 						Endpoint: "https://test.endpoint.svc",
@@ -68,7 +68,7 @@ func TestSyncWithIndex(t *testing.T) {
 			},
 			ExpectedEntries: map[string]*UIPlugin{
 				"test-plugin": {
-					UIPluginEntry: &v1.UIPluginEntry{
+					UIPluginEntry: v1.UIPluginEntry{
 						Name:     "test-plugin",
 						Version:  "0.1.0",
 						Endpoint: "https://test.endpoint.svc",
@@ -101,17 +101,9 @@ func TestSyncWithIndex(t *testing.T) {
 			ExpectedPluginDeleted: FSCacheRootDir + "/test-plugin",
 		},
 		{
-			Name: "Sync with nil UIPluginEntry does not panic",
-			CurrentEntries: map[string]*UIPlugin{
-				"test-plugin": {
-					UIPluginEntry: nil,
-				},
-			},
-			ExpectedEntries: map[string]*UIPlugin{
-				"test-plugin": {
-					UIPluginEntry: nil,
-				},
-			},
+			Name:            "Sync with nil UIPluginEntry does not panic",
+			CurrentEntries:  map[string]*UIPlugin{},
+			ExpectedEntries: map[string]*UIPlugin{},
 			FsCacheFiles: []string{
 				FSCacheRootDir + "/test-plugin/0.1.0",
 			},
