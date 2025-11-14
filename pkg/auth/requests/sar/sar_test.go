@@ -1,7 +1,6 @@
 package sar
 
 import (
-	"fmt"
 	"net/http"
 	"testing"
 
@@ -21,7 +20,7 @@ func TestUserCanImpersonateUser(t *testing.T) {
 		user                string
 		impUser             string
 		expectedAuthed      bool
-		expectedErr         error
+		expecterErr         error
 	}{
 		"can impersonate": {
 			sarClientGetterMock: func(req *http.Request, user string, impUser string) SubjectAccessReviewClientGetter {
@@ -50,7 +49,7 @@ func TestUserCanImpersonateUser(t *testing.T) {
 			user:           "user",
 			impUser:        "impUser",
 			expectedAuthed: true,
-			expectedErr:    nil,
+			expecterErr:    nil,
 		},
 		"impersonate not allowed": {
 			sarClientGetterMock: func(req *http.Request, user string, impUser string) SubjectAccessReviewClientGetter {
@@ -79,7 +78,7 @@ func TestUserCanImpersonateUser(t *testing.T) {
 			user:           "user",
 			impUser:        "impUser",
 			expectedAuthed: false,
-			expectedErr:    nil,
+			expecterErr:    nil,
 		},
 		"impersonate error": {
 			sarClientGetterMock: func(req *http.Request, user string, impUser string) SubjectAccessReviewClientGetter {
@@ -104,7 +103,7 @@ func TestUserCanImpersonateUser(t *testing.T) {
 			user:           "user",
 			impUser:        "impUser",
 			expectedAuthed: false,
-			expectedErr:    err,
+			expecterErr:    err,
 		},
 	}
 
@@ -115,7 +114,7 @@ func TestUserCanImpersonateUser(t *testing.T) {
 			sar := NewSubjectAccessReview(test.sarClientGetterMock(req, test.user, test.impUser))
 
 			authed, err := sar.UserCanImpersonateUser(req, test.user, test.impUser)
-			assert.Equal(t, test.expectedErr, err)
+			assert.Equal(t, test.expecterErr, err)
 			assert.Equal(t, test.expectedAuthed, authed)
 		})
 	}
@@ -129,7 +128,7 @@ func TestUserCanImpersonateGroup(t *testing.T) {
 		user                string
 		group               string
 		expectedAuthed      bool
-		expectedErr         error
+		expecterErr         error
 	}{
 		"can impersonate": {
 			sarClientGetterMock: func(req *http.Request, user string, impGroup string) SubjectAccessReviewClientGetter {
@@ -158,7 +157,7 @@ func TestUserCanImpersonateGroup(t *testing.T) {
 			user:           "user",
 			group:          "admin",
 			expectedAuthed: true,
-			expectedErr:    nil,
+			expecterErr:    nil,
 		},
 		"impersonate not allowed": {
 			sarClientGetterMock: func(req *http.Request, user string, impGroup string) SubjectAccessReviewClientGetter {
@@ -187,7 +186,7 @@ func TestUserCanImpersonateGroup(t *testing.T) {
 			user:           "user",
 			group:          "admin",
 			expectedAuthed: false,
-			expectedErr:    nil,
+			expecterErr:    nil,
 		},
 		"impersonate error": {
 			sarClientGetterMock: func(req *http.Request, user string, impGroup string) SubjectAccessReviewClientGetter {
@@ -212,7 +211,7 @@ func TestUserCanImpersonateGroup(t *testing.T) {
 			user:           "user",
 			group:          "admin",
 			expectedAuthed: false,
-			expectedErr:    err,
+			expecterErr:    err,
 		},
 	}
 
@@ -223,7 +222,7 @@ func TestUserCanImpersonateGroup(t *testing.T) {
 			sar := NewSubjectAccessReview(test.sarClientGetterMock(req, test.user, test.group))
 
 			authed, err := sar.UserCanImpersonateGroup(req, test.user, test.group)
-			assert.Equal(t, test.expectedErr, err)
+			assert.Equal(t, test.expecterErr, err)
 			assert.Equal(t, test.expectedAuthed, authed)
 		})
 	}
@@ -237,7 +236,7 @@ func TestUserCanImpersonateExtras(t *testing.T) {
 		user                string
 		extras              map[string][]string
 		expectedAuthed      bool
-		expectedErr         error
+		expecterErr         error
 	}{
 		"can impersonate": {
 			sarClientGetterMock: func(req *http.Request, impExtras map[string][]string, user string) SubjectAccessReviewClientGetter {
@@ -271,7 +270,7 @@ func TestUserCanImpersonateExtras(t *testing.T) {
 			user:           "user",
 			extras:         map[string][]string{"extra": {"extra1", "extra2"}},
 			expectedAuthed: true,
-			expectedErr:    nil,
+			expecterErr:    nil,
 		},
 		"impersonate not allowed": {
 			sarClientGetterMock: func(req *http.Request, impExtras map[string][]string, user string) SubjectAccessReviewClientGetter {
@@ -305,7 +304,7 @@ func TestUserCanImpersonateExtras(t *testing.T) {
 			user:           "user",
 			extras:         map[string][]string{"extra": {"extra1"}},
 			expectedAuthed: false,
-			expectedErr:    nil,
+			expecterErr:    nil,
 		},
 		"impersonate error": {
 			sarClientGetterMock: func(req *http.Request, impExtras map[string][]string, user string) SubjectAccessReviewClientGetter {
@@ -334,7 +333,7 @@ func TestUserCanImpersonateExtras(t *testing.T) {
 			user:           "user",
 			extras:         map[string][]string{"extra": {"extra1"}},
 			expectedAuthed: false,
-			expectedErr:    err,
+			expecterErr:    err,
 		},
 	}
 
@@ -345,7 +344,7 @@ func TestUserCanImpersonateExtras(t *testing.T) {
 			sar := NewSubjectAccessReview(test.sarClientGetterMock(req, test.extras, test.user))
 
 			authed, err := sar.UserCanImpersonateExtras(req, test.user, test.extras)
-			assert.Equal(t, test.expectedErr, err)
+			assert.Equal(t, test.expecterErr, err)
 			assert.Equal(t, test.expectedAuthed, authed)
 		})
 	}
@@ -355,16 +354,14 @@ func TestUserCanImpersonateServiceAccount(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	err := errors.New("unexpected error")
 	tests := map[string]struct {
-		sarClientGetterMock func(req *http.Request, user string, impSA string, ns string, name string) SubjectAccessReviewClientGetter
+		sarClientGetterMock func(req *http.Request, user string, impSA string) SubjectAccessReviewClientGetter
 		user                string
 		impSA               string
-		saNs                string
-		saName              string
 		expectedAuthed      bool
-		expectedErr         error
+		expecterErr         error
 	}{
 		"can impersonate": {
-			sarClientGetterMock: func(req *http.Request, user string, impSA string, ns string, name string) SubjectAccessReviewClientGetter {
+			sarClientGetterMock: func(req *http.Request, user string, impSA string) SubjectAccessReviewClientGetter {
 				sarClientMock := mocks.NewMockSubjectAccessReviewInterface(ctrl)
 				sarMock := mocks.NewMockSubjectAccessReviewClientGetter(ctrl)
 				sarMock.EXPECT().SubjectAccessReviewForCluster(req).Return(sarClientMock, nil)
@@ -373,10 +370,9 @@ func TestUserCanImpersonateServiceAccount(t *testing.T) {
 					Spec: authV1.SubjectAccessReviewSpec{
 						User: user,
 						ResourceAttributes: &authV1.ResourceAttributes{
-							Verb:      "impersonate",
-							Resource:  "serviceaccounts",
-							Namespace: ns,
-							Name:      name,
+							Verb:     "impersonate",
+							Resource: "serviceaccounts",
+							Name:     impSA,
 						},
 					},
 				}
@@ -389,14 +385,12 @@ func TestUserCanImpersonateServiceAccount(t *testing.T) {
 				return sarMock
 			},
 			user:           "user",
-			impSA:          "system:serviceaccount:example-ns:example-test",
-			saNs:           "example-ns",
-			saName:         "example-test",
+			impSA:          "impSA",
 			expectedAuthed: true,
-			expectedErr:    nil,
+			expecterErr:    nil,
 		},
 		"impersonate not allowed": {
-			sarClientGetterMock: func(req *http.Request, user string, impSA string, ns string, name string) SubjectAccessReviewClientGetter {
+			sarClientGetterMock: func(req *http.Request, user string, impSA string) SubjectAccessReviewClientGetter {
 				sarClientMock := mocks.NewMockSubjectAccessReviewInterface(ctrl)
 				sarMock := mocks.NewMockSubjectAccessReviewClientGetter(ctrl)
 				sarMock.EXPECT().SubjectAccessReviewForCluster(req).Return(sarClientMock, nil)
@@ -405,10 +399,9 @@ func TestUserCanImpersonateServiceAccount(t *testing.T) {
 					Spec: authV1.SubjectAccessReviewSpec{
 						User: user,
 						ResourceAttributes: &authV1.ResourceAttributes{
-							Verb:      "impersonate",
-							Resource:  "serviceaccounts",
-							Namespace: ns,
-							Name:      name,
+							Verb:     "impersonate",
+							Resource: "serviceaccounts",
+							Name:     impSA,
 						},
 					},
 				}
@@ -421,14 +414,12 @@ func TestUserCanImpersonateServiceAccount(t *testing.T) {
 				return sarMock
 			},
 			user:           "user",
-			impSA:          "system:serviceaccount:example-ns:example-test",
-			saNs:           "example-ns",
-			saName:         "example-test",
+			impSA:          "impSA",
 			expectedAuthed: false,
-			expectedErr:    nil,
+			expecterErr:    nil,
 		},
 		"impersonate error": {
-			sarClientGetterMock: func(req *http.Request, user string, impSA string, ns string, name string) SubjectAccessReviewClientGetter {
+			sarClientGetterMock: func(req *http.Request, user string, impSA string) SubjectAccessReviewClientGetter {
 				sarClientMock := mocks.NewMockSubjectAccessReviewInterface(ctrl)
 				sarMock := mocks.NewMockSubjectAccessReviewClientGetter(ctrl)
 				sarMock.EXPECT().SubjectAccessReviewForCluster(req).Return(sarClientMock, nil)
@@ -437,10 +428,9 @@ func TestUserCanImpersonateServiceAccount(t *testing.T) {
 					Spec: authV1.SubjectAccessReviewSpec{
 						User: user,
 						ResourceAttributes: &authV1.ResourceAttributes{
-							Verb:      "impersonate",
-							Resource:  "serviceaccounts",
-							Namespace: ns,
-							Name:      name,
+							Verb:     "impersonate",
+							Resource: "serviceaccounts",
+							Name:     impSA,
 						},
 					},
 				}
@@ -449,25 +439,9 @@ func TestUserCanImpersonateServiceAccount(t *testing.T) {
 				return sarMock
 			},
 			user:           "user",
-			impSA:          "system:serviceaccount:example-ns:example-test",
-			saNs:           "example-ns",
-			saName:         "example-test",
+			impSA:          "impUser",
 			expectedAuthed: false,
-			expectedErr:    err,
-		},
-		"impersonate parsing error": {
-			sarClientGetterMock: func(req *http.Request, user string, impSA string, ns string, name string) SubjectAccessReviewClientGetter {
-				sarClientMock := mocks.NewMockSubjectAccessReviewInterface(ctrl)
-				sarMock := mocks.NewMockSubjectAccessReviewClientGetter(ctrl)
-				sarMock.EXPECT().SubjectAccessReviewForCluster(req).Return(sarClientMock, nil)
-				return sarMock
-			},
-			user:           "user",
-			impSA:          "system:serviceaccount:example-test",
-			saNs:           "example-ns",
-			saName:         "example-test",
-			expectedAuthed: false,
-			expectedErr:    fmt.Errorf("invalid service account username format: expected system:serviceaccount:<namespace>:<name>, but got 'system:serviceaccount:example-test'"),
+			expecterErr:    err,
 		},
 	}
 
@@ -475,14 +449,10 @@ func TestUserCanImpersonateServiceAccount(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			req := &http.Request{}
-			sar := NewSubjectAccessReview(test.sarClientGetterMock(req, test.user, test.impSA, test.saNs, test.saName))
+			sar := NewSubjectAccessReview(test.sarClientGetterMock(req, test.user, test.impSA))
 
 			authed, err := sar.UserCanImpersonateServiceAccount(req, test.user, test.impSA)
-			if test.expectedErr != nil {
-				assert.EqualError(t, err, test.expectedErr.Error())
-			} else {
-				assert.Nil(t, err)
-			}
+			assert.Equal(t, test.expecterErr, err)
 			assert.Equal(t, test.expectedAuthed, authed)
 		})
 	}
