@@ -43,7 +43,7 @@ func TestGenerate(t *testing.T) {
 			},
 			ExpectedEntries: map[string]*UIPlugin{
 				"test-plugin": {
-					UIPluginEntry: &v1.UIPluginEntry{
+					UIPluginEntry: v1.UIPluginEntry{
 
 						Name:     "test-plugin",
 						Version:  "0.1.0",
@@ -55,7 +55,7 @@ func TestGenerate(t *testing.T) {
 					},
 				},
 				"test-plugin-2": {
-					UIPluginEntry: &v1.UIPluginEntry{
+					UIPluginEntry: v1.UIPluginEntry{
 						Name:     "test-plugin-2",
 						Version:  "0.1.1",
 						Endpoint: "https://test-2.endpoint.svc",

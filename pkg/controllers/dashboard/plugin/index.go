@@ -13,7 +13,7 @@ var (
 )
 
 type UIPlugin struct {
-	*v1.UIPluginEntry
+	v1.UIPluginEntry
 	CacheState string
 	Ready      bool
 }
@@ -30,8 +30,8 @@ func (s *SafeIndex) Generate(cachedPlugins []*v1.UIPlugin) error {
 	defer s.mu.Unlock()
 	s.Entries = make(map[string]*UIPlugin, len(cachedPlugins))
 	for _, plugin := range cachedPlugins {
-		entry := &plugin.Spec.Plugin
-		logrus.Debugf("adding plugin to index: %+v", *entry)
+		entry := plugin.Spec.Plugin
+		logrus.Debugf("adding plugin to index: %+v", entry)
 		s.Entries[entry.Name] = &UIPlugin{
 			UIPluginEntry: entry,
 			CacheState:    plugin.Status.CacheState,

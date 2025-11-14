@@ -12,17 +12,18 @@ import (
 
 func TestSyncWithIndex(t *testing.T) {
 	testCases := []struct {
-		Name            string
-		CurrentEntries  map[string]*UIPlugin
-		ExpectedEntries map[string]*UIPlugin
-		FsCacheFiles    []string
-		ShouldDelete    bool
+		Name                  string
+		CurrentEntries        map[string]*UIPlugin
+		ExpectedEntries       map[string]*UIPlugin
+		FsCacheFiles          []string
+		ShouldDelete          bool
+		ExpectedPluginDeleted string
 	}{
 		{
 			Name: "Sync index with FS cache no new entries",
 			CurrentEntries: map[string]*UIPlugin{
 				"test-plugin": {
-					UIPluginEntry: &v1.UIPluginEntry{
+					UIPluginEntry: v1.UIPluginEntry{
 						Name:     "test-plugin",
 						Version:  "0.1.0",
 						Endpoint: "https://test.endpoint.svc",
@@ -35,7 +36,7 @@ func TestSyncWithIndex(t *testing.T) {
 			},
 			ExpectedEntries: map[string]*UIPlugin{
 				"test-plugin": {
-					UIPluginEntry: &v1.UIPluginEntry{
+					UIPluginEntry: v1.UIPluginEntry{
 						Name:     "test-plugin",
 						Version:  "0.1.0",
 						Endpoint: "https://test.endpoint.svc",
@@ -54,7 +55,7 @@ func TestSyncWithIndex(t *testing.T) {
 			Name: "Sync index with FS cache delete old test-plugin-2 entry",
 			CurrentEntries: map[string]*UIPlugin{
 				"test-plugin": {
-					UIPluginEntry: &v1.UIPluginEntry{
+					UIPluginEntry: v1.UIPluginEntry{
 						Name:     "test-plugin",
 						Version:  "0.1.0",
 						Endpoint: "https://test.endpoint.svc",
@@ -67,7 +68,7 @@ func TestSyncWithIndex(t *testing.T) {
 			},
 			ExpectedEntries: map[string]*UIPlugin{
 				"test-plugin": {
-					UIPluginEntry: &v1.UIPluginEntry{
+					UIPluginEntry: v1.UIPluginEntry{
 						Name:     "test-plugin",
 						Version:  "0.1.0",
 						Endpoint: "https://test.endpoint.svc",
@@ -82,7 +83,32 @@ func TestSyncWithIndex(t *testing.T) {
 				FSCacheRootDir + "/test-plugin/0.1.0",
 				FSCacheRootDir + "/test-plugin-2/0.1.0",
 			},
-			ShouldDelete: true,
+			ShouldDelete:          true,
+			ExpectedPluginDeleted: FSCacheRootDir + "/test-plugin-2",
+		},
+		{
+			Name: "Sync with nil entry does not panic",
+			CurrentEntries: map[string]*UIPlugin{
+				"test-plugin": nil,
+			},
+			ExpectedEntries: map[string]*UIPlugin{
+				"test-plugin": nil,
+			},
+			FsCacheFiles: []string{
+				FSCacheRootDir + "/test-plugin/0.1.0",
+			},
+			ShouldDelete:          true,
+			ExpectedPluginDeleted: FSCacheRootDir + "/test-plugin",
+		},
+		{
+			Name:            "Sync with nil UIPluginEntry does not panic",
+			CurrentEntries:  map[string]*UIPlugin{},
+			ExpectedEntries: map[string]*UIPlugin{},
+			FsCacheFiles: []string{
+				FSCacheRootDir + "/test-plugin/0.1.0",
+			},
+			ShouldDelete:          true,
+			ExpectedPluginDeleted: FSCacheRootDir + "/test-plugin",
 		},
 	}
 
@@ -110,8 +136,9 @@ func TestSyncWithIndex(t *testing.T) {
 			assert.Equal(t, index.Entries, tc.CurrentEntries)
 			if tc.ShouldDelete {
 				assert.Equal(t, tc.ShouldDelete, osRemoveAllCalled)
-				expectedPluginDeleted := FSCacheRootDir + "/test-plugin-2"
-				assert.Equal(t, expectedPluginDeleted, actualPluginDeleted)
+				if tc.ExpectedPluginDeleted != "" {
+					assert.Equal(t, tc.ExpectedPluginDeleted, actualPluginDeleted)
+				}
 			}
 		})
 	}

@@ -136,8 +136,8 @@ func (c FSCache) SyncWithIndex(index *SafeIndex, fsCacheFiles []string) error {
 			errs = errors.Join(errs, fmt.Errorf("failed to get chart name and version for file [%s]. Error: %w", file, err))
 			continue
 		}
-		_, ok := index.Entries[chartName]
-		if !ok || index.Entries[chartName].Version != chartVersion {
+		entry, ok := index.Entries[chartName]
+		if !ok || entry == nil || entry.Version != chartVersion {
 			err := c.Delete(chartName, chartVersion)
 			if err != nil {
 				errs = errors.Join(errs, fmt.Errorf("failed to delete cache entry. Error: %w", err))
