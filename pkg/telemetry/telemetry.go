@@ -42,6 +42,7 @@ type RancherVersionTelemetry interface {
 	ServerURL() string
 	RancherVersion() string
 	RancherGitHash() string
+	IsPrime() bool
 	FeatureFlags() []string
 }
 
@@ -142,6 +143,7 @@ func (n *nodeTelemetryImpl) KernelVersion() string {
 type rancherTelemetryImpl struct {
 	rancherVersion string
 	gitHash        string
+	isPrime        bool
 	installUUID    string
 	clusterUUID    string
 	serverURL      string
@@ -194,6 +196,10 @@ func (r *rancherTelemetryImpl) RancherVersion() string {
 
 func (r *rancherTelemetryImpl) RancherGitHash() string {
 	return r.gitHash
+}
+
+func (r *rancherTelemetryImpl) IsPrime() bool {
+	return r.isPrime
 }
 
 func (r *rancherTelemetryImpl) InstallUUID() string {
@@ -252,6 +258,7 @@ func (c *clusterTelemetryImpl) PerNodeTelemetry() iter.Seq2[NodeID, NodeTelemetr
 type TelemetryGatherer struct {
 	rancherVersion string
 	gitHash        string
+	isPrime        bool
 	installUUID    string
 	clusterUUID    string
 	serverURL      string
@@ -314,6 +321,7 @@ func (t *TelemetryGatherer) GetClusterTelemetry() (RancherManagerTelemetry, erro
 	return newTelemetryImpl(
 		t.rancherVersion,
 		t.gitHash,
+		t.isPrime,
 		t.installUUID,
 		t.clusterUUID,
 		t.serverURL,
@@ -326,7 +334,8 @@ func (t *TelemetryGatherer) GetClusterTelemetry() (RancherManagerTelemetry, erro
 
 func newTelemetryImpl(
 	version,
-	gitHash,
+	gitHash string,
+	isPrime bool,
 	installUUID,
 	clusterUUID string,
 	serverURL string,
@@ -338,6 +347,7 @@ func newTelemetryImpl(
 	return &rancherTelemetryImpl{
 		rancherVersion:  version,
 		gitHash:         gitHash,
+		isPrime:         isPrime,
 		installUUID:     installUUID,
 		clusterUUID:     clusterUUID,
 		serverURL:       serverURL,
