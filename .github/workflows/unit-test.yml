@@ -1,13 +1,38 @@
 name: Unit Tests
 on: [workflow_dispatch, workflow_call]
+
 jobs:
   unit-test:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+
     steps:
       - name: Checkout code
         uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+      - name: Free disk space for unit tests
+        run: |
+          sudo rm -rf /usr/local/lib/android || true
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /opt/ghc || true
+          sudo rm -rf /usr/local/.ghcup || true
+          sudo rm -rf /usr/share/swift || true
+          # Optionally, CodeQL if we know no step uses it here
+          sudo rm -rf /opt/hostedtoolcache/CodeQL || true
+      - name: Show Go env and disk mapping
+        run: |
+          echo "PWD: $(pwd)"
+          echo "GOCACHE:   $(go env GOCACHE)"
+          echo "GOMODCACHE:$(go env GOMODCACHE)"
+          echo "GOTMPDIR:  ${GOTMPDIR:-<unset>}"
+          echo "TMPDIR:    ${TMPDIR:-/tmp}"
+
+          echo
+          echo "=== df -h for relevant paths ==="
+          df -h .
+
+          df -h "$(go env GOCACHE)"    || echo "GOCACHE dir not created yet"
+          df -h "$(go env GOMODCACHE)" || echo "GOMODCACHE dir not created yet"
+          df -h "${GOTMPDIR:-/tmp}"
 
       - name: Run unit tests
         run: go test -cover -tags=test ./pkg/...
-

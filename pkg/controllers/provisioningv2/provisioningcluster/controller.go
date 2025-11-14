@@ -265,7 +265,7 @@ func reconcileClusterSpecEtcdRestore(cluster *rancherv1.Cluster, desiredSpec ran
 		changed = true
 		cluster.Spec.RKEConfig.AdditionalManifest = desiredSpec.RKEConfig.AdditionalManifest
 	}
-	if cluster.Spec.RKEConfig.Networking != desiredSpec.RKEConfig.Networking {
+	if !equality.Semantic.DeepEqual(cluster.Spec.RKEConfig.Networking, desiredSpec.RKEConfig.Networking) {
 		changed = true
 		cluster.Spec.RKEConfig.Networking = desiredSpec.RKEConfig.Networking
 	}
