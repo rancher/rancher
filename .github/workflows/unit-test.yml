@@ -2,12 +2,19 @@ name: Unit Tests
 on: [workflow_dispatch, workflow_call]
 jobs:
   unit-test:
-    runs-on: ubuntu-latest
+    runs-on:
+      - runs-on
+      - spot=false
+      - runner=8cpu-linux-arm64
+      - run-id=${{ github.run_id }}
     timeout-minutes: 60
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
       - name: Run unit tests
         run: go test -cover -tags=test ./pkg/...
 
