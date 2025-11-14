@@ -362,7 +362,7 @@ func (gr *globalRoleLifecycle) purgeInvalidNamespacedRoles(roles []*v1.Role, uid
 func (gr *globalRoleLifecycle) setGRAsInProgress(globalRole *v3.GlobalRole) error {
 	globalRole.Status.Conditions = []metav1.Condition{}
 	globalRole.Status.Summary = SummaryInProgress
-	globalRole.Status.LastUpdate = time.Now().String()
+	globalRole.Status.LastUpdate = time.Now().UTC().Format(time.RFC3339)
 	updatedGR, err := gr.grClient.UpdateStatus(globalRole)
 	// For future updates, we want the latest version of our GlobalRole
 	*globalRole = *updatedGR
@@ -377,7 +377,7 @@ func (gr *globalRoleLifecycle) setGRAsCompleted(globalRole *v3.GlobalRole) error
 			break
 		}
 	}
-	globalRole.Status.LastUpdate = time.Now().String()
+	globalRole.Status.LastUpdate = time.Now().UTC().Format(time.RFC3339)
 	globalRole.Status.ObservedGeneration = globalRole.ObjectMeta.Generation
 	_, err := gr.grClient.UpdateStatus(globalRole)
 	return err
@@ -386,7 +386,7 @@ func (gr *globalRoleLifecycle) setGRAsCompleted(globalRole *v3.GlobalRole) error
 func (gr *globalRoleLifecycle) setGRAsTerminating(globalRole *v3.GlobalRole) error {
 	globalRole.Status.Conditions = []metav1.Condition{}
 	globalRole.Status.Summary = SummaryTerminating
-	globalRole.Status.LastUpdate = time.Now().String()
+	globalRole.Status.LastUpdate = time.Now().UTC().Format(time.RFC3339)
 	_, err := gr.grClient.UpdateStatus(globalRole)
 	return err
 }
