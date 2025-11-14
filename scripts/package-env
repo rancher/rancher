@@ -11,6 +11,8 @@ SYSTEM_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_SYSTEM_AGENT_VERSION" ../package/Doc
 SYSTEM_AGENT_UPGRADE_IMAGE=${REPO}/system-agent:${SYSTEM_AGENT_UPGRADE_TAG}
 WINS_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_WINS_AGENT_VERSION" ../package/Dockerfile | awk -F'=' '{ print $NF }')
 WINS_AGENT_UPGRADE_IMAGE=${REPO}/wins:${WINS_AGENT_UPGRADE_TAG}
+CLUSTER_API_CONTROLLER_TAG=v1.10.6
+CLUSTER_API_CONTROLLER_IMAGE=registry.k8s.io/cluster-api/cluster-api-controller:${CLUSTER_API_CONTROLLER_TAG}
 
 # Query KDM data for RKE2 released versions where server args are defined.
 RKE2_RELEASE_VERSIONS=$(jq -r 'def semver_array: (if startswith("v") then ltrimstr("v") else . end) | split(".") | map(tonumber? // .);
