@@ -2,8 +2,11 @@ name: Unit Tests
 on: [workflow_dispatch, workflow_call]
 jobs:
   unit-test:
-    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: registry.suse.com/bci/golang:1.24
+    runs-on:
+      - runs-on
+      - spot=false
+      - runner=8cpu-linux-arm64
+      - run-id=${{ github.run_id }}
     timeout-minutes: 60
     steps:
       - name: Checkout code
