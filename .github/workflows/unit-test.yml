@@ -3,7 +3,7 @@ on: [workflow_dispatch, workflow_call]
 jobs:
   unit-test:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: registry.suse.com/bci/bci-base:15.7
+    container: registry.suse.com/bci/golang:1.24
     timeout-minutes: 60
     steps:
       - name: Checkout code
