@@ -34,7 +34,7 @@ spec:
   ingressClassName: {{ .Values.ingress.ingressClassName }}
 {{- end }}
   rules:
-  - host: {{ .Values.hostname }}  # hostname to access rancher server
+  - host: {{ template "rancher.hostname" . }}  # hostname to access rancher server
     http:
       paths:
       - backend:
@@ -54,7 +54,7 @@ spec:
 {{- if eq .Values.tls "ingress" }}
   tls:
   - hosts:
-    - {{ .Values.hostname }}
+    - {{ template "rancher.hostname" . }}
     secretName: {{ .Values.ingress.tls.secretName }}
 {{- end }}
 {{- end }}
