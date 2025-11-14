@@ -161,3 +161,43 @@ add below linux tolerations to workloads could be scheduled to those linux nodes
     {{- .Values.auditLog.image.repository -}}:{{- .Values.auditLog.image.tag -}}
   {{ end -}}
 {{ end -}}
+
+{{- define "rancher.certmanager.notes" -}}
+{{- if .Values.ingress.tls.source | eq "rancher" -}}
+{{- $requiredVersion := "1.15.0" -}}
+{{- $requiredCRD := "certificates.cert-manager.io" -}}
+{{- $crdVersion := "v1" -}}
+
+{{- $crd := (lookup "apiextensions.k8s.io/v1" "CustomResourceDefinition" "" $requiredCRD) -}}
+
+{{- if not $crd -}}
+{{- $msg := printf "Cert-manager dependency check failed. CRD '%s' not found. Please ensure cert-manager (>= %s) is installed." $requiredCRD $requiredVersion -}}
+{{- include "tpl.chart.warning" $msg -}}
+{{- else -}}
+  {{- $hasV1 := false -}}
+  {{- range $crd.spec.versions -}}
+    {{- if and (eq .name $crdVersion) .served -}}
+      {{- $hasV1 = true -}}
+    {{- end -}}
+  {{- end -}}
+
+  {{- if not $hasV1 -}}
+    {{- $msg := printf "Cert-manager CRD '%s' found, but it does not support the required API version '%s'. This likely indicates an old cert-manager version. Minimum required version is %s." $requiredCRD $crdVersion $requiredVersion -}}
+    {{- include "tpl.chart.warning" $msg -}}
+  {{- end -}}
+{{- end -}}
+
+{{- $userVersion := .Values.certmanager.version | default "" -}}
+{{- if $userVersion -}}
+  {{- /* Only execute if version is actually provided and non-empty */ -}}
+  {{- if not (semverCompare ">= 0.0.0" $userVersion) -}}
+    {{- /* Invalid semver - this will catch parse errors */ -}}
+    {{- include "tpl.chart.warning" (printf "Value 'certmanager.version' (%s) is not a valid Semantic Version. Must be >= %s." $userVersion $requiredVersion) -}}
+  {{- else if not (semverCompare (printf ">= %s" $requiredVersion) $userVersion) -}}
+    {{- /* Valid semver but too old */ -}}
+    {{- $msg := printf "The user-provided cert-manager version (%s) is too old. Minimum required version is %s." $userVersion $requiredVersion -}}
+    {{- include "tpl.chart.warning" $msg -}}
+  {{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
