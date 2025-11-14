@@ -82,7 +82,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addNamespacedRule("fleet-default").addRule().apiGroups("").resources("secrets").verbs("create")
 
 	rb.addRole("User Base", "user-base").
-		addRule().apiGroups("ext.cattle.io").resources("useractivities").verbs("get", "create").
+		addRule().apiGroups("ext.cattle.io").resources("useractivities").verbs("get", "update", "patch").
 		addRule().apiGroups("ext.cattle.io").resources("selfusers").verbs("create").
 		addRule().apiGroups("ext.cattle.io").resources("passwordchangerequests").verbs("create").
 		addRule().apiGroups("ext.cattle.io").resources("kubeconfigs").verbs("get", "list", "watch", "create", "delete", "deletecollection", "update", "patch").
@@ -391,7 +391,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 func addUserRules(role *roleBuilder) *roleBuilder {
 	role.
 		addRule().apiGroups("ext.cattle.io").resources("kubeconfigs").verbs("get", "list", "watch", "create", "delete", "deletecollection", "update", "patch").
-		addRule().apiGroups("ext.cattle.io").resources("useractivities").verbs("get", "create").
+		addRule().apiGroups("ext.cattle.io").resources("useractivities").verbs("get", "update", "patch").
 		// standard permissions for regular users, on their tokens
 		// Note: The ext token store applies additional restrictions. A user can see and manipulate only their own tokens.
 		addRule().apiGroups("ext.cattle.io").resources("tokens").verbs("get", "list", "watch", "create", "delete", "update", "patch").
