@@ -417,22 +417,22 @@ func DeleteLegacyServiceAndSecret(service wranglercorev1.ServiceController, secr
 	}
 
 	// Check if the legacy secret exists before attempting to delete
-	_, err = secrets.Get(Namespace, LegacySecretName, metav1.GetOptions{})
-	if err != nil {
-		logrus.Warnf("failed to get legacy Secret %s/%s: %v", Namespace, LegacySecretName, err)
-	} else {
-		// Secret found, proceed with deletion
-		logrus.Infof("Deleting legacy Secret %s/%s...", Namespace, LegacySecretName)
-		deleteErr := secrets.Delete(Namespace, LegacySecretName, &metav1.DeleteOptions{})
-		if deleteErr != nil {
-			if !apierrors.IsNotFound(deleteErr) {
-				logrus.Warnf("failed to delete legacy Secret %s/%s: %v", Namespace, LegacySecretName, deleteErr)
-			}
-			logrus.Infof("Legacy Secret %s/%s was already gone.", Namespace, LegacySecretName)
-		} else {
-			logrus.Infof("Successfully deleted legacy Secret %s/%s.", Namespace, LegacySecretName)
-		}
-	}
+	// _, err = secrets.Get(Namespace, LegacySecretName, metav1.GetOptions{})
+	// if err != nil {
+	// 	logrus.Warnf("failed to get legacy Secret %s/%s: %v", Namespace, LegacySecretName, err)
+	// } else {
+	// 	// Secret found, proceed with deletion
+	// 	logrus.Infof("Deleting legacy Secret %s/%s...", Namespace, LegacySecretName)
+	// 	deleteErr := secrets.Delete(Namespace, LegacySecretName, &metav1.DeleteOptions{})
+	// 	if deleteErr != nil {
+	// 		if !apierrors.IsNotFound(deleteErr) {
+	// 			logrus.Warnf("failed to delete legacy Secret %s/%s: %v", Namespace, LegacySecretName, deleteErr)
+	// 		}
+	// 		logrus.Infof("Legacy Secret %s/%s was already gone.", Namespace, LegacySecretName)
+	// 	} else {
+	// 		logrus.Infof("Successfully deleted legacy Secret %s/%s.", Namespace, LegacySecretName)
+	// 	}
+	// }
 
 	logrus.Info("Finished attempting to delete legacy Service and Secret.")
 	return nil
