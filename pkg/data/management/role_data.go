@@ -94,6 +94,78 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("rancherusernotifications").verbs("get", "list", "watch")
 
+	rb.addRole("Tenant", "tenant").
+		addRule().apiGroups("").resources("events").verbs("get", "list", "watch").
+		addRule().apiGroups("").resources("namespaces").verbs("get", "list", "watch", "create").
+		addRule().apiGroups("").resources("nodes").verbs("get", "list", "watch").
+		addRule().apiGroups("").resources("persistentvolumes").verbs("*").
+		addRule().apiGroups("").resources("persistentvolumeclaims").verbs("*").
+		addRule().apiGroups("").resources("pods").verbs("*").
+		addRule().apiGroups("").resources("pods/log").verbs("get").
+		addRule().apiGroups("").resources("secrets").verbs("*").
+		addRule().apiGroups("").resources("services/proxy").verbs("*").
+		addRule().apiGroups("").resources("services").verbs("*").
+		addRule().apiGroups("devices.harvesterhci.io").resources("pcidevices").verbs("get", "list", "watch").
+		addRule().apiGroups("devices.harvesterhci.io").resources("pcideviceclaims").verbs("get", "list", "watch").
+		addRule().apiGroups("devices.harvesterhci.io").resources("sriovnetworkdevices").verbs("get", "list", "watch").
+		addRule().apiGroups("devices.harvesterhci.io").resources("sriovgpudevices").verbs("get", "list", "watch").
+		addRule().apiGroups("devices.harvesterhci.io").resources("vgpudevices").verbs("get", "list", "watch").
+		addRule().apiGroups("devices.harvesterhci.io").resources("usbdevices").verbs("get", "list", "watch").
+		addRule().apiGroups("devices.harvesterhci.io").resources("usbdeviceclaims").verbs("get", "list", "watch").
+		addRule().apiGroups("ext.cattle.io").resources("tokens").verbs("*").
+		addRule().apiGroups("harvesterhci.io").resources("addons").verbs("*").
+		addRule().apiGroups("harvesterhci.io").resources("keypairs").verbs("*").
+		addRule().apiGroups("harvesterhci.io").resources("settings").verbs("get", "list", "watch").
+		addRule().apiGroups("harvesterhci.io").resources("schedulevmbackups").verbs("*").
+		addRule().apiGroups("harvesterhci.io").resources("virtualmachinebackups").verbs("*").
+		addRule().apiGroups("harvesterhci.io").resources("virtualmachineimages").verbs("*").
+		addRule().apiGroups("harvesterhci.io").resources("virtualmachinetemplateversions").verbs("*").
+		addRule().apiGroups("harvesterhci.io").resources("virtualmachinerestores").verbs("*").
+		addRule().apiGroups("harvesterhci.io").resources("virtualmachinetemplates").verbs("*").
+		addRule().apiGroups("harvesterhci.io").resources("blockdevices").verbs("get", "list", "watch").
+		addRule().apiGroups("harvesterhci.io").resources("resourcequotas").verbs("*").
+		addRule().apiGroups("kubeovn.io").resources("vpcs").verbs("*").
+		addRule().apiGroups("kubeovn.io").resources("subnets").verbs("*").
+		addRule().apiGroups("kubevirt.io").resources("virtualmachineinstances").verbs("*").
+		addRule().apiGroups("kubevirt.io").resources("virtualmachineinstances/restart").verbs("create", "update", "watch", "patch").
+		addRule().apiGroups("kubevirt.io").resources("virtualmachineinstancemigrations").verbs("*").
+		addRule().apiGroups("kubevirt.io").resources("virtualmachines").verbs("*").
+		addRule().apiGroups("k8s.cni.cncf.io").resources("network-attachment-definitions").verbs("*").
+		addRule().apiGroups("loadbalancer.harvesterhci.io").resources("ippools").verbs("*").
+		addRule().apiGroups("loadbalancer.harvesterhci.io").resources("loadbalancers").verbs("*").
+		addRule().apiGroups("longhorn.io").resources("engines").verbs("*").
+		addRule().apiGroups("longhorn.io").resources("nodes").verbs("get", "list", "watch").
+		addRule().apiGroups("longhorn.io").resources("settings").verbs("get", "list", "watch").
+		addRule().apiGroups("longhorn.io").resources("volumes").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("rancherusernotifications").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch").
+		addRule().apiGroups("metrics.k8s.io").resources("nodes").verbs("get", "list", "watch").
+		addRule().apiGroups("monitoring.coreos.com").resources("podmonitors").verbs("*").
+		addRule().apiGroups("network.harvesterhci.io").resources("clusternetworks").verbs("get", "list", "watch").
+		addRule().apiGroups("network.harvesterhci.io").resources("vlanconfigs").verbs("get", "list", "watch").
+		addRule().apiGroups("network.harvesterhci.io").resources("vlanstatuses").verbs("*").
+		addRule().apiGroups("snapshot.storage.k8s.io").resources("volumesnapshots").verbs("*").
+		addRule().apiGroups("snapshot.storage.k8s.io").resources("volumesnapshotclasses").verbs("*").
+		addRule().apiGroups("storage.k8s.io").resources("storageclasses").verbs("get", "list", "watch").
+		addRule().apiGroups("subresources.kubevirt.io").resources("virtualmachineinstances/vnc").verbs("get")
+
+	rb.addRole("Safe Admin", "safe-admin").
+		addRule().apiGroups("ext.cattle.io").resources("kubeconfigs").verbs("*").
+		addRule().apiGroups("ext.cattle.io").resources("tokens").verbs("get", "list", "patch", "update", "watch", "create", "delete").
+		addRule().apiGroups("ext.cattle.io").resources("useractivities").verbs("get", "create").
+		addRule().apiGroups("management.cattle.io").resources("globalroles").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("settings").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("users").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("features").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("rancherusernotifications").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("preferences").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("roletemplates").verbs("*").
+		addRule().apiGroups("management.cattle.io").resources("globalrolebindings").verbs("*").
+		addRule().apiGroups("rbac.authorization.k8s.io").resources("clusterroles").verbs("*").
+		addRule().apiGroups("rbac.authorization.k8s.io").resources("roles").verbs("*")
+
 	// TODO user should be dynamically authorized to only see herself
 	// TODO enable when groups are "in". they need to be self-service
 
@@ -194,6 +266,59 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 
 	rb.addRoleTemplate("Manage Navlinks", "navlinks-manage", "cluster", false, false, false).
 		addRule().apiGroups("ui.cattle.io").resources("navlinks").verbs("*")
+
+	rb.addRoleTemplate("Tenant", "cluster-tenant", "cluster", false, false, false).
+		addRule().apiGroups("").resources("events").verbs("get", "list", "watch").
+		addRule().apiGroups("").resources("namespaces").verbs("get", "watch", "create").
+		addRule().apiGroups("").resources("nodes").verbs("get", "list", "watch").
+		addRule().apiGroups("").resources("persistentvolumes").verbs("*").
+		addRule().apiGroups("").resources("pods").verbs("*").
+		addRule().apiGroups("").resources("persistentvolumeclaims").verbs("*").
+		addRule().apiGroups("").resources("secrets").verbs("*").
+		addRule().apiGroups("").resources("services/proxy").verbs("get", "list", "watch", "create").
+		addRule().apiGroups("").resources("services").verbs("get", "list", "watch").
+		addRule().apiGroups("devices.harvesterhci.io").resources("pcidevices").verbs("get", "list", "watch").
+		addRule().apiGroups("devices.harvesterhci.io").resources("pcideviceclaims").verbs("get", "list", "watch").
+		addRule().apiGroups("devices.harvesterhci.io").resources("sriovnetworkdevices").verbs("get", "list", "watch").
+		addRule().apiGroups("devices.harvesterhci.io").resources("sriovgpudevices").verbs("get", "list", "watch").
+		addRule().apiGroups("devices.harvesterhci.io").resources("usbdevices").verbs("get", "list", "watch").
+		addRule().apiGroups("devices.harvesterhci.io").resources("usbdeviceclaims").verbs("get", "list", "watch").
+		addRule().apiGroups("devices.harvesterhci.io").resources("vgpudevices").verbs("get", "list", "watch").
+		addRule().apiGroups("harvesterhci.io").resources("addons").verbs("*").
+		addRule().apiGroups("harvesterhci.io").resources("blockdevices").verbs("get", "list", "watch").
+		addRule().apiGroups("harvesterhci.io").resources("keypairs").verbs("*").
+		addRule().apiGroups("harvesterhci.io").resources("resourcequotas").verbs("get", "update", "delete").
+		addRule().apiGroups("harvesterhci.io").resources("schedulevmbackups").verbs("*").
+		addRule().apiGroups("harvesterhci.io").resources("settings").verbs("get", "list", "watch").
+		addRule().apiGroups("harvesterhci.io").resources("virtualmachinebackups").verbs("*").
+		addRule().apiGroups("harvesterhci.io").resources("virtualmachineimages").verbs("delete", "create", "get", "patch", "update", "watch", "list").
+		addRule().apiGroups("harvesterhci.io").resources("virtualmachinetemplateversions").verbs("*").
+		addRule().apiGroups("harvesterhci.io").resources("virtualmachinerestores").verbs("*").
+		addRule().apiGroups("harvesterhci.io").resources("virtualmachinetemplates").verbs("*").
+		addRule().apiGroups("kubeovn.io").resources("vpcs").verbs("*").
+		addRule().apiGroups("kubeovn.io").resources("subnets").verbs("*").
+		addRule().apiGroups("kubevirt.io").resources("virtualmachines").verbs("get", "watch", "create", "delete", "patch", "update", "list").
+		addRule().apiGroups("kubevirt.io").resources("virtualmachineinstances").verbs("*").
+		addRule().apiGroups("kubevirt.io").resources("virtualmachineinstancemigrations").verbs("*").
+		addRule().apiGroups("kubevirt.io").resources("virtualmachineinstances/restart").verbs("create", "patch", "update").
+		addRule().apiGroups("k8s.cni.cncf.io").resources("network-attachment-definitions").verbs("create", "delete", "get", "patch", "update", "watch", "list").
+		addRule().apiGroups("snapshot.storage.k8s.io").resources("volumesnapshots").verbs("*").
+		addRule().apiGroups("snapshot.storage.k8s.io").resources("volumesnapshotclasses").verbs("*").
+		addRule().apiGroups("storage.k8s.io").resources("storageclasses").verbs("list", "get", "watch").
+		addRule().apiGroups("loadbalancer.harvesterhci.io").resources("ippools").verbs("*").
+		addRule().apiGroups("loadbalancer.harvesterhci.io").resources("loadbalancers").verbs("*").
+		addRule().apiGroups("longhorn.io").resources("engines").verbs("get", "list", "watch").
+		addRule().apiGroups("longhorn.io").resources("nodes").verbs("get", "list", "watch").
+		addRule().apiGroups("longhorn.io").resources("settings").verbs("get", "list", "watch").
+		addRule().apiGroups("longhorn.io").resources("volumes").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("rancherusernotifications").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch").
+		addRule().apiGroups("metrics.k8s.io").resources("node").verbs("list", "watch", "get").
+		addRule().apiGroups("metrics.k8s.io").resources("nodes").verbs("get", "list", "watch").
+		addRule().apiGroups("monitoring.coreos.com").resources("podmonitors").verbs("get", "list", "watch").
+		addRule().apiGroups("network.harvesterhci.io").resources("clusternetworks").verbs("get", "list", "watch").
+		addRule().apiGroups("network.harvesterhci.io").resources("vlanconfigs").verbs("get", "list", "watch").
+		addRule().apiGroups("network.harvesterhci.io").resources("vlanstatuses").verbs("get", "list", "watch")
 
 	// Project roles
 	rb.addRoleTemplate("Project Owner", "project-owner", "project", false, false, false).
@@ -343,6 +468,57 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	rb.addRoleTemplate("Project Monitoring View Role", "project-monitoring-readonly", "project", false, true, false).
 		addRule().apiGroups("monitoring.cattle.io").resources("prometheus").verbs("view").
 		setRoleTemplateNames("view")
+
+	rb.addRoleTemplate("Tenant", "project-tenant", "project", false, false, false).
+		addRule().apiGroups("").resources("namespaces").verbs("create", "get", "watch").
+		addRule().apiGroups("").resources("nodes").verbs("get", "list", "watch").
+		addRule().apiGroups("").resources("persistentvolumes").verbs("*").
+		addRule().apiGroups("").resources("persistentvolumeclaims").verbs("*").
+		addRule().apiGroups("").resources("pods").verbs("*").
+		addRule().apiGroups("").resources("pods/log").verbs("get").
+		addRule().apiGroups("").resources("secrets").verbs("*").
+		addRule().apiGroups("").resources("services/proxy").verbs("get", "list", "watch").
+		addRule().apiGroups("").resources("services").verbs("get", "list", "watch").
+		addRule().apiGroups("catalog.cattle.io").resources("apps").verbs("get", "list", "watch").
+		addRule().apiGroups("devices.harvesterhci.io").resources("sriovnetworkdevices").verbs("get", "list", "watch").
+		addRule().apiGroups("devices.harvesterhci.io").resources("pcidevices").verbs("get", "list", "watch").
+		addRule().apiGroups("devices.harvesterhci.io").resources("pcideviceclaims").verbs("get", "list", "watch").
+		addRule().apiGroups("devices.harvesterhci.io").resources("sriovgpudevices").verbs("get", "list", "watch").
+		addRule().apiGroups("devices.harvesterhci.io").resources("vgpudevices").verbs("get", "list", "watch").
+		addRule().apiGroups("devices.harvesterhci.io").resources("usbdevices").verbs("*").
+		addRule().apiGroups("devices.harvesterhci.io").resources("usbdeviceclaims").verbs("get", "list", "watch").
+		addRule().apiGroups("harvesterhci.io").resources("addons").verbs("*").
+		addRule().apiGroups("harvesterhci.io").resources("blockdevices").verbs("get", "list", "watch").
+		addRule().apiGroups("harvesterhci.io").resources("keypairs").verbs("*").
+		addRule().apiGroups("harvesterhci.io").resources("resourcequotas").verbs("get", "update", "delete").
+		addRule().apiGroups("harvesterhci.io").resources("settings").verbs("get", "list", "watch").
+		addRule().apiGroups("harvesterhci.io").resources("schedulevmbackups").verbs("*").
+		addRule().apiGroups("harvesterhci.io").resources("virtualmachineimages").verbs("create", "delete", "get", "patch", "update", "watch", "list").
+		addRule().apiGroups("harvesterhci.io").resources("virtualmachinerestores").verbs("*").
+		addRule().apiGroups("harvesterhci.io").resources("virtualmachinebackups").verbs("*").
+		addRule().apiGroups("harvesterhci.io").resources("virtualmachinetemplateversions").verbs("*").
+		addRule().apiGroups("k8s.cni.cncf.io").resources("network-attachment-definitions").verbs("create", "delete", "get", "patch", "update", "watch", "list").
+		addRule().apiGroups("kubevirt.io").resources("virtualmachineinstancemigrations").verbs("*").
+		addRule().apiGroups("kubevirt.io").resources("virtualmachineinstances").verbs("*").
+		addRule().apiGroups("kubevirt.io").resources("virtualmachineinstances/restart").verbs("create", "patch", "update", "watch").
+		addRule().apiGroups("kubevirt.io").resources("virtualmachines").verbs("get", "watch", "create", "delete", "patch", "update", "list").
+		addRule().apiGroups("kubeovn.io").resources("subnets").verbs("*").
+		addRule().apiGroups("kubeovn.io").resources("vpcs").verbs("*").
+		addRule().apiGroups("loadbalancer.harvesterhci.io").resources("ippools").verbs("*").
+		addRule().apiGroups("loadbalancer.harvesterhci.io").resources("loadbalancers").verbs("*").
+		addRule().apiGroups("longhorn.io").resources("engines").verbs("get", "list", "watch").
+		addRule().apiGroups("longhorn.io").resources("nodes").verbs("get", "list", "watch").
+		addRule().apiGroups("longhorn.io").resources("settings").verbs("get", "list", "watch").
+		addRule().apiGroups("metrics.k8s.io").resources("nodes").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("settings").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("rancherusernotifications").verbs("get", "list", "watch").
+		addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch").
+		addRule().apiGroups("monitoring.coreos.com").resources("podmonitors").verbs("get", "list", "watch").
+		addRule().apiGroups("network.harvesterhci.io").resources("vlanconfigs").verbs("get", "list", "watch").
+		addRule().apiGroups("network.harvesterhci.io").resources("vlanstatuses").verbs("get", "list", "watch").
+		addRule().apiGroups("snapshot.storage.k8s.io").resources("volumesnapshots").verbs("*").
+		addRule().apiGroups("storage.k8s.io").resources("storageclasses").verbs("get", "list", "watch").
+		addRule().apiGroups("subresources.kubevirt.io").resources("virtualmachineinstances/vnc").verbs("get")
 
 	proxyNames := []string{
 		"http:rancher-monitoring-prometheus:9090",
