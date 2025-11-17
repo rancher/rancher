@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/features"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -42,9 +43,12 @@ func newPRTBHandler(management *config.ManagementContext) *prtbHandler {
 //   - Create the membership bindings to give access to the cluster.
 //   - Create a binding to the project management role if it exists.
 func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
-	if prtb == nil || prtb.DeletionTimestamp != nil {
+	if prtb == nil || prtb.DeletionTimestamp != nil || !features.AggregatedRoleTemplates.Enabled() {
 		return nil, nil
 	}
+
+	prtb.Annotations[rbac.AggregationAnnotation] = "true"
+
 	var err error
 	prtb, err = p.reconcileSubject(prtb)
 	if err != nil {
@@ -60,7 +64,7 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 
 // OnRemove deletes Role Bindings that are owned by the PRTB. It also removes the membership binding if no other PRTBs give membership access.
 func (p *prtbHandler) OnRemove(_ string, prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
-	if prtb == nil {
+	if prtb == nil || !features.AggregatedRoleTemplates.Enabled() {
 		return nil, nil
 	}
 

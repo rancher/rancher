@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
 	pkgrbac "github.com/rancher/rancher/pkg/rbac"
@@ -59,11 +60,17 @@ type prtbLifecycle struct {
 }
 
 func (p *prtbLifecycle) Create(obj *v3.ProjectRoleTemplateBinding) (runtime.Object, error) {
+	if features.AggregatedRoleTemplates.Enabled() {
+		return nil, nil
+	}
 	err := p.syncPRTB(obj)
 	return obj, err
 }
 
 func (p *prtbLifecycle) Updated(obj *v3.ProjectRoleTemplateBinding) (runtime.Object, error) {
+	if features.AggregatedRoleTemplates.Enabled() {
+		return nil, nil
+	}
 	if err := p.reconcilePRTBUserClusterLabels(obj); err != nil {
 		return obj, err
 	}
@@ -72,6 +79,9 @@ func (p *prtbLifecycle) Updated(obj *v3.ProjectRoleTemplateBinding) (runtime.Obj
 }
 
 func (p *prtbLifecycle) Remove(obj *v3.ProjectRoleTemplateBinding) (runtime.Object, error) {
+	if features.AggregatedRoleTemplates.Enabled() {
+		return nil, nil
+	}
 	err := p.ensurePRTBDelete(obj)
 	return obj, err
 }
