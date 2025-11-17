@@ -9,6 +9,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/status"
+	"github.com/rancher/rancher/pkg/features"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -51,9 +52,10 @@ func newCRTBHandler(management *config.ManagementContext) *crtbHandler {
 //   - Create the membership bindings to give access to the cluster.
 //   - Create a binding to the project and cluster management role if it exists.
 func (c *crtbHandler) OnChange(_ string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-	if crtb == nil || crtb.DeletionTimestamp != nil {
+	if crtb == nil || crtb.DeletionTimestamp != nil || !features.AggregatedRoleTemplates.Enabled() {
 		return nil, nil
 	}
+	crtb.Annotations[rbac.AggregationAnnotation] = "true"
 
 	var localConditions []metav1.Condition
 	var err error
@@ -218,7 +220,7 @@ func (c *crtbHandler) getDesiredRoleBindings(crtb *v3.ClusterRoleTemplateBinding
 
 // OnRemove deletes Cluster Role Bindings that are owned by the CRTB and the membership binding if no other CRTBs give membership access.
 func (c *crtbHandler) OnRemove(_ string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-	if crtb == nil {
+	if crtb == nil || !features.AggregatedRoleTemplates.Enabled() {
 		return nil, nil
 	}
 

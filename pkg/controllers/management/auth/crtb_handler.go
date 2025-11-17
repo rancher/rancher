@@ -8,6 +8,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/controllers/management/authprovisioningv2"
 	"github.com/rancher/rancher/pkg/controllers/status"
+	"github.com/rancher/rancher/pkg/features"
 	controllersv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	typesrbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
@@ -92,6 +93,10 @@ type crtbLifecycle struct {
 }
 
 func (c *crtbLifecycle) Create(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
+	if features.AggregatedRoleTemplates.Enabled() {
+		return nil, nil
+	}
+
 	var localConditions []metav1.Condition
 	obj, err := c.reconcileSubject(obj, &localConditions)
 	return obj, errors.Join(err,
@@ -100,6 +105,9 @@ func (c *crtbLifecycle) Create(obj *v3.ClusterRoleTemplateBinding) (runtime.Obje
 }
 
 func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
+	if features.AggregatedRoleTemplates.Enabled() {
+		return nil, nil
+	}
 	var localConditions []metav1.Condition
 	obj, err := c.reconcileSubject(obj, &localConditions)
 	return obj, errors.Join(err,
@@ -109,6 +117,9 @@ func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (runtime.Obj
 }
 
 func (c *crtbLifecycle) Remove(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
+	if features.AggregatedRoleTemplates.Enabled() {
+		return nil, nil
+	}
 	condition := metav1.Condition{Type: clusterRoleTemplateBindingDelete}
 
 	if err := c.mgr.reconcileClusterMembershipBindingForDelete("", pkgrbac.GetRTBLabel(obj.ObjectMeta)); err != nil {
