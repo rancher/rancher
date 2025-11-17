@@ -3,14 +3,20 @@ package auth
 import (
 	"context"
 
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/auth/globalroles"
 	"github.com/rancher/rancher/pkg/controllers/management/auth/project_cluster"
 	"github.com/rancher/rancher/pkg/controllers/management/auth/roletemplates"
-	"github.com/rancher/rancher/pkg/features"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/rancher/wrangler/v3/pkg/relatedresource"
+	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/rbac/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -80,14 +86,23 @@ func RegisterEarly(ctx context.Context, management *config.ManagementContext, cl
 	management.Management.Settings("").AddHandler(ctx, authSettingController, s.sync)
 	globalroles.Register(ctx, management, clusterManager)
 
-	// Only one set of CRTB/PRTB/RoleTemplate controllers should run at a time. Using aggregated cluster roles is currently experimental and only available via feature flags.
-	if features.AggregatedRoleTemplates.Enabled() {
-		roletemplates.Register(ctx, management, clusterManager)
-	} else {
-		management.Management.ClusterRoleTemplateBindings("").AddLifecycle(ctx, ctrbMGMTController, crtb)
-		management.Management.ProjectRoleTemplateBindings("").AddLifecycle(ctx, ptrbMGMTController, prtb)
-		management.Management.RoleTemplates("").AddLifecycle(ctx, roleTemplateLifecycleName, rt)
+	// Register aggregated-roletemplate controllers
+	roletemplates.Register(ctx, management, clusterManager)
+
+	// Register non aggregated-roletemplate controllers
+	management.Management.ClusterRoleTemplateBindings("").AddLifecycle(ctx, ctrbMGMTController, crtb)
+	management.Management.ProjectRoleTemplateBindings("").AddLifecycle(ctx, ptrbMGMTController, prtb)
+	management.Management.RoleTemplates("").AddLifecycle(ctx, roleTemplateLifecycleName, rt)
+
+	aggregationEnqueuer := aggregationEnqueuer{
+		crtbCache: management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
+		prtbCache: management.Wrangler.Mgmt.ProjectRoleTemplateBinding().Cache(),
+		rtCache:   management.Wrangler.Mgmt.RoleTemplate().Cache(),
 	}
+	relatedresource.WatchClusterScoped(ctx, "aggregation-feature-rt-enqueuer", aggregationEnqueuer.enqueueRoleTemplates, management.Wrangler.Mgmt.RoleTemplate(), management.Wrangler.Mgmt.Feature())
+	relatedresource.Watch(ctx, "aggregation-feature-crtb-enqueuer", aggregationEnqueuer.enqueueCRTBs, management.Wrangler.Mgmt.ClusterRoleTemplateBinding(), management.Wrangler.Mgmt.Feature())
+	relatedresource.Watch(ctx, "aggregation-feature-prtb-enqueuer", aggregationEnqueuer.enqueuePRTBs, management.Wrangler.Mgmt.ProjectRoleTemplateBinding(), management.Wrangler.Mgmt.Feature())
+
 	management.Management.Users("").AddLifecycle(ctx, userController, u)
 }
 
@@ -96,4 +111,71 @@ func RegisterLate(ctx context.Context, management *config.ManagementContext) {
 	c := project_cluster.NewClusterLifecycle(management)
 	management.Management.Projects("").AddLifecycle(ctx, project_cluster.ProjectRemoveController, p)
 	management.Management.Clusters("").AddLifecycle(ctx, project_cluster.ClusterRemoveController, c)
+}
+
+type aggregationEnqueuer struct {
+	crtbCache mgmtv3.ClusterRoleTemplateBindingCache
+	prtbCache mgmtv3.ProjectRoleTemplateBindingCache
+	rtCache   mgmtv3.RoleTemplateCache
+}
+
+func isFeatureAggregation(obj runtime.Object) bool {
+	if obj == nil {
+		return false
+	}
+	feature, ok := obj.(*v3.Feature)
+	if !ok {
+		logrus.Errorf("unable to convert object: %[1]v, type: %[1]T to a feature", obj)
+		return false
+	}
+	return feature.Name == "aggregated-roletemplates"
+}
+
+// TODO: make this generic
+func (a *aggregationEnqueuer) enqueueCRTBs(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
+	if !isFeatureAggregation(obj) {
+		return nil, nil
+	}
+	crtbs, err := a.crtbCache.List(metav1.NamespaceAll, labels.NewSelector())
+	if err != nil {
+		return nil, err
+	}
+	crtbNames := make([]relatedresource.Key, 0, len(crtbs))
+	for _, crtb := range crtbs {
+		crtbNames = append(crtbNames, relatedresource.Key{Name: crtb.Name, Namespace: crtb.Namespace})
+	}
+
+	return crtbNames, nil
+}
+
+func (a *aggregationEnqueuer) enqueuePRTBs(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
+	if !isFeatureAggregation(obj) {
+		return nil, nil
+	}
+	prtbs, err := a.prtbCache.List(metav1.NamespaceAll, labels.NewSelector())
+	if err != nil {
+		return nil, err
+	}
+	prtbNames := make([]relatedresource.Key, 0, len(prtbs))
+	for _, prtb := range prtbs {
+		prtbNames = append(prtbNames, relatedresource.Key{Name: prtb.Name, Namespace: prtb.Namespace})
+	}
+
+	return prtbNames, nil
+}
+
+func (a *aggregationEnqueuer) enqueueRoleTemplates(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
+	if !isFeatureAggregation(obj) {
+		return nil, nil
+	}
+	roletemplates, err := a.rtCache.List(labels.NewSelector())
+	if err != nil {
+		return nil, err
+	}
+	roletemplateNames := make([]relatedresource.Key, 0, len(roletemplates))
+	for _, roleTemplate := range roletemplates {
+		roletemplateNames = append(roletemplateNames, relatedresource.Key{Name: roleTemplate.Name, Namespace: roleTemplate.Namespace})
+	}
+
+	return roletemplateNames, nil
 }
