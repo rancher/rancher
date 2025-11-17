@@ -82,8 +82,8 @@ kubectl --ignore-not-found=true delete secret bootstrap-secret -n "${rancher_nam
 echo 'Removing Rancher v1.ext.cattle.io APIService'
 kubectl --ignore-not-found=true delete apiservice v1.ext.cattle.io
 
-echo "Removing Rancher api-extension Service in the following namespace: ${rancher_namespace}"
-kubectl --ignore-not-found=true delete service api-extension -n "${rancher_namespace}"
+echo "Removing Rancher imperative-api-extension Service in the following namespace: ${rancher_namespace}"
+kubectl --ignore-not-found=true delete service imperative-api-extension -n "${rancher_namespace}"
 
 echo "------ Summary ------"
 if [[ ${#succeeded[@]} -ne 0 ]]; then
