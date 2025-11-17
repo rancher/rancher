@@ -6,6 +6,7 @@ import (
 
 	v3apis "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/capr/dynamicschema"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/fleet"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	image2 "github.com/rancher/rancher/pkg/image"
@@ -66,7 +67,15 @@ func (h *handler) onChange(key string, obj *v3apis.ClusterRegistrationToken) (_ 
 	return obj, nil
 }
 
+// cleanupObjects returns the service account, cluster role+binding, config map, & cronjob required for periodically
+// cleaning up outdated & unowned machine configs.
+// This handler always runs, but must return an empty list when the provisioning feature is disabled in order for the
+// cronjob to be cleaned up.
 func cleanupObjects(token string) []runtime.Object {
+	if !features.ProvisioningV2.Enabled() {
+		return []runtime.Object{}
+	}
+
 	url := settings.ServerURL.Get()
 	ca := systemtemplate.CAChecksum()
 	image := image2.Resolve(settings.AgentImage.Get())
