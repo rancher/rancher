@@ -64,20 +64,46 @@ func (c Charts) FetchImages(imagesSet map[string]map[string]struct{}) error {
 		// Note: Selecting the correct latest version relies on the charts-build-scripts `make standardize` command
 		// sorting the versions in the index file in descending order correctly.
 		latestVersion := versions[0]
-		if isConstraintSatisfied, err := c.checkChartVersionConstraint(*latestVersion); err != nil {
+		chartName := versions[0].Metadata.Name
+		isConstraintSatisfied, err := c.checkChartVersionConstraint(*latestVersion)
+		if err != nil {
 			return errors.Wrapf(err, "failed to check constraint of chart")
-		} else if isConstraintSatisfied {
+		}
+
+		if isConstraintSatisfied {
 			filteredVersions = append(filteredVersions, latestVersion)
+		}
+
+		if !isConstraintSatisfied {
+			constraintStr := latestVersion.Annotations[RancherVersionAnnotationKey]
+			if constraintStr == "" {
+				logrus.Warnf("SKIPPED chart %s:%s - no rancher-version annotation", chartName, latestVersion.Version)
+			} else {
+				logrus.Warnf("SKIPPED chart %s:%s - constraint '%s' not satisfied by Rancher version %s",
+					chartName, latestVersion.Version, constraintStr, c.Config.RancherVersion)
+			}
 		}
 		// Append the remaining versions of the chart if the chart exists in the chartsToCheckConstraints map
 		// and the given Rancher version satisfies the chart's Rancher version constraint annotation.
-		chartName := versions[0].Metadata.Name
 		if _, ok := chartsToCheckConstraints[chartName]; ok {
 			for _, version := range versions[1:] {
-				if isConstraintSatisfied, err := c.checkChartVersionConstraint(*version); err != nil {
+				isConstraintSatisfied, err := c.checkChartVersionConstraint(*version)
+				if err != nil {
 					return errors.Wrapf(err, "failed to check constraint of chart")
-				} else if isConstraintSatisfied {
+				}
+
+				if isConstraintSatisfied {
 					filteredVersions = append(filteredVersions, version)
+				}
+
+				if !isConstraintSatisfied {
+					constraintStr := version.Annotations[RancherVersionAnnotationKey]
+					if constraintStr == "" {
+						logrus.Warnf("SKIPPED older chart %s:%s - no rancher-version annotation", chartName, version.Version)
+					} else {
+						logrus.Warnf("SKIPPED older chart %s:%s - constraint '%s' not satisfied by Rancher version %s",
+							chartName, version.Version, constraintStr, c.Config.RancherVersion)
+					}
 				}
 			}
 		}
