@@ -16,29 +16,5 @@ func NewServer(schemas *types.Schemas) (*normanapi.Server, error) {
 }
 
 func ConfigureAPIUI(server *normanapi.Server) {
-	server.CustomAPIUIResponseWriter(cssURL, jsURL, settings.APIUIVersion.Get)
-}
-
-func cssURL() string {
-	switch settings.UIOfflinePreferred.Get() {
-	case "dynamic":
-		if !settings.IsRelease() {
-			return ""
-		}
-	case "false":
-		return ""
-	}
-	return "/api-ui/ui.min.css"
-}
-
-func jsURL() string {
-	switch settings.UIOfflinePreferred.Get() {
-	case "dynamic":
-		if !settings.IsRelease() {
-			return ""
-		}
-	case "false":
-		return ""
-	}
-	return "/api-ui/ui.min.js"
+	server.CustomAPIUIResponseWriter(nil, nil, settings.APIUIVersion.Get)
 }
