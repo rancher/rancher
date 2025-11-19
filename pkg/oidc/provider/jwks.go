@@ -40,7 +40,32 @@ type JWKS struct {
 	Keys []JWK `json:"keys"`
 }
 
+// NewOIDCKeyClient creates and returns a new OIDCKeyClient that can lookup a
+// PublicKey by ID.
+func NewOIDCKeyClient(secrets corecontrollers.SecretCache) *oidcKeyClient {
+	return &oidcKeyClient{secretCache: secrets}
+}
+
+type oidcKeyClient struct {
+	secretCache corecontrollers.SecretCache
+}
+
+// GetPublicKey returns the public key specified by the kid
+func (h *oidcKeyClient) GetPublicKey(kid string) (*rsa.PublicKey, error) {
+	s, err := h.secretCache.Get(keySecretNamespace, keySecretName)
+	if err != nil {
+		return nil, err
+	}
+	for name, value := range s.Data {
+		if name == kid+".pub" {
+			return getPublicKeyFromSecretData(value)
+		}
+	}
+	return nil, fmt.Errorf("public key not found")
+}
+
 type jwksHandler struct {
+	*oidcKeyClient
 	secretCache  corecontrollers.SecretCache
 	secretClient corecontrollers.SecretClient
 }
@@ -94,8 +119,9 @@ func newJWKSHandler(secretCache corecontrollers.SecretCache, secretClient coreco
 	}
 
 	return &jwksHandler{
-		secretCache:  secretCache,
-		secretClient: secretClient,
+		oidcKeyClient: NewOIDCKeyClient(secretCache),
+		secretCache:   secretCache,
+		secretClient:  secretClient,
 	}, nil
 }
 
@@ -169,20 +195,6 @@ func (h *jwksHandler) GetSigningKey() (*rsa.PrivateKey, string, error) {
 		}
 	}
 	return nil, "", fmt.Errorf("signing key not found")
-}
-
-// GetPublicKey returns the public key specified by the kid
-func (h *jwksHandler) GetPublicKey(kid string) (*rsa.PublicKey, error) {
-	s, err := h.secretCache.Get(keySecretNamespace, keySecretName)
-	if err != nil {
-		return nil, err
-	}
-	for name, value := range s.Data {
-		if name == kid+".pub" {
-			return getPublicKeyFromSecretData(value)
-		}
-	}
-	return nil, fmt.Errorf("public key not found")
 }
 
 func getPrivateKeyFromSecretData(name string, privateKeyPEM []byte) (*rsa.PrivateKey, string, error) {

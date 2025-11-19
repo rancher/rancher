@@ -317,49 +317,15 @@ func (h *tokenHandler) createTokenResponse(rancherToken *v3.Token, oidcClient *v
 	if err != nil {
 		return TokenResponse{}, oidcerror.New(oidcerror.ServerError, fmt.Sprintf("failed to get signing key: %v", err))
 	}
-	// create id_token
-	idClaims := jwt.MapClaims{
-		"aud": []string{oidcClient.Status.ClientID},
-		"exp": h.now().Add(time.Duration(oidcClient.Spec.TokenExpirationSeconds) * time.Second).Unix(),
-		"iss": settings.ServerURL.Get() + "/oidc",
-		"iat": h.now().Unix(),
-		"sub": rancherToken.UserID,
-	}
-	if slices.Contains(scopes, "profile") {
-		idClaims["name"] = user.DisplayName
-	}
-	if nonce != "" {
-		idClaims["nonce"] = nonce
-	}
-	if groups != nil {
-		idClaims["groups"] = groups
-	}
-	if rancherToken.AuthProvider != "" {
-		idClaims["auth_provider"] = rancherToken.AuthProvider
-	}
-	idToken := jwt.NewWithClaims(jwt.SigningMethodRS256, idClaims)
-	idToken.Header["kid"] = kid
+
+	idToken := h.createIDToken(oidcClient, rancherToken, scopes, user, nonce, groups, kid)
 	idTokenString, err := idToken.SignedString(key)
 	if err != nil {
 		logrus.Errorf("[OIDC provider] failed to sign id token %v", err)
 		return TokenResponse{}, oidcerror.New(oidcerror.ServerError, fmt.Sprintf("failed to sign id token: %v", err))
 	}
 
-	// create access_token
-	accessClaims := jwt.MapClaims{
-		"aud":   []string{oidcClient.Status.ClientID},
-		"exp":   h.now().Add(time.Duration(oidcClient.Spec.TokenExpirationSeconds) * time.Second).Unix(),
-		"iss":   settings.ServerURL.Get() + "/oidc",
-		"iat":   h.now().Unix(),
-		"sub":   rancherToken.UserID,
-		"scope": scopes,
-	}
-	if rancherToken.AuthProvider != "" {
-		accessClaims["auth_provider"] = rancherToken.AuthProvider
-	}
-	accessToken := jwt.NewWithClaims(jwt.SigningMethodRS256, accessClaims)
-	accessToken.Header["kid"] = kid
-
+	accessToken := CreateAccessToken(oidcClient, rancherToken, scopes, kid, h.now())
 	accessTokenString, err := accessToken.SignedString(key)
 	if err != nil {
 		logrus.Errorf("[OIDC provider] failed to sign access token %v", err)
@@ -403,6 +369,52 @@ func (h *tokenHandler) createTokenResponse(rancherToken *v3.Token, oidcClient *v
 	resp.ExpiresIn = time.Duration(oidcClient.Spec.TokenExpirationSeconds) * time.Second
 
 	return resp, nil
+}
+
+func (h *tokenHandler) createIDToken(oidcClient *v3.OIDCClient, rancherToken *v3.Token, scopes []string, user *v3.User, nonce string, groups []string, kid string) *jwt.Token {
+	idClaims := jwt.MapClaims{
+		"aud": []string{oidcClient.Status.ClientID},
+		"exp": h.now().Add(time.Duration(oidcClient.Spec.TokenExpirationSeconds) * time.Second).Unix(),
+		"iss": settings.ServerURL.Get() + "/oidc",
+		"iat": h.now().Unix(),
+		"sub": rancherToken.UserID,
+	}
+
+	if slices.Contains(scopes, "profile") {
+		idClaims["name"] = user.DisplayName
+	}
+	if nonce != "" {
+		idClaims["nonce"] = nonce
+	}
+	if groups != nil {
+		idClaims["groups"] = groups
+	}
+	if rancherToken.AuthProvider != "" {
+		idClaims["auth_provider"] = rancherToken.AuthProvider
+	}
+	idToken := jwt.NewWithClaims(jwt.SigningMethodRS256, idClaims)
+	idToken.Header["kid"] = kid
+	return idToken
+}
+
+// CreateAccessToken creates and returns a JWT access token.
+func CreateAccessToken(oidcClient *v3.OIDCClient, rancherToken *v3.Token, scopes []string, kid string, now time.Time) *jwt.Token {
+	accessClaims := jwt.MapClaims{
+		"aud":   []string{oidcClient.Status.ClientID},
+		"exp":   now.Add(time.Duration(oidcClient.Spec.TokenExpirationSeconds) * time.Second).Unix(),
+		"iss":   settings.ServerURL.Get() + "/oidc",
+		"iat":   now.Unix(),
+		"sub":   rancherToken.UserID,
+		"scope": scopes,
+		"token": rancherToken.Name + ":" + rancherToken.Token,
+	}
+	if rancherToken.AuthProvider != "" {
+		accessClaims["auth_provider"] = rancherToken.AuthProvider
+	}
+	accessToken := jwt.NewWithClaims(jwt.SigningMethodRS256, accessClaims)
+	accessToken.Header["kid"] = kid
+
+	return accessToken
 }
 
 func (h *tokenHandler) updateClientSecretUsedTimeStamp(oidcClient *v3.OIDCClient, clientSecretID string) interface{} {
@@ -459,9 +471,9 @@ func (h *tokenHandler) addOIDCClientIDToRancherToken(oidcClientName string, ranc
 }
 
 func (h *tokenHandler) getOIDCClientByClientID(clientID string) (*v3.OIDCClient, error) {
-	oidcClients, err := h.oidcClientCache.GetByIndex(oidcClientByIDIndex, clientID)
+	oidcClients, err := h.oidcClientCache.GetByIndex(OIDCClientByIDIndex, clientID)
 	if err != nil {
-		return nil, fmt.Errorf("error retreiving OIDC client: %w", err)
+		return nil, fmt.Errorf("error retrieving OIDC client %s: %w", clientID, err)
 	}
 	if len(oidcClients) == 0 {
 		return nil, fmt.Errorf("no OIDC clients found")

@@ -2,6 +2,8 @@ package requests
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -20,6 +22,9 @@ import (
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	mgmtFakes "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
+	"github.com/rancher/rancher/pkg/oidc/mocks"
+	"github.com/rancher/rancher/pkg/oidc/provider"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -117,6 +122,7 @@ func (p *fakeProvider) CleanupResources(*v3.AuthConfig) error {
 }
 
 func TestTokenAuthenticatorAuthenticate(t *testing.T) {
+	// This test cannot run in parallel.
 	existingProviders := providers.Providers
 	defer func() {
 		providers.Providers = existingProviders
@@ -1186,4 +1192,175 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 		require.Nil(t, resp)
 		assert.False(t, userRefresher.called)
 	})
+}
+
+func TestAuthenticateWithAccessToken(t *testing.T) {
+	// This test cannot run in parallel.
+	existingServerURL := settings.ServerURL.Get()
+	existingProviders := providers.Providers
+	t.Cleanup(func() {
+		providers.Providers = existingProviders
+		_ = settings.ServerURL.Set(existingServerURL)
+	})
+	_ = settings.ServerURL.Set("https://rancher.example.com")
+
+	fakeProvider := &fakeProvider{
+		name: "fake",
+	}
+	providers.Providers = map[string]common.AuthProvider{
+		fakeProvider.name: fakeProvider,
+	}
+
+	userID := "u-abcdef"
+	userPrincipalID := "fake_user://12345"
+	user := &v3.User{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: userID,
+		},
+		Username:     "fake-user",
+		PrincipalIDs: []string{userPrincipalID},
+	}
+	now := time.Now()
+
+	t.Run("with valid access token", func(t *testing.T) {
+		token := &v3.Token{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              "token-55rl6",
+				CreationTimestamp: metav1.NewTime(now),
+			},
+			Token:        "jnb9tksmnctvgbn92ngbkptblcjwg4pmfp98wqj29wk5kv85ktg59s",
+			AuthProvider: "fake",
+			TTLMillis:    57600000,
+			UserID:       userID,
+			UserPrincipal: v3.Principal{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: userPrincipalID,
+				},
+				Me:            true,
+				PrincipalType: "user",
+				Provider:      "fake",
+				LoginName:     user.Username,
+			},
+		}
+
+		ctrl := gomock.NewController(t)
+		tokenClient := fake.NewMockNonNamespacedClientInterface[*apiv3.Token, *apiv3.TokenList](ctrl)
+		tokenClient.EXPECT().Get(token.Name, metav1.GetOptions{}).Return(token, nil).AnyTimes()
+		var patchData []byte
+		tokenClient.EXPECT().Patch(token.Name, k8stypes.JSONPatchType, gomock.Any()).DoAndReturn(func(name string, pt k8stypes.PatchType, data []byte, subresources ...any) (*apiv3.Token, error) {
+			patchData = data
+			return nil, nil
+		}).AnyTimes()
+		tokenIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+		tokenIndexer.AddIndexers(cache.Indexers{tokenKeyIndex: tokenKeyIndexer})
+		testOIDCClient := &apiv3.OIDCClient{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-client-id",
+			},
+			Spec: apiv3.OIDCClientSpec{
+				TokenExpirationSeconds:        600,
+				RefreshTokenExpirationSeconds: 3600,
+			},
+			Status: apiv3.OIDCClientStatus{
+				ClientID: "this-is-a-test-client-id",
+			},
+		}
+
+		oidcClientCache := fake.NewMockNonNamespacedCacheInterface[*v3.OIDCClient](ctrl)
+		oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", testOIDCClient.Status.ClientID).Return([]*v3.OIDCClient{testOIDCClient}, nil)
+		accessToken := provider.CreateAccessToken(testOIDCClient, token, []string{"openid"}, "kid", now)
+		privateKey := testGeneratePrivateKey(t)
+		signedToken, err := accessToken.SignedString(privateKey)
+		require.NoError(t, err)
+
+		signingKeyGetter := mocks.NewMocksigningKeyGetter(ctrl)
+		signingKeyGetter.EXPECT().GetPublicKey("kid").Return(&privateKey.PublicKey, nil)
+
+		userAttribute := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: userID,
+			},
+			GroupPrincipals: map[string]apiv3.Principals{
+				fakeProvider.name: {
+					Items: []apiv3.Principal{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: fakeProvider.name + "_group://56789",
+							},
+							MemberOf:      true,
+							LoginName:     "rancher",
+							DisplayName:   "rancher",
+							PrincipalType: "group",
+							Provider:      fakeProvider.name,
+						},
+					},
+				},
+			},
+			ExtraByProvider: map[string]map[string][]string{
+				fakeProvider.name: {
+					common.UserAttributePrincipalID: {userPrincipalID},
+					common.UserAttributeUserName:    {user.Username},
+				},
+				providers.LocalProvider: {
+					common.UserAttributePrincipalID: {"local://" + userID},
+					common.UserAttributeUserName:    {"local-user"},
+				},
+			},
+		}
+		userAttributeLister := &mgmtFakes.UserAttributeListerMock{
+			GetFunc: func(namespace, name string) (*v3.UserAttribute, error) {
+				return userAttribute, nil
+			},
+		}
+		userLister := &mgmtFakes.UserListerMock{
+			GetFunc: func(namespace, name string) (*v3.User, error) {
+				return user, nil
+			},
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/v1/namespaces", nil)
+		req.Header.Set("Authorization", "Bearer "+signedToken)
+
+		userRefresher := &fakeUserRefresher{}
+		authenticator := tokenAuthenticator{
+			ctx:                 t.Context(),
+			tokenIndexer:        tokenIndexer,
+			tokenClient:         tokenClient,
+			userAttributeLister: userAttributeLister,
+			userLister:          userLister,
+			refreshUser:         userRefresher.refreshUser,
+			now: func() time.Time {
+				return now
+			},
+			keyGetter:       signingKeyGetter,
+			oidcClientCache: oidcClientCache,
+		}
+
+		resp, err := authenticator.Authenticate(req)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		assert.True(t, resp.IsAuthed)
+		assert.Equal(t, userID, resp.User)
+		assert.Equal(t, userPrincipalID, resp.UserPrincipal)
+		assert.Contains(t, resp.Groups, fakeProvider.name+"_group://56789")
+		assert.Contains(t, resp.Groups, "system:cattle:authenticated")
+		assert.Contains(t, resp.Extras[common.UserAttributePrincipalID], userPrincipalID)
+		assert.Contains(t, resp.Extras[common.UserAttributeUserName], "fake-user")
+		assert.True(t, userRefresher.called)
+		assert.Equal(t, userID, userRefresher.userID)
+		assert.False(t, userRefresher.force)
+		require.NotEmpty(t, patchData)
+		require.Len(t, resp.Extras[common.ExtraRequestTokenID], 1)
+		assert.Equal(t, token.Name, resp.Extras[common.ExtraRequestTokenID][0])
+		require.Len(t, resp.Extras[common.ExtraRequestHost], 1)
+		require.Equal(t, req.Host, resp.Extras[common.ExtraRequestHost][0])
+	})
+}
+
+func testGeneratePrivateKey(t *testing.T) *rsa.PrivateKey {
+	t.Helper()
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	return privateKey
 }

@@ -111,7 +111,7 @@ func (h *authorizeHandler) authEndpoint(w http.ResponseWriter, r *http.Request) 
 	if redirectURL.Host == r.URL.Host && redirectURL.Path == r.URL.Path {
 		oidcerror.WriteError(oidcerror.InvalidRequest, "redirect_uri can't be the same as the host uri", http.StatusBadRequest, w)
 	}
-	oidcClients, err := h.oidcClientCache.GetByIndex(oidcClientByIDIndex, params.clientID)
+	oidcClients, err := h.oidcClientCache.GetByIndex(OIDCClientByIDIndex, params.clientID)
 	if err != nil {
 		oidcerror.WriteError(oidcerror.InvalidRequest, fmt.Sprintf("error retrieving OIDC client: %v", err), http.StatusBadRequest, w)
 		return
