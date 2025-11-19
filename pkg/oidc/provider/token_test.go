@@ -68,8 +68,8 @@ func TestTokenEndpoint(t *testing.T) {
 		fakeRefreshTokenLifespan = 3600
 	)
 
-	fakeScopes := []interface{}{"openid", "profile"}
-	fakeScopesOfflineAccess := []interface{}{"openid", "profile", "offline_access"}
+	fakeScopes := []any{"openid", "profile"}
+	fakeScopesOfflineAccess := []any{"openid", "profile", "offline_access"}
 	now := time.Now()
 	fakeTime := func() time.Time {
 		return now
@@ -104,6 +104,7 @@ func TestTokenEndpoint(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fakeTokenName,
 		},
+		Token:        "this-is-a-test",
 		UserID:       fakeUserID,
 		Enabled:      ptr.To(true),
 		AuthProvider: fakeAuthProvider,
@@ -115,6 +116,7 @@ func TestTokenEndpoint(t *testing.T) {
 				Time: time.Unix(10, 0),
 			},
 		},
+		Token:        "this-is-a-test",
 		UserID:       fakeUserID,
 		Enabled:      ptr.To(true),
 		AuthProvider: fakeAuthProvider,
@@ -211,23 +213,24 @@ func TestTokenEndpoint(t *testing.T) {
 				m.oidcClient.EXPECT().Patch(fakeClientName, types.JSONPatchType, clientSecretIDPatch).Return(fakeOIDCClient, nil)
 			},
 			wantIdTokenClaims: &jwt.MapClaims{
-				"aud":           []interface{}{fakeClientID},
+				"aud":           []any{fakeClientID},
 				"exp":           float64(fakeTime().Add(fakeTokenLifespan * time.Second).Unix()),
 				"iss":           settings.ServerURL.Get() + "/oidc",
 				"iat":           float64(fakeTime().Unix()),
 				"name":          fakeUsername,
 				"sub":           fakeUserID,
 				"auth_provider": fakeAuthProvider,
-				"groups":        []interface{}{fakeGroup},
+				"groups":        []any{fakeGroup},
 			},
 			wantAccessTokenClaims: &jwt.MapClaims{
-				"aud":           []interface{}{fakeClientID},
+				"aud":           []any{fakeClientID},
 				"exp":           float64(fakeTime().Add(fakeTokenLifespan * time.Second).Unix()),
 				"iss":           settings.ServerURL.Get() + "/oidc",
 				"iat":           float64(fakeTime().Unix()),
 				"sub":           fakeUserID,
 				"auth_provider": fakeAuthProvider,
 				"scope":         fakeScopes,
+				"token":         fakeToken.Name + ":" + fakeToken.Token,
 			},
 		},
 		"authorization_code fails for an invalid code": {
@@ -375,26 +378,27 @@ func TestTokenEndpoint(t *testing.T) {
 				m.oidcClient.EXPECT().Patch(fakeClientName, types.JSONPatchType, clientSecretIDPatch).Return(fakeOIDCClient, nil)
 			},
 			wantIdTokenClaims: &jwt.MapClaims{
-				"aud":           []interface{}{fakeClientID},
+				"aud":           []any{fakeClientID},
 				"exp":           float64(fakeTime().Add(fakeTokenLifespan * time.Second).Unix()),
 				"iss":           settings.ServerURL.Get() + "/oidc",
 				"iat":           float64(fakeTime().Unix()),
 				"name":          fakeUsername,
 				"sub":           fakeUserID,
 				"auth_provider": fakeAuthProvider,
-				"groups":        []interface{}{fakeGroup},
+				"groups":        []any{fakeGroup},
 			},
 			wantAccessTokenClaims: &jwt.MapClaims{
-				"aud":           []interface{}{fakeClientID},
+				"aud":           []any{fakeClientID},
 				"exp":           float64(fakeTime().Add(fakeTokenLifespan * time.Second).Unix()),
 				"iss":           settings.ServerURL.Get() + "/oidc",
 				"iat":           float64(fakeTime().Unix()),
 				"sub":           fakeUserID,
 				"auth_provider": fakeAuthProvider,
 				"scope":         fakeScopesOfflineAccess,
+				"token":         fakeToken.Name + ":" + fakeToken.Token,
 			},
 			wantRefreshTokenClaims: &jwt.MapClaims{
-				"aud":                []interface{}{fakeClientID},
+				"aud":                []any{fakeClientID},
 				"exp":                float64(fakeTime().Add(fakeRefreshTokenLifespan * time.Second).Unix()),
 				"iat":                float64(fakeTime().Unix()),
 				"sub":                fakeUserID,
@@ -426,26 +430,27 @@ func TestTokenEndpoint(t *testing.T) {
 				m.signingKeyGetter.EXPECT().GetPublicKey(fakeSigningKey).Return(&privateKey.PublicKey, nil)
 			},
 			wantIdTokenClaims: &jwt.MapClaims{
-				"aud":           []interface{}{fakeClientID},
+				"aud":           []any{fakeClientID},
 				"exp":           float64(fakeTime().Add(fakeTokenLifespan * time.Second).Unix()),
 				"iss":           settings.ServerURL.Get() + "/oidc",
 				"iat":           float64(fakeTime().Unix()),
 				"name":          fakeUsername,
 				"sub":           fakeUserID,
 				"auth_provider": fakeAuthProvider,
-				"groups":        []interface{}{fakeGroup},
+				"groups":        []any{fakeGroup},
 			},
 			wantAccessTokenClaims: &jwt.MapClaims{
-				"aud":           []interface{}{fakeClientID},
+				"aud":           []any{fakeClientID},
 				"exp":           float64(fakeTime().Add(fakeTokenLifespan * time.Second).Unix()),
 				"iss":           settings.ServerURL.Get() + "/oidc",
 				"iat":           float64(fakeTime().Unix()),
 				"sub":           fakeUserID,
 				"auth_provider": fakeAuthProvider,
 				"scope":         fakeScopesOfflineAccess,
+				"token":         fakeToken.Name + ":" + fakeToken.Token,
 			},
 			wantRefreshTokenClaims: &jwt.MapClaims{
-				"aud":                []interface{}{fakeClientID},
+				"aud":                []any{fakeClientID},
 				"exp":                float64(fakeTime().Add(fakeRefreshTokenLifespan * time.Second).Unix()),
 				"iat":                float64(fakeTime().Unix()),
 				"sub":                fakeUserID,
@@ -598,31 +603,31 @@ func TestTokenEndpoint(t *testing.T) {
 				assert.Equal(t, tokenResponse.TokenType, bearerTokenType)
 				if test.wantIdTokenClaims != nil {
 					claims := jwt.MapClaims{}
-					_, err := jwt.ParseWithClaims(tokenResponse.IDToken, &claims, func(token *jwt.Token) (interface{}, error) {
+					_, err := jwt.ParseWithClaims(tokenResponse.IDToken, &claims, func(token *jwt.Token) (any, error) {
 						return &privateKey.PublicKey, nil
 					})
 					assert.NoError(t, err)
-					assert.Equal(t, test.wantIdTokenClaims, &claims)
+					assert.Equal(t, test.wantIdTokenClaims, &claims, "id token does not match")
 				} else {
 					assert.Empty(t, tokenResponse.IDToken)
 				}
 				if test.wantAccessTokenClaims != nil {
 					claims := jwt.MapClaims{}
-					_, err := jwt.ParseWithClaims(tokenResponse.AccessToken, &claims, func(token *jwt.Token) (interface{}, error) {
+					_, err := jwt.ParseWithClaims(tokenResponse.AccessToken, &claims, func(token *jwt.Token) (any, error) {
 						return &privateKey.PublicKey, nil
 					})
 					assert.NoError(t, err)
-					assert.Equal(t, test.wantAccessTokenClaims, &claims)
+					assert.Equal(t, test.wantAccessTokenClaims, &claims, "access token does not match")
 				} else {
 					assert.Empty(t, tokenResponse.AccessToken)
 				}
 				if test.wantRefreshTokenClaims != nil {
 					claims := jwt.MapClaims{}
-					_, err := jwt.ParseWithClaims(tokenResponse.RefreshToken, &claims, func(token *jwt.Token) (interface{}, error) {
+					_, err := jwt.ParseWithClaims(tokenResponse.RefreshToken, &claims, func(token *jwt.Token) (any, error) {
 						return &privateKey.PublicKey, nil
 					})
 					assert.NoError(t, err)
-					assert.Equal(t, test.wantRefreshTokenClaims, &claims)
+					assert.Equal(t, test.wantRefreshTokenClaims, &claims, "refresh token does not match")
 				} else {
 					assert.Empty(t, tokenResponse.RefreshToken)
 				}
