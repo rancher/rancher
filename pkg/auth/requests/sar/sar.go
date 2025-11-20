@@ -2,11 +2,14 @@ package sar
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 	authV1 "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	v1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 )
 
@@ -142,13 +145,18 @@ func (sar subjectAccessReview) checkUserCanImpersonateExtras(ctx context.Context
 }
 
 func (sar subjectAccessReview) checkUserCanImpersonateServiceAccount(ctx context.Context, sarClient v1.SubjectAccessReviewInterface, user string, sa string) (bool, error) {
+	saNamespace, saName, err := parseServiceAccountUsername(sa)
+	if err != nil {
+		return false, err
+	}
 	review := authV1.SubjectAccessReview{
 		Spec: authV1.SubjectAccessReviewSpec{
 			User: user,
 			ResourceAttributes: &authV1.ResourceAttributes{
-				Verb:     "impersonate",
-				Resource: "serviceaccounts",
-				Name:     sa,
+				Verb:      "impersonate",
+				Resource:  "serviceaccounts",
+				Namespace: saNamespace,
+				Name:      saName,
 			},
 		},
 	}
@@ -159,4 +167,15 @@ func (sar subjectAccessReview) checkUserCanImpersonateServiceAccount(ctx context
 	}
 	logrus.Debugf("Impersonate sa check result: %v", result)
 	return result.Status.Allowed, nil
+}
+
+func parseServiceAccountUsername(username string) (namespace string, name string, err error) {
+	namespacedName := strings.TrimPrefix(username, serviceaccount.ServiceAccountUsernamePrefix)
+	tokens := strings.Split(namespacedName, ":")
+	if len(tokens) != 2 {
+		return "", "", fmt.Errorf("invalid service account username format: expected system:serviceaccount:<namespace>:<name>, but got '%s'", username)
+	}
+	namespace = tokens[0]
+	name = tokens[1]
+	return namespace, name, nil
 }
