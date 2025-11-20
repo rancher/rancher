@@ -3,6 +3,7 @@ package globalroles
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
@@ -1314,6 +1315,10 @@ func TestSetGRAsInProgress(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
+			// ensure the lastUpdateTime is of format RFC3339
+			if _, err := time.Parse(time.RFC3339, updatedGR.Status.LastUpdate); err != nil {
+				t.Errorf("failed to parse lastUpdate as RFC3339: %v", err)
+			}
 			require.Empty(t, updatedGR.Status.Conditions)
 			require.Equal(t, SummaryInProgress, updatedGR.Status.Summary)
 		})
@@ -1499,6 +1504,10 @@ func TestSetGRAsCompleted(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
+			// ensure the lastUpdateTime follows format RFC3339
+			if _, err := time.Parse(time.RFC3339, updatedGR.Status.LastUpdate); err != nil {
+				t.Errorf("failed to parse lastUpdate as RFC3339: %v", err)
+			}
 			if test.summary != "" {
 				require.Equal(t, test.summary, updatedGR.Status.Summary)
 			}
@@ -1575,6 +1584,10 @@ func TestSetGRAsTerminating(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
+			}
+			// ensure the lastUpdateTime is of format RFC3339
+			if _, err := time.Parse(time.RFC3339, updatedGR.Status.LastUpdate); err != nil {
+				t.Errorf("failed to parse lastUpdate as RFC3339: %v", err)
 			}
 			require.Empty(t, updatedGR.Status.Conditions)
 			require.Equal(t, SummaryTerminating, updatedGR.Status.Summary)
