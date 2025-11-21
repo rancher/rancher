@@ -5,12 +5,13 @@
   ],
   "baseBranchPatterns": [
     "main",
+    "release/v2.13",
     "release/v2.12",
     "release/v2.11",
     "release/v2.10",
     "release/v2.9"
   ],
-  "ignoreDeps":[
+  "ignoreDeps": [
     "go.qase.io/client"
   ],
   "prHourlyLimit": 2,
