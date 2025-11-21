@@ -13,6 +13,15 @@ func main() {
 		log.Fatal("\"main.go\" requires 1 argument. Usage: go run main.go [CHART_PATH] [OPTIONAL]...")
 	}
 
+	log.Printf("export/main.go called with %d arguments:", len(os.Args)-1)
+	log.Printf("  Chart path: %s", os.Args[1])
+	if len(os.Args) > 2 {
+		log.Printf("  Images from args (%d):", len(os.Args)-2)
+		for i, img := range os.Args[2:] {
+			log.Printf("    [%d] %s", i+1, img)
+		}
+	}
+
 	if err := run(os.Args[1], os.Args[2:]); err != nil {
 		log.Fatal(err)
 	}
