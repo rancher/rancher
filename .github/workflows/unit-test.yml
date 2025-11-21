@@ -15,6 +15,11 @@ jobs:
         uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5  # v5
         with:
           go-version-file: 'go.mod'
+
+      # https://github.com/golang/go/issues/75031
+      - name: Set toolchain version
+        run: go env -w GOTOOLCHAIN=go1.25.4+auto
+
       - name: Run unit tests
         run: go test -cover -tags=test ./pkg/...
 
