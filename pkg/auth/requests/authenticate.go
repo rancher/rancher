@@ -93,6 +93,11 @@ func NewAuthenticator(ctx context.Context, clusterRouter ClusterRouter, mgmtCtx 
 	tokenInformer := mgmtCtx.Management.Tokens("").Controller().Informer()
 	// Deliberately ignore the error if the indexer was already added.
 	_ = tokenInformer.AddIndexers(map[string]cache.IndexFunc{tokenKeyIndex: tokenKeyIndexer})
+	// Add indexer for the wrangler context as it won't be added if multi-cluster-management is not enabled.
+	wTokenInformer := mgmtCtx.Wrangler.Mgmt.Token().Informer()
+	// Deliberately ignore the error if the indexer was already added.
+	_ = wTokenInformer.AddIndexers(map[string]cache.IndexFunc{tokenKeyIndex: tokenKeyIndexer})
+
 	providerRefresher := providerrefresh.NewUserAuthRefresher(mgmtCtx)
 
 	extTokenStore := exttokenstore.NewSystemFromWrangler(mgmtCtx.Wrangler)
