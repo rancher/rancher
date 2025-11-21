@@ -33,10 +33,7 @@ import (
 )
 
 const (
-	byNodeInfra                       = "by-node-infra"
-	restoreRKEConfigKubernetesVersion = "kubernetesVersion"
-	restoreRKEConfigAll               = "all"
-	restoreRKEConfigNone              = "none"
+	byNodeInfra = "by-node-infra"
 )
 
 type handler struct {
@@ -320,7 +317,7 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 		if obj.Spec.RKEConfig.ETCDSnapshotRestore != nil &&
 			obj.Spec.RKEConfig.ETCDSnapshotRestore.Name != "" &&
 			obj.Spec.RKEConfig.ETCDSnapshotRestore.RestoreRKEConfig != "" &&
-			obj.Spec.RKEConfig.ETCDSnapshotRestore.RestoreRKEConfig != restoreRKEConfigNone {
+			obj.Spec.RKEConfig.ETCDSnapshotRestore.RestoreRKEConfig != capr.RestoreRKEConfigNone {
 			logrus.Debugf("rkecluster %s/%s: Reconciling rkeconfig against specified etcd restore snapshot metadata", obj.Namespace, obj.Name)
 			if !equality.Semantic.DeepEqual(rkeCP.Status.ETCDSnapshotRestore, obj.Spec.RKEConfig.ETCDSnapshotRestore) {
 				clusterSpec, err := h.findSnapshotClusterSpec(obj.Namespace, obj.Spec.RKEConfig.ETCDSnapshotRestore.Name)
@@ -328,7 +325,7 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 					return nil, status, err
 				}
 				switch obj.Spec.RKEConfig.ETCDSnapshotRestore.RestoreRKEConfig {
-				case restoreRKEConfigKubernetesVersion:
+				case capr.RestoreRKEConfigKubernetesVersion:
 					if obj.Spec.KubernetesVersion != clusterSpec.KubernetesVersion {
 						logrus.Infof("rkecluster %s/%s: restoring Kubernetes version from %s to %s for etcd snapshot restore (snapshot: %s)", obj.Namespace, obj.Name, obj.Spec.KubernetesVersion, clusterSpec.KubernetesVersion, obj.Spec.RKEConfig.ETCDSnapshotRestore.Name)
 						obj = obj.DeepCopy()
@@ -339,7 +336,7 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 						}
 						return nil, status, err
 					}
-				case restoreRKEConfigAll:
+				case capr.RestoreRKEConfigAll:
 					newCluster := obj.DeepCopy()
 					if reconcileClusterSpecEtcdRestore(newCluster, *clusterSpec) {
 						logrus.Infof("rkecluster %s/%s: restoring RKE config for etcd snapshot restore (snapshot: %s)", obj.Namespace, obj.Name, obj.Spec.RKEConfig.ETCDSnapshotRestore.Name)

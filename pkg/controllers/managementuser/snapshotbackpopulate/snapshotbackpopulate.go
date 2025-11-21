@@ -41,8 +41,15 @@ var (
 )
 
 const (
-	StorageAnnotationKey          = "etcdsnapshot.rke.io/storage"
+	StorageAnnotationKey = "etcdsnapshot.rke.io/storage"
+	// SnapshotFileNameAnnotationKey is the annotation key used to store the snapshot file resource name.
 	SnapshotFileNameAnnotationKey = "etcdsnapshot.rke.io/snapshot-file-name"
+	// RestoreModeOptionsAnnotation is the annotation key used to store the available restore modes.
+	RestoreModeOptionsAnnotation = "etcdsnapshot.rke.io/restore-mode-options"
+	// RestoreModeNone indicates only a "none" (etcd-only) restore is available.
+	RestoreModeNone = "none"
+	// RestoreModeAll indicates all restore modes ("none", "kubernetesVersion", "all") are available.
+	RestoreModeAll = "none,kubernetesVersion,all"
 )
 
 type Storage string
@@ -291,6 +298,57 @@ func generateSafeSnapshotName(spec k3s.ETCDSnapshotSpec, createdAt time.Time) st
 	return fmt.Sprintf("%s-%s-%s", storage, name, hex6)
 }
 
+// getRestoreModesAnnotation determines the appropriate value for the restore-mode-options annotation
+// by checking for a valid, parseable provisioning-cluster-spec and the presence of
+// fields required for each restore mode.
+func getRestoreModesAnnotation(downstream *k3s.ETCDSnapshotFile, cluster *provv1.Cluster) string {
+	logPrefix := getLogPrefix(cluster)
+	availableModes := []string{capr.RestoreRKEConfigNone}
+
+	if downstream.Spec.Metadata == nil {
+		logrus.Debugf("%s: downstream snapshot %s/%s has nil metadata, setting restore mode to 'none'",
+			logPrefix, downstream.Namespace, downstream.Name)
+		return capr.RestoreRKEConfigNone
+	}
+
+	specPayload, ok := downstream.Spec.Metadata[capr.SnapshotMetadataClusterSpecKey]
+	if !ok || specPayload == "" {
+		logrus.Debugf("%s: downstream snapshot %s/%s is missing '%s' key in metadata or key is empty, setting restore mode to 'none'",
+			logPrefix, downstream.Namespace, downstream.Name, capr.SnapshotMetadataClusterSpecKey)
+		return capr.RestoreRKEConfigNone
+	}
+
+	clusterSpec, err := capr.DecompressClusterSpec(specPayload)
+	if err != nil {
+		logrus.Warnf("%s: downstream snapshot %s/%s contains an unparseable '%s' metadata payload: %v. Setting restore mode to 'none'",
+			logPrefix,
+			downstream.Namespace,
+			downstream.Name,
+			capr.SnapshotMetadataClusterSpecKey,
+			err)
+		return capr.RestoreRKEConfigNone
+	}
+
+	logrus.Warnf("%s: downstream snapshot %s/%s has parseable metadata: %+v",
+		logPrefix, downstream.Namespace, downstream.Name, clusterSpec)
+
+	if clusterSpec.KubernetesVersion != "" {
+		availableModes = append(availableModes, capr.RestoreRKEConfigKubernetesVersion)
+	} else {
+		logrus.Warnf("%s: downstream snapshot %s/%s has parseable metadata but is missing 'kubernetesVersion', 'kubernetesVersion' restore mode will be unavailable.",
+			logPrefix, downstream.Namespace, downstream.Name)
+	}
+
+	if clusterSpec.KubernetesVersion != "" && clusterSpec.RKEConfig != nil {
+		availableModes = append(availableModes, capr.RestoreRKEConfigAll)
+	} else {
+		logrus.Warnf("%s: downstream snapshot %s/%s is missing 'KubernetesVersion' or 'RKEConfig', 'all' restore mode will be unavailable.",
+			logPrefix, downstream.Namespace, downstream.Name)
+	}
+
+	return strings.Join(availableModes, ",")
+}
+
 // populateUpstreamSnapshotFromDownstream sets the labels, annotations, spec and status fields which are governed by the
 // downstream snapshot. Also sets the relevant owner references (machine for local, capi cluster for s3), and
 // namespace/name if the snapshot is being created.
@@ -328,6 +386,7 @@ func (h *handler) populateUpstreamSnapshotFromDownstream(
 		upstream.Annotations = map[string]string{}
 	}
 
+	upstream.Annotations[RestoreModeOptionsAnnotation] = getRestoreModesAnnotation(downstream, cluster)
 	upstream.Annotations[StorageAnnotationKey] = string(storage)
 	upstream.Annotations[SnapshotFileNameAnnotationKey] = downstream.Spec.SnapshotName
 	upstream.Annotations[capr.SnapshotNameAnnotation] = downstream.Name
@@ -356,15 +415,6 @@ func (h *handler) populateUpstreamSnapshotFromDownstream(
 		upstream.SnapshotFile.Status = "successful"
 	} else {
 		upstream.SnapshotFile.Status = "failed"
-	}
-
-	if len(downstream.Spec.Metadata) == 0 {
-		// Force failed status so this snapshot cannot be restored via Rancher UI
-		upstream.SnapshotFile.Status = "failed"
-		upstream.SnapshotFile.Message = EncodedMetadataIsEmptyMessage
-
-		logrus.Warnf("%s snapshot has empty metadata; not restorable via Rancher UI (key=%s, storage=%s)",
-			getLogPrefix(cluster), downstream.Spec.SnapshotName, storage)
 	}
 
 	if storage == Local {
