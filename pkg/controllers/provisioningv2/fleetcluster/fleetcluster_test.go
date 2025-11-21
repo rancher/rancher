@@ -18,8 +18,7 @@ import (
 )
 
 var (
-	errNotImplemented = fmt.Errorf("unimplemented")
-	errNotFound       = fmt.Errorf("not found")
+	errNotFound = fmt.Errorf("not found")
 
 	builtinAffinity = corev1.Affinity{
 		NodeAffinity: &corev1.NodeAffinity{
@@ -64,7 +63,10 @@ var (
 			corev1.ResourceMemory: resource.MustParse("1Gi"),
 		},
 	}
-	tolerations = []corev1.Toleration{
+	// used in tests to assert ordering with non-nil TolerationSeconds
+	tolerationSeconds30 int64 = 30
+	tolerationSeconds10 int64 = 10
+	tolerations               = []corev1.Toleration{
 		{
 			Key:      "key",
 			Operator: corev1.TolerationOpEqual,
@@ -531,11 +533,71 @@ func TestCreateCluster(t *testing.T) {
 						ClusterSpecBase: apimgmtv3.ClusterSpecBase{
 							FleetAgentDeploymentCustomization: &apimgmtv3.AgentDeploymentCustomization{
 								AppendTolerations: []corev1.Toleration{
+									// intentionally added in bad (unsorted) order to validate sorting
+									{
+										Key:      "extraKey2",
+										Value:    "extraValue2",
+										Effect:   corev1.TaintEffectPreferNoSchedule,
+										Operator: corev1.TolerationOpEqual,
+									},
+									{
+										Key:      "akey",
+										Value:    "valueB",
+										Effect:   corev1.TaintEffectPreferNoSchedule,
+										Operator: corev1.TolerationOpEqual,
+									},
 									{
 										Key:      "extraKey1",
 										Value:    "extraValue1",
 										Effect:   corev1.TaintEffectPreferNoSchedule,
 										Operator: corev1.TolerationOpEqual,
+									},
+									{
+										Key:      "akey",
+										Value:    "valueA",
+										Effect:   corev1.TaintEffectPreferNoSchedule,
+										Operator: corev1.TolerationOpEqual,
+									},
+									{
+										Key:      "akey",
+										Value:    "valueA",
+										Effect:   corev1.TaintEffectNoSchedule,
+										Operator: corev1.TolerationOpEqual,
+									},
+									{
+										Key:      "existsKey",
+										Operator: corev1.TolerationOpExists,
+									},
+									{
+										Key:               "bkey",
+										Value:             "value",
+										Effect:            corev1.TaintEffectNoSchedule,
+										Operator:          corev1.TolerationOpEqual,
+										TolerationSeconds: &tolerationSeconds30,
+									},
+									{
+										Key:      "bkey",
+										Value:    "value",
+										Effect:   corev1.TaintEffectNoSchedule,
+										Operator: corev1.TolerationOpEqual,
+										// nil TolerationSeconds - should sort before non-nil
+									},
+									{
+										Key:               "bkey",
+										Value:             "value",
+										Effect:            corev1.TaintEffectNoSchedule,
+										Operator:          corev1.TolerationOpEqual,
+										TolerationSeconds: &tolerationSeconds10,
+									},
+									{
+										Key:      "bkey",
+										Value:    "value2",
+										Effect:   corev1.TaintEffectNoSchedule,
+										Operator: corev1.TolerationOpEqual,
+									},
+									{
+										Key:      "zkey",
+										Operator: corev1.TolerationOpExists,
 									},
 								},
 							},
@@ -564,8 +626,63 @@ func TestCreateCluster(t *testing.T) {
 			cpTaintsLabel: "node-role.kubernetes.io/control-plane=true",
 			expectedTolerations: []corev1.Toleration{
 				{
-					Key:      "key_taint2",
-					Value:    "value_taint2",
+					Key:      "akey",
+					Value:    "valueA",
+					Effect:   corev1.TaintEffectNoSchedule,
+					Operator: corev1.TolerationOpEqual,
+				},
+				{
+					Key:      "akey",
+					Value:    "valueA",
+					Effect:   corev1.TaintEffectPreferNoSchedule,
+					Operator: corev1.TolerationOpEqual,
+				},
+				{
+					Key:      "akey",
+					Value:    "valueB",
+					Effect:   corev1.TaintEffectPreferNoSchedule,
+					Operator: corev1.TolerationOpEqual,
+				},
+				{
+					Key:      "bkey",
+					Value:    "value",
+					Effect:   corev1.TaintEffectNoSchedule,
+					Operator: corev1.TolerationOpEqual,
+					// nil TolerationSeconds sorts before non-nil
+				},
+				{
+					Key:               "bkey",
+					Value:             "value",
+					Effect:            corev1.TaintEffectNoSchedule,
+					Operator:          corev1.TolerationOpEqual,
+					TolerationSeconds: &tolerationSeconds10,
+				},
+				{
+					Key:               "bkey",
+					Value:             "value",
+					Effect:            corev1.TaintEffectNoSchedule,
+					Operator:          corev1.TolerationOpEqual,
+					TolerationSeconds: &tolerationSeconds30,
+				},
+				{
+					Key:      "bkey",
+					Value:    "value2",
+					Effect:   corev1.TaintEffectNoSchedule,
+					Operator: corev1.TolerationOpEqual,
+				},
+				{
+					Key:      "existsKey",
+					Operator: corev1.TolerationOpExists,
+				},
+				{
+					Key:      "extraKey1",
+					Value:    "extraValue1",
+					Effect:   corev1.TaintEffectPreferNoSchedule,
+					Operator: corev1.TolerationOpEqual,
+				},
+				{
+					Key:      "extraKey2",
+					Value:    "extraValue2",
 					Effect:   corev1.TaintEffectPreferNoSchedule,
 					Operator: corev1.TolerationOpEqual,
 				},
@@ -576,10 +693,14 @@ func TestCreateCluster(t *testing.T) {
 					Operator: corev1.TolerationOpEqual,
 				},
 				{
-					Key:      "extraKey1",
-					Value:    "extraValue1",
+					Key:      "key_taint2",
+					Value:    "value_taint2",
 					Effect:   corev1.TaintEffectPreferNoSchedule,
 					Operator: corev1.TolerationOpEqual,
+				},
+				{
+					Key:      "zkey",
+					Operator: corev1.TolerationOpExists,
 				},
 			},
 			expectedLen: 2, // cluster and cluster group
@@ -627,7 +748,17 @@ func TestCreateCluster(t *testing.T) {
 							},
 							{
 								Key:    "key_taint2",
-								Value:  "value_taint2",
+								Value:  "value_taint2_2",
+								Effect: corev1.TaintEffectNoSchedule,
+							},
+							{
+								Key:    "key_taint2",
+								Value:  "value_taint2_1",
+								Effect: corev1.TaintEffectNoSchedule,
+							},
+							{
+								Key:    "key_taint2",
+								Value:  "value_taint2_2",
 								Effect: corev1.TaintEffectPreferNoSchedule,
 							},
 						},
@@ -637,15 +768,27 @@ func TestCreateCluster(t *testing.T) {
 			cpTaintsLabel: "node-role.kubernetes.io/controlplane=true",
 			expectedTolerations: []corev1.Toleration{
 				{
-					Key:      "key_taint2",
-					Value:    "value_taint2",
-					Effect:   corev1.TaintEffectPreferNoSchedule,
-					Operator: corev1.TolerationOpEqual,
-				},
-				{
 					Key:      "key_taint1",
 					Value:    "value_taint1",
 					Effect:   corev1.TaintEffectNoSchedule,
+					Operator: corev1.TolerationOpEqual,
+				},
+				{
+					Key:      "key_taint2",
+					Value:    "value_taint2_1",
+					Effect:   corev1.TaintEffectNoSchedule,
+					Operator: corev1.TolerationOpEqual,
+				},
+				{
+					Key:      "key_taint2",
+					Value:    "value_taint2_2",
+					Effect:   corev1.TaintEffectNoSchedule,
+					Operator: corev1.TolerationOpEqual,
+				},
+				{
+					Key:      "key_taint2",
+					Value:    "value_taint2_2",
+					Effect:   corev1.TaintEffectPreferNoSchedule,
 					Operator: corev1.TolerationOpEqual,
 				},
 			},
@@ -739,7 +882,7 @@ func TestCreateCluster(t *testing.T) {
 					if len(tt.expectedTolerations) == 0 {
 						require.Empty(t, cluster.Spec.AgentTolerations)
 					} else {
-						require.ElementsMatch(t, tt.expectedTolerations, cluster.Spec.AgentTolerations)
+						require.Equal(t, tt.expectedTolerations, cluster.Spec.AgentTolerations)
 					}
 				}
 
