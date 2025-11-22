@@ -81,7 +81,7 @@ func (c *calculateLimitController) calculateProjectResourceQuota(projectID strin
 		}
 		nsResourceList, err := validate.ConvertLimitToResourceList(nsLimit)
 		if err != nil {
-			return err
+			return fmt.Errorf("parsing namespace quota limits: %w", err)
 		}
 		nssResourceList = quota.Add(nssResourceList, nsResourceList)
 	}
