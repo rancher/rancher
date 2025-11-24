@@ -887,7 +887,7 @@ func Test_createOrUpdateProjectMembershipBinding(t *testing.T) {
 			if tt.setupRBController != nil {
 				tt.setupRBController(rbController)
 			}
-			if err := CreateOrUpdateProjectMembershipBinding(tt.prtb, tt.rt, rbController); (err != nil) != tt.wantErr {
+			if err := createOrUpdateProjectMembershipBinding(tt.prtb, tt.rt, rbController); (err != nil) != tt.wantErr {
 				t.Errorf("createOrUpdateProjectMembershipBinding() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
