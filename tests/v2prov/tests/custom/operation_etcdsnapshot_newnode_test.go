@@ -142,7 +142,7 @@ func Test_Operation_SetB_Custom_EtcdSnapshotOperationsOnNewNode(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.SnapshotFile.Name, cm, 2)
+	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.SnapshotFile.Name, cm, 2, capr.RestoreRKEConfigNone)
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	assert.NoError(t, err)
 }
