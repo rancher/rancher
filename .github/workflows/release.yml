@@ -215,25 +215,3 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY ;
       - name: publish to gh
         uses: ./.github/actions/images-digests/publish-gh
-  notify-release:
-    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: registry.suse.com/bci/bci-base:15.7
-    needs: [merge-server-agent-installer-manifests, docker-image-digests]
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - name: install dependencies
-        shell: bash
-        run: zypper install -y git
-      - name: Git safe directory
-        run: git config --global --add safe.directory "$PWD"
-      - name: Checkout code
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
-      - name: Read App Secrets
-        uses: rancher-eio/read-vault-secrets@main
-        with:
-          secrets: |
-            secret/data/github/repo/${{ github.repository }}/slack/webhook credentials | WEBHOOK_URL;
-      - name: notify
-        uses: ./.github/actions/notify-release
