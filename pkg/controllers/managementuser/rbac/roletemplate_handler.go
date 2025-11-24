@@ -41,10 +41,7 @@ type rtEnqueue struct {
 }
 
 func (c *rtSync) sync(key string, obj *v3.RoleTemplate) (runtime.Object, error) {
-	if features.AggregatedRoleTemplates.Enabled() {
-		return nil, nil
-	}
-	if obj == nil || obj.DeletionTimestamp != nil {
+	if obj == nil || obj.DeletionTimestamp != nil || features.AggregatedRoleTemplates.Enabled() {
 		return nil, nil
 	}
 	// check if there are any PRTBs/CRTBs referencing this RoleTemplate for this cluster
