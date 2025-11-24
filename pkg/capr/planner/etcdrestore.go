@@ -802,9 +802,9 @@ func (p *Planner) restoreEtcdSnapshot(cp *rkev1.RKEControlPlane, status rkev1.RK
 		if err != nil || clusterSpec == nil {
 			errorStr := fmt.Sprintf("[planner] rkecluster %s/%s: error parsing snapshot cluster spec for snapshot %s/%s during etcd restoration: %v", cp.Namespace, cp.Name, snapshot.Namespace, snapshot.Name, err)
 			if restoreModeRequiresClusterSpec {
-				logrus.Errorf(errorStr)
+				logrus.Error(errorStr)
 			} else {
-				logrus.Warnf(errorStr)
+				logrus.Warn(errorStr)
 			}
 		} else {
 			snapshotK8sVersion, err := semver.NewVersion(clusterSpec.KubernetesVersion)

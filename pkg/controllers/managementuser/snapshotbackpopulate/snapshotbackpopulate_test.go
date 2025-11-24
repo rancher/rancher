@@ -2,7 +2,6 @@ package snapshotbackpopulate
 
 import (
 	"errors"
-	"fmt"
 	"regexp"
 	"strings"
 	"testing"
@@ -796,9 +795,6 @@ func TestOnDownstreamChange_RestoreModeAnnotationIsSetCorrectly(t *testing.T) {
 			downstreamSnapshotName := strings.ReplaceAll(tc.name, " ", "-") + "-" + strings.ToLower(storage.name)
 
 			t.Run(storage.name+": "+tc.name, func(t *testing.T) {
-				if tc.name == "spec has k8s version but no RKEConfig" {
-					fmt.Println("this one")
-				}
 				downstreamFile := makeDownstream(storage.isS3Storage, tc.metadata, downstreamSnapshotName)
 
 				etcdSnapshotCache.EXPECT().
