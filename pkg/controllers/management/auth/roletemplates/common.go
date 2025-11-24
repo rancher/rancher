@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher/pkg/rbac"
 	crbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/name"
+	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -152,11 +153,11 @@ func getClusterMembershipRoleName(rt *v3.RoleTemplate, rtb metav1.Object) string
 }
 
 // createOrUpdateProjectMembershipBinding ensures the RoleBinding required to give Project access to a user exists.
-func createOrUpdateProjectMembershipBinding(prtb *v3.ProjectRoleTemplateBinding, rt *v3.RoleTemplate, rbController crbacv1.RoleBindingController) error {
+func CreateOrUpdateProjectMembershipBinding(prtb *v3.ProjectRoleTemplateBinding, rt *v3.RoleTemplate, rbController crbacv1.RoleBindingController) error {
 	roleName := getProjectMembershipRoleName(rt, prtb)
 	roleRef := rbacv1.RoleRef{
 		APIGroup: rbacv1.GroupName,
-		Kind:     "ClusterRole",
+		Kind:     "Role",
 		Name:     roleName,
 	}
 
@@ -168,13 +169,16 @@ func createOrUpdateProjectMembershipBinding(prtb *v3.ProjectRoleTemplateBinding,
 	existingRB, err := rbController.Get(wantedRB.Namespace, wantedRB.Name, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
+			logrus.Infof("Creating roleBinding %s for project membership in project %s for subjects %v", existingRB.Name, prtb.ProjectName, existingRB.Subjects)
 			_, err := rbController.Create(wantedRB)
 			return err
 		}
 		return err
 	}
 
+	// RoleRef is immutable, so if it's incorrect it needs to be deleted and re-created
 	if ok, _ := rbac.AreRoleBindingContentsSame(wantedRB, existingRB); !ok {
+		logrus.Infof("Re-creating roleBinding %s for project membership in project %s for subjects %v", existingRB.Name, prtb.ProjectName, existingRB.Subjects)
 		if err := rbController.Delete(wantedRB.Namespace, wantedRB.Name, &metav1.DeleteOptions{}); err != nil {
 			return err
 		}
@@ -185,6 +189,7 @@ func createOrUpdateProjectMembershipBinding(prtb *v3.ProjectRoleTemplateBinding,
 	// Update label
 	rtbLabel := getRTBLabel(prtb)
 	if v, ok := existingRB.Labels[rtbLabel]; !ok || v != "true" {
+		logrus.Infof("Updating roleBinding %s for project membership in project %s for subjects %v", existingRB.Name, prtb.ProjectName, existingRB.Subjects)
 		existingRB.Labels[rtbLabel] = "true"
 		_, err := rbController.Update(existingRB)
 		return err
@@ -249,9 +254,9 @@ func deleteProjectMembershipBinding(prtb *v3.ProjectRoleTemplateBinding, rbContr
 func getProjectMembershipRoleName(rt *v3.RoleTemplate, prtb *v3.ProjectRoleTemplateBinding) string {
 	_, projectName := rbac.GetClusterAndProjectNameFromPRTB(prtb)
 	if isProjectOwnerRole(rt) {
-		return name.SafeConcatName(projectName, projectContext, "owner")
+		return name.SafeConcatName(projectName, projectContext+"owner")
 	} else {
-		return name.SafeConcatName(projectName, projectContext, "member")
+		return name.SafeConcatName(projectName, projectContext+"member")
 	}
 }
 

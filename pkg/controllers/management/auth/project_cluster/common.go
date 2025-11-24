@@ -12,6 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 	v12 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -76,41 +77,72 @@ func reconcileResourceToNamespace(obj runtime.Object, controller string, nsName 
 	})
 }
 
-// createMembershipRoles creates 2 cluster roles: an owner role and a member role. To be used to create project/cluster membership roles.
-func createMembershipRoles(obj runtime.Object, crClient crbacv1.ClusterRoleController) error {
-	var resourceName, resourceType, context string
-	var annotations map[string]string
-
-	switch v := obj.(type) {
-	case *apisv3.Project:
-		context = projectContext
-		resourceType = apisv3.ProjectResourceName
-		resourceName = v.GetName()
-	case *apisv3.Cluster:
-		annotations = map[string]string{clusterNameLabel: v.GetName()}
-		context = clusterContext
-		resourceType = apisv3.ClusterResourceName
-		resourceName = v.GetName()
-	default:
-		return fmt.Errorf("cannot create membership roles for unsupported type %T", v)
+func createProjectMembershipRoles(project *apisv3.Project, roleController crbacv1.RoleController) error {
+	ownerRef, err := newOwnerReference(project)
+	if err != nil {
+		return err
 	}
 
-	ownerRef, err := newOwnerReference(obj)
+	memberRole := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            name.SafeConcatName(project.Name, projectContext+"member"),
+			Namespace:       project.Spec.ClusterName,
+			OwnerReferences: []metav1.OwnerReference{ownerRef},
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups:     []string{apisv3.SchemeGroupVersion.Group},
+				Resources:     []string{apisv3.ProjectResourceName},
+				ResourceNames: []string{project.Name},
+				Verbs:         []string{"get"},
+			},
+		},
+	}
+
+	ownerRole := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            name.SafeConcatName(project.Name, projectContext+"owner"),
+			Namespace:       project.Spec.ClusterName,
+			OwnerReferences: []metav1.OwnerReference{ownerRef},
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups:     []string{apisv3.SchemeGroupVersion.Group},
+				Resources:     []string{apisv3.ProjectResourceName},
+				ResourceNames: []string{project.Name},
+				Verbs:         []string{rbacv1.VerbAll},
+			},
+		},
+	}
+	for _, role := range []*rbacv1.Role{memberRole, ownerRole} {
+		if err := rbac.CreateOrUpdateNamespacedResource(role, roleController, func(currentRole, wantedRole *rbacv1.Role) (bool, *rbacv1.Role) {
+			return !equality.Semantic.DeepEqual(currentRole.Rules, wantedRole.Rules), wantedRole
+		}); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// createClusterMembershipRoles creates 2 cluster roles: an owner role and a member role. Used to provide cluster membership.
+func createClusterMembershipRoles(cluster *apisv3.Cluster, crClient crbacv1.ClusterRoleController) error {
+	ownerRef, err := newOwnerReference(cluster)
 	if err != nil {
 		return err
 	}
 
 	memberRole := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            name.SafeConcatName(resourceName, context, "member"),
+			Name:            name.SafeConcatName(cluster.Name, clusterContext+"member"),
 			OwnerReferences: []metav1.OwnerReference{ownerRef},
-			Annotations:     annotations,
+			Annotations:     map[string]string{clusterNameLabel: cluster.Name},
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
 				APIGroups:     []string{apisv3.SchemeGroupVersion.Group},
-				Resources:     []string{resourceType},
-				ResourceNames: []string{resourceName},
+				Resources:     []string{apisv3.ClusterResourceName},
+				ResourceNames: []string{cluster.Name},
 				Verbs:         []string{"get"},
 			},
 		},
@@ -118,15 +150,15 @@ func createMembershipRoles(obj runtime.Object, crClient crbacv1.ClusterRoleContr
 
 	ownerRole := &rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            name.SafeConcatName(resourceName, context, "owner"),
+			Name:            name.SafeConcatName(cluster.Name, clusterContext+"owner"),
 			OwnerReferences: []metav1.OwnerReference{ownerRef},
-			Annotations:     annotations,
+			Annotations:     map[string]string{clusterNameLabel: cluster.Name},
 		},
 		Rules: []rbacv1.PolicyRule{
 			{
 				APIGroups:     []string{apisv3.SchemeGroupVersion.Group},
-				Resources:     []string{resourceType},
-				ResourceNames: []string{resourceName},
+				Resources:     []string{apisv3.ClusterResourceName},
+				ResourceNames: []string{cluster.Name},
 				Verbs:         []string{rbacv1.VerbAll},
 			},
 		},

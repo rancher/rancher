@@ -122,7 +122,7 @@ func (p *prtbHandler) reconcileMembershipBindings(prtb *v3.ProjectRoleTemplateBi
 	}
 
 	return errors.Join(createOrUpdateClusterMembershipBinding(prtb, rt, p.crbController),
-		createOrUpdateProjectMembershipBinding(prtb, rt, p.rbController))
+		CreateOrUpdateProjectMembershipBinding(prtb, rt, p.rbController))
 }
 
 // reconcileBindings ensures the right Role Binding exists for the project management plane role. It deletes any additional unwanted Role Bindings.
