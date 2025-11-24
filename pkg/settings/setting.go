@@ -59,6 +59,8 @@ var (
 		"cattle-telemetry-system",
 		"cattle-local-user-passwords",
 		"cattle-tokens",
+		"cattle-oidc-codes",
+		"cattle-oidc-client-secrets",
 	}
 
 	AgentImage          = NewSetting("agent-image", "rancher/rancher-agent:head")
