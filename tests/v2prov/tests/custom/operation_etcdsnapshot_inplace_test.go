@@ -39,10 +39,8 @@ func Test_Operation_SetA_Custom_EtcdSnapshotCreationRestoreInPlace(t *testing.T)
 					ETCD: &rkev1.ETCD{
 						DisableSnapshots: true,
 					},
-					MachineGlobalConfig:   rkev1.GenericMap{},
 					MachineSelectorConfig: []rkev1.RKESystemConfig{},
 					ChartValues:           rkev1.GenericMap{},
-					Registries:            &rkev1.Registry{},
 					UpgradeStrategy:       rkev1.ClusterUpgradeStrategy{},
 					AdditionalManifest:    "",
 					Networking:            &rkev1.Networking{},
