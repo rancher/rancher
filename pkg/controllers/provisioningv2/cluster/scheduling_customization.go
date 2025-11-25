@@ -90,7 +90,10 @@ func (h *handler) updateV1AgentSchedulingCustomization(cluster *v1.Cluster) (*v1
 		return h.clusters.Update(cluster)
 	}
 
-	defaultPC, defaultPDB, err := getDefaultSchedulingCustomization[v1.PriorityClassSpec, v1.PodDisruptionBudgetSpec]()
+	defaultPC, defaultPDB, err := getDefaultSchedulingCustomization[v1.PriorityClassSpec, v1.PodDisruptionBudgetSpec](
+		settings.ClusterAgentDefaultPriorityClass,
+		settings.ClusterAgentDefaultPodDisruptionBudget,
+	)
 	if err != nil {
 		return cluster, fmt.Errorf("failed to get default scheduling customization: %w", err)
 	}
@@ -143,7 +146,10 @@ func (h *handler) updateV1FleetAgentSchedulingCustomization(cluster *v1.Cluster)
 		return h.clusters.Update(cluster)
 	}
 
-	defaultPC, defaultPDB, err := getDefaultFleetSchedulingCustomization[v1.PriorityClassSpec, v1.PodDisruptionBudgetSpec]()
+	defaultPC, defaultPDB, err := getDefaultSchedulingCustomization[v1.PriorityClassSpec, v1.PodDisruptionBudgetSpec](
+		settings.FleetAgentDefaultPriorityClass,
+		settings.FleetAgentDefaultPodDisruptionBudget,
+	)
 	if err != nil {
 		return cluster, fmt.Errorf("failed to get default scheduling customization: %w", err)
 	}
@@ -200,7 +206,10 @@ func (h *handler) updateV3AgentSchedulingCustomization(cluster *v3.Cluster) (*v3
 		return h.mgmtClusters.Update(cluster)
 	}
 
-	defaultPC, defaultPDB, err := getDefaultSchedulingCustomization[v3.PriorityClassSpec, v3.PodDisruptionBudgetSpec]()
+	defaultPC, defaultPDB, err := getDefaultSchedulingCustomization[v3.PriorityClassSpec, v3.PodDisruptionBudgetSpec](
+		settings.ClusterAgentDefaultPriorityClass,
+		settings.ClusterAgentDefaultPodDisruptionBudget,
+	)
 	if err != nil {
 		return cluster, fmt.Errorf("failed to get default scheduling customization: %w", err)
 	}
@@ -258,7 +267,10 @@ func (h *handler) updateV3FleetAgentSchedulingCustomization(cluster *v3.Cluster)
 		return h.mgmtClusters.Update(cluster)
 	}
 
-	defaultPC, defaultPDB, err := getDefaultFleetSchedulingCustomization[v3.PriorityClassSpec, v3.PodDisruptionBudgetSpec]()
+	defaultPC, defaultPDB, err := getDefaultSchedulingCustomization[v3.PriorityClassSpec, v3.PodDisruptionBudgetSpec](
+		settings.FleetAgentDefaultPriorityClass,
+		settings.FleetAgentDefaultPodDisruptionBudget,
+	)
 	if err != nil {
 		return cluster, fmt.Errorf("failed to get default scheduling customization: %w", err)
 	}
@@ -276,8 +288,10 @@ func (h *handler) updateV3FleetAgentSchedulingCustomization(cluster *v3.Cluster)
 	return h.mgmtClusters.Update(cluster)
 }
 
-func getDefaultSchedulingCustomization[T v1.PriorityClassSpec | v3.PriorityClassSpec, TT v1.PodDisruptionBudgetSpec | v3.PodDisruptionBudgetSpec]() (*T, *TT, error) {
-	defaultPC := settings.ClusterAgentDefaultPriorityClass.Get()
+func getDefaultSchedulingCustomization[T v1.PriorityClassSpec | v3.PriorityClassSpec, TT v1.PodDisruptionBudgetSpec | v3.PodDisruptionBudgetSpec](
+	defaultPriorityClassSetting, defaultPodDisruptionClassSetting settings.Setting,
+) (*T, *TT, error) {
+	defaultPC := defaultPriorityClassSetting.Get()
 	pc := new(T)
 	if defaultPC != "" {
 		err := json.Unmarshal([]byte(defaultPC), &pc)
@@ -288,38 +302,12 @@ func getDefaultSchedulingCustomization[T v1.PriorityClassSpec | v3.PriorityClass
 		pc = nil
 	}
 
-	defaultPdb := settings.ClusterAgentDefaultPodDisruptionBudget.Get()
+	defaultPdb := defaultPodDisruptionClassSetting.Get()
 	pdb := new(TT)
 	if defaultPdb != "" {
 		err := json.Unmarshal([]byte(defaultPdb), &pdb)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to unmarshal default cluster agent priority class: %w", err)
-		}
-	} else {
-		pdb = nil
-	}
-
-	return pc, pdb, nil
-}
-
-func getDefaultFleetSchedulingCustomization[T v1.PriorityClassSpec | v3.PriorityClassSpec, TT v1.PodDisruptionBudgetSpec | v3.PodDisruptionBudgetSpec]() (*T, *TT, error) {
-	defaultPC := settings.FleetAgentDefaultPriorityClass.Get()
-	pc := new(T)
-	if defaultPC != "" {
-		err := json.Unmarshal([]byte(defaultPC), &pc)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to unmarshal default fleet cluster agent priority class: %w", err)
-		}
-	} else {
-		pc = nil
-	}
-
-	defaultPdb := settings.FleetAgentDefaultPodDisruptionBudget.Get()
-	pdb := new(TT)
-	if defaultPdb != "" {
-		err := json.Unmarshal([]byte(defaultPdb), &pdb)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to unmarshal default fleet cluster agent priority class: %w", err)
 		}
 	} else {
 		pdb = nil
