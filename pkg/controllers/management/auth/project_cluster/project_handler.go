@@ -56,6 +56,7 @@ func NewProjectLifecycle(management *config.ManagementContext) *projectLifecycle
 		roleBindings:         management.Wrangler.RBAC.RoleBinding(),
 		systemAccountManager: systemaccount.NewManager(management),
 		crClient:             management.Wrangler.RBAC.ClusterRole(),
+		roleController:       management.Wrangler.RBAC.Role(),
 	}
 }
 
