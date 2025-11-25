@@ -63,7 +63,7 @@ func createOrUpdateClusterMembershipBinding(rtb metav1.Object, rt *v3.RoleTempla
 	existingCRB, err := crbController.Get(wantedCRB.Name, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			logrus.Infof("Creating clusterRoleBinding %s for cluster membership role %s for subjects %v", existingCRB.Name, existingCRB.RoleRef.Name, existingCRB.Subjects)
+			logrus.Infof("Creating clusterRoleBinding %s for cluster membership role %s for subjects %v", wantedCRB.Name, wantedCRB.RoleRef.Name, wantedCRB.Subjects)
 			_, err := crbController.Create(wantedCRB)
 			return err
 		}
@@ -72,7 +72,7 @@ func createOrUpdateClusterMembershipBinding(rtb metav1.Object, rt *v3.RoleTempla
 
 	// If the role referenced or subjects are wrong, delete and re-create the CRB
 	if !rbac.AreClusterRoleBindingContentsSame(wantedCRB, existingCRB) {
-		logrus.Infof("Re-creating clusterRoleBinding %s for cluster membership role %s for subjects %v", existingCRB.Name, existingCRB.RoleRef.Name, existingCRB.Subjects)
+		logrus.Infof("Re-creating clusterRoleBinding %s for cluster membership role %s for subjects %v", wantedCRB.Name, wantedCRB.RoleRef.Name, wantedCRB.Subjects)
 		if err := crbController.Delete(wantedCRB.Name, &metav1.DeleteOptions{}); err != nil {
 			return err
 		}
@@ -82,7 +82,7 @@ func createOrUpdateClusterMembershipBinding(rtb metav1.Object, rt *v3.RoleTempla
 	// Update Label
 	rtbLabel := getRTBLabel(rtb)
 	if v, ok := existingCRB.Labels[rtbLabel]; !ok || v != "true" {
-		logrus.Infof("Updating clusterRoleBinding %s for cluster membership role %s for subjects %v", existingCRB.Name, existingCRB.RoleRef.Name, existingCRB.Subjects)
+		logrus.Infof("Updating clusterRoleBinding %s for cluster membership role %s for subjects %v", wantedCRB.Name, wantedCRB.RoleRef.Name, wantedCRB.Subjects)
 		existingCRB.Labels[rtbLabel] = "true"
 		_, err := crbController.Update(existingCRB)
 		return err
@@ -149,9 +149,9 @@ func getClusterMembershipRoleName(rt *v3.RoleTemplate, rtb metav1.Object) string
 		clusterName = obj.ClusterName
 	}
 	if isClusterOwnerRole(rt) {
-		return name.SafeConcatName(clusterName, clusterContext, "owner")
+		return name.SafeConcatName(clusterName, clusterContext+"owner")
 	} else {
-		return name.SafeConcatName(clusterName, clusterContext, "member")
+		return name.SafeConcatName(clusterName, clusterContext+"member")
 	}
 }
 
@@ -172,7 +172,7 @@ func createOrUpdateProjectMembershipBinding(prtb *v3.ProjectRoleTemplateBinding,
 	existingRB, err := rbController.Get(wantedRB.Namespace, wantedRB.Name, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			logrus.Infof("Creating roleBinding %s for project membership role %s for subjects %v", existingRB.Name, existingRB.RoleRef.Name, existingRB.Subjects)
+			logrus.Infof("Creating roleBinding %s for project membership role %s for subjects %v", wantedRB.Name, wantedRB.RoleRef.Name, wantedRB.Subjects)
 			_, err := rbController.Create(wantedRB)
 			return err
 		}
@@ -181,7 +181,7 @@ func createOrUpdateProjectMembershipBinding(prtb *v3.ProjectRoleTemplateBinding,
 
 	// RoleRef is immutable, so if it's incorrect it needs to be deleted and re-created
 	if ok, _ := rbac.AreRoleBindingContentsSame(wantedRB, existingRB); !ok {
-		logrus.Infof("Re-creating roleBinding %s for project membership role %s for subjects %v", existingRB.Name, existingRB.RoleRef.Name, existingRB.Subjects)
+		logrus.Infof("Re-creating roleBinding %s for project membership role %s for subjects %v", wantedRB.Name, wantedRB.RoleRef.Name, wantedRB.Subjects)
 		if err := rbController.Delete(wantedRB.Namespace, wantedRB.Name, &metav1.DeleteOptions{}); err != nil {
 			return err
 		}
@@ -192,7 +192,7 @@ func createOrUpdateProjectMembershipBinding(prtb *v3.ProjectRoleTemplateBinding,
 	// Update label
 	rtbLabel := getRTBLabel(prtb)
 	if v, ok := existingRB.Labels[rtbLabel]; !ok || v != "true" {
-		logrus.Infof("Updating roleBinding %s for project membership role %s for subjects %v", existingRB.Name, existingRB.RoleRef.Name, existingRB.Subjects)
+		logrus.Infof("Updating roleBinding %s for project membership role %s for subjects %v", wantedRB.Name, wantedRB.RoleRef.Name, wantedRB.Subjects)
 		existingRB.Labels[rtbLabel] = "true"
 		_, err := rbController.Update(existingRB)
 		return err
