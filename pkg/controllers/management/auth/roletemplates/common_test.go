@@ -34,12 +34,12 @@ var (
 	}
 	defaultProjectRoleRef = rbacv1.RoleRef{
 		APIGroup: "rbac.authorization.k8s.io",
-		Name:     "test-cluster-cluster-member",
+		Name:     "test-cluster-clustermember",
 		Kind:     "ClusterRole",
 	}
 	defaultProjectCRB = rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   "crb-eawz62u5xd",
+			Name:   "crb-mps2cvektd",
 			Labels: map[string]string{"test-namespace_test-prtb": "true"},
 		},
 		Subjects: []rbacv1.Subject{defaultSubject},
@@ -56,13 +56,13 @@ var (
 		RoleTemplateName: "test-rt",
 	}
 	defaultClusterRoleRef = rbacv1.RoleRef{
-		Name:     "test-cluster-cluster-member",
+		Name:     "test-cluster-clustermember",
 		Kind:     "ClusterRole",
 		APIGroup: "rbac.authorization.k8s.io",
 	}
 	defaultClusterCRB = rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   "crb-eawz62u5xd",
+			Name:   "crb-mps2cvektd",
 			Labels: map[string]string{"test-namespace_test-crtb": "true"},
 		},
 		Subjects: []rbacv1.Subject{defaultSubject},
@@ -525,7 +525,7 @@ func Test_getClusterMembershipRoleName(t *testing.T) {
 			rtb: &v3.ClusterRoleTemplateBinding{
 				ClusterName: "c-abc123",
 			},
-			want: "c-abc123-cluster-owner",
+			want: "c-abc123-clusterowner",
 		},
 		{
 			name: "get CRTB member role",
@@ -535,7 +535,7 @@ func Test_getClusterMembershipRoleName(t *testing.T) {
 			rtb: &v3.ClusterRoleTemplateBinding{
 				ClusterName: "c-abc123",
 			},
-			want: "c-abc123-cluster-member",
+			want: "c-abc123-clustermember",
 		},
 		{
 			name: "get PRTB role",
@@ -549,7 +549,7 @@ func Test_getClusterMembershipRoleName(t *testing.T) {
 			rtb: &v3.ProjectRoleTemplateBinding{
 				ProjectName: "c-abc123:p-xyz789",
 			},
-			want: "c-abc123-cluster-member",
+			want: "c-abc123-clustermember",
 		},
 	}
 	for _, tt := range tests {
@@ -582,7 +582,7 @@ func Test_getProjectMembershipRoleName(t *testing.T) {
 			prtb: &v3.ProjectRoleTemplateBinding{
 				ProjectName: "c-abc123:p-xyz789",
 			},
-			want: "p-xyz789-project-owner",
+			want: "p-xyz789-projectowner",
 		},
 		{
 			name: "get member role",
@@ -592,7 +592,7 @@ func Test_getProjectMembershipRoleName(t *testing.T) {
 			prtb: &v3.ProjectRoleTemplateBinding{
 				ProjectName: "c-abc123:p-xyz789",
 			},
-			want: "p-xyz789-project-member",
+			want: "p-xyz789-projectmember",
 		},
 	}
 	for _, tt := range tests {
@@ -711,17 +711,17 @@ func Test_removeAuthV2Permissions(t *testing.T) {
 var (
 	defaultRoleRef = rbacv1.RoleRef{
 		APIGroup: "rbac.authorization.k8s.io",
-		Name:     "test-project-project-member",
-		Kind:     "ClusterRole",
+		Name:     "test-project-projectmember",
+		Kind:     "Role",
 	}
 	projectOwnerRoleRef = rbacv1.RoleRef{
 		APIGroup: "rbac.authorization.k8s.io",
-		Name:     "test-project-project-owner",
-		Kind:     "ClusterRole",
+		Name:     "test-project-projectowner",
+		Kind:     "Role",
 	}
 	defaultRoleBinding = rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "rb-y5xedljk46",
+			Name:      "rb-gvc7margqw",
 			Namespace: "test-cluster",
 			Labels:    map[string]string{"test-namespace_test-prtb": "true"},
 		},
@@ -730,7 +730,7 @@ var (
 	}
 	projectOwnerRoleBinding = rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "rb-3hgt2h3gvw",
+			Name:      "rb-kqdnporyfe",
 			Namespace: "test-cluster",
 			Labels:    map[string]string{"test-namespace_test-prtb": "true"},
 		},

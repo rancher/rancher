@@ -125,10 +125,6 @@ type manager struct {
 // that gives the subject access to the the cluster custom resource itself
 // This is painfully similar to ensureProjectMemberBinding, but making one function that handles both is overly complex
 func (m *manager) ensureClusterMembershipBinding(roleName, rtbNsAndName string, cluster *v3.Cluster, makeOwner bool, subject v1.Subject) error {
-	if err := m.createClusterMembershipRole(roleName, cluster, makeOwner); err != nil {
-		return err
-	}
-
 	key := rbRoleSubjectKey(roleName, subject)
 	crbs, err := m.crbIndexer.ByIndex(membershipBindingOwnerIndex, "/"+rtbNsAndName)
 	if err != nil {
@@ -210,10 +206,6 @@ func (m *manager) ensureClusterMembershipBinding(roleName, rtbNsAndName string, 
 // When a PRTB is created that gives a subject some permissions in a project or cluster, we need to create a "membership" binding
 // that gives the subject access to the the project/cluster custom resource itself
 func (m *manager) ensureProjectMembershipBinding(roleName, rtbNsAndName, namespace string, project *v3.Project, makeOwner bool, subject v1.Subject) error {
-	if err := m.createProjectMembershipRole(roleName, namespace, project, makeOwner); err != nil {
-		return err
-	}
-
 	key := rbRoleSubjectKey(roleName, subject)
 	rbs, err := m.rbIndexer.ByIndex(membershipBindingOwnerIndex, namespace+"/"+rtbNsAndName)
 	if err != nil {
@@ -292,80 +284,10 @@ func (m *manager) ensureProjectMembershipBinding(roleName, rtbNsAndName, namespa
 	return err
 }
 
-// Creates a role that lets the bound subject see (if they are an ordinary member) the project or cluster in the mgmt api
-// (or CRUD the project/cluster if they are an owner)
-func (m *manager) createClusterMembershipRole(roleName string, cluster *v3.Cluster, makeOwner bool) error {
-	if cr, _ := m.crLister.Get("", roleName); cr == nil {
-		return m.createMembershipRole(clusterResource, roleName, makeOwner, cluster, m.mgmt.RBAC.ClusterRoles("").ObjectClient(), true)
-	}
-	return nil
-}
-
-// Creates a role that lets the bound subject see (if they are an ordinary member) the project in the mgmt api
-// (or CRUD the project if they are an owner)
-func (m *manager) createProjectMembershipRole(roleName, namespace string, project *v3.Project, makeOwner bool) error {
-	if cr, _ := m.rLister.Get(namespace, roleName); cr == nil {
-		return m.createMembershipRole(projectResource, roleName, makeOwner, project, m.mgmt.RBAC.Roles(namespace).ObjectClient(), false)
-	}
-	return nil
-}
-
-func (m *manager) createMembershipRole(resourceType, roleName string, makeOwner bool, ownerObject interface{}, client *objectclient.ObjectClient, clusterRole bool) error {
-	metaObj, err := meta.Accessor(ownerObject)
-	if err != nil {
-		return err
-	}
-	typeMeta, err := meta.TypeAccessor(ownerObject)
-	if err != nil {
-		return err
-	}
-	rules := []v1.PolicyRule{
-		{
-			APIGroups:     []string{"management.cattle.io"},
-			Resources:     []string{resourceType},
-			ResourceNames: []string{metaObj.GetName()},
-			Verbs:         []string{"get"},
-		},
-	}
-
-	if makeOwner {
-		rules[0].Verbs = []string{"*"}
-	} else {
-		rules[0].Verbs = []string{"get"}
-	}
-	logrus.Infof("[%v] Creating role/clusterRole %v", m.controller, roleName)
-	var toCreate runtime.Object
-	objectMeta := metav1.ObjectMeta{
-		Name: roleName,
-		OwnerReferences: []metav1.OwnerReference{
-			{
-				APIVersion: typeMeta.GetAPIVersion(),
-				Kind:       typeMeta.GetKind(),
-				Name:       metaObj.GetName(),
-				UID:        metaObj.GetUID(),
-			},
-		},
-	}
-	if clusterRole {
-		objectMeta.Annotations = map[string]string{clusterNameLabel: metaObj.GetName()}
-		toCreate = &v1.ClusterRole{
-			ObjectMeta: objectMeta,
-			Rules:      rules,
-		}
-	} else {
-		toCreate = &v1.Role{
-			ObjectMeta: objectMeta,
-			Rules:      rules,
-		}
-	}
-	_, err = client.Create(toCreate)
-	return err
-}
-
 // The CRTB has been deleted or modified, either delete or update the membership binding so that the subject
 // is removed from the cluster if they should be
 func (m *manager) reconcileClusterMembershipBindingForDelete(roleToKeep, rtbNsAndName string) error {
-	convert := func(i interface{}) string {
+	convert := func(i any) string {
 		rb, _ := i.(*v1.ClusterRoleBinding)
 		return rb.RoleRef.Name
 	}
@@ -376,7 +298,7 @@ func (m *manager) reconcileClusterMembershipBindingForDelete(roleToKeep, rtbNsAn
 // The PRTB has been deleted, either delete or update the project membership binding so that the subject
 // is removed from the project if they should be
 func (m *manager) reconcileProjectMembershipBindingForDelete(namespace, roleToKeep, rtbNsAndName string) error {
-	convert := func(i interface{}) string {
+	convert := func(i any) string {
 		rb, _ := i.(*v1.RoleBinding)
 		return rb.RoleRef.Name
 	}
