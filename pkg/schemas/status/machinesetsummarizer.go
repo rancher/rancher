@@ -33,6 +33,8 @@ func checkMachineSet(obj data.Object, conditions []summary.Condition, s summary.
 		return s
 	}
 
+	// These fields may not exist on the object, in which case they default to 0/false.
+	// Errors are ignored since missing or invalid fields are treated as 0 (the default).
 	specReplicas, specFound, _ := unstructured.NestedInt64(obj, "spec", "replicas")
 	statusReplicas, _, _ := unstructured.NestedInt64(obj, "status", "replicas")
 	availableReplicas, _, _ := unstructured.NestedInt64(obj, "status", "availableReplicas")
@@ -74,7 +76,9 @@ func checkMachineSet(obj data.Object, conditions []summary.Condition, s summary.
 		return s
 	}
 
-	// Case 5: All replicas are ready and available
+	// Case 5: All replicas are ready and available.
+	// Using >= for robustness in case of transient states during rolling updates
+	// where available replicas may temporarily exceed desired.
 	if desiredReplicas > 0 && availableReplicas >= desiredReplicas {
 		s.State = "active"
 		s.Transitioning = false
