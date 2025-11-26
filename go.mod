@@ -119,7 +119,7 @@ require (
 	github.com/rancher/ali-operator v1.13.0-rc.2
 	github.com/rancher/apiserver v0.8.0
 	github.com/rancher/channelserver v0.7.0
-	github.com/rancher/dynamiclistener v0.7.3-rc.1
+	github.com/rancher/dynamiclistener v0.7.3
 	github.com/rancher/eks-operator v1.13.0-rc.4
 	github.com/rancher/fleet/pkg/apis v0.14.0-rc.1
 	github.com/rancher/gke-operator v1.13.0-rc.3
@@ -130,8 +130,8 @@ require (
 	github.com/rancher/muchang v0.1.0
 	github.com/rancher/norman v0.8.0
 	github.com/rancher/rancher/pkg/client v0.0.0
-	github.com/rancher/remotedialer v0.6.0-rc.1
-	github.com/rancher/remotedialer-proxy v0.6.0-rc.4
+	github.com/rancher/remotedialer v0.6.0
+	github.com/rancher/remotedialer-proxy v0.6.0
 	github.com/rancher/rke v1.8.0
 	github.com/rancher/shepherd v0.0.0-20251111151559-050d62ead063
 	github.com/rancher/steve v0.8.0
