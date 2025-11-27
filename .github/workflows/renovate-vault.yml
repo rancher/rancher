@@ -5,16 +5,45 @@ on:
       logLevel:
         description: "Override default log level"
         required: false
-        default: "info"
-        type: string
+        default: info
+        type: choice
+        options:
+          - info
+          - debug
       overrideSchedule:
         description: "Override all schedules"
         required: false
         default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      configMigration:
+        description: "Toggle PRs for config migration"
+        required: false
+        default: "true"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      renovateConfig:
+        description: "Define a custom renovate config file"
+        required: false
+        default: ".github/renovate.json"
         type: string
-  # Run twice in the early morning (UTC) for initial and follow up steps (create pull request and merge)
+      minimumReleaseAge:
+        description: "Override minimumReleaseAge for a one-time run (e.g., '0 days' to disable delay)"
+        required: false
+        default: "null"
+        type: string
+      extendsPreset:
+        description: "Override renovate extends preset (default: 'github>rancher/renovate-config#release')."
+        required: false
+        default: "github>rancher/renovate-config#release"
+        type: string
+
   schedule:
-    - cron: '30 4,6 * * *'
+    - cron: '30 4,6 * * 1-5'
 
 permissions:
   contents: read
@@ -24,6 +53,11 @@ jobs:
   call-workflow:
     uses: rancher/renovate-config/.github/workflows/renovate-vault.yml@release
     with:
+      configMigration: ${{ inputs.configMigration || 'true' }}
       logLevel: ${{ inputs.logLevel || 'info' }}
       overrideSchedule: ${{ github.event.inputs.overrideSchedule == 'true' && '{''schedule'':null}' || '' }}
-    secrets: inherit
+      renovateConfig: ${{ inputs.renovateConfig || '.github/renovate.json' }}
+      minimumReleaseAge: ${{ inputs.minimumReleaseAge || 'null' }}
+      extendsPreset: ${{ inputs.extendsPreset || 'github>rancher/renovate-config#release' }}
+    secrets:
+      override-token: "${{ secrets.RENOVATE_FORK_GH_TOKEN || '' }}"
