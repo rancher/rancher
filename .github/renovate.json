@@ -20,6 +20,14 @@
   "packageRules": [
     {
       "matchBaseBranches": [
+        "release/v2.13"
+      ],
+      "extends": [
+        "github>rancher/renovate-config//rancher-2.13#release"
+      ]
+    },
+    {
+      "matchBaseBranches": [
         "release/v2.12"
       ],
       "extends": [
