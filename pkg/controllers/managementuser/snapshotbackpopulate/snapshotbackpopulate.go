@@ -17,6 +17,7 @@ import (
 	k3s "github.com/k3s-io/api/k3s.cattle.io/v1"
 	k3scontrollers "github.com/k3s-io/api/pkg/generated/controllers/k3s.cattle.io/v1"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	cluster2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
@@ -303,44 +304,41 @@ func generateSafeSnapshotName(spec k3s.ETCDSnapshotSpec, createdAt time.Time) st
 // fields required for each restore mode.
 func getRestoreModesAnnotation(downstream *k3s.ETCDSnapshotFile, cluster *provv1.Cluster) string {
 	logPrefix := getLogPrefix(cluster)
-	availableModes := []string{capr.RestoreRKEConfigNone}
+	availableModes := []string{rkev1.RestoreRKEConfigNone}
 
 	if downstream.Spec.Metadata == nil {
-		logrus.Debugf("%s: downstream snapshot %s/%s has nil metadata, setting restore mode to 'none'",
+		logrus.Warnf("%s: downstream snapshot %s/%s has nil metadata, setting restore mode to 'none'",
 			logPrefix, downstream.Namespace, downstream.Name)
-		return capr.RestoreRKEConfigNone
+		return rkev1.RestoreRKEConfigNone
 	}
 
-	specPayload, ok := downstream.Spec.Metadata[capr.SnapshotMetadataClusterSpecKey]
+	specPayload, ok := downstream.Spec.Metadata[rkev1.SnapshotMetadataClusterSpecKey]
 	if !ok || specPayload == "" {
-		logrus.Debugf("%s: downstream snapshot %s/%s is missing '%s' key in metadata or key is empty, setting restore mode to 'none'",
-			logPrefix, downstream.Namespace, downstream.Name, capr.SnapshotMetadataClusterSpecKey)
-		return capr.RestoreRKEConfigNone
+		logrus.Warnf("%s: downstream snapshot %s/%s is missing '%s' key in metadata or key is empty, setting restore mode to 'none'",
+			logPrefix, downstream.Namespace, downstream.Name, rkev1.SnapshotMetadataClusterSpecKey)
+		return rkev1.RestoreRKEConfigNone
 	}
 
-	clusterSpec, err := capr.DecompressClusterSpec(specPayload)
+	clusterSpec, err := snapshotutil.DecompressClusterSpec(specPayload)
 	if err != nil {
 		logrus.Warnf("%s: downstream snapshot %s/%s contains an unparseable '%s' metadata payload: %v. Setting restore mode to 'none'",
 			logPrefix,
 			downstream.Namespace,
 			downstream.Name,
-			capr.SnapshotMetadataClusterSpecKey,
+			rkev1.SnapshotMetadataClusterSpecKey,
 			err)
-		return capr.RestoreRKEConfigNone
+		return rkev1.RestoreRKEConfigNone
 	}
 
-	logrus.Warnf("%s: downstream snapshot %s/%s has parseable metadata: %+v",
-		logPrefix, downstream.Namespace, downstream.Name, clusterSpec)
-
 	if clusterSpec.KubernetesVersion != "" {
-		availableModes = append(availableModes, capr.RestoreRKEConfigKubernetesVersion)
+		availableModes = append(availableModes, rkev1.RestoreRKEConfigKubernetesVersion)
 	} else {
 		logrus.Warnf("%s: downstream snapshot %s/%s has parseable metadata but is missing 'kubernetesVersion', 'kubernetesVersion' restore mode will be unavailable.",
 			logPrefix, downstream.Namespace, downstream.Name)
 	}
 
 	if clusterSpec.KubernetesVersion != "" && clusterSpec.RKEConfig != nil {
-		availableModes = append(availableModes, capr.RestoreRKEConfigAll)
+		availableModes = append(availableModes, rkev1.RestoreRKEConfigAll)
 	} else {
 		logrus.Warnf("%s: downstream snapshot %s/%s is missing 'KubernetesVersion' or 'RKEConfig', 'all' restore mode will be unavailable.",
 			logPrefix, downstream.Namespace, downstream.Name)

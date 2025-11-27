@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
@@ -794,11 +795,11 @@ func (p *Planner) restoreEtcdSnapshot(cp *rkev1.RKEControlPlane, status rkev1.RK
 		return status, err
 	}
 
-	restoreModeRequiresClusterSpec := capr.RestoreModeRequiresClusterSpec(cp.Spec.ETCDSnapshotRestore)
+	restoreModeRequiresClusterSpec := snapshotutil.RestoreModeRequiresClusterSpec(cp.Spec.ETCDSnapshotRestore)
 
 	// validate the snapshot can be restored by checking to see if the snapshot version is < 1.25.x and the current version is 1.25 or newer.
 	if snapshot != nil {
-		clusterSpec, err := capr.ParseSnapshotClusterSpecOrError(snapshot)
+		clusterSpec, err := snapshotutil.ParseSnapshotClusterSpecOrError(snapshot)
 		if err != nil || clusterSpec == nil {
 			errorStr := fmt.Sprintf("[planner] rkecluster %s/%s: error parsing snapshot cluster spec for snapshot %s/%s during etcd restoration: %v", cp.Namespace, cp.Name, snapshot.Namespace, snapshot.Name, err)
 			if restoreModeRequiresClusterSpec {

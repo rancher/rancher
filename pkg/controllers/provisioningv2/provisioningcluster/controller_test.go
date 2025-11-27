@@ -11,7 +11,6 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/wrangler/v3/pkg/condition"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	wfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
@@ -542,7 +541,7 @@ func Test_OnRancherClusterChange(t *testing.T) {
 			input: func() *provv1.Cluster {
 				c := newBaseCluster("ns", "cluster-none", "v1.29.4+rke2r1")
 				c.Spec.RKEConfig.ETCDSnapshotRestore = &rkev1.ETCDSnapshotRestore{
-					Name: "snapshot-none", RestoreRKEConfig: capr.RestoreRKEConfigNone,
+					Name: "snapshot-none", RestoreRKEConfig: rkev1.RestoreRKEConfigNone,
 				}
 				return c
 			}(),
@@ -584,7 +583,7 @@ func Test_OnRancherClusterChange(t *testing.T) {
 			input: func() *provv1.Cluster {
 				c := newBaseCluster("ns", "cluster-kversion", "v1.29.4+rke2r1")
 				c.Spec.RKEConfig.ETCDSnapshotRestore = &rkev1.ETCDSnapshotRestore{
-					Name: "snap-kv", RestoreRKEConfig: capr.RestoreRKEConfigKubernetesVersion,
+					Name: "snap-kv", RestoreRKEConfig: rkev1.RestoreRKEConfigKubernetesVersion,
 				}
 				return c
 			}(),
@@ -637,7 +636,7 @@ func Test_OnRancherClusterChange(t *testing.T) {
 				c := newBaseCluster("ns", "cluster-all-ok", "v1.29.4+rke2r1")
 				c.Spec.RKEConfig.ETCDSnapshotRestore = &rkev1.ETCDSnapshotRestore{
 					Name:             "snap-all-ok",
-					RestoreRKEConfig: capr.RestoreRKEConfigAll,
+					RestoreRKEConfig: rkev1.RestoreRKEConfigAll,
 				}
 				return c
 			}(),
@@ -715,7 +714,7 @@ func Test_OnRancherClusterChange(t *testing.T) {
 			input: func() *provv1.Cluster {
 				c := newBaseCluster("ns", "cluster-fail", "v1.29.4+rke2r1")
 				c.Spec.RKEConfig.ETCDSnapshotRestore = &rkev1.ETCDSnapshotRestore{
-					Name: "snap-missing", RestoreRKEConfig: capr.RestoreRKEConfigAll,
+					Name: "snap-missing", RestoreRKEConfig: rkev1.RestoreRKEConfigAll,
 				}
 				return c
 			}(),
