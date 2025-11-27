@@ -661,28 +661,28 @@ func TestOnDownstreamChange_RestoreModeAnnotationIsSetCorrectly(t *testing.T) {
 		{
 			name: "metadata key is present but payload is corrupt",
 			metadata: map[string]string{
-				capr.SnapshotMetadataClusterSpecKey: "not-base64-or-gzip-corrupt-data",
+				rkev1.SnapshotMetadataClusterSpecKey: "not-base64-or-gzip-corrupt-data",
 			},
 			expectedAnnotation: "none",
 		},
 		{
 			name: "spec is valid but missing k8s version",
 			metadata: map[string]string{
-				capr.SnapshotMetadataClusterSpecKey: compressSpec(t, validSpecNoK8sVersion),
+				rkev1.SnapshotMetadataClusterSpecKey: compressSpec(t, validSpecNoK8sVersion),
 			},
 			expectedAnnotation: "none",
 		},
 		{
 			name: "spec has k8s version but no RKEConfig",
 			metadata: map[string]string{
-				capr.SnapshotMetadataClusterSpecKey: compressSpec(t, validSpecNoRKEConfig),
+				rkev1.SnapshotMetadataClusterSpecKey: compressSpec(t, validSpecNoRKEConfig),
 			},
 			expectedAnnotation: "none,kubernetesVersion",
 		},
 		{
 			name: "spec has k8s version and RKEConfig",
 			metadata: map[string]string{
-				capr.SnapshotMetadataClusterSpecKey: compressSpec(t, validSpecFull),
+				rkev1.SnapshotMetadataClusterSpecKey: compressSpec(t, validSpecFull),
 			},
 			expectedAnnotation: "none,kubernetesVersion,all",
 		},

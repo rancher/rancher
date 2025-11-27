@@ -1,6 +1,16 @@
 package v1
 
-import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	SnapshotMetadataClusterSpecKey = "provisioning-cluster-spec"
+
+	RestoreRKEConfigNone              = "none"
+	RestoreRKEConfigKubernetesVersion = "kubernetesVersion"
+	RestoreRKEConfigAll               = "all"
+)
 
 // ETCDSnapshotS3 defines S3 snapshot configuration for ETCD backups.
 type ETCDSnapshotS3 struct {

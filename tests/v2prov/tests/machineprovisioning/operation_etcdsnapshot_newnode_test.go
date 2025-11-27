@@ -110,7 +110,7 @@ func Test_Operation_SetB_MP_EtcdSnapshotOperationsOnNewNode(t *testing.T) {
 		return strings.Contains(capr.Ready.GetMessage(&rkeControlPlane.Status), "rkecontrolplane was already initialized but no etcd machines exist that have plans, indicating the etcd plane has been entirely replaced. Restoration from etcd snapshot is required."), nil
 	})
 
-	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.Name, cm, 2, capr.RestoreRKEConfigNone)
+	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.Name, cm, 2, rkev1.RestoreRKEConfigNone)
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	assert.NoError(t, err)
 }

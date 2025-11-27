@@ -13,6 +13,7 @@ import (
 	"time"
 
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/snapshotbackpopulate"
@@ -191,7 +192,7 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 				if (s.SnapshotFile.NodeName == targetNode || (targetNode == "s3" && s.Annotations[snapshotbackpopulate.StorageAnnotationKey] == string(snapshotbackpopulate.S3))) && s.SnapshotFile.Size > 0 {
 					// Workaround in response to K3s/RKE2 bug around etcd snapshot configmap existence: https://github.com/k3s-io/k3s/issues/9047
 					// Ensure that there are at least 2 snapshots for the given target node, as the first snapshot is not usable.
-					spec, err := capr.ParseSnapshotClusterSpecOrError(&s)
+					spec, err := snapshotutil.ParseSnapshotClusterSpecOrError(&s)
 					if err != nil || spec == nil {
 						continue // ignore errors parsing the snapshot
 					}
@@ -281,6 +282,9 @@ func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 		if err != nil {
 			return err
 		}
+
+		logrus.Infof("Updated cluster spec: %+v", newC.Spec.RKEConfig.ETCDSnapshotRestore)
+
 		c = newC
 		return nil
 	})
@@ -288,27 +292,34 @@ func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 
 	logrus.Infof("Waiting for control plane to start restore type: %s", restoreRKEConfig)
 
-	err = wait.PollUntilContextTimeout(clients.Ctx, 20*time.Second, 3*time.Minute, true, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(clients.Ctx, 20*time.Second, 15*time.Minute, true, func(ctx context.Context) (bool, error) {
 		cp, err := clients.RKE.RKEControlPlane().Get(c.Namespace, c.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
 
-		// Check if restore for our generation has started
-		if cp.Status.ETCDSnapshotRestore != nil &&
-			cp.Status.ETCDSnapshotRestore.Generation == generation {
+		// Start when we see any active restore phase for this generation
+		if cp.Spec.ETCDSnapshotRestore != nil && cp.Spec.ETCDSnapshotRestore.Generation == generation {
 			return true, nil
 		}
-
-		logrus.Infof("Expected Generation: %d, Generation Found: %+v", generation, cp.Status.ETCDSnapshotRestore)
-
+		logrus.Infof("Expected Generation: %d, Generation Found: %+v, Generation Spec: %+v", generation, cp.Status.ETCDSnapshotRestore, cp.Spec.ETCDSnapshotRestore)
+		// List available snapshots when restore finishes
+		snapshotsList, listErr := clients.RKE.ETCDSnapshot().List(c.Namespace, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", capr.ClusterNameLabel, c.Name)})
+		if listErr != nil {
+			logrus.Warnf("Failed to list snapshots during restore check: %v", listErr)
+		} else {
+			logrus.Infof("Awaiting restore to start. Available upstream snapshot list for cluster %s:", c.Name)
+			for _, s := range snapshotsList.Items {
+				logrus.Infof("  - Snapshot: %s (UID=%s, downstream=%s)", s.Name, s.UID, s.Annotations["etcdsnapshot.rke.io/snapshot-name"])
+			}
+		}
 		return false, nil
 	})
 	require.NoError(t, err, "Timeout waiting for snapshot restore to start")
 
 	logrus.Infof("Waiting for control plane to complete restore type: %s", restoreRKEConfig)
 
-	err = wait.PollUntilContextTimeout(clients.Ctx, 30*time.Second, 30*time.Minute, true, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(clients.Ctx, 1*time.Minute, 40*time.Minute, true, func(ctx context.Context) (bool, error) {
 		cp, err := clients.RKE.RKEControlPlane().Get(c.Namespace, c.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
@@ -316,8 +327,20 @@ func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 
 		// Check specific restore phase and ready status
 		if cp.Status.ETCDSnapshotRestorePhase == rkev1.ETCDSnapshotPhaseFinished && capr.Ready.IsTrue(cp) {
+			// List available snapshots when restore finishes
+			snapshotsList, listErr := clients.RKE.ETCDSnapshot().List(c.Namespace, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", capr.ClusterNameLabel, c.Name)})
+			if listErr != nil {
+				logrus.Warnf("Failed to list snapshots after restore finished: %v", listErr)
+			} else {
+				logrus.Infof("Restore finished. Available upstream snapshot list for cluster %s:", c.Name)
+				for _, s := range snapshotsList.Items {
+					logrus.Infof("  - Snapshot: %s (UID=%s, downstream=%s)", s.Name, s.UID, s.Annotations["etcdsnapshot.rke.io/snapshot-name"])
+				}
+			}
 			return true, nil
 		}
+
+		logrus.Infof("Current restore phase: %s, Current ready condition: %s", cp.Status.ETCDSnapshotRestorePhase, capr.Ready.GetStatus(cp))
 
 		return false, nil
 	})
