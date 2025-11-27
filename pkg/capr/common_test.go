@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
@@ -312,7 +313,7 @@ func TestCompressInterface(t *testing.T) {
 
 			target := reflect.New(reflect.ValueOf(tt.value).Elem().Type()).Interface()
 
-			err = decompressInterface(result, target)
+			err = snapshotutil.DecompressInterface(result, target)
 			assert.Nil(t, err)
 			assert.Equal(t, tt.value, target)
 		})
@@ -730,7 +731,7 @@ func TestParseSnapshotClusterSpecOrError(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := ParseSnapshotClusterSpecOrError(tt.snapshot)
+			result, err := snapshotutil.ParseSnapshotClusterSpecOrError(tt.snapshot)
 
 			if tt.expectedError != "" {
 				require.Error(t, err)

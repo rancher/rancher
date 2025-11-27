@@ -83,15 +83,15 @@ func Test_Operation_SetA_MP_EtcdSnapshotCreationRestoreInPlace(t *testing.T) {
 
 	snapshot := operations.RunSnapshotCreateTest(t, clients, c, cm, machines.Items[0].Status.NodeRef.Name)
 
-	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.Name, cm, 2, capr.RestoreRKEConfigAll)
+	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.Name, cm, 2, rkev1.RestoreRKEConfigAll)
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	require.NoError(t, err)
 
-	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.Name, cm, 2, capr.RestoreRKEConfigKubernetesVersion)
+	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.Name, cm, 2, rkev1.RestoreRKEConfigKubernetesVersion)
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	require.NoError(t, err)
 
-	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.Name, cm, 2, capr.RestoreRKEConfigNone)
+	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.Name, cm, 2, rkev1.RestoreRKEConfigNone)
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	require.NoError(t, err)
 }
