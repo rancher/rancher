@@ -259,6 +259,8 @@ func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 		}
 	}()
 
+	generation := 1
+
 	// Update the cluster spec to trigger restore
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		newC, err := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
@@ -266,8 +268,6 @@ func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 			return err
 		}
 
-		// Dynamically increment generation to support multiple restores in one test sequence
-		generation := 1
 		if newC.Spec.RKEConfig.ETCDSnapshotRestore != nil {
 			generation = newC.Spec.RKEConfig.ETCDSnapshotRestore.Generation + 1
 		}
@@ -288,16 +288,19 @@ func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 
 	logrus.Infof("Waiting for control plane to start restore type: %s", restoreRKEConfig)
 
-	err = wait.PollUntilContextTimeout(clients.Ctx, 2*time.Second, 30*time.Minute, true, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(clients.Ctx, 20*time.Second, 3*time.Minute, true, func(ctx context.Context) (bool, error) {
 		cp, err := clients.RKE.RKEControlPlane().Get(c.Namespace, c.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
 
-		// Check specific restore phase and provisioned status
-		if (cp.Status.ETCDSnapshotRestorePhase == rkev1.ETCDSnapshotPhaseShutdown || cp.Status.ETCDSnapshotRestorePhase == rkev1.ETCDSnapshotPhaseRestore) && capr.Bootstrapped.IsFalse(cp) {
+		// Check if restore for our generation has started
+		if cp.Status.ETCDSnapshotRestore != nil &&
+			cp.Status.ETCDSnapshotRestore.Generation == generation {
 			return true, nil
 		}
+
+		logrus.Infof("Expected Generation: %d, Generation Found: %+v", generation, cp.Status.ETCDSnapshotRestore)
 
 		return false, nil
 	})
@@ -305,7 +308,7 @@ func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 
 	logrus.Infof("Waiting for control plane to complete restore type: %s", restoreRKEConfig)
 
-	err = wait.PollUntilContextTimeout(clients.Ctx, 2*time.Second, 20*time.Minute, true, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(clients.Ctx, 30*time.Second, 30*time.Minute, true, func(ctx context.Context) (bool, error) {
 		cp, err := clients.RKE.RKEControlPlane().Get(c.Namespace, c.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
