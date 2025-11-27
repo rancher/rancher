@@ -53,26 +53,64 @@
     }
   },
   "required": [],
-  "if": {
-    "properties": {
-      "service": {
+  "allOf": [
+    {
+      "if": {
         "properties": {
-          "disableHTTP": { "const": true }
-        },
-        "required": ["disableHTTP"]
-      }
-    }
-  },
-  "then": {
-    "properties": {
-      "ingress": {
-        "properties": {
-          "servicePort": {
-            "enum": [443]
+          "service": {
+            "properties": {
+              "disableHTTP": { "const": true }
+            },
+            "required": ["disableHTTP"]
+          },
+          "ingress": {
+            "properties": {
+              "enabled": { "const": true }
+            }
           }
-        },
-        "required": ["servicePort"]
+        }
+      },
+      "then": {
+        "properties": {
+          "ingress": {
+            "properties": {
+              "servicePort": {
+                "enum": [443]
+              }
+            },
+            "required": ["servicePort"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "service": {
+            "properties": {
+              "disableHTTP": { "const": true }
+            },
+            "required": ["disableHTTP"]
+          },
+          "httpRoute": {
+            "properties": {
+              "enabled": { "const": true }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "httpRoute": {
+            "properties": {
+              "servicePort": {
+                "enum": [443]
+              }
+            },
+            "required": ["servicePort"]
+          }
+        }
       }
     }
-  }
+  ]
 }

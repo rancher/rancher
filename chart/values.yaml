@@ -95,6 +95,44 @@ ingress:
     source: rancher
     secretName: tls-rancher-ingress
 
+# -- Expose the service via gateway-api HTTPRoute
+# Requires Gateway API resources and suitable controller installed within the cluster
+# (see: https://gateway-api.sigs.k8s.io/guides/)
+httpRoute:
+  # HTTPRoute enabled.
+  enabled: false
+  # HTTPRoute annotations.
+  annotations: {}
+  # Backend port number; should use either: 80, or 443.
+  # Must use 443 when `service.disableHTTP` is set to true.
+  servicePort: 80
+  # Which Gateways this Route is attached to.
+  parentRefs:
+  - name: gateway
+    sectionName: http
+    # namespace: default
+  # List of rules and filters applied.
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+  #   filters:
+  #   - type: RequestHeaderModifier
+  #     requestHeaderModifier:
+  #       set:
+  #       - name: My-Overwrite-Header
+  #         value: this-is-the-only-value
+  #       remove:
+  #       - User-Agent
+  # - matches:
+  #   - path:
+  #       type: PathPrefix
+  #       value: /echo
+  #     headers:
+  #     - name: version
+  #       value: v2
+
 ### service ###
 # Override to use NodePort or LoadBalancer service type - default is ClusterIP
 service:

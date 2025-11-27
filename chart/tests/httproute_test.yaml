@@ -1,0 +1,48 @@
+suite: Test HTTPRoute
+templates:
+- httproute.yaml
+tests:
+- it: should work with service.disableHTTP
+  set:
+    hostname: host.example.com
+    ingress:
+      enabled: false
+    httpRoute:
+      enabled: true
+      servicePort: 443
+    service:
+      disableHTTP: true
+  asserts:
+    - equal:
+        path: spec.rules[0].backendRefs
+        value:
+          - name: RELEASE-NAME-rancher
+            port: 443
+            weight: 1
+- it: can target servicePort 443 without disabling port 80
+  set:
+    hostname: host.example.com
+    ingress:
+      enabled: false
+    httpRoute:
+      enabled: true
+      servicePort: 443
+  asserts:
+    - equal:
+        path: spec.rules[0].backendRefs
+        value:
+          - name: RELEASE-NAME-rancher
+            port: 443
+            weight: 1
+- it: it should fail when disableHTTP is set and servicePort is not 443
+  set:
+    hostname: host.example.com
+    ingress:
+      enabled: false
+    httpRoute:
+      enabled: true
+    service:
+      disableHTTP: true
+  asserts:
+    - failedTemplate:
+        errorPattern: "'/httpRoute/servicePort': value must be 443"
