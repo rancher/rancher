@@ -35,5 +35,5 @@ spec:
             value: /
       backendRefs:
         - name: {{ include "rancher.fullname" . }}
-          port: 80
+          port: {{ ternary "443" "80" .Values.service.disableHTTP }}
 {{- end }}
