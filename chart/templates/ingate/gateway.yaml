@@ -1,14 +1,34 @@
-{{- if and (eq (include "rancher.gatewayEnabled" .) "true") .Values.gateway.createGateway -}}
+{{- if and (include "rancher.gatewayEnabled" .) .Values.gateway.createGateway -}}
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: {{ template "rancher.gateway" . }}
+  name: {{ include "rancher.gateway" . }}
   labels:
-{{ template "rancher.labels" . | indent 4 }}
+{{ include "rancher.labels" . | indent 4 }}
 spec:
-  gatewayClassName: {{ .Values.gateway.gatewayClassName }}
+  gatewayClassName: {{ .Values.gateway.gatewayClass.name }}
   listeners:
-    {{- range .Values.gateway.listeners }}
+    - name: rancher-http
+      protocol: HTTP
+      port: {{ .Values.gateway.gatewayClass.ports.http | default 80 }}
+      hostname: {{ include "rancher.hostname" . }}
+      allowedRoutes:
+        namespaces:
+          from: Same
+{{- if eq (include "rancher.useExternalTls" .) "false" }}
+    - name: rancher-https
+      protocol: HTTPS
+      port: {{ .Values.gateway.gatewayClass.ports.https | default 443 }}
+      hostname: {{ include "rancher.hostname" . }}
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: {{ .Values.gateway.gatewayClass.tls.secretName }}
+      allowedRoutes:
+        namespaces:
+          from: Same
+{{- end }}
+    {{- range .Values.gateway.gatewayClass.additionalListeners }}
     - name: {{ .name }}
       protocol: {{ .protocol }}
       port: {{ .port }}
