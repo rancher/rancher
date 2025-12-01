@@ -1,0 +1,15 @@
+{{- if (include "rancher.gatewayEnabled" .) -}}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+    name: {{ include "rancher.gateway" . }}-tls
+    labels:
+{{ include "rancher.labels" . | indent 4 }}
+spec:
+    secretName: tls-rancher-ingress  # Same secret name as before
+    issuerRef:
+        name: {{ template "rancher.fullname" . }}
+        kind: Issuer
+    dnsNames:
+        - {{ template "rancher.hostname" . }}
+{{- end }}
