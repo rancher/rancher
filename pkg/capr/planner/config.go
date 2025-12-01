@@ -363,7 +363,7 @@ func addAddresses(secrets corecontrollers.SecretCache, config map[string]interfa
 		return err
 	}
 
-	updateConfigWithAddresses(config, info)
+	updateConfigWithAddresses(config, info, isOnlyWorker(entry))
 	return nil
 }
 
@@ -438,9 +438,10 @@ func getMachineNetworkInfo(secrets corecontrollers.SecretCache, entry *planEntry
 }
 
 // updateConfigWithAddresses mutates the node configuration map based on the provided network information.
-// As long as Rancher sets the node-ip and node-external-ip properly, RKE2/K3s will automatically
-// determine the appropriate advertise-address and tls-san values.
-func updateConfigWithAddresses(config map[string]interface{}, info *machineNetworkInfo) {
+// When both internal and external IPs are present and different, it sets advertise-address to the internal IP
+// and adds external IPs to tls-san for control plane nodes. This ensures the Kubernetes API server
+// advertises on the internal network while remaining accessible via external IPs.
+func updateConfigWithAddresses(config map[string]interface{}, info *machineNetworkInfo, onlyWorker bool) {
 	nodeIPs := convert.ToStringSlice(config["node-ip"])
 	var toAdd []string
 
@@ -478,6 +479,31 @@ func updateConfigWithAddresses(config map[string]interface{}, info *machineNetwo
 	}
 
 	config["node-ip"] = nodeIPs
+
+	// For control plane nodes (not worker-only), when both internal and external IPs exist
+	// and are different, explicitly set advertise-address to the internal IP and add external
+	// IPs to tls-san. This ensures the API server advertises on the internal network.
+	if !onlyWorker && len(info.InternalAddresses) > 0 && len(info.ExternalAddresses) > 0 {
+		// Check if any external IP differs from all internal IPs
+		hasDistinctExternal := false
+		for _, extIP := range info.ExternalAddresses {
+			if extIP != "" && !slices.Contains(info.InternalAddresses, extIP) {
+				hasDistinctExternal = true
+				break
+			}
+		}
+		if hasDistinctExternal {
+			config["advertise-address"] = info.InternalAddresses[0]
+			tlsSANs := convert.ToStringSlice(config["tls-san"])
+			for _, extIP := range info.ExternalAddresses {
+				// Only add external IPs that are not also internal IPs
+				if extIP != "" && !slices.Contains(info.InternalAddresses, extIP) && !slices.Contains(tlsSANs, extIP) {
+					tlsSANs = append(tlsSANs, extIP)
+				}
+			}
+			config["tls-san"] = tlsSANs
+		}
+	}
 
 	// If a cloud provider is configured, it will manage the external IP.
 	// If no cloud provider is set, assign node-external-ip if public IPs are available,
