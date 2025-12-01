@@ -8,17 +8,24 @@ metadata:
 {{ include "rancher.labels" . | indent 4 }}
 spec:
   parentRefs:
-      {{- if .Values.gateway.createGateway }}
+    {{- if .Values.gateway.createGateway }}
     # If we're creating our own gateway, reference it in the same namespace
-    - name: {{ template "rancher.gateway" . }}
+    - name: {{ include "rancher.gateway" . }}
       namespace: {{ .Release.Namespace }}
-      {{- else }}
-    # Reference to existing gateway
-    - name: {{ .Values.gateway.gatewayName }}
-      {{- if .Values.gateway.gatewayNamespace }}
-      namespace: {{ .Values.gateway.gatewayNamespace }}
+      sectionName: rancher-http
+    - name: {{ include "rancher.gateway" . }}
+      namespace: {{ .Release.Namespace }}
+      sectionName: rancher-https
+    {{- else }}
+    # Reference to existing gateway listener
+    {{- range $section := .Values.gateway.gatewaySections }}
+    - name: {{ $.Values.gateway.gatewayName }}
+      {{- if $.Values.gateway.gatewayNamespace }}
+      namespace: {{ $.Values.gateway.gatewayNamespace }}
       {{- end }}
+      sectionName: {{ $section }}
       {{- end }}
+    {{- end }}
   hostnames:
     - {{ template "rancher.hostname" . }}
   rules:
