@@ -3,6 +3,7 @@ package roletemplates
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -115,14 +116,22 @@ func (c *crtbHandler) reconcileSubject(binding *v3.ClusterRoleTemplateBinding, l
 // reconcileMemberShipBindings ensures that any needed membership bindings for the cluster exist
 func (c *crtbHandler) reconcileMembershipBindings(crtb *v3.ClusterRoleTemplateBinding, localCondition *[]metav1.Condition) error {
 	condition := metav1.Condition{Type: reconcileMembershipBindings}
-	rt, err := c.rtController.Get(crtb.RoleTemplateName, metav1.GetOptions{})
+
+	// to determine if a user is a member or an owner, we need to check the aggregated cluster role to see if it inherited the "own" verb on projects/clusters
+	clusterRole, err := c.crController.Get(rbac.AggregatedClusterRoleNameFor(crtb.RoleTemplateName), metav1.GetOptions{})
 	if err != nil {
-		c.s.AddCondition(localCondition, condition, failedToGetRoleTemplate, err)
+		c.s.AddCondition(localCondition, condition, failedToGetClusterRole, err)
 		return err
+	}
+	isClusterOwner := false
+	for _, rule := range clusterRole.Rules {
+		if slices.Contains(rule.Verbs, "own") && slices.Contains(rule.Resources, "clusters") {
+			isClusterOwner = true
+		}
 	}
 
 	// Create membership binding
-	if err := createOrUpdateClusterMembershipBinding(crtb, rt, c.crbController); err != nil {
+	if err := createOrUpdateClusterMembershipBinding(crtb, c.crbController, isClusterOwner); err != nil {
 		c.s.AddCondition(localCondition, condition, failedToCreateOrUpdateMembershipBinding, err)
 		return err
 	}
