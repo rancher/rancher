@@ -1,4 +1,4 @@
-{{- if and (eq .Values.tls "ingress") (eq .Values.ingress.tls.source "letsEncrypt") -}}
+{{- if and (eq (include "rancher.useExternalTls" .) "false") (eq .Values.ingress.tls.source "letsEncrypt") -}}
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
