@@ -3,6 +3,17 @@
 {{- end }}
 
 {{/*
+Check if TLS for rancher terminates external or local to k8s cluster
+*/}}
+{{- define "rancher.useExternalTls" -}}
+{{- if eq .Values.tls "external" -}}
+true
+{{- else -}}
+false
+{{- end -}}
+{{- end }}
+
+{{/*
 Check if Gateway API should be enabled
 */}}
 {{- define "rancher.gatewayEnabled" -}}
