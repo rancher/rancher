@@ -493,6 +493,9 @@ func updateConfigWithAddresses(config map[string]interface{}, info *machineNetwo
 			}
 		}
 		if hasDistinctExternal {
+			// Use the first internal address as the advertise-address. This ensures the
+			// Kubernetes API server endpoint uses the internal IP, which is critical for
+			// proper cluster communication when nodes have both internal and external IPs.
 			config["advertise-address"] = info.InternalAddresses[0]
 			tlsSANs := convert.ToStringSlice(config["tls-san"])
 			for _, extIP := range info.ExternalAddresses {
