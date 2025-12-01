@@ -11,10 +11,11 @@ import (
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
-	v1 "k8s.io/api/rbac/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	meta "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
@@ -22,13 +23,13 @@ import (
 
 func RegisterWranglerIndexers(config *wrangler.Context) {
 	config.RBAC.ClusterRoleBinding().Cache().AddIndexer(rbByRoleAndSubjectIndex, rbByClusterRoleAndSubject)
-	config.RBAC.ClusterRoleBinding().Cache().AddIndexer(membershipBindingOwnerIndex, func(obj *v1.ClusterRoleBinding) ([]string, error) {
+	config.RBAC.ClusterRoleBinding().Cache().AddIndexer(membershipBindingOwnerIndex, func(obj *rbacv1.ClusterRoleBinding) ([]string, error) {
 		return indexByMembershipBindingOwner(obj)
 	})
 
 	config.RBAC.RoleBinding().Cache().AddIndexer(rbByOwnerIndex, rbByOwner)
 	config.RBAC.RoleBinding().Cache().AddIndexer(rbByRoleAndSubjectIndex, rbByRoleAndSubject)
-	config.RBAC.RoleBinding().Cache().AddIndexer(membershipBindingOwnerIndex, func(obj *v1.RoleBinding) ([]string, error) {
+	config.RBAC.RoleBinding().Cache().AddIndexer(membershipBindingOwnerIndex, func(obj *rbacv1.RoleBinding) ([]string, error) {
 		return indexByMembershipBindingOwner(obj)
 	})
 }
@@ -131,51 +132,34 @@ func isFeatureAggregation(obj runtime.Object) bool {
 	return feature.Name == "aggregated-roletemplates"
 }
 
-// TODO: make this generic
-func (a *aggregationEnqueuer) enqueueCRTBs(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
+// enqueueAggregationResources is a helper function to enqueue resources when the "aggregated-roletemplates" feature is toggled
+func enqueueAggregationResources[T generic.RuntimeMetaObject](obj runtime.Object, listFunc func() ([]T, error)) ([]relatedresource.Key, error) {
 	if !isFeatureAggregation(obj) {
 		return nil, nil
 	}
-	crtbs, err := a.crtbCache.List(metav1.NamespaceAll, labels.NewSelector())
+	objs, err := listFunc()
 	if err != nil {
 		return nil, err
 	}
-	crtbNames := make([]relatedresource.Key, 0, len(crtbs))
-	for _, crtb := range crtbs {
-		crtbNames = append(crtbNames, relatedresource.Key{Name: crtb.Name, Namespace: crtb.Namespace})
+	keys := make([]relatedresource.Key, 0, len(objs))
+	for _, o := range objs {
+		metaObj, err := meta.Accessor(o)
+		if err != nil {
+			return nil, err
+		}
+		keys = append(keys, relatedresource.Key{Name: metaObj.GetName(), Namespace: metaObj.GetNamespace()})
 	}
+	return keys, nil
+}
 
-	return crtbNames, nil
+func (a *aggregationEnqueuer) enqueueCRTBs(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
+	return enqueueAggregationResources(obj, func() ([]*v3.ClusterRoleTemplateBinding, error) { return a.crtbCache.List("", labels.NewSelector()) })
 }
 
 func (a *aggregationEnqueuer) enqueuePRTBs(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
-	if !isFeatureAggregation(obj) {
-		return nil, nil
-	}
-	prtbs, err := a.prtbCache.List(metav1.NamespaceAll, labels.NewSelector())
-	if err != nil {
-		return nil, err
-	}
-	prtbNames := make([]relatedresource.Key, 0, len(prtbs))
-	for _, prtb := range prtbs {
-		prtbNames = append(prtbNames, relatedresource.Key{Name: prtb.Name, Namespace: prtb.Namespace})
-	}
-
-	return prtbNames, nil
+	return enqueueAggregationResources(obj, func() ([]*v3.ProjectRoleTemplateBinding, error) { return a.prtbCache.List("", labels.NewSelector()) })
 }
 
 func (a *aggregationEnqueuer) enqueueRoleTemplates(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
-	if !isFeatureAggregation(obj) {
-		return nil, nil
-	}
-	roletemplates, err := a.rtCache.List(labels.NewSelector())
-	if err != nil {
-		return nil, err
-	}
-	roletemplateNames := make([]relatedresource.Key, 0, len(roletemplates))
-	for _, roleTemplate := range roletemplates {
-		roletemplateNames = append(roletemplateNames, relatedresource.Key{Name: roleTemplate.Name, Namespace: roleTemplate.Namespace})
-	}
-
-	return roletemplateNames, nil
+	return enqueueAggregationResources(obj, func() ([]*v3.RoleTemplate, error) { return a.rtCache.List(labels.NewSelector()) })
 }
