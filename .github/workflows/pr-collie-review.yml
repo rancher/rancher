@@ -1,0 +1,39 @@
+name: Auto Review Team PRs
+
+on:
+  pull_request:
+    types: [opened]
+
+jobs:
+  auto-review:
+    runs-on: ubuntu-latest
+    if: |
+      github.repository_owner == 'rancher' &&
+      contains(fromJson('["bigkevmcd", "andreas-kupries", "joncrowther", "pmatseykanets", "raulcabello", "enrichman"]'), github.event.pull_request.user.login)
+    
+    permissions:
+      pull-requests: write
+      contents: read
+    
+    steps:
+      - name: Auto Review PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              body: `## 🤖 Automated PR Review
+
+**PR Details:**
+- Author: @${pr.user.login}
+- Base: \`${pr.base.ref}\` ← Head: \`${pr.head.ref}\`
+- Files changed: ${pr.changed_files}
+- Additions: +${pr.additions} | Deletions: -${pr.deletions}
+
+
+*This is an automated review. A human reviewer will follow up shortly.*`
+            });
