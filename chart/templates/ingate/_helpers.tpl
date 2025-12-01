@@ -13,6 +13,17 @@ false
 {{- end -}}
 {{- end }}
 
+{{/*
+Check if Ingress should be enabled
+*/}}
+{{- define "rancher.ingressEnabled" -}}
+{{- if and (eq .Values.networkExposure.type "ingress") .Values.ingress.enabled -}}
+true
+{{- else -}}
+false
+{{- end -}}
+{{- end }}
+
 {{- define "rancher.gateway" }}
 {{- printf "%s-%s" (include "rancher.fullname" .) "gateway" }}
 {{- end }}
