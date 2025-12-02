@@ -59,6 +59,7 @@ var OriginMap = map[string]string{
 	"hardened-sriov-network-operator":                         "https://github.com/rancher/image-build-sriov-operator",
 	"hardened-sriov-network-resources-injector":               "https://github.com/rancher/image-build-sriov-network-resources-injector",
 	"hardened-sriov-network-webhook":                          "https://github.com/openshift/sriov-network-webhook",
+	"hardened-traefik":                                        "https://github.com/rancher/image-build-traefik",
 	"hardened-whereabouts":                                    "https://github.com/rancher/image-build-whereabouts",
 	"harvester-cloud-provider":                                "https://github.com/harvester/cloud-provider-harvester",
 	"harvester-csi-driver":                                    "https://github.com/harvester/harvester-csi-driver",
