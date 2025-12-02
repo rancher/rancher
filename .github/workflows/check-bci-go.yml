@@ -1,0 +1,130 @@
+name: Check BCI Go Updates
+
+on:
+  schedule:
+    - cron: '0 9 * * 1,4'  # Monday and Thursday at 9am UTC
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  check-bci-go:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch BCI Go RSS Feed
+        id: fetch
+        run: |
+          echo "Fetching BCI Go RSS feed..."
+          curl -s https://artifacthub.io/api/v1/packages/container/bci-go-stable/golang/feed/rss -o bci-go.xml
+          
+          # Parse the latest version from RSS
+          LATEST=$(grep -oP '(?<=<title>)[0-9]+\.[0-9]+\.[0-9]+(?=</title>)' bci-go.xml | head -1)
+          echo "latest_version=$LATEST" >> $GITHUB_OUTPUT
+          echo "Latest BCI Go version: $LATEST"
+          
+          # Get the link to the release
+          LINK=$(grep -A1 "<title>$LATEST</title>" bci-go.xml | grep -oP '(?<=<link>)[^<]+' | head -1)
+          echo "release_link=$LINK" >> $GITHUB_OUTPUT
+          
+          # Get current date
+          echo "check_date=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
+      
+      - name: Check if issue already exists
+        id: check_issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = '${{ steps.fetch.outputs.latest_version }}';
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'bci-go-update',
+              per_page: 100
+            });
+            
+            const existingIssue = issues.data.find(issue => 
+              issue.title.includes(version)
+            );
+            
+            if (existingIssue) {
+              console.log(`Issue already exists for version ${version}: #${existingIssue.number}`);
+              core.setOutput('issue_exists', 'true');
+              core.setOutput('issue_number', existingIssue.number);
+            } else {
+              console.log(`No existing issue found for version ${version}`);
+              core.setOutput('issue_exists', 'false');
+            }
+      
+      - name: Create issue for new BCI Go version
+        if: steps.check_issue.outputs.issue_exists == 'false'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = '${{ steps.fetch.outputs.latest_version }}';
+            const link = '${{ steps.fetch.outputs.release_link }}';
+            const checkDate = '${{ steps.fetch.outputs.check_date }}';
+            
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Update BCI Go to ${version}`,
+              labels: ['dependencies', 'bci-go-update', 'go-version'],
+              body: `## New BCI Go Version Available
+            
+**Version**: \`${version}\`  
+**Detected**: ${checkDate}  
+**Release Info**: ${link || 'https://artifacthub.io/packages/container/bci-go-stable/golang'}
+
+---
+
+### Update Checklist
+
+- [ ] Review [release notes](${link || 'https://artifacthub.io/packages/container/bci-go-stable/golang'})
+- [ ] Update Go version in relevant Dockerfiles
+- [ ] Update \`go.mod\` if needed (\`go ${version}\`)
+- [ ] Test local build
+- [ ] Run CI/CD pipeline
+- [ ] Check for breaking changes
+- [ ] Update documentation if needed
+
+### Files to Check
+
+Common locations for Go version:
+- \`Dockerfile\`
+- \`Dockerfile.dapper\`
+- \`go.mod\` (first line)
+- CI/CD configuration files
+- Build scripts
+
+### Commands
+
+\`\`\`bash
+# Update go.mod
+go mod edit -go=${version}
+
+# Verify
+go version
+\`\`\`
+
+---
+
+**RSS Feed**: https://artifacthub.io/api/v1/packages/container/bci-go-stable/golang/feed/rss  
+**Auto-generated** by [Check BCI Go Updates workflow](${{ github.server_url }}/${{ github.repository }}/actions/workflows/check-bci-go.yml)
+`
+            });
+            
+            console.log(`Created issue #${issue.data.number} for BCI Go ${version}`);
+      
+      - name: Comment on existing issue
+        if: steps.check_issue.outputs.issue_exists == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issueNumber = '${{ steps.check_issue.outputs.issue_number }}';
+            const checkDate = '${{ steps.fetch.outputs.check_date }}';
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: parseInt(issueNumber),
+              body: `Checked again on ${checkDate} - this version is still the latest. 👍`
+            });
