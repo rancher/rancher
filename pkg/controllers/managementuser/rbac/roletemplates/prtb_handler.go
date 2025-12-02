@@ -69,7 +69,6 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 	if prtb == nil || prtb.DeletionTimestamp != nil || !features.AggregatedRoleTemplates.Enabled() {
 		return nil, nil
 	}
-	prtb.Annotations[rbac.AggregationAnnotation] = "true"
 
 	// Only run this controller if the PRTB is for this cluster
 	clusterName, _ := rbac.GetClusterAndProjectNameFromPRTB(prtb)
@@ -80,10 +79,6 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 	// Handle cluster role bindings for special permissions.
 	if err := p.reconcileClusterRoleBindings(prtb); err != nil {
 		return nil, fmt.Errorf("error reconciling ClusterRoleBindings for ProjectRoleTemplateBinding %s: %w", prtb.Name, err)
-	}
-
-	if err := p.reconcileNamespaceBindings(prtb); err != nil {
-		return nil, fmt.Errorf("error reconciling Namespace RoleBindings for ProjectRoleTemplateBinding %s: %w", prtb.Name, err)
 	}
 
 	if err := p.reconcileBindings(prtb); err != nil {
@@ -139,8 +134,11 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 
 		rb := &rbacv1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      rbac.NameForRoleBinding(namespace.Name, roleRef, subject),
-				Labels:    map[string]string{rbac.GetPRTBOwnerLabel(prtb.Name): "true"},
+				Name: rbac.NameForRoleBinding(namespace.Name, roleRef, subject),
+				Labels: map[string]string{
+					rbac.GetPRTBOwnerLabel(prtb.Name): "true",
+					rbac.AggregationFeatureLabel:      "true",
+				},
 				Namespace: namespace.Name,
 			},
 			RoleRef:  roleRef,
@@ -262,42 +260,6 @@ func (p *prtbHandler) reconcileClusterRoleBindings(prtb *v3.ProjectRoleTemplateB
 	return p.ensureOnlyDesiredClusterRoleBindingsExists(crbs, rbac.GetPRTBOwnerLabel(prtb.Name))
 }
 
-// reconcileNamespaceBindings ensures that the PRTB has created ClusterRoleBindings to the ClusterRoles responsible
-// for providing access to each of the namespaces within the project.
-func (p *prtbHandler) reconcileNamespaceBindings(prtb *v3.ProjectRoleTemplateBinding) error {
-	namespaceBindings, err := p.buildNamespaceBindings(prtb)
-	if err != nil {
-		return err
-	}
-
-	var returnedErr error
-	for _, namespaceBinding := range namespaceBindings {
-		existingCRB, err := p.crbClient.Get(namespaceBinding.Name, metav1.GetOptions{})
-		if apierrors.IsNotFound(err) {
-			_, err = p.crbClient.Create(namespaceBinding)
-			returnedErr = errors.Join(returnedErr, err)
-			continue
-		} else if err != nil {
-			returnedErr = errors.Join(returnedErr, err)
-			continue
-		}
-
-		if existingCRB.Labels == nil {
-			existingCRB.Labels = map[string]string{}
-		}
-
-		// The binding already exists. Make sure it references this PRTB
-		if _, ok := existingCRB.Labels[rbac.GetPRTBOwnerLabel(prtb.Name)]; !ok {
-			existingCRB.Labels[rbac.GetPRTBOwnerLabel(prtb.Name)] = "true"
-			_, err := p.crbClient.Update(existingCRB)
-			returnedErr = errors.Join(returnedErr, err)
-
-		}
-	}
-
-	return returnedErr
-}
-
 // buildNamespaceBindings builds the Cluster Role Bindings used to provide access to the project's namespaces.
 func (p *prtbHandler) buildNamespaceBindings(prtb *v3.ProjectRoleTemplateBinding) ([]*rbacv1.ClusterRoleBinding, error) {
 	cr, err := p.crClient.Get(rbac.AggregatedClusterRoleNameFor(prtb.RoleTemplateName), metav1.GetOptions{})
@@ -398,6 +360,7 @@ func (p *prtbHandler) ensureOnlyDesiredClusterRoleBindingsExists(crbs []*rbacv1.
 				continue
 			}
 		}
+		// Subject and RoleRef can't be updated, so we need to delete and recreate them.
 		if err = p.crbClient.Delete(currentCRB.Name, &metav1.DeleteOptions{}); err != nil {
 			return err
 		}
@@ -405,6 +368,10 @@ func (p *prtbHandler) ensureOnlyDesiredClusterRoleBindingsExists(crbs []*rbacv1.
 
 	// Any remaining ClusterRoleBindings in the desiredCRBs get created.
 	for _, crb := range desiredCRBs {
+		if crb.Labels == nil {
+			crb.Labels = map[string]string{}
+		}
+		crb.Labels[rbac.AggregationFeatureLabel] = "true"
 		// It's possible the CRB was already created, so ignore AlreadyExists errors
 		if _, err := p.crbClient.Create(crb); err != nil && !apierrors.IsAlreadyExists(err) {
 			return err
