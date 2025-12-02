@@ -480,32 +480,9 @@ func updateConfigWithAddresses(config map[string]interface{}, info *machineNetwo
 
 	config["node-ip"] = nodeIPs
 
-	// For control plane nodes (not worker-only), when both internal and external IPs exist
-	// and are different, explicitly set advertise-address to the internal IP and add external
-	// IPs to tls-san. This ensures the API server advertises on the internal network.
-	if !onlyWorker && len(info.InternalAddresses) > 0 && len(info.ExternalAddresses) > 0 {
-		// Check if any external IP differs from all internal IPs
-		hasDistinctExternal := false
-		for _, extIP := range info.ExternalAddresses {
-			if extIP != "" && !slices.Contains(info.InternalAddresses, extIP) {
-				hasDistinctExternal = true
-				break
-			}
-		}
-		if hasDistinctExternal {
-			// Use the first internal address as the advertise-address. This ensures the
-			// Kubernetes API server endpoint uses the internal IP, which is critical for
-			// proper cluster communication when nodes have both internal and external IPs.
-			config["advertise-address"] = info.InternalAddresses[0]
-			tlsSANs := convert.ToStringSlice(config["tls-san"])
-			for _, extIP := range info.ExternalAddresses {
-				// Only add external IPs that are not also internal IPs
-				if extIP != "" && !slices.Contains(info.InternalAddresses, extIP) && !slices.Contains(tlsSANs, extIP) {
-					tlsSANs = append(tlsSANs, extIP)
-				}
-			}
-			config["tls-san"] = tlsSANs
-		}
+	// Set advertise-address and tls-san for control plane nodes
+	if !onlyWorker {
+		setControlPlaneAdvertiseAddress(config, info)
 	}
 
 	// If a cloud provider is configured, it will manage the external IP.
@@ -520,6 +497,40 @@ func updateConfigWithAddresses(config map[string]interface{}, info *machineNetwo
 		}
 		config["node-external-ip"] = nodeExternalIPs
 	}
+}
+
+// setControlPlaneAdvertiseAddress sets the advertise-address to the first internal IP
+// and adds distinct external IPs to tls-san when both internal and external IPs exist.
+// This ensures the Kubernetes API server endpoint uses the internal IP for cluster
+// communication while remaining accessible via external IPs.
+func setControlPlaneAdvertiseAddress(config map[string]interface{}, info *machineNetworkInfo) {
+	if len(info.InternalAddresses) == 0 || len(info.ExternalAddresses) == 0 {
+		return
+	}
+
+	// Find external IPs that are distinct from internal IPs
+	var distinctExternalIPs []string
+	for _, extIP := range info.ExternalAddresses {
+		if extIP != "" && !slices.Contains(info.InternalAddresses, extIP) {
+			distinctExternalIPs = append(distinctExternalIPs, extIP)
+		}
+	}
+
+	if len(distinctExternalIPs) == 0 {
+		return
+	}
+
+	// Set advertise-address to the first internal IP
+	config["advertise-address"] = info.InternalAddresses[0]
+
+	// Add distinct external IPs to tls-san
+	tlsSANs := convert.ToStringSlice(config["tls-san"])
+	for _, extIP := range distinctExternalIPs {
+		if !slices.Contains(tlsSANs, extIP) {
+			tlsSANs = append(tlsSANs, extIP)
+		}
+	}
+	config["tls-san"] = tlsSANs
 }
 
 func addLabels(config map[string]interface{}, entry *planEntry) error {
