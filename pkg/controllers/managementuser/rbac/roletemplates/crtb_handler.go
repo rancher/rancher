@@ -55,7 +55,6 @@ func (c *crtbHandler) OnChange(key string, crtb *v3.ClusterRoleTemplateBinding) 
 	if crtb == nil || crtb.DeletionTimestamp != nil || !features.AggregatedRoleTemplates.Enabled() {
 		return nil, nil
 	}
-	crtb.Annotations[rbac.AggregationAnnotation] = "true"
 
 	// Only run this controller if the CRTB is for this cluster
 	if crtb.ClusterName != c.clusterName {
@@ -122,6 +121,10 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, rem
 
 	// If we didn't find an existing CRB, create it.
 	if matchingCRB == nil {
+		if crb.Labels == nil {
+			crb.Labels = map[string]string{}
+		}
+		crb.Labels[rbac.AggregationFeatureLabel] = "true"
 		if _, err := c.crbClient.Create(crb); err != nil {
 			c.s.AddCondition(remoteConditions, condition, failureToCreateClusterRoleBinding, err)
 			return err

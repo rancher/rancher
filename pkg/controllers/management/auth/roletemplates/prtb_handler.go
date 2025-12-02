@@ -45,8 +45,6 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 		return nil, nil
 	}
 
-	prtb.Annotations[rbac.AggregationAnnotation] = "true"
-
 	var err error
 	prtb, err = p.reconcileSubject(prtb)
 	if err != nil {

@@ -38,7 +38,6 @@ func (rth *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.Rol
 	if rt == nil || rt.DeletionTimestamp != nil || !features.AggregatedRoleTemplates.Enabled() {
 		return nil, nil
 	}
-	rt.Annotations[rbac.AggregationAnnotation] = "true"
 
 	clusterRoles, err := rth.clusterRolesForRoleTemplate(rt)
 	if err != nil {

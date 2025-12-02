@@ -54,7 +54,6 @@ func (c *crtbHandler) OnChange(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 	if crtb == nil || crtb.DeletionTimestamp != nil || !features.AggregatedRoleTemplates.Enabled() {
 		return nil, nil
 	}
-	crtb.Annotations[rbac.AggregationAnnotation] = "true"
 
 	var localConditions []metav1.Condition
 	var err error
