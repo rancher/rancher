@@ -10,7 +10,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	wranglerFake "github.com/rancher/wrangler/v3/pkg/generic/fake"
+	normanv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
+	rbacFakes "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
+	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
@@ -153,11 +155,11 @@ type grTestStateChanges struct {
 	createdClusterRoles map[string]*rbacv1.ClusterRole
 }
 type grTestState struct {
-	nsCacheMock  *wranglerFake.MockNonNamespacedCacheInterface[*corev1.Namespace]
-	rCacheMock   *wranglerFake.MockCacheInterface[*rbacv1.Role]
-	rClientMock  *wranglerFake.MockControllerInterface[*rbacv1.Role, *rbacv1.RoleList]
-	crCacheMock  *wranglerFake.MockNonNamespacedCacheInterface[*rbacv1.ClusterRole]
-	crClientMock *wranglerFake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]
+	nsCacheMock  *fake.MockNonNamespacedCacheInterface[*corev1.Namespace]
+	rListerMock  *rbacFakes.RoleListerMock
+	rClientMock  *rbacFakes.RoleInterfaceMock
+	crListerMock *rbacFakes.ClusterRoleListerMock
+	crClientMock *rbacFakes.ClusterRoleInterfaceMock
 	counter      int
 	stateChanges *grTestStateChanges
 }
@@ -177,7 +179,7 @@ func TestReconcileGlobalRole(t *testing.T) {
 		{
 			name: "no changes to clusterRole",
 			stateSetup: func(state grTestState) {
-				state.crCacheMock.EXPECT().Get = func(_, _ string) (*normanv1.ClusterRole, error) {
+				state.crListerMock.GetFunc = func(_, _ string) (*normanv1.ClusterRole, error) {
 					return readPodCR.DeepCopy(), nil
 				}
 			},
@@ -191,10 +193,10 @@ func TestReconcileGlobalRole(t *testing.T) {
 		{
 			name: "clusterRole is updated",
 			stateSetup: func(state grTestState) {
-				state.crCacheMock.EXPECT().Get = func(_, _ string) (*normanv1.ClusterRole, error) {
+				state.crListerMock.GetFunc = func(_, _ string) (*normanv1.ClusterRole, error) {
 					return readConfigCR.DeepCopy(), nil
 				}
-				state.crClientMock.EXPECT().Update = func(cr *normanv1.ClusterRole) (*normanv1.ClusterRole, error) {
+				state.crClientMock.UpdateFunc = func(cr *normanv1.ClusterRole) (*normanv1.ClusterRole, error) {
 					state.stateChanges.createdClusterRoles[cr.Name] = cr
 					return nil, nil
 				}
@@ -215,10 +217,10 @@ func TestReconcileGlobalRole(t *testing.T) {
 		{
 			name: "update clusterRole fails",
 			stateSetup: func(state grTestState) {
-				state.crCacheMock.EXPECT().Get = func(_, _ string) (*normanv1.ClusterRole, error) {
+				state.crListerMock.GetFunc = func(_, _ string) (*normanv1.ClusterRole, error) {
 					return readConfigCR.DeepCopy(), nil
 				}
-				state.crClientMock.EXPECT().Update = func(cr *normanv1.ClusterRole) (*normanv1.ClusterRole, error) {
+				state.crClientMock.UpdateFunc = func(cr *normanv1.ClusterRole) (*normanv1.ClusterRole, error) {
 					return nil, fmt.Errorf("error")
 				}
 			},
@@ -232,10 +234,10 @@ func TestReconcileGlobalRole(t *testing.T) {
 		{
 			name: "create clusterRole fails",
 			stateSetup: func(state grTestState) {
-				state.crCacheMock.EXPECT().Get = func(_, _ string) (*normanv1.ClusterRole, error) {
+				state.crListerMock.GetFunc = func(_, _ string) (*normanv1.ClusterRole, error) {
 					return nil, nil
 				}
-				state.crClientMock.EXPECT().Create = func(cr *normanv1.ClusterRole) (*normanv1.ClusterRole, error) {
+				state.crClientMock.CreateFunc = func(cr *normanv1.ClusterRole) (*normanv1.ClusterRole, error) {
 					return nil, fmt.Errorf("error")
 				}
 			},
@@ -249,10 +251,10 @@ func TestReconcileGlobalRole(t *testing.T) {
 		{
 			name: "clusterRole is created",
 			stateSetup: func(state grTestState) {
-				state.crCacheMock.EXPECT().Get = func(_, _ string) (*normanv1.ClusterRole, error) {
+				state.crListerMock.GetFunc = func(_, _ string) (*normanv1.ClusterRole, error) {
 					return nil, nil
 				}
-				state.crClientMock.EXPECT().Create = func(cr *normanv1.ClusterRole) (*normanv1.ClusterRole, error) {
+				state.crClientMock.CreateFunc = func(cr *normanv1.ClusterRole) (*normanv1.ClusterRole, error) {
 					state.stateChanges.createdClusterRoles[cr.Name] = cr
 					return nil, nil
 				}
@@ -274,10 +276,10 @@ func TestReconcileGlobalRole(t *testing.T) {
 		{
 			name: "missing grOwnerLabel in clusterRole triggers update",
 			stateSetup: func(state grTestState) {
-				state.crCacheMock.EXPECT().Get = func(_, _ string) (*normanv1.ClusterRole, error) {
+				state.crListerMock.GetFunc = func(_, _ string) (*normanv1.ClusterRole, error) {
 					return missingLabelCR.DeepCopy(), nil
 				}
-				state.crClientMock.EXPECT().Update = func(cr *normanv1.ClusterRole) (*normanv1.ClusterRole, error) {
+				state.crClientMock.UpdateFunc = func(cr *normanv1.ClusterRole) (*normanv1.ClusterRole, error) {
 					state.stateChanges.createdClusterRoles[cr.Name] = cr
 					return nil, nil
 				}
@@ -311,7 +313,7 @@ func TestReconcileGlobalRole(t *testing.T) {
 			if test.stateSetup != nil {
 				test.stateSetup(state)
 			}
-			grLifecycle.crCache = state.crCacheMock
+			grLifecycle.crLister = state.crListerMock
 			grLifecycle.crClient = state.crClientMock
 
 			err := grLifecycle.reconcileGlobalRole(test.globalRole)
@@ -1221,11 +1223,11 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 
 func setupTest(t *testing.T) grTestState {
 	ctrl := gomock.NewController(t)
-	nsCacheMock := wranglerFake.NewMockNonNamespacedCacheInterface[*corev1.Namespace](ctrl)
-	rCacheMock := wranglerFake.NewMockCacheInterface[*rbacv1.Role](ctrl)
-	rClientMock := wranglerFake.NewMockControllerInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl)
-	crCacheMock := wranglerFake.NewMockNonNamespacedCacheInterface[*rbacv1.ClusterRole](ctrl)
-	crClientMock := wranglerFake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
+	nsCacheMock := fake.NewMockNonNamespacedCacheInterface[*corev1.Namespace](ctrl)
+	rListerMock := rbacFakes.RoleListerMock{}
+	rClientMock := rbacFakes.RoleInterfaceMock{}
+	crListerMock := rbacFakes.ClusterRoleListerMock{}
+	crClientMock := rbacFakes.ClusterRoleInterfaceMock{}
 
 	stateChanges := grTestStateChanges{
 		t:                   t,
@@ -1235,10 +1237,10 @@ func setupTest(t *testing.T) grTestState {
 	}
 	state := grTestState{
 		nsCacheMock:  nsCacheMock,
-		rCacheMock:   rCacheMock,
-		rClientMock:  rClientMock,
-		crCacheMock:  crCacheMock,
-		crClientMock: crClientMock,
+		rListerMock:  &rListerMock,
+		rClientMock:  &rClientMock,
+		crListerMock: &crListerMock,
+		crClientMock: &crClientMock,
 		stateChanges: &stateChanges,
 	}
 	return state
