@@ -20,7 +20,6 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/steve/pkg/auth"
 	"github.com/sirupsen/logrus"
@@ -62,9 +61,9 @@ type tokenAuthenticator struct {
 	ctx                 context.Context
 	tokenIndexer        cache.Indexer
 	tokenClient         mgmtcontrollers.TokenClient
-	userAttributes      v3.UserAttributeInterface
-	userAttributeLister v3.UserAttributeLister
-	userLister          v3.UserLister
+	userAttributeClient mgmtcontrollers.UserAttributeClient
+	userAttributeCache  mgmtcontrollers.UserAttributeCache
+	userCache           mgmtcontrollers.UserCache
 	clusterRouter       ClusterRouter
 	refreshUser         func(userID string, force bool)
 	now                 func() time.Time // Make it easier to test.
@@ -106,9 +105,9 @@ func NewAuthenticator(ctx context.Context, clusterRouter ClusterRouter, mgmtCtx 
 		ctx:                 ctx,
 		tokenIndexer:        tokenInformer.GetIndexer(),
 		tokenClient:         mgmtCtx.Wrangler.Mgmt.Token(),
-		userAttributeLister: mgmtCtx.Management.UserAttributes("").Controller().Lister(),
-		userAttributes:      mgmtCtx.Management.UserAttributes(""),
-		userLister:          mgmtCtx.Management.Users("").Controller().Lister(),
+		userAttributeCache:  mgmtCtx.Wrangler.Mgmt.UserAttribute().Cache(),
+		userAttributeClient: mgmtCtx.Wrangler.Mgmt.UserAttribute(),
+		userCache:           mgmtCtx.Wrangler.Mgmt.User().Cache(),
 		clusterRouter:       clusterRouter,
 		refreshUser: func(userID string, force bool) {
 			go providerRefresher.TriggerUserRefresh(userID, force)
@@ -156,13 +155,13 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 		}
 	}
 
-	attribs, err := a.userAttributeLister.Get("", token.GetUserID())
+	attribs, err := a.userAttributeCache.Get(token.GetUserID())
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, errors.Wrapf(ErrMustAuthenticate,
 			"failed to retrieve userattribute %s: %v", token.GetUserID(), err)
 	}
 
-	authUser, err := a.userLister.Get("", token.GetUserID())
+	authUser, err := a.userCache.Get(token.GetUserID())
 	if err != nil {
 		return nil, errors.Wrapf(ErrMustAuthenticate,
 			"failed to retrieve user %s: %v", token.GetUserID(), err)

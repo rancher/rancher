@@ -10,11 +10,11 @@ import (
 	"github.com/gorilla/mux"
 	authcontext "github.com/rancher/rancher/pkg/auth/context"
 	"github.com/rancher/rancher/pkg/auth/tokens"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	controllers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
-	mgmtv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/steve/pkg/auth"
+	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,15 +27,15 @@ import (
 )
 
 type (
-	restConfigGetter  func(cluster *mgmtv3.Cluster, context *config.ScaledContext, secretLister corev1.SecretLister, tryReconnecting bool) (*rest.Config, error)
+	restConfigGetter  func(cluster *v3.Cluster, context *config.ScaledContext, secretLister wcorev1.SecretCache, tryReconnecting bool) (*rest.Config, error)
 	authClientCreator func(clusterID string) (kubernetes.Interface, error)
 )
 
 // ServiceAccountAuth is an authenticator that authenticates requests using the downstream service account's JWT.
 type ServiceAccountAuth struct {
 	scaledContext             *config.ScaledContext
-	clusterLister             mgmtv3.ClusterLister
-	secretLister              corev1.SecretLister
+	clusterCache              controllers.ClusterCache
+	secretCache               wcorev1.SecretCache
 	restConfigGetter          restConfigGetter
 	authClientCreator         authClientCreator
 	clusterProxyConfigsGetter controllers.ClusterProxyConfigCache
@@ -48,8 +48,8 @@ func NewServiceAccountAuth(
 ) auth.Authenticator {
 	return &ServiceAccountAuth{
 		scaledContext:    scaledContext,
-		clusterLister:    scaledContext.Management.Clusters("").Controller().Lister(),
-		secretLister:     scaledContext.Core.Secrets("").Controller().Lister(),
+		clusterCache:     scaledContext.Wrangler.Mgmt.Cluster().Cache(),
+		secretCache:      scaledContext.Wrangler.Core.Secret().Cache(),
 		restConfigGetter: restConfigGetter,
 		authClientCreator: func(clusterID string) (kubernetes.Interface, error) {
 			return scaledContext.Wrangler.MultiClusterManager.K8sClient(clusterID)
