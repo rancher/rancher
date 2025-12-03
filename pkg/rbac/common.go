@@ -617,9 +617,9 @@ func AreClusterRoleBindingContentsSame(crb1, crb2 *rbacv1.ClusterRoleBinding) bo
 }
 
 // AreRoleBindingsSame compares the Subjects and RoleRef fields of two Cluster Role Bindings.
-func AreRoleBindingContentsSame(rb1, rb2 *rbacv1.RoleBinding) (bool, *rbacv1.RoleBinding) {
+func AreRoleBindingContentsSame(rb1, rb2 *rbacv1.RoleBinding) bool {
 	return equality.Semantic.DeepEqual(rb1.Subjects, rb2.Subjects) &&
-		equality.Semantic.DeepEqual(rb1.RoleRef, rb2.RoleRef), rb2
+		equality.Semantic.DeepEqual(rb1.RoleRef, rb2.RoleRef)
 }
 
 // ClusterRoleNameFor returns safe version of a string to be used for a clusterRoleName
