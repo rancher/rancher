@@ -1,5 +1,4 @@
-{{- if eq .Values.tls "ingress" -}}
-  {{- if eq .Values.ingress.tls.source "letsEncrypt" -}}
+{{- if and (eq .Values.tls "ingress") (eq .Values.ingress.tls.source "letsEncrypt") -}}
     {{- $certmanagerVer :=  split "." .Values.certmanager.version -}}
     {{- if or (.Capabilities.APIVersions.Has "cert-manager.io/v1beta1") (and (gt (len $certmanagerVer._0) 0) (eq (int $certmanagerVer._0) 0) (ge (int $certmanagerVer._1) 16)) }}
 apiVersion: cert-manager.io/v1beta1
@@ -33,5 +32,4 @@ spec:
         ingress:
           class: {{ .Values.letsEncrypt.ingress.class }}
     {{- end }}
-  {{- end -}}
 {{- end -}}
