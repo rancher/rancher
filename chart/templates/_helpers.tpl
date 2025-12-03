@@ -171,7 +171,7 @@ add below linux tolerations to workloads could be scheduled to those linux nodes
 {{- $crd := (lookup "apiextensions.k8s.io/v1" "CustomResourceDefinition" "" $requiredCRD) -}}
 
 {{- if not $crd -}}
-{{- $msg := printf "Cert-manager dependency check failed. CRD '%s' not found. Please ensure cert-manager (>= %s) is installed." $requiredCRD $requiredVersion -}}
+{{- $msg := printf "Cert-manager dependency check failed. CRD '%s' not found. Please ensure cert-manager (>= %s) is installed. (Note: This is expected in template/dry-run mode)" $requiredCRD $requiredVersion -}}
 {{- include "tpl.chart.warning" $msg -}}
 {{- else -}}
   {{- $hasV1 := false -}}
