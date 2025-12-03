@@ -1,6 +1,6 @@
 suite: Test Ingress
 templates:
-- ingress.yaml
+- ingate/ingress.yaml
 tests:
 - it: should set external options
   set:

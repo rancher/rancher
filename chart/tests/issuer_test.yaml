@@ -1,7 +1,7 @@
 suite: Test Issuers
 templates:
-- issuer-letsEncrypt.yaml
-- issuer-rancher.yaml
+- ingate/issuer-letsEncrypt.yaml
+- ingate/issuer-rancher.yaml
 tests:
 - it: should not render issuers - tls=external
   set:
@@ -9,30 +9,30 @@ tests:
   asserts:
   - hasDocuments:
       count: 0
-    template: issuer-letsEncrypt.yaml
+    template: ingate/issuer-letsEncrypt.yaml
   - hasDocuments:
       count: 0
-    template: issuer-rancher.yaml
+    template: ingate/issuer-rancher.yaml
 - it: should not render issuers - ingress.tls.source=secret
   set:
     ingress.tls.source: secret
   asserts:
   - hasDocuments:
       count: 0
-    template: issuer-letsEncrypt.yaml
+    template: ingate/issuer-letsEncrypt.yaml
   - hasDocuments:
       count: 0
-    template: issuer-rancher.yaml
+    template: ingate/issuer-rancher.yaml
 - it: should render letsEncrypt but not rancher with default cert-manager
   set:
     ingress.tls.source: letsEncrypt
   asserts:
   - hasDocuments:
       count: 1
-    template: issuer-letsEncrypt.yaml
+    template: ingate/issuer-letsEncrypt.yaml
   - hasDocuments:
       count: 0
-    template: issuer-rancher.yaml
+    template: ingate/issuer-rancher.yaml
 - it: should render letsEncrypt but not rancher with cert-manager < 0.11.0 using capabilities
   capabilities:
     apiVersions:
@@ -42,10 +42,10 @@ tests:
   asserts:
   - hasDocuments:
       count: 1
-    template: issuer-letsEncrypt.yaml
+    template: ingate/issuer-letsEncrypt.yaml
   - hasDocuments:
       count: 0
-    template: issuer-rancher.yaml
+    template: ingate/issuer-rancher.yaml
 - it: should render letsEncrypt but not rancher with cert-manager < 0.11.0 using parameter
   set:
     certmanager.version: 0.9.0
@@ -53,20 +53,20 @@ tests:
   asserts:
   - hasDocuments:
       count: 1
-    template: issuer-letsEncrypt.yaml
+    template: ingate/issuer-letsEncrypt.yaml
   - hasDocuments:
       count: 0
-    template: issuer-rancher.yaml
+    template: ingate/issuer-rancher.yaml
 - it: should render rancher but not letsEncrypt with default cert-manager
   set:
     ingress.tls.source: rancher
   asserts:
   - hasDocuments:
       count: 0
-    template: issuer-letsEncrypt.yaml
+    template: ingate/issuer-letsEncrypt.yaml
   - hasDocuments:
       count: 1
-    template: issuer-rancher.yaml
+    template: ingate/issuer-rancher.yaml
 - it: should render rancher but not letsEncrypt with cert-manager < 0.11.0 using capabilities
   capabilities:
     apiVersions:
@@ -76,10 +76,10 @@ tests:
   asserts:
   - hasDocuments:
       count: 0
-    template: issuer-letsEncrypt.yaml
+    template: ingate/issuer-letsEncrypt.yaml
   - hasDocuments:
       count: 1
-    template: issuer-rancher.yaml
+    template: ingate/issuer-rancher.yaml
 - it: should render rancher but not letsEncrypt with cert-manager < 0.11.0 using parameter
   set:
     certmanager.version: 0.9.0
@@ -87,10 +87,10 @@ tests:
   asserts:
   - hasDocuments:
       count: 0
-    template: issuer-letsEncrypt.yaml
+    template: ingate/issuer-letsEncrypt.yaml
   - hasDocuments:
       count: 1
-    template: issuer-rancher.yaml
+    template: ingate/issuer-rancher.yaml
 - it: should set letsEncrypt apiVersion with default cert-manager
   set:
     ingress.tls.source: letsEncrypt
@@ -98,7 +98,7 @@ tests:
   - equal:
       path: apiVersion
       value: cert-manager.io/v1
-    template: issuer-letsEncrypt.yaml
+    template: ingate/issuer-letsEncrypt.yaml
 - it: should set rancher apiVersion with default cert-manager
   set:
     ingress.tls.source: rancher
@@ -106,7 +106,7 @@ tests:
   - equal:
       path: apiVersion
       value: cert-manager.io/v1
-    template: issuer-rancher.yaml
+    template: ingate/issuer-rancher.yaml
 - it: should set letsEncrypt production by default with default cert-manager
   set:
     ingress.tls.source: letsEncrypt
@@ -114,7 +114,7 @@ tests:
   - equal:
       path: spec.acme.server
       value: https://acme-v02.api.letsencrypt.org/directory
-    template: issuer-letsEncrypt.yaml
+    template: ingate/issuer-letsEncrypt.yaml
 - it: should set letsEncrypt production by default with cert-manager < 0.11.0 using capabilities
   capabilities:
     apiVersions:
@@ -125,7 +125,7 @@ tests:
   - equal:
       path: spec.acme.server
       value: https://acme-v02.api.letsencrypt.org/directory
-    template: issuer-letsEncrypt.yaml
+    template: ingate/issuer-letsEncrypt.yaml
 - it: should set letsEncrypt production by default with cert-manager < 0.11.0 using parameter
   set:
     certmanager.version: 0.9.0
@@ -134,7 +134,7 @@ tests:
   - equal:
       path: spec.acme.server
       value: https://acme-v02.api.letsencrypt.org/directory
-    template: issuer-letsEncrypt.yaml
+    template: ingate/issuer-letsEncrypt.yaml
 - it: should set letsEncrypt staging with default cert-manager
   capabilities:
     apiVersions:
@@ -146,7 +146,7 @@ tests:
   - equal:
       path: spec.acme.server
       value: https://acme-staging-v02.api.letsencrypt.org/directory
-    template: issuer-letsEncrypt.yaml
+    template: ingate/issuer-letsEncrypt.yaml
 - it: should set letsEncrypt email address with default cert-manager
   set:
     ingress.tls.source: letsEncrypt
@@ -155,4 +155,4 @@ tests:
   - equal:
       path: spec.acme.email
       value: test@test.org
-    template: issuer-letsEncrypt.yaml
+    template: ingate/issuer-letsEncrypt.yaml
