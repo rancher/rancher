@@ -1,9 +1,5 @@
 {{- if .Values.ingress.enabled }}
-{{- if or (.Capabilities.APIVersions.Has "networking.k8s.io/v1/Ingress") (not (.Capabilities.APIVersions.Has "networking.k8s.io/v1beta1/Ingress")) }}
 apiVersion: networking.k8s.io/v1
-{{- else }}
-apiVersion: networking.k8s.io/v1beta1
-{{- end }}
 kind: Ingress
 metadata:
   name: {{ template "rancher.fullname" . }}
@@ -18,13 +14,8 @@ metadata:
     nginx.ingress.kubernetes.io/ssl-redirect: "false" # turn off ssl redirect for external.
 {{- else }}
   {{- if ne .Values.ingress.tls.source "secret" }}
-    {{- $certmanagerVer :=  split "." .Values.certmanager.version -}}
-    {{- if or (.Capabilities.APIVersions.Has "certmanager.k8s.io/v1alpha1") (and (gt (len $certmanagerVer._0) 0) (eq (int $certmanagerVer._0) 0) (lt (int $certmanagerVer._1) 11)) }}
-    certmanager.k8s.io/issuer: {{ template "rancher.fullname" . }}
-    {{- else }}
     cert-manager.io/issuer: {{ template "rancher.fullname" . }}
     cert-manager.io/issuer-kind: Issuer
-    {{- end }}
   {{- end }}
 {{- end }}
 {{- if .Values.ingress.includeDefaultExtraAnnotations }}
