@@ -1,62 +1,27 @@
-{
+﻿{
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "github>rancher/renovate-config//rancher-main#release"
   ],
-  "baseBranchPatterns": [
-    "main",
-    "release/v2.13",
-    "release/v2.12",
-    "release/v2.11",
-    "release/v2.10",
-    "release/v2.9"
-  ],
-  "ignoreDeps": [
-    "go.qase.io/client"
-  ],
   "prHourlyLimit": 2,
   "prConcurrentLimit": 4,
   "prCreation": "status-success",
+  "labels": ["dependencies"],
   "packageRules": [
     {
-      "matchBaseBranches": [
-        "release/v2.13"
-      ],
-      "extends": [
-        "github>rancher/renovate-config//rancher-2.13#release"
-      ]
+      "description": "Group Go version updates",
+      "matchDatasources": ["golang-version"],
+      "labels": ["dependencies", "go-version"],
+      "prPriority": 10
     },
     {
-      "matchBaseBranches": [
-        "release/v2.12"
+      "description": "Rancher API client updates",
+      "matchPackagePatterns": [
+        "github.com/rancher/norman",
+        "github.com/rancher/wrangler"
       ],
-      "extends": [
-        "github>rancher/renovate-config//rancher-2.12#release"
-      ]
-    },
-    {
-      "matchBaseBranches": [
-        "release/v2.11"
-      ],
-      "extends": [
-        "github>rancher/renovate-config//rancher-2.11#release"
-      ]
-    },
-    {
-      "matchBaseBranches": [
-        "release/v2.10"
-      ],
-      "extends": [
-        "github>rancher/renovate-config//rancher-2.10#release"
-      ]
-    },
-    {
-      "matchBaseBranches": [
-        "release/v2.9"
-      ],
-      "extends": [
-        "github>rancher/renovate-config//rancher-2.9#release"
-      ]
+      "labels": ["dependencies", "rancher-api"],
+      "prPriority": 5
     }
   ]
 }
