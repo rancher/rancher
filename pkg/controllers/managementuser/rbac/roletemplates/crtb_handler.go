@@ -15,6 +15,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -52,8 +53,12 @@ func newCRTBHandler(uc *config.UserContext) (*crtbHandler, error) {
 
 // OnChange ensures that the correct ClusterRoleBinding exists for the ClusterRoleTemplateBinding
 func (c *crtbHandler) OnChange(key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-	if crtb == nil || crtb.DeletionTimestamp != nil || !features.AggregatedRoleTemplates.Enabled() {
+	if crtb == nil || crtb.DeletionTimestamp != nil {
 		return nil, nil
+	}
+
+	if !features.AggregatedRoleTemplates.Enabled() {
+		return crtb, c.deleteBindings(crtb, &crtb.Status.RemoteConditions)
 	}
 
 	// Only run this controller if the CRTB is for this cluster
@@ -136,6 +141,10 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, rem
 
 // OnRemove deletes all ClusterRoleBindings owned by the ClusterRoleTemplateBinding.
 func (c *crtbHandler) OnRemove(_ string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+	if !features.AggregatedRoleTemplates.Enabled() {
+		return nil, nil
+	}
+
 	err := c.deleteBindings(crtb, &crtb.Status.RemoteConditions)
 	if err != nil {
 		return crtb, errors.Join(err, c.updateStatus(crtb, crtb.Status.RemoteConditions))
@@ -152,7 +161,12 @@ func (c *crtbHandler) OnRemove(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 func (c *crtbHandler) deleteBindings(crtb *v3.ClusterRoleTemplateBinding, remoteConditions *[]metav1.Condition) error {
 	condition := metav1.Condition{Type: deleteClusterRoleBindings}
 
-	lo := metav1.ListOptions{LabelSelector: rbac.GetCRTBOwnerLabel(crtb.Name)}
+	// Get all ClusterRoleBindings owned by this CRTB.
+	set := labels.Set(map[string]string{
+		rbac.CrtbOwnerLabel:          crtb.Name,
+		rbac.AggregationFeatureLabel: "true",
+	})
+	lo := metav1.ListOptions{LabelSelector: set.AsSelector().String()}
 
 	crbs, err := c.crbClient.List(lo)
 	if err != nil {
