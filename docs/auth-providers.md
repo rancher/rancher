@@ -46,10 +46,10 @@ The Cognito authentication provider can be configured via the Rancher Management
 
 - `clientId` - The Cognito App Client ID
 - `clientSecret` - The Cognito App Client Secret
-- `issuer` - The Cognito Issuer URL (e.g., `https://cognito-idp.us-east-1.amazonaws.com/us-east-1_YourPoolId`)
+- `issuer` - The Cognito Issuer URL (e.g., `https://cognito-idp.{region}.amazonaws.com/{region}_{pool-id}`)
 - `authEndpoint` - The Cognito authorization endpoint
 - `tokenEndpoint` - The Cognito token endpoint
-- `userInfoEndpoint` - The Cognito user info endpoint
+- `userInfoEndpoint` - The Cognito user info endpoint (note: AWS Cognito uses `userInfo` with capital I)
 - `endSessionEndpoint` - (Optional) The Cognito logout endpoint
 - `rancherUrl` - The Rancher server URL for OAuth callbacks
 - `scope` - OAuth scopes (e.g., "openid profile email")
@@ -74,10 +74,10 @@ resource "rancher2_auth_config_cognito" "cognito" {
   enabled                = true
   client_id             = "your-cognito-client-id"
   client_secret         = "your-cognito-client-secret"
-  issuer                = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_YourPoolId"
-  auth_endpoint         = "https://your-domain.auth.us-east-1.amazoncognito.com/oauth2/authorize"
-  token_endpoint        = "https://your-domain.auth.us-east-1.amazoncognito.com/oauth2/token"
-  userinfo_endpoint     = "https://your-domain.auth.us-east-1.amazoncognito.com/oauth2/userInfo"
+  issuer                = "https://cognito-idp.{region}.amazonaws.com/{region}_{pool-id}"
+  auth_endpoint         = "https://{your-domain}.auth.{region}.amazoncognito.com/oauth2/authorize"
+  token_endpoint        = "https://{your-domain}.auth.{region}.amazoncognito.com/oauth2/token"
+  userinfo_endpoint     = "https://{your-domain}.auth.{region}.amazoncognito.com/oauth2/userInfo"
   rancher_url           = "https://your-rancher-server.example.com"
   scope                 = "openid profile email"
   groups_claim          = "cognito:groups"
