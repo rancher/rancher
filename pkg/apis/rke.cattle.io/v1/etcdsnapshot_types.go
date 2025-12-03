@@ -55,6 +55,13 @@ type ETCDSnapshotS3 struct {
 	// +optional
 	CloudCredentialName string `json:"cloudCredentialName,omitempty"`
 
+	// Retention defines the number of snapshots to retain in the S3 bucket.
+	// Older snapshots beyond this retention count will be deleted.
+	// If this field is not explicitly set, the retention value from the etcd retention will be used.
+	// +optional
+	// +nullable
+	Retention int `json:"retention,omitempty"`
+
 	// Folder is the name of the S3 folder used for snapshot operations.
 	// If this field is not explicitly set, the folder from the referenced CloudCredential will be used.
 	// +nullable

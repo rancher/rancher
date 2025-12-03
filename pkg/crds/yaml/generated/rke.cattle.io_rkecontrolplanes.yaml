@@ -197,6 +197,12 @@ spec:
                           If this field is not explicitly set, the 'defaultRegion' value from the referenced CloudCredential will be used.
                         nullable: true
                         type: string
+                      retention:
+                        description: |-
+                          Retention defines the number of snapshots to retain in the S3 bucket.
+                          Older snapshots beyond this retention count will be deleted.
+                          If this field is not explicitly set, the retention value from the cluster will be used.
+                        type: integer
                       skipSSLVerify:
                         description: |-
                           SkipSSLVerify defines whether TLS certificate verification is disabled.
@@ -1069,6 +1075,12 @@ spec:
                               If this field is not explicitly set, the 'defaultRegion' value from the referenced CloudCredential will be used.
                             nullable: true
                             type: string
+                          retention:
+                            description: |-
+                              Retention defines the number of snapshots to retain in the S3 bucket.
+                              Older snapshots beyond this retention count will be deleted.
+                              If this field is not explicitly set, the retention value from the cluster will be used.
+                            type: integer
                           skipSSLVerify:
                             description: |-
                               SkipSSLVerify defines whether TLS certificate verification is disabled.
