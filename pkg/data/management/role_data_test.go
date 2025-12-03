@@ -10,7 +10,7 @@ import (
 // TestProjectOwnerHasPrincipalsPermission verifies that the Project Owner role template
 // includes the principals resource permission. This is required to allow users with only
 // the User-Base role to view members when they are project owners.
-// See: https://github.com/rancher/rancher/issues/<issue-number>
+// See: https://github.com/rancher/dashboard/issues/10215
 func TestProjectOwnerHasPrincipalsPermission(t *testing.T) {
 	rb := newRoleBuilder()
 
