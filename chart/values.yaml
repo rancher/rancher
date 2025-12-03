@@ -69,13 +69,17 @@ agentTLSMode: ""
 imagePullSecrets: []
 # - name: secretName
 
-### ingress ###
+# Network exposure configuration
+# Choose between 'ingress' or 'gateway'
+networkExposure:
+  type: "ingress"  # Options: "ingress", "gateway", or "none"
+
+# Traditional Ingress configuration
 # Readme for details and instruction on adding tls secrets.
 ingress:
   # If set to false, ingress will not be created
-  # Defaults to true
-  # options: true, false
-  enabled: true
+  # Defaults to true; options: true, false
+  enabled: true  # Will be overridden based on networkExposure.type
   includeDefaultExtraAnnotations: true
   extraAnnotations: {}
   ingressClassName: ""
@@ -94,6 +98,28 @@ ingress:
     # options: rancher, letsEncrypt, secret
     source: rancher
     secretName: tls-rancher-ingress
+
+# Gateway API configuration
+gateway:
+  enabled: false  # Will be overridden based on networkExposure.type
+  createGateway: false  # Set to true to create a new Gateway resource
+  gatewayClassName: "default-gateway-class" # TODO idk what default value we need
+  gatewayName: "default-gateway"  # Name of existing Gateway resource
+  gatewayNamespace: "default-gateway-namespace"  # Namespace where Gateway exists
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      hostname: "*.example.com"
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: "*.example.com"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: app-tls
+            kind: Secret
 
 ### service ###
 # Override to use NodePort or LoadBalancer service type - default is ClusterIP

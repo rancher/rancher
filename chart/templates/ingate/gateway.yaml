@@ -1,0 +1,33 @@
+{{- if and (eq (include "rancher.gatewayEnabled" .) "true") .Values.gateway.createGateway -}}
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: {{ template "rancher.gateway" . }}
+  labels:
+{{ template "rancher.labels" . | indent 4 }}
+spec:
+  gatewayClassName: {{ .Values.gateway.gatewayClassName }}
+  listeners:
+    {{- range .Values.gateway.listeners }}
+    - name: {{ .name }}
+      protocol: {{ .protocol }}
+      port: {{ .port }}
+      {{- if .hostname }}
+      hostname: {{ .hostname | quote }}
+      {{- end }}
+      {{- if .tls }}
+      tls:
+        mode: {{ .tls.mode }}
+        {{- if .tls.certificateRefs }}
+        certificateRefs:
+          {{- range .tls.certificateRefs }}
+          - name: {{ .name }}
+            kind: {{ .kind | default "Secret" }}
+            {{- if .namespace }}
+            namespace: {{ .namespace }}
+            {{- end }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+{{- end }}

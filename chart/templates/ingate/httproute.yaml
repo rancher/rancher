@@ -1,0 +1,32 @@
+{{- if eq (include "rancher.gatewayEnabled" .) "true" -}}
+{{ $defaultGateway := printf "%s-%s" (include "rancher.fullname" .) "gateway" }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "rancher.fullname" . }}
+  labels:
+{{ include "rancher.labels" . | indent 4 }}
+spec:
+  parentRefs:
+      {{- if .Values.gateway.createGateway }}
+    # If we're creating our own gateway, reference it in the same namespace
+    - name: {{ template "rancher.gateway" . }}
+      namespace: {{ .Release.Namespace }}
+      {{- else }}
+    # Reference to existing gateway
+    - name: {{ .Values.gateway.gatewayName }}
+      {{- if .Values.gateway.gatewayNamespace }}
+      namespace: {{ .Values.gateway.gatewayNamespace }}
+      {{- end }}
+      {{- end }}
+  hostnames:
+    - {{ template "rancher.hostname" . }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: {{ include "rancher.fullname" . }}
+          port: 80
+{{- end }}
