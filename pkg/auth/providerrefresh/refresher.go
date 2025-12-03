@@ -357,7 +357,7 @@ func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*apiv3.User
 	return attribs, err
 }
 
-func GetPrincipalIDForProvider(providerName string, user *v3.User) string {
+func GetPrincipalIDForProvider(providerName string, user *apiv3.User) string {
 	prefix := providerName + "_user://"
 	if providerName == "local" {
 		prefix = "local://"

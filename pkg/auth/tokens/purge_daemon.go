@@ -64,7 +64,7 @@ func (p *purger) purge() {
 	for _, token := range samlTokens {
 		// avoid delete immediately after creation, login request might be pending
 		if token.CreationTimestamp.Add(15 * time.Minute).Before(time.Now()) {
-			err = p.samlTokens.Delete(token.ObjectMeta.Name, &metav1.DeleteOptions{})
+			err = p.samlTokens.Delete(namespace.GlobalNamespace, token.ObjectMeta.Name, &metav1.DeleteOptions{})
 			if err != nil && !apierrors.IsNotFound(err) {
 				logrus.Errorf("Error: while deleting expired token %v: %v", err, token.Name)
 				continue

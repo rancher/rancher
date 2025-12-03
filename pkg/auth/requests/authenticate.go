@@ -350,7 +350,7 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 			return nil, errors.Wrapf(ErrMustAuthenticate, "failed to retrieve auth token, error: %v", err)
 		}
 	} else {
-		storedToken = objs[0].(*v3.Token)
+		storedToken = objs[0].(*apiv3.Token)
 	}
 
 	if _, err := tokens.VerifyToken(storedToken, tokenName, tokenKey); err != nil {
