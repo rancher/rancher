@@ -3,7 +3,6 @@ package nsserviceaccount
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/rancher/norman/types/slice"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/nsserviceaccount"
@@ -22,17 +21,25 @@ const (
 )
 
 type defaultSvcAccountHandler struct {
-	namespaces    corew.NamespaceClient
-	projectLister v3.ProjectLister
-	clusterName   string
+	namespaces       corew.NamespaceClient
+	projectLister    v3.ProjectLister
+	clusterName      string
+	systemNamespaces []string
 }
 
 func Register(ctx context.Context, cluster *config.UserContext) {
 	logrus.Debugf("Registering defaultSvcAccountHandler for checking default service account of system namespaces")
+
+	systemNamespaces, err := settings.GetSystemNamespacesList()
+	if err != nil {
+		logrus.Error(err)
+	}
+
 	nsh := &defaultSvcAccountHandler{
-		namespaces:    cluster.Corew.Namespace(),
-		clusterName:   cluster.ClusterName,
-		projectLister: cluster.Management.Management.Projects("").Controller().Lister(),
+		namespaces:       cluster.Corew.Namespace(),
+		clusterName:      cluster.ClusterName,
+		projectLister:    cluster.Management.Management.Projects("").Controller().Lister(),
+		systemNamespaces: systemNamespaces,
 	}
 	cluster.Corew.Namespace().OnChange(ctx, "defaultSvcAccountHandler", nsh.Sync)
 }
@@ -72,12 +79,7 @@ func (nsh *defaultSvcAccountHandler) handleIfSystemNSDefaultSA(ns *corev1.Namesp
 }
 
 func (nsh *defaultSvcAccountHandler) isSystemNS(namespace string) bool {
-	systemNamespacesStr := settings.SystemNamespaces.Get()
-	if systemNamespacesStr == "" {
-		return false
-	}
-	systemNamespaces := strings.Split(systemNamespacesStr, ",")
-	return slice.ContainsString(systemNamespaces, namespace)
+	return slice.ContainsString(nsh.systemNamespaces, namespace)
 }
 
 func (nsh *defaultSvcAccountHandler) isSystemProjectNS(nsObj *corev1.Namespace, sysProjectAnnotation string) bool {
