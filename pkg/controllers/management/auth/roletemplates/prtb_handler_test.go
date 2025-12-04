@@ -379,7 +379,7 @@ func Test_prtbHandler_reconcileMembershipBindings(t *testing.T) {
 	type controllers struct {
 		rbController  *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]
 		crbController *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]
-		rtController  *fake.MockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]
+		crController  *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]
 	}
 	tests := []struct {
 		name             string
@@ -390,7 +390,7 @@ func Test_prtbHandler_reconcileMembershipBindings(t *testing.T) {
 		{
 			name: "error getting roletemplate",
 			setupControllers: func(c controllers) {
-				c.rtController.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(nil, errDefault)
+				c.crController.EXPECT().Get("test-rt-aggregator", metav1.GetOptions{}).Return(nil, errDefault)
 			},
 			prtb:    defaultPRTB.DeepCopy(),
 			wantErr: true,
@@ -400,7 +400,7 @@ func Test_prtbHandler_reconcileMembershipBindings(t *testing.T) {
 		{
 			name: "create cluster and project membership bindings",
 			setupControllers: func(c controllers) {
-				c.rtController.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(&v3.RoleTemplate{
+				c.crController.EXPECT().Get("test-rt-aggregator", metav1.GetOptions{}).Return(&rbacv1.ClusterRole{
 					ObjectMeta: metav1.ObjectMeta{Name: "test-rt"},
 				}, nil)
 
@@ -419,7 +419,7 @@ func Test_prtbHandler_reconcileMembershipBindings(t *testing.T) {
 			c := controllers{
 				rbController:  fake.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl),
 				crbController: fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl),
-				rtController:  fake.NewMockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList](ctrl),
+				crController:  fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl),
 			}
 			if tt.setupControllers != nil {
 				tt.setupControllers(c)
@@ -427,7 +427,7 @@ func Test_prtbHandler_reconcileMembershipBindings(t *testing.T) {
 			p := &prtbHandler{
 				rbController:  c.rbController,
 				crbController: c.crbController,
-				rtController:  c.rtController,
+				crController:  c.crController,
 			}
 			if err := p.reconcileMembershipBindings(tt.prtb); (err != nil) != tt.wantErr {
 				t.Errorf("prtbHandler.reconcileMembershipBindings() error = %v, wantErr %v", err, tt.wantErr)

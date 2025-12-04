@@ -211,7 +211,7 @@ func Test_crtbHandler_reconcileSubject(t *testing.T) {
 
 func Test_crtbHandler_reconcileMembershipBindings(t *testing.T) {
 	type controllers struct {
-		rtController  *fake.MockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]
+		crController  *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]
 		crbController *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]
 	}
 	tests := []struct {
@@ -222,15 +222,15 @@ func Test_crtbHandler_reconcileMembershipBindings(t *testing.T) {
 		wantErr          bool
 	}{
 		{
-			name: "error getting role template",
+			name: "error getting cluster role",
 			crtb: &v3.ClusterRoleTemplateBinding{
 				RoleTemplateName: "test-rt",
 			},
 			setupControllers: func(c controllers) {
-				c.rtController.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(nil, errDefault)
+				c.crController.EXPECT().Get("test-rt-aggregator", metav1.GetOptions{}).Return(nil, errDefault)
 			},
 			wantedCondition: &reducedCondition{
-				reason: failedToGetRoleTemplate,
+				reason: failedToGetClusterRole,
 				status: metav1.ConditionFalse,
 			},
 			wantErr: true,
@@ -239,8 +239,9 @@ func Test_crtbHandler_reconcileMembershipBindings(t *testing.T) {
 			name: "error creating cluster membership binding",
 			crtb: defaultCRTB.DeepCopy(),
 			setupControllers: func(c controllers) {
-				c.rtController.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(&v3.RoleTemplate{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-rt"},
+				c.crController.EXPECT().Get("test-rt-aggregator", metav1.GetOptions{}).Return(&rbacv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-rt-aggregator"},
+					Rules:      []rbacv1.PolicyRule{},
 				}, nil)
 
 				c.crbController.EXPECT().Get(defaultClusterCRB.Name, metav1.GetOptions{}).Return(nil, errDefault)
@@ -255,8 +256,9 @@ func Test_crtbHandler_reconcileMembershipBindings(t *testing.T) {
 			name: "cluster membership binding is created",
 			crtb: defaultCRTB.DeepCopy(),
 			setupControllers: func(c controllers) {
-				c.rtController.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(&v3.RoleTemplate{
-					ObjectMeta: metav1.ObjectMeta{Name: "test-rt"},
+				c.crController.EXPECT().Get("test-rt-aggregator", metav1.GetOptions{}).Return(&rbacv1.ClusterRole{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-rt-aggregator"},
+					Rules:      []rbacv1.PolicyRule{},
 				}, nil)
 
 				c.crbController.EXPECT().Get(defaultClusterCRB.Name, metav1.GetOptions{}).Return(nil, errNotFound)
@@ -272,7 +274,7 @@ func Test_crtbHandler_reconcileMembershipBindings(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			controllers := controllers{
-				rtController:  fake.NewMockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList](ctrl),
+				crController:  fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl),
 				crbController: fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl),
 			}
 			if tt.setupControllers != nil {
@@ -280,7 +282,7 @@ func Test_crtbHandler_reconcileMembershipBindings(t *testing.T) {
 			}
 			c := &crtbHandler{
 				s:             status.NewStatus(),
-				rtController:  controllers.rtController,
+				crController:  controllers.crController,
 				crbController: controllers.crbController,
 			}
 			localConditions := []metav1.Condition{}
