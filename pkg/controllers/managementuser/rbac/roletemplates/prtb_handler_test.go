@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
@@ -102,7 +103,7 @@ var (
 func Test_prtbHandler_OnRemove(t *testing.T) {
 	prtbOwnerLabel := "authz.cluster.cattle.io/prtb-owner-test-prtb"
 	prtbOwnerLabel2 := "authz.cluster.cattle.io/prtb-owner-test-prtb-2"
-	listOptions := metav1.ListOptions{LabelSelector: prtbOwnerLabel}
+	listOptions := metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/prtb-owner=test-prtb,management.cattle.io/roletemplate-aggregation=true"}
 
 	type fields struct {
 		crbClient func(ctrl *gomock.Controller) *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]
@@ -157,7 +158,9 @@ func Test_prtbHandler_OnRemove(t *testing.T) {
 					return nil
 				},
 				crbClient: func(ctrl *gomock.Controller) *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList] {
-					return nil
+					m := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl)
+					m.EXPECT().List(listOptions).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+					return m
 				},
 			},
 			wantErr: true,
@@ -177,7 +180,9 @@ func Test_prtbHandler_OnRemove(t *testing.T) {
 					return m
 				},
 				crbClient: func(ctrl *gomock.Controller) *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList] {
-					return nil
+					m := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl)
+					m.EXPECT().List(listOptions).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+					return m
 				},
 			},
 			wantErr: true,
@@ -258,7 +263,7 @@ func Test_prtbHandler_OnRemove(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-
+			features.AggregatedRoleTemplates.Set(true)
 			p := &prtbHandler{
 				crbClient: tt.fields.crbClient(ctrl),
 				nsClient:  tt.fields.nsClient(ctrl),
@@ -422,8 +427,11 @@ var (
 	rbListOptions        = metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/prtb-owner-test-prtb"}
 	defaultRoleBinding   = rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   "rb-d2l5e2jqi6",
-			Labels: map[string]string{"authz.cluster.cattle.io/prtb-owner-test-prtb": "true"},
+			Name: "rb-d2l5e2jqi6",
+			Labels: map[string]string{
+				"authz.cluster.cattle.io/prtb-owner-test-prtb":  "true",
+				"management.cattle.io/roletemplate-aggregation": "true",
+			},
 		},
 		RoleRef: rbacv1.RoleRef{
 			Kind:     "ClusterRole",
@@ -763,7 +771,11 @@ func Test_ensureOnlyDesiredClusterRoleBindingsExists(t *testing.T) {
 			},
 			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				m.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
-				m.EXPECT().Create(&rbacv1.ClusterRoleBinding{ObjectMeta: metav1.ObjectMeta{Name: "crb1"}}).Return(nil, errDefault)
+				m.EXPECT().Create(&rbacv1.ClusterRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "crb1",
+						Labels: map[string]string{"management.cattle.io/roletemplate-aggregation": "true"},
+					}}).Return(nil, errDefault)
 			},
 			wantErr: true,
 		},
@@ -775,8 +787,16 @@ func Test_ensureOnlyDesiredClusterRoleBindingsExists(t *testing.T) {
 			},
 			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				m.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
-				m.EXPECT().Create(&rbacv1.ClusterRoleBinding{ObjectMeta: metav1.ObjectMeta{Name: "crb1"}}).Return(nil, nil)
-				m.EXPECT().Create(&rbacv1.ClusterRoleBinding{ObjectMeta: metav1.ObjectMeta{Name: "crb2"}}).Return(nil, nil)
+				m.EXPECT().Create(&rbacv1.ClusterRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "crb1",
+						Labels: map[string]string{"management.cattle.io/roletemplate-aggregation": "true"},
+					}}).Return(nil, nil)
+				m.EXPECT().Create(&rbacv1.ClusterRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "crb2",
+						Labels: map[string]string{"management.cattle.io/roletemplate-aggregation": "true"},
+					}}).Return(nil, nil)
 			},
 		},
 		{
@@ -835,9 +855,12 @@ func Test_ensureOnlyDesiredClusterRoleBindingsExists(t *testing.T) {
 				}}, nil)
 				m.EXPECT().Delete("crb2", &metav1.DeleteOptions{}).Return(nil)
 				m.EXPECT().Create(&rbacv1.ClusterRoleBinding{
-					ObjectMeta: metav1.ObjectMeta{Name: "crb2"},
-					RoleRef:    defaultCRB.RoleRef,
-					Subjects:   defaultCRB.Subjects,
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "crb2",
+						Labels: map[string]string{"management.cattle.io/roletemplate-aggregation": "true"},
+					},
+					RoleRef:  defaultCRB.RoleRef,
+					Subjects: defaultCRB.Subjects,
 				})
 			},
 		},
