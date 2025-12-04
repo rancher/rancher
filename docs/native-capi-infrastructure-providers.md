@@ -137,9 +137,80 @@ For native CAPI infrastructure providers, machine addresses are discovered from 
 
 ### Cloud Credentials
 
-When using native CAPI infrastructure providers:
-- The `cloudCredentialSecretName` field in the cluster spec is ignored for infrastructure provisioning
-- Credentials must be configured according to the infrastructure provider's requirements (typically via Kubernetes Secrets referenced by the infrastructure resources)
+When using native CAPI infrastructure providers, **Rancher's cloud credentials model is NOT used** for infrastructure provisioning. Instead, credentials are managed according to each CAPI provider's native mechanism.
+
+#### Key Differences from Rancher Machine-based Provisioning
+
+| Aspect | Rancher Machine | Native CAPI Providers |
+|--------|-----------------|----------------------|
+| Credential Storage | `cloudCredentialSecretName` in cluster spec | Provider-specific Secrets referenced by infrastructure resources |
+| Credential Format | Rancher-specific format in `cattle-global-data` namespace | Provider-specific format (e.g., CAPV uses `VSphereClusterIdentity`) |
+| Scope | Per-cluster or per-machine-pool | Per-infrastructure resource |
+
+#### CAPV (vSphere) Credentials
+
+For CAPV, credentials are configured using `VSphereClusterIdentity` and referenced by `VSphereCluster`:
+
+```yaml
+# Step 1: Create a Secret with vSphere credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vsphere-credentials
+  namespace: fleet-default
+stringData:
+  username: administrator@vsphere.local
+  password: your-password
+---
+# Step 2: Create a VSphereClusterIdentity that references the secret
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: VSphereClusterIdentity
+metadata:
+  name: vsphere-identity
+spec:
+  secretName: vsphere-credentials
+  allowedNamespaces:
+    selector:
+      matchLabels: {}  # Allow all namespaces, or restrict as needed
+---
+# Step 3: Reference the identity in your VSphereCluster
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: VSphereCluster
+metadata:
+  name: my-cluster-infra
+  namespace: fleet-default
+spec:
+  identityRef:
+    kind: VSphereClusterIdentity
+    name: vsphere-identity
+  # ... other spec fields
+```
+
+#### CAPA (AWS) Credentials
+
+For CAPA, credentials are typically configured via:
+- IAM roles for service accounts (IRSA) when running on EKS
+- AWS credentials in a Secret referenced by `AWSClusterRoleIdentity` or `AWSClusterStaticIdentity`
+
+```yaml
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta2
+kind: AWSClusterStaticIdentity
+metadata:
+  name: aws-identity
+spec:
+  secretRef: aws-credentials
+  allowedNamespaces:
+    selector:
+      matchLabels: {}
+```
+
+#### Important Notes
+
+1. **Rancher's `cloudCredentialSecretName` is ignored**: When using native CAPI infrastructure references, the `cloudCredentialSecretName` field in the provisioning cluster spec has no effect on infrastructure provisioning.
+
+2. **Credentials are pre-created**: Unlike Rancher's cloud credentials which can be created via the UI, native CAPI credentials must be pre-created as Kubernetes resources before creating the cluster.
+
+3. **No UI integration**: Currently, there is no Rancher UI support for managing native CAPI provider credentials. They must be created via kubectl or GitOps workflows.
 
 ## Troubleshooting
 
