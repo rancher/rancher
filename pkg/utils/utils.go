@@ -33,3 +33,8 @@ func IsPlainIPV6(address string) bool {
 func IsMCMServerOnly() bool {
 	return !features.MCMAgent.Enabled() && features.MCM.Enabled()
 }
+
+// IsAgentOnly identifies when a Rancher instance is acting as only an MCM Agent
+func IsAgentOnly() bool {
+	return features.MCMAgent.Enabled() && !features.MCM.Enabled()
+}
