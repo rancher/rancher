@@ -163,7 +163,8 @@ type RKEConfig struct {
 	// - AWSCluster (infrastructure.cluster.x-k8s.io/v1beta2) from CAPA
 	// - Other native CAPI infrastructure provider clusters
 	// The referenced infrastructure cluster must be pre-created in the same
-	// namespace and implement the CAPI infrastructure cluster contract.
+	// namespace and implement the CAPI infrastructure cluster contract
+	// (see https://cluster-api.sigs.k8s.io/developer/providers/contracts/infra-cluster).
 	// +nullable
 	// +optional
 	InfrastructureRef *corev1.ObjectReference `json:"infrastructureRef,omitempty"`
@@ -221,7 +222,8 @@ type RKEMachinePool struct {
 	// - AWSMachineTemplate (infrastructure.cluster.x-k8s.io/v1beta2) from CAPA
 	// - Other native CAPI infrastructure provider machine templates
 	// When using a native CAPI template, ensure the template is pre-created
-	// in the same namespace and implements the CAPI machine template contract.
+	// in the same namespace and implements the CAPI machine template contract
+	// (see https://cluster-api.sigs.k8s.io/developer/providers/contracts/infra-machine).
 	// +nullable
 	// +required
 	NodeConfig *corev1.ObjectReference `json:"machineConfigRef,omitempty"`
