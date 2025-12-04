@@ -364,6 +364,7 @@ func addAddresses(secrets corecontrollers.SecretCache, config map[string]interfa
 	}
 
 	updateConfigWithAddresses(config, info)
+	updateConfigWithAdvertiseAddresses(config, info)
 	return nil
 }
 
@@ -373,12 +374,14 @@ type machineNetworkInfo struct {
 	ExternalAddresses []string
 	IPv6Address       string
 	DriverName        string
+	Entry             *planEntry
 }
 
 // getMachineNetworkInfo retrieves IP address information and the driver name for a given machine entry.
 // It first checks annotations, if needed fetches the machine state secret to extract addresses from the driver config.
 func getMachineNetworkInfo(secrets corecontrollers.SecretCache, entry *planEntry) (*machineNetworkInfo, error) {
 	info := &machineNetworkInfo{}
+	info.Entry = entry
 	if ips := entry.Metadata.Annotations[capr.InternalAddressAnnotation]; ips != "" {
 		for _, ip := range strings.Split(ips, ",") {
 			if ip != "" {
@@ -438,8 +441,6 @@ func getMachineNetworkInfo(secrets corecontrollers.SecretCache, entry *planEntry
 }
 
 // updateConfigWithAddresses mutates the node configuration map based on the provided network information.
-// As long as Rancher sets the node-ip and node-external-ip properly, RKE2/K3s will automatically
-// determine the appropriate advertise-address and tls-san values.
 func updateConfigWithAddresses(config map[string]interface{}, info *machineNetworkInfo) {
 	nodeIPs := convert.ToStringSlice(config["node-ip"])
 	var toAdd []string
@@ -490,6 +491,29 @@ func updateConfigWithAddresses(config map[string]interface{}, info *machineNetwo
 			}
 		}
 		config["node-external-ip"] = nodeExternalIPs
+	}
+}
+
+// updateConfigWithAdvertiseAddresses sets the advertise-address and tls-san in the config
+// if the non-worker node has different internal and external IPs.
+func updateConfigWithAdvertiseAddresses(config map[string]interface{}, info *machineNetworkInfo) {
+	if isOnlyWorker(info.Entry) || len(info.InternalAddresses) == 0 || len(info.ExternalAddresses) == 0 {
+		return
+	}
+	internalAddresses := slices.Clone(info.InternalAddresses)
+	externalAddresses := slices.Clone(info.ExternalAddresses)
+	slices.Sort(internalAddresses)
+	slices.Sort(externalAddresses)
+	if !slices.Equal(internalAddresses, externalAddresses) {
+		config["advertise-address"] = info.InternalAddresses[0]
+
+		tlsSan := convert.ToStringSlice(config["tls-san"])
+		for _, ip := range info.ExternalAddresses {
+			if !slices.Contains(tlsSan, ip) {
+				tlsSan = append(tlsSan, ip)
+			}
+		}
+		config["tls-san"] = tlsSan
 	}
 }
 
