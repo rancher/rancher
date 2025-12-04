@@ -5,6 +5,7 @@ import (
 	"time"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/stretchr/testify/require"
 
 	provisioningv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/v2prov/clients"
@@ -37,6 +38,11 @@ func Test_Operation_SetA_Custom_EtcdSnapshotCreationRestoreInPlace(t *testing.T)
 					ETCD: &rkev1.ETCD{
 						DisableSnapshots: true,
 					},
+					MachineSelectorConfig: []rkev1.RKESystemConfig{},
+					ChartValues:           rkev1.GenericMap{},
+					UpgradeStrategy:       rkev1.ClusterUpgradeStrategy{},
+					AdditionalManifest:    "",
+					Networking:            &rkev1.Networking{},
 				},
 			},
 		},
@@ -77,7 +83,16 @@ func Test_Operation_SetA_Custom_EtcdSnapshotCreationRestoreInPlace(t *testing.T)
 	}
 
 	snapshot := operations.RunSnapshotCreateTest(t, clients, c, cm, "etcd-test-node")
-	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.Name, cm, 2)
+
+	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.Name, cm, 2, rkev1.RestoreRKEConfigAll)
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	require.NoError(t, err)
+
+	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.Name, cm, 2, rkev1.RestoreRKEConfigKubernetesVersion)
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	require.NoError(t, err)
+
+	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.Name, cm, 2, rkev1.RestoreRKEConfigNone)
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	assert.NoError(t, err)
 }
