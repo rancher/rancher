@@ -20,7 +20,7 @@ type reducedCondition struct {
 }
 
 var (
-	defaultListOption = metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/crtb-owner-test-crtb"}
+	defaultListOption = metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/crtb-owner=test-crtb,management.cattle.io/roletemplate-aggregation=true"}
 	defaultCRTB       = v3.ClusterRoleTemplateBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-crtb",
@@ -30,8 +30,11 @@ var (
 	}
 	defaultCRB = rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   "crb-mggi3adyhn",
-			Labels: map[string]string{"authz.cluster.cattle.io/crtb-owner-test-crtb": "true"},
+			Name: "crb-mggi3adyhn",
+			Labels: map[string]string{
+				"authz.cluster.cattle.io/crtb-owner-test-crtb":  "true",
+				"management.cattle.io/roletemplate-aggregation": "true",
+			},
 		},
 		RoleRef: rbacv1.RoleRef{
 			Kind:     "ClusterRole",
@@ -49,8 +52,11 @@ var (
 	}
 	externalCRB = rbacv1.ClusterRoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:   "crb-panishv6ga",
-			Labels: map[string]string{"authz.cluster.cattle.io/crtb-owner-test-crtb": "true"},
+			Name: "crb-panishv6ga",
+			Labels: map[string]string{
+				"authz.cluster.cattle.io/crtb-owner-test-crtb":  "true",
+				"management.cattle.io/roletemplate-aggregation": "true",
+			},
 		},
 		RoleRef: rbacv1.RoleRef{
 			Kind:     "ClusterRole",
@@ -75,6 +81,8 @@ var (
 )
 
 func Test_reconcileBindings(t *testing.T) {
+	listOption := metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/crtb-owner-test-crtb"}
+
 	tests := []struct {
 		name               string
 		setupCRBController func(*fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList])
@@ -98,7 +106,7 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "error on list CRB",
 			setupCRBController: func(c *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
-				c.EXPECT().List(defaultListOption).Return(nil, errDefault)
+				c.EXPECT().List(listOption).Return(nil, errDefault)
 			},
 			setupRTController: func(m *fake.MockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]) {
 				m.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(nonExternalRT.DeepCopy(), nil)
@@ -113,7 +121,7 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "error creating CRB",
 			setupCRBController: func(c *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
-				c.EXPECT().List(defaultListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				c.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
 				c.EXPECT().Create(defaultCRB.DeepCopy()).Return(nil, errDefault)
 			},
 			setupRTController: func(m *fake.MockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]) {
@@ -129,7 +137,7 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "success creating CRB",
 			setupCRBController: func(c *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
-				c.EXPECT().List(defaultListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				c.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
 				c.EXPECT().Create(defaultCRB.DeepCopy()).Return(nil, nil)
 			},
 			setupRTController: func(m *fake.MockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]) {
@@ -144,7 +152,7 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "CRB already exists no create needed",
 			setupCRBController: func(c *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
-				c.EXPECT().List(defaultListOption).Return(&rbacv1.ClusterRoleBindingList{
+				c.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{
 					Items: []rbacv1.ClusterRoleBinding{*defaultCRB.DeepCopy()},
 				}, nil)
 			},
@@ -160,7 +168,7 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "error deleting CRB",
 			setupCRBController: func(c *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
-				c.EXPECT().List(defaultListOption).Return(&rbacv1.ClusterRoleBindingList{
+				c.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{
 					Items: []rbacv1.ClusterRoleBinding{
 						{
 							ObjectMeta: metav1.ObjectMeta{Name: "bad-crb1"},
@@ -182,7 +190,7 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "wrong CRBs exist and get deleted",
 			setupCRBController: func(c *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
-				c.EXPECT().List(defaultListOption).Return(&rbacv1.ClusterRoleBindingList{
+				c.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{
 					Items: []rbacv1.ClusterRoleBinding{
 						{
 							ObjectMeta: metav1.ObjectMeta{Name: "bad-crb1"},
@@ -208,7 +216,7 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "wrong CRBs exist and are deleted but correct CRB exists and is not created again",
 			setupCRBController: func(c *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
-				c.EXPECT().List(defaultListOption).Return(&rbacv1.ClusterRoleBindingList{
+				c.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{
 					Items: []rbacv1.ClusterRoleBinding{
 						{
 							ObjectMeta: metav1.ObjectMeta{Name: "bad-crb1"},
@@ -246,7 +254,7 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "create binding for external cluster role",
 			setupCRBController: func(c *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
-				c.EXPECT().List(defaultListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				c.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
 				c.EXPECT().Create(externalCRB.DeepCopy()).Return(nil, nil)
 			},
 			setupRTController: func(m *fake.MockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]) {

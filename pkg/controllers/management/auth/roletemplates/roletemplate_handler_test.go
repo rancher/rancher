@@ -7,6 +7,7 @@ import (
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
@@ -60,8 +61,9 @@ var (
 			Name:            "test-rt-project-mgmt",
 			OwnerReferences: []metav1.OwnerReference{defaultOwnerReference},
 			Labels: map[string]string{
-				"management.cattle.io/aggregates":           "test-rt-project-mgmt",
-				"authz.cluster.cattle.io/clusterrole-owner": "test-rt",
+				"management.cattle.io/aggregates":               "test-rt-project-mgmt",
+				"authz.cluster.cattle.io/clusterrole-owner":     "test-rt",
+				"management.cattle.io/roletemplate-aggregation": "true",
 			},
 		},
 		Rules: []rbacv1.PolicyRule{getPRTBS},
@@ -71,8 +73,9 @@ var (
 			Name:            "test-rt-project-mgmt-aggregator",
 			OwnerReferences: []metav1.OwnerReference{defaultOwnerReference},
 			Labels: map[string]string{
-				"management.cattle.io/aggregates":           "test-rt-project-mgmt-aggregator",
-				"authz.cluster.cattle.io/clusterrole-owner": "test-rt",
+				"management.cattle.io/aggregates":               "test-rt-project-mgmt-aggregator",
+				"management.cattle.io/roletemplate-aggregation": "true",
+				"authz.cluster.cattle.io/clusterrole-owner":     "test-rt",
 			},
 		},
 		AggregationRule: &rbacv1.AggregationRule{
@@ -88,8 +91,9 @@ var (
 			Name:            "test-rt-cluster-mgmt",
 			OwnerReferences: []metav1.OwnerReference{defaultOwnerReference},
 			Labels: map[string]string{
-				"management.cattle.io/aggregates":           "test-rt-cluster-mgmt",
-				"authz.cluster.cattle.io/clusterrole-owner": "test-rt",
+				"management.cattle.io/aggregates":               "test-rt-cluster-mgmt",
+				"authz.cluster.cattle.io/clusterrole-owner":     "test-rt",
+				"management.cattle.io/roletemplate-aggregation": "true",
 			},
 		},
 		Rules: []rbacv1.PolicyRule{getCRTBs},
@@ -99,8 +103,9 @@ var (
 			Name:            "test-rt-cluster-mgmt-aggregator",
 			OwnerReferences: []metav1.OwnerReference{defaultOwnerReference},
 			Labels: map[string]string{
-				"management.cattle.io/aggregates":           "test-rt-cluster-mgmt-aggregator",
-				"authz.cluster.cattle.io/clusterrole-owner": "test-rt",
+				"management.cattle.io/aggregates":               "test-rt-cluster-mgmt-aggregator",
+				"authz.cluster.cattle.io/clusterrole-owner":     "test-rt",
+				"management.cattle.io/roletemplate-aggregation": "true",
 			},
 		},
 		AggregationRule: &rbacv1.AggregationRule{
@@ -327,8 +332,9 @@ func Test_OnChange(t *testing.T) {
 							},
 						},
 						Labels: map[string]string{
-							"management.cattle.io/aggregates":           "test-rt-project-mgmt-aggregator",
-							"authz.cluster.cattle.io/clusterrole-owner": "test-rt",
+							"management.cattle.io/aggregates":               "test-rt-project-mgmt-aggregator",
+							"authz.cluster.cattle.io/clusterrole-owner":     "test-rt",
+							"management.cattle.io/roletemplate-aggregation": "true",
 						},
 					},
 					AggregationRule: &rbacv1.AggregationRule{
@@ -356,8 +362,9 @@ func Test_OnChange(t *testing.T) {
 							},
 						},
 						Labels: map[string]string{
-							"management.cattle.io/aggregates":           "test-rt-cluster-mgmt-aggregator",
-							"authz.cluster.cattle.io/clusterrole-owner": "test-rt",
+							"management.cattle.io/aggregates":               "test-rt-cluster-mgmt-aggregator",
+							"authz.cluster.cattle.io/clusterrole-owner":     "test-rt",
+							"management.cattle.io/roletemplate-aggregation": "true",
 						},
 					},
 					AggregationRule: &rbacv1.AggregationRule{
@@ -398,8 +405,9 @@ func Test_OnChange(t *testing.T) {
 							},
 						},
 						Labels: map[string]string{
-							"management.cattle.io/aggregates":           "test-rt-project-mgmt-aggregator",
-							"authz.cluster.cattle.io/clusterrole-owner": "test-rt",
+							"management.cattle.io/aggregates":               "test-rt-project-mgmt-aggregator",
+							"authz.cluster.cattle.io/clusterrole-owner":     "test-rt",
+							"management.cattle.io/roletemplate-aggregation": "true",
 						},
 					},
 					AggregationRule: &rbacv1.AggregationRule{
@@ -559,6 +567,7 @@ func Test_OnChange(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+			features.AggregatedRoleTemplates.Set(true)
 			crController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
 			if tt.setupClusterRoleController != nil {
 				tt.setupClusterRoleController(crController)
