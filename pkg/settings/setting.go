@@ -32,6 +32,7 @@ var (
 	provider       Provider
 	InjectDefaults string
 
+	// systemNamespaces is the default value of namespaces to go in the "System" project on rancher clusters
 	systemNamespaces = []string{
 		"kube-system",
 		"kube-public",
@@ -62,6 +63,8 @@ var (
 		"cattle-oidc-codes",
 		"cattle-oidc-client-secrets",
 	}
+	// agentSystemNamespaces is the default value of namespaces to go into "System" project on downstream clusters
+	agentSystemNamespaces = []string{}
 
 	AgentImage          = NewSetting("agent-image", "rancher/rancher-agent:head")
 	AgentRolloutTimeout = NewSetting("agent-rollout-timeout", "300s")
@@ -116,6 +119,7 @@ var (
 	SystemAgentUpgradeImage             = NewSetting("system-agent-upgrade-image", "")   // Defined via environment variable
 	WinsAgentUpgradeImage               = NewSetting("wins-agent-upgrade-image", "")
 	SystemNamespaces                    = NewSetting("system-namespaces", strings.Join(systemNamespaces, ","))
+	AgentSystemNamespaces               = NewSetting("agent-system-namespaces", strings.Join(systemNamespaces, ","))
 	SystemUpgradeControllerChartVersion = NewSetting("system-upgrade-controller-chart-version", "")
 	TLSMinVersion                       = NewSetting("tls-min-version", "1.2")
 	TLSCiphers                          = NewSetting("tls-ciphers", "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305")
