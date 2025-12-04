@@ -345,7 +345,10 @@ func Test_crtbHandler_getDesiredRoleBindings(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "rb-visjzlqzqw",
 						Namespace: "test-namespace",
-						Labels:    map[string]string{"authz.cluster.cattle.io/crtb-owner-test-crtb": "true"},
+						Labels: map[string]string{
+							"authz.cluster.cattle.io/crtb-owner-test-crtb":  "true",
+							"management.cattle.io/roletemplate-aggregation": "true",
+						},
 					},
 					RoleRef: rbacv1.RoleRef{
 						APIGroup: "rbac.authorization.k8s.io",
@@ -368,7 +371,10 @@ func Test_crtbHandler_getDesiredRoleBindings(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "rb-lhchhtbxqn",
 						Namespace: "test-namespace",
-						Labels:    map[string]string{"authz.cluster.cattle.io/crtb-owner-test-crtb": "true"},
+						Labels: map[string]string{
+							"authz.cluster.cattle.io/crtb-owner-test-crtb":  "true",
+							"management.cattle.io/roletemplate-aggregation": "true",
+						},
 					},
 					RoleRef: rbacv1.RoleRef{
 						APIGroup: "rbac.authorization.k8s.io",
@@ -391,7 +397,10 @@ func Test_crtbHandler_getDesiredRoleBindings(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "rb-lhchhtbxqn",
 						Namespace: "test-namespace",
-						Labels:    map[string]string{"authz.cluster.cattle.io/crtb-owner-test-crtb": "true"},
+						Labels: map[string]string{
+							"authz.cluster.cattle.io/crtb-owner-test-crtb":  "true",
+							"management.cattle.io/roletemplate-aggregation": "true",
+						},
 					},
 					RoleRef: rbacv1.RoleRef{
 						APIGroup: "rbac.authorization.k8s.io",
@@ -404,7 +413,10 @@ func Test_crtbHandler_getDesiredRoleBindings(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "rb-visjzlqzqw",
 						Namespace: "test-namespace",
-						Labels:    map[string]string{"authz.cluster.cattle.io/crtb-owner-test-crtb": "true"},
+						Labels: map[string]string{
+							"authz.cluster.cattle.io/crtb-owner-test-crtb":  "true",
+							"management.cattle.io/roletemplate-aggregation": "true",
+						},
 					},
 					RoleRef: rbacv1.RoleRef{
 						APIGroup: "rbac.authorization.k8s.io",
