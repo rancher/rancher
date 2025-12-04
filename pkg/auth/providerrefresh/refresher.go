@@ -13,7 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -31,12 +31,12 @@ func NewUserAuthRefresher(scaledContext *config.ScaledContext) UserAuthRefresher
 	extTokenStore := exttokenstore.NewSystemFromWrangler(scaledContext.Wrangler)
 
 	return &refresher{
-		tokenLister:               scaledContext.Management.Tokens("").Controller().Lister(),
-		tokens:                    scaledContext.Management.Tokens(""),
+		tokenCache:                scaledContext.Wrangler.Mgmt.Token().Cache(),
+		tokens:                    scaledContext.Wrangler.Mgmt.Token(),
 		tokenMGR:                  tokens.NewManager(scaledContext.Wrangler),
-		userLister:                scaledContext.Management.Users("").Controller().Lister(),
-		userAttributes:            scaledContext.Management.UserAttributes(""),
-		userAttributeLister:       scaledContext.Management.UserAttributes("").Controller().Lister(),
+		userCache:                 scaledContext.Wrangler.Mgmt.User().Cache(),
+		userAttributes:            scaledContext.Wrangler.Mgmt.UserAttribute(),
+		userAttributeCache:        scaledContext.Wrangler.Mgmt.UserAttribute().Cache(),
 		extTokenStore:             extTokenStore,
 		ensureAndGetUserAttribute: scaledContext.UserManager.EnsureAndGetUserAttribute,
 	}
@@ -44,12 +44,12 @@ func NewUserAuthRefresher(scaledContext *config.ScaledContext) UserAuthRefresher
 
 type refresher struct {
 	sync.Mutex
-	tokenLister               v3.TokenLister
-	tokens                    v3.TokenInterface
+	tokenCache                mgmtcontrollers.TokenCache
+	tokens                    mgmtcontrollers.TokenClient
 	tokenMGR                  *tokens.Manager
-	userLister                v3.UserLister
-	userAttributes            v3.UserAttributeInterface
-	userAttributeLister       v3.UserAttributeLister
+	userCache                 mgmtcontrollers.UserCache
+	userAttributes            mgmtcontrollers.UserAttributeClient
+	userAttributeCache        mgmtcontrollers.UserAttributeCache
 	unparsedMaxAge            string
 	maxAge                    time.Duration
 	extTokenStore             *exttokenstore.SystemStore
@@ -93,7 +93,7 @@ func (r *refresher) TriggerAllUserRefresh() {
 }
 
 func (r *refresher) refreshAll(force bool) {
-	users, err := r.userLister.List("", labels.Everything())
+	users, err := r.userCache.List(labels.Everything())
 	if err != nil {
 		logrus.Errorf("Error listing Users during auth provider refresh: %v", err)
 	}
@@ -117,7 +117,7 @@ func (r *refresher) triggerUserRefresh(userName string, force bool) {
 		return
 	}
 
-	user, err := r.userLister.Get("", userName)
+	user, err := r.userCache.Get(userName)
 	if err != nil {
 		logrus.Errorf("Error finding user before triggering refresh %v", err)
 		return
@@ -149,7 +149,7 @@ func (r *refresher) triggerUserRefresh(userName string, force bool) {
 	}
 }
 
-func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*v3.UserAttribute, error) {
+func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*apiv3.UserAttribute, error) {
 	var (
 		derivedTokenList      []accessor.TokenAccessor
 		canLogInAtAll         bool
@@ -158,7 +158,7 @@ func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*v3.UserAtt
 
 	attribs = attribs.DeepCopy()
 
-	user, err := r.userLister.Get("", attribs.Name)
+	user, err := r.userCache.Get(attribs.Name)
 	if err != nil {
 		return nil, fmt.Errorf("error getting user %s: %w", attribs.Name, err)
 	}
@@ -178,7 +178,7 @@ func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*v3.UserAtt
 
 	// List v3.Tokens.
 	tokenUserIDLabelSet := labels.Set(map[string]string{tokens.UserIDLabel: user.Name})
-	v3Tokens, err := r.tokenLister.List("", tokenUserIDLabelSet.AsSelector())
+	v3Tokens, err := r.tokenCache.List(tokenUserIDLabelSet.AsSelector())
 	if err != nil {
 		return nil, fmt.Errorf("error listing tokens for user %s: %w", user.Name, err)
 	}
@@ -357,7 +357,7 @@ func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*v3.UserAtt
 	return attribs, err
 }
 
-func GetPrincipalIDForProvider(providerName string, user *v3.User) string {
+func GetPrincipalIDForProvider(providerName string, user *apiv3.User) string {
 	prefix := providerName + "_user://"
 	if providerName == "local" {
 		prefix = "local://"
