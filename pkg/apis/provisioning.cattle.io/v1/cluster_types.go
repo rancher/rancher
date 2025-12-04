@@ -156,7 +156,14 @@ type RKEConfig struct {
 
 	// InfrastructureRef is a reference to the infrastructure cluster object
 	// that is required when provisioning a CAPI cluster.
-	// NOTE: in practice this will always be a rkecluster.rke.cattle.io.
+	// When not specified, an RKECluster (rke.cattle.io/v1) will be created
+	// automatically. When specified, this can reference any CAPI-compatible
+	// infrastructure cluster such as:
+	// - VSphereCluster (infrastructure.cluster.x-k8s.io/v1beta1) from CAPV
+	// - AWSCluster (infrastructure.cluster.x-k8s.io/v1beta2) from CAPA
+	// - Other native CAPI infrastructure provider clusters
+	// The referenced infrastructure cluster must be pre-created in the same
+	// namespace and implement the CAPI infrastructure cluster contract.
 	// +nullable
 	// +optional
 	InfrastructureRef *corev1.ObjectReference `json:"infrastructureRef,omitempty"`
@@ -204,10 +211,17 @@ type RKEMachinePool struct {
 	// +optional
 	DrainBeforeDeleteTimeout *metav1.Duration `json:"drainBeforeDeleteTimeout,omitempty"`
 
-	// NodeConfig is a reference to a MachineConfig object that will be used
-	// to configure the machines provisioned by this pool.
-	// The NodeConfig object will, in turn, be used to create a corresponding
-	// MachineTemplate object for the generated machine deployment.
+	// NodeConfig is a reference to a MachineConfig or MachineTemplate object
+	// that will be used to configure the machines provisioned by this pool.
+	// When referencing a rke-machine-config.cattle.io/v1 resource, a
+	// corresponding MachineTemplate will be created automatically.
+	// Alternatively, this can directly reference a native CAPI
+	// InfrastructureMachineTemplate such as:
+	// - VSphereMachineTemplate (infrastructure.cluster.x-k8s.io/v1beta1) from CAPV
+	// - AWSMachineTemplate (infrastructure.cluster.x-k8s.io/v1beta2) from CAPA
+	// - Other native CAPI infrastructure provider machine templates
+	// When using a native CAPI template, ensure the template is pre-created
+	// in the same namespace and implements the CAPI machine template contract.
 	// +nullable
 	// +required
 	NodeConfig *corev1.ObjectReference `json:"machineConfigRef,omitempty"`
