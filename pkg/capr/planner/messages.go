@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/rancher/rancher/pkg/capr"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
@@ -35,9 +36,10 @@ func removeReconciledCondition(machine *capi.Machine) *capi.Machine {
 		return machine
 	}
 
-	conds := make([]capi.Condition, 0, len(machine.Status.Conditions))
+	// In v1beta2, Machine.Status.Conditions is []metav1.Condition
+	conds := make([]metav1.Condition, 0, len(machine.Status.Conditions))
 	for _, c := range machine.Status.Conditions {
-		if string(c.Type) != string(capr.Reconciled) {
+		if c.Type != string(capr.Reconciled) {
 			conds = append(conds, c)
 		}
 	}
@@ -47,6 +49,6 @@ func removeReconciledCondition(machine *capi.Machine) *capi.Machine {
 	}
 
 	machine = machine.DeepCopy()
-	machine.SetConditions(conds)
+	machine.Status.Conditions = conds
 	return machine
 }

@@ -525,13 +525,16 @@ func GatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 	} else if newErr != nil {
 		logrus.Errorf("failed to get capi cluster %s/%s to print error: %v", c.Namespace, c.Name, newErr)
 	} else {
-		infraCluster, newErr = clients.Dynamic.Resource(schema.GroupVersionResource{
-			Group:    capiCluster.Spec.InfrastructureRef.GroupVersionKind().Group,
-			Version:  capiCluster.Spec.InfrastructureRef.GroupVersionKind().Version,
-			Resource: strings.ToLower(fmt.Sprintf("%ss", capiCluster.Spec.InfrastructureRef.GroupVersionKind().Kind)),
-		}).Namespace(capiCluster.Spec.InfrastructureRef.Namespace).Get(context.TODO(), capiCluster.Spec.InfrastructureRef.Name, metav1.GetOptions{})
+		// In v1beta2, InfrastructureRef uses APIGroup instead of APIVersion
+		gvr := schema.GroupVersionResource{
+			Group:    capiCluster.Spec.InfrastructureRef.APIGroup,
+			Version:  "v1", // Default version
+			Resource: strings.ToLower(fmt.Sprintf("%ss", capiCluster.Spec.InfrastructureRef.Kind)),
+		}
+		// In v1beta2, the infrastructure resource is in the same namespace as the cluster
+		infraCluster, newErr = clients.Dynamic.Resource(gvr).Namespace(capiCluster.Namespace).Get(context.TODO(), capiCluster.Spec.InfrastructureRef.Name, metav1.GetOptions{})
 		if newErr != nil {
-			logrus.Errorf("failed to get %s %s/%s to print error: %v", capiCluster.Spec.InfrastructureRef.GroupVersionKind().String(), capiCluster.Spec.InfrastructureRef.Namespace, capiCluster.Spec.InfrastructureRef.Name, newErr)
+			logrus.Errorf("failed to get %s/%s/%s %s/%s to print error: %v", capiCluster.Spec.InfrastructureRef.APIGroup, "v1", capiCluster.Spec.InfrastructureRef.Kind, capiCluster.Namespace, capiCluster.Spec.InfrastructureRef.Name, newErr)
 			infraCluster = nil
 		}
 		machineDeployments, newErr = clients.CAPI.MachineDeployment().List(c.Namespace, metav1.ListOptions{
@@ -620,15 +623,18 @@ func EnsureMinimalConflictsWithThreshold(clients *clients.Clients, c *provisioni
 		logrus.Errorf("failed to get machines for %s/%s to count conflicts: %v", c.Namespace, c.Name, newErr)
 	}
 	for _, machine := range machines.Items {
-		im, newErr := clients.Dynamic.Resource(schema.GroupVersionResource{
-			Group:    machine.Spec.InfrastructureRef.GroupVersionKind().Group,
-			Version:  machine.Spec.InfrastructureRef.GroupVersionKind().Version,
-			Resource: strings.ToLower(fmt.Sprintf("%ss", machine.Spec.InfrastructureRef.GroupVersionKind().Kind)),
-		}).Namespace(machine.Spec.InfrastructureRef.Namespace).Get(context.TODO(), machine.Spec.InfrastructureRef.Name, metav1.GetOptions{})
+		// In v1beta2, InfrastructureRef uses APIGroup instead of APIVersion
+		gvr := schema.GroupVersionResource{
+			Group:    machine.Spec.InfrastructureRef.APIGroup,
+			Version:  "v1", // Default version
+			Resource: strings.ToLower(fmt.Sprintf("%ss", machine.Spec.InfrastructureRef.Kind)),
+		}
+		// In v1beta2, the infrastructure resource is in the same namespace as the machine
+		im, newErr := clients.Dynamic.Resource(gvr).Namespace(machine.Namespace).Get(context.TODO(), machine.Spec.InfrastructureRef.Name, metav1.GetOptions{})
 		if newErr != nil {
-			logrus.Errorf("failed to get %s %s/%s to print error: %v", machine.Spec.InfrastructureRef.GroupVersionKind().String(), machine.Spec.InfrastructureRef.Namespace, machine.Spec.InfrastructureRef.Name, newErr)
+			logrus.Errorf("failed to get %s/%s/%s %s/%s to print error: %v", machine.Spec.InfrastructureRef.APIGroup, "v1", machine.Spec.InfrastructureRef.Kind, machine.Namespace, machine.Spec.InfrastructureRef.Name, newErr)
 		} else {
-			if machine.Spec.InfrastructureRef.GroupVersionKind().Kind == "PodMachine" {
+			if machine.Spec.InfrastructureRef.Kind == "PodMachine" {
 				// In the case of a podmachine, the pod name will be strings.ReplaceAll(infra.meta.GetName(), ".", "-")
 				podName := strings.ReplaceAll(im.GetName(), ".", "-")
 				count, err := countPodLogRegexOccurances(clients, im.GetNamespace(), podName, ConflictMessageRegex)
