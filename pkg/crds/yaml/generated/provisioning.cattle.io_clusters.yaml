@@ -2461,7 +2461,8 @@ spec:
                             description: |-
                               Retention defines the number of snapshots to retain in the S3 bucket.
                               Older snapshots beyond this retention count will be deleted.
-                              If this field is not explicitly set, the retention value from the cluster will be used.
+                              If this field is not explicitly set, the retention value from the etcd retention will be used.
+                            nullable: true
                             type: integer
                           skipSSLVerify:
                             description: |-
