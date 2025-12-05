@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/rancher/rancher/pkg/capr"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 func atMostThree(names []string) string {
