@@ -186,11 +186,6 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	kontainerdriver.RegisterIndexers(wranglerContext)
 	managementauth.RegisterWranglerIndexers(wranglerContext)
 
-	if features.ProvisioningV2.Enabled() {
-		// ensure indexers are registered for all replicas
-		provisioningv2.RegisterIndexers(wranglerContext)
-	}
-
 	clientSet, err := clientset.NewForConfig(restConfig)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new clientset: %w", err)
@@ -204,6 +199,12 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	// install all non migrated CRDs
 	if err := dashboardcrds.Create(ctx, restConfig); err != nil {
 		return nil, fmt.Errorf("failed to create CRDs: %w", err)
+	}
+
+	// Register provisioningv2 indexers after CRDs are ensured, as the ETCDSnapshot
+	// indexer requires the etcdsnapshots.rke.cattle.io CRD to exist
+	if features.ProvisioningV2.Enabled() {
+		provisioningv2.RegisterIndexers(wranglerContext)
 	}
 
 	if features.MCM.Enabled() && !features.Fleet.Enabled() {
