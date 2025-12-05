@@ -98,7 +98,7 @@ func NewForConfig(ctx context.Context, config clientcmd.ClientConfig) (*Clients,
 		Dynamic: dynamic,
 
 		capi: capi,
-		CAPI: capi.Cluster().V1beta1(),
+		CAPI: capi.Cluster().V1beta2(),
 
 		Ctx:    ctx,
 		cancel: cancel,

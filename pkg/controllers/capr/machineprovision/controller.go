@@ -409,7 +409,7 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 
 	// If the controller owner reference is not properly configured, or the CAPI machine does not exist, there is no way
 	// to recover from this situation, so we should proceed with deletion
-	if machine == nil || machine.Status.NodeRef == nil {
+	if machine == nil || !machine.Status.NodeRef.IsDefined() {
 		// Machine noderef is nil, we should just allow deletion.
 		logrus.Debugf("[machineprovision] There was no associated K8s node with this machine %s. Proceeding with deletion", key)
 		return h.doRemove(infra)
@@ -556,7 +556,9 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 		return obj, generic.ErrSkip
 	}
 
-	if !capiCluster.Status.InfrastructureReady {
+	// In v1beta2, InfrastructureReady moved to Initialization.InfrastructureProvisioned
+	infraReady := capiCluster.Status.Initialization.InfrastructureProvisioned != nil && *capiCluster.Status.Initialization.InfrastructureProvisioned
+	if !infraReady {
 		logrus.Debugf("[machineprovision] %s/%s: waiting: CAPI cluster infrastructure is not ready", infra.meta.GetNamespace(), infra.meta.GetName())
 		h.EnqueueAfter(infra, 10*time.Second)
 		return obj, generic.ErrSkip

@@ -398,11 +398,13 @@ func getMachineNetworkInfo(secrets corecontrollers.SecretCache, entry *planEntry
 	externalProvided := len(info.ExternalAddresses) > 0
 
 	// Skip secret lookup for custom nodes or when both addresses are already provided
-	if entry.Machine.Spec.InfrastructureRef.APIVersion != capr.RKEMachineAPIVersion || (internalProvided && externalProvided) {
+	// In v1beta2, InfrastructureRef uses APIGroup instead of APIVersion
+	if entry.Machine.Spec.InfrastructureRef.APIGroup != "rke.cattle.io" || (internalProvided && externalProvided) {
 		return info, nil
 	}
 
-	secret, err := secrets.Get(entry.Machine.Spec.InfrastructureRef.Namespace, capr.MachineStateSecretName(entry.Machine.Spec.InfrastructureRef.Name))
+	// In v1beta2, the infrastructure resource is in the same namespace as the machine
+	secret, err := secrets.Get(entry.Machine.Namespace, capr.MachineStateSecretName(entry.Machine.Spec.InfrastructureRef.Name))
 	if apierrors.IsNotFound(err) || (secret != nil && len(secret.Data["extractedConfig"]) == 0) {
 		return nil, errIgnore(fmt.Sprintf("waiting for machine %s/%s driver config to be saved", entry.Machine.Namespace, entry.Machine.Name))
 	} else if err != nil {

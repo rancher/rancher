@@ -77,12 +77,18 @@ func (h *handler) associateMachineWithNode(_ string, bootstrap *rkev1.RKEBootstr
 		return bootstrap, err
 	}
 
-	if machine.Spec.ProviderID != nil && *machine.Spec.ProviderID != "" {
+	// In v1beta2, ProviderID is a string instead of *string
+	if machine.Spec.ProviderID != "" {
 		// If the machine already has its provider ID set, then we do not need to continue
 		return bootstrap, nil
 	}
 
-	gvk := schema.FromAPIVersionAndKind(machine.Spec.InfrastructureRef.APIVersion, machine.Spec.InfrastructureRef.Kind)
+	// In v1beta2, InfrastructureRef uses APIGroup instead of APIVersion
+	gvk := schema.GroupVersionKind{
+		Group:   machine.Spec.InfrastructureRef.APIGroup,
+		Version: "v1", // Default version, determined by contract
+		Kind:    machine.Spec.InfrastructureRef.Kind,
+	}
 	infra, err := h.dynamic.Get(gvk, machine.Namespace, machine.Spec.InfrastructureRef.Name)
 	if apierror.IsNotFound(err) {
 		return bootstrap, nil

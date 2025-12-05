@@ -200,12 +200,15 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]any, d
 }
 
 func (h *handler) getBootstrapSecret(machine *capi.Machine) (string, error) {
-	if machine == nil || machine.Spec.Bootstrap.ConfigRef == nil {
+	if machine == nil || !machine.Spec.Bootstrap.ConfigRef.IsDefined() {
 		return "", nil
 	}
 
-	gvk := schema.FromAPIVersionAndKind(machine.Spec.Bootstrap.ConfigRef.APIVersion,
-		machine.Spec.Bootstrap.ConfigRef.Kind)
+	gvk := schema.GroupVersionKind{
+		Group:   machine.Spec.Bootstrap.ConfigRef.APIGroup,
+		Version: "v1", // The version is determined by the contract, defaulting to v1
+		Kind:    machine.Spec.Bootstrap.ConfigRef.Kind,
+	}
 	bootstrap, err := h.dynamic.Get(gvk, machine.Namespace, machine.Spec.Bootstrap.ConfigRef.Name)
 	if apierrors.IsNotFound(err) {
 		return "", nil

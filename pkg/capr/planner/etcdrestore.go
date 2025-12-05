@@ -290,7 +290,7 @@ func (p *Planner) runEtcdSnapshotPostRestoreNodeCleanupPlan(controlPlane *rkev1.
 		if n.Machine != nil && n.Machine.UID != "" {
 			allMachineUIDs = append(allMachineUIDs, string(n.Machine.UID))
 		}
-		if n.Machine != nil && n.Machine.Status.NodeRef != nil && n.Machine.Status.NodeRef.Name != "" {
+		if n.Machine != nil && n.Machine.Status.NodeRef.IsDefined() && n.Machine.Status.NodeRef.Name != "" {
 			allNodeNames = append(allNodeNames, n.Machine.Status.NodeRef.Name)
 		}
 	}
@@ -689,7 +689,7 @@ func (p *Planner) runEtcdRestoreServiceStop(controlPlane *rkev1.RKEControlPlane,
 			continue
 		}
 		if !server.Plan.InSync {
-			if server.Machine.Status.NodeRef == nil {
+			if !server.Machine.Status.NodeRef.IsDefined() {
 				return errWaiting(fmt.Sprintf("waiting to stop %s services on machine [%s]", capr.GetRuntime(controlPlane.Spec.KubernetesVersion), server.Machine.Name))
 			}
 			return errWaiting(fmt.Sprintf("waiting to stop %s services on node [%s]", capr.GetRuntime(controlPlane.Spec.KubernetesVersion), server.Machine.Status.NodeRef.Name))
@@ -729,12 +729,14 @@ func (p *Planner) forceDeleteAllDeletingEtcdMachines(cp *rkev1.RKEControlPlane, 
 			logrus.Warnf("[planner] rkecluster %s/%s: did not find CAPI machine for entry when deleting etcd nodes", cp.Namespace, cp.Name)
 			continue
 		}
-		if deletingEtcdNode.Machine.Spec.Bootstrap.ConfigRef == nil {
+		// In v1beta2, ConfigRef is a value type, check with IsDefined()
+		if !deletingEtcdNode.Machine.Spec.Bootstrap.ConfigRef.IsDefined() {
 			logrus.Warnf("[planner] rkecluster %s/%s: did not find a corresponding CAPI machine for %s/%s", cp.Namespace, cp.Name, deletingEtcdNode.Machine.Namespace, deletingEtcdNode.Machine.Name)
 			continue
 		}
-		if !strings.Contains(deletingEtcdNode.Machine.Spec.Bootstrap.ConfigRef.APIVersion, "rke.cattle.io") {
-			logrus.Warnf("[planner] rkecluster %s/%s: CAPI machine %s/%s had a bootstrap ref with an unexpected API version: %s", cp.Namespace, cp.Name, deletingEtcdNode.Machine.Namespace, deletingEtcdNode.Machine.Name, deletingEtcdNode.Machine.Spec.Bootstrap.ConfigRef.APIVersion)
+		// In v1beta2, ConfigRef uses APIGroup instead of APIVersion
+		if !strings.Contains(deletingEtcdNode.Machine.Spec.Bootstrap.ConfigRef.APIGroup, "rke.cattle.io") {
+			logrus.Warnf("[planner] rkecluster %s/%s: CAPI machine %s/%s had a bootstrap ref with an unexpected API group: %s", cp.Namespace, cp.Name, deletingEtcdNode.Machine.Namespace, deletingEtcdNode.Machine.Name, deletingEtcdNode.Machine.Spec.Bootstrap.ConfigRef.APIGroup)
 			continue
 		}
 		logrus.Infof("[planner] rkecluster %s/%s: force deleting etcd machine %s/%s as cluster was not sane and machine was deleting", cp.Namespace, cp.Name, deletingEtcdNode.Machine.Namespace, deletingEtcdNode.Machine.Name)
@@ -754,7 +756,8 @@ func (p *Planner) forceDeleteAllDeletingEtcdMachines(cp *rkev1.RKEControlPlane, 
 			// If we get an error here, go ahead and return the error as this will re-enqueue and we can try again.
 			return -1, err
 		}
-		rb, err := p.rkeBootstrapCache.Get(deletingEtcdNode.Machine.Spec.Bootstrap.ConfigRef.Namespace, deletingEtcdNode.Machine.Spec.Bootstrap.ConfigRef.Name)
+		// In v1beta2, the bootstrap config is in the same namespace as the machine
+		rb, err := p.rkeBootstrapCache.Get(deletingEtcdNode.Machine.Namespace, deletingEtcdNode.Machine.Spec.Bootstrap.ConfigRef.Name)
 		if err != nil {
 			return -1, err
 		}

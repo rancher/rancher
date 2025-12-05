@@ -107,7 +107,7 @@ func (h *handler) k8sClient(machine *capi.Machine) (kubernetes.Interface, error)
 }
 
 func (h *handler) unDrain(secret *corev1.Secret, machine *capi.Machine, drainData string) (*corev1.Secret, error) {
-	if machine.Status.NodeRef == nil || machine.Status.NodeRef.Name == "" {
+	if !machine.Status.NodeRef.IsDefined() || machine.Status.NodeRef.Name == "" {
 		logrus.Debugf("unable to drain machine %s as there is no noderef", machine.Name)
 		return secret, nil
 	}
@@ -170,7 +170,7 @@ func (h *handler) drain(secret *corev1.Secret, machine *capi.Machine, drainData 
 }
 
 func (h *handler) cordon(machine *capi.Machine, drainOpts *rkev1.DrainOptions) error {
-	if machine.Status.NodeRef == nil || machine.Status.NodeRef.Name == "" {
+	if !machine.Status.NodeRef.IsDefined() || machine.Status.NodeRef.Name == "" {
 		return nil
 	}
 
@@ -216,7 +216,7 @@ func (h *handler) getHelper(machine *capi.Machine, drainOpts rkev1.DrainOptions)
 }
 
 func (h *handler) performDrain(machine *capi.Machine, drainOpts *rkev1.DrainOptions) error {
-	if machine.Status.NodeRef == nil || machine.Status.NodeRef.Name == "" {
+	if !machine.Status.NodeRef.IsDefined() || machine.Status.NodeRef.Name == "" {
 		return nil
 	}
 

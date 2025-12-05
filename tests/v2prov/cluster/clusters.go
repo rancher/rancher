@@ -205,7 +205,7 @@ func WaitForCreate(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 		}
 		err = wait.Object(clients.Ctx, clients.CAPI.Machine().Watch, &machine, func(obj runtime.Object) (bool, error) {
 			machine = *obj.(*capi.Machine)
-			return machine.Status.NodeRef != nil, nil
+			return machine.Status.NodeRef.IsDefined(), nil
 		})
 		if err != nil {
 			return nil, fmt.Errorf("noderef not assigned to %s/%s: %w", machine.Namespace, machine.Name, err)
@@ -282,23 +282,30 @@ func WaitForDelete(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 	}
 
 	for _, machine := range machines.Items {
-		gvk := schema.FromAPIVersionAndKind(machine.Spec.InfrastructureRef.APIVersion, machine.Spec.InfrastructureRef.Kind)
+		// In v1beta2, InfrastructureRef uses APIGroup instead of APIVersion
+		gvk := schema.GroupVersionKind{
+			Group:   machine.Spec.InfrastructureRef.APIGroup,
+			Version: "v1", // Default version, determined by contract
+			Kind:    machine.Spec.InfrastructureRef.Kind,
+		}
 		gvr := schema.GroupVersionResource{
 			Group:    gvk.Group,
 			Version:  gvk.Version,
 			Resource: strings.ToLower(gvk.Kind) + "s",
 		}
+		// In v1beta2, the infrastructure resource is in the same namespace as the machine
 		if err := wait.EnsureDoesNotExist(clients.Ctx, func() (runtime.Object, error) {
-			return clients.Dynamic.Resource(gvr).Namespace(machine.Spec.InfrastructureRef.Namespace).Get(clients.Ctx, machine.Spec.InfrastructureRef.Name, metav1.GetOptions{})
+			return clients.Dynamic.Resource(gvr).Namespace(machine.Namespace).Get(clients.Ctx, machine.Spec.InfrastructureRef.Name, metav1.GetOptions{})
 		}); err != nil {
-			return nil, fmt.Errorf("infra machine %s/%s not deleted: %w", machine.Spec.InfrastructureRef.Namespace, machine.Spec.InfrastructureRef.Name, err)
+			return nil, fmt.Errorf("infra machine %s/%s not deleted: %w", machine.Namespace, machine.Spec.InfrastructureRef.Name, err)
 		}
 
-		if machine.Spec.Bootstrap.ConfigRef != nil {
+		if machine.Spec.Bootstrap.ConfigRef.IsDefined() {
+			// In v1beta2, the bootstrap config is in the same namespace as the machine
 			if err := wait.EnsureDoesNotExist(clients.Ctx, func() (runtime.Object, error) {
-				return clients.RKE.RKEBootstrap().Get(machine.Spec.Bootstrap.ConfigRef.Namespace, machine.Spec.Bootstrap.ConfigRef.Name, metav1.GetOptions{})
+				return clients.RKE.RKEBootstrap().Get(machine.Namespace, machine.Spec.Bootstrap.ConfigRef.Name, metav1.GetOptions{})
 			}); err != nil {
-				return nil, fmt.Errorf("bootstrap config %s/%s not deleted: %w", machine.Spec.Bootstrap.ConfigRef.Namespace, machine.Spec.Bootstrap.ConfigRef.Name, err)
+				return nil, fmt.Errorf("bootstrap config %s/%s not deleted: %w", machine.Namespace, machine.Spec.Bootstrap.ConfigRef.Name, err)
 			}
 		}
 
@@ -445,22 +452,26 @@ func GatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 		logrus.Errorf("failed to get machines for %s/%s to print error: %v", c.Namespace, c.Name, newErr)
 	} else {
 		for _, machine := range machines.Items {
-			rb, newErr := clients.RKE.RKEBootstrap().Get(machine.Spec.Bootstrap.ConfigRef.Namespace, machine.Spec.Bootstrap.ConfigRef.Name, metav1.GetOptions{})
+			// In v1beta2, the bootstrap config is in the same namespace as the machine
+			rb, newErr := clients.RKE.RKEBootstrap().Get(machine.Namespace, machine.Spec.Bootstrap.ConfigRef.Name, metav1.GetOptions{})
 			if newErr != nil {
 				logrus.Errorf("failed to get RKEBootstrap %s/%s to print error: %v", c.Namespace, c.Name, newErr)
 			} else {
 				rkeBootstraps = append(rkeBootstraps, rb)
 			}
-			im, newErr := clients.Dynamic.Resource(schema.GroupVersionResource{
-				Group:    machine.Spec.InfrastructureRef.GroupVersionKind().Group,
-				Version:  machine.Spec.InfrastructureRef.GroupVersionKind().Version,
-				Resource: strings.ToLower(fmt.Sprintf("%ss", machine.Spec.InfrastructureRef.GroupVersionKind().Kind)),
-			}).Namespace(machine.Spec.InfrastructureRef.Namespace).Get(context.TODO(), machine.Spec.InfrastructureRef.Name, metav1.GetOptions{})
+			// In v1beta2, InfrastructureRef uses APIGroup instead of APIVersion
+			gvr := schema.GroupVersionResource{
+				Group:    machine.Spec.InfrastructureRef.APIGroup,
+				Version:  "v1", // Default version
+				Resource: strings.ToLower(fmt.Sprintf("%ss", machine.Spec.InfrastructureRef.Kind)),
+			}
+			// In v1beta2, the infrastructure resource is in the same namespace as the machine
+			im, newErr := clients.Dynamic.Resource(gvr).Namespace(machine.Namespace).Get(context.TODO(), machine.Spec.InfrastructureRef.Name, metav1.GetOptions{})
 			if newErr != nil {
-				logrus.Errorf("failed to get %s %s/%s to print error: %v", machine.Spec.InfrastructureRef.GroupVersionKind().String(), machine.Spec.InfrastructureRef.Namespace, machine.Spec.InfrastructureRef.Name, newErr)
+				logrus.Errorf("failed to get %s/%s/%s %s/%s to print error: %v", machine.Spec.InfrastructureRef.APIGroup, "v1", machine.Spec.InfrastructureRef.Kind, machine.Namespace, machine.Spec.InfrastructureRef.Name, newErr)
 			} else {
 				infraMachines = append(infraMachines, im)
-				if machine.Spec.InfrastructureRef.GroupVersionKind().Kind == "PodMachine" {
+				if machine.Spec.InfrastructureRef.Kind == "PodMachine" {
 					// In the case of a podmachine, the pod name will be strings.ReplaceAll(infra.meta.GetName(), ".", "-")
 					podName := strings.ReplaceAll(im.GetName(), ".", "-")
 					podLogs[podName] = populatePodLogs(clients, newControlPlane, im.GetNamespace(), podName)

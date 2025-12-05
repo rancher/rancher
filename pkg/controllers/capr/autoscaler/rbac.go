@@ -96,7 +96,8 @@ func (h *autoscalerHandler) ensureGlobalRole(cluster *capi.Cluster, mds []*capi.
 		// machineTemplate object associated with the machineDeployment in order to scale from zero.
 
 		infraType := strings.ToLower(mds[0].Spec.Template.Spec.InfrastructureRef.Kind) + "s"
-		infraAPIGroup := strings.Split(mds[0].Spec.Template.Spec.InfrastructureRef.APIVersion, "/")[0]
+		// In v1beta2, InfrastructureRef uses APIGroup instead of APIVersion
+		infraAPIGroup := mds[0].Spec.Template.Spec.InfrastructureRef.APIGroup
 		namespacedRules[cluster.Namespace] = append(namespacedRules[cluster.Namespace], rbacv1.PolicyRule{
 			APIGroups: []string{infraAPIGroup},
 			Resources: []string{infraType},
