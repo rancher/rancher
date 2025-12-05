@@ -62,7 +62,12 @@ func (p *Planner) addETCD(config map[string]interface{}, controlPlane *rkev1.RKE
 			if v == "" {
 				config[k] = true
 			} else {
-				config[k] = v
+				// this part is specific for retention which is an int
+				if i, err := strconv.Atoi(v); err == nil {
+					config[k] = i
+				} else {
+					config[k] = v
+				}
 			}
 		}
 		result = files
