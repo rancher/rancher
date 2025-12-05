@@ -391,12 +391,14 @@ func (h *handler) getRKEControlPlaneForCluster(cluster *rancherv1.Cluster) (*rke
 		return nil, err
 	}
 
-	if capiCluster.Spec.ControlPlaneRef == nil ||
+	// In v1beta2, ControlPlaneRef is a value type, use IsDefined()
+	if !capiCluster.Spec.ControlPlaneRef.IsDefined() ||
 		capiCluster.Spec.ControlPlaneRef.Kind != "RKEControlPlane" {
 		return nil, nil
 	}
 
-	cp, err := h.rkeControlPlane.Get(capiCluster.Spec.ControlPlaneRef.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
+	// In v1beta2, the control plane is in the same namespace as the cluster
+	cp, err := h.rkeControlPlane.Get(capiCluster.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
 	if apierror.IsNotFound(err) && cluster.DeletionTimestamp != nil {
 		return nil, nil
 	} else if err != nil {
