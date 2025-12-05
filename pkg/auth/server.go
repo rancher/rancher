@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/providers/publicapi"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
+	"github.com/rancher/rancher/pkg/auth/providers/scim"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/features"
@@ -101,6 +102,7 @@ func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext, 
 		root.PathPrefix("/v3-public").Handler(limitingHandler(v3PublicAPI)) // Deprecated. Use /v1-public instead.
 	}
 	root.PathPrefix("/v1-public").Handler(limitingHandler(v1PublicAPI))
+	root.PathPrefix(scim.URLPrefix).Handler(limitingHandler(scim.NewHandler(scaledContext)))
 	root.NotFoundHandler = privateAPI
 
 	return func(next http.Handler) http.Handler {

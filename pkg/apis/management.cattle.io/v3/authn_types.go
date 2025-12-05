@@ -234,6 +234,8 @@ type Group struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	DisplayName string `json:"displayName,omitempty"`
+	Provider    string `json:"provider,omitempty"`
+	ExternalID  string `json:"externalId,omitempty"`
 }
 
 // +genclient
