@@ -1,6 +1,7 @@
 package roletemplates
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -658,6 +659,230 @@ func TestUpdateStatus(t *testing.T) {
 			}
 			err := c.updateStatus(test.crtb, test.localConditions)
 			assert.Equal(t, test.wantErr, err)
+		})
+	}
+}
+
+func Test_crtbHandler_removeRoleBindings(t *testing.T) {
+	t.Parallel()
+	ctrl := gomock.NewController(t)
+	errDefault := fmt.Errorf("error")
+
+	// Define test role bindings for reuse
+	testRoleBinding1 := rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "rb-1",
+			Namespace: "test-namespace",
+			Labels: map[string]string{
+				"authz.cluster.cattle.io/crtb-owner-test-crtb":  "true",
+				"management.cattle.io/roletemplate-aggregation": "true",
+			},
+		},
+	}
+	testRoleBinding2 := rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "rb-2",
+			Namespace: "test-namespace",
+			Labels: map[string]string{
+				"authz.cluster.cattle.io/crtb-owner-test-crtb":  "true",
+				"management.cattle.io/roletemplate-aggregation": "true",
+			},
+		},
+	}
+
+	type controllers struct {
+		rbController *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]
+	}
+
+	tests := []struct {
+		name             string
+		crtb             *v3.ClusterRoleTemplateBinding
+		setupControllers func(controllers)
+		wantErr          bool
+		wantedConditions []reducedCondition
+	}{
+		{
+			name: "error listing role bindings",
+			crtb: &v3.ClusterRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-namespace",
+					Name:      "test-crtb",
+				},
+			},
+			setupControllers: func(c controllers) {
+				c.rbController.EXPECT().List("test-namespace", gomock.Any()).Return(nil, errDefault)
+			},
+			wantErr: true,
+			wantedConditions: []reducedCondition{
+				{
+					reason: failedToListExistingRoleBindings,
+					status: metav1.ConditionFalse,
+				},
+			},
+		},
+		{
+			name: "no role bindings to remove",
+			crtb: &v3.ClusterRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-namespace",
+					Name:      "test-crtb",
+				},
+			},
+			setupControllers: func(c controllers) {
+				c.rbController.EXPECT().List("test-namespace", gomock.Any()).Return(&rbacv1.RoleBindingList{
+					Items: []rbacv1.RoleBinding{},
+				}, nil)
+			},
+			wantErr: false,
+			wantedConditions: []reducedCondition{
+				{
+					reason: roleBindingDeleted,
+					status: metav1.ConditionTrue,
+				},
+			},
+		},
+		{
+			name: "successfully remove single role binding",
+			crtb: &v3.ClusterRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-namespace",
+					Name:      "test-crtb",
+				},
+			},
+			setupControllers: func(c controllers) {
+				c.rbController.EXPECT().List("test-namespace", gomock.Any()).Return(&rbacv1.RoleBindingList{
+					Items: []rbacv1.RoleBinding{testRoleBinding1},
+				}, nil)
+				c.rbController.EXPECT().Delete("test-namespace", "rb-1", &metav1.DeleteOptions{}).Return(nil)
+			},
+			wantErr: false,
+			wantedConditions: []reducedCondition{
+				{
+					reason: roleBindingDeleted,
+					status: metav1.ConditionTrue,
+				},
+			},
+		},
+		{
+			name: "successfully remove multiple role bindings",
+			crtb: &v3.ClusterRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-namespace",
+					Name:      "test-crtb",
+				},
+			},
+			setupControllers: func(c controllers) {
+				c.rbController.EXPECT().List("test-namespace", gomock.Any()).Return(&rbacv1.RoleBindingList{
+					Items: []rbacv1.RoleBinding{testRoleBinding1, testRoleBinding2},
+				}, nil)
+				c.rbController.EXPECT().Delete("test-namespace", "rb-1", &metav1.DeleteOptions{}).Return(nil)
+				c.rbController.EXPECT().Delete("test-namespace", "rb-2", &metav1.DeleteOptions{}).Return(nil)
+			},
+			wantErr: false,
+			wantedConditions: []reducedCondition{
+				{
+					reason: roleBindingDeleted,
+					status: metav1.ConditionTrue,
+				},
+			},
+		},
+		{
+			name: "error deleting one role binding",
+			crtb: &v3.ClusterRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-namespace",
+					Name:      "test-crtb",
+				},
+			},
+			setupControllers: func(c controllers) {
+				c.rbController.EXPECT().List("test-namespace", gomock.Any()).Return(&rbacv1.RoleBindingList{
+					Items: []rbacv1.RoleBinding{testRoleBinding1},
+				}, nil)
+				c.rbController.EXPECT().Delete("test-namespace", "rb-1", &metav1.DeleteOptions{}).Return(errDefault)
+			},
+			wantErr: true,
+			wantedConditions: []reducedCondition{
+				{
+					reason: roleBindingDeleted,
+					status: metav1.ConditionFalse,
+				},
+			},
+		},
+		{
+			name: "error deleting multiple role bindings",
+			crtb: &v3.ClusterRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-namespace",
+					Name:      "test-crtb",
+				},
+			},
+			setupControllers: func(c controllers) {
+				c.rbController.EXPECT().List("test-namespace", gomock.Any()).Return(&rbacv1.RoleBindingList{
+					Items: []rbacv1.RoleBinding{testRoleBinding1, testRoleBinding2},
+				}, nil)
+				c.rbController.EXPECT().Delete("test-namespace", "rb-1", &metav1.DeleteOptions{}).Return(errDefault)
+				c.rbController.EXPECT().Delete("test-namespace", "rb-2", &metav1.DeleteOptions{}).Return(errDefault)
+			},
+			wantErr: true,
+			wantedConditions: []reducedCondition{
+				{
+					reason: roleBindingDeleted,
+					status: metav1.ConditionFalse,
+				},
+			},
+		},
+		{
+			name: "partial success - one deletion succeeds, one fails",
+			crtb: &v3.ClusterRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-namespace",
+					Name:      "test-crtb",
+				},
+			},
+			setupControllers: func(c controllers) {
+				c.rbController.EXPECT().List("test-namespace", gomock.Any()).Return(&rbacv1.RoleBindingList{
+					Items: []rbacv1.RoleBinding{testRoleBinding1, testRoleBinding2},
+				}, nil)
+				c.rbController.EXPECT().Delete("test-namespace", "rb-1", &metav1.DeleteOptions{}).Return(nil)
+				c.rbController.EXPECT().Delete("test-namespace", "rb-2", &metav1.DeleteOptions{}).Return(errDefault)
+			},
+			wantErr: true,
+			wantedConditions: []reducedCondition{
+				{
+					reason: roleBindingDeleted,
+					status: metav1.ConditionFalse,
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			rbController := fake.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl)
+			if tt.setupControllers != nil {
+				tt.setupControllers(controllers{
+					rbController: rbController,
+				})
+			}
+
+			c := crtbHandler{
+				s:            status.NewStatus(),
+				rbController: rbController,
+			}
+
+			err := c.removeRoleBindings(tt.crtb)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("crtbHandler.removeRoleBindings() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			// Check the conditions were set correctly
+			assert.Len(t, tt.crtb.Status.LocalConditions, len(tt.wantedConditions))
+			for i, wantedCondition := range tt.wantedConditions {
+				assert.Equal(t, wantedCondition.reason, tt.crtb.Status.LocalConditions[i].Reason)
+				assert.Equal(t, wantedCondition.status, tt.crtb.Status.LocalConditions[i].Status)
+			}
 		})
 	}
 }
