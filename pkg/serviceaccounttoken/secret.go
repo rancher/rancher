@@ -303,16 +303,14 @@ func logKeyFromObject(obj metav1.Object) string {
 }
 
 func secretRefFromSA(sa *corev1.ServiceAccount) (*types.NamespacedName, error) {
-	if sa.Annotations == nil {
-		return nil, nil
+	ann := sa.Annotations[ServiceAccountSecretRefAnnotation]
+	if ann == "" {
+		return nil, fmt.Errorf("ServiceAccount %q is missing the annotation %q", logKeyFromObject(sa), ServiceAccountSecretRefAnnotation)
 	}
-	if ann := sa.Annotations[ServiceAccountSecretRefAnnotation]; ann != "" {
-		elements := strings.Split(ann, "/")
-		if len(elements) != 2 {
-			return nil, fmt.Errorf("too many elements parsing ServiceAccount secret reference: %s", ann)
-		}
-		return &types.NamespacedName{Namespace: elements[0], Name: elements[1]}, nil
+	elements := strings.Split(ann, "/")
+	if len(elements) != 2 {
+		return nil, fmt.Errorf("too many elements parsing ServiceAccount secret reference: %s", ann)
 	}
 
-	return nil, nil
+	return &types.NamespacedName{Namespace: elements[0], Name: elements[1]}, nil
 }
