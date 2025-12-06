@@ -24,7 +24,7 @@ import (
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/channelserver"
 	"github.com/rancher/rancher/pkg/features"
-	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
@@ -39,7 +39,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	capierrors "sigs.k8s.io/cluster-api/errors"
 )
 
@@ -413,7 +413,10 @@ func GetMachineDeletionStatus(machines []*capi.Machine) (string, error) {
 		return machines[i].Name < machines[j].Name
 	})
 	for _, machine := range machines {
-		if machine.Status.FailureReason != nil && *machine.Status.FailureReason == capierrors.DeleteMachineError {
+		// In v1beta2, FailureReason has moved to Deprecated.V1Beta1.FailureReason
+		if machine.Status.Deprecated != nil && machine.Status.Deprecated.V1Beta1 != nil &&
+			machine.Status.Deprecated.V1Beta1.FailureReason != nil &&
+			*machine.Status.Deprecated.V1Beta1.FailureReason == capierrors.DeleteMachineError {
 			return "", fmt.Errorf("error deleting machine [%s], machine must be deleted manually", machine.Name)
 		}
 		return fmt.Sprintf("waiting for machine [%s] to delete", machine.Name), nil

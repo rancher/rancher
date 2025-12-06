@@ -14,7 +14,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 // Test cases for ensureFleetHelmOp method
@@ -285,7 +285,7 @@ func (s *autoscalerSuite) TestGetKubernetesMinorVersion_HappyPath_CAPIControlPla
 		},
 		Spec: capi.ClusterSpec{
 			ControlPlaneRef: &corev1.ObjectReference{
-				APIVersion: "controlplane.cluster.x-k8s.io/v1beta1",
+				APIVersion: "controlplane.cluster.x-k8s.io/v1beta2",
 				Kind:       "KubeadmControlPlane",
 				Name:       "test-control-plane",
 				Namespace:  "default",
@@ -303,7 +303,7 @@ func (s *autoscalerSuite) TestGetKubernetesMinorVersion_HappyPath_CAPIControlPla
 
 	s.dynamicClient.SetGetFunc(func(gvk schema.GroupVersionKind, namespace string, name string) (runtime.Object, error) {
 		// Only return the Unstructured object if the GVK matches what we expect for CAPI control plane
-		if gvk.Group == "controlplane.cluster.x-k8s.io" && gvk.Version == "v1beta1" && gvk.Kind == "KubeadmControlPlane" {
+		if gvk.Group == "controlplane.cluster.x-k8s.io" && gvk.Version == "v1beta2" && gvk.Kind == "KubeadmControlPlane" {
 			return unstructuredCP, nil
 		}
 		return nil, fmt.Errorf("not found")

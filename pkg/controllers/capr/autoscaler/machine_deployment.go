@@ -2,19 +2,19 @@ package autoscaler
 
 import (
 	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	"github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	v1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 type machineDeploymentReplicaOverrider struct {
 	clusterCache  v1.ClusterCache
 	clusterClient v1.ClusterClient
 
-	capiClusterCache v1beta1.ClusterCache
+	capiClusterCache v1beta2.ClusterCache
 }
 
 // syncMachinePoolReplicas synchronizes machine pool replicas between the capi MachineDeployment and v2prov Cluster object's machinePool field.

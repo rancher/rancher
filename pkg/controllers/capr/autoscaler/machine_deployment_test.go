@@ -8,7 +8,7 @@ import (
 
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 func (s *autoscalerSuite) TestSyncMachinePoolReplicas_ReplicaCountHigherThanMachinePoolQuantity_ShouldIncreaseQuantity() {

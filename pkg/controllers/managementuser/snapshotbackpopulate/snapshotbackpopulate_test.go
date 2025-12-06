@@ -18,7 +18,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 func TestOnUpstreamChange(t *testing.T) {
@@ -539,7 +539,7 @@ func TestOnDownstreamChange(t *testing.T) {
 	etcdSnapshotController.EXPECT().Create(gomock.Any()).Return(nil, nil).Times(1)
 
 	snapshot.Spec.NodeName = "test-node"
-	capiMachine.Status.NodeRef = &corev1.ObjectReference{
+	capiMachine.Status.NodeRef = capi.MachineNodeReference{
 		Name: "test-node",
 	}
 
@@ -862,7 +862,7 @@ func TestGetMachineFromNode(t *testing.T) {
 				cache.EXPECT().List(gomock.Any(), gomock.Any()).Return([]*capi.Machine{
 					{
 						Status: capi.MachineStatus{
-							NodeRef: &corev1.ObjectReference{
+							NodeRef: capi.MachineNodeReference{
 								Name: "not-test-node",
 							},
 						},
@@ -881,7 +881,7 @@ func TestGetMachineFromNode(t *testing.T) {
 				cache.EXPECT().List(gomock.Any(), gomock.Any()).Return([]*capi.Machine{
 					{
 						Status: capi.MachineStatus{
-							NodeRef: &corev1.ObjectReference{
+							NodeRef: capi.MachineNodeReference{
 								Name: "test-node",
 							},
 						},
@@ -890,7 +890,7 @@ func TestGetMachineFromNode(t *testing.T) {
 			},
 			expectedMachine: &capi.Machine{
 				Status: capi.MachineStatus{
-					NodeRef: &corev1.ObjectReference{
+					NodeRef: capi.MachineNodeReference{
 						Name: "test-node",
 					},
 				},
