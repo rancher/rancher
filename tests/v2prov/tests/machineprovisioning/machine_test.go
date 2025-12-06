@@ -1,3 +1,6 @@
+// Package machineprovisioning contains integration tests for machine-provisioned v2prov clusters.
+// Machine-provisioned clusters use machine pools and infrastructure providers
+// to automatically create and manage cluster nodes.
 package machineprovisioning
 
 import (
@@ -33,6 +36,9 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
+// Test_Provisioning_MP_SingleNodeAllRolesWithDelete creates a single-node machine-provisioned
+// cluster with all roles (etcd, controlplane, worker), verifies it provisions correctly,
+// and then deletes it to ensure cleanup works properly.
 func Test_Provisioning_MP_SingleNodeAllRolesWithDelete(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
@@ -123,6 +129,10 @@ func Test_Provisioning_MP_SingleNodeAllRolesWithDelete(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// Test_Provisioning_MP_MachineTemplateClonedAnnotations verifies that infrastructure
+// machines have the correct annotations for tracking their source machine template.
+// This ensures proper lineage tracking for machine lifecycle management.
+// This test is skipped for RKE2 distributions.
 func Test_Provisioning_MP_MachineTemplateClonedAnnotations(t *testing.T) {
 	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
 		t.Skip()
@@ -187,6 +197,10 @@ func Test_Provisioning_MP_MachineTemplateClonedAnnotations(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// Test_Provisioning_MP_MachineSetDeletePolicyOldestSet verifies that machine sets
+// are configured with the "Oldest" delete policy, which ensures that the oldest
+// machines are deleted first during scale-down operations.
+// This test is skipped for RKE2 distributions.
 func Test_Provisioning_MP_MachineSetDeletePolicyOldestSet(t *testing.T) {
 	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
 		t.Skip()
@@ -253,6 +267,9 @@ func Test_Provisioning_MP_MachineSetDeletePolicyOldestSet(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// Test_Provisioning_MP_MultipleEtcdNodesScaledDownThenDelete creates a cluster with
+// 2 etcd nodes and 1 controlplane+worker node, scales down the etcd pool to 1 node,
+// and then deletes the cluster. This tests the ability to scale etcd nodes safely.
 func Test_Provisioning_MP_MultipleEtcdNodesScaledDownThenDelete(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
@@ -360,6 +377,10 @@ func Test_Provisioning_MP_MultipleEtcdNodesScaledDownThenDelete(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// Test_Provisioning_MP_FiveNodesUniqueRolesWithDelete creates a 5-node cluster with
+// dedicated role assignments: 3 etcd nodes, 1 controlplane node, and 1 worker node.
+// This tests the traditional HA architecture with separated roles.
+// This test is skipped for RKE2 distributions.
 func Test_Provisioning_MP_FiveNodesUniqueRolesWithDelete(t *testing.T) {
 	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
 		t.Skip()
@@ -417,6 +438,10 @@ func Test_Provisioning_MP_FiveNodesUniqueRolesWithDelete(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// Test_Provisioning_MP_FourNodesServerAndWorkerRolesWithDelete creates a 4-node cluster
+// with 3 combined etcd+controlplane nodes and 1 dedicated worker node.
+// This tests the K3s/RKE2 server+agent architecture pattern.
+// This test is skipped for RKE2 distributions.
 func Test_Provisioning_MP_FourNodesServerAndWorkerRolesWithDelete(t *testing.T) {
 	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
 		t.Skip()
@@ -472,6 +497,9 @@ func Test_Provisioning_MP_FourNodesServerAndWorkerRolesWithDelete(t *testing.T) 
 	assert.NoError(t, err)
 }
 
+// Test_Provisioning_MP_Drain creates a cluster with drain options configured for both
+// controlplane and worker nodes. It tests pre-drain and post-drain hooks by simulating
+// the annotation-based hook handshake mechanism during a provision generation update.
 func Test_Provisioning_MP_Drain(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
@@ -614,6 +642,9 @@ func Test_Provisioning_MP_Drain(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// Test_Provisioning_MP_DrainNoDelete verifies the DrainBeforeDelete flag behavior.
+// When DrainBeforeDelete is false, the ExcludeNodeDrainingAnnotation should be set.
+// When DrainBeforeDelete is true (or default), no exclusion annotation should be present.
 func Test_Provisioning_MP_DrainNoDelete(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
@@ -670,6 +701,12 @@ func Test_Provisioning_MP_DrainNoDelete(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// Test_Provisioning_Single_Node_All_Roles_Drain tests the drain behavior during a rolling
+// update of a single-node all-in-one cluster. It verifies that:
+// 1. A second node is created with a new template hash
+// 2. The incoming control plane node is not cordoned during join
+// 3. The old node enters the Deleting state after the new node is ready
+// 4. The cluster converges back to a single node after the update
 func Test_Provisioning_Single_Node_All_Roles_Drain(t *testing.T) {
 	clients, err := clients.New()
 	require.NoError(t, err)

@@ -1,3 +1,6 @@
+// Package custom contains integration tests for custom (non-machine-provisioned) v2prov clusters.
+// Custom clusters use manually created systemd-node pods to simulate node registration
+// via the cluster registration token command.
 package custom
 
 import (
@@ -16,6 +19,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// Test_Provisioning_Custom_OneNodeWithDelete creates a custom single-node cluster
+// with all roles (worker, etcd, controlplane), verifies it provisions correctly,
+// and then deletes it to ensure cleanup works properly.
+// This test is skipped for RKE2 distributions.
 func Test_Provisioning_Custom_OneNodeWithDelete(t *testing.T) {
 	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
 		t.Skip()
@@ -92,6 +99,9 @@ func Test_Provisioning_Custom_OneNodeWithDelete(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// Test_Provisioning_Custom_ThreeNode creates a custom three-node cluster
+// with all roles on each node. This tests multi-node custom cluster provisioning
+// and verifies that all nodes are properly registered with the correct roles.
 func Test_Provisioning_Custom_ThreeNode(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
@@ -156,6 +166,9 @@ func Test_Provisioning_Custom_ThreeNode(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// Test_Provisioning_Custom_UniqueRoles creates a custom cluster with separate nodes
+// for each role: 3 etcd nodes, 1 control plane node, and 1 worker node.
+// This tests the ability to run a cluster with dedicated role assignments.
 func Test_Provisioning_Custom_UniqueRoles(t *testing.T) {
 	clients, err := clients.New()
 	if err != nil {
@@ -236,6 +249,10 @@ func Test_Provisioning_Custom_UniqueRoles(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+// Test_Provisioning_Custom_ThreeNodeWithTaints creates a three-node custom cluster
+// and applies a taint to one of the nodes. This tests the ability to pass taints
+// via the node registration command.
+// This test is skipped for RKE2 distributions.
 func Test_Provisioning_Custom_ThreeNodeWithTaints(t *testing.T) {
 	if strings.ToLower(os.Getenv("DIST")) == "rke2" {
 		t.Skip()
