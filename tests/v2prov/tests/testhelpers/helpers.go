@@ -233,8 +233,22 @@ func CreateCustomCluster(t *testing.T, tc *TestClients, clusterName string, spec
 	})
 }
 
-// CreateSnapshotTestDir creates a temporary directory path for etcd snapshot storage.
+// CreateSnapshotTestDir creates a volume mount specification string for etcd snapshot storage.
 // This is used for tests that need to persist snapshots across node recreation.
+//
+// Parameters:
+//   - prefix: The host path directory where snapshots will be stored (e.g., "/tmp/snapshot-abc123").
+//     This is typically a temporary directory that persists across pod restarts.
+//   - runtime: The Kubernetes runtime being used ("k3s" or "rke2"). This determines the
+//     target path inside the container where snapshots are stored.
+//
+// Returns a volume mount specification in the format "hostPath:containerPath" which can be
+// passed to systemdnode.New() as part of the hostPaths parameter.
+//
+// Example:
+//
+//	dir := CreateSnapshotTestDir("/tmp/my-snapshots", "k3s")
+//	// Returns: "/tmp/my-snapshots:/var/lib/rancher/k3s/server/db/snapshots"
 func CreateSnapshotTestDir(prefix string, runtime string) string {
 	return fmt.Sprintf("%s:/var/lib/rancher/%s/server/db/snapshots", prefix, runtime)
 }
