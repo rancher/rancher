@@ -41,41 +41,14 @@ func NewTestClients(t *testing.T) *TestClients {
 	return tc
 }
 
-// NodeRole represents the role(s) a node should have in the cluster.
-// Multiple roles can be combined using bitwise OR.
-type NodeRole int
-
-const (
-	// RoleWorker indicates the node should have the worker role.
-	RoleWorker NodeRole = 1 << iota
-	// RoleControlPlane indicates the node should have the control plane role.
-	RoleControlPlane
-	// RoleEtcd indicates the node should have the etcd role.
-	RoleEtcd
-)
-
-// String returns a command-line flag string for the node roles.
-func (r NodeRole) String() string {
-	var roles string
-	if r&RoleWorker != 0 {
-		roles += " --worker"
-	}
-	if r&RoleControlPlane != 0 {
-		roles += " --controlplane"
-	}
-	if r&RoleEtcd != 0 {
-		roles += " --etcd"
-	}
-	return roles
-}
-
-// RoleAllInOne combines all three roles (worker, control plane, and etcd).
-const RoleAllInOne = RoleWorker | RoleControlPlane | RoleEtcd
-
 // CustomClusterNodeOptions contains options for creating a custom cluster node.
 type CustomClusterNodeOptions struct {
-	// Role specifies the role(s) for the node.
-	Role NodeRole
+	// Worker specifies whether the node should have the worker role.
+	Worker bool
+	// ControlPlane specifies whether the node should have the control plane role.
+	ControlPlane bool
+	// Etcd specifies whether the node should have the etcd role.
+	Etcd bool
 	// Labels specifies additional labels to add to the node (format: "key=value").
 	Labels []string
 	// Taints specifies taints to add to the node (format: "key=value:Effect").
@@ -86,12 +59,27 @@ type CustomClusterNodeOptions struct {
 	HostPaths []string
 }
 
+// buildRoleFlags returns the command-line flags for the node roles.
+func (opts CustomClusterNodeOptions) buildRoleFlags() string {
+	var roles string
+	if opts.Worker {
+		roles += " --worker"
+	}
+	if opts.ControlPlane {
+		roles += " --controlplane"
+	}
+	if opts.Etcd {
+		roles += " --etcd"
+	}
+	return roles
+}
+
 // CreateCustomClusterNode creates a new systemd node for a custom cluster.
 // It constructs the appropriate command with roles, labels, taints, and node name.
 func CreateCustomClusterNode(t *testing.T, tc *TestClients, c *provisioningv1.Cluster, command string, opts CustomClusterNodeOptions) *corev1.Pod {
 	t.Helper()
 
-	cmd := "#!/usr/bin/env sh\n" + command + opts.Role.String()
+	cmd := "#!/usr/bin/env sh\n" + command + opts.buildRoleFlags()
 
 	// Add labels
 	for _, label := range opts.Labels {
@@ -116,8 +104,8 @@ func CreateCustomClusterNode(t *testing.T, tc *TestClients, c *provisioningv1.Cl
 }
 
 // CreateCustomClusterWithNodes creates a custom cluster and adds the specified number
-// of nodes with the given role. This is a convenience function for simple test setups.
-func CreateCustomClusterWithNodes(t *testing.T, tc *TestClients, clusterName string, nodeCount int, role NodeRole) (*provisioningv1.Cluster, error) {
+// of nodes with the given options. This is a convenience function for simple test setups.
+func CreateCustomClusterWithNodes(t *testing.T, tc *TestClients, clusterName string, nodeCount int, opts CustomClusterNodeOptions) (*provisioningv1.Cluster, error) {
 	t.Helper()
 
 	c, err := cluster.New(tc.Clients, &provisioningv1.Cluster{
@@ -140,7 +128,7 @@ func CreateCustomClusterWithNodes(t *testing.T, tc *TestClients, clusterName str
 	assert.NotEmpty(t, command)
 
 	for i := 0; i < nodeCount; i++ {
-		CreateCustomClusterNode(t, tc, c, command, CustomClusterNodeOptions{Role: role})
+		CreateCustomClusterNode(t, tc, c, command, opts)
 	}
 
 	return c, nil
