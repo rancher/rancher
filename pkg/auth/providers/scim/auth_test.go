@@ -135,7 +135,7 @@ func TestTokenAuthenticator(t *testing.T) {
 
 		auth.Authenticate(next).ServeHTTP(w, r)
 
-		require.Equal(t, http.StatusUnauthorized, w.Result().StatusCode)
+		require.Equal(t, http.StatusNotFound, w.Result().StatusCode)
 	})
 
 	t.Run("disabled provider", func(t *testing.T) {
@@ -152,7 +152,7 @@ func TestTokenAuthenticator(t *testing.T) {
 
 		auth.Authenticate(next).ServeHTTP(w, r)
 
-		require.Equal(t, http.StatusUnauthorized, w.Result().StatusCode)
+		require.Equal(t, http.StatusNotFound, w.Result().StatusCode)
 	})
 
 	t.Run("no secrets", func(t *testing.T) {
