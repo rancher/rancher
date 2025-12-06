@@ -330,7 +330,8 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.CAPIContext)
 			allMachines := append(machines.Items, otherMachines.Items...)
 
 			for _, machine := range allMachines {
-				if machine.Spec.Bootstrap.ConfigRef == nil || machine.Spec.Bootstrap.ConfigRef.APIVersion != capr.RKEAPIVersion {
+				// In v1beta2, ConfigRef is ContractVersionedObjectReference (value type, no Namespace, uses APIGroup instead of APIVersion)
+				if !machine.Spec.Bootstrap.ConfigRef.IsDefined() || machine.Spec.Bootstrap.ConfigRef.APIGroup != "rke.cattle.io" {
 					continue
 				}
 
@@ -360,7 +361,8 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.CAPIContext)
 				}
 
 				if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-					bootstrap, err := w.RKE.RKEBootstrap().Get(machine.Spec.Bootstrap.ConfigRef.Namespace, machine.Spec.Bootstrap.ConfigRef.Name, metav1.GetOptions{})
+					// In v1beta2, ConfigRef no longer has Namespace - use machine's namespace
+					bootstrap, err := w.RKE.RKEBootstrap().Get(machine.Namespace, machine.Spec.Bootstrap.ConfigRef.Name, metav1.GetOptions{})
 					if err != nil {
 						return err
 					}
@@ -380,20 +382,16 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.CAPIContext)
 					return err
 				}
 
-				if machine.Spec.InfrastructureRef.APIVersion == capr.RKEAPIVersion || machine.Spec.InfrastructureRef.APIVersion == capr.RKEMachineAPIVersion {
-					gv, err := schema.ParseGroupVersion(machine.Spec.InfrastructureRef.APIVersion)
-					if err != nil {
-						// This error should not occur because RKEAPIVersion and RKEMachineAPIVersion are valid
-						continue
-					}
-
+				// In v1beta2, InfrastructureRef uses APIGroup instead of APIVersion
+				if machine.Spec.InfrastructureRef.APIGroup == "rke.cattle.io" || machine.Spec.InfrastructureRef.APIGroup == "rke-machine.cattle.io" {
 					gvk := schema.GroupVersionKind{
-						Group:   gv.Group,
-						Version: gv.Version,
+						Group:   machine.Spec.InfrastructureRef.APIGroup,
+						Version: "v1",
 						Kind:    machine.Spec.InfrastructureRef.Kind,
 					}
 					if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-						infraMachine, err := w.Dynamic.Get(gvk, machine.Spec.InfrastructureRef.Namespace, machine.Spec.InfrastructureRef.Name)
+						// In v1beta2, InfrastructureRef no longer has Namespace - use machine's namespace
+						infraMachine, err := w.Dynamic.Get(gvk, machine.Namespace, machine.Spec.InfrastructureRef.Name)
 						if err != nil {
 							return err
 						}

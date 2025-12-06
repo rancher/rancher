@@ -539,7 +539,7 @@ func TestOnDownstreamChange(t *testing.T) {
 	etcdSnapshotController.EXPECT().Create(gomock.Any()).Return(nil, nil).Times(1)
 
 	snapshot.Spec.NodeName = "test-node"
-	capiMachine.Status.NodeRef = &corev1.ObjectReference{
+	capiMachine.Status.NodeRef = capi.MachineNodeReference{
 		Name: "test-node",
 	}
 
@@ -862,7 +862,7 @@ func TestGetMachineFromNode(t *testing.T) {
 				cache.EXPECT().List(gomock.Any(), gomock.Any()).Return([]*capi.Machine{
 					{
 						Status: capi.MachineStatus{
-							NodeRef: &corev1.ObjectReference{
+							NodeRef: capi.MachineNodeReference{
 								Name: "not-test-node",
 							},
 						},
@@ -881,7 +881,7 @@ func TestGetMachineFromNode(t *testing.T) {
 				cache.EXPECT().List(gomock.Any(), gomock.Any()).Return([]*capi.Machine{
 					{
 						Status: capi.MachineStatus{
-							NodeRef: &corev1.ObjectReference{
+							NodeRef: capi.MachineNodeReference{
 								Name: "test-node",
 							},
 						},
@@ -890,7 +890,7 @@ func TestGetMachineFromNode(t *testing.T) {
 			},
 			expectedMachine: &capi.Machine{
 				Status: capi.MachineStatus{
-					NodeRef: &corev1.ObjectReference{
+					NodeRef: capi.MachineNodeReference{
 						Name: "test-node",
 					},
 				},

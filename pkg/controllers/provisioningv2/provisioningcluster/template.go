@@ -415,10 +415,12 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 			Spec: capi.MachineDeploymentSpec{
 				ClusterName: capiCluster.Name,
 				Replicas:    machinePool.Quantity,
-				// In v1beta2, Strategy is replaced by Rollout
+				// In v1beta2, Strategy is nested inside Rollout
 				Rollout: capi.MachineDeploymentRolloutSpec{
-					// RollingUpdate is the default
-					Type: capi.RollingUpdateMachineDeploymentStrategyType,
+					Strategy: capi.MachineDeploymentRolloutStrategy{
+						// RollingUpdate is the default
+						Type: capi.RollingUpdateMachineDeploymentStrategyType,
+					},
 				},
 				Template: capi.MachineTemplateSpec{
 					ObjectMeta: capi.ObjectMeta{
@@ -440,16 +442,19 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 								APIGroup: "rke.cattle.io",
 							},
 						},
-						InfrastructureRef:        infraRef,
-						NodeDrainTimeoutSeconds:  nodeDrainTimeoutSeconds,
+						InfrastructureRef: infraRef,
+						// In v1beta2, NodeDrainTimeoutSeconds is under Deletion
+						Deletion: capi.MachineDeletionSpec{
+							NodeDrainTimeoutSeconds: nodeDrainTimeoutSeconds,
+						},
 					},
 				},
 				Paused: paused,
 			},
 		}
 		if machinePool.RollingUpdate != nil {
-			machineDeployment.Spec.Rollout.RollingUpdate.MaxSurge = machinePool.RollingUpdate.MaxSurge
-			machineDeployment.Spec.Rollout.RollingUpdate.MaxUnavailable = machinePool.RollingUpdate.MaxUnavailable
+			machineDeployment.Spec.Rollout.Strategy.RollingUpdate.MaxSurge = machinePool.RollingUpdate.MaxSurge
+			machineDeployment.Spec.Rollout.Strategy.RollingUpdate.MaxUnavailable = machinePool.RollingUpdate.MaxUnavailable
 		}
 
 		if machinePool.EtcdRole {
@@ -502,6 +507,20 @@ func deploymentHealthChecks(machineDeployment *capi.MachineDeployment, machinePo
 		*maxUnhealthy = intstr.Parse(*machinePool.MaxUnhealthy)
 	}
 
+	// In v1beta2, convert NodeStartupTimeout duration to seconds
+	var nodeStartupTimeoutSeconds *int32
+	if machinePool.NodeStartupTimeout != nil {
+		seconds := int32(machinePool.NodeStartupTimeout.Seconds())
+		nodeStartupTimeoutSeconds = &seconds
+	}
+
+	// In v1beta2, convert UnhealthyNodeTimeout duration to seconds
+	var unhealthyNodeTimeoutSeconds *int32
+	if machinePool.UnhealthyNodeTimeout != nil {
+		seconds := int32(machinePool.UnhealthyNodeTimeout.Seconds())
+		unhealthyNodeTimeoutSeconds = &seconds
+	}
+
 	return &capi.MachineHealthCheck{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      machineDeployment.Name,
@@ -514,23 +533,40 @@ func deploymentHealthChecks(machineDeployment *capi.MachineDeployment, machinePo
 					capi.MachineDeploymentNameLabel: machineDeployment.Name,
 				},
 			},
-			UnhealthyConditions: []capi.UnhealthyCondition{ // if a node status is unready or unknown for the timeout mark it unhealthy
-				{
-					Status:  corev1.ConditionUnknown,
-					Type:    corev1.NodeReady,
-					Timeout: *machinePool.UnhealthyNodeTimeout,
-				},
-				{
-					Status:  corev1.ConditionFalse,
-					Type:    corev1.NodeReady,
-					Timeout: *machinePool.UnhealthyNodeTimeout,
+			// In v1beta2, checks configuration is under Checks field
+			Checks: capi.MachineHealthCheckChecks{
+				NodeStartupTimeoutSeconds: nodeStartupTimeoutSeconds,
+				UnhealthyNodeConditions: []capi.UnhealthyNodeCondition{ // if a node status is unready or unknown for the timeout mark it unhealthy
+					{
+						Status:         corev1.ConditionUnknown,
+						Type:           corev1.NodeReady,
+						TimeoutSeconds: unhealthyNodeTimeoutSeconds,
+					},
+					{
+						Status:         corev1.ConditionFalse,
+						Type:           corev1.NodeReady,
+						TimeoutSeconds: unhealthyNodeTimeoutSeconds,
+					},
 				},
 			},
-			MaxUnhealthy:       maxUnhealthy,
-			UnhealthyRange:     machinePool.UnhealthyRange,
-			NodeStartupTimeout: machinePool.NodeStartupTimeout,
+			// In v1beta2, remediation settings are under Remediation field
+			Remediation: capi.MachineHealthCheckRemediation{
+				TriggerIf: capi.MachineHealthCheckRemediationTriggerIf{
+					// In v1beta2, MaxUnhealthy → UnhealthyLessThanOrEqualTo, UnhealthyRange → UnhealthyInRange
+					UnhealthyLessThanOrEqualTo: maxUnhealthy,
+					UnhealthyInRange:           unhealthyInRangeStr(machinePool.UnhealthyRange),
+				},
+			},
 		},
 	}
+}
+
+// unhealthyInRangeStr converts the *string UnhealthyRange to a string for v1beta2
+func unhealthyInRangeStr(unhealthyRange *string) string {
+	if unhealthyRange == nil {
+		return ""
+	}
+	return *unhealthyRange
 }
 
 func assign(labels map[string]string, key string, value interface{}) error {
