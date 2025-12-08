@@ -709,10 +709,10 @@ func (m *nodesSyncer) isClusterRestoring() (bool, error) {
 		return false, nil
 	}
 	if strings.HasPrefix(cluster.Name, "c-m-") {
-		// capiClusterCache may be nil if CAPI CRDs are not yet established
-		// In this case, we assume the cluster is not restoring and proceed
+		// capiClusterCache should not be nil for non-local clusters since we defer
+		// registration until CAPI is ready. Return an error if it is nil.
 		if m.capiClusterCache == nil {
-			return false, nil
+			return false, errors.Errorf("capiClusterCache is nil for non-local cluster %s", cluster.Name)
 		}
 		provCluster, err := m.provClusterCache.Get(cluster.Spec.FleetWorkspaceName, cluster.Spec.DisplayName)
 		if err != nil {
