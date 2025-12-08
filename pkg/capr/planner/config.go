@@ -63,8 +63,10 @@ func (p *Planner) addETCD(config map[string]interface{}, controlPlane *rkev1.RKE
 				config[k] = true
 			} else {
 				// this part is specific for retention which is an int
-				if i, err := strconv.Atoi(v); err == nil {
-					config[k] = i
+				if k == "etcd-s3-retention" {
+					if i, err := strconv.Atoi(v); err == nil {
+						config[k] = i
+					}
 				} else {
 					config[k] = v
 				}
