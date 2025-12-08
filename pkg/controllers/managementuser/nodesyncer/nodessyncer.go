@@ -712,6 +712,7 @@ func (m *nodesSyncer) isClusterRestoring() (bool, error) {
 		// capiClusterCache should not be nil for non-local clusters since we defer
 		// registration until CAPI is ready. Return an error if it is nil.
 		if m.capiClusterCache == nil {
+			logrus.Errorf("[nodessyncer][isClusterRestoring] capiClusterCache is nil for non-local cluster %s", cluster.Name)
 			return false, errors.Errorf("capiClusterCache is nil for non-local cluster %s", cluster.Name)
 		}
 		provCluster, err := m.provClusterCache.Get(cluster.Spec.FleetWorkspaceName, cluster.Spec.DisplayName)
