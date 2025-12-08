@@ -324,7 +324,7 @@ func (p *Planner) encryptionKeyRotationFindLeader(status rkev1.RKEControlPlaneSt
 // encryptionKeyRotationIsSuitableControlPlane ensures that a control plane node has not been deleted and has a valid
 // node associated with it.
 func encryptionKeyRotationIsSuitableControlPlane(entry *planEntry) bool {
-	return isControlPlane(entry) && isNotDeleting(entry) && entry.Machine.Status.NodeRef != nil && capr.Ready.IsTrue(entry.Machine)
+	return isControlPlane(entry) && isNotDeleting(entry) && entry.Machine.Status.NodeRef.IsDefined() && capr.Ready.IsTrue(entry.Machine)
 }
 
 // encryptionKeyRotationIsControlPlaneAndNotLeaderAndInit allows us to filter cluster plans to restart healthy follower nodes.

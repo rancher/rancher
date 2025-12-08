@@ -20,7 +20,7 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
-	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	ranchercontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
@@ -37,9 +37,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/client-go/util/retry"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
-	"sigs.k8s.io/cluster-api/util/conditions"
+	conditions "sigs.k8s.io/cluster-api/util/conditions/deprecated/v1beta1"
 )
 
 const (
@@ -265,7 +265,9 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		return status, nil
 	}
 
-	if !capiCluster.Status.InfrastructureReady {
+	// In v1beta2, InfrastructureReady moved to Initialization.InfrastructureProvisioned
+	infraReady := capiCluster.Status.Initialization.InfrastructureProvisioned != nil && *capiCluster.Status.Initialization.InfrastructureProvisioned
+	if !infraReady {
 		return status, errWaiting("waiting for infrastructure ready")
 	}
 
@@ -1228,10 +1230,12 @@ func (p *Planner) pauseCAPICluster(cp *rkev1.RKEControlPlane, pause bool) error 
 			return fmt.Errorf("CAPI cluster does not exist for %s/%s", cp.Namespace, cp.Name)
 		}
 		cluster = cluster.DeepCopy()
-		if cluster.Spec.Paused == pause {
+		// In v1beta2, Paused is *bool
+		paused := cluster.Spec.Paused != nil && *cluster.Spec.Paused
+		if paused == pause {
 			return nil
 		}
-		cluster.Spec.Paused = pause
+		cluster.Spec.Paused = &pause
 		_, err = p.capiClient.Update(cluster)
 		return err
 	})
@@ -1251,8 +1255,9 @@ func (p *Planner) ensureCAPIClusterControlPlaneInitializedFalse(cp *rkev1.RKECon
 		return fmt.Errorf("CAPI cluster does not exist for %s/%s", cp.Namespace, cp.Name)
 	}
 	cluster = cluster.DeepCopy()
-	if !conditions.IsFalse(cluster, capi.ControlPlaneInitializedCondition) {
-		conditions.MarkFalse(cluster, capi.ControlPlaneInitializedCondition, capi.WaitingForControlPlaneProviderInitializedReason, capi.ConditionSeverityInfo, "Waiting for control plane provider to indicate the control plane has been initialized")
+	// In v1beta2, use the V1Beta1 condition constants for backward compatibility
+	if !conditions.IsFalse(cluster, capi.ControlPlaneInitializedV1Beta1Condition) {
+		conditions.MarkFalse(cluster, capi.ControlPlaneInitializedV1Beta1Condition, capi.WaitingForControlPlaneProviderInitializedV1Beta1Reason, capi.ConditionSeverityInfo, "Waiting for control plane provider to indicate the control plane has been initialized")
 		_, err = p.capiClient.UpdateStatus(cluster)
 	}
 	return err

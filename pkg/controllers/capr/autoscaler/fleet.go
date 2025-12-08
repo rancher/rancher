@@ -16,7 +16,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 // hardcoded k8s minor <-> image tag mapping, adding new versions here will automatically
@@ -169,14 +170,21 @@ func getChartName() string {
 
 // getKubernetesMinorVersion returns the k8s minor version which is looked up from the controlPlaneRef on the capi object
 func (h *autoscalerHandler) getKubernetesMinorVersion(cluster *capi.Cluster) int {
-	if cluster.Spec.ControlPlaneRef == nil {
+	if !cluster.Spec.ControlPlaneRef.IsDefined() {
 		logrus.Debugf("[autoscaler] no control-plane ref found for cluster %s/%s - latest version of cluster-autoscaler chart will be installed", cluster.Namespace, cluster.Name)
 		return 0
 	}
 
+	// In v1beta2, ControlPlaneRef uses APIGroup instead of APIVersion, and version is determined by contract
+	// The control plane is in the same namespace as the cluster
+	gvk := schema.GroupVersionKind{
+		Group:   cluster.Spec.ControlPlaneRef.APIGroup,
+		Version: "v1", // Default version, will be determined by contract
+		Kind:    cluster.Spec.ControlPlaneRef.Kind,
+	}
 	cp, err := h.dynamicClient.Get(
-		cluster.Spec.ControlPlaneRef.GroupVersionKind(),
-		cluster.Spec.ControlPlaneRef.Namespace,
+		gvk,
+		cluster.Namespace,
 		cluster.Spec.ControlPlaneRef.Name)
 	if err != nil {
 		logrus.Debugf("[autoscaler] no control-plane found for cluster %s/%s - latest version of cluster-autoscaler chart will be installed", cluster.Namespace, cluster.Name)
