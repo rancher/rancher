@@ -179,9 +179,9 @@ func (s *autoscalerSuite) TestEnsureGlobalRole_RoleAlreadyExists() {
 			Spec: capi.MachineDeploymentSpec{
 				Template: capi.MachineTemplateSpec{
 					Spec: capi.MachineSpec{
-						InfrastructureRef: corev1.ObjectReference{
-							Kind:       "TestMachineTemplate",
-							APIVersion: "testing-rke.cattle.com/v1",
+						InfrastructureRef: capi.ContractVersionedObjectReference{
+							Kind:     "TestMachineTemplate",
+							APIGroup: "testing-rke.cattle.com",
 						},
 					},
 				},

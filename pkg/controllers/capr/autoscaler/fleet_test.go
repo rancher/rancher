@@ -8,7 +8,6 @@ import (
 	"github.com/rancher/rancher/pkg/buildconfig"
 	"github.com/rancher/rancher/pkg/settings"
 	"go.uber.org/mock/gomock"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -155,11 +154,10 @@ func (s *autoscalerSuite) TestResolveImageTagVersion_HappyPath_KnownVersion() {
 			Namespace: "default",
 		},
 		Spec: capi.ClusterSpec{
-			ControlPlaneRef: &corev1.ObjectReference{
-				APIVersion: "rke.cattle.io/v1",
-				Kind:       "RKEControlPlane",
-				Name:       "test-control-plane",
-				Namespace:  "default",
+			ControlPlaneRef: capi.ContractVersionedObjectReference{
+				APIGroup: "rke.cattle.io",
+				Kind:     "RKEControlPlane",
+				Name:     "test-control-plane",
 			},
 		},
 	}
@@ -242,11 +240,10 @@ func (s *autoscalerSuite) TestGetKubernetesMinorVersion_HappyPath_RKEControlPlan
 			Namespace: "default",
 		},
 		Spec: capi.ClusterSpec{
-			ControlPlaneRef: &corev1.ObjectReference{
-				APIVersion: "rke.cattle.io/v1",
-				Kind:       "RKEControlPlane",
-				Name:       "test-control-plane",
-				Namespace:  "default",
+			ControlPlaneRef: capi.ContractVersionedObjectReference{
+				APIGroup: "rke.cattle.io",
+				Kind:     "RKEControlPlane",
+				Name:     "test-control-plane",
 			},
 		},
 	}
@@ -284,11 +281,10 @@ func (s *autoscalerSuite) TestGetKubernetesMinorVersion_HappyPath_CAPIControlPla
 			Namespace: "default",
 		},
 		Spec: capi.ClusterSpec{
-			ControlPlaneRef: &corev1.ObjectReference{
-				APIVersion: "controlplane.cluster.x-k8s.io/v1beta2",
-				Kind:       "KubeadmControlPlane",
-				Name:       "test-control-plane",
-				Namespace:  "default",
+			ControlPlaneRef: capi.ContractVersionedObjectReference{
+				APIGroup: "controlplane.cluster.x-k8s.io",
+				Kind:     "KubeadmControlPlane",
+				Name:     "test-control-plane",
 			},
 		},
 	}
@@ -303,7 +299,8 @@ func (s *autoscalerSuite) TestGetKubernetesMinorVersion_HappyPath_CAPIControlPla
 
 	s.dynamicClient.SetGetFunc(func(gvk schema.GroupVersionKind, namespace string, name string) (runtime.Object, error) {
 		// Only return the Unstructured object if the GVK matches what we expect for CAPI control plane
-		if gvk.Group == "controlplane.cluster.x-k8s.io" && gvk.Version == "v1beta2" && gvk.Kind == "KubeadmControlPlane" {
+		// Note: Version is "v1" as the handler uses a default version for lookup
+		if gvk.Group == "controlplane.cluster.x-k8s.io" && gvk.Version == "v1" && gvk.Kind == "KubeadmControlPlane" {
 			return unstructuredCP, nil
 		}
 		return nil, fmt.Errorf("not found")
@@ -320,11 +317,10 @@ func (s *autoscalerSuite) TestGetKubernetesMinorVersion_EdgeCase_ErrorGettingCon
 			Namespace: "default",
 		},
 		Spec: capi.ClusterSpec{
-			ControlPlaneRef: &corev1.ObjectReference{
-				APIVersion: "rke.cattle.io/v1",
-				Kind:       "RKEControlPlane",
-				Name:       "non-existent",
-				Namespace:  "default",
+			ControlPlaneRef: capi.ContractVersionedObjectReference{
+				APIGroup: "rke.cattle.io",
+				Kind:     "RKEControlPlane",
+				Name:     "non-existent",
 			},
 		},
 	}
@@ -348,11 +344,10 @@ func (s *autoscalerSuite) TestGetKubernetesMinorVersion_EdgeCase_InvalidVersion(
 			Namespace: "default",
 		},
 		Spec: capi.ClusterSpec{
-			ControlPlaneRef: &corev1.ObjectReference{
-				APIVersion: "rke.cattle.io/v1",
-				Kind:       "RKEControlPlane",
-				Name:       "test-control-plane",
-				Namespace:  "default",
+			ControlPlaneRef: capi.ContractVersionedObjectReference{
+				APIGroup: "rke.cattle.io",
+				Kind:     "RKEControlPlane",
+				Name:     "test-control-plane",
 			},
 		},
 	}
@@ -386,12 +381,12 @@ func (s *autoscalerSuite) TestGetKubernetesMinorVersion_EdgeCase_NilControlPlane
 			Namespace: "default",
 		},
 		Spec: capi.ClusterSpec{
-			ControlPlaneRef: nil, // Nil control plane ref
+			ControlPlaneRef: capi.ContractVersionedObjectReference{}, // Empty control plane ref (tests !IsDefined())
 		},
 	}
 
 	result := s.h.getKubernetesMinorVersion(cluster)
-	s.Equal(0, result) // Should return 0 when ControlPlaneRef is nil
+	s.Equal(0, result) // Should return 0 when ControlPlaneRef is not defined
 }
 
 // Test cases for cleanupFleet method

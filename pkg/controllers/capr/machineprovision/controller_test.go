@@ -413,8 +413,8 @@ func newCapiMachine(name, namespace string) *capi.Machine {
 		},
 		Spec: capi.MachineSpec{
 			Bootstrap: capi.Bootstrap{
-				ConfigRef: &corev1.ObjectReference{
-					APIVersion: "v1",
+				ConfigRef: capi.ContractVersionedObjectReference{
+					APIGroup: "",
 				},
 				DataSecretName: &dataSecretName,
 			},
@@ -423,6 +423,7 @@ func newCapiMachine(name, namespace string) *capi.Machine {
 }
 
 func newCluster(name, namespace string) *capi.Cluster {
+	trueVal := true
 	return &capi.Cluster{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: capi.GroupVersion.String(),
@@ -437,7 +438,9 @@ func newCluster(name, namespace string) *capi.Cluster {
 		},
 		Spec: capi.ClusterSpec{},
 		Status: capi.ClusterStatus{
-			InfrastructureReady: true,
+			Initialization: capi.ClusterInitializationStatus{
+				InfrastructureProvisioned: &trueVal,
+			},
 		},
 	}
 }
