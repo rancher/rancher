@@ -18,10 +18,10 @@ spec:
       sectionName: rancher-https
     {{- else }}
     # Reference to existing gateway listener
-    {{- range $section := .Values.gateway.gatewaySections }}
-    - name: {{ $.Values.gateway.gatewayName }}
-      {{- if $.Values.gateway.gatewayNamespace }}
-      namespace: {{ $.Values.gateway.gatewayNamespace }}
+    {{- range $section := .Values.gateway.existingGateway.sections }}
+    - name: {{ $.Values.gateway.existingGateway.name }}
+      {{- if $.Values.gateway.existingGateway.namespace }}
+      namespace: {{ $.Values.gateway.existingGateway.namespace }}
       {{- end }}
       sectionName: {{ $section }}
       {{- end }}
