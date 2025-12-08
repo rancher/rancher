@@ -738,9 +738,158 @@ type listTestType struct {
 	expect         []map[string]string
 	expectExcludes bool
 	expectContains bool
+	expectSummary []clientv1.SteveAPISummaryItem
 }
 
+var SQLOnlyListTests= []listTestType{
+		// user-a
+	{
+		description: "user:user-a,namespace:none,query:summary=metadata.namespace,metadata.name",
+		user:        "user-a",
+		namespace:   "",
+		query:       "summary=metadata.namespace,metadata.name",
+		expect: []map[string]string{
+			{"name": "test1", "namespace": "test-ns-1"},
+			{"name": "test2", "namespace": "test-ns-1"},
+			{"name": "test3", "namespace": "test-ns-1"},
+			{"name": "test4", "namespace": "test-ns-1"},
+			{"name": "test5", "namespace": "test-ns-1"},
+			{"name": "test1", "namespace": "test-ns-2"},
+			{"name": "test2", "namespace": "test-ns-2"},
+			{"name": "test3", "namespace": "test-ns-2"},
+			{"name": "test4", "namespace": "test-ns-2"},
+			{"name": "test5", "namespace": "test-ns-2"},
+			{"name": "test1", "namespace": "test-ns-3"},
+			{"name": "test2", "namespace": "test-ns-3"},
+			{"name": "test3", "namespace": "test-ns-3"},
+			{"name": "test4", "namespace": "test-ns-3"},
+			{"name": "test5", "namespace": "test-ns-3"},
+			{"name": "test1", "namespace": "test-ns-4"},
+			{"name": "test2", "namespace": "test-ns-4"},
+			{"name": "test3", "namespace": "test-ns-4"},
+			{"name": "test4", "namespace": "test-ns-4"},
+			{"name": "test5", "namespace": "test-ns-4"},
+			{"name": "test1", "namespace": "test-ns-5"},
+			{"name": "test2", "namespace": "test-ns-5"},
+			{"name": "test3", "namespace": "test-ns-5"},
+			{"name": "test4", "namespace": "test-ns-5"},
+			{"name": "test5", "namespace": "test-ns-5"},
+		},
+		expectSummary: []clientv1.SteveAPISummaryItem{
+			clientv1.SteveAPISummaryItem{
+				Property: "metadata.name",
+				Counts: map[string]int{
+					"test1":5, "test2":5, "test3":5, "test4":5, "test5":5,
+				},
+			},
+			clientv1.SteveAPISummaryItem{
+				Property: "metadata.namespace",
+				Counts: map[string]int{
+					"test-ns-1":5, "test-ns-2":5, "test-ns-3":5, "test-ns-4":5, "test-ns-5":5,
+				},
+			},
+		},
+	},
+	{
+		description: "user:user-a,namespace:none,query:limit=8&summary=metadata.name,metadata.namespace",
+		user:        "user-a",
+		namespace:   "",
+		query:       "limit=8&summary=metadata.name,metadata.namespace",
+		expect: []map[string]string{
+			{"name": "test1", "namespace": "test-ns-1"},
+			{"name": "test2", "namespace": "test-ns-1"},
+			{"name": "test3", "namespace": "test-ns-1"},
+			{"name": "test4", "namespace": "test-ns-1"},
+			{"name": "test5", "namespace": "test-ns-1"},
+			{"name": "test1", "namespace": "test-ns-2"},
+			{"name": "test2", "namespace": "test-ns-2"},
+			{"name": "test3", "namespace": "test-ns-2"},
+		},
+		expectSummary: []clientv1.SteveAPISummaryItem{
+			clientv1.SteveAPISummaryItem{
+				Property: "metadata.name",
+				Counts: map[string]int{
+					"test1":2, "test2":2, "test3":2, "test4":1, "test5":1,
+				},
+			},
+			clientv1.SteveAPISummaryItem{
+				Property: "metadata.namespace",
+				Counts: map[string]int{
+					"test-ns-1":5, "test-ns-2":3,
+				},
+			},
+		},
+	},
+	{
+		description: "user:user-a,namespace:none,query:filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&limit=20&summary=metadata.name",
+		user:        "user-a",
+		namespace:   "",
+		query:       "filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&limit=20&summary=metadata.name",
+		// limit is applied BEFORE filter and pagesize, which is why not all test5 secrets appear in the result
+		expect: []map[string]string{
+			{"name": "test5"},
+			{"name": "test5"},
+			{"name": "test5"},
+			{"name": "test5"},
+			{"name": "test4"},
+			{"name": "test4"},
+		},
+	},
+	{
+		description: "user:user-a,namespace:test-ns-2,query:filter=test-label=2&summary=metadata.namespace,metadata.name",
+		user:        "user-a",
+		namespace:   "test-ns-2",
+		query:       "filter=test-label=2&summary=metadata.namespace,metadata.name",
+		expect: []map[string]string{
+			{"name": "test2", "namespace": "test-ns-2"},
+		},
+	},
+	{
+		// non-sql can't handle annotations and label fields that contain "."s because it splits on them
+		description: "user:user-a,namespace:test-ns-2,query:filter=metadata.annotations[management.cattle.io/project-scoped-secret-copy]=spuds",
+		user:        "user-a",
+		namespace:   "test-ns-2",
+		query:       "filter=metadata.annotations[management.cattle.io/project-scoped-secret-copy]=spuds",
+		expect: []map[string]string{
+			{"name": "test4", "namespace": "test-ns-2"},
+		},
+	},
+}
 var nonSQLListTests = []listTestType{
+		// user-a
+	{
+		description: "user:user-a,namespace:none,query:none",
+		user:        "user-a",
+		namespace:   "",
+		query:       "",
+		expect: []map[string]string{
+			{"name": "test1", "namespace": "test-ns-1"},
+			{"name": "test2", "namespace": "test-ns-1"},
+			{"name": "test3", "namespace": "test-ns-1"},
+			{"name": "test4", "namespace": "test-ns-1"},
+			{"name": "test5", "namespace": "test-ns-1"},
+			{"name": "test1", "namespace": "test-ns-2"},
+			{"name": "test2", "namespace": "test-ns-2"},
+			{"name": "test3", "namespace": "test-ns-2"},
+			{"name": "test4", "namespace": "test-ns-2"},
+			{"name": "test5", "namespace": "test-ns-2"},
+			{"name": "test1", "namespace": "test-ns-3"},
+			{"name": "test2", "namespace": "test-ns-3"},
+			{"name": "test3", "namespace": "test-ns-3"},
+			{"name": "test4", "namespace": "test-ns-3"},
+			{"name": "test5", "namespace": "test-ns-3"},
+			{"name": "test1", "namespace": "test-ns-4"},
+			{"name": "test2", "namespace": "test-ns-4"},
+			{"name": "test3", "namespace": "test-ns-4"},
+			{"name": "test4", "namespace": "test-ns-4"},
+			{"name": "test5", "namespace": "test-ns-4"},
+			{"name": "test1", "namespace": "test-ns-5"},
+			{"name": "test2", "namespace": "test-ns-5"},
+			{"name": "test3", "namespace": "test-ns-5"},
+			{"name": "test4", "namespace": "test-ns-5"},
+			{"name": "test5", "namespace": "test-ns-5"},
+		},
+	},
 	{
 		description: "user:user-a,namespace:none,query:limit=8",
 		user:        "user-a",
@@ -939,39 +1088,6 @@ func (s *steveAPITestSuite) TestList() {
 	tests := []listTestType{
 		// user-a
 		{
-			description: "user:user-a,namespace:none,query:none",
-			user:        "user-a",
-			namespace:   "",
-			query:       "",
-			expect: []map[string]string{
-				{"name": "test1", "namespace": "test-ns-1"},
-				{"name": "test2", "namespace": "test-ns-1"},
-				{"name": "test3", "namespace": "test-ns-1"},
-				{"name": "test4", "namespace": "test-ns-1"},
-				{"name": "test5", "namespace": "test-ns-1"},
-				{"name": "test1", "namespace": "test-ns-2"},
-				{"name": "test2", "namespace": "test-ns-2"},
-				{"name": "test3", "namespace": "test-ns-2"},
-				{"name": "test4", "namespace": "test-ns-2"},
-				{"name": "test5", "namespace": "test-ns-2"},
-				{"name": "test1", "namespace": "test-ns-3"},
-				{"name": "test2", "namespace": "test-ns-3"},
-				{"name": "test3", "namespace": "test-ns-3"},
-				{"name": "test4", "namespace": "test-ns-3"},
-				{"name": "test5", "namespace": "test-ns-3"},
-				{"name": "test1", "namespace": "test-ns-4"},
-				{"name": "test2", "namespace": "test-ns-4"},
-				{"name": "test3", "namespace": "test-ns-4"},
-				{"name": "test4", "namespace": "test-ns-4"},
-				{"name": "test5", "namespace": "test-ns-4"},
-				{"name": "test1", "namespace": "test-ns-5"},
-				{"name": "test2", "namespace": "test-ns-5"},
-				{"name": "test3", "namespace": "test-ns-5"},
-				{"name": "test4", "namespace": "test-ns-5"},
-				{"name": "test5", "namespace": "test-ns-5"},
-			},
-		},
-		{
 			description: "user:user-a,namespace:test-ns-1,query:none",
 			user:        "user-a",
 			namespace:   "test-ns-1",
@@ -1008,15 +1124,6 @@ func (s *steveAPITestSuite) TestList() {
 				{"name": "test2", "namespace": "test-ns-3"},
 				{"name": "test2", "namespace": "test-ns-4"},
 				{"name": "test2", "namespace": "test-ns-5"},
-			},
-		},
-		{
-			description: "user:user-a,namespace:test-ns-2,query:labelSelector=test-label=2",
-			user:        "user-a",
-			namespace:   "test-ns-2",
-			query:       "labelSelector=test-label=2",
-			expect: []map[string]string{
-				{"name": "test2", "namespace": "test-ns-2"},
 			},
 		},
 		{
@@ -1158,15 +1265,6 @@ func (s *steveAPITestSuite) TestList() {
 				{"name": "test3", "namespace": "test-ns-5"},
 				{"name": "test4", "namespace": "test-ns-5"},
 				{"name": "test5", "namespace": "test-ns-5"},
-			},
-		},
-		{
-			description: "user:user-a,namespace:test-ns-2,query:filter=metadata.annotations[management.cattle.io/project-scoped-secret-copy]=spuds",
-			user:        "user-a",
-			namespace:   "test-ns-2",
-			query:       "filter=metadata.annotations[management.cattle.io/project-scoped-secret-copy]=spuds",
-			expect: []map[string]string{
-				{"name": "test4", "namespace": "test-ns-2"},
 			},
 		},
 		{
@@ -3134,6 +3232,35 @@ func (s *steveAPITestSuite) assertListIsEqual(expectedList []map[string]string, 
 			assert.Equal(s.T(), namespaceMap[ns], receivedList[i].Namespace, fmt.Sprintf("diff at index %d: expecting namespace mapped:%q (raw:%q), got %q", i, namespaceMap[ns], ns, receivedList[i].Namespace))
 		}
 	}
+}
+
+// shepherd includes a filled `jsonResp` field in the clientv1.SteveAPISummaryItem payload,
+// and it needs to be ignored
+func (s *steveAPITestSuite) assertSummariesMatch(expectedSummaries []clientv1.SteveAPISummaryItem, receivedSummaries []clientv1.SteveAPISummaryItem) {
+	assert.Equal(s.T(), len(expectedSummaries), len(receivedSummaries))
+	fixExpectedSummaries := make([]clientv1.SteveAPISummaryItem, len(expectedSummaries))
+	for i, s := range expectedSummaries {
+		newS := clientv1.SteveAPISummaryItem{}
+		newS.Property = s.Property
+		if newS.Property == "metadata.namespace" {
+			newS.Counts = make(map[string]int)
+			for k, v := range s.Counts {
+				newS.Counts[namespaceMap[k]] = v
+			}
+		} else {
+			newS.Counts = s.Counts
+		}
+		fixExpectedSummaries[i] = newS
+	}
+	fixReceivedSummaries := make([]clientv1.SteveAPISummaryItem, len(receivedSummaries))
+	for i, s := range receivedSummaries {
+		// Drop the jsonResp
+		newS := clientv1.SteveAPISummaryItem{}
+		newS.Property = s.Property
+		newS.Counts = s.Counts
+		fixReceivedSummaries[i] = newS
+	}
+	assert.Equal(s.T(), fixExpectedSummaries, fixReceivedSummaries)
 }
 
 func (s *steveAPITestSuite) assertListContains(expect []map[string]string, list []clientv1.SteveAPIObject) {
