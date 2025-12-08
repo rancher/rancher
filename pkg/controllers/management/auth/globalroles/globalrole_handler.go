@@ -9,7 +9,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	mgmtconv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
+	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -66,11 +66,11 @@ func newGlobalRoleLifecycle(management *config.ManagementContext, clusterManager
 	return &globalRoleLifecycle{
 		clusters:                management.Wrangler.Mgmt.Cluster(),
 		clusterManager:          clusterManager,
-		crLister:                management.RBAC.ClusterRoles("").Controller().Lister(),
-		crClient:                management.RBAC.ClusterRoles(""),
+		crCache:                 management.Wrangler.RBAC.ClusterRole().Cache(),
+		crClient:                management.Wrangler.RBAC.ClusterRole(),
 		nsCache:                 management.Wrangler.Core.Namespace().Cache(),
-		rLister:                 management.RBAC.Roles("").Controller().Lister(),
-		rClient:                 management.RBAC.Roles(""),
+		rCache:                  management.Wrangler.RBAC.Role().Cache(),
+		rClient:                 management.Wrangler.RBAC.Role(),
 		grClient:                management.Wrangler.Mgmt.GlobalRole(),
 		grbCache:                management.Wrangler.Mgmt.GlobalRoleBinding().Cache(),
 		fleetPermissionsHandler: newFleetWorkspaceRoleHandler(management),
@@ -80,11 +80,11 @@ func newGlobalRoleLifecycle(management *config.ManagementContext, clusterManager
 type globalRoleLifecycle struct {
 	clusters                mgmtconv3.ClusterClient
 	clusterManager          *clustermanager.Manager
-	crLister                rbacv1.ClusterRoleLister
-	crClient                rbacv1.ClusterRoleInterface
+	crCache                 wrbacv1.ClusterRoleCache
+	crClient                wrbacv1.ClusterRoleController
 	nsCache                 wcorev1.NamespaceCache
-	rLister                 rbacv1.RoleLister
-	rClient                 rbacv1.RoleInterface
+	rCache                  wrbacv1.RoleCache
+	rClient                 wrbacv1.RoleController
 	grClient                mgmtconv3.GlobalRoleClient
 	grbCache                mgmtconv3.GlobalRoleBindingCache
 	fleetPermissionsHandler fleetPermissionsRoleHandler
@@ -158,7 +158,7 @@ func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole) er
 		Type: ClusterRoleExists,
 	}
 
-	clusterRole, _ := gr.crLister.Get("", crName)
+	clusterRole, _ := gr.crCache.Get(crName)
 	if clusterRole != nil {
 		updated := false
 		clusterRole = clusterRole.DeepCopy()
@@ -243,7 +243,7 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 		}
 
 		// Check if the role exists
-		role, err := gr.rLister.Get(ns, roleName)
+		role, err := gr.rCache.Get(ns, roleName)
 		if err != nil {
 			if !apierrors.IsNotFound(err) {
 				returnError = errors.Join(returnError, err)
@@ -290,7 +290,7 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 			}
 
 			// In the case that the role already exists, we get it and check that the rules are correct
-			role, err = gr.rLister.Get(ns, roleName)
+			role, err = gr.rCache.Get(ns, roleName)
 			if err != nil {
 				returnError = errors.Join(returnError, err)
 				addCondition(globalRole, condition, FailedToGetRole, roleName, err)
@@ -329,7 +329,7 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 		return errors.Join(returnError, fmt.Errorf("couldn't create label: %s: %w", grOwnerLabel, err))
 	}
 
-	roles, err := gr.rLister.List("", labels.NewSelector().Add(*r))
+	roles, err := gr.rCache.List("", labels.NewSelector().Add(*r))
 	if err != nil {
 		return errors.Join(returnError, fmt.Errorf("couldn't list roles with label %s : %s: %w", grOwnerLabel, globalRoleName, err))
 	}
@@ -350,7 +350,7 @@ func (gr *globalRoleLifecycle) purgeInvalidNamespacedRoles(roles []*v1.Role, uid
 	var returnError error
 	for _, r := range roles {
 		if _, ok := uids[r.UID]; !ok {
-			err := gr.rClient.DeleteNamespaced(r.Namespace, r.Name, &metav1.DeleteOptions{})
+			err := gr.rClient.Delete(r.Namespace, r.Name, &metav1.DeleteOptions{})
 			if err != nil {
 				returnError = errors.Join(returnError, fmt.Errorf("couldn't delete role %s: %w", r.Name, err))
 			}
