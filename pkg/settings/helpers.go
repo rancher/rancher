@@ -3,14 +3,12 @@ package settings
 import (
 	"fmt"
 	"strings"
-
-	"github.com/rancher/rancher/pkg/utils"
 )
 
-func GetSystemNamespacesList() ([]string, error) {
+func GetSystemNamespacesList(clusterName string) ([]string, error) {
 	var systemNamespacesSetting Setting
 
-	if utils.IsAgentOnly() {
+	if clusterName != "local" {
 		systemNamespacesSetting = AgentSystemNamespaces
 	} else {
 		systemNamespacesSetting = SystemNamespaces

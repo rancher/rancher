@@ -189,7 +189,7 @@ func (p *pLifecycle) ensureNamespaceRolesUpdated(project *v3.Project) error {
 }
 
 func (p *pLifecycle) assignNamespacesToProject(project *v3.Project, projectName string) error {
-	initialProjectsToNamespaces, err := getDefaultAndSystemProjectsToNamespaces()
+	initialProjectsToNamespaces, err := getDefaultAndSystemProjectsToNamespaces(project.Spec.ClusterName)
 	if err != nil {
 		return err
 	}
@@ -218,8 +218,8 @@ func (p *pLifecycle) assignNamespacesToProject(project *v3.Project, projectName 
 	return nil
 }
 
-func getDefaultAndSystemProjectsToNamespaces() (map[string][]string, error) {
-	systemNamespaces, err := settings.GetSystemNamespacesList()
+func getDefaultAndSystemProjectsToNamespaces(clusterName string) (map[string][]string, error) {
+	systemNamespaces, err := settings.GetSystemNamespacesList(clusterName)
 	if err != nil {
 		return nil, err
 	}

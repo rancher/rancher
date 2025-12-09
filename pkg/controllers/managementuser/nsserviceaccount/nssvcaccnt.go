@@ -30,7 +30,7 @@ type defaultSvcAccountHandler struct {
 func Register(ctx context.Context, cluster *config.UserContext) {
 	logrus.Debugf("Registering defaultSvcAccountHandler for checking default service account of system namespaces")
 
-	systemNamespaces, err := settings.GetSystemNamespacesList()
+	systemNamespaces, err := settings.GetSystemNamespacesList(cluster.ClusterName)
 	if err != nil {
 		logrus.Error(err)
 	}
