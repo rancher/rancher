@@ -89,8 +89,15 @@ func Register(ctx context.Context, cluster *config.UserContext, capi *wrangler.C
 		nodeClient:           cluster.Corew.Node(),
 		clusterLister:        cluster.Management.Management.Clusters("").Controller().Lister(),
 		provClusterCache:     cluster.Management.Wrangler.Provisioning.Cluster().Cache(),
-		capiClusterCache:     capi.CAPI.Cluster().Cache(),
 		rkeControlPlaneCache: cluster.Management.Wrangler.RKE.RKEControlPlane().Cache(),
+	}
+
+	// capiClusterCache is optional - only set it if capi context is available
+	// This allows nodesyncer to work for the local cluster even when CAPI CRDs
+	// are not yet established. The capiClusterCache is only used in isClusterRestoring()
+	// which is already skipped for the local cluster.
+	if capi != nil {
+		m.capiClusterCache = capi.CAPI.Cluster().Cache()
 	}
 
 	n := &nodeSyncer{
@@ -702,6 +709,12 @@ func (m *nodesSyncer) isClusterRestoring() (bool, error) {
 		return false, nil
 	}
 	if strings.HasPrefix(cluster.Name, "c-m-") {
+		// capiClusterCache should not be nil for non-local clusters since we defer
+		// registration until CAPI is ready. Return an error if it is nil.
+		if m.capiClusterCache == nil {
+			logrus.Errorf("[nodessyncer][isClusterRestoring] capiClusterCache is nil for non-local cluster %s", cluster.Name)
+			return false, errors.Errorf("capiClusterCache is nil for non-local cluster %s", cluster.Name)
+		}
 		provCluster, err := m.provClusterCache.Get(cluster.Spec.FleetWorkspaceName, cluster.Spec.DisplayName)
 		if err != nil {
 			return false, err
