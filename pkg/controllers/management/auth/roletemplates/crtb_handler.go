@@ -127,6 +127,7 @@ func (c *crtbHandler) reconcileMembershipBindings(crtb *v3.ClusterRoleTemplateBi
 	for _, rule := range clusterRole.Rules {
 		if slices.Contains(rule.Verbs, "own") && slices.Contains(rule.Resources, "clusters") {
 			isClusterOwner = true
+			break
 		}
 	}
 

@@ -150,9 +150,8 @@ func getClusterMembershipRoleName(rtb metav1.Object, isClusterOwner bool) string
 	}
 	if isClusterOwner {
 		return name.SafeConcatName(clusterName, clusterContext+"owner")
-	} else {
-		return name.SafeConcatName(clusterName, clusterContext+"member")
 	}
+	return name.SafeConcatName(clusterName, clusterContext+"member")
 }
 
 // createOrUpdateProjectMembershipBinding ensures the RoleBinding required to give Project access to a user exists.
@@ -258,9 +257,8 @@ func getProjectMembershipRoleName(prtb *v3.ProjectRoleTemplateBinding, isProject
 	_, projectName := rbac.GetClusterAndProjectNameFromPRTB(prtb)
 	if isProjectOwner {
 		return name.SafeConcatName(projectName, projectContext+"owner")
-	} else {
-		return name.SafeConcatName(projectName, projectContext+"member")
 	}
+	return name.SafeConcatName(projectName, projectContext+"member")
 }
 
 // getRTBLabel returns the label to be used to indicate what PRTB/CRTB make use of a membership role.
