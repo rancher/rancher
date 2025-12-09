@@ -134,7 +134,7 @@ require (
 	github.com/rancher/remotedialer-proxy v0.6.0
 	github.com/rancher/rke v1.8.0
 	github.com/rancher/shepherd v0.0.0-20251107194714-b8e8da9ac830
-	github.com/rancher/steve v0.7.32
+	github.com/rancher/steve v0.7.33
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20250930163923-f2c9e60b1078
 	github.com/rancher/wrangler v1.1.2
 	github.com/rancher/wrangler/v3 v3.3.1
@@ -269,10 +269,10 @@ require (
 	k8s.io/gengo v0.0.0-20250130153323-76c5745d3511 // indirect
 	k8s.io/gengo/v2 v2.0.0-20250604051438-85fd79dbfd9f // indirect
 	k8s.io/kms v0.34.2 // indirect
-	modernc.org/libc v1.66.3 // indirect
+	modernc.org/libc v1.66.10 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.39.0 // indirect
+	modernc.org/sqlite v1.40.1 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
 )
