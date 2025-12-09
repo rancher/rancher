@@ -7,10 +7,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestProjectOwnerRoleHasPrincipalsPermission tests that the actual Project Owner role
-// definition in addRoles includes the principals permission. This test extracts the role
-// definition as it's built in the production code and validates it contains the required
-// permission for users with User-Base role to view project members.
+// TestProjectOwnerRoleHasPrincipalsPermission tests that the Project Owner role
+// includes the principals permission by replicating the exact role definition from
+// addRoles. This validates that users with User-Base role can view project members
+// when they are project owners.
 // See: https://github.com/rancher/dashboard/issues/10215
 func TestProjectOwnerRoleHasPrincipalsPermission(t *testing.T) {
 	// Create a roleBuilder and build roles exactly as done in addRoles
