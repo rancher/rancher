@@ -10,6 +10,7 @@ import (
 
 	gmux "github.com/gorilla/mux"
 	"github.com/rancher/rancher/pkg/api/steve/disallow"
+	"github.com/rancher/rancher/pkg/api/steve/proxy/rbac"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
@@ -72,7 +73,7 @@ func NewProxyMiddleware(sar v1.AuthorizationV1Interface,
 	mux.Path("/v1/management.cattle.io.clusters/{clusterID}").Queries("link", "shell").HandlerFunc(routeToShellProxy("link", "shell", localSupport, localCluster, mux, proxyHandler))
 	mux.Path("/v1/management.cattle.io.clusters/{clusterID}").Queries("action", "apply").HandlerFunc(routeToShellProxy("action", "apply", localSupport, localCluster, mux, proxyHandler))
 	mux.Path("/v3/clusters/{clusterID}").Queries("shell", "true").HandlerFunc(routeToShellProxy("link", "shell", localSupport, localCluster, mux, proxyHandler))
-	mux.Path("/{prefix:k8s/clusters/[^/]+}{suffix:/v1.*}").MatcherFunc(proxyHandler.MatchNonLegacy("/k8s/clusters/")).Handler(RBAC(proxyHandler, localCluster))
+	mux.Path("/{prefix:k8s/clusters/[^/]+}{suffix:/v1.*}").MatcherFunc(proxyHandler.MatchNonLegacy("/k8s/clusters/")).Handler(rbac.RBAC(proxyHandler, localCluster))
 
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {

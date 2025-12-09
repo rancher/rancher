@@ -1,4 +1,4 @@
-package proxy
+package rbac
 
 import (
 	"bufio"
@@ -20,61 +20,68 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
-// RBAC 代理请求中间件，包装实际响应
-func RBAC(next http.Handler, apiServer http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !matchURL(r.URL.RequestURI()) {
-			next.ServeHTTP(w, r)
+type SchemaRbacProcessor struct {
+	next      http.Handler
+	apiServer http.Handler
+}
+
+func (s *SchemaRbacProcessor) Process(w http.ResponseWriter, r *http.Request) {
+	logrus.Infof("Request URI: %s matched an RBAC filtering rule.", r.URL.RequestURI())
+
+	middleWriter := MiddleResponseWriter(w)
+	s.next.ServeHTTP(middleWriter, r)
+
+	body := middleWriter.GetResponseBody()
+
+	isGzip := middleWriter.Header().Get("Content-Encoding") == "gzip"
+
+	if isGzip {
+		decompressed, err := decompressGzip(body)
+		if err != nil {
+			logrus.Warnf("Failed to decompress gzip: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+		body = decompressed
+	}
 
-		logrus.Infof("Request URI: %s matched an RBAC filtering rule.", r.URL.RequestURI())
+	filteredBody := filterResponse(r, body, s.apiServer)
 
-		middleWriter := MiddleResponseWriter(w)
-		next.ServeHTTP(middleWriter, r)
-
-		body := middleWriter.GetResponseBody()
-
-		isGzip := middleWriter.Header().Get("Content-Encoding") == "gzip"
-
-		if isGzip {
-			decompressed, err := decompressGzip(body)
-			if err != nil {
-				logrus.Warnf("Failed to decompress gzip: %v", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			body = decompressed
+	// Re-compress the body if the original response was gzip
+	if isGzip {
+		compressed, err := compressGzip(filteredBody)
+		if err != nil {
+			logrus.Warnf("Failed to compress gzip: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
+		filteredBody = compressed
+	}
 
-		// 过滤响应
-		filteredBody := filterResponse(r, body, apiServer)
-
-		// 如果原响应是 gzip，重新压缩
-		if isGzip {
-			compressed, err := compressGzip(filteredBody)
-			if err != nil {
-				logrus.Warnf("Failed to compress gzip: %v", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			filteredBody = compressed
+	// Write filtered response back to the client
+	for k, vv := range middleWriter.Header() {
+		for _, v := range vv {
+			w.Header().Add(k, v)
 		}
+	}
 
-		// 写回客户端
-		for k, vv := range middleWriter.Header() {
-			for _, v := range vv {
-				w.Header().Add(k, v)
-			}
-		}
+	status := middleWriter.StatusCode
+	if status == 0 {
+		status = http.StatusOK
+	}
+	w.WriteHeader(status)
+	w.Write(filteredBody)
 
-		status := middleWriter.StatusCode
-		if status == 0 {
-			status = http.StatusOK
-		}
-		w.WriteHeader(status)
-		w.Write(filteredBody)
-	})
+}
+
+func (s *SchemaRbacProcessor) Match(r *http.Request) bool {
+	url := r.URL.RequestURI()
+	pattern := `^/k8s/clusters/[^/]+/v1/(harvester/)?schemas(\?.*)?$`
+	matched, err := regexp.MatchString(pattern, url)
+	if err != nil {
+		return false
+	}
+	return matched
 }
 
 type HijackResponseWriter struct {
@@ -96,23 +103,20 @@ func MiddleResponseWriter(w http.ResponseWriter) *HijackResponseWriter {
 	}
 }
 
-// Write 捕获响应数据
+// Write captures the response body
 func (c *HijackResponseWriter) Write(p []byte) (int, error) {
 	c.Body.Write(p)
 	return len(p), nil
 }
 
-// WriteHeader 捕获状态码
 func (c *HijackResponseWriter) WriteHeader(statusCode int) {
 	c.StatusCode = statusCode
 }
 
-// Header 返回 header map
 func (c *HijackResponseWriter) Header() http.Header {
 	return c.HeaderMap
 }
 
-// Hijack 实现 http.Hijacker
 func (c *HijackResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	hijacker, ok := c.ResponseWriter.(http.Hijacker)
 	if !ok {
@@ -128,48 +132,11 @@ func (c *HijackResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	return conn, rw, nil
 }
 
-// GetResponseBody 获取捕获的响应体
 func (c *HijackResponseWriter) GetResponseBody() []byte {
 	return c.Body.Bytes()
 }
 
-func decompressGzip(data []byte) ([]byte, error) {
-	var buf bytes.Buffer
-	reader, err := gzip.NewReader(bytes.NewReader(data))
-	if err != nil {
-		return nil, err
-	}
-	defer reader.Close()
-	_, err = io.Copy(&buf, reader)
-	if err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func compressGzip(data []byte) ([]byte, error) {
-	var buf bytes.Buffer
-	writer := gzip.NewWriter(&buf)
-	_, err := writer.Write(data)
-	if err != nil {
-		return nil, err
-	}
-	if err := writer.Close(); err != nil {
-		logrus.Warnf("Error closing the writer while compressing data: %v!", err)
-	}
-	return buf.Bytes(), nil
-}
-
-func matchURL(url string) bool {
-	pattern := `^/k8s/clusters/[^/]+/v1/(harvester/)?schemas(\?.*)?$`
-	matched, err := regexp.MatchString(pattern, url)
-	if err != nil {
-		return false
-	}
-	return matched
-}
-
-// filterResponse 根据 accessSet 过滤原始 schemas，只要错误产生即返回空数据集，避免越权
+// filterResponse filters schemas based on accessSet; if any error occurs, return an empty result to prevent privilege escalation
 func filterResponse(r *http.Request, dataToFilter []byte, apiServer http.Handler) []byte {
 	var finalResult = make([]byte, 0)
 
@@ -197,7 +164,7 @@ func filterResponse(r *http.Request, dataToFilter []byte, apiServer http.Handler
 		return finalResult
 	}
 
-	// 解析原始 JSON
+	// Parse raw JSON
 	var raw map[string]interface{}
 	if err = json.Unmarshal(dataToFilter, &raw); err != nil {
 		return finalResult
@@ -216,7 +183,7 @@ func filterResponse(r *http.Request, dataToFilter []byte, apiServer http.Handler
 		}
 		attr, ok := m["attributes"].(map[string]interface{})
 		if !ok {
-			// 说明当前 schema 不需要权限，直接添加
+			// Schema does not require RBAC check; include it directly
 			filtered = append(filtered, m)
 			continue
 		}
@@ -246,7 +213,7 @@ func filterResponse(r *http.Request, dataToFilter []byte, apiServer http.Handler
 			name = n
 		}
 
-		// 过滤 resourceMethods
+		// Filter resourceMethods
 		var filteredR []interface{}
 		if rMethods, ok := m["resourceMethods"].([]interface{}); ok && rMethods != nil {
 			for _, v := range rMethods {
@@ -260,7 +227,7 @@ func filterResponse(r *http.Request, dataToFilter []byte, apiServer http.Handler
 		}
 		m["resourceMethods"] = filteredR
 
-		// 过滤 collectionMethods
+		// Filter collectionMethods
 		var filteredC []interface{}
 		if cMethods, ok := m["collectionMethods"].([]interface{}); ok && cMethods != nil {
 			for _, v := range cMethods {
@@ -274,7 +241,7 @@ func filterResponse(r *http.Request, dataToFilter []byte, apiServer http.Handler
 		}
 		m["collectionMethods"] = filteredC
 
-		// 如果两个方法都为空，则整个资源过滤掉
+		// If both sets are empty, remove the entire resource
 		if len(filteredR) == 0 && len(filteredC) == 0 {
 			continue
 		}
@@ -285,4 +252,31 @@ func filterResponse(r *http.Request, dataToFilter []byte, apiServer http.Handler
 	raw["data"] = filtered
 	finalResult, _ = json.Marshal(raw)
 	return finalResult
+}
+
+func compressGzip(data []byte) ([]byte, error) {
+	var buf bytes.Buffer
+	writer := gzip.NewWriter(&buf)
+	_, err := writer.Write(data)
+	if err != nil {
+		return nil, err
+	}
+	if err := writer.Close(); err != nil {
+		logrus.Warnf("Error closing the writer while compressing data: %v!", err)
+	}
+	return buf.Bytes(), nil
+}
+
+func decompressGzip(data []byte) ([]byte, error) {
+	var buf bytes.Buffer
+	reader, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+	_, err = io.Copy(&buf, reader)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
