@@ -2,6 +2,8 @@ module github.com/rancher/rancher
 
 go 1.24.0
 
+toolchain go1.24.11
+
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.6.27 // for compatibilty with docker 20.10.x
 	github.com/crewjam/saml => github.com/rancher/saml v0.4.14-rancher3
