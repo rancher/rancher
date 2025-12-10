@@ -288,7 +288,7 @@ func TestAuthEndpoint(t *testing.T) {
 			wantRedirect:                       fakeRedirectUri + "?error=invalid_scope&error_description=missing+openid+scope",
 			wantAccessControlAllowOriginHeader: fakeRedirectUri,
 		},
-		"invalid scope": {
+		"invalid scope with no configured scopes": {
 			req: func() *http.Request {
 				req := &http.Request{
 					URL: &url.URL{
@@ -333,6 +333,111 @@ func TestAuthEndpoint(t *testing.T) {
 			},
 			wantHttpCode:                       http.StatusFound,
 			wantRedirect:                       fakeRedirectUri + "?error=invalid_scope&error_description=invalid+scope%3A+invalidscope",
+			wantAccessControlAllowOriginHeader: fakeRedirectUri,
+		},
+		"invalid scope with configured scopes": {
+			req: func() *http.Request {
+				req := &http.Request{
+					URL: &url.URL{
+						Scheme:   "https",
+						Host:     "rancher.com",
+						RawQuery: "code_challenge_method=S256&response_type=code&code_challenge=code-challenge&client_id=client-id&scope=openid+invalidscope&redirect_uri=" + fakeRedirectUri,
+					},
+					Method: http.MethodGet,
+				}
+				req.Header = map[string][]string{
+					"Cookie": {"R_SESS=" + fakeTokenName + ":" + fakeTokenValue},
+				}
+
+				return req
+			},
+			mockSetup: func(m mockParams) {
+				m.tokenCache.EXPECT().Get(fakeTokenName).Return(&v3.Token{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeTokenName,
+					},
+					Token:  fakeTokenValue,
+					UserID: fakeUserID,
+				}, nil)
+				m.userLister.EXPECT().Get(fakeUserID).Return(&v3.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeUserID,
+					},
+				}, nil)
+				m.oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", fakeClientID).Return([]*v3.OIDCClient{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: fakeClientName,
+						},
+						Spec: v3.OIDCClientSpec{
+							RedirectURIs: []string{fakeRedirectUri},
+							Scopes:       []string{"openid", "profile", "rancher:test"},
+						},
+						Status: v3.OIDCClientStatus{
+							ClientID: fakeClientID,
+						},
+					},
+				}, nil)
+			},
+			wantHttpCode:                       http.StatusFound,
+			wantRedirect:                       fakeRedirectUri + "?error=invalid_scope&error_description=invalid+scope%3A+invalidscope",
+			wantAccessControlAllowOriginHeader: fakeRedirectUri,
+		},
+
+		"configured scopes": {
+			req: func() *http.Request {
+				req := &http.Request{
+					URL: &url.URL{
+						Scheme:   "https",
+						Host:     "rancher.com",
+						RawQuery: "code_challenge_method=S256&response_type=code&code_challenge=code-challenge&client_id=client-id&scope=openid+profile+rancher:test&redirect_uri=" + fakeRedirectUri,
+					},
+					Method: http.MethodGet,
+				}
+				req.Header = map[string][]string{
+					"Cookie": {"R_SESS=" + fakeTokenName + ":" + fakeTokenValue},
+				}
+
+				return req
+			},
+			mockSetup: func(m mockParams) {
+				m.tokenCache.EXPECT().Get(fakeTokenName).Return(&v3.Token{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeTokenName,
+					},
+					Token:  fakeTokenValue,
+					UserID: fakeUserID,
+				}, nil)
+				m.userLister.EXPECT().Get(fakeUserID).Return(&v3.User{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fakeUserID,
+					},
+				}, nil)
+				m.sessionAdder.EXPECT().Add(fakeCode, session.Session{
+					ClientID:      fakeClientID,
+					TokenName:     fakeTokenName,
+					Scope:         []string{"openid", "profile", "rancher:test"},
+					CodeChallenge: "code-challenge",
+					CreatedAt:     fakeTime,
+				})
+				m.oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", fakeClientID).Return([]*v3.OIDCClient{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: fakeClientName,
+						},
+						Spec: v3.OIDCClientSpec{
+							RedirectURIs: []string{fakeRedirectUri},
+							Scopes:       []string{"openid", "profile", "rancher:test"},
+						},
+						Status: v3.OIDCClientStatus{
+							ClientID: fakeClientID,
+						},
+					},
+				}, nil)
+				m.codeCreator.EXPECT().GenerateCode().Return(fakeCode, nil)
+			},
+			wantHttpCode:                       http.StatusFound,
+			wantRedirect:                       fakeRedirectUri + "?code=fake-code",
 			wantAccessControlAllowOriginHeader: fakeRedirectUri,
 		},
 		"missing code challenge": {

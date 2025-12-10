@@ -67,6 +67,14 @@ spec:
                 format: int64
                 minimum: 1
                 type: integer
+              scopes:
+                description: |-
+                  Scopes is the list of scopes allowed for this client.
+
+                  If configured, the client will only be able to request these scopes.
+                items:
+                  type: string
+                type: array
               tokenExpirationSeconds:
                 description: |-
                   TokenExpirationSeconds specifies the duration (in seconds) before

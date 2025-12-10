@@ -16,6 +16,7 @@ const (
 	OIDCClientFieldRedirectURIs                  = "redirectURIs"
 	OIDCClientFieldRefreshTokenExpirationSeconds = "refreshTokenExpirationSeconds"
 	OIDCClientFieldRemoved                       = "removed"
+	OIDCClientFieldScopes                        = "scopes"
 	OIDCClientFieldState                         = "state"
 	OIDCClientFieldStatus                        = "status"
 	OIDCClientFieldTokenExpirationSeconds        = "tokenExpirationSeconds"
@@ -36,6 +37,7 @@ type OIDCClient struct {
 	RedirectURIs                  []string          `json:"redirectURIs,omitempty" yaml:"redirectURIs,omitempty"`
 	RefreshTokenExpirationSeconds int64             `json:"refreshTokenExpirationSeconds,omitempty" yaml:"refreshTokenExpirationSeconds,omitempty"`
 	Removed                       string            `json:"removed,omitempty" yaml:"removed,omitempty"`
+	Scopes                        []string          `json:"scopes,omitempty" yaml:"scopes,omitempty"`
 	State                         string            `json:"state,omitempty" yaml:"state,omitempty"`
 	Status                        OIDCClientStatus  `json:"status,omitempty" yaml:"status,omitempty"`
 	TokenExpirationSeconds        int64             `json:"tokenExpirationSeconds,omitempty" yaml:"tokenExpirationSeconds,omitempty"`

@@ -144,11 +144,10 @@ func (h *authorizeHandler) authEndpoint(w http.ResponseWriter, r *http.Request) 
 		oidcerror.RedirectWithError(params.redirectURI, oidcerror.InvalidScope, "missing openid scope", params.state, w, r)
 		return
 	}
-	for _, scope := range params.scopes {
-		if !slices.Contains(supportedScopes, scope) {
-			oidcerror.RedirectWithError(params.redirectURI, oidcerror.InvalidScope, fmt.Sprintf("invalid scope: %s", scope), params.state, w, r)
-			return
-		}
+
+	if err := h.validateScopes(params.scopes, oidcClient); err != nil {
+		oidcerror.RedirectWithError(params.redirectURI, oidcerror.InvalidScope, err.Error(), params.state, w, r)
+		return
 	}
 	if params.codeChallenge == "" {
 		oidcerror.RedirectWithError(params.redirectURI, oidcerror.InvalidRequest, "missing code_challenge", params.state, w, r)
@@ -261,4 +260,28 @@ func getAuthParamsFromRequest(r *http.Request) (*authParams, error) {
 		redirectURI:         values.Get("redirect_uri"),
 		responseType:        values.Get("response_type"),
 	}, nil
+}
+
+// validateScopes returns true if the requested scopes are allowed by the
+// OIDCClient.
+//
+// The scopes are defaulted
+func (h *authorizeHandler) validateScopes(requested []string, oidcClient *v3.OIDCClient) error {
+	scopes := oidcClient.Spec.Scopes
+	if len(scopes) == 0 {
+		scopes = append(scopes, supportedScopes...)
+	}
+
+	var invalidScopes []string
+	for _, scope := range requested {
+		if !slices.Contains(scopes, scope) {
+			invalidScopes = append(invalidScopes, scope)
+		}
+	}
+
+	if len(invalidScopes) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("invalid scope: %s", strings.Join(invalidScopes, " "))
 }

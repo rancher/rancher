@@ -159,7 +159,7 @@ func (h *tokenHandler) createTokenFromCode(r *http.Request) (TokenResponse, *oid
 	}
 
 	// verify clientID and secret. They can be set in the Authorization header or as a form param as specified in the OIDC spec.
-	var clientID, _ string
+	var clientID string
 	clientID, clientSecret, ok := r.BasicAuth()
 	if !ok {
 		clientID = r.FormValue("client_id")
@@ -176,6 +176,7 @@ func (h *tokenHandler) createTokenFromCode(r *http.Request) (TokenResponse, *oid
 	if err != nil {
 		return TokenResponse{}, oidcerror.New(oidcerror.ServerError, "failed to get client secret")
 	}
+
 	clientSecretFound := false
 	for key, cs := range secret.Data {
 		if clientSecret == string(cs) {
