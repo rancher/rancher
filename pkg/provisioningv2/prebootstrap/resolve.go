@@ -33,7 +33,7 @@ type Retriever struct {
 }
 
 func (r *Retriever) GeneratePreBootstrapClusterAgentManifest(controlPlane *rkev1.RKEControlPlane) ([]plan.File, error) {
-	shouldDo, err := r.preBootstrapCluster(controlPlane)
+	shouldDo, _ := r.preBootstrapCluster(controlPlane)
 	if !shouldDo {
 		return nil, nil
 	}

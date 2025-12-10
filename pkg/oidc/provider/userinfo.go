@@ -38,6 +38,11 @@ func newUserInfoHandler(userLister wrangmgmtv3.UserCache, userAttributeLister wr
 // userInfoEndpoint handles the userinfo endpoint of the OIDC provider
 func (h *userInfoHandler) userInfoEndpoint(w http.ResponseWriter, r *http.Request) {
 	accessToken, err := getTokenFromHeader(r)
+	if err != nil {
+		oidcerror.WriteError(oidcerror.InvalidRequest, fmt.Sprintf("failed to get token from header: %v", err), http.StatusBadRequest, w)
+		return
+	}
+
 	claims := jwt.MapClaims{}
 	// verify access_token signature
 	_, err = jwt.ParseWithClaims(accessToken, &claims, func(token *jwt.Token) (interface{}, error) {
