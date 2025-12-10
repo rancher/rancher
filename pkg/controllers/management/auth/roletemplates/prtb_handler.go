@@ -3,6 +3,7 @@ package roletemplates
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -11,6 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	crbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -114,15 +116,30 @@ func (p *prtbHandler) reconcileSubject(binding *v3.ProjectRoleTemplateBinding) (
 	return binding, nil
 }
 
+// isInheritedOwner checks if a PolicyRule contains the "own" verb for the given resource. That indicates whether the user should be given owner level access via membership bindings.
+func isInheritedOwner(rule rbacv1.PolicyRule, resource string) bool {
+	return slices.Contains(rule.Verbs, "own") && slices.Contains(rule.Resources, resource)
+}
+
 // reconcileMembershipBindings ensures that the user is given the right membership binding to the project and cluster.
 func (p *prtbHandler) reconcileMembershipBindings(prtb *v3.ProjectRoleTemplateBinding) error {
-	rt, err := p.rtController.Get(prtb.RoleTemplateName, metav1.GetOptions{})
+	// to determine if a user is a member or an owner, we need to check the aggregated cluster role to see if it inherited the "own" verb on projects/clusters
+	clusterRole, err := p.crController.Get(rbac.AggregatedClusterRoleNameFor(prtb.RoleTemplateName), metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
+	isProjectOwner, isClusterOwner := false, false
+	for _, rule := range clusterRole.Rules {
+		if isInheritedOwner(rule, "projects") {
+			isProjectOwner = true
+		}
+		if isInheritedOwner(rule, "clusters") {
+			isClusterOwner = true
+		}
+	}
 
-	return errors.Join(createOrUpdateClusterMembershipBinding(prtb, rt, p.crbController),
-		createOrUpdateProjectMembershipBinding(prtb, rt, p.rbController))
+	return errors.Join(createOrUpdateClusterMembershipBinding(prtb, p.crbController, isClusterOwner),
+		createOrUpdateProjectMembershipBinding(prtb, p.rbController, isProjectOwner))
 }
 
 // reconcileBindings ensures the right Role Binding exists for the project management plane role. It deletes any additional unwanted Role Bindings.

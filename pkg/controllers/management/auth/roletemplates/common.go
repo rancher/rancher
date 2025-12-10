@@ -41,14 +41,14 @@ const (
 	failedToCreateUser                      = "FailedToCreateUser"
 	failedToDeleteRoleBinding               = "FailedToDeleteRoleBinding"
 	failedToGetDesiredRoleBindings          = "FailedToGetDesiredRoleBindings"
-	failedToGetRoleTemplate                 = "FailedToGetRoleTemplate"
 	failedToGetUser                         = "FailedToGetUser"
+	failedToGetClusterRole                  = "FailedToGetClusterRole"
 	failedToListExistingRoleBindings        = "FailedToGetExistingRoleBindings"
 )
 
 // createOrUpdateClusterMembershipBinding ensures that the user specified by a CRTB or PRTB has membership to the cluster referenced by the CRTB or PRTB.
-func createOrUpdateClusterMembershipBinding(rtb metav1.Object, rt *v3.RoleTemplate, crbController crbacv1.ClusterRoleBindingController) error {
-	roleName := getClusterMembershipRoleName(rt, rtb)
+func createOrUpdateClusterMembershipBinding(rtb metav1.Object, crbController crbacv1.ClusterRoleBindingController, isClusterOwner bool) error {
+	roleName := getClusterMembershipRoleName(rtb, isClusterOwner)
 	roleRef := rbacv1.RoleRef{
 		APIGroup: rbacv1.GroupName,
 		Kind:     "ClusterRole",
@@ -140,7 +140,7 @@ func deleteClusterMembershipBinding(rtb metav1.Object, crbController crbacv1.Clu
 }
 
 // getMembershipRoleName returns the name of the membership role based on the RoleTemplate.
-func getClusterMembershipRoleName(rt *v3.RoleTemplate, rtb metav1.Object) string {
+func getClusterMembershipRoleName(rtb metav1.Object, isClusterOwner bool) string {
 	var clusterName string
 	switch obj := rtb.(type) {
 	case *v3.ProjectRoleTemplateBinding:
@@ -148,16 +148,15 @@ func getClusterMembershipRoleName(rt *v3.RoleTemplate, rtb metav1.Object) string
 	case *v3.ClusterRoleTemplateBinding:
 		clusterName = obj.ClusterName
 	}
-	if isClusterOwnerRole(rt) {
+	if isClusterOwner {
 		return name.SafeConcatName(clusterName, clusterContext+"owner")
-	} else {
-		return name.SafeConcatName(clusterName, clusterContext+"member")
 	}
+	return name.SafeConcatName(clusterName, clusterContext+"member")
 }
 
 // createOrUpdateProjectMembershipBinding ensures the RoleBinding required to give Project access to a user exists.
-func createOrUpdateProjectMembershipBinding(prtb *v3.ProjectRoleTemplateBinding, rt *v3.RoleTemplate, rbController crbacv1.RoleBindingController) error {
-	roleName := getProjectMembershipRoleName(rt, prtb)
+func createOrUpdateProjectMembershipBinding(prtb *v3.ProjectRoleTemplateBinding, rbController crbacv1.RoleBindingController, isProjectOwner bool) error {
+	roleName := getProjectMembershipRoleName(prtb, isProjectOwner)
 	roleRef := rbacv1.RoleRef{
 		APIGroup: rbacv1.GroupName,
 		Kind:     "Role",
@@ -254,25 +253,12 @@ func deleteProjectMembershipBinding(prtb *v3.ProjectRoleTemplateBinding, rbContr
 }
 
 // getProjectMembershipRoleName returns the name of the project member or owner binding for the PRTB.
-func getProjectMembershipRoleName(rt *v3.RoleTemplate, prtb *v3.ProjectRoleTemplateBinding) string {
+func getProjectMembershipRoleName(prtb *v3.ProjectRoleTemplateBinding, isProjectOwner bool) string {
 	_, projectName := rbac.GetClusterAndProjectNameFromPRTB(prtb)
-	if isProjectOwnerRole(rt) {
+	if isProjectOwner {
 		return name.SafeConcatName(projectName, projectContext+"owner")
-	} else {
-		return name.SafeConcatName(projectName, projectContext+"member")
 	}
-}
-
-// isClusterOwnerRole returns if the RoleTemplate is an Owner role. If not it is considered a Member role.
-// The only valid OwnerRole is the builtin "cluster-owner" role.
-func isClusterOwnerRole(rt *v3.RoleTemplate) bool {
-	return rt.Builtin && rt.Context == clusterContext && rt.Name == clusterOwner
-}
-
-// isProjectOwnerRole returns if the RoleTemplate is an Owner role. If not it is considered a Member role.
-// The only valid OwnerRole is the builtin "project-owner" role.
-func isProjectOwnerRole(rt *v3.RoleTemplate) bool {
-	return rt.Builtin && rt.Context == projectContext && rt.Name == projectOwner
+	return name.SafeConcatName(projectName, projectContext+"member")
 }
 
 // getRTBLabel returns the label to be used to indicate what PRTB/CRTB make use of a membership role.
