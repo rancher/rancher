@@ -300,6 +300,7 @@ func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 
 		// Start when we see any active restore phase for this generation
 		if cp.Spec.ETCDSnapshotRestore != nil && cp.Spec.ETCDSnapshotRestore.Generation == generation {
+			logrus.Infof("SUCCESS: Expected Generation: %d, Generation Found: %+v, Generation Spec: %+v", generation, cp.Status.ETCDSnapshotRestore, cp.Spec.ETCDSnapshotRestore)
 			return true, nil
 		}
 		logrus.Infof("Expected Generation: %d, Generation Found: %+v, Generation Spec: %+v", generation, cp.Status.ETCDSnapshotRestore, cp.Spec.ETCDSnapshotRestore)
@@ -340,7 +341,7 @@ func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 			return true, nil
 		}
 
-		logrus.Infof("Current restore phase: %s, Current ready condition: %s", cp.Status.ETCDSnapshotRestorePhase, capr.Ready.GetStatus(cp))
+		logrus.Infof("Current restore phase: %s, Current restore status: %+v, Current restore spec: %+v, Current ready condition: %s", cp.Status.ETCDSnapshotRestorePhase, cp.Status.ETCDSnapshotRestore, cp.Spec.ETCDSnapshotRestore, capr.Ready.GetStatus(cp))
 
 		return false, nil
 	})
