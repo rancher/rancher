@@ -99,7 +99,6 @@ func TestTokenEndpoint(t *testing.T) {
 			ClientID: fakeClientID,
 		},
 	}
-
 	fakeToken := &v3.Token{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fakeTokenName,
