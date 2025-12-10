@@ -212,12 +212,12 @@ func (h *handler) updateV3SchedulingCustomizationForAgent(cluster *v3.Cluster, a
 
 	cluster = cluster.DeepCopy()
 
-	var adc **v3.AgentDeploymentCustomization
+	var adc *v3.AgentDeploymentCustomization
 	switch agent {
 	case clusterAgent:
-		adc = &cluster.Spec.ClusterAgentDeploymentCustomization
+		adc = cluster.Spec.ClusterAgentDeploymentCustomization
 	case fleetAgent:
-		adc = &cluster.Spec.FleetAgentDeploymentCustomization
+		adc = cluster.Spec.FleetAgentDeploymentCustomization
 	default:
 		return nil, fmt.Errorf("unknown agent type during adc assignment: %v", agent)
 	}
@@ -225,15 +225,15 @@ func (h *handler) updateV3SchedulingCustomizationForAgent(cluster *v3.Cluster, a
 	if lowerVal == "false" {
 		delete(cluster.Annotations, annotation)
 
-		if *adc != nil {
-			(*adc).SchedulingCustomization = nil
+		if adc != nil {
+			adc.SchedulingCustomization = nil
 		}
 
 		return h.mgmtClusters.Update(cluster)
 	}
 
 	// annotation was added to a cluster that already has the fields set, we should not override the existing values.
-	if *adc != nil && (*adc).SchedulingCustomization != nil {
+	if adc != nil && adc.SchedulingCustomization != nil {
 		delete(cluster.Annotations, annotation)
 		return h.mgmtClusters.Update(cluster)
 	}
@@ -246,10 +246,16 @@ func (h *handler) updateV3SchedulingCustomizationForAgent(cluster *v3.Cluster, a
 		return cluster, fmt.Errorf("failed to get default scheduling customization: %w", err)
 	}
 	if defaultPDB != nil || defaultPC != nil {
-		if *adc == nil {
-			*adc = &v3.AgentDeploymentCustomization{}
+		if adc == nil {
+			adc = &v3.AgentDeploymentCustomization{}
+			switch agent {
+			case clusterAgent:
+				cluster.Spec.ClusterAgentDeploymentCustomization = adc
+			case fleetAgent:
+				cluster.Spec.FleetAgentDeploymentCustomization = adc
+			}
 		}
-		(*adc).SchedulingCustomization = &v3.AgentSchedulingCustomization{
+		adc.SchedulingCustomization = &v3.AgentSchedulingCustomization{
 			PodDisruptionBudget: defaultPDB,
 			PriorityClass:       defaultPC,
 		}

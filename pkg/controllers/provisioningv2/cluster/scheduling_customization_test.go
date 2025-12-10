@@ -2,6 +2,7 @@ package cluster
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/ghodss/yaml"
@@ -118,28 +119,29 @@ func Test_updateV1AgentSchedulingCustomization(t *testing.T) {
 				t.Fatalf("did not expect error but got: %v", err)
 			}
 
-			out, err := yaml.Marshal(outputCluster)
-			if err != nil {
-				t.Fatalf("failed to marshal input cluster: %v", err)
-			}
-			expected, err := yaml.Marshal(tt.expectedCluster)
-			if err != nil {
-				t.Fatalf("failed to marshal output cluster: %v", err)
-			}
-			diff := difflib.UnifiedDiff{
-				A:        difflib.SplitLines(string(out)),
-				B:        difflib.SplitLines(string(expected)),
-				FromFile: "actual",
-				ToFile:   "expected",
-				Context:  3,
-			}
-			text, err := difflib.GetUnifiedDiffString(diff)
-			if err != nil {
-				t.Fatalf("failed to get diff string: %v", err)
-			}
-			if text != "" {
-				fmt.Printf("Diff:\n%s\n", text)
-				t.Fatalf("resulting cluster differs from the expected cluster\n%s", text)
+			if !reflect.DeepEqual(outputCluster, &tt.expectedCluster) {
+				out, err := yaml.Marshal(outputCluster)
+				if err != nil {
+					t.Fatalf("failed to marshal input cluster: %v", err)
+				}
+				expected, err := yaml.Marshal(tt.expectedCluster)
+				if err != nil {
+					t.Fatalf("failed to marshal output cluster: %v", err)
+				}
+				diff := difflib.UnifiedDiff{
+					A:        difflib.SplitLines(string(out)),
+					B:        difflib.SplitLines(string(expected)),
+					FromFile: "actual",
+					ToFile:   "expected",
+					Context:  3,
+				}
+				text, err := difflib.GetUnifiedDiffString(diff)
+				if err != nil {
+					t.Fatalf("failed to get diff string: %v", err)
+				}
+				if text != "" {
+					t.Fatalf("resulting cluster differs from the expected cluster\n%s", text)
+				}
 			}
 		})
 	}
@@ -241,28 +243,31 @@ func Test_updateV1FleetAgentSchedulingCustomization(t *testing.T) {
 				t.Fatalf("did not expect error but got: %v", err)
 			}
 
-			out, err := yaml.Marshal(outputCluster)
-			if err != nil {
-				t.Fatalf("failed to marshal input cluster: %v", err)
-			}
-			expected, err := yaml.Marshal(tt.expectedCluster)
-			if err != nil {
-				t.Fatalf("failed to marshal output cluster: %v", err)
-			}
-			diff := difflib.UnifiedDiff{
-				A:        difflib.SplitLines(string(out)),
-				B:        difflib.SplitLines(string(expected)),
-				FromFile: "actual",
-				ToFile:   "expected",
-				Context:  3,
-			}
-			text, err := difflib.GetUnifiedDiffString(diff)
-			if err != nil {
-				t.Fatalf("failed to get diff string: %v", err)
-			}
-			if text != "" {
-				fmt.Printf("Diff:\n%s\n", text)
-				t.Fatalf("resulting cluster differs from the expected cluster\n%s", text)
+			if !reflect.DeepEqual(outputCluster, &tt.expectedCluster) {
+				out, err := yaml.Marshal(outputCluster)
+				if err != nil {
+					t.Fatalf("failed to marshal input cluster: %v", err)
+				}
+				expected, err := yaml.Marshal(tt.expectedCluster)
+				if err != nil {
+					t.Fatalf("failed to marshal output cluster: %v", err)
+				}
+
+				diff := difflib.UnifiedDiff{
+					A:        difflib.SplitLines(string(out)),
+					B:        difflib.SplitLines(string(expected)),
+					FromFile: "actual",
+					ToFile:   "expected",
+					Context:  3,
+				}
+				text, err := difflib.GetUnifiedDiffString(diff)
+				if err != nil {
+					t.Fatalf("failed to get diff string: %v", err)
+				}
+				if text != "" {
+					fmt.Printf("Diff:\n%s\n", text)
+					t.Fatalf("resulting cluster differs from the expected cluster\n%s", text)
+				}
 			}
 		})
 	}
@@ -426,27 +431,30 @@ func Test_updateV3AgentSchedulingCustomization(t *testing.T) {
 				return
 			}
 
-			out, err := yaml.Marshal(outputCluster)
-			if err != nil {
-				t.Fatalf("failed to marshal input cluster: %v", err)
-			}
-			expected, err := yaml.Marshal(tt.expectedCluster)
-			if err != nil {
-				t.Fatalf("failed to marshal output cluster: %v", err)
-			}
-			diff := difflib.UnifiedDiff{
-				A:        difflib.SplitLines(string(out)),
-				B:        difflib.SplitLines(string(expected)),
-				FromFile: "actual",
-				ToFile:   "expected",
-				Context:  3,
-			}
-			text, err := difflib.GetUnifiedDiffString(diff)
-			if err != nil {
-				t.Fatalf("failed to get diff string: %v", err)
-			}
-			if text != "" {
-				t.Fatalf("resulting cluster differs from the expected cluster\n%s", text)
+			if !reflect.DeepEqual(outputCluster, tt.expectedCluster) {
+				out, err := yaml.Marshal(outputCluster)
+				if err != nil {
+					t.Fatalf("failed to marshal input cluster: %v", err)
+				}
+				expected, err := yaml.Marshal(tt.expectedCluster)
+				if err != nil {
+					t.Fatalf("failed to marshal output cluster: %v", err)
+				}
+
+				diff := difflib.UnifiedDiff{
+					A:        difflib.SplitLines(string(out)),
+					B:        difflib.SplitLines(string(expected)),
+					FromFile: "actual",
+					ToFile:   "expected",
+					Context:  3,
+				}
+				text, err := difflib.GetUnifiedDiffString(diff)
+				if err != nil {
+					t.Fatalf("failed to get diff string: %v", err)
+				}
+				if text != "" {
+					t.Fatalf("resulting cluster differs from the expected cluster\n%s", text)
+				}
 			}
 		})
 	}
@@ -610,27 +618,30 @@ func Test_updateV3FleetAgentSchedulingCustomization(t *testing.T) {
 				return
 			}
 
-			out, err := yaml.Marshal(outputCluster)
-			if err != nil {
-				t.Fatalf("failed to marshal input cluster: %v", err)
-			}
-			expected, err := yaml.Marshal(tt.expectedCluster)
-			if err != nil {
-				t.Fatalf("failed to marshal output cluster: %v", err)
-			}
-			diff := difflib.UnifiedDiff{
-				A:        difflib.SplitLines(string(out)),
-				B:        difflib.SplitLines(string(expected)),
-				FromFile: "actual",
-				ToFile:   "expected",
-				Context:  3,
-			}
-			text, err := difflib.GetUnifiedDiffString(diff)
-			if err != nil {
-				t.Fatalf("failed to get diff string: %v", err)
-			}
-			if text != "" {
-				t.Fatalf("resulting cluster differs from the expected cluster\n%s", text)
+			if !reflect.DeepEqual(outputCluster, tt.expectedCluster) {
+				out, err := yaml.Marshal(outputCluster)
+				if err != nil {
+					t.Fatalf("failed to marshal input cluster: %v", err)
+				}
+				expected, err := yaml.Marshal(tt.expectedCluster)
+				if err != nil {
+					t.Fatalf("failed to marshal output cluster: %v", err)
+				}
+
+				diff := difflib.UnifiedDiff{
+					A:        difflib.SplitLines(string(out)),
+					B:        difflib.SplitLines(string(expected)),
+					FromFile: "actual",
+					ToFile:   "expected",
+					Context:  3,
+				}
+				text, err := difflib.GetUnifiedDiffString(diff)
+				if err != nil {
+					t.Fatalf("failed to get diff string: %v", err)
+				}
+				if text != "" {
+					t.Fatalf("resulting cluster differs from the expected cluster\n%s", text)
+				}
 			}
 		})
 	}
@@ -723,27 +734,30 @@ func Test_updateV3SchedulingCustomization(t *testing.T) {
 				return
 			}
 
-			out, err := yaml.Marshal(outputCluster)
-			if err != nil {
-				t.Fatalf("failed to marshal input cluster: %v", err)
-			}
-			expected, err := yaml.Marshal(tt.expectedCluster)
-			if err != nil {
-				t.Fatalf("failed to marshal output cluster: %v", err)
-			}
-			diff := difflib.UnifiedDiff{
-				A:        difflib.SplitLines(string(out)),
-				B:        difflib.SplitLines(string(expected)),
-				FromFile: "actual",
-				ToFile:   "expected",
-				Context:  3,
-			}
-			text, err := difflib.GetUnifiedDiffString(diff)
-			if err != nil {
-				t.Fatalf("failed to get diff string: %v", err)
-			}
-			if text != "" {
-				t.Fatalf("resulting cluster differs from the expected cluster\n%s", text)
+			if !reflect.DeepEqual(outputCluster, tt.expectedCluster) {
+				out, err := yaml.Marshal(outputCluster)
+				if err != nil {
+					t.Fatalf("failed to marshal input cluster: %v", err)
+				}
+				expected, err := yaml.Marshal(tt.expectedCluster)
+				if err != nil {
+					t.Fatalf("failed to marshal output cluster: %v", err)
+				}
+
+				diff := difflib.UnifiedDiff{
+					A:        difflib.SplitLines(string(out)),
+					B:        difflib.SplitLines(string(expected)),
+					FromFile: "actual",
+					ToFile:   "expected",
+					Context:  3,
+				}
+				text, err := difflib.GetUnifiedDiffString(diff)
+				if err != nil {
+					t.Fatalf("failed to get diff string: %v", err)
+				}
+				if text != "" {
+					t.Fatalf("resulting cluster differs from the expected cluster\n%s", text)
+				}
 			}
 		})
 	}
