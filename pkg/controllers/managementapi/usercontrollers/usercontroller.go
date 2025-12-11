@@ -36,7 +36,6 @@ func Register(ctx context.Context, scaledContext *config.ScaledContext, clusterM
 		clusters:      scaledContext.Management.Clusters(""),
 		clustered:     scaledContext.PeerManager != nil,
 		ctx:           ctx,
-		start:         time.Now(),
 	}
 
 	scaledContext.Management.Clusters("").AddHandler(ctx, "user-controllers-controller", u.sync)
@@ -88,7 +87,6 @@ type userControllersController struct {
 	clusters      v3.ClusterInterface
 	ctx           context.Context
 	peers         tpeermanager.Peers
-	start         time.Time
 }
 
 func (u *userControllersController) sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
