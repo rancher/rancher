@@ -216,7 +216,10 @@ func (u *userControllersController) amOwner(peers tpeermanager.Peers, cluster *v
 		return true
 	}
 
-	if !peers.Ready || len(peers.IDs) == 0 || (len(peers.IDs) == 1 && !peers.Leader) {
+	// WHY? Possible assumption:
+	// - peers.IDs with just 1 item will be just SelfID
+	// - then, being a sole non-leader replica, should not own any downstream until becoming the leader
+	if !peers.Ready || (len(peers.IDs) == 1 && !peers.Leader) {
 		return false
 	}
 
