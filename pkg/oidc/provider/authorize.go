@@ -140,10 +140,6 @@ func (h *authorizeHandler) authEndpoint(w http.ResponseWriter, r *http.Request) 
 		oidcerror.RedirectWithError(params.redirectURI, oidcerror.InvalidRequest, "challenge_method not supported, only S256 is supported", params.state, w, r)
 		return
 	}
-	if !slices.Contains(params.scopes, "openid") {
-		oidcerror.RedirectWithError(params.redirectURI, oidcerror.InvalidScope, "missing openid scope", params.state, w, r)
-		return
-	}
 
 	if err := h.validateScopes(params.scopes, oidcClient); err != nil {
 		oidcerror.RedirectWithError(params.redirectURI, oidcerror.InvalidScope, err.Error(), params.state, w, r)

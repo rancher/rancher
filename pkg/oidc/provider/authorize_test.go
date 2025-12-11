@@ -241,53 +241,6 @@ func TestAuthEndpoint(t *testing.T) {
 			wantRedirect:                       fakeRedirectUri + "?error=invalid_request&error_description=challenge_method+not+supported%2C+only+S256+is+supported",
 			wantAccessControlAllowOriginHeader: fakeRedirectUri,
 		},
-		"missing openid": {
-			req: func() *http.Request {
-				req := &http.Request{
-					URL: &url.URL{
-						Scheme:   "https",
-						Host:     "rancher.com",
-						RawQuery: "code_challenge_method=S256&response_type=code&code_challenge=code-challenge&client_id=client-id&scope=profile&redirect_uri=" + fakeRedirectUri,
-					},
-					Method: http.MethodGet,
-				}
-				req.Header = map[string][]string{
-					"Cookie": {"R_SESS=" + fakeTokenName + ":" + fakeTokenValue},
-				}
-
-				return req
-			},
-			mockSetup: func(m mockParams) {
-				m.tokenCache.EXPECT().Get(fakeTokenName).Return(&v3.Token{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: fakeTokenName,
-					},
-					Token:  fakeTokenValue,
-					UserID: fakeUserID,
-				}, nil)
-				m.userLister.EXPECT().Get(fakeUserID).Return(&v3.User{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: fakeUserID,
-					},
-				}, nil)
-				m.oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", fakeClientID).Return([]*v3.OIDCClient{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: fakeClientName,
-						},
-						Spec: v3.OIDCClientSpec{
-							RedirectURIs: []string{fakeRedirectUri},
-						},
-						Status: v3.OIDCClientStatus{
-							ClientID: fakeClientID,
-						},
-					},
-				}, nil)
-			},
-			wantHttpCode:                       http.StatusFound,
-			wantRedirect:                       fakeRedirectUri + "?error=invalid_scope&error_description=missing+openid+scope",
-			wantAccessControlAllowOriginHeader: fakeRedirectUri,
-		},
 		"invalid scope with no configured scopes": {
 			req: func() *http.Request {
 				req := &http.Request{
