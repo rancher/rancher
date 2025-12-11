@@ -15,7 +15,8 @@
         "enable": [
             "govet",
             "revive",
-            "ineffassign"
+            "ineffassign",
+            "misspell"
         ],
         "settings": {
             "govet": {
@@ -25,6 +26,11 @@
                     "shadow",
                     "nilness",
                     "structtag"
+                ]
+            },
+            "misspell": {
+                "ignore-rules": [
+                    "Creater"
                 ]
             }
         },
