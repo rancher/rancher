@@ -51,6 +51,10 @@ func (s *peersBasedStrategy) forcedResync() <-chan struct{} {
 }
 
 func (s *peersBasedStrategy) amOwner(cluster *v3.Cluster) (owner bool) {
+	if s.peers.SelfID == "" {
+		// not ready
+		return false
+	}
 	defer func() {
 		if owner {
 			metrics.SetClusterOwner(s.peers.SelfID, cluster.Name)
