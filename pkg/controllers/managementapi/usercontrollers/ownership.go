@@ -1,0 +1,137 @@
+package usercontrollers
+
+import (
+	"context"
+	"hash/crc32"
+	"math"
+	"slices"
+	"sort"
+	"sync"
+
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/metrics"
+	"github.com/rancher/rancher/pkg/peermanager"
+	"github.com/sirupsen/logrus"
+)
+
+type ownerStrategy interface {
+	// amOwner returns true if the current process owns the provided downstream Cluster
+	amOwner(cluster *v3.Cluster) bool
+	// forcedResync provides a channel to communicate events that may require a resync in the consumer
+	forcedResync() <-chan struct{}
+}
+
+func getOwnerStrategy(ctx context.Context, m peermanager.PeerManager) ownerStrategy {
+	if m == nil {
+		return &nonClusteredStrategy{}
+	}
+	return newPeersBasedStrategy(ctx, m)
+}
+
+// nonClusteredStrategy makes a single Rancher replica the owner of every downstream cluster
+type nonClusteredStrategy struct{}
+
+func (nonClusteredStrategy) forcedResync() <-chan struct{} {
+	return nil
+}
+
+func (nonClusteredStrategy) amOwner(_ *v3.Cluster) bool {
+	return true
+}
+
+// peersBasedStrategy uses peers information to decide the owners for every downstream cluster
+type peersBasedStrategy struct {
+	sync.Mutex
+	forcedResyncChan chan struct{}
+	peers            peermanager.Peers
+}
+
+func (s *peersBasedStrategy) forcedResync() <-chan struct{} {
+	return s.forcedResyncChan
+}
+
+func (s *peersBasedStrategy) amOwner(cluster *v3.Cluster) (owner bool) {
+	defer func() {
+		if owner {
+			metrics.SetClusterOwner(s.peers.SelfID, cluster.Name)
+		} else {
+			metrics.UnsetClusterOwner(s.peers.SelfID, cluster.Name)
+		}
+	}()
+
+	peers := s.peers
+
+	// Possible assumption on this condition:
+	// - peers.IDs with just 1 item will be just SelfID (IDs should never be empty, but better use caution)
+	// - then, being a sole non-leader replica, should not own any downstream until becoming the leader
+	if !peers.Ready || len(peers.IDs) == 0 || (len(peers.IDs) == 1 && !peers.Leader) {
+		return false
+	}
+
+	ck := crc32.ChecksumIEEE([]byte(cluster.UID))
+	if ck == math.MaxUint32 {
+		ck--
+	}
+
+	scaled := int(ck) * len(peers.IDs) / math.MaxUint32
+	logrus.Debugf("%s(%v): (%v * %v) / %v = %v[%v] = %v, self = %v\n", cluster.Name, cluster.UID, ck,
+		uint32(len(peers.IDs)), math.MaxUint32, peers.IDs, scaled, peers.IDs[scaled], peers.SelfID)
+	return peers.IDs[scaled] == peers.SelfID
+}
+
+func (s *peersBasedStrategy) setPeers(peers peermanager.Peers) bool {
+	s.Lock()
+	defer s.Unlock()
+
+	ids := append(peers.IDs, peers.SelfID)
+	sort.Strings(ids)
+	peers.IDs = slices.Compact(ids)
+
+	if s.peers.Equals(peers) {
+		return false
+	}
+
+	s.peers = peers
+	return true
+}
+
+func (s *peersBasedStrategy) triggerForcedResync() {
+	// try-send to channel, combined with a 1-sized buffer, allows aggregating successive signals while the consumer may still be processing a previous one
+	select {
+	case s.forcedResyncChan <- struct{}{}:
+	default:
+	}
+}
+
+func newPeersBasedStrategy(ctx context.Context, m peermanager.PeerManager) *peersBasedStrategy {
+	// PeerManager watches Endpoints in the "rancher" Service to detect available pods, sending peer updates
+	peersChan := make(chan peermanager.Peers, 100)
+	m.AddListener(peersChan)
+
+	forcedResync := make(chan struct{}, 1)
+	s := &peersBasedStrategy{
+		forcedResyncChan: forcedResync,
+	}
+
+	go func() {
+		defer close(forcedResync)
+		for {
+			select {
+			// Keep remotedialer peers list up to date, triggering a resync of ownership when they change
+			case peers := <-peersChan:
+				if s.setPeers(peers) {
+					s.triggerForcedResync()
+				}
+			case <-ctx.Done():
+				m.RemoveListener(peersChan)
+				close(peersChan)
+				for range peersChan {
+					// drain channel
+				}
+				return
+			}
+		}
+	}()
+
+	return s
+}
