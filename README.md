@@ -26,24 +26,24 @@ Open your browser to https://localhost
 
 ## Installation
 
-See [Installing/Upgrading Rancher](https://ranchermanager.docs.rancher.com/v2.8/pages-for-subheaders/installation-and-upgrade) for all installation options.
+See [Installing/Upgrading Rancher](https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade) for all installation options.
 
 ### Minimum Requirements
 
 * Operating Systems
-  * Please see [Support Matrix](https://rancher.com/support-matrix/) for specific OS versions for each Rancher version. Note that the link will default to the support matrix for the latest version of Rancher. Use the left navigation menu to select a different Rancher version. 
+  * Please see [Support Matrix](https://rancher.com/support-matrix/) for specific OS versions for each Rancher version. Note that the link will default to the support matrix for the latest version of Rancher. Use the left navigation menu to select a different Rancher version.
 * Hardware & Software
-  * Please see [Installation Requirements](https://ranchermanager.docs.rancher.com/v2.8/pages-for-subheaders/installation-requirements) for hardware and software requirements.
+  * Please see [Installation Requirements](https://ranchermanager.docs.rancher.com/getting-started/installation-and-upgrade/installation-requirements) for hardware and software requirements.
 
 ### Using Rancher
 
-To learn more about using Rancher, please refer to our [Rancher Documentation](https://ranchermanager.docs.rancher.com/v2.8).
+To learn more about using Rancher, please refer to our [Rancher Documentation](https://ranchermanager.docs.rancher.com/).
 
 ## Source Code
 
-This repo is a meta-repo used for packaging and contains the majority of Rancher codebase. For other Rancher projects and modules, [see go.mod](https://github.com/rancher/rancher/blob/release/v2.8/go.mod) for the full list.
+This repo is a meta-repo used for packaging and contains the majority of Rancher codebase. For other Rancher projects and modules, [see go.mod](https://github.com/rancher/rancher/blob/main/go.mod) for the full list.
 
-Rancher also includes other open source libraries and projects, [see go.mod](https://github.com/rancher/rancher/blob/release/v2.8/go.mod) for the full list.
+Rancher also includes other open source libraries and projects, [see go.mod](https://github.com/rancher/rancher/blob/main/go.mod) for the full list.
 
 ## Build configuration
 
