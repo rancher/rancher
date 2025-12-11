@@ -46,8 +46,10 @@ func Register(ctx context.Context, scaledContext *config.ScaledContext, clusterM
 
 		go func() {
 			for peer := range c {
-				if err := u.setPeers(&peer); err != nil {
-					logrus.Errorf("Failed syncing peers [%v]: %v", peer, err)
+				if u.setPeers(peer) {
+					if err := u.peersSync(); err != nil {
+						logrus.Errorf("Failed syncing peers [%v]: %v", peer, err)
+					}
 				}
 			}
 		}()
@@ -97,8 +99,7 @@ func (u *userControllersController) sync(key string, cluster *v3.Cluster) (runti
 		}
 	}
 	if key == relatedresource.AllKey {
-		err := u.setPeers(nil)
-		if err != nil {
+		if err := u.peersSync(); err != nil {
 			return nil, fmt.Errorf("userControllersController: failed to set peers for key %s: %w", key, err)
 		}
 		return nil, nil
@@ -169,17 +170,18 @@ func clusterVersionChanged(current, new *version.Version) bool {
 	return current.Major() != new.Major() || current.Minor() != new.Minor()
 }
 
-func (u *userControllersController) setPeers(peers *tpeermanager.Peers) error {
+func (u *userControllersController) setPeers(peers tpeermanager.Peers) bool {
 	u.Lock()
 	defer u.Unlock()
 
-	if peers != nil {
-		u.peers = *peers
-		u.peers.IDs = append(u.peers.IDs, u.peers.SelfID)
-		sort.Strings(u.peers.IDs)
-	}
+	peers.IDs = append(u.peers.IDs, peers.SelfID)
+	sort.Strings(peers.IDs)
 
-	return u.peersSync()
+	if u.peers.Equals(peers) {
+		return false
+	}
+	u.peers = peers
+	return true
 }
 
 func (u *userControllersController) peersSync() error {
@@ -187,6 +189,9 @@ func (u *userControllersController) peersSync() error {
 	if err != nil {
 		return err
 	}
+
+	u.Lock()
+	defer u.Unlock()
 
 	var (
 		errs []error
