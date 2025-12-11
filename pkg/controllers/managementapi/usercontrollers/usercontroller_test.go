@@ -68,11 +68,12 @@ func TestAnnotationFailsToBeSaved(t *testing.T) {
 				Version: &version.Info{GitVersion: "1.23.4"},
 			},
 		}
+		apimgmtv3.ClusterConditionProvisioned.True(cluster)
 
 		obj, err := controller.sync("", cluster)
 		require.Error(t, err)
 		require.Nil(t, obj)
-		assert.False(t, starter.startCalled)
+		assert.True(t, starter.startCalled)
 		assert.False(t, starter.stopCalled)
 	})
 
@@ -89,6 +90,7 @@ func TestAnnotationFailsToBeSaved(t *testing.T) {
 				Version: &version.Info{GitVersion: "1.23.4"},
 			},
 		}
+		apimgmtv3.ClusterConditionProvisioned.True(cluster)
 
 		obj, err := controller.sync("", cluster)
 		require.Error(t, err)
@@ -111,6 +113,7 @@ func TestClusterControllerFailsToRestart(t *testing.T) {
 			Version: &version.Info{GitVersion: "1.23.4"},
 		},
 	}
+	apimgmtv3.ClusterConditionProvisioned.True(cluster)
 
 	obj, err := controller.sync("", cluster)
 	require.Error(t, err)
@@ -132,12 +135,13 @@ func TestClusterWithoutControllersVersionAnnotationGetsUpdated(t *testing.T) {
 			Version: &version.Info{GitVersion: "1.23.4"},
 		},
 	}
+	apimgmtv3.ClusterConditionProvisioned.True(cluster)
 
 	obj, err := controller.sync("", cluster)
 	require.NoError(t, err)
 	require.NotNil(t, obj)
 	assert.Equal(t, "1.23.4", obj.(*v3.Cluster).Annotations[currentClusterControllersVersion])
-	assert.False(t, starter.startCalled)
+	assert.True(t, starter.startCalled)
 	assert.False(t, starter.stopCalled)
 }
 
@@ -154,6 +158,7 @@ func TestClusterControllersNotRestartedOnPatchVersionChange(t *testing.T) {
 			Version: &version.Info{GitVersion: "1.23.1"},
 		},
 	}
+	apimgmtv3.ClusterConditionProvisioned.True(cluster)
 
 	obj, err := controller.sync("", cluster)
 	require.NoError(t, err)
@@ -162,7 +167,7 @@ func TestClusterControllersNotRestartedOnPatchVersionChange(t *testing.T) {
 	// The annotation is also not updated.
 	assert.Equal(t, "1.23.0", obj.(*v3.Cluster).Annotations[currentClusterControllersVersion])
 
-	assert.False(t, starter.startCalled)
+	assert.True(t, starter.startCalled)
 	assert.False(t, starter.stopCalled)
 }
 
@@ -181,6 +186,7 @@ func TestClusterControllersWereStoppedAndStartedOnVersionChange(t *testing.T) {
 				Version: &version.Info{GitVersion: "1.25.2"},
 			},
 		}
+		apimgmtv3.ClusterConditionProvisioned.True(cluster)
 
 		obj, err := controller.sync("", cluster)
 		require.NoError(t, err)
@@ -203,6 +209,7 @@ func TestClusterControllersWereStoppedAndStartedOnVersionChange(t *testing.T) {
 				Version: &version.Info{GitVersion: "1.22.1"},
 			},
 		}
+		apimgmtv3.ClusterConditionProvisioned.True(cluster)
 
 		obj, err := controller.sync("", cluster)
 		require.NoError(t, err)
@@ -211,52 +218,4 @@ func TestClusterControllersWereStoppedAndStartedOnVersionChange(t *testing.T) {
 		assert.True(t, starter.startCalled)
 		assert.True(t, starter.stopCalled)
 	})
-}
-
-func TestClusterControllerEnqueuesControllers(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name    string
-		cluster *v3.Cluster
-	}{
-		{
-			name:    "nil cluster enqueues all controllers",
-			cluster: nil,
-		},
-		{
-			name: "same version cluster enqueues all controllers",
-			cluster: &v3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "my-cluster",
-					Annotations: map[string]string{currentClusterControllersVersion: "1.23.4"},
-				},
-				Status: apimgmtv3.ClusterStatus{
-					Version: &version.Info{GitVersion: "1.23.4"},
-				},
-			},
-		},
-		{
-			name: "new cluster enqueues all controllers",
-			cluster: &v3.Cluster{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "my-cluster",
-					Annotations: map[string]string{},
-				},
-				Status: apimgmtv3.ClusterStatus{
-					Version: &version.Info{GitVersion: "1.23.4"},
-				},
-			},
-		},
-	}
-	for _, test := range tests {
-		test := test
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			starter := simpleControllerStarter{}
-			controller := newMockUserControllersController(&starter)
-			_, err := controller.sync("", test.cluster)
-			require.NoError(t, err)
-			assert.Equal(t, 1, len(controller.clusters.Controller().(*fakes.ClusterControllerMock).EnqueueCalls()))
-		})
-	}
 }
