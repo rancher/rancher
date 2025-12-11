@@ -60,6 +60,7 @@ type ETCDSnapshotS3 struct {
 	// If this field is not explicitly set, the retention value from the etcd retention will be used.
 	// +optional
 	// +nullable
+	// +kubebuilder:validation:Minimum=0
 	Retention int `json:"retention,omitempty"`
 
 	// Folder is the name of the S3 folder used for snapshot operations.

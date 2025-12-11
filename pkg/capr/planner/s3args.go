@@ -122,7 +122,7 @@ func (s *s3Args) ToArgs(s3 *rkev1.ETCDSnapshotS3, controlPlane *rkev1.RKEControl
 		}
 	}
 
-	if s3.Retention != 0 {
+	if s3.Retention > 0 {
 		args = append(args, fmt.Sprintf("--%ss3-retention=%d", prefix, s3.Retention))
 	}
 
