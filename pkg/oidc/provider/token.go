@@ -319,7 +319,7 @@ func (h *tokenHandler) createTokenResponse(rancherToken *v3.Token, oidcClient *v
 		return TokenResponse{}, oidcerror.New(oidcerror.ServerError, fmt.Sprintf("failed to get signing key: %v", err))
 	}
 
-	idToken := h.createIDToken(oidcClient, rancherToken, scopes, user, nonce, groups, kid)
+	idToken := createIDToken(oidcClient, rancherToken, scopes, user, nonce, groups, kid, h.now())
 	idTokenString, err := idToken.SignedString(key)
 	if err != nil {
 		logrus.Errorf("[OIDC provider] failed to sign id token %v", err)
@@ -372,12 +372,12 @@ func (h *tokenHandler) createTokenResponse(rancherToken *v3.Token, oidcClient *v
 	return resp, nil
 }
 
-func (h *tokenHandler) createIDToken(oidcClient *v3.OIDCClient, rancherToken *v3.Token, scopes []string, user *v3.User, nonce string, groups []string, kid string) *jwt.Token {
+func createIDToken(oidcClient *v3.OIDCClient, rancherToken *v3.Token, scopes []string, user *v3.User, nonce string, groups []string, kid string, now time.Time) *jwt.Token {
 	idClaims := jwt.MapClaims{
 		"aud": []string{oidcClient.Status.ClientID},
-		"exp": h.now().Add(time.Duration(oidcClient.Spec.TokenExpirationSeconds) * time.Second).Unix(),
+		"exp": now.Add(time.Duration(oidcClient.Spec.TokenExpirationSeconds) * time.Second).Unix(),
 		"iss": settings.ServerURL.Get() + "/oidc",
-		"iat": h.now().Unix(),
+		"iat": now.Unix(),
 		"sub": rancherToken.UserID,
 	}
 
