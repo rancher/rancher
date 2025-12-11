@@ -283,7 +283,7 @@ func (m *Manager) traverseAndUpdate(helm *helmlib.Helm, commit string, cmt *Cata
 		if _, err := m.updateCatalogInfo(cmt, catalogType, "", false, true); err != nil {
 			return err
 		}
-		return errors.Errorf(strings.Join(errstrings, ";"))
+		return errors.Errorf("%s", strings.Join(errstrings, ";"))
 	}
 	var finalError error
 	if len(errs) > 0 {

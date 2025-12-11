@@ -175,7 +175,7 @@ func LoadScript(arch string, targetImages []string) error {
 	defer load.Close()
 	load.Chmod(0755)
 
-	fmt.Fprintf(load, getScript(arch, "load"))
+	fmt.Fprint(load, getScript(arch, "load"))
 	return nil
 }
 
@@ -192,7 +192,7 @@ func SaveScript(arch string, targetImages []string) error {
 	defer save.Close()
 	save.Chmod(0755)
 
-	fmt.Fprintf(save, getScript(arch, "save"))
+	fmt.Fprint(save, getScript(arch, "save"))
 
 	return nil
 }
@@ -255,7 +255,7 @@ func MirrorScript(arch string, targetImages []string) error {
 	mirror.Chmod(0755)
 
 	scriptStarter := getScript(arch, "mirror")
-	fmt.Fprintf(mirror, scriptStarter)
+	fmt.Fprint(mirror, scriptStarter)
 
 	var saveImages []string
 	for _, targetImage := range targetImages {

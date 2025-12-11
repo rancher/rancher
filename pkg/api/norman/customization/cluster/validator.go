@@ -563,7 +563,7 @@ func validateEKSNodegroups(spec *v32.ClusterSpec) error {
 	}
 
 	if len(errors) != 0 {
-		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf(strings.Join(errors, ";")))
+		return httperror.NewAPIError(httperror.InvalidBodyContent, strings.Join(errors, ";"))
 	}
 	return nil
 }
@@ -721,7 +721,7 @@ func validateGKENodePools(spec *v32.ClusterSpec) error {
 	}
 
 	if len(errors) != 0 {
-		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf(strings.Join(errors, ";")))
+		return httperror.NewAPIError(httperror.InvalidBodyContent, strings.Join(errors, ";"))
 	}
 	return nil
 }
