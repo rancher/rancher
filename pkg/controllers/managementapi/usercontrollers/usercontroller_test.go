@@ -32,6 +32,7 @@ func newMockUserControllersController(starter *simpleControllerStarter) *userCon
 				return c, nil
 			},
 		},
+		ownerStrategy: &nonClusteredStrategy{},
 	}
 }
 
