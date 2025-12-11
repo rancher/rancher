@@ -147,7 +147,8 @@ func (h *tokenHandler) tokenEndpoint(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// createTokenFromCode creates a response with an id_token, access_token and refresh_token
+// createTokenFromCode creates a response with an id_token (if openid scope is
+// provided), access_token and refresh_token
 func (h *tokenHandler) createTokenFromCode(r *http.Request) (TokenResponse, *oidcerror.Error) {
 	code := r.FormValue("code")
 	session, err := h.sessionClient.Get(code)
@@ -176,7 +177,6 @@ func (h *tokenHandler) createTokenFromCode(r *http.Request) (TokenResponse, *oid
 	if err != nil {
 		return TokenResponse{}, oidcerror.New(oidcerror.ServerError, "failed to get client secret")
 	}
-
 	clientSecretFound := false
 	for key, cs := range secret.Data {
 		if clientSecret == string(cs) {
@@ -319,23 +319,26 @@ func (h *tokenHandler) createTokenResponse(rancherToken *v3.Token, oidcClient *v
 		return TokenResponse{}, oidcerror.New(oidcerror.ServerError, fmt.Sprintf("failed to get signing key: %v", err))
 	}
 
-	idToken := createIDToken(oidcClient, rancherToken, scopes, user, nonce, groups, kid, h.now())
-	idTokenString, err := idToken.SignedString(key)
-	if err != nil {
-		logrus.Errorf("[OIDC provider] failed to sign id token %v", err)
-		return TokenResponse{}, oidcerror.New(oidcerror.ServerError, fmt.Sprintf("failed to sign id token: %v", err))
-	}
-
 	accessToken := CreateAccessToken(oidcClient, rancherToken, scopes, kid, h.now())
 	accessTokenString, err := accessToken.SignedString(key)
 	if err != nil {
 		logrus.Errorf("[OIDC provider] failed to sign access token %v", err)
 		return TokenResponse{}, oidcerror.New(oidcerror.ServerError, fmt.Sprintf("failed to sign access token: %v", err))
 	}
+
 	resp := TokenResponse{
-		IDToken:     idTokenString,
 		AccessToken: accessTokenString,
 		TokenType:   bearerTokenType,
+	}
+
+	if slices.Contains(scopes, "openid") {
+		idToken := createIDToken(oidcClient, rancherToken, scopes, user, nonce, groups, kid, h.now())
+		idTokenString, err := idToken.SignedString(key)
+		if err != nil {
+			logrus.Errorf("[OIDC provider] failed to sign id token %v", err)
+			return TokenResponse{}, oidcerror.New(oidcerror.ServerError, fmt.Sprintf("failed to sign id token: %v", err))
+		}
+		resp.IDToken = idTokenString
 	}
 
 	// create refresh_token
@@ -395,6 +398,7 @@ func createIDToken(oidcClient *v3.OIDCClient, rancherToken *v3.Token, scopes []s
 	}
 	idToken := jwt.NewWithClaims(jwt.SigningMethodRS256, idClaims)
 	idToken.Header["kid"] = kid
+
 	return idToken
 }
 
