@@ -62,14 +62,19 @@ func Register(ctx context.Context, scaledContext *config.ScaledContext, clusterM
 	}
 
 	go func() {
+		timer := time.NewTimer(5 * time.Second)
+		defer timer.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case <-time.After(5 * time.Second):
-				if err := u.setPeers(nil); err == nil {
-					time.Sleep(2 * time.Minute)
-				}
+			case <-timer.C:
+			}
+			if err := u.peersSync(); err != nil {
+				// faster retry on error
+				timer.Reset(5 * time.Second)
+			} else {
+				timer.Reset(2 * time.Minute)
 			}
 		}
 	}()
