@@ -616,7 +616,7 @@ func AreClusterRoleBindingContentsSame(crb1, crb2 *rbacv1.ClusterRoleBinding) bo
 		equality.Semantic.DeepEqual(crb1.RoleRef, crb2.RoleRef)
 }
 
-// AreRoleBindingsSame compares the Subjects and RoleRef fields of two Cluster Role Bindings.
+// AreRoleBindingsSame compares the Subjects and RoleRef fields of two Role Bindings.
 func AreRoleBindingContentsSame(rb1, rb2 *rbacv1.RoleBinding) bool {
 	return equality.Semantic.DeepEqual(rb1.Subjects, rb2.Subjects) &&
 		equality.Semantic.DeepEqual(rb1.RoleRef, rb2.RoleRef)
