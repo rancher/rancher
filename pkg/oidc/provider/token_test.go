@@ -229,7 +229,7 @@ func TestTokenEndpoint(t *testing.T) {
 				"sub":           fakeUserID,
 				"auth_provider": fakeAuthProvider,
 				"scope":         fakeScopes,
-				"token":         fakeToken.Name + ":" + fakeToken.Token,
+				"token":         fakeToken.Name,
 			},
 		},
 		"authorization_code fails for an invalid code": {
@@ -394,7 +394,7 @@ func TestTokenEndpoint(t *testing.T) {
 				"sub":           fakeUserID,
 				"auth_provider": fakeAuthProvider,
 				"scope":         fakeScopesOfflineAccess,
-				"token":         fakeToken.Name + ":" + fakeToken.Token,
+				"token":         fakeToken.Name,
 			},
 			wantRefreshTokenClaims: &jwt.MapClaims{
 				"aud":                []any{fakeClientID},
@@ -446,7 +446,7 @@ func TestTokenEndpoint(t *testing.T) {
 				"sub":           fakeUserID,
 				"auth_provider": fakeAuthProvider,
 				"scope":         fakeScopesOfflineAccess,
-				"token":         fakeToken.Name + ":" + fakeToken.Token,
+				"token":         fakeToken.Name,
 			},
 			wantRefreshTokenClaims: &jwt.MapClaims{
 				"aud":                []any{fakeClientID},
