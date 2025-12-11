@@ -12,6 +12,7 @@ import (
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/kv"
 	"github.com/rancher/wrangler/v3/pkg/name"
+	"github.com/sirupsen/logrus"
 )
 
 // s3Args is a struct that contains functions used to generate arguments for etcd snapshots stored in S3
@@ -183,8 +184,10 @@ func getS3Credential(secretCache corecontrollers.SecretCache, namespace, name st
 		data[k] = v
 	}
 
-	// this conversion ignores errors and defaults to 0 if conversion fails
-	retention, _ := strconv.Atoi(string(data["defaultRetention"]))
+	retention, err := strconv.Atoi(string(data["defaultRetention"]))
+	if err != nil {
+		logrus.Warnf("Failed to convert defaultRetention value %s to int: %v", string(data["defaultRetention"]), err)
+	}
 
 	return s3Credential{
 		AccessKey:     string(data["accessKey"]),
