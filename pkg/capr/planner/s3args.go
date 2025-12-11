@@ -3,7 +3,6 @@ package planner
 import (
 	"encoding/base64"
 	"fmt"
-	"strconv"
 	"strings"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -12,7 +11,6 @@ import (
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/kv"
 	"github.com/rancher/wrangler/v3/pkg/name"
-	"github.com/sirupsen/logrus"
 )
 
 // s3Args is a struct that contains functions used to generate arguments for etcd snapshots stored in S3
@@ -33,7 +31,7 @@ func S3Enabled(s3 *rkev1.ETCDSnapshotS3) bool {
 	if s3 == nil {
 		return false
 	}
-	if s3.Bucket != "" || s3.Endpoint != "" || s3.Folder != "" || s3.CloudCredentialName != "" || s3.Region != "" || s3.Retention != 0 {
+	if s3.Bucket != "" || s3.Endpoint != "" || s3.Folder != "" || s3.CloudCredentialName != "" || s3.Region != "" {
 		return true
 	}
 	return false
@@ -124,11 +122,8 @@ func (s *s3Args) ToArgs(s3 *rkev1.ETCDSnapshotS3, controlPlane *rkev1.RKEControl
 		}
 	}
 
-	// if retention is set in the ETCDSnapshotS3 spec, use that. Otherwise, fall back to the cloud credential retention if set.
 	if s3.Retention != 0 {
 		args = append(args, fmt.Sprintf("--%ss3-retention=%d", prefix, s3.Retention))
-	} else if s3Cred.Retention != 0 {
-		args = append(args, fmt.Sprintf("--%ss3-retention=%d", prefix, s3Cred.Retention))
 	}
 
 	if len(args) > 0 {
@@ -165,7 +160,6 @@ type s3Credential struct {
 	SkipSSLVerify bool
 	Bucket        string
 	Folder        string
-	Retention     int
 }
 
 func getS3Credential(secretCache corecontrollers.SecretCache, namespace, name string) (result s3Credential, _ error) {
@@ -184,11 +178,6 @@ func getS3Credential(secretCache corecontrollers.SecretCache, namespace, name st
 		data[k] = v
 	}
 
-	retention, err := strconv.Atoi(string(data["defaultRetention"]))
-	if err != nil {
-		logrus.Warnf("Failed to convert defaultRetention value %s to int: %v", string(data["defaultRetention"]), err)
-	}
-
 	return s3Credential{
 		AccessKey:     string(data["accessKey"]),
 		SecretKey:     string(data["secretKey"]),
@@ -198,6 +187,5 @@ func getS3Credential(secretCache corecontrollers.SecretCache, namespace, name st
 		SkipSSLVerify: string(data["defaultSkipSSLVerify"]) == "true",
 		Bucket:        string(data["defaultBucket"]),
 		Folder:        string(data["defaultFolder"]),
-		Retention:     retention,
 	}, nil
 }
