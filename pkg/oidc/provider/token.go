@@ -407,7 +407,7 @@ func CreateAccessToken(oidcClient *v3.OIDCClient, rancherToken *v3.Token, scopes
 		"iat":   now.Unix(),
 		"sub":   rancherToken.UserID,
 		"scope": scopes,
-		"token": rancherToken.Name + ":" + rancherToken.Token,
+		"token": rancherToken.Name,
 	}
 	if rancherToken.AuthProvider != "" {
 		accessClaims["auth_provider"] = rancherToken.AuthProvider

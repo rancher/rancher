@@ -356,8 +356,16 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 			return nil, ErrMustAuthenticate
 		}
 
+		obj, exists, err := a.tokenIndexer.GetByKey(claims.Token)
+		if err != nil || !exists {
+			logrus.Errorf("Unknown token in OAuth Token: %s", claims.Token)
+			return nil, ErrMustAuthenticate
+		}
+
+		token := obj.(*apiv3.Token)
+
 		tokenClaims = claims
-		tokenName, tokenKey = tokens.SplitTokenParts(claims.Token)
+		tokenName, tokenKey = token.Name, token.Token
 		logrus.Debug("Parsed tokenName and TokenKey from JWT")
 	}
 

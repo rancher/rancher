@@ -1253,6 +1253,8 @@ func TestAuthenticateWithAccessToken(t *testing.T) {
 		}).AnyTimes()
 		tokenIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
 		tokenIndexer.AddIndexers(cache.Indexers{tokenKeyIndex: tokenKeyIndexer})
+		tokenIndexer.Add(token)
+
 		testOIDCClient := &apiv3.OIDCClient{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "test-client-id",
