@@ -15,6 +15,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 // currentClusterControllersVersion is the version of the controllers that are run in the local cluster for a particular downstream cluster.
@@ -33,22 +34,22 @@ func Register(ctx context.Context, scaledContext *config.ScaledContext, clusterM
 	scaledContext.Management.Clusters("").AddHandler(ctx, "user-controllers-controller", u.sync)
 
 	go func() {
-		timer := time.NewTimer(5 * time.Second)
-		defer timer.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case <-timer.C:
 			case <-u.forcedResync():
-				timer.Stop()
 			}
-			if err := u.reconcileClusterOwnership(); err != nil {
-				// faster retry on error
-				logrus.WithError(err).Errorf("Failed syncing peers")
-				timer.Reset(5 * time.Second)
-			} else {
-				timer.Reset(2 * time.Minute)
+
+			backoff := wait.Backoff{
+				Steps:    3,
+				Duration: 5 * time.Second,
+				Factor:   1,
+			}
+			if err := wait.ExponentialBackoffWithContext(ctx, backoff, func(ctx context.Context) (bool, error) {
+				return true, u.reconcileClusterOwnership()
+			}); err != nil {
+				logrus.Errorf("failed syncing peers after %d attempts: %v", backoff.Steps, err)
 			}
 		}
 	}()
