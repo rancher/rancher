@@ -186,7 +186,7 @@ func (n *nsLifecycle) assignToInitialProject(ns *v1.Namespace) error {
 		return nil
 	}
 
-	initialProjectsToNamespaces, err := getDefaultAndSystemProjectsToNamespaces()
+	initialProjectsToNamespaces, err := getDefaultAndSystemProjectsToNamespaces(n.m.clusterName)
 	if err != nil {
 		return fmt.Errorf("assigning namespace %s to initial projects: %w", ns.Name, err)
 	}

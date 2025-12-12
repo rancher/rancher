@@ -3,7 +3,6 @@ package rbac
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -190,7 +189,7 @@ func (p *pLifecycle) ensureNamespaceRolesUpdated(project *v3.Project) error {
 }
 
 func (p *pLifecycle) assignNamespacesToProject(project *v3.Project, projectName string) error {
-	initialProjectsToNamespaces, err := getDefaultAndSystemProjectsToNamespaces()
+	initialProjectsToNamespaces, err := getDefaultAndSystemProjectsToNamespaces(project.Spec.ClusterName)
 	if err != nil {
 		return err
 	}
@@ -219,16 +218,10 @@ func (p *pLifecycle) assignNamespacesToProject(project *v3.Project, projectName 
 	return nil
 }
 
-func getDefaultAndSystemProjectsToNamespaces() (map[string][]string, error) {
-	systemNamespacesStr := settings.SystemNamespaces.Get()
-	var systemNamespaces []string
-	if systemNamespacesStr == "" {
-		return nil, fmt.Errorf("failed to load setting %v", settings.SystemNamespaces)
-	}
-
-	splitted := strings.Split(systemNamespacesStr, ",")
-	for _, s := range splitted {
-		systemNamespaces = append(systemNamespaces, strings.TrimSpace(s))
+func getDefaultAndSystemProjectsToNamespaces(clusterName string) (map[string][]string, error) {
+	systemNamespaces, err := settings.GetSystemNamespacesList(clusterName)
+	if err != nil {
+		return nil, err
 	}
 
 	return map[string][]string{
