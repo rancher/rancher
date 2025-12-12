@@ -28,13 +28,13 @@ jobs:
     if: github.ref == 'refs/heads/main'
     steps:
       - name: Checkout
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
 
       - name: Install updatecli
-        uses: updatecli/updatecli-action@57aa8966d4d775cb1420b90c270ba97a4b5abe47 # v2.93.0
+        uses: updatecli/updatecli-action@5ca36367fadc6ad94d590984fd9c696e783ec635 # v2.96.0
 
       - name: Install Go
-        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
         with:
           go-version-file: 'go.mod'
 
@@ -67,7 +67,7 @@ jobs:
             secret/data/github/org/rancher/github/renovate-rancher privateKey | PRIVATE_KEY
 
       - name: Create App token
-        uses: actions/create-github-app-token@67018539274d69449ef7c02e8e71183d1719ab42 # v2.1.4
+        uses: actions/create-github-app-token@7e473efe3cb98aa54f8d4bac15400b15fad77d94 # v2.2.0
         id: app-token
         with:
           app-id: ${{ env.APP_ID }}
