@@ -1,0 +1,22 @@
+{{- if and (eq (include "rancher.useExternalTls" .) "false") (eq .Values.ingress.tls.source "letsEncrypt") -}}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ template "rancher.fullname" . }}
+  labels:
+{{ include "rancher.labels" . | indent 4 }}
+spec:
+  acme:
+    {{- if eq .Values.letsEncrypt.environment "production" }}
+    server: https://acme-v02.api.letsencrypt.org/directory
+    {{- else }}
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    {{- end }}
+    email: {{ .Values.letsEncrypt.email }}
+    privateKeySecretRef:
+      name: letsencrypt-{{ .Values.letsEncrypt.environment }}
+    solvers:
+      - http01:
+          ingress:
+            class: {{ .Values.letsEncrypt.ingress.class }}
+{{- end -}}
