@@ -179,7 +179,7 @@ func createOrUpdateProjectMembershipBinding(prtb *v3.ProjectRoleTemplateBinding,
 	}
 
 	// RoleRef is immutable, so if it's incorrect it needs to be deleted and re-created
-	if ok, _ := rbac.AreRoleBindingContentsSame(wantedRB, existingRB); !ok {
+	if !rbac.AreRoleBindingContentsSame(wantedRB, existingRB) {
 		logrus.Infof("Re-creating roleBinding %s for project membership role %s for subjects %v", wantedRB.Name, wantedRB.RoleRef.Name, wantedRB.Subjects)
 		if err := rbController.Delete(wantedRB.Namespace, wantedRB.Name, &metav1.DeleteOptions{}); err != nil {
 			return err
