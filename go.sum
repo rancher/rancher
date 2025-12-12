@@ -2553,8 +2553,8 @@ k8s.io/kube-openapi v0.0.0-20230717233707-2695361300d9 h1:LyMgNKD2P8Wn1iAwQU5Ohx
 k8s.io/kube-openapi v0.0.0-20230717233707-2695361300d9/go.mod h1:wZK2AVp1uHCp4VamDVgBP2COHZjqD1T68Rf0CM3YjSM=
 k8s.io/kubectl v0.30.10 h1:d/dsbA/JARUcL5wvRGqnjEvsBv7ageTj08PUCIcHwpE=
 k8s.io/kubectl v0.30.10/go.mod h1:2Okr39i+LHeK4QinNqy+IGivw8PCUcXIpfSUiZP8Llk=
-k8s.io/kubernetes v1.30.12 h1:NK0EvCirLLsUqTr0a0O0OIC7ffvlvhVVRKtkmUWOagU=
-k8s.io/kubernetes v1.30.12/go.mod h1:DGWYRXHx5NhImLiR9FvIVBsOKxwKZOX6bPF/YP7TqHY=
+k8s.io/kubernetes v1.30.13 h1:t656iV8rh8K/RlnRewqBWAJIGoXRCZnis9WQOhlQh/E=
+k8s.io/kubernetes v1.30.13/go.mod h1:DGWYRXHx5NhImLiR9FvIVBsOKxwKZOX6bPF/YP7TqHY=
 k8s.io/pod-security-admission v0.30.10 h1:0LPfv9pvZ6XzDY2xkQlPpE3IBxP8RtCdXNtXsFfrt8k=
 k8s.io/pod-security-admission v0.30.10/go.mod h1:BXfCHNKujtBm/YYoyrr5Na1GyVbidV0o/pK5F64WhZM=
 k8s.io/utils v0.0.0-20210802155522-efc7438f0176/go.mod h1:jPW/WVKK9YHAvNhRxK0md/EJ228hCsBRufyofKtW8HA=
