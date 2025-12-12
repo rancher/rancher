@@ -2,7 +2,9 @@ package snapshotbackpopulate
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +17,7 @@ import (
 	k3s "github.com/k3s-io/api/k3s.cattle.io/v1"
 	k3scontrollers "github.com/k3s-io/api/pkg/generated/controllers/k3s.cattle.io/v1"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	cluster2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
@@ -29,15 +32,25 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
 var (
-	InvalidKeyChars = regexp.MustCompile(`[^-.a-zA-Z0-9]`)
+	InvalidKeyChars               = regexp.MustCompile(`[^-.a-zA-Z0-9]`)
+	EncodedMetadataIsEmptyMessage = base64.StdEncoding.EncodeToString([]byte("Metadata is empty"))
 )
 
 const (
 	StorageAnnotationKey = "etcdsnapshot.rke.io/storage"
+	// SnapshotFileNameAnnotationKey is the annotation key used to store the snapshot file resource name.
+	SnapshotFileNameAnnotationKey = "etcdsnapshot.rke.io/snapshot-file-name"
+	// RestoreModeOptionsAnnotation is the annotation key used to store the available restore modes.
+	RestoreModeOptionsAnnotation = "etcdsnapshot.rke.io/restore-mode-options"
+	// RestoreModeNone indicates only a "none" (etcd-only) restore is available.
+	RestoreModeNone = "none"
+	// RestoreModeAll indicates all restore modes ("none", "kubernetesVersion", "all") are available.
+	RestoreModeAll = "none,kubernetesVersion,all"
 )
 
 type Storage string
@@ -113,12 +126,27 @@ func (h *handler) OnUpstreamChange(_ string, snapshot *rkev1.ETCDSnapshot) (*rke
 		return snapshot, nil
 	}
 
-	_, err = h.etcdSnapshotFileController.Get(snapshot.Annotations[capr.SnapshotNameAnnotation], metav1.GetOptions{})
+	downstreamSnapshotName := snapshot.Annotations[capr.SnapshotNameAnnotation]
+	_, err = h.etcdSnapshotFileController.Get(downstreamSnapshotName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
+		logrus.Infof("%s ABOUT TO DELETE snapshot=%s (uid=%s) for cluster=%s/%s; downstream=%s; cp.Spec=%+v; cp.Status=%+v; getError=%v; time=%s",
+			logPrefix,
+			snapshot.Name,
+			string(snapshot.UID),
+			controlPlane.Namespace,
+			controlPlane.Name,
+			downstreamSnapshotName,
+			controlPlane.Spec.ETCDSnapshotRestore,
+			controlPlane.Status.ETCDSnapshotRestore,
+			err,
+			time.Now().Format(time.RFC3339),
+		)
+
 		// If the downstream snapshot does not exist in the downstream cluster, delete the local version
-		logrus.Debugf("%s deleting snapshot %s", logPrefix, snapshot.Name)
+		logrus.Infof("%s deleting snapshot %s because downstream snapshot %s was not found: %+v", logPrefix, snapshot.Name, downstreamSnapshotName, err)
 		return nil, h.etcdSnapshotController.Delete(snapshot.Namespace, snapshot.Name, &metav1.DeleteOptions{})
 	} else if err != nil {
+		logrus.Errorf("%s error checking downstream snapshot %s for snapshot %s: %+v", logPrefix, downstreamSnapshotName, snapshot.Name, err)
 		return snapshot, err
 	}
 	return snapshot, nil
@@ -264,21 +292,98 @@ func (h *handler) OnDownstreamChange(_ string, downstream *k3s.ETCDSnapshotFile)
 	return downstream, err
 }
 
+// generateSafeSnapshotName generates a resource-safe name for an etcd snapshot,
+// following the same logic as k3s/pkg/etcd/snapshot.(*File).GenerateName
+func generateSafeSnapshotName(spec k3s.ETCDSnapshotSpec, createdAt time.Time) string {
+	name := strings.ToLower(spec.SnapshotName)
+
+	storage := Local
+	if spec.S3 != nil {
+		storage = S3
+	}
+
+	nodeName := spec.NodeName
+	digest := sha256.Sum256([]byte(nodeName + spec.Location))
+	hex6 := hex.EncodeToString(digest[:])[:6]
+
+	if errs := validation.IsDNS1123Subdomain(name); len(errs) != 0 || len(name)+13 > validation.DNS1123SubdomainMaxLength {
+		shortHost, _, _ := strings.Cut(nodeName, ".")
+		name = fmt.Sprintf("etcd-snapshot-%s-%d", shortHost, createdAt.Unix())
+	}
+
+	return fmt.Sprintf("%s-%s-%s", storage, name, hex6)
+}
+
+// getRestoreModesAnnotation determines the appropriate value for the restore-mode-options annotation
+// by checking for a valid, parseable provisioning-cluster-spec and the presence of
+// fields required for each restore mode.
+func getRestoreModesAnnotation(downstream *k3s.ETCDSnapshotFile, cluster *provv1.Cluster) string {
+	logPrefix := getLogPrefix(cluster)
+	availableModes := []string{rkev1.RestoreRKEConfigNone}
+
+	if downstream.Spec.Metadata == nil {
+		logrus.Warnf("%s: downstream snapshot %s/%s has nil metadata, setting restore mode to 'none'",
+			logPrefix, downstream.Namespace, downstream.Name)
+		return rkev1.RestoreRKEConfigNone
+	}
+
+	specPayload, ok := downstream.Spec.Metadata[rkev1.SnapshotMetadataClusterSpecKey]
+	if !ok || specPayload == "" {
+		logrus.Warnf("%s: downstream snapshot %s/%s is missing '%s' key in metadata or key is empty, setting restore mode to 'none'",
+			logPrefix, downstream.Namespace, downstream.Name, rkev1.SnapshotMetadataClusterSpecKey)
+		return rkev1.RestoreRKEConfigNone
+	}
+
+	clusterSpec, err := snapshotutil.DecompressClusterSpec(specPayload)
+	if err != nil {
+		logrus.Warnf("%s: downstream snapshot %s/%s contains an unparseable '%s' metadata payload: %v. Setting restore mode to 'none'",
+			logPrefix,
+			downstream.Namespace,
+			downstream.Name,
+			rkev1.SnapshotMetadataClusterSpecKey,
+			err)
+		return rkev1.RestoreRKEConfigNone
+	}
+
+	if clusterSpec.KubernetesVersion != "" {
+		availableModes = append(availableModes, rkev1.RestoreRKEConfigKubernetesVersion)
+	} else {
+		logrus.Warnf("%s: downstream snapshot %s/%s has parseable metadata but is missing 'kubernetesVersion', 'kubernetesVersion' restore mode will be unavailable.",
+			logPrefix, downstream.Namespace, downstream.Name)
+	}
+
+	if clusterSpec.KubernetesVersion != "" && clusterSpec.RKEConfig != nil {
+		availableModes = append(availableModes, rkev1.RestoreRKEConfigAll)
+	} else {
+		logrus.Warnf("%s: downstream snapshot %s/%s is missing 'KubernetesVersion' or 'RKEConfig', 'all' restore mode will be unavailable.",
+			logPrefix, downstream.Namespace, downstream.Name)
+	}
+
+	return strings.Join(availableModes, ",")
+}
+
 // populateUpstreamSnapshotFromDownstream sets the labels, annotations, spec and status fields which are governed by the
 // downstream snapshot. Also sets the relevant owner references (machine for local, capi cluster for s3), and
 // namespace/name if the snapshot is being created.
-func (h *handler) populateUpstreamSnapshotFromDownstream(upstream *rkev1.ETCDSnapshot, downstream *k3s.ETCDSnapshotFile, cluster *provv1.Cluster, controlPlane *rkev1.RKEControlPlane) (*rkev1.ETCDSnapshot, error) {
+func (h *handler) populateUpstreamSnapshotFromDownstream(
+	upstream *rkev1.ETCDSnapshot,
+	downstream *k3s.ETCDSnapshotFile,
+	cluster *provv1.Cluster,
+	controlPlane *rkev1.RKEControlPlane,
+) (*rkev1.ETCDSnapshot, error) {
 	storage := S3
 	if downstream.Spec.S3 == nil {
 		storage = Local
 	}
 
+	genBase := generateSafeSnapshotName(downstream.Spec, downstream.Status.CreationTime.Time)
+	snapshotName := name.SafeConcatName(cluster.Name, genBase)
+
 	if upstream == nil {
-		name := name.SafeConcatName(cluster.Name, strings.ToLower(InvalidKeyChars.ReplaceAllString(downstream.Spec.SnapshotName, "-")), string(storage))
 		upstream = &rkev1.ETCDSnapshot{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: cluster.Namespace,
-				Name:      name,
+				Name:      snapshotName,
 			},
 		}
 	} else {
@@ -293,7 +398,10 @@ func (h *handler) populateUpstreamSnapshotFromDownstream(upstream *rkev1.ETCDSna
 	if upstream.Annotations == nil {
 		upstream.Annotations = map[string]string{}
 	}
+
+	upstream.Annotations[RestoreModeOptionsAnnotation] = getRestoreModesAnnotation(downstream, cluster)
 	upstream.Annotations[StorageAnnotationKey] = string(storage)
+	upstream.Annotations[SnapshotFileNameAnnotationKey] = downstream.Spec.SnapshotName
 	upstream.Annotations[capr.SnapshotNameAnnotation] = downstream.Name
 
 	upstream.Spec.ClusterName = cluster.Name
