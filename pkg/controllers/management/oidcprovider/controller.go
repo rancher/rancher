@@ -76,6 +76,10 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 		}
 
 		clients, err := c.oidcClientCache.List(labels.Everything())
+		if err != nil {
+			return nil, fmt.Errorf("failed to list OIDC clients: %w", err)
+		}
+
 		if slices.ContainsFunc(clients, func(client *v3.OIDCClient) bool {
 			return client.Status.ClientID == clientID
 		}) {
@@ -262,7 +266,7 @@ func (c *oidcClientController) updateStatusIfNeeded(oidcClient *v3.OIDCClient, s
 
 func findNextSecretKey(secretData map[string][]byte) (string, error) {
 	maxSecretKeyCounter := 0
-	for key, _ := range secretData {
+	for key := range secretData {
 		split := strings.Split(key, "-")
 		if len(split) != 3 {
 			return "", fmt.Errorf("invalid key found in secret")

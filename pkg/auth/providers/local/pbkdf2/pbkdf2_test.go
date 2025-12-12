@@ -5,12 +5,12 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	"golang.org/x/crypto/bcrypt"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -509,7 +509,7 @@ func TestVerifyAndUpdatePassword(t *testing.T) {
 					Data: map[string][]byte{
 						"salt": []byte(fakePasswordSalt),
 					},
-				}, nil).Times(2)
+				}, nil).Times(1)
 
 				return mock
 			},
