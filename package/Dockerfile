@@ -45,7 +45,7 @@ RUN zypper refresh && \
 FROM final AS builder
 COPY --from=chroot-builder-server /chroot/ /
 
-FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.23 AS go-builder
+FROM --platform=$BUILDPLATFORM registry.suse.com/bci/golang:1.24 AS go-builder
 ARG CGO_ENABLED=0
 ENV CGO_ENABLED=$CGO_ENABLED
 ENV GOMODCACHE=/root/.cache/go/modcache
