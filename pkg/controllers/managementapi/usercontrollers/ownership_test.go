@@ -220,12 +220,13 @@ func TestPeersBasedStrategy(t *testing.T) {
 		// Assert that RemoveListener was called
 		mockPeerManager.AssertCalled(t, "RemoveListener", removeCall.Arguments.Get(0))
 
-		var closed bool
+		var open bool
 		select {
-		case _, closed = <-strategy.forcedResync():
+		case _, open = <-strategy.forcedResync():
 		default:
+			assert.False(t, open, "Expected forcedResync channel to be closed")
 		}
-		assert.False(t, closed, "Expected forcedResync channel to be closed")
+		assert.False(t, open, "Expected forcedResync channel to be closed")
 	})
 
 	t.Run("setPeers handles selfID correctly in IDs list", func(t *testing.T) {
