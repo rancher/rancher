@@ -42,7 +42,7 @@ func (a awsv4) sign(req *http.Request, secrets SecretGetter, auth string) error 
 	awsSigner := v4.NewSigner()
 	var body []byte
 	if req.Body != nil {
-		body, err = ioutil.ReadAll(req.Body)
+		body, err = io.ReadAll(req.Body)
 		if err != nil {
 			return fmt.Errorf("error reading request body %v", err)
 		}
