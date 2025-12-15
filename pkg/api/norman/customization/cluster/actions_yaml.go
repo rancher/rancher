@@ -112,9 +112,7 @@ func (a ActionHandler) findOrCreateProjectNamespaces(apiContext *types.APIContex
 			}
 		} else if err != nil {
 			return nil, err
-		} else if nsObj.Annotations[nslabels.ProjectIDFieldLabel] == projectName {
-			// nothing
-		} else {
+		} else if nsObj.Annotations[nslabels.ProjectIDFieldLabel] != projectName {
 			return nil, fmt.Errorf("Namespace [%s] already exists in project [%s]", ns, nsObj.Annotations[nslabels.ProjectIDFieldLabel])
 		}
 	}

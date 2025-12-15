@@ -386,7 +386,9 @@ func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, er
 	}
 	defer func() {
 		respSA.Stop()
+		//nolint:revive
 		for range respSA.ResultChan() {
+			// Intentionally drain the channel.
 		}
 	}()
 
@@ -444,7 +446,9 @@ func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, er
 	}
 	defer func() {
 		respSecret.Stop()
+		//nolint:revive
 		for range respSecret.ResultChan() {
+			// Intentionally drain the channel.
 		}
 	}()
 	for event := range respSecret.ResultChan() {

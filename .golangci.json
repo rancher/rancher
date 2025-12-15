@@ -76,12 +76,6 @@
                     "linters": [
                         "revive"
                     ],
-                    "text": "empty-block"
-                },
-                {
-                    "linters": [
-                        "revive"
-                    ],
                     "text": "^var-naming"
                 },
                 {

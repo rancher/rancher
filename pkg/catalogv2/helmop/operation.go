@@ -996,8 +996,9 @@ func (s *Operations) createNamespace(ctx context.Context, namespace, projectID s
 
 	defer func() {
 		w.Stop()
-		// no clue if this needed, but I'm afraid there will be a stuck producer
+		//nolint:revive
 		for range w.ResultChan() {
+			// Intentionally drain the channel.
 		}
 	}()
 
