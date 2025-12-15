@@ -3,12 +3,10 @@ package chart
 import (
 	"fmt"
 	"io"
-
 	"os"
 	"path/filepath"
 
 	"helm.sh/helm/v3/pkg/chart"
-
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/chartutil"
 )

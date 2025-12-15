@@ -2,12 +2,10 @@ package kubectl
 
 import (
 	"context"
-
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
-
-	"fmt"
 
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
