@@ -155,7 +155,7 @@ func writeYAMLFile(yaml []byte) (*os.File, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := ioutil.WriteFile(yamlFile.Name(), yaml, 0600); err != nil {
+	if err := os.WriteFile(yamlFile.Name(), yaml, 0600); err != nil {
 		return nil, err
 	}
 	return yamlFile, nil
