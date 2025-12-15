@@ -18,6 +18,7 @@ type ownerStrategy interface {
 	// amOwner returns true if the current process owns the provided downstream Cluster
 	amOwner(cluster *v3.Cluster) bool
 	// forcedResync provides a channel to communicate events that may require a resync in the consumer
+	// it could be nil for some implementations
 	forcedResync() <-chan struct{}
 }
 
