@@ -88,12 +88,6 @@
                     "linters": [
                         "revive"
                     ],
-                    "text": "^error-strings"
-                },
-                {
-                    "linters": [
-                        "revive"
-                    ],
                     "text": "^unexported-return"
                 },
                 {
