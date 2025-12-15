@@ -85,6 +85,9 @@ func TestPeersBasedStrategy(t *testing.T) {
 			Ready:  false,
 			Leader: false,
 		})
+		// sendPeers is asynchronous, wait for the signal
+		err := receiveWithTimeout(100*time.Millisecond, strategy.forcedResync())
+		assert.NoError(t, err, "Expected resync channel to be sent")
 
 		assert.False(t, strategy.amOwner(cluster), "Should not own if peer manager is not ready")
 	})
@@ -105,6 +108,9 @@ func TestPeersBasedStrategy(t *testing.T) {
 			Ready:  true,
 			Leader: false,
 		})
+		// sendPeers is asynchronous, wait for the signal
+		err := receiveWithTimeout(100*time.Millisecond, strategy.forcedResync())
+		assert.NoError(t, err, "Expected resync channel to be sent")
 
 		assert.False(t, strategy.amOwner(cluster), "Single non-leader replica should not own")
 	})
@@ -141,7 +147,8 @@ func TestPeersBasedStrategy(t *testing.T) {
 				Ready:  true,
 			})
 			// sendPeers is asynchronous, wait for the signal
-			<-strategy.forcedResync()
+			err := receiveWithTimeout(100*time.Millisecond, strategy.forcedResync())
+			assert.NoError(t, err, "Expected resync channel to be sent")
 
 			for _, tc := range testCases {
 				t.Run("peer="+selfID+",cluster="+tc.clusterUID, func(t *testing.T) {
