@@ -42,8 +42,9 @@ func Register(ctx context.Context, scaledContext *config.ScaledContext, clusterM
 			select {
 			case <-ctx.Done():
 				return
-			case <-u.forcedResync():
 			case <-timer.C:
+			case <-u.forcedResync():
+				timer.Stop()
 			}
 			if err := u.peersSync(); err != nil {
 				// faster retry on error
