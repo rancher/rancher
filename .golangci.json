@@ -16,7 +16,8 @@
             "govet",
             "revive",
             "ineffassign",
-            "misspell"
+            "misspell",
+            "staticcheck"
         ],
         "settings": {
             "govet": {
@@ -31,6 +32,13 @@
             "misspell": {
                 "ignore-rules": [
                     "Creater"
+                ]
+            },
+            "staticcheck": {
+                "checks": [
+                    "S1005",
+                    "S1008",
+                    "ST1019"
                 ]
             }
         },
