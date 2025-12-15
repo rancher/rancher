@@ -151,10 +151,6 @@ func getClusterMembershipRoleName(rtb metav1.Object, isClusterOwner bool) string
 	if isClusterOwner {
 		return name.SafeConcatName(clusterName, clusterContext+"owner")
 	}
-<<<<<<< HEAD
-=======
-
->>>>>>> c9765ca38 (Remove revive:indent-error-flow exclusion)
 	return name.SafeConcatName(clusterName, clusterContext+"member")
 }
 

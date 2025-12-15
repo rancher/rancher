@@ -3,7 +3,6 @@ package nodeconfig
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -192,7 +191,7 @@ func (m *NodeConfig) UpdateAmazonAuth(rawConfig interface{}) (bool, error) {
 
 	machines := filepath.Join(m.fullMachinePath, "machines")
 	logrus.Debugf("[UpdateAmazonAuth] machine path %v", machines)
-	files, err := ioutil.ReadDir(machines)
+	files, err := os.ReadDir(machines)
 	if err != nil {
 		// There aren't any machines, nothing to update
 		if os.IsNotExist(err) {
@@ -258,7 +257,6 @@ func (m *NodeConfig) UpdateAmazonAuth(rawConfig interface{}) (bool, error) {
 					return update, errors.WithMessage(err, "error writing  new machine config")
 				}
 			}
-
 		}
 	}
 
