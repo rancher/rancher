@@ -156,6 +156,10 @@ func (p *Pbkdf2) VerifyAndUpdatePassword(userId string, currentPassword, newPass
 	}
 
 	hashedPassword, err := p.hashKey(currentPassword, secret.Data["salt"], iterations, keyLength)
+	if err != nil {
+		return fmt.Errorf("failed to hash password: %w", err)
+	}
+
 	if !bytes.Equal(hashedPassword, secret.Data["password"]) {
 		return fmt.Errorf("invalid current password")
 	}

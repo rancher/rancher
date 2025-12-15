@@ -68,7 +68,7 @@ func ClusterAuthTokenSecretValue(clusterAuthSecret *corev1.Secret) string {
 // VerifyClusterAuthToken verifies that a provided secret key is valid for the
 // given clusterAuthToken and hashed value. Also determines if the hashed value
 // requires migration from cluster auth token to cluster auth token secret.
-func VerifyClusterAuthToken(secretKey string, clusterAuthToken *clusterv3.ClusterAuthToken, clusterAuthTokenSecret *corev1.Secret) (error, bool) {
+func VerifyClusterAuthToken(secretKey string, clusterAuthToken *clusterv3.ClusterAuthToken, clusterAuthTokenSecret *corev1.Secret) (error, bool) { //nolint:revive
 	if !clusterAuthToken.Enabled {
 		return fmt.Errorf("token is not enabled"), false
 	}
