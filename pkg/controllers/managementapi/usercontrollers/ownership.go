@@ -92,7 +92,7 @@ func (s *peersBasedStrategy) setPeers(peers peermanager.Peers) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	ids := append(peers.IDs, peers.SelfID)
+	ids := append(slices.Clone(peers.IDs), peers.SelfID)
 	sort.Strings(ids)
 	peers.IDs = slices.Compact(ids)
 
