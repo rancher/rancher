@@ -21,7 +21,7 @@ type Policy struct {
 	Verbosity auditlogv1.LogVerbosity
 }
 
-func (p Policy) actionForLog(log *log) auditlogv1.FilterAction {
+func (p Policy) actionForLog(log *logEntry) auditlogv1.FilterAction {
 	if len(p.Filters) == 0 {
 		return auditlogv1.FilterActionAllow
 	}
@@ -107,7 +107,7 @@ func NewWriter(output io.Writer, opts WriterOptions) (*Writer, error) {
 	return w, nil
 }
 
-func (w *Writer) Write(log *log) error {
+func (w *Writer) Write(log *logEntry) error {
 	redactors := []Redactor{}
 	if !w.DisableDefaultPolicies {
 		defaultMu.Lock()
@@ -142,23 +142,23 @@ func (w *Writer) Write(log *log) error {
 
 	for _, r := range redactors {
 		if err := r.Redact(log); err != nil {
-			return fmt.Errorf("failed to redact log: %w", err)
+			return fmt.Errorf("failed to redact logEntry: %w", err)
 		}
 	}
 
 	data, err := json.Marshal(log)
 	if err != nil {
-		return fmt.Errorf("failed to marshal log: %w", err)
+		return fmt.Errorf("failed to marshal logEntry: %w", err)
 	}
 
 	var buffer bytes.Buffer
 	if err := json.Compact(&buffer, data); err != nil {
-		return fmt.Errorf("failed to compact log: %w", err)
+		return fmt.Errorf("failed to compact logEntry: %w", err)
 	}
 	buffer.WriteByte('\n')
 
 	if _, err := w.output.Write(buffer.Bytes()); err != nil {
-		return fmt.Errorf("failed to write log: %w", err)
+		return fmt.Errorf("failed to write logEntry: %w", err)
 	}
 
 	return nil

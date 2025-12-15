@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func sampleLog() log {
-	return log{
+func sampleLog() logEntry {
+	return logEntry{
 		RequestHeader: map[string][]string{
 			"password":     {"password1234"},
 			"foo":          {"bar"},
@@ -44,8 +44,8 @@ func TestPolicyRedactor(t *testing.T) {
 	type testCase struct {
 		Name     string
 		Redactor *policyRedactor
-		Input    log
-		Expected log
+		Input    logEntry
+		Expected logEntry
 	}
 
 	cases := []testCase{
@@ -53,7 +53,7 @@ func TestPolicyRedactor(t *testing.T) {
 			Name:     "Redact Headers",
 			Redactor: headerRedactor,
 			Input:    sampleLog(),
-			Expected: log{
+			Expected: logEntry{
 				RequestHeader: map[string][]string{
 					"password":     {redacted},
 					"foo":          {"bar"},
@@ -81,7 +81,7 @@ func TestPolicyRedactor(t *testing.T) {
 			Name:     "Redact Both With Paths",
 			Redactor: pathRedactor,
 			Input:    sampleLog(),
-			Expected: log{
+			Expected: logEntry{
 				RequestHeader: map[string][]string{
 					"password":     {"password1234"},
 					"foo":          {"bar"},
@@ -110,7 +110,7 @@ func TestPolicyRedactor(t *testing.T) {
 			Name:     "Redact Keys Regex",
 			Redactor: keyRedactor,
 			Input:    sampleLog(),
-			Expected: log{
+			Expected: logEntry{
 				RequestHeader: map[string][]string{
 					"password":     {"password1234"},
 					"foo":          {"bar"},

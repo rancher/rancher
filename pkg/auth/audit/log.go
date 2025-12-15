@@ -69,7 +69,7 @@ func decompress(readCloser io.ReadCloser) ([]byte, error) {
 	return rawData, nil
 }
 
-type log struct {
+type logEntry struct {
 	AuditID       k8stypes.UID `json:"auditID,omitempty"`
 	RequestURI    string       `json:"requestURI,omitempty"`
 	User          *User        `json:"user,omitempty"`
@@ -124,8 +124,8 @@ func newLog(
 	respTimestamp string,
 	rawBody []byte,
 	userName string,
-) *log {
-	log := &log{
+) *logEntry {
+	log := &logEntry{
 		AuditID:       k8stypes.UID(uuid.NewRandom().String()),
 		RequestURI:    req.RequestURI,
 		User:          userInfo,
@@ -147,7 +147,7 @@ func newLog(
 	return log
 }
 
-func (l *log) decompressResponse() error {
+func (l *logEntry) decompressResponse() error {
 	var err error
 	var decompressed []byte
 
@@ -172,7 +172,7 @@ func (l *log) decompressResponse() error {
 	return nil
 }
 
-func (l *log) prepare(verbosity auditlogv1.LogVerbosity) {
+func (l *logEntry) prepare(verbosity auditlogv1.LogVerbosity) {
 	if !verbosity.Request.Headers {
 		l.RequestHeader = nil
 	}

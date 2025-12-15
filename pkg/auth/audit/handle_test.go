@@ -20,10 +20,10 @@ func TestAuditLogMiddleware(t *testing.T) {
 	dummyW, err := NewWriter(&buf, WriterOptions{})
 	assert.NoError(t, err)
 
-	readLog := func(t *testing.T) *log {
+	readLog := func(t *testing.T) *logEntry {
 		t.Helper()
 
-		var log log
+		var log logEntry
 		err := json.Unmarshal(buf.Bytes(), &log)
 		assert.NoError(t, err)
 		buf.Reset()

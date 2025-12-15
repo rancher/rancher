@@ -546,7 +546,7 @@ func TestDefaultPolicies(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
-			log := &log{
+			log := &logEntry{
 				AuditID:        "0123456789",
 				RequestURI:     c.Uri,
 				RequestHeader:  c.Headers,

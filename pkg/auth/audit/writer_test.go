@@ -14,11 +14,11 @@ import (
 )
 
 type logWriter struct {
-	logs []log
+	logs []logEntry
 }
 
 func (w *logWriter) Write(p []byte) (n int, err error) {
-	var l log
+	var l logEntry
 	if err := json.Unmarshal(p, &l); err != nil {
 		return 0, err
 	}
@@ -30,7 +30,7 @@ func (w *logWriter) Write(p []byte) (n int, err error) {
 
 func setup(t *testing.T, opts WriterOptions) (*logWriter, *Writer) {
 	lw := &logWriter{
-		logs: []log{},
+		logs: []logEntry{},
 	}
 
 	w, err := NewWriter(lw, opts)
@@ -63,9 +63,9 @@ func TestAllowList(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	expected := []log{}
+	expected := []logEntry{}
 
-	err = w.Write(&log{
+	err = w.Write(&logEntry{
 		RequestURI: "/api/v1/secrets",
 	})
 	assert.NoError(t, err)
@@ -87,13 +87,13 @@ func TestAllowList(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	expected = []log{
+	expected = []logEntry{
 		{
 			RequestURI: "/api/v1/secrets",
 		},
 	}
 
-	err = w.Write(&log{
+	err = w.Write(&logEntry{
 		RequestURI: "/api/v1/secrets",
 	})
 	assert.NoError(t, err)
@@ -106,14 +106,14 @@ func TestBlockList(t *testing.T) {
 		DisableDefaultPolicies: true,
 	})
 
-	expected := []log{
+	expected := []logEntry{
 		{
 			RequestURI: "/api/v1/secrets",
 			Method:     http.MethodGet,
 		},
 	}
 
-	err := w.Write(&log{
+	err := w.Write(&logEntry{
 		RequestURI: "/api/v1/secrets",
 		Method:     http.MethodGet,
 	})
@@ -136,7 +136,7 @@ func TestBlockList(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	err = w.Write(&log{
+	err = w.Write(&logEntry{
 		RequestURI: "/api/v1/secrets",
 		Method:     http.MethodGet,
 	})
@@ -184,7 +184,7 @@ func TestHigherVerbosityForPolicy(t *testing.T) {
 		},
 	})
 
-	err := w.Write(&log{
+	err := w.Write(&logEntry{
 		RequestURI:      "/some/endopint",
 		RequestHeader:   headers,
 		ResponseHeader:  headers,
@@ -193,7 +193,7 @@ func TestHigherVerbosityForPolicy(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	err = w.Write(&log{
+	err = w.Write(&logEntry{
 		RequestURI:      "/my/endopint",
 		RequestHeader:   headers,
 		ResponseHeader:  headers,
@@ -202,7 +202,7 @@ func TestHigherVerbosityForPolicy(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	expected := []log{
+	expected := []logEntry{
 		{
 			RequestURI:     "/some/endopint",
 			RequestHeader:  headers,
@@ -240,7 +240,7 @@ func TestCompressedGzip(t *testing.T) {
 
 	body := buffer.Bytes()
 
-	err := w.Write(&log{
+	err := w.Write(&logEntry{
 		ResponseHeader: http.Header{
 			"Content-Encoding": []string{contentEncodingGZIP},
 			"Content-Type":     []string{contentTypeJSON},
@@ -249,7 +249,7 @@ func TestCompressedGzip(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	expected := []log{
+	expected := []logEntry{
 		{
 			ResponseHeader: http.Header{
 				"Content-Encoding": []string{contentEncodingGZIP},
@@ -277,7 +277,7 @@ func TestCompressedZLib(t *testing.T) {
 
 	body := buffer.Bytes()
 
-	err := w.Write(&log{
+	err := w.Write(&logEntry{
 		ResponseHeader: http.Header{
 			"Content-Encoding": []string{contentEncodingZLib},
 			"Content-Type":     []string{contentTypeJSON},
@@ -286,7 +286,7 @@ func TestCompressedZLib(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	expected := []log{
+	expected := []logEntry{
 		{
 			ResponseHeader: http.Header{
 				"Content-Encoding": []string{contentEncodingZLib},
