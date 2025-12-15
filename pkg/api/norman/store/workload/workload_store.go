@@ -313,10 +313,7 @@ func setPorts(workloadName string, data map[string]interface{}) error {
 }
 
 func isRancherGeneratedPort(portName, containerPort, protocol string) bool {
-	if strings.HasPrefix(portName, fmt.Sprintf("%s%s", containerPort, protocol)) {
-		return true
-	}
-	return false
+	return strings.HasPrefix(portName, fmt.Sprintf("%s%s", containerPort, protocol))
 }
 
 func generateDNSName(workloadName, dnsName string) bool {
