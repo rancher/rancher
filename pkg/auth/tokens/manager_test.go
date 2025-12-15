@@ -12,14 +12,11 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/mapper"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/features"
-
 	"github.com/rancher/wrangler/v3/pkg/randomtoken"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 )
 
@@ -46,7 +43,7 @@ func TestListTokens(t *testing.T) {
 		tokens: &fakeTokenClient{
 			// Two tokens one matches the token and is current
 			// the other token does not match the token and is not current.
-			list: []v3.Token{
+			list: []apiv3.Token{
 				{
 					TypeMeta: metav1.TypeMeta{
 						APIVersion: "management.cattle.io/v3",
@@ -260,7 +257,7 @@ func (d *dummyIndexer) ListIndexFuncValues(indexName string) []string {
 func (d *dummyIndexer) ByIndex(indexName, indexKey string) ([]interface{}, error) {
 	token := &apiv3.Token{
 		Token: token,
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "testname",
 		},
 		UserID: "testuser",
@@ -295,14 +292,14 @@ func mustGenerateRandomToken(t *testing.T) string {
 }
 
 type fakeTokenClient struct {
-	list []v3.Token
+	list []apiv3.Token
 }
 
-func (f *fakeTokenClient) Create(o *v3.Token) (*v3.Token, error) {
+func (f *fakeTokenClient) Create(o *apiv3.Token) (*apiv3.Token, error) {
 	return nil, nil
 }
 
-func (f *fakeTokenClient) Get(name string, options metav1.GetOptions) (*v3.Token, error) {
+func (f *fakeTokenClient) Get(name string, options metav1.GetOptions) (*apiv3.Token, error) {
 	return nil, nil
 }
 
@@ -310,11 +307,11 @@ func (f *fakeTokenClient) Delete(name string, options *metav1.DeleteOptions) err
 	return nil
 }
 
-func (f *fakeTokenClient) List(opts metav1.ListOptions) (*v3.TokenList, error) {
-	return &v3.TokenList{Items: f.list}, nil
+func (f *fakeTokenClient) List(opts metav1.ListOptions) (*apiv3.TokenList, error) {
+	return &apiv3.TokenList{Items: f.list}, nil
 }
 
-func (f *fakeTokenClient) Update(*v3.Token) (*v3.Token, error) {
+func (f *fakeTokenClient) Update(*apiv3.Token) (*apiv3.Token, error) {
 	return nil, nil
 }
 

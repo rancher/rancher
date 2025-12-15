@@ -19,20 +19,19 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	projectschema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
-	schema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 )
 
 func NewWorkloadAggregateStore(schemas *types.Schemas, manager *clustermanager.Manager) {
-	workloadSchema := schemas.Schema(&schema.Version, "workload")
-	store := NewAggregateStore(schemas.Schema(&schema.Version, "deployment"),
-		schemas.Schema(&schema.Version, "replicaSet"),
-		schemas.Schema(&schema.Version, "replicationController"),
-		schemas.Schema(&schema.Version, "daemonSet"),
-		schemas.Schema(&schema.Version, "statefulSet"),
-		schemas.Schema(&schema.Version, "job"),
-		schemas.Schema(&schema.Version, "cronJob"))
+	workloadSchema := schemas.Schema(&projectschema.Version, "workload")
+	store := NewAggregateStore(schemas.Schema(&projectschema.Version, "deployment"),
+		schemas.Schema(&projectschema.Version, "replicaSet"),
+		schemas.Schema(&projectschema.Version, "replicationController"),
+		schemas.Schema(&projectschema.Version, "daemonSet"),
+		schemas.Schema(&projectschema.Version, "statefulSet"),
+		schemas.Schema(&projectschema.Version, "job"),
+		schemas.Schema(&projectschema.Version, "cronJob"))
 
 	workloadConfig := workload.Config{
 		ClusterManager: manager,

@@ -9,7 +9,6 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
-	client "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	projectclient "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
@@ -116,7 +115,7 @@ func (a *AggregateStore) List(apiContext *types.APIContext, schema *types.Schema
 
 func (a *AggregateStore) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
 	// deployment is default if otherwise is not specified
-	kind := client.DeploymentType
+	kind := projectclient.DeploymentType
 	toSchema := a.Schemas[kind]
 	toStore := a.Stores[kind]
 	for field, schemaID := range a.FieldToSchemaID {

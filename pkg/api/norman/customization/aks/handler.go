@@ -23,7 +23,6 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/ref"
-	mgmtSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	schema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
@@ -313,7 +312,7 @@ func (h *handler) clusterCheck(apiContext *types.APIContext, clusterID, cloudCre
 			continue
 		}
 
-		clusterSchema := h.schemas.Schema(&mgmtSchema.Version, client.ClusterType)
+		clusterSchema := h.schemas.Schema(&schema.Version, client.ClusterType)
 		if err := h.ac.CanDo(v3.ClusterGroupVersionKind.Group, v3.ClusterResource.Name, "update", apiContext, map[string]interface{}{"id": c.Name}, clusterSchema); err == nil {
 			return http.StatusOK, nil
 		}
