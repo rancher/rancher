@@ -338,9 +338,9 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 			if err != nil {
 				if apierrors.IsNotFound(err) {
 					continue
-				} else {
-					return false, errors.Wrapf(err, "couldn't find prtb for %s", rb.Name)
 				}
+
+				return false, errors.Wrapf(err, "couldn't find prtb for %s", rb.Name)
 			}
 			for _, prtb := range prtbs {
 				if prtb, ok := prtb.(*v3.ProjectRoleTemplateBinding); ok {
@@ -359,9 +359,9 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 			if err != nil {
 				if apierrors.IsNotFound(err) {
 					continue
-				} else {
-					return false, errors.Wrapf(err, "couldn't find prtb for %s", rb.Name)
 				}
+
+				return false, errors.Wrapf(err, "couldn't find prtb for %s", rb.Name)
 			}
 			for _, prtb := range prtbs {
 				if prtb, ok := prtb.(*v3.ProjectRoleTemplateBinding); ok {

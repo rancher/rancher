@@ -122,8 +122,8 @@ func waitForNS(nsClient corew.NamespaceClient, namespaces []string) {
 
 		if allGood {
 			break
-		} else {
-			time.Sleep(2 * time.Second)
 		}
+
+		time.Sleep(2 * time.Second)
 	}
 }

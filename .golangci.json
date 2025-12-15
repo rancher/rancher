@@ -70,12 +70,6 @@
                     "linters": [
                         "revive"
                     ],
-                    "text": "superfluous-else"
-                },
-                {
-                    "linters": [
-                        "revive"
-                    ],
                     "text": "^var-naming"
                 },
                 {
