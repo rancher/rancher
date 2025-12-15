@@ -3,7 +3,6 @@ package usercontrollers
 import (
 	"context"
 	"fmt"
-	"slices"
 	"testing"
 	"time"
 
@@ -138,7 +137,7 @@ func TestPeersBasedStrategy(t *testing.T) {
 		for x, selfID := range peers {
 			mockPeerManager.SendPeers(peermanager.Peers{
 				SelfID: selfID,
-				IDs:    slices.Delete(peers, x, x+1),
+				IDs:    append(append([]string{}, peers[:x]...), peers[x+1:]...), // omit self
 				Ready:  true,
 			})
 			// sendPeers is asynchronous, wait for the signal
