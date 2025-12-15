@@ -1,6 +1,6 @@
 FROM python:3.11
 
-ARG KUBECTL_VERSION=v1.33.6
+ARG KUBECTL_VERSION=v1.33.7
 ENV WORKSPACE /src/rancher-validation
 WORKDIR $WORKSPACE
 ENV PYTHONPATH /src/rancher-validation
