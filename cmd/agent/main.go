@@ -157,8 +157,6 @@ func run(ctx context.Context) error {
 				logrus.Errorf("Could not securely connect to %s: %v", server, err)
 				os.Exit(1)
 			}
-			// onConnect will use the transport later on, so discard it as it doesn't work and fallback to the system store.
-			transport = nil
 		} else {
 			topContext = context.WithValue(topContext, cavalidator.CacertsValid, true)
 			systemStoreConnectionCheckRequired = false
