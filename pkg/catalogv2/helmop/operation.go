@@ -722,7 +722,7 @@ func (s *Operations) enableKustomize(annotations map[string]string, upgrade bool
 		return false
 	}
 
-	if val, _ := annotations["apps.cattle.io/migrated"]; val != "true" {
+	if annotations["apps.cattle.io/migrated"] != "true" {
 		return false
 	}
 

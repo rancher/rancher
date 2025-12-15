@@ -129,8 +129,8 @@ func (e *aliOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 	}
 
 	// get ali Cluster Config's phase
-	status, _ := aliClusterConfigDynamic.Object["status"].(map[string]interface{})
-	phase, _ := status["phase"]
+	status := aliClusterConfigDynamic.Object["status"].(map[string]interface{})
+	phase := status["phase"]
 	failureMessage, _ := status["failureMessage"].(string)
 	if strings.Contains(failureMessage, "403") {
 		failureMessage = fmt.Sprintf("cannot access alibaba cloud, check cloud credential: %s", failureMessage)

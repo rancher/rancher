@@ -127,8 +127,8 @@ func (e *aksOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 	}
 
 	// get aks Cluster Config's phase
-	status, _ := aksClusterConfigDynamic.Object["status"].(map[string]interface{})
-	phase, _ := status["phase"]
+	status := aksClusterConfigDynamic.Object["status"].(map[string]interface{})
+	phase := status["phase"]
 	failureMessage, _ := status["failureMessage"].(string)
 
 	switch phase {

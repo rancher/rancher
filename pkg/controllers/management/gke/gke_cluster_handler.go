@@ -137,8 +137,8 @@ func (e *gkeOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 	}
 
 	// get gke Cluster Config's phase
-	status, _ := gkeClusterConfigDynamic.Object["status"].(map[string]interface{})
-	phase, _ := status["phase"]
+	status := gkeClusterConfigDynamic.Object["status"].(map[string]interface{})
+	phase := status["phase"]
 	failureMessage, _ := status["failureMessage"].(string)
 	if strings.Contains(failureMessage, "403") {
 		failureMessage = fmt.Sprintf("cannot access gke, check cloud credential: %s", failureMessage)

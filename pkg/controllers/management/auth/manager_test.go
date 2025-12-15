@@ -855,7 +855,7 @@ func Test_gatherRoleTemplates(t *testing.T) {
 			manager := &manager{
 				rtLister: &fakes.RoleTemplateListerMock{
 					GetFunc: func(namespace, name string) (*v3.RoleTemplate, error) {
-						rt, _ := roleTemplates[name]
+						rt := roleTemplates[name]
 						if tt.wantErr {
 							return nil, fmt.Errorf("RoleTemplate not found")
 						}
