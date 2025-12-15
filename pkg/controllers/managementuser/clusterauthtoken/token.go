@@ -120,7 +120,7 @@ func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
 	// note: ext tokens are always hashed (contrary to v3 Tokens)
 	hashVersion, err := hashers.GetHashVersion(token.Status.Hash)
 	if err != nil {
-		logrus.Errorf("unable to determine hash version of token [%s], will not sync token: %s", token.Name, err.Error())
+		logrus.Errorf("unable to determine hash version of token [%s], will not sync token: %s", token.Name, err)
 		return token, generic.ErrSkip
 	}
 	// we only sync tokens downstream that were created with SHA3
@@ -142,8 +142,15 @@ func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
 	if current.value != "" {
 		clusterAuthTokenSecret.Data["hash"] = []byte(current.value)
 		_, err = h.clusterSecret.Update(clusterAuthTokenSecret)
-		if errors.IsNotFound(err) {
-			_, err = h.clusterSecret.Create(clusterAuthTokenSecret)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				_, err = h.clusterSecret.Create(clusterAuthTokenSecret)
+				if err != nil {
+					return nil, fmt.Errorf("unable to create clusterauthtoken secret for token [%s]: %w", token.Name, err)
+				}
+			} else {
+				return nil, fmt.Errorf("unable to update clusterauthtoken secret for token [%s]: %w", token.Name, err)
+			}
 		}
 	}
 
@@ -152,10 +159,18 @@ func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
 	clusterAuthToken.ExpiresAt = token.Status.ExpiresAt
 
 	_, err = h.clusterAuthToken.Update(clusterAuthToken)
-	if errors.IsNotFound(err) {
-		_, err = h.clusterAuthToken.Create(clusterAuthToken)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			_, err = h.clusterAuthToken.Create(clusterAuthToken)
+			if err != nil {
+				return nil, fmt.Errorf("unable to create clusterauthtoken for token [%s]: %w", token.Name, err)
+			}
+		} else {
+			return nil, fmt.Errorf("unable to update clusterauthtoken for token [%s]: %w", token.Name, err)
+		}
 	}
-	return nil, err
+
+	return nil, nil
 }
 
 // ExtRemove is called when a given ext token is deleted,

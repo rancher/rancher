@@ -320,7 +320,7 @@ func (e *gkeOperatorController) updateGKEClusterConfig(cluster *mgmtv3.Cluster, 
 		return cluster, err
 	}
 	gkeClusterConfigDynamic.Object["spec"] = spec
-	gkeClusterConfigDynamic, err = e.DynamicClient.Namespace(namespace.GlobalNamespace).Update(context.TODO(), gkeClusterConfigDynamic, v1.UpdateOptions{})
+	_, err = e.DynamicClient.Namespace(namespace.GlobalNamespace).Update(context.TODO(), gkeClusterConfigDynamic, v1.UpdateOptions{})
 	if err != nil {
 		return cluster, err
 	}

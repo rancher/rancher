@@ -457,11 +457,8 @@ func migrateEncryptionKeyRotationLeader(w *wrangler.CAPIContext) error {
 			}
 			cp = cp.DeepCopy()
 			delete(cp.Annotations, "rke.cattle.io/encrypt-key-rotation-leader")
-			cp, err = w.RKE.RKEControlPlane().Update(cp)
-			if err != nil {
-				return err
-			}
-			return nil
+			_, err = w.RKE.RKEControlPlane().Update(cp)
+			return err
 		}); err != nil {
 			return err
 		}

@@ -104,12 +104,12 @@ func (s *OIDCProviderSuite) SetupSuite() {
 	oidcprovider.Register(s.ctx, s.wranglerContext)
 
 	// Init caches
-	assert.NoError(s.T(), err)
 	_, err = s.wranglerContext.ControllerFactory.SharedCacheFactory().ForKind(schema.GroupVersionKind{
 		Group:   "management.cattle.io",
 		Version: "v3",
 		Kind:    "OIDCClient",
 	})
+	assert.NoError(s.T(), err)
 	_, err = s.wranglerContext.ControllerFactory.SharedCacheFactory().ForKind(schema.GroupVersionKind{
 		Group:   "management.cattle.io",
 		Version: "v3",

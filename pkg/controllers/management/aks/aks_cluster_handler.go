@@ -293,7 +293,7 @@ func (e *aksOperatorController) updateAKSClusterConfig(cluster *apimgmtv3.Cluste
 		return cluster, err
 	}
 	aksClusterConfigDynamic.Object["spec"] = spec
-	aksClusterConfigDynamic, err = e.DynamicClient.Namespace(namespace.GlobalNamespace).Update(context.TODO(), aksClusterConfigDynamic, v1.UpdateOptions{})
+	_, err = e.DynamicClient.Namespace(namespace.GlobalNamespace).Update(context.TODO(), aksClusterConfigDynamic, v1.UpdateOptions{})
 	if err != nil {
 		return cluster, err
 	}

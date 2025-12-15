@@ -37,11 +37,10 @@ func (t *TokenController) sync(key string, obj *v3.Token) (runtime.Object, error
 	// remove legacy finalizers
 	if obj.DeletionTimestamp != nil {
 		finalizers := obj.GetFinalizers()
-		newObj := obj.DeepCopy()
 		for i, finalizer := range finalizers {
 			if finalizer == "controller.cattle.io/cat-token-controller" {
 				finalizers = append(finalizers[:i], finalizers[i+1:]...)
-				newObj = obj.DeepCopy()
+				newObj := obj.DeepCopy()
 				newObj.SetFinalizers(finalizers)
 				var err error
 				newObj, err = t.tokens.Update(newObj)

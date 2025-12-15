@@ -622,6 +622,7 @@ func (c *ClusterRepoTestSuite) test429Error(params ClusterRepoParams) {
 
 		return false, nil
 	})
+	assert.NoError(c.T(), err)
 
 	clusterRepo, err = c.catalogClient.ClusterRepos().Get(context.TODO(), params.Name, metav1.GetOptions{})
 	assert.NoError(c.T(), err)
@@ -672,6 +673,7 @@ func (c *ClusterRepoTestSuite) test4xxErrors(params ClusterRepoParams) {
 
 		return false, nil
 	})
+	assert.NoError(c.T(), err)
 
 	clusterRepo, err := c.catalogClient.ClusterRepos().Get(context.TODO(), params.Name, metav1.GetOptions{})
 	assert.NoError(c.T(), err)

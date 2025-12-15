@@ -409,7 +409,7 @@ func (e *eksOperatorController) updateEKSClusterConfig(cluster *mgmtv3.Cluster, 
 		return cluster, err
 	}
 	eksClusterConfigDynamic.Object["spec"] = spec
-	eksClusterConfigDynamic, err = e.DynamicClient.Namespace(namespace.GlobalNamespace).Update(context.TODO(), eksClusterConfigDynamic, v1.UpdateOptions{})
+	_, err = e.DynamicClient.Namespace(namespace.GlobalNamespace).Update(context.TODO(), eksClusterConfigDynamic, v1.UpdateOptions{})
 	if err != nil {
 		return cluster, err
 	}

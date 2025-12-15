@@ -316,7 +316,7 @@ func (e *aliOperatorController) updateAliClusterConfig(cluster *apimgmtv3.Cluste
 		return cluster, err
 	}
 	aliClusterConfigDynamic.Object["spec"] = spec
-	aliClusterConfigDynamic, err = e.DynamicClient.Namespace(namespace.GlobalNamespace).Update(context.TODO(), aliClusterConfigDynamic, v1.UpdateOptions{})
+	_, err = e.DynamicClient.Namespace(namespace.GlobalNamespace).Update(context.TODO(), aliClusterConfigDynamic, v1.UpdateOptions{})
 	if err != nil {
 		return cluster, err
 	}

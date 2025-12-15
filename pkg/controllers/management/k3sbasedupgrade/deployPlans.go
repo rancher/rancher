@@ -149,11 +149,8 @@ func (h *handler) deployPlans(cluster *mgmtv3.Cluster) error {
 		logrus.Infof("[k3s-based-upgrader] plans are successfully deployed into cluster [%s]", cluster.Name)
 	}
 
-	cluster, err = h.modifyClusterCondition(cluster, *masterPlan, *workerPlan, strategy)
-	if err != nil {
-		return err
-	}
-	return nil
+	cluster, err = h.modifyClusterCondition(cluster, *masterPlan, *workerPlan, strategy) //lint:ignore SA4006 updated by reference but not used
+	return err
 }
 
 // cmp compares two plans but does not compare their Status, returns true if they are the same

@@ -157,9 +157,12 @@ func Test_updateEKSClusterConfig(t *testing.T) {
 	mockOperatorController = getMockEksOperatorController(t, "Ekscc")
 	mockCluster, err := getMockV3Cluster(MockEksClusterConfigClusterFilename)
 	if err != nil {
-		t.Errorf("error getting mock v3 cluster: %s", err)
+		t.Fatalf("error getting mock v3 cluster: %s", err)
 	}
 	mockEksClusterConfig, err := getMockEksClusterConfig(MockEksClusterConfigFilename)
+	if err != nil {
+		t.Fatalf("error getting mock eks cluster config: %s", err)
+	}
 
 	// test remove tags from the cluster
 	_, err = mockOperatorController.updateEKSClusterConfig(&mockCluster, mockEksClusterConfig, nil)
@@ -199,9 +202,12 @@ func Test_generateAndSetServiceAccount(t *testing.T) {
 func Test_buildEKSCCCreateObject(t *testing.T) {
 	mockCluster, err := getMockV3Cluster(MockDefaultClusterFilename)
 	if err != nil {
-		t.Errorf("error getting mock v3 cluster: %s", err)
+		t.Fatalf("error getting mock v3 cluster: %s", err)
 	}
 	expected, err := getMockEksClusterConfig(MockBuildEksCCCreateObjectFilename)
+	if err != nil {
+		t.Fatalf("error getting mock eks cluster config: %s", err)
+	}
 
 	ekscc, err := buildEKSCCCreateObject(&mockCluster)
 

@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	v1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -241,6 +242,8 @@ func TestServiceAccountAuthAuthenticate(t *testing.T) {
 		}).AnyTimes()
 		t.Run(test.name, func(t *testing.T) {
 			mgmtCtx, err := config.NewScaledContext(rest.Config{}, nil)
+			require.NoError(t, err)
+
 			auth := &ServiceAccountAuth{
 				scaledContext: mgmtCtx,
 				clusterLister: &fakes.ClusterListerMock{
