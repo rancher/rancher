@@ -116,9 +116,9 @@ func (s *Store) Get(ctx context.Context,
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, apierrors.NewBadRequest(fmt.Sprintf("token not found %s: %v", name, err))
-		} else {
-			return nil, apierrors.NewInternalError(fmt.Errorf("failed to get token %s: %w", name, err))
 		}
+
+		return nil, apierrors.NewInternalError(fmt.Errorf("failed to get token %s: %w", name, err))
 	}
 
 	if err = validateToken(authToken, token, timeNow()); err != nil {
@@ -176,9 +176,9 @@ func (s *Store) Update(
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, false, apierrors.NewNotFound(gvr.GroupResource(), name)
-		} else {
-			return nil, false, apierrors.NewInternalError(fmt.Errorf("failed to get token %s: %w", name, err))
 		}
+
+		return nil, false, apierrors.NewInternalError(fmt.Errorf("failed to get token %s: %w", name, err))
 	}
 
 	// Maintain the same idle timeout value when reading and updating the UserActivity.

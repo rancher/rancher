@@ -155,8 +155,10 @@ func setupSteveAggregation(ctx context.Context) error {
 	}
 
 	ca, err := ioutil.ReadFile("/etc/kubernetes/ssl/certs/serverca")
-	if err != nil && !os.IsNotExist(err) {
-		return err
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return err
+		}
 	} else {
 		data["ca.crt"] = ca
 	}

@@ -153,9 +153,9 @@ func (h *autoscalerHandler) ensureGlobalRole(cluster *capi.Cluster, mds []*capi.
 			}
 
 			return nil
-		} else {
-			return err
 		}
+
+		return err
 	})
 
 	return globalRole, err

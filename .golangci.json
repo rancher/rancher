@@ -95,12 +95,6 @@
                         "revive"
                     ],
                     "text": "^exported"
-                },
-                {
-                    "linters": [
-                        "revive"
-                    ],
-                    "text": "^indent-error-flow"
                 }
             ]
         }
