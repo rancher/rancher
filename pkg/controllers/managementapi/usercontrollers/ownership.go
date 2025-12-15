@@ -41,9 +41,11 @@ func (nonClusteredStrategy) amOwner(_ *v3.Cluster) bool {
 
 // peersBasedStrategy uses peers information to decide the owners for every downstream cluster
 type peersBasedStrategy struct {
-	sync.Mutex
 	forcedResyncChan chan struct{}
-	peers            peermanager.Peers
+
+	// mu protects peers for concurrent read/write access
+	mu    sync.Mutex
+	peers peermanager.Peers
 }
 
 func (s *peersBasedStrategy) forcedResync() <-chan struct{} {
@@ -51,19 +53,21 @@ func (s *peersBasedStrategy) forcedResync() <-chan struct{} {
 }
 
 func (s *peersBasedStrategy) amOwner(cluster *v3.Cluster) (owner bool) {
-	if s.peers.SelfID == "" {
+	s.mu.Lock()
+	peers := s.peers
+	s.mu.Unlock()
+
+	if peers.SelfID == "" {
 		// not ready
 		return false
 	}
 	defer func() {
 		if owner {
-			metrics.SetClusterOwner(s.peers.SelfID, cluster.Name)
+			metrics.SetClusterOwner(peers.SelfID, cluster.Name)
 		} else {
-			metrics.UnsetClusterOwner(s.peers.SelfID, cluster.Name)
+			metrics.UnsetClusterOwner(peers.SelfID, cluster.Name)
 		}
 	}()
-
-	peers := s.peers
 
 	// Possible assumption on this condition:
 	// - peers.IDs with just 1 item will be just SelfID (IDs should never be empty, but better use caution)
@@ -84,8 +88,8 @@ func (s *peersBasedStrategy) amOwner(cluster *v3.Cluster) (owner bool) {
 }
 
 func (s *peersBasedStrategy) setPeers(peers peermanager.Peers) bool {
-	s.Lock()
-	defer s.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	ids := append(peers.IDs, peers.SelfID)
 	sort.Strings(ids)
