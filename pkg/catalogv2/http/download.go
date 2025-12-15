@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
@@ -64,7 +63,7 @@ func Icon(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipTL
 	if err != nil {
 		return nil, "", err
 	}
-	return ioutil.NopCloser(bytes.NewBuffer(data)), path.Ext(u.Path), nil
+	return io.NopCloser(bytes.NewBuffer(data)), path.Ext(u.Path), nil
 }
 
 func Chart(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipTLSVerify bool, disableSameOriginCheck bool, chart *repo.ChartVersion) (io.ReadCloser, error) {
@@ -103,7 +102,7 @@ func Chart(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipT
 	defer resp.Body.Close()
 
 	data, err := io.ReadAll(resp.Body)
-	return ioutil.NopCloser(bytes.NewBuffer(data)), err
+	return io.NopCloser(bytes.NewBuffer(data)), err
 }
 
 func DownloadIndex(secret *corev1.Secret, repoURL string, caBundle []byte, insecureSkipTLSVerify bool, disableSameOriginCheck bool) (*repo.IndexFile, error) {
