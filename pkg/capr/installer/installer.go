@@ -35,7 +35,7 @@ func installScript(setting settings.Setting, files []string) ([]byte, error) {
 	if setting.Get() == setting.Default {
 		// no setting override, check for local file first
 		for _, f := range files {
-			script, err := ioutil.ReadFile(f)
+			script, err := os.ReadFile(f)
 			if err != nil {
 				if !os.IsNotExist(err) {
 					logrus.Debugf("error pulling system agent installation script %s: %s", f, err)
