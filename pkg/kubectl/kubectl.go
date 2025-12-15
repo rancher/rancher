@@ -2,7 +2,7 @@ package kubectl
 
 import (
 	"context"
-	"io/ioutil"
+
 	"os"
 	"os/exec"
 	"strings"
@@ -179,7 +179,7 @@ func tempFile(prefix string) (*os.File, error) {
 		}
 	}
 
-	f, err := ioutil.TempFile(tmpDir, prefix)
+	f, err := os.CreateTemp(tmpDir, prefix)
 	if err != nil {
 		return nil, err
 	}
