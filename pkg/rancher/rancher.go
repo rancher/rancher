@@ -305,6 +305,9 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		return nil, err
 	}
 
+	auditLogMiddleware := func(next http.Handler) http.Handler {
+		return next
+	}
 	var auditLogWriter *audit.Writer
 
 	if opts.AuditLogEnabled {
@@ -328,9 +331,10 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		if err := auditlogcontroller.Register(ctx, auditLogWriter, auditController); err != nil {
 			return nil, fmt.Errorf("failed to register audit log controller: %w", err)
 		}
+
+		auditLogMiddleware = audit.NewAuditLogMiddleware(auditLogWriter)
 	}
 
-	auditLogMiddleware := audit.NewAuditLogMiddleware(auditLogWriter)
 	aggregationMiddleware := aggregation.NewMiddleware(ctx, wranglerContext.Mgmt.APIService(), wranglerContext.TunnelServer)
 
 	wranglerContext.OnLeaderOrDie("rancher-new", func(ctx context.Context) error {
