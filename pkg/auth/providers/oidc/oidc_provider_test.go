@@ -16,10 +16,15 @@ import (
 	"github.com/golang-jwt/jwt"
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/mocks"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	"golang.org/x/oauth2"
 )
+
+func init() {
+	logrus.SetLevel(logrus.DebugLevel)
+}
 
 func Test_validateACR(t *testing.T) {
 	tests := []struct {

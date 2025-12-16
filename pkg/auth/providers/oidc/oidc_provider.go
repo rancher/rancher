@@ -125,7 +125,7 @@ func (o *OpenIDCProvider) LoginUser(ctx context.Context, oauthLoginInfo *v32.OID
 	userPrincipal.Me = true
 	groupPrincipals = o.getGroupsFromClaimInfo(userClaimInfo)
 
-	logrus.Debugf("[generic oidc] loginuser: checking user's access to rancher")
+	logrus.Debugf("[generic oidc] loginuser: checking user's access to rancher with %v groups", len(groupPrincipals))
 	allowed, err := o.UserMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipal.Name, groupPrincipals)
 	if err != nil {
 		return userPrincipal, groupPrincipals, "", userClaimInfo, err
@@ -546,7 +546,9 @@ func (o *OpenIDCProvider) getGroupsFromClaimInfo(claimInfo ClaimInfo) []v3.Princ
 	var groupPrincipals []v3.Principal
 
 	if claimInfo.FullGroupPath != nil {
+		logrus.Debugf("[generic oidc] OIDCProvider (%s): getGroupsFromClaimInfo processing FullGroupPath", o.Name)
 		for _, groupPath := range claimInfo.FullGroupPath {
+			logrus.Debugf("[generic oidc] OIDCProvider (%s): getGroupsFromClaimInfo processing groupPath %s", o.Name, groupPath)
 			groupsFromPath := strings.Split(groupPath, "/")
 			for _, group := range groupsFromPath {
 				if group != "" {
@@ -557,12 +559,17 @@ func (o *OpenIDCProvider) getGroupsFromClaimInfo(claimInfo ClaimInfo) []v3.Princ
 			}
 		}
 	} else {
+		logrus.Debugf("[generic oidc] OIDCProvider (%s): getGroupsFromClaimInfo processing groups claim", o.Name)
 		for _, group := range claimInfo.Groups {
+			logrus.Debugf("[generic oidc] OIDCProvider (%s): getGroupsFromClaimInfo processing group %s", o.Name, group)
 			groupPrincipal := o.groupToPrincipal(group)
 			groupPrincipal.MemberOf = true
 			groupPrincipals = append(groupPrincipals, groupPrincipal)
 		}
 	}
+
+	logrus.Debugf("[generic oidc] OIDCProvider (%s): getGroupsFromClaimInfo extracted %v groups", o.Name, len(groupPrincipals))
+
 	return groupPrincipals
 }
 
