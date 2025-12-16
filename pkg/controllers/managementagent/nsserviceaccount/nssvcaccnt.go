@@ -55,7 +55,7 @@ func (nsh *defaultSvcAccountHandler) handleIfSystemNSDefaultSA(ns *corev1.Namesp
 		return err
 	}
 
-	if defSvcAccnt.AutomountServiceAccountToken != nil && *defSvcAccnt.AutomountServiceAccountToken == false {
+	if defSvcAccnt.AutomountServiceAccountToken != nil && !*defSvcAccnt.AutomountServiceAccountToken {
 		return nil
 	}
 	automountServiceAccountToken := false

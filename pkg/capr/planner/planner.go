@@ -407,7 +407,7 @@ func (p *Planner) fullReconcile(cp *rkev1.RKEControlPlane, status rkev1.RKEContr
 		return status, errWaiting("waiting for control plane to be available")
 	}
 
-	if status.Initialized != true || status.Ready != true {
+	if !status.Initialized || !status.Ready {
 		status.Initialized = true
 		status.Ready = true
 		return status, errWaiting("marking control plane as initialized and ready")

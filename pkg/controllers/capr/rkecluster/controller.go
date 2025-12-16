@@ -72,7 +72,7 @@ func (h *handler) OnChange(_ string, cluster *v1.RKECluster) (*v1.RKECluster, er
 		return h.rkeCluster.Update(cluster)
 	}
 
-	if len(cluster.Status.Conditions) > 0 || cluster.Status.Ready != true {
+	if len(cluster.Status.Conditions) > 0 || !cluster.Status.Ready {
 		cluster := cluster.DeepCopy()
 		// the rke2.Ready and rke2.Removed conditions may still be present on the object, remove them if present
 		cluster.Status.Conditions = nil
