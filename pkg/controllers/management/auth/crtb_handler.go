@@ -96,7 +96,6 @@ func (c *crtbLifecycle) Create(obj *v3.ClusterRoleTemplateBinding) (runtime.Obje
 	if features.AggregatedRoleTemplates.Enabled() {
 		return nil, nil
 	}
-
 	var localConditions []metav1.Condition
 	obj, err := c.reconcileSubject(obj, &localConditions)
 	return obj, errors.Join(err,
