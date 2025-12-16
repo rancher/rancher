@@ -17,7 +17,8 @@ import (
 
 func TestAuditLogMiddleware(t *testing.T) {
 	var buf bytes.Buffer
-	dummyW, err := NewWriter(&buf, WriterOptions{})
+	writerOpts := WriterOptions{}
+	dummyW, err := NewWriter(&buf, writerOpts)
 	assert.NoError(t, err)
 
 	readLog := func(t *testing.T) *logEntry {
@@ -37,7 +38,7 @@ func TestAuditLogMiddleware(t *testing.T) {
 			next.ServeHTTP(w, req)
 		})
 	}
-	auditMiddleware := NewAuditLogMiddleware(dummyW)
+	auditMiddleware := NewAuditLogMiddleware(dummyW, writerOpts.DefaultPolicyLevel)
 
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		w.Write([]byte(`hello world`))
