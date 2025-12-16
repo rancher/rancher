@@ -241,7 +241,7 @@ func TestPeersBasedStrategy(t *testing.T) {
 
 		// After setPeers, "B" should be added and the slice sorted.
 		expectedIDs := []string{"A", "B", "C"}
-		assert.Equal(t, expectedIDs, strategy.peers.IDs, "SelfID should be added and IDs sorted")
+		assert.Equal(t, expectedIDs, strategy.getPeers().IDs, "SelfID should be added and IDs sorted")
 
 		peersWithSelf := peermanager.Peers{
 			SelfID: "X",
@@ -251,7 +251,7 @@ func TestPeersBasedStrategy(t *testing.T) {
 		}
 		changed := strategy.setPeers(peersWithSelf)
 		expectedIDsWithSelf := []string{"X", "Y"}
-		assert.Equal(t, expectedIDsWithSelf, strategy.peers.IDs, "SelfID should not be duplicated if already present")
+		assert.Equal(t, expectedIDsWithSelf, strategy.getPeers().IDs, "SelfID should not be duplicated if already present")
 		assert.True(t, changed, "Expected setPeers to return true")
 	})
 }
