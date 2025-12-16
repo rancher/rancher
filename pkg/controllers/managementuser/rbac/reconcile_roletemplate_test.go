@@ -347,15 +347,14 @@ func TestEnsureGlobalResourcesRolesForPRTB(t *testing.T) {
 				},
 			},
 		},
-		// TODO: rectify this logic
 		{
 			description:   "returns edit, readOnly & manageNamespace role for edit & read permissions",
 			projectName:   "testproject",
-			expectedRoles: []string{"testproject-namespaces-manage", "testproject-namespaces-readonly"},
+			expectedRoles: []string{"testproject-namespaces-edit", "testproject-namespaces-manage", "testproject-namespaces-readonly"},
 			roleTemplates: map[string]*v3.RoleTemplate{
 				"testRT": {
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "testDeleteRT",
+						Name: "testEditRT",
 					},
 					Rules: []v1.PolicyRule{
 						{

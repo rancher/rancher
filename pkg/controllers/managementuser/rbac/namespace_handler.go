@@ -320,7 +320,7 @@ func (n *nsLifecycle) ensurePRTBAddToNamespace(ns *v1.Namespace) (bool, error) {
 
 	var namespace string
 	if parts := strings.SplitN(projectID, ":", 2); len(parts) == 2 && len(parts[1]) > 0 {
-		project, err := n.rq.ProjectLister.Get(parts[0], parts[1])
+		project, err := n.rq.ProjectCache.Get(parts[0], parts[1])
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				logrus.Warnf("Namespace %s references project %s in namespace %s which does not exist", ns.Name, parts[1], parts[0])
@@ -439,9 +439,10 @@ func removeNSFromRules(cr *rbacv1.ClusterRole, verb, nsName string) (bool, bool)
 	return false, modified
 }
 
-// reconcileNamespaceProjectClusterRole creates and maintains two default ClusterRoles for each project:
+// reconcileNamespaceProjectClusterRole creates and maintains three default ClusterRoles for each project:
 // 1. "readonly" role - read access (get) to project namespaces. (dynamically updated as namespaces are added)
 // 2. "manage" role - namespace management permissions for the project.
+// 3. "edit" role = namespace edit (update/patch) permissions for the project.
 // A corresponding PRTB handler ensures that a binding to these ClusterRoles exists for every project member.
 func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace, verb string) error {
 	var desiredRole string
@@ -463,7 +464,7 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace, ver
 	for _, c := range clusterRoles {
 		// project-manage role grants manage-ns permissions across all namespaces, so no specific resourceNames to be added.
 		if verb == manageNSVerb {
-			continue
+			break
 		}
 		cr, ok := c.(*rbacv1.ClusterRole)
 		if !ok {
@@ -513,8 +514,7 @@ func (n *nsLifecycle) reconcileNamespaceProjectClusterRole(ns *v1.Namespace, ver
 		if mustUpdate && verb != manageNSVerb {
 			cr = cr.DeepCopy()
 			appendedToExisting := false
-			for i := range cr.Rules {
-				r := &cr.Rules[i]
+			for _, r := range cr.Rules {
 				if anyVerbMatches(r.Verbs, verb) && slice.ContainsString(r.Resources, "namespaces") {
 					r.ResourceNames = append(r.ResourceNames, ns.Name)
 					appendedToExisting = true
