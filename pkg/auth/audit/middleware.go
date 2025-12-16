@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
 	"github.com/sirupsen/logrus"
 )
 
@@ -22,8 +23,10 @@ func GetAuditLoggerMiddleware(auditLog *LoggingHandler) func(next http.Handler) 
 			req = req.WithContext(context)
 			rawBody, userName := copyReqBody(req)
 
+			keepResBody := auditLog.level >= auditlogv1.LevelRequestResponse
 			wrappedRw := &wrapWriter{
 				ResponseWriter: rw,
+				keepBody:       keepResBody,
 				headerWrote:    false,
 				statusCode:     http.StatusTeapot, // Default status should never matter so it can be nonsense; controversial, but it serves as our canary in the coal mine. If we see teapots we KNOW we have bugs somewhere.
 			}

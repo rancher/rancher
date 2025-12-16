@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
 	"github.com/rancher/steve/pkg/auth"
 	"github.com/sirupsen/logrus"
 )
@@ -22,8 +23,9 @@ type userKey string
 
 var userKeyValue userKey = "audit_user"
 
-func NewAuditLogMiddleware(writer *Writer) auth.Middleware {
+func NewAuditLogMiddleware(writer *Writer, level auditlogv1.Level) auth.Middleware {
 	return GetAuditLoggerMiddleware(&LoggingHandler{
+		level:   level,
 		writer:  writer,
 		errMap:  make(map[string]time.Time),
 		errLock: &sync.Mutex{},
@@ -31,6 +33,7 @@ func NewAuditLogMiddleware(writer *Writer) auth.Middleware {
 }
 
 type LoggingHandler struct {
+	level  auditlogv1.Level
 	writer *Writer
 
 	errMap  map[string]time.Time
@@ -45,6 +48,7 @@ type wrapWriter struct {
 
 	statusCode   int
 	bytesWritten int
+	keepBody     bool
 	buf          bytes.Buffer
 }
 
@@ -62,7 +66,9 @@ func (w *wrapWriter) Write(body []byte) (int, error) {
 	}
 	n, err := w.ResponseWriter.Write(body)
 	w.bytesWritten += n
-	w.buf.Write(body)
+	if w.keepBody {
+		w.buf.Write(body)
+	}
 	return n, err
 }
 
