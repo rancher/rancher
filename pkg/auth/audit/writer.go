@@ -119,6 +119,7 @@ func (w *Writer) Write(log *logEntry) error {
 	action := auditlogv1.FilterActionUnknown
 
 	w.policiesMutex.RLock()
+	// TODO: this policy resolution affects verbosity value which makes it hard to remove log.prepare w/o breaking change
 	for _, policy := range w.policies {
 		switch policy.actionForLog(log) {
 		case auditlogv1.FilterActionAllow:

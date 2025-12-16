@@ -133,6 +133,7 @@ func copyReqBody(req *http.Request, keepBody bool) ([]byte, string) {
 }
 
 func newLog(
+	// verbosity auditlogv1.LogVerbosity, // TODO eventually pass verbosity here not in prepare
 	userInfo *User,
 	req *http.Request,
 	rw *wrapWriter,
@@ -188,6 +189,9 @@ func (l *logEntry) decompressResponse() error {
 	return nil
 }
 
+// TODO(ORBS): this is another target for refactoring - we nil after assigning data
+// Partially this is done because the log Writer.Write is what juggles policy and verbosity
+// To get rid of this would require major refactor to the log writer and policy resolution.
 func (l *logEntry) prepare(verbosity auditlogv1.LogVerbosity) {
 	if !verbosity.Request.Headers {
 		l.RequestHeader = nil
