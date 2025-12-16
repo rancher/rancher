@@ -255,7 +255,10 @@ func (c *oidcClientController) updateStatusIfNeeded(oidcClient *v3.OIDCClient, s
 		if err != nil {
 			return fmt.Errorf("failed to create status patch: %w", err)
 		}
-		oidcClient, err = c.oidcClient.Patch(oidcClient.Name, types.JSONPatchType, patchBytes, "status") //lint:ignore SA4006 updated by reference but not used
+
+		//lint:ignore SA4006 //
+		//nolint:staticcheck // SA4006: updated by reference but not used
+		oidcClient, err = c.oidcClient.Patch(oidcClient.Name, types.JSONPatchType, patchBytes, "status")
 		if err != nil {
 			return fmt.Errorf("failed to apply status patch: %w", err)
 		}
