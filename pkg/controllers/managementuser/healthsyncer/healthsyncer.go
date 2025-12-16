@@ -91,7 +91,7 @@ func (h *HealthSyncer) getComponentStatus(cluster *v3.Cluster) error {
 		return nil
 	}
 	parts := versionMatchRE.FindStringSubmatch(cluster.Status.Version.String())
-	if parts == nil || len(parts) < 2 {
+	if len(parts) < 2 {
 		return condition.Error("ComponentStatusFetchingFailure", fmt.Errorf("Failed to parse cluster status version %s",
 			cluster.Status.Version.String()))
 	}

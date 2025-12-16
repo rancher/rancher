@@ -84,7 +84,7 @@ func GetExternalImages(rancherVersion string, externalData map[string]interface{
 		compatibleReleases = append(compatibleReleases, version)
 	}
 
-	if compatibleReleases == nil || len(compatibleReleases) < 1 {
+	if len(compatibleReleases) < 1 {
 		logrus.Infof("skipping image generation since no compatible releases were found for version: %s", rancherVersion)
 		return nil, nil
 	}

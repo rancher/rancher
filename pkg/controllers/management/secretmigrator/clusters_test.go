@@ -52,7 +52,7 @@ func newTestHandler(t *testing.T) *handler {
 			// All keys and values are merged into the data field on write, overwriting any existing values.
 			// The stringData field is never output when reading from the API.
 			// https://pkg.go.dev/k8s.io/api/core/v1@v0.24.2#Secret.StringData
-			if secret.StringData != nil && len(secret.StringData) != 0 {
+			if len(secret.StringData) != 0 {
 				if secret.Data == nil {
 					secret.Data = map[string][]byte{}
 				}
@@ -72,7 +72,7 @@ func newTestHandler(t *testing.T) *handler {
 				return nil, apierror.NewNotFound(schema.GroupResource{}, fmt.Sprintf("secret [%s] not found", key))
 			}
 
-			if secret.StringData != nil && len(secret.StringData) != 0 {
+			if len(secret.StringData) != 0 {
 				for k, v := range secret.StringData {
 					secret.Data[k] = []byte(v)
 				}
