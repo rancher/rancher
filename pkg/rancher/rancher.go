@@ -323,9 +323,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create audit log writer: %w", err)
 		}
-	}
 
-	if opts.AuditLogEnabled {
 		auditController := auditlog.New(wranglerContext.SharedControllerFactory)
 		if err := auditlogcontroller.Register(ctx, auditLogWriter, auditController); err != nil {
 			return nil, fmt.Errorf("failed to register audit log controller: %w", err)
