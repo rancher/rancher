@@ -137,7 +137,7 @@ func (e *gkeOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 	}
 
 	// get gke Cluster Config's phase
-	status := gkeClusterConfigDynamic.Object["status"].(map[string]interface{})
+	status, _ := gkeClusterConfigDynamic.Object["status"].(map[string]interface{})
 	phase := status["phase"]
 	failureMessage, _ := status["failureMessage"].(string)
 	if strings.Contains(failureMessage, "403") {

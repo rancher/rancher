@@ -129,7 +129,7 @@ func (e *aliOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 	}
 
 	// get ali Cluster Config's phase
-	status := aliClusterConfigDynamic.Object["status"].(map[string]interface{})
+	status, _ := aliClusterConfigDynamic.Object["status"].(map[string]interface{})
 	phase := status["phase"]
 	failureMessage, _ := status["failureMessage"].(string)
 	if strings.Contains(failureMessage, "403") {
