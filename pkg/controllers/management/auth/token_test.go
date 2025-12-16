@@ -85,7 +85,7 @@ func TestSync(t *testing.T) {
 		}
 		returnToken, _ := testTokenController.sync(testcase.inputToken.Name, testcase.inputToken)
 		storedToken, _ := testTokenController.tokens.Get(testcase.inputToken.Name, metav1.GetOptions{})
-		assert.Equalf(t, returnToken, storedToken, fmt.Sprintf("%s", testcase.inputToken.Name), testErr)
+		assert.Equalf(t, returnToken, storedToken, "%s: %s", testErr, testcase.inputToken.Name)
 		features.TokenHashing.Set(false)
 		if testcase.enableHashing {
 			tokenVal := returnToken.(*v3.Token).Token
@@ -96,12 +96,12 @@ func TestSync(t *testing.T) {
 			testcase.expectedOutputToken.Token = ""
 			returnToken.(*v3.Token).Token = ""
 		}
-		assert.Equalf(t, testcase.expectedOutputToken, returnToken, fmt.Sprintf("%s", testcase.inputToken.Name), testErr)
+		assert.Equalf(t, testcase.expectedOutputToken, returnToken, "%s: %s", testErr, testcase.inputToken.Name)
 		if testcase.inputUserAttribute == nil {
 			continue
 		}
 		returnUserAttribute, _ := testTokenController.userAttributesLister.Get(testcase.inputUserAttribute.Name)
-		assert.Equalf(t, testcase.expectedOutputUserAttribute, returnUserAttribute, fmt.Sprintf("%s", testcase.inputToken.Name), testErr)
+		assert.Equalf(t, testcase.expectedOutputUserAttribute, returnUserAttribute, "%s: %s", testErr, testcase.inputUserAttribute.Name)
 	}
 
 	// test error from token update
