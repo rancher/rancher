@@ -2,7 +2,9 @@ package audit
 
 import (
 	"fmt"
+	"net/http"
 	"regexp"
+	"strings"
 
 	jsonpath "github.com/rancher/jsonpath/pkg"
 	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
@@ -117,4 +119,11 @@ func pairMatches(v any, f func(string, any) bool) bool {
 	}
 
 	return false
+}
+
+func isLoginRequest(req *http.Request) bool {
+	// TODO: validate rancher login URLs and practices
+	// Detect login endpoints - adjust patterns as needed
+	return strings.Contains(req.URL.Path, "login") ||
+		strings.Contains(req.URL.RawQuery, "action=login")
 }

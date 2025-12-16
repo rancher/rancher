@@ -91,29 +91,45 @@ type logEntry struct {
 	rawResponseBody []byte
 }
 
-func copyReqBody(req *http.Request) (rawBody []byte, user string) {
+func copyReqBody(req *http.Request, keepBody bool) ([]byte, string) {
 	contentType := req.Header.Get("Content-Type")
 
-	if methodsWithBody[req.Method] && strings.HasPrefix(contentType, contentTypeJSON) {
-		body, err := io.ReadAll(req.Body)
+	if !methodsWithBody[req.Method] || !strings.HasPrefix(contentType, contentTypeJSON) {
+		return nil, ""
+	}
+
+	isLoginEndpoint := isLoginRequest(req)
+	shouldReadBody := isLoginEndpoint || keepBody
+
+	if !shouldReadBody {
+		// Don't read - let it stream
+		return nil, ""
+	}
+
+	body, err := io.ReadAll(req.Body)
+	if err != nil {
+		body, err = json.Marshal(map[string]any{
+			"responseReadError": err.Error(),
+		})
 		if err != nil {
-			body, err = json.Marshal(map[string]any{
-				"responseReadError": err.Error(),
-			})
-			if err != nil {
-				body = []byte(`{"responseReadError": "failed to read response body"}`)
-			}
+			body = []byte(`{"responseReadError": "failed to read response body"}`)
 		}
+	}
 
-		req.Body = io.NopCloser(bytes.NewBuffer(body))
+	req.Body = io.NopCloser(bytes.NewBuffer(body))
 
+	var user string
+	if isLoginEndpoint {
 		if loginName := getUserNameForBasicLogin(body); loginName != "" {
 			user = loginName
 		}
-
-		rawBody = body
 	}
-	return
+
+	if keepBody {
+		return body, user
+	}
+
+	return nil, user
 }
 
 func newLog(

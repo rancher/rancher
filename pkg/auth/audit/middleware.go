@@ -21,7 +21,8 @@ func GetAuditLoggerMiddleware(auditLog *LoggingHandler) func(next http.Handler) 
 			user := getUserInfo(req)
 			context := context.WithValue(req.Context(), userKeyValue, user)
 			req = req.WithContext(context)
-			rawBody, userName := copyReqBody(req)
+			keepReqBody := auditLog.level >= auditlogv1.LevelRequest
+			rawReqBody, userName := copyReqBody(req, keepReqBody)
 
 			keepResBody := auditLog.level >= auditlogv1.LevelRequestResponse
 			wrappedRw := &wrapWriter{
@@ -38,7 +39,7 @@ func GetAuditLoggerMiddleware(auditLog *LoggingHandler) func(next http.Handler) 
 
 			respTimestamp := time.Now().Format(time.RFC3339)
 
-			auditLogEntry := newLog(user, req, wrappedRw, reqTimestamp, respTimestamp, rawBody, userName)
+			auditLogEntry := newLog(user, req, wrappedRw, reqTimestamp, respTimestamp, rawReqBody, userName)
 			if err := auditLog.writer.Write(auditLogEntry); err != nil {
 				// Locking after next is called to avoid performance hits on the request.
 				auditLog.errLock.Lock()
