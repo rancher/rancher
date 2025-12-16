@@ -86,9 +86,6 @@ type logEntry struct {
 
 	RequestBody  map[string]any `json:"requestBody,omitempty"`
 	ResponseBody map[string]any `json:"responseBody,omitempty"`
-
-	rawRequestBody  []byte
-	rawResponseBody []byte
 }
 
 func copyReqBody(req *http.Request, keepBody bool) ([]byte, string) {
@@ -173,25 +170,29 @@ func newLog(
 	}
 
 	// Attempt res body prep
-	if verbosity.Response.Body && rw.Header().Get("Content-Type") == contentTypeJSON && len(log.rawResponseBody) > 0 {
-		rawResponseBody := rw.buf.Bytes()
-		// TODO: something to decompress if needed
-		decompressed, err := decompressResponse(rw.Header().Get("Content-Encoding"), rawResponseBody)
+	if verbosity.Response.Body {
+		log.prepareResponseBody(rw.Header(), rw.buf.Bytes())
+	}
+
+	return log
+}
+
+func (l *logEntry) prepareResponseBody(resHeaders http.Header, body []byte) {
+	if resHeaders.Get("Content-Type") == contentTypeJSON && len(body) > 0 {
+		decompressed, err := decompressResponse(resHeaders.Get("Content-Encoding"), body)
 		if err != nil {
-			log.ResponseBody = map[string]any{
+			l.ResponseBody = map[string]any{
 				auditLogErrorKey: fmt.Sprintf("failed to decompress response body: %s", err),
 			}
-			return log
+			return
 		}
 
-		if jsonErr := json.Unmarshal(decompressed, &log.ResponseBody); jsonErr != nil {
-			log.ResponseBody = map[string]any{
+		if jsonErr := json.Unmarshal(decompressed, &l.ResponseBody); jsonErr != nil {
+			l.ResponseBody = map[string]any{
 				auditLogErrorKey: fmt.Sprintf("failed to unmarshal response body: %s", jsonErr.Error()),
 			}
 		}
 	}
-
-	return log
 }
 
 func decompressResponse(encoding string, rawResponseBody []byte) ([]byte, error) {
@@ -207,7 +208,7 @@ func decompressResponse(encoding string, rawResponseBody []byte) ([]byte, error)
 	case contentEncodingZLib:
 		decompressed, err = decompressZLib(rawResponseBody)
 	default:
-		err = fmt.Errorf("%w '%s' in resopnse header", ErrUnsupportedEncoding, encoding)
+		err = fmt.Errorf("%w '%s' in response header", ErrUnsupportedEncoding, encoding)
 	}
 
 	if err != nil {
@@ -215,8 +216,4 @@ func decompressResponse(encoding string, rawResponseBody []byte) ([]byte, error)
 	}
 
 	return decompressed, nil
-}
-
-func (l *logEntry) prepare(verbosity auditlogv1.LogVerbosity) {
-	// TODO: not sure how to refactor tests for prepare being gone.
 }

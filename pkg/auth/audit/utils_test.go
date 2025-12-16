@@ -1,11 +1,49 @@
 package audit
 
 import (
+	"encoding/json"
+	"fmt"
+	"net/http"
 	"testing"
 
 	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
 	"github.com/stretchr/testify/assert"
 )
+
+type testLogData struct {
+	verbosity  auditlogv1.LogVerbosity
+	reqHeaders http.Header
+	rawReqBody []byte
+	resHeaders http.Header
+	rawResBody []byte
+}
+
+// prepareLogEntry replicates necessary construction steps.
+// With the refactor, newLog() does this automatically, but tests that create
+// logEntry directly need to prepare them manually.
+func prepareLogEntry(log *logEntry, data *testLogData) {
+	if data.verbosity.Request.Headers {
+		log.RequestHeader = data.reqHeaders
+	}
+
+	// Attempt req body prep
+	if data.verbosity.Request.Body && data.reqHeaders.Get("Content-Type") == contentTypeJSON && len(data.rawReqBody) > 0 {
+		if err := json.Unmarshal(data.rawReqBody, &log.RequestBody); err != nil {
+			log.RequestBody = map[string]any{
+				auditLogErrorKey: fmt.Sprintf("failed to unmarshal request body: %s", err.Error()),
+			}
+		}
+	}
+
+	if data.verbosity.Response.Headers {
+		log.ResponseHeader = data.resHeaders
+	}
+
+	// Attempt res body prep
+	if data.verbosity.Response.Body {
+		log.prepareResponseBody(data.resHeaders, data.rawResBody)
+	}
+}
 
 func TestMergePolicyVerbosities(t *testing.T) {
 	type testCase struct {

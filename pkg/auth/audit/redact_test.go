@@ -20,8 +20,18 @@ func sampleLog() logEntry {
 			"baz":          {"qux"},
 			"Content-Type": []string{contentTypeJSON},
 		},
-		rawRequestBody:  []byte(`{"toplevel":{"inner":{"bottom":"value"},"sibling":"value"}}`),
-		rawResponseBody: []byte(`{"words":[{"foo":"bar"},{"baz":"qux"}]}`),
+		RequestBody: map[string]any{
+			"toplevel": map[string]any{
+				"inner":   map[string]any{"bottom": "value"},
+				"sibling": "value",
+			},
+		},
+		ResponseBody: map[string]any{
+			"words": []any{
+				map[string]any{"foo": "bar"},
+				map[string]any{"baz": "qux"},
+			},
+		},
 	}
 }
 
@@ -137,14 +147,9 @@ func TestPolicyRedactor(t *testing.T) {
 		},
 	}
 
-	verbosity := auditlogv1.LogVerbosity{
-		Request:  auditlogv1.Verbosity{Headers: true, Body: true},
-		Response: auditlogv1.Verbosity{Headers: true, Body: true},
-	}
-
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
-			c.Input.prepare(verbosity) // TODO: figure out how to fix
+			// No need to call prepare() - test inputs already have bodies as maps
 			err := c.Redactor.Redact(&c.Input)
 
 			actual := c.Input

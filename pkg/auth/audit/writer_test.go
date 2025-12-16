@@ -184,22 +184,36 @@ func TestHigherVerbosityForPolicy(t *testing.T) {
 		},
 	})
 
-	err := w.Write(&logEntry{
-		RequestURI:      "/some/endopint",
-		RequestHeader:   headers,
-		ResponseHeader:  headers,
-		rawRequestBody:  bodyContent,
-		rawResponseBody: bodyContent,
+	entry1 := &logEntry{
+		RequestURI:     "/some/endopint",
+		RequestHeader:  headers,
+		ResponseHeader: headers,
+	}
+	// This entry should get LevelRequest verbosity (request body only)
+	prepareLogEntry(entry1, &testLogData{
+		verbosity:  verbosityForLevel(auditlogv1.LevelRequest),
+		resHeaders: headers,
+		rawResBody: bodyContent,
+		reqHeaders: headers,
+		rawReqBody: bodyContent,
 	})
+	err := w.Write(entry1)
 	assert.NoError(t, err)
 
-	err = w.Write(&logEntry{
-		RequestURI:      "/my/endopint",
-		RequestHeader:   headers,
-		ResponseHeader:  headers,
-		rawRequestBody:  bodyContent,
-		rawResponseBody: bodyContent,
+	entry2 := &logEntry{
+		RequestURI:     "/my/endopint",
+		RequestHeader:  headers,
+		ResponseHeader: headers,
+	}
+	// This entry should get LevelRequestResponse verbosity (both bodies)
+	prepareLogEntry(entry2, &testLogData{
+		verbosity:  verbosityForLevel(auditlogv1.LevelRequestResponse),
+		resHeaders: headers,
+		rawResBody: bodyContent,
+		reqHeaders: headers,
+		rawReqBody: bodyContent,
 	})
+	err = w.Write(entry2)
 	assert.NoError(t, err)
 
 	expected := []logEntry{
@@ -240,13 +254,18 @@ func TestCompressedGzip(t *testing.T) {
 
 	body := buffer.Bytes()
 
-	err := w.Write(&logEntry{
-		ResponseHeader: http.Header{
+	entry := &logEntry{}
+	// Prepare the response body similar to a production path
+	prepareLogEntry(entry, &testLogData{
+		verbosity: verbosityForLevel(auditlogv1.LevelRequestResponse),
+		resHeaders: http.Header{
 			"Content-Encoding": []string{contentEncodingGZIP},
 			"Content-Type":     []string{contentTypeJSON},
 		},
-		rawResponseBody: body,
+		rawResBody: body,
 	})
+
+	err := w.Write(entry)
 	assert.NoError(t, err)
 
 	expected := []logEntry{
@@ -277,13 +296,18 @@ func TestCompressedZLib(t *testing.T) {
 
 	body := buffer.Bytes()
 
-	err := w.Write(&logEntry{
-		ResponseHeader: http.Header{
+	entry := &logEntry{}
+	// Prepare the response body similar to production path
+	prepareLogEntry(entry, &testLogData{
+		verbosity: verbosityForLevel(auditlogv1.LevelRequestResponse),
+		resHeaders: http.Header{
 			"Content-Encoding": []string{contentEncodingZLib},
 			"Content-Type":     []string{contentTypeJSON},
 		},
-		rawResponseBody: body,
+		rawResBody: body,
 	})
+
+	err := w.Write(entry)
 	assert.NoError(t, err)
 
 	expected := []logEntry{
