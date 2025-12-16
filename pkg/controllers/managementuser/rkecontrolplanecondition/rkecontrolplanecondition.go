@@ -56,7 +56,7 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 	targetVersion := settings.SystemUpgradeControllerChartVersion.Get()
 	if targetVersion == "" {
 		logrus.Warn("[rkecontrolplanecondition] the SystemUpgradeControllerChartVersion setting is not set")
-		capr.SystemUpgradeControllerReady.Reason(&status, fmt.Sprintf("the SystemUpgradeControllerChartVersion setting is not set"))
+		capr.SystemUpgradeControllerReady.Reason(&status, "the SystemUpgradeControllerChartVersion setting is not set")
 		capr.SystemUpgradeControllerReady.Message(&status, "")
 		capr.SystemUpgradeControllerReady.False(&status)
 		return status, nil
@@ -71,7 +71,7 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 			// If SystemUpgradeControllerReady is true but its message is empty, this may occur in scenarios where Rancher
 			// is upgraded to 2.12.x, then rolled back to 2.11.x, and later re-upgraded to 2.12.x without restoring the local cluster.
 			// In such cases, the condition should be rest
-			capr.SystemUpgradeControllerReady.Reason(&status, fmt.Sprintf("reset the condition"))
+			capr.SystemUpgradeControllerReady.Reason(&status, "reset the condition")
 			capr.SystemUpgradeControllerReady.Message(&status, "")
 			capr.SystemUpgradeControllerReady.False(&status)
 			return status, nil

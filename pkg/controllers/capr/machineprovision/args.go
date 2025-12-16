@@ -143,7 +143,7 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]any, d
 	if create {
 		cmd = append(cmd, "create",
 			fmt.Sprintf("--driver=%s", driver),
-			fmt.Sprintf("--custom-install-script=/run/secrets/machine/value"))
+			"--custom-install-script=/run/secrets/machine/value")
 
 		hostname := getHostname(*infra)
 		if hostname != instanceName {
