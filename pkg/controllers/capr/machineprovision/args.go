@@ -301,19 +301,19 @@ func toArgs(driverName string, args map[string]any, cluster *rancherv1.Cluster) 
 			continue
 		}
 
-		switch v.(type) {
+		switch v := v.(type) {
 		case float64:
 			cmd = append(cmd, fmt.Sprintf("%s=%v", dmField, v))
 		case string:
-			if v.(string) != "" {
-				cmd = append(cmd, fmt.Sprintf("%s=%s", dmField, v.(string)))
+			if v != "" {
+				cmd = append(cmd, fmt.Sprintf("%s=%s", dmField, v))
 			}
 		case bool:
-			if v.(bool) {
+			if v {
 				cmd = append(cmd, dmField)
 			}
 		case []interface{}:
-			for _, s := range v.([]interface{}) {
+			for _, s := range v {
 				if _, ok := s.(string); ok {
 					cmd = append(cmd, fmt.Sprintf("%s=%s", dmField, s.(string)))
 				}

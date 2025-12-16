@@ -41,19 +41,19 @@ func buildDriverFlags(driverName string, configMap map[string]any) []string {
 			continue
 		}
 
-		switch v.(type) {
+		switch v := v.(type) {
 		case float64:
 			cmd = append(cmd, dmField, fmt.Sprintf("%v", v))
 		case string:
-			if v.(string) != "" {
-				cmd = append(cmd, dmField, v.(string))
+			if v != "" {
+				cmd = append(cmd, dmField, v)
 			}
 		case bool:
-			if v.(bool) {
+			if v {
 				cmd = append(cmd, dmField)
 			}
 		case []interface{}:
-			for _, s := range v.([]interface{}) {
+			for _, s := range v {
 				if _, ok := s.(string); ok {
 					cmd = append(cmd, dmField, s.(string))
 				}
