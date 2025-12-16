@@ -54,10 +54,7 @@ func (s *peersBasedStrategy) forcedResync() <-chan struct{} {
 }
 
 func (s *peersBasedStrategy) amOwner(cluster *v3.Cluster) (owner bool) {
-	s.mu.Lock()
-	peers := s.peers
-	s.mu.Unlock()
-
+	peers := s.getPeers()
 	if peers.SelfID == "" {
 		// not ready
 		return false
@@ -86,6 +83,13 @@ func (s *peersBasedStrategy) amOwner(cluster *v3.Cluster) (owner bool) {
 	logrus.Debugf("%s(%v): (%v * %v) / %v = %v[%v] = %v, self = %v\n", cluster.Name, cluster.UID, ck,
 		uint32(len(peers.IDs)), math.MaxUint32, peers.IDs, scaled, peers.IDs[scaled], peers.SelfID)
 	return peers.IDs[scaled] == peers.SelfID
+}
+
+func (s *peersBasedStrategy) getPeers() peermanager.Peers {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.peers
 }
 
 func (s *peersBasedStrategy) setPeers(peers peermanager.Peers) bool {
