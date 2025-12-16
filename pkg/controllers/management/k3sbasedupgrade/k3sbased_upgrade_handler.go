@@ -79,9 +79,9 @@ func (h *handler) onClusterChange(_ string, cluster *mgmtv3.Cluster) (*mgmtv3.Cl
 				}
 			}
 			return cluster, nil
-		} else {
-			return h.modifyClusterCondition(cluster, masterPlan, workerPlan, mgmtv3.ClusterUpgradeStrategy{})
 		}
+
+		return h.modifyClusterCondition(cluster, masterPlan, workerPlan, mgmtv3.ClusterUpgradeStrategy{})
 	}
 
 	// Reaching this point indicates that the cluster version management is enabled on the cluster

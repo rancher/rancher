@@ -358,9 +358,9 @@ func (s *Store) Create(
 				clusters = clusters[:len(clusters)-1]
 				i--
 				continue
-			} else {
-				return nil, apierrors.NewForbidden(gvr.GroupResource(), "", fmt.Errorf("user %s is not allowed to access cluster %s", userInfo.GetName(), clusters[i].Name))
 			}
+
+			return nil, apierrors.NewForbidden(gvr.GroupResource(), "", fmt.Errorf("user %s is not allowed to access cluster %s", userInfo.GetName(), clusters[i].Name))
 		}
 
 		if currentContext == "" && kubeconfig.Spec.CurrentContext == clusters[i].Name {

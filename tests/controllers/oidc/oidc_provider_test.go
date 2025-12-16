@@ -5,7 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -326,7 +326,7 @@ func (s *OIDCProviderSuite) redirect(rw http.ResponseWriter, r *http.Request) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body)
 		assert.Fail(s.T(), "Failed to refresh token: %s\nResponse: %s\n", resp.Status, string(body))
 		http.Error(rw, "Failed to refresh token", http.StatusInternalServerError)
 		return

@@ -70,18 +70,6 @@
                     "linters": [
                         "revive"
                     ],
-                    "text": "superfluous-else"
-                },
-                {
-                    "linters": [
-                        "revive"
-                    ],
-                    "text": "empty-block"
-                },
-                {
-                    "linters": [
-                        "revive"
-                    ],
                     "text": "^var-naming"
                 },
                 {
@@ -94,12 +82,6 @@
                     "linters": [
                         "revive"
                     ],
-                    "text": "^error-strings"
-                },
-                {
-                    "linters": [
-                        "revive"
-                    ],
                     "text": "^unexported-return"
                 },
                 {
@@ -107,12 +89,6 @@
                         "revive"
                     ],
                     "text": "^exported"
-                },
-                {
-                    "linters": [
-                        "revive"
-                    ],
-                    "text": "^indent-error-flow"
                 }
             ]
         }

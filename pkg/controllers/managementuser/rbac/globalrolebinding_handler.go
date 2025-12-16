@@ -98,9 +98,9 @@ func (c *grbHandler) sync(_ string, obj *apiv3.GlobalRoleBinding) (runtime.Objec
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return obj, nil
-		} else {
-			return nil, err
 		}
+
+		return nil, err
 	}
 
 	if !rbac.IsAdminGlobalRole(gr) {

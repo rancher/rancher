@@ -33,7 +33,9 @@ func doWatch(ctx context.Context, watchFunc watchFunc, cb func(obj runtime.Objec
 	}
 	defer func() {
 		result.Stop()
+		//nolint:revive
 		for range result.ResultChan() {
+			// Intentionally drain the channel.
 		}
 	}()
 

@@ -4,7 +4,6 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"io"
-	"io/ioutil"
 	"strings"
 
 	"github.com/rancher/rancher/pkg/api/steve/catalog/types"
@@ -14,7 +13,7 @@ import (
 
 // decodeYAML reads YAML data from input and decodes it into target
 func decodeYAML(input io.Reader, target interface{}) error {
-	data, err := ioutil.ReadAll(input)
+	data, err := io.ReadAll(input)
 	if err != nil {
 		return err
 	}
@@ -67,13 +66,13 @@ func InfoFromTarball(input io.Reader) (*types.ChartInfo, error) {
 				return nil, err
 			}
 		case "app-readme.md":
-			bytes, err := ioutil.ReadAll(tarball)
+			bytes, err := io.ReadAll(tarball)
 			if err != nil {
 				return nil, err
 			}
 			result.APPReadme = string(bytes)
 		case "readme.md":
-			bytes, err := ioutil.ReadAll(tarball)
+			bytes, err := io.ReadAll(tarball)
 			if err != nil {
 				return nil, err
 			}

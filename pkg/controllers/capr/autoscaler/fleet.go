@@ -162,9 +162,9 @@ func (h *autoscalerHandler) getChartImageSettings(cluster *capi.Cluster) map[str
 func getChartName() string {
 	if strings.HasPrefix(settings.ClusterAutoscalerChartRepository.Get(), "oci://") {
 		return ""
-	} else {
-		return "cluster-autoscaler"
 	}
+
+	return "cluster-autoscaler"
 }
 
 // getKubernetesMinorVersion returns the k8s minor version which is looked up from the controlPlaneRef on the capi object

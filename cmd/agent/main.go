@@ -9,7 +9,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -215,7 +214,7 @@ func run(ctx context.Context) error {
 					}
 				}
 				if _, err := os.Stat(caFileLocation); err == nil {
-					caFile, err := ioutil.ReadFile(caFileLocation)
+					caFile, err := os.ReadFile(caFileLocation)
 					if err != nil {
 						return err
 					}

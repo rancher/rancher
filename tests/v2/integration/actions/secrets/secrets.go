@@ -202,15 +202,16 @@ func WaitForSecretInNamespaces(client *rancher.Client, clusterID, secretName str
 					return false, err
 				}
 				return true, nil
-			} else {
-				if err == nil {
-					return false, nil
-				}
-				if apierrors.IsNotFound(err) {
-					return true, nil
-				}
-				return false, err
 			}
+
+			if err == nil {
+				return false, nil
+			}
+			if apierrors.IsNotFound(err) {
+				return true, nil
+			}
+			return false, err
+
 		})
 		if err != nil {
 			return fmt.Errorf("waiting for secret %s in namespace %s failed: %w", secretName, ns.Name, err)
