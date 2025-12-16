@@ -55,7 +55,7 @@ func TestFilter(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
-			actual := c.Filter.Allowed(&c.log)
+			actual := c.Filter.LogAllowed(&c.log)
 			assert.Equal(t, c.Allowed, actual)
 		})
 	}

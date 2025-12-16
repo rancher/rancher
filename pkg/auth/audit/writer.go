@@ -21,13 +21,27 @@ type Policy struct {
 	Verbosity auditlogv1.LogVerbosity
 }
 
+func (p Policy) actionForUri(uri string) auditlogv1.FilterAction {
+	if len(p.Filters) == 0 {
+		return auditlogv1.FilterActionAllow
+	}
+
+	for _, f := range p.Filters {
+		if f.Allowed(uri) {
+			return auditlogv1.FilterActionAllow
+		}
+	}
+
+	return auditlogv1.FilterActionDeny
+}
+
 func (p Policy) actionForLog(log *logEntry) auditlogv1.FilterAction {
 	if len(p.Filters) == 0 {
 		return auditlogv1.FilterActionAllow
 	}
 
 	for _, f := range p.Filters {
-		if f.Allowed(log) {
+		if f.LogAllowed(log) {
 			return auditlogv1.FilterActionAllow
 		}
 	}
@@ -115,16 +129,13 @@ func (w *Writer) Write(log *logEntry) error {
 		defaultMu.Unlock()
 	}
 
-	verbosity := verbosityForLevel(w.DefaultPolicyLevel)
 	action := auditlogv1.FilterActionUnknown
 
 	w.policiesMutex.RLock()
-	// TODO: this policy resolution affects verbosity value which makes it hard to remove log.prepare w/o breaking change
 	for _, policy := range w.policies {
 		switch policy.actionForLog(log) {
 		case auditlogv1.FilterActionAllow:
 			redactors = append(redactors, policy.Redactors...)
-			verbosity = mergeLogVerbosities(verbosity, policy.Verbosity)
 
 			action = auditlogv1.FilterActionAllow
 		case auditlogv1.FilterActionDeny:
@@ -138,8 +149,6 @@ func (w *Writer) Write(log *logEntry) error {
 	if action == auditlogv1.FilterActionDeny {
 		return nil
 	}
-
-	log.prepare(verbosity)
 
 	for _, r := range redactors {
 		if err := r.Redact(log); err != nil {

@@ -38,7 +38,7 @@ func TestAuditLogMiddleware(t *testing.T) {
 			next.ServeHTTP(w, req)
 		})
 	}
-	auditMiddleware := NewAuditLogMiddleware(dummyW, writerOpts.DefaultPolicyLevel)
+	auditMiddleware := NewAuditLogMiddleware(dummyW)
 
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		w.Write([]byte(`hello world`))

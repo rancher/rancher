@@ -133,7 +133,7 @@ func copyReqBody(req *http.Request, keepBody bool) ([]byte, string) {
 }
 
 func newLog(
-	// verbosity auditlogv1.LogVerbosity, // TODO eventually pass verbosity here not in prepare
+	verbosity auditlogv1.LogVerbosity,
 	userInfo *User,
 	req *http.Request,
 	rw *wrapWriter,
@@ -153,75 +153,70 @@ func newLog(
 
 		RequestTimestamp:  reqTimestamp,
 		ResponseTimestamp: respTimestamp,
+	}
 
-		RequestHeader:  req.Header.Clone(),
-		ResponseHeader: rw.Header().Clone(),
+	if verbosity.Request.Headers {
+		log.RequestHeader = req.Header.Clone()
+	}
 
-		rawRequestBody:  rawBody,
-		rawResponseBody: rw.buf.Bytes(),
+	// Attempt req body prep
+	if verbosity.Request.Body && req.Header.Get("Content-Type") == contentTypeJSON && len(rawBody) > 0 {
+		if err := json.Unmarshal(rawBody, &log.RequestBody); err != nil {
+			log.RequestBody = map[string]any{
+				auditLogErrorKey: fmt.Sprintf("failed to unmarshal request body: %s", err.Error()),
+			}
+		}
+	}
+
+	if verbosity.Response.Headers {
+		log.ResponseHeader = rw.Header().Clone()
+	}
+
+	// Attempt res body prep
+	if verbosity.Response.Body && rw.Header().Get("Content-Type") == contentTypeJSON && len(log.rawResponseBody) > 0 {
+		rawResponseBody := rw.buf.Bytes()
+		// TODO: something to decompress if needed
+		decompressed, err := decompressResponse(rw.Header().Get("Content-Encoding"), rawResponseBody)
+		if err != nil {
+			log.ResponseBody = map[string]any{
+				auditLogErrorKey: fmt.Sprintf("failed to decompress response body: %s", err),
+			}
+			return log
+		}
+
+		if jsonErr := json.Unmarshal(decompressed, &log.ResponseBody); jsonErr != nil {
+			log.ResponseBody = map[string]any{
+				auditLogErrorKey: fmt.Sprintf("failed to unmarshal response body: %s", jsonErr.Error()),
+			}
+		}
 	}
 
 	return log
 }
 
-func (l *logEntry) decompressResponse() error {
+func decompressResponse(encoding string, rawResponseBody []byte) ([]byte, error) {
 	var err error
 	var decompressed []byte
 
-	switch contentType := l.ResponseHeader.Get("Content-Encoding"); contentType {
+	switch encoding {
 	case "", "none":
 		// not encoded do nothing
-		return nil
+		return rawResponseBody, nil
 	case contentEncodingGZIP:
-		decompressed, err = decompressGZIP(l.rawResponseBody)
+		decompressed, err = decompressGZIP(rawResponseBody)
 	case contentEncodingZLib:
-		decompressed, err = decompressZLib(l.rawResponseBody)
+		decompressed, err = decompressZLib(rawResponseBody)
 	default:
-		err = fmt.Errorf("%w '%s' in resopnse header", ErrUnsupportedEncoding, contentType)
+		err = fmt.Errorf("%w '%s' in resopnse header", ErrUnsupportedEncoding, encoding)
 	}
 
 	if err != nil {
-		return fmt.Errorf("failed to decode response body: %w", err)
+		return nil, fmt.Errorf("failed to decode response body: %w", err)
 	}
 
-	l.rawResponseBody = decompressed
-
-	return nil
+	return decompressed, nil
 }
 
-// TODO(ORBS): this is another target for refactoring - we nil after assigning data
-// Partially this is done because the log Writer.Write is what juggles policy and verbosity
-// To get rid of this would require major refactor to the log writer and policy resolution.
 func (l *logEntry) prepare(verbosity auditlogv1.LogVerbosity) {
-	if !verbosity.Request.Headers {
-		l.RequestHeader = nil
-	}
-
-	if !verbosity.Response.Headers {
-		l.ResponseHeader = nil
-	}
-
-	if verbosity.Request.Body && l.RequestHeader.Get("Content-Type") == contentTypeJSON && len(l.rawRequestBody) > 0 {
-		if err := json.Unmarshal(l.rawRequestBody, &l.RequestBody); err != nil {
-			l.RequestBody = map[string]any{
-				auditLogErrorKey: fmt.Sprintf("failed to unmarshal request body: %s", err.Error()),
-			}
-		}
-	}
-	l.rawRequestBody = nil
-
-	if verbosity.Response.Body && l.ResponseHeader.Get("Content-Type") == contentTypeJSON && len(l.rawResponseBody) > 0 {
-		if err := l.decompressResponse(); err != nil {
-			l.RequestBody = map[string]any{
-				auditLogErrorKey: fmt.Sprintf("failed to decompressed reuqest body: %s", err.Error()),
-			}
-		}
-
-		if err := json.Unmarshal(l.rawResponseBody, &l.ResponseBody); err != nil {
-			l.ResponseBody = map[string]any{
-				auditLogErrorKey: fmt.Sprintf("failed to unmarshal response body: %s", err.Error()),
-			}
-		}
-	}
-	l.rawResponseBody = nil
+	// TODO: not sure how to refactor tests for prepare being gone.
 }

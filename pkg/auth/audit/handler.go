@@ -23,9 +23,9 @@ type userKey string
 
 var userKeyValue userKey = "audit_user"
 
-func NewAuditLogMiddleware(writer *Writer, level auditlogv1.Level) auth.Middleware {
+func NewAuditLogMiddleware(writer *Writer) auth.Middleware {
 	return GetAuditLoggerMiddleware(&LoggingHandler{
-		level:   level,
+		level:   writer.DefaultPolicyLevel,
 		writer:  writer,
 		errMap:  make(map[string]time.Time),
 		errLock: &sync.Mutex{},
@@ -38,6 +38,37 @@ type LoggingHandler struct {
 
 	errMap  map[string]time.Time
 	errLock *sync.Mutex
+}
+
+func (lh *LoggingHandler) ResolveVerbosity(requestURI string) auditlogv1.LogVerbosity {
+	verbosity := verbosityForLevel(lh.writer.DefaultPolicyLevel)
+
+	lh.writer.policiesMutex.RLock()
+	defer lh.writer.policiesMutex.RUnlock()
+
+	for _, policy := range lh.writer.policies {
+		if policy.actionForUri(requestURI) == auditlogv1.FilterActionAllow {
+			verbosity = mergeLogVerbosities(verbosity, policy.Verbosity)
+		}
+	}
+
+	return verbosity
+}
+
+func (lh *LoggingHandler) Write(entry *logEntry) {
+	if err := lh.writer.Write(entry); err != nil {
+		// Locking after next is called to avoid performance hits on the request.
+		lh.errLock.Lock()
+		defer lh.errLock.Unlock()
+
+		// Only log duplicate error messages at most every errorDebounceTime.
+		// This is to prevent the rancher logs from being flooded with error messages
+		// when the log path is invalid or any other error that will always cause a write to fail.
+		if lastSeen, ok := lh.errMap[err.Error()]; !ok || time.Since(lastSeen) > errorDebounceTime {
+			logrus.Warnf("Failed to write audit logEntry: %s", err)
+			lh.errMap[err.Error()] = time.Now()
+		}
+	}
 }
 
 type wrapWriter struct {

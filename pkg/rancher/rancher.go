@@ -332,7 +332,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 			return nil, fmt.Errorf("failed to register audit log controller: %w", err)
 		}
 
-		auditLogMiddleware = audit.NewAuditLogMiddleware(auditLogWriter, auditlogv1.Level(opts.AuditLogLevel))
+		auditLogMiddleware = audit.NewAuditLogMiddleware(auditLogWriter)
 	}
 
 	aggregationMiddleware := aggregation.NewMiddleware(ctx, wranglerContext.Mgmt.APIService(), wranglerContext.TunnelServer)

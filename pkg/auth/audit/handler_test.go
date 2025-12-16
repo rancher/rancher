@@ -69,7 +69,7 @@ func TestMiddleware(t *testing.T) {
 	writer, err := NewWriter(out, writerOpts)
 	require.NoError(t, err)
 
-	m := NewAuditLogMiddleware(writer, writerOpts.DefaultPolicyLevel)
+	m := NewAuditLogMiddleware(writer)
 	handler := m(next)
 
 	req := getRequest()

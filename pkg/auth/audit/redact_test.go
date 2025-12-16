@@ -144,7 +144,7 @@ func TestPolicyRedactor(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
-			c.Input.prepare(verbosity)
+			c.Input.prepare(verbosity) // TODO: figure out how to fix
 			err := c.Redactor.Redact(&c.Input)
 
 			actual := c.Input
