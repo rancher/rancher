@@ -37,8 +37,7 @@ import (
 )
 
 var (
-	InvalidKeyChars               = regexp.MustCompile(`[^-.a-zA-Z0-9]`)
-	EncodedMetadataIsEmptyMessage = base64.StdEncoding.EncodeToString([]byte("Metadata is empty"))
+	InvalidKeyChars = regexp.MustCompile(`[^-.a-zA-Z0-9]`)
 )
 
 const (
@@ -47,10 +46,6 @@ const (
 	SnapshotFileNameAnnotationKey = "etcdsnapshot.rke.io/snapshot-file-name"
 	// RestoreModeOptionsAnnotation is the annotation key used to store the available restore modes.
 	RestoreModeOptionsAnnotation = "etcdsnapshot.rke.io/restore-mode-options"
-	// RestoreModeNone indicates only a "none" (etcd-only) restore is available.
-	RestoreModeNone = "none"
-	// RestoreModeAll indicates all restore modes ("none", "kubernetesVersion", "all") are available.
-	RestoreModeAll = "none,kubernetesVersion,all"
 )
 
 type Storage string
@@ -126,27 +121,12 @@ func (h *handler) OnUpstreamChange(_ string, snapshot *rkev1.ETCDSnapshot) (*rke
 		return snapshot, nil
 	}
 
-	downstreamSnapshotName := snapshot.Annotations[capr.SnapshotNameAnnotation]
-	_, err = h.etcdSnapshotFileController.Get(downstreamSnapshotName, metav1.GetOptions{})
+	_, err = h.etcdSnapshotFileController.Get(snapshot.Annotations[capr.SnapshotNameAnnotation], metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
-		logrus.Infof("%s ABOUT TO DELETE snapshot=%s (uid=%s) for cluster=%s/%s; downstream=%s; cp.Spec=%+v; cp.Status=%+v; getError=%v; time=%s",
-			logPrefix,
-			snapshot.Name,
-			string(snapshot.UID),
-			controlPlane.Namespace,
-			controlPlane.Name,
-			downstreamSnapshotName,
-			controlPlane.Spec.ETCDSnapshotRestore,
-			controlPlane.Status.ETCDSnapshotRestore,
-			err,
-			time.Now().Format(time.RFC3339),
-		)
-
 		// If the downstream snapshot does not exist in the downstream cluster, delete the local version
-		logrus.Infof("%s deleting snapshot %s because downstream snapshot %s was not found: %+v", logPrefix, snapshot.Name, downstreamSnapshotName, err)
+		logrus.Debugf("%s deleting snapshot %s", logPrefix, snapshot.Name)
 		return nil, h.etcdSnapshotController.Delete(snapshot.Namespace, snapshot.Name, &metav1.DeleteOptions{})
 	} else if err != nil {
-		logrus.Errorf("%s error checking downstream snapshot %s for snapshot %s: %+v", logPrefix, downstreamSnapshotName, snapshot.Name, err)
 		return snapshot, err
 	}
 	return snapshot, nil

@@ -467,8 +467,6 @@ func TestGeneratingHandler(t *testing.T) {
 	}
 }
 
-/*************** Helpers for OnRancherClusterChange tests ***************/
-
 func buildSnapshotWithClusterSpec(t *testing.T, namespace, name string, spec provv1.ClusterSpec) *rkev1.ETCDSnapshot {
 	t.Helper()
 	inner := map[string]string{
@@ -815,7 +813,7 @@ func TestReconcileClusterSpecEtcdRestore(t *testing.T) {
 			assertState:    func(t *testing.T, c *provv1.Cluster) {},
 		},
 		{
-			name: "networking pointers differ but values are semantically equal",
+			name: "networking pointers differ but values are semantically equal (with values)",
 			current: &provv1.Cluster{
 				Spec: provv1.ClusterSpec{
 					RKEConfig: &provv1.RKEConfig{
@@ -867,6 +865,8 @@ func TestReconcileClusterSpecEtcdRestore(t *testing.T) {
 			},
 			expectedChange: true,
 			assertState: func(t *testing.T, c *provv1.Cluster) {
+				require.NotNil(t, c.Spec.RKEConfig, "RKEConfig should not be nil")
+				require.NotNil(t, c.Spec.RKEConfig.MachineGlobalConfig.Data, "Data should not be nil")
 				assert.Equal(t, "true", c.Spec.RKEConfig.MachineGlobalConfig.Data["debug"])
 			},
 		},
@@ -892,7 +892,7 @@ func TestReconcileClusterSpecEtcdRestore(t *testing.T) {
 			},
 			expectedChange: true,
 			assertState: func(t *testing.T, c *provv1.Cluster) {
-				assert.Len(t, c.Spec.RKEConfig.MachineSelectorConfig, 1)
+				require.Len(t, c.Spec.RKEConfig.MachineSelectorConfig, 1, "should have exactly 1 selector")
 				assert.Equal(t, "default", c.Spec.RKEConfig.MachineSelectorConfig[0].Config.Data["profile"])
 			},
 		},
@@ -924,6 +924,8 @@ func TestReconcileClusterSpecEtcdRestore(t *testing.T) {
 			},
 			expectedChange: true,
 			assertState: func(t *testing.T, c *provv1.Cluster) {
+				require.NotNil(t, c.Spec.RKEConfig, "RKEConfig should not be nil")
+				require.NotNil(t, c.Spec.RKEConfig.ChartValues.Data, "ChartValues Data should not be nil")
 				val := c.Spec.RKEConfig.ChartValues.Data["rke2-canal"].(map[string]any)
 				assert.Equal(t, 1450, val["mtu"])
 			},

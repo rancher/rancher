@@ -18,6 +18,26 @@ const (
 	metaMapPrefix = "reading snapshot metadata map"
 )
 
+// CompressInterface is a function that will marshal, gzip, then base64 encode the provided interface.
+func CompressInterface(v interface{}) (string, error) {
+	marshalledCluster, err := json.Marshal(v)
+	if err != nil {
+		return "", err
+	}
+	var b bytes.Buffer
+	gz := gzip.NewWriter(&b)
+	if _, err := gz.Write(marshalledCluster); err != nil {
+		return "", err
+	}
+	if err := gz.Flush(); err != nil {
+		return "", err
+	}
+	if err := gz.Close(); err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(b.Bytes()), nil
+}
+
 // DecompressInterface is a function that will base64 decode, ungzip, and unmarshal a string into the provided interface.
 func DecompressInterface(inputb64 string, v any) error {
 	if inputb64 == "" {

@@ -21,7 +21,6 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/cluster"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,8 +29,6 @@ import (
 )
 
 func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster, configMap corev1.ConfigMap, targetNode string) *rkev1.ETCDSnapshot {
-	t.Helper()
-
 	defer func() {
 		if t.Failed() {
 			data, newErr := cluster.GatherDebugData(clients, c)
@@ -247,9 +244,7 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 	return snapshot
 }
 
-func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluster, snapshotName string, expectedConfigMap corev1.ConfigMap, expectedNodeCount int, restoreRKEConfig string) {
-	t.Helper()
-
+func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluster, snapshotName string, expectedConfigMap corev1.ConfigMap, expectedNodeCount int) {
 	defer func() {
 		if t.Failed() {
 			data, newErr := cluster.GatherDebugData(clients, c)
@@ -260,118 +255,70 @@ func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 		}
 	}()
 
-	generation := 1
-
-	// Update the cluster spec to trigger restore
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		newC, err := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
-
-		if newC.Spec.RKEConfig.ETCDSnapshotRestore != nil {
-			generation = newC.Spec.RKEConfig.ETCDSnapshotRestore.Generation + 1
-		}
-
 		newC.Spec.RKEConfig.ETCDSnapshotRestore = &rkev1.ETCDSnapshotRestore{
 			Name:             snapshotName,
-			Generation:       generation,
-			RestoreRKEConfig: restoreRKEConfig,
+			Generation:       1,
+			RestoreRKEConfig: "none",
 		}
 		newC, err = clients.Provisioning.Cluster().Update(newC)
 		if err != nil {
 			return err
 		}
-
-		logrus.Infof("Updated cluster spec: %+v", newC.Spec.RKEConfig.ETCDSnapshotRestore)
-
 		c = newC
 		return nil
 	})
-	require.NoError(t, err, "Failed to update cluster spec for restore")
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	logrus.Infof("Waiting for control plane to start restore type: %s", restoreRKEConfig)
-
-	err = wait.PollUntilContextTimeout(clients.Ctx, 20*time.Second, 15*time.Minute, true, func(ctx context.Context) (bool, error) {
-		cp, err := clients.RKE.RKEControlPlane().Get(c.Namespace, c.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		// Start when we see any active restore phase for this generation
-		if cp.Spec.ETCDSnapshotRestore != nil && cp.Spec.ETCDSnapshotRestore.Generation == generation {
-			logrus.Infof("SUCCESS: Expected Generation: %d, Generation Found: %+v, Generation Spec: %+v", generation, cp.Status.ETCDSnapshotRestore, cp.Spec.ETCDSnapshotRestore)
-			return true, nil
-		}
-		logrus.Infof("Expected Generation: %d, Generation Found: %+v, Generation Spec: %+v", generation, cp.Status.ETCDSnapshotRestore, cp.Spec.ETCDSnapshotRestore)
-		// List available snapshots when restore finishes
-		snapshotsList, listErr := clients.RKE.ETCDSnapshot().List(c.Namespace, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", capr.ClusterNameLabel, c.Name)})
-		if listErr != nil {
-			logrus.Warnf("Failed to list snapshots during restore check: %v", listErr)
-		} else {
-			logrus.Infof("Awaiting restore to start. Available upstream snapshot list for cluster %s:", c.Name)
-			for _, s := range snapshotsList.Items {
-				logrus.Infof("  - Snapshot: %s (UID=%s, downstream=%s)", s.Name, s.UID, s.Annotations["etcdsnapshot.rke.io/snapshot-name"])
-			}
-		}
-		return false, nil
+	_, err = cluster.WaitForControlPlane(clients, c, "etcd snapshot restore", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
+		return rkeControlPlane.Status.ETCDSnapshotRestorePhase == rkev1.ETCDSnapshotPhaseFinished && capr.Ready.IsTrue(rkeControlPlane), nil
 	})
-	require.NoError(t, err, "Timeout waiting for snapshot restore to start")
-
-	logrus.Infof("Waiting for control plane to complete restore type: %s", restoreRKEConfig)
-
-	err = wait.PollUntilContextTimeout(clients.Ctx, 1*time.Minute, 40*time.Minute, true, func(ctx context.Context) (bool, error) {
-		cp, err := clients.RKE.RKEControlPlane().Get(c.Namespace, c.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		// Check specific restore phase and ready status
-		if cp.Status.ETCDSnapshotRestorePhase == rkev1.ETCDSnapshotPhaseFinished && capr.Ready.IsTrue(cp) {
-			// List available snapshots when restore finishes
-			snapshotsList, listErr := clients.RKE.ETCDSnapshot().List(c.Namespace, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", capr.ClusterNameLabel, c.Name)})
-			if listErr != nil {
-				logrus.Warnf("Failed to list snapshots after restore finished: %v", listErr)
-			} else {
-				logrus.Infof("Restore finished. Available upstream snapshot list for cluster %s:", c.Name)
-				for _, s := range snapshotsList.Items {
-					logrus.Infof("  - Snapshot: %s (UID=%s, downstream=%s)", s.Name, s.UID, s.Annotations["etcdsnapshot.rke.io/snapshot-name"])
-				}
-			}
-			return true, nil
-		}
-
-		logrus.Infof("Current restore phase: %s, Current restore status: %+v, Current restore spec: %+v, Current ready condition: %s", cp.Status.ETCDSnapshotRestorePhase, cp.Status.ETCDSnapshotRestore, cp.Spec.ETCDSnapshotRestore, capr.Ready.GetStatus(cp))
-
-		return false, nil
-	})
-	require.NoError(t, err, "Timeout waiting for snapshot restore to finish")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	_, err = cluster.WaitForCreate(clients, c)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	clientset, err := GetAndVerifyDownstreamClientset(clients, c)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ns := corev1.NamespaceDefault
+
 	if expectedConfigMap.Namespace != "" {
 		ns = expectedConfigMap.Namespace
 	}
 
+	// Check for the configmap!
 	retrievedConfigMap, err := clientset.CoreV1().ConfigMaps(ns).Get(context.TODO(), expectedConfigMap.Name, metav1.GetOptions{})
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	assert.Equal(t, expectedConfigMap.Name, retrievedConfigMap.Name)
 	assert.Equal(t, expectedConfigMap.Data, retrievedConfigMap.Data)
 
 	allNodes, err := clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
+	// Nodes can be left in a `Deleting` state, so only check that our expected node count equals the number of nodes that are not deleting.
 	nonDeletingNodes := 0
 	for _, n := range allNodes.Items {
 		if n.GetDeletionTimestamp() == nil {
 			nonDeletingNodes++
 		}
 	}
-	assert.Equal(t, expectedNodeCount, nonDeletingNodes, "Unexpected number of nodes after restore")
+	assert.Equal(t, expectedNodeCount, nonDeletingNodes)
 }

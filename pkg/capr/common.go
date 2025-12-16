@@ -1,13 +1,9 @@
 package capr
 
 import (
-	"bytes"
-	"compress/gzip"
 	"context"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"path"
@@ -585,26 +581,6 @@ func SafeConcatName(maxLength int, name ...string) string {
 	}
 
 	return fullPath[0:maxLength-(hashLength+1)] + "-" + hex.EncodeToString(digest[0:])[0:hashLength]
-}
-
-// CompressInterface is a function that will marshal, gzip, then base64 encode the provided interface.
-func CompressInterface(v interface{}) (string, error) {
-	marshalledCluster, err := json.Marshal(v)
-	if err != nil {
-		return "", err
-	}
-	var b bytes.Buffer
-	gz := gzip.NewWriter(&b)
-	if _, err := gz.Write(marshalledCluster); err != nil {
-		return "", err
-	}
-	if err := gz.Flush(); err != nil {
-		return "", err
-	}
-	if err := gz.Close(); err != nil {
-		return "", err
-	}
-	return base64.StdEncoding.EncodeToString(b.Bytes()), nil
 }
 
 func PreBootstrap(mgmtCluster *v3.Cluster) bool {

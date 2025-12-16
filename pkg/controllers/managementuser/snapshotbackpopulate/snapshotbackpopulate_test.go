@@ -9,6 +9,7 @@ import (
 
 	k3s "github.com/k3s-io/api/k3s.cattle.io/v1"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	cluster2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
@@ -622,10 +623,9 @@ func TestOnDownstreamChange(t *testing.T) {
 }
 
 func TestOnDownstreamChange_RestoreModeAnnotationIsSetCorrectly(t *testing.T) {
-	// --- Test Cases for Annotation Logic ---
 	// Helper to create a valid, compressed spec payload
 	compressSpec := func(t *testing.T, spec *provv1.ClusterSpec) string {
-		payload, err := capr.CompressInterface(spec)
+		payload, err := snapshotutil.CompressInterface(spec)
 		require.NoError(t, err)
 		return payload
 	}
@@ -809,7 +809,6 @@ func TestOnDownstreamChange_RestoreModeAnnotationIsSetCorrectly(t *testing.T) {
 						require.NotNil(t, annotations)
 						assert.Equal(t, tc.expectedAnnotation, annotations[RestoreModeOptionsAnnotation], "Annotation should be set correctly")
 
-						// Assert old behavior (status is based on ReadyToUse)
 						assert.Equal(t, "successful", created.SnapshotFile.Status, "Status should be successful because ReadyToUse is true")
 
 						require.Equal(t, downstreamFile.Spec.SnapshotName, annotations[SnapshotFileNameAnnotationKey])
