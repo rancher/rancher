@@ -73,7 +73,7 @@ func CreateNamespace(client *rancher.Client, namespaceName, containerDefaultReso
 	projectID := strings.Split(project.ID, ":")[1]
 
 	clusterRoleWatch, err := clusterRoleResource.Watch(context.TODO(), metav1.ListOptions{
-		FieldSelector:  "metadata.name=" + fmt.Sprintf("%s-namespaces-manage", projectID),
+		FieldSelector:  "metadata.name=" + fmt.Sprintf("%s-namespaces-edit", projectID),
 		TimeoutSeconds: &defaults.WatchTimeoutSeconds,
 	})
 
