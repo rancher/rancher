@@ -49,7 +49,8 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 	}
 
 	if !features.AggregatedRoleTemplates.Enabled() {
-		return prtb, p.deleteRoleBindings(prtb)
+		return prtb, nil
+		// TODO return prtb, p.deleteRoleBindings(prtb)
 	}
 
 	var err error

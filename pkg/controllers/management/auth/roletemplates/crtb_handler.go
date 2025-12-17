@@ -58,7 +58,8 @@ func (c *crtbHandler) OnChange(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 	}
 
 	if !features.AggregatedRoleTemplates.Enabled() {
-		return crtb, c.removeRoleBindings(crtb)
+		return crtb, nil
+		// TODO return crtb, c.removeRoleBindings(crtb)
 	}
 
 	var localConditions []metav1.Condition
