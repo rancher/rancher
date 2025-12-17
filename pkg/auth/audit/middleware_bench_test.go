@@ -12,116 +12,83 @@ import (
 
 // Benchmarks for memory and CPU profiling
 //
-// ## Running Benchmarks with Memory Profiling
+// ## Overview
 //
-// To reproduce the user-reported 1.7GB heap issue, run these commands:
+// These benchmarks are organized by audit log level to facilitate "apples to apples"
+// comparisons. Each level section contains benchmarks with progressively larger
+// response sizes, allowing you to compare memory usage both:
+// - Across levels (same size, different levels)
+// - Within a level (same level, different sizes)
 //
-// 1. Run a specific benchmark with memory profiling:
-//    go test -bench=BenchmarkMiddleware_GigabyteResponse_LevelMetadata \
-//            -memprofile=mem.prof \
+// ## Running Comparative Benchmarks
+//
+// ### Compare memory usage across ALL audit levels for a specific response size:
+//
+//    # Compare 1GB responses across all 4 audit levels
+//    go test -bench='Benchmark.*_1GB$' -benchmem -benchtime=1x
+//
+//    # Compare 100MB responses across all levels
+//    go test -bench='Benchmark.*_100MB$' -benchmem -benchtime=1x
+//
+// ### Compare memory usage for ONE level across different sizes:
+//
+//    # See how LevelNull scales from small to gigabyte responses
+//    go test -bench='BenchmarkLevelNull_' -benchmem -benchtime=1x
+//
+//    # See how LevelRequestResponse scales across sizes
+//    go test -bench='BenchmarkLevelRequestResponse_' -benchmem -benchtime=1x
+//
+// ### Run a specific size/level combination:
+//
+//    go test -bench='BenchmarkLevelNull_1GB$' -benchmem -benchtime=1x
+//    go test -bench='BenchmarkLevelRequestResponse_1GB$' -benchmem -benchtime=1x
+//
+// ## Memory Profiling
+//
+// ### Generate and analyze memory profiles:
+//
+//    # Profile a specific benchmark
+//    go test -bench=BenchmarkLevelNull_1GB \
+//            -memprofile=mem_null_1gb.prof \
 //            -benchmem \
 //            -benchtime=1x
 //
-// 2. Run the streaming benchmark (simulates reverse proxy behavior):
-//    go test -bench=BenchmarkMiddleware_StreamingResponse_1GB_LevelMetadata \
-//            -memprofile=mem.prof \
-//            -benchmem \
-//            -benchtime=1x
-//
-// 3. Analyze the memory profile:
-//    go tool pprof -alloc_space mem.prof
+//    # Analyze the profile
+//    go tool pprof -alloc_space mem_null_1gb.prof
 //    (pprof) top10
 //    (pprof) list wrapWriter.Write
 //
-// 4. Compare memory usage between levels (shows the bug):
-//    # This should use ~1GB but DOES because of bug:
-//    go test -bench=BenchmarkMiddleware_GigabyteResponse_LevelMetadata -benchmem -benchtime=1x
+// ### Compare profiles across levels:
 //
-//    # This SHOULD use ~1GB and does (correct behavior):
-//    go test -bench=BenchmarkMiddleware_GigabyteResponse_LevelRequestResponse -benchmem -benchtime=1x
+//    # Generate profiles for each level
+//    go test -bench=BenchmarkLevelNull_1GB -memprofile=mem_null.prof -benchmem -benchtime=1x
+//    go test -bench=BenchmarkLevelRequestResponse_1GB -memprofile=mem_reqresp.prof -benchmem -benchtime=1x
 //
-// 5. Run with heap dump (like user's scenario):
-//    GODEBUG=allocfreetrace=1 go test -bench=BenchmarkMiddleware_StreamingResponse_1GB_LevelMetadata -benchtime=1x
+//    # Compare allocations
+//    go tool pprof -base=mem_null.prof mem_reqresp.prof
 //
-// ## Expected Results (Current Bug)
+// ## Expected Behavior
 //
-// With the current implementation, you'll see:
-// - LevelMetadata: ~1GB allocation (BUG - should be minimal)
-// - LevelRequestResponse: ~1GB allocation (CORRECT - needs the data)
+// Current implementation (with bug at handler.go:65):
+// - LevelNull: Buffers entire response (~1GB allocation for 1GB response) - BUG
+// - LevelHeaders: Buffers entire response (~1GB allocation for 1GB response) - BUG
+// - LevelRequest: Buffers entire response (~1GB allocation for 1GB response) - BUG
+// - LevelRequestResponse: Buffers entire response (~1GB allocation for 1GB response) - CORRECT
 //
-// After fixing handler.go:65 to conditionally buffer:
-// - LevelMetadata: <10MB allocation (only metadata/headers)
-// - LevelRequestResponse: ~1GB allocation (buffers response as needed)
+// After fixing wrapWriter.Write() to conditionally buffer:
+// - LevelNull: Minimal allocation (<10MB for 1GB response)
+// - LevelHeaders: Minimal allocation (<10MB for 1GB response)
+// - LevelRequest: Minimal allocation (<10MB for 1GB response)
+// - LevelRequestResponse: Full buffering (~1GB allocation for 1GB response)
 
-// BenchmarkMiddleware_SmallResponse_* benchmarks with small responses (1KB)
-func BenchmarkMiddleware_SmallResponse_LevelMetadata(b *testing.B) {
-	benchmarkMiddlewareWithSize(b, auditlogv1.LevelNull, 1024)
-}
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
+//
+// Note: newTestRequest, newSizedResponseHandler, and newTestAuditWriter are
+// defined in middleware_test.go and shared across both test files.
 
-func BenchmarkMiddleware_SmallResponse_LevelHeaders(b *testing.B) {
-	benchmarkMiddlewareWithSize(b, auditlogv1.LevelHeaders, 1024)
-}
-
-func BenchmarkMiddleware_SmallResponse_LevelRequest(b *testing.B) {
-	benchmarkMiddlewareWithSize(b, auditlogv1.LevelRequest, 1024)
-}
-
-func BenchmarkMiddleware_SmallResponse_LevelRequestResponse(b *testing.B) {
-	benchmarkMiddlewareWithSize(b, auditlogv1.LevelRequestResponse, 1024)
-}
-
-// BenchmarkMiddleware_MediumResponse_* benchmarks with medium responses (100KB)
-func BenchmarkMiddleware_MediumResponse_LevelMetadata(b *testing.B) {
-	benchmarkMiddlewareWithSize(b, auditlogv1.LevelNull, 100*1024)
-}
-
-func BenchmarkMiddleware_MediumResponse_LevelHeaders(b *testing.B) {
-	benchmarkMiddlewareWithSize(b, auditlogv1.LevelHeaders, 100*1024)
-}
-
-func BenchmarkMiddleware_MediumResponse_LevelRequest(b *testing.B) {
-	benchmarkMiddlewareWithSize(b, auditlogv1.LevelRequest, 100*1024)
-}
-
-func BenchmarkMiddleware_MediumResponse_LevelRequestResponse(b *testing.B) {
-	benchmarkMiddlewareWithSize(b, auditlogv1.LevelRequestResponse, 100*1024)
-}
-
-// BenchmarkMiddleware_LargeResponse_* benchmarks with large responses (1MB)
-func BenchmarkMiddleware_LargeResponse_LevelMetadata(b *testing.B) {
-	benchmarkMiddlewareWithSize(b, auditlogv1.LevelNull, 1024*1024)
-}
-
-func BenchmarkMiddleware_LargeResponse_LevelHeaders(b *testing.B) {
-	benchmarkMiddlewareWithSize(b, auditlogv1.LevelHeaders, 1024*1024)
-}
-
-func BenchmarkMiddleware_LargeResponse_LevelRequest(b *testing.B) {
-	benchmarkMiddlewareWithSize(b, auditlogv1.LevelRequest, 1024*1024)
-}
-
-func BenchmarkMiddleware_LargeResponse_LevelRequestResponse(b *testing.B) {
-	benchmarkMiddlewareWithSize(b, auditlogv1.LevelRequestResponse, 1024*1024)
-}
-
-// BenchmarkMiddleware_VeryLargeResponse_* benchmarks with very large responses (10MB)
-func BenchmarkMiddleware_VeryLargeResponse_LevelMetadata(b *testing.B) {
-	benchmarkMiddlewareWithSize(b, auditlogv1.LevelNull, 10*1024*1024)
-}
-
-func BenchmarkMiddleware_VeryLargeResponse_LevelHeaders(b *testing.B) {
-	benchmarkMiddlewareWithSize(b, auditlogv1.LevelHeaders, 10*1024*1024)
-}
-
-func BenchmarkMiddleware_VeryLargeResponse_LevelRequest(b *testing.B) {
-	benchmarkMiddlewareWithSize(b, auditlogv1.LevelRequest, 10*1024*1024)
-}
-
-func BenchmarkMiddleware_VeryLargeResponse_LevelRequestResponse(b *testing.B) {
-	benchmarkMiddlewareWithSize(b, auditlogv1.LevelRequestResponse, 10*1024*1024)
-}
-
-// Helper function for response size benchmarks
+// Helper function for standard response size benchmarks
 func benchmarkMiddlewareWithSize(b *testing.B, level auditlogv1.Level, responseSize int) {
 	writer, _ := newTestAuditWriter(level)
 	middleware := NewAuditLogMiddleware(writer)
@@ -140,64 +107,6 @@ func benchmarkMiddlewareWithSize(b *testing.B, level auditlogv1.Level, responseS
 		rw := httptest.NewRecorder()
 		wrappedHandler.ServeHTTP(rw, req)
 	}
-}
-
-// BenchmarkMiddleware_WithRequestBody benchmarks with both request and response bodies
-func BenchmarkMiddleware_WithRequestBody_Small(b *testing.B) {
-	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelRequestResponse, 1024, 1024)
-}
-
-func BenchmarkMiddleware_WithRequestBody_Medium(b *testing.B) {
-	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelRequestResponse, 100*1024, 100*1024)
-}
-
-func BenchmarkMiddleware_WithRequestBody_Large(b *testing.B) {
-	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelRequestResponse, 1024*1024, 1024*1024)
-}
-
-// BenchmarkMiddleware_ExtraLargeResponse_* benchmarks with very large responses (100MB)
-func BenchmarkMiddleware_ExtraLargeResponse_LevelMetadata(b *testing.B) {
-	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelNull, 10*1024*1024, 100*1024*1024)
-}
-
-func BenchmarkMiddleware_ExtraLargeResponse_LevelHeaders(b *testing.B) {
-	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelHeaders, 10*1024*1024, 100*1024*1024)
-}
-
-func BenchmarkMiddleware_ExtraLargeResponse_LevelRequest(b *testing.B) {
-	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelRequest, 10*1024*1024, 100*1024*1024)
-}
-
-func BenchmarkMiddleware_ExtraLargeResponse_LevelRequestResponse(b *testing.B) {
-	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelRequestResponse, 10*1024*1024, 100*1024*1024)
-}
-
-// BenchmarkMiddleware_GigabyteResponse_* benchmarks with gigabyte responses (1GB, 2GB)
-// These simulate the user-reported scenario with 1.7GB heap usage
-func BenchmarkMiddleware_GigabyteResponse_LevelMetadata(b *testing.B) {
-	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelNull, 1024*1024, 1024*1024*1024)
-}
-
-func BenchmarkMiddleware_GigabyteResponse_LevelHeaders(b *testing.B) {
-	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelHeaders, 1024*1024, 1024*1024*1024)
-}
-
-func BenchmarkMiddleware_GigabyteResponse_LevelRequest(b *testing.B) {
-	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelRequest, 1024*1024, 1024*1024*1024)
-}
-
-func BenchmarkMiddleware_GigabyteResponse_LevelRequestResponse(b *testing.B) {
-	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelRequestResponse, 1024*1024, 1024*1024*1024)
-}
-
-// BenchmarkMiddleware_2GBResponse_* benchmarks with 2GB responses
-// Useful for stress testing and confirming the issue scales with size
-func BenchmarkMiddleware_2GBResponse_LevelMetadata(b *testing.B) {
-	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelNull, 1024*1024, 2*1024*1024*1024)
-}
-
-func BenchmarkMiddleware_2GBResponse_LevelRequestResponse(b *testing.B) {
-	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelRequestResponse, 1024*1024, 2*1024*1024*1024)
 }
 
 // Helper function for request/response body benchmarks
@@ -221,15 +130,6 @@ func benchmarkMiddlewareWithRequestBody(b *testing.B, level auditlogv1.Level, re
 	}
 }
 
-// BenchmarkMiddleware_Concurrent tests concurrent request handling
-func BenchmarkMiddleware_Concurrent_LevelMetadata(b *testing.B) {
-	benchmarkMiddlewareConcurrent(b, auditlogv1.LevelNull, 100*1024)
-}
-
-func BenchmarkMiddleware_Concurrent_LevelRequestResponse(b *testing.B) {
-	benchmarkMiddlewareConcurrent(b, auditlogv1.LevelRequestResponse, 100*1024)
-}
-
 // Helper function for concurrent benchmarks
 func benchmarkMiddlewareConcurrent(b *testing.B, level auditlogv1.Level, responseSize int) {
 	writer, _ := newTestAuditWriter(level)
@@ -248,24 +148,6 @@ func benchmarkMiddlewareConcurrent(b *testing.B, level auditlogv1.Level, respons
 			wrappedHandler.ServeHTTP(rw, req)
 		}
 	})
-}
-
-// BenchmarkMiddleware_StreamingResponse_* benchmarks simulate reverse proxy streaming scenario
-// These write responses in chunks like httputil.ReverseProxy.copyBuffer does
-func BenchmarkMiddleware_StreamingResponse_100MB_LevelMetadata(b *testing.B) {
-	benchmarkMiddlewareStreaming(b, auditlogv1.LevelNull, 100*1024*1024, 32*1024)
-}
-
-func BenchmarkMiddleware_StreamingResponse_100MB_LevelRequestResponse(b *testing.B) {
-	benchmarkMiddlewareStreaming(b, auditlogv1.LevelRequestResponse, 100*1024*1024, 32*1024)
-}
-
-func BenchmarkMiddleware_StreamingResponse_1GB_LevelMetadata(b *testing.B) {
-	benchmarkMiddlewareStreaming(b, auditlogv1.LevelNull, 1024*1024*1024, 32*1024)
-}
-
-func BenchmarkMiddleware_StreamingResponse_1GB_LevelRequestResponse(b *testing.B) {
-	benchmarkMiddlewareStreaming(b, auditlogv1.LevelRequestResponse, 1024*1024*1024, 32*1024)
 }
 
 // Helper function for streaming benchmarks
@@ -309,4 +191,210 @@ func benchmarkMiddlewareStreaming(b *testing.B, level auditlogv1.Level, totalSiz
 		rw := httptest.NewRecorder()
 		wrappedHandler.ServeHTTP(rw, req)
 	}
+}
+
+// =============================================================================
+// LEVEL NULL (Metadata only) BENCHMARKS
+// =============================================================================
+//
+// These benchmarks test auditlogv1.LevelNull, which should only log metadata
+// (timestamps, user info, status code) without buffering request/response bodies.
+//
+// Expected behavior: Minimal memory usage regardless of response size
+// Current bug: Buffers entire response, causing high memory usage
+
+func BenchmarkLevelNull_1KB(b *testing.B) {
+	benchmarkMiddlewareWithSize(b, auditlogv1.LevelNull, 1024)
+}
+
+func BenchmarkLevelNull_100KB(b *testing.B) {
+	benchmarkMiddlewareWithSize(b, auditlogv1.LevelNull, 100*1024)
+}
+
+func BenchmarkLevelNull_1MB(b *testing.B) {
+	benchmarkMiddlewareWithSize(b, auditlogv1.LevelNull, 1024*1024)
+}
+
+func BenchmarkLevelNull_10MB(b *testing.B) {
+	benchmarkMiddlewareWithSize(b, auditlogv1.LevelNull, 10*1024*1024)
+}
+
+func BenchmarkLevelNull_100MB(b *testing.B) {
+	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelNull, 10*1024*1024, 100*1024*1024)
+}
+
+func BenchmarkLevelNull_1GB(b *testing.B) {
+	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelNull, 1024*1024, 1024*1024*1024)
+}
+
+func BenchmarkLevelNull_2GB(b *testing.B) {
+	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelNull, 1024*1024, 2*1024*1024*1024)
+}
+
+// Streaming benchmarks for LevelNull
+func BenchmarkLevelNull_Streaming_100MB(b *testing.B) {
+	benchmarkMiddlewareStreaming(b, auditlogv1.LevelNull, 100*1024*1024, 32*1024)
+}
+
+func BenchmarkLevelNull_Streaming_1GB(b *testing.B) {
+	benchmarkMiddlewareStreaming(b, auditlogv1.LevelNull, 1024*1024*1024, 32*1024)
+}
+
+// Concurrent benchmark for LevelNull
+func BenchmarkLevelNull_Concurrent_100KB(b *testing.B) {
+	benchmarkMiddlewareConcurrent(b, auditlogv1.LevelNull, 100*1024)
+}
+
+// =============================================================================
+// LEVEL HEADERS BENCHMARKS
+// =============================================================================
+//
+// These benchmarks test auditlogv1.LevelHeaders, which logs metadata and
+// request/response headers without buffering request/response bodies.
+//
+// Expected behavior: Minimal memory usage regardless of response size
+// Current bug: Buffers entire response, causing high memory usage
+
+func BenchmarkLevelHeaders_1KB(b *testing.B) {
+	benchmarkMiddlewareWithSize(b, auditlogv1.LevelHeaders, 1024)
+}
+
+func BenchmarkLevelHeaders_100KB(b *testing.B) {
+	benchmarkMiddlewareWithSize(b, auditlogv1.LevelHeaders, 100*1024)
+}
+
+func BenchmarkLevelHeaders_1MB(b *testing.B) {
+	benchmarkMiddlewareWithSize(b, auditlogv1.LevelHeaders, 1024*1024)
+}
+
+func BenchmarkLevelHeaders_10MB(b *testing.B) {
+	benchmarkMiddlewareWithSize(b, auditlogv1.LevelHeaders, 10*1024*1024)
+}
+
+func BenchmarkLevelHeaders_100MB(b *testing.B) {
+	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelHeaders, 10*1024*1024, 100*1024*1024)
+}
+
+func BenchmarkLevelHeaders_1GB(b *testing.B) {
+	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelHeaders, 1024*1024, 1024*1024*1024)
+}
+
+func BenchmarkLevelHeaders_2GB(b *testing.B) {
+	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelHeaders, 1024*1024, 2*1024*1024*1024)
+}
+
+// =============================================================================
+// LEVEL REQUEST BENCHMARKS
+// =============================================================================
+//
+// These benchmarks test auditlogv1.LevelRequest, which logs metadata, headers,
+// and request body without buffering the response body.
+//
+// Expected behavior: Buffers request body only, minimal response buffering
+// Current bug: Buffers entire response, causing high memory usage
+
+func BenchmarkLevelRequest_1KB(b *testing.B) {
+	benchmarkMiddlewareWithSize(b, auditlogv1.LevelRequest, 1024)
+}
+
+func BenchmarkLevelRequest_100KB(b *testing.B) {
+	benchmarkMiddlewareWithSize(b, auditlogv1.LevelRequest, 100*1024)
+}
+
+func BenchmarkLevelRequest_1MB(b *testing.B) {
+	benchmarkMiddlewareWithSize(b, auditlogv1.LevelRequest, 1024*1024)
+}
+
+func BenchmarkLevelRequest_10MB(b *testing.B) {
+	benchmarkMiddlewareWithSize(b, auditlogv1.LevelRequest, 10*1024*1024)
+}
+
+func BenchmarkLevelRequest_100MB(b *testing.B) {
+	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelRequest, 10*1024*1024, 100*1024*1024)
+}
+
+func BenchmarkLevelRequest_1GB(b *testing.B) {
+	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelRequest, 1024*1024, 1024*1024*1024)
+}
+
+func BenchmarkLevelRequest_2GB(b *testing.B) {
+	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelRequest, 1024*1024, 2*1024*1024*1024)
+}
+
+// With request body benchmarks for LevelRequest
+func BenchmarkLevelRequest_WithRequestBody_1KB(b *testing.B) {
+	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelRequest, 1024, 1024)
+}
+
+func BenchmarkLevelRequest_WithRequestBody_100KB(b *testing.B) {
+	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelRequest, 100*1024, 100*1024)
+}
+
+func BenchmarkLevelRequest_WithRequestBody_1MB(b *testing.B) {
+	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelRequest, 1024*1024, 1024*1024)
+}
+
+// =============================================================================
+// LEVEL REQUEST+RESPONSE BENCHMARKS
+// =============================================================================
+//
+// These benchmarks test auditlogv1.LevelRequestResponse, which logs everything
+// including request and response bodies. This level MUST buffer response bodies.
+//
+// Expected behavior: Buffers both request and response bodies
+// Current behavior: Correct - buffers as expected
+
+func BenchmarkLevelRequestResponse_1KB(b *testing.B) {
+	benchmarkMiddlewareWithSize(b, auditlogv1.LevelRequestResponse, 1024)
+}
+
+func BenchmarkLevelRequestResponse_100KB(b *testing.B) {
+	benchmarkMiddlewareWithSize(b, auditlogv1.LevelRequestResponse, 100*1024)
+}
+
+func BenchmarkLevelRequestResponse_1MB(b *testing.B) {
+	benchmarkMiddlewareWithSize(b, auditlogv1.LevelRequestResponse, 1024*1024)
+}
+
+func BenchmarkLevelRequestResponse_10MB(b *testing.B) {
+	benchmarkMiddlewareWithSize(b, auditlogv1.LevelRequestResponse, 10*1024*1024)
+}
+
+func BenchmarkLevelRequestResponse_100MB(b *testing.B) {
+	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelRequestResponse, 10*1024*1024, 100*1024*1024)
+}
+
+func BenchmarkLevelRequestResponse_1GB(b *testing.B) {
+	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelRequestResponse, 1024*1024, 1024*1024*1024)
+}
+
+func BenchmarkLevelRequestResponse_2GB(b *testing.B) {
+	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelRequestResponse, 1024*1024, 2*1024*1024*1024)
+}
+
+// Streaming benchmarks for LevelRequestResponse
+func BenchmarkLevelRequestResponse_Streaming_100MB(b *testing.B) {
+	benchmarkMiddlewareStreaming(b, auditlogv1.LevelRequestResponse, 100*1024*1024, 32*1024)
+}
+
+func BenchmarkLevelRequestResponse_Streaming_1GB(b *testing.B) {
+	benchmarkMiddlewareStreaming(b, auditlogv1.LevelRequestResponse, 1024*1024*1024, 32*1024)
+}
+
+// Concurrent benchmark for LevelRequestResponse
+func BenchmarkLevelRequestResponse_Concurrent_100KB(b *testing.B) {
+	benchmarkMiddlewareConcurrent(b, auditlogv1.LevelRequestResponse, 100*1024)
+}
+
+// With request body benchmarks for LevelRequestResponse
+func BenchmarkLevelRequestResponse_WithRequestBody_1KB(b *testing.B) {
+	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelRequestResponse, 1024, 1024)
+}
+
+func BenchmarkLevelRequestResponse_WithRequestBody_100KB(b *testing.B) {
+	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelRequestResponse, 100*1024, 100*1024)
+}
+
+func BenchmarkLevelRequestResponse_WithRequestBody_1MB(b *testing.B) {
+	benchmarkMiddlewareWithRequestBody(b, auditlogv1.LevelRequestResponse, 1024*1024, 1024*1024)
 }

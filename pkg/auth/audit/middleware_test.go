@@ -17,6 +17,13 @@ import (
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
+// =============================================================================
+// SHARED HELPER FUNCTIONS
+// =============================================================================
+//
+// These helper functions are used by both middleware_test.go and
+// middleware_bench_test.go to ensure consistent test/benchmark setup.
+
 // Helper function to create a test request with user context
 func newTestRequest(method, uri string, body io.Reader) *http.Request {
 	req := httptest.NewRequest(method, uri, body)
@@ -60,13 +67,17 @@ func newTestAuditWriter(level auditlogv1.Level) (*Writer, *bytes.Buffer) {
 	return writer, out
 }
 
+// =============================================================================
+// BASIC FUNCTIONALITY TESTS
+// =============================================================================
+
 // TestMiddlewareBasicFunctionality tests that the middleware properly forwards requests
 func TestMiddlewareBasicFunctionality(t *testing.T) {
 	tests := []struct {
 		name  string
 		level auditlogv1.Level
 	}{
-		{"LevelMetadata", auditlogv1.LevelNull},
+		{"LevelNull", auditlogv1.LevelNull},
 		{"LevelHeaders", auditlogv1.LevelHeaders},
 		{"LevelRequest", auditlogv1.LevelRequest},
 		{"LevelRequestResponse", auditlogv1.LevelRequestResponse},
@@ -96,6 +107,34 @@ func TestMiddlewareBasicFunctionality(t *testing.T) {
 	}
 }
 
+// TestMiddlewareNilWriter tests that middleware handles nil writer gracefully
+func TestMiddlewareNilWriter(t *testing.T) {
+	// Simulate the production code path when audit logging is disabled
+	middleware := GetAuditLoggerMiddleware(nil)
+
+	handlerCalled := false
+	handler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		handlerCalled = true
+		rw.WriteHeader(http.StatusOK)
+	})
+
+	wrappedHandler := middleware(handler)
+	req := newTestRequest(http.MethodGet, "/v3/clusters", nil)
+	rw := httptest.NewRecorder()
+
+	wrappedHandler.ServeHTTP(rw, req)
+
+	assert.True(t, handlerCalled, "handler should have been called even with nil writer")
+	assert.Equal(t, http.StatusOK, rw.Code)
+}
+
+// =============================================================================
+// RESPONSE BODY BUFFERING TESTS
+// =============================================================================
+//
+// These tests verify that response bodies are only buffered when the audit
+// level requires them (LevelRequestResponse only).
+
 // TestMiddlewareResponseBodyBuffering tests that response bodies are only buffered at appropriate levels
 func TestMiddlewareResponseBodyBuffering(t *testing.T) {
 	tests := []struct {
@@ -103,7 +142,7 @@ func TestMiddlewareResponseBodyBuffering(t *testing.T) {
 		level                auditlogv1.Level
 		expectBodyInAuditLog bool
 	}{
-		{"LevelMetadata_NoBody", auditlogv1.LevelNull, false},
+		{"LevelNull_NoBody", auditlogv1.LevelNull, false},
 		{"LevelHeaders_NoBody", auditlogv1.LevelHeaders, false},
 		{"LevelRequest_NoBody", auditlogv1.LevelRequest, false},
 		{"LevelRequestResponse_HasBody", auditlogv1.LevelRequestResponse, true},
@@ -145,6 +184,13 @@ func TestMiddlewareResponseBodyBuffering(t *testing.T) {
 	}
 }
 
+// =============================================================================
+// REQUEST BODY BUFFERING TESTS
+// =============================================================================
+//
+// These tests verify that request bodies are buffered when the audit level
+// requires them (LevelRequest and LevelRequestResponse).
+
 // TestMiddlewareRequestBodyBuffering tests that request bodies are buffered at appropriate levels
 func TestMiddlewareRequestBodyBuffering(t *testing.T) {
 	tests := []struct {
@@ -153,7 +199,7 @@ func TestMiddlewareRequestBodyBuffering(t *testing.T) {
 		method               string
 		expectBodyInAuditLog bool
 	}{
-		{"LevelMetadata_NoBody", auditlogv1.LevelNull, http.MethodPost, false},
+		{"LevelNull_NoBody", auditlogv1.LevelNull, http.MethodPost, false},
 		{"LevelHeaders_NoBody", auditlogv1.LevelHeaders, http.MethodPost, false},
 		{"LevelRequest_HasBody", auditlogv1.LevelRequest, http.MethodPost, true},
 		{"LevelRequestResponse_HasBody", auditlogv1.LevelRequestResponse, http.MethodPost, true},
@@ -195,55 +241,9 @@ func TestMiddlewareRequestBodyBuffering(t *testing.T) {
 	}
 }
 
-// TestMiddlewareNilWriter tests that middleware handles nil writer gracefully
-func TestMiddlewareNilWriter(t *testing.T) {
-	// Simulate the production code path when audit logging is disabled
-	middleware := GetAuditLoggerMiddleware(nil)
-
-	handlerCalled := false
-	handler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		handlerCalled = true
-		rw.WriteHeader(http.StatusOK)
-	})
-
-	wrappedHandler := middleware(handler)
-	req := newTestRequest(http.MethodGet, "/v3/clusters", nil)
-	rw := httptest.NewRecorder()
-
-	wrappedHandler.ServeHTTP(rw, req)
-
-	assert.True(t, handlerCalled, "handler should have been called even with nil writer")
-	assert.Equal(t, http.StatusOK, rw.Code)
-}
-
-// TestMiddlewareHijack tests that the middleware properly handles connection hijacking
-func TestMiddlewareHijack(t *testing.T) {
-	writer, _ := newTestAuditWriter(auditlogv1.LevelNull)
-	middleware := NewAuditLogMiddleware(writer)
-
-	handler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		hijacker, ok := rw.(http.Hijacker)
-		require.True(t, ok, "ResponseWriter should implement http.Hijacker")
-
-		// We can't actually hijack in tests without a real connection,
-		// but we can verify the interface is available
-		assert.NotNil(t, hijacker)
-
-		rw.WriteHeader(http.StatusOK)
-	})
-
-	wrappedHandler := middleware(handler)
-
-	// Use a real HTTP server for hijacker test
-	server := httptest.NewServer(wrappedHandler)
-	defer server.Close()
-
-	req := newTestRequest(http.MethodGet, server.URL+"/test", nil)
-	rw := httptest.NewRecorder()
-	wrappedHandler.ServeHTTP(rw, req)
-
-	assert.Equal(t, http.StatusOK, rw.Code)
-}
+// =============================================================================
+// STATUS CODE TESTS
+// =============================================================================
 
 // TestMiddlewareStatusCodes tests that various status codes are properly recorded
 func TestMiddlewareStatusCodes(t *testing.T) {
@@ -283,6 +283,10 @@ func TestMiddlewareStatusCodes(t *testing.T) {
 	}
 }
 
+// =============================================================================
+// INTERFACE PRESERVATION TESTS
+// =============================================================================
+
 // TestMiddlewarePreservesResponseWriterInterfaces tests that wrapWriter implements expected interfaces
 func TestMiddlewarePreservesResponseWriterInterfaces(t *testing.T) {
 	writer, _ := newTestAuditWriter(auditlogv1.LevelNull)
@@ -306,6 +310,43 @@ func TestMiddlewarePreservesResponseWriterInterfaces(t *testing.T) {
 	wrappedHandler.ServeHTTP(rw, req)
 }
 
+// TestMiddlewareHijack tests that the middleware properly handles connection hijacking
+func TestMiddlewareHijack(t *testing.T) {
+	writer, _ := newTestAuditWriter(auditlogv1.LevelNull)
+	middleware := NewAuditLogMiddleware(writer)
+
+	handler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		hijacker, ok := rw.(http.Hijacker)
+		require.True(t, ok, "ResponseWriter should implement http.Hijacker")
+
+		// We can't actually hijack in tests without a real connection,
+		// but we can verify the interface is available
+		assert.NotNil(t, hijacker)
+
+		rw.WriteHeader(http.StatusOK)
+	})
+
+	wrappedHandler := middleware(handler)
+
+	// Use a real HTTP server for hijacker test
+	server := httptest.NewServer(wrappedHandler)
+	defer server.Close()
+
+	req := newTestRequest(http.MethodGet, server.URL+"/test", nil)
+	rw := httptest.NewRecorder()
+	wrappedHandler.ServeHTTP(rw, req)
+
+	assert.Equal(t, http.StatusOK, rw.Code)
+}
+
+// =============================================================================
+// MEMORY USAGE TESTS
+// =============================================================================
+//
+// These tests document and verify the memory behavior of the middleware.
+// They demonstrate the bug where response bodies are buffered even when
+// the audit level doesn't require them.
+
 // TestMiddlewareMemoryUsage tests that large responses cause proportional memory usage
 // This test demonstrates the bug: memory grows even when audit level doesn't need response body
 func TestMiddlewareMemoryUsage(t *testing.T) {
@@ -317,7 +358,7 @@ func TestMiddlewareMemoryUsage(t *testing.T) {
 		description          string
 	}{
 		{
-			name:                 "LevelMetadata_LargeResponse_ShouldNotBuffer",
+			name:                 "LevelNull_LargeResponse_ShouldNotBuffer",
 			level:                auditlogv1.LevelNull,
 			responseSize:         10 * 1024 * 1024, // 10MB
 			expectLargeMemUsage:  false,
