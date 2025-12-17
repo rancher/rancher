@@ -8,7 +8,6 @@ import (
 	authcontext "github.com/rancher/rancher/pkg/auth/context"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/util"
-	"github.com/sirupsen/logrus"
 	"k8s.io/apiserver/pkg/endpoints/request"
 )
 
@@ -57,8 +56,6 @@ func (h authHeaderHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 			}
 		}
 	}
-
-	logrus.Tracef("Rancher Auth Filter ##headers %v: ", req.Header)
 
 	auditUser, ok := audit.FromContext(req.Context())
 	if ok {
