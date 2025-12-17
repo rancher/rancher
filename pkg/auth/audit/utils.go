@@ -121,9 +121,9 @@ func pairMatches(v any, f func(string, any) bool) bool {
 	return false
 }
 
+// isLoginRequest reports whether the request is a login attempt, indicating
+// that the request body should be parsed to extract the basic auth username.
 func isLoginRequest(req *http.Request) bool {
-	// TODO: validate rancher login URLs and practices
-	// Detect login endpoints - adjust patterns as needed
 	return strings.Contains(req.URL.Path, "login") ||
 		strings.Contains(req.URL.RawQuery, "action=login")
 }
