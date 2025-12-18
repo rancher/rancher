@@ -140,9 +140,11 @@ func newPeersBasedStrategy(ctx context.Context, m peermanager.PeerManager) *peer
 			case <-ctx.Done():
 				m.RemoveListener(peersChan)
 				close(peersChan)
+				//revive:disable:empty-block Until https://github.com/mgechev/revive/issues/386 is fixed
 				for range peersChan {
 					// drain channel
 				}
+				//revive:enable:empty-block
 				return
 			}
 		}
