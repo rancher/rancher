@@ -57,9 +57,7 @@ func (r *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.RoleT
 
 	if !features.AggregatedRoleTemplates.Enabled() {
 		// If the feature is disabled, ensure any existing cluster roles created for aggregation are deleted.
-
-		// TODO return rt, r.deleteClusterRoles(rt)
-		return rt, nil
+		return rt, r.deleteClusterRoles(rt)
 	}
 	return rt, r.reconcileClusterRoles(rt)
 }
