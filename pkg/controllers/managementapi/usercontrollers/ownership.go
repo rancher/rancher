@@ -79,7 +79,9 @@ func (s *peersBasedStrategy) amOwner(cluster *v3.Cluster) (owner bool) {
 		ck--
 	}
 
-	scaled := int(ck) * len(peers.IDs) / math.MaxUint32
+	// This math needs 64-bit size to be safe, as "ck" is uint32 and will be multiplied by the number of peers
+	// int is equivalent to int64 in 64-bit systems, but better be explicit
+	scaled := uint64(ck) * uint64(len(peers.IDs)) / math.MaxUint32
 	logrus.Debugf("%s(%v): (%v * %v) / %v = %v[%v] = %v, self = %v\n", cluster.Name, cluster.UID, ck,
 		uint32(len(peers.IDs)), math.MaxUint32, peers.IDs, scaled, peers.IDs[scaled], peers.SelfID)
 	return peers.IDs[scaled] == peers.SelfID
