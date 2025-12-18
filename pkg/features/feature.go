@@ -203,6 +203,13 @@ var (
 		false,
 		true,
 	)
+	ClusterOwnershipStrategy = newFeature(
+		"consistent-hashing-cluster-ownership",
+		"Enable consistent-hashing for cluster-ownership calculation",
+		false,
+		false,
+		true,
+	)
 )
 
 func ListEnabled() []string {

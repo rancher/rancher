@@ -22,11 +22,11 @@ type ownerStrategy interface {
 	forcedResync() <-chan struct{}
 }
 
-func getOwnerStrategy(ctx context.Context, m peermanager.PeerManager) ownerStrategy {
+func getOwnerStrategy(ctx context.Context, m peermanager.PeerManager, consistentHashingEnabled bool) ownerStrategy {
 	if m == nil {
 		return &nonClusteredStrategy{}
 	}
-	return newPeersBasedStrategy(ctx, m)
+	return newPeersBasedStrategy(ctx, m, consistentHashingEnabled)
 }
 
 // nonClusteredStrategy makes a single Rancher replica the owner of every downstream cluster
@@ -154,7 +154,7 @@ func (s *peersBasedStrategy) triggerForcedResync() {
 	}
 }
 
-func newPeersBasedStrategy(ctx context.Context, m peermanager.PeerManager) *peersBasedStrategy {
+func newPeersBasedStrategy(ctx context.Context, m peermanager.PeerManager, useConsistentHashing bool) *peersBasedStrategy {
 	// PeerManager watches Endpoints in the "rancher" Service to detect available pods, sending peer updates
 	peersChan := make(chan peermanager.Peers, 100)
 	m.AddListener(peersChan)
@@ -162,7 +162,7 @@ func newPeersBasedStrategy(ctx context.Context, m peermanager.PeerManager) *peer
 	forcedResync := make(chan struct{}, 1)
 	s := &peersBasedStrategy{
 		forcedResyncChan:     forcedResync,
-		useConsistentHashing: false, // TODO: read this value from env. variable
+		useConsistentHashing: useConsistentHashing,
 	}
 
 	go func() {
@@ -182,6 +182,9 @@ func newPeersBasedStrategy(ctx context.Context, m peermanager.PeerManager) *peer
 					// drain channel
 				}
 				//revive:enable:empty-block
+
+				// Reset internal state, disabling all further usage
+				s.setPeers(peermanager.Peers{})
 				return
 			}
 		}
