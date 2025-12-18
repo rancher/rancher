@@ -282,7 +282,9 @@ func removeLabelFromExternalRole(rt *v3.RoleTemplate, crController crbacv1.Clust
 	}
 
 	externalRole, err := crController.Get(rt.Name, metav1.GetOptions{})
-	if err != nil {
+	if apierrors.IsNotFound(err) {
+		return nil
+	} else if err != nil {
 		return err
 	}
 
