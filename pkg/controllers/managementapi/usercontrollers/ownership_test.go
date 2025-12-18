@@ -18,7 +18,7 @@ import (
 )
 
 func TestNonClusteredStrategy(t *testing.T) {
-	strategy := getOwnerStrategy(t.Context(), nil)
+	strategy := getOwnerStrategy(t.Context(), nil, false)
 
 	assert.IsType(t, &nonClusteredStrategy{}, strategy)
 	assert.Nil(t, strategy.forcedResync(), "forcedResync should return nil for nonClusteredStrategy")
@@ -41,7 +41,7 @@ func TestPeersBasedStrategy(t *testing.T) {
 		mockPeerManager.EXPECT().AddListener(gomock.Any()).Do(func(lis chan<- peermanager.Peers) {
 			peersChan = lis
 		})
-		strategy := newPeersBasedStrategy(t.Context(), mockPeerManager)
+		strategy := newPeersBasedStrategy(t.Context(), mockPeerManager, false)
 		mockPeerManager.EXPECT().RemoveListener(peersChan).AnyTimes()
 		assert.False(t, strategy.isOwner(cluster), "Should not own if not initialized")
 
@@ -66,7 +66,7 @@ func TestPeersBasedStrategy(t *testing.T) {
 		mockPeerManager.EXPECT().AddListener(gomock.Any()).Do(func(lis chan<- peermanager.Peers) {
 			peersChan = lis
 		})
-		strategy := newPeersBasedStrategy(t.Context(), mockPeerManager)
+		strategy := newPeersBasedStrategy(t.Context(), mockPeerManager, false)
 		mockPeerManager.EXPECT().RemoveListener(peersChan).AnyTimes()
 
 		// Simulate a single, non-leader replica
@@ -90,7 +90,7 @@ func TestPeersBasedStrategy(t *testing.T) {
 		mockPeerManager.EXPECT().AddListener(gomock.Any()).Do(func(lis chan<- peermanager.Peers) {
 			peersChan = lis
 		})
-		strategy := newPeersBasedStrategy(t.Context(), mockPeerManager)
+		strategy := newPeersBasedStrategy(t.Context(), mockPeerManager, false)
 		mockPeerManager.EXPECT().RemoveListener(peersChan).AnyTimes()
 
 		// Test various cluster UIDs to check ownership distribution
@@ -142,7 +142,7 @@ func TestPeersBasedStrategy(t *testing.T) {
 		mockPeerManager.EXPECT().AddListener(gomock.Any()).Do(func(lis chan<- peermanager.Peers) {
 			peersChan = lis
 		})
-		strategy := newPeersBasedStrategy(t.Context(), mockPeerManager)
+		strategy := newPeersBasedStrategy(t.Context(), mockPeerManager, false)
 		mockPeerManager.EXPECT().RemoveListener(peersChan).AnyTimes()
 
 		// Initial peers
@@ -180,7 +180,7 @@ func TestPeersBasedStrategy(t *testing.T) {
 		mockPeerManager.EXPECT().AddListener(gomock.Any()).Do(func(lis chan<- peermanager.Peers) {
 			peersChan = lis
 		})
-		strategy := newPeersBasedStrategy(ctx, mockPeerManager)
+		strategy := newPeersBasedStrategy(ctx, mockPeerManager, false)
 		mockPeerManager.EXPECT().RemoveListener(peersChan).Times(1)
 
 		// Simulate a single, leader replica
@@ -206,6 +206,7 @@ func TestPeersBasedStrategy(t *testing.T) {
 			assert.False(t, open, "Expected forcedResync channel to be closed")
 		}
 		assert.False(t, open, "Expected forcedResync channel to be closed")
+		assert.False(t, strategy.isOwner(cluster), "Should not own after context canceled")
 	})
 
 	t.Run("setPeers handles selfID correctly in IDs list", func(t *testing.T) {
