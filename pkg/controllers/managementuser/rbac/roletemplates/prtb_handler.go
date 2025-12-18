@@ -72,8 +72,7 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 
 	// If the feature is disabled, remove the bindings created by aggregation
 	if !features.AggregatedRoleTemplates.Enabled() {
-		return prtb, nil
-		// TODO return prtb, errors.Join(p.deleteClusterRoleBindings(prtb), p.deleteRoleBindings(prtb))
+		return prtb, errors.Join(p.deleteClusterRoleBindings(prtb), p.deleteRoleBindings(prtb))
 	}
 
 	// Only run this controller if the PRTB is for this cluster
