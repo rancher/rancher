@@ -70,6 +70,10 @@ spec:
       {{- if .Values.extraTolerations }}
       {{- toYaml .Values.extraTolerations | nindent 8 }}
       {{- end }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+      {{ toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - image: "{{ template "rancher.image" . }}:{{ template "rancher.imageTag" . }}"
         imagePullPolicy: {{ include "rancher.imagePullPolicy" . }}
@@ -165,6 +169,10 @@ spec:
 {{- end }}
 {{- if .Values.extraEnv }}
 {{ toYaml .Values.extraEnv | indent 8}}
+{{- end }}
+{{- with .Values.securityContext }}
+        securityContext:
+{{ toYaml . | nindent 8 }}
 {{- end }}
         startupProbe:
           httpGet:

@@ -287,3 +287,23 @@ extraObjects: []
 #         app: rancher
 #     policyTypes:
 #       - Ingress
+
+# optional security context for Pod (see: https://kubernetes.io/docs/tasks/configure-pod-container/security-context/)
+podSecurityContext: {}
+# or, when enabled:
+# podSecurityContext:
+#   runAsUser: 1000
+#   runAsGroup: 1000
+#   fsGroup: 2000
+
+# optional security context for rancher container
+securityContext: {}
+# or, when enabled:
+# securityContext:
+#   allowPrivilegeEscalation: false
+#   readOnlyRootFilesystem: true
+#   seccompProfile:
+#     type: RuntimeDefault
+#   capabilities:
+#     drop:
+#       - ALL
