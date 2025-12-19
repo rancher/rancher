@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -42,9 +43,10 @@ import (
 )
 
 const (
-	ByCluster          = "by-cluster"
-	ByCloudCred        = "by-cloud-cred"
-	ByETCDSnapshotName = "by-etcd-snapshot-name"
+	ByCluster              = "by-cluster"
+	ByCloudCred            = "by-cloud-cred"
+	ByMachinePoolCloudCred = "by-machine-pool-cloud-cred"
+	ByETCDSnapshotName     = "by-etcd-snapshot-name"
 
 	creatorIDAnn              = "field.cattle.io/creatorId"
 	administratedAnn          = "provisioning.cattle.io/administrated"
@@ -180,6 +182,7 @@ func Register(
 func RegisterIndexers(config *wrangler.Context) {
 	config.Provisioning.Cluster().Cache().AddIndexer(ByCluster, byClusterIndex)
 	config.Provisioning.Cluster().Cache().AddIndexer(ByCloudCred, byCloudCredentialIndex)
+	config.Provisioning.Cluster().Cache().AddIndexer(ByMachinePoolCloudCred, byMachinePoolCloudCredIndex)
 	if features.Provisioningv2ETCDSnapshotBackPopulation.Enabled() {
 		config.RKE.ETCDSnapshot().Cache().AddIndexer(ByETCDSnapshotName, byETCDSnapshotName)
 	}
@@ -206,11 +209,40 @@ func byClusterIndex(obj *v1.Cluster) ([]string, error) {
 	return []string{obj.Status.ClusterName}, nil
 }
 
+// byCloudCredentialIndex returns all unique cloud-credential IDs referenced by a provisioning cluster.
+// - spec.cloudCredentialSecretName (cluster-level)
 func byCloudCredentialIndex(obj *v1.Cluster) ([]string, error) {
 	if obj.Spec.CloudCredentialSecretName == "" {
 		return nil, nil
 	}
 	return []string{obj.Spec.CloudCredentialSecretName}, nil
+}
+
+// byMachinePoolCloudCredIndex returns all cloud-credential IDs referenced by a machine pool:
+// - spec.rkeConfig.machinePools[*].cloudCredentialSecretName (per-pool)
+func byMachinePoolCloudCredIndex(obj *v1.Cluster) ([]string, error) {
+	credentialsSet := make(map[string]struct{})
+
+	if obj.Spec.RKEConfig != nil {
+		for _, machinePool := range obj.Spec.RKEConfig.MachinePools {
+			if machinePoolCredential := machinePool.CloudCredentialSecretName; machinePoolCredential != "" {
+				credentialsSet[machinePoolCredential] = struct{}{}
+			}
+		}
+	}
+
+	if len(credentialsSet) == 0 {
+		return nil, nil
+	}
+
+	credentialSlice := make([]string, 0, len(credentialsSet))
+	for cred := range credentialsSet {
+		credentialSlice = append(credentialSlice, cred)
+	}
+
+	sort.Strings(credentialSlice)
+
+	return credentialSlice, nil
 }
 
 func (h *handler) clusterWatch(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {

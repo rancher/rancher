@@ -183,5 +183,12 @@ func (s *Store) Delete(apiContext *types.APIContext, schema *types.Schema, id st
 		return nil, httperror.NewAPIError(httperror.InvalidAction, fmt.Sprintf("Cloud credential is currently referenced by provisioning cluster %s", provClusters[0].Name))
 	}
 
+	// make sure the credential isn't being used by an active machine pool within a RKE2/K3s cluster
+	if provClusters, err := s.ProvClusterCache.GetByIndex(cluster.ByMachinePoolCloudCred, id); err != nil {
+		return nil, httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("An error was encountered while attempting to delete the cloud credential: %s", err))
+	} else if len(provClusters) > 0 {
+		return nil, httperror.NewAPIError(httperror.InvalidAction, fmt.Sprintf("Cloud credential is currently referenced by provisioning cluster %s", provClusters[0].Name))
+	}
+
 	return s.Store.Delete(apiContext, schema, id)
 }
