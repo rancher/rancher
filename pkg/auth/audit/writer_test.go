@@ -14,11 +14,11 @@ import (
 )
 
 type logWriter struct {
-	logs []log
+	logs []logEntry
 }
 
 func (w *logWriter) Write(p []byte) (n int, err error) {
-	var l log
+	var l logEntry
 	if err := json.Unmarshal(p, &l); err != nil {
 		return 0, err
 	}
@@ -30,7 +30,7 @@ func (w *logWriter) Write(p []byte) (n int, err error) {
 
 func setup(t *testing.T, opts WriterOptions) (*logWriter, *Writer) {
 	lw := &logWriter{
-		logs: []log{},
+		logs: []logEntry{},
 	}
 
 	w, err := NewWriter(lw, opts)
@@ -63,9 +63,9 @@ func TestAllowList(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	expected := []log{}
+	expected := []logEntry{}
 
-	err = w.Write(&log{
+	err = w.Write(&logEntry{
 		RequestURI: "/api/v1/secrets",
 	})
 	assert.NoError(t, err)
@@ -87,13 +87,13 @@ func TestAllowList(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	expected = []log{
+	expected = []logEntry{
 		{
 			RequestURI: "/api/v1/secrets",
 		},
 	}
 
-	err = w.Write(&log{
+	err = w.Write(&logEntry{
 		RequestURI: "/api/v1/secrets",
 	})
 	assert.NoError(t, err)
@@ -106,14 +106,14 @@ func TestBlockList(t *testing.T) {
 		DisableDefaultPolicies: true,
 	})
 
-	expected := []log{
+	expected := []logEntry{
 		{
 			RequestURI: "/api/v1/secrets",
 			Method:     http.MethodGet,
 		},
 	}
 
-	err := w.Write(&log{
+	err := w.Write(&logEntry{
 		RequestURI: "/api/v1/secrets",
 		Method:     http.MethodGet,
 	})
@@ -136,7 +136,7 @@ func TestBlockList(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	err = w.Write(&log{
+	err = w.Write(&logEntry{
 		RequestURI: "/api/v1/secrets",
 		Method:     http.MethodGet,
 	})
@@ -184,25 +184,39 @@ func TestHigherVerbosityForPolicy(t *testing.T) {
 		},
 	})
 
-	err := w.Write(&log{
-		RequestURI:      "/some/endopint",
-		RequestHeader:   headers,
-		ResponseHeader:  headers,
-		rawRequestBody:  bodyContent,
-		rawResponseBody: bodyContent,
+	entry1 := &logEntry{
+		RequestURI:     "/some/endopint",
+		RequestHeader:  headers,
+		ResponseHeader: headers,
+	}
+	// This entry should get LevelRequest verbosity (request body only)
+	prepareLogEntry(entry1, &testLogData{
+		verbosity:  verbosityForLevel(auditlogv1.LevelRequest),
+		resHeaders: headers,
+		rawResBody: bodyContent,
+		reqHeaders: headers,
+		rawReqBody: bodyContent,
 	})
+	err := w.Write(entry1)
 	assert.NoError(t, err)
 
-	err = w.Write(&log{
-		RequestURI:      "/my/endopint",
-		RequestHeader:   headers,
-		ResponseHeader:  headers,
-		rawRequestBody:  bodyContent,
-		rawResponseBody: bodyContent,
+	entry2 := &logEntry{
+		RequestURI:     "/my/endopint",
+		RequestHeader:  headers,
+		ResponseHeader: headers,
+	}
+	// This entry should get LevelRequestResponse verbosity (both bodies)
+	prepareLogEntry(entry2, &testLogData{
+		verbosity:  verbosityForLevel(auditlogv1.LevelRequestResponse),
+		resHeaders: headers,
+		rawResBody: bodyContent,
+		reqHeaders: headers,
+		rawReqBody: bodyContent,
 	})
+	err = w.Write(entry2)
 	assert.NoError(t, err)
 
-	expected := []log{
+	expected := []logEntry{
 		{
 			RequestURI:     "/some/endopint",
 			RequestHeader:  headers,
@@ -240,16 +254,21 @@ func TestCompressedGzip(t *testing.T) {
 
 	body := buffer.Bytes()
 
-	err := w.Write(&log{
-		ResponseHeader: http.Header{
+	entry := &logEntry{}
+	// Prepare the response body similar to a production path
+	prepareLogEntry(entry, &testLogData{
+		verbosity: verbosityForLevel(auditlogv1.LevelRequestResponse),
+		resHeaders: http.Header{
 			"Content-Encoding": []string{contentEncodingGZIP},
 			"Content-Type":     []string{contentTypeJSON},
 		},
-		rawResponseBody: body,
+		rawResBody: body,
 	})
+
+	err := w.Write(entry)
 	assert.NoError(t, err)
 
-	expected := []log{
+	expected := []logEntry{
 		{
 			ResponseHeader: http.Header{
 				"Content-Encoding": []string{contentEncodingGZIP},
@@ -277,16 +296,21 @@ func TestCompressedZLib(t *testing.T) {
 
 	body := buffer.Bytes()
 
-	err := w.Write(&log{
-		ResponseHeader: http.Header{
+	entry := &logEntry{}
+	// Prepare the response body similar to production path
+	prepareLogEntry(entry, &testLogData{
+		verbosity: verbosityForLevel(auditlogv1.LevelRequestResponse),
+		resHeaders: http.Header{
 			"Content-Encoding": []string{contentEncodingZLib},
 			"Content-Type":     []string{contentTypeJSON},
 		},
-		rawResponseBody: body,
+		rawResBody: body,
 	})
+
+	err := w.Write(entry)
 	assert.NoError(t, err)
 
-	expected := []log{
+	expected := []logEntry{
 		{
 			ResponseHeader: http.Header{
 				"Content-Encoding": []string{contentEncodingZLib},
