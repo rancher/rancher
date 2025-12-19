@@ -35,6 +35,7 @@ var OriginMap = map[string]string{
 	"coreos-kube-state-metrics":                               "https://github.com/kubernetes/kube-state-metrics",
 	"coreos-prometheus-config-reloader":                       "https://github.com/prometheus-operator/prometheus-operator/pkgs/container/prometheus-config-reloader",
 	"coreos-prometheus-operator":                              "https://github.com/prometheus-operator/prometheus-operator",
+	"cluster-api-controller":                                  "https://github.com/rancher-sandbox/cluster-api",
 	"eks-operator":                                            "https://github.com/rancher/eks-operator",
 	"externalip-webhook":                                      "https://github.com/rancher/externalip-webhook",
 	"fleet":                                                   "https://github.com/rancher/fleet",

@@ -523,10 +523,10 @@ func (p *Provisioner) reconcileCluster(cluster *apimgmtv3.Cluster, create bool) 
 		if cluster, err = p.Clusters.Update(cluster); err == nil {
 			saved = true
 			break
-		} else {
-			logrus.Errorf("failed to update cluster [%s]: %v", cluster.Name, err)
-			time.Sleep(2)
 		}
+
+		logrus.Errorf("failed to update cluster [%s]: %v", cluster.Name, err)
+		time.Sleep(2)
 	}
 
 	if !saved {

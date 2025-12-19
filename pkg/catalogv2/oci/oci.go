@@ -198,7 +198,7 @@ func GenerateIndex(ociClient *Client, URL string, credentialSecret *corev1.Secre
 					err = addToHelmRepoIndex(*ociClient, indexFile, orasRepository)
 					if err != nil {
 						// Users can have access to only some repositories and not all.
-						// So, if pulling the chart fails due to Forbiden error, then skip it.
+						// So, if pulling the chart fails due to Forbidden error, then skip it.
 						var errResp *errcode.ErrorResponse
 						if errors.As(err, &errResp) && errResp.StatusCode == http.StatusForbidden {
 							delete(indexFile.Entries, chartName)

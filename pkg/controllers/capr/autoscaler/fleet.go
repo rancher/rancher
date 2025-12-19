@@ -23,7 +23,7 @@ import (
 // rollout updates to all clusters on rancher upgrade (e.g. setting a new minor version)
 //
 // NOTE: When updating the chart version in build.yaml you will need to update this mapping
-// if adding support for a new minor k8s verison
+// if adding support for a new minor k8s version
 var imageTagVersions = map[int]string{
 	34: "1.34.0-3.4",
 	33: "1.33.0-3.3",
@@ -162,9 +162,9 @@ func (h *autoscalerHandler) getChartImageSettings(cluster *capi.Cluster) map[str
 func getChartName() string {
 	if strings.HasPrefix(settings.ClusterAutoscalerChartRepository.Get(), "oci://") {
 		return ""
-	} else {
-		return "cluster-autoscaler"
 	}
+
+	return "cluster-autoscaler"
 }
 
 // getKubernetesMinorVersion returns the k8s minor version which is looked up from the controlPlaneRef on the capi object

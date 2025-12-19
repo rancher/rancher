@@ -14,7 +14,7 @@ if ! command -v golangci-lint; then
 fi
 
 echo Running: golangci-lint
-golangci-lint run
+golangci-lint run -v
 
 echo Tidying up modules
 cd pkg/apis/

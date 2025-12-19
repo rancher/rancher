@@ -248,17 +248,18 @@ func (g *googleOauthProvider) gatherParentGroups(groupPrincipal apiv3.Principal,
 	for _, group := range groups {
 		if groupMap[group.ObjectMeta.Name] {
 			continue
-		} else {
-			principals = append(principals, group)
-			nestedGroupPrincipals, err := g.gatherParentGroups(group, adminSvc, config, hostedDomain, groupMap)
-			if err != nil {
-				return principals, err
-			}
-			if len(nestedGroupPrincipals) > 0 {
-				principals = append(principals, nestedGroupPrincipals...)
-			}
+		}
+
+		principals = append(principals, group)
+		nestedGroupPrincipals, err := g.gatherParentGroups(group, adminSvc, config, hostedDomain, groupMap)
+		if err != nil {
+			return principals, err
+		}
+		if len(nestedGroupPrincipals) > 0 {
+			principals = append(principals, nestedGroupPrincipals...)
 		}
 	}
+
 	return principals, nil
 }
 

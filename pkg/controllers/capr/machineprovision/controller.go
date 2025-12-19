@@ -702,9 +702,9 @@ func (h *handler) infraMachineDeletionEnqueueingTime(infra *infraObject, current
 
 	if timeSinceFailure >= deleteOnFailureAfter {
 		return 0, nil
-	} else {
-		return deleteOnFailureAfter - timeSinceFailure, nil
 	}
+
+	return deleteOnFailureAfter - timeSinceFailure, nil
 }
 
 func (h *handler) run(infra *infraObject, create bool) (rkev1.RKEMachineStatus, bool, error) {

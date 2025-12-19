@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -105,12 +104,12 @@ func ListenAndServe(ctx context.Context, restConfig *rest.Config, handler http.H
 	}
 
 	serverOptions := &server.ListenOpts{
-		Storage:       opts.Storage,
-		Secrets:       opts.Secrets,
-		CAName:        "tls-rancher-internal-ca",
-		CANamespace:   namespace.System,
-		CertNamespace: namespace.System,
-		CertName:      "tls-rancher-internal",
+		Storage:           opts.Storage,
+		Secrets:           opts.Secrets,
+		CAName:            "tls-rancher-internal-ca",
+		CANamespace:       namespace.System,
+		CertNamespace:     namespace.System,
+		CertName:          "tls-rancher-internal",
 		DisplayServerLogs: true,
 	}
 	clusterIP, err := getClusterIP(core.Core().V1().Service())
@@ -397,7 +396,7 @@ func fileExists(path string) bool {
 }
 
 func readPEM(path string) (string, error) {
-	content, err := ioutil.ReadFile(path)
+	content, err := os.ReadFile(path)
 	if err != nil {
 		return "", err
 	}

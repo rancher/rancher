@@ -2,12 +2,10 @@ package kubectl
 
 import (
 	"context"
-	"io/ioutil"
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
-
-	"fmt"
 
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -155,7 +153,7 @@ func writeYAMLFile(yaml []byte) (*os.File, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := ioutil.WriteFile(yamlFile.Name(), yaml, 0600); err != nil {
+	if err := os.WriteFile(yamlFile.Name(), yaml, 0600); err != nil {
 		return nil, err
 	}
 	return yamlFile, nil
@@ -179,7 +177,7 @@ func tempFile(prefix string) (*os.File, error) {
 		}
 	}
 
-	f, err := ioutil.TempFile(tmpDir, prefix)
+	f, err := os.CreateTemp(tmpDir, prefix)
 	if err != nil {
 		return nil, err
 	}

@@ -168,11 +168,11 @@ func (h *handler) onChange(obj runtime.Object) (runtime.Object, error) {
 				logrus.Warnf("[%s] %s: there is no VM to update (gvr=%s, namespace=%s, name=%s). Skipping ...",
 					harvMachineProvCleanupHandlerName, key, resourceGVR.String(), resourceNamespace, resourceName)
 				return obj, nil
-			} else {
-				err = fmt.Errorf("failed to update VM (gvr=%s, namespace=%s, name=%s): %w", resourceGVR.String(), resourceNamespace, resourceName, err)
-				logrus.Errorf("[%s] %s: %v", harvMachineProvCleanupHandlerName, key, err)
-				return obj, err
 			}
+
+			err = fmt.Errorf("failed to update VM (gvr=%s, namespace=%s, name=%s): %w", resourceGVR.String(), resourceNamespace, resourceName, err)
+			logrus.Errorf("[%s] %s: %v", harvMachineProvCleanupHandlerName, key, err)
+			return obj, err
 		}
 
 		logrus.Infof("[%s] %s: VM successfully marked for removal (gvr=%s, namespace=%s, name=%s)",

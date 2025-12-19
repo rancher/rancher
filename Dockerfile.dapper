@@ -9,7 +9,7 @@ ENV HELM_UNITTEST_VERSION=0.3.2
 ENV K3D_VERSION=v5.7.1
 
 # kontainer-driver-metadata branch to be set for specific branch other than dev/master, logic at rancher/rancher/pkg/settings/setting.go
-ENV CATTLE_KDM_BRANCH=dev-v2.13
+ENV CATTLE_KDM_BRANCH=dev-v2.14
 
 RUN zypper -n install gcc binutils glibc-devel-static ca-certificates git-core wget curl unzip tar vim less file xz gzip sed gawk iproute2 iptables jq skopeo
 # use containerd from k3s image, not from bci
@@ -23,7 +23,7 @@ RUN if [ "${ARCH}" != "s390x" ]; then \
         curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=${K3D_VERSION} bash; \
     fi
 
-ENV GOLANGCI_LINT=v1.59.0
+ENV GOLANGCI_LINT=v2.7.1
 RUN if [ "${ARCH}" == "amd64" ]; then \
         curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s "${GOLANGCI_LINT}"; \
     fi

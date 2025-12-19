@@ -26,7 +26,7 @@ replace (
 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.34.1
 	k8s.io/kubectl => k8s.io/kubectl v0.34.1
 	k8s.io/kubelet => k8s.io/kubelet v0.34.1
-	k8s.io/kubernetes => k8s.io/kubernetes v1.34.1
+	k8s.io/kubernetes => k8s.io/kubernetes v1.34.2
 	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.34.1
 	k8s.io/metrics => k8s.io/metrics v0.34.1
 	k8s.io/mount-utils => k8s.io/mount-utils v0.34.1
@@ -38,14 +38,14 @@ require (
 	github.com/rancher/aks-operator v1.13.0-rc.4
 	github.com/rancher/ali-operator v1.13.0-rc.2
 	github.com/rancher/eks-operator v1.13.0-rc.4
-	github.com/rancher/fleet/pkg/apis v0.15.0-alpha.1
+	github.com/rancher/fleet/pkg/apis v0.15.0-alpha.4
 	github.com/rancher/gke-operator v1.13.0-rc.3
-	github.com/rancher/norman v0.8.0
+	github.com/rancher/norman v0.8.1
 	github.com/rancher/rke v1.8.0
 	github.com/rancher/wrangler/v3 v3.3.1
 	github.com/sirupsen/logrus v1.9.3
-	k8s.io/api v0.34.2
-	k8s.io/apimachinery v0.34.2
+	k8s.io/api v0.34.3
+	k8s.io/apimachinery v0.34.3
 	sigs.k8s.io/cluster-api v1.10.6
 )
 

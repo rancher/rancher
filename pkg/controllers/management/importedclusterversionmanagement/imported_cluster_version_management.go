@@ -26,17 +26,8 @@ func Enabled(cluster *mgmtv3.Cluster) bool {
 	case "false":
 		return false
 	case "system-default":
-		if settings.ImportedClusterVersionManagement.Get() == "true" {
-			return true
-		} else {
-			return false
-		}
+		fallthrough
 	default:
-		// in practice this case will never happen because Rancher webhook ensures the annotation to be set on the cluster
-		if settings.ImportedClusterVersionManagement.Get() == "true" {
-			return true
-		} else {
-			return false
-		}
+		return settings.ImportedClusterVersionManagement.Get() == "true"
 	}
 }

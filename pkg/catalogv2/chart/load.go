@@ -3,12 +3,10 @@ package chart
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
 	"helm.sh/helm/v3/pkg/chart"
-
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/chartutil"
 )
@@ -60,7 +58,7 @@ func LoadArchive(path string) (*Archive, bool, error) {
 		return nil, false, err
 	}
 
-	tempDir, err := ioutil.TempDir("", "chart-archive-")
+	tempDir, err := os.MkdirTemp("", "chart-archive-")
 	if err != nil {
 		return nil, false, fmt.Errorf("creating archive for %s: %w", path, err)
 	}

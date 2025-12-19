@@ -147,6 +147,7 @@ func WaitForCreate(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 			if newErr != nil {
 				logrus.Error(newErr)
 			}
+			//nolint:revive
 			err = fmt.Errorf("cluster %s creation wait failed on: %w\ncluster %s test data bundle: \n%s\n", c.Name, err, c.Name, data)
 		}
 	}()
@@ -237,6 +238,7 @@ func WaitForControlPlane(clients *clients.Clients, c *provisioningv1api.Cluster,
 			if newErr != nil {
 				logrus.Error(newErr)
 			}
+			//nolint:revive
 			err = fmt.Errorf("cluster %s %s wait failed on: %w\ncluster %s test data bundle: \n%s\n", c.Name, errorPrefix, err, c.Name, data)
 		}
 	}()
@@ -264,6 +266,7 @@ func WaitForDelete(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 			if newErr != nil {
 				logrus.Error(newErr)
 			}
+			//nolint:revive
 			err = fmt.Errorf("cluster %s delete wait failed on: %w\ncluster %s test data bundle: \n%s\n", c.Name, err, c.Name, data)
 		}
 	}()

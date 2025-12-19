@@ -255,12 +255,12 @@ func GatherParentGroups(groupPrincipal v3.Principal, searchDomain string, groupS
 	for _, gp := range principals {
 		if _, ok := groupMap[gp.ObjectMeta.Name]; ok {
 			continue
-		} else {
-			*nestedGroupPrincipals = append(*nestedGroupPrincipals, gp)
-			err = GatherParentGroups(gp, searchDomain, groupScope, config, lConn, groupMap, nestedGroupPrincipals, searchAttributes)
-			if err != nil {
-				return err
-			}
+		}
+
+		*nestedGroupPrincipals = append(*nestedGroupPrincipals, gp)
+		err = GatherParentGroups(gp, searchDomain, groupScope, config, lConn, groupMap, nestedGroupPrincipals, searchAttributes)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -274,9 +274,9 @@ func FindNonDuplicateBetweenGroupPrincipals(newGroupPrincipals []v3.Principal, g
 			// check the groups ObjectMeta.Name and name fields value are the same, then they are the same group
 			if gp.ObjectMeta.Name == usermembergp.ObjectMeta.Name && gp.DisplayName == usermembergp.DisplayName {
 				break
-			} else {
-				counter++
 			}
+
+			counter++
 		}
 		if counter == len(groupPrincipals) {
 			nonDupGroupPrincipals = append(nonDupGroupPrincipals, gp)

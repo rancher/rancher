@@ -397,7 +397,9 @@ func (m *Manager) waitPodDone(op *catalog.Operation) error {
 	}
 	defer func() {
 		go func() {
+			//nolint:revive
 			for range resp.ResultChan() {
+				// Intentionally drain the channel.
 			}
 		}()
 		resp.Stop()

@@ -154,7 +154,7 @@ func TestUserInfoEndpoint(t *testing.T) {
 				req, _ := http.NewRequest("GET", "https://rancher.com", nil)
 				return req
 			},
-			wantError: `{"error":"invalid_request","error_description":"invalid access_token: token is malformed: token contains an invalid number of segments"}`,
+			wantError: `{"error":"invalid_request","error_description":"failed to get token from header: authorization header is missing"}`,
 		},
 	}
 

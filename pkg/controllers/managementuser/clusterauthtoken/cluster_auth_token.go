@@ -64,10 +64,10 @@ func (h *clusterAuthTokenHandler) sync(key string, clusterAuthToken *clusterv3.C
 			logrus.Debugf("[%s] Updated lastUsedAt for token %s", clusterAuthTokenController, tokenName)
 
 			return clusterAuthToken, nil
-		} else {
-			if !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
-				return nil, fmt.Errorf("error getting token %s: %w", tokenName, err)
-			}
+		}
+
+		if !apierrors.IsNotFound(err) && !apierrors.IsGone(err) {
+			return nil, fmt.Errorf("error getting token %s: %w", tokenName, err)
 		}
 	}
 

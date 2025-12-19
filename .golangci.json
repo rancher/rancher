@@ -1,83 +1,100 @@
 {
-    "linters": {
-        "disable-all": true,
+    "formatters": {
         "enable": [
-           "govet",
-           "revive",
-           "goimports",
-           "misspell",
-           "ineffassign",
-           "gofmt"
-        ]
+            "gofmt",
+            "goimports"
+        ],
+        "settings": {
+            "gofmt": {
+                "simplify": false
+            }
+        }
     },
-    "linters-settings": {
-        "govet": {
-            "check-shadowing": false
+    "linters": {
+        "default": "none",
+        "enable": [
+            "govet",
+            "revive",
+            "ineffassign",
+            "misspell"
+        ],
+        "settings": {
+            "govet": {
+                "enable-all": true,
+                "disable": [
+                    "fieldalignment",
+                    "shadow",
+                    "nilness",
+                    "structtag"
+                ]
+            },
+            "misspell": {
+                "ignore-rules": [
+                    "Creater"
+                ]
+            }
         },
-        "gofmt": {
-            "simplify": false
+        "exclusions": {
+            "paths": [
+                "vendor",
+                "pkg/client",
+                "pkg/generated",
+                "tests/framework/clients/rancher/generated"
+            ],
+            "rules": [
+                {
+                    "linters": [
+                        "revive"
+                    ],
+                    "text": "should have comment"
+                },
+                {
+                    "linters": [
+                        "revive"
+                    ],
+                    "text": "should be of the form"
+                },
+                {
+                    "linters": [
+                        "revive"
+                    ],
+                    "text": "unused-parameter"
+                },
+                {
+                    "linters": [
+                        "revive"
+                    ],
+                    "text": "redefines-builtin-id"
+                },
+                {
+                    "linters": [
+                        "revive"
+                    ],
+                    "text": "^var-naming"
+                },
+                {
+                    "linters": [
+                        "revive"
+                    ],
+                    "text": "^package-comments"
+                },
+                {
+                    "linters": [
+                        "revive"
+                    ],
+                    "text": "^unexported-return"
+                },
+                {
+                    "linters": [
+                        "revive"
+                    ],
+                    "text": "^exported"
+                }
+            ]
         }
     },
     "run": {
-        "skip-dirs": [
-            "vendor",
-            "pkg/client",
-            "pkg/generated",
-            "tests/framework/clients/rancher/generated"
-        ],
-        "tests": false,
-        "timeout": "10m"
+        "tests": false
     },
-    "issues": {
-        "exclude-rules": [
-            {
-                "linters": "govet",
-                "text": "^(nilness|structtag)"
-            },
-            {
-                "path":"pkg/apis/management.cattle.io/v3/globaldns_types.go",
-                "text":".*lobalDns.*"
-            },
-            {
-                "path": "pkg/apis/management.cattle.io/v3/zz_generated_register.go",
-                "text":".*lobalDns.*"
-            },
-            {
-                "path":"pkg/apis/management.cattle.io/v3/zz_generated_list_types.go",
-                "text":".*lobalDns.*"
-            },
-            {
-                "linters": "revive",
-                "text": "should have comment"
-            },
-            {
-                "linters": "revive",
-                "text": "should be of the form"
-            },
-            {
-                "linters": "typecheck",
-                "text": "imported but not used as apierrors"
-            },
-            {
-                "linters": "revive",
-                "text": "unused-parameter"
-            },
-            {
-                "linters": "revive",
-                "text": "redefines-builtin-id"
-            },
-            {
-                "linters": "revive",
-                "text": "superfluous-else"
-            },
-            {
-                "linters": "revive",
-                "text": "empty-block"
-            },
-            {
-                "linters": "revive",
-                "text": "if-return: redundant if"
-            }
-        ]
-    }
+    "version": "2"
 }

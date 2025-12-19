@@ -10,9 +10,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/rancher/rancher/pkg/taints"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
 	"path/filepath"
@@ -30,6 +28,7 @@ import (
 	catalogcontrollers "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
 	namespaces "github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/steve/pkg/podimpersonation"
 	"github.com/rancher/steve/pkg/stores/proxy"
 	data2 "github.com/rancher/wrangler/v3/pkg/data"
@@ -658,7 +657,7 @@ func injectAnnotation(data []byte, annotations map[string]string) ([]byte, error
 			break
 		}
 
-		data, err := ioutil.ReadAll(tar)
+		data, err := io.ReadAll(tar)
 		if err != nil {
 			return nil, err
 		}
@@ -739,7 +738,7 @@ func (s *Operations) getChartCommand(namespace, name, chartName, chartVersion st
 	if err != nil {
 		return Command{}, err
 	}
-	chartData, err := ioutil.ReadAll(chart)
+	chartData, err := io.ReadAll(chart)
 	chart.Close()
 	if err != nil {
 		return Command{}, err
@@ -996,8 +995,9 @@ func (s *Operations) createNamespace(ctx context.Context, namespace, projectID s
 
 	defer func() {
 		w.Stop()
-		// no clue if this needed, but I'm afraid there will be a stuck producer
+		//nolint:revive
 		for range w.ResultChan() {
+			// Intentionally drain the channel.
 		}
 	}()
 

@@ -110,7 +110,9 @@ func (r *RKE2ConfigServer) waitReady(secret *corev1.Secret) (*corev1.Secret, err
 	}
 	defer func() {
 		resp.Stop()
+		//nolint:revive
 		for range resp.ResultChan() {
+			// Intentionally drain the channel.
 		}
 	}()
 

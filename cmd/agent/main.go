@@ -9,7 +9,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -157,8 +156,6 @@ func run(ctx context.Context) error {
 				logrus.Errorf("Could not securely connect to %s: %v", server, err)
 				os.Exit(1)
 			}
-			// onConnect will use the transport later on, so discard it as it doesn't work and fallback to the system store.
-			transport = nil
 		} else {
 			topContext = context.WithValue(topContext, cavalidator.CacertsValid, true)
 			systemStoreConnectionCheckRequired = false
@@ -217,7 +214,7 @@ func run(ctx context.Context) error {
 					}
 				}
 				if _, err := os.Stat(caFileLocation); err == nil {
-					caFile, err := ioutil.ReadFile(caFileLocation)
+					caFile, err := os.ReadFile(caFileLocation)
 					if err != nil {
 						return err
 					}
