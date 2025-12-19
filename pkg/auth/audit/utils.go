@@ -2,7 +2,9 @@ package audit
 
 import (
 	"fmt"
+	"net/http"
 	"regexp"
+	"strings"
 
 	jsonpath "github.com/rancher/jsonpath/pkg"
 	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
@@ -117,4 +119,11 @@ func pairMatches(v any, f func(string, any) bool) bool {
 	}
 
 	return false
+}
+
+// isLoginRequest reports whether the request is a login attempt, indicating
+// that the request body should be parsed to extract the basic auth username.
+func isLoginRequest(req *http.Request) bool {
+	return strings.Contains(req.URL.Path, "login") ||
+		strings.Contains(req.URL.RawQuery, "action=login")
 }
