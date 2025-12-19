@@ -286,7 +286,13 @@ func generateSafeSnapshotName(spec k3s.ETCDSnapshotSpec, createdAt time.Time) st
 	digest := sha256.Sum256([]byte(nodeName + spec.Location))
 	hex6 := hex.EncodeToString(digest[:])[:6]
 
-	if errs := validation.IsDNS1123Subdomain(name); len(errs) != 0 || len(name)+13 > validation.DNS1123SubdomainMaxLength {
+	// reserve space for the non-name parts that will be added:
+	// - storage string (worst-case "local" length)
+	// - two hyphens around the name
+	// - 6-char hex suffix
+	reservedSuffixLen := len(string(Local)) + 2 + len(hex6)
+
+	if errs := validation.IsDNS1123Subdomain(name); len(errs) != 0 || len(name)+reservedSuffixLen > validation.DNS1123SubdomainMaxLength {
 		shortHost, _, _ := strings.Cut(nodeName, ".")
 		name = fmt.Sprintf("etcd-snapshot-%s-%d", shortHost, createdAt.Unix())
 	}
@@ -295,7 +301,7 @@ func generateSafeSnapshotName(spec k3s.ETCDSnapshotSpec, createdAt time.Time) st
 }
 
 // getRestoreModesAnnotation determines the appropriate value for the restore-mode-options annotation
-// by checking for a valid, parseable provisioning-cluster-spec and the presence of
+// by checking for a valid, parsable provisioning-cluster-spec and the presence of
 // fields required for each restore mode.
 func getRestoreModesAnnotation(downstream *k3s.ETCDSnapshotFile, cluster *provv1.Cluster) string {
 	logPrefix := getLogPrefix(cluster)
@@ -316,7 +322,7 @@ func getRestoreModesAnnotation(downstream *k3s.ETCDSnapshotFile, cluster *provv1
 
 	clusterSpec, err := snapshotutil.DecompressClusterSpec(specPayload)
 	if err != nil {
-		logrus.Warnf("%s: downstream snapshot %s/%s contains an unparseable '%s' metadata payload: %v. Setting restore mode to 'none'",
+		logrus.Warnf("%s: downstream snapshot %s/%s contains an unparsable '%s' metadata payload: %v. Setting restore mode to 'none'",
 			logPrefix,
 			downstream.Namespace,
 			downstream.Name,
@@ -328,7 +334,7 @@ func getRestoreModesAnnotation(downstream *k3s.ETCDSnapshotFile, cluster *provv1
 	if clusterSpec.KubernetesVersion != "" {
 		availableModes = append(availableModes, rkev1.RestoreRKEConfigKubernetesVersion)
 	} else {
-		logrus.Warnf("%s: downstream snapshot %s/%s has parseable metadata but is missing 'kubernetesVersion', 'kubernetesVersion' restore mode will be unavailable.",
+		logrus.Warnf("%s: downstream snapshot %s/%s has parsable metadata but is missing 'kubernetesVersion', 'kubernetesVersion' restore mode will be unavailable.",
 			logPrefix, downstream.Namespace, downstream.Name)
 	}
 
