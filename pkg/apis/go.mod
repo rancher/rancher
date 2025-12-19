@@ -31,7 +31,7 @@ replace (
 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.31.6
 	k8s.io/kubectl => k8s.io/kubectl v0.31.6
 	k8s.io/kubelet => k8s.io/kubelet v0.31.6
-	k8s.io/kubernetes => k8s.io/kubernetes v1.31.11
+	k8s.io/kubernetes => k8s.io/kubernetes v1.31.12
 	k8s.io/legacy-cloud-providers => k8s.io/legacy-cloud-providers v0.31.6
 	k8s.io/metrics => k8s.io/metrics v0.31.6
 	k8s.io/mount-utils => k8s.io/mount-utils v0.31.6
