@@ -413,7 +413,7 @@ func waitContainerExit(rootCtx context.Context, dockerCli *client.Client, contai
 			if result.Error != nil {
 				statusC <- containerWaitingStatus{
 					code:  125,
-					cause: fmt.Errorf(result.Error.Message),
+					cause: fmt.Errorf("%s", result.Error.Message),
 				}
 			} else {
 				statusC <- containerWaitingStatus{

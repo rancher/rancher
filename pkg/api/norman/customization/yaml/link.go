@@ -47,7 +47,7 @@ func (s *yamlLinkHandler) LinkHandler(apiContext *types.APIContext, next types.R
 
 	schema := apiContext.Schemas.Schema(apiContext.Version, apiContext.Type)
 	if schema == nil {
-		return fmt.Errorf("failed to find schema " + apiContext.Type)
+		return fmt.Errorf("failed to find schema %s", apiContext.Type)
 	}
 
 	data, err := schema.Store.ByID(apiContext, schema, apiContext.ID)

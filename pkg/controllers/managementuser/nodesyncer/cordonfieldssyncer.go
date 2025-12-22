@@ -169,7 +169,7 @@ func (d *nodeDrain) drain(ctx context.Context, obj *v32.Node, nodeName string, c
 			if err != nil {
 				if ctx.Err() == context.Canceled {
 					stopped = true
-					logrus.Infof(fmt.Sprintf("Stopped draining %s in %s", nodeName, obj.Namespace))
+					logrus.Infof("Stopped draining %s in %s", nodeName, obj.Namespace)
 					return nodeObj, nil
 				}
 				errMsg := filterErrorMsg(msg, nodeName)
@@ -182,8 +182,8 @@ func (d *nodeDrain) drain(ctx context.Context, obj *v32.Node, nodeName string, c
 			ignore, timeoutErr := ignoreErr(err.Error())
 			if ignore {
 				if timeoutErr {
-					err = fmt.Errorf(fmt.Sprintf("Drain failed: drain did not complete within %vs",
-						obj.Spec.NodeDrainInput.Timeout))
+					err = fmt.Errorf("Drain failed: drain did not complete within %vs",
+						obj.Spec.NodeDrainInput.Timeout)
 				} else {
 					// log before ignoring
 					logrus.Errorf("nodeDrain: kubectl error ignore draining node [%s] in cluster [%s]: %v", nodeName,

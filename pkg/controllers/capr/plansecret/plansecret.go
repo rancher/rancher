@@ -147,7 +147,7 @@ func (h *handler) reconcileMachinePlanAppliedCondition(secret *corev1.Secret, pl
 			!conditions.IsFalse(machine, condition) ||
 			conditions.GetReason(machine, condition) != "Error") {
 		logrus.Debugf("[plansecret] machine %s/%s: marking PlanApplied as false", machine.Namespace, machine.Name)
-		conditions.MarkFalse(machine, condition, "Error", capi.ConditionSeverityError, planAppliedErr.Error())
+		conditions.MarkFalse(machine, condition, "Error", capi.ConditionSeverityError, "%s", planAppliedErr.Error())
 		needsUpdate = true
 	} else if planAppliedErr == nil && !conditions.IsTrue(machine, condition) {
 		logrus.Debugf("[plansecret] machine %s/%s: marking PlanApplied as true", machine.Namespace, machine.Name)
