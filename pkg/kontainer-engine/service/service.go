@@ -481,7 +481,7 @@ func portOnly(address string) (string, error) {
 	}
 
 	if portNum < 1 || portNum > 65535 {
-		return "", errors.Wrap(fmt.Errorf(fmt.Sprintf("invalid port [%s], port range is between 1 and 65535", port)), portParseErr.Error())
+		return "", errors.Wrap(fmt.Errorf("invalid port [%s], port range is between 1 and 65535", port), portParseErr.Error())
 	}
 
 	return port, nil
