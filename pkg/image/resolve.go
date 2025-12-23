@@ -52,19 +52,37 @@ func ResolveWithCluster(image string, cluster *v3.Cluster) string {
 	return image
 }
 
-// GetImages fetches the list of container images used in the sources provided in the exportConfig.
-// Rancher charts, system images and extension images of Rancher are fetched.
-// GetImages is called during runtime by Rancher catalog package which is deprecated.
+// GetImages fetches the list of container images used in the sources provided in the chartsPath
+// and extensionendpoints. Rancher/Prime charts, system images and extension images of Rancher
+// are fetched. GetImages is called during runtime by Rancher catalog package which is deprecated.
 // It is actually used for generation rancher-images.txt for airgap scenarios.
-func GetImages(exportConfig ExportConfig, externalImages map[string][]string, imagesFromArgs []string) ([]string, []string, error) {
+func GetImages(chartsPath string,
+	osType OSType,
+	rancherVersion string,
+	extensionEndpoints []GithubEndpoint,
+	externalImages map[string][]string,
+	imagesFromArgs []string) ([]string, []string, error) {
 	imagesSet := make(map[string]map[string]struct{})
 
-	// fetch images from charts
-	charts := Charts{exportConfig}
-	if err := charts.FetchImages(imagesSet); err != nil {
-		return nil, nil, errors.Wrap(err, "failed to fetch images from charts")
+	chartsPathList := strings.Split(chartsPath, ",")
+	for _, chartPath := range chartsPathList {
+		exportConfig := ExportConfig{
+			ChartsPath:     chartPath,
+			OsType:         osType,
+			RancherVersion: rancherVersion,
+		}
+
+		charts := Charts{exportConfig}
+		if err := charts.FetchImages(imagesSet); err != nil {
+			return nil, nil, errors.Wrap(err, "failed to fetch images from charts")
+		}
 	}
 
+	exportConfig := ExportConfig{
+		OsType:          osType,
+		RancherVersion:  rancherVersion,
+		GithubEndpoints: extensionEndpoints,
+	}
 	// fetch images from extension catalog images
 	extensions := ExtensionsConfig{exportConfig}
 	if err := extensions.FetchExtensionImages(imagesSet); err != nil {

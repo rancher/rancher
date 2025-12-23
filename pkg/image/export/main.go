@@ -10,7 +10,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		log.Fatal("\"main.go\" requires 1 argument. Usage: go run main.go [CHART_PATH] [OPTIONAL]...")
+		log.Fatal("\"main.go\" requires 1 argument. Usage: go run main.go [CHART_PATHS] [OPTIONAL]...")
 	}
 
 	if err := run(os.Args[1], os.Args[2:]); err != nil {

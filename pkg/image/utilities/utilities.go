@@ -53,10 +53,10 @@ type ImageTargetsAndSources struct {
 	TargetWindowsImagesAndSources []string
 }
 
-// GatherTargetImagesAndSources queries KDM, charts and system-charts to gather all the images used by Rancher and their source.
+// GatherTargetImagesAndSources queries KDM, multiple chart repos to gather all the images used by Rancher and their source.
 // It returns an aggregate type, ImageTargetsAndSources, which contains the images required to run Rancher on Linux and Windows, as well
 // as the source of each image.
-func GatherTargetImagesAndSources(chartsPath string, imagesFromArgs []string) (ImageTargetsAndSources, error) {
+func GatherTargetImagesAndSources(chartPaths string, imagesFromArgs []string) (ImageTargetsAndSources, error) {
 	rancherVersion, ok := os.LookupEnv("TAG")
 	if !ok {
 		return ImageTargetsAndSources{}, fmt.Errorf("no tag defining current Rancher version, cannot gather target images and sources")
@@ -115,19 +115,12 @@ func GatherTargetImagesAndSources(chartsPath string, imagesFromArgs []string) (I
 	winsAgentUpdateImage := imagesFromArgs[winsIndex]
 	linuxImagesFromArgs := append(imagesFromArgs[:winsIndex], imagesFromArgs[winsIndex+1:]...)
 
-	exportConfig := img.ExportConfig{
-		ChartsPath:      chartsPath,
-		OsType:          img.Linux,
-		RancherVersion:  rancherVersion,
-		GithubEndpoints: img.ExtensionEndpoints,
-	}
-	targetImages, targetImagesAndSources, err := img.GetImages(exportConfig, externalLinuxImages, linuxImagesFromArgs)
+	targetImages, targetImagesAndSources, err := img.GetImages(chartPaths, img.Linux, rancherVersion, img.ExtensionEndpoints, externalLinuxImages, linuxImagesFromArgs)
 	if err != nil {
 		return ImageTargetsAndSources{}, err
 	}
 
-	exportConfig.OsType = img.Windows
-	targetWindowsImages, targetWindowsImagesAndSources, err := img.GetImages(exportConfig, nil, []string{winsAgentUpdateImage})
+	targetWindowsImages, targetWindowsImagesAndSources, err := img.GetImages(chartPaths, img.Windows, rancherVersion, img.ExtensionEndpoints, externalLinuxImages, []string{winsAgentUpdateImage})
 	if err != nil {
 		return ImageTargetsAndSources{}, err
 	}
