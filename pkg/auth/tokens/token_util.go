@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	invalidAuthTokenError = errors.New("invalid auth token value")
+	errInvalidAuthToken = errors.New("invalid auth token value")
 )
 
 func SplitTokenParts(tokenID string) (string, string) {
@@ -138,7 +138,7 @@ func extractClusterIDFromResponseType(responseType string) string {
 // Given a stored token with hashed key, check if the provided (unhashed) tokenKey matches and is valid
 func VerifyToken(storedToken *apiv3.Token, tokenName, tokenKey string) (int, error) {
 	if storedToken == nil || storedToken.Name != tokenName {
-		return http.StatusUnprocessableEntity, invalidAuthTokenError
+		return http.StatusUnprocessableEntity, errInvalidAuthToken
 	}
 
 	if storedToken.Annotations != nil && storedToken.Annotations[TokenHashed] == "true" {
@@ -149,11 +149,11 @@ func VerifyToken(storedToken *apiv3.Token, tokenName, tokenKey string) (int, err
 		}
 		if err := hasher.VerifyHash(storedToken.Token, tokenKey); err != nil {
 			logrus.Errorf("VerifyHash failed with error: %v", err)
-			return http.StatusUnprocessableEntity, invalidAuthTokenError
+			return http.StatusUnprocessableEntity, errInvalidAuthToken
 		}
 	} else {
 		if storedToken.Token != tokenKey {
-			return http.StatusUnprocessableEntity, invalidAuthTokenError
+			return http.StatusUnprocessableEntity, errInvalidAuthToken
 		}
 	}
 
