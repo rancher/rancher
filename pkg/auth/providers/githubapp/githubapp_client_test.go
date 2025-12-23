@@ -83,7 +83,7 @@ func TestGithubAppClientGetUserWithInvalidToken(t *testing.T) {
 
 	appClient := githubAppClient{httpClient: http.DefaultClient}
 	_, err := appClient.getUser(t.Context(), "invalid token", cfg)
-	assert.ErrorContains(t, err, "Access token is invalid or expired")
+	assert.ErrorContains(t, err, "request failed, got status code: 401")
 }
 
 func TestGithubAppClientGetOrgsForUser(t *testing.T) {

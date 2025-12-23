@@ -1,7 +1,6 @@
 package googleoauth
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -47,10 +46,7 @@ func (g *GClient) getFromGoogle(accessToken string, url string) ([]byte, int, er
 	case 200:
 	case 201:
 	default:
-		var body bytes.Buffer
-		io.Copy(&body, resp.Body)
-		return nil, resp.StatusCode, fmt.Errorf("request failed, got status code: %d. Response: %s",
-			resp.StatusCode, body.Bytes())
+		return nil, resp.StatusCode, fmt.Errorf("request failed, got status code: %d", resp.StatusCode)
 	}
 
 	b, err := io.ReadAll(resp.Body)
