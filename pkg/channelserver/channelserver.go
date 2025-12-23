@@ -20,9 +20,11 @@ import (
 )
 
 var (
-	configs     map[string]*config.Config
-	configsInit sync.Once
-	action      chan string
+	configs       map[string]*config.Config
+	configsInit   sync.Once
+	action        chan string
+	refreshDoneMu sync.Mutex
+	refreshDone   map[string]chan struct{}
 )
 
 func GetURLAndInterval() (string, time.Duration) {
@@ -68,6 +70,15 @@ func (d *DynamicInterval) Wait(ctx context.Context) bool {
 		case msg := <-action:
 			if msg == d.subKey {
 				logrus.Infof("getReleaseConfig: reloading config for %s", d.subKey)
+				// Signal that this runtime is about to reload
+				refreshDoneMu.Lock()
+				if refreshDone != nil {
+					if ch, ok := refreshDone[d.subKey]; ok {
+						close(ch)
+						delete(refreshDone, d.subKey)
+					}
+				}
+				refreshDoneMu.Unlock()
 				return true
 			}
 			action <- msg
@@ -80,6 +91,50 @@ func (d *DynamicInterval) Wait(ctx context.Context) bool {
 func Refresh() {
 	action <- "k3s"
 	action <- "rke2"
+}
+
+// RefreshAndWait signals the channelserver configs to refresh and waits for the refresh to complete.
+// This ensures that subsequent calls to Get*Config methods will return fresh data.
+func RefreshAndWait(ctx context.Context) error {
+	refreshDoneMu.Lock()
+	if refreshDone == nil {
+		refreshDone = make(map[string]chan struct{})
+	}
+	k3sDone := make(chan struct{})
+	rke2Done := make(chan struct{})
+	refreshDone["k3s"] = k3sDone
+	refreshDone["rke2"] = rke2Done
+	refreshDoneMu.Unlock()
+
+	// Send refresh signals
+	action <- "k3s"
+	action <- "rke2"
+
+	// Wait for both refreshes to complete or context to be canceled
+	// Use a timeout to prevent indefinite blocking
+	timeout := time.After(30 * time.Second)
+	
+	select {
+	case <-k3sDone:
+	case <-timeout:
+		return fmt.Errorf("timeout waiting for k3s config to refresh")
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	select {
+	case <-rke2Done:
+	case <-timeout:
+		return fmt.Errorf("timeout waiting for rke2 config to refresh")
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	// Give the config.Config internal reload goroutine a moment to actually process the data
+	// The DynamicInterval.Wait() returning triggers the reload, but the reload itself takes a bit of time
+	time.Sleep(500 * time.Millisecond)
+
+	return nil
 }
 
 type DynamicSource struct{}
