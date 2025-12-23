@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash"
+	"net"
 	"path"
 	"slices"
 	"sort"
@@ -486,9 +487,17 @@ func updateConfigWithAddresses(config map[string]interface{}, info *machineNetwo
 	if convert.ToString(config["cloud-provider-name"]) == "" {
 		nodeExternalIPs := convert.ToStringSlice(config["node-external-ip"])
 		for _, ip := range info.ExternalAddresses {
-			if ip != "" && !slices.Contains(nodeExternalIPs, ip) && !slices.Contains(nodeIPs, ip) {
-				nodeExternalIPs = append(nodeExternalIPs, ip)
+			if ip == "" || slices.Contains(nodeExternalIPs, ip) || slices.Contains(nodeIPs, ip) {
+				continue
 			}
+
+			parsedIP := net.ParseIP(ip)
+			// Never allow IPv6 link-local addresses (fe80::/10) as node-external-ip
+			if parsedIP != nil && parsedIP.IsLinkLocalUnicast() {
+				continue
+			}
+
+			nodeExternalIPs = append(nodeExternalIPs, ip)
 		}
 		config["node-external-ip"] = nodeExternalIPs
 	}
