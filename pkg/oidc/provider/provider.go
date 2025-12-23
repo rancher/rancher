@@ -21,7 +21,9 @@ import (
 )
 
 const (
-	oidcClientByIDIndex = "oidc.management.cattle.io/oidcclient-by-id"
+	// OIDCClientByIDIndex indexes the `.status.clientID` field on OIDCClient
+	// resources.
+	OIDCClientByIDIndex = "oidc.management.cattle.io/oidcclient-by-id"
 	secretsNamespace    = "cattle-oidc-client-secrets"
 	codesNamespace      = "cattle-oidc-codes"
 	maxTime             = 10 * time.Minute
@@ -34,6 +36,17 @@ type Provider struct {
 	userInfoHandler *userInfoHandler
 }
 
+// OIDCClientIDIndexFunc indexes the .status.clientID field from OIDCClient
+// resources.
+func OIDCClientIDIndexFunc(obj interface{}) ([]string, error) {
+	o, ok := obj.(*v3.OIDCClient)
+	if !ok {
+		return []string{}, nil
+	}
+
+	return []string{o.Status.ClientID}, nil
+}
+
 func NewProvider(ctx context.Context, tokenCache wrangmgmtv3.TokenCache, tokenClient wrangmgmtv3.TokenClient, userLister wrangmgmtv3.UserCache, userAttributeLister wrangmgmtv3.UserAttributeCache, secretCache corecontrollers.SecretCache, secretClient corecontrollers.SecretClient, oidcClientCache wrangmgmtv3.OIDCClientCache, oidcClientController wrangmgmtv3.OIDCClientController, namespaceClient corecontrollers.NamespaceClient) (Provider, error) {
 	sessionStorage := session.NewSecretSessionStore(ctx, secretCache, secretClient, maxTime)
 	jwks, err := newJWKSHandler(secretCache, secretClient)
@@ -42,14 +55,7 @@ func NewProvider(ctx context.Context, tokenCache wrangmgmtv3.TokenCache, tokenCl
 	}
 	oidcClientInformer := oidcClientController.Informer()
 	oidcClientIndexers := map[string]cache.IndexFunc{
-		oidcClientByIDIndex: func(obj interface{}) ([]string, error) {
-			o, ok := obj.(*v3.OIDCClient)
-			if !ok {
-				return []string{}, nil
-			}
-
-			return []string{o.Status.ClientID}, nil
-		},
+		OIDCClientByIDIndex: OIDCClientIDIndexFunc,
 	}
 	err = oidcClientInformer.AddIndexers(oidcClientIndexers)
 	if err != nil {
