@@ -1,4 +1,4 @@
-package ldap
+package activedirectory
 
 import (
 	"fmt"
@@ -16,40 +16,38 @@ import (
 )
 
 const (
-	saDN                = "cn=sa,ou=users,dc=foo,dc=bar"
+	saUsername          = "FOO\\sa"
 	saPassword          = "secret"
 	userName            = "user"
-	userDN              = "cn=user,ou=users,dc=foo,dc=bar"
+	baseDN              = "ou=foo,dc=foo,dc=bar"
+	userDN              = "cn=user," + baseDN
 	userPassword        = "secret"
-	userObjectClassName = "inetOrgPerson"
+	userObjectClassName = "person"
 )
 
-func TestLDAPProviderLoginUser(t *testing.T) {
+func TestADProviderLoginUser(t *testing.T) {
 	t.Parallel()
 
-	config := v3.LdapConfig{
-		LdapFields: v3.LdapFields{
-			ServiceAccountDistinguishedName: saDN,
-			ServiceAccountPassword:          saPassword,
-			UserObjectClass:                 userObjectClassName,
-			UserLoginAttribute:              "uid",
-			UserNameAttribute:               "cn",
-			UserSearchBase:                  "ou=users,dc=foo,dc=bar",
-			GroupDNAttribute:                "entryDN",
-			GroupMemberMappingAttribute:     "member",
-			GroupMemberUserAttribute:        "entryDN",
-			GroupNameAttribute:              "cn",
-			GroupObjectClass:                "groupOfNames",
-			GroupSearchAttribute:            "cn",
-		},
+	config := v3.ActiveDirectoryConfig{
+		ServiceAccountUsername:      saUsername,
+		ServiceAccountPassword:      saPassword,
+		UserObjectClass:             userObjectClassName,
+		UserLoginAttribute:          "sAMAccountName",
+		UserDisabledBitMask:         2,
+		UserEnabledAttribute:        "userAccountControl",
+		UserNameAttribute:           "name",
+		UserSearchBase:              baseDN,
+		GroupDNAttribute:            "distinguishedName",
+		GroupMemberMappingAttribute: "member",
+		GroupMemberUserAttribute:    "distinguishedName",
+		GroupNameAttribute:          "name",
+		GroupObjectClass:            "group",
+		GroupSearchAttribute:        "sAMAccountName",
 	}
 
-	provider := ldapProvider{
-		providerName: "openldap",
-		userMGR:      common.FakeUserManager{HasAccess: true},
-		tokenMGR:     &tokens.Manager{},
-		userScope:    "openldap_user",
-		groupScope:   "openldap_group",
+	provider := adProvider{
+		userMGR:  common.FakeUserManager{HasAccess: true},
+		tokenMGR: &tokens.Manager{},
 	}
 
 	credentials := v3.BasicLogin{
@@ -62,34 +60,25 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 			{
 				DN: userDN,
 				Attributes: []*ldapv3.EntryAttribute{
-					{Name: ObjectClass, Values: []string{userObjectClassName}},
-					{Name: "cn", Values: []string{"user"}},
-					{Name: "uid", Values: []string{"user"}},
+					{Name: ObjectClass, Values: []string{"top", "person", "organizationalPerson", "user"}},
+					{Name: "name", Values: []string{"user"}},
+					{Name: "memberOf", Values: []string{"cn=group,ou=foo,dc=foo,dc=bar"}},
+					{Name: "objectGUID", Values: []string{"\xff\xf9MyK0\xbaM\xb8vz#h^XP"}},
+					{Name: "sAMAccountName", Values: []string{"user"}},
+					{Name: "userAccountControl", Values: []string{"512"}},
 				},
 			},
 		},
 	}
-	userDetailsResult := &ldapv3.SearchResult{
-		Entries: []*ldapv3.Entry{
-			{
-				DN: userDN,
-				Attributes: []*ldapv3.EntryAttribute{
-					{Name: ObjectClass, Values: []string{userObjectClassName}},
-					{Name: "cn", Values: []string{"user"}},
-					{Name: "uid", Values: []string{"user"}},
-					{Name: "entryDN", Values: []string{userDN}},
-				},
-			},
-		},
-	}
+
 	groupSearchResult := &ldapv3.SearchResult{
 		Entries: []*ldapv3.Entry{
 			{
-				DN: "cn=group,ou=groups,dc=foo,dc=bar",
+				DN: "cn=group,ou=foo,dc=foo,dc=bar",
 				Attributes: []*ldapv3.EntryAttribute{
-					{Name: ObjectClass, Values: []string{"groupOfNames"}},
-					{Name: "cn", Values: []string{"group"}},
-					{Name: "entryDN", Values: []string{"cn=group,ou=groups,dc=foo,dc=bar"}},
+					{Name: ObjectClass, Values: []string{"top", "group"}},
+					{Name: "name", Values: []string{"group"}},
+					{Name: "sAMAccountName", Values: []string{"group"}},
 				},
 			},
 		},
@@ -102,20 +91,15 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 
 		ldapConn := &ldapFakes.FakeLdapConn{
 			SearchFunc: func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
-				if searchRequest.Filter == "(&(objectClass=inetOrgPerson)(uid=user))" &&
-					searchRequest.BaseDN == "ou=users,dc=foo,dc=bar" {
+				if searchRequest.Filter == "(sAMAccountName=user)" &&
+					searchRequest.BaseDN == baseDN {
 					return userSearchResult, nil
-				}
-
-				if searchRequest.Filter == "(objectClass=inetOrgPerson)" &&
-					searchRequest.BaseDN == userDN {
-					return userDetailsResult, nil
 				}
 
 				return &ldapv3.SearchResult{}, nil
 			},
 			SearchWithPagingFunc: func(searchRequest *ldapv3.SearchRequest, pagingSize uint32) (*ldapv3.SearchResult, error) {
-				if searchRequest.Filter == "(&(member=cn=user,ou=users,dc=foo,dc=bar)(objectClass=groupOfNames))" {
+				if searchRequest.Filter == "(&(objectClass=group)(|(distinguishedName=cn=group,ou=foo,dc=foo,dc=bar)))" {
 					return groupSearchResult, nil
 				}
 
@@ -131,24 +115,25 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 
 		wantUserPrincipal := v3.Principal{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: "openldap_user://cn=user,ou=users,dc=foo,dc=bar",
+				Name: "activedirectory_user://cn=user,ou=foo,dc=foo,dc=bar",
 			},
 			DisplayName:   "user",
 			LoginName:     "user",
 			PrincipalType: "user",
-			Provider:      "openldap",
+			Provider:      "activedirectory",
 			Me:            true,
 		}
 		wantGroupPrincipals := []v3.Principal{
 			{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "openldap_group://cn=group,ou=groups,dc=foo,dc=bar",
+					Name: "activedirectory_group://cn=group,ou=foo,dc=foo,dc=bar",
 				},
 				DisplayName:   "group",
 				LoginName:     "group",
 				PrincipalType: "group",
-				Provider:      "openldap",
+				Provider:      "activedirectory",
 				Me:            true,
+				MemberOf:      true,
 			},
 		}
 
@@ -158,26 +143,23 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Len(t, boundCredentials, 3)
-		// Bind as SA to See if the user exists and is unique.
-		assert.Equal(t, v3.BasicLogin{Username: saDN, Password: saPassword}, boundCredentials[0])
-		// Bind as a user to authenticate the user.
-		assert.Equal(t, v3.BasicLogin{Username: userDN, Password: userPassword}, boundCredentials[1])
-		// Bind back as SA to get principals from the search results via (ldapSearch).
-		assert.Equal(t, v3.BasicLogin{Username: saDN, Password: saPassword}, boundCredentials[0])
+		assert.Equal(t, v3.BasicLogin{Username: saUsername, Password: saPassword}, boundCredentials[0])
+		assert.Equal(t, v3.BasicLogin{Username: userName, Password: userPassword}, boundCredentials[1])
+		assert.Equal(t, v3.BasicLogin{Username: saUsername, Password: saPassword}, boundCredentials[2])
 
 		assert.Equal(t, wantUserPrincipal, userPrincipal)
 		assert.Equal(t, wantGroupPrincipals, groupPrincipals)
 	})
 
-	t.Run("invalid user credentials", func(t *testing.T) {
+	t.Run("invalid credentials", func(t *testing.T) {
 		t.Parallel()
 
 		var boundCredentials []v3.BasicLogin
 
 		ldapConn := &ldapFakes.FakeLdapConn{
 			SearchFunc: func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
-				if searchRequest.Filter == "(&(objectClass=inetOrgPerson)(uid=user))" &&
-					searchRequest.BaseDN == "ou=users,dc=foo,dc=bar" {
+				if searchRequest.Filter == "(&(sAMAccountName=user)" &&
+					searchRequest.BaseDN == baseDN {
 					return userSearchResult, nil
 				}
 
@@ -187,7 +169,7 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 				return &ldapv3.SearchResult{}, nil
 			},
 			BindFunc: func(username, password string) error {
-				if username == userDN && password != userPassword {
+				if username == userName && password != userPassword {
 					return ldapv3.NewError(ldapv3.LDAPResultInvalidCredentials, fmt.Errorf("ldap: invalid credentials"))
 				}
 				boundCredentials = append(boundCredentials, v3.BasicLogin{Username: username, Password: password})
@@ -208,7 +190,7 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 		require.Equal(t, httperror.Unauthorized, herr.Code)
 
 		require.Len(t, boundCredentials, 1)
-		assert.Equal(t, v3.BasicLogin{Username: saDN, Password: saPassword}, boundCredentials[0])
+		assert.Equal(t, v3.BasicLogin{Username: saUsername, Password: saPassword}, boundCredentials[0])
 	})
 
 	t.Run("user has no access", func(t *testing.T) {
@@ -218,22 +200,18 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 
 		ldapConn := &ldapFakes.FakeLdapConn{
 			SearchFunc: func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
-				if searchRequest.Filter == "(&(objectClass=inetOrgPerson)(uid=user))" &&
-					searchRequest.BaseDN == "ou=users,dc=foo,dc=bar" {
+				if searchRequest.Filter == "(sAMAccountName=user)" &&
+					searchRequest.BaseDN == baseDN {
 					return userSearchResult, nil
-				}
-
-				if searchRequest.Filter == "(objectClass=inetOrgPerson)" &&
-					searchRequest.BaseDN == userDN {
-					return userDetailsResult, nil
 				}
 
 				return &ldapv3.SearchResult{}, nil
 			},
 			SearchWithPagingFunc: func(searchRequest *ldapv3.SearchRequest, pagingSize uint32) (*ldapv3.SearchResult, error) {
-				if searchRequest.Filter == "(&(member=cn=user,ou=users,dc=foo,dc=bar)(objectClass=groupOfNames))" {
+				if searchRequest.Filter == "(&(objectClass=group)(|(distinguishedName=cn=group,ou=foo,dc=foo,dc=bar)))" {
 					return groupSearchResult, nil
 				}
+
 				return &ldapv3.SearchResult{}, nil
 			},
 			BindFunc: func(username, password string) error {
@@ -349,15 +327,15 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 
 		ldapConn := &ldapFakes.FakeLdapConn{
 			SearchFunc: func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
-				if searchRequest.Filter == "(&(objectClass=inetOrgPerson)(uid=user))" &&
-					searchRequest.BaseDN == "ou=users,dc=foo,dc=bar" {
+				if searchRequest.Filter == "(sAMAccountName=user)" &&
+					searchRequest.BaseDN == baseDN {
 					return userSearchResult, nil
 				}
 
 				return &ldapv3.SearchResult{}, nil
 			},
 			BindFunc: func(username, password string) error {
-				if username == userDN && password == userPassword {
+				if username == userName && password == userPassword {
 					return ldapv3.NewError(ldapv3.LDAPResultServerDown, fmt.Errorf("ldap: server down"))
 				}
 				return nil
@@ -379,17 +357,7 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 
 		ldapConn := &ldapFakes.FakeLdapConn{
 			SearchFunc: func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
-				if searchRequest.Filter == "(&(objectClass=inetOrgPerson)(uid=user))" &&
-					searchRequest.BaseDN == "ou=users,dc=foo,dc=bar" {
-					return userSearchResult, nil
-				}
-
-				if searchRequest.Filter == "(objectClass=inetOrgPerson)" &&
-					searchRequest.BaseDN == userDN {
-					return nil, ldapv3.NewError(ldapv3.LDAPResultUnavailable, fmt.Errorf("ldap: result unavailable"))
-				}
-
-				return &ldapv3.SearchResult{}, nil
+				return nil, ldapv3.NewError(ldapv3.LDAPResultUnavailable, fmt.Errorf("ldap: result unavailable"))
 			},
 		}
 
@@ -408,11 +376,6 @@ func TestLDAPProviderLoginUser(t *testing.T) {
 
 		ldapConn := &ldapFakes.FakeLdapConn{
 			SearchFunc: func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
-				if searchRequest.Filter == "(&(objectClass=inetOrgPerson)(uid=user))" &&
-					searchRequest.BaseDN == "ou=users,dc=foo,dc=bar" {
-					return userSearchResult, nil
-				}
-				// Return empty result for the second (user details) request.
 				return &ldapv3.SearchResult{}, nil
 			},
 		}
