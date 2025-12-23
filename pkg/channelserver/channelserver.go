@@ -106,25 +106,51 @@ func RefreshAndWait(ctx context.Context) error {
 	refreshDone["rke2"] = rke2Done
 	refreshDoneMu.Unlock()
 
-	// Send refresh signals
-	action <- "k3s"
-	action <- "rke2"
+	// Cleanup function to remove channels from map if they weren't already removed
+	defer func() {
+		refreshDoneMu.Lock()
+		delete(refreshDone, "k3s")
+		delete(refreshDone, "rke2")
+		refreshDoneMu.Unlock()
+	}()
 
-	// Wait for both refreshes to complete or context to be canceled
-	// Use a timeout to prevent indefinite blocking
-	timeout := time.After(30 * time.Second)
+	// Send refresh signals with non-blocking sends to avoid deadlock if channel is full
+	select {
+	case action <- "k3s":
+	default:
+		return fmt.Errorf("failed to send k3s refresh signal: action channel is full")
+	}
 
 	select {
+	case action <- "rke2":
+	default:
+		return fmt.Errorf("failed to send rke2 refresh signal: action channel is full")
+	}
+
+	// Use a deadline-based approach to ensure consistent timeout for both runtimes
+	deadline := time.Now().Add(30 * time.Second)
+
+	// Wait for k3s refresh to complete
+	k3sTimeout := time.Until(deadline)
+	if k3sTimeout <= 0 {
+		return fmt.Errorf("timeout waiting for k3s config to refresh")
+	}
+	select {
 	case <-k3sDone:
-	case <-timeout:
+	case <-time.After(k3sTimeout):
 		return fmt.Errorf("timeout waiting for k3s config to refresh")
 	case <-ctx.Done():
 		return ctx.Err()
 	}
 
+	// Wait for rke2 refresh to complete
+	rke2Timeout := time.Until(deadline)
+	if rke2Timeout <= 0 {
+		return fmt.Errorf("timeout waiting for rke2 config to refresh")
+	}
 	select {
 	case <-rke2Done:
-	case <-timeout:
+	case <-time.After(rke2Timeout):
 		return fmt.Errorf("timeout waiting for rke2 config to refresh")
 	case <-ctx.Done():
 		return ctx.Err()
