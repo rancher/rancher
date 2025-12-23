@@ -24,7 +24,6 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/ratelimit"
 	"github.com/rancher/wrangler/v3/pkg/start"
 	"github.com/sirupsen/logrus"
-	k8srbacv1 "k8s.io/api/rbac/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -162,7 +161,7 @@ func (bc *orphanBindingsCleanup) isOrphanBinding(rb *rbacv1.RoleBinding) bool {
 		return false
 	}
 	var hasGroupSubject bool
-	if len(rb.Subjects) == 1 && rb.Subjects[0].Kind == k8srbacv1.GroupKind {
+	if len(rb.Subjects) == 1 && rb.Subjects[0].Kind == rbacv1.GroupKind {
 		hasGroupSubject = true
 	}
 	if !hasGroupSubject {

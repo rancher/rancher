@@ -8,7 +8,7 @@ import (
 
 	"github.com/Azure/go-autorest/autorest/to"
 	v1 "github.com/rancher/gke-operator/pkg/apis/gke.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 )
 
 const (
@@ -158,9 +158,12 @@ func Test_updateGKEClusterConfig(t *testing.T) {
 	mockOperatorController = getMockGkeOperatorController(t, "gkecc")
 	mockCluster, err := getMockV3Cluster(MockGkeClusterConfigClusterFilename)
 	if err != nil {
-		t.Errorf("error getting mock v3 cluster: %s", err)
+		t.Fatalf("error getting mock v3 cluster: %s", err)
 	}
 	mockGkeClusterConfig, err := getMockGkeClusterConfig(MockGkeClusterConfigFilename)
+	if err != nil {
+		t.Fatalf("error getting mock gke cluster config: %s", err)
+	}
 
 	// test remove tags from the cluster
 	_, err = mockOperatorController.updateGKEClusterConfig(&mockCluster, mockGkeClusterConfig, nil)
@@ -200,9 +203,12 @@ func Test_generateAndSetServiceAccount(t *testing.T) {
 func Test_buildGKECCCreateObject(t *testing.T) {
 	mockCluster, err := getMockV3Cluster(MockDefaultClusterFilename)
 	if err != nil {
-		t.Errorf("error getting mock v3 cluster: %s", err)
+		t.Fatalf("error getting mock v3 cluster: %s", err)
 	}
 	expected, err := getMockGkeClusterConfig(MockBuildGkeCCCreateObjectFilename)
+	if err != nil {
+		t.Fatalf("error getting mock gke cluster config: %s", err)
+	}
 
 	gkecc, err := buildGKECCCreateObject(&mockCluster)
 

@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1562,9 +1561,9 @@ func createTestHelmOp(name, namespace, clusterName string, summary fleet.BundleS
 }
 
 func createTestProvisioningCluster(name, namespace string, ready bool) *provv1.Cluster {
-	status := v1.ConditionFalse
+	status := corev1.ConditionFalse
 	if ready {
-		status = v1.ConditionTrue
+		status = corev1.ConditionTrue
 	}
 
 	return &provv1.Cluster{

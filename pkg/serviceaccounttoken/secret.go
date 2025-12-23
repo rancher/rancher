@@ -109,7 +109,7 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrol
 			return false, fmt.Errorf("error ensuring secret for service account %s: %w", logKeyFromObject(sa), err)
 		}
 		if len(secret.Data[corev1.ServiceAccountTokenKey]) > 0 {
-			logrus.Infof("EnsureSecretForServiceAccount: got the service account token for service account %s in %s", logKeyFromObject(sa), time.Now().Sub(start))
+			logrus.Infof("EnsureSecretForServiceAccount: got the service account token for service account %s in %s", logKeyFromObject(sa), time.Since(start))
 			return true, nil
 		}
 		return false, nil

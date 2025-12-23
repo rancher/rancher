@@ -141,13 +141,13 @@ func TestCleanupDeprecatedSecretsKnownConfig(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	s, err := secrets.Get(common.SecretsNamespace, secretName, metav1.GetOptions{})
+	_, err = secrets.Get(common.SecretsNamespace, secretName, metav1.GetOptions{})
 	assert.NoErrorf(t, err, "expected to find the secret %s belonging to the disabled auth provider", secretName)
 
 	err = CleanupClientSecrets(secrets, config)
 	assert.NoError(t, err)
 
-	s, err = secrets.Get(common.SecretsNamespace, secretName, metav1.GetOptions{})
+	s, err := secrets.Get(common.SecretsNamespace, secretName, metav1.GetOptions{})
 	assert.Errorf(t, err, "expected to not find the secret %s belonging to the disabled auth provider", secretName)
 	assert.Nil(t, s, "expected the secret to be nil")
 }

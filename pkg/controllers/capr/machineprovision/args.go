@@ -143,7 +143,7 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]any, d
 	if create {
 		cmd = append(cmd, "create",
 			fmt.Sprintf("--driver=%s", driver),
-			fmt.Sprintf("--custom-install-script=/run/secrets/machine/value"))
+			"--custom-install-script=/run/secrets/machine/value")
 
 		hostname := getHostname(*infra)
 		if hostname != instanceName {
@@ -301,19 +301,19 @@ func toArgs(driverName string, args map[string]any, cluster *rancherv1.Cluster) 
 			continue
 		}
 
-		switch v.(type) {
+		switch v := v.(type) {
 		case float64:
 			cmd = append(cmd, fmt.Sprintf("%s=%v", dmField, v))
 		case string:
-			if v.(string) != "" {
-				cmd = append(cmd, fmt.Sprintf("%s=%s", dmField, v.(string)))
+			if v != "" {
+				cmd = append(cmd, fmt.Sprintf("%s=%s", dmField, v))
 			}
 		case bool:
-			if v.(bool) {
+			if v {
 				cmd = append(cmd, dmField)
 			}
 		case []interface{}:
-			for _, s := range v.([]interface{}) {
+			for _, s := range v {
 				if _, ok := s.(string); ok {
 					cmd = append(cmd, fmt.Sprintf("%s=%s", dmField, s.(string)))
 				}

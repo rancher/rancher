@@ -68,14 +68,13 @@ func (a awsv4) sign(req *http.Request, secrets SecretGetter, auth string) error 
 	// The V2 SDK does not implement internally the sign with body method as per https://github.com/aws/aws-sdk-go/blob/main/aws/signer/v4/v4.go#L357
 	// Therefore we need the below in order for the body to be included with the forwarded request.
 
-	var reader io.ReadCloser
-	var bodyReader io.ReadSeeker
-	bodyReader = bytes.NewReader(body)
-	if bodyReader != nil {
-		var ok bool
-		if reader, ok = bodyReader.(io.ReadCloser); !ok {
-			reader = io.NopCloser(bodyReader)
-		}
+	var (
+		reader     io.ReadCloser
+		ok         bool
+		bodyReader io.ReadSeeker = bytes.NewReader(body)
+	)
+	if reader, ok = bodyReader.(io.ReadCloser); !ok {
+		reader = io.NopCloser(bodyReader)
 	}
 	req.Body = reader
 

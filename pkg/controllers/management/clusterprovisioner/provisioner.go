@@ -126,7 +126,7 @@ func (p *Provisioner) Updated(cluster *apimgmtv3.Cluster) (runtime.Object, error
 	}
 
 	obj, err := apimgmtv3.ClusterConditionUpdated.Do(cluster, func() (runtime.Object, error) {
-		anno, _ := cluster.Annotations[KontainerEngineUpdate]
+		anno := cluster.Annotations[KontainerEngineUpdate]
 		if anno == "updated" {
 			// Cluster has already been updated proceed as usual
 			setVersion(cluster)

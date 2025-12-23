@@ -26,16 +26,16 @@ func addCattleGlobalNamespaces(management *config.ManagementContext) error {
 func createNamespace(namespace string, management *config.ManagementContext) error {
 	lister := management.Core.Namespaces("").Controller().Lister()
 
-	ns, err := lister.Get("", namespace)
+	_, err := lister.Get("", namespace)
 	if k8serrors.IsNotFound(err) {
-		ns = &corev1.Namespace{}
+		ns := &corev1.Namespace{}
 		ns.Name = namespace
 		if _, err := management.Core.Namespaces("").Create(ns); err != nil {
 			return fmt.Errorf("error creating %v namespace: %v", namespace, err)
 		}
 		logrus.Infof("Created %v namespace", namespace)
 	} else if err != nil {
-		return fmt.Errorf("error creating %v namespace: %v", namespace, err)
+		return fmt.Errorf("error getting %v namespace: %v", namespace, err)
 	}
 
 	return nil

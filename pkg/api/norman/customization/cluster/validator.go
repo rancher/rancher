@@ -792,19 +792,19 @@ func validateKeV2ClusterRequest(clusterSpec *v32.ClusterSpec) error {
 		switch operatorData.Name {
 		case management.AlibabaOperator:
 			if !operatorData.Active && clusterSpec.AliConfig != nil {
-				return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("alibaba operator is inactive"))
+				return httperror.NewAPIError(httperror.InvalidBodyContent, "alibaba operator is inactive")
 			}
 		case management.EKSOperator:
 			if !operatorData.Active && clusterSpec.EKSConfig != nil {
-				return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("eks operator is inactive"))
+				return httperror.NewAPIError(httperror.InvalidBodyContent, "eks operator is inactive")
 			}
 		case management.GKEOperator:
 			if !operatorData.Active && clusterSpec.GKEConfig != nil {
-				return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("gke operator is inactive"))
+				return httperror.NewAPIError(httperror.InvalidBodyContent, "gke operator is inactive")
 			}
 		case management.AKSOperator:
 			if !operatorData.Active && clusterSpec.AKSConfig != nil {
-				return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("aks operator is inactive"))
+				return httperror.NewAPIError(httperror.InvalidBodyContent, "aks operator is inactive")
 			}
 		}
 	}

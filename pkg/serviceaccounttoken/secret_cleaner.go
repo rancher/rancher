@@ -15,7 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
 	clientcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	clientv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 const (
@@ -96,7 +95,7 @@ func StartServiceAccountSecretCleaner(ctx context.Context, secrets secretsCache,
 
 // CleanServiceAccountSecrets removes unused Secrets for ServiceAccountTokens from a
 // namespace in batches.
-func CleanServiceAccountSecrets(ctx context.Context, secrets clientv1.SecretInterface, serviceAccounts serviceAccountsCache, secretsToDelete []types.NamespacedName) error {
+func CleanServiceAccountSecrets(ctx context.Context, secrets clientcorev1.SecretInterface, serviceAccounts serviceAccountsCache, secretsToDelete []types.NamespacedName) error {
 	var deletionErr error
 	var deletedCount int64
 	var toBeDeleted []types.NamespacedName

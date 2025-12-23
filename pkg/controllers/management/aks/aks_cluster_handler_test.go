@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
 )
 
@@ -156,13 +156,15 @@ func Test_updateAKSClusterConfig(t *testing.T) {
 	mockOperatorController = getMockAksOperatorController(t, "akscc")
 	mockCluster, err := getMockV3Cluster(MockAksClusterConfigClusterFilename)
 	if err != nil {
-		t.Errorf("error getting mock v3 cluster: %s", err)
+		t.Fatalf("error getting mock v3 cluster: %s", err)
 	}
 	mockAksClusterConfig, err := getMockAksClusterConfig(MockAksClusterConfigFilename)
+	if err != nil {
+		t.Fatalf("error getting mock AKSClusterConfig: %s", err)
+	}
 
 	// test remove tags from the cluster
 	_, err = mockOperatorController.updateAKSClusterConfig(&mockCluster, mockAksClusterConfig, nil)
-
 	if err != nil {
 		t.Errorf("error running updateAKSClusterConfig: %s", err)
 	}
@@ -198,12 +200,14 @@ func Test_generateAndSetServiceAccount(t *testing.T) {
 func Test_buildAKSCCCreateObject(t *testing.T) {
 	mockCluster, err := getMockV3Cluster(MockDefaultClusterFilename)
 	if err != nil {
-		t.Errorf("error getting mock v3 cluster: %s", err)
+		t.Fatalf("error getting mock v3 cluster: %s", err)
 	}
 	expected, err := getMockAksClusterConfig(MockBuildAksCCCreateObjectFilename)
+	if err != nil {
+		t.Fatalf("error getting mock AKSClusterConfig: %s", err)
+	}
 
 	akscc, err := buildAKSCCCreateObject(&mockCluster)
-
 	if err != nil {
 		t.Errorf("error running buildAKSCCCreateObject: %s", err)
 	}

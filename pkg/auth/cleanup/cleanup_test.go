@@ -9,7 +9,6 @@ import (
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
-	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -148,7 +147,7 @@ type storedAuthConfig struct {
 }
 
 func getAuthConfigControllerMock(ctrl *gomock.Controller, store map[string]storedAuthConfig) mgmtv3.AuthConfigController {
-	authConfigs := wranglerfake.NewMockNonNamespacedControllerInterface[*v3.AuthConfig, *v3.AuthConfigList](ctrl)
+	authConfigs := fake.NewMockNonNamespacedControllerInterface[*v3.AuthConfig, *v3.AuthConfigList](ctrl)
 	authConfigsCache := fake.NewMockNonNamespacedCacheInterface[*v3.AuthConfig](ctrl)
 	authConfigs.EXPECT().Cache().Return(authConfigsCache).Times(2)
 

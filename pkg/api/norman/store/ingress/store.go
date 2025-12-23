@@ -168,7 +168,7 @@ func updateDataRules(data map[string]interface{}) {
 
 func updateRule(target map[string]interface{}, id, host, path string, forFrontend bool, data map[string]interface{}, oldState map[string]string, newState map[string]string) {
 	targetData := convert.ToMapInterface(target)
-	port, _ := targetData["targetPort"]
+	port := targetData["targetPort"]
 	serviceID, _ := targetData["serviceId"].(string)
 	namespace, name := ref.Parse(id)
 	stateKey := ingress.GetStateKey(name, namespace, host, path, convert.ToString(port))

@@ -15,10 +15,9 @@ import (
 	"github.com/vmware/govmomi/vapi/rest"
 	"github.com/vmware/govmomi/vapi/tags"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 )
 
-func processSoapFinder(ctx context.Context, fieldName string, cc *v1.Secret, dc string) ([]string, error) {
+func processSoapFinder(ctx context.Context, fieldName string, cc *corev1.Secret, dc string) ([]string, error) {
 	finder, err := getSoapFinder(ctx, cc, dc)
 	if err != nil {
 		return nil, err
@@ -51,7 +50,7 @@ func processSoapFinder(ctx context.Context, fieldName string, cc *v1.Secret, dc 
 	return data, err
 }
 
-func processSoapFinderExtended(ctx context.Context, fieldName string, cc *v1.Secret, dc string) ([]map[string]interface{}, error) {
+func processSoapFinderExtended(ctx context.Context, fieldName string, cc *corev1.Secret, dc string) ([]map[string]interface{}, error) {
 	finder, err := getSoapFinder(ctx, cc, dc)
 	if err != nil {
 		return nil, fmt.Errorf("error getting soap finder: %v", err)
@@ -80,7 +79,7 @@ func listNetworksExtended(ctx context.Context, finder *find.Finder) ([]map[strin
 	return data, nil
 }
 
-func processTagsManager(ctx context.Context, fieldName string, cc *v1.Secret, cat string) ([]map[string]string, error) {
+func processTagsManager(ctx context.Context, fieldName string, cc *corev1.Secret, cat string) ([]map[string]string, error) {
 	tagsManager, err := getTagsManager(ctx, cc)
 	if err != nil {
 		return nil, err
@@ -97,7 +96,7 @@ func processTagsManager(ctx context.Context, fieldName string, cc *v1.Secret, ca
 	return data, err
 }
 
-func processContentLibraryManager(ctx context.Context, fieldName string, cc *v1.Secret, library string) ([]string, error) {
+func processContentLibraryManager(ctx context.Context, fieldName string, cc *corev1.Secret, library string) ([]string, error) {
 	libraryManager, err := getContentLibraryManager(ctx, cc)
 	if err != nil {
 		return nil, err
@@ -150,7 +149,7 @@ func listContentLibraryTemplates(ctx context.Context, mgr *library.Manager, libr
 	return data, nil
 }
 
-func processCustomFieldsFinder(ctx context.Context, cc *v1.Secret) ([]map[string]interface{}, error) {
+func processCustomFieldsFinder(ctx context.Context, cc *corev1.Secret) ([]map[string]interface{}, error) {
 	mgr, err := getCustomFieldsManager(ctx, cc)
 	if err != nil {
 		return nil, err

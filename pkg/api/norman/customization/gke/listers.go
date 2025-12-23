@@ -12,13 +12,12 @@ import (
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v1"
 	"google.golang.org/api/container/v1"
-	gkeapi "google.golang.org/api/container/v1"
 	"google.golang.org/api/iam/v1"
 	"google.golang.org/api/option"
 )
 
 func getTokenSource(ctx context.Context, credential string) (oauth2.TokenSource, error) {
-	ts, err := google.CredentialsFromJSON(ctx, []byte(credential), gkeapi.CloudPlatformScope)
+	ts, err := google.CredentialsFromJSON(ctx, []byte(credential), container.CloudPlatformScope)
 	if err != nil {
 		return nil, err
 	}

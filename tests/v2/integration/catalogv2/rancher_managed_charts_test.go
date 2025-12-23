@@ -436,6 +436,8 @@ func (w *RancherManagedChartsTest) uninstallApp(namespace, chartName string) {
 		secrets, err := w.corev1.Secrets(namespace).List(context.TODO(), metav1.ListOptions{
 			LabelSelector: helmReleaseSecretLabels,
 		})
+		w.Require().NoError(err)
+
 		if len(secrets.Items) == 0 {
 			return true, nil
 		}

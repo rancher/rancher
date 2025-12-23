@@ -307,7 +307,7 @@ func TestShibbolethAuthConfigMigration(t *testing.T) {
 			wantConditions: []condition.Cond{
 				apimgmtv3.AuthConfigConditionShibbolethSecretFixed,
 			},
-			wantSecretRef: fmt.Sprintf("cattle-global-data:testing-Password"),
+			wantSecretRef: "cattle-global-data:testing-Password",
 		},
 		{
 			name:               "test migrating Shibboleth without migrated secret",

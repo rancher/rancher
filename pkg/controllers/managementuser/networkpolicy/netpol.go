@@ -115,7 +115,7 @@ func (npmgr *netpolMgr) programNetworkPolicy(projectID string, clusterNamespace 
 	}
 
 	for _, aNS := range namespaces {
-		id, _ := aNS.Labels[nslabels.ProjectIDFieldLabel]
+		id := aNS.Labels[nslabels.ProjectIDFieldLabel]
 
 		// add an allow all network policy to system project namespaces
 		// this is the same as having no network policy, i.e. it allows all ingress and egress traffic to/from the namespace
@@ -263,7 +263,7 @@ func (npmgr *netpolMgr) handleHostNetwork(clusterNamespace string) error {
 		return fmt.Errorf("netpolMgr: handleHostNetwork getSystemNamespaces: err=%v", err)
 	}
 	for _, aNS := range namespaces {
-		projectID, _ := aNS.Labels[nslabels.ProjectIDFieldLabel]
+		projectID := aNS.Labels[nslabels.ProjectIDFieldLabel]
 		if systemNamespaces[aNS.Name] || projectID == "" {
 			npmgr.delete(aNS.Name, hostNetworkPolicyName)
 			continue

@@ -9,7 +9,6 @@ import (
 	"github.com/rancher/rancher/pkg/schemas/factory"
 	"github.com/rancher/rancher/pkg/schemas/mapper"
 	appsv1 "k8s.io/api/apps/v1"
-	k8sappv1 "k8s.io/api/apps/v1"
 	autoscaling "k8s.io/api/autoscaling/v2"
 	batchv1 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
@@ -142,7 +141,7 @@ func workloadTypes(schemas *types.Schemas) *types.Schemas {
 
 func statefulSetTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
-		AddMapperForType(&Version, k8sappv1.StatefulSetUpdateStrategy{},
+		AddMapperForType(&Version, appsv1.StatefulSetUpdateStrategy{},
 			&m.Embed{Field: "rollingUpdate"},
 			m.Enum{Field: "type", Options: []string{
 				"RollingUpdate",
@@ -150,7 +149,7 @@ func statefulSetTypes(schemas *types.Schemas) *types.Schemas {
 			}},
 			m.Move{From: "type", To: "strategy"},
 		).
-		AddMapperForType(&Version, k8sappv1.StatefulSetSpec{},
+		AddMapperForType(&Version, appsv1.StatefulSetSpec{},
 			&m.Move{
 				From: "replicas",
 				To:   "scale",
@@ -177,15 +176,15 @@ func statefulSetTypes(schemas *types.Schemas) *types.Schemas {
 			&m.Embed{Field: "template"},
 		).
 		MustImport(&Version, v3.WorkloadMetric{}).
-		AddMapperForType(&Version, k8sappv1.StatefulSet{},
+		AddMapperForType(&Version, appsv1.StatefulSet{},
 			&m.Move{
 				From: "status",
 				To:   "statefulSetStatus",
 			},
 			NewWorkloadTypeMapper(),
 		).
-		MustImport(&Version, k8sappv1.StatefulSetSpec{}, statefulSetConfigOverride{}).
-		MustImportAndCustomize(&Version, k8sappv1.StatefulSet{}, func(schema *types.Schema) {
+		MustImport(&Version, appsv1.StatefulSetSpec{}, statefulSetConfigOverride{}).
+		MustImportAndCustomize(&Version, appsv1.StatefulSet{}, func(schema *types.Schema) {
 			schema.BaseType = "workload"
 			schema.ResourceActions = map[string]types.Action{
 				"redeploy": {},
@@ -284,7 +283,7 @@ func replicationControllerTypes(schemas *types.Schemas) *types.Schemas {
 
 func daemonSetTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
-		AddMapperForType(&Version, k8sappv1.DaemonSetUpdateStrategy{},
+		AddMapperForType(&Version, appsv1.DaemonSetUpdateStrategy{},
 			&m.Embed{Field: "rollingUpdate"},
 			m.Enum{Field: "type", Options: []string{
 				"RollingUpdate",
@@ -292,7 +291,7 @@ func daemonSetTypes(schemas *types.Schemas) *types.Schemas {
 			}},
 			m.Move{From: "type", To: "strategy"},
 		).
-		AddMapperForType(&Version, k8sappv1.DaemonSetSpec{},
+		AddMapperForType(&Version, appsv1.DaemonSetSpec{},
 			&m.Embed{Field: "updateStrategy"},
 			&m.BatchMove{
 				From: []string{
@@ -306,15 +305,15 @@ func daemonSetTypes(schemas *types.Schemas) *types.Schemas {
 			&m.Embed{Field: "template"},
 		).
 		MustImport(&Version, v3.WorkloadMetric{}).
-		AddMapperForType(&Version, k8sappv1.DaemonSet{},
+		AddMapperForType(&Version, appsv1.DaemonSet{},
 			&m.Move{
 				From: "status",
 				To:   "daemonSetStatus",
 			},
 			NewWorkloadTypeMapper(),
 		).
-		MustImport(&Version, k8sappv1.DaemonSetSpec{}, daemonSetOverride{}).
-		MustImportAndCustomize(&Version, k8sappv1.DaemonSet{}, func(schema *types.Schema) {
+		MustImport(&Version, appsv1.DaemonSetSpec{}, daemonSetOverride{}).
+		MustImportAndCustomize(&Version, appsv1.DaemonSet{}, func(schema *types.Schema) {
 			schema.BaseType = "workload"
 			schema.ResourceActions = map[string]types.Action{
 				"redeploy": {},
@@ -445,7 +444,7 @@ func cronJobTypes(schemas *types.Schemas) *types.Schemas {
 
 func deploymentTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
-		AddMapperForType(&Version, k8sappv1.DeploymentStrategy{},
+		AddMapperForType(&Version, appsv1.DeploymentStrategy{},
 			&m.Embed{Field: "rollingUpdate", EmptyValueOk: true},
 			m.Enum{Field: "type", Options: []string{
 				"Recreate",
@@ -453,7 +452,7 @@ func deploymentTypes(schemas *types.Schemas) *types.Schemas {
 			}},
 			m.Move{From: "type", To: "strategy"},
 		).
-		AddMapperForType(&Version, k8sappv1.DeploymentSpec{},
+		AddMapperForType(&Version, appsv1.DeploymentSpec{},
 			&m.Move{
 				From: "strategy",
 				To:   "upgradeStrategy",
@@ -477,16 +476,16 @@ func deploymentTypes(schemas *types.Schemas) *types.Schemas {
 			&m.Embed{Field: "template"},
 		).
 		MustImport(&Version, v3.WorkloadMetric{}).
-		AddMapperForType(&Version, k8sappv1.Deployment{},
+		AddMapperForType(&Version, appsv1.Deployment{},
 			&m.Move{
 				From: "status",
 				To:   "deploymentStatus",
 			},
 			NewWorkloadTypeMapper(),
 		).
-		MustImport(&Version, k8sappv1.DeploymentSpec{}, deploymentConfigOverride{}).
+		MustImport(&Version, appsv1.DeploymentSpec{}, deploymentConfigOverride{}).
 		MustImport(&Version, v3.DeploymentRollbackInput{}).
-		MustImportAndCustomize(&Version, k8sappv1.Deployment{}, func(schema *types.Schema) {
+		MustImportAndCustomize(&Version, appsv1.Deployment{}, func(schema *types.Schema) {
 			schema.BaseType = "workload"
 			schema.ResourceActions = map[string]types.Action{
 				"rollback": {

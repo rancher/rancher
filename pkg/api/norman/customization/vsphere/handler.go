@@ -209,7 +209,7 @@ func (v *handler) getCloudCredential(id string, req *http.Request) (*corev1.Secr
 		return nil, httperror.InvalidBodyContent, fmt.Errorf("error getting cloud cred %s: %v", id, err)
 	}
 
-	if cc.Data == nil || len(cc.Data) == 0 {
+	if len(cc.Data) == 0 {
 		return nil, httperror.InvalidBodyContent, fmt.Errorf("empty credential ID data %s", id)
 	}
 	if !validCloudCredential(cc) {
@@ -239,7 +239,7 @@ func (v *handler) getSecret(id string, req *http.Request) (*corev1.Secret, httpe
 		return nil, httperror.InvalidBodyContent, fmt.Errorf("error getting cloud cred %s: %v", id, err)
 	}
 
-	if cc.Data == nil || len(cc.Data) == 0 {
+	if len(cc.Data) == 0 {
 		return nil, httperror.InvalidBodyContent, fmt.Errorf("empty secret ID data %s", id)
 	}
 

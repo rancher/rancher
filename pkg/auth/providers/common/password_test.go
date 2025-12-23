@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -87,8 +86,8 @@ func TestSavePasswordSecret(t *testing.T) {
 
 	ctrl := gomock.NewController(t)
 	secretController := wranglerfake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
-	var createdSecret *v1.Secret
-	secretController.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *v1.Secret) (*v1.Secret, error) {
+	var createdSecret *corev1.Secret
+	secretController.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
 		createdSecret = secret
 		return secret, nil
 	})

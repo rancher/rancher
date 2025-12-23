@@ -111,10 +111,7 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 		Factor:   1.0,
 		Jitter:   0.1,
 	}, func(err error) bool {
-		if apierrors.IsForbidden(err) {
-			return false
-		}
-		return true
+		return !apierrors.IsForbidden(err)
 	},
 		func() error {
 			clientset, err = GetAndVerifyDownstreamClientset(clients, c)
@@ -170,10 +167,7 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 		Factor:   1.0,
 		Jitter:   0.1,
 	}, func(err error) bool {
-		if apierrors.IsForbidden(err) {
-			return false
-		}
-		return true
+		return !apierrors.IsForbidden(err)
 	},
 		func() error {
 			snapshotsList, err := clients.RKE.ETCDSnapshot().List(c.Namespace, metav1.ListOptions{LabelSelector: fmt.Sprintf("%s=%s", capr.ClusterNameLabel, c.Name)})

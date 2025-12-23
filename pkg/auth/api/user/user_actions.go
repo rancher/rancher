@@ -114,7 +114,7 @@ func (h *Handler) changePassword(request *types.APIContext) error {
 	}
 
 	user.MustChangePassword = false
-	user, err = h.UserClient.Update(user)
+	_, err = h.UserClient.Update(user)
 	if err != nil {
 		return err
 	}

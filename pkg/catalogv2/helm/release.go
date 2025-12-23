@@ -7,12 +7,10 @@ import (
 	"strconv"
 
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
-
 	"github.com/rancher/wrangler/v3/pkg/data"
 	"github.com/rancher/wrangler/v3/pkg/yaml"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	meta2 "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -130,7 +128,7 @@ func resourcesFromManifest(namespace string, manifest string, isNamespaced IsNam
 	}
 
 	for _, obj := range objs {
-		meta, err := meta2.Accessor(obj)
+		meta, err := meta.Accessor(obj)
 		if err != nil {
 			return nil, err
 		}

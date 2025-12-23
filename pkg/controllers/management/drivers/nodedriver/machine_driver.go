@@ -300,10 +300,7 @@ func (m *Lifecycle) checkDriverVersion(obj *v32.NodeDriver) bool {
 
 	// Builtin drivers use the rancher-machine version to validate against
 	if obj.Spec.Builtin {
-		if obj.Status.AppliedDockerMachineVersion != m.dockerMachineVersion {
-			return true
-		}
-		return false
+		return obj.Status.AppliedDockerMachineVersion != m.dockerMachineVersion
 	}
 
 	if obj.Spec.URL != obj.Status.AppliedURL || obj.Spec.Checksum != obj.Status.AppliedChecksum {
