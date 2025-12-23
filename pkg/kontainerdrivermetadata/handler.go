@@ -57,7 +57,7 @@ func (m *MetadataController) Refresh() error {
 		// Fall back to async refresh if synchronous refresh fails
 		channelserver.Refresh()
 		// Wait briefly to allow the reload to process
-		time.Sleep(2 * time.Second)
+		time.Sleep(channelserver.FallbackRefreshDelay)
 	}
 	// Update settings for rke2/k3s and ui
 	return m.updateSettings(m.ctx, settings.GetRancherVersion())

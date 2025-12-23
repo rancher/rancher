@@ -19,6 +19,15 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	// RefreshTimeout is the maximum time to wait for a config refresh to start
+	RefreshTimeout = 30 * time.Second
+	// ConfigProcessingDelay is the time to wait after a refresh signal for the config to fully process the new data
+	ConfigProcessingDelay = 500 * time.Millisecond
+	// FallbackRefreshDelay is the time to wait in the fallback path when RefreshAndWait fails
+	FallbackRefreshDelay = 2 * time.Second
+)
+
 var (
 	configs       map[string]*config.Config
 	configsInit   sync.Once
@@ -128,7 +137,7 @@ func RefreshAndWait(ctx context.Context) error {
 	}
 
 	// Use a deadline-based approach to ensure consistent timeout for both runtimes
-	deadline := time.Now().Add(30 * time.Second)
+	deadline := time.Now().Add(RefreshTimeout)
 
 	// Wait for k3s refresh to complete
 	k3sTimeout := time.Until(deadline)
@@ -158,7 +167,7 @@ func RefreshAndWait(ctx context.Context) error {
 
 	// Give the config.Config internal reload goroutine a moment to actually process the data
 	// The DynamicInterval.Wait() returning triggers the reload, but the reload itself takes a bit of time
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(ConfigProcessingDelay)
 
 	return nil
 }
