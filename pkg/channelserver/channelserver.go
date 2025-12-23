@@ -113,7 +113,7 @@ func RefreshAndWait(ctx context.Context) error {
 	// Wait for both refreshes to complete or context to be canceled
 	// Use a timeout to prevent indefinite blocking
 	timeout := time.After(30 * time.Second)
-	
+
 	select {
 	case <-k3sDone:
 	case <-timeout:
