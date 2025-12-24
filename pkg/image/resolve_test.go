@@ -137,7 +137,7 @@ func TestResolveWithCluster(t *testing.T) {
 	}
 }
 
-func TestGetImages(t *testing.T) {
+func TestGetArtifacts(t *testing.T) {
 	// Setup a httpserver
 	server := setupTestServer()
 	defer server.Close()
@@ -185,7 +185,7 @@ func TestGetImages(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			imagesList, _, err := GetImages(tt.chartsPath, tt.OsType, tt.rancherVersion, tt.GithubEndpoints, make(map[string][]string), []string{})
+			imagesList, _, err := GetArtifacts(tt.chartsPath, "", tt.OsType, tt.rancherVersion, tt.GithubEndpoints, make(map[string][]string), []string{}, "")
 			assertlib.NoError(t, err)
 
 			for _, expected := range tt.expected {

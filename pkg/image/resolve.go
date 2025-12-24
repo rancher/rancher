@@ -17,10 +17,11 @@ var Mirrors = map[string]string{}
 
 // ExportConfig provides parameters you can define to configure image exporting for Rancher components
 type ExportConfig struct {
-	RancherVersion  string
-	ChartsPath      string
-	GithubEndpoints []GithubEndpoint
-	OsType          OSType
+	RancherVersion   string
+	ChartsPath       string
+	OCIChartsGitPath string
+	GithubEndpoints  []GithubEndpoint
+	OsType           OSType
 }
 
 type OSType int
@@ -52,16 +53,20 @@ func ResolveWithCluster(image string, cluster *v3.Cluster) string {
 	return image
 }
 
-// GetImages fetches the list of container images used in the sources provided in the chartsPath
-// and extensionendpoints. Rancher/Prime charts, system images and extension images of Rancher
-// are fetched. GetImages is called during runtime by Rancher catalog package which is deprecated.
+// GetArtifacts fetches the list of container images/oci chart urls used in the sources provided in the chartsPath,
+// ociChartsGitPaths and extensionendpoints. Rancher/Prime charts, system images and extension images of Rancher
+// are fetched. GetArtifacts is called during runtime by Rancher catalog package which is deprecated.
 // It is actually used for generation rancher-images.txt for airgap scenarios.
-func GetImages(chartsPath string,
+func GetArtifacts(
+	chartsPath string,
+	ociChartsGitPaths string,
 	osType OSType,
 	rancherVersion string,
 	extensionEndpoints []GithubEndpoint,
 	externalImages map[string][]string,
-	imagesFromArgs []string) ([]string, []string, error) {
+	imagesFromArgs []string,
+	ociRepository string,
+) ([]string, []string, error) {
 	imagesSet := make(map[string]map[string]struct{})
 
 	chartsPathList := strings.Split(chartsPath, ",")
@@ -75,6 +80,21 @@ func GetImages(chartsPath string,
 		charts := Charts{exportConfig}
 		if err := charts.FetchImages(imagesSet); err != nil {
 			return nil, nil, errors.Wrap(err, "failed to fetch images from charts")
+		}
+	}
+
+	if ociChartsGitPaths != "" {
+		ociChartPaths := strings.Split(ociChartsGitPaths, ",")
+		for _, ociChartPath := range ociChartPaths {
+			exportConfig := ExportConfig{
+				OCIChartsGitPath: ociChartPath,
+				RancherVersion:   rancherVersion,
+			}
+
+			charts := Charts{exportConfig}
+			if err := charts.FetchOCICharts(imagesSet, ociRepository); err != nil {
+				return nil, nil, errors.Wrap(err, "failed to fetch OCI charts")
+			}
 		}
 	}
 

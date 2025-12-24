@@ -101,6 +101,77 @@ func (c Charts) FetchImages(imagesSet map[string]map[string]struct{}) error {
 	return nil
 }
 
+// FetchOCICharts finds all OCI chart artifacts for charts in a github repository
+// and adds them to imagesSet. The chart selection logic mirrors FetchImages exactly,
+// but instead of parsing values.yaml it emits OCI chart URLs.
+func (c Charts) FetchOCICharts(
+	imagesSet map[string]map[string]struct{},
+	ociRepository string,
+) error {
+	if c.Config.OCIChartsGitPath == "" || c.Config.RancherVersion == "" {
+		return nil
+	}
+
+	if ociRepository == "" {
+		return fmt.Errorf("OCI repository must be provided")
+	}
+
+	index, err := repo.LoadIndexFile(filepath.Join(c.Config.OCIChartsGitPath, "index.yaml"))
+	if err != nil {
+		return err
+	}
+
+	// Filter index entries based on their Rancher version constraint
+	var filteredVersions repo.ChartVersions
+	for _, versions := range index.Entries {
+		if len(versions) == 0 {
+			continue
+		}
+
+		latestVersion := versions[0]
+		if isConstraintSatisfied, err := c.checkChartVersionConstraint(*latestVersion); err != nil {
+			return errors.Wrapf(err, "failed to check constraint of chart")
+		} else if isConstraintSatisfied {
+			filteredVersions = append(filteredVersions, latestVersion)
+		}
+
+		chartName := versions[0].Metadata.Name
+		if _, ok := chartsToCheckConstraints[chartName]; ok {
+			for _, version := range versions[1:] {
+				if isConstraintSatisfied, err := c.checkChartVersionConstraint(*version); err != nil {
+					return errors.Wrapf(err, "failed to check constraint of chart")
+				} else if !isConstraintSatisfied {
+					filteredVersions = append(filteredVersions, version)
+				}
+			}
+		}
+	}
+
+	// Emit OCI chart URLs instead of parsing values.yaml
+	for _, version := range filteredVersions {
+		ociURL := buildOCIChartURL(version, ociRepository)
+		addSourceToImage(
+			imagesSet,
+			ociURL,
+			fmt.Sprintf("%s:%s", version.Name, version.Version),
+		)
+	}
+
+	return nil
+}
+
+func buildOCIChartURL(
+	version *repo.ChartVersion,
+	ociRegistry string,
+) string {
+	return fmt.Sprintf(
+		"%s/%s:%s",
+		strings.TrimSuffix(ociRegistry, "/"),
+		version.Name,
+		version.Version,
+	)
+}
+
 // checkChartVersionConstraint retrieves the value of a chart's Rancher version constraint annotation, and
 // returns true if the Rancher version in the export configuration satisfies the chart's constraint, false otherwise.
 // If a chart does not have a Rancher version annotation defined, this function returns false.
@@ -252,32 +323,6 @@ func walkMap(inputMap interface{}, callback func(map[interface{}]interface{})) {
 			walkMap(elem, callback)
 		}
 	}
-}
-
-func decodeQuestionsFile(path string) (Questions, error) {
-	var questions Questions
-	file, err := os.Open(path)
-	if err != nil {
-		return Questions{}, err
-	}
-	defer file.Close()
-	if err := decodeYAMLFile(file, &questions); err != nil {
-		return Questions{}, err
-	}
-	return questions, nil
-}
-
-func decodeValuesFile(path string) (map[interface{}]interface{}, error) {
-	var values map[interface{}]interface{}
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-	if err := decodeYAMLFile(file, &values); err != nil {
-		return nil, err
-	}
-	return values, nil
 }
 
 func decodeYAMLFile(r io.Reader, target interface{}) error {
