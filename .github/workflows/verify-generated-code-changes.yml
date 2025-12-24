@@ -23,7 +23,7 @@ jobs:
         with:
           fetch-depth: 0
       -
-        uses: actions/setup-go@19bb51245e9c80abacb2e91cc42b33fa478b8639 # v4
+        uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4
         with:
           go-version: ${{ env.SETUP_GO_VERSION }}
       -
