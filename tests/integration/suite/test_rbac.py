@@ -541,7 +541,10 @@ def test_permissions_can_be_removed(admin_cc, admin_mc, user_mc, request,
             except ApiError:
                 pass
 
-        ns = admin_cc.client.create_namespace(name=random_str(),
+        name = random_str()
+        print("Creating namespace " + name + " in project " +
+              admin_pc.project.id)
+        ns = admin_cc.client.create_namespace(name=name,
                                               projectId=admin_pc.project.id)
         request.addfinalizer(lambda: safe_remove(admin_cc.client, ns))
 
@@ -569,6 +572,7 @@ def test_permissions_can_be_removed(admin_cc, admin_mc, user_mc, request,
     def prtb_deleted():
         prtbs = admin_mc.client.list_project_role_template_binding(
             projectId=admin_pc2.project.id)
+        print(prtbs)
         return prtb2.uuid not in [
             prtb.uuid for prtb in prtbs]
 
@@ -579,7 +583,10 @@ def test_permissions_can_be_removed(admin_cc, admin_mc, user_mc, request,
 
 
 def ns_count(client, count):
-    return len(client.list_namespace()) == count
+    namespaces = client.list_namespace()
+    print("want: " + str(count) + " got: " + str(len(namespaces)))
+    print(namespaces)
+    return len(namespaces) == count
 
 
 def test_appropriate_users_can_see_kontainer_drivers(user_factory):
