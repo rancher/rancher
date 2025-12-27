@@ -17,6 +17,10 @@ spec:
       labels: {{ include "rancher.labels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ template "rancher.fullname" . }}-post-delete
+      {{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+      {{ toYaml .Values.imagePullSecrets | indent 2 }}
+      {{- end }}
       restartPolicy: OnFailure
       containers:
         - name: {{ template "rancher.name" . }}-post-delete
