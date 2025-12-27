@@ -10,11 +10,15 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// Retriever provides system information for RKE control planes, including pod label selectors
+// for system components that should be tracked during cluster operations.
 type Retriever struct {
 	fleetClusterCache fleetv1alpha1.ClusterCache
 }
 
-// NewRetriever returns a new instance of the systeminfo.Retriever
+// NewRetriever returns a new instance of the systeminfo.Retriever that can be used to retrieve
+// system pod label selectors for a given RKE control plane. Returns nil if the provided clients
+// context is nil.
 func NewRetriever(clients *wrangler.CAPIContext) *Retriever {
 	if clients == nil {
 		return nil
@@ -24,7 +28,12 @@ func NewRetriever(clients *wrangler.CAPIContext) *Retriever {
 	}
 }
 
-// GetSystemPodLabelSelectors returns a slice of strings that contains system pod label selectors in the format of namespace:labelSelector, delimited by :
+// GetSystemPodLabelSelectors returns a slice of strings that contains system pod label selectors
+// in the format of "namespace:labelSelector". Each entry represents a critical system component
+// that should be considered during cluster operations. These include the cattle cluster agent,
+// kube-api-auth, rancher-webhook, system-upgrade-controller, and fleet-agent.
+// Returns an empty slice if controlPlane is nil. If there is an error retrieving the fleet cluster,
+// logs the error but continues to return other system pod selectors to avoid blocking pod cleanup.
 func (r *Retriever) GetSystemPodLabelSelectors(controlPlane *v1.RKEControlPlane) []string {
 	if controlPlane == nil {
 		return []string{}
