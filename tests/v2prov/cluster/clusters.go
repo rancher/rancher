@@ -14,6 +14,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provisioningv1api "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/controllers/capr/machineprovision"
@@ -368,7 +369,7 @@ func getPodLogs(clients *clients.Clients, podNamespace, podName string) (string,
 	for reader.Scan() {
 		logs = logs + fmt.Sprintf("%sSnewlineG", reader.Text())
 	}
-	return capr.CompressInterface(logs)
+	return snapshotutil.CompressInterface(logs)
 }
 
 // countPodLogRegexOccurances gathers the logs from the specified pod in a manner similar to `kubectl logs` and counts the number of times the log matches the given regex.
@@ -420,7 +421,7 @@ func getPodFileContents(podNamespace, podName, podPath string) (string, error) {
 	for reader.Scan() {
 		logs = logs + fmt.Sprintf("%sSnewlineG", reader.Text())
 	}
-	return capr.CompressInterface(logs)
+	return snapshotutil.CompressInterface(logs)
 }
 
 // GatherDebugData gathers debug data that is relevant to the current cluster and returns a gzip compressed + base64 encoded string of the json.
@@ -548,7 +549,7 @@ func GatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 		snapshots = nil
 	}
 
-	return capr.CompressInterface(map[string]interface{}{
+	return snapshotutil.CompressInterface(map[string]interface{}{
 		"cluster":               newC,
 		"rkecontrolplane":       newControlPlane,
 		"mgmtCluster":           mgmtCluster,
