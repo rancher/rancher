@@ -43,7 +43,6 @@ type autoscalerSuite struct {
 
 	mockCtrl                   *gomock.Controller
 	h                          *autoscalerHandler
-	m                          *machineDeploymentReplicaOverrider
 	capiClusterCache           *fake.MockCacheInterface[*capi.Cluster]
 	capiMachineCache           *fake.MockCacheInterface[*capi.Machine]
 	capiMachineDeploymentCache *fake.MockCacheInterface[*capi.MachineDeployment]
@@ -111,12 +110,6 @@ func (s *autoscalerSuite) SetupTest() {
 		helmOp:                     s.helmOp,
 		helmOpCache:                s.helmOpCache,
 		dynamicClient:              s.dynamicClient,
-	}
-
-	s.m = &machineDeploymentReplicaOverrider{
-		clusterCache:     s.clusterCache,
-		clusterClient:    s.clusterClient,
-		capiClusterCache: s.capiClusterCache,
 	}
 }
 
