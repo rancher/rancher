@@ -198,8 +198,8 @@ func (w *Writer) GetPolicy(name string) (Policy, bool) {
 	return p, ok
 }
 
-func (l *Writer) Start(ctx context.Context) {
-	if l == nil {
+func (w *Writer) Start(ctx context.Context) {
+	if w == nil {
 		return
 	}
 

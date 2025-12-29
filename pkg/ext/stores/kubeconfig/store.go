@@ -1474,7 +1474,7 @@ func (s *Store) GroupVersionKind(gv schema.GroupVersion) schema.GroupVersionKind
 func (s *Store) Destroy() {}
 
 // NamespaceScoped implements [rest.Scoper].
-func (t *Store) NamespaceScoped() bool {
+func (s *Store) NamespaceScoped() bool {
 	return false
 }
 

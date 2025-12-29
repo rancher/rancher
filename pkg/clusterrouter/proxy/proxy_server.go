@@ -279,7 +279,7 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 				}
 				req.Header.Del("Impersonate-User")
 				req.Header.Del("Impersonate-Group")
-				for k, _ := range req.Header {
+				for k := range req.Header {
 					if strings.HasPrefix(k, "Impersonate-Extra") {
 						req.Header.Del(k)
 					}

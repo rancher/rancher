@@ -327,7 +327,7 @@ func (m *Lifecycle) addUIHintsAnno(obj *v32.NodeDriver) (*v32.NodeDriver, error)
 	if aliasedField, ok := obj.Annotations[FileToFieldAliasesAnno]; ok {
 		anno := make(map[string]map[string]string)
 		aliases := ParseKeyValueString(aliasedField)
-		for field, _ := range aliases {
+		for field := range aliases {
 			anno[field] = map[string]string{
 				"type": "multiline",
 			}
