@@ -34,13 +34,8 @@ var (
 
 func init() {
 	for _, fields := range management.DriverData {
-		for _, item := range fields.PrivateCredentialFields {
-			sensitiveBodyFields = append(sensitiveBodyFields, item)
-		}
-
-		for _, item := range fields.PasswordFields {
-			sensitiveBodyFields = append(sensitiveBodyFields, item)
-		}
+		sensitiveBodyFields = append(sensitiveBodyFields, fields.PrivateCredentialFields...)
+		sensitiveBodyFields = append(sensitiveBodyFields, fields.PasswordFields...)
 	}
 
 	for _, fields := range management.KEv2OperatorsCredentialFields {
