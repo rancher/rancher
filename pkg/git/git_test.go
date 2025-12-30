@@ -286,15 +286,15 @@ func setMockGitExecutable(t *testing.T) error {
 	t.Setenv("PATH", tempDir+string(os.PathListSeparator)+path)
 	// copy the main test executable to the new temp directory under the name of git
 	testExecFile, err := os.Open(mainExec)
+	if err != nil {
+		return err
+	}
 	defer testExecFile.Close()
-	if err != nil {
-		return err
-	}
 	testGitExec, err := os.Create(filepath.Join(tempDir, "git"))
-	defer testGitExec.Close()
 	if err != nil {
 		return err
 	}
+	defer testGitExec.Close()
 	_, err = io.Copy(testGitExec, testExecFile)
 	if err != nil {
 		return err
