@@ -22,11 +22,11 @@ func serveHTTPWithHeader(port string, origins []string, connections []string, ua
 	testWSHandler := NewWebsocketHandler(&testHandler{})
 	testWSHandler.ServeHTTP(testRW, testReq)
 
-	if statusCode := testRW.header["code"]; len(statusCode) == 0 {
+	if statusCode := testRW.header["Code"]; len(statusCode) == 0 {
 		return -1
 	}
 
-	code, err := strconv.Atoi(testRW.header["code"][0])
+	code, err := strconv.Atoi(testRW.header["Code"][0])
 	if err != nil {
 		return -1
 	}
@@ -80,7 +80,7 @@ func (trw *testResponseWriter) Write([]byte) (int, error) {
 }
 
 func (trw *testResponseWriter) WriteHeader(statusCode int) {
-	trw.header["code"] = []string{strconv.Itoa(statusCode)}
+	trw.header["Code"] = []string{strconv.Itoa(statusCode)}
 }
 
 func (th *testHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
