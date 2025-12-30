@@ -16,9 +16,7 @@ import (
 
 const (
 	clusterContext = "cluster"
-	clusterOwner   = "cluster-owner"
 	projectContext = "project"
-	projectOwner   = "project-owner"
 )
 
 const (
@@ -222,11 +220,11 @@ func buildProjectMembershipBinding(roleRef rbacv1.RoleRef, prtb *v3.ProjectRoleT
 
 // deleteProjectMembershipBinding removes the Project membership RoleBinding if no other PRTBs are using it.
 func deleteProjectMembershipBinding(prtb *v3.ProjectRoleTemplateBinding, rbController crbacv1.RoleBindingController) error {
-	_, projectNamespace := rbac.GetClusterAndProjectNameFromPRTB(prtb)
+	clusterName, _ := rbac.GetClusterAndProjectNameFromPRTB(prtb)
 
 	label := getRTBLabel(prtb)
 	listOption := metav1.ListOptions{LabelSelector: label}
-	rbs, err := rbController.List(projectNamespace, listOption)
+	rbs, err := rbController.List(clusterName, listOption)
 	if err != nil {
 		return err
 	}

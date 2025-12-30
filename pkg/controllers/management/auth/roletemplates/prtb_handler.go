@@ -83,8 +83,8 @@ func (p *prtbHandler) OnRemove(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 func (p *prtbHandler) deleteRoleBindings(prtb *v3.ProjectRoleTemplateBinding) error {
 	// Collect all RoleBindings owned by this ProjectRoleTemplateBinding
 	set := labels.Set(map[string]string{
-		rbac.PrtbOwnerLabel:          prtb.Name,
-		rbac.AggregationFeatureLabel: "true",
+		rbac.GetPRTBOwnerLabel(prtb.Name): "true",
+		rbac.AggregationFeatureLabel:      "true",
 	})
 	currentRBs, err := p.rbController.List(prtb.Namespace, metav1.ListOptions{LabelSelector: set.AsSelector().String()})
 	if err != nil {

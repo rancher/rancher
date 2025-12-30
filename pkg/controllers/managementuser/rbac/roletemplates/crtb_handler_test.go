@@ -20,7 +20,7 @@ type reducedCondition struct {
 }
 
 var (
-	defaultListOption = metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/crtb-owner=test-crtb,management.cattle.io/roletemplate-aggregation=true"}
+	defaultListOption = metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/crtb-owner-test-crtb=true,management.cattle.io/roletemplate-aggregation=true"}
 	defaultCRTB       = v3.ClusterRoleTemplateBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-crtb",

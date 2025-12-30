@@ -165,8 +165,8 @@ func (c *crtbHandler) deleteBindings(crtb *v3.ClusterRoleTemplateBinding, remote
 
 	// Get all ClusterRoleBindings owned by this CRTB.
 	set := labels.Set(map[string]string{
-		rbac.CrtbOwnerLabel:          crtb.Name,
-		rbac.AggregationFeatureLabel: "true",
+		rbac.GetCRTBOwnerLabel(crtb.Name): "true",
+		rbac.AggregationFeatureLabel:      "true",
 	})
 	lo := metav1.ListOptions{LabelSelector: set.AsSelector().String()}
 

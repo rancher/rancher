@@ -185,8 +185,8 @@ func (p *prtbHandler) deleteRoleBindings(prtb *v3.ProjectRoleTemplateBinding) er
 
 	// Get all RoleBindings owned by this PRTB.
 	set := labels.Set(map[string]string{
-		rbac.PrtbOwnerLabel:          prtb.Name,
-		rbac.AggregationFeatureLabel: "true",
+		rbac.GetPRTBOwnerLabel(prtb.Name): "true",
+		rbac.AggregationFeatureLabel:      "true",
 	})
 	listOptions := metav1.ListOptions{LabelSelector: set.AsSelector().String()}
 
@@ -207,8 +207,8 @@ func (p *prtbHandler) deleteRoleBindings(prtb *v3.ProjectRoleTemplateBinding) er
 func (p *prtbHandler) deleteClusterRoleBindings(prtb *v3.ProjectRoleTemplateBinding) error {
 	// Get all ClusterRoleBindings owned by this PRTB.
 	set := labels.Set(map[string]string{
-		rbac.PrtbOwnerLabel:          prtb.Name,
-		rbac.AggregationFeatureLabel: "true",
+		rbac.GetPRTBOwnerLabel(prtb.Name): "true",
+		rbac.AggregationFeatureLabel:      "true",
 	})
 	listOptions := metav1.ListOptions{LabelSelector: set.AsSelector().String()}
 	crbs, err := p.crbClient.List(listOptions)

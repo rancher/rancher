@@ -103,7 +103,7 @@ var (
 func Test_prtbHandler_OnRemove(t *testing.T) {
 	prtbOwnerLabel := "authz.cluster.cattle.io/prtb-owner-test-prtb"
 	prtbOwnerLabel2 := "authz.cluster.cattle.io/prtb-owner-test-prtb-2"
-	listOptions := metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/prtb-owner=test-prtb,management.cattle.io/roletemplate-aggregation=true"}
+	listOptions := metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/prtb-owner-test-prtb=true,management.cattle.io/roletemplate-aggregation=true"}
 
 	type fields struct {
 		crbClient func(ctrl *gomock.Controller) *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]

@@ -245,8 +245,8 @@ func (c *crtbHandler) removeRoleBindings(crtb *v3.ClusterRoleTemplateBinding) er
 
 	// Collect all RoleBindings owned by this ClusterRoleTemplateBinding
 	set := labels.Set(map[string]string{
-		rbac.CrtbOwnerLabel:          crtb.Name,
-		rbac.AggregationFeatureLabel: "true",
+		rbac.GetCRTBOwnerLabel(crtb.Name): "true",
+		rbac.AggregationFeatureLabel:      "true",
 	})
 	currentRBs, err := c.rbController.List(crtb.Namespace, metav1.ListOptions{LabelSelector: set.AsSelector().String()})
 	if err != nil {
