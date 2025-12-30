@@ -38,19 +38,25 @@ func GetBootstrapPassword(ctx context.Context, secrets corev1.SecretInterface) (
 			return string(bootstrapPasswordBytes), generated, nil
 		}
 		logrus.Warn("A bootstrap password secret was found, but did not match the expected structure.")
+	} else {
+		s = &v1.Secret{
+			Type: v1.SecretTypeOpaque,
+		}
 	}
 
 	// if the password secret is not set check the env for user-input, or fall back to generating one
 	userPasswordValue := os.Getenv("CATTLE_BOOTSTRAP_PASSWORD")
-	s.StringData = make(map[string]string)
 	if userPasswordValue == "" {
 		generated = true
 		userPasswordValue, _ = randomtoken.Generate()
 	}
-	s.StringData[bootstrapPasswordSecretKey] = userPasswordValue
+
+	s.StringData = map[string]string{
+		bootstrapPasswordSecretKey: userPasswordValue,
+	}
 
 	// persist the password
-	if s != nil && s.GetResourceVersion() != "" {
+	if s.GetResourceVersion() != "" {
 		_, err = secrets.Update(ctx, s, metav1.UpdateOptions{})
 	} else {
 		s.Name = bootstrapPasswordSecretName
