@@ -234,9 +234,7 @@ func TestCleanOrphans(t *testing.T) {
 func newStandardClient(roleBindings []v1.RoleBinding) *orphanBindingsCleanup {
 	// Copy the role bindings to avoid unwanted concurrent modification. The slice is shared by multiple fake clients.
 	rbs := make([]v1.RoleBinding, len(roleBindings))
-	for i := range roleBindings {
-		rbs[i] = roleBindings[i]
-	}
+	copy(rbs, roleBindings)
 	return &orphanBindingsCleanup{
 		prtbs: &fakePRTBClient{bindings: []v3.ProjectRoleTemplateBinding{
 			{
