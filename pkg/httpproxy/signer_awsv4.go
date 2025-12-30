@@ -69,8 +69,7 @@ func (a awsv4) sign(req *http.Request, secrets SecretGetter, auth string) error 
 	// Therefore we need the below in order for the body to be included with the forwarded request.
 
 	var reader io.ReadCloser
-	var bodyReader io.ReadSeeker
-	bodyReader = bytes.NewReader(body)
+	var bodyReader io.ReadSeeker = bytes.NewReader(body)
 	if bodyReader != nil {
 		var ok bool
 		if reader, ok = bodyReader.(io.ReadCloser); !ok {
