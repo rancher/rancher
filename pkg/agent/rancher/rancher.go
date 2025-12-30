@@ -162,7 +162,7 @@ func setupSteveAggregation(ctx context.Context) error {
 		data["ca.crt"] = ca
 	}
 
-	if ctx.Value(cavalidator.CacertsValid).(bool) {
+	if ctx.Value(cavalidator.CACertsValidKey).(bool) {
 		data[cavalidator.CacertsValid] = []byte("true")
 	} else {
 		data[cavalidator.CacertsValid] = []byte("false")
