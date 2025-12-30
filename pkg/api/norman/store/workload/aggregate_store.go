@@ -137,11 +137,7 @@ func store(registries map[string]projectclient.RegistryCredential, domainToCreds
 			continue
 		}
 		secretRef := corev1.LocalObjectReference{Name: name}
-		if _, ok := domainToCreds[rd]; ok {
-			domainToCreds[rd] = append(domainToCreds[rd], secretRef)
-		} else {
-			domainToCreds[rd] = []corev1.LocalObjectReference{secretRef}
-		}
+		domainToCreds[rd] = append(domainToCreds[rd], secretRef)
 	}
 }
 
