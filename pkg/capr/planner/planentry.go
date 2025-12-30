@@ -104,10 +104,6 @@ func isControlPlaneAndNotInitNode(entry *planEntry) bool {
 	return isControlPlane(entry) && !isInitNode(entry)
 }
 
-func isControlPlaneEtcd(entry *planEntry) bool {
-	return isControlPlane(entry) || isEtcd(entry)
-}
-
 func IsOnlyEtcd(entry *planEntry) bool {
 	return isEtcd(entry) && !isControlPlane(entry)
 }
@@ -122,10 +118,6 @@ func isWorker(entry *planEntry) bool {
 
 func noRole(entry *planEntry) bool {
 	return !isEtcd(entry) && !isControlPlane(entry) && !isWorker(entry)
-}
-
-func anyRole(entry *planEntry) bool {
-	return !noRole(entry)
 }
 
 func anyRoleWithoutWindows(entry *planEntry) bool {

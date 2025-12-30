@@ -340,7 +340,6 @@ func (s *AuthzSuite) createRoleTemplate(name string, rules []rbacv1.PolicyRule, 
 	return rt, err
 }
 
-
 func (s *AuthzSuite) clusterBindingWatcher(c *check.C) watch.Interface {
 	bindingClient := s.clusterClient.RbacV1().ClusterRoleBindings()
 	bList, err := bindingClient.List(context.TODO(), metav1.ListOptions{})
@@ -361,17 +360,6 @@ func (s *AuthzSuite) bindingWatcher(namespace string, c *check.C) watch.Interfac
 	bindingWatch, err := bindingClient.Watch(context.TODO(), metav1.ListOptions{ResourceVersion: bListMeta.GetResourceVersion()})
 	c.Assert(err, check.IsNil)
 	return bindingWatch
-}
-
-func (s *AuthzSuite) roleWatcher(c *check.C) watch.Interface {
-	roleClient := s.clusterClient.RbacV1().ClusterRoles()
-	initialList, err := roleClient.List(context.TODO(), metav1.ListOptions{})
-	c.Assert(err, check.IsNil)
-	initialListListMeta, err := meta.ListAccessor(initialList)
-	c.Assert(err, check.IsNil)
-	roleWatch, err := roleClient.Watch(context.TODO(), metav1.ListOptions{ResourceVersion: initialListListMeta.GetResourceVersion()})
-	c.Assert(err, check.IsNil)
-	return roleWatch
 }
 
 func (s *AuthzSuite) SetUpSuite(c *check.C) {

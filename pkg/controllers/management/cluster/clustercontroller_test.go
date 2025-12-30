@@ -11,8 +11,6 @@ import (
 	"k8s.io/utils/pointer"
 )
 
-const testServiceNodePortRange = "10000-32769"
-
 type capabilitiesTestCase struct {
 	annotations  map[string]string
 	capabilities v32.Capabilities

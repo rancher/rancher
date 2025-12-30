@@ -78,8 +78,6 @@ type nodeDrain struct {
 	nodesToContext       map[string]context.CancelFunc
 }
 
-type canChangeValuePolicy func(key string) bool
-
 func Register(ctx context.Context, cluster *config.UserContext, capi *wrangler.CAPIContext, kubeConfigGetter common.KubeConfigGetter) {
 	m := &nodesSyncer{
 		clusterNamespace:     cluster.ClusterName,
