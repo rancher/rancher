@@ -228,14 +228,12 @@ func MirrorScript(arch string, targetImages []string) error {
 	scriptStarter := getScript(arch, "mirror")
 	fmt.Fprint(mirror, scriptStarter)
 
-	var saveImages []string
 	for _, targetImage := range targetImages {
 		srcImage, ok := img.Mirrors[targetImage]
 		if !ok {
 			continue
 		}
 
-		saveImages = append(saveImages, targetImage)
 		fmt.Fprintf(mirror, "docker pull %s\n", srcImage)
 		if targetImage != srcImage {
 			fmt.Fprintf(mirror, "docker tag %s %s\n", srcImage, targetImage)
