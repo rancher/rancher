@@ -299,7 +299,7 @@ func setMockGitExecutable(t *testing.T) error {
 	if err != nil {
 		return err
 	}
-	return os.Chmod(testGitExec.Name(), 755)
+	return os.Chmod(testGitExec.Name(), 0755)
 }
 
 func setTestOutput(t *testing.T, output string) {
