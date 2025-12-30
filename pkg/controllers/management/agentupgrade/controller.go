@@ -21,7 +21,7 @@ var (
 	names = map[string]bool{
 		"cattle-cluster-agent": true,
 	}
-	imageRegexp = regexp.MustCompile("v2\\.[0-4]\\.")
+	imageRegexp = regexp.MustCompile(`v2\.[0-4]\.`)
 )
 
 type handler struct {
