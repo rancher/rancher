@@ -468,13 +468,11 @@ func (r *Rancher) Start(ctx context.Context) error {
 
 	r.Wrangler.OnLeaderOrDie("rancher-start::DefferedCAPIRegistration", func(ctx context.Context) error {
 		errChan := r.Wrangler.DeferredCAPIRegistration.DeferFuncWithError(runRKE2Migrations)
-		select {
-		case err, ok := <-errChan:
-			if !ok {
-				return nil
-			}
-			return err
+		err, ok := <-errChan
+		if !ok {
+			return nil
 		}
+		return err
 	})
 
 	if utils.IsMCMServerOnly() && features.RancherSCCRegistrationExtension.Enabled() {
