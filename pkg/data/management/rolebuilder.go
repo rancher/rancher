@@ -192,14 +192,6 @@ func (r *ruleBuilder) nonResourceURLs(u ...string) *ruleBuilder {
 	return r
 }
 
-func (r *ruleBuilder) addRoleTemplate(displayName, name, context string, external, hidden, administrative bool) *roleBuilder {
-	return r.rb.addRoleTemplate(displayName, name, context, external, hidden, administrative)
-}
-
-func (r *ruleBuilder) addRole(displayName, name string) *roleBuilder {
-	return r.rb.addRole(displayName, name)
-}
-
 func (r *ruleBuilder) addRule() *ruleBuilder {
 	return r.rb.addRule()
 }
@@ -210,24 +202,6 @@ func (r *ruleBuilder) addExternalRule() *ruleBuilder {
 
 func (r *ruleBuilder) setRoleTemplateNames(names ...string) *roleBuilder {
 	return r.rb.setRoleTemplateNames(names...)
-}
-
-func (r *ruleBuilder) setInheritedClusterRoles(roles ...string) *ruleBuilder {
-	r.rb.inheritedClusterRoles = roles
-	return r
-}
-
-func (r *ruleBuilder) setInheritedFleetWorkspacePermissions(permissions *v3.FleetWorkspacePermission) *ruleBuilder {
-	r.rb.inheritedFleetWorkspacePermissions = permissions
-	return r
-}
-
-func (r *ruleBuilder) reconcileGlobalRoles(grClient wranglerv3.GlobalRoleClient) error {
-	return r.rb.reconcileGlobalRoles(grClient)
-}
-
-func (r *ruleBuilder) reconcileRoleTemplates(rtClient wranglerv3.RoleTemplateClient) error {
-	return r.rb.reconcileRoleTemplates(rtClient)
 }
 
 func (r *ruleBuilder) toPolicyRule() rbacv1.PolicyRule {

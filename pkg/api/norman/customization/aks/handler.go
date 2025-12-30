@@ -29,12 +29,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const (
-	tenantIDAnnotation          = "cluster.management.cattle.io/azure-tenant-id"
-	tenantIDTimestampAnnotation = "cluster.management.cattle.io/azure-tenant-id-created-at"
-	tenantIDTimeout             = time.Hour
-)
-
 type Capabilities struct {
 	AuthBaseURL      string `json:"authBaseUrl"`
 	BaseURL          string `json:"baseUrl"`

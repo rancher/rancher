@@ -38,7 +38,6 @@ const (
 
 type orphanBindingsCleanup struct {
 	namespaces   corev1.NamespaceController
-	crtbs        v3.ClusterRoleTemplateBindingClient
 	prtbs        v3.ProjectRoleTemplateBindingClient
 	prtbHashes   map[string]struct{}
 	prtbUIDs     map[string]struct{}

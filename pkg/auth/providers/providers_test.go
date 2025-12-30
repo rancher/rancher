@@ -2,12 +2,8 @@ package providers
 
 import (
 	"fmt"
-	"net/http"
 	"testing"
 
-	"github.com/rancher/norman/types"
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/azure"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/github"
@@ -135,57 +131,3 @@ func (m *mockUnstructured) EachListItem(func(runtime.Object) error) error       
 func (m *mockUnstructured) EachListItemWithAlloc(func(runtime.Object) error) error { return nil }
 func (m *mockUnstructured) GetObjectKind() schema.ObjectKind                       { return nil }
 func (m *mockUnstructured) DeepCopyObject() runtime.Object                         { return nil }
-
-type fakeProvider struct{}
-
-func (f fakeProvider) Logout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
-	panic("not implemented")
-}
-
-func (f fakeProvider) LogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
-	panic("not implemented")
-}
-
-func (f fakeProvider) GetName() string {
-	panic("implement me")
-}
-
-func (f fakeProvider) AuthenticateUser(http.ResponseWriter, *http.Request, any) (v3.Principal, []v3.Principal, string, error) {
-	panic("implement me")
-}
-
-func (f fakeProvider) SearchPrincipals(_, _ string, _ accessor.TokenAccessor) ([]v3.Principal, error) {
-	panic("implement me")
-}
-
-func (f fakeProvider) GetPrincipal(_ string, _ accessor.TokenAccessor) (v3.Principal, error) {
-	panic("implement me")
-}
-
-func (f fakeProvider) CustomizeSchema(_ *types.Schema) {
-	panic("implement me")
-}
-
-func (f fakeProvider) TransformToAuthProvider(_ map[string]any) (map[string]any, error) {
-	panic("implement me")
-}
-
-func (f fakeProvider) RefetchGroupPrincipals(_ string, _ string) ([]v3.Principal, error) {
-	panic("implement me")
-}
-
-func (f fakeProvider) CanAccessWithGroupProviders(_ string, _ []v3.Principal) (bool, error) {
-	panic("implement me")
-}
-
-func (f fakeProvider) GetUserExtraAttributes(_ v3.Principal) map[string][]string {
-	panic("implement me")
-}
-
-func (f fakeProvider) GetUserExtraAttributesFromToken(_ accessor.TokenAccessor) map[string][]string {
-	panic("implement me")
-}
-
-func (f fakeProvider) IsDisabledProvider() (bool, error) {
-	panic("implement me")
-}

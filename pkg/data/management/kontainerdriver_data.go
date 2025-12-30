@@ -93,44 +93,6 @@ type driverCreator struct {
 	drivers       v3.KontainerDriverInterface
 }
 
-func (c *driverCreator) add(name string) error {
-	logrus.Infof("adding kontainer driver %v", name)
-
-	driver, err := c.driversLister.Get("", name)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			_, err = c.drivers.Create(&v3.KontainerDriver{
-				ObjectMeta: v1.ObjectMeta{
-					Name:      strings.ToLower(name),
-					Namespace: "",
-				},
-				Spec: v32.KontainerDriverSpec{
-					URL:     "",
-					BuiltIn: true,
-					Active:  true,
-				},
-				Status: v32.KontainerDriverStatus{
-					DisplayName: name,
-				},
-			})
-			if err != nil && !errors.IsAlreadyExists(err) {
-				return fmt.Errorf("error creating driver: %v", err)
-			}
-		} else {
-			return fmt.Errorf("error getting driver: %v", err)
-		}
-	} else {
-		driver.Spec.URL = ""
-
-		_, err = c.drivers.Update(driver)
-		if err != nil {
-			return fmt.Errorf("error updating driver: %v", err)
-		}
-	}
-
-	return nil
-}
-
 func (c *driverCreator) addCustomDriver(name, url, checksum, uiURL string, active bool, domains ...string) error {
 	logrus.Infof("adding kontainer driver %v", name)
 	_, err := c.driversLister.Get("", name)

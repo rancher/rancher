@@ -27,17 +27,12 @@ var chartsToCheckConstraints = map[string]struct{}{
 	"rancher-istio": {},
 }
 
-var systemChartsToCheckConstraints = map[string]struct{}{
-	"rancher-monitoring": {},
-}
-
 // chartsToIgnoreTags and systemChartsToIgnoreTags defines the charts and system charts in which a specified
 // image tag should be ignored.
 var chartsToIgnoreTags = map[string]string{
 	"rancher-vsphere-csi": "latest",
 	"rancher-vsphere-cpi": "latest",
 }
-var systemChartsToIgnoreTags = map[string]string{}
 
 type Charts struct {
 	Config ExportConfig
@@ -252,32 +247,6 @@ func walkMap(inputMap interface{}, callback func(map[interface{}]interface{})) {
 			walkMap(elem, callback)
 		}
 	}
-}
-
-func decodeQuestionsFile(path string) (Questions, error) {
-	var questions Questions
-	file, err := os.Open(path)
-	if err != nil {
-		return Questions{}, err
-	}
-	defer file.Close()
-	if err := decodeYAMLFile(file, &questions); err != nil {
-		return Questions{}, err
-	}
-	return questions, nil
-}
-
-func decodeValuesFile(path string) (map[interface{}]interface{}, error) {
-	var values map[interface{}]interface{}
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-	if err := decodeYAMLFile(file, &values); err != nil {
-		return nil, err
-	}
-	return values, nil
 }
 
 func decodeYAMLFile(r io.Reader, target interface{}) error {

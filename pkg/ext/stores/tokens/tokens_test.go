@@ -164,12 +164,10 @@ var (
 	userIDMissingError       = fmt.Errorf("user id missing")
 	invalidContext           = fmt.Errorf("context has no user info")
 
-	bogusNotFoundError       = apierrors.NewNotFound(GVR.GroupResource(), "bogus")
-	emptyNotFoundError       = apierrors.NewNotFound(GVR.GroupResource(), "")
-	createUserMismatch       = apierrors.NewBadRequest("unable to create token for other user")
-	helloAlreadyExistsError  = apierrors.NewAlreadyExists(GVR.GroupResource(), "hello")
-	invalidNameError         = apierrors.NewBadRequest("Token is invalid: metadata.name: Locked by system. Do not set.")
-	invalidGenerateNameError = apierrors.NewBadRequest("Token is invalid: metadata.generateName: Locked by system. Do not set.")
+	bogusNotFoundError      = apierrors.NewNotFound(GVR.GroupResource(), "bogus")
+	emptyNotFoundError      = apierrors.NewNotFound(GVR.GroupResource(), "")
+	createUserMismatch      = apierrors.NewBadRequest("unable to create token for other user")
+	helloAlreadyExistsError = apierrors.NewAlreadyExists(GVR.GroupResource(), "hello")
 
 	parseBoolError error
 	parseIntError  error

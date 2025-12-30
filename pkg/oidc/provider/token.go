@@ -26,7 +26,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/cache"
 )
 
 const bearerTokenType = "Bearer"
@@ -56,7 +55,6 @@ type tokenHandler struct {
 	oidcClientCache     wrangmgmtv3.OIDCClientCache
 	oidcClient          wrangmgmtv3.OIDCClientClient
 	secretCache         corev1.SecretCache
-	oidcClientIndexer   cache.Indexer
 	jwks                signingKeyGetter
 	now                 func() time.Time
 }

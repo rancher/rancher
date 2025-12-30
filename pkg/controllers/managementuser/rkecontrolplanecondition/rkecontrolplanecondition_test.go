@@ -54,12 +54,9 @@ type setupConfig struct {
 	// The error that the mock handler returns
 	appError     error
 	clusterError error
-	planError    error
 
 	// The value for the SystemUpgradeControllerChartVersion setting
 	chartVersion string
-	// The value for the SystemAgentUpgradeImage setting
-	image string
 }
 
 type testCase struct {

@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1529,56 +1528,4 @@ func (s *autoscalerSuite) TestSyncHelmOpStatus_NoStatusChange() {
 
 	// Verify that the cluster client was NOT called to update status since there were no changes
 	s.clusterClient.EXPECT().UpdateStatus(gomock.Any()).Times(0)
-}
-
-// Helper variables and functions
-
-var testTime = metav1.Now()
-
-func createTestCluster(name, namespace string) *capi.Cluster {
-	return &capi.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-	}
-}
-
-func createTestHelmOp(name, namespace, clusterName string, summary fleet.BundleSummary) *fleet.HelmOp {
-	return &fleet.HelmOp{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-			Labels: map[string]string{
-				capi.ClusterNameLabel: clusterName,
-			},
-		},
-		Status: fleet.HelmOpStatus{
-			StatusBase: fleet.StatusBase{
-				Summary: summary,
-			},
-		},
-	}
-}
-
-func createTestProvisioningCluster(name, namespace string, ready bool) *provv1.Cluster {
-	status := v1.ConditionFalse
-	if ready {
-		status = v1.ConditionTrue
-	}
-
-	return &provv1.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-		Status: provv1.ClusterStatus{
-			Conditions: []genericcondition.GenericCondition{
-				{
-					Type:   "Ready",
-					Status: status,
-				},
-			},
-		},
-	}
 }
