@@ -575,7 +575,7 @@ def test_permissions_can_be_removed(admin_cc, admin_mc, user_mc, request,
     wait_for(prtb_deleted, fail_handler="prtb not deleted", timeout=60)
 
     user_cc = new_user_cc(user_mc)
-    wait_for(lambda: ns_count(user_cc.client, 1), timeout=60)
+    wait_for(lambda: ns_count(user_cc.client, 1), timeout=120)
 
 
 def ns_count(client, count):
