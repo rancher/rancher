@@ -30,7 +30,12 @@ func main() {
 const imageNotFound = "image not found"
 
 func inner(chartsPath string, imagesFromArgs []string, ociChartsPath string, ociRepository string) error {
-	targetsAndSources, err := utilities.GatherTargetArtifactsAndSources(chartsPath, ociChartsPath, imagesFromArgs, ociRepository)
+	rancherVersion, ok := os.LookupEnv("TAG")
+	if !ok {
+		return fmt.Errorf("no tag defining current Rancher version")
+	}
+
+	targetsAndSources, err := utilities.GatherTargetArtifactsAndSources(chartsPath, ociChartsPath, imagesFromArgs, ociRepository, rancherVersion)
 	if err != nil {
 		return err
 	}
