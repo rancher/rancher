@@ -1,0 +1,11 @@
+{{- if and (eq (include "rancher.useExternalTls" .) "false") (eq .Values.ingress.tls.source "rancher") -}}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ template "rancher.fullname" . }}
+  labels:
+{{ include "rancher.labels" . | indent 4 }}
+spec:
+  ca:
+    secretName: tls-rancher
+{{- end -}}
