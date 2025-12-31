@@ -61,12 +61,8 @@ func GatherTargetArtifactsAndSources(
 	ociChartsPath string,
 	imagesFromArgs []string,
 	ociRepository string,
+	rancherVersion string,
 ) (ArtifactTargetsAndSources, error) {
-	rancherVersion, ok := os.LookupEnv("TAG")
-	if !ok {
-		return ArtifactTargetsAndSources{}, fmt.Errorf("no tag defining current Rancher version, cannot gather target images and sources")
-	}
-
 	if !img.IsValidSemver(rancherVersion) || !settings.IsReleaseServerVersion(rancherVersion) {
 		rancherVersion = settings.RancherVersionDev
 	}

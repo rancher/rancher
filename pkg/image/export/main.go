@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -19,7 +20,12 @@ func main() {
 }
 
 func run(chartsPath string, imagesFromArgs []string, ociChartsPath string, ociRepositoryURL string) error {
-	targetsAndSources, err := utilities.GatherTargetArtifactsAndSources(chartsPath, ociChartsPath, imagesFromArgs, ociRepositoryURL)
+	rancherVersion, ok := os.LookupEnv("TAG")
+	if !ok {
+		return fmt.Errorf("no tag defining current Rancher version, cannot gather target images and sources")
+	}
+
+	targetsAndSources, err := utilities.GatherTargetArtifactsAndSources(chartsPath, ociChartsPath, imagesFromArgs, ociRepositoryURL, rancherVersion)
 	if err != nil {
 		return err
 	}
