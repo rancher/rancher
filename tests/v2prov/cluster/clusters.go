@@ -467,12 +467,6 @@ func GatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 					podLogs[podName] = populatePodLogs(clients, newControlPlane, im.GetNamespace(), podName)
 				}
 			}
-			_, newErr = clients.Core.Secret().List(machine.Namespace, metav1.ListOptions{
-				LabelSelector: fmt.Sprintf("cluster.x-k8s.io/cluster-name=%s,rke.cattle.io/machine-name=", machine.Name),
-			})
-			if newErr != nil {
-				logrus.Errorf("failed to get secrets for machine %s: %v", machine.Name, newErr)
-			}
 		}
 	}
 
