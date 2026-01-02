@@ -3,6 +3,7 @@ package rbac
 import (
 	"github.com/pkg/errors"
 	wranglerv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/rbac"
@@ -40,7 +41,7 @@ type rtEnqueue struct {
 }
 
 func (c *rtSync) sync(key string, obj *v3.RoleTemplate) (runtime.Object, error) {
-	if obj == nil || obj.DeletionTimestamp != nil {
+	if obj == nil || obj.DeletionTimestamp != nil || features.AggregatedRoleTemplates.Enabled() {
 		return nil, nil
 	}
 	// check if there are any PRTBs/CRTBs referencing this RoleTemplate for this cluster

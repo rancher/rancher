@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/features"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -15,6 +16,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 type prtbHandler struct {
@@ -45,6 +47,11 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 	if prtb == nil || prtb.DeletionTimestamp != nil {
 		return nil, nil
 	}
+
+	if !features.AggregatedRoleTemplates.Enabled() {
+		return prtb, p.deleteRoleBindings(prtb)
+	}
+
 	var err error
 	prtb, err = p.reconcileSubject(prtb)
 	if err != nil {
@@ -60,24 +67,35 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 
 // OnRemove deletes Role Bindings that are owned by the PRTB. It also removes the membership binding if no other PRTBs give membership access.
 func (p *prtbHandler) OnRemove(_ string, prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
-	if prtb == nil {
+	if prtb == nil || !features.AggregatedRoleTemplates.Enabled() {
 		return nil, nil
 	}
 
 	returnErr := errors.Join(deleteClusterMembershipBinding(prtb, p.crbController),
 		deleteProjectMembershipBinding(prtb, p.rbController),
-		removeAuthV2Permissions(prtb, p.rbController))
+		removeAuthV2Permissions(prtb, p.rbController),
+		p.deleteRoleBindings(prtb))
 
-	currentRBs, err := p.rbController.List(prtb.Namespace, metav1.ListOptions{LabelSelector: rbac.GetPRTBOwnerLabel(prtb.Name)})
+	return prtb, returnErr
+}
+
+// deleteRoleBindings deletes all Role Bindings in the project namespace made by the PRTB.
+func (p *prtbHandler) deleteRoleBindings(prtb *v3.ProjectRoleTemplateBinding) error {
+	// Collect all RoleBindings owned by this ProjectRoleTemplateBinding
+	set := labels.Set(map[string]string{
+		rbac.GetPRTBOwnerLabel(prtb.Name): "true",
+		rbac.AggregationFeatureLabel:      "true",
+	})
+	currentRBs, err := p.rbController.List(prtb.Namespace, metav1.ListOptions{LabelSelector: set.AsSelector().String()})
 	if err != nil {
-		return nil, errors.Join(returnErr, err)
+		return err
 	}
 
+	var returnErr error
 	for _, rb := range currentRBs.Items {
 		returnErr = errors.Join(returnErr, rbac.DeleteNamespacedResource(rb.Namespace, rb.Name, p.rbController))
 	}
-
-	return prtb, returnErr
+	return returnErr
 }
 
 // reconcileSubject ensures that both the UserPrincipalName and UserName are set, creating the user if UserPrincipalName is set but not UserName.
@@ -165,19 +183,21 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 		return err
 	}
 
+	// Remove any excess or incorrect Role Bindings that may exist for this PRTB
 	var prtbHasBinding bool
 	for _, currentRB := range currentRBs.Items {
-		if ok, _ := rbac.AreRoleBindingContentsSame(&currentRB, rb); ok {
+		if rbac.AreRoleBindingContentsSame(&currentRB, rb) {
 			prtbHasBinding = true
 			continue
 		}
+		// RoleRef and Subjects are immutable, so we have to delete and recreate if they are different
 		if err := rbac.DeleteNamespacedResource(currentRB.Namespace, currentRB.Name, p.rbController); err != nil {
 			return err
 		}
 	}
 
 	if !prtbHasBinding {
-		if err := rbac.CreateOrUpdateNamespacedResource(rb, p.rbController, rbac.AreRoleBindingContentsSame); err != nil {
+		if _, err := p.rbController.Create(rb); err != nil && !apierrors.IsAlreadyExists(err) {
 			return err
 		}
 	}

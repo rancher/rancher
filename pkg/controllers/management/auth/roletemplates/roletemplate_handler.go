@@ -6,6 +6,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/features"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -14,6 +15,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 var (
@@ -53,6 +55,10 @@ func (r *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.RoleT
 		return nil, nil
 	}
 
+	if !features.AggregatedRoleTemplates.Enabled() {
+		// If the feature is disabled, ensure any existing cluster roles created for aggregation are deleted.
+		return rt, r.deleteClusterRoles(rt)
+	}
 	return rt, r.reconcileClusterRoles(rt)
 }
 
@@ -224,9 +230,18 @@ func (r *roleTemplateHandler) gatherRules(rt *v3.RoleTemplate) ([]rbacv1.PolicyR
 
 // OnRemove deletes all the ClusterRoles created in each cluster for the RoleTemplate
 func (r *roleTemplateHandler) OnRemove(_ string, rt *v3.RoleTemplate) (*v3.RoleTemplate, error) {
+	if rt == nil || !features.AggregatedRoleTemplates.Enabled() {
+		return nil, nil
+	}
+
+	return nil, r.deleteClusterRoles(rt)
+}
+
+// deleteClusterRoles deletes all the ClusterRoles created in each cluster for the RoleTemplate
+func (r *roleTemplateHandler) deleteClusterRoles(rt *v3.RoleTemplate) error {
 	clusters, err := r.clusterController.List(metav1.ListOptions{})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	var returnedErrors error
@@ -241,29 +256,22 @@ func (r *roleTemplateHandler) OnRemove(_ string, rt *v3.RoleTemplate) (*v3.RoleT
 		}
 		crController := userContext.RBACw.ClusterRole()
 
-		crName := rbac.ClusterRoleNameFor(rt.Name)
-		acrName := rbac.AggregatedClusterRoleNameFor(crName)
+		// Remove the label that was added to the external role
+		returnedErrors = errors.Join(returnedErrors, removeLabelFromExternalRole(rt, crController))
 
-		returnedErrors = removeLabelFromExternalRole(rt, crController)
+		// Collect all ClusterRoles owned by this RoleTemplate
+		set := labels.Set(map[string]string{
+			rbac.ClusterRoleOwnerLabel:   rt.Name,
+			rbac.AggregationFeatureLabel: "true",
+		})
+		clusterRoles, err := crController.List(metav1.ListOptions{LabelSelector: set.AsSelector().String()})
+		returnedErrors = errors.Join(returnedErrors, err)
 
-		// if the cluster role is external don't delete the external cluster role
-		if !rt.External {
-			returnedErrors = errors.Join(returnedErrors, rbac.DeleteResource(crName, crController))
-		}
-
-		returnedErrors = errors.Join(returnedErrors, rbac.DeleteResource(acrName, crController))
-
-		if rt.Context == projectContext {
-			promotedCRName := rbac.PromotedClusterRoleNameFor(crName)
-			promotedACRName := rbac.AggregatedClusterRoleNameFor(promotedCRName)
-			returnedErrors = errors.Join(returnedErrors,
-				rbac.DeleteResource(promotedCRName, crController),
-				rbac.DeleteResource(promotedACRName, crController),
-			)
+		for _, cr := range clusterRoles.Items {
+			returnedErrors = errors.Join(returnedErrors, rbac.DeleteResource(cr.Name, crController))
 		}
 	}
-
-	return nil, returnedErrors
+	return returnedErrors
 }
 
 // removeLabelFromExternalRole removes the aggregation label from the external role.
@@ -274,7 +282,9 @@ func removeLabelFromExternalRole(rt *v3.RoleTemplate, crController crbacv1.Clust
 	}
 
 	externalRole, err := crController.Get(rt.Name, metav1.GetOptions{})
-	if err != nil {
+	if apierrors.IsNotFound(err) {
+		return nil
+	} else if err != nil {
 		return err
 	}
 

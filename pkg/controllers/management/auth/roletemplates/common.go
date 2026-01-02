@@ -16,9 +16,7 @@ import (
 
 const (
 	clusterContext = "cluster"
-	clusterOwner   = "cluster-owner"
 	projectContext = "project"
-	projectOwner   = "project-owner"
 )
 
 const (
@@ -179,7 +177,7 @@ func createOrUpdateProjectMembershipBinding(prtb *v3.ProjectRoleTemplateBinding,
 	}
 
 	// RoleRef is immutable, so if it's incorrect it needs to be deleted and re-created
-	if ok, _ := rbac.AreRoleBindingContentsSame(wantedRB, existingRB); !ok {
+	if !rbac.AreRoleBindingContentsSame(wantedRB, existingRB) {
 		logrus.Infof("Re-creating roleBinding %s for project membership role %s for subjects %v", wantedRB.Name, wantedRB.RoleRef.Name, wantedRB.Subjects)
 		if err := rbController.Delete(wantedRB.Namespace, wantedRB.Name, &metav1.DeleteOptions{}); err != nil {
 			return err
@@ -222,11 +220,11 @@ func buildProjectMembershipBinding(roleRef rbacv1.RoleRef, prtb *v3.ProjectRoleT
 
 // deleteProjectMembershipBinding removes the Project membership RoleBinding if no other PRTBs are using it.
 func deleteProjectMembershipBinding(prtb *v3.ProjectRoleTemplateBinding, rbController crbacv1.RoleBindingController) error {
-	_, projectNamespace := rbac.GetClusterAndProjectNameFromPRTB(prtb)
+	clusterName, _ := rbac.GetClusterAndProjectNameFromPRTB(prtb)
 
 	label := getRTBLabel(prtb)
 	listOption := metav1.ListOptions{LabelSelector: label}
-	rbs, err := rbController.List(projectNamespace, listOption)
+	rbs, err := rbController.List(clusterName, listOption)
 	if err != nil {
 		return err
 	}
