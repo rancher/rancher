@@ -24,7 +24,6 @@ func (i IngressSpec) FromInternal(data map[string]interface{}) {
 		}
 		delete(data, "backend")
 	}
-	return
 }
 
 func (i IngressSpec) ToInternal(data map[string]interface{}) error {
@@ -91,7 +90,6 @@ func (i IngressBackend) ModifySchema(schema *types.Schema, schemas *types.Schema
 type IngressPath struct{}
 
 func (i IngressPath) FromInternal(data map[string]interface{}) {
-	return
 }
 
 func (i IngressPath) ToInternal(data map[string]interface{}) error {

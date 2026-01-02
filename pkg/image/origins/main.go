@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -194,7 +195,7 @@ func checkURL(url string) (string, error) {
 		return "", err
 	}
 	if r.StatusCode != http.StatusOK {
-		return "", fmt.Errorf(imageNotFound)
+		return "", errors.New(imageNotFound)
 	}
 	return url, nil
 }

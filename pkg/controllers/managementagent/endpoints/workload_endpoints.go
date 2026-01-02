@@ -20,13 +20,12 @@ import (
 // and NodePort services backing up the workload
 
 type WorkloadEndpointsController struct {
-	ingressLister           ingresswrapper.CompatLister
-	serviceLister           v1.ServiceLister
-	podLister               v1.PodLister
-	WorkloadController      workloadutil.CommonController
-	nodeLister              v1.NodeLister
-	clusterName             string
-	serverSupportsIngressV1 bool
+	ingressLister      ingresswrapper.CompatLister
+	serviceLister      v1.ServiceLister
+	podLister          v1.PodLister
+	WorkloadController workloadutil.CommonController
+	nodeLister         v1.NodeLister
+	clusterName        string
 }
 
 func (c *WorkloadEndpointsController) UpdateEndpoints(key string, obj *workloadutil.Workload) error {

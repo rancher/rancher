@@ -270,7 +270,6 @@ func TestCreateProjectNSRole(t *testing.T) {
 		verb        string
 		namespace   string
 		projectName string
-		crSetup     func()
 		startingCR  *rbacv1.ClusterRole
 		expectedCR  *rbacv1.ClusterRole
 		createError error

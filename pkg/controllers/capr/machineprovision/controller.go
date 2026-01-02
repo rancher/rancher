@@ -805,43 +805,6 @@ func (h *handler) getJobFromInfraMachine(infra *infraObject) (*batchv1.Job, erro
 	return jobs[0], nil
 }
 
-func setCondition(dynamic *dynamic.Controller, obj runtime.Object, conditionType string, err error) (runtime.Object, error) {
-	if errors.Is(generic.ErrSkip, err) {
-		return obj, nil
-	}
-
-	var (
-		reason  = ""
-		status  = "True"
-		message = ""
-	)
-
-	if err != nil {
-		reason = "Error"
-		status = "False"
-		message = err.Error()
-	}
-
-	desiredCondition := summary.NewCondition(conditionType, status, reason, message)
-
-	d, mapErr := data.Convert(obj.DeepCopyObject())
-	if mapErr != nil {
-		return obj, mapErr
-	}
-
-	if updated, err := insertOrUpdateCondition(d, desiredCondition); !updated || err != nil {
-		return obj, err
-	}
-
-	obj, updateErr := dynamic.UpdateStatus(&unstructured.Unstructured{
-		Object: d,
-	})
-	if updateErr != nil {
-		return obj, updateErr
-	}
-	return obj, err
-}
-
 func insertOrUpdateCondition(d data.Object, desiredCondition summary.Condition) (bool, error) {
 	for _, cond := range summary.GetUnstructuredConditions(d) {
 		if desiredCondition.Equals(cond) {

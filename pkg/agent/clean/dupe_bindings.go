@@ -361,10 +361,6 @@ func createLabelSelectors(newLabel bool, obj metav1.ObjectMeta, objType string) 
 	return labelSelectors
 }
 
-func rbRoleSubjectKey(roleName string, subject k8srbacv1.Subject) string {
-	return roleName + "." + subject.Kind + "." + subject.Name
-}
-
 type crbByCreation []k8srbacv1.ClusterRoleBinding
 
 func (n crbByCreation) Len() int      { return len(n) }

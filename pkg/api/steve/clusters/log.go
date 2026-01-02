@@ -2,7 +2,6 @@ package clusters
 
 import (
 	"bufio"
-	"context"
 	"encoding/base64"
 	"net/http"
 	"strings"
@@ -11,14 +10,10 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/steve/pkg/stores/proxy"
-	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/client-go/kubernetes"
 )
 
 var (
@@ -134,19 +129,4 @@ func printMessage(msg string, conn *websocket.Conn) error {
 		return err
 	}
 	return writer.Close()
-}
-
-func (l *log) contextAndClient(req *http.Request) (context.Context, user.Info, kubernetes.Interface, error) {
-	ctx := req.Context()
-	client, err := l.cg.AdminK8sInterface()
-	if err != nil {
-		return ctx, nil, nil, err
-	}
-
-	user, ok := request.UserFrom(ctx)
-	if !ok {
-		return ctx, nil, nil, validation.Unauthorized
-	}
-
-	return ctx, user, client, nil
 }

@@ -324,21 +324,6 @@ func (ma *MemberAccess) EnsureRoleInTargets(targetProjects, roleTemplates []stri
 	return nil
 }
 
-func hasLocalTargets(targetProjects []string) (bool, error) {
-	for _, target := range targetProjects {
-		split := strings.SplitN(target, ":", 2)
-		if len(split) != 2 {
-			errMsg := fmt.Sprintf("Invalid project ID: %v", target)
-			return false, httperror.NewAPIError(httperror.InvalidBodyContent, errMsg)
-		}
-		clusterName := split[0]
-		if clusterName == "local" {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
 func (ma *MemberAccess) GetAccessTypeOfCaller(callerID, creatorID, name string, members []v32.Member) (string, error) {
 	var username string
 	isAdmin, err := ma.IsAdmin(callerID)

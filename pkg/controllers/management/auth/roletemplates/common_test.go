@@ -669,19 +669,6 @@ var (
 		Subjects: []rbacv1.Subject{defaultSubject},
 		RoleRef:  projectOwnerRoleRef,
 	}
-	projectOwnerRT = v3.RoleTemplate{
-		Builtin: true,
-		Context: "project",
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "project-owner",
-		},
-	}
-	projectMemberRT = v3.RoleTemplate{
-		Context: "project",
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-rt",
-		},
-	}
 )
 
 func Test_createOrUpdateProjectMembershipBinding(t *testing.T) {

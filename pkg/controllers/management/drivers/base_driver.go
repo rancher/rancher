@@ -181,7 +181,7 @@ func isElf(input string) bool {
 		return false
 	}
 	// support unix binary and mac-os binary mach-o
-	return bytes.Compare(elf, []byte{0x7f, 0x45, 0x4c, 0x46}) == 0 || bytes.Compare(elf, []byte{0xcf, 0xfa, 0xed, 0xfe}) == 0
+	return bytes.Equal(elf, []byte{0x7f, 0x45, 0x4c, 0x46}) || bytes.Equal(elf, []byte{0xcf, 0xfa, 0xed, 0xfe})
 }
 
 func (d *BaseDriver) copyBinary(cacheFile, input string) (string, error) {

@@ -36,9 +36,6 @@ type userLifecycle struct {
 	namespaceLister  wcorev1.NamespaceCache
 	secrets          wcorev1.SecretController
 	secretsLister    wcorev1.SecretCache
-	prtbLister       wranglerv3.ProjectRoleTemplateBindingCache
-	crtbLister       wranglerv3.ClusterRoleTemplateBindingCache
-	grbLister        wranglerv3.GlobalRoleBindingCache
 	prtbIndexer      cache.Indexer
 	crtbIndexer      cache.Indexer
 	grbIndexer       cache.Indexer

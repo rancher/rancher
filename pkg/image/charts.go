@@ -27,17 +27,12 @@ var chartsToCheckConstraints = map[string]struct{}{
 	"rancher-istio": {},
 }
 
-var systemChartsToCheckConstraints = map[string]struct{}{
-	"rancher-monitoring": {},
-}
-
 // chartsToIgnoreTags and systemChartsToIgnoreTags defines the charts and system charts in which a specified
 // image tag should be ignored.
 var chartsToIgnoreTags = map[string]string{
 	"rancher-vsphere-csi": "latest",
 	"rancher-vsphere-cpi": "latest",
 }
-var systemChartsToIgnoreTags = map[string]string{}
 
 type Charts struct {
 	Config ExportConfig

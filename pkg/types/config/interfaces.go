@@ -11,13 +11,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-// nonNamespacedCacheAndClient limits a Controller interface to only the direct and cached clients
-type nonNamespacedCacheAndClient[T generic.RuntimeMetaObject, TList runtime.Object] interface {
-	generic.NonNamespacedClientInterface[T, TList]
-	Cache() generic.NonNamespacedCacheInterface[T]
-	Informer() cache.SharedIndexInformer // needed to immediately start the caches
-}
-
 // namespacedCacheAndClient limits a Controller interface to only the direct and cached clients
 type namespacedCacheAndClient[T generic.RuntimeMetaObject, TList runtime.Object] interface {
 	generic.ClientInterface[T, TList]

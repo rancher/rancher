@@ -15,8 +15,6 @@ import (
 type Controller struct {
 	sync.Mutex
 	Schemas *types.Schemas
-	lister  v3.DynamicSchemaLister
-	known   map[string]bool
 }
 
 func Register(ctx context.Context, management *config.ScaledContext, schemas *types.Schemas) {

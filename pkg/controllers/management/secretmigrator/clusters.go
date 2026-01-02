@@ -175,8 +175,6 @@ func (m *Migrator) CreateOrUpdateServiceAccountTokenSecret(secretName string, cr
 	return m.createOrUpdateSecretForCredential(secretName, SecretNamespace, credential, nil, owner, "cluster", "serviceaccounttoken")
 }
 
-type cleanupFunc func(spec *apimgmtv3.ClusterSpec)
-
 func (h *handler) migrateServiceAccountSecrets(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
 	if apimgmtv3.ClusterConditionServiceAccountSecretsMigrated.IsTrue(cluster) {
 		return cluster, nil

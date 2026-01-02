@@ -220,15 +220,6 @@ func getNodeNameToMachine(nodeLister v1.NodeLister) (map[string]*v1.Node, error)
 	return machineMap, nil
 }
 
-func isMachineReady(machine *managementv3.Node) bool {
-	for _, cond := range machine.Status.InternalNodeStatus.Conditions {
-		if cond.Type == corev1.NodeReady {
-			return cond.Status == corev1.ConditionTrue
-		}
-	}
-	return false
-}
-
 func getAllNodesPublicEndpointIP(nodesLister v1.NodeLister, clusterName string) (string, error) {
 	var addresses []string
 	nodes, err := nodesLister.List(clusterName, labels.NewSelector())

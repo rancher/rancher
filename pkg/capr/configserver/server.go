@@ -51,7 +51,6 @@ type RKE2ConfigServer struct {
 	serviceAccounts          corecontrollers.ServiceAccountClient
 	secretsCache             corecontrollers.SecretCache
 	secrets                  corecontrollers.SecretController
-	settings                 mgmtcontroller.SettingCache
 	machineCache             capicontrollers.MachineCache
 	machines                 capicontrollers.MachineClient
 	bootstrapCache           rkecontroller.RKEBootstrapCache
