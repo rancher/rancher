@@ -32,7 +32,6 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	apierror "k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
@@ -408,7 +407,7 @@ func (p *Planner) fullReconcile(cp *rkev1.RKEControlPlane, status rkev1.RKEContr
 		return status, errWaiting("waiting for control plane to be available")
 	}
 
-	if status.Initialized != true || status.Ready != true {
+	if !status.Initialized || !status.Ready {
 		status.Initialized = true
 		status.Ready = true
 		return status, errWaiting("marking control plane as initialized and ready")
@@ -1156,7 +1155,7 @@ func (p *Planner) ensureRKEStateSecret(controlPlane *rkev1.RKEControlPlane, newC
 
 	name := name.SafeConcatName(controlPlane.Name, "rke", "state")
 	secret, err := p.secretCache.Get(controlPlane.Namespace, name)
-	if apierror.IsNotFound(err) {
+	if apierrors.IsNotFound(err) {
 		if !newCluster {
 			return "", plan.Secret{}, fmt.Errorf("newCluster was false and secret does not exist: %w", err)
 		}

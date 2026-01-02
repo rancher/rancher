@@ -8,17 +8,15 @@ import (
 	"time"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"k8s.io/client-go/kubernetes"
-
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rkecerts"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
 )
 
 const getStateTimeout = time.Second * 30
@@ -57,7 +55,7 @@ func (c *certsExpiration) sync(key string, cluster *v3.Cluster) (runtime.Object,
 	}
 	fullState, err := getFullStateFromK8s(context.Background(), c.k8sClient)
 	if err != nil {
-		if k8sErrors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return cluster, nil // not an rke cluster, nothing we can do
 		}
 		return cluster, err

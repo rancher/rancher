@@ -25,7 +25,6 @@ import (
 	"golang.org/x/mod/semver"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	k8serror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -119,7 +118,7 @@ func runRKE2Migrations(wranglerContext *wrangler.CAPIContext) error {
 
 func getConfigMap(configMapController controllerv1.ConfigMapController, configMapName string) (*v1.ConfigMap, error) {
 	cm, err := configMapController.Cache().Get(cattleNamespace, configMapName)
-	if err != nil && !k8serror.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, err
 	}
 
@@ -188,7 +187,7 @@ func forceUpgradeLogout(configMapController controllerv1.ConfigMapController, to
 	// log out all the dashboard users forcing them to be redirected to the login page
 	for _, token := range allTokens {
 		err = tokenController.Delete(token.ObjectMeta.Name, &metav1.DeleteOptions{})
-		if err != nil && !k8serror.IsNotFound(err) {
+		if err != nil && !apierrors.IsNotFound(err) {
 			logrus.Errorf("Failed to delete token [%s] for upgrade forced logout", token.Name)
 		}
 	}
@@ -213,7 +212,7 @@ func forceSystemAndDefaultProjectCreation(configMapController controllerv1.Confi
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		localCluster, err := clusterClient.Get("local", metav1.GetOptions{})
 		if err != nil {
-			if k8serror.IsNotFound(err) {
+			if apierrors.IsNotFound(err) {
 				return nil
 			}
 			return err
@@ -310,7 +309,7 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.CAPIContext)
 
 	for _, mgmtCluster := range mgmtClusters.Items {
 		provClusters, err := w.Provisioning.Cluster().List(mgmtCluster.Spec.FleetWorkspaceName, metav1.ListOptions{})
-		if k8serror.IsNotFound(err) || len(provClusters.Items) == 0 {
+		if apierrors.IsNotFound(err) || len(provClusters.Items) == 0 {
 			continue
 		} else if err != nil {
 			return err
@@ -440,7 +439,7 @@ func migrateEncryptionKeyRotationLeader(w *wrangler.CAPIContext) error {
 	for _, mgmtCluster := range mgmtClusters.Items {
 		if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			cp, err := w.RKE.RKEControlPlane().Get(mgmtCluster.Spec.FleetWorkspaceName, mgmtCluster.Name, metav1.GetOptions{})
-			if k8serror.IsNotFound(err) {
+			if apierrors.IsNotFound(err) {
 				return nil
 			}
 			if err != nil {
@@ -458,11 +457,8 @@ func migrateEncryptionKeyRotationLeader(w *wrangler.CAPIContext) error {
 			}
 			cp = cp.DeepCopy()
 			delete(cp.Annotations, "rke.cattle.io/encrypt-key-rotation-leader")
-			cp, err = w.RKE.RKEControlPlane().Update(cp)
-			if err != nil {
-				return err
-			}
-			return nil
+			_, err = w.RKE.RKEControlPlane().Update(cp)
+			return err
 		}); err != nil {
 			return err
 		}
@@ -489,7 +485,7 @@ func migrateMachinePoolsDynamicSchemaLabel(w *wrangler.CAPIContext) error {
 
 	for _, mgmtCluster := range mgmtClusters.Items {
 		provClusters, err := w.Provisioning.Cluster().List(mgmtCluster.Spec.FleetWorkspaceName, metav1.ListOptions{})
-		if k8serror.IsNotFound(err) || len(provClusters.Items) == 0 {
+		if apierrors.IsNotFound(err) || len(provClusters.Items) == 0 {
 			continue
 		} else if err != nil {
 			return err
@@ -500,7 +496,7 @@ func migrateMachinePoolsDynamicSchemaLabel(w *wrangler.CAPIContext) error {
 			}
 			if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
 				cluster, err := w.Provisioning.Cluster().Get(provCluster.Namespace, provCluster.Name, metav1.GetOptions{})
-				if k8serror.IsNotFound(err) {
+				if apierrors.IsNotFound(err) {
 					return nil
 				} else if err != nil {
 					return err
@@ -612,7 +608,7 @@ func migrateImportedClusterFields(w *wrangler.Context) error {
 			continue
 		}
 		mgmtCluster, err := w.Mgmt.Cluster().Get(cluster.Status.ClusterName, metav1.GetOptions{})
-		if k8serror.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			continue
 		} else if err != nil {
 			return err
@@ -682,31 +678,31 @@ func rkeResourcesCleanup(w *wrangler.Context) error {
 	}
 
 	err = w.Core.ConfigMap().Delete(cattleNamespace, migrateRKEClusterState, &metav1.DeleteOptions{})
-	if err != nil && !k8serror.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		logrus.Error("Failed to delete rkeaddons.management.cattle.io crd")
 		return err
 	}
 
 	err = w.CRD.CustomResourceDefinition().Delete("rkeaddons.management.cattle.io", &metav1.DeleteOptions{})
-	if err != nil && !k8serror.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		logrus.Error("Failed to delete rkeaddons.management.cattle.io crd")
 		return err
 	}
 
 	err = w.CRD.CustomResourceDefinition().Delete("rkek8sserviceoptions.management.cattle.io", &metav1.DeleteOptions{})
-	if err != nil && !k8serror.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		logrus.Error("Failed to delete rkek8sserviceoptions.management.cattle.io crd")
 		return err
 	}
 
 	err = w.CRD.CustomResourceDefinition().Delete("rkek8ssystemimages.management.cattle.io", &metav1.DeleteOptions{})
-	if err != nil && !k8serror.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		logrus.Error("Failed to delete rkeaddons.management.cattle.io crd")
 		return err
 	}
 
 	err = w.CRD.CustomResourceDefinition().Delete("etcdbackups.management.cattle.io", &metav1.DeleteOptions{})
-	if err != nil && !k8serror.IsNotFound(err) {
+	if err != nil && !apierrors.IsNotFound(err) {
 		logrus.Error("Failed to delete etcdbackups.management.cattle.io crd")
 		return err
 	}

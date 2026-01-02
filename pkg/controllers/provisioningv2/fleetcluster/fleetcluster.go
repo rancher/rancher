@@ -12,7 +12,6 @@ import (
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	mgmtcluster "github.com/rancher/rancher/pkg/cluster"
-	fleetconst "github.com/rancher/rancher/pkg/fleet"
 	fleetpkg "github.com/rancher/rancher/pkg/fleet"
 	fleetcontrollers "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -142,7 +141,7 @@ func (h *handler) assignWorkspace(key string, cluster *apimgmtv3.Cluster) (*apim
 
 	if cluster.Spec.Internal && cluster.Spec.FleetWorkspaceName == "" {
 		newCluster := cluster.DeepCopy()
-		newCluster.Spec.FleetWorkspaceName = fleetconst.ClustersLocalNamespace
+		newCluster.Spec.FleetWorkspaceName = fleetpkg.ClustersLocalNamespace
 		return h.clusters.Update(newCluster)
 	} else if cluster.Spec.Internal {
 		return cluster, nil
@@ -170,7 +169,7 @@ func (h *handler) assignWorkspace(key string, cluster *apimgmtv3.Cluster) (*apim
 }
 
 func (h *handler) ensureAgentMigrated(key string, cluster *fleet.Cluster) (*fleet.Cluster, error) {
-	if cluster != nil && cluster.Name == "local" && cluster.Namespace == fleetconst.ClustersLocalNamespace &&
+	if cluster != nil && cluster.Name == "local" && cluster.Namespace == fleetpkg.ClustersLocalNamespace &&
 		cluster.Spec.AgentNamespace == "" {
 		// keep re-enqueueing until agentNamespace is set. This happens before the fleet
 		// CRD is upgraded to include the new agentNamespace field
@@ -219,7 +218,7 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 			h.addAPIServer(clientSecret)
 		}
 
-		agentNamespace = fleetconst.ReleaseLocalNamespace
+		agentNamespace = fleetpkg.ReleaseLocalNamespace
 		// restore fleet's hardcoded name label for the local cluster
 		labels["name"] = "local"
 		// default cluster group, used if fleet bundle has no targets, uses hardcoded name label
@@ -273,7 +272,7 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 // addAPIServer populates the internal API server URL and CA into the provided secret, which should be used as the
 // KubeConfig secret in the local cluster.
 func (h *handler) addAPIServer(clientSecret string) {
-	secret, err := h.secretsController.Cache().Get(fleetconst.ClustersLocalNamespace, clientSecret)
+	secret, err := h.secretsController.Cache().Get(fleetpkg.ClustersLocalNamespace, clientSecret)
 	if err != nil {
 		logrus.Warnf("local cluster provisioning: failed to get client secret: %v", err)
 		return

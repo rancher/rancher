@@ -75,7 +75,7 @@ func shouldRotate(cp *rkev1.RKEControlPlane) bool {
 	}
 
 	// The controlplane must be initialized before we rotate anything
-	if cp.Status.Initialized != true {
+	if !cp.Status.Initialized {
 		logrus.Warnf("[planner] rkecluster %s/%s: skipping certificate rotation as cluster was not initialized", cp.Namespace, cp.Name)
 		return false
 	}

@@ -279,10 +279,7 @@ func (c *crtbLifecycle) updateStatus(crtb *v3.ClusterRoleTemplateBinding, remote
 		crtbFromCluster.Status.LastUpdateTime = timeNow().Format(time.RFC3339)
 		crtbFromCluster.Status.ObservedGenerationRemote = crtb.ObjectMeta.Generation
 		crtbFromCluster.Status.RemoteConditions = remoteConditions
-		crtbFromCluster, err = c.crtbClient.UpdateStatus(crtbFromCluster)
-		if err != nil {
-			return err
-		}
-		return nil
+		_, err = c.crtbClient.UpdateStatus(crtbFromCluster)
+		return err
 	})
 }

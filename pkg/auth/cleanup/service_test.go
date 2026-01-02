@@ -17,7 +17,6 @@ import (
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
-	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -302,7 +301,7 @@ func newMockCleanupService(t *testing.T,
 }
 
 func getSecretControllerMock(ctrl *gomock.Controller, store map[string]*corev1.Secret) wcorev1.SecretController {
-	secretController := wranglerfake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	secretController := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
 	secretController.EXPECT().Create(gomock.Any()).DoAndReturn(func(secret *corev1.Secret) (*corev1.Secret, error) {
 		if secret.Name == "" {
 			uniqueIdentifier := md5.Sum([]byte(time.Now().String()))

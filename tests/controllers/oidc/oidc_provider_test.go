@@ -17,7 +17,6 @@ import (
 	goidc "github.com/coreos/go-oidc/v3/oidc"
 	gmux "github.com/gorilla/mux"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	providermocks "github.com/rancher/rancher/pkg/auth/providers/mocks"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -105,12 +104,12 @@ func (s *OIDCProviderSuite) SetupSuite() {
 	oidcprovider.Register(s.ctx, s.wranglerContext)
 
 	// Init caches
-	assert.NoError(s.T(), err)
 	_, err = s.wranglerContext.ControllerFactory.SharedCacheFactory().ForKind(schema.GroupVersionKind{
 		Group:   "management.cattle.io",
 		Version: "v3",
 		Kind:    "OIDCClient",
 	})
+	assert.NoError(s.T(), err)
 	_, err = s.wranglerContext.ControllerFactory.SharedCacheFactory().ForKind(schema.GroupVersionKind{
 		Group:   "management.cattle.io",
 		Version: "v3",
@@ -216,14 +215,14 @@ func (s *OIDCProviderSuite) TestOIDCAuthorizationCodeFlow() {
 	providers.Providers[fakeAuthProvider] = mockProvider
 
 	// create OIDC client
-	oidcClient := &v3.OIDCClient{
+	oidcClient := &apimgmtv3.OIDCClient{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fakeOIDCClient,
 			Annotations: map[string]string{
 				"foo": "bar",
 			},
 		},
-		Spec: v3.OIDCClientSpec{
+		Spec: apimgmtv3.OIDCClientSpec{
 			RedirectURIs:                  []string{s.server.URL + "/redirect"},
 			TokenExpirationSeconds:        3600,
 			RefreshTokenExpirationSeconds: 36000,

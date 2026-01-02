@@ -511,7 +511,7 @@ func listVMSizesV2(ctx context.Context, cap *Capabilities) ([]byte, int, error) 
 				}
 			}
 
-			if v.LocationInfo != nil && len(v.LocationInfo) > 0 {
+			if len(v.LocationInfo) > 0 {
 				locInfo := v.LocationInfo
 				// We specified a location in the Azure API request so there is at most one element
 				for _, z := range locInfo[0].Zones {

@@ -218,10 +218,10 @@ func (c *oidcClientController) onChange(_ string, oidcClient *v3.OIDCClient) (*v
 		}
 	}
 
-	return oidcClient, c.updateStatusIfNeeded(oidcClient, k8sSecret)
+	return c.updateStatusIfNeeded(oidcClient, k8sSecret)
 }
 
-func (c *oidcClientController) updateStatusIfNeeded(oidcClient *v3.OIDCClient, secret *v1.Secret) error {
+func (c *oidcClientController) updateStatusIfNeeded(oidcClient *v3.OIDCClient, secret *v1.Secret) (*v3.OIDCClient, error) {
 	// calculate status
 	observedClientSecrets := map[string]v3.OIDCClientSecretStatus{}
 	for clientSecretName, clientSecretBytes := range secret.Data {
@@ -253,15 +253,16 @@ func (c *oidcClientController) updateStatusIfNeeded(oidcClient *v3.OIDCClient, s
 		}
 		patchBytes, err := json.Marshal(patchOp)
 		if err != nil {
-			return fmt.Errorf("failed to create status patch: %w", err)
+			return nil, fmt.Errorf("failed to create status patch: %w", err)
 		}
+
 		oidcClient, err = c.oidcClient.Patch(oidcClient.Name, types.JSONPatchType, patchBytes, "status")
 		if err != nil {
-			return fmt.Errorf("failed to apply status patch: %w", err)
+			return nil, fmt.Errorf("failed to apply status patch: %w", err)
 		}
 	}
 
-	return nil
+	return oidcClient, nil
 }
 
 func findNextSecretKey(secretData map[string][]byte) (string, error) {

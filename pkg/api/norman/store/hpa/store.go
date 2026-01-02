@@ -44,7 +44,7 @@ func NewIgnoreTransitioningErrorStore(store types.Store, d time.Duration, expect
 			if err != nil {
 				return data, nil
 			}
-			if time.Now().Sub(t).Nanoseconds()-d.Nanoseconds() > 0 {
+			if time.Since(t).Nanoseconds()-d.Nanoseconds() > 0 {
 				return data, nil
 			}
 			if found {

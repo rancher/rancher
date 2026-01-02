@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/crd"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -63,6 +64,7 @@ func (s *FeatureTestSuite) SetupSuite() {
 	assert.NoError(s.T(), err)
 
 	scaledContext, _, _, err := mcm.BuildScaledContext(s.ctx, s.wranglerContext, &mcm.Options{})
+	require.NoError(s.T(), err)
 
 	management, err := scaledContext.NewManagementContext()
 	// Register the feature controller

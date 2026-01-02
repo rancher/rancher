@@ -268,7 +268,7 @@ func NodeTypes(schemas *types.Schemas, management *config.ScaledContext) error {
 	actionWrapper := node.ActionWrapper{}
 	schema.ActionHandler = actionWrapper.ActionHandler
 
-	schema = schemas.Schema(&managementschema.Version, client.NodePoolType)
+	_ = schemas.Schema(&managementschema.Version, client.NodePoolType)
 	return nil
 }
 

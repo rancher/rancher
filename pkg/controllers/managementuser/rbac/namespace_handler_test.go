@@ -14,9 +14,6 @@ import (
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	v1 "k8s.io/api/rbac/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	apierror "k8s.io/apimachinery/pkg/api/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -186,9 +183,9 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 				},
 				err: test.indexerError,
 			}
-			fakeLister := wfakes.NewMockNonNamespacedCacheInterface[*v1.ClusterRole](ctrl)
+			fakeLister := wfakes.NewMockNonNamespacedCacheInterface[*rbacv1.ClusterRole](ctrl)
 			fakeLister.EXPECT().Get(gomock.Any()).DoAndReturn(
-				func(in1 string) (*v1.ClusterRole, error) {
+				func(in1 string) (*rbacv1.ClusterRole, error) {
 					if test.getError != nil {
 						return nil, test.getError
 					}
@@ -197,13 +194,13 @@ func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
 							return role, nil
 						}
 					}
-					return nil, apierror.NewNotFound(schema.GroupResource{
+					return nil, apierrors.NewNotFound(schema.GroupResource{
 						Group:    "rbac.authorization.k8s.io",
 						Resource: "ClusterRoles",
 					}, in1)
 				},
 			).AnyTimes()
-			fakeClusterRoles := wfakes.NewMockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
+			fakeClusterRoles := wfakes.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
 			fakeClusterRoles.EXPECT().Create(gomock.Any()).DoAndReturn(
 				func(in *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
 					newRoles = append(newRoles, in)
@@ -274,8 +271,8 @@ func TestCreateProjectNSRole(t *testing.T) {
 		namespace   string
 		projectName string
 		crSetup     func()
-		startingCR  *v1.ClusterRole
-		expectedCR  *v1.ClusterRole
+		startingCR  *rbacv1.ClusterRole
+		expectedCR  *rbacv1.ClusterRole
 		createError error
 		expectedErr string
 	}
@@ -284,7 +281,7 @@ func TestCreateProjectNSRole(t *testing.T) {
 			description: "create get role",
 			verb:        "get",
 			projectName: "p-123xyz",
-			expectedCR: &v1.ClusterRole{
+			expectedCR: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "p-123xyz-namespaces-readonly",
 					Annotations: map[string]string{
@@ -297,14 +294,14 @@ func TestCreateProjectNSRole(t *testing.T) {
 			description: "create edit role",
 			verb:        "*",
 			projectName: "p-123xyz",
-			expectedCR: &v1.ClusterRole{
+			expectedCR: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "p-123xyz-namespaces-edit",
 					Annotations: map[string]string{
 						projectNSAnn: "p-123xyz-namespaces-edit",
 					},
 				},
-				Rules: []v1.PolicyRule{
+				Rules: []rbacv1.PolicyRule{
 					{
 						APIGroups:     []string{"management.cattle.io"},
 						Verbs:         []string{"manage-namespaces"},
@@ -318,14 +315,14 @@ func TestCreateProjectNSRole(t *testing.T) {
 			description: "do not change role if already exists and return AlreadyExists error",
 			verb:        "*",
 			projectName: "p-123xyz",
-			expectedCR: &v1.ClusterRole{
+			expectedCR: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "p-123xyz-namespaces-edit",
 					Annotations: map[string]string{
 						projectNSAnn: "p-123xyz-namespaces-edit",
 					},
 				},
-				Rules: []v1.PolicyRule{
+				Rules: []rbacv1.PolicyRule{
 					{
 						APIGroups:     []string{"management.cattle.io"},
 						Verbs:         []string{"manage-namespaces"},
@@ -334,14 +331,14 @@ func TestCreateProjectNSRole(t *testing.T) {
 					},
 				},
 			},
-			startingCR: &v1.ClusterRole{
+			startingCR: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "p-123xyz-namespaces-edit",
 					Annotations: map[string]string{
 						projectNSAnn: "p-123xyz-namespaces-edit",
 					},
 				},
-				Rules: []v1.PolicyRule{
+				Rules: []rbacv1.PolicyRule{
 					{
 						APIGroups:     []string{"management.cattle.io"},
 						Verbs:         []string{"manage-namespaces"},
@@ -356,22 +353,22 @@ func TestCreateProjectNSRole(t *testing.T) {
 			description: "test should return non-AlreadyExists error",
 			verb:        "*",
 			projectName: "p-123xyz",
-			createError: errors.NewInternalError(fmt.Errorf("some error")),
+			createError: apierrors.NewInternalError(fmt.Errorf("some error")),
 			expectedErr: "Internal error occurred: some error",
 		},
 	}
 	for _, test := range testCases {
-		clusterRoles := map[string]*v1.ClusterRole{}
+		clusterRoles := map[string]*rbacv1.ClusterRole{}
 		if test.startingCR != nil {
-			clusterRoles = map[string]*v1.ClusterRole{
+			clusterRoles = map[string]*rbacv1.ClusterRole{
 				test.startingCR.Name: test.startingCR,
 			}
 		}
 
 		m := newManager(withClusterRoles(clusterRoles, &clientErrs{createError: test.createError}, ctrl), func(m *manager) {
-			clusterRoles := wfakes.NewMockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
+			clusterRoles := wfakes.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
 			clusterRoles.EXPECT().Create(gomock.Any()).DoAndReturn(
-				func(In1 *v1.ClusterRole) (*v1.ClusterRole, error) {
+				func(In1 *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
 					if test.expectedErr != "" {
 						return nil, fmt.Errorf("%v", test.expectedErr)
 					}
@@ -574,9 +571,9 @@ func TestAsyncCleanupRBAC_NamespaceDeleted(t *testing.T) {
 				err: nil,
 			}
 
-			fakeClusterRoles := wfakes.NewMockNonNamespacedControllerInterface[*v1.ClusterRole, *v1.ClusterRoleList](ctrl)
+			fakeClusterRoles := wfakes.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
 			fakeClusterRoles.EXPECT().Update(gomock.Any()).DoAndReturn(
-				func(in *v1.ClusterRole) (*v1.ClusterRole, error) {
+				func(in *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
 					return in, nil
 				},
 			).AnyTimes()
@@ -586,10 +583,10 @@ func TestAsyncCleanupRBAC_NamespaceDeleted(t *testing.T) {
 				},
 			).AnyTimes()
 
-			fakeLister := wfakes.NewMockNonNamespacedCacheInterface[*v1.ClusterRole](ctrl)
+			fakeLister := wfakes.NewMockNonNamespacedCacheInterface[*rbacv1.ClusterRole](ctrl)
 			fakeLister.EXPECT().Get(gomock.Any()).DoAndReturn(
-				func(int1 string) (*v1.ClusterRole, error) {
-					return &v1.ClusterRole{}, nil
+				func(int1 string) (*rbacv1.ClusterRole, error) {
+					return &rbacv1.ClusterRole{}, nil
 				},
 			).AnyTimes()
 			nsLifecycle := &nsLifecycle{
@@ -626,8 +623,8 @@ func TestEnsurePRTBAddToNamespace(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	tests := []struct {
 		name                string
-		indexedRoles        []*v1.ClusterRole
-		currentRoles        []*v1.ClusterRole
+		indexedRoles        []*rbacv1.ClusterRole
+		currentRoles        []*rbacv1.ClusterRole
 		indexedPRTBs        []*v3.ProjectRoleTemplateBinding
 		projectNSAnnotation string
 		indexerError        error
@@ -642,7 +639,7 @@ func TestEnsurePRTBAddToNamespace(t *testing.T) {
 		{
 			name:                "update namespace with missing namespace",
 			projectNSAnnotation: "c-123xyz:p-123xyz",
-			indexedRoles: []*v1.ClusterRole{
+			indexedRoles: []*rbacv1.ClusterRole{
 				createClusterRoleForProject("p-123xyz", namespaceName, "*"),
 				addNamespaceToClusterRole("otherNamespace", "get", createClusterRoleForProject("p-123abc", namespaceName, "get")),
 			},
@@ -663,8 +660,8 @@ func TestEnsurePRTBAddToNamespace(t *testing.T) {
 	for _, test := range tests {
 		test := test
 		t.Run(test.name, func(t *testing.T) {
-			crIndexer := &FakeResourceIndexer[*v1.ClusterRole]{
-				resources: map[string][]*v1.ClusterRole{
+			crIndexer := &FakeResourceIndexer[*rbacv1.ClusterRole]{
+				resources: map[string][]*rbacv1.ClusterRole{
 					namespaceName: test.indexedRoles,
 				},
 				index: crByNSIndex,

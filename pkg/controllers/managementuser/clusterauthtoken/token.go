@@ -143,7 +143,7 @@ func (h *tokenHandler) ExtUpdated(token *extv1.Token) (*extv1.Token, error) {
 		clusterAuthTokenSecret.Data["hash"] = []byte(current.value)
 		_, err = h.clusterSecret.Update(clusterAuthTokenSecret)
 		if errors.IsNotFound(err) {
-			_, err = h.clusterSecret.Create(clusterAuthTokenSecret)
+			_, _ = h.clusterSecret.Create(clusterAuthTokenSecret)
 		}
 	}
 

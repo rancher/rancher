@@ -22,7 +22,6 @@ import (
 	corev1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/rbac"
 	projectschema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
-	schema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	k8sappsv1 "k8s.io/api/apps/v1"
@@ -149,7 +148,7 @@ func updatePause(apiContext *types.APIContext, value bool, deployment projectcli
 }
 
 func update(apiContext *types.APIContext, data map[string]interface{}, ID string) error {
-	workloadSchema := apiContext.Schemas.Schema(&schema.Version, "workload")
+	workloadSchema := apiContext.Schemas.Schema(&projectschema.Version, "workload")
 	_, err := workloadSchema.Store.Update(apiContext, workloadSchema, data, ID)
 	return err
 }
@@ -256,7 +255,7 @@ func (h Handler) LinkHandler(apiContext *types.APIContext, next types.RequestHan
 
 func (a *Config) Formatter(apiContext *types.APIContext, resource *types.RawResource) {
 	workloadID := resource.ID
-	workloadSchema := apiContext.Schemas.Schema(&schema.Version, "workload")
+	workloadSchema := apiContext.Schemas.Schema(&projectschema.Version, "workload")
 	resource.Links["self"] = apiContext.URLBuilder.ResourceLinkByID(workloadSchema, workloadID)
 	resource.Links["remove"] = apiContext.URLBuilder.ResourceLinkByID(workloadSchema, workloadID)
 	resource.Links["update"] = apiContext.URLBuilder.ResourceLinkByID(workloadSchema, workloadID)
@@ -272,7 +271,7 @@ func (a *Config) Formatter(apiContext *types.APIContext, resource *types.RawReso
 
 func (a *Config) DeploymentFormatter(apiContext *types.APIContext, resource *types.RawResource) {
 	workloadID := resource.ID
-	workloadSchema := apiContext.Schemas.Schema(&schema.Version, "workload")
+	workloadSchema := apiContext.Schemas.Schema(&projectschema.Version, "workload")
 	a.Formatter(apiContext, resource)
 	resource.Links["revisions"] = apiContext.URLBuilder.ResourceLinkByID(workloadSchema, workloadID) + "/" + workloadRevisions
 	workloadType, _, _ := splitID(resource.ID)

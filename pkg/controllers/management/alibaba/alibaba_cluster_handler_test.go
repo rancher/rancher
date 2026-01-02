@@ -8,16 +8,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rancher/rancher/pkg/types/config/dialer"
-	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
-
 	"github.com/ghodss/yaml"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
 	test "github.com/rancher/rancher/pkg/controllers/management/alibaba/mocks"
 	"github.com/rancher/rancher/pkg/controllers/management/clusteroperator"
+	"github.com/rancher/rancher/pkg/types/config/dialer"
 	"github.com/rancher/rancher/pkg/types/config/dialer/mocks"
+	wranglerfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -64,8 +62,8 @@ func Test_onClusterChange_ClusterIsNil(t *testing.T) {
 
 func Test_onClusterChange_AliConfigIsNil(t *testing.T) {
 	var mockOperatorController aliOperatorController
-	mockCluster := &v3.Cluster{
-		Spec: v3.ClusterSpec{
+	mockCluster := &apimgmtv3.Cluster{
+		Spec: apimgmtv3.ClusterSpec{
 			AliConfig: nil,
 		},
 	}

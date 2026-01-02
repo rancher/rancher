@@ -100,17 +100,27 @@ func Test_Operation_SetB_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode(t 
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	_, err = cluster.WaitForControlPlane(clients, c, "rkecontrolplane ready condition indicating insane cluster", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
 		return strings.Contains(capr.Ready.GetMessage(&rkeControlPlane.Status), "waiting for at least one control plane, etcd, and worker node to be registered"), nil
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Scale etcd nodes to 1
 	c, err = operations.Scale(clients, c, 0, 1, false)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	_, err = cluster.WaitForControlPlane(clients, c, "rkecontrolplane ready condition indicating restoration required", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
 		return strings.Contains(capr.Ready.GetMessage(&rkeControlPlane.Status), "rkecontrolplane was already initialized but no etcd machines exist that have plans, indicating the etcd plane has been entirely replaced. Restoration from etcd snapshot is required."), nil
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.Name, cm, 3)
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	assert.NoError(t, err)
