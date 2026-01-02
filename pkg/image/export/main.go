@@ -1,10 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	img "github.com/rancher/rancher/pkg/image"
+	"github.com/rancher/rancher/pkg/image/appco"
 	"github.com/rancher/rancher/pkg/image/utilities"
 )
 
@@ -19,9 +22,36 @@ func main() {
 }
 
 func run(chartsPath string, imagesFromArgs []string, ociChartsPath string, ociRepositoryURL string) error {
-	targetsAndSources, err := utilities.GatherTargetArtifactsAndSources(chartsPath, ociChartsPath, imagesFromArgs, ociRepositoryURL)
+	rancherVersion, ok := os.LookupEnv("TAG")
+	if !ok {
+		return fmt.Errorf("no tag defining current Rancher version, cannot gather target images and sources")
+	}
+
+	targetsAndSources, err := utilities.GatherTargetArtifactsAndSources(chartsPath, ociChartsPath, imagesFromArgs, ociRepositoryURL, rancherVersion)
 	if err != nil {
 		return err
+	}
+
+	// Append AppCo artifacts if enabled
+	if strings.EqualFold(os.Getenv("ENABLE_APPCO_ARTIFACTS"), "true") {
+		appcoArtifacts, err := appco.CollectArtifacts(rancherVersion)
+		if err != nil {
+			return err
+		}
+
+		// add to rancher-images.txt
+		targetsAndSources.TargetLinuxArtifacts =
+			append(targetsAndSources.TargetLinuxArtifacts, appcoArtifacts...)
+
+		// add to rancher-images-sources.txt
+		// Source is "appco" for all AppCo artifacts
+		for _, artifact := range appcoArtifacts {
+			targetsAndSources.TargetLinuxArtifactsAndSources = addSourceToImage(
+				targetsAndSources.TargetLinuxArtifactsAndSources,
+				artifact,
+				"appco",
+			)
+		}
 	}
 
 	// create rancher-image-origins.txt. Will fail if /pkg/image/origins.go
@@ -64,4 +94,19 @@ func run(chartsPath string, imagesFromArgs []string, ociChartsPath string, ociRe
 	}
 
 	return nil
+}
+
+func addSourceToImage(
+	imagesAndSources []string,
+	image string,
+	source string,
+) []string {
+	if image == "" || source == "" {
+		return imagesAndSources
+	}
+
+	return append(
+		imagesAndSources,
+		fmt.Sprintf("%s %s", image, source),
+	)
 }
