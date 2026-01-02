@@ -526,7 +526,7 @@ func (p *Provisioner) reconcileCluster(cluster *apimgmtv3.Cluster, create bool) 
 		}
 
 		logrus.Errorf("failed to update cluster [%s]: %v", cluster.Name, err)
-		//lint:ignore SA1004 intentional use of nannoseconds
+		//lint:ignore SA1004 intentional use of nanoseconds
 		time.Sleep(2) //nolint:staticcheck //SA1004
 	}
 
