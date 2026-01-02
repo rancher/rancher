@@ -41,6 +41,9 @@ const (
 	Version    = 2
 )
 
+// Manager manages kubeconfig generation and token management for provisioned clusters.
+// It handles the creation and validation of kubeconfigs, ensuring they remain up-to-date
+// with current server URLs, certificates, and authentication tokens.
 type Manager struct {
 	deploymentCache  appcontroller.DeploymentCache
 	daemonsetCache   appcontroller.DaemonSetCache
@@ -53,6 +56,8 @@ type Manager struct {
 	kubeConfigLocker locker.Locker
 }
 
+// New creates a new kubeconfig Manager with the necessary client caches and controllers
+// for managing kubeconfigs and authentication tokens for provisioned clusters.
 func New(clients *wrangler.Context) *Manager {
 	return &Manager{
 		deploymentCache: clients.Apps.Deployment().Cache(),
@@ -66,10 +71,15 @@ func New(clients *wrangler.Context) *Manager {
 	}
 }
 
+// getKubeConfigSecretName returns the standard name for a cluster's kubeconfig secret,
+// formed by appending "-kubeconfig" to the cluster name.
 func getKubeConfigSecretName(clusterName string) string {
 	return clusterName + "-kubeconfig"
 }
 
+// getToken retrieves or creates an authentication token for the specified cluster.
+// It first attempts to retrieve a saved token from cache, then from the API server if not cached.
+// If no token exists, it ensures a user exists for the cluster and creates a new token for that user.
 func (m *Manager) getToken(clusterNamespace, clusterName string) (string, error) {
 	kubeConfigSecretName := getKubeConfigSecretName(clusterName)
 	if token, err := m.getSavedToken(clusterNamespace, kubeConfigSecretName); err != nil || token != "" {
@@ -90,8 +100,9 @@ func (m *Manager) getToken(clusterNamespace, clusterName string) (string, error)
 	return m.createUserToken(userName)
 }
 
-// getCachedToken retrieves the token for a given cluster without manipulating the token itself. This function is
-// primary to ensure the kubeconfig for a cluster remains valid.
+// getCachedToken retrieves the token for a given cluster without manipulating the token itself.
+// This function is primarily used to ensure the kubeconfig for a cluster remains valid by checking
+// if the cached token matches the token in the kubeconfig. Returns the token name, token object, and any error.
 func (m *Manager) getCachedToken(clusterNamespace, clusterName string) (string, *v3.Token, error) {
 	_, userName := getPrincipalAndUserName(clusterNamespace, clusterName)
 	token, err := m.tokensCache.Get(userName)
@@ -101,20 +112,31 @@ func (m *Manager) getCachedToken(clusterNamespace, clusterName string) (string, 
 	return userName, token, nil
 }
 
+// getPrincipalAndUserName generates the principal ID and corresponding username for a cluster.
+// The principal ID follows the format "system://provisioning/{namespace}/{clusterName}" and the
+// username is derived by hashing the principal ID.
 func getPrincipalAndUserName(clusterNamespace, clusterName string) (string, string) {
 	principalID := getPrincipalID(clusterNamespace, clusterName)
 	return principalID, getUserNameForPrincipal(principalID)
 }
 
+// EnsureUser ensures that a user exists for the specified cluster. If the user does not exist,
+// it will be created with the appropriate principal ID. Returns the username.
 func (m *Manager) EnsureUser(clusterNamespace, clusterName string) (string, error) {
 	principalID, userName := getPrincipalAndUserName(clusterNamespace, clusterName)
 	return userName, m.createUser(principalID, userName)
 }
 
+// DeleteUser deletes the user associated with the specified cluster. This is typically called
+// during cluster cleanup operations. Returns an error only if deletion fails for reasons other
+// than the user not existing.
 func (m *Manager) DeleteUser(clusterNamespace, clusterName string) error {
 	return m.deleteUser(getUserNameForPrincipal(getPrincipalID(clusterNamespace, clusterName)))
 }
 
+// getUserNameForPrincipal generates a deterministic username from a principal ID by
+// computing a SHA256 hash of the principal and encoding it as a base32 string.
+// The resulting username is prefixed with "u-" and truncated to 12 characters total.
 func getUserNameForPrincipal(principal string) string {
 	hasher := sha256.New()
 	hasher.Write([]byte(principal))
@@ -122,6 +144,9 @@ func getUserNameForPrincipal(principal string) string {
 	return "u-" + strings.ToLower(sha)
 }
 
+// labelsForUser creates labels for a user based on their principal ID. The principal ID is
+// hex-encoded and truncated to 63 characters to comply with Kubernetes label constraints.
+// Returns a map with the encoded principal as the label key.
 func labelsForUser(principalID string) map[string]string {
 	encodedPrincipalID := base32.HexEncoding.WithPadding(base32.NoPadding).EncodeToString([]byte(principalID))
 	if len(encodedPrincipalID) > 63 {
@@ -132,6 +157,8 @@ func labelsForUser(principalID string) map[string]string {
 	}
 }
 
+// getSavedToken retrieves a saved token from the secret cache. Returns an empty string
+// if the secret is not found, and an error for other retrieval failures.
 func (m *Manager) getSavedToken(kubeConfigNamespace, kubeConfigName string) (string, error) {
 	secret, err := m.secretCache.Get(kubeConfigNamespace, kubeConfigName)
 	if apierror.IsNotFound(err) {
@@ -142,6 +169,9 @@ func (m *Manager) getSavedToken(kubeConfigNamespace, kubeConfigName string) (str
 	return string(secret.Data["token"]), nil
 }
 
+// getSavedTokenNoCache retrieves a saved token directly from the API server, bypassing the cache.
+// This is used to handle potential cache inconsistencies. Returns an empty string if the secret
+// is not found, and an error for other retrieval failures.
 func (m *Manager) getSavedTokenNoCache(kubeConfigNamespace, kubeConfigName string) (string, error) {
 	secret, err := m.secrets.Get(kubeConfigNamespace, kubeConfigName, metav1.GetOptions{})
 	if apierror.IsNotFound(err) {
@@ -152,10 +182,15 @@ func (m *Manager) getSavedTokenNoCache(kubeConfigNamespace, kubeConfigName strin
 	return string(secret.Data["token"]), nil
 }
 
+// getPrincipalID constructs the principal ID for a cluster in the format
+// "system://provisioning/{namespace}/{clusterName}". This ID uniquely identifies
+// the cluster within the Rancher authentication system.
 func getPrincipalID(clusterNamespace, clusterName string) string {
 	return fmt.Sprintf("system://provisioning/%s/%s", clusterNamespace, clusterName)
 }
 
+// createUser creates a new user with the given principal ID and username. If the user already
+// exists, returns without error. The user is created with labels derived from the principal ID.
 func (m *Manager) createUser(principalID, userName string) error {
 	_, err := m.userCache.Get(userName)
 	if apierror.IsNotFound(err) {
@@ -172,6 +207,8 @@ func (m *Manager) createUser(principalID, userName string) error {
 	return err
 }
 
+// deleteUser deletes the user with the specified username. Returns an error only if deletion
+// fails for reasons other than the user not existing (NotFound errors are ignored).
 func (m *Manager) deleteUser(userName string) error {
 	if err := m.users.Delete(userName, nil); err != nil && !apierror.IsNotFound(err) {
 		return err
@@ -179,6 +216,10 @@ func (m *Manager) deleteUser(userName string) error {
 	return nil
 }
 
+// createUserToken creates a new authentication token for the specified user. If a token already
+// exists for the user, it is deleted first to ensure a fresh token is created. The token is marked
+// as derived and uses the "local" auth provider. If token hashing is enabled, the token will be
+// hashed before storage. Returns the token in the format "userName:tokenValue".
 func (m *Manager) createUserToken(userName string) (string, error) {
 	_, err := m.tokens.Get(userName, metav1.GetOptions{})
 	if err == nil {
@@ -219,6 +260,9 @@ func (m *Manager) createUserToken(userName string) (string, error) {
 	return fmt.Sprintf("%s:%s", userName, tokenValue), err
 }
 
+// createSHA256Hash generates a salted SHA256 hash of the provided secret key.
+// Returns the hash in the format "$version:encodedSalt:encodedHash" where version is 2.
+// Uses a randomly generated 8-byte salt and base64 encoding for both salt and hash values.
 func createSHA256Hash(secretKey string) (string, error) {
 	salt := make([]byte, 8)
 	_, err := rand.Read(salt)
@@ -231,6 +275,10 @@ func createSHA256Hash(secretKey string) (string, error) {
 	return fmt.Sprintf(hashFormat, Version, encSalt, encKey), nil
 }
 
+// GetCRTBForClusterOwner creates a ClusterRoleTemplateBinding that grants cluster-owner
+// permissions to the service account associated with the cluster. This binding is used to
+// provide the provisioning user with full access to manage the cluster. Returns an error
+// if the management cluster name is not yet assigned to the cluster.
 func (m *Manager) GetCRTBForClusterOwner(cluster *v1.Cluster, status v1.ClusterStatus) (*v3.ClusterRoleTemplateBinding, error) {
 	if status.ClusterName == "" {
 		return nil, fmt.Errorf("management cluster is not assigned to v1.Cluster")
@@ -249,9 +297,11 @@ func (m *Manager) GetCRTBForClusterOwner(cluster *v1.Cluster, status v1.ClusterS
 	}, nil
 }
 
-// kubeConfigValid accepts a kubeconfig and corresponding data, and validates that the kubeconfig is valid for the
-// cluster in question. It returns two booleans, the first of which is whether an error occurred parsing the kubeconfig
-// or retrieving information related to the kubeconfig, and the second which indicates whether the kubeconfig is valid.
+// kubeConfigValid validates that a kubeconfig matches the expected configuration for a cluster.
+// It checks that the server URL, CA certificate, management cluster name, authentication token,
+// and CAPI cluster label all match the current expected values. Returns two booleans: the first
+// indicates if an error occurred during validation (true = error), and the second indicates if
+// the kubeconfig is valid (true = valid). If the kubeconfig data is empty, returns (true, false).
 func (m *Manager) kubeConfigValid(kcData []byte, cluster *v1.Cluster, currentServerURL, currentServerCA, currentManagementClusterName string, secretLabels map[string]string) (bool, bool) {
 	if len(kcData) == 0 {
 		return true, false
@@ -305,6 +355,11 @@ func (m *Manager) kubeConfigValid(kcData []byte, cluster *v1.Cluster, currentSer
 	return false, true
 }
 
+// getKubeConfigData retrieves or generates kubeconfig data for a cluster. It first checks if
+// a valid cached kubeconfig exists, validating it against current server settings. If the cached
+// kubeconfig is invalid or missing, it uses a lock to ensure only one goroutine generates a new
+// kubeconfig. The new kubeconfig is created with an authentication token and stored as a secret
+// with an owner reference to the cluster.
 func (m *Manager) getKubeConfigData(cluster *v1.Cluster, secretName, managementClusterName string) (map[string][]byte, error) {
 	serverURL, cacert := settings.InternalServerURL.Get(), settings.InternalCACerts.Get()
 	if serverURL == "" {
@@ -392,6 +447,9 @@ func (m *Manager) getKubeConfigData(cluster *v1.Cluster, secretName, managementC
 	return secret.Data, nil
 }
 
+// GetRESTConfig retrieves a Kubernetes REST config for the specified cluster by first obtaining
+// the kubeconfig secret and then converting it to a REST config. This can be used to create
+// a Kubernetes client for interacting with the cluster.
 func (m *Manager) GetRESTConfig(cluster *v1.Cluster, status v1.ClusterStatus) (*rest.Config, error) {
 	secret, err := m.GetKubeConfig(cluster, status)
 	if err != nil {
@@ -401,6 +459,10 @@ func (m *Manager) GetRESTConfig(cluster *v1.Cluster, status v1.ClusterStatus) (*
 	return clientcmd.RESTConfigFromKubeConfig(secret.Data["value"])
 }
 
+// GetKubeConfig retrieves the kubeconfig secret for the specified cluster. For clusters using
+// ClusterAPI, it retrieves the existing kubeconfig secret. For other clusters, it generates or
+// retrieves the kubeconfig data and returns it as a secret object. The secret contains the
+// kubeconfig in the "value" field.
 func (m *Manager) GetKubeConfig(cluster *v1.Cluster, status v1.ClusterStatus) (*corev1.Secret, error) {
 	if cluster.Spec.ClusterAPIConfig != nil {
 		return m.secretCache.Get(cluster.Namespace, getKubeConfigSecretName(cluster.Spec.ClusterAPIConfig.ClusterName))

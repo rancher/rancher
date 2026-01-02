@@ -17,6 +17,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// NewRetriever creates a new Retriever instance for generating pre-bootstrap cluster agent manifests.
+// It initializes the retriever with caches for management clusters, cluster registration tokens, and secrets.
 func NewRetriever(clients *wrangler.CAPIContext) *Retriever {
 	return &Retriever{
 		mgmtClusterCache:              clients.Mgmt.Cluster().Cache(),
@@ -26,12 +28,20 @@ func NewRetriever(clients *wrangler.CAPIContext) *Retriever {
 
 }
 
+// Retriever handles the generation of pre-bootstrap cluster agent manifests for RKE control planes.
+// It manages access to management cluster, cluster registration token, and secret caches needed
+// for manifest generation.
 type Retriever struct {
 	mgmtClusterCache              mgmtcontrollers.ClusterCache
 	clusterRegistrationTokenCache mgmtcontrollers.ClusterRegistrationTokenCache
 	secretCache                   corecontrollers.SecretCache
 }
 
+// GeneratePreBootstrapClusterAgentManifest generates a cluster agent manifest file for pre-bootstrap operations.
+// Pre-bootstrapping is used to prepare a cluster before the main bootstrap process begins. The manifest is
+// generated only if pre-bootstrap is enabled for the cluster, and it requires a valid cluster registration token.
+// Returns nil if pre-bootstrap is not needed or if no registration token is found. The manifest file is marked
+// as dynamic and minor, and is placed in the appropriate distro data directory.
 func (r *Retriever) GeneratePreBootstrapClusterAgentManifest(controlPlane *rkev1.RKEControlPlane) ([]plan.File, error) {
 	shouldDo, _ := r.preBootstrapCluster(controlPlane)
 	if !shouldDo {
@@ -70,6 +80,9 @@ func (r *Retriever) GeneratePreBootstrapClusterAgentManifest(controlPlane *rkev1
 	}}, nil
 }
 
+// preBootstrapCluster checks if pre-bootstrap should be performed for the given RKE control plane.
+// It retrieves the associated management cluster and delegates to capr.PreBootstrap to determine
+// if pre-bootstrap is enabled. Logs a warning if the management cluster cannot be retrieved.
 func (r *Retriever) preBootstrapCluster(cp *rkev1.RKEControlPlane) (bool, error) {
 	mgmtCluster, err := r.mgmtClusterCache.Get(cp.Spec.ManagementClusterName)
 	if err != nil {
