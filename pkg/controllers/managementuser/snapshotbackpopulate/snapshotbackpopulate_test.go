@@ -2,22 +2,27 @@ package snapshotbackpopulate
 
 import (
 	"errors"
+	"regexp"
+	"strings"
 	"testing"
 	"time"
 
 	k3s "github.com/k3s-io/api/k3s.cattle.io/v1"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	cluster2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/utils/ptr"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
 
@@ -431,6 +436,10 @@ func TestOnDownstreamChange(t *testing.T) {
 			Namespace: "test-namespace",
 			Name:      "test-snapshot-downstream",
 		},
+		Status: k3s.ETCDSnapshotStatus{
+			CreationTime: &metav1.Time{Time: time.Now()},
+			ReadyToUse:   ptr.To(true),
+		},
 	}
 
 	_, err = h.OnDownstreamChange("", snapshot)
@@ -611,6 +620,206 @@ func TestOnDownstreamChange(t *testing.T) {
 
 	_, err = h.OnDownstreamChange("", snapshot)
 	assert.NoError(t, err, "It should not return an error when update the snapshot")
+}
+
+func TestOnDownstreamChange_RestoreModeAnnotationIsSetCorrectly(t *testing.T) {
+	// Helper to create a valid, compressed spec payload
+	compressSpec := func(t *testing.T, spec *provv1.ClusterSpec) string {
+		payload, err := snapshotutil.CompressInterface(spec)
+		require.NoError(t, err)
+		return payload
+	}
+
+	validSpecFull := &provv1.ClusterSpec{
+		KubernetesVersion: "v1.34.1+rke2r1",
+		RKEConfig:         &provv1.RKEConfig{},
+	}
+	validSpecNoRKEConfig := &provv1.ClusterSpec{
+		KubernetesVersion: "v1.34.1+rke2r1",
+		// RKEConfig is nil
+	}
+	validSpecNoK8sVersion := &provv1.ClusterSpec{
+		RKEConfig: &provv1.RKEConfig{},
+		// KubernetesVersion is empty
+	}
+
+	testCases := []struct {
+		name               string
+		metadata           map[string]string
+		expectedAnnotation string
+	}{
+		{
+			name:               "metadata is nil",
+			metadata:           nil,
+			expectedAnnotation: "none",
+		},
+		{
+			name:               "metadata is empty map",
+			metadata:           map[string]string{},
+			expectedAnnotation: "none",
+		},
+		{
+			name: "metadata key is present but payload is corrupt",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataClusterSpecKey: "not-base64-or-gzip-corrupt-data",
+			},
+			expectedAnnotation: "none",
+		},
+		{
+			name: "spec is valid but missing k8s version",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataClusterSpecKey: compressSpec(t, validSpecNoK8sVersion),
+			},
+			expectedAnnotation: "none",
+		},
+		{
+			name: "spec has k8s version but no RKEConfig",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataClusterSpecKey: compressSpec(t, validSpecNoRKEConfig),
+			},
+			expectedAnnotation: "none,kubernetesVersion",
+		},
+		{
+			name: "spec has k8s version and RKEConfig",
+			metadata: map[string]string{
+				rkev1.SnapshotMetadataClusterSpecKey: compressSpec(t, validSpecFull),
+			},
+			expectedAnnotation: "none,kubernetesVersion,all",
+		},
+	}
+
+	mockController := gomock.NewController(t)
+
+	clusterCache := fake.NewMockCacheInterface[*provv1.Cluster](mockController)
+	controlPlaneCache := fake.NewMockCacheInterface[*rkev1.RKEControlPlane](mockController)
+	etcdSnapshotCache := fake.NewMockCacheInterface[*rkev1.ETCDSnapshot](mockController)
+	etcdSnapshotController := fake.NewMockControllerInterface[*rkev1.ETCDSnapshot, *rkev1.ETCDSnapshotList](mockController)
+	machineCache := fake.NewMockCacheInterface[*capi.Machine](mockController)
+	capiClusterCache := fake.NewMockCacheInterface[*capi.Cluster](mockController)
+	etcdSnapshotFileController := fake.NewMockNonNamespacedControllerInterface[*k3s.ETCDSnapshotFile, *k3s.ETCDSnapshotFileList](mockController)
+
+	handlerUnderTest := handler{
+		clusterName:                "test-management-cluster",
+		clusterCache:               clusterCache,
+		controlPlaneCache:          controlPlaneCache,
+		etcdSnapshotCache:          etcdSnapshotCache,
+		etcdSnapshotController:     etcdSnapshotController,
+		machineCache:               machineCache,
+		capiClusterCache:           capiClusterCache,
+		etcdSnapshotFileController: etcdSnapshotFileController,
+	}
+
+	// Cluster state
+	provisioningCluster := &provv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "fleet-default", Name: "example"},
+		Status:     provv1.ClusterStatus{ClusterName: "test-management-cluster"},
+	}
+	controlPlane := &rkev1.RKEControlPlane{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fleet-default",
+			Name:      "example",
+			Labels:    map[string]string{capi.ClusterNameLabel: "example"},
+		},
+	}
+	capiCluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "fleet-default", Name: "example"},
+	}
+	capiMachine := &capi.Machine{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "fleet-default",
+			Name:      "machine-0",
+			Labels:    map[string]string{capi.ClusterNameLabel: "example", capr.MachineIDLabel: "machine-id-0"},
+		},
+		Status: capi.MachineStatus{NodeRef: &corev1.ObjectReference{Name: "cp-0"}},
+	}
+
+	clusterCache.EXPECT().
+		GetByIndex(cluster2.ByCluster, handlerUnderTest.clusterName).
+		Return([]*provv1.Cluster{provisioningCluster}, nil).
+		AnyTimes()
+
+	controlPlaneCache.EXPECT().
+		Get(provisioningCluster.Namespace, provisioningCluster.Name).
+		Return(controlPlane, nil).
+		AnyTimes()
+
+	capiClusterCache.EXPECT().
+		Get(provisioningCluster.Namespace, provisioningCluster.Name).
+		Return(capiCluster, nil).
+		AnyTimes()
+
+	selectorForCluster := labels.SelectorFromSet(labels.Set{capi.ClusterNameLabel: provisioningCluster.Name})
+	machineCache.EXPECT().
+		List(provisioningCluster.Namespace, selectorForCluster).
+		Return([]*capi.Machine{capiMachine}, nil).
+		AnyTimes()
+
+	// Factory for downstream snapshot files
+	makeDownstream := func(isS3Storage bool, metadata map[string]string, name string) *k3s.ETCDSnapshotFile {
+		ds := &k3s.ETCDSnapshotFile{
+			ObjectMeta: metav1.ObjectMeta{Name: name},
+			Spec: k3s.ETCDSnapshotSpec{
+				SnapshotName: "etcdsnapshot-name",
+				NodeName:     "cp-0",
+				Location:     "file:///var/lib/rancher/etcd",
+				Metadata:     metadata,
+			},
+			Status: k3s.ETCDSnapshotStatus{
+				CreationTime: &metav1.Time{Time: time.Now()},
+				ReadyToUse:   ptr.To(true),
+			},
+		}
+		if isS3Storage {
+			ds.Spec.S3 = &k3s.ETCDSnapshotS3{
+				Bucket:   "bucket-name",
+				Region:   "us-east-1",
+				Prefix:   "etcd-snaps",
+				Endpoint: "s3.amazonaws.com",
+			}
+			ds.Spec.Location = "s3://bucket-name/etcd-snaps/etcdsnapshot-name"
+		}
+		return ds
+	}
+
+	storageTypes := []struct {
+		name        string
+		isS3Storage bool
+	}{
+		{name: "Local Storage", isS3Storage: false},
+		{name: "S3 Storage", isS3Storage: true},
+	}
+
+	for _, storage := range storageTypes {
+		for _, tc := range testCases {
+
+			downstreamSnapshotName := strings.ReplaceAll(tc.name, " ", "-") + "-" + strings.ToLower(storage.name)
+
+			t.Run(storage.name+": "+tc.name, func(t *testing.T) {
+				downstreamFile := makeDownstream(storage.isS3Storage, tc.metadata, downstreamSnapshotName)
+
+				etcdSnapshotCache.EXPECT().
+					GetByIndex(cluster2.ByETCDSnapshotName, "fleet-default/example/"+downstreamSnapshotName).
+					Return([]*rkev1.ETCDSnapshot{}, nil).
+					Times(1)
+
+				etcdSnapshotController.EXPECT().
+					Create(gomock.Any()).
+					DoAndReturn(func(created *rkev1.ETCDSnapshot) (*rkev1.ETCDSnapshot, error) {
+						annotations := created.GetAnnotations()
+						require.NotNil(t, annotations)
+						assert.Equal(t, tc.expectedAnnotation, annotations[RestoreModeOptionsAnnotation], "Annotation should be set correctly")
+
+						assert.Equal(t, "successful", created.SnapshotFile.Status, "Status should be successful because ReadyToUse is true")
+
+						require.Equal(t, downstreamFile.Spec.SnapshotName, annotations[SnapshotFileNameAnnotationKey])
+						return created, nil
+					}).Times(1)
+
+				_, err := handlerUnderTest.OnDownstreamChange("", downstreamFile)
+				require.NoError(t, err)
+			})
+		}
+	}
 }
 
 func TestGetCluster(t *testing.T) {
@@ -1017,4 +1226,80 @@ func TestGetMachineByID(t *testing.T) {
 
 func TestGetLogPrefix(t *testing.T) {
 	assert.Equal(t, "[snapshotbackpopulate] rkecluster test-namespace/test-cluster:", getLogPrefix(&provv1.Cluster{ObjectMeta: metav1.ObjectMeta{Namespace: "test-namespace", Name: "test-cluster"}}))
+}
+
+func TestGenerateSafeSnapshotName(t *testing.T) {
+	callTime := time.Unix(1_700_000_000, 0)
+
+	newSpec := func(name, node, loc string, s3 bool) k3s.ETCDSnapshotSpec {
+		var s3ptr *k3s.ETCDSnapshotS3
+		if s3 {
+			s3ptr = &k3s.ETCDSnapshotS3{}
+		}
+		return k3s.ETCDSnapshotSpec{
+			SnapshotName: name,
+			NodeName:     node,
+			Location:     loc,
+			S3:           s3ptr,
+		}
+	}
+
+	hex6re := regexp.MustCompile(`^[a-f0-9]{6}$`)
+
+	tests := []struct {
+		name       string
+		storage    Storage
+		spec       k3s.ETCDSnapshotSpec
+		wantPrefix string
+	}{
+		{
+			name:       "Local valid filename is reused as base",
+			spec:       newSpec("valid-filename", "cp-0", "file:///var/lib/etcd", false),
+			wantPrefix: "local-valid-filename-",
+		},
+		{
+			name:       "S3 valid filename is reused as base",
+			spec:       newSpec("ok.valid.name", "cp-0", "s3://bucket/prefix/key", true),
+			wantPrefix: "s3-ok.valid.name-",
+		},
+		{
+			name:       "Local invalid filename falls back to host+unix",
+			spec:       newSpec("something.something.-.s3-.com", "cp-0.example.com", "file:///var/lib", false),
+			wantPrefix: "local-etcd-snapshot-cp-0-1700000000-",
+		},
+		{
+			name:       "S3 overly long filename falls back to host+unix",
+			spec:       newSpec(strings.Repeat("a", 250), "cp-0", "s3://bucket/prefix", true),
+			wantPrefix: "s3-etcd-snapshot-cp-0-1700000000-",
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			got := generateSafeSnapshotName(tc.spec, callTime)
+			require.Equal(t, strings.ToLower(got), got)
+			require.True(t, strings.HasPrefix(got, tc.wantPrefix), got)
+
+			parts := strings.Split(got, "-")
+			require.GreaterOrEqual(t, len(parts), 2)
+			suffix := parts[len(parts)-1]
+			require.Regexp(t, hex6re, suffix)
+
+			got2 := generateSafeSnapshotName(tc.spec, callTime)
+			require.Equal(t, got, got2)
+		})
+	}
+
+	t.Run("Digest changes when location changes", func(t *testing.T) {
+		a := newSpec("ok", "cp-0", "s3://bucket/prefix/A", true)
+		b := newSpec("ok", "cp-0", "s3://bucket/prefix/B", true)
+
+		ga := generateSafeSnapshotName(a, callTime)
+		gb := generateSafeSnapshotName(b, callTime)
+
+		require.True(t, strings.HasPrefix(ga, "s3-ok-"))
+		require.True(t, strings.HasPrefix(gb, "s3-ok-"))
+		require.NotEqual(t, ga, gb, "digest suffix must differ when location differs")
+	})
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/lasso/pkg/dynamic"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/capr/planner"
@@ -538,7 +539,7 @@ func rkeControlPlane(cluster *rancherv1.Cluster) (*rkev1.RKEControlPlane, error)
 	filteredClusterSpec.RKEConfig.ETCDSnapshotCreate = nil
 	filteredClusterSpec.RKEConfig.RotateEncryptionKeys = nil
 	filteredClusterSpec.RKEConfig.RotateCertificates = nil
-	b64GZCluster, err := capr.CompressInterface(filteredClusterSpec)
+	b64GZCluster, err := snapshotutil.CompressInterface(filteredClusterSpec)
 	if err != nil {
 		logrus.Errorf("cluster: %s/%s : error while gz/b64 encoding cluster specification: %v", cluster.Namespace, cluster.Name, err)
 		return nil, err
