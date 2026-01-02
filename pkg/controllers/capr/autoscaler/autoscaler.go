@@ -106,14 +106,6 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 
 	clients.CAPI.Cluster().OnChange(ctx, "autoscaler-mgr", h.OnChange)
 	clients.Fleet.HelmOp().OnChange(ctx, "autoscaler-status-sync", h.syncHelmOpStatus)
-
-	s := machineDeploymentReplicaOverrider{
-		clusterCache:     clients.Provisioning.Cluster().Cache(),
-		clusterClient:    clients.Provisioning.Cluster(),
-		capiClusterCache: clients.CAPI.Cluster().Cache(),
-	}
-
-	clients.CAPI.MachineDeployment().OnChange(ctx, "machinedeployment-replica-sync", s.syncMachinePoolReplicas)
 }
 
 // OnChange handles changes to CAPI clusters and manages autoscaler deployment.
