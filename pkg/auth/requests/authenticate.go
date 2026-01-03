@@ -21,6 +21,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
+	"github.com/rancher/rancher/pkg/features"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/oidc/provider"
@@ -119,7 +120,7 @@ func NewAuthenticator(ctx context.Context, clusterRouter ClusterRouter, mgmtCtx 
 
 	extTokenStore := exttokenstore.NewSystemFromWrangler(mgmtCtx.Wrangler)
 
-	return &tokenAuthenticator{
+	authenticator := &tokenAuthenticator{
 		ctx:                 ctx,
 		tokenIndexer:        tokenInformer.GetIndexer(),
 		tokenClient:         mgmtCtx.Wrangler.Mgmt.Token(),
@@ -130,11 +131,16 @@ func NewAuthenticator(ctx context.Context, clusterRouter ClusterRouter, mgmtCtx 
 		refreshUser: func(userID string, force bool) {
 			go providerRefresher.TriggerUserRefresh(userID, force)
 		},
-		now:             time.Now,
-		extTokenStore:   extTokenStore,
-		keyGetter:       provider.NewOIDCKeyClient(mgmtCtx.Wrangler.Core.Secret().Cache()),
-		oidcClientCache: mgmtCtx.Wrangler.Mgmt.OIDCClient().Cache(),
+		now:           time.Now,
+		extTokenStore: extTokenStore,
 	}
+
+	if features.OIDCProvider.Enabled() {
+		authenticator.keyGetter = provider.NewOIDCKeyClient(mgmtCtx.Wrangler.Core.Secret().Cache())
+		authenticator.oidcClientCache = mgmtCtx.Wrangler.Mgmt.OIDCClient().Cache()
+	}
+
+	return authenticator
 }
 
 func tokenKeyIndexer(obj interface{}) ([]string, error) {
@@ -349,6 +355,10 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 	var tokenClaims *authorizationTokenClaims
 	tokenName, tokenKey := tokens.SplitTokenParts(tokenAuthValue)
 	if tokenName == "" || tokenKey == "" {
+		if !features.OIDCProvider.Enabled() {
+			return nil, ErrMustAuthenticate
+		}
+
 		logrus.Debug("Could not parse tokenName and tokenKey from request - attempting JWT authentication")
 		claims, err := a.parseTokenFromJWT(tokenAuthValue)
 		if err != nil {

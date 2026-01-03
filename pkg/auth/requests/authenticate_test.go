@@ -20,6 +20,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
+	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	mgmtFakes "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3/fakes"
 	"github.com/rancher/rancher/pkg/oidc/mocks"
@@ -1203,6 +1204,12 @@ func TestAuthenticateWithAccessToken(t *testing.T) {
 		_ = settings.ServerURL.Set(existingServerURL)
 	})
 	_ = settings.ServerURL.Set("https://rancher.example.com")
+
+	previousOIDCProvider := features.OIDCProvider.Enabled()
+	features.OIDCProvider.Set(true)
+	t.Cleanup(func() {
+		features.OIDCProvider.Set(previousOIDCProvider)
+	})
 
 	fakeProvider := &fakeProvider{
 		name: "fake",
