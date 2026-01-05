@@ -40,7 +40,7 @@ jobs:
       REGISTRY: "172.17.0.2:5000"
     steps:
       - name: Checkout
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: testdata
         run: mkdir -p build/testdata
       - name: Install Dapper
