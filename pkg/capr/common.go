@@ -1,16 +1,11 @@
 package capr
 
 import (
-	"bytes"
-	"compress/gzip"
 	"context"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"path"
 	"regexp"
 	"sort"
@@ -586,89 +581,6 @@ func SafeConcatName(maxLength int, name ...string) string {
 	}
 
 	return fullPath[0:maxLength-(hashLength+1)] + "-" + hex.EncodeToString(digest[0:])[0:hashLength]
-}
-
-// CompressInterface is a function that will marshal, gzip, then base64 encode the provided interface.
-func CompressInterface(v interface{}) (string, error) {
-	marshalledCluster, err := json.Marshal(v)
-	if err != nil {
-		return "", err
-	}
-	var b bytes.Buffer
-	gz := gzip.NewWriter(&b)
-	if _, err := gz.Write(marshalledCluster); err != nil {
-		return "", err
-	}
-	if err := gz.Flush(); err != nil {
-		return "", err
-	}
-	if err := gz.Close(); err != nil {
-		return "", err
-	}
-	return base64.StdEncoding.EncodeToString(b.Bytes()), nil
-}
-
-// DecompressInterface is a function that will base64 decode, ungzip, and unmarshal a string into the provided interface.
-func DecompressInterface(inputb64 string, v any) error {
-	if inputb64 == "" {
-		return fmt.Errorf("empty base64 input")
-	}
-
-	decodedGzip, err := base64.StdEncoding.DecodeString(inputb64)
-	if err != nil {
-		return fmt.Errorf("error base64.DecodeString: %v", err)
-	}
-
-	buffer := bytes.NewBuffer(decodedGzip)
-
-	var gz io.Reader
-	gz, err = gzip.NewReader(buffer)
-	if err != nil {
-		return err
-	}
-
-	csBytes, err := io.ReadAll(gz)
-	if err != nil {
-		return err
-	}
-
-	err = json.Unmarshal(csBytes, v)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// DecompressClusterSpec is a function that will base64 decode, ungzip, and unmarshal a string into a cluster spec.
-func DecompressClusterSpec(inputb64 string) (*provv1.ClusterSpec, error) {
-	c := provv1.ClusterSpec{}
-	err := DecompressInterface(inputb64, &c)
-	if err != nil {
-		return nil, err
-	}
-	return &c, nil
-}
-
-// ParseSnapshotClusterSpecOrError returns a provv1 ClusterSpec from the etcd snapshot if it can be found in the CR. If it cannot be found, it returns an error.
-func ParseSnapshotClusterSpecOrError(snapshot *rkev1.ETCDSnapshot) (*provv1.ClusterSpec, error) {
-	if snapshot == nil {
-		return nil, fmt.Errorf("snapshot was nil")
-	}
-	if snapshot.SnapshotFile.Metadata != "" {
-		var md map[string]string
-		b, err := base64.StdEncoding.DecodeString(snapshot.SnapshotFile.Metadata)
-		if err != nil {
-			return nil, err
-		}
-		if err := json.Unmarshal(b, &md); err != nil {
-			return nil, err
-		}
-		if v, ok := md["provisioning-cluster-spec"]; ok {
-			return DecompressClusterSpec(v)
-		}
-	}
-	return nil, fmt.Errorf("unable to find and decode snapshot ClusterSpec for snapshot")
 }
 
 func PreBootstrap(mgmtCluster *v3.Cluster) bool {

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/snapshotbackpopulate"
@@ -182,7 +183,7 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 				if (s.SnapshotFile.NodeName == targetNode || (targetNode == "s3" && s.Annotations[snapshotbackpopulate.StorageAnnotationKey] == string(snapshotbackpopulate.S3))) && s.SnapshotFile.Size > 0 {
 					// Workaround in response to K3s/RKE2 bug around etcd snapshot configmap existence: https://github.com/k3s-io/k3s/issues/9047
 					// Ensure that there are at least 2 snapshots for the given target node, as the first snapshot is not usable.
-					spec, err := capr.ParseSnapshotClusterSpecOrError(&s)
+					spec, err := snapshotutil.ParseSnapshotClusterSpecOrError(&s)
 					if err != nil || spec == nil {
 						continue // ignore errors parsing the snapshot
 					}

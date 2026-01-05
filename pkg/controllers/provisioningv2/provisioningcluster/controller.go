@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/lasso/pkg/dynamic"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1/snapshotutil"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/features"
@@ -32,10 +33,7 @@ import (
 )
 
 const (
-	byNodeInfra                       = "by-node-infra"
-	restoreRKEConfigKubernetesVersion = "kubernetesVersion"
-	restoreRKEConfigAll               = "all"
-	restoreRKEConfigNone              = "none"
+	byNodeInfra = "by-node-infra"
 )
 
 type handler struct {
@@ -231,7 +229,7 @@ func (h *handler) findSnapshotClusterSpec(snapshotNamespace, snapshotName string
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving etcdsnapshot %s/%s: %w", snapshotNamespace, snapshotName, err)
 	}
-	return capr.ParseSnapshotClusterSpecOrError(snapshot)
+	return snapshotutil.ParseSnapshotClusterSpecOrError(snapshot)
 }
 
 // reconcileClusterSpecEtcdRestore reconciles the cluster against the desiredSpec, but only sets fields that should be set
@@ -319,7 +317,7 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 		if obj.Spec.RKEConfig.ETCDSnapshotRestore != nil &&
 			obj.Spec.RKEConfig.ETCDSnapshotRestore.Name != "" &&
 			obj.Spec.RKEConfig.ETCDSnapshotRestore.RestoreRKEConfig != "" &&
-			obj.Spec.RKEConfig.ETCDSnapshotRestore.RestoreRKEConfig != restoreRKEConfigNone {
+			obj.Spec.RKEConfig.ETCDSnapshotRestore.RestoreRKEConfig != rkev1.RestoreRKEConfigNone {
 			logrus.Debugf("rkecluster %s/%s: Reconciling rkeconfig against specified etcd restore snapshot metadata", obj.Namespace, obj.Name)
 			if !equality.Semantic.DeepEqual(rkeCP.Status.ETCDSnapshotRestore, obj.Spec.RKEConfig.ETCDSnapshotRestore) {
 				clusterSpec, err := h.findSnapshotClusterSpec(obj.Namespace, obj.Spec.RKEConfig.ETCDSnapshotRestore.Name)
@@ -327,7 +325,7 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 					return nil, status, err
 				}
 				switch obj.Spec.RKEConfig.ETCDSnapshotRestore.RestoreRKEConfig {
-				case restoreRKEConfigKubernetesVersion:
+				case rkev1.RestoreRKEConfigKubernetesVersion:
 					if obj.Spec.KubernetesVersion != clusterSpec.KubernetesVersion {
 						logrus.Infof("rkecluster %s/%s: restoring Kubernetes version from %s to %s for etcd snapshot restore (snapshot: %s)", obj.Namespace, obj.Name, obj.Spec.KubernetesVersion, clusterSpec.KubernetesVersion, obj.Spec.RKEConfig.ETCDSnapshotRestore.Name)
 						obj = obj.DeepCopy()
@@ -338,7 +336,7 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 						}
 						return nil, status, err
 					}
-				case restoreRKEConfigAll:
+				case rkev1.RestoreRKEConfigAll:
 					newCluster := obj.DeepCopy()
 					if reconcileClusterSpecEtcdRestore(newCluster, *clusterSpec) {
 						logrus.Infof("rkecluster %s/%s: restoring RKE config for etcd snapshot restore (snapshot: %s)", obj.Namespace, obj.Name, obj.Spec.RKEConfig.ETCDSnapshotRestore.Name)
