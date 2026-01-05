@@ -254,7 +254,7 @@ func TestGetPublicKey(t *testing.T) {
 
 				return mock
 			},
-			expectedErr: "unexpected error",
+			expectedErr: "getting public key: unexpected error",
 		},
 		"no signing key in secret": {
 			secretCache: func() corecontrollers.SecretCache {

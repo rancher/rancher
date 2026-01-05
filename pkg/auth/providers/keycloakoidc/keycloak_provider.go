@@ -85,7 +85,7 @@ func (k *keyCloakOIDCProvider) SearchPrincipals(searchValue, principalType strin
 	}
 	keyCloakClient, err := k.newClient(config, token)
 	if err != nil {
-		logrus.Errorf("[keycloak oidc] SsearchPrincipals: error creating new http client: %v", err)
+		logrus.Errorf("[keycloak oidc] SearchPrincipals: error creating new http client: %v", err)
 		return principals, err
 	}
 	accts, err := keyCloakClient.searchPrincipals(searchValue, principalType, config)
