@@ -31,13 +31,3 @@ func Create(ctx context.Context, cfg *rest.Config) error {
 
 	return factory.BatchCreateCRDs(ctx, List()...).BatchWait()
 }
-
-func newCRD(obj interface{}, customize func(crd.CRD) crd.CRD) crd.CRD {
-	crd := crd.CRD{
-		SchemaObject: obj,
-	}
-	if customize != nil {
-		crd = customize(crd)
-	}
-	return crd
-}

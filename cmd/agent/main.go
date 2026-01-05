@@ -139,7 +139,7 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	topContext = context.WithValue(topContext, cavalidator.CacertsValid, false)
+	topContext = context.WithValue(topContext, cavalidator.CACertsValidKey, false)
 
 	// Perform root CA verification
 	var transport *http.Transport
@@ -157,7 +157,7 @@ func run(ctx context.Context) error {
 				os.Exit(1)
 			}
 		} else {
-			topContext = context.WithValue(topContext, cavalidator.CacertsValid, true)
+			topContext = context.WithValue(topContext, cavalidator.CACertsValidKey, true)
 			systemStoreConnectionCheckRequired = false
 		}
 	} else if cluster.CAStrictVerify() {

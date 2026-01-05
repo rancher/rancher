@@ -26,7 +26,7 @@ func buildOrGetIndex(dir string) (*repo.IndexFile, error) {
 		builtIndex    = repo.NewIndexFile()
 	)
 
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, walkErr error) error {
 		if info.Name() == "index.yaml" {
 			if indexPath == "" || len(path) < len(indexPath) {
 				if index, err := repo.LoadIndexFile(path); err == nil {

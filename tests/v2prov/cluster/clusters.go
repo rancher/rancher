@@ -440,8 +440,6 @@ func GatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 
 	var rkeBootstraps []*rkev1.RKEBootstrap
 	var infraMachines []*unstructured.Unstructured
-	var machineSecrets []*corev1.Secret
-
 	var podLogs = make(map[string]map[string]string)
 
 	machines, newErr := Machines(clients, c)
@@ -468,16 +466,6 @@ func GatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 					// In the case of a podmachine, the pod name will be strings.ReplaceAll(infra.meta.GetName(), ".", "-")
 					podName := strings.ReplaceAll(im.GetName(), ".", "-")
 					podLogs[podName] = populatePodLogs(clients, newControlPlane, im.GetNamespace(), podName)
-				}
-			}
-			ms, newErr := clients.Core.Secret().List(machine.Namespace, metav1.ListOptions{
-				LabelSelector: fmt.Sprintf("cluster.x-k8s.io/cluster-name=%s,rke.cattle.io/machine-name=", machine.Name),
-			})
-			if newErr != nil {
-				logrus.Errorf("failed to get secrets for machine %s: %v", machine.Name, newErr)
-			} else {
-				for _, s := range ms.Items {
-					machineSecrets = append(machineSecrets, s.DeepCopy())
 				}
 			}
 		}

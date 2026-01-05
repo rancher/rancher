@@ -25,9 +25,7 @@ import (
 	"github.com/rancher/rancher/pkg/rkecerts"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/rancher/pkg/types/config/dialer"
 	"github.com/rancher/steve/pkg/accesscontrol"
-	rbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/ratelimit"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
@@ -47,8 +45,6 @@ type Manager struct {
 	secretLister  v1.SecretLister
 	controllers   sync.Map
 	accessControl types.AccessControl
-	rbac          rbacv1.Interface
-	dialer        dialer.Factory
 	startSem      *semaphore.Weighted
 }
 

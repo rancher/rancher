@@ -47,16 +47,12 @@ func (p projectSetter) List(apiContext *types.APIContext, schema *types.Schema, 
 }
 
 func (p projectSetter) Create(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}) (map[string]interface{}, error) {
-	if _, ok := data[client.NamespaceFieldProjectID]; ok {
-		delete(data, client.NamespaceFieldProjectID)
-	}
+	delete(data, client.NamespaceFieldProjectID)
 	return p.Store.Create(apiContext, schema, data)
 }
 
 func (p projectSetter) Update(apiContext *types.APIContext, schema *types.Schema, data map[string]interface{}, id string) (map[string]interface{}, error) {
-	if _, ok := data[client.NamespaceFieldProjectID]; ok {
-		delete(data, client.NamespaceFieldProjectID)
-	}
+	delete(data, client.NamespaceFieldProjectID)
 	return p.Store.Update(apiContext, schema, data, id)
 }
 

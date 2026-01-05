@@ -27,6 +27,10 @@ const (
 	stvAggregationSecretName      = "stv-aggregation"
 )
 
+type CACertsValidContextKey struct{}
+
+var CACertsValidKey = CACertsValidContextKey{}
+
 type CertificateAuthorityValidator struct {
 	clusterName  string
 	clusterCache mgmtv3controllers.ClusterCache
