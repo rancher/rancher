@@ -229,6 +229,35 @@ func TestUpdateConfigWithAddresses(t *testing.T) {
 			expectedNodeIPs:         []string{"eth0", "2001:db8::1"},
 			expectedNodeExternalIPs: []string{"1.2.3.4"},
 		},
+		{
+			name: "IPv6 link-local external address is ignored",
+			initialConfig: map[string]interface{}{
+				"node-ip":             []string{},
+				"node-external-ip":    []string{},
+				"cloud-provider-name": "",
+			},
+			info: &machineNetworkInfo{
+				InternalAddresses: []string{"10.0.0.5"},
+				ExternalAddresses: []string{"fe80::250:56ff:fe87:84dc"},
+				IPv6Address:       "fe80::250:56ff:fe87:84dc",
+			},
+			expectedNodeIPs:         []string{"10.0.0.5", "fe80::250:56ff:fe87:84dc"},
+			expectedNodeExternalIPs: []string{},
+		},
+		{
+			name: "Global Unicast IPv6 should still be allowed",
+			initialConfig: map[string]interface{}{
+				"node-ip":             []string{},
+				"node-external-ip":    []string{},
+				"cloud-provider-name": "",
+			},
+			info: &machineNetworkInfo{
+				InternalAddresses: []string{"10.0.0.5"},
+				ExternalAddresses: []string{"2001:db8::dead:beef"},
+			},
+			expectedNodeIPs:         []string{"10.0.0.5"},
+			expectedNodeExternalIPs: []string{"2001:db8::dead:beef"},
+		},
 	}
 
 	for _, tt := range tests {
