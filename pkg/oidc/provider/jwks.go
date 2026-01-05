@@ -54,7 +54,7 @@ type oidcKeyClient struct {
 func (h *oidcKeyClient) GetPublicKey(kid string) (*rsa.PublicKey, error) {
 	s, err := h.secretCache.Get(keySecretNamespace, keySecretName)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getting public key: %w", err)
 	}
 	for name, value := range s.Data {
 		if name == kid+".pub" {
