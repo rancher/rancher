@@ -38,6 +38,8 @@ import (
 
 const tokenKeyIndex = "authn.management.cattle.io/token-key-index"
 
+// ErrMustAuthenticate is returned by the authenticator when the request cannot
+// be authenticated.
 var ErrMustAuthenticate = httperror.NewAPIError(httperror.Unauthorized, "must authenticate")
 
 // AuthTokenGetter retrieves a token from the request.
