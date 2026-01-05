@@ -22,7 +22,7 @@ func serveHTTPWithHeader(port string, origins []string, connections []string, ua
 	testWSHandler := NewWebsocketHandler(&testHandler{})
 	testWSHandler.ServeHTTP(testRW, testReq)
 
-	if statusCode := testRW.header["Code"]; len(statusCode) == 0 {
+	if len(testRW.header["Code"]) == 0 {
 		return -1
 	}
 
