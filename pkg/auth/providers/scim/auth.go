@@ -1,6 +1,7 @@
 package scim
 
 import (
+	"crypto/subtle"
 	"net/http"
 	"strings"
 
@@ -63,7 +64,7 @@ func (a *tokenAuthenticator) Authenticate(next http.Handler) http.Handler {
 
 		var authenticated bool
 		for _, secret := range list {
-			if token == string(secret.Data["token"]) {
+			if subtle.ConstantTimeCompare([]byte(token), secret.Data["token"]) == 1 {
 				authenticated = true
 				break
 			}
