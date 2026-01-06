@@ -248,6 +248,10 @@ readinessProbe:
   periodSeconds: 30
   failureThreshold: 5
 
+# Enable host networking for Rancher pods.
+# Required for EKS clusters using non-VPC CNIs (e.g. Calico).
+hostNetwork: false
+
 # helm values to use when installing the rancher-webhook chart.
 # helm values set here will override all other global values used when installing the webhook such as priorityClassName and systemRegistry settings.
 webhook: ""
