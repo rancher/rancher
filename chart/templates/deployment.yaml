@@ -70,6 +70,10 @@ spec:
       {{- if .Values.extraTolerations }}
       {{- toYaml .Values.extraTolerations | nindent 8 }}
       {{- end }}
+{{- if .Values.hostNetwork }}
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+{{- end }}
       containers:
       - image: "{{ template "rancher.image" . }}:{{ template "rancher.imageTag" . }}"
         imagePullPolicy: {{ include "rancher.imagePullPolicy" . }}
