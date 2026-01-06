@@ -48,14 +48,14 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 }
 
 // GetName returns the name of this provider.
-func (c *CognitoProvider) GetName() string {
+func (p *CognitoProvider) GetName() string {
 	return Name
 }
 
-func (s *CognitoProvider) Logout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
+func (p *CognitoProvider) Logout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	providerName := token.GetAuthProvider()
 	logrus.Debugf("CognitoProvider [logout]: triggered by provider %s", providerName)
-	oidcConfig, err := s.GetConfig()
+	oidcConfig, err := p.GetConfig()
 	if err != nil {
 		return fmt.Errorf("getting config for OIDC Logout: %w", err)
 	}
@@ -67,9 +67,9 @@ func (s *CognitoProvider) Logout(w http.ResponseWriter, r *http.Request, token a
 	return nil
 }
 
-func (s *CognitoProvider) LogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
+func (p *CognitoProvider) LogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
 	logrus.Debugf("CognitoProvider [logout-all]: triggered by provider %s", token.GetAuthProvider())
-	oidcConfig, err := s.GetConfig()
+	oidcConfig, err := p.GetConfig()
 	if err != nil {
 		return err
 	}

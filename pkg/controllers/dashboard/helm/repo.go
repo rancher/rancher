@@ -479,7 +479,7 @@ func setConditionWithInterval(clusterRepo *catalog.ClusterRepo,
 	downloaded := condition.Cond(cond)
 
 	if apierrors.IsConflict(err) {
-		err = nil
+		err = nil //nolint:ineffassign
 	}
 	downloaded.SetError(newStatus, "", newErr)
 
@@ -510,7 +510,7 @@ func setCondition(clusterRepo *catalog.ClusterRepo,
 	downloaded := condition.Cond(cond)
 
 	if apierrors.IsConflict(err) {
-		err = nil
+		err = nil //nolint:ineffassign
 	}
 	downloaded.SetError(newStatus, "", newErr)
 

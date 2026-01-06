@@ -225,7 +225,7 @@ func (h *tokenHandler) createClusterAuthToken(token accessor.TokenAccessor, hash
 	clusterAuthTokenSecret, err = h.clusterSecret.Create(clusterAuthTokenSecret)
 	if err != nil && errors.IsAlreadyExists(err) {
 		// Overwrite an existing secret.
-		clusterAuthTokenSecret, err = h.clusterSecret.Update(clusterAuthTokenSecret)
+		_, err = h.clusterSecret.Update(clusterAuthTokenSecret)
 	}
 
 	if err != nil {
@@ -335,6 +335,9 @@ func (h *tokenHandler) Updated(token *managementv3.Token) (runtime.Object, error
 		_, err = h.clusterSecret.Update(clusterAuthTokenSecret)
 		if errors.IsNotFound(err) {
 			_, err = h.clusterSecret.Create(clusterAuthTokenSecret)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
