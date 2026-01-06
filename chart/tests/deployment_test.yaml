@@ -738,3 +738,19 @@ tests:
           value: RELEASE-NAME-rancher
         - name: CACHE_SYNC_TIMEOUT
           value: 10m
+- it: should enable hostNetwork and set dnsPolicy when hostNetwork is true
+  set:
+    hostNetwork: true
+  asserts:
+    - equal:
+        path: spec.template.spec.hostNetwork
+        value: true
+    - equal:
+        path: spec.template.spec.dnsPolicy
+        value: ClusterFirstWithHostNet
+- it: should not enable hostNetwork by default
+  asserts:
+    - notExists:
+        path: spec.template.spec.hostNetwork
+    - notExists:
+        path: spec.template.spec.dnsPolicy
