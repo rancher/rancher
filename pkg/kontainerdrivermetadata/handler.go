@@ -50,15 +50,13 @@ func (m *MetadataController) sync(_ string, setting *v3.Setting) (*v3.Setting, e
 }
 
 func (m *MetadataController) Refresh() error {
-	// Refreshes to sync rke2/k3s releases and waits for the refresh to complete
-	// This ensures that the channelserver configs have fresh data before we update settings
-	if err := channelserver.RefreshAndWait(m.ctx); err != nil {
-		logrus.Errorf("error waiting for channelserver refresh: %v", err)
-		// Fall back to async refresh if synchronous refresh fails
-		channelserver.Refresh()
-		// Wait briefly to allow the reload to process
-		time.Sleep(channelserver.FallbackRefreshDelay)
-	}
+	// Refreshes to sync rke2/k3s releases
+	channelserver.Refresh()
+	// Wait for the channelserver configs to reload with fresh data.
+	// The Refresh() call signals background goroutines in the channelserver package to reload,
+	// but the reload is asynchronous. We need to wait for the data to be loaded before updating settings.
+	// A 1-second delay has been tested to be sufficient for the config reload to complete.
+	time.Sleep(1 * time.Second)
 	// Update settings for rke2/k3s and ui
 	return m.updateSettings(m.ctx, settings.GetRancherVersion())
 }

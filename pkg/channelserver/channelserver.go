@@ -19,21 +19,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const (
-	// RefreshTimeout is the maximum time to wait for a config refresh to start
-	RefreshTimeout = 30 * time.Second
-	// ConfigProcessingDelay is the time to wait after a refresh signal for the config to fully process the new data
-	ConfigProcessingDelay = 500 * time.Millisecond
-	// FallbackRefreshDelay is the time to wait in the fallback path when RefreshAndWait fails
-	FallbackRefreshDelay = 2 * time.Second
-)
-
 var (
-	configs       map[string]*config.Config
-	configsInit   sync.Once
-	action        chan string
-	refreshDoneMu sync.Mutex
-	refreshDone   map[string]chan struct{}
+	configs     map[string]*config.Config
+	configsInit sync.Once
+	action      chan string
 )
 
 func GetURLAndInterval() (string, time.Duration) {
@@ -79,15 +68,6 @@ func (d *DynamicInterval) Wait(ctx context.Context) bool {
 		case msg := <-action:
 			if msg == d.subKey {
 				logrus.Infof("getReleaseConfig: reloading config for %s", d.subKey)
-				// Signal that this runtime is about to reload
-				refreshDoneMu.Lock()
-				if refreshDone != nil {
-					if ch, ok := refreshDone[d.subKey]; ok {
-						close(ch)
-						delete(refreshDone, d.subKey)
-					}
-				}
-				refreshDoneMu.Unlock()
 				return true
 			}
 			action <- msg
@@ -100,76 +80,6 @@ func (d *DynamicInterval) Wait(ctx context.Context) bool {
 func Refresh() {
 	action <- "k3s"
 	action <- "rke2"
-}
-
-// RefreshAndWait signals the channelserver configs to refresh and waits for the refresh to complete.
-// This ensures that subsequent calls to Get*Config methods will return fresh data.
-func RefreshAndWait(ctx context.Context) error {
-	refreshDoneMu.Lock()
-	if refreshDone == nil {
-		refreshDone = make(map[string]chan struct{})
-	}
-	k3sDone := make(chan struct{})
-	rke2Done := make(chan struct{})
-	refreshDone["k3s"] = k3sDone
-	refreshDone["rke2"] = rke2Done
-	refreshDoneMu.Unlock()
-
-	// Cleanup function to remove channels from map if they weren't already removed
-	defer func() {
-		refreshDoneMu.Lock()
-		delete(refreshDone, "k3s")
-		delete(refreshDone, "rke2")
-		refreshDoneMu.Unlock()
-	}()
-
-	// Send refresh signals with non-blocking sends to avoid deadlock if channel is full
-	select {
-	case action <- "k3s":
-	default:
-		return fmt.Errorf("failed to send k3s refresh signal: action channel is full")
-	}
-
-	select {
-	case action <- "rke2":
-	default:
-		return fmt.Errorf("failed to send rke2 refresh signal: action channel is full")
-	}
-
-	// Use a deadline-based approach to ensure consistent timeout for both runtimes
-	deadline := time.Now().Add(RefreshTimeout)
-
-	// Wait for k3s refresh to complete
-	k3sTimeout := time.Until(deadline)
-	if k3sTimeout <= 0 {
-		return fmt.Errorf("timeout waiting for k3s config to refresh")
-	}
-	select {
-	case <-k3sDone:
-	case <-time.After(k3sTimeout):
-		return fmt.Errorf("timeout waiting for k3s config to refresh")
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-
-	// Wait for rke2 refresh to complete
-	rke2Timeout := time.Until(deadline)
-	if rke2Timeout <= 0 {
-		return fmt.Errorf("timeout waiting for rke2 config to refresh")
-	}
-	select {
-	case <-rke2Done:
-	case <-time.After(rke2Timeout):
-		return fmt.Errorf("timeout waiting for rke2 config to refresh")
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-
-	// Give the config.Config internal reload goroutine a moment to actually process the data
-	// The DynamicInterval.Wait() returning triggers the reload, but the reload itself takes a bit of time
-	time.Sleep(ConfigProcessingDelay)
-
-	return nil
 }
 
 type DynamicSource struct{}
