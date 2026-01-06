@@ -324,10 +324,10 @@ func (s *SCIMServer) PatchGroup(w http.ResponseWriter, r *http.Request) {
 		if apierrors.IsNotFound(err) {
 			writeError(w, NewError(http.StatusNotFound, fmt.Sprintf("Group %s not found", id)))
 			return
-		} else {
-			logrus.Errorf("scim::PatchGroup: failed to get group: %s", err)
-			writeError(w, NewInternalError())
 		}
+
+		logrus.Errorf("scim::PatchGroup: failed to get group: %s", err)
+		writeError(w, NewInternalError())
 		return
 	}
 
@@ -354,10 +354,10 @@ func (s *SCIMServer) DeleteGroup(w http.ResponseWriter, r *http.Request) {
 		if apierrors.IsNotFound(err) {
 			writeError(w, NewError(http.StatusNotFound, fmt.Sprintf("Group %s not found", id)))
 			return
-		} else {
-			logrus.Errorf("scim::DeleteGroup: failed to get group: %s", err)
-			writeError(w, NewInternalError())
 		}
+
+		logrus.Errorf("scim::DeleteGroup: failed to get group: %s", err)
+		writeError(w, NewInternalError())
 		return
 	}
 

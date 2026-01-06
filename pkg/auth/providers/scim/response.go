@@ -88,4 +88,4 @@ func writeResponse(w http.ResponseWriter, payload any, status ...int) {
 	}
 }
 
-var noPayload any = nil
+var noPayload any

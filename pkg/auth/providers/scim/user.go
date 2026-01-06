@@ -207,12 +207,13 @@ func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				continue
-			} else {
-				logrus.Errorf("scim::CreateUser: failed to get user attributes for %s: %s", user.Name, err)
-				writeError(w, NewInternalError())
-				return
 			}
+
+			logrus.Errorf("scim::CreateUser: failed to get user attributes for %s: %s", user.Name, err)
+			writeError(w, NewInternalError())
+			return
 		}
+
 		userName := first(attr.ExtraByProvider[provider]["username"])
 		if strings.EqualFold(userName, payload.UserName) {
 			writeError(w, NewError(http.StatusConflict, fmt.Sprintf("User with username %s already exists", payload.UserName)))
@@ -286,10 +287,10 @@ func (s *SCIMServer) GetUser(w http.ResponseWriter, r *http.Request) {
 		if apierrors.IsNotFound(err) {
 			writeError(w, NewError(http.StatusNotFound, fmt.Sprintf("User %s not found", id)))
 			return
-		} else {
-			logrus.Errorf("scim::GetUser: failed to get user: %s", err)
-			writeError(w, NewInternalError())
 		}
+
+		logrus.Errorf("scim::GetUser: failed to get user: %s", err)
+		writeError(w, NewInternalError())
 		return
 	}
 
@@ -359,10 +360,10 @@ func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		if apierrors.IsNotFound(err) {
 			writeError(w, NewError(http.StatusBadRequest, fmt.Sprintf("User %s not found", id)))
 			return
-		} else {
-			logrus.Errorf("scim::UpdateUser: failed to get user: %s", err)
-			writeError(w, NewInternalError())
 		}
+
+		logrus.Errorf("scim::UpdateUser: failed to get user: %s", err)
+		writeError(w, NewInternalError())
 		return
 	}
 
@@ -462,10 +463,10 @@ func (s *SCIMServer) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		if apierrors.IsNotFound(err) {
 			writeError(w, NewError(http.StatusNotFound, fmt.Sprintf("User %s not found", id)))
 			return
-		} else {
-			logrus.Errorf("scim::DeleteUser: failed to get user: %s", err)
-			writeError(w, NewInternalError())
 		}
+
+		logrus.Errorf("scim::DeleteUser: failed to get user: %s", err)
+		writeError(w, NewInternalError())
 		return
 	}
 
@@ -506,10 +507,10 @@ func (s *SCIMServer) PatchUser(w http.ResponseWriter, r *http.Request) {
 		if apierrors.IsNotFound(err) {
 			writeError(w, NewError(http.StatusNotFound, fmt.Sprintf("User %s not found", id)))
 			return
-		} else {
-			logrus.Errorf("scim::PatchUser: failed to get user: %s", err)
-			writeError(w, NewInternalError())
 		}
+
+		logrus.Errorf("scim::PatchUser: failed to get user: %s", err)
+		writeError(w, NewInternalError())
 		return
 	}
 
