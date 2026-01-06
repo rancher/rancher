@@ -33,7 +33,7 @@ var (
 	adminCreateLock   sync.Mutex
 )
 
-func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) (string, error) {
+func AddRoles(wrangler *wrangler.Context, management *config.ManagementContext) (string, error) {
 	rb := newRoleBuilder()
 
 	clusterCreateRole := rb.addRole("Create Clusters", "clusters-create")

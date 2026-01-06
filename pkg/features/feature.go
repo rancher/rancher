@@ -62,6 +62,14 @@ var (
 		true,
 		false,
 		false)
+
+	Tenant = newFeature(
+		"tenant",
+		"Enable tenant supported",
+		false,
+		false,
+		false)
+
 	EmbeddedClusterAPI = newFeature(
 		"embedded-cluster-api",
 		"Enable a Rancher-managed instance of cluster-api core controller",

@@ -9,8 +9,7 @@ import (
 )
 
 func Add(ctx context.Context, wrangler *wrangler.Context, management *config.ManagementContext) error {
-	_, err := addRoles(wrangler, management)
-
+	_, err := AddRoles(wrangler, management)
 	if err != nil {
 		return err
 	}

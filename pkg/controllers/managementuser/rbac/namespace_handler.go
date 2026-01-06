@@ -530,7 +530,10 @@ func (m *manager) createProjectNSRole(roleName, verb, ns, projectName string) er
 		cr = addManageNSPermission(cr, projectName)
 	}
 	_, err := roleCli.Create(cr)
-	return err
+	if err != nil && !apierrors.IsAlreadyExists(err) {
+		return err
+	}
+	return nil
 }
 
 func addManageNSPermission(clusterRole *rbacv1.ClusterRole, projectName string) *rbacv1.ClusterRole {

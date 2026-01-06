@@ -28,6 +28,9 @@ func RequiredCRDs() []string {
 	if features.Auth.Enabled() {
 		requiredCRDS = append(requiredCRDS, AuthCRDs()...)
 	}
+	if !features.MCM.Enabled() && features.Tenant.Enabled() {
+		requiredCRDS = append(requiredCRDS, TenantCRDs()...)
+	}
 	if features.UIExtension.Enabled() {
 		requiredCRDS = append(requiredCRDS, UIPluginsCRD()...)
 	}
@@ -128,6 +131,19 @@ func AuthCRDs() []string {
 		"users.management.cattle.io",
 		"userattributes.management.cattle.io",
 		"clusterproxyconfigs.management.cattle.io",
+	}
+}
+
+// TenantCRDs returns a list of CRD names needed for tenant.
+func TenantCRDs() []string {
+	return []string{
+		"globalroles.management.cattle.io",
+		"globalrolebindings.management.cattle.io",
+		"roletemplates.management.cattle.io",
+		"clusterroletemplatebindings.management.cattle.io",
+		"projects.management.cattle.io",
+		"projectroletemplatebindings.management.cattle.io",
+		"projectnetworkpolicys.management.cattle.io",
 	}
 }
 

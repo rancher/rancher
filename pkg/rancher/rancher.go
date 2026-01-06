@@ -53,6 +53,7 @@ import (
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/pkg/settings"
 	telemetrycontrollers "github.com/rancher/rancher/pkg/telemetry/controllers"
+	"github.com/rancher/rancher/pkg/tenant"
 	"github.com/rancher/rancher/pkg/tls"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/ui"
@@ -120,6 +121,7 @@ type Rancher struct {
 	authServer       *auth.Server
 	opts             *Options
 
+	tenant                         *tenant.Tenant
 	aggregationRegistrationTimeout time.Duration
 	kubeAggregationReadyChan       <-chan struct{}
 }
@@ -270,7 +272,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	}
 
 	gcInterval, gcKeepCount := getSQLCacheGCValues(wranglerContext)
-	steve, err := steveserver.New(ctx, restConfig, &steveserver.Options{
+	opt := &steveserver.Options{
 		ServerVersion:   settings.ServerVersion.Get(),
 		Controllers:     steveControllers,
 		AccessSetLookup: wranglerContext.ASL,
@@ -284,7 +286,18 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		},
 		ExtensionAPIServer:            extensionAPIServer,
 		SkipWaitForExtensionAPIServer: skipWaitForExtensionAPIServer,
-	})
+	}
+
+	t := &tenant.Tenant{}
+	if tenant.Enabled() {
+		logrus.Info("enable tenant support")
+		err = t.Register(ctx, *wranglerContext, opt, restConfig)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	steve, err := steveserver.New(ctx, restConfig, opt)
 	if err != nil {
 		return nil, err
 	}
@@ -386,6 +399,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		opts:                           opts,
 		aggregationRegistrationTimeout: opts.AggregationRegistrationTimeout,
 		kubeAggregationReadyChan:       kubeAggregationReadyChan,
+		tenant:                         t,
 	}, nil
 }
 
@@ -453,6 +467,13 @@ func (r *Rancher) Start(ctx context.Context) error {
 	}
 
 	r.Wrangler.OnLeaderOrDie("rancher-start::dashboarddata", func(ctx context.Context) error {
+		if tenant.Enabled() {
+			err := r.tenant.RegisterController(ctx, r.Wrangler)
+			if err != nil {
+				return err
+			}
+		}
+
 		if err := dashboarddata.Add(ctx, r.Wrangler, localClusterEnabled(r.opts), r.opts.AddLocal == "false", r.opts.Embedded); err != nil {
 			return errors.New("dashboarddata.Add() failed: " + err.Error())
 		}
