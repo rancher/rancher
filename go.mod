@@ -106,9 +106,9 @@ require (
 	github.com/k3s-io/api v0.1.0
 	github.com/mattn/go-colorable v0.1.13
 	github.com/mcuadros/go-version v0.0.0-20190830083331-035f6764e8d2
-	github.com/microsoft/kiota-abstractions-go v1.7.0
-	github.com/microsoftgraph/msgraph-sdk-go v1.51.0
-	github.com/microsoftgraph/msgraph-sdk-go-core v1.2.1
+	github.com/microsoft/kiota-abstractions-go v1.9.3
+	github.com/microsoftgraph/msgraph-sdk-go v1.92.0
+	github.com/microsoftgraph/msgraph-sdk-go-core v1.4.0
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/moby/locker v1.0.1
 	github.com/opencontainers/go-digest v1.0.0
@@ -135,7 +135,7 @@ require (
 	github.com/rancher/remotedialer v0.5.1
 	github.com/rancher/rke v1.8.0
 	github.com/rancher/shepherd v0.0.0-20251216155458-c158387c2140
-	github.com/rancher/steve v0.6.47
+	github.com/rancher/steve v0.6.48
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20250710162344-185ff9f785cd
 	github.com/rancher/wrangler v1.1.2
 	github.com/rancher/wrangler/v3 v3.2.4
@@ -206,7 +206,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.10 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.41.2 // indirect
 	github.com/aws/smithy-go v1.23.2 // indirect
-	github.com/cjlapao/common-go v0.0.39 // indirect
 	github.com/cloudflare/circl v1.3.7 // indirect
 	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
@@ -229,12 +228,12 @@ require (
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/kubereboot/kured v1.13.1 // indirect
-	github.com/microsoft/kiota-authentication-azure-go v1.1.0 // indirect
-	github.com/microsoft/kiota-http-go v1.4.4 // indirect
-	github.com/microsoft/kiota-serialization-form-go v1.0.0 // indirect
-	github.com/microsoft/kiota-serialization-json-go v1.0.8 // indirect
-	github.com/microsoft/kiota-serialization-multipart-go v1.0.0 // indirect
-	github.com/microsoft/kiota-serialization-text-go v1.0.0 // indirect
+	github.com/microsoft/kiota-authentication-azure-go v1.3.1 // indirect
+	github.com/microsoft/kiota-http-go v1.5.4 // indirect
+	github.com/microsoft/kiota-serialization-form-go v1.1.2 // indirect
+	github.com/microsoft/kiota-serialization-json-go v1.1.2 // indirect
+	github.com/microsoft/kiota-serialization-multipart-go v1.1.2 // indirect
+	github.com/microsoft/kiota-serialization-text-go v1.1.3 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
@@ -242,7 +241,7 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
 	github.com/skeema/knownhosts v1.2.2 // indirect
-	github.com/std-uritemplate/std-uritemplate/go v0.0.57 // indirect
+	github.com/std-uritemplate/std-uritemplate/go/v2 v2.0.3 // indirect
 	github.com/stoewer/go-strcase v1.3.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
@@ -364,7 +363,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
-	github.com/rogpeppe/go-internal v1.13.1 // indirect
+	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/rubenv/sql-migrate v1.8.0 // indirect
 	github.com/russellhaering/goxmldsig v1.4.0
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
