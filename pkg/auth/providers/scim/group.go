@@ -42,7 +42,7 @@ func (s *SCIMServer) ListGroups(w http.ResponseWriter, r *http.Request) {
 		err               error
 	)
 	if value := r.URL.Query().Get("filter"); value != "" {
-		// For simplicity, only support filtering by dasplayName eq "<value>".
+		// For simplicity, only support filtering by displayName eq "<value>".
 		parts := strings.SplitN(value, " ", 3)
 		if len(parts) != 3 || parts[0] != "displayName" || parts[1] != "eq" {
 			writeError(w, NewError(http.StatusBadRequest, "Unsupported filter"))
@@ -81,7 +81,7 @@ func (s *SCIMServer) ListGroups(w http.ResponseWriter, r *http.Request) {
 	if len(groups) > 0 {
 		var uniqueGroups map[string][]SCIMMember
 		if !excludeMembers {
-			uniqueGroups, err = s.getRancherGroups(provider)
+			uniqueGroups, err = s.getAllRancherGroupMembers(provider)
 			if err != nil {
 				logrus.Errorf("scim::ListGroups: %s", err)
 				writeError(w, NewInternalError())
@@ -222,9 +222,9 @@ func (s *SCIMServer) GetGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var uniqueGroups map[string][]SCIMMember
+	var members []SCIMMember
 	if !excludeMembers {
-		uniqueGroups, err = s.getRancherGroups(provider)
+		members, err = s.getRancherGroupMembers(provider, group.DisplayName)
 		if err != nil {
 			logrus.Errorf("scim::GetGroups: %s", err)
 			writeError(w, NewInternalError())
@@ -242,8 +242,7 @@ func (s *SCIMServer) GetGroup(w http.ResponseWriter, r *http.Request) {
 			"location":     locationURL(r, provider, GroupEndpoint, group.Name),
 		},
 	}
-	members, ok := uniqueGroups[group.DisplayName]
-	if !ok {
+	if members == nil {
 		members = []SCIMMember{}
 	}
 	if !excludeMembers {
@@ -340,7 +339,134 @@ func (s *SCIMServer) PatchGroup(w http.ResponseWriter, r *http.Request) {
 
 	logrus.Info("scim::PatchGroup: request body:", string(bodyBytes))
 
-	_, _, _ = provider, id, group
+	payload := struct {
+		Operations []patchOp `json:"Operations"`
+		Schemas    []string  `json:"schemas"`
+	}{}
+
+	err = json.NewDecoder(strings.NewReader(string(bodyBytes))).Decode(&payload)
+	if err != nil {
+		logrus.Errorf("scim::PatchGroup: failed to decode request body: %s", err)
+		writeError(w, NewError(http.StatusBadRequest, "Invalid request body"))
+		return
+	}
+
+	group = group.DeepCopy()
+	var shouldUpdateGroup bool
+
+	var membersToAdd []SCIMMember
+	var membersToRemove []string
+
+	for _, op := range payload.Operations {
+		switch strings.ToLower(op.Op) {
+		case "replace":
+			updated, err := applyReplaceGroup(group, op)
+			if err != nil {
+				logrus.Errorf("scim::PatchGroup: failed to apply replace operation: %s", err)
+				writeError(w, NewError(http.StatusBadRequest, fmt.Sprintf("Failed to apply replace operation: %s", err)))
+				return
+			}
+			if updated {
+				shouldUpdateGroup = true
+			}
+
+		case "add":
+			// SCIM 2.0: Add members to group
+			if strings.ToLower(op.Path) == "members" {
+				members, ok := op.Value.([]any)
+				if !ok {
+					writeError(w, NewError(http.StatusBadRequest, "Invalid members value for add operation"))
+					return
+				}
+				for _, m := range members {
+					memberMap, ok := m.(map[string]any)
+					if !ok {
+						continue
+					}
+					value, _ := memberMap["value"].(string)
+					display, _ := memberMap["display"].(string)
+					if value != "" {
+						membersToAdd = append(membersToAdd, SCIMMember{
+							Value:   value,
+							Display: display,
+						})
+					}
+				}
+			} else {
+				writeError(w, NewError(http.StatusBadRequest, fmt.Sprintf("Unsupported add path: %s", op.Path)))
+				return
+			}
+
+		case "remove":
+			// SCIM 2.0: Remove members from group
+			if strings.HasPrefix(strings.ToLower(op.Path), "members[") {
+				// Format: members[value eq "user-id"]
+				// Extract user-id from the filter
+				if userID := extractMemberValueFromPath(op.Path); userID != "" {
+					membersToRemove = append(membersToRemove, userID)
+				} else {
+					writeError(w, NewError(http.StatusBadRequest, "Invalid member removal path format"))
+					return
+				}
+			} else {
+				writeError(w, NewError(http.StatusBadRequest, fmt.Sprintf("Unsupported remove path: %s", op.Path)))
+				return
+			}
+
+		default:
+			writeError(w, NewError(http.StatusBadRequest, fmt.Sprintf("Unsupported patch operation: %s", op.Op)))
+			return
+		}
+	}
+
+	// Apply group updates
+	if shouldUpdateGroup {
+		if group, err = s.groups.Update(group); err != nil {
+			logrus.Errorf("scim::PatchGroup: failed to update group %s: %s", group.Name, err)
+			writeError(w, NewInternalError())
+			return
+		}
+	}
+
+	// Apply member additions
+	for _, member := range membersToAdd {
+		if err := s.addGroupMember(provider, group.DisplayName, member); err != nil {
+			logrus.Errorf("scim::PatchGroup: failed to add member %s: %s", member.Value, err)
+			writeError(w, NewInternalError())
+			return
+		}
+	}
+
+	// Apply member removals
+	for _, memberValue := range membersToRemove {
+		if err := s.removeGroupMember(provider, group.DisplayName, memberValue); err != nil {
+			logrus.Errorf("scim::PatchGroup: failed to remove member %s: %s", memberValue, err)
+			writeError(w, NewInternalError())
+			return
+		}
+	}
+
+	// Fetch current members for response
+	members, err := s.getRancherGroupMembers(provider, group.DisplayName)
+	if err != nil {
+		logrus.Errorf("scim::PatchGroup: failed to get group members: %s", err)
+		writeError(w, NewInternalError())
+		return
+	}
+
+	resource := map[string]any{
+		"schemas":     []string{GroupSchemaID},
+		"id":          group.Name,
+		"displayName": group.DisplayName,
+		"members":     members,
+		"meta": map[string]any{
+			"created":      group.CreationTimestamp,
+			"resourceType": GroupResource,
+			"location":     locationURL(r, provider, GroupEndpoint, group.Name),
+		},
+	}
+
+	writeResponse(w, resource)
 }
 
 func (s *SCIMServer) DeleteGroup(w http.ResponseWriter, r *http.Request) {
@@ -377,7 +503,7 @@ func (s *SCIMServer) DeleteGroup(w http.ResponseWriter, r *http.Request) {
 	writeResponse(w, noPayload, http.StatusNoContent)
 }
 
-func (s *SCIMServer) getRancherGroups(provider string) (map[string][]SCIMMember, error) {
+func (s *SCIMServer) getAllRancherGroupMembers(provider string) (map[string][]SCIMMember, error) {
 	list, err := s.userCache.List(labels.Everything())
 	if err != nil {
 		return nil, fmt.Errorf("failed to list users: %w", err)
@@ -391,8 +517,8 @@ func (s *SCIMServer) getRancherGroups(provider string) (map[string][]SCIMMember,
 
 		attr, err := s.userAttributeCache.Get(user.Name)
 		if err != nil {
-			if !apierrors.IsNotFound(err) {
-				continue
+			if apierrors.IsNotFound(err) {
+				continue // User has no attributes yet.
 			}
 			return nil, fmt.Errorf("failed to get user attributes for %s: %w", user.Name, err)
 		}
@@ -408,13 +534,46 @@ func (s *SCIMServer) getRancherGroups(provider string) (map[string][]SCIMMember,
 	return uniqueGroups, nil
 }
 
+func (s *SCIMServer) getRancherGroupMembers(provider string, name string) ([]SCIMMember, error) {
+	list, err := s.userCache.List(labels.Everything())
+	if err != nil {
+		return nil, fmt.Errorf("failed to list users: %w", err)
+	}
+
+	var members []SCIMMember
+	for _, user := range list {
+		if user.IsSystem() {
+			continue
+		}
+
+		attr, err := s.userAttributeCache.Get(user.Name)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				continue // User has no attributes yet.
+			}
+			return nil, fmt.Errorf("failed to get user attributes for %s: %w", user.Name, err)
+		}
+
+		for _, group := range attr.GroupPrincipals[provider].Items {
+			if group.DisplayName == name {
+				members = append(members, SCIMMember{
+					Value:   user.Name,
+					Display: first(attr.ExtraByProvider[provider]["username"]),
+				})
+				break // No need to check other groups.
+			}
+		}
+	}
+
+	return members, nil
+}
+
 func (s *SCIMServer) syncGroupMembers(provider, groupName string, members []SCIMMember) error {
-	uniqueGroups, err := s.getRancherGroups(provider)
+	rancherMembers, err := s.getRancherGroupMembers(provider, groupName)
 	if err != nil {
 		return fmt.Errorf("failed to get groups: %w", err)
 	}
 
-	rancherMembers := uniqueGroups[groupName]
 	existing := make(map[string]string, len(rancherMembers))
 	for _, m := range rancherMembers {
 		existing[m.Value] = m.Display
@@ -425,7 +584,7 @@ func (s *SCIMServer) syncGroupMembers(provider, groupName string, members []SCIM
 			// New member added.
 			err := s.addGroupMember(provider, groupName, member)
 			if err != nil {
-				return fmt.Errorf("failed to add member %s to group %s: %s", member.Value, groupName, err)
+				return fmt.Errorf("failed to add member %s to group %s: %w", member.Value, groupName, err)
 			}
 		}
 		delete(existing, member.Value)
@@ -518,12 +677,12 @@ func (s *SCIMServer) removeGroupMember(provider, groupName, value string) error 
 }
 
 func (s *SCIMServer) removeAllGroupMembers(provider, groupName string) error {
-	uniqueGroups, err := s.getRancherGroups(provider)
+	members, err := s.getRancherGroupMembers(provider, groupName)
 	if err != nil {
 		return fmt.Errorf("failed to get groups: %w", err)
 	}
 
-	for _, member := range uniqueGroups[groupName] {
+	for _, member := range members {
 		err := s.removeGroupMember(provider, groupName, member.Value)
 		if err != nil {
 			return fmt.Errorf("failed to remove member %s from group %s: %w", member.Value, groupName, err)
@@ -581,4 +740,75 @@ func (s *SCIMServer) ensureRancherGroup(provider string, grp SCIMGroup) (*v3.Gro
 	}
 
 	return group, nil
+}
+
+// applyReplaceGroup applies a replace operation to a group.
+// Currently only supports replacing displayName and externalId.
+func applyReplaceGroup(group *v3.Group, op patchOp) (bool, error) {
+	if op.Path == "" {
+		// Bulk replace - replace multiple attributes at once
+		fields, ok := op.Value.(map[string]any)
+		if !ok {
+			return false, fmt.Errorf("invalid value type for replace operation: %T", op.Value)
+		}
+
+		var updated bool
+		for name, value := range fields {
+			wasUpdated, err := applyReplaceGroup(group, patchOp{
+				Op:    "replace",
+				Path:  name,
+				Value: value,
+			})
+			if err != nil {
+				return false, fmt.Errorf("failed to apply replace operation: %v", err)
+			}
+			if wasUpdated {
+				updated = true
+			}
+		}
+		return updated, nil
+	}
+
+	var updated bool
+	switch strings.ToLower(op.Path) {
+	case "displayname":
+		displayName, ok := op.Value.(string)
+		if !ok {
+			return false, NewError(http.StatusBadRequest, fmt.Sprintf("Invalid value for displayName: %v", op.Value))
+		}
+		if group.DisplayName != displayName {
+			group.DisplayName = displayName
+			updated = true
+		}
+
+	case "externalid":
+		externalID, ok := op.Value.(string)
+		if !ok {
+			return false, NewError(http.StatusBadRequest, fmt.Sprintf("Invalid value for externalId: %v", op.Value))
+		}
+		if group.ExternalID != externalID {
+			group.ExternalID = externalID
+			updated = true
+		}
+
+	default:
+		return false, NewError(http.StatusBadRequest, fmt.Sprintf("Unsupported patch path: %s", op.Path))
+	}
+
+	return updated, nil
+}
+
+// extractMemberValueFromPath extracts user ID from SCIM filter path like:
+// members[value eq "user-123"] -> user-123
+func extractMemberValueFromPath(path string) string {
+	// Simple parser for: members[value eq "user-id"]
+	start := strings.Index(path, `"`)
+	if start == -1 {
+		return ""
+	}
+	end := strings.LastIndex(path, `"`)
+	if end == -1 || end <= start {
+		return ""
+	}
+	return path[start+1 : end]
 }
