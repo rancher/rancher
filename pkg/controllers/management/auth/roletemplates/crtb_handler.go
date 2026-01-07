@@ -104,7 +104,7 @@ func (c *crtbHandler) reconcileSubject(binding *v3.ClusterRoleTemplateBinding, l
 		u, err := c.userController.Get(binding.UserName, metav1.GetOptions{})
 		if err != nil {
 			c.s.AddCondition(localConditions, condition, failedToGetUser, err)
-			return binding, err
+			return binding, fmt.Errorf("failed to get user %s for binding %s: %w", binding.UserName, binding.Name, err)
 		}
 		for _, p := range u.PrincipalIDs {
 			if strings.HasSuffix(p, binding.UserName) {
@@ -165,14 +165,14 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, loc
 
 	for _, currentRB := range currentRBs.Items {
 		if rb, ok := desiredRBs[currentRB.Name]; ok {
-			if rbac.AreRoleBindingContentsSame(&currentRB, rb) {
+			if rbac.IsRoleBindingContentSame(&currentRB, rb) {
 				// If the role binding already exists with the right contents, we can skip creating it.
 				delete(desiredRBs, rb.Name)
 				continue
 			}
 		}
 		// If the role binding is not a member of the desired role bindings or has different contents, delete it.
-		if err := c.rbController.Delete(currentRB.Namespace, currentRB.Name, &metav1.DeleteOptions{}); err != nil {
+		if err := rbac.DeleteNamespacedResource(currentRB.Namespace, currentRB.Name, c.rbController); err != nil {
 			c.s.AddCondition(localConditions, condition, failedToDeleteRoleBinding, err)
 			return err
 		}
@@ -182,7 +182,7 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, loc
 	for _, rb := range desiredRBs {
 		if _, err := c.rbController.Create(rb); err != nil && !apierrors.IsAlreadyExists(err) {
 			c.s.AddCondition(localConditions, condition, failedToCreateRoleBinding, err)
-			return err
+			return fmt.Errorf("failed to create role binding %s: %w", rb.Name, err)
 		}
 	}
 

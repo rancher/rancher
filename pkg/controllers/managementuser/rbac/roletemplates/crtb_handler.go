@@ -2,6 +2,7 @@ package roletemplates
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -13,7 +14,6 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/util/retry"
@@ -116,11 +116,11 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, rem
 	// There should only ever be 1 cluster role binding per CRTB.
 	var matchingCRB *rbacv1.ClusterRoleBinding
 	for _, currentCRB := range currentCRBs.Items {
-		if rbac.AreClusterRoleBindingContentsSame(crb, &currentCRB) && matchingCRB == nil {
+		if rbac.IsClusterRoleBindingContentSame(crb, &currentCRB) && matchingCRB == nil {
 			matchingCRB = &currentCRB
 			continue
 		}
-		if err := c.crbClient.Delete(currentCRB.Name, &metav1.DeleteOptions{}); err != nil {
+		if err := rbac.DeleteResource(currentCRB.Name, c.crbClient); err != nil {
 			c.s.AddCondition(remoteConditions, condition, failureToDeleteClusterRoleBinding, err)
 			return err
 		}
@@ -134,7 +134,7 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, rem
 		crb.Labels[rbac.AggregationFeatureLabel] = "true"
 		if _, err := c.crbClient.Create(crb); err != nil {
 			c.s.AddCondition(remoteConditions, condition, failureToCreateClusterRoleBinding, err)
-			return err
+			return fmt.Errorf("failed to create cluster role binding %s: %w", crb.Name, err)
 		}
 	}
 	c.s.AddCondition(remoteConditions, condition, clusterRoleBindingExists, nil)
@@ -178,10 +178,7 @@ func (c *crtbHandler) deleteBindings(crtb *v3.ClusterRoleTemplateBinding, remote
 
 	var returnError error
 	for _, crb := range crbs.Items {
-		err = c.crbClient.Delete(crb.Name, &metav1.DeleteOptions{})
-		if err != nil && !apierrors.IsNotFound(err) {
-			returnError = errors.Join(returnError, err)
-		}
+		returnError = errors.Join(returnError, rbac.DeleteResource(crb.Name, c.crbClient))
 	}
 
 	c.s.AddCondition(remoteConditions, condition, clusterRoleBindingsDeleted, returnError)
