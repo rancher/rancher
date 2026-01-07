@@ -4,6 +4,7 @@ import (
 	"slices"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	crbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
@@ -34,7 +35,7 @@ type roleTemplateHandler struct {
 //  1. If the RoleTemplate has any rules for Global Resources, make a ClusterRole with those named "RoleTemplateName-promoted"
 //  2. An Aggregating ClusterRole that aggregates all inherited RoleTemplates' promoted Cluster Roles named "RoleTemplateName-promoted-aggregator"
 func (rth *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.RoleTemplate, error) {
-	if rt == nil || rt.DeletionTimestamp != nil {
+	if rt == nil || rt.DeletionTimestamp != nil || !features.AggregatedRoleTemplates.Enabled() {
 		return nil, nil
 	}
 

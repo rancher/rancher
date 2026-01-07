@@ -6,6 +6,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/status"
+	"github.com/rancher/rancher/pkg/features"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/impersonation"
 	"github.com/rancher/rancher/pkg/rbac"
@@ -14,6 +15,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -53,6 +55,12 @@ func newCRTBHandler(uc *config.UserContext) (*crtbHandler, error) {
 func (c *crtbHandler) OnChange(key string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
 	if crtb == nil || crtb.DeletionTimestamp != nil {
 		return nil, nil
+	}
+
+	if !features.AggregatedRoleTemplates.Enabled() {
+		err := c.deleteBindings(crtb, &crtb.Status.RemoteConditions)
+		// Don't update status. Only the active controller should update the status of the crtb.
+		return crtb, err
 	}
 
 	// Only run this controller if the CRTB is for this cluster
@@ -120,6 +128,10 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, rem
 
 	// If we didn't find an existing CRB, create it.
 	if matchingCRB == nil {
+		if crb.Labels == nil {
+			crb.Labels = map[string]string{}
+		}
+		crb.Labels[rbac.AggregationFeatureLabel] = "true"
 		if _, err := c.crbClient.Create(crb); err != nil {
 			c.s.AddCondition(remoteConditions, condition, failureToCreateClusterRoleBinding, err)
 			return err
@@ -131,6 +143,10 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, rem
 
 // OnRemove deletes all ClusterRoleBindings owned by the ClusterRoleTemplateBinding.
 func (c *crtbHandler) OnRemove(_ string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+	if !features.AggregatedRoleTemplates.Enabled() {
+		return nil, nil
+	}
+
 	err := c.deleteBindings(crtb, &crtb.Status.RemoteConditions)
 	if err != nil {
 		return crtb, errors.Join(err, c.updateStatus(crtb, crtb.Status.RemoteConditions))
@@ -147,7 +163,12 @@ func (c *crtbHandler) OnRemove(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 func (c *crtbHandler) deleteBindings(crtb *v3.ClusterRoleTemplateBinding, remoteConditions *[]metav1.Condition) error {
 	condition := metav1.Condition{Type: deleteClusterRoleBindings}
 
-	lo := metav1.ListOptions{LabelSelector: rbac.GetCRTBOwnerLabel(crtb.Name)}
+	// Get all ClusterRoleBindings owned by this CRTB.
+	set := labels.Set(map[string]string{
+		rbac.GetCRTBOwnerLabel(crtb.Name): "true",
+		rbac.AggregationFeatureLabel:      "true",
+	})
+	lo := metav1.ListOptions{LabelSelector: set.AsSelector().String()}
 
 	crbs, err := c.crbClient.List(lo)
 	if err != nil {

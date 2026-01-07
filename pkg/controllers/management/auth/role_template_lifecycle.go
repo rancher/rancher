@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -50,10 +51,16 @@ func newRoleTemplateLifecycle(management *config.ManagementContext, clusterManag
 }
 
 func (rtl *roleTemplateLifecycle) Create(obj *v3.RoleTemplate) (runtime.Object, error) {
+	if features.AggregatedRoleTemplates.Enabled() {
+		return nil, nil
+	}
 	return rtl.enqueueRtbs(obj)
 }
 
 func (rtl *roleTemplateLifecycle) Updated(obj *v3.RoleTemplate) (runtime.Object, error) {
+	if features.AggregatedRoleTemplates.Enabled() {
+		return nil, nil
+	}
 	return rtl.enqueueRtbs(obj)
 }
 
@@ -71,6 +78,9 @@ func (rtl *roleTemplateLifecycle) enqueueRtbs(obj *v3.RoleTemplate) (runtime.Obj
 }
 
 func (rtl *roleTemplateLifecycle) Remove(obj *v3.RoleTemplate) (runtime.Object, error) {
+	if features.AggregatedRoleTemplates.Enabled() {
+		return nil, nil
+	}
 	clusters, err := rtl.clusters.List(metav1.ListOptions{})
 	if err != nil {
 		return obj, err

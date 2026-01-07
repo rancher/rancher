@@ -156,8 +156,8 @@ var (
 		"aggregated-roletemplates",
 		"[Experimental] Make RoleTemplates use aggregation for generated RBAC roles",
 		false,
-		false,
-		true).lockOnInstall()
+		true,
+		true)
 	ClusterAgentSchedulingCustomization = newFeature(
 		"cluster-agent-scheduling-customization",
 		"Enables the automatic deployment of Pod Disruption Budgets and Priority Classes when deploying the cattle-cluster-agent. Disabling this feature will not impact existing clusters.",

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/controllers/status"
+	"github.com/rancher/rancher/pkg/features"
 	rbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 
 	controllersv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -64,12 +65,18 @@ type crtbLifecycle struct {
 }
 
 func (c *crtbLifecycle) Create(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
+	if features.AggregatedRoleTemplates.Enabled() {
+		return nil, nil
+	}
 	remoteConditions := []metav1.Condition{}
 	return obj, errors.Join(c.syncCRTB(obj, &remoteConditions),
 		c.updateStatus(obj, remoteConditions))
 }
 
 func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
+	if features.AggregatedRoleTemplates.Enabled() {
+		return nil, nil
+	}
 	remoteConditions := []metav1.Condition{}
 	return obj, errors.Join(c.reconcileCRTBUserClusterLabels(obj, &remoteConditions),
 		c.syncCRTB(obj, &remoteConditions),
@@ -77,6 +84,9 @@ func (c *crtbLifecycle) Updated(obj *v3.ClusterRoleTemplateBinding) (runtime.Obj
 }
 
 func (c *crtbLifecycle) Remove(obj *v3.ClusterRoleTemplateBinding) (runtime.Object, error) {
+	if features.AggregatedRoleTemplates.Enabled() {
+		return nil, nil
+	}
 	err := c.ensureCRTBDelete(obj, &obj.Status.RemoteConditions)
 	if err != nil {
 		return obj, errors.Join(err,

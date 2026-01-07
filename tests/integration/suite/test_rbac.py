@@ -566,8 +566,16 @@ def test_permissions_can_be_removed(admin_cc, admin_mc, user_mc, request,
     wait_for(lambda: ns_count(user_cc.client, 2), timeout=60)
     admin_mc.client.delete(prtb2)
 
+    def prtb_deleted():
+        prtbs = admin_mc.client.list_project_role_template_binding(
+            projectId=admin_pc2.project.id)
+        return prtb2.uuid not in [
+            prtb.uuid for prtb in prtbs]
+
+    wait_for(prtb_deleted, fail_handler="prtb not deleted", timeout=60)
+
     user_cc = new_user_cc(user_mc)
-    wait_for(lambda: ns_count(user_cc.client, 1), timeout=60)
+    wait_for(lambda: ns_count(user_cc.client, 1), timeout=120)
 
 
 def ns_count(client, count):
