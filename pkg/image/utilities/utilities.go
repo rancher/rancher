@@ -45,23 +45,24 @@ var (
 // ImageTargetsAndSources is an aggregate type containing
 // the list of images used by Rancher for Linux and Windows,
 // as well as the source of these images.
-type ImageTargetsAndSources struct {
-	LinuxImagesFromArgs           []string
-	TargetLinuxImages             []string
-	TargetLinuxImagesAndSources   []string
-	TargetWindowsImages           []string
-	TargetWindowsImagesAndSources []string
+type ArtifactTargetsAndSources struct {
+	LinuxImagesFromArgs              []string
+	TargetLinuxArtifacts             []string
+	TargetLinuxArtifactsAndSources   []string
+	TargetWindowsArtifacts           []string
+	TargetWindowsArtifactsAndSources []string
 }
 
-// GatherTargetImagesAndSources queries KDM, charts and system-charts to gather all the images used by Rancher and their source.
-// It returns an aggregate type, ImageTargetsAndSources, which contains the images required to run Rancher on Linux and Windows, as well
+// GatherTargetArtifactsAndSources queries KDM, multiple chart repos to gather all the images/oci charts used by Rancher and their source.
+// It returns an aggregate type, ArtifactTargetsAndSources, which contains the images required to run Rancher on Linux and Windows, as well
 // as the source of each image.
-func GatherTargetImagesAndSources(chartsPath string, imagesFromArgs []string) (ImageTargetsAndSources, error) {
-	rancherVersion, ok := os.LookupEnv("TAG")
-	if !ok {
-		return ImageTargetsAndSources{}, fmt.Errorf("no tag defining current Rancher version, cannot gather target images and sources")
-	}
-
+func GatherTargetArtifactsAndSources(
+	chartPaths string,
+	ociChartsPath string,
+	imagesFromArgs []string,
+	ociRepository string,
+	rancherVersion string,
+) (ArtifactTargetsAndSources, error) {
 	if !img.IsValidSemver(rancherVersion) || !settings.IsReleaseServerVersion(rancherVersion) {
 		rancherVersion = settings.RancherVersionDev
 	}
@@ -73,11 +74,11 @@ func GatherTargetImagesAndSources(chartsPath string, imagesFromArgs []string) (I
 		b, err = os.ReadFile(filepath.Join(os.Getenv("HOME"), "bin", "data.json"))
 	}
 	if err != nil {
-		return ImageTargetsAndSources{}, fmt.Errorf("could not read data.json: %w", err)
+		return ArtifactTargetsAndSources{}, fmt.Errorf("could not read data.json: %w", err)
 	}
 	data, err := kontainerdrivermetadata.FromData(b)
 	if err != nil {
-		return ImageTargetsAndSources{}, fmt.Errorf("could not load KDM data: %w", err)
+		return ArtifactTargetsAndSources{}, fmt.Errorf("could not load KDM data: %w", err)
 	}
 
 	mink8sVersion := &semver.Version{
@@ -92,7 +93,7 @@ func GatherTargetImagesAndSources(chartsPath string, imagesFromArgs []string) (I
 	// https://www.suse.com/suse-rancher/support-matrix/all-supported-versions
 	k3sUpgradeImages, err := ext.GetExternalImages(rancherVersion, data.K3S, ext.K3S, mink8sVersion, img.Linux)
 	if err != nil {
-		return ImageTargetsAndSources{}, fmt.Errorf("%s: %w", "could not get external images for K3s", err)
+		return ArtifactTargetsAndSources{}, fmt.Errorf("%s: %w", "could not get external images for K3s", err)
 	}
 	if k3sUpgradeImages != nil {
 		externalLinuxImages["k3sUpgrade"] = k3sUpgradeImages
@@ -100,7 +101,7 @@ func GatherTargetImagesAndSources(chartsPath string, imagesFromArgs []string) (I
 
 	rke2LinuxImages, err := ext.GetExternalImages(rancherVersion, data.RKE2, ext.RKE2, mink8sVersion, img.Linux)
 	if err != nil {
-		return ImageTargetsAndSources{}, fmt.Errorf("%s: %w", "could not get external images for RKE2", err)
+		return ArtifactTargetsAndSources{}, fmt.Errorf("%s: %w", "could not get external images for RKE2", err)
 	}
 	if rke2LinuxImages != nil {
 		externalLinuxImages["rke2All"] = rke2LinuxImages
@@ -109,35 +110,28 @@ func GatherTargetImagesAndSources(chartsPath string, imagesFromArgs []string) (I
 	sort.Strings(imagesFromArgs)
 	winsIndex := sort.SearchStrings(imagesFromArgs, "rancher/wins")
 	if winsIndex > len(imagesFromArgs)-1 {
-		return ImageTargetsAndSources{}, fmt.Errorf("rancher/wins upgrade image not found")
+		return ArtifactTargetsAndSources{}, fmt.Errorf("rancher/wins upgrade image not found")
 	}
 
 	winsAgentUpdateImage := imagesFromArgs[winsIndex]
 	linuxImagesFromArgs := append(imagesFromArgs[:winsIndex], imagesFromArgs[winsIndex+1:]...)
 
-	exportConfig := img.ExportConfig{
-		ChartsPath:      chartsPath,
-		OsType:          img.Linux,
-		RancherVersion:  rancherVersion,
-		GithubEndpoints: img.ExtensionEndpoints,
-	}
-	targetImages, targetImagesAndSources, err := img.GetImages(exportConfig, externalLinuxImages, linuxImagesFromArgs)
+	targetArtifacts, targetArtifactsAndSources, err := img.GetArtifacts(chartPaths, ociChartsPath, img.Linux, rancherVersion, img.ExtensionEndpoints, externalLinuxImages, linuxImagesFromArgs, ociRepository)
 	if err != nil {
-		return ImageTargetsAndSources{}, err
+		return ArtifactTargetsAndSources{}, err
 	}
 
-	exportConfig.OsType = img.Windows
-	targetWindowsImages, targetWindowsImagesAndSources, err := img.GetImages(exportConfig, nil, []string{winsAgentUpdateImage})
+	targetWindowsArtifacts, targetWindowsArtifactsAndSources, err := img.GetArtifacts(chartPaths, ociChartsPath, img.Windows, rancherVersion, img.ExtensionEndpoints, externalLinuxImages, []string{winsAgentUpdateImage}, ociRepository)
 	if err != nil {
-		return ImageTargetsAndSources{}, err
+		return ArtifactTargetsAndSources{}, err
 	}
 
-	return ImageTargetsAndSources{
-		LinuxImagesFromArgs:           linuxImagesFromArgs,
-		TargetLinuxImages:             targetImages,
-		TargetLinuxImagesAndSources:   targetImagesAndSources,
-		TargetWindowsImages:           targetWindowsImages,
-		TargetWindowsImagesAndSources: targetWindowsImagesAndSources,
+	return ArtifactTargetsAndSources{
+		LinuxImagesFromArgs:              linuxImagesFromArgs,
+		TargetLinuxArtifacts:             targetArtifacts,
+		TargetLinuxArtifactsAndSources:   targetArtifactsAndSources,
+		TargetWindowsArtifacts:           targetWindowsArtifacts,
+		TargetWindowsArtifactsAndSources: targetWindowsArtifactsAndSources,
 	}, nil
 }
 
