@@ -1167,7 +1167,7 @@ func Test_ChartInstallation(t *testing.T) {
 					},
 					"kubectl": map[string]interface{}{
 						"image": map[string]interface{}{
-							"repository": "rancher-test.io/rancher/kubectl",
+							"repository": "rancher-test.io/rancher/kuberlr-kubectl",
 						},
 					},
 				}
