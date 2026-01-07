@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
 )
 
 func GetAuditLoggerMiddleware(auditLog *LoggingHandler) func(next http.Handler) http.Handler {
@@ -20,10 +20,16 @@ func GetAuditLoggerMiddleware(auditLog *LoggingHandler) func(next http.Handler) 
 			user := getUserInfo(req)
 			context := context.WithValue(req.Context(), userKeyValue, user)
 			req = req.WithContext(context)
-			rawBody, userName := copyReqBody(req)
+			keepReqBody := auditLog.level >= auditlogv1.LevelRequest
+			rawReqBody, userName := copyReqBody(req, keepReqBody)
 
+			// keepResBody determines whether to buffer response bodies for audit logging.
+			// Note: Buffering large responses (e.g., cluster lists) can consume significant
+			// memory (MBs-GBs). Only enable LevelRequestResponse if response body logging is required.
+			keepResBody := auditLog.level >= auditlogv1.LevelRequestResponse
 			wrappedRw := &wrapWriter{
 				ResponseWriter: rw,
+				keepBody:       keepResBody,
 				headerWrote:    false,
 				statusCode:     http.StatusTeapot, // Default status should never matter so it can be nonsense; controversial, but it serves as our canary in the coal mine. If we see teapots we KNOW we have bugs somewhere.
 			}
@@ -35,21 +41,9 @@ func GetAuditLoggerMiddleware(auditLog *LoggingHandler) func(next http.Handler) 
 
 			respTimestamp := time.Now().Format(time.RFC3339)
 
-			auditLogEntry := newLog(user, req, wrappedRw, reqTimestamp, respTimestamp, rawBody, userName)
-			if err := auditLog.writer.Write(auditLogEntry); err != nil {
-				// Locking after next is called to avoid performance hits on the request.
-				auditLog.errLock.Lock()
-				defer auditLog.errLock.Unlock()
-
-				// Only log duplicate error messages at most every errorDebounceTime.
-				// This is to prevent the rancher logs from being flooded with error messages
-				// when the log path is invalid or any other error that will always cause a write to fail.
-				if lastSeen, ok := auditLog.errMap[err.Error()]; !ok || time.Since(lastSeen) > errorDebounceTime {
-					logrus.Warnf("Failed to write audit log: %s", err)
-					auditLog.errMap[err.Error()] = time.Now()
-				}
-			}
-
+			verbosityLevel := auditLog.ResolveVerbosity(req.RequestURI)
+			auditLogEntry := newLog(verbosityLevel, user, req, wrappedRw, reqTimestamp, respTimestamp, rawReqBody, userName)
+			auditLog.Write(auditLogEntry)
 		})
 	}
 }

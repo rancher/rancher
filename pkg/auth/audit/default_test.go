@@ -535,12 +535,21 @@ func TestDefaultPolicies(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
-			log := &log{
-				AuditID:        "0123456789",
-				RequestURI:     c.Uri,
-				RequestHeader:  c.Headers,
-				rawRequestBody: c.Body,
+			log := &logEntry{
+				AuditID:       "0123456789",
+				RequestURI:    c.Uri,
+				RequestHeader: c.Headers,
 			}
+
+			// In production, request bodies are prepared by newLog(); tests that
+			// construct logEntry directly must populate RequestBody themselves.
+			prepareLogEntry(log, &testLogData{
+				verbosity:  verbosityForLevel(auditlogv1.LevelRequestResponse),
+				reqHeaders: c.Headers,
+				rawReqBody: c.Body,
+				resHeaders: c.Headers,
+				rawResBody: c.ExpectedBody,
+			})
 
 			err = writer.Write(log)
 			assert.NoError(t, err)

@@ -28,7 +28,7 @@ func getUserNameForBasicLogin(body []byte) string {
 
 	err := json.Unmarshal(body, input)
 	if err != nil {
-		logrus.Debugf("error unmarshalling user, cannot add login info to audit log: %v", err)
+		logrus.Debugf("error unmarshalling user, cannot add login info to audit logEntry: %v", err)
 		return ""
 	}
 
