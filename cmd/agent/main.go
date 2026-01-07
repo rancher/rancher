@@ -289,7 +289,6 @@ func run(ctx context.Context) error {
 		}
 
 		logrus.Infof("Connecting to %s with token starting with %s", wsURL, token[:len(token)/2])
-		logrus.Tracef("Connecting to %s with token %s", wsURL, token)
 		remotedialer.ClientConnect(ctx, wsURL, headers, nil, func(proto, address string) bool {
 			switch proto {
 			case "tcp":
