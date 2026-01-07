@@ -65,7 +65,8 @@ func TestMiddleware(t *testing.T) {
 		requests = append(requests, r)
 	})
 	out := &strings.Builder{}
-	writer, err := NewWriter(out, WriterOptions{})
+	writerOpts := WriterOptions{}
+	writer, err := NewWriter(out, writerOpts)
 	require.NoError(t, err)
 
 	m := NewAuditLogMiddleware(writer)
