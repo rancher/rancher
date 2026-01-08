@@ -367,7 +367,7 @@ func CreateOrUpdateResource[T generic.RuntimeMetaObject, TList runtime.Object](o
 	resource, err := client.Get(obj.GetName(), metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to get %s %s", kind, obj.GetName())
+			return fmt.Errorf("failed to get %s %s: %w", kind, obj.GetName(), err)
 		}
 		logrus.Infof("%s %s being created", kind, obj.GetName())
 		// resource doesn't exist, create it
@@ -400,7 +400,7 @@ func CreateOrUpdateNamespacedResource[T generic.RuntimeMetaObject, TList runtime
 	resource, err := client.Get(obj.GetNamespace(), obj.GetName(), metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to get %s %s in namespace %s", kind, obj.GetName(), obj.GetNamespace())
+			return fmt.Errorf("failed to get %s %s in namespace %s: %w", kind, obj.GetName(), obj.GetNamespace(), err)
 		}
 		logrus.Infof("%s %s being created in namespace %s", kind, obj.GetName(), obj.GetNamespace())
 		// resource doesn't exist, create it
@@ -465,28 +465,28 @@ func AreClusterRolesSame(currentCR, wantedCR *rbacv1.ClusterRole) (bool, *rbacv1
 
 // DeleteResource deletes a non namespaced resource
 func DeleteResource[T generic.RuntimeMetaObject, TList runtime.Object](name string, client generic.NonNamespacedClientInterface[T, TList]) error {
-	logrus.Infof("deleting %T %s", *new(T), name)
+	logrus.Infof("Deleting %T %s", *new(T), name)
 	err := client.Delete(name, &metav1.DeleteOptions{})
 	// If the resource is already gone, don't treat it as an error
 	if apierrors.IsNotFound(err) {
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("failed to delete %T %s", *new(T), name)
+		return fmt.Errorf("failed to delete %T %s: %w", *new(T), name, err)
 	}
 	return nil
 }
 
-// DeleteResource deletes a non namespaced resource
+// DeleteNamespacedResource deletes a namespaced resource
 func DeleteNamespacedResource[T generic.RuntimeMetaObject, TList runtime.Object](namespace, name string, client generic.ClientInterface[T, TList]) error {
-	logrus.Infof("deleting %T %s in namespace %s", *new(T), name, namespace)
+	logrus.Infof("Deleting %T %s in namespace %s", *new(T), name, namespace)
 	err := client.Delete(namespace, name, &metav1.DeleteOptions{})
 	// If the resource is already gone, don't treat it as an error
 	if apierrors.IsNotFound(err) {
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("failed to delete %T %s in namespace %s", *new(T), name, namespace)
+		return fmt.Errorf("failed to delete %T %s in namespace %s: %w", *new(T), name, namespace, err)
 	}
 	return nil
 }

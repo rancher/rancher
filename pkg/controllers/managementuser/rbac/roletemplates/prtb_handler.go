@@ -89,7 +89,7 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 	// Ensure a service account impersonator exists on the cluster.
 	if prtb.UserName != "" {
 		if err := p.impersonationHandler.ensureServiceAccountImpersonator(prtb.UserName); err != nil {
-			return nil, fmt.Errorf("error deleting service account impersonator for %s: %w", prtb.UserName, err)
+			return nil, fmt.Errorf("error ensuring service account impersonator for %s: %w", prtb.UserName, err)
 		}
 	}
 
