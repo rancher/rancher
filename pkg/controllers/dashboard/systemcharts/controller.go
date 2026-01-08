@@ -332,7 +332,7 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 					}
 					values["kubectl"] = map[string]interface{}{
 						"image": map[string]interface{}{
-							"repository": fmt.Sprintf("%s/%s", h.registryOverride, "rancher/kubectl"),
+							"repository": fmt.Sprintf("%s/%s", h.registryOverride, "rancher/kuberlr-kubectl"),
 						},
 					}
 				}
