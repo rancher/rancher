@@ -174,6 +174,41 @@ func (s *shell) createPod(imageOverride string) *v1.Pod {
 					ImagePullPolicy: v1.PullIfNotPresent,
 					SecurityContext: &v1.SecurityContext{
 						AllowPrivilegeEscalation: boolPointer(false),
+						ReadOnlyRootFilesystem:   boolPointer(true),
+					},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      "tmp",
+							MountPath: "/tmp",
+						},
+						{
+							Name:      "run",
+							MountPath: "/run",
+						},
+						{
+							Name:      "helm-run",
+							MountPath: "/home/shell/helm-run",
+						},
+					},
+				},
+			},
+			Volumes: []v1.Volume{
+				{
+					Name: "tmp",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
+				},
+				{
+					Name: "run",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
+				},
+				{
+					Name: "helm-run",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
 					},
 				},
 			},
