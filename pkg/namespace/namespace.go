@@ -6,7 +6,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
 )
@@ -19,7 +19,7 @@ const (
 
 // NsByProjectID is an index that selects namespaces based on the projectIDAnnotation
 func NsByProjectID(obj interface{}) ([]string, error) {
-	ns, ok := obj.(*v1.Namespace)
+	ns, ok := obj.(*corev1.Namespace)
 	if !ok {
 		return []string{}, nil
 	}
@@ -81,7 +81,7 @@ func (n *NsEnqueuer) RoleTemplateEnqueueNamespace(_, _ string, obj runtime.Objec
 			return nil, fmt.Errorf("unable to get namespaces for prtb %s from indexer: %w", prtb.Name, err)
 		}
 		for _, ns := range namespaces {
-			if namespace, ok := ns.(*v1.Namespace); ok {
+			if namespace, ok := ns.(*corev1.Namespace); ok {
 				// Only queue each namespace once
 				if _, ok := namespaceMap[namespace.Name]; !ok {
 					namespaceKeys = append(namespaceKeys, relatedresource.Key{Name: namespace.Name})
