@@ -16,6 +16,10 @@ type handler struct {
 }
 
 func (h *handler) shouldManage(ns *corev1.Namespace) bool {
+	if ns.Name == "cattle-system" {
+		return true
+	}
+
 	if managed, ok := ns.Annotations[namespace.AnnotationManagedNamespace]; ok && managed == namespace.AnnotationManagedNamespceTrue {
 		return true
 	}
