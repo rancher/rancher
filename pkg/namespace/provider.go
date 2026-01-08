@@ -3,6 +3,7 @@ package namespace
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 
 	corev1 "k8s.io/api/core/v1"
 )
@@ -32,8 +33,10 @@ func SetNamespaceOptions(s string) error {
 	}
 
 	if p.Enabled {
-		annotations = p.Annotations
-		annotations[AnnotationManagedNamespace] = AnnotationManagedNamespceTrue
+		annotations = map[string]string{
+			AnnotationManagedNamespace: AnnotationManagedNamespceTrue,
+		}
+		maps.Copy(annotations, p.Annotations)
 
 		labels = p.Labels
 	}
