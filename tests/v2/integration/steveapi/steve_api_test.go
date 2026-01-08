@@ -741,7 +741,7 @@ type listTestType struct {
 	expectSummary []clientv1.SteveAPISummaryItem
 }
 
-var SQLOnlyListTests= []listTestType{
+var SQLOnlyListTests = []listTestType{
 		// user-a
 	{
 		description: "user:user-a,namespace:none,query:summary=metadata.namespace,metadata.name",
@@ -791,10 +791,10 @@ var SQLOnlyListTests= []listTestType{
 		},
 	},
 	{
-		description: "user:user-a,namespace:none,query:limit=8&summary=metadata.name,metadata.namespace",
+		description: "user:user-a,namespace:none,query:pagesize=8&summary=metadata.name,metadata.namespace&sort=metadata.namespace,metadata.name",
 		user:        "user-a",
 		namespace:   "",
-		query:       "limit=8&summary=metadata.name,metadata.namespace",
+		query:       "pagesize=8&summary=metadata.name,metadata.namespace&sort=metadata.namespace,metadata.name",
 		expect: []map[string]string{
 			{"name": "test1", "namespace": "test-ns-1"},
 			{"name": "test2", "namespace": "test-ns-1"},
@@ -821,27 +821,49 @@ var SQLOnlyListTests= []listTestType{
 		},
 	},
 	{
-		description: "user:user-a,namespace:none,query:filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&limit=20&summary=metadata.name",
+		description: "user:user-a,namespace:none,query:filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&summary=metadata.name",
 		user:        "user-a",
 		namespace:   "",
-		query:       "filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&limit=20&summary=metadata.name",
-		// limit is applied BEFORE filter and pagesize, which is why not all test5 secrets appear in the result
+		query:       "filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&summary=metadata.name",
 		expect: []map[string]string{
 			{"name": "test5"},
 			{"name": "test5"},
 			{"name": "test5"},
 			{"name": "test5"},
+			{"name": "test5"},
 			{"name": "test4"},
-			{"name": "test4"},
+		},
+		expectSummary: []clientv1.SteveAPISummaryItem{
+			clientv1.SteveAPISummaryItem{
+				Property: "metadata.name",
+				Counts: map[string]int{
+					"test4": 1,
+					"test5": 5,
+				},
+			},
 		},
 	},
 	{
-		description: "user:user-a,namespace:test-ns-2,query:filter=test-label=2&summary=metadata.namespace,metadata.name",
+		description: "user:user-a,namespace:test-ns-2,query:filter=metadata.labels.test-label=2&summary=metadata.namespace,metadata.name",
 		user:        "user-a",
 		namespace:   "test-ns-2",
-		query:       "filter=test-label=2&summary=metadata.namespace,metadata.name",
+		query:       "filter=metadata.labels.test-label=2&summary=metadata.namespace,metadata.name",
 		expect: []map[string]string{
 			{"name": "test2", "namespace": "test-ns-2"},
+		},
+		expectSummary: []clientv1.SteveAPISummaryItem{
+			clientv1.SteveAPISummaryItem{
+				Property: "metadata.name",
+				Counts: map[string]int{
+					"test2":1,
+				},
+			},
+			clientv1.SteveAPISummaryItem{
+				Property: "metadata.namespace",
+				Counts: map[string]int{
+					"test-ns-2":1,
+				},
+			},
 		},
 	},
 	{
@@ -2778,6 +2800,7 @@ func (s *steveAPITestSuite) TestList() {
 	if !usingSQLCache {
 		tests = append(tests, nonSQLListTests...)
 	} else {
+		tests = append(tests, SQLOnlyListTests...)
 		// map labelSelector and fieldSelector params to the VAI equivalents
 		// ensure metadata.namespace tests are doing partial matching because
 		// the actual namespaces are given an `auto` prefix and a random suffix
@@ -2899,6 +2922,10 @@ func (s *steveAPITestSuite) TestList() {
 				s.assertListExcludes(test.expect, secretList.Data)
 			} else {
 				s.assertListIsEqual(test.expect, secretList.Data)
+			}
+			if test.expectSummary != nil {
+				require.NotNil(s.T(), secretList.Summary)
+				s.assertSummariesMatch(test.expectSummary, secretList.Summary)
 			}
 
 			// Write human-readable request and response examples
