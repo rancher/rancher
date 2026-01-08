@@ -69,18 +69,25 @@ func GetArtifacts(
 ) ([]string, []string, error) {
 	imagesSet := make(map[string]map[string]struct{})
 
+	exportConfig := ExportConfig{
+		OsType:         osType,
+		RancherVersion: rancherVersion,
+	}
+
 	chartsPathList := strings.Split(chartsPath, ",")
 	for _, chartPath := range chartsPathList {
-		exportConfig := ExportConfig{
-			ChartsPath:     chartPath,
-			OsType:         osType,
-			RancherVersion: rancherVersion,
-		}
+		chartExportConfig := exportConfig
+		chartExportConfig.ChartsPath = chartPath
 
-		charts := Charts{exportConfig}
+		charts := Charts{chartExportConfig}
 		if err := charts.FetchImages(imagesSet); err != nil {
 			return nil, nil, errors.Wrap(err, "failed to fetch images from charts")
 		}
+	}
+
+	system := System{exportConfig}
+	if err := system.FetchImages(imagesSet); err != nil {
+		return nil, nil, errors.Wrap(err, "failed to fetch images from system")
 	}
 
 	if ociChartsGitPaths != "" {
@@ -98,13 +105,10 @@ func GetArtifacts(
 		}
 	}
 
-	exportConfig := ExportConfig{
-		OsType:          osType,
-		RancherVersion:  rancherVersion,
-		GithubEndpoints: extensionEndpoints,
-	}
 	// fetch images from extension catalog images
-	extensions := ExtensionsConfig{exportConfig}
+	extExportConfig := exportConfig
+	extExportConfig.GithubEndpoints = extensionEndpoints
+	extensions := ExtensionsConfig{extExportConfig}
 	if err := extensions.FetchExtensionImages(imagesSet); err != nil {
 		return nil, nil, errors.Wrap(err, "failed to fetch images from extensions")
 	}
