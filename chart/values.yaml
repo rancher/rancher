@@ -329,11 +329,16 @@ extraObjects: []
 #     policyTypes:
 #       - Ingress
 
+# Control additional labels and annotations on namespaces create by Rancher.
 rancherNamespaces:
-  enabled: true
 
-  labels:
-    foo: bar
-  
-  annotations:
-    baz: quz
+  # If enabled is true, the "cattle.io/managed-namespace" annotation will be applied to any new namespaces. 
+  enabled: false
+
+  # Additional labels to be added to new namespaces.
+  # labels:
+  #   foo: bar
+
+  # Additional annotaitons to be added to new namespaces. Will be appied along with the "cattle.io/managed-namespace" annotation.  
+  # annotations:
+  #   foo: bar
