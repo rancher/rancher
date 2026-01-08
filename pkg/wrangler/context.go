@@ -46,6 +46,7 @@ import (
 	telemetryv1 "github.com/rancher/rancher/pkg/generated/controllers/telemetry.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/generated/controllers/upgrade.cattle.io"
 	plancontrolers "github.com/rancher/rancher/pkg/generated/controllers/upgrade.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/peermanager"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/tunnelserver"
@@ -535,7 +536,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		Catalog:                 helm.Catalog().V1(),
 		Batch:                   batch.Batch().V1(),
 		RBAC:                    rbac.Rbac().V1(),
-		Core:                    core.Core().V1(),
+		Core:                    namespace.NewFactory(core).Core().V1(),
 		API:                     api.Apiregistration().V1(),
 		CRD:                     crd.Apiextensions().V1(),
 		K8s:                     k8s,
