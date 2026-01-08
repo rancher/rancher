@@ -754,3 +754,25 @@ tests:
         path: spec.template.spec.hostNetwork
     - notExists:
         path: spec.template.spec.dnsPolicy
+- it: should configure rancher deployments with namespace options
+  set:
+    rancherNamespaces:
+      enabled: true
+      labels:
+        foo: bar
+      annotations:
+        foo: bar
+  asserts:
+    - equal:
+        path: spec.template.spec.containers[0].env
+        value:
+          - name: CATTLE_NAMESPACE
+            value: NAMESPACE
+          - name: CATTLE_PEER_SERVICE
+            value: RELEASE-NAME-rancher
+          - name: IMPERATIVE_API_DIRECT
+            value: "true"
+          - name: IMPERATIVE_API_APP_SELECTOR
+            value: RELEASE-NAME-rancher
+          - name: RANCHER_NAMESPACES_OPTIONS
+            value: "{\"annotations\":{\"foo\":\"bar\"},\"enabled\":true,\"labels\":{\"foo\":\"bar\"}}"
