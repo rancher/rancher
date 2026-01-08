@@ -108,6 +108,7 @@ type Options struct {
 	Features                       string
 	ClusterRegistry                string
 	AggregationRegistrationTimeout time.Duration
+	RancherNamespaceOptions        string
 }
 
 type Rancher struct {
@@ -146,6 +147,12 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	// Run the encryption migration before any controllers run otherwise the fields will be dropped
 	if err := migrateEncryptionConfig(ctx, restConfig); err != nil {
 		return nil, err
+	}
+
+	if opts.RancherNamespaceOptions != "" {
+		if err := namespace.SetNamespaceOptions(opts.RancherNamespaceOptions); err != nil {
+			return nil, err
+		}
 	}
 
 	wranglerContext, err := wrangler.NewPrimaryContext(ctx, clientConfg, restConfig)
