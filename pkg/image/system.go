@@ -10,7 +10,7 @@ type System struct {
 }
 
 func (s System) FetchImages(imagesSet map[string]map[string]struct{}) error {
-	collectionImagesList := []interface{}{}
+	collectionImagesList := []any{}
 	if s.Config.OsType == Linux {
 		collectionImagesList = append(collectionImagesList, v32.ToolsSystemImages)
 	}
@@ -24,9 +24,9 @@ func (s System) FetchImages(imagesSet map[string]map[string]struct{}) error {
 	return nil
 }
 
-func flatImagesFromCollections(cols ...interface{}) (images []string, err error) {
+func flatImagesFromCollections(cols ...any) (images []string, err error) {
 	for _, col := range cols {
-		colObj := map[string]interface{}{}
+		colObj := map[string]any{}
 		if err := convert.ToObj(col, &colObj); err != nil {
 			return []string{}, err
 		}
@@ -35,12 +35,12 @@ func flatImagesFromCollections(cols ...interface{}) (images []string, err error)
 	return images, nil
 }
 
-func fetchImagesFromCollection(obj map[string]interface{}) (images []string) {
+func fetchImagesFromCollection(obj map[string]any) (images []string) {
 	for _, v := range obj {
 		switch t := v.(type) {
 		case string:
 			images = append(images, t)
-		case map[string]interface{}:
+		case map[string]any:
 			images = append(images, fetchImagesFromCollection(t)...)
 		}
 	}
