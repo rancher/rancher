@@ -167,6 +167,12 @@ func main() {
 			Usage:       "Declare a different timeout duration when waiting to registration requests from the aggregation layer",
 			Destination: &config.AggregationRegistrationTimeout,
 		},
+		cli.StringFlag{
+			Name:        "rancher-namespaces",
+			EnvVar:      "RANCHER_NAMESPACES_OPTIONS",
+			Usage:       "Configuration for rancher namespace labels and annotations",
+			Destination: &config.RancherNamespaceOptions,
+		},
 	}
 
 	app.Action = func(c *cli.Context) error {
