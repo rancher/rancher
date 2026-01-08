@@ -1,0 +1,38 @@
+var expected = [
+    {"name":"test1", "namespace":"auto-test-ns-1-zmeui"},
+    {"name":"test2", "namespace":"auto-test-ns-1-zmeui"},
+    {"name":"test3", "namespace":"auto-test-ns-1-zmeui"},
+    {"name":"test4", "namespace":"auto-test-ns-1-zmeui"},
+    {"name":"test5", "namespace":"auto-test-ns-1-zmeui"},
+    {"name":"test1", "namespace":"auto-test-ns-2-pwkjn"},
+    {"name":"test2", "namespace":"auto-test-ns-2-pwkjn"},
+    {"name":"test3", "namespace":"auto-test-ns-2-pwkjn"}
+];
+
+var actual = [
+    {"name":"test1", "namespace":"auto-test-ns-1-zmeui"},
+    {"name":"test2", "namespace":"auto-test-ns-1-zmeui"},
+    {"name":"test3", "namespace":"auto-test-ns-1-zmeui"},
+    {"name":"test4", "namespace":"auto-test-ns-1-zmeui"},
+    {"name":"test5", "namespace":"auto-test-ns-1-zmeui"},
+    {"name":"test1", "namespace":"auto-test-ns-2-pwkjn"},
+    {"name":"test2", "namespace":"auto-test-ns-2-pwkjn"},
+    {"name":"test3", "namespace":"auto-test-ns-2-pwkjn"},
+    {"name":"test4", "namespace":"auto-test-ns-2-pwkjn"},
+    {"name":"test5", "namespace":"auto-test-ns-2-pwkjn"},
+    {"name":"test1", "namespace":"auto-test-ns-3-simgk"},
+    {"name":"test2", "namespace":"auto-test-ns-3-simgk"},
+    {"name":"test3", "namespace":"auto-test-ns-3-simgk"},
+    {"name":"test4", "namespace":"auto-test-ns-3-simgk"},
+    {"name":"test5", "namespace":"auto-test-ns-3-simgk"},
+    {"name":"test1", "namespace":"auto-test-ns-4-ceemi"},
+    {"name":"test2", "namespace":"auto-test-ns-4-ceemi"},
+    {"name":"test3", "namespace":"auto-test-ns-4-ceemi"},
+    {"name":"test4", "namespace":"auto-test-ns-4-ceemi"},
+    {"name":"test5", "namespace":"auto-test-ns-4-ceemi"},
+    {"name":"test1", "namespace":"auto-test-ns-5-ihcin"},
+    {"name":"test2", "namespace":"auto-test-ns-5-ihcin"},
+    {"name":"test3", "namespace":"auto-test-ns-5-ihcin"},
+    {"name":"test4", "namespace":"auto-test-ns-5-ihcin"},
+    {"name":"test5", "namespace":"auto-test-ns-5-ihcin"},
+]
