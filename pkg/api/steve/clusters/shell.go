@@ -110,16 +110,27 @@ func (s *shell) contextAndClient(req *http.Request) (context.Context, user.Info,
 }
 
 func (s *shell) createPod(imageOverride string) *v1.Pod {
+	var (
+		f = false
+		t = true
+	)
 	imageName := imageOverride
 	if imageName == "" {
 		imageName = settings.FullShellImage()
 	}
+	runAsUser := int64(1000)
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "dashboard-shell-",
 			Namespace:    s.namespace,
 		},
 		Spec: v1.PodSpec{
+			SecurityContext: &v1.PodSecurityContext{
+				RunAsNonRoot: &t,
+				RunAsUser:    &runAsUser,
+				RunAsGroup:   &runAsUser,
+				FSGroup:      &runAsUser,
+			},
 			TerminationGracePeriodSeconds: new(int64),
 			RestartPolicy:                 v1.RestartPolicyNever,
 			NodeSelector: map[string]string{
@@ -165,6 +176,9 @@ func (s *shell) createPod(imageOverride string) *v1.Pod {
 					},
 					Image:           imageName,
 					ImagePullPolicy: v1.PullIfNotPresent,
+					SecurityContext: &v1.SecurityContext{
+						AllowPrivilegeEscalation: &f,
+					},
 				},
 			},
 		},
