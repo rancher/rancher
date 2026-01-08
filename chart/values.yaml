@@ -328,3 +328,12 @@ extraObjects: []
 #         app: rancher
 #     policyTypes:
 #       - Ingress
+
+rancherNamespaces:
+  enabled: true
+
+  labels:
+    foo: bar
+  
+  annotations:
+    baz: quz
