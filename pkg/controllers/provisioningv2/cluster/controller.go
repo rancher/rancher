@@ -23,6 +23,7 @@ import (
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
+
 	"github.com/rancher/wrangler/v3/pkg/apply"
 	"github.com/rancher/wrangler/v3/pkg/condition"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -55,7 +56,8 @@ const (
 	fleetWorkspaceNameAnn     = "provisioning.cattle.io/fleet-workspace-name"
 	externallyManagedAnn      = "provisioning.cattle.io/externally-managed"
 
-	manageSchedulingDefaultsAnn = "provisioning.cattle.io/enable-scheduling-customization"
+	manageSchedulingDefaultsAnn      = "provisioning.cattle.io/enable-scheduling-customization"
+	manageFleetSchedulingDefaultsAnn = "provisioning.cattle.io/enable-fleet-scheduling-customization"
 )
 
 var (
@@ -337,6 +339,24 @@ func (h *handler) generateProvisioningClusterFromLegacyCluster(cluster *v3.Clust
 		}
 	}
 
+	if cluster.Spec.FleetAgentDeploymentCustomization != nil && cluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization != nil {
+		provCluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization = &v1.AgentSchedulingCustomization{}
+
+		if cluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization.PodDisruptionBudget != nil {
+			provCluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization.PodDisruptionBudget = &v1.PodDisruptionBudgetSpec{
+				MinAvailable:   cluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization.PodDisruptionBudget.MinAvailable,
+				MaxUnavailable: cluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization.PodDisruptionBudget.MaxUnavailable,
+			}
+		}
+
+		if cluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization.PriorityClass != nil {
+			provCluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization.PriorityClass = &v1.PriorityClassSpec{
+				Value:            cluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization.PriorityClass.Value,
+				PreemptionPolicy: cluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization.PriorityClass.PreemptionPolicy,
+			}
+		}
+	}
+
 	return []runtime.Object{
 		provCluster,
 	}, status, nil
@@ -529,6 +549,24 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 			spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PriorityClass = &v3.PriorityClassSpec{
 				Value:            cluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PriorityClass.Value,
 				PreemptionPolicy: cluster.Spec.ClusterAgentDeploymentCustomization.SchedulingCustomization.PriorityClass.PreemptionPolicy,
+			}
+		}
+	}
+
+	if cluster.Spec.FleetAgentDeploymentCustomization != nil && cluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization != nil {
+		spec.FleetAgentDeploymentCustomization.SchedulingCustomization = &v3.AgentSchedulingCustomization{}
+
+		if cluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization.PodDisruptionBudget != nil {
+			spec.FleetAgentDeploymentCustomization.SchedulingCustomization.PodDisruptionBudget = &v3.PodDisruptionBudgetSpec{
+				MaxUnavailable: cluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization.PodDisruptionBudget.MaxUnavailable,
+				MinAvailable:   cluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization.PodDisruptionBudget.MinAvailable,
+			}
+		}
+
+		if cluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization.PriorityClass != nil {
+			spec.FleetAgentDeploymentCustomization.SchedulingCustomization.PriorityClass = &v3.PriorityClassSpec{
+				Value:            cluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization.PriorityClass.Value,
+				PreemptionPolicy: cluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization.PriorityClass.PreemptionPolicy,
 			}
 		}
 	}

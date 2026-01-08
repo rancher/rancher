@@ -9,6 +9,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	managementv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -160,7 +161,7 @@ var (
 		true)
 	ClusterAgentSchedulingCustomization = newFeature(
 		"cluster-agent-scheduling-customization",
-		"Enables the automatic deployment of Pod Disruption Budgets and Priority Classes when deploying the cattle-cluster-agent. Disabling this feature will not impact existing clusters.",
+		"Enables the automatic deployment of Pod Disruption Budgets and Priority Classes when deploying the cattle-cluster-agent and fleet agent. Disabling this feature will not impact existing clusters.",
 		false,
 		true,
 		true)
