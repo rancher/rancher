@@ -3,10 +3,9 @@ package appco
 import (
 	"bufio"
 	"fmt"
-	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
-
-	"github.com/Masterminds/semver/v3"
 )
 
 func isCorrectAppCoArtifact(a Artifact) bool {
@@ -25,36 +24,51 @@ func isCorrectAppCoArtifact(a Artifact) bool {
 	return false
 }
 
-func appcoAllowListURL(rancherVersion string) (string, error) {
-	mm, err := majorMinor(rancherVersion)
+func rancherRepoRoot() (string, error) {
+	wd, err := os.Getwd()
 	if err != nil {
 		return "", err
 	}
 
-	return fmt.Sprintf(
-		"https://raw.githubusercontent.com/rancher/prime-charts/dev-v%s/appcoSupportVersions.yaml",
-		mm,
+	const marker = string(os.PathSeparator) + "rancher"
+
+	idx := strings.LastIndex(wd, marker)
+	if idx == -1 {
+		return "", fmt.Errorf("appco: unable to locate rancher repo root from %s", wd)
+	}
+
+	return wd[:idx+len(marker)], nil
+}
+
+func appcoAllowListPath() (string, error) {
+	repoRoot, err := rancherRepoRoot()
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Join(
+		repoRoot,
+		"bin",
+		"build",
+		"prime-charts",
+		"appcoSupportVersions.yaml",
 	), nil
 }
 
-func loadAppCoAllowList(rancherVersion string) (map[string]struct{}, error) {
-	url, err := appcoAllowListURL(rancherVersion)
+func loadAppCoAllowList() (map[string]struct{}, error) {
+	path, err := appcoAllowListPath()
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := http.Get(url)
+	f, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("appco: failed to open allow list file %s: %w", path, err)
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("appco: failed to fetch allow list: %s", resp.Status)
-	}
+	defer f.Close()
 
 	allowed := make(map[string]struct{})
-	scanner := bufio.NewScanner(resp.Body)
+	scanner := bufio.NewScanner(f)
 
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -65,13 +79,4 @@ func loadAppCoAllowList(rancherVersion string) (map[string]struct{}, error) {
 	}
 
 	return allowed, scanner.Err()
-}
-
-func majorMinor(rancherVersion string) (string, error) {
-	v, err := semver.NewVersion(rancherVersion)
-	if err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf("%d.%d", v.Major(), v.Minor()), nil
 }
