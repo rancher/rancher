@@ -44,6 +44,7 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 			TokenMgr:    tokenMGR,
 		},
 	}
+
 	p.GetConfig = p.GetOIDCConfig
 	return p
 }

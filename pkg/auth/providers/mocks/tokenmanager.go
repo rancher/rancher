@@ -84,3 +84,53 @@ func (mr *MocktokenManagerMockRecorder) UpdateSecret(userID, provider, secret an
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateSecret", reflect.TypeOf((*MocktokenManager)(nil).UpdateSecret), userID, provider, secret)
 }
+
+// MockurlValues is a mock of urlValues interface.
+type MockurlValues struct {
+	ctrl     *gomock.Controller
+	recorder *MockurlValuesMockRecorder
+	isgomock struct{}
+}
+
+// MockurlValuesMockRecorder is the mock recorder for MockurlValues.
+type MockurlValuesMockRecorder struct {
+	mock *MockurlValues
+}
+
+// NewMockurlValues creates a new mock instance.
+func NewMockurlValues(ctrl *gomock.Controller) *MockurlValues {
+	mock := &MockurlValues{ctrl: ctrl}
+	mock.recorder = &MockurlValuesMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockurlValues) EXPECT() *MockurlValuesMockRecorder {
+	return m.recorder
+}
+
+// Add mocks base method.
+func (m *MockurlValues) Add(arg0, arg1 string) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Add", arg0, arg1)
+}
+
+// Add indicates an expected call of Add.
+func (mr *MockurlValuesMockRecorder) Add(arg0, arg1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*MockurlValues)(nil).Add), arg0, arg1)
+}
+
+// Encode mocks base method.
+func (m *MockurlValues) Encode() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Encode")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// Encode indicates an expected call of Encode.
+func (mr *MockurlValuesMockRecorder) Encode() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Encode", reflect.TypeOf((*MockurlValues)(nil).Encode))
+}
