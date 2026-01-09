@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"slices"
 	"strings"
 
@@ -16,7 +17,10 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/oauth2"
 	"k8s.io/client-go/util/retry"
+	"k8s.io/utils/ptr"
 )
 
 const cognitoGroupsClaim = "cognito:groups"
@@ -54,11 +58,26 @@ func (o *OpenIDCProvider) ConfigureTest(request *types.APIContext) error {
 		return err
 	}
 
+	// TODO: Remove this when the UI can set it.
+	pkceMethod := os.Getenv("TEST_PKCE_METHOD")
+	logrus.Debugf("OpenIDCProvider: PKCE enabled for testing: %v", pkceMethod)
+	if pkceMethod != "" {
+		input[client.GenericOIDCConfigFieldPKCEMethod] = pkceMethod
+	}
+
+	var pkceVerifier string
+	if pkceMethod != "" {
+		pkceVerifier = oauth2.GenerateVerifier()
+		SetPKCEVerifier(request.Request, request.Response, pkceVerifier)
+	}
+
 	data := map[string]any{
-		"redirectUrl": o.getRedirectURL(input),
+		"redirectUrl": GetOIDCRedirectionURL(input, pkceVerifier, &orderedValues{}),
 		"type":        "OIDCTestOutput",
 	}
+
 	request.WriteResponse(http.StatusOK, data)
+
 	return nil
 }
 
@@ -79,8 +98,7 @@ func (o *OpenIDCProvider) TestAndApply(request *types.APIContext) error {
 	// set a default value for GroupSearchEnabled
 	// in case user input is nil for some reasons.
 	if oidcConfigApplyInput.OIDCConfig.GroupSearchEnabled == nil {
-		falseBool := false
-		oidcConfig.GroupSearchEnabled = &falseBool
+		oidcConfig.GroupSearchEnabled = ptr.To(false)
 	}
 	// we need to set cognito:groups as GroupsClaim in order to be able to fetch groups from aws cognito
 	if oidcConfig.Type == client.CognitoConfigType {
@@ -91,7 +109,7 @@ func (o *OpenIDCProvider) TestAndApply(request *types.APIContext) error {
 	}
 
 	if !validateScopes(oidcConfig.Scopes) {
-		return fmt.Errorf("scopes are invalid:  scopes must be space delimited and openid is a required scope. %s", oidcConfig.Scopes)
+		return fmt.Errorf("scopes are invalid: scopes must be space delimited and openid is a required scope. %s", oidcConfig.Scopes)
 	}
 
 	// encode url to ensure path is escaped properly
@@ -102,7 +120,7 @@ func (o *OpenIDCProvider) TestAndApply(request *types.APIContext) error {
 		if httperror.IsAPIError(err) {
 			return err
 		}
-		return errors.Wrap(err, "[generic oidc]: server error while authenticating")
+		return errors.Wrap(err, "[generic oidc]: failed to parse the issuer URL while authenticating")
 	}
 	oidcConfig.Issuer = issuerURL.String()
 
