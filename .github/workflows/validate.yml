@@ -7,9 +7,6 @@ jobs:
       GOLANG_CI_LINT_VERSION: v2.7.2
       GOLANG_VERSION: '1.25'
     steps:
-      # - name: Install dependencies
-      #   shell: bash
-      #   run: zypper install -y git awk
       - name: Git safe directory
         run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
