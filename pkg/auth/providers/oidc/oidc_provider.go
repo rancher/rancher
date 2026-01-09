@@ -192,6 +192,8 @@ func (o *OpenIDCProvider) GetPrincipal(principalID string, token accessor.TokenA
 	if principalType != UserType && principalType != GroupType {
 		return p, fmt.Errorf("invalid principal type")
 	}
+
+	// This is probably a bug - principalID will never equal UserType.
 	if principalID == UserType {
 		p = apiv3.Principal{
 			ObjectMeta:    metav1.ObjectMeta{Name: principalType + "://" + externalID},
@@ -203,7 +205,10 @@ func (o *OpenIDCProvider) GetPrincipal(principalID string, token accessor.TokenA
 	} else {
 		p = o.groupToPrincipal(externalID)
 	}
+
+	// And p may be overwritten here.
 	p = o.toPrincipalFromToken(principalType, p, token)
+
 	return p, nil
 }
 
@@ -289,13 +294,14 @@ func (o *OpenIDCProvider) RefetchGroupPrincipals(principalID string, secret stri
 	}
 	var oauthToken oauth2.Token
 	if err := json.Unmarshal([]byte(secret), &oauthToken); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal oauth token: %w", err)
 	}
 
 	claimInfo, err := o.getClaimInfoFromToken(o.CTX, config, &oauthToken, user.Name)
 	if err != nil {
 		return groupPrincipals, err
 	}
+
 	return o.getGroupsFromClaimInfo(*claimInfo), nil
 }
 
@@ -541,9 +547,9 @@ func (o *OpenIDCProvider) getUserInfoFromAuthCode(rw http.ResponseWriter, req *h
 		claimInfo.Email = emailClaim
 	}
 
-	// Valid will return false if access token is expired
+	// Valid will return false if access token is expired.
 	if !oauth2Token.Valid() {
-		return userInfo, oauth2Token, "", fmt.Errorf("not valid token: %w", err)
+		return userInfo, oauth2Token, "", errors.New("access token is not valid")
 	}
 
 	if err := o.UpdateToken(oauth2Token, userName); err != nil {
@@ -607,6 +613,7 @@ func (o *OpenIDCProvider) getClaimInfoFromToken(ctx context.Context, config *api
 		token = reusedToken
 	}
 
+	// TODO: This is probably a bug? verifier.Verify verifies the ID Token?
 	idToken, err := verifier.Verify(updatedContext, token.AccessToken)
 	if err != nil {
 		return nil, fmt.Errorf("failed to verify ID token: %w", err)
@@ -712,7 +719,10 @@ func (o *OpenIDCProvider) UpdateToken(refreshedToken *oauth2.Token, userID strin
 		return err
 	}
 	logrus.Debugf("OpenIDCProvider: UpdateToken: saving refreshed access token")
-	o.TokenMgr.UpdateSecret(userID, o.Name, string(marshalledToken))
+	if err := o.TokenMgr.UpdateSecret(userID, o.Name, string(marshalledToken)); err != nil {
+		return fmt.Errorf("failed to update secret: %w", err)
+	}
+
 	return err
 }
 
@@ -900,63 +910,26 @@ func getValueFromClaims[T any](idToken *oidc.IDToken, name string) (T, error) {
 }
 
 func deletePKCEVerifier(req *http.Request, w http.ResponseWriter) {
-	isSecure := req.URL.Scheme == "https"
-	pkceCookie := &http.Cookie{
-		Name:    pkceVerifierCookieName,
-		Value:   "",
-		Secure:  isSecure,
-		Expires: time.Now().Add(time.Second * -10),
-	}
-
-	http.SetCookie(w, pkceCookie)
+	setCookie(req, w, pkceVerifierCookieName, "", time.Now().Add(time.Second*-10))
 }
-
-// TODO: Can this use SameSite: true?
 
 // SetPKCEVerifier sets Cookie with the PKCE Verification token which is needed
 // when the user's browser is redirected back to exchange the token.
 func SetPKCEVerifier(req *http.Request, w http.ResponseWriter, value string) {
-	isSecure := req.URL.Scheme == "https"
-	pkceCookie := &http.Cookie{
-		Name:     pkceVerifierCookieName,
-		Value:    value,
-		Secure:   isSecure,
-		Path:     "/",
-		HttpOnly: true,
-		Expires:  time.Now().Add(time.Minute * 10),
-	}
-
-	http.SetCookie(w, pkceCookie)
+	setCookie(req, w, pkceVerifierCookieName, value, time.Now().Add(time.Minute*10))
 }
 
 func setIDToken(req *http.Request, w http.ResponseWriter, token string) {
-	isSecure := req.URL.Scheme == "https"
-	tokenCookie := &http.Cookie{
-		Name:     IDTokenCookie,
-		Value:    token,
-		Secure:   isSecure,
-		Path:     "/",
-		HttpOnly: true,
-	}
-	http.SetCookie(w, tokenCookie)
+	// Set cookie without expiry - session cookie
+	setCookie(req, w, IDTokenCookie, token, time.Time{})
 }
 
 func getIDToken(req *http.Request) string {
-	cookie, err := req.Cookie(IDTokenCookie)
-	if err != nil {
-		return ""
-	}
-
-	return cookie.Value
+	return getCookieValue(req, IDTokenCookie)
 }
 
 func getPKCEVerifier(req *http.Request) string {
-	cookie, err := req.Cookie(pkceVerifierCookieName)
-	if err != nil {
-		return ""
-	}
-
-	return cookie.Value
+	return getCookieValue(req, pkceVerifierCookieName)
 }
 
 // This is used instead of url.Values to avoid URL encoding the values.
@@ -993,4 +966,27 @@ func (v orderedValues) Encode() string {
 
 func (v *orderedValues) Add(key, value string) {
 	*v = append(*v, key, value)
+}
+
+// setCookie is a helper function to set an HTTP cookie with common settings.
+func setCookie(req *http.Request, w http.ResponseWriter, name, value string, expires time.Time) {
+	isSecure := req.URL.Scheme == "https"
+	cookie := &http.Cookie{
+		Name:     name,
+		Value:    value,
+		Secure:   isSecure,
+		Path:     "/",
+		HttpOnly: true,
+		Expires:  expires,
+	}
+	http.SetCookie(w, cookie)
+}
+
+// getCookieValue retrieves a cookie value by name from the request.
+func getCookieValue(req *http.Request, name string) string {
+	cookie, err := req.Cookie(name)
+	if err != nil {
+		return ""
+	}
+	return cookie.Value
 }
