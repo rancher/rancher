@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -123,6 +124,7 @@ func (h *handler) addCpTaintsToTolerations(tolerations []corev1.Toleration) ([]c
 			allTaints = append(allTaints, taint)
 		}
 	}
+
 	for _, taint := range allTaints {
 		tolerations = append(tolerations, corev1.Toleration{
 			Key:      taint.Key,
@@ -261,6 +263,9 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 		}
 	}
 
+	// sort tolerations for consistent ordering to avoid unnecessary updates
+	sortTolerations(tolerations)
+
 	return append(objs, &fleet.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        cluster.Name,
@@ -303,4 +308,44 @@ func (h *handler) addAPIServer(clientSecret string) {
 	if _, err := h.secretsController.Update(secret); err != nil {
 		logrus.Warnf("local cluster provisioning: failed to update client secret: %v", err)
 	}
+}
+
+func sortTolerations(tols []corev1.Toleration) {
+	sort.Slice(tols, func(i, j int) bool {
+		a := tols[i]
+		b := tols[j]
+
+		// 1. Key
+		if a.Key != b.Key {
+			return a.Key < b.Key
+		}
+
+		// 2. Value
+		if a.Value != b.Value {
+			return a.Value < b.Value
+		}
+
+		// 3. Operator
+		if a.Operator != b.Operator {
+			return a.Operator < b.Operator
+		}
+
+		// 4. Effect
+		if a.Effect != b.Effect {
+			return a.Effect < b.Effect
+		}
+
+		// 5. TolerationSeconds (nil-safe)
+		if a.TolerationSeconds == nil && b.TolerationSeconds != nil {
+			return true // nil sorts first
+		}
+		if a.TolerationSeconds != nil && b.TolerationSeconds == nil {
+			return false
+		}
+		if a.TolerationSeconds == nil && b.TolerationSeconds == nil {
+			return false
+		}
+
+		return *a.TolerationSeconds < *b.TolerationSeconds
+	})
 }

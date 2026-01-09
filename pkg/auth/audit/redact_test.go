@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func sampleLog() log {
-	return log{
+func sampleLog() logEntry {
+	return logEntry{
 		RequestHeader: map[string][]string{
 			"password":     {"password1234"},
 			"foo":          {"bar"},
@@ -20,8 +20,18 @@ func sampleLog() log {
 			"baz":          {"qux"},
 			"Content-Type": []string{contentTypeJSON},
 		},
-		rawRequestBody:  []byte(`{"toplevel":{"inner":{"bottom":"value"},"sibling":"value"}}`),
-		rawResponseBody: []byte(`{"words":[{"foo":"bar"},{"baz":"qux"}]}`),
+		RequestBody: map[string]any{
+			"toplevel": map[string]any{
+				"inner":   map[string]any{"bottom": "value"},
+				"sibling": "value",
+			},
+		},
+		ResponseBody: map[string]any{
+			"words": []any{
+				map[string]any{"foo": "bar"},
+				map[string]any{"baz": "qux"},
+			},
+		},
 	}
 }
 
@@ -44,8 +54,8 @@ func TestPolicyRedactor(t *testing.T) {
 	type testCase struct {
 		Name     string
 		Redactor *policyRedactor
-		Input    log
-		Expected log
+		Input    logEntry
+		Expected logEntry
 	}
 
 	cases := []testCase{
@@ -53,7 +63,7 @@ func TestPolicyRedactor(t *testing.T) {
 			Name:     "Redact Headers",
 			Redactor: headerRedactor,
 			Input:    sampleLog(),
-			Expected: log{
+			Expected: logEntry{
 				RequestHeader: map[string][]string{
 					"password":     {redacted},
 					"foo":          {"bar"},
@@ -81,7 +91,7 @@ func TestPolicyRedactor(t *testing.T) {
 			Name:     "Redact Both With Paths",
 			Redactor: pathRedactor,
 			Input:    sampleLog(),
-			Expected: log{
+			Expected: logEntry{
 				RequestHeader: map[string][]string{
 					"password":     {"password1234"},
 					"foo":          {"bar"},
@@ -110,7 +120,7 @@ func TestPolicyRedactor(t *testing.T) {
 			Name:     "Redact Keys Regex",
 			Redactor: keyRedactor,
 			Input:    sampleLog(),
-			Expected: log{
+			Expected: logEntry{
 				RequestHeader: map[string][]string{
 					"password":     {"password1234"},
 					"foo":          {"bar"},
@@ -137,14 +147,9 @@ func TestPolicyRedactor(t *testing.T) {
 		},
 	}
 
-	verbosity := auditlogv1.LogVerbosity{
-		Request:  auditlogv1.Verbosity{Headers: true, Body: true},
-		Response: auditlogv1.Verbosity{Headers: true, Body: true},
-	}
-
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
-			c.Input.prepare(verbosity)
+			// No need to call prepare() - test inputs already have bodies as maps
 			err := c.Redactor.Redact(&c.Input)
 
 			actual := c.Input

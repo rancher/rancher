@@ -21,13 +21,27 @@ type Policy struct {
 	Verbosity auditlogv1.LogVerbosity
 }
 
-func (p Policy) actionForLog(log *log) auditlogv1.FilterAction {
+func (p Policy) actionForUri(uri string) auditlogv1.FilterAction {
 	if len(p.Filters) == 0 {
 		return auditlogv1.FilterActionAllow
 	}
 
 	for _, f := range p.Filters {
-		if f.Allowed(log) {
+		if f.Allowed(uri) {
+			return auditlogv1.FilterActionAllow
+		}
+	}
+
+	return auditlogv1.FilterActionDeny
+}
+
+func (p Policy) actionForLog(log *logEntry) auditlogv1.FilterAction {
+	if len(p.Filters) == 0 {
+		return auditlogv1.FilterActionAllow
+	}
+
+	for _, f := range p.Filters {
+		if f.LogAllowed(log) {
 			return auditlogv1.FilterActionAllow
 		}
 	}
@@ -107,7 +121,7 @@ func NewWriter(output io.Writer, opts WriterOptions) (*Writer, error) {
 	return w, nil
 }
 
-func (w *Writer) Write(log *log) error {
+func (w *Writer) Write(log *logEntry) error {
 	redactors := []Redactor{}
 	if !w.DisableDefaultPolicies {
 		defaultMu.Lock()
@@ -115,7 +129,6 @@ func (w *Writer) Write(log *log) error {
 		defaultMu.Unlock()
 	}
 
-	verbosity := verbosityForLevel(w.DefaultPolicyLevel)
 	action := auditlogv1.FilterActionUnknown
 
 	w.policiesMutex.RLock()
@@ -123,7 +136,6 @@ func (w *Writer) Write(log *log) error {
 		switch policy.actionForLog(log) {
 		case auditlogv1.FilterActionAllow:
 			redactors = append(redactors, policy.Redactors...)
-			verbosity = mergeLogVerbosities(verbosity, policy.Verbosity)
 
 			action = auditlogv1.FilterActionAllow
 		case auditlogv1.FilterActionDeny:
@@ -138,27 +150,25 @@ func (w *Writer) Write(log *log) error {
 		return nil
 	}
 
-	log.prepare(verbosity)
-
 	for _, r := range redactors {
 		if err := r.Redact(log); err != nil {
-			return fmt.Errorf("failed to redact log: %w", err)
+			return fmt.Errorf("failed to redact logEntry: %w", err)
 		}
 	}
 
 	data, err := json.Marshal(log)
 	if err != nil {
-		return fmt.Errorf("failed to marshal log: %w", err)
+		return fmt.Errorf("failed to marshal logEntry: %w", err)
 	}
 
 	var buffer bytes.Buffer
 	if err := json.Compact(&buffer, data); err != nil {
-		return fmt.Errorf("failed to compact log: %w", err)
+		return fmt.Errorf("failed to compact logEntry: %w", err)
 	}
 	buffer.WriteByte('\n')
 
 	if _, err := w.output.Write(buffer.Bytes()); err != nil {
-		return fmt.Errorf("failed to write log: %w", err)
+		return fmt.Errorf("failed to write logEntry: %w", err)
 	}
 
 	return nil
@@ -198,8 +208,8 @@ func (w *Writer) GetPolicy(name string) (Policy, bool) {
 	return p, ok
 }
 
-func (l *Writer) Start(ctx context.Context) {
-	if l == nil {
+func (w *Writer) Start(ctx context.Context) {
+	if w == nil {
 		return
 	}
 

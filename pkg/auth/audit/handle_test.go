@@ -17,13 +17,14 @@ import (
 
 func TestAuditLogMiddleware(t *testing.T) {
 	var buf bytes.Buffer
-	dummyW, err := NewWriter(&buf, WriterOptions{})
+	writerOpts := WriterOptions{}
+	dummyW, err := NewWriter(&buf, writerOpts)
 	assert.NoError(t, err)
 
-	readLog := func(t *testing.T) *log {
+	readLog := func(t *testing.T) *logEntry {
 		t.Helper()
 
-		var log log
+		var log logEntry
 		err := json.Unmarshal(buf.Bytes(), &log)
 		assert.NoError(t, err)
 		buf.Reset()

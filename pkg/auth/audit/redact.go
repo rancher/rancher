@@ -16,8 +16,8 @@ const (
 )
 
 type Redactor interface {
-	// Redact replaces sensitive information within a log with "[redacted]". Expects the log to have been prepared.
-	Redact(*log) error
+	// Redact replaces sensitive information within a logEntry with "[redacted]". Expects the logEntry to have been prepared.
+	Redact(*logEntry) error
 }
 
 type policyRedactor struct {
@@ -55,7 +55,7 @@ func (r *policyRedactor) redactHeaders(headers http.Header) {
 }
 
 // Redact redacts fields and headers which match the
-func (r *policyRedactor) Redact(log *log) error {
+func (r *policyRedactor) Redact(log *logEntry) error {
 	r.redactHeaders(log.RequestHeader)
 	r.redactHeaders(log.ResponseHeader)
 
@@ -67,10 +67,10 @@ func (r *policyRedactor) Redact(log *log) error {
 	return nil
 }
 
-// RedactFunc is a function that redacts a log entry in place.
-type RedactFunc func(*log) error
+// RedactFunc is a function that redacts a logEntry entry in place.
+type RedactFunc func(*logEntry) error
 
-func (rf RedactFunc) Redact(log *log) error {
+func (rf RedactFunc) Redact(log *logEntry) error {
 	return rf(log)
 }
 
@@ -111,7 +111,7 @@ func redactData(secret map[string]any) bool {
 	return isRedacted
 }
 
-func redactDataFromBody(log *log, body map[string]any, listKind string) bool {
+func redactDataFromBody(log *logEntry, body map[string]any, listKind string) bool {
 	var changed bool
 
 	isK8sProxyList := strings.HasPrefix(log.RequestURI, "/k8s") && (body["kind"] != nil && body["kind"] == listKind)
@@ -163,7 +163,7 @@ func checkForBasetype(pattern *regexp.Regexp) func(string, any) bool {
 	}
 }
 
-func redactSecret(log *log) error {
+func redactSecret(log *logEntry) error {
 	if strings.Contains(log.RequestURI, "secrets") || pairMatches(log.RequestBody, checkForBasetype(secretBaseType)) {
 		redactDataFromBody(log, log.RequestBody, "SecretList")
 	}
@@ -175,7 +175,7 @@ func redactSecret(log *log) error {
 	return nil
 }
 
-func redactConfigMap(log *log) error {
+func redactConfigMap(log *logEntry) error {
 	if strings.Contains(log.RequestURI, "configmaps") || pairMatches(log.RequestBody, checkForBasetype(configmapBaseType)) {
 		redactDataFromBody(log, log.RequestBody, "ConfigMapList")
 	}
@@ -225,7 +225,7 @@ func regexRedactor(patterns []string) (Redactor, error) {
 		return nil, err
 	}
 
-	return RedactFunc(func(log *log) error {
+	return RedactFunc(func(log *logEntry) error {
 		redactMap(regexes, log.RequestBody)
 		redactMap(regexes, log.ResponseBody)
 		return nil
@@ -238,7 +238,7 @@ const (
 	refererHeader     = "Referer"
 )
 
-func redactImportUrl(l *log) error {
+func redactImportUrl(l *logEntry) error {
 	l.RequestURI = redactImportUrlPath(l.RequestURI)
 
 	if err := redactImportUrlHeader(l, refererHeader); err != nil {
@@ -256,7 +256,7 @@ func redactImportUrlPath(path string) string {
 	return path
 }
 
-func redactImportUrlHeader(l *log, headerName string) error {
+func redactImportUrlHeader(l *logEntry, headerName string) error {
 	referrer, ok := l.RequestHeader[headerName]
 	if !ok {
 		return nil

@@ -69,7 +69,7 @@ func decompress(readCloser io.ReadCloser) ([]byte, error) {
 	return rawData, nil
 }
 
-type log struct {
+type logEntry struct {
 	AuditID       k8stypes.UID `json:"auditID,omitempty"`
 	RequestURI    string       `json:"requestURI,omitempty"`
 	User          *User        `json:"user,omitempty"`
@@ -86,37 +86,51 @@ type log struct {
 
 	RequestBody  map[string]any `json:"requestBody,omitempty"`
 	ResponseBody map[string]any `json:"responseBody,omitempty"`
-
-	rawRequestBody  []byte
-	rawResponseBody []byte
 }
 
-func copyReqBody(req *http.Request) (rawBody []byte, user string) {
+func copyReqBody(req *http.Request, keepBody bool) ([]byte, string) {
 	contentType := req.Header.Get("Content-Type")
 
-	if methodsWithBody[req.Method] && strings.HasPrefix(contentType, contentTypeJSON) {
-		body, err := io.ReadAll(req.Body)
+	if !methodsWithBody[req.Method] || !strings.HasPrefix(contentType, contentTypeJSON) {
+		return nil, ""
+	}
+
+	isLoginEndpoint := isLoginRequest(req)
+	shouldReadBody := isLoginEndpoint || keepBody
+
+	if !shouldReadBody {
+		// Don't read - let it stream
+		return nil, ""
+	}
+
+	body, err := io.ReadAll(req.Body)
+	if err != nil {
+		body, err = json.Marshal(map[string]any{
+			"responseReadError": err.Error(),
+		})
 		if err != nil {
-			body, err = json.Marshal(map[string]any{
-				"responseReadError": err.Error(),
-			})
-			if err != nil {
-				body = []byte(`{"responseReadError": "failed to read response body"}`)
-			}
+			body = []byte(`{"responseReadError": "failed to read response body"}`)
 		}
+	}
 
-		req.Body = io.NopCloser(bytes.NewBuffer(body))
+	req.Body = io.NopCloser(bytes.NewBuffer(body))
 
+	var user string
+	if isLoginEndpoint {
 		if loginName := getUserNameForBasicLogin(body); loginName != "" {
 			user = loginName
 		}
-
-		rawBody = body
 	}
-	return
+
+	if keepBody {
+		return body, user
+	}
+
+	return nil, user
 }
 
 func newLog(
+	verbosity auditlogv1.LogVerbosity,
 	userInfo *User,
 	req *http.Request,
 	rw *wrapWriter,
@@ -124,8 +138,8 @@ func newLog(
 	respTimestamp string,
 	rawBody []byte,
 	userName string,
-) *log {
-	log := &log{
+) *logEntry {
+	log := &logEntry{
 		AuditID:       k8stypes.UID(uuid.NewRandom().String()),
 		RequestURI:    req.RequestURI,
 		User:          userInfo,
@@ -136,72 +150,70 @@ func newLog(
 
 		RequestTimestamp:  reqTimestamp,
 		ResponseTimestamp: respTimestamp,
+	}
 
-		RequestHeader:  req.Header.Clone(),
-		ResponseHeader: rw.Header().Clone(),
+	if verbosity.Request.Headers {
+		log.RequestHeader = req.Header.Clone()
+	}
 
-		rawRequestBody:  rawBody,
-		rawResponseBody: rw.buf.Bytes(),
+	// Attempt req body prep
+	if verbosity.Request.Body && req.Header.Get("Content-Type") == contentTypeJSON && len(rawBody) > 0 {
+		if err := json.Unmarshal(rawBody, &log.RequestBody); err != nil {
+			log.RequestBody = map[string]any{
+				auditLogErrorKey: fmt.Sprintf("failed to unmarshal request body: %s", err.Error()),
+			}
+		}
+	}
+
+	if verbosity.Response.Headers {
+		log.ResponseHeader = rw.Header().Clone()
+	}
+
+	// Attempt res body prep
+	if verbosity.Response.Body {
+		log.prepareResponseBody(rw.Header(), rw.buf.Bytes())
 	}
 
 	return log
 }
 
-func (l *log) decompressResponse() error {
+func (l *logEntry) prepareResponseBody(resHeaders http.Header, body []byte) {
+	if resHeaders.Get("Content-Type") == contentTypeJSON && len(body) > 0 {
+		decompressed, err := decompressResponse(resHeaders.Get("Content-Encoding"), body)
+		if err != nil {
+			l.ResponseBody = map[string]any{
+				auditLogErrorKey: fmt.Sprintf("failed to decompress response body: %s", err),
+			}
+			return
+		}
+
+		if jsonErr := json.Unmarshal(decompressed, &l.ResponseBody); jsonErr != nil {
+			l.ResponseBody = map[string]any{
+				auditLogErrorKey: fmt.Sprintf("failed to unmarshal response body: %s", jsonErr.Error()),
+			}
+		}
+	}
+}
+
+func decompressResponse(encoding string, rawResponseBody []byte) ([]byte, error) {
 	var err error
 	var decompressed []byte
 
-	switch contentType := l.ResponseHeader.Get("Content-Encoding"); contentType {
+	switch encoding {
 	case "", "none":
 		// not encoded do nothing
-		return nil
+		return rawResponseBody, nil
 	case contentEncodingGZIP:
-		decompressed, err = decompressGZIP(l.rawResponseBody)
+		decompressed, err = decompressGZIP(rawResponseBody)
 	case contentEncodingZLib:
-		decompressed, err = decompressZLib(l.rawResponseBody)
+		decompressed, err = decompressZLib(rawResponseBody)
 	default:
-		err = fmt.Errorf("%w '%s' in resopnse header", ErrUnsupportedEncoding, contentType)
+		err = fmt.Errorf("%w '%s' in response header", ErrUnsupportedEncoding, encoding)
 	}
 
 	if err != nil {
-		return fmt.Errorf("failed to decode response body: %w", err)
+		return nil, fmt.Errorf("failed to decode response body: %w", err)
 	}
 
-	l.rawResponseBody = decompressed
-
-	return nil
-}
-
-func (l *log) prepare(verbosity auditlogv1.LogVerbosity) {
-	if !verbosity.Request.Headers {
-		l.RequestHeader = nil
-	}
-
-	if !verbosity.Response.Headers {
-		l.ResponseHeader = nil
-	}
-
-	if verbosity.Request.Body && l.RequestHeader.Get("Content-Type") == contentTypeJSON && len(l.rawRequestBody) > 0 {
-		if err := json.Unmarshal(l.rawRequestBody, &l.RequestBody); err != nil {
-			l.RequestBody = map[string]any{
-				auditLogErrorKey: fmt.Sprintf("failed to unmarshal request body: %s", err.Error()),
-			}
-		}
-	}
-	l.rawRequestBody = nil
-
-	if verbosity.Response.Body && l.ResponseHeader.Get("Content-Type") == contentTypeJSON && len(l.rawResponseBody) > 0 {
-		if err := l.decompressResponse(); err != nil {
-			l.RequestBody = map[string]any{
-				auditLogErrorKey: fmt.Sprintf("failed to decompressed reuqest body: %s", err.Error()),
-			}
-		}
-
-		if err := json.Unmarshal(l.rawResponseBody, &l.ResponseBody); err != nil {
-			l.ResponseBody = map[string]any{
-				auditLogErrorKey: fmt.Sprintf("failed to unmarshal response body: %s", err.Error()),
-			}
-		}
-	}
-	l.rawResponseBody = nil
+	return decompressed, nil
 }
