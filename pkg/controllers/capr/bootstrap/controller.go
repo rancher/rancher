@@ -368,6 +368,8 @@ func (h *handler) GeneratingHandler(bootstrap *rkev1.RKEBootstrap, status rkev1.
 	return result, status, nil
 }
 
+// rancherDeploymentHasHostPort returns true if the rancher deployment exposes a host port,
+// which is the case when the local cluster is provisioned via rancherd.
 func (h *handler) rancherDeploymentHasHostPort() (bool, error) {
 	deployment, err := h.deploymentCache.Get(namespace.System, "rancher")
 	if err != nil {

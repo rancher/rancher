@@ -18,6 +18,7 @@ import (
 	"github.com/rancher/dynamiclistener/storage/kubernetes"
 	"github.com/rancher/lasso/pkg/metrics"
 	"github.com/rancher/norman/types/convert"
+	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/v3/pkg/generated/controllers/apps"
@@ -220,28 +221,46 @@ func SetupListener(secrets corev1controllers.SecretController, acmeDomains []str
 	return opts, nil
 }
 
+// readConfig returns the TLS configuration for the Rancher server.
+// It determines the source of the TLS certificates and CA bundle based on the environment and flags.
+// The order of precedence for TLS configuration is:
+// 1. ACME (Let's Encrypt): If acmeDomains are provided. Rancher will obtain a cert from Let's Encrypt.
+// 2. User-Provided Certificates: If a cert and key are mounted into the container.
+// 3. External Termination: If TLS is terminated by an upstream proxy/load-balancer. A private CA can be provided.
+// 4. Rancher-Generated Self-Signed Certificates: If no other configuration is provided.
+//
+// It returns:
+// - ca: The CA certificate chain in PEM format. Can be empty.
+// - bool: The value of the noCACerts flag.
+// - *server.ListenOpts: The listener options for dynamiclistener.
+// - error: An error if the configuration is invalid.
 func readConfig(secrets corev1controllers.SecretController, acmeDomains []string, noCACerts bool) (string, bool, *server.ListenOpts, error) {
 	var (
 		ca  string
 		err error
 	)
 
+	// Create a base TLS config from settings for TLS version and ciphers.
 	tlsConfig, err := baseTLSConfig(settings.TLSMinVersion.Get(), settings.TLSCiphers.Get())
 	if err != nil {
 		return "", noCACerts, nil, err
 	}
 
+	// Get the certificate rotation expiration setting.
 	expiration, err := strconv.Atoi(settings.RotateCertsIfExpiringInDays.Get())
 	if err != nil {
 		return "", noCACerts, nil, errors.Wrapf(err, "parsing %s", settings.RotateCertsIfExpiringInDays.Get())
 	}
 
+	// Default SANs for the Rancher-generated certificate.
 	sans := []string{"localhost", "127.0.0.1", "rancher.cattle-system"}
 	ip, err := net.ChooseHostInterface()
 	if err == nil {
 		sans = append(sans, ip.String())
 	}
 
+	// Initialize listener options. These are used for all TLS configuration types, but some fields
+	// are only relevant for Rancher-generated certificates.
 	opts := &server.ListenOpts{
 		Secrets:       secrets,
 		CAName:        "tls-rancher",
@@ -257,25 +276,27 @@ func readConfig(secrets corev1controllers.SecretController, acmeDomains []string
 		},
 	}
 
-	// ACME / Let's Encrypt
-	// If --acme-domain is set, configure and return
+	// Case 1: ACME (Let's Encrypt).
+	// If --acme-domain is set, Rancher will manage the certificate via ACME.
+	// In this mode, Rancher does not use a custom CA, so we return an empty CA string
+	// and indicate that no CA certs are expected (noCACerts=true).
 	if len(acmeDomains) > 0 {
 		return "", true, opts, nil
 	}
 
-	// Mounted certificates
-	// If certificate file/key are set
+	// Case 2: User-provided certificates mounted into the container.
+	// Check if certificate and key files are mounted at the standard locations.
 	certFileExists := fileExists(rancherCertFile)
 	keyFileExists := fileExists(rancherKeyFile)
 
-	// If certificate file exists but not certificate key, or other way around, error out
+	// Both certificate and key must be present, or neither. A mismatch is a configuration error.
 	if (certFileExists && !keyFileExists) || (!certFileExists && keyFileExists) {
 		return "", noCACerts, nil, fmt.Errorf("invalid SSL configuration found, please set both certificate file and certificate key file (one is missing)")
 	}
 
 	caFileExists := fileExists(rancherCACertsFile)
 
-	// If certificate file and certificate key file exists, load files into listenConfig
+	// If both certificate and key files exist, we use this user-provided cert.
 	if certFileExists && keyFileExists {
 		cert, err := tls.LoadX509KeyPair(rancherCertFile, rancherKeyFile)
 		if err != nil {
@@ -283,25 +304,31 @@ func readConfig(secrets corev1controllers.SecretController, acmeDomains []string
 		}
 		opts.TLSListenerConfig.TLSConfig.Certificates = []tls.Certificate{cert}
 
-		// Selfsigned needs cacerts, recognized CA needs --no-cacerts but can't be used together
+		// When using custom certificates, the user must either provide a CA bundle (for self-signed certs)
+		// or explicitly state there is no CA bundle with --no-cacerts (for certs from a recognized CA).
+		// It's an error to provide a CA bundle AND --no-cacerts.
+		// It's also an error to NOT provide a CA bundle AND NOT use --no-cacerts, as Rancher can't
+		// determine if the cert is self-signed or not.
 		if (caFileExists && noCACerts) || (!caFileExists && !noCACerts) {
 			return "", noCACerts, nil, fmt.Errorf("invalid SSL configuration found, please set cacerts when using self signed certificates or use --no-cacerts when using certificates from a recognized Certificate Authority, do not use both at the same time")
 		}
-		// Load cacerts if exists
+		// If a CA file is provided, read it. This is the CA for the provided cert.
 		if caFileExists {
 			ca, err = readPEM(rancherCACertsFile)
 			if err != nil {
 				return "", noCACerts, nil, err
 			}
 		}
+		// Return the custom CA (if any) and the listener options with the custom cert.
 		return ca, noCACerts, opts, nil
 	}
 
-	// External termination
-	// We need to check if cacerts is passed or if --no-cacerts is used (when not providing certificate file and key)
-	// If cacerts is passed
+	// Case 3: External termination.
+	// This case is for when TLS is terminated by an external load balancer or proxy, and Rancher itself
+	// does not handle TLS termination for external traffic. A private CA may be provided so that
+	// Rancher and its agents can trust the endpoint. The '/cacerts' endpoint will return this CA.
 	if caFileExists {
-		// We can't have --no-cacerts
+		// It's a configuration error to provide a CA for external termination but also specify --no-cacerts.
 		if noCACerts {
 			return "", noCACerts, nil, fmt.Errorf("invalid SSL configuration found, please set cacerts when using self signed certificates or use --no-cacerts when using certificates from a recognized Certificate Authority, do not use both at the same time")
 		}
@@ -311,12 +338,21 @@ func readConfig(secrets corev1controllers.SecretController, acmeDomains []string
 		}
 	}
 
-	// No certificates mounted or only --no-cacerts used
+	// Case 4: Rancher-generated self-signed certs OR external termination without a private CA.
+	// If we reach this point, it means no ACME and no mounted certs were found.
+	// The 'ca' variable will contain the content of 'rancherCACertsFile' if it existed, otherwise it's empty.
+	// If 'ca' is empty and 'noCACerts' is false, the caller ('SetupListener') will generate a new self-signed CA.
+	// This generated CA is often referred to as the "Internal certificate". If you are seeing this
+	// certificate unexpectedly, it's likely because 'rancherCACertsFile' was not found in the container,
+	// even though you intended to provide a private CA.
 	return ca, noCACerts, opts, nil
 }
 
+// getClusterIP retrieves the ClusterIP of the rancher-internal service.
+// It returns the ClusterIP as a string, or an error if the service exists but is not assigned an IP.
+// If the service does not exist, it returns an empty string and no error.
 func getClusterIP(services corev1controllers.ServiceController) (string, error) {
-	service, err := services.Get(namespace.System, commonName, metav1.GetOptions{})
+	service, err := services.Get(namespace.System, apiservice.RancherInternalServiceName, metav1.GetOptions{})
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return "", nil
@@ -324,7 +360,8 @@ func getClusterIP(services corev1controllers.ServiceController) (string, error) 
 		return "", err
 	}
 	if service.Spec.ClusterIP == "" {
-		return "", fmt.Errorf("waiting on service %s/rancher to be assigned a ClusterIP", namespace.System)
+		return "", fmt.Errorf("waiting on service %s/%s to be assigned a ClusterIP",
+			namespace.System, apiservice.RancherInternalServiceName)
 	}
 	return service.Spec.ClusterIP, nil
 }

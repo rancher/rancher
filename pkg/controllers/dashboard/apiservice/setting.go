@@ -12,6 +12,7 @@ import (
 )
 
 const RancherServiceName = "rancher"
+const RancherInternalServiceName = "rancher-internal"
 
 func (h *handler) SetupInternalServerURL(key string, setting *v3.Setting) (*v3.Setting, error) {
 	if key != settings.ServerURL.Name {
@@ -40,7 +41,7 @@ func (h *handler) SetupInternalServerURL(key string, setting *v3.Setting) (*v3.S
 }
 
 func (h *handler) getClusterIP() (string, error) {
-	serviceName := RancherServiceName
+	serviceName := RancherInternalServiceName
 	if features.MCMAgent.Enabled() {
 		serviceName = "cattle-cluster-agent"
 	}

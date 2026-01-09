@@ -23,8 +23,26 @@ spec:
     name: http
   {{- end }}
   - port: 443
-    targetPort: 444
+    targetPort: 443
     protocol: TCP
-    name: https-internal
+    name: https
+  selector:
+    app: {{ template "rancher.fullname" . }}
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "rancher.fullname" . }}-internal
+  labels:
+{{ include "rancher.labels" . | indent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 443
+      targetPort: 444
+      protocol: TCP
+      name: https-internal
   selector:
     app: {{ template "rancher.fullname" . }}
