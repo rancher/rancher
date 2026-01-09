@@ -2,7 +2,7 @@ name: Validate
 on: [pull_request, push]
 jobs:
   validate:
-    runs-on: runs-on,runner=4cpu-linux-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,runner=8cpu-linux-x64,run-id=${{ github.run_id }}
     env:
       GOLANG_CI_LINT_VERSION: v2.7.2
       GOLANG_VERSION: '1.25'
@@ -26,13 +26,14 @@ jobs:
           args: -v
           only-new-issues: true
           skip-cache: false
-      - name: Check Python version
+      - name: Set up Python
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - name: Install Python dependencies
         run: |
-          python3 --version
-          python3 -m ensurepip --upgrade
-      - name: Install Python and dependencies
-        run: |
-          pip3 install --upgrade pip
-          pip3 install tox flake8
+          pip install --upgrade pip
+          pip install tox flake8
       - name: Validate (modules and flake8)
         run: ./scripts/validate
