@@ -1,6 +1,7 @@
 package roletemplates
 
 import (
+	"fmt"
 	"slices"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -191,7 +192,7 @@ func (rth *roleTemplateHandler) addLabelToExternalRole(rt *v3.RoleTemplate) erro
 	if val, ok := externalRole.Labels[rbac.AggregationLabel]; !ok || val != rbac.ClusterRoleNameFor(rt.Name) {
 		externalRole.Labels[rbac.AggregationLabel] = rbac.ClusterRoleNameFor(rt.Name)
 		if _, err := rth.crController.Update(externalRole); err != nil {
-			return err
+			return fmt.Errorf("failed to update external cluster role %s: %w", externalRole.Name, err)
 		}
 	}
 
