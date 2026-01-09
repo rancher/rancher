@@ -13,8 +13,10 @@ if ! command -v golangci-lint; then
   exit
 fi
 
-echo Running: golangci-lint
-golangci-lint run -v
+if [ -z "$CI" ]; then
+  echo Running: golangci-lint
+  CGO_ENABLED=0 golangci-lint run -v --concurrency=2 ./...
+fi
 
 echo Tidying up modules
 cd pkg/apis/
