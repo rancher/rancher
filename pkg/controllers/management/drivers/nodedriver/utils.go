@@ -48,6 +48,7 @@ func FlagToField(flag cli.Flag) (string, v32.Field, error) {
 	case *cli.BoolFlag:
 		field.Type = "boolean"
 		field.Description = v.Usage
+		field.Default.BoolValue = v.Value
 	case *cli.StringSliceFlag:
 		field.Type = "array[string]"
 		field.Description = v.Usage
@@ -56,6 +57,11 @@ func FlagToField(flag cli.Flag) (string, v32.Field, error) {
 	case *BoolPointerFlag:
 		field.Type = "boolean"
 		field.Description = v.Usage
+		if v.Value != nil {
+			field.Default.BoolValue = *v.Value
+		} else {
+			field.Default.BoolValue = false
+		}
 	default:
 		return name, field, fmt.Errorf("unknown type of flag %v: %v", flag, reflect.TypeOf(flag))
 	}
