@@ -114,12 +114,19 @@ func (s *shell) createPod(imageOverride string) *v1.Pod {
 	if imageName == "" {
 		imageName = settings.FullShellImage()
 	}
+	runAsUser := int64(1000)
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "dashboard-shell-",
 			Namespace:    s.namespace,
 		},
 		Spec: v1.PodSpec{
+			SecurityContext: &v1.PodSecurityContext{
+				RunAsNonRoot: boolPointer(true),
+				RunAsUser:    &runAsUser,
+				RunAsGroup:   &runAsUser,
+				FSGroup:      &runAsUser,
+			},
 			TerminationGracePeriodSeconds: new(int64),
 			RestartPolicy:                 v1.RestartPolicyNever,
 			NodeSelector: map[string]string{
@@ -165,8 +172,50 @@ func (s *shell) createPod(imageOverride string) *v1.Pod {
 					},
 					Image:           imageName,
 					ImagePullPolicy: v1.PullIfNotPresent,
+					SecurityContext: &v1.SecurityContext{
+						AllowPrivilegeEscalation: boolPointer(false),
+						ReadOnlyRootFilesystem:   boolPointer(true),
+					},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      "tmp",
+							MountPath: "/tmp",
+						},
+						{
+							Name:      "run",
+							MountPath: "/run",
+						},
+						{
+							Name:      "helm-run",
+							MountPath: "/home/shell/helm-run",
+						},
+					},
+				},
+			},
+			Volumes: []v1.Volume{
+				{
+					Name: "tmp",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
+				},
+				{
+					Name: "run",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
+				},
+				{
+					Name: "helm-run",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
 				},
 			},
 		},
 	}
+}
+
+func boolPointer(b bool) *bool {
+	return &b
 }
