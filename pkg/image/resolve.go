@@ -8,8 +8,8 @@ import (
 
 	"github.com/Masterminds/semver/v3"
 	"github.com/pkg/errors"
+	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	util "github.com/rancher/rancher/pkg/cluster"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 )
 
@@ -30,6 +30,12 @@ const (
 	Windows
 )
 
+// Image source types.
+const (
+	imageSourceCore   = "core"
+	imageSourceSystem = "system"
+)
+
 // Resolve calls ResolveWithCluster passing nil into the cluster argument.
 // returns the image concatenated with the URL of the system default registry.
 // if there is no system default registry it will return the image
@@ -40,7 +46,7 @@ func Resolve(image string) string {
 // ResolveWithCluster returns the image concatenated with the URL of the private registry specified, adding rancher/ if is a private repo.
 // It will use the cluster level registry if one is found, or the system default registry if no cluster level registry is found.
 // If either is not found, it returns the image.
-func ResolveWithCluster(image string, cluster *v3.Cluster) string {
+func ResolveWithCluster(image string, cluster *apisv3.Cluster) string {
 	reg := util.GetPrivateRegistryURL(cluster)
 	if reg != "" && !strings.HasPrefix(image, reg) {
 		// Images from Dockerhub Library repo, we add rancher prefix when using private registry
@@ -71,7 +77,7 @@ func GetImages(exportConfig ExportConfig, externalImages map[string][]string, im
 		return nil, nil, errors.Wrap(err, "failed to fetch images from extensions")
 	}
 
-	setRequirementImages(exportConfig.OsType, imagesSet)
+	setRequiredImages(exportConfig.OsType, imagesSet)
 
 	// set rancher images from args
 	setImages("rancher", imagesFromArgs, imagesSet)
@@ -92,15 +98,15 @@ func IsValidSemver(version string) bool {
 	return err == nil
 }
 
-func setRequirementImages(osType OSType, imagesSet map[string]map[string]struct{}) {
-	coreLabel := "core"
-	switch osType {
-	case Linux:
-		addSourceToImage(imagesSet, settings.SCCOperatorImage.Get(), coreLabel)
-		addSourceToImage(imagesSet, settings.ShellImage.Get(), coreLabel)
-		addSourceToImage(imagesSet, settings.MachineProvisionImage.Get(), coreLabel)
-		addSourceToImage(imagesSet, "rancher/mirrored-bci-busybox:15.6.24.2", coreLabel)
-		addSourceToImage(imagesSet, "rancher/mirrored-bci-micro:15.6.24.2", coreLabel)
+func setRequiredImages(osType OSType, imagesSet map[string]map[string]struct{}) {
+	if osType == Linux {
+		addSourceToImage(imagesSet, settings.SCCOperatorImage.Get(), imageSourceCore)
+		addSourceToImage(imagesSet, settings.ShellImage.Get(), imageSourceCore)
+		addSourceToImage(imagesSet, settings.MachineProvisionImage.Get(), imageSourceCore)
+		addSourceToImage(imagesSet, "rancher/mirrored-bci-busybox:15.6.24.2", imageSourceCore)
+		addSourceToImage(imagesSet, "rancher/mirrored-bci-micro:15.6.24.2", imageSourceCore)
+		// kube-api-auth is required for ACE.
+		addSourceToImage(imagesSet, apisv3.ToolsSystemImages.AuthSystemImages.KubeAPIAuth, imageSourceSystem)
 	}
 }
 
