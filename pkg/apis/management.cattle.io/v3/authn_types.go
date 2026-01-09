@@ -721,6 +721,14 @@ type OIDCConfig struct {
 
 	// EmailClaim is used instead of email
 	EmailClaim string `json:"emailClaim,omitempty"`
+
+	// PKCE Method - leave empty for no PKCE or S256 for S256
+	// verification.
+	PKCEMethod string `json:"pkceMethod"`
+
+	// RancherAPIHost should be the base URL for accessing Rancher through the
+	// web. e.g. https://rancher.example.com.
+	RancherAPIHost string `json:"rancherApiHost"`
 }
 
 type OIDCTestOutput struct {

@@ -370,11 +370,11 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 				Name:     providerName,
 				TokenMgr: test.tokenManagerMock(oidcResp.token),
 			}
-			ctx := context.TODO()
 			claimInfo := &ClaimInfo{}
 
-			userInfo, token, idToken, err := o.getUserInfoFromAuthCode(ctx, test.config(port), test.authCode, claimInfo, userId)
-
+			rw := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, "https://localhost:"+port, nil)
+			userInfo, token, idToken, err := o.getUserInfoFromAuthCode(rw, req, test.config(port), test.authCode, claimInfo, userId)
 			if test.expectedErrorMessage != "" {
 				assert.ErrorContains(t, err, test.expectedErrorMessage)
 			} else {
@@ -1005,6 +1005,58 @@ type providerJSON struct {
 	JWKSURL       string   `json:"jwks_uri"`
 	UserInfoURL   string   `json:"userinfo_endpoint"`
 	Algorithms    []string `json:"id_token_signing_alg_values_supported"`
+}
+
+func TestTransformToAuthProvider(t *testing.T) {
+	tests := map[string]struct {
+		beforeAuthConfig map[string]any
+		want             map[string]any
+	}{
+		"with no API Host": {
+			beforeAuthConfig: map[string]any{
+				"metadata": map[string]any{
+					"name": "genericoidc",
+				},
+				"clientId":     "rancher",
+				"rancherUrl":   "https://localhost:9443/verify-auth",
+				"authEndpoint": "https://example.com/realms/rancher/protocol/openid-connect/auth",
+			},
+			want: map[string]any{
+				"id":                 "genericoidc",
+				"logoutAllEnabled":   false,
+				"logoutAllForced":    false,
+				"logoutAllSupported": false,
+				"redirectUrl":        "https://example.com/realms/rancher/protocol/openid-connect/auth?client_id=rancher&response_type=code&redirect_uri=https://localhost:9443/verify-auth",
+			},
+		},
+		"with an API Host configured": {
+			beforeAuthConfig: map[string]any{
+				"metadata": map[string]any{
+					"name": "genericoidc",
+				},
+				"rancherApiHost": "https://example.com",
+				"clientId":       "rancher",
+				"rancherUrl":     "https://localhost:9443/verify-auth",
+				"authEndpoint":   "https://example.com/realms/rancher/protocol/openid-connect/auth",
+			},
+			want: map[string]any{
+				"id":                 "genericoidc",
+				"logoutAllEnabled":   false,
+				"logoutAllForced":    false,
+				"logoutAllSupported": false,
+				"redirectUrl":        "https://example.com/v1-oidc/genericoidc",
+			},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			p := OpenIDCProvider{}
+			transformed, err := p.TransformToAuthProvider(tt.beforeAuthConfig)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want, transformed)
+		})
+	}
 }
 
 // expiryIn is calculated inside the oauth2 library using time.Now, so we just compare the token is equal
