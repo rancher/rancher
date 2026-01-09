@@ -2,35 +2,35 @@ name: Validate
 on: [pull_request, push]
 jobs:
   validate:
-    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
-    container: registry.suse.com/bci/python:3.11
+    runs-on: runs-on,runner=8cpu-linux-x64,run-id=${{ github.run_id }}
     env:
-      GOLANG_CI_LINT_VERSION: v2.7.1
+      GOLANG_CI_LINT_VERSION: v2.7.2
       GOLANG_VERSION: '1.25'
     steps:
-      - name: Install dependencies
-        shell: bash
-        run: zypper install -y git awk
       - name: Git safe directory
         run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - name: Check Python version
-        run: |
-          python3 --version
-          python3 -m ensurepip --upgrade
       - name: Set up Go
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version: "${{ env.GOLANG_VERSION }}"
-      - name: Install Python and dependencies
-        run: |
-          pip3 install --upgrade pip
-          pip3 install tox flake8
-      - name: Install golangci-lint
+          cache: true
+      - name: Run golangci-lint
         uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9.2.0
         with:
           version: ${{ env.GOLANG_CI_LINT_VERSION }}
-          install-only: true
-      - name: Validate
+          args: -v
+          only-new-issues: true
+          skip-cache: false
+      - name: Set up Python
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install tox flake8
+      - name: Validate (modules and flake8)
         run: ./scripts/validate
