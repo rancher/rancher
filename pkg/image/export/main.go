@@ -34,7 +34,7 @@ func run(chartsPath string, imagesFromArgs []string, ociChartsPath string, ociRe
 
 	// Append AppCo artifacts if enabled
 	if strings.EqualFold(os.Getenv("ENABLE_APPCO_ARTIFACTS"), "true") {
-		appcoArtifacts, err := appco.CollectArtifacts(rancherVersion)
+		appcoArtifacts, err := appco.CollectArtifacts()
 		if err != nil {
 			return err
 		}
