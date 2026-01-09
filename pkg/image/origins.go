@@ -19,10 +19,11 @@ import (
 // by the team which owns the image.
 
 var OriginMap = map[string]string{
-	"aci-containers-controller":                               "https://github.com/noironetworks/aci-containers",
+	"ali-operator":                                            "https://github.com/rancher/ali-operator",
 	"aci-containers-host":                                     "https://github.com/noironetworks/aci-containers",
 	"appco-alertmanager":                                      "https://github.com/prometheus/alertmanager",
 	"appco-grafana":                                           "https://github.com/grafana/grafana",
+	"appco-kubernetes-cluster-autoscaler":                     "https://apps.rancher.io/applications/kubernetes-cluster-autoscaler",
 	"appco-k8s-sidecar":                                       "https://github.com/kiwigrid/k8s-sidecar",
 	"appco-kube-rbac-proxy":                                   "https://github.com/brancz/kube-rbac-proxy",
 	"appco-kube-state-metrics":                                "https://github.com/kubernetes/kube-state-metrics",
