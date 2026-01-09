@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/golang-jwt/jwt/v5"
@@ -35,10 +36,16 @@ import (
 )
 
 const (
-	Name          = "oidc"
-	UserType      = "user"
-	GroupType     = "group"
-	IDTokenCookie = "R_OIDC_ID"
+	Name                   = "oidc"
+	UserType               = "user"
+	GroupType              = "group"
+	IDTokenCookie          = "R_OIDC_ID"
+	pkceVerifierCookieName = "R_PKCE_VERIFIER"
+
+	// PKCES256 is a constant for the SHA256 PKCE Verification method.
+	PKCES256Method string = "S256"
+	// PKCEPlain is a constant for the Plain PKCE Verification method.
+	PKCESPlainMethod string = "plain"
 )
 
 type tokenManager interface {
@@ -96,6 +103,7 @@ func (o *OpenIDCProvider) CustomizeSchema(schema *types.Schema) {
 }
 
 func (o *OpenIDCProvider) AuthenticateUser(w http.ResponseWriter, req *http.Request, input any) (apiv3.Principal, []apiv3.Principal, string, error) {
+	logrus.Debug("Authenticating user")
 	login, ok := input.(*apiv3.OIDCLogin)
 	if !ok {
 		return apiv3.Principal{}, nil, "", fmt.Errorf("unexpected input type")
@@ -117,7 +125,7 @@ func (o *OpenIDCProvider) LoginUser(w http.ResponseWriter, req *http.Request, oa
 		}
 	}
 
-	userInfo, oauth2Token, idToken, err := o.getUserInfoFromAuthCode(req.Context(), config, oauthLoginInfo.Code, &userClaimInfo, "")
+	userInfo, oauth2Token, idToken, err := o.getUserInfoFromAuthCode(w, req, config, oauthLoginInfo.Code, &userClaimInfo, "")
 	if err != nil {
 		return userPrincipal, groupPrincipals, "", userClaimInfo, err
 	}
@@ -125,7 +133,7 @@ func (o *OpenIDCProvider) LoginUser(w http.ResponseWriter, req *http.Request, oa
 	userPrincipal.Me = true
 	groupPrincipals = o.getGroupsFromClaimInfo(userClaimInfo)
 
-	logrus.Debugf("OpenIDCProvider: loginuser: checking user's access to rancher")
+	logrus.Debug("OpenIDCProvider: loginuser: checking user's access to rancher")
 	allowed, err := o.UserMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipal.Name, groupPrincipals)
 	if err != nil {
 		return userPrincipal, groupPrincipals, "", userClaimInfo, err
@@ -202,19 +210,76 @@ func (o *OpenIDCProvider) GetPrincipal(principalID string, token accessor.TokenA
 
 func (o *OpenIDCProvider) TransformToAuthProvider(authConfig map[string]any) (map[string]any, error) {
 	p := common.TransformToAuthProvider(authConfig)
-	p[publicclient.OIDCProviderFieldRedirectURL] = o.getRedirectURL(authConfig)
+	redirectPath, err := o.getRedirectURL(authConfig)
+	if err != nil {
+		return nil, fmt.Errorf("creating OIDC login URL: %w", err)
+	}
+	logrus.Debugf("TransformToAuthProvider using URL %s", redirectPath)
+
+	p[publicclient.OIDCProviderFieldRedirectURL] = redirectPath
+
 	return p, nil
 }
 
-func (o *OpenIDCProvider) getRedirectURL(config map[string]any) string {
+type urlValues interface {
+	Add(_, _ string)
+	Encode() string
+}
+
+// GetOIDCRedirectionURL generates the URL to redirect to the provider.
+//
+// the Values can either be an `orderedValues` value or a url.Values.
+func GetOIDCRedirectionURL(config map[string]any, pkceVerifier string, values urlValues) string {
 	authURL, _ := FetchAuthURL(config)
 
-	return fmt.Sprintf(
-		"%s?client_id=%s&response_type=code&redirect_uri=%s",
-		authURL,
-		config["clientId"],
-		config["rancherUrl"],
-	)
+	values.Add("client_id", config["clientId"].(string))
+	values.Add("response_type", "code")
+
+	logrus.Debug("Checking for PKCE")
+	if pkceMethod, ok := config[client.GenericOIDCConfigFieldPKCEMethod]; ok {
+		if pkceVerifier != "" {
+			switch pkceMethod {
+			case PKCES256Method:
+				logrus.Debug("PKCE Enabled sending code_challenge and s256 code_challenge_method")
+				values.Add("code_challenge", oauth2.S256ChallengeFromVerifier(pkceVerifier))
+				values.Add("code_challenge_method", PKCES256Method)
+			case PKCESPlainMethod:
+				logrus.Debug("PKCE Enabled sending code_challenge and plain code_challenge_method")
+				values.Add("code_challenge", pkceVerifier)
+				values.Add("code_challenge_method", PKCESPlainMethod)
+			default:
+				logrus.Debug("PKCE NOT Enabled for redirect URL")
+			}
+		} else {
+			logrus.Debugf("PKCE requested but no verifier available")
+		}
+	} else {
+		logrus.Debug("PKCE - no configuration")
+	}
+
+	values.Add("redirect_uri", config["rancherUrl"].(string))
+
+	return fmt.Sprintf("%s?%s", authURL, values.Encode())
+}
+
+func (o *OpenIDCProvider) getRedirectURL(authConfig map[string]any) (string, error) {
+	name := authConfig["metadata"].(map[string]any)["name"].(string)
+	rancherAPIHost, ok := authConfig[client.GenericOIDCConfigFieldRancherAPIHost].(string)
+	// No API Host - no PKCE Redirection.
+	if !ok {
+		logrus.Debugf("OpenIDCProvider: No API Host - no PKCE Redirection")
+		authURL, _ := FetchAuthURL(authConfig)
+		return fmt.Sprintf(
+			"%s?client_id=%s&response_type=code&redirect_uri=%s",
+			authURL,
+			authConfig["clientId"],
+			authConfig["rancherUrl"],
+		), nil
+
+	}
+
+	// This redirects via the handler in pkg/auth/handler
+	return url.JoinPath(rancherAPIHost, "v1-oidc", name)
 }
 
 func (o *OpenIDCProvider) RefetchGroupPrincipals(principalID string, secret string) ([]apiv3.Principal, error) {
@@ -351,6 +416,11 @@ func (o *OpenIDCProvider) GetOIDCConfig() (*apiv3.OIDCConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode OidcConfig: %w", err)
 	}
+	if storedOidcConfig.PKCEMethod != "" {
+		logrus.Debugf("GetOIDCConfig PKCE Enabled for %s", o.Name)
+	} else {
+		logrus.Debugf("GetOIDCConfig PKCE IS NOT Enabled %s", o.Name)
+	}
 
 	if storedOidcConfig.PrivateKey != "" {
 		value, err := common.ReadFromSecret(o.Secrets, storedOidcConfig.PrivateKey, strings.ToLower(client.OIDCConfigFieldPrivateKey))
@@ -380,12 +450,13 @@ func (o *OpenIDCProvider) GetUserExtraAttributes(userPrincipal apiv3.Principal) 
 	return common.GetCommonUserExtraAttributes(userPrincipal)
 }
 
-func (o *OpenIDCProvider) getUserInfoFromAuthCode(ctx context.Context, config *apiv3.OIDCConfig, authCode string, claimInfo *ClaimInfo, userName string) (*oidc.UserInfo, *oauth2.Token, string, error) {
+func (o *OpenIDCProvider) getUserInfoFromAuthCode(rw http.ResponseWriter, req *http.Request, config *apiv3.OIDCConfig, authCode string, claimInfo *ClaimInfo, userName string) (*oidc.UserInfo, *oauth2.Token, string, error) {
+	logrus.Info("OpenIDCProvider: getUserInfoFromAuthCode")
 	var userInfo *oidc.UserInfo
 	var oauth2Token *oauth2.Token
 	var err error
 
-	updatedContext, err := AddCertKeyToContext(ctx, config.Certificate, config.PrivateKey)
+	updatedContext, err := AddCertKeyToContext(req.Context(), config.Certificate, config.PrivateKey)
 	if err != nil {
 		return userInfo, oauth2Token, "", err
 	}
@@ -397,9 +468,29 @@ func (o *OpenIDCProvider) getUserInfoFromAuthCode(ctx context.Context, config *a
 	oauthConfig := ConfigToOauthConfig(provider.Endpoint(), config)
 	var verifier = provider.Verifier(&oidc.Config{ClientID: config.ClientID})
 
-	oauth2Token, err = oauthConfig.Exchange(updatedContext, authCode, oauth2.SetAuthURLParam("scope", strings.Join(oauthConfig.Scopes, " ")))
+	opts := []oauth2.AuthCodeOption{
+		oauth2.SetAuthURLParam("scope", strings.Join(oauthConfig.Scopes, " ")),
+	}
+
+	if config.PKCEMethod != "" {
+		pkceVerifier := getPKCEVerifier(req)
+		if pkceVerifier != "" {
+			logrus.Debug("OpenIDCProvider: PKCE Enabled - sending verifier in token exchange")
+			opts = append(opts, oauth2.VerifierOption(pkceVerifier))
+			// We can delete the token as even if it fails, it will require a new
+			// token.
+			logrus.Debugf("OpenIDCProvider: PKCE Enabled - deleting the cookie")
+			deletePKCEVerifier(req, rw)
+		} else {
+			logrus.Debug("OpenIDCProvider: PKCE Enabled - but no cookie was available for verifier")
+		}
+	} else {
+		logrus.Debug("OpenIDCProvider: PKCE not Enabled - not sending verifier")
+	}
+
+	oauth2Token, err = oauthConfig.Exchange(updatedContext, authCode, opts...)
 	if err != nil {
-		return userInfo, oauth2Token, "", err
+		return userInfo, oauth2Token, "", fmt.Errorf("failed exchanging token: %w", err)
 	}
 
 	// Get the ID token.  The ID token should be there because we require the openid scope.
@@ -811,6 +902,36 @@ func getValueFromClaims[T any](idToken *oidc.IDToken, name string) (T, error) {
 	return claim, nil
 }
 
+func deletePKCEVerifier(req *http.Request, w http.ResponseWriter) {
+	isSecure := req.URL.Scheme == "https"
+	pkceCookie := &http.Cookie{
+		Name:    pkceVerifierCookieName,
+		Value:   "",
+		Secure:  isSecure,
+		Expires: time.Now().Add(time.Second * -10),
+	}
+
+	http.SetCookie(w, pkceCookie)
+}
+
+// TODO: Can this use SameSite: true?
+
+// SetPKCEVerifier sets Cookie with the PKCE Verification token which is needed
+// when the user's browser is redirected back to exchange the token.
+func SetPKCEVerifier(req *http.Request, w http.ResponseWriter, value string) {
+	isSecure := req.URL.Scheme == "https"
+	pkceCookie := &http.Cookie{
+		Name:     pkceVerifierCookieName,
+		Value:    value,
+		Secure:   isSecure,
+		Path:     "/",
+		HttpOnly: true,
+		Expires:  time.Now().Add(time.Minute * 10),
+	}
+
+	http.SetCookie(w, pkceCookie)
+}
+
 func setIDToken(req *http.Request, w http.ResponseWriter, token string) {
 	isSecure := req.URL.Scheme == "https"
 	tokenCookie := &http.Cookie{
@@ -823,11 +944,56 @@ func setIDToken(req *http.Request, w http.ResponseWriter, token string) {
 	http.SetCookie(w, tokenCookie)
 }
 
-func getIDToken(request *http.Request) string {
-	cookie, err := request.Cookie(IDTokenCookie)
+func getIDToken(req *http.Request) string {
+	cookie, err := req.Cookie(IDTokenCookie)
 	if err != nil {
 		return ""
 	}
 
 	return cookie.Value
+}
+
+func getPKCEVerifier(req *http.Request) string {
+	cookie, err := req.Cookie(pkceVerifierCookieName)
+	if err != nil {
+		return ""
+	}
+
+	return cookie.Value
+}
+
+// This is used instead of url.Values to avoid URL encoding the values.
+//
+// It implements a subset of the url.Values struct.
+type orderedValues []string
+
+// this will take a slice of pairs of strings and generate a non-encoded string
+// in the order they are added separated by &
+// e.g. []string{"testing","value","user","1"} == "testing=value&user=1"
+//
+// If an uneven number of elements is passed, the final one will be dropped.
+func (v orderedValues) Encode() string {
+	if len(v) == 0 {
+		return ""
+	}
+
+	var buf strings.Builder
+	for i := 0; i < len(v); i += 2 {
+		if len(v)-i < 2 {
+			break
+		}
+		k, v := v[i], v[i+1]
+		if buf.Len() > 0 {
+			buf.WriteByte('&')
+		}
+		buf.WriteString(k)
+		buf.WriteByte('=')
+		buf.WriteString(v)
+	}
+
+	return buf.String()
+}
+
+func (v *orderedValues) Add(key, value string) {
+	*v = append(*v, key, value)
 }
