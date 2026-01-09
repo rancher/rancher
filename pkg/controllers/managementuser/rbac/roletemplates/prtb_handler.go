@@ -81,19 +81,15 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 		return nil, nil
 	}
 
-	// Handle cluster role bindings for special permissions.
-	if err := p.reconcileClusterRoleBindings(prtb); err != nil {
-		return nil, fmt.Errorf("error reconciling ClusterRoleBindings for ProjectRoleTemplateBinding %s: %w", prtb.Name, err)
-	}
-
-	if err := p.reconcileBindings(prtb); err != nil {
-		return nil, fmt.Errorf("error reconciling RoleBindings for ProjectRoleTemplateBinding %s: %w", prtb.Name, err)
+	// Create bindings
+	if err := errors.Join(p.reconcileClusterRoleBindings(prtb), p.reconcileBindings(prtb)); err != nil {
+		return nil, err
 	}
 
 	// Ensure a service account impersonator exists on the cluster.
 	if prtb.UserName != "" {
 		if err := p.impersonationHandler.ensureServiceAccountImpersonator(prtb.UserName); err != nil {
-			return nil, fmt.Errorf("error deleting service account impersonator: %w", err)
+			return nil, fmt.Errorf("error ensuring service account impersonator for %s: %w", prtb.UserName, err)
 		}
 	}
 
@@ -166,7 +162,7 @@ func (p *prtbHandler) OnRemove(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 
 	if prtb.UserName != "" {
 		if err := p.impersonationHandler.deleteServiceAccountImpersonator(prtb.UserName); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to delete service account impersonator for %s: %w", prtb.UserName, err)
 		}
 	}
 
@@ -230,8 +226,9 @@ func (p *prtbHandler) deleteClusterRoleBindings(prtb *v3.ProjectRoleTemplateBind
 		}
 		// In the case where it is shared, only update the CRB with the ownership label removed
 		if crbOwnedByAnotherPRTB {
-			_, err = p.crbClient.Update(&crb)
-			returnError = errors.Join(returnError, err)
+			if _, err = p.crbClient.Update(&crb); err != nil {
+				returnError = errors.Join(returnError, fmt.Errorf("failed to update cluster role binding %s: %w", crb.Name, err))
+			}
 			continue
 		}
 
@@ -310,7 +307,6 @@ func (p *prtbHandler) buildNamespaceBindings(prtb *v3.ProjectRoleTemplateBinding
 			return nil, err
 		}
 		neededCRBs = append(neededCRBs, namespaceCreateCR, namespaceEditCR)
-
 	}
 
 	// check if any of the aggregated CR grant updatepsa permission
@@ -333,9 +329,8 @@ func (p *prtbHandler) buildNamespaceBindings(prtb *v3.ProjectRoleTemplateBinding
 				ResourceNames: []string{projectName},
 			},
 		})
-		_, err := p.crClient.Create(psaCR)
-		if err != nil && !apierrors.IsAlreadyExists(err) {
-			return nil, err
+		if _, err := p.crClient.Create(psaCR); err != nil && !apierrors.IsAlreadyExists(err) {
+			return nil, fmt.Errorf("failed to create namespace PSA cluster role %s: %w", psaCR.Name, err)
 		}
 
 		namespacePSACRB, err := rbac.BuildClusterRoleBindingFromRTB(prtb, psaCR.Name)
@@ -375,13 +370,13 @@ func (p *prtbHandler) ensureOnlyDesiredClusterRoleBindingsExists(crbs []*rbacv1.
 	// Search for the ClusterRoleBindings that are needed, all others should be removed.
 	for _, currentCRB := range currentCRBs.Items {
 		if desiredCRB, ok := desiredCRBs[currentCRB.Name]; ok {
-			if rbac.AreClusterRoleBindingContentsSame(&currentCRB, desiredCRB) {
+			if rbac.IsClusterRoleBindingContentSame(&currentCRB, desiredCRB) {
 				delete(desiredCRBs, desiredCRB.Name)
 				continue
 			}
 		}
 		// Subject and RoleRef can't be updated, so we need to delete and recreate them.
-		if err = p.crbClient.Delete(currentCRB.Name, &metav1.DeleteOptions{}); err != nil {
+		if err = rbac.DeleteResource(currentCRB.Name, p.crbClient); err != nil {
 			return err
 		}
 	}
@@ -394,7 +389,7 @@ func (p *prtbHandler) ensureOnlyDesiredClusterRoleBindingsExists(crbs []*rbacv1.
 		crb.Labels[rbac.AggregationFeatureLabel] = "true"
 		// It's possible the CRB was already created, so ignore AlreadyExists errors
 		if _, err := p.crbClient.Create(crb); err != nil && !apierrors.IsAlreadyExists(err) {
-			return err
+			return fmt.Errorf("failed to create cluster role binding %s: %w", crb.Name, err)
 		}
 	}
 	return nil
@@ -429,10 +424,10 @@ func (p *prtbHandler) ensureOnlyDesiredRoleBindingExists(desiredRB *rbacv1.RoleB
 	var matchingRB *rbacv1.RoleBinding
 	// Search for the RoleBindings that is needed, all others should be removed.
 	for _, currentRB := range currentRBs.Items {
-		if rbac.AreRoleBindingContentsSame(&currentRB, desiredRB) && matchingRB == nil {
+		if rbac.IsRoleBindingContentSame(&currentRB, desiredRB) && matchingRB == nil {
 			matchingRB = &currentRB
 		} else {
-			if err = p.rbClient.Delete(desiredRB.Namespace, currentRB.Name, &metav1.DeleteOptions{}); err != nil {
+			if err = rbac.DeleteNamespacedResource(desiredRB.Namespace, currentRB.Name, p.rbClient); err != nil {
 				return err
 			}
 		}
@@ -441,7 +436,7 @@ func (p *prtbHandler) ensureOnlyDesiredRoleBindingExists(desiredRB *rbacv1.RoleB
 	// If the desired RoleBinding doesn't exist, create it.
 	if matchingRB == nil {
 		if _, err := p.rbClient.Create(desiredRB); err != nil {
-			return err
+			return fmt.Errorf("failed to create role binding %s/%s: %w", desiredRB.Namespace, desiredRB.Name, err)
 		}
 	}
 	return nil
