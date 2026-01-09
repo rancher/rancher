@@ -9,6 +9,7 @@ import (
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 func NewPRTBValidator(management *config.ScaledContext) types.Validator {
@@ -24,6 +25,7 @@ func newValidator(management *config.ScaledContext, field string, context string
 		roleTemplateLister: management.Management.RoleTemplates("").Controller().Lister(),
 		field:              field,
 		context:            context,
+		crtbLister:         management.Management.ClusterRoleTemplateBindings("").Controller().Lister(),
 	}
 
 	return validator.validator
@@ -33,6 +35,7 @@ type validator struct {
 	roleTemplateLister v3.RoleTemplateLister
 	field              string
 	context            string
+	crtbLister         v3.ClusterRoleTemplateBindingLister
 }
 
 func (v *validator) validator(request *types.APIContext, schema *types.Schema, data map[string]interface{}) error {
@@ -68,6 +71,36 @@ func (v *validator) validator(request *types.APIContext, schema *types.Schema, d
 			"OR a group [groupId]/[groupPrincipalId]")
 	}
 
+	// check for duplicate crtb
+	if v.context == "cluster" && request.Method == http.MethodPost {
+		if clusterID, ok := data[client.ClusterRoleTemplateBindingFieldClusterID].(string); ok && clusterID != "" {
+			existingCRTBs, err := v.crtbLister.List(clusterID, labels.Everything())
+			if err != nil {
+				return err
+			}
+
+			for _, crtb := range existingCRTBs {
+				if crtb.RoleTemplateName != roleTemplateName {
+					continue
+				}
+
+				isDuplicate := (userID != "" && userID == crtb.UserName) ||
+					(userPrincipalID != "" && userPrincipalID == crtb.UserPrincipalName) ||
+					(groupID != "" && groupID == crtb.GroupName) ||
+					(groupPrincipalID != "" && groupPrincipalID == crtb.GroupPrincipalName)
+
+				if isDuplicate {
+					if crtb.DeletionTimestamp != nil {
+						// This handles the UI race condition where a binding is removed and re-added in the same "Save" operation.
+						// We ignore the conflict if the conflicting object is already being deleted.
+						continue
+					}
+					return httperror.NewAPIError(httperror.Conflict, "Cluster role template binding for this role already exists")
+				}
+			}
+		}
+
+	}
 	return nil
 }
 
