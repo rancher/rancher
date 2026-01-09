@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	mgmtcluster "github.com/rancher/rancher/pkg/cluster"
@@ -21,11 +20,13 @@ import (
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/taints"
 	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/sirupsen/logrus"
+
+	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/wrangler/v3/pkg/apply"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/yaml"
-	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -247,6 +248,21 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 		return nil, status, err
 	}
 
+	schedulingCustomization := &fleet.AgentSchedulingCustomization{}
+	if cluster.Spec.FleetAgentDeploymentCustomization != nil && cluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization != nil {
+		sc := cluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization
+		if sc.PodDisruptionBudget != nil {
+			schedulingCustomization.PodDisruptionBudget = &fleet.PodDisruptionBudgetSpec{}
+			schedulingCustomization.PodDisruptionBudget.MaxUnavailable = sc.PodDisruptionBudget.MaxUnavailable
+			schedulingCustomization.PodDisruptionBudget.MinAvailable = sc.PodDisruptionBudget.MinAvailable
+		}
+		if sc.PriorityClass != nil {
+			schedulingCustomization.PriorityClass = &fleet.PriorityClassSpec{}
+			schedulingCustomization.PriorityClass.PreemptionPolicy = sc.PriorityClass.PreemptionPolicy
+			schedulingCustomization.PriorityClass.Value = sc.PriorityClass.Value
+		}
+	}
+
 	// sort tolerations for consistent ordering to avoid unnecessary updates
 	sortTolerations(tolerations)
 
@@ -258,14 +274,15 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 			Annotations: annotations,
 		},
 		Spec: fleet.ClusterSpec{
-			KubeConfigSecret:          clientSecret,
-			KubeConfigSecretNamespace: cluster.Namespace,
-			AgentEnvVars:              mgmtCluster.Spec.AgentEnvVars,
-			AgentNamespace:            agentNamespace,
-			PrivateRepoURL:            h.getPrivateRepoURL(cluster, mgmtCluster),
-			AgentTolerations:          tolerations,
-			AgentAffinity:             agentAffinity,
-			AgentResources:            mgmtcluster.GetFleetAgentResourceRequirements(mgmtCluster),
+			KubeConfigSecret:             clientSecret,
+			KubeConfigSecretNamespace:    cluster.Namespace,
+			AgentEnvVars:                 mgmtCluster.Spec.AgentEnvVars,
+			AgentNamespace:               agentNamespace,
+			PrivateRepoURL:               h.getPrivateRepoURL(cluster, mgmtCluster),
+			AgentTolerations:             tolerations,
+			AgentAffinity:                agentAffinity,
+			AgentResources:               mgmtcluster.GetFleetAgentResourceRequirements(mgmtCluster),
+			AgentSchedulingCustomization: schedulingCustomization,
 		},
 	}), status, nil
 }
