@@ -8,8 +8,9 @@ import (
 const (
 	SccSecretName = "rancher-scc-telemetry"
 
-	archUnknown              = "unknown"
-	rancherProductIdentifier = "rancher"
+	archUnknown                   = "unknown"
+	rancherProductIdentifier      = "rancher"
+	rancherPrimeProductIdentifier = "rancher-prime"
 )
 
 // SccPayload represents the canonical golang implementation of `schemas/scc-RMSSubscription.json`
@@ -139,6 +140,11 @@ func GenerateSCCPayload(telG RancherManagerTelemetry) (*SccPayload, error) {
 		})
 	}
 
+	productIdentifier := rancherProductIdentifier
+	if telG.IsPrime() {
+		productIdentifier = rancherPrimeProductIdentifier
+	}
+
 	return &SccPayload{
 		Version:         telG.RancherVersion(),
 		FeatureFlags:    telG.FeatureFlags(),
@@ -149,7 +155,7 @@ func GenerateSCCPayload(telG RancherManagerTelemetry) (*SccPayload, error) {
 			ClusterUUID: telG.ClusterUUID(),
 			Version:     telG.RancherVersion(),
 			Arch:        archUnknown,
-			Product:     rancherProductIdentifier,
+			Product:     productIdentifier,
 			Git:         telG.RancherGitHash(),
 			ServerURL:   telG.ServerURL(),
 		},
