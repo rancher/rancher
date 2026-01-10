@@ -19,14 +19,14 @@ var (
 	annotations map[string]string
 )
 
-type provider struct {
+type mutator struct {
 	Enabled     bool              `json:"enabled"`
 	Annotations map[string]string `json:"annotations"`
 	Labels      map[string]string `json:"labels"`
 }
 
 func SetNamespaceOptions(s string) error {
-	var p provider
+	var p mutator
 
 	if err := json.Unmarshal([]byte(s), &p); err != nil {
 		return fmt.Errorf("failed marshalling namespace options: %w", err)
