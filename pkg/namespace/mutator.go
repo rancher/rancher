@@ -1,10 +1,6 @@
 package namespace
 
 import (
-	"encoding/json"
-	"fmt"
-	"maps"
-
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -15,33 +11,37 @@ const (
 )
 
 var (
-	labels      map[string]string
-	annotations map[string]string
+	mutator *Mutator
 )
 
-type mutator struct {
+type Mutator struct {
 	Enabled     bool              `json:"enabled"`
 	Annotations map[string]string `json:"annotations"`
 	Labels      map[string]string `json:"labels"`
 }
 
-func SetNamespaceOptions(s string) error {
-	var p mutator
-
-	if err := json.Unmarshal([]byte(s), &p); err != nil {
-		return fmt.Errorf("failed marshalling namespace options: %w", err)
+func (m *Mutator) Mutate(ns *corev1.Namespace) bool {
+	if !m.Enabled {
+		return false
 	}
 
-	if p.Enabled {
-		annotations = map[string]string{
-			AnnotationManagedNamespace: AnnotationManagedNamespceTrue,
-		}
-		maps.Copy(annotations, p.Annotations)
+	var updated bool
 
-		labels = p.Labels
+	if len(ns.Annotations) == 0 {
+		ns.Annotations = make(map[string]string, len(m.Annotations))
 	}
+	updated = copy(ns.Annotations, m.Annotations) || updated
 
-	return nil
+	if len(ns.Labels) == 0 {
+		ns.Labels = make(map[string]string, len(m.Labels))
+	}
+	updated = copy(ns.Labels, m.Labels) || updated
+
+	return updated
+}
+
+func SetMutator(m *Mutator) {
+	mutator = m
 }
 
 // Copy copies all key/value pairs in src adding them to dst and returns whether the dst map was updated. If a key
@@ -62,17 +62,9 @@ func copy[M1, M2 map[K]V, K comparable, V comparable](m1 M1, m2 M2) bool {
 
 // todo: how to handle overwriting existing labels and annotations
 func ApplyLabelsAndAnnotations(ns *corev1.Namespace) bool {
-	var updated bool
-
-	if ns.Annotations == nil && len(annotations) > 0 {
-		ns.Annotations = make(map[string]string, len(annotations))
+	if mutator == nil {
+		return false
 	}
-	updated = copy(ns.Annotations, annotations) || updated
 
-	if ns.Labels == nil && len(labels) > 0 {
-		ns.Labels = make(map[string]string, len(labels))
-	}
-	updated = copy(ns.Labels, labels) || updated
-
-	return updated
+	return mutator.Mutate(ns)
 }

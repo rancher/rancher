@@ -150,9 +150,17 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	}
 
 	if opts.RancherNamespaceOptions != "" {
-		if err := namespace.SetNamespaceOptions(opts.RancherNamespaceOptions); err != nil {
-			return nil, err
+		mutator := &namespace.Mutator{}
+		if err := json.Unmarshal([]byte(opts.RancherNamespaceOptions), mutator); err != nil {
+			return nil, fmt.Errorf("failed marshalling namespace options: %w", err)
 		}
+
+		if mutator.Annotations == nil {
+			mutator.Annotations = make(map[string]string, 1)
+		}
+		mutator.Annotations[namespace.AnnotationManagedNamespace] = namespace.AnnotationManagedNamespceTrue
+
+		namespace.SetMutator(mutator)
 	}
 
 	wranglerContext, err := wrangler.NewPrimaryContext(ctx, clientConfg, restConfig)
