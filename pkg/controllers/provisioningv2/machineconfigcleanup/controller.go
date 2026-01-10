@@ -6,6 +6,7 @@ import (
 
 	v3apis "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/capr/dynamicschema"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/fleet"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	image2 "github.com/rancher/rancher/pkg/image"
@@ -51,7 +52,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 //
 // The logic is triggered on every update to a ClusterRegistrationToken, as the job
 // requires the most recent token to run `kubectl` successfully.
-func (h *handler) onChange(key string, obj *v3apis.ClusterRegistrationToken) (_ *v3apis.ClusterRegistrationToken, err error) {
+func (h *handler) onChange(_ string, obj *v3apis.ClusterRegistrationToken) (_ *v3apis.ClusterRegistrationToken, err error) {
 	if obj == nil || obj.Namespace != "local" || obj.DeletionTimestamp != nil || obj.Status.Token == "" {
 		return obj, nil
 	}
@@ -66,17 +67,31 @@ func (h *handler) onChange(key string, obj *v3apis.ClusterRegistrationToken) (_ 
 	return obj, nil
 }
 
+// cleanupObjects returns the service account, cluster role+binding, config map, and cronjob required for periodically
+// cleaning up outdated and unowned machine configs. This handler is only registered if the features.ProvisioningV2
+// setting is true, but if features.RKE2 is false, the CRDs required for the cronjob script would not exist and the
+// script will fail. For the Harvester use case, features.ProvisioningV2 and features.RKE2 will be enabled, but
+// features.MCM will be disabled (and Harvester local does not have machine configs due to custom clusters), which is
+// why the "fleet-local" cluster is used for this cronjob as it should always exist (as opposed to "fleet-default",
+// which is absent for Harvester).
 func cleanupObjects(token string) []runtime.Object {
+	// Check features.ProvisioningV2 to be explicit, even though it's checked when registering.
+	if !features.ProvisioningV2.Enabled() || !features.RKE2.Enabled() {
+		return []runtime.Object{}
+	}
+
 	url := settings.ServerURL.Get()
 	ca := systemtemplate.CAChecksum()
 	image := image2.Resolve(settings.AgentImage.Get())
-	fleetNamespace := fleet.ClustersDefaultNamespace
+
+	// Use fleet-local namespace as it's guaranteed to exist.
+	namespace := fleet.ClustersLocalNamespace
 	prefix := "rke2-machineconfig-cleanup"
 
 	sa := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      prefix + "-sa",
-			Namespace: fleetNamespace,
+			Namespace: namespace,
 		},
 	}
 
@@ -111,7 +126,7 @@ func cleanupObjects(token string) []runtime.Object {
 			{
 				Kind:      "ServiceAccount",
 				Name:      sa.Name,
-				Namespace: fleetNamespace,
+				Namespace: namespace,
 			},
 		},
 		RoleRef: rbacv1.RoleRef{
@@ -124,7 +139,7 @@ func cleanupObjects(token string) []runtime.Object {
 	configMap := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      prefix + "-script",
-			Namespace: fleetNamespace,
+			Namespace: namespace,
 		},
 		Data: map[string]string{
 			"cleanup.sh": `#!/bin/bash
@@ -166,7 +181,7 @@ func cleanupObjects(token string) []runtime.Object {
 	cronJob := &batchv1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      prefix + "-cronjob",
-			Namespace: fleetNamespace,
+			Namespace: namespace,
 		},
 		Spec: batchv1.CronJobSpec{
 			Schedule: "5 0 * * *", // at 12:05am every day
