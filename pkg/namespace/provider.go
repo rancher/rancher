@@ -67,12 +67,12 @@ func ApplyLabelsAndAnnotations(ns *corev1.Namespace) bool {
 	if ns.Annotations == nil && len(annotations) > 0 {
 		ns.Annotations = make(map[string]string, len(annotations))
 	}
-	updated = updated || copy(ns.Annotations, annotations)
+	updated = copy(ns.Annotations, annotations) || updated
 
 	if ns.Labels == nil && len(labels) > 0 {
 		ns.Labels = make(map[string]string, len(labels))
 	}
-	updated = updated || copy(ns.Labels, labels)
+	updated = copy(ns.Labels, labels) || updated
 
 	return updated
 }
