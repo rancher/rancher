@@ -54,6 +54,11 @@ func (c Charts) FetchImages(imagesSet map[string]map[string]struct{}) error {
 	if err != nil {
 		return err
 	}
+
+	fmt.Printf("Loaded index file from %s\n", filepath.Join(c.Config.ChartsPath, "index.yaml"))
+	fmt.Printf("Index entries: %+v\n", index.Entries)
+	fmt.Printf("Rancher Version: %+v\n", c.Config.RancherVersion)
+
 	// Filter index entries based on their Rancher version constraint
 	var filteredVersions repo.ChartVersions
 	for _, versions := range index.Entries {
@@ -82,6 +87,9 @@ func (c Charts) FetchImages(imagesSet map[string]map[string]struct{}) error {
 			}
 		}
 	}
+
+	fmt.Printf("Filtered Versions: %+v\n", filteredVersions)
+
 	// Find values.yaml files in the tgz files of each chart, and check for images to add to imageSet
 	for _, version := range filteredVersions {
 		tgzPath := filepath.Join(c.Config.ChartsPath, version.URLs[0])

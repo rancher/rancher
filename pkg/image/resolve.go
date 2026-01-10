@@ -69,6 +69,8 @@ func GetArtifacts(
 ) ([]string, []string, error) {
 	imagesSet := make(map[string]map[string]struct{})
 
+	fmt.Println("Considering : ", osType)
+
 	chartsPathList := strings.Split(chartsPath, ",")
 	for _, chartPath := range chartsPathList {
 		exportConfig := ExportConfig{
@@ -82,6 +84,8 @@ func GetArtifacts(
 			return nil, nil, errors.Wrap(err, "failed to fetch images from charts")
 		}
 	}
+
+	fmt.Printf("After ChartsPathList imagesSet: %+v\n", imagesSet)
 
 	if ociChartsGitPaths != "" {
 		ociChartPaths := strings.Split(ociChartsGitPaths, ",")
@@ -119,6 +123,7 @@ func GetArtifacts(
 	}
 
 	convertMirroredImages(imagesSet)
+	fmt.Printf("imagesSet: %+v\n", imagesSet)
 
 	imagesList, imagesAndSourcesList := generateImageAndSourceLists(imagesSet)
 

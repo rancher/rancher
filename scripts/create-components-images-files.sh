@@ -23,6 +23,8 @@ fi
 
 CHARTS_DIRS="${CHARTS_DIRS:+${CHARTS_DIRS},}${CHART_REPO_DIR}"
 
+echo "CHART_DIRS"=$CHARTS_DIRS
+
 if [ ! -d $SMALL_FORK_REPO_DIR ]; then
     mkdir -p $SMALL_FORK_REPO_DIR
     git clone --branch main https://github.com/rancher/charts-small-fork $SMALL_FORK_REPO_DIR
