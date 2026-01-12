@@ -265,7 +265,7 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251103181224-f26f9409b101 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
-	k8s.io/controller-manager v0.0.0 // indirect
+	k8s.io/controller-manager v0.34.3 // indirect
 	k8s.io/gengo v0.0.0-20250130153323-76c5745d3511 // indirect
 	k8s.io/gengo/v2 v2.0.0-20250604051438-85fd79dbfd9f // indirect
 	k8s.io/kms v0.34.3 // indirect
@@ -400,7 +400,7 @@ require (
 	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	k8s.io/cluster-bootstrap v0.32.3 // indirect
+	k8s.io/cluster-bootstrap v0.34.3 // indirect
 	k8s.io/code-generator v0.34.3 // indirect
 	k8s.io/component-base v0.34.3 // indirect
 	k8s.io/component-helpers v0.34.3 // indirect
