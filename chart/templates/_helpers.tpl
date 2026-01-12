@@ -190,8 +190,8 @@ add below linux tolerations to workloads could be scheduled to those linux nodes
 {{- $userVersion := .Values.certmanager.version | default "" -}}
 {{- if $userVersion -}}
   {{- /* Only execute if version is actually provided and non-empty */ -}}
-  {{- if not (semverCompare ">= 0.0.0" $userVersion) -}}
-    {{- /* Invalid semver - this will catch parse errors */ -}}
+  {{- if not (semverCompare "> 0.0.0" $userVersion) -}}
+    {{- /* Invalid semver or semantically invalid (e.g. 0.0.0) - this will catch parse errors */ -}}
     {{- include "tpl.chart.warning" (printf "Value 'certmanager.version' (%s) is not a valid Semantic Version. Must be >= %s." $userVersion $requiredVersion) -}}
   {{- else if not (semverCompare (printf ">= %s" $requiredVersion) $userVersion) -}}
     {{- /* Valid semver but too old */ -}}
