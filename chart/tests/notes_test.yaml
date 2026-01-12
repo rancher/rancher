@@ -32,7 +32,7 @@ tests:
       - matchRegexRaw:
           pattern: ".*Please ensure cert-manager \\(>= 1\\.15\\.0\\) is installed.*"
 
-  - it: should show CRD not found warning when running in unit test context
+  - it: should show CRD not found warning when using letsEncrypt in unit test context
     set:
       ingress.tls.source: "letsEncrypt"
     asserts:
