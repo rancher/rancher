@@ -1,3 +1,8 @@
+// Package autoscaler handles the creation and lifecycle of downstream cluster-autoscaler deployments.
+// The actual scaling side effects are performed by the external autoscaler, which modifies
+// MachineDeployment objects via scale subresources.
+// See: https://github.com/rancher/webhook/blob/machinedeployment_scale_validating_webhook/pkg/resources/cluster.x-k8s.io/v1beta1/machinedeployment/Scale.md
+
 package autoscaler
 
 import (
