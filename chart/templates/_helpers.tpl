@@ -163,7 +163,7 @@ add below linux tolerations to workloads could be scheduled to those linux nodes
 {{ end -}}
 
 {{- define "rancher.certmanager.notes" -}}
-{{- if .Values.ingress.tls.source | eq "rancher" -}}
+{{- if or (eq .Values.ingress.tls.source "rancher") (eq .Values.ingress.tls.source "letsEncrypt") -}}
 {{- $requiredVersion := "1.15.0" -}}
 {{- $requiredCRD := "certificates.cert-manager.io" -}}
 {{- $crdVersion := "v1" -}}
