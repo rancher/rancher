@@ -1,3 +1,8 @@
+// Package autoscaler handles the creation and lifecycle of downstream cluster-autoscaler deployments.
+// The actual scaling side effects are performed by the external autoscaler, which modifies
+// MachineDeployment objects via scale subresources.
+// See: https://github.com/rancher/webhook/blob/machinedeployment_scale_validating_webhook/pkg/resources/cluster.x-k8s.io/v1beta1/machinedeployment/Scale.md
+
 package autoscaler
 
 import (
@@ -106,14 +111,6 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 
 	clients.CAPI.Cluster().OnChange(ctx, "autoscaler-mgr", h.OnChange)
 	clients.Fleet.HelmOp().OnChange(ctx, "autoscaler-status-sync", h.syncHelmOpStatus)
-
-	s := machineDeploymentReplicaOverrider{
-		clusterCache:     clients.Provisioning.Cluster().Cache(),
-		clusterClient:    clients.Provisioning.Cluster(),
-		capiClusterCache: clients.CAPI.Cluster().Cache(),
-	}
-
-	clients.CAPI.MachineDeployment().OnChange(ctx, "machinedeployment-replica-sync", s.syncMachinePoolReplicas)
 }
 
 // OnChange handles changes to CAPI clusters and manages autoscaler deployment.
