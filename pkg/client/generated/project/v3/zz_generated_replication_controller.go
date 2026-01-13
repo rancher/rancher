@@ -72,6 +72,7 @@ const (
 	ReplicationControllerFieldWorkloadAnnotations           = "workloadAnnotations"
 	ReplicationControllerFieldWorkloadLabels                = "workloadLabels"
 	ReplicationControllerFieldWorkloadMetrics               = "workloadMetrics"
+	ReplicationControllerFieldWorkloadRef                   = "workloadRef"
 )
 
 type ReplicationController struct {
@@ -142,6 +143,7 @@ type ReplicationController struct {
 	WorkloadAnnotations           map[string]string              `json:"workloadAnnotations,omitempty" yaml:"workloadAnnotations,omitempty"`
 	WorkloadLabels                map[string]string              `json:"workloadLabels,omitempty" yaml:"workloadLabels,omitempty"`
 	WorkloadMetrics               []WorkloadMetric               `json:"workloadMetrics,omitempty" yaml:"workloadMetrics,omitempty"`
+	WorkloadRef                   *WorkloadReference             `json:"workloadRef,omitempty" yaml:"workloadRef,omitempty"`
 }
 
 type ReplicationControllerCollection struct {

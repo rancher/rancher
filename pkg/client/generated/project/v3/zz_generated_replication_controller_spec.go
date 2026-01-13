@@ -51,6 +51,7 @@ const (
 	ReplicationControllerSpecFieldUid                           = "uid"
 	ReplicationControllerSpecFieldVolumes                       = "volumes"
 	ReplicationControllerSpecFieldWindowsOptions                = "windowsOptions"
+	ReplicationControllerSpecFieldWorkloadRef                   = "workloadRef"
 )
 
 type ReplicationControllerSpec struct {
@@ -103,4 +104,5 @@ type ReplicationControllerSpec struct {
 	Uid                           *int64                         `json:"uid,omitempty" yaml:"uid,omitempty"`
 	Volumes                       []Volume                       `json:"volumes,omitempty" yaml:"volumes,omitempty"`
 	WindowsOptions                *WindowsSecurityContextOptions `json:"windowsOptions,omitempty" yaml:"windowsOptions,omitempty"`
+	WorkloadRef                   *WorkloadReference             `json:"workloadRef,omitempty" yaml:"workloadRef,omitempty"`
 }
