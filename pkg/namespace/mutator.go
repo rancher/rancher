@@ -60,11 +60,23 @@ func copy[M1, M2 map[K]V, K comparable, V comparable](m1 M1, m2 M2) bool {
 	return updated
 }
 
-// todo: how to handle overwriting existing labels and annotations
 func ApplyLabelsAndAnnotations(ns *corev1.Namespace) bool {
 	if mutator == nil {
 		return false
 	}
 
 	return mutator.Mutate(ns)
+}
+
+func InjectValues(values map[string]any) map[string]any {
+	if values == nil {
+		values = make(map[string]any, 1)
+	}
+
+	values["rancherNamespaces"] = map[string]any{
+		"enabled":     mutator.Enabled,
+		"annotations": mutator.Annotations,
+		"labels":      mutator.Labels,
+	}
+	return values
 }
