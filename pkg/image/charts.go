@@ -168,7 +168,7 @@ func buildOCIChartURL(
 		"%s/%s:%s",
 		strings.TrimSuffix(ociRegistry, "/"),
 		version.Name,
-		version.Version,
+		strings.ReplaceAll(version.Version, "+", "_"), // Change plus (+) to underscore (_) because of Helm See https://github.com/helm/helm/issues/10166
 	)
 }
 
