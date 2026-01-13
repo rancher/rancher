@@ -452,7 +452,7 @@ func (s *Operations) getUpgradeCommand(repoNamespace, repoName string, body io.R
 	}
 
 	for _, chartUpgrade := range upgradeArgs.Charts {
-		cmd, err := s.getChartCommand(repoNamespace, repoName, chartUpgrade.ChartName, chartUpgrade.Version, true, chartUpgrade.Annotations, chartUpgrade.Values)
+		cmd, err := s.getChartCommand(repoNamespace, repoName, chartUpgrade.ChartName, chartUpgrade.Version, true, chartUpgrade.Annotations, namespaces.InjectValues(chartUpgrade.Values))
 		if err != nil {
 			return status, nil, err
 		}
@@ -788,7 +788,7 @@ func (s *Operations) getInstallCommand(repoNamespace, repoName string, body io.R
 	// and then the actual helm chart. So, we need a for loop and the last index of the array
 	// would be the main chart.
 	for _, chartInstall := range installArgs.Charts {
-		cmd, err := s.getChartCommand(repoNamespace, repoName, chartInstall.ChartName, chartInstall.Version, false, chartInstall.Annotations, chartInstall.Values)
+		cmd, err := s.getChartCommand(repoNamespace, repoName, chartInstall.ChartName, chartInstall.Version, false, chartInstall.Annotations, namespaces.InjectValues(chartInstall.Values))
 		if err != nil {
 			return status, nil, err
 		}
@@ -967,13 +967,17 @@ func (s *Operations) createNamespace(ctx context.Context, namespace, projectID s
 	if projectID != "" {
 		annotations["field.cattle.io/projectId"] = strings.ReplaceAll(projectID, "/", ":")
 	}
-	// We just always try to create an ignore the error. This is because you might have create but not get privileges
-	_, _ = client.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+
+	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        namespace,
 			Annotations: annotations,
 		},
-	}, metav1.CreateOptions{})
+	}
+	namespaces.ApplyLabelsAndAnnotations(ns)
+
+	// We just always try to create an ignore the error. This is because you might have create but not get privileges
+	_, _ = client.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 
 	if projectID == "" {
 		return client.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})
