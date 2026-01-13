@@ -357,6 +357,7 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 	// validate cluster does not reference an EKS cluster that is already backed by a Rancher cluster
 	name := eksConfig["displayName"]
 	region := eksConfig["region"]
+	amazonCredential, _ := eksConfig["amazonCredentialSecret"].(string)
 
 	// cluster client is being used instead of lister to avoid the use of an outdated cache
 	clusters, err := v.ClusterClient.List(metav1.ListOptions{})
@@ -372,6 +373,10 @@ func (v *Validator) validateEKSConfig(request *types.APIContext, cluster map[str
 			continue
 		}
 		if region != cluster.Spec.EKSConfig.Region {
+			continue
+		}
+		// Allow same name+region if using different AWS credentials (different accounts)
+		if amazonCredential != cluster.Spec.EKSConfig.AmazonCredentialSecret {
 			continue
 		}
 		return httperror.NewAPIError(httperror.InvalidBodyContent, fmt.Sprintf("cluster already exists for EKS cluster [%s] in region [%s]", name, region))
