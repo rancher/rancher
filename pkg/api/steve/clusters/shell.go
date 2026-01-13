@@ -125,6 +125,7 @@ func (s *shell) createPod(imageOverride string) *v1.Pod {
 			GenerateName: "dashboard-shell-",
 			Namespace:    s.namespace,
 		},
+		// TODO: Add PodSecurityContext when steve CreatePod is updated for non-root support
 		Spec: v1.PodSpec{
 			TerminationGracePeriodSeconds: new(int64),
 			RestartPolicy:                 v1.RestartPolicyNever,
@@ -171,6 +172,7 @@ func (s *shell) createPod(imageOverride string) *v1.Pod {
 					},
 					Image:           imageName,
 					ImagePullPolicy: v1.PullIfNotPresent,
+					// TODO: When PodSecurityContext can be used remove all except AllowPrivilegeEscalation
 					SecurityContext: &v1.SecurityContext{
 						RunAsUser:                &userId,
 						RunAsGroup:               &userId,
