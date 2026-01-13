@@ -1075,6 +1075,7 @@ func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, ima
 			GenerateName: "helm-operation-",
 			Namespace:    s.namespace,
 		},
+		// TODO: Add PodSecurityContext when steve CreatePod is updated for non-root support
 		Spec: corev1.PodSpec{
 			Volumes: []corev1.Volume{
 				{
@@ -1115,10 +1116,12 @@ func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, ima
 							ReadOnly:  true,
 						},
 					},
+					// TODO: When PodSecurityContext can be used remove all except AllowPrivilegeEscalation
 					SecurityContext: &corev1.SecurityContext{
 						RunAsUser:                &userId,
 						RunAsGroup:               &userId,
 						RunAsNonRoot:             &t,
+						ReadOnlyRootFilesystem:   &t,
 						AllowPrivilegeEscalation: &f,
 					},
 				},
