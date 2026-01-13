@@ -1,7 +1,6 @@
 package project_cluster
 
 import (
-	"context"
 	"fmt"
 
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -17,7 +16,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	v1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 const (
@@ -33,8 +31,8 @@ const (
 
 var crtbCreatorOwnerAnnotations = map[string]string{creatorOwnerBindingAnnotation: "true"}
 
-func deleteNamespace(controller string, nsName string, nsClient v1.NamespaceInterface) error {
-	ns, err := nsClient.Get(context.TODO(), nsName, metav1.GetOptions{})
+func deleteNamespace(controller string, nsName string, nsClient corev1.NamespaceClient) error {
+	ns, err := nsClient.Get(nsName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return nil
 	} else if err != nil {
@@ -42,7 +40,7 @@ func deleteNamespace(controller string, nsName string, nsClient v1.NamespaceInte
 	}
 	if ns.Status.Phase != v12.NamespaceTerminating {
 		logrus.Infof("[%s] Deleting namespace %s", controller, nsName)
-		err = nsClient.Delete(context.TODO(), nsName, metav1.DeleteOptions{})
+		err = nsClient.Delete(nsName, &metav1.DeleteOptions{})
 		if apierrors.IsNotFound(err) {
 			return nil
 		}
@@ -50,7 +48,7 @@ func deleteNamespace(controller string, nsName string, nsClient v1.NamespaceInte
 	return err
 }
 
-func reconcileResourceToNamespace(obj runtime.Object, controller string, nsName string, nsLister corev1.NamespaceCache, nsClient v1.NamespaceInterface) (runtime.Object, error) {
+func reconcileResourceToNamespace(obj runtime.Object, controller string, nsName string, nsLister corev1.NamespaceCache, nsClient corev1.NamespaceClient) (runtime.Object, error) {
 	return apisv3.NamespaceBackedResource.Do(obj, func() (runtime.Object, error) {
 		t, err := meta.TypeAccessor(obj)
 		if err != nil {
@@ -60,14 +58,14 @@ func reconcileResourceToNamespace(obj runtime.Object, controller string, nsName 
 		ns, _ := nsLister.Get(nsName)
 		if ns == nil {
 			logrus.Infof("[%v] Creating namespace %v", controller, nsName)
-			_, err := nsClient.Create(context.TODO(), &v12.Namespace{
+			_, err := nsClient.Create(&v12.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: nsName,
 					Annotations: map[string]string{
 						"management.cattle.io/system-namespace": "true",
 					},
 				},
-			}, metav1.CreateOptions{})
+			})
 			if err != nil {
 				return obj, fmt.Errorf("[%s] failed to create namespace for %s %s: %w", controller, t.GetKind(), nsName, err)
 			}
