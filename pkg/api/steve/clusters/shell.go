@@ -110,6 +110,12 @@ func (s *shell) contextAndClient(req *http.Request) (context.Context, user.Info,
 }
 
 func (s *shell) createPod(imageOverride string) *v1.Pod {
+	var (
+		f      = false
+		t      = true
+		userId = int64(1000)
+	)
+
 	imageName := imageOverride
 	if imageName == "" {
 		imageName = settings.FullShellImage()
@@ -165,6 +171,12 @@ func (s *shell) createPod(imageOverride string) *v1.Pod {
 					},
 					Image:           imageName,
 					ImagePullPolicy: v1.PullIfNotPresent,
+					SecurityContext: &v1.SecurityContext{
+						AllowPrivilegeEscalation: &f,
+						RunAsNonRoot:             &t,
+						RunAsUser:                &userId,
+						RunAsGroup:               &userId,
+					},
 				},
 			},
 		},
