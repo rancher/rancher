@@ -1065,9 +1065,8 @@ func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, ima
 	}
 
 	var (
-		f      = false
-		t      = true
-		userId = int64(1000)
+		f = false
+		t = true
 	)
 
 	pod := &corev1.Pod{
@@ -1118,8 +1117,8 @@ func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, ima
 					},
 					// TODO: When PodSecurityContext can be used remove all except AllowPrivilegeEscalation
 					SecurityContext: &corev1.SecurityContext{
-						RunAsUser:                &userId,
-						RunAsGroup:               &userId,
+						RunAsUser:                &settings.ShellImageUserId,
+						RunAsGroup:               &settings.ShellImageUserId,
 						RunAsNonRoot:             &t,
 						ReadOnlyRootFilesystem:   &t,
 						AllowPrivilegeEscalation: &f,

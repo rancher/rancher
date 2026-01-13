@@ -111,9 +111,8 @@ func (s *shell) contextAndClient(req *http.Request) (context.Context, user.Info,
 
 func (s *shell) createPod(imageOverride string) *v1.Pod {
 	var (
-		f      = false
-		t      = true
-		userId = int64(1000)
+		f = false
+		t = true
 	)
 
 	imageName := imageOverride
@@ -174,8 +173,8 @@ func (s *shell) createPod(imageOverride string) *v1.Pod {
 					ImagePullPolicy: v1.PullIfNotPresent,
 					// TODO: When PodSecurityContext can be used remove all except AllowPrivilegeEscalation
 					SecurityContext: &v1.SecurityContext{
-						RunAsUser:                &userId,
-						RunAsGroup:               &userId,
+						RunAsUser:                &settings.ShellImageUserId,
+						RunAsGroup:               &settings.ShellImageUserId,
 						RunAsNonRoot:             &t,
 						ReadOnlyRootFilesystem:   &t,
 						AllowPrivilegeEscalation: &f,
