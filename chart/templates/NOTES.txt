@@ -7,6 +7,7 @@
 {{- include "tpl.chart.deprecated" (list .Values.rancherImage ".Values.rancherImage" "Use `.Values.image.repository` & `.Values.image.registry` instead; if you used image name with Registry included you must split them up.") -}}
 {{- include "tpl.chart.replace" (list .Values.rancherImageTag ".Values.rancherImageTag" ".Values.image.tag") -}}
 {{- include "tpl.chart.replace" (list .Values.rancherImagePullPolicy ".Values.rancherImagePullPolicy" ".Values.image.pullPolicy") -}}
+{{- include "rancher.certmanager.notes" . -}}
 
 
 Rancher Server has been {{ $action }}. Rancher may take several minutes to fully initialize.

@@ -23,29 +23,6 @@ tests:
         nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
         nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
         nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
-- it: should set default annotations with cert-manager < 0.11.0 using capabilities
-  capabilities:
-    apiVersions:
-    - certmanager.k8s.io/v1alpha1
-  asserts:
-  - equal:
-      path: metadata.annotations
-      value:
-        certmanager.k8s.io/issuer: RELEASE-NAME-rancher
-        nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
-        nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
-        nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
-- it: should set default annotations with cert-manager < 0.11.0 using parameter
-  set:
-    certmanager.version: 0.9.0
-  asserts:
-  - equal:
-      path: metadata.annotations
-      value:
-        certmanager.k8s.io/issuer: RELEASE-NAME-rancher
-        nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
-        nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
-        nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
 - it: should disable the default nginx annotations
   set:
     ingress.includeDefaultExtraAnnotations: false
@@ -67,34 +44,6 @@ tests:
       value:
         cert-manager.io/issuer: RELEASE-NAME-rancher
         cert-manager.io/issuer-kind: Issuer
-        nginx.ingress.kubernetes.io/proxy-connect-timeout: "15"
-- it: should over write proxy-connect-timeout with cert-manager < 0.11.0 using capabilities
-  capabilities:
-    apiVersions:
-    - certmanager.k8s.io/v1alpha1
-  set:
-    ingress:
-      includeDefaultExtraAnnotations: false
-      extraAnnotations:
-        nginx.ingress.kubernetes.io/proxy-connect-timeout: "15"
-  asserts:
-  - equal:
-      path: metadata.annotations
-      value:
-        certmanager.k8s.io/issuer: RELEASE-NAME-rancher
-        nginx.ingress.kubernetes.io/proxy-connect-timeout: "15"
-- it: should over write proxy-connect-timeout with cert-manager < 0.11.0 using parameter
-  set:
-    certmanager.version: 0.9.0
-    ingress:
-      includeDefaultExtraAnnotations: false
-      extraAnnotations:
-        nginx.ingress.kubernetes.io/proxy-connect-timeout: "15"
-  asserts:
-  - equal:
-      path: metadata.annotations
-      value:
-        certmanager.k8s.io/issuer: RELEASE-NAME-rancher
         nginx.ingress.kubernetes.io/proxy-connect-timeout: "15"
 - it: should set source secret
   set:
@@ -126,42 +75,6 @@ tests:
         nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
         nginx.ingress.kubernetes.io/configuration-snippet: |
           more_set_input_headers "X-Forwarded-Host: host.example.com";
-- it: should set static X-Forwarded-Host header with cert-manager < 0.11.0 using capabilities
-  capabilities:
-    apiVersions:
-    - certmanager.k8s.io/v1alpha1
-  set:
-    hostname: host.example.com
-    ingress:
-      configurationSnippet: |
-        more_set_input_headers "X-Forwarded-Host: {{ .Values.hostname }}";
-  asserts:
-  - equal:
-      path: metadata.annotations
-      value:
-        certmanager.k8s.io/issuer: RELEASE-NAME-rancher
-        nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
-        nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
-        nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
-        nginx.ingress.kubernetes.io/configuration-snippet: |
-          more_set_input_headers "X-Forwarded-Host: host.example.com";
-- it: should set static X-Forwarded-Host header with cert-manager < 0.11.0 using parameter
-  set:
-    certmanager.version: 0.9.0
-    hostname: host.example.com
-    ingress:
-      configurationSnippet: |
-        more_set_input_headers "X-Forwarded-Host: {{ .Values.hostname }}";
-  asserts:
-  - equal:
-      path: metadata.annotations
-      value:
-        certmanager.k8s.io/issuer: RELEASE-NAME-rancher
-        nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
-        nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
-        nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
-        nginx.ingress.kubernetes.io/configuration-snippet: |
-          more_set_input_headers "X-Forwarded-Host: host.example.com";
 - it: should be able to set multiple lines using configurationSnippet with default cert-manager
   set:
     hostname: host.example.com
@@ -175,46 +88,6 @@ tests:
       value:
         cert-manager.io/issuer: RELEASE-NAME-rancher
         cert-manager.io/issuer-kind: Issuer
-        nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
-        nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
-        nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
-        nginx.ingress.kubernetes.io/configuration-snippet: |
-          more_set_input_headers "X-Forwarded-Host: host.example.com";
-          more_set_input_headers "foo: bar";
-- it: should be able to set multiple lines using configurationSnippet with cert-manager < 0.11.0 using capabilities
-  capabilities:
-    apiVersions:
-    - certmanager.k8s.io/v1alpha1
-  set:
-    hostname: host.example.com
-    ingress:
-      configurationSnippet: |
-        more_set_input_headers "X-Forwarded-Host: {{ .Values.hostname }}";
-        more_set_input_headers "foo: bar";
-  asserts:
-  - equal:
-      path: metadata.annotations
-      value:
-        certmanager.k8s.io/issuer: RELEASE-NAME-rancher
-        nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
-        nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
-        nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
-        nginx.ingress.kubernetes.io/configuration-snippet: |
-          more_set_input_headers "X-Forwarded-Host: host.example.com";
-          more_set_input_headers "foo: bar";
-- it: should be able to set multiple lines using configurationSnippet with cert-manager < 0.11.0 using parameter
-  set:
-    certmanager.version: 0.9.0
-    hostname: host.example.com
-    ingress:
-      configurationSnippet: |
-        more_set_input_headers "X-Forwarded-Host: {{ .Values.hostname }}";
-        more_set_input_headers "foo: bar";
-  asserts:
-  - equal:
-      path: metadata.annotations
-      value:
-        certmanager.k8s.io/issuer: RELEASE-NAME-rancher
         nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
         nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
         nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"

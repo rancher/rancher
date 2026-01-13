@@ -5,27 +5,6 @@
 {{ printf "%s/" $url }}
 {{- end -}}
 
-{{ define "tpl.chart.deprecated" -}}
-{{ $val := index . 0 -}}
-{{ $name := index . 1 -}}
-{{ $msg := "" -}}
-{{ if ge (len .) 3 -}}
-  {{ $msg = index . 2 -}}
-{{ end -}}
-{{ if $val -}}
-{{ printf "[WARNING] Deprecated: %s is deprecated and will be removed in a future release.%s\n" $name $msg | indent 0 }}
-{{ end -}}
-{{ end -}}
-
-{{ define "tpl.chart.replace" -}}
-{{ $val := index . 0 -}}
-{{ $old := index . 1 -}}
-{{ $new := index . 2 -}}
-{{ if $val -}}
-{{ printf "[WARNING] Deprecated: %s is deprecated. Please use %s instead.\n" $old $new | indent 0 }}
-{{ end -}}
-{{ end -}}
-
 {{/*
 Expand the name of the chart.
 */}}
@@ -183,9 +162,42 @@ add below linux tolerations to workloads could be scheduled to those linux nodes
   {{ end -}}
 {{ end -}}
 
-{{/*
-    Determine the registration mode, defaulting to online if not specified
-*/}}
-{{ define "registration.mode" -}}
-{{ default "online" .Values.registration.mode | quote }}
+{{- define "rancher.certmanager.notes" -}}
+{{- if or (eq .Values.ingress.tls.source "rancher") (eq .Values.ingress.tls.source "letsEncrypt") -}}
+{{- $requiredVersion := "1.15.0" -}}
+{{- $requiredCRD := "certificates.cert-manager.io" -}}
+{{- $crdVersion := "v1" -}}
+
+{{- $crd := (lookup "apiextensions.k8s.io/v1" "CustomResourceDefinition" "" $requiredCRD) -}}
+
+{{- if not $crd -}}
+{{- $msg := printf "Cert-manager dependency check failed. CRD '%s' not found. Please ensure cert-manager (>= %s) is installed. (Note: This is expected in template/dry-run mode)" $requiredCRD $requiredVersion -}}
+{{- include "tpl.chart.warning" $msg -}}
+{{- else -}}
+  {{- $hasV1 := false -}}
+  {{- range $crd.spec.versions -}}
+    {{- if and (eq .name $crdVersion) .served -}}
+      {{- $hasV1 = true -}}
+    {{- end -}}
+  {{- end -}}
+
+  {{- if not $hasV1 -}}
+    {{- $msg := printf "Cert-manager CRD '%s' found, but it does not support the required API version '%s'. This likely indicates an old cert-manager version. Minimum required version is %s." $requiredCRD $crdVersion $requiredVersion -}}
+    {{- include "tpl.chart.warning" $msg -}}
+  {{- end -}}
+{{- end -}}
+
+{{- $userVersion := .Values.certmanager.version | default "" -}}
+{{- if $userVersion -}}
+  {{- /* Only execute if version is actually provided and non-empty */ -}}
+  {{- if not (semverCompare "> 0.0.0" $userVersion) -}}
+    {{- /* Invalid semver or semantically invalid (e.g. 0.0.0) - this will catch parse errors */ -}}
+    {{- include "tpl.chart.warning" (printf "Value 'certmanager.version' (%s) is not a valid Semantic Version. Must be >= %s." $userVersion $requiredVersion) -}}
+  {{- else if not (semverCompare (printf ">= %s" $requiredVersion) $userVersion) -}}
+    {{- /* Valid semver but too old */ -}}
+    {{- $msg := printf "The user-provided cert-manager version (%s) is too old. Minimum required version is %s." $userVersion $requiredVersion -}}
+    {{- include "tpl.chart.warning" $msg -}}
+  {{- end -}}
+{{- end -}}
+{{- end -}}
 {{- end -}}

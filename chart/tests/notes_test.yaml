@@ -1,0 +1,62 @@
+suite: test NOTES.txt cert-manager warnings
+templates:
+  - NOTES.txt
+tests:
+  - it: should not warn when certmanager.version is not set
+    set:
+      ingress.tls.source: "rancher"
+      # certmanager.version is intentionally not set
+    asserts:
+      - notMatchRegexRaw:
+          pattern: ".*certmanager\\.version.*"
+      - notMatchRegexRaw:
+          pattern: ".*is too old.*"
+
+  - it: should not show cert-manager warnings when tls source is secret
+    set:
+      ingress.tls.source: "secret"
+    asserts:
+      - notMatchRegexRaw:
+          pattern: ".*Cert-manager.*"
+      - notMatchRegexRaw:
+          pattern: ".*\\[WARNING\\].*"
+
+  - it: should show CRD not found warning when running in unit test context
+    set:
+      ingress.tls.source: "rancher"
+    asserts:
+      - matchRegexRaw:
+          pattern: ".*\\[WARNING\\].*Cert-manager dependency check failed.*"
+      - matchRegexRaw:
+          pattern: ".*CRD 'certificates\\.cert-manager\\.io' not found.*"
+      - matchRegexRaw:
+          pattern: ".*Please ensure cert-manager \\(>= 1\\.15\\.0\\) is installed.*"
+
+  - it: should show CRD not found warning when using letsEncrypt in unit test context
+    set:
+      ingress.tls.source: "letsEncrypt"
+    asserts:
+      - matchRegexRaw:
+          pattern: ".*\\[WARNING\\].*Cert-manager dependency check failed.*"
+      - matchRegexRaw:
+          pattern: ".*CRD 'certificates\\.cert-manager\\.io' not found.*"
+      - matchRegexRaw:
+          pattern: ".*Please ensure cert-manager \\(>= 1\\.15\\.0\\) is installed.*"
+
+  - it: should warn when certmanager.version is too old
+    set:
+      ingress.tls.source: "rancher"
+      certmanager.version: "1.10.0"
+    asserts:
+      - matchRegexRaw:
+          pattern: ".*\\[WARNING\\].*user-provided cert-manager version.*is too old.*"
+      - matchRegexRaw:
+          pattern: ".*Minimum required version is 1\\.15\\.0.*"
+
+  - it: should not warn about version when certmanager.version is valid and recent
+    set:
+      ingress.tls.source: "rancher"
+      certmanager.version: "1.15.0"
+    asserts:
+      - notMatchRegexRaw:
+          pattern: ".*user-provided cert-manager version.*is too old.*"
