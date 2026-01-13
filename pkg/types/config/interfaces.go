@@ -24,7 +24,7 @@ type rbacInterface wrbac.Interface
 // coreInterface provides a reduced interface from the regular core.Interface
 // This prevents new caches being added unintentionally.
 type coreInterface struct {
-	factory *namespace.Factory
+	factory *namespace.WranglerFactory
 }
 
 // Secret provides access only for a downstream client.
