@@ -1063,6 +1063,13 @@ func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, ima
 		},
 		Data: secretData,
 	}
+
+	var (
+		f      = false
+		t      = true
+		userId = int64(1000)
+	)
+
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "helm-operation-",
@@ -1107,6 +1114,12 @@ func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, ima
 							MountPath: helmDataPath,
 							ReadOnly:  true,
 						},
+					},
+					SecurityContext: &corev1.SecurityContext{
+						RunAsUser:                &userId,
+						RunAsGroup:               &userId,
+						RunAsNonRoot:             &t,
+						AllowPrivilegeEscalation: &f,
 					},
 				},
 			},
