@@ -8,6 +8,8 @@ variable "dependency" {
   type    = any
   default = null
 }
+variable "docker_org_token_username" {}
+variable "docker_org_token_password" {}
 variable "ec2_instance_class" {}
 variable "volume_size" {}
 variable "iam_role" {}
