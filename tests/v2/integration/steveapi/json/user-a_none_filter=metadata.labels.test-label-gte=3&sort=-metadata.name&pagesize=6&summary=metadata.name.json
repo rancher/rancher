@@ -174,14 +174,14 @@
     {
       "actions": null,
       "apiVersion": "v1",
-      "id": "test-ns-4/test4",
+      "id": "test-ns-1/test4",
       "kind": "Secret",
       "links": {
-        "patch": "https://rancherurl/v1/secrets/test-ns-4/test4",
-        "remove": "https://rancherurl/v1/secrets/test-ns-4/test4",
-        "self": "https://rancherurl/v1/secrets/test-ns-4/test4",
-        "update": "https://rancherurl/v1/secrets/test-ns-4/test4",
-        "view": "https://rancherurl/api/v1/namespaces/test-ns-4/secrets/test4"
+        "patch": "https://rancherurl/v1/secrets/test-ns-1/test4",
+        "remove": "https://rancherurl/v1/secrets/test-ns-1/test4",
+        "self": "https://rancherurl/v1/secrets/test-ns-1/test4",
+        "update": "https://rancherurl/v1/secrets/test-ns-1/test4",
+        "view": "https://rancherurl/api/v1/namespaces/test-ns-1/secrets/test4"
       },
       "metadata": {
         "fields": [
@@ -195,7 +195,7 @@
           "test.cattle.io/steveapi": "nondeterministicid"
         },
         "name": "test4",
-        "namespace": "test-ns-4",
+        "namespace": "test-ns-1",
         "resourceVersion": "1000",
         "state": {
           "message": "Resource is always ready",
