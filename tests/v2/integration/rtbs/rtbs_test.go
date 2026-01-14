@@ -3,7 +3,6 @@ package integration
 import (
 	"strings"
 	"testing"
-	"time"
 
 	extnamespaces "github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/namespaces"
 	"github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/secrets"
@@ -375,37 +374,28 @@ func (p *RTBTestSuite) TestPermissionsCanBeRemoved() {
 	// Add namespace to first project
 	ns1 := addNamespaceToProject(project1)
 
-	// Helper function to check that namespaces are visible to the user
-	doNamespacesExist := func(namespaces ...*corev1.Namespace) bool {
-		nsList, err := extnamespaces.ListNamespaces(testUser, p.downstreamClusterID, metav1.ListOptions{})
-		require.NoError(p.T(), err)
-		for _, ns := range namespaces {
-			require.Contains(p.T(), nsList.Items, *ns)
-		}
-		return len(nsList.Items) == len(namespaces)
-	}
-
-	// Wait for user to see exactly 1 namespace
-	require.Eventually(p.T(), func() bool {
-		return doNamespacesExist(ns1)
-	}, 60*time.Second, 2*time.Second, "user should see exactly 1 namespace")
+	// Verify user can access namespace in first project
+	_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns1.Name)
+	require.NoError(p.T(), err)
 
 	// Add namespace to second project
 	ns2 := addNamespaceToProject(project2)
 
-	// Wait for user to see exactly 2 namespaces
-	require.Eventually(p.T(), func() bool {
-		return doNamespacesExist(ns1, ns2)
-	}, 60*time.Second, 2*time.Second, "user should see exactly 2 namespaces")
+	// Verify user can access namespace in both projects
+	_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns1.Name)
+	require.NoError(p.T(), err)
+	_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns2.Name)
+	require.NoError(p.T(), err)
 
 	// Remove user from second project
 	err = client.Management.ProjectRoleTemplateBinding.Delete(prtb2)
 	require.NoError(p.T(), err)
 
-	// Wait for user to see exactly 1 namespace again (lost access to second project)
-	require.Eventually(p.T(), func() bool {
-		return doNamespacesExist(ns1)
-	}, 60*time.Second, 2*time.Second, "user should see exactly 1 namespace after removal")
+	// Verify user can still access namespace in first project but not in second anymore
+	_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns1.Name)
+	require.NoError(p.T(), err)
+	_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns2.Name)
+	require.Error(p.T(), err)
 }
 
 func TestRTBTestSuite(t *testing.T) {
