@@ -6,8 +6,7 @@ import time
 from .common import random_str
 from .conftest import wait_until_available, wait_until, \
     cluster_and_client, user_project_client, \
-    kubernetes_api_client, wait_for, ClusterContext, \
-    user_cluster_client
+    kubernetes_api_client, wait_for, user_cluster_client
 
 
 def test_multi_user(admin_mc, user_mc):
@@ -515,71 +514,6 @@ def test_impersonation_passthrough(admin_mc, admin_cc, user_mc, user_factory,
         return response.status.allowed is True
 
     wait_for(_access_check2, fail_handler=lambda: "user1 does not have access")
-
-
-def test_permissions_can_be_removed(admin_cc, admin_mc, user_mc, request,
-                                    remove_resource, admin_pc_factory):
-    def create_project_and_add_user():
-        admin_pc_instance = admin_pc_factory()
-
-        prtb = admin_mc.client.create_project_role_template_binding(
-            userId=user_mc.user.id,
-            roleTemplateId="project-member",
-            projectId=admin_pc_instance.project.id,
-        )
-        remove_resource(prtb)
-        wait_until_available(user_mc.client, admin_pc_instance.project)
-        return admin_pc_instance, prtb
-
-    admin_pc1, _ = create_project_and_add_user()
-    admin_pc2, prtb2 = create_project_and_add_user()
-
-    def add_namespace_to_project(admin_pc):
-        def safe_remove(client, resource):
-            try:
-                client.delete(resource)
-            except ApiError:
-                pass
-
-        ns = admin_cc.client.create_namespace(name=random_str(),
-                                              projectId=admin_pc.project.id)
-        request.addfinalizer(lambda: safe_remove(admin_cc.client, ns))
-
-        def ns_active():
-            new_ns = admin_cc.client.reload(ns)
-            return new_ns.state == 'active'
-
-        wait_for(ns_active)
-
-    add_namespace_to_project(admin_pc1)
-
-    def new_user_cc(user_mc):
-        cluster, client = cluster_and_client('local', user_mc.client)
-        return ClusterContext(user_mc, cluster, client)
-
-    user_cc = new_user_cc(user_mc)
-    wait_for(lambda: ns_count(user_cc.client, 1), timeout=60)
-
-    add_namespace_to_project(admin_pc2)
-
-    user_cc = new_user_cc(user_mc)
-    wait_for(lambda: ns_count(user_cc.client, 2), timeout=60)
-    admin_mc.client.delete(prtb2)
-
-    def prtb_deleted():
-        prtbs = admin_mc.client.list_project_role_template_binding(
-            projectId=admin_pc2.project.id)
-        return prtb2.uuid not in [
-            prtb.uuid for prtb in prtbs]
-
-    wait_for(prtb_deleted, fail_handler="prtb not deleted", timeout=60)
-
-    user_cc = new_user_cc(user_mc)
-    wait_for(lambda: ns_count(user_cc.client, 1), timeout=120)
-
-
-def ns_count(client, count):
-    return len(client.list_namespace()) == count
 
 
 def test_appropriate_users_can_see_kontainer_drivers(user_factory):

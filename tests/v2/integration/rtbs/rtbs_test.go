@@ -3,6 +3,7 @@ package integration
 import (
 	"strings"
 	"testing"
+	"time"
 
 	extnamespaces "github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/namespaces"
 	"github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/secrets"
@@ -327,6 +328,84 @@ func (p *RTBTestSuite) TestCRTBRoleTemplateInheritance() {
 
 	_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, anotherNS.Name)
 	require.NoError(p.T(), err)
+}
+
+func (p *RTBTestSuite) TestPermissionsCanBeRemoved() {
+	subSession := p.session.NewSession()
+	defer subSession.Cleanup()
+
+	client, err := p.client.WithSession(subSession)
+	require.NoError(p.T(), err)
+
+	testUser, err := client.AsUser(p.testUser)
+	require.NoError(p.T(), err)
+
+	// Helper function to create a project and add the user as project-member
+	createProjectAndAddUser := func() (*management.Project, *management.ProjectRoleTemplateBinding) {
+		projectConfig := &management.Project{
+			ClusterID: p.downstreamClusterID,
+			Name:      namegen.AppendRandomString("test-project-"),
+		}
+
+		project, err := client.Management.Project.Create(projectConfig)
+		require.NoError(p.T(), err)
+
+		prtb, err := client.Management.ProjectRoleTemplateBinding.Create(&management.ProjectRoleTemplateBinding{
+			UserID:         p.testUser.ID,
+			RoleTemplateID: "project-member",
+			ProjectID:      project.ID,
+		})
+		require.NoError(p.T(), err)
+
+		return project, prtb
+	}
+
+	// Create two projects and add user to both
+	project1, _ := createProjectAndAddUser()
+	project2, prtb2 := createProjectAndAddUser()
+
+	// Helper function to add a namespace to a project
+	addNamespaceToProject := func(project *management.Project) *corev1.Namespace {
+		projectName := strings.Split(project.ID, ":")[1]
+		ns, err := extnamespaces.CreateNamespace(client, p.downstreamClusterID, projectName, namegen.AppendRandomString("testns-"), "{}", map[string]string{}, map[string]string{})
+		require.NoError(p.T(), err)
+		return ns
+	}
+
+	// Add namespace to first project
+	ns1 := addNamespaceToProject(project1)
+
+	// Helper function to check that namespaces are visible to the user
+	doNamespacesExist := func(namespaces ...*corev1.Namespace) bool {
+		nsList, err := extnamespaces.ListNamespaces(testUser, p.downstreamClusterID, metav1.ListOptions{})
+		require.NoError(p.T(), err)
+		for _, ns := range namespaces {
+			require.Contains(p.T(), nsList.Items, *ns)
+		}
+		return len(nsList.Items) == len(namespaces)
+	}
+
+	// Wait for user to see exactly 1 namespace
+	require.Eventually(p.T(), func() bool {
+		return doNamespacesExist(ns1)
+	}, 60*time.Second, 2*time.Second, "user should see exactly 1 namespace")
+
+	// Add namespace to second project
+	ns2 := addNamespaceToProject(project2)
+
+	// Wait for user to see exactly 2 namespaces
+	require.Eventually(p.T(), func() bool {
+		return doNamespacesExist(ns1, ns2)
+	}, 60*time.Second, 2*time.Second, "user should see exactly 2 namespaces")
+
+	// Remove user from second project
+	err = client.Management.ProjectRoleTemplateBinding.Delete(prtb2)
+	require.NoError(p.T(), err)
+
+	// Wait for user to see exactly 1 namespace again (lost access to second project)
+	require.Eventually(p.T(), func() bool {
+		return doNamespacesExist(ns1)
+	}, 60*time.Second, 2*time.Second, "user should see exactly 1 namespace after removal")
 }
 
 func TestRTBTestSuite(t *testing.T) {
