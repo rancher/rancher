@@ -6,7 +6,6 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -128,16 +127,15 @@ func TestHandler(t *testing.T) {
 		},
 	}
 
-	err := namespace.SetNamespaceOptions(`{
-		"enabled": true,
-		"annotations": {
-			"foo": "bar"
+	namespace.SetMutator(&namespace.Mutator{
+		Enabled: true,
+		Annotations: map[string]string{
+			"foo": "bar",
 		},
-		"labels": {
-			"foo": "bar"
-		}
-	}`)
-	require.NoError(t, err)
+		Labels: map[string]string{
+			"foo": "bar",
+		},
+	})
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
