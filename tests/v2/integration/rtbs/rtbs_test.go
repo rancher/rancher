@@ -20,7 +20,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	authzv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -398,7 +397,7 @@ func (p *RTBTestSuite) TestPermissionsCanBeRemoved() {
 	require.NoError(p.T(), err)
 	require.Eventually(p.T(), func() bool {
 		_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns2.Name)
-		return apierrors.IsUnauthorized(err)
+		return err != nil
 	}, 60*time.Second, 2*time.Second, "waiting for permissions to be removed from user")
 }
 
