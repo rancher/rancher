@@ -2,7 +2,7 @@ name: FOSSA Scanning
 
 on:
   push:
-    branches: ["main", "release/**"]
+    branches: ["main", "master", "release/**"]
   workflow_dispatch:
 
 permissions:
@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 30
     steps:
     - name: Checkout
-      uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
 
     # The FOSSA token is shared between all repos in Rancher's GH org. It can be
     # used directly and there is no need to request specific access to EIO.
