@@ -2,7 +2,6 @@ package managementstored
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/rancher/norman/store/crd"
 	"github.com/rancher/norman/store/proxy"
@@ -48,7 +47,7 @@ import (
 )
 
 func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager *clustermanager.Manager,
-	k8sProxy http.Handler, localClusterEnabled bool) error {
+	localClusterEnabled bool) error {
 	// Here we setup all types that will be stored in the Management cluster
 	schemas := apiContext.Schemas
 
@@ -94,7 +93,7 @@ func Setup(ctx context.Context, apiContext *config.ScaledContext, clusterManager
 
 	tokenAuthenticator := requests.NewAuthenticator(ctx, clusterrouter.GetClusterID, apiContext)
 
-	Clusters(ctx, schemas, apiContext, clusterManager, k8sProxy, tokenAuthenticator)
+	Clusters(ctx, schemas, apiContext, clusterManager, tokenAuthenticator)
 	ClusterRoleTemplateBinding(schemas, apiContext)
 	SecretTypes(ctx, schemas, apiContext)
 	Setting(schemas)
@@ -151,12 +150,12 @@ func setupScopedTypes(schemas *types.Schemas, management *config.ScaledContext) 
 	}
 }
 
-func Clusters(ctx context.Context, schemas *types.Schemas, managementContext *config.ScaledContext, clusterManager *clustermanager.Manager, k8sProxy http.Handler, authToken requests.AuthTokenGetter) {
+func Clusters(ctx context.Context, schemas *types.Schemas, managementContext *config.ScaledContext, clusterManager *clustermanager.Manager, authToken requests.AuthTokenGetter) {
 	schema := schemas.Schema(&managementschema.Version, client.ClusterType)
 	clusterFormatter := ccluster.NewFormatter(schemas, managementContext)
 	schema.Formatter = clusterFormatter.Formatter
 	schema.CollectionFormatter = clusterFormatter.CollectionFormatter
-	clusterStore := cluster.GetClusterStore(schema, managementContext, clusterManager, k8sProxy)
+	clusterStore := cluster.GetClusterStore(schema, managementContext)
 	schema.Store = clusterStore
 
 	handler := ccluster.ActionHandler{
