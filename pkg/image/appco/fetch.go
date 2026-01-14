@@ -4,13 +4,13 @@ import (
 	img "github.com/rancher/rancher/pkg/image"
 )
 
-func CollectArtifacts(rancherVersion string) ([]string, error) {
+func CollectArtifacts() ([]string, error) {
 	artifacts, err := loadArtifacts()
 	if err != nil {
 		return nil, err
 	}
 
-	allowed, err := loadAppCoAllowList(rancherVersion)
+	allowed, err := loadAppCoAllowList()
 	if err != nil {
 		return nil, err
 	}
