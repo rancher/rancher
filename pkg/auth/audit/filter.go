@@ -24,14 +24,16 @@ func NewFilter(filter auditlogv1.Filter) (*Filter, error) {
 	}, nil
 }
 
-func (m *Filter) Allowed(requestUri string) bool {
-	if m.uri.MatchString(requestUri) {
-		return m.action == auditlogv1.FilterActionAllow
+// Allowed returns the filter action if the regex matches, otherwise Unknown.
+// Unknown means "this filter does not apply to the request URI".
+func (m *Filter) Allowed(requestURI string) auditlogv1.FilterAction {
+	if m.uri.MatchString(requestURI) {
+		return m.action
 	}
 
-	return false
+	return auditlogv1.FilterActionUnknown
 }
 
-func (m *Filter) LogAllowed(log *logEntry) bool {
+func (m *Filter) LogAllowed(log *logEntry) auditlogv1.FilterAction {
 	return m.Allowed(log.RequestURI)
 }
