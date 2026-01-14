@@ -20,6 +20,7 @@ import (
 
 var OriginMap = map[string]string{
 	"ali-operator":                                            "https://github.com/rancher/ali-operator",
+	"aci-containers-controller":                               "https://github.com/noironetworks/aci-containers",
 	"aci-containers-host":                                     "https://github.com/noironetworks/aci-containers",
 	"appco-alertmanager":                                      "https://github.com/prometheus/alertmanager",
 	"appco-grafana":                                           "https://github.com/grafana/grafana",
