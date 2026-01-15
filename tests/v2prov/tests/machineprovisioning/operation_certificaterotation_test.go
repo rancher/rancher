@@ -1,7 +1,6 @@
 package machineprovisioning
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
 
 	provisioningv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
@@ -9,6 +8,7 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/cluster"
 	"github.com/rancher/rancher/tests/v2prov/defaults"
 	"github.com/rancher/rancher/tests/v2prov/operations"
+	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
