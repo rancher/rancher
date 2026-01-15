@@ -16,7 +16,7 @@ spec:
 {{ include "rancher.gateway.parentRefs" (list . "http") | indent 4 }}
     {{- end }}
   hostnames:
-    - {{ template "rancher.hostname" . }}
+    - {{ .Values.hostname }}
   rules:
     - matches:
         - path:

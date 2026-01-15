@@ -1,7 +1,3 @@
-{{- define "rancher.hostname" }}
-{{- required "hostname is required - please set .Values.hostname to the domain where Rancher will be accessed" .Values.hostname | quote }}
-{{- end }}
-
 {{/*
 Check if TLS for rancher terminates external or local to k8s cluster
 */}}
