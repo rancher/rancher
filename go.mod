@@ -120,7 +120,7 @@ require (
 	github.com/prometheus/client_golang v1.22.0
 	github.com/prometheus/client_model v0.6.1
 	github.com/rancher/aks-operator v1.12.4
-	github.com/rancher/apiserver v0.6.5
+	github.com/rancher/apiserver v0.6.6
 	github.com/rancher/channelserver v0.7.0
 	github.com/rancher/dynamiclistener v0.7.0
 	github.com/rancher/eks-operator v1.12.4
@@ -135,7 +135,7 @@ require (
 	github.com/rancher/remotedialer v0.5.1
 	github.com/rancher/rke v1.8.0
 	github.com/rancher/shepherd v0.0.0-20251216155458-c158387c2140
-	github.com/rancher/steve v0.6.49
+	github.com/rancher/steve v0.6.51
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20250710162344-185ff9f785cd
 	github.com/rancher/wrangler v1.1.2
 	github.com/rancher/wrangler/v3 v3.2.4

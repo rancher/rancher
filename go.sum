@@ -647,8 +647,8 @@ github.com/prometheus/procfs v0.15.1 h1:YagwOFzUgYfKKHX6Dr+sHT7km/hxC76UB0leargg
 github.com/prometheus/procfs v0.15.1/go.mod h1:fB45yRUv8NstnjriLhBQLuOUt+WW4BsoGhij/e3PBqk=
 github.com/rancher/aks-operator v1.12.4 h1:/DGkSZAzeddVoEVnt7I6hDp7omIHQfeFkW5zK9FO504=
 github.com/rancher/aks-operator v1.12.4/go.mod h1:6oWMtHtdfb/mHZ7cx/zM1Ce1X1wE5SlRUNd1+w3MMN0=
-github.com/rancher/apiserver v0.6.5 h1:ksnAAL4vpMbONTmkHyBZ+W6A+lj6bjHvQp5SzZlLf38=
-github.com/rancher/apiserver v0.6.5/go.mod h1:9b/n58YT7S8bMFEyr1v7xzL72qwZKQQJK2Ir6lMT8Yk=
+github.com/rancher/apiserver v0.6.6 h1:zY3Q1a1Nm+shWV8IZOKEIoJwsE/NV2HE7hy9BzPxcnI=
+github.com/rancher/apiserver v0.6.6/go.mod h1:o4ec3Bqe0MpvgyYvDkv9bM0Om7oF1COXgKJOc37zhXY=
 github.com/rancher/channelserver v0.7.0 h1:ZN5o8aD4mD31uhjEEW2e9yQXa3eOb+4Cp6DcWm7W/Lc=
 github.com/rancher/channelserver v0.7.0/go.mod h1:Mwd7hlMSu9X4FnZKj+0mA5ak8nTyJZtZsVX33G62Gzc=
 github.com/rancher/dynamiclistener v0.7.0 h1:+jyfZ4lVamc1UbKWo8V8dhSPtCgRZYaY8nm7wiHeko4=
@@ -681,8 +681,8 @@ github.com/rancher/saml v0.4.14-rancher3 h1:2NN6cPqm9FJeiT25x8+gLHWGdulsEak33cHR
 github.com/rancher/saml v0.4.14-rancher3/go.mod h1:S4+611dxnKt8z/ulbvaJzcgSHsuhjVc1QHNTcr1R7Fw=
 github.com/rancher/shepherd v0.0.0-20251216155458-c158387c2140 h1:yPRnnvt4GZJIN5bsWgLJBLZaFZs/smS55s1743bXxyc=
 github.com/rancher/shepherd v0.0.0-20251216155458-c158387c2140/go.mod h1:f79PzzjS7z3CBSAIMA1sqoJgHKTtTJlyH11KXTw3U1E=
-github.com/rancher/steve v0.6.49 h1:3KN3dgL4BEy5sNRmcgxFAXf35fgNIPBqZaIdnZbQVO0=
-github.com/rancher/steve v0.6.49/go.mod h1:UPZYk9YeXS4F14RVAKUX/DqGQqK2Gh3BRfrgWJffmJc=
+github.com/rancher/steve v0.6.51 h1:rxhK8JcB9k/lmzKLOxaGjka2Pa6sYdI+3zR8XfeQ/g0=
+github.com/rancher/steve v0.6.51/go.mod h1:UgxXTbIX88LVaaCTTxhDIBm1Gsja9CcYIz2FPittC04=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20250710162344-185ff9f785cd h1:M3oVcVktMhNk8l3ZRW94kroqzWzE/VGbZfLw/F0rw5Y=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20250710162344-185ff9f785cd/go.mod h1:VfRrgue4yl6O0GYakMGYgyByu7ySooPQWWRxTt2MIEI=
 github.com/rancher/wrangler v1.1.2 h1:oXbXo9k7y/H4drUpb4RM1c++vT9O3rpoNEfyusGykiU=
