@@ -3,7 +3,7 @@ package v1
 import (
 	"github.com/rancher/wrangler/v3/pkg/genericcondition"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 type RKEClusterSpec struct {
@@ -32,7 +32,7 @@ type RKEClusterStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:path=rkeclusters,scope=Namespaced,categories=cluster-api
 // +kubebuilder:subresource:status
-// +kubebuilder:metadata:labels={"cluster.x-k8s.io/v1beta1=v1","auth.cattle.io/cluster-indexed=true"}
+// +kubebuilder:metadata:labels={"cluster.x-k8s.io/v1beta1=v1","cluster.x-k8s.io/v1beta2=v1","auth.cattle.io/cluster-indexed=true"}
 
 // RKECluster represents the InfraCluster resource required by Cluster API
 // to provide the necessary infrastructure prerequisites for running machines.
