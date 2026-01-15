@@ -79,7 +79,8 @@ networkExposure:
 ingress:
   # If set to false, ingress will not be created
   # Defaults to true; options: true, false
-  enabled: true  # Will be overridden based on networkExposure.type
+  # Note: Ingress is only created when BOTH this is true AND networkExposure.type is 'ingress'
+  enabled: true
   includeDefaultExtraAnnotations: true
   extraAnnotations: {}
   ingressClassName: ""
@@ -104,7 +105,7 @@ gateway:
   createGateway: true  # Set false to use an existing Gateway resource; must be properly configured
   gatewayClass: # Used when createGateway is set to true
     name: "traefik" # Set to the Gateway class name (k3s/rke2: traefik)
-    ports: # Must match the GatewayClass's configured entryoints
+    ports: # Must match the GatewayClass's configured entrypoints
       http: 8000  # k3s Traefik defaults to web entrypoint to 8000
       https: 8443 # k3s Traefik defaults to websecure entrypoint to 8443
     additionalListeners: {} # Additional listener configs; Only used when createGateway=true
