@@ -488,7 +488,7 @@ COPY --from=rke2-charts /var/lib/rancher-data/local-catalogs/v2/rancher-rke2-cha
 COPY --from=kdm /var/lib/rancher-data/driver-metadata/data.json /var/lib/rancher-data/driver-metadata/data.json
 COPY --from=tini /usr/bin/tini /usr/bin/
 COPY --from=agent-build /app/agent /usr/bin/
-COPY package/loglevel package/run.sh package/kubectl-shell.sh package/shell-setup.sh /usr/bin/
+COPY package/loglevel package/run.sh /usr/bin/
 WORKDIR /var/lib/rancher
 
 LABEL "io.artifacthub.package.logo-url"="https://raw.githubusercontent.com/rancher/ui/master/public/assets/images/logos/welcome-cow.svg" \

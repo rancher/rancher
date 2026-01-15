@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"fmt"
-	"net/http"
 	"reflect"
 	"strconv"
 	"strings"
@@ -14,10 +13,8 @@ import (
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/types/values"
-	ccluster "github.com/rancher/rancher/pkg/api/norman/customization/cluster"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	managementv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
-	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterprovisioner"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterstatus"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -29,7 +26,6 @@ import (
 
 type Store struct {
 	types.Store
-	ShellHandler          types.RequestHandler
 	mu                    sync.Mutex
 	KontainerDriverLister v3.KontainerDriverLister
 	ClusterClient         dynamic.ResourceInterface
@@ -79,7 +75,7 @@ func (t *transformer) transposeGenericConfigToDynamicField(data map[string]inter
 	return data, nil
 }
 
-func GetClusterStore(schema *types.Schema, mgmt *config.ScaledContext, clusterManager *clustermanager.Manager, k8sProxy http.Handler) *Store {
+func GetClusterStore(schema *types.Schema, mgmt *config.ScaledContext) *Store {
 
 	transformer := transformer{
 		KontainerDriverLister: mgmt.Management.KontainerDrivers("").Controller().Lister(),
@@ -90,15 +86,9 @@ func GetClusterStore(schema *types.Schema, mgmt *config.ScaledContext, clusterMa
 		Transformer: transformer.TransformerFunc,
 	}
 
-	linkHandler := &ccluster.ShellLinkHandler{
-		Proxy:          k8sProxy,
-		ClusterManager: clusterManager,
-	}
-
 	s := &Store{
 		Store:                 t,
 		KontainerDriverLister: mgmt.Management.KontainerDrivers("").Controller().Lister(),
-		ShellHandler:          linkHandler.LinkHandler,
 	}
 
 	dynamicClient, err := dynamic.NewForConfig(&mgmt.RESTConfig)
@@ -113,12 +103,6 @@ func GetClusterStore(schema *types.Schema, mgmt *config.ScaledContext, clusterMa
 }
 
 func (r *Store) ByID(apiContext *types.APIContext, schema *types.Schema, id string) (map[string]interface{}, error) {
-	// Really we want a link handler but the URL parse makes it impossible to add links to clusters for now.  So this
-	// is basically a hack
-	if apiContext.Query.Get("shell") == "true" {
-		return nil, r.ShellHandler(apiContext, nil)
-	}
-
 	return r.Store.ByID(apiContext, schema, id)
 }
 

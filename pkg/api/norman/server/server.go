@@ -25,7 +25,7 @@ func New(ctx context.Context, scaledContext *config.ScaledContext, clusterManage
 	subscribe.Register(&clusterSchema.Version, scaledContext.Schemas)
 	subscribe.Register(&projectSchema.Version, scaledContext.Schemas)
 
-	if err := managementstored.Setup(ctx, scaledContext, clusterManager, k8sProxy, localClusterEnabled); err != nil {
+	if err := managementstored.Setup(ctx, scaledContext, clusterManager, localClusterEnabled); err != nil {
 		return nil, err
 	}
 
