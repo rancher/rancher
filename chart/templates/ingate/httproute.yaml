@@ -8,23 +8,12 @@ metadata:
 {{ include "rancher.labels" . | indent 4 }}
 spec:
   parentRefs:
-    {{- if .Values.gateway.createGateway }}
-    # If we're creating our own gateway, reference it in the same namespace
-    - name: {{ include "rancher.gateway" . }}
-      namespace: {{ .Release.Namespace }}
-      sectionName: rancher-http
-    - name: {{ include "rancher.gateway" . }}
-      namespace: {{ .Release.Namespace }}
-      sectionName: rancher-https
+    {{- if eq (include "rancher.useExternalTls" .) "false" }}
+    # TLS terminates at k8s: attach to HTTPS listeners (redirect route handles HTTP)
+{{ include "rancher.gateway.parentRefs" (list . "https") | indent 4 }}
     {{- else }}
-    # Reference to existing gateway listener
-    {{- range $section := .Values.gateway.existingGateway.sections }}
-    - name: {{ $.Values.gateway.existingGateway.name }}
-      {{- if $.Values.gateway.existingGateway.namespace }}
-      namespace: {{ $.Values.gateway.existingGateway.namespace }}
-      {{- end }}
-      sectionName: {{ $section }}
-      {{- end }}
+    # TLS is external: attach to HTTP listeners (no redirect route)
+{{ include "rancher.gateway.parentRefs" (list . "http") | indent 4 }}
     {{- end }}
   hostnames:
     - {{ template "rancher.hostname" . }}

@@ -38,3 +38,26 @@ false
 {{- define "rancher.gateway" }}
 {{- printf "%s-%s" (include "rancher.fullname" .) "gateway" }}
 {{- end }}
+
+{{/*
+Generate parentRefs for HTTPRoute resources
+Usage: include "rancher.gateway.parentRefs" (list . "http"|"https")
+*/}}
+{{- define "rancher.gateway.parentRefs" -}}
+{{- $ctx := index . 0 -}}
+{{- $listenerType := index . 1 -}}
+{{- if $ctx.Values.gateway.createGateway }}
+- name: {{ include "rancher.gateway" $ctx }}
+  namespace: {{ $ctx.Release.Namespace }}
+  sectionName: rancher-{{ $listenerType }}
+{{- else }}
+{{- $sections := ternary $ctx.Values.gateway.existingGateway.httpsSections $ctx.Values.gateway.existingGateway.httpSections (eq $listenerType "https") }}
+{{- range $section := $sections }}
+- name: {{ $ctx.Values.gateway.existingGateway.name }}
+  {{- if $ctx.Values.gateway.existingGateway.namespace }}
+  namespace: {{ $ctx.Values.gateway.existingGateway.namespace }}
+  {{- end }}
+  sectionName: {{ $section }}
+{{- end }}
+{{- end }}
+{{- end }}
