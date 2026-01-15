@@ -1,6 +1,8 @@
 suite: Test Ingress
 templates:
 - ingate/ingress.yaml
+set:
+  hostname: "rancher.example.com"
 tests:
 - it: should set external options
   set:
