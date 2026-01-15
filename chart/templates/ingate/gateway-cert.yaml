@@ -11,5 +11,5 @@ spec:
         name: {{ template "rancher.fullname" . }}
         kind: Issuer
     dnsNames:
-        - {{ template "rancher.hostname" . }}
+        - {{ .Values.hostname }}
 {{- end }}

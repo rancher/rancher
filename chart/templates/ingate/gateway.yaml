@@ -11,7 +11,7 @@ spec:
     - name: rancher-http
       protocol: HTTP
       port: {{ .Values.gateway.gatewayClass.ports.http | default 80 }}
-      hostname: {{ include "rancher.hostname" . }}
+      hostname: {{ .Values.hostname }}
       allowedRoutes:
         namespaces:
           from: Same
@@ -19,7 +19,7 @@ spec:
     - name: rancher-https
       protocol: HTTPS
       port: {{ .Values.gateway.gatewayClass.ports.https | default 443 }}
-      hostname: {{ include "rancher.hostname" . }}
+      hostname: {{ .Values.hostname }}
       tls:
         mode: Terminate
         certificateRefs:

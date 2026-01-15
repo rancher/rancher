@@ -9,7 +9,7 @@ spec:
   parentRefs:
 {{ include "rancher.gateway.parentRefs" (list . "http") | indent 4 }}
   hostnames:
-    - {{ template "rancher.hostname" . }}
+    - {{ .Values.hostname }}
   rules:
     - filters:
         - type: RequestRedirect

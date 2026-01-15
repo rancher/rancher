@@ -5,9 +5,6 @@ templates:
   - templates/ingate/httproute-redirect.yaml
   - templates/ingate/gateway-cert.yaml
 
-set:
-  hostname: rancher.example.com
-
 tests:
   - it: should not render Gateway when networkExposure type is ingress (default)
     asserts:
@@ -52,6 +49,7 @@ tests:
   - it: should configure HTTP listener with default Traefik port 8000
     template: templates/ingate/gateway.yaml
     set:
+      hostname: rancher.example.com
       networkExposure:
         type: gateway
       gateway:
@@ -71,6 +69,7 @@ tests:
   - it: should configure HTTP listener with custom port
     template: templates/ingate/gateway.yaml
     set:
+      hostname: rancher.example.com
       networkExposure:
         type: gateway
       gateway:
@@ -93,6 +92,7 @@ tests:
   - it: should configure HTTPS listener with default Traefik port 443 when internal TLS
     template: templates/ingate/gateway.yaml
     set:
+      hostname: rancher.example.com
       tls: selfsigned
       networkExposure:
         type: gateway
@@ -117,6 +117,7 @@ tests:
   - it: should configure HTTPS listener with custom port when internal TLS
     template: templates/ingate/gateway.yaml
     set:
+      hostname: rancher.example.com
       tls: selfsigned
       networkExposure:
         type: gateway
@@ -158,6 +159,7 @@ tests:
   - it: should use custom TLS secret name
     template: templates/ingate/gateway.yaml
     set:
+      hostname: rancher.example.com
       tls: selfsigned
       networkExposure:
         type: gateway
