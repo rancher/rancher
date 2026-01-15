@@ -63,7 +63,16 @@ func (p *Planner) addETCD(config map[string]interface{}, controlPlane *rkev1.RKE
 			if v == "" {
 				config[k] = true
 			} else {
-				config[k] = v
+				if k == "etcd-s3-retention" {
+					i, err := strconv.Atoi(v)
+					if err != nil {
+						logrus.Warnf("Failed to convert etcd-s3-retention value %s to int: %v", v, err)
+						continue
+					}
+					config[k] = i
+				} else {
+					config[k] = v
+				}
 			}
 		}
 		result = files
