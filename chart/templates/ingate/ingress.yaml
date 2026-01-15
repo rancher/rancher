@@ -1,4 +1,4 @@
-{{- if (include "rancher.ingressEnabled" .)  }}
+{{- if eq (include "rancher.ingressEnabled" .) "true" }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
