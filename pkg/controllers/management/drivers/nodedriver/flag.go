@@ -4,6 +4,7 @@ type BoolPointerFlag struct {
 	Name   string
 	Usage  string
 	EnvVar string
+	Value  *bool
 }
 
 func (f BoolPointerFlag) String() string {
