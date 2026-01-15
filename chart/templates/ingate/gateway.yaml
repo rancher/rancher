@@ -10,7 +10,7 @@ spec:
   listeners:
     - name: rancher-http
       protocol: HTTP
-      port: {{ .Values.gateway.gatewayClass.ports.http | default 80 }}
+      port: {{ .Values.gateway.gatewayClass.ports.http }}
       hostname: {{ .Values.hostname }}
       allowedRoutes:
         namespaces:
@@ -18,7 +18,7 @@ spec:
 {{- if eq (include "rancher.useExternalTls" .) "false" }}
     - name: rancher-https
       protocol: HTTPS
-      port: {{ .Values.gateway.gatewayClass.ports.https | default 443 }}
+      port: {{ .Values.gateway.gatewayClass.ports.https }}
       hostname: {{ .Values.hostname }}
       tls:
         mode: Terminate
