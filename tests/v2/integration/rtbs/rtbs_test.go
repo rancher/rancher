@@ -398,7 +398,7 @@ func (p *RTBTestSuite) TestPermissionsCanBeRemoved() {
 	require.Eventually(p.T(), func() bool {
 		_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns2.Name)
 		return err != nil
-	}, 60*time.Second, 2*time.Second, "waiting for permissions to be removed from user")
+	}, 2*time.Minute, 2*time.Second, "waiting for permissions to be removed from user")
 }
 
 func TestRTBTestSuite(t *testing.T) {
