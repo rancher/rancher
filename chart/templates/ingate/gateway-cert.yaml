@@ -1,4 +1,4 @@
-{{- if (include "rancher.gatewayEnabled" .) -}}
+{{- if eq (include "rancher.gatewayEnabled" .) "true" -}}
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
