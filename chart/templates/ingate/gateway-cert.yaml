@@ -1,4 +1,4 @@
-{{- if eq (include "rancher.gatewayEnabled" .) "true" -}}
+{{- if and (eq (include "rancher.gatewayEnabled" .) "true") .Values.gateway.createGateway (eq (include "rancher.useExternalTls" .) "false") (ne .Values.gateway.gatewayClass.tls.source "secret") -}}
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -6,7 +6,7 @@ metadata:
     labels:
 {{ include "rancher.labels" . | indent 4 }}
 spec:
-    secretName: tls-rancher-ingress  # Same secret name as before
+    secretName: {{ .Values.gateway.gatewayClass.tls.secretName }}
     issuerRef:
         name: {{ template "rancher.fullname" . }}
         kind: Issuer
