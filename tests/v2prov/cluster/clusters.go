@@ -57,6 +57,11 @@ func New(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*provisi
 		cluster.Spec.KubernetesVersion = defaults.SomeK8sVersion
 	}
 
+	if defaults.PrimeMode == "1" && defaults.PrimeRegistryHost != "" {
+		appendGlobalRegistrySelector(cluster, defaults.PrimeRegistryHost)
+		logrus.Infof("Prime registry active")
+	}
+
 	if cluster.Spec.RKEConfig != nil {
 		if cluster.Spec.RKEConfig.MachineGlobalConfig.Data == nil {
 			cluster.Spec.RKEConfig.MachineGlobalConfig.Data = map[string]interface{}{}
@@ -631,4 +636,22 @@ func EnsureMinimalConflictsWithThreshold(clients *clients.Clients, c *provisioni
 		}
 	}
 	return nil
+}
+
+func appendGlobalRegistrySelector(c *provisioningv1api.Cluster, host string) {
+	if c.Spec.RKEConfig == nil {
+		c.Spec.RKEConfig = &provisioningv1api.RKEConfig{}
+	}
+	if c.Spec.RKEConfig.MachineSelectorConfig == nil {
+		c.Spec.RKEConfig.MachineSelectorConfig = []rkev1.RKESystemConfig{}
+	}
+
+	sel := rkev1.RKESystemConfig{
+		Config: rkev1.GenericMap{
+			Data: map[string]any{
+				"system-default-registry": host,
+			},
+		},
+	}
+	c.Spec.RKEConfig.MachineSelectorConfig = append(c.Spec.RKEConfig.MachineSelectorConfig, sel)
 }
