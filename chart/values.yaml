@@ -108,7 +108,7 @@ gateway:
     ports: # Must match the GatewayClass's configured entrypoints
       http: 8000  # k3s Traefik defaults to web entrypoint to 8000
       https: 8443 # k3s Traefik defaults to websecure entrypoint to 8443
-    additionalListeners: {} # Additional listener configs; Only used when createGateway=true
+    additionalListeners: [] # Additional listener configs; Only used when createGateway=true
     #  - name: http
     #    protocol: HTTP
     #    port: 80
