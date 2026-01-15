@@ -7,6 +7,7 @@ metadata:
   labels:
     auth.cattle.io/cluster-indexed: "true"
     cluster.x-k8s.io/v1beta1: v1
+    cluster.x-k8s.io/v1beta2: v1
   name: rkeclusters.rke.cattle.io
 spec:
   group: rke.cattle.io
@@ -51,18 +52,19 @@ spec:
               controlPlaneEndpoint:
                 description: ControlPlaneEndpoint represents the endpoint used to
                   communicate with the control plane.
+                minProperties: 1
                 properties:
                   host:
                     description: host is the hostname on which the API server is serving.
                     maxLength: 512
+                    minLength: 1
                     type: string
                   port:
                     description: port is the port on which the API server is serving.
                     format: int32
+                    maximum: 65535
+                    minimum: 1
                     type: integer
-                required:
-                - host
-                - port
                 type: object
             type: object
           status:

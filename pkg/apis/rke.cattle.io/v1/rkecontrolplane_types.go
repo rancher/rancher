@@ -154,7 +154,7 @@ type RKEControlPlaneStatus struct {
 // +genclient
 // +kubebuilder:resource:path=rkecontrolplanes,shortName=rcp,scope=Namespaced,categories=cluster-api
 // +kubebuilder:subresource:status
-// +kubebuilder:metadata:labels={"cluster.x-k8s.io/v1beta1=v1","auth.cattle.io/cluster-indexed=true"}
+// +kubebuilder:metadata:labels={"cluster.x-k8s.io/v1beta1=v1","cluster.x-k8s.io/v1beta2=v1","auth.cattle.io/cluster-indexed=true"}
 // +kubebuilder:printcolumn:name="Cluster",type="string",JSONPath=".metadata.labels['cluster\\.x-k8s\\.io/cluster-name']",description="Cluster"
 // +kubebuilder:printcolumn:name="Initialized",type=string,JSONPath=".status.initialized",description="This denotes whether or not the control plane is initialized"
 // +kubebuilder:printcolumn:name="API Server Available",type=boolean,JSONPath=".status.ready",description="RKEControlPlane API Server is ready to receive requests"

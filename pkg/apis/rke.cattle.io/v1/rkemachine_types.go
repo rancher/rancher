@@ -4,7 +4,7 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/genericcondition"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 // RKECommonNodeConfig is a common configuration shared between node driver and custom machines.
@@ -70,7 +70,7 @@ type RKEMachineStatus struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:scope=Namespaced
 // +kubebuilder:subresource:status
-// +kubebuilder:metadata:labels={"cluster.x-k8s.io/v1beta1=v1","auth.cattle.io/cluster-indexed=true"}
+// +kubebuilder:metadata:labels={"cluster.x-k8s.io/v1beta1=v1","cluster.x-k8s.io/v1beta2=v1","auth.cattle.io/cluster-indexed=true"}
 
 // CustomMachine represents an unmanaged CAPI
 // machine registered to a Rancher custom cluster.
