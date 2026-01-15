@@ -131,8 +131,10 @@ gateway:
   existingGateway: # Used when createGateway is set false
     name: "default-gateway" # Name of an existing gateway to use
     namespace: "default"    # Namespace of the existing gateway
-    sections: # Sections of the existing Gateway to match
-      - "default-section"
+    httpSections:  # HTTP listener sections (used for redirect route or main route when tls=external)
+      - "http-listener"
+    httpsSections: # HTTPS listener sections (used for main route when TLS terminates at k8s)
+      - "https-listener"
 
 ### service ###
 # Override to use NodePort or LoadBalancer service type - default is ClusterIP
