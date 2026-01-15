@@ -1,5 +1,5 @@
 {{- define "rancher.hostname" }}
-{{- default "rancher.example.com" .Values.hostname | quote }}
+{{- required "hostname is required - please set .Values.hostname to the domain where Rancher will be accessed" .Values.hostname | quote }}
 {{- end }}
 
 {{/*
