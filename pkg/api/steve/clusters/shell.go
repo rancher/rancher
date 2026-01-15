@@ -118,7 +118,6 @@ func (s *shell) createPod(imageOverride string) *v1.Pod {
 	if imageName == "" {
 		imageName = settings.FullShellImage()
 	}
-	runAsUser := int64(1000)
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "dashboard-shell-",
@@ -127,9 +126,9 @@ func (s *shell) createPod(imageOverride string) *v1.Pod {
 		Spec: v1.PodSpec{
 			SecurityContext: &v1.PodSecurityContext{
 				RunAsNonRoot: &t,
-				RunAsUser:    &runAsUser,
-				RunAsGroup:   &runAsUser,
-				FSGroup:      &runAsUser,
+				RunAsUser:    &settings.ShellImageUserId,
+				RunAsGroup:   &settings.ShellImageUserId,
+				FSGroup:      &settings.ShellImageUserId,
 			},
 			TerminationGracePeriodSeconds: new(int64),
 			RestartPolicy:                 v1.RestartPolicyNever,

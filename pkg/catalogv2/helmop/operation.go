@@ -1019,6 +1019,10 @@ func (s *Operations) createNamespace(ctx context.Context, namespace, projectID s
 // If the kustomize flag is true, the created pod is modified to be able to run the kustomize.sh script.
 // Returns a pod object and a pod options object representing the helm operation pod and it's options
 func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, imageOverride string, tolerations []corev1.Toleration) (*corev1.Pod, *podimpersonation.PodOptions) {
+	var (
+		f = false
+		t = true
+	)
 	image := imageOverride
 	if image == "" {
 		image = settings.FullShellImage()
@@ -1069,7 +1073,25 @@ func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, ima
 			Namespace:    s.namespace,
 		},
 		Spec: corev1.PodSpec{
+			SecurityContext: &corev1.PodSecurityContext{
+				RunAsNonRoot: &t,
+				RunAsUser:    &settings.ShellImageUserId,
+				RunAsGroup:   &settings.ShellImageUserId,
+				FSGroup:      &settings.ShellImageUserId,
+			},
 			Volumes: []corev1.Volume{
+				{
+					Name: "tmp",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				},
+				{
+					Name: "run",
+					VolumeSource: corev1.VolumeSource{
+						EmptyDir: &corev1.EmptyDirVolumeSource{},
+					},
+				},
 				{
 					Name: "data",
 					VolumeSource: corev1.VolumeSource{
@@ -1101,7 +1123,19 @@ func (s *Operations) createPod(secretData map[string][]byte, kustomize bool, ima
 					ImagePullPolicy: corev1.PullIfNotPresent,
 					Command:         []string{"helm-cmd"},
 					WorkingDir:      helmDataPath,
+					SecurityContext: &corev1.SecurityContext{
+						AllowPrivilegeEscalation: &f,
+						ReadOnlyRootFilesystem:   &t,
+					},
 					VolumeMounts: []corev1.VolumeMount{
+						{
+							Name:      "tmp",
+							MountPath: "/tmp",
+						},
+						{
+							Name:      "run",
+							MountPath: "/run",
+						},
 						{
 							Name:      "data",
 							MountPath: helmDataPath,
