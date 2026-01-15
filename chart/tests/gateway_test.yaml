@@ -89,7 +89,7 @@ tests:
               namespaces:
                 from: Same
 
-  - it: should configure HTTPS listener with default Traefik port 443 when internal TLS
+  - it: should configure HTTPS listener with default Traefik port 8443 when internal TLS
     template: templates/ingate/gateway.yaml
     set:
       hostname: rancher.example.com
