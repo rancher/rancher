@@ -743,10 +743,17 @@ func validateAliConfigNodePools(spec *v32.ClusterSpec) error {
 		return httperror.NewAPIError(httperror.InvalidBodyContent, "must have at least one nodepool")
 	}
 
+	existingNodePoolNames := make(map[string]bool)
 	for _, np := range nodePools {
 		if np.Name == "" {
 			return httperror.NewAPIError(httperror.InvalidBodyContent, "nodePool Name cannot be an empty string")
 		}
+
+		if existingNodePoolNames[np.Name] {
+			return httperror.NewAPIError(httperror.InvalidBodyContent, "nodePool Name must be unique")
+		}
+		existingNodePoolNames[np.Name] = true
+
 		if np.ImageID == "" {
 			return httperror.NewAPIError(httperror.InvalidBodyContent, "nodePool ImageId cannot be an empty string")
 		}
