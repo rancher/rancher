@@ -91,7 +91,7 @@ def get_chart_latest_version(catalog, chart_name):
     headers = {"Accept": "application/json",
                "Authorization": "Bearer " + USER_TOKEN}
     url = catalog["links"]["index"]
-    response = requests.get(url=url, verify=False, headers=headers)
+    response = requests.get(url=url, headers=headers)
     assert response.status_code == 200, \
         "failed to get the response from {}".format(url)
     assert response.content is not None, \

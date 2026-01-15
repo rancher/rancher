@@ -74,7 +74,7 @@ def disable_ad(username, token, expected_status=200):
         "enabled": False,
         "username": username,
         "password": PASSWORD
-    }, verify=False, headers=headers)
+    }, headers=headers)
     assert r.status_code == expected_status
     print("Disable ActiveDirectory request for " +
           username + " " + str(expected_status))
@@ -128,7 +128,7 @@ def search_ad_users(searchkey, token, expected_status=200):
     r = requests.post(CATTLE_AUTH_PRINCIPAL_URL,
                       json={'name': searchkey, 'principalType': 'user',
                             'responseType': 'json'},
-                      verify=False, headers=headers)
+                      headers=headers)
     assert r.status_code == expected_status
 
     if r.status_code == 200:
@@ -152,7 +152,7 @@ def search_ad_groups(searchkey, token, expected_status=200):
     r = requests.post(CATTLE_AUTH_PRINCIPAL_URL,
                       json={'name': searchkey, 'principalType': 'group',
                             'responseType': 'json'},
-                      verify=False, headers=headers)
+                      headers=headers)
     assert r.status_code == expected_status
 
     if r.status_code == 200:

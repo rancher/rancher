@@ -29,7 +29,7 @@ headers = {"Content-Type":"application/json","Authorization": "Bearer " + args.a
 # Iterate through list_of_urls to get the values
 for url, label in zip(list_of_urls, url_label):
 	web_url = rancher_server_url + "/v3/settings/" + url
-	response = requests.get(web_url, headers=headers, verify=False)
+	response = requests.get(web_url, headers=headers)
 	if response.status_code == 200:
 		print("\t" + label + ": " + response.json()["value"])
 	else:
