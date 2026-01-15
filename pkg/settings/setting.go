@@ -145,8 +145,6 @@ var (
 
 	ClusterAgentDefaultPriorityClass       = NewSetting("cluster-agent-default-priority-class", ClusterAgentPriorityClass)
 	ClusterAgentDefaultPodDisruptionBudget = NewSetting("cluster-agent-default-pod-disruption-budget", ClusterAgentPodDisruptionBudget)
-	FleetAgentDefaultPriorityClass         = NewSetting("fleet-agent-default-priority-class", FleetAgentPriorityClass)
-	FleetAgentDefaultPodDisruptionBudget   = NewSetting("fleet-agent-default-pod-disruption-budget", FleetAgentPodDisruptionBudget)
 
 	Rke2DefaultVersion = NewSetting("rke2-default-version", "")
 	K3sDefaultVersion  = NewSetting("k3s-default-version", "")

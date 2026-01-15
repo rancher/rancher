@@ -115,17 +115,7 @@ const (
     "value": 1000000000
 }`
 
-	FleetAgentPriorityClass = `{
-    "preemptionPolicy": "PreemptLowerPriority",
-    "value":  999999999
-}`
-
 	ClusterAgentPodDisruptionBudget = `{
-	"minAvailable": "1",
-	"maxUnavailable": "0"
-}`
-
-	FleetAgentPodDisruptionBudget = `{
 	"minAvailable": "1",
 	"maxUnavailable": "0"
 }`
