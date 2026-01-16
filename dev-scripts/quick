@@ -40,6 +40,17 @@ BUILD_ARGS+=("--build-arg=CATTLE_FLEET_VERSION=${CATTLE_FLEET_VERSION}")
 BUILD_ARGS+=("--build-arg=CATTLE_HELM_VERSION=${CATTLE_HELM_VERSION}")
 BUILD_ARGS+=("--build-arg=RANCHER_TAG=${TAG}")
 BUILD_ARGS+=("--build-arg=RANCHER_REPO=${REPO}")
+
+if [[ -n "${DUAL:-}" && "${TARGET:-}" == "server" ]]; then
+    case $ARCH in
+        amd64) AGENT_ARCH=arm64 ;;
+        arm64) AGENT_ARCH=amd64 ;;
+        *) echo "Unknown platform for DUAL build: $ARCH" ; exit 1 ;;
+    esac
+    AGENT_TAG=$(echo $TAG | sed "s/$ARCH/$AGENT_ARCH/g")
+    BUILD_ARGS+=("--build-arg=CATTLE_AGENT_IMAGE=${IMAGE_REPO}/rancher-agent:$AGENT_TAG")
+fi
+
 if [ "$BINARY_DEBUG" = true ]; then
   # Remove -s (strip symbols)
   BUILD_ARGS+=("--build-arg=LINKFLAGS=-extldflags -static")
