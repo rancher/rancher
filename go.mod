@@ -18,7 +18,7 @@ replace (
 	github.com/rancher/remotedialer-proxy => github.com/bhartigautam156/remotedialer-proxy v0.0.0-20251231055517-35cf5f5f38c2
 	github.com/rancher/rke => github.com/bhartigautam156/rke v0.0.0-20260105055322-f255d24b8c6a
 	github.com/rancher/shepherd => github.com/bhartigautam156/shepherd v0.0.0-20260108045959-90c7c77662f8
-	github.com/rancher/steve => github.com/bhartigautam156/steve v0.0.0-20260109055430-80bdd22df23b
+	github.com/rancher/steve => github.com/bhartigautam156/steve v0.0.0-20260116071623-656e088a0456
 	github.com/rancher/system-upgrade-controller/pkg/apis => github.com/bhartigautam156/system-upgrade-controller/pkg/apis v0.0.0-20260108045225-ceadd8e4ee44
 	github.com/rancher/wrangler/v3 => github.com/bhartigautam156/wrangler/v3 v3.3.1-0.20251229122518-17d8c43b27b8
 )
@@ -270,7 +270,7 @@ require (
 	github.com/skeema/knownhosts v1.3.0 // indirect
 	github.com/std-uritemplate/std-uritemplate/go v0.0.57 // indirect
 	github.com/stoewer/go-strcase v1.3.0 // indirect
-	github.com/tinylib/msgp v1.6.1 // indirect
+	github.com/tinylib/msgp v1.6.3 // indirect
 	github.com/tjfoc/gmsm v1.4.1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect

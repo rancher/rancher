@@ -5,6 +5,7 @@ go 1.25.0
 toolchain go1.25.4
 
 replace github.com/rancher/norman => github.com/bhartigautam156/norman v0.0.0-20251230120334-71f332fee56c
+
 require (
 	github.com/rancher/norman v0.8.1
 	k8s.io/apimachinery v0.35.0

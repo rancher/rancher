@@ -1,3 +1,5 @@
+github.com/bhartigautam156/norman v0.0.0-20251230120334-71f332fee56c h1:WCVqFE6xmc6Pk4DDKdv/Ja8I3453SJ5geBvEdT+XFQ0=
+github.com/bhartigautam156/norman v0.0.0-20251230120334-71f332fee56c/go.mod h1:fcUCoAsTJispMjlXq6hivVV4b9HZYB6/BoRtEkfHpCg=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
@@ -17,8 +19,6 @@ github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINE
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRIccs7FGNTlIRMkT8wgtp5eCXdBlqhYGL6U=
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
-github.com/rancher/norman v0.8.1 h1:114Rdt3xsWTUdqaxlIR2F6PJT0ls01vF0Rfglustgow=
-github.com/rancher/norman v0.8.1/go.mod h1:vZ5qL+eKodJ7zOMQYdl6jwMrSFrqTKpA+KYSFEKew2M=
 github.com/rancher/wrangler/v3 v3.3.1 h1:YFqRfhxjuLNudUrvWrn+64wUPZ8pnn2KWbTsha75JLg=
 github.com/rancher/wrangler/v3 v3.3.1/go.mod h1:0D4kZDaOUkP5W2Zfww/75tQwF9w7kaZgzpZG+4XQDAI=
 github.com/sirupsen/logrus v1.9.3 h1:dueUQJ1C2q9oE3F7wvmSGAaVtTmUizReu6fjN8uqzbQ=
