@@ -69,6 +69,7 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -637,9 +638,9 @@ func createOrUpdateService(ctx context.Context, k8sClient *kubernetes.Clientset,
 			}
 			return err
 		}
-		if existing.Spec.String() != svc.Spec.String() {
-			logrus.Debugf("service %s/%s spec did not match, refreshing service, %s vs %s",
-				svc.Namespace, svc.Name, existing.Spec.String(), svc.Spec.String())
+		if !equality.Semantic.DeepEqual(existing.Spec.Ports, svc.Spec.Ports) {
+			logrus.Debugf("service %s/%s ports did not match, refreshing service, (existing: %v vs desired: %v)",
+				svc.Namespace, svc.Name, existing.Spec.Ports, svc.Spec.Ports)
 			existing.Spec.Ports = svc.Spec.Ports
 			_, err := k8sClient.CoreV1().Services(svc.Namespace).Update(ctx, existing, metav1.UpdateOptions{})
 			return err
@@ -660,17 +661,9 @@ func createOrUpdateEndpoint(ctx context.Context, k8sClient *kubernetes.Clientset
 			return err
 		}
 
-		needsUpdate := false
-		if len(existing.Subsets) != 1 || len(ep.Subsets) != 1 {
-			logrus.Debugf("endpoint %s/%s subsets length did not match, refreshing endpoint (existing=%d, desired=%d)",
-				ep.Namespace, ep.Name, len(existing.Subsets), len(ep.Subsets))
-			needsUpdate = true
-		} else if existing.Subsets[0].String() != ep.Subsets[0].String() {
-			logrus.Debugf("endpoint %s/%s subsets did not match, refreshing endpoint (existing: %s vs desired: %s)",
-				ep.Namespace, ep.Name, existing.Subsets[0].String(), ep.Subsets[0].String())
-			needsUpdate = true
-		}
-		if needsUpdate {
+		if !equality.Semantic.DeepEqual(existing.Subsets, ep.Subsets) {
+			logrus.Debugf("endpoint %s/%s subsets did not match, refreshing endpoint (existing: %v vs desired: %v)",
+				ep.Namespace, ep.Name, existing.Subsets, ep.Subsets)
 			existing.Subsets = ep.Subsets
 			_, err := k8sClient.CoreV1().Endpoints(ep.Namespace).Update(ctx, existing, metav1.UpdateOptions{})
 			return err
@@ -726,7 +719,10 @@ func setupRancherService(ctx context.Context, restConfig *rest.Config, httpsList
 		},
 		Subsets: []v1.EndpointSubset{{
 			Addresses: []v1.EndpointAddress{{IP: ip.String()}},
-			Ports:     []v1.EndpointPort{{Port: int32(httpsListenPort)}},
+			Ports: []v1.EndpointPort{{
+				Port:     int32(httpsListenPort),
+				Protocol: v1.ProtocolTCP,
+			}},
 		}},
 	}
 	internalEndpoint := v1.Endpoints{
@@ -736,7 +732,10 @@ func setupRancherService(ctx context.Context, restConfig *rest.Config, httpsList
 		},
 		Subsets: []v1.EndpointSubset{{
 			Addresses: []v1.EndpointAddress{{IP: ip.String()}},
-			Ports:     []v1.EndpointPort{{Port: int32(httpsListenPort + 1)}},
+			Ports: []v1.EndpointPort{{
+				Port:     int32(httpsListenPort + 1),
+				Protocol: v1.ProtocolTCP,
+			}},
 		}},
 	}
 
