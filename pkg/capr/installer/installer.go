@@ -72,6 +72,8 @@ func LinuxInstallScript(ctx context.Context, token string, envVars []corev1.EnvV
 		}
 	}
 	ca := systemtemplate.CAChecksum()
+	// When the request is from the container port 444, the request is handled by the internal server,
+	// therefore, tls.InternalAPI is true on the context
 	if v, ok := ctx.Value(tls.InternalAPI).(bool); ok && v {
 		ca = systemtemplate.InternalCAChecksum()
 	}

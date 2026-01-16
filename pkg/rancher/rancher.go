@@ -69,6 +69,7 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -626,131 +627,133 @@ func localClusterEnabled(opts *Options) bool {
 	return false
 }
 
-// setupRancherService will ensure that a Rancher service with a custom endpoint exists that will be used
-// to access Rancher
+// createOrUpdateService ensures the Service exists and matches the desired spec.
+func createOrUpdateService(ctx context.Context, k8sClient *kubernetes.Clientset, svc v1.Service) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		existing, err := k8sClient.CoreV1().Services(svc.Namespace).Get(ctx, svc.Name, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				_, err := k8sClient.CoreV1().Services(svc.Namespace).Create(ctx, &svc, metav1.CreateOptions{})
+				return err
+			}
+			return err
+		}
+		if !equality.Semantic.DeepEqual(existing.Spec.Ports, svc.Spec.Ports) {
+			logrus.Debugf("service %s/%s ports did not match, refreshing service, (existing: %v vs desired: %v)",
+				svc.Namespace, svc.Name, existing.Spec.Ports, svc.Spec.Ports)
+			existing.Spec.Ports = svc.Spec.Ports
+			_, err := k8sClient.CoreV1().Services(svc.Namespace).Update(ctx, existing, metav1.UpdateOptions{})
+			return err
+		}
+		return nil
+	})
+}
+
+// createOrUpdateEndpoint ensures the Endpoints object exists and matches the desired spec.
+func createOrUpdateEndpoint(ctx context.Context, k8sClient *kubernetes.Clientset, ep v1.Endpoints) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		existing, err := k8sClient.CoreV1().Endpoints(ep.Namespace).Get(ctx, ep.Name, metav1.GetOptions{})
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				_, err := k8sClient.CoreV1().Endpoints(ep.Namespace).Create(ctx, &ep, metav1.CreateOptions{})
+				return err
+			}
+			return err
+		}
+
+		if !equality.Semantic.DeepEqual(existing.Subsets, ep.Subsets) {
+			logrus.Debugf("endpoint %s/%s subsets did not match, refreshing endpoint (existing: %v vs desired: %v)",
+				ep.Namespace, ep.Name, existing.Subsets, ep.Subsets)
+			existing.Subsets = ep.Subsets
+			_, err := k8sClient.CoreV1().Endpoints(ep.Namespace).Update(ctx, existing, metav1.UpdateOptions{})
+			return err
+		}
+		return nil
+	})
+}
+
+// setupRancherService ensures that the required services and endpoints exist on the local cluster.
+// This should only be called when Rancher is run in a Docker container and not in a pod.
 func setupRancherService(ctx context.Context, restConfig *rest.Config, httpsListenPort int) error {
-	clientset, err := kubernetes.NewForConfig(restConfig)
+	k8sClient, err := kubernetes.NewForConfig(restConfig)
 	if err != nil {
 		return fmt.Errorf("error setting up kubernetes clientset while setting up rancher service: %w", err)
 	}
 
-	service := v1.Service{
+	rancherService := v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      apiservice.RancherServiceName,
 			Namespace: namespace.System,
 		},
 		Spec: v1.ServiceSpec{
-			Ports: []v1.ServicePort{
-				{
-					Protocol:   v1.ProtocolTCP,
-					Port:       443,
-					TargetPort: intstr.FromInt(httpsListenPort + 1),
-				},
-			},
+			Ports: []v1.ServicePort{{
+				Protocol:   v1.ProtocolTCP,
+				Port:       443,
+				TargetPort: intstr.FromInt32(int32(httpsListenPort)),
+			}},
 		},
 	}
-
-	refreshService := false
-
-	s, err := clientset.CoreV1().Services(namespace.System).Get(ctx, apiservice.RancherServiceName, metav1.GetOptions{})
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			refreshService = true
-		} else {
-			return fmt.Errorf("error looking for rancher service: %w", err)
-		}
-	} else {
-		if s.Spec.String() != service.Spec.String() {
-			refreshService = true
-		}
-	}
-
-	if refreshService {
-		logrus.Debugf("setupRancherService refreshing service")
-		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			if s, err := clientset.CoreV1().Services(namespace.System).Get(ctx, apiservice.RancherServiceName, metav1.GetOptions{}); err != nil {
-				if apierrors.IsNotFound(err) {
-					if _, err := clientset.CoreV1().Services(namespace.System).Create(ctx, &service, metav1.CreateOptions{}); err != nil {
-						return err
-					}
-				} else {
-					return err
-				}
-			} else {
-				s.Spec.Ports = service.Spec.Ports
-				if _, err := clientset.CoreV1().Services(namespace.System).Update(ctx, s, metav1.UpdateOptions{}); err != nil {
-					return err
-				}
-			}
-			return nil
-		}); err != nil {
-			return fmt.Errorf("setupRancherService error refreshing service: %w", err)
-		}
+	internalService := v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      apiservice.RancherInternalServiceName,
+			Namespace: namespace.System,
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{{
+				Protocol:   v1.ProtocolTCP,
+				Port:       443,
+				TargetPort: intstr.FromInt32(int32(httpsListenPort + 1)),
+			}},
+		},
 	}
 
 	ip, err := net.ChooseHostInterface()
 	if err != nil {
-		return fmt.Errorf("setupRancherService error getting host IP while setting up rancher service: %w", err)
+		return fmt.Errorf("setupRancherService error getting host IP: %w", err)
 	}
 
-	endpoint := v1.Endpoints{
+	rancherEndpoint := v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      apiservice.RancherServiceName,
 			Namespace: namespace.System,
 		},
-		Subsets: []v1.EndpointSubset{
-			{
-				Addresses: []v1.EndpointAddress{
-					{
-						IP: ip.String(),
-					},
-				},
-				Ports: []v1.EndpointPort{
-					{
-						Port: int32(httpsListenPort + 1),
-					},
-				},
-			},
+		Subsets: []v1.EndpointSubset{{
+			Addresses: []v1.EndpointAddress{{IP: ip.String()}},
+			Ports: []v1.EndpointPort{{
+				Port:     int32(httpsListenPort),
+				Protocol: v1.ProtocolTCP,
+			}},
+		}},
+	}
+	internalEndpoint := v1.Endpoints{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      apiservice.RancherInternalServiceName,
+			Namespace: namespace.System,
 		},
+		Subsets: []v1.EndpointSubset{{
+			Addresses: []v1.EndpointAddress{{IP: ip.String()}},
+			Ports: []v1.EndpointPort{{
+				Port:     int32(httpsListenPort + 1),
+				Protocol: v1.ProtocolTCP,
+			}},
+		}},
 	}
 
-	refreshEndpoint := false
-	e, err := clientset.CoreV1().Endpoints(namespace.System).Get(ctx, apiservice.RancherServiceName, metav1.GetOptions{})
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			refreshEndpoint = true
-		} else {
-			return fmt.Errorf("error looking for rancher endpoint while setting up rancher service: %w", err)
-		}
-	} else {
-		if e.Subsets[0].String() != endpoint.Subsets[0].String() && len(e.Subsets) != 1 {
-			logrus.Debugf("setupRancherService subsets did not match, refreshing endpoint (%s vs %s)", e.Subsets[0].String(), endpoint.String())
-			refreshEndpoint = true
-		}
+	// Setup rancher service and endpoint
+	if err := createOrUpdateService(ctx, k8sClient, rancherService); err != nil {
+		return fmt.Errorf("setupRancherService error refreshing rancher service: %w", err)
+	}
+	if err := createOrUpdateEndpoint(ctx, k8sClient, rancherEndpoint); err != nil {
+		return fmt.Errorf("setupRancherService error refreshing rancher endpoint: %w", err)
+	}
+	// Setup rancher-internal service and endpoint
+	if err := createOrUpdateService(ctx, k8sClient, internalService); err != nil {
+		return fmt.Errorf("setupRancherService error refreshing internal service: %w", err)
+	}
+	if err := createOrUpdateEndpoint(ctx, k8sClient, internalEndpoint); err != nil {
+		return fmt.Errorf("setupRancherService error refreshing internal endpoint: %w", err)
 	}
 
-	if refreshEndpoint {
-		logrus.Debugf("setupRancherService refreshing endpoint")
-		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			if e, err := clientset.CoreV1().Endpoints(namespace.System).Get(ctx, apiservice.RancherServiceName, metav1.GetOptions{}); err != nil {
-				if apierrors.IsNotFound(err) {
-					if _, err := clientset.CoreV1().Endpoints(namespace.System).Create(ctx, &endpoint, metav1.CreateOptions{}); err != nil {
-						return err
-					}
-				} else {
-					return err
-				}
-			} else {
-				e.Subsets = endpoint.Subsets
-				if _, err := clientset.CoreV1().Endpoints(namespace.System).Update(ctx, e, metav1.UpdateOptions{}); err != nil {
-					return err
-				}
-			}
-			return nil
-		}); err != nil {
-			return fmt.Errorf("setupRancherService error refreshing endpoint: %w", err)
-		}
-	}
 	return nil
 }
 
