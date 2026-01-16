@@ -10,6 +10,11 @@ write-kubeconfig-mode: "0644"
 tls-san:
   - ${2}
 node-name: ${hostname}
+registries:
+  "docker.io":
+    auth:
+      username: "${DOCKERHUB_USERNAME}"
+      password: "${DOCKERHUB_PASSWORD}"
 EOF
 
 if [ ! -z "${7}" ] && [[ "${7}" == *":"* ]]
