@@ -68,8 +68,8 @@ func TestTokenEndpoint(t *testing.T) {
 		fakeRefreshTokenLifespan = 3600
 	)
 
-	fakeScopes := []interface{}{"openid", "profile"}
-	fakeScopesOfflineAccess := []interface{}{"openid", "profile", "offline_access"}
+	fakeScopes := []any{"openid", "profile"}
+	fakeScopesOfflineAccess := []any{"openid", "profile", "offline_access"}
 	now := time.Now()
 	fakeTime := func() time.Time {
 		return now
@@ -99,11 +99,11 @@ func TestTokenEndpoint(t *testing.T) {
 			ClientID: fakeClientID,
 		},
 	}
-
 	fakeToken := &v3.Token{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fakeTokenName,
 		},
+		Token:        "this-is-a-test",
 		UserID:       fakeUserID,
 		Enabled:      ptr.To(true),
 		AuthProvider: fakeAuthProvider,
@@ -115,6 +115,7 @@ func TestTokenEndpoint(t *testing.T) {
 				Time: time.Unix(10, 0),
 			},
 		},
+		Token:        "this-is-a-test",
 		UserID:       fakeUserID,
 		Enabled:      ptr.To(true),
 		AuthProvider: fakeAuthProvider,
@@ -211,23 +212,24 @@ func TestTokenEndpoint(t *testing.T) {
 				m.oidcClient.EXPECT().Patch(fakeClientName, types.JSONPatchType, clientSecretIDPatch).Return(fakeOIDCClient, nil)
 			},
 			wantIdTokenClaims: &jwt.MapClaims{
-				"aud":           []interface{}{fakeClientID},
+				"aud":           []any{fakeClientID},
 				"exp":           float64(fakeTime().Add(fakeTokenLifespan * time.Second).Unix()),
 				"iss":           settings.ServerURL.Get() + "/oidc",
 				"iat":           float64(fakeTime().Unix()),
 				"name":          fakeUsername,
 				"sub":           fakeUserID,
 				"auth_provider": fakeAuthProvider,
-				"groups":        []interface{}{fakeGroup},
+				"groups":        []any{fakeGroup},
 			},
 			wantAccessTokenClaims: &jwt.MapClaims{
-				"aud":           []interface{}{fakeClientID},
+				"aud":           []any{fakeClientID},
 				"exp":           float64(fakeTime().Add(fakeTokenLifespan * time.Second).Unix()),
 				"iss":           settings.ServerURL.Get() + "/oidc",
 				"iat":           float64(fakeTime().Unix()),
 				"sub":           fakeUserID,
 				"auth_provider": fakeAuthProvider,
 				"scope":         fakeScopes,
+				"token":         fakeToken.Name,
 			},
 		},
 		"authorization_code fails for an invalid code": {
@@ -375,26 +377,27 @@ func TestTokenEndpoint(t *testing.T) {
 				m.oidcClient.EXPECT().Patch(fakeClientName, types.JSONPatchType, clientSecretIDPatch).Return(fakeOIDCClient, nil)
 			},
 			wantIdTokenClaims: &jwt.MapClaims{
-				"aud":           []interface{}{fakeClientID},
+				"aud":           []any{fakeClientID},
 				"exp":           float64(fakeTime().Add(fakeTokenLifespan * time.Second).Unix()),
 				"iss":           settings.ServerURL.Get() + "/oidc",
 				"iat":           float64(fakeTime().Unix()),
 				"name":          fakeUsername,
 				"sub":           fakeUserID,
 				"auth_provider": fakeAuthProvider,
-				"groups":        []interface{}{fakeGroup},
+				"groups":        []any{fakeGroup},
 			},
 			wantAccessTokenClaims: &jwt.MapClaims{
-				"aud":           []interface{}{fakeClientID},
+				"aud":           []any{fakeClientID},
 				"exp":           float64(fakeTime().Add(fakeTokenLifespan * time.Second).Unix()),
 				"iss":           settings.ServerURL.Get() + "/oidc",
 				"iat":           float64(fakeTime().Unix()),
 				"sub":           fakeUserID,
 				"auth_provider": fakeAuthProvider,
 				"scope":         fakeScopesOfflineAccess,
+				"token":         fakeToken.Name,
 			},
 			wantRefreshTokenClaims: &jwt.MapClaims{
-				"aud":                []interface{}{fakeClientID},
+				"aud":                []any{fakeClientID},
 				"exp":                float64(fakeTime().Add(fakeRefreshTokenLifespan * time.Second).Unix()),
 				"iat":                float64(fakeTime().Unix()),
 				"sub":                fakeUserID,
@@ -426,26 +429,27 @@ func TestTokenEndpoint(t *testing.T) {
 				m.signingKeyGetter.EXPECT().GetPublicKey(fakeSigningKey).Return(&privateKey.PublicKey, nil)
 			},
 			wantIdTokenClaims: &jwt.MapClaims{
-				"aud":           []interface{}{fakeClientID},
+				"aud":           []any{fakeClientID},
 				"exp":           float64(fakeTime().Add(fakeTokenLifespan * time.Second).Unix()),
 				"iss":           settings.ServerURL.Get() + "/oidc",
 				"iat":           float64(fakeTime().Unix()),
 				"name":          fakeUsername,
 				"sub":           fakeUserID,
 				"auth_provider": fakeAuthProvider,
-				"groups":        []interface{}{fakeGroup},
+				"groups":        []any{fakeGroup},
 			},
 			wantAccessTokenClaims: &jwt.MapClaims{
-				"aud":           []interface{}{fakeClientID},
+				"aud":           []any{fakeClientID},
 				"exp":           float64(fakeTime().Add(fakeTokenLifespan * time.Second).Unix()),
 				"iss":           settings.ServerURL.Get() + "/oidc",
 				"iat":           float64(fakeTime().Unix()),
 				"sub":           fakeUserID,
 				"auth_provider": fakeAuthProvider,
 				"scope":         fakeScopesOfflineAccess,
+				"token":         fakeToken.Name,
 			},
 			wantRefreshTokenClaims: &jwt.MapClaims{
-				"aud":                []interface{}{fakeClientID},
+				"aud":                []any{fakeClientID},
 				"exp":                float64(fakeTime().Add(fakeRefreshTokenLifespan * time.Second).Unix()),
 				"iat":                float64(fakeTime().Unix()),
 				"sub":                fakeUserID,
@@ -559,6 +563,56 @@ func TestTokenEndpoint(t *testing.T) {
 			},
 			wantError: `{"error":"server_error","error_description":"failed to parse refresh token: token has invalid claims: token is expired"}`,
 		},
+		"authorization_code does not return an id token if the openid scope is not provided": {
+			req: func() *http.Request {
+				data := url.Values{}
+				data.Set("grant_type", "authorization_code")
+				data.Set("code", fakeCode)
+				data.Set("code_verifier", fakeCodeVerifier)
+				req, _ := http.NewRequest("POST", "https://rancher.com", bytes.NewBufferString(data.Encode()))
+				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+				req.Header.Add("Authorization", fmt.Sprintf("Basic %s", base64.StdEncoding.EncodeToString([]byte(fakeClientID+":"+fakeClientSecret))))
+
+				return req
+			},
+			mockSetup: func(m mockParams) {
+				fakeSession := &session.Session{
+					ClientID:      fakeClientID,
+					TokenName:     fakeTokenName,
+					Scope:         []string{"profile", "offline_access", "testing:scope"},
+					CodeChallenge: oauth2.S256ChallengeFromVerifier(fakeCodeVerifier),
+				}
+				m.sessionClient.EXPECT().Get(fakeCode).Return(fakeSession, nil)
+				m.sessionClient.EXPECT().Remove(fakeCode).Return(nil)
+				m.secretCache.EXPECT().Get("cattle-oidc-client-secrets", fakeClientID).Return(fakeClientk8sSecret, nil)
+				m.oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", fakeClientID).Return([]*v3.OIDCClient{fakeOIDCClient}, nil)
+				m.tokenCache.EXPECT().Get(fakeTokenName).Return(fakeToken, nil)
+				m.userLister.EXPECT().Get(fakeUserID).Return(fakeUser, nil)
+				m.useAttributeLister.EXPECT().Get(fakeUserID).Return(fakeUserAttributes, nil)
+				m.tokenClient.EXPECT().Patch(fakeTokenName, types.JSONPatchType, tokenPatch).Return(fakeToken, nil)
+				m.signingKeyGetter.EXPECT().GetSigningKey().Return(privateKey, fakeSigningKey, nil)
+				m.oidcClient.EXPECT().Patch(fakeClientName, types.JSONPatchType, clientSecretIDPatch).Return(fakeOIDCClient, nil)
+			},
+			wantAccessTokenClaims: &jwt.MapClaims{
+				"aud":           []any{fakeClientID},
+				"exp":           float64(fakeTime().Add(fakeTokenLifespan * time.Second).Unix()),
+				"iss":           settings.ServerURL.Get() + "/oidc",
+				"iat":           float64(fakeTime().Unix()),
+				"sub":           fakeUserID,
+				"auth_provider": fakeAuthProvider,
+				"scope":         []any{"profile", "offline_access", "testing:scope"},
+				"token":         fakeToken.Name,
+			},
+			wantRefreshTokenClaims: &jwt.MapClaims{
+				"aud":                []any{fakeClientID},
+				"exp":                float64(fakeTime().Add(fakeRefreshTokenLifespan * time.Second).Unix()),
+				"iat":                float64(fakeTime().Unix()),
+				"sub":                fakeUserID,
+				"auth_provider":      fakeAuthProvider,
+				"scope":              []any{"profile", "offline_access", "testing:scope"},
+				"rancher_token_hash": rancherTokenHash,
+			},
+		},
 	}
 
 	// register auth provider
@@ -598,31 +652,31 @@ func TestTokenEndpoint(t *testing.T) {
 				assert.Equal(t, tokenResponse.TokenType, bearerTokenType)
 				if test.wantIdTokenClaims != nil {
 					claims := jwt.MapClaims{}
-					_, err := jwt.ParseWithClaims(tokenResponse.IDToken, &claims, func(token *jwt.Token) (interface{}, error) {
+					_, err := jwt.ParseWithClaims(tokenResponse.IDToken, &claims, func(token *jwt.Token) (any, error) {
 						return &privateKey.PublicKey, nil
 					})
 					assert.NoError(t, err)
-					assert.Equal(t, test.wantIdTokenClaims, &claims)
+					assert.Equal(t, test.wantIdTokenClaims, &claims, "id token does not match")
 				} else {
 					assert.Empty(t, tokenResponse.IDToken)
 				}
 				if test.wantAccessTokenClaims != nil {
 					claims := jwt.MapClaims{}
-					_, err := jwt.ParseWithClaims(tokenResponse.AccessToken, &claims, func(token *jwt.Token) (interface{}, error) {
+					_, err := jwt.ParseWithClaims(tokenResponse.AccessToken, &claims, func(token *jwt.Token) (any, error) {
 						return &privateKey.PublicKey, nil
 					})
 					assert.NoError(t, err)
-					assert.Equal(t, test.wantAccessTokenClaims, &claims)
+					assert.Equal(t, test.wantAccessTokenClaims, &claims, "access token does not match")
 				} else {
 					assert.Empty(t, tokenResponse.AccessToken)
 				}
 				if test.wantRefreshTokenClaims != nil {
 					claims := jwt.MapClaims{}
-					_, err := jwt.ParseWithClaims(tokenResponse.RefreshToken, &claims, func(token *jwt.Token) (interface{}, error) {
+					_, err := jwt.ParseWithClaims(tokenResponse.RefreshToken, &claims, func(token *jwt.Token) (any, error) {
 						return &privateKey.PublicKey, nil
 					})
 					assert.NoError(t, err)
-					assert.Equal(t, test.wantRefreshTokenClaims, &claims)
+					assert.Equal(t, test.wantRefreshTokenClaims, &claims, "refresh token does not match")
 				} else {
 					assert.Empty(t, tokenResponse.RefreshToken)
 				}
