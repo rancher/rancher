@@ -21,32 +21,38 @@ type Policy struct {
 	Verbosity auditlogv1.LogVerbosity
 }
 
+// actionForUri returns the first non-Unknown action from filters.
+// If no filter matches, it returns Unknown (no opinion).
 func (p Policy) actionForUri(uri string) auditlogv1.FilterAction {
 	if len(p.Filters) == 0 {
 		return auditlogv1.FilterActionAllow
 	}
 
 	for _, f := range p.Filters {
-		if f.Allowed(uri) {
-			return auditlogv1.FilterActionAllow
+		res := f.Allowed(uri)
+		if res != auditlogv1.FilterActionUnknown {
+			return res
 		}
 	}
 
-	return auditlogv1.FilterActionDeny
+	return auditlogv1.FilterActionUnknown
 }
 
+// actionForLog returns the first non-Unknown action from filters.
+// If no filter matches, it returns Unknown (no opinion).
 func (p Policy) actionForLog(log *logEntry) auditlogv1.FilterAction {
 	if len(p.Filters) == 0 {
 		return auditlogv1.FilterActionAllow
 	}
 
 	for _, f := range p.Filters {
-		if f.LogAllowed(log) {
-			return auditlogv1.FilterActionAllow
+		res := f.LogAllowed(log)
+		if res != auditlogv1.FilterActionUnknown {
+			return res
 		}
 	}
 
-	return auditlogv1.FilterActionDeny
+	return auditlogv1.FilterActionUnknown
 }
 
 func PolicyFromAuditPolicy(policy *auditlogv1.AuditPolicy) (Policy, error) {
@@ -129,26 +135,33 @@ func (w *Writer) Write(log *logEntry) error {
 		defaultMu.Unlock()
 	}
 
+	// Start with Unknown; we will default to Allow if nothing matches.
 	action := auditlogv1.FilterActionUnknown
 
 	w.policiesMutex.RLock()
 	for _, policy := range w.policies {
-		switch policy.actionForLog(log) {
-		case auditlogv1.FilterActionAllow:
-			redactors = append(redactors, policy.Redactors...)
+		policyResult := policy.actionForLog(log)
 
+		// Deny wins across all policies: if any policy denies, drop immediately.
+		if policyResult == auditlogv1.FilterActionDeny {
+			action = auditlogv1.FilterActionDeny
+			break
+		}
+
+		// Allow marks the entry as loggable, and includes that policy's redactors.
+		if policyResult == auditlogv1.FilterActionAllow {
 			action = auditlogv1.FilterActionAllow
-		case auditlogv1.FilterActionDeny:
-			if action != auditlogv1.FilterActionAllow {
-				action = auditlogv1.FilterActionDeny
-			}
+			redactors = append(redactors, policy.Redactors...)
 		}
 	}
 	w.policiesMutex.RUnlock()
 
+	// If any deny matched, drop.
 	if action == auditlogv1.FilterActionDeny {
 		return nil
 	}
+
+	// If no policy matched (Unknown), default behavior is Allow.
 
 	for _, r := range redactors {
 		if err := r.Redact(log); err != nil {
