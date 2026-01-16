@@ -377,28 +377,31 @@ func (p *RTBTestSuite) TestPermissionsCanBeRemoved() {
 	ns1 := addNamespaceToProject(project1)
 
 	// Verify user can access namespace in first project
-	_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns1.Name)
-	require.NoError(p.T(), err)
+	require.Eventually(p.T(), func() bool {
+		_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns1.Name)
+		return err == nil
+	}, 2*time.Minute, 2*time.Second, "waiting for permissions to be applied to user")
 
 	// Add namespace to second project
 	ns2 := addNamespaceToProject(project2)
 
 	// Verify user can access namespace in both projects
-	_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns1.Name)
-	require.NoError(p.T(), err)
-	_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns2.Name)
-	require.NoError(p.T(), err)
+	require.Eventually(p.T(), func() bool {
+		_, err1 := extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns1.Name)
+		_, err2 := extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns2.Name)
+		return err1 == nil && err2 == nil
+	}, 2*time.Minute, 2*time.Second, "waiting for permissions to be applied to user")
 
 	// Remove user from second project
 	err = client.Management.ProjectRoleTemplateBinding.Delete(prtb2)
 	require.NoError(p.T(), err)
 
 	// Verify user can still access namespace in first project but not in second anymore
-	_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns1.Name)
 	require.NoError(p.T(), err)
 	require.Eventually(p.T(), func() bool {
-		_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns2.Name)
-		return apierrors.IsForbidden(err)
+		_, err1 := extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns1.Name)
+		_, err2 := extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns2.Name)
+		return apierrors.IsForbidden(err2) && err1 == nil
 	}, 2*time.Minute, 2*time.Second, "waiting for permissions to be removed from user")
 }
 
