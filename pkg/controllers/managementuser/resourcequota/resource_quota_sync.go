@@ -510,9 +510,13 @@ func completeLimit(nsLimit *v32.ContainerResourceLimit, projectLimit *v32.Contai
 	return resultingLimit, err
 }
 
-// zeroOutResourceQuotaLimit takes a resource quota limit and a list of resources exceeding the quota,
-// and returns a new quota limit with exceeded resources zeroed out.
+// zeroOutResourceQuotaLimit takes a resource quota limit and a list of
+// resources exceeding the quota, and returns a new quota limit with exceeded
+// resources zeroed out.
 func zeroOutResourceQuotaLimit(limit *v32.ResourceQuotaLimit, exceeded corev1.ResourceList) (*v32.ResourceQuotaLimit, error) {
+	// See also `convertResourceListToLimit` in sibling file
+	// `resource_quota_common.go` for the same kind of key mapping.
+
 	limitMap, err := convert.EncodeToMap(limit)
 	if err != nil {
 		return nil, err
@@ -520,7 +524,13 @@ func zeroOutResourceQuotaLimit(limit *v32.ResourceQuotaLimit, exceeded corev1.Re
 
 	for k := range exceeded {
 		resource := string(k)
-		limitMap[resource] = "0"
+		if val, ok := resourceQuotaReturnConversion[resource]; ok {
+			limitMap[val] = "0"
+		} else {
+			extended := limitMap["extended"].(map[string]any)
+			extended[resource] = "0"
+			limitMap["extended"] = extended
+		}
 	}
 
 	toReturn := &v32.ResourceQuotaLimit{}

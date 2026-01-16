@@ -16,6 +16,9 @@ import (
 const extendedKey = resourcequota.ExtendedKey
 
 func convertResourceListToLimit(rList corev1.ResourceList) (*apiv3.ResourceQuotaLimit, error) {
+	// See also `zeroOutResourceQuotaLimit` in sibling file
+	// `resource_quota_sync.go` for the same kind of key mapping.
+
 	converted, err := convert.EncodeToMap(rList)
 	if err != nil {
 		return nil, err
