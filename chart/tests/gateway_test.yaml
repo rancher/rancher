@@ -1,0 +1,466 @@
+suite: Test Gateway API Resources
+templates:
+  - templates/ingate/gateway.yaml
+  - templates/ingate/httproute.yaml
+  - templates/ingate/httproute-redirect.yaml
+  - templates/ingate/gateway-cert.yaml
+
+tests:
+  - it: should not render Gateway when networkExposure type is ingress (default)
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render Gateway when networkExposure type is none
+    set:
+      networkExposure:
+        type: none
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render Gateway when networkExposure type is gateway
+    template: templates/ingate/gateway.yaml
+    set:
+      networkExposure:
+        type: gateway
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Gateway
+      - equal:
+          path: apiVersion
+          value: gateway.networking.k8s.io/v1
+
+  - it: should configure HTTP listener with default Traefik port 8000
+    template: templates/ingate/gateway.yaml
+    set:
+      hostname: rancher.example.com
+      networkExposure:
+        type: gateway
+    asserts:
+      - contains:
+          path: spec.listeners
+          content:
+            name: rancher-http
+            protocol: HTTP
+            port: 8000
+            hostname: rancher.example.com
+            allowedRoutes:
+              namespaces:
+                from: Same
+
+  - it: should configure HTTP listener with custom port
+    template: templates/ingate/gateway.yaml
+    set:
+      hostname: rancher.example.com
+      networkExposure:
+        type: gateway
+      gateway:
+        gatewayClass:
+          ports:
+            http: 9000
+    asserts:
+      - contains:
+          path: spec.listeners
+          content:
+            name: rancher-http
+            protocol: HTTP
+            port: 9000
+            hostname: rancher.example.com
+            allowedRoutes:
+              namespaces:
+                from: Same
+
+  - it: should configure HTTPS listener with default Traefik port 8443 when internal TLS
+    template: templates/ingate/gateway.yaml
+    set:
+      hostname: rancher.example.com
+      tls: selfsigned
+      networkExposure:
+        type: gateway
+    asserts:
+      - contains:
+          path: spec.listeners
+          content:
+            name: rancher-https
+            protocol: HTTPS
+            port: 8443
+            hostname: rancher.example.com
+            allowedRoutes:
+              namespaces:
+                from: Same
+            tls:
+              mode: Terminate
+              certificateRefs:
+                - name: tls-rancher-ingress
+
+  - it: should configure HTTPS listener with custom port when internal TLS
+    template: templates/ingate/gateway.yaml
+    set:
+      hostname: rancher.example.com
+      tls: selfsigned
+      networkExposure:
+        type: gateway
+      gateway:
+        gatewayClass:
+          ports:
+            https: 9443
+    asserts:
+      - contains:
+          path: spec.listeners
+          content:
+            name: rancher-https
+            protocol: HTTPS
+            port: 9443
+            hostname: rancher.example.com
+            allowedRoutes:
+              namespaces:
+                from: Same
+            tls:
+              mode: Terminate
+              certificateRefs:
+                - name: tls-rancher-ingress
+
+  - it: should not configure HTTPS listener when external TLS
+    template: templates/ingate/gateway.yaml
+    set:
+      tls: external
+      networkExposure:
+        type: gateway
+    asserts:
+      - notContains:
+          path: spec.listeners
+          content:
+            name: https
+
+  - it: should use custom TLS secret name
+    template: templates/ingate/gateway.yaml
+    set:
+      hostname: rancher.example.com
+      tls: selfsigned
+      networkExposure:
+        type: gateway
+      gateway:
+        gatewayClass:
+          tls:
+            secretName: custom-tls-secret
+    asserts:
+      - contains:
+          path: spec.listeners
+          content:
+            name: rancher-https
+            protocol: HTTPS
+            port: 8443
+            hostname: rancher.example.com
+            allowedRoutes:
+              namespaces:
+                from: Same
+            tls:
+              mode: Terminate
+              certificateRefs:
+                - name: custom-tls-secret
+
+  - it: should use custom gatewayClassName
+    template: templates/ingate/gateway.yaml
+    set:
+      networkExposure:
+        type: gateway
+      gateway:
+        gatewayClass:
+          name: nginx
+    asserts:
+      - equal:
+          path: spec.gatewayClassName
+          value: nginx
+
+  - it: should render HTTPRoute when networkExposure type is gateway
+    template: templates/ingate/httproute.yaml
+    set:
+      networkExposure:
+        type: gateway
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: HTTPRoute
+      - equal:
+          path: apiVersion
+          value: gateway.networking.k8s.io/v1
+
+  - it: should not render HTTPRoute when networkExposure type is ingress
+    template: templates/ingate/httproute.yaml
+    set:
+      networkExposure:
+        type: ingress
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should attach to HTTPS listener when internal TLS
+    template: templates/ingate/httproute.yaml
+    set:
+      tls: selfsigned
+      networkExposure:
+        type: gateway
+    asserts:
+      - equal:
+          path: spec.parentRefs[0].sectionName
+          value: rancher-https
+      - isNotNull:
+          path: spec.parentRefs[0].name
+      - isNotNull:
+          path: spec.parentRefs[0].namespace
+
+  - it: should attach to HTTP listener when external TLS
+    template: templates/ingate/httproute.yaml
+    set:
+      tls: external
+      networkExposure:
+        type: gateway
+    asserts:
+      - equal:
+          path: spec.parentRefs[0].sectionName
+          value: rancher-http
+      - isNotNull:
+          path: spec.parentRefs[0].name
+      - isNotNull:
+          path: spec.parentRefs[0].namespace
+
+  - it: should route to service on port 443 when disableHTTP is true
+    template: templates/ingate/httproute.yaml
+    set:
+      networkExposure:
+        type: gateway
+      service:
+        disableHTTP: true
+      ingress:
+        servicePort: 443
+    asserts:
+      - equal:
+          path: spec.rules[0].backendRefs[0].port
+          value: 443
+
+  - it: should route to service on port 80 when disableHTTP is false
+    template: templates/ingate/httproute.yaml
+    set:
+      networkExposure:
+        type: gateway
+      service:
+        disableHTTP: false
+    asserts:
+      - equal:
+          path: spec.rules[0].backendRefs[0].port
+          value: 80
+
+  - it: should configure correct hostname
+    template: templates/ingate/httproute.yaml
+    set:
+      hostname: my-rancher.example.com
+      networkExposure:
+        type: gateway
+    asserts:
+      - equal:
+          path: spec.hostnames[0]
+          value: my-rancher.example.com
+
+  - it: should use PathPrefix matching for root path
+    template: templates/ingate/httproute.yaml
+    set:
+      networkExposure:
+        type: gateway
+    asserts:
+      - equal:
+          path: spec.rules[0].matches[0].path.type
+          value: PathPrefix
+      - equal:
+          path: spec.rules[0].matches[0].path.value
+          value: /
+
+  - it: should render redirect HTTPRoute when internal TLS
+    template: templates/ingate/httproute-redirect.yaml
+    set:
+      tls: selfsigned
+      networkExposure:
+        type: gateway
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: HTTPRoute
+
+  - it: should not render redirect HTTPRoute when external TLS
+    template: templates/ingate/httproute-redirect.yaml
+    set:
+      tls: external
+      networkExposure:
+        type: gateway
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render redirect HTTPRoute when networkExposure type is ingress
+    template: templates/ingate/httproute-redirect.yaml
+    set:
+      tls: selfsigned
+      networkExposure:
+        type: ingress
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should configure RequestRedirect filter with HTTPS scheme
+    template: templates/ingate/httproute-redirect.yaml
+    set:
+      tls: selfsigned
+      networkExposure:
+        type: gateway
+    asserts:
+      - equal:
+          path: spec.rules[0].filters[0].type
+          value: RequestRedirect
+      - equal:
+          path: spec.rules[0].filters[0].requestRedirect.scheme
+          value: https
+      - equal:
+          path: spec.rules[0].filters[0].requestRedirect.statusCode
+          value: 301
+
+  - it: should attach to HTTP listener for redirect
+    template: templates/ingate/httproute-redirect.yaml
+    set:
+      tls: selfsigned
+      networkExposure:
+        type: gateway
+    asserts:
+      - equal:
+          path: spec.parentRefs[0].sectionName
+          value: rancher-http
+      - isNotNull:
+          path: spec.parentRefs[0].name
+      - isNotNull:
+          path: spec.parentRefs[0].namespace
+
+  - it: should render Certificate when internal TLS with rancher source
+    template: templates/ingate/gateway-cert.yaml
+    set:
+      tls: selfsigned
+      networkExposure:
+        type: gateway
+      gateway:
+        gatewayClass:
+          tls:
+            source: rancher
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Certificate
+      - equal:
+          path: apiVersion
+          value: cert-manager.io/v1
+
+  - it: should render Certificate when and internal TLS with letsEncrypt source
+    template: templates/ingate/gateway-cert.yaml
+    set:
+      tls: selfsigned
+      networkExposure:
+        type: gateway
+      gateway:
+        gatewayClass:
+          tls:
+            source: letsEncrypt
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Certificate
+
+  - it: should not render Certificate when tls source is secret
+    template: templates/ingate/gateway-cert.yaml
+    set:
+      tls: selfsigned
+      networkExposure:
+        type: gateway
+      gateway:
+        gatewayClass:
+          tls:
+            source: secret
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render Certificate when external TLS
+    template: templates/ingate/gateway-cert.yaml
+    set:
+      tls: external
+      networkExposure:
+        type: gateway
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render Certificate when networkExposure type is ingress
+    template: templates/ingate/gateway-cert.yaml
+    set:
+      tls: selfsigned
+      networkExposure:
+        type: ingress
+      gateway:
+        gatewayClass:
+          tls:
+            source: rancher
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should reference Rancher issuer when tls source is rancher
+    template: templates/ingate/gateway-cert.yaml
+    set:
+      tls: selfsigned
+      networkExposure:
+        type: gateway
+      gateway:
+        gatewayClass:
+          tls:
+            source: rancher
+    asserts:
+      - matchRegex:
+          path: spec.issuerRef.name
+          pattern: .*rancher$
+      - equal:
+          path: spec.issuerRef.kind
+          value: Issuer
+
+  - it: should use custom secret name in Certificate
+    template: templates/ingate/gateway-cert.yaml
+    set:
+      tls: selfsigned
+      networkExposure:
+        type: gateway
+      gateway:
+        gatewayClass:
+          tls:
+            source: rancher
+            secretName: custom-gateway-tls
+    asserts:
+      - equal:
+          path: spec.secretName
+          value: custom-gateway-tls
+
+  - it: should configure correct hostname in Certificate
+    template: templates/ingate/gateway-cert.yaml
+    set:
+      hostname: my-rancher.example.com
+      tls: selfsigned
+      networkExposure:
+        type: gateway
+      gateway:
+        gatewayClass:
+          tls:
+            source: rancher
+    asserts:
+      - equal:
+          path: spec.dnsNames[0]
+          value: my-rancher.example.com

@@ -2,6 +2,10 @@ suite: test NOTES.txt cert-manager warnings
 templates:
   - NOTES.txt
 tests:
+  - it: should show hostname warning by default
+    asserts:
+      - matchRegexRaw:
+          pattern: ".*\\[WARNING\\].*\\`\\.Values\\.hostname\\`.*"
   - it: should not warn when certmanager.version is not set
     set:
       ingress.tls.source: "rancher"
@@ -19,7 +23,7 @@ tests:
       - notMatchRegexRaw:
           pattern: ".*Cert-manager.*"
       - notMatchRegexRaw:
-          pattern: ".*\\[WARNING\\].*"
+          pattern: ".*\\[WARNING\\].*Cert-manager"
 
   - it: should show CRD not found warning when running in unit test context
     set:

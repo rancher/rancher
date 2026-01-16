@@ -8,7 +8,9 @@ source $(dirname $0)/prepare-chart
 
 # test - need to be in the chart directory during the test so it can find Chart.yaml
 cd chart
-helm lint ./
+# Adding hostname ensures warnings about required field don't show up
+# These could cause someone to think there is a false-positive for lint issues
+helm lint ./ --set hostname=rancher-lint.example.com
 helm unittest ./
 cd ..
 

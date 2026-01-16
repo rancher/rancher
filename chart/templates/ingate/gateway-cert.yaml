@@ -1,0 +1,15 @@
+{{- if and (eq (include "rancher.gatewayEnabled" .) "true") (eq (include "rancher.useExternalTls" .) "false") (ne .Values.gateway.gatewayClass.tls.source "secret") -}}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+    name: {{ include "rancher.gateway" . }}-tls
+    labels:
+{{ include "rancher.labels" . | indent 4 }}
+spec:
+    secretName: {{ .Values.gateway.gatewayClass.tls.secretName }}
+    issuerRef:
+        name: {{ template "rancher.fullname" . }}
+        kind: Issuer
+    dnsNames:
+        - {{ .Values.hostname }}
+{{- end }}

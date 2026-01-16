@@ -1,0 +1,21 @@
+{{- if and (eq (include "rancher.gatewayEnabled" .) "true") (eq (include "rancher.useExternalTls" .) "false") -}}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "rancher.fullname" . }}-http-redirect
+  labels:
+{{ include "rancher.labels" . | indent 4 }}
+spec:
+  parentRefs:
+    - name: {{ include "rancher.gateway" . }}
+      namespace: {{ .Release.Namespace }}
+      sectionName: rancher-http
+  hostnames:
+    - {{ .Values.hostname }}
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301
+{{- end }}
