@@ -7,7 +7,9 @@ metadata:
 {{ include "rancher.labels" . | indent 4 }}
 spec:
   parentRefs:
-{{ include "rancher.gateway.parentRefs" (list . "http") | indent 4 }}
+    - name: {{ include "rancher.gateway" . }}
+      namespace: {{ .Release.Namespace }}
+      sectionName: rancher-http
   hostnames:
     - {{ .Values.hostname }}
   rules:

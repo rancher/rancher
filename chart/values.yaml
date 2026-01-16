@@ -102,7 +102,6 @@ ingress:
 
 # Gateway API configuration
 gateway:
-  createGateway: true  # Set false to use an existing Gateway resource; must be properly configured
   gatewayClass: # Used when createGateway is set to true
     name: "traefik" # Set to the Gateway class name (k3s/rke2: traefik)
     ports: # Must match the GatewayClass's configured entrypoints
@@ -127,14 +126,6 @@ gateway:
       # options: rancher, letsEncrypt, secret
       source: rancher
       secretName: tls-rancher-ingress
-
-  existingGateway: # Used when createGateway is set false
-    name: "default-gateway" # Name of an existing gateway to use
-    namespace: "default"    # Namespace of the existing gateway
-    httpSections:  # HTTP listener sections (used for redirect route or main route when tls=external)
-      - "http-listener"
-    httpsSections: # HTTPS listener sections (used for main route when TLS terminates at k8s)
-      - "https-listener"
 
 ### service ###
 # Override to use NodePort or LoadBalancer service type - default is ClusterIP

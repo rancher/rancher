@@ -8,12 +8,14 @@ metadata:
 {{ include "rancher.labels" . | indent 4 }}
 spec:
   parentRefs:
+    - name: {{ include "rancher.gateway" . }}
+      namespace: {{ .Release.Namespace }}
     {{- if eq (include "rancher.useExternalTls" .) "false" }}
-    # TLS terminates at k8s: attach to HTTPS listeners (redirect route handles HTTP)
-{{ include "rancher.gateway.parentRefs" (list . "https") | indent 4 }}
+      # TLS terminates at k8s: attach to HTTPS listeners (redirect route handles HTTP)
+      sectionName: rancher-https
     {{- else }}
     # TLS is external: attach to HTTP listeners (no redirect route)
-{{ include "rancher.gateway.parentRefs" (list . "http") | indent 4 }}
+      sectionName: rancher-http
     {{- end }}
   hostnames:
     - {{ .Values.hostname }}
