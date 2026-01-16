@@ -1,4 +1,4 @@
-{{- if and (eq (include "rancher.gatewayEnabled" .) "true") .Values.gateway.createGateway -}}
+{{- if eq (include "rancher.gatewayEnabled" .) "true" -}}
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:

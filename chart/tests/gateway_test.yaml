@@ -19,13 +19,11 @@ tests:
       - hasDocuments:
           count: 0
 
-  - it: should render Gateway when networkExposure type is gateway and createGateway is true
+  - it: should render Gateway when networkExposure type is gateway
     template: templates/ingate/gateway.yaml
     set:
       networkExposure:
         type: gateway
-      gateway:
-        createGateway: true
     asserts:
       - hasDocuments:
           count: 1
@@ -35,25 +33,12 @@ tests:
           path: apiVersion
           value: gateway.networking.k8s.io/v1
 
-  - it: should not render Gateway when createGateway is false
-    template: templates/ingate/gateway.yaml
-    set:
-      networkExposure:
-        type: gateway
-      gateway:
-        createGateway: false
-    asserts:
-      - hasDocuments:
-          count: 0
-
   - it: should configure HTTP listener with default Traefik port 8000
     template: templates/ingate/gateway.yaml
     set:
       hostname: rancher.example.com
       networkExposure:
         type: gateway
-      gateway:
-        createGateway: true
     asserts:
       - contains:
           path: spec.listeners
@@ -73,7 +58,6 @@ tests:
       networkExposure:
         type: gateway
       gateway:
-        createGateway: true
         gatewayClass:
           ports:
             http: 9000
@@ -96,8 +80,6 @@ tests:
       tls: selfsigned
       networkExposure:
         type: gateway
-      gateway:
-        createGateway: true
     asserts:
       - contains:
           path: spec.listeners
@@ -122,7 +104,6 @@ tests:
       networkExposure:
         type: gateway
       gateway:
-        createGateway: true
         gatewayClass:
           ports:
             https: 9443
@@ -148,8 +129,6 @@ tests:
       tls: external
       networkExposure:
         type: gateway
-      gateway:
-        createGateway: true
     asserts:
       - notContains:
           path: spec.listeners
@@ -164,7 +143,6 @@ tests:
       networkExposure:
         type: gateway
       gateway:
-        createGateway: true
         gatewayClass:
           tls:
             secretName: custom-tls-secret
@@ -190,7 +168,6 @@ tests:
       networkExposure:
         type: gateway
       gateway:
-        createGateway: true
         gatewayClass:
           name: nginx
     asserts:
@@ -221,14 +198,12 @@ tests:
       - hasDocuments:
           count: 0
 
-  - it: should attach to HTTPS listener when internal TLS and createGateway true
+  - it: should attach to HTTPS listener when internal TLS
     template: templates/ingate/httproute.yaml
     set:
       tls: selfsigned
       networkExposure:
         type: gateway
-      gateway:
-        createGateway: true
     asserts:
       - equal:
           path: spec.parentRefs[0].sectionName
@@ -238,14 +213,12 @@ tests:
       - isNotNull:
           path: spec.parentRefs[0].namespace
 
-  - it: should attach to HTTP listener when external TLS and createGateway true
+  - it: should attach to HTTP listener when external TLS
     template: templates/ingate/httproute.yaml
     set:
       tls: external
       networkExposure:
         type: gateway
-      gateway:
-        createGateway: true
     asserts:
       - equal:
           path: spec.parentRefs[0].sectionName
@@ -254,27 +227,6 @@ tests:
           path: spec.parentRefs[0].name
       - isNotNull:
           path: spec.parentRefs[0].namespace
-
-  - it: should attach to existing gateway when createGateway false
-    template: templates/ingate/httproute.yaml
-    set:
-      tls: external
-      networkExposure:
-        type: gateway
-      gateway:
-        createGateway: false
-        existingGateway:
-          name: external-gateway
-          namespace: gateway-system
-          httpSections:
-            - http-listener
-    asserts:
-      - contains:
-          path: spec.parentRefs
-          content:
-            name: external-gateway
-            namespace: gateway-system
-            sectionName: http-listener
 
   - it: should route to service on port 443 when disableHTTP is true
     template: templates/ingate/httproute.yaml
@@ -375,14 +327,12 @@ tests:
           path: spec.rules[0].filters[0].requestRedirect.statusCode
           value: 301
 
-  - it: should attach to HTTP listener for redirect when createGateway true
+  - it: should attach to HTTP listener for redirect
     template: templates/ingate/httproute-redirect.yaml
     set:
       tls: selfsigned
       networkExposure:
         type: gateway
-      gateway:
-        createGateway: true
     asserts:
       - equal:
           path: spec.parentRefs[0].sectionName
@@ -392,35 +342,13 @@ tests:
       - isNotNull:
           path: spec.parentRefs[0].namespace
 
-  - it: should attach to existing gateway HTTP listener for redirect when createGateway false
-    template: templates/ingate/httproute-redirect.yaml
-    set:
-      tls: selfsigned
-      networkExposure:
-        type: gateway
-      gateway:
-        createGateway: false
-        existingGateway:
-          name: external-gateway
-          namespace: gateway-system
-          httpSections:
-            - http-80
-    asserts:
-      - contains:
-          path: spec.parentRefs
-          content:
-            name: external-gateway
-            namespace: gateway-system
-            sectionName: http-80
-
-  - it: should render Certificate when createGateway true and internal TLS with rancher source
+  - it: should render Certificate when internal TLS with rancher source
     template: templates/ingate/gateway-cert.yaml
     set:
       tls: selfsigned
       networkExposure:
         type: gateway
       gateway:
-        createGateway: true
         gatewayClass:
           tls:
             source: rancher
@@ -433,14 +361,13 @@ tests:
           path: apiVersion
           value: cert-manager.io/v1
 
-  - it: should render Certificate when createGateway true and internal TLS with letsEncrypt source
+  - it: should render Certificate when and internal TLS with letsEncrypt source
     template: templates/ingate/gateway-cert.yaml
     set:
       tls: selfsigned
       networkExposure:
         type: gateway
       gateway:
-        createGateway: true
         gatewayClass:
           tls:
             source: letsEncrypt
@@ -457,7 +384,6 @@ tests:
       networkExposure:
         type: gateway
       gateway:
-        createGateway: true
         gatewayClass:
           tls:
             source: secret
@@ -471,23 +397,6 @@ tests:
       tls: external
       networkExposure:
         type: gateway
-      gateway:
-        createGateway: true
-    asserts:
-      - hasDocuments:
-          count: 0
-
-  - it: should not render Certificate when createGateway is false
-    template: templates/ingate/gateway-cert.yaml
-    set:
-      tls: selfsigned
-      networkExposure:
-        type: gateway
-      gateway:
-        createGateway: false
-        gatewayClass:
-          tls:
-            source: rancher
     asserts:
       - hasDocuments:
           count: 0
@@ -499,7 +408,6 @@ tests:
       networkExposure:
         type: ingress
       gateway:
-        createGateway: true
         gatewayClass:
           tls:
             source: rancher
@@ -514,7 +422,6 @@ tests:
       networkExposure:
         type: gateway
       gateway:
-        createGateway: true
         gatewayClass:
           tls:
             source: rancher
@@ -533,7 +440,6 @@ tests:
       networkExposure:
         type: gateway
       gateway:
-        createGateway: true
         gatewayClass:
           tls:
             source: rancher
@@ -551,7 +457,6 @@ tests:
       networkExposure:
         type: gateway
       gateway:
-        createGateway: true
         gatewayClass:
           tls:
             source: rancher
