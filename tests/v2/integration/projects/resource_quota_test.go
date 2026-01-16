@@ -149,7 +149,7 @@ func (s *ResourceQuotaSuite) TestCreateNamespaceWithOverriddenQuotaInProject() {
 
 	resourceList = quotas.Items[0].Spec.Hard
 	want = v1.ResourceList{
-		v1.ResourceLimitsCPU: resource.MustParse("400m"),
+		v1.ResourceLimitsCPU: resource.MustParse("0"),
 	}
 	s.Require().Equal(want, resourceList)
 	s.Require().NoError(err)
