@@ -270,9 +270,10 @@ RUN mkdir -p /var/lib/rancher/k3s/agent/images/ && \
     curl -sfL ${ETCD_URL} | tar xvzf - --strip-components=1 --no-same-owner -C /usr/bin/ etcd-${CATTLE_ETCD_VERSION}-linux-${ARCH}/etcdctl && \
     mkdir -p /var/lib/rancher-data/driver-metadata
 
-ENV CATTLE_UI_VERSION=2.11.6-alpha2
-ENV CATTLE_DASHBOARD_UI_VERSION=v2.11.6-alpha2
-ENV CATTLE_CLI_VERSION=v2.11.5
+ENV CATTLE_UI_VERSION=2.11.9
+ENV CATTLE_DASHBOARD_UI_VERSION=v2.11.9
+
+ENV CATTLE_CLI_VERSION=v2.11.9
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
 ENV CATTLE_BASE_UI_BRAND=
@@ -335,6 +336,10 @@ RUN --mount=type=cache,target=/root/.cache,id=rancher go mod download
 COPY hack/airgap/ /src/
 RUN --mount=type=cache,target=/root/.cache,id=rancher go build -tags k3s_export -o export-images ./...
 RUN ./export-images -k3s-version ${CATTLE_K3S_VERSION} -output /src/k3s-airgap-images.tar
+
+# Output just k3s images
+FROM scratch AS k3s-images
+COPY --from=images /src/k3s-airgap-images.tar /k3s-airgap-images.tar
 
 # rancher-go-builder is an intermediate stage with go mod ready and Rancher
 # dependencies downloaded. Can be used to build both the Rancher server and agent
@@ -447,7 +452,7 @@ RUN /usr/bin/unshare --version && \
     /usr/bin/nsenter --version
 
 ARG ARCH
-ENV KUBECTL_VERSION=v1.32.1
+ENV KUBECTL_VERSION=v1.32.10
 
 RUN curl -sLf https://dl.k8s.io/${KUBECTL_VERSION}/bin/linux/${ARCH}/kubectl > /usr/bin/kubectl && \
     chmod +x /usr/bin/kubectl
