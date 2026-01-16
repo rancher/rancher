@@ -1,7 +1,7 @@
 package config
 
 import (
-	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core"
+	"github.com/rancher/rancher/pkg/namespace"
 	core "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	wrbac "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
@@ -24,7 +24,7 @@ type rbacInterface wrbac.Interface
 // coreInterface provides a reduced interface from the regular core.Interface
 // This prevents new caches being added unintentionally.
 type coreInterface struct {
-	factory *corecontrollers.Factory
+	factory *namespace.WranglerFactory
 }
 
 // Secret provides access only for a downstream client.

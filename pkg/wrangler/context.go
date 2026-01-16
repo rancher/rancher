@@ -46,6 +46,7 @@ import (
 	telemetryv1 "github.com/rancher/rancher/pkg/generated/controllers/telemetry.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/generated/controllers/upgrade.cattle.io"
 	plancontrolers "github.com/rancher/rancher/pkg/generated/controllers/upgrade.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/peermanager"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/tunnelserver"
@@ -152,7 +153,7 @@ type Context struct {
 	Core                corev1.Interface
 	API                 apiregv1.Interface
 	CRD                 crdv1.Interface
-	K8s                 *kubernetes.Clientset
+	K8s                 *namespace.Clientset
 	Plan                plancontrolers.Interface
 	Telemetry           telemetryv1.Interface
 
@@ -179,7 +180,7 @@ type Context struct {
 	fleet        *fleet.Factory
 	provisioning *provisioning.Factory
 	batch        *batch.Factory
-	core         *core.Factory
+	core         *namespace.WranglerFactory
 	api          *apiregistration.Factory
 	crd          *apiextensions.Factory
 	plan         *upgrade.Factory
@@ -316,7 +317,7 @@ func (w *Context) WithAgent(userAgent string) *Context {
 		*restConfigCopy = *w.RESTConfig
 		restConfigCopy.UserAgent = userAgent
 	}
-	k8sClientWithAgent, err := kubernetes.NewForConfig(restConfigCopy)
+	k8sClientWithAgent, err := namespace.NewForConfig(restConfigCopy)
 	if err != nil {
 		logrus.Debugf("failed to set agent [%s] on k8s client: %v", userAgent, err)
 	}
@@ -445,10 +446,11 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		return nil, err
 	}
 
-	core, err := core.NewFactoryFromConfigWithOptions(restConfig, opts)
+	rCore, err := core.NewFactoryFromConfigWithOptions(restConfig, opts)
 	if err != nil {
 		return nil, err
 	}
+	core := namespace.NewWranglerFactory(rCore)
 
 	api, err := apiregistration.NewFactoryFromConfigWithOptions(restConfig, opts)
 	if err != nil {
@@ -465,7 +467,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		return nil, err
 	}
 
-	k8s, err := kubernetes.NewForConfig(restConfig)
+	k8s, err := namespace.NewForConfig(restConfig)
 	if err != nil {
 		return nil, err
 	}
