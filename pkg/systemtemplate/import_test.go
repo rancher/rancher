@@ -139,8 +139,20 @@ func TestSystemTemplate_systemtemplate(t *testing.T) {
 					Provider: "rke2",
 				},
 			},
+			taints: []corev1.Taint{
+				{
+					Key:       "key1",
+					Value:     "value1",
+					Effect:    corev1.TaintEffectNoSchedule,
+					TimeAdded: &metav1.Time{}, // this should be stripped from tolerations
+				},
+				{
+					Key:    "key2",
+					Effect: corev1.TaintEffectPreferNoSchedule,
+				},
+			},
 			expectedDeploymentHashes: map[string]string{
-				"cattle-cluster-agent": "de4c14250ecab17d8f14f5e42d6c9096318e49ba8621f3e2e4b4bac7c6f15f80",
+				"cattle-cluster-agent": "e81533874b9f021ad4c948064fc6a62758befd5250606b6e1407e6a0c31ae905",
 			},
 			expectedDaemonSetHashes: map[string]string{},
 			expectedClusterRoleHashes: map[string]string{

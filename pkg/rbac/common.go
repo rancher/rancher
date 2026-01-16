@@ -27,27 +27,31 @@ import (
 )
 
 const (
-	NamespaceID                       = "namespaceId"
-	ProjectID                         = "projectId"
-	ClusterID                         = "clusterId"
-	GlobalAdmin                       = "admin"
-	globalAdminCRBPrefix              = "globaladmin-"
-	GlobalRestrictedAdmin             = "restricted-admin"
-	ClusterCRDsClusterRole            = "cluster-crd-clusterRole"
-	RestrictedAdminClusterRoleBinding = "restricted-admin-rb-cluster"
-	ProjectCRDsClusterRole            = "project-crd-clusterRole"
-	RestrictedAdminProjectRoleBinding = "restricted-admin-rb-project"
-	RestrictedAdminCRForClusters      = "restricted-admin-cr-clusters"
-	RestrictedAdminCRBForClusters     = "restricted-admin-crb-clusters"
-	CrtbOwnerLabel                    = "authz.cluster.cattle.io/crtb-owner"
-	PrtbOwnerLabel                    = "authz.cluster.cattle.io/prtb-owner"
-	AggregationLabel                  = "management.cattle.io/aggregates"
-	clusterRoleOwnerAnnotation        = "authz.cluster.cattle.io/clusterrole-owner"
-	aggregatorSuffix                  = "aggregator"
-	promotedSuffix                    = "promoted"
-	namespaceSuffix                   = "namespaces"
-	clusterManagementPlaneSuffix      = "cluster-mgmt"
-	projectManagementPlaneSuffix      = "project-mgmt"
+	NamespaceID                         = "namespaceId"
+	ProjectID                           = "projectId"
+	ClusterID                           = "clusterId"
+	GlobalAdmin                         = "admin"
+	GlobalAdminCRBPrefix                = "globaladmin-"
+	GlobalRestrictedAdmin               = "restricted-admin"
+	ClusterCRDsClusterRole              = "cluster-crd-clusterRole"
+	RestrictedAdminClusterRoleBinding   = "restricted-admin-rb-cluster"
+	ProjectCRDsClusterRole              = "project-crd-clusterRole"
+	RestrictedAdminProjectRoleBinding   = "restricted-admin-rb-project"
+	RestrictedAdminCRForClusters        = "restricted-admin-cr-clusters"
+	RestrictedAdminCRBForClusters       = "restricted-admin-crb-clusters"
+	CrtbOwnerLabel                      = "authz.cluster.cattle.io/crtb-owner"
+	PrtbOwnerLabel                      = "authz.cluster.cattle.io/prtb-owner"
+	AggregationLabel                    = "management.cattle.io/aggregates"
+	clusterRoleOwnerAnnotation          = "authz.cluster.cattle.io/clusterrole-owner"
+	aggregatorSuffix                    = "aggregator"
+	promotedSuffix                      = "promoted"
+	namespaceSuffix                     = "namespaces"
+	clusterManagementPlaneSuffix        = "cluster-mgmt"
+	projectManagementPlaneSuffix        = "project-mgmt"
+	ClusterAdminRoleName                = "cluster-admin"
+	CrbGlobalRoleAnnotation             = "authz.cluster.cattle.io/globalrole"
+	CrbGlobalRoleBindingAnnotation      = "authz.cluster.cattle.io/globalrolebinding"
+	CrbAdminGlobalRoleCheckedAnnotation = "authz.cluster.cattle.io/admin-globalrole-checked"
 )
 
 // BuildSubjectFromRTB This function will generate
@@ -124,7 +128,7 @@ func BuildSubjectFromRTB(object metav1.Object) (rbacv1.Subject, error) {
 }
 
 func GrbCRBName(grb *v3.GlobalRoleBinding) string {
-	return globalAdminCRBPrefix + GetGRBTargetKey(grb)
+	return GlobalAdminCRBPrefix + GetGRBTargetKey(grb)
 }
 
 // GetGRBSubject creates and returns a subject that is

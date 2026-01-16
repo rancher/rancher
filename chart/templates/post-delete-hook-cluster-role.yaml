@@ -13,7 +13,7 @@ rules:
     resources: [ "deployments" ]
     verbs: [ "get", "list", "delete" ]
   - apiGroups: [ "batch" ]
-    resources: [ "jobs" ]
+    resources: [ "jobs", "cronjobs" ]
     verbs: [ "get", "list", "watch", "delete", "create" ]
   - apiGroups: [ "rbac.authorization.k8s.io" ]
     resources: [ "clusterroles", "clusterrolebindings", "roles", "rolebindings" ]

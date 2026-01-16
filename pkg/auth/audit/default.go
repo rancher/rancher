@@ -108,7 +108,7 @@ func DefaultPolicies() []auditlogv1.AuditPolicy {
 				AdditionalRedactions: []auditlogv1.Redaction{
 					{
 						Paths: []string{
-							"$.metadata.annotations['kubectl.kubernetes.io/last-applied-configuration']",
+							"$..metadata.annotations['kubectl.kubernetes.io/last-applied-configuration']",
 						},
 					},
 				},

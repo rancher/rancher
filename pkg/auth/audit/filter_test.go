@@ -12,7 +12,7 @@ func TestFilter(t *testing.T) {
 	type testCase struct {
 		Name    string
 		Filter  Filter
-		log     log
+		log     logEntry
 		Allowed bool
 	}
 
@@ -23,7 +23,7 @@ func TestFilter(t *testing.T) {
 				action: auditlogv1.FilterActionAllow,
 				uri:    regexp.MustCompile(".*"),
 			},
-			log: log{
+			log: logEntry{
 				RequestURI: "/api/v1/namespaces/default/pods",
 			},
 			Allowed: true,
@@ -34,7 +34,7 @@ func TestFilter(t *testing.T) {
 				action: auditlogv1.FilterActionDeny,
 				uri:    regexp.MustCompile(".*"),
 			},
-			log: log{
+			log: logEntry{
 				RequestURI: "/api/v1/namespaces/default/pods",
 			},
 			Allowed: false,
@@ -46,7 +46,7 @@ func TestFilter(t *testing.T) {
 				action: auditlogv1.FilterActionDeny,
 				uri:    regexp.MustCompile("/api/v1/namespaces/.*/secrets.*"),
 			},
-			log: log{
+			log: logEntry{
 				RequestURI: "/api/v1/namespaces/default/secrets/my-secret",
 			},
 			Allowed: false,
@@ -55,7 +55,7 @@ func TestFilter(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
-			actual := c.Filter.Allowed(&c.log)
+			actual := c.Filter.LogAllowed(&c.log)
 			assert.Equal(t, c.Allowed, actual)
 		})
 	}

@@ -72,7 +72,7 @@ func (h *handler) OnPluginChange(key string, plugin *v1.UIPlugin) (*v1.UIPlugin,
 	pattern := FSCacheRootDir + "/*/*"
 	fsCacheFiles, err := fsCacheFilepathGlob(pattern)
 	if err != nil {
-		logrus.WithError(err).Error("failed to get files from filesystem cache")
+		logrus.Errorf("failed to get files from filesystem cache: %v", err)
 		return plugin, err
 	}
 	FsCache.SyncWithIndex(&Index, fsCacheFiles)
@@ -153,7 +153,7 @@ func (h *handler) OnPluginChange(key string, plugin *v1.UIPlugin) (*v1.UIPlugin,
 }
 
 func (h *handler) retry(plugin *v1.UIPlugin, err error) (*v1.UIPlugin, error) {
-	logrus.WithError(err).Error("failed to sync filesystem cache with controller cache")
+	logrus.Errorf("failed to sync filesystem cache with controller cache: %v", err)
 	backoff := calculateBackoff(plugin.Status.RetryNumber).Round(time.Second)
 	plugin.Status.RetryNumber++
 	plugin.Status.RetryAt = metav1.Time{Time: timeNow().UTC().Add(backoff)}

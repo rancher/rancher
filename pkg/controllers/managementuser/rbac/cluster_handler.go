@@ -5,9 +5,9 @@ import (
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
-	v1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
+	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	k8srbac "k8s.io/api/rbac/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,8 +28,8 @@ func newClusterHandler(workload *config.UserContext) v3.ClusterHandlerFunc { //*
 		// Management level resources
 		clusters: workload.Management.Management.Clusters(""),
 		// User context resources
-		userCRB:       workload.RBAC.ClusterRoleBindings(""),
-		userCRBLister: workload.RBAC.ClusterRoleBindings("").Controller().Lister(),
+		userCRB:       workload.RBACw.ClusterRoleBinding(),
+		userCRBLister: workload.RBACw.ClusterRoleBinding().Cache(),
 	}
 	return ch.sync
 }
@@ -40,11 +40,11 @@ type clusterHandler struct {
 	// Management level resources
 	clusters v3.ClusterInterface
 	// User context resources
-	userCRB       v1.ClusterRoleBindingInterface
-	userCRBLister v1.ClusterRoleBindingLister
+	userCRB       wrbacv1.ClusterRoleBindingClient
+	userCRBLister wrbacv1.ClusterRoleBindingCache
 }
 
-func (h *clusterHandler) sync(key string, obj *v3.Cluster) (runtime.Object, error) {
+func (h *clusterHandler) sync(key string, obj *v32.Cluster) (runtime.Object, error) {
 	// We receive clusters with no data, when that happens no checks will work so just ignore them
 	if key == "" || obj == nil || obj.Name == "" {
 		return nil, nil
@@ -65,8 +65,8 @@ func (h *clusterHandler) sync(key string, obj *v3.Cluster) (runtime.Object, erro
 	return obj, nil
 }
 
-// doSync syncs CRBs for all GlobalAdmins to the clustere role 'cluster-admin'.
-func (h *clusterHandler) doSync(cluster *v3.Cluster) error {
+// doSync syncs CRBs for all GlobalAdmins to the cluster role 'cluster-admin'.
+func (h *clusterHandler) doSync(cluster *v32.Cluster) error {
 	_, err := v32.ClusterConditionGlobalAdminsSynced.DoUntilTrue(cluster, func() (runtime.Object, error) {
 		grbs, err := h.grbIndexer.ByIndex(grbByRoleIndex, rbac.GlobalAdmin)
 		if err != nil {
@@ -79,7 +79,7 @@ func (h *clusterHandler) doSync(cluster *v3.Cluster) error {
 				continue
 			}
 			bindingName := rbac.GrbCRBName(grb)
-			_, err := h.userCRBLister.Get("", bindingName)
+			_, err := h.userCRBLister.Get(bindingName)
 			if err == nil {
 				// binding exists, nothing to do
 				continue
@@ -91,12 +91,17 @@ func (h *clusterHandler) doSync(cluster *v3.Cluster) error {
 			_, err = h.userCRB.Create(&k8srbac.ClusterRoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: bindingName,
+					Annotations: map[string]string{
+						rbac.CrbGlobalRoleAnnotation:             grb.GlobalRoleName,
+						rbac.CrbGlobalRoleBindingAnnotation:      grb.Name,
+						rbac.CrbAdminGlobalRoleCheckedAnnotation: "true",
+					},
 				},
 				Subjects: []k8srbac.Subject{
 					rbac.GetGRBSubject(grb),
 				},
 				RoleRef: k8srbac.RoleRef{
-					Name: "cluster-admin",
+					Name: rbac.ClusterAdminRoleName,
 					Kind: "ClusterRole",
 				},
 			})

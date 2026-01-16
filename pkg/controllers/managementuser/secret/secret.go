@@ -30,11 +30,6 @@ import (
 // and creates the secrets in the cluster namespace
 
 const (
-	create                     = "create"
-	update                     = "update"
-	projectNamespaceAnnotation = "management.cattle.io/system-namespace"
-	userSecretAnnotation       = "secret.user.cattle.io/secret"
-
 	syncAnnotation             = "provisioning.cattle.io/sync"
 	syncPreBootstrapAnnotation = "provisioning.cattle.io/sync-bootstrap"
 	syncNamespaceAnnotation    = "provisioning.cattle.io/sync-target-namespace"
