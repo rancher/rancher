@@ -394,5 +394,63 @@ func TestSemanticDeepEqual(t *testing.T) {
 		result := tt.method(srcResourceList, dstResourceList)
 		assert.Equal(t, tt.expected, result)
 	}
+}
 
+func TestZeroOutResourceQuotaLimit(t *testing.T) {
+	t.Run("zeroOutResourceQuotaLimit, zero all", func(t *testing.T) {
+		out, err := zeroOutResourceQuotaLimit(
+			&v32.ResourceQuotaLimit{
+				ConfigMaps:             "10",
+				LimitsCPU:              "10",
+				LimitsMemory:           "10",
+				PersistentVolumeClaims: "10",
+				Pods:                   "10",
+				ReplicationControllers: "10",
+				RequestsCPU:            "10",
+				RequestsMemory:         "10",
+				RequestsStorage:        "10",
+				Secrets:                "10",
+				Services:               "10",
+				ServicesLoadBalancers:  "10",
+				ServicesNodePorts:      "10",
+				Extended: map[string]string{
+					"ephemeral-storage": "10",
+				},
+			},
+			corev1.ResourceList{
+				"configmaps":             resource.MustParse("1"),
+				"ephemeral-storage":      resource.MustParse("14"),
+				"limits.cpu":             resource.MustParse("2"),
+				"limits.memory":          resource.MustParse("3"),
+				"persistentvolumeclaims": resource.MustParse("4"),
+				"pods":                   resource.MustParse("5"),
+				"replicationcontrollers": resource.MustParse("6"),
+				"requests.cpu":           resource.MustParse("7"),
+				"requests.memory":        resource.MustParse("8"),
+				"requests.storage":       resource.MustParse("9"),
+				"secrets":                resource.MustParse("10"),
+				"services":               resource.MustParse("11"),
+				"services.loadbalancers": resource.MustParse("12"),
+				"services.nodeports":     resource.MustParse("13"),
+			})
+		assert.NoError(t, err)
+		assert.Equal(t, &v32.ResourceQuotaLimit{
+			ConfigMaps:             "0",
+			LimitsCPU:              "0",
+			LimitsMemory:           "0",
+			PersistentVolumeClaims: "0",
+			Pods:                   "0",
+			ReplicationControllers: "0",
+			RequestsCPU:            "0",
+			RequestsMemory:         "0",
+			RequestsStorage:        "0",
+			Secrets:                "0",
+			Services:               "0",
+			ServicesLoadBalancers:  "0",
+			ServicesNodePorts:      "0",
+			Extended: map[string]string{
+				"ephemeral-storage": "0",
+			},
+		}, out)
+	})
 }
