@@ -13,7 +13,16 @@ tests:
       path: metadata.annotations["certmanager.k8s.io/issuer"]
   - isNull:
       path: spec.tls
-- it: should set default annotations with default cert-manager
+- it: should not set default annotations with default cert-manager
+  asserts:
+  - equal:
+      path: metadata.annotations
+      value:
+        cert-manager.io/issuer: RELEASE-NAME-rancher
+        cert-manager.io/issuer-kind: Issuer
+- it: should enable the default nginx annotations
+  set:
+    ingress.includeDefaultExtraAnnotations: true
   asserts:
   - equal:
       path: metadata.annotations
@@ -23,19 +32,9 @@ tests:
         nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
         nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
         nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
-- it: should disable the default nginx annotations
-  set:
-    ingress.includeDefaultExtraAnnotations: false
-  asserts:
-  - equal:
-      path: metadata.annotations
-      value:
-        cert-manager.io/issuer: RELEASE-NAME-rancher
-        cert-manager.io/issuer-kind: Issuer
 - it: should over write proxy-connect-timeout with default cert-manager
   set:
     ingress:
-      includeDefaultExtraAnnotations: false
       extraAnnotations:
         nginx.ingress.kubernetes.io/proxy-connect-timeout: "15"
   asserts:
@@ -70,9 +69,6 @@ tests:
       value:
         cert-manager.io/issuer: RELEASE-NAME-rancher
         cert-manager.io/issuer-kind: Issuer
-        nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
-        nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
-        nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
         nginx.ingress.kubernetes.io/configuration-snippet: |
           more_set_input_headers "X-Forwarded-Host: host.example.com";
 - it: should be able to set multiple lines using configurationSnippet with default cert-manager
@@ -88,9 +84,6 @@ tests:
       value:
         cert-manager.io/issuer: RELEASE-NAME-rancher
         cert-manager.io/issuer-kind: Issuer
-        nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
-        nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
-        nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
         nginx.ingress.kubernetes.io/configuration-snippet: |
           more_set_input_headers "X-Forwarded-Host: host.example.com";
           more_set_input_headers "foo: bar";
@@ -155,9 +148,6 @@ tests:
           cert-manager.io/issuer: RELEASE-NAME-rancher
           cert-manager.io/issuer-kind: Issuer
           nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
-          nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
-          nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
-          nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
 - it: can target servicePort 443 without disabling port 80
   set:
     hostname: host.example.com
@@ -182,6 +172,3 @@ tests:
           cert-manager.io/issuer: RELEASE-NAME-rancher
           cert-manager.io/issuer-kind: Issuer
           nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
-          nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
-          nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
-          nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
