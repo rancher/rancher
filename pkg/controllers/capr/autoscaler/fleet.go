@@ -25,9 +25,9 @@ import (
 // NOTE: When updating the chart version in build.yaml you will need to update this mapping
 // if adding support for a new minor k8s version
 var imageTagVersions = map[int]string{
+	35: "1.35.0-3.5",
 	34: "1.34.0-3.4",
 	33: "1.33.0-3.3",
-	32: "1.32.3-1.5",
 }
 
 // ensureFleetHelmOp creates or updates a Helm operation for cluster autoscaler.

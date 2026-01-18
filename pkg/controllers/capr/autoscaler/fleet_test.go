@@ -145,7 +145,7 @@ func (s *autoscalerSuite) TestResolveImageTagVersion_HappyPath_KnownVersion() {
 			Namespace: "default",
 		},
 		Spec: rke.RKEControlPlaneSpec{
-			KubernetesVersion: "v1.34.0+k3s1",
+			KubernetesVersion: "v1.35.0+k3s1",
 		},
 	}
 
@@ -173,7 +173,7 @@ func (s *autoscalerSuite) TestResolveImageTagVersion_HappyPath_KnownVersion() {
 	})
 
 	result := s.h.resolveImageTagVersion(cluster)
-	s.Equal("1.34.0-3.4", result) // Should return the version for minor 34
+	s.Equal("1.35.0-3.5", result) // Should return the version for minor 35
 }
 
 func (s *autoscalerSuite) TestResolveImageTagVersion_EdgeCase_UnknownVersion() {
@@ -261,7 +261,7 @@ func (s *autoscalerSuite) TestGetKubernetesMinorVersion_HappyPath_RKEControlPlan
 			Namespace: "default",
 		},
 		Spec: rke.RKEControlPlaneSpec{
-			KubernetesVersion: "v1.34.0+k3s1",
+			KubernetesVersion: "v1.35.0+k3s1",
 		},
 	}
 

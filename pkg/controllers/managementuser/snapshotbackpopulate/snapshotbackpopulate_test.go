@@ -631,11 +631,11 @@ func TestOnDownstreamChange_RestoreModeAnnotationIsSetCorrectly(t *testing.T) {
 	}
 
 	validSpecFull := &provv1.ClusterSpec{
-		KubernetesVersion: "v1.34.1+rke2r1",
+		KubernetesVersion: "v1.35.0+rke2r1",
 		RKEConfig:         &provv1.RKEConfig{},
 	}
 	validSpecNoRKEConfig := &provv1.ClusterSpec{
-		KubernetesVersion: "v1.34.1+rke2r1",
+		KubernetesVersion: "v1.35.0+rke2r1",
 		// RKEConfig is nil
 	}
 	validSpecNoK8sVersion := &provv1.ClusterSpec{
