@@ -5,7 +5,6 @@ import (
 	"hash/crc32"
 	"math"
 	"slices"
-	"sort"
 	"sync"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -99,7 +98,7 @@ func (s *peersBasedStrategy) setPeers(peers peermanager.Peers) bool {
 	defer s.mu.Unlock()
 
 	ids := append(slices.Clone(peers.IDs), peers.SelfID)
-	sort.Strings(ids)
+	slices.Sort(ids)
 	peers.IDs = slices.Compact(ids)
 
 	if s.peers.Equals(peers) {
