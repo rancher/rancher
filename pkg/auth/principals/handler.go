@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -76,7 +77,8 @@ func (h *principalsHandler) actions(actionName string, action *types.Action, api
 }
 
 func (h *principalsHandler) list(apiContext *types.APIContext, next types.RequestHandler) error {
-	var principals []map[string]interface{}
+	logrus.Debugf("principalsHandler: list")
+	var principals []map[string]any
 
 	token, err := h.getToken(apiContext.Request)
 	if err != nil {
@@ -84,6 +86,7 @@ func (h *principalsHandler) list(apiContext *types.APIContext, next types.Reques
 	}
 
 	if apiContext.ID != "" {
+		logrus.Debugf("principalsHandler: list with ID %v", apiContext.ID)
 		princ, err := providers.GetPrincipal(apiContext.ID, token)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
@@ -101,10 +104,12 @@ func (h *principalsHandler) list(apiContext *types.APIContext, next types.Reques
 		context := map[string]string{"resource": "principals", "apiGroup": "management.cattle.io"}
 		p = h.ac.Filter(apiContext, apiContext.Schema, p, context)
 
+		logrus.Debugf("principalsHandler: returning single principal")
 		apiContext.WriteResponse(http.StatusOK, p)
 		return nil
 	}
 
+	logrus.Debugf("principalsHandler: list with no ID")
 	p, err := convertPrincipal(apiContext.Schema, token.GetUserPrincipal())
 	if err != nil {
 		return err
@@ -120,6 +125,7 @@ func (h *principalsHandler) list(apiContext *types.APIContext, next types.Reques
 		principals = append(principals, x)
 	}
 
+	logrus.Debugf("principalsHandler: list returning %v principals", len(principals))
 	apiContext.WriteResponse(http.StatusOK, principals)
 	return nil
 }
