@@ -134,7 +134,7 @@ require (
 	github.com/rancher/remotedialer-proxy v0.6.0
 	github.com/rancher/rke v1.8.0
 	github.com/rancher/shepherd v0.0.0-20251107194714-b8e8da9ac830
-	github.com/rancher/steve v0.7.33
+	github.com/rancher/steve v0.7.36
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20250930163923-f2c9e60b1078
 	github.com/rancher/wrangler v1.1.2
 	github.com/rancher/wrangler/v3 v3.3.1
@@ -250,7 +250,7 @@ require (
 	github.com/skeema/knownhosts v1.3.0 // indirect
 	github.com/std-uritemplate/std-uritemplate/go v0.0.57 // indirect
 	github.com/stoewer/go-strcase v1.3.0 // indirect
-	github.com/tinylib/msgp v1.5.0 // indirect
+	github.com/tinylib/msgp v1.6.3 // indirect
 	github.com/tjfoc/gmsm v1.4.1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
