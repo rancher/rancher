@@ -55,7 +55,7 @@ func TestNonClusteredStrategy(t *testing.T) {
 
 	assert.IsType(t, &nonClusteredStrategy{}, strategy)
 	assert.Nil(t, strategy.forcedResync(), "forcedResync should return nil for nonClusteredStrategy")
-	assert.True(t, strategy.amOwner(&v3.Cluster{}), "nonClusteredStrategy should own all clusters")
+	assert.True(t, strategy.isOwner(&v3.Cluster{}), "nonClusteredStrategy should own all clusters")
 }
 
 func TestPeersBasedStrategy(t *testing.T) {
@@ -77,7 +77,7 @@ func TestPeersBasedStrategy(t *testing.T) {
 		strategy := getOwnerStrategy(ctx, mockPeerManager)
 		assert.IsType(t, &peersBasedStrategy{}, strategy)
 
-		assert.False(t, strategy.amOwner(cluster), "Should not own if not initialized")
+		assert.False(t, strategy.isOwner(cluster), "Should not own if not initialized")
 
 		// Simulate initial state where peers are not ready
 		mockPeerManager.SendPeers(peermanager.Peers{
@@ -89,7 +89,7 @@ func TestPeersBasedStrategy(t *testing.T) {
 		err := receiveWithTimeout(100*time.Millisecond, strategy.forcedResync())
 		assert.NoError(t, err, "Expected resync channel to be sent")
 
-		assert.False(t, strategy.amOwner(cluster), "Should not own if peer manager is not ready")
+		assert.False(t, strategy.isOwner(cluster), "Should not own if peer manager is not ready")
 	})
 
 	t.Run("single non-leader replica should not own", func(t *testing.T) {
@@ -112,7 +112,7 @@ func TestPeersBasedStrategy(t *testing.T) {
 		err := receiveWithTimeout(100*time.Millisecond, strategy.forcedResync())
 		assert.NoError(t, err, "Expected resync channel to be sent")
 
-		assert.False(t, strategy.amOwner(cluster), "Single non-leader replica should not own")
+		assert.False(t, strategy.isOwner(cluster), "Single non-leader replica should not own")
 	})
 
 	t.Run("ownership distribution with multiple peers", func(t *testing.T) {
@@ -160,7 +160,7 @@ func TestPeersBasedStrategy(t *testing.T) {
 					}
 
 					isOwnerExpected := selfID == tc.expectedOwner
-					assert.Equal(t, isOwnerExpected, strategy.amOwner(cluster), "Incorrect cluster ownership")
+					assert.Equal(t, isOwnerExpected, strategy.isOwner(cluster), "Incorrect cluster ownership")
 				})
 			}
 		}

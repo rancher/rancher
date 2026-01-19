@@ -15,8 +15,8 @@ import (
 )
 
 type ownerStrategy interface {
-	// amOwner returns true if the current process owns the provided downstream Cluster
-	amOwner(cluster *v3.Cluster) bool
+	// isOwner returns true if the current process owns the provided downstream Cluster
+	isOwner(cluster *v3.Cluster) bool
 	// forcedResync provides a channel to communicate events that may require a resync in the consumer
 	// it could be nil for some implementations
 	forcedResync() <-chan struct{}
@@ -36,7 +36,7 @@ func (nonClusteredStrategy) forcedResync() <-chan struct{} {
 	return nil
 }
 
-func (nonClusteredStrategy) amOwner(_ *v3.Cluster) bool {
+func (nonClusteredStrategy) isOwner(_ *v3.Cluster) bool {
 	return true
 }
 
@@ -53,7 +53,7 @@ func (s *peersBasedStrategy) forcedResync() <-chan struct{} {
 	return s.forcedResyncChan
 }
 
-func (s *peersBasedStrategy) amOwner(cluster *v3.Cluster) (owner bool) {
+func (s *peersBasedStrategy) isOwner(cluster *v3.Cluster) (owner bool) {
 	peers := s.getPeers()
 	if peers.SelfID == "" {
 		// not ready

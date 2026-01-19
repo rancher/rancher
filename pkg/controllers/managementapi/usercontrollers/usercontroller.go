@@ -114,7 +114,7 @@ func (u *userControllersController) sync(key string, cluster *v3.Cluster) (runti
 		}
 
 		u.starter.Stop(cluster)
-		err = u.starter.Start(u.ctx, cluster, u.amOwner(cluster))
+		err = u.starter.Start(u.ctx, cluster, u.isOwner(cluster))
 		if err != nil {
 			return nil, fmt.Errorf("userControllersController: unable to restart controllers for cluster %s: %w", cluster.Name, err)
 		}
@@ -168,7 +168,7 @@ func (u *userControllersController) peersSync() error {
 		if cluster.DeletionTimestamp != nil || !v33.ClusterConditionProvisioned.IsTrue(cluster) {
 			u.starter.Stop(cluster)
 		} else {
-			amOwner := u.amOwner(cluster)
+			amOwner := u.isOwner(cluster)
 			if err := u.starter.Start(u.ctx, cluster, amOwner); err != nil {
 				errs = append(errs, errors.Wrapf(err, "failed to start user controllers for cluster %s", cluster.Name))
 			}
