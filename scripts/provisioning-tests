@@ -65,10 +65,10 @@ export CATTLE_FEATURES=${CATTLE_FEATURES}
 source ./scripts/version
 
 if [ -z "${CATTLE_AGENT_IMAGE}" ]; then
-# Only set CATTLE_AGENT_IMAGE if it is empty -- for KDM provisioning tests in Prime Mode this value should already be populated
+# Only set CATTLE_AGENT_IMAGE if it is empty - for KDM provisioning tests in Prime Mode this value should already be populated
 # export CATTLE_AGENT_IMAGE="rancher/rancher-agent:${AGENT_TAG}"
 # using :head for now while figuring out why loading from the docker cache isn't working
-  export CATTLE_AGENT_IMAGE="rancher/rancher-agent:head"
+  export CATTLE_AGENT_IMAGE="rancher/rancher-agent:v2.10-head"
 fi
 echo "Using Rancher agent image $CATTLE_AGENT_IMAGE"
 
@@ -80,7 +80,7 @@ eval "$(grep '^ENV CATTLE_KDM_BRANCH' package/Dockerfile | awk '{print "export "
 export CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$(grep -m1 'provisioningCAPIVersion' build.yaml | cut -d ' ' -f2)
 
 if [ -z "${SOME_K8S_VERSION:-}" ]; then
-# Only resolve SOME_K8S_VERSION if it’s empty — KDM-driven runs may set it upstream.
+# Only resolve SOME_K8S_VERSION if it’s empty - KDM-driven runs may set it upstream.
 # Prime context:
 # "Latest" in KDM can be Prime-only. To avoid unintentionally selecting a Prime-only
 # release when the job isn't configured for Prime, this script FIRST honors per-distro
