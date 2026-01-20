@@ -69,6 +69,10 @@ func ApplyLabelsAndAnnotations(ns *corev1.Namespace) bool {
 }
 
 func InjectValues(values map[string]any) map[string]any {
+	if mutator == nil {
+		return values
+	}
+
 	if values == nil {
 		values = make(map[string]any, 1)
 	}
@@ -78,5 +82,6 @@ func InjectValues(values map[string]any) map[string]any {
 		"annotations": mutator.Annotations,
 		"labels":      mutator.Labels,
 	}
+
 	return values
 }
