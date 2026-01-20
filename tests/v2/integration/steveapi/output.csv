@@ -1,9 +1,9 @@
 user,url,response
 user-a,https://rancherurl/v1/secrets,[json/user-a_none_none.json](json/user-a_none_none.json)
-user-a,https://rancherurl/v1/secrets/test-ns-1,[json/user-a_test-ns-1_none.json](json/user-a_test-ns-1_none.json)
-user-a,https://rancherurl/v1/secrets/test-ns-5,[json/user-a_test-ns-5_none.json](json/user-a_test-ns-5_none.json)
 user-a,https://rancherurl/v1/secrets?filter=metadata.labels[test-label]=2,[json/user-a_none_filter=metadata.labels[test-label]=2.json](json/user-a_none_filter=metadata.labels[test-label]=2.json)
 user-a,https://rancherurl/v1/secrets/test-ns-2?filter=metadata.labels[test-label]=2,[json/user-a_test-ns-2_filter=metadata.labels[test-label]=2.json](json/user-a_test-ns-2_filter=metadata.labels[test-label]=2.json)
+user-a,https://rancherurl/v1/secrets/test-ns-1,[json/user-a_test-ns-1_none.json](json/user-a_test-ns-1_none.json)
+user-a,https://rancherurl/v1/secrets/test-ns-5,[json/user-a_test-ns-5_none.json](json/user-a_test-ns-5_none.json)
 user-a,https://rancherurl/v1/secrets?filter=metadata.namespace~test-ns-1,[json/user-a_none_filter=metadata.namespace~test-ns-1.json](json/user-a_none_filter=metadata.namespace~test-ns-1.json)
 user-a,https://rancherurl/v1/secrets?filter=metadata.name=test1,[json/user-a_none_filter=metadata.name=test1.json](json/user-a_none_filter=metadata.name=test1.json)
 user-a,https://rancherurl/v1/secrets/test-ns-1?filter=metadata.namespace~test-ns-1,[json/user-a_test-ns-1_filter=metadata.namespace~test-ns-1.json](json/user-a_test-ns-1_filter=metadata.namespace~test-ns-1.json)
@@ -15,7 +15,6 @@ user-a,https://rancherurl/v1/secrets/test-ns-1?filter=metadata.name=test1,[json/
 user-a,"https://rancherurl/v1/secrets?filter=metadata.name=test1,metadata.namespace~test-ns-1","[json/user-a_none_filter=metadata.name=test1,metadata.namespace~test-ns-1.json](json/user-a_none_filter=metadata.name=test1,metadata.namespace~test-ns-1.json)"
 user-a,"https://rancherurl/v1/secrets?filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace~test-ns-1","[json/user-a_none_filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace~test-ns-1.json](json/user-a_none_filter=metadata.labels.test-label-gte=3,metadata.labels.test-label=2&filter=metadata.namespace~test-ns-1.json)"
 user-a,https://rancherurl/v1/secrets?filter=metadata.name!=test1,[json/user-a_none_filter=metadata.name!=test1.json](json/user-a_none_filter=metadata.name!=test1.json)
-user-a,https://rancherurl/v1/secrets/test-ns-2?filter=metadata.annotations[management.cattle.io/project-scoped-secret-copy]=spuds,[json/user-a_test-ns-2_filter=metadata.annotations[management.cattle.io%2Fproject-scoped-secret-copy]=spuds.json](json/user-a_test-ns-2_filter=metadata.annotations[management.cattle.io%2Fproject-scoped-secret-copy]=spuds.json)
 user-a,https://rancherurl/v1/secrets/test-ns-2?filter=metadata.annotations[management.cattle.io/project-scoped-secret-copy]=potatoes,[json/user-a_test-ns-2_filter=metadata.annotations[management.cattle.io%2Fproject-scoped-secret-copy]=potatoes.json](json/user-a_test-ns-2_filter=metadata.annotations[management.cattle.io%2Fproject-scoped-secret-copy]=potatoes.json)
 user-a,https://rancherurl/v1/secrets?sort=metadata.name,[json/user-a_none_sort=metadata.name.json](json/user-a_none_sort=metadata.name.json)
 user-a,https://rancherurl/v1/secrets?sort=-metadata.name,[json/user-a_none_sort=-metadata.name.json](json/user-a_none_sort=-metadata.name.json)
@@ -27,7 +26,6 @@ user-a,https://rancherurl/v1/secrets?pagesize=8,[json/user-a_none_pagesize=8.jso
 user-a,https://rancherurl/v1/secrets?pagesize=8&page=2&revision=nondeterministicint,[json/user-a_none_pagesize=8&page=2&revision=nondeterministicint.json](json/user-a_none_pagesize=8&page=2&revision=nondeterministicint.json)
 user-a,https://rancherurl/v1/secrets/test-ns-1?pagesize=3,[json/user-a_test-ns-1_pagesize=3.json](json/user-a_test-ns-1_pagesize=3.json)
 user-a,https://rancherurl/v1/secrets/test-ns-1?pagesize=3&page=2&revision=nondeterministicint,[json/user-a_test-ns-1_pagesize=3&page=2&revision=nondeterministicint.json](json/user-a_test-ns-1_pagesize=3&page=2&revision=nondeterministicint.json)
-user-a,https://rancherurl/v1/secrets/test-ns-1?filter=metadata.fields[2]>0&sort=metadata.fields[2],[json/user-a_test-ns-1_filter=metadata.fields[2]>0&sort=metadata.fields[2].json](json/user-a_test-ns-1_filter=metadata.fields[2]>0&sort=metadata.fields[2].json)
 user-b,https://rancherurl/v1/secrets,[json/user-b_none_none.json](json/user-b_none_none.json)
 user-b,https://rancherurl/v1/secrets/test-ns-1,[json/user-b_test-ns-1_none.json](json/user-b_test-ns-1_none.json)
 user-b,https://rancherurl/v1/secrets/test-ns-5,[json/user-b_test-ns-5_none.json](json/user-b_test-ns-5_none.json)
@@ -133,3 +131,10 @@ user-e,"https://rancherurl/v1/secrets/test-ns-1?projectsornamespaces=test-ns-1,t
 user-e,https://rancherurl/v1/secrets/test-ns-1?projectsornamespaces!=test-prj-1,[json/user-e_test-ns-1_projectsornamespaces!=test-prj-1.json](json/user-e_test-ns-1_projectsornamespaces!=test-prj-1.json)
 user-e,"https://rancherurl/v1/secrets/test-ns-1?projectsornamespaces!=test-prj-1,test-prj-2","[json/user-e_test-ns-1_projectsornamespaces!=test-prj-1,test-prj-2.json](json/user-e_test-ns-1_projectsornamespaces!=test-prj-1,test-prj-2.json)"
 user-e,"https://rancherurl/v1/secrets/test-ns-1?projectsornamespaces!=test-prj-1,test-ns-2,test-ns-8","[json/user-e_test-ns-1_projectsornamespaces!=test-prj-1,test-ns-2,test-ns-8.json](json/user-e_test-ns-1_projectsornamespaces!=test-prj-1,test-ns-2,test-ns-8.json)"
+user-a,"https://rancherurl/v1/secrets?summary=metadata.namespace,metadata.name","[json/user-a_none_summary=metadata.namespace,metadata.name.json](json/user-a_none_summary=metadata.namespace,metadata.name.json)"
+user-a,"https://rancherurl/v1/secrets?pagesize=8&summary=metadata.name,metadata.namespace&sort=metadata.namespace,metadata.name","[json/user-a_none_pagesize=8&summary=metadata.name,metadata.namespace&sort=metadata.namespace,metadata.name.json](json/user-a_none_pagesize=8&summary=metadata.name,metadata.namespace&sort=metadata.namespace,metadata.name.json)"
+user-a,https://rancherurl/v1/secrets?filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&summary=metadata.name,[json/user-a_none_filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&summary=metadata.name.json](json/user-a_none_filter=metadata.labels.test-label-gte=3&sort=-metadata.name&pagesize=6&summary=metadata.name.json)
+user-a,"https://rancherurl/v1/secrets/test-ns-2?filter=metadata.labels.test-label=2&summary=metadata.namespace,metadata.name","[json/user-a_test-ns-2_filter=metadata.labels.test-label=2&summary=metadata.namespace,metadata.name.json](json/user-a_test-ns-2_filter=metadata.labels.test-label=2&summary=metadata.namespace,metadata.name.json)"
+user-a,https://rancherurl/v1/secrets/none?summary=metadata.state.name,[json/user-a_none_summary=metadata.state.name.json](json/user-a_none_summary=metadata.state.name.json)
+user-a,https://rancherurl/v1/secrets/test-ns-2?filter=metadata.annotations[management.cattle.io/project-scoped-secret-copy]=spuds,[json/user-a_test-ns-2_filter=metadata.annotations[management.cattle.io%2Fproject-scoped-secret-copy]=spuds.json](json/user-a_test-ns-2_filter=metadata.annotations[management.cattle.io%2Fproject-scoped-secret-copy]=spuds.json)
+user-a,https://rancherurl/v1/secrets/test-ns-1?filter=metadata.fields[2]>0&sort=metadata.fields[2],[json/user-a_test-ns-1_filter=metadata.fields[2]>0&sort=metadata.fields[2].json](json/user-a_test-ns-1_filter=metadata.fields[2]>0&sort=metadata.fields[2].json)
