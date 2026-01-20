@@ -67,7 +67,7 @@ replace (
 require (
 	github.com/antihax/optional v1.0.0
 	github.com/rancher/rancher/pkg/apis v0.0.0-20250826201537-0192450794b5
-	github.com/rancher/shepherd v0.0.0-20251216155525-dcbe27035e6e
+	github.com/rancher/shepherd v0.0.0-20260120174445-e2b9b4d10f3a
 	go.qase.io/client v0.0.0-20231114201952-65195ec001fa
 )
 
