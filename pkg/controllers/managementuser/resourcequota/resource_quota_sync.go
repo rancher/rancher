@@ -17,6 +17,7 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -514,26 +515,15 @@ func completeLimit(nsLimit *v32.ContainerResourceLimit, projectLimit *v32.Contai
 // resources exceeding the quota, and returns a new quota limit with exceeded
 // resources zeroed out.
 func zeroOutResourceQuotaLimit(limit *v32.ResourceQuotaLimit, exceeded corev1.ResourceList) (*v32.ResourceQuotaLimit, error) {
-	// See also `convertResourceListToLimit` in sibling file
-	// `resource_quota_common.go` for the same kind of key mapping.
-
-	limitMap, err := convert.EncodeToMap(limit)
+	zeroed, err := convertProjectResourceLimitToResourceList(limit)
 	if err != nil {
 		return nil, err
 	}
 
+	zero := resource.MustParse("0")
 	for k := range exceeded {
-		resource := string(k)
-		if val, ok := resourceQuotaReturnConversion[resource]; ok {
-			limitMap[val] = "0"
-		} else {
-			extended := limitMap["extended"].(map[string]any)
-			extended[resource] = "0"
-			limitMap["extended"] = extended
-		}
+		zeroed[k] = zero
 	}
 
-	toReturn := &v32.ResourceQuotaLimit{}
-	err = convert.ToObj(limitMap, toReturn)
-	return toReturn, err
+	return convertResourceListToLimit(zeroed)
 }
