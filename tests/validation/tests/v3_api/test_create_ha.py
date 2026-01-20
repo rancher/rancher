@@ -35,6 +35,8 @@ RANCHER_VALID_TLS_KEY = os.environ.get("RANCHER_VALID_TLS_KEY")
 RANCHER_BYO_TLS_CERT = os.environ.get("RANCHER_BYO_TLS_CERT")
 RANCHER_BYO_TLS_KEY = os.environ.get("RANCHER_BYO_TLS_KEY")
 RANCHER_PRIVATE_CA_CERT = os.environ.get("RANCHER_PRIVATE_CA_CERT")
+DOCKER_ORG_TOKEN_USERNAME = os.environ.get("DOCKER_ORG_TOKEN_USERNAME", "")
+DOCKER_ORG_TOKEN_PASSWORD = os.environ.get("DOCKER_ORG_TOKEN_PASSWORD", "")
 
 RANCHER_LOCAL_CLUSTER_TYPE = os.environ.get("RANCHER_LOCAL_CLUSTER_TYPE")
 RANCHER_ADD_CUSTOM_CLUSTER = os.environ.get("RANCHER_ADD_CUSTOM_CLUSTER",
@@ -339,7 +341,18 @@ def add_repo_create_namespace(repo=RANCHER_HELM_REPO, url=RANCHER_HELM_URL):
 def install_rancher(type=RANCHER_HA_CERT_OPTION, repo=RANCHER_HELM_REPO,
                     upgrade=False, extra_settings=[]):
     operation = "install"
-
+    dockerhub_secret = "dockerhub_org_secret"
+    # Create Docker Hub secret if credentials are provided
+    if operation == "install":
+        docker_secret_cmd = (
+            export_cmd + " && kubectl create secret docker-registry " + dockerhub_secret + " " +
+            "--docker-username=" + DOCKER_ORG_TOKEN_USERNAME + " " +
+            "--docker-password=" + DOCKER_ORG_TOKEN_PASSWORD + " " +
+            "--docker-server=https://index.docker.io/v1/ "
+            "--namespace cattle-system"
+        )
+        run_command_with_stderr(docker_secret_cmd)
+    
     if upgrade:
         operation = "upgrade"
 
@@ -348,7 +361,8 @@ def install_rancher(type=RANCHER_HA_CERT_OPTION, repo=RANCHER_HELM_REPO,
         "rancher-" + repo + "/rancher " + \
         "--version " + RANCHER_CHART_VERSION + " " + \
         "--namespace cattle-system " + \
-        "--set hostname=" + RANCHER_HA_HOSTNAME
+        "--set hostname=" + RANCHER_HA_HOSTNAME + " " + \
+        "--set rancherImagePullSecrets[0].name=" + dockerhub_secret
 
     if version.parse(RANCHER_CHART_VERSION) > version.parse("2.7.1"):
         helm_rancher_cmd = helm_rancher_cmd + " --set global.cattle.psp.enabled=" + str(RANCHER_PSP_ENABLED).lower()

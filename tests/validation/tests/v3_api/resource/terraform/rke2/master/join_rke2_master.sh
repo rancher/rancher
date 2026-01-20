@@ -11,6 +11,11 @@ tls-san:
 server: https://${3}:9345
 token:  "${4}"
 node-name: "${hostname}"
+registries:
+  "docker.io":
+    auth:
+      username: "${DOCKERHUB_USERNAME}"
+      password: "${DOCKERHUB_PASSWORD}"
 EOF
 
 if [ ! -z "${9}" ] && [[ "${9}" == *":"* ]]

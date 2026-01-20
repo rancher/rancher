@@ -34,6 +34,11 @@ node {
                         string(credentialsId: 'AWS_ACCESS_KEY_ID', variable: 'RANCHER_EKS_ACCESS_KEY'),
                         string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'RANCHER_EKS_SECRET_KEY'),
                         string(credentialsId: 'DO_ACCESSKEY', variable: 'DO_ACCESSKEY'),
+                        usernamePassword(
+                                credentialsId: 'jenkins-dockerhub-org-token', 
+                                usernameVariable: 'DOCKER_ORG_TOKEN_USERNAME', 
+                                passwordVariable: 'DOCKER_ORG_TOKEN_PASSWORD'
+                        ),
                         string(credentialsId: 'AWS_SSH_PEM_KEY', variable: 'AWS_SSH_PEM_KEY'),
                         string(credentialsId: 'RANCHER_SSH_KEY', variable: 'RANCHER_SSH_KEY'),
                         string(credentialsId: 'AZURE_SUBSCRIPTION_ID', variable: 'AZURE_SUBSCRIPTION_ID'),
@@ -103,7 +108,6 @@ node {
                 writeFile file: AWS_SSH_KEY_NAME, text: decoded
               }
             }
-
             sh "./tests/v3_api/scripts/configure.sh"
             sh "./tests/v3_api/scripts/build.sh"
           }

@@ -17,6 +17,8 @@ RANCHER_EC2_WINDOWS_INSTANCE_CLASS = os.environ.get("AWS_WINDOWS_INSTANCE_TYPE",
 HOST_NAME = os.environ.get('RANCHER_HOST_NAME', "sa")
 RANCHER_IAM_ROLE = os.environ.get("RANCHER_IAM_ROLE")
 RKE2_CREATE_LB = os.environ.get("RKE2_CREATE_LB", False)
+DOCKER_ORG_TOKEN_USERNAME = os.environ.get("DOCKER_ORG_TOKEN_USERNAME", "")
+DOCKER_ORG_TOKEN_PASSWORD = os.environ.get("DOCKER_ORG_TOKEN_PASSWORD", "")
 
 RANCHER_RKE2_VERSION = os.environ.get("RANCHER_RKE2_VERSION", "")
 RANCHER_RKE2_CHANNEL = os.environ.get("RANCHER_RKE2_CHANNEL", "null")
@@ -132,6 +134,8 @@ def create_rke2_multiple_control_cluster(cluster_type, cluster_version):
                               'resource_name': RANCHER_HOSTNAME_PREFIX,
                               'access_key': keyPath,
                               'access_key_name': AWS_SSH_KEY_NAME.replace(".pem", ""),
+                              'docker_org_token_username': DOCKER_ORG_TOKEN_USERNAME,
+                              'docker_org_token_password': DOCKER_ORG_TOKEN_PASSWORD,
                               'ec2_instance_class': RANCHER_EC2_INSTANCE_CLASS,
                               'username': RANCHER_RKE2_RHEL_USERNAME,
                               'password': RANCHER_RKE2_RHEL_PASSWORD,
@@ -174,6 +178,8 @@ def create_rke2_multiple_control_cluster(cluster_type, cluster_version):
                                   'aws_ami': RANCHER_AWS_AMI,
                                   'aws_user': RANCHER_AWS_USER,
                                   'ec2_instance_class': RANCHER_EC2_INSTANCE_CLASS,
+                                  'docker_org_token_username': DOCKER_ORG_TOKEN_USERNAME,
+                                  'docker_org_token_password': DOCKER_ORG_TOKEN_PASSWORD,
                                   'resource_name': RANCHER_HOSTNAME_PREFIX,
                                   'access_key': keyPath,
                                   'access_key_name': AWS_SSH_KEY_NAME.replace(".pem", ""),
