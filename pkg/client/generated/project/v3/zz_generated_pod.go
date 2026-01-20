@@ -69,6 +69,7 @@ const (
 	PodFieldWindowsOptions                = "windowsOptions"
 	PodFieldWorkloadID                    = "workloadId"
 	PodFieldWorkloadMetrics               = "workloadMetrics"
+	PodFieldWorkloadRef                   = "workloadRef"
 )
 
 type Pod struct {
@@ -136,6 +137,7 @@ type Pod struct {
 	WindowsOptions                *WindowsSecurityContextOptions `json:"windowsOptions,omitempty" yaml:"windowsOptions,omitempty"`
 	WorkloadID                    string                         `json:"workloadId,omitempty" yaml:"workloadId,omitempty"`
 	WorkloadMetrics               []WorkloadMetric               `json:"workloadMetrics,omitempty" yaml:"workloadMetrics,omitempty"`
+	WorkloadRef                   *WorkloadReference             `json:"workloadRef,omitempty" yaml:"workloadRef,omitempty"`
 }
 
 type PodCollection struct {

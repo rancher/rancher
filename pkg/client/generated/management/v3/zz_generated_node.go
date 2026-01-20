@@ -16,6 +16,7 @@ const (
 	NodeFieldCreated              = "created"
 	NodeFieldCreatorID            = "creatorId"
 	NodeFieldCustomConfig         = "customConfig"
+	NodeFieldDeclaredFeatures     = "declaredFeatures"
 	NodeFieldDescription          = "description"
 	NodeFieldDockerInfo           = "dockerInfo"
 	NodeFieldEtcd                 = "etcd"
@@ -68,6 +69,7 @@ type Node struct {
 	Created              string                    `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID            string                    `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	CustomConfig         *CustomConfig             `json:"customConfig,omitempty" yaml:"customConfig,omitempty"`
+	DeclaredFeatures     []string                  `json:"declaredFeatures,omitempty" yaml:"declaredFeatures,omitempty"`
 	Description          string                    `json:"description,omitempty" yaml:"description,omitempty"`
 	DockerInfo           *DockerInfo               `json:"dockerInfo,omitempty" yaml:"dockerInfo,omitempty"`
 	Etcd                 bool                      `json:"etcd,omitempty" yaml:"etcd,omitempty"`

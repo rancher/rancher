@@ -78,6 +78,7 @@ const (
 	StatefulSetFieldWorkloadAnnotations                  = "workloadAnnotations"
 	StatefulSetFieldWorkloadLabels                       = "workloadLabels"
 	StatefulSetFieldWorkloadMetrics                      = "workloadMetrics"
+	StatefulSetFieldWorkloadRef                          = "workloadRef"
 )
 
 type StatefulSet struct {
@@ -152,6 +153,7 @@ type StatefulSet struct {
 	WorkloadAnnotations                  map[string]string                                `json:"workloadAnnotations,omitempty" yaml:"workloadAnnotations,omitempty"`
 	WorkloadLabels                       map[string]string                                `json:"workloadLabels,omitempty" yaml:"workloadLabels,omitempty"`
 	WorkloadMetrics                      []WorkloadMetric                                 `json:"workloadMetrics,omitempty" yaml:"workloadMetrics,omitempty"`
+	WorkloadRef                          *WorkloadReference                               `json:"workloadRef,omitempty" yaml:"workloadRef,omitempty"`
 }
 
 type StatefulSetCollection struct {
