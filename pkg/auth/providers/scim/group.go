@@ -17,11 +17,13 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
+// SCIMMember represents a member of a SCIM group.
 type SCIMMember struct {
 	Value   string `json:"value"`
 	Display string `json:"display"`
 }
 
+// SCIMGroup represents a SCIM group.
 type SCIMGroup struct {
 	Schemas     []string     `json:"schemas"`
 	ID          string       `json:"id"`
@@ -30,8 +32,14 @@ type SCIMGroup struct {
 	Members     []SCIMMember `json:"members"`
 }
 
+// ListGroups returns a list of groups.
+// It supports filtering by displayName using the "eq" operator.
+// Pagination is not implemented yet.
+// Returns:
+//   - 200 on success
+//   - 400 for invalid requests.
 func (s *SCIMServer) ListGroups(w http.ResponseWriter, r *http.Request) {
-	logrus.Infof("scim::ListGroups: url %s", r.URL.String())
+	logrus.Tracef("scim::ListGroups: url %s", r.URL.String())
 
 	provider := mux.Vars(r)["provider"]
 
@@ -68,7 +76,7 @@ func (s *SCIMServer) ListGroups(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	logrus.Infof("scim::ListGroups: startIndex=%d, count=%d", startIndex, count)
+	logrus.Tracef("scim::ListGroups: startIndex=%d, count=%d", startIndex, count)
 
 	groups, err := s.groupsCache.List(labels.Set{authProviderLabel: provider}.AsSelector())
 	if err != nil {
@@ -131,8 +139,12 @@ func (s *SCIMServer) ListGroups(w http.ResponseWriter, r *http.Request) {
 	writeResponse(w, response)
 }
 
+// CreateGroup creates a group.
+// Returns:
+//   - 201 on success
+//   - 400 for invalid requests.
 func (s *SCIMServer) CreateGroup(w http.ResponseWriter, r *http.Request) {
-	logrus.Infof("scim::CreateGroup: url %s", r.URL.String())
+	logrus.Tracef("scim::CreateGroup: url %s", r.URL.String())
 
 	provider := mux.Vars(r)["provider"]
 
@@ -201,8 +213,12 @@ func (s *SCIMServer) CreateGroup(w http.ResponseWriter, r *http.Request) {
 	writeResponse(w, resource, http.StatusCreated)
 }
 
+// GetGroup retutns a group by ID.
+// Returns:
+//   - 200 on success
+//   - 400 for invalid requests.
 func (s *SCIMServer) GetGroup(w http.ResponseWriter, r *http.Request) {
-	logrus.Infof("scim::GetGroup: url %s", r.URL.String())
+	logrus.Tracef("scim::GetGroup: url %s", r.URL.String())
 
 	provider := mux.Vars(r)["provider"]
 	id := mux.Vars(r)["id"]
@@ -255,6 +271,10 @@ func (s *SCIMServer) GetGroup(w http.ResponseWriter, r *http.Request) {
 	writeResponse(w, resource)
 }
 
+// UpdateGroup updates a group.
+// Returns:
+//   - 200 on success
+//   - 400 for invalid requests.
 func (s *SCIMServer) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 	logrus.Infof("scim::UpdateGroup: url %s", r.URL.String())
 
@@ -316,6 +336,14 @@ func (s *SCIMServer) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 	writeResponse(w, resource)
 }
 
+// PatchGroup applies partial modifications to a group.
+// Currently supports
+//   - the "replace" operation for updating externalId.
+//   - the "add" and "remove" operations for managing group members.
+//
+// Returns:
+//   - 200 on success
+//   - 400 for invalid requests.
 func (s *SCIMServer) PatchGroup(w http.ResponseWriter, r *http.Request) {
 	logrus.Infof("scim::PatchGroup: url %s", r.URL.String())
 
@@ -471,6 +499,10 @@ func (s *SCIMServer) PatchGroup(w http.ResponseWriter, r *http.Request) {
 	writeResponse(w, resource)
 }
 
+// DeleteGroup deletes a group.
+// Returns:
+//   - 204 on successful deletion
+//   - 404 if the group is not found
 func (s *SCIMServer) DeleteGroup(w http.ResponseWriter, r *http.Request) {
 	logrus.Infof("scim::DeleteGroup: url %s", r.URL.String())
 
@@ -505,6 +537,7 @@ func (s *SCIMServer) DeleteGroup(w http.ResponseWriter, r *http.Request) {
 	writeResponse(w, noPayload, http.StatusNoContent)
 }
 
+// getAllRancherGroupMembers retrieves all groups and their members for the specified provider.
 func (s *SCIMServer) getAllRancherGroupMembers(provider string) (map[string][]SCIMMember, error) {
 	list, err := s.userCache.List(labels.Everything())
 	if err != nil {
@@ -536,6 +569,7 @@ func (s *SCIMServer) getAllRancherGroupMembers(provider string) (map[string][]SC
 	return uniqueGroups, nil
 }
 
+// getRancherGroupMembers retrieves members of a specific group for the specified provider.
 func (s *SCIMServer) getRancherGroupMembers(provider string, name string) ([]SCIMMember, error) {
 	list, err := s.userCache.List(labels.Everything())
 	if err != nil {
@@ -570,6 +604,7 @@ func (s *SCIMServer) getRancherGroupMembers(provider string, name string) ([]SCI
 	return members, nil
 }
 
+// syncGroupMembers synchronizes the members of a group to match the provided list.
 func (s *SCIMServer) syncGroupMembers(provider, groupName string, members []SCIMMember) error {
 	rancherMembers, err := s.getRancherGroupMembers(provider, groupName)
 	if err != nil {
@@ -603,6 +638,7 @@ func (s *SCIMServer) syncGroupMembers(provider, groupName string, members []SCIM
 	return nil
 }
 
+// addGroupMember adds a member to a group.
 func (s *SCIMServer) addGroupMember(provider, groupName string, member SCIMMember) error {
 	user, err := s.userCache.Get(member.Value)
 	if err != nil {
@@ -678,6 +714,7 @@ func (s *SCIMServer) removeGroupMember(provider, groupName, value string) error 
 	return nil
 }
 
+// removeAllGroupMembers removes all members from a group.
 func (s *SCIMServer) removeAllGroupMembers(provider, groupName string) error {
 	members, err := s.getRancherGroupMembers(provider, groupName)
 	if err != nil {
@@ -694,6 +731,7 @@ func (s *SCIMServer) removeAllGroupMembers(provider, groupName string) error {
 	return nil
 }
 
+// ensureRancherGroup ensures that a Rancher group exists for the given SCIM group.
 func (s *SCIMServer) ensureRancherGroup(provider string, grp SCIMGroup) (*v3.Group, error) {
 	if grp.ID != "" {
 		return s.groupsCache.Get(grp.ID)

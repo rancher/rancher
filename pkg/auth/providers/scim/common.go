@@ -19,6 +19,7 @@ const (
 	scimAuthToken     = "scim-auth-token"
 )
 
+// patchOp defines a single operation in a SCIM PATCH request.
 type patchOp struct {
 	Op    string `json:"op"`
 	Path  string `json:"path"`
@@ -35,6 +36,7 @@ func first[Slice ~[]E, E any](s Slice) E {
 	return e
 }
 
+// locationURL constructs the location URL for a SCIM resource.
 func locationURL(r *http.Request, provider, resourceType, id string) string {
 	host := "https://" + authutil.GetHost(r)
 	location, err := url.JoinPath(host, URLPrefix, provider, resourceType, id)

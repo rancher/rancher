@@ -9,6 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// ListResponse defines a SCIM list response.
 type ListResponse struct {
 	Schemas      []string `json:"schemas"`
 	TotalResults int      `json:"totalResults"`
@@ -17,6 +18,7 @@ type ListResponse struct {
 	Resources    []any    `json:"Resources"`
 }
 
+// Error defines a SCIM error response.
 type Error struct {
 	Schemas  []string `json:"schemas"`
 	Status   int      `json:"status"`
@@ -24,6 +26,7 @@ type Error struct {
 	ScimType string   `json:"scimType,omitempty"`
 }
 
+// Error implements the [error] interface.
 func (e Error) Error() string {
 	s := fmt.Sprintf("status: %d", e.Status)
 	if e.Detail != "" {
@@ -32,6 +35,7 @@ func (e Error) Error() string {
 	return s
 }
 
+// MarshalJSON customizes the JSON marshaling for Error.
 func (e Error) MarshalJSON() ([]byte, error) {
 	t := map[string]any{
 		"schemas": e.Schemas,
@@ -45,6 +49,7 @@ func (e Error) MarshalJSON() ([]byte, error) {
 	return json.Marshal(t)
 }
 
+// NewError creates a new SCIM error.
 func NewError(status int, detail string, scimType ...string) *Error {
 	err := &Error{
 		Schemas: []string{ErrorSchemaID},
@@ -59,10 +64,12 @@ func NewError(status int, detail string, scimType ...string) *Error {
 	return err
 }
 
+// NewInternalError creates a new SCIM internal server error.
 func NewInternalError() *Error {
 	return NewError(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
 }
 
+// writeError writes a SCIM error response.
 func writeError(w http.ResponseWriter, err *Error) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(err.Status)
@@ -71,6 +78,7 @@ func writeError(w http.ResponseWriter, err *Error) {
 	}
 }
 
+// writeResponse writes a SCIM response.
 func writeResponse(w http.ResponseWriter, payload any, status ...int) {
 	if payload != nil {
 		w.Header().Set("Content-Type", "application/scim+json")
@@ -88,4 +96,5 @@ func writeResponse(w http.ResponseWriter, payload any, status ...int) {
 	}
 }
 
+// noPayload represents an empty response payload.
 var noPayload any
