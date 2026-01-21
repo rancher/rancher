@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 func getInfraRef(rkeCluster *rkev1.RKECluster) *corev1.ObjectReference {
@@ -314,24 +314,36 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 
 		var (
 			machineDeploymentName = name.SafeConcatName(cluster.Name, machinePool.Name)
-			infraRef              corev1.ObjectReference
+			infraRef              capi.ContractVersionedObjectReference
 		)
 
-		if machinePool.NodeConfig.APIVersion == "" || machinePool.NodeConfig.APIVersion == "rke-machine-config.cattle.io/v1" {
+		if machinePool.NodeConfig.APIVersion == "" || machinePool.NodeConfig.APIVersion == capr.DefaultMachineConfigAPIVersion {
 			machineTemplate, err := toMachineTemplate(machineDeploymentName, cluster, machinePool, dynamic, secrets)
 			if err != nil {
 				return nil, err
 			}
 
 			result = append(result, machineTemplate)
-			infraRef = corev1.ObjectReference{
-				APIVersion: machineTemplate.GetAPIVersion(),
-				Kind:       machineTemplate.GetKind(),
-				Namespace:  machineTemplate.GetNamespace(),
-				Name:       machineTemplate.GetName(),
+
+			gv, err := schema.ParseGroupVersion(machineTemplate.GetAPIVersion())
+			if err != nil {
+				return nil, err
+			}
+			infraRef = capi.ContractVersionedObjectReference{
+				APIGroup: gv.Group,
+				Kind:     machineTemplate.GetKind(),
+				Name:     machineTemplate.GetName(),
 			}
 		} else {
-			infraRef = *machinePool.NodeConfig
+			gv, err := schema.ParseGroupVersion(machinePool.NodeConfig.APIVersion)
+			if err != nil {
+				return nil, err
+			}
+			infraRef = capi.ContractVersionedObjectReference{
+				APIGroup: gv.Group,
+				Kind:     machinePool.NodeConfig.Kind,
+				Name:     machinePool.NodeConfig.Name,
+			}
 		}
 
 		// The MachineOS field is used below to set the cattle.io/os label in the
@@ -389,13 +401,15 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 			Spec: capi.MachineDeploymentSpec{
 				ClusterName: capiCluster.Name,
 				Replicas:    machinePool.Quantity,
-				Strategy: &capi.MachineDeploymentStrategy{
-					// RollingUpdate is the default, so no harm in setting it here.
-					Type: capi.RollingUpdateMachineDeploymentStrategyType,
-					RollingUpdate: &capi.MachineRollingUpdateDeployment{
-						// Delete oldest machines by default.
-						DeletePolicy: &[]string{string(capi.OldestMachineSetDeletePolicy)}[0],
+				Rollout: capi.MachineDeploymentRolloutSpec{
+					Strategy: capi.MachineDeploymentRolloutStrategy{
+						// RollingUpdate is the default, so no harm in setting it here.
+						Type: capi.RollingUpdateMachineDeploymentStrategyType,
 					},
+				},
+				Deletion: capi.MachineDeploymentDeletionSpec{
+					// Delete oldest machines by default.
+					Order: capi.OldestMachineSetDeletionOrder,
 				},
 				Template: capi.MachineTemplateSpec{
 					ObjectMeta: capi.ObjectMeta{
@@ -410,23 +424,27 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 					Spec: capi.MachineSpec{
 						ClusterName: capiCluster.Name,
 						Bootstrap: capi.Bootstrap{
-							ConfigRef: &corev1.ObjectReference{
-								Kind:       "RKEBootstrapTemplate",
-								Namespace:  cluster.Namespace,
-								Name:       bootstrapName,
-								APIVersion: capr.RKEAPIVersion,
+							ConfigRef: capi.ContractVersionedObjectReference{
+								Kind:     "RKEBootstrapTemplate",
+								Name:     bootstrapName,
+								APIGroup: capr.RKEAPIGroup,
 							},
 						},
 						InfrastructureRef: infraRef,
-						NodeDrainTimeout:  machinePool.DrainBeforeDeleteTimeout,
+						Deletion: capi.MachineDeletionSpec{
+							NodeDrainTimeoutSeconds: durationToSeconds(machinePool.DrainBeforeDeleteTimeout, cluster),
+						},
 					},
 				},
-				Paused: machinePool.Paused,
+				Paused: &machinePool.Paused,
 			},
 		}
 		if machinePool.RollingUpdate != nil {
-			machineDeployment.Spec.Strategy.RollingUpdate.MaxSurge = machinePool.RollingUpdate.MaxSurge
-			machineDeployment.Spec.Strategy.RollingUpdate.MaxUnavailable = machinePool.RollingUpdate.MaxUnavailable
+			machineDeployment.Spec.Rollout.Strategy.Type = capi.RollingUpdateMachineDeploymentStrategyType
+			machineDeployment.Spec.Rollout.Strategy.RollingUpdate = capi.MachineDeploymentRolloutStrategyRollingUpdate{
+				MaxUnavailable: machinePool.RollingUpdate.MaxUnavailable,
+				MaxSurge:       machinePool.RollingUpdate.MaxSurge,
+			}
 		}
 
 		if machinePool.EtcdRole {
@@ -463,7 +481,7 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 
 		// if a health check timeout was specified create health checks for this machine pool
 		if machinePool.UnhealthyNodeTimeout != nil && machinePool.UnhealthyNodeTimeout.Duration > 0 {
-			hc := deploymentHealthChecks(machineDeployment, machinePool)
+			hc := deploymentHealthChecks(machineDeployment, machinePool, cluster)
 			result = append(result, hc)
 		}
 	}
@@ -472,11 +490,16 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 }
 
 // deploymentHealthChecks Health checks will mark a machine as failed if it has any of the conditions below for the duration of the given timeout. https://cluster-api.sigs.k8s.io/tasks/healthcheck.html#what-is-a-machinehealthcheck
-func deploymentHealthChecks(machineDeployment *capi.MachineDeployment, machinePool rancherv1.RKEMachinePool) *capi.MachineHealthCheck {
+func deploymentHealthChecks(machineDeployment *capi.MachineDeployment, machinePool rancherv1.RKEMachinePool, cluster *rancherv1.Cluster) *capi.MachineHealthCheck {
 	var maxUnhealthy *intstr.IntOrString
 	if machinePool.MaxUnhealthy != nil {
 		maxUnhealthy = new(intstr.IntOrString)
 		*maxUnhealthy = intstr.Parse(*machinePool.MaxUnhealthy)
+	}
+
+	var unhealthyInRange string
+	if machinePool.UnhealthyRange != nil {
+		unhealthyInRange = *machinePool.UnhealthyRange
 	}
 
 	return &capi.MachineHealthCheck{
@@ -491,21 +514,28 @@ func deploymentHealthChecks(machineDeployment *capi.MachineDeployment, machinePo
 					capi.MachineDeploymentNameLabel: machineDeployment.Name,
 				},
 			},
-			UnhealthyConditions: []capi.UnhealthyCondition{ // if a node status is unready or unknown for the timeout mark it unhealthy
-				{
-					Status:  corev1.ConditionUnknown,
-					Type:    corev1.NodeReady,
-					Timeout: *machinePool.UnhealthyNodeTimeout,
-				},
-				{
-					Status:  corev1.ConditionFalse,
-					Type:    corev1.NodeReady,
-					Timeout: *machinePool.UnhealthyNodeTimeout,
+			Checks: capi.MachineHealthCheckChecks{
+				NodeStartupTimeoutSeconds: durationToSeconds(machinePool.NodeStartupTimeout, cluster),
+
+				UnhealthyNodeConditions: []capi.UnhealthyNodeCondition{
+					{
+						Status:         corev1.ConditionUnknown,
+						Type:           corev1.NodeReady,
+						TimeoutSeconds: durationToSeconds(machinePool.UnhealthyNodeTimeout, cluster),
+					},
+					{
+						Status:         corev1.ConditionFalse,
+						Type:           corev1.NodeReady,
+						TimeoutSeconds: durationToSeconds(machinePool.UnhealthyNodeTimeout, cluster),
+					},
 				},
 			},
-			MaxUnhealthy:       maxUnhealthy,
-			UnhealthyRange:     machinePool.UnhealthyRange,
-			NodeStartupTimeout: machinePool.NodeStartupTimeout,
+			Remediation: capi.MachineHealthCheckRemediation{
+				TriggerIf: capi.MachineHealthCheckRemediationTriggerIf{
+					UnhealthyLessThanOrEqualTo: maxUnhealthy,
+					UnhealthyInRange:           unhealthyInRange,
+				},
+			},
 		},
 	}
 }
@@ -592,10 +622,26 @@ func capiCluster(cluster *rancherv1.Cluster, rkeControlPlane *rkev1.RKEControlPl
 		annotations[capr.ClusterAutoscalerPausedAnnotation] = "true"
 	}
 
-	apiVersion, kind := gvk.ToAPIVersionAndKind()
-
 	ownerGVK := rancherv1.SchemeGroupVersion.WithKind("Cluster")
 	ownerAPIVersion, _ := ownerGVK.ToAPIVersionAndKind()
+
+	gv, err := schema.ParseGroupVersion(infraRef.APIVersion)
+	if err != nil {
+		logrus.Warnf("cluster %s/%s: failed to parse infrastructure ref apiVersion %s: %v",
+			cluster.Namespace, cluster.Name, infraRef.APIVersion, err)
+	}
+	infra := capi.ContractVersionedObjectReference{
+		APIGroup: gv.Group,
+		Kind:     infraRef.Kind,
+		Name:     infraRef.Name,
+	}
+
+	controlPlane := capi.ContractVersionedObjectReference{
+		Kind:     gvk.Kind,
+		Name:     rkeControlPlane.Name,
+		APIGroup: gvk.Group,
+	}
+
 	return &capi.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        cluster.Name,
@@ -613,13 +659,24 @@ func capiCluster(cluster *rancherv1.Cluster, rkeControlPlane *rkev1.RKEControlPl
 			},
 		},
 		Spec: capi.ClusterSpec{
-			InfrastructureRef: infraRef,
-			ControlPlaneRef: &corev1.ObjectReference{
-				Kind:       kind,
-				Namespace:  rkeControlPlane.Namespace,
-				Name:       rkeControlPlane.Name,
-				APIVersion: apiVersion,
-			},
+			InfrastructureRef: infra,
+			ControlPlaneRef:   controlPlane,
 		},
 	}
+}
+
+func durationToSeconds(d *metav1.Duration, cluster *rancherv1.Cluster) *int32 {
+	if d == nil {
+		return nil
+	}
+	s := d.Duration.Seconds()
+	maxInt32 := float64(^uint32(0) >> 1) // ^uint32(0) >> 1 is a portable way to get math.MaxInt32
+	// Cap the value at MaxInt32 to prevent overflow, as NodeDrainTimeoutSeconds is an *int32.
+	if s > maxInt32 {
+		logrus.Warnf("cluster %s/%s: drainBeforeDeleteTimeout %s is greater than max supported value, capping to max value %d",
+			cluster.Namespace, cluster.Name, d.Duration.String(), int32(maxInt32))
+		s = maxInt32
+	}
+	seconds := int32(s)
+	return &seconds
 }
