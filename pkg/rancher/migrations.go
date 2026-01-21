@@ -379,46 +379,45 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.CAPIContext)
 					return err
 				}
 
-				apiVersion := ""
-				switch machine.Spec.InfrastructureRef.APIGroup {
-				case capr.RKEAPIGroup: // custom cluster
-					apiVersion = capr.RKEAPIVersion
-				case capr.RKEMachineAPIGroup: // node driver cluster
-					apiVersion = capr.RKEMachineAPIVersion
+				// Discover the version for the resource
+				apiVersion, err := capr.DiscoverResourceVersion(w.CachedDiscovery, machine.Spec.InfrastructureRef.APIGroup, machine.Spec.InfrastructureRef.Kind)
+				if err != nil {
+					logrus.Debugf("failed to discover version for %s/%s: %v - skipping infra machine update", machine.Spec.InfrastructureRef.APIGroup, machine.Spec.InfrastructureRef.Kind, err)
+					continue
 				}
-				if apiVersion != "" {
-					gv, err := schema.ParseGroupVersion(apiVersion)
+
+				gv, err := schema.ParseGroupVersion(apiVersion)
+				if err != nil {
+					// This error should not occur because RKEAPIVersion and RKEMachineAPIVersion are valid
+					logrus.Debugf("failed to parse discovered API version %s: %v - skipping infra machine update", apiVersion, err)
+					continue
+				}
+
+				gvk := schema.GroupVersionKind{
+					Group:   gv.Group,
+					Version: gv.Version,
+					Kind:    machine.Spec.InfrastructureRef.Kind,
+				}
+				if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+					infraMachine, err := w.Dynamic.Get(gvk, machine.Namespace, machine.Spec.InfrastructureRef.Name)
 					if err != nil {
-						// This error should not occur because RKEAPIVersion and RKEMachineAPIVersion are valid
-						continue
-					}
-
-					gvk := schema.GroupVersionKind{
-						Group:   gv.Group,
-						Version: gv.Version,
-						Kind:    machine.Spec.InfrastructureRef.Kind,
-					}
-					if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-						infraMachine, err := w.Dynamic.Get(gvk, machine.Namespace, machine.Spec.InfrastructureRef.Name)
-						if err != nil {
-							return err
-						}
-
-						d, err := data.Convert(infraMachine.DeepCopyObject())
-						if err != nil {
-							return err
-						}
-
-						if changed, err := insertOrUpdateCondition(d, summary.NewCondition("Ready", "True", "", "")); err != nil {
-							return err
-						} else if changed {
-							_, err = w.Dynamic.UpdateStatus(&unstructured.Unstructured{Object: d})
-							return err
-						}
-						return err
-					}); err != nil {
 						return err
 					}
+
+					d, err := data.Convert(infraMachine.DeepCopyObject())
+					if err != nil {
+						return err
+					}
+
+					if changed, err := insertOrUpdateCondition(d, summary.NewCondition("Ready", "True", "", "")); err != nil {
+						return err
+					} else if changed {
+						_, err = w.Dynamic.UpdateStatus(&unstructured.Unstructured{Object: d})
+						return err
+					}
+					return err
+				}); err != nil {
+					return err
 				}
 			}
 		}

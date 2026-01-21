@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	capiconditions "sigs.k8s.io/cluster-api/util/conditions"
@@ -681,4 +682,47 @@ func ToOwnerReference(typeMeta metav1.TypeMeta, objectMeta metav1.ObjectMeta) me
 		Controller:         &[]bool{true}[0],
 		BlockOwnerDeletion: &[]bool{true}[0],
 	}
+}
+
+// DiscoverResourceVersion discovers the preferred API version for a given group and kind
+// using the Kubernetes discovery API. It returns the full API version in the format "group/version".
+func DiscoverResourceVersion(discoveryClient discovery.CachedDiscoveryInterface, group, kind string) (string, error) {
+	if discoveryClient == nil {
+		return "", fmt.Errorf("discovery client is not available")
+	}
+
+	// Get the list of API groups
+	apiGroups, err := discoveryClient.ServerGroups()
+	if err != nil {
+		return "", fmt.Errorf("failed to discover server groups: %w", err)
+	}
+
+	// Find the matching group
+	var preferredVersion string
+	for _, apiGroup := range apiGroups.Groups {
+		if apiGroup.Name == group {
+			// Use the preferred version from the API group
+			preferredVersion = apiGroup.PreferredVersion.Version
+			break
+		}
+	}
+
+	if preferredVersion == "" {
+		return "", fmt.Errorf("no preferred version found for group %s", group)
+	}
+
+	// Verify the kind exists in this version
+	resourceList, err := discoveryClient.ServerResourcesForGroupVersion(group + "/" + preferredVersion)
+	if err != nil {
+		return "", fmt.Errorf("failed to get resources for %s/%s: %w", group, preferredVersion, err)
+	}
+
+	// Check if the kind exists in this version
+	for _, resource := range resourceList.APIResources {
+		if resource.Kind == kind {
+			return group + "/" + preferredVersion, nil
+		}
+	}
+
+	return "", fmt.Errorf("kind %s not found in group %s version %s", kind, group, preferredVersion)
 }

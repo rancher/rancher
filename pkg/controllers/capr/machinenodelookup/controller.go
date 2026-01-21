@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -39,6 +40,7 @@ type handler struct {
 	rkeBootstrap        rkecontroller.RKEBootstrapController
 	kubeconfigManager   *kubeconfig.Manager
 	dynamic             *dynamic.Controller
+	discovery           discovery.CachedDiscoveryInterface
 }
 
 func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigManager *kubeconfig.Manager) {
@@ -49,6 +51,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigMana
 		rkeBootstrap:        clients.RKE.RKEBootstrap(),
 		kubeconfigManager:   kubeconfigManager,
 		dynamic:             clients.Dynamic,
+		discovery:           clients.CachedDiscovery,
 	}
 
 	clients.RKE.RKEBootstrap().OnChange(ctx, "machine-node-lookup", h.associateMachineWithNode)
@@ -78,16 +81,10 @@ func (h *handler) associateMachineWithNode(_ string, bootstrap *rkev1.RKEBootstr
 		return bootstrap, nil
 	}
 
-	apiVersion := ""
-	switch machine.Spec.InfrastructureRef.APIGroup {
-	case capr.RKEAPIGroup: // custom cluster
-		apiVersion = capr.RKEAPIVersion
-	case capr.RKEMachineAPIGroup: // node driver cluster
-		apiVersion = capr.RKEMachineAPIVersion
-	}
-	if apiVersion == "" {
-		return bootstrap, fmt.Errorf("machine %s/%s has unsupported infrastructureRef apiGroup %s",
-			machine.Namespace, machine.Name, machine.Spec.InfrastructureRef.APIGroup)
+	// Discover the version for the resource
+	apiVersion, err := capr.DiscoverResourceVersion(h.discovery, machine.Spec.InfrastructureRef.APIGroup, machine.Spec.InfrastructureRef.Kind)
+	if err != nil {
+		return bootstrap, fmt.Errorf("failed to discover version for %s/%s: %w", machine.Spec.InfrastructureRef.APIGroup, machine.Spec.InfrastructureRef.Kind, err)
 	}
 	gvk := schema.FromAPIVersionAndKind(apiVersion, machine.Spec.InfrastructureRef.Kind)
 	infra, err := h.dynamic.Get(gvk, machine.Namespace, machine.Spec.InfrastructureRef.Name)

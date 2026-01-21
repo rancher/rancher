@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
@@ -61,6 +62,7 @@ type autoscalerHandler struct {
 	helmOpCache fleetcontrollers.HelmOpCache
 
 	dynamicClient dynamicGetter
+	discovery     discovery.CachedDiscoveryInterface
 }
 
 func Register(ctx context.Context, clients *wrangler.CAPIContext) {
@@ -90,6 +92,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 		helmOpCache: clients.Fleet.HelmOp().Cache(),
 
 		dynamicClient: clients.Dynamic,
+		discovery:     clients.CachedDiscovery,
 	}
 
 	// only run the "create" handlers if autoscaling is enabled. otherwise only run the cleanup handler
