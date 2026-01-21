@@ -99,6 +99,7 @@ func (s *SCIMServer) ListGroups(w http.ResponseWriter, r *http.Request) {
 				"schemas":     []string{GroupSchemaID},
 				"id":          group.Name,
 				"displayName": group.DisplayName,
+				"externalId":  group.ExternalID,
 				"meta": map[string]any{
 					"created":      group.CreationTimestamp,
 					"resourceType": GroupResource,
@@ -184,6 +185,7 @@ func (s *SCIMServer) CreateGroup(w http.ResponseWriter, r *http.Request) {
 		"schemas":     []string{GroupSchemaID},
 		"id":          group.Name,
 		"displayName": group.DisplayName,
+		"externalId":  group.ExternalID,
 		"meta": map[string]any{
 			"created":      group.CreationTimestamp,
 			"resourceType": GroupResource,
@@ -236,6 +238,7 @@ func (s *SCIMServer) GetGroup(w http.ResponseWriter, r *http.Request) {
 		"schemas":     []string{GroupSchemaID},
 		"id":          group.Name,
 		"displayName": group.DisplayName,
+		"externalId":  group.ExternalID,
 		"meta": map[string]any{
 			"created":      group.CreationTimestamp,
 			"resourceType": GroupResource,
@@ -297,6 +300,7 @@ func (s *SCIMServer) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 		"schemas":     []string{GroupSchemaID},
 		"id":          group.Name,
 		"displayName": group.DisplayName,
+		"externalId":  group.ExternalID,
 		"meta": map[string]any{
 			"created":      group.CreationTimestamp,
 			"resourceType": GroupResource,
@@ -371,48 +375,45 @@ func (s *SCIMServer) PatchGroup(w http.ResponseWriter, r *http.Request) {
 			}
 
 		case "add":
-			// SCIM 2.0: Add members to group
-			if strings.ToLower(op.Path) == "members" {
-				members, ok := op.Value.([]any)
-				if !ok {
-					writeError(w, NewError(http.StatusBadRequest, "Invalid members value for add operation"))
-					return
-				}
-				for _, m := range members {
-					memberMap, ok := m.(map[string]any)
-					if !ok {
-						continue
-					}
-					value, _ := memberMap["value"].(string)
-					display, _ := memberMap["display"].(string)
-					if value != "" {
-						membersToAdd = append(membersToAdd, SCIMMember{
-							Value:   value,
-							Display: display,
-						})
-					}
-				}
-			} else {
+			// Add members to group
+			if strings.ToLower(op.Path) != "members" {
 				writeError(w, NewError(http.StatusBadRequest, fmt.Sprintf("Unsupported add path: %s", op.Path)))
 				return
 			}
 
-		case "remove":
-			// SCIM 2.0: Remove members from group
-			if strings.HasPrefix(strings.ToLower(op.Path), "members[") {
-				// Format: members[value eq "user-id"]
-				// Extract user-id from the filter
-				if userID := extractMemberValueFromPath(op.Path); userID != "" {
-					membersToRemove = append(membersToRemove, userID)
-				} else {
-					writeError(w, NewError(http.StatusBadRequest, "Invalid member removal path format"))
-					return
+			members, ok := op.Value.([]any)
+			if !ok {
+				writeError(w, NewError(http.StatusBadRequest, "Invalid members value for add operation"))
+				return
+			}
+			for _, m := range members {
+				memberMap, ok := m.(map[string]any)
+				if !ok {
+					continue
 				}
-			} else {
+				value, _ := memberMap["value"].(string)
+				display, _ := memberMap["display"].(string)
+				if value != "" {
+					membersToAdd = append(membersToAdd, SCIMMember{
+						Value:   value,
+						Display: display,
+					})
+				}
+			}
+		case "remove":
+			// Remove members from group
+			if !strings.HasPrefix(strings.ToLower(op.Path), "members[") {
 				writeError(w, NewError(http.StatusBadRequest, fmt.Sprintf("Unsupported remove path: %s", op.Path)))
 				return
 			}
-
+			// Format: members[value eq "user-id"]
+			// Extract user-id from the filter
+			if userID := extractMemberValueFromPath(op.Path); userID != "" {
+				membersToRemove = append(membersToRemove, userID)
+			} else {
+				writeError(w, NewError(http.StatusBadRequest, "Invalid member removal path format"))
+				return
+			}
 		default:
 			writeError(w, NewError(http.StatusBadRequest, fmt.Sprintf("Unsupported patch operation: %s", op.Op)))
 			return
@@ -458,6 +459,7 @@ func (s *SCIMServer) PatchGroup(w http.ResponseWriter, r *http.Request) {
 		"schemas":     []string{GroupSchemaID},
 		"id":          group.Name,
 		"displayName": group.DisplayName,
+		"externalId":  group.ExternalID,
 		"members":     members,
 		"meta": map[string]any{
 			"created":      group.CreationTimestamp,
@@ -728,6 +730,7 @@ func (s *SCIMServer) ensureRancherGroup(provider string, grp SCIMGroup) (*v3.Gro
 	}
 
 	// Check and update existing group if needed.
+	// Note: We can't change displayName as it is used as the unique identifier for groups.
 	shouldUpdate := false
 	group = group.DeepCopy()
 	if group.ExternalID != grp.ExternalID {
@@ -771,16 +774,7 @@ func applyReplaceGroup(group *v3.Group, op patchOp) (bool, error) {
 
 	var updated bool
 	switch strings.ToLower(op.Path) {
-	case "displayname":
-		displayName, ok := op.Value.(string)
-		if !ok {
-			return false, NewError(http.StatusBadRequest, fmt.Sprintf("Invalid value for displayName: %v", op.Value))
-		}
-		if group.DisplayName != displayName {
-			group.DisplayName = displayName
-			updated = true
-		}
-
+	// Note: We can't change displayName as it is used as the unique identifier for groups.
 	case "externalid":
 		externalID, ok := op.Value.(string)
 		if !ok {
@@ -790,7 +784,6 @@ func applyReplaceGroup(group *v3.Group, op patchOp) (bool, error) {
 			group.ExternalID = externalID
 			updated = true
 		}
-
 	default:
 		return false, NewError(http.StatusBadRequest, fmt.Sprintf("Unsupported patch path: %s", op.Path))
 	}
