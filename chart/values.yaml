@@ -79,6 +79,10 @@ ingress:
   # The includeDefaultExtraAnnotations are deprecated due to ingress-nginx retiring in March 2026.
   includeDefaultExtraAnnotations: false
   extraAnnotations: {}
+  # When left blank the ingress will use the cluster default ingress class.
+  # The ingress template only renders annotations for `ingress-nginx` by default.
+  # Use `ingress.extraAnnotations` to define annotations for other ingress classes.
+  # As of March 2026 `ingress-nginx` has been retired and should be migrated away from. 
   ingressClassName: ""
   # Certain ingress controllers will require the pathType or path to be set to a different value.
   pathType: ImplementationSpecific
