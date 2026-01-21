@@ -51,7 +51,7 @@ func (p *Planner) runEtcdSnapshotCreate(controlPlane *rkev1.RKEControlPlane, tok
 			return []error{err}
 		}
 		msg := fmt.Sprintf("etcd snapshot on machine %s/%s", server.Machine.Namespace, server.Machine.Name)
-		if server.Machine.Status.NodeRef != nil && server.Machine.Status.NodeRef.Name != "" {
+		if server.Machine.Status.NodeRef.IsDefined() {
 			msg = fmt.Sprintf("etcd snapshot on node %s", server.Machine.Status.NodeRef.Name)
 		}
 		if err = assignAndCheckPlan(p.store, msg, server, createPlan, joinedServer, 3, 3); err != nil {

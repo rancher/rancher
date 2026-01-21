@@ -3,13 +3,14 @@ package machinenodelookup
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/rancher/lasso/pkg/dynamic"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
-	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	ranchercontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
@@ -72,12 +73,23 @@ func (h *handler) associateMachineWithNode(_ string, bootstrap *rkev1.RKEBootstr
 		return bootstrap, err
 	}
 
-	if machine.Spec.ProviderID != nil && *machine.Spec.ProviderID != "" {
+	if machine.Spec.ProviderID != "" {
 		// If the machine already has its provider ID set, then we do not need to continue
 		return bootstrap, nil
 	}
 
-	gvk := schema.FromAPIVersionAndKind(machine.Spec.InfrastructureRef.APIVersion, machine.Spec.InfrastructureRef.Kind)
+	apiVersion := ""
+	switch machine.Spec.InfrastructureRef.APIGroup {
+	case capr.RKEAPIGroup: // custom cluster
+		apiVersion = capr.RKEAPIVersion
+	case capr.RKEMachineAPIGroup: // node driver cluster
+		apiVersion = capr.RKEMachineAPIVersion
+	}
+	if apiVersion == "" {
+		return bootstrap, fmt.Errorf("machine %s/%s has unsupported infrastructureRef apiGroup %s",
+			machine.Namespace, machine.Name, machine.Spec.InfrastructureRef.APIGroup)
+	}
+	gvk := schema.FromAPIVersionAndKind(apiVersion, machine.Spec.InfrastructureRef.Kind)
 	infra, err := h.dynamic.Get(gvk, machine.Namespace, machine.Spec.InfrastructureRef.Name)
 	if apierror.IsNotFound(err) {
 		return bootstrap, nil

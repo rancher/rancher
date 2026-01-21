@@ -14,7 +14,7 @@ import (
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/features"
-	"github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	"github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	fleetcontrollers "github.com/rancher/rancher/pkg/generated/controllers/fleet.cattle.io/v1alpha1"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v2provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 // dynamicGetter defines the interface for the Get method from dynamic.Controller
@@ -35,9 +35,9 @@ type dynamicGetter interface {
 }
 
 type autoscalerHandler struct {
-	capiClusterCache           v1beta1.ClusterCache
-	capiMachineCache           v1beta1.MachineCache
-	capiMachineDeploymentCache v1beta1.MachineDeploymentCache
+	capiClusterCache           v1beta2.ClusterCache
+	capiMachineCache           v1beta2.MachineCache
+	capiMachineDeploymentCache v1beta2.MachineDeploymentCache
 
 	clusterClient v2provcontrollers.ClusterClient
 	clusterCache  v2provcontrollers.ClusterCache

@@ -11,13 +11,13 @@ import (
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/capr/planner"
-	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	rkev1controllers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/cluster-api/util/conditions"
 )
 
@@ -180,7 +180,7 @@ func (h *handler) reconcileMachinePlanAppliedCondition(secret *corev1.Secret, pl
 		return nil
 	}
 
-	condition := capi.ConditionType(capr.PlanApplied)
+	condition := string(capr.PlanApplied)
 
 	machineName, ok := secret.Labels[capr.MachineNameLabel]
 	if !ok {
@@ -197,15 +197,22 @@ func (h *handler) reconcileMachinePlanAppliedCondition(secret *corev1.Secret, pl
 	var needsUpdate bool
 	if planAppliedErr != nil &&
 		(conditions.GetMessage(machine, condition) != planAppliedErr.Error() ||
-			*conditions.GetSeverity(machine, condition) != capi.ConditionSeverityError ||
 			!conditions.IsFalse(machine, condition) ||
 			conditions.GetReason(machine, condition) != "Error") {
 		logrus.Debugf("[plansecret] machine %s/%s: marking PlanApplied as false", machine.Namespace, machine.Name)
-		conditions.MarkFalse(machine, condition, "Error", capi.ConditionSeverityError, "%s", planAppliedErr.Error())
+		conditions.Set(machine, metav1.Condition{
+			Type:    condition,
+			Status:  metav1.ConditionFalse,
+			Reason:  "Error",
+			Message: planAppliedErr.Error(),
+		})
 		needsUpdate = true
 	} else if planAppliedErr == nil && !conditions.IsTrue(machine, condition) {
 		logrus.Debugf("[plansecret] machine %s/%s: marking PlanApplied as true", machine.Namespace, machine.Name)
-		conditions.MarkTrue(machine, condition)
+		conditions.Set(machine, metav1.Condition{
+			Type:   condition,
+			Status: metav1.ConditionTrue,
+		})
 		needsUpdate = true
 	}
 

@@ -6,7 +6,7 @@ import (
 
 	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
-	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/generic"
@@ -14,7 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
 )
 
@@ -31,7 +31,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 
 	clients.RKE.RKECluster().OnChange(ctx, "rke-cluster", h.OnChange)
 	relatedresource.Watch(ctx, "rke-cluster-trigger", func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
-		if capiCluster, ok := obj.(*capi.Cluster); ok && !capiCluster.Spec.Paused {
+		if capiCluster, ok := obj.(*capi.Cluster); ok && (capiCluster.Spec.Paused != nil && !*capiCluster.Spec.Paused) {
 			return []relatedresource.Key{{
 				Namespace: namespace,
 				Name:      name,

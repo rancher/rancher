@@ -19,7 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/channelserver"
 	"github.com/rancher/rancher/pkg/features"
-	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
@@ -34,8 +34,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
-	capierrors "sigs.k8s.io/cluster-api/errors"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	capiconditions "sigs.k8s.io/cluster-api/util/conditions"
 )
 
 const (
@@ -96,8 +96,13 @@ const (
 	WindowsMachineOS = "windows"
 
 	DefaultMachineConfigAPIVersion = "rke-machine-config.cattle.io/v1"
-	RKEMachineAPIVersion           = "rke-machine.cattle.io/v1"
-	RKEAPIVersion                  = "rke.cattle.io/v1"
+
+	// RKEMachineAPIGroup contains kinds for rancher-provisioned, aka node-driver, machine and machineTemplate
+	RKEMachineAPIGroup   = "rke-machine.cattle.io"
+	RKEMachineAPIVersion = "rke-machine.cattle.io/v1"
+
+	RKEAPIGroup   = "rke.cattle.io"
+	RKEAPIVersion = "rke.cattle.io/v1"
 
 	Provisioned                  = condition.Cond("Provisioned")
 	Stable                       = condition.Cond("Stable") // The Stable condition is used to indicate whether we can safely copy the v3 management cluster Ready condition to the v1 object.
@@ -408,7 +413,8 @@ func GetMachineDeletionStatus(machines []*capi.Machine) (string, error) {
 		return machines[i].Name < machines[j].Name
 	})
 	for _, machine := range machines {
-		if machine.Status.FailureReason != nil && *machine.Status.FailureReason == capierrors.DeleteMachineError {
+		cond := capiconditions.Get(machine, capi.MachineDeletingCondition)
+		if cond != nil && cond.Status == metav1.ConditionTrue && cond.Reason == capi.MachineDeletingInternalErrorReason {
 			return "", fmt.Errorf("error deleting machine [%s], machine must be deleted manually", machine.Name)
 		}
 		return fmt.Sprintf("waiting for machine [%s] to delete", machine.Name), nil

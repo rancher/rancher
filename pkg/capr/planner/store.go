@@ -19,7 +19,7 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
-	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	"github.com/rancher/rancher/pkg/utils"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
@@ -28,7 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/labels"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 const (
@@ -321,8 +321,7 @@ func (p *PlanStore) getPlanSecrets(machines []*capi.Machine) (map[string]*corev1
 }
 
 func isRKEBootstrap(machine *capi.Machine) bool {
-	return machine.Spec.Bootstrap.ConfigRef != nil &&
-		machine.Spec.Bootstrap.ConfigRef.Kind == "RKEBootstrap"
+	return machine.Spec.Bootstrap.ConfigRef.IsDefined() && machine.Spec.Bootstrap.ConfigRef.Kind == "RKEBootstrap"
 }
 
 // getPlanSecretFromMachine returns the plan secret from the secrets client for the given machine,
@@ -337,12 +336,12 @@ func (p *PlanStore) getPlanSecretFromMachine(machine *capi.Machine) (*corev1.Sec
 		return nil, fmt.Errorf("machine %s/%s is not using RKEBootstrap", machine.Namespace, machine.Name)
 	}
 
-	if machine.Spec.Bootstrap.ConfigRef == nil {
-		return nil, fmt.Errorf("machine %s/%s bootstrap configref was nil", machine.Namespace, machine.Name)
+	if !machine.Spec.Bootstrap.ConfigRef.IsDefined() {
+		return nil, fmt.Errorf("machine %s/%s bootstrap ConfigRef was nil", machine.Namespace, machine.Name)
 	}
 
 	if machine.Spec.Bootstrap.ConfigRef.Name == "" {
-		return nil, fmt.Errorf("machine %s/%s bootstrap configref name was empty", machine.Namespace, machine.Name)
+		return nil, fmt.Errorf("machine %s/%s bootstrap ConfigRef name was empty", machine.Namespace, machine.Name)
 	}
 
 	secret, err := p.secrets.Get(machine.Namespace, capr.PlanSecretFromBootstrapName(machine.Spec.Bootstrap.ConfigRef.Name), metav1.GetOptions{})
@@ -587,7 +586,7 @@ func joinURLFromAddress(address string, port int) string {
 
 // getJoinURLFromOutput parses the periodic output from a given entry and determines the full join URL including `https://` and the supervisor port
 func getJoinURLFromOutput(entry *planEntry, capiCluster *capi.Cluster, rkeControlPlane *rkev1.RKEControlPlane) (string, error) {
-	if entry.Plan == nil || !IsEtcdOnlyInitNode(entry) || capiCluster.Spec.ControlPlaneRef == nil || rkeControlPlane == nil {
+	if entry.Plan == nil || !IsEtcdOnlyInitNode(entry) || !capiCluster.Spec.ControlPlaneRef.IsDefined() || rkeControlPlane == nil {
 		return "", nil
 	}
 

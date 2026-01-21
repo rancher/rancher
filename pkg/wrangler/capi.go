@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 
 	capi "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io"
-	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	wapiextv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/apiextensions.k8s.io/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/sirupsen/logrus"
@@ -73,7 +73,7 @@ func (d *DeferredCAPIInitializer) WaitForClient(ctx context.Context) (*CAPIConte
 	return &CAPIContext{
 		Context:     d.context,
 		CAPIFactory: capi,
-		CAPI:        capi.Cluster().V1beta1(),
+		CAPI:        capi.Cluster().V1beta2(),
 	}, nil
 }
 
