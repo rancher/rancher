@@ -297,7 +297,7 @@ func removeLabelFromExternalRole(rt *v3.RoleTemplate, crController crbacv1.Clust
 	if _, ok := externalRole.Labels[rbac.AggregationLabel]; ok {
 		delete(externalRole.Labels, rbac.AggregationLabel)
 		if _, err := crController.Update(externalRole); err != nil {
-			return fmt.Errorf("failed to update external ClusterRole %s: %w", externalRole.Name, err)
+			return fmt.Errorf("failed to update external cluster role %s: %w", externalRole.Name, err)
 		}
 	}
 

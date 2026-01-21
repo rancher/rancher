@@ -85,7 +85,7 @@ func isRoleTemplateExternal(rtName string, rtClient mgmtv3.RoleTemplateControlle
 		return false, err
 	}
 	if rt == nil {
-		return false, fmt.Errorf("failed to get roletemplate %s", rtName)
+		return false, fmt.Errorf("roletemplate %s is nil", rtName)
 	}
 	return rt.External, nil
 }

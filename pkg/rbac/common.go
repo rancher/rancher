@@ -369,11 +369,11 @@ func CreateOrUpdateResource[T generic.RuntimeMetaObject, TList runtime.Object](o
 		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed to get %s %s: %w", kind, obj.GetName(), err)
 		}
-		logrus.Infof("%s %s being created", kind, obj.GetName())
+		logrus.Infof("%s %s is being created", kind, obj.GetName())
 		// resource doesn't exist, create it
 		_, err = client.Create(obj)
 		if err != nil {
-			return fmt.Errorf("%s %s creation failed: %w", kind, obj.GetName(), err)
+			return fmt.Errorf("failed to create %s %s: %w", kind, obj.GetName(), err)
 		}
 		return nil
 	}
@@ -384,7 +384,7 @@ func CreateOrUpdateResource[T generic.RuntimeMetaObject, TList runtime.Object](o
 		// if it has changed, update it to the correct version
 		_, err := client.Update(updatedResource)
 		if err != nil {
-			return fmt.Errorf("%s %s update failed: %w", kind, obj.GetName(), err)
+			return fmt.Errorf("failed to update %s %s: %w", kind, obj.GetName(), err)
 		}
 	}
 	return nil
@@ -402,11 +402,11 @@ func CreateOrUpdateNamespacedResource[T generic.RuntimeMetaObject, TList runtime
 		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed to get %s %s in namespace %s: %w", kind, obj.GetName(), obj.GetNamespace(), err)
 		}
-		logrus.Infof("%s %s being created in namespace %s", kind, obj.GetName(), obj.GetNamespace())
+		logrus.Infof("%s %s is being created in namespace %s", kind, obj.GetName(), obj.GetNamespace())
 		// resource doesn't exist, create it
 		_, err = client.Create(obj)
 		if err != nil {
-			return fmt.Errorf("%s %s creation in namespace %s failed: %w", kind, obj.GetName(), obj.GetNamespace(), err)
+			return fmt.Errorf("failed to create %s %s in namespace %s: %w", kind, obj.GetName(), obj.GetNamespace(), err)
 		}
 		return nil
 	}
@@ -417,7 +417,7 @@ func CreateOrUpdateNamespacedResource[T generic.RuntimeMetaObject, TList runtime
 		// if it has changed, update it to the correct version
 		_, err := client.Update(updatedResource)
 		if err != nil {
-			return fmt.Errorf("%s %s update in namespace %s failed: %w", kind, obj.GetName(), obj.GetNamespace(), err)
+			return fmt.Errorf("failed to update %s %s in namespace %s: %w", kind, obj.GetName(), obj.GetNamespace(), err)
 		}
 	}
 	return nil
