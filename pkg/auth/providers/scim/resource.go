@@ -9,6 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// SCIM resource types.
 const (
 	UserResource         = "User"
 	GroupResource        = "Group"
@@ -16,6 +17,7 @@ const (
 	SchemaResource       = "Schema"
 )
 
+// SCIM resource endpoints.
 const (
 	UserEndpoint          = "Users"
 	GroupEndpoint         = "Groups"
@@ -63,6 +65,7 @@ type ResourceType struct {
 	Meta Meta `json:"meta"`
 }
 
+// userResourceType defines the SCIM User resource type.
 var userResourceType = ResourceType{
 	ID:          UserResource,
 	Name:        UserResource,
@@ -74,6 +77,8 @@ var userResourceType = ResourceType{
 		ResourceType: ResourceTypeResource,
 	},
 }
+
+// groupResourceType defines the SCIM Group resource type.
 var groupResourceType = ResourceType{
 	ID:          GroupResource,
 	Name:        GroupResource,
@@ -86,13 +91,15 @@ var groupResourceType = ResourceType{
 	},
 }
 
+// resourceTypeRegistry maps SCIM resource type IDs to their definitions.
 var resourceTypeRegistry = map[string]ResourceType{
 	UserResource:  userResourceType,
 	GroupResource: groupResourceType,
 }
 
+// ListResourceTypes lists supported SCIM resource types.
 func (s *SCIMServer) ListResourceTypes(w http.ResponseWriter, r *http.Request) {
-	logrus.Infof("scim::ListResourceTypes: url %s", r.URL.String())
+	logrus.Tracef("scim::ListResourceTypes: url %s", r.URL.String())
 
 	provider := mux.Vars(r)["provider"]
 
@@ -112,8 +119,9 @@ func (s *SCIMServer) ListResourceTypes(w http.ResponseWriter, r *http.Request) {
 	writeResponse(w, response)
 }
 
+// GetResourceType gets a SCIM resource type by ID.
 func (s *SCIMServer) GetResourceType(w http.ResponseWriter, r *http.Request) {
-	logrus.Infof("scim::GetResourceType: url %s", r.URL.String())
+	logrus.Tracef("scim::GetResourceType: url %s", r.URL.String())
 
 	provider := mux.Vars(r)["provider"]
 	id := mux.Vars(r)["id"]

@@ -8,6 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// Well known SCIM Schema URNs.
 const (
 	ListSchemaID     = "urn:ietf:params:scim:api:messages:2.0:ListResponse"
 	GroupSchemaID    = "urn:ietf:params:scim:schemas:core:2.0:Group"
@@ -17,6 +18,7 @@ const (
 	SchemaSchemaID   = "urn:ietf:params:scim:schemas:core:2.0:Schema"
 )
 
+// Schema defines a SCIM schema.
 type Schema struct {
 	ID          string            `json:"id"`
 	Name        string            `json:"name"`
@@ -26,6 +28,7 @@ type Schema struct {
 	Meta        Meta              `json:"meta"`
 }
 
+// SchemaAttribute defines an attribute in a SCIM schema.
 type SchemaAttribute struct {
 	Name          string            `json:"name"`
 	Type          string            `json:"type"`
@@ -39,6 +42,7 @@ type SchemaAttribute struct {
 	SubAttributes []SchemaAttribute `json:"subAttributes,omitempty"`
 }
 
+// UserSchema defines the SCIM schema for User resources.
 var UserSchema = Schema{
 	Schemas:     []string{SchemaSchemaID},
 	ID:          UserSchemaID,
@@ -91,6 +95,7 @@ var UserSchema = Schema{
 	},
 }
 
+// GroupSchema defines the SCIM schema for Group resources.
 var GroupSchema = Schema{
 	Schemas:     []string{SchemaSchemaID},
 	ID:          GroupSchemaID,
@@ -138,8 +143,9 @@ var schemaRegistry = map[string]Schema{
 	GroupSchema.ID: GroupSchema,
 }
 
+// ListSchemas lists supported SCIM schemas.
 func (s *SCIMServer) ListSchemas(w http.ResponseWriter, r *http.Request) {
-	logrus.Infof("scim::GetSchemas: url %s", r.URL.String())
+	logrus.Tracef("scim::ListSchemas: url %s", r.URL.String())
 
 	provider := mux.Vars(r)["provider"]
 
@@ -158,8 +164,9 @@ func (s *SCIMServer) ListSchemas(w http.ResponseWriter, r *http.Request) {
 	writeResponse(w, response)
 }
 
+// GetSchema retrieves a specific SCIM schema by ID.
 func (s *SCIMServer) GetSchema(w http.ResponseWriter, r *http.Request) {
-	logrus.Infof("scim::GetSchemas: url %s", r.URL.String())
+	logrus.Tracef("scim::GetSchemas: url %s", r.URL.String())
 
 	provider := mux.Vars(r)["provider"]
 	id := mux.Vars(r)["id"]

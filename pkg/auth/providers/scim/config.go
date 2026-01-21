@@ -6,6 +6,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// AuthenticationType defines the type of authentication scheme.
 type AuthenticationType string
 
 const (
@@ -21,6 +22,7 @@ const (
 	AuthenticationTypeHTTPDigest AuthenticationType = "httpdigest"
 )
 
+// AuthenticationScheme represents an authentication scheme supported by the service provider.
 type AuthenticationScheme struct {
 	// Type is the authentication scheme. This specification defines the values "oauth", "oauth2", "oauthbearertoken",
 	// "httpbasic", and "httpdigest".
@@ -36,6 +38,8 @@ type AuthenticationScheme struct {
 	// Primary is a boolean value indicating the 'primary' or preferred authentication scheme.
 	Primary bool
 }
+
+// ServiceProviderConfig represents the SCIM Service Provider Configuration.
 type ServiceProviderConfig struct {
 	// AuthenticationSchemes is a multi-valued complex type that specifies supported authentication scheme properties.
 	AuthenticationSchemes []AuthenticationScheme
@@ -47,6 +51,7 @@ type ServiceProviderConfig struct {
 	SupportPatch bool
 }
 
+// getRaw returns the raw representation of the ServiceProviderConfig.
 func (c ServiceProviderConfig) getRaw() map[string]any {
 	return map[string]any{
 		"schemas":          []string{"urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig"},
@@ -76,6 +81,7 @@ func (c ServiceProviderConfig) getRaw() map[string]any {
 	}
 }
 
+// getRawAuthenticationSchemes returns the raw representation of the authentication schemes.
 func (c ServiceProviderConfig) getRawAuthenticationSchemes() []map[string]any {
 	schemes := make([]map[string]any, 0)
 	for _, s := range c.AuthenticationSchemes {
@@ -91,8 +97,9 @@ func (c ServiceProviderConfig) getRawAuthenticationSchemes() []map[string]any {
 	return schemes
 }
 
+// GetServiceProviderConfig returns the SCIM Service Provider Configuration.
 func (s *SCIMServer) GetServiceProviderConfig(w http.ResponseWriter, r *http.Request) {
-	logrus.Infof("scim::GetServiceProviderConfig: url %s", r.URL.String())
+	logrus.Tracef("scim::GetServiceProviderConfig: url %s", r.URL.String())
 
 	config := &ServiceProviderConfig{
 		AuthenticationSchemes: []AuthenticationScheme{

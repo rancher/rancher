@@ -18,8 +18,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
+// Bool represents a boolean value that can be unmarshaled from JSON.
 type Bool bool
 
+// UnmarshalJSON implements the [json.Unmarshaler] interface.
 func (b *Bool) UnmarshalJSON(data []byte) error {
 	switch string(data) {
 	case "true", `"true"`:
@@ -32,6 +34,7 @@ func (b *Bool) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// SCIMUser represents a SCIM user.
 type SCIMUser struct {
 	Active     bool   `json:"active"`
 	ID         string `json:"id"`
@@ -53,8 +56,14 @@ type SCIMUser struct {
 	}
 }
 
+// ListUsers returns a list of users.
+// It supports filtering by userName using the "eq" operator.
+// Pagination is not implemented yet.
+// Returns:
+//   - 200 on success
+//   - 400 for invalid requests.
 func (s *SCIMServer) ListUsers(w http.ResponseWriter, r *http.Request) {
-	logrus.Infof("scim::ListUsers: url %s", r.URL.String())
+	logrus.Tracef("scim::ListUsers: url %s", r.URL.String())
 
 	provider := mux.Vars(r)["provider"]
 
@@ -92,7 +101,7 @@ func (s *SCIMServer) ListUsers(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	logrus.Infof("scim::ListUsers: userName=%s, startIndex=%d, count=%d", nameFilter, startIndex, count)
+	logrus.Tracef("scim::ListUsers: userName=%s, startIndex=%d, count=%d", nameFilter, startIndex, count)
 
 	list, err := s.userCache.List(labels.Everything())
 	if err != nil {
@@ -173,8 +182,13 @@ func (s *SCIMServer) ListUsers(w http.ResponseWriter, r *http.Request) {
 	writeResponse(w, response)
 }
 
+// CreateUser creates a new user.
+// Returns:
+//   - 201 on success
+//   - 400 for invalid requests
+//   - 409 if the user already exists.
 func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
-	logrus.Infof("scim::CreateUser: url %s", r.URL.String())
+	logrus.Tracef("scim::CreateUser: url %s", r.URL.String())
 
 	provider := mux.Vars(r)["provider"]
 
@@ -184,7 +198,7 @@ func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, NewError(http.StatusBadRequest, "Invalid request body"))
 		return
 	}
-	logrus.Info("scim::CreateUser: request body:", string(bodyBytes))
+	logrus.Trace("scim::CreateUser: request body:", string(bodyBytes))
 
 	payload := &SCIMUser{}
 
@@ -276,8 +290,13 @@ func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 	writeResponse(w, response, http.StatusCreated)
 }
 
+// GetUser retrieves a user by their ID.
+// Returns:
+//   - 200 on success
+//   - 400 for invalid requests
+//   - 404 if the user is not found or is a system user.
 func (s *SCIMServer) GetUser(w http.ResponseWriter, r *http.Request) {
-	logrus.Infof("scim::GetUser: query %s", r.URL.String())
+	logrus.Tracef("scim::GetUser: query %s", r.URL.String())
 
 	provider := mux.Vars(r)["provider"]
 	id := mux.Vars(r)["id"]
@@ -332,8 +351,14 @@ func (s *SCIMServer) GetUser(w http.ResponseWriter, r *http.Request) {
 	writeResponse(w, response)
 }
 
+// UpdateUser updates an existing user.
+// Returns:
+//   - 200 on success
+//   - 400 for invalid requests
+//   - 404 if the user is not found or is a system user
+//   - 409 if attempting to deprovision the default admin user.
 func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
-	logrus.Infof("scim::UpdateUser: url %s", r.URL.String())
+	logrus.Tracef("scim::UpdateUser: url %s", r.URL.String())
 
 	provider := mux.Vars(r)["provider"]
 	id := mux.Vars(r)["id"]
@@ -344,7 +369,8 @@ func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, NewError(http.StatusBadRequest, "Invalid request body"))
 		return
 	}
-	logrus.Info("scim::UpdateUser: request body:", string(bodyBytes))
+
+	logrus.Trace("scim::UpdateUser: request body:", string(bodyBytes))
 
 	payload := &SCIMUser{}
 
@@ -375,23 +401,11 @@ func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if user.IsSystem() {
-		writeError(w, NewError(http.StatusConflict, "Cannot update system or default admin user"))
+		writeError(w, NewError(http.StatusNotFound, fmt.Sprintf("User %s not found", id)))
 		return
 	}
 
 	userIsActive := user.Enabled == nil || (user.Enabled != nil && *user.Enabled)
-
-	// Handle delete on deactivation.
-	// To make this possible we need to ensure that update is idempotent:
-	// - don't fail if payload.Active is false and user doesn't exist. Parrot the payload back.
-
-	// if userIsActive && !payload.Active && settings.SCIMDeleteDeactivatedUsers.Get() == "true" {
-	// 	if err := s.users.Delete(user.Name, &metav1.DeleteOptions{}); err != nil {
-	// 		logrus.Errorf("scim::UpdateUser: failed to delete deactivated user %s: %s", user.Name, err)
-	// 		writeError(w, NewInternalError())
-	// 		return
-	// 	}
-	// }
 
 	var shouldUpdateAttr, shouldUpdateUser bool
 	attr = attr.DeepCopy()
@@ -407,6 +421,11 @@ func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		shouldUpdateAttr = true
 	}
 	if userIsActive != payload.Active {
+		if user.IsDefaultAdmin() && !payload.Active {
+			writeError(w, NewError(http.StatusConflict, "Cannot deprovision default admin user"))
+			return
+		}
+
 		user = user.DeepCopy()
 		user.Enabled = &payload.Active
 		shouldUpdateUser = true
@@ -452,9 +471,13 @@ func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	writeResponse(w, response)
 }
 
+// DeleteUser permanently deletes a user by ID.
+// Returns:
+//   - 204 on successful deletion
+//   - 404 if the user is not found or is a system user
+//   - 409 if attempting to delete the default admin user.
 func (s *SCIMServer) DeleteUser(w http.ResponseWriter, r *http.Request) {
-	logrus.Infof("scim::DeleteUser: url %s", r.URL.String())
-
+	logrus.Tracef("scim::DeleteUser: url %s", r.URL.String())
 	// provider := mux.Vars(r)["provider"]
 	id := mux.Vars(r)["id"]
 
@@ -470,8 +493,13 @@ func (s *SCIMServer) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if user.IsSystem() || user.IsDefaultAdmin() {
-		writeError(w, NewError(http.StatusConflict, "Cannot delete system or default admin user"))
+	if user.IsSystem() {
+		writeError(w, NewError(http.StatusNotFound, fmt.Sprintf("User %s not found", id)))
+		return
+	}
+
+	if user.IsDefaultAdmin() {
+		writeError(w, NewError(http.StatusConflict, "Cannot delete default admin user"))
 		return
 	}
 
@@ -496,8 +524,16 @@ func (s *SCIMServer) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	writeResponse(w, noPayload, http.StatusNoContent)
 }
 
+// PatchUser applies partial modifications to a user.
+// Currently supports the "replace" operation for updating active status, externalId,
+// and primary email address.
+// Returns:
+//   - 200 on success
+//   - 400 for invalid requests
+//   - 404 if the user is not found or is a system user
+//   - 409 if attempting to deprovision the default admin user.
 func (s *SCIMServer) PatchUser(w http.ResponseWriter, r *http.Request) {
-	logrus.Infof("scim::PatchUser: url %s", r.URL.String())
+	logrus.Tracef("scim::PatchUser: url %s", r.URL.String())
 
 	provider := mux.Vars(r)["provider"]
 	id := mux.Vars(r)["id"]
@@ -514,8 +550,8 @@ func (s *SCIMServer) PatchUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if user.IsSystem() || user.IsDefaultAdmin() {
-		writeError(w, NewError(http.StatusConflict, "Cannot delete system or default admin user"))
+	if user.IsSystem() {
+		writeError(w, NewError(http.StatusNotFound, fmt.Sprintf("User %s not found", id)))
 		return
 	}
 
@@ -525,7 +561,7 @@ func (s *SCIMServer) PatchUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, NewError(http.StatusBadRequest, "Invalid request body"))
 		return
 	}
-	logrus.Info("scim::PatchUser: request body:", string(bodyBytes))
+	logrus.Trace("scim::PatchUser: request body:", string(bodyBytes))
 
 	payload := struct {
 		Operations []patchOp `json:"Operations"`
@@ -617,6 +653,7 @@ func (s *SCIMServer) PatchUser(w http.ResponseWriter, r *http.Request) {
 	writeResponse(w, response)
 }
 
+// applyReplaceUser applies a SCIM PATCH replace operation to a user.
 func applyReplaceUser(provider string, attr *v3.UserAttribute, user *v3.User, op patchOp) (bool, bool, error) {
 	if op.Path == "" {
 		fields, ok := op.Value.(map[string]any)
@@ -654,6 +691,10 @@ func applyReplaceUser(provider string, attr *v3.UserAttribute, user *v3.User, op
 
 		userIsActive := user.Enabled == nil || (user.Enabled != nil && *user.Enabled)
 		if userIsActive != active {
+			if user.IsDefaultAdmin() && !active {
+				return false, false, NewError(http.StatusConflict, "Cannot deprovision default admin user")
+			}
+
 			user.Enabled = &active
 			updateUser = true
 		}
