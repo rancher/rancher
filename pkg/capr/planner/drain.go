@@ -60,7 +60,7 @@ func optionsToString(options rkev1.DrainOptions, disable bool) (string, error) {
 }
 
 func (p *Planner) drain(oldPlan *plan.NodePlan, newPlan plan.NodePlan, entry *planEntry, clusterPlan *plan.Plan, options rkev1.DrainOptions) (bool, error) {
-	if entry == nil || entry.Metadata == nil || entry.Metadata.Annotations == nil || entry.Machine == nil || entry.Machine.Status.NodeRef == nil {
+	if entry == nil || entry.Metadata == nil || entry.Metadata.Annotations == nil || entry.Machine == nil || !entry.Machine.Status.NodeRef.IsDefined() {
 		return true, nil
 	}
 

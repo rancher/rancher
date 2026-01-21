@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
@@ -200,12 +200,16 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]any, d
 }
 
 func (h *handler) getBootstrapSecret(machine *capi.Machine) (string, error) {
-	if machine == nil || machine.Spec.Bootstrap.ConfigRef == nil {
+	if machine == nil || !machine.Spec.Bootstrap.ConfigRef.IsDefined() {
 		return "", nil
 	}
 
-	gvk := schema.FromAPIVersionAndKind(machine.Spec.Bootstrap.ConfigRef.APIVersion,
-		machine.Spec.Bootstrap.ConfigRef.Kind)
+	if machine.Spec.Bootstrap.ConfigRef.Kind != "RKEBootstrap" {
+		return "", fmt.Errorf("CAPI machine %s/%s has unsupported bootstrap configRef kind %s",
+			machine.Namespace, machine.Name, machine.Spec.Bootstrap.ConfigRef.Kind)
+	}
+
+	gvk := schema.FromAPIVersionAndKind(capr.RKEAPIVersion, machine.Spec.Bootstrap.ConfigRef.Kind)
 	bootstrap, err := h.dynamic.Get(gvk, machine.Namespace, machine.Spec.Bootstrap.ConfigRef.Name)
 	if apierrors.IsNotFound(err) {
 		return "", nil

@@ -11,7 +11,7 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterindex"
-	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	rocontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/util/conditions"
 )
 
@@ -69,9 +69,9 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigMana
 					return nil, err
 				}
 				for _, m := range machines.Items {
-					if m.Spec.InfrastructureRef.Kind == UnmanagedMachineKind && m.Spec.InfrastructureRef.APIVersion == capr.RKEAPIVersion && machineHasNodeNotFoundCondition(&m) {
+					if m.Spec.InfrastructureRef.Kind == UnmanagedMachineKind && m.Spec.InfrastructureRef.APIGroup == capr.RKEAPIGroup && machineHasNodeNotFoundCondition(&m) {
 						relatedResources = append(relatedResources, relatedresource.Key{
-							Namespace: m.Spec.InfrastructureRef.Namespace,
+							Namespace: m.Namespace,
 							Name:      m.Spec.InfrastructureRef.Name,
 						})
 					}
@@ -79,7 +79,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigMana
 			}
 			return relatedResources, nil
 		} else if m, ok := obj.(*capi.Machine); ok {
-			if m.Spec.InfrastructureRef.Kind == UnmanagedMachineKind && m.Spec.InfrastructureRef.APIVersion == capr.RKEAPIVersion {
+			if m.Spec.InfrastructureRef.Kind == UnmanagedMachineKind && m.Spec.InfrastructureRef.APIGroup == capr.RKEAPIGroup {
 				logrus.Tracef("[unmanaged] handling related resource for CAPI machine %s/%s", m.Namespace, m.Name)
 				rkeCluster, err := clients.RKE.RKECluster().Get(m.Namespace, m.Spec.ClusterName, metav1.GetOptions{})
 				if err != nil {
@@ -88,7 +88,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigMana
 				if rkeCluster.Annotations[capr.DeleteMissingCustomMachinesAfterAnnotation] != "" && machineHasNodeNotFoundCondition(m) {
 					logrus.Tracef("[unmanaged] machine %s/%s has node not found condition", m.Namespace, m.Name)
 					return []relatedresource.Key{{
-						Namespace: m.Spec.InfrastructureRef.Namespace,
+						Namespace: m.Namespace,
 						Name:      m.Spec.InfrastructureRef.Name,
 					}}, nil
 				}
@@ -285,18 +285,16 @@ func (h *handler) createMachineObjects(capiCluster *capi.Cluster, machineName st
 			Spec: capi.MachineSpec{
 				ClusterName: capiCluster.Name,
 				Bootstrap: capi.Bootstrap{
-					ConfigRef: &corev1.ObjectReference{
-						Kind:       "RKEBootstrap",
-						Namespace:  capiCluster.Namespace,
-						Name:       machineName,
-						APIVersion: capr.RKEAPIVersion,
+					ConfigRef: capi.ContractVersionedObjectReference{
+						Kind:     "RKEBootstrap",
+						Name:     machineName,
+						APIGroup: capr.RKEAPIGroup,
 					},
 				},
-				InfrastructureRef: corev1.ObjectReference{
-					Kind:       UnmanagedMachineKind,
-					Namespace:  capiCluster.Namespace,
-					Name:       machineName,
-					APIVersion: capr.RKEAPIVersion,
+				InfrastructureRef: capi.ContractVersionedObjectReference{
+					Kind:     UnmanagedMachineKind,
+					Name:     machineName,
+					APIGroup: capr.RKEAPIGroup,
 				},
 			},
 		},
@@ -361,7 +359,7 @@ func (h *handler) onUnmanagedMachineChange(_ string, customMachine *rkev1.Custom
 		}
 
 		if machineHasNodeNotFoundCondition(capiMachine) {
-			if capiMachine.Status.NodeRef == nil {
+			if !capiMachine.Status.NodeRef.IsDefined() {
 				return customMachine, nil
 			}
 			logrus.Tracef("[unmanaged] RKECluster %s/%s related to CustomMachine %s/%s specifies deletion after duration (%s), and machine was not found per CAPI, evaluating machine for potential deletion", rkeCluster.Namespace, rkeCluster.Name, customMachine.Namespace, customMachine.Name, rkeCluster.Annotations[capr.DeleteMissingCustomMachinesAfterAnnotation])
@@ -409,5 +407,5 @@ func (h *handler) onUnmanagedMachineChange(_ string, customMachine *rkev1.Custom
 }
 
 func machineHasNodeNotFoundCondition(capiMachine *capi.Machine) bool {
-	return conditions.IsFalse(capiMachine, capi.MachineNodeHealthyCondition) && (conditions.GetReason(capiMachine, capi.MachineNodeHealthyCondition) == capi.NodeNotFoundReason)
+	return conditions.IsFalse(capiMachine, capi.MachineNodeHealthyCondition) && (conditions.GetReason(capiMachine, capi.MachineNodeHealthyCondition) == capi.MachineNodeDoesNotExistReason)
 }

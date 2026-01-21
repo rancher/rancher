@@ -20,7 +20,7 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
-	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	ranchercontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
@@ -36,7 +36,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/client-go/util/retry"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	"k8s.io/utils/ptr"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
 	"sigs.k8s.io/cluster-api/util/conditions"
 )
@@ -198,11 +199,19 @@ func (p *Planner) setMachineConditionStatus(clusterPlan *plan.Plan, machineNames
 			if capr.Reconciled.GetMessage(machine) == msg {
 				continue
 			}
-			conditions.MarkUnknown(machine, capi.ConditionType(capr.Reconciled), "Waiting", "%s", msg)
+			conditions.Set(machine, metav1.Condition{
+				Type:    string(capr.Reconciled),
+				Status:  metav1.ConditionUnknown,
+				Reason:  "Waiting",
+				Message: msg,
+			})
 		} else if !capr.Reconciled.IsTrue(machine) {
 			// Since there is no status message, then the condition should be set to true.
-			conditions.MarkTrue(machine, capi.ConditionType(capr.Reconciled))
-
+			conditions.Set(machine, metav1.Condition{
+				Type:   string(capr.Reconciled),
+				Status: metav1.ConditionTrue,
+				Reason: "Reconciled",
+			})
 			// Even though we are technically not waiting for something, an error should be returned so that the planner will retry.
 			// The machine being updated will cause the planner to re-enqueue with the new data.
 			waiting = true
@@ -264,7 +273,7 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		return status, nil
 	}
 
-	if !capiCluster.Status.InfrastructureReady {
+	if !ptr.Deref(capiCluster.Status.Initialization.InfrastructureProvisioned, false) {
 		return status, errWaiting("waiting for infrastructure ready")
 	}
 
@@ -1227,10 +1236,10 @@ func (p *Planner) pauseCAPICluster(cp *rkev1.RKEControlPlane, pause bool) error 
 			return fmt.Errorf("CAPI cluster does not exist for %s/%s", cp.Namespace, cp.Name)
 		}
 		cluster = cluster.DeepCopy()
-		if cluster.Spec.Paused == pause {
+		if cluster.Spec.Paused != nil && *cluster.Spec.Paused == pause {
 			return nil
 		}
-		cluster.Spec.Paused = pause
+		cluster.Spec.Paused = &pause
 		_, err = p.capiClient.Update(cluster)
 		return err
 	})
@@ -1250,8 +1259,13 @@ func (p *Planner) ensureCAPIClusterControlPlaneInitializedFalse(cp *rkev1.RKECon
 		return fmt.Errorf("CAPI cluster does not exist for %s/%s", cp.Namespace, cp.Name)
 	}
 	cluster = cluster.DeepCopy()
-	if !conditions.IsFalse(cluster, capi.ControlPlaneInitializedCondition) {
-		conditions.MarkFalse(cluster, capi.ControlPlaneInitializedCondition, capi.WaitingForControlPlaneProviderInitializedReason, capi.ConditionSeverityInfo, "Waiting for control plane provider to indicate the control plane has been initialized")
+	if !conditions.IsFalse(cluster, capi.ClusterControlPlaneInitializedCondition) {
+		conditions.Set(cluster, metav1.Condition{
+			Type:    capi.ClusterControlPlaneInitializedCondition,
+			Status:  metav1.ConditionFalse,
+			Reason:  capi.WaitingForControlPlaneProviderInitializedV1Beta1Reason,
+			Message: "Waiting for control plane provider to indicate the control plane has been initialized",
+		})
 		_, err = p.capiClient.UpdateStatus(cluster)
 	}
 	return err

@@ -21,7 +21,7 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	cluster2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
-	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	provisioningcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkev1controllers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/validation"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 var (
@@ -488,7 +488,7 @@ func (h *handler) getMachineFromNode(nodeName string, clusterName, namespace str
 		return nil, err
 	}
 	for _, machine := range machines {
-		if machine.Status.NodeRef != nil && machine.Status.NodeRef.Name == nodeName {
+		if machine.Status.NodeRef.IsDefined() && machine.Status.NodeRef.Name == nodeName {
 			return machine, nil
 		}
 	}
