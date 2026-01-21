@@ -1,0 +1,5 @@
+# Release workflows
+.github/workflows @rancher/release-team
+.github/actions @rancher/release-team
+package/Dockerfile @rancher/release-team
+package/Dockerfile.installer @rancher/release-team
