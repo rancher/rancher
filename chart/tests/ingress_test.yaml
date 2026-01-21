@@ -185,3 +185,10 @@ tests:
           nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
           nginx.ingress.kubernetes.io/proxy-read-timeout: "1800"
           nginx.ingress.kubernetes.io/proxy-send-timeout: "1800"
+- it: it should fail when disableHTTP is set and servicePort is not 443
+  set:
+    hostname: host.example.com
+    service.disableHTTP: true
+  asserts:
+    - failedTemplate:
+        errorPattern: "'/ingress/servicePort': value must be 443"
