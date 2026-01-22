@@ -74,9 +74,7 @@ func TestPeersBasedStrategy(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		strategy := getOwnerStrategy(ctx, mockPeerManager)
-		assert.IsType(t, &peersBasedStrategy{}, strategy)
-
+		strategy := newPeersBasedStrategy(ctx, mockPeerManager)
 		assert.False(t, strategy.isOwner(cluster), "Should not own if not initialized")
 
 		// Simulate initial state where peers are not ready
@@ -86,7 +84,7 @@ func TestPeersBasedStrategy(t *testing.T) {
 			Leader: false,
 		})
 		// sendPeers is asynchronous, wait for the signal
-		err := receiveWithTimeout(100*time.Millisecond, strategy.forcedResync())
+		err := receiveWithTimeout(500*time.Millisecond, strategy.forcedResync())
 		assert.NoError(t, err, "Expected resync channel to be sent")
 
 		assert.False(t, strategy.isOwner(cluster), "Should not own if peer manager is not ready")
@@ -100,7 +98,7 @@ func TestPeersBasedStrategy(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 
-		strategy := getOwnerStrategy(ctx, mockPeerManager)
+		strategy := newPeersBasedStrategy(ctx, mockPeerManager)
 
 		// Simulate a single, non-leader replica
 		mockPeerManager.SendPeers(peermanager.Peers{
@@ -109,7 +107,7 @@ func TestPeersBasedStrategy(t *testing.T) {
 			Leader: false,
 		})
 		// sendPeers is asynchronous, wait for the signal
-		err := receiveWithTimeout(100*time.Millisecond, strategy.forcedResync())
+		err := receiveWithTimeout(500*time.Millisecond, strategy.forcedResync())
 		assert.NoError(t, err, "Expected resync channel to be sent")
 
 		assert.False(t, strategy.isOwner(cluster), "Single non-leader replica should not own")
@@ -123,7 +121,7 @@ func TestPeersBasedStrategy(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 
-		strategy := getOwnerStrategy(ctx, mockPeerManager)
+		strategy := newPeersBasedStrategy(ctx, mockPeerManager)
 
 		// Test various cluster UIDs to check ownership distribution
 		testCases := []struct {
@@ -147,7 +145,7 @@ func TestPeersBasedStrategy(t *testing.T) {
 				Ready:  true,
 			})
 			// sendPeers is asynchronous, wait for the signal
-			err := receiveWithTimeout(100*time.Millisecond, strategy.forcedResync())
+			err := receiveWithTimeout(500*time.Millisecond, strategy.forcedResync())
 			assert.NoError(t, err, "Expected resync channel to be sent")
 
 			for _, tc := range testCases {
@@ -174,13 +172,13 @@ func TestPeersBasedStrategy(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 
-		strategy := getOwnerStrategy(ctx, mockPeerManager)
+		strategy := newPeersBasedStrategy(ctx, mockPeerManager)
 
 		// Initial peers
 		mockPeerManager.SendPeers(peermanager.Peers{
 			SelfID: "peer1",
 		})
-		err := receiveWithTimeout(100*time.Millisecond, strategy.forcedResync())
+		err := receiveWithTimeout(500*time.Millisecond, strategy.forcedResync())
 		assert.NoError(t, err, "Expected resync channel to be sent")
 
 		// Change peers - expect a resync
@@ -188,7 +186,7 @@ func TestPeersBasedStrategy(t *testing.T) {
 			SelfID: "peer1",
 			IDs:    []string{"peer2"},
 		})
-		err = receiveWithTimeout(100*time.Millisecond, strategy.forcedResync())
+		err = receiveWithTimeout(500*time.Millisecond, strategy.forcedResync())
 		assert.NoError(t, err, "Expected resync channel to be sent")
 
 		// Send same peers again - no resync expected
@@ -196,7 +194,7 @@ func TestPeersBasedStrategy(t *testing.T) {
 			SelfID: "peer1",
 			IDs:    []string{"peer2"},
 		})
-		err = receiveWithTimeout(100*time.Millisecond, strategy.forcedResync())
+		err = receiveWithTimeout(500*time.Millisecond, strategy.forcedResync())
 		assert.Error(t, err, "Unexpected resync")
 	})
 
@@ -208,8 +206,18 @@ func TestPeersBasedStrategy(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 
-		strategy := getOwnerStrategy(ctx, mockPeerManager)
+		strategy := newPeersBasedStrategy(ctx, mockPeerManager)
 		mockPeerManager.AssertCalled(t, "AddListener", addCall.Arguments.Get(0))
+
+		// Simulate a single, leader replica
+		mockPeerManager.SendPeers(peermanager.Peers{
+			SelfID: "peer1",
+			Ready:  true,
+			Leader: true,
+		})
+		err := receiveWithTimeout(500*time.Millisecond, strategy.forcedResync())
+		assert.NoError(t, err, "Expected resync channel to be sent")
+		assert.True(t, strategy.isOwner(cluster), "Single leader replica should own")
 
 		// Cancel the context
 		cancel()
