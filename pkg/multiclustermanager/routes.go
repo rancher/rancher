@@ -109,7 +109,9 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 		unauthed.PathPrefix("/v3-public").Handler(v3PublicAPI)
 	}
 	unauthed.PathPrefix("/v1-public").Handler(v1PublicAPI)
-	unauthed.PathPrefix(scim.URLPrefix).Handler(scim.NewHandler(scaledContext))
+	if features.SCIM.Enabled() {
+		unauthed.PathPrefix(scim.URLPrefix).Handler(scim.NewHandler(scaledContext))
+	}
 
 	// Authenticated routes
 	impersonatingAuth := requests.NewImpersonatingAuth(scaledContext.Wrangler, sar.NewSubjectAccessReview(clusterManager))

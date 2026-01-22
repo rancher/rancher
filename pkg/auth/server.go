@@ -102,7 +102,9 @@ func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext, 
 		root.PathPrefix("/v3-public").Handler(limitingHandler(v3PublicAPI)) // Deprecated. Use /v1-public instead.
 	}
 	root.PathPrefix("/v1-public").Handler(limitingHandler(v1PublicAPI))
-	root.PathPrefix(scim.URLPrefix).Handler(limitingHandler(scim.NewHandler(scaledContext)))
+	if features.SCIM.Enabled() {
+		root.PathPrefix(scim.URLPrefix).Handler(limitingHandler(scim.NewHandler(scaledContext)))
+	}
 	root.NotFoundHandler = privateAPI
 
 	return func(next http.Handler) http.Handler {
