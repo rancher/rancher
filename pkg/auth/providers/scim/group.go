@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 	"slices"
-	"strconv"
+	"sort"
 	"strings"
 
 	"github.com/gorilla/mux"
@@ -34,7 +34,7 @@ type SCIMGroup struct {
 
 // ListGroups returns a list of groups.
 // It supports filtering by displayName using the "eq" operator.
-// Pagination is not implemented yet.
+// Pagination is supported via startIndex (1-based) and count query parameters.
 // Returns:
 //   - 200 on success
 //   - 400 for invalid requests.
@@ -43,12 +43,16 @@ func (s *SCIMServer) ListGroups(w http.ResponseWriter, r *http.Request) {
 
 	provider := mux.Vars(r)["provider"]
 
-	var (
-		nameFilter        string
-		excludeMembers    bool
-		startIndex, count int
-		err               error
-	)
+	// Parse pagination parameters.
+	pagination, err := ParsePaginationParams(r)
+	if err != nil {
+		writeError(w, NewError(http.StatusBadRequest, err.Error()))
+		return
+	}
+
+	// Parse filter and excludedAttributes.
+	var nameFilter string
+	var excludeMembers bool
 	if value := r.URL.Query().Get("filter"); value != "" {
 		// For simplicity, only support filtering by displayName eq "<value>".
 		parts := strings.SplitN(value, " ", 3)
@@ -62,21 +66,8 @@ func (s *SCIMServer) ListGroups(w http.ResponseWriter, r *http.Request) {
 		fields := strings.Split(value, ",")
 		excludeMembers = slices.Contains(fields, "members")
 	}
-	if value := r.URL.Query().Get("startIndex"); value != "" {
-		startIndex, err = strconv.Atoi(value)
-		if err != nil {
-			writeError(w, NewError(http.StatusBadRequest, "Invalid startIndex"))
-			return
-		}
-	}
-	if value := r.URL.Query().Get("count"); value != "" {
-		count, err = strconv.Atoi(value)
-		if err != nil {
-			writeError(w, NewError(http.StatusBadRequest, "Invalid count"))
-			return
-		}
-	}
-	logrus.Tracef("scim::ListGroups: startIndex=%d, count=%d", startIndex, count)
+
+	logrus.Tracef("scim::ListGroups: displayName=%s, startIndex=%d, count=%d", nameFilter, pagination.StartIndex, pagination.Count)
 
 	groups, err := s.groupsCache.List(labels.Set{authProviderLabel: provider}.AsSelector())
 	if err != nil {
@@ -85,7 +76,14 @@ func (s *SCIMServer) ListGroups(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var resources []any
+	// Sort groups by Name for deterministic ordering across pagination requests.
+	// Without sorting, the cache order is undefined and pagination would be inconsistent.
+	sort.Slice(groups, func(i, j int) bool {
+		return groups[i].Name < groups[j].Name
+	})
+
+	// Collect all matching resources (needed to compute totalResults).
+	var allResources []any
 	if len(groups) > 0 {
 		var uniqueGroups map[string][]SCIMMember
 		if !excludeMembers {
@@ -122,18 +120,24 @@ func (s *SCIMServer) ListGroups(w http.ResponseWriter, r *http.Request) {
 				resource["members"] = members
 			}
 
-			resources = append(resources, resource)
+			allResources = append(allResources, resource)
 		}
+	}
+
+	totalResults := len(allResources)
+
+	// Apply pagination.
+	paginatedResources, startIndex := Paginate(allResources, pagination)
+	if paginatedResources == nil {
+		paginatedResources = []any{}
 	}
 
 	response := &ListResponse{
 		Schemas:      []string{ListSchemaID},
-		Resources:    resources,
-		TotalResults: len(resources), // No pagination for now.
-		ItemsPerPage: len(resources),
-	}
-	if response.TotalResults > 0 {
-		response.StartIndex = 1
+		Resources:    paginatedResources,
+		TotalResults: totalResults,
+		ItemsPerPage: len(paginatedResources),
+		StartIndex:   startIndex,
 	}
 
 	writeResponse(w, response)
