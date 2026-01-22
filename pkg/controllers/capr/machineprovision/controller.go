@@ -43,6 +43,7 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	capierrors "sigs.k8s.io/cluster-api/errors"
 	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -108,6 +109,7 @@ type handler struct {
 	dynamic             dynamicController
 	rancherClusterCache ranchercontrollers.ClusterCache
 	kubeconfigManager   *kubeconfig.Manager
+	client              client.Client
 }
 
 func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigManager *kubeconfig.Manager) {
@@ -131,6 +133,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigMana
 		dynamic:             clients.Dynamic,
 		rancherClusterCache: clients.Provisioning.Cluster().Cache(),
 		kubeconfigManager:   kubeconfigManager,
+		client:              clients.Client,
 	}
 
 	removeHandler := generic.NewRemoveHandler("machine-provision-remove", clients.Dynamic.Update, h.OnRemove)

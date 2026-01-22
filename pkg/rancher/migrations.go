@@ -1,6 +1,7 @@
 package rancher
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -28,9 +29,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/util/retry"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	"sigs.k8s.io/cluster-api/controllers/external"
 )
 
 const (
@@ -379,27 +380,8 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.CAPIContext)
 					return err
 				}
 
-				// Discover the version for the resource
-				apiVersion, err := capr.DiscoverResourceVersion(w.CachedDiscovery, machine.Spec.InfrastructureRef.APIGroup, machine.Spec.InfrastructureRef.Kind)
-				if err != nil {
-					logrus.Debugf("failed to discover version for %s/%s: %v - skipping infra machine update", machine.Spec.InfrastructureRef.APIGroup, machine.Spec.InfrastructureRef.Kind, err)
-					continue
-				}
-
-				gv, err := schema.ParseGroupVersion(apiVersion)
-				if err != nil {
-					// This error should not occur because RKEAPIVersion and RKEMachineAPIVersion are valid
-					logrus.Debugf("failed to parse discovered API version %s: %v - skipping infra machine update", apiVersion, err)
-					continue
-				}
-
-				gvk := schema.GroupVersionKind{
-					Group:   gv.Group,
-					Version: gv.Version,
-					Kind:    machine.Spec.InfrastructureRef.Kind,
-				}
 				if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-					infraMachine, err := w.Dynamic.Get(gvk, machine.Namespace, machine.Spec.InfrastructureRef.Name)
+					infraMachine, err := external.GetObjectFromContractVersionedRef(context.TODO(), w.Client, machine.Spec.InfrastructureRef, machine.Namespace)
 					if err != nil {
 						return err
 					}
@@ -417,6 +399,7 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.CAPIContext)
 					}
 					return err
 				}); err != nil {
+					logrus.Debugf("failed to update infrastructure machine %s/%s: %v - skipping infra machine update", machine.Namespace, machine.Spec.InfrastructureRef.Name, err)
 					return err
 				}
 			}

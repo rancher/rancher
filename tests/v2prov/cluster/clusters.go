@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	"sigs.k8s.io/cluster-api/controllers/external"
 )
 
 const ConflictMessageRegex = `\[K8s\] encountered an error while attempting to update the secret: Operation cannot be fulfilled on secrets.*: the object has been modified; please apply your changes to the latest version and try again`
@@ -286,19 +287,8 @@ func WaitForDelete(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 	}
 
 	for _, machine := range machines.Items {
-		// Discover the version for the resource
-		apiVersion, err := capr.DiscoverResourceVersion(clients.CachedDiscovery, machine.Spec.InfrastructureRef.APIGroup, machine.Spec.InfrastructureRef.Kind)
-		if err != nil {
-			return nil, fmt.Errorf("failed to discover version for %s/%s: %w", machine.Spec.InfrastructureRef.APIGroup, machine.Spec.InfrastructureRef.Kind, err)
-		}
-		gvk := schema.FromAPIVersionAndKind(apiVersion, machine.Spec.InfrastructureRef.Kind)
-		gvr := schema.GroupVersionResource{
-			Group:    gvk.Group,
-			Version:  gvk.Version,
-			Resource: strings.ToLower(gvk.Kind) + "s",
-		}
 		if err := wait.EnsureDoesNotExist(clients.Ctx, func() (runtime.Object, error) {
-			return clients.Dynamic.Resource(gvr).Namespace(machine.Namespace).Get(clients.Ctx, machine.Spec.InfrastructureRef.Name, metav1.GetOptions{})
+			return external.GetObjectFromContractVersionedRef(clients.Ctx, clients.Client, machine.Spec.InfrastructureRef, machine.Namespace)
 		}); err != nil {
 			return nil, fmt.Errorf("infra machine %s/%s not deleted: %w", machine.Namespace, machine.Spec.InfrastructureRef.Name, err)
 		}
@@ -458,27 +448,15 @@ func GatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 			} else {
 				rkeBootstraps = append(rkeBootstraps, rb)
 			}
-			// Discover the version for the resource
-			apiVersion, newErr := capr.DiscoverResourceVersion(clients.CachedDiscovery, machine.Spec.InfrastructureRef.APIGroup, machine.Spec.InfrastructureRef.Kind)
+			im, newErr := external.GetObjectFromContractVersionedRef(clients.Ctx, clients.Client, machine.Spec.InfrastructureRef, machine.Namespace)
 			if newErr != nil {
-				logrus.Errorf("failed to discover version for %s/%s: %v", machine.Spec.InfrastructureRef.APIGroup, machine.Spec.InfrastructureRef.Kind, newErr)
+				logrus.Errorf("failed to get infrastructure machine %s/%s: %v", machine.Namespace, machine.Spec.InfrastructureRef.Name, newErr)
 			} else {
-				gvk := schema.FromAPIVersionAndKind(apiVersion, machine.Spec.InfrastructureRef.Kind)
-				gvr := schema.GroupVersionResource{
-					Group:    gvk.Group,
-					Version:  gvk.Version,
-					Resource: strings.ToLower(gvk.Kind) + "s",
-				}
-				im, newErr := clients.Dynamic.Resource(gvr).Namespace(machine.Namespace).Get(context.TODO(), machine.Spec.InfrastructureRef.Name, metav1.GetOptions{})
-				if newErr != nil {
-					logrus.Errorf("failed to get %s %s/%s to print error: %v", gvk.String(), machine.Namespace, machine.Spec.InfrastructureRef.Name, newErr)
-				} else {
-					infraMachines = append(infraMachines, im)
-					if machine.Spec.InfrastructureRef.Kind == "PodMachine" {
-						// In the case of a podmachine, the pod name will be strings.ReplaceAll(infra.meta.GetName(), ".", "-")
-						podName := strings.ReplaceAll(im.GetName(), ".", "-")
-						podLogs[podName] = populatePodLogs(clients, newControlPlane, im.GetNamespace(), podName)
-					}
+				infraMachines = append(infraMachines, im)
+				if machine.Spec.InfrastructureRef.Kind == "PodMachine" {
+					// In the case of a podMachine, the pod name will be strings.ReplaceAll(infra.meta.GetName(), ".", "-")
+					podName := strings.ReplaceAll(im.GetName(), ".", "-")
+					podLogs[podName] = populatePodLogs(clients, newControlPlane, im.GetNamespace(), podName)
 				}
 			}
 		}
@@ -616,31 +594,19 @@ func EnsureMinimalConflictsWithThreshold(clients *clients.Clients, c *provisioni
 		logrus.Errorf("failed to get machines for %s/%s to count conflicts: %v", c.Namespace, c.Name, newErr)
 	}
 	for _, machine := range machines.Items {
-		// Discover the version for the resource
-		apiVersion, newErr := capr.DiscoverResourceVersion(clients.CachedDiscovery, machine.Spec.InfrastructureRef.APIGroup, machine.Spec.InfrastructureRef.Kind)
+		im, newErr := external.GetObjectFromContractVersionedRef(clients.Ctx, clients.Client, machine.Spec.InfrastructureRef, machine.Namespace)
 		if newErr != nil {
-			logrus.Errorf("failed to discover version for %s/%s: %v", machine.Spec.InfrastructureRef.APIGroup, machine.Spec.InfrastructureRef.Kind, newErr)
+			logrus.Errorf("failed to get infrastructure machine %s/%s: %v", machine.Namespace, machine.Spec.InfrastructureRef.Name, newErr)
 		} else {
-			gvk := schema.FromAPIVersionAndKind(apiVersion, machine.Spec.InfrastructureRef.Kind)
-			gvr := schema.GroupVersionResource{
-				Group:    gvk.Group,
-				Version:  gvk.Version,
-				Resource: strings.ToLower(gvk.Kind) + "s",
-			}
-			im, newErr := clients.Dynamic.Resource(gvr).Namespace(machine.Namespace).Get(context.TODO(), machine.Spec.InfrastructureRef.Name, metav1.GetOptions{})
-			if newErr != nil {
-				logrus.Errorf("failed to get %s %s/%s to print error: %v", gvk.String(), machine.Namespace, machine.Spec.InfrastructureRef.Name, newErr)
-			} else {
-				if machine.Spec.InfrastructureRef.Kind == "PodMachine" {
-					// In the case of a podmachine, the pod name will be strings.ReplaceAll(infra.meta.GetName(), ".", "-")
-					podName := strings.ReplaceAll(im.GetName(), ".", "-")
-					count, err := countPodLogRegexOccurances(clients, im.GetNamespace(), podName, ConflictMessageRegex)
-					if err != nil {
-						return err
-					}
-					if count > threshold {
-						return fmt.Errorf("pod %s/%s had %d occurrences of conflicts which was greater than the threshold of %d", im.GetNamespace(), podName, count, threshold)
-					}
+			if machine.Spec.InfrastructureRef.Kind == "PodMachine" {
+				// In the case of a podMachine, the pod name will be strings.ReplaceAll(infra.meta.GetName(), ".", "-")
+				podName := strings.ReplaceAll(im.GetName(), ".", "-")
+				count, err := countPodLogRegexOccurances(clients, im.GetNamespace(), podName, ConflictMessageRegex)
+				if err != nil {
+					return err
+				}
+				if count > threshold {
+					return fmt.Errorf("pod %s/%s had %d occurrences of conflicts which was greater than the threshold of %d", im.GetNamespace(), podName, count, threshold)
 				}
 			}
 		}

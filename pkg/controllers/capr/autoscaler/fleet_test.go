@@ -1,6 +1,7 @@
 package autoscaler
 
 import (
+	"context"
 	"fmt"
 
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
@@ -38,30 +39,32 @@ func (s *autoscalerSuite) createTestClusterWithControlPlane(name, namespace, api
 	return cluster
 }
 
-func (s *autoscalerSuite) setupDiscoveryForAPIGroup(apiGroup, version, kind string) {
-	s.discovery.serverGroupsFunc = func() (*metav1.APIGroupList, error) {
-		return &metav1.APIGroupList{
-			Groups: []metav1.APIGroup{
-				{
-					Name: apiGroup,
-					PreferredVersion: metav1.GroupVersionForDiscovery{
-						Version: version,
-					},
-				},
-			},
-		}, nil
-	}
-
-	s.discovery.serverResourcesForGroupVersionFunc = func(groupVersion string) (*metav1.APIResourceList, error) {
-		if groupVersion == apiGroup+"/"+version {
-			return &metav1.APIResourceList{
-				APIResources: []metav1.APIResource{
-					{Kind: kind},
-				},
-			}, nil
+func (s *autoscalerSuite) setupClientForControlPlane(apiVersion, kind, kubernetesVersion string, isRKE bool) {
+	// Mock the controller-runtime client's Get method to return an unstructured object
+	s.client.SetGetFunc(func(ctx context.Context, key any, obj any, opts ...any) error {
+		// Cast obj to *unstructured.Unstructured
+		u, ok := obj.(*unstructured.Unstructured)
+		if !ok {
+			return fmt.Errorf("expected *unstructured.Unstructured, got %T", obj)
 		}
-		return nil, fmt.Errorf("not found")
-	}
+
+		// Set the GVK
+		u.SetAPIVersion(apiVersion)
+		u.SetKind(kind)
+
+		// Set the kubernetes version field based on control plane type
+		if isRKE {
+			u.Object["spec"] = map[string]interface{}{
+				"kubernetesVersion": kubernetesVersion,
+			}
+		} else {
+			u.Object["spec"] = map[string]interface{}{
+				"version": kubernetesVersion,
+			}
+		}
+
+		return nil
+	})
 }
 
 func (s *autoscalerSuite) setupDynamicClientForRKEControlPlane(kubernetesVersion string) {
@@ -225,8 +228,7 @@ func (s *autoscalerSuite) TestEnsureFleetHelmOp_HappyPath_NoUpdateNeeded() {
 func (s *autoscalerSuite) TestResolveImageTagVersion_HappyPath_KnownVersion() {
 	cluster := s.createTestClusterWithControlPlane("test-cluster", "default", "rke.cattle.io", "RKEControlPlane", "test-control-plane")
 
-	s.setupDiscoveryForAPIGroup("rke.cattle.io", "v1", "RKEControlPlane")
-	s.setupDynamicClientForRKEControlPlane("v1.34.0+k3s1")
+	s.setupClientForControlPlane("rke.cattle.io/v1", "RKEControlPlane", "v1.34.0+k3s1", true)
 
 	result := s.h.resolveImageTagVersion(cluster)
 	s.Equal("1.34.0-3.4", result)
@@ -286,8 +288,7 @@ func (s *autoscalerSuite) TestGetChartImageSettings_HappyPath_WithValidImage() {
 func (s *autoscalerSuite) TestGetKubernetesMinorVersion_HappyPath_RKEControlPlane() {
 	cluster := s.createTestClusterWithControlPlane("test-cluster", "default", "rke.cattle.io", "RKEControlPlane", "test-control-plane")
 
-	s.setupDiscoveryForAPIGroup("rke.cattle.io", "v1", "RKEControlPlane")
-	s.setupDynamicClientForRKEControlPlane("v1.34.0+k3s1")
+	s.setupClientForControlPlane("rke.cattle.io/v1", "RKEControlPlane", "v1.34.0+k3s1", true)
 
 	result := s.h.getKubernetesMinorVersion(cluster)
 	s.Equal(34, result)
@@ -296,8 +297,7 @@ func (s *autoscalerSuite) TestGetKubernetesMinorVersion_HappyPath_RKEControlPlan
 func (s *autoscalerSuite) TestGetKubernetesMinorVersion_HappyPath_CAPIControlPlane() {
 	cluster := s.createTestClusterWithControlPlane("test-cluster", "default", "controlplane.cluster.x-k8s.io", "KubeadmControlPlane", "test-control-plane")
 
-	s.setupDiscoveryForAPIGroup("controlplane.cluster.x-k8s.io", "v1beta1", "KubeadmControlPlane")
-	s.setupDynamicClientForCAPIControlPlane("v1.33.0+k3s1")
+	s.setupClientForControlPlane("controlplane.cluster.x-k8s.io/v1beta1", "KubeadmControlPlane", "v1.33.0+k3s1", false)
 
 	result := s.h.getKubernetesMinorVersion(cluster)
 	s.Equal(33, result)
@@ -306,9 +306,8 @@ func (s *autoscalerSuite) TestGetKubernetesMinorVersion_HappyPath_CAPIControlPla
 func (s *autoscalerSuite) TestGetKubernetesMinorVersion_EdgeCase_ErrorGettingControlPlane() {
 	cluster := s.createTestClusterWithControlPlane("test-cluster", "default", "rke.cattle.io", "RKEControlPlane", "non-existent")
 
-	s.setupDiscoveryForAPIGroup("rke.cattle.io", "v1", "RKEControlPlane")
-	s.dynamicClient.SetGetFunc(func(gvk schema.GroupVersionKind, namespace string, name string) (runtime.Object, error) {
-		return nil, fmt.Errorf("not found")
+	s.client.SetGetFunc(func(ctx context.Context, key any, obj any, opts ...any) error {
+		return fmt.Errorf("not found")
 	})
 
 	result := s.h.getKubernetesMinorVersion(cluster)
@@ -318,8 +317,7 @@ func (s *autoscalerSuite) TestGetKubernetesMinorVersion_EdgeCase_ErrorGettingCon
 func (s *autoscalerSuite) TestGetKubernetesMinorVersion_EdgeCase_InvalidVersion() {
 	cluster := s.createTestClusterWithControlPlane("test-cluster", "default", "rke.cattle.io", "RKEControlPlane", "test-control-plane")
 
-	s.setupDiscoveryForAPIGroup("rke.cattle.io", "v1", "RKEControlPlane")
-	s.setupDynamicClientForRKEControlPlane("invalid-version")
+	s.setupClientForControlPlane("rke.cattle.io/v1", "RKEControlPlane", "invalid-version", true)
 
 	result := s.h.getKubernetesMinorVersion(cluster)
 	s.Equal(0, result)
