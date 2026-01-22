@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/status"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	wrangler "github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
@@ -108,7 +109,7 @@ func (g *globalRBACEnqueuer) clusterEnqueueGRs(_, _ string, obj runtime.Object) 
 			continue
 		}
 		// Set the status as InProgress since we have to reconcile the global role
-		globalRole.Status.Summary = SummaryInProgress
+		globalRole.Status.Summary = status.SummaryInProgress
 		rolesToSync = append(rolesToSync, relatedresource.Key{Name: globalRole.Name})
 	}
 	// attempt to update the cluster with a sync annotation - this is costly since it will re-enqueue all grs
@@ -184,7 +185,7 @@ func (g *globalRBACEnqueuer) roleEnqueueGR(_, _ string, obj runtime.Object) ([]r
 	grNames := make([]relatedresource.Key, 0, len(grs))
 	for _, gr := range grs {
 		// Set the status as InProgress since we have to reconcile the global role
-		gr.Status.Summary = SummaryInProgress
+		gr.Status.Summary = status.SummaryInProgress
 		grNames = append(grNames, relatedresource.Key{Name: gr.Name})
 	}
 	return grNames, nil
@@ -237,7 +238,7 @@ func (g *globalRBACEnqueuer) namespaceEnqueueGR(_, _ string, obj runtime.Object)
 	grNames := make([]relatedresource.Key, 0, len(grs))
 	for _, gr := range grs {
 		// Set the status as InProgress since we have to reconcile the global role
-		gr.Status.Summary = SummaryInProgress
+		gr.Status.Summary = status.SummaryInProgress
 		grNames = append(grNames, relatedresource.Key{Name: gr.Name})
 	}
 	return grNames, nil
@@ -259,7 +260,7 @@ func (g *globalRBACEnqueuer) fleetWorkspaceEnqueueGR(_, _ string, obj runtime.Ob
 		if gr.InheritedFleetWorkspacePermissions != nil && (gr.InheritedFleetWorkspacePermissions.WorkspaceVerbs != nil ||
 			gr.InheritedFleetWorkspacePermissions.ResourceRules != nil) {
 			// Set the status as InProgress since we have to reconcile the global role
-			gr.Status.Summary = SummaryInProgress
+			gr.Status.Summary = status.SummaryInProgress
 			grToSync = append(grToSync, relatedresource.Key{Name: gr.Name})
 		}
 	}
@@ -290,7 +291,7 @@ func (g *globalRBACEnqueuer) clusterRoleEnqueueGR(_, _ string, obj runtime.Objec
 	grNames := make([]relatedresource.Key, 0, len(grs))
 	for _, gr := range grs {
 		// Set the status as InProgress since we have to reconcile the global role
-		gr.Status.Summary = SummaryInProgress
+		gr.Status.Summary = status.SummaryInProgress
 		grNames = append(grNames, relatedresource.Key{Name: gr.Name})
 	}
 

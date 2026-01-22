@@ -8,15 +8,16 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
-	mgmtconv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
+	"github.com/rancher/rancher/pkg/controllers/status"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	wrangler "github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/rbac/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -36,18 +37,10 @@ const (
 	grOwnerLabel = "authz.management.cattle.io/gr-owner"
 )
 
-const (
-	SummaryInProgress  = "InProgress"
-	SummaryCompleted   = "Completed"
-	SummaryError       = "Error"
-	SummaryTerminating = "Terminating"
-)
-
 // Condition reason types
 const (
 	ClusterRoleExists         = "ClusterRoleExists"
 	NamespacedRuleRoleExists  = "NamespacedRuleRoleExists"
-	CatalogRoleExists         = "CatalogRoleExists"
 	NamespaceNotFound         = "NamespaceNotFound"
 	NamespaceTerminating      = "NamespaceTerminating"
 	FailedToGetRole           = "GetRoleFailed"
@@ -66,11 +59,11 @@ func newGlobalRoleLifecycle(management *config.ManagementContext, clusterManager
 	return &globalRoleLifecycle{
 		clusters:                management.Wrangler.Mgmt.Cluster(),
 		clusterManager:          clusterManager,
-		crLister:                management.RBAC.ClusterRoles("").Controller().Lister(),
-		crClient:                management.RBAC.ClusterRoles(""),
+		crLister:                management.Wrangler.RBAC.ClusterRole().Cache(),
+		crClient:                management.Wrangler.RBAC.ClusterRole(),
 		nsCache:                 management.Wrangler.Core.Namespace().Cache(),
-		rLister:                 management.RBAC.Roles("").Controller().Lister(),
-		rClient:                 management.RBAC.Roles(""),
+		rLister:                 management.Wrangler.RBAC.Role().Cache(),
+		rClient:                 management.Wrangler.RBAC.Role(),
 		grClient:                management.Wrangler.Mgmt.GlobalRole(),
 		grbCache:                management.Wrangler.Mgmt.GlobalRoleBinding().Cache(),
 		fleetPermissionsHandler: newFleetWorkspaceRoleHandler(management),
@@ -78,15 +71,15 @@ func newGlobalRoleLifecycle(management *config.ManagementContext, clusterManager
 }
 
 type globalRoleLifecycle struct {
-	clusters                mgmtconv3.ClusterClient
+	clusters                mgmtv3.ClusterClient
 	clusterManager          *clustermanager.Manager
-	crLister                rbacv1.ClusterRoleLister
-	crClient                rbacv1.ClusterRoleInterface
+	crLister                wrbacv1.ClusterRoleCache
+	crClient                wrbacv1.ClusterRoleClient
 	nsCache                 wcorev1.NamespaceCache
-	rLister                 rbacv1.RoleLister
-	rClient                 rbacv1.RoleInterface
-	grClient                mgmtconv3.GlobalRoleClient
-	grbCache                mgmtconv3.GlobalRoleBindingCache
+	rLister                 wrbacv1.RoleCache
+	rClient                 wrbacv1.RoleClient
+	grClient                mgmtv3.GlobalRoleClient
+	grbCache                mgmtv3.GlobalRoleBindingCache
 	fleetPermissionsHandler fleetPermissionsRoleHandler
 }
 
@@ -94,7 +87,7 @@ func (gr *globalRoleLifecycle) Create(obj *v3.GlobalRole) (runtime.Object, error
 	// ObjectMeta.Generation does not get updated when the Status is updated.
 	// If only the status has been updated and we have finished updating the status (status.Summary != "InProgress")
 	// we don't need to perform a reconcile as nothing has changed.
-	if obj.Status.ObservedGeneration == obj.ObjectMeta.Generation && obj.Status.Summary != SummaryInProgress {
+	if obj.Status.ObservedGeneration == obj.ObjectMeta.Generation && obj.Status.Summary != status.SummaryCompleted {
 		return obj, nil
 	}
 	returnError := errors.Join(
@@ -111,7 +104,7 @@ func (gr *globalRoleLifecycle) Updated(obj *v3.GlobalRole) (runtime.Object, erro
 	// ObjectMeta.Generation does not get updated when the Status is updated.
 	// If only the status has been updated and we have finished updating the status (status.Summary != "InProgress")
 	// we don't need to perform a reconcile as nothing has changed.
-	if obj.Status.ObservedGeneration == obj.ObjectMeta.Generation && obj.Status.Summary != SummaryInProgress {
+	if obj.Status.ObservedGeneration == obj.ObjectMeta.Generation && obj.Status.Summary != status.SummaryInProgress {
 		return obj, nil
 	}
 
@@ -158,7 +151,7 @@ func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole) er
 		Type: ClusterRoleExists,
 	}
 
-	clusterRole, _ := gr.crLister.Get("", crName)
+	clusterRole, _ := gr.crLister.Get(crName)
 	if clusterRole != nil {
 		updated := false
 		clusterRole = clusterRole.DeepCopy()
@@ -185,7 +178,7 @@ func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole) er
 	}
 
 	logrus.Infof("[%v] Creating clusterRole %v for corresponding GlobalRole", grController, crName)
-	_, err := gr.crClient.Create(&v1.ClusterRole{
+	_, err := gr.crClient.Create(&rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: crName,
 			OwnerReferences: []metav1.OwnerReference{
@@ -258,7 +251,7 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 				continue
 			}
 
-			newRole := &v1.Role{
+			newRole := &rbacv1.Role{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      roleName,
 					Namespace: ns,
@@ -346,11 +339,11 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 }
 
 // purgeInvalidNamespacedRoles removes any roles that aren't in the slice of UIDS that we created/updated in reconcileNamespacedRoles
-func (gr *globalRoleLifecycle) purgeInvalidNamespacedRoles(roles []*v1.Role, uids map[types.UID]struct{}) error {
+func (gr *globalRoleLifecycle) purgeInvalidNamespacedRoles(roles []*rbacv1.Role, uids map[types.UID]struct{}) error {
 	var returnError error
 	for _, r := range roles {
 		if _, ok := uids[r.UID]; !ok {
-			err := gr.rClient.DeleteNamespaced(r.Namespace, r.Name, &metav1.DeleteOptions{})
+			err := gr.rClient.Delete(r.Namespace, r.Name, &metav1.DeleteOptions{})
 			if err != nil {
 				returnError = errors.Join(returnError, fmt.Errorf("couldn't delete role %s: %w", r.Name, err))
 			}
@@ -361,7 +354,7 @@ func (gr *globalRoleLifecycle) purgeInvalidNamespacedRoles(roles []*v1.Role, uid
 
 func (gr *globalRoleLifecycle) setGRAsInProgress(globalRole *v3.GlobalRole) error {
 	globalRole.Status.Conditions = []metav1.Condition{}
-	globalRole.Status.Summary = SummaryInProgress
+	globalRole.Status.Summary = status.SummaryInProgress
 	globalRole.Status.LastUpdate = time.Now().UTC().Format(time.RFC3339)
 	updatedGR, err := gr.grClient.UpdateStatus(globalRole)
 	// For future updates, we want the latest version of our GlobalRole
@@ -370,10 +363,10 @@ func (gr *globalRoleLifecycle) setGRAsInProgress(globalRole *v3.GlobalRole) erro
 }
 
 func (gr *globalRoleLifecycle) setGRAsCompleted(globalRole *v3.GlobalRole) error {
-	globalRole.Status.Summary = SummaryCompleted
+	globalRole.Status.Summary = status.SummaryCompleted
 	for _, c := range globalRole.Status.Conditions {
 		if c.Status != metav1.ConditionTrue {
-			globalRole.Status.Summary = SummaryError
+			globalRole.Status.Summary = status.SummaryError
 			break
 		}
 	}
@@ -385,7 +378,7 @@ func (gr *globalRoleLifecycle) setGRAsCompleted(globalRole *v3.GlobalRole) error
 
 func (gr *globalRoleLifecycle) setGRAsTerminating(globalRole *v3.GlobalRole) error {
 	globalRole.Status.Conditions = []metav1.Condition{}
-	globalRole.Status.Summary = SummaryTerminating
+	globalRole.Status.Summary = status.SummaryTerminating
 	globalRole.Status.LastUpdate = time.Now().UTC().Format(time.RFC3339)
 	_, err := gr.grClient.UpdateStatus(globalRole)
 	return err
