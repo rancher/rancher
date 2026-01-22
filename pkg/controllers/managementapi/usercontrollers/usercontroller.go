@@ -7,13 +7,12 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
-	v33 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	controllers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
@@ -26,12 +25,12 @@ func Register(ctx context.Context, scaledContext *config.ScaledContext, clusterM
 	u := &userControllersController{
 		ctx:           ctx,
 		starter:       clusterManager,
-		clusterLister: scaledContext.Management.Clusters("").Controller().Lister(),
-		clusters:      scaledContext.Management.Clusters(""),
+		clusterLister: scaledContext.Wrangler.Mgmt.Cluster().Cache(),
+		clusters:      scaledContext.Wrangler.Mgmt.Cluster(),
 		ownerStrategy: getOwnerStrategy(ctx, scaledContext.PeerManager),
 	}
 
-	scaledContext.Management.Clusters("").AddHandler(ctx, "user-controllers-controller", u.sync)
+	scaledContext.Wrangler.Mgmt.Cluster().OnChange(ctx, "user-controllers-controller", u.sync)
 
 	go func() {
 		for {
@@ -65,11 +64,11 @@ type userControllersController struct {
 	ownerStrategy
 	ctx           context.Context
 	starter       controllerStarter
-	clusterLister v3.ClusterLister
-	clusters      v3.ClusterInterface
+	clusterLister controllers.ClusterCache
+	clusters      controllers.ClusterClient
 }
 
-func (u *userControllersController) sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
+func (u *userControllersController) sync(key string, cluster *v3.Cluster) (*v3.Cluster, error) {
 	if cluster == nil || cluster.DeletionTimestamp != nil {
 		return nil, nil
 	}
@@ -81,7 +80,7 @@ func (u *userControllersController) sync(key string, cluster *v3.Cluster) (runti
 	}
 
 	// Skip usercontrollers if cluster is not yet provisioned
-	if !v33.ClusterConditionProvisioned.IsTrue(cluster) {
+	if !v3.ClusterConditionProvisioned.IsTrue(cluster) {
 		return cluster, nil
 	}
 
@@ -135,11 +134,12 @@ func (u *userControllersController) checkClusterControllerVersion(cluster *v3.Cl
 // that indicates the cluster controllers' version. It does not matter if the provided version starts with a "v" or doesn't,
 // as it's parsed the same by other code.
 func (u *userControllersController) saveClusterControllersVersionAnnotation(cluster *v3.Cluster, value string) (*v3.Cluster, error) {
+	clusterName := cluster.Name
 	cluster = cluster.DeepCopy()
 	cluster.Annotations[currentClusterControllersVersion] = value
 	cluster, err := u.clusters.Update(cluster)
 	if err != nil {
-		return nil, fmt.Errorf("unable to update cluster %s with annotation indicating its K8s version: %w", cluster.Name, err)
+		return nil, fmt.Errorf("unable to update cluster %s with annotation indicating its K8s version: %w", clusterName, err)
 	}
 	return cluster, nil
 }
@@ -155,7 +155,7 @@ func clusterVersionChanged(current, new *version.Version) bool {
 }
 
 func (u *userControllersController) reconcileClusterOwnership() error {
-	clusters, err := u.clusterLister.List("", labels.Everything())
+	clusters, err := u.clusterLister.List(labels.Everything())
 	if err != nil {
 		return err
 	}
@@ -165,7 +165,7 @@ func (u *userControllersController) reconcileClusterOwnership() error {
 	)
 
 	for _, cluster := range clusters {
-		if cluster.DeletionTimestamp != nil || !v33.ClusterConditionProvisioned.IsTrue(cluster) {
+		if cluster.DeletionTimestamp != nil || !v3.ClusterConditionProvisioned.IsTrue(cluster) {
 			continue
 		}
 
