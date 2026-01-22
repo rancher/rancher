@@ -13,11 +13,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/clientcmd"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type Clients struct {
 	*wrangler.Context
 	Dynamic dynamic.Interface
+	Client  client.Client
 
 	capi *capi.Factory
 	CAPI capicontrollers.Interface
@@ -93,9 +95,19 @@ func NewForConfig(ctx context.Context, config clientcmd.ClientConfig) (*Clients,
 		return nil, err
 	}
 
+	// Create controller-runtime client using the wrangler Scheme
+	ctrlRuntimeClient, err := client.New(rest, client.Options{
+		Scheme: wrangler.Scheme,
+	})
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+
 	return &Clients{
 		Context: wranglerCtx,
 		Dynamic: dynamic,
+		Client:  ctrlRuntimeClient,
 
 		capi: capi,
 		CAPI: capi.Cluster().V1beta2(),

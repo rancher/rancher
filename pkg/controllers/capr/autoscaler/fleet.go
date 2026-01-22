@@ -8,17 +8,14 @@ import (
 	"github.com/Masterminds/semver/v3"
 	"github.com/docker/distribution/reference"
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
-	rke "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/buildconfig"
-	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	"sigs.k8s.io/cluster-api/controllers/external"
 )
 
 // hardcoded k8s minor <-> image tag mapping, adding new versions here will automatically
@@ -176,25 +173,10 @@ func (h *autoscalerHandler) getKubernetesMinorVersion(cluster *capi.Cluster) int
 		return 0
 	}
 
-	// Discover the version for the resource
-	apiVersion, err := capr.DiscoverResourceVersion(h.discovery, cluster.Spec.ControlPlaneRef.APIGroup, cluster.Spec.ControlPlaneRef.Kind)
+	// Use CAPI's external package to get the control plane object with automatic version discovery
+	cp, err := external.GetObjectFromContractVersionedRef(h.context, h.client, cluster.Spec.ControlPlaneRef, cluster.Namespace)
 	if err != nil {
-		logrus.Debugf("[autoscaler] failed to discover version for %s/%s: %v - latest version of cluster-autoscaler chart will be installed", cluster.Spec.ControlPlaneRef.APIGroup, cluster.Spec.ControlPlaneRef.Kind, err)
-		return 0
-	}
-	gv, err := schema.ParseGroupVersion(apiVersion)
-	if err != nil {
-		logrus.Debugf("[autoscaler] failed to parse API version %s: %v - latest version of cluster-autoscaler chart will be installed", apiVersion, err)
-		return 0
-	}
-	gvk := schema.GroupVersionKind{
-		Group:   gv.Group,
-		Version: gv.Version,
-		Kind:    cluster.Spec.ControlPlaneRef.Kind,
-	}
-	cp, err := h.dynamicClient.Get(gvk, cluster.Namespace, cluster.Spec.ControlPlaneRef.Name)
-	if err != nil {
-		logrus.Debugf("[autoscaler] no control-plane found for cluster %s/%s - latest version of cluster-autoscaler chart will be installed", cluster.Namespace, cluster.Name)
+		logrus.Debugf("[autoscaler] failed to get control-plane for cluster %s/%s: %v - latest version of cluster-autoscaler chart will be installed", cluster.Namespace, cluster.Name, err)
 		return 0
 	}
 
@@ -203,28 +185,21 @@ func (h *autoscalerHandler) getKubernetesMinorVersion(cluster *capi.Cluster) int
 	// handle v2prov not adhering to capi for the `Version` field
 	cpAPIVersion, _ := cp.GetObjectKind().GroupVersionKind().ToAPIVersionAndKind()
 	if cpAPIVersion == "rke.cattle.io/v1" {
-		obj, ok := cp.(*rke.RKEControlPlane)
-		if !ok {
+		// For RKE control planes, the kubernetes version is in spec.kubernetesVersion
+		v, ok, err := unstructured.NestedString(cp.Object, "spec", "kubernetesVersion")
+		if !ok || err != nil {
+			logrus.Debugf("[autoscaler] failed to get kubernetesVersion field from RKE control plane for cluster %s/%s: ok=%v, err=%v", cluster.Namespace, cluster.Name, ok, err)
 			return 0
 		}
-		k8sVersionStr = obj.Spec.KubernetesVersion
+		k8sVersionStr = v
 	} else {
-		obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(cp)
-		if err != nil {
-			logrus.Debugf("[autoscaler] failed to convert object to unstructured for cluster %s/%s - latest version of cluster-autoscaler chart will be installed", cluster.Namespace, cluster.Name)
-			return 0
-		}
-
-		v, ok, err := unstructured.NestedFieldNoCopy(obj, "spec", "version")
+		// For CAPI control planes, the kubernetes version is in spec.version
+		v, ok, err := unstructured.NestedString(cp.Object, "spec", "version")
 		if !ok || err != nil {
 			logrus.Debugf("[autoscaler] failed to get CAPI version field from unstructured object for cluster %s/%s: ok=%v, err=%v", cluster.Namespace, cluster.Name, ok, err)
 			return 0
 		}
-		k8sVersionStr, ok = v.(string)
-		if !ok {
-			logrus.Debugf("[autoscaler] failed to convert version field to string for cluster %s/%s: type assertion failed", cluster.Namespace, cluster.Name)
-			return 0
-		}
+		k8sVersionStr = v
 	}
 
 	version, err := semver.NewVersion(k8sVersionStr)

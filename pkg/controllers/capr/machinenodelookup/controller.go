@@ -3,7 +3,6 @@ package machinenodelookup
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -24,9 +23,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/cluster-api/controllers/external"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -40,7 +39,8 @@ type handler struct {
 	rkeBootstrap        rkecontroller.RKEBootstrapController
 	kubeconfigManager   *kubeconfig.Manager
 	dynamic             *dynamic.Controller
-	discovery           discovery.CachedDiscoveryInterface
+	client              client.Client
+	context             context.Context
 }
 
 func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigManager *kubeconfig.Manager) {
@@ -51,7 +51,8 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigMana
 		rkeBootstrap:        clients.RKE.RKEBootstrap(),
 		kubeconfigManager:   kubeconfigManager,
 		dynamic:             clients.Dynamic,
-		discovery:           clients.CachedDiscovery,
+		client:              clients.Client,
+		context:             ctx,
 	}
 
 	clients.RKE.RKEBootstrap().OnChange(ctx, "machine-node-lookup", h.associateMachineWithNode)
@@ -80,17 +81,11 @@ func (h *handler) associateMachineWithNode(_ string, bootstrap *rkev1.RKEBootstr
 		// If the machine already has its provider ID set, then we do not need to continue
 		return bootstrap, nil
 	}
-
-	// Discover the version for the resource
-	apiVersion, err := capr.DiscoverResourceVersion(h.discovery, machine.Spec.InfrastructureRef.APIGroup, machine.Spec.InfrastructureRef.Kind)
+	infra, err := external.GetObjectFromContractVersionedRef(h.context, h.client, machine.Spec.InfrastructureRef, machine.Namespace)
 	if err != nil {
-		return bootstrap, fmt.Errorf("failed to discover version for %s/%s: %w", machine.Spec.InfrastructureRef.APIGroup, machine.Spec.InfrastructureRef.Kind, err)
-	}
-	gvk := schema.FromAPIVersionAndKind(apiVersion, machine.Spec.InfrastructureRef.Kind)
-	infra, err := h.dynamic.Get(gvk, machine.Namespace, machine.Spec.InfrastructureRef.Name)
-	if apierror.IsNotFound(err) {
-		return bootstrap, nil
-	} else if err != nil {
+		if apierror.IsNotFound(err) {
+			return bootstrap, nil
+		}
 		return bootstrap, err
 	}
 

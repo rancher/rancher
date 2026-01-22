@@ -1,11 +1,11 @@
 package autoscaler
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
 
-	openapi_v2 "github.com/google/gnostic-models/openapiv2"
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
@@ -19,10 +19,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/version"
-	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/openapi"
-	restclient "k8s.io/client-go/rest"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
@@ -43,67 +39,72 @@ func (m *mockDynamicGetter) SetGetFunc(f func(gvk schema.GroupVersionKind, names
 	m.getFunc = f
 }
 
-// mockDiscovery is a mock implementation of discovery.CachedDiscoveryInterface
-type mockDiscovery struct {
-	serverGroupsFunc                   func() (*metav1.APIGroupList, error)
-	serverResourcesForGroupVersionFunc func(groupVersion string) (*metav1.APIResourceList, error)
+// mockControllerRuntimeClient is a minimal mock for controller-runtime client.Client
+type mockControllerRuntimeClient struct {
+	getFunc func(ctx context.Context, key any, obj any, opts ...any) error
 }
 
-func (m *mockDiscovery) ServerGroups() (*metav1.APIGroupList, error) {
-	if m.serverGroupsFunc != nil {
-		return m.serverGroupsFunc()
+func (m *mockControllerRuntimeClient) Get(ctx context.Context, key any, obj any, opts ...any) error {
+	if m.getFunc != nil {
+		return m.getFunc(ctx, key, obj, opts...)
 	}
-	return &metav1.APIGroupList{}, nil
-}
-
-func (m *mockDiscovery) ServerResourcesForGroupVersion(groupVersion string) (*metav1.APIResourceList, error) {
-	if m.serverResourcesForGroupVersionFunc != nil {
-		return m.serverResourcesForGroupVersionFunc(groupVersion)
-	}
-	return &metav1.APIResourceList{}, nil
-}
-
-func (m *mockDiscovery) ServerGroupsAndResources() ([]*metav1.APIGroup, []*metav1.APIResourceList, error) {
-	return nil, nil, nil
-}
-
-func (m *mockDiscovery) ServerPreferredResources() ([]*metav1.APIResourceList, error) {
-	return nil, nil
-}
-
-func (m *mockDiscovery) ServerPreferredNamespacedResources() ([]*metav1.APIResourceList, error) {
-	return nil, nil
-}
-
-func (m *mockDiscovery) ServerResources() ([]*metav1.APIResourceList, error) {
-	return nil, nil
-}
-
-func (m *mockDiscovery) ServerVersion() (*version.Info, error) {
-	return nil, nil
-}
-
-func (m *mockDiscovery) OpenAPISchema() (*openapi_v2.Document, error) {
-	return nil, nil
-}
-
-func (m *mockDiscovery) OpenAPIV3() openapi.Client {
 	return nil
 }
 
-func (m *mockDiscovery) RESTClient() restclient.Interface {
+func (m *mockControllerRuntimeClient) List(ctx context.Context, list any, opts ...any) error {
 	return nil
 }
 
-func (m *mockDiscovery) WithLegacy() discovery.DiscoveryInterface {
-	return m
+func (m *mockControllerRuntimeClient) Create(ctx context.Context, obj any, opts ...any) error {
+	return nil
 }
 
-func (m *mockDiscovery) Fresh() bool {
-	return true
+func (m *mockControllerRuntimeClient) Delete(ctx context.Context, obj any, opts ...any) error {
+	return nil
 }
 
-func (m *mockDiscovery) Invalidate() {
+func (m *mockControllerRuntimeClient) Update(ctx context.Context, obj any, opts ...any) error {
+	return nil
+}
+
+func (m *mockControllerRuntimeClient) Patch(ctx context.Context, obj any, patch any, opts ...any) error {
+	return nil
+}
+
+func (m *mockControllerRuntimeClient) DeleteAllOf(ctx context.Context, obj any, opts ...any) error {
+	return nil
+}
+
+func (m *mockControllerRuntimeClient) Apply(ctx context.Context, obj interface{}, opts ...any) error {
+	return nil
+}
+
+func (m *mockControllerRuntimeClient) Status() any {
+	return nil
+}
+
+func (m *mockControllerRuntimeClient) SubResource(subResource string) any {
+	return nil
+}
+
+func (m *mockControllerRuntimeClient) Scheme() *runtime.Scheme {
+	return nil
+}
+
+func (m *mockControllerRuntimeClient) RESTMapper() any {
+	return nil
+}
+
+func (m *mockControllerRuntimeClient) GroupVersionKindFor(obj runtime.Object) (schema.GroupVersionKind, error) {
+	return schema.GroupVersionKind{}, nil
+}
+
+func (m *mockControllerRuntimeClient) IsObjectNamespaced(obj runtime.Object) (bool, error) {
+	return false, nil
+}
+
+func (m *mockControllerRuntimeClient) SetGetFunc(f func(ctx context.Context, key any, obj any, opts ...any) error) {
+	m.getFunc = f
 }
 
 type autoscalerSuite struct {
@@ -129,7 +130,8 @@ type autoscalerSuite struct {
 	helmOp                     *fake.MockControllerInterface[*fleet.HelmOp, *fleet.HelmOpList]
 	helmOpCache                *fake.MockCacheInterface[*fleet.HelmOp]
 	dynamicClient              *mockDynamicGetter
-	discovery                  *mockDiscovery
+	client                     *mockControllerRuntimeClient
+	context                    context.Context
 }
 
 func TestAutoscaler(t *testing.T) {
@@ -159,7 +161,8 @@ func (s *autoscalerSuite) SetupTest() {
 	s.helmOp = fake.NewMockControllerInterface[*fleet.HelmOp, *fleet.HelmOpList](s.mockCtrl)
 	s.helmOpCache = fake.NewMockCacheInterface[*fleet.HelmOp](s.mockCtrl)
 	s.dynamicClient = &mockDynamicGetter{mockCtrl: s.mockCtrl}
-	s.discovery = &mockDiscovery{}
+	s.client = &mockControllerRuntimeClient{}
+	s.context = context.Background()
 
 	s.h = &autoscalerHandler{
 		capiClusterCache:           s.capiClusterCache,
@@ -180,7 +183,8 @@ func (s *autoscalerSuite) SetupTest() {
 		helmOp:                     s.helmOp,
 		helmOpCache:                s.helmOpCache,
 		dynamicClient:              s.dynamicClient,
-		discovery:                  s.discovery,
+		client:                     s.client,
+		context:                    s.context,
 	}
 }
 

@@ -11,6 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // CAPIContext is a scoped context which wraps the larger Wrangler context.
@@ -20,6 +21,7 @@ type CAPIContext struct {
 	*Context
 	CAPI        capicontrollers.Interface
 	CAPIFactory *capi.Factory
+	Client      client.Client
 }
 
 // DeferredCAPIInitializer implements the DeferredInitializer interface
@@ -65,15 +67,35 @@ func (d *DeferredCAPIInitializer) WaitForClient(ctx context.Context) (*CAPIConte
 		SharedControllerFactory: d.context.ControllerFactory,
 	}
 
-	capi, err := capi.NewFactoryFromConfigWithOptions(d.context.RESTConfig, opts)
+	capiFactory, err := capi.NewFactoryFromConfigWithOptions(d.context.RESTConfig, opts)
 	if err != nil {
 		logrus.Fatalf("Encountered unexpected error while creating capi factory: %v", err)
 	}
 
+	// Create controller-runtime client for CAPI operations using the wrangler Scheme.
+	// This ensures the client can properly decode all CAPI and related resource types.
+	//
+	// Note: This client is not cached because controller-runtime's cache system is separate
+	// from wrangler/lasso's SharedControllerFactory cache. While we could create a separate
+	// controller-runtime cache, that would duplicate the existing wrangler cache infrastructure.
+	// This client is primarily used by external.GetObjectFromContractVersionedRef() from the
+	// CAPI library, which requires a controller-runtime client interface.
+	//
+	// The CAPI factory (created above) uses the wrangler SharedControllerFactory cache for
+	// most operations, so API calls from this client are limited to the specific CAPI
+	// contract reference lookups.
+	c, err := client.New(d.context.RESTConfig, client.Options{
+		Scheme: Scheme,
+	})
+	if err != nil {
+		logrus.Fatalf("Encountered unexpected error while creating controller-runtime client: %v", err)
+	}
+
 	return &CAPIContext{
 		Context:     d.context,
-		CAPIFactory: capi,
-		CAPI:        capi.Cluster().V1beta2(),
+		CAPIFactory: capiFactory,
+		CAPI:        capiFactory.Cluster().V1beta2(),
+		Client:      c,
 	}, nil
 }
 
