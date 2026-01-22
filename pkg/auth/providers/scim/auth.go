@@ -7,6 +7,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/rancher/rancher/pkg/auth/providers"
+	"github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/namespace"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
@@ -44,6 +45,13 @@ func (a *tokenAuthenticator) Authenticate(next http.Handler) http.Handler {
 		token := parts[1]
 
 		provider := mux.Vars(r)["provider"]
+
+		if provider == local.Name {
+			// We don't suppport the "local" provider for SCIM as it's not intended
+			// for production use and it doesn't have a group concept .
+			writeError(w, NewError(http.StatusNotFound, http.StatusText(http.StatusNotFound)))
+			return
+		}
 		disabled, err := a.isDisabledProvider(provider)
 		if err != nil || disabled {
 			writeError(w, NewError(http.StatusNotFound, http.StatusText(http.StatusNotFound)))

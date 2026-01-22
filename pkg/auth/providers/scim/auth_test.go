@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/gorilla/mux"
+	"github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,7 +24,7 @@ func TestTokenAuthenticator(t *testing.T) {
 
 	provider := "okta"
 	isDisabledProvider := func(p string) (bool, error) {
-		return p != provider, nil
+		return p != local.Name && p != provider, nil
 	}
 	wantSelector := labels.Set{
 		secretKindLabel:   scimAuthToken,
@@ -128,6 +129,20 @@ func TestTokenAuthenticator(t *testing.T) {
 			},
 		}
 
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, "/v1/scim/"+provider+"/Users", nil)
+		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		r.Header.Set("Authorization", "Bearer "+validToken1)
+
+		auth.Authenticate(next).ServeHTTP(w, r)
+
+		require.Equal(t, http.StatusNotFound, w.Result().StatusCode)
+	})
+
+	t.Run("local provider", func(t *testing.T) {
+		auth := &tokenAuthenticator{}
+
+		provider := "local"
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, "/v1/scim/"+provider+"/Users", nil)
 		r = mux.SetURLVars(r, map[string]string{"provider": provider})
