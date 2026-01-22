@@ -63,6 +63,7 @@ func registerDeferred(ctx context.Context, cluster *config.UserContext) error {
 	calculate := &calculateLimitController{
 		nsIndexer:   nsInformer.GetIndexer(),
 		projects:    cluster.Management.Wrangler.Mgmt.Project(),
+		namespaces:  cluster.Corew.Namespace(),
 		clusterName: cluster.ClusterName,
 	}
 	cluster.Corew.Namespace().OnChange(ctx, "resourceQuotaUsedLimitController", calculate.calculateResourceQuotaUsed)
