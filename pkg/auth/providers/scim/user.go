@@ -18,7 +18,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-// Bool represents a boolean value that can be unmarshaled from JSON.
+// Bool represents a boolean value that can be unmarshaled from JSON strings or boolean literals.
+// Okta uses boolean values, whereas Azure uses strings "true"/"false" for primary email flag.
 type Bool bool
 
 // UnmarshalJSON implements the [json.Unmarshaler] interface.
