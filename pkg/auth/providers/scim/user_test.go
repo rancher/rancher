@@ -1,6 +1,7 @@
 package scim
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/gorilla/mux"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/user/mocks"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -352,4 +354,1775 @@ func TestListUsersExcludesSystemUsers(t *testing.T) {
 	// Should only have 2 users (system user excluded).
 	assert.Equal(t, 2, resp.TotalResults)
 	assert.Len(t, resp.Resources, 2)
+}
+
+func TestGetUser(t *testing.T) {
+	provider := "okta"
+
+	t.Run("user found with all attributes", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		enabled := true
+		userID := "u-abc123"
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}, nil)
+
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(&v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username":    {"john.doe"},
+					"externalid":  {"ext-12345"},
+					"principalid": {provider + "_user://john.doe"},
+					"email":       {"john.doe@example.com"},
+				},
+			},
+		}, nil)
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users/"+userID, nil)
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.GetUser(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		assert.Equal(t, userID, resp["id"])
+		assert.Equal(t, "john.doe", resp["userName"])
+		assert.Equal(t, "ext-12345", resp["externalId"])
+		assert.Equal(t, true, resp["active"])
+		assert.Equal(t, []any{UserSchemaID}, resp["schemas"])
+
+		meta, ok := resp["meta"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, UserResource, meta["resourceType"])
+		assert.Contains(t, meta["location"], "/v1-scim/"+provider+"/Users/"+userID)
+
+		emails, ok := resp["emails"].([]any)
+		require.True(t, ok)
+		require.Len(t, emails, 1)
+		email := emails[0].(map[string]any)
+		assert.Equal(t, "john.doe@example.com", email["value"])
+		assert.Equal(t, true, email["primary"])
+	})
+
+	t.Run("disabled user", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		disabled := false
+		userID := "u-disabled"
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &disabled,
+		}, nil)
+
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(&v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username":    {"inactive.user"},
+					"externalid":  {"ext-inactive"},
+					"principalid": {provider + "_user://inactive.user"},
+				},
+			},
+		}, nil)
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users/"+userID, nil)
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.GetUser(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		assert.Equal(t, userID, resp["id"])
+		assert.Equal(t, "inactive.user", resp["userName"])
+		assert.Equal(t, false, resp["active"])
+	})
+
+	t.Run("user not found", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-notfound"
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(nil, apierrors.NewNotFound(v3.Resource("user"), userID))
+
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users/"+userID, nil)
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.GetUser(rec, req)
+
+		require.Equal(t, http.StatusNotFound, rec.Code)
+
+		var errResp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &errResp)
+		require.NoError(t, err)
+		assert.Contains(t, errResp["schemas"], ErrorSchemaID)
+	})
+
+	t.Run("system user returns not found", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-system"
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"system://local"},
+		}, nil)
+
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users/"+userID, nil)
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.GetUser(rec, req)
+
+		require.Equal(t, http.StatusNotFound, rec.Code)
+
+		var errResp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &errResp)
+		require.NoError(t, err)
+		assert.Contains(t, errResp["schemas"], ErrorSchemaID)
+	})
+}
+
+func TestCreateUser(t *testing.T) {
+	provider := "okta"
+
+	t.Run("creates user successfully with all fields", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
+
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+
+		enabled := true
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureUser("okta_user://john.doe", "john.doe").Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: "u-abc123"},
+			Enabled:    &enabled,
+		}, nil)
+		userMGR.EXPECT().UserAttributeCreateOrUpdate(
+			"u-abc123",
+			provider,
+			[]v3.Principal{},
+			map[string][]string{
+				"username":    {"john.doe"},
+				"externalid":  {"ext-12345"},
+				"principalid": {"okta_user://john.doe"},
+				"email":       {"john.doe@example.com"},
+			},
+		).Return(nil)
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+			userMGR:            userMGR,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+			"userName": "john.doe",
+			"externalId": "ext-12345",
+			"emails": [{"value": "john.doe@example.com", "primary": true}]
+		}`
+		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider})
+		rec := httptest.NewRecorder()
+
+		srv.CreateUser(rec, req)
+
+		require.Equal(t, http.StatusCreated, rec.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		assert.Equal(t, "u-abc123", resp["id"])
+		assert.Equal(t, "john.doe", resp["userName"])
+		assert.Equal(t, "ext-12345", resp["externalId"])
+		assert.Equal(t, true, resp["active"])
+		assert.Equal(t, []any{UserSchemaID}, resp["schemas"])
+
+		emails, ok := resp["emails"].([]any)
+		require.True(t, ok)
+		require.Len(t, emails, 1)
+		email := emails[0].(map[string]any)
+		assert.Equal(t, "john.doe@example.com", email["value"])
+		assert.Equal(t, true, email["primary"])
+	})
+
+	t.Run("creates user without email", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
+
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+
+		enabled := true
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureUser("okta_user://jane.doe", "jane.doe").Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: "u-def456"},
+			Enabled:    &enabled,
+		}, nil)
+		userMGR.EXPECT().UserAttributeCreateOrUpdate(
+			"u-def456",
+			provider,
+			[]v3.Principal{},
+			map[string][]string{
+				"username":    {"jane.doe"},
+				"externalid":  {"ext-67890"},
+				"principalid": {"okta_user://jane.doe"},
+			},
+		).Return(nil)
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+			userMGR:            userMGR,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+			"userName": "jane.doe",
+			"externalId": "ext-67890"
+		}`
+		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider})
+		rec := httptest.NewRecorder()
+
+		srv.CreateUser(rec, req)
+
+		require.Equal(t, http.StatusCreated, rec.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		assert.Equal(t, "u-def456", resp["id"])
+		assert.Equal(t, "jane.doe", resp["userName"])
+		assert.Nil(t, resp["emails"])
+	})
+
+	t.Run("conflict when username already exists", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		existingUser := &v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: "u-existing"},
+		}
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{existingUser}, nil)
+
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get("u-existing").Return(&v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: "u-existing"},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username": {"john.doe"},
+				},
+			},
+		}, nil)
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+			"userName": "John.Doe",
+			"externalId": "ext-12345"
+		}`
+		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider})
+		rec := httptest.NewRecorder()
+
+		srv.CreateUser(rec, req)
+
+		require.Equal(t, http.StatusConflict, rec.Code)
+
+		var errResp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &errResp)
+		require.NoError(t, err)
+		assert.Contains(t, errResp["schemas"], ErrorSchemaID)
+	})
+
+	t.Run("invalid request body", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+		}
+
+		body := `not valid json`
+		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider})
+		rec := httptest.NewRecorder()
+
+		srv.CreateUser(rec, req)
+
+		require.Equal(t, http.StatusBadRequest, rec.Code)
+
+		var errResp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &errResp)
+		require.NoError(t, err)
+		assert.Contains(t, errResp["schemas"], ErrorSchemaID)
+	})
+
+	t.Run("error listing users", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return(nil, fmt.Errorf("cache error"))
+
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+			"userName": "john.doe"
+		}`
+		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider})
+		rec := httptest.NewRecorder()
+
+		srv.CreateUser(rec, req)
+
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
+
+	t.Run("error ensuring user", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
+
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureUser("okta_user://john.doe", "john.doe").Return(nil, fmt.Errorf("failed to create user"))
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+			userMGR:            userMGR,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+			"userName": "john.doe"
+		}`
+		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider})
+		rec := httptest.NewRecorder()
+
+		srv.CreateUser(rec, req)
+
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
+
+	t.Run("error creating user attributes", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
+
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+
+		enabled := true
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureUser("okta_user://john.doe", "john.doe").Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: "u-abc123"},
+			Enabled:    &enabled,
+		}, nil)
+		userMGR.EXPECT().UserAttributeCreateOrUpdate(
+			"u-abc123",
+			provider,
+			gomock.Any(),
+			gomock.Any(),
+		).Return(fmt.Errorf("failed to create attributes"))
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+			userMGR:            userMGR,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+			"userName": "john.doe"
+		}`
+		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider})
+		rec := httptest.NewRecorder()
+
+		srv.CreateUser(rec, req)
+
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
+
+	t.Run("skips users without attributes during duplicate check", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		existingUser := &v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: "u-noattr"},
+		}
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{existingUser}, nil)
+
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get("u-noattr").Return(nil, apierrors.NewNotFound(v3.Resource("userattribute"), "u-noattr"))
+
+		enabled := true
+		userMGR := mocks.NewMockManager(ctrl)
+		userMGR.EXPECT().EnsureUser("okta_user://john.doe", "john.doe").Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: "u-abc123"},
+			Enabled:    &enabled,
+		}, nil)
+		userMGR.EXPECT().UserAttributeCreateOrUpdate(
+			"u-abc123",
+			provider,
+			gomock.Any(),
+			gomock.Any(),
+		).Return(nil)
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+			userMGR:            userMGR,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+			"userName": "john.doe"
+		}`
+		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider})
+		rec := httptest.NewRecorder()
+
+		srv.CreateUser(rec, req)
+
+		require.Equal(t, http.StatusCreated, rec.Code)
+	})
+}
+
+func TestUpdateUser(t *testing.T) {
+	provider := "okta"
+
+	t.Run("updates userName successfully", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username":    {"old.name"},
+					"externalid":  {"ext-12345"},
+					"principalid": {provider + "_user://old.name"},
+				},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+		userAttrClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+			assert.Equal(t, "new.name", first(attr.ExtraByProvider[provider]["username"]))
+			return attr, nil
+		})
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+			userAttributes:     userAttrClient,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+			"userName": "new.name",
+			"externalId": "ext-12345",
+			"active": true
+		}`
+		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.UpdateUser(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		assert.Equal(t, userID, resp["id"])
+		assert.Equal(t, "new.name", resp["userName"])
+		assert.Equal(t, true, resp["active"])
+	})
+
+	t.Run("deactivates user", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username":   {"john.doe"},
+					"externalid": {"ext-12345"},
+				},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+		userClient := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
+		userClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
+			assert.Equal(t, false, *u.Enabled)
+			return u, nil
+		})
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			users:              userClient,
+			userAttributeCache: userAttributeCache,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+			"userName": "john.doe",
+			"externalId": "ext-12345",
+			"active": false
+		}`
+		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.UpdateUser(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		assert.Equal(t, false, resp["active"])
+	})
+
+	t.Run("reactivates user", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+		disabled := false
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &disabled,
+		}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username":   {"john.doe"},
+					"externalid": {"ext-12345"},
+				},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+		userClient := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
+		userClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
+			assert.Equal(t, true, *u.Enabled)
+			return u, nil
+		})
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			users:              userClient,
+			userAttributeCache: userAttributeCache,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+			"userName": "john.doe",
+			"externalId": "ext-12345",
+			"active": true
+		}`
+		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.UpdateUser(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		assert.Equal(t, true, resp["active"])
+	})
+
+	t.Run("no update when nothing changed", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username":   {"john.doe"},
+					"externalid": {"ext-12345"},
+				},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+		// No Update calls expected since nothing changed.
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+			"userName": "john.doe",
+			"externalId": "ext-12345",
+			"active": true
+		}`
+		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.UpdateUser(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+	})
+
+	t.Run("user not found", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-notfound"
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(nil, apierrors.NewNotFound(v3.Resource("user"), userID))
+
+		srv := &SCIMServer{
+			userCache: userCache,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+			"userName": "john.doe",
+			"active": true
+		}`
+		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.UpdateUser(rec, req)
+
+		require.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("system user returns not found", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-system"
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"system://local"},
+		}, nil)
+
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(&v3.UserAttribute{
+			ObjectMeta:      metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{},
+		}, nil)
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+			"userName": "john.doe",
+			"active": true
+		}`
+		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.UpdateUser(rec, req)
+
+		require.Equal(t, http.StatusNotFound, rec.Code)
+	})
+
+	t.Run("cannot deactivate default admin", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-admin"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Username:   "admin",
+			Enabled:    &enabled,
+		}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username":   {"admin"},
+					"externalid": {"ext-admin"},
+				},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+			"userName": "admin",
+			"externalId": "ext-admin",
+			"active": false
+		}`
+		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.UpdateUser(rec, req)
+
+		require.Equal(t, http.StatusConflict, rec.Code)
+
+		var errResp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &errResp)
+		require.NoError(t, err)
+		assert.Contains(t, errResp["schemas"], ErrorSchemaID)
+	})
+
+	t.Run("invalid request body", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+
+		srv := &SCIMServer{
+			userCache: userCache,
+		}
+
+		body := `not valid json`
+		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.UpdateUser(rec, req)
+
+		require.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("error updating user attributes", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username":   {"old.name"},
+					"externalid": {"ext-12345"},
+				},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+		userAttrClient.EXPECT().Update(gomock.Any()).Return(nil, fmt.Errorf("update failed"))
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+			userAttributes:     userAttrClient,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+			"userName": "new.name",
+			"externalId": "ext-12345",
+			"active": true
+		}`
+		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.UpdateUser(rec, req)
+
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
+
+	t.Run("error updating user", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username":   {"john.doe"},
+					"externalid": {"ext-12345"},
+				},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+		userClient := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
+		userClient.EXPECT().Update(gomock.Any()).Return(nil, fmt.Errorf("update failed"))
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			users:              userClient,
+			userAttributeCache: userAttributeCache,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+			"userName": "john.doe",
+			"externalId": "ext-12345",
+			"active": false
+		}`
+		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.UpdateUser(rec, req)
+
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
+}
+
+func TestDeleteUser(t *testing.T) {
+	provider := "okta"
+
+	t.Run("deletes user successfully", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+		}, nil)
+
+		userClient := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
+		userClient.EXPECT().Delete(userID, gomock.Any()).Return(nil)
+
+		srv := &SCIMServer{
+			userCache: userCache,
+			users:     userClient,
+		}
+
+		req := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Users/"+userID, nil)
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.DeleteUser(rec, req)
+
+		require.Equal(t, http.StatusNoContent, rec.Code)
+		assert.Empty(t, rec.Body.String())
+	})
+
+	t.Run("user not found", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-notfound"
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(nil, apierrors.NewNotFound(v3.Resource("user"), userID))
+
+		srv := &SCIMServer{
+			userCache: userCache,
+		}
+
+		req := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Users/"+userID, nil)
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.DeleteUser(rec, req)
+
+		require.Equal(t, http.StatusNotFound, rec.Code)
+
+		var errResp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &errResp)
+		require.NoError(t, err)
+		assert.Contains(t, errResp["schemas"], ErrorSchemaID)
+	})
+
+	t.Run("system user returns not found", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-system"
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"system://local"},
+		}, nil)
+
+		srv := &SCIMServer{
+			userCache: userCache,
+		}
+
+		req := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Users/"+userID, nil)
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.DeleteUser(rec, req)
+
+		require.Equal(t, http.StatusNotFound, rec.Code)
+	})
+
+	t.Run("cannot delete default admin", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-admin"
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Username:   "admin",
+		}, nil)
+
+		srv := &SCIMServer{
+			userCache: userCache,
+		}
+
+		req := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Users/"+userID, nil)
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.DeleteUser(rec, req)
+
+		require.Equal(t, http.StatusConflict, rec.Code)
+
+		var errResp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &errResp)
+		require.NoError(t, err)
+		assert.Contains(t, errResp["schemas"], ErrorSchemaID)
+	})
+
+	t.Run("error deleting user", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+		}, nil)
+
+		userClient := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
+		userClient.EXPECT().Delete(userID, gomock.Any()).Return(fmt.Errorf("delete failed"))
+
+		srv := &SCIMServer{
+			userCache: userCache,
+			users:     userClient,
+		}
+
+		req := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Users/"+userID, nil)
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.DeleteUser(rec, req)
+
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
+
+	t.Run("error getting user from cache", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(nil, fmt.Errorf("cache error"))
+
+		srv := &SCIMServer{
+			userCache: userCache,
+		}
+
+		req := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Users/"+userID, nil)
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.DeleteUser(rec, req)
+
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
+}
+
+func TestPatchUser(t *testing.T) {
+	provider := "okta"
+
+	t.Run("replace active to false deactivates user", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username":   {"john.doe"},
+					"externalid": {"ext-12345"},
+				},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+		userClient := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
+		userClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
+			assert.Equal(t, false, *u.Enabled)
+			return u, nil
+		})
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			users:              userClient,
+			userAttributeCache: userAttributeCache,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+			"Operations": [{"op": "replace", "path": "active", "value": false}]
+		}`
+		req := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.PatchUser(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Equal(t, false, resp["active"])
+	})
+
+	t.Run("replace active to true reactivates user", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+		disabled := false
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &disabled,
+		}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username":   {"john.doe"},
+					"externalid": {"ext-12345"},
+				},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+		userClient := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
+		userClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
+			assert.Equal(t, true, *u.Enabled)
+			return u, nil
+		})
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			users:              userClient,
+			userAttributeCache: userAttributeCache,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+			"Operations": [{"op": "replace", "path": "active", "value": true}]
+		}`
+		req := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.PatchUser(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Equal(t, true, resp["active"])
+	})
+
+	t.Run("replace externalId", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username":   {"john.doe"},
+					"externalid": {"old-ext-id"},
+				},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+		userAttrClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+			assert.Equal(t, "new-ext-id", first(attr.ExtraByProvider[provider]["externalid"]))
+			return attr, nil
+		})
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+			userAttributes:     userAttrClient,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+			"Operations": [{"op": "replace", "path": "externalId", "value": "new-ext-id"}]
+		}`
+		req := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.PatchUser(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Equal(t, "new-ext-id", resp["externalId"])
+	})
+
+	t.Run("replace primary email", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username":   {"john.doe"},
+					"externalid": {"ext-12345"},
+					"email":      {"old@example.com"},
+				},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+		userAttrClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+			assert.Equal(t, "new@example.com", first(attr.ExtraByProvider[provider]["email"]))
+			return attr, nil
+		})
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+			userAttributes:     userAttrClient,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+			"Operations": [{"op": "replace", "path": "emails[primary eq true].value", "value": "new@example.com"}]
+		}`
+		req := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.PatchUser(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		emails, ok := resp["emails"].([]any)
+		require.True(t, ok)
+		require.Len(t, emails, 1)
+		email := emails[0].(map[string]any)
+		assert.Equal(t, "new@example.com", email["value"])
+	})
+
+	t.Run("bulk replace multiple fields", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username":   {"john.doe"},
+					"externalid": {"old-ext-id"},
+				},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+		userAttrClient.EXPECT().Update(gomock.Any()).Return(existingAttr, nil)
+
+		userClient := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
+		userClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(u *v3.User) (*v3.User, error) {
+			return u, nil
+		})
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			users:              userClient,
+			userAttributeCache: userAttributeCache,
+			userAttributes:     userAttrClient,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+			"Operations": [{"op": "replace", "value": {"externalId": "new-ext-id", "active": false}}]
+		}`
+		req := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.PatchUser(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+	})
+
+	t.Run("no update when value unchanged", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username":   {"john.doe"},
+					"externalid": {"ext-12345"},
+				},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+		// No Update calls expected since nothing changed.
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+			"Operations": [{"op": "replace", "path": "active", "value": true}]
+		}`
+		req := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.PatchUser(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+	})
+
+	t.Run("user not found", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-notfound"
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(nil, apierrors.NewNotFound(v3.Resource("user"), userID))
+
+		srv := &SCIMServer{
+			userCache: userCache,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+			"Operations": [{"op": "replace", "path": "active", "value": false}]
+		}`
+		req := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.PatchUser(rec, req)
+
+		require.Equal(t, http.StatusNotFound, rec.Code)
+	})
+
+	t.Run("system user returns not found", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-system"
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta:   metav1.ObjectMeta{Name: userID},
+			PrincipalIDs: []string{"system://local"},
+		}, nil)
+
+		srv := &SCIMServer{
+			userCache: userCache,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+			"Operations": [{"op": "replace", "path": "active", "value": false}]
+		}`
+		req := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.PatchUser(rec, req)
+
+		require.Equal(t, http.StatusNotFound, rec.Code)
+	})
+
+	t.Run("cannot deactivate default admin", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-admin"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Username:   "admin",
+			Enabled:    &enabled,
+		}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username": {"admin"},
+				},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+			"Operations": [{"op": "replace", "path": "active", "value": false}]
+		}`
+		req := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.PatchUser(rec, req)
+
+		require.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("unsupported operation", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username": {"john.doe"},
+				},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+			"Operations": [{"op": "add", "path": "active", "value": false}]
+		}`
+		req := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.PatchUser(rec, req)
+
+		require.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("unsupported path", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username": {"john.doe"},
+				},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+			"Operations": [{"op": "replace", "path": "unsupportedPath", "value": "test"}]
+		}`
+		req := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.PatchUser(rec, req)
+
+		require.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("invalid request body", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}, nil)
+
+		srv := &SCIMServer{
+			userCache: userCache,
+		}
+
+		body := `not valid json`
+		req := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.PatchUser(rec, req)
+
+		require.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("invalid value type for active", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username": {"john.doe"},
+				},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+			"Operations": [{"op": "replace", "path": "active", "value": "not-a-boolean"}]
+		}`
+		req := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.PatchUser(rec, req)
+
+		require.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("error updating user attributes", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username":   {"john.doe"},
+					"externalid": {"old-ext-id"},
+				},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+		userAttrClient.EXPECT().Update(gomock.Any()).Return(nil, fmt.Errorf("update failed"))
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+			userAttributes:     userAttrClient,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+			"Operations": [{"op": "replace", "path": "externalId", "value": "new-ext-id"}]
+		}`
+		req := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.PatchUser(rec, req)
+
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
+
+	t.Run("error updating user", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username": {"john.doe"},
+				},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+		userClient := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
+		userClient.EXPECT().Update(gomock.Any()).Return(nil, fmt.Errorf("update failed"))
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			users:              userClient,
+			userAttributeCache: userAttributeCache,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+			"Operations": [{"op": "replace", "path": "active", "value": false}]
+		}`
+		req := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
+		rec := httptest.NewRecorder()
+
+		srv.PatchUser(rec, req)
+
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
 }

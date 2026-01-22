@@ -696,7 +696,7 @@ func applyReplaceUser(provider string, attr *v3.UserAttribute, user *v3.User, op
 			user.Enabled = &active
 			updateUser = true
 		}
-	case "externalId":
+	case "externalid":
 		externalID, ok := op.Value.(string)
 		if !ok {
 			return false, false, NewError(http.StatusBadRequest, fmt.Sprintf("Invalid value for externalId: %v", op.Value))
