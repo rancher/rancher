@@ -46,7 +46,7 @@ func Register(ctx context.Context, scaledContext *config.ScaledContext, clusterM
 			case <-u.forcedResync():
 				timer.Stop()
 			}
-			if err := u.syncPeers(); err != nil {
+			if err := u.reconcileClusterOwnership(); err != nil {
 				// faster retry on error
 				logrus.WithError(err).Errorf("Failed syncing peers")
 				timer.Reset(5 * time.Second)
@@ -80,7 +80,7 @@ func (u *userControllersController) sync(key string, cluster *v3.Cluster) (runti
 		}
 	}
 	if key == relatedresource.AllKey {
-		if err := u.syncPeers(); err != nil {
+		if err := u.reconcileClusterOwnership(); err != nil {
 			return nil, fmt.Errorf("userControllersController: failed to set peers for key %s: %w", key, err)
 		}
 		return nil, nil
@@ -151,7 +151,7 @@ func clusterVersionChanged(current, new *version.Version) bool {
 	return current.Major() != new.Major() || current.Minor() != new.Minor()
 }
 
-func (u *userControllersController) syncPeers() error {
+func (u *userControllersController) reconcileClusterOwnership() error {
 	clusters, err := u.clusterLister.List("", labels.Everything())
 	if err != nil {
 		return err
