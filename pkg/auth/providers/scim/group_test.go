@@ -787,3 +787,1141 @@ func TestListGroupsPaginationConsistency(t *testing.T) {
 			"Groups not in sorted order: %s should come before %s", allCollectedIDs[i-1], allCollectedIDs[i])
 	}
 }
+
+func TestCreateGroup(t *testing.T) {
+	provider := "okta"
+
+	t.Run("creates group successfully", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().List(labels.Everything()).Return([]*v3.Group{}, nil)
+		groupsCache.EXPECT().List(labels.Set{authProviderLabel: provider}.AsSelector()).Return([]*v3.Group{}, nil)
+
+		createdGroup := &v3.Group{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "grp-abc123",
+			},
+			DisplayName: "Engineering",
+			ExternalID:  "ext-eng-001",
+		}
+		groupClient := fake.NewMockNonNamespacedClientInterface[*v3.Group, *v3.GroupList](ctrl)
+		groupClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(g *v3.Group) (*v3.Group, error) {
+			assert.Equal(t, "Engineering", g.DisplayName)
+			assert.Equal(t, "ext-eng-001", g.ExternalID)
+			assert.Equal(t, provider, g.Labels[authProviderLabel])
+			return createdGroup, nil
+		})
+
+		srv := &SCIMServer{
+			groupsCache: groupsCache,
+			groups:      groupClient,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+			"displayName": "Engineering",
+			"externalId": "ext-eng-001"
+		}`
+		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider})
+		rec := httptest.NewRecorder()
+
+		srv.CreateGroup(rec, req)
+
+		require.Equal(t, http.StatusCreated, rec.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Equal(t, "grp-abc123", resp["id"])
+		assert.Equal(t, "Engineering", resp["displayName"])
+		assert.Equal(t, "ext-eng-001", resp["externalId"])
+	})
+
+	t.Run("creates group with members", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().List(labels.Everything()).Return([]*v3.Group{}, nil)
+		groupsCache.EXPECT().List(labels.Set{authProviderLabel: provider}.AsSelector()).Return([]*v3.Group{}, nil)
+
+		createdGroup := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: "grp-abc123"},
+			DisplayName: "Engineering",
+			ExternalID:  "ext-eng-001",
+		}
+		groupClient := fake.NewMockNonNamespacedClientInterface[*v3.Group, *v3.GroupList](ctrl)
+		groupClient.EXPECT().Create(gomock.Any()).Return(createdGroup, nil)
+
+		// Mock for syncGroupMembers -> getRancherGroupMembers
+		enabled := true
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "u-user1"},
+				Enabled:    &enabled,
+			},
+		}, nil)
+		userCache.EXPECT().Get("u-user1").Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: "u-user1"},
+			Enabled:    &enabled,
+		}, nil)
+
+		userAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: "u-user1"},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {"username": {"user1"}},
+			},
+			GroupPrincipals: map[string]v3.Principals{
+				provider: {Items: []v3.Principal{}},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get("u-user1").Return(userAttr, nil).Times(2) // Once for getRancherGroupMembers, once for addGroupMember
+
+		userAttributeClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+		userAttributeClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+			// addGroupMember updates GroupPrincipals, not ExtraByProvider
+			principals := attr.GroupPrincipals[provider].Items
+			require.Len(t, principals, 1)
+			assert.Equal(t, "Engineering", principals[0].DisplayName)
+			return attr, nil
+		})
+
+		srv := &SCIMServer{
+			groupsCache:        groupsCache,
+			groups:             groupClient,
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+			userAttributes:     userAttributeClient,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+			"displayName": "Engineering",
+			"externalId": "ext-eng-001",
+			"members": [{"value": "u-user1", "display": "user1"}]
+		}`
+		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider})
+		rec := httptest.NewRecorder()
+
+		srv.CreateGroup(rec, req)
+
+		require.Equal(t, http.StatusCreated, rec.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		members, ok := resp["members"].([]any)
+		require.True(t, ok)
+		require.Len(t, members, 1)
+	})
+
+	t.Run("conflict when group already exists", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		existingGroup := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: "grp-existing"},
+			DisplayName: "Engineering",
+		}
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().List(labels.Everything()).Return([]*v3.Group{existingGroup}, nil)
+
+		srv := &SCIMServer{
+			groupsCache: groupsCache,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+			"displayName": "Engineering"
+		}`
+		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider})
+		rec := httptest.NewRecorder()
+
+		srv.CreateGroup(rec, req)
+
+		require.Equal(t, http.StatusConflict, rec.Code)
+	})
+
+	t.Run("conflict is case insensitive", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		existingGroup := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: "grp-existing"},
+			DisplayName: "ENGINEERING",
+		}
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().List(labels.Everything()).Return([]*v3.Group{existingGroup}, nil)
+
+		srv := &SCIMServer{
+			groupsCache: groupsCache,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+			"displayName": "engineering"
+		}`
+		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider})
+		rec := httptest.NewRecorder()
+
+		srv.CreateGroup(rec, req)
+
+		require.Equal(t, http.StatusConflict, rec.Code)
+	})
+
+	t.Run("invalid request body", func(t *testing.T) {
+		srv := &SCIMServer{}
+
+		body := `not valid json`
+		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider})
+		rec := httptest.NewRecorder()
+
+		srv.CreateGroup(rec, req)
+
+		require.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("error listing groups", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().List(labels.Everything()).Return(nil, fmt.Errorf("cache error"))
+
+		srv := &SCIMServer{
+			groupsCache: groupsCache,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+			"displayName": "Engineering"
+		}`
+		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider})
+		rec := httptest.NewRecorder()
+
+		srv.CreateGroup(rec, req)
+
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
+
+	t.Run("error creating group", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().List(labels.Everything()).Return([]*v3.Group{}, nil)
+		groupsCache.EXPECT().List(labels.Set{authProviderLabel: provider}.AsSelector()).Return([]*v3.Group{}, nil)
+
+		groupClient := fake.NewMockNonNamespacedClientInterface[*v3.Group, *v3.GroupList](ctrl)
+		groupClient.EXPECT().Create(gomock.Any()).Return(nil, fmt.Errorf("create failed"))
+
+		srv := &SCIMServer{
+			groupsCache: groupsCache,
+			groups:      groupClient,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+			"displayName": "Engineering"
+		}`
+		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider})
+		rec := httptest.NewRecorder()
+
+		srv.CreateGroup(rec, req)
+
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
+
+	t.Run("error syncing members", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().List(labels.Everything()).Return([]*v3.Group{}, nil)
+		groupsCache.EXPECT().List(labels.Set{authProviderLabel: provider}.AsSelector()).Return([]*v3.Group{}, nil)
+
+		createdGroup := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: "grp-abc123"},
+			DisplayName: "Engineering",
+		}
+		groupClient := fake.NewMockNonNamespacedClientInterface[*v3.Group, *v3.GroupList](ctrl)
+		groupClient.EXPECT().Create(gomock.Any()).Return(createdGroup, nil)
+
+		// getRancherGroupMembers calls userCache.List
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return(nil, fmt.Errorf("list failed"))
+
+		srv := &SCIMServer{
+			groupsCache: groupsCache,
+			groups:      groupClient,
+			userCache:   userCache,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+			"displayName": "Engineering",
+			"members": [{"value": "u-user1", "display": "user1"}]
+		}`
+		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider})
+		rec := httptest.NewRecorder()
+
+		srv.CreateGroup(rec, req)
+
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
+
+	t.Run("returns existing group when found by ID", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		existingGroup := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: "grp-existing"},
+			DisplayName: "Engineering",
+			ExternalID:  "ext-id",
+		}
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().List(labels.Everything()).Return([]*v3.Group{}, nil)
+		groupsCache.EXPECT().Get("grp-existing").Return(existingGroup, nil)
+
+		// Note: When ID is provided, ensureRancherGroup just returns the group from cache
+		// without any update logic.
+
+		srv := &SCIMServer{
+			groupsCache: groupsCache,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+			"id": "grp-existing",
+			"displayName": "Engineering",
+			"externalId": "new-ext-id"
+		}`
+		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider})
+		rec := httptest.NewRecorder()
+
+		srv.CreateGroup(rec, req)
+
+		require.Equal(t, http.StatusCreated, rec.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Equal(t, "grp-existing", resp["id"])
+		// Note: The response returns the existing group's externalId, not the new one
+		assert.Equal(t, "ext-id", resp["externalId"])
+	})
+
+	t.Run("updates existing group found by displayName", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		existingGroup := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: "grp-existing"},
+			DisplayName: "Engineering",
+			ExternalID:  "old-ext-id",
+		}
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().List(labels.Everything()).Return([]*v3.Group{}, nil)
+		groupsCache.EXPECT().List(labels.Set{authProviderLabel: provider}.AsSelector()).Return([]*v3.Group{existingGroup}, nil)
+
+		groupClient := fake.NewMockNonNamespacedClientInterface[*v3.Group, *v3.GroupList](ctrl)
+		groupClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(g *v3.Group) (*v3.Group, error) {
+			assert.Equal(t, "new-ext-id", g.ExternalID)
+			return g, nil
+		})
+
+		srv := &SCIMServer{
+			groupsCache: groupsCache,
+			groups:      groupClient,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+			"displayName": "Engineering",
+			"externalId": "new-ext-id"
+		}`
+		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider})
+		rec := httptest.NewRecorder()
+
+		srv.CreateGroup(rec, req)
+
+		require.Equal(t, http.StatusCreated, rec.Code)
+	})
+}
+
+func TestGetGroup(t *testing.T) {
+	provider := "okta"
+
+	t.Run("returns group successfully", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupID := "grp-abc123"
+		group := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			DisplayName: "Engineering",
+			ExternalID:  "ext-eng-001",
+		}
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().Get(groupID).Return(group, nil)
+
+		// getRancherGroupMembers needs userCache
+		enabled := true
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "u-user1"},
+				Enabled:    &enabled,
+			},
+		}, nil)
+
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get("u-user1").Return(&v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: "u-user1"},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {"username": {"user1"}},
+			},
+			GroupPrincipals: map[string]v3.Principals{
+				provider: {Items: []v3.Principal{
+					{DisplayName: "Engineering"},
+				}},
+			},
+		}, nil)
+
+		srv := &SCIMServer{
+			groupsCache:        groupsCache,
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
+		rec := httptest.NewRecorder()
+
+		srv.GetGroup(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Equal(t, groupID, resp["id"])
+		assert.Equal(t, "Engineering", resp["displayName"])
+		assert.Equal(t, "ext-eng-001", resp["externalId"])
+
+		members, ok := resp["members"].([]any)
+		require.True(t, ok)
+		require.Len(t, members, 1)
+		member := members[0].(map[string]any)
+		assert.Equal(t, "u-user1", member["value"])
+		assert.Equal(t, "user1", member["display"])
+	})
+
+	t.Run("returns group without members when excluded", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupID := "grp-abc123"
+		group := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			DisplayName: "Engineering",
+			ExternalID:  "ext-eng-001",
+		}
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().Get(groupID).Return(group, nil)
+
+		// No userCache calls expected when members excluded
+
+		srv := &SCIMServer{
+			groupsCache: groupsCache,
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID+"?excludedAttributes=members", nil)
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
+		rec := httptest.NewRecorder()
+
+		srv.GetGroup(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Equal(t, groupID, resp["id"])
+		assert.Equal(t, "Engineering", resp["displayName"])
+
+		// members should not be in response
+		_, hasMembers := resp["members"]
+		assert.False(t, hasMembers)
+	})
+
+	t.Run("returns empty members array when no members", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupID := "grp-abc123"
+		group := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			DisplayName: "Engineering",
+		}
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().Get(groupID).Return(group, nil)
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
+
+		srv := &SCIMServer{
+			groupsCache: groupsCache,
+			userCache:   userCache,
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
+		rec := httptest.NewRecorder()
+
+		srv.GetGroup(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		members, ok := resp["members"].([]any)
+		require.True(t, ok)
+		assert.Empty(t, members)
+	})
+
+	t.Run("group not found", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupID := "grp-notfound"
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().Get(groupID).Return(nil, apierrors.NewNotFound(v3.Resource("group"), groupID))
+
+		srv := &SCIMServer{
+			groupsCache: groupsCache,
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
+		rec := httptest.NewRecorder()
+
+		srv.GetGroup(rec, req)
+
+		require.Equal(t, http.StatusNotFound, rec.Code)
+	})
+
+	t.Run("error getting group from cache", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupID := "grp-abc123"
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().Get(groupID).Return(nil, fmt.Errorf("cache error"))
+
+		srv := &SCIMServer{
+			groupsCache: groupsCache,
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
+		rec := httptest.NewRecorder()
+
+		srv.GetGroup(rec, req)
+
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
+
+	t.Run("error getting group members", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupID := "grp-abc123"
+		group := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			DisplayName: "Engineering",
+		}
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().Get(groupID).Return(group, nil)
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return(nil, fmt.Errorf("list error"))
+
+		srv := &SCIMServer{
+			groupsCache: groupsCache,
+			userCache:   userCache,
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
+		rec := httptest.NewRecorder()
+
+		srv.GetGroup(rec, req)
+
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
+
+	t.Run("skips system users when getting members", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupID := "grp-abc123"
+		group := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			DisplayName: "Engineering",
+		}
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().Get(groupID).Return(group, nil)
+
+		enabled := true
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{
+			{
+				ObjectMeta:   metav1.ObjectMeta{Name: "u-system"},
+				PrincipalIDs: []string{"system://local"},
+				Enabled:      &enabled,
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "u-normal"},
+				Enabled:    &enabled,
+			},
+		}, nil)
+
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get("u-normal").Return(&v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: "u-normal"},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {"username": {"normal-user"}},
+			},
+			GroupPrincipals: map[string]v3.Principals{
+				provider: {Items: []v3.Principal{
+					{DisplayName: "Engineering"},
+				}},
+			},
+		}, nil)
+
+		srv := &SCIMServer{
+			groupsCache:        groupsCache,
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
+		rec := httptest.NewRecorder()
+
+		srv.GetGroup(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		members, ok := resp["members"].([]any)
+		require.True(t, ok)
+		require.Len(t, members, 1)
+		member := members[0].(map[string]any)
+		assert.Equal(t, "u-normal", member["value"])
+	})
+}
+
+func TestUpdateGroup(t *testing.T) {
+	provider := "okta"
+
+	t.Run("updates group successfully", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupID := "grp-abc123"
+		existingGroup := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			DisplayName: "Engineering",
+			ExternalID:  "ext-id",
+		}
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		// ensureRancherGroup with ID just returns from cache (no update logic)
+		groupsCache.EXPECT().Get(groupID).Return(existingGroup, nil)
+
+		// syncGroupMembers needs userCache for getRancherGroupMembers
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
+
+		srv := &SCIMServer{
+			groupsCache: groupsCache,
+			userCache:   userCache,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+			"id": "grp-abc123",
+			"displayName": "Engineering",
+			"externalId": "ext-id",
+			"members": []
+		}`
+		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
+		rec := httptest.NewRecorder()
+
+		srv.UpdateGroup(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Equal(t, groupID, resp["id"])
+		assert.Equal(t, "Engineering", resp["displayName"])
+		assert.Equal(t, "ext-id", resp["externalId"])
+	})
+
+	t.Run("updates group with members", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupID := "grp-abc123"
+		existingGroup := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			DisplayName: "Engineering",
+			ExternalID:  "ext-id",
+		}
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().Get(groupID).Return(existingGroup, nil)
+
+		// No update needed when externalId unchanged
+		enabled := true
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{
+			{ObjectMeta: metav1.ObjectMeta{Name: "u-user1"}, Enabled: &enabled},
+		}, nil)
+		userCache.EXPECT().Get("u-user1").Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: "u-user1"},
+			Enabled:    &enabled,
+		}, nil)
+
+		userAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: "u-user1"},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {"username": {"user1"}},
+			},
+			GroupPrincipals: map[string]v3.Principals{
+				provider: {Items: []v3.Principal{}},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get("u-user1").Return(userAttr, nil).Times(2)
+
+		userAttributeClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+		userAttributeClient.EXPECT().Update(gomock.Any()).Return(userAttr, nil)
+
+		srv := &SCIMServer{
+			groupsCache:        groupsCache,
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+			userAttributes:     userAttributeClient,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+			"id": "grp-abc123",
+			"displayName": "Engineering",
+			"externalId": "ext-id",
+			"members": [{"value": "u-user1", "display": "user1"}]
+		}`
+		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
+		rec := httptest.NewRecorder()
+
+		srv.UpdateGroup(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		members, ok := resp["members"].([]any)
+		require.True(t, ok)
+		require.Len(t, members, 1)
+	})
+
+	t.Run("mismatched group id", func(t *testing.T) {
+		srv := &SCIMServer{}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+			"id": "grp-different",
+			"displayName": "Engineering"
+		}`
+		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/grp-abc123", bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": "grp-abc123"})
+		rec := httptest.NewRecorder()
+
+		srv.UpdateGroup(rec, req)
+
+		require.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("invalid request body", func(t *testing.T) {
+		srv := &SCIMServer{}
+
+		body := `not valid json`
+		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/grp-abc123", bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": "grp-abc123"})
+		rec := httptest.NewRecorder()
+
+		srv.UpdateGroup(rec, req)
+
+		require.Equal(t, http.StatusBadRequest, rec.Code)
+	})
+
+	t.Run("error ensuring group", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupID := "grp-abc123"
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().Get(groupID).Return(nil, fmt.Errorf("cache error"))
+
+		srv := &SCIMServer{
+			groupsCache: groupsCache,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+			"id": "grp-abc123",
+			"displayName": "Engineering"
+		}`
+		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
+		rec := httptest.NewRecorder()
+
+		srv.UpdateGroup(rec, req)
+
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
+
+	t.Run("error syncing members", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupID := "grp-abc123"
+		existingGroup := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			DisplayName: "Engineering",
+			ExternalID:  "ext-id",
+		}
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().Get(groupID).Return(existingGroup, nil)
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return(nil, fmt.Errorf("list error"))
+
+		srv := &SCIMServer{
+			groupsCache: groupsCache,
+			userCache:   userCache,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+			"id": "grp-abc123",
+			"displayName": "Engineering",
+			"externalId": "ext-id",
+			"members": [{"value": "u-user1", "display": "user1"}]
+		}`
+		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
+		rec := httptest.NewRecorder()
+
+		srv.UpdateGroup(rec, req)
+
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
+
+	t.Run("removes members not in update", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupID := "grp-abc123"
+		existingGroup := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			DisplayName: "Engineering",
+			ExternalID:  "ext-id",
+		}
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().Get(groupID).Return(existingGroup, nil)
+
+		enabled := true
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		// First call for getRancherGroupMembers
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{
+			{ObjectMeta: metav1.ObjectMeta{Name: "u-user1"}, Enabled: &enabled},
+		}, nil)
+		// Second call for removeGroupMember
+		userCache.EXPECT().Get("u-user1").Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: "u-user1"},
+			Enabled:    &enabled,
+		}, nil)
+
+		userAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: "u-user1"},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {"username": {"user1"}},
+			},
+			GroupPrincipals: map[string]v3.Principals{
+				provider: {Items: []v3.Principal{
+					{DisplayName: "Engineering"},
+				}},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get("u-user1").Return(userAttr, nil).Times(2)
+
+		userAttributeClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+		userAttributeClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+			// Verify the member was removed
+			principals := attr.GroupPrincipals[provider].Items
+			assert.Empty(t, principals)
+			return attr, nil
+		})
+
+		srv := &SCIMServer{
+			groupsCache:        groupsCache,
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+			userAttributes:     userAttributeClient,
+		}
+
+		// Update with empty members list should remove existing member
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+			"id": "grp-abc123",
+			"displayName": "Engineering",
+			"externalId": "ext-id",
+			"members": []
+		}`
+		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
+		rec := httptest.NewRecorder()
+
+		srv.UpdateGroup(rec, req)
+
+		require.Equal(t, http.StatusOK, rec.Code)
+	})
+}
+
+func TestDeleteGroup(t *testing.T) {
+	provider := "okta"
+
+	t.Run("deletes group successfully", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupID := "grp-abc123"
+		group := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			DisplayName: "Engineering",
+		}
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().Get(groupID).Return(group, nil)
+
+		groupClient := fake.NewMockNonNamespacedClientInterface[*v3.Group, *v3.GroupList](ctrl)
+		groupClient.EXPECT().Delete(groupID, gomock.Any()).Return(nil)
+
+		// removeAllGroupMembers needs userCache
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
+
+		srv := &SCIMServer{
+			groupsCache: groupsCache,
+			groups:      groupClient,
+			userCache:   userCache,
+		}
+
+		req := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
+		rec := httptest.NewRecorder()
+
+		srv.DeleteGroup(rec, req)
+
+		require.Equal(t, http.StatusNoContent, rec.Code)
+	})
+
+	t.Run("removes members before deleting group", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupID := "grp-abc123"
+		group := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			DisplayName: "Engineering",
+		}
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().Get(groupID).Return(group, nil)
+
+		groupClient := fake.NewMockNonNamespacedClientInterface[*v3.Group, *v3.GroupList](ctrl)
+		groupClient.EXPECT().Delete(groupID, gomock.Any()).Return(nil)
+
+		enabled := true
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{
+			{ObjectMeta: metav1.ObjectMeta{Name: "u-user1"}, Enabled: &enabled},
+		}, nil)
+		userCache.EXPECT().Get("u-user1").Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: "u-user1"},
+			Enabled:    &enabled,
+		}, nil)
+
+		userAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: "u-user1"},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {"username": {"user1"}},
+			},
+			GroupPrincipals: map[string]v3.Principals{
+				provider: {Items: []v3.Principal{
+					{DisplayName: "Engineering"},
+				}},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get("u-user1").Return(userAttr, nil).Times(2)
+
+		userAttributeClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+		userAttributeClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+			// Verify member was removed from group
+			principals := attr.GroupPrincipals[provider].Items
+			assert.Empty(t, principals)
+			return attr, nil
+		})
+
+		srv := &SCIMServer{
+			groupsCache:        groupsCache,
+			groups:             groupClient,
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+			userAttributes:     userAttributeClient,
+		}
+
+		req := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
+		rec := httptest.NewRecorder()
+
+		srv.DeleteGroup(rec, req)
+
+		require.Equal(t, http.StatusNoContent, rec.Code)
+	})
+
+	t.Run("group not found", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupID := "grp-notfound"
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().Get(groupID).Return(nil, apierrors.NewNotFound(v3.Resource("group"), groupID))
+
+		srv := &SCIMServer{
+			groupsCache: groupsCache,
+		}
+
+		req := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
+		rec := httptest.NewRecorder()
+
+		srv.DeleteGroup(rec, req)
+
+		require.Equal(t, http.StatusNotFound, rec.Code)
+	})
+
+	t.Run("error getting group from cache", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupID := "grp-abc123"
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().Get(groupID).Return(nil, fmt.Errorf("cache error"))
+
+		srv := &SCIMServer{
+			groupsCache: groupsCache,
+		}
+
+		req := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
+		rec := httptest.NewRecorder()
+
+		srv.DeleteGroup(rec, req)
+
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
+
+	t.Run("error removing group members", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupID := "grp-abc123"
+		group := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			DisplayName: "Engineering",
+		}
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().Get(groupID).Return(group, nil)
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return(nil, fmt.Errorf("list error"))
+
+		srv := &SCIMServer{
+			groupsCache: groupsCache,
+			userCache:   userCache,
+		}
+
+		req := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
+		rec := httptest.NewRecorder()
+
+		srv.DeleteGroup(rec, req)
+
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
+
+	t.Run("error deleting group", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupID := "grp-abc123"
+		group := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			DisplayName: "Engineering",
+		}
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().Get(groupID).Return(group, nil)
+
+		groupClient := fake.NewMockNonNamespacedClientInterface[*v3.Group, *v3.GroupList](ctrl)
+		groupClient.EXPECT().Delete(groupID, gomock.Any()).Return(fmt.Errorf("delete failed"))
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
+
+		srv := &SCIMServer{
+			groupsCache: groupsCache,
+			groups:      groupClient,
+			userCache:   userCache,
+		}
+
+		req := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
+		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
+		rec := httptest.NewRecorder()
+
+		srv.DeleteGroup(rec, req)
+
+		require.Equal(t, http.StatusInternalServerError, rec.Code)
+	})
+}
