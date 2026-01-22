@@ -191,11 +191,11 @@ func TestGetAllRancherGroupMembers(t *testing.T) {
 }
 
 func TestSyncGroupMembers(t *testing.T) {
-	ctrl := gomock.NewController(t)
 	provider := "okta"
 	groupName := "Engineering"
 
 	t.Run("adds new members", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
 
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		// Current state: no members.
@@ -241,6 +241,8 @@ func TestSyncGroupMembers(t *testing.T) {
 	})
 
 	t.Run("removes members not in new list", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		// Current state: one member.
 		existingUser := &v3.User{ObjectMeta: metav1.ObjectMeta{Name: "u-mo773yttt4"}}
@@ -384,11 +386,12 @@ func TestExtractMemberValueFromPath(t *testing.T) {
 }
 
 func TestPatchGroup(t *testing.T) {
-	ctrl := gomock.NewController(t)
 	provider := "okta"
 	groupID := "grp-abc123"
 
 	t.Run("add members operation", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
 		groupCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
@@ -467,6 +470,8 @@ func TestPatchGroup(t *testing.T) {
 	})
 
 	t.Run("remove member operation", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
 		groupCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
@@ -523,6 +528,8 @@ func TestPatchGroup(t *testing.T) {
 	})
 
 	t.Run("replace externalId operation", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
 		existingGroup := &v3.Group{
 			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
 			DisplayName: "Engineering",
