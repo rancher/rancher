@@ -203,6 +203,13 @@ var (
 		false,
 		true,
 	)
+	SCIM = newFeature(
+		"scim",
+		"Enable SCIM identity provisioning",
+		false,
+		false,
+		true,
+	)
 )
 
 func ListEnabled() []string {
