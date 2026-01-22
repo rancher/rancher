@@ -1,5 +1,7 @@
 package usercontrollers
 
+//go:generate go tool -modfile ../../../../gotools/mockgen/go.mod mockgen -package usercontrollers -source=../../../../pkg/peermanager/peermanager.go -destination=./peermanager_mock_test.go
+
 import (
 	"context"
 	"fmt"
@@ -9,46 +11,10 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/peermanager"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
+	"go.uber.org/mock/gomock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
-
-// mockPeerManager is a mock implementation of peermanager.PeerManager
-type mockPeerManager struct {
-	mock.Mock
-	isLeader  bool
-	listeners []chan<- peermanager.Peers
-}
-
-func (m *mockPeerManager) IsLeader() bool {
-	return m.isLeader
-}
-
-func (m *mockPeerManager) Leader() {
-	m.isLeader = true
-}
-
-func (m *mockPeerManager) AddListener(listener chan<- peermanager.Peers) {
-	m.listeners = append(m.listeners, listener)
-	m.Called(listener)
-}
-
-func (m *mockPeerManager) RemoveListener(listener chan<- peermanager.Peers) {
-	for i, l := range m.listeners {
-		if l == listener {
-			m.listeners = append(m.listeners[:i], m.listeners[i+1:]...)
-			break
-		}
-	}
-	m.Called(listener)
-}
-
-func (m *mockPeerManager) SendPeers(peers peermanager.Peers) {
-	for _, listener := range m.listeners {
-		listener <- peers
-	}
-}
 
 func TestNonClusteredStrategy(t *testing.T) {
 	strategy := getOwnerStrategy(t.Context(), nil)
@@ -67,22 +33,23 @@ func TestPeersBasedStrategy(t *testing.T) {
 	}
 
 	t.Run("not ready peer should not own", func(t *testing.T) {
-		mockPeerManager := new(mockPeerManager)
-		mockPeerManager.On("AddListener", mock.Anything).Return()
-		mockPeerManager.On("RemoveListener", mock.Anything).Return()
+		ctrl := gomock.NewController(t)
+		mockPeerManager := NewMockPeerManager(ctrl)
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		strategy := newPeersBasedStrategy(ctx, mockPeerManager)
+		var peersChan chan<- peermanager.Peers
+		mockPeerManager.EXPECT().AddListener(gomock.Any()).Do(func(lis chan<- peermanager.Peers) {
+			peersChan = lis
+		})
+		strategy := newPeersBasedStrategy(t.Context(), mockPeerManager)
+		mockPeerManager.EXPECT().RemoveListener(peersChan).AnyTimes()
 		assert.False(t, strategy.isOwner(cluster), "Should not own if not initialized")
 
 		// Simulate initial state where peers are not ready
-		mockPeerManager.SendPeers(peermanager.Peers{
+		peersChan <- peermanager.Peers{
 			SelfID: "peer1",
 			Ready:  false,
 			Leader: false,
-		})
+		}
 		// sendPeers is asynchronous, wait for the signal
 		err := receiveWithTimeout(500*time.Millisecond, strategy.forcedResync())
 		assert.NoError(t, err, "Expected resync channel to be sent")
@@ -91,21 +58,22 @@ func TestPeersBasedStrategy(t *testing.T) {
 	})
 
 	t.Run("single non-leader replica should not own", func(t *testing.T) {
-		mockPeerManager := new(mockPeerManager)
-		mockPeerManager.On("AddListener", mock.Anything).Return()
-		mockPeerManager.On("RemoveListener", mock.Anything).Return()
+		ctrl := gomock.NewController(t)
+		mockPeerManager := NewMockPeerManager(ctrl)
 
-		ctx, cancel := context.WithCancel(t.Context())
-		defer cancel()
-
-		strategy := newPeersBasedStrategy(ctx, mockPeerManager)
+		var peersChan chan<- peermanager.Peers
+		mockPeerManager.EXPECT().AddListener(gomock.Any()).Do(func(lis chan<- peermanager.Peers) {
+			peersChan = lis
+		})
+		strategy := newPeersBasedStrategy(t.Context(), mockPeerManager)
+		mockPeerManager.EXPECT().RemoveListener(peersChan).AnyTimes()
 
 		// Simulate a single, non-leader replica
-		mockPeerManager.SendPeers(peermanager.Peers{
+		peersChan <- peermanager.Peers{
 			SelfID: "peer1",
 			Ready:  true,
 			Leader: false,
-		})
+		}
 		// sendPeers is asynchronous, wait for the signal
 		err := receiveWithTimeout(500*time.Millisecond, strategy.forcedResync())
 		assert.NoError(t, err, "Expected resync channel to be sent")
@@ -114,14 +82,15 @@ func TestPeersBasedStrategy(t *testing.T) {
 	})
 
 	t.Run("ownership distribution with multiple peers", func(t *testing.T) {
-		mockPeerManager := new(mockPeerManager)
-		mockPeerManager.On("AddListener", mock.Anything).Return()
-		mockPeerManager.On("RemoveListener", mock.Anything).Return()
+		ctrl := gomock.NewController(t)
+		mockPeerManager := NewMockPeerManager(ctrl)
 
-		ctx, cancel := context.WithCancel(t.Context())
-		defer cancel()
-
-		strategy := newPeersBasedStrategy(ctx, mockPeerManager)
+		var peersChan chan<- peermanager.Peers
+		mockPeerManager.EXPECT().AddListener(gomock.Any()).Do(func(lis chan<- peermanager.Peers) {
+			peersChan = lis
+		})
+		strategy := newPeersBasedStrategy(t.Context(), mockPeerManager)
+		mockPeerManager.EXPECT().RemoveListener(peersChan).AnyTimes()
 
 		// Test various cluster UIDs to check ownership distribution
 		testCases := []struct {
@@ -139,11 +108,11 @@ func TestPeersBasedStrategy(t *testing.T) {
 		peers := []string{"peerA", "peerB", "peerC"}
 		// Repeat the test from all the different perspectives
 		for x, selfID := range peers {
-			mockPeerManager.SendPeers(peermanager.Peers{
+			peersChan <- peermanager.Peers{
 				SelfID: selfID,
 				IDs:    append(append([]string{}, peers[:x]...), peers[x+1:]...), // omit self
 				Ready:  true,
-			})
+			}
 			// sendPeers is asynchronous, wait for the signal
 			err := receiveWithTimeout(500*time.Millisecond, strategy.forcedResync())
 			assert.NoError(t, err, "Expected resync channel to be sent")
@@ -165,56 +134,60 @@ func TestPeersBasedStrategy(t *testing.T) {
 	})
 
 	t.Run("forcedResync channel sends on peer change", func(t *testing.T) {
-		mockPeerManager := new(mockPeerManager)
-		mockPeerManager.On("AddListener", mock.Anything).Return()
-		mockPeerManager.On("RemoveListener", mock.Anything).Return()
+		ctrl := gomock.NewController(t)
+		mockPeerManager := NewMockPeerManager(ctrl)
 
-		ctx, cancel := context.WithCancel(t.Context())
-		defer cancel()
-
-		strategy := newPeersBasedStrategy(ctx, mockPeerManager)
+		var peersChan chan<- peermanager.Peers
+		mockPeerManager.EXPECT().AddListener(gomock.Any()).Do(func(lis chan<- peermanager.Peers) {
+			peersChan = lis
+		})
+		strategy := newPeersBasedStrategy(t.Context(), mockPeerManager)
+		mockPeerManager.EXPECT().RemoveListener(peersChan).AnyTimes()
 
 		// Initial peers
-		mockPeerManager.SendPeers(peermanager.Peers{
+		peersChan <- peermanager.Peers{
 			SelfID: "peer1",
-		})
+		}
 		err := receiveWithTimeout(500*time.Millisecond, strategy.forcedResync())
 		assert.NoError(t, err, "Expected resync channel to be sent")
 
 		// Change peers - expect a resync
-		mockPeerManager.SendPeers(peermanager.Peers{
+		peersChan <- peermanager.Peers{
 			SelfID: "peer1",
 			IDs:    []string{"peer2"},
-		})
+		}
 		err = receiveWithTimeout(500*time.Millisecond, strategy.forcedResync())
 		assert.NoError(t, err, "Expected resync channel to be sent")
 
 		// Send same peers again - no resync expected
-		mockPeerManager.SendPeers(peermanager.Peers{
+		peersChan <- peermanager.Peers{
 			SelfID: "peer1",
 			IDs:    []string{"peer2"},
-		})
+		}
 		err = receiveWithTimeout(500*time.Millisecond, strategy.forcedResync())
 		assert.Error(t, err, "Unexpected resync")
 	})
 
 	t.Run("cleanup on context cancellation", func(t *testing.T) {
-		mockPeerManager := new(mockPeerManager)
-		addCall := mockPeerManager.On("AddListener", mock.Anything).Return()
-		removeCall := mockPeerManager.On("RemoveListener", mock.Anything).Return()
+		ctrl := gomock.NewController(t)
+		mockPeerManager := NewMockPeerManager(ctrl)
 
 		ctx, cancel := context.WithCancel(t.Context())
 		defer cancel()
 
+		var peersChan chan<- peermanager.Peers
+		mockPeerManager.EXPECT().AddListener(gomock.Any()).Do(func(lis chan<- peermanager.Peers) {
+			peersChan = lis
+		})
 		strategy := newPeersBasedStrategy(ctx, mockPeerManager)
-		mockPeerManager.AssertCalled(t, "AddListener", addCall.Arguments.Get(0))
+		mockPeerManager.EXPECT().RemoveListener(peersChan).Times(1)
 
 		// Simulate a single, leader replica
-		mockPeerManager.SendPeers(peermanager.Peers{
+		peersChan <- peermanager.Peers{
 			SelfID: "peer1",
 			Ready:  true,
 			Leader: true,
-		})
+		}
 		err := receiveWithTimeout(500*time.Millisecond, strategy.forcedResync())
 		assert.NoError(t, err, "Expected resync channel to be sent")
 		assert.True(t, strategy.isOwner(cluster), "Single leader replica should own")
@@ -224,9 +197,6 @@ func TestPeersBasedStrategy(t *testing.T) {
 
 		// Wait a bit for the goroutine to process the cancellation
 		time.Sleep(100 * time.Millisecond)
-
-		// Assert that RemoveListener was called
-		mockPeerManager.AssertCalled(t, "RemoveListener", removeCall.Arguments.Get(0))
 
 		var open bool
 		select {
