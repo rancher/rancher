@@ -20,6 +20,38 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
+func TestBoolUnmarshalJSON(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    bool
+		wantErr bool
+	}{
+		{name: "true as boolean", input: "true", want: true},
+		{name: "false as boolean", input: "false", want: false},
+		{name: "true as string", input: `"true"`, want: true},
+		{name: "false as string", input: `"false"`, want: false},
+		{name: "invalid string", input: `"invalid"`, wantErr: true},
+		{name: "number is invalid", input: "1", wantErr: true},
+		{name: "null is invalid", input: "null", wantErr: true},
+		{name: "empty string is invalid", input: `""`, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var b Bool
+			err := json.Unmarshal([]byte(tt.input), &b)
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "invalid boolean value")
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.want, bool(b))
+			}
+		})
+	}
+}
+
 func TestListUsersPagination(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	provider := "okta"
