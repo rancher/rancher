@@ -480,9 +480,6 @@ func (o *OpenIDCProvider) getUserInfoFromAuthCode(ctx context.Context, config *a
 	if err != nil {
 		return userInfo, oauth2Token, "", err
 	}
-	if err := userInfo.Claims(&claimInfo); err != nil {
-		return userInfo, oauth2Token, "", err
-	}
 
 	return userInfo, oauth2Token, rawIDToken, nil
 }
