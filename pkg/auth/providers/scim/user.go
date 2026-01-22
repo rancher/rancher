@@ -7,7 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strconv"
+	"sort"
 	"strings"
 
 	"github.com/gorilla/mux"
@@ -58,7 +58,7 @@ type SCIMUser struct {
 
 // ListUsers returns a list of users.
 // It supports filtering by userName using the "eq" operator.
-// Pagination is not implemented yet.
+// Pagination is supported via startIndex (1-based) and count query parameters.
 // Returns:
 //   - 200 on success
 //   - 400 for invalid requests.
@@ -67,11 +67,15 @@ func (s *SCIMServer) ListUsers(w http.ResponseWriter, r *http.Request) {
 
 	provider := mux.Vars(r)["provider"]
 
-	var (
-		nameFilter        string
-		startIndex, count int
-		err               error
-	)
+	// Parse pagination parameters.
+	pagination, err := ParsePaginationParams(r)
+	if err != nil {
+		writeError(w, NewError(http.StatusBadRequest, err.Error()))
+		return
+	}
+
+	// Parse filter.
+	var nameFilter string
 	if value := r.URL.Query().Get("filter"); value != "" {
 		// For simplicity, only support filtering by userName eq "<value>"
 		parts := strings.SplitN(value, " ", 3)
@@ -86,22 +90,7 @@ func (s *SCIMServer) ListUsers(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if value := r.URL.Query().Get("startIndex"); value != "" {
-		startIndex, err = strconv.Atoi(value)
-		if err != nil {
-			writeError(w, NewError(http.StatusBadRequest, "Invalid startIndex"))
-			return
-		}
-	}
-	if value := r.URL.Query().Get("count"); value != "" {
-		count, err = strconv.Atoi(value)
-		if err != nil {
-			writeError(w, NewError(http.StatusBadRequest, "Invalid count"))
-			return
-		}
-	}
-
-	logrus.Tracef("scim::ListUsers: userName=%s, startIndex=%d, count=%d", nameFilter, startIndex, count)
+	logrus.Tracef("scim::ListUsers: userName=%s, startIndex=%d, count=%d", nameFilter, pagination.StartIndex, pagination.Count)
 
 	list, err := s.userCache.List(labels.Everything())
 	if err != nil {
@@ -110,7 +99,14 @@ func (s *SCIMServer) ListUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var resources []any
+	// Sort users by Name for deterministic ordering across pagination requests.
+	// Without sorting, the cache order is undefined and pagination would be inconsistent.
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].Name < list[j].Name
+	})
+
+	// Collect all matching resources (needed to compute totalResults).
+	var allResources []any
 	for _, user := range list {
 		if user.IsSystem() {
 			continue
@@ -133,6 +129,11 @@ func (s *SCIMServer) ListUsers(w http.ResponseWriter, r *http.Request) {
 
 		userName := first(attr.ExtraByProvider[provider]["username"])
 		externalID := first(attr.ExtraByProvider[provider]["externalid"])
+
+		// Apply filter.
+		if nameFilter != "" && !strings.EqualFold(userName, nameFilter) {
+			continue
+		}
 
 		resource := map[string]any{
 			"schemas":    []string{UserSchemaID},
@@ -157,26 +158,23 @@ func (s *SCIMServer) ListUsers(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		if nameFilter == "" {
-			resources = append(resources, resource)
-		} else if nameFilter != "" && strings.EqualFold(userName, nameFilter) {
-			resources = append(resources, resource)
-			break
-		}
+		allResources = append(allResources, resource)
 	}
-	if resources == nil {
-		resources = []any{}
+
+	totalResults := len(allResources)
+
+	// Apply pagination.
+	paginatedResources, startIndex := Paginate(allResources, pagination)
+	if paginatedResources == nil {
+		paginatedResources = []any{}
 	}
 
 	response := ListResponse{
 		Schemas:      []string{ListSchemaID},
-		Resources:    resources,
-		TotalResults: len(resources), // No pagination for now.
-		ItemsPerPage: len(resources),
-	}
-
-	if response.TotalResults > 0 {
-		response.StartIndex = 1
+		Resources:    paginatedResources,
+		TotalResults: totalResults,
+		ItemsPerPage: len(paginatedResources),
+		StartIndex:   startIndex,
 	}
 
 	writeResponse(w, response)
