@@ -98,7 +98,6 @@ func setQuotaProjectID(ns *corev1.Namespace, newProjectId string) {
 
 	}
 	ns.Annotations[resourceQuotaProjectID] = newProjectId
-	return
 }
 
 func deleteQuotaProjectID(ns *corev1.Namespace) {
@@ -106,7 +105,6 @@ func deleteQuotaProjectID(ns *corev1.Namespace) {
 		return
 	}
 	delete(ns.Annotations, resourceQuotaProjectID)
-	return
 }
 
 func getQuotaProjectID(ns *corev1.Namespace) string {
