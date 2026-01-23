@@ -5,7 +5,7 @@ go 1.25.0
 toolchain go1.25.4
 
 replace (
-	github.com/containerd/containerd => github.com/containerd/containerd v1.7.29 // CVE-2024-40635
+	github.com/containerd/containerd => github.com/containerd/containerd v1.7.30 // CVE-2024-40635
 	github.com/docker/docker => github.com/docker/docker v28.3.3+incompatible // CVE-2025-54388
 	github.com/go-jose/go-jose/v4 => github.com/go-jose/go-jose/v4 v4.0.5 // CVE-2025-27144
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.2.8 // CVE-2024-45310
