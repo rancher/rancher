@@ -300,7 +300,7 @@ func (s *SCIMServer) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if id != payload.ID { // TODO: Revisit this.
+	if id != payload.ID {
 		logrus.Errorf("scim::UpdateGroup: id in URL %s does not match id in body %s", id, payload.ID)
 		writeError(w, NewError(http.StatusBadRequest, "Mismatched Group id"))
 		return
