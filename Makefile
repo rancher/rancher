@@ -37,6 +37,9 @@ quick-k3s-images:
 build-server: buildx-machine
 	@$(MAKE) build TARGET="server" BUILDER="$(MACHINE)"
 
+build-server-tarball: buildx-machine
+	@$(MAKE) build TARGET="server-tarball" BUILDER="$(MACHINE)"
+
 build-agent: buildx-machine
 	@$(MAKE) build TARGET="agent" BUILDER="$(MACHINE)"
 
