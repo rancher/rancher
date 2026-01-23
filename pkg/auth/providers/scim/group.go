@@ -51,23 +51,31 @@ func (s *SCIMServer) ListGroups(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse filter and excludedAttributes.
-	var nameFilter string
+	var filter *Filter
 	var excludeMembers bool
 	if value := r.URL.Query().Get("filter"); value != "" {
-		// For simplicity, only support filtering by displayName eq "<value>".
-		parts := strings.SplitN(value, " ", 3)
-		if len(parts) != 3 || parts[0] != "displayName" || parts[1] != "eq" {
-			writeError(w, NewError(http.StatusBadRequest, "Unsupported filter"))
+		var err error
+		filter, err = ParseFilter(value)
+		if err != nil {
+			writeError(w, NewError(http.StatusBadRequest, err.Error()))
 			return
 		}
-		nameFilter = strings.Trim(parts[2], `"`)
+		// Currently only support displayName eq "<value>" filter.
+		if err := filter.ValidateForAttribute("displayName", OpEqual); err != nil {
+			writeError(w, NewError(http.StatusBadRequest, err.Error()))
+			return
+		}
 	}
 	if value := r.URL.Query().Get("excludedAttributes"); value != "" {
 		fields := strings.Split(value, ",")
 		excludeMembers = slices.Contains(fields, "members")
 	}
 
-	logrus.Tracef("scim::ListGroups: displayName=%s, startIndex=%d, count=%d", nameFilter, pagination.StartIndex, pagination.Count)
+	var filterValue string
+	if filter != nil {
+		filterValue = filter.Value
+	}
+	logrus.Tracef("scim::ListGroups: displayName=%s, startIndex=%d, count=%d", filterValue, pagination.StartIndex, pagination.Count)
 
 	groups, err := s.groupsCache.List(labels.Set{authProviderLabel: provider}.AsSelector())
 	if err != nil {
@@ -97,7 +105,7 @@ func (s *SCIMServer) ListGroups(w http.ResponseWriter, r *http.Request) {
 
 		for _, group := range groups {
 			// Case insensitive match for displayName.
-			if nameFilter != "" && !strings.EqualFold(group.DisplayName, nameFilter) {
+			if !filter.Matches(group.DisplayName) {
 				continue
 			}
 
