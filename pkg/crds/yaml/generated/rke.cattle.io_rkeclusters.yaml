@@ -100,6 +100,18 @@ spec:
                   - type
                   type: object
                 type: array
+              initialization:
+                description: |-
+                  Initialization provides observations of the RKECluster initialization process.
+                  NOTE: Fields in this struct are part of the Cluster API contract and are used to orchestrate initial Cluster provisioning.
+                minProperties: 1
+                properties:
+                  provisioned:
+                    description: |-
+                      Provisioned is true when the infrastructure provider reports that the Cluster's infrastructure is fully provisioned.
+                      NOTE: this field is part of the Cluster API contract, and it is used to orchestrate initial Cluster provisioning.
+                    type: boolean
+                type: object
               ready:
                 description: |-
                   Ready denotes that the RKE cluster infrastructure is fully provisioned.
@@ -108,6 +120,7 @@ spec:
                   orchestrate provisioning.
                   The value of this field is never updated after provisioning is completed.
                   Please use conditions to check the operational state of the cluster.
+                  Deprecated: use Initialization.Provisioned instead.
                 type: boolean
             type: object
         required:

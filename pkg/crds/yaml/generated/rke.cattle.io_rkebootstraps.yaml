@@ -63,9 +63,22 @@ spec:
                 maxLength: 253
                 minLength: 1
                 type: string
+              initialization:
+                description: |-
+                  Initialization provides observations of the RKEBootstrap initialization process.
+                  NOTE: Fields in this struct are part of the Cluster API contract and are used to orchestrate initial Machine provisioning.
+                minProperties: 1
+                properties:
+                  dataSecretCreated:
+                    description: |-
+                      DataSecretCreated is true when the Machine's boostrap secret is created.
+                      NOTE: this field is part of the Cluster API contract, and it is used to orchestrate initial Machine provisioning.
+                    type: boolean
+                type: object
               ready:
-                description: Ready indicates the BootstrapData field is ready to be
-                  consumed.
+                description: |-
+                  Ready indicates the BootstrapData field is ready to be consumed.
+                  Deprecated: use Initialization.DataSecretCreated instead.
                 type: boolean
             type: object
         required:
