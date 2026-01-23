@@ -10,7 +10,7 @@ cd $(git rev-parse --show-toplevel)
 # variables
 COMMIT=$(git rev-parse --short HEAD)
 TAG="${TAG:-$(grep -m1 ' TAG:' .github/workflows/pull-request.yml | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e "s/\${{ github.sha }}/$COMMIT/g" | cut -d' ' -f2)}"
-REGISTRY="docker.io"
+REGISTRY="${REGISTRY:-'docker.io'}"
 BINARY_DEBUG=${BINARY_DEBUG:-false}
 
 source dev-scripts/build
