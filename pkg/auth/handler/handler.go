@@ -11,7 +11,6 @@
 //
 // Supported PKCE methods:
 //   - S256: SHA-256 based challenge (recommended)
-//   - plain: Plain text challenge
 package handler
 
 import (
@@ -113,9 +112,9 @@ func (p *AuthProviderServer) redirectToIdP(w http.ResponseWriter, req *http.Requ
 		}
 
 		// Validate supported PKCE methods
-		if pkceMethod != "" && pkceMethod != oidc.PKCESPlainMethod && pkceMethod != oidc.PKCES256Method {
+		if pkceMethod != "" && pkceMethod != oidc.PKCES256Method {
 			logrus.Warnf("[oidc] Unsupported PKCE method '%s' for provider %s", pkceMethod, provider)
-			http.Error(w, "Unsupported PKCE method. Supported methods: plain, S256", http.StatusBadRequest)
+			http.Error(w, "Unsupported PKCE method. Supported methods: S256", http.StatusBadRequest)
 			return
 		}
 

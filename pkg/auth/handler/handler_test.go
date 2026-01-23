@@ -246,65 +246,6 @@ func TestAuthenticationProvidersUnsupportedPKCEMethod(t *testing.T) {
 	}
 }
 
-func TestAuthenticationProvidersWithPlainPKCE(t *testing.T) {
-	fc := newFakeUnstructuredClient(map[string]*runtimetesting.Unstructured{
-		"oidc-plain-pkce": &runtimetesting.Unstructured{
-			Object: map[string]any{
-				"apiVersion": "management.cattle.io/v3",
-				"kind":       "AuthConfig",
-				"metadata": map[string]any{
-					"name": "oidc-plain-pkce",
-				},
-				"scope":        "openid profile email",
-				"type":         "oidcConfig",
-				"authEndpoint": "https://idp.example.com/oauth/authorize",
-				"clientId":     "test-client",
-				"enabled":      true,
-				"issuer":       "https://idp.example.com",
-				"rancherUrl":   "https://rancher.example.com/verify-auth",
-				"pkceMethod":   "plain",
-			},
-		},
-	})
-	srv := NewFromUnstructuredClient(fc)
-	router := mux.NewRouter()
-	srv.RegisterOIDCProviderHandlers(router)
-	testSrv := httptest.NewServer(router)
-	t.Cleanup(func() {
-		testSrv.Close()
-	})
-
-	req, err := http.NewRequest(http.MethodGet, testSrv.URL+"/v1-oidc/oidc-plain-pkce?state=teststate&scope=openid", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	client := testSrv.Client()
-	client.CheckRedirect = func(*http.Request, []*http.Request) error {
-		return http.ErrUseLastResponse
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if resp.StatusCode != http.StatusFound {
-		t.Errorf("got Status %v, want %v", resp.StatusCode, http.StatusFound)
-	}
-
-	location := resp.Header.Get("Location")
-	if location == "" {
-		t.Fatal("expected Location header, got empty")
-	}
-
-	// Verify PKCE challenge is present with plain method
-	if !strings.Contains(location, "code_challenge=") {
-		t.Error("expected PKCE code_challenge parameter in redirect URL")
-	}
-	if !strings.Contains(location, "code_challenge_method=plain") {
-		t.Error("expected PKCE code_challenge_method=plain in redirect URL")
-	}
-}
-
 func newFakeUnstructuredClient(acs map[string]*runtimetesting.Unstructured) *fakeUnstructuredClient {
 	configs := map[string]runtime.Unstructured{}
 	for k, v := range acs {

@@ -44,8 +44,6 @@ const (
 
 	// PKCES256 is a constant for the SHA256 PKCE Verification method.
 	PKCES256Method string = "S256"
-	// PKCEPlain is a constant for the Plain PKCE Verification method.
-	PKCESPlainMethod string = "plain"
 )
 
 type tokenManager interface {
@@ -243,10 +241,6 @@ func GetOIDCRedirectionURL(config map[string]any, pkceVerifier string, values ur
 				logrus.Debug("PKCE Enabled sending code_challenge and s256 code_challenge_method")
 				values.Add("code_challenge", oauth2.S256ChallengeFromVerifier(pkceVerifier))
 				values.Add("code_challenge_method", PKCES256Method)
-			case PKCESPlainMethod:
-				logrus.Debug("PKCE Enabled sending code_challenge and plain code_challenge_method")
-				values.Add("code_challenge", pkceVerifier)
-				values.Add("code_challenge_method", PKCESPlainMethod)
 			default:
 				logrus.Debug("PKCE NOT Enabled for redirect URL")
 			}

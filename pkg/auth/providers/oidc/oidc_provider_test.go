@@ -1108,17 +1108,6 @@ func TestGetOIDCRedirectionURL(t *testing.T) {
 			verifyPKCEChallenge: true,
 		},
 		{
-			name: "With PKCE plain method",
-			config: map[string]any{
-				"authEndpoint": "https://provider.example.com/auth",
-				"clientId":     "test-client-id",
-				"rancherUrl":   "https://rancher.example.com/callback",
-				"pkceMethod":   "plain",
-			},
-			pkceVerifier: "test-verifier-12345",
-			expectedURL:  "https://provider.example.com/auth?client_id=test-client-id&response_type=code&code_challenge=test-verifier-12345&code_challenge_method=plain&redirect_uri=https://rancher.example.com/callback",
-		},
-		{
 			name: "With PKCE plain method but no verifier provided",
 			config: map[string]any{
 				"authEndpoint": "https://provider.example.com/auth",
