@@ -5,39 +5,19 @@
 set -eo pipefail
 set -x
 
+cd $(git rev-parse --show-toplevel)
+
 # variables
 COMMIT=$(git rev-parse --short HEAD)
 TAG="${TAG:-$(grep -m1 ' TAG:' .github/workflows/pull-request.yml | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e "s/\${{ github.sha }}/$COMMIT/g" | cut -d' ' -f2)}"
-OS="${OS:-linux}"
-ARCH="${ARCH:-amd64}"
-REPO="${REPO:-rancher}"
+REGISTRY="docker.io"
 BINARY_DEBUG=${BINARY_DEBUG:-false}
-CATTLE_K3S_VERSION=$(grep -m1 'ENV CATTLE_K3S_VERSION=' package/Dockerfile | cut -d '=' -f2)
-CATTLE_KDM_BRANCH=$(grep -m1 'ARG CATTLE_KDM_BRANCH=' package/Dockerfile | cut -d '=' -f2)
-CATTLE_RANCHER_WEBHOOK_VERSION=$(grep -m1 'webhookVersion' build.yaml | cut -d ' ' -f2)
-CATTLE_REMOTEDIALER_PROXY_VERSION=$(grep -m1 'remoteDialerProxyVersion' build.yaml | cut -d ' ' -f2)
-CATTLE_CSP_ADAPTER_MIN_VERSION=$(grep -m1 'cspAdapterMinVersion' build.yaml | cut -d ' ' -f2)
-CATTLE_RANCHER_TURTLES_VERSION=$(grep -m1 'turtlesVersion' build.yaml | cut -d ' ' -f2)
-CATTLE_FLEET_VERSION=$(grep -m1 'fleetVersion' build.yaml | cut -d ' ' -f2)
-CATTLE_HELM_VERSION=$(grep -m1 'ENV CATTLE_HELM_VERSION=' package/Dockerfile | cut -d '=' -f2)
+
+source dev-scripts/build
 
 # download kontainer driver metadata
 curl -sLf https://releases.rancher.com/kontainer-driver-metadata/"${CATTLE_KDM_BRANCH}"/data.json >./data.json
 
-BUILD_ARGS=()
-BUILD_ARGS+=("--build-arg=VERSION=${TAG}")
-BUILD_ARGS+=("--build-arg=ARCH=${ARCH}")
-BUILD_ARGS+=("--build-arg=IMAGE_REPO=${REPO}")
-BUILD_ARGS+=("--build-arg=COMMIT=${COMMIT}")
-BUILD_ARGS+=("--build-arg=RKE_VERSION=${RKE_VERSION}")
-BUILD_ARGS+=("--build-arg=CATTLE_RANCHER_WEBHOOK_VERSION=${CATTLE_RANCHER_WEBHOOK_VERSION}")
-BUILD_ARGS+=("--build-arg=CATTLE_REMOTEDIALER_PROXY_VERSION=${CATTLE_REMOTEDIALER_PROXY_VERSION}")
-BUILD_ARGS+=("--build-arg=CATTLE_RANCHER_TURTLES_VERSION=${CATTLE_RANCHER_TURTLES_VERSION}")
-BUILD_ARGS+=("--build-arg=CATTLE_CSP_ADAPTER_MIN_VERSION=${CATTLE_CSP_ADAPTER_MIN_VERSION}")
-BUILD_ARGS+=("--build-arg=CATTLE_FLEET_VERSION=${CATTLE_FLEET_VERSION}")
-BUILD_ARGS+=("--build-arg=CATTLE_HELM_VERSION=${CATTLE_HELM_VERSION}")
-BUILD_ARGS+=("--build-arg=RANCHER_TAG=${TAG}")
-BUILD_ARGS+=("--build-arg=RANCHER_REPO=${REPO}")
 if [ "$BINARY_DEBUG" = true ]; then
   # Remove -s (strip symbols)
   BUILD_ARGS+=("--build-arg=LINKFLAGS=-extldflags -static")
@@ -111,48 +91,32 @@ if [ "$needs_workdir" = "true" ]; then
 fi
 
 if [ "$TARGET" = "k3s-images" ]; then
-  docker buildx build \
-    "${BUILD_ARGS[@]}" \
-    --output=type=local,dest=$PWD/bin \
-    --platform="${OS}/${ARCH}" \
-    --target k3s-images \
-    --file ./package/Dockerfile .
+  BUILDX_ARGS+=("--output=type=local,dest=$PWD/bin")
+
+  build_rancher "k3s-images"
 fi
 
 if [ "$TARGET" = "binary-server" ]; then
-  docker buildx build \
-    "${BUILD_ARGS[@]}" \
-    --output=type=local,dest=$PWD \
-    --platform="${OS}/${ARCH}" \
-    --target server-binary \
-    --file ./package/Dockerfile .
+  BUILDX_ARGS+=("--output=type=local,dest=$PWD")
+
+  build_rancher "server-binary"
 fi
 
 if [ -z "$TARGET" ] || [ "$TARGET" = "server" ]; then
   # start the builds
-  docker buildx build \
-    "${BUILD_ARGS[@]}" \
-    --tag "${REPO}"/rancher:"${TAG}" \
-    --platform="${OS}/${ARCH}" \
-    --target server \
-    --file ./package/Dockerfile .
+  build_rancher "server"
 
-  if [ "$PUSH" = "true" ]; then
-    docker push "${REPO}"/rancher:"${TAG}" &
-  fi
+  # if [ "$PUSH" = "true" ]; then
+  #   docker push "${REPO}"/rancher:"${TAG}" &
+  # fi
 fi
 
 if [ -z "$TARGET" ] || [ "$TARGET" = "agent" ]; then
-  docker buildx build \
-    "${BUILD_ARGS[@]}" \
-    --tag "${REPO}"/rancher-agent:"${TAG}" \
-    --platform="${OS}/${ARCH}" \
-    --target agent \
-    --file ./package/Dockerfile .
+  build_rancher "agent"
 
-  if [ "$PUSH" = "true" ]; then
-    docker push "${REPO}"/rancher-agent:"${TAG}" &
-  fi
+  # if [ "$PUSH" = "true" ]; then
+  #   docker push "${REPO}"/rancher-agent:"${TAG}" &
+  # fi
 fi
 
 wait
