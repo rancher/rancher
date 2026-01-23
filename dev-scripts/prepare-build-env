@@ -13,6 +13,8 @@ check_missing() {
 source scripts/export-config
 source scripts/version
 
+OS="${OS:-linux}"
+
 ARCH="${ARCH:-$(uname -p)}"
 if [[ "$ARCH" == "x86_64" ]]; then
   ARCH="amd64"
@@ -46,6 +48,8 @@ export CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$CATTLE_RANCHER_PROVISIONING_CAP
 export CATTLE_RANCHER_TURTLES_VERSION=$CATTLE_RANCHER_TURTLES_VERSION
 export CATTLE_CSP_ADAPTER_MIN_VERSION=$CATTLE_CSP_ADAPTER_MIN_VERSION
 export CATTLE_FLEET_VERSION=$CATTLE_FLEET_VERSION
+export OS=$OS
+export REPO=$REPO
 
 check_missing "REGISTRY"
 check_missing "TAG"
@@ -68,3 +72,4 @@ check_missing "CATTLE_RANCHER_PROVISIONING_CAPI_VERSION"
 check_missing "CATTLE_RANCHER_TURTLES_VERSION"
 check_missing "CATTLE_CSP_ADAPTER_MIN_VERSION"
 check_missing "CATTLE_FLEET_VERSION"
+check_missing "OS"
