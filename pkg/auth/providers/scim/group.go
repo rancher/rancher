@@ -1,6 +1,7 @@
 package scim
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -39,12 +40,12 @@ type SCIMGroup struct {
 //   - 200 on success
 //   - 400 for invalid requests.
 func (s *SCIMServer) ListGroups(w http.ResponseWriter, r *http.Request) {
-	logrus.Tracef("scim::ListGroups: url %s", r.URL.String())
+	logrus.Tracef("scim::ListGroups: url %s", r.URL)
 
 	provider := mux.Vars(r)["provider"]
 
 	// Parse pagination parameters.
-	pagination, err := ParsePaginationParams(r)
+	pagination, err := parsePaginationParams(r)
 	if err != nil {
 		writeError(w, NewError(http.StatusBadRequest, err.Error()))
 		return
@@ -75,7 +76,7 @@ func (s *SCIMServer) ListGroups(w http.ResponseWriter, r *http.Request) {
 	if filter != nil {
 		filterValue = filter.Value
 	}
-	logrus.Tracef("scim::ListGroups: displayName=%s, startIndex=%d, count=%d", filterValue, pagination.StartIndex, pagination.Count)
+	logrus.Tracef("scim::ListGroups: displayName=%s, startIndex=%d, count=%d", filterValue, pagination.startIndex, pagination.count)
 
 	groups, err := s.groupsCache.List(labels.Set{authProviderLabel: provider}.AsSelector())
 	if err != nil {
@@ -135,7 +136,7 @@ func (s *SCIMServer) ListGroups(w http.ResponseWriter, r *http.Request) {
 	totalResults := len(allResources)
 
 	// Apply pagination.
-	paginatedResources, startIndex := Paginate(allResources, pagination)
+	paginatedResources, startIndex := paginate(allResources, pagination)
 	if paginatedResources == nil {
 		paginatedResources = []any{}
 	}
@@ -156,7 +157,7 @@ func (s *SCIMServer) ListGroups(w http.ResponseWriter, r *http.Request) {
 //   - 201 on success
 //   - 400 for invalid requests.
 func (s *SCIMServer) CreateGroup(w http.ResponseWriter, r *http.Request) {
-	logrus.Tracef("scim::CreateGroup: url %s", r.URL.String())
+	logrus.Tracef("scim::CreateGroup: url %s", r.URL)
 
 	provider := mux.Vars(r)["provider"]
 
@@ -166,10 +167,11 @@ func (s *SCIMServer) CreateGroup(w http.ResponseWriter, r *http.Request) {
 		writeError(w, NewError(http.StatusBadRequest, "Invalid request body"))
 		return
 	}
-	logrus.Tracef("scim::CreateGroup: request body: %s", string(bodyBytes))
+	logrus.Tracef("scim::CreateGroup: request body: %s", bodyBytes)
 
 	payload := SCIMGroup{}
-	if err := json.Unmarshal(bodyBytes, &payload); err != nil {
+	err = json.NewDecoder(bytes.NewReader(bodyBytes)).Decode(&payload)
+	if err != nil {
 		logrus.Errorf("scim::CreateGroup: failed to unmarshal request body: %s", err)
 		writeError(w, NewError(http.StatusBadRequest, "Invalid request body"))
 		return
@@ -217,12 +219,12 @@ func (s *SCIMServer) CreateGroup(w http.ResponseWriter, r *http.Request) {
 	writeResponse(w, resource, http.StatusCreated)
 }
 
-// GetGroup retutns a group by ID.
+// GetGroup returns a group by ID.
 // Returns:
 //   - 200 on success
 //   - 400 for invalid requests.
 func (s *SCIMServer) GetGroup(w http.ResponseWriter, r *http.Request) {
-	logrus.Tracef("scim::GetGroup: url %s", r.URL.String())
+	logrus.Tracef("scim::GetGroup: url %s", r.URL)
 
 	provider := mux.Vars(r)["provider"]
 	id := mux.Vars(r)["id"]
@@ -280,7 +282,7 @@ func (s *SCIMServer) GetGroup(w http.ResponseWriter, r *http.Request) {
 //   - 200 on success
 //   - 400 for invalid requests.
 func (s *SCIMServer) UpdateGroup(w http.ResponseWriter, r *http.Request) {
-	logrus.Tracef("scim::UpdateGroup: url %s", r.URL.String())
+	logrus.Tracef("scim::UpdateGroup: url %s", r.URL)
 
 	provider := mux.Vars(r)["provider"]
 	id := mux.Vars(r)["id"]
@@ -291,10 +293,11 @@ func (s *SCIMServer) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 		writeError(w, NewError(http.StatusBadRequest, "Invalid request body"))
 		return
 	}
-	logrus.Tracef("scim::UpdateGroup: request body: %s", string(bodyBytes))
+	logrus.Tracef("scim::UpdateGroup: request body: %s", bodyBytes)
 
 	payload := SCIMGroup{}
-	if err := json.Unmarshal(bodyBytes, &payload); err != nil {
+	err = json.NewDecoder(bytes.NewReader(bodyBytes)).Decode(&payload)
+	if err != nil {
 		logrus.Errorf("scim::UpdateGroup: failed to unmarshal request body: %s", err)
 		writeError(w, NewError(http.StatusBadRequest, "Invalid request body"))
 		return
@@ -349,7 +352,7 @@ func (s *SCIMServer) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 //   - 200 on success
 //   - 400 for invalid requests.
 func (s *SCIMServer) PatchGroup(w http.ResponseWriter, r *http.Request) {
-	logrus.Infof("scim::PatchGroup: url %s", r.URL.String())
+	logrus.Infof("scim::PatchGroup: url %s", r.URL)
 
 	provider := mux.Vars(r)["provider"]
 	id := mux.Vars(r)["id"]
@@ -373,14 +376,14 @@ func (s *SCIMServer) PatchGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logrus.Info("scim::PatchGroup: request body:", string(bodyBytes))
+	logrus.Tracef("scim::PatchGroup: request body: %s", bodyBytes)
 
 	payload := struct {
 		Operations []patchOp `json:"Operations"`
 		Schemas    []string  `json:"schemas"`
 	}{}
 
-	err = json.NewDecoder(strings.NewReader(string(bodyBytes))).Decode(&payload)
+	err = json.NewDecoder(bytes.NewReader(bodyBytes)).Decode(&payload)
 	if err != nil {
 		logrus.Errorf("scim::PatchGroup: failed to decode request body: %s", err)
 		writeError(w, NewError(http.StatusBadRequest, "Invalid request body"))
@@ -508,7 +511,7 @@ func (s *SCIMServer) PatchGroup(w http.ResponseWriter, r *http.Request) {
 //   - 204 on successful deletion
 //   - 404 if the group is not found
 func (s *SCIMServer) DeleteGroup(w http.ResponseWriter, r *http.Request) {
-	logrus.Infof("scim::DeleteGroup: url %s", r.URL.String())
+	logrus.Infof("scim::DeleteGroup: url %s", r.URL)
 
 	provider := mux.Vars(r)["provider"]
 	id := mux.Vars(r)["id"]
@@ -780,7 +783,7 @@ func (s *SCIMServer) ensureRancherGroup(provider string, grp SCIMGroup) (*v3.Gro
 }
 
 // applyReplaceGroup applies a replace operation to a group.
-// Currently only supports replacing displayName and externalId.
+// Currently only supports replacing externalId.
 func applyReplaceGroup(group *v3.Group, op patchOp) (bool, error) {
 	if op.Path == "" {
 		// Bulk replace - replace multiple attributes at once

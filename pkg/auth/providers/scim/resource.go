@@ -99,7 +99,7 @@ var resourceTypeRegistry = map[string]ResourceType{
 
 // ListResourceTypes lists supported SCIM resource types.
 func (s *SCIMServer) ListResourceTypes(w http.ResponseWriter, r *http.Request) {
-	logrus.Tracef("scim::ListResourceTypes: url %s", r.URL.String())
+	logrus.Tracef("scim::ListResourceTypes: url %s", r.URL)
 
 	provider := mux.Vars(r)["provider"]
 
@@ -121,7 +121,7 @@ func (s *SCIMServer) ListResourceTypes(w http.ResponseWriter, r *http.Request) {
 
 // GetResourceType gets a SCIM resource type by ID.
 func (s *SCIMServer) GetResourceType(w http.ResponseWriter, r *http.Request) {
-	logrus.Tracef("scim::GetResourceType: url %s", r.URL.String())
+	logrus.Tracef("scim::GetResourceType: url %s", r.URL)
 
 	provider := mux.Vars(r)["provider"]
 	id := mux.Vars(r)["id"]

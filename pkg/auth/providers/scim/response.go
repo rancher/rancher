@@ -57,8 +57,8 @@ func NewError(status int, detail string, scimType ...string) *Error {
 		Detail:  detail,
 	}
 
-	if len(scimType) > 0 {
-		err.ScimType = scimType[0]
+	if s := first(scimType); s != "" {
+		err.ScimType = s
 	}
 
 	return err
