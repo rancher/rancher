@@ -71,7 +71,7 @@ func NewInternalError() *Error {
 
 // writeError writes a SCIM error response.
 func writeError(w http.ResponseWriter, err *Error) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/scim+json")
 	w.WriteHeader(err.Status)
 	if err := json.NewEncoder(w).Encode(err); err != nil {
 		logrus.Errorf("scim::writeError: failed to encode response: %s", err)

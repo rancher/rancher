@@ -209,7 +209,7 @@ func TestWriteError(t *testing.T) {
 			writeError(w, tt.err)
 
 			assert.Equal(t, tt.expectStatus, w.Result().StatusCode)
-			assert.Equal(t, "application/json", w.Result().Header.Get("Content-Type"))
+			assert.Equal(t, "application/scim+json", w.Result().Header.Get("Content-Type"))
 
 			var body map[string]any
 			require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
