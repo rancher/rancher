@@ -111,9 +111,9 @@ func (s *SCIMServer) GetServiceProviderConfig(w http.ResponseWriter, r *http.Req
 				Primary:     true,
 			},
 		},
-		MaxResults:       100,
-		SupportFiltering: false,
-		SupportPatch:     false,
+		MaxResults:       MaxPageSize,
+		SupportFiltering: true,
+		SupportPatch:     true,
 	}
 
 	writeResponse(w, config.getRaw())

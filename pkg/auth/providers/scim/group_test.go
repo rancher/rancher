@@ -795,7 +795,6 @@ func TestCreateGroup(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
 		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
-		groupsCache.EXPECT().List(labels.Everything()).Return([]*v3.Group{}, nil)
 		groupsCache.EXPECT().List(labels.Set{authProviderLabel: provider}.AsSelector()).Return([]*v3.Group{}, nil)
 
 		createdGroup := &v3.Group{
@@ -843,7 +842,6 @@ func TestCreateGroup(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
 		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
-		groupsCache.EXPECT().List(labels.Everything()).Return([]*v3.Group{}, nil)
 		groupsCache.EXPECT().List(labels.Set{authProviderLabel: provider}.AsSelector()).Return([]*v3.Group{}, nil)
 
 		createdGroup := &v3.Group{
@@ -928,7 +926,7 @@ func TestCreateGroup(t *testing.T) {
 			DisplayName: "Engineering",
 		}
 		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
-		groupsCache.EXPECT().List(labels.Everything()).Return([]*v3.Group{existingGroup}, nil)
+		groupsCache.EXPECT().List(labels.Set{authProviderLabel: provider}.AsSelector()).Return([]*v3.Group{existingGroup}, nil)
 
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
@@ -955,7 +953,7 @@ func TestCreateGroup(t *testing.T) {
 			DisplayName: "ENGINEERING",
 		}
 		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
-		groupsCache.EXPECT().List(labels.Everything()).Return([]*v3.Group{existingGroup}, nil)
+		groupsCache.EXPECT().List(labels.Set{authProviderLabel: provider}.AsSelector()).Return([]*v3.Group{existingGroup}, nil)
 
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
@@ -991,7 +989,7 @@ func TestCreateGroup(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
 		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
-		groupsCache.EXPECT().List(labels.Everything()).Return(nil, fmt.Errorf("cache error"))
+		groupsCache.EXPECT().List(labels.Set{authProviderLabel: provider}.AsSelector()).Return(nil, fmt.Errorf("cache error"))
 
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
@@ -1014,7 +1012,6 @@ func TestCreateGroup(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
 		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
-		groupsCache.EXPECT().List(labels.Everything()).Return([]*v3.Group{}, nil)
 		groupsCache.EXPECT().List(labels.Set{authProviderLabel: provider}.AsSelector()).Return([]*v3.Group{}, nil)
 
 		groupClient := fake.NewMockNonNamespacedClientInterface[*v3.Group, *v3.GroupList](ctrl)
@@ -1042,7 +1039,6 @@ func TestCreateGroup(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
 		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
-		groupsCache.EXPECT().List(labels.Everything()).Return([]*v3.Group{}, nil)
 		groupsCache.EXPECT().List(labels.Set{authProviderLabel: provider}.AsSelector()).Return([]*v3.Group{}, nil)
 
 		createdGroup := &v3.Group{
@@ -1076,7 +1072,7 @@ func TestCreateGroup(t *testing.T) {
 		require.Equal(t, http.StatusInternalServerError, rec.Code)
 	})
 
-	t.Run("returns existing group when found by ID", func(t *testing.T) {
+	t.Run("conflict when group found by ID", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
 		existingGroup := &v3.Group{
@@ -1086,11 +1082,10 @@ func TestCreateGroup(t *testing.T) {
 		}
 
 		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
-		groupsCache.EXPECT().List(labels.Everything()).Return([]*v3.Group{}, nil)
 		groupsCache.EXPECT().Get("grp-existing").Return(existingGroup, nil)
 
-		// Note: When ID is provided, ensureRancherGroup just returns the group from cache
-		// without any update logic.
+		// When ID is provided and exists, ensureRancherGroup returns the existing group
+		// with created=false, which triggers a 409 Conflict.
 
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
@@ -1108,17 +1103,10 @@ func TestCreateGroup(t *testing.T) {
 
 		srv.CreateGroup(rec, req)
 
-		require.Equal(t, http.StatusCreated, rec.Code)
-
-		var resp map[string]any
-		err := json.Unmarshal(rec.Body.Bytes(), &resp)
-		require.NoError(t, err)
-		assert.Equal(t, "grp-existing", resp["id"])
-		// Note: The response returns the existing group's externalId, not the new one
-		assert.Equal(t, "ext-id", resp["externalId"])
+		require.Equal(t, http.StatusConflict, rec.Code)
 	})
 
-	t.Run("updates existing group found by displayName", func(t *testing.T) {
+	t.Run("conflict when group found by displayName with different externalId", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
 		existingGroup := &v3.Group{
@@ -1128,9 +1116,10 @@ func TestCreateGroup(t *testing.T) {
 		}
 
 		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
-		groupsCache.EXPECT().List(labels.Everything()).Return([]*v3.Group{}, nil)
 		groupsCache.EXPECT().List(labels.Set{authProviderLabel: provider}.AsSelector()).Return([]*v3.Group{existingGroup}, nil)
 
+		// When found by displayName with different externalId, the group is updated
+		// but created=false is returned, which triggers a 409 Conflict.
 		groupClient := fake.NewMockNonNamespacedClientInterface[*v3.Group, *v3.GroupList](ctrl)
 		groupClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(g *v3.Group) (*v3.Group, error) {
 			assert.Equal(t, "new-ext-id", g.ExternalID)
@@ -1153,7 +1142,7 @@ func TestCreateGroup(t *testing.T) {
 
 		srv.CreateGroup(rec, req)
 
-		require.Equal(t, http.StatusCreated, rec.Code)
+		require.Equal(t, http.StatusConflict, rec.Code)
 	})
 }
 

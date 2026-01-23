@@ -158,7 +158,7 @@ func (s *SCIMServer) CreateGroup(w http.ResponseWriter, r *http.Request) {
 		writeError(w, NewError(http.StatusBadRequest, "Invalid request body"))
 		return
 	}
-	logrus.Info("scim::CreateGroup: request body:", string(bodyBytes))
+	logrus.Tracef("scim::CreateGroup: request body: %s", string(bodyBytes))
 
 	payload := SCIMGroup{}
 	if err := json.Unmarshal(bodyBytes, &payload); err != nil {
@@ -167,24 +167,16 @@ func (s *SCIMServer) CreateGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	list, err := s.groupsCache.List(labels.Everything())
+	group, created, err := s.ensureRancherGroup(provider, payload)
 	if err != nil {
-		logrus.Errorf("scim::CreateGroup: failed to list groups: %s", err)
+		logrus.Errorf("scim::CreateGroup: failed to ensure rancher group: %s", err)
 		writeError(w, NewInternalError())
 		return
 	}
 
-	for _, group := range list {
-		if strings.EqualFold(group.DisplayName, payload.DisplayName) {
-			writeError(w, NewError(http.StatusConflict, fmt.Sprintf("Group %s already exists", payload.ID)))
-			return
-		}
-	}
-
-	group, err := s.ensureRancherGroup(provider, payload)
-	if err != nil {
-		logrus.Errorf("scim::CreateGroup: failed to ensure rancher group: %s", err)
-		writeError(w, NewInternalError())
+	if !created {
+		writeError(w, NewError(http.StatusConflict,
+			fmt.Sprintf("Group with displayName %q already exists", payload.DisplayName), "uniqueness"))
 		return
 	}
 
@@ -280,7 +272,7 @@ func (s *SCIMServer) GetGroup(w http.ResponseWriter, r *http.Request) {
 //   - 200 on success
 //   - 400 for invalid requests.
 func (s *SCIMServer) UpdateGroup(w http.ResponseWriter, r *http.Request) {
-	logrus.Infof("scim::UpdateGroup: url %s", r.URL.String())
+	logrus.Tracef("scim::UpdateGroup: url %s", r.URL.String())
 
 	provider := mux.Vars(r)["provider"]
 	id := mux.Vars(r)["id"]
@@ -291,7 +283,7 @@ func (s *SCIMServer) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 		writeError(w, NewError(http.StatusBadRequest, "Invalid request body"))
 		return
 	}
-	logrus.Info("scim::UpdateGroup: request body:", string(bodyBytes))
+	logrus.Tracef("scim::UpdateGroup: request body: %s", string(bodyBytes))
 
 	payload := SCIMGroup{}
 	if err := json.Unmarshal(bodyBytes, &payload); err != nil {
@@ -306,7 +298,7 @@ func (s *SCIMServer) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	group, err := s.ensureRancherGroup(provider, payload)
+	group, _, err := s.ensureRancherGroup(provider, payload)
 	if err != nil {
 		logrus.Errorf("scim::UpdateGroup: failed to ensure rancher group %s: %s", id, err)
 		writeError(w, NewInternalError())
@@ -736,55 +728,47 @@ func (s *SCIMServer) removeAllGroupMembers(provider, groupName string) error {
 }
 
 // ensureRancherGroup ensures that a Rancher group exists for the given SCIM group.
-func (s *SCIMServer) ensureRancherGroup(provider string, grp SCIMGroup) (*v3.Group, error) {
+// Returns the group, a boolean indicating if a new group was created, and any error.
+func (s *SCIMServer) ensureRancherGroup(provider string, grp SCIMGroup) (*v3.Group, bool, error) {
 	if grp.ID != "" {
-		return s.groupsCache.Get(grp.ID)
+		g, err := s.groupsCache.Get(grp.ID)
+		return g, false, err
 	}
 
 	// Try to find an existing group by display name.
-	var group *v3.Group
 	groups, err := s.groupsCache.List(labels.Set{authProviderLabel: provider}.AsSelector())
 	if err != nil {
-		return nil, fmt.Errorf("failed to list groups for provider %s: %w", provider, err)
+		return nil, false, fmt.Errorf("failed to list groups for provider %s: %w", provider, err)
 	}
 
 	for _, g := range groups {
-		if g.DisplayName == grp.DisplayName {
-			group = g
-			break
+		if strings.EqualFold(g.DisplayName, grp.DisplayName) {
+			// Found existing group - update if needed and return created=false.
+			group := g.DeepCopy()
+			if group.ExternalID != grp.ExternalID {
+				group.ExternalID = grp.ExternalID
+				updated, err := s.groups.Update(group)
+				return updated, false, err
+			}
+			return g, false, nil
 		}
 	}
 
-	if group == nil {
-		group = &v3.Group{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "grp-",
-				Labels: map[string]string{
-					authProviderLabel: provider,
-				},
+	// Create new group.
+	group := &v3.Group{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "grp-",
+			Labels: map[string]string{
+				authProviderLabel: provider,
 			},
-			DisplayName: grp.DisplayName,
-			Provider:    provider,
-			ExternalID:  grp.ExternalID,
-		}
-
-		return s.groups.Create(group)
+		},
+		DisplayName: grp.DisplayName,
+		Provider:    provider,
+		ExternalID:  grp.ExternalID,
 	}
 
-	// Check and update existing group if needed.
-	// Note: We can't change displayName as it is used as the unique identifier for groups.
-	shouldUpdate := false
-	group = group.DeepCopy()
-	if group.ExternalID != grp.ExternalID {
-		group.ExternalID = grp.ExternalID
-		shouldUpdate = true
-	}
-
-	if shouldUpdate {
-		return s.groups.Update(group)
-	}
-
-	return group, nil
+	created, err := s.groups.Create(group)
+	return created, true, err
 }
 
 // applyReplaceGroup applies a replace operation to a group.
