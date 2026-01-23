@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"sort"
 	"strings"
 
@@ -76,22 +75,25 @@ func (s *SCIMServer) ListUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse filter.
-	var nameFilter string
+	var filter *Filter
 	if value := r.URL.Query().Get("filter"); value != "" {
-		// For simplicity, only support filtering by userName eq "<value>"
-		parts := strings.SplitN(value, " ", 3)
-		if len(parts) != 3 || parts[0] != "userName" || parts[1] != "eq" {
-			writeError(w, NewError(http.StatusBadRequest, "Unsupported filter"))
+		filter, err = ParseFilter(value)
+		if err != nil {
+			writeError(w, NewError(http.StatusBadRequest, err.Error()))
 			return
 		}
-		nameFilter, err = url.QueryUnescape(strings.Trim(parts[2], `"`))
-		if err != nil {
-			writeError(w, NewError(http.StatusBadRequest, "Invalid filter value"))
+		// Currently only support userName eq "<value>" filter.
+		if err := filter.ValidateForAttribute("userName", OpEqual); err != nil {
+			writeError(w, NewError(http.StatusBadRequest, err.Error()))
 			return
 		}
 	}
 
-	logrus.Tracef("scim::ListUsers: userName=%s, startIndex=%d, count=%d", nameFilter, pagination.StartIndex, pagination.Count)
+	var filterValue string
+	if filter != nil {
+		filterValue = filter.Value
+	}
+	logrus.Tracef("scim::ListUsers: userName=%s, startIndex=%d, count=%d", filterValue, pagination.StartIndex, pagination.Count)
 
 	list, err := s.userCache.List(labels.Everything())
 	if err != nil {
@@ -132,7 +134,7 @@ func (s *SCIMServer) ListUsers(w http.ResponseWriter, r *http.Request) {
 		externalID := first(attr.ExtraByProvider[provider]["externalid"])
 
 		// Apply filter.
-		if nameFilter != "" && !strings.EqualFold(userName, nameFilter) {
+		if !filter.Matches(userName) {
 			continue
 		}
 
