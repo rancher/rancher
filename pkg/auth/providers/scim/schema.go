@@ -145,7 +145,7 @@ var schemaRegistry = map[string]Schema{
 
 // ListSchemas lists supported SCIM schemas.
 func (s *SCIMServer) ListSchemas(w http.ResponseWriter, r *http.Request) {
-	logrus.Tracef("scim::ListSchemas: url %s", r.URL.String())
+	logrus.Tracef("scim::ListSchemas: url %s", r.URL)
 
 	provider := mux.Vars(r)["provider"]
 
@@ -166,7 +166,7 @@ func (s *SCIMServer) ListSchemas(w http.ResponseWriter, r *http.Request) {
 
 // GetSchema retrieves a specific SCIM schema by ID.
 func (s *SCIMServer) GetSchema(w http.ResponseWriter, r *http.Request) {
-	logrus.Tracef("scim::GetSchemas: url %s", r.URL.String())
+	logrus.Tracef("scim::GetSchemas: url %s", r.URL)
 
 	provider := mux.Vars(r)["provider"]
 	id := mux.Vars(r)["id"]

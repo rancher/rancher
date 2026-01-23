@@ -16,10 +16,6 @@ const (
 	AuthenticationTypeOauth2 AuthenticationType = "oauth2"
 	// AuthenticationTypeOauthBearerToken indicates that the authentication type is OAuth2 Bearer Token.
 	AuthenticationTypeOauthBearerToken AuthenticationType = "oauthbearertoken"
-	// AuthenticationTypeHTTPBasic indicated that the authentication type is Basic Access Authentication.
-	AuthenticationTypeHTTPBasic AuthenticationType = "httpbasic"
-	// AuthenticationTypeHTTPDigest indicated that the authentication type is Digest Access Authentication.
-	AuthenticationTypeHTTPDigest AuthenticationType = "httpdigest"
 )
 
 // AuthenticationScheme represents an authentication scheme supported by the service provider.
@@ -83,7 +79,7 @@ func (c ServiceProviderConfig) getRaw() map[string]any {
 
 // getRawAuthenticationSchemes returns the raw representation of the authentication schemes.
 func (c ServiceProviderConfig) getRawAuthenticationSchemes() []map[string]any {
-	schemes := make([]map[string]any, 0)
+	schemes := make([]map[string]any, 0, len(c.AuthenticationSchemes))
 	for _, s := range c.AuthenticationSchemes {
 		schemes = append(schemes, map[string]any{
 			"description":      s.Description,
@@ -99,7 +95,7 @@ func (c ServiceProviderConfig) getRawAuthenticationSchemes() []map[string]any {
 
 // GetServiceProviderConfig returns the SCIM Service Provider Configuration.
 func (s *SCIMServer) GetServiceProviderConfig(w http.ResponseWriter, r *http.Request) {
-	logrus.Tracef("scim::GetServiceProviderConfig: url %s", r.URL.String())
+	logrus.Tracef("scim::GetServiceProviderConfig: url %s", r.URL)
 
 	config := &ServiceProviderConfig{
 		AuthenticationSchemes: []AuthenticationScheme{

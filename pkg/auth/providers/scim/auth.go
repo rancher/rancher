@@ -3,6 +3,7 @@ package scim
 import (
 	"crypto/subtle"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/gorilla/mux"
@@ -11,6 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -70,13 +72,10 @@ func (a *tokenAuthenticator) Authenticate(next http.Handler) http.Handler {
 			return
 		}
 
-		var authenticated bool
-		for _, secret := range list {
-			if subtle.ConstantTimeCompare([]byte(token), secret.Data["token"]) == 1 {
-				authenticated = true
-				break
-			}
-		}
+		authenticated := slices.ContainsFunc(list, func(secret *corev1.Secret) bool {
+			return subtle.ConstantTimeCompare([]byte(token), secret.Data["token"]) == 1
+		})
+
 		if !authenticated {
 			writeError(w, NewError(http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized)))
 			return
