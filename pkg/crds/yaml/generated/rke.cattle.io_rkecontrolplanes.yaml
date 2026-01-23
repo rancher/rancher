@@ -32,7 +32,7 @@ spec:
       name: Initialized
       type: string
     - description: RKEControlPlane API Server is ready to receive requests
-      jsonPath: .status.ready
+      jsonPath: .status.initialization.controlPlaneInitialized
       name: API Server Available
       type: boolean
     - description: Time duration since creation of RKEControlPlane
@@ -1927,10 +1927,25 @@ spec:
                 - Finished
                 - Failed
                 type: string
+              initialization:
+                description: |-
+                  Initialization provides observations of the RKEControlPlane initialization process.
+                  NOTE: Fields in this struct are part of the Cluster API contract and are used to orchestrate initial Cluster provisioning.
+                minProperties: 1
+                properties:
+                  controlPlaneInitialized:
+                    description: |-
+                      ControlPlaneInitialized is true when the control plane provider reports that the Kubernetes control plane is initialized;
+                      usually a control plane is considered initialized when it can accept requests, no matter if this happens before
+                      the control plane is fully provisioned or not.
+                      NOTE: this field is part of the Cluster API contract, and it is used to orchestrate initial Cluster provisioning.
+                    type: boolean
+                type: object
               initialized:
                 description: |-
                   Initialized denotes that the API server is initialized and worker
                   nodes can be joined to the cluster.
+                  Deprecated: Use Initialization.ControlPlaneInitialized instead.
                 type: boolean
               observedGeneration:
                 description: |-
@@ -1942,6 +1957,7 @@ spec:
                 description: |-
                   Ready denotes that the API server has been initialized and is ready to
                   receive requests.
+                  Deprecated: Use Initialization.ControlPlaneInitialized instead.
                 type: boolean
               rotateEncryptionKeys:
                 description: |-
