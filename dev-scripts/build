@@ -34,9 +34,10 @@ build_rancher() {
     "${BUILDX_ARGS[@]}" \
     "${LABELS[@]}" \
     ${BUILD_ACTION} \
-    --target "${DOCKER_TARGET}" \
-    --tag "${REPO}/rancher-linux-$ARCH:${TAG}" \
-    --file package/Dockerfile .
+    --target="${DOCKER_TARGET}" \
+    --platform="${TARGET_PLATFORMS}" \
+    --tag="${REPO}/rancher-linux-${ARCH}:${TAG}" \
+    --file=package/Dockerfile .
 }
 
 if [ "$TARGET" = "server" ]; then
