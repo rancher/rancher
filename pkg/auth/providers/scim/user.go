@@ -581,11 +581,6 @@ func (s *SCIMServer) PatchUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if user.IsSystem() {
-		writeError(w, NewError(http.StatusConflict, "Cannot update system or default admin user"))
-		return
-	}
-
 	attr = attr.DeepCopy()
 	user = user.DeepCopy()
 
