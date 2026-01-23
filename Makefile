@@ -1,5 +1,6 @@
 TARGETS := $(shell ls scripts)
 DEV_TARGETS := $(shell ls dev-scripts)
+MACHINE ?= "rancher"
 
 .dapper:
 	@echo Downloading dapper
@@ -17,6 +18,10 @@ $(TARGETS): .dapper
 
 .DEFAULT_GOAL := ci
 
+buildx-machine:
+	@docker buildx ls | grep $(MACHINE) || \
+	docker buildx create --name=$(MACHINE) --driver=docker-container
+
 quick-agent:
 	@$(MAKE) quick TARGET="agent"
 
@@ -29,7 +34,13 @@ quick-binary-server:
 quick-k3s-images:
 	@$(MAKE) quick TARGET="k3s-images"
 
+build-server: buildx-machine
+	@$(MAKE) build TARGET="server" BUILDER="$(MACHINE)"
+
+build-agent: buildx-machine
+	@$(MAKE) build TARGET="agent" BUILDER="$(MACHINE)"
+
 $(DEV_TARGETS):
 	./dev-scripts/$@
 
-.PHONY: $(TARGETS) $(DEV_TARGETS) quick-agent quick-server quick-binary-server
+.PHONY: $(TARGETS) $(DEV_TARGETS) quick-agent quick-server quick-binary-server build-server
