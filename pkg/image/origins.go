@@ -31,6 +31,7 @@ var OriginMap = map[string]string{
 	"appco-redis":                                             "https://github.com/redis/redis",
 	"appco-thanos":                                            "https://github.com/thanos-io/thanos",
 	"aks-operator":                                            "https://github.com/rancher/aks-operator",
+	"azureserviceoperator":                                    "https://github.com/rancher-sandbox/azure-service-operator",
 	"backup-restore-operator":                                 "https://github.com/rancher/backup-restore-operator",
 	"cnideploy":                                               "https://github.com/containernetworking/plugins",
 	"coreos-kube-state-metrics":                               "https://github.com/kubernetes/kube-state-metrics",
