@@ -14,6 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/ptr"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
 )
@@ -72,11 +73,11 @@ func (h *handler) OnChange(_ string, cluster *v1.RKECluster) (*v1.RKECluster, er
 		return h.rkeCluster.Update(cluster)
 	}
 
-	if len(cluster.Status.Conditions) > 0 || !cluster.Status.Ready {
+	if len(cluster.Status.Conditions) > 0 || !ptr.Deref(cluster.Status.Initialization.Provisioned, false) {
 		cluster := cluster.DeepCopy()
 		// the rke2.Ready and rke2.Removed conditions may still be present on the object, remove them if present
 		cluster.Status.Conditions = nil
-		cluster.Status.Ready = true
+		cluster.Status.Initialization.Provisioned = ptr.To(true)
 		logrus.Tracef("[rkecluster] %s/%s: removing stale conditions", cluster.Namespace, cluster.Name)
 		logrus.Debugf("[rkecluster] %s/%s: marking cluster ready", cluster.Namespace, cluster.Name)
 		return h.rkeCluster.UpdateStatus(cluster)

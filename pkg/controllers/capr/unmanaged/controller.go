@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/utils/ptr"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/util/conditions"
 )
@@ -333,8 +334,10 @@ func (h *handler) onUnmanagedMachineChange(_ string, customMachine *rkev1.Custom
 		capr.Ready.Message(customMachine, "")
 		return h.unmanagedMachine.UpdateStatus(customMachine)
 	}
-	if !customMachine.Status.Ready && customMachine.Spec.ProviderID != "" {
+	if !ptr.Deref(customMachine.Status.Initialization.Provisioned, false) && customMachine.Spec.ProviderID != "" {
 		customMachine = customMachine.DeepCopy()
+		customMachine.Status.Initialization.Provisioned = ptr.To(true)
+		// set Ready to true to keep parity with previous behavior, though it is deprecated
 		customMachine.Status.Ready = true
 		return h.unmanagedMachine.UpdateStatus(customMachine)
 	}
@@ -346,7 +349,7 @@ func (h *handler) onUnmanagedMachineChange(_ string, customMachine *rkev1.Custom
 	}
 
 	if rkeCluster.Annotations[capr.DeleteMissingCustomMachinesAfterAnnotation] != "" {
-		if customMachine.Spec.ProviderID == "" || !customMachine.Status.Ready {
+		if customMachine.Spec.ProviderID == "" || !ptr.Deref(customMachine.Status.Initialization.Provisioned, false) {
 			return customMachine, nil
 		}
 

@@ -83,8 +83,15 @@ type RKEControlPlaneStatus struct {
 
 	// Ready denotes that the API server has been initialized and is ready to
 	// receive requests.
+	// Deprecated: Use Initialization.ControlPlaneInitialized instead.
+	// +deprecated
 	// +optional
 	Ready bool `json:"ready,omitempty"`
+
+	// Initialization provides observations of the RKEControlPlane initialization process.
+	// NOTE: Fields in this struct are part of the Cluster API contract and are used to orchestrate initial Cluster provisioning.
+	// +optional
+	Initialization RKEControlPlaneInitializationStatus `json:"initialization,omitempty,omitzero"`
 
 	// ObservedGeneration is the generation for which the RKEControlPlane has
 	// started processing.
@@ -142,6 +149,8 @@ type RKEControlPlaneStatus struct {
 
 	// Initialized denotes that the API server is initialized and worker
 	// nodes can be joined to the cluster.
+	// Deprecated: Use Initialization.ControlPlaneInitialized instead.
+	// +deprecated
 	// +optional
 	Initialized bool `json:"initialized,omitempty"`
 
@@ -151,13 +160,24 @@ type RKEControlPlaneStatus struct {
 	AgentConnected bool `json:"agentConnected,omitempty"`
 }
 
+// RKEControlPlaneInitializationStatus provides observations of the RKEControlPlane initialization process.
+// +kubebuilder:validation:MinProperties=1
+type RKEControlPlaneInitializationStatus struct {
+	// ControlPlaneInitialized is true when the control plane provider reports that the Kubernetes control plane is initialized;
+	// usually a control plane is considered initialized when it can accept requests, no matter if this happens before
+	// the control plane is fully provisioned or not.
+	// NOTE: this field is part of the Cluster API contract, and it is used to orchestrate initial Cluster provisioning.
+	// +optional
+	ControlPlaneInitialized *bool `json:"controlPlaneInitialized,omitempty"`
+}
+
 // +genclient
 // +kubebuilder:resource:path=rkecontrolplanes,shortName=rcp,scope=Namespaced,categories=cluster-api
 // +kubebuilder:subresource:status
 // +kubebuilder:metadata:labels={"cluster.x-k8s.io/v1beta1=v1","cluster.x-k8s.io/v1beta2=v1","auth.cattle.io/cluster-indexed=true"}
 // +kubebuilder:printcolumn:name="Cluster",type="string",JSONPath=".metadata.labels['cluster\\.x-k8s\\.io/cluster-name']",description="Cluster"
 // +kubebuilder:printcolumn:name="Initialized",type=string,JSONPath=".status.initialized",description="This denotes whether or not the control plane is initialized"
-// +kubebuilder:printcolumn:name="API Server Available",type=boolean,JSONPath=".status.ready",description="RKEControlPlane API Server is ready to receive requests"
+// +kubebuilder:printcolumn:name="API Server Available",type=boolean,JSONPath=".status.initialization.controlPlaneInitialized",description="RKEControlPlane API Server is ready to receive requests"
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=".metadata.creationTimestamp",description="Time duration since creation of RKEControlPlane"
 // +kubebuilder:printcolumn:name="Version",type=string,JSONPath=".spec.kubernetesVersion",description="Kubernetes version associated with this control plane"
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

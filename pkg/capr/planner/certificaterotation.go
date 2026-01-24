@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/sirupsen/logrus"
+	"k8s.io/utils/ptr"
 )
 
 // rotateCertificates checks if there is a need to rotate any certificates and updates the plan accordingly.
@@ -75,7 +76,7 @@ func shouldRotate(cp *rkev1.RKEControlPlane) bool {
 	}
 
 	// The controlplane must be initialized before we rotate anything
-	if !cp.Status.Initialized {
+	if !ptr.Deref(cp.Status.Initialization.ControlPlaneInitialized, false) {
 		logrus.Warnf("[planner] rkecluster %s/%s: skipping certificate rotation as cluster was not initialized", cp.Namespace, cp.Name)
 		return false
 	}

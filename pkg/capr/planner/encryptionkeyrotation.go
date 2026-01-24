@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -133,7 +134,7 @@ func (p *Planner) rotateEncryptionKeys(controlPlane *rkev1.RKEControlPlane, stat
 		return status, nil
 	}
 
-	if !status.Initialized {
+	if !ptr.Deref(status.Initialization.ControlPlaneInitialized, false) {
 		// cluster is not yet initialized, so return nil for now.
 		logrus.Warnf("[planner] rkecluster %s/%s: skipping encryption key rotation as cluster was not initialized", controlPlane.Namespace, controlPlane.Name)
 		return status, nil

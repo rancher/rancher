@@ -64,6 +64,11 @@ type RKEMachineStatus struct {
 	// Addresses are the machine network addresses. Assigned by the CAPI controller.
 	// +optional
 	Addresses []capi.MachineAddress `json:"addresses,omitempty"`
+
+	// Initialization provides observations of the RKEMachine initialization process.
+	// NOTE: Fields in this struct are part of the Cluster API contract and are used to orchestrate initial Machine provisioning.
+	// +optional
+	Initialization MachineInitializationStatus `json:"initialization,omitempty,omitzero"`
 }
 
 // +genclient
@@ -99,13 +104,31 @@ type CustomMachineStatus struct {
 	// Conditions is a representation of the current state of the machine.
 	// +optional
 	Conditions []genericcondition.GenericCondition `json:"conditions,omitempty"`
+
 	// Ready indicates that the machine infrastructure is fully provisioned,
 	// and is a requirement of the Cluster API contract. The value of this
 	// field is never updated after provisioning has completed.
 	// Please use Conditions to determine the current state of the machine.
+	// Deprecated: use Initialization.Provisioned instead.
+	// +deprecated
 	// +optional
 	Ready bool `json:"ready,omitempty"`
+
+	// Initialization provides observations of the CustomMachine initialization process.
+	// NOTE: Fields in this struct are part of the Cluster API contract and are used to orchestrate initial Machine provisioning.
+	// +optional
+	Initialization MachineInitializationStatus `json:"initialization,omitempty,omitzero"`
+
 	// Addresses contains the associated addresses for the machine.
 	// +optional
 	Addresses []capi.MachineAddress `json:"addresses,omitempty"`
+}
+
+// MachineInitializationStatus provides observations of the CustomMachine initialization process.
+// +kubebuilder:validation:MinProperties=1
+type MachineInitializationStatus struct {
+	// Provisioned is true when the infrastructure provider reports that the Machine's infrastructure is fully provisioned.
+	// NOTE: this field is part of the Cluster API contract, and it is used to orchestrate initial Machine provisioning.
+	// +optional
+	Provisioned *bool `json:"provisioned,omitempty"`
 }

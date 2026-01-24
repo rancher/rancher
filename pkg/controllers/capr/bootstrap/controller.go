@@ -359,7 +359,7 @@ func (h *handler) GeneratingHandler(bootstrap *rkev1.RKEBootstrap, status rkev1.
 	if bootstrapSecret != nil {
 		if status.DataSecretName == nil {
 			status.DataSecretName = &bootstrapSecret.Name
-			status.Ready = true
+			status.Initialization.DataSecretCreated = ptr.To(true)
 			logrus.Debugf("[rkebootstrap] %s/%s: setting dataSecretName: %s", bootstrap.Namespace, bootstrap.Name, *status.DataSecretName)
 		}
 		result = append(result, bootstrapSecret)

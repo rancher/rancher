@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/utils/ptr"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -191,7 +192,7 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]any, d
 		Args:                cmd,
 		BackoffLimit:        jobBackoffLimit,
 		RKEMachineStatus: rkev1.RKEMachineStatus{
-			Ready:                     infra.data.String("spec", "providerID") != "",
+			Initialization:            rkev1.MachineInitializationStatus{Provisioned: ptr.To(infra.data.String("spec", "providerID") != "")},
 			DriverHash:                hash,
 			DriverURL:                 url,
 			CloudCredentialSecretName: cloudCredentialSecretName,
