@@ -14,14 +14,31 @@ type RKEBootstrapSpec struct {
 // RKEBootstrapStatus defines the observed state of RKEBootstrap.
 type RKEBootstrapStatus struct {
 	// Ready indicates the BootstrapData field is ready to be consumed.
+	// Deprecated: use Initialization.DataSecretCreated instead.
+	// +deprecated
 	// +optional
 	Ready bool `json:"ready,omitempty"`
+
+	// Initialization provides observations of the RKEBootstrap initialization process.
+	// NOTE: Fields in this struct are part of the Cluster API contract and are used to orchestrate initial Machine provisioning.
+	// +optional
+	Initialization RKEBootstrapInitializationStatus `json:"initialization,omitempty,omitzero"`
 
 	// DataSecretName is the name of the secret that stores the bootstrap data script.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=253
 	DataSecretName *string `json:"dataSecretName,omitempty"`
+}
+
+//	RKEBootstrapInitializationStatus provides observations of the RKEBootstrap initialization process.
+//
+// +kubebuilder:validation:MinProperties=1
+type RKEBootstrapInitializationStatus struct {
+	// DataSecretCreated is true when the Machine's boostrap secret is created.
+	// NOTE: this field is part of the Cluster API contract, and it is used to orchestrate initial Machine provisioning.
+	// +optional
+	DataSecretCreated *bool `json:"dataSecretCreated,omitempty"`
 }
 
 // +genclient

@@ -289,13 +289,12 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		// cluster objects Ready condition.
 		capr.Stable.False(&status)
 
-		// Set the `initialized` and `ready` status fields on the status to false, as the cluster is not sane and cannot
+		// Set the `initialization.controlPlaneInitialized` status fields on the status to false, as the cluster is not sane and cannot
 		// be considered initialized. This is to also prevent CAPI from setting the ControlPlaneInitialized condition
 		// using fallback logic from the status field.
-		if status.Initialized || status.Ready {
-			status.Initialized = false
-			status.Ready = false
-			logrus.Debugf("[planner] rkecluster %s/%s: setting controlplane ready/initialized to false as cluster was not sane", cp.Namespace, cp.Name)
+		if ptr.Deref(status.Initialization.ControlPlaneInitialized, false) {
+			status.Initialization.ControlPlaneInitialized = ptr.To(false)
+			logrus.Debugf("[planner] rkecluster %s/%s: setting controlplane controlPlaneInitialized to false as cluster was not sane", cp.Namespace, cp.Name)
 			return status, errWaitingf("uninitializing rkecontrolplane %s/%s", cp.Namespace, cp.Name)
 		}
 
@@ -416,10 +415,9 @@ func (p *Planner) fullReconcile(cp *rkev1.RKEControlPlane, status rkev1.RKEContr
 		return status, errWaiting("waiting for control plane to be available")
 	}
 
-	if !status.Initialized || !status.Ready {
-		status.Initialized = true
-		status.Ready = true
-		return status, errWaiting("marking control plane as initialized and ready")
+	if !ptr.Deref(status.Initialization.ControlPlaneInitialized, false) {
+		status.Initialization.ControlPlaneInitialized = ptr.To(true)
+		return status, errWaiting("marking control plane as initialized")
 	}
 
 	// Process all nodes that are ONLY linux worker nodes.
@@ -1139,7 +1137,7 @@ func (p *Planner) desiredPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret 
 	if windows(entry) {
 		// We need to wait for the controlPlane to be ready before sending this plan
 		// to ensure that the initial installation has fully completed
-		if controlPlane.Status.Ready {
+		if ptr.Deref(controlPlane.Status.Initialization.ControlPlaneInitialized, false) {
 			nodePlan.Files = append(nodePlan.Files, setPermissionsWindowsScriptFile)
 			nodePlan.Instructions = append(nodePlan.Instructions, setPermissionsWindowsScriptInstruction)
 		}

@@ -23,8 +23,24 @@ type RKEClusterStatus struct {
 	// orchestrate provisioning.
 	// The value of this field is never updated after provisioning is completed.
 	// Please use conditions to check the operational state of the cluster.
+	// Deprecated: use Initialization.Provisioned instead.
+	// +deprecated
 	// +optional
 	Ready bool `json:"ready,omitempty"`
+
+	// Initialization provides observations of the RKECluster initialization process.
+	// NOTE: Fields in this struct are part of the Cluster API contract and are used to orchestrate initial Cluster provisioning.
+	// +optional
+	Initialization RKEClusterInitializationStatus `json:"initialization,omitempty,omitzero"`
+}
+
+// RKEClusterInitializationStatus provides observations of the RKECluster initialization process.
+// +kubebuilder:validation:MinProperties=1
+type RKEClusterInitializationStatus struct {
+	// Provisioned is true when the infrastructure provider reports that the Cluster's infrastructure is fully provisioned.
+	// NOTE: this field is part of the Cluster API contract, and it is used to orchestrate initial Cluster provisioning.
+	// +optional
+	Provisioned *bool `json:"provisioned,omitempty"`
 }
 
 // +genclient

@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/merr"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/utils/ptr"
 )
 
 func (p *Planner) setEtcdSnapshotCreateState(status rkev1.RKEControlPlaneStatus, create *rkev1.ETCDSnapshotCreate, phase rkev1.ETCDSnapshotPhase) (rkev1.RKEControlPlaneStatus, error) {
@@ -127,7 +128,7 @@ func (p *Planner) createEtcdSnapshot(controlPlane *rkev1.RKEControlPlane, status
 	}
 
 	// Don't create an etcd snapshot if the cluster is not initialized or bootstrapped.
-	if !status.Initialized || !capr.Bootstrapped.IsTrue(&status) {
+	if !ptr.Deref(status.Initialization.ControlPlaneInitialized, false) || !capr.Bootstrapped.IsTrue(&status) {
 		logrus.Warnf("[planner] rkecluster %s/%s: skipping etcd snapshot creation as cluster has not yet been initialized or bootstrapped", controlPlane.Namespace, controlPlane.Name)
 		return status, nil
 	}

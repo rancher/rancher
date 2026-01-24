@@ -18,6 +18,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/utils/ptr"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
@@ -820,10 +821,9 @@ func (p *Planner) restoreEtcdSnapshot(cp *rkev1.RKEControlPlane, status rkev1.RK
 
 	switch cp.Status.ETCDSnapshotRestorePhase {
 	case rkev1.ETCDSnapshotPhaseStarted:
-		if status.Initialized || status.Ready {
-			status.Initialized = false
-			status.Ready = false
-			logrus.Debugf("[planner] rkecluster %s/%s: setting controlplane ready/initialized to false during etcd restore", cp.Namespace, cp.Name)
+		if ptr.Deref(status.Initialization.ControlPlaneInitialized, false) {
+			status.Initialization.ControlPlaneInitialized = ptr.To(false)
+			logrus.Debugf("[planner] rkecluster %s/%s: setting controlplane controlPlaneInitialized to false during etcd restore", cp.Namespace, cp.Name)
 		}
 		status, _ = p.setEtcdSnapshotRestoreState(status, cp.Spec.ETCDSnapshotRestore, rkev1.ETCDSnapshotPhaseShutdown)
 		return status, errWaitingf("shutting down cluster")
