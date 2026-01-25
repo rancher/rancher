@@ -179,7 +179,7 @@ func (o *OCIRepohandler) onClusterRepoChange(key string, clusterRepo *catalog.Cl
 			index.SortEntries()
 			_, err := createOrUpdateMap(clusterRepo.Namespace, index, owner, o.apply)
 			if err != nil {
-				logrus.Debugf("failed to create/udpate the configmap incase of 4xx statuscode for %s", clusterRepo.Name)
+				logrus.Debugf("failed to create/update configmap after 4xx response for %s", clusterRepo.Name)
 			}
 		}
 
