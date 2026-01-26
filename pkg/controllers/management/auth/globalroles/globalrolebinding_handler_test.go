@@ -105,878 +105,1154 @@ type grbTestState struct {
 }
 
 /*
-func TestCreateUpdate(t *testing.T) {
-	// right now, create and update have the same input/output, so they are tested in the same way
-	t.Parallel()
+	func TestCreateUpdate(t *testing.T) {
+		// right now, create and update have the same input/output, so they are tested in the same way
+		t.Parallel()
 
-	readOnlyRoleName := "read-only"
-	testPrincipal := "testing://test-user"
-	userName := "test-user"
-	gr := v3.GlobalRole{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-gr",
-			UID:  "5678",
-		},
-		Rules:                 []rbacv1.PolicyRule{readPodPolicyRule},
-		InheritedClusterRoles: []string{readOnlyRoleName},
-	}
-
-	grb := v3.GlobalRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "test-grb",
-			UID:  "1234",
-		},
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
-			Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
-		},
-		UserName:       userName,
-		GlobalRoleName: gr.Name,
-	}
-	grbOwnerRef := metav1.OwnerReference{
-		APIVersion: "management.cattle.io/v3",
-		Kind:       "GlobalRoleBinding",
-		Name:       "test-grb",
-		UID:        types.UID("1234"),
-	}
-
-	addAnnotation := func(grb *v3.GlobalRoleBinding, others ...map[string]string) *v3.GlobalRoleBinding {
-		newGRB := grb.DeepCopy()
-		newGRB.Annotations = map[string]string{
-			"authz.management.cattle.io/crb-name": "cattle-globalrolebinding-" + grb.Name,
+		readOnlyRoleName := "read-only"
+		testPrincipal := "testing://test-user"
+		userName := "test-user"
+		gr := v3.GlobalRole{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-gr",
+				UID:  "5678",
+			},
+			Rules:                 []rbacv1.PolicyRule{readPodPolicyRule},
+			InheritedClusterRoles: []string{readOnlyRoleName},
 		}
-		for _, o := range others {
-			for k, v := range o {
-				newGRB.Annotations[k] = v
+
+		grb := v3.GlobalRoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "test-grb",
+				UID:  "1234",
+			},
+			TypeMeta: metav1.TypeMeta{
+				APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
+				Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
+			},
+			UserName:       userName,
+			GlobalRoleName: gr.Name,
+		}
+		grbOwnerRef := metav1.OwnerReference{
+			APIVersion: "management.cattle.io/v3",
+			Kind:       "GlobalRoleBinding",
+			Name:       "test-grb",
+			UID:        types.UID("1234"),
+		}
+
+		addAnnotation := func(grb *v3.GlobalRoleBinding, others ...map[string]string) *v3.GlobalRoleBinding {
+			newGRB := grb.DeepCopy()
+			newGRB.Annotations = map[string]string{
+				"authz.management.cattle.io/crb-name": "cattle-globalrolebinding-" + grb.Name,
 			}
+			for _, o := range others {
+				for k, v := range o {
+					newGRB.Annotations[k] = v
+				}
+			}
+
+			return newGRB
 		}
 
-		return newGRB
-	}
+		addUserPrincipalName := func(grb *v3.GlobalRoleBinding, name string) *v3.GlobalRoleBinding {
+			newGRB := grb.DeepCopy()
+			newGRB.UserPrincipalName = name
 
-	addUserPrincipalName := func(grb *v3.GlobalRoleBinding, name string) *v3.GlobalRoleBinding {
-		newGRB := grb.DeepCopy()
-		newGRB.UserPrincipalName = name
+			return newGRB
+		}
 
-		return newGRB
-	}
+		mockTime := func() time.Time {
+			return time.Unix(0, 0)
+		}
 
-	mockTime := func() time.Time {
-		return time.Unix(0, 0)
-	}
-
-	tests := []struct {
-		name            string
-		stateSetup      func(grbTestState)
-		stateAssertions func(grbTestStateChanges)
-		inputBinding    *v3.GlobalRoleBinding
-		wantBinding     *v3.GlobalRoleBinding
-		wantError       bool
-	}{
-		{
-			name: "success on both cluster and global permissions",
-			stateSetup: func(state grbTestState) {
-				// mocks for both cluster and global permissions
-				state.grListerMock.GetFunc = func(namespace, name string) (*v3.GlobalRole, error) {
-					if name == gr.Name && namespace == "" {
-						return &gr, nil
+		tests := []struct {
+			name            string
+			stateSetup      func(grbTestState)
+			stateAssertions func(grbTestStateChanges)
+			inputBinding    *v3.GlobalRoleBinding
+			wantBinding     *v3.GlobalRoleBinding
+			wantError       bool
+		}{
+			{
+				name: "success on both cluster and global permissions",
+				stateSetup: func(state grbTestState) {
+					// mocks for both cluster and global permissions
+					state.grListerMock.GetFunc = func(namespace, name string) (*v3.GlobalRole, error) {
+						if name == gr.Name && namespace == "" {
+							return &gr, nil
+						}
+						return nil, fmt.Errorf("not found")
 					}
-					return nil, fmt.Errorf("not found")
-				}
-				state.rbListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.RoleBinding, error) {
-					return nil, nil
-				}
-				// mocks for just cluster permissions
-				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
-				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "not-local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil).Times(2)
-				state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-					state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
-					return crtb, nil
-				}
-				state.crtbClientMock.DeleteNamespacedFunc = func(_ string, name string, _ *metav1.DeleteOptions) error {
-					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
-					return nil
-				}
-				state.clusterCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&notLocalCluster, &localCluster}, nil).AnyTimes()
+					state.rbListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.RoleBinding, error) {
+						return nil, nil
+					}
+					// mocks for just cluster permissions
+					state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
+					state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "not-local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil).Times(2)
+					state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+						state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
+						return crtb, nil
+					}
+					state.crtbClientMock.DeleteNamespacedFunc = func(_ string, name string, _ *metav1.DeleteOptions) error {
+						state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
+						return nil
+					}
+					state.clusterCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&notLocalCluster, &localCluster}, nil).AnyTimes()
 
-				// mocks for just global permissions
-				state.crbListerMock.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
-					return nil, fmt.Errorf("not found")
-				}
-				state.crbClientMock.CreateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
-					state.stateChanges.createdCRBs = append(state.stateChanges.createdCRBs, crb)
-					return crb, nil
-				}
+					// mocks for just global permissions
+					state.crbListerMock.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
+						return nil, fmt.Errorf("not found")
+					}
+					state.crbClientMock.CreateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
+						state.stateChanges.createdCRBs = append(state.stateChanges.createdCRBs, crb)
+						return crb, nil
+					}
 
-				// mocks for fleet workspace permissions
-				state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding, _ *[]metav1.Condition) error {
-					state.stateChanges.fwhCalled = true
-					return nil
-				}
-				// Allow the username specified to be queried for.
-				state.userListerMock.GetFunc = func(namespace, name string) (*v3.User, error) {
-					return &v3.User{
+					// mocks for fleet workspace permissions
+					state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding, _ *[]metav1.Condition) error {
+						state.stateChanges.fwhCalled = true
+						return nil
+					}
+					// Allow the username specified to be queried for.
+					state.userListerMock.GetFunc = func(namespace, name string) (*v3.User, error) {
+						return &v3.User{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: name,
+							},
+							PrincipalIDs: []string{
+								testPrincipal,
+							},
+						}, nil
+					}
+					// mocks for status field
+					state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
 						ObjectMeta: metav1.ObjectMeta{
-							Name: name,
+							Name: "test-grb",
+							UID:  "1234",
 						},
-						PrincipalIDs: []string{
-							testPrincipal,
+						TypeMeta: metav1.TypeMeta{
+							APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
+							Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
 						},
-					}, nil
-				}
-				// mocks for status field
-				state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "test-grb",
-						UID:  "1234",
-					},
+						GlobalRoleName: gr.Name,
+						UserName:       userName,
+						Status: v3.GlobalRoleBindingStatus{
+							LastUpdateTime: mockTime().Format(time.RFC3339),
+							SummaryLocal:   status.SummaryCompleted,
+							Summary:        status.SummaryCompleted,
+							LocalConditions: []metav1.Condition{
+								{
+									Type:               subjectReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             subjectExists,
+								},
+								{
+									Type:               clusterPermissionsReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             clusterPermissionsReconciled,
+								},
+								{
+									Type:               globalRoleBindingReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             globalRoleBindingReconciled,
+								},
+								{
+									Type:               namespacedRoleBindingReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             namespacedRoleBindingReconciled,
+								},
+							},
+						},
+					})
+				},
+
+				stateAssertions: func(stateChanges grbTestStateChanges) {
+					require.Len(stateChanges.t, stateChanges.createdCRTBs, 1)
+					require.Len(stateChanges.t, stateChanges.createdCRBs, 1)
+					require.Len(stateChanges.t, stateChanges.deletedCRTBNames, 0)
+
+					// cluster assertions
+					crtb := stateChanges.createdCRTBs[0]
+					require.Equal(stateChanges.t, "not-local", crtb.ClusterName)
+					require.Equal(stateChanges.t, "not-local", crtb.Namespace)
+					require.Equal(stateChanges.t, "test-grb", crtb.Labels[grbOwnerLabel])
+					require.Equal(stateChanges.t, "test-grb", crtb.Labels[grbOwnerLabel])
+					require.Equal(stateChanges.t, readOnlyRoleName, crtb.RoleTemplateName)
+					require.Equal(stateChanges.t, userName, crtb.UserName)
+					require.Equal(stateChanges.t, "", crtb.GroupPrincipalName)
+					require.Len(stateChanges.t, crtb.OwnerReferences, 1)
+					require.Equal(stateChanges.t, grbOwnerRef, crtb.OwnerReferences[0])
+
+					// global assertions
+					crb := stateChanges.createdCRBs[0]
+					bindingName := "cattle-globalrolebinding-" + grb.Name
+					roleName := "cattle-globalrole-" + gr.Name
+					require.Equal(stateChanges.t, bindingName, crb.Name)
+					require.Len(stateChanges.t, crb.OwnerReferences, 1)
+					require.Equal(stateChanges.t, grbOwnerRef, crb.OwnerReferences[0])
+					require.Equal(stateChanges.t, rbacv1.RoleRef{Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
+					require.Equal(stateChanges.t, rbacv1.Subject{Name: userName, Kind: "User", APIGroup: rbacv1.GroupName}, crb.Subjects[0])
+					require.Equal(stateChanges.t, "true", crb.Labels["authz.management.cattle.io/globalrolebinding"])
+
+					// fleet workspace assertions
+					require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
+				},
+				inputBinding: grb.DeepCopy(),
+				wantBinding:  addUserPrincipalName(addAnnotation(&grb), testPrincipal),
+				wantError:    false,
+			},
+			{
+				name: "success on both cluster and global permissions - ClusterRole already exists and need to be updated with new Subject",
+				stateSetup: func(state grbTestState) {
+					// mocks for both cluster and global permissions
+					state.grListerMock.GetFunc = func(namespace, name string) (*v3.GlobalRole, error) {
+						if name == gr.Name && namespace == "" {
+							return &gr, nil
+						}
+						return nil, fmt.Errorf("not found")
+					}
+					state.rbListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.RoleBinding, error) {
+						return nil, nil
+					}
+
+					// mocks for just cluster permissions
+					state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
+					state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "not-local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil).Times(2)
+					state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+						state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
+						return crtb, nil
+					}
+					state.crtbClientMock.DeleteNamespacedFunc = func(_ string, name string, _ *metav1.DeleteOptions) error {
+						state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
+						return nil
+					}
+					state.clusterCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&notLocalCluster, &localCluster}, nil).AnyTimes()
+
+					// mocks for just global permissions
+					state.crbListerMock.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
+						return &rbacv1.ClusterRoleBinding{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "cattle-globalrolebinding-test-grb",
+							},
+						}, nil
+					}
+					state.crbClientMock.UpdateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
+						state.stateChanges.updatedCRBs = append(state.stateChanges.updatedCRBs, crb)
+						return crb, nil
+					}
+
+					// mocks for fleet workspace permissions
+					state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding, _ *[]metav1.Condition) error {
+						state.stateChanges.fwhCalled = true
+						return nil
+					}
+					// Allow the username specified to be queried for.
+					state.userListerMock.GetFunc = func(namespace, name string) (*v3.User, error) {
+						return &v3.User{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: name,
+							},
+							PrincipalIDs: []string{
+								testPrincipal,
+							},
+						}, nil
+					}
+					// mocks for status field
+					state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "test-grb",
+							UID:  "1234",
+						},
+						TypeMeta: metav1.TypeMeta{
+							APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
+							Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
+						},
+						GlobalRoleName: gr.Name,
+						UserName:       userName,
+						Status: v3.GlobalRoleBindingStatus{
+							LastUpdateTime: mockTime().Format(time.RFC3339),
+							Summary:        status.SummaryCompleted,
+							SummaryLocal:   status.SummaryCompleted,
+							LocalConditions: []metav1.Condition{
+								{
+									Type:               subjectReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             subjectExists,
+								},
+								{
+									Type:               clusterPermissionsReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             clusterPermissionsReconciled,
+								},
+								{
+									Type:               globalRoleBindingReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             globalRoleBindingReconciled,
+								},
+								{
+									Type:               namespacedRoleBindingReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             namespacedRoleBindingReconciled,
+								},
+							},
+						},
+					})
+				},
+				stateAssertions: func(stateChanges grbTestStateChanges) {
+					require.Len(stateChanges.t, stateChanges.createdCRTBs, 1)
+					require.Len(stateChanges.t, stateChanges.updatedCRBs, 1)
+					require.Len(stateChanges.t, stateChanges.deletedCRTBNames, 0)
+
+					// cluster assertions
+					crtb := stateChanges.createdCRTBs[0]
+					require.Equal(stateChanges.t, "not-local", crtb.ClusterName)
+					require.Equal(stateChanges.t, "not-local", crtb.Namespace)
+					require.Equal(stateChanges.t, "test-grb", crtb.Labels[grbOwnerLabel])
+					require.Equal(stateChanges.t, "test-grb", crtb.Labels[grbOwnerLabel])
+					require.Equal(stateChanges.t, readOnlyRoleName, crtb.RoleTemplateName)
+					require.Equal(stateChanges.t, userName, crtb.UserName)
+					require.Equal(stateChanges.t, "", crtb.GroupPrincipalName)
+					require.Len(stateChanges.t, crtb.OwnerReferences, 1)
+					require.Equal(stateChanges.t, grbOwnerRef, crtb.OwnerReferences[0])
+
+					// global assertions
+					crb := stateChanges.updatedCRBs[0]
+					bindingName := "cattle-globalrolebinding-" + grb.Name
+					roleName := "cattle-globalrole-" + gr.Name
+					require.Equal(stateChanges.t, bindingName, crb.Name)
+					require.Equal(stateChanges.t, rbacv1.RoleRef{Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
+					require.Equal(stateChanges.t, rbacv1.Subject{Name: userName, Kind: "User", APIGroup: rbacv1.GroupName}, crb.Subjects[0])
+
+					// fleet workspace assertions
+					require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
+				},
+				inputBinding: grb.DeepCopy(),
+				wantBinding:  addUserPrincipalName(&grb, testPrincipal),
+				wantError:    false,
+			},
+			{
+				name: "success on global, failure on cluster",
+				stateSetup: func(state grbTestState) {
+					// mocks for both cluster and global permissions
+					state.grListerMock.GetFunc = func(namespace, name string) (*v3.GlobalRole, error) {
+						if name == gr.Name && namespace == "" {
+							return &gr, nil
+						}
+						return nil, fmt.Errorf("not found")
+					}
+					state.rbListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.RoleBinding, error) {
+						return nil, nil
+					}
+					// mocks for just cluster permissions
+					state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+						state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
+						return crtb, nil
+					}
+					state.crtbClientMock.DeleteNamespacedFunc = func(_ string, name string, _ *metav1.DeleteOptions) error {
+						state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
+						return nil
+					}
+					state.clusterCacheMock.EXPECT().List(labels.Everything()).Return(nil, fmt.Errorf("server not available")).AnyTimes()
+
+					// mocks for just global permissions
+					state.crbListerMock.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
+						return nil, fmt.Errorf("not found")
+					}
+					state.crbClientMock.CreateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
+						state.stateChanges.createdCRBs = append(state.stateChanges.createdCRBs, crb)
+						return crb, nil
+					}
+
+					// mocks for fleet workspace permissions
+					state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding, _ *[]metav1.Condition) error {
+						state.stateChanges.fwhCalled = true
+						return nil
+					}
+					// Allow the username specified to be queried for.
+					state.userListerMock.GetFunc = func(namespace, name string) (*v3.User, error) {
+						return &v3.User{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: name,
+							},
+							PrincipalIDs: []string{
+								testPrincipal,
+							},
+						}, nil
+					}
+					// mocks for status field
+					state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "test-grb",
+							UID:  "1234",
+						},
+						TypeMeta: metav1.TypeMeta{
+							APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
+							Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
+						},
+						GlobalRoleName: gr.Name,
+						UserName:       userName,
+						Status: v3.GlobalRoleBindingStatus{
+							LastUpdateTime: mockTime().Format(time.RFC3339),
+							SummaryLocal:   status.SummaryError,
+							Summary:        status.SummaryError,
+							LocalConditions: []metav1.Condition{
+								{
+									Type:               subjectReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             subjectExists,
+								},
+								{
+									Type:               clusterPermissionsReconciled,
+									Status:             metav1.ConditionFalse,
+									Message:            "server not available",
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             failedToListCluster,
+								},
+								{
+									Type:               globalRoleBindingReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             globalRoleBindingReconciled,
+								},
+								{
+									Type:               namespacedRoleBindingReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             namespacedRoleBindingReconciled,
+								},
+							},
+						},
+					})
+				},
+				stateAssertions: func(stateChanges grbTestStateChanges) {
+					require.Len(stateChanges.t, stateChanges.createdCRTBs, 0)
+					require.Len(stateChanges.t, stateChanges.createdCRBs, 1)
+					require.Len(stateChanges.t, stateChanges.deletedCRTBNames, 0)
+
+					// global assertions
+					crb := stateChanges.createdCRBs[0]
+					bindingName := "cattle-globalrolebinding-" + grb.Name
+					roleName := "cattle-globalrole-" + gr.Name
+					require.Equal(stateChanges.t, bindingName, crb.Name)
+					ownerRef := crb.OwnerReferences[0]
+					require.Equal(stateChanges.t, "management.cattle.io/v3", ownerRef.APIVersion)
+					require.Equal(stateChanges.t, "GlobalRoleBinding", ownerRef.Kind)
+					require.Equal(stateChanges.t, "test-grb", ownerRef.Name)
+					require.Equal(stateChanges.t, types.UID("1234"), ownerRef.UID)
+					require.Equal(stateChanges.t, rbacv1.RoleRef{Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
+					require.Equal(stateChanges.t, rbacv1.Subject{Name: userName, Kind: "User", APIGroup: rbacv1.GroupName}, crb.Subjects[0])
+					require.Equal(stateChanges.t, "true", crb.Labels["authz.management.cattle.io/globalrolebinding"])
+
+					// fleet workspace assertions
+					require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
+				},
+				inputBinding: grb.DeepCopy(),
+				wantBinding:  addUserPrincipalName(addAnnotation(&grb), testPrincipal),
+				wantError:    true,
+			},
+			{
+				name: "success on cluster, failure on global",
+				stateSetup: func(state grbTestState) {
+					// mocks for both cluster and global permissions
+					state.grListerMock.GetFunc = func(namespace, name string) (*v3.GlobalRole, error) {
+						if name == gr.Name && namespace == "" {
+							return &gr, nil
+						}
+						return nil, fmt.Errorf("not found")
+					}
+					state.rbListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.RoleBinding, error) {
+						return nil, nil
+					}
+					// mocks for just cluster permissions
+					state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
+					state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "not-local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil).Times(2)
+					state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+						state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
+						return crtb, nil
+					}
+					state.crtbClientMock.DeleteNamespacedFunc = func(_ string, name string, _ *metav1.DeleteOptions) error {
+						state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
+						return nil
+					}
+					state.clusterCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&notLocalCluster, &localCluster}, nil).AnyTimes()
+
+					// mocks for just global permissions
+					state.crbListerMock.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
+						return nil, fmt.Errorf("not found")
+					}
+					state.crbClientMock.CreateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
+						state.stateChanges.createdCRBs = append(state.stateChanges.createdCRBs, crb)
+						return nil, fmt.Errorf("server not available")
+					}
+
+					// mocks for fleet workspace permissions
+					state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding, _ *[]metav1.Condition) error {
+						state.stateChanges.fwhCalled = true
+						return nil
+					}
+					// Allow the username specified to be queried for.
+					state.userListerMock.GetFunc = func(namespace, name string) (*v3.User, error) {
+						return &v3.User{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: name,
+							},
+							PrincipalIDs: []string{
+								testPrincipal,
+							},
+						}, nil
+					}
+					// mocks for status field
+					state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "test-grb",
+							UID:  "1234",
+						},
+						TypeMeta: metav1.TypeMeta{
+							APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
+							Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
+						},
+						GlobalRoleName: gr.Name,
+						UserName:       userName,
+						Status: v3.GlobalRoleBindingStatus{
+							LastUpdateTime: mockTime().Format(time.RFC3339),
+							SummaryLocal:   status.SummaryError,
+							Summary:        status.SummaryError,
+							LocalConditions: []metav1.Condition{
+								{
+									Type:               subjectReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             subjectExists,
+								},
+								{
+									Type:               clusterPermissionsReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             clusterPermissionsReconciled,
+								},
+								{
+									Type:               globalRoleBindingReconciled,
+									Status:             metav1.ConditionFalse,
+									Message:            "server not available",
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             failedToCreateClusterRoleBinding,
+								},
+								{
+									Type:               namespacedRoleBindingReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             namespacedRoleBindingReconciled,
+								},
+							},
+						},
+					})
+				},
+				stateAssertions: func(stateChanges grbTestStateChanges) {
+					require.Len(stateChanges.t, stateChanges.createdCRTBs, 1)
+					require.Len(stateChanges.t, stateChanges.createdCRBs, 1)
+					require.Len(stateChanges.t, stateChanges.deletedCRTBNames, 0)
+
+					// cluster assertions
+					crtb := stateChanges.createdCRTBs[0]
+					require.Equal(stateChanges.t, "not-local", crtb.ClusterName)
+					require.Equal(stateChanges.t, "not-local", crtb.Namespace)
+					require.Equal(stateChanges.t, "test-grb", crtb.Labels[grbOwnerLabel])
+					require.Equal(stateChanges.t, "test-grb", crtb.Labels[grbOwnerLabel])
+					require.Equal(stateChanges.t, readOnlyRoleName, crtb.RoleTemplateName)
+					require.Equal(stateChanges.t, userName, crtb.UserName)
+					require.Equal(stateChanges.t, "", crtb.GroupPrincipalName)
+					require.Len(stateChanges.t, crtb.OwnerReferences, 1)
+					require.Equal(stateChanges.t, grbOwnerRef, crtb.OwnerReferences[0])
+
+					// global assertions
+					crb := stateChanges.createdCRBs[0]
+					bindingName := "cattle-globalrolebinding-" + grb.Name
+					roleName := "cattle-globalrole-" + gr.Name
+					require.Equal(stateChanges.t, bindingName, crb.Name)
+					require.Len(stateChanges.t, crb.OwnerReferences, 1)
+					require.Equal(stateChanges.t, grbOwnerRef, crb.OwnerReferences[0])
+					require.Equal(stateChanges.t, rbacv1.RoleRef{Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
+					require.Equal(stateChanges.t, rbacv1.Subject{Name: userName, Kind: "User", APIGroup: rbacv1.GroupName}, crb.Subjects[0])
+					require.Equal(stateChanges.t, "true", crb.Labels["authz.management.cattle.io/globalrolebinding"])
+
+					// fleet workspace assertions
+					require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
+				},
+				inputBinding: grb.DeepCopy(),
+				wantBinding:  addUserPrincipalName(&grb, testPrincipal),
+				wantError:    true,
+			},
+			{
+				name: "failure on cluster and global",
+				stateSetup: func(state grbTestState) {
+					// mocks for both cluster and global permissions
+					state.grListerMock.GetFunc = func(namespace, name string) (*v3.GlobalRole, error) {
+						return nil, fmt.Errorf("not found")
+					}
+					state.rbListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.RoleBinding, error) {
+						return nil, nil
+					}
+					// mocks for just cluster permissions
+					state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+						state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
+						return crtb, nil
+					}
+					state.crtbClientMock.DeleteNamespacedFunc = func(_ string, name string, _ *metav1.DeleteOptions) error {
+						state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
+						return nil
+					}
+
+					// mocks for just global permissions
+					state.crbListerMock.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
+						return nil, fmt.Errorf("not found")
+					}
+					state.crbClientMock.CreateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
+						state.stateChanges.createdCRBs = append(state.stateChanges.createdCRBs, crb)
+						return nil, fmt.Errorf("server not available")
+					}
+
+					// mocks for fleet workspace permissions
+					state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding, _ *[]metav1.Condition) error {
+						state.stateChanges.fwhCalled = true
+						return nil
+					}
+					// Allow the provided user to be looked up
+					state.userListerMock.GetFunc = func(namespace, name string) (*v3.User, error) {
+						return &v3.User{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: name,
+							},
+							PrincipalIDs: []string{
+								testPrincipal,
+							},
+						}, nil
+					}
+					// mocks for status field
+					state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "test-grb",
+							UID:  "1234",
+						},
+						TypeMeta: metav1.TypeMeta{
+							APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
+							Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
+						},
+						GlobalRoleName: gr.Name,
+						UserName:       userName,
+						Status: v3.GlobalRoleBindingStatus{
+							LastUpdateTime: mockTime().Format(time.RFC3339),
+							SummaryLocal:   status.SummaryError,
+							Summary:        status.SummaryError,
+							LocalConditions: []metav1.Condition{
+								{
+									Type:               subjectReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             subjectExists,
+								},
+								{
+									Type:               clusterPermissionsReconciled,
+									Status:             metav1.ConditionFalse,
+									Message:            "not found",
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             failedToGetGlobalRole,
+								},
+								{
+									Type:               globalRoleBindingReconciled,
+									Status:             metav1.ConditionFalse,
+									Message:            "server not available",
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             failedToCreateClusterRoleBinding,
+								},
+								{
+									Type:               namespacedRoleBindingReconciled,
+									Status:             metav1.ConditionFalse,
+									Message:            "not found",
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             failedToGetGlobalRole,
+								},
+							},
+						},
+					})
+				},
+				stateAssertions: func(stateChanges grbTestStateChanges) {
+					require.Len(stateChanges.t, stateChanges.createdCRTBs, 0)
+					require.Len(stateChanges.t, stateChanges.createdCRBs, 1)
+					require.Len(stateChanges.t, stateChanges.deletedCRTBNames, 0)
+
+					// global assertions
+					crb := stateChanges.createdCRBs[0]
+					bindingName := "cattle-globalrolebinding-" + grb.Name
+					roleName := "cattle-globalrole-" + gr.Name
+					require.Equal(stateChanges.t, bindingName, crb.Name)
+					require.Len(stateChanges.t, crb.OwnerReferences, 1)
+					require.Equal(stateChanges.t, grbOwnerRef, crb.OwnerReferences[0])
+					require.Equal(stateChanges.t, rbacv1.RoleRef{Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
+					require.Equal(stateChanges.t, rbacv1.Subject{Name: userName, Kind: "User", APIGroup: rbacv1.GroupName}, crb.Subjects[0])
+					require.Equal(stateChanges.t, "true", crb.Labels["authz.management.cattle.io/globalrolebinding"])
+					// fleet workspace assertions
+					require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
+				},
+				inputBinding: grb.DeepCopy(),
+				wantBinding:  addUserPrincipalName(&grb, testPrincipal),
+				wantError:    true,
+			},
+			{
+				name: "success on cluster and global permissions, failure on fleet workspace permissions",
+				stateSetup: func(state grbTestState) {
+					// mocks for both cluster and global permissions
+					state.grListerMock.GetFunc = func(namespace, name string) (*v3.GlobalRole, error) {
+						if name == gr.Name && namespace == "" {
+							return &gr, nil
+						}
+						return nil, fmt.Errorf("not found")
+					}
+					state.rbListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.RoleBinding, error) {
+						return nil, nil
+					}
+					// mocks for just cluster permissions
+					state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
+					state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "not-local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil).Times(2)
+					state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+						state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
+						return crtb, nil
+					}
+					state.crtbClientMock.DeleteNamespacedFunc = func(_ string, name string, _ *metav1.DeleteOptions) error {
+						state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
+						return nil
+					}
+					state.clusterCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&notLocalCluster, &localCluster}, nil).AnyTimes()
+
+					// mocks for just global permissions
+					state.crbListerMock.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
+						return nil, fmt.Errorf("not found")
+					}
+					state.crbClientMock.CreateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
+						state.stateChanges.createdCRBs = append(state.stateChanges.createdCRBs, crb)
+						return crb, nil
+					}
+
+					// mocks for fleet workspace permissions
+					state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding, _ *[]metav1.Condition) error {
+						state.stateChanges.fwhCalled = true
+						return fmt.Errorf("unavailable")
+					}
+					// Allow the provided user to be looked up
+					state.userListerMock.GetFunc = func(namespace, name string) (*v3.User, error) {
+						return &v3.User{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: name,
+							},
+							PrincipalIDs: []string{
+								testPrincipal,
+							},
+						}, nil
+					}
+					// mocks for status field
+					state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "test-grb",
+							UID:  "1234",
+						},
+						TypeMeta: metav1.TypeMeta{
+							APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
+							Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
+						},
+						GlobalRoleName: gr.Name,
+						UserName:       userName,
+						Status: v3.GlobalRoleBindingStatus{
+							LastUpdateTime: mockTime().Format(time.RFC3339),
+							SummaryLocal:   status.SummaryCompleted,
+							Summary:        status.SummaryCompleted,
+							LocalConditions: []metav1.Condition{
+								{
+									Type:               subjectReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             subjectExists,
+								},
+								{
+									Type:               clusterPermissionsReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             clusterPermissionsReconciled,
+								},
+								{
+									Type:               globalRoleBindingReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             globalRoleBindingReconciled,
+								},
+								{
+									Type:               namespacedRoleBindingReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             namespacedRoleBindingReconciled,
+								},
+							},
+						},
+					})
+				},
+				stateAssertions: func(stateChanges grbTestStateChanges) {
+					require.Len(stateChanges.t, stateChanges.createdCRTBs, 1)
+					require.Len(stateChanges.t, stateChanges.createdCRBs, 1)
+					require.Len(stateChanges.t, stateChanges.deletedCRTBNames, 0)
+
+					// cluster assertions
+					crtb := stateChanges.createdCRTBs[0]
+					require.Equal(stateChanges.t, "not-local", crtb.ClusterName)
+					require.Equal(stateChanges.t, "not-local", crtb.Namespace)
+					require.Equal(stateChanges.t, "test-grb", crtb.Labels[grbOwnerLabel])
+					require.Equal(stateChanges.t, "test-grb", crtb.Labels[grbOwnerLabel])
+					require.Equal(stateChanges.t, readOnlyRoleName, crtb.RoleTemplateName)
+					require.Equal(stateChanges.t, userName, crtb.UserName)
+					require.Equal(stateChanges.t, "", crtb.GroupPrincipalName)
+					require.Len(stateChanges.t, crtb.OwnerReferences, 1)
+					require.Equal(stateChanges.t, grbOwnerRef, crtb.OwnerReferences[0])
+
+					// global assertions
+					crb := stateChanges.createdCRBs[0]
+					bindingName := "cattle-globalrolebinding-" + grb.Name
+					roleName := "cattle-globalrole-" + gr.Name
+					require.Equal(stateChanges.t, bindingName, crb.Name)
+					require.Len(stateChanges.t, crb.OwnerReferences, 1)
+					require.Equal(stateChanges.t, grbOwnerRef, crb.OwnerReferences[0])
+					require.Equal(stateChanges.t, rbacv1.RoleRef{Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
+					require.Equal(stateChanges.t, rbacv1.Subject{Name: userName, Kind: "User", APIGroup: rbacv1.GroupName}, crb.Subjects[0])
+					require.Equal(stateChanges.t, "true", crb.Labels["authz.management.cattle.io/globalrolebinding"])
+
+					// fleet workspace assertions
+					require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
+				},
+				inputBinding: grb.DeepCopy(),
+				wantBinding:  addUserPrincipalName(addAnnotation(&grb), testPrincipal),
+				wantError:    true,
+			},
+			{
+				name: "binding referencing user triggers creation of user",
+				stateSetup: func(state grbTestState) {
+					state.clusterCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&notLocalCluster, &localCluster}, nil).AnyTimes()
+					state.rbListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.RoleBinding, error) {
+						return nil, nil
+					}
+					state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
+					state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "not-local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil).Times(2)
+					state.grListerMock.GetFunc = func(namespace, name string) (*v3.GlobalRole, error) {
+						if name == gr.Name && namespace == "" {
+							return &gr, nil
+						}
+						return nil, fmt.Errorf("not found")
+					}
+					state.crbClientMock.CreateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
+						state.stateChanges.createdCRBs = append(state.stateChanges.createdCRBs, crb)
+						return crb, nil
+					}
+					state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+						state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
+						return crtb, nil
+					}
+					state.crbListerMock.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
+						return nil, fmt.Errorf("not found")
+					}
+					state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding, _ *[]metav1.Condition) error {
+						state.stateChanges.fwhCalled = true
+						return nil
+					}
+					state.userManagerMock.EXPECT().EnsureUser(
+						"activedirectory_user://CN=test,CN=Users,DC=ad,DC=ians,DC=farm", "test-user").Return(
+						&v3.User{ObjectMeta: metav1.ObjectMeta{Name: "test-user"}}, nil)
+					// mocks for status field
+					state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "test-grb",
+							UID:  "1234",
+							Annotations: map[string]string{
+								"auth.cattle.io/principal-display-name": "test-user",
+							},
+						},
+						TypeMeta: metav1.TypeMeta{
+							APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
+							Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
+						},
+						GlobalRoleName:    gr.Name,
+						UserPrincipalName: "activedirectory_user://CN=test,CN=Users,DC=ad,DC=ians,DC=farm",
+						Status: v3.GlobalRoleBindingStatus{
+							LastUpdateTime: mockTime().Format(time.RFC3339),
+							SummaryLocal:   status.SummaryCompleted,
+							Summary:        status.SummaryCompleted,
+							LocalConditions: []metav1.Condition{
+								{
+									Type:               subjectReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             subjectExists,
+								},
+								{
+									Type:               clusterPermissionsReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             clusterPermissionsReconciled,
+								},
+								{
+									Type:               globalRoleBindingReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             globalRoleBindingReconciled,
+								},
+								{
+									Type:               namespacedRoleBindingReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             namespacedRoleBindingReconciled,
+								},
+							},
+						},
+					})
+				},
+				inputBinding: &v3.GlobalRoleBinding{
 					TypeMeta: metav1.TypeMeta{
 						APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
 						Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
 					},
-					GlobalRoleName: gr.Name,
-					UserName:       userName,
-					Status: v3.GlobalRoleBindingStatus{
-						LastUpdateTime: mockTime().Format(time.RFC3339),
-						SummaryLocal:   status.SummaryCompleted,
-						Summary:        status.SummaryCompleted,
-						LocalConditions: []metav1.Condition{
-							{
-								Type:               subjectReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             subjectExists,
-							},
-							{
-								Type:               clusterPermissionsReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             clusterPermissionsReconciled,
-							},
-							{
-								Type:               globalRoleBindingReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             globalRoleBindingReconciled,
-							},
-							{
-								Type:               namespacedRoleBindingReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             namespacedRoleBindingReconciled,
-							},
-						},
-					},
-				})
-			},
-
-			stateAssertions: func(stateChanges grbTestStateChanges) {
-				require.Len(stateChanges.t, stateChanges.createdCRTBs, 1)
-				require.Len(stateChanges.t, stateChanges.createdCRBs, 1)
-				require.Len(stateChanges.t, stateChanges.deletedCRTBNames, 0)
-
-				// cluster assertions
-				crtb := stateChanges.createdCRTBs[0]
-				require.Equal(stateChanges.t, "not-local", crtb.ClusterName)
-				require.Equal(stateChanges.t, "not-local", crtb.Namespace)
-				require.Equal(stateChanges.t, "test-grb", crtb.Labels[grbOwnerLabel])
-				require.Equal(stateChanges.t, "test-grb", crtb.Labels[grbOwnerLabel])
-				require.Equal(stateChanges.t, readOnlyRoleName, crtb.RoleTemplateName)
-				require.Equal(stateChanges.t, userName, crtb.UserName)
-				require.Equal(stateChanges.t, "", crtb.GroupPrincipalName)
-				require.Len(stateChanges.t, crtb.OwnerReferences, 1)
-				require.Equal(stateChanges.t, grbOwnerRef, crtb.OwnerReferences[0])
-
-				// global assertions
-				crb := stateChanges.createdCRBs[0]
-				bindingName := "cattle-globalrolebinding-" + grb.Name
-				roleName := "cattle-globalrole-" + gr.Name
-				require.Equal(stateChanges.t, bindingName, crb.Name)
-				require.Len(stateChanges.t, crb.OwnerReferences, 1)
-				require.Equal(stateChanges.t, grbOwnerRef, crb.OwnerReferences[0])
-				require.Equal(stateChanges.t, rbacv1.RoleRef{Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
-				require.Equal(stateChanges.t, rbacv1.Subject{Name: userName, Kind: "User", APIGroup: rbacv1.GroupName}, crb.Subjects[0])
-				require.Equal(stateChanges.t, "true", crb.Labels["authz.management.cattle.io/globalrolebinding"])
-
-				// fleet workspace assertions
-				require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
-			},
-			inputBinding: grb.DeepCopy(),
-			wantBinding:  addUserPrincipalName(addAnnotation(&grb), testPrincipal),
-			wantError:    false,
-		},
-		{
-			name: "success on both cluster and global permissions - ClusterRole already exists and need to be updated with new Subject",
-			stateSetup: func(state grbTestState) {
-				// mocks for both cluster and global permissions
-				state.grListerMock.GetFunc = func(namespace, name string) (*v3.GlobalRole, error) {
-					if name == gr.Name && namespace == "" {
-						return &gr, nil
-					}
-					return nil, fmt.Errorf("not found")
-				}
-				state.rbListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.RoleBinding, error) {
-					return nil, nil
-				}
-
-				// mocks for just cluster permissions
-				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
-				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "not-local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil).Times(2)
-				state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-					state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
-					return crtb, nil
-				}
-				state.crtbClientMock.DeleteNamespacedFunc = func(_ string, name string, _ *metav1.DeleteOptions) error {
-					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
-					return nil
-				}
-				state.clusterCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&notLocalCluster, &localCluster}, nil).AnyTimes()
-
-				// mocks for just global permissions
-				state.crbListerMock.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
-					return &rbacv1.ClusterRoleBinding{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "cattle-globalrolebinding-test-grb",
-						},
-					}, nil
-				}
-				state.crbClientMock.UpdateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
-					state.stateChanges.updatedCRBs = append(state.stateChanges.updatedCRBs, crb)
-					return crb, nil
-				}
-
-				// mocks for fleet workspace permissions
-				state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding, _ *[]metav1.Condition) error {
-					state.stateChanges.fwhCalled = true
-					return nil
-				}
-				// Allow the username specified to be queried for.
-				state.userListerMock.GetFunc = func(namespace, name string) (*v3.User, error) {
-					return &v3.User{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: name,
-						},
-						PrincipalIDs: []string{
-							testPrincipal,
-						},
-					}, nil
-				}
-				// mocks for status field
-				state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "test-grb",
-						UID:  "1234",
-					},
-					TypeMeta: metav1.TypeMeta{
-						APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
-						Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
-					},
-					GlobalRoleName: gr.Name,
-					UserName:       userName,
-					Status: v3.GlobalRoleBindingStatus{
-						LastUpdateTime: mockTime().Format(time.RFC3339),
-						Summary:        status.SummaryCompleted,
-						SummaryLocal:   status.SummaryCompleted,
-						LocalConditions: []metav1.Condition{
-							{
-								Type:               subjectReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             subjectExists,
-							},
-							{
-								Type:               clusterPermissionsReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             clusterPermissionsReconciled,
-							},
-							{
-								Type:               globalRoleBindingReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             globalRoleBindingReconciled,
-							},
-							{
-								Type:               namespacedRoleBindingReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             namespacedRoleBindingReconciled,
-							},
-						},
-					},
-				})
-			},
-			stateAssertions: func(stateChanges grbTestStateChanges) {
-				require.Len(stateChanges.t, stateChanges.createdCRTBs, 1)
-				require.Len(stateChanges.t, stateChanges.updatedCRBs, 1)
-				require.Len(stateChanges.t, stateChanges.deletedCRTBNames, 0)
-
-				// cluster assertions
-				crtb := stateChanges.createdCRTBs[0]
-				require.Equal(stateChanges.t, "not-local", crtb.ClusterName)
-				require.Equal(stateChanges.t, "not-local", crtb.Namespace)
-				require.Equal(stateChanges.t, "test-grb", crtb.Labels[grbOwnerLabel])
-				require.Equal(stateChanges.t, "test-grb", crtb.Labels[grbOwnerLabel])
-				require.Equal(stateChanges.t, readOnlyRoleName, crtb.RoleTemplateName)
-				require.Equal(stateChanges.t, userName, crtb.UserName)
-				require.Equal(stateChanges.t, "", crtb.GroupPrincipalName)
-				require.Len(stateChanges.t, crtb.OwnerReferences, 1)
-				require.Equal(stateChanges.t, grbOwnerRef, crtb.OwnerReferences[0])
-
-				// global assertions
-				crb := stateChanges.updatedCRBs[0]
-				bindingName := "cattle-globalrolebinding-" + grb.Name
-				roleName := "cattle-globalrole-" + gr.Name
-				require.Equal(stateChanges.t, bindingName, crb.Name)
-				require.Equal(stateChanges.t, rbacv1.RoleRef{Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
-				require.Equal(stateChanges.t, rbacv1.Subject{Name: userName, Kind: "User", APIGroup: rbacv1.GroupName}, crb.Subjects[0])
-
-				// fleet workspace assertions
-				require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
-			},
-			inputBinding: grb.DeepCopy(),
-			wantBinding:  addUserPrincipalName(&grb, testPrincipal),
-			wantError:    false,
-		},
-		{
-			name: "success on global, failure on cluster",
-			stateSetup: func(state grbTestState) {
-				// mocks for both cluster and global permissions
-				state.grListerMock.GetFunc = func(namespace, name string) (*v3.GlobalRole, error) {
-					if name == gr.Name && namespace == "" {
-						return &gr, nil
-					}
-					return nil, fmt.Errorf("not found")
-				}
-				state.rbListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.RoleBinding, error) {
-					return nil, nil
-				}
-				// mocks for just cluster permissions
-				state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-					state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
-					return crtb, nil
-				}
-				state.crtbClientMock.DeleteNamespacedFunc = func(_ string, name string, _ *metav1.DeleteOptions) error {
-					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
-					return nil
-				}
-				state.clusterCacheMock.EXPECT().List(labels.Everything()).Return(nil, fmt.Errorf("server not available")).AnyTimes()
-
-				// mocks for just global permissions
-				state.crbListerMock.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
-					return nil, fmt.Errorf("not found")
-				}
-				state.crbClientMock.CreateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
-					state.stateChanges.createdCRBs = append(state.stateChanges.createdCRBs, crb)
-					return crb, nil
-				}
-
-				// mocks for fleet workspace permissions
-				state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding, _ *[]metav1.Condition) error {
-					state.stateChanges.fwhCalled = true
-					return nil
-				}
-				// Allow the username specified to be queried for.
-				state.userListerMock.GetFunc = func(namespace, name string) (*v3.User, error) {
-					return &v3.User{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: name,
-						},
-						PrincipalIDs: []string{
-							testPrincipal,
-						},
-					}, nil
-				}
-				// mocks for status field
-				state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "test-grb",
-						UID:  "1234",
-					},
-					TypeMeta: metav1.TypeMeta{
-						APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
-						Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
-					},
-					GlobalRoleName: gr.Name,
-					UserName:       userName,
-					Status: v3.GlobalRoleBindingStatus{
-						LastUpdateTime: mockTime().Format(time.RFC3339),
-						SummaryLocal:   status.SummaryError,
-						Summary:        status.SummaryError,
-						LocalConditions: []metav1.Condition{
-							{
-								Type:               subjectReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             subjectExists,
-							},
-							{
-								Type:               clusterPermissionsReconciled,
-								Status:             metav1.ConditionFalse,
-								Message:            "server not available",
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             failedToListCluster,
-							},
-							{
-								Type:               globalRoleBindingReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             globalRoleBindingReconciled,
-							},
-							{
-								Type:               namespacedRoleBindingReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             namespacedRoleBindingReconciled,
-							},
-						},
-					},
-				})
-			},
-			stateAssertions: func(stateChanges grbTestStateChanges) {
-				require.Len(stateChanges.t, stateChanges.createdCRTBs, 0)
-				require.Len(stateChanges.t, stateChanges.createdCRBs, 1)
-				require.Len(stateChanges.t, stateChanges.deletedCRTBNames, 0)
-
-				// global assertions
-				crb := stateChanges.createdCRBs[0]
-				bindingName := "cattle-globalrolebinding-" + grb.Name
-				roleName := "cattle-globalrole-" + gr.Name
-				require.Equal(stateChanges.t, bindingName, crb.Name)
-				ownerRef := crb.OwnerReferences[0]
-				require.Equal(stateChanges.t, "management.cattle.io/v3", ownerRef.APIVersion)
-				require.Equal(stateChanges.t, "GlobalRoleBinding", ownerRef.Kind)
-				require.Equal(stateChanges.t, "test-grb", ownerRef.Name)
-				require.Equal(stateChanges.t, types.UID("1234"), ownerRef.UID)
-				require.Equal(stateChanges.t, rbacv1.RoleRef{Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
-				require.Equal(stateChanges.t, rbacv1.Subject{Name: userName, Kind: "User", APIGroup: rbacv1.GroupName}, crb.Subjects[0])
-				require.Equal(stateChanges.t, "true", crb.Labels["authz.management.cattle.io/globalrolebinding"])
-
-				// fleet workspace assertions
-				require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
-			},
-			inputBinding: grb.DeepCopy(),
-			wantBinding:  addUserPrincipalName(addAnnotation(&grb), testPrincipal),
-			wantError:    true,
-		},
-		{
-			name: "success on cluster, failure on global",
-			stateSetup: func(state grbTestState) {
-				// mocks for both cluster and global permissions
-				state.grListerMock.GetFunc = func(namespace, name string) (*v3.GlobalRole, error) {
-					if name == gr.Name && namespace == "" {
-						return &gr, nil
-					}
-					return nil, fmt.Errorf("not found")
-				}
-				state.rbListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.RoleBinding, error) {
-					return nil, nil
-				}
-				// mocks for just cluster permissions
-				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
-				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "not-local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil).Times(2)
-				state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-					state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
-					return crtb, nil
-				}
-				state.crtbClientMock.DeleteNamespacedFunc = func(_ string, name string, _ *metav1.DeleteOptions) error {
-					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
-					return nil
-				}
-				state.clusterCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&notLocalCluster, &localCluster}, nil).AnyTimes()
-
-				// mocks for just global permissions
-				state.crbListerMock.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
-					return nil, fmt.Errorf("not found")
-				}
-				state.crbClientMock.CreateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
-					state.stateChanges.createdCRBs = append(state.stateChanges.createdCRBs, crb)
-					return nil, fmt.Errorf("server not available")
-				}
-
-				// mocks for fleet workspace permissions
-				state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding, _ *[]metav1.Condition) error {
-					state.stateChanges.fwhCalled = true
-					return nil
-				}
-				// Allow the username specified to be queried for.
-				state.userListerMock.GetFunc = func(namespace, name string) (*v3.User, error) {
-					return &v3.User{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: name,
-						},
-						PrincipalIDs: []string{
-							testPrincipal,
-						},
-					}, nil
-				}
-				// mocks for status field
-				state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "test-grb",
-						UID:  "1234",
-					},
-					TypeMeta: metav1.TypeMeta{
-						APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
-						Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
-					},
-					GlobalRoleName: gr.Name,
-					UserName:       userName,
-					Status: v3.GlobalRoleBindingStatus{
-						LastUpdateTime: mockTime().Format(time.RFC3339),
-						SummaryLocal:   status.SummaryError,
-						Summary:        status.SummaryError,
-						LocalConditions: []metav1.Condition{
-							{
-								Type:               subjectReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             subjectExists,
-							},
-							{
-								Type:               clusterPermissionsReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             clusterPermissionsReconciled,
-							},
-							{
-								Type:               globalRoleBindingReconciled,
-								Status:             metav1.ConditionFalse,
-								Message:            "server not available",
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             failedToCreateClusterRoleBinding,
-							},
-							{
-								Type:               namespacedRoleBindingReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             namespacedRoleBindingReconciled,
-							},
-						},
-					},
-				})
-			},
-			stateAssertions: func(stateChanges grbTestStateChanges) {
-				require.Len(stateChanges.t, stateChanges.createdCRTBs, 1)
-				require.Len(stateChanges.t, stateChanges.createdCRBs, 1)
-				require.Len(stateChanges.t, stateChanges.deletedCRTBNames, 0)
-
-				// cluster assertions
-				crtb := stateChanges.createdCRTBs[0]
-				require.Equal(stateChanges.t, "not-local", crtb.ClusterName)
-				require.Equal(stateChanges.t, "not-local", crtb.Namespace)
-				require.Equal(stateChanges.t, "test-grb", crtb.Labels[grbOwnerLabel])
-				require.Equal(stateChanges.t, "test-grb", crtb.Labels[grbOwnerLabel])
-				require.Equal(stateChanges.t, readOnlyRoleName, crtb.RoleTemplateName)
-				require.Equal(stateChanges.t, userName, crtb.UserName)
-				require.Equal(stateChanges.t, "", crtb.GroupPrincipalName)
-				require.Len(stateChanges.t, crtb.OwnerReferences, 1)
-				require.Equal(stateChanges.t, grbOwnerRef, crtb.OwnerReferences[0])
-
-				// global assertions
-				crb := stateChanges.createdCRBs[0]
-				bindingName := "cattle-globalrolebinding-" + grb.Name
-				roleName := "cattle-globalrole-" + gr.Name
-				require.Equal(stateChanges.t, bindingName, crb.Name)
-				require.Len(stateChanges.t, crb.OwnerReferences, 1)
-				require.Equal(stateChanges.t, grbOwnerRef, crb.OwnerReferences[0])
-				require.Equal(stateChanges.t, rbacv1.RoleRef{Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
-				require.Equal(stateChanges.t, rbacv1.Subject{Name: userName, Kind: "User", APIGroup: rbacv1.GroupName}, crb.Subjects[0])
-				require.Equal(stateChanges.t, "true", crb.Labels["authz.management.cattle.io/globalrolebinding"])
-
-				// fleet workspace assertions
-				require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
-			},
-			inputBinding: grb.DeepCopy(),
-			wantBinding:  addUserPrincipalName(&grb, testPrincipal),
-			wantError:    true,
-		},
-		{
-			name: "failure on cluster and global",
-			stateSetup: func(state grbTestState) {
-				// mocks for both cluster and global permissions
-				state.grListerMock.GetFunc = func(namespace, name string) (*v3.GlobalRole, error) {
-					return nil, fmt.Errorf("not found")
-				}
-				state.rbListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.RoleBinding, error) {
-					return nil, nil
-				}
-				// mocks for just cluster permissions
-				state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-					state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
-					return crtb, nil
-				}
-				state.crtbClientMock.DeleteNamespacedFunc = func(_ string, name string, _ *metav1.DeleteOptions) error {
-					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
-					return nil
-				}
-
-				// mocks for just global permissions
-				state.crbListerMock.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
-					return nil, fmt.Errorf("not found")
-				}
-				state.crbClientMock.CreateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
-					state.stateChanges.createdCRBs = append(state.stateChanges.createdCRBs, crb)
-					return nil, fmt.Errorf("server not available")
-				}
-
-				// mocks for fleet workspace permissions
-				state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding, _ *[]metav1.Condition) error {
-					state.stateChanges.fwhCalled = true
-					return nil
-				}
-				// Allow the provided user to be looked up
-				state.userListerMock.GetFunc = func(namespace, name string) (*v3.User, error) {
-					return &v3.User{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: name,
-						},
-						PrincipalIDs: []string{
-							testPrincipal,
-						},
-					}, nil
-				}
-				// mocks for status field
-				state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "test-grb",
-						UID:  "1234",
-					},
-					TypeMeta: metav1.TypeMeta{
-						APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
-						Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
-					},
-					GlobalRoleName: gr.Name,
-					UserName:       userName,
-					Status: v3.GlobalRoleBindingStatus{
-						LastUpdateTime: mockTime().Format(time.RFC3339),
-						SummaryLocal:   status.SummaryError,
-						Summary:        status.SummaryError,
-						LocalConditions: []metav1.Condition{
-							{
-								Type:               subjectReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             subjectExists,
-							},
-							{
-								Type:               clusterPermissionsReconciled,
-								Status:             metav1.ConditionFalse,
-								Message:            "not found",
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             failedToGetGlobalRole,
-							},
-							{
-								Type:               globalRoleBindingReconciled,
-								Status:             metav1.ConditionFalse,
-								Message:            "server not available",
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             failedToCreateClusterRoleBinding,
-							},
-							{
-								Type:               namespacedRoleBindingReconciled,
-								Status:             metav1.ConditionFalse,
-								Message:            "not found",
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             failedToGetGlobalRole,
-							},
-						},
-					},
-				})
-			},
-			stateAssertions: func(stateChanges grbTestStateChanges) {
-				require.Len(stateChanges.t, stateChanges.createdCRTBs, 0)
-				require.Len(stateChanges.t, stateChanges.createdCRBs, 1)
-				require.Len(stateChanges.t, stateChanges.deletedCRTBNames, 0)
-
-				// global assertions
-				crb := stateChanges.createdCRBs[0]
-				bindingName := "cattle-globalrolebinding-" + grb.Name
-				roleName := "cattle-globalrole-" + gr.Name
-				require.Equal(stateChanges.t, bindingName, crb.Name)
-				require.Len(stateChanges.t, crb.OwnerReferences, 1)
-				require.Equal(stateChanges.t, grbOwnerRef, crb.OwnerReferences[0])
-				require.Equal(stateChanges.t, rbacv1.RoleRef{Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
-				require.Equal(stateChanges.t, rbacv1.Subject{Name: userName, Kind: "User", APIGroup: rbacv1.GroupName}, crb.Subjects[0])
-				require.Equal(stateChanges.t, "true", crb.Labels["authz.management.cattle.io/globalrolebinding"])
-				// fleet workspace assertions
-				require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
-			},
-			inputBinding: grb.DeepCopy(),
-			wantBinding:  addUserPrincipalName(&grb, testPrincipal),
-			wantError:    true,
-		},
-		{
-			name: "success on cluster and global permissions, failure on fleet workspace permissions",
-			stateSetup: func(state grbTestState) {
-				// mocks for both cluster and global permissions
-				state.grListerMock.GetFunc = func(namespace, name string) (*v3.GlobalRole, error) {
-					if name == gr.Name && namespace == "" {
-						return &gr, nil
-					}
-					return nil, fmt.Errorf("not found")
-				}
-				state.rbListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.RoleBinding, error) {
-					return nil, nil
-				}
-				// mocks for just cluster permissions
-				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
-				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "not-local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil).Times(2)
-				state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-					state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
-					return crtb, nil
-				}
-				state.crtbClientMock.DeleteNamespacedFunc = func(_ string, name string, _ *metav1.DeleteOptions) error {
-					state.stateChanges.deletedCRTBNames = append(state.stateChanges.deletedCRTBNames, name)
-					return nil
-				}
-				state.clusterCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&notLocalCluster, &localCluster}, nil).AnyTimes()
-
-				// mocks for just global permissions
-				state.crbListerMock.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
-					return nil, fmt.Errorf("not found")
-				}
-				state.crbClientMock.CreateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
-					state.stateChanges.createdCRBs = append(state.stateChanges.createdCRBs, crb)
-					return crb, nil
-				}
-
-				// mocks for fleet workspace permissions
-				state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding, _ *[]metav1.Condition) error {
-					state.stateChanges.fwhCalled = true
-					return fmt.Errorf("unavailable")
-				}
-				// Allow the provided user to be looked up
-				state.userListerMock.GetFunc = func(namespace, name string) (*v3.User, error) {
-					return &v3.User{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: name,
-						},
-						PrincipalIDs: []string{
-							testPrincipal,
-						},
-					}, nil
-				}
-				// mocks for status field
-				state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "test-grb",
-						UID:  "1234",
-					},
-					TypeMeta: metav1.TypeMeta{
-						APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
-						Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
-					},
-					GlobalRoleName: gr.Name,
-					UserName:       userName,
-					Status: v3.GlobalRoleBindingStatus{
-						LastUpdateTime: mockTime().Format(time.RFC3339),
-						SummaryLocal:   status.SummaryCompleted,
-						Summary:        status.SummaryCompleted,
-						LocalConditions: []metav1.Condition{
-							{
-								Type:               subjectReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             subjectExists,
-							},
-							{
-								Type:               clusterPermissionsReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             clusterPermissionsReconciled,
-							},
-							{
-								Type:               globalRoleBindingReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             globalRoleBindingReconciled,
-							},
-							{
-								Type:               namespacedRoleBindingReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             namespacedRoleBindingReconciled,
-							},
-						},
-					},
-				})
-			},
-			stateAssertions: func(stateChanges grbTestStateChanges) {
-				require.Len(stateChanges.t, stateChanges.createdCRTBs, 1)
-				require.Len(stateChanges.t, stateChanges.createdCRBs, 1)
-				require.Len(stateChanges.t, stateChanges.deletedCRTBNames, 0)
-
-				// cluster assertions
-				crtb := stateChanges.createdCRTBs[0]
-				require.Equal(stateChanges.t, "not-local", crtb.ClusterName)
-				require.Equal(stateChanges.t, "not-local", crtb.Namespace)
-				require.Equal(stateChanges.t, "test-grb", crtb.Labels[grbOwnerLabel])
-				require.Equal(stateChanges.t, "test-grb", crtb.Labels[grbOwnerLabel])
-				require.Equal(stateChanges.t, readOnlyRoleName, crtb.RoleTemplateName)
-				require.Equal(stateChanges.t, userName, crtb.UserName)
-				require.Equal(stateChanges.t, "", crtb.GroupPrincipalName)
-				require.Len(stateChanges.t, crtb.OwnerReferences, 1)
-				require.Equal(stateChanges.t, grbOwnerRef, crtb.OwnerReferences[0])
-
-				// global assertions
-				crb := stateChanges.createdCRBs[0]
-				bindingName := "cattle-globalrolebinding-" + grb.Name
-				roleName := "cattle-globalrole-" + gr.Name
-				require.Equal(stateChanges.t, bindingName, crb.Name)
-				require.Len(stateChanges.t, crb.OwnerReferences, 1)
-				require.Equal(stateChanges.t, grbOwnerRef, crb.OwnerReferences[0])
-				require.Equal(stateChanges.t, rbacv1.RoleRef{Name: roleName, Kind: "ClusterRole"}, crb.RoleRef)
-				require.Equal(stateChanges.t, rbacv1.Subject{Name: userName, Kind: "User", APIGroup: rbacv1.GroupName}, crb.Subjects[0])
-				require.Equal(stateChanges.t, "true", crb.Labels["authz.management.cattle.io/globalrolebinding"])
-
-				// fleet workspace assertions
-				require.Equal(stateChanges.t, true, stateChanges.fwhCalled)
-			},
-			inputBinding: grb.DeepCopy(),
-			wantBinding:  addUserPrincipalName(addAnnotation(&grb), testPrincipal),
-			wantError:    true,
-		},
-		{
-			name: "binding referencing user triggers creation of user",
-			stateSetup: func(state grbTestState) {
-				state.clusterCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&notLocalCluster, &localCluster}, nil).AnyTimes()
-				state.rbListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.RoleBinding, error) {
-					return nil, nil
-				}
-				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
-				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "not-local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil).Times(2)
-				state.grListerMock.GetFunc = func(namespace, name string) (*v3.GlobalRole, error) {
-					if name == gr.Name && namespace == "" {
-						return &gr, nil
-					}
-					return nil, fmt.Errorf("not found")
-				}
-				state.crbClientMock.CreateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
-					state.stateChanges.createdCRBs = append(state.stateChanges.createdCRBs, crb)
-					return crb, nil
-				}
-				state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-					state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
-					return crtb, nil
-				}
-				state.crbListerMock.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
-					return nil, fmt.Errorf("not found")
-				}
-				state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding, _ *[]metav1.Condition) error {
-					state.stateChanges.fwhCalled = true
-					return nil
-				}
-				state.userManagerMock.EXPECT().EnsureUser(
-					"activedirectory_user://CN=test,CN=Users,DC=ad,DC=ians,DC=farm", "test-user").Return(
-					&v3.User{ObjectMeta: metav1.ObjectMeta{Name: "test-user"}}, nil)
-				// mocks for status field
-				state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "test-grb",
 						UID:  "1234",
 						Annotations: map[string]string{
 							"auth.cattle.io/principal-display-name": "test-user",
+						},
+					},
+					GlobalRoleName:    gr.Name,
+					UserPrincipalName: "activedirectory_user://CN=test,CN=Users,DC=ad,DC=ians,DC=farm",
+				},
+				wantBinding: addUserPrincipalName(addAnnotation(&grb, map[string]string{
+					"auth.cattle.io/principal-display-name": "test-user",
+				}), "activedirectory_user://CN=test,CN=Users,DC=ad,DC=ians,DC=farm"),
+				wantError: false,
+			},
+			{
+				name: "binding referencing groupName and no user or userPrincipal",
+				stateSetup: func(state grbTestState) {
+					state.clusterCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&notLocalCluster, &localCluster}, nil).AnyTimes()
+					state.rbListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.RoleBinding, error) {
+						return nil, nil
+					}
+					state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
+					state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "not-local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil).Times(2)
+					state.grListerMock.GetFunc = func(namespace, name string) (*v3.GlobalRole, error) {
+						if name == gr.Name && namespace == "" {
+							return &gr, nil
+						}
+						return nil, fmt.Errorf("not found")
+					}
+					state.crbClientMock.CreateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
+						state.stateChanges.createdCRBs = append(state.stateChanges.createdCRBs, crb)
+						return crb, nil
+					}
+					state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+						state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
+						return crtb, nil
+					}
+					state.crbListerMock.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
+						return nil, fmt.Errorf("not found")
+					}
+					state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding, _ *[]metav1.Condition) error {
+						state.stateChanges.fwhCalled = true
+						return nil
+					}
+					// mocks for status field
+					state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "test-grb",
+							UID:  "1234",
+						},
+						TypeMeta: metav1.TypeMeta{
+							APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
+							Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
+						},
+						GlobalRoleName:     gr.Name,
+						GroupPrincipalName: "activedirectory_user://CN=Users,DC=ad,DC=ians,DC=farm",
+						Status: v3.GlobalRoleBindingStatus{
+							LastUpdateTime: mockTime().Format(time.RFC3339),
+							SummaryLocal:   status.SummaryCompleted,
+							Summary:        status.SummaryCompleted,
+							LocalConditions: []metav1.Condition{
+								{
+									Type:               subjectReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             subjectExists,
+								},
+								{
+									Type:               clusterPermissionsReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             clusterPermissionsReconciled,
+								},
+								{
+									Type:               globalRoleBindingReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             globalRoleBindingReconciled,
+								},
+								{
+									Type:               namespacedRoleBindingReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             namespacedRoleBindingReconciled,
+								},
+							},
+						},
+					})
+				},
+				inputBinding: &v3.GlobalRoleBinding{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
+						Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-grb",
+						UID:  "1234",
+					},
+					GlobalRoleName:     gr.Name,
+					GroupPrincipalName: "activedirectory_user://CN=Users,DC=ad,DC=ians,DC=farm",
+				},
+				wantBinding: &v3.GlobalRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-grb",
+						UID:  "1234",
+						Annotations: map[string]string{
+							"authz.management.cattle.io/crb-name": "cattle-globalrolebinding-test-grb",
+						},
+					},
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
+						Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
+					},
+					GroupPrincipalName: "activedirectory_user://CN=Users,DC=ad,DC=ians,DC=farm",
+					GlobalRoleName:     "test-gr",
+				},
+				wantError: false,
+			},
+			{
+				name: "binding referencing user links to existing user",
+				stateSetup: func(state grbTestState) {
+					state.clusterCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&notLocalCluster, &localCluster}, nil).AnyTimes()
+					state.rbListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.RoleBinding, error) {
+						return nil, nil
+					}
+					state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
+					state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "not-local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil).Times(2)
+					state.grListerMock.GetFunc = func(namespace, name string) (*v3.GlobalRole, error) {
+						if name == gr.Name && namespace == "" {
+							return &gr, nil
+						}
+						return nil, fmt.Errorf("not found")
+					}
+					state.crbClientMock.CreateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
+						state.stateChanges.createdCRBs = append(state.stateChanges.createdCRBs, crb)
+						return crb, nil
+					}
+					state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+						state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
+						return crtb, nil
+					}
+					state.crbListerMock.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
+						return nil, fmt.Errorf("not found")
+					}
+					state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding, _ *[]metav1.Condition) error {
+						state.stateChanges.fwhCalled = true
+						return nil
+					}
+					// Allow the provided user to be looked up
+					state.userListerMock.GetFunc = func(namespace, name string) (*v3.User, error) {
+						return &v3.User{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: name,
+							},
+							PrincipalIDs: []string{
+								testPrincipal,
+							},
+						}, nil
+					}
+					// mocks for status field
+					state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "test-grb",
+							UID:  "1234",
+							Annotations: map[string]string{
+								"auth.cattle.io/principal-display-name": "test-user",
+							},
+						},
+						TypeMeta: metav1.TypeMeta{
+							APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
+							Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
+						},
+						GlobalRoleName: gr.Name,
+						UserName:       "test-user",
+						Status: v3.GlobalRoleBindingStatus{
+							LastUpdateTime: mockTime().Format(time.RFC3339),
+							SummaryLocal:   status.SummaryCompleted,
+							Summary:        status.SummaryCompleted,
+							LocalConditions: []metav1.Condition{
+								{
+									Type:               subjectReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             subjectExists,
+								},
+								{
+									Type:               clusterPermissionsReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             clusterPermissionsReconciled,
+								},
+								{
+									Type:               globalRoleBindingReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             globalRoleBindingReconciled,
+								},
+								{
+									Type:               namespacedRoleBindingReconciled,
+									Status:             metav1.ConditionTrue,
+									LastTransitionTime: metav1.Time{Time: mockTime()},
+									Reason:             namespacedRoleBindingReconciled,
+								},
+							},
+						},
+					})
+				},
+				inputBinding: &v3.GlobalRoleBinding{
+					TypeMeta: metav1.TypeMeta{
+						APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
+						Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-grb",
+						UID:  "1234",
+						Annotations: map[string]string{
+							"auth.cattle.io/principal-display-name": "test-user",
+						},
+					},
+					GlobalRoleName: gr.Name,
+					UserName:       "test-user",
+				},
+				wantBinding: &v3.GlobalRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "test-grb",
+						UID:  "1234",
+						Annotations: map[string]string{
+							"auth.cattle.io/principal-display-name": "test-user",
+							"authz.management.cattle.io/crb-name":   "cattle-globalrolebinding-test-grb",
 						},
 					},
 					TypeMeta: metav1.TypeMeta{
@@ -984,361 +1260,85 @@ func TestCreateUpdate(t *testing.T) {
 						Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
 					},
 					GlobalRoleName:    gr.Name,
-					UserPrincipalName: "activedirectory_user://CN=test,CN=Users,DC=ad,DC=ians,DC=farm",
-					Status: v3.GlobalRoleBindingStatus{
-						LastUpdateTime: mockTime().Format(time.RFC3339),
-						SummaryLocal:   status.SummaryCompleted,
-						Summary:        status.SummaryCompleted,
-						LocalConditions: []metav1.Condition{
-							{
-								Type:               subjectReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             subjectExists,
-							},
-							{
-								Type:               clusterPermissionsReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             clusterPermissionsReconciled,
-							},
-							{
-								Type:               globalRoleBindingReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             globalRoleBindingReconciled,
-							},
-							{
-								Type:               namespacedRoleBindingReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             namespacedRoleBindingReconciled,
-							},
-						},
-					},
-				})
+					UserName:          "test-user",
+					UserPrincipalName: testPrincipal,
+				},
+				wantError: false,
 			},
-			inputBinding: &v3.GlobalRoleBinding{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
-					Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-grb",
-					UID:  "1234",
-					Annotations: map[string]string{
-						"auth.cattle.io/principal-display-name": "test-user",
-					},
-				},
-				GlobalRoleName:    gr.Name,
-				UserPrincipalName: "activedirectory_user://CN=test,CN=Users,DC=ad,DC=ians,DC=farm",
-			},
-			wantBinding: addUserPrincipalName(addAnnotation(&grb, map[string]string{
-				"auth.cattle.io/principal-display-name": "test-user",
-			}), "activedirectory_user://CN=test,CN=Users,DC=ad,DC=ians,DC=farm"),
-			wantError: false,
-		},
-		{
-			name: "binding referencing groupName and no user or userPrincipal",
-			stateSetup: func(state grbTestState) {
-				state.clusterCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&notLocalCluster, &localCluster}, nil).AnyTimes()
-				state.rbListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.RoleBinding, error) {
-					return nil, nil
-				}
-				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
-				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "not-local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil).Times(2)
-				state.grListerMock.GetFunc = func(namespace, name string) (*v3.GlobalRole, error) {
-					if name == gr.Name && namespace == "" {
-						return &gr, nil
-					}
-					return nil, fmt.Errorf("not found")
-				}
-				state.crbClientMock.CreateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
-					state.stateChanges.createdCRBs = append(state.stateChanges.createdCRBs, crb)
-					return crb, nil
-				}
-				state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-					state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
-					return crtb, nil
-				}
-				state.crbListerMock.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
-					return nil, fmt.Errorf("not found")
-				}
-				state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding, _ *[]metav1.Condition) error {
-					state.stateChanges.fwhCalled = true
-					return nil
-				}
-				// mocks for status field
-				state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "test-grb",
-						UID:  "1234",
-					},
-					TypeMeta: metav1.TypeMeta{
-						APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
-						Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
-					},
-					GlobalRoleName:     gr.Name,
-					GroupPrincipalName: "activedirectory_user://CN=Users,DC=ad,DC=ians,DC=farm",
-					Status: v3.GlobalRoleBindingStatus{
-						LastUpdateTime: mockTime().Format(time.RFC3339),
-						SummaryLocal:   status.SummaryCompleted,
-						Summary:        status.SummaryCompleted,
-						LocalConditions: []metav1.Condition{
-							{
-								Type:               subjectReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             subjectExists,
-							},
-							{
-								Type:               clusterPermissionsReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             clusterPermissionsReconciled,
-							},
-							{
-								Type:               globalRoleBindingReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             globalRoleBindingReconciled,
-							},
-							{
-								Type:               namespacedRoleBindingReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             namespacedRoleBindingReconciled,
-							},
-						},
-					},
-				})
-			},
-			inputBinding: &v3.GlobalRoleBinding{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
-					Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-grb",
-					UID:  "1234",
-				},
-				GlobalRoleName:     gr.Name,
-				GroupPrincipalName: "activedirectory_user://CN=Users,DC=ad,DC=ians,DC=farm",
-			},
-			wantBinding: &v3.GlobalRoleBinding{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-grb",
-					UID:  "1234",
-					Annotations: map[string]string{
-						"authz.management.cattle.io/crb-name": "cattle-globalrolebinding-test-grb",
-					},
-				},
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
-					Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
-				},
-				GroupPrincipalName: "activedirectory_user://CN=Users,DC=ad,DC=ians,DC=farm",
-				GlobalRoleName:     "test-gr",
-			},
-			wantError: false,
-		},
-		{
-			name: "binding referencing user links to existing user",
-			stateSetup: func(state grbTestState) {
-				state.clusterCacheMock.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&notLocalCluster, &localCluster}, nil).AnyTimes()
-				state.rbListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.RoleBinding, error) {
-					return nil, nil
-				}
-				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil)
-				state.crtbCacheMock.EXPECT().GetByIndex(crtbGrbOwnerIndex, "not-local/test-grb").Return([]*v3.ClusterRoleTemplateBinding{}, nil).Times(2)
-				state.grListerMock.GetFunc = func(namespace, name string) (*v3.GlobalRole, error) {
-					if name == gr.Name && namespace == "" {
-						return &gr, nil
-					}
-					return nil, fmt.Errorf("not found")
-				}
-				state.crbClientMock.CreateFunc = func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
-					state.stateChanges.createdCRBs = append(state.stateChanges.createdCRBs, crb)
-					return crb, nil
-				}
-				state.crtbClientMock.CreateFunc = func(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-					state.stateChanges.createdCRTBs = append(state.stateChanges.createdCRTBs, crtb)
-					return crtb, nil
-				}
-				state.crbListerMock.GetFunc = func(namespace, name string) (*rbacv1.ClusterRoleBinding, error) {
-					return nil, fmt.Errorf("not found")
-				}
-				state.fwhMock.reconcileFleetWorkspacePermissionsFunc = func(globalRoleBinding *v3.GlobalRoleBinding, _ *[]metav1.Condition) error {
-					state.stateChanges.fwhCalled = true
-					return nil
-				}
-				// Allow the provided user to be looked up
-				state.userListerMock.GetFunc = func(namespace, name string) (*v3.User, error) {
-					return &v3.User{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: name,
-						},
-						PrincipalIDs: []string{
-							testPrincipal,
-						},
-					}, nil
-				}
-				// mocks for status field
-				state.grbClientMock.EXPECT().UpdateStatus(&v3.GlobalRoleBinding{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "test-grb",
-						UID:  "1234",
-						Annotations: map[string]string{
-							"auth.cattle.io/principal-display-name": "test-user",
-						},
-					},
-					TypeMeta: metav1.TypeMeta{
-						APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
-						Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
-					},
-					GlobalRoleName: gr.Name,
-					UserName:       "test-user",
-					Status: v3.GlobalRoleBindingStatus{
-						LastUpdateTime: mockTime().Format(time.RFC3339),
-						SummaryLocal:   status.SummaryCompleted,
-						Summary:        status.SummaryCompleted,
-						LocalConditions: []metav1.Condition{
-							{
-								Type:               subjectReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             subjectExists,
-							},
-							{
-								Type:               clusterPermissionsReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             clusterPermissionsReconciled,
-							},
-							{
-								Type:               globalRoleBindingReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             globalRoleBindingReconciled,
-							},
-							{
-								Type:               namespacedRoleBindingReconciled,
-								Status:             metav1.ConditionTrue,
-								LastTransitionTime: metav1.Time{Time: mockTime()},
-								Reason:             namespacedRoleBindingReconciled,
-							},
-						},
-					},
-				})
-			},
-			inputBinding: &v3.GlobalRoleBinding{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
-					Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-grb",
-					UID:  "1234",
-					Annotations: map[string]string{
-						"auth.cattle.io/principal-display-name": "test-user",
-					},
-				},
-				GlobalRoleName: gr.Name,
-				UserName:       "test-user",
-			},
-			wantBinding: &v3.GlobalRoleBinding{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-grb",
-					UID:  "1234",
-					Annotations: map[string]string{
-						"auth.cattle.io/principal-display-name": "test-user",
-						"authz.management.cattle.io/crb-name":   "cattle-globalrolebinding-test-grb",
-					},
-				},
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: apisv3.GlobalRoleBindingGroupVersionKind.GroupVersion().String(),
-					Kind:       apisv3.GlobalRoleBindingGroupVersionKind.Kind,
-				},
-				GlobalRoleName:    gr.Name,
-				UserName:          "test-user",
-				UserPrincipalName: testPrincipal,
-			},
-			wantError: false,
-		},
-	}
+		}
 
-	for _, test := range tests {
-		test := test
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			grbLifecycle := globalRoleBindingLifecycle{}
-			testFuncs := []func(*v3.GlobalRoleBinding) (runtime.Object, error){grbLifecycle.Updated, grbLifecycle.Create}
-			for _, testFunc := range testFuncs {
-				ctrl := gomock.NewController(t)
-				crtbCacheMock := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
-				grListerMock := fakes.GlobalRoleListerMock{}
-				crbListerMock := rbacFakes.ClusterRoleBindingListerMock{}
-				clusterCacheMock := fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl)
-				crtbClientMock := fakes.ClusterRoleTemplateBindingInterfaceMock{}
-				crbClientMock := rbacFakes.ClusterRoleBindingInterfaceMock{}
-				rbListerMock := rbacFakes.RoleBindingListerMock{}
-				grbListerMock := fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRoleBinding](ctrl)
-				grbClientMock := fake.NewMockNonNamespacedControllerInterface[*v3.GlobalRoleBinding, *v3.GlobalRoleBindingList](ctrl)
-				fphMock := fleetPermissionsHandlerMock{}
-				grbListerMock.EXPECT().Get(test.inputBinding.Name).Return(test.inputBinding.DeepCopy(), nil)
-				stateChanges := grbTestStateChanges{
-					t:                t,
-					createdCRTBs:     []*v3.ClusterRoleTemplateBinding{},
-					createdCRBs:      []*rbacv1.ClusterRoleBinding{},
-					deletedCRTBNames: []string{},
+		for _, test := range tests {
+			test := test
+			t.Run(test.name, func(t *testing.T) {
+				t.Parallel()
+				grbLifecycle := globalRoleBindingLifecycle{}
+				testFuncs := []func(*v3.GlobalRoleBinding) (runtime.Object, error){grbLifecycle.Updated, grbLifecycle.Create}
+				for _, testFunc := range testFuncs {
+					ctrl := gomock.NewController(t)
+					crtbCacheMock := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
+					grListerMock := fakes.GlobalRoleListerMock{}
+					crbListerMock := rbacFakes.ClusterRoleBindingListerMock{}
+					clusterCacheMock := fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl)
+					crtbClientMock := fakes.ClusterRoleTemplateBindingInterfaceMock{}
+					crbClientMock := rbacFakes.ClusterRoleBindingInterfaceMock{}
+					rbListerMock := rbacFakes.RoleBindingListerMock{}
+					grbListerMock := fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRoleBinding](ctrl)
+					grbClientMock := fake.NewMockNonNamespacedControllerInterface[*v3.GlobalRoleBinding, *v3.GlobalRoleBindingList](ctrl)
+					fphMock := fleetPermissionsHandlerMock{}
+					grbListerMock.EXPECT().Get(test.inputBinding.Name).Return(test.inputBinding.DeepCopy(), nil)
+					stateChanges := grbTestStateChanges{
+						t:                t,
+						createdCRTBs:     []*v3.ClusterRoleTemplateBinding{},
+						createdCRBs:      []*rbacv1.ClusterRoleBinding{},
+						deletedCRTBNames: []string{},
+					}
+					state := grbTestState{
+						crtbCacheMock:    crtbCacheMock,
+						grListerMock:     &grListerMock,
+						crbListerMock:    &crbListerMock,
+						clusterCacheMock: clusterCacheMock,
+						crtbClientMock:   &crtbClientMock,
+						crbClientMock:    &crbClientMock,
+						rbListerMock:     &rbListerMock,
+						fwhMock:          &fphMock,
+						grbListerMock:    grbListerMock,
+						grbClientMock:    grbClientMock,
+						userManagerMock:  userMocks.NewMockManager(ctrl),
+						userListerMock:   &fakes.UserListerMock{},
+						stateChanges:     &stateChanges,
+					}
+					if test.stateSetup != nil {
+						test.stateSetup(state)
+					}
+					grbLifecycle.grLister = &grListerMock
+					grbLifecycle.crbLister = &crbListerMock
+					grbLifecycle.crtbCache = crtbCacheMock
+					grbLifecycle.clusterLister = clusterCacheMock
+					grbLifecycle.crtbClient = &crtbClientMock
+					grbLifecycle.crbClient = &crbClientMock
+					grbLifecycle.roleBindingLister = &rbListerMock
+					grbLifecycle.fleetPermissionsHandler = &fphMock
+					grbLifecycle.grbLister = grbListerMock
+					grbLifecycle.grbClient = grbClientMock
+					grbLifecycle.status = status.NewStatus()
+					grbLifecycle.status.TimeNow = mockTime
+					grbLifecycle.userManager = state.userManagerMock
+					grbLifecycle.userLister = state.userListerMock
+					res, resErr := testFunc(test.inputBinding.DeepCopy())
+					require.Equal(t, test.wantBinding, res)
+					if test.wantError {
+						require.Error(t, resErr)
+					} else {
+						require.NoError(t, resErr)
+					}
+					if test.stateAssertions != nil {
+						test.stateAssertions(*state.stateChanges)
+					}
 				}
-				state := grbTestState{
-					crtbCacheMock:    crtbCacheMock,
-					grListerMock:     &grListerMock,
-					crbListerMock:    &crbListerMock,
-					clusterCacheMock: clusterCacheMock,
-					crtbClientMock:   &crtbClientMock,
-					crbClientMock:    &crbClientMock,
-					rbListerMock:     &rbListerMock,
-					fwhMock:          &fphMock,
-					grbListerMock:    grbListerMock,
-					grbClientMock:    grbClientMock,
-					userManagerMock:  userMocks.NewMockManager(ctrl),
-					userListerMock:   &fakes.UserListerMock{},
-					stateChanges:     &stateChanges,
-				}
-				if test.stateSetup != nil {
-					test.stateSetup(state)
-				}
-				grbLifecycle.grLister = &grListerMock
-				grbLifecycle.crbLister = &crbListerMock
-				grbLifecycle.crtbCache = crtbCacheMock
-				grbLifecycle.clusterLister = clusterCacheMock
-				grbLifecycle.crtbClient = &crtbClientMock
-				grbLifecycle.crbClient = &crbClientMock
-				grbLifecycle.roleBindingLister = &rbListerMock
-				grbLifecycle.fleetPermissionsHandler = &fphMock
-				grbLifecycle.grbLister = grbListerMock
-				grbLifecycle.grbClient = grbClientMock
-				grbLifecycle.status = status.NewStatus()
-				grbLifecycle.status.TimeNow = mockTime
-				grbLifecycle.userManager = state.userManagerMock
-				grbLifecycle.userLister = state.userListerMock
-				res, resErr := testFunc(test.inputBinding.DeepCopy())
-				require.Equal(t, test.wantBinding, res)
-				if test.wantError {
-					require.Error(t, resErr)
-				} else {
-					require.NoError(t, resErr)
-				}
-				if test.stateAssertions != nil {
-					test.stateAssertions(*state.stateChanges)
-				}
-			}
-		})
+			})
+		}
 	}
-}
-
+*/
 func Test_crtbGrbOwnerIndexer(t *testing.T) {
 	t.Parallel()
 	grbOwnedCRTB := &v3.ClusterRoleTemplateBinding{
@@ -1404,7 +1404,7 @@ func Test_crtbGrbOwnerIndexer(t *testing.T) {
 	keys, err = crtbGrbOwnerIndexer(standardCRTB)
 	require.NoError(t, err)
 	require.Len(t, keys, 0)
-}*/
+}
 
 func TestReconcileClusterPermissions(t *testing.T) {
 	t.Parallel()
@@ -1670,6 +1670,320 @@ func TestReconcileClusterPermissions(t *testing.T) {
 		})
 	}
 
+}
+
+func TestReconcileGlobalRoleBinding(t *testing.T) {
+	t.Parallel()
+
+	testGR := v3.GlobalRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-gr",
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				Verbs:     []string{"get", "list", "watch"},
+				APIGroups: []string{""},
+				Resources: []string{"pods"},
+			},
+		},
+	}
+
+	testGRWithAnnotation := v3.GlobalRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-gr",
+			Annotations: map[string]string{
+				crNameAnnotation: "custom-cr-name",
+			},
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				Verbs:     []string{"get", "list", "watch"},
+				APIGroups: []string{""},
+				Resources: []string{"pods"},
+			},
+		},
+	}
+
+	testGRB := v3.GlobalRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-grb",
+			UID:  "1234",
+		},
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "management.cattle.io/v3",
+			Kind:       "GlobalRoleBinding",
+		},
+		GlobalRoleName: "test-gr",
+		UserName:       "test-user",
+	}
+
+	testGRBWithAnnotation := v3.GlobalRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-grb",
+			UID:  "1234",
+			Annotations: map[string]string{
+				crbNameAnnotation: "custom-crb-name",
+			},
+		},
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "management.cattle.io/v3",
+			Kind:       "GlobalRoleBinding",
+		},
+		GlobalRoleName: "test-gr",
+		UserName:       "test-user",
+	}
+
+	expectedCRB := rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: crbNamePrefix + "test-grb",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: "management.cattle.io/v3",
+					Kind:       "GlobalRoleBinding",
+					Name:       "test-grb",
+					UID:        "1234",
+				},
+			},
+			Labels: globalRoleBindingLabel,
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:     "User",
+				Name:     "test-user",
+				APIGroup: rbacv1.GroupName,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			Name: generateCRName("test-gr"),
+			Kind: clusterRoleKind,
+		},
+	}
+
+	type controllers struct {
+		crbCache      *fake.MockNonNamespacedCacheInterface[*rbacv1.ClusterRoleBinding]
+		crbController *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]
+		grCache       *fake.MockNonNamespacedCacheInterface[*v3.GlobalRole]
+	}
+
+	tests := []struct {
+		name             string
+		setupControllers func(controllers)
+		inputObject      *v3.GlobalRoleBinding
+		wantError        bool
+		wantAnnotation   string
+	}{
+		{
+			name: "create new clusterRoleBinding",
+			setupControllers: func(c controllers) {
+				c.crbCache.EXPECT().Get(crbNamePrefix+"test-grb").Return(nil, nil)
+				c.grCache.EXPECT().Get("test-gr").Return(testGR.DeepCopy(), nil)
+				c.crbController.EXPECT().Create(expectedCRB.DeepCopy()).Return(&expectedCRB, nil)
+			},
+			inputObject:    testGRB.DeepCopy(),
+			wantError:      false,
+			wantAnnotation: crbNamePrefix + "test-grb",
+		},
+		{
+			name: "create new clusterRoleBinding with custom annotation",
+			setupControllers: func(c controllers) {
+				c.crbCache.EXPECT().Get("custom-crb-name").Return(nil, nil)
+				c.grCache.EXPECT().Get("test-gr").Return(testGR.DeepCopy(), nil)
+				customCRB := expectedCRB.DeepCopy()
+				customCRB.Name = "custom-crb-name"
+				c.crbController.EXPECT().Create(customCRB).Return(customCRB, nil)
+			},
+			inputObject:    testGRBWithAnnotation.DeepCopy(),
+			wantError:      false,
+			wantAnnotation: "custom-crb-name",
+		},
+		{
+			name: "create new clusterRoleBinding uses CR name from GlobalRole annotation",
+			setupControllers: func(c controllers) {
+				c.crbCache.EXPECT().Get(crbNamePrefix+"test-grb").Return(nil, nil)
+				c.grCache.EXPECT().Get("test-gr").Return(testGRWithAnnotation.DeepCopy(), nil)
+				crbWithCustomCR := expectedCRB.DeepCopy()
+				crbWithCustomCR.RoleRef.Name = "custom-cr-name"
+				c.crbController.EXPECT().Create(crbWithCustomCR).Return(crbWithCustomCR, nil)
+			},
+			inputObject:    testGRB.DeepCopy(),
+			wantError:      false,
+			wantAnnotation: crbNamePrefix + "test-grb",
+		},
+		{
+			name: "clusterRoleBinding creation fails",
+			setupControllers: func(c controllers) {
+				c.crbCache.EXPECT().Get(crbNamePrefix+"test-grb").Return(nil, nil)
+				c.grCache.EXPECT().Get("test-gr").Return(testGR.DeepCopy(), nil)
+				c.crbController.EXPECT().Create(expectedCRB.DeepCopy()).Return(nil, fmt.Errorf("server unavailable"))
+			},
+			inputObject: testGRB.DeepCopy(),
+			wantError:   true,
+		},
+		{
+			name: "clusterRoleBinding already exists no update needed",
+			setupControllers: func(c controllers) {
+				existingCRB := expectedCRB.DeepCopy()
+				c.crbCache.EXPECT().Get(crbNamePrefix+"test-grb").Return(existingCRB, nil)
+				c.grCache.EXPECT().Get("test-gr").Return(testGR.DeepCopy(), nil)
+			},
+			inputObject: testGRB.DeepCopy(),
+			wantError:   false,
+		},
+		{
+			name: "update clusterRoleBinding subject",
+			setupControllers: func(c controllers) {
+				existingCRB := expectedCRB.DeepCopy()
+				existingCRB.Subjects = []rbacv1.Subject{
+					{
+						Kind:     "User",
+						Name:     "old-user",
+						APIGroup: rbacv1.GroupName,
+					},
+				}
+				c.crbCache.EXPECT().Get(crbNamePrefix+"test-grb").Return(existingCRB, nil)
+				c.grCache.EXPECT().Get("test-gr").Return(testGR.DeepCopy(), nil)
+				updatedCRB := expectedCRB.DeepCopy()
+				c.crbController.EXPECT().Update(updatedCRB).Return(updatedCRB, nil)
+			},
+			inputObject: testGRB.DeepCopy(),
+			wantError:   false,
+		},
+		{
+			name: "update clusterRoleBinding roleRef",
+			setupControllers: func(c controllers) {
+				existingCRB := expectedCRB.DeepCopy()
+				existingCRB.RoleRef = rbacv1.RoleRef{
+					Name: "old-role",
+					Kind: clusterRoleKind,
+				}
+				c.crbCache.EXPECT().Get(crbNamePrefix+"test-grb").Return(existingCRB, nil)
+				c.grCache.EXPECT().Get("test-gr").Return(testGR.DeepCopy(), nil)
+				updatedCRB := expectedCRB.DeepCopy()
+				c.crbController.EXPECT().Update(updatedCRB).Return(updatedCRB, nil)
+			},
+			inputObject: testGRB.DeepCopy(),
+			wantError:   false,
+		},
+		{
+			name: "update clusterRoleBinding subject and roleRef",
+			setupControllers: func(c controllers) {
+				existingCRB := expectedCRB.DeepCopy()
+				existingCRB.Subjects = []rbacv1.Subject{
+					{
+						Kind:     "User",
+						Name:     "old-user",
+						APIGroup: rbacv1.GroupName,
+					},
+				}
+				existingCRB.RoleRef = rbacv1.RoleRef{
+					Name: "old-role",
+					Kind: clusterRoleKind,
+				}
+				c.crbCache.EXPECT().Get(crbNamePrefix+"test-grb").Return(existingCRB, nil)
+				c.grCache.EXPECT().Get("test-gr").Return(testGR.DeepCopy(), nil)
+				updatedCRB := expectedCRB.DeepCopy()
+				c.crbController.EXPECT().Update(updatedCRB).Return(updatedCRB, nil)
+			},
+			inputObject: testGRB.DeepCopy(),
+			wantError:   false,
+		},
+		{
+			name: "update clusterRoleBinding fails",
+			setupControllers: func(c controllers) {
+				existingCRB := expectedCRB.DeepCopy()
+				existingCRB.Subjects = []rbacv1.Subject{
+					{
+						Kind:     "User",
+						Name:     "old-user",
+						APIGroup: rbacv1.GroupName,
+					},
+				}
+				c.crbCache.EXPECT().Get(crbNamePrefix+"test-grb").Return(existingCRB, nil)
+				c.grCache.EXPECT().Get("test-gr").Return(testGR.DeepCopy(), nil)
+				updatedCRB := expectedCRB.DeepCopy()
+				c.crbController.EXPECT().Update(updatedCRB).Return(nil, fmt.Errorf("server unavailable"))
+			},
+			inputObject: testGRB.DeepCopy(),
+			wantError:   true,
+		},
+		{
+			name: "globalRole not found uses generated name",
+			setupControllers: func(c controllers) {
+				c.crbCache.EXPECT().Get(crbNamePrefix+"test-grb").Return(nil, nil)
+				c.grCache.EXPECT().Get("test-gr").Return(nil, apierrors.NewNotFound(schema.GroupResource{
+					Group:    "management.cattle.io",
+					Resource: "GlobalRole",
+				}, "test-gr"))
+				c.crbController.EXPECT().Create(expectedCRB.DeepCopy()).Return(&expectedCRB, nil)
+			},
+			inputObject:    testGRB.DeepCopy(),
+			wantError:      false,
+			wantAnnotation: crbNamePrefix + "test-grb",
+		},
+		{
+			name: "group principal binding",
+			setupControllers: func(c controllers) {
+				c.crbCache.EXPECT().Get(crbNamePrefix+"test-grb").Return(nil, nil)
+				c.grCache.EXPECT().Get("test-gr").Return(testGR.DeepCopy(), nil)
+				groupCRB := expectedCRB.DeepCopy()
+				groupCRB.Subjects = []rbacv1.Subject{
+					{
+						Kind:     "Group",
+						Name:     "test-group",
+						APIGroup: rbacv1.GroupName,
+					},
+				}
+				c.crbController.EXPECT().Create(groupCRB).Return(groupCRB, nil)
+			},
+			inputObject: &v3.GlobalRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-grb",
+					UID:  "1234",
+				},
+				TypeMeta: metav1.TypeMeta{
+					APIVersion: "management.cattle.io/v3",
+					Kind:       "GlobalRoleBinding",
+				},
+				GlobalRoleName:     "test-gr",
+				GroupPrincipalName: "test-group",
+			},
+			wantError:      false,
+			wantAnnotation: crbNamePrefix + "test-grb",
+		},
+	}
+
+	ctrl := gomock.NewController(t)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			controllers := controllers{
+				crbCache:      fake.NewMockNonNamespacedCacheInterface[*rbacv1.ClusterRoleBinding](ctrl),
+				crbController: fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl),
+				grCache:       fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl),
+			}
+			if test.setupControllers != nil {
+				test.setupControllers(controllers)
+			}
+
+			grbLifecycle := globalRoleBindingLifecycle{
+				crbLister: controllers.crbCache,
+				crbClient: controllers.crbController,
+				grLister:  controllers.grCache,
+				status:    status.NewStatus(),
+			}
+			var conditions []metav1.Condition
+			resErr := grbLifecycle.reconcileGlobalRoleBinding(test.inputObject, &conditions)
+			if test.wantError {
+				require.Error(t, resErr)
+			} else {
+				require.NoError(t, resErr)
+			}
+
+			if test.wantAnnotation != "" {
+				require.Equal(t, test.wantAnnotation, test.inputObject.Annotations[crbNameAnnotation])
+			}
+		})
+	}
 }
 
 func Test_reconcileNamespacedPermissions(t *testing.T) {
