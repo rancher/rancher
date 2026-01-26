@@ -10,10 +10,10 @@ import (
 
 func TestFilter(t *testing.T) {
 	type testCase struct {
-		Name    string
-		Filter  Filter
-		log     logEntry
-		Allowed bool
+		Name           string
+		Filter         Filter
+		log            logEntry
+		ExpectedAction auditlogv1.FilterAction
 	}
 
 	cases := []testCase{
@@ -26,7 +26,7 @@ func TestFilter(t *testing.T) {
 			log: logEntry{
 				RequestURI: "/api/v1/namespaces/default/pods",
 			},
-			Allowed: true,
+			ExpectedAction: auditlogv1.FilterActionAllow,
 		},
 		{
 			Name: "Deny All",
@@ -37,9 +37,8 @@ func TestFilter(t *testing.T) {
 			log: logEntry{
 				RequestURI: "/api/v1/namespaces/default/pods",
 			},
-			Allowed: false,
+			ExpectedAction: auditlogv1.FilterActionDeny,
 		},
-
 		{
 			Name: "Block Secret Operations",
 			Filter: Filter{
@@ -49,14 +48,14 @@ func TestFilter(t *testing.T) {
 			log: logEntry{
 				RequestURI: "/api/v1/namespaces/default/secrets/my-secret",
 			},
-			Allowed: false,
+			ExpectedAction: auditlogv1.FilterActionDeny,
 		},
 	}
 
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
 			actual := c.Filter.LogAllowed(&c.log)
-			assert.Equal(t, c.Allowed, actual)
+			assert.Equal(t, c.ExpectedAction, actual)
 		})
 	}
 }

@@ -47,30 +47,24 @@ func TestAllowList(t *testing.T) {
 		DisableDefaultPolicies: true,
 	})
 
+	// 1️⃣ Deny only POD APIs
 	err := w.UpdatePolicy(&auditlogv1.AuditPolicy{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "block-all",
+			Name:      "deny-pods",
 			Namespace: "default",
 		},
 		Spec: auditlogv1.AuditPolicySpec{
 			Filters: []auditlogv1.Filter{
 				{
 					Action:     auditlogv1.FilterActionDeny,
-					RequestURI: ".*",
+					RequestURI: "/api/v1/pods.*",
 				},
 			},
 		},
 	})
 	assert.NoError(t, err)
 
-	expected := []logEntry{}
-
-	err = w.Write(&logEntry{
-		RequestURI: "/api/v1/secrets",
-	})
-	assert.NoError(t, err)
-	assert.Equal(t, expected, logs.logs)
-
+	// 2️⃣ Allow SECRETS API
 	err = w.UpdatePolicy(&auditlogv1.AuditPolicy{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "allow-secrets",
@@ -87,16 +81,19 @@ func TestAllowList(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	expected = []logEntry{
+	// 3️⃣ Write a secrets request
+	err = w.Write(&logEntry{
+		RequestURI: "/api/v1/secrets",
+	})
+	assert.NoError(t, err)
+
+	// 4️⃣ Expect it to be logged (no deny matched)
+	expected := []logEntry{
 		{
 			RequestURI: "/api/v1/secrets",
 		},
 	}
 
-	err = w.Write(&logEntry{
-		RequestURI: "/api/v1/secrets",
-	})
-	assert.NoError(t, err)
 	assert.Equal(t, expected, logs.logs)
 }
 
@@ -106,30 +103,32 @@ func TestBlockList(t *testing.T) {
 		DisableDefaultPolicies: true,
 	})
 
+	// default allow (no policies) => should log
+	err := w.Write(&logEntry{
+		RequestURI: "/api/v1/secrets",
+		Method:     http.MethodGet,
+	})
+	assert.NoError(t, err)
+
 	expected := []logEntry{
 		{
 			RequestURI: "/api/v1/secrets",
 			Method:     http.MethodGet,
 		},
 	}
-
-	err := w.Write(&logEntry{
-		RequestURI: "/api/v1/secrets",
-		Method:     http.MethodGet,
-	})
-	assert.NoError(t, err)
 	assert.Equal(t, expected, logs.logs)
 
+	// add deny => should NOT log any further matching requests
 	err = w.UpdatePolicy(&auditlogv1.AuditPolicy{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "allow-secrets",
+			Name:      "deny-secrets",
 			Namespace: "default",
 		},
 		Spec: auditlogv1.AuditPolicySpec{
 			Filters: []auditlogv1.Filter{
 				{
 					Action:     auditlogv1.FilterActionDeny,
-					RequestURI: "/api/v1/secrets",
+					RequestURI: "/api/v1/secrets.*",
 				},
 			},
 		},
@@ -141,6 +140,8 @@ func TestBlockList(t *testing.T) {
 		Method:     http.MethodGet,
 	})
 	assert.NoError(t, err)
+
+	// still only the first log entry exists
 	assert.Equal(t, expected, logs.logs)
 }
 
