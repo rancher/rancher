@@ -8,7 +8,6 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
-	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/name"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -26,10 +25,12 @@ const (
 	roleTemplateChangeHandler = "cluster-roletemplate-change-handler"
 )
 
+/*
 func RegisterIndexers(wranglerContext *wrangler.Context) {
 	wranglerContext.Mgmt.ClusterRoleTemplateBinding().Cache().AddIndexer(crtbByUsernameIndex, getCRTBByUsername)
 	wranglerContext.Mgmt.ProjectRoleTemplateBinding().Cache().AddIndexer(prtbByUsernameIndex, getPRTBByUsername)
 }
+*/
 
 func Register(ctx context.Context, workload *config.UserContext) error {
 	management := workload.Management.WithAgent("rbac-role-templates")
@@ -39,14 +40,14 @@ func Register(ctx context.Context, workload *config.UserContext) error {
 		return fmt.Errorf("cannot create clusterroletemplatebinding handler: %w", err)
 	}
 	management.Wrangler.Mgmt.ClusterRoleTemplateBinding().OnChange(ctx, crtbChangeHandler, c.OnChange)
-	scopedOnRemove(ctx, crtbRemoveHandler, management.Wrangler.Mgmt.ClusterRoleTemplateBinding(), crtbForCluster(workload.ClusterName), c.OnRemove)
+	//scopedOnRemove(ctx, crtbRemoveHandler, management.Wrangler.Mgmt.ClusterRoleTemplateBinding(), crtbForCluster(workload.ClusterName), c.OnRemove)
 
 	p, err := newPRTBHandler(workload)
 	if err != nil {
 		return fmt.Errorf("cannot create projectroletemplatebinding handler: %w", err)
 	}
 	management.Wrangler.Mgmt.ProjectRoleTemplateBinding().OnChange(ctx, prtbChangeHandler, p.OnChange)
-	scopedOnRemove(ctx, prtbRemoveHandler, management.Wrangler.Mgmt.ProjectRoleTemplateBinding(), prtbForCluster(workload.ClusterName), p.OnRemove)
+	//	scopedOnRemove(ctx, prtbRemoveHandler, management.Wrangler.Mgmt.ProjectRoleTemplateBinding(), prtbForCluster(workload.ClusterName), p.OnRemove)
 
 	rth := newRoleTemplateHandler(workload)
 	management.Wrangler.Mgmt.RoleTemplate().OnChange(ctx, roleTemplateChangeHandler, rth.OnChange)

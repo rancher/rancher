@@ -3,11 +3,9 @@ package roletemplates
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/features"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/impersonation"
 	"github.com/rancher/rancher/pkg/rbac"
@@ -18,7 +16,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	rbacAuth "k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 )
@@ -70,10 +67,12 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 		return nil, nil
 	}
 
-	// If the feature is disabled, remove the bindings created by aggregation
-	if !features.AggregatedRoleTemplates.Enabled() {
-		return prtb, errors.Join(p.deleteClusterRoleBindings(prtb), p.deleteRoleBindings(prtb))
-	}
+	/*
+		// If the feature is disabled, remove the bindings created by aggregation
+		if !features.AggregatedRoleTemplates.Enabled() {
+			return prtb, errors.Join(p.deleteClusterRoleBindings(prtb), p.deleteRoleBindings(prtb))
+		}
+	*/
 
 	// Only run this controller if the PRTB is for this cluster
 	clusterName, _ := rbac.GetClusterAndProjectNameFromPRTB(prtb)
@@ -154,6 +153,7 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 	return nil
 }
 
+/*
 // OnRemove removes all Role Bindings in each project namespace made by the PRTB.
 func (p *prtbHandler) OnRemove(_ string, prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
 	if !features.AggregatedRoleTemplates.Enabled() {
@@ -237,7 +237,7 @@ func (p *prtbHandler) deleteClusterRoleBindings(prtb *v3.ProjectRoleTemplateBind
 	}
 	return returnError
 }
-
+*/
 // reconcileClusterRoleBindings handles the promoted and namespace Cluster Role Bindings for a PRTB.
 // Promoted CRBs are for any rules that are non-namespace scoped that are given by the PRTB.
 // Namespace CRBs are to give the user either edit or read-only access to the namespaces within the project. Primarily used by the UI.

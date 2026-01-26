@@ -1,20 +1,17 @@
 package roletemplates
 
 import (
-	"errors"
 	"fmt"
 	"reflect"
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
@@ -100,6 +97,7 @@ var (
 	}
 )
 
+/*
 func Test_prtbHandler_OnRemove(t *testing.T) {
 	prtbOwnerLabel := "authz.cluster.cattle.io/prtb-owner-test-prtb"
 	prtbOwnerLabel2 := "authz.cluster.cattle.io/prtb-owner-test-prtb-2"
@@ -277,6 +275,7 @@ func Test_prtbHandler_OnRemove(t *testing.T) {
 		})
 	}
 }
+*/
 
 var (
 	listOption = metav1.ListOptions{LabelSelector: "ownerlabel"}

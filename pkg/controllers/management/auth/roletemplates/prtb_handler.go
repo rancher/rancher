@@ -7,7 +7,9 @@ import (
 	"strings"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/features"
+	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -20,22 +22,31 @@ import (
 )
 
 type prtbHandler struct {
-	userMGR        user.Manager
-	userController mgmtv3.UserController
-	rtController   mgmtv3.RoleTemplateController
-	rbController   crbacv1.RoleBindingController
-	crController   crbacv1.ClusterRoleController
-	crbController  crbacv1.ClusterRoleBindingController
+	userMGR              user.Manager
+	userController       mgmtv3.UserController
+	rtController         mgmtv3.RoleTemplateController
+	rbController         crbacv1.RoleBindingController
+	crController         crbacv1.ClusterRoleController
+	crbController        crbacv1.ClusterRoleBindingController
+	clusterController    mgmtcontroller.ClusterController
+	clusterManager       *clustermanager.Manager
+	impersonationHandler *impersonationHandler
 }
 
-func newPRTBHandler(management *config.ManagementContext) *prtbHandler {
+func newPRTBHandler(management *config.ManagementContext, clusterManager *clustermanager.Manager) *prtbHandler {
 	return &prtbHandler{
-		userMGR:        management.UserManager,
-		userController: management.Wrangler.Mgmt.User(),
-		rtController:   management.Wrangler.Mgmt.RoleTemplate(),
-		rbController:   management.Wrangler.RBAC.RoleBinding(),
-		crController:   management.Wrangler.RBAC.ClusterRole(),
-		crbController:  management.Wrangler.RBAC.ClusterRoleBinding(),
+		userMGR:           management.UserManager,
+		userController:    management.Wrangler.Mgmt.User(),
+		rtController:      management.Wrangler.Mgmt.RoleTemplate(),
+		rbController:      management.Wrangler.RBAC.RoleBinding(),
+		crController:      management.Wrangler.RBAC.ClusterRole(),
+		crbController:     management.Wrangler.RBAC.ClusterRoleBinding(),
+		clusterController: management.Wrangler.Mgmt.Cluster(),
+		clusterManager:    clusterManager,
+		impersonationHandler: &impersonationHandler{
+			crtbCache: management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
+			prtbCache: management.Wrangler.Mgmt.ProjectRoleTemplateBinding().Cache(),
+		},
 	}
 }
 
@@ -68,13 +79,14 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 // OnRemove deletes Role Bindings that are owned by the PRTB. It also removes the membership binding if no other PRTBs give membership access.
 func (p *prtbHandler) OnRemove(_ string, prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
 	if prtb == nil || !features.AggregatedRoleTemplates.Enabled() {
-		return nil, nil
+		return nil, p.deleteDownstreamResources(prtb)
 	}
 
 	returnErr := errors.Join(deleteClusterMembershipBinding(prtb, p.crbController),
 		deleteProjectMembershipBinding(prtb, p.rbController),
 		removeAuthV2Permissions(prtb, p.rbController),
-		p.deleteRoleBindings(prtb))
+		p.deleteRoleBindings(prtb),
+		p.deleteDownstreamResources(prtb))
 
 	return prtb, returnErr
 }
@@ -94,6 +106,80 @@ func (p *prtbHandler) deleteRoleBindings(prtb *v3.ProjectRoleTemplateBinding) er
 	var returnErr error
 	for _, rb := range currentRBs.Items {
 		returnErr = errors.Join(returnErr, rbac.DeleteNamespacedResource(rb.Namespace, rb.Name, p.rbController))
+	}
+	return returnErr
+}
+
+// deleteDownstreamResources deletes all Role Bindings and Cluster Role Bindings in the downstream cluster made by the PRTB.
+// It also removes the service account impersonator for the user if there are no other PRTBs or CRTBs for the user.
+func (p *prtbHandler) deleteDownstreamResources(prtb *v3.ProjectRoleTemplateBinding) error {
+	clusterName, _ := rbac.GetClusterAndProjectNameFromPRTB(prtb)
+	cluster, err := p.clusterController.Get(clusterName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	userContext, err := p.clusterManager.UserContext(cluster.Name)
+	if err != nil {
+		return err
+	}
+
+	return errors.Join(p.deleteDownstreamRoleBindings(prtb, userContext.RBACw.RoleBinding()),
+		p.deleteDownstreamClusterRoleBindings(prtb, userContext.RBACw.ClusterRoleBinding()),
+		p.impersonationHandler.deleteServiceAccountImpersonator(clusterName, prtb.UserName, userContext.RBACw.ClusterRole()))
+}
+
+// deleteDownstreamRoleBindings deletes all Role Bindings in the downstream cluster made by the PRTB.
+func (p *prtbHandler) deleteDownstreamRoleBindings(prtb *v3.ProjectRoleTemplateBinding, rbController crbacv1.RoleBindingController) error {
+	set := labels.Set(map[string]string{
+		rbac.GetPRTBOwnerLabel(prtb.Name): "true",
+		rbac.AggregationFeatureLabel:      "true",
+	})
+	currentRBs, err := rbController.List(metav1.NamespaceAll, metav1.ListOptions{LabelSelector: set.AsSelector().String()})
+	if err != nil {
+		return err
+	}
+
+	var returnErr error
+	for _, rb := range currentRBs.Items {
+		returnErr = errors.Join(returnErr, rbac.DeleteNamespacedResource(rb.Namespace, rb.Name, rbController))
+	}
+
+	return returnErr
+}
+
+// deleteDownstreamClusterRoleBindings deletes all Cluster Role Bindings in the downstream cluster made by the PRTB.
+func (p *prtbHandler) deleteDownstreamClusterRoleBindings(prtb *v3.ProjectRoleTemplateBinding, crbController crbacv1.ClusterRoleBindingController) error {
+	set := labels.Set(map[string]string{
+		rbac.GetPRTBOwnerLabel(prtb.Name): "true",
+		rbac.AggregationFeatureLabel:      "true",
+	})
+	currentCRBs, err := crbController.List(metav1.ListOptions{LabelSelector: set.AsSelector().String()})
+	if err != nil {
+		return err
+	}
+
+	var returnErr error
+	for _, crb := range currentCRBs.Items {
+		// Check if the CRB is owned by another PRTB
+		// This can happen if the CRB is reused like the namespace access CRB
+		crbOwnedByAnotherPRTB := false
+		delete(crb.Labels, rbac.GetPRTBOwnerLabel(prtb.Name))
+		for label := range crb.Labels {
+			if strings.HasPrefix(label, rbac.PrtbOwnerLabel) {
+				crbOwnedByAnotherPRTB = true
+				break
+			}
+		}
+		// In the case where it is shared, only update the CRB with the ownership label removed
+		if crbOwnedByAnotherPRTB {
+			if _, err = crbController.Update(&crb); err != nil {
+				returnErr = errors.Join(returnErr, fmt.Errorf("failed to update cluster role binding %s: %w", crb.Name, err))
+			}
+			continue
+		}
+		// If there are no other owners, delete the CRB
+		returnErr = errors.Join(returnErr, rbac.DeleteResource(crb.Name, crbController))
 	}
 	return returnErr
 }

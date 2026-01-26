@@ -16,7 +16,6 @@ import (
 	whitelistproxyNodeDriver "github.com/rancher/rancher/pkg/controllers/managementapi/whitelistproxy/nodedriver"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/clusterauthtoken"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac"
-	"github.com/rancher/rancher/pkg/controllers/managementuser/rbac/roletemplates"
 	"github.com/rancher/rancher/pkg/types/config"
 )
 
@@ -47,7 +46,7 @@ func registerIndexers(scaledContext *config.ScaledContext) error {
 		return err
 	}
 
-	roletemplates.RegisterIndexers(scaledContext.Wrangler)
+	//roletemplates.RegisterIndexers(scaledContext.Wrangler)
 
 	v3cluster.RegisterIndexers(scaledContext)
 	return nil
