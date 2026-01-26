@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -22,7 +23,6 @@ import (
 var (
 	configs     map[string]*config.Config
 	configsInit sync.Once
-	action      chan string
 )
 
 func GetURLAndInterval() (string, time.Duration) {
@@ -51,35 +51,27 @@ func getChannelServerArg() string {
 	return serverVersion
 }
 
-type DynamicInterval struct {
-	subKey string
-}
-
-func (d *DynamicInterval) Wait(ctx context.Context) bool {
-	start := time.Now()
-	for {
-		select {
-		case <-time.After(time.Second):
-			_, duration := GetURLAndInterval()
-			if start.Add(duration).Before(time.Now()) {
-				return true
-			}
+func Refresh(ctx context.Context) error {
+	var errs []string
+	for _, runtime := range []string{"k3s", "rke2"} {
+		cfg := GetReleaseConfigByRuntime(ctx, runtime)
+		if cfg == nil {
+			msg := fmt.Sprintf("no config found for %s", runtime)
+			logrus.Error(msg)
+			errs = append(errs, msg)
 			continue
-		case msg := <-action:
-			if msg == d.subKey {
-				logrus.Infof("getReleaseConfig: reloading config for %s", d.subKey)
-				return true
-			}
-			action <- msg
-		case <-ctx.Done():
-			return false
+		}
+		if err := cfg.LoadConfig(ctx); err != nil {
+			logrus.Errorf("failed to reload configuration for %s: %v", runtime, err)
+			errs = append(errs, fmt.Sprintf("%s: %v", runtime, err))
+		} else {
+			logrus.Infof("reloaded configuration for %s", runtime)
 		}
 	}
-}
-
-func Refresh() {
-	action <- "k3s"
-	action <- "rke2"
+	if len(errs) > 0 {
+		return fmt.Errorf("refresh errors: %s", strings.Join(errs, "; "))
+	}
+	return nil
 }
 
 type DynamicSource struct{}
@@ -115,15 +107,19 @@ func GetReleaseConfigByRuntime(ctx context.Context, runtime string) *config.Conf
 			config.StringSource("/var/lib/rancher-data/driver-metadata/data.json"),
 		}
 		configs = map[string]*config.Config{
-			"k3s":  config.NewConfig(ctx, "k3s", &DynamicInterval{"k3s"}, getChannelServerArg(), "rancher", urls),
-			"rke2": config.NewConfig(ctx, "rke2", &DynamicInterval{"rke2"}, getChannelServerArg(), "rancher", urls),
+			"k3s":  config.NewConfigNoLoad(ctx, "k3s", getChannelServerArg(), "rancher", "", urls),
+			"rke2": config.NewConfigNoLoad(ctx, "rke2", getChannelServerArg(), "rancher", "", urls),
+		}
+		for name, cfg := range configs {
+			if err := cfg.LoadConfig(ctx); err != nil {
+				logrus.Fatalf("Failed to load initial config for %s: %v", name, err)
+			}
 		}
 	})
 	return configs[runtime]
 }
 
 func NewHandler(ctx context.Context) http.Handler {
-	action = make(chan string, 2)
 	return server.NewHandler(map[string]*config.Config{
 		"v1-k3s-release":  GetReleaseConfigByRuntime(ctx, "k3s"),
 		"v1-rke2-release": GetReleaseConfigByRuntime(ctx, "rke2"),

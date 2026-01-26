@@ -1,7 +1,6 @@
 package kontainerdriver
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/rancher/norman/httperror"
@@ -9,6 +8,7 @@ import (
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	kd "github.com/rancher/rancher/pkg/kontainerdrivermetadata"
+	"github.com/rancher/rancher/pkg/settings"
 )
 
 type ActionHandler struct {
@@ -47,13 +47,8 @@ func (a ActionHandler) deactivate(apiContext *types.APIContext) error {
 }
 
 func (a ActionHandler) refresh(apiContext *types.APIContext) error {
-	response := map[string]interface{}{}
-	// Refresh to sync k3s/rke2 releases and update settings
-	if err := a.MetadataHandler.Refresh(); err != nil {
-		msg := fmt.Sprintf("failed to refresh %v", err)
-		return httperror.WrapAPIError(err, httperror.ServerError, msg)
-	}
-	apiContext.WriteResponse(http.StatusOK, response)
+	a.MetadataHandler.Settings.Enqueue(settings.RkeMetadataConfig.Name)
+	apiContext.WriteResponse(http.StatusOK, struct{}{})
 	return nil
 }
 

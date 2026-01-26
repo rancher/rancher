@@ -48,8 +48,9 @@ func (m *MetadataController) sync(_ string, setting *v3.Setting) (*v3.Setting, e
 }
 
 func (m *MetadataController) Refresh() error {
-	// Refreshes to sync rke2/k3s releases
-	channelserver.Refresh()
+	if err := channelserver.Refresh(m.ctx); err != nil {
+		return err
+	}
 	// Update settings for rke2/k3s and ui
 	return m.updateSettings(m.ctx, settings.GetRancherVersion())
 }
