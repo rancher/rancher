@@ -24,7 +24,6 @@ const (
 	clusterRoleBindingExists          = "ClusterRoleBindingExists"
 	clusterRoleBindingsDeleted        = "ClusterRoleBindingsDeleted"
 	serviceAccountImpersonatorExists  = "ServiceAccountImpersonatorExists"
-	failureToEnsureServiceAccount     = "FailureToEnsureServiceAccount"
 	failureToDeleteServiceAccount     = "FailureToDeleteServiceAccount"
 	failureToBuildClusterRoleBinding  = "FailureToBuildClusterRoleBinding"
 	failureToListClusterRoleBindings  = "FailureToListClusterRoleBindings"
@@ -86,7 +85,7 @@ func isRoleTemplateExternal(rtName string, rtClient mgmtv3.RoleTemplateControlle
 		return false, err
 	}
 	if rt == nil {
-		return false, fmt.Errorf("error getting roletemplate")
+		return false, fmt.Errorf("roletemplate %s is nil", rtName)
 	}
 	return rt.External, nil
 }

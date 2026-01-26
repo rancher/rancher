@@ -64,20 +64,20 @@ func (r *roletemplateEnqueuer) roletemplateEnqueuePRTBs(_, name string, obj runt
 
 	clusters, err := r.clusterCache.List(labels.Everything())
 	if err != nil {
-		return nil, fmt.Errorf("unable to list clusters: %w", err)
+		return nil, fmt.Errorf("failed to list clusters: %w", err)
 	}
 
 	var keys []relatedresource.Key
 	for _, cluster := range clusters {
 		projects, err := r.projectCache.List(cluster.Name, labels.Everything())
 		if err != nil {
-			return nil, fmt.Errorf("unable to list projects: %w", err)
+			return nil, fmt.Errorf("failed to list projects: %w", err)
 		}
 
 		for _, project := range projects {
 			prtbs, err := r.prtbCache.List(project.GetProjectBackingNamespace(), labels.Everything())
 			if err != nil {
-				return nil, fmt.Errorf("unable to list ProjectRoleTemplateBindings in namespace %s: %w", project.GetProjectBackingNamespace(), err)
+				return nil, fmt.Errorf("failed to list ProjectRoleTemplateBindings in namespace %s: %w", project.GetProjectBackingNamespace(), err)
 			}
 			for _, prtb := range prtbs {
 				if prtb.RoleTemplateName == name {
@@ -101,14 +101,14 @@ func (r *roletemplateEnqueuer) roletemplateEnqueueCRTBs(_, name string, obj runt
 
 	clusters, err := r.clusterCache.List(labels.Everything())
 	if err != nil {
-		return nil, fmt.Errorf("unable to list clusters: %w", err)
+		return nil, fmt.Errorf("failed to list clusters: %w", err)
 	}
 
 	var keys []relatedresource.Key
 	for _, cluster := range clusters {
 		crtbs, err := r.crtbCache.List(cluster.Name, labels.Everything())
 		if err != nil {
-			return nil, fmt.Errorf("unable to list ClusterRoleTemplateBindings: %w", err)
+			return nil, fmt.Errorf("failed to list ClusterRoleTemplateBindings: %w", err)
 		}
 		for _, crtb := range crtbs {
 			if crtb.RoleTemplateName == name {

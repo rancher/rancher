@@ -2,6 +2,7 @@ package roletemplates
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -284,7 +285,8 @@ func removeLabelFromExternalRole(rt *v3.RoleTemplate, crController crbacv1.Clust
 	externalRole, err := crController.Get(rt.Name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return nil
-	} else if err != nil {
+	}
+	if err != nil {
 		return err
 	}
 
@@ -295,7 +297,7 @@ func removeLabelFromExternalRole(rt *v3.RoleTemplate, crController crbacv1.Clust
 	if _, ok := externalRole.Labels[rbac.AggregationLabel]; ok {
 		delete(externalRole.Labels, rbac.AggregationLabel)
 		if _, err := crController.Update(externalRole); err != nil {
-			return err
+			return fmt.Errorf("failed to update external cluster role %s: %w", externalRole.Name, err)
 		}
 	}
 

@@ -121,7 +121,7 @@ func (p *prtbHandler) reconcileSubject(binding *v3.ProjectRoleTemplateBinding) (
 	if binding.UserPrincipalName == "" {
 		u, err := p.userController.Get(binding.UserName, metav1.GetOptions{})
 		if err != nil {
-			return binding, err
+			return binding, fmt.Errorf("failed to get user %s for binding %s: %w", binding.UserName, binding.Name, err)
 		}
 		for _, p := range u.PrincipalIDs {
 			if strings.HasSuffix(p, binding.UserName) {
@@ -186,7 +186,7 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 	// Remove any excess or incorrect Role Bindings that may exist for this PRTB
 	var prtbHasBinding bool
 	for _, currentRB := range currentRBs.Items {
-		if rbac.AreRoleBindingContentsSame(&currentRB, rb) {
+		if rbac.IsRoleBindingContentSame(&currentRB, rb) {
 			prtbHasBinding = true
 			continue
 		}
@@ -198,7 +198,7 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 
 	if !prtbHasBinding {
 		if _, err := p.rbController.Create(rb); err != nil && !apierrors.IsAlreadyExists(err) {
-			return err
+			return fmt.Errorf("failed to create role binding %s: %w", rb.Name, err)
 		}
 	}
 	return nil

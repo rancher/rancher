@@ -2,6 +2,7 @@ package roletemplates
 
 import (
 	"errors"
+	"fmt"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/fleet"
@@ -62,28 +63,35 @@ func createOrUpdateClusterMembershipBinding(rtb metav1.Object, crbController crb
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			logrus.Infof("Creating clusterRoleBinding %s for cluster membership role %s for subjects %v", wantedCRB.Name, wantedCRB.RoleRef.Name, wantedCRB.Subjects)
-			_, err := crbController.Create(wantedCRB)
-			return err
+			if _, err := crbController.Create(wantedCRB); err != nil {
+				return fmt.Errorf("failed to create cluster membership binding %s: %w", wantedCRB.Name, err)
+			}
+			return nil
 		}
 		return err
 	}
 
 	// If the role referenced or subjects are wrong, delete and re-create the CRB
-	if !rbac.AreClusterRoleBindingContentsSame(wantedCRB, existingCRB) {
+	if !rbac.IsClusterRoleBindingContentSame(wantedCRB, existingCRB) {
 		logrus.Infof("Re-creating clusterRoleBinding %s for cluster membership role %s for subjects %v", wantedCRB.Name, wantedCRB.RoleRef.Name, wantedCRB.Subjects)
 		if err := crbController.Delete(wantedCRB.Name, &metav1.DeleteOptions{}); err != nil {
-			return err
+			return fmt.Errorf("failed to delete cluster membership binding %s: %w", wantedCRB.Name, err)
 		}
-		_, err := crbController.Create(wantedCRB)
-		return err
+
+		if _, err := crbController.Create(wantedCRB); err != nil {
+			return fmt.Errorf("failed to create cluster membership binding %s: %w", wantedCRB.Name, err)
+		}
+		return nil
 	}
 	// Update Label
 	rtbLabel := getRTBLabel(rtb)
 	if v, ok := existingCRB.Labels[rtbLabel]; !ok || v != "true" {
 		logrus.Infof("Updating clusterRoleBinding %s for cluster membership role %s for subjects %v", wantedCRB.Name, wantedCRB.RoleRef.Name, wantedCRB.Subjects)
 		existingCRB.Labels[rtbLabel] = "true"
-		_, err := crbController.Update(existingCRB)
-		return err
+
+		if _, err := crbController.Update(existingCRB); err != nil {
+			return fmt.Errorf("failed to update cluster membership binding %s: %w", wantedCRB.Name, err)
+		}
 	}
 	return nil
 }
@@ -127,11 +135,14 @@ func deleteClusterMembershipBinding(rtb metav1.Object, crbController crbacv1.Clu
 				err = crbController.Delete(c.Name, &metav1.DeleteOptions{
 					Preconditions: &metav1.Preconditions{UID: &c.UID, ResourceVersion: &c.ResourceVersion},
 				})
-				returnedErr = errors.Join(returnedErr, err)
+				if err != nil {
+					returnedErr = errors.Join(returnedErr, fmt.Errorf("failed to delete cluster membership binding %s: %w", c.Name, err))
+				}
 				continue
 			}
-			_, err := crbController.Update(&c)
-			returnedErr = errors.Join(returnedErr, err)
+			if _, err := crbController.Update(&c); err != nil {
+				returnedErr = errors.Join(returnedErr, fmt.Errorf("failed to update cluster membership binding %s: %w", c.Name, err))
+			}
 		}
 	}
 	return returnedErr
@@ -170,20 +181,25 @@ func createOrUpdateProjectMembershipBinding(prtb *v3.ProjectRoleTemplateBinding,
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			logrus.Infof("Creating roleBinding %s for project membership role %s for subjects %v", wantedRB.Name, wantedRB.RoleRef.Name, wantedRB.Subjects)
-			_, err := rbController.Create(wantedRB)
-			return err
+			if _, err := rbController.Create(wantedRB); err != nil {
+				return fmt.Errorf("failed to create project membership binding %s: %w", wantedRB.Name, err)
+			}
+			return nil
 		}
 		return err
 	}
 
 	// RoleRef is immutable, so if it's incorrect it needs to be deleted and re-created
-	if !rbac.AreRoleBindingContentsSame(wantedRB, existingRB) {
+	if !rbac.IsRoleBindingContentSame(wantedRB, existingRB) {
 		logrus.Infof("Re-creating roleBinding %s for project membership role %s for subjects %v", wantedRB.Name, wantedRB.RoleRef.Name, wantedRB.Subjects)
 		if err := rbController.Delete(wantedRB.Namespace, wantedRB.Name, &metav1.DeleteOptions{}); err != nil {
-			return err
+			return fmt.Errorf("failed to delete project membership binding %s: %w", wantedRB.Name, err)
 		}
-		_, err := rbController.Create(wantedRB)
-		return err
+
+		if _, err := rbController.Create(wantedRB); err != nil {
+			return fmt.Errorf("failed to create project membership binding %s: %w", wantedRB.Name, err)
+		}
+		return nil
 	}
 
 	// Update label
@@ -191,8 +207,10 @@ func createOrUpdateProjectMembershipBinding(prtb *v3.ProjectRoleTemplateBinding,
 	if v, ok := existingRB.Labels[rtbLabel]; !ok || v != "true" {
 		logrus.Infof("Updating roleBinding %s for project membership role %s for subjects %v", wantedRB.Name, wantedRB.RoleRef.Name, wantedRB.Subjects)
 		existingRB.Labels[rtbLabel] = "true"
-		_, err := rbController.Update(existingRB)
-		return err
+
+		if _, err := rbController.Update(existingRB); err != nil {
+			return fmt.Errorf("failed to update project membership binding %s: %w", wantedRB.Name, err)
+		}
 	}
 	return nil
 }
@@ -239,11 +257,14 @@ func deleteProjectMembershipBinding(prtb *v3.ProjectRoleTemplateBinding, rbContr
 				err = rbController.Delete(rb.Namespace, rb.Name, &metav1.DeleteOptions{
 					Preconditions: &metav1.Preconditions{UID: &rb.UID, ResourceVersion: &rb.ResourceVersion},
 				})
-				returnedErr = errors.Join(returnedErr, err)
+				if err != nil {
+					returnedErr = errors.Join(returnedErr, fmt.Errorf("failed to delete project membership binding %s: %w", rb.Name, err))
+				}
 				continue
 			}
-			_, err := rbController.Update(&rb)
-			returnedErr = errors.Join(returnedErr, err)
+			if _, err := rbController.Update(&rb); err != nil {
+				returnedErr = errors.Join(returnedErr, fmt.Errorf("failed to update project membership binding %s: %w", rb.Name, err))
+			}
 		}
 	}
 
@@ -276,7 +297,7 @@ func removeAuthV2Permissions(obj metav1.Object, rbController crbacv1.RoleBinding
 	}
 	for _, roleBinding := range roleBindings.Items {
 		if err := rbController.Delete(roleBinding.Namespace, roleBinding.Name, &metav1.DeleteOptions{}); err != nil {
-			return err
+			return fmt.Errorf("failed to delete AuthV2 role binding %s: %w", roleBinding.Name, err)
 		}
 	}
 	return nil

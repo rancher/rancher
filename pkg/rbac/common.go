@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/slice"
 	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io"
@@ -75,7 +74,7 @@ func BuildSubjectFromRTB(object metav1.Object) (rbacv1.Subject, error) {
 		if object != nil {
 			objectName = object.GetName()
 		}
-		return rbacv1.Subject{}, errors.Errorf("unrecognized roleTemplateBinding type: %v", objectName)
+		return rbacv1.Subject{}, fmt.Errorf("unrecognized roleTemplateBinding type: %v", objectName)
 	}
 
 	if userName != "" {
@@ -85,7 +84,7 @@ func BuildSubjectFromRTB(object metav1.Object) (rbacv1.Subject, error) {
 
 	if groupPrincipalName != "" {
 		if name != "" {
-			return rbacv1.Subject{}, errors.Errorf("roletemplatebinding has more than one subject fields set: %v", object.GetName())
+			return rbacv1.Subject{}, fmt.Errorf("roletemplatebinding has more than one subject fields set: %v", object.GetName())
 		}
 		name = groupPrincipalName
 		kind = "Group"
@@ -93,7 +92,7 @@ func BuildSubjectFromRTB(object metav1.Object) (rbacv1.Subject, error) {
 
 	if groupName != "" {
 		if name != "" {
-			return rbacv1.Subject{}, errors.Errorf("roletemplatebinding has more than one subject fields set: %v", object.GetName())
+			return rbacv1.Subject{}, fmt.Errorf("roletemplatebinding has more than one subject fields set: %v", object.GetName())
 		}
 		name = groupName
 		kind = "Group"
@@ -102,7 +101,7 @@ func BuildSubjectFromRTB(object metav1.Object) (rbacv1.Subject, error) {
 	if sa != "" {
 		parts := strings.SplitN(sa, ":", 2)
 		if len(parts) < 2 {
-			return rbacv1.Subject{}, errors.Errorf("service account %s of projectroletemplatebinding is invalid: %v", sa, object.GetName())
+			return rbacv1.Subject{}, fmt.Errorf("service account %s of projectroletemplatebinding is invalid: %v", sa, object.GetName())
 		}
 		namespace = parts[0]
 		name = parts[1]
@@ -110,7 +109,7 @@ func BuildSubjectFromRTB(object metav1.Object) (rbacv1.Subject, error) {
 	}
 
 	if name == "" {
-		return rbacv1.Subject{}, errors.Errorf("roletemplatebinding doesn't have any subject fields set: %v", object.GetName())
+		return rbacv1.Subject{}, fmt.Errorf("roletemplatebinding doesn't have any subject fields set: %v", object.GetName())
 	}
 
 	// apiGroup default for both User and Group
@@ -363,23 +362,29 @@ func IsAdminGlobalRole(gr *v3.GlobalRole) bool {
 //   - areResourcesTheSame is a func that compares two resources and returns (true, nil) if they are equal, and (false, T) when not the same.
 //     T is an updated version of the resource.
 func CreateOrUpdateResource[T generic.RuntimeMetaObject, TList runtime.Object](obj T, client generic.NonNamespacedClientInterface[T, TList], areResourcesTheSame func(T, T) (bool, T)) error {
+	kind := obj.GetObjectKind().GroupVersionKind().Kind
 	// attempt to get the resource
 	resource, err := client.Get(obj.GetName(), metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			return err
+			return fmt.Errorf("failed to get %s %s: %w", kind, obj.GetName(), err)
 		}
+		logrus.Infof("%s %s is being created", kind, obj.GetName())
 		// resource doesn't exist, create it
 		_, err = client.Create(obj)
-		return err
+		if err != nil {
+			return fmt.Errorf("failed to create %s %s: %w", kind, obj.GetName(), err)
+		}
+		return nil
 	}
 
 	// check that the existing resource is the same as the one we want
 	if same, updatedResource := areResourcesTheSame(resource, obj); !same {
+		logrus.Infof("%s %s needs to be updated", kind, obj.GetName())
 		// if it has changed, update it to the correct version
 		_, err := client.Update(updatedResource)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to update %s %s: %w", kind, obj.GetName(), err)
 		}
 	}
 	return nil
@@ -391,22 +396,29 @@ func CreateOrUpdateResource[T generic.RuntimeMetaObject, TList runtime.Object](o
 //   - areResourcesTheSame is a func that compares two resources and returns (true, nil) if they are equal, and (false, T) when not the same.
 //     T is an updated version of the resource.
 func CreateOrUpdateNamespacedResource[T generic.RuntimeMetaObject, TList runtime.Object](obj T, client generic.ClientInterface[T, TList], areResourcesTheSame func(T, T) (bool, T)) error {
+	kind := obj.GetObjectKind().GroupVersionKind().Kind
 	resource, err := client.Get(obj.GetNamespace(), obj.GetName(), metav1.GetOptions{})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
-			return err
+			return fmt.Errorf("failed to get %s %s in namespace %s: %w", kind, obj.GetName(), obj.GetNamespace(), err)
 		}
+		logrus.Infof("%s %s is being created in namespace %s", kind, obj.GetName(), obj.GetNamespace())
 		// resource doesn't exist, create it
-		logrus.Infof("%T %s being created in namespace %s", obj, obj.GetName(), obj.GetNamespace())
-		_, err := client.Create(obj)
-		return err
+		_, err = client.Create(obj)
+		if err != nil {
+			return fmt.Errorf("failed to create %s %s in namespace %s: %w", kind, obj.GetName(), obj.GetNamespace(), err)
+		}
+		return nil
 	}
 
+	// check that the existing resource is the same as the one we want
 	if same, updatedResource := areResourcesTheSame(resource, obj); !same {
-		logrus.Infof("%T %s in namespace %s needs to be updated", obj, obj.GetName(), obj.GetNamespace())
+		logrus.Infof("%s %s in namespace %s needs to be updated", kind, obj.GetName(), obj.GetNamespace())
+		// if it has changed, update it to the correct version
 		_, err := client.Update(updatedResource)
-		return err
-
+		if err != nil {
+			return fmt.Errorf("failed to update %s %s in namespace %s: %w", kind, obj.GetName(), obj.GetNamespace(), err)
+		}
 	}
 	return nil
 }
@@ -453,22 +465,30 @@ func AreClusterRolesSame(currentCR, wantedCR *rbacv1.ClusterRole) (bool, *rbacv1
 
 // DeleteResource deletes a non namespaced resource
 func DeleteResource[T generic.RuntimeMetaObject, TList runtime.Object](name string, client generic.NonNamespacedClientInterface[T, TList]) error {
+	logrus.Infof("Deleting %T %s", *new(T), name)
 	err := client.Delete(name, &metav1.DeleteOptions{})
 	// If the resource is already gone, don't treat it as an error
 	if apierrors.IsNotFound(err) {
 		return nil
 	}
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to delete %T %s: %w", *new(T), name, err)
+	}
+	return nil
 }
 
-// DeleteResource deletes a non namespaced resource
+// DeleteNamespacedResource deletes a namespaced resource
 func DeleteNamespacedResource[T generic.RuntimeMetaObject, TList runtime.Object](namespace, name string, client generic.ClientInterface[T, TList]) error {
+	logrus.Infof("Deleting %T %s in namespace %s", *new(T), name, namespace)
 	err := client.Delete(namespace, name, &metav1.DeleteOptions{})
 	// If the resource is already gone, don't treat it as an error
 	if apierrors.IsNotFound(err) {
 		return nil
 	}
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to delete %T %s in namespace %s: %w", *new(T), name, namespace, err)
+	}
+	return nil
 }
 
 // BuildClusterRole creates a cluster role with an aggregation label
@@ -610,14 +630,14 @@ func BuildClusterRoleBindingFromRTB(rtb metav1.Object, roleRefName string) (*rba
 	}, nil
 }
 
-// AreClusterRoleBindingsSame compares the Subjects and RoleRef fields of two Cluster Role Bindings.
-func AreClusterRoleBindingContentsSame(crb1, crb2 *rbacv1.ClusterRoleBinding) bool {
+// IsClusterRoleBindingContentSame compares the Subjects and RoleRef fields of two Cluster Role Bindings.
+func IsClusterRoleBindingContentSame(crb1, crb2 *rbacv1.ClusterRoleBinding) bool {
 	return equality.Semantic.DeepEqual(crb1.Subjects, crb2.Subjects) &&
 		equality.Semantic.DeepEqual(crb1.RoleRef, crb2.RoleRef)
 }
 
-// AreRoleBindingsSame compares the Subjects and RoleRef fields of two Role Bindings.
-func AreRoleBindingContentsSame(rb1, rb2 *rbacv1.RoleBinding) bool {
+// IsRoleBindingContentSame compares the Subjects and RoleRef fields of two Role Bindings.
+func IsRoleBindingContentSame(rb1, rb2 *rbacv1.RoleBinding) bool {
 	return equality.Semantic.DeepEqual(rb1.Subjects, rb2.Subjects) &&
 		equality.Semantic.DeepEqual(rb1.RoleRef, rb2.RoleRef)
 }
