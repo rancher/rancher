@@ -1233,7 +1233,7 @@ func TestGetGroup(t *testing.T) {
 			groupsCache: groupsCache,
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID+"?excludedAttributes=members", nil)
+		req := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID+"?excludedAttributes=members,other_attribute", nil)
 		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
 		rec := httptest.NewRecorder()
 
