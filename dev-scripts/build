@@ -62,3 +62,11 @@ if [ "$TARGET" = "server-tarball" ]; then
 
   build_rancher "server"
 fi
+
+if [ "$TARGET" = "agent-tarball" ]; then
+  BUILD_ACTION=""
+  BUILDX_ARGS+=("--output=type=docker,dest=/tmp/rancher-agent-${OS}-${ARCH}.tar")
+  BUILDX_ARGS+=("--no-cache")
+
+  build_rancher "agent"
+fi

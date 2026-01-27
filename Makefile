@@ -43,6 +43,9 @@ build-server-tarball: buildx-machine
 build-agent: buildx-machine
 	@$(MAKE) build TARGET="agent" BUILDER="$(MACHINE)"
 
+build-agent-tarball: buildx-machine
+	@$(MAKE) build TARGET="agent-tarball" BUILDER="$(MACHINE)"
+
 $(DEV_TARGETS):
 	./dev-scripts/$@
 
