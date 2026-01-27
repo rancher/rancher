@@ -72,7 +72,7 @@ func Test_Operation_SetC_MP_DataDirectories(t *testing.T) {
 		}
 		im, newErr := clients.Dynamic.Resource(gvr).Namespace(machine.Namespace).Get(context.TODO(), machine.Spec.InfrastructureRef.Name, metav1.GetOptions{})
 		if newErr != nil {
-			t.Fatalf("failed to get %s %s/%s to for validating directories: %v", gvk.String(), machine.Namespace, machine.Spec.InfrastructureRef.Name, err)
+			t.Fatalf("failed to get %s %s/%s to for validating directories: %v", gvk.String(), machine.Namespace, machine.Spec.InfrastructureRef.Name, newErr)
 		}
 
 		// This test is only for clusters provisioned via the pod driver

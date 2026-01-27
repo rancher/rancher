@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -33,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
@@ -670,13 +672,11 @@ func durationToSeconds(d *metav1.Duration, cluster *rancherv1.Cluster) *int32 {
 		return nil
 	}
 	s := d.Duration.Seconds()
-	maxInt32 := float64(^uint32(0) >> 1) // ^uint32(0) >> 1 is a portable way to get math.MaxInt32
-	// Cap the value at MaxInt32 to prevent overflow, as NodeDrainTimeoutSeconds is an *int32.
-	if s > maxInt32 {
-		logrus.Warnf("cluster %s/%s: drainBeforeDeleteTimeout %s is greater than max supported value, capping to max value %d",
-			cluster.Namespace, cluster.Name, d.Duration.String(), int32(maxInt32))
-		s = maxInt32
+	// Cap the value at MaxInt32 to prevent overflow
+	if s > float64(math.MaxInt32) {
+		logrus.Warnf("cluster %s/%s: duration %s is greater than max supported value, capping to max value %d",
+			cluster.Namespace, cluster.Name, d.Duration.String(), math.MaxInt32)
+		s = math.MaxInt32
 	}
-	seconds := int32(s)
-	return &seconds
+	return ptr.To(int32(s))
 }

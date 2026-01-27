@@ -32,7 +32,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 
 	clients.RKE.RKECluster().OnChange(ctx, "rke-cluster", h.OnChange)
 	relatedresource.Watch(ctx, "rke-cluster-trigger", func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
-		if capiCluster, ok := obj.(*capi.Cluster); ok && (capiCluster.Spec.Paused != nil && !*capiCluster.Spec.Paused) {
+		if capiCluster, ok := obj.(*capi.Cluster); ok && (capiCluster.Spec.Paused == nil || !*capiCluster.Spec.Paused) {
 			return []relatedresource.Key{{
 				Namespace: namespace,
 				Name:      name,
