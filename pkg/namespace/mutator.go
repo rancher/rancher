@@ -40,8 +40,12 @@ func (m *Mutator) Mutate(ns *corev1.Namespace) bool {
 	return updated
 }
 
-func SetMutator(m *Mutator) {
-	mutator = m
+func SetMutator(m Mutator) {
+	mutator = &m
+}
+
+func GetMutator() Mutator {
+	return *mutator
 }
 
 // Copy copies all key/value pairs in src adding them to dst and returns whether the dst map was updated. If a key
