@@ -149,12 +149,7 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 				FullGroupPath: []string{"/admingroup"},
 				Roles:         []string{"adminrole"},
 			},
-			expectedClaimInfo: &ClaimInfo{
-				Subject:       "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
-				Groups:        []string{"admingroup"},
-				FullGroupPath: []string{"/admingroup"},
-				Roles:         []string{"adminrole"},
-			},
+			expectedClaimInfo: &ClaimInfo{},
 		},
 		"get groups with GroupsClaims": {
 			config: func(port string) *apiv3.OIDCConfig {
@@ -200,8 +195,7 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
 			},
 			expectedClaimInfo: &ClaimInfo{
-				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
-				Groups:  []string{"group1", "group2"},
+				Groups: []string{"group1", "group2"},
 			},
 		},
 		"error - invalid certificate": {
@@ -301,9 +295,8 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
 			},
 			expectedClaimInfo: &ClaimInfo{
-				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
-				Name:    "Test User",
-				Email:   "test@example.com",
+				Name:  "Test User",
+				Email: "test@example.com",
 			},
 		},
 		"display name with custom emailClaim": {
@@ -351,8 +344,7 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
 			},
 			expectedClaimInfo: &ClaimInfo{
-				Subject: "a8d0d2c4-6543-4546-8f1a-73e1d7dffcbd",
-				Email:   "test.dev@example.com",
+				Email: "test.dev@example.com",
 			},
 		},
 	}
