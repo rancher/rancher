@@ -3,6 +3,7 @@ package autoscaler
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	rke "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -42,15 +43,53 @@ func (s *autoscalerSuite) createTestClusterWithControlPlane(name, namespace, api
 func (s *autoscalerSuite) setupClientForControlPlane(apiVersion, kind, kubernetesVersion string, isRKE bool) {
 	// Mock the controller-runtime client's Get method to return an unstructured object
 	s.client.SetGetFunc(func(ctx context.Context, key any, obj any, opts ...any) error {
-		// Cast obj to *unstructured.Unstructured
-		u, ok := obj.(*unstructured.Unstructured)
-		if !ok {
-			return fmt.Errorf("expected *unstructured.Unstructured, got %T", obj)
+		// Handle PartialObjectMetadata requests for CRD discovery
+		if pom, ok := obj.(*metav1.PartialObjectMetadata); ok {
+			// Set up a minimal CRD metadata response
+			pom.APIVersion = "apiextensions.k8s.io/v1"
+			pom.Kind = "CustomResourceDefinition"
+			pom.Name = kind + "s." + apiVersion[:strings.LastIndex(apiVersion, "/")]
+
+			// Set the contract version label that CAPI needs to discover the version
+			// Extract the version from the apiVersion (e.g., "rke.cattle.io/v1" -> "v1")
+			version := apiVersion[strings.LastIndex(apiVersion, "/")+1:]
+			pom.Labels = map[string]string{
+				"cluster.x-k8s.io/v1beta2": version,
+			}
+
+			// Set the versions in the CRD
+			pom.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   "apiextensions.k8s.io",
+				Version: "v1",
+				Kind:    "CustomResourceDefinition",
+			})
+			return nil
 		}
 
-		// Set the GVK
+		// Handle Unstructured requests for the actual control plane object
+		u, ok := obj.(*unstructured.Unstructured)
+		if !ok {
+			return fmt.Errorf("expected *unstructured.Unstructured or *metav1.PartialObjectMetadata, got %T", obj)
+		}
+
+		// Initialize the object map if it's nil
+		if u.Object == nil {
+			u.Object = make(map[string]interface{})
+		}
+
+		// Set the GVK on both the object and its TypeMeta
 		u.SetAPIVersion(apiVersion)
 		u.SetKind(kind)
+		gvk := schema.FromAPIVersionAndKind(apiVersion, kind)
+		u.GetObjectKind().SetGroupVersionKind(gvk)
+
+		// Also set metadata
+		u.Object["apiVersion"] = apiVersion
+		u.Object["kind"] = kind
+		u.Object["metadata"] = map[string]interface{}{
+			"name":      "test-control-plane",
+			"namespace": "default",
+		}
 
 		// Set the kubernetes version field based on control plane type
 		if isRKE {
