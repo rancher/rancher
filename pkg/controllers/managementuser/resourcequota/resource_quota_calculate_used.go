@@ -92,12 +92,11 @@ func (c *calculateLimitController) calculateResourceQuotaUsed(_ string, ns *core
 	return nil, c.calculateProjectResourceQuota(projectNowID)
 }
 
-func setQuotaProjectID(ns *corev1.Namespace, newProjectId string) {
+func setQuotaProjectID(ns *corev1.Namespace, newProjectID string) {
 	if ns.Annotations == nil {
 		ns.Annotations = make(map[string]string)
-
 	}
-	ns.Annotations[resourceQuotaProjectID] = newProjectId
+	ns.Annotations[resourceQuotaProjectID] = newProjectID
 }
 
 func deleteQuotaProjectID(ns *corev1.Namespace) {
