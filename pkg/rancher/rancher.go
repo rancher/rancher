@@ -150,8 +150,8 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	}
 
 	if opts.RancherNamespaceOptions != "" {
-		mutator := &namespace.Mutator{}
-		if err := json.Unmarshal([]byte(opts.RancherNamespaceOptions), mutator); err != nil {
+		mutator := namespace.Mutator{}
+		if err := json.Unmarshal([]byte(opts.RancherNamespaceOptions), &mutator); err != nil {
 			return nil, fmt.Errorf("failed marshalling namespace options: %w", err)
 		}
 
