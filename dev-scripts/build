@@ -7,6 +7,7 @@ source dev-scripts/prepare-build-env
 
 BUILD_ARGS=()
 BUILDX_ARGS=()
+LABELS_STR="${LABELS_STR:-""}"
 LABELS=()
 
 BUILD_ACTION="${BUILD_ACTION:-"--load"}"
@@ -17,6 +18,13 @@ build_rancher() {
 
   if [ -n "${BUILDER}" ]; then
     BUILDX_ARGS+=("--builder=${BUILDER}")
+  fi
+
+  if [ -n "${LABELS_STR}" ]; then
+    temp_labels=()
+    mapfile -t temp_labels <<<"$LABELS_STR"
+    temp_labels=("${temp_labels[@]/#/--label=}")
+    LABELS=("${LABELS[@]}" "${temp_labels[@]}")
   fi
 
   BUILD_ARGS+=("--build-arg=VERSION=${TAG}")
