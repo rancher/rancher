@@ -31,6 +31,10 @@ GO_VERSION=$(grep -m1 'golang:' package/Dockerfile | cut -d ':' -f2 | cut -d ' '
 HELM_UNITTEST_VERSION=$(grep -m1 'ENV HELM_UNITTEST_VERSION=' Dockerfile.dapper | cut -d '=' -f2)
 CATTLE_HELM_VERSION=$(grep -m1 'ENV CATTLE_HELM_VERSION=' package/Dockerfile | cut -d '=' -f2)
 
+export ARCH=$ARCH
+export OS=$OS
+export REPO=$REPO
+export REPO_OWNER=$REPO_OWNER
 export IMAGE=$IMAGE
 export IMAGE_AGENT=$IMAGE_AGENT
 export IMAGE_INSTALLER=$IMAGE_INSTALLER
@@ -38,32 +42,19 @@ export CATTLE_KDM_BRANCH=$CATTLE_KDM_BRANCH
 export CATTLE_K3S_VERSION=$CATTLE_K3S_VERSION
 export HELM_VERSION=$HELM_VERSION
 export GO_VERSION=$GO_VERSION
-export TAG=$TAG
-export ARCH=$ARCH
 export HELM_UNITTEST_VERSION=$HELM_UNITTEST_VERSION
 export CATTLE_HELM_VERSION=$CATTLE_HELM_VERSION
-export CATTLE_RANCHER_WEBHOOK_VERSION=$CATTLE_RANCHER_WEBHOOK_VERSION
-export CATTLE_REMOTEDIALER_PROXY_VERSION=$CATTLE_REMOTEDIALER_PROXY_VERSION
-export CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$CATTLE_RANCHER_PROVISIONING_CAPI_VERSION
-export CATTLE_RANCHER_TURTLES_VERSION=$CATTLE_RANCHER_TURTLES_VERSION
-export CATTLE_CSP_ADAPTER_MIN_VERSION=$CATTLE_CSP_ADAPTER_MIN_VERSION
-export CATTLE_FLEET_VERSION=$CATTLE_FLEET_VERSION
-export OS=$OS
-export REPO=$REPO
 
-check_missing "REGISTRY"
-check_missing "TAG"
 check_missing "ARCH"
+check_missing "OS"
+check_missing "REPO"
 check_missing "IMAGE"
 check_missing "IMAGE_AGENT"
 check_missing "IMAGE_INSTALLER"
-#check_missing "IMAGE_TAG"
-check_missing "REPO"
-check_missing "COMMIT"
-#check_missing "GIT_HTTP_URL"
-#check_missing "REPO_LINK"
-#check_missing "AGENT_IMAGE_TAG"
-#check_missing "INSTALLER_IMAGE_TAG"
+check_missing "CATTLE_KDM_BRANCH"
+check_missing "CATTLE_K3S_VERSION"
+check_missing "HELM_VERSION"
+check_missing "GO_VERSION"
 check_missing "HELM_UNITTEST_VERSION"
 check_missing "CATTLE_HELM_VERSION"
 check_missing "CATTLE_RANCHER_WEBHOOK_VERSION"
@@ -72,4 +63,6 @@ check_missing "CATTLE_RANCHER_PROVISIONING_CAPI_VERSION"
 check_missing "CATTLE_RANCHER_TURTLES_VERSION"
 check_missing "CATTLE_CSP_ADAPTER_MIN_VERSION"
 check_missing "CATTLE_FLEET_VERSION"
-check_missing "OS"
+check_missing "REGISTRY"
+check_missing "TAG"
+check_missing "COMMIT"
