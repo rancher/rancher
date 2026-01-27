@@ -127,7 +127,7 @@ func TestHandler(t *testing.T) {
 		},
 	}
 
-	namespace.SetMutator(&namespace.Mutator{
+	namespace.SetMutator(namespace.Mutator{
 		Enabled: true,
 		Annotations: map[string]string{
 			"foo": "bar",
