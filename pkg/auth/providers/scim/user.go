@@ -36,24 +36,21 @@ func (b *Bool) UnmarshalJSON(data []byte) error {
 
 // SCIMUser represents a SCIM user.
 type SCIMUser struct {
-	Active     bool   `json:"active"`
-	ID         string `json:"id"`
-	ExternalID string `json:"externalId"`
-	Name       struct {
+	Schemas    []string `json:"schemas"`    // Resource schema URIs.
+	ID         string   `json:"id"`         // Service provider identifier User.Name.
+	ExternalID string   `json:"externalId"` // IdPs identifier.
+	Active     bool     `json:"active"`     // A flag indicating the user's active status.
+	Name       struct { // The components of the user's real name.
 		GivenName  string `json:"givenName"`
 		FamilyName string `json:"familyName"`
 	} `json:"name"`
-	DisplayName string `json:"displayName"`
-	UserName    string `json:"userName"`
-	Emails      []struct {
+	DisplayName string     `json:"displayName"` // The name of the user, suitable for display to end-users.
+	UserName    string     `json:"userName"`    // A service provider's unique identifier for the user, typically used by the user to directly authenticate to the service provider.
+	Emails      []struct { // Email addresses for the user.
 		Value   string `json:"value"`
 		Primary Bool   `json:"primary"`
 	} `json:"emails"`
-	Schemas []string `json:"schemas"`
-	Meta    struct {
-		Created      string `json:"created"`
-		ResourceType string `json:"resourceType"`
-	}
+	Meta Meta `json:"meta"` // The resource metadata.
 }
 
 // ListUsers returns a list of users.
