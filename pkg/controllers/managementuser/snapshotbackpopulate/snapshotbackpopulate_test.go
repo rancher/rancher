@@ -17,7 +17,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -548,7 +547,7 @@ func TestOnDownstreamChange(t *testing.T) {
 	etcdSnapshotController.EXPECT().Create(gomock.Any()).Return(nil, nil).Times(1)
 
 	snapshot.Spec.NodeName = "test-node"
-	capiMachine.Status.NodeRef = &corev1.ObjectReference{
+	capiMachine.Status.NodeRef = capi.MachineNodeReference{
 		Name: "test-node",
 	}
 
@@ -730,7 +729,7 @@ func TestOnDownstreamChange_RestoreModeAnnotationIsSetCorrectly(t *testing.T) {
 			Name:      "machine-0",
 			Labels:    map[string]string{capi.ClusterNameLabel: "example", capr.MachineIDLabel: "machine-id-0"},
 		},
-		Status: capi.MachineStatus{NodeRef: &corev1.ObjectReference{Name: "cp-0"}},
+		Status: capi.MachineStatus{NodeRef: capi.MachineNodeReference{Name: "cp-0"}},
 	}
 
 	clusterCache.EXPECT().
@@ -1071,7 +1070,7 @@ func TestGetMachineFromNode(t *testing.T) {
 				cache.EXPECT().List(gomock.Any(), gomock.Any()).Return([]*capi.Machine{
 					{
 						Status: capi.MachineStatus{
-							NodeRef: &corev1.ObjectReference{
+							NodeRef: capi.MachineNodeReference{
 								Name: "not-test-node",
 							},
 						},
@@ -1090,7 +1089,7 @@ func TestGetMachineFromNode(t *testing.T) {
 				cache.EXPECT().List(gomock.Any(), gomock.Any()).Return([]*capi.Machine{
 					{
 						Status: capi.MachineStatus{
-							NodeRef: &corev1.ObjectReference{
+							NodeRef: capi.MachineNodeReference{
 								Name: "test-node",
 							},
 						},
@@ -1099,7 +1098,7 @@ func TestGetMachineFromNode(t *testing.T) {
 			},
 			expectedMachine: &capi.Machine{
 				Status: capi.MachineStatus{
-					NodeRef: &corev1.ObjectReference{
+					NodeRef: capi.MachineNodeReference{
 						Name: "test-node",
 					},
 				},

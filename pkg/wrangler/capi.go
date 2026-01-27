@@ -2,9 +2,9 @@ package wrangler
 
 import (
 	"context"
+	"fmt"
 	"sync/atomic"
 
-	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
 	"github.com/rancher/rancher/pkg/features"
@@ -171,7 +171,7 @@ func waitForCAPIAppVersion(ctx context.Context, wContext *Context) error {
 
 	if features.EmbeddedClusterAPI.Enabled() && features.Turtles.Enabled() {
 		logrus.Debugf("[deferred-capi] Both embedded-cluster-api and turtles features are enabled, which is not supported. Skipping CAPI App version wait")
-		return nil
+		return fmt.Errorf("both embedded-cluster-api and turtles features cannot be enabled simultaneously")
 	}
 
 	if features.Turtles.Enabled() {
@@ -214,7 +214,7 @@ func waitForCAPIAppVersion(ctx context.Context, wContext *Context) error {
 			return false
 		}
 
-		if app.Status.Summary.State != string(catalog.StatusDeployed) {
+		if app.Status.Summary.State != string(v1.StatusDeployed) {
 			logrus.Tracef("[deferred-capi] App %s/%s is not yet deployed (current state: %s), continuing to wait...", ns, name, app.Status.Summary.State)
 			return false
 		}
