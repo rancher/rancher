@@ -20,17 +20,19 @@ import (
 
 // SCIMMember represents a member of a SCIM group.
 type SCIMMember struct {
-	Value   string `json:"value"`
-	Display string `json:"display"`
+	Value   string `json:"value"`   // Member identifier.
+	Type    string `json:"type"`    // Member type, e.g., "User" or "Group".
+	Display string `json:"display"` // A human-readable name.
 }
 
 // SCIMGroup represents a SCIM group.
 type SCIMGroup struct {
-	Schemas     []string     `json:"schemas"`
-	ID          string       `json:"id"`
-	DisplayName string       `json:"displayName"`
-	ExternalID  string       `json:"externalId"`
-	Members     []SCIMMember `json:"members"`
+	Schemas     []string     `json:"schemas"`     // Resource schema URIs.
+	ID          string       `json:"id"`          // Service provider internal identifier Group.Name.
+	DisplayName string       `json:"displayName"` // A human-readable name for the Group.
+	ExternalID  string       `json:"externalId"`  // IdPs identifier.
+	Members     []SCIMMember `json:"members"`     // A list of members of the Group.
+	Meta        Meta         `json:"meta"`        // The resource metadata.
 }
 
 // ListGroups returns a list of groups.
@@ -624,6 +626,10 @@ func (s *SCIMServer) syncGroupMembers(provider, groupName string, members []SCIM
 	}
 
 	for _, member := range members {
+		if member.Type == GroupResource {
+			continue // Nested groups are not supported yet.
+		}
+
 		if _, ok := existing[member.Value]; !ok {
 			// New member added.
 			err := s.addGroupMember(provider, groupName, member)
