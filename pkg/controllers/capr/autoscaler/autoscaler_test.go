@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // mockDynamicGetter is a mock implementation of the DynamicClient interface
@@ -41,66 +42,15 @@ func (m *mockDynamicGetter) SetGetFunc(f func(gvk schema.GroupVersionKind, names
 
 // mockControllerRuntimeClient is a minimal mock for controller-runtime client.Client
 type mockControllerRuntimeClient struct {
+	client.Client
 	getFunc func(ctx context.Context, key any, obj any, opts ...any) error
 }
 
-func (m *mockControllerRuntimeClient) Get(ctx context.Context, key any, obj any, opts ...any) error {
+func (m *mockControllerRuntimeClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 	if m.getFunc != nil {
-		return m.getFunc(ctx, key, obj, opts...)
+		return m.getFunc(ctx, key, obj, opts)
 	}
 	return nil
-}
-
-func (m *mockControllerRuntimeClient) List(ctx context.Context, list any, opts ...any) error {
-	return nil
-}
-
-func (m *mockControllerRuntimeClient) Create(ctx context.Context, obj any, opts ...any) error {
-	return nil
-}
-
-func (m *mockControllerRuntimeClient) Delete(ctx context.Context, obj any, opts ...any) error {
-	return nil
-}
-
-func (m *mockControllerRuntimeClient) Update(ctx context.Context, obj any, opts ...any) error {
-	return nil
-}
-
-func (m *mockControllerRuntimeClient) Patch(ctx context.Context, obj any, patch any, opts ...any) error {
-	return nil
-}
-
-func (m *mockControllerRuntimeClient) DeleteAllOf(ctx context.Context, obj any, opts ...any) error {
-	return nil
-}
-
-func (m *mockControllerRuntimeClient) Apply(ctx context.Context, obj interface{}, opts ...any) error {
-	return nil
-}
-
-func (m *mockControllerRuntimeClient) Status() any {
-	return nil
-}
-
-func (m *mockControllerRuntimeClient) SubResource(subResource string) any {
-	return nil
-}
-
-func (m *mockControllerRuntimeClient) Scheme() *runtime.Scheme {
-	return nil
-}
-
-func (m *mockControllerRuntimeClient) RESTMapper() any {
-	return nil
-}
-
-func (m *mockControllerRuntimeClient) GroupVersionKindFor(obj runtime.Object) (schema.GroupVersionKind, error) {
-	return schema.GroupVersionKind{}, nil
-}
-
-func (m *mockControllerRuntimeClient) IsObjectNamespaced(obj runtime.Object) (bool, error) {
-	return false, nil
 }
 
 func (m *mockControllerRuntimeClient) SetGetFunc(f func(ctx context.Context, key any, obj any, opts ...any) error) {
