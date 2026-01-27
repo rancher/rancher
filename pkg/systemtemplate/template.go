@@ -33,7 +33,21 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: cattle-system
+{{- if .NamespaceOptions.Enabled }}
+  {{- if .NamespaceOptions.Annotations }}
+  annotations:
+    {{- range $annotation, $value := .NamespaceOptions.Annotations }}
+    {{$annotation}}: {{$value | quote}}
+    {{- end }}
+  {{- end }}
 
+  {{- if .NamespaceOptions.Labels }}
+  labels:
+    {{- range $label, $value := .NamespaceOptions.Labels }}
+    {{$label}}: {{$value | quote}}
+    {{- end }}
+  {{- end }}
+{{- end }}
 ---
 
 apiVersion: v1
@@ -197,6 +211,10 @@ spec:
             value: cattle-credentials-{{.TokenKey}}
           - name: CATTLE_SUC_APP_NAME_OVERRIDE
             value: "{{.SUCAppNameOverride}}"
+          {{- if eq .NamespaceOptions.Enabled true }}
+          - name: RANCHER_NAMESPACE_OPTIONS
+            value: '{{.NamespaceOptions | mustToJson}}'
+          {{- end }}
           {{- if .IsPreBootstrap }}
           # since we're on the host network, talk to the apiserver over localhost
           {{- end }}
