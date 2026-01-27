@@ -106,17 +106,17 @@ if [ -z "$TARGET" ] || [ "$TARGET" = "server" ]; then
   # start the builds
   build_rancher "server"
 
-  # if [ "$PUSH" = "true" ]; then
-  #   docker push "${REPO}"/rancher:"${TAG}" &
-  # fi
+  if [ "$PUSH" = "true" ]; then
+    docker push "${REPO}"/rancher:"${TAG}" &
+  fi
 fi
 
 if [ -z "$TARGET" ] || [ "$TARGET" = "agent" ]; then
   build_rancher "agent"
 
-  # if [ "$PUSH" = "true" ]; then
-  #   docker push "${REPO}"/rancher-agent:"${TAG}" &
-  # fi
+  if [ "$PUSH" = "true" ]; then
+    docker push "${REPO}"/rancher-agent:"${TAG}" &
+  fi
 fi
 
 wait
