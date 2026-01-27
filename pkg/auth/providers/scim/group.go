@@ -696,6 +696,9 @@ func (s *SCIMServer) addGroupMember(provider, groupName string, member SCIMMembe
 func (s *SCIMServer) removeGroupMember(provider, groupName, value string) error {
 	user, err := s.userCache.Get(value)
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil // User already deleted.
+		}
 		return fmt.Errorf("failed to get user %s: %w", value, err)
 	}
 
