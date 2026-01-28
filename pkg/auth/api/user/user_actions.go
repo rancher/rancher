@@ -29,6 +29,10 @@ func (h *Handler) UserFormatter(apiContext *types.APIContext, resource *types.Ra
 	if canRefresh := h.userCanRefresh(apiContext); canRefresh {
 		resource.AddAction(apiContext, "refreshauthprovideraccess")
 	}
+
+	if !(apiContext.AccessControl.CanDo(v3.UserGroupVersionKind.Group, v3.UserResource.Name, "update", apiContext, nil, apiContext.Schema) == nil) {
+		delete(resource.Links, "update")
+	}
 }
 
 func (h *Handler) CollectionFormatter(apiContext *types.APIContext, collection *types.GenericCollection) {
