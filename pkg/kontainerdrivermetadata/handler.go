@@ -89,7 +89,11 @@ func getKubernetesVersionRange(ctx context.Context, runtime, serverVersion strin
 	if err != nil {
 		return "", fmt.Errorf("failed to parse server version %s: %v", serverVersion, err)
 	}
-	config := channelserver.GetReleaseConfigByRuntime(ctx, runtime).ReleasesConfig()
+	cfg, err := channelserver.GetReleaseConfigByRuntime(ctx, runtime)
+	if err != nil {
+		return "", fmt.Errorf("failed to get release config for %s: %w", runtime, err)
+	}
+	config := cfg.ReleasesConfig()
 	if config == nil || len(config.Releases) == 0 {
 		return "", fmt.Errorf("no released versions found for %s: %s", runtime, serverVersion)
 	}
