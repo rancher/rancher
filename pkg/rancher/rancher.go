@@ -33,6 +33,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/dashboard/plugin"
 	"github.com/rancher/rancher/pkg/controllers/dashboardapi"
 	managementauth "github.com/rancher/rancher/pkg/controllers/management/auth"
+	namespacecontroller "github.com/rancher/rancher/pkg/controllers/namespace"
 	"github.com/rancher/rancher/pkg/controllers/nodedriver"
 	provisioningv2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	"github.com/rancher/rancher/pkg/crds"
@@ -446,6 +447,8 @@ func (r *Rancher) Start(ctx context.Context) error {
 	if err := dashboardapi.Register(ctx, r.Wrangler); err != nil {
 		return err
 	}
+
+	namespacecontroller.Register(ctx, r.Wrangler)
 
 	userManager, err := common.NewUserManagerNoBindings(r.Wrangler)
 	if err != nil {
