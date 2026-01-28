@@ -100,6 +100,13 @@ func (c *Manager) Index(namespace, name, targetK8sVersion string, skipFilter boo
 		return nil, err
 	}
 
+	// Check if the ClusterRepo status has been populated with the ConfigMap information.
+	// This can be empty during startup or catalog refresh when the helm controller hasn't
+	// finished processing the ClusterRepo yet.
+	if r.status.IndexConfigMapName == "" {
+		return nil, fmt.Errorf("cluster repo %s index not ready yet, helm controller is still processing", name)
+	}
+
 	cm, err := c.configMaps.Get(r.status.IndexConfigMapNamespace, r.status.IndexConfigMapName)
 	if err != nil {
 		return nil, err
