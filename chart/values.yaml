@@ -69,12 +69,17 @@ agentTLSMode: ""
 imagePullSecrets: []
 # - name: secretName
 
-### ingress ###
+# Network exposure configuration
+# Choose between 'ingress' or 'gateway'
+networkExposure:
+  type: "ingress"  # Options: "ingress", "gateway", or "none"
+
+# Traditional Ingress configuration
 # Readme for details and instruction on adding tls secrets.
 ingress:
   # If set to false, ingress will not be created
-  # Defaults to true
-  # options: true, false
+  # Defaults to true; options: true, false
+  # Note: Ingress is only created when BOTH this is true AND networkExposure.type is 'ingress'
   enabled: true
   # The includeDefaultExtraAnnotations are deprecated due to ingress-nginx retiring in March 2026.
   includeDefaultExtraAnnotations: false
@@ -99,6 +104,33 @@ ingress:
     # options: rancher, letsEncrypt, secret
     source: rancher
     secretName: tls-rancher-ingress
+
+# Gateway API configuration
+gateway:
+  gatewayClass:
+    name: "traefik" # Set to the Gateway class name (k3s/rke2: traefik)
+    ports: # Must match the GatewayClass's configured entrypoints
+      http: 8000  # k3s Traefik defaults to web entrypoint to 8000
+      https: 8443 # k3s Traefik defaults to websecure entrypoint to 8443
+    additionalListeners: [] # Additional listener configs
+    #  - name: http
+    #    protocol: HTTP
+    #    port: 80
+    #    hostname: "*.example.com"
+    #  - name: https
+    #    protocol: HTTPS
+    #    port: 443
+    #    hostname: "*.example.com"
+    #    tls:
+    #      mode: Terminate
+    #      certificateRefs:
+    #        - name: app-tls
+    #          kind: Secret
+
+    tls:
+      # options: rancher, letsEncrypt, secret
+      source: rancher
+      secretName: tls-rancher-ingress
 
 ### service ###
 # Override to use NodePort or LoadBalancer service type - default is ClusterIP

@@ -1,4 +1,4 @@
-{{- if .Values.ingress.enabled }}
+{{- if eq (include "rancher.ingressEnabled" .) "true" }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -10,7 +10,7 @@ metadata:
     nginx.ingress.kubernetes.io/configuration-snippet: |
       {{- template "configurationSnippet" . }}
 {{- end }}
-{{- if eq .Values.tls "external" }}
+{{- if eq (include "rancher.useExternalTls" .) "true" }}
     nginx.ingress.kubernetes.io/ssl-redirect: "false" # turn off ssl redirect for external.
 {{- else }}
   {{- if ne .Values.ingress.tls.source "secret" }}
@@ -51,7 +51,7 @@ spec:
         pathType: {{ .Values.ingress.pathType }}
         path: {{ .Values.ingress.path }}
         {{- end }}
-{{- if eq .Values.tls "ingress" }}
+{{- if eq (include "rancher.useExternalTls" .) "false" }}
   tls:
   - hosts:
     - {{ .Values.hostname }}

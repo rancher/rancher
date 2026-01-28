@@ -41,6 +41,16 @@
         }
       }
     },
+    "networkExposure": {
+      "type": "object",
+      "description": "The default rancher network exposure configuration",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["ingress", "gateway", "none"]
+        }
+      }
+    },
     "ingress": {
       "type": "object",
       "description": "The default rancher ingress configuration",
@@ -48,6 +58,78 @@
         "servicePort": {
           "type": "integer",
           "enum": [443, 80]
+        }
+      }
+    },
+    "gateway": {
+      "type": "object",
+      "description": "The default rancher gateway configuration",
+      "properties": {
+        "gatewayClass": {
+          "type": "object",
+          "description": "The default rancher gateway class configuration",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "ports": {
+              "type": "object",
+              "description": "The default rancher gateway class ports configuration",
+              "properties": {
+                "http": {
+                  "type": "integer"
+                },
+                "https": {
+                  "type": "integer"
+                }
+              }
+            },
+            "additionalListeners": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["name", "protocol", "port"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "protocol": {
+                    "type": "string",
+                    "enum": ["HTTP", "HTTPS", "TCP", "UDP"]
+                  },
+                  "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+                  "hostname": { "type": "string" },
+                  "tls": {
+                    "type": ["object", "null"],
+                    "properties": {
+                      "mode": { "type": "string", "enum": ["Terminate", "Passthrough"] },
+                      "certificateRefs": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "name": { "type": "string" },
+                            "kind": { "type": "string" }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "tls": {
+              "type": "object",
+              "description": "The default rancher gateway class tls configuration",
+              "properties": {
+                "source": {
+                  "type": "string",
+                  "enum": ["rancher", "letsEncrypt", "secret"]
+                },
+                "secretName": {
+                  "type": "string"
+                }
+              }
+            }
+          }
         }
       }
     }

@@ -2,6 +2,9 @@
 {{ if .Release.IsUpgrade -}}
 {{ $action = "upgraded" -}}
 {{ end -}}
+{{ if not .Values.hostname }}
+{{- include "tpl.chart.warning" "`.Values.hostname` is unset or empty, Rancher must have a valid hostname."}}
+{{- end -}}
 {{- include "tpl.chart.deprecated" (list .Values.busyboxImage ".Values.busyboxImage" "Use `.Values.auditLog.image.repository` & `.Values.auditLog.image.tag` instead.") -}}
 {{- include "tpl.chart.replace" (list .Values.busyboxImagePullPolicy ".Values.busyboxImagePullPolicy" ".Values.auditLog.image.pullPolicy") -}}
 {{- include "tpl.chart.deprecated" (list .Values.rancherImage ".Values.rancherImage" "Use `.Values.image.repository` & `.Values.image.registry` instead; if you used image name with Registry included you must split them up.") -}}
