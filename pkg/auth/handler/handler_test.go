@@ -246,6 +246,51 @@ func TestAuthenticationProvidersUnsupportedPKCEMethod(t *testing.T) {
 	}
 }
 
+func TestAuthenticationProvidersDisabledProvider(t *testing.T) {
+	fc := newFakeUnstructuredClient(map[string]*runtimetesting.Unstructured{
+		"disabled-provider": &runtimetesting.Unstructured{
+			Object: map[string]any{
+				"apiVersion": "management.cattle.io/v3",
+				"kind":       "AuthConfig",
+				"metadata": map[string]any{
+					"name": "disabled-provider",
+				},
+				"scope":        "openid profile email",
+				"type":         "oidcConfig",
+				"authEndpoint": "https://idp.example.com/oauth/authorize",
+				"clientId":     "test-client",
+				"enabled":      false, // Provider is disabled
+				"issuer":       "https://idp.example.com",
+				"rancherUrl":   "https://rancher.example.com/verify-auth",
+			},
+		},
+	})
+	srv := NewFromUnstructuredClient(fc)
+	router := mux.NewRouter()
+	srv.RegisterOIDCProviderHandlers(router)
+	testSrv := httptest.NewServer(router)
+	t.Cleanup(func() {
+		testSrv.Close()
+	})
+
+	req, err := http.NewRequest(http.MethodGet, testSrv.URL+"/v1-oidc/disabled-provider?state=teststate&scope=openid", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := testSrv.Client()
+	client.CheckRedirect = func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("got Status %v, want %v", resp.StatusCode, http.StatusBadRequest)
+	}
+}
+
 func newFakeUnstructuredClient(acs map[string]*runtimetesting.Unstructured) *fakeUnstructuredClient {
 	configs := map[string]runtime.Unstructured{}
 	for k, v := range acs {

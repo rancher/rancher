@@ -101,7 +101,6 @@ func (o *OpenIDCProvider) CustomizeSchema(schema *types.Schema) {
 }
 
 func (o *OpenIDCProvider) AuthenticateUser(w http.ResponseWriter, req *http.Request, input any) (apiv3.Principal, []apiv3.Principal, string, error) {
-	logrus.Debug("Authenticating user")
 	login, ok := input.(*apiv3.OIDCLogin)
 	if !ok {
 		return apiv3.Principal{}, nil, "", fmt.Errorf("unexpected input type")
@@ -212,7 +211,6 @@ func (o *OpenIDCProvider) TransformToAuthProvider(authConfig map[string]any) (ma
 	if err != nil {
 		return nil, fmt.Errorf("creating OIDC login URL: %w", err)
 	}
-	logrus.Debugf("TransformToAuthProvider using URL %s", redirectPath)
 
 	p[publicclient.OIDCProviderFieldRedirectURL] = redirectPath
 

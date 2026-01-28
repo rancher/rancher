@@ -101,6 +101,21 @@ func (p *AuthProviderServer) redirectToIdP(w http.ResponseWriter, req *http.Requ
 	data := authConfigData.UnstructuredContent()
 	logrus.Debugf("[oidc] Retrieved auth config for provider: %s", provider)
 
+	// Validate that the provider is enabled
+	if enabledRaw := data[client.GenericOIDCConfigFieldEnabled]; enabledRaw != nil {
+		enabled, ok := enabledRaw.(bool)
+		if !ok {
+			logrus.Errorf("[oidc] Invalid enabled field type for provider %s: expected bool, got %T", provider, enabledRaw)
+			http.Error(w, "Invalid provider configuration", http.StatusInternalServerError)
+			return
+		}
+		if !enabled {
+			logrus.Debugf("[oidc] Provider %s is disabled", provider)
+			http.Error(w, "Provider is disabled", http.StatusBadRequest)
+			return
+		}
+	}
+
 	// Validate PKCE method if configured
 	var pkceVerifier string
 	if pkceMethodRaw := data[client.GenericOIDCConfigFieldPKCEMethod]; pkceMethodRaw != nil {
