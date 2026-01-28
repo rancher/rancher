@@ -110,6 +110,10 @@ func (s *shell) contextAndClient(req *http.Request) (context.Context, user.Info,
 }
 
 func (s *shell) createPod(imageOverride string) *v1.Pod {
+	var (
+		f = false
+		t = true
+	)
 	imageName := imageOverride
 	if imageName == "" {
 		imageName = settings.FullShellImage()
@@ -120,6 +124,12 @@ func (s *shell) createPod(imageOverride string) *v1.Pod {
 			Namespace:    s.namespace,
 		},
 		Spec: v1.PodSpec{
+			SecurityContext: &v1.PodSecurityContext{
+				RunAsNonRoot: &t,
+				RunAsUser:    &settings.ShellImageUserId,
+				RunAsGroup:   &settings.ShellImageUserId,
+				FSGroup:      &settings.ShellImageUserId,
+			},
 			TerminationGracePeriodSeconds: new(int64),
 			RestartPolicy:                 v1.RestartPolicyNever,
 			NodeSelector: map[string]string{
@@ -165,6 +175,44 @@ func (s *shell) createPod(imageOverride string) *v1.Pod {
 					},
 					Image:           imageName,
 					ImagePullPolicy: v1.PullIfNotPresent,
+					SecurityContext: &v1.SecurityContext{
+						AllowPrivilegeEscalation: &f,
+						ReadOnlyRootFilesystem:   &t,
+					},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      "tmp",
+							MountPath: "/tmp",
+						},
+						{
+							Name:      "run",
+							MountPath: "/run",
+						},
+						{
+							Name:      "helm-run",
+							MountPath: "/home/shell/helm-run",
+						},
+					},
+				},
+			},
+			Volumes: []v1.Volume{
+				{
+					Name: "tmp",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
+				},
+				{
+					Name: "run",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
+				},
+				{
+					Name: "helm-run",
+					VolumeSource: v1.VolumeSource{
+						EmptyDir: &v1.EmptyDirVolumeSource{},
+					},
 				},
 			},
 		},
