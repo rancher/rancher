@@ -33,6 +33,10 @@ const (
 	ResourceQuotaInitCondition      = "ResourceQuotaInit"
 )
 
+var (
+	zeroQuantity = resource.MustParse("0")
+)
+
 /*
 SyncController takes care of creating Kubernetes resource quota based on the resource limits
 defined in namespace.resourceQuota
@@ -520,9 +524,8 @@ func zeroOutResourceQuotaLimit(limit *v32.ResourceQuotaLimit, exceeded corev1.Re
 		return nil, err
 	}
 
-	zero := resource.MustParse("0")
 	for k := range exceeded {
-		zeroed[k] = zero
+		zeroed[k] = zeroQuantity
 	}
 
 	return convertResourceListToLimit(zeroed)
