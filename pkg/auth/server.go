@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman"
 	"github.com/rancher/rancher/pkg/auth/api"
 	"github.com/rancher/rancher/pkg/auth/data"
+	"github.com/rancher/rancher/pkg/auth/handler"
 	"github.com/rancher/rancher/pkg/auth/logout"
 	"github.com/rancher/rancher/pkg/auth/providerrefresh"
 	"github.com/rancher/rancher/pkg/auth/providers/publicapi"
@@ -90,6 +91,9 @@ func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext, 
 		return nil, err
 	}
 	logrus.Infof("Configuring auth server API body limit to %v bytes", apiLimit)
+
+	p := handler.NewFromAuthConfigInterface(scaledContext.Management.AuthConfigs(""))
+	p.RegisterOIDCProviderHandlers(root)
 
 	limitingHandler := utils.APIBodyLimitingHandler(apiLimit)
 	root.PathPrefix("/v1-saml").Handler(limitingHandler(saml))

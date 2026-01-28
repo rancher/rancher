@@ -26,7 +26,9 @@ const (
 	KeyCloakOIDCConfigFieldName                = "name"
 	KeyCloakOIDCConfigFieldNameClaim           = "nameClaim"
 	KeyCloakOIDCConfigFieldOwnerReferences     = "ownerReferences"
+	KeyCloakOIDCConfigFieldPKCEMethod          = "pkceMethod"
 	KeyCloakOIDCConfigFieldPrivateKey          = "privateKey"
+	KeyCloakOIDCConfigFieldRancherAPIHost      = "rancherApiHost"
 	KeyCloakOIDCConfigFieldRancherURL          = "rancherUrl"
 	KeyCloakOIDCConfigFieldRemoved             = "removed"
 	KeyCloakOIDCConfigFieldScopes              = "scope"
@@ -62,7 +64,9 @@ type KeyCloakOIDCConfig struct {
 	Name                string            `json:"name,omitempty" yaml:"name,omitempty"`
 	NameClaim           string            `json:"nameClaim,omitempty" yaml:"nameClaim,omitempty"`
 	OwnerReferences     []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	PKCEMethod          string            `json:"pkceMethod,omitempty" yaml:"pkceMethod,omitempty"`
 	PrivateKey          string            `json:"privateKey,omitempty" yaml:"privateKey,omitempty"`
+	RancherAPIHost      string            `json:"rancherApiHost,omitempty" yaml:"rancherApiHost,omitempty"`
 	RancherURL          string            `json:"rancherUrl,omitempty" yaml:"rancherUrl,omitempty"`
 	Removed             string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	Scopes              string            `json:"scope,omitempty" yaml:"scope,omitempty"`
