@@ -286,8 +286,8 @@ func TestAuthenticationProvidersDisabledProvider(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.StatusCode != http.StatusBadRequest {
-		t.Errorf("got Status %v, want %v", resp.StatusCode, http.StatusBadRequest)
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("got Status %v, want %v", resp.StatusCode, http.StatusNotFound)
 	}
 }
 

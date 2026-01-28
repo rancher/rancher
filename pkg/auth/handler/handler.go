@@ -111,7 +111,7 @@ func (p *AuthProviderServer) redirectToIdP(w http.ResponseWriter, req *http.Requ
 		}
 		if !enabled {
 			logrus.Debugf("[oidc] Provider %s is disabled", provider)
-			http.Error(w, "Provider is disabled", http.StatusBadRequest)
+			http.Error(w, "Provider is disabled", http.StatusNotFound)
 			return
 		}
 	}
