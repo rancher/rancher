@@ -15,6 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	crbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
+	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -112,10 +113,14 @@ func (p *prtbHandler) deleteRoleBindings(prtb *v3.ProjectRoleTemplateBinding) er
 
 // deleteDownstreamResources deletes all Role Bindings and Cluster Role Bindings in the downstream cluster made by the PRTB.
 // It also removes the service account impersonator for the user if there are no other PRTBs or CRTBs for the user.
+// If the cluster is not found, it assumes it has been deleted and does not re-queue.
 func (p *prtbHandler) deleteDownstreamResources(prtb *v3.ProjectRoleTemplateBinding) error {
 	clusterName, _ := rbac.GetClusterAndProjectNameFromPRTB(prtb)
 	cluster, err := p.clusterController.Get(clusterName, metav1.GetOptions{})
-	if err != nil {
+	if apierrors.IsNotFound(err) {
+		logrus.Infof("Cluster %s not found when deleting downstream resources for PRTB %s. Not re-queuing.", clusterName, prtb.Name)
+		return nil
+	} else if err != nil {
 		return err
 	}
 

@@ -4,10 +4,8 @@ import (
 	"fmt"
 
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/impersonation"
 	"github.com/rancher/rancher/pkg/types/config"
 	rbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
-	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,31 +44,6 @@ func (ih *impersonationHandler) ensureServiceAccountImpersonator(username string
 	err := ih.impersonator.SetUpImpersonation(&user.DefaultInfo{UID: username})
 	if apierrors.IsNotFound(err) {
 		logrus.Warnf("could not find user %s, will not create impersonation account on cluster", username)
-		return nil
-	}
-	return err
-}
-
-// deleteServiceAccountImpersonator checks if there are any CRTBs or PRTBs for this user. If there are none, remove their Service Account Impersonator.
-// Currently uses custom indexers to get CRTBs and PRTBs. Once Rancher's minimum support is >1.31,
-// the indexers can be replaced by crd selectable fields https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#crd-selectable-fields
-func (ih *impersonationHandler) deleteServiceAccountImpersonator(username string) error {
-	indexKey := name.SafeConcatName(ih.clusterName, username)
-	crtbs, err := ih.crtbCache.GetByIndex(crtbByUsernameIndex, indexKey)
-	if err != nil {
-		return err
-	}
-	prtbs, err := ih.prtbCache.GetByIndex(prtbByUsernameIndex, indexKey)
-	if err != nil {
-		return err
-	}
-	if len(crtbs)+len(prtbs) > 0 {
-		return nil
-	}
-	roleName := impersonation.ImpersonationPrefix + username
-	logrus.Debugf("deleting service account impersonator for %s", username)
-	err = ih.crClient.Delete(roleName, &metav1.DeleteOptions{})
-	if apierrors.IsNotFound(err) {
 		return nil
 	}
 	return err

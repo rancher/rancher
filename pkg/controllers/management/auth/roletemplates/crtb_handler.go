@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
+	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -280,7 +281,10 @@ func (c *crtbHandler) removeRoleBindings(crtb *v3.ClusterRoleTemplateBinding) er
 func (c *crtbHandler) deleteDownstreamResources(crtb *v3.ClusterRoleTemplateBinding) error {
 	clusterName := crtb.ClusterName
 	cluster, err := c.clusterController.Get(clusterName, metav1.GetOptions{})
-	if err != nil {
+	if apierrors.IsNotFound(err) {
+		logrus.Infof("Cluster %s not found when deleting downstream resources for CRTB %s. Not re-queuing.", clusterName, crtb.Name)
+		return nil
+	} else if err != nil {
 		return err
 	}
 
