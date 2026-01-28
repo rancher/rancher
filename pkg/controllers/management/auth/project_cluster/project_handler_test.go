@@ -195,8 +195,6 @@ func TestRemove(t *testing.T) {
 	ns.EXPECT().Get(namespace.Name, metav1.GetOptions{}).Return(namespace, nil)
 	ns.EXPECT().Delete(project.Name, &metav1.DeleteOptions{})
 
-	// require.Len(t, clientset.Fake.Actions(), 2, "expected exactly two actions to be recorded")
-
 	lifecycle := &projectLifecycle{
 		nsClient: ns,
 	}
