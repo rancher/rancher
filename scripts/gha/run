@@ -26,4 +26,4 @@ export CATTLE_BOOTSTRAP_PASSWORD="admin"
 export CATTLE_FEATURES="harvester=false"
 
 mkdir -p /etc/rancher/k3s/
-docker run -d --name rancher-server -v /etc/rancher/k3s:/etc/rancher/k3s --restart=unless-stopped --privileged -p 6443:6443 -p 8080:8080 -p 443:443 -e CATTLE_SERVER_URL=$CATTLE_SERVER_URL -e CATTLE_BOOTSTRAP_PASSWORD=$CATTLE_BOOTSTRAP_PASSWORD -e CATTLE_DEV_MODE=yes -e CATTLE_AGENT_IMAGE=$AGENT_IMAGE $IMAGE
+docker run -d --name rancher-server -v /etc/rancher/k3s:/etc/rancher/k3s --restart=unless-stopped --privileged -p 6443:6443 -p 8080:8080 -p 443:443 -e CATTLE_RANCHER_PROVISIONING_CAPI_VERSION="109.0.0+up0.9.0" -e CATTLE_CHART_DEFAULT_URL="https://github.com/jiaqiluo/charts" -e CATTLE_CHART_DEFAULT_BRANCH="capi-v1beta2"  -e CATTLE_SERVER_URL=$CATTLE_SERVER_URL -e CATTLE_BOOTSTRAP_PASSWORD=$CATTLE_BOOTSTRAP_PASSWORD -e CATTLE_DEV_MODE=yes -e CATTLE_AGENT_IMAGE=$AGENT_IMAGE $IMAGE
