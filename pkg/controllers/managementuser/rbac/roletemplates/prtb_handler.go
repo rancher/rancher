@@ -6,6 +6,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/apis/management.cattle.io"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/features"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/impersonation"
 	"github.com/rancher/rancher/pkg/rbac"
@@ -63,7 +64,7 @@ func newPRTBHandler(uc *config.UserContext) (*prtbHandler, error) {
 // OnChange ensures a Role Binding exists in every project namespace to the RoleTemplate ClusterRole.
 // If there are promoted rules, it creates a second Role Binding in each namespace to the promoted ClusterRole
 func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
-	if prtb == nil || prtb.DeletionTimestamp != nil {
+	if prtb == nil || prtb.DeletionTimestamp != nil || !features.AggregatedRoleTemplates.Enabled() {
 		return nil, nil
 	}
 
