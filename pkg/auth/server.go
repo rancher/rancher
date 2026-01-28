@@ -92,7 +92,6 @@ func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext, 
 	}
 	logrus.Infof("Configuring auth server API body limit to %v bytes", apiLimit)
 
-	logrus.Info("Registering custom OIDC bouncher")
 	p := handler.NewFromAuthConfigInterface(scaledContext.Management.AuthConfigs(""))
 	p.RegisterOIDCProviderHandlers(root)
 

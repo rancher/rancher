@@ -445,7 +445,6 @@ func (o *OpenIDCProvider) GetUserExtraAttributes(userPrincipal apiv3.Principal) 
 }
 
 func (o *OpenIDCProvider) getUserInfoFromAuthCode(rw http.ResponseWriter, req *http.Request, config *apiv3.OIDCConfig, authCode string, claimInfo *ClaimInfo, userName string) (*oidc.UserInfo, *oauth2.Token, string, error) {
-	logrus.Info("OpenIDCProvider: getUserInfoFromAuthCode")
 	var userInfo *oidc.UserInfo
 	var oauth2Token *oauth2.Token
 	var err error
@@ -907,8 +906,6 @@ func deletePKCEVerifier(req *http.Request, w http.ResponseWriter) {
 
 	http.SetCookie(w, pkceCookie)
 }
-
-// TODO: Can this use SameSite: true?
 
 // SetPKCEVerifier sets Cookie with the PKCE Verification token which is needed
 // when the user's browser is redirected back to exchange the token.
