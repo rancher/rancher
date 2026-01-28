@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/pkg/capr"
+	"github.com/rancher/rancher/pkg/namespace"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
@@ -557,7 +558,7 @@ func (cd *clusterDeploy) getYAML(cluster *apimgmtv3.Cluster, agentImage, authIma
 	buf := &bytes.Buffer{}
 	err = systemtemplate.SystemTemplate(buf, agentImage, authImage, cluster.Name,
 		token, url, capr.PreBootstrap(cluster), cluster, features,
-		taints, cd.secretLister, priorityClassExists)
+		taints, cd.secretLister, priorityClassExists, namespace.GetMutator())
 
 	return buf.Bytes(), err
 }

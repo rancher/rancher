@@ -7,7 +7,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/cache"
@@ -60,12 +60,12 @@ func TestNsByProjectID(t *testing.T) {
 	}{
 		{
 			name: "Wrong type",
-			obj:  &v1.Pod{},
+			obj:  &corev1.Pod{},
 			want: []string{},
 		},
 		{
 			name: "Matching annotation",
-			obj: &v1.Namespace{
+			obj: &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						projectIDAnnotation: "test-namespace",
@@ -76,7 +76,7 @@ func TestNsByProjectID(t *testing.T) {
 		},
 		{
 			name: "No annotation",
-			obj: &v1.Namespace{
+			obj: &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
 						"bad-annotation": "test-namespace",
@@ -182,7 +182,7 @@ func TestRoleTemplateEnqueueNamespace(t *testing.T) {
 					"test-rt": {{ProjectName: "test-project"}},
 				},
 			},
-			nsIndexer: &DummyIndexer[*v1.Namespace]{
+			nsIndexer: &DummyIndexer[*corev1.Namespace]{
 				err: errDefault,
 			},
 			want:    nil,
@@ -195,8 +195,8 @@ func TestRoleTemplateEnqueueNamespace(t *testing.T) {
 					Name: "test-rt",
 				},
 			},
-			nsIndexer: &DummyIndexer[*v1.Namespace]{
-				resources: map[string][]*v1.Namespace{
+			nsIndexer: &DummyIndexer[*corev1.Namespace]{
+				resources: map[string][]*corev1.Namespace{
 					"test-project": {
 						{
 							ObjectMeta: metav1.ObjectMeta{Name: "test-namespace"},
@@ -224,8 +224,8 @@ func TestRoleTemplateEnqueueNamespace(t *testing.T) {
 					Name: "test-rt",
 				},
 			},
-			nsIndexer: &DummyIndexer[*v1.Namespace]{
-				resources: map[string][]*v1.Namespace{
+			nsIndexer: &DummyIndexer[*corev1.Namespace]{
+				resources: map[string][]*corev1.Namespace{
 					"test-project": {{
 						ObjectMeta: metav1.ObjectMeta{Name: "test-namespace"},
 					}},
@@ -251,8 +251,8 @@ func TestRoleTemplateEnqueueNamespace(t *testing.T) {
 					Name: "test-rt",
 				},
 			},
-			nsIndexer: &DummyIndexer[*v1.Namespace]{
-				resources: map[string][]*v1.Namespace{
+			nsIndexer: &DummyIndexer[*corev1.Namespace]{
+				resources: map[string][]*corev1.Namespace{
 					"test-project": {{
 						ObjectMeta: metav1.ObjectMeta{Name: "test-namespace"},
 					}},
