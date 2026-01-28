@@ -9,7 +9,6 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/features"
-	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -29,7 +28,7 @@ type prtbHandler struct {
 	rbController         crbacv1.RoleBindingController
 	crController         crbacv1.ClusterRoleController
 	crbController        crbacv1.ClusterRoleBindingController
-	clusterController    mgmtcontroller.ClusterController
+	clusterController    mgmtv3.ClusterController
 	clusterManager       *clustermanager.Manager
 	impersonationHandler *impersonationHandler
 }
@@ -79,7 +78,10 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 
 // OnRemove deletes Role Bindings that are owned by the PRTB. It also removes the membership binding if no other PRTBs give membership access.
 func (p *prtbHandler) OnRemove(_ string, prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
-	if prtb == nil || !features.AggregatedRoleTemplates.Enabled() {
+	if prtb == nil {
+		return nil, nil
+	}
+	if !features.AggregatedRoleTemplates.Enabled() {
 		return nil, p.deleteDownstreamResources(prtb, false)
 	}
 
@@ -134,7 +136,7 @@ func (p *prtbHandler) deleteDownstreamResources(prtb *v3.ProjectRoleTemplateBind
 		p.deleteDownstreamClusterRoleBindings(prtb, userContext.RBACw.ClusterRoleBinding()),
 	)
 
-	if deleteImpersonator {
+	if deleteImpersonator && prtb.UserName != "" {
 		returnErr = errors.Join(returnErr, p.impersonationHandler.deleteServiceAccountImpersonator(clusterName, prtb.UserName, userContext.RBACw.ClusterRole()))
 	}
 

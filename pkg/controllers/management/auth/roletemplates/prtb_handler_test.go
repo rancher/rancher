@@ -564,7 +564,6 @@ func Test_prtbHandler_deleteDownstreamRoleBindings(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			rbController := fake.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl)
 			if tt.setupRBController != nil {
 				tt.setupRBController(rbController)
@@ -793,7 +792,6 @@ func Test_prtbHandler_deleteDownstreamClusterRoleBindings(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			crbController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl)
 			if tt.setupCRBController != nil {
 				tt.setupCRBController(crbController)

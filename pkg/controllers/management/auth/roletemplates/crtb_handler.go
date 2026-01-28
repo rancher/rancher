@@ -235,7 +235,10 @@ func (c *crtbHandler) getDesiredRoleBindings(crtb *v3.ClusterRoleTemplateBinding
 
 // OnRemove deletes Cluster Role Bindings that are owned by the CRTB and the membership binding if no other CRTBs give membership access.
 func (c *crtbHandler) OnRemove(_ string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-	if crtb == nil || !features.AggregatedRoleTemplates.Enabled() {
+	if crtb == nil {
+		return nil, nil
+	}
+	if !features.AggregatedRoleTemplates.Enabled() {
 		return nil, c.deleteDownstreamResources(crtb, false)
 	}
 
@@ -293,7 +296,7 @@ func (c *crtbHandler) deleteDownstreamResources(crtb *v3.ClusterRoleTemplateBind
 		return err
 	}
 
-	if deleteImpersonator {
+	if deleteImpersonator && crtb.UserName != "" {
 		return errors.Join(
 			c.deleteDownstreamClusterRoleBindings(crtb, userContext.RBACw.ClusterRoleBinding()),
 			c.impersonationHandler.deleteServiceAccountImpersonator(clusterName, crtb.UserName, userContext.RBACw.ClusterRole()),
