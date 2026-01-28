@@ -121,7 +121,7 @@ func GatherTargetArtifactsAndSources(
 		return ArtifactTargetsAndSources{}, err
 	}
 
-	targetWindowsArtifacts, targetWindowsArtifactsAndSources, err := img.GetArtifacts(chartPaths, ociChartsPath, img.Windows, rancherVersion, img.ExtensionEndpoints, externalLinuxImages, []string{winsAgentUpdateImage}, ociRepository)
+	targetWindowsArtifacts, targetWindowsArtifactsAndSources, err := img.GetArtifacts(chartPaths, ociChartsPath, img.Windows, rancherVersion, img.ExtensionEndpoints, nil, []string{winsAgentUpdateImage}, ociRepository)
 	if err != nil {
 		return ArtifactTargetsAndSources{}, err
 	}
@@ -145,7 +145,7 @@ func LoadScript(arch string, targetImages []string) error {
 		return err
 	}
 	defer load.Close()
-	load.Chmod(0755)
+	load.Chmod(0o755)
 
 	fmt.Fprint(load, getScript(arch, "load"))
 	return nil
@@ -162,7 +162,7 @@ func SaveScript(arch string, targetImages []string) error {
 		return err
 	}
 	defer save.Close()
-	save.Chmod(0755)
+	save.Chmod(0o755)
 
 	fmt.Fprint(save, getScript(arch, "save"))
 
@@ -179,7 +179,7 @@ func ImagesText(arch string, targetImages []string) error {
 		return err
 	}
 	defer save.Close()
-	save.Chmod(0755)
+	save.Chmod(0o755)
 
 	for _, image := range saveImages(targetImages) {
 		err := checkImage(image)
@@ -202,7 +202,7 @@ func ImagesAndSourcesText(arch string, targetImagesAndSources []string) error {
 		return err
 	}
 	defer save.Close()
-	save.Chmod(0755)
+	save.Chmod(0o755)
 
 	for _, imageAndSources := range saveImagesAndSources(targetImagesAndSources) {
 		if err := checkImage(strings.Split(imageAndSources, " ")[0]); err != nil {
@@ -224,7 +224,7 @@ func MirrorScript(arch string, targetImages []string) error {
 		return err
 	}
 	defer mirror.Close()
-	mirror.Chmod(0755)
+	mirror.Chmod(0o755)
 
 	scriptStarter := getScript(arch, "mirror")
 	fmt.Fprint(mirror, scriptStarter)
