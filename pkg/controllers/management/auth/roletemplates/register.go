@@ -3,10 +3,14 @@ package roletemplates
 import (
 	"context"
 	"fmt"
+	"strings"
 
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/wrangler"
+	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -15,26 +19,33 @@ import (
 const (
 	roleTemplateChangeHandler = "mgmt-roletemplate-change-handler"
 	roleTemplateRemoveHandler = "mgmt-roletemplate-remove-handler"
+	prtbByUsernameIndex       = "auth.management.cattle.io/prtb-by-username"
 
 	crtbChangeHandler        = "mgmt-crtb-change-handler"
 	crtbRemoveHandler        = "mgmt-crtb-remove-handler"
 	crtbRoleTemplateEnqueuer = "cluster-crtb-roletemplate-enqueuer"
+	crtbByUsernameIndex      = "auth.management.cattle.io/crtb-by-username"
 
 	prtbChangeHandler        = "mgmt-prtb-change-handler"
 	prtbRemoveHandler        = "mgmt-prtb-remove-handler"
 	prtbRoleTemplateEnqueuer = "cluster-prtb-roletemplate-enqueuer"
 )
 
+func RegisterIndexers(wranglerContext *wrangler.Context) {
+	wranglerContext.Mgmt.ClusterRoleTemplateBinding().Cache().AddIndexer(crtbByUsernameIndex, getCRTBByUsername)
+	wranglerContext.Mgmt.ProjectRoleTemplateBinding().Cache().AddIndexer(prtbByUsernameIndex, getPRTBByUsername)
+}
+
 func Register(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {
 	r := newRoleTemplateHandler(management.Wrangler, clusterManager)
 	management.Wrangler.Mgmt.RoleTemplate().OnChange(ctx, roleTemplateChangeHandler, r.OnChange)
 	management.Wrangler.Mgmt.RoleTemplate().OnRemove(ctx, roleTemplateRemoveHandler, r.OnRemove)
 
-	c := newCRTBHandler(management)
+	c := newCRTBHandler(management, clusterManager)
 	management.Wrangler.Mgmt.ClusterRoleTemplateBinding().OnChange(ctx, crtbChangeHandler, c.OnChange)
 	management.Wrangler.Mgmt.ClusterRoleTemplateBinding().OnRemove(ctx, crtbRemoveHandler, c.OnRemove)
 
-	p := newPRTBHandler(management)
+	p := newPRTBHandler(management, clusterManager)
 	management.Wrangler.Mgmt.ProjectRoleTemplateBinding().OnChange(ctx, prtbChangeHandler, p.OnChange)
 	management.Wrangler.Mgmt.ProjectRoleTemplateBinding().OnRemove(ctx, prtbRemoveHandler, p.OnRemove)
 
@@ -121,4 +132,25 @@ func (r *roletemplateEnqueuer) roletemplateEnqueueCRTBs(_, name string, obj runt
 	}
 
 	return keys, nil
+}
+
+func getCRTBByUsername(crtb *v3.ClusterRoleTemplateBinding) ([]string, error) {
+	if crtb == nil {
+		return []string{}, nil
+	}
+	if crtb.UserName != "" && crtb.ClusterName != "" {
+		return []string{name.SafeConcatName(crtb.ClusterName, crtb.UserName)}, nil
+	}
+	return []string{}, nil
+}
+
+func getPRTBByUsername(prtb *v3.ProjectRoleTemplateBinding) ([]string, error) {
+	if prtb == nil {
+		return []string{}, nil
+	}
+	if prtb.UserName != "" && prtb.ProjectName != "" {
+		clusterName, _, _ := strings.Cut(prtb.ProjectName, ":")
+		return []string{name.SafeConcatName(clusterName, prtb.UserName)}, nil
+	}
+	return []string{}, nil
 }

@@ -60,6 +60,8 @@ func RegisterIndexers(scaledContext *config.ScaledContext) error {
 		return err
 	}
 
+	roletemplates.RegisterIndexers(scaledContext.Wrangler)
+
 	grbInformer := scaledContext.Management.GlobalRoleBindings("").Controller().Informer()
 	return grbInformer.AddIndexers(map[string]cache.IndexFunc{
 		grbByUserRefKey: grbByUserRefFunc,

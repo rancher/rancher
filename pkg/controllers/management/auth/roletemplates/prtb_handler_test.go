@@ -422,3 +422,387 @@ func Test_prtbHandler_reconcileMembershipBindings(t *testing.T) {
 		})
 	}
 }
+
+func Test_prtbHandler_deleteDownstreamRoleBindings(t *testing.T) {
+	t.Parallel()
+
+	prtbName := "test-prtb"
+	ownerLabelKey := "authz.cluster.cattle.io/prtb-owner-test-prtb"
+	aggregationLabelKey := "management.cattle.io/roletemplate-aggregation"
+
+	rb1 := rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "rb-downstream-1",
+			Namespace: "namespace-1",
+			Labels: map[string]string{
+				ownerLabelKey:       "true",
+				aggregationLabelKey: "true",
+			},
+		},
+	}
+
+	rb2 := rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "rb-downstream-2",
+			Namespace: "namespace-2",
+			Labels: map[string]string{
+				ownerLabelKey:       "true",
+				aggregationLabelKey: "true",
+			},
+		},
+	}
+
+	tests := []struct {
+		name              string
+		prtb              *v3.ProjectRoleTemplateBinding
+		setupRBController func(*fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList])
+		wantErr           bool
+	}{
+		{
+			name: "successfully delete multiple role bindings",
+			prtb: &v3.ProjectRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: prtbName,
+				},
+			},
+			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
+				m.EXPECT().List(metav1.NamespaceAll, metav1.ListOptions{
+					LabelSelector: ownerLabelKey + "=true,management.cattle.io/roletemplate-aggregation=true",
+				}).Return(&rbacv1.RoleBindingList{
+					Items: []rbacv1.RoleBinding{rb1, rb2},
+				}, nil)
+				m.EXPECT().Delete("namespace-1", "rb-downstream-1", &metav1.DeleteOptions{}).Return(nil)
+				m.EXPECT().Delete("namespace-2", "rb-downstream-2", &metav1.DeleteOptions{}).Return(nil)
+			},
+			wantErr: false,
+		},
+		{
+			name: "no role bindings to delete",
+			prtb: &v3.ProjectRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: prtbName,
+				},
+			},
+			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
+				m.EXPECT().List(metav1.NamespaceAll, metav1.ListOptions{
+					LabelSelector: ownerLabelKey + "=true,management.cattle.io/roletemplate-aggregation=true",
+				}).Return(&rbacv1.RoleBindingList{
+					Items: []rbacv1.RoleBinding{},
+				}, nil)
+			},
+			wantErr: false,
+		},
+		{
+			name: "error listing role bindings",
+			prtb: &v3.ProjectRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: prtbName,
+				},
+			},
+			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
+				m.EXPECT().List(metav1.NamespaceAll, metav1.ListOptions{
+					LabelSelector: ownerLabelKey + "=true,management.cattle.io/roletemplate-aggregation=true",
+				}).Return(nil, errDefault)
+			},
+			wantErr: true,
+		},
+		{
+			name: "error deleting one role binding",
+			prtb: &v3.ProjectRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: prtbName,
+				},
+			},
+			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
+				m.EXPECT().List(metav1.NamespaceAll, metav1.ListOptions{
+					LabelSelector: ownerLabelKey + "=true,management.cattle.io/roletemplate-aggregation=true",
+				}).Return(&rbacv1.RoleBindingList{
+					Items: []rbacv1.RoleBinding{rb1, rb2},
+				}, nil)
+				m.EXPECT().Delete("namespace-1", "rb-downstream-1", &metav1.DeleteOptions{}).Return(errDefault)
+				m.EXPECT().Delete("namespace-2", "rb-downstream-2", &metav1.DeleteOptions{}).Return(nil)
+			},
+			wantErr: true,
+		},
+		{
+			name: "error deleting multiple role bindings",
+			prtb: &v3.ProjectRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: prtbName,
+				},
+			},
+			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
+				m.EXPECT().List(metav1.NamespaceAll, metav1.ListOptions{
+					LabelSelector: ownerLabelKey + "=true,management.cattle.io/roletemplate-aggregation=true",
+				}).Return(&rbacv1.RoleBindingList{
+					Items: []rbacv1.RoleBinding{rb1, rb2},
+				}, nil)
+				m.EXPECT().Delete("namespace-1", "rb-downstream-1", &metav1.DeleteOptions{}).Return(errDefault)
+				m.EXPECT().Delete("namespace-2", "rb-downstream-2", &metav1.DeleteOptions{}).Return(errDefault)
+			},
+			wantErr: true,
+		},
+		{
+			name: "role binding not found during delete does not error",
+			prtb: &v3.ProjectRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: prtbName,
+				},
+			},
+			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
+				m.EXPECT().List(metav1.NamespaceAll, metav1.ListOptions{
+					LabelSelector: ownerLabelKey + "=true,management.cattle.io/roletemplate-aggregation=true",
+				}).Return(&rbacv1.RoleBindingList{
+					Items: []rbacv1.RoleBinding{rb1},
+				}, nil)
+				m.EXPECT().Delete("namespace-1", "rb-downstream-1", &metav1.DeleteOptions{}).Return(errNotFound)
+			},
+			wantErr: false,
+		},
+	}
+
+	ctrl := gomock.NewController(t)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rbController := fake.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl)
+			if tt.setupRBController != nil {
+				tt.setupRBController(rbController)
+			}
+
+			p := &prtbHandler{}
+			err := p.deleteDownstreamRoleBindings(tt.prtb, rbController)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("prtbHandler.deleteDownstreamRoleBindings() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_prtbHandler_deleteDownstreamClusterRoleBindings(t *testing.T) {
+	t.Parallel()
+
+	prtbName := "test-prtb"
+	ownerLabelKey := "authz.cluster.cattle.io/prtb-owner-test-prtb"
+	anotherOwnerLabelKey := "authz.cluster.cattle.io/prtb-owner-another-prtb"
+	aggregationLabelKey := "management.cattle.io/roletemplate-aggregation"
+
+	crb1 := rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "crb-downstream-1",
+			Labels: map[string]string{
+				ownerLabelKey:       "true",
+				aggregationLabelKey: "true",
+			},
+		},
+	}
+
+	crb2 := rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "crb-downstream-2",
+			Labels: map[string]string{
+				ownerLabelKey:       "true",
+				aggregationLabelKey: "true",
+			},
+		},
+	}
+
+	crbShared := rbacv1.ClusterRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "crb-shared",
+			Labels: map[string]string{
+				ownerLabelKey:        "true",
+				anotherOwnerLabelKey: "true",
+				aggregationLabelKey:  "true",
+			},
+		},
+	}
+
+	tests := []struct {
+		name               string
+		prtb               *v3.ProjectRoleTemplateBinding
+		setupCRBController func(*fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList])
+		wantErr            bool
+	}{
+		{
+			name: "successfully delete multiple cluster role bindings",
+			prtb: &v3.ProjectRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: prtbName,
+				},
+			},
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
+				m.EXPECT().List(metav1.ListOptions{
+					LabelSelector: ownerLabelKey + "=true,management.cattle.io/roletemplate-aggregation=true",
+				}).Return(&rbacv1.ClusterRoleBindingList{
+					Items: []rbacv1.ClusterRoleBinding{crb1, crb2},
+				}, nil)
+				m.EXPECT().Delete("crb-downstream-1", &metav1.DeleteOptions{}).Return(nil)
+				m.EXPECT().Delete("crb-downstream-2", &metav1.DeleteOptions{}).Return(nil)
+			},
+			wantErr: false,
+		},
+		{
+			name: "no cluster role bindings to delete",
+			prtb: &v3.ProjectRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: prtbName,
+				},
+			},
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
+				m.EXPECT().List(metav1.ListOptions{
+					LabelSelector: ownerLabelKey + "=true,management.cattle.io/roletemplate-aggregation=true",
+				}).Return(&rbacv1.ClusterRoleBindingList{
+					Items: []rbacv1.ClusterRoleBinding{},
+				}, nil)
+			},
+			wantErr: false,
+		},
+		{
+			name: "error listing cluster role bindings",
+			prtb: &v3.ProjectRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: prtbName,
+				},
+			},
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
+				m.EXPECT().List(metav1.ListOptions{
+					LabelSelector: ownerLabelKey + "=true,management.cattle.io/roletemplate-aggregation=true",
+				}).Return(nil, errDefault)
+			},
+			wantErr: true,
+		},
+		{
+			name: "shared cluster role binding is updated not deleted",
+			prtb: &v3.ProjectRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: prtbName,
+				},
+			},
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
+				m.EXPECT().List(metav1.ListOptions{
+					LabelSelector: ownerLabelKey + "=true,management.cattle.io/roletemplate-aggregation=true",
+				}).Return(&rbacv1.ClusterRoleBindingList{
+					Items: []rbacv1.ClusterRoleBinding{crbShared},
+				}, nil)
+				// Expect Update to be called with the CRB that has the owner label removed
+				m.EXPECT().Update(gomock.Any()).DoAndReturn(func(crb *rbacv1.ClusterRoleBinding) (*rbacv1.ClusterRoleBinding, error) {
+					// Verify the owner label was removed but other labels remain
+					if _, exists := crb.Labels[ownerLabelKey]; exists {
+						t.Errorf("Expected owner label to be removed")
+					}
+					if _, exists := crb.Labels[anotherOwnerLabelKey]; !exists {
+						t.Errorf("Expected another owner label to still exist")
+					}
+					return crb, nil
+				})
+			},
+			wantErr: false,
+		},
+		{
+			name: "error updating shared cluster role binding",
+			prtb: &v3.ProjectRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: prtbName,
+				},
+			},
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
+				m.EXPECT().List(metav1.ListOptions{
+					LabelSelector: ownerLabelKey + "=true,management.cattle.io/roletemplate-aggregation=true",
+				}).Return(&rbacv1.ClusterRoleBindingList{
+					Items: []rbacv1.ClusterRoleBinding{crbShared},
+				}, nil)
+				m.EXPECT().Update(gomock.Any()).Return(nil, errDefault)
+			},
+			wantErr: true,
+		},
+		{
+			name: "error deleting cluster role binding",
+			prtb: &v3.ProjectRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: prtbName,
+				},
+			},
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
+				m.EXPECT().List(metav1.ListOptions{
+					LabelSelector: ownerLabelKey + "=true,management.cattle.io/roletemplate-aggregation=true",
+				}).Return(&rbacv1.ClusterRoleBindingList{
+					Items: []rbacv1.ClusterRoleBinding{crb1},
+				}, nil)
+				m.EXPECT().Delete("crb-downstream-1", &metav1.DeleteOptions{}).Return(errDefault)
+			},
+			wantErr: true,
+		},
+		{
+			name: "mix of shared and non-shared cluster role bindings",
+			prtb: &v3.ProjectRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: prtbName,
+				},
+			},
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
+				m.EXPECT().List(metav1.ListOptions{
+					LabelSelector: ownerLabelKey + "=true,management.cattle.io/roletemplate-aggregation=true",
+				}).Return(&rbacv1.ClusterRoleBindingList{
+					Items: []rbacv1.ClusterRoleBinding{crb1, crbShared, crb2},
+				}, nil)
+				m.EXPECT().Delete("crb-downstream-1", &metav1.DeleteOptions{}).Return(nil)
+				m.EXPECT().Update(gomock.Any()).Return(&crbShared, nil)
+				m.EXPECT().Delete("crb-downstream-2", &metav1.DeleteOptions{}).Return(nil)
+			},
+			wantErr: false,
+		},
+		{
+			name: "error deleting one but shared crb updates successfully",
+			prtb: &v3.ProjectRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: prtbName,
+				},
+			},
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
+				m.EXPECT().List(metav1.ListOptions{
+					LabelSelector: ownerLabelKey + "=true,management.cattle.io/roletemplate-aggregation=true",
+				}).Return(&rbacv1.ClusterRoleBindingList{
+					Items: []rbacv1.ClusterRoleBinding{crb1, crbShared},
+				}, nil)
+				m.EXPECT().Delete("crb-downstream-1", &metav1.DeleteOptions{}).Return(errDefault)
+				m.EXPECT().Update(gomock.Any()).Return(&crbShared, nil)
+			},
+			wantErr: true,
+		},
+		{
+			name: "cluster role binding not found during delete does not error",
+			prtb: &v3.ProjectRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: prtbName,
+				},
+			},
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
+				m.EXPECT().List(metav1.ListOptions{
+					LabelSelector: ownerLabelKey + "=true,management.cattle.io/roletemplate-aggregation=true",
+				}).Return(&rbacv1.ClusterRoleBindingList{
+					Items: []rbacv1.ClusterRoleBinding{crb1},
+				}, nil)
+				m.EXPECT().Delete("crb-downstream-1", &metav1.DeleteOptions{}).Return(errNotFound)
+			},
+			wantErr: false,
+		},
+	}
+
+	ctrl := gomock.NewController(t)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			crbController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl)
+			if tt.setupCRBController != nil {
+				tt.setupCRBController(crbController)
+			}
+
+			p := &prtbHandler{}
+			err := p.deleteDownstreamClusterRoleBindings(tt.prtb, crbController)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("prtbHandler.deleteDownstreamClusterRoleBindings() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
