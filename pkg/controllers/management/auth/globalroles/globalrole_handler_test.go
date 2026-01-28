@@ -5,19 +5,16 @@ import (
 	"testing"
 	"time"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	normanv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
-	rbacFakes "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1/fakes"
+	"github.com/rancher/rancher/pkg/controllers/status"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // using a subset of condition, because we don't need to check LastTransitionTime or Message
@@ -110,64 +107,27 @@ var (
 			},
 		},
 	}
-	namespacedRulesOwnerRef = metav1.OwnerReference{
-		APIVersion: namespacedRulesGR.APIVersion,
-		Kind:       namespacedRulesGR.Kind,
-		Name:       namespacedRulesGR.Name,
-		UID:        namespacedRulesGR.UID,
-	}
-
-	updatedNamespacedRulesGR = v3.GlobalRole{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "namespacedRulesGR",
-		},
-		NamespacedRules: map[string][]rbacv1.PolicyRule{
-			"namespace1": {
-				readPodPolicyRule,
-			},
-			"namespace2": {
-				adminPodPolicyRule,
-				readPodPolicyRule,
-				readConfigPolicyRule,
-			},
-		},
-	}
 )
-
-type grTestStateChanges struct {
-	t                   *testing.T
-	createdRoles        map[string]*rbacv1.Role
-	deletedRoles        map[string]struct{}
-	createdClusterRoles map[string]*rbacv1.ClusterRole
-}
-type grTestState struct {
-	nsCacheMock  *fake.MockNonNamespacedCacheInterface[*corev1.Namespace]
-	rListerMock  *rbacFakes.RoleListerMock
-	rClientMock  *rbacFakes.RoleInterfaceMock
-	crListerMock *rbacFakes.ClusterRoleListerMock
-	crClientMock *rbacFakes.ClusterRoleInterfaceMock
-	counter      int
-	stateChanges *grTestStateChanges
-}
 
 func TestReconcileGlobalRole(t *testing.T) {
 	t.Parallel()
 
+	type controllers struct {
+		crController *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]
+		crCache      *fake.MockNonNamespacedCacheInterface[*rbacv1.ClusterRole]
+	}
 	tests := []struct {
-		name            string
-		stateSetup      func(grTestState)
-		stateAssertions func(grTestStateChanges)
-		globalRole      *v3.GlobalRole
-		wantError       bool
-		condition       reducedCondition
-		annotation      string
+		name             string
+		setupControllers func(controllers)
+		globalRole       *v3.GlobalRole
+		wantError        bool
+		condition        reducedCondition
+		annotation       string
 	}{
 		{
 			name: "no changes to clusterRole",
-			stateSetup: func(state grTestState) {
-				state.crListerMock.GetFunc = func(_, _ string) (*normanv1.ClusterRole, error) {
-					return readPodCR.DeepCopy(), nil
-				}
+			setupControllers: func(c controllers) {
+				c.crCache.EXPECT().Get(gomock.Any()).Return(readPodCR.DeepCopy(), nil)
 			},
 			globalRole: defaultGR.DeepCopy(),
 			wantError:  false,
@@ -178,20 +138,9 @@ func TestReconcileGlobalRole(t *testing.T) {
 		},
 		{
 			name: "clusterRole is updated",
-			stateSetup: func(state grTestState) {
-				state.crListerMock.GetFunc = func(_, _ string) (*normanv1.ClusterRole, error) {
-					return readConfigCR.DeepCopy(), nil
-				}
-				state.crClientMock.UpdateFunc = func(cr *normanv1.ClusterRole) (*normanv1.ClusterRole, error) {
-					state.stateChanges.createdClusterRoles[cr.Name] = cr
-					return nil, nil
-				}
-			},
-			stateAssertions: func(gtsc grTestStateChanges) {
-				require.Len(gtsc.t, gtsc.createdClusterRoles, 1)
-				cr, ok := gtsc.createdClusterRoles["clusterRole"]
-				require.True(gtsc.t, ok)
-				require.Equal(gtsc.t, &readPodCR, cr)
+			setupControllers: func(c controllers) {
+				c.crCache.EXPECT().Get(gomock.Any()).Return(readConfigCR.DeepCopy(), nil)
+				c.crController.EXPECT().Update(gomock.Any()).Return(readConfigCR.DeepCopy(), nil)
 			},
 			globalRole: defaultGR.DeepCopy(),
 			wantError:  false,
@@ -202,13 +151,9 @@ func TestReconcileGlobalRole(t *testing.T) {
 		},
 		{
 			name: "update clusterRole fails",
-			stateSetup: func(state grTestState) {
-				state.crListerMock.GetFunc = func(_, _ string) (*normanv1.ClusterRole, error) {
-					return readConfigCR.DeepCopy(), nil
-				}
-				state.crClientMock.UpdateFunc = func(cr *normanv1.ClusterRole) (*normanv1.ClusterRole, error) {
-					return nil, fmt.Errorf("error")
-				}
+			setupControllers: func(c controllers) {
+				c.crCache.EXPECT().Get(gomock.Any()).Return(readConfigCR.DeepCopy(), nil)
+				c.crController.EXPECT().Update(gomock.Any()).Return(nil, fmt.Errorf("error"))
 			},
 			globalRole: defaultGR.DeepCopy(),
 			wantError:  true,
@@ -219,13 +164,9 @@ func TestReconcileGlobalRole(t *testing.T) {
 		},
 		{
 			name: "create clusterRole fails",
-			stateSetup: func(state grTestState) {
-				state.crListerMock.GetFunc = func(_, _ string) (*normanv1.ClusterRole, error) {
-					return nil, nil
-				}
-				state.crClientMock.CreateFunc = func(cr *normanv1.ClusterRole) (*normanv1.ClusterRole, error) {
-					return nil, fmt.Errorf("error")
-				}
+			setupControllers: func(c controllers) {
+				c.crCache.EXPECT().Get(gomock.Any()).Return(nil, nil)
+				c.crController.EXPECT().Create(gomock.Any()).Return(nil, fmt.Errorf("error"))
 			},
 			globalRole: defaultGR.DeepCopy(),
 			wantError:  true,
@@ -236,20 +177,9 @@ func TestReconcileGlobalRole(t *testing.T) {
 		},
 		{
 			name: "clusterRole is created",
-			stateSetup: func(state grTestState) {
-				state.crListerMock.GetFunc = func(_, _ string) (*normanv1.ClusterRole, error) {
-					return nil, nil
-				}
-				state.crClientMock.CreateFunc = func(cr *normanv1.ClusterRole) (*normanv1.ClusterRole, error) {
-					state.stateChanges.createdClusterRoles[cr.Name] = cr
-					return nil, nil
-				}
-			},
-			stateAssertions: func(gtsc grTestStateChanges) {
-				require.Len(gtsc.t, gtsc.createdClusterRoles, 1)
-				cr, ok := gtsc.createdClusterRoles[getCRName(&defaultGR)]
-				require.True(gtsc.t, ok)
-				require.Equal(gtsc.t, readPodCR.Rules, cr.Rules)
+			setupControllers: func(c controllers) {
+				c.crCache.EXPECT().Get(gomock.Any()).Return(nil, nil)
+				c.crController.EXPECT().Create(gomock.Any()).Return(readPodCR.DeepCopy(), nil)
 			},
 			globalRole: defaultGR.DeepCopy(),
 			wantError:  false,
@@ -261,25 +191,9 @@ func TestReconcileGlobalRole(t *testing.T) {
 		},
 		{
 			name: "missing grOwnerLabel in clusterRole triggers update",
-			stateSetup: func(state grTestState) {
-				state.crListerMock.GetFunc = func(_, _ string) (*normanv1.ClusterRole, error) {
-					return missingLabelCR.DeepCopy(), nil
-				}
-				state.crClientMock.UpdateFunc = func(cr *normanv1.ClusterRole) (*normanv1.ClusterRole, error) {
-					state.stateChanges.createdClusterRoles[cr.Name] = cr
-					return nil, nil
-				}
-			},
-			stateAssertions: func(gtsc grTestStateChanges) {
-				require.Len(gtsc.t, gtsc.createdClusterRoles, 1)
-				cr, ok := gtsc.createdClusterRoles["clusterRole"]
-				require.True(gtsc.t, ok)
-				require.Equal(gtsc.t, &readPodCR, cr)
-
-				// Validate that label had expected owner value set
-				val, exists := cr.Labels[grOwnerLabel]
-				require.True(gtsc.t, exists)
-				require.Equal(gtsc.t, defaultGR.Name, val)
+			setupControllers: func(c controllers) {
+				c.crCache.EXPECT().Get(gomock.Any()).Return(missingLabelCR.DeepCopy(), nil)
+				c.crController.EXPECT().Update(gomock.Any()).Return(readPodCR.DeepCopy(), nil)
 			},
 			globalRole: defaultGR.DeepCopy(),
 			wantError:  false,
@@ -290,27 +204,28 @@ func TestReconcileGlobalRole(t *testing.T) {
 		},
 	}
 
+	ctrl := gomock.NewController(t)
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			grLifecycle := globalRoleLifecycle{}
-			state := setupTest(t)
-			if test.stateSetup != nil {
-				test.stateSetup(state)
+			controllers := controllers{
+				crController: fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl),
+				crCache:      fake.NewMockNonNamespacedCacheInterface[*rbacv1.ClusterRole](ctrl),
 			}
-			grLifecycle.crLister = state.crListerMock
-			grLifecycle.crClient = state.crClientMock
+			if test.setupControllers != nil {
+				test.setupControllers(controllers)
+			}
 
+			grLifecycle := globalRoleLifecycle{
+				crClient: controllers.crController,
+				crLister: controllers.crCache,
+			}
 			err := grLifecycle.reconcileGlobalRole(test.globalRole)
 
 			if test.wantError {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-			}
-			if test.stateAssertions != nil {
-				test.stateAssertions(*state.stateChanges)
 			}
 			if test.annotation != "" {
 				require.Equal(t, test.annotation, test.globalRole.Annotations[crNameAnnotation])
@@ -341,23 +256,71 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 			Phase: corev1.NamespaceTerminating,
 		},
 	}
+	errRoleNotFound := apierrors.NewNotFound(schema.GroupResource{
+		Group:    "rbac.authorization.k8s.io",
+		Resource: "Role",
+	}, "")
+	errRoleAlreadyExists := apierrors.NewAlreadyExists(schema.GroupResource{
+		Group:    "rbac.authorization.k8s.io",
+		Resource: "Role",
+	}, "")
+	role1 := rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "namespacedRulesGR-namespace1",
+			Namespace: "namespace1",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: namespacedRulesGR.APIVersion,
+					Kind:       namespacedRulesGR.Kind,
+					Name:       namespacedRulesGR.Name,
+					UID:        namespacedRulesGR.UID,
+				},
+			},
+			Labels: map[string]string{grOwnerLabel: "namespacedRulesGR"},
+		},
+		Rules: []rbacv1.PolicyRule{
+			readPodPolicyRule,
+			readConfigPolicyRule,
+		},
+	}
+	role2 := rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "namespacedRulesGR-namespace2",
+			Namespace: "namespace2",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: namespacedRulesGR.APIVersion,
+					Kind:       namespacedRulesGR.Kind,
+					Name:       namespacedRulesGR.Name,
+					UID:        namespacedRulesGR.UID,
+				},
+			},
+			Labels: map[string]string{grOwnerLabel: "namespacedRulesGR"},
+		},
+		Rules: []rbacv1.PolicyRule{
+			adminPodPolicyRule,
+			readPodPolicyRule,
+		},
+	}
+
+	type controllers struct {
+		nsCache     *fake.MockNonNamespacedCacheInterface[*corev1.Namespace]
+		rCache      *fake.MockCacheInterface[*rbacv1.Role]
+		rController *fake.MockControllerInterface[*rbacv1.Role, *rbacv1.RoleList]
+	}
 
 	tests := []struct {
-		name            string
-		stateSetup      func(grTestState)
-		stateAssertions func(grTestStateChanges)
-		globalRole      *v3.GlobalRole
-		wantError       bool
-		conditions      []reducedCondition
+		name             string
+		setupControllers func(controllers)
+		globalRole       *v3.GlobalRole
+		wantError        bool
+		conditions       []reducedCondition
 	}{
 		{
 			name: "getting namespace fails",
-			stateSetup: func(state grTestState) {
-				state.rListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.Role, error) {
-					return nil, nil
-				}
-
-				state.nsCacheMock.EXPECT().Get(gomock.Any()).AnyTimes().Return(activeNamespace, fmt.Errorf("error"))
+			setupControllers: func(c controllers) {
+				c.rCache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil)
+				c.nsCache.EXPECT().Get(gomock.Any()).AnyTimes().Return(activeNamespace, fmt.Errorf("error"))
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
 			wantError:  true,
@@ -370,17 +333,15 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 		},
 		{
 			name: "namespace is not found",
-			stateSetup: func(state grTestState) {
-				state.rListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.Role, error) {
-					return nil, nil
-				}
+			setupControllers: func(c controllers) {
+				c.rCache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil)
 
 				nsNotFound := apierrors.NewNotFound(schema.GroupResource{
-					Group:    normanv1.RoleGroupVersionKind.Group,
-					Resource: normanv1.RoleGroupVersionResource.Resource,
+					Group:    rbacv1.GroupKind,
+					Resource: activeNamespace.Name,
 				}, "")
 
-				state.nsCacheMock.EXPECT().Get(gomock.Any()).AnyTimes().Return(activeNamespace, nsNotFound)
+				c.nsCache.EXPECT().Get(gomock.Any()).AnyTimes().Return(activeNamespace, nsNotFound)
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
 			wantError:  false,
@@ -393,11 +354,9 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 		},
 		{
 			name: "namespace is nil",
-			stateSetup: func(state grTestState) {
-				state.rListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.Role, error) {
-					return nil, nil
-				}
-				state.nsCacheMock.EXPECT().Get(gomock.Any()).AnyTimes().Return(nil, nil)
+			setupControllers: func(c controllers) {
+				c.rCache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil)
+				c.nsCache.EXPECT().Get(gomock.Any()).AnyTimes().Return(nil, nil)
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
 			wantError:  false,
@@ -410,14 +369,10 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 		},
 		{
 			name: "getting role fails",
-			stateSetup: func(state grTestState) {
-				state.rListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.Role, error) {
-					return nil, nil
-				}
-				state.nsCacheMock.EXPECT().Get(gomock.Any()).AnyTimes().Return(activeNamespace, nil)
-				state.rListerMock.GetFunc = func(_, _ string) (*rbacv1.Role, error) {
-					return nil, fmt.Errorf("error")
-				}
+			setupControllers: func(c controllers) {
+				c.rCache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil)
+				c.nsCache.EXPECT().Get(gomock.Any()).AnyTimes().Return(activeNamespace, nil)
+				c.rCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("error")).Times(2)
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
 			wantError:  true,
@@ -430,20 +385,11 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 		},
 		{
 			name: "creating role fails",
-			stateSetup: func(state grTestState) {
-				state.rListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.Role, error) {
-					return nil, nil
-				}
-				state.nsCacheMock.EXPECT().Get(gomock.Any()).AnyTimes().Return(activeNamespace, nil)
-				state.rListerMock.GetFunc = func(_, _ string) (*rbacv1.Role, error) {
-					return nil, apierrors.NewNotFound(schema.GroupResource{
-						Group:    normanv1.RoleGroupVersionKind.Group,
-						Resource: normanv1.RoleGroupVersionResource.Resource,
-					}, "")
-				}
-				state.rClientMock.CreateFunc = func(role *rbacv1.Role) (*rbacv1.Role, error) {
-					return nil, fmt.Errorf("error")
-				}
+			setupControllers: func(c controllers) {
+				c.rCache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil)
+				c.nsCache.EXPECT().Get(gomock.Any()).AnyTimes().Return(activeNamespace, nil)
+				c.rCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, errRoleNotFound).Times(2)
+				c.rController.EXPECT().Create(gomock.Any()).Return(nil, fmt.Errorf("error")).Times(2)
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
 			wantError:  true,
@@ -456,28 +402,11 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 		},
 		{
 			name: "created role already exists but get continuously fails",
-			stateSetup: func(state grTestState) {
-				state.rListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.Role, error) {
-					return nil, nil
-				}
-				state.nsCacheMock.EXPECT().Get(gomock.Any()).AnyTimes().Return(activeNamespace, nil)
-				state.rListerMock.GetFunc = func(_, _ string) (*rbacv1.Role, error) {
-					return nil, apierrors.NewNotFound(schema.GroupResource{
-						Group:    normanv1.RoleGroupVersionKind.Group,
-						Resource: normanv1.RoleGroupVersionResource.Resource,
-					}, "")
-				}
-				state.rClientMock.CreateFunc = func(role *rbacv1.Role) (*rbacv1.Role, error) {
-					return nil, apierrors.NewAlreadyExists(schema.GroupResource{
-						Group:    normanv1.RoleGroupVersionKind.Group,
-						Resource: normanv1.RoleGroupVersionResource.Resource,
-					}, "")
-				}
-				state.rClientMock.UpdateFunc = func(role *rbacv1.Role) (*rbacv1.Role, error) {
-					state.stateChanges.createdRoles[role.Name] = role
-					role.UID = ""
-					return role, nil
-				}
+			setupControllers: func(c controllers) {
+				c.rCache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil)
+				c.nsCache.EXPECT().Get(gomock.Any()).AnyTimes().Return(activeNamespace, nil)
+				c.rCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, errRoleNotFound).Times(4)
+				c.rController.EXPECT().Create(gomock.Any()).Return(nil, errRoleAlreadyExists).Times(2)
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
 			wantError:  true,
@@ -489,80 +418,31 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 			},
 		},
 		{
-			// It's possible that a user can create the invalid role in the middle of the reconcile
+			// It's possible that a user can create the role in the middle of the reconcile
 			// In that case, the first attempt to get the role fails. Then the reconcile function attempts to
 			// create the role and finds that it already exists. It gets the new role and checks that it is valid
-			name: "role gets created incorrectly mid reconcile",
-			stateSetup: func(state grTestState) {
-				state.rListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.Role, error) {
-					return nil, nil
-				}
-				state.nsCacheMock.EXPECT().Get(gomock.Any()).AnyTimes().Return(activeNamespace, nil)
-				state.rListerMock.GetFunc = func(namespace, _ string) (*rbacv1.Role, error) {
-					// counter == 0 means that the create hasn't happened and should fail
-					// counter == 1 means that the create has occurred and should return an incorrect role
-					if state.counter == 0 {
-						return nil, apierrors.NewNotFound(schema.GroupResource{
-							Group:    normanv1.RoleGroupVersionKind.Group,
-							Resource: normanv1.RoleGroupVersionResource.Resource,
-						}, "")
-					} else {
-						state.counter = 0
-						role := &rbacv1.Role{}
-						if namespace == "namespace1" {
-							role.ObjectMeta = metav1.ObjectMeta{
-								Name:      "namespacedRulesGR-namespace1",
-								Namespace: "namespace1",
-							}
-							role.Rules = []rbacv1.PolicyRule{
-								readPodPolicyRule,
-								readConfigPolicyRule,
-							}
-						} else if namespace == "namespace2" {
-							role.ObjectMeta = metav1.ObjectMeta{
-								Name:      "namespacedRulesGR-namespace2",
-								Namespace: "namespace2",
-								Labels:    map[string]string{grOwnerLabel: "badGR"},
-							}
-							role.Rules = []rbacv1.PolicyRule{
-								adminPodPolicyRule,
-								readPodPolicyRule,
-							}
-						}
-						return role, nil
-					}
-				}
-				state.rClientMock.CreateFunc = func(role *rbacv1.Role) (*rbacv1.Role, error) {
-					state.counter = 1
-					return nil, apierrors.NewAlreadyExists(schema.GroupResource{
-						Group:    normanv1.RoleGroupVersionKind.Group,
-						Resource: normanv1.RoleGroupVersionResource.Resource,
-					}, "")
-				}
-				state.rClientMock.UpdateFunc = func(role *rbacv1.Role) (*rbacv1.Role, error) {
-					state.stateChanges.createdRoles[role.Name] = role
-					role.UID = ""
-					return role, nil
-				}
-			},
-			stateAssertions: func(gtsc grTestStateChanges) {
-				require.Len(gtsc.t, gtsc.createdRoles, 2)
-
-				role, ok := gtsc.createdRoles["namespacedRulesGR-namespace1"]
-				require.True(gtsc.t, ok)
-				require.Equal(gtsc.t, "namespace1", role.Namespace)
-				require.Equal(gtsc.t, "namespacedRulesGR", role.Labels[grOwnerLabel])
-				require.Len(gtsc.t, role.Rules, 2)
-				require.Equal(gtsc.t, readPodPolicyRule, role.Rules[0])
-				require.Equal(gtsc.t, readConfigPolicyRule, role.Rules[1])
-
-				role, ok = gtsc.createdRoles["namespacedRulesGR-namespace2"]
-				require.True(gtsc.t, ok)
-				require.Equal(gtsc.t, "namespace2", role.Namespace)
-				require.Equal(gtsc.t, "namespacedRulesGR", role.Labels[grOwnerLabel])
-				require.Len(gtsc.t, role.Rules, 2)
-				require.Equal(gtsc.t, adminPodPolicyRule, role.Rules[0])
-				require.Equal(gtsc.t, readPodPolicyRule, role.Rules[1])
+			name: "role gets created mid reconcile",
+			setupControllers: func(c controllers) {
+				c.rCache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil)
+				c.nsCache.EXPECT().Get("namespace1").Return(activeNamespace, nil)
+				c.nsCache.EXPECT().Get("namespace2").Return(activeNamespace, nil)
+				gomock.InOrder(
+					c.rCache.EXPECT().Get("namespace1", gomock.Any()).Return(nil, errRoleNotFound),
+					c.rCache.EXPECT().Get("namespace1", gomock.Any()).Return(role1.DeepCopy(), nil),
+				)
+				c.rCache.EXPECT().Get("namespace2", gomock.Any()).Return(&rbacv1.Role{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "namespacedRulesGR-namespace2",
+						Namespace: "namespace2",
+						Labels:    map[string]string{grOwnerLabel: "badGR"},
+					},
+					Rules: []rbacv1.PolicyRule{
+						adminPodPolicyRule,
+						readPodPolicyRule,
+					},
+				}, nil)
+				c.rController.EXPECT().Create(role1.DeepCopy()).Return(nil, errRoleAlreadyExists)
+				c.rController.EXPECT().Update(gomock.Any()).Return(nil, nil)
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
 			wantError:  false,
@@ -575,43 +455,12 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 		},
 		{
 			name: "create roles successfully",
-			stateSetup: func(state grTestState) {
-				state.rListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.Role, error) {
-					return nil, nil
-				}
-				state.nsCacheMock.EXPECT().Get(gomock.Any()).AnyTimes().Return(activeNamespace, nil)
-				state.rListerMock.GetFunc = func(namespace string, name string) (*rbacv1.Role, error) {
-					return nil, apierrors.NewNotFound(schema.GroupResource{
-						Group:    normanv1.RoleGroupVersionKind.Group,
-						Resource: normanv1.RoleGroupVersionResource.Resource,
-					}, "")
-				}
-				state.rClientMock.CreateFunc = func(role *rbacv1.Role) (*rbacv1.Role, error) {
-					state.stateChanges.createdRoles[role.Name] = role
-					role.UID = ""
-					return role, nil
-				}
-			},
-			stateAssertions: func(gtsc grTestStateChanges) {
-				require.Len(gtsc.t, gtsc.createdRoles, 2)
-
-				role, ok := gtsc.createdRoles["namespacedRulesGR-namespace1"]
-				require.True(gtsc.t, ok)
-				require.Equal(gtsc.t, "namespace1", role.Namespace)
-				require.Equal(gtsc.t, "namespacedRulesGR", role.Labels[grOwnerLabel])
-				require.Len(gtsc.t, role.Rules, 2)
-				require.Equal(gtsc.t, readPodPolicyRule, role.Rules[0])
-				require.Equal(gtsc.t, readConfigPolicyRule, role.Rules[1])
-				require.Equal(gtsc.t, namespacedRulesOwnerRef, role.OwnerReferences[0])
-
-				role, ok = gtsc.createdRoles["namespacedRulesGR-namespace2"]
-				require.True(gtsc.t, ok)
-				require.Equal(gtsc.t, "namespace2", role.Namespace)
-				require.Equal(gtsc.t, "namespacedRulesGR", role.Labels[grOwnerLabel])
-				require.Len(gtsc.t, role.Rules, 2)
-				require.Equal(gtsc.t, adminPodPolicyRule, role.Rules[0])
-				require.Equal(gtsc.t, readPodPolicyRule, role.Rules[1])
-				require.Equal(gtsc.t, namespacedRulesOwnerRef, role.OwnerReferences[0])
+			setupControllers: func(c controllers) {
+				c.rCache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil)
+				c.nsCache.EXPECT().Get(gomock.Any()).AnyTimes().Return(activeNamespace, nil)
+				c.rCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, errRoleNotFound).Times(2)
+				c.rController.EXPECT().Create(role1.DeepCopy()).Return(role1.DeepCopy(), nil)
+				c.rController.EXPECT().Create(role2.DeepCopy()).Return(role2.DeepCopy(), nil)
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
 			wantError:  false,
@@ -624,26 +473,10 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 		},
 		{
 			name: "create role in terminating namespace",
-			stateSetup: func(state grTestState) {
-				state.rListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.Role, error) {
-					return nil, nil
-				}
-				state.nsCacheMock.EXPECT().Get(gomock.Any()).AnyTimes().Return(terminatingNamespace, nil)
-
-				state.rListerMock.GetFunc = func(namespace string, name string) (*rbacv1.Role, error) {
-					return nil, apierrors.NewNotFound(schema.GroupResource{
-						Group:    normanv1.RoleGroupVersionKind.Group,
-						Resource: normanv1.RoleGroupVersionResource.Resource,
-					}, "")
-				}
-				state.rClientMock.CreateFunc = func(role *rbacv1.Role) (*rbacv1.Role, error) {
-					state.stateChanges.createdRoles[role.Name] = role
-					role.UID = ""
-					return role, nil
-				}
-			},
-			stateAssertions: func(gtsc grTestStateChanges) {
-				require.Len(gtsc.t, gtsc.createdRoles, 0)
+			setupControllers: func(c controllers) {
+				c.rCache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil)
+				c.nsCache.EXPECT().Get(gomock.Any()).Return(terminatingNamespace, nil).Times(2)
+				c.rCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, errRoleNotFound).Times(2)
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
 			wantError:  false,
@@ -656,31 +489,12 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 		},
 		{
 			name: "some roles have errors but rest get created",
-			stateSetup: func(state grTestState) {
-				state.rListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.Role, error) {
-					return nil, nil
-				}
-				first := state.nsCacheMock.EXPECT().Get(gomock.Any()).Return(activeNamespace, fmt.Errorf("error"))
-				second := state.nsCacheMock.EXPECT().Get(gomock.Any()).Return(activeNamespace, nil)
-				gomock.InOrder(first, second)
-
-				state.rListerMock.GetFunc = func(_, _ string) (*rbacv1.Role, error) {
-					return nil, apierrors.NewNotFound(schema.GroupResource{
-						Group:    normanv1.RoleGroupVersionKind.Group,
-						Resource: normanv1.RoleGroupVersionResource.Resource,
-					}, "")
-				}
-				state.rClientMock.CreateFunc = func(role *rbacv1.Role) (*rbacv1.Role, error) {
-					state.stateChanges.createdRoles[role.Name] = role
-					role.UID = ""
-					return role, nil
-				}
-			},
-			stateAssertions: func(gtsc grTestStateChanges) {
-				// The second role should be created despite the first getting an error
-				// Because the order is not guaranteed, we can't assert any info on the
-				// created role, just that it exists
-				require.Len(gtsc.t, gtsc.createdRoles, 1)
+			setupControllers: func(c controllers) {
+				c.rCache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil)
+				c.nsCache.EXPECT().Get("namespace1").Return(activeNamespace, nil)
+				c.nsCache.EXPECT().Get("namespace2").Return(activeNamespace, fmt.Errorf("error"))
+				c.rCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, errRoleNotFound)
+				c.rController.EXPECT().Create(role1.DeepCopy()).Return(role1.DeepCopy(), nil)
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
 			wantError:  true,
@@ -697,63 +511,21 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 		},
 		{
 			name: "update an existing role with rule and label changes",
-			stateSetup: func(state grTestState) {
-				state.rListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.Role, error) {
-					return nil, nil
-				}
-				state.nsCacheMock.EXPECT().Get(gomock.Any()).AnyTimes().Return(activeNamespace, nil)
-
-				state.rListerMock.GetFunc = func(namespace string, _ string) (*rbacv1.Role, error) {
-					role := &rbacv1.Role{}
-					if namespace == "namespace1" {
-						role.ObjectMeta = metav1.ObjectMeta{
-							Name:      "namespacedRulesGR-namespace1",
-							Namespace: "namespace1",
-						}
-						role.Rules = []rbacv1.PolicyRule{
-							readPodPolicyRule,
-							readConfigPolicyRule,
-						}
-					} else if namespace == "namespace2" {
-						role.ObjectMeta = metav1.ObjectMeta{
-							Name:      "namespacedRulesGR-namespace2",
-							Namespace: "namespace2",
-							Labels:    map[string]string{grOwnerLabel: "badGR"},
-						}
-						role.Rules = []rbacv1.PolicyRule{
-							adminPodPolicyRule,
-							readPodPolicyRule,
-						}
-					}
-
+			setupControllers: func(c controllers) {
+				c.rCache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil)
+				c.nsCache.EXPECT().Get("namespace1").Return(activeNamespace, nil)
+				c.nsCache.EXPECT().Get("namespace2").Return(activeNamespace, nil)
+				c.rCache.EXPECT().Get("namespace1", "namespacedRulesGR-namespace1").DoAndReturn(func(_ string, _ string) (*rbacv1.Role, error) {
+					role := role1.DeepCopy()
+					role.Labels = map[string]string{grOwnerLabel: "badGR"}
+					role.Rules = append(role.Rules, adminPodPolicyRule)
 					return role, nil
-				}
-				state.rClientMock.UpdateFunc = func(role *rbacv1.Role) (*rbacv1.Role, error) {
-					state.stateChanges.createdRoles[role.Name] = role
-					role.UID = ""
-					return role, nil
-				}
+				})
+				c.rController.EXPECT().Update(role1.DeepCopy()).Return(nil, nil)
+				c.rCache.EXPECT().Get("namespace2", "namespacedRulesGR-namespace2").Return(nil, errRoleNotFound)
+				c.rController.EXPECT().Create(role2.DeepCopy()).Return(role2.DeepCopy(), nil)
 			},
-			stateAssertions: func(gtsc grTestStateChanges) {
-				require.Len(gtsc.t, gtsc.createdRoles, 2)
-
-				role, ok := gtsc.createdRoles["namespacedRulesGR-namespace1"]
-				require.True(gtsc.t, ok)
-				require.Equal(gtsc.t, "namespace1", role.Namespace)
-				require.Len(gtsc.t, role.Rules, 1)
-				require.Equal(gtsc.t, readPodPolicyRule, role.Rules[0])
-				require.Equal(gtsc.t, "namespacedRulesGR", role.Labels[grOwnerLabel])
-
-				role, ok = gtsc.createdRoles["namespacedRulesGR-namespace2"]
-				require.True(gtsc.t, ok)
-				require.Equal(gtsc.t, "namespace2", role.Namespace)
-				require.Len(gtsc.t, role.Rules, 3)
-				require.Equal(gtsc.t, adminPodPolicyRule, role.Rules[0])
-				require.Equal(gtsc.t, readPodPolicyRule, role.Rules[1])
-				require.Equal(gtsc.t, readConfigPolicyRule, role.Rules[2])
-				require.Equal(gtsc.t, "namespacedRulesGR", role.Labels[grOwnerLabel])
-			},
-			globalRole: updatedNamespacedRulesGR.DeepCopy(),
+			globalRole: namespacedRulesGR.DeepCopy(),
 			wantError:  false,
 			conditions: []reducedCondition{
 				{
@@ -764,49 +536,12 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 		},
 		{
 			name: "update an existing role no changes",
-			stateSetup: func(state grTestState) {
-				state.rListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.Role, error) {
-					return nil, nil
-				}
-				state.nsCacheMock.EXPECT().Get(gomock.Any()).AnyTimes().Return(activeNamespace, nil)
-
-				state.rListerMock.GetFunc = func(namespace string, _ string) (*rbacv1.Role, error) {
-					role := &rbacv1.Role{}
-					if namespace == "namespace1" {
-						role.ObjectMeta = metav1.ObjectMeta{
-							Name:      "namespacedRulesGR-namespace1",
-							Namespace: "namespace1",
-							Labels: map[string]string{
-								grOwnerLabel: "namespacedRulesGR",
-							},
-						}
-						role.Rules = []rbacv1.PolicyRule{
-							readPodPolicyRule,
-							readConfigPolicyRule,
-						}
-					} else if namespace == "namespace2" {
-						role.ObjectMeta = metav1.ObjectMeta{
-							Name:      "namespacedRulesGR-namespace2",
-							Namespace: "namespace2",
-							Labels: map[string]string{
-								grOwnerLabel: "namespacedRulesGR",
-							},
-						}
-						role.Rules = []rbacv1.PolicyRule{
-							adminPodPolicyRule,
-							readPodPolicyRule,
-						}
-					}
-
-					return role, nil
-				}
-				state.rClientMock.UpdateFunc = func(role *rbacv1.Role) (*rbacv1.Role, error) {
-					state.stateChanges.createdRoles[role.Name] = role
-					return nil, nil
-				}
-			},
-			stateAssertions: func(gtsc grTestStateChanges) {
-				require.Len(gtsc.t, gtsc.createdRoles, 0)
+			setupControllers: func(c controllers) {
+				c.rCache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil)
+				c.nsCache.EXPECT().Get("namespace1").Return(activeNamespace, nil)
+				c.nsCache.EXPECT().Get("namespace2").Return(activeNamespace, nil)
+				c.rCache.EXPECT().Get("namespace1", "namespacedRulesGR-namespace1").Return(role1.DeepCopy(), nil)
+				c.rCache.EXPECT().Get("namespace2", "namespacedRulesGR-namespace2").Return(role2.DeepCopy(), nil)
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
 			wantError:  false,
@@ -819,26 +554,18 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 		},
 		{
 			name: "update role fails",
-			stateSetup: func(state grTestState) {
-				state.rListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.Role, error) {
-					return nil, nil
-				}
-				state.nsCacheMock.EXPECT().Get(gomock.Any()).AnyTimes().Return(activeNamespace, nil)
-
-				state.rListerMock.GetFunc = func(namespace string, _ string) (*rbacv1.Role, error) {
-					role := &rbacv1.Role{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      "namespacedRulesGR-namespace1",
-							Namespace: "namespace1",
-						},
-						Rules: []rbacv1.PolicyRule{},
-					}
-
+			setupControllers: func(c controllers) {
+				c.rCache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil)
+				c.nsCache.EXPECT().Get("namespace1").Return(activeNamespace, nil)
+				c.nsCache.EXPECT().Get("namespace2").Return(activeNamespace, nil)
+				c.rCache.EXPECT().Get("namespace1", "namespacedRulesGR-namespace1").DoAndReturn(func(_ string, _ string) (*rbacv1.Role, error) {
+					role := role1.DeepCopy()
+					role.Labels = map[string]string{grOwnerLabel: "badGR"}
+					role.Rules = append(role.Rules, adminPodPolicyRule)
 					return role, nil
-				}
-				state.rClientMock.UpdateFunc = func(role *rbacv1.Role) (*rbacv1.Role, error) {
-					return nil, fmt.Errorf("error")
-				}
+				})
+				c.rController.EXPECT().Update(role1.DeepCopy()).Return(nil, fmt.Errorf("error"))
+				c.rCache.EXPECT().Get("namespace2", "namespacedRulesGR-namespace2").Return(role2.DeepCopy(), nil)
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
 			wantError:  true,
@@ -847,236 +574,6 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 					reason: FailedToUpdateRole,
 					status: metav1.ConditionFalse,
 				},
-			},
-		},
-		{
-			name: "remove roles that falsely claim to be owned by GR after create",
-			stateSetup: func(state grTestState) {
-				state.rListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.Role, error) {
-					roles := []*rbacv1.Role{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "deleted-role-1",
-								UID:  "2222",
-							},
-						},
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "kept-role-1",
-								UID:  "1111",
-							},
-						},
-					}
-
-					return roles, nil
-				}
-				state.nsCacheMock.EXPECT().Get(gomock.Any()).AnyTimes().Return(activeNamespace, nil)
-
-				state.rListerMock.GetFunc = func(namespace string, _ string) (*rbacv1.Role, error) {
-					return nil, apierrors.NewNotFound(schema.GroupResource{
-						Group:    normanv1.RoleGroupVersionKind.Group,
-						Resource: normanv1.RoleGroupVersionResource.Resource,
-					}, "")
-				}
-				state.rClientMock.CreateFunc = func(role *rbacv1.Role) (*rbacv1.Role, error) {
-					state.stateChanges.createdRoles[role.Name] = role
-					role.UID = "1111"
-					return role, nil
-				}
-				state.rClientMock.DeleteNamespacedFunc = func(_, name string, _ *metav1.DeleteOptions) error {
-					state.stateChanges.deletedRoles[name] = struct{}{}
-					return nil
-				}
-			},
-			stateAssertions: func(gtsc grTestStateChanges) {
-				require.Len(gtsc.t, gtsc.createdRoles, 2)
-
-				role, ok := gtsc.createdRoles["namespacedRulesGR-namespace1"]
-				require.True(gtsc.t, ok)
-				require.Equal(gtsc.t, "namespace1", role.Namespace)
-				require.Equal(gtsc.t, "namespacedRulesGR", role.Labels[grOwnerLabel])
-				require.Len(gtsc.t, role.Rules, 2)
-				require.Equal(gtsc.t, readPodPolicyRule, role.Rules[0])
-				require.Equal(gtsc.t, readConfigPolicyRule, role.Rules[1])
-				require.Equal(gtsc.t, namespacedRulesOwnerRef, role.OwnerReferences[0])
-
-				role, ok = gtsc.createdRoles["namespacedRulesGR-namespace2"]
-				require.True(gtsc.t, ok)
-				require.Equal(gtsc.t, "namespace2", role.Namespace)
-				require.Equal(gtsc.t, "namespacedRulesGR", role.Labels[grOwnerLabel])
-				require.Len(gtsc.t, role.Rules, 2)
-				require.Equal(gtsc.t, adminPodPolicyRule, role.Rules[0])
-				require.Equal(gtsc.t, readPodPolicyRule, role.Rules[1])
-				require.Equal(gtsc.t, namespacedRulesOwnerRef, role.OwnerReferences[0])
-
-				require.Contains(gtsc.t, gtsc.deletedRoles, "deleted-role-1")
-			},
-			globalRole: namespacedRulesGR.DeepCopy(),
-			wantError:  false,
-			conditions: []reducedCondition{
-				{
-					reason: NamespacedRuleRoleExists,
-					status: metav1.ConditionTrue,
-				},
-			},
-		},
-		{
-			name: "remove invalid role despite terminating namespace",
-			stateSetup: func(state grTestState) {
-				state.rListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.Role, error) {
-					roles := []*rbacv1.Role{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "deleted-role-1",
-								UID:  "1111",
-							},
-						},
-					}
-
-					return roles, nil
-				}
-				state.nsCacheMock.EXPECT().Get(gomock.Any()).AnyTimes().Return(terminatingNamespace, nil)
-
-				state.rListerMock.GetFunc = func(namespace string, _ string) (*rbacv1.Role, error) {
-					return nil, apierrors.NewNotFound(schema.GroupResource{
-						Group:    normanv1.RoleGroupVersionKind.Group,
-						Resource: normanv1.RoleGroupVersionResource.Resource,
-					}, "")
-				}
-				state.rClientMock.DeleteNamespacedFunc = func(_, name string, _ *metav1.DeleteOptions) error {
-					state.stateChanges.deletedRoles[name] = struct{}{}
-					return nil
-				}
-			},
-			stateAssertions: func(gtsc grTestStateChanges) {
-				require.Len(gtsc.t, gtsc.deletedRoles, 1)
-				require.Contains(gtsc.t, gtsc.deletedRoles, "deleted-role-1")
-			},
-			globalRole: namespacedRulesGR.DeepCopy(),
-			wantError:  false,
-			conditions: []reducedCondition{
-				{
-					reason: NamespaceTerminating,
-					status: metav1.ConditionFalse,
-				},
-			},
-		},
-		{
-			name: "delete Role fails",
-			stateSetup: func(state grTestState) {
-				state.rListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.Role, error) {
-					roles := []*rbacv1.Role{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "deleted-role-1",
-								UID:  "2222",
-							},
-						},
-					}
-
-					return roles, nil
-				}
-				state.nsCacheMock.EXPECT().Get(gomock.Any()).AnyTimes().Return(activeNamespace, nil)
-
-				state.rListerMock.GetFunc = func(namespace string, _ string) (*rbacv1.Role, error) {
-					return nil, nil
-				}
-				state.rClientMock.DeleteNamespacedFunc = func(_, name string, _ *metav1.DeleteOptions) error {
-					return fmt.Errorf("error")
-				}
-			},
-			globalRole: namespacedRulesGR.DeepCopy(),
-			wantError:  true,
-		},
-		{
-			name: "remove roles that falsely claim to be owned by GR after update",
-			stateSetup: func(state grTestState) {
-				state.rListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.Role, error) {
-					roles := []*rbacv1.Role{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "kept-role-1",
-								UID:  "1111",
-							},
-						},
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "kept-role-2",
-								UID:  "2222",
-							},
-						},
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "deleted-role-1",
-								UID:  "3333",
-							},
-						},
-					}
-
-					return roles, nil
-				}
-				state.nsCacheMock.EXPECT().Get(gomock.Any()).AnyTimes().Return(activeNamespace, nil)
-
-				state.rListerMock.GetFunc = func(namespace string, _ string) (*rbacv1.Role, error) {
-					role := &rbacv1.Role{}
-					if namespace == "namespace1" {
-						role.ObjectMeta = metav1.ObjectMeta{
-							Name:      "namespacedRulesGR-namespace1",
-							Namespace: "namespace1",
-						}
-						role.Rules = []rbacv1.PolicyRule{
-							readPodPolicyRule,
-							readConfigPolicyRule,
-						}
-						role.UID = "1111"
-					} else if namespace == "namespace2" {
-						role.ObjectMeta = metav1.ObjectMeta{
-							Name:      "namespacedRulesGR-namespace2",
-							Namespace: "namespace2",
-							Labels:    map[string]string{grOwnerLabel: "badGR"},
-						}
-						role.Rules = []rbacv1.PolicyRule{
-							adminPodPolicyRule,
-							readPodPolicyRule,
-						}
-						role.UID = "2222"
-					}
-
-					return role, nil
-				}
-				state.rClientMock.UpdateFunc = func(role *rbacv1.Role) (*rbacv1.Role, error) {
-					state.stateChanges.createdRoles[role.Name] = role
-					return role, nil
-				}
-				state.rClientMock.DeleteNamespacedFunc = func(_, name string, _ *metav1.DeleteOptions) error {
-					state.stateChanges.deletedRoles[name] = struct{}{}
-					return nil
-				}
-			},
-			stateAssertions: func(gtsc grTestStateChanges) {
-				require.Len(gtsc.t, gtsc.createdRoles, 2)
-
-				role, ok := gtsc.createdRoles["namespacedRulesGR-namespace1"]
-				require.True(gtsc.t, ok)
-				require.Equal(gtsc.t, "namespace1", role.Namespace)
-				require.Len(gtsc.t, role.Rules, 1)
-				require.Equal(gtsc.t, readPodPolicyRule, role.Rules[0])
-				require.Equal(gtsc.t, "namespacedRulesGR", role.Labels[grOwnerLabel])
-
-				role, ok = gtsc.createdRoles["namespacedRulesGR-namespace2"]
-				require.True(gtsc.t, ok)
-				require.Equal(gtsc.t, "namespace2", role.Namespace)
-				require.Len(gtsc.t, role.Rules, 3)
-				require.Equal(gtsc.t, adminPodPolicyRule, role.Rules[0])
-				require.Equal(gtsc.t, readPodPolicyRule, role.Rules[1])
-				require.Equal(gtsc.t, readConfigPolicyRule, role.Rules[2])
-				require.Equal(gtsc.t, "namespacedRulesGR", role.Labels[grOwnerLabel])
-
-				require.Contains(gtsc.t, gtsc.deletedRoles, "deleted-role-1")
-			},
-			globalRole: updatedNamespacedRulesGR.DeepCopy(),
-			wantError:  false,
-			conditions: []reducedCondition{
 				{
 					reason: NamespacedRuleRoleExists,
 					status: metav1.ConditionTrue,
@@ -1085,101 +582,37 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 		},
 		{
 			name: "listing existing roles fails",
-			stateSetup: func(state grTestState) {
-				state.rListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.Role, error) {
-					return nil, fmt.Errorf("error")
-				}
-				state.nsCacheMock.EXPECT().Get(gomock.Any()).AnyTimes().Return(activeNamespace, nil)
-
-				state.rListerMock.GetFunc = func(_, _ string) (*rbacv1.Role, error) {
-					return nil, nil
-				}
+			setupControllers: func(c controllers) {
+				c.rCache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("error"))
+				c.nsCache.EXPECT().Get("namespace1").Return(activeNamespace, nil)
+				c.nsCache.EXPECT().Get("namespace2").Return(activeNamespace, nil)
+				c.rCache.EXPECT().Get("namespace1", "namespacedRulesGR-namespace1").Return(role1.DeepCopy(), nil)
+				c.rCache.EXPECT().Get("namespace2", "namespacedRulesGR-namespace2").Return(role2.DeepCopy(), nil)
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
 			wantError:  true,
 		},
-		{
-			name: "roles that should exist with no changes don't get deleted",
-			stateSetup: func(state grTestState) {
-				state.rListerMock.ListFunc = func(_ string, _ labels.Selector) ([]*rbacv1.Role, error) {
-					roles := []*rbacv1.Role{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "kept-role-1",
-								UID:  "1111",
-							},
-						},
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "kept-role-2",
-								UID:  "2222",
-							},
-						},
-					}
-
-					return roles, nil
-				}
-				state.nsCacheMock.EXPECT().Get(gomock.Any()).AnyTimes().Return(activeNamespace, nil)
-
-				state.rListerMock.GetFunc = func(namespace string, _ string) (*rbacv1.Role, error) {
-					role := &rbacv1.Role{}
-					if namespace == "namespace1" {
-						role.ObjectMeta = metav1.ObjectMeta{
-							Name:      "namespacedRulesGR-namespace1",
-							Namespace: "namespace1",
-							Labels:    map[string]string{grOwnerLabel: "namespacedRulesGR"},
-						}
-						role.Rules = []rbacv1.PolicyRule{
-							readPodPolicyRule,
-							readConfigPolicyRule,
-						}
-						role.UID = "1111"
-					} else if namespace == "namespace2" {
-						role.ObjectMeta = metav1.ObjectMeta{
-							Name:      "namespacedRulesGR-namespace2",
-							Namespace: "namespace2",
-							Labels:    map[string]string{grOwnerLabel: "namespacedRulesGR"},
-						}
-						role.Rules = []rbacv1.PolicyRule{
-							adminPodPolicyRule,
-							readPodPolicyRule,
-						}
-						role.UID = "2222"
-					}
-
-					return role, nil
-				}
-				state.rClientMock.DeleteNamespacedFunc = func(_, name string, _ *metav1.DeleteOptions) error {
-					state.stateChanges.deletedRoles[name] = struct{}{}
-					return nil
-				}
-			},
-			stateAssertions: func(gtsc grTestStateChanges) {
-				require.Len(gtsc.t, gtsc.deletedRoles, 0)
-			},
-			globalRole: namespacedRulesGR.DeepCopy(),
-			wantError:  false,
-			conditions: []reducedCondition{
-				{
-					reason: NamespacedRuleRoleExists,
-					status: metav1.ConditionTrue,
-				},
-			},
-		},
 	}
-
+	ctrl := gomock.NewController(t)
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			grLifecycle := globalRoleLifecycle{}
-			state := setupTest(t)
-			if test.stateSetup != nil {
-				test.stateSetup(state)
+
+			controllers := controllers{
+				nsCache:     fake.NewMockNonNamespacedCacheInterface[*corev1.Namespace](ctrl),
+				rCache:      fake.NewMockCacheInterface[*rbacv1.Role](ctrl),
+				rController: fake.NewMockControllerInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl),
 			}
-			grLifecycle.nsCache = state.nsCacheMock
-			grLifecycle.rLister = state.rListerMock
-			grLifecycle.rClient = state.rClientMock
+
+			if test.setupControllers != nil {
+				test.setupControllers(controllers)
+			}
+
+			grLifecycle := globalRoleLifecycle{
+				rClient: controllers.rController,
+				rLister: controllers.rCache,
+				nsCache: controllers.nsCache,
+			}
 
 			err := grLifecycle.reconcileNamespacedRoles(test.globalRole)
 
@@ -1187,9 +620,6 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-			}
-			if test.stateAssertions != nil {
-				test.stateAssertions(*state.stateChanges)
 			}
 			if test.conditions != nil {
 				// All tests are done with 2 NamespacedRules
@@ -1207,31 +637,6 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 	}
 }
 
-func setupTest(t *testing.T) grTestState {
-	ctrl := gomock.NewController(t)
-	nsCacheMock := fake.NewMockNonNamespacedCacheInterface[*corev1.Namespace](ctrl)
-	rListerMock := rbacFakes.RoleListerMock{}
-	rClientMock := rbacFakes.RoleInterfaceMock{}
-	crListerMock := rbacFakes.ClusterRoleListerMock{}
-	crClientMock := rbacFakes.ClusterRoleInterfaceMock{}
-
-	stateChanges := grTestStateChanges{
-		t:                   t,
-		createdRoles:        map[string]*rbacv1.Role{},
-		deletedRoles:        map[string]struct{}{},
-		createdClusterRoles: map[string]*rbacv1.ClusterRole{},
-	}
-	state := grTestState{
-		nsCacheMock:  nsCacheMock,
-		rListerMock:  &rListerMock,
-		rClientMock:  &rClientMock,
-		crListerMock: &crListerMock,
-		crClientMock: &crClientMock,
-		stateChanges: &stateChanges,
-	}
-	return state
-}
-
 func TestSetGRAsInProgress(t *testing.T) {
 	t.Parallel()
 
@@ -1245,7 +650,7 @@ func TestSetGRAsInProgress(t *testing.T) {
 			name: "update gr status to InProgress",
 			oldGR: &v3.GlobalRole{
 				Status: v3.GlobalRoleStatus{
-					Summary: SummaryCompleted,
+					Summary: status.SummaryCompleted,
 					Conditions: []metav1.Condition{
 						{
 							Type:   "test",
@@ -1306,7 +711,7 @@ func TestSetGRAsInProgress(t *testing.T) {
 				t.Errorf("failed to parse lastUpdate as RFC3339: %v", err)
 			}
 			require.Empty(t, updatedGR.Status.Conditions)
-			require.Equal(t, SummaryInProgress, updatedGR.Status.Summary)
+			require.Equal(t, status.SummaryInProgress, updatedGR.Status.Summary)
 		})
 	}
 }
@@ -1336,7 +741,7 @@ func TestSetGRAsCompleted(t *testing.T) {
 					},
 				},
 			},
-			summary:      SummaryCompleted,
+			summary:      status.SummaryCompleted,
 			updateReturn: nil,
 			wantError:    false,
 		},
@@ -1359,7 +764,7 @@ func TestSetGRAsCompleted(t *testing.T) {
 					},
 				},
 			},
-			summary:      SummaryCompleted,
+			summary:      status.SummaryCompleted,
 			updateReturn: nil,
 			wantError:    false,
 		},
@@ -1373,7 +778,7 @@ func TestSetGRAsCompleted(t *testing.T) {
 					Conditions: []metav1.Condition{},
 				},
 			},
-			summary:      SummaryCompleted,
+			summary:      status.SummaryCompleted,
 			updateReturn: nil,
 			wantError:    false,
 		},
@@ -1384,7 +789,7 @@ func TestSetGRAsCompleted(t *testing.T) {
 					Generation: generation,
 				},
 			},
-			summary:      SummaryCompleted,
+			summary:      status.SummaryCompleted,
 			updateReturn: nil,
 			wantError:    false,
 		},
@@ -1407,7 +812,7 @@ func TestSetGRAsCompleted(t *testing.T) {
 					},
 				},
 			},
-			summary:      SummaryError,
+			summary:      status.SummaryError,
 			updateReturn: nil,
 			wantError:    false,
 		},
@@ -1430,7 +835,7 @@ func TestSetGRAsCompleted(t *testing.T) {
 					},
 				},
 			},
-			summary:      SummaryError,
+			summary:      status.SummaryError,
 			updateReturn: nil,
 			wantError:    false,
 		},
@@ -1453,7 +858,7 @@ func TestSetGRAsCompleted(t *testing.T) {
 					},
 				},
 			},
-			summary:      SummaryError,
+			summary:      status.SummaryError,
 			updateReturn: nil,
 			wantError:    false,
 		},
@@ -1515,7 +920,7 @@ func TestSetGRAsTerminating(t *testing.T) {
 			name: "update gr status to Terminating",
 			oldGR: &v3.GlobalRole{
 				Status: v3.GlobalRoleStatus{
-					Summary: SummaryCompleted,
+					Summary: status.SummaryCompleted,
 					Conditions: []metav1.Condition{
 						{
 							Type:   "test",
@@ -1576,7 +981,7 @@ func TestSetGRAsTerminating(t *testing.T) {
 				t.Errorf("failed to parse lastUpdate as RFC3339: %v", err)
 			}
 			require.Empty(t, updatedGR.Status.Conditions)
-			require.Equal(t, SummaryTerminating, updatedGR.Status.Summary)
+			require.Equal(t, status.SummaryTerminating, updatedGR.Status.Summary)
 		})
 	}
 }
