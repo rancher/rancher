@@ -49,7 +49,7 @@ RKE2_LINUX_RUNTIME_IMAGES=(
   "rancher/rke2-runtime:v1.34.2-rke2r1-linux-amd64"
   "rancher/rke2-runtime:v1.34.3-rke2r1-linux-amd64"
   "rancher/rke2-runtime:v1.32.10-rke2r1-linux-arm64"
-  "rancher/rke2-runtime:v1.32.11-rke2r1-linux-amd64"
+  "rancher/rke2-runtime:v1.32.11-rke2r1-linux-arm64"
   "rancher/rke2-runtime:v1.32.4-rke2r1-linux-arm64"
   "rancher/rke2-runtime:v1.32.5-rke2r1-linux-arm64"
   "rancher/rke2-runtime:v1.32.6-rke2r1-linux-arm64"
@@ -89,7 +89,6 @@ RKE2_WINDOWS_RUNTIME_IMAGES=(
   "rancher/rke2-runtime:v1.34.1-rke2r1-windows-amd64"
   "rancher/rke2-runtime:v1.34.2-rke2r1-windows-amd64"
   "rancher/rke2-runtime:v1.34.3-rke2r1-windows-amd64"
-
 )
 
 if [ ${ARCH} == amd64 ]; then
