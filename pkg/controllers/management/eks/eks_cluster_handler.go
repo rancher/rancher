@@ -51,7 +51,25 @@ const (
 	eksShortName        = "EKS"
 	enqueueTime         = time.Second * 5
 	importedAnno        = "eks.cattle.io/imported"
+	// Disable Rancher->AWS EKS sync for this cluster when set to a truthy value.
+	disableEKSConfigSyncAnnotation = "management.cattle.io/disable-eks-sync"
 )
+
+func isEKSConfigSyncDisabled(cluster *mgmtv3.Cluster) bool {
+	if cluster == nil || cluster.Annotations == nil {
+		return false
+	}
+	value, ok := cluster.Annotations[disableEKSConfigSyncAnnotation]
+	if !ok {
+		return false
+	}
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "true", "1", "yes", "y", "on":
+		return true
+	default:
+		return false
+	}
+}
 
 type eksOperatorController struct {
 	clusteroperator.OperatorController
@@ -141,8 +159,12 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 
 	// check for changes between EKS spec on cluster and the EKS spec on the EKSClusterConfig object
 	if !reflect.DeepEqual(eksClusterConfigMap, eksClusterConfigDynamic.Object["spec"]) {
-		logrus.Infof("change detected for cluster [%s], updating EKSClusterConfig", cluster.Name)
-		return e.updateEKSClusterConfig(cluster, eksClusterConfigDynamic, eksClusterConfigMap)
+		if isEKSConfigSyncDisabled(cluster) {
+			logrus.Infof("sync disabled for cluster [%s], skipping EKSClusterConfig update due to %s", cluster.Name, disableEKSConfigSyncAnnotation)
+		} else {
+			logrus.Infof("change detected for cluster [%s], updating EKSClusterConfig", cluster.Name)
+			return e.updateEKSClusterConfig(cluster, eksClusterConfigDynamic, eksClusterConfigMap)
+		}
 	}
 
 	// get EKS Cluster Config's phase
