@@ -976,7 +976,7 @@ func (s *Operations) createNamespace(ctx context.Context, namespace, projectID s
 	}
 	namespaces.ApplyLabelsAndAnnotations(ns)
 
-	// We just always try to create an ignore the error. This is because you might have create but not get privileges
+	// We just always try to create and ignore the error. This is because you might have create but not get privileges
 	_, _ = client.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 
 	if projectID == "" {
