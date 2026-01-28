@@ -11,7 +11,7 @@ const (
 )
 
 var (
-	mutator *Mutator
+	mutator Mutator
 )
 
 type Mutator struct {
@@ -41,11 +41,11 @@ func (m *Mutator) Mutate(ns *corev1.Namespace) bool {
 }
 
 func SetMutator(m Mutator) {
-	mutator = &m
+	mutator = m
 }
 
 func GetMutator() Mutator {
-	return *mutator
+	return mutator
 }
 
 // Copy copies all key/value pairs in src adding them to dst and returns whether the dst map was updated. If a key
@@ -65,7 +65,7 @@ func copy[M1, M2 map[K]V, K comparable, V comparable](m1 M1, m2 M2) bool {
 }
 
 func ApplyLabelsAndAnnotations(ns *corev1.Namespace) bool {
-	if mutator == nil {
+	if !mutator.Enabled {
 		return false
 	}
 
@@ -73,7 +73,7 @@ func ApplyLabelsAndAnnotations(ns *corev1.Namespace) bool {
 }
 
 func InjectValues(values map[string]any) map[string]any {
-	if mutator == nil {
+	if !mutator.Enabled {
 		return values
 	}
 
