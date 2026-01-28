@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/norman/types"
 	v33 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
+	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
@@ -25,12 +26,30 @@ const currentClusterControllersVersion = "management.cattle.io/current-cluster-c
 
 // Register adds the user-controllers-controller handler and starts the peer manager.
 func Register(ctx context.Context, scaledContext *config.ScaledContext, clusterManager *clustermanager.Manager) {
+	// Configure a handler for features that will cancel the owner strategy if the value is flipped.
+	// This eliminates the need for using "Recreate" rollout strategy to avoid a split-brain situation
+	// At the cost of temporarily stopping usercontrollers while waiting for new pods to be up and running
+	clusterOwnershipFeature := features.ClusterOwnershipStrategy
+	initialValue := clusterOwnershipFeature.Enabled()
+	featureName := clusterOwnershipFeature.Name()
+	ctx, cancel := context.WithCancel(ctx)
+	scaledContext.Wrangler.Mgmt.Feature().OnChange(ctx, "cluster-owner-strategy-change", func(s string, obj *v3.Feature) (*v3.Feature, error) {
+		if obj == nil || s != featureName {
+			return nil, nil
+		}
+		if value := features.IsEnabled(obj); initialValue != value {
+			logrus.Warnf("Feature flag %q was flipped, new value is %v, disabling userscontrollers in preparation for restart", featureName, value)
+			cancel()
+		}
+		return nil, nil
+	})
+
 	u := &userControllersController{
 		starter:       clusterManager,
 		clusterLister: scaledContext.Management.Clusters("").Controller().Lister(),
 		clusters:      scaledContext.Management.Clusters(""),
 		ctx:           ctx,
-		ownerStrategy: getOwnerStrategy(ctx, scaledContext.PeerManager),
+		ownerStrategy: getOwnerStrategy(ctx, scaledContext.PeerManager, initialValue),
 	}
 
 	scaledContext.Management.Clusters("").AddHandler(ctx, "user-controllers-controller", u.sync)
