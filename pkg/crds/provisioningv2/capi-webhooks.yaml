@@ -12,7 +12,7 @@ webhooks:
       service:
         name: capi-webhook-service
         namespace: cattle-provisioning-capi-system
-        path: /mutate-cluster-x-k8s-io-v1beta1-cluster
+        path: /mutate-cluster-x-k8s-io-v1beta2-cluster
     failurePolicy: Fail
     matchPolicy: Equivalent
     name: default.cluster.cluster.x-k8s.io
@@ -20,7 +20,7 @@ webhooks:
       - apiGroups:
           - cluster.x-k8s.io
         apiVersions:
-          - v1beta1
+          - v1beta2
         operations:
           - CREATE
           - UPDATE
@@ -34,29 +34,7 @@ webhooks:
       service:
         name: capi-webhook-service
         namespace: cattle-provisioning-capi-system
-        path: /mutate-cluster-x-k8s-io-v1beta1-clusterclass
-    failurePolicy: Fail
-    matchPolicy: Equivalent
-    name: default.clusterclass.cluster.x-k8s.io
-    rules:
-      - apiGroups:
-          - cluster.x-k8s.io
-        apiVersions:
-          - v1beta1
-        operations:
-          - CREATE
-          - UPDATE
-        resources:
-          - clusterclasses
-    sideEffects: None
-  - admissionReviewVersions:
-      - v1
-      - v1beta1
-    clientConfig:
-      service:
-        name: capi-webhook-service
-        namespace: cattle-provisioning-capi-system
-        path: /mutate-addons-cluster-x-k8s-io-v1beta1-clusterresourceset
+        path: /mutate-addons-cluster-x-k8s-io-v1beta2-clusterresourceset
     failurePolicy: Fail
     matchPolicy: Equivalent
     name: default.clusterresourceset.addons.cluster.x-k8s.io
@@ -64,7 +42,7 @@ webhooks:
       - apiGroups:
           - addons.cluster.x-k8s.io
         apiVersions:
-          - v1beta1
+          - v1beta2
         operations:
           - CREATE
           - UPDATE
@@ -78,7 +56,7 @@ webhooks:
       service:
         name: capi-webhook-service
         namespace: cattle-provisioning-capi-system
-        path: /mutate-cluster-x-k8s-io-v1beta1-machine
+        path: /mutate-cluster-x-k8s-io-v1beta2-machine
     failurePolicy: Fail
     matchPolicy: Equivalent
     name: default.machine.cluster.x-k8s.io
@@ -86,7 +64,7 @@ webhooks:
       - apiGroups:
           - cluster.x-k8s.io
         apiVersions:
-          - v1beta1
+          - v1beta2
         operations:
           - CREATE
           - UPDATE
@@ -100,7 +78,7 @@ webhooks:
       service:
         name: capi-webhook-service
         namespace: cattle-provisioning-capi-system
-        path: /mutate-cluster-x-k8s-io-v1beta1-machinedeployment
+        path: /mutate-cluster-x-k8s-io-v1beta2-machinedeployment
     failurePolicy: Fail
     matchPolicy: Equivalent
     name: default.machinedeployment.cluster.x-k8s.io
@@ -108,7 +86,7 @@ webhooks:
       - apiGroups:
           - cluster.x-k8s.io
         apiVersions:
-          - v1beta1
+          - v1beta2
         operations:
           - CREATE
           - UPDATE
@@ -122,7 +100,7 @@ webhooks:
       service:
         name: capi-webhook-service
         namespace: cattle-provisioning-capi-system
-        path: /mutate-cluster-x-k8s-io-v1beta1-machinehealthcheck
+        path: /mutate-cluster-x-k8s-io-v1beta2-machinehealthcheck
     failurePolicy: Fail
     matchPolicy: Equivalent
     name: default.machinehealthcheck.cluster.x-k8s.io
@@ -130,7 +108,7 @@ webhooks:
       - apiGroups:
           - cluster.x-k8s.io
         apiVersions:
-          - v1beta1
+          - v1beta2
         operations:
           - CREATE
           - UPDATE
@@ -144,7 +122,7 @@ webhooks:
       service:
         name: capi-webhook-service
         namespace: cattle-provisioning-capi-system
-        path: /mutate-cluster-x-k8s-io-v1beta1-machineset
+        path: /mutate-cluster-x-k8s-io-v1beta2-machineset
     failurePolicy: Fail
     matchPolicy: Equivalent
     name: default.machineset.cluster.x-k8s.io
@@ -152,7 +130,7 @@ webhooks:
       - apiGroups:
           - cluster.x-k8s.io
         apiVersions:
-          - v1beta1
+          - v1beta2
         operations:
           - CREATE
           - UPDATE
@@ -166,7 +144,7 @@ webhooks:
       service:
         name: capi-webhook-service
         namespace: cattle-provisioning-capi-system
-        path: /mutate-runtime-cluster-x-k8s-io-v1alpha1-extensionconfig
+        path: /mutate-runtime-cluster-x-k8s-io-v1beta2-extensionconfig
     failurePolicy: Fail
     matchPolicy: Equivalent
     name: default.extensionconfig.runtime.addons.cluster.x-k8s.io
@@ -174,7 +152,7 @@ webhooks:
       - apiGroups:
           - runtime.cluster.x-k8s.io
         apiVersions:
-          - v1alpha1
+          - v1beta2
         operations:
           - CREATE
           - UPDATE
@@ -188,7 +166,7 @@ webhooks:
       service:
         name: capi-webhook-service
         namespace: cattle-provisioning-capi-system
-        path: /mutate-cluster-x-k8s-io-v1beta1-machinepool
+        path: /mutate-cluster-x-k8s-io-v1beta2-machinepool
     failurePolicy: Fail
     matchPolicy: Equivalent
     name: default.machinepool.cluster.x-k8s.io
@@ -196,7 +174,7 @@ webhooks:
       - apiGroups:
           - cluster.x-k8s.io
         apiVersions:
-          - v1beta1
+          - v1beta2
         operations:
           - CREATE
           - UPDATE
@@ -217,7 +195,7 @@ webhooks:
       service:
         name: capi-webhook-service
         namespace: cattle-provisioning-capi-system
-        path: /validate-cluster-x-k8s-io-v1beta1-cluster
+        path: /validate-cluster-x-k8s-io-v1beta2-cluster
     failurePolicy: Fail
     matchPolicy: Equivalent
     name: validation.cluster.cluster.x-k8s.io
@@ -225,7 +203,7 @@ webhooks:
       - apiGroups:
           - cluster.x-k8s.io
         apiVersions:
-          - v1beta1
+          - v1beta2
         operations:
           - CREATE
           - UPDATE
@@ -240,7 +218,7 @@ webhooks:
       service:
         name: capi-webhook-service
         namespace: cattle-provisioning-capi-system
-        path: /validate-cluster-x-k8s-io-v1beta1-clusterclass
+        path: /validate-cluster-x-k8s-io-v1beta2-clusterclass
     failurePolicy: Fail
     matchPolicy: Equivalent
     name: validation.clusterclass.cluster.x-k8s.io
@@ -248,7 +226,7 @@ webhooks:
       - apiGroups:
           - cluster.x-k8s.io
         apiVersions:
-          - v1beta1
+          - v1beta2
         operations:
           - CREATE
           - UPDATE
@@ -263,7 +241,7 @@ webhooks:
       service:
         name: capi-webhook-service
         namespace: cattle-provisioning-capi-system
-        path: /validate-addons-cluster-x-k8s-io-v1beta1-clusterresourceset
+        path: /validate-addons-cluster-x-k8s-io-v1beta2-clusterresourceset
     failurePolicy: Fail
     matchPolicy: Equivalent
     name: validation.clusterresourceset.addons.cluster.x-k8s.io
@@ -271,7 +249,7 @@ webhooks:
       - apiGroups:
           - addons.cluster.x-k8s.io
         apiVersions:
-          - v1beta1
+          - v1beta2
         operations:
           - CREATE
           - UPDATE
@@ -285,7 +263,7 @@ webhooks:
       service:
         name: capi-webhook-service
         namespace: cattle-provisioning-capi-system
-        path: /validate-addons-cluster-x-k8s-io-v1beta1-clusterresourcesetbinding
+        path: /validate-addons-cluster-x-k8s-io-v1beta2-clusterresourcesetbinding
     failurePolicy: Fail
     matchPolicy: Equivalent
     name: validation.clusterresourcesetbinding.addons.cluster.x-k8s.io
@@ -293,7 +271,7 @@ webhooks:
       - apiGroups:
           - addons.cluster.x-k8s.io
         apiVersions:
-          - v1beta1
+          - v1beta2
         operations:
           - CREATE
           - UPDATE
@@ -307,7 +285,7 @@ webhooks:
       service:
         name: capi-webhook-service
         namespace: cattle-provisioning-capi-system
-        path: /validate-cluster-x-k8s-io-v1beta1-machine
+        path: /validate-cluster-x-k8s-io-v1beta2-machine
     failurePolicy: Fail
     matchPolicy: Equivalent
     name: validation.machine.cluster.x-k8s.io
@@ -315,7 +293,7 @@ webhooks:
       - apiGroups:
           - cluster.x-k8s.io
         apiVersions:
-          - v1beta1
+          - v1beta2
         operations:
           - CREATE
           - UPDATE
@@ -329,7 +307,7 @@ webhooks:
       service:
         name: capi-webhook-service
         namespace: cattle-provisioning-capi-system
-        path: /validate-cluster-x-k8s-io-v1beta1-machinedeployment
+        path: /validate-cluster-x-k8s-io-v1beta2-machinedeployment
     failurePolicy: Fail
     matchPolicy: Equivalent
     name: validation.machinedeployment.cluster.x-k8s.io
@@ -337,7 +315,7 @@ webhooks:
       - apiGroups:
           - cluster.x-k8s.io
         apiVersions:
-          - v1beta1
+          - v1beta2
         operations:
           - CREATE
           - UPDATE
@@ -351,7 +329,7 @@ webhooks:
       service:
         name: capi-webhook-service
         namespace: cattle-provisioning-capi-system
-        path: /validate-cluster-x-k8s-io-v1beta1-machinedrainrule
+        path: /validate-cluster-x-k8s-io-v1beta2-machinedrainrule
     failurePolicy: Fail
     matchPolicy: Equivalent
     name: validation.machinedrainrule.cluster.x-k8s.io
@@ -359,7 +337,7 @@ webhooks:
       - apiGroups:
           - cluster.x-k8s.io
         apiVersions:
-          - v1beta1
+          - v1beta2
         operations:
           - CREATE
           - UPDATE
@@ -373,7 +351,7 @@ webhooks:
       service:
         name: capi-webhook-service
         namespace: cattle-provisioning-capi-system
-        path: /validate-cluster-x-k8s-io-v1beta1-machinehealthcheck
+        path: /validate-cluster-x-k8s-io-v1beta2-machinehealthcheck
     failurePolicy: Fail
     matchPolicy: Equivalent
     name: validation.machinehealthcheck.cluster.x-k8s.io
@@ -381,7 +359,7 @@ webhooks:
       - apiGroups:
           - cluster.x-k8s.io
         apiVersions:
-          - v1beta1
+          - v1beta2
         operations:
           - CREATE
           - UPDATE
@@ -395,7 +373,7 @@ webhooks:
       service:
         name: capi-webhook-service
         namespace: cattle-provisioning-capi-system
-        path: /validate-cluster-x-k8s-io-v1beta1-machineset
+        path: /validate-cluster-x-k8s-io-v1beta2-machineset
     failurePolicy: Fail
     matchPolicy: Equivalent
     name: validation.machineset.cluster.x-k8s.io
@@ -403,7 +381,7 @@ webhooks:
       - apiGroups:
           - cluster.x-k8s.io
         apiVersions:
-          - v1beta1
+          - v1beta2
         operations:
           - CREATE
           - UPDATE
@@ -417,7 +395,7 @@ webhooks:
       service:
         name: capi-webhook-service
         namespace: cattle-provisioning-capi-system
-        path: /validate-runtime-cluster-x-k8s-io-v1alpha1-extensionconfig
+        path: /validate-runtime-cluster-x-k8s-io-v1beta2-extensionconfig
     failurePolicy: Fail
     matchPolicy: Equivalent
     name: validation.extensionconfig.runtime.cluster.x-k8s.io
@@ -425,7 +403,7 @@ webhooks:
       - apiGroups:
           - runtime.cluster.x-k8s.io
         apiVersions:
-          - v1alpha1
+          - v1beta2
         operations:
           - CREATE
           - UPDATE
@@ -439,7 +417,7 @@ webhooks:
       service:
         name: capi-webhook-service
         namespace: cattle-provisioning-capi-system
-        path: /validate-cluster-x-k8s-io-v1beta1-machinepool
+        path: /validate-cluster-x-k8s-io-v1beta2-machinepool
     failurePolicy: Fail
     matchPolicy: Equivalent
     name: validation.machinepool.cluster.x-k8s.io
@@ -447,7 +425,7 @@ webhooks:
       - apiGroups:
           - cluster.x-k8s.io
         apiVersions:
-          - v1beta1
+          - v1beta2
         operations:
           - CREATE
           - UPDATE
@@ -461,7 +439,7 @@ webhooks:
       service:
         name: capi-webhook-service
         namespace: cattle-provisioning-capi-system
-        path: /validate-ipam-cluster-x-k8s-io-v1beta1-ipaddress
+        path: /validate-ipam-cluster-x-k8s-io-v1beta2-ipaddress
     failurePolicy: Fail
     matchPolicy: Equivalent
     name: validation.ipaddress.ipam.cluster.x-k8s.io
@@ -469,7 +447,7 @@ webhooks:
       - apiGroups:
           - ipam.cluster.x-k8s.io
         apiVersions:
-          - v1beta1
+          - v1beta2
         operations:
           - CREATE
           - UPDATE
@@ -484,7 +462,7 @@ webhooks:
       service:
         name: capi-webhook-service
         namespace: cattle-provisioning-capi-system
-        path: /validate-ipam-cluster-x-k8s-io-v1beta1-ipaddressclaim
+        path: /validate-ipam-cluster-x-k8s-io-v1beta2-ipaddressclaim
     failurePolicy: Fail
     matchPolicy: Equivalent
     name: validation.ipaddressclaim.ipam.cluster.x-k8s.io
@@ -492,7 +470,7 @@ webhooks:
       - apiGroups:
           - ipam.cluster.x-k8s.io
         apiVersions:
-          - v1beta1
+          - v1beta2
         operations:
           - CREATE
           - UPDATE
