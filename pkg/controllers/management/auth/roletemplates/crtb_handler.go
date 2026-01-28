@@ -236,7 +236,7 @@ func (c *crtbHandler) getDesiredRoleBindings(crtb *v3.ClusterRoleTemplateBinding
 // OnRemove deletes Cluster Role Bindings that are owned by the CRTB and the membership binding if no other CRTBs give membership access.
 func (c *crtbHandler) OnRemove(_ string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
 	if crtb == nil || !features.AggregatedRoleTemplates.Enabled() {
-		return nil, c.deleteDownstreamResources(crtb)
+		return nil, c.deleteDownstreamResources(crtb, false)
 	}
 
 	condition := metav1.Condition{Type: clusterRoleTemplateBindingDelete}
@@ -247,7 +247,7 @@ func (c *crtbHandler) OnRemove(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 	err = removeAuthV2Permissions(crtb, c.rbController)
 	c.s.AddCondition(&crtb.Status.LocalConditions, condition, authv2ProvisioningBindingDeleted, err)
 
-	return crtb, errors.Join(err, c.removeRoleBindings(crtb), c.deleteDownstreamResources(crtb))
+	return crtb, errors.Join(err, c.removeRoleBindings(crtb), c.deleteDownstreamResources(crtb, true))
 }
 
 // removeClusterRoleBindings removes all bindings owned by the CRTB
@@ -278,7 +278,7 @@ func (c *crtbHandler) removeRoleBindings(crtb *v3.ClusterRoleTemplateBinding) er
 	return returnErr
 }
 
-func (c *crtbHandler) deleteDownstreamResources(crtb *v3.ClusterRoleTemplateBinding) error {
+func (c *crtbHandler) deleteDownstreamResources(crtb *v3.ClusterRoleTemplateBinding, deleteImpersonator bool) error {
 	clusterName := crtb.ClusterName
 	cluster, err := c.clusterController.Get(clusterName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
@@ -292,8 +292,14 @@ func (c *crtbHandler) deleteDownstreamResources(crtb *v3.ClusterRoleTemplateBind
 	if err != nil {
 		return err
 	}
-	return errors.Join(c.deleteDownstreamClusterRoleBindings(crtb, userContext.RBACw.ClusterRoleBinding()),
-		c.impersonationHandler.deleteServiceAccountImpersonator(clusterName, crtb.UserName, userContext.RBACw.ClusterRole()))
+
+	if deleteImpersonator {
+		return errors.Join(
+			c.deleteDownstreamClusterRoleBindings(crtb, userContext.RBACw.ClusterRoleBinding()),
+			c.impersonationHandler.deleteServiceAccountImpersonator(clusterName, crtb.UserName, userContext.RBACw.ClusterRole()),
+		)
+	}
+	return c.deleteDownstreamClusterRoleBindings(crtb, userContext.RBACw.ClusterRoleBinding())
 }
 
 // deleteBindings removes cluster role bindings owned by CRTB.

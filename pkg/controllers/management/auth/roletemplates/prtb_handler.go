@@ -80,14 +80,14 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 // OnRemove deletes Role Bindings that are owned by the PRTB. It also removes the membership binding if no other PRTBs give membership access.
 func (p *prtbHandler) OnRemove(_ string, prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
 	if prtb == nil || !features.AggregatedRoleTemplates.Enabled() {
-		return nil, p.deleteDownstreamResources(prtb)
+		return nil, p.deleteDownstreamResources(prtb, false)
 	}
 
 	returnErr := errors.Join(deleteClusterMembershipBinding(prtb, p.crbController),
 		deleteProjectMembershipBinding(prtb, p.rbController),
 		removeAuthV2Permissions(prtb, p.rbController),
 		p.deleteRoleBindings(prtb),
-		p.deleteDownstreamResources(prtb))
+		p.deleteDownstreamResources(prtb, true))
 
 	return prtb, returnErr
 }
@@ -112,9 +112,9 @@ func (p *prtbHandler) deleteRoleBindings(prtb *v3.ProjectRoleTemplateBinding) er
 }
 
 // deleteDownstreamResources deletes all Role Bindings and Cluster Role Bindings in the downstream cluster made by the PRTB.
-// It also removes the service account impersonator for the user if there are no other PRTBs or CRTBs for the user.
+// If deleteImpersonator is true, it also removes the service account impersonator for the user if there are no other PRTBs or CRTBs for the user.
 // If the cluster is not found, it assumes it has been deleted and does not re-queue.
-func (p *prtbHandler) deleteDownstreamResources(prtb *v3.ProjectRoleTemplateBinding) error {
+func (p *prtbHandler) deleteDownstreamResources(prtb *v3.ProjectRoleTemplateBinding, deleteImpersonator bool) error {
 	clusterName, _ := rbac.GetClusterAndProjectNameFromPRTB(prtb)
 	cluster, err := p.clusterController.Get(clusterName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
@@ -129,9 +129,16 @@ func (p *prtbHandler) deleteDownstreamResources(prtb *v3.ProjectRoleTemplateBind
 		return err
 	}
 
-	return errors.Join(p.deleteDownstreamRoleBindings(prtb, userContext.RBACw.RoleBinding()),
+	returnErr := errors.Join(
+		p.deleteDownstreamRoleBindings(prtb, userContext.RBACw.RoleBinding()),
 		p.deleteDownstreamClusterRoleBindings(prtb, userContext.RBACw.ClusterRoleBinding()),
-		p.impersonationHandler.deleteServiceAccountImpersonator(clusterName, prtb.UserName, userContext.RBACw.ClusterRole()))
+	)
+
+	if deleteImpersonator {
+		returnErr = errors.Join(returnErr, p.impersonationHandler.deleteServiceAccountImpersonator(clusterName, prtb.UserName, userContext.RBACw.ClusterRole()))
+	}
+
+	return returnErr
 }
 
 // deleteDownstreamRoleBindings deletes all Role Bindings in the downstream cluster made by the PRTB.
