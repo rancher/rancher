@@ -29,6 +29,10 @@ func (h *Handler) UserFormatter(apiContext *types.APIContext, resource *types.Ra
 	if canRefresh := h.userCanRefresh(apiContext); canRefresh {
 		resource.AddAction(apiContext, "refreshauthprovideraccess")
 	}
+
+	if !h.canDoUserAction(apiContext, "update") {
+		delete(resource.Links, "update")
+	}
 }
 
 func (h *Handler) CollectionFormatter(apiContext *types.APIContext, collection *types.GenericCollection) {
@@ -193,7 +197,12 @@ func (h *Handler) refreshAttributes(request *types.APIContext) error {
 }
 
 func (h *Handler) userCanRefresh(request *types.APIContext) bool {
-	return request.AccessControl.CanDo(v3.UserGroupVersionKind.Group, v3.UserResource.Name, "create", request, nil, request.Schema) == nil
+	return h.canDoUserAction(request, "create")
+}
+
+// canDoUserAction checks if the user has permission to perform the specified action on user resources.
+func (h *Handler) canDoUserAction(apiContext *types.APIContext, verb string) bool {
+	return apiContext.AccessControl.CanDo(v3.UserGroupVersionKind.Group, v3.UserResource.Name, verb, apiContext, nil, apiContext.Schema) == nil
 }
 
 // validatePassword will ensure a password is at least the minimum required length in runes,
