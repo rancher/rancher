@@ -52,8 +52,6 @@ func (h *handler) onChange(_ string, ns *corev1.Namespace) (*corev1.Namespace, e
 }
 
 func Register(ctx context.Context, wContext *wrangler.Context) {
-	fmt.Printf("=== [pkg.controllers.management.namespace.controller.go::Register 000] ===\n")
-
 	nsClient := wContext.Core.Namespace()
 
 	handler := &handler{
