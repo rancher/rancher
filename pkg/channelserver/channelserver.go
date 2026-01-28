@@ -131,7 +131,13 @@ func GetReleaseConfigByRuntime(ctx context.Context, runtime string) (*config.Con
 	if initErr != nil {
 		return nil, initErr
 	}
-	return configs[runtime], nil
+
+	cfg, ok := configs[runtime]
+	if !ok {
+		return nil, fmt.Errorf("unsupported runtime: %s", runtime)
+	}
+
+	return cfg, nil
 }
 
 func NewHandler(ctx context.Context) (http.Handler, error) {
