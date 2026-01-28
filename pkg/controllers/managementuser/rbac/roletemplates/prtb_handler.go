@@ -67,13 +67,6 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 		return nil, nil
 	}
 
-	/*
-		// If the feature is disabled, remove the bindings created by aggregation
-		if !features.AggregatedRoleTemplates.Enabled() {
-			return prtb, errors.Join(p.deleteClusterRoleBindings(prtb), p.deleteRoleBindings(prtb))
-		}
-	*/
-
 	// Only run this controller if the PRTB is for this cluster
 	clusterName, _ := rbac.GetClusterAndProjectNameFromPRTB(prtb)
 	if clusterName != p.clusterName {
@@ -153,91 +146,6 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 	return nil
 }
 
-/*
-// OnRemove removes all Role Bindings in each project namespace made by the PRTB.
-func (p *prtbHandler) OnRemove(_ string, prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
-	if !features.AggregatedRoleTemplates.Enabled() {
-		return nil, nil
-	}
-
-	if prtb.UserName != "" {
-		if err := p.impersonationHandler.deleteServiceAccountImpersonator(prtb.UserName); err != nil {
-			return nil, fmt.Errorf("failed to delete service account impersonator for %s: %w", prtb.UserName, err)
-		}
-	}
-
-	return prtb, errors.Join(
-		p.deleteRoleBindings(prtb),
-		p.deleteClusterRoleBindings(prtb),
-	)
-}
-
-// deleteRoleBindings deletes all Role Bindings in each project namespace made by the PRTB.
-func (p *prtbHandler) deleteRoleBindings(prtb *v3.ProjectRoleTemplateBinding) error {
-	namespaces, err := p.getNamespacesFromProject(prtb)
-	if err != nil {
-		return err
-	}
-
-	// Get all RoleBindings owned by this PRTB.
-	set := labels.Set(map[string]string{
-		rbac.GetPRTBOwnerLabel(prtb.Name): "true",
-		rbac.AggregationFeatureLabel:      "true",
-	})
-	listOptions := metav1.ListOptions{LabelSelector: set.AsSelector().String()}
-
-	var returnError error
-	for _, n := range namespaces.Items {
-		rbs, err := p.rbClient.List(n.Name, listOptions)
-		if err != nil {
-			return err
-		}
-		for _, rb := range rbs.Items {
-			returnError = errors.Join(returnError, rbac.DeleteNamespacedResource(n.Name, rb.Name, p.rbClient))
-		}
-	}
-	return returnError
-}
-
-// deleteClusterRoleBindings deletes all Cluster Role Bindings made by the PRTB.
-func (p *prtbHandler) deleteClusterRoleBindings(prtb *v3.ProjectRoleTemplateBinding) error {
-	// Get all ClusterRoleBindings owned by this PRTB.
-	set := labels.Set(map[string]string{
-		rbac.GetPRTBOwnerLabel(prtb.Name): "true",
-		rbac.AggregationFeatureLabel:      "true",
-	})
-	listOptions := metav1.ListOptions{LabelSelector: set.AsSelector().String()}
-	crbs, err := p.crbClient.List(listOptions)
-	if err != nil {
-		return err
-	}
-
-	var returnError error
-	for _, crb := range crbs.Items {
-		// Check if the CRB is owned by another PRTB
-		// This can happen if the CRB is reused like the namespace access CRB
-		crbOwnedByAnotherPRTB := false
-		delete(crb.Labels, rbac.GetPRTBOwnerLabel(prtb.Name))
-		for label := range crb.Labels {
-			if strings.HasPrefix(label, rbac.PrtbOwnerLabel) {
-				crbOwnedByAnotherPRTB = true
-				break
-			}
-		}
-		// In the case where it is shared, only update the CRB with the ownership label removed
-		if crbOwnedByAnotherPRTB {
-			if _, err = p.crbClient.Update(&crb); err != nil {
-				returnError = errors.Join(returnError, fmt.Errorf("failed to update cluster role binding %s: %w", crb.Name, err))
-			}
-			continue
-		}
-
-		// If there are no other owners, delete the CRB
-		returnError = errors.Join(returnError, rbac.DeleteResource(crb.Name, p.crbClient))
-	}
-	return returnError
-}
-*/
 // reconcileClusterRoleBindings handles the promoted and namespace Cluster Role Bindings for a PRTB.
 // Promoted CRBs are for any rules that are non-namespace scoped that are given by the PRTB.
 // Namespace CRBs are to give the user either edit or read-only access to the namespaces within the project. Primarily used by the UI.

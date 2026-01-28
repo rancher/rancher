@@ -55,14 +55,6 @@ func (c *crtbHandler) OnChange(key string, crtb *v3.ClusterRoleTemplateBinding) 
 		return nil, nil
 	}
 
-	/*
-		if !features.AggregatedRoleTemplates.Enabled() {
-			err := c.deleteBindings(crtb, &crtb.Status.RemoteConditions)
-			// Don't update status. Only the active controller should update the status of the crtb.
-			return crtb, err
-		}
-	*/
-
 	// Only run this controller if the CRTB is for this cluster
 	if crtb.ClusterName != c.clusterName {
 		return nil, nil

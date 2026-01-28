@@ -46,8 +46,6 @@ func registerIndexers(scaledContext *config.ScaledContext) error {
 		return err
 	}
 
-	//roletemplates.RegisterIndexers(scaledContext.Wrangler)
-
 	v3cluster.RegisterIndexers(scaledContext)
 	return nil
 }
