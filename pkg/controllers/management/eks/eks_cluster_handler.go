@@ -160,7 +160,9 @@ func (e *eksOperatorController) onClusterChange(key string, cluster *mgmtv3.Clus
 	// check for changes between EKS spec on cluster and the EKS spec on the EKSClusterConfig object
 	if !reflect.DeepEqual(eksClusterConfigMap, eksClusterConfigDynamic.Object["spec"]) {
 		if isEKSConfigSyncDisabled(cluster) {
-			logrus.Infof("sync disabled for cluster [%s], skipping EKSClusterConfig update due to %s", cluster.Name, disableEKSConfigSyncAnnotation)
+			// When disabled, treat drift between Cluster.spec and EKSClusterConfig.spec as expected and do not
+			// attempt to reconcile AWS via EKSClusterConfig updates.
+			logrus.Debugf("sync disabled for cluster [%s], skipping EKSClusterConfig update due to %s", cluster.Name, disableEKSConfigSyncAnnotation)
 		} else {
 			logrus.Infof("change detected for cluster [%s], updating EKSClusterConfig", cluster.Name)
 			return e.updateEKSClusterConfig(cluster, eksClusterConfigDynamic, eksClusterConfigMap)
