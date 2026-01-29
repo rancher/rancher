@@ -66,7 +66,7 @@ RKE2_LINUX_RUNTIME_IMAGES=(
   "rancher/rke2-runtime:v1.30.13-rke2r1-linux-arm64"
   "rancher/rke2-runtime:v1.30.14-rke2r1-linux-arm64"
   "rancher/rke2-runtime:v1.30.14-rke2r2-linux-arm64"
-  "rancher/rke2-runtime:v1.30.9-rke2r1-linux-arm"
+  "rancher/rke2-runtime:v1.30.9-rke2r1-linux-arm64"
   "rancher/rke2-runtime:v1.31.10-rke2r1-linux-arm64"
   "rancher/rke2-runtime:v1.31.11-rke2r1-linux-arm64"
   "rancher/rke2-runtime:v1.31.12-rke2r1-linux-arm64"
