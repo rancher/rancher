@@ -7,6 +7,7 @@ import (
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/oidc"
+	baseoidc "github.com/rancher/rancher/pkg/auth/providers/oidc"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -321,6 +322,7 @@ func TestGenOIDCProvider_TransformToAuthProvider(t *testing.T) {
 		{
 			name: "Test with valid authConfig",
 			authConfig: map[string]any{
+				"metadata":     map[string]any{"name": "genericoidc"},
 				"clientId":     "client123",
 				"rancherUrl":   "https://example.com/callback",
 				"scope":        "openid profile email",
@@ -328,7 +330,28 @@ func TestGenOIDCProvider_TransformToAuthProvider(t *testing.T) {
 				"authEndpoint": "https://ranchertest.io/auth",
 			},
 			expected: map[string]any{
+				"id":                 "genericoidc",
 				"redirectUrl":        "https://ranchertest.io/auth?client_id=client123&response_type=code&redirect_uri=https://example.com/callback",
+				"scopes":             "openid profile email",
+				"logoutAllSupported": false,
+				"logoutAllEnabled":   false,
+				"logoutAllForced":    false,
+			},
+		},
+		{
+			name: "When configuration has acrValue",
+			authConfig: map[string]any{
+				"metadata":     map[string]any{"name": "genericoidc"},
+				"clientId":     "client123",
+				"rancherUrl":   "https://example.com/callback",
+				"scope":        "openid profile email",
+				"issuer":       "https://ranchertest.io/issuer",
+				"authEndpoint": "https://ranchertest.io/auth",
+				"acrValue":     "testing",
+			},
+			expected: map[string]any{
+				"id":                 "genericoidc",
+				"redirectUrl":        "https://ranchertest.io/auth?client_id=client123&response_type=code&redirect_uri=https://example.com/callback&acr_values=testing",
 				"scopes":             "openid profile email",
 				"logoutAllSupported": false,
 				"logoutAllEnabled":   false,
@@ -337,20 +360,16 @@ func TestGenOIDCProvider_TransformToAuthProvider(t *testing.T) {
 		},
 	}
 
-	provider := &GenOIDCProvider{}
+	provider := &GenOIDCProvider{
+		baseoidc.OpenIDCProvider{},
+	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			result, err := provider.TransformToAuthProvider(test.authConfig)
-			if err != nil {
-				t.Errorf("TransformToAuthProvider() returned an error: %v", err)
-			}
-
-			if !reflect.DeepEqual(result, test.expected) {
-				t.Errorf("TransformToAuthProvider() returned %+v, expected %+v", result, test.expected)
-			}
+			assert.NoError(t, err)
+			assert.Equal(t, test.expected, result)
 		})
 	}
 }

@@ -362,11 +362,11 @@ func TestGetUserInfoFromAuthCode(t *testing.T) {
 				Name:     providerName,
 				TokenMgr: test.tokenManagerMock(oidcResp.token),
 			}
-			ctx := context.TODO()
 			claimInfo := &ClaimInfo{}
 
-			userInfo, token, idToken, err := o.getUserInfoFromAuthCode(ctx, test.config(port), test.authCode, claimInfo, userId)
-
+			rw := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, "https://localhost:"+port, nil)
+			userInfo, token, idToken, err := o.getUserInfoFromAuthCode(rw, req, test.config(port), test.authCode, claimInfo, userId)
 			if test.expectedErrorMessage != "" {
 				assert.ErrorContains(t, err, test.expectedErrorMessage)
 			} else {
@@ -999,6 +999,58 @@ type providerJSON struct {
 	Algorithms    []string `json:"id_token_signing_alg_values_supported"`
 }
 
+func TestTransformToAuthProvider(t *testing.T) {
+	tests := map[string]struct {
+		beforeAuthConfig map[string]any
+		want             map[string]any
+	}{
+		"with no API Host": {
+			beforeAuthConfig: map[string]any{
+				"metadata": map[string]any{
+					"name": "genericoidc",
+				},
+				"clientId":     "rancher",
+				"rancherUrl":   "https://localhost:9443/verify-auth",
+				"authEndpoint": "https://example.com/realms/rancher/protocol/openid-connect/auth",
+			},
+			want: map[string]any{
+				"id":                 "genericoidc",
+				"logoutAllEnabled":   false,
+				"logoutAllForced":    false,
+				"logoutAllSupported": false,
+				"redirectUrl":        "https://example.com/realms/rancher/protocol/openid-connect/auth?client_id=rancher&response_type=code&redirect_uri=https://localhost:9443/verify-auth",
+			},
+		},
+		"with an API Host configured": {
+			beforeAuthConfig: map[string]any{
+				"metadata": map[string]any{
+					"name": "genericoidc",
+				},
+				"rancherApiHost": "https://example.com",
+				"clientId":       "rancher",
+				"rancherUrl":     "https://localhost:9443/verify-auth",
+				"authEndpoint":   "https://example.com/realms/rancher/protocol/openid-connect/auth",
+			},
+			want: map[string]any{
+				"id":                 "genericoidc",
+				"logoutAllEnabled":   false,
+				"logoutAllForced":    false,
+				"logoutAllSupported": false,
+				"redirectUrl":        "https://example.com/v1-oidc/genericoidc",
+			},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			p := OpenIDCProvider{}
+			transformed, err := p.TransformToAuthProvider(tt.beforeAuthConfig)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want, transformed)
+		})
+	}
+}
+
 // expiryIn is calculated inside the oauth2 library using time.Now, so we just compare the token is equal
 type tokenMatcher struct {
 	accessToken string
@@ -1024,4 +1076,97 @@ func (m tokenMatcher) String() string {
 
 func EqToken(accessToken string) gomock.Matcher {
 	return tokenMatcher{accessToken}
+}
+
+func TestGetOIDCRedirectionURL(t *testing.T) {
+	testCases := []struct {
+		name                string
+		config              map[string]any
+		pkceVerifier        string
+		expectedURL         string
+		verifyPKCEChallenge bool
+	}{
+		{
+			name: "Basic URL without PKCE",
+			config: map[string]any{
+				"authEndpoint": "https://provider.example.com/auth",
+				"clientId":     "test-client-id",
+				"rancherUrl":   "https://rancher.example.com/callback",
+			},
+			pkceVerifier: "",
+			expectedURL:  "https://provider.example.com/auth?client_id=test-client-id&response_type=code&redirect_uri=https://rancher.example.com/callback",
+		},
+		{
+			name: "With PKCE S256 method",
+			config: map[string]any{
+				"authEndpoint": "https://provider.example.com/auth",
+				"clientId":     "test-client-id",
+				"rancherUrl":   "https://rancher.example.com/callback",
+				"pkceMethod":   "S256",
+			},
+			pkceVerifier:        "test-verifier-12345",
+			verifyPKCEChallenge: true,
+		},
+		{
+			name: "With PKCE plain method but no verifier provided",
+			config: map[string]any{
+				"authEndpoint": "https://provider.example.com/auth",
+				"clientId":     "test-client-id",
+				"rancherUrl":   "https://rancher.example.com/callback",
+				"pkceMethod":   "plain",
+			},
+			pkceVerifier: "",
+			expectedURL:  "https://provider.example.com/auth?client_id=test-client-id&response_type=code&redirect_uri=https://rancher.example.com/callback",
+		},
+		{
+			name: "With PKCE S256 method configured but no verifier provided",
+			config: map[string]any{
+				"authEndpoint": "https://provider.example.com/auth",
+				"clientId":     "test-client-id",
+				"rancherUrl":   "https://rancher.example.com/callback",
+				"pkceMethod":   "S256",
+			},
+			pkceVerifier: "",
+			expectedURL:  "https://provider.example.com/auth?client_id=test-client-id&response_type=code&redirect_uri=https://rancher.example.com/callback",
+		},
+		{
+			name: "With invalid PKCE method does not add PKCE params",
+			config: map[string]any{
+				"authEndpoint": "https://provider.example.com/auth",
+				"clientId":     "test-client-id",
+				"rancherUrl":   "https://rancher.example.com/callback",
+				"pkceMethod":   "invalid-method",
+			},
+			pkceVerifier: "test-verifier-12345",
+			expectedURL:  "https://provider.example.com/auth?client_id=test-client-id&response_type=code&redirect_uri=https://rancher.example.com/callback",
+		},
+		{
+			name: "With special characters in URLs",
+			config: map[string]any{
+				"authEndpoint": "https://provider.example.com/auth?extra=param",
+				"clientId":     "test-client-id",
+				"rancherUrl":   "https://rancher.example.com/callback?state=xyz",
+			},
+			pkceVerifier: "",
+			expectedURL:  "https://provider.example.com/auth?extra=param?client_id=test-client-id&response_type=code&redirect_uri=https://rancher.example.com/callback?state=xyz",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			values := &orderedValues{}
+			result := GetOIDCRedirectionURL(tc.config, tc.pkceVerifier, values)
+
+			if tc.verifyPKCEChallenge {
+				assert.Contains(t, result, "client_id=test-client-id")
+				assert.Contains(t, result, "response_type=code")
+				assert.Contains(t, result, "code_challenge=")
+				assert.Contains(t, result, "code_challenge_method=S256")
+				assert.Contains(t, result, "redirect_uri=https://rancher.example.com/callback")
+				assert.True(t, strings.HasPrefix(result, "https://provider.example.com/auth?"))
+			} else {
+				assert.Equal(t, tc.expectedURL, result)
+			}
+		})
+	}
 }

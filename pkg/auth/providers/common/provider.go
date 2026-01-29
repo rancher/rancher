@@ -9,7 +9,8 @@ import (
 )
 
 const (
-	// UserAttributePrincipalID is a key in the ExtraByProvider field of the UserAttribute that holds principal IDs for a partucular provider.
+	// UserAttributePrincipalID is a key in the ExtraByProvider field of the
+	// UserAttribute that holds principal IDs for a particular provider.
 	UserAttributePrincipalID = "principalid"
 	// UserAttributeUserName is a key in the ExtraByProvider field of the UserAttribute that holds usernames for a partucular provider.
 	UserAttributeUserName = "username"

@@ -115,9 +115,18 @@ func (g *GenOIDCProvider) GetPrincipal(principalID string, token accessor.TokenA
 
 // TransformToAuthProvider yields information used, typically by the UI, to be able to form URLs used to perform login.
 func (g *GenOIDCProvider) TransformToAuthProvider(authConfig map[string]any) (map[string]any, error) {
-	p := common.TransformToAuthProvider(authConfig)
-	p[publicclient.GenericOIDCProviderFieldRedirectURL] = g.getRedirectURL(authConfig)
+	p, err := g.OpenIDCProvider.TransformToAuthProvider(authConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to transform auth config: %w", err)
+	}
+
+	if authConfig["acrValue"] != nil {
+		redirectURL := p[publicclient.GenericOIDCProviderFieldRedirectURL].(string)
+		p[publicclient.GenericOIDCProviderFieldRedirectURL] = redirectURL + fmt.Sprintf("&acr_values=%s", authConfig["acrValue"])
+	}
+
 	p[publicclient.GenericOIDCProviderFieldScopes] = authConfig["scope"]
+
 	return p, nil
 }
 
@@ -136,24 +145,6 @@ func (g *GenOIDCProvider) groupToPrincipal(groupName string) apiv3.Principal {
 		PrincipalType: GroupType,
 		Me:            false,
 	}
-}
-
-// getRedirectURL uses the AuthConfig map to build-up the redirect URL passed to the OIDC provider at login-time.
-func (g *GenOIDCProvider) getRedirectURL(config map[string]any) string {
-	authURL, _ := baseoidc.FetchAuthURL(config)
-
-	redirectURL := fmt.Sprintf(
-		"%s?client_id=%s&response_type=code&redirect_uri=%s",
-		authURL,
-		config["clientId"],
-		config["rancherUrl"],
-	)
-
-	if config["acrValue"] != nil {
-		redirectURL += fmt.Sprintf("&acr_values=%s", config["acrValue"])
-	}
-
-	return redirectURL
 }
 
 // toPrincipalFromToken uses additional information about the principal found in the token, if available, to provide
