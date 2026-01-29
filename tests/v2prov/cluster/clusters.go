@@ -186,7 +186,7 @@ func WaitForCreate(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 						if mp.Quantity != nil {
 							mpQuantityMatches = *mp.Quantity == *md.Spec.Replicas
 						}
-						return mpQuantityMatches && md.Status.Phase == "Running" && capr.Ready.IsTrue(md), nil
+						return mpQuantityMatches && md.Status.Phase == "Running" && capr.MachineDeploymentMachinesReadyCondition.IsTrue(md), nil
 					}
 				}
 				return false, nil
