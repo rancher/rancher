@@ -120,7 +120,7 @@ func Test_Operation_SetB_MP_EtcdSnapshotOperationsWithThreeEtcdNodesOnNewNode(t 
 		t.Fatal(err)
 	}
 
-	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.Name, cm, 3)
+	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.Name, cm, 3, rkev1.RestoreRKEConfigNone)
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	assert.NoError(t, err)
 }
