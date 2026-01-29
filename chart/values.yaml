@@ -36,7 +36,7 @@ auditLog:
   image:
     # Optional: Image-specific registry override
     # registry: ""
-    repository: "rancher/mirrored-bci-micro"
+    repository: "docker.io/rancher/mirrored-bci-micro"
     tag: 15.6.24.2
     # Optional: Image-specific pullPolicy Override
     # options: Always, Never, IfNotPresent
@@ -164,7 +164,7 @@ noProxy: 127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,.svc,.cluster.local
 image:
   # Optional: Image-specific registry override
   # registry: ""
-  repository: rancher/rancher
+  repository: docker.io/rancher/rancher
   # Defaults to .Chart.appVersion
   # rancher/rancher image tag. https://hub.docker.com/r/rancher/rancher/tags/
   tag: ""
@@ -233,7 +233,7 @@ postDelete:
   image:
     # Optional: Image-specific registry override
     # registry: ""
-    repository: %POST_DELETE_IMAGE_NAME%
+    repository: docker.io/%POST_DELETE_IMAGE_NAME%
     tag: %POST_DELETE_IMAGE_TAG%
     # Optional: Image-specific pullPolicy Override
     # options: Always, Never, IfNotPresent
@@ -251,7 +251,7 @@ preUpgrade:
   image:
     # Optional: Image-specific registry override
     # registry: ""
-    repository: %PRE_UPGRADE_IMAGE_NAME%
+    repository: docker.io/%PRE_UPGRADE_IMAGE_NAME%
     tag: %PRE_UPGRADE_IMAGE_TAG%
     # Optional: Image-specific pull policy override
     # pullPolicy: "Always"
