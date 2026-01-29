@@ -13,9 +13,10 @@ import (
 	cond "github.com/rancher/norman/condition"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/controllers/managementagent/podresources"
 	"github.com/rancher/rancher/pkg/controllers/managementlegacy/compose/common"
-	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -724,10 +725,10 @@ func (m *nodesSyncer) isClusterRestoring() (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		if capiCluster.Spec.ControlPlaneRef.Kind != "RKEControlPlane" || capiCluster.Spec.ControlPlaneRef.APIVersion != "rke.cattle.io/v1" {
+		if capiCluster.Spec.ControlPlaneRef.Kind != "RKEControlPlane" || capiCluster.Spec.ControlPlaneRef.APIGroup != capr.RKEAPIGroup {
 			return false, nil
 		}
-		controlplane, err := m.rkeControlPlaneCache.Get(capiCluster.Spec.ControlPlaneRef.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
+		controlplane, err := m.rkeControlPlaneCache.Get(capiCluster.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
 		if err != nil {
 			return false, err
 		}

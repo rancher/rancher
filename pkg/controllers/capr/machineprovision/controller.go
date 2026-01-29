@@ -12,7 +12,7 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
-	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	ranchercontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -39,7 +39,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	"k8s.io/utils/ptr"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	capierrors "sigs.k8s.io/cluster-api/errors"
 	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
 )
@@ -409,7 +410,7 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 
 	// If the controller owner reference is not properly configured, or the CAPI machine does not exist, there is no way
 	// to recover from this situation, so we should proceed with deletion
-	if machine == nil || machine.Status.NodeRef == nil {
+	if machine == nil || !machine.Status.NodeRef.IsDefined() {
 		// Machine noderef is nil, we should just allow deletion.
 		logrus.Debugf("[machineprovision] There was no associated K8s node with this machine %s. Proceeding with deletion", key)
 		return h.doRemove(infra)
@@ -556,7 +557,7 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 		return obj, generic.ErrSkip
 	}
 
-	if !capiCluster.Status.InfrastructureReady {
+	if !ptr.Deref(capiCluster.Status.Initialization.InfrastructureProvisioned, false) {
 		logrus.Debugf("[machineprovision] %s/%s: waiting: CAPI cluster infrastructure is not ready", infra.meta.GetNamespace(), infra.meta.GetName())
 		h.EnqueueAfter(infra, 10*time.Second)
 		return obj, generic.ErrSkip

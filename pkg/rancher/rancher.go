@@ -162,6 +162,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	}
 
 	if opts.Embedded {
+		logrus.Debugf("Rancher is running in embedded mode")
 		if err := setupRancherService(ctx, restConfig, opts.HTTPSListenPort); err != nil {
 			return nil, err
 		}

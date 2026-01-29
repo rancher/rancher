@@ -195,7 +195,7 @@ func (m *Manager) installCharts(charts map[desiredKey]map[string]interface{}, ta
 	for key, values := range charts {
 		for {
 			if err := m.install(key.namespace, key.chartName, key.releaseName, key.minVersion, key.exactVersion, values, takeOwnership, key.installImageOverride); err == repo.ErrNoChartName || apierrors.IsNotFound(err) {
-				logrus.Errorf("Failed to find system chart %s will try again in 5 seconds: %v", key.chartName, err)
+				logrus.Errorf("System chart %s not ready yet (this is normal during startup or catalog refresh), will retry in 5 seconds: %v", key.chartName, err)
 				time.Sleep(5 * time.Second)
 				continue
 			} else if err != nil {

@@ -9,7 +9,7 @@ import (
 	"github.com/rancher/lasso/pkg/dynamic"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
-	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	ranchercontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
@@ -23,8 +23,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/utils/ptr"
+	"sigs.k8s.io/cluster-api/controllers/external"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -38,6 +40,8 @@ type handler struct {
 	rkeBootstrap        rkecontroller.RKEBootstrapController
 	kubeconfigManager   *kubeconfig.Manager
 	dynamic             *dynamic.Controller
+	client              client.Client
+	context             context.Context
 }
 
 func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigManager *kubeconfig.Manager) {
@@ -48,6 +52,8 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigMana
 		rkeBootstrap:        clients.RKE.RKEBootstrap(),
 		kubeconfigManager:   kubeconfigManager,
 		dynamic:             clients.Dynamic,
+		client:              clients.Client,
+		context:             ctx,
 	}
 
 	clients.RKE.RKEBootstrap().OnChange(ctx, "machine-node-lookup", h.associateMachineWithNode)
@@ -60,7 +66,7 @@ func (h *handler) associateMachineWithNode(_ string, bootstrap *rkev1.RKEBootstr
 		return bootstrap, nil
 	}
 
-	if !bootstrap.Status.Ready || bootstrap.Status.DataSecretName == nil || *bootstrap.Status.DataSecretName == "" {
+	if !ptr.Deref(bootstrap.Status.Initialization.DataSecretCreated, false) || bootstrap.Status.DataSecretName == nil || *bootstrap.Status.DataSecretName == "" {
 		return bootstrap, nil
 	}
 
@@ -72,16 +78,15 @@ func (h *handler) associateMachineWithNode(_ string, bootstrap *rkev1.RKEBootstr
 		return bootstrap, err
 	}
 
-	if machine.Spec.ProviderID != nil && *machine.Spec.ProviderID != "" {
+	if machine.Spec.ProviderID != "" {
 		// If the machine already has its provider ID set, then we do not need to continue
 		return bootstrap, nil
 	}
-
-	gvk := schema.FromAPIVersionAndKind(machine.Spec.InfrastructureRef.APIVersion, machine.Spec.InfrastructureRef.Kind)
-	infra, err := h.dynamic.Get(gvk, machine.Namespace, machine.Spec.InfrastructureRef.Name)
-	if apierror.IsNotFound(err) {
-		return bootstrap, nil
-	} else if err != nil {
+	infra, err := external.GetObjectFromContractVersionedRef(h.context, h.client, machine.Spec.InfrastructureRef, machine.Namespace)
+	if err != nil {
+		if apierror.IsNotFound(err) {
+			return bootstrap, nil
+		}
 		return bootstrap, err
 	}
 

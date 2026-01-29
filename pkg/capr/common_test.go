@@ -12,7 +12,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 // Implements ClusterCache
@@ -142,7 +142,7 @@ func TestFindOwnerCAPICluster(t *testing.T) {
 					OwnerReferences: []metav1.OwnerReference{
 						{
 							Kind:       "nil",
-							APIVersion: "cluster.x-k8s.io/v1beta1",
+							APIVersion: "cluster.x-k8s.io/v1beta2",
 							Controller: &[]bool{true}[0],
 						},
 					},
@@ -184,7 +184,7 @@ func TestFindOwnerCAPICluster(t *testing.T) {
 					OwnerReferences: []metav1.OwnerReference{
 						{
 							Kind:       "Cluster",
-							APIVersion: "cluster.x-k8s.io/v1beta1",
+							APIVersion: "cluster.x-k8s.io/v1beta2",
 							Controller: &[]bool{true}[0],
 						},
 					},

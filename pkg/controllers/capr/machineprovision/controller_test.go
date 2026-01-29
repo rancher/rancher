@@ -12,13 +12,15 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/data"
 	v1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/batch/v1"
 	ctrlfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	"k8s.io/utils/ptr"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	capierrors "sigs.k8s.io/cluster-api/errors"
 )
 
@@ -379,8 +381,10 @@ func TestOnChange(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			settings.DeleteMachineOnFailureAfter.Set(tc.setting)
+			_ = settings.DeleteMachineOnFailureAfter.Set(tc.setting)
 
+			logrus.Info("Running test case: ", tc.name)
+			logrus.Infof("setting DeleteMachineOnFailureAfter is %s", settings.DeleteMachineOnFailureAfter.Get())
 			dynamicControllerFake := dynamicControllerFake{}
 			h.dynamic = &dynamicControllerFake
 			h.jobs = tc.jobCache
@@ -413,8 +417,10 @@ func newCapiMachine(name, namespace string) *capi.Machine {
 		},
 		Spec: capi.MachineSpec{
 			Bootstrap: capi.Bootstrap{
-				ConfigRef: &corev1.ObjectReference{
-					APIVersion: "v1",
+				ConfigRef: capi.ContractVersionedObjectReference{
+					Kind:     "RKEBootstrap",
+					Name:     "testing",
+					APIGroup: "rke.cattle.io",
 				},
 				DataSecretName: &dataSecretName,
 			},
@@ -437,7 +443,9 @@ func newCluster(name, namespace string) *capi.Cluster {
 		},
 		Spec: capi.ClusterSpec{},
 		Status: capi.ClusterStatus{
-			InfrastructureReady: true,
+			Initialization: capi.ClusterInitializationStatus{
+				InfrastructureProvisioned: ptr.To(true),
+			},
 		},
 	}
 }
@@ -485,7 +493,7 @@ func newInfra(jobName string) *infraObject {
 // newTestInfraMachine creates an object that will be translated to a infraMachine on the OnChange function
 func newTestInfraMachine(withFailure bool) *unstructured.Unstructured {
 	objectData := map[string]interface{}{
-		"apiVersion": "infrastructure.cluster.x-k8s.io/v1beta1",
+		"apiVersion": "infrastructure.cluster.x-k8s.io/v1beta2",
 		"kind":       "InfraMachine",
 		"metadata": map[string]interface{}{
 			"namespace": "namespace",

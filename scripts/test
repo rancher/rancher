@@ -163,14 +163,15 @@ echo "Waiting up to 5 minutes for rancher-webhook deployment"
   --message "rancher-webhook was not available after {{elapsed}} seconds" `# Print this progress message` \
   "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-system deploy/rancher-webhook &>/dev/null"
 
-echo "Waiting up to 5 minutes for rancher-turtles deployment"
+# For testing purposes, turtles is disabled, rancher-provisioning-capi is used instead.
+echo "Waiting up to 5 minutes for capi-controller-manager deployment"
 ./scripts/retry \
   --timeout 300 `# Time out after 300 seconds (5 min)` \
   --sleep 2 `# Sleep for 2 seconds in between attempts` \
   --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
-  --message "rancher-turtles was not available after {{elapsed}} seconds" `# Print this progress message` \
-  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml get ns cattle-turtles-system &>/dev/null \
-    && kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-turtles-system deploy/rancher-turtles-controller-manager &>/dev/null"
+  --message "capi-controller-manager was not available after {{elapsed}} seconds" `# Print this progress message` \
+  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml get ns cattle-provisioning-capi-system &>/dev/null \
+    && kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-provisioning-capi-system deploy/capi-controller-manager &>/dev/null"
 
 #kill $TPID
 

@@ -1,6 +1,7 @@
 package rancher
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -28,9 +29,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/util/retry"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	"sigs.k8s.io/cluster-api/controllers/external"
 )
 
 const (
@@ -329,7 +330,7 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.CAPIContext)
 			allMachines := append(machines.Items, otherMachines.Items...)
 
 			for _, machine := range allMachines {
-				if machine.Spec.Bootstrap.ConfigRef == nil || machine.Spec.Bootstrap.ConfigRef.APIVersion != capr.RKEAPIVersion {
+				if !machine.Spec.Bootstrap.ConfigRef.IsDefined() || machine.Spec.Bootstrap.ConfigRef.APIGroup != capr.RKEAPIGroup {
 					continue
 				}
 
@@ -359,7 +360,7 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.CAPIContext)
 				}
 
 				if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-					bootstrap, err := w.RKE.RKEBootstrap().Get(machine.Spec.Bootstrap.ConfigRef.Namespace, machine.Spec.Bootstrap.ConfigRef.Name, metav1.GetOptions{})
+					bootstrap, err := w.RKE.RKEBootstrap().Get(machine.Namespace, machine.Spec.Bootstrap.ConfigRef.Name, metav1.GetOptions{})
 					if err != nil {
 						return err
 					}
@@ -379,39 +380,27 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.CAPIContext)
 					return err
 				}
 
-				if machine.Spec.InfrastructureRef.APIVersion == capr.RKEAPIVersion || machine.Spec.InfrastructureRef.APIVersion == capr.RKEMachineAPIVersion {
-					gv, err := schema.ParseGroupVersion(machine.Spec.InfrastructureRef.APIVersion)
+				if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+					infraMachine, err := external.GetObjectFromContractVersionedRef(context.TODO(), w.Client, machine.Spec.InfrastructureRef, machine.Namespace)
 					if err != nil {
-						// This error should not occur because RKEAPIVersion and RKEMachineAPIVersion are valid
-						continue
-					}
-
-					gvk := schema.GroupVersionKind{
-						Group:   gv.Group,
-						Version: gv.Version,
-						Kind:    machine.Spec.InfrastructureRef.Kind,
-					}
-					if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-						infraMachine, err := w.Dynamic.Get(gvk, machine.Spec.InfrastructureRef.Namespace, machine.Spec.InfrastructureRef.Name)
-						if err != nil {
-							return err
-						}
-
-						d, err := data.Convert(infraMachine.DeepCopyObject())
-						if err != nil {
-							return err
-						}
-
-						if changed, err := insertOrUpdateCondition(d, summary.NewCondition("Ready", "True", "", "")); err != nil {
-							return err
-						} else if changed {
-							_, err = w.Dynamic.UpdateStatus(&unstructured.Unstructured{Object: d})
-							return err
-						}
-						return err
-					}); err != nil {
 						return err
 					}
+
+					d, err := data.Convert(infraMachine.DeepCopyObject())
+					if err != nil {
+						return err
+					}
+
+					if changed, err := insertOrUpdateCondition(d, summary.NewCondition("Ready", "True", "", "")); err != nil {
+						return err
+					} else if changed {
+						_, err = w.Dynamic.UpdateStatus(&unstructured.Unstructured{Object: d})
+						return err
+					}
+					return err
+				}); err != nil {
+					logrus.Debugf("failed to update infrastructure machine %s/%s: %v - skipping infra machine update", machine.Namespace, machine.Spec.InfrastructureRef.Name, err)
+					return err
 				}
 			}
 		}
