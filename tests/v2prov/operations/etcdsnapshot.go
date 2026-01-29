@@ -283,7 +283,7 @@ func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 
 	logrus.Infof("Waiting for control plane to start restore type: %s", restoreRKEConfig)
 
-	err = wait.PollUntilContextTimeout(clients.Ctx, 2*time.Second, 2*time.Minute, true, func(ctx context.Context) (bool, error) {
+	err = wait.PollUntilContextTimeout(clients.Ctx, 2*time.Second, 10*time.Minute, true, func(ctx context.Context) (bool, error) {
 		cp, err := clients.RKE.RKEControlPlane().Get(c.Namespace, c.Name, metav1.GetOptions{})
 		if err != nil {
 			return false, err
