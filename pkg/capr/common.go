@@ -116,6 +116,9 @@ const (
 	InfrastructureReady          = condition.Cond(capi.InfrastructureReadyCondition)
 	SystemUpgradeControllerReady = condition.Cond("SystemUpgradeControllerReady")
 	Bootstrapped                 = condition.Cond("Bootstrapped")
+
+	MachineDeploymentMachinesReadyCondition = condition.Cond(capi.MachineDeploymentMachinesReadyCondition)
+
 	// ClusterAutoscalerDeploymentReady is a condition that indicates whether the cluster autoscaler deployment is ready
 	ClusterAutoscalerDeploymentReady = condition.Cond("ClusterAutoscalerDeploymentReady")
 
