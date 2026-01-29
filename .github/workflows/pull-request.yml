@@ -3,9 +3,8 @@ on:
   pull_request:
     paths-ignore:
       # omit tests from triggering CI except when CI tests are changed
-      - 'tests/v2/codecoverage/**'
-      - 'tests/validation/**'
-      - 'README.md'
+      - "tests/v2/codecoverage/**"
+      - "tests/validation/**"
 
 env:
   ARCH: amd64
