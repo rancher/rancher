@@ -338,5 +338,5 @@ func (ih *impersonationHandler) deleteServiceAccountImpersonator(clusterName, us
 	if apierrors.IsNotFound(err) {
 		return nil
 	}
-	return err
+	return fmt.Errorf("failed to delete service account impersonator role %s: %w", roleName, err)
 }

@@ -288,7 +288,7 @@ func (c *crtbHandler) deleteDownstreamResources(crtb *v3.ClusterRoleTemplateBind
 		logrus.Infof("Cluster %s not found when deleting downstream resources for CRTB %s. Not re-queuing.", clusterName, crtb.Name)
 		return nil
 	} else if err != nil {
-		return err
+		return fmt.Errorf("failed to get cluster %s: %w", clusterName, err)
 	}
 
 	userContext, err := c.clusterManager.UserContext(cluster.Name)
@@ -310,16 +310,16 @@ func (c *crtbHandler) deleteDownstreamClusterRoleBindings(crtb *v3.ClusterRoleTe
 	condition := metav1.Condition{Type: deleteClusterRoleBindings}
 
 	// Get all ClusterRoleBindings owned by this CRTB.
-	set := labels.Set(map[string]string{
+	set := labels.Set{
 		rbac.GetCRTBOwnerLabel(crtb.Name): "true",
 		rbac.AggregationFeatureLabel:      "true",
-	})
+	}
 	lo := metav1.ListOptions{LabelSelector: set.AsSelector().String()}
 
 	crbs, err := crbController.List(lo)
 	if err != nil {
 		c.s.AddCondition(&crtb.Status.LocalConditions, condition, failureToListClusterRoleBindings, err)
-		return err
+		return fmt.Errorf("failed to list ClusterRoleBindings for CRTB %s: %w", crtb.Name, err)
 	}
 
 	var returnError error

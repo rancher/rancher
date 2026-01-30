@@ -97,13 +97,13 @@ func (p *prtbHandler) OnRemove(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 // deleteRoleBindings deletes all Role Bindings in the project namespace made by the PRTB.
 func (p *prtbHandler) deleteRoleBindings(prtb *v3.ProjectRoleTemplateBinding) error {
 	// Collect all RoleBindings owned by this ProjectRoleTemplateBinding
-	set := labels.Set(map[string]string{
+	set := labels.Set{
 		rbac.GetPRTBOwnerLabel(prtb.Name): "true",
 		rbac.AggregationFeatureLabel:      "true",
-	})
+	}
 	currentRBs, err := p.rbController.List(prtb.Namespace, metav1.ListOptions{LabelSelector: set.AsSelector().String()})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to list role bindings in namespace %s: %w", prtb.Namespace, err)
 	}
 
 	var returnErr error
@@ -123,7 +123,7 @@ func (p *prtbHandler) deleteDownstreamResources(prtb *v3.ProjectRoleTemplateBind
 		logrus.Infof("Cluster %s not found when deleting downstream resources for PRTB %s. Not re-queuing.", clusterName, prtb.Name)
 		return nil
 	} else if err != nil {
-		return err
+		return fmt.Errorf("failed to get cluster %s: %w", clusterName, err)
 	}
 
 	userContext, err := p.clusterManager.UserContext(cluster.Name)
@@ -145,13 +145,13 @@ func (p *prtbHandler) deleteDownstreamResources(prtb *v3.ProjectRoleTemplateBind
 
 // deleteDownstreamRoleBindings deletes all Role Bindings in the downstream cluster made by the PRTB.
 func (p *prtbHandler) deleteDownstreamRoleBindings(prtb *v3.ProjectRoleTemplateBinding, rbController crbacv1.RoleBindingController) error {
-	set := labels.Set(map[string]string{
+	set := labels.Set{
 		rbac.GetPRTBOwnerLabel(prtb.Name): "true",
 		rbac.AggregationFeatureLabel:      "true",
-	})
+	}
 	currentRBs, err := rbController.List(metav1.NamespaceAll, metav1.ListOptions{LabelSelector: set.AsSelector().String()})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to list role bindings in downstream cluster for PRTB %s: %w", prtb.Name, err)
 	}
 
 	var returnErr error
@@ -164,13 +164,13 @@ func (p *prtbHandler) deleteDownstreamRoleBindings(prtb *v3.ProjectRoleTemplateB
 
 // deleteDownstreamClusterRoleBindings deletes all Cluster Role Bindings in the downstream cluster made by the PRTB.
 func (p *prtbHandler) deleteDownstreamClusterRoleBindings(prtb *v3.ProjectRoleTemplateBinding, crbController crbacv1.ClusterRoleBindingController) error {
-	set := labels.Set(map[string]string{
+	set := labels.Set{
 		rbac.GetPRTBOwnerLabel(prtb.Name): "true",
 		rbac.AggregationFeatureLabel:      "true",
-	})
+	}
 	currentCRBs, err := crbController.List(metav1.ListOptions{LabelSelector: set.AsSelector().String()})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to list cluster role bindings in downstream cluster for PRTB %s: %w", prtb.Name, err)
 	}
 
 	var returnErr error
