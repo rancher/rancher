@@ -75,10 +75,7 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 		return nil, err
 	}
 
-	channelserver, err := channelserver.NewHandler(ctx)
-	if err != nil {
-		return nil, err
-	}
+	channelserver := channelserver.NewHandler(ctx)
 
 	supportConfigGenerator := supportconfigs.NewHandler(scaledContext)
 	// Unauthenticated routes

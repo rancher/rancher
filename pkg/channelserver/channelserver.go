@@ -3,10 +3,10 @@ package channelserver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -52,31 +52,21 @@ func getChannelServerArg() string {
 }
 
 func Refresh(ctx context.Context) error {
-	var errs []string
+	var errs error
 	for _, runtime := range []string{"k3s", "rke2"} {
-		cfg, err := GetReleaseConfigByRuntime(ctx, runtime)
-		if err != nil {
-			logrus.Errorf("failed to get config for %s: %v", runtime, err)
-			errs = append(errs, fmt.Sprintf("%s: %v", runtime, err))
-			continue
-		}
+		cfg := GetReleaseConfigByRuntime(ctx, runtime)
 		if cfg == nil {
-			msg := fmt.Sprintf("no config found for %s", runtime)
-			logrus.Error(msg)
-			errs = append(errs, msg)
+			errs = errors.Join(errs, fmt.Errorf("no config found for %s", runtime))
 			continue
 		}
 		if err := cfg.LoadConfig(ctx); err != nil {
-			logrus.Errorf("failed to reload configuration for %s: %v", runtime, err)
-			errs = append(errs, fmt.Sprintf("%s: %v", runtime, err))
+			errs = errors.Join(errs, fmt.Errorf("failed to reload configuration for %s: %w", runtime, err))
 		} else {
 			logrus.Infof("reloaded configuration for %s", runtime)
 		}
 	}
-	if len(errs) > 0 {
-		return fmt.Errorf("refresh errors: %s", strings.Join(errs, "; "))
-	}
-	return nil
+
+	return errs
 }
 
 type DynamicSource struct{}
@@ -91,9 +81,9 @@ func GetReleaseConfigByRuntimeAndVersion(ctx context.Context, runtime, kubernete
 		AgentArgs:  map[string]schemas.Field{},
 		ServerArgs: map[string]schemas.Field{},
 	}
-	cfg, err := GetReleaseConfigByRuntime(ctx, runtime)
-	if err != nil {
-		logrus.Errorf("failed to get release config for %s: %v", runtime, err)
+	cfg := GetReleaseConfigByRuntime(ctx, runtime)
+	if cfg == nil {
+		logrus.Errorf("no release config for %s", runtime)
 		return fallBack
 	}
 	for _, releaseData := range cfg.ReleasesConfig().Releases {
@@ -110,8 +100,7 @@ func GetReleaseConfigByRuntimeAndVersion(ctx context.Context, runtime, kubernete
 	return fallBack
 }
 
-func GetReleaseConfigByRuntime(ctx context.Context, runtime string) (*config.Config, error) {
-	var initErr error
+func GetReleaseConfigByRuntime(ctx context.Context, runtime string) *config.Config {
 	configsInit.Do(func() {
 		urls := []config.Source{
 			&DynamicSource{},
@@ -123,36 +112,21 @@ func GetReleaseConfigByRuntime(ctx context.Context, runtime string) (*config.Con
 		}
 		for name, cfg := range configs {
 			if err := cfg.LoadConfig(ctx); err != nil {
-				initErr = fmt.Errorf("failed to load initial config for %s: %w", name, err)
-				return
+				logrus.Errorf("failed to load initial config for %s: %v", name, err)
 			}
 		}
 	})
-	if initErr != nil {
-		return nil, initErr
-	}
 
-	cfg, ok := configs[runtime]
-	if !ok {
-		return nil, fmt.Errorf("unsupported runtime: %s", runtime)
-	}
-
-	return cfg, nil
+	return configs[runtime]
 }
 
-func NewHandler(ctx context.Context) (http.Handler, error) {
-	k3sConfig, err := GetReleaseConfigByRuntime(ctx, "k3s")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get k3s config: %w", err)
-	}
-	rke2Config, err := GetReleaseConfigByRuntime(ctx, "rke2")
-	if err != nil {
-		return nil, fmt.Errorf("failed to get rke2 config: %w", err)
-	}
+func NewHandler(ctx context.Context) http.Handler {
+	k3sConfig := GetReleaseConfigByRuntime(ctx, "k3s")
+	rke2Config := GetReleaseConfigByRuntime(ctx, "rke2")
 	return server.NewHandler(map[string]*config.Config{
 		"v1-k3s-release":  k3sConfig,
 		"v1-rke2-release": rke2Config,
-	}), nil
+	})
 }
 
 func GetDefaultByRuntimeAndServerVersion(ctx context.Context, runtime, serverVersion string) string {
@@ -170,9 +144,9 @@ func getDefaultFromAppDefaultsByRuntimeAndServerVersion(ctx context.Context, run
 	if err != nil {
 		return "", fmt.Errorf("fails to parse the server version: %v", err)
 	}
-	config, err := GetReleaseConfigByRuntime(ctx, runtime)
-	if err != nil {
-		return "", fmt.Errorf("failed to get release config for %s: %w", runtime, err)
+	config := GetReleaseConfigByRuntime(ctx, runtime)
+	if config == nil {
+		return "", fmt.Errorf("no release config for %s", runtime)
 	}
 	appDefaults := config.AppDefaultsConfig().AppDefaults
 	if len(appDefaults) == 0 {
@@ -218,9 +192,9 @@ func getDefaultFromAppDefaultsByRuntimeAndServerVersion(ctx context.Context, run
 }
 
 func getDefaultFromChannel(ctx context.Context, runtime, channelName string) string {
-	config, err := GetReleaseConfigByRuntime(ctx, runtime)
-	if err != nil {
-		logrus.Errorf("failed to get release config for %s: %v", runtime, err)
+	config := GetReleaseConfigByRuntime(ctx, runtime)
+	if config == nil {
+		logrus.Errorf("no release config for %s", runtime)
 		return ""
 	}
 	for _, c := range config.ChannelsConfig().Channels {
