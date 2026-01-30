@@ -207,7 +207,6 @@ func TestReconcileGlobalRole(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
 			controllers := controllers{
 				crController: fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl),
 				crCache:      fake.NewMockNonNamespacedCacheInterface[*rbacv1.ClusterRole](ctrl),
@@ -337,7 +336,7 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 				c.rCache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil)
 
 				nsNotFound := apierrors.NewNotFound(schema.GroupResource{
-					Group:    rbacv1.GroupKind,
+					Group:    rbacv1.GroupName,
 					Resource: activeNamespace.Name,
 				}, "")
 
@@ -596,8 +595,6 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-
 			controllers := controllers{
 				nsCache:     fake.NewMockNonNamespacedCacheInterface[*corev1.Namespace](ctrl),
 				rCache:      fake.NewMockCacheInterface[*rbacv1.Role](ctrl),
@@ -684,7 +681,6 @@ func TestSetGRAsInProgress(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			grLifecycle := globalRoleLifecycle{}
@@ -874,7 +870,6 @@ func TestSetGRAsCompleted(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			grLifecycle := globalRoleLifecycle{}
@@ -954,7 +949,6 @@ func TestSetGRAsTerminating(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			grLifecycle := globalRoleLifecycle{}

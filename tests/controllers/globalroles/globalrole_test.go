@@ -6,8 +6,9 @@ import (
 	"testing"
 	"time"
 
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/auth/globalroles"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/status"
 	"github.com/rancher/rancher/pkg/multiclustermanager"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -86,7 +87,7 @@ func (s *GlobalRoleTestSuite) SetupSuite() {
 	globalroles.Register(s.ctx, s.managementContext, clusterManager)
 
 	// Start controllers
-	common.StartNormanControllers(s.ctx, s.T(), s.managementContext,
+	common.StartWranglerControllers(s.ctx, s.T(), s.managementContext.Wrangler,
 		schema.GroupVersionKind{
 			Group:   "management.cattle.io",
 			Version: "v3",
@@ -263,7 +264,7 @@ func (s *GlobalRoleTestSuite) TestCreateGlobalRole() {
 				assert.NotNil(c, gr.Status)
 
 				// Once status is completed, all necessary backing resources should have been created
-				assert.Equal(c, globalroles.SummaryCompleted, gr.Status.Summary)
+				assert.Equal(c, status.SummaryCompleted, gr.Status.Summary)
 			}, duration, tick)
 
 			// Check created Cluster Role

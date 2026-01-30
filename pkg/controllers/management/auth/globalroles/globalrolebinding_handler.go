@@ -104,10 +104,7 @@ type fleetPermissionsHandler interface {
 type globalRoleBindingLifecycle struct {
 	clusters                mgmtv3.ClusterClient
 	clusterLister           mgmtv3.ClusterCache
-	projectLister           mgmtv3.ProjectCache
 	clusterManager          *clustermanager.Manager
-	clusterRoles            wrbacv1.ClusterRoleClient
-	crLister                wrbacv1.ClusterRoleCache
 	crbClient               wrbacv1.ClusterRoleBindingClient
 	crbLister               wrbacv1.ClusterRoleBindingCache
 	crtbCache               mgmtv3.ClusterRoleTemplateBindingCache
@@ -116,8 +113,6 @@ type globalRoleBindingLifecycle struct {
 	grbLister               mgmtv3.GlobalRoleBindingCache
 	grbClient               mgmtv3.GlobalRoleBindingController
 	nsCache                 wcorev1.NamespaceCache
-	roles                   wrbacv1.RoleClient
-	roleLister              wrbacv1.RoleCache
 	roleBindings            wrbacv1.RoleBindingClient
 	roleBindingLister       wrbacv1.RoleBindingCache
 	fleetPermissionsHandler fleetPermissionsHandler

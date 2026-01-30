@@ -87,7 +87,7 @@ func (gr *globalRoleLifecycle) Create(obj *v3.GlobalRole) (runtime.Object, error
 	// ObjectMeta.Generation does not get updated when the Status is updated.
 	// If only the status has been updated and we have finished updating the status (status.Summary != "InProgress")
 	// we don't need to perform a reconcile as nothing has changed.
-	if obj.Status.ObservedGeneration == obj.ObjectMeta.Generation && obj.Status.Summary != status.SummaryCompleted {
+	if obj.Status.ObservedGeneration == obj.ObjectMeta.Generation && obj.Status.Summary != status.SummaryInProgress {
 		return obj, nil
 	}
 	returnError := errors.Join(

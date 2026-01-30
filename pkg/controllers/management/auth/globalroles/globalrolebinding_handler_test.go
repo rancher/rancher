@@ -376,7 +376,6 @@ func TestReconcileClusterPermissions(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
 			controllers := controllers{
 				grCache:        fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl),
 				crtbCache:      fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl),
@@ -689,7 +688,6 @@ func TestReconcileGlobalRoleBinding(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
 			controllers := controllers{
 				crbCache:      fake.NewMockNonNamespacedCacheInterface[*rbacv1.ClusterRoleBinding](ctrl),
 				crbController: fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList](ctrl),
@@ -972,8 +970,6 @@ func Test_reconcileNamespacedPermissions(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-
 			controllers := controllers{
 				grCache:      fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl),
 				nsCache:      fake.NewMockNonNamespacedCacheInterface[*corev1.Namespace](ctrl),
@@ -1182,8 +1178,6 @@ func Test_reconcileSubject(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
 			userManager := userMocks.NewMockManager(ctrl)
 			if tt.setupUserManager != nil {
 				tt.setupUserManager(userManager)
