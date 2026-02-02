@@ -120,6 +120,9 @@ func GetReleaseConfigByRuntime(ctx context.Context, runtime string) *config.Conf
 	return configs[runtime]
 }
 
+// NewHandler creates an HTTP handler for serving k3s and rke2 release metadata.
+// Note: Initial loading might fail, in which case the configs will have missing KDM data.
+// The handler gracefully handles this case by returning empty responses.
 func NewHandler(ctx context.Context) http.Handler {
 	k3sConfig := GetReleaseConfigByRuntime(ctx, "k3s")
 	rke2Config := GetReleaseConfigByRuntime(ctx, "rke2")
