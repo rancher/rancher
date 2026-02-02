@@ -9,6 +9,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/api/secrets"
 	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
+	"github.com/rancher/rancher/pkg/auth/providers/scim"
 	controllers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -85,6 +86,10 @@ func (s *Service) Run(config *v3.AuthConfig) error {
 
 	if err := s.deleteTokens(config); err != nil {
 		return fmt.Errorf("error cleaning up tokens associated with a disabled auth provider %s: %w", config.Name, err)
+	}
+
+	if err := scim.CleanupSecrets(s.secretsInterface, config.GetName()); err != nil {
+		return fmt.Errorf("error cleaning up SCIM token secrets associated with a disabled auth provider %s: %w", config.Name, err)
 	}
 
 	return nil
