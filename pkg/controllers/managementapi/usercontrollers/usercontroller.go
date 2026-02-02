@@ -92,9 +92,9 @@ func (u *userControllersController) sync(key string, cluster *v3.Cluster) (*v3.C
 		u.starter.Stop(cluster)
 	}
 	if err := u.starter.Start(u.ctx, cluster, u.isOwner(cluster)); err != nil {
-		action := "starting"
+		action := "start"
 		if restartNeeded {
-			action = "restarting"
+			action = "restart"
 		}
 		return nil, fmt.Errorf("userControllersController: unable to %s controllers for cluster %s: %w", action, key, err)
 	}
