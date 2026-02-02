@@ -46,9 +46,13 @@ func Register(ctx context.Context, scaledContext *config.ScaledContext, clusterM
 				Factor:   1,
 			}
 			if err := wait.ExponentialBackoffWithContext(ctx, backoff, func(ctx context.Context) (bool, error) {
-				return true, u.reconcileClusterOwnership()
+				if err := u.reconcileClusterOwnership(); err != nil {
+					logrus.Warnf("Failed to reconcile cluster ownership: %v, retrying...", err)
+					return false, nil
+				}
+				return true, nil
 			}); err != nil {
-				logrus.Errorf("failed syncing peers after %d attempts: %v", backoff.Steps, err)
+				logrus.Errorf("Giving up reconciling cluster ownership after %d attempts", backoff.Steps)
 			}
 		}
 	}()
