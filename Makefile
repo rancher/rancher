@@ -49,4 +49,4 @@ build-agent-tarball: buildx-machine
 $(DEV_TARGETS):
 	./dev-scripts/$@
 
-.PHONY: $(TARGETS) $(DEV_TARGETS) quick-agent quick-server quick-binary-server build-server
+.PHONY: $(TARGETS) $(DEV_TARGETS) quick-agent quick-server quick-binary-server build-server build-server-tarball build-agent build-agent-tarball
