@@ -3035,6 +3035,114 @@ func (s *steveAPITestSuite) TestList() {
 	}
 }
 
+func (s *steveAPITestSuite) TestNodes() {
+	client, err := rest.HTTPClientFor(s.client.WranglerContext.RESTConfig)
+	require.NoError(s.T(), err)
+	host := s.client.WranglerContext.RESTConfig.Host
+	placeholderBuf := bytes.NewBuffer([]byte{})
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://%s/v1/nodes", host), placeholderBuf)
+	require.NoError(s.T(), err)
+
+	resp, err := client.Do(req)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), http.StatusOK, resp.StatusCode)
+	defer resp.Body.Close()
+	buf := make([]byte, 1000000)
+	data2, err := resp.Body.Read(buf)
+	if err != nil && err != io.EOF {
+		require.NoError(s.T(), err)
+	}
+	require.True(s.T(), data2 <= 1000000-1)
+	buf2 := buf[0:data2]
+
+	// corev1.NodeList doesn't work because the json is more generic
+	// use raw rancher JSON because working with nodes is tough
+
+	var mapResp map[string]interface{}
+	err = json.Unmarshal(buf2, &mapResp)
+	require.NoError(s.T(), err)
+	count := mapResp["count"].(float64)
+	require.True(s.T(), count > 0)
+	data := mapResp["data"].([]any)
+	data0 := data[0].(map[string]interface{})
+	id := data0["id"].(string)
+
+	taintKeys := make([]string, 0)
+	addressTypes := make([]string, 0)
+	taints, ok := data0["spec"].(map[string]interface{})["taints"]
+	if ok {
+		for _, taint := range taints.([]map[string]interface{}) {
+			taintKeys = append(taintKeys, taint["key"].(string))
+		}
+	}
+	addresses, ok := data0["status"].(map[string]interface{})["addresses"]
+	if ok {
+		for _, address := range addresses.([]interface{}) {
+			addressTypes = append(addressTypes, address.(map[string]interface{})["type"].(string))
+		}
+	}
+
+	if len(taintKeys) > 0 {
+		testURL := fmt.Sprintf(`https://%s/v1/nodes?filter=spec.taints.key~"%s"`,
+			host, taintKeys[0])
+		req, err := http.NewRequest(http.MethodGet, testURL, placeholderBuf)
+		require.NoError(s.T(), err)
+
+		resp, err := client.Do(req)
+		if err != nil && err != io.EOF {
+			require.NoError(s.T(), err)
+		}
+		require.Equal(s.T(), http.StatusOK, resp.StatusCode)
+		defer resp.Body.Close()
+
+		data2, err := resp.Body.Read(buf)
+		if err != nil && err != io.EOF {
+			require.NoError(s.T(), err)
+		}
+		require.True(s.T(), data2 <= 1000000-1)
+		buf2 := buf[0:data2]
+
+		var mapResp map[string]interface{}
+		err = json.Unmarshal(buf2, &mapResp)
+		require.NoError(s.T(), err)
+		count := mapResp["count"].(float64)
+		require.Equal(s.T(), float64(1), count)
+		data := mapResp["data"].([]any)
+		data0 := data[0].(map[string]interface{})
+		require.Equal(s.T(), id, data0["id"].(string))
+	}
+
+	if len(addressTypes) > 0 {
+		testURL := fmt.Sprintf(`https://%s/v1/nodes?filter=status.addresses.type~"%s"`,
+			host, addressTypes[0])
+		req, err := http.NewRequest(http.MethodGet, testURL, placeholderBuf)
+		require.NoError(s.T(), err)
+
+		resp, err := client.Do(req)
+		if err != nil && err != io.EOF {
+			require.NoError(s.T(), err)
+		}
+		require.Equal(s.T(), http.StatusOK, resp.StatusCode)
+		defer resp.Body.Close()
+
+		data2, err := resp.Body.Read(buf)
+		if err != nil && err != io.EOF {
+			require.NoError(s.T(), err)
+		}
+		require.True(s.T(), data2 <= 1000000-1)
+		buf2 := buf[0:data2]
+
+		var mapResp map[string]interface{}
+		err = json.Unmarshal(buf2, &mapResp)
+		require.NoError(s.T(), err)
+		count := mapResp["count"].(float64)
+		require.Equal(s.T(), float64(1), count)
+		data := mapResp["data"].([]any)
+		data0 := data[0].(map[string]interface{})
+		require.Equal(s.T(), id, data0["id"].(string))
+	}
+}
+
 func getFileName(user, ns, query string) string {
 	if user == "" {
 		user = "none"
