@@ -21,9 +21,7 @@ import (
 
 func Test_Operation_SetA_MP_EtcdSnapshotCreationRestoreInPlace(t *testing.T) {
 	clients, err := clients.New()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer clients.Close()
 
 	// Initialize empty structures to prevent nil pointer issues during deep equality checks in controllers
@@ -76,17 +74,20 @@ func Test_Operation_SetA_MP_EtcdSnapshotCreationRestoreInPlace(t *testing.T) {
 		},
 	}
 
-	snapshot := operations.RunSnapshotCreateTest(t, clients, c, cm, machines.Items[0].Status.NodeRef.Name)
+	// Create 3 snapshots upfront - one for each restore type
+	// This avoids issues where snapshots get deleted after RestoreRKEConfigAll
+	snapshots := operations.RunSnapshotCreatesTest(t, clients, c, cm, machines.Items[0].Status.NodeRef.Name, 3)
+	require.Len(t, snapshots, 3, "expected 3 snapshots to be created")
 
-	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.Name, cm, 2, rkev1.RestoreRKEConfigAll)
+	operations.RunSnapshotRestoreTest(t, clients, c, snapshots[2].Name, cm, 2, rkev1.RestoreRKEConfigAll)
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	require.NoError(t, err)
 
-	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.Name, cm, 2, rkev1.RestoreRKEConfigKubernetesVersion)
+	operations.RunSnapshotRestoreTest(t, clients, c, snapshots[1].Name, cm, 2, rkev1.RestoreRKEConfigKubernetesVersion)
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	require.NoError(t, err)
 
-	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.Name, cm, 2, rkev1.RestoreRKEConfigNone)
+	operations.RunSnapshotRestoreTest(t, clients, c, snapshots[0].Name, cm, 2, rkev1.RestoreRKEConfigNone)
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	require.NoError(t, err)
 }
