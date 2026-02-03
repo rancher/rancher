@@ -22,94 +22,98 @@ limitations under the License.
 package openapi
 
 import (
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
+	telemetrycattleiov1 "github.com/rancher/rancher/pkg/apis/telemetry.cattle.io/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
+	version "k8s.io/apimachinery/pkg/version"
 	common "k8s.io/kube-openapi/pkg/common"
 	spec "k8s.io/kube-openapi/pkg/validation/spec"
 )
 
 func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 	return map[string]common.OpenAPIDefinition{
-		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.GroupMembershipRefreshRequest":       schema_pkg_apis_extcattleio_v1_GroupMembershipRefreshRequest(ref),
-		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.GroupMembershipRefreshRequestList":   schema_pkg_apis_extcattleio_v1_GroupMembershipRefreshRequestList(ref),
-		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.GroupMembershipRefreshRequestSpec":   schema_pkg_apis_extcattleio_v1_GroupMembershipRefreshRequestSpec(ref),
-		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.GroupMembershipRefreshRequestStatus": schema_pkg_apis_extcattleio_v1_GroupMembershipRefreshRequestStatus(ref),
-		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.Kubeconfig":                          schema_pkg_apis_extcattleio_v1_Kubeconfig(ref),
-		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.KubeconfigList":                      schema_pkg_apis_extcattleio_v1_KubeconfigList(ref),
-		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.KubeconfigSpec":                      schema_pkg_apis_extcattleio_v1_KubeconfigSpec(ref),
-		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.KubeconfigStatus":                    schema_pkg_apis_extcattleio_v1_KubeconfigStatus(ref),
-		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.PasswordChangeRequest":               schema_pkg_apis_extcattleio_v1_PasswordChangeRequest(ref),
-		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.PasswordChangeRequestList":           schema_pkg_apis_extcattleio_v1_PasswordChangeRequestList(ref),
-		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.PasswordChangeRequestSpec":           schema_pkg_apis_extcattleio_v1_PasswordChangeRequestSpec(ref),
-		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.PasswordChangeRequestStatus":         schema_pkg_apis_extcattleio_v1_PasswordChangeRequestStatus(ref),
-		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.SelfUser":                            schema_pkg_apis_extcattleio_v1_SelfUser(ref),
-		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.SelfUserList":                        schema_pkg_apis_extcattleio_v1_SelfUserList(ref),
-		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.SelfUserStatus":                      schema_pkg_apis_extcattleio_v1_SelfUserStatus(ref),
-		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.Token":                               schema_pkg_apis_extcattleio_v1_Token(ref),
-		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenList":                           schema_pkg_apis_extcattleio_v1_TokenList(ref),
-		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenPrincipal":                      schema_pkg_apis_extcattleio_v1_TokenPrincipal(ref),
-		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenSpec":                           schema_pkg_apis_extcattleio_v1_TokenSpec(ref),
-		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenStatus":                         schema_pkg_apis_extcattleio_v1_TokenStatus(ref),
-		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.UserActivity":                        schema_pkg_apis_extcattleio_v1_UserActivity(ref),
-		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.UserActivityList":                    schema_pkg_apis_extcattleio_v1_UserActivityList(ref),
-		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.UserActivitySpec":                    schema_pkg_apis_extcattleio_v1_UserActivitySpec(ref),
-		"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.UserActivityStatus":                  schema_pkg_apis_extcattleio_v1_UserActivityStatus(ref),
-		"github.com/rancher/rancher/pkg/apis/telemetry.cattle.io/v1.SecretRequest":                 schema_pkg_apis_telemetrycattleio_v1_SecretRequest(ref),
-		"github.com/rancher/rancher/pkg/apis/telemetry.cattle.io/v1.SecretRequestList":             schema_pkg_apis_telemetrycattleio_v1_SecretRequestList(ref),
-		"github.com/rancher/rancher/pkg/apis/telemetry.cattle.io/v1.SecretRequestSpec":             schema_pkg_apis_telemetrycattleio_v1_SecretRequestSpec(ref),
-		"github.com/rancher/rancher/pkg/apis/telemetry.cattle.io/v1.SecretRequestStatus":           schema_pkg_apis_telemetrycattleio_v1_SecretRequestStatus(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroup":                                            schema_pkg_apis_meta_v1_APIGroup(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroupList":                                        schema_pkg_apis_meta_v1_APIGroupList(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.APIResource":                                         schema_pkg_apis_meta_v1_APIResource(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.APIResourceList":                                     schema_pkg_apis_meta_v1_APIResourceList(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.APIVersions":                                         schema_pkg_apis_meta_v1_APIVersions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.ApplyOptions":                                        schema_pkg_apis_meta_v1_ApplyOptions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.Condition":                                           schema_pkg_apis_meta_v1_Condition(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.CreateOptions":                                       schema_pkg_apis_meta_v1_CreateOptions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.DeleteOptions":                                       schema_pkg_apis_meta_v1_DeleteOptions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.Duration":                                            schema_pkg_apis_meta_v1_Duration(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.FieldSelectorRequirement":                            schema_pkg_apis_meta_v1_FieldSelectorRequirement(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.FieldsV1":                                            schema_pkg_apis_meta_v1_FieldsV1(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.GetOptions":                                          schema_pkg_apis_meta_v1_GetOptions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.GroupKind":                                           schema_pkg_apis_meta_v1_GroupKind(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.GroupResource":                                       schema_pkg_apis_meta_v1_GroupResource(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.GroupVersion":                                        schema_pkg_apis_meta_v1_GroupVersion(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.GroupVersionForDiscovery":                            schema_pkg_apis_meta_v1_GroupVersionForDiscovery(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.GroupVersionKind":                                    schema_pkg_apis_meta_v1_GroupVersionKind(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.GroupVersionResource":                                schema_pkg_apis_meta_v1_GroupVersionResource(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.InternalEvent":                                       schema_pkg_apis_meta_v1_InternalEvent(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelector":                                       schema_pkg_apis_meta_v1_LabelSelector(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelectorRequirement":                            schema_pkg_apis_meta_v1_LabelSelectorRequirement(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.List":                                                schema_pkg_apis_meta_v1_List(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta":                                            schema_pkg_apis_meta_v1_ListMeta(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.ListOptions":                                         schema_pkg_apis_meta_v1_ListOptions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.ManagedFieldsEntry":                                  schema_pkg_apis_meta_v1_ManagedFieldsEntry(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.MicroTime":                                           schema_pkg_apis_meta_v1_MicroTime(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta":                                          schema_pkg_apis_meta_v1_ObjectMeta(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.OwnerReference":                                      schema_pkg_apis_meta_v1_OwnerReference(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.PartialObjectMetadata":                               schema_pkg_apis_meta_v1_PartialObjectMetadata(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.PartialObjectMetadataList":                           schema_pkg_apis_meta_v1_PartialObjectMetadataList(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.Patch":                                               schema_pkg_apis_meta_v1_Patch(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.PatchOptions":                                        schema_pkg_apis_meta_v1_PatchOptions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.Preconditions":                                       schema_pkg_apis_meta_v1_Preconditions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.RootPaths":                                           schema_pkg_apis_meta_v1_RootPaths(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.ServerAddressByClientCIDR":                           schema_pkg_apis_meta_v1_ServerAddressByClientCIDR(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.Status":                                              schema_pkg_apis_meta_v1_Status(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.StatusCause":                                         schema_pkg_apis_meta_v1_StatusCause(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.StatusDetails":                                       schema_pkg_apis_meta_v1_StatusDetails(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.Table":                                               schema_pkg_apis_meta_v1_Table(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.TableColumnDefinition":                               schema_pkg_apis_meta_v1_TableColumnDefinition(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.TableOptions":                                        schema_pkg_apis_meta_v1_TableOptions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.TableRow":                                            schema_pkg_apis_meta_v1_TableRow(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.TableRowCondition":                                   schema_pkg_apis_meta_v1_TableRowCondition(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.Time":                                                schema_pkg_apis_meta_v1_Time(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.Timestamp":                                           schema_pkg_apis_meta_v1_Timestamp(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.TypeMeta":                                            schema_pkg_apis_meta_v1_TypeMeta(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.UpdateOptions":                                       schema_pkg_apis_meta_v1_UpdateOptions(ref),
-		"k8s.io/apimachinery/pkg/apis/meta/v1.WatchEvent":                                          schema_pkg_apis_meta_v1_WatchEvent(ref),
-		"k8s.io/apimachinery/pkg/runtime.RawExtension":                                             schema_k8sio_apimachinery_pkg_runtime_RawExtension(ref),
-		"k8s.io/apimachinery/pkg/runtime.TypeMeta":                                                 schema_k8sio_apimachinery_pkg_runtime_TypeMeta(ref),
-		"k8s.io/apimachinery/pkg/runtime.Unknown":                                                  schema_k8sio_apimachinery_pkg_runtime_Unknown(ref),
-		"k8s.io/apimachinery/pkg/version.Info":                                                     schema_k8sio_apimachinery_pkg_version_Info(ref),
+		v1.GroupMembershipRefreshRequest{}.OpenAPIModelName():        schema_pkg_apis_extcattleio_v1_GroupMembershipRefreshRequest(ref),
+		v1.GroupMembershipRefreshRequestList{}.OpenAPIModelName():    schema_pkg_apis_extcattleio_v1_GroupMembershipRefreshRequestList(ref),
+		v1.GroupMembershipRefreshRequestSpec{}.OpenAPIModelName():    schema_pkg_apis_extcattleio_v1_GroupMembershipRefreshRequestSpec(ref),
+		v1.GroupMembershipRefreshRequestStatus{}.OpenAPIModelName():  schema_pkg_apis_extcattleio_v1_GroupMembershipRefreshRequestStatus(ref),
+		v1.Kubeconfig{}.OpenAPIModelName():                           schema_pkg_apis_extcattleio_v1_Kubeconfig(ref),
+		v1.KubeconfigList{}.OpenAPIModelName():                       schema_pkg_apis_extcattleio_v1_KubeconfigList(ref),
+		v1.KubeconfigSpec{}.OpenAPIModelName():                       schema_pkg_apis_extcattleio_v1_KubeconfigSpec(ref),
+		v1.KubeconfigStatus{}.OpenAPIModelName():                     schema_pkg_apis_extcattleio_v1_KubeconfigStatus(ref),
+		v1.PasswordChangeRequest{}.OpenAPIModelName():                schema_pkg_apis_extcattleio_v1_PasswordChangeRequest(ref),
+		v1.PasswordChangeRequestList{}.OpenAPIModelName():            schema_pkg_apis_extcattleio_v1_PasswordChangeRequestList(ref),
+		v1.PasswordChangeRequestSpec{}.OpenAPIModelName():            schema_pkg_apis_extcattleio_v1_PasswordChangeRequestSpec(ref),
+		v1.PasswordChangeRequestStatus{}.OpenAPIModelName():          schema_pkg_apis_extcattleio_v1_PasswordChangeRequestStatus(ref),
+		v1.SelfUser{}.OpenAPIModelName():                             schema_pkg_apis_extcattleio_v1_SelfUser(ref),
+		v1.SelfUserList{}.OpenAPIModelName():                         schema_pkg_apis_extcattleio_v1_SelfUserList(ref),
+		v1.SelfUserStatus{}.OpenAPIModelName():                       schema_pkg_apis_extcattleio_v1_SelfUserStatus(ref),
+		v1.Token{}.OpenAPIModelName():                                schema_pkg_apis_extcattleio_v1_Token(ref),
+		v1.TokenList{}.OpenAPIModelName():                            schema_pkg_apis_extcattleio_v1_TokenList(ref),
+		v1.TokenPrincipal{}.OpenAPIModelName():                       schema_pkg_apis_extcattleio_v1_TokenPrincipal(ref),
+		v1.TokenSpec{}.OpenAPIModelName():                            schema_pkg_apis_extcattleio_v1_TokenSpec(ref),
+		v1.TokenStatus{}.OpenAPIModelName():                          schema_pkg_apis_extcattleio_v1_TokenStatus(ref),
+		v1.UserActivity{}.OpenAPIModelName():                         schema_pkg_apis_extcattleio_v1_UserActivity(ref),
+		v1.UserActivityList{}.OpenAPIModelName():                     schema_pkg_apis_extcattleio_v1_UserActivityList(ref),
+		v1.UserActivitySpec{}.OpenAPIModelName():                     schema_pkg_apis_extcattleio_v1_UserActivitySpec(ref),
+		v1.UserActivityStatus{}.OpenAPIModelName():                   schema_pkg_apis_extcattleio_v1_UserActivityStatus(ref),
+		telemetrycattleiov1.SecretRequest{}.OpenAPIModelName():       schema_pkg_apis_telemetrycattleio_v1_SecretRequest(ref),
+		telemetrycattleiov1.SecretRequestList{}.OpenAPIModelName():   schema_pkg_apis_telemetrycattleio_v1_SecretRequestList(ref),
+		telemetrycattleiov1.SecretRequestSpec{}.OpenAPIModelName():   schema_pkg_apis_telemetrycattleio_v1_SecretRequestSpec(ref),
+		telemetrycattleiov1.SecretRequestStatus{}.OpenAPIModelName(): schema_pkg_apis_telemetrycattleio_v1_SecretRequestStatus(ref),
+		metav1.APIGroup{}.OpenAPIModelName():                         schema_pkg_apis_meta_v1_APIGroup(ref),
+		metav1.APIGroupList{}.OpenAPIModelName():                     schema_pkg_apis_meta_v1_APIGroupList(ref),
+		metav1.APIResource{}.OpenAPIModelName():                      schema_pkg_apis_meta_v1_APIResource(ref),
+		metav1.APIResourceList{}.OpenAPIModelName():                  schema_pkg_apis_meta_v1_APIResourceList(ref),
+		metav1.APIVersions{}.OpenAPIModelName():                      schema_pkg_apis_meta_v1_APIVersions(ref),
+		metav1.ApplyOptions{}.OpenAPIModelName():                     schema_pkg_apis_meta_v1_ApplyOptions(ref),
+		metav1.Condition{}.OpenAPIModelName():                        schema_pkg_apis_meta_v1_Condition(ref),
+		metav1.CreateOptions{}.OpenAPIModelName():                    schema_pkg_apis_meta_v1_CreateOptions(ref),
+		metav1.DeleteOptions{}.OpenAPIModelName():                    schema_pkg_apis_meta_v1_DeleteOptions(ref),
+		metav1.Duration{}.OpenAPIModelName():                         schema_pkg_apis_meta_v1_Duration(ref),
+		metav1.FieldSelectorRequirement{}.OpenAPIModelName():         schema_pkg_apis_meta_v1_FieldSelectorRequirement(ref),
+		metav1.FieldsV1{}.OpenAPIModelName():                         schema_pkg_apis_meta_v1_FieldsV1(ref),
+		metav1.GetOptions{}.OpenAPIModelName():                       schema_pkg_apis_meta_v1_GetOptions(ref),
+		metav1.GroupKind{}.OpenAPIModelName():                        schema_pkg_apis_meta_v1_GroupKind(ref),
+		metav1.GroupResource{}.OpenAPIModelName():                    schema_pkg_apis_meta_v1_GroupResource(ref),
+		metav1.GroupVersion{}.OpenAPIModelName():                     schema_pkg_apis_meta_v1_GroupVersion(ref),
+		metav1.GroupVersionForDiscovery{}.OpenAPIModelName():         schema_pkg_apis_meta_v1_GroupVersionForDiscovery(ref),
+		metav1.GroupVersionKind{}.OpenAPIModelName():                 schema_pkg_apis_meta_v1_GroupVersionKind(ref),
+		metav1.GroupVersionResource{}.OpenAPIModelName():             schema_pkg_apis_meta_v1_GroupVersionResource(ref),
+		metav1.InternalEvent{}.OpenAPIModelName():                    schema_pkg_apis_meta_v1_InternalEvent(ref),
+		metav1.LabelSelector{}.OpenAPIModelName():                    schema_pkg_apis_meta_v1_LabelSelector(ref),
+		metav1.LabelSelectorRequirement{}.OpenAPIModelName():         schema_pkg_apis_meta_v1_LabelSelectorRequirement(ref),
+		metav1.List{}.OpenAPIModelName():                             schema_pkg_apis_meta_v1_List(ref),
+		metav1.ListMeta{}.OpenAPIModelName():                         schema_pkg_apis_meta_v1_ListMeta(ref),
+		metav1.ListOptions{}.OpenAPIModelName():                      schema_pkg_apis_meta_v1_ListOptions(ref),
+		metav1.ManagedFieldsEntry{}.OpenAPIModelName():               schema_pkg_apis_meta_v1_ManagedFieldsEntry(ref),
+		metav1.MicroTime{}.OpenAPIModelName():                        schema_pkg_apis_meta_v1_MicroTime(ref),
+		metav1.ObjectMeta{}.OpenAPIModelName():                       schema_pkg_apis_meta_v1_ObjectMeta(ref),
+		metav1.OwnerReference{}.OpenAPIModelName():                   schema_pkg_apis_meta_v1_OwnerReference(ref),
+		metav1.PartialObjectMetadata{}.OpenAPIModelName():            schema_pkg_apis_meta_v1_PartialObjectMetadata(ref),
+		metav1.PartialObjectMetadataList{}.OpenAPIModelName():        schema_pkg_apis_meta_v1_PartialObjectMetadataList(ref),
+		metav1.Patch{}.OpenAPIModelName():                            schema_pkg_apis_meta_v1_Patch(ref),
+		metav1.PatchOptions{}.OpenAPIModelName():                     schema_pkg_apis_meta_v1_PatchOptions(ref),
+		metav1.Preconditions{}.OpenAPIModelName():                    schema_pkg_apis_meta_v1_Preconditions(ref),
+		metav1.RootPaths{}.OpenAPIModelName():                        schema_pkg_apis_meta_v1_RootPaths(ref),
+		metav1.ServerAddressByClientCIDR{}.OpenAPIModelName():        schema_pkg_apis_meta_v1_ServerAddressByClientCIDR(ref),
+		metav1.Status{}.OpenAPIModelName():                           schema_pkg_apis_meta_v1_Status(ref),
+		metav1.StatusCause{}.OpenAPIModelName():                      schema_pkg_apis_meta_v1_StatusCause(ref),
+		metav1.StatusDetails{}.OpenAPIModelName():                    schema_pkg_apis_meta_v1_StatusDetails(ref),
+		metav1.Table{}.OpenAPIModelName():                            schema_pkg_apis_meta_v1_Table(ref),
+		metav1.TableColumnDefinition{}.OpenAPIModelName():            schema_pkg_apis_meta_v1_TableColumnDefinition(ref),
+		metav1.TableOptions{}.OpenAPIModelName():                     schema_pkg_apis_meta_v1_TableOptions(ref),
+		metav1.TableRow{}.OpenAPIModelName():                         schema_pkg_apis_meta_v1_TableRow(ref),
+		metav1.TableRowCondition{}.OpenAPIModelName():                schema_pkg_apis_meta_v1_TableRowCondition(ref),
+		metav1.Time{}.OpenAPIModelName():                             schema_pkg_apis_meta_v1_Time(ref),
+		metav1.Timestamp{}.OpenAPIModelName():                        schema_pkg_apis_meta_v1_Timestamp(ref),
+		metav1.TypeMeta{}.OpenAPIModelName():                         schema_pkg_apis_meta_v1_TypeMeta(ref),
+		metav1.UpdateOptions{}.OpenAPIModelName():                    schema_pkg_apis_meta_v1_UpdateOptions(ref),
+		metav1.WatchEvent{}.OpenAPIModelName():                       schema_pkg_apis_meta_v1_WatchEvent(ref),
+		runtime.RawExtension{}.OpenAPIModelName():                    schema_k8sio_apimachinery_pkg_runtime_RawExtension(ref),
+		runtime.TypeMeta{}.OpenAPIModelName():                        schema_k8sio_apimachinery_pkg_runtime_TypeMeta(ref),
+		runtime.Unknown{}.OpenAPIModelName():                         schema_k8sio_apimachinery_pkg_runtime_Unknown(ref),
+		version.Info{}.OpenAPIModelName():                            schema_k8sio_apimachinery_pkg_version_Info(ref),
 	}
 }
 
@@ -138,28 +142,28 @@ func schema_pkg_apis_extcattleio_v1_GroupMembershipRefreshRequest(ref common.Ref
 						SchemaProps: spec.SchemaProps{
 							Description: "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Spec is the desired state of the GroupMembershipRefreshRequestSpec.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.GroupMembershipRefreshRequestSpec"),
+							Ref:         ref(v1.GroupMembershipRefreshRequestSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Status is the most recently observed status of the GroupMembershipRefreshRequestSpec.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.GroupMembershipRefreshRequestStatus"),
+							Ref:         ref(v1.GroupMembershipRefreshRequestStatus{}.OpenAPIModelName()),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.GroupMembershipRefreshRequestSpec", "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.GroupMembershipRefreshRequestStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			v1.GroupMembershipRefreshRequestSpec{}.OpenAPIModelName(), v1.GroupMembershipRefreshRequestStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
 	}
 }
 
@@ -187,7 +191,7 @@ func schema_pkg_apis_extcattleio_v1_GroupMembershipRefreshRequestList(ref common
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
 							Default: map[string]interface{}{},
-							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+							Ref:     ref(metav1.ListMeta{}.OpenAPIModelName()),
 						},
 					},
 					"items": {
@@ -197,7 +201,7 @@ func schema_pkg_apis_extcattleio_v1_GroupMembershipRefreshRequestList(ref common
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.GroupMembershipRefreshRequest"),
+										Ref:     ref(v1.GroupMembershipRefreshRequest{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -208,7 +212,7 @@ func schema_pkg_apis_extcattleio_v1_GroupMembershipRefreshRequestList(ref common
 			},
 		},
 		Dependencies: []string{
-			"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.GroupMembershipRefreshRequest", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+			v1.GroupMembershipRefreshRequest{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
 	}
 }
 
@@ -247,7 +251,7 @@ func schema_pkg_apis_extcattleio_v1_GroupMembershipRefreshRequestStatus(ref comm
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.Condition"),
+										Ref:     ref(metav1.Condition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -265,7 +269,7 @@ func schema_pkg_apis_extcattleio_v1_GroupMembershipRefreshRequestStatus(ref comm
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Condition"},
+			metav1.Condition{}.OpenAPIModelName()},
 	}
 }
 
@@ -294,28 +298,28 @@ func schema_pkg_apis_extcattleio_v1_Kubeconfig(ref common.ReferenceCallback) com
 						SchemaProps: spec.SchemaProps{
 							Description: "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata. Note: Name and GenerateName are not respected. A name is always generated with a predefined prefix.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Spec is the desired state of the Kubeconfig.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.KubeconfigSpec"),
+							Ref:         ref(v1.KubeconfigSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Status is the most recently observed status of the Kubeconfig.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.KubeconfigStatus"),
+							Ref:         ref(v1.KubeconfigStatus{}.OpenAPIModelName()),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.KubeconfigSpec", "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.KubeconfigStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			v1.KubeconfigSpec{}.OpenAPIModelName(), v1.KubeconfigStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
 	}
 }
 
@@ -343,7 +347,7 @@ func schema_pkg_apis_extcattleio_v1_KubeconfigList(ref common.ReferenceCallback)
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
 							Default: map[string]interface{}{},
-							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+							Ref:     ref(metav1.ListMeta{}.OpenAPIModelName()),
 						},
 					},
 					"items": {
@@ -353,7 +357,7 @@ func schema_pkg_apis_extcattleio_v1_KubeconfigList(ref common.ReferenceCallback)
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.Kubeconfig"),
+										Ref:     ref(v1.Kubeconfig{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -364,7 +368,7 @@ func schema_pkg_apis_extcattleio_v1_KubeconfigList(ref common.ReferenceCallback)
 			},
 		},
 		Dependencies: []string{
-			"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.Kubeconfig", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+			v1.Kubeconfig{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
 	}
 }
 
@@ -447,7 +451,7 @@ func schema_pkg_apis_extcattleio_v1_KubeconfigStatus(ref common.ReferenceCallbac
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.Condition"),
+										Ref:     ref(metav1.Condition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -486,7 +490,7 @@ func schema_pkg_apis_extcattleio_v1_KubeconfigStatus(ref common.ReferenceCallbac
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Condition"},
+			metav1.Condition{}.OpenAPIModelName()},
 	}
 }
 
@@ -515,28 +519,28 @@ func schema_pkg_apis_extcattleio_v1_PasswordChangeRequest(ref common.ReferenceCa
 						SchemaProps: spec.SchemaProps{
 							Description: "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Spec is the desired state of the PasswordChangeRequest.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.PasswordChangeRequestSpec"),
+							Ref:         ref(v1.PasswordChangeRequestSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Status is the most recently observed status of the PasswordChangeRequest.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.PasswordChangeRequestStatus"),
+							Ref:         ref(v1.PasswordChangeRequestStatus{}.OpenAPIModelName()),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.PasswordChangeRequestSpec", "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.PasswordChangeRequestStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			v1.PasswordChangeRequestSpec{}.OpenAPIModelName(), v1.PasswordChangeRequestStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
 	}
 }
 
@@ -564,7 +568,7 @@ func schema_pkg_apis_extcattleio_v1_PasswordChangeRequestList(ref common.Referen
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
 							Default: map[string]interface{}{},
-							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+							Ref:     ref(metav1.ListMeta{}.OpenAPIModelName()),
 						},
 					},
 					"items": {
@@ -574,7 +578,7 @@ func schema_pkg_apis_extcattleio_v1_PasswordChangeRequestList(ref common.Referen
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.PasswordChangeRequest"),
+										Ref:     ref(v1.PasswordChangeRequest{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -585,7 +589,7 @@ func schema_pkg_apis_extcattleio_v1_PasswordChangeRequestList(ref common.Referen
 			},
 		},
 		Dependencies: []string{
-			"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.PasswordChangeRequest", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+			v1.PasswordChangeRequest{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
 	}
 }
 
@@ -638,7 +642,7 @@ func schema_pkg_apis_extcattleio_v1_PasswordChangeRequestStatus(ref common.Refer
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.Condition"),
+										Ref:     ref(metav1.Condition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -656,7 +660,7 @@ func schema_pkg_apis_extcattleio_v1_PasswordChangeRequestStatus(ref common.Refer
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Condition"},
+			metav1.Condition{}.OpenAPIModelName()},
 	}
 }
 
@@ -685,21 +689,21 @@ func schema_pkg_apis_extcattleio_v1_SelfUser(ref common.ReferenceCallback) commo
 						SchemaProps: spec.SchemaProps{
 							Description: "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Status is the most recently observed state of the Self User.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.SelfUserStatus"),
+							Ref:         ref(v1.SelfUserStatus{}.OpenAPIModelName()),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.SelfUserStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			v1.SelfUserStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
 	}
 }
 
@@ -727,7 +731,7 @@ func schema_pkg_apis_extcattleio_v1_SelfUserList(ref common.ReferenceCallback) c
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
 							Default: map[string]interface{}{},
-							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+							Ref:     ref(metav1.ListMeta{}.OpenAPIModelName()),
 						},
 					},
 					"items": {
@@ -737,7 +741,7 @@ func schema_pkg_apis_extcattleio_v1_SelfUserList(ref common.ReferenceCallback) c
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.SelfUser"),
+										Ref:     ref(v1.SelfUser{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -748,7 +752,7 @@ func schema_pkg_apis_extcattleio_v1_SelfUserList(ref common.ReferenceCallback) c
 			},
 		},
 		Dependencies: []string{
-			"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.SelfUser", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+			v1.SelfUser{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
 	}
 }
 
@@ -796,21 +800,21 @@ func schema_pkg_apis_extcattleio_v1_Token(ref common.ReferenceCallback) common.O
 						SchemaProps: spec.SchemaProps{
 							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata Note: Name and GenerateName are not respected. A name is always generated with a predefined prefix.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Spec is the desired state of the Token.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenSpec"),
+							Ref:         ref(v1.TokenSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Status is the most recently observed status of the Token.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenStatus"),
+							Ref:         ref(v1.TokenStatus{}.OpenAPIModelName()),
 						},
 					},
 				},
@@ -818,7 +822,7 @@ func schema_pkg_apis_extcattleio_v1_Token(ref common.ReferenceCallback) common.O
 			},
 		},
 		Dependencies: []string{
-			"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenSpec", "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			v1.TokenSpec{}.OpenAPIModelName(), v1.TokenStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
 	}
 }
 
@@ -846,7 +850,7 @@ func schema_pkg_apis_extcattleio_v1_TokenList(ref common.ReferenceCallback) comm
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
 							Default: map[string]interface{}{},
-							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+							Ref:     ref(metav1.ListMeta{}.OpenAPIModelName()),
 						},
 					},
 					"items": {
@@ -856,7 +860,7 @@ func schema_pkg_apis_extcattleio_v1_TokenList(ref common.ReferenceCallback) comm
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.Token"),
+										Ref:     ref(v1.Token{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -867,7 +871,7 @@ func schema_pkg_apis_extcattleio_v1_TokenList(ref common.ReferenceCallback) comm
 			},
 		},
 		Dependencies: []string{
-			"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.Token", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+			v1.Token{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
 	}
 }
 
@@ -983,7 +987,7 @@ func schema_pkg_apis_extcattleio_v1_TokenSpec(ref common.ReferenceCallback) comm
 						SchemaProps: spec.SchemaProps{
 							Description: "UserPrincipal holds the information about the ext auth provider managed user (principal) owning the token.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenPrincipal"),
+							Ref:         ref(v1.TokenPrincipal{}.OpenAPIModelName()),
 						},
 					},
 					"kind": {
@@ -1028,7 +1032,7 @@ func schema_pkg_apis_extcattleio_v1_TokenSpec(ref common.ReferenceCallback) comm
 			},
 		},
 		Dependencies: []string{
-			"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.TokenPrincipal"},
+			v1.TokenPrincipal{}.OpenAPIModelName()},
 	}
 }
 
@@ -1088,13 +1092,13 @@ func schema_pkg_apis_extcattleio_v1_TokenStatus(ref common.ReferenceCallback) co
 					"lastUsedAt": {
 						SchemaProps: spec.SchemaProps{
 							Description: "LastUsedAt is the timestamp of the last time the token was used to authenticate.",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
 					"lastActivitySeen": {
 						SchemaProps: spec.SchemaProps{
 							Description: "LastActivitySeen is the timestamp of the last time user activity (mouse movement, interaction, ...) was reported for the token.",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
 					"bearerToken": {
@@ -1109,7 +1113,7 @@ func schema_pkg_apis_extcattleio_v1_TokenStatus(ref common.ReferenceCallback) co
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+			metav1.Time{}.OpenAPIModelName()},
 	}
 }
 
@@ -1137,21 +1141,21 @@ func schema_pkg_apis_extcattleio_v1_UserActivity(ref common.ReferenceCallback) c
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
 							Default: map[string]interface{}{},
-							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							Ref:     ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Spec is the desired state of the UserActivity.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.UserActivitySpec"),
+							Ref:         ref(v1.UserActivitySpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Status is the most recently observed status of the UserActivity.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.UserActivityStatus"),
+							Ref:         ref(v1.UserActivityStatus{}.OpenAPIModelName()),
 						},
 					},
 				},
@@ -1159,7 +1163,7 @@ func schema_pkg_apis_extcattleio_v1_UserActivity(ref common.ReferenceCallback) c
 			},
 		},
 		Dependencies: []string{
-			"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.UserActivitySpec", "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.UserActivityStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			v1.UserActivitySpec{}.OpenAPIModelName(), v1.UserActivityStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
 	}
 }
 
@@ -1187,7 +1191,7 @@ func schema_pkg_apis_extcattleio_v1_UserActivityList(ref common.ReferenceCallbac
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
 							Default: map[string]interface{}{},
-							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+							Ref:     ref(metav1.ListMeta{}.OpenAPIModelName()),
 						},
 					},
 					"items": {
@@ -1197,7 +1201,7 @@ func schema_pkg_apis_extcattleio_v1_UserActivityList(ref common.ReferenceCallbac
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.UserActivity"),
+										Ref:     ref(v1.UserActivity{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -1208,7 +1212,7 @@ func schema_pkg_apis_extcattleio_v1_UserActivityList(ref common.ReferenceCallbac
 			},
 		},
 		Dependencies: []string{
-			"github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1.UserActivity", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+			v1.UserActivity{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
 	}
 }
 
@@ -1222,14 +1226,14 @@ func schema_pkg_apis_extcattleio_v1_UserActivitySpec(ref common.ReferenceCallbac
 					"seenAt": {
 						SchemaProps: spec.SchemaProps{
 							Description: "SeenAt is the timestamp of the last user activity.",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+			metav1.Time{}.OpenAPIModelName()},
 	}
 }
 
@@ -1277,26 +1281,26 @@ func schema_pkg_apis_telemetrycattleio_v1_SecretRequest(ref common.ReferenceCall
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
 							Default: map[string]interface{}{},
-							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							Ref:     ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
 							Default: map[string]interface{}{},
-							Ref:     ref("github.com/rancher/rancher/pkg/apis/telemetry.cattle.io/v1.SecretRequestSpec"),
+							Ref:     ref(telemetrycattleiov1.SecretRequestSpec{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
 							Default: map[string]interface{}{},
-							Ref:     ref("github.com/rancher/rancher/pkg/apis/telemetry.cattle.io/v1.SecretRequestStatus"),
+							Ref:     ref(telemetrycattleiov1.SecretRequestStatus{}.OpenAPIModelName()),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/rancher/rancher/pkg/apis/telemetry.cattle.io/v1.SecretRequestSpec", "github.com/rancher/rancher/pkg/apis/telemetry.cattle.io/v1.SecretRequestStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			telemetrycattleiov1.SecretRequestSpec{}.OpenAPIModelName(), telemetrycattleiov1.SecretRequestStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
 	}
 }
 
@@ -1324,7 +1328,7 @@ func schema_pkg_apis_telemetrycattleio_v1_SecretRequestList(ref common.Reference
 					"metadata": {
 						SchemaProps: spec.SchemaProps{
 							Default: map[string]interface{}{},
-							Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+							Ref:     ref(metav1.ListMeta{}.OpenAPIModelName()),
 						},
 					},
 					"items": {
@@ -1334,7 +1338,7 @@ func schema_pkg_apis_telemetrycattleio_v1_SecretRequestList(ref common.Reference
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("github.com/rancher/rancher/pkg/apis/telemetry.cattle.io/v1.SecretRequest"),
+										Ref:     ref(telemetrycattleiov1.SecretRequest{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -1345,7 +1349,7 @@ func schema_pkg_apis_telemetrycattleio_v1_SecretRequestList(ref common.Reference
 			},
 		},
 		Dependencies: []string{
-			"github.com/rancher/rancher/pkg/apis/telemetry.cattle.io/v1.SecretRequest", "k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"},
+			telemetrycattleiov1.SecretRequest{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
 	}
 }
 
@@ -1409,14 +1413,14 @@ func schema_pkg_apis_telemetrycattleio_v1_SecretRequestStatus(ref common.Referen
 					},
 					"lastSyncTS": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+							Ref: ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/rancher/wrangler/v3/pkg/genericcondition.GenericCondition", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+			"github.com/rancher/wrangler/v3/pkg/genericcondition.GenericCondition", metav1.Time{}.OpenAPIModelName()},
 	}
 }
 
@@ -1462,7 +1466,7 @@ func schema_pkg_apis_meta_v1_APIGroup(ref common.ReferenceCallback) common.OpenA
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.GroupVersionForDiscovery"),
+										Ref:     ref(metav1.GroupVersionForDiscovery{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -1472,7 +1476,7 @@ func schema_pkg_apis_meta_v1_APIGroup(ref common.ReferenceCallback) common.OpenA
 						SchemaProps: spec.SchemaProps{
 							Description: "preferredVersion is the version preferred by the API server, which probably is the storage version.",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.GroupVersionForDiscovery"),
+							Ref:         ref(metav1.GroupVersionForDiscovery{}.OpenAPIModelName()),
 						},
 					},
 					"serverAddressByClientCIDRs": {
@@ -1488,7 +1492,7 @@ func schema_pkg_apis_meta_v1_APIGroup(ref common.ReferenceCallback) common.OpenA
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ServerAddressByClientCIDR"),
+										Ref:     ref(metav1.ServerAddressByClientCIDR{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -1499,7 +1503,7 @@ func schema_pkg_apis_meta_v1_APIGroup(ref common.ReferenceCallback) common.OpenA
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.GroupVersionForDiscovery", "k8s.io/apimachinery/pkg/apis/meta/v1.ServerAddressByClientCIDR"},
+			metav1.GroupVersionForDiscovery{}.OpenAPIModelName(), metav1.ServerAddressByClientCIDR{}.OpenAPIModelName()},
 	}
 }
 
@@ -1537,7 +1541,7 @@ func schema_pkg_apis_meta_v1_APIGroupList(ref common.ReferenceCallback) common.O
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.APIGroup"),
+										Ref:     ref(metav1.APIGroup{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -1548,7 +1552,7 @@ func schema_pkg_apis_meta_v1_APIGroupList(ref common.ReferenceCallback) common.O
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.APIGroup"},
+			metav1.APIGroup{}.OpenAPIModelName()},
 	}
 }
 
@@ -1716,7 +1720,7 @@ func schema_pkg_apis_meta_v1_APIResourceList(ref common.ReferenceCallback) commo
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.APIResource"),
+										Ref:     ref(metav1.APIResource{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -1727,7 +1731,7 @@ func schema_pkg_apis_meta_v1_APIResourceList(ref common.ReferenceCallback) commo
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.APIResource"},
+			metav1.APIResource{}.OpenAPIModelName()},
 	}
 }
 
@@ -1785,7 +1789,7 @@ func schema_pkg_apis_meta_v1_APIVersions(ref common.ReferenceCallback) common.Op
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ServerAddressByClientCIDR"),
+										Ref:     ref(metav1.ServerAddressByClientCIDR{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -1796,7 +1800,7 @@ func schema_pkg_apis_meta_v1_APIVersions(ref common.ReferenceCallback) common.Op
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.ServerAddressByClientCIDR"},
+			metav1.ServerAddressByClientCIDR{}.OpenAPIModelName()},
 	}
 }
 
@@ -1897,7 +1901,7 @@ func schema_pkg_apis_meta_v1_Condition(ref common.ReferenceCallback) common.Open
 					"lastTransitionTime": {
 						SchemaProps: spec.SchemaProps{
 							Description: "lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
 					"reason": {
@@ -1921,7 +1925,7 @@ func schema_pkg_apis_meta_v1_Condition(ref common.ReferenceCallback) common.Open
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+			metav1.Time{}.OpenAPIModelName()},
 	}
 }
 
@@ -2017,7 +2021,7 @@ func schema_pkg_apis_meta_v1_DeleteOptions(ref common.ReferenceCallback) common.
 					"preconditions": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Must be fulfilled before a deletion is carried out. If not possible, a 409 Conflict status will be returned.",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Preconditions"),
+							Ref:         ref(metav1.Preconditions{}.OpenAPIModelName()),
 						},
 					},
 					"orphanDependents": {
@@ -2065,7 +2069,7 @@ func schema_pkg_apis_meta_v1_DeleteOptions(ref common.ReferenceCallback) common.
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.Preconditions"},
+			metav1.Preconditions{}.OpenAPIModelName()},
 	}
 }
 
@@ -2074,8 +2078,8 @@ func schema_pkg_apis_meta_v1_Duration(ref common.ReferenceCallback) common.OpenA
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "Duration is a wrapper around time.Duration which supports correct marshaling to YAML and JSON. In particular, it marshals into strings, which can be used as map keys in json.",
-				Type:        v1.Duration{}.OpenAPISchemaType(),
-				Format:      v1.Duration{}.OpenAPISchemaFormat(),
+				Type:        metav1.Duration{}.OpenAPISchemaType(),
+				Format:      metav1.Duration{}.OpenAPISchemaFormat(),
 			},
 		},
 	}
@@ -2422,7 +2426,7 @@ func schema_pkg_apis_meta_v1_LabelSelector(ref common.ReferenceCallback) common.
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelectorRequirement"),
+										Ref:     ref(metav1.LabelSelectorRequirement{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -2437,7 +2441,7 @@ func schema_pkg_apis_meta_v1_LabelSelector(ref common.ReferenceCallback) common.
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.LabelSelectorRequirement"},
+			metav1.LabelSelectorRequirement{}.OpenAPIModelName()},
 	}
 }
 
@@ -2516,7 +2520,7 @@ func schema_pkg_apis_meta_v1_List(ref common.ReferenceCallback) common.OpenAPIDe
 						SchemaProps: spec.SchemaProps{
 							Description: "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+							Ref:         ref(metav1.ListMeta{}.OpenAPIModelName()),
 						},
 					},
 					"items": {
@@ -2526,7 +2530,7 @@ func schema_pkg_apis_meta_v1_List(ref common.ReferenceCallback) common.OpenAPIDe
 							Items: &spec.SchemaOrArray{
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
-										Ref: ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
+										Ref: ref(runtime.RawExtension{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -2537,7 +2541,7 @@ func schema_pkg_apis_meta_v1_List(ref common.ReferenceCallback) common.OpenAPIDe
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/apimachinery/pkg/runtime.RawExtension"},
+			metav1.ListMeta{}.OpenAPIModelName(), runtime.RawExtension{}.OpenAPIModelName()},
 	}
 }
 
@@ -2710,7 +2714,7 @@ func schema_pkg_apis_meta_v1_ManagedFieldsEntry(ref common.ReferenceCallback) co
 					"time": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Time is the timestamp of when the ManagedFields entry was added. The timestamp will also be updated if a field is added, the manager changes any of the owned fields value or removes a field. The timestamp does not update when a field is removed from the entry because another manager took it over.",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
 					"fieldsType": {
@@ -2723,7 +2727,7 @@ func schema_pkg_apis_meta_v1_ManagedFieldsEntry(ref common.ReferenceCallback) co
 					"fieldsV1": {
 						SchemaProps: spec.SchemaProps{
 							Description: "FieldsV1 holds the first JSON version format as described in the \"FieldsV1\" type.",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.FieldsV1"),
+							Ref:         ref(metav1.FieldsV1{}.OpenAPIModelName()),
 						},
 					},
 					"subresource": {
@@ -2737,7 +2741,7 @@ func schema_pkg_apis_meta_v1_ManagedFieldsEntry(ref common.ReferenceCallback) co
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.FieldsV1", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+			metav1.FieldsV1{}.OpenAPIModelName(), metav1.Time{}.OpenAPIModelName()},
 	}
 }
 
@@ -2746,8 +2750,8 @@ func schema_pkg_apis_meta_v1_MicroTime(ref common.ReferenceCallback) common.Open
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "MicroTime is version of Time with microsecond level precision.",
-				Type:        v1.MicroTime{}.OpenAPISchemaType(),
-				Format:      v1.MicroTime{}.OpenAPISchemaFormat(),
+				Type:        metav1.MicroTime{}.OpenAPISchemaType(),
+				Format:      metav1.MicroTime{}.OpenAPISchemaFormat(),
 			},
 		},
 	}
@@ -2812,13 +2816,13 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 					"creationTimestamp": {
 						SchemaProps: spec.SchemaProps{
 							Description: "CreationTimestamp is a timestamp representing the server time when this object was created. It is not guaranteed to be set in happens-before order across separate operations. Clients may not set this value. It is represented in RFC3339 form and is in UTC.\n\nPopulated by the system. Read-only. Null for lists. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
 					"deletionTimestamp": {
 						SchemaProps: spec.SchemaProps{
 							Description: "DeletionTimestamp is RFC 3339 date and time at which this resource will be deleted. This field is set by the server when a graceful deletion is requested by the user, and is not directly settable by a client. The resource is expected to be deleted (no longer visible from resource lists, and not reachable by name) after the time in this field, once the finalizers list is empty. As long as the finalizers list contains items, deletion is blocked. Once the deletionTimestamp is set, this value may not be unset or be set further into the future, although it may be shortened or the resource may be deleted prior to this time. For example, a user may request that a pod is deleted in 30 seconds. The Kubelet will react by sending a graceful termination signal to the containers in the pod. After that 30 seconds, the Kubelet will send a hard termination signal (SIGKILL) to the container and after cleanup, remove the pod from the API. In the presence of network partitions, this object may still exist after this timestamp, until an administrator or automated process can determine the resource is fully terminated. If not set, graceful deletion of the object has not been requested.\n\nPopulated by the system when a graceful deletion is requested. Read-only. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.Time"),
+							Ref:         ref(metav1.Time{}.OpenAPIModelName()),
 						},
 					},
 					"deletionGracePeriodSeconds": {
@@ -2878,7 +2882,7 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.OwnerReference"),
+										Ref:     ref(metav1.OwnerReference{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -2918,7 +2922,7 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.ManagedFieldsEntry"),
+										Ref:     ref(metav1.ManagedFieldsEntry{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -2928,7 +2932,7 @@ func schema_pkg_apis_meta_v1_ObjectMeta(ref common.ReferenceCallback) common.Ope
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.ManagedFieldsEntry", "k8s.io/apimachinery/pkg/apis/meta/v1.OwnerReference", "k8s.io/apimachinery/pkg/apis/meta/v1.Time"},
+			metav1.ManagedFieldsEntry{}.OpenAPIModelName(), metav1.OwnerReference{}.OpenAPIModelName(), metav1.Time{}.OpenAPIModelName()},
 	}
 }
 
@@ -3022,14 +3026,14 @@ func schema_pkg_apis_meta_v1_PartialObjectMetadata(ref common.ReferenceCallback)
 						SchemaProps: spec.SchemaProps{
 							Description: "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"),
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			metav1.ObjectMeta{}.OpenAPIModelName()},
 	}
 }
 
@@ -3058,7 +3062,7 @@ func schema_pkg_apis_meta_v1_PartialObjectMetadataList(ref common.ReferenceCallb
 						SchemaProps: spec.SchemaProps{
 							Description: "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+							Ref:         ref(metav1.ListMeta{}.OpenAPIModelName()),
 						},
 					},
 					"items": {
@@ -3069,7 +3073,7 @@ func schema_pkg_apis_meta_v1_PartialObjectMetadataList(ref common.ReferenceCallb
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.PartialObjectMetadata"),
+										Ref:     ref(metav1.PartialObjectMetadata{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3080,7 +3084,7 @@ func schema_pkg_apis_meta_v1_PartialObjectMetadataList(ref common.ReferenceCallb
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/apimachinery/pkg/apis/meta/v1.PartialObjectMetadata"},
+			metav1.ListMeta{}.OpenAPIModelName(), metav1.PartialObjectMetadata{}.OpenAPIModelName()},
 	}
 }
 
@@ -3279,7 +3283,7 @@ func schema_pkg_apis_meta_v1_Status(ref common.ReferenceCallback) common.OpenAPI
 						SchemaProps: spec.SchemaProps{
 							Description: "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+							Ref:         ref(metav1.ListMeta{}.OpenAPIModelName()),
 						},
 					},
 					"status": {
@@ -3304,14 +3308,9 @@ func schema_pkg_apis_meta_v1_Status(ref common.ReferenceCallback) common.OpenAPI
 						},
 					},
 					"details": {
-						VendorExtensible: spec.VendorExtensible{
-							Extensions: spec.Extensions{
-								"x-kubernetes-list-type": "atomic",
-							},
-						},
 						SchemaProps: spec.SchemaProps{
 							Description: "Extended data associated with the reason.  Each reason may define its own extended details. This field is optional and the data returned is not guaranteed to conform to any schema except that defined by the reason type.",
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.StatusDetails"),
+							Ref:         ref(metav1.StatusDetails{}.OpenAPIModelName()),
 						},
 					},
 					"code": {
@@ -3325,7 +3324,7 @@ func schema_pkg_apis_meta_v1_Status(ref common.ReferenceCallback) common.OpenAPI
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/apimachinery/pkg/apis/meta/v1.StatusDetails"},
+			metav1.ListMeta{}.OpenAPIModelName(), metav1.StatusDetails{}.OpenAPIModelName()},
 	}
 }
 
@@ -3411,7 +3410,7 @@ func schema_pkg_apis_meta_v1_StatusDetails(ref common.ReferenceCallback) common.
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.StatusCause"),
+										Ref:     ref(metav1.StatusCause{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3428,7 +3427,7 @@ func schema_pkg_apis_meta_v1_StatusDetails(ref common.ReferenceCallback) common.
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.StatusCause"},
+			metav1.StatusCause{}.OpenAPIModelName()},
 	}
 }
 
@@ -3457,7 +3456,7 @@ func schema_pkg_apis_meta_v1_Table(ref common.ReferenceCallback) common.OpenAPID
 						SchemaProps: spec.SchemaProps{
 							Description: "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
 							Default:     map[string]interface{}{},
-							Ref:         ref("k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta"),
+							Ref:         ref(metav1.ListMeta{}.OpenAPIModelName()),
 						},
 					},
 					"columnDefinitions": {
@@ -3473,7 +3472,7 @@ func schema_pkg_apis_meta_v1_Table(ref common.ReferenceCallback) common.OpenAPID
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.TableColumnDefinition"),
+										Ref:     ref(metav1.TableColumnDefinition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3492,7 +3491,7 @@ func schema_pkg_apis_meta_v1_Table(ref common.ReferenceCallback) common.OpenAPID
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.TableRow"),
+										Ref:     ref(metav1.TableRow{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3503,7 +3502,7 @@ func schema_pkg_apis_meta_v1_Table(ref common.ReferenceCallback) common.OpenAPID
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.ListMeta", "k8s.io/apimachinery/pkg/apis/meta/v1.TableColumnDefinition", "k8s.io/apimachinery/pkg/apis/meta/v1.TableRow"},
+			metav1.ListMeta{}.OpenAPIModelName(), metav1.TableColumnDefinition{}.OpenAPIModelName(), metav1.TableRow{}.OpenAPIModelName()},
 	}
 }
 
@@ -3634,7 +3633,7 @@ func schema_pkg_apis_meta_v1_TableRow(ref common.ReferenceCallback) common.OpenA
 								Schema: &spec.Schema{
 									SchemaProps: spec.SchemaProps{
 										Default: map[string]interface{}{},
-										Ref:     ref("k8s.io/apimachinery/pkg/apis/meta/v1.TableRowCondition"),
+										Ref:     ref(metav1.TableRowCondition{}.OpenAPIModelName()),
 									},
 								},
 							},
@@ -3643,7 +3642,7 @@ func schema_pkg_apis_meta_v1_TableRow(ref common.ReferenceCallback) common.OpenA
 					"object": {
 						SchemaProps: spec.SchemaProps{
 							Description: "This field contains the requested additional information about each object based on the includeObject policy when requesting the Table. If \"None\", this field is empty, if \"Object\" this will be the default serialization of the object for the current API version, and if \"Metadata\" (the default) will contain the object metadata. Check the returned kind and apiVersion of the object before parsing. The media type of the object will always match the enclosing list - if this as a JSON table, these will be JSON encoded objects.",
-							Ref:         ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
+							Ref:         ref(runtime.RawExtension{}.OpenAPIModelName()),
 						},
 					},
 				},
@@ -3651,7 +3650,7 @@ func schema_pkg_apis_meta_v1_TableRow(ref common.ReferenceCallback) common.OpenA
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/apis/meta/v1.TableRowCondition", "k8s.io/apimachinery/pkg/runtime.RawExtension"},
+			metav1.TableRowCondition{}.OpenAPIModelName(), runtime.RawExtension{}.OpenAPIModelName()},
 	}
 }
 
@@ -3704,8 +3703,8 @@ func schema_pkg_apis_meta_v1_Time(ref common.ReferenceCallback) common.OpenAPIDe
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
 				Description: "Time is a wrapper around time.Time which supports correct marshaling to YAML and JSON.  Wrappers are provided for many of the factory methods that the time package offers.",
-				Type:        v1.Time{}.OpenAPISchemaType(),
-				Format:      v1.Time{}.OpenAPISchemaFormat(),
+				Type:        metav1.Time{}.OpenAPISchemaType(),
+				Format:      metav1.Time{}.OpenAPISchemaFormat(),
 			},
 		},
 	}
@@ -3846,7 +3845,7 @@ func schema_pkg_apis_meta_v1_WatchEvent(ref common.ReferenceCallback) common.Ope
 					"object": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Object is:\n * If Type is Added or Modified: the new state of the object.\n * If Type is Deleted: the state of the object immediately before deletion.\n * If Type is Error: *Status is recommended; other types may make sense\n   depending on context.",
-							Ref:         ref("k8s.io/apimachinery/pkg/runtime.RawExtension"),
+							Ref:         ref(runtime.RawExtension{}.OpenAPIModelName()),
 						},
 					},
 				},
@@ -3854,7 +3853,7 @@ func schema_pkg_apis_meta_v1_WatchEvent(ref common.ReferenceCallback) common.Ope
 			},
 		},
 		Dependencies: []string{
-			"k8s.io/apimachinery/pkg/runtime.RawExtension"},
+			runtime.RawExtension{}.OpenAPIModelName()},
 	}
 }
 

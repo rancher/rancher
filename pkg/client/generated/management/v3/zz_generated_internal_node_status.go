@@ -5,6 +5,7 @@ const (
 	InternalNodeStatusFieldAllocatable       = "allocatable"
 	InternalNodeStatusFieldCapacity          = "capacity"
 	InternalNodeStatusFieldConfig            = "config"
+	InternalNodeStatusFieldDeclaredFeatures  = "declaredFeatures"
 	InternalNodeStatusFieldExternalIPAddress = "externalIpAddress"
 	InternalNodeStatusFieldFeatures          = "features"
 	InternalNodeStatusFieldHostname          = "hostname"
@@ -20,6 +21,7 @@ type InternalNodeStatus struct {
 	Allocatable       map[string]string         `json:"allocatable,omitempty" yaml:"allocatable,omitempty"`
 	Capacity          map[string]string         `json:"capacity,omitempty" yaml:"capacity,omitempty"`
 	Config            *NodeConfigStatus         `json:"config,omitempty" yaml:"config,omitempty"`
+	DeclaredFeatures  []string                  `json:"declaredFeatures,omitempty" yaml:"declaredFeatures,omitempty"`
 	ExternalIPAddress string                    `json:"externalIpAddress,omitempty" yaml:"externalIpAddress,omitempty"`
 	Features          *NodeFeatures             `json:"features,omitempty" yaml:"features,omitempty"`
 	Hostname          string                    `json:"hostname,omitempty" yaml:"hostname,omitempty"`
