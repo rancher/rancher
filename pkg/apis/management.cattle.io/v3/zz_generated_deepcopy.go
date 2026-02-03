@@ -3298,6 +3298,23 @@ func (in *GlobalRole) DeepCopyInto(out *GlobalRole) {
 			(*out)[key] = outVal
 		}
 	}
+	if in.InheritedNamespacedRules != nil {
+		in, out := &in.InheritedNamespacedRules, &out.InheritedNamespacedRules
+		*out = make(map[string][]rbacv1.PolicyRule, len(*in))
+		for key, val := range *in {
+			var outVal []rbacv1.PolicyRule
+			if val == nil {
+				(*out)[key] = nil
+			} else {
+				in, out := &val, &outVal
+				*out = make([]rbacv1.PolicyRule, len(*in))
+				for i := range *in {
+					(*in)[i].DeepCopyInto(&(*out)[i])
+				}
+			}
+			(*out)[key] = outVal
+		}
+	}
 	if in.InheritedFleetWorkspacePermissions != nil {
 		in, out := &in.InheritedFleetWorkspacePermissions, &out.InheritedFleetWorkspacePermissions
 		*out = new(FleetWorkspacePermission)
