@@ -48,8 +48,9 @@ func (m *MetadataController) sync(_ string, setting *v3.Setting) (*v3.Setting, e
 }
 
 func (m *MetadataController) Refresh() error {
-	// Refreshes to sync rke2/k3s releases
-	channelserver.Refresh()
+	if err := channelserver.Refresh(m.ctx); err != nil {
+		return err
+	}
 	// Update settings for rke2/k3s and ui
 	return m.updateSettings(m.ctx, settings.GetRancherVersion())
 }
@@ -88,7 +89,11 @@ func getKubernetesVersionRange(ctx context.Context, runtime, serverVersion strin
 	if err != nil {
 		return "", fmt.Errorf("failed to parse server version %s: %v", serverVersion, err)
 	}
-	config := channelserver.GetReleaseConfigByRuntime(ctx, runtime).ReleasesConfig()
+	cfg := channelserver.GetReleaseConfigByRuntime(ctx, runtime)
+	if cfg == nil {
+		return "", fmt.Errorf("failed to get release config for %s", runtime)
+	}
+	config := cfg.ReleasesConfig()
 	if config == nil || len(config.Releases) == 0 {
 		return "", fmt.Errorf("no released versions found for %s: %s", runtime, serverVersion)
 	}
