@@ -72,6 +72,7 @@ const (
 	ReplicaSetFieldWorkloadAnnotations           = "workloadAnnotations"
 	ReplicaSetFieldWorkloadLabels                = "workloadLabels"
 	ReplicaSetFieldWorkloadMetrics               = "workloadMetrics"
+	ReplicaSetFieldWorkloadRef                   = "workloadRef"
 )
 
 type ReplicaSet struct {
@@ -142,6 +143,7 @@ type ReplicaSet struct {
 	WorkloadAnnotations           map[string]string              `json:"workloadAnnotations,omitempty" yaml:"workloadAnnotations,omitempty"`
 	WorkloadLabels                map[string]string              `json:"workloadLabels,omitempty" yaml:"workloadLabels,omitempty"`
 	WorkloadMetrics               []WorkloadMetric               `json:"workloadMetrics,omitempty" yaml:"workloadMetrics,omitempty"`
+	WorkloadRef                   *WorkloadReference             `json:"workloadRef,omitempty" yaml:"workloadRef,omitempty"`
 }
 
 type ReplicaSetCollection struct {

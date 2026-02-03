@@ -59,6 +59,7 @@ const (
 	StatefulSetSpecFieldUid                                  = "uid"
 	StatefulSetSpecFieldVolumes                              = "volumes"
 	StatefulSetSpecFieldWindowsOptions                       = "windowsOptions"
+	StatefulSetSpecFieldWorkloadRef                          = "workloadRef"
 )
 
 type StatefulSetSpec struct {
@@ -115,4 +116,5 @@ type StatefulSetSpec struct {
 	Uid                                  *int64                                           `json:"uid,omitempty" yaml:"uid,omitempty"`
 	Volumes                              []Volume                                         `json:"volumes,omitempty" yaml:"volumes,omitempty"`
 	WindowsOptions                       *WindowsSecurityContextOptions                   `json:"windowsOptions,omitempty" yaml:"windowsOptions,omitempty"`
+	WorkloadRef                          *WorkloadReference                               `json:"workloadRef,omitempty" yaml:"workloadRef,omitempty"`
 }
