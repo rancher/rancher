@@ -6,6 +6,8 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/fleet"
+	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/impersonation"
 	"github.com/rancher/rancher/pkg/rbac"
 	crbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/name"
@@ -27,8 +29,13 @@ const (
 	reconcileSubject                 = "ReconcileSubject"
 	reconcileMembershipBindings      = "ReconcileMembershipBindings"
 	reconcileBindings                = "ReconcileBindings"
+	reconcileClusterRoleBindings     = "ReconcileClusterRoleBindings"
+	deleteClusterRoleBindings        = "DeleteClusterRoleBindings"
+	ensureServiceAccountImpersonator = "EnsureServiceAccountImpersonator"
+	deleteServiceAccountImpersonator = "DeleteServiceAccountImpersonator"
 	// Reasons
 	roleBindingDeleted                      = "roleBindingDeleted"
+	clusterRoleBindingsDeleted              = "ClusterRoleBindingsDeleted"
 	bindingsExists                          = "BindingsExists"
 	membershipBindingExists                 = "MembershipBindingExists"
 	subjectExists                           = "SubjectExists"
@@ -43,6 +50,7 @@ const (
 	failedToGetUser                         = "FailedToGetUser"
 	failedToGetClusterRole                  = "FailedToGetClusterRole"
 	failedToListExistingRoleBindings        = "FailedToGetExistingRoleBindings"
+	failureToListClusterRoleBindings        = "FailureToListClusterRoleBindings"
 )
 
 // createOrUpdateClusterMembershipBinding ensures that the user specified by a CRTB or PRTB has membership to the cluster referenced by the CRTB or PRTB.
@@ -301,4 +309,34 @@ func removeAuthV2Permissions(obj metav1.Object, rbController crbacv1.RoleBinding
 		}
 	}
 	return nil
+}
+
+type impersonationHandler struct {
+	crtbCache mgmtv3.ClusterRoleTemplateBindingCache
+	prtbCache mgmtv3.ProjectRoleTemplateBindingCache
+}
+
+// deleteServiceAccountImpersonator checks if there are any CRTBs or PRTBs for this user. If there are none, remove their Service Account Impersonator.
+// Currently uses custom indexers to get CRTBs and PRTBs. Once Rancher's minimum support is >1.31,
+// the indexers can be replaced by crd selectable fields https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#crd-selectable-fields
+func (ih *impersonationHandler) deleteServiceAccountImpersonator(clusterName, username string, crClient crbacv1.ClusterRoleController) error {
+	indexKey := name.SafeConcatName(clusterName, username)
+	crtbs, err := ih.crtbCache.GetByIndex(crtbByUsernameIndex, indexKey)
+	if err != nil {
+		return err
+	}
+	prtbs, err := ih.prtbCache.GetByIndex(prtbByUsernameIndex, indexKey)
+	if err != nil {
+		return err
+	}
+	if len(crtbs)+len(prtbs) > 0 {
+		return nil
+	}
+	roleName := impersonation.ImpersonationPrefix + username
+	logrus.Debugf("deleting service account impersonator for %s", username)
+	err = crClient.Delete(roleName, &metav1.DeleteOptions{})
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	return fmt.Errorf("failed to delete service account impersonator role %s: %w", roleName, err)
 }

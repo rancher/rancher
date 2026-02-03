@@ -8,6 +8,7 @@ import (
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers/status"
 	"github.com/rancher/rancher/pkg/features"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -15,6 +16,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
+	"github.com/sirupsen/logrus"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,28 +25,37 @@ import (
 )
 
 type crtbHandler struct {
-	s              *status.Status
-	userMGR        user.Manager
-	userController mgmtv3.UserController
-	rtController   mgmtv3.RoleTemplateController
-	rbController   wrbacv1.RoleBindingController
-	crController   wrbacv1.ClusterRoleController
-	crbController  wrbacv1.ClusterRoleBindingController
-	crtbCache      mgmtv3.ClusterRoleTemplateBindingCache
-	crtbClient     mgmtv3.ClusterRoleTemplateBindingController
+	s                    *status.Status
+	userMGR              user.Manager
+	userController       mgmtv3.UserController
+	rtController         mgmtv3.RoleTemplateController
+	rbController         wrbacv1.RoleBindingController
+	crController         wrbacv1.ClusterRoleController
+	crbController        wrbacv1.ClusterRoleBindingController
+	crtbCache            mgmtv3.ClusterRoleTemplateBindingCache
+	crtbClient           mgmtv3.ClusterRoleTemplateBindingController
+	clusterController    mgmtv3.ClusterController
+	clusterManager       *clustermanager.Manager
+	impersonationHandler *impersonationHandler
 }
 
-func newCRTBHandler(management *config.ManagementContext) *crtbHandler {
+func newCRTBHandler(management *config.ManagementContext, clusterManager *clustermanager.Manager) *crtbHandler {
 	return &crtbHandler{
-		s:              status.NewStatus(),
-		userMGR:        management.UserManager,
-		userController: management.Wrangler.Mgmt.User(),
-		rtController:   management.Wrangler.Mgmt.RoleTemplate(),
-		rbController:   management.Wrangler.RBAC.RoleBinding(),
-		crController:   management.Wrangler.RBAC.ClusterRole(),
-		crbController:  management.Wrangler.RBAC.ClusterRoleBinding(),
-		crtbCache:      management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
-		crtbClient:     management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
+		s:                 status.NewStatus(),
+		userMGR:           management.UserManager,
+		userController:    management.Wrangler.Mgmt.User(),
+		rtController:      management.Wrangler.Mgmt.RoleTemplate(),
+		rbController:      management.Wrangler.RBAC.RoleBinding(),
+		crController:      management.Wrangler.RBAC.ClusterRole(),
+		crbController:     management.Wrangler.RBAC.ClusterRoleBinding(),
+		crtbCache:         management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
+		crtbClient:        management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
+		clusterController: management.Wrangler.Mgmt.Cluster(),
+		clusterManager:    clusterManager,
+		impersonationHandler: &impersonationHandler{
+			crtbCache: management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
+			prtbCache: management.Wrangler.Mgmt.ProjectRoleTemplateBinding().Cache(),
+		},
 	}
 }
 
@@ -224,8 +235,11 @@ func (c *crtbHandler) getDesiredRoleBindings(crtb *v3.ClusterRoleTemplateBinding
 
 // OnRemove deletes Cluster Role Bindings that are owned by the CRTB and the membership binding if no other CRTBs give membership access.
 func (c *crtbHandler) OnRemove(_ string, crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-	if crtb == nil || !features.AggregatedRoleTemplates.Enabled() {
+	if crtb == nil {
 		return nil, nil
+	}
+	if !features.AggregatedRoleTemplates.Enabled() {
+		return nil, c.deleteDownstreamResources(crtb, false)
 	}
 
 	condition := metav1.Condition{Type: clusterRoleTemplateBindingDelete}
@@ -236,7 +250,7 @@ func (c *crtbHandler) OnRemove(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 	err = removeAuthV2Permissions(crtb, c.rbController)
 	c.s.AddCondition(&crtb.Status.LocalConditions, condition, authv2ProvisioningBindingDeleted, err)
 
-	return crtb, errors.Join(err, c.removeRoleBindings(crtb))
+	return crtb, errors.Join(err, c.removeRoleBindings(crtb), c.deleteDownstreamResources(crtb, true))
 }
 
 // removeClusterRoleBindings removes all bindings owned by the CRTB
@@ -265,6 +279,56 @@ func (c *crtbHandler) removeRoleBindings(crtb *v3.ClusterRoleTemplateBinding) er
 
 	c.s.AddCondition(&crtb.Status.LocalConditions, condition, roleBindingDeleted, returnErr)
 	return returnErr
+}
+
+func (c *crtbHandler) deleteDownstreamResources(crtb *v3.ClusterRoleTemplateBinding, deleteImpersonator bool) error {
+	clusterName := crtb.ClusterName
+	cluster, err := c.clusterController.Get(clusterName, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		logrus.Infof("Cluster %s not found when deleting downstream resources for CRTB %s. Not re-queuing.", clusterName, crtb.Name)
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("failed to get cluster %s: %w", clusterName, err)
+	}
+
+	userContext, err := c.clusterManager.UserContext(cluster.Name)
+	if err != nil {
+		return err
+	}
+
+	if deleteImpersonator && crtb.UserName != "" {
+		return errors.Join(
+			c.deleteDownstreamClusterRoleBindings(crtb, userContext.RBACw.ClusterRoleBinding()),
+			c.impersonationHandler.deleteServiceAccountImpersonator(clusterName, crtb.UserName, userContext.RBACw.ClusterRole()),
+		)
+	}
+	return c.deleteDownstreamClusterRoleBindings(crtb, userContext.RBACw.ClusterRoleBinding())
+}
+
+// deleteBindings removes cluster role bindings owned by CRTB.
+func (c *crtbHandler) deleteDownstreamClusterRoleBindings(crtb *v3.ClusterRoleTemplateBinding, crbController wrbacv1.ClusterRoleBindingController) error {
+	condition := metav1.Condition{Type: deleteClusterRoleBindings}
+
+	// Get all ClusterRoleBindings owned by this CRTB.
+	set := labels.Set{
+		rbac.GetCRTBOwnerLabel(crtb.Name): "true",
+		rbac.AggregationFeatureLabel:      "true",
+	}
+	lo := metav1.ListOptions{LabelSelector: set.AsSelector().String()}
+
+	crbs, err := crbController.List(lo)
+	if err != nil {
+		c.s.AddCondition(&crtb.Status.LocalConditions, condition, failureToListClusterRoleBindings, err)
+		return fmt.Errorf("failed to list ClusterRoleBindings for CRTB %s: %w", crtb.Name, err)
+	}
+
+	var returnError error
+	for _, crb := range crbs.Items {
+		returnError = errors.Join(returnError, rbac.DeleteResource(crb.Name, crbController))
+	}
+
+	c.s.AddCondition(&crtb.Status.LocalConditions, condition, clusterRoleBindingsDeleted, returnError)
+	return returnError
 }
 
 var timeNow = func() time.Time {
