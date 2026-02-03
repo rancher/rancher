@@ -15,11 +15,6 @@ source scripts/version
 
 OS="${OS:-linux}"
 
-ARCH="${ARCH:-$(uname -p)}"
-if [[ "$ARCH" == "x86_64" ]]; then
-  ARCH="amd64"
-fi
-
 REPO_OWNER="${REPO_OWNER:-"rancher"}"
 IMAGE="${IMAGE:-"$REPO_OWNER/rancher"}"
 IMAGE_AGENT="${IMAGE_AGENT:-"$REPO_OWNER/rancher-agent"}"
