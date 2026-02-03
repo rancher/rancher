@@ -7,8 +7,10 @@ import (
 )
 
 const (
-	SummaryCompleted = "Completed"
-	SummaryError     = "Error"
+	SummaryCompleted   = "Completed"
+	SummaryError       = "Error"
+	SummaryInProgress  = "InProgress"
+	SummaryTerminating = "Terminating"
 )
 
 type Status struct {
