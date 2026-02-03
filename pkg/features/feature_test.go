@@ -322,3 +322,136 @@ func TestRequireRestarts(t *testing.T) {
 		})
 	}
 }
+
+func TestPrimeFeatureEnabled(t *testing.T) {
+	trueVal := true
+	falseVal := false
+
+	tests := []struct {
+		name        string
+		primeEnvVal string
+		val         *bool
+		def         bool
+		expected    bool
+	}{
+		{
+			name:        "prime feature on prime build with no value set defaults to enabled",
+			primeEnvVal: "prime",
+			val:         nil,
+			def:         true,
+			expected:    true,
+		},
+		{
+			name:        "prime feature on prime build respects explicit false value",
+			primeEnvVal: "prime",
+			val:         &falseVal,
+			def:         true,
+			expected:    false,
+		},
+		{
+			name:        "prime feature on prime build respects explicit true value",
+			primeEnvVal: "prime",
+			val:         &trueVal,
+			def:         false,
+			expected:    true,
+		},
+		{
+			name:        "prime feature on non-prime build returns false even when val is true",
+			primeEnvVal: "",
+			val:         &trueVal,
+			def:         true,
+			expected:    false,
+		},
+		{
+			name:        "prime feature on non-prime build returns false regardless of default",
+			primeEnvVal: "",
+			val:         nil,
+			def:         true,
+			expected:    false,
+		},
+		{
+			name:        "non-prime feature on non-prime build is unaffected",
+			primeEnvVal: "",
+			val:         &trueVal,
+			def:         false,
+			expected:    true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv(primeEnv, test.primeEnvVal)
+			feat := &Feature{
+				prime: test.name != "non-prime feature on non-prime build is unaffected",
+				val:   test.val,
+				def:   test.def,
+			}
+			assert.Equal(t, test.expected, feat.Enabled())
+		})
+	}
+}
+
+func TestIsEnabledPrimeFeature(t *testing.T) {
+	trueVal := true
+
+	tests := []struct {
+		name        string
+		primeEnvVal string
+		feature     *v3.Feature
+		expected    bool
+	}{
+		{
+			name:        "prime feature CR on non-prime build always returns false",
+			primeEnvVal: "",
+			feature: &v3.Feature{
+				Spec:   v3.FeatureSpec{Value: &trueVal},
+				Status: v3.FeatureStatus{Prime: true, Default: true},
+			},
+			expected: false,
+		},
+		{
+			name:        "prime feature CR on prime build returns spec value",
+			primeEnvVal: "prime",
+			feature: &v3.Feature{
+				Spec:   v3.FeatureSpec{Value: &trueVal},
+				Status: v3.FeatureStatus{Prime: true, Default: false},
+			},
+			expected: true,
+		},
+		{
+			name:        "non-prime feature CR on non-prime build is unaffected",
+			primeEnvVal: "",
+			feature: &v3.Feature{
+				Spec:   v3.FeatureSpec{Value: &trueVal},
+				Status: v3.FeatureStatus{Prime: false, Default: false},
+			},
+			expected: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv(primeEnv, test.primeEnvVal)
+			assert.Equal(t, test.expected, IsEnabled(test.feature))
+		})
+	}
+}
+
+func TestRequireRestartsNonPrimeBuild(t *testing.T) {
+	trueVal := true
+	t.Setenv(primeEnv, "")
+
+	feat := &Feature{
+		prime:   true,
+		dynamic: false,
+		def:     true,
+		val:     nil,
+	}
+	featureObj := &v3.Feature{
+		Spec:   v3.FeatureSpec{Value: &trueVal},
+		Status: v3.FeatureStatus{Prime: true},
+	}
+	// Toggling a prime feature on a non-prime build never requires restart
+	// because the feature is unconditionally disabled.
+	assert.False(t, RequireRestarts(feat, featureObj))
+}

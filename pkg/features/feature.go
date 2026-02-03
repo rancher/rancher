@@ -170,10 +170,10 @@ var (
 		isPrime(),
 		false,
 		true)
-	RancherSCCRegistrationExtension = newFeature(
+	RancherSCCRegistrationExtension = newPrimeFeature(
 		"rancher-scc-registration-extension",
 		"Enable Rancher's SCC registration extension to register the system(s) for customer support",
-		isPrime(),
+		true,
 		false,
 		true)
 	Turtles = newFeature(
@@ -182,10 +182,10 @@ var (
 		true,
 		false,
 		false)
-	ClusterAutoscaling = newFeature(
+	ClusterAutoscaling = newPrimeFeature(
 		"cluster-autoscaling",
 		"Enable Rancher cluster-autoscaler support",
-		isPrime(),
+		true,
 		false,
 		true,
 	)
@@ -234,6 +234,9 @@ type Feature struct {
 	dynamic bool
 	// Whether we should install this feature or assume something else will install and manage the Feature CR
 	install bool
+	// prime indicates this feature is only available in Prime builds.
+	// On non-Prime builds, Enabled() always returns false regardless of configuration.
+	prime bool
 	// If a feature is locked on install, it can't be modified after install. A new Rancher instance is required to change the value.
 	lockedOnInstall bool
 }
@@ -276,6 +279,7 @@ func InitializeFeatures(featuresClient managementv3.FeatureClient, featureArgs s
 						Default:     f.def,
 						Dynamic:     f.dynamic,
 						Description: f.description,
+						Prime:       f.prime,
 					},
 				}
 				if f.lockedOnInstall {
@@ -306,6 +310,11 @@ func InitializeFeatures(featuresClient managementv3.FeatureClient, featureArgs s
 			// Check if a feature is no longer locked but has a locked value. If so, remove the locked value.
 			if !f.lockedOnInstall && featureState.Status.LockedValue != nil {
 				newFeatureState.Status.LockedValue = nil
+			}
+
+			// check if the feature's prime value has changed from previous rancher version
+			if featureState.Status.Prime != f.prime {
+				newFeatureState.Status.Prime = f.prime
 			}
 
 			newFeatureState, err = featuresClient.Update(newFeatureState)
@@ -384,8 +393,12 @@ func applyArgumentDefaults(featureArgs string) error {
 	return nil
 }
 
-// Enabled returns whether the feature is enabled
+// Enabled returns whether the feature is enabled.
+// Prime features always return false on non-Prime builds.
 func (f *Feature) Enabled() bool {
+	if f.prime && !isPrime() {
+		return false
+	}
 	if f.val != nil {
 		return *f.val
 	}
@@ -400,6 +413,9 @@ func (f *Feature) Enabled() bool {
 // this only happens during an upgrade.
 func RequireRestarts(f *Feature, obj *v3.Feature) bool {
 	if f.Dynamic() {
+		return false
+	}
+	if f.prime && !isPrime() {
 		return false
 	}
 
@@ -428,6 +444,11 @@ func (f *Feature) Dynamic() bool {
 	return f.dynamic
 }
 
+// Prime returns whether the feature is only available in Prime builds.
+func (f *Feature) Prime() bool {
+	return f.prime
+}
+
 func (f *Feature) Set(val bool) {
 	f.val = &val
 }
@@ -451,6 +472,10 @@ func GetFeatureByName(name string) *Feature {
 
 func IsEnabled(feature *v3.Feature) bool {
 	if feature == nil {
+		return false
+	}
+	// Prime features always return false on non-Prime builds.
+	if feature.Status.Prime && !isPrime() {
 		return false
 	}
 	if feature.Status.LockedValue != nil {
@@ -477,6 +502,15 @@ func newFeature(name, description string, def, dynamic, install bool) *Feature {
 	features[name] = feature
 
 	return feature
+}
+
+// newPrimeFeature creates a feature that is only available in Prime builds.
+// On non-Prime builds Enabled() unconditionally returns false regardless of
+// the configured value or default.
+func newPrimeFeature(name, description string, def, dynamic, install bool) *Feature {
+	f := newFeature(name, description, def, dynamic, install)
+	f.prime = true
+	return f
 }
 
 // isPrime returns true if it is a Rancher Prime installation
