@@ -111,13 +111,13 @@ func (h *authorizeHandler) authEndpoint(w http.ResponseWriter, r *http.Request) 
 	if redirectURL.Host == r.URL.Host && redirectURL.Path == r.URL.Path {
 		oidcerror.WriteError(oidcerror.InvalidRequest, "redirect_uri can't be the same as the host uri", http.StatusBadRequest, w)
 	}
-	oidcClients, err := h.oidcClientCache.GetByIndex(oidcClientByIDIndex, params.clientID)
+	oidcClients, err := h.oidcClientCache.GetByIndex(OIDCClientByIDIndex, params.clientID)
 	if err != nil {
 		oidcerror.WriteError(oidcerror.InvalidRequest, fmt.Sprintf("error retrieving OIDC client: %v", err), http.StatusBadRequest, w)
 		return
 	}
 	if len(oidcClients) == 0 {
-		oidcerror.WriteError(oidcerror.InvalidRequest, fmt.Sprintf("OIDC client not found: %v", err), http.StatusBadRequest, w)
+		oidcerror.WriteError(oidcerror.InvalidRequest, fmt.Sprintf("OIDC client %q not found", params.clientID), http.StatusBadRequest, w)
 		return
 	}
 	if len(oidcClients) > 1 {
@@ -140,15 +140,10 @@ func (h *authorizeHandler) authEndpoint(w http.ResponseWriter, r *http.Request) 
 		oidcerror.RedirectWithError(params.redirectURI, oidcerror.InvalidRequest, "challenge_method not supported, only S256 is supported", params.state, w, r)
 		return
 	}
-	if !slices.Contains(params.scopes, "openid") {
-		oidcerror.RedirectWithError(params.redirectURI, oidcerror.InvalidScope, "missing openid scope", params.state, w, r)
+
+	if err := h.validateScopes(params.scopes, oidcClient); err != nil {
+		oidcerror.RedirectWithError(params.redirectURI, oidcerror.InvalidScope, err.Error(), params.state, w, r)
 		return
-	}
-	for _, scope := range params.scopes {
-		if !slices.Contains(supportedScopes, scope) {
-			oidcerror.RedirectWithError(params.redirectURI, oidcerror.InvalidScope, fmt.Sprintf("invalid scope: %s", scope), params.state, w, r)
-			return
-		}
 	}
 	if params.codeChallenge == "" {
 		oidcerror.RedirectWithError(params.redirectURI, oidcerror.InvalidRequest, "missing code_challenge", params.state, w, r)
@@ -261,4 +256,31 @@ func getAuthParamsFromRequest(r *http.Request) (*authParams, error) {
 		redirectURI:         values.Get("redirect_uri"),
 		responseType:        values.Get("response_type"),
 	}, nil
+}
+
+// validateScopes validates that all requested scopes are allowed for the given
+// OIDCClient.
+//
+// If oidcClient.Spec.Scopes is empty, the allowed scopes default to supportedScopes.
+// It returns nil when all requested scopes are allowed; otherwise it returns a
+// non-nil error describing the invalid scopes.
+func (h *authorizeHandler) validateScopes(requested []string, oidcClient *v3.OIDCClient) error {
+	scopes := slices.Clone(oidcClient.Spec.Scopes)
+
+	if len(scopes) == 0 {
+		scopes = append(scopes, supportedScopes...)
+	}
+
+	var invalidScopes []string
+	for _, scope := range requested {
+		if !slices.Contains(scopes, scope) {
+			invalidScopes = append(invalidScopes, scope)
+		}
+	}
+
+	if len(invalidScopes) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("invalid scope: %s", strings.Join(invalidScopes, " "))
 }

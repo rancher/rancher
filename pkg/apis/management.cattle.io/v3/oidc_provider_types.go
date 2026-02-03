@@ -66,4 +66,11 @@ type OIDCClientSpec struct {
 	// a refresh token remains valid before expiration.
 	// +kubebuilder:validation:Minimum=1
 	RefreshTokenExpirationSeconds int64 `json:"refreshTokenExpirationSeconds"`
+
+	// Scopes is the list of scopes allowed for this client.
+	//
+	// If configured, the client will only be able to request these scopes.
+	//
+	// +optional
+	Scopes []string `json:"scopes"`
 }

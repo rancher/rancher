@@ -5301,6 +5301,11 @@ func (in *OIDCClientSpec) DeepCopyInto(out *OIDCClientSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.Scopes != nil {
+		in, out := &in.Scopes, &out.Scopes
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

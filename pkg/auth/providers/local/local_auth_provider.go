@@ -186,7 +186,7 @@ func (l *Provider) getGroupPrincipals(user *apiv3.User) ([]apiv3.Principal, erro
 				continue
 			}
 
-			//find group for this member mapping
+			// find group for this member mapping
 			localGroup, err := l.groupLister.Get("", gm.GroupName)
 			if err != nil {
 				logrus.Errorf("Failed to get Group resource %v: %v", gm.GroupName, err)

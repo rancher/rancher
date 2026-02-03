@@ -2,12 +2,14 @@ package requests
 
 import (
 	"context"
+	"crypto/rsa"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
@@ -19,8 +21,11 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	exttokenstore "github.com/rancher/rancher/pkg/ext/stores/tokens"
+	"github.com/rancher/rancher/pkg/features"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/oidc/provider"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/steve/pkg/auth"
 	"github.com/sirupsen/logrus"
@@ -33,11 +38,17 @@ import (
 
 const tokenKeyIndex = "authn.management.cattle.io/token-key-index"
 
+// ErrMustAuthenticate is returned by the authenticator when the request cannot
+// be authenticated.
 var ErrMustAuthenticate = httperror.NewAPIError(httperror.Unauthorized, "must authenticate")
 
 // AuthTokenGetter retrieves a token from the request.
 type AuthTokenGetter interface {
 	TokenFromRequest(req *http.Request) (accessor.TokenAccessor, error)
+}
+
+type publicKeyGetter interface {
+	GetPublicKey(kid string) (*rsa.PublicKey, error)
 }
 
 // Authenticator authenticates a request.
@@ -58,6 +69,16 @@ type AuthenticatorResponse struct {
 // ClusterRouter returns the cluster ID based on the request URL's path.
 type ClusterRouter func(req *http.Request) string
 
+// authorizationTokenClaims contains the claims for the Rancher issued
+// Authorization tokens.
+type authorizationTokenClaims struct {
+	jwt.RegisteredClaims
+
+	// Token is a reference to the underlying v3.Token associated with the
+	// authenticated user.
+	Token string `json:"token"`
+}
+
 type tokenAuthenticator struct {
 	ctx                 context.Context
 	tokenIndexer        cache.Indexer
@@ -69,6 +90,8 @@ type tokenAuthenticator struct {
 	refreshUser         func(userID string, force bool)
 	now                 func() time.Time // Make it easier to test.
 	extTokenStore       *exttokenstore.SystemStore
+	keyGetter           publicKeyGetter
+	oidcClientCache     mgmtcontrollers.OIDCClientCache
 }
 
 // ToAuthMiddleware converts an Authenticator to an auth.Middleware.
@@ -102,7 +125,7 @@ func NewAuthenticator(ctx context.Context, clusterRouter ClusterRouter, mgmtCtx 
 
 	extTokenStore := exttokenstore.NewSystemFromWrangler(mgmtCtx.Wrangler)
 
-	return &tokenAuthenticator{
+	authenticator := &tokenAuthenticator{
 		ctx:                 ctx,
 		tokenIndexer:        tokenInformer.GetIndexer(),
 		tokenClient:         mgmtCtx.Wrangler.Mgmt.Token(),
@@ -116,6 +139,13 @@ func NewAuthenticator(ctx context.Context, clusterRouter ClusterRouter, mgmtCtx 
 		now:           time.Now,
 		extTokenStore: extTokenStore,
 	}
+
+	if features.OIDCProvider.Enabled() {
+		authenticator.keyGetter = provider.NewOIDCKeyClient(mgmtCtx.Wrangler.Core.Secret().Cache())
+		authenticator.oidcClientCache = mgmtCtx.Wrangler.Mgmt.OIDCClient().Cache()
+	}
+
+	return authenticator
 }
 
 func tokenKeyIndexer(obj interface{}) ([]string, error) {
@@ -295,6 +325,35 @@ func getUserExtraInfo(token accessor.TokenAccessor, user *apiv3.User, attribs *a
 	return extraInfo
 }
 
+func (a *tokenAuthenticator) parseTokenFromJWT(s string) (*authorizationTokenClaims, error) {
+	var claims authorizationTokenClaims
+	_, err := jwt.ParseWithClaims(s, &claims, func(token *jwt.Token) (any, error) {
+		if kid, ok := token.Header["kid"]; ok {
+			kidStr, ok := kid.(string)
+			if !ok {
+				return nil, errors.New("kid header must be a string")
+			}
+			publicKey, err := a.keyGetter.GetPublicKey(kidStr)
+			if err != nil {
+				return nil, fmt.Errorf("getting PublicKey %q: %w", kidStr, err)
+			}
+
+			return publicKey, nil
+		}
+
+		return nil, errors.New("missing kid in access token")
+	},
+		jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Name}),
+		jwt.WithIssuer(settings.ServerURL.Get()+"/oidc"),
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("tokenAuthenticator parsing JWT: %w", err)
+	}
+
+	return &claims, nil
+}
+
 // TokenFromRequest retrieves and verifies the token from the request.
 func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.TokenAccessor, error) {
 	tokenAuthValue := tokens.GetTokenAuthFromRequest(req)
@@ -302,10 +361,34 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 		return nil, ErrMustAuthenticate
 	}
 
+	var tokenClaims *authorizationTokenClaims
 	tokenName, tokenKey := tokens.SplitTokenParts(tokenAuthValue)
 	if tokenName == "" || tokenKey == "" {
-		return nil, ErrMustAuthenticate
+		if !features.OIDCProvider.Enabled() {
+			return nil, ErrMustAuthenticate
+		}
+
+		logrus.Debug("Could not parse tokenName and tokenKey from request - attempting JWT authentication")
+		claims, err := a.parseTokenFromJWT(tokenAuthValue)
+		if err != nil {
+			logrus.Errorf("TokenFromRequest failed to parse JWT: %s", err)
+			return nil, ErrMustAuthenticate
+		}
+
+		obj, exists, err := a.tokenIndexer.GetByKey(claims.Token)
+		if err != nil || !exists {
+			logrus.Errorf("Unknown token in OAuth Token: %s", claims.Token)
+			return nil, ErrMustAuthenticate
+		}
+
+		token := obj.(*apiv3.Token)
+
+		tokenClaims = claims
+		tokenName, tokenKey = token.Name, token.Token
+		logrus.Debug("Parsed tokenName and TokenKey from JWT")
 	}
+
+	logrus.Debugf("TokenFromRequest: Using tokenName %q", tokenName)
 
 	lookupUsingClient := false
 
@@ -354,12 +437,34 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 		storedToken = objs[0].(*v3.Token)
 	}
 
+	if tokenClaims != nil {
+		if err := a.validateOIDCClientForToken(tokenClaims); err != nil {
+			return nil, err
+		}
+	}
+
 	if _, err := tokens.VerifyToken(storedToken, tokenName, tokenKey); err != nil {
 		logrus.Debugf("auth: Error verifying token %s: %v", tokenName, err)
 		return nil, errors.Wrapf(ErrMustAuthenticate, "failed to verify token: %v", err)
 	}
 
 	return storedToken, nil
+}
+
+func (a *tokenAuthenticator) validateOIDCClientForToken(claims *authorizationTokenClaims) error {
+	if len(claims.Audience) == 0 {
+		return errors.New("invalid authorization token - has no audience")
+	}
+
+	oidcClients, err := a.oidcClientCache.GetByIndex(provider.OIDCClientByIDIndex, claims.Audience[0])
+	if err != nil {
+		return fmt.Errorf("error retrieving OIDC client %s: %w", claims.Audience[0], err)
+	}
+	if len(oidcClients) == 0 {
+		return errors.New("no OIDC clients found")
+	}
+
+	return nil
 }
 
 // Given a stored token with hashed key, check if the provided (unhashed) tokenKey matches and is valid.

@@ -254,7 +254,7 @@ func TestGetPublicKey(t *testing.T) {
 
 				return mock
 			},
-			expectedErr: "unexpected error",
+			expectedErr: "getting public key: unexpected error",
 		},
 		"no signing key in secret": {
 			secretCache: func() corecontrollers.SecretCache {
@@ -274,7 +274,8 @@ func TestGetPublicKey(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			h := jwksHandler{secretCache: test.secretCache()}
+			cache := test.secretCache()
+			h := jwksHandler{secretCache: cache, oidcKeyClient: NewOIDCKeyClient(cache)}
 
 			key, err := h.GetPublicKey(test.kid)
 
