@@ -73,6 +73,9 @@ type ClusterRouter func(req *http.Request) string
 // Authorization tokens.
 type authorizationTokenClaims struct {
 	jwt.RegisteredClaims
+
+	// Token is a reference to the underlying v3.Token associated with the
+	// authenticated user.
 	Token string `json:"token"`
 }
 
@@ -326,9 +329,13 @@ func (a *tokenAuthenticator) parseTokenFromJWT(s string) (*authorizationTokenCla
 	var claims authorizationTokenClaims
 	_, err := jwt.ParseWithClaims(s, &claims, func(token *jwt.Token) (any, error) {
 		if kid, ok := token.Header["kid"]; ok {
-			publicKey, err := a.keyGetter.GetPublicKey(kid.(string))
+			kidStr, ok := kid.(string)
+			if !ok {
+				return nil, errors.New("kid header must be a string")
+			}
+			publicKey, err := a.keyGetter.GetPublicKey(kidStr)
 			if err != nil {
-				return nil, fmt.Errorf("getting PublicKey %q", kid)
+				return nil, fmt.Errorf("getting PublicKey %q: %w", kidStr, err)
 			}
 
 			return publicKey, nil

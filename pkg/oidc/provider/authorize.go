@@ -117,7 +117,7 @@ func (h *authorizeHandler) authEndpoint(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if len(oidcClients) == 0 {
-		oidcerror.WriteError(oidcerror.InvalidRequest, fmt.Sprintf("OIDC client not found: %v", err), http.StatusBadRequest, w)
+		oidcerror.WriteError(oidcerror.InvalidRequest, fmt.Sprintf("OIDC client %q not found", params.clientID), http.StatusBadRequest, w)
 		return
 	}
 	if len(oidcClients) > 1 {
@@ -258,12 +258,15 @@ func getAuthParamsFromRequest(r *http.Request) (*authParams, error) {
 	}, nil
 }
 
-// validateScopes returns true if the requested scopes are allowed by the
+// validateScopes validates that all requested scopes are allowed for the given
 // OIDCClient.
 //
-// The scopes are defaulted
+// If oidcClient.Spec.Scopes is empty, the allowed scopes default to supportedScopes.
+// It returns nil when all requested scopes are allowed; otherwise it returns a
+// non-nil error describing the invalid scopes.
 func (h *authorizeHandler) validateScopes(requested []string, oidcClient *v3.OIDCClient) error {
-	scopes := oidcClient.Spec.Scopes
+	scopes := slices.Clone(oidcClient.Spec.Scopes)
+
 	if len(scopes) == 0 {
 		scopes = append(scopes, supportedScopes...)
 	}

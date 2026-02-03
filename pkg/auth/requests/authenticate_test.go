@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/rancher/norman/types"
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -36,7 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 type fakeUserRefresher struct {
@@ -506,7 +507,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 	t.Run("token is disabled", func(t *testing.T) {
 		oldTokenEnabled := token.Enabled
 		defer func() { token.Enabled = oldTokenEnabled }()
-		token.Enabled = pointer.BoolPtr(false)
+		token.Enabled = ptr.To(false)
 
 		userRefresher.reset()
 
@@ -555,7 +556,7 @@ func TestTokenAuthenticatorAuthenticate(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: userID,
 				},
-				Enabled: pointer.BoolPtr(false),
+				Enabled: ptr.To(false),
 			}, nil
 		}
 
@@ -674,7 +675,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 			UserID:  userID,
 			TTL:     57600000,
 			Kind:    exttokenstore.IsLogin,
-			Enabled: pointer.Bool(true),
+			Enabled: ptr.To(true),
 			UserPrincipal: ext.TokenPrincipal{
 				Name:        userPrincipalID,
 				Provider:    fakeProvider.name,
@@ -1090,7 +1091,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: userID,
 				},
-				Enabled: pointer.BoolPtr(false),
+				Enabled: ptr.To(false),
 			}, nil
 		}
 
@@ -1624,6 +1625,53 @@ func TestAuthenticateWithAccessTokenAndOIDCDisabled(t *testing.T) {
 	// use require.ErrorsIs.
 	require.ErrorContains(t, err, ErrMustAuthenticate.Error())
 	require.Nil(t, resp)
+}
+
+// This test verifies that parseTokenFromJWT handles non-string kid values
+// without panicking. A malformed JWT could have a kid that is a number,
+// boolean, or other type instead of a string.
+func Test_tokenAuthenticator_parseTokenFromJWT_NonStringKid(t *testing.T) {
+	previousOIDCProvider := features.OIDCProvider.Enabled()
+	features.OIDCProvider.Set(true)
+	t.Cleanup(func() {
+		features.OIDCProvider.Set(previousOIDCProvider)
+	})
+
+	now := time.Now()
+	ctrl := gomock.NewController(t)
+	privateKey := testGeneratePrivateKey(t)
+
+	// Create a token manually with a non-string kid (integer)
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, &authorizationTokenClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    settings.ServerURL.Get() + "/oidc",
+			ExpiresAt: jwt.NewNumericDate(now.Add(1 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(now),
+			Audience:  []string{"test-client-id"},
+		},
+		Token: "test-token",
+	})
+
+	// Set kid as an integer instead of string
+	token.Header["kid"] = 12345
+
+	signedToken, err := token.SignedString(privateKey)
+	require.NoError(t, err)
+
+	signingKeyGetter := mocks.NewMocksigningKeyGetter(ctrl)
+	// The GetPublicKey should not be called since we should detect the type error first
+
+	authenticator := tokenAuthenticator{
+		ctx:       context.Background(),
+		keyGetter: signingKeyGetter,
+		now: func() time.Time {
+			return now
+		},
+	}
+
+	claims, err := authenticator.parseTokenFromJWT(signedToken)
+	require.Contains(t, err.Error(), "kid header must be a string")
+	require.Nil(t, claims)
 }
 
 func testGeneratePrivateKey(t *testing.T) *rsa.PrivateKey {

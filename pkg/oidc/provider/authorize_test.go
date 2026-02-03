@@ -71,7 +71,7 @@ func TestAuthEndpoint(t *testing.T) {
 					CodeChallenge: "code-challenge",
 					CreatedAt:     fakeTime,
 				})
-				m.oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", fakeClientID).Return([]*v3.OIDCClient{
+				m.oidcClientCache.EXPECT().GetByIndex(OIDCClientByIDIndex, fakeClientID).Return([]*v3.OIDCClient{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: fakeClientName,
@@ -176,7 +176,7 @@ func TestAuthEndpoint(t *testing.T) {
 						Name: fakeUserID,
 					},
 				}, nil)
-				m.oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", fakeClientID).Return([]*v3.OIDCClient{
+				m.oidcClientCache.EXPECT().GetByIndex(OIDCClientByIDIndex, fakeClientID).Return([]*v3.OIDCClient{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: fakeClientName,
@@ -223,7 +223,7 @@ func TestAuthEndpoint(t *testing.T) {
 						Name: fakeUserID,
 					},
 				}, nil)
-				m.oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", fakeClientID).Return([]*v3.OIDCClient{
+				m.oidcClientCache.EXPECT().GetByIndex(OIDCClientByIDIndex, fakeClientID).Return([]*v3.OIDCClient{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: fakeClientName,
@@ -270,7 +270,7 @@ func TestAuthEndpoint(t *testing.T) {
 						Name: fakeUserID,
 					},
 				}, nil)
-				m.oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", fakeClientID).Return([]*v3.OIDCClient{
+				m.oidcClientCache.EXPECT().GetByIndex(OIDCClientByIDIndex, fakeClientID).Return([]*v3.OIDCClient{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: fakeClientName,
@@ -317,7 +317,7 @@ func TestAuthEndpoint(t *testing.T) {
 						Name: fakeUserID,
 					},
 				}, nil)
-				m.oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", fakeClientID).Return([]*v3.OIDCClient{
+				m.oidcClientCache.EXPECT().GetByIndex(OIDCClientByIDIndex, fakeClientID).Return([]*v3.OIDCClient{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: fakeClientName,
@@ -336,14 +336,13 @@ func TestAuthEndpoint(t *testing.T) {
 			wantRedirect:                       fakeRedirectUri + "?error=invalid_scope&error_description=invalid+scope%3A+invalidscope",
 			wantAccessControlAllowOriginHeader: fakeRedirectUri,
 		},
-
 		"configured scopes": {
 			req: func() *http.Request {
 				req := &http.Request{
 					URL: &url.URL{
 						Scheme:   "https",
 						Host:     "rancher.com",
-						RawQuery: "code_challenge_method=S256&response_type=code&code_challenge=code-challenge&client_id=client-id&scope=openid+profile+rancher:test&redirect_uri=" + fakeRedirectUri,
+						RawQuery: "code_challenge_method=S256&response_type=code&code_challenge=code-challenge&client_id=client-id&scope=openid+offline_access+profile+rancher:test&redirect_uri=" + fakeRedirectUri,
 					},
 					Method: http.MethodGet,
 				}
@@ -369,18 +368,18 @@ func TestAuthEndpoint(t *testing.T) {
 				m.sessionAdder.EXPECT().Add(fakeCode, session.Session{
 					ClientID:      fakeClientID,
 					TokenName:     fakeTokenName,
-					Scope:         []string{"openid", "profile", "rancher:test"},
+					Scope:         []string{"openid", "offline_access", "profile", "rancher:test"},
 					CodeChallenge: "code-challenge",
 					CreatedAt:     fakeTime,
 				})
-				m.oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", fakeClientID).Return([]*v3.OIDCClient{
+				m.oidcClientCache.EXPECT().GetByIndex(OIDCClientByIDIndex, fakeClientID).Return([]*v3.OIDCClient{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: fakeClientName,
 						},
 						Spec: v3.OIDCClientSpec{
 							RedirectURIs: []string{fakeRedirectUri},
-							Scopes:       []string{"openid", "profile", "rancher:test"},
+							Scopes:       []string{"openid", "profile", "rancher:test", "offline_access"},
 						},
 						Status: v3.OIDCClientStatus{
 							ClientID: fakeClientID,
@@ -422,7 +421,7 @@ func TestAuthEndpoint(t *testing.T) {
 						Name: fakeUserID,
 					},
 				}, nil)
-				m.oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", fakeClientID).Return([]*v3.OIDCClient{
+				m.oidcClientCache.EXPECT().GetByIndex(OIDCClientByIDIndex, fakeClientID).Return([]*v3.OIDCClient{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: fakeClientName,
@@ -487,7 +486,7 @@ func TestAuthEndpoint(t *testing.T) {
 						Name: fakeUserID,
 					},
 				}, nil)
-				m.oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", fakeClientID).Return(nil, errors.NewNotFound(schema.GroupResource{}, fakeClientID))
+				m.oidcClientCache.EXPECT().GetByIndex(OIDCClientByIDIndex, fakeClientID).Return(nil, errors.NewNotFound(schema.GroupResource{}, fakeClientID))
 			},
 			req: func() *http.Request {
 				req := &http.Request{
@@ -521,7 +520,7 @@ func TestAuthEndpoint(t *testing.T) {
 						Name: fakeUserID,
 					},
 				}, nil)
-				m.oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", fakeClientID).Return([]*v3.OIDCClient{
+				m.oidcClientCache.EXPECT().GetByIndex(OIDCClientByIDIndex, fakeClientID).Return([]*v3.OIDCClient{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: fakeClientName,
