@@ -80,12 +80,7 @@ func (s *peersBasedStrategy) isOwner(cluster *v3.Cluster) (owner bool) {
 	var highestScore uint64
 	var ownerID string
 	for _, peerID := range peers.IDs {
-		// Order matters: Peer IDs (IPs/Names) often share long prefixes (subnet) and differ only by a small part.
-		// FNV-1a is sensitive to this; if the differing suffix is processed last, the resulting scores correlate
-		// linearly, creating "hot spots" and not achieving the desired uniform distribution.
-		// By hashing the Peer ID first, we ensure the high entropy of the UUID randomizes the final state.
 		score := hashCombine(peerID, string(cluster.UID))
-
 		if score > highestScore {
 			highestScore = score
 			ownerID = peerID
@@ -194,7 +189,11 @@ func newPeersBasedStrategy(ctx context.Context, m peermanager.PeerManager, useCo
 }
 
 // hashCombine generates a hash for a combination of peer and cluster IDs.
-// FNV-1a is fast and provides good distribution for this use case.
+// FNV-1a is fast and provides good distribution for this use case, with a caveat:
+// Order matters: Peer IDs (IPs/Names) often share long prefixes (subnet) and differ only by a small part.
+// FNV-1a is sensitive to this; if the differing suffix is processed last, the resulting scores correlate
+// linearly, creating "hot spots" and not achieving the desired uniform distribution.
+// By hashing the Peer ID first, we ensure the high entropy of the UUID randomizes the final state.
 func hashCombine(peerID, clusterUID string) uint64 {
 	h := fnv.New64a()
 	_, _ = h.Write([]byte(peerID))
