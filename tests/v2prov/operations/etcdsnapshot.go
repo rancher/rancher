@@ -21,7 +21,6 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/cluster"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,8 +29,6 @@ import (
 )
 
 func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster, configMap corev1.ConfigMap, targetNode string) *rkev1.ETCDSnapshot {
-	t.Helper()
-
 	defer func() {
 		if t.Failed() {
 			data, newErr := cluster.GatherDebugData(clients, c)
@@ -224,7 +221,32 @@ func RunSnapshotCreateTest(t *testing.T, clients *clients.Clients, c *v1.Cluster
 	return snapshot
 }
 
-func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluster, snapshotName string, expectedConfigMap corev1.ConfigMap, expectedNodeCount int, restoreRKEConfig string) {
+func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluster, snapshotName string, expectedConfigMap corev1.ConfigMap, expectedNodeCount int) {
+	runSnapshotRestoreTest(t, clients, c, snapshotName, expectedConfigMap, expectedNodeCount, "none", false)
+}
+
+func RunSnapshotCreateTests(t *testing.T, clients *clients.Clients, c *v1.Cluster, configMap corev1.ConfigMap, targetNode string, count int) []*rkev1.ETCDSnapshot {
+	t.Helper()
+
+	if count <= 0 {
+		t.Fatal("snapshot count must be positive")
+	}
+
+	snapshots := make([]*rkev1.ETCDSnapshot, 0, count)
+	for i := 0; i < count; i++ {
+		snapshot := RunSnapshotCreateTest(t, clients, c, configMap, targetNode)
+		snapshots = append(snapshots, snapshot)
+	}
+
+	return snapshots
+}
+
+func RunSnapshotRestoreTestWithRKEConfig(t *testing.T, clients *clients.Clients, c *v1.Cluster, snapshotName string, expectedConfigMap corev1.ConfigMap, expectedNodeCount int, restoreRKEConfig string) {
+	t.Helper()
+	runSnapshotRestoreTest(t, clients, c, snapshotName, expectedConfigMap, expectedNodeCount, restoreRKEConfig, true)
+}
+
+func runSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluster, snapshotName string, expectedConfigMap corev1.ConfigMap, expectedNodeCount int, restoreRKEConfig string, incrementGeneration bool) {
 	t.Helper()
 
 	defer func() {
@@ -237,19 +259,15 @@ func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 		}
 	}()
 
-	// Update the cluster spec to trigger restore
+	generation := 1
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		newC, err := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
-
-		// Dynamically increment generation to support multiple restores in one test sequence
-		generation := 1
-		if newC.Spec.RKEConfig.ETCDSnapshotRestore != nil {
+		if incrementGeneration && newC.Spec.RKEConfig.ETCDSnapshotRestore != nil {
 			generation = newC.Spec.RKEConfig.ETCDSnapshotRestore.Generation + 1
 		}
-
 		newC.Spec.RKEConfig.ETCDSnapshotRestore = &rkev1.ETCDSnapshotRestore{
 			Name:             snapshotName,
 			Generation:       generation,
@@ -262,47 +280,32 @@ func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 		c = newC
 		return nil
 	})
-	require.NoError(t, err, "Failed to update cluster spec for restore")
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	logrus.Infof("Waiting for control plane to start restore type: %s", restoreRKEConfig)
-
-	err = wait.PollUntilContextTimeout(clients.Ctx, 2*time.Second, 10*time.Minute, true, func(ctx context.Context) (bool, error) {
-		cp, err := clients.RKE.RKEControlPlane().Get(c.Namespace, c.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
+	_, err = cluster.WaitForControlPlane(clients, c, "etcd snapshot restore", func(rkeControlPlane *rkev1.RKEControlPlane) (bool, error) {
+		restoreComplete := rkeControlPlane.Status.ETCDSnapshotRestorePhase == rkev1.ETCDSnapshotPhaseFinished && capr.Ready.IsTrue(rkeControlPlane)
+		if !incrementGeneration {
+			return restoreComplete, nil
 		}
-
-		// Check specific restore phase and provisioned status
-		if (cp.Status.ETCDSnapshotRestorePhase == rkev1.ETCDSnapshotPhaseShutdown || cp.Status.ETCDSnapshotRestorePhase == rkev1.ETCDSnapshotPhaseRestore) && capr.Bootstrapped.IsFalse(cp) {
-			return true, nil
-		}
-
-		return false, nil
+		return rkeControlPlane.Status.ETCDSnapshotRestore != nil &&
+			rkeControlPlane.Status.ETCDSnapshotRestore.Generation == generation &&
+			restoreComplete, nil
 	})
-	require.NoError(t, err, "Timeout waiting for snapshot restore to start")
-
-	logrus.Infof("Waiting for control plane to complete restore type: %s", restoreRKEConfig)
-
-	err = wait.PollUntilContextTimeout(clients.Ctx, 2*time.Second, 10*time.Minute, true, func(ctx context.Context) (bool, error) {
-		cp, err := clients.RKE.RKEControlPlane().Get(c.Namespace, c.Name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-
-		// Check specific restore phase and ready status
-		if cp.Status.ETCDSnapshotRestorePhase == rkev1.ETCDSnapshotPhaseFinished && capr.Ready.IsTrue(cp) {
-			return true, nil
-		}
-
-		return false, nil
-	})
-	require.NoError(t, err, "Timeout waiting for snapshot restore to finish")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	_, err = cluster.WaitForCreate(clients, c)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	clientset, err := GetAndVerifyDownstreamClientset(clients, c)
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ns := corev1.NamespaceDefault
 	if expectedConfigMap.Namespace != "" {
@@ -310,13 +313,17 @@ func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 	}
 
 	retrievedConfigMap, err := clientset.CoreV1().ConfigMaps(ns).Get(context.TODO(), expectedConfigMap.Name, metav1.GetOptions{})
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	assert.Equal(t, expectedConfigMap.Name, retrievedConfigMap.Name)
 	assert.Equal(t, expectedConfigMap.Data, retrievedConfigMap.Data)
 
 	allNodes, err := clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-	require.NoError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	nonDeletingNodes := 0
 	for _, n := range allNodes.Items {
@@ -325,4 +332,22 @@ func RunSnapshotRestoreTest(t *testing.T, clients *clients.Clients, c *v1.Cluste
 		}
 	}
 	assert.Equal(t, expectedNodeCount, nonDeletingNodes, "Unexpected number of nodes after restore")
+}
+
+// ModifyClusterAdditionalManifest updates the AdditionalManifest field on the cluster spec.
+// This is used to validate that restore modes properly revert (or preserve) spec changes.
+func ModifyClusterAdditionalManifest(t *testing.T, clients *clients.Clients, c *v1.Cluster, value string) {
+	t.Helper()
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		newC, err := clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		newC.Spec.RKEConfig.AdditionalManifest = value
+		_, err = clients.Provisioning.Cluster().Update(newC)
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 }
