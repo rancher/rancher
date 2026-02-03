@@ -5,16 +5,17 @@ package usercontrollers
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/peermanager"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/uuid"
 )
 
 func TestNonClusteredStrategy(t *testing.T) {
@@ -236,14 +237,31 @@ func TestPeersBasedStrategy(t *testing.T) {
 	})
 }
 
+func newUIDGenerator(t *testing.T, seed int64) func() types.UID {
+	t.Helper()
+	r := rand.New(rand.NewSource(seed))
+	return func() types.UID {
+		b := make([]byte, 16)
+		if _, err := r.Read(b); err != nil {
+			t.Fatal(err)
+		}
+		res, err := uuid.FromBytes(b)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return types.UID(res.String())
+	}
+}
+
 func TestConsistentHashing_StabilityAndDistribution(t *testing.T) {
 	const numClusters = 300
 	var clusters []*v3.Cluster
+	generateUID := newUIDGenerator(t, 0) // random UIDs from a known seed
 	for i := range numClusters {
 		clusters = append(clusters, &v3.Cluster{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("cluster-%d", i),
-				UID:  uuid.NewUUID(),
+				UID:  generateUID(),
 			},
 		})
 	}
