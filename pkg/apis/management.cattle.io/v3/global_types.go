@@ -41,6 +41,8 @@ type FeatureStatus struct {
 	Default     bool   `json:"default"`
 	Description string `json:"description"`
 	LockedValue *bool  `json:"lockedValue"`
+	// Prime indicates this feature is only available in Rancher Prime builds.
+	Prime bool `json:"prime"`
 }
 
 const (
