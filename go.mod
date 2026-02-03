@@ -118,7 +118,7 @@ require (
 	github.com/rancher/aks-operator v1.13.3-rc.1
 	github.com/rancher/ali-operator v1.13.2-rc.1
 	github.com/rancher/apiserver v0.7.7
-	github.com/rancher/channelserver v0.7.0
+	github.com/rancher/channelserver v0.9.1-0.20260116181358-8dcd92dec745
 	github.com/rancher/dynamiclistener v0.7.5
 	github.com/rancher/eks-operator v1.13.3-rc.1
 	github.com/rancher/fleet/pkg/apis v0.14.2
@@ -225,6 +225,7 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/google/cel-go v0.26.0 // indirect
+	github.com/google/go-github/v67 v67.0.0 // indirect
 	github.com/google/go-github/v72 v72.0.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.11 // indirect
@@ -328,7 +329,6 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/go-github/v29 v29.0.3 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/gax-go/v2 v2.16.0 // indirect
