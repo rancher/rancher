@@ -133,6 +133,7 @@ func main() {
 					"k8s.io/apimachinery/pkg/runtime",
 					"k8s.io/apimachinery/pkg/version",
 				},
+				OpenAPIModelPackageName: "ext.cattle.io.v1",
 			},
 			"telemetry.cattle.io": {
 				PackageName: "telemetry.cattle.io",
@@ -145,6 +146,7 @@ func main() {
 				OpenAPIDependencies: []string{
 					"k8s.io/apimachinery/pkg/apis/meta/v1",
 				},
+				OpenAPIModelPackageName: "telemetry.cattle.io.v1",
 			},
 		},
 	})
