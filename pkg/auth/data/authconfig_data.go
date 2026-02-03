@@ -15,9 +15,9 @@ import (
 	localprovider "github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/auth/providers/oidc"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/rancher/pkg/controllers/management/auth"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -106,7 +106,7 @@ func addAuthConfigCore(name, aType string, enabled, sloSupported bool, managemen
 	}
 	annotations[auth.CleanupAnnotation] = auth.CleanupRancherLocked
 
-	createdOrKnown, err := management.Management.AuthConfigs("").ObjectClient().Create(&v3.AuthConfig{
+	authConfig := &v3.AuthConfig{
 		ObjectMeta: v1.ObjectMeta{
 			Name:        name,
 			Annotations: annotations,
@@ -114,7 +114,9 @@ func addAuthConfigCore(name, aType string, enabled, sloSupported bool, managemen
 		Type:               aType,
 		Enabled:            enabled,
 		LogoutAllSupported: sloSupported,
-	})
+	}
+
+	_, err := management.Wrangler.Mgmt.AuthConfig().Create(authConfig)
 	if err != nil {
 		if !apierrors.IsAlreadyExists(err) {
 			return err
@@ -135,8 +137,7 @@ func addAuthConfigCore(name, aType string, enabled, sloSupported bool, managemen
 			return err
 		}
 
-		_, err = management.Management.AuthConfigs("").ObjectClient().
-			Patch(name, createdOrKnown, types.JSONPatchType, patch)
+		_, err = management.Wrangler.Mgmt.AuthConfig().Patch(name, types.JSONPatchType, patch)
 		if err != nil {
 			return err
 		}

@@ -24,12 +24,12 @@ func StartRefreshDaemon(scaledContext *config.ScaledContext, mgmtContext *config
 	refreshCronTime := settings.AuthUserInfoResyncCron.Get()
 	maxAge := settings.AuthUserInfoMaxAgeSeconds.Get()
 	ref = &refresher{
-		tokenLister:               mgmtContext.Management.Tokens("").Controller().Lister(),
-		tokens:                    mgmtContext.Management.Tokens(""),
-		userLister:                mgmtContext.Management.Users("").Controller().Lister(),
+		tokenCache:                scaledContext.Wrangler.Mgmt.Token().Cache(),
+		tokens:                    scaledContext.Wrangler.Mgmt.Token(),
+		userCache:                 scaledContext.Wrangler.Mgmt.User().Cache(),
 		tokenMGR:                  tokens.NewManager(scaledContext.Wrangler),
-		userAttributes:            mgmtContext.Management.UserAttributes(""),
-		userAttributeLister:       mgmtContext.Management.UserAttributes("").Controller().Lister(),
+		userAttributes:            scaledContext.Wrangler.Mgmt.UserAttribute(),
+		userAttributeCache:        scaledContext.Wrangler.Mgmt.UserAttribute().Cache(),
 		extTokenStore:             extTokenStore,
 		ensureAndGetUserAttribute: scaledContext.UserManager.EnsureAndGetUserAttribute,
 	}
