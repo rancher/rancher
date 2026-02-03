@@ -40,7 +40,7 @@ jobs:
       REGISTRY: "172.17.0.2:5000"
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: testdata
         run: mkdir -p build/testdata
       - name: Install Dapper
@@ -53,7 +53,7 @@ jobs:
           sudo systemctl restart docker
           sudo docker info
       - name: Download Docker images artifact
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: "/tmp"
           merge-multiple: true
@@ -97,7 +97,7 @@ jobs:
           sudo mv ./build/out.txt /tmp/report-${{ matrix.V2PROV_TEST_DIST }}-$TESTSUITE.txt
       - name: Upload Plain Text Test Results
         if: steps.test_output.outcome == 'success'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: "Test Results ${{ matrix.V2PROV_TEST_DIST }} ${{ steps.test_output.outputs.suite }}"
           path: "/tmp/report-${{ matrix.V2PROV_TEST_DIST }}-${{ steps.test_output.outputs.suite }}.*"
@@ -111,7 +111,7 @@ jobs:
         run: |
           zypper --non-interactive install golang
       - name: Fetch plaintext test output
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           merge-multiple: true
           path: /tmp/test-results/
@@ -122,7 +122,7 @@ jobs:
              go run github.com/jstemmer/go-junit-report/v2@latest < $file > $(sed 's/txt/xml/g' <<<$file)
           done
       - name: Upload XML Test Results
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: XML Results
           path: "/tmp/test-results/report-*.xml"
@@ -132,7 +132,7 @@ jobs:
     container: registry.suse.com/bci/bci-base:15.7
     steps:
       - name: Upload GH Event File
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: Event File
           path: ${{ github.event_path }}
