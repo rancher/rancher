@@ -419,6 +419,24 @@ func TestIsEnabledPrimeFeature(t *testing.T) {
 			expected: true,
 		},
 		{
+			name:        "prime feature CR on non-prime build returns false even with LockedValue true",
+			primeEnvVal: "",
+			feature: &v3.Feature{
+				Spec:   v3.FeatureSpec{Value: &trueVal},
+				Status: v3.FeatureStatus{Prime: true, Default: true, LockedValue: &trueVal},
+			},
+			expected: false,
+		},
+		{
+			name:        "prime feature CR on prime build falls through to default when value and lockedValue are nil",
+			primeEnvVal: "prime",
+			feature: &v3.Feature{
+				Spec:   v3.FeatureSpec{Value: nil},
+				Status: v3.FeatureStatus{Prime: true, Default: true},
+			},
+			expected: true,
+		},
+		{
 			name:        "non-prime feature CR on non-prime build is unaffected",
 			primeEnvVal: "",
 			feature: &v3.Feature{
