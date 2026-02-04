@@ -63,12 +63,6 @@ var (
 		true,
 		false,
 		false)
-	EmbeddedClusterAPI = newFeature(
-		"embedded-cluster-api",
-		"Enable a Rancher-managed instance of cluster-api core controller",
-		false,
-		false,
-		false)
 	ManagedSystemUpgradeController = newFeature(
 		"managed-system-upgrade-controller",
 		"Enable the installation of the system-upgrade-controller app as a managed system chart",

@@ -248,9 +248,6 @@ var (
 	// RemoteDialerProxyVersion is the exact version of the RDP that Rancher will install.
 	RemoteDialerProxyVersion = NewSetting("remotedialer-proxy-version", "")
 
-	// RancherProvisioningCAPIVersion is the exact version of the cluster api controller that Rancher will install.
-	RancherProvisioningCAPIVersion = NewSetting("rancher-provisioning-capi-version", "")
-
 	// RancherTurtlesVersion is the exact version of the rancher-turtles chart that Rancher will install.
 	RancherTurtlesVersion = NewSetting("rancher-turtles-version", "")
 
