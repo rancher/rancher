@@ -13,7 +13,6 @@ const (
 	UIPluginNamespace           = "cattle-ui-plugin-system"
 	GlobalNamespace             = "cattle-global-data"
 	NodeTemplateGlobalNamespace = "cattle-global-nt"
-	ProvisioningCAPINamespace   = "cattle-provisioning-capi-system"
 	TurtlesNamespace            = "cattle-turtles-system"
 )
 

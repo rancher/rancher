@@ -1,6 +1,5 @@
 webhookVersion: 109.0.0+up0.10.0-rc.10
 remoteDialerProxyVersion: 109.0.0+up0.7.0-rc.4
-provisioningCAPIVersion: 108.0.0+up0.9.0
 turtlesVersion: 109.0.0+up0.26.0-rc.2
 cspAdapterMinVersion: 109.0.0+up9.0.0-rc.3
 defaultShellVersion: rancher/shell:v0.6.2-rc.1

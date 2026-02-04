@@ -22,9 +22,6 @@ const (
 	// WebhookChartName name of the chart for rancher-webhook.
 	WebhookChartName = "rancher-webhook"
 
-	// ProvisioningCAPIChartName name of the chart for rancher-provisioning-capi.
-	ProvisioningCAPIChartName = "rancher-provisioning-capi"
-
 	// TurtlesChartName name of the chart for rancher-turtles.
 	TurtlesChartName = "rancher-turtles"
 
