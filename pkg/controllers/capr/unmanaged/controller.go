@@ -410,5 +410,7 @@ func (h *handler) onUnmanagedMachineChange(_ string, customMachine *rkev1.Custom
 }
 
 func machineHasNodeNotFoundCondition(capiMachine *capi.Machine) bool {
-	return conditions.IsFalse(capiMachine, capi.MachineNodeHealthyCondition) && (conditions.GetReason(capiMachine, capi.MachineNodeHealthyCondition) == capi.MachineNodeDoesNotExistReason)
+	// Reason of the NodeHealthy condition is "NodeDeleted" in v1beta2
+	return conditions.IsFalse(capiMachine, capi.MachineNodeHealthyCondition) &&
+		conditions.GetReason(capiMachine, capi.MachineNodeHealthyCondition) == capi.MachineNodeDeletedReason
 }
