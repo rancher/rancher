@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/steve/pkg/podimpersonation"
 	"github.com/rancher/steve/pkg/stores/proxy"
@@ -28,6 +29,11 @@ type shell struct {
 }
 
 func (s *shell) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	if !features.ClusterShell.Enabled() {
+		http.Error(rw, "Rancher's cluster shell feature is currently disabled", http.StatusServiceUnavailable)
+		return
+	}
+
 	ctx, user, client, err := s.contextAndClient(req)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusInternalServerError)
