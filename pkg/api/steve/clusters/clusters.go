@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/clusterrouter"
+	"github.com/rancher/rancher/pkg/features"
 	normanv3 "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -29,12 +30,7 @@ func Register(ctx context.Context, server *steve.Server, wrangler *wrangler.Cont
 	log := &log{
 		cg: server.ClientFactory,
 	}
-	shell := &shell{
-		cg:              server.ClientFactory,
-		namespace:       "cattle-system",
-		impersonator:    podimpersonation.New("shell", server.ClientFactory, time.Hour, settings.FullShellImage),
-		clusterRegistry: server.ClusterRegistry,
-	}
+
 	sc, err := config.NewScaledContext(*wrangler.RESTConfig, nil)
 	if err != nil {
 		return err
@@ -48,10 +44,20 @@ func Register(ctx context.Context, server *steve.Server, wrangler *wrangler.Cont
 		authToken: requests.NewAuthenticator(ctx, clusterrouter.GetClusterID, sc),
 	}
 
-	server.ClusterCache.OnAdd(ctx, shell.impersonator.PurgeOldRoles)
-	server.ClusterCache.OnChange(ctx, func(gvk schema.GroupVersionKind, key string, obj, oldObj runtime.Object) error {
-		return shell.impersonator.PurgeOldRoles(gvk, key, obj)
-	})
+	var shellHandler *shell
+	if features.ClusterShell.Enabled() {
+		shellHandler = &shell{
+			cg:              server.ClientFactory,
+			namespace:       "cattle-system",
+			impersonator:    podimpersonation.New("shell", server.ClientFactory, time.Hour, settings.FullShellImage),
+			clusterRegistry: server.ClusterRegistry,
+		}
+
+		server.ClusterCache.OnAdd(ctx, shellHandler.impersonator.PurgeOldRoles)
+		server.ClusterCache.OnChange(ctx, func(gvk schema.GroupVersionKind, key string, obj, oldObj runtime.Object) error {
+			return shellHandler.impersonator.PurgeOldRoles(gvk, key, obj)
+		})
+	}
 
 	server.BaseSchemas.MustImportAndCustomize(GenerateKubeconfigOutput{}, nil)
 	server.SchemaFactory.AddTemplate(schema2.Template{
@@ -62,7 +68,7 @@ func Register(ctx context.Context, server *steve.Server, wrangler *wrangler.Cont
 			if schema.LinkHandlers == nil {
 				schema.LinkHandlers = map[string]http.Handler{}
 			}
-			schema.LinkHandlers["shell"] = shell
+			schema.LinkHandlers["shell"] = shellHandler
 			schema.LinkHandlers["log"] = log
 			if schema.ActionHandlers == nil {
 				schema.ActionHandlers = map[string]http.Handler{}
@@ -78,7 +84,7 @@ func Register(ctx context.Context, server *steve.Server, wrangler *wrangler.Cont
 				// By pass authorization for local shell because the user might not have
 				// GET granted for local cluster
 				if request.Name == "local" && request.Link == "shell" {
-					shell.ServeHTTP(request.Response, request.Request)
+					shellHandler.ServeHTTP(request.Response, request.Request)
 					return types.APIObject{}, validation.ErrComplete
 				}
 				return handlers.ByIDHandler(request)
