@@ -8,13 +8,16 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/status"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // using a subset of condition, because we don't need to check LastTransitionTime or Message
@@ -346,7 +349,7 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 			wantError:  false,
 			conditions: []reducedCondition{
 				{
-					reason: NamespaceNotFound,
+					reason: NamespaceNotAvailable,
 					status: metav1.ConditionFalse,
 				},
 			},
@@ -358,10 +361,10 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 				c.nsCache.EXPECT().Get(gomock.Any()).AnyTimes().Return(nil, nil)
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
-			wantError:  false,
+			wantError:  true,
 			conditions: []reducedCondition{
 				{
-					reason: NamespaceNotFound,
+					reason: FailedToGetNamespace,
 					status: metav1.ConditionFalse,
 				},
 			},
@@ -475,13 +478,12 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 			setupControllers: func(c controllers) {
 				c.rCache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil)
 				c.nsCache.EXPECT().Get(gomock.Any()).Return(terminatingNamespace, nil).Times(2)
-				c.rCache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, errRoleNotFound).Times(2)
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
 			wantError:  false,
 			conditions: []reducedCondition{
 				{
-					reason: NamespaceTerminating,
+					reason: NamespaceNotAvailable,
 					status: metav1.ConditionFalse,
 				},
 			},
@@ -976,6 +978,598 @@ func TestSetGRAsTerminating(t *testing.T) {
 			}
 			require.Empty(t, updatedGR.Status.Conditions)
 			require.Equal(t, status.SummaryTerminating, updatedGR.Status.Summary)
+		})
+	}
+}
+
+func TestValidateNamespace(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		namespace      string
+		context        string
+		setupCache     func(*fake.MockNonNamespacedCacheInterface[*corev1.Namespace])
+		wantShouldSkip bool
+		wantError      bool
+	}{
+		{
+			name:      "namespace exists and is active",
+			namespace: "test-ns",
+			context:   "local cluster",
+			setupCache: func(cache *fake.MockNonNamespacedCacheInterface[*corev1.Namespace]) {
+				ns := &corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-ns"},
+					Status:     corev1.NamespaceStatus{Phase: corev1.NamespaceActive},
+				}
+				cache.EXPECT().Get("test-ns").Return(ns, nil)
+			},
+			wantShouldSkip: false,
+			wantError:      false,
+		},
+		{
+			name:      "namespace not found",
+			namespace: "missing-ns",
+			context:   "cluster1",
+			setupCache: func(cache *fake.MockNonNamespacedCacheInterface[*corev1.Namespace]) {
+				cache.EXPECT().Get("missing-ns").Return(nil, apierrors.NewNotFound(schema.GroupResource{Resource: "namespaces"}, "missing-ns"))
+			},
+			wantShouldSkip: true,
+			wantError:      false,
+		},
+		{
+			name:      "namespace is nil",
+			namespace: "nil-ns",
+			context:   "cluster2",
+			setupCache: func(cache *fake.MockNonNamespacedCacheInterface[*corev1.Namespace]) {
+				cache.EXPECT().Get("nil-ns").Return(nil, nil)
+			},
+			wantShouldSkip: false,
+			wantError:      true,
+		},
+		{
+			name:      "namespace is terminating",
+			namespace: "terminating-ns",
+			context:   "cluster3",
+			setupCache: func(cache *fake.MockNonNamespacedCacheInterface[*corev1.Namespace]) {
+				ns := &corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{Name: "terminating-ns"},
+					Status:     corev1.NamespaceStatus{Phase: corev1.NamespaceTerminating},
+				}
+				cache.EXPECT().Get("terminating-ns").Return(ns, nil)
+			},
+			wantShouldSkip: true,
+			wantError:      false,
+		},
+		{
+			name:      "error getting namespace",
+			namespace: "error-ns",
+			context:   "cluster4",
+			setupCache: func(cache *fake.MockNonNamespacedCacheInterface[*corev1.Namespace]) {
+				cache.EXPECT().Get("error-ns").Return(nil, fmt.Errorf("cache error"))
+			},
+			wantShouldSkip: false,
+			wantError:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctrl := gomock.NewController(t)
+			cache := fake.NewMockNonNamespacedCacheInterface[*corev1.Namespace](ctrl)
+
+			tt.setupCache(cache)
+
+			gotShouldSkip, err := validateNamespace(cache, tt.namespace, tt.context)
+
+			if tt.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			assert.Equal(t, tt.wantShouldSkip, gotShouldSkip)
+		})
+	}
+}
+
+func TestEnsureRoleLabels(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		role        *rbacv1.Role
+		ownerLabel  string
+		wantUpdated bool
+		wantLabels  map[string]string
+	}{
+		{
+			name: "role has no labels, adds owner label",
+			role: &rbacv1.Role{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-role",
+				},
+			},
+			ownerLabel:  "my-global-role",
+			wantUpdated: true,
+			wantLabels: map[string]string{
+				grOwnerLabel: "my-global-role",
+			},
+		},
+		{
+			name: "role has correct label",
+			role: &rbacv1.Role{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-role",
+					Labels: map[string]string{
+						grOwnerLabel: "my-global-role",
+					},
+				},
+			},
+			ownerLabel:  "my-global-role",
+			wantUpdated: false,
+			wantLabels: map[string]string{
+				grOwnerLabel: "my-global-role",
+			},
+		},
+		{
+			name: "role has incorrect label, updates it",
+			role: &rbacv1.Role{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-role",
+					Labels: map[string]string{
+						grOwnerLabel: "old-global-role",
+					},
+				},
+			},
+			ownerLabel:  "new-global-role",
+			wantUpdated: true,
+			wantLabels: map[string]string{
+				grOwnerLabel: "new-global-role",
+			},
+		},
+		{
+			name: "role has other labels, preserves them",
+			role: &rbacv1.Role{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-role",
+					Labels: map[string]string{
+						"other-label": "value",
+					},
+				},
+			},
+			ownerLabel:  "my-global-role",
+			wantUpdated: true,
+			wantLabels: map[string]string{
+				grOwnerLabel:  "my-global-role",
+				"other-label": "value",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			gotUpdated := ensureRoleLabels(tt.role, tt.ownerLabel)
+			assert.Equal(t, tt.wantUpdated, gotUpdated)
+			assert.Equal(t, tt.wantLabels, tt.role.Labels)
+		})
+	}
+}
+
+func TestNeedsRoleUpdate(t *testing.T) {
+	t.Parallel()
+
+	rule1 := rbacv1.PolicyRule{
+		Verbs:     []string{"get", "list"},
+		APIGroups: []string{""},
+		Resources: []string{"pods"},
+	}
+	rule2 := rbacv1.PolicyRule{
+		Verbs:     []string{"create", "delete"},
+		APIGroups: []string{"apps"},
+		Resources: []string{"deployments"},
+	}
+
+	tests := []struct {
+		name        string
+		role        *rbacv1.Role
+		rules       []rbacv1.PolicyRule
+		ownerLabel  string
+		wantUpdated bool
+	}{
+		{
+			name: "rules and labels match",
+			role: &rbacv1.Role{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{grOwnerLabel: "test-owner"},
+				},
+				Rules: []rbacv1.PolicyRule{rule1},
+			},
+			rules:       []rbacv1.PolicyRule{rule1},
+			ownerLabel:  "test-owner",
+			wantUpdated: false,
+		},
+		{
+			name: "rules differ",
+			role: &rbacv1.Role{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{grOwnerLabel: "test-owner"},
+				},
+				Rules: []rbacv1.PolicyRule{rule1},
+			},
+			rules:       []rbacv1.PolicyRule{rule2},
+			ownerLabel:  "test-owner",
+			wantUpdated: true,
+		},
+		{
+			name: "labels differ",
+			role: &rbacv1.Role{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{grOwnerLabel: "old-owner"},
+				},
+				Rules: []rbacv1.PolicyRule{rule1},
+			},
+			rules:       []rbacv1.PolicyRule{rule1},
+			ownerLabel:  "new-owner",
+			wantUpdated: true,
+		},
+		{
+			name: "labels missing",
+			role: &rbacv1.Role{
+				ObjectMeta: metav1.ObjectMeta{},
+				Rules:      []rbacv1.PolicyRule{rule1},
+			},
+			rules:       []rbacv1.PolicyRule{rule1},
+			ownerLabel:  "test-owner",
+			wantUpdated: true,
+		},
+		{
+			name: "both rules and labels differ",
+			role: &rbacv1.Role{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{grOwnerLabel: "old-owner"},
+				},
+				Rules: []rbacv1.PolicyRule{rule1},
+			},
+			rules:       []rbacv1.PolicyRule{rule2},
+			ownerLabel:  "new-owner",
+			wantUpdated: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			gotUpdated := needsRoleUpdate(tt.role, tt.rules, tt.ownerLabel)
+			assert.Equal(t, tt.wantUpdated, gotUpdated)
+		})
+	}
+}
+
+func TestCreateOwnerLabelSelector(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		ownerLabel string
+		wantError  bool
+		checkFunc  func(t *testing.T, selector labels.Selector)
+	}{
+		{
+			name:       "creates valid selector",
+			ownerLabel: "test-owner",
+			wantError:  false,
+			checkFunc: func(t *testing.T, selector labels.Selector) {
+				require.NotNil(t, selector)
+				// Test that the selector matches a label set with the correct owner
+				matches := selector.Matches(labels.Set{grOwnerLabel: "test-owner"})
+				assert.True(t, matches, "selector should match correct owner label")
+				// Test that it doesn't match a different owner
+				matches = selector.Matches(labels.Set{grOwnerLabel: "different-owner"})
+				assert.False(t, matches, "selector should not match different owner label")
+			},
+		},
+		{
+			name:       "empty owner label creates valid selector",
+			ownerLabel: "",
+			wantError:  false,
+			checkFunc: func(t *testing.T, selector labels.Selector) {
+				require.NotNil(t, selector)
+				matches := selector.Matches(labels.Set{grOwnerLabel: ""})
+				assert.True(t, matches)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			selector, err := createOwnerLabelSelector(tt.ownerLabel)
+
+			if tt.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				if tt.checkFunc != nil {
+					tt.checkFunc(t, selector)
+				}
+			}
+		})
+	}
+}
+
+func TestDeleteRolesByUID(t *testing.T) {
+	t.Parallel()
+
+	uid1 := types.UID("uid-1")
+	uid2 := types.UID("uid-2")
+	uid3 := types.UID("uid-3")
+
+	tests := []struct {
+		name        string
+		roles       []*rbacv1.Role
+		validUIDs   map[types.UID]struct{}
+		setupClient func(*fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList])
+		wantError   bool
+	}{
+		{
+			name: "deletes roles not in valid UIDs",
+			roles: []*rbacv1.Role{
+				{ObjectMeta: metav1.ObjectMeta{Name: "role1", Namespace: "ns1", UID: uid1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "role2", Namespace: "ns2", UID: uid2}},
+			},
+			validUIDs: map[types.UID]struct{}{
+				uid1: {},
+			},
+			setupClient: func(client *fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList]) {
+				client.EXPECT().Delete("ns2", "role2", gomock.Any()).Return(nil)
+			},
+			wantError: false,
+		},
+		{
+			name: "keeps roles in valid UIDs",
+			roles: []*rbacv1.Role{
+				{ObjectMeta: metav1.ObjectMeta{Name: "role1", Namespace: "ns1", UID: uid1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "role2", Namespace: "ns2", UID: uid2}},
+			},
+			validUIDs: map[types.UID]struct{}{
+				uid1: {},
+				uid2: {},
+			},
+			setupClient: func(client *fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList]) {
+				// No deletions expected
+			},
+			wantError: false,
+		},
+		{
+			name: "handles deletion errors",
+			roles: []*rbacv1.Role{
+				{ObjectMeta: metav1.ObjectMeta{Name: "role1", Namespace: "ns1", UID: uid1}},
+			},
+			validUIDs: map[types.UID]struct{}{},
+			setupClient: func(client *fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList]) {
+				client.EXPECT().Delete("ns1", "role1", gomock.Any()).Return(fmt.Errorf("delete error"))
+			},
+			wantError: true,
+		},
+		{
+			name: "ignores NotFound errors",
+			roles: []*rbacv1.Role{
+				{ObjectMeta: metav1.ObjectMeta{Name: "role1", Namespace: "ns1", UID: uid1}},
+			},
+			validUIDs: map[types.UID]struct{}{},
+			setupClient: func(client *fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList]) {
+				client.EXPECT().Delete("ns1", "role1", gomock.Any()).Return(apierrors.NewNotFound(schema.GroupResource{}, "role1"))
+			},
+			wantError: false,
+		},
+		{
+			name: "deletes multiple invalid roles",
+			roles: []*rbacv1.Role{
+				{ObjectMeta: metav1.ObjectMeta{Name: "role1", Namespace: "ns1", UID: uid1}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "role2", Namespace: "ns2", UID: uid2}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "role3", Namespace: "ns3", UID: uid3}},
+			},
+			validUIDs: map[types.UID]struct{}{
+				uid2: {},
+			},
+			setupClient: func(client *fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList]) {
+				client.EXPECT().Delete("ns1", "role1", gomock.Any()).Return(nil)
+				client.EXPECT().Delete("ns3", "role3", gomock.Any()).Return(nil)
+			},
+			wantError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctrl := gomock.NewController(t)
+			client := fake.NewMockClientInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl)
+
+			tt.setupClient(client)
+
+			err := deleteRolesByUID(tt.roles, tt.validUIDs, client)
+
+			if tt.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestReconcileInheritedRoleInNamespace(t *testing.T) {
+	t.Parallel()
+
+	testRule := rbacv1.PolicyRule{
+		Verbs:     []string{"get", "list"},
+		APIGroups: []string{""},
+		Resources: []string{"pods"},
+	}
+
+	tests := []struct {
+		name            string
+		clusterName     string
+		namespace       string
+		rules           []rbacv1.PolicyRule
+		globalRoleName  string
+		safeGRName      string
+		setupMocks      func(*fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList], *fake.MockCacheInterface[*rbacv1.Role], *fake.MockNonNamespacedCacheInterface[*corev1.Namespace])
+		expectedRoleUID *types.UID
+		wantError       bool
+	}{
+		{
+			name:           "creates new role when namespace exists",
+			clusterName:    "cluster1",
+			namespace:      "test-ns",
+			rules:          []rbacv1.PolicyRule{testRule},
+			globalRoleName: "test-gr",
+			safeGRName:     "test-gr",
+			setupMocks: func(roleClient *fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList], roleCache *fake.MockCacheInterface[*rbacv1.Role], nsCache *fake.MockNonNamespacedCacheInterface[*corev1.Namespace]) {
+				ns := &corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-ns"},
+					Status:     corev1.NamespaceStatus{Phase: corev1.NamespaceActive},
+				}
+				nsCache.EXPECT().Get("test-ns").Return(ns, nil)
+				roleCache.EXPECT().Get("test-ns", gomock.Any()).Return(nil, apierrors.NewNotFound(schema.GroupResource{}, "role"))
+				newUID := types.UID("new-uid")
+				roleClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(role *rbacv1.Role) (*rbacv1.Role, error) {
+					role.UID = newUID
+					return role, nil
+				})
+			},
+			wantError: false,
+		},
+		{
+			name:           "skips when namespace not found",
+			clusterName:    "cluster1",
+			namespace:      "missing-ns",
+			rules:          []rbacv1.PolicyRule{testRule},
+			globalRoleName: "test-gr",
+			safeGRName:     "test-gr",
+			setupMocks: func(roleClient *fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList], roleCache *fake.MockCacheInterface[*rbacv1.Role], nsCache *fake.MockNonNamespacedCacheInterface[*corev1.Namespace]) {
+				nsCache.EXPECT().Get("missing-ns").Return(nil, apierrors.NewNotFound(schema.GroupResource{}, "missing-ns"))
+			},
+			wantError: false,
+		},
+		{
+			name:           "skips when namespace is terminating",
+			clusterName:    "cluster1",
+			namespace:      "terminating-ns",
+			rules:          []rbacv1.PolicyRule{testRule},
+			globalRoleName: "test-gr",
+			safeGRName:     "test-gr",
+			setupMocks: func(roleClient *fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList], roleCache *fake.MockCacheInterface[*rbacv1.Role], nsCache *fake.MockNonNamespacedCacheInterface[*corev1.Namespace]) {
+				ns := &corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{Name: "terminating-ns"},
+					Status:     corev1.NamespaceStatus{Phase: corev1.NamespaceTerminating},
+				}
+				nsCache.EXPECT().Get("terminating-ns").Return(ns, nil)
+			},
+			wantError: false,
+		},
+		{
+			name:           "updates role when rules differ",
+			clusterName:    "cluster1",
+			namespace:      "test-ns",
+			rules:          []rbacv1.PolicyRule{testRule},
+			globalRoleName: "test-gr",
+			safeGRName:     "test-gr",
+			setupMocks: func(roleClient *fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList], roleCache *fake.MockCacheInterface[*rbacv1.Role], nsCache *fake.MockNonNamespacedCacheInterface[*corev1.Namespace]) {
+				ns := &corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-ns"},
+					Status:     corev1.NamespaceStatus{Phase: corev1.NamespaceActive},
+				}
+				existingRole := &rbacv1.Role{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-gr-test-ns",
+						Namespace: "test-ns",
+						UID:       types.UID("existing-uid"),
+						Labels:    map[string]string{grOwnerLabel: "test-gr"},
+					},
+					Rules: []rbacv1.PolicyRule{
+						{Verbs: []string{"create"}, APIGroups: []string{""}, Resources: []string{"secrets"}},
+					},
+				}
+				nsCache.EXPECT().Get("test-ns").Return(ns, nil)
+				roleCache.EXPECT().Get("test-ns", gomock.Any()).Return(existingRole, nil)
+				roleClient.EXPECT().Update(gomock.Any()).Return(existingRole, nil)
+			},
+			wantError: false,
+		},
+		{
+			name:           "no update when role is correct",
+			clusterName:    "cluster1",
+			namespace:      "test-ns",
+			rules:          []rbacv1.PolicyRule{testRule},
+			globalRoleName: "test-gr",
+			safeGRName:     "test-gr",
+			setupMocks: func(roleClient *fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList], roleCache *fake.MockCacheInterface[*rbacv1.Role], nsCache *fake.MockNonNamespacedCacheInterface[*corev1.Namespace]) {
+				ns := &corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{Name: "test-ns"},
+					Status:     corev1.NamespaceStatus{Phase: corev1.NamespaceActive},
+				}
+				existingRole := &rbacv1.Role{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-gr-test-ns",
+						Namespace: "test-ns",
+						UID:       types.UID("existing-uid"),
+						Labels:    map[string]string{grOwnerLabel: "test-gr"},
+					},
+					Rules: []rbacv1.PolicyRule{testRule},
+				}
+				nsCache.EXPECT().Get("test-ns").Return(ns, nil)
+				roleCache.EXPECT().Get("test-ns", gomock.Any()).Return(existingRole, nil)
+			},
+			wantError: false,
+		},
+		{
+			name:           "returns error on namespace get failure",
+			clusterName:    "cluster1",
+			namespace:      "error-ns",
+			rules:          []rbacv1.PolicyRule{testRule},
+			globalRoleName: "test-gr",
+			safeGRName:     "test-gr",
+			setupMocks: func(roleClient *fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList], roleCache *fake.MockCacheInterface[*rbacv1.Role], nsCache *fake.MockNonNamespacedCacheInterface[*corev1.Namespace]) {
+				nsCache.EXPECT().Get("error-ns").Return(nil, fmt.Errorf("cache error"))
+			},
+			wantError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctrl := gomock.NewController(t)
+			roleClient := fake.NewMockClientInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl)
+			roleCache := fake.NewMockCacheInterface[*rbacv1.Role](ctrl)
+			nsCache := fake.NewMockNonNamespacedCacheInterface[*corev1.Namespace](ctrl)
+
+			roleUIDs := make(map[types.UID]struct{})
+			tt.setupMocks(roleClient, roleCache, nsCache)
+
+			gr := &globalRoleLifecycle{}
+			err := gr.reconcileInheritedRoleInNamespace(
+				tt.clusterName,
+				tt.namespace,
+				tt.rules,
+				tt.globalRoleName,
+				tt.safeGRName,
+				roleClient,
+				roleCache,
+				nsCache,
+				roleUIDs,
+			)
+
+			if tt.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
 		})
 	}
 }

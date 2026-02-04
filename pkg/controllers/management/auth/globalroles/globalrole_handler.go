@@ -39,16 +39,18 @@ const (
 
 // Condition reason types
 const (
-	ClusterRoleExists         = "ClusterRoleExists"
-	NamespacedRuleRoleExists  = "NamespacedRuleRoleExists"
-	NamespaceNotFound         = "NamespaceNotFound"
-	NamespaceTerminating      = "NamespaceTerminating"
-	FailedToGetRole           = "GetRoleFailed"
-	FailedToCreateRole        = "CreateRoleFailed"
-	FailedToUpdateRole        = "UpdateRoleFailed"
-	FailedToGetNamespace      = "GetNamespaceFailed"
-	FailedToCreateClusterRole = "CreateClusterRoleFailed"
-	FailedToUpdateClusterRole = "UpdateClusterRoleFailed"
+	ClusterRoleExists                 = "ClusterRoleExists"
+	NamespacedRuleRoleExists          = "NamespacedRuleRoleExists"
+	InheritedNamespacedRuleRoleExists = "InheritedNamespacedRuleRoleExists"
+	NamespaceNotAvailable             = "NamespaceNotAvailable"
+	FailedToGetRole                   = "GetRoleFailed"
+	FailedToCreateRole                = "CreateRoleFailed"
+	FailedToUpdateRole                = "UpdateRoleFailed"
+	FailedToGetNamespace              = "GetNamespaceFailed"
+	FailedToCreateClusterRole         = "CreateClusterRoleFailed"
+	FailedToUpdateClusterRole         = "UpdateClusterRoleFailed"
+	FailedToGetCluster                = "GetClusterFailed"
+	FailedToGetUserContext            = "GetUserContextFailed"
 )
 
 type fleetPermissionsRoleHandler interface {
@@ -94,6 +96,7 @@ func (gr *globalRoleLifecycle) Create(obj *v3.GlobalRole) (runtime.Object, error
 		gr.setGRAsInProgress(obj), // set GR status to "in progress" while the underlying roles get added
 		gr.reconcileGlobalRole(obj),
 		gr.reconcileNamespacedRoles(obj),
+		gr.reconcileInheritedNamespacedRoles(obj),
 		gr.fleetPermissionsHandler.reconcileFleetWorkspacePermissions(obj),
 		gr.setGRAsCompleted(obj),
 	)
@@ -112,6 +115,7 @@ func (gr *globalRoleLifecycle) Updated(obj *v3.GlobalRole) (runtime.Object, erro
 		gr.setGRAsInProgress(obj), // set GR status to "in progress" while the underlying roles get added
 		gr.reconcileGlobalRole(obj),
 		gr.reconcileNamespacedRoles(obj),
+		gr.reconcileInheritedNamespacedRoles(obj),
 		gr.fleetPermissionsHandler.reconcileFleetWorkspacePermissions(obj),
 		gr.setGRAsCompleted(obj),
 	)
@@ -140,8 +144,12 @@ func (gr *globalRoleLifecycle) Remove(obj *v3.GlobalRole) (runtime.Object, error
 		}
 	}
 
-	// Don't need to delete the created ClusterRole or Roles because owner reference will take care of them
-	err := gr.setGRAsTerminating(obj)
+	// Don't need to delete the created ClusterRole or Roles in local cluster because owner reference will take care of them
+	// However, roles in downstream clusters need to be deleted manually
+	err := errors.Join(
+		gr.deleteInheritedNamespacedRoles(obj),
+		gr.setGRAsTerminating(obj),
+	)
 	return nil, err
 }
 
@@ -223,14 +231,13 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 			Type: NamespacedRuleRoleExists,
 		}
 
-		namespace, err := gr.nsCache.Get(ns)
-		if apierrors.IsNotFound(err) || namespace == nil {
-			// When a namespace is not found, don't re-enqueue GlobalRole
-			logrus.Warnf("[%v] Namespace %s not found. Not re-enqueueing GlobalRole %s", grController, ns, globalRole.Name)
-			addCondition(globalRole, condition, NamespaceNotFound, roleName, fmt.Errorf("namespace %s not found", ns))
+		shouldSkip, err := validateNamespace(gr.nsCache, ns, "local cluster")
+		if shouldSkip {
+			addCondition(globalRole, condition, NamespaceNotAvailable, roleName, fmt.Errorf("namespace %s not available", ns))
 			continue
-		} else if err != nil {
-			returnError = errors.Join(returnError, fmt.Errorf("couldn't get namespace %s: %w", ns, err))
+		}
+		if err != nil {
+			returnError = errors.Join(returnError, err)
 			addCondition(globalRole, condition, FailedToGetNamespace, roleName, err)
 			continue
 		}
@@ -241,13 +248,6 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 			if !apierrors.IsNotFound(err) {
 				returnError = errors.Join(returnError, err)
 				addCondition(globalRole, condition, FailedToGetRole, roleName, err)
-				continue
-			}
-
-			// If the namespace is terminating, don't create a Role
-			if namespace.Status.Phase == corev1.NamespaceTerminating {
-				logrus.Warnf("[%v] Namespace %s is terminating. Not creating role %s for %s", grController, ns, roleName, globalRole.Name)
-				addCondition(globalRole, condition, NamespaceTerminating, roleName, fmt.Errorf("namespace %s is terminating", ns))
 				continue
 			}
 
@@ -294,17 +294,14 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 			roleUIDs[role.GetUID()] = struct{}{}
 
 			// Check that the rules for the existing role are correct and that it has the right Owner Label
-			if reflect.DeepEqual(role.Rules, rules) && role.Labels != nil && role.Labels[grOwnerLabel] == globalRoleName {
+			if !needsRoleUpdate(role, rules, globalRoleName) {
 				addCondition(globalRole, condition, NamespacedRuleRoleExists, roleName, nil)
 				continue
 			}
 
 			newRole := role.DeepCopy()
 			newRole.Rules = rules
-			if newRole.Labels == nil {
-				newRole.Labels = map[string]string{}
-			}
-			newRole.Labels[grOwnerLabel] = globalRoleName
+			ensureRoleLabels(newRole, globalRoleName)
 
 			_, err := gr.rClient.Update(newRole)
 			if err != nil {
@@ -317,20 +314,20 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 	}
 
 	// get all the roles claiming to be owned by this GR and remove any that shouldn't exist
-	r, err := labels.NewRequirement(grOwnerLabel, selection.Equals, []string{globalRoleName})
+	selector, err := createOwnerLabelSelector(globalRoleName)
 	if err != nil {
-		return errors.Join(returnError, fmt.Errorf("couldn't create label: %s: %w", grOwnerLabel, err))
+		return errors.Join(returnError, err)
 	}
 
-	roles, err := gr.rLister.List("", labels.NewSelector().Add(*r))
+	roles, err := gr.rLister.List("", selector)
 	if err != nil {
-		return errors.Join(returnError, fmt.Errorf("couldn't list roles with label %s : %s: %w", grOwnerLabel, globalRoleName, err))
+		return errors.Join(returnError, fmt.Errorf("couldn't list roles with label %s: %s: %w", grOwnerLabel, globalRoleName, err))
 	}
 
 	// After creating/updating all Roles, if the number of RBs with the grOwnerLabel is the same as
 	// as the number of created/updated Roles, we know there are no invalid Roles to purge
 	if len(roleUIDs) != len(roles) {
-		err = gr.purgeInvalidNamespacedRoles(roles, roleUIDs)
+		err = deleteRolesByUID(roles, roleUIDs, gr.rClient)
 		if err != nil {
 			returnError = errors.Join(returnError, err)
 		}
@@ -338,17 +335,226 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 	return returnError
 }
 
-// purgeInvalidNamespacedRoles removes any roles that aren't in the slice of UIDS that we created/updated in reconcileNamespacedRoles
-func (gr *globalRoleLifecycle) purgeInvalidNamespacedRoles(roles []*rbacv1.Role, uids map[types.UID]struct{}) error {
+// reconcileInheritedNamespacedRoles ensures that Roles exist in each namespace of InheritedNamespacedRules for all downstream clusters
+func (gr *globalRoleLifecycle) reconcileInheritedNamespacedRoles(globalRole *v3.GlobalRole) error {
+	// If there are no InheritedNamespacedRules, nothing to do
+	if len(globalRole.InheritedNamespacedRules) == 0 {
+		return nil
+	}
+
 	var returnError error
-	for _, r := range roles {
-		if _, ok := uids[r.UID]; !ok {
-			err := gr.rClient.Delete(r.Namespace, r.Name, &metav1.DeleteOptions{})
-			if err != nil {
-				returnError = errors.Join(returnError, fmt.Errorf("couldn't delete role %s: %w", r.Name, err))
-			}
+	globalRoleName := wrangler.SafeConcatName(globalRole.Name)
+	hasError := false
+
+	// Get all clusters
+	clusters, err := gr.clusters.List(metav1.ListOptions{})
+	if err != nil {
+		condition := metav1.Condition{
+			Type: InheritedNamespacedRuleRoleExists,
+		}
+		addCondition(globalRole, condition, FailedToGetCluster, "InheritedNamespacedRules", err)
+		return fmt.Errorf("couldn't list clusters: %w", err)
+	}
+
+	// Track all role UIDs that should exist across all clusters
+	roleUIDs := map[types.UID]struct{}{}
+
+	// Iterate through all clusters except local
+	for _, cluster := range clusters.Items {
+		if cluster.Name == "local" {
+			continue
+		}
+
+		clusterErr := gr.reconcileInheritedNamespacedRolesForCluster(&cluster, globalRole, globalRoleName, roleUIDs)
+		if clusterErr != nil {
+			returnError = errors.Join(returnError, clusterErr)
+			hasError = true
 		}
 	}
+
+	// Add a single condition for all InheritedNamespacedRules
+	condition := metav1.Condition{
+		Type: InheritedNamespacedRuleRoleExists,
+	}
+	if hasError {
+		addCondition(globalRole, condition, FailedToCreateRole, "InheritedNamespacedRules", returnError)
+	} else {
+		addCondition(globalRole, condition, InheritedNamespacedRuleRoleExists, "InheritedNamespacedRules", nil)
+	}
+
+	return returnError
+}
+
+// reconcileInheritedNamespacedRolesForCluster reconciles roles for a single downstream cluster
+func (gr *globalRoleLifecycle) reconcileInheritedNamespacedRolesForCluster(cluster *v3.Cluster, globalRole *v3.GlobalRole, globalRoleName string, roleUIDs map[types.UID]struct{}) error {
+	// Get user context for the cluster
+	userContext, err := gr.clusterManager.UserContext(cluster.Name)
+	if err != nil {
+		logrus.Warnf("[%v] Failed to get user context for cluster %s: %v. Continuing with other clusters.", grController, cluster.Name, err)
+		return nil
+	}
+
+	// Get the Role client for this cluster
+	roleClient := userContext.RBACw.Role()
+	roleCache := roleClient.Cache()
+	namespaceCache := userContext.Corew.Namespace().Cache()
+
+	var returnError error
+
+	// Iterate through all namespaces in InheritedNamespacedRules
+	for ns, rules := range globalRole.InheritedNamespacedRules {
+		nsErr := gr.reconcileInheritedRoleInNamespace(cluster.Name, ns, rules, globalRole.Name, globalRoleName, roleClient, roleCache, namespaceCache, roleUIDs)
+		if nsErr != nil {
+			returnError = errors.Join(returnError, nsErr)
+		}
+	}
+
+	// Purge invalid roles in this cluster
+	purgeErr := gr.purgeInvalidInheritedRolesInCluster(cluster.Name, globalRoleName, roleCache, roleClient, roleUIDs)
+	if purgeErr != nil {
+		returnError = errors.Join(returnError, purgeErr)
+	}
+
+	return returnError
+}
+
+// reconcileInheritedRoleInNamespace reconciles a single role in a specific namespace of a downstream cluster
+func (gr *globalRoleLifecycle) reconcileInheritedRoleInNamespace(clusterName, ns string, rules []rbacv1.PolicyRule, globalRoleName, safeGlobalRoleName string, roleClient wrbacv1.RoleClient, roleCache wrbacv1.RoleCache, namespaceCache wcorev1.NamespaceCache, roleUIDs map[types.UID]struct{}) error {
+	roleName := wrangler.SafeConcatName(globalRoleName, ns)
+
+	// Check if the namespace exists in this cluster
+	shouldSkip, err := validateNamespace(namespaceCache, ns, fmt.Sprintf("cluster %s", clusterName))
+	if shouldSkip {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("%s in cluster %s: %w", err.Error(), clusterName, err)
+	}
+
+	// Check if the role exists
+	role, err := roleCache.Get(ns, roleName)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			return fmt.Errorf("couldn't get role %s in namespace %s in cluster %s: %w", roleName, ns, clusterName, err)
+		}
+
+		// Create the role
+		newRole := &rbacv1.Role{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      roleName,
+				Namespace: ns,
+				Labels: map[string]string{
+					grOwnerLabel: safeGlobalRoleName,
+				},
+			},
+			Rules: rules,
+		}
+		createdRole, err := roleClient.Create(newRole)
+		if err == nil {
+			roleUIDs[createdRole.UID] = struct{}{}
+			return nil
+		}
+
+		if !apierrors.IsAlreadyExists(err) {
+			return fmt.Errorf("couldn't create role %s in namespace %s in cluster %s: %w", roleName, ns, clusterName, err)
+		}
+
+		// If it already exists, get it and check that the rules are correct
+		role, err = roleCache.Get(ns, roleName)
+		if err != nil {
+			return fmt.Errorf("couldn't get existing role %s in namespace %s in cluster %s: %w", roleName, ns, clusterName, err)
+		}
+	}
+
+	if role != nil {
+		roleUIDs[role.GetUID()] = struct{}{}
+
+		// Check that the rules for the existing role are correct and that it has the right Owner Label
+		if !needsRoleUpdate(role, rules, safeGlobalRoleName) {
+			return nil
+		}
+
+		newRole := role.DeepCopy()
+		newRole.Rules = rules
+		ensureRoleLabels(newRole, safeGlobalRoleName)
+
+		_, err := roleClient.Update(newRole)
+		if err != nil {
+			return fmt.Errorf("couldn't update role %s in namespace %s in cluster %s: %w", roleName, ns, clusterName, err)
+		}
+	}
+
+	return nil
+}
+
+// purgeInvalidInheritedRolesInCluster removes roles in a cluster that are no longer needed
+func (gr *globalRoleLifecycle) purgeInvalidInheritedRolesInCluster(clusterName, globalRoleName string, roleCache wrbacv1.RoleCache, roleClient wrbacv1.RoleClient, validRoleUIDs map[types.UID]struct{}) error {
+	selector, err := createOwnerLabelSelector(globalRoleName)
+	if err != nil {
+		return fmt.Errorf("cluster %s: %w", clusterName, err)
+	}
+
+	roles, err := roleCache.List("", selector)
+	if err != nil {
+		return fmt.Errorf("couldn't list roles in cluster %s: %w", clusterName, err)
+	}
+
+	return deleteRolesByUID(roles, validRoleUIDs, roleClient)
+}
+
+// deleteInheritedNamespacedRoles removes all Roles in downstream clusters that are owned by this GlobalRole
+func (gr *globalRoleLifecycle) deleteInheritedNamespacedRoles(globalRole *v3.GlobalRole) error {
+	// If there are no InheritedNamespacedRules, nothing to do
+	if len(globalRole.InheritedNamespacedRules) == 0 {
+		return nil
+	}
+
+	var returnError error
+	globalRoleName := wrangler.SafeConcatName(globalRole.Name)
+
+	// Get all clusters
+	clusters, err := gr.clusters.List(metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("couldn't list clusters: %w", err)
+	}
+
+	// Iterate through all clusters except local
+	for _, cluster := range clusters.Items {
+		if cluster.Name == "local" {
+			continue
+		}
+
+		// Get user context for the cluster
+		userContext, err := gr.clusterManager.UserContext(cluster.Name)
+		if err != nil {
+			logrus.Warnf("[%v] Failed to get user context for cluster %s during cleanup: %v. Continuing with other clusters.", grController, cluster.Name, err)
+			continue
+		}
+
+		// Get the Role client for this cluster
+		roleClient := userContext.RBACw.Role()
+		roleCache := roleClient.Cache()
+
+		// Get all roles owned by this GlobalRole
+		selector, err := createOwnerLabelSelector(globalRoleName)
+		if err != nil {
+			returnError = errors.Join(returnError, fmt.Errorf("cluster %s: %w", cluster.Name, err))
+			continue
+		}
+
+		roles, err := roleCache.List("", selector)
+		if err != nil {
+			returnError = errors.Join(returnError, fmt.Errorf("couldn't list roles in cluster %s: %w", cluster.Name, err))
+			continue
+		}
+
+		// Delete all roles owned by this GlobalRole
+		deleteErr := deleteRolesByUID(roles, map[types.UID]struct{}{}, roleClient)
+		if deleteErr != nil {
+			returnError = errors.Join(returnError, deleteErr)
+		}
+	}
+
 	return returnError
 }
 
@@ -406,4 +612,69 @@ func addCondition(globalRole *v3.GlobalRole, condition metav1.Condition, reason,
 	condition.Reason = reason
 	condition.LastTransitionTime = metav1.Time{Time: time.Now()}
 	globalRole.Status.Conditions = append(globalRole.Status.Conditions, condition)
+}
+
+// validateNamespace checks if a namespace exists and is not terminating
+// Returns (namespace, shouldSkip, error)
+// - shouldSkip is true if the namespace is not found (warning logged, no error)
+// - error is returned for other failures
+func validateNamespace(nsCache wcorev1.NamespaceCache, ns, context string) (bool, error) {
+	namespace, err := nsCache.Get(ns)
+	if apierrors.IsNotFound(err) {
+		logrus.Warnf("[%v] Namespace %s not found in %s. Continuing.", grController, ns, context)
+		return true, nil
+	}
+	if err != nil || namespace == nil {
+		return false, fmt.Errorf("couldn't get namespace %s in %s: %w", ns, context, err)
+	}
+
+	if namespace.Status.Phase == corev1.NamespaceTerminating {
+		logrus.Warnf("[%v] Namespace %s is terminating in %s. Skipping role creation.", grController, ns, context)
+		return true, nil
+	}
+
+	return false, nil
+}
+
+// ensureRoleLabels ensures a role has the correct owner label
+func ensureRoleLabels(role *rbacv1.Role, ownerLabel string) bool {
+	if role.Labels == nil {
+		role.Labels = map[string]string{}
+	}
+	if role.Labels[grOwnerLabel] != ownerLabel {
+		role.Labels[grOwnerLabel] = ownerLabel
+		return true
+	}
+	return false
+}
+
+// needsRoleUpdate checks if a role needs updating based on rules and labels
+func needsRoleUpdate(role *rbacv1.Role, rules []rbacv1.PolicyRule, ownerLabel string) bool {
+	if !reflect.DeepEqual(role.Rules, rules) {
+		return true
+	}
+	if role.Labels == nil || role.Labels[grOwnerLabel] != ownerLabel {
+		return true
+	}
+	return false
+}
+
+// createOwnerLabelSelector creates a label selector for roles owned by a GlobalRole
+func createOwnerLabelSelector(ownerLabel string) (labels.Selector, error) {
+	r, err := labels.NewRequirement(grOwnerLabel, selection.Equals, []string{ownerLabel})
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create label selector: %w", err)
+	}
+	return labels.NewSelector().Add(*r), nil
+}
+
+// deleteRolesByUID deletes roles that are not in the validUIDs set
+func deleteRolesByUID(roles []*rbacv1.Role, validUIDs map[types.UID]struct{}, roleClient wrbacv1.RoleClient) error {
+	var returnError error
+	for _, role := range roles {
+		if _, ok := validUIDs[role.UID]; !ok {
+			returnError = errors.Join(returnError, rbac.DeleteNamespacedResource(role.Namespace, role.Name, roleClient))
+		}
+	}
+	return returnError
 }
