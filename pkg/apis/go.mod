@@ -42,12 +42,12 @@ require (
 	github.com/rancher/gke-operator v1.13.0-rc.3
 	github.com/rancher/norman v0.8.1
 	github.com/rancher/rke v1.8.0
-	github.com/rancher/wrangler/v3 v3.3.2-rc.1
+	github.com/rancher/wrangler/v3 v3.3.2-rc.2
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.11.1
 	k8s.io/api v0.35.0
 	k8s.io/apimachinery v0.35.0
-	sigs.k8s.io/cluster-api v1.10.6
+	sigs.k8s.io/cluster-api v1.11.4
 )
 
 require (
