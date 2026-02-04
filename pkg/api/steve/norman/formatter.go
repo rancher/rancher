@@ -8,6 +8,7 @@ import (
 	types2 "github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
 	"github.com/rancher/norman/urlbuilder"
+	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/sirupsen/logrus"
@@ -73,6 +74,10 @@ func (a *LinksAndActionsFormatter) Formatter(request *types.APIRequest, resource
 	}
 	for k, v := range normanResource.Actions {
 		resource.Actions[k] = v
+	}
+
+	if !features.ClusterShell.Enabled() {
+		delete(resource.Links, "shell")
 	}
 }
 
