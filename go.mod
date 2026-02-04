@@ -135,7 +135,6 @@ require (
 	github.com/rancher/shepherd v0.0.0-20260218212518-d89877f13cac
 	github.com/rancher/steve v0.8.19
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260218133309-b0ff1f4c330d
-	github.com/rancher/wrangler v1.1.2
 	github.com/rancher/wrangler/v3 v3.5.0-rc.2
 	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.9.4
@@ -256,6 +255,7 @@ require (
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/prometheus/common v0.67.5 // indirect
+	github.com/rancher/wrangler v1.1.2 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
