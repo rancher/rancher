@@ -23,6 +23,7 @@ const (
 	MachineFieldRemoved              = "removed"
 	MachineFieldState                = "state"
 	MachineFieldStatus               = "status"
+	MachineFieldTaints               = "taints"
 	MachineFieldTransitioning        = "transitioning"
 	MachineFieldTransitioningMessage = "transitioningMessage"
 	MachineFieldUUID                 = "uuid"
@@ -48,6 +49,7 @@ type Machine struct {
 	Removed              string                            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	State                string                            `json:"state,omitempty" yaml:"state,omitempty"`
 	Status               *MachineStatus                    `json:"status,omitempty" yaml:"status,omitempty"`
+	Taints               []MachineTaint                    `json:"taints,omitempty" yaml:"taints,omitempty"`
 	Transitioning        string                            `json:"transitioning,omitempty" yaml:"transitioning,omitempty"`
 	TransitioningMessage string                            `json:"transitioningMessage,omitempty" yaml:"transitioningMessage,omitempty"`
 	UUID                 string                            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
