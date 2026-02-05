@@ -18,6 +18,7 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -474,7 +475,7 @@ func (m *manager) reconcileRoleForProjectAccessToGlobalResource(roleName string,
 	}
 
 	// if the rules are already correct, no need to update
-	if reflect.DeepEqual(role.Rules, promotedRules) {
+	if policyRulesEquivalent(role.Rules, promotedRules) {
 		return roleName, nil
 	}
 
@@ -581,4 +582,29 @@ func parseProjectName(id string) string {
 		return ""
 	}
 	return parts[1]
+}
+
+// policyRulesEquivalent compares two slices of PolicyRules for semantic equivalence,
+// ignoring the order of rules in the slices. Two slices are considered equivalent if
+// they contain the same set of rules, regardless of their ordering.
+func policyRulesEquivalent(rules1, rules2 []rbacv1.PolicyRule) bool {
+	if len(rules1) != len(rules2) {
+		return false
+	}
+
+	// For each rule in rules1, find a matching rule in rules2
+	for _, r1 := range rules1 {
+		found := false
+		for _, r2 := range rules2 {
+			if equality.Semantic.DeepEqual(r1, r2) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+
+	return true
 }
