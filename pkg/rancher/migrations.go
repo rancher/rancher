@@ -19,7 +19,6 @@ import (
 	rancherversion "github.com/rancher/rancher/pkg/version"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/data"
-	"github.com/rancher/wrangler/v3/pkg/data/convert"
 	controllerv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/summary"
 	"github.com/sirupsen/logrus"
@@ -391,7 +390,7 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.CAPIContext)
 						return err
 					}
 
-					if changed, err := insertOrUpdateCondition(d, summary.NewCondition("Ready", "True", "", "")); err != nil {
+					if changed, err := capr.InsertOrUpdateCondition(d, summary.NewCondition("Ready", "True", "", "")); err != nil {
 						return err
 					} else if changed {
 						_, err = w.Dynamic.UpdateStatus(&unstructured.Unstructured{Object: d})
@@ -616,43 +615,6 @@ func migrateImportedClusterFields(w *wrangler.Context) error {
 
 	cm.Data[importedClusterManagedFieldsMigratedKey] = "true"
 	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
-}
-
-func insertOrUpdateCondition(d data.Object, desiredCondition summary.Condition) (bool, error) {
-	for _, cond := range summary.GetUnstructuredConditions(d) {
-		if desiredCondition.Equals(cond) {
-			return false, nil
-		}
-	}
-
-	// The conditions must be converted to a map so that DeepCopyJSONValue will
-	// recognize it as a map instead of a data.Object.
-	newCond, err := convert.EncodeToMap(desiredCondition.Object)
-	if err != nil {
-		return false, err
-	}
-
-	dConditions := d.Slice("status", "conditions")
-	conditions := make([]interface{}, len(dConditions))
-	found := false
-	for i, cond := range dConditions {
-		if cond.String("type") == desiredCondition.Type() {
-			conditions[i] = newCond
-			found = true
-		} else {
-			conditions[i], err = convert.EncodeToMap(cond)
-			if err != nil {
-				return false, err
-			}
-		}
-	}
-
-	if !found {
-		conditions = append(conditions, newCond)
-	}
-	d.SetNested(conditions, "status", "conditions")
-
-	return true, nil
 }
 
 func rkeResourcesCleanup(w *wrangler.Context) error {

@@ -17,7 +17,6 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/condition"
 	"github.com/rancher/wrangler/v3/pkg/data"
 	"github.com/rancher/wrangler/v3/pkg/generic"
-	"github.com/rancher/wrangler/v3/pkg/summary"
 	"github.com/sirupsen/logrus"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -97,7 +96,7 @@ func (h *handler) associateMachineWithNode(_ string, bootstrap *rkev1.RKEBootstr
 
 	// Do not mutate the infrastructure machine object if it is not marked as Ready, otherwise it will cause the
 	// controller to potentially re-run the provision job
-	if c := getCondition(d, "Ready"); c == nil || (c != nil && strings.ToLower(c.Status()) != "true") {
+	if c := capr.GetCondition(d, string(capr.Ready)); c == nil || (c != nil && strings.ToLower(c.Status()) != "true") {
 		h.rkeBootstrap.EnqueueAfter(bootstrap.Namespace, bootstrap.Name, nodeErrorEnqueueTime)
 		return bootstrap, nil
 	}
@@ -155,14 +154,4 @@ func (h *handler) associateMachineWithNode(_ string, bootstrap *rkev1.RKEBootstr
 	}
 
 	return bootstrap, nil
-}
-
-func getCondition(d data.Object, conditionType string) *summary.Condition {
-	for _, cond := range summary.GetUnstructuredConditions(d) {
-		if cond.Type() == conditionType {
-			return &cond
-		}
-	}
-
-	return nil
 }
