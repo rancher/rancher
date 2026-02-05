@@ -190,28 +190,24 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 					},
 				},
 			},
-			setupControllers: func(c controllers) {
-				existingRole := &rbacv1.ClusterRole{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "myrole-promoted",
+			crListerMockGetResult: &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "myrole-promoted",
+				},
+				Rules: []rbacv1.PolicyRule{
+					{
+						Resources:     []string{"anotherresource"},
+						Verbs:         []string{"get", "watch"},
+						APIGroups:     []string{"management.cattle.io"},
+						ResourceNames: []string{"remote"},
 					},
-					Rules: []rbacv1.PolicyRule{
-						{
-							Resources:     []string{"anotherresource"},
-							Verbs:         []string{"get", "watch"},
-							APIGroups:     []string{"management.cattle.io"},
-							ResourceNames: []string{"remote"},
-						},
-						{
-							Resources:     []string{"myresource"},
-							Verbs:         []string{"list", "delete"},
-							APIGroups:     []string{"management.cattle.io"},
-							ResourceNames: []string{"local"},
-						},
+					{
+						Resources:     []string{"myresource"},
+						Verbs:         []string{"list", "delete"},
+						APIGroups:     []string{"management.cattle.io"},
+						ResourceNames: []string{"local"},
 					},
-				}
-				c.crLister.EXPECT().Get("myrole-promoted").Return(existingRole, nil)
-				// No Update call expected since rules are equivalent
+				},
 			},
 			want: "myrole-promoted",
 		},
