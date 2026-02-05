@@ -30,7 +30,7 @@ import (
 	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/utils/ptr"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 func Test_Provisioning_MP_SingleNodeAllRolesWithDelete(t *testing.T) {
@@ -247,7 +247,7 @@ func Test_Provisioning_MP_MachineSetDeletePolicyOldestSet(t *testing.T) {
 	}
 
 	for _, machineSet := range machineSets.Items {
-		assert.Equal(t, string(capi.OldestMachineSetDeletePolicy), machineSet.Spec.DeletePolicy)
+		assert.Equal(t, capi.OldestMachineSetDeletionOrder, machineSet.Spec.Deletion.Order)
 	}
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	assert.NoError(t, err)
@@ -562,7 +562,7 @@ func Test_Provisioning_MP_Drain(t *testing.T) {
 	runHooks := func(machine *capi.Machine) error {
 		var secret *corev1.Secret
 		err = retry.OnError(retry.DefaultBackoff, func(err error) bool { return !apierror.IsNotFound(err) }, func() error {
-			bootstrap, err := clients.RKE.RKEBootstrap().Get(machine.Spec.Bootstrap.ConfigRef.Namespace, machine.Spec.Bootstrap.ConfigRef.Name, metav1.GetOptions{})
+			bootstrap, err := clients.RKE.RKEBootstrap().Get(machine.Namespace, machine.Spec.Bootstrap.ConfigRef.Name, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -775,7 +775,7 @@ func Test_Provisioning_Single_Node_All_Roles_Drain(t *testing.T) {
 		machines, _ = cluster.Machines(clients, c)
 		for _, m := range machines.Items {
 			hash := m.Labels["machine-template-hash"]
-			if hash != "" && hash != firstMachineHash && m.Status.NodeRef != nil {
+			if hash != "" && hash != firstMachineHash && m.Status.NodeRef.IsDefined() {
 				secondMachineName = m.Name
 				return true
 			}
@@ -790,7 +790,7 @@ func Test_Provisioning_Single_Node_All_Roles_Drain(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		m, err := clients.CAPI.Machine().Get(c.Namespace, secondMachineName, metav1.GetOptions{})
-		if err != nil || m.Status.NodeRef == nil {
+		if err != nil || !m.Status.NodeRef.IsDefined() {
 			return false
 		}
 

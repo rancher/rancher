@@ -13,7 +13,7 @@ import (
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 func TestJoinURLFromAddress(t *testing.T) {
@@ -96,7 +96,13 @@ func TestSetMachineJoinURL(t *testing.T) {
 						},
 					},
 					Spec: capi.MachineSpec{
-						Bootstrap: capi.Bootstrap{ConfigRef: &corev1.ObjectReference{Kind: "RKEBootstrap", Name: rkeBootstrapName}},
+						Bootstrap: capi.Bootstrap{
+							ConfigRef: capi.ContractVersionedObjectReference{
+								Kind:     "RKEBootstrap",
+								Name:     rkeBootstrapName,
+								APIGroup: "rke.cattle.io",
+							},
+						},
 					},
 				},
 			},
@@ -107,7 +113,7 @@ func TestSetMachineJoinURL(t *testing.T) {
 			},
 			capiCluster: &capi.Cluster{
 				Spec: capi.ClusterSpec{
-					InfrastructureRef: &corev1.ObjectReference{
+					InfrastructureRef: capi.ContractVersionedObjectReference{
 						Name: "something",
 					},
 				},
@@ -148,7 +154,13 @@ func TestSetMachineJoinURL(t *testing.T) {
 						},
 					},
 					Spec: capi.MachineSpec{
-						Bootstrap: capi.Bootstrap{ConfigRef: &corev1.ObjectReference{Kind: "RKEBootstrap", Name: rkeBootstrapName}},
+						Bootstrap: capi.Bootstrap{
+							ConfigRef: capi.ContractVersionedObjectReference{
+								Kind:     "RKEBootstrap",
+								Name:     rkeBootstrapName,
+								APIGroup: "rke.cattle.io",
+							},
+						},
 					},
 				},
 			},
@@ -159,7 +171,7 @@ func TestSetMachineJoinURL(t *testing.T) {
 			},
 			capiCluster: &capi.Cluster{
 				Spec: capi.ClusterSpec{
-					InfrastructureRef: &corev1.ObjectReference{
+					InfrastructureRef: capi.ContractVersionedObjectReference{
 						Name: "something",
 					},
 				},
@@ -217,7 +229,13 @@ func TestSetMachineJoinURL(t *testing.T) {
 						},
 					},
 					Spec: capi.MachineSpec{
-						Bootstrap: capi.Bootstrap{ConfigRef: &corev1.ObjectReference{Kind: "RKEBootstrap", Name: rkeBootstrapName}},
+						Bootstrap: capi.Bootstrap{
+							ConfigRef: capi.ContractVersionedObjectReference{
+								Kind:     "RKEBootstrap",
+								Name:     rkeBootstrapName,
+								APIGroup: "rke.cattle.io",
+							},
+						},
 					},
 				},
 			},
@@ -228,7 +246,7 @@ func TestSetMachineJoinURL(t *testing.T) {
 			},
 			capiCluster: &capi.Cluster{
 				Spec: capi.ClusterSpec{
-					InfrastructureRef: &corev1.ObjectReference{
+					InfrastructureRef: capi.ContractVersionedObjectReference{
 						Name: "something",
 					},
 				},
@@ -286,7 +304,13 @@ func TestSetMachineJoinURL(t *testing.T) {
 						},
 					},
 					Spec: capi.MachineSpec{
-						Bootstrap: capi.Bootstrap{ConfigRef: &corev1.ObjectReference{Kind: "RKEBootstrap", Name: rkeBootstrapName}},
+						Bootstrap: capi.Bootstrap{
+							ConfigRef: capi.ContractVersionedObjectReference{
+								Kind:     "RKEBootstrap",
+								Name:     rkeBootstrapName,
+								APIGroup: "rke.cattle.io",
+							},
+						},
 					},
 				},
 			},
@@ -297,7 +321,7 @@ func TestSetMachineJoinURL(t *testing.T) {
 			},
 			capiCluster: &capi.Cluster{
 				Spec: capi.ClusterSpec{
-					InfrastructureRef: &corev1.ObjectReference{
+					InfrastructureRef: capi.ContractVersionedObjectReference{
 						Name: "something",
 					},
 				},
@@ -343,7 +367,13 @@ func TestSetMachineJoinURL(t *testing.T) {
 						},
 					},
 					Spec: capi.MachineSpec{
-						Bootstrap: capi.Bootstrap{ConfigRef: &corev1.ObjectReference{Kind: "RKEBootstrap", Name: rkeBootstrapName}},
+						Bootstrap: capi.Bootstrap{
+							ConfigRef: capi.ContractVersionedObjectReference{
+								Kind:     "RKEBootstrap",
+								Name:     rkeBootstrapName,
+								APIGroup: "rke.cattle.io",
+							},
+						},
 					},
 				},
 			},
@@ -354,7 +384,7 @@ func TestSetMachineJoinURL(t *testing.T) {
 			},
 			capiCluster: &capi.Cluster{
 				Spec: capi.ClusterSpec{
-					InfrastructureRef: &corev1.ObjectReference{
+					InfrastructureRef: capi.ContractVersionedObjectReference{
 						Name: "something",
 					},
 				},
@@ -393,7 +423,13 @@ func TestSetMachineJoinURL(t *testing.T) {
 						},
 					},
 					Spec: capi.MachineSpec{
-						Bootstrap: capi.Bootstrap{ConfigRef: &corev1.ObjectReference{Kind: "RKEBootstrap", Name: rkeBootstrapName}},
+						Bootstrap: capi.Bootstrap{
+							ConfigRef: capi.ContractVersionedObjectReference{
+								Kind:     "RKEBootstrap",
+								Name:     rkeBootstrapName,
+								APIGroup: "rke.cattle.io",
+							},
+						},
 					},
 				},
 			},
@@ -404,7 +440,7 @@ func TestSetMachineJoinURL(t *testing.T) {
 			},
 			capiCluster: &capi.Cluster{
 				Spec: capi.ClusterSpec{
-					InfrastructureRef: &corev1.ObjectReference{
+					InfrastructureRef: capi.ContractVersionedObjectReference{
 						Name: "something",
 					},
 				},
@@ -445,7 +481,13 @@ func TestSetMachineJoinURL(t *testing.T) {
 						},
 					},
 					Spec: capi.MachineSpec{
-						Bootstrap: capi.Bootstrap{ConfigRef: &corev1.ObjectReference{Kind: "RKEBootstrap", Name: rkeBootstrapName}},
+						Bootstrap: capi.Bootstrap{
+							ConfigRef: capi.ContractVersionedObjectReference{
+								Kind:     "RKEBootstrap",
+								Name:     rkeBootstrapName,
+								APIGroup: "rke.cattle.io",
+							},
+						},
 					},
 				},
 			},
@@ -456,7 +498,7 @@ func TestSetMachineJoinURL(t *testing.T) {
 			},
 			capiCluster: &capi.Cluster{
 				Spec: capi.ClusterSpec{
-					InfrastructureRef: &corev1.ObjectReference{
+					InfrastructureRef: capi.ContractVersionedObjectReference{
 						Name: "something",
 					},
 				},
@@ -503,7 +545,7 @@ func TestSetMachineJoinURL(t *testing.T) {
 			},
 			capiCluster: &capi.Cluster{
 				Spec: capi.ClusterSpec{
-					InfrastructureRef: &corev1.ObjectReference{
+					InfrastructureRef: capi.ContractVersionedObjectReference{
 						Name: "something",
 					},
 				},
@@ -537,7 +579,7 @@ func TestSetMachineJoinURL(t *testing.T) {
 			},
 			capiCluster: &capi.Cluster{
 				Spec: capi.ClusterSpec{
-					InfrastructureRef: &corev1.ObjectReference{
+					InfrastructureRef: capi.ContractVersionedObjectReference{
 						Name: "something",
 					},
 				},
@@ -571,7 +613,7 @@ func TestSetMachineJoinURL(t *testing.T) {
 			},
 			capiCluster: &capi.Cluster{
 				Spec: capi.ClusterSpec{
-					InfrastructureRef: &corev1.ObjectReference{
+					InfrastructureRef: capi.ContractVersionedObjectReference{
 						Name: "something",
 					},
 				},
@@ -605,7 +647,7 @@ func TestSetMachineJoinURL(t *testing.T) {
 			},
 			capiCluster: &capi.Cluster{
 				Spec: capi.ClusterSpec{
-					InfrastructureRef: &corev1.ObjectReference{
+					InfrastructureRef: capi.ContractVersionedObjectReference{
 						Name: "something",
 					},
 				},
@@ -639,7 +681,13 @@ func TestSetMachineJoinURL(t *testing.T) {
 						Namespace: "test",
 					},
 					Spec: capi.MachineSpec{
-						Bootstrap: capi.Bootstrap{ConfigRef: &corev1.ObjectReference{Kind: "RKEBootstrap", Name: rkeBootstrapName}},
+						Bootstrap: capi.Bootstrap{
+							ConfigRef: capi.ContractVersionedObjectReference{
+								Kind:     "RKEBootstrap",
+								Name:     rkeBootstrapName,
+								APIGroup: "rke.cattle.io",
+							},
+						},
 					},
 				},
 			},
@@ -650,10 +698,10 @@ func TestSetMachineJoinURL(t *testing.T) {
 			},
 			capiCluster: &capi.Cluster{
 				Spec: capi.ClusterSpec{
-					InfrastructureRef: &corev1.ObjectReference{
+					InfrastructureRef: capi.ContractVersionedObjectReference{
 						Name: "something",
 					},
-					ControlPlaneRef: &corev1.ObjectReference{
+					ControlPlaneRef: capi.ContractVersionedObjectReference{
 						Name: "something",
 					},
 				},
@@ -703,9 +751,12 @@ func TestSetMachineJoinURL(t *testing.T) {
 					},
 					Spec: capi.MachineSpec{
 						Bootstrap: capi.Bootstrap{
-							ConfigRef: &corev1.ObjectReference{
-								Kind: "RKEBootstrap",
-								Name: rkeBootstrapName}},
+							ConfigRef: capi.ContractVersionedObjectReference{
+								Kind:     "RKEBootstrap",
+								Name:     rkeBootstrapName,
+								APIGroup: "rke.cattle.io",
+							},
+						},
 					},
 				},
 			},
@@ -716,10 +767,10 @@ func TestSetMachineJoinURL(t *testing.T) {
 			},
 			capiCluster: &capi.Cluster{
 				Spec: capi.ClusterSpec{
-					InfrastructureRef: &corev1.ObjectReference{
+					InfrastructureRef: capi.ContractVersionedObjectReference{
 						Name: "something",
 					},
-					ControlPlaneRef: &corev1.ObjectReference{
+					ControlPlaneRef: capi.ContractVersionedObjectReference{
 						Name: "something",
 					},
 				},
@@ -768,7 +819,13 @@ func TestSetMachineJoinURL(t *testing.T) {
 						Namespace: "test",
 					},
 					Spec: capi.MachineSpec{
-						Bootstrap: capi.Bootstrap{ConfigRef: &corev1.ObjectReference{Kind: "RKEBootstrap", Name: rkeBootstrapName}},
+						Bootstrap: capi.Bootstrap{
+							ConfigRef: capi.ContractVersionedObjectReference{
+								Kind:     "RKEBootstrap",
+								Name:     rkeBootstrapName,
+								APIGroup: "rke.cattle.io",
+							},
+						},
 					},
 				},
 			},
@@ -779,10 +836,10 @@ func TestSetMachineJoinURL(t *testing.T) {
 			},
 			capiCluster: &capi.Cluster{
 				Spec: capi.ClusterSpec{
-					InfrastructureRef: &corev1.ObjectReference{
+					InfrastructureRef: capi.ContractVersionedObjectReference{
 						Name: "something",
 					},
-					ControlPlaneRef: &corev1.ObjectReference{
+					ControlPlaneRef: capi.ContractVersionedObjectReference{
 						Name: "something",
 					},
 				},
@@ -831,7 +888,13 @@ func TestSetMachineJoinURL(t *testing.T) {
 						Namespace: "test",
 					},
 					Spec: capi.MachineSpec{
-						Bootstrap: capi.Bootstrap{ConfigRef: &corev1.ObjectReference{Kind: "RKEBootstrap", Name: rkeBootstrapName}},
+						Bootstrap: capi.Bootstrap{
+							ConfigRef: capi.ContractVersionedObjectReference{
+								Kind:     "RKEBootstrap",
+								Name:     rkeBootstrapName,
+								APIGroup: "rke.cattle.io",
+							},
+						},
 					},
 				},
 			},
@@ -842,10 +905,10 @@ func TestSetMachineJoinURL(t *testing.T) {
 			},
 			capiCluster: &capi.Cluster{
 				Spec: capi.ClusterSpec{
-					InfrastructureRef: &corev1.ObjectReference{
+					InfrastructureRef: capi.ContractVersionedObjectReference{
 						Name: "something",
 					},
-					ControlPlaneRef: &corev1.ObjectReference{
+					ControlPlaneRef: capi.ContractVersionedObjectReference{
 						Name: "something",
 					},
 				},
@@ -898,7 +961,13 @@ func TestSetMachineJoinURL(t *testing.T) {
 						NodeInfo: &corev1.NodeSystemInfo{},
 					},
 					Spec: capi.MachineSpec{
-						Bootstrap: capi.Bootstrap{ConfigRef: &corev1.ObjectReference{Kind: "RKEBootstrap", Name: rkeBootstrapName}},
+						Bootstrap: capi.Bootstrap{
+							ConfigRef: capi.ContractVersionedObjectReference{
+								Kind:     "RKEBootstrap",
+								Name:     rkeBootstrapName,
+								APIGroup: "rke.cattle.io",
+							},
+						},
 					},
 				},
 			},
@@ -909,10 +978,10 @@ func TestSetMachineJoinURL(t *testing.T) {
 			},
 			capiCluster: &capi.Cluster{
 				Spec: capi.ClusterSpec{
-					InfrastructureRef: &corev1.ObjectReference{
+					InfrastructureRef: capi.ContractVersionedObjectReference{
 						Name: "something",
 					},
-					ControlPlaneRef: &corev1.ObjectReference{
+					ControlPlaneRef: capi.ContractVersionedObjectReference{
 						Name: "something",
 					},
 				},
