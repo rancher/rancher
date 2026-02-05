@@ -5,10 +5,13 @@ import (
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers"
 	"github.com/rancher/rancher/pkg/controllers/status"
 	userMocks "github.com/rancher/rancher/pkg/user/mocks"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
+	wrangler "github.com/rancher/wrangler/v3/pkg/name"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
@@ -17,6 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 var (
@@ -1397,4 +1401,684 @@ func Test_globalRoleBindingLifecycle_Create(t *testing.T) {
 		require.Equal(t, testPrincipal, resultGRB.UserPrincipalName, "user principal should be set by reconcileSubject")
 		require.Equal(t, crbNamePrefix+testGRBName, resultGRB.Annotations[crbNameAnnotation], "CRB annotation should be set by reconcileGlobalRoleBinding")
 	})
+}
+
+var (
+	inheritedNamespacedRulesGR = v3.GlobalRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "inheritedNamespacedRulesGR",
+			UID:  "00000000",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "GlobalRole",
+			APIVersion: "management.cattle.io/v3",
+		},
+		InheritedNamespacedRules: map[string][]rbacv1.PolicyRule{
+			"namespace1": {
+				readPodPolicyRule,
+				readConfigPolicyRule,
+			},
+			"namespace2": {
+				adminPodPolicyRule,
+			},
+		},
+	}
+
+	inheritedNamespacedRulesGRB = v3.GlobalRoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "inheritedNamespacedRulesGRB",
+			UID:  "grb-1234",
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "GlobalRoleBinding",
+			APIVersion: "management.cattle.io/v3",
+		},
+		UserName:       "testuser",
+		GlobalRoleName: "inheritedNamespacedRulesGR",
+	}
+
+	cluster1 = v3.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cluster1",
+		},
+	}
+
+	cluster2 = v3.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cluster2",
+		},
+	}
+)
+
+func TestReconcileInheritedNamespacedRoleBindings(t *testing.T) {
+	t.Parallel()
+
+	type controllers struct {
+		grCache        *fake.MockNonNamespacedCacheInterface[*v3.GlobalRole]
+		clusterLister  *fake.MockNonNamespacedCacheInterface[*v3.Cluster]
+		clusterManager *clustermanager.Manager
+	}
+
+	tests := []struct {
+		name              string
+		setupControllers  func(controllers)
+		globalRoleBinding *v3.GlobalRoleBinding
+		wantError         bool
+		wantCondition     string
+	}{
+		{
+			name: "no inherited namespaced rules",
+			setupControllers: func(c controllers) {
+				noInheritedGR := v3.GlobalRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "no-inherited-gr",
+					},
+					InheritedNamespacedRules: map[string][]rbacv1.PolicyRule{},
+				}
+				c.grCache.EXPECT().Get("no-inherited-gr").Return(&noInheritedGR, nil)
+			},
+			globalRoleBinding: &v3.GlobalRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-grb",
+				},
+				GlobalRoleName: "no-inherited-gr",
+				UserName:       "testuser",
+			},
+			wantError:     false,
+			wantCondition: "",
+		},
+		{
+			name: "failed to get global role",
+			setupControllers: func(c controllers) {
+				c.grCache.EXPECT().Get("missing-gr").Return(nil, fmt.Errorf("not found"))
+			},
+			globalRoleBinding: &v3.GlobalRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-grb",
+				},
+				GlobalRoleName: "missing-gr",
+				UserName:       "testuser",
+			},
+			wantError:     true,
+			wantCondition: failedToGetGlobalRole,
+		},
+		{
+			name: "failed to list clusters",
+			setupControllers: func(c controllers) {
+				c.grCache.EXPECT().Get(inheritedNamespacedRulesGR.Name).Return(inheritedNamespacedRulesGR.DeepCopy(), nil)
+				c.clusterLister.EXPECT().List(labels.Everything()).Return(nil, fmt.Errorf("server unavailable"))
+			},
+			globalRoleBinding: inheritedNamespacedRulesGRB.DeepCopy(),
+			wantError:         true,
+			wantCondition:     failedToListCluster,
+		},
+		{
+			name: "skip local cluster",
+			setupControllers: func(c controllers) {
+				c.grCache.EXPECT().Get(inheritedNamespacedRulesGR.Name).Return(inheritedNamespacedRulesGR.DeepCopy(), nil)
+				c.clusterLister.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&localCluster}, nil)
+			},
+			globalRoleBinding: inheritedNamespacedRulesGRB.DeepCopy(),
+			wantError:         false,
+			wantCondition:     inheritedNamespacedRoleBindingReconciled,
+		},
+	}
+
+	ctrl := gomock.NewController(t)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			grCache := fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl)
+			clusterLister := fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl)
+			clusterManager := &clustermanager.Manager{}
+
+			test.setupControllers(controllers{
+				grCache:        grCache,
+				clusterLister:  clusterLister,
+				clusterManager: clusterManager,
+			})
+
+			lifecycle := &globalRoleBindingLifecycle{
+				grLister:       grCache,
+				clusterLister:  clusterLister,
+				clusterManager: clusterManager,
+				status:         status.NewStatus(),
+			}
+
+			localConditions := []metav1.Condition{}
+			err := lifecycle.reconcileInheritedNamespacedRoleBindings(test.globalRoleBinding, &localConditions)
+
+			if test.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			if test.wantCondition != "" {
+				require.NotEmpty(t, localConditions)
+				found := false
+				for _, cond := range localConditions {
+					if cond.Type == inheritedNamespacedRoleBindingReconciled {
+						found = true
+						assert.Equal(t, test.wantCondition, cond.Reason)
+					}
+				}
+				require.True(t, found, "expected condition not found")
+			}
+		})
+	}
+}
+
+func TestReconcileInheritedRoleBindingInNamespace(t *testing.T) {
+	t.Parallel()
+
+	activeNamespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "namespace1",
+		},
+		Status: corev1.NamespaceStatus{
+			Phase: corev1.NamespaceActive,
+		},
+	}
+	terminatingNamespace := &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "namespace1",
+		},
+		Status: corev1.NamespaceStatus{
+			Phase: corev1.NamespaceTerminating,
+		},
+	}
+	errRoleBindingNotFound := apierrors.NewNotFound(schema.GroupResource{
+		Group:    "rbac.authorization.k8s.io",
+		Resource: "RoleBinding",
+	}, "")
+	subject := rbacv1.Subject{
+		Kind: "User",
+		Name: "testuser",
+	}
+	globalRoleName := wrangler.SafeConcatName(inheritedNamespacedRulesGR.Name)
+	grbName := wrangler.SafeConcatName(inheritedNamespacedRulesGRB.Name)
+	rbName := wrangler.SafeConcatName(grbName, "namespace1")
+	roleName := wrangler.SafeConcatName(globalRoleName, "namespace1")
+
+	correctRoleBinding := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rbName,
+			Namespace: "namespace1",
+			UID:       "rb-uid-1",
+			Labels: map[string]string{
+				grbOwnerLabel: grbName,
+			},
+		},
+		Subjects: []rbacv1.Subject{subject},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "Role",
+			Name:     roleName,
+		},
+	}
+
+	wrongRoleRefRoleBinding := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rbName,
+			Namespace: "namespace1",
+			UID:       "rb-uid-2",
+			Labels: map[string]string{
+				grbOwnerLabel: grbName,
+			},
+		},
+		Subjects: []rbacv1.Subject{subject},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "Role",
+			Name:     "wrong-role",
+		},
+	}
+
+	wrongLabelRoleBinding := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      rbName,
+			Namespace: "namespace1",
+			UID:       "rb-uid-3",
+			Labels: map[string]string{
+				grbOwnerLabel: "wrong-owner",
+			},
+		},
+		Subjects: []rbacv1.Subject{subject},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: rbacv1.GroupName,
+			Kind:     "Role",
+			Name:     roleName,
+		},
+	}
+
+	type controllers struct {
+		nsCache      *fake.MockNonNamespacedCacheInterface[*corev1.Namespace]
+		rbCache      *fake.MockCacheInterface[*rbacv1.RoleBinding]
+		rbController *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]
+	}
+
+	tests := []struct {
+		name             string
+		setupControllers func(controllers)
+		wantError        bool
+		wantUIDs         []types.UID
+	}{
+		{
+			name: "namespace not found",
+			setupControllers: func(c controllers) {
+				c.nsCache.EXPECT().Get("namespace1").Return(nil, errRoleBindingNotFound)
+			},
+			wantError: false,
+			wantUIDs:  []types.UID{},
+		},
+		{
+			name: "namespace is nil",
+			setupControllers: func(c controllers) {
+				c.nsCache.EXPECT().Get("namespace1").Return(nil, nil)
+			},
+			wantError: true,
+			wantUIDs:  []types.UID{},
+		},
+		{
+			name: "namespace is terminating",
+			setupControllers: func(c controllers) {
+				c.nsCache.EXPECT().Get("namespace1").Return(terminatingNamespace, nil)
+			},
+			wantError: false,
+			wantUIDs:  []types.UID{},
+		},
+		{
+			name: "get namespace fails",
+			setupControllers: func(c controllers) {
+				c.nsCache.EXPECT().Get("namespace1").Return(nil, fmt.Errorf("server error"))
+			},
+			wantError: true,
+			wantUIDs:  []types.UID{},
+		},
+		{
+			name: "get rolebinding fails",
+			setupControllers: func(c controllers) {
+				c.nsCache.EXPECT().Get("namespace1").Return(activeNamespace, nil)
+				c.rbCache.EXPECT().Get("namespace1", rbName).Return(nil, fmt.Errorf("server error"))
+			},
+			wantError: true,
+			wantUIDs:  []types.UID{},
+		},
+		{
+			name: "create rolebinding successfully",
+			setupControllers: func(c controllers) {
+				c.nsCache.EXPECT().Get("namespace1").Return(activeNamespace, nil)
+				c.rbCache.EXPECT().Get("namespace1", rbName).Return(nil, errRoleBindingNotFound)
+				c.rbController.EXPECT().Create(gomock.Any()).DoAndReturn(func(rb *rbacv1.RoleBinding) (*rbacv1.RoleBinding, error) {
+					rb.UID = "new-rb-uid"
+					return rb, nil
+				})
+			},
+			wantError: false,
+			wantUIDs:  []types.UID{"new-rb-uid"},
+		},
+		{
+			name: "create rolebinding fails",
+			setupControllers: func(c controllers) {
+				c.nsCache.EXPECT().Get("namespace1").Return(activeNamespace, nil)
+				c.rbCache.EXPECT().Get("namespace1", rbName).Return(nil, errRoleBindingNotFound)
+				c.rbController.EXPECT().Create(gomock.Any()).Return(nil, fmt.Errorf("creation failed"))
+			},
+			wantError: true,
+			wantUIDs:  []types.UID{},
+		},
+		{
+			name: "rolebinding already correct",
+			setupControllers: func(c controllers) {
+				c.nsCache.EXPECT().Get("namespace1").Return(activeNamespace, nil)
+				c.rbCache.EXPECT().Get("namespace1", rbName).Return(correctRoleBinding, nil)
+			},
+			wantError: false,
+			wantUIDs:  []types.UID{"rb-uid-1"},
+		},
+		{
+			name: "rolebinding has wrong roleref - delete and recreate",
+			setupControllers: func(c controllers) {
+				c.nsCache.EXPECT().Get("namespace1").Return(activeNamespace, nil)
+				c.rbCache.EXPECT().Get("namespace1", rbName).Return(wrongRoleRefRoleBinding, nil)
+				c.rbController.EXPECT().Delete("namespace1", rbName, gomock.Any()).Return(nil)
+				c.rbController.EXPECT().Create(gomock.Any()).DoAndReturn(func(rb *rbacv1.RoleBinding) (*rbacv1.RoleBinding, error) {
+					rb.UID = "new-rb-uid"
+					return rb, nil
+				})
+			},
+			wantError: false,
+			wantUIDs:  []types.UID{"new-rb-uid"},
+		},
+		{
+			name: "rolebinding has wrong label - delete and recreate",
+			setupControllers: func(c controllers) {
+				c.nsCache.EXPECT().Get("namespace1").Return(activeNamespace, nil)
+				c.rbCache.EXPECT().Get("namespace1", rbName).Return(wrongLabelRoleBinding, nil)
+				c.rbController.EXPECT().Delete("namespace1", rbName, gomock.Any()).Return(nil)
+				c.rbController.EXPECT().Create(gomock.Any()).DoAndReturn(func(rb *rbacv1.RoleBinding) (*rbacv1.RoleBinding, error) {
+					rb.UID = "new-rb-uid"
+					return rb, nil
+				})
+			},
+			wantError: false,
+			wantUIDs:  []types.UID{"new-rb-uid"},
+		},
+		{
+			name: "delete rolebinding fails",
+			setupControllers: func(c controllers) {
+				c.nsCache.EXPECT().Get("namespace1").Return(activeNamespace, nil)
+				c.rbCache.EXPECT().Get("namespace1", rbName).Return(wrongRoleRefRoleBinding, nil)
+				c.rbController.EXPECT().Delete("namespace1", rbName, gomock.Any()).Return(fmt.Errorf("delete failed"))
+			},
+			wantError: true,
+			wantUIDs:  []types.UID{},
+		},
+	}
+
+	ctrl := gomock.NewController(t)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			nsCache := fake.NewMockNonNamespacedCacheInterface[*corev1.Namespace](ctrl)
+			rbCache := fake.NewMockCacheInterface[*rbacv1.RoleBinding](ctrl)
+			rbController := fake.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl)
+
+			test.setupControllers(controllers{
+				nsCache:      nsCache,
+				rbCache:      rbCache,
+				rbController: rbController,
+			})
+
+			lifecycle := &globalRoleBindingLifecycle{}
+			roleBindingUIDs := make(map[types.UID]struct{})
+
+			err := lifecycle.reconcileInheritedRoleBindingInNamespace(
+				"cluster1",
+				"namespace1",
+				globalRoleName,
+				grbName,
+				subject,
+				rbController,
+				rbCache,
+				nsCache,
+				roleBindingUIDs,
+			)
+
+			if test.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			require.Equal(t, len(test.wantUIDs), len(roleBindingUIDs))
+			for _, uid := range test.wantUIDs {
+				_, exists := roleBindingUIDs[uid]
+				require.True(t, exists, "expected UID %s not found in roleBindingUIDs", uid)
+			}
+		})
+	}
+}
+
+func TestPurgeInvalidInheritedRoleBindingsInCluster(t *testing.T) {
+	t.Parallel()
+
+	grbName := wrangler.SafeConcatName(inheritedNamespacedRulesGRB.Name)
+
+	validRB1 := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "valid-rb-1",
+			Namespace: "namespace1",
+			UID:       "valid-uid-1",
+			Labels: map[string]string{
+				grbOwnerLabel: grbName,
+			},
+		},
+	}
+
+	validRB2 := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "valid-rb-2",
+			Namespace: "namespace2",
+			UID:       "valid-uid-2",
+			Labels: map[string]string{
+				grbOwnerLabel: grbName,
+			},
+		},
+	}
+
+	invalidRB := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "invalid-rb",
+			Namespace: "namespace3",
+			UID:       "invalid-uid",
+			Labels: map[string]string{
+				grbOwnerLabel: grbName,
+			},
+		},
+	}
+
+	type controllers struct {
+		rbCache      *fake.MockCacheInterface[*rbacv1.RoleBinding]
+		rbController *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]
+	}
+
+	tests := []struct {
+		name                string
+		setupControllers    func(controllers)
+		validUIDs           map[types.UID]struct{}
+		wantError           bool
+		expectedDeleteCalls int
+	}{
+		{
+			name: "no rolebindings to purge",
+			setupControllers: func(c controllers) {
+				c.rbCache.EXPECT().List("", gomock.Any()).Return([]*rbacv1.RoleBinding{validRB1, validRB2}, nil)
+			},
+			validUIDs: map[types.UID]struct{}{
+				"valid-uid-1": {},
+				"valid-uid-2": {},
+			},
+			wantError:           false,
+			expectedDeleteCalls: 0,
+		},
+		{
+			name: "purge invalid rolebinding",
+			setupControllers: func(c controllers) {
+				c.rbCache.EXPECT().List("", gomock.Any()).Return([]*rbacv1.RoleBinding{validRB1, validRB2, invalidRB}, nil)
+				c.rbController.EXPECT().Delete("namespace3", "invalid-rb", gomock.Any()).Return(nil)
+			},
+			validUIDs: map[types.UID]struct{}{
+				"valid-uid-1": {},
+				"valid-uid-2": {},
+			},
+			wantError:           false,
+			expectedDeleteCalls: 1,
+		},
+		{
+			name: "list rolebindings fails",
+			setupControllers: func(c controllers) {
+				c.rbCache.EXPECT().List("", gomock.Any()).Return(nil, fmt.Errorf("list failed"))
+			},
+			validUIDs: map[types.UID]struct{}{
+				"valid-uid-1": {},
+			},
+			wantError:           true,
+			expectedDeleteCalls: 0,
+		},
+		{
+			name: "delete rolebinding fails",
+			setupControllers: func(c controllers) {
+				c.rbCache.EXPECT().List("", gomock.Any()).Return([]*rbacv1.RoleBinding{validRB1, invalidRB}, nil)
+				c.rbController.EXPECT().Delete("namespace3", "invalid-rb", gomock.Any()).Return(fmt.Errorf("delete failed"))
+			},
+			validUIDs: map[types.UID]struct{}{
+				"valid-uid-1": {},
+			},
+			wantError:           true,
+			expectedDeleteCalls: 1,
+		},
+		{
+			name: "purge multiple invalid rolebindings",
+			setupControllers: func(c controllers) {
+				invalidRB2 := &rbacv1.RoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "invalid-rb-2",
+						Namespace: "namespace4",
+						UID:       "invalid-uid-2",
+						Labels: map[string]string{
+							grbOwnerLabel: grbName,
+						},
+					},
+				}
+				c.rbCache.EXPECT().List("", gomock.Any()).Return([]*rbacv1.RoleBinding{validRB1, invalidRB, invalidRB2}, nil)
+				c.rbController.EXPECT().Delete("namespace3", "invalid-rb", gomock.Any()).Return(nil)
+				c.rbController.EXPECT().Delete("namespace4", "invalid-rb-2", gomock.Any()).Return(nil)
+			},
+			validUIDs: map[types.UID]struct{}{
+				"valid-uid-1": {},
+			},
+			wantError:           false,
+			expectedDeleteCalls: 2,
+		},
+	}
+
+	ctrl := gomock.NewController(t)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			rbCache := fake.NewMockCacheInterface[*rbacv1.RoleBinding](ctrl)
+			rbController := fake.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl)
+
+			test.setupControllers(controllers{
+				rbCache:      rbCache,
+				rbController: rbController,
+			})
+
+			lifecycle := &globalRoleBindingLifecycle{}
+
+			err := lifecycle.purgeInvalidInheritedRoleBindingsInCluster(
+				"cluster1",
+				grbName,
+				rbCache,
+				rbController,
+				test.validUIDs,
+			)
+
+			if test.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestDeleteInheritedNamespacedRoleBindings(t *testing.T) {
+	t.Parallel()
+
+	type controllers struct {
+		grCache       *fake.MockNonNamespacedCacheInterface[*v3.GlobalRole]
+		clusterLister *fake.MockNonNamespacedCacheInterface[*v3.Cluster]
+	}
+
+	tests := []struct {
+		name              string
+		setupControllers  func(controllers)
+		globalRoleBinding *v3.GlobalRoleBinding
+		wantError         bool
+	}{
+		{
+			name: "no inherited namespaced rules",
+			setupControllers: func(c controllers) {
+				noInheritedGR := v3.GlobalRole{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "no-inherited-gr",
+					},
+					InheritedNamespacedRules: map[string][]rbacv1.PolicyRule{},
+				}
+				c.grCache.EXPECT().Get("no-inherited-gr").Return(&noInheritedGR, nil)
+			},
+			globalRoleBinding: &v3.GlobalRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-grb",
+				},
+				GlobalRoleName: "no-inherited-gr",
+			},
+			wantError: false,
+		},
+		{
+			name: "global role not found - logs warning and continues",
+			setupControllers: func(c controllers) {
+				notFoundErr := apierrors.NewNotFound(schema.GroupResource{
+					Group:    "management.cattle.io",
+					Resource: "GlobalRole",
+				}, "missing-gr")
+				c.grCache.EXPECT().Get("missing-gr").Return(nil, notFoundErr)
+			},
+			globalRoleBinding: &v3.GlobalRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-grb",
+				},
+				GlobalRoleName: "missing-gr",
+			},
+			wantError: false, // Function logs warning and continues for NotFound errors
+		},
+		{
+			name: "failed to get global role with non-NotFound error",
+			setupControllers: func(c controllers) {
+				c.grCache.EXPECT().Get("missing-gr").Return(nil, fmt.Errorf("server error"))
+			},
+			globalRoleBinding: &v3.GlobalRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-grb",
+				},
+				GlobalRoleName: "missing-gr",
+			},
+			wantError: true, // Function returns error for non-NotFound errors
+		},
+		{
+			name: "failed to list clusters",
+			setupControllers: func(c controllers) {
+				c.grCache.EXPECT().Get(inheritedNamespacedRulesGR.Name).Return(inheritedNamespacedRulesGR.DeepCopy(), nil)
+				c.clusterLister.EXPECT().List(labels.Everything()).Return(nil, fmt.Errorf("server unavailable"))
+			},
+			globalRoleBinding: inheritedNamespacedRulesGRB.DeepCopy(),
+			wantError:         true,
+		},
+		{
+			name: "skip local cluster",
+			setupControllers: func(c controllers) {
+				c.grCache.EXPECT().Get(inheritedNamespacedRulesGR.Name).Return(inheritedNamespacedRulesGR.DeepCopy(), nil)
+				c.clusterLister.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&localCluster}, nil)
+			},
+			globalRoleBinding: inheritedNamespacedRulesGRB.DeepCopy(),
+			wantError:         false,
+		},
+	}
+
+	ctrl := gomock.NewController(t)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			grCache := fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl)
+			clusterLister := fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl)
+
+			test.setupControllers(controllers{
+				grCache:       grCache,
+				clusterLister: clusterLister,
+			})
+
+			lifecycle := &globalRoleBindingLifecycle{
+				grLister:       grCache,
+				clusterLister:  clusterLister,
+				clusterManager: &clustermanager.Manager{},
+			}
+
+			err := lifecycle.deleteInheritedNamespacedRoleBindings(test.globalRoleBinding)
+
+			if test.wantError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }
