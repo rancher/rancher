@@ -212,6 +212,7 @@ func (h *handler) reconcileMachinePlanAppliedCondition(secret *corev1.Secret, pl
 		conditions.Set(machine, metav1.Condition{
 			Type:   condition,
 			Status: metav1.ConditionTrue,
+			Reason: "PlanApplied",
 		})
 		needsUpdate = true
 	}
