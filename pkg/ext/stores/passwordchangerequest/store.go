@@ -3,6 +3,7 @@ package passwordchangerequest
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"unicode/utf8"
 
@@ -17,6 +18,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -50,6 +52,7 @@ type Store struct {
 	authorizer           authorizer.Authorizer
 	pwdUpdater           PasswordUpdater
 	userCache            mgmtv3.UserCache
+	userClient           mgmtv3.UserClient
 	getPasswordMinLength func() int
 }
 
@@ -65,6 +68,7 @@ func New(wranglerContext *wrangler.Context, authorizer authorizer.Authorizer) *S
 		pwdUpdater:           pwdManager,
 		authorizer:           authorizer,
 		userCache:            wranglerContext.Mgmt.User().Cache(),
+		userClient:           wranglerContext.Mgmt.User(),
 		getPasswordMinLength: settings.PasswordMinLength.GetInt,
 	}
 }
@@ -161,6 +165,12 @@ func (s *Store) Create(
 			return nil, apierrors.NewUnauthorized(fmt.Sprintf("error checking permissions %s", err.Error()))
 		}
 
+		if user.MustChangePassword {
+			if err := s.updateMustChangePasswordIfNeeded(user.Name); err != nil {
+				return nil, fmt.Errorf("can't update MustChangePassword: %w", err)
+			}
+		}
+
 		req.Status = ext.PasswordChangeRequestStatus{
 			Conditions: []metav1.Condition{
 				{
@@ -180,6 +190,13 @@ func (s *Store) Create(
 		if err != nil {
 			return nil, apierrors.NewInternalError(fmt.Errorf("error updating password: %w", err))
 		}
+
+		if user.MustChangePassword {
+			if err := s.updateMustChangePasswordIfNeeded(user.Name); err != nil {
+				return nil, fmt.Errorf("can't update MustChangePassword: %w", err)
+			}
+		}
+
 		req.Status = ext.PasswordChangeRequestStatus{
 			Conditions: []metav1.Condition{
 				{
@@ -225,4 +242,26 @@ func (s *Store) canUpdateAnyPassword(ctx context.Context, userInfo user.Info) (b
 	}
 
 	return decision == authorizer.DecisionAllow, nil
+}
+
+func (s *Store) updateMustChangePasswordIfNeeded(userName string) error {
+	patch, err := json.Marshal([]struct {
+		Op    string `json:"op"`
+		Path  string `json:"path"`
+		Value any    `json:"value"`
+	}{{
+		Op:    "add",
+		Path:  "/mustChangePassword",
+		Value: false,
+	}})
+	if err != nil {
+		return err
+	}
+
+	_, err = s.userClient.Patch(userName, types.JSONPatchType, patch)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
