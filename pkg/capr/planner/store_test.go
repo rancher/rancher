@@ -98,7 +98,7 @@ func TestSetMachineJoinURL(t *testing.T) {
 					Spec: capi.MachineSpec{
 						Bootstrap: capi.Bootstrap{
 							ConfigRef: capi.ContractVersionedObjectReference{
-								Kind:     "RKEBootstrap",
+								Kind:     capr.RKEBootstrapKind,
 								Name:     rkeBootstrapName,
 								APIGroup: "rke.cattle.io",
 							},
@@ -156,7 +156,7 @@ func TestSetMachineJoinURL(t *testing.T) {
 					Spec: capi.MachineSpec{
 						Bootstrap: capi.Bootstrap{
 							ConfigRef: capi.ContractVersionedObjectReference{
-								Kind:     "RKEBootstrap",
+								Kind:     capr.RKEBootstrapKind,
 								Name:     rkeBootstrapName,
 								APIGroup: "rke.cattle.io",
 							},
@@ -231,7 +231,7 @@ func TestSetMachineJoinURL(t *testing.T) {
 					Spec: capi.MachineSpec{
 						Bootstrap: capi.Bootstrap{
 							ConfigRef: capi.ContractVersionedObjectReference{
-								Kind:     "RKEBootstrap",
+								Kind:     capr.RKEBootstrapKind,
 								Name:     rkeBootstrapName,
 								APIGroup: "rke.cattle.io",
 							},
@@ -306,7 +306,7 @@ func TestSetMachineJoinURL(t *testing.T) {
 					Spec: capi.MachineSpec{
 						Bootstrap: capi.Bootstrap{
 							ConfigRef: capi.ContractVersionedObjectReference{
-								Kind:     "RKEBootstrap",
+								Kind:     capr.RKEBootstrapKind,
 								Name:     rkeBootstrapName,
 								APIGroup: "rke.cattle.io",
 							},
@@ -369,7 +369,7 @@ func TestSetMachineJoinURL(t *testing.T) {
 					Spec: capi.MachineSpec{
 						Bootstrap: capi.Bootstrap{
 							ConfigRef: capi.ContractVersionedObjectReference{
-								Kind:     "RKEBootstrap",
+								Kind:     capr.RKEBootstrapKind,
 								Name:     rkeBootstrapName,
 								APIGroup: "rke.cattle.io",
 							},
@@ -425,7 +425,7 @@ func TestSetMachineJoinURL(t *testing.T) {
 					Spec: capi.MachineSpec{
 						Bootstrap: capi.Bootstrap{
 							ConfigRef: capi.ContractVersionedObjectReference{
-								Kind:     "RKEBootstrap",
+								Kind:     capr.RKEBootstrapKind,
 								Name:     rkeBootstrapName,
 								APIGroup: "rke.cattle.io",
 							},
@@ -483,7 +483,7 @@ func TestSetMachineJoinURL(t *testing.T) {
 					Spec: capi.MachineSpec{
 						Bootstrap: capi.Bootstrap{
 							ConfigRef: capi.ContractVersionedObjectReference{
-								Kind:     "RKEBootstrap",
+								Kind:     capr.RKEBootstrapKind,
 								Name:     rkeBootstrapName,
 								APIGroup: "rke.cattle.io",
 							},
@@ -683,7 +683,7 @@ func TestSetMachineJoinURL(t *testing.T) {
 					Spec: capi.MachineSpec{
 						Bootstrap: capi.Bootstrap{
 							ConfigRef: capi.ContractVersionedObjectReference{
-								Kind:     "RKEBootstrap",
+								Kind:     capr.RKEBootstrapKind,
 								Name:     rkeBootstrapName,
 								APIGroup: "rke.cattle.io",
 							},
@@ -752,7 +752,7 @@ func TestSetMachineJoinURL(t *testing.T) {
 					Spec: capi.MachineSpec{
 						Bootstrap: capi.Bootstrap{
 							ConfigRef: capi.ContractVersionedObjectReference{
-								Kind:     "RKEBootstrap",
+								Kind:     capr.RKEBootstrapKind,
 								Name:     rkeBootstrapName,
 								APIGroup: "rke.cattle.io",
 							},
@@ -821,7 +821,7 @@ func TestSetMachineJoinURL(t *testing.T) {
 					Spec: capi.MachineSpec{
 						Bootstrap: capi.Bootstrap{
 							ConfigRef: capi.ContractVersionedObjectReference{
-								Kind:     "RKEBootstrap",
+								Kind:     capr.RKEBootstrapKind,
 								Name:     rkeBootstrapName,
 								APIGroup: "rke.cattle.io",
 							},
@@ -890,7 +890,7 @@ func TestSetMachineJoinURL(t *testing.T) {
 					Spec: capi.MachineSpec{
 						Bootstrap: capi.Bootstrap{
 							ConfigRef: capi.ContractVersionedObjectReference{
-								Kind:     "RKEBootstrap",
+								Kind:     capr.RKEBootstrapKind,
 								Name:     rkeBootstrapName,
 								APIGroup: "rke.cattle.io",
 							},
@@ -963,7 +963,7 @@ func TestSetMachineJoinURL(t *testing.T) {
 					Spec: capi.MachineSpec{
 						Bootstrap: capi.Bootstrap{
 							ConfigRef: capi.ContractVersionedObjectReference{
-								Kind:     "RKEBootstrap",
+								Kind:     capr.RKEBootstrapKind,
 								Name:     rkeBootstrapName,
 								APIGroup: "rke.cattle.io",
 							},

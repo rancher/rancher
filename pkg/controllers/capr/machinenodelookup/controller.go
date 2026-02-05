@@ -17,7 +17,6 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/condition"
 	"github.com/rancher/wrangler/v3/pkg/data"
 	"github.com/rancher/wrangler/v3/pkg/generic"
-	"github.com/rancher/wrangler/v3/pkg/summary"
 	"github.com/sirupsen/logrus"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -97,7 +96,8 @@ func (h *handler) associateMachineWithNode(_ string, bootstrap *rkev1.RKEBootstr
 
 	// Do not mutate the infrastructure machine object if it is not marked as Ready, otherwise it will cause the
 	// controller to potentially re-run the provision job
-	if c := getCondition(d, "Ready"); c == nil || (c != nil && strings.ToLower(c.Status()) != "true") {
+	if c := capr.GetCondition(d, string(capr.Ready)); c == nil || strings.ToLower(c.Status()) != "true" {
+		logrus.Debugf("[machine-node-lookup] Waiting for %s %s/%s to be ready", infra.GetKind(), infra.GetNamespace(), infra.GetName())
 		h.rkeBootstrap.EnqueueAfter(bootstrap.Namespace, bootstrap.Name, nodeErrorEnqueueTime)
 		return bootstrap, nil
 	}
@@ -120,7 +120,7 @@ func (h *handler) associateMachineWithNode(_ string, bootstrap *rkev1.RKEBootstr
 	nodeLabelSelector := metav1.LabelSelector{MatchLabels: map[string]string{capr.MachineUIDLabel: string(machine.GetUID())}}
 	nodes, err := clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{LabelSelector: labels.Set(nodeLabelSelector.MatchLabels).String()})
 	if err != nil || len(nodes.Items) == 0 || nodes.Items[0].Spec.ProviderID == "" || !condition.Cond("Ready").IsTrue(nodes.Items[0]) {
-		logrus.Debugf("Searching for providerID for selector %s in cluster %s/%s, machine %s: %v",
+		logrus.Debugf("[machine-node-lookup] Searching for providerID for selector %s in cluster %s/%s, machine %s: %v",
 			labels.Set(nodeLabelSelector.MatchLabels), rancherCluster.Namespace, rancherCluster.Name, machine.Name, err)
 		h.rkeBootstrap.EnqueueAfter(bootstrap.Namespace, bootstrap.Name, nodeErrorEnqueueTime)
 		return bootstrap, nil
@@ -155,14 +155,4 @@ func (h *handler) associateMachineWithNode(_ string, bootstrap *rkev1.RKEBootstr
 	}
 
 	return bootstrap, nil
-}
-
-func getCondition(d data.Object, conditionType string) *summary.Condition {
-	for _, cond := range summary.GetUnstructuredConditions(d) {
-		if cond.Type() == conditionType {
-			return &cond
-		}
-	}
-
-	return nil
 }

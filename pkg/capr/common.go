@@ -25,9 +25,11 @@ import (
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/wrangler/v3/pkg/condition"
 	"github.com/rancher/wrangler/v3/pkg/data"
+	"github.com/rancher/wrangler/v3/pkg/data/convert"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/name"
+	"github.com/rancher/wrangler/v3/pkg/summary"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -88,12 +90,14 @@ const (
 	MachineTemplateClonedFromKindAnn         = "rke.cattle.io/cloned-from-kind"
 	MachineTemplateClonedFromNameAnn         = "rke.cattle.io/cloned-from-name"
 
-	// Label added to secrets to make sure they are included in backups when created in a namespace other than fleet-default
+	// BackupLabel is added to secrets to make sure they are included in backups when created in a namespace other than fleet-default
 	BackupLabel = "resources.cattle.io/backup"
 
 	CattleOSLabel    = "cattle.io/os"
 	DefaultMachineOS = "linux"
 	WindowsMachineOS = "windows"
+
+	// API Groups and Versions
 
 	DefaultMachineConfigAPIVersion = "rke-machine-config.cattle.io/v1"
 
@@ -103,6 +107,12 @@ const (
 
 	RKEAPIGroup   = "rke.cattle.io"
 	RKEAPIVersion = "rke.cattle.io/v1"
+
+	// Kinds
+
+	RKEBootstrapKind = "RKEBootstrap"
+
+	// Conditions
 
 	Provisioned                  = condition.Cond("Provisioned")
 	Stable                       = condition.Cond("Stable") // The Stable condition is used to indicate whether we can safely copy the v3 management cluster Ready condition to the v1 object.
@@ -313,7 +323,7 @@ func GetSystemAgentDataDir(spec *rkev1.ClusterConfiguration) string {
 
 func IsOwnedByMachine(bootstrapCache rkecontroller.RKEBootstrapCache, machineName string, sa *corev1.ServiceAccount) (bool, error) {
 	for _, owner := range sa.OwnerReferences {
-		if owner.Kind == "RKEBootstrap" {
+		if owner.Kind == RKEBootstrapKind {
 			bootstrap, err := bootstrapCache.Get(sa.Namespace, owner.Name)
 			if err != nil {
 				return false, err
@@ -684,4 +694,51 @@ func ToOwnerReference(typeMeta metav1.TypeMeta, objectMeta metav1.ObjectMeta) me
 		Controller:         &[]bool{true}[0],
 		BlockOwnerDeletion: &[]bool{true}[0],
 	}
+}
+
+func GetCondition(d data.Object, conditionType string) *summary.Condition {
+	for _, cond := range summary.GetUnstructuredConditions(d) {
+		if cond.Type() == conditionType {
+			return &cond
+		}
+	}
+
+	return nil
+}
+
+func InsertOrUpdateCondition(d data.Object, desiredCondition summary.Condition) (bool, error) {
+	for _, cond := range summary.GetUnstructuredConditions(d) {
+		if desiredCondition.Equals(cond) {
+			return false, nil
+		}
+	}
+
+	// The conditions must be converted to a map so that DeepCopyJSONValue will
+	// recognize it as a map instead of a data.Object.
+	newCond, err := convert.EncodeToMap(desiredCondition.Object)
+	if err != nil {
+		return false, err
+	}
+
+	dConditions := d.Slice("status", "conditions")
+	conditions := make([]interface{}, len(dConditions))
+	found := false
+	for i, cond := range dConditions {
+		if cond.String("type") == desiredCondition.Type() {
+			conditions[i] = newCond
+			found = true
+		} else {
+			conditions[i], err = convert.EncodeToMap(cond)
+			if err != nil {
+				return false, err
+			}
+		}
+	}
+
+	if !found {
+		conditions = append(conditions, newCond)
+	}
+	d.SetNested(conditions, "status", "conditions")
+
+	return true, nil
 }

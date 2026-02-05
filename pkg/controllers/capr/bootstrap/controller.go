@@ -102,7 +102,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 			}
 		}
 		if machine, ok := obj.(*capi.Machine); ok {
-			if machine.Spec.Bootstrap.ConfigRef.IsDefined() && machine.Spec.Bootstrap.ConfigRef.Kind == "RKEBootstrap" {
+			if machine.Spec.Bootstrap.ConfigRef.IsDefined() && machine.Spec.Bootstrap.ConfigRef.Kind == capr.RKEBootstrapKind {
 				return []relatedresource.Key{{
 					Namespace: machine.Namespace,
 					Name:      machine.Spec.Bootstrap.ConfigRef.Name,

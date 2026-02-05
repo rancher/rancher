@@ -321,7 +321,7 @@ func (p *PlanStore) getPlanSecrets(machines []*capi.Machine) (map[string]*corev1
 }
 
 func isRKEBootstrap(machine *capi.Machine) bool {
-	return machine.Spec.Bootstrap.ConfigRef.IsDefined() && machine.Spec.Bootstrap.ConfigRef.Kind == "RKEBootstrap"
+	return machine.Spec.Bootstrap.ConfigRef.IsDefined() && machine.Spec.Bootstrap.ConfigRef.Kind == capr.RKEBootstrapKind
 }
 
 // getPlanSecretFromMachine returns the plan secret from the secrets client for the given machine,

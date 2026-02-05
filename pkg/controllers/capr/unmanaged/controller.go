@@ -287,7 +287,7 @@ func (h *handler) createMachineObjects(capiCluster *capi.Cluster, machineName st
 				ClusterName: capiCluster.Name,
 				Bootstrap: capi.Bootstrap{
 					ConfigRef: capi.ContractVersionedObjectReference{
-						Kind:     "RKEBootstrap",
+						Kind:     capr.RKEBootstrapKind,
 						Name:     machineName,
 						APIGroup: capr.RKEAPIGroup,
 					},
