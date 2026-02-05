@@ -171,7 +171,7 @@ func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole, lo
 		return nil
 	}
 
-	logrus.Infof("[%v] Creating clusterRole %v for corresponding GlobalRole", grController, crName)
+	logrus.Infof("[%s] Creating clusterRole %s for corresponding GlobalRole", grController, crName)
 	_, err := gr.crClient.Create(&rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: crName,
@@ -593,7 +593,7 @@ func addCondition(globalRole *v3.GlobalRole, condition metav1.Condition, reason,
 }
 
 // validateNamespace checks if a namespace exists and is not terminating
-// Returns (namespace, shouldSkip, error)
+// Returns (shouldSkip, error)
 // - shouldSkip is true if the namespace is not found (warning logged, no error)
 // - error is returned for other failures
 func validateNamespace(nsCache wcorev1.NamespaceCache, ns, context string) (bool, error) {
