@@ -259,9 +259,5 @@ func (s *Store) updateMustChangePasswordIfNeeded(userName string) error {
 	}
 
 	_, err = s.userClient.Patch(userName, types.JSONPatchType, patch)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
