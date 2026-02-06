@@ -3,6 +3,7 @@ package usercontrollers
 import (
 	"context"
 	"hash/crc32"
+	"hash/fnv"
 	"math"
 	"slices"
 	"sync"
@@ -21,11 +22,11 @@ type ownerStrategy interface {
 	forcedResync() <-chan struct{}
 }
 
-func getOwnerStrategy(ctx context.Context, m peermanager.PeerManager) ownerStrategy {
+func getOwnerStrategy(ctx context.Context, m peermanager.PeerManager, consistentHashingEnabled bool) ownerStrategy {
 	if m == nil {
 		return &nonClusteredStrategy{}
 	}
-	return newPeersBasedStrategy(ctx, m)
+	return newPeersBasedStrategy(ctx, m, consistentHashingEnabled)
 }
 
 // nonClusteredStrategy makes a single Rancher replica the owner of every downstream cluster
@@ -46,6 +47,10 @@ type peersBasedStrategy struct {
 	// mu protects peers for concurrent read/write access
 	mu    sync.Mutex
 	peers peermanager.Peers
+
+	// useConsistentHashing is controlled by the "consistent-hashing-cluster-ownership" feature flag, switching to an improved calculation method that minimizes disruption on peers changes.
+	// Changing this value requires a full restart of the rancher Deployment to be completely safe (avoid collisions).
+	useConsistentHashing bool
 }
 
 func (s *peersBasedStrategy) forcedResync() <-chan struct{} {
@@ -54,7 +59,7 @@ func (s *peersBasedStrategy) forcedResync() <-chan struct{} {
 
 func (s *peersBasedStrategy) isOwner(cluster *v3.Cluster) (owner bool) {
 	peers := s.getPeers()
-	if peers.SelfID == "" {
+	if peers.SelfID == "" || !peers.Ready {
 		// not ready
 		return false
 	}
@@ -66,10 +71,37 @@ func (s *peersBasedStrategy) isOwner(cluster *v3.Cluster) (owner bool) {
 		}
 	}()
 
+	if !s.useConsistentHashing {
+		return isOwnerLegacy(cluster, peers)
+	}
+
+	// Use consistent (rendezvous) hashing to deterministically find the owner:
+	// Every peer has a score (hash of cluster and peer IDs). Highest score is the owner.
+	var highestScore uint64
+	var ownerID string
+	for _, peerID := range peers.IDs {
+		score := hashCombine(peerID, string(cluster.UID))
+		if score > highestScore {
+			highestScore = score
+			ownerID = peerID
+		} else if score == highestScore {
+			// Special case for matching scores, compare IDs itself, deterministic
+			if peerID > ownerID {
+				ownerID = peerID
+			}
+		}
+	}
+
+	return ownerID == peers.SelfID
+}
+
+// isOwnerLegacy represents the original ownership calculation based on a simpler hash partitioning
+// This is now deprecated and controlled via feature flag, and will be removed in the future
+func isOwnerLegacy(cluster *v3.Cluster, peers peermanager.Peers) (owner bool) {
 	// Possible assumption on this condition:
 	// - peers.IDs with just 1 item will be just SelfID (IDs should never be empty, but better use caution)
 	// - then, being a sole non-leader replica, should not own any downstream until becoming the leader
-	if !peers.Ready || len(peers.IDs) == 0 || (len(peers.IDs) == 1 && !peers.Leader) {
+	if len(peers.IDs) == 0 || (len(peers.IDs) == 1 && !peers.Leader) {
 		return false
 	}
 
@@ -117,14 +149,15 @@ func (s *peersBasedStrategy) triggerForcedResync() {
 	}
 }
 
-func newPeersBasedStrategy(ctx context.Context, m peermanager.PeerManager) *peersBasedStrategy {
+func newPeersBasedStrategy(ctx context.Context, m peermanager.PeerManager, useConsistentHashing bool) *peersBasedStrategy {
 	// PeerManager watches Endpoints in the "rancher" Service to detect available pods, sending peer updates
 	peersChan := make(chan peermanager.Peers, 100)
 	m.AddListener(peersChan)
 
 	forcedResync := make(chan struct{}, 1)
 	s := &peersBasedStrategy{
-		forcedResyncChan: forcedResync,
+		forcedResyncChan:     forcedResync,
+		useConsistentHashing: useConsistentHashing,
 	}
 
 	go func() {
@@ -144,10 +177,26 @@ func newPeersBasedStrategy(ctx context.Context, m peermanager.PeerManager) *peer
 					// drain channel
 				}
 				//revive:enable:empty-block
+
+				// Reset internal state, disabling all further usage
+				s.setPeers(peermanager.Peers{})
 				return
 			}
 		}
 	}()
 
 	return s
+}
+
+// hashCombine generates a hash for a combination of peer and cluster IDs.
+// FNV-1a is fast and provides good distribution for this use case, with a caveat:
+// Order matters: Peer IDs (IPs/Names) often share long prefixes (subnet) and differ only by a small part.
+// FNV-1a is sensitive to this; if the differing suffix is processed last, the resulting scores correlate
+// linearly, creating "hot spots" and not achieving the desired uniform distribution.
+// By hashing the Peer ID first, we ensure the high entropy of the UUID randomizes the final state.
+func hashCombine(peerID, clusterUID string) uint64 {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(peerID))
+	_, _ = h.Write([]byte(clusterUID))
+	return h.Sum64()
 }
