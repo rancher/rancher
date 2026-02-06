@@ -28,7 +28,7 @@ const (
 )
 
 // CreateNamespace is a helper function that uses the dynamic client to create a namespace on a project.
-// It registers a delete function with a wait.WatchWait to ensure the namspace is deleted cleanly.
+// It registers a delete function with a wait.WatchWait to ensure the namespace is deleted cleanly.
 func CreateNamespace(client *rancher.Client, namespaceName, containerDefaultResourceLimit string, labels, annotations map[string]string, project *management.Project) (*v1.SteveAPIObject, error) {
 	if annotations == nil {
 		annotations = make(map[string]string)
@@ -110,6 +110,9 @@ func CreateNamespace(client *rancher.Client, namespaceName, containerDefaultReso
 		}
 
 		nameSpaceClient = steveClient.SteveType(NamespaceSteveType)
+		if resp == nil {
+			return nil
+		}
 		err := nameSpaceClient.Delete(resp)
 		if errors.IsNotFound(err) {
 			return nil
