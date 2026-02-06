@@ -82,17 +82,17 @@ func parsePaginationParams(r *http.Request) (paginationParams, error) {
 	}
 
 	if value := r.URL.Query().Get("count"); value != "" {
-		cnt, err := strconv.Atoi(value)
+		count, err := strconv.Atoi(value)
 		if err != nil {
 			return params, fmt.Errorf("invalid count: must be an integer: %w", err)
 		}
-		if cnt < 0 {
+		if count < 0 {
 			return params, fmt.Errorf("invalid count: must be >= 0")
 		}
-		if cnt > MaxPageSize {
-			cnt = MaxPageSize
+		if count > MaxPageSize {
+			count = MaxPageSize
 		}
-		params.count = cnt
+		params.count = count
 	}
 
 	return params, nil

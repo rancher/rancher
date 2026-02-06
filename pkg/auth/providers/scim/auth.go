@@ -50,7 +50,7 @@ func (a *tokenAuthenticator) Authenticate(next http.Handler) http.Handler {
 
 		if provider == local.Name {
 			// We don't suppport the "local" provider for SCIM as it's not intended
-			// for production use and it doesn't have a group concept .
+			// for production use and it doesn't have a group concept.
 			writeError(w, NewError(http.StatusNotFound, http.StatusText(http.StatusNotFound)))
 			return
 		}
@@ -60,10 +60,10 @@ func (a *tokenAuthenticator) Authenticate(next http.Handler) http.Handler {
 			return
 		}
 
-		labelSet := labels.Set(map[string]string{
+		labelSet := labels.Set{
 			secretKindLabel:   scimAuthToken,
 			authProviderLabel: provider,
-		})
+		}
 
 		list, err := a.secrets.List(tokenSecretNamespace, labelSet.AsSelector())
 		if err != nil {

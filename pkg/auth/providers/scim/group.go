@@ -157,7 +157,8 @@ func (s *SCIMServer) ListGroups(w http.ResponseWriter, r *http.Request) {
 // CreateGroup creates a group.
 // Returns:
 //   - 201 on success
-//   - 400 for invalid requests.
+//   - 400 for invalid requests
+//   - 409 if the group already exists.
 func (s *SCIMServer) CreateGroup(w http.ResponseWriter, r *http.Request) {
 	logrus.Tracef("scim::CreateGroup: url %s", r.URL)
 
@@ -224,7 +225,8 @@ func (s *SCIMServer) CreateGroup(w http.ResponseWriter, r *http.Request) {
 // GetGroup returns a group by ID.
 // Returns:
 //   - 200 on success
-//   - 400 for invalid requests.
+//   - 400 for invalid requests
+//   - 404 if the group is not found.
 func (s *SCIMServer) GetGroup(w http.ResponseWriter, r *http.Request) {
 	logrus.Tracef("scim::GetGroup: url %s", r.URL)
 

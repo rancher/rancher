@@ -382,7 +382,7 @@ func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	user, err := s.userCache.Get(id)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			writeError(w, NewError(http.StatusBadRequest, fmt.Sprintf("User %s not found", id)))
+			writeError(w, NewError(http.StatusNotFound, fmt.Sprintf("User %s not found", id)))
 			return
 		}
 

@@ -1137,7 +1137,7 @@ func TestUpdateUser(t *testing.T) {
 
 		srv.UpdateUser(rec, req)
 
-		require.Equal(t, http.StatusBadRequest, rec.Code)
+		require.Equal(t, http.StatusNotFound, rec.Code)
 	})
 
 	t.Run("system user returns not found", func(t *testing.T) {

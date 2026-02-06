@@ -10,10 +10,10 @@ import (
 )
 
 func CleanupSecrets(secrets wcorev1.SecretController, provider string) error {
-	labelSet := labels.Set(map[string]string{
+	labelSet := labels.Set{
 		secretKindLabel:   scimAuthToken,
 		authProviderLabel: provider,
-	})
+	}
 
 	list, err := secrets.List(tokenSecretNamespace, metav1.ListOptions{LabelSelector: labelSet.AsSelector().String()})
 	if err != nil {
