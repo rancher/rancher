@@ -172,6 +172,46 @@ func Test_manager_reconcileRoleForProjectAccessToGlobalResource(t *testing.T) {
 			want: "myrole-promoted",
 		},
 		{
+			name: "existing ClusterRole with out of order rules should not update",
+			args: args{
+				rtName: "myrole",
+				promotedRules: []rbacv1.PolicyRule{
+					{
+						Resources:     []string{"myresource"},
+						Verbs:         []string{"list", "delete"},
+						APIGroups:     []string{"management.cattle.io"},
+						ResourceNames: []string{"local"},
+					},
+					{
+						Resources:     []string{"anotherresource"},
+						Verbs:         []string{"get", "watch"},
+						APIGroups:     []string{"management.cattle.io"},
+						ResourceNames: []string{"remote"},
+					},
+				},
+			},
+			crListerMockGetResult: &rbacv1.ClusterRole{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "myrole-promoted",
+				},
+				Rules: []rbacv1.PolicyRule{
+					{
+						Resources:     []string{"anotherresource"},
+						Verbs:         []string{"get", "watch"},
+						APIGroups:     []string{"management.cattle.io"},
+						ResourceNames: []string{"remote"},
+					},
+					{
+						Resources:     []string{"myresource"},
+						Verbs:         []string{"list", "delete"},
+						APIGroups:     []string{"management.cattle.io"},
+						ResourceNames: []string{"local"},
+					},
+				},
+			},
+			want: "myrole-promoted",
+		},
+		{
 			name: "non existing ClusterRole will create a new promoted ClusterRole",
 			args: args{
 				rtName:        "myrole",
