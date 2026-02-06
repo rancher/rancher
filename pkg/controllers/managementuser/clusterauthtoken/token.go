@@ -214,7 +214,7 @@ func (h *tokenHandler) createClusterAuthToken(token accessor.TokenAccessor, hash
 		return err
 	}
 
-	clusterAuthToken := common.NewClusterAuthToken(token, hashedValue)
+	clusterAuthToken := common.NewClusterAuthToken(h.namespace, token, hashedValue)
 	clusterAuthTokenSecret := common.NewClusterAuthTokenSecret(h.namespace, token, hashedValue)
 
 	// Creating the secret first, then the token for it. This ensures that
