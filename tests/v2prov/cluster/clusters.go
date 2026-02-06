@@ -43,7 +43,7 @@ const SaneConflictMessageThreshold = 10
 func New(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*provisioningv1api.Cluster, error) {
 	cluster = cluster.DeepCopy()
 	if cluster.Namespace == "" {
-		newNs, err := namespace.Random(clients)
+		newNs, err := namespace.RandomWithAnnotations(clients, map[string]string{"field.cattle.io/allow-fleetworkspace-creation-for-existing-namespace": "true"})
 		if err != nil {
 			return nil, err
 		}
@@ -329,6 +329,12 @@ func WaitForDelete(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 		return clients.Provisioning.Cluster().Get(c.Namespace, c.Name, metav1.GetOptions{})
 	}); err != nil {
 		return nil, fmt.Errorf("cluster not cleaned up: %w", err)
+	}
+
+	if err := wait.EnsureDoesNotExist(clients.Ctx, func() (runtime.Object, error) {
+		return clients.Core.Namespace().Get(c.Status.ClusterName, metav1.GetOptions{})
+	}); err != nil {
+		return nil, fmt.Errorf("mgmt cluster namespace not cleaned up: %w", err)
 	}
 
 	return c, nil
