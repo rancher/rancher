@@ -72,6 +72,7 @@ var (
 	ProjectResourceName                                   = "projects"
 	ProjectNetworkPolicyResourceName                      = "projectnetworkpolicies"
 	ProjectRoleTemplateBindingResourceName                = "projectroletemplatebindings"
+	ProxyEndpointResourceName                             = "proxyendpoints"
 	RancherUserNotificationResourceName                   = "rancherusernotifications"
 	RkeAddonResourceName                                  = "rkeaddons"
 	RkeK8sServiceOptionResourceName                       = "rkek8sserviceoptions"
@@ -194,6 +195,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ProjectNetworkPolicyList{},
 		&ProjectRoleTemplateBinding{},
 		&ProjectRoleTemplateBindingList{},
+		&ProxyEndpoint{},
+		&ProxyEndpointList{},
 		&RancherUserNotification{},
 		&RancherUserNotificationList{},
 		&RkeAddon{},

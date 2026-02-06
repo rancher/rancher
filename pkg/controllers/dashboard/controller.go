@@ -19,6 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/rkecontrolplanecondition"
 	"github.com/rancher/rancher/pkg/controllers/provisioningv2"
+	"github.com/rancher/rancher/pkg/data/management"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -51,6 +52,8 @@ func Register(ctx context.Context, clients *wrangler.Context, embedded bool, reg
 
 	if features.MCM.Enabled() {
 		hostedcluster.Register(ctx, clients)
+		// Automatically enable / disable built-in ProxyEndpoints via settings
+		management.ManageProxyEndpointData(ctx, clients)
 	}
 
 	if features.Fleet.Enabled() {

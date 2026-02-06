@@ -65,6 +65,10 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("management.cattle.io").resources("authconfigs").verbs("get", "list", "watch", "update")
 	rb.addRole("Manage Settings", "settings-manage").
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("*")
+
+	rb.addRole("Manage Rancher Proxy", "proxy-endpoint-manage").
+		addRule().apiGroups("management.cattle.io").resources("proxyendpoints").verbs("*")
+
 	rb.addRole("Manage Features", "features-manage").
 		addRule().apiGroups("management.cattle.io").resources("features").verbs("get", "list", "watch", "update")
 	rb.addRole("View Rancher Metrics", "view-rancher-metrics").

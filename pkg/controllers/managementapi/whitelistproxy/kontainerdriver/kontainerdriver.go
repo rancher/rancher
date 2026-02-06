@@ -6,6 +6,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/multiclustermanager/whitelist"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -18,14 +19,16 @@ func sync(key string, kontainerDriver *v3.KontainerDriver) (runtime.Object, erro
 		return nil, nil
 	}
 	if kontainerDriver.DeletionTimestamp != nil {
-		for _, d := range kontainerDriver.Spec.WhitelistDomains {
-			whitelist.Proxy.Rm(d)
-		}
+		whitelist.Proxy.RmSource(string(kontainerDriver.UID))
 		return nil, nil
 	}
 
+	whitelist.Proxy.RmSource(string(kontainerDriver.UID))
 	for _, d := range kontainerDriver.Spec.WhitelistDomains {
-		whitelist.Proxy.Add(d)
+		err := whitelist.Proxy.Add(d, string(kontainerDriver.UID))
+		if err != nil {
+			logrus.Debugf("failed to add domain %s to proxy accept list: %v", d, err)
+		}
 	}
 	return nil, nil
 }
