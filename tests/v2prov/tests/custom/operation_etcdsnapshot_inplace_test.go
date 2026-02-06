@@ -5,6 +5,7 @@ import (
 	"time"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/stretchr/testify/require"
 
 	provisioningv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/tests/v2prov/clients"
@@ -22,9 +23,7 @@ import (
 // This validates that it is possible to restore a snapshot.
 func Test_Operation_SetA_Custom_EtcdSnapshotCreationRestoreInPlace(t *testing.T) {
 	clients, err := clients.New()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer clients.Close()
 
 	c, err := cluster.New(clients, &provisioningv1.Cluster{
@@ -41,31 +40,21 @@ func Test_Operation_SetA_Custom_EtcdSnapshotCreationRestoreInPlace(t *testing.T)
 			},
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	command, err := cluster.CustomCommand(clients, c)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	assert.NotEmpty(t, command)
 
 	_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --worker --controlplane", map[string]string{"custom-cluster-name": c.Name}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	_, err = systemdnode.New(clients, c.Namespace, "#!/usr/bin/env sh\n"+command+" --etcd --node-name etcd-test-node", map[string]string{"custom-cluster-name": c.Name}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	_, err = cluster.WaitForCreate(clients, c)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	cm := corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -76,8 +65,20 @@ func Test_Operation_SetA_Custom_EtcdSnapshotCreationRestoreInPlace(t *testing.T)
 		},
 	}
 
-	snapshot := operations.RunSnapshotCreateTest(t, clients, c, cm, "etcd-test-node")
-	operations.RunSnapshotRestoreTest(t, clients, c, snapshot.Name, cm, 2)
+	// Create 3 snapshots upfront - one for each restore type
+	// This avoids issues where snapshots get deleted after RestoreRKEConfigAll
+	snapshots := operations.RunSnapshotCreatesTest(t, clients, c, cm, "etcd-test-node", 3)
+	require.Len(t, snapshots, 3, "expected 3 snapshots to be created")
+
+	operations.RunSnapshotRestoreTest(t, clients, c, snapshots[2].Name, cm, 2, rkev1.RestoreRKEConfigAll)
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	require.NoError(t, err)
+
+	operations.RunSnapshotRestoreTest(t, clients, c, snapshots[1].Name, cm, 2, rkev1.RestoreRKEConfigKubernetesVersion)
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	require.NoError(t, err)
+
+	operations.RunSnapshotRestoreTest(t, clients, c, snapshots[0].Name, cm, 2, rkev1.RestoreRKEConfigNone)
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	assert.NoError(t, err)
 }
