@@ -967,13 +967,17 @@ func (s *Operations) createNamespace(ctx context.Context, namespace, projectID s
 	if projectID != "" {
 		annotations["field.cattle.io/projectId"] = strings.ReplaceAll(projectID, "/", ":")
 	}
-	// We just always try to create an ignore the error. This is because you might have create but not get privileges
-	_, _ = client.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+
+	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        namespace,
 			Annotations: annotations,
 		},
-	}, metav1.CreateOptions{})
+	}
+	namespaces.ApplyLabelsAndAnnotations(ns)
+
+	// We just always try to create and ignore the error. This is because you might have create but not get privileges
+	_, _ = client.CoreV1().Namespaces().Create(ctx, ns, metav1.CreateOptions{})
 
 	if projectID == "" {
 		return client.CoreV1().Namespaces().Get(ctx, namespace, metav1.GetOptions{})

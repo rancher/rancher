@@ -77,11 +77,12 @@ func (h *handler) startRancher() {
 
 	clientConfig := kubeconfig.GetNonInteractiveClientConfig("")
 	server, err := rancher.New(h.ctx, clientConfig, &rancher.Options{
-		HTTPListenPort:  80,
-		HTTPSListenPort: 443,
-		Features:        os.Getenv("CATTLE_FEATURES"),
-		AddLocal:        "true",
-		ClusterRegistry: os.Getenv("CATTLE_CLUSTER_REGISTRY"),
+		HTTPListenPort:          80,
+		HTTPSListenPort:         443,
+		Features:                os.Getenv("CATTLE_FEATURES"),
+		AddLocal:                "true",
+		ClusterRegistry:         os.Getenv("CATTLE_CLUSTER_REGISTRY"),
+		RancherNamespaceOptions: os.Getenv("RANCHER_NAMESPACE_OPTIONS"),
 	})
 	if err != nil {
 		logrus.Fatalf("Embedded rancher failed to initialize: %v", err)
