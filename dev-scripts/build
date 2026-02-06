@@ -3,7 +3,7 @@
 set -eo pipefail
 set -x
 
-source dev-scripts/prepare-build-env
+source scripts/package-env
 
 BUILD_ARGS=()
 BUILDX_ARGS=()
@@ -43,7 +43,7 @@ build_rancher() {
     ${BUILD_ACTION} \
     --target="${DOCKER_TARGET}" \
     --platform="${TARGET_PLATFORMS}" \
-    --tag="${REPO}/rancher-linux-${ARCH}:${TAG}" \
+    --tag="$IMAGE_TAG" \
     --file=package/Dockerfile .
 }
 

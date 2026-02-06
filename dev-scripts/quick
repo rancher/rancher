@@ -10,7 +10,6 @@ cd $(git rev-parse --show-toplevel)
 # variables
 COMMIT=$(git rev-parse --short HEAD)
 TAG="${TAG:-$(grep -m1 ' TAG:' .github/workflows/pull-request.yml | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e "s/\${{ github.sha }}/$COMMIT/g" | cut -d' ' -f2)}"
-REGISTRY="${REGISTRY:-'docker.io'}"
 BINARY_DEBUG=${BINARY_DEBUG:-false}
 
 source dev-scripts/build
@@ -103,11 +102,12 @@ if [ "$TARGET" = "binary-server" ]; then
 fi
 
 if [ -z "$TARGET" ] || [ "$TARGET" = "server" ]; then
+  export IMAGE_TAG="${REGISTRY}rancher/rancher:${TAG}"
   # start the builds
   build_rancher "server"
 
   if [ "$PUSH" = "true" ]; then
-    docker push "${REPO}"/rancher:"${TAG}" &
+    docker push "$IMAGE_TAG" &
   fi
 fi
 
