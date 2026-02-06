@@ -56,6 +56,8 @@ func getMockEksOperatorController(t *testing.T, clusterState string) mockEksOper
 		dynamicClient = MockNamespaceableResourceInterfaceActive{}
 	case "update":
 		dynamicClient = MockNamespaceableResourceInterfaceUpdate{}
+	case "disable-sync":
+		dynamicClient = MockNamespaceableResourceInterfaceDisableSync{}
 	case "Ekscc":
 		dynamicClient = MockNamespaceableResourceInterfaceEksCC{}
 	default:
