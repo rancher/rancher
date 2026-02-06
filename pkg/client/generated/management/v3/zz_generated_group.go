@@ -9,9 +9,11 @@ const (
 	GroupFieldAnnotations     = "annotations"
 	GroupFieldCreated         = "created"
 	GroupFieldCreatorID       = "creatorId"
+	GroupFieldExternalID      = "externalId"
 	GroupFieldLabels          = "labels"
 	GroupFieldName            = "name"
 	GroupFieldOwnerReferences = "ownerReferences"
+	GroupFieldProvider        = "provider"
 	GroupFieldRemoved         = "removed"
 	GroupFieldUUID            = "uuid"
 )
@@ -21,9 +23,11 @@ type Group struct {
 	Annotations     map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	Created         string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID       string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	ExternalID      string            `json:"externalId,omitempty" yaml:"externalId,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name            string            `json:"name,omitempty" yaml:"name,omitempty"`
 	OwnerReferences []OwnerReference  `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
+	Provider        string            `json:"provider,omitempty" yaml:"provider,omitempty"`
 	Removed         string            `json:"removed,omitempty" yaml:"removed,omitempty"`
 	UUID            string            `json:"uuid,omitempty" yaml:"uuid,omitempty"`
 }
