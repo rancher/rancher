@@ -13,7 +13,6 @@ import (
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	v32 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/ref"
-	"github.com/rancher/wrangler/pkg/name"
 	k8srbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	wranglerName "github.com/rancher/wrangler/v3/pkg/name"
@@ -644,32 +643,32 @@ func IsRoleBindingContentSame(rb1, rb2 *rbacv1.RoleBinding) bool {
 
 // ClusterRoleNameFor returns safe version of a string to be used for a clusterRoleName
 func ClusterRoleNameFor(s string) string {
-	return name.SafeConcatName(s)
+	return wranglerName.SafeConcatName(s)
 }
 
 // PromotedClusterRoleNameFor appends the promoted suffix to a string safely (ie <= 63 characters)
 func PromotedClusterRoleNameFor(s string) string {
-	return name.SafeConcatName(s, promotedSuffix)
+	return wranglerName.SafeConcatName(s, promotedSuffix)
 }
 
 // NamespaceClusterRoleNameFor appends the namespace suffix to a string safely (ie <= 63 characters)
 func NamespaceClusterRoleNameFor(s string) string {
-	return name.SafeConcatName(s, namespaceSuffix)
+	return wranglerName.SafeConcatName(s, namespaceSuffix)
 }
 
 // AggregatedClusterRoleNameFor appends the aggregation suffix to a string safely (ie <= 63 characters)
 func AggregatedClusterRoleNameFor(s string) string {
-	return name.SafeConcatName(s, aggregatorSuffix)
+	return wranglerName.SafeConcatName(s, aggregatorSuffix)
 }
 
 // ClusterManagementPlaneClusterRoleNameFor appends the cluster management plane suffix to a string safely (ie <= 63 characters)
 func ClusterManagementPlaneClusterRoleNameFor(s string) string {
-	return name.SafeConcatName(s, clusterManagementPlaneSuffix)
+	return wranglerName.SafeConcatName(s, clusterManagementPlaneSuffix)
 }
 
 // ProjectManagementPlaneClusterRoleNameFor appends the project management plane suffix to a string safely (ie <= 63 characters)
 func ProjectManagementPlaneClusterRoleNameFor(s string) string {
-	return name.SafeConcatName(s, projectManagementPlaneSuffix)
+	return wranglerName.SafeConcatName(s, projectManagementPlaneSuffix)
 }
 
 // GetAuthV2OwnerLabel creates the owner label for the RoleTemplateBinding in the style used in pkg/controllers/management/authprovisioningv2.
@@ -691,14 +690,14 @@ func GetAuthV2OwnerLabel(rtb metav1.Object) string {
 // The label is always authz.cluster.cattle.io/prtb-owner-<prtb.name>: "true"
 // The reason it isn't a key value pair is because we have multiple of these labels on a single RoleBinding/ClusterRoleBinding, so we need unique labels.
 func GetPRTBOwnerLabel(s string) string {
-	return name.SafeConcatName(PrtbOwnerLabel, s)
+	return wranglerName.SafeConcatName(PrtbOwnerLabel, s)
 }
 
 // GetCRTBOwnerLabel gets the owner label for a CRTB.
 // The label is always authz.cluster.cattle.io/crtb-owner-<crtb.name>: "true"
 // The reason it isn't a key value pair is because we have multiple of these labels on a single RoleBinding/ClusterRoleBinding, so we need unique labels.
 func GetCRTBOwnerLabel(s string) string {
-	return name.SafeConcatName(CrtbOwnerLabel, s)
+	return wranglerName.SafeConcatName(CrtbOwnerLabel, s)
 }
 
 // GetClusterRoleOwnerLabel gets the owner label for a ClusterRole.
