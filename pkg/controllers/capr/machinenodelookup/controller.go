@@ -78,6 +78,14 @@ func (h *handler) associateMachineWithNode(_ string, bootstrap *rkev1.RKEBootstr
 	}
 
 	gvk := schema.FromAPIVersionAndKind(machine.Spec.InfrastructureRef.APIVersion, machine.Spec.InfrastructureRef.Kind)
+
+	// Skip provider ID propagation for native CAPI infrastructure providers
+	// Native providers (e.g., CAPV, CAPA) set the provider ID themselves through their own controllers
+	// Only rke-machine.cattle.io machines need Rancher to propagate the provider ID from the node
+	if gvk.Group != "rke-machine.cattle.io" && gvk.Group != "rke.cattle.io" {
+		return bootstrap, nil
+	}
+
 	infra, err := h.dynamic.Get(gvk, machine.Namespace, machine.Spec.InfrastructureRef.Name)
 	if apierror.IsNotFound(err) {
 		return bootstrap, nil
