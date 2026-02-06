@@ -1197,6 +1197,7 @@ func TestTokenAuthenticatorAuthenticateExtToken(t *testing.T) {
 }
 
 func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
+	t.Setenv("RANCHER_VERSION_TYPE", "prime")
 	// This test cannot run in parallel.
 	existingServerURL := settings.ServerURL.Get()
 	existingProviders := providers.Providers
@@ -1208,6 +1209,8 @@ func TestAuthenticateWithAccessTokenAndOIDCEnabled(t *testing.T) {
 
 	previousOIDCProvider := features.OIDCProvider.Enabled()
 	features.OIDCProvider.Set(true)
+	newVal := features.OIDCProvider.Enabled()
+	fmt.Println(newVal)
 	t.Cleanup(func() {
 		features.OIDCProvider.Set(previousOIDCProvider)
 	})
