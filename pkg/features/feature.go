@@ -66,7 +66,7 @@ var (
 	EmbeddedClusterAPI = newFeature(
 		"embedded-cluster-api",
 		"Enable a Rancher-managed instance of cluster-api core controller",
-		true,
+		false,
 		false,
 		false)
 	ManagedSystemUpgradeController = newFeature(
@@ -186,7 +186,7 @@ var (
 	Turtles = newFeature(
 		"turtles",
 		"Enable Rancher Turtles for managing CAPI lifecycle",
-		false,
+		true,
 		false,
 		false)
 	ClusterAutoscaling = newFeature(
