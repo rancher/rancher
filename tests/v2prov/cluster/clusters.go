@@ -34,7 +34,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/watch"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	"sigs.k8s.io/cluster-api/controllers/external"
 )
 
 const ConflictMessageRegex = `\[K8s\] encountered an error while attempting to update the secret: Operation cannot be fulfilled on secrets.*: the object has been modified; please apply your changes to the latest version and try again`
@@ -133,7 +134,7 @@ func MachineSets(clients *clients.Clients, cluster *provisioningv1api.Cluster) (
 
 func PodInfraMachines(clients *clients.Clients, cluster *provisioningv1api.Cluster) (*unstructured.UnstructuredList, error) {
 	return clients.Dynamic.Resource(schema.GroupVersionResource{
-		Group:    "rke-machine.cattle.io",
+		Group:    capr.RKEMachineAPIGroup,
 		Version:  "v1",
 		Resource: "podmachines",
 	}).Namespace(cluster.Namespace).List(clients.Ctx, metav1.ListOptions{
@@ -185,7 +186,7 @@ func WaitForCreate(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 						if mp.Quantity != nil {
 							mpQuantityMatches = *mp.Quantity == *md.Spec.Replicas
 						}
-						return mpQuantityMatches && md.Status.Phase == "Running" && capr.Ready.IsTrue(md), nil
+						return mpQuantityMatches && md.Status.Phase == "Running" && capr.MachineDeploymentMachinesReadyCondition.IsTrue(md), nil
 					}
 				}
 				return false, nil
@@ -207,7 +208,7 @@ func WaitForCreate(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 		}
 		err = wait.Object(clients.Ctx, clients.CAPI.Machine().Watch, &machine, func(obj runtime.Object) (bool, error) {
 			machine = *obj.(*capi.Machine)
-			return machine.Status.NodeRef != nil, nil
+			return machine.Status.NodeRef.IsDefined(), nil
 		})
 		if err != nil {
 			return nil, fmt.Errorf("noderef not assigned to %s/%s: %w", machine.Namespace, machine.Name, err)
@@ -286,23 +287,17 @@ func WaitForDelete(clients *clients.Clients, c *provisioningv1api.Cluster) (_ *p
 	}
 
 	for _, machine := range machines.Items {
-		gvk := schema.FromAPIVersionAndKind(machine.Spec.InfrastructureRef.APIVersion, machine.Spec.InfrastructureRef.Kind)
-		gvr := schema.GroupVersionResource{
-			Group:    gvk.Group,
-			Version:  gvk.Version,
-			Resource: strings.ToLower(gvk.Kind) + "s",
-		}
 		if err := wait.EnsureDoesNotExist(clients.Ctx, func() (runtime.Object, error) {
-			return clients.Dynamic.Resource(gvr).Namespace(machine.Spec.InfrastructureRef.Namespace).Get(clients.Ctx, machine.Spec.InfrastructureRef.Name, metav1.GetOptions{})
+			return external.GetObjectFromContractVersionedRef(clients.Ctx, clients.Client, machine.Spec.InfrastructureRef, machine.Namespace)
 		}); err != nil {
-			return nil, fmt.Errorf("infra machine %s/%s not deleted: %w", machine.Spec.InfrastructureRef.Namespace, machine.Spec.InfrastructureRef.Name, err)
+			return nil, fmt.Errorf("infra machine %s/%s not deleted: %w", machine.Namespace, machine.Spec.InfrastructureRef.Name, err)
 		}
 
-		if machine.Spec.Bootstrap.ConfigRef != nil {
+		if machine.Spec.Bootstrap.ConfigRef.IsDefined() {
 			if err := wait.EnsureDoesNotExist(clients.Ctx, func() (runtime.Object, error) {
-				return clients.RKE.RKEBootstrap().Get(machine.Spec.Bootstrap.ConfigRef.Namespace, machine.Spec.Bootstrap.ConfigRef.Name, metav1.GetOptions{})
+				return clients.RKE.RKEBootstrap().Get(machine.Namespace, machine.Spec.Bootstrap.ConfigRef.Name, metav1.GetOptions{})
 			}); err != nil {
-				return nil, fmt.Errorf("bootstrap config %s/%s not deleted: %w", machine.Spec.Bootstrap.ConfigRef.Namespace, machine.Spec.Bootstrap.ConfigRef.Name, err)
+				return nil, fmt.Errorf("bootstrap config %s/%s not deleted: %w", machine.Namespace, machine.Spec.Bootstrap.ConfigRef.Name, err)
 			}
 		}
 
@@ -447,23 +442,20 @@ func GatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 		logrus.Errorf("failed to get machines for %s/%s to print error: %v", c.Namespace, c.Name, newErr)
 	} else {
 		for _, machine := range machines.Items {
-			rb, newErr := clients.RKE.RKEBootstrap().Get(machine.Spec.Bootstrap.ConfigRef.Namespace, machine.Spec.Bootstrap.ConfigRef.Name, metav1.GetOptions{})
+			rb, newErr := clients.RKE.RKEBootstrap().Get(machine.Namespace, machine.Spec.Bootstrap.ConfigRef.Name, metav1.GetOptions{})
 			if newErr != nil {
 				logrus.Errorf("failed to get RKEBootstrap %s/%s to print error: %v", c.Namespace, c.Name, newErr)
 			} else {
 				rkeBootstraps = append(rkeBootstraps, rb)
 			}
-			im, newErr := clients.Dynamic.Resource(schema.GroupVersionResource{
-				Group:    machine.Spec.InfrastructureRef.GroupVersionKind().Group,
-				Version:  machine.Spec.InfrastructureRef.GroupVersionKind().Version,
-				Resource: strings.ToLower(fmt.Sprintf("%ss", machine.Spec.InfrastructureRef.GroupVersionKind().Kind)),
-			}).Namespace(machine.Spec.InfrastructureRef.Namespace).Get(context.TODO(), machine.Spec.InfrastructureRef.Name, metav1.GetOptions{})
+
+			im, newErr := external.GetObjectFromContractVersionedRef(clients.Ctx, clients.Client, machine.Spec.InfrastructureRef, machine.Namespace)
 			if newErr != nil {
-				logrus.Errorf("failed to get %s %s/%s to print error: %v", machine.Spec.InfrastructureRef.GroupVersionKind().String(), machine.Spec.InfrastructureRef.Namespace, machine.Spec.InfrastructureRef.Name, newErr)
+				logrus.Errorf("failed to get infrastructure machine %s/%s: %v", machine.Namespace, machine.Spec.InfrastructureRef.Name, newErr)
 			} else {
 				infraMachines = append(infraMachines, im)
-				if machine.Spec.InfrastructureRef.GroupVersionKind().Kind == "PodMachine" {
-					// In the case of a podmachine, the pod name will be strings.ReplaceAll(infra.meta.GetName(), ".", "-")
+				if machine.Spec.InfrastructureRef.Kind == "PodMachine" {
+					// In the case of a podMachine, the pod name will be strings.ReplaceAll(infra.meta.GetName(), ".", "-")
 					podName := strings.ReplaceAll(im.GetName(), ".", "-")
 					podLogs[podName] = populatePodLogs(clients, newControlPlane, im.GetNamespace(), podName)
 				}
@@ -506,13 +498,10 @@ func GatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 	} else if newErr != nil {
 		logrus.Errorf("failed to get capi cluster %s/%s to print error: %v", c.Namespace, c.Name, newErr)
 	} else {
-		infraCluster, newErr = clients.Dynamic.Resource(schema.GroupVersionResource{
-			Group:    capiCluster.Spec.InfrastructureRef.GroupVersionKind().Group,
-			Version:  capiCluster.Spec.InfrastructureRef.GroupVersionKind().Version,
-			Resource: strings.ToLower(fmt.Sprintf("%ss", capiCluster.Spec.InfrastructureRef.GroupVersionKind().Kind)),
-		}).Namespace(capiCluster.Spec.InfrastructureRef.Namespace).Get(context.TODO(), capiCluster.Spec.InfrastructureRef.Name, metav1.GetOptions{})
+		infraCluster, newErr = external.GetObjectFromContractVersionedRef(clients.Ctx, clients.Client, capiCluster.Spec.InfrastructureRef, capiCluster.Namespace)
 		if newErr != nil {
-			logrus.Errorf("failed to get %s %s/%s to print error: %v", capiCluster.Spec.InfrastructureRef.GroupVersionKind().String(), capiCluster.Spec.InfrastructureRef.Namespace, capiCluster.Spec.InfrastructureRef.Name, newErr)
+			logrus.Errorf("failed to get %s %s/%s to print error: %v",
+				capiCluster.Spec.InfrastructureRef.GroupKind(), capiCluster.Namespace, capiCluster.Spec.InfrastructureRef.Name, newErr)
 			infraCluster = nil
 		}
 		machineDeployments, newErr = clients.CAPI.MachineDeployment().List(c.Namespace, metav1.ListOptions{
@@ -601,16 +590,12 @@ func EnsureMinimalConflictsWithThreshold(clients *clients.Clients, c *provisioni
 		logrus.Errorf("failed to get machines for %s/%s to count conflicts: %v", c.Namespace, c.Name, newErr)
 	}
 	for _, machine := range machines.Items {
-		im, newErr := clients.Dynamic.Resource(schema.GroupVersionResource{
-			Group:    machine.Spec.InfrastructureRef.GroupVersionKind().Group,
-			Version:  machine.Spec.InfrastructureRef.GroupVersionKind().Version,
-			Resource: strings.ToLower(fmt.Sprintf("%ss", machine.Spec.InfrastructureRef.GroupVersionKind().Kind)),
-		}).Namespace(machine.Spec.InfrastructureRef.Namespace).Get(context.TODO(), machine.Spec.InfrastructureRef.Name, metav1.GetOptions{})
+		im, newErr := external.GetObjectFromContractVersionedRef(clients.Ctx, clients.Client, machine.Spec.InfrastructureRef, machine.Namespace)
 		if newErr != nil {
-			logrus.Errorf("failed to get %s %s/%s to print error: %v", machine.Spec.InfrastructureRef.GroupVersionKind().String(), machine.Spec.InfrastructureRef.Namespace, machine.Spec.InfrastructureRef.Name, newErr)
+			logrus.Errorf("failed to get infrastructure machine %s/%s: %v", machine.Namespace, machine.Spec.InfrastructureRef.Name, newErr)
 		} else {
-			if machine.Spec.InfrastructureRef.GroupVersionKind().Kind == "PodMachine" {
-				// In the case of a podmachine, the pod name will be strings.ReplaceAll(infra.meta.GetName(), ".", "-")
+			if machine.Spec.InfrastructureRef.Kind == "PodMachine" {
+				// In the case of a podMachine, the pod name will be strings.ReplaceAll(infra.meta.GetName(), ".", "-")
 				podName := strings.ReplaceAll(im.GetName(), ".", "-")
 				count, err := countPodLogRegexOccurances(clients, im.GetNamespace(), podName, ConflictMessageRegex)
 				if err != nil {

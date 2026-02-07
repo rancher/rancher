@@ -1,7 +1,6 @@
 package machineprovisioning
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -14,7 +13,7 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/cluster"
 	"github.com/rancher/rancher/tests/v2prov/defaults"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/cluster-api/controllers/external"
 )
 
 func Test_Operation_SetC_MP_DataDirectories(t *testing.T) {
@@ -63,18 +62,15 @@ func Test_Operation_SetC_MP_DataDirectories(t *testing.T) {
 	}
 
 	for _, machine := range machines.Items {
-		im, err := clients.Dynamic.Resource(schema.GroupVersionResource{
-			Group:    machine.Spec.InfrastructureRef.GroupVersionKind().Group,
-			Version:  machine.Spec.InfrastructureRef.GroupVersionKind().Version,
-			Resource: strings.ToLower(fmt.Sprintf("%ss", machine.Spec.InfrastructureRef.GroupVersionKind().Kind)),
-		}).Namespace(machine.Spec.InfrastructureRef.Namespace).Get(context.TODO(), machine.Spec.InfrastructureRef.Name, metav1.GetOptions{})
-		if err != nil {
-			t.Fatalf("failed to get %s %s/%s to for validating directories: %v", machine.Spec.InfrastructureRef.GroupVersionKind().String(), machine.Spec.InfrastructureRef.Namespace, machine.Spec.InfrastructureRef.Name, err)
+		// This test is only for clusters provisioned via the pod driver
+		if machine.Spec.InfrastructureRef.Kind != "PodMachine" {
+			continue
 		}
 
-		// This test is only for clusters provisioned via the pod driver
-		if machine.Spec.InfrastructureRef.GroupVersionKind().Kind != "PodMachine" {
-			continue
+		im, newErr := external.GetObjectFromContractVersionedRef(clients.Ctx, clients.Client, machine.Spec.InfrastructureRef, machine.Namespace)
+		if newErr != nil {
+			t.Fatalf("failed to get %s %s/%s to for validating directories: %v",
+				machine.Spec.InfrastructureRef.GroupKind(), machine.Namespace, machine.Spec.InfrastructureRef.Name, newErr)
 		}
 
 		// In the case of a podmachine, the pod name will be strings.ReplaceAll(infra.meta.GetName(), ".", "-")

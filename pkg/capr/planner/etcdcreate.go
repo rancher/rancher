@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/merr"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/equality"
+	"k8s.io/utils/ptr"
 )
 
 func (p *Planner) setEtcdSnapshotCreateState(status rkev1.RKEControlPlaneStatus, create *rkev1.ETCDSnapshotCreate, phase rkev1.ETCDSnapshotPhase) (rkev1.RKEControlPlaneStatus, error) {
@@ -51,7 +52,7 @@ func (p *Planner) runEtcdSnapshotCreate(controlPlane *rkev1.RKEControlPlane, tok
 			return []error{err}
 		}
 		msg := fmt.Sprintf("etcd snapshot on machine %s/%s", server.Machine.Namespace, server.Machine.Name)
-		if server.Machine.Status.NodeRef != nil && server.Machine.Status.NodeRef.Name != "" {
+		if server.Machine.Status.NodeRef.IsDefined() {
 			msg = fmt.Sprintf("etcd snapshot on node %s", server.Machine.Status.NodeRef.Name)
 		}
 		if err = assignAndCheckPlan(p.store, msg, server, createPlan, joinedServer, 3, 3); err != nil {
@@ -127,7 +128,7 @@ func (p *Planner) createEtcdSnapshot(controlPlane *rkev1.RKEControlPlane, status
 	}
 
 	// Don't create an etcd snapshot if the cluster is not initialized or bootstrapped.
-	if !status.Initialized || !capr.Bootstrapped.IsTrue(&status) {
+	if !ptr.Deref(status.Initialization.ControlPlaneInitialized, false) || !capr.Bootstrapped.IsTrue(&status) {
 		logrus.Warnf("[planner] rkecluster %s/%s: skipping etcd snapshot creation as cluster has not yet been initialized or bootstrapped", controlPlane.Namespace, controlPlane.Name)
 		return status, nil
 	}

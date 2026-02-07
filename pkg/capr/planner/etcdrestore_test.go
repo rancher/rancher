@@ -10,9 +10,8 @@ import (
 	"github.com/rancher/rancher/pkg/provisioningv2/image"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 func TestForceDeleteAllDeletingEtcdMachines(t *testing.T) {
@@ -96,7 +95,7 @@ func TestForceDeleteAllDeletingEtcdMachines(t *testing.T) {
 					"a": {
 						Spec: capi.MachineSpec{
 							Bootstrap: capi.Bootstrap{
-								ConfigRef: nil,
+								ConfigRef: capi.ContractVersionedObjectReference{},
 							},
 						},
 					},
@@ -120,8 +119,10 @@ func TestForceDeleteAllDeletingEtcdMachines(t *testing.T) {
 					"a": {
 						Spec: capi.MachineSpec{
 							Bootstrap: capi.Bootstrap{
-								ConfigRef: &corev1.ObjectReference{
-									APIVersion: "rancher.testing.io",
+								ConfigRef: capi.ContractVersionedObjectReference{
+									Kind:     "",
+									Name:     "",
+									APIGroup: "rancher.testing.io",
 								},
 							},
 						},
@@ -149,8 +150,10 @@ func TestForceDeleteAllDeletingEtcdMachines(t *testing.T) {
 						},
 						Spec: capi.MachineSpec{
 							Bootstrap: capi.Bootstrap{
-								ConfigRef: &corev1.ObjectReference{
-									APIVersion: "rke.cattle.io",
+								ConfigRef: capi.ContractVersionedObjectReference{
+									Kind:     "",
+									Name:     "",
+									APIGroup: "rke.cattle.io",
 								},
 							},
 						},
@@ -181,8 +184,10 @@ func TestForceDeleteAllDeletingEtcdMachines(t *testing.T) {
 						},
 						Spec: capi.MachineSpec{
 							Bootstrap: capi.Bootstrap{
-								ConfigRef: &corev1.ObjectReference{
-									APIVersion: "rke.cattle.io",
+								ConfigRef: capi.ContractVersionedObjectReference{
+									Kind:     "",
+									Name:     "",
+									APIGroup: "rke.cattle.io",
 								},
 							},
 						},
@@ -210,8 +215,10 @@ func TestForceDeleteAllDeletingEtcdMachines(t *testing.T) {
 						},
 						Spec: capi.MachineSpec{
 							Bootstrap: capi.Bootstrap{
-								ConfigRef: &corev1.ObjectReference{
-									APIVersion: "rke.cattle.io",
+								ConfigRef: capi.ContractVersionedObjectReference{
+									Kind:     "",
+									Name:     "",
+									APIGroup: "rke.cattle.io",
 								},
 							},
 						},
@@ -222,8 +229,10 @@ func TestForceDeleteAllDeletingEtcdMachines(t *testing.T) {
 						},
 						Spec: capi.MachineSpec{
 							Bootstrap: capi.Bootstrap{
-								ConfigRef: &corev1.ObjectReference{
-									APIVersion: "rke.cattle.io",
+								ConfigRef: capi.ContractVersionedObjectReference{
+									Kind:     "",
+									Name:     "",
+									APIGroup: "rke.cattle.io",
 								},
 							},
 						},
@@ -234,8 +243,10 @@ func TestForceDeleteAllDeletingEtcdMachines(t *testing.T) {
 						},
 						Spec: capi.MachineSpec{
 							Bootstrap: capi.Bootstrap{
-								ConfigRef: &corev1.ObjectReference{
-									APIVersion: "rke.cattle.io",
+								ConfigRef: capi.ContractVersionedObjectReference{
+									Kind:     "",
+									Name:     "",
+									APIGroup: "rke.cattle.io",
 								},
 							},
 						},
