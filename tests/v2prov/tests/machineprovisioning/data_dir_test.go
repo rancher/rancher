@@ -1,7 +1,6 @@
 package machineprovisioning
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -10,12 +9,11 @@ import (
 
 	provisioningv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/tests/v2prov/clients"
 	"github.com/rancher/rancher/tests/v2prov/cluster"
 	"github.com/rancher/rancher/tests/v2prov/defaults"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	"sigs.k8s.io/cluster-api/controllers/external"
 )
 
 func Test_Operation_SetC_MP_DataDirectories(t *testing.T) {
@@ -64,20 +62,15 @@ func Test_Operation_SetC_MP_DataDirectories(t *testing.T) {
 	}
 
 	for _, machine := range machines.Items {
-		gvk := schema.FromAPIVersionAndKind(capr.RKEMachineAPIVersion, machine.Spec.InfrastructureRef.Kind)
-		gvr := schema.GroupVersionResource{
-			Group:    gvk.Group,
-			Version:  gvk.Version,
-			Resource: strings.ToLower(gvk.Kind) + "s",
-		}
-		im, newErr := clients.Dynamic.Resource(gvr).Namespace(machine.Namespace).Get(context.TODO(), machine.Spec.InfrastructureRef.Name, metav1.GetOptions{})
-		if newErr != nil {
-			t.Fatalf("failed to get %s %s/%s to for validating directories: %v", gvk.String(), machine.Namespace, machine.Spec.InfrastructureRef.Name, newErr)
-		}
-
 		// This test is only for clusters provisioned via the pod driver
 		if machine.Spec.InfrastructureRef.Kind != "PodMachine" {
 			continue
+		}
+
+		im, newErr := external.GetObjectFromContractVersionedRef(clients.Ctx, clients.Client, machine.Spec.InfrastructureRef, machine.Namespace)
+		if newErr != nil {
+			t.Fatalf("failed to get %s %s/%s to for validating directories: %v",
+				machine.Spec.InfrastructureRef.GroupKind(), machine.Namespace, machine.Spec.InfrastructureRef.Name, newErr)
 		}
 
 		// In the case of a podmachine, the pod name will be strings.ReplaceAll(infra.meta.GetName(), ".", "-")

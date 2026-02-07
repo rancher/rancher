@@ -448,6 +448,7 @@ func GatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 			} else {
 				rkeBootstraps = append(rkeBootstraps, rb)
 			}
+
 			im, newErr := external.GetObjectFromContractVersionedRef(clients.Ctx, clients.Client, machine.Spec.InfrastructureRef, machine.Namespace)
 			if newErr != nil {
 				logrus.Errorf("failed to get infrastructure machine %s/%s: %v", machine.Namespace, machine.Spec.InfrastructureRef.Name, newErr)
@@ -497,15 +498,10 @@ func GatherDebugData(clients *clients.Clients, c *provisioningv1api.Cluster) (st
 	} else if newErr != nil {
 		logrus.Errorf("failed to get capi cluster %s/%s to print error: %v", c.Namespace, c.Name, newErr)
 	} else {
-		gvk := schema.FromAPIVersionAndKind(capr.RKEAPIVersion, capiCluster.Spec.InfrastructureRef.Kind)
-		gvr := schema.GroupVersionResource{
-			Group:    gvk.Group,
-			Version:  gvk.Version,
-			Resource: strings.ToLower(gvk.Kind) + "s",
-		}
-		infraCluster, newErr = clients.Dynamic.Resource(gvr).Namespace(capiCluster.Namespace).Get(context.TODO(), capiCluster.Spec.InfrastructureRef.Name, metav1.GetOptions{})
+		infraCluster, newErr = external.GetObjectFromContractVersionedRef(clients.Ctx, clients.Client, capiCluster.Spec.InfrastructureRef, capiCluster.Namespace)
 		if newErr != nil {
-			logrus.Errorf("failed to get %s %s/%s to print error: %v", gvr.String(), capiCluster.Namespace, capiCluster.Spec.InfrastructureRef.Name, newErr)
+			logrus.Errorf("failed to get %s %s/%s to print error: %v",
+				capiCluster.Spec.InfrastructureRef.GroupKind(), capiCluster.Namespace, capiCluster.Spec.InfrastructureRef.Name, newErr)
 			infraCluster = nil
 		}
 		machineDeployments, newErr = clients.CAPI.MachineDeployment().List(c.Namespace, metav1.ListOptions{
