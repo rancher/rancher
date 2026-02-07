@@ -70,7 +70,16 @@ if [ $TAG = "dev" ]; then
 fi
 
 export CATTLE_AGENT_IMAGE=${CATTLE_AGENT_IMAGE:-rancher/rancher-agent:${TAG:-head}}
-echo "Using Rancher agent image $CATTLE_AGENT_IMAGE"
+echo "Using Rancher agent image $CATTLE_AGENT_IMAGE, checking to see if it exists in local docker daemon or remote"
+
+# checking to see if the image exists - since the tests will timeout if not.
+# checks in the local daemon first (in the case of loading the image direct from the CI build)
+if ! ( docker image inspect 172.17.0.2:5000/$CATTLE_AGENT_IMAGE >/dev/null 2>&1 || docker pull $CATTLE_AGENT_IMAGE >/dev/null 2>&1 ) ; then
+    echo "Rancher agent image $CATTLE_AGENT_IMAGE not found - exiting"
+    exit 1
+  else
+    echo "Rancher agent image $CATTLE_AGENT_IMAGE exists!"
+fi
 
 eval "$(grep '^ENV CATTLE_SYSTEM_AGENT' package/Dockerfile | awk '{print "export " $2}')"
 eval "$(grep '^ENV CATTLE_WINS_AGENT' package/Dockerfile | awk '{print "export " $2}')"
