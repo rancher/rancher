@@ -166,7 +166,7 @@ ENV LINODE_UI_DRIVER_VERSION=v0.7.0
 # For displaying Helm version in the UI only.
 ENV CATTLE_HELM_VERSION=v3.19.0-rancher1
 # make sure the version number is consistent with the one at Line 100 of pkg/data/management/machinedriver_data.go
-ENV DOCKER_MACHINE_HARVESTER_VERSION=v1.0.4
+ENV DOCKER_MACHINE_HARVESTER_VERSION=v1.0.6
 ENV CATTLE_KDM_BRANCH=${CATTLE_KDM_BRANCH}
 ENV CATTLE_WINS_AGENT_VERSION=v0.5.4-rc.1
 ENV CATTLE_WINS_AGENT_INSTALL_SCRIPT=https://raw.githubusercontent.com/rancher/wins/${CATTLE_WINS_AGENT_VERSION}/install.ps1
