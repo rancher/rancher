@@ -1141,6 +1141,7 @@ func (t *Store) watch(ctx context.Context, options *metav1.ListOptions) (watch.I
 					obj = &ext.Token{
 						ObjectMeta: metav1.ObjectMeta{
 							ResourceVersion: secret.ResourceVersion,
+							Annotations:     secret.Annotations,
 						},
 					}
 				case watch.Added, watch.Modified, watch.Deleted:
