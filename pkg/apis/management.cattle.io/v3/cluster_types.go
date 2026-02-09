@@ -232,6 +232,8 @@ type ClusterStatus struct {
 	AADClientCertSecret        string                    `json:"aadClientCertSecret,omitempty" norman:"nocreate,noupdate"`   // Deprecated: use ClusterSpec.ClusterSecrets.AADClientCertSecret instead
 
 	AppliedClusterAgentDeploymentCustomization *AgentDeploymentCustomization `json:"appliedClusterAgentDeploymentCustomization,omitempty"`
+	MachineProvider                            string                        `json:"machineProvider,omitempty"`
+	KubernetesVersion                          string                        `json:"kubernetesVersion,omitempty"`
 }
 
 type ClusterComponentStatus struct {
