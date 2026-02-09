@@ -1253,7 +1253,7 @@ func TestStoreGet(t *testing.T) {
 				},
 			},
 			ManagedFields: []metav1.ManagedFieldsEntry{
-				metav1.ManagedFieldsEntry{
+				{
 					Manager:    "kubeconfig",
 					Operation:  "something",
 					Time:       &now,
@@ -1283,7 +1283,7 @@ func TestStoreGet(t *testing.T) {
 	assert.Nil(t, err)
 
 	kcFields := []metav1.ManagedFieldsEntry{
-		metav1.ManagedFieldsEntry{
+		{
 			Manager:    "kubeconfig",
 			Operation:  "something",
 			Time:       &now,
@@ -1673,6 +1673,7 @@ func TestStoreWatch(t *testing.T) {
 		require.NoError(t, err)
 		defer watcher.Stop()
 
+		// Initial events.
 		configMapWatcher.add(watch.Event{
 			Type:   watch.Added,
 			Object: configMap1,
@@ -1684,11 +1685,15 @@ func TestStoreWatch(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, configMap1.Name, k.Name)
 
+		// Bookmark event with annotation indicating the end of initial events.
 		configMapWatcher.add(watch.Event{
 			Type: watch.Bookmark,
 			Object: &corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					ResourceVersion: "1",
+					Annotations: map[string]string{
+						"k8s.io/initial-events-end": "true",
+					},
 				},
 			},
 		})
@@ -1697,7 +1702,9 @@ func TestStoreWatch(t *testing.T) {
 		k, ok = event.Object.(*ext.Kubeconfig)
 		require.True(t, ok)
 		assert.Equal(t, "1", k.ResourceVersion)
+		assert.Equal(t, "true", k.Annotations["k8s.io/initial-events-end"])
 
+		// Subsequent events.
 		configMapWatcher.add(watch.Event{
 			Type:   watch.Modified,
 			Object: configMap1,
@@ -1763,6 +1770,7 @@ func TestStoreWatch(t *testing.T) {
 		k, ok = event.Object.(*ext.Kubeconfig)
 		require.True(t, ok)
 		assert.Equal(t, "2", k.ResourceVersion)
+		assert.Empty(t, k.Annotations)
 	})
 
 	t.Run("user watches kubeconfigs", func(t *testing.T) {
