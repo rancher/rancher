@@ -1041,6 +1041,7 @@ func (s *Store) Watch(
 					obj = &ext.Kubeconfig{
 						ObjectMeta: metav1.ObjectMeta{
 							ResourceVersion: configMap.ResourceVersion,
+							Annotations:     configMap.Annotations,
 						},
 					}
 				case watch.Error:

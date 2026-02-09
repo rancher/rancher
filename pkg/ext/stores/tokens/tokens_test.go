@@ -955,7 +955,17 @@ func TestStoreWatch(t *testing.T) {
 		users.EXPECT().Cache().Return(nil)
 		secrets.EXPECT().Cache().Return(nil)
 
-		watcher := NewWatcherFor(watch.Event{Object: &properSecret, Type: watch.Bookmark})
+		watcher := NewWatcherFor(watch.Event{
+			Object: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					ResourceVersion: "1",
+					Annotations: map[string]string{
+						"k8s.io/initial-events-end": "true",
+					},
+				},
+			},
+			Type: watch.Bookmark,
+		})
 		secrets.EXPECT().Watch("cattle-tokens", gomock.Any()).
 			Return(watcher, nil)
 
@@ -970,7 +980,10 @@ func TestStoreWatch(t *testing.T) {
 		event, more := (<-consumer.ResultChan()) // receive bookmark event
 		assert.True(t, more)
 		assert.Equal(t, watch.Bookmark, event.Type)
-		assert.Equal(t, &ext.Token{ObjectMeta: metav1.ObjectMeta{ResourceVersion: ""}}, event.Object)
+		token, ok := event.Object.(*ext.Token)
+		require.True(t, ok)
+		assert.Equal(t, "1", token.ResourceVersion)
+		assert.Equal(t, "true", token.Annotations["k8s.io/initial-events-end"])
 
 		watcher.Done() // close backend channel
 		consumer.Stop()
