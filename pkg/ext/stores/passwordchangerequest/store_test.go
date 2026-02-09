@@ -2,6 +2,7 @@ package passwordchangerequest
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"testing"
@@ -16,6 +17,7 @@ import (
 	"go.uber.org/mock/gomock"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -30,6 +32,16 @@ func TestCreate(t *testing.T) {
 	oldPassword := "fake-current-password"
 	newPassword := "fake-new-password"
 
+	mustChangePasswordPatch, _ := json.Marshal([]struct {
+		Op    string `json:"op"`
+		Path  string `json:"path"`
+		Value any    `json:"value"`
+	}{{
+		Op:    "add",
+		Path:  "/mustChangePassword",
+		Value: false,
+	}})
+
 	userCache := func() mgmtv3.UserCache {
 		cache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		cache.EXPECT().Get(gomock.Any()).Return(&v3.User{
@@ -37,6 +49,17 @@ func TestCreate(t *testing.T) {
 				Name: userID,
 			},
 			Username: username,
+		}, nil).AnyTimes()
+		return cache
+	}
+	userWithMustChangePasswordCache := func() mgmtv3.UserCache {
+		cache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		cache.EXPECT().Get(gomock.Any()).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: userID,
+			},
+			Username:           username,
+			MustChangePassword: true,
 		}, nil).AnyTimes()
 		return cache
 	}
@@ -52,6 +75,7 @@ func TestCreate(t *testing.T) {
 		authorizer authorizer.Authorizer
 		pwdUpdater func() PasswordUpdater
 		userCache  func() mgmtv3.UserCache
+		userClient func() mgmtv3.UserClient
 		wantObj    *ext.PasswordChangeRequest
 		wantErr    string
 	}{
@@ -248,6 +272,92 @@ func TestCreate(t *testing.T) {
 			userCache: userCache,
 			wantErr:   "unexpected error",
 		},
+		{
+			desc: "password changed for the same user and mustChangePassword is set to false",
+			obj: &ext.PasswordChangeRequest{
+				Spec: ext.PasswordChangeRequestSpec{
+					UserID:          userID,
+					CurrentPassword: oldPassword,
+					NewPassword:     newPassword,
+				},
+			},
+			ctx: request.WithUser(context.Background(), &user.DefaultInfo{Name: userID}),
+			pwdUpdater: func() PasswordUpdater {
+				mock := mocks.NewMockPasswordUpdater(ctrl)
+				mock.EXPECT().VerifyAndUpdatePassword(userID, oldPassword, newPassword).Return(nil)
+
+				return mock
+			},
+			userCache: userWithMustChangePasswordCache,
+			authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+				return authorizer.DecisionDeny, "", nil
+			}),
+			userClient: func() mgmtv3.UserClient {
+				mock := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
+				mock.EXPECT().Patch(userID, types.JSONPatchType, mustChangePasswordPatch)
+
+				return mock
+			},
+			wantObj: &ext.PasswordChangeRequest{
+				Spec: ext.PasswordChangeRequestSpec{
+					UserID:          userID,
+					CurrentPassword: oldPassword,
+					NewPassword:     newPassword,
+				},
+				Status: ext.PasswordChangeRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   "PasswordUpdated",
+							Status: "True",
+						},
+					},
+					Summary: status.SummaryCompleted,
+				},
+			},
+		},
+		{
+			desc: "password changed for a different user and mustChangePassword is set to false",
+			obj: &ext.PasswordChangeRequest{
+				Spec: ext.PasswordChangeRequestSpec{
+					UserID:          userID,
+					CurrentPassword: oldPassword,
+					NewPassword:     newPassword,
+				},
+			},
+			ctx: request.WithUser(context.Background(), &user.DefaultInfo{Name: "another-user"}),
+			authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+				return authorizer.DecisionAllow, "", nil
+			}),
+			pwdUpdater: func() PasswordUpdater {
+				mock := mocks.NewMockPasswordUpdater(ctrl)
+				mock.EXPECT().UpdatePassword(userID, newPassword).Return(nil)
+
+				return mock
+			},
+			userCache: userWithMustChangePasswordCache,
+			userClient: func() mgmtv3.UserClient {
+				mock := fake.NewMockNonNamespacedClientInterface[*v3.User, *v3.UserList](ctrl)
+				mock.EXPECT().Patch(userID, types.JSONPatchType, mustChangePasswordPatch)
+
+				return mock
+			},
+			wantObj: &ext.PasswordChangeRequest{
+				Spec: ext.PasswordChangeRequestSpec{
+					UserID:          userID,
+					CurrentPassword: oldPassword,
+					NewPassword:     newPassword,
+				},
+				Status: ext.PasswordChangeRequestStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   "PasswordUpdated",
+							Status: "True",
+						},
+					},
+					Summary: status.SummaryCompleted,
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -261,6 +371,9 @@ func TestCreate(t *testing.T) {
 			}
 			if tt.userCache != nil {
 				store.userCache = tt.userCache()
+			}
+			if tt.userClient != nil {
+				store.userClient = tt.userClient()
 			}
 
 			obj, err := store.Create(tt.ctx, tt.obj, nil, tt.options)
