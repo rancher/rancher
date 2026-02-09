@@ -68,7 +68,9 @@ func Register(ctx context.Context, server *steve.Server, wrangler *wrangler.Cont
 			if schema.LinkHandlers == nil {
 				schema.LinkHandlers = map[string]http.Handler{}
 			}
-			schema.LinkHandlers["shell"] = shellHandler
+			if shellHandler != nil {
+				schema.LinkHandlers["shell"] = shellHandler
+			}
 			schema.LinkHandlers["log"] = log
 			if schema.ActionHandlers == nil {
 				schema.ActionHandlers = map[string]http.Handler{}
@@ -83,7 +85,7 @@ func Register(ctx context.Context, server *steve.Server, wrangler *wrangler.Cont
 			schema.ByIDHandler = func(request *types.APIRequest) (types.APIObject, error) {
 				// By pass authorization for local shell because the user might not have
 				// GET granted for local cluster
-				if request.Name == "local" && request.Link == "shell" {
+				if request.Name == "local" && request.Link == "shell" && shellHandler != nil {
 					shellHandler.ServeHTTP(request.Response, request.Request)
 					return types.APIObject{}, validation.ErrComplete
 				}
