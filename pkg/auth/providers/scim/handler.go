@@ -32,7 +32,7 @@ func NewHandler(scaledContext *config.ScaledContext) http.Handler {
 		userMGR:            scaledContext.UserManager,
 	}
 
-	authenticator := NewTokenAuthenticator(scaledContext.Wrangler.Core.Secret().Cache())
+	authenticator := NewTokenAuthenticator(scaledContext.Wrangler)
 
 	r := mux.NewRouter().UseEncodedPath().StrictSlash(true)
 	r.Use(authenticator.Authenticate)

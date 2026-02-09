@@ -3,16 +3,17 @@ package scim
 import (
 	"crypto/subtle"
 	"net/http"
-	"slices"
 	"strings"
+	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/namespace"
+	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/wrangler"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
@@ -32,8 +33,10 @@ var tokenSecretNamespace = namespace.GlobalNamespace
 // kubectl create secret generic scim-okta -n cattle-global-data --from-literal="token=$(sha256 -s $(uuidgen))"
 // kubectl label secret -n cattle-global-data scim-okta 'cattle.io/kind=scim-auth-token' 'authn.management.cattle.io/provider=okta'
 type tokenAuthenticator struct {
-	secrets            wcorev1.SecretCache
+	secretCache        wcorev1.SecretCache
+	secrets            wcorev1.SecretClient
 	isDisabledProvider func(provider string) (bool, error)
+	expireTokensAfter  func() time.Duration
 }
 
 // Authenticate implements the http middleware for tokenAuthenticator.
@@ -65,16 +68,29 @@ func (a *tokenAuthenticator) Authenticate(next http.Handler) http.Handler {
 			authProviderLabel: provider,
 		}
 
-		list, err := a.secrets.List(tokenSecretNamespace, labelSet.AsSelector())
+		list, err := a.secretCache.List(tokenSecretNamespace, labelSet.AsSelector())
 		if err != nil {
 			logrus.Errorf("scim::TokenAuthenticator: failed to list secrets: %s", err)
 			writeError(w, NewInternalError())
 			return
 		}
 
-		authenticated := slices.ContainsFunc(list, func(secret *corev1.Secret) bool {
-			return subtle.ConstantTimeCompare([]byte(token), secret.Data["token"]) == 1
-		})
+		ttl := a.expireTokensAfter()
+
+		var authenticated bool
+		for _, secret := range list {
+			if ttl > 0 && secret.CreationTimestamp.Add(ttl).Before(time.Now()) {
+				// Clean up expired tokens, but don't block authentication if deletion fails for some reason
+				if err := a.secrets.Delete(tokenSecretNamespace, secret.Name, nil); err != nil {
+					logrus.Errorf("scim::TokenAuthenticator: failed to delete expired token secret %s: %s", secret.Name, err)
+				}
+				continue
+			}
+
+			if !authenticated {
+				authenticated = subtle.ConstantTimeCompare([]byte(token), secret.Data["token"]) == 1
+			}
+		}
 
 		if !authenticated {
 			writeError(w, NewError(http.StatusUnauthorized, http.StatusText(http.StatusUnauthorized)))
@@ -86,9 +102,11 @@ func (a *tokenAuthenticator) Authenticate(next http.Handler) http.Handler {
 }
 
 // NewTokenAuthenticator returns a new tokenAuthenticator instance.
-func NewTokenAuthenticator(secrets wcorev1.SecretCache) *tokenAuthenticator {
+func NewTokenAuthenticator(wContext *wrangler.Context) *tokenAuthenticator {
 	return &tokenAuthenticator{
-		secrets:            secrets,
+		secretCache:        wContext.Core.Secret().Cache(),
+		secrets:            wContext.Core.Secret(),
 		isDisabledProvider: providers.IsDisabledProvider,
+		expireTokensAfter:  func() time.Duration { return settings.ExpireSCIMTokensAfter.GetDuration() },
 	}
 }
