@@ -29,6 +29,8 @@ func NewLinksAndActionsFormatter(multiClusterManager wrangler.MultiClusterManage
 	return formatter.Formatter
 }
 
+var _ types.Formatter = (*LinksAndActionsFormatter)(nil).Formatter
+
 func (a *LinksAndActionsFormatter) Formatter(request *types.APIRequest, resource *types.RawResource) {
 	schemas := a.multiClusterManager.NormanSchemas()
 	if schemas == nil {
