@@ -329,6 +329,7 @@ func TestPrimeFeatureEnabled(t *testing.T) {
 
 	tests := []struct {
 		name        string
+		prime       bool
 		primeEnvVal string
 		val         *bool
 		def         bool
@@ -336,6 +337,7 @@ func TestPrimeFeatureEnabled(t *testing.T) {
 	}{
 		{
 			name:        "prime feature on prime build with no value set defaults to enabled",
+			prime:       true,
 			primeEnvVal: "prime",
 			val:         nil,
 			def:         true,
@@ -343,6 +345,7 @@ func TestPrimeFeatureEnabled(t *testing.T) {
 		},
 		{
 			name:        "prime feature on prime build respects explicit false value",
+			prime:       true,
 			primeEnvVal: "prime",
 			val:         &falseVal,
 			def:         true,
@@ -350,6 +353,7 @@ func TestPrimeFeatureEnabled(t *testing.T) {
 		},
 		{
 			name:        "prime feature on prime build respects explicit true value",
+			prime:       true,
 			primeEnvVal: "prime",
 			val:         &trueVal,
 			def:         false,
@@ -357,6 +361,7 @@ func TestPrimeFeatureEnabled(t *testing.T) {
 		},
 		{
 			name:        "prime feature on non-prime build returns false even when val is true",
+			prime:       true,
 			primeEnvVal: "",
 			val:         &trueVal,
 			def:         true,
@@ -364,6 +369,7 @@ func TestPrimeFeatureEnabled(t *testing.T) {
 		},
 		{
 			name:        "prime feature on non-prime build returns false regardless of default",
+			prime:       true,
 			primeEnvVal: "",
 			val:         nil,
 			def:         true,
@@ -371,6 +377,7 @@ func TestPrimeFeatureEnabled(t *testing.T) {
 		},
 		{
 			name:        "non-prime feature on non-prime build is unaffected",
+			prime:       false,
 			primeEnvVal: "",
 			val:         &trueVal,
 			def:         false,
@@ -382,7 +389,7 @@ func TestPrimeFeatureEnabled(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Setenv(primeEnv, test.primeEnvVal)
 			feat := &Feature{
-				prime: test.name != "non-prime feature on non-prime build is unaffected",
+				prime: test.prime,
 				val:   test.val,
 				def:   test.def,
 			}
