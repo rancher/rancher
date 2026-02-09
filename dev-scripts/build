@@ -5,6 +5,9 @@ set -x
 
 source scripts/package-env
 
+# navigate to the previous directory
+cd -
+
 BUILD_ARGS=()
 BUILDX_ARGS=()
 LABELS_STR="${LABELS_STR:-""}"
