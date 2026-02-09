@@ -46,7 +46,7 @@ runs:
       shell: bash
       run: |
         cd ${{ inputs.rancher_path }}
-        source dev-scripts/prepare-build-env
+        source scripts/package-env
 
         echo "CATTLE_KDM_BRANCH=$CATTLE_KDM_BRANCH" >> $GITHUB_OUTPUT
         echo "CATTLE_K3S_VERSION=$CATTLE_K3S_VERSION" >> $GITHUB_OUTPUT
