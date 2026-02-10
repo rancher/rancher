@@ -35,6 +35,7 @@ type ProxyAcceptList struct {
 func (p *ProxyAcceptList) Start(ctx context.Context, proxyEndpoint controllersv3.ProxyEndpointController) {
 	p.Lock()
 	if p.started {
+		p.Unlock()
 		return
 	}
 	p.started = true
