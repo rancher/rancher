@@ -55,7 +55,7 @@ if [ "$TARGET" = "server" ]; then
 fi
 
 if [ "$TARGET" = "agent" ]; then
-  build_rancher "server"
+  build_rancher "agent"
 fi
 
 if [ "$TARGET" = "server-tarball" ]; then
