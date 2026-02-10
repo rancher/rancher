@@ -9,7 +9,7 @@ import (
 func random(clients *clients.Clients, annotations map[string]string) (*corev1.Namespace, error) {
 	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "namespace-",
+			GenerateName: "test-ns-",
 		},
 	}
 	if len(annotations) > 0 {
