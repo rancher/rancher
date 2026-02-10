@@ -337,11 +337,7 @@ func (p *PlanStore) getPlanSecretFromMachine(machine *capi.Machine) (*corev1.Sec
 	}
 
 	if !machine.Spec.Bootstrap.ConfigRef.IsDefined() {
-		return nil, fmt.Errorf("machine %s/%s bootstrap ConfigRef was nil", machine.Namespace, machine.Name)
-	}
-
-	if machine.Spec.Bootstrap.ConfigRef.Name == "" {
-		return nil, fmt.Errorf("machine %s/%s bootstrap ConfigRef name was empty", machine.Namespace, machine.Name)
+		return nil, fmt.Errorf("machine %s/%s bootstrap ConfigRef was not defined", machine.Namespace, machine.Name)
 	}
 
 	secret, err := p.secrets.Get(machine.Namespace, capr.PlanSecretFromBootstrapName(machine.Spec.Bootstrap.ConfigRef.Name), metav1.GetOptions{})
