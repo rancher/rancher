@@ -24,6 +24,7 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	upgradev1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
 	"github.com/rancher/wrangler/v3/pkg/data"
+	admissionregcontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/admissionregistration.k8s.io/v1"
 	deploymentControllers "github.com/rancher/wrangler/v3/pkg/generated/controllers/apps/v1"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
@@ -67,18 +68,20 @@ var (
 // Register is called to create a new handler and subscribe to change events.
 func Register(ctx context.Context, wContext *wrangler.Context, registryOverride string) error {
 	h := &handler{
-		manager:          wContext.SystemChartsManager,
-		namespaces:       wContext.Core.Namespace(),
-		namespaceCache:   wContext.Core.Namespace().Cache(),
-		deployment:       wContext.Apps.Deployment(),
-		deploymentCache:  wContext.Apps.Deployment().Cache(),
-		clusterRepo:      wContext.Catalog.ClusterRepo(),
-		clusterCache:     wContext.Mgmt.Cluster().Cache(),
-		plan:             wContext.Plan.Plan(),
-		planCache:        wContext.Plan.Plan().Cache(),
-		secrets:          wContext.Core.Secret(),
-		chartsConfig:     chart.RancherConfigGetter{ConfigCache: wContext.Core.ConfigMap().Cache()},
-		registryOverride: registryOverride,
+		manager:                        wContext.SystemChartsManager,
+		namespaces:                     wContext.Core.Namespace(),
+		namespaceCache:                 wContext.Core.Namespace().Cache(),
+		deployment:                     wContext.Apps.Deployment(),
+		deploymentCache:                wContext.Apps.Deployment().Cache(),
+		clusterRepo:                    wContext.Catalog.ClusterRepo(),
+		clusterCache:                   wContext.Mgmt.Cluster().Cache(),
+		plan:                           wContext.Plan.Plan(),
+		planCache:                      wContext.Plan.Plan().Cache(),
+		secrets:                        wContext.Core.Secret(),
+		validatingWebhookConfiguration: wContext.Admission.ValidatingWebhookConfiguration(),
+		mutatingWebhookConfigurations:  wContext.Admission.MutatingWebhookConfiguration(),
+		chartsConfig:                   chart.RancherConfigGetter{ConfigCache: wContext.Core.ConfigMap().Cache()},
+		registryOverride:               registryOverride,
 	}
 
 	wContext.Catalog.ClusterRepo().OnChange(ctx, "bootstrap-charts", h.onRepo)
@@ -93,25 +96,29 @@ func Register(ctx context.Context, wContext *wrangler.Context, registryOverride 
 
 	wContext.Plan.Plan().OnChange(ctx, "monitor-plans", h.onPlan)
 
-	wContext.Core.Namespace().OnChange(ctx, "watch-provisioning-namespaces", h.onNamespace)
-
 	wContext.Mgmt.Cluster().OnChange(ctx, "monitor-local-cluster", h.onCluster)
+
+	// TODO: remove in 2.15 - cleanup embedded CAPI webhooks when the namespace is deleted
+	wContext.Core.Namespace().OnChange(ctx, "cleanup-embedded-capi-webhook-configs", h.removeCAPIWebhooks)
+
 	return nil
 }
 
 type handler struct {
-	manager          chart.Manager
-	namespaces       corecontrollers.NamespaceController
-	namespaceCache   corecontrollers.NamespaceCache
-	deployment       deploymentControllers.DeploymentController
-	deploymentCache  deploymentControllers.DeploymentCache
-	clusterRepo      catalogcontrollers.ClusterRepoController
-	secrets          corecontrollers.SecretController
-	chartsConfig     chart.RancherConfigGetter
-	clusterCache     mgmtcontrollers.ClusterCache
-	plan             plancontrolers.PlanController
-	planCache        plancontrolers.PlanCache
-	registryOverride string
+	manager                        chart.Manager
+	namespaces                     corecontrollers.NamespaceController
+	namespaceCache                 corecontrollers.NamespaceCache
+	deployment                     deploymentControllers.DeploymentController
+	deploymentCache                deploymentControllers.DeploymentCache
+	clusterRepo                    catalogcontrollers.ClusterRepoController
+	secrets                        corecontrollers.SecretController
+	mutatingWebhookConfigurations  admissionregcontrollers.MutatingWebhookConfigurationController
+	validatingWebhookConfiguration admissionregcontrollers.ValidatingWebhookConfigurationController
+	chartsConfig                   chart.RancherConfigGetter
+	clusterCache                   mgmtcontrollers.ClusterCache
+	plan                           plancontrolers.PlanController
+	planCache                      plancontrolers.PlanCache
+	registryOverride               string
 }
 
 func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.ClusterRepo, error) {
@@ -232,6 +239,14 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 			ReleaseNamespace: "rancher-operator-system",
 			ReleaseName:      "rancher-operator",
 			ChartName:        "rancher-operator",
+			Uninstall:        true,
+			RemoveNamespace:  true,
+		},
+		{
+			// TODO: remove in 2.15
+			ReleaseNamespace: "cattle-provisioning-capi-system",
+			ReleaseName:      "rancher-provisioning-capi",
+			ChartName:        "rancher-provisioning-capi",
 			Uninstall:        true,
 			RemoveNamespace:  true,
 		},
@@ -585,16 +600,18 @@ func isInHarvesterLocal() bool {
 	return false
 }
 
-// onNamespace watches for deletion of namespaces used by the Turtles chart.
-func (h *handler) onNamespace(_ string, ns *kcorev1.Namespace) (*kcorev1.Namespace, error) {
-	if ns == nil {
+// removeCAPIWebhooks runs when the cattle-provisioning-capi-system namespace is deleted
+// and ensures the old Rancher-created mutating/validating webhook configurations are removed
+// after the provisioning CAPI chart is replaced by the turtles chart on upgrade.
+func (h *handler) removeCAPIWebhooks(_ string, ns *kcorev1.Namespace) (*kcorev1.Namespace, error) {
+	if ns == nil || ns.Name != "cattle-provisioning-capi-system" || ns.DeletionTimestamp == nil {
 		return ns, nil
 	}
-	if ns.Name != namespace.TurtlesNamespace {
-		return ns, nil
+	if err := h.mutatingWebhookConfigurations.Delete("capi-mutating-webhook-configuration", &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+		return nil, err
 	}
-
-	logrus.Debugf("[systemcharts] namespace change detected for %s", ns.Name)
-	h.clusterRepo.EnqueueAfter(repoName, 10*time.Second)
+	if err := h.validatingWebhookConfiguration.Delete("capi-validating-webhook-configuration", &metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+		return nil, err
+	}
 	return ns, nil
 }
