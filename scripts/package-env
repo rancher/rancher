@@ -29,6 +29,7 @@ export REPO_OWNER="${REPO_OWNER:-"rancher"}"
 export IMAGE="${IMAGE:-"$REPO_OWNER/rancher"}"
 export IMAGE_TAG="${IMAGE_TAG:-"$IMAGE-$OS-$ARCH:$TAG"}"
 export IMAGE_AGENT="${IMAGE_AGENT:-"$REPO_OWNER/rancher-agent"}"
+export IMAGE_AGENT_TAG=="${IMAGE_AGENT_TAG:-"$IMAGE_AGENT-$OS-$ARCH:$TAG"}"
 export IMAGE_INSTALLER="${IMAGE_INSTALLER:-"$REPO_OWNER/system-agent-installer-rancher"}"
 export CATTLE_KDM_BRANCH=$(grep -m1 'ARG CATTLE_KDM_BRANCH=' package/Dockerfile | cut -d '=' -f2)
 export CATTLE_K3S_VERSION=$(grep -m1 'ENV CATTLE_K3S_VERSION=' package/Dockerfile | cut -d '=' -f2)
