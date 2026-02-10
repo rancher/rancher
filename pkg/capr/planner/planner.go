@@ -1261,7 +1261,7 @@ func (p *Planner) ensureCAPIClusterControlPlaneInitializedFalse(cp *rkev1.RKECon
 		conditions.Set(cluster, metav1.Condition{
 			Type:    capi.ClusterControlPlaneInitializedCondition,
 			Status:  metav1.ConditionFalse,
-			Reason:  capi.WaitingForControlPlaneProviderInitializedV1Beta1Reason,
+			Reason:  capi.ClusterControlPlaneNotInitializedReason,
 			Message: "Waiting for control plane provider to indicate the control plane has been initialized",
 		})
 		_, err = p.capiClient.UpdateStatus(cluster)
