@@ -398,7 +398,6 @@ func migrateCAPIMachineLabelsAndAnnotationsToPlanSecret(w *wrangler.CAPIContext)
 					}
 					return err
 				}); err != nil {
-					logrus.Debugf("failed to update infrastructure machine %s/%s: %v - skipping infra machine update", machine.Namespace, machine.Spec.InfrastructureRef.Name, err)
 					return err
 				}
 			}
