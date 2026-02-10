@@ -2895,6 +2895,33 @@ spec:
                             MachineHealthCheck is allowed to remediate.
                           nullable: true
                           type: string
+                        userdata:
+                          description: |-
+                            Additional userdata to merge with rancher-defined userdata.
+
+                            Currently, this field is only supported for external CAPI
+                            infrastructure providers, and will have no effect for
+                            Rancher-provisioned nodes. Userdata for Rancher-provisioned nodes
+                            can be set in the machine configuration.
+
+                            WARNING: Do not include sensitive data, this field is visible
+                            in non-Secret API objects.
+
+                            EXPERIMENTAL: this field is experimental and future compatibility
+                            is not guaranteed.
+                          nullable: true
+                          properties:
+                            inlineUserdata:
+                              description: |-
+                                Userdata string in cloud-config format.
+
+                                WARNING: Do not include sensitive data, this field is visible
+                                in non-Secret API objects.
+
+                                EXPERIMENTAL: this field is experimental and future compatibility
+                                is not guaranteed.
+                              type: string
+                          type: object
                         workerRole:
                           description: |-
                             WorkerRole defines whether the machines provisioned by this pool

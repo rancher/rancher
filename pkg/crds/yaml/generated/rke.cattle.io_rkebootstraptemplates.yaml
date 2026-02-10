@@ -97,6 +97,33 @@ spec:
                         description: ClusterName refers to the name of the CAPI Cluster
                           associated with this RKEBootstrap.
                         type: string
+                      userdata:
+                        description: |-
+                          Additional that will be merged with rancher-defined userdata.
+
+                          Currently, this field is only supported for external CAPI
+                          infrastructure providers, and will have no effect for
+                          Rancher-provisioned nodes. Userdata for Rancher-provisioned nodes
+                          can be set in the machine configuration.
+
+                          WARNING: Do not include sensitive data, this field is visible
+                          in non-Secret API objects.
+
+                          EXPERIMENTAL: this field is experimental and future compatibility
+                          is not guaranteed.
+                        nullable: true
+                        properties:
+                          inlineUserdata:
+                            description: |-
+                              Userdata string in cloud-config format.
+
+                              WARNING: Do not include sensitive data, this field is visible
+                              in non-Secret API objects.
+
+                              EXPERIMENTAL: this field is experimental and future compatibility
+                              is not guaranteed.
+                            type: string
+                        type: object
                     type: object
                   status:
                     description: Status is the observed state of RKEBootstrap.

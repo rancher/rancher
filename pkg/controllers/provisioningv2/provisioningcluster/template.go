@@ -270,32 +270,55 @@ func createMachineTemplateHash(dataMap map[string]interface{}) string {
 	return hex.EncodeToString(hash[:])[:8]
 }
 
+// Create a hash of some fields in the bootstrap templates. This hash
+// is used to set the final name of the template so that the CAPI machine
+// deployment will notice the name change once the content changes and redeploy
+// the machines. Any fields that should cause a redeployment should be added
+// to the hash.
+func createBootstrapTemplateHash(template *rkev1.RKEBootstrapTemplate) string {
+	sha := sha256.New()
+	sha.Write([]byte(template.ObjectMeta.Name))
+
+	if template.Spec.Template.Spec.Userdata != nil {
+		sha.Write([]byte(template.Spec.Template.Spec.Userdata.InlineUserdata))
+	}
+
+	return hex.EncodeToString(sha.Sum(nil))[:8]
+}
+
 func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, dynamic *dynamic.Controller,
 	dynamicSchema mgmtcontroller.DynamicSchemaCache, secrets v1.SecretCache) (result []runtime.Object, _ error) {
-	bootstrapName := name.SafeConcatName(cluster.Name, "bootstrap", "template")
 
 	if dynamicSchema == nil {
 		return nil, nil
 	}
 
-	if len(cluster.Spec.RKEConfig.MachinePools) > 0 {
-		result = append(result, &rkev1.RKEBootstrapTemplate{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: cluster.Namespace,
-				Name:      bootstrapName,
-				Labels: map[string]string{
-					capr.ClusterNameLabel: cluster.Name,
-				},
-			},
-			Spec: rkev1.RKEBootstrapTemplateSpec{
-				ClusterName: cluster.Name,
-				Template: rkev1.RKEBootstrap{
-					Spec: rkev1.RKEBootstrapSpec{
-						ClusterName: cluster.Name,
+	commonBootstrapTplName := ""
+
+	// When using CAPR as the infrastructure provider, we currently don't support additional
+	// userdata defined in the bootstrap template, because it can already be defined in the machine
+	// configuration, so we can use a common bootstrap template.
+	if capiCluster.Spec.InfrastructureRef.APIGroup == capr.RKEAPIGroup {
+		commonBootstrapTplName = name.SafeConcatName(cluster.Name, "bootstrap", "template")
+		if len(cluster.Spec.RKEConfig.MachinePools) > 0 {
+			result = append(result, &rkev1.RKEBootstrapTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: cluster.Namespace,
+					Name:      commonBootstrapTplName,
+					Labels: map[string]string{
+						capr.ClusterNameLabel: cluster.Name,
 					},
 				},
-			},
-		})
+				Spec: rkev1.RKEBootstrapTemplateSpec{
+					ClusterName: cluster.Name,
+					Template: rkev1.RKEBootstrap{
+						Spec: rkev1.RKEBootstrapSpec{
+							ClusterName: cluster.Name,
+						},
+					},
+				},
+			})
+		}
 	}
 
 	machinePoolNames := map[string]bool{}
@@ -393,6 +416,38 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 			deployAnnotations[capi.AutoscalerMaxSizeAnnotation] = strconv.Itoa(int(*machinePool.AutoscalingMaxSize))
 		}
 
+		bootstrapTplName := commonBootstrapTplName
+
+		// For external CAPI infrastructure providers, create a bootstrap template
+		// for each machine pool, because they could have different additional userdata.
+		if bootstrapTplName == "" {
+			bootstrapTpl := &rkev1.RKEBootstrapTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: cluster.Namespace,
+					Name:      machineDeploymentName,
+					Labels: map[string]string{
+						capr.ClusterNameLabel: cluster.Name,
+					},
+				},
+				Spec: rkev1.RKEBootstrapTemplateSpec{
+					ClusterName: cluster.Name,
+					Template: rkev1.RKEBootstrap{
+						Spec: rkev1.RKEBootstrapSpec{
+							Userdata:    machinePool.Userdata.DeepCopy(),
+							ClusterName: cluster.Name,
+						},
+					},
+				},
+			}
+
+			boostrapTplHash := createBootstrapTemplateHash(bootstrapTpl)
+			bootstrapTpl.ObjectMeta.Name = name.SafeConcatName(
+				bootstrapTpl.ObjectMeta.Name, boostrapTplHash)
+
+			result = append(result, bootstrapTpl)
+			bootstrapTplName = bootstrapTpl.ObjectMeta.Name
+		}
+
 		machineDeployment := &capi.MachineDeployment{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:   cluster.Namespace,
@@ -428,7 +483,7 @@ func machineDeployments(cluster *rancherv1.Cluster, capiCluster *capi.Cluster, d
 						Bootstrap: capi.Bootstrap{
 							ConfigRef: capi.ContractVersionedObjectReference{
 								Kind:     "RKEBootstrapTemplate",
-								Name:     bootstrapName,
+								Name:     bootstrapTplName,
 								APIGroup: capr.RKEAPIGroup,
 							},
 						},
