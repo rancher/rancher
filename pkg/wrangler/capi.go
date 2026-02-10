@@ -2,7 +2,6 @@ package wrangler
 
 import (
 	"context"
-	"fmt"
 	"sync/atomic"
 
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
@@ -169,19 +168,14 @@ func waitForCAPIAppVersion(ctx context.Context, wContext *Context) error {
 		version string
 	)
 
-	if features.EmbeddedClusterAPI.Enabled() && features.Turtles.Enabled() {
-		logrus.Debugf("[deferred-capi] Both embedded-cluster-api and turtles features are enabled, which is not supported. Skipping CAPI App version wait")
-		return fmt.Errorf("both embedded-cluster-api and turtles features cannot be enabled simultaneously")
-	}
-
-	if features.Turtles.Enabled() {
-		name = chart.TurtlesChartName
-		ns = namespace.TurtlesNamespace
-		version = settings.RancherTurtlesVersion.Get()
-	} else if features.EmbeddedClusterAPI.Enabled() {
+	if features.EmbeddedClusterAPI.Enabled() {
 		name = chart.ProvisioningCAPIChartName
 		ns = namespace.ProvisioningCAPINamespace
 		version = settings.RancherProvisioningCAPIVersion.Get()
+	} else if features.Turtles.Enabled() {
+		name = chart.TurtlesChartName
+		ns = namespace.TurtlesNamespace
+		version = settings.RancherTurtlesVersion.Get()
 	}
 
 	if name == "" || ns == "" || version == "" {
