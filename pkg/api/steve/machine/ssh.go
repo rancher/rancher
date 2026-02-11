@@ -19,7 +19,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/rancher/pkg/capr"
-	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	"github.com/rancher/rancher/pkg/utils"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"

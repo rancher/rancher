@@ -6,7 +6,7 @@ import (
 
 	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
-	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/generic"
@@ -14,7 +14,8 @@ import (
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	"k8s.io/utils/ptr"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
 )
 
@@ -31,7 +32,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 
 	clients.RKE.RKECluster().OnChange(ctx, "rke-cluster", h.OnChange)
 	relatedresource.Watch(ctx, "rke-cluster-trigger", func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
-		if capiCluster, ok := obj.(*capi.Cluster); ok && !capiCluster.Spec.Paused {
+		if capiCluster, ok := obj.(*capi.Cluster); ok && (capiCluster.Spec.Paused == nil || !*capiCluster.Spec.Paused) {
 			return []relatedresource.Key{{
 				Namespace: namespace,
 				Name:      name,
@@ -72,11 +73,11 @@ func (h *handler) OnChange(_ string, cluster *v1.RKECluster) (*v1.RKECluster, er
 		return h.rkeCluster.Update(cluster)
 	}
 
-	if len(cluster.Status.Conditions) > 0 || !cluster.Status.Ready {
+	if len(cluster.Status.Conditions) > 0 || !ptr.Deref(cluster.Status.Initialization.Provisioned, false) {
 		cluster := cluster.DeepCopy()
 		// the rke2.Ready and rke2.Removed conditions may still be present on the object, remove them if present
 		cluster.Status.Conditions = nil
-		cluster.Status.Ready = true
+		cluster.Status.Initialization.Provisioned = ptr.To(true)
 		logrus.Tracef("[rkecluster] %s/%s: removing stale conditions", cluster.Namespace, cluster.Name)
 		logrus.Debugf("[rkecluster] %s/%s: marking cluster ready", cluster.Namespace, cluster.Name)
 		return h.rkeCluster.UpdateStatus(cluster)

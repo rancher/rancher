@@ -620,8 +620,8 @@ github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20250930163923-f2c9
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20250930163923-f2c9e60b1078/go.mod h1:CV2Soy/Skw8/SA9dDJVgpeHxoEdtjYkNpNy6xvvC5kA=
 github.com/rancher/wrangler v1.1.2 h1:oXbXo9k7y/H4drUpb4RM1c++vT9O3rpoNEfyusGykiU=
 github.com/rancher/wrangler v1.1.2/go.mod h1:2k9MyhlBdjcutcBGoOJSUAz0HgDAXnMjv81d3n/AaQc=
-github.com/rancher/wrangler/v3 v3.3.2-rc.1 h1:L7UbofKTHBUq+yR0KtoTeaw9N+HX4fyyo9yrMXwyEJM=
-github.com/rancher/wrangler/v3 v3.3.2-rc.1/go.mod h1:bRcdkdwRTwoXVSWVGtJdSBNXkKbInlo+PVkCtkUCi4s=
+github.com/rancher/wrangler/v3 v3.3.2-rc.2 h1:terdYKoYsdMiabh7CBLzGLJPl3Sf9j4Qgd4GO10yxPA=
+github.com/rancher/wrangler/v3 v3.3.2-rc.2/go.mod h1:bRcdkdwRTwoXVSWVGtJdSBNXkKbInlo+PVkCtkUCi4s=
 github.com/redis/go-redis/extra/rediscmd/v9 v9.0.5 h1:EaDatTxkdHG+U3Bk4EUr+DZ7fOGwTfezUiUJMaIcaho=
 github.com/redis/go-redis/extra/rediscmd/v9 v9.0.5/go.mod h1:fyalQWdtzDBECAQFBJuQe5bzQ02jGd5Qcbgb97Flm7U=
 github.com/redis/go-redis/extra/redisotel/v9 v9.0.5 h1:EfpWLLCyXw8PSM2/XNJLjI3Pb27yVE+gIAfeqp8LUCc=
@@ -1025,8 +1025,8 @@ sigs.k8s.io/aws-iam-authenticator v0.6.17 h1:YV/4D1XRzstuKTK2f3XD2nPA9rIKyi3YVdH
 sigs.k8s.io/aws-iam-authenticator v0.6.17/go.mod h1:CnvFyzR/xeLHmUY/BD0qW6q0wp6KIwXmFp4eTfrHdP8=
 sigs.k8s.io/cli-utils v0.37.2 h1:GOfKw5RV2HDQZDJlru5KkfLO1tbxqMoyn1IYUxqBpNg=
 sigs.k8s.io/cli-utils v0.37.2/go.mod h1:V+IZZr4UoGj7gMJXklWBg6t5xbdThFBcpj4MrZuCYco=
-sigs.k8s.io/cluster-api v1.10.6 h1:0bnLTpT47R8KIvGZ3tTGek0DwMIc8fZi6IxA3Mlqq4g=
-sigs.k8s.io/cluster-api v1.10.6/go.mod h1:vymugs3Jm3gxHVMuVqdzgp6BVy/SEqQVyUg/UM7bnT4=
+sigs.k8s.io/cluster-api v1.11.5 h1:mKQAfB8+6l2uxtEvQ6Z5EIcTObdPNs3TL4DcJScchGo=
+sigs.k8s.io/cluster-api v1.11.5/go.mod h1:n0d6BAo8s9+KRap8Wv/IllfmwnSN5XFTWNJuq2gKNlg=
 sigs.k8s.io/controller-runtime v0.22.3 h1:I7mfqz/a/WdmDCEnXmSPm8/b/yRTy6JsKKENTijTq8Y=
 sigs.k8s.io/controller-runtime v0.22.3/go.mod h1:+QX1XUpTXN4mLoblf4tqr5CQcyHPAki2HLXqQMY6vh8=
 sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 h1:IpInykpT6ceI+QxKBbEflcR5EXP7sU1kvOlxwZh5txg=

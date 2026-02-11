@@ -313,6 +313,7 @@ func getCRD(props *apiextv1.JSONSchemaProps, id, group string) *crd.CRD {
 		Schema: props,
 		Labels: map[string]string{
 			"cluster.x-k8s.io/v1beta1":       "v1",
+			"cluster.x-k8s.io/v1beta2":       "v1",
 			"auth.cattle.io/cluster-indexed": "true",
 		},
 		Status: ok,

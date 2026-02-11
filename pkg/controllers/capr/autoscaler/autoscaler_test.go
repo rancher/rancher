@@ -1,6 +1,7 @@
 package autoscaler
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -18,7 +19,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // mockDynamicGetter is a mock implementation of the DynamicClient interface
@@ -35,6 +37,23 @@ func (m *mockDynamicGetter) Get(gvk schema.GroupVersionKind, namespace string, n
 }
 
 func (m *mockDynamicGetter) SetGetFunc(f func(gvk schema.GroupVersionKind, namespace string, name string) (runtime.Object, error)) {
+	m.getFunc = f
+}
+
+// mockControllerRuntimeClient is a minimal mock for controller-runtime client.Client
+type mockControllerRuntimeClient struct {
+	client.Client
+	getFunc func(ctx context.Context, key any, obj any, opts ...any) error
+}
+
+func (m *mockControllerRuntimeClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	if m.getFunc != nil {
+		return m.getFunc(ctx, key, obj, opts)
+	}
+	return nil
+}
+
+func (m *mockControllerRuntimeClient) SetGetFunc(f func(ctx context.Context, key any, obj any, opts ...any) error) {
 	m.getFunc = f
 }
 
@@ -61,6 +80,8 @@ type autoscalerSuite struct {
 	helmOp                     *fake.MockControllerInterface[*fleet.HelmOp, *fleet.HelmOpList]
 	helmOpCache                *fake.MockCacheInterface[*fleet.HelmOp]
 	dynamicClient              *mockDynamicGetter
+	client                     *mockControllerRuntimeClient
+	context                    context.Context
 }
 
 func TestAutoscaler(t *testing.T) {
@@ -90,6 +111,8 @@ func (s *autoscalerSuite) SetupTest() {
 	s.helmOp = fake.NewMockControllerInterface[*fleet.HelmOp, *fleet.HelmOpList](s.mockCtrl)
 	s.helmOpCache = fake.NewMockCacheInterface[*fleet.HelmOp](s.mockCtrl)
 	s.dynamicClient = &mockDynamicGetter{mockCtrl: s.mockCtrl}
+	s.client = &mockControllerRuntimeClient{}
+	s.context = context.Background()
 
 	s.h = &autoscalerHandler{
 		capiClusterCache:           s.capiClusterCache,
@@ -110,6 +133,8 @@ func (s *autoscalerSuite) SetupTest() {
 		helmOp:                     s.helmOp,
 		helmOpCache:                s.helmOpCache,
 		dynamicClient:              s.dynamicClient,
+		client:                     s.client,
+		context:                    s.context,
 	}
 }
 

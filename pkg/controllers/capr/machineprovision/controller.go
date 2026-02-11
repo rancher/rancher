@@ -12,7 +12,7 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/controllers/management/drivers/nodedriver"
-	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	ranchercontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/namespace"
@@ -39,9 +39,11 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	"k8s.io/utils/ptr"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	capierrors "sigs.k8s.io/cluster-api/errors"
 	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -107,6 +109,7 @@ type handler struct {
 	dynamic             dynamicController
 	rancherClusterCache ranchercontrollers.ClusterCache
 	kubeconfigManager   *kubeconfig.Manager
+	client              client.Client
 }
 
 func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigManager *kubeconfig.Manager) {
@@ -130,6 +133,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigMana
 		dynamic:             clients.Dynamic,
 		rancherClusterCache: clients.Provisioning.Cluster().Cache(),
 		kubeconfigManager:   kubeconfigManager,
+		client:              clients.Client,
 	}
 
 	removeHandler := generic.NewRemoveHandler("machine-provision-remove", clients.Dynamic.Update, h.OnRemove)
@@ -208,7 +212,7 @@ func (h *handler) getMachineStatus(job *batchv1.Job) (rkev1.RKEMachineStatus, er
 					Status: corev1.ConditionTrue,
 				},
 				{
-					Type:   "Ready",
+					Type:   string(capr.Ready),
 					Status: corev1.ConditionTrue,
 				},
 			},
@@ -241,7 +245,7 @@ func (h *handler) getMachineStatus(job *batchv1.Job) (rkev1.RKEMachineStatus, er
 
 	return rkev1.RKEMachineStatus{Conditions: []genericcondition.GenericCondition{
 		{
-			Type:    "Ready",
+			Type:    string(capr.Ready),
 			Status:  corev1.ConditionFalse,
 			Message: ExecutingMachineMessage(job.Spec.Template.Labels, job.Namespace),
 		},
@@ -262,7 +266,7 @@ func getMachineStatusFromPod(pod *corev1.Pod, condType string) rkev1.RKEMachineS
 					Status: corev1.ConditionTrue,
 				},
 				{
-					Type:   "Ready",
+					Type:   string(capr.Ready),
 					Status: corev1.ConditionTrue,
 				},
 			},
@@ -282,7 +286,7 @@ func getMachineStatusFromPod(pod *corev1.Pod, condType string) rkev1.RKEMachineS
 						Message: message,
 					},
 					{
-						Type:    "Ready",
+						Type:    string(capr.Ready),
 						Status:  corev1.ConditionFalse,
 						Reason:  reason,
 						Message: message,
@@ -329,7 +333,7 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 	}
 
 	// Initial provisioning not finished
-	if cond := getCondition(infra.data, createJobConditionType); cond != nil && cond.Status() == "Unknown" {
+	if cond := capr.GetCondition(infra.data, createJobConditionType); cond != nil && cond.Status() == "Unknown" {
 		job, err := h.getJobFromInfraMachine(infra)
 		if apierrors.IsNotFound(err) {
 			// If the job is not found, go ahead and proceed with machine deletion
@@ -372,7 +376,7 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 	}
 
 	// infrastructure deletion finished
-	if cond := getCondition(infra.data, deleteJobConditionType); cond != nil && cond.Status() != "Unknown" {
+	if cond := capr.GetCondition(infra.data, deleteJobConditionType); cond != nil && cond.Status() != "Unknown" {
 		job, err := h.getJobFromInfraMachine(infra)
 		if apierrors.IsNotFound(err) {
 			// If the deletion job condition has been set on the infrastructure object and the deletion job has been removed,
@@ -409,7 +413,7 @@ func (h *handler) OnRemove(key string, obj runtime.Object) (runtime.Object, erro
 
 	// If the controller owner reference is not properly configured, or the CAPI machine does not exist, there is no way
 	// to recover from this situation, so we should proceed with deletion
-	if machine == nil || machine.Status.NodeRef == nil {
+	if machine == nil || !machine.Status.NodeRef.IsDefined() {
 		// Machine noderef is nil, we should just allow deletion.
 		logrus.Debugf("[machineprovision] There was no associated K8s node with this machine %s. Proceeding with deletion", key)
 		return h.doRemove(infra)
@@ -436,7 +440,7 @@ func (h *handler) doRemove(infra *infraObject) (runtime.Object, error) {
 		return infra.obj, err
 	}
 
-	if cond := getCondition(infra.data, deleteJobConditionType); cond == nil {
+	if cond := capr.GetCondition(infra.data, deleteJobConditionType); cond == nil {
 		if err = reconcileStatus(infra.data, rkev1.RKEMachineStatus{
 			Conditions: []genericcondition.GenericCondition{
 				{
@@ -556,7 +560,7 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 		return obj, generic.ErrSkip
 	}
 
-	if !capiCluster.Status.InfrastructureReady {
+	if !ptr.Deref(capiCluster.Status.Initialization.InfrastructureProvisioned, false) {
 		logrus.Debugf("[machineprovision] %s/%s: waiting: CAPI cluster infrastructure is not ready", infra.meta.GetNamespace(), infra.meta.GetName())
 		h.EnqueueAfter(infra, 10*time.Second)
 		return obj, generic.ErrSkip
@@ -595,7 +599,7 @@ func (h *handler) OnChange(obj runtime.Object) (runtime.Object, error) {
 		return obj, err
 	}
 
-	if cond := getCondition(infra.data, createJobConditionType); cond == nil {
+	if cond := capr.GetCondition(infra.data, createJobConditionType); cond == nil {
 		if err = reconcileStatus(infra.data, rkev1.RKEMachineStatus{
 			Conditions: []genericcondition.GenericCondition{
 				{
@@ -732,7 +736,7 @@ func (h *handler) run(infra *infraObject, create bool) (rkev1.RKEMachineStatus, 
 	failure := infra.data.String("status", "failureReason") == string(failureReasonType)
 	ready := false
 
-	cond := getCondition(infra.data, "Ready")
+	cond := capr.GetCondition(infra.data, string(capr.Ready))
 	if cond != nil {
 		// We are only "ready" if both the condition "Ready" is "True" and the provider ID has been set on the machine.
 		ready = cond.Status() == "True" && args.String("providerID") != ""
@@ -760,7 +764,7 @@ func reconcileStatus(d data.Object, state rkev1.RKEMachineStatus) error {
 			}
 		} else if len(state.Conditions) > 0 {
 			for _, c := range state.Conditions {
-				if thisChanged, err := insertOrUpdateCondition(d, summary.NewCondition(c.Type, string(c.Status), c.Reason, c.Message)); err != nil {
+				if thisChanged, err := capr.InsertOrUpdateCondition(d, summary.NewCondition(c.Type, string(c.Status), c.Reason, c.Message)); err != nil {
 					return err
 				} else if thisChanged {
 					changed = true
@@ -803,53 +807,6 @@ func (h *handler) getJobFromInfraMachine(infra *infraObject) (*batchv1.Job, erro
 
 	// There can be at most one job returned here because there can be at most one infra machine object with the given GVK and name.
 	return jobs[0], nil
-}
-
-func insertOrUpdateCondition(d data.Object, desiredCondition summary.Condition) (bool, error) {
-	for _, cond := range summary.GetUnstructuredConditions(d) {
-		if desiredCondition.Equals(cond) {
-			return false, nil
-		}
-	}
-
-	// The conditions must be converted to a map so that DeepCopyJSONValue will
-	// recognize it as a map instead of a data.Object.
-	newCond, err := convert.EncodeToMap(desiredCondition.Object)
-	if err != nil {
-		return false, err
-	}
-
-	dConditions := d.Slice("status", "conditions")
-	conditions := make([]interface{}, len(dConditions))
-	found := false
-	for i, cond := range dConditions {
-		if cond.String("type") == desiredCondition.Type() {
-			conditions[i] = newCond
-			found = true
-		} else {
-			conditions[i], err = convert.EncodeToMap(cond)
-			if err != nil {
-				return false, err
-			}
-		}
-	}
-
-	if !found {
-		conditions = append(conditions, newCond)
-	}
-	d.SetNested(conditions, "status", "conditions")
-
-	return true, nil
-}
-
-func getCondition(d data.Object, conditionType string) *summary.Condition {
-	for _, cond := range summary.GetUnstructuredConditions(d) {
-		if cond.Type() == conditionType {
-			return &cond
-		}
-	}
-
-	return nil
 }
 
 func constructFilesSecret(aliasedFields string, config map[string]interface{}) *corev1.Secret {
@@ -925,7 +882,7 @@ func shouldCleanupObjects(job *batchv1.Job, d data.Object) bool {
 		return true
 	}
 
-	createJobCondition := getCondition(d, createJobConditionType)
+	createJobCondition := capr.GetCondition(d, createJobConditionType)
 	if createJobCondition == nil {
 		return false
 	}
