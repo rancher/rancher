@@ -12,7 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 const (
@@ -96,7 +96,7 @@ func (h *autoscalerHandler) ensureGlobalRole(cluster *capi.Cluster, mds []*capi.
 		// machineTemplate object associated with the machineDeployment in order to scale from zero.
 
 		infraType := strings.ToLower(mds[0].Spec.Template.Spec.InfrastructureRef.Kind) + "s"
-		infraAPIGroup := strings.Split(mds[0].Spec.Template.Spec.InfrastructureRef.APIVersion, "/")[0]
+		infraAPIGroup := mds[0].Spec.Template.Spec.InfrastructureRef.APIGroup
 		namespacedRules[cluster.Namespace] = append(namespacedRules[cluster.Namespace], rbacv1.PolicyRule{
 			APIGroups: []string{infraAPIGroup},
 			Resources: []string{infraType},

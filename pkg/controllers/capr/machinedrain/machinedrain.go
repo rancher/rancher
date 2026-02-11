@@ -9,7 +9,7 @@ import (
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
-	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/name"
@@ -20,7 +20,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubectl/pkg/drain"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 type handler struct {
@@ -107,7 +107,7 @@ func (h *handler) k8sClient(machine *capi.Machine) (kubernetes.Interface, error)
 }
 
 func (h *handler) unDrain(secret *corev1.Secret, machine *capi.Machine, drainData string) (*corev1.Secret, error) {
-	if machine.Status.NodeRef == nil || machine.Status.NodeRef.Name == "" {
+	if !machine.Status.NodeRef.IsDefined() {
 		logrus.Debugf("unable to drain machine %s as there is no noderef", machine.Name)
 		return secret, nil
 	}
@@ -170,7 +170,7 @@ func (h *handler) drain(secret *corev1.Secret, machine *capi.Machine, drainData 
 }
 
 func (h *handler) cordon(machine *capi.Machine, drainOpts *rkev1.DrainOptions) error {
-	if machine.Status.NodeRef == nil || machine.Status.NodeRef.Name == "" {
+	if !machine.Status.NodeRef.IsDefined() {
 		return nil
 	}
 
@@ -216,7 +216,7 @@ func (h *handler) getHelper(machine *capi.Machine, drainOpts rkev1.DrainOptions)
 }
 
 func (h *handler) performDrain(machine *capi.Machine, drainOpts *rkev1.DrainOptions) error {
-	if machine.Status.NodeRef == nil || machine.Status.NodeRef.Name == "" {
+	if !machine.Status.NodeRef.IsDefined() {
 		return nil
 	}
 
