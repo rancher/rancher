@@ -16,6 +16,14 @@ LABELS=()
 BUILD_ACTION="${BUILD_ACTION:-"--load"}"
 TARGET_PLATFORMS="${TARGET_PLATFORMS:-"${OS}/${ARCH}"}"
 
+# add labels from string into the labels array
+if [ -n "${LABELS_STR}" ]; then
+  temp_labels=()
+  mapfile -t temp_labels <<<"$LABELS_STR"
+  temp_labels=("${temp_labels[@]/#/--label=}")
+  LABELS=("${LABELS[@]}" "${temp_labels[@]}")
+fi
+
 build_rancher() {
   docker_target=$1
   docker_tag=$2
@@ -25,13 +33,6 @@ build_rancher() {
 
   if [ -n "${BUILDER}" ]; then
     BUILDX_ARGS+=("--builder=${BUILDER}")
-  fi
-
-  if [ -n "${LABELS_STR}" ]; then
-    temp_labels=()
-    mapfile -t temp_labels <<<"$LABELS_STR"
-    temp_labels=("${temp_labels[@]/#/--label=}")
-    LABELS=("${LABELS[@]}" "${temp_labels[@]}")
   fi
 
   BUILD_ARGS+=("--build-arg=VERSION=${TAG}")
