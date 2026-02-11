@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cd $(git rev-parse --show-toplevel)
+cd "$(git rev-parse --show-toplevel)" || exit
 
 check_missing() {
   var=$1
@@ -13,30 +13,29 @@ check_missing() {
 source scripts/export-config
 source scripts/version
 
-export OS="${OS:-linux}"
-export ARCH=${ARCH:-"amd64"}
-export CHART_REPO_DIR=build/charts
-export CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH:-"dev-v2.14"}
-
-export REGISTRY=${REGISTRY:-""}
-export SYSTEM_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_SYSTEM_AGENT_VERSION" package/Dockerfile | awk -F'=' '{ print $NF }')-suc
-export SYSTEM_AGENT_UPGRADE_IMAGE=${REPO}/system-agent:${SYSTEM_AGENT_UPGRADE_TAG}
-export WINS_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_WINS_AGENT_VERSION" package/Dockerfile | awk -F'=' '{ print $NF }')
-export WINS_AGENT_UPGRADE_IMAGE=${REPO}/wins:${WINS_AGENT_UPGRADE_TAG}
-export CLUSTER_API_CONTROLLER_TAG=v1.10.6
-export CLUSTER_API_CONTROLLER_IMAGE=rancher/cluster-api-controller:${CLUSTER_API_CONTROLLER_TAG}
-export REPO_OWNER="${REPO_OWNER:-"rancher"}"
-export IMAGE="${IMAGE:-"$REPO_OWNER/rancher"}"
-export IMAGE_TAG="${IMAGE_TAG:-"$IMAGE-$OS-$ARCH:$TAG"}"
-export IMAGE_AGENT="${IMAGE_AGENT:-"$REPO_OWNER/rancher-agent"}"
-export IMAGE_AGENT_TAG="${IMAGE_AGENT_TAG:-"$IMAGE_AGENT-$OS-$ARCH:$TAG"}"
-export IMAGE_INSTALLER="${IMAGE_INSTALLER:-"$REPO_OWNER/system-agent-installer-rancher"}"
-export CATTLE_KDM_BRANCH=$(grep -m1 'ARG CATTLE_KDM_BRANCH=' package/Dockerfile | cut -d '=' -f2)
-export CATTLE_K3S_VERSION=$(grep -m1 'ENV CATTLE_K3S_VERSION=' package/Dockerfile | cut -d '=' -f2)
-export HELM_VERSION=$(grep -m1 'ENV HELM_VERSION=' package/Dockerfile.installer | cut -d '=' -f2)
-export GO_VERSION=$(grep -m1 'golang:' package/Dockerfile | cut -d ':' -f2 | cut -d ' ' -f1)
-export HELM_UNITTEST_VERSION=$(grep -m1 'ENV HELM_UNITTEST_VERSION=' Dockerfile.dapper | cut -d '=' -f2)
-export CATTLE_HELM_VERSION=$(grep -m1 'ENV CATTLE_HELM_VERSION=' package/Dockerfile | cut -d '=' -f2)
+OS="${OS:-linux}"
+ARCH=${ARCH:-"amd64"}
+CHART_REPO_DIR=build/charts
+CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH:-"dev-v2.14"}
+REGISTRY=${REGISTRY:-""}
+SYSTEM_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_SYSTEM_AGENT_VERSION" package/Dockerfile | awk -F'=' '{ print $NF }')-suc
+SYSTEM_AGENT_UPGRADE_IMAGE=${REPO}/system-agent:${SYSTEM_AGENT_UPGRADE_TAG}
+WINS_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_WINS_AGENT_VERSION" package/Dockerfile | awk -F'=' '{ print $NF }')
+WINS_AGENT_UPGRADE_IMAGE=${REPO}/wins:${WINS_AGENT_UPGRADE_TAG}
+CLUSTER_API_CONTROLLER_TAG=v1.10.6
+CLUSTER_API_CONTROLLER_IMAGE=rancher/cluster-api-controller:${CLUSTER_API_CONTROLLER_TAG}
+REPO_OWNER="${REPO_OWNER:-"rancher"}"
+IMAGE="${IMAGE:-"$REPO_OWNER/rancher"}"
+IMAGE_TAG="${IMAGE_TAG:-"$IMAGE-$OS-$ARCH:$TAG"}"
+IMAGE_AGENT="${IMAGE_AGENT:-"$REPO_OWNER/rancher-agent"}"
+IMAGE_AGENT_TAG="${IMAGE_AGENT_TAG:-"$IMAGE_AGENT-$OS-$ARCH:$TAG"}"
+IMAGE_INSTALLER="${IMAGE_INSTALLER:-"$REPO_OWNER/system-agent-installer-rancher"}"
+CATTLE_KDM_BRANCH=$(grep -m1 'ARG CATTLE_KDM_BRANCH=' package/Dockerfile | cut -d '=' -f2)
+CATTLE_K3S_VERSION=$(grep -m1 'ENV CATTLE_K3S_VERSION=' package/Dockerfile | cut -d '=' -f2)
+HELM_VERSION=$(grep -m1 'ENV HELM_VERSION=' package/Dockerfile.installer | cut -d '=' -f2)
+GO_VERSION=$(grep -m1 'golang:' package/Dockerfile | cut -d ':' -f2 | cut -d ' ' -f1)
+HELM_UNITTEST_VERSION=$(grep -m1 'ENV HELM_UNITTEST_VERSION=' Dockerfile.dapper | cut -d '=' -f2)
+CATTLE_HELM_VERSION=$(grep -m1 'ENV CATTLE_HELM_VERSION=' package/Dockerfile | cut -d '=' -f2)
 
 check_missing "ARCH"
 check_missing "OS"
@@ -59,3 +58,27 @@ check_missing "CATTLE_CSP_ADAPTER_MIN_VERSION"
 check_missing "CATTLE_FLEET_VERSION"
 check_missing "TAG"
 check_missing "COMMIT"
+
+export OS
+export ARCH
+export CHART_REPO_DIR
+export CHART_DEFAULT_BRANCH
+export REGISTRY
+export SYSTEM_AGENT_UPGRADE_TAG
+export SYSTEM_AGENT_UPGRADE_IMAGE
+export WINS_AGENT_UPGRADE_TAG
+export WINS_AGENT_UPGRADE_IMAGE
+export CLUSTER_API_CONTROLLER_TAG
+export CLUSTER_API_CONTROLLER_IMAGE
+export REPO_OWNER
+export IMAGE
+export IMAGE_TAG
+export IMAGE_AGENT
+export IMAGE_AGENT_TAG
+export IMAGE_INSTALLER
+export CATTLE_KDM_BRANCH
+export CATTLE_K3S_VERSION
+export HELM_VERSION
+export GO_VERSION
+export HELM_UNITTEST_VERSION
+export CATTLE_HELM_VERSION
