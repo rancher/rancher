@@ -120,8 +120,12 @@ func createOrDisableEndpoint(endpoint v3.ProxyEndpoint, disabled bool, clients *
 		return nil
 	}
 
-	// if it exists and is not disabled, ensure it has the correct routes
-	existingEndpoint.Spec.Routes = endpoint.Spec.Routes
-	_, err = clients.Mgmt.ProxyEndpoint().Update(existingEndpoint)
+	if !disabled {
+		// if it exists and is not disabled, ensure it has the correct routes
+		existingEndpoint = existingEndpoint.DeepCopy()
+		existingEndpoint.Spec.Routes = endpoint.Spec.Routes
+		_, err = clients.Mgmt.ProxyEndpoint().Update(existingEndpoint)
+	}
+
 	return err
 }

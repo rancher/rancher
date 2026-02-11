@@ -421,7 +421,7 @@ var (
 	// created in the local cluster. Its value is a comma-separated list of ProxyEndpoint resource names to disable
 	// (for example, "rancher-aws-endpoints"). The special value "all" disables creation of all built-in ProxyEndpoints.
 	// Refer to Rancher documentation for the list of built-in ProxyEndpoints.
-	DisableDefaultProxyEndpoint = NewSetting("disable-default-proxy-endpoint", "")
+	DisableDefaultProxyEndpoint = NewSetting("disable-default-proxy-endpoints", "")
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.
