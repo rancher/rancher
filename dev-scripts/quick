@@ -92,19 +92,19 @@ fi
 if [ "$TARGET" = "k3s-images" ]; then
   BUILDX_ARGS+=("--output=type=local,dest=$PWD/bin")
 
-  build_rancher "k3s-images"
+  build_rancher "k3s-images" "${IMAGE_TAG}"
 fi
 
 if [ "$TARGET" = "binary-server" ]; then
   BUILDX_ARGS+=("--output=type=local,dest=$PWD")
 
-  build_rancher "server-binary"
+  build_rancher "server-binary" "${IMAGE_TAG}"
 fi
 
 if [ -z "$TARGET" ] || [ "$TARGET" = "server" ]; then
-  export IMAGE_TAG="${REGISTRY}rancher/rancher:${TAG}"
+  IMAGE_TAG="${REGISTRY}${REPO}/rancher:${TAG}"
   # start the builds
-  build_rancher "server"
+  build_rancher "server" "${IMAGE_TAG}"
 
   if [ "$PUSH" = "true" ]; then
     docker push "$IMAGE_TAG" &
@@ -112,10 +112,11 @@ if [ -z "$TARGET" ] || [ "$TARGET" = "server" ]; then
 fi
 
 if [ -z "$TARGET" ] || [ "$TARGET" = "agent" ]; then
-  build_rancher "agent"
+  IMAGE_AGENT_TAG="${REGISTRY}${REPO}/rancher-agent:${TAG}"
+  build_rancher "agent" "${IMAGE_AGENT_TAG}"
 
   if [ "$PUSH" = "true" ]; then
-    docker push "${REPO}"/rancher-agent:"${TAG}" &
+    docker push "${IMAGE_AGENT_TAG}" &
   fi
 fi
 

@@ -17,7 +17,11 @@ BUILD_ACTION="${BUILD_ACTION:-"--load"}"
 TARGET_PLATFORMS="${TARGET_PLATFORMS:-"${OS}/${ARCH}"}"
 
 build_rancher() {
-  DOCKER_TARGET=$1
+  docker_target=$1
+  docker_tag=$2
+
+  check_missing "docker_target"
+  check_missing "docker_tag"
 
   if [ -n "${BUILDER}" ]; then
     BUILDX_ARGS+=("--builder=${BUILDER}")
@@ -44,34 +48,32 @@ build_rancher() {
     "${BUILDX_ARGS[@]}" \
     "${LABELS[@]}" \
     ${BUILD_ACTION} \
-    --target="${DOCKER_TARGET}" \
+    --target="${docker_target}" \
     --platform="${TARGET_PLATFORMS}" \
-    --tag="$IMAGE_TAG" \
+    --tag="$docker_tag" \
     --file=package/Dockerfile .
 }
 
-if [ "$TARGET" = "server" ]; then
-  build_rancher "server"
+if [ "$TARGET" = "build-server" ]; then
+  build_rancher "server" "${IMAGE_TAG}"
 fi
 
-if [ "$TARGET" = "agent" ]; then
-  IMAGE_TAG="${IMAGE_AGENT_TAG}"
-  build_rancher "agent"
+if [ "$TARGET" = "build-agent" ]; then
+  build_rancher "agent" "${IMAGE_AGENT_TAG}"
 fi
 
-if [ "$TARGET" = "server-tarball" ]; then
+if [ "$TARGET" = "build-server-tarball" ]; then
   BUILD_ACTION=""
   BUILDX_ARGS+=("--output=type=docker,dest=/tmp/rancher-${OS}-${ARCH}.tar")
   BUILDX_ARGS+=("--no-cache")
 
-  build_rancher "server"
+  build_rancher "server" "${IMAGE_TAG}"
 fi
 
-if [ "$TARGET" = "agent-tarball" ]; then
+if [ "$TARGET" = "build-agent-tarball" ]; then
   BUILD_ACTION=""
   BUILDX_ARGS+=("--output=type=docker,dest=/tmp/rancher-agent-${OS}-${ARCH}.tar")
   BUILDX_ARGS+=("--no-cache")
-  IMAGE_TAG="${IMAGE_AGENT_TAG}"
 
-  build_rancher "agent"
+  build_rancher "agent" "${IMAGE_AGENT_TAG}"
 fi

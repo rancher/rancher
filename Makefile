@@ -35,16 +35,15 @@ quick-k3s-images:
 	@$(MAKE) quick TARGET="k3s-images"
 
 build-server: buildx-machine
-	@$(MAKE) build TARGET="server" BUILDER="$(MACHINE)"
+	@$(MAKE) BUILDER="$(MACHINE)" build TARGET="build-server"
 
 build-server-tarball: buildx-machine
-	@$(MAKE) build TARGET="server-tarball" BUILDER="$(MACHINE)"
+	@$(MAKE) BUILDER="$(MACHINE)" build TARGET="build-server-tarball"
 
 build-agent: buildx-machine
-	@$(MAKE) build TARGET="agent" BUILDER="$(MACHINE)"
-
+	@$(MAKE) BUILDER="$(MACHINE)" build TARGET="build-agent"
 build-agent-tarball: buildx-machine
-	@$(MAKE) build TARGET="agent-tarball" BUILDER="$(MACHINE)"
+	@$(MAKE) BUILDER="$(MACHINE)" build TARGET="build-agent-tarball"
 
 $(DEV_TARGETS):
 	./dev-scripts/$@
