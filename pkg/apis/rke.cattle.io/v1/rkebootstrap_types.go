@@ -14,8 +14,15 @@ type RKEBootstrapSpec struct {
 // RKEBootstrapStatus defines the observed state of RKEBootstrap.
 type RKEBootstrapStatus struct {
 	// Ready indicates the BootstrapData field is ready to be consumed.
+	// Deprecated: use Initialization.DataSecretCreated instead.
+	// +deprecated
 	// +optional
 	Ready bool `json:"ready,omitempty"`
+
+	// Initialization provides observations of the RKEBootstrap initialization process.
+	// NOTE: Fields in this struct are part of the Cluster API contract and are used to orchestrate initial Machine provisioning.
+	// +optional
+	Initialization RKEBootstrapInitializationStatus `json:"initialization,omitempty,omitzero"`
 
 	// DataSecretName is the name of the secret that stores the bootstrap data script.
 	// +optional
@@ -24,12 +31,22 @@ type RKEBootstrapStatus struct {
 	DataSecretName *string `json:"dataSecretName,omitempty"`
 }
 
+//	RKEBootstrapInitializationStatus provides observations of the RKEBootstrap initialization process.
+//
+// +kubebuilder:validation:MinProperties=1
+type RKEBootstrapInitializationStatus struct {
+	// DataSecretCreated is true when the Machine's boostrap secret is created.
+	// NOTE: this field is part of the Cluster API contract, and it is used to orchestrate initial Machine provisioning.
+	// +optional
+	DataSecretCreated *bool `json:"dataSecretCreated,omitempty"`
+}
+
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:path=rkebootstraps,scope=Namespaced,categories=cluster-api
 // +kubebuilder:subresource:status
-// +kubebuilder:metadata:labels={"cluster.x-k8s.io/v1beta1=v1","auth.cattle.io/cluster-indexed=true"}
+// +kubebuilder:metadata:labels={"cluster.x-k8s.io/v1beta1=v1","cluster.x-k8s.io/v1beta2=v1","auth.cattle.io/cluster-indexed=true"}
 
 // RKEBootstrap defines the BootstrapConfig resource required by Cluster API
 // to supply the bootstrap data necessary for initializing a Kubernetes node.

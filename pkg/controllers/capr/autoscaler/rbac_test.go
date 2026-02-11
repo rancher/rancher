@@ -10,7 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 func (s *autoscalerSuite) TestEnsureUser_UserDoesNotExist() {
@@ -179,9 +179,11 @@ func (s *autoscalerSuite) TestEnsureGlobalRole_RoleAlreadyExists() {
 			Spec: capi.MachineDeploymentSpec{
 				Template: capi.MachineTemplateSpec{
 					Spec: capi.MachineSpec{
-						InfrastructureRef: corev1.ObjectReference{
-							Kind:       "TestMachineTemplate",
-							APIVersion: "testing-rke.cattle.com/v1",
+
+						InfrastructureRef: capi.ContractVersionedObjectReference{
+							APIGroup: "testing-rke.cattle.com",
+							Kind:     "TestMachineTemplate",
+							Name:     "test-machine-template",
 						},
 					},
 				},
