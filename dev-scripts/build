@@ -48,7 +48,7 @@ build_rancher() {
     "${BUILD_ARGS[@]}" \
     "${BUILDX_ARGS[@]}" \
     "${LABELS[@]}" \
-    "${BUILD_ACTION}" \
+    ${BUILD_ACTION} \
     --target="${docker_target}" \
     --platform="${TARGET_PLATFORMS}" \
     --tag="$docker_tag" \
@@ -68,7 +68,7 @@ build_installer() {
     "${BUILD_ARGS[@]}" \
     "${BUILDX_ARGS[@]}" \
     "${LABELS[@]}" \
-    "${BUILD_ACTION}" \
+    ${BUILD_ACTION} \
     --platform="${TARGET_PLATFORMS}" \
     --tag="$docker_tag" \
     --file=package/Dockerfile.installer .
