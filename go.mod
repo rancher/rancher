@@ -54,7 +54,6 @@ replace (
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.34.1
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.34.1
 	oras.land/oras-go => oras.land/oras-go v1.2.2 // for docker 20.10.x compatibility
-	sigs.k8s.io/cluster-api => sigs.k8s.io/cluster-api v1.10.6
 )
 
 require github.com/rancher/rancher/pkg/apis v0.0.0
@@ -137,7 +136,7 @@ require (
 	github.com/rancher/steve v0.8.6
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20250930163923-f2c9e60b1078
 	github.com/rancher/wrangler v1.1.2
-	github.com/rancher/wrangler/v3 v3.3.2-rc.1
+	github.com/rancher/wrangler/v3 v3.3.2-rc.2
 	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.11.1
@@ -172,7 +171,7 @@ require (
 	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4
 	oras.land/oras-go/v2 v2.6.0
 	sigs.k8s.io/aws-iam-authenticator v0.6.17
-	sigs.k8s.io/cluster-api v1.10.6
+	sigs.k8s.io/cluster-api v1.11.5
 	sigs.k8s.io/controller-runtime v0.22.3
 	sigs.k8s.io/structured-merge-diff/v4 v4.6.0
 	sigs.k8s.io/yaml v1.6.0
@@ -400,7 +399,7 @@ require (
 	gomodules.xyz/jsonpatch/v2 v2.5.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	k8s.io/cluster-bootstrap v0.32.3 // indirect
+	k8s.io/cluster-bootstrap v0.33.3 // indirect
 	k8s.io/code-generator v0.35.0 // indirect
 	k8s.io/component-base v0.35.0 // indirect
 	k8s.io/component-helpers v0.34.1 // indirect
