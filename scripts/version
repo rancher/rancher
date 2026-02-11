@@ -2,7 +2,7 @@
 shopt -s extglob
 
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
-    DIRTY="-dirty"
+  DIRTY="-dirty"
 fi
 
 COMMIT=$(git rev-parse --short HEAD)
@@ -17,48 +17,45 @@ if [ -n "$GIT_TAG" ]; then
 fi
 
 if [[ -z "$DIRTY" && -n "$GIT_TAG" ]]; then
-    VERSION=$GIT_TAG
+  VERSION=$GIT_TAG
 else
-    VERSION="${COMMIT}${DIRTY}"
+  VERSION="${COMMIT}${DIRTY}"
 fi
 
 if [ -z "$GIT_TAG" ] && [ -n "$GIT_COMMIT" ] && [ -n "$GIT_BRANCH" ]; then
-    APP_VERSION=${GIT_BRANCH/release\//}-${GIT_COMMIT}-head
+  APP_VERSION=${GIT_BRANCH/release\//}-${GIT_COMMIT}-head
 else
-    APP_VERSION=$VERSION
+  APP_VERSION=$VERSION
 fi
 
 # Chart tag.
-# if the chart version is set, use it
-if [[ -n "${CHART_VERSION}" ]]; then
-    CHART_VERSION="${CHART_VERSION}"
 # if there isn't any uncommited change and the tag is set, use the tag
-elif [[ -z "${DIRTY}" && -n "${GIT_TAG}" ]]; then
-    CHART_VERSION="${GIT_TAG}"
+if [[ -z "${DIRTY}" && -n "${GIT_TAG}" ]]; then
+  CHART_VERSION="${GIT_TAG}"
 # if there is uncommited changes, use the default last tag and mark it as dirty
 elif [[ "$DIRTY" ]]; then
-    CHART_VERSION="${LAST_TAG}${DIRTY}.commit-${COMMIT}"
+  CHART_VERSION="${LAST_TAG}${DIRTY}.commit-${COMMIT}"
 else
-    CHART_VERSION="${LAST_TAG}-${COMMIT_DATE}.commit-${COMMIT}.${COMMIT_BRANCH}"
+  CHART_VERSION="${LAST_TAG}-${COMMIT_DATE}.commit-${COMMIT}.${COMMIT_BRANCH}"
 fi
 
 # Drop the v prefix for Chart Version to follow existing pattern.
-CHART_VERSION="$(echo ${CHART_VERSION} | sed -E 's/^v//' | sed -e 's/^\(.\{55\}\).*/\1/')"
+CHART_VERSION="$(echo "${CHART_VERSION}" | sed -E 's/^v//' | sed -e 's/^\(.\{55\}\).*/\1/')"
 
 # Chart Repo - Target Repo for releases.
 case $CHART_VERSION in
-    *-alpha*) # All alpha tags
-        CHART_REPO="alpha" ;;
-    *-rc*) # All rc tags
-        CHART_REPO="latest" ;;
-    *-hotfix*) # All hotfix tags
-        CHART_REPO="latest" ;;
-    *-head*) # All head tags
-        CHART_REPO="release-$(echo $CHART_VERSION | cut -d '-' -f1)" ;; # release-2.12
-    +([0-9]).+([0-9]).+([0-9])) # All release tags
-        CHART_REPO="latest" ;;
-    *) # Anything else - Future use
-        CHART_REPO="dev" ;;
+*-alpha*) # All alpha tags
+  CHART_REPO="alpha" ;;
+*-rc*) # All rc tags
+  CHART_REPO="latest" ;;
+*-hotfix*) # All hotfix tags
+  CHART_REPO="latest" ;;
+*-head*)                                                            # All head tags
+  CHART_REPO="release-$(echo "$CHART_VERSION" | cut -d '-' -f1)" ;; # release-2.12
++([0-9]).+([0-9]).+([0-9]))                                         # All release tags
+  CHART_REPO="latest" ;;
+*) # Anything else - Future use
+  CHART_REPO="dev" ;;
 esac
 
 ARCH="${ARCH:-$(uname -m)}"
@@ -72,13 +69,13 @@ SUFFIX=""
 TAG=${TAG:-${VERSION}${SUFFIX}}
 REPO=${REPO:-rancher}
 
-if echo $TAG | grep -q dirty; then
-    TAG=dev
+if echo "$TAG" | grep -q dirty; then
+  TAG=dev
 fi
 
 AGENT_TAG="$TAG"
 if [ "$AGENT_TAG" = dev ]; then
-    AGENT_TAG="master-head"
+  AGENT_TAG="master-head"
 fi
 
 echo "ARCH: $ARCH"
@@ -91,7 +88,7 @@ echo "REPO: $REPO"
 echo "TAG: $TAG"
 echo "AGENT_TAG: $AGENT_TAG"
 echo "CATTLE_KDM_BRANCH: $CATTLE_KDM_BRANCH"
-echo "DIRNAME: $(dirname $0)"
+echo "DIRNAME: $(dirname "$0")"
 echo "GIT_TAG: $GIT_TAG"
 echo "COMMIT: $COMMIT"
 echo "BRANCH: $BRANCH"
