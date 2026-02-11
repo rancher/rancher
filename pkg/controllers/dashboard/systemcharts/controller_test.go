@@ -28,9 +28,10 @@ import (
 )
 
 var (
-	errTest           = fmt.Errorf("test error")
-	priorityClassName = "rancher-critical"
-	operatorNamespace = "rancher-operator-system"
+	errTest                     = fmt.Errorf("test error")
+	priorityClassName           = "rancher-critical"
+	operatorNamespace           = "rancher-operator-system"
+	provisioningCapiNamespace   = "cattle-provisioning-capi-system"
 	priorityConfig    = &v1.ConfigMap{
 		Data: map[string]string{
 			"priorityClassName": priorityClassName,
@@ -232,6 +233,11 @@ func Test_ChartInstallation(t *testing.T) {
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+
+				// rancher-provisioning-capi
+				mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil)
+				mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil)
+				mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi")
 			},
 		},
 		{
@@ -321,6 +327,11 @@ func Test_ChartInstallation(t *testing.T) {
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+
+				// rancher-provisioning-capi
+				mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil)
+				mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil)
+				mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi")
 			},
 		},
 		{
@@ -393,6 +404,11 @@ func Test_ChartInstallation(t *testing.T) {
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+
+				// rancher-provisioning-capi
+				mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil)
+				mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil)
+				mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi")
 			},
 		},
 		{
@@ -465,6 +481,11 @@ func Test_ChartInstallation(t *testing.T) {
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+
+				// rancher-provisioning-capi
+				mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil)
+				mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil)
+				mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi")
 			},
 		},
 		{
@@ -537,6 +558,11 @@ func Test_ChartInstallation(t *testing.T) {
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+
+				// rancher-provisioning-capi
+				mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil)
+				mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil)
+				mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi")
 			},
 		},
 		{
@@ -609,6 +635,11 @@ func Test_ChartInstallation(t *testing.T) {
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+
+				// rancher-provisioning-capi
+				mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil)
+				mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil)
+				mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi")
 			},
 		},
 		{
@@ -717,6 +748,11 @@ func Test_ChartInstallation(t *testing.T) {
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+
+				// rancher-provisioning-capi
+				mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil)
+				mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil)
+				mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi")
 			},
 		},
 		{
@@ -809,6 +845,11 @@ func Test_ChartInstallation(t *testing.T) {
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+
+				// rancher-provisioning-capi
+				mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil)
+				mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil)
+				mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi")
 			},
 		},
 		{
@@ -901,6 +942,11 @@ func Test_ChartInstallation(t *testing.T) {
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+
+				// rancher-provisioning-capi
+				mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil)
+				mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil)
+				mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi")
 			},
 		},
 		{
@@ -974,6 +1020,11 @@ func Test_ChartInstallation(t *testing.T) {
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+
+				// rancher-provisioning-capi
+				mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil)
+				mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil)
+				mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi")
 			},
 		},
 		{
@@ -1078,6 +1129,11 @@ func Test_ChartInstallation(t *testing.T) {
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+
+				// rancher-provisioning-capi
+				mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil)
+				mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil)
+				mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi")
 			},
 		},
 		{
@@ -1200,6 +1256,11 @@ func Test_ChartInstallation(t *testing.T) {
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+
+				// rancher-provisioning-capi
+				mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil)
+				mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil)
+				mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi")
 			},
 			registryOverride: "rancher-test.io",
 		},
@@ -1217,6 +1278,26 @@ func Test_ChartInstallation(t *testing.T) {
 				_ = settings.RemoteDialerProxyVersion.Set("2.0.1")
 				features.MCM.Set(true)
 				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
+
+				// remotedialer-proxy
+				expectedRDPValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					chart.RemoteDialerProxyChartName,
+					chart.RemoteDialerProxyChartName,
+					"",
+					"2.0.1",
+					expectedRDPValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
 
 				// rancher-webhook
 				expectedValues := map[string]interface{}{
@@ -1238,6 +1319,15 @@ func Test_ChartInstallation(t *testing.T) {
 					gomock.AssignableToTypeOf(false),
 					"",
 				).Return(nil)
+
+				// rancher-operator
+				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
+				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+
+				// rancher-provisioning-capi
+				mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil)
+				mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil)
+				mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi")
 
 				// rancher-turtles
 				expectedTurtlesValues := map[string]interface{}{
@@ -1283,30 +1373,6 @@ func Test_ChartInstallation(t *testing.T) {
 					gomock.AssignableToTypeOf(false),
 					"",
 				).Return(nil)
-
-				// remotedialer-proxy
-				expectedRDPValues := map[string]interface{}{
-					"priorityClassName": priorityClassName,
-					"global": map[string]interface{}{
-						"cattle": map[string]interface{}{
-							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
-						},
-					},
-				}
-				mocks.manager.EXPECT().Ensure(
-					namespace.System,
-					chart.RemoteDialerProxyChartName,
-					chart.RemoteDialerProxyChartName,
-					"",
-					"2.0.1",
-					expectedRDPValues,
-					gomock.AssignableToTypeOf(false),
-					"",
-				).Return(nil)
-
-				// rancher-operator
-				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
-				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
 			},
 		},
 	}
@@ -1407,6 +1473,10 @@ func Test_TurtlesInstallation(t *testing.T) {
 		mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil),
 		mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil),
 
+		mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi"),
+		mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil),
+		mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil),
+
 		mocks.manager.EXPECT().Ensure(
 			namespace.TurtlesNamespace, chart.TurtlesChartName, chart.TurtlesChartName, "", "2.0.0", expectedTurtlesValues, gomock.AssignableToTypeOf(false), "",
 		).Return(nil),
@@ -1462,6 +1532,10 @@ func Test_TurtlesWinsWhenBothEnabled(t *testing.T) {
 		mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator"),
 		mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil),
 		mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil),
+
+		mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi"),
+		mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil),
+		mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil),
 
 		mocks.manager.EXPECT().Ensure(
 			namespace.TurtlesNamespace, chart.TurtlesChartName, chart.TurtlesChartName, "", "2.0.0",
