@@ -48,7 +48,6 @@ const (
 	rtbLabelUpdated                  = "authz.cluster.cattle.io/rtb-label-updated"
 	rtbCrbRbLabelsUpdated            = "authz.cluster.cattle.io/crb-rb-labels-updated"
 	rtByInheritedRTsIndex            = "authz.cluster.cattle.io/rts-by-inherited-rts"
-	impersonationLabel               = "authz.cluster.cattle.io/impersonator"
 
 	rolesCircularSoftLimit = 100
 	rolesCircularHardLimit = 500
@@ -162,6 +161,14 @@ func Register(ctx context.Context, workload *config.UserContext) error {
 		NsIndexer: nsInformer.GetIndexer(),
 	}
 	relatedresource.WatchClusterScoped(ctx, "enqueue-namespaces-by-roletemplate", nsEnqueuer.RoleTemplateEnqueueNamespace, workload.Corew.Namespace(), management.Wrangler.Mgmt.RoleTemplate())
+
+	// Register GlobalRole and GlobalRoleBinding Enqueuers
+	grEnqueuer := globalRoleEnqueuer{
+		grbLister: management.Wrangler.Mgmt.GlobalRoleBinding().Cache(),
+		grLister:  management.Wrangler.Mgmt.GlobalRole().Cache(),
+	}
+	relatedresource.WatchClusterScoped(ctx, "enqueue-grbs-by-namespace", grEnqueuer.namespaceEnqueueGRBs, management.Wrangler.Mgmt.GlobalRoleBinding(), workload.Corew.Namespace())
+	relatedresource.WatchClusterScoped(ctx, "enqueue-grs-by-namespace", grEnqueuer.namespaceEnqueueGRs, management.Wrangler.Mgmt.GlobalRole(), workload.Corew.Namespace())
 
 	// Register roletemplate-aggregation controllers
 	if err := roletemplates.Register(ctx, workload); err != nil {
@@ -343,19 +350,19 @@ func (m *manager) ensureClusterBindings(roles map[string]*v3.RoleTemplate, bindi
 		}
 	}
 
-	list := func(_ string, selector labels.Selector) ([]interface{}, error) {
+	list := func(_ string, selector labels.Selector) ([]any, error) {
 		currentRBs, err := m.crbLister.List(selector)
 		if err != nil {
 			return nil, err
 		}
-		var items []interface{}
+		var items []any
 		for _, c := range currentRBs {
 			items = append(items, c)
 		}
 		return items, nil
 	}
 
-	convert := func(i interface{}) (string, string, []rbacv1.Subject) {
+	convert := func(i any) (string, string, []rbacv1.Subject) {
 		crb, _ := i.(*rbacv1.ClusterRoleBinding)
 		return crb.Name, crb.RoleRef.Name, crb.Subjects
 	}
@@ -380,19 +387,19 @@ func (m *manager) ensureProjectRoleBindings(ns string, roles map[string]*v3.Role
 		return rb
 	}
 
-	list := func(ns string, selector labels.Selector) ([]interface{}, error) {
+	list := func(ns string, selector labels.Selector) ([]any, error) {
 		currentRBs, err := m.rbLister.List(ns, selector)
 		if err != nil {
 			return nil, err
 		}
-		var items []interface{}
+		var items []any
 		for _, c := range currentRBs {
 			items = append(items, c)
 		}
 		return items, nil
 	}
 
-	convert := func(i interface{}) (string, string, []rbacv1.Subject) {
+	convert := func(i any) (string, string, []rbacv1.Subject) {
 		rb, _ := i.(*rbacv1.RoleBinding)
 		return rb.Name, rb.RoleRef.Name, rb.Subjects
 	}
@@ -409,8 +416,8 @@ func (m *manager) ensureProjectRoleBindings(ns string, roles map[string]*v3.Role
 type deleteFn func(name string) error
 
 type createFn func(objectMeta metav1.ObjectMeta, subjects []rbacv1.Subject, roleRef rbacv1.RoleRef) runtime.Object
-type listFn func(ns string, selector labels.Selector) ([]interface{}, error)
-type convertFn func(i interface{}) (string, string, []rbacv1.Subject)
+type listFn func(ns string, selector labels.Selector) ([]any, error)
+type convertFn func(i any) (string, string, []rbacv1.Subject)
 
 func (m *manager) ensureBindings(ns string, roles map[string]*v3.RoleTemplate, binding metav1.Object,
 	deleteFunc deleteFn, create createFn, list listFn, convert convertFn) error {
@@ -508,7 +515,7 @@ func bindingParts(namespace, roleName string, objMeta metav1.ObjectMeta, subject
 		roleRef
 }
 
-func prtbByProjectName(obj interface{}) ([]string, error) {
+func prtbByProjectName(obj any) ([]string, error) {
 	prtb, ok := obj.(*v3.ProjectRoleTemplateBinding)
 	if !ok {
 		return []string{}, nil
@@ -532,7 +539,7 @@ func getPRTBProjectAndSubjectKey(prtb *v3.ProjectRoleTemplateBinding) string {
 	return prtb.ProjectName + "." + name
 }
 
-func prtbByProjectAndSubject(obj interface{}) ([]string, error) {
+func prtbByProjectAndSubject(obj any) ([]string, error) {
 	prtb, ok := obj.(*v3.ProjectRoleTemplateBinding)
 	if !ok {
 		return []string{}, nil
@@ -540,7 +547,7 @@ func prtbByProjectAndSubject(obj interface{}) ([]string, error) {
 	return []string{getPRTBProjectAndSubjectKey(prtb)}, nil
 }
 
-func prtbByUID(obj interface{}) ([]string, error) {
+func prtbByUID(obj any) ([]string, error) {
 	prtb, ok := obj.(*v3.ProjectRoleTemplateBinding)
 	if !ok {
 		return []string{}, nil
@@ -548,7 +555,7 @@ func prtbByUID(obj interface{}) ([]string, error) {
 	return []string{convert.ToString(prtb.UID)}, nil
 }
 
-func prtbByNsName(obj interface{}) ([]string, error) {
+func prtbByNsName(obj any) ([]string, error) {
 	prtb, ok := obj.(*v3.ProjectRoleTemplateBinding)
 	if !ok {
 		return []string{}, nil
@@ -568,7 +575,7 @@ func rbRoleSubjectKey(roleName string, subject rbacv1.Subject) string {
 	return subject.Kind + " " + subject.Name + " Role " + roleName
 }
 
-func crbByRoleAndSubject(obj interface{}) ([]string, error) {
+func crbByRoleAndSubject(obj any) ([]string, error) {
 	crb, ok := obj.(*rbacv1.ClusterRoleBinding)
 	if !ok {
 		return []string{}, nil
@@ -576,7 +583,7 @@ func crbByRoleAndSubject(obj interface{}) ([]string, error) {
 	return crbRoleSubjectKeys(crb.RoleRef.Name, crb.Subjects), nil
 }
 
-func rtbByClusterAndRoleTemplateName(obj interface{}) ([]string, error) {
+func rtbByClusterAndRoleTemplateName(obj any) ([]string, error) {
 	var idx string
 	switch rtb := obj.(type) {
 	case *v3.ProjectRoleTemplateBinding:
@@ -598,7 +605,7 @@ func rtbByClusterAndRoleTemplateName(obj interface{}) ([]string, error) {
 	return []string{idx}, nil
 }
 
-func rtByInterhitedRTs(obj interface{}) ([]string, error) {
+func rtByInterhitedRTs(obj any) ([]string, error) {
 	rt, ok := obj.(*wranglerv3.RoleTemplate)
 	if !ok {
 		return nil, fmt.Errorf("failed to convert object to *RoleTemplate in indexer [%s]", rtByInheritedRTsIndex)
@@ -606,7 +613,7 @@ func rtByInterhitedRTs(obj interface{}) ([]string, error) {
 	return rt.RoleTemplateNames, nil
 }
 
-func rtbByClusterAndUserNotDeleting(obj interface{}) ([]string, error) {
+func rtbByClusterAndUserNotDeleting(obj any) ([]string, error) {
 	meta, err := meta.Accessor(obj)
 	if err != nil {
 		return []string{}, err
@@ -633,4 +640,57 @@ func rtbByClusterAndUserNotDeleting(obj interface{}) ([]string, error) {
 		return []string{}, nil
 	}
 	return []string{idx}, nil
+}
+
+type globalRoleEnqueuer struct {
+	grbLister mgmtv3.GlobalRoleBindingCache
+	grLister  mgmtv3.GlobalRoleCache
+}
+
+// namespaceEnqueueGRBs enqueues GRBs that reference the changed namespace in their inherited namespaced rules.
+func (g *globalRoleEnqueuer) namespaceEnqueueGRBs(_, name string, obj runtime.Object) ([]relatedresource.Key, error) {
+	if obj == nil {
+		return nil, nil
+	}
+	grbs, err := g.grbLister.List(labels.Everything())
+	if err != nil {
+		return nil, fmt.Errorf("failed to list GlobalRoleBindings: %w", err)
+	}
+	var keys []relatedresource.Key
+	for _, grb := range grbs {
+		gr, err := g.grLister.Get(grb.GlobalRoleName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get GlobalRole %s for GlobalRoleBinding %s: %w", grb.GlobalRoleName, grb.Name, err)
+		}
+		for nsName, _ := range gr.InheritedNamespacedRules {
+			if nsName == name {
+				keys = append(keys, relatedresource.Key{
+					Name: grb.Name,
+				})
+			}
+		}
+	}
+	return keys, nil
+}
+
+// namespaceEnqueueGRs enqueues GRs that reference the changed namespace in their inherited namespaced rules.
+func (g *globalRoleEnqueuer) namespaceEnqueueGRs(_, name string, obj runtime.Object) ([]relatedresource.Key, error) {
+	if obj == nil {
+		return nil, nil
+	}
+	grs, err := g.grLister.List(labels.Everything())
+	if err != nil {
+		return nil, fmt.Errorf("failed to list GlobalRoles: %w", err)
+	}
+	var keys []relatedresource.Key
+	for _, gr := range grs {
+		for nsName, _ := range gr.InheritedNamespacedRules {
+			if nsName == name {
+				keys = append(keys, relatedresource.Key{
+					Name: gr.Name,
+				})
+			}
+		}
+	}
+	return keys, nil
 }
