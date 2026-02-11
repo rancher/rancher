@@ -303,6 +303,11 @@ func InitializeFeatures(featuresClient managementv3.FeatureClient, featureArgs s
 				newFeatureState.Status.Description = f.description
 			}
 
+			// Check if a feature is no longer locked but has a locked value. If so, remove the locked value.
+			if !f.lockedOnInstall && featureState.Status.LockedValue != nil {
+				newFeatureState.Status.LockedValue = nil
+			}
+
 			newFeatureState, err = featuresClient.Update(newFeatureState)
 			if err != nil {
 				logrus.Errorf("unable to update feature %s in initialize features: %v", f.name, err)
