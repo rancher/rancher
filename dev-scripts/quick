@@ -5,7 +5,7 @@
 set -eo pipefail
 set -x
 
-cd $(git rev-parse --show-toplevel)
+cd "$(git rev-parse --show-toplevel)" || exit
 
 # variables
 COMMIT=$(git rev-parse --short HEAD)
