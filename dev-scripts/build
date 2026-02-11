@@ -48,11 +48,30 @@ build_rancher() {
     "${BUILD_ARGS[@]}" \
     "${BUILDX_ARGS[@]}" \
     "${LABELS[@]}" \
-    ${BUILD_ACTION} \
+    "${BUILD_ACTION}" \
     --target="${docker_target}" \
     --platform="${TARGET_PLATFORMS}" \
     --tag="$docker_tag" \
     --file=package/Dockerfile .
+}
+
+build_installer() {
+  docker_tag=$1
+
+  check_missing "docker_tag"
+
+  BUILD_ARGS+=("--build-arg=VERSION=${TAG}")
+  BUILD_ARGS+=("--build-arg=COMMIT=${COMMIT}")
+  BUILD_ARGS+=("--build-arg=ARCH=${ARCH}")
+
+  docker buildx build \
+    "${BUILD_ARGS[@]}" \
+    "${BUILDX_ARGS[@]}" \
+    "${LABELS[@]}" \
+    "${BUILD_ACTION}" \
+    --platform="${TARGET_PLATFORMS}" \
+    --tag="$docker_tag" \
+    --file=package/Dockerfile.installer .
 }
 
 if [ "$TARGET" = "build-server" ]; then
