@@ -9,7 +9,7 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 )
 
-func Add(ctx context.Context, wrangler *wrangler.Context, management *config.ManagementContext) error {
+func Add(_ context.Context, wrangler *wrangler.Context, management *config.ManagementContext) error {
 	_, err := addRoles(wrangler, management)
 
 	if err != nil {

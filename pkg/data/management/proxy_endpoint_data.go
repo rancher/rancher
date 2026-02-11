@@ -1,7 +1,6 @@
 package management
 
 import (
-	"context"
 	"slices"
 	"strings"
 
@@ -61,25 +60,6 @@ var (
 	}
 )
 
-type handler struct {
-	clients *wrangler.Context
-}
-
-func ManageProxyEndpointData(ctx context.Context, clients *wrangler.Context) {
-	h := &handler{
-		clients: clients,
-	}
-	clients.Mgmt.Setting().OnChange(ctx, "handle-builtin-proxy-endpoints", h.manageDefaultProxyEndpoints)
-}
-
-func (h *handler) manageDefaultProxyEndpoints(_ string, setting *v3.Setting) (*v3.Setting, error) {
-	if setting == nil || setting.Name != "disable-default-proxy-endpoint" {
-		return setting, nil
-	}
-	err := AddProxyEndpointData(setting.Value, h.clients)
-	return setting, err
-}
-
 // AddProxyEndpointData adds default ProxyEndpoint resources unless they are disabled via the DisableDefaultProxyEndpoint setting.
 func AddProxyEndpointData(disabledEndpointsSetting string, clients *wrangler.Context) error {
 	disabledEndpoints := strings.Split(disabledEndpointsSetting, ",")
@@ -109,19 +89,19 @@ func AddProxyEndpointData(disabledEndpointsSetting string, clients *wrangler.Con
 	return nil
 }
 
-func endpointExists(name string, clients *wrangler.Context) (bool, error) {
-	_, err := clients.Mgmt.ProxyEndpoint().Get(name, v1.GetOptions{})
+func endpointExists(name string, clients *wrangler.Context) (*v3.ProxyEndpoint, bool, error) {
+	endpoint, err := clients.Mgmt.ProxyEndpoint().Cache().Get(name)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			return false, nil
+			return endpoint, false, nil
 		}
-		return false, err
+		return endpoint, false, err
 	}
-	return true, nil
+	return endpoint, true, nil
 }
 
 func createOrDisableEndpoint(endpoint v3.ProxyEndpoint, disabled bool, clients *wrangler.Context) error {
-	exists, err := endpointExists(endpoint.Name, clients)
+	existingEndpoint, exists, err := endpointExists(endpoint.Name, clients)
 	if err != nil {
 		return err
 	}
@@ -130,12 +110,18 @@ func createOrDisableEndpoint(endpoint v3.ProxyEndpoint, disabled bool, clients *
 		if err != nil && !errors.IsAlreadyExists(err) {
 			return err
 		}
+		return nil
 	}
 	if disabled && exists {
 		err = clients.Mgmt.ProxyEndpoint().Delete(endpoint.Name, &v1.DeleteOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			return err
 		}
+		return nil
 	}
-	return nil
+
+	// if it exists and is not disabled, ensure it has the correct routes
+	existingEndpoint.Spec.Routes = endpoint.Spec.Routes
+	_, err = clients.Mgmt.ProxyEndpoint().Update(existingEndpoint)
+	return err
 }

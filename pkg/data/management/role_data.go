@@ -66,7 +66,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	rb.addRole("Manage Settings", "settings-manage").
 		addRule().apiGroups("management.cattle.io").resources("settings").verbs("*")
 
-	rb.addRole("Manage Rancher Proxy", "proxy-endpoint-manage").
+	rb.addRole("Manage Rancher Proxy Endpoints", "proxy-endpoints-manage").
 		addRule().apiGroups("management.cattle.io").resources("proxyendpoints").verbs("*")
 
 	rb.addRole("Manage Features", "features-manage").
