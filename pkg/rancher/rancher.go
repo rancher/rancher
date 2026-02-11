@@ -244,6 +244,11 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		}
 	}
 
+	if !features.Turtles.Enabled() {
+		// turtles needs to be enabled or else rancher will not work correctly due to lack of capi controllers
+		logrus.Warnf("turtles is not enabled, cluster provisioning will not work correctly")
+	}
+
 	steveControllers, err := steveserver.NewController(restConfig, &generic.FactoryOptions{SharedControllerFactory: wranglerContext.SharedControllerFactory})
 	if err != nil {
 		return nil, err
