@@ -44,6 +44,7 @@ import (
 	mgmntv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/kontainerdrivermetadata"
 	"github.com/rancher/rancher/pkg/multiclustermanager"
+	"github.com/rancher/rancher/pkg/multiclustermanager/whitelist"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/scc"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
@@ -448,6 +449,8 @@ func (r *Rancher) Start(ctx context.Context) error {
 		// Registers handlers for all rancher replicas running in the local cluster, but not downstream agents
 		nodedriver.Register(ctx, r.Wrangler)
 		kontainerdrivermetadata.Register(ctx, r.Wrangler)
+		// monitor ProxyEndpoints and update whitelist accordingly
+		whitelist.Proxy.Start(ctx, r.Wrangler.Mgmt.ProxyEndpoint())
 		if err := r.Wrangler.MultiClusterManager.Start(ctx); err != nil {
 			return err
 		}

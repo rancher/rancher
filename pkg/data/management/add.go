@@ -4,11 +4,12 @@ import (
 	"context"
 
 	"github.com/rancher/rancher/pkg/auth/data"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
 )
 
-func Add(ctx context.Context, wrangler *wrangler.Context, management *config.ManagementContext) error {
+func Add(_ context.Context, wrangler *wrangler.Context, management *config.ManagementContext) error {
 	_, err := addRoles(wrangler, management)
 
 	if err != nil {
@@ -39,5 +40,9 @@ func Add(ctx context.Context, wrangler *wrangler.Context, management *config.Man
 		return err
 	}
 
-	return addMachineDrivers(management)
+	if err := addMachineDrivers(management); err != nil {
+		return err
+	}
+
+	return AddProxyEndpointData(settings.DisableDefaultProxyEndpoint.Get(), management.Wrangler)
 }
