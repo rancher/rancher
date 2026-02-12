@@ -77,9 +77,10 @@ func (h *handler) associateMachineWithNode(_ string, bootstrap *rkev1.RKEBootstr
 		return bootstrap, err
 	}
 
-	/* Skip this controller when CAPR isn't the infrastructure provider. The external infrastructure provider
-	   will be responsible for setting the providerID and addresses in the infra machine.*/
-	if machine.Spec.InfrastructureRef.APIGroup != capr.RKEMachineAPIGroup {
+	// Skip this controller when CAPR isn't the infrastructure provider. The external infrastructure provider
+	// will be responsible for setting the providerID and addresses in the infra machine.
+	if machine.Spec.InfrastructureRef.APIGroup != capr.RKEMachineAPIGroup &&
+		machine.Spec.InfrastructureRef.APIGroup != capr.RKEAPIGroup {
 		return bootstrap, nil
 	}
 

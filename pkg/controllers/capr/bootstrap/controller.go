@@ -151,7 +151,8 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 	//
 	// Additional userdata is defined in the machine config and it will be merged with
 	// install script from the secret by rancher-machine.
-	if machine.Spec.InfrastructureRef.APIGroup == capr.RKEMachineAPIGroup {
+	if machine.Spec.InfrastructureRef.APIGroup == capr.RKEMachineAPIGroup ||
+		machine.Spec.InfrastructureRef.APIGroup == capr.RKEAPIGroup {
 		return &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,
