@@ -20,7 +20,7 @@ func (h *handler) shouldManage(ns *corev1.Namespace) bool {
 		return true
 	}
 
-	if managed, ok := ns.Annotations[namespace.AnnotationManagedNamespace]; ok && managed == namespace.AnnotationManagedNamespceTrue {
+	if managed, ok := ns.Annotations[namespace.AnnotationManagedNamespace]; ok && managed == namespace.AnnotationManagedNamespaceTrue {
 		return true
 	}
 

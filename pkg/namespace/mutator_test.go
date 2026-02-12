@@ -266,7 +266,7 @@ func TestMutator(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			actual := c.ns
 
-			updated := c.mutator.Mutate(&actual)
+			updated := c.mutator.mutate(&actual)
 
 			assert.Equal(t, c.expected, actual)
 			assert.Equal(t, c.shouldUpdate, updated)

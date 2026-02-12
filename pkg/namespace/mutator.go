@@ -5,22 +5,24 @@ import (
 )
 
 const (
-	AnnotationManagedNamespace     = "cattle.io/managed-namespace"
-	AnnotationManagedNamespceTrue  = "true"
-	AnnotationManagedNamespceFalse = "false"
+	AnnotationManagedNamespace      = "cattle.io/managed-namespace"
+	AnnotationManagedNamespaceTrue  = "true"
+	AnnotationManagedNamespaceFalse = "false"
 )
 
 var (
 	mutator Mutator
 )
 
+// Mutator describes how rancher namespaces will be mutated at creation time.
 type Mutator struct {
 	Enabled     bool              `json:"enabled"`
 	Annotations map[string]string `json:"annotations"`
 	Labels      map[string]string `json:"labels"`
 }
 
-func (m *Mutator) Mutate(ns *corev1.Namespace) bool {
+// Mutate updates the given Namespace in-place and returns if any changes were made.
+func (m *Mutator) mutate(ns *corev1.Namespace) bool {
 	if !m.Enabled {
 		return false
 	}
@@ -64,14 +66,16 @@ func copy[M1, M2 map[K]V, K comparable, V comparable](m1 M1, m2 M2) bool {
 	return updated
 }
 
+// ApplyLabelsAndAnnotations updates the given Namespace in-place and retusn if any changes were made.
 func ApplyLabelsAndAnnotations(ns *corev1.Namespace) bool {
 	if !mutator.Enabled {
 		return false
 	}
 
-	return mutator.Mutate(ns)
+	return mutator.mutate(ns)
 }
 
+// InjectValues injects Mutator information into a Helm Chart's values, allowing it to set the same Labels and Annotations to chart namespaces.
 func InjectValues(values map[string]any) map[string]any {
 	if !mutator.Enabled {
 		return values

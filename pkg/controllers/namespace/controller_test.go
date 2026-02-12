@@ -52,7 +52,7 @@ func TestHandler(t *testing.T) {
 			ns: &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						namespace.AnnotationManagedNamespace: namespace.AnnotationManagedNamespceTrue,
+						namespace.AnnotationManagedNamespace: namespace.AnnotationManagedNamespaceTrue,
 						"foo":                                "bar",
 					},
 				},
@@ -61,7 +61,7 @@ func TestHandler(t *testing.T) {
 			expected: &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						namespace.AnnotationManagedNamespace: namespace.AnnotationManagedNamespceTrue,
+						namespace.AnnotationManagedNamespace: namespace.AnnotationManagedNamespaceTrue,
 						"foo":                                "bar",
 					},
 					Labels: map[string]string{
@@ -77,7 +77,7 @@ func TestHandler(t *testing.T) {
 			ns: &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						namespace.AnnotationManagedNamespace: namespace.AnnotationManagedNamespceTrue,
+						namespace.AnnotationManagedNamespace: namespace.AnnotationManagedNamespaceTrue,
 					},
 					Labels: map[string]string{
 						"foo": "bar",
@@ -88,7 +88,7 @@ func TestHandler(t *testing.T) {
 			expected: &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						namespace.AnnotationManagedNamespace: namespace.AnnotationManagedNamespceTrue,
+						namespace.AnnotationManagedNamespace: namespace.AnnotationManagedNamespaceTrue,
 						"foo":                                "bar",
 					},
 					Labels: map[string]string{
@@ -104,7 +104,7 @@ func TestHandler(t *testing.T) {
 			ns: &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						namespace.AnnotationManagedNamespace: namespace.AnnotationManagedNamespceTrue,
+						namespace.AnnotationManagedNamespace: namespace.AnnotationManagedNamespaceTrue,
 						"foo":                                "bar",
 					},
 					Labels: map[string]string{
@@ -116,7 +116,7 @@ func TestHandler(t *testing.T) {
 			expected: &corev1.Namespace{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						namespace.AnnotationManagedNamespace: namespace.AnnotationManagedNamespceTrue,
+						namespace.AnnotationManagedNamespace: namespace.AnnotationManagedNamespaceTrue,
 						"foo":                                "bar",
 					},
 					Labels: map[string]string{

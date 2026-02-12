@@ -159,7 +159,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		if mutator.Annotations == nil {
 			mutator.Annotations = make(map[string]string, 1)
 		}
-		mutator.Annotations[namespace.AnnotationManagedNamespace] = namespace.AnnotationManagedNamespceTrue
+		mutator.Annotations[namespace.AnnotationManagedNamespace] = namespace.AnnotationManagedNamespaceTrue
 
 		namespace.SetMutator(mutator)
 	}
