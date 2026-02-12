@@ -112,7 +112,7 @@ func (c *SyncController) createLimitRange(ns *corev1.Namespace) error {
 
 	updatedNs := ns.DeepCopy()
 	if operation == "delete" {
-		unsetLimitRangeAnnotation(updatedNs)
+		deleteLimitRangeAnnotation(updatedNs)
 	} else {
 		if err := setLimitRangeAnnotation(updatedNs, rangeLimit); err != nil {
 			return err
@@ -354,7 +354,7 @@ func setLimitRangeAnnotation(ns *corev1.Namespace, limit *v32.ContainerResourceL
 	return nil
 }
 
-func unsetLimitRangeAnnotation(ns *corev1.Namespace) {
+func deleteLimitRangeAnnotation(ns *corev1.Namespace) {
 	if ns.Annotations == nil {
 		return
 	}
