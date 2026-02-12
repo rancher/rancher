@@ -76,6 +76,8 @@ jobs:
           ASSIGNEES=$(echo "${ORIGINAL_ISSUE}" | jq -r .assignees[].login)
           if [ -n "$ASSIGNEES" ]; then
               echo "Checking if assignee is member before assigning"
+              # Fetch organization members once to reduce API calls
+              ORG_MEMBERS=$(gh api orgs/${GITHUB_REPOSITORY_OWNER}/members --paginate | jq -r '.[].login')
               DELIMITER=""
               NEW_ASSIGNEES=""
               for ASSIGNEE in $ASSIGNEES; do
@@ -84,7 +86,7 @@ jobs:
                       echo "Skipping Copilot assignee: ${ASSIGNEE}"
                       continue
                   fi
-                  if gh api orgs/${GITHUB_REPOSITORY_OWNER}/members --paginate | jq -e --arg ASSIGNEE "$ASSIGNEE" '.[] | select(.login == $ASSIGNEE)' > /dev/null; then
+                  if echo "$ORG_MEMBERS" | grep -qx "$ASSIGNEE"; then
                       echo "${ASSIGNEE} is a member, adding to assignees"
                       NEW_ASSIGNEES="${NEW_ASSIGNEES}${DELIMITER}${ASSIGNEE}"
                       DELIMITER=","
