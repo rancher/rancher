@@ -81,8 +81,8 @@ jobs:
               DELIMITER=""
               NEW_ASSIGNEES=""
               for ASSIGNEE in $ASSIGNEES; do
-                  # Exclude Copilot assignees (copilot-swe-agent, etc.)
-                  if [[ "$ASSIGNEE" =~ ^[Cc]opilot ]]; then
+                  # Exclude Copilot assignees (copilot, copilot-swe-agent, etc.)
+                  if [[ "$ASSIGNEE" =~ ^[Cc]opilot(-|$) ]]; then
                       echo "Skipping Copilot assignee: ${ASSIGNEE}"
                       continue
                   fi
