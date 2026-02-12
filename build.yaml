@@ -4,7 +4,7 @@ provisioningCAPIVersion: 108.0.0+up0.9.0
 turtlesVersion: 109.0.0+up0.26.0-rc.1
 cspAdapterMinVersion: 108.0.0+up8.0.0
 defaultShellVersion: rancher/shell:v0.6.2-rc.1
-fleetVersion: 109.0.0+up0.15.0-alpha.9
+fleetVersion: 109.0.0+up0.15.0-alpha.10
 defaultSccOperatorImage: rancher/scc-operator:v0.3.1-rc.2
 # NOTE: when updating this version, you will also need to update the hardcoded
 # k8s minor <-> image tag mapping in pkg/controllers/capr/autoscaler/fleet.go (imageTagVersions variable).
