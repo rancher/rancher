@@ -13,18 +13,17 @@ import (
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const clusterID = "test-cluster"
 
 func TestEnqueueCrtbsOnProjectCreation(t *testing.T) {
 	existingCrtbs := []*v3.ClusterRoleTemplateBinding{
-		{ObjectMeta: v1.ObjectMeta{
+		{ObjectMeta: metav1.ObjectMeta{
 			Name:      "crtb-1",
 			Namespace: clusterID,
 		}},
-		{ObjectMeta: v1.ObjectMeta{
+		{ObjectMeta: metav1.ObjectMeta{
 			Name:      "crtb-2",
 			Namespace: clusterID,
 		}},
@@ -44,7 +43,7 @@ func TestEnqueueCrtbsOnProjectCreation(t *testing.T) {
 	}
 
 	newProject := v3.Project{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-project",
 			Namespace: clusterID,
 		},
@@ -81,7 +80,7 @@ func TestReconcileProjectCreatorRTBRespectsUserPrincipalName(t *testing.T) {
 	userPrincipalName := "keycloak_user@12345"
 
 	project := &v3.Project{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "p-abcdef",
 			Namespace: clusterID,
 			Annotations: map[string]string{
@@ -108,7 +107,7 @@ func TestReconcileProjectCreatorRTBNoCreatorRBAC(t *testing.T) {
 	// When NoCreatorRBACAnnotation is set, nothing in the lifecycle will be called
 	lifecycle := &projectLifecycle{}
 	project := &v3.Project{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{
 				NoCreatorRBACAnnotation: "true",
 			},
@@ -133,9 +132,9 @@ func (f *fakeSystemAccountManager) RemoveSystemAccount(projectID string) error {
 func TestSyncDeleteSystemUser(t *testing.T) {
 	sysMgr := &fakeSystemAccountManager{}
 	// Create a project with a deletion timestamp.
-	now := v1.NewTime(time.Now())
+	now := metav1.NewTime(time.Now())
 	proj := &v3.Project{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:              "p-deleted",
 			Namespace:         clusterID,
 			DeletionTimestamp: &now,
@@ -160,7 +159,7 @@ func TestSyncDeleteSystemUser(t *testing.T) {
 func TestCreateAndUpdated(t *testing.T) {
 	lifecycle := &projectLifecycle{}
 	proj := &v3.Project{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-project",
 		},
 	}
@@ -175,13 +174,13 @@ func TestCreateAndUpdated(t *testing.T) {
 
 func TestRemove(t *testing.T) {
 	namespace := &corev1.Namespace{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "p-remove",
 		},
 	}
 
 	project := &v3.Project{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "p-remove",
 			Namespace: "test-namespace",
 		},
@@ -209,13 +208,13 @@ func TestRemove(t *testing.T) {
 
 func TestRemoveDifferentBackingNamespace(t *testing.T) {
 	namespace := &corev1.Namespace{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "diff-remove",
 		},
 	}
 
 	project := &v3.Project{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "p-remove",
 			Namespace: "test-namespace",
 		},
@@ -246,13 +245,13 @@ func TestRemoveDifferentBackingNamespace(t *testing.T) {
 
 func TestRemoveWithDeleteError(t *testing.T) {
 	namespace := &corev1.Namespace{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "p-remove",
 		},
 	}
 
 	project := &v3.Project{
-		ObjectMeta: v1.ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "p-remove",
 			Namespace: "test-namespace",
 		},
