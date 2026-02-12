@@ -129,6 +129,9 @@ func TestMutator(t *testing.T) {
 					"foo": "bar",
 				},
 			},
+			ns: corev1.Namespace{},
+
+			expected: corev1.Namespace{},
 		},
 		{
 			name: "with no updates",
