@@ -82,11 +82,11 @@ jobs:
               NEW_ASSIGNEES=""
               for ASSIGNEE in $ASSIGNEES; do
                   # Exclude Copilot assignees (copilot, copilot-swe-agent, etc.)
-                  if [[ "$ASSIGNEE" =~ ^[Cc]opilot(-|$) ]]; then
+                  if [[ "${ASSIGNEE,,}" =~ ^copilot(-|$) ]]; then
                       echo "Skipping Copilot assignee: ${ASSIGNEE}"
                       continue
                   fi
-                  if echo "$ORG_MEMBERS" | grep -qx "$ASSIGNEE"; then
+                  if echo "$ORG_MEMBERS" | grep -Fqx "$ASSIGNEE"; then
                       echo "${ASSIGNEE} is a member, adding to assignees"
                       NEW_ASSIGNEES="${NEW_ASSIGNEES}${DELIMITER}${ASSIGNEE}"
                       DELIMITER=","
