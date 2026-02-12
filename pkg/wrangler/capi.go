@@ -168,18 +168,14 @@ func waitForCAPIAppVersion(ctx context.Context, wContext *Context) error {
 		version string
 	)
 
-	if features.EmbeddedClusterAPI.Enabled() {
-		name = chart.ProvisioningCAPIChartName
-		ns = namespace.ProvisioningCAPINamespace
-		version = settings.RancherProvisioningCAPIVersion.Get()
-	} else if features.Turtles.Enabled() {
+	if features.Turtles.Enabled() {
 		name = chart.TurtlesChartName
 		ns = namespace.TurtlesNamespace
 		version = settings.RancherTurtlesVersion.Get()
 	}
 
 	if name == "" || ns == "" || version == "" {
-		logrus.Debugf("[deferred-capi] Neither Turtles nor EmbeddedClusterAPI feature is enabled, skipping CAPI App version wait")
+		logrus.Debugf("[deferred-capi] Turtles feature is disabled, skipping CAPI App version wait")
 		return nil
 	}
 

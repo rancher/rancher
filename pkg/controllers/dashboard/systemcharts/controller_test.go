@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"testing"
-	"time"
 
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -20,7 +19,6 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
-	admissionv1 "k8s.io/api/admissionregistration/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -30,9 +28,10 @@ import (
 )
 
 var (
-	errTest           = fmt.Errorf("test error")
-	priorityClassName = "rancher-critical"
-	operatorNamespace = "rancher-operator-system"
+	errTest                     = fmt.Errorf("test error")
+	priorityClassName           = "rancher-critical"
+	operatorNamespace           = "rancher-operator-system"
+	provisioningCapiNamespace   = "cattle-provisioning-capi-system"
 	priorityConfig    = &v1.ConfigMap{
 		Data: map[string]string{
 			"priorityClassName": priorityClassName,
@@ -46,7 +45,6 @@ var (
 	}
 	emptyConfig                            = &v1.ConfigMap{}
 	originalWebhookVersion                 = settings.RancherWebhookVersion.Get()
-	originalCAPIVersion                    = settings.RancherProvisioningCAPIVersion.Get()
 	originalSUCVersion                     = settings.SystemUpgradeControllerChartVersion.Get()
 	originalImportedVersionManagement      = settings.ImportedClusterVersionManagement.Get()
 	originalMCM                            = features.MCM.Enabled()
@@ -110,32 +108,28 @@ priorityClassName: newClass
 `
 
 type testMocks struct {
-	manager                         *chartfake.MockManager
-	namespaceCtrl                   *fake.MockNonNamespacedControllerInterface[*v1.Namespace, *v1.NamespaceList]
-	namespaceCache                  *fake.MockNonNamespacedCacheInterface[*v1.Namespace]
-	configCache                     *fake.MockCacheInterface[*v1.ConfigMap]
-	deployment                      *fake.MockControllerInterface[*appsv1.Deployment, *appsv1.DeploymentList]
-	deploymentCache                 *fake.MockCacheInterface[*appsv1.Deployment]
-	clusterCache                    *fake.MockNonNamespacedCacheInterface[*v3.Cluster]
-	plan                            *fake.MockControllerInterface[*upgradev1.Plan, *upgradev1.PlanList]
-	planCache                       *fake.MockCacheInterface[*upgradev1.Plan]
-	mutatingWebhookConfigurations   *fake.MockNonNamespacedControllerInterface[*admissionv1.MutatingWebhookConfiguration, *admissionv1.MutatingWebhookConfigurationList]
-	validatingWebhookConfigurations *fake.MockNonNamespacedControllerInterface[*admissionv1.ValidatingWebhookConfiguration, *admissionv1.ValidatingWebhookConfigurationList]
+	manager         *chartfake.MockManager
+	namespaceCtrl   *fake.MockNonNamespacedControllerInterface[*v1.Namespace, *v1.NamespaceList]
+	namespaceCache  *fake.MockNonNamespacedCacheInterface[*v1.Namespace]
+	configCache     *fake.MockCacheInterface[*v1.ConfigMap]
+	deployment      *fake.MockControllerInterface[*appsv1.Deployment, *appsv1.DeploymentList]
+	deploymentCache *fake.MockCacheInterface[*appsv1.Deployment]
+	clusterCache    *fake.MockNonNamespacedCacheInterface[*v3.Cluster]
+	plan            *fake.MockControllerInterface[*upgradev1.Plan, *upgradev1.PlanList]
+	planCache       *fake.MockCacheInterface[*upgradev1.Plan]
 }
 
 func (t *testMocks) Handler() *handler {
 	return &handler{
-		manager:                        t.manager,
-		namespaces:                     t.namespaceCtrl,
-		namespaceCache:                 t.namespaceCache,
-		chartsConfig:                   chart.RancherConfigGetter{ConfigCache: t.configCache},
-		deployment:                     t.deployment,
-		deploymentCache:                t.deploymentCache,
-		clusterCache:                   t.clusterCache,
-		plan:                           t.plan,
-		planCache:                      t.planCache,
-		mutatingWebhookConfigurations:  t.mutatingWebhookConfigurations,
-		validatingWebhookConfiguration: t.validatingWebhookConfigurations,
+		manager:         t.manager,
+		namespaces:      t.namespaceCtrl,
+		namespaceCache:  t.namespaceCache,
+		chartsConfig:    chart.RancherConfigGetter{ConfigCache: t.configCache},
+		deployment:      t.deployment,
+		deploymentCache: t.deploymentCache,
+		clusterCache:    t.clusterCache,
+		plan:            t.plan,
+		planCache:       t.planCache,
 	}
 }
 
@@ -239,6 +233,11 @@ func Test_ChartInstallation(t *testing.T) {
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+
+				// rancher-provisioning-capi
+				mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil)
+				mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil)
+				mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi")
 			},
 		},
 		{
@@ -328,6 +327,11 @@ func Test_ChartInstallation(t *testing.T) {
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+
+				// rancher-provisioning-capi
+				mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil)
+				mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil)
+				mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi")
 			},
 		},
 		{
@@ -400,6 +404,11 @@ func Test_ChartInstallation(t *testing.T) {
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+
+				// rancher-provisioning-capi
+				mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil)
+				mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil)
+				mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi")
 			},
 		},
 		{
@@ -472,6 +481,11 @@ func Test_ChartInstallation(t *testing.T) {
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+
+				// rancher-provisioning-capi
+				mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil)
+				mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil)
+				mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi")
 			},
 		},
 		{
@@ -544,6 +558,11 @@ func Test_ChartInstallation(t *testing.T) {
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+
+				// rancher-provisioning-capi
+				mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil)
+				mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil)
+				mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi")
 			},
 		},
 		{
@@ -616,6 +635,11 @@ func Test_ChartInstallation(t *testing.T) {
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+
+				// rancher-provisioning-capi
+				mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil)
+				mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil)
+				mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi")
 			},
 		},
 		{
@@ -724,6 +748,11 @@ func Test_ChartInstallation(t *testing.T) {
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+
+				// rancher-provisioning-capi
+				mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil)
+				mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil)
+				mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi")
 			},
 		},
 		{
@@ -816,6 +845,11 @@ func Test_ChartInstallation(t *testing.T) {
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+
+				// rancher-provisioning-capi
+				mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil)
+				mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil)
+				mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi")
 			},
 		},
 		{
@@ -908,6 +942,11 @@ func Test_ChartInstallation(t *testing.T) {
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+
+				// rancher-provisioning-capi
+				mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil)
+				mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil)
+				mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi")
 			},
 		},
 		{
@@ -981,6 +1020,11 @@ func Test_ChartInstallation(t *testing.T) {
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+
+				// rancher-provisioning-capi
+				mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil)
+				mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil)
+				mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi")
 			},
 		},
 		{
@@ -1085,6 +1129,11 @@ func Test_ChartInstallation(t *testing.T) {
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+
+				// rancher-provisioning-capi
+				mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil)
+				mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil)
+				mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi")
 			},
 		},
 		{
@@ -1207,6 +1256,11 @@ func Test_ChartInstallation(t *testing.T) {
 				// rancher-operator
 				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
 				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+
+				// rancher-provisioning-capi
+				mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil)
+				mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil)
+				mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi")
 			},
 			registryOverride: "rancher-test.io",
 		},
@@ -1224,6 +1278,26 @@ func Test_ChartInstallation(t *testing.T) {
 				_ = settings.RemoteDialerProxyVersion.Set("2.0.1")
 				features.MCM.Set(true)
 				_ = os.Setenv("CATTLE_SUC_APP_NAME_OVERRIDE", "")
+
+				// remotedialer-proxy
+				expectedRDPValues := map[string]interface{}{
+					"priorityClassName": priorityClassName,
+					"global": map[string]interface{}{
+						"cattle": map[string]interface{}{
+							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
+						},
+					},
+				}
+				mocks.manager.EXPECT().Ensure(
+					namespace.System,
+					chart.RemoteDialerProxyChartName,
+					chart.RemoteDialerProxyChartName,
+					"",
+					"2.0.1",
+					expectedRDPValues,
+					gomock.AssignableToTypeOf(false),
+					"",
+				).Return(nil)
 
 				// rancher-webhook
 				expectedValues := map[string]interface{}{
@@ -1245,6 +1319,15 @@ func Test_ChartInstallation(t *testing.T) {
 					gomock.AssignableToTypeOf(false),
 					"",
 				).Return(nil)
+
+				// rancher-operator
+				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
+				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
+
+				// rancher-provisioning-capi
+				mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil)
+				mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil)
+				mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi")
 
 				// rancher-turtles
 				expectedTurtlesValues := map[string]interface{}{
@@ -1290,30 +1373,6 @@ func Test_ChartInstallation(t *testing.T) {
 					gomock.AssignableToTypeOf(false),
 					"",
 				).Return(nil)
-
-				// remotedialer-proxy
-				expectedRDPValues := map[string]interface{}{
-					"priorityClassName": priorityClassName,
-					"global": map[string]interface{}{
-						"cattle": map[string]interface{}{
-							"systemDefaultRegistry": settings.SystemDefaultRegistry.Get(),
-						},
-					},
-				}
-				mocks.manager.EXPECT().Ensure(
-					namespace.System,
-					chart.RemoteDialerProxyChartName,
-					chart.RemoteDialerProxyChartName,
-					"",
-					"2.0.1",
-					expectedRDPValues,
-					gomock.AssignableToTypeOf(false),
-					"",
-				).Return(nil)
-
-				// rancher-operator
-				mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil)
-				mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator")
 			},
 		},
 	}
@@ -1322,7 +1381,6 @@ func Test_ChartInstallation(t *testing.T) {
 			// reset setting to default values before each test
 			os.Setenv("IMPERATIVE_API_DIRECT", "")
 			_ = settings.RancherWebhookVersion.Set(originalWebhookVersion)
-			_ = settings.RancherProvisioningCAPIVersion.Set(originalCAPIVersion)
 			_ = settings.SystemUpgradeControllerChartVersion.Set(originalSUCVersion)
 			_ = settings.ImportedClusterVersionManagement.Set(originalImportedVersionManagement)
 			features.MCM.Set(originalMCM)
@@ -1343,11 +1401,6 @@ func Test_ChartInstallation(t *testing.T) {
 				planCache:       fake.NewMockCacheInterface[*upgradev1.Plan](ctrl),
 				clusterCache:    fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl),
 			}
-
-			mocks.namespaceCache.EXPECT().Get(namespace.ProvisioningCAPINamespace).Return(nil, apierrors.NewNotFound(schema.GroupResource{Group: "", Resource: "namespaces"}, namespace.ProvisioningCAPINamespace)).AnyTimes()
-			mocks.manager.EXPECT().Remove(namespace.ProvisioningCAPINamespace, chart.ProvisioningCAPIChartName)
-			mocks.manager.EXPECT().Uninstall(namespace.ProvisioningCAPINamespace, chart.ProvisioningCAPIChartName).Return(nil)
-			mocks.namespaceCtrl.EXPECT().Delete(namespace.ProvisioningCAPINamespace, nil).Return(nil)
 
 			// allow test to add expected calls to mock and run any additional setup
 			tt.setup(mocks)
@@ -1370,7 +1423,6 @@ func Test_TurtlesInstallation(t *testing.T) {
 	os.Setenv("IMPERATIVE_API_DIRECT", "")
 	_ = settings.RancherWebhookVersion.Set("2.0.0")
 	_ = settings.RancherTurtlesVersion.Set("2.0.0")
-	_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
 	_ = settings.SystemUpgradeControllerChartVersion.Set("2.0.0")
 	features.Turtles.Set(true)
 	features.MCMAgent.Set(true)
@@ -1389,7 +1441,6 @@ func Test_TurtlesInstallation(t *testing.T) {
 	}
 
 	mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).AnyTimes()
-	mocks.namespaceCache.EXPECT().Get(namespace.ProvisioningCAPINamespace).Return(nil, apierrors.NewNotFound(schema.GroupResource{Group: "", Resource: "namespaces"}, namespace.ProvisioningCAPINamespace)).AnyTimes()
 	features.ManagedSystemUpgradeController.Set(false)
 	mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(plans, nil).Times(1)
 	mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(nil, apierrors.NewNotFound(schema.GroupResource{Group: "apps", Resource: "deployments"}, sucDeploymentName)).AnyTimes()
@@ -1422,9 +1473,9 @@ func Test_TurtlesInstallation(t *testing.T) {
 		mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil),
 		mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil),
 
-		mocks.manager.EXPECT().Remove(namespace.ProvisioningCAPINamespace, chart.ProvisioningCAPIChartName),
-		mocks.manager.EXPECT().Uninstall(namespace.ProvisioningCAPINamespace, chart.ProvisioningCAPIChartName).Return(nil),
-		mocks.namespaceCtrl.EXPECT().Delete(namespace.ProvisioningCAPINamespace, nil).Return(nil),
+		mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi"),
+		mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil),
+		mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil),
 
 		mocks.manager.EXPECT().Ensure(
 			namespace.TurtlesNamespace, chart.TurtlesChartName, chart.TurtlesChartName, "", "2.0.0", expectedTurtlesValues, gomock.AssignableToTypeOf(false), "",
@@ -1433,175 +1484,13 @@ func Test_TurtlesInstallation(t *testing.T) {
 
 	h := mocks.Handler()
 	_, err := h.onRepo("", repo)
-	require.NoError(t, err)
-}
-
-func Test_SwitchFromProvisioningToTurtlesRace(t *testing.T) {
-	repo := &catalog.ClusterRepo{ObjectMeta: metav1.ObjectMeta{Name: repoName}}
-	os.Setenv("IMPERATIVE_API_DIRECT", "")
-	_ = settings.RancherWebhookVersion.Set("2.0.0")
-	_ = settings.RancherTurtlesVersion.Set("2.0.0")
-	_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
-	features.Turtles.Set(true)
-	features.MCMAgent.Set(true)
-	features.MCM.Set(false)
-
-	ctrl := gomock.NewController(t)
-	mocks := testMocks{
-		manager:         chartfake.NewMockManager(ctrl),
-		namespaceCtrl:   fake.NewMockNonNamespacedControllerInterface[*v1.Namespace, *v1.NamespaceList](ctrl),
-		namespaceCache:  fake.NewMockNonNamespacedCacheInterface[*v1.Namespace](ctrl),
-		configCache:     fake.NewMockCacheInterface[*v1.ConfigMap](ctrl),
-		deploymentCache: fake.NewMockCacheInterface[*appsv1.Deployment](ctrl),
-		plan:            fake.NewMockControllerInterface[*upgradev1.Plan, *upgradev1.PlanList](ctrl),
-		planCache:       fake.NewMockCacheInterface[*upgradev1.Plan](ctrl),
-		clusterCache:    fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl),
-	}
-
-	mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).AnyTimes()
-
-	features.ManagedSystemUpgradeController.Set(false)
-	mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(plans, nil).Times(2)
-	mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(nil, apierrors.NewNotFound(schema.GroupResource{Group: "apps", Resource: "deployments"}, sucDeploymentName)).AnyTimes()
-
-	gomock.InOrder(
-		mocks.manager.EXPECT().Ensure(
-			namespace.System, chart.WebhookChartName, chart.WebhookChartName, "", "2.0.0",
-			gomock.AssignableToTypeOf(map[string]interface{}{}), gomock.AssignableToTypeOf(false), "",
-		).Return(nil),
-
-		mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator"),
-		mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil),
-		mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil),
-
-		mocks.manager.EXPECT().Remove(namespace.ProvisioningCAPINamespace, chart.ProvisioningCAPIChartName),
-		mocks.manager.EXPECT().Uninstall(namespace.ProvisioningCAPINamespace, chart.ProvisioningCAPIChartName).Return(nil),
-		mocks.namespaceCtrl.EXPECT().Delete(namespace.ProvisioningCAPINamespace, nil).Return(nil),
-		mocks.namespaceCache.EXPECT().Get(namespace.ProvisioningCAPINamespace).Return(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace.ProvisioningCAPINamespace}}, nil),
-	)
-	h := mocks.Handler()
-	_, err := h.onRepo("", repo)
-	require.NoError(t, err)
-
-	expectedTurtlesValues := map[string]interface{}{
-		"priorityClassName": priorityClassName,
-		"features": map[string]interface{}{
-			"no-cert-manager": map[string]interface{}{
-				"enabled": true,
-			},
-		},
-		"global": map[string]interface{}{
-			"cattle": map[string]interface{}{"systemDefaultRegistry": settings.SystemDefaultRegistry.Get()},
-		},
-	}
-	gomock.InOrder(
-		mocks.manager.EXPECT().Ensure(
-			namespace.System, chart.WebhookChartName, chart.WebhookChartName, "", "2.0.0",
-			gomock.AssignableToTypeOf(map[string]interface{}{}), gomock.AssignableToTypeOf(false), "",
-		).Return(nil),
-
-		mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator"),
-		mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil),
-		mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil),
-
-		mocks.manager.EXPECT().Remove(namespace.ProvisioningCAPINamespace, chart.ProvisioningCAPIChartName),
-		mocks.manager.EXPECT().Uninstall(namespace.ProvisioningCAPINamespace, chart.ProvisioningCAPIChartName).Return(nil),
-		mocks.namespaceCtrl.EXPECT().Delete(namespace.ProvisioningCAPINamespace, nil).Return(nil),
-
-		mocks.namespaceCache.EXPECT().Get(namespace.ProvisioningCAPINamespace).Return(nil, apierrors.NewNotFound(schema.GroupResource{Group: "", Resource: "namespaces"}, namespace.ProvisioningCAPINamespace)),
-		mocks.manager.EXPECT().Ensure(
-			namespace.TurtlesNamespace, chart.TurtlesChartName, chart.TurtlesChartName, "", "2.0.0", expectedTurtlesValues, gomock.AssignableToTypeOf(false), "",
-		).Return(nil),
-	)
-
-	_, err = h.onRepo("", repo)
-	require.NoError(t, err)
-}
-
-func Test_SwitchFromTurtlesToProvisioningRace(t *testing.T) {
-	repo := &catalog.ClusterRepo{ObjectMeta: metav1.ObjectMeta{Name: repoName}}
-	os.Setenv("IMPERATIVE_API_DIRECT", "")
-	_ = settings.RancherWebhookVersion.Set("2.0.0")
-	_ = settings.RancherTurtlesVersion.Set("2.0.0")
-	_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
-
-	features.EmbeddedClusterAPI.Set(true)
-	features.Turtles.Set(false)
-	features.MCMAgent.Set(true)
-	features.MCM.Set(false)
-	features.ManagedSystemUpgradeController.Set(false)
-
-	ctrl := gomock.NewController(t)
-	mocks := testMocks{
-		manager:         chartfake.NewMockManager(ctrl),
-		namespaceCtrl:   fake.NewMockNonNamespacedControllerInterface[*v1.Namespace, *v1.NamespaceList](ctrl),
-		namespaceCache:  fake.NewMockNonNamespacedCacheInterface[*v1.Namespace](ctrl),
-		configCache:     fake.NewMockCacheInterface[*v1.ConfigMap](ctrl),
-		deploymentCache: fake.NewMockCacheInterface[*appsv1.Deployment](ctrl),
-		plan:            fake.NewMockControllerInterface[*upgradev1.Plan, *upgradev1.PlanList](ctrl),
-		planCache:       fake.NewMockCacheInterface[*upgradev1.Plan](ctrl),
-		clusterCache:    fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl),
-	}
-
-	mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).AnyTimes()
-
-	mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(plans, nil).AnyTimes()
-	mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(nil, apierrors.NewNotFound(schema.GroupResource{Group: "apps", Resource: "deployments"}, sucDeploymentName)).AnyTimes()
-
-	mocks.namespaceCache.EXPECT().Get(namespace.TurtlesNamespace).Return(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace.TurtlesNamespace}}, nil)
-	gomock.InOrder(
-		mocks.manager.EXPECT().Ensure(
-			namespace.System, chart.WebhookChartName, chart.WebhookChartName, "", "2.0.0",
-			gomock.AssignableToTypeOf(map[string]interface{}{}), gomock.AssignableToTypeOf(false), "",
-		).Return(nil),
-
-		mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator"),
-		mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil),
-		mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil),
-
-		mocks.manager.EXPECT().Remove(namespace.TurtlesNamespace, chart.TurtlesChartName),
-		mocks.manager.EXPECT().Uninstall(namespace.TurtlesNamespace, chart.TurtlesChartName).Return(nil),
-		mocks.namespaceCtrl.EXPECT().Delete(namespace.TurtlesNamespace, nil).Return(nil),
-	)
-	h := mocks.Handler()
-	_, err := h.onRepo("", repo)
-	require.NoError(t, err)
-
-	expectedProvCAPIValues := map[string]interface{}{
-		"priorityClassName": priorityClassName,
-		"global": map[string]interface{}{
-			"cattle": map[string]interface{}{"systemDefaultRegistry": settings.SystemDefaultRegistry.Get()},
-		},
-	}
-	gomock.InOrder(
-		mocks.manager.EXPECT().Ensure(
-			namespace.System, chart.WebhookChartName, chart.WebhookChartName, "", "2.0.0",
-			gomock.AssignableToTypeOf(map[string]interface{}{}), gomock.AssignableToTypeOf(false), "",
-		).Return(nil),
-
-		mocks.manager.EXPECT().Remove(operatorNamespace, "rancher-operator"),
-		mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil),
-		mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil),
-
-		mocks.namespaceCache.EXPECT().Get(namespace.TurtlesNamespace).Return(nil, apierrors.NewNotFound(schema.GroupResource{Group: "", Resource: "namespaces"}, namespace.TurtlesNamespace)),
-		mocks.manager.EXPECT().Ensure(
-			namespace.ProvisioningCAPINamespace, chart.ProvisioningCAPIChartName, chart.ProvisioningCAPIChartName, "", "2.0.0",
-			expectedProvCAPIValues, gomock.AssignableToTypeOf(false), "",
-		).Return(nil),
-		mocks.manager.EXPECT().Remove(namespace.TurtlesNamespace, chart.TurtlesChartName),
-		mocks.manager.EXPECT().Uninstall(namespace.TurtlesNamespace, chart.TurtlesChartName).Return(nil),
-		mocks.namespaceCtrl.EXPECT().Delete(namespace.TurtlesNamespace, nil).Return(nil),
-	)
-	_, err = h.onRepo("", repo)
 	require.NoError(t, err)
 }
 
 func Test_TurtlesWinsWhenBothEnabled(t *testing.T) {
 	repo := &catalog.ClusterRepo{ObjectMeta: metav1.ObjectMeta{Name: repoName}}
 	_ = settings.RancherTurtlesVersion.Set("2.0.0")
-	_ = settings.RancherProvisioningCAPIVersion.Set("2.0.0")
 	features.Turtles.Set(true)
-	features.EmbeddedClusterAPI.Set(true)
 	features.MCMAgent.Set(true)
 	features.MCM.Set(false)
 	features.ManagedSystemUpgradeController.Set(false)
@@ -1623,7 +1512,6 @@ func Test_TurtlesWinsWhenBothEnabled(t *testing.T) {
 	mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(plans, nil).AnyTimes()
 	mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(nil, apierrors.NewNotFound(schema.GroupResource{Group: "apps", Resource: "deployments"}, sucDeploymentName)).AnyTimes()
 
-	mocks.namespaceCache.EXPECT().Get(namespace.ProvisioningCAPINamespace).Return(nil, apierrors.NewNotFound(schema.GroupResource{Group: "", Resource: "namespaces"}, namespace.ProvisioningCAPINamespace)).AnyTimes()
 	expectedTurtlesValues := map[string]interface{}{
 		"priorityClassName": priorityClassName,
 		"features": map[string]interface{}{
@@ -1645,9 +1533,9 @@ func Test_TurtlesWinsWhenBothEnabled(t *testing.T) {
 		mocks.manager.EXPECT().Uninstall(operatorNamespace, "rancher-operator").Return(nil),
 		mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil),
 
-		mocks.manager.EXPECT().Remove(namespace.ProvisioningCAPINamespace, chart.ProvisioningCAPIChartName),
-		mocks.manager.EXPECT().Uninstall(namespace.ProvisioningCAPINamespace, chart.ProvisioningCAPIChartName).Return(nil),
-		mocks.namespaceCtrl.EXPECT().Delete(namespace.ProvisioningCAPINamespace, nil).Return(nil),
+		mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-capi"),
+		mocks.manager.EXPECT().Uninstall(provisioningCapiNamespace, "rancher-provisioning-capi").Return(nil),
+		mocks.namespaceCtrl.EXPECT().Delete(provisioningCapiNamespace, nil).Return(nil),
 
 		mocks.manager.EXPECT().Ensure(
 			namespace.TurtlesNamespace, chart.TurtlesChartName, chart.TurtlesChartName, "", "2.0.0",
@@ -1658,75 +1546,6 @@ func Test_TurtlesWinsWhenBothEnabled(t *testing.T) {
 	h := mocks.Handler()
 	_, err := h.onRepo("", repo)
 	require.NoError(t, err)
-}
-
-func Test_CleanupEmbeddedWebhookConfigs(t *testing.T) {
-	expectNoConfigsDeleted := func() *testMocks {
-		ctrl := gomock.NewController(t)
-		mocks := testMocks{
-			validatingWebhookConfigurations: fake.NewMockNonNamespacedControllerInterface[*admissionv1.ValidatingWebhookConfiguration, *admissionv1.ValidatingWebhookConfigurationList](ctrl),
-			mutatingWebhookConfigurations:   fake.NewMockNonNamespacedControllerInterface[*admissionv1.MutatingWebhookConfiguration, *admissionv1.MutatingWebhookConfigurationList](ctrl),
-		}
-		gomock.InOrder(
-			mocks.mutatingWebhookConfigurations.EXPECT().Delete(capiMutatingWebhookName, nil).Times(0),
-			mocks.validatingWebhookConfigurations.EXPECT().Delete(capiValidatingWebhookName, nil).Times(0),
-		)
-		return &mocks
-	}
-
-	tests := []struct {
-		name              string
-		namespaceName     string
-		deletionTime      *metav1.Time
-		setupExpectations func() *testMocks
-	}{
-		{
-			name:              "unrelated NS",
-			namespaceName:     "not-embedded-capi",
-			setupExpectations: expectNoConfigsDeleted,
-		},
-		{
-			name:              "unrelated NS being deleted",
-			namespaceName:     "not-embedded-capi",
-			deletionTime:      &metav1.Time{Time: time.Now()},
-			setupExpectations: expectNoConfigsDeleted,
-		},
-		{
-			name:              "embedded capi namespace non-deletion",
-			namespaceName:     namespace.ProvisioningCAPINamespace,
-			setupExpectations: expectNoConfigsDeleted,
-		},
-		{
-			name:          "embedded-capi namespace deletion",
-			namespaceName: namespace.ProvisioningCAPINamespace,
-			deletionTime:  &metav1.Time{Time: time.Now()},
-			setupExpectations: func() *testMocks {
-				ctrl := gomock.NewController(t)
-				mocks := testMocks{
-					validatingWebhookConfigurations: fake.NewMockNonNamespacedControllerInterface[*admissionv1.ValidatingWebhookConfiguration, *admissionv1.ValidatingWebhookConfigurationList](ctrl),
-					mutatingWebhookConfigurations:   fake.NewMockNonNamespacedControllerInterface[*admissionv1.MutatingWebhookConfiguration, *admissionv1.MutatingWebhookConfigurationList](ctrl),
-				}
-				gomock.InOrder(
-					mocks.mutatingWebhookConfigurations.EXPECT().Delete(capiMutatingWebhookName, &metav1.DeleteOptions{}).Times(1),
-					mocks.validatingWebhookConfigurations.EXPECT().Delete(capiValidatingWebhookName, &metav1.DeleteOptions{}).Times(1),
-				)
-				return &mocks
-			},
-		},
-	}
-
-	for _, tst := range tests {
-		t.Run(tst.name, func(t *testing.T) {
-			testNS := &v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: tst.namespaceName}}
-			if tst.deletionTime != nil {
-				testNS.DeletionTimestamp = tst.deletionTime
-			}
-			mocks := tst.setupExpectations()
-			h := mocks.Handler()
-			_, err := h.cleanUpEmbeddedCAPIWebhooks("", testNS)
-			require.NoError(t, err)
-		})
-	}
 }
 
 func Test_relatedConfigMaps(t *testing.T) {

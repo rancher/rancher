@@ -61,7 +61,6 @@ var (
 		"cattle-prometheus",
 		"cattle-logging",
 		"cattle-fleet-system",
-		"cattle-provisioning-capi-system",
 		"cattle-turtles-system",
 		"cattle-impersonation-system",
 	}

@@ -20,7 +20,6 @@ import (
 )
 
 const (
-	capiCRD           = "clusters.cluster.x-k8s.io"
 	rtCRD             = "roletemplates.management.cattle.io"
 	grCRD             = "globalroles.management.cattle.io"
 	bootstrapFleetCRD = "clusters.fleet.cattle.io"
@@ -67,10 +66,8 @@ func TestEnsure_MCM(t *testing.T) {
 	testClient := setupFakeClient()
 	crdFS = validFS
 
-	migrated := map[string]bool{rtCRD: true, capiCRD: true, grCRD: false}
-	expected := []string{rtCRD, capiCRD}
-	features.EmbeddedClusterAPI.Set(true)
-	features.Turtles.Set(false)
+	migrated := map[string]bool{rtCRD: true, grCRD: false}
+	expected := []string{rtCRD}
 	features.MCM.Set(true)
 
 	MigratedResources = migrated
@@ -87,16 +84,11 @@ func TestEnsure_NonMCM(t *testing.T) {
 	crdFS = validFS
 
 	features.MCM.Set(false)
-	features.EmbeddedClusterAPI.Set(true)
-	features.Turtles.Set(false)
-	MigratedResources = map[string]bool{rtCRD: true, capiCRD: true, grCRD: false}
-	expected := []string{capiCRD}
+	MigratedResources = map[string]bool{rtCRD: true, grCRD: false}
 
 	err := EnsureRequired(context.Background(), testClient.client.CustomResourceDefinitions())
 	require.NoError(t, err, "unexpected error when creating yaml")
-	sort.Strings(expected)
-	sort.Strings(testClient.CrdNames)
-	require.Equal(t, expected, testClient.CrdNames, "unexpected CRDs created")
+	require.Empty(t, testClient.CrdNames, "unexpected CRDs created")
 }
 
 func TestEnsure_TurtlesEnabled(t *testing.T) {
@@ -104,18 +96,16 @@ func TestEnsure_TurtlesEnabled(t *testing.T) {
 	testClient := setupFakeClient()
 	crdFS = validFS
 
-	// When Turtles is enabled, CAPI CRDs should not be installed by Rancher
-	features.EmbeddedClusterAPI.Set(true)
 	features.Turtles.Set(true)
 	features.MCM.Set(true)
-	MigratedResources = map[string]bool{rtCRD: true, capiCRD: true, grCRD: false}
+	MigratedResources = map[string]bool{rtCRD: true, grCRD: false}
 	expected := []string{rtCRD}
 
 	err := EnsureRequired(context.Background(), testClient.client.CustomResourceDefinitions())
 	require.NoError(t, err, "unexpected error when creating yaml")
 	sort.Strings(expected)
 	sort.Strings(testClient.CrdNames)
-	require.Equal(t, expected, testClient.CrdNames, "unexpected CRDs created - CAPI CRDs should not be installed when Turtles is enabled")
+	require.Equal(t, expected, testClient.CrdNames, "unexpected CRDs created")
 }
 
 func TestEnsure_MissingCRDs(t *testing.T) {
@@ -173,13 +163,11 @@ func TestEnusure_metadata(t *testing.T) {
 	testClient := setupFakeClient()
 	crdFS = validFS
 
-	MigratedResources = map[string]bool{rtCRD: true, capiCRD: true, bootstrapFleetCRD: true}
-	expected := []string{rtCRD, capiCRD, bootstrapFleetCRD}
+	MigratedResources = map[string]bool{rtCRD: true, bootstrapFleetCRD: true}
+	expected := []string{rtCRD, bootstrapFleetCRD}
 
 	features.MCM.Set(true)
 	features.Fleet.Set(true)
-	features.EmbeddedClusterAPI.Set(true)
-	features.Turtles.Set(false) // Ensure Turtles is disabled so CAPI CRDs are installed
 	features.ProvisioningV2.Set(true)
 
 	err := EnsureRequired(context.Background(), testClient.client.CustomResourceDefinitions())
@@ -192,12 +180,6 @@ func TestEnusure_metadata(t *testing.T) {
 	require.True(t, ok, "%s CRD not found", rtCRD)
 	require.NotNil(t, rtCRDObj.Labels, "rancher managed object missing labels")
 	require.Equal(t, managerValue, rtCRDObj.Labels[k8sManagedByKey], "%s CRD missing expected managed-by label", rtCRD)
-
-	capiCRDObj, ok := testClient.CRDValues[capiCRD]
-	require.True(t, ok, "%s CRD not found", capiCRD)
-	require.NotNil(t, capiCRDObj.Labels, "rancher managed object missing labels")
-	require.Equal(t, managerValue, capiCRDObj.Labels[k8sManagedByKey], "%s CRD missing expected managed-by label", capiCRD)
-	require.Equal(t, "true", capiCRDObj.Labels["auth.cattle.io/cluster-indexed"], "%s CRD missing expected auth label", capiCRD)
 
 	fleetObj, ok := testClient.CRDValues[bootstrapFleetCRD]
 	require.True(t, ok, "%s CRD not found", bootstrapFleetCRD)

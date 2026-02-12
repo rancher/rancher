@@ -1,40 +1,18 @@
 package provisioningv2
 
 import (
-	"embed"
-
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/wrangler/v3/pkg/crd"
-	"github.com/rancher/wrangler/v3/pkg/data"
-	"github.com/rancher/wrangler/v3/pkg/yaml"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-)
-
-var (
-	capiCRDs = map[string]bool{
-		"Machine":            true,
-		"MachineHealthCheck": true,
-		"MachineDeployment":  true,
-		"MachineSet":         true,
-		"Cluster":            true,
-		"MachineDrainRule":   true,
-	}
-
-	//go:embed capi-crds.yaml capi-webhooks.yaml
-	capiData embed.FS
 )
 
 func List() (result []crd.CRD) {
 	result = append(result, provisioning()...)
 	if features.RKE2.Enabled() {
 		result = append(result, rke2()...)
-	}
-	if features.EmbeddedClusterAPI.Enabled() && !features.Turtles.Enabled() {
-		result = append(result, capi()...)
 	}
 	return
 }
@@ -121,60 +99,9 @@ func rke2() []crd.CRD {
 	}
 }
 
+// Webhooks returns empty as the provisioning CAPI webhooks have been removed.
 func Webhooks() []runtime.Object {
-	if features.EmbeddedClusterAPI.Enabled() && !features.Turtles.Enabled() {
-		return capiWebhooks()
-	}
 	return nil
-}
-
-func capiWebhooks() []runtime.Object {
-	f, err := capiData.Open("capi-webhooks.yaml")
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
-
-	objs, err := yaml.ToObjects(f)
-	if err != nil {
-		panic(err)
-	}
-
-	return objs
-}
-
-func capi() []crd.CRD {
-	f, err := capiData.Open("capi-crds.yaml")
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
-
-	objs, err := yaml.ToObjects(f)
-	if err != nil {
-		panic(err)
-	}
-
-	var result []crd.CRD
-	for _, obj := range objs {
-		if obj.GetObjectKind().GroupVersionKind().Kind != "CustomResourceDefinition" {
-			continue
-		}
-		if unstr, ok := obj.(*unstructured.Unstructured); ok &&
-			capiCRDs[data.Object(unstr.Object).String("spec", "names", "kind")] {
-			labels := unstr.GetLabels()
-			if labels == nil {
-				labels = map[string]string{}
-			}
-			labels["auth.cattle.io/cluster-indexed"] = "true"
-			unstr.SetLabels(labels)
-			result = append(result, crd.CRD{
-				Override: obj,
-			})
-		}
-	}
-
-	return result
 }
 
 func newRKECRD(obj interface{}, customize func(crd.CRD) crd.CRD) crd.CRD {
