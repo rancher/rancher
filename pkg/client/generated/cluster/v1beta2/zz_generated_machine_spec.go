@@ -10,6 +10,7 @@ const (
 	MachineSpecFieldMinReadySeconds   = "minReadySeconds"
 	MachineSpecFieldProviderID        = "providerID"
 	MachineSpecFieldReadinessGates    = "readinessGates"
+	MachineSpecFieldTaints            = "taints"
 	MachineSpecFieldVersion           = "version"
 )
 
@@ -22,5 +23,6 @@ type MachineSpec struct {
 	MinReadySeconds   *int64                            `json:"minReadySeconds,omitempty" yaml:"minReadySeconds,omitempty"`
 	ProviderID        string                            `json:"providerID,omitempty" yaml:"providerID,omitempty"`
 	ReadinessGates    []MachineReadinessGate            `json:"readinessGates,omitempty" yaml:"readinessGates,omitempty"`
+	Taints            []MachineTaint                    `json:"taints,omitempty" yaml:"taints,omitempty"`
 	Version           string                            `json:"version,omitempty" yaml:"version,omitempty"`
 }
