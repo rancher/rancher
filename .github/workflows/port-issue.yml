@@ -82,7 +82,7 @@ jobs:
               NEW_ASSIGNEES=""
               for ASSIGNEE in $ASSIGNEES; do
                   # Exclude Copilot assignees (copilot, copilot-swe-agent, etc.)
-                  if [[ "${ASSIGNEE,,}" =~ ^copilot(-.*)?$ ]]; then
+                  if [[ "${ASSIGNEE,,}" =~ ^copilot(-.+)?$ ]]; then
                       echo "Skipping Copilot assignee: ${ASSIGNEE}"
                       continue
                   fi
