@@ -1,10 +1,8 @@
 package scim
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"sort"
 	"strings"
@@ -190,17 +188,8 @@ func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 	provider := mux.Vars(r)["provider"]
 
-	bodyBytes, err := io.ReadAll(r.Body)
-	if err != nil {
-		logrus.Errorf("scim::CreateUser: failed to read request body: %s", err)
-		writeError(w, NewError(http.StatusBadRequest, "Invalid request body"))
-		return
-	}
-	logrus.Tracef("scim::CreateUser: request body: %s", bodyBytes)
-
 	payload := SCIMUser{}
-
-	err = json.NewDecoder(bytes.NewReader(bodyBytes)).Decode(&payload)
+	err := json.NewDecoder(r.Body).Decode(&payload)
 	if err != nil {
 		logrus.Errorf("scim::CreateUser: failed to decode request body: %s", err)
 		writeError(w, NewError(http.StatusBadRequest, "Invalid request body"))
@@ -241,7 +230,7 @@ func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	groupPrincipals := []v3.Principal{} // TBD
+	groupPrincipals := []v3.Principal{}
 	extras := map[string][]string{
 		"username":    {payload.UserName},
 		"externalid":  {payload.ExternalID},
@@ -361,18 +350,8 @@ func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	provider := mux.Vars(r)["provider"]
 	id := mux.Vars(r)["id"]
 
-	bodyBytes, err := io.ReadAll(r.Body)
-	if err != nil {
-		logrus.Errorf("scim::UpdateUser: failed to read request body: %s", err)
-		writeError(w, NewError(http.StatusBadRequest, "Invalid request body"))
-		return
-	}
-
-	logrus.Tracef("scim::UpdateUser: request body: %s", bodyBytes)
-
 	payload := SCIMUser{}
-
-	err = json.NewDecoder(bytes.NewReader(bodyBytes)).Decode(&payload)
+	err := json.NewDecoder(r.Body).Decode(&payload)
 	if err != nil {
 		logrus.Errorf("scim::UpdateUser: failed to decode request body: %s", err)
 		writeError(w, NewError(http.StatusBadRequest, "Invalid request body"))
@@ -541,20 +520,11 @@ func (s *SCIMServer) PatchUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bodyBytes, err := io.ReadAll(r.Body)
-	if err != nil {
-		logrus.Errorf("scim::PatchUser: failed to read request body: %s", err)
-		writeError(w, NewError(http.StatusBadRequest, "Invalid request body"))
-		return
-	}
-	logrus.Tracef("scim::PatchUser: request body: %s", bodyBytes)
-
 	payload := struct {
 		Operations []patchOp `json:"Operations"`
 		Schemas    []string  `json:"schemas"`
 	}{}
-
-	err = json.NewDecoder(bytes.NewReader(bodyBytes)).Decode(&payload)
+	err = json.NewDecoder(r.Body).Decode(&payload)
 	if err != nil {
 		logrus.Errorf("scim::PatchUser: failed to decode request body: %s", err)
 		writeError(w, NewError(http.StatusBadRequest, "Invalid request body"))
