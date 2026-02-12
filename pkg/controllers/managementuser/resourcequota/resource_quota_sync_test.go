@@ -114,8 +114,9 @@ func TestUpdateDefaultLimitRange(t *testing.T) {
 		lrMock.EXPECT().Update(gomock.Any()).Return(nil, nil).Times(0)
 		sc := SyncController{LimitRange: lrMock}
 
-		err := sc.updateDefaultLimitRange(&corev1.LimitRange{Spec: specA}, &specA)
+		update, err := sc.updateDefaultLimitRange(&corev1.LimitRange{Spec: specA}, &specA)
 		assert.NoError(t, err)
+		assert.False(t, update)
 	})
 
 	t.Run("update for changes", func(t *testing.T) {
@@ -125,8 +126,9 @@ func TestUpdateDefaultLimitRange(t *testing.T) {
 		lrMock.EXPECT().Update(gomock.Any()).Return(nil, nil)
 		sc := SyncController{LimitRange: lrMock}
 
-		err := sc.updateDefaultLimitRange(&corev1.LimitRange{Spec: specA}, &specB)
+		update, err := sc.updateDefaultLimitRange(&corev1.LimitRange{Spec: specA}, &specB)
 		assert.NoError(t, err)
+		assert.True(t, update)
 	})
 }
 
