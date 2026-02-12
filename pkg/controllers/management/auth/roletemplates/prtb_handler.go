@@ -301,5 +301,23 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 			return fmt.Errorf("failed to create role binding %s: %w", rb.Name, err)
 		}
 	}
-	return nil
+
+	// Remove any legacy bindings that were created before the aggregation feature was enabled.
+	return p.deleteLegacyBinding(prtb)
+}
+
+// deleteLegacyBinding deletes the management plane Role Binding in the project namespace that was created for this PRTB before the aggregation feature was enabled.
+// TODO: Remove this once roletemplate aggregation is the only enabled RBAC model. https://github.com/rancher/rancher/issues/53743
+func (p *prtbHandler) deleteLegacyBinding(prtb *v3.ProjectRoleTemplateBinding) error {
+	rbs, err := p.rbController.List(prtb.Namespace, metav1.ListOptions{LabelSelector: labels.Everything().String()})
+	if err != nil {
+		return fmt.Errorf("failed to list role bindings in cluster namespace %s: %w", prtb.Namespace, err)
+	}
+	var returnErr error
+	for _, rb := range rbs.Items {
+		if strings.HasPrefix(rb.Name, prtb.Name) {
+			returnErr = errors.Join(returnErr, rbac.DeleteNamespacedResource(prtb.Namespace, fmt.Sprintf("%s-%s", prtb.Name, prtb.RoleTemplateName), p.rbController))
+		}
+	}
+	return returnErr
 }

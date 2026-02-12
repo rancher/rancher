@@ -35,6 +35,7 @@ type crtbHandler struct {
 	crtbCache            mgmtv3.ClusterRoleTemplateBindingCache
 	crtbClient           mgmtv3.ClusterRoleTemplateBindingController
 	clusterController    mgmtv3.ClusterController
+	projectCache         mgmtv3.ProjectCache
 	clusterManager       *clustermanager.Manager
 	impersonationHandler *impersonationHandler
 }
@@ -51,6 +52,7 @@ func newCRTBHandler(management *config.ManagementContext, clusterManager *cluste
 		crtbCache:         management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
 		crtbClient:        management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
 		clusterController: management.Wrangler.Mgmt.Cluster(),
+		projectCache:      management.Wrangler.Mgmt.Project().Cache(),
 		clusterManager:    clusterManager,
 		impersonationHandler: &impersonationHandler{
 			crtbCache: management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
@@ -198,7 +200,9 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, loc
 	}
 
 	c.s.AddCondition(localConditions, condition, bindingsExists, nil)
-	return nil
+
+	// Remove any legacy bindings that were created before the aggregation feature was enabled.
+	return c.deleteLegacyRoleBindings(crtb)
 }
 
 // getDesiredRoleBindings checks for project and cluster management roles, and if they exist, builds and returns the needed RoleBindings
@@ -231,6 +235,43 @@ func (c *crtbHandler) getDesiredRoleBindings(crtb *v3.ClusterRoleTemplateBinding
 	}
 
 	return desiredRBs, nil
+}
+
+// deleteLegacyRoleBindings deletes any management plane RoleBindings that were created for this CRTB before the aggregation feature was enabled.
+// TODO: Remove this once roletemplate aggregation is the only enabled RBAC model. https://github.com/rancher/rancher/issues/53743
+func (c *crtbHandler) deleteLegacyRoleBindings(crtb *v3.ClusterRoleTemplateBinding) error {
+	projects, err := c.projectCache.List(crtb.ClusterName, labels.Everything())
+	if err != nil {
+		return fmt.Errorf("failed to list projects for cluster %s: %w", crtb.ClusterName, err)
+	}
+
+	// Remove each project management plane role binding if it exists
+	var returnErr error
+	for _, project := range projects {
+		rbs, err := c.rbController.List(project.GetProjectBackingNamespace(), metav1.ListOptions{LabelSelector: labels.Everything().String()})
+		if err != nil {
+			return err
+		}
+		for _, rb := range rbs.Items {
+			if strings.HasPrefix(rb.Name, crtb.Name) {
+				// remove rolebindings that start with crtb-abc123-
+				returnErr = errors.Join(returnErr, rbac.DeleteNamespacedResource(project.GetProjectBackingNamespace(), rb.Name, c.rbController))
+			}
+		}
+	}
+
+	// Remove the cluster management plane role binding if it exists
+	rbs, err := c.rbController.List(crtb.ClusterName, metav1.ListOptions{LabelSelector: labels.Everything().String()})
+	if err != nil {
+		return fmt.Errorf("failed to list role bindings in cluster namespace %s: %w", crtb.ClusterName, err)
+	}
+	for _, rb := range rbs.Items {
+		if strings.HasPrefix(rb.Name, crtb.Name) {
+			// remove rolebindings that start with crtb-abc123-
+			returnErr = errors.Join(returnErr, rbac.DeleteNamespacedResource(crtb.ClusterName, rb.Name, c.rbController))
+		}
+	}
+	return returnErr
 }
 
 // OnRemove deletes Cluster Role Bindings that are owned by the CRTB and the membership binding if no other CRTBs give membership access.

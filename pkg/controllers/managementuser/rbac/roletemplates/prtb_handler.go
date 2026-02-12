@@ -17,6 +17,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	rbacAuth "k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 )
@@ -142,6 +143,10 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 		if err := p.ensureOnlyDesiredRoleBindingExists(rb, rbac.GetPRTBOwnerLabel(prtb.Name)); err != nil {
 			return err
 		}
+
+		if err := p.deleteLegacyRoleBindings(prtb, namespace.Name); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -183,7 +188,16 @@ func (p *prtbHandler) reconcileClusterRoleBindings(prtb *v3.ProjectRoleTemplateB
 
 	crbs = append(crbs, namespaceCRBs...)
 
-	return p.ensureOnlyDesiredClusterRoleBindingsExists(crbs, rbac.GetPRTBOwnerLabel(prtb.Name))
+	err = p.ensureOnlyDesiredClusterRoleBindingsExists(crbs, rbac.GetPRTBOwnerLabel(prtb.Name))
+	if err != nil {
+		return err
+	}
+
+	if err := p.deleteLegacyClusterRoleBindings(prtb); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // buildNamespaceBindings builds the Cluster Role Bindings used to provide access to the project's namespaces.
@@ -349,4 +363,42 @@ func (p *prtbHandler) ensureOnlyDesiredRoleBindingExists(desiredRB *rbacv1.RoleB
 		}
 	}
 	return nil
+}
+
+func (p *prtbHandler) deleteLegacyRoleBindings(prtb *v3.ProjectRoleTemplateBinding, namespace string) error {
+	// The label used for pre-aggregation PRTB ClusterRoleBindings
+	set := labels.Set{rtbOwnerLabel: rbac.GetRTBLabel(prtb.ObjectMeta)}
+
+	rbs, err := p.rbClient.List(namespace, metav1.ListOptions{LabelSelector: set.AsSelector().String()})
+	if err != nil {
+		return fmt.Errorf("failed to list legacy role bindings in namespace %s for PRTB %s: %w", namespace, prtb.Name, err)
+	}
+	var returnErr error
+	for _, rb := range rbs.Items {
+		if err := rbac.DeleteNamespacedResource(namespace, rb.Name, p.rbClient); err != nil {
+			returnErr = errors.Join(returnErr, err)
+		}
+	}
+
+	return returnErr
+}
+
+// deleteLegacyClusterRoleBindings deletes any ClusterRoleBindings that were created for this PRTB before the aggregation feature was enabled.
+// TODO: Remove this once roletemplate aggregation is the only enabled RBAC model. https://github.com/rancher/rancher/issues/53743
+func (p *prtbHandler) deleteLegacyClusterRoleBindings(prtb *v3.ProjectRoleTemplateBinding) error {
+	// The label used for pre-aggregation PRTB ClusterRoleBindings
+	set := labels.Set{rtbOwnerLabel: rbac.GetRTBLabel(prtb.ObjectMeta)}
+
+	crbs, err := p.crbClient.List(metav1.ListOptions{LabelSelector: set.AsSelector().String()})
+	if err != nil {
+		return fmt.Errorf("failed to list legacy cluster role bindings in cluster %s for PRTB %s: %w", p.clusterName, prtb.Name, err)
+	}
+	var returnErr error
+	for _, crb := range crbs.Items {
+		if err := rbac.DeleteResource(crb.Name, p.crbClient); err != nil {
+			returnErr = errors.Join(returnErr, err)
+		}
+	}
+
+	return returnErr
 }
