@@ -73,7 +73,7 @@ func getEffectiveValue(resource *types.RawResource) bool {
 	}
 
 	var val bool
-	// if value is nil, then this ensure default value will be usedq
+	// if value is nil, then this ensures default value will be used
 	if ok {
 		val, _ = status["default"].(bool)
 	}
