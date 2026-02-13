@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	v3client "github.com/rancher/rancher/pkg/client/generated/management/v3"
+	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 )
 
@@ -58,6 +59,14 @@ func Formatter(request *types.APIContext, resource *types.RawResource) {
 }
 
 func getEffectiveValue(resource *types.RawResource) bool {
+	// Prime features always return false on non-Prime builds.
+	status, ok := resource.Values["status"].(map[string]interface{})
+	if ok {
+		if prime, _ := status["prime"].(bool); prime && !features.IsPrime() {
+			return false
+		}
+	}
+
 	if val := resource.Values["value"]; val != nil {
 		val, _ := val.(bool)
 		return val
@@ -65,7 +74,6 @@ func getEffectiveValue(resource *types.RawResource) bool {
 
 	var val bool
 	// if value is nil, then this ensure default value will be usedq
-	status, ok := resource.Values["status"].(map[string]interface{})
 	if ok {
 		val, _ = status["default"].(bool)
 	}

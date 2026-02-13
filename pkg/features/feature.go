@@ -167,7 +167,7 @@ var (
 	OIDCProvider = newFeature(
 		"oidc-provider",
 		"Provide an OIDC provider embedded in Rancher. Required to enable SSO in Rancher Prime components.",
-		isPrime(),
+		IsPrime(), // OIDC is only default enabled on prime, but available to community users
 		false,
 		true)
 	RancherSCCRegistrationExtension = newPrimeFeature(
@@ -396,7 +396,7 @@ func applyArgumentDefaults(featureArgs string) error {
 // Enabled returns whether the feature is enabled.
 // Prime features always return false on non-Prime builds.
 func (f *Feature) Enabled() bool {
-	if f.prime && !isPrime() {
+	if f.prime && !IsPrime() {
 		return false
 	}
 	if f.val != nil {
@@ -415,7 +415,7 @@ func RequireRestarts(f *Feature, obj *v3.Feature) bool {
 	if f.Dynamic() {
 		return false
 	}
-	if f.prime && !isPrime() {
+	if f.prime && !IsPrime() {
 		return false
 	}
 
@@ -475,7 +475,7 @@ func IsEnabled(feature *v3.Feature) bool {
 		return false
 	}
 	// Prime features always return false on non-Prime builds.
-	if feature.Status.Prime && !isPrime() {
+	if feature.Status.Prime && !IsPrime() {
 		return false
 	}
 	if feature.Status.LockedValue != nil {
@@ -513,7 +513,7 @@ func newPrimeFeature(name, description string, def, dynamic, install bool) *Feat
 	return f
 }
 
-// isPrime returns true if it is a Rancher Prime installation
-func isPrime() bool {
+// IsPrime returns true if it is a Rancher Prime installation
+func IsPrime() bool {
 	return os.Getenv(primeEnv) == "prime"
 }
