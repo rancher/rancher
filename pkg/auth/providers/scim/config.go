@@ -6,23 +6,23 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// AuthenticationType defines the type of authentication scheme.
-type AuthenticationType string
+// authenticationType defines the type of authentication scheme.
+type authenticationType string
 
 const (
-	// AuthenticationTypeOauth indicates that the authentication type is OAuth.
-	AuthenticationTypeOauth AuthenticationType = "oauth"
-	// AuthenticationTypeOauth2 indicates that the authentication type is OAuth2.
-	AuthenticationTypeOauth2 AuthenticationType = "oauth2"
-	// AuthenticationTypeOauthBearerToken indicates that the authentication type is OAuth2 Bearer Token.
-	AuthenticationTypeOauthBearerToken AuthenticationType = "oauthbearertoken"
+	// authenticationTypeOauth indicates that the authentication type is OAuth.
+	authenticationTypeOauth authenticationType = "oauth"
+	// authenticationTypeOauth2 indicates that the authentication type is OAuth2.
+	authenticationTypeOauth2 authenticationType = "oauth2"
+	// authenticationTypeOauthBearerToken indicates that the authentication type is OAuth2 Bearer Token.
+	authenticationTypeOauthBearerToken authenticationType = "oauthbearertoken"
 )
 
-// AuthenticationScheme represents an authentication scheme supported by the service provider.
-type AuthenticationScheme struct {
+// authenticationScheme represents an authentication scheme supported by the service provider.
+type authenticationScheme struct {
 	// Type is the authentication scheme. This specification defines the values "oauth", "oauth2", "oauthbearertoken",
 	// "httpbasic", and "httpdigest".
-	Type AuthenticationType
+	Type authenticationType
 	// Name is the common authentication scheme name, e.g., HTTP Basic.
 	Name string
 	// Description of the authentication scheme.
@@ -38,7 +38,7 @@ type AuthenticationScheme struct {
 // ServiceProviderConfig represents the SCIM Service Provider Configuration.
 type ServiceProviderConfig struct {
 	// AuthenticationSchemes is a multi-valued complex type that specifies supported authentication scheme properties.
-	AuthenticationSchemes []AuthenticationScheme
+	AuthenticationSchemes []authenticationScheme
 	// MaxResults denotes the the integer value specifying the maximum number of resources returned in a response. It defaults to 100.
 	MaxResults int
 	// SupportFiltering indicates whether or not the SCIM implementation supports filtering.
@@ -98,16 +98,16 @@ func (s *SCIMServer) GetServiceProviderConfig(w http.ResponseWriter, r *http.Req
 	logrus.Tracef("scim::GetServiceProviderConfig: url %s", r.URL)
 
 	config := &ServiceProviderConfig{
-		AuthenticationSchemes: []AuthenticationScheme{
+		AuthenticationSchemes: []authenticationScheme{
 			{
-				Type:        AuthenticationTypeOauthBearerToken,
+				Type:        authenticationTypeOauthBearerToken,
 				Name:        "OAuth Bearer Token",
 				Description: "Authentication scheme using the OAuth Bearer Token",
 				SpecURI:     "http://tools.ietf.org/html/draft-ietf-scim-core-protocol-10#section-3.1",
 				Primary:     true,
 			},
 		},
-		MaxResults:       MaxPageSize,
+		MaxResults:       maxPageSize,
 		SupportFiltering: true,
 		SupportPatch:     true,
 	}

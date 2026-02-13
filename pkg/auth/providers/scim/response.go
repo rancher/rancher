@@ -9,8 +9,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// ListResponse defines a SCIM list response.
-type ListResponse struct {
+// listResponse defines a SCIM list response.
+type listResponse struct {
 	Schemas      []string `json:"schemas"`
 	TotalResults int      `json:"totalResults"`
 	ItemsPerPage int      `json:"itemsPerPage"`
@@ -52,7 +52,7 @@ func (e Error) MarshalJSON() ([]byte, error) {
 // NewError creates a new SCIM error.
 func NewError(status int, detail string, scimType ...string) *Error {
 	err := &Error{
-		Schemas: []string{ErrorSchemaID},
+		Schemas: []string{errorSchemaID},
 		Status:  status,
 		Detail:  detail,
 	}

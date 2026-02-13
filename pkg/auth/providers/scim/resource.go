@@ -11,18 +11,18 @@ import (
 
 // SCIM resource types.
 const (
-	UserResource         = "User"
-	GroupResource        = "Group"
-	ResourceTypeResource = "ResourceType"
-	SchemaResource       = "Schema"
+	userResource         = "User"
+	groupResource        = "Group"
+	resourceTypeResource = "ResourceType"
+	schemaResource       = "Schema"
 )
 
 // SCIM resource endpoints.
 const (
-	UserEndpoint          = "Users"
-	GroupEndpoint         = "Groups"
-	ResourceTypesEndpoint = "ResourceTypes"
-	SchemasEndpoint       = "Schemas"
+	userEndpoint         = "Users"
+	groupEndpoint        = "Groups"
+	resourceTypeEndpoint = "ResourceTypes"
+	schemaEndpoint       = "Schemas"
 )
 
 // Meta represents the resource metadata.
@@ -67,34 +67,34 @@ type ResourceType struct {
 
 // userResourceType defines the SCIM User resource type.
 var userResourceType = ResourceType{
-	ID:          UserResource,
-	Name:        UserResource,
+	ID:          userResource,
+	Name:        userResource,
 	Description: "User Account",
-	Endpoint:    "/" + UserEndpoint,
-	Schema:      UserSchemaID,
-	Schemas:     []string{ResourceSchemaID},
+	Endpoint:    "/" + userEndpoint,
+	Schema:      userSchemaID,
+	Schemas:     []string{resourceSchemaID},
 	Meta: Meta{
-		ResourceType: ResourceTypeResource,
+		ResourceType: resourceTypeResource,
 	},
 }
 
 // groupResourceType defines the SCIM Group resource type.
 var groupResourceType = ResourceType{
-	ID:          GroupResource,
-	Name:        GroupResource,
+	ID:          groupResource,
+	Name:        groupResource,
 	Description: "Group of users",
-	Endpoint:    "/" + GroupEndpoint,
-	Schema:      GroupSchemaID,
-	Schemas:     []string{ResourceSchemaID},
+	Endpoint:    "/" + groupEndpoint,
+	Schema:      groupSchemaID,
+	Schemas:     []string{resourceSchemaID},
 	Meta: Meta{
-		ResourceType: ResourceTypeResource,
+		ResourceType: resourceTypeResource,
 	},
 }
 
 // resourceTypeRegistry maps SCIM resource type IDs to their definitions.
 var resourceTypeRegistry = map[string]ResourceType{
-	UserResource:  userResourceType,
-	GroupResource: groupResourceType,
+	userResource:  userResourceType,
+	groupResource: groupResourceType,
 }
 
 // ListResourceTypes lists supported SCIM resource types.
@@ -103,10 +103,10 @@ func (s *SCIMServer) ListResourceTypes(w http.ResponseWriter, r *http.Request) {
 
 	provider := mux.Vars(r)["provider"]
 
-	response := &ListResponse{Schemas: []string{ListSchemaID}}
+	response := &listResponse{Schemas: []string{listSchemaID}}
 	for _, resourceType := range resourceTypeRegistry {
 		resourceType := resourceType
-		resourceType.Meta.Location = locationURL(r, provider, ResourceTypesEndpoint, resourceType.ID)
+		resourceType.Meta.Location = locationURL(r, provider, resourceTypeEndpoint, resourceType.ID)
 		response.Resources = append(response.Resources, resourceType)
 	}
 
@@ -131,7 +131,7 @@ func (s *SCIMServer) GetResourceType(w http.ResponseWriter, r *http.Request) {
 		writeError(w, NewError(http.StatusNotFound, fmt.Sprintf("ResourceType %s not found", id)))
 		return
 	}
-	resourceType.Meta.Location = locationURL(r, provider, ResourceTypesEndpoint, resourceType.ID)
+	resourceType.Meta.Location = locationURL(r, provider, resourceTypeEndpoint, resourceType.ID)
 
 	writeResponse(w, resourceType)
 }

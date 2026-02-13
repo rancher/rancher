@@ -176,7 +176,7 @@ func TestListUsersPagination(t *testing.T) {
 			assert.Equal(t, tt.wantStatus, w.Code)
 
 			if tt.wantStatus == http.StatusOK {
-				var resp ListResponse
+				var resp listResponse
 				err := json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
 
@@ -240,7 +240,7 @@ func TestListUsersPaginationConsistency(t *testing.T) {
 		srv.ListUsers(w, r)
 		require.Equal(t, http.StatusOK, w.Code)
 
-		var resp ListResponse
+		var resp listResponse
 		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 
@@ -319,7 +319,7 @@ func TestListUsersWithFilter(t *testing.T) {
 	srv.ListUsers(w, r)
 	require.Equal(t, http.StatusOK, w.Code)
 
-	var resp ListResponse
+	var resp listResponse
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	require.NoError(t, err)
 
@@ -376,7 +376,7 @@ func TestListUsersExcludesSystemUsers(t *testing.T) {
 	srv.ListUsers(w, r)
 	require.Equal(t, http.StatusOK, w.Code)
 
-	var resp ListResponse
+	var resp listResponse
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	require.NoError(t, err)
 
@@ -433,11 +433,11 @@ func TestGetUser(t *testing.T) {
 		assert.Equal(t, "john.doe", resp["userName"])
 		assert.Equal(t, "ext-12345", resp["externalId"])
 		assert.Equal(t, true, resp["active"])
-		assert.Equal(t, []any{UserSchemaID}, resp["schemas"])
+		assert.Equal(t, []any{userSchemaID}, resp["schemas"])
 
 		meta, ok := resp["meta"].(map[string]any)
 		require.True(t, ok)
-		assert.Equal(t, UserResource, meta["resourceType"])
+		assert.Equal(t, userResource, meta["resourceType"])
 		assert.Contains(t, meta["location"], "/v1-scim/"+provider+"/Users/"+userID)
 
 		emails, ok := resp["emails"].([]any)
@@ -518,7 +518,7 @@ func TestGetUser(t *testing.T) {
 		var errResp map[string]any
 		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
-		assert.Contains(t, errResp["schemas"], ErrorSchemaID)
+		assert.Contains(t, errResp["schemas"], errorSchemaID)
 	})
 
 	t.Run("system user returns not found", func(t *testing.T) {
@@ -549,7 +549,7 @@ func TestGetUser(t *testing.T) {
 		var errResp map[string]any
 		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
-		assert.Contains(t, errResp["schemas"], ErrorSchemaID)
+		assert.Contains(t, errResp["schemas"], errorSchemaID)
 	})
 }
 
@@ -610,7 +610,7 @@ func TestCreateUser(t *testing.T) {
 		assert.Equal(t, "john.doe", resp["userName"])
 		assert.Equal(t, "ext-12345", resp["externalId"])
 		assert.Equal(t, true, resp["active"])
-		assert.Equal(t, []any{UserSchemaID}, resp["schemas"])
+		assert.Equal(t, []any{userSchemaID}, resp["schemas"])
 
 		emails, ok := resp["emails"].([]any)
 		require.True(t, ok)
@@ -621,7 +621,7 @@ func TestCreateUser(t *testing.T) {
 
 		meta, ok := resp["meta"].(map[string]any)
 		require.True(t, ok)
-		assert.Equal(t, UserResource, meta["resourceType"])
+		assert.Equal(t, userResource, meta["resourceType"])
 
 		wantLocation := "/v1-scim/" + provider + "/Users/" + userID
 		assert.Contains(t, meta["location"], wantLocation)
@@ -720,7 +720,7 @@ func TestCreateUser(t *testing.T) {
 		var errResp map[string]any
 		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
-		assert.Contains(t, errResp["schemas"], ErrorSchemaID)
+		assert.Contains(t, errResp["schemas"], errorSchemaID)
 	})
 
 	t.Run("invalid request body", func(t *testing.T) {
@@ -745,7 +745,7 @@ func TestCreateUser(t *testing.T) {
 		var errResp map[string]any
 		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
-		assert.Contains(t, errResp["schemas"], ErrorSchemaID)
+		assert.Contains(t, errResp["schemas"], errorSchemaID)
 	})
 
 	t.Run("error listing users", func(t *testing.T) {
@@ -949,7 +949,7 @@ func TestUpdateUser(t *testing.T) {
 
 		meta, ok := resp["meta"].(map[string]any)
 		require.True(t, ok)
-		assert.Equal(t, UserResource, meta["resourceType"])
+		assert.Equal(t, userResource, meta["resourceType"])
 
 		wantLocation := "/v1-scim/" + provider + "/Users/" + userID
 		assert.Contains(t, meta["location"], wantLocation)
@@ -1218,7 +1218,7 @@ func TestUpdateUser(t *testing.T) {
 		var errResp map[string]any
 		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
-		assert.Contains(t, errResp["schemas"], ErrorSchemaID)
+		assert.Contains(t, errResp["schemas"], errorSchemaID)
 	})
 
 	t.Run("invalid request body", func(t *testing.T) {
@@ -1388,7 +1388,7 @@ func TestDeleteUser(t *testing.T) {
 		var errResp map[string]any
 		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
-		assert.Contains(t, errResp["schemas"], ErrorSchemaID)
+		assert.Contains(t, errResp["schemas"], errorSchemaID)
 	})
 
 	t.Run("system user returns not found", func(t *testing.T) {
@@ -1439,7 +1439,7 @@ func TestDeleteUser(t *testing.T) {
 		var errResp map[string]any
 		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
-		assert.Contains(t, errResp["schemas"], ErrorSchemaID)
+		assert.Contains(t, errResp["schemas"], errorSchemaID)
 	})
 
 	t.Run("error deleting user", func(t *testing.T) {
@@ -1546,7 +1546,7 @@ func TestPatchUser(t *testing.T) {
 
 		meta, ok := resp["meta"].(map[string]any)
 		require.True(t, ok)
-		assert.Equal(t, UserResource, meta["resourceType"])
+		assert.Equal(t, userResource, meta["resourceType"])
 
 		wantLocation := "/v1-scim/" + provider + "/Users/" + userID
 		assert.Contains(t, meta["location"], wantLocation)

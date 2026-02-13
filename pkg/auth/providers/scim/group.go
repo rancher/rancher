@@ -16,20 +16,20 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-// SCIMMember represents a member of a SCIM group.
-type SCIMMember struct {
+// scimMember represents a member of a SCIM group.
+type scimMember struct {
 	Value   string `json:"value"`   // Member identifier.
 	Type    string `json:"type"`    // Member type, e.g., "User" or "Group".
 	Display string `json:"display"` // A human-readable name.
 }
 
-// SCIMGroup represents a SCIM group.
-type SCIMGroup struct {
+// scimGroup represents a SCIM group.
+type scimGroup struct {
 	Schemas     []string     `json:"schemas"`     // Resource schema URIs.
 	ID          string       `json:"id"`          // Service provider internal identifier Group.Name.
 	DisplayName string       `json:"displayName"` // A human-readable name for the Group.
 	ExternalID  string       `json:"externalId"`  // IdPs identifier.
-	Members     []SCIMMember `json:"members"`     // A list of members of the Group.
+	Members     []scimMember `json:"members"`     // A list of members of the Group.
 	Meta        Meta         `json:"meta"`        // The resource metadata.
 }
 
@@ -62,7 +62,7 @@ func (s *SCIMServer) ListGroups(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// Currently only support displayName eq "<value>" filter.
-		if err := filter.ValidateForAttribute("displayName", OpEqual); err != nil {
+		if err := filter.ValidateForAttribute("displayName", opEqual); err != nil {
 			writeError(w, NewError(http.StatusBadRequest, err.Error()))
 			return
 		}
@@ -94,7 +94,7 @@ func (s *SCIMServer) ListGroups(w http.ResponseWriter, r *http.Request) {
 	// Collect all matching resources (needed to compute totalResults).
 	var allResources []any
 	if len(groups) > 0 {
-		var uniqueGroups map[string][]SCIMMember
+		var uniqueGroups map[string][]scimMember
 		if !excludeMembers {
 			uniqueGroups, err = s.getAllRancherGroupMembers(provider)
 			if err != nil {
@@ -111,19 +111,19 @@ func (s *SCIMServer) ListGroups(w http.ResponseWriter, r *http.Request) {
 			}
 
 			resource := map[string]any{
-				"schemas":     []string{GroupSchemaID},
+				"schemas":     []string{groupSchemaID},
 				"id":          group.Name,
 				"displayName": group.DisplayName,
 				"externalId":  group.ExternalID,
 				"meta": map[string]any{
 					"created":      group.CreationTimestamp,
-					"resourceType": GroupResource,
-					"location":     locationURL(r, provider, GroupEndpoint, group.Name),
+					"resourceType": groupResource,
+					"location":     locationURL(r, provider, groupEndpoint, group.Name),
 				},
 			}
 			members, ok := uniqueGroups[group.DisplayName]
 			if !ok {
-				members = []SCIMMember{}
+				members = []scimMember{}
 			}
 			if !excludeMembers {
 				resource["members"] = members
@@ -141,8 +141,8 @@ func (s *SCIMServer) ListGroups(w http.ResponseWriter, r *http.Request) {
 		paginatedResources = []any{}
 	}
 
-	response := &ListResponse{
-		Schemas:      []string{ListSchemaID},
+	response := &listResponse{
+		Schemas:      []string{listSchemaID},
 		Resources:    paginatedResources,
 		TotalResults: totalResults,
 		ItemsPerPage: len(paginatedResources),
@@ -162,7 +162,7 @@ func (s *SCIMServer) CreateGroup(w http.ResponseWriter, r *http.Request) {
 
 	provider := mux.Vars(r)["provider"]
 
-	payload := SCIMGroup{}
+	payload := scimGroup{}
 	err := json.NewDecoder(r.Body).Decode(&payload)
 	if err != nil {
 		logrus.Errorf("scim::CreateGroup: failed to unmarshal request body: %s", err)
@@ -192,21 +192,21 @@ func (s *SCIMServer) CreateGroup(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	location := locationURL(r, provider, GroupEndpoint, group.Name)
+	location := locationURL(r, provider, groupEndpoint, group.Name)
 	resource := map[string]any{
-		"schemas":     []string{GroupSchemaID},
+		"schemas":     []string{groupSchemaID},
 		"id":          group.Name,
 		"displayName": group.DisplayName,
 		"externalId":  group.ExternalID,
 		"meta": map[string]any{
 			"created":      group.CreationTimestamp,
-			"resourceType": GroupResource,
+			"resourceType": groupResource,
 			"location":     location,
 		},
 	}
 	members := payload.Members
 	if members == nil {
-		members = []SCIMMember{}
+		members = []scimMember{}
 	}
 	resource["members"] = members
 
@@ -242,7 +242,7 @@ func (s *SCIMServer) GetGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var members []SCIMMember
+	var members []scimMember
 	if !excludeMembers {
 		members, err = s.getRancherGroupMembers(provider, group.DisplayName)
 		if err != nil {
@@ -253,18 +253,18 @@ func (s *SCIMServer) GetGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resource := map[string]any{
-		"schemas":     []string{GroupSchemaID},
+		"schemas":     []string{groupSchemaID},
 		"id":          group.Name,
 		"displayName": group.DisplayName,
 		"externalId":  group.ExternalID,
 		"meta": map[string]any{
 			"created":      group.CreationTimestamp,
-			"resourceType": GroupResource,
-			"location":     locationURL(r, provider, GroupEndpoint, group.Name),
+			"resourceType": groupResource,
+			"location":     locationURL(r, provider, groupEndpoint, group.Name),
 		},
 	}
 	if members == nil {
-		members = []SCIMMember{}
+		members = []scimMember{}
 	}
 	if !excludeMembers {
 		resource["members"] = members
@@ -283,7 +283,7 @@ func (s *SCIMServer) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 	provider := mux.Vars(r)["provider"]
 	id := mux.Vars(r)["id"]
 
-	payload := SCIMGroup{}
+	payload := scimGroup{}
 	err := json.NewDecoder(r.Body).Decode(&payload)
 	if err != nil {
 		logrus.Errorf("scim::UpdateGroup: failed to unmarshal request body: %s", err)
@@ -311,21 +311,21 @@ func (s *SCIMServer) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	location := locationURL(r, provider, GroupEndpoint, group.Name)
+	location := locationURL(r, provider, groupEndpoint, group.Name)
 	resource := map[string]any{
-		"schemas":     []string{GroupSchemaID},
+		"schemas":     []string{groupSchemaID},
 		"id":          group.Name,
 		"displayName": group.DisplayName,
 		"externalId":  group.ExternalID,
 		"meta": map[string]any{
 			"created":      group.CreationTimestamp,
-			"resourceType": GroupResource,
+			"resourceType": groupResource,
 			"location":     location,
 		},
 	}
 	members := payload.Members
 	if members == nil {
-		members = []SCIMMember{}
+		members = []scimMember{}
 	}
 	resource["members"] = members
 
@@ -373,7 +373,7 @@ func (s *SCIMServer) PatchGroup(w http.ResponseWriter, r *http.Request) {
 	group = group.DeepCopy()
 	var shouldUpdateGroup bool
 
-	var membersToAdd []SCIMMember
+	var membersToAdd []scimMember
 	var membersToRemove []string
 
 	for _, op := range payload.Operations {
@@ -408,7 +408,7 @@ func (s *SCIMServer) PatchGroup(w http.ResponseWriter, r *http.Request) {
 				value, _ := memberMap["value"].(string)
 				display, _ := memberMap["display"].(string)
 				if value != "" {
-					membersToAdd = append(membersToAdd, SCIMMember{
+					membersToAdd = append(membersToAdd, scimMember{
 						Value:   value,
 						Display: display,
 					})
@@ -469,16 +469,16 @@ func (s *SCIMServer) PatchGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	location := locationURL(r, provider, GroupEndpoint, group.Name)
+	location := locationURL(r, provider, groupEndpoint, group.Name)
 	resource := map[string]any{
-		"schemas":     []string{GroupSchemaID},
+		"schemas":     []string{groupSchemaID},
 		"id":          group.Name,
 		"displayName": group.DisplayName,
 		"externalId":  group.ExternalID,
 		"members":     members,
 		"meta": map[string]any{
 			"created":      group.CreationTimestamp,
-			"resourceType": GroupResource,
+			"resourceType": groupResource,
 			"location":     location,
 		},
 	}
@@ -526,13 +526,13 @@ func (s *SCIMServer) DeleteGroup(w http.ResponseWriter, r *http.Request) {
 }
 
 // getAllRancherGroupMembers retrieves all groups and their members for the specified provider.
-func (s *SCIMServer) getAllRancherGroupMembers(provider string) (map[string][]SCIMMember, error) {
+func (s *SCIMServer) getAllRancherGroupMembers(provider string) (map[string][]scimMember, error) {
 	list, err := s.userCache.List(labels.Everything())
 	if err != nil {
 		return nil, fmt.Errorf("failed to list users: %w", err)
 	}
 
-	uniqueGroups := make(map[string][]SCIMMember)
+	uniqueGroups := make(map[string][]scimMember)
 	for _, user := range list {
 		if user.IsSystem() {
 			continue
@@ -547,7 +547,7 @@ func (s *SCIMServer) getAllRancherGroupMembers(provider string) (map[string][]SC
 		}
 
 		for _, group := range attr.GroupPrincipals[provider].Items {
-			uniqueGroups[group.DisplayName] = append(uniqueGroups[group.DisplayName], SCIMMember{
+			uniqueGroups[group.DisplayName] = append(uniqueGroups[group.DisplayName], scimMember{
 				Value:   user.Name,
 				Display: first(attr.ExtraByProvider[provider]["username"]),
 			})
@@ -558,13 +558,13 @@ func (s *SCIMServer) getAllRancherGroupMembers(provider string) (map[string][]SC
 }
 
 // getRancherGroupMembers retrieves members of a specific group for the specified provider.
-func (s *SCIMServer) getRancherGroupMembers(provider string, name string) ([]SCIMMember, error) {
+func (s *SCIMServer) getRancherGroupMembers(provider string, name string) ([]scimMember, error) {
 	list, err := s.userCache.List(labels.Everything())
 	if err != nil {
 		return nil, fmt.Errorf("failed to list users: %w", err)
 	}
 
-	var members []SCIMMember
+	var members []scimMember
 	for _, user := range list {
 		if user.IsSystem() {
 			continue
@@ -580,7 +580,7 @@ func (s *SCIMServer) getRancherGroupMembers(provider string, name string) ([]SCI
 
 		for _, group := range attr.GroupPrincipals[provider].Items {
 			if group.DisplayName == name {
-				members = append(members, SCIMMember{
+				members = append(members, scimMember{
 					Value:   user.Name,
 					Display: first(attr.ExtraByProvider[provider]["username"]),
 				})
@@ -593,7 +593,7 @@ func (s *SCIMServer) getRancherGroupMembers(provider string, name string) ([]SCI
 }
 
 // syncGroupMembers synchronizes the members of a group to match the provided list.
-func (s *SCIMServer) syncGroupMembers(provider, groupName string, members []SCIMMember) error {
+func (s *SCIMServer) syncGroupMembers(provider, groupName string, members []scimMember) error {
 	rancherMembers, err := s.getRancherGroupMembers(provider, groupName)
 	if err != nil {
 		return fmt.Errorf("failed to get groups: %w", err)
@@ -605,7 +605,7 @@ func (s *SCIMServer) syncGroupMembers(provider, groupName string, members []SCIM
 	}
 
 	for _, member := range members {
-		if member.Type == GroupResource {
+		if member.Type == groupResource {
 			continue // Nested groups are not supported yet.
 		}
 
@@ -631,7 +631,7 @@ func (s *SCIMServer) syncGroupMembers(provider, groupName string, members []SCIM
 }
 
 // addGroupMember adds a member to a group.
-func (s *SCIMServer) addGroupMember(provider, groupName string, member SCIMMember) error {
+func (s *SCIMServer) addGroupMember(provider, groupName string, member scimMember) error {
 	user, err := s.userCache.Get(member.Value)
 	if err != nil {
 		return fmt.Errorf("failed to get user %s: %w", member.Value, err)
@@ -728,7 +728,7 @@ func (s *SCIMServer) removeAllGroupMembers(provider, groupName string) error {
 
 // ensureRancherGroup ensures that a Rancher group exists for the given SCIM group.
 // Returns the group, a boolean indicating if a new group was created, and any error.
-func (s *SCIMServer) ensureRancherGroup(provider string, grp SCIMGroup) (*v3.Group, bool, error) {
+func (s *SCIMServer) ensureRancherGroup(provider string, grp scimGroup) (*v3.Group, bool, error) {
 	if grp.ID != "" {
 		g, err := s.groupsCache.Get(grp.ID)
 		return g, false, err

@@ -22,10 +22,10 @@ const (
 )
 
 const (
-	// DefaultPageSize is the default number of results per page when count is not specified.
-	DefaultPageSize = 100
-	// MaxPageSize is the maximum allowed page size to prevent excessive memory usage.
-	MaxPageSize = 1000
+	// defaultPageSize is the default number of results per page when count is not specified.
+	defaultPageSize = 100
+	// maxPageSize is the maximum allowed page size to prevent excessive memory usage.
+	maxPageSize = 1000
 )
 
 // patchOp defines a single operation in a SCIM PATCH request.
@@ -67,7 +67,7 @@ type paginationParams struct {
 func parsePaginationParams(r *http.Request) (paginationParams, error) {
 	params := paginationParams{
 		startIndex: 1,
-		count:      DefaultPageSize,
+		count:      defaultPageSize,
 	}
 
 	if value := r.URL.Query().Get("startIndex"); value != "" {
@@ -89,8 +89,8 @@ func parsePaginationParams(r *http.Request) (paginationParams, error) {
 		if count < 0 {
 			return params, fmt.Errorf("invalid count: must be >= 0")
 		}
-		if count > MaxPageSize {
-			count = MaxPageSize
+		if count > maxPageSize {
+			count = maxPageSize
 		}
 		params.count = count
 	}

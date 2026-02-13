@@ -33,7 +33,7 @@ func TestParseFilter(t *testing.T) {
 			filter: `userName eq "john.doe"`,
 			want: &Filter{
 				Attribute: "userName",
-				Operator:  OpEqual,
+				Operator:  opEqual,
 				Value:     "john.doe",
 			},
 		},
@@ -42,7 +42,7 @@ func TestParseFilter(t *testing.T) {
 			filter: `userName EQ "test"`,
 			want: &Filter{
 				Attribute: "userName",
-				Operator:  OpEqual,
+				Operator:  opEqual,
 				Value:     "test",
 			},
 		},
@@ -53,7 +53,7 @@ func TestParseFilter(t *testing.T) {
 			filter: `active ne "false"`,
 			want: &Filter{
 				Attribute: "active",
-				Operator:  OpNotEqual,
+				Operator:  opNotEqual,
 				Value:     "false",
 			},
 		},
@@ -64,7 +64,7 @@ func TestParseFilter(t *testing.T) {
 			filter: `userName co "john"`,
 			want: &Filter{
 				Attribute: "userName",
-				Operator:  OpContains,
+				Operator:  opContains,
 				Value:     "john",
 			},
 		},
@@ -75,7 +75,7 @@ func TestParseFilter(t *testing.T) {
 			filter: `userName sw "john"`,
 			want: &Filter{
 				Attribute: "userName",
-				Operator:  OpStartsWith,
+				Operator:  opStartsWith,
 				Value:     "john",
 			},
 		},
@@ -86,7 +86,7 @@ func TestParseFilter(t *testing.T) {
 			filter: `userName ew "@example.com"`,
 			want: &Filter{
 				Attribute: "userName",
-				Operator:  OpEndsWith,
+				Operator:  opEndsWith,
 				Value:     "@example.com",
 			},
 		},
@@ -97,7 +97,7 @@ func TestParseFilter(t *testing.T) {
 			filter: `externalId pr`,
 			want: &Filter{
 				Attribute: "externalId",
-				Operator:  OpPresent,
+				Operator:  opPresent,
 				Value:     "",
 			},
 		},
@@ -108,7 +108,7 @@ func TestParseFilter(t *testing.T) {
 			filter: `created gt "2024-01-01"`,
 			want: &Filter{
 				Attribute: "created",
-				Operator:  OpGreaterThan,
+				Operator:  opGreaterThan,
 				Value:     "2024-01-01",
 			},
 		},
@@ -117,7 +117,7 @@ func TestParseFilter(t *testing.T) {
 			filter: `created ge "2024-01-01"`,
 			want: &Filter{
 				Attribute: "created",
-				Operator:  OpGreaterOrEqual,
+				Operator:  opGreaterOrEqual,
 				Value:     "2024-01-01",
 			},
 		},
@@ -126,7 +126,7 @@ func TestParseFilter(t *testing.T) {
 			filter: `created lt "2024-12-31"`,
 			want: &Filter{
 				Attribute: "created",
-				Operator:  OpLessThan,
+				Operator:  opLessThan,
 				Value:     "2024-12-31",
 			},
 		},
@@ -135,7 +135,7 @@ func TestParseFilter(t *testing.T) {
 			filter: `created le "2024-12-31"`,
 			want: &Filter{
 				Attribute: "created",
-				Operator:  OpLessOrEqual,
+				Operator:  opLessOrEqual,
 				Value:     "2024-12-31",
 			},
 		},
@@ -146,7 +146,7 @@ func TestParseFilter(t *testing.T) {
 			filter: `displayName eq "Engineering Team"`,
 			want: &Filter{
 				Attribute: "displayName",
-				Operator:  OpEqual,
+				Operator:  opEqual,
 				Value:     "Engineering Team",
 			},
 		},
@@ -155,7 +155,7 @@ func TestParseFilter(t *testing.T) {
 			filter: `userName eq "user@example.com"`,
 			want: &Filter{
 				Attribute: "userName",
-				Operator:  OpEqual,
+				Operator:  opEqual,
 				Value:     "user@example.com",
 			},
 		},
@@ -164,7 +164,7 @@ func TestParseFilter(t *testing.T) {
 			filter: `displayName eq "Team \"Alpha\""`,
 			want: &Filter{
 				Attribute: "displayName",
-				Operator:  OpEqual,
+				Operator:  opEqual,
 				Value:     `Team "Alpha"`,
 			},
 		},
@@ -173,7 +173,7 @@ func TestParseFilter(t *testing.T) {
 			filter: `  userName   eq   "test"  `,
 			want: &Filter{
 				Attribute: "userName",
-				Operator:  OpEqual,
+				Operator:  opEqual,
 				Value:     "test",
 			},
 		},
@@ -184,7 +184,7 @@ func TestParseFilter(t *testing.T) {
 			filter: `name.familyName eq "Smith"`,
 			want: &Filter{
 				Attribute: "name.familyName",
-				Operator:  OpEqual,
+				Operator:  opEqual,
 				Value:     "Smith",
 			},
 		},
@@ -193,7 +193,7 @@ func TestParseFilter(t *testing.T) {
 			filter: `external_id eq "123"`,
 			want: &Filter{
 				Attribute: "external_id",
-				Operator:  OpEqual,
+				Operator:  opEqual,
 				Value:     "123",
 			},
 		},
@@ -274,79 +274,79 @@ func TestFilterMatches(t *testing.T) {
 		},
 		{
 			name:   "eq exact match",
-			filter: &Filter{Attribute: "userName", Operator: OpEqual, Value: "john.doe"},
+			filter: &Filter{Attribute: "userName", Operator: opEqual, Value: "john.doe"},
 			value:  "john.doe",
 			want:   true,
 		},
 		{
 			name:   "eq case insensitive match",
-			filter: &Filter{Attribute: "userName", Operator: OpEqual, Value: "John.Doe"},
+			filter: &Filter{Attribute: "userName", Operator: opEqual, Value: "John.Doe"},
 			value:  "john.doe",
 			want:   true,
 		},
 		{
 			name:   "eq no match",
-			filter: &Filter{Attribute: "userName", Operator: OpEqual, Value: "jane.doe"},
+			filter: &Filter{Attribute: "userName", Operator: opEqual, Value: "jane.doe"},
 			value:  "john.doe",
 			want:   false,
 		},
 		{
 			name:   "ne match",
-			filter: &Filter{Attribute: "userName", Operator: OpNotEqual, Value: "jane.doe"},
+			filter: &Filter{Attribute: "userName", Operator: opNotEqual, Value: "jane.doe"},
 			value:  "john.doe",
 			want:   true,
 		},
 		{
 			name:   "ne no match",
-			filter: &Filter{Attribute: "userName", Operator: OpNotEqual, Value: "john.doe"},
+			filter: &Filter{Attribute: "userName", Operator: opNotEqual, Value: "john.doe"},
 			value:  "john.doe",
 			want:   false,
 		},
 		{
 			name:   "co match",
-			filter: &Filter{Attribute: "userName", Operator: OpContains, Value: "ohn"},
+			filter: &Filter{Attribute: "userName", Operator: opContains, Value: "ohn"},
 			value:  "john.doe",
 			want:   true,
 		},
 		{
 			name:   "co no match",
-			filter: &Filter{Attribute: "userName", Operator: OpContains, Value: "xyz"},
+			filter: &Filter{Attribute: "userName", Operator: opContains, Value: "xyz"},
 			value:  "john.doe",
 			want:   false,
 		},
 		{
 			name:   "sw match",
-			filter: &Filter{Attribute: "userName", Operator: OpStartsWith, Value: "john"},
+			filter: &Filter{Attribute: "userName", Operator: opStartsWith, Value: "john"},
 			value:  "john.doe",
 			want:   true,
 		},
 		{
 			name:   "sw no match",
-			filter: &Filter{Attribute: "userName", Operator: OpStartsWith, Value: "doe"},
+			filter: &Filter{Attribute: "userName", Operator: opStartsWith, Value: "doe"},
 			value:  "john.doe",
 			want:   false,
 		},
 		{
 			name:   "ew match",
-			filter: &Filter{Attribute: "userName", Operator: OpEndsWith, Value: ".doe"},
+			filter: &Filter{Attribute: "userName", Operator: opEndsWith, Value: ".doe"},
 			value:  "john.doe",
 			want:   true,
 		},
 		{
 			name:   "ew no match",
-			filter: &Filter{Attribute: "userName", Operator: OpEndsWith, Value: "john"},
+			filter: &Filter{Attribute: "userName", Operator: opEndsWith, Value: "john"},
 			value:  "john.doe",
 			want:   false,
 		},
 		{
 			name:   "pr match when present",
-			filter: &Filter{Attribute: "externalId", Operator: OpPresent},
+			filter: &Filter{Attribute: "externalId", Operator: opPresent},
 			value:  "ext-123",
 			want:   true,
 		},
 		{
 			name:   "pr no match when empty",
-			filter: &Filter{Attribute: "externalId", Operator: OpPresent},
+			filter: &Filter{Attribute: "externalId", Operator: opPresent},
 			value:  "",
 			want:   false,
 		},
@@ -369,13 +369,13 @@ func TestFilterMatchesCaseExact(t *testing.T) {
 	}{
 		{
 			name:   "case exact match",
-			filter: &Filter{Attribute: "id", Operator: OpEqual, Value: "user-123"},
+			filter: &Filter{Attribute: "id", Operator: opEqual, Value: "user-123"},
 			value:  "user-123",
 			want:   true,
 		},
 		{
 			name:   "case exact no match different case",
-			filter: &Filter{Attribute: "id", Operator: OpEqual, Value: "User-123"},
+			filter: &Filter{Attribute: "id", Operator: opEqual, Value: "User-123"},
 			value:  "user-123",
 			want:   false,
 		},
@@ -394,7 +394,7 @@ func TestFilterValidateForAttribute(t *testing.T) {
 		name             string
 		filter           *Filter
 		allowedAttribute string
-		allowedOperators []FilterOperator
+		allowedOperators []filterOperator
 		wantErr          bool
 		errContains      string
 	}{
@@ -402,43 +402,43 @@ func TestFilterValidateForAttribute(t *testing.T) {
 			name:             "nil filter is valid",
 			filter:           nil,
 			allowedAttribute: "userName",
-			allowedOperators: []FilterOperator{OpEqual},
+			allowedOperators: []filterOperator{opEqual},
 			wantErr:          false,
 		},
 		{
 			name:             "valid attribute and operator",
-			filter:           &Filter{Attribute: "userName", Operator: OpEqual, Value: "john"},
+			filter:           &Filter{Attribute: "userName", Operator: opEqual, Value: "john"},
 			allowedAttribute: "userName",
-			allowedOperators: []FilterOperator{OpEqual},
+			allowedOperators: []filterOperator{opEqual},
 			wantErr:          false,
 		},
 		{
 			name:             "attribute case insensitive match",
-			filter:           &Filter{Attribute: "USERNAME", Operator: OpEqual, Value: "john"},
+			filter:           &Filter{Attribute: "USERNAME", Operator: opEqual, Value: "john"},
 			allowedAttribute: "userName",
-			allowedOperators: []FilterOperator{OpEqual},
+			allowedOperators: []filterOperator{opEqual},
 			wantErr:          false,
 		},
 		{
 			name:             "multiple allowed operators",
-			filter:           &Filter{Attribute: "userName", Operator: OpStartsWith, Value: "john"},
+			filter:           &Filter{Attribute: "userName", Operator: opStartsWith, Value: "john"},
 			allowedAttribute: "userName",
-			allowedOperators: []FilterOperator{OpEqual, OpStartsWith, OpContains},
+			allowedOperators: []filterOperator{opEqual, opStartsWith, opContains},
 			wantErr:          false,
 		},
 		{
 			name:             "unsupported attribute",
-			filter:           &Filter{Attribute: "externalId", Operator: OpEqual, Value: "ext-123"},
+			filter:           &Filter{Attribute: "externalId", Operator: opEqual, Value: "ext-123"},
 			allowedAttribute: "userName",
-			allowedOperators: []FilterOperator{OpEqual},
+			allowedOperators: []filterOperator{opEqual},
 			wantErr:          true,
 			errContains:      "unsupported filter attribute",
 		},
 		{
 			name:             "unsupported operator",
-			filter:           &Filter{Attribute: "userName", Operator: OpContains, Value: "john"},
+			filter:           &Filter{Attribute: "userName", Operator: opContains, Value: "john"},
 			allowedAttribute: "userName",
-			allowedOperators: []FilterOperator{OpEqual},
+			allowedOperators: []filterOperator{opEqual},
 			wantErr:          true,
 			errContains:      "unsupported filter operator",
 		},

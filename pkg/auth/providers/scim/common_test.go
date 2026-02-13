@@ -53,12 +53,12 @@ func TestParsePaginationParams(t *testing.T) {
 		{
 			name:        "default values when no params",
 			queryString: "",
-			want:        paginationParams{startIndex: 1, count: DefaultPageSize},
+			want:        paginationParams{startIndex: 1, count: defaultPageSize},
 		},
 		{
 			name:        "custom startIndex",
 			queryString: "startIndex=5",
-			want:        paginationParams{startIndex: 5, count: DefaultPageSize},
+			want:        paginationParams{startIndex: 5, count: defaultPageSize},
 		},
 		{
 			name:        "custom count",
@@ -71,9 +71,9 @@ func TestParsePaginationParams(t *testing.T) {
 			want:        paginationParams{startIndex: 10, count: 50},
 		},
 		{
-			name:        "count clamped to MaxPageSize",
+			name:        "count clamped to maxPageSize",
 			queryString: "count=5000",
-			want:        paginationParams{startIndex: 1, count: MaxPageSize},
+			want:        paginationParams{startIndex: 1, count: maxPageSize},
 		},
 		{
 			name:        "count=0 is valid",

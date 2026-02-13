@@ -6,34 +6,34 @@ import (
 	"unicode"
 )
 
-// FilterOperator represents a SCIM filter comparison operator (RFC 7644 §3.4.2.2).
-type FilterOperator string
+// filterOperator represents a SCIM filter comparison operator (RFC 7644 §3.4.2.2).
+type filterOperator string
 
 const (
-	OpEqual          FilterOperator = "eq" // Equal
-	OpNotEqual       FilterOperator = "ne" // Not equal
-	OpContains       FilterOperator = "co" // Contains
-	OpStartsWith     FilterOperator = "sw" // Starts with
-	OpEndsWith       FilterOperator = "ew" // Ends with
-	OpPresent        FilterOperator = "pr" // Present (has value)
-	OpGreaterThan    FilterOperator = "gt" // Greater than
-	OpGreaterOrEqual FilterOperator = "ge" // Greater than or equal
-	OpLessThan       FilterOperator = "lt" // Less than
-	OpLessOrEqual    FilterOperator = "le" // Less than or equal
+	opEqual          filterOperator = "eq" // Equal
+	opNotEqual       filterOperator = "ne" // Not equal
+	opContains       filterOperator = "co" // Contains
+	opStartsWith     filterOperator = "sw" // Starts with
+	opEndsWith       filterOperator = "ew" // Ends with
+	opPresent        filterOperator = "pr" // Present (has value)
+	opGreaterThan    filterOperator = "gt" // Greater than
+	opGreaterOrEqual filterOperator = "ge" // Greater than or equal
+	opLessThan       filterOperator = "lt" // Less than
+	opLessOrEqual    filterOperator = "le" // Less than or equal
 )
 
 // supportedOperators lists all operators defined in RFC 7644.
-var supportedOperators = map[string]FilterOperator{
-	"eq": OpEqual,
-	"ne": OpNotEqual,
-	"co": OpContains,
-	"sw": OpStartsWith,
-	"ew": OpEndsWith,
-	"pr": OpPresent,
-	"gt": OpGreaterThan,
-	"ge": OpGreaterOrEqual,
-	"lt": OpLessThan,
-	"le": OpLessOrEqual,
+var supportedOperators = map[string]filterOperator{
+	"eq": opEqual,
+	"ne": opNotEqual,
+	"co": opContains,
+	"sw": opStartsWith,
+	"ew": opEndsWith,
+	"pr": opPresent,
+	"gt": opGreaterThan,
+	"ge": opGreaterOrEqual,
+	"lt": opLessThan,
+	"le": opLessOrEqual,
 }
 
 // Filter represents a parsed SCIM filter expression.
@@ -41,7 +41,7 @@ var supportedOperators = map[string]FilterOperator{
 // e.g., userName eq "john.doe"
 type Filter struct {
 	Attribute string
-	Operator  FilterOperator
+	Operator  filterOperator
 	Value     string // Empty for "pr" (present) operator
 }
 
@@ -85,7 +85,7 @@ func ParseFilter(filter string) (*Filter, error) {
 	}
 
 	// Handle "pr" (present) operator - no value required.
-	if op == OpPresent {
+	if op == opPresent {
 		if len(tokens) > 2 {
 			return nil, fmt.Errorf("operator 'pr' does not accept a value")
 		}
@@ -125,25 +125,25 @@ func (f *Filter) MatchesValue(value string, caseExact bool) bool {
 	}
 
 	switch f.Operator {
-	case OpEqual:
+	case opEqual:
 		return compareValue == target
-	case OpNotEqual:
+	case opNotEqual:
 		return compareValue != target
-	case OpContains:
+	case opContains:
 		return strings.Contains(compareValue, target)
-	case OpStartsWith:
+	case opStartsWith:
 		return strings.HasPrefix(compareValue, target)
-	case OpEndsWith:
+	case opEndsWith:
 		return strings.HasSuffix(compareValue, target)
-	case OpPresent:
+	case opPresent:
 		return value != ""
-	case OpGreaterThan:
+	case opGreaterThan:
 		return compareValue > target
-	case OpGreaterOrEqual:
+	case opGreaterOrEqual:
 		return compareValue >= target
-	case OpLessThan:
+	case opLessThan:
 		return compareValue < target
-	case OpLessOrEqual:
+	case opLessOrEqual:
 		return compareValue <= target
 	default:
 		return false
@@ -164,7 +164,7 @@ func (f *Filter) MatchesCaseExact(value string) bool {
 
 // ValidateForAttribute checks if the filter is valid for the specified attribute and operators.
 // Returns an error if the filter uses an unsupported attribute or operator.
-func (f *Filter) ValidateForAttribute(allowedAttribute string, allowedOperators ...FilterOperator) error {
+func (f *Filter) ValidateForAttribute(allowedAttribute string, allowedOperators ...filterOperator) error {
 	if f == nil {
 		return nil
 	}

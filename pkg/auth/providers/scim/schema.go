@@ -10,12 +10,12 @@ import (
 
 // Well known SCIM Schema URNs.
 const (
-	ListSchemaID     = "urn:ietf:params:scim:api:messages:2.0:ListResponse"
-	GroupSchemaID    = "urn:ietf:params:scim:schemas:core:2.0:Group"
-	UserSchemaID     = "urn:ietf:params:scim:schemas:core:2.0:User"
-	ErrorSchemaID    = "urn:ietf:params:scim:api:messages:2.0:Error"
-	ResourceSchemaID = "urn:ietf:params:scim:schemas:core:2.0:ResourceType"
-	SchemaSchemaID   = "urn:ietf:params:scim:schemas:core:2.0:Schema"
+	listSchemaID     = "urn:ietf:params:scim:api:messages:2.0:ListResponse"
+	groupSchemaID    = "urn:ietf:params:scim:schemas:core:2.0:Group"
+	userSchemaID     = "urn:ietf:params:scim:schemas:core:2.0:User"
+	errorSchemaID    = "urn:ietf:params:scim:api:messages:2.0:Error"
+	resourceSchemaID = "urn:ietf:params:scim:schemas:core:2.0:ResourceType"
+	schemaSchemaID   = "urn:ietf:params:scim:schemas:core:2.0:Schema"
 )
 
 // Schema defines a SCIM schema.
@@ -44,9 +44,9 @@ type SchemaAttribute struct {
 
 // UserSchema defines the SCIM schema for User resources.
 var UserSchema = Schema{
-	Schemas:     []string{SchemaSchemaID},
-	ID:          UserSchemaID,
-	Name:        UserResource,
+	Schemas:     []string{schemaSchemaID},
+	ID:          userSchemaID,
+	Name:        userResource,
 	Description: "User Account",
 	Attributes: []SchemaAttribute{
 		{
@@ -117,15 +117,15 @@ var UserSchema = Schema{
 		},
 	},
 	Meta: Meta{
-		ResourceType: SchemaResource,
+		ResourceType: schemaResource,
 	},
 }
 
 // GroupSchema defines the SCIM schema for Group resources.
 var GroupSchema = Schema{
-	Schemas:     []string{SchemaSchemaID},
-	ID:          GroupSchemaID,
-	Name:        GroupResource,
+	Schemas:     []string{schemaSchemaID},
+	ID:          groupSchemaID,
+	Name:        groupResource,
 	Description: "Group",
 	Attributes: []SchemaAttribute{
 		{
@@ -180,7 +180,7 @@ var GroupSchema = Schema{
 		},
 	},
 	Meta: Meta{
-		ResourceType: SchemaResource,
+		ResourceType: schemaResource,
 	},
 }
 
@@ -195,9 +195,9 @@ func (s *SCIMServer) ListSchemas(w http.ResponseWriter, r *http.Request) {
 
 	provider := mux.Vars(r)["provider"]
 
-	response := &ListResponse{Schemas: []string{ListSchemaID}}
+	response := &listResponse{Schemas: []string{listSchemaID}}
 	for _, schema := range schemaRegistry {
-		schema.Meta.Location = locationURL(r, provider, SchemasEndpoint, schema.ID)
+		schema.Meta.Location = locationURL(r, provider, schemaEndpoint, schema.ID)
 		response.Resources = append(response.Resources, schema)
 	}
 
@@ -222,7 +222,7 @@ func (s *SCIMServer) GetSchema(w http.ResponseWriter, r *http.Request) {
 		writeError(w, NewError(http.StatusNotFound, fmt.Sprintf("Schema %s not found", id)))
 		return
 	}
-	schema.Meta.Location = locationURL(r, provider, SchemasEndpoint, schema.ID)
+	schema.Meta.Location = locationURL(r, provider, schemaEndpoint, schema.ID)
 
 	writeResponse(w, schema)
 }

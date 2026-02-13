@@ -32,8 +32,8 @@ func (b *Bool) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// SCIMUser represents a SCIM user.
-type SCIMUser struct {
+// scimUser represents a SCIM user.
+type scimUser struct {
 	Schemas    []string `json:"schemas"`    // Resource schema URIs.
 	ID         string   `json:"id"`         // Service provider identifier User.Name.
 	ExternalID string   `json:"externalId"` // IdPs identifier.
@@ -78,7 +78,7 @@ func (s *SCIMServer) ListUsers(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// Currently only support userName eq "<value>" filter.
-		if err := filter.ValidateForAttribute("userName", OpEqual); err != nil {
+		if err := filter.ValidateForAttribute("userName", opEqual); err != nil {
 			writeError(w, NewError(http.StatusBadRequest, err.Error()))
 			return
 		}
@@ -134,15 +134,15 @@ func (s *SCIMServer) ListUsers(w http.ResponseWriter, r *http.Request) {
 		}
 
 		resource := map[string]any{
-			"schemas":    []string{UserSchemaID},
+			"schemas":    []string{userSchemaID},
 			"id":         user.Name,
 			"userName":   userName,
 			"externalId": externalID,
 			"active":     user.GetEnabled(),
 			"meta": map[string]any{
-				"resourceType": UserResource,
+				"resourceType": userResource,
 				"created":      user.CreationTimestamp,
-				"location":     locationURL(r, provider, UserEndpoint, user.Name),
+				"location":     locationURL(r, provider, userEndpoint, user.Name),
 			},
 		}
 
@@ -167,8 +167,8 @@ func (s *SCIMServer) ListUsers(w http.ResponseWriter, r *http.Request) {
 		paginatedResources = []any{}
 	}
 
-	response := ListResponse{
-		Schemas:      []string{ListSchemaID},
+	response := listResponse{
+		Schemas:      []string{listSchemaID},
 		Resources:    paginatedResources,
 		TotalResults: totalResults,
 		ItemsPerPage: len(paginatedResources),
@@ -188,7 +188,7 @@ func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 	provider := mux.Vars(r)["provider"]
 
-	payload := SCIMUser{}
+	payload := scimUser{}
 	err := json.NewDecoder(r.Body).Decode(&payload)
 	if err != nil {
 		logrus.Errorf("scim::CreateUser: failed to decode request body: %s", err)
@@ -253,15 +253,15 @@ func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	location := locationURL(r, provider, UserEndpoint, user.Name)
+	location := locationURL(r, provider, userEndpoint, user.Name)
 	response := map[string]any{
-		"schemas":    []string{UserSchemaID},
+		"schemas":    []string{userSchemaID},
 		"id":         user.Name,
 		"userName":   payload.UserName,
 		"externalId": payload.ExternalID,
 		"active":     user.GetEnabled(),
 		"meta": map[string]any{
-			"resourceType": UserResource,
+			"resourceType": userResource,
 			"created":      user.CreationTimestamp,
 			"location":     location,
 		},
@@ -315,15 +315,15 @@ func (s *SCIMServer) GetUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := map[string]any{
-		"schemas":    []string{UserSchemaID},
+		"schemas":    []string{userSchemaID},
 		"id":         user.Name,
 		"userName":   first(attr.ExtraByProvider[provider]["username"]),
 		"externalId": first(attr.ExtraByProvider[provider]["externalid"]),
 		"active":     user.GetEnabled(),
 		"meta": map[string]any{
-			"resourceType": UserResource,
+			"resourceType": userResource,
 			"created":      user.CreationTimestamp,
-			"location":     locationURL(r, provider, UserEndpoint, user.Name),
+			"location":     locationURL(r, provider, userEndpoint, user.Name),
 		},
 	}
 
@@ -352,7 +352,7 @@ func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	provider := mux.Vars(r)["provider"]
 	id := mux.Vars(r)["id"]
 
-	payload := SCIMUser{}
+	payload := scimUser{}
 	err := json.NewDecoder(r.Body).Decode(&payload)
 	if err != nil {
 		logrus.Errorf("scim::UpdateUser: failed to decode request body: %s", err)
@@ -422,15 +422,15 @@ func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	location := locationURL(r, provider, UserEndpoint, user.Name)
+	location := locationURL(r, provider, userEndpoint, user.Name)
 	response := map[string]any{
-		"schemas":    []string{UserSchemaID},
+		"schemas":    []string{userSchemaID},
 		"id":         user.Name,
 		"userName":   first(attr.ExtraByProvider[provider]["username"]),
 		"externalId": first(attr.ExtraByProvider[provider]["externalid"]),
 		"active":     payload.Active,
 		"meta": map[string]any{
-			"resourceType": UserResource,
+			"resourceType": userResource,
 			"created":      user.CreationTimestamp,
 			"location":     location,
 		},
@@ -580,15 +580,15 @@ func (s *SCIMServer) PatchUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	location := locationURL(r, provider, UserEndpoint, user.Name)
+	location := locationURL(r, provider, userEndpoint, user.Name)
 	response := map[string]any{
-		"schemas":    []string{UserSchemaID},
+		"schemas":    []string{userSchemaID},
 		"id":         user.Name,
 		"userName":   first(attr.ExtraByProvider[provider]["username"]),
 		"externalId": first(attr.ExtraByProvider[provider]["externalid"]),
 		"active":     user.GetEnabled(),
 		"meta": map[string]any{
-			"resourceType": UserResource,
+			"resourceType": userResource,
 			"created":      user.CreationTimestamp,
 			"location":     location,
 		},

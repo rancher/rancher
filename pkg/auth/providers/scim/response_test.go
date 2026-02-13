@@ -49,12 +49,12 @@ func TestErrorMarshalJSON(t *testing.T) {
 		{
 			name: "basic error",
 			err: Error{
-				Schemas: []string{ErrorSchemaID},
+				Schemas: []string{errorSchemaID},
 				Status:  400,
 				Detail:  "Bad request",
 			},
 			expect: map[string]any{
-				"schemas": []any{ErrorSchemaID},
+				"schemas": []any{errorSchemaID},
 				"status":  "400",
 				"detail":  "Bad request",
 			},
@@ -62,13 +62,13 @@ func TestErrorMarshalJSON(t *testing.T) {
 		{
 			name: "error with scimType",
 			err: Error{
-				Schemas:  []string{ErrorSchemaID},
+				Schemas:  []string{errorSchemaID},
 				Status:   409,
 				Detail:   "Resource already exists",
 				ScimType: "uniqueness",
 			},
 			expect: map[string]any{
-				"schemas":  []any{ErrorSchemaID},
+				"schemas":  []any{errorSchemaID},
 				"status":   "409",
 				"detail":   "Resource already exists",
 				"scimType": "uniqueness",
@@ -77,12 +77,12 @@ func TestErrorMarshalJSON(t *testing.T) {
 		{
 			name: "error without scimType excludes field",
 			err: Error{
-				Schemas: []string{ErrorSchemaID},
+				Schemas: []string{errorSchemaID},
 				Status:  404,
 				Detail:  "Not found",
 			},
 			expect: map[string]any{
-				"schemas": []any{ErrorSchemaID},
+				"schemas": []any{errorSchemaID},
 				"status":  "404",
 				"detail":  "Not found",
 			},
@@ -115,7 +115,7 @@ func TestNewError(t *testing.T) {
 			status: 400,
 			detail: "Bad request",
 			expect: &Error{
-				Schemas: []string{ErrorSchemaID},
+				Schemas: []string{errorSchemaID},
 				Status:  400,
 				Detail:  "Bad request",
 			},
@@ -126,7 +126,7 @@ func TestNewError(t *testing.T) {
 			detail:   "Resource already exists",
 			scimType: []string{"uniqueness"},
 			expect: &Error{
-				Schemas:  []string{ErrorSchemaID},
+				Schemas:  []string{errorSchemaID},
 				Status:   409,
 				Detail:   "Resource already exists",
 				ScimType: "uniqueness",
@@ -138,7 +138,7 @@ func TestNewError(t *testing.T) {
 			detail:   "Invalid value",
 			scimType: []string{"invalidValue", "mutability"},
 			expect: &Error{
-				Schemas:  []string{ErrorSchemaID},
+				Schemas:  []string{errorSchemaID},
 				Status:   400,
 				Detail:   "Invalid value",
 				ScimType: "invalidValue",
@@ -157,7 +157,7 @@ func TestNewError(t *testing.T) {
 func TestNewInternalError(t *testing.T) {
 	err := NewInternalError()
 
-	assert.Equal(t, []string{ErrorSchemaID}, err.Schemas)
+	assert.Equal(t, []string{errorSchemaID}, err.Schemas)
 	assert.Equal(t, http.StatusInternalServerError, err.Status)
 	assert.Equal(t, "Internal Server Error", err.Detail)
 	assert.Empty(t, err.ScimType)
@@ -175,7 +175,7 @@ func TestWriteError(t *testing.T) {
 			err:          NewError(http.StatusBadRequest, "Invalid input"),
 			expectStatus: http.StatusBadRequest,
 			expectBody: map[string]any{
-				"schemas": []any{ErrorSchemaID},
+				"schemas": []any{errorSchemaID},
 				"status":  "400",
 				"detail":  "Invalid input",
 			},
@@ -185,7 +185,7 @@ func TestWriteError(t *testing.T) {
 			err:          NewError(http.StatusNotFound, "Resource not found"),
 			expectStatus: http.StatusNotFound,
 			expectBody: map[string]any{
-				"schemas": []any{ErrorSchemaID},
+				"schemas": []any{errorSchemaID},
 				"status":  "404",
 				"detail":  "Resource not found",
 			},
@@ -195,7 +195,7 @@ func TestWriteError(t *testing.T) {
 			err:          NewError(http.StatusConflict, "Duplicate", "uniqueness"),
 			expectStatus: http.StatusConflict,
 			expectBody: map[string]any{
-				"schemas":  []any{ErrorSchemaID},
+				"schemas":  []any{errorSchemaID},
 				"status":   "409",
 				"detail":   "Duplicate",
 				"scimType": "uniqueness",
@@ -253,8 +253,8 @@ func TestWriteResponse(t *testing.T) {
 
 	t.Run("with list response", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		payload := ListResponse{
-			Schemas:      []string{ListSchemaID},
+		payload := listResponse{
+			Schemas:      []string{listSchemaID},
 			TotalResults: 10,
 			ItemsPerPage: 5,
 			StartIndex:   1,
@@ -265,7 +265,7 @@ func TestWriteResponse(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Result().StatusCode)
 		assert.Equal(t, "application/scim+json", w.Result().Header.Get("Content-Type"))
 
-		var body ListResponse
+		var body listResponse
 		require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
 		assert.Equal(t, payload, body)
 	})

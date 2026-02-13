@@ -202,7 +202,7 @@ func TestSyncGroupMembers(t *testing.T) {
 		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
 
 		// Adding one member.
-		newMember := SCIMMember{Value: "u-mo773yttt4", Display: "john.doe"}
+		newMember := scimMember{Value: "u-mo773yttt4", Display: "john.doe"}
 		userCache.EXPECT().Get("u-mo773yttt4").Return(&v3.User{
 			ObjectMeta: metav1.ObjectMeta{Name: "u-mo773yttt4"},
 		}, nil)
@@ -236,7 +236,7 @@ func TestSyncGroupMembers(t *testing.T) {
 			userAttributes:     userAttrClient,
 		}
 
-		err := srv.syncGroupMembers(provider, groupName, []SCIMMember{newMember})
+		err := srv.syncGroupMembers(provider, groupName, []scimMember{newMember})
 		require.NoError(t, err)
 	})
 
@@ -279,7 +279,7 @@ func TestSyncGroupMembers(t *testing.T) {
 			userAttributes:     userAttrClient,
 		}
 
-		err := srv.syncGroupMembers(provider, groupName, []SCIMMember{})
+		err := srv.syncGroupMembers(provider, groupName, []scimMember{})
 		require.NoError(t, err)
 	})
 }
@@ -470,7 +470,7 @@ func TestPatchGroup(t *testing.T) {
 
 		meta, ok := resp["meta"].(map[string]any)
 		require.True(t, ok)
-		assert.Equal(t, GroupResource, meta["resourceType"])
+		assert.Equal(t, groupResource, meta["resourceType"])
 
 		wantLocation := "/v1-scim/" + provider + "/Groups/" + groupID
 		assert.Contains(t, meta["location"], wantLocation)
@@ -702,7 +702,7 @@ func TestListGroupsPagination(t *testing.T) {
 
 			assert.Equal(t, tt.wantStatus, w.Code)
 			if tt.wantStatus == http.StatusOK {
-				var resp ListResponse
+				var resp listResponse
 				err := json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
 
@@ -759,7 +759,7 @@ func TestListGroupsPaginationConsistency(t *testing.T) {
 
 		srv.ListGroups(w, r)
 		require.Equal(t, http.StatusOK, w.Code)
-		var resp ListResponse
+		var resp listResponse
 		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 
@@ -846,7 +846,7 @@ func TestCreateGroup(t *testing.T) {
 
 		meta, ok := resp["meta"].(map[string]any)
 		require.True(t, ok)
-		assert.Equal(t, GroupResource, meta["resourceType"])
+		assert.Equal(t, groupResource, meta["resourceType"])
 
 		wantLocation := "/v1-scim/" + provider + "/Groups/" + groupID
 		assert.Contains(t, meta["location"], wantLocation)
@@ -1475,7 +1475,7 @@ func TestUpdateGroup(t *testing.T) {
 
 		meta, ok := resp["meta"].(map[string]any)
 		require.True(t, ok)
-		assert.Equal(t, GroupResource, meta["resourceType"])
+		assert.Equal(t, groupResource, meta["resourceType"])
 
 		wantLocation := "/v1-scim/" + provider + "/Groups/" + groupID
 		assert.Contains(t, meta["location"], wantLocation)
