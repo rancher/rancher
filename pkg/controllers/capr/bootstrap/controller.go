@@ -176,7 +176,7 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 	if bootstrap.Spec.Userdata != nil && bootstrap.Spec.Userdata.InlineUserdata != "" {
 		err = yaml.Unmarshal([]byte(bootstrap.Spec.Userdata.InlineUserdata), &userdata)
 		if err != nil {
-			return nil, fmt.Errorf("could not unmarshal inline userdata: %w", err)
+			return nil, fmt.Errorf("could not unmarshal inline userdata")
 		}
 	}
 
