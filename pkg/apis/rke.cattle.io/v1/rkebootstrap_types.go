@@ -4,8 +4,36 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type UserdataSpec struct {
+	// Userdata string in cloud-config format.
+	//
+	// WARNING: Do not include sensitive data, this field is visible
+	// in non-Secret API objects.
+	//
+	// EXPERIMENTAL: this field is experimental and future compatibility
+	// is not guaranteed.
+	// +optional
+	InlineUserdata string `json:"inlineUserdata,omitempty"`
+}
+
 // RKEBootstrapSpec defines the desired state of RKEBootstrap.
 type RKEBootstrapSpec struct {
+	// Additional that will be merged with rancher-defined userdata.
+	//
+	// Currently, this field is only supported for external CAPI
+	// infrastructure providers, and will have no effect for
+	// Rancher-provisioned nodes. Userdata for Rancher-provisioned nodes
+	// can be set in the machine configuration.
+	//
+	// WARNING: Do not include sensitive data, this field is visible
+	// in non-Secret API objects.
+	//
+	// EXPERIMENTAL: this field is experimental and future compatibility
+	// is not guaranteed.
+	// +nullable
+	// +optional
+	Userdata *UserdataSpec `json:"userdata,omitempty"`
+
 	// ClusterName refers to the name of the CAPI Cluster associated with this RKEBootstrap.
 	// +optional
 	ClusterName string `json:"clusterName,omitempty"`

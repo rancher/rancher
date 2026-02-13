@@ -84,7 +84,7 @@ func Test_getBootstrapSecret(t *testing.T) {
 			a.Nil(err)
 			machine, err := handler.machineCache.Get(tt.args.namespaceName, tt.args.os)
 			a.Nil(err)
-			secret, err := handler.getBootstrapSecret(tt.args.namespaceName, tt.args.secretName, []v1.EnvVar{}, machine, "")
+			secret, err := handler.getBootstrapSecret(tt.args.namespaceName, tt.args.secretName, []v1.EnvVar{}, machine, nil, "")
 			a.Nil(err)
 
 			// assert
@@ -148,6 +148,11 @@ func getMachineCacheMock(ctrl *gomock.Controller, namespace, os string) *ctrlfak
 					capr.CattleOSLabel:         os,
 				},
 			},
+			Spec: capi.MachineSpec{
+				InfrastructureRef: capi.ContractVersionedObjectReference{
+					APIGroup: capr.RKEMachineAPIGroup,
+				},
+			},
 		}, nil
 	}).AnyTimes()
 
@@ -161,6 +166,11 @@ func getMachineCacheMock(ctrl *gomock.Controller, namespace, os string) *ctrlfak
 					capr.EtcdRoleLabel:         "false",
 					capr.WorkerRoleLabel:       "true",
 					capr.CattleOSLabel:         os,
+				},
+			},
+			Spec: capi.MachineSpec{
+				InfrastructureRef: capi.ContractVersionedObjectReference{
+					APIGroup: capr.RKEMachineAPIGroup,
 				},
 			},
 		}, nil
