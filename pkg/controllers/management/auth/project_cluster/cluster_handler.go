@@ -23,7 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	k8scorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -48,7 +47,7 @@ type clusterLifecycle struct {
 	crtbLister         v3.ClusterRoleTemplateBindingCache
 	crtbClient         v3.ClusterRoleTemplateBindingController
 	nsLister           corev1.NamespaceCache
-	nsClient           k8scorev1.NamespaceInterface
+	nsClient           corev1.NamespaceClient
 	projects           v3.ProjectClient
 	projectLister      v3.ProjectCache
 	rbLister           rbacv1.RoleBindingCache
@@ -64,7 +63,7 @@ func NewClusterLifecycle(management *config.ManagementContext) *clusterLifecycle
 		crtbLister:         management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
 		crtbClient:         management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
 		nsLister:           management.Wrangler.Core.Namespace().Cache(),
-		nsClient:           management.K8sClient.CoreV1().Namespaces(),
+		nsClient:           management.Wrangler.Core.Namespace(),
 		projects:           management.Wrangler.Mgmt.Project(),
 		projectLister:      management.Wrangler.Mgmt.Project().Cache(),
 		rbLister:           management.Wrangler.RBAC.RoleBinding().Cache(),

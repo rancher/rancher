@@ -1,11 +1,11 @@
 package project_cluster
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -16,7 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
-	applycorev1 "k8s.io/client-go/applyconfigurations/core/v1"
+	"k8s.io/client-go/rest"
 )
 
 var errNotFound = apierrors.NewNotFound(schema.GroupResource{}, "")
@@ -170,53 +170,53 @@ var (
 func Test_deleteNamespace(t *testing.T) {
 	tests := []struct {
 		name         string
-		nsGetFunc    func(context.Context, string, metav1.GetOptions) (*v1.Namespace, error)
-		nsDeleteFunc func(context.Context, string, metav1.DeleteOptions) error
+		nsGetFunc    func(string, metav1.GetOptions) (*v1.Namespace, error)
+		nsDeleteFunc func(string, metav1.DeleteOptions) error
 		wantErr      bool
 	}{
 		{
 			name: "error getting namespace",
-			nsGetFunc: func(ctx context.Context, s string, g metav1.GetOptions) (*v1.Namespace, error) {
+			nsGetFunc: func(s string, g metav1.GetOptions) (*v1.Namespace, error) {
 				return nil, errDefault
 			},
 			wantErr: true,
 		},
 		{
 			name: "namespace not found",
-			nsGetFunc: func(ctx context.Context, s string, g metav1.GetOptions) (*v1.Namespace, error) {
+			nsGetFunc: func(s string, g metav1.GetOptions) (*v1.Namespace, error) {
 				return nil, errNsNotFound
 			},
 		},
 		{
 			name: "namespace is terminating",
-			nsGetFunc: func(ctx context.Context, s string, g metav1.GetOptions) (*v1.Namespace, error) {
+			nsGetFunc: func(s string, g metav1.GetOptions) (*v1.Namespace, error) {
 				return terminatingNamespace.DeepCopy(), nil
 			},
 		},
 		{
 			name: "successfully delete namespace",
-			nsGetFunc: func(ctx context.Context, s string, g metav1.GetOptions) (*v1.Namespace, error) {
+			nsGetFunc: func(s string, g metav1.GetOptions) (*v1.Namespace, error) {
 				return defaultNamespace.DeepCopy(), nil
 			},
-			nsDeleteFunc: func(ctx context.Context, s string, do metav1.DeleteOptions) error {
+			nsDeleteFunc: func(s string, do metav1.DeleteOptions) error {
 				return nil
 			},
 		},
 		{
 			name: "deleting namespace not found",
-			nsGetFunc: func(ctx context.Context, s string, g metav1.GetOptions) (*v1.Namespace, error) {
+			nsGetFunc: func(s string, g metav1.GetOptions) (*v1.Namespace, error) {
 				return defaultNamespace.DeepCopy(), nil
 			},
-			nsDeleteFunc: func(ctx context.Context, s string, do metav1.DeleteOptions) error {
+			nsDeleteFunc: func(s string, do metav1.DeleteOptions) error {
 				return errNsNotFound
 			},
 		},
 		{
 			name: "error deleting namespace",
-			nsGetFunc: func(ctx context.Context, s string, g metav1.GetOptions) (*v1.Namespace, error) {
+			nsGetFunc: func(s string, g metav1.GetOptions) (*v1.Namespace, error) {
 				return defaultNamespace.DeepCopy(), nil
 			},
-			nsDeleteFunc: func(ctx context.Context, s string, do metav1.DeleteOptions) error {
+			nsDeleteFunc: func(s string, do metav1.DeleteOptions) error {
 				return errDefault
 			},
 			wantErr: true,
@@ -236,50 +236,42 @@ func Test_deleteNamespace(t *testing.T) {
 }
 
 type mockNamespaces struct {
-	getter  func(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Namespace, error)
-	deleter func(ctx context.Context, name string, opts metav1.DeleteOptions) error
+	getter  func(name string, opts metav1.GetOptions) (*v1.Namespace, error)
+	deleter func(name string, opts metav1.DeleteOptions) error
 }
 
-func (m mockNamespaces) Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Namespace, error) {
-	return m.getter(ctx, name, opts)
+func (m mockNamespaces) Get(name string, opts metav1.GetOptions) (*v1.Namespace, error) {
+	return m.getter(name, opts)
 }
 
-func (m mockNamespaces) Create(ctx context.Context, namespace *v1.Namespace, opts metav1.CreateOptions) (*v1.Namespace, error) {
+func (m mockNamespaces) Create(namespace *v1.Namespace) (*v1.Namespace, error) {
 	panic("implement me")
 }
 
-func (m mockNamespaces) Update(ctx context.Context, namespace *v1.Namespace, opts metav1.UpdateOptions) (*v1.Namespace, error) {
+func (m mockNamespaces) Update(namespace *v1.Namespace) (*v1.Namespace, error) {
 	panic("implement me")
 }
 
-func (m mockNamespaces) UpdateStatus(ctx context.Context, namespace *v1.Namespace, opts metav1.UpdateOptions) (*v1.Namespace, error) {
+func (m mockNamespaces) Delete(name string, opts *metav1.DeleteOptions) error {
+	return m.deleter(name, *opts)
+}
+
+func (m mockNamespaces) List(opts metav1.ListOptions) (*v1.NamespaceList, error) {
 	panic("implement me")
 }
 
-func (m mockNamespaces) Delete(ctx context.Context, name string, opts metav1.DeleteOptions) error {
-	return m.deleter(ctx, name, opts)
-}
-
-func (m mockNamespaces) List(ctx context.Context, opts metav1.ListOptions) (*v1.NamespaceList, error) {
+func (m mockNamespaces) Watch(opts metav1.ListOptions) (watch.Interface, error) {
 	panic("implement me")
 }
 
-func (m mockNamespaces) Watch(ctx context.Context, opts metav1.ListOptions) (watch.Interface, error) {
+func (m mockNamespaces) Patch(name string, pt types.PatchType, data []byte, subresources ...string) (result *v1.Namespace, err error) {
 	panic("implement me")
 }
 
-func (m mockNamespaces) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts metav1.PatchOptions, subresources ...string) (result *v1.Namespace, err error) {
+func (m mockNamespaces) UpdateStatus(ns *v1.Namespace) (*v1.Namespace, error) {
 	panic("implement me")
 }
 
-func (m mockNamespaces) Apply(ctx context.Context, namespace *applycorev1.NamespaceApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Namespace, err error) {
-	panic("implement me")
-}
-
-func (m mockNamespaces) ApplyStatus(ctx context.Context, namespace *applycorev1.NamespaceApplyConfiguration, opts metav1.ApplyOptions) (result *v1.Namespace, err error) {
-	panic("implement me")
-}
-
-func (m mockNamespaces) Finalize(ctx context.Context, item *v1.Namespace, opts metav1.UpdateOptions) (*v1.Namespace, error) {
+func (m mockNamespaces) WithImpersonation(impersonat rest.ImpersonationConfig) (generic.NonNamespacedClientInterface[*v1.Namespace, *v1.NamespaceList], error) {
 	panic("implement me")
 }

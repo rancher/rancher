@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -16,7 +16,7 @@ const (
 	TurtlesNamespace            = "cattle-turtles-system"
 )
 
-func SetNamespaceCondition(namespace *v1.Namespace, d time.Duration, conditionType string, conditionStatus bool, message string) error {
+func SetNamespaceCondition(namespace *corev1.Namespace, d time.Duration, conditionType string, conditionStatus bool, message string) error {
 	annotations := namespace.ObjectMeta.Annotations
 	if annotations == nil {
 		annotations = map[string]string{}
@@ -84,7 +84,7 @@ func GenerateConditionAnnotation(ann string, d time.Duration, conditionType stri
 	return string(bAnn), nil
 }
 
-func IsNamespaceConditionSet(namespace *v1.Namespace, conditionType string, conditionStatus bool) (bool, error) {
+func IsNamespaceConditionSet(namespace *corev1.Namespace, conditionType string, conditionStatus bool) (bool, error) {
 	if namespace.ObjectMeta.Annotations == nil {
 		return false, nil
 	}

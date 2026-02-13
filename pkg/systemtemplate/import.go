@@ -20,6 +20,7 @@ import (
 	"github.com/rancher/rancher/pkg/features"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/image"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -54,6 +55,7 @@ type clusterAgentContext struct {
 	EnablePriorityClass   bool
 	PodDisruptionBudget   string
 	SUCAppNameOverride    string
+	NamespaceOptions      namespace.Mutator
 }
 
 type priorityClassContext struct {
@@ -135,7 +137,7 @@ func PodDisruptionBudgetTemplate(cluster *apimgmtv3.Cluster) ([]byte, error) {
 
 func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url string, isPreBootstrap bool,
 	cluster *apimgmtv3.Cluster, agentFeatures map[string]bool, taints []corev1.Taint,
-	secretLister v1.SecretLister, pcExists bool) error {
+	secretLister v1.SecretLister, pcExists bool, mutator namespace.Mutator) error {
 	var tolerations, agentEnvVars, agentAppendTolerations, agentAffinity, agentResourceRequirements string
 	d := sha256.Sum256([]byte(fmt.Sprintf("%s.%s.%s", url, token, namespace)))
 	tokenKey := hex.EncodeToString(d[:])[:10]
@@ -262,6 +264,7 @@ func SystemTemplate(resp io.Writer, agentImage, authImage, namespace, token, url
 			}
 			return ""
 		}(),
+		NamespaceOptions: mutator,
 	}
 
 	return t.Execute(resp, context)
@@ -299,7 +302,7 @@ func ForCluster(cluster *apimgmtv3.Cluster, token string, taints []corev1.Taint,
 
 	buf := &bytes.Buffer{}
 	err := SystemTemplate(buf, GetDesiredAgentImage(cluster), GetDesiredAuthImage(cluster),
-		cluster.Name, token, settings.ServerURL.Get(), capr.PreBootstrap(cluster), cluster, GetDesiredFeatures(cluster), taints, secretLister, pcExists)
+		cluster.Name, token, settings.ServerURL.Get(), capr.PreBootstrap(cluster), cluster, GetDesiredFeatures(cluster), taints, secretLister, pcExists, namespace.GetMutator())
 	return buf.Bytes(), err
 }
 

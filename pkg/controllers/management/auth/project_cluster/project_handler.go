@@ -17,7 +17,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	k8scorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 const (
@@ -31,7 +30,7 @@ type projectLifecycle struct {
 	crtbClient           v3.ClusterRoleTemplateBindingController
 	crtbLister           v3.ClusterRoleTemplateBindingCache
 	nsLister             corev1.NamespaceCache
-	nsClient             k8scorev1.NamespaceInterface
+	nsClient             corev1.NamespaceClient
 	projects             v3.ProjectController
 	prtbLister           v3.ProjectRoleTemplateBindingCache
 	prtbClient           v3.ProjectRoleTemplateBindingController
@@ -48,7 +47,7 @@ func NewProjectLifecycle(management *config.ManagementContext) *projectLifecycle
 		crtbClient:           management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
 		crtbLister:           management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
 		nsLister:             management.Wrangler.Core.Namespace().Cache(),
-		nsClient:             management.K8sClient.CoreV1().Namespaces(),
+		nsClient:             management.Wrangler.Core.Namespace(),
 		projects:             management.Wrangler.Mgmt.Project(),
 		prtbLister:           management.Wrangler.Mgmt.ProjectRoleTemplateBinding().Cache(),
 		prtbClient:           management.Wrangler.Mgmt.ProjectRoleTemplateBinding(),

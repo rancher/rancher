@@ -33,6 +33,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/dashboard/plugin"
 	"github.com/rancher/rancher/pkg/controllers/dashboardapi"
 	managementauth "github.com/rancher/rancher/pkg/controllers/management/auth"
+	namespacecontroller "github.com/rancher/rancher/pkg/controllers/namespace"
 	"github.com/rancher/rancher/pkg/controllers/nodedriver"
 	provisioningv2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	"github.com/rancher/rancher/pkg/crds"
@@ -108,6 +109,7 @@ type Options struct {
 	Features                       string
 	ClusterRegistry                string
 	AggregationRegistrationTimeout time.Duration
+	RancherNamespaceOptions        string
 }
 
 type Rancher struct {
@@ -146,6 +148,20 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 	// Run the encryption migration before any controllers run otherwise the fields will be dropped
 	if err := migrateEncryptionConfig(ctx, restConfig); err != nil {
 		return nil, err
+	}
+
+	if opts.RancherNamespaceOptions != "" {
+		mutator := namespace.Mutator{}
+		if err := json.Unmarshal([]byte(opts.RancherNamespaceOptions), &mutator); err != nil {
+			return nil, fmt.Errorf("failed marshalling namespace options: %w", err)
+		}
+
+		if mutator.Annotations == nil {
+			mutator.Annotations = make(map[string]string, 1)
+		}
+		mutator.Annotations[namespace.AnnotationManagedNamespace] = namespace.AnnotationManagedNamespaceTrue
+
+		namespace.SetMutator(mutator)
 	}
 
 	wranglerContext, err := wrangler.NewPrimaryContext(ctx, clientConfg, restConfig)
@@ -436,6 +452,8 @@ func (r *Rancher) Start(ctx context.Context) error {
 	if err := dashboardapi.Register(ctx, r.Wrangler); err != nil {
 		return err
 	}
+
+	namespacecontroller.Register(ctx, r.Wrangler)
 
 	userManager, err := common.NewUserManagerNoBindings(r.Wrangler)
 	if err != nil {
