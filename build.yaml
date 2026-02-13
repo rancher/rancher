@@ -1,5 +1,6 @@
 webhookVersion: 109.0.0+up0.10.0-rc.11
 remoteDialerProxyVersion: 109.0.0+up0.7.0-rc.5
+# NOTE: CAPI controller version has to be update in scripts/package-env
 turtlesVersion: 109.0.0+up0.26.0-rc.5
 cspAdapterMinVersion: 109.0.0+up9.0.0-rc.3
 defaultShellVersion: rancher/shell:v0.7.0-rc.3
