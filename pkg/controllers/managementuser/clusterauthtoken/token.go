@@ -222,14 +222,21 @@ func (h *tokenHandler) createClusterAuthToken(token accessor.TokenAccessor, hash
 	// resources. In case of trouble the partial set of resources (orphan
 	// secret) is removed.
 
-	clusterAuthTokenSecret, err = h.clusterSecret.Create(clusterAuthTokenSecret)
-	if err != nil && errors.IsAlreadyExists(err) {
-		// Overwrite an existing secret.
-		_, err = h.clusterSecret.Update(clusterAuthTokenSecret)
-	}
+	if _, err = h.clusterSecret.Create(clusterAuthTokenSecret); err != nil {
+		if !errors.IsAlreadyExists(err) {
+			return err
+		}
 
-	if err != nil {
-		return err
+		// Overwrite an existing secret.
+		existing, err := h.clusterSecret.Get(clusterAuthTokenSecret.Namespace, clusterAuthTokenSecret.Name, metav1.GetOptions{})
+		if err != nil {
+			logrus.Errorf("error migrating clusterAuthToken's secret %s: %s", clusterAuthTokenSecret.Name, err)
+			return err
+		}
+		existing.Data = clusterAuthTokenSecret.Data
+		if _, err = h.clusterSecret.Update(existing); err != nil {
+			return err
+		}
 	}
 
 	// Now create the shadow token.
