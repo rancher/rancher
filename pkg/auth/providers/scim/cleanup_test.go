@@ -109,8 +109,8 @@ func TestCleanupSecrets(t *testing.T) {
 
 		err := CleanupSecrets(secrets, provider)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "scim::Cleanup: failed to list token secrets for provider okta")
-		assert.Contains(t, err.Error(), "failed to list secrets")
+		assert.ErrorContains(t, err, "scim::Cleanup: failed to list token secrets for provider okta")
+		assert.ErrorContains(t, err, "failed to list secrets")
 	})
 
 	t.Run("delete secret fails", func(t *testing.T) {
@@ -144,8 +144,8 @@ func TestCleanupSecrets(t *testing.T) {
 
 		err := CleanupSecrets(secrets, provider)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "scim::Cleanup: failed to delete token secret scim-token-1 for provider okta")
-		assert.Contains(t, err.Error(), "permission denied")
+		assert.ErrorContains(t, err, "scim::Cleanup: failed to delete token secret scim-token-1 for provider okta")
+		assert.ErrorContains(t, err, "permission denied")
 	})
 
 	t.Run("delete secret not found is ignored", func(t *testing.T) {
@@ -225,7 +225,7 @@ func TestCleanupSecrets(t *testing.T) {
 
 		err := CleanupSecrets(secrets, provider)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "scim::Cleanup: failed to delete token secret scim-token-2 for provider okta")
-		assert.Contains(t, err.Error(), "server error")
+		assert.ErrorContains(t, err, "scim::Cleanup: failed to delete token secret scim-token-2 for provider okta")
+		assert.ErrorContains(t, err, "server error")
 	})
 }

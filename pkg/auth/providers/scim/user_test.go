@@ -168,17 +168,16 @@ func TestListUsersPagination(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users?"+tt.queryString, nil)
-			req = mux.SetURLVars(req, map[string]string{"provider": provider})
-			rec := httptest.NewRecorder()
+			r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users?"+tt.queryString, nil)
+			r = mux.SetURLVars(r, map[string]string{"provider": provider})
+			w := httptest.NewRecorder()
 
-			srv.ListUsers(rec, req)
-
-			assert.Equal(t, tt.wantStatus, rec.Code)
+			srv.ListUsers(w, r)
+			assert.Equal(t, tt.wantStatus, w.Code)
 
 			if tt.wantStatus == http.StatusOK {
 				var resp ListResponse
-				err := json.Unmarshal(rec.Body.Bytes(), &resp)
+				err := json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
 
 				assert.Equal(t, tt.wantTotalResults, resp.TotalResults)
@@ -234,15 +233,15 @@ func TestListUsersPaginationConsistency(t *testing.T) {
 	var allCollectedIDs []string
 
 	for startIndex := 1; ; startIndex += pageSize {
-		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/v1-scim/%s/Users?startIndex=%d&count=%d", provider, startIndex, pageSize), nil)
-		req = mux.SetURLVars(req, map[string]string{"provider": provider})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/v1-scim/%s/Users?startIndex=%d&count=%d", provider, startIndex, pageSize), nil)
+		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		w := httptest.NewRecorder()
 
-		srv.ListUsers(rec, req)
-		require.Equal(t, http.StatusOK, rec.Code)
+		srv.ListUsers(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
 
 		var resp ListResponse
-		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 
 		if len(resp.Resources) == 0 {
@@ -313,16 +312,15 @@ func TestListUsersWithFilter(t *testing.T) {
 		userAttributeCache: userAttributeCache,
 	}
 
-	req := httptest.NewRequest(http.MethodGet, `/v1-scim/`+provider+`/Users?filter=userName%20eq%20%22jane.smith%22`, nil)
-	req = mux.SetURLVars(req, map[string]string{"provider": provider})
-	rec := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, `/v1-scim/`+provider+`/Users?filter=userName%20eq%20%22jane.smith%22`, nil)
+	r = mux.SetURLVars(r, map[string]string{"provider": provider})
+	w := httptest.NewRecorder()
 
-	srv.ListUsers(rec, req)
-
-	require.Equal(t, http.StatusOK, rec.Code)
+	srv.ListUsers(w, r)
+	require.Equal(t, http.StatusOK, w.Code)
 
 	var resp ListResponse
-	err := json.Unmarshal(rec.Body.Bytes(), &resp)
+	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	require.NoError(t, err)
 
 	assert.Equal(t, 1, resp.TotalResults)
@@ -371,16 +369,15 @@ func TestListUsersExcludesSystemUsers(t *testing.T) {
 		userAttributeCache: userAttributeCache,
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users", nil)
-	req = mux.SetURLVars(req, map[string]string{"provider": provider})
-	rec := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users", nil)
+	r = mux.SetURLVars(r, map[string]string{"provider": provider})
+	w := httptest.NewRecorder()
 
-	srv.ListUsers(rec, req)
-
-	require.Equal(t, http.StatusOK, rec.Code)
+	srv.ListUsers(w, r)
+	require.Equal(t, http.StatusOK, w.Code)
 
 	var resp ListResponse
-	err := json.Unmarshal(rec.Body.Bytes(), &resp)
+	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	require.NoError(t, err)
 
 	// Should only have 2 users (system user excluded).
@@ -421,16 +418,15 @@ func TestGetUser(t *testing.T) {
 			userAttributeCache: userAttributeCache,
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users/"+userID, nil)
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.GetUser(rec, req)
-
-		require.Equal(t, http.StatusOK, rec.Code)
+		srv.GetUser(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
 
 		var resp map[string]any
-		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 
 		assert.Equal(t, userID, resp["id"])
@@ -481,16 +477,15 @@ func TestGetUser(t *testing.T) {
 			userAttributeCache: userAttributeCache,
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users/"+userID, nil)
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.GetUser(rec, req)
-
-		require.Equal(t, http.StatusOK, rec.Code)
+		srv.GetUser(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
 
 		var resp map[string]any
-		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 
 		assert.Equal(t, userID, resp["id"])
@@ -513,16 +508,15 @@ func TestGetUser(t *testing.T) {
 			userAttributeCache: userAttributeCache,
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users/"+userID, nil)
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.GetUser(rec, req)
-
-		require.Equal(t, http.StatusNotFound, rec.Code)
+		srv.GetUser(w, r)
+		require.Equal(t, http.StatusNotFound, w.Code)
 
 		var errResp map[string]any
-		err := json.Unmarshal(rec.Body.Bytes(), &errResp)
+		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
 		assert.Contains(t, errResp["schemas"], ErrorSchemaID)
 	})
@@ -545,16 +539,15 @@ func TestGetUser(t *testing.T) {
 			userAttributeCache: userAttributeCache,
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users/"+userID, nil)
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.GetUser(rec, req)
-
-		require.Equal(t, http.StatusNotFound, rec.Code)
+		srv.GetUser(w, r)
+		require.Equal(t, http.StatusNotFound, w.Code)
 
 		var errResp map[string]any
-		err := json.Unmarshal(rec.Body.Bytes(), &errResp)
+		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
 		assert.Contains(t, errResp["schemas"], ErrorSchemaID)
 	})
@@ -566,6 +559,7 @@ func TestCreateUser(t *testing.T) {
 	t.Run("creates user successfully with all fields", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
+		userID := "u-abc123"
 		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
 		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
 
@@ -601,19 +595,18 @@ func TestCreateUser(t *testing.T) {
 			"externalId": "ext-12345",
 			"emails": [{"value": "john.doe@example.com", "primary": true}]
 		}`
-		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		w := httptest.NewRecorder()
 
-		srv.CreateUser(rec, req)
-
-		require.Equal(t, http.StatusCreated, rec.Code)
+		srv.CreateUser(w, r)
+		require.Equal(t, http.StatusCreated, w.Code)
 
 		var resp map[string]any
-		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 
-		assert.Equal(t, "u-abc123", resp["id"])
+		assert.Equal(t, userID, resp["id"])
 		assert.Equal(t, "john.doe", resp["userName"])
 		assert.Equal(t, "ext-12345", resp["externalId"])
 		assert.Equal(t, true, resp["active"])
@@ -625,6 +618,14 @@ func TestCreateUser(t *testing.T) {
 		email := emails[0].(map[string]any)
 		assert.Equal(t, "john.doe@example.com", email["value"])
 		assert.Equal(t, true, email["primary"])
+
+		meta, ok := resp["meta"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, UserResource, meta["resourceType"])
+
+		wantLocation := "/v1-scim/" + provider + "/Users/" + userID
+		assert.Contains(t, meta["location"], wantLocation)
+		assert.Contains(t, w.Header().Get("Location"), wantLocation)
 	})
 
 	t.Run("creates user without email", func(t *testing.T) {
@@ -663,16 +664,15 @@ func TestCreateUser(t *testing.T) {
 			"userName": "jane.doe",
 			"externalId": "ext-67890"
 		}`
-		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		w := httptest.NewRecorder()
 
-		srv.CreateUser(rec, req)
-
-		require.Equal(t, http.StatusCreated, rec.Code)
+		srv.CreateUser(w, r)
+		require.Equal(t, http.StatusCreated, w.Code)
 
 		var resp map[string]any
-		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 
 		assert.Equal(t, "u-def456", resp["id"])
@@ -710,16 +710,15 @@ func TestCreateUser(t *testing.T) {
 			"userName": "John.Doe",
 			"externalId": "ext-12345"
 		}`
-		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		w := httptest.NewRecorder()
 
-		srv.CreateUser(rec, req)
-
-		require.Equal(t, http.StatusConflict, rec.Code)
+		srv.CreateUser(w, r)
+		require.Equal(t, http.StatusConflict, w.Code)
 
 		var errResp map[string]any
-		err := json.Unmarshal(rec.Body.Bytes(), &errResp)
+		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
 		assert.Contains(t, errResp["schemas"], ErrorSchemaID)
 	})
@@ -736,16 +735,15 @@ func TestCreateUser(t *testing.T) {
 		}
 
 		body := `not valid json`
-		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		w := httptest.NewRecorder()
 
-		srv.CreateUser(rec, req)
-
-		require.Equal(t, http.StatusBadRequest, rec.Code)
+		srv.CreateUser(w, r)
+		require.Equal(t, http.StatusBadRequest, w.Code)
 
 		var errResp map[string]any
-		err := json.Unmarshal(rec.Body.Bytes(), &errResp)
+		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
 		assert.Contains(t, errResp["schemas"], ErrorSchemaID)
 	})
@@ -767,13 +765,12 @@ func TestCreateUser(t *testing.T) {
 			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
 			"userName": "john.doe"
 		}`
-		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		w := httptest.NewRecorder()
 
-		srv.CreateUser(rec, req)
-
-		require.Equal(t, http.StatusInternalServerError, rec.Code)
+		srv.CreateUser(w, r)
+		require.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 
 	t.Run("error ensuring user", func(t *testing.T) {
@@ -797,13 +794,12 @@ func TestCreateUser(t *testing.T) {
 			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
 			"userName": "john.doe"
 		}`
-		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		w := httptest.NewRecorder()
 
-		srv.CreateUser(rec, req)
-
-		require.Equal(t, http.StatusInternalServerError, rec.Code)
+		srv.CreateUser(w, r)
+		require.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 
 	t.Run("error creating user attributes", func(t *testing.T) {
@@ -837,13 +833,12 @@ func TestCreateUser(t *testing.T) {
 			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
 			"userName": "john.doe"
 		}`
-		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		w := httptest.NewRecorder()
 
-		srv.CreateUser(rec, req)
-
-		require.Equal(t, http.StatusInternalServerError, rec.Code)
+		srv.CreateUser(w, r)
+		require.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 
 	t.Run("skips users without attributes during duplicate check", func(t *testing.T) {
@@ -882,13 +877,12 @@ func TestCreateUser(t *testing.T) {
 			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
 			"userName": "john.doe"
 		}`
-		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		w := httptest.NewRecorder()
 
-		srv.CreateUser(rec, req)
-
-		require.Equal(t, http.StatusCreated, rec.Code)
+		srv.CreateUser(w, r)
+		require.Equal(t, http.StatusCreated, w.Code)
 	})
 }
 
@@ -938,21 +932,28 @@ func TestUpdateUser(t *testing.T) {
 			"externalId": "ext-12345",
 			"active": true
 		}`
-		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.UpdateUser(rec, req)
-
-		require.Equal(t, http.StatusOK, rec.Code)
+		srv.UpdateUser(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
 
 		var resp map[string]any
-		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 
 		assert.Equal(t, userID, resp["id"])
 		assert.Equal(t, "new.name", resp["userName"])
 		assert.Equal(t, true, resp["active"])
+
+		meta, ok := resp["meta"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, UserResource, meta["resourceType"])
+
+		wantLocation := "/v1-scim/" + provider + "/Users/" + userID
+		assert.Contains(t, meta["location"], wantLocation)
+		assert.Contains(t, w.Header().Get("Location"), wantLocation)
 	})
 
 	t.Run("deactivates user", func(t *testing.T) {
@@ -997,16 +998,15 @@ func TestUpdateUser(t *testing.T) {
 			"externalId": "ext-12345",
 			"active": false
 		}`
-		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.UpdateUser(rec, req)
-
-		require.Equal(t, http.StatusOK, rec.Code)
+		srv.UpdateUser(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
 
 		var resp map[string]any
-		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 
 		assert.Equal(t, false, resp["active"])
@@ -1054,16 +1054,15 @@ func TestUpdateUser(t *testing.T) {
 			"externalId": "ext-12345",
 			"active": true
 		}`
-		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.UpdateUser(rec, req)
-
-		require.Equal(t, http.StatusOK, rec.Code)
+		srv.UpdateUser(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
 
 		var resp map[string]any
-		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 
 		assert.Equal(t, true, resp["active"])
@@ -1105,13 +1104,12 @@ func TestUpdateUser(t *testing.T) {
 			"externalId": "ext-12345",
 			"active": true
 		}`
-		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.UpdateUser(rec, req)
-
-		require.Equal(t, http.StatusOK, rec.Code)
+		srv.UpdateUser(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
 	})
 
 	t.Run("user not found", func(t *testing.T) {
@@ -1131,13 +1129,12 @@ func TestUpdateUser(t *testing.T) {
 			"userName": "john.doe",
 			"active": true
 		}`
-		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.UpdateUser(rec, req)
-
-		require.Equal(t, http.StatusNotFound, rec.Code)
+		srv.UpdateUser(w, r)
+		require.Equal(t, http.StatusNotFound, w.Code)
 	})
 
 	t.Run("system user returns not found", func(t *testing.T) {
@@ -1167,13 +1164,12 @@ func TestUpdateUser(t *testing.T) {
 			"userName": "john.doe",
 			"active": true
 		}`
-		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.UpdateUser(rec, req)
-
-		require.Equal(t, http.StatusNotFound, rec.Code)
+		srv.UpdateUser(w, r)
+		require.Equal(t, http.StatusNotFound, w.Code)
 	})
 
 	t.Run("cannot deactivate default admin", func(t *testing.T) {
@@ -1212,16 +1208,15 @@ func TestUpdateUser(t *testing.T) {
 			"externalId": "ext-admin",
 			"active": false
 		}`
-		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.UpdateUser(rec, req)
-
-		require.Equal(t, http.StatusConflict, rec.Code)
+		srv.UpdateUser(w, r)
+		require.Equal(t, http.StatusConflict, w.Code)
 
 		var errResp map[string]any
-		err := json.Unmarshal(rec.Body.Bytes(), &errResp)
+		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
 		assert.Contains(t, errResp["schemas"], ErrorSchemaID)
 	})
@@ -1238,13 +1233,12 @@ func TestUpdateUser(t *testing.T) {
 		}
 
 		body := `not valid json`
-		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.UpdateUser(rec, req)
-
-		require.Equal(t, http.StatusBadRequest, rec.Code)
+		srv.UpdateUser(w, r)
+		require.Equal(t, http.StatusBadRequest, w.Code)
 	})
 
 	t.Run("error updating user attributes", func(t *testing.T) {
@@ -1286,13 +1280,12 @@ func TestUpdateUser(t *testing.T) {
 			"externalId": "ext-12345",
 			"active": true
 		}`
-		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.UpdateUser(rec, req)
-
-		require.Equal(t, http.StatusInternalServerError, rec.Code)
+		srv.UpdateUser(w, r)
+		require.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 
 	t.Run("error updating user", func(t *testing.T) {
@@ -1334,13 +1327,12 @@ func TestUpdateUser(t *testing.T) {
 			"externalId": "ext-12345",
 			"active": false
 		}`
-		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.UpdateUser(rec, req)
-
-		require.Equal(t, http.StatusInternalServerError, rec.Code)
+		srv.UpdateUser(w, r)
+		require.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 }
 
@@ -1365,14 +1357,13 @@ func TestDeleteUser(t *testing.T) {
 			users:     userClient,
 		}
 
-		req := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Users/"+userID, nil)
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.DeleteUser(rec, req)
-
-		require.Equal(t, http.StatusNoContent, rec.Code)
-		assert.Empty(t, rec.Body.String())
+		srv.DeleteUser(w, r)
+		require.Equal(t, http.StatusNoContent, w.Code)
+		assert.Empty(t, w.Body.String())
 	})
 
 	t.Run("user not found", func(t *testing.T) {
@@ -1387,16 +1378,15 @@ func TestDeleteUser(t *testing.T) {
 			userCache: userCache,
 		}
 
-		req := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Users/"+userID, nil)
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.DeleteUser(rec, req)
-
-		require.Equal(t, http.StatusNotFound, rec.Code)
+		srv.DeleteUser(w, r)
+		require.Equal(t, http.StatusNotFound, w.Code)
 
 		var errResp map[string]any
-		err := json.Unmarshal(rec.Body.Bytes(), &errResp)
+		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
 		assert.Contains(t, errResp["schemas"], ErrorSchemaID)
 	})
@@ -1416,13 +1406,12 @@ func TestDeleteUser(t *testing.T) {
 			userCache: userCache,
 		}
 
-		req := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Users/"+userID, nil)
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.DeleteUser(rec, req)
-
-		require.Equal(t, http.StatusNotFound, rec.Code)
+		srv.DeleteUser(w, r)
+		require.Equal(t, http.StatusNotFound, w.Code)
 	})
 
 	t.Run("cannot delete default admin", func(t *testing.T) {
@@ -1440,16 +1429,15 @@ func TestDeleteUser(t *testing.T) {
 			userCache: userCache,
 		}
 
-		req := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Users/"+userID, nil)
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.DeleteUser(rec, req)
-
-		require.Equal(t, http.StatusConflict, rec.Code)
+		srv.DeleteUser(w, r)
+		require.Equal(t, http.StatusConflict, w.Code)
 
 		var errResp map[string]any
-		err := json.Unmarshal(rec.Body.Bytes(), &errResp)
+		err := json.Unmarshal(w.Body.Bytes(), &errResp)
 		require.NoError(t, err)
 		assert.Contains(t, errResp["schemas"], ErrorSchemaID)
 	})
@@ -1472,13 +1460,12 @@ func TestDeleteUser(t *testing.T) {
 			users:     userClient,
 		}
 
-		req := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Users/"+userID, nil)
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.DeleteUser(rec, req)
-
-		require.Equal(t, http.StatusInternalServerError, rec.Code)
+		srv.DeleteUser(w, r)
+		require.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 
 	t.Run("error getting user from cache", func(t *testing.T) {
@@ -1493,13 +1480,12 @@ func TestDeleteUser(t *testing.T) {
 			userCache: userCache,
 		}
 
-		req := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Users/"+userID, nil)
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.DeleteUser(rec, req)
-
-		require.Equal(t, http.StatusInternalServerError, rec.Code)
+		srv.DeleteUser(w, r)
+		require.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 }
 
@@ -1546,18 +1532,25 @@ func TestPatchUser(t *testing.T) {
 			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
 			"Operations": [{"op": "replace", "path": "active", "value": false}]
 		}`
-		req := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.PatchUser(rec, req)
-
-		require.Equal(t, http.StatusOK, rec.Code)
+		srv.PatchUser(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
 
 		var resp map[string]any
-		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 		assert.Equal(t, false, resp["active"])
+
+		meta, ok := resp["meta"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, UserResource, meta["resourceType"])
+
+		wantLocation := "/v1-scim/" + provider + "/Users/" + userID
+		assert.Contains(t, meta["location"], wantLocation)
+		assert.Contains(t, w.Header().Get("Location"), wantLocation)
 	})
 
 	t.Run("replace active to true reactivates user", func(t *testing.T) {
@@ -1600,16 +1593,15 @@ func TestPatchUser(t *testing.T) {
 			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
 			"Operations": [{"op": "replace", "path": "active", "value": true}]
 		}`
-		req := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.PatchUser(rec, req)
-
-		require.Equal(t, http.StatusOK, rec.Code)
+		srv.PatchUser(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
 
 		var resp map[string]any
-		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 		assert.Equal(t, true, resp["active"])
 	})
@@ -1654,16 +1646,15 @@ func TestPatchUser(t *testing.T) {
 			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
 			"Operations": [{"op": "replace", "path": "externalId", "value": "new-ext-id"}]
 		}`
-		req := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.PatchUser(rec, req)
-
-		require.Equal(t, http.StatusOK, rec.Code)
+		srv.PatchUser(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
 
 		var resp map[string]any
-		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 		assert.Equal(t, "new-ext-id", resp["externalId"])
 	})
@@ -1709,16 +1700,15 @@ func TestPatchUser(t *testing.T) {
 			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
 			"Operations": [{"op": "replace", "path": "emails[primary eq true].value", "value": "new@example.com"}]
 		}`
-		req := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.PatchUser(rec, req)
-
-		require.Equal(t, http.StatusOK, rec.Code)
+		srv.PatchUser(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
 
 		var resp map[string]any
-		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 
 		emails, ok := resp["emails"].([]any)
@@ -1771,13 +1761,12 @@ func TestPatchUser(t *testing.T) {
 			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
 			"Operations": [{"op": "replace", "value": {"externalId": "new-ext-id", "active": false}}]
 		}`
-		req := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.PatchUser(rec, req)
-
-		require.Equal(t, http.StatusOK, rec.Code)
+		srv.PatchUser(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
 	})
 
 	t.Run("no update when value unchanged", func(t *testing.T) {
@@ -1814,13 +1803,12 @@ func TestPatchUser(t *testing.T) {
 			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
 			"Operations": [{"op": "replace", "path": "active", "value": true}]
 		}`
-		req := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.PatchUser(rec, req)
-
-		require.Equal(t, http.StatusOK, rec.Code)
+		srv.PatchUser(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
 	})
 
 	t.Run("user not found", func(t *testing.T) {
@@ -1839,13 +1827,12 @@ func TestPatchUser(t *testing.T) {
 			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
 			"Operations": [{"op": "replace", "path": "active", "value": false}]
 		}`
-		req := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.PatchUser(rec, req)
-
-		require.Equal(t, http.StatusNotFound, rec.Code)
+		srv.PatchUser(w, r)
+		require.Equal(t, http.StatusNotFound, w.Code)
 	})
 
 	t.Run("system user returns not found", func(t *testing.T) {
@@ -1867,13 +1854,12 @@ func TestPatchUser(t *testing.T) {
 			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
 			"Operations": [{"op": "replace", "path": "active", "value": false}]
 		}`
-		req := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.PatchUser(rec, req)
-
-		require.Equal(t, http.StatusNotFound, rec.Code)
+		srv.PatchUser(w, r)
+		require.Equal(t, http.StatusNotFound, w.Code)
 	})
 
 	t.Run("cannot deactivate default admin", func(t *testing.T) {
@@ -1909,13 +1895,12 @@ func TestPatchUser(t *testing.T) {
 			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
 			"Operations": [{"op": "replace", "path": "active", "value": false}]
 		}`
-		req := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.PatchUser(rec, req)
-
-		require.Equal(t, http.StatusBadRequest, rec.Code)
+		srv.PatchUser(w, r)
+		require.Equal(t, http.StatusBadRequest, w.Code)
 	})
 
 	t.Run("unsupported operation", func(t *testing.T) {
@@ -1950,13 +1935,12 @@ func TestPatchUser(t *testing.T) {
 			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
 			"Operations": [{"op": "add", "path": "active", "value": false}]
 		}`
-		req := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.PatchUser(rec, req)
-
-		require.Equal(t, http.StatusBadRequest, rec.Code)
+		srv.PatchUser(w, r)
+		require.Equal(t, http.StatusBadRequest, w.Code)
 	})
 
 	t.Run("unsupported path", func(t *testing.T) {
@@ -1991,13 +1975,12 @@ func TestPatchUser(t *testing.T) {
 			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
 			"Operations": [{"op": "replace", "path": "unsupportedPath", "value": "test"}]
 		}`
-		req := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.PatchUser(rec, req)
-
-		require.Equal(t, http.StatusBadRequest, rec.Code)
+		srv.PatchUser(w, r)
+		require.Equal(t, http.StatusBadRequest, w.Code)
 	})
 
 	t.Run("invalid request body", func(t *testing.T) {
@@ -2017,13 +2000,12 @@ func TestPatchUser(t *testing.T) {
 		}
 
 		body := `not valid json`
-		req := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.PatchUser(rec, req)
-
-		require.Equal(t, http.StatusBadRequest, rec.Code)
+		srv.PatchUser(w, r)
+		require.Equal(t, http.StatusBadRequest, w.Code)
 	})
 
 	t.Run("invalid value type for active", func(t *testing.T) {
@@ -2058,13 +2040,12 @@ func TestPatchUser(t *testing.T) {
 			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
 			"Operations": [{"op": "replace", "path": "active", "value": "not-a-boolean"}]
 		}`
-		req := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.PatchUser(rec, req)
-
-		require.Equal(t, http.StatusBadRequest, rec.Code)
+		srv.PatchUser(w, r)
+		require.Equal(t, http.StatusBadRequest, w.Code)
 	})
 
 	t.Run("error updating user attributes", func(t *testing.T) {
@@ -2104,13 +2085,12 @@ func TestPatchUser(t *testing.T) {
 			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
 			"Operations": [{"op": "replace", "path": "externalId", "value": "new-ext-id"}]
 		}`
-		req := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.PatchUser(rec, req)
-
-		require.Equal(t, http.StatusInternalServerError, rec.Code)
+		srv.PatchUser(w, r)
+		require.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 
 	t.Run("error updating user", func(t *testing.T) {
@@ -2149,12 +2129,11 @@ func TestPatchUser(t *testing.T) {
 			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
 			"Operations": [{"op": "replace", "path": "active", "value": false}]
 		}`
-		req := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": userID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
 
-		srv.PatchUser(rec, req)
-
-		require.Equal(t, http.StatusInternalServerError, rec.Code)
+		srv.PatchUser(w, r)
+		require.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 }

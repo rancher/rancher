@@ -457,16 +457,25 @@ func TestPatchGroup(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var response map[string]any
-		err := json.Unmarshal(w.Body.Bytes(), &response)
+		var resp map[string]any
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
-		assert.Equal(t, "Engineering", response["displayName"])
+		assert.Equal(t, "Engineering", resp["displayName"])
 
 		// Members should be present in response.
-		if members, ok := response["members"].([]any); ok {
+		if members, ok := resp["members"].([]any); ok {
 			// Members list is returned (could be empty based on mocks).
 			assert.NotNil(t, members)
 		}
+
+		meta, ok := resp["meta"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, GroupResource, meta["resourceType"])
+
+		wantLocation := "/v1-scim/" + provider + "/Groups/" + groupID
+		assert.Contains(t, meta["location"], wantLocation)
+		assert.Contains(t, w.Header().Get("Location"), wantLocation)
+
 	})
 
 	t.Run("remove member operation", func(t *testing.T) {
@@ -574,10 +583,10 @@ func TestPatchGroup(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var response map[string]any
-		err = json.Unmarshal(w.Body.Bytes(), &response)
+		var resp map[string]any
+		err = json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
-		assert.Equal(t, "new-external-id", response["externalId"])
+		assert.Equal(t, "new-external-id", resp["externalId"])
 	})
 }
 
@@ -685,17 +694,16 @@ func TestListGroupsPagination(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups?"+tt.queryString, nil)
-			req = mux.SetURLVars(req, map[string]string{"provider": provider})
-			rec := httptest.NewRecorder()
+			r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups?"+tt.queryString, nil)
+			r = mux.SetURLVars(r, map[string]string{"provider": provider})
+			w := httptest.NewRecorder()
 
-			srv.ListGroups(rec, req)
+			srv.ListGroups(w, r)
 
-			assert.Equal(t, tt.wantStatus, rec.Code)
-
+			assert.Equal(t, tt.wantStatus, w.Code)
 			if tt.wantStatus == http.StatusOK {
 				var resp ListResponse
-				err := json.Unmarshal(rec.Body.Bytes(), &resp)
+				err := json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
 
 				assert.Equal(t, tt.wantTotalResults, resp.TotalResults)
@@ -719,7 +727,7 @@ func TestListGroupsPaginationConsistency(t *testing.T) {
 
 	// Create 10 groups.
 	groups := make([]*v3.Group, 10)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		groups[i] = &v3.Group{
 			ObjectMeta:  metav1.ObjectMeta{Name: fmt.Sprintf("g-%03d", i), Labels: map[string]string{authProviderLabel: provider}},
 			DisplayName: fmt.Sprintf("Group %03d", i),
@@ -745,15 +753,14 @@ func TestListGroupsPaginationConsistency(t *testing.T) {
 	var allCollectedIDs []string
 
 	for startIndex := 1; ; startIndex += pageSize {
-		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/v1-scim/%s/Groups?startIndex=%d&count=%d&excludedAttributes=members", provider, startIndex, pageSize), nil)
-		req = mux.SetURLVars(req, map[string]string{"provider": provider})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/v1-scim/%s/Groups?startIndex=%d&count=%d&excludedAttributes=members", provider, startIndex, pageSize), nil)
+		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		w := httptest.NewRecorder()
 
-		srv.ListGroups(rec, req)
-		require.Equal(t, http.StatusOK, rec.Code)
-
+		srv.ListGroups(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
 		var resp ListResponse
-		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 
 		if len(resp.Resources) == 0 {
@@ -794,6 +801,7 @@ func TestCreateGroup(t *testing.T) {
 	t.Run("creates group successfully", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
+		groupID := "grp-abc123"
 		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
 		groupsCache.EXPECT().List(labels.Set{authProviderLabel: provider}.AsSelector()).Return([]*v3.Group{}, nil)
 
@@ -822,20 +830,27 @@ func TestCreateGroup(t *testing.T) {
 			"displayName": "Engineering",
 			"externalId": "ext-eng-001"
 		}`
-		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		w := httptest.NewRecorder()
 
-		srv.CreateGroup(rec, req)
+		srv.CreateGroup(w, r)
 
-		require.Equal(t, http.StatusCreated, rec.Code)
-
+		require.Equal(t, http.StatusCreated, w.Code)
 		var resp map[string]any
-		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
-		assert.Equal(t, "grp-abc123", resp["id"])
+		assert.Equal(t, groupID, resp["id"])
 		assert.Equal(t, "Engineering", resp["displayName"])
 		assert.Equal(t, "ext-eng-001", resp["externalId"])
+
+		meta, ok := resp["meta"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, GroupResource, meta["resourceType"])
+
+		wantLocation := "/v1-scim/" + provider + "/Groups/" + groupID
+		assert.Contains(t, meta["location"], wantLocation)
+		assert.Contains(t, w.Header().Get("Location"), wantLocation)
 	})
 
 	t.Run("creates group with members", func(t *testing.T) {
@@ -901,16 +916,16 @@ func TestCreateGroup(t *testing.T) {
 			"externalId": "ext-eng-001",
 			"members": [{"value": "u-user1", "display": "user1"}]
 		}`
-		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		w := httptest.NewRecorder()
 
-		srv.CreateGroup(rec, req)
+		srv.CreateGroup(w, r)
 
-		require.Equal(t, http.StatusCreated, rec.Code)
+		require.Equal(t, http.StatusCreated, w.Code)
 
 		var resp map[string]any
-		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 
 		members, ok := resp["members"].([]any)
@@ -936,13 +951,12 @@ func TestCreateGroup(t *testing.T) {
 			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
 			"displayName": "Engineering"
 		}`
-		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		w := httptest.NewRecorder()
 
-		srv.CreateGroup(rec, req)
-
-		require.Equal(t, http.StatusConflict, rec.Code)
+		srv.CreateGroup(w, r)
+		require.Equal(t, http.StatusConflict, w.Code)
 	})
 
 	t.Run("conflict is case insensitive", func(t *testing.T) {
@@ -963,26 +977,24 @@ func TestCreateGroup(t *testing.T) {
 			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
 			"displayName": "engineering"
 		}`
-		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		w := httptest.NewRecorder()
 
-		srv.CreateGroup(rec, req)
-
-		require.Equal(t, http.StatusConflict, rec.Code)
+		srv.CreateGroup(w, r)
+		require.Equal(t, http.StatusConflict, w.Code)
 	})
 
 	t.Run("invalid request body", func(t *testing.T) {
 		srv := &SCIMServer{}
 
 		body := `not valid json`
-		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		w := httptest.NewRecorder()
 
-		srv.CreateGroup(rec, req)
-
-		require.Equal(t, http.StatusBadRequest, rec.Code)
+		srv.CreateGroup(w, r)
+		require.Equal(t, http.StatusBadRequest, w.Code)
 	})
 
 	t.Run("error listing groups", func(t *testing.T) {
@@ -999,13 +1011,12 @@ func TestCreateGroup(t *testing.T) {
 			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
 			"displayName": "Engineering"
 		}`
-		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		w := httptest.NewRecorder()
 
-		srv.CreateGroup(rec, req)
-
-		require.Equal(t, http.StatusInternalServerError, rec.Code)
+		srv.CreateGroup(w, r)
+		require.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 
 	t.Run("error creating group", func(t *testing.T) {
@@ -1026,13 +1037,12 @@ func TestCreateGroup(t *testing.T) {
 			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
 			"displayName": "Engineering"
 		}`
-		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		w := httptest.NewRecorder()
 
-		srv.CreateGroup(rec, req)
-
-		require.Equal(t, http.StatusInternalServerError, rec.Code)
+		srv.CreateGroup(w, r)
+		require.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 
 	t.Run("error syncing members", func(t *testing.T) {
@@ -1063,13 +1073,13 @@ func TestCreateGroup(t *testing.T) {
 			"displayName": "Engineering",
 			"members": [{"value": "u-user1", "display": "user1"}]
 		}`
-		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		w := httptest.NewRecorder()
 
-		srv.CreateGroup(rec, req)
+		srv.CreateGroup(w, r)
 
-		require.Equal(t, http.StatusInternalServerError, rec.Code)
+		require.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 
 	t.Run("conflict when group found by ID", func(t *testing.T) {
@@ -1097,13 +1107,12 @@ func TestCreateGroup(t *testing.T) {
 			"displayName": "Engineering",
 			"externalId": "new-ext-id"
 		}`
-		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		w := httptest.NewRecorder()
 
-		srv.CreateGroup(rec, req)
-
-		require.Equal(t, http.StatusConflict, rec.Code)
+		srv.CreateGroup(w, r)
+		require.Equal(t, http.StatusConflict, w.Code)
 	})
 
 	t.Run("conflict when group found by displayName with different externalId", func(t *testing.T) {
@@ -1136,13 +1145,12 @@ func TestCreateGroup(t *testing.T) {
 			"displayName": "Engineering",
 			"externalId": "new-ext-id"
 		}`
-		req := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		w := httptest.NewRecorder()
 
-		srv.CreateGroup(rec, req)
-
-		require.Equal(t, http.StatusConflict, rec.Code)
+		srv.CreateGroup(w, r)
+		require.Equal(t, http.StatusConflict, w.Code)
 	})
 }
 
@@ -1191,16 +1199,15 @@ func TestGetGroup(t *testing.T) {
 			userAttributeCache: userAttributeCache,
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		w := httptest.NewRecorder()
 
-		srv.GetGroup(rec, req)
-
-		require.Equal(t, http.StatusOK, rec.Code)
+		srv.GetGroup(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
 
 		var resp map[string]any
-		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 		assert.Equal(t, groupID, resp["id"])
 		assert.Equal(t, "Engineering", resp["displayName"])
@@ -1233,16 +1240,15 @@ func TestGetGroup(t *testing.T) {
 			groupsCache: groupsCache,
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID+"?excludedAttributes=members,other_attribute", nil)
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID+"?excludedAttributes=members,other_attribute", nil)
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		w := httptest.NewRecorder()
 
-		srv.GetGroup(rec, req)
-
-		require.Equal(t, http.StatusOK, rec.Code)
+		srv.GetGroup(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
 
 		var resp map[string]any
-		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 		assert.Equal(t, groupID, resp["id"])
 		assert.Equal(t, "Engineering", resp["displayName"])
@@ -1272,16 +1278,15 @@ func TestGetGroup(t *testing.T) {
 			userCache:   userCache,
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		w := httptest.NewRecorder()
 
-		srv.GetGroup(rec, req)
-
-		require.Equal(t, http.StatusOK, rec.Code)
+		srv.GetGroup(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
 
 		var resp map[string]any
-		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 
 		members, ok := resp["members"].([]any)
@@ -1301,13 +1306,12 @@ func TestGetGroup(t *testing.T) {
 			groupsCache: groupsCache,
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		w := httptest.NewRecorder()
 
-		srv.GetGroup(rec, req)
-
-		require.Equal(t, http.StatusNotFound, rec.Code)
+		srv.GetGroup(w, r)
+		require.Equal(t, http.StatusNotFound, w.Code)
 	})
 
 	t.Run("error getting group from cache", func(t *testing.T) {
@@ -1322,13 +1326,12 @@ func TestGetGroup(t *testing.T) {
 			groupsCache: groupsCache,
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		w := httptest.NewRecorder()
 
-		srv.GetGroup(rec, req)
-
-		require.Equal(t, http.StatusInternalServerError, rec.Code)
+		srv.GetGroup(w, r)
+		require.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 
 	t.Run("error getting group members", func(t *testing.T) {
@@ -1351,13 +1354,12 @@ func TestGetGroup(t *testing.T) {
 			userCache:   userCache,
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		w := httptest.NewRecorder()
 
-		srv.GetGroup(rec, req)
-
-		require.Equal(t, http.StatusInternalServerError, rec.Code)
+		srv.GetGroup(w, r)
+		require.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 
 	t.Run("skips system users when getting members", func(t *testing.T) {
@@ -1405,16 +1407,15 @@ func TestGetGroup(t *testing.T) {
 			userAttributeCache: userAttributeCache,
 		}
 
-		req := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		w := httptest.NewRecorder()
 
-		srv.GetGroup(rec, req)
-
-		require.Equal(t, http.StatusOK, rec.Code)
+		srv.GetGroup(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
 
 		var resp map[string]any
-		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 
 		members, ok := resp["members"].([]any)
@@ -1458,20 +1459,27 @@ func TestUpdateGroup(t *testing.T) {
 			"externalId": "ext-id",
 			"members": []
 		}`
-		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		w := httptest.NewRecorder()
 
-		srv.UpdateGroup(rec, req)
-
-		require.Equal(t, http.StatusOK, rec.Code)
+		srv.UpdateGroup(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
 
 		var resp map[string]any
-		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 		assert.Equal(t, groupID, resp["id"])
 		assert.Equal(t, "Engineering", resp["displayName"])
 		assert.Equal(t, "ext-id", resp["externalId"])
+
+		meta, ok := resp["meta"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, GroupResource, meta["resourceType"])
+
+		wantLocation := "/v1-scim/" + provider + "/Groups/" + groupID
+		assert.Contains(t, meta["location"], wantLocation)
+		assert.Contains(t, w.Header().Get("Location"), wantLocation)
 	})
 
 	t.Run("updates group with members", func(t *testing.T) {
@@ -1527,16 +1535,15 @@ func TestUpdateGroup(t *testing.T) {
 			"externalId": "ext-id",
 			"members": [{"value": "u-user1", "display": "user1"}]
 		}`
-		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		w := httptest.NewRecorder()
 
-		srv.UpdateGroup(rec, req)
-
-		require.Equal(t, http.StatusOK, rec.Code)
+		srv.UpdateGroup(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
 
 		var resp map[string]any
-		err := json.Unmarshal(rec.Body.Bytes(), &resp)
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 
 		members, ok := resp["members"].([]any)
@@ -1552,26 +1559,24 @@ func TestUpdateGroup(t *testing.T) {
 			"id": "grp-different",
 			"displayName": "Engineering"
 		}`
-		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/grp-abc123", bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": "grp-abc123"})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/grp-abc123", bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": "grp-abc123"})
+		w := httptest.NewRecorder()
 
-		srv.UpdateGroup(rec, req)
-
-		require.Equal(t, http.StatusBadRequest, rec.Code)
+		srv.UpdateGroup(w, r)
+		require.Equal(t, http.StatusBadRequest, w.Code)
 	})
 
 	t.Run("invalid request body", func(t *testing.T) {
 		srv := &SCIMServer{}
 
 		body := `not valid json`
-		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/grp-abc123", bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": "grp-abc123"})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/grp-abc123", bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": "grp-abc123"})
+		w := httptest.NewRecorder()
 
-		srv.UpdateGroup(rec, req)
-
-		require.Equal(t, http.StatusBadRequest, rec.Code)
+		srv.UpdateGroup(w, r)
+		require.Equal(t, http.StatusBadRequest, w.Code)
 	})
 
 	t.Run("error ensuring group", func(t *testing.T) {
@@ -1591,13 +1596,12 @@ func TestUpdateGroup(t *testing.T) {
 			"id": "grp-abc123",
 			"displayName": "Engineering"
 		}`
-		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		w := httptest.NewRecorder()
 
-		srv.UpdateGroup(rec, req)
-
-		require.Equal(t, http.StatusInternalServerError, rec.Code)
+		srv.UpdateGroup(w, r)
+		require.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 
 	t.Run("error syncing members", func(t *testing.T) {
@@ -1628,13 +1632,12 @@ func TestUpdateGroup(t *testing.T) {
 			"externalId": "ext-id",
 			"members": [{"value": "u-user1", "display": "user1"}]
 		}`
-		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		w := httptest.NewRecorder()
 
-		srv.UpdateGroup(rec, req)
-
-		require.Equal(t, http.StatusInternalServerError, rec.Code)
+		srv.UpdateGroup(w, r)
+		require.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 
 	t.Run("removes members not in update", func(t *testing.T) {
@@ -1699,13 +1702,12 @@ func TestUpdateGroup(t *testing.T) {
 			"externalId": "ext-id",
 			"members": []
 		}`
-		req := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		w := httptest.NewRecorder()
 
-		srv.UpdateGroup(rec, req)
-
-		require.Equal(t, http.StatusOK, rec.Code)
+		srv.UpdateGroup(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
 	})
 }
 
@@ -1737,13 +1739,12 @@ func TestDeleteGroup(t *testing.T) {
 			userCache:   userCache,
 		}
 
-		req := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		w := httptest.NewRecorder()
 
-		srv.DeleteGroup(rec, req)
-
-		require.Equal(t, http.StatusNoContent, rec.Code)
+		srv.DeleteGroup(w, r)
+		require.Equal(t, http.StatusNoContent, w.Code)
 	})
 
 	t.Run("removes members before deleting group", func(t *testing.T) {
@@ -1801,13 +1802,12 @@ func TestDeleteGroup(t *testing.T) {
 			userAttributes:     userAttributeClient,
 		}
 
-		req := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		w := httptest.NewRecorder()
 
-		srv.DeleteGroup(rec, req)
-
-		require.Equal(t, http.StatusNoContent, rec.Code)
+		srv.DeleteGroup(w, r)
+		require.Equal(t, http.StatusNoContent, w.Code)
 	})
 
 	t.Run("group not found", func(t *testing.T) {
@@ -1822,13 +1822,12 @@ func TestDeleteGroup(t *testing.T) {
 			groupsCache: groupsCache,
 		}
 
-		req := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		w := httptest.NewRecorder()
 
-		srv.DeleteGroup(rec, req)
-
-		require.Equal(t, http.StatusNotFound, rec.Code)
+		srv.DeleteGroup(w, r)
+		require.Equal(t, http.StatusNotFound, w.Code)
 	})
 
 	t.Run("error getting group from cache", func(t *testing.T) {
@@ -1843,13 +1842,12 @@ func TestDeleteGroup(t *testing.T) {
 			groupsCache: groupsCache,
 		}
 
-		req := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		w := httptest.NewRecorder()
 
-		srv.DeleteGroup(rec, req)
-
-		require.Equal(t, http.StatusInternalServerError, rec.Code)
+		srv.DeleteGroup(w, r)
+		require.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 
 	t.Run("error removing group members", func(t *testing.T) {
@@ -1872,13 +1870,12 @@ func TestDeleteGroup(t *testing.T) {
 			userCache:   userCache,
 		}
 
-		req := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		w := httptest.NewRecorder()
 
-		srv.DeleteGroup(rec, req)
-
-		require.Equal(t, http.StatusInternalServerError, rec.Code)
+		srv.DeleteGroup(w, r)
+		require.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 
 	t.Run("error deleting group", func(t *testing.T) {
@@ -1905,12 +1902,11 @@ func TestDeleteGroup(t *testing.T) {
 			userCache:   userCache,
 		}
 
-		req := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		req = mux.SetURLVars(req, map[string]string{"provider": provider, "id": groupID})
-		rec := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		w := httptest.NewRecorder()
 
-		srv.DeleteGroup(rec, req)
-
-		require.Equal(t, http.StatusInternalServerError, rec.Code)
+		srv.DeleteGroup(w, r)
+		require.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 }

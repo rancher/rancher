@@ -249,7 +249,7 @@ func TestParseFilter(t *testing.T) {
 			if tt.wantErr {
 				require.Error(t, err)
 				if tt.errContains != "" {
-					assert.Contains(t, err.Error(), tt.errContains)
+					assert.ErrorContains(t, err, tt.errContains)
 				}
 				return
 			}
@@ -450,7 +450,7 @@ func TestFilterValidateForAttribute(t *testing.T) {
 			if tt.wantErr {
 				require.Error(t, err)
 				if tt.errContains != "" {
-					assert.Contains(t, err.Error(), tt.errContains)
+					assert.ErrorContains(t, err, tt.errContains)
 				}
 				return
 			}
@@ -506,7 +506,7 @@ func TestTokenize(t *testing.T) {
 			if tt.wantErr {
 				require.Error(t, err)
 				if tt.errContains != "" {
-					assert.Contains(t, err.Error(), tt.errContains)
+					assert.ErrorContains(t, err, tt.errContains)
 				}
 				return
 			}

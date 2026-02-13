@@ -138,7 +138,7 @@ func (s *SCIMServer) ListUsers(w http.ResponseWriter, r *http.Request) {
 			"id":         user.Name,
 			"userName":   userName,
 			"externalId": externalID,
-			"active":     user.Enabled == nil || (user.Enabled != nil && *user.Enabled),
+			"active":     user.GetEnabled(),
 			"meta": map[string]any{
 				"resourceType": UserResource,
 				"created":      user.CreationTimestamp,
@@ -253,16 +253,17 @@ func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	location := locationURL(r, provider, UserEndpoint, user.Name)
 	response := map[string]any{
 		"schemas":    []string{UserSchemaID},
 		"id":         user.Name,
 		"userName":   payload.UserName,
 		"externalId": payload.ExternalID,
-		"active":     user.Enabled == nil || (user.Enabled != nil && *user.Enabled),
+		"active":     user.GetEnabled(),
 		"meta": map[string]any{
 			"resourceType": UserResource,
 			"created":      user.CreationTimestamp,
-			"location":     locationURL(r, provider, UserEndpoint, user.Name),
+			"location":     location,
 		},
 	}
 	if primaryEmail != "" {
@@ -274,6 +275,7 @@ func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	w.Header().Set("Location", location)
 	writeResponse(w, response, http.StatusCreated)
 }
 
@@ -317,7 +319,7 @@ func (s *SCIMServer) GetUser(w http.ResponseWriter, r *http.Request) {
 		"id":         user.Name,
 		"userName":   first(attr.ExtraByProvider[provider]["username"]),
 		"externalId": first(attr.ExtraByProvider[provider]["externalid"]),
-		"active":     user.Enabled == nil || (user.Enabled != nil && *user.Enabled),
+		"active":     user.GetEnabled(),
 		"meta": map[string]any{
 			"resourceType": UserResource,
 			"created":      user.CreationTimestamp,
@@ -382,8 +384,6 @@ func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userIsActive := user.Enabled == nil || (user.Enabled != nil && *user.Enabled)
-
 	var shouldUpdateAttr, shouldUpdateUser bool
 	attr = attr.DeepCopy()
 	if attr.ExtraByProvider[provider] == nil {
@@ -397,7 +397,7 @@ func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		attr.ExtraByProvider[provider]["externalid"] = []string{payload.ExternalID}
 		shouldUpdateAttr = true
 	}
-	if userIsActive != payload.Active {
+	if user.GetEnabled() != payload.Active {
 		if user.IsDefaultAdmin() && !payload.Active {
 			writeError(w, NewError(http.StatusConflict, "Cannot deprovision default admin user"))
 			return
@@ -422,6 +422,7 @@ func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	location := locationURL(r, provider, UserEndpoint, user.Name)
 	response := map[string]any{
 		"schemas":    []string{UserSchemaID},
 		"id":         user.Name,
@@ -431,7 +432,7 @@ func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		"meta": map[string]any{
 			"resourceType": UserResource,
 			"created":      user.CreationTimestamp,
-			"location":     locationURL(r, provider, UserEndpoint, user.Name),
+			"location":     location,
 		},
 	}
 
@@ -445,6 +446,7 @@ func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	w.Header().Set("Location", location)
 	writeResponse(w, response)
 }
 
@@ -578,16 +580,17 @@ func (s *SCIMServer) PatchUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	location := locationURL(r, provider, UserEndpoint, user.Name)
 	response := map[string]any{
 		"schemas":    []string{UserSchemaID},
 		"id":         user.Name,
 		"userName":   first(attr.ExtraByProvider[provider]["username"]),
 		"externalId": first(attr.ExtraByProvider[provider]["externalid"]),
-		"active":     user.Enabled == nil || (user.Enabled != nil && *user.Enabled),
+		"active":     user.GetEnabled(),
 		"meta": map[string]any{
 			"resourceType": UserResource,
 			"created":      user.CreationTimestamp,
-			"location":     locationURL(r, provider, UserEndpoint, user.Name),
+			"location":     location,
 		},
 	}
 
@@ -601,6 +604,7 @@ func (s *SCIMServer) PatchUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	w.Header().Set("Location", location)
 	writeResponse(w, response)
 }
 
@@ -640,8 +644,7 @@ func applyReplaceUser(provider string, attr *v3.UserAttribute, user *v3.User, op
 			return false, false, NewError(http.StatusBadRequest, fmt.Sprintf("Invalid value for active: %v", op.Value))
 		}
 
-		userIsActive := user.Enabled == nil || (user.Enabled != nil && *user.Enabled)
-		if userIsActive != active {
+		if user.GetEnabled() != active {
 			if user.IsDefaultAdmin() && !active {
 				return false, false, NewError(http.StatusConflict, "Cannot deprovision default admin user")
 			}

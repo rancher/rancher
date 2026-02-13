@@ -41,9 +41,9 @@ type ServiceProviderConfig struct {
 	AuthenticationSchemes []AuthenticationScheme
 	// MaxResults denotes the the integer value specifying the maximum number of resources returned in a response. It defaults to 100.
 	MaxResults int
-	// SupportFiltering whether you SCIM implementation will support filtering.
+	// SupportFiltering indicates whether or not the SCIM implementation supports filtering.
 	SupportFiltering bool
-	// SupportPatch whether your SCIM implementation will support patch requests.
+	// SupportPatch indicates whether or not the SCIM implementation supports patch requests.
 	SupportPatch bool
 }
 

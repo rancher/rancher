@@ -192,6 +192,7 @@ func (s *SCIMServer) CreateGroup(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	location := locationURL(r, provider, GroupEndpoint, group.Name)
 	resource := map[string]any{
 		"schemas":     []string{GroupSchemaID},
 		"id":          group.Name,
@@ -200,7 +201,7 @@ func (s *SCIMServer) CreateGroup(w http.ResponseWriter, r *http.Request) {
 		"meta": map[string]any{
 			"created":      group.CreationTimestamp,
 			"resourceType": GroupResource,
-			"location":     locationURL(r, provider, GroupEndpoint, group.Name),
+			"location":     location,
 		},
 	}
 	members := payload.Members
@@ -209,6 +210,7 @@ func (s *SCIMServer) CreateGroup(w http.ResponseWriter, r *http.Request) {
 	}
 	resource["members"] = members
 
+	w.Header().Set("Location", location)
 	writeResponse(w, resource, http.StatusCreated)
 }
 
@@ -309,6 +311,7 @@ func (s *SCIMServer) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	location := locationURL(r, provider, GroupEndpoint, group.Name)
 	resource := map[string]any{
 		"schemas":     []string{GroupSchemaID},
 		"id":          group.Name,
@@ -317,7 +320,7 @@ func (s *SCIMServer) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 		"meta": map[string]any{
 			"created":      group.CreationTimestamp,
 			"resourceType": GroupResource,
-			"location":     locationURL(r, provider, GroupEndpoint, group.Name),
+			"location":     location,
 		},
 	}
 	members := payload.Members
@@ -326,6 +329,7 @@ func (s *SCIMServer) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 	}
 	resource["members"] = members
 
+	w.Header().Set("Location", location)
 	writeResponse(w, resource)
 }
 
@@ -465,6 +469,7 @@ func (s *SCIMServer) PatchGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	location := locationURL(r, provider, GroupEndpoint, group.Name)
 	resource := map[string]any{
 		"schemas":     []string{GroupSchemaID},
 		"id":          group.Name,
@@ -474,10 +479,11 @@ func (s *SCIMServer) PatchGroup(w http.ResponseWriter, r *http.Request) {
 		"meta": map[string]any{
 			"created":      group.CreationTimestamp,
 			"resourceType": GroupResource,
-			"location":     locationURL(r, provider, GroupEndpoint, group.Name),
+			"location":     location,
 		},
 	}
 
+	w.Header().Set("Location", location)
 	writeResponse(w, resource)
 }
 
