@@ -227,6 +227,7 @@ type Feature struct {
 	description string
 	// val is the effective value- it is equal to default until explicitly changed.
 	// The order of precedence is lockedValue > value > default
+	// when prime is true and IsPrime() is false, the effective value is always false
 	val *bool
 	// default value of feature
 	def bool
