@@ -1,5 +1,10 @@
 name: Validate
-on: [pull_request, push]
+on:
+  pull_request:
+  push:
+    branches:
+      - "main"
+      - "release/v*"
 jobs:
   validate:
     runs-on: runs-on,runner=8cpu-linux-x64,run-id=${{ github.run_id }}
