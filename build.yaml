@@ -2,7 +2,7 @@ webhookVersion: 109.0.0+up0.10.0-rc.11
 remoteDialerProxyVersion: 109.0.0+up0.7.0-rc.5
 turtlesVersion: 109.0.0+up0.26.0-rc.3
 cspAdapterMinVersion: 109.0.0+up9.0.0-rc.3
-defaultShellVersion: rancher/shell:v0.6.2-rc.1
+defaultShellVersion: rancher/shell:v0.7.0-rc.3
 fleetVersion: 109.0.0+up0.15.0-alpha.10
 defaultSccOperatorImage: rancher/scc-operator:v0.3.1-rc.2
 # NOTE: when updating this version, you will also need to update the hardcoded
