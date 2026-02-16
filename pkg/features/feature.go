@@ -9,7 +9,6 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	managementv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -200,6 +199,13 @@ var (
 	ClusterOwnershipStrategy = newFeature(
 		"consistent-hashing-cluster-ownership",
 		"Enable consistent-hashing for cluster-ownership calculation",
+		false,
+		false,
+		true,
+	)
+	SCIM = newFeature(
+		"scim",
+		"Enable SCIM identity provisioning",
 		false,
 		false,
 		true,

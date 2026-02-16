@@ -20,6 +20,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/logout"
 	"github.com/rancher/rancher/pkg/auth/providers/publicapi"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
+	"github.com/rancher/rancher/pkg/auth/providers/scim"
 	"github.com/rancher/rancher/pkg/auth/requests"
 	"github.com/rancher/rancher/pkg/auth/requests/sar"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -108,6 +109,9 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 		unauthed.PathPrefix("/v3-public").Handler(v3PublicAPI)
 	}
 	unauthed.PathPrefix("/v1-public").Handler(v1PublicAPI)
+	if features.SCIM.Enabled() {
+		unauthed.PathPrefix(scim.URLPrefix).Handler(scim.NewHandler(scaledContext))
+	}
 
 	// Authenticated routes
 	impersonatingAuth := requests.NewImpersonatingAuth(scaledContext.Wrangler, sar.NewSubjectAccessReview(clusterManager))

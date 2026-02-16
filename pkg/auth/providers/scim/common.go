@@ -1,0 +1,119 @@
+package scim
+
+import (
+	"fmt"
+	"net/http"
+	"net/url"
+	"strconv"
+
+	authutil "github.com/rancher/rancher/pkg/auth/util"
+	"github.com/sirupsen/logrus"
+)
+
+const (
+	// URLPrefix is the base path for SCIM API endpoints.
+	URLPrefix = "/v1-scim"
+)
+
+const (
+	secretKindLabel   = "cattle.io/kind"
+	authProviderLabel = "authn.management.cattle.io/provider"
+	scimAuthToken     = "scim-auth-token"
+)
+
+const (
+	// defaultPageSize is the default number of results per page when count is not specified.
+	defaultPageSize = 100
+	// maxPageSize is the maximum allowed page size to prevent excessive memory usage.
+	maxPageSize = 1000
+)
+
+// patchOp defines a single operation in a SCIM PATCH request.
+type patchOp struct {
+	Op    string `json:"op"`
+	Path  string `json:"path"`
+	Value any    `json:"value"`
+}
+
+// first returns the first element of the slice s, or the zero value of E if s is empty.
+func first[Slice ~[]E, E any](s Slice) E {
+	if len(s) > 0 {
+		return s[0]
+	}
+
+	var e E
+	return e
+}
+
+// locationURL constructs the location URL for a SCIM resource.
+func locationURL(r *http.Request, provider, resourceType, id string) string {
+	host := "https://" + authutil.GetHost(r)
+	location, err := url.JoinPath(host, URLPrefix, provider, resourceType, id)
+	if err != nil {
+		logrus.Errorf("scim::locationURL: failed to join URL path: %s", err)
+		return "" // TODO: Revisit this.
+	}
+	return location
+}
+
+// paginationParams holds parsed and validated pagination parameters.
+type paginationParams struct {
+	startIndex int // 1-based, validated to be >= 1.
+	count      int // Number of items per page, clamped to [0, MaxPageSize].
+}
+
+// ParsePaginationParams extracts and validates startIndex and count from the request.
+// Returns defaults if parameters are not provided.
+func parsePaginationParams(r *http.Request) (paginationParams, error) {
+	params := paginationParams{
+		startIndex: 1,
+		count:      defaultPageSize,
+	}
+
+	if value := r.URL.Query().Get("startIndex"); value != "" {
+		idx, err := strconv.Atoi(value)
+		if err != nil {
+			return params, fmt.Errorf("invalid startIndex: must be an integer: %w", err)
+		}
+		if idx < 1 {
+			return params, fmt.Errorf("invalid startIndex: must be >= 1")
+		}
+		params.startIndex = idx
+	}
+
+	if value := r.URL.Query().Get("count"); value != "" {
+		count, err := strconv.Atoi(value)
+		if err != nil {
+			return params, fmt.Errorf("invalid count: must be an integer: %w", err)
+		}
+		if count < 0 {
+			return params, fmt.Errorf("invalid count: must be >= 0")
+		}
+		if count > maxPageSize {
+			count = maxPageSize
+		}
+		params.count = count
+	}
+
+	return params, nil
+}
+
+// paginate applies pagination to a slice and returns the paginated subset along with
+// the actual start index used. The startIndex in params is 1-based per SCIM protocol.
+func paginate[T any](items []T, params paginationParams) (result []T, startIndex int) {
+	total := len(items)
+	startIndex = params.startIndex
+
+	// Convert 1-based startIndex to 0-based offset.
+	offset := params.startIndex - 1
+
+	// If offset is beyond the total, return empty slice.
+	if offset >= total || offset < 0 {
+		return []T{}, startIndex
+	}
+
+	// Calculate end index.
+	end := min(offset+params.count, total)
+
+	return items[offset:end], startIndex
+}

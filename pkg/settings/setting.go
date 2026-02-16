@@ -419,6 +419,11 @@ var (
 	// (for example, "rancher-aws-endpoints"). The special value "all" disables creation of all built-in ProxyEndpoints.
 	// Refer to Rancher documentation for the list of built-in ProxyEndpoints.
 	DisableDefaultProxyEndpoint = NewSetting("disable-default-proxy-endpoints", "")
+
+	// ExpireSCIMTokensAfter is the duration after which SCIM authentication tokens expire.
+	// The value should be expressed in valid time.Duration units e.g. "24h".
+	// An empty string or a zero value means SCIM tokens do not expire.
+	ExpireSCIMTokensAfter = NewSetting("expire-scim-tokens-after", "720h") // 30 days
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.
