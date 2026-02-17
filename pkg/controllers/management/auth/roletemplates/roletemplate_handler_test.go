@@ -568,6 +568,12 @@ func Test_OnChange(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			features.AggregatedRoleTemplates.Set(true)
+			if tt.rt != nil {
+				if tt.rt.Labels == nil {
+					tt.rt.Labels = map[string]string{}
+				}
+				tt.rt.Labels[rbac.AggregationFeatureLabel] = "true"
+			}
 			crController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
 			if tt.setupClusterRoleController != nil {
 				tt.setupClusterRoleController(crController)
@@ -969,6 +975,171 @@ func Test_removeLabelFromExternalRole(t *testing.T) {
 
 			if err := removeLabelFromExternalRole(tt.rt, crController); (err != nil) != tt.wantErr {
 				t.Errorf("roleTemplateHandler.removeLabelFromExternalRole() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_roleTemplateHandler_handleMigration(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	type controllers struct {
+		rtController      *fake.MockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]
+		crController      *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]
+		clusterController *fake.MockNonNamespacedControllerInterface[*v3.Cluster, *v3.ClusterList]
+		projectCache      *fake.MockCacheInterface[*v3.Project]
+		rController       *fake.MockControllerInterface[*rbacv1.Role, *rbacv1.RoleList]
+	}
+
+	tests := []struct {
+		name               string
+		rt                 *v3.RoleTemplate
+		featureFlagEnabled bool
+		setupControllers   func(controllers)
+		wantLabel          bool
+		wantErr            bool
+	}{
+		{
+			name: "feature flag disabled, label present - should remove label and call deleteClusterRoles",
+			rt: &v3.RoleTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-rt",
+					Labels: map[string]string{
+						rbac.AggregationFeatureLabel: "true",
+					},
+				},
+			},
+			featureFlagEnabled: false,
+			setupControllers: func(c controllers) {
+				// Expect Update to be called with label removed
+				c.rtController.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *v3.RoleTemplate) (*v3.RoleTemplate, error) {
+					if _, exists := obj.Labels[rbac.AggregationFeatureLabel]; exists {
+						t.Error("expected label to be removed from updated RoleTemplate")
+					}
+					return obj, nil
+				})
+				// deleteClusterRoles will be called, which needs clusterController.List
+				c.clusterController.EXPECT().List(gomock.Any()).Return(&v3.ClusterList{}, nil)
+			},
+			wantLabel: false,
+		},
+		{
+			name: "feature flag disabled, label absent - no-op",
+			rt: &v3.RoleTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-rt",
+					Labels: map[string]string{},
+				},
+			},
+			featureFlagEnabled: false,
+			setupControllers:   func(c controllers) {},
+			wantLabel:          false,
+		},
+		{
+			name: "feature flag enabled, label absent - should add label and call deleteLegacyRoles",
+			rt: &v3.RoleTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-rt",
+					Labels: map[string]string{},
+				},
+			},
+			featureFlagEnabled: true,
+			setupControllers: func(c controllers) {
+				// deleteLegacyRoles will be called, which needs clusterController.List
+				c.clusterController.EXPECT().List(gomock.Any()).Return(&v3.ClusterList{}, nil)
+				// Expect Update to be called with label added
+				c.rtController.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *v3.RoleTemplate) (*v3.RoleTemplate, error) {
+					if obj.Labels[rbac.AggregationFeatureLabel] != "true" {
+						t.Error("expected label to be added to updated RoleTemplate")
+					}
+					return obj, nil
+				})
+			},
+			wantLabel: true,
+		},
+		{
+			name: "feature flag enabled, label present - no-op",
+			rt: &v3.RoleTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-rt",
+					Labels: map[string]string{
+						rbac.AggregationFeatureLabel: "true",
+					},
+				},
+			},
+			featureFlagEnabled: true,
+			setupControllers:   func(c controllers) {},
+			wantLabel:          true,
+		},
+		{
+			name: "feature flag enabled, nil labels - should add label",
+			rt: &v3.RoleTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-rt",
+					Labels: nil,
+				},
+			},
+			featureFlagEnabled: true,
+			setupControllers: func(c controllers) {
+				// deleteLegacyRoles will be called
+				c.clusterController.EXPECT().List(gomock.Any()).Return(&v3.ClusterList{}, nil)
+				// Expect Update to be called with label added
+				c.rtController.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *v3.RoleTemplate) (*v3.RoleTemplate, error) {
+					if obj.Labels == nil {
+						t.Error("expected labels map to be initialized")
+					}
+					if obj.Labels[rbac.AggregationFeatureLabel] != "true" {
+						t.Error("expected label to be added to updated RoleTemplate")
+					}
+					return obj, nil
+				})
+			},
+			wantLabel: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			features.AggregatedRoleTemplates.Set(tt.featureFlagEnabled)
+
+			rtController := fake.NewMockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList](ctrl)
+			crController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
+			clusterController := fake.NewMockNonNamespacedControllerInterface[*v3.Cluster, *v3.ClusterList](ctrl)
+			projectCache := fake.NewMockCacheInterface[*v3.Project](ctrl)
+			rController := fake.NewMockControllerInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl)
+
+			if tt.setupControllers != nil {
+				tt.setupControllers(controllers{
+					rtController:      rtController,
+					crController:      crController,
+					clusterController: clusterController,
+					projectCache:      projectCache,
+					rController:       rController,
+				})
+			}
+
+			h := &roleTemplateHandler{
+				rtController:      rtController,
+				crController:      crController,
+				clusterController: clusterController,
+				projectCache:      projectCache,
+				rController:       rController,
+			}
+
+			result, err := h.handleMigration(tt.rt)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("handleMigration() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if tt.wantLabel {
+				if result.Labels[rbac.AggregationFeatureLabel] != "true" {
+					t.Error("expected label to be present and set to 'true'")
+				}
+			} else {
+				if result != nil && result.Labels[rbac.AggregationFeatureLabel] == "true" {
+					t.Error("expected label to be absent or not set to 'true'")
+				}
 			}
 		})
 	}

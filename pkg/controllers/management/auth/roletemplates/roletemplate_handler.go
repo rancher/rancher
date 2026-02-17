@@ -62,6 +62,16 @@ func (r *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.RoleT
 		return nil, nil
 	}
 
+	var err error
+	rt, err = r.handleMigration(rt)
+	if err != nil {
+		return rt, err
+	}
+
+	return rt, r.reconcileClusterRoles(rt)
+}
+
+func (r *roleTemplateHandler) handleMigration(rt *v3.RoleTemplate) (*v3.RoleTemplate, error) {
 	if !features.AggregatedRoleTemplates.Enabled() {
 		// If the feature is disabled, ensure any existing cluster roles created for aggregation are deleted.
 		if rt.Labels[rbac.AggregationFeatureLabel] == "true" {
@@ -88,13 +98,9 @@ func (r *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.RoleT
 			rtCopy.Labels = map[string]string{}
 		}
 		rtCopy.Labels[rbac.AggregationFeatureLabel] = "true"
-		rtCopy, err := r.rtController.Update(rtCopy)
-		if err != nil {
-			return rtCopy, err
-		}
+		return r.rtController.Update(rtCopy)
 	}
-
-	return rt, errors.Join(r.reconcileClusterRoles(rt))
+	return rt, nil
 }
 
 // reconcileClusterRoles is responsible for ensuring the right set of Cluster Roles exist. It deletes any owned by the Role Template that shouldn't exist.

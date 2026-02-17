@@ -70,6 +70,30 @@ func (c *crtbHandler) OnChange(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 		return nil, nil
 	}
 
+	var err error
+	crtb, err = c.handleMigration(crtb)
+	if err != nil {
+		return crtb, err
+	}
+
+	var localConditions []metav1.Condition
+	crtb, err = c.reconcileSubject(crtb, &localConditions)
+	if err != nil {
+		return crtb, errors.Join(err, c.updateStatus(crtb, localConditions))
+	}
+
+	if err := c.reconcileMembershipBindings(crtb, &localConditions); err != nil {
+		return crtb, errors.Join(err, c.updateStatus(crtb, localConditions))
+	}
+
+	return crtb, errors.Join(c.reconcileBindings(crtb, &localConditions), c.updateStatus(crtb, localConditions))
+}
+
+// handleMigration handles the migration of CRTBs when toggling the AggregatedRoleTemplates feature flag.
+// If the feature flag is disabled, it removes the aggregation label and deletes any bindings that were created for aggregation.
+// If the feature flag is enabled, it adds the aggregation label and deletes any legacy bindings that were created before aggregation.
+// TODO: To be removed once roletemplate aggregation is the only enabled RBAC model. https://github.com/rancher/rancher/issues/53743
+func (c *crtbHandler) handleMigration(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
 	if !features.AggregatedRoleTemplates.Enabled() {
 		if crtb.Labels[rbac.AggregationFeatureLabel] == "true" {
 			crtbCopy := crtb.DeepCopy()
@@ -95,24 +119,10 @@ func (c *crtbHandler) OnChange(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 			crtbCopy.Labels = map[string]string{}
 		}
 		crtbCopy.Labels[rbac.AggregationFeatureLabel] = "true"
-		crtbCopy, err := c.crtbClient.Update(crtbCopy)
-		if err != nil {
-			return crtbCopy, err
-		}
-	}
+		return c.crtbClient.Update(crtbCopy)
 
-	var localConditions []metav1.Condition
-	var err error
-	crtb, err = c.reconcileSubject(crtb, &localConditions)
-	if err != nil {
-		return crtb, errors.Join(err, c.updateStatus(crtb, localConditions))
 	}
-
-	if err := c.reconcileMembershipBindings(crtb, &localConditions); err != nil {
-		return crtb, errors.Join(err, c.updateStatus(crtb, localConditions))
-	}
-
-	return crtb, errors.Join(c.reconcileBindings(crtb, &localConditions), c.updateStatus(crtb, localConditions))
+	return crtb, nil
 }
 
 // reconcileSubject ensures that the user referenced by the role template binding exists
