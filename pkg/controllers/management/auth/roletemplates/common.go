@@ -3,6 +3,7 @@ package roletemplates
 import (
 	"errors"
 	"fmt"
+	"maps"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/features"
@@ -366,15 +367,17 @@ func handleAggregationMigration[T any](
 	deleteAggregatedResources func(T) error,
 	deleteLegacyResources func(T) error,
 ) (T, error) {
-	if labels == nil {
-		labels = map[string]string{}
+	labelCopy := make(map[string]string)
+	maps.Copy(labelCopy, labels)
+	if labelCopy == nil {
+		labelCopy = map[string]string{}
 	}
-	hasLabel := labels[rbac.AggregationFeatureLabel] == "true"
+	hasLabel := labelCopy[rbac.AggregationFeatureLabel] == "true"
 
 	if !features.AggregatedRoleTemplates.Enabled() {
 		if hasLabel {
-			delete(labels, rbac.AggregationFeatureLabel)
-			updated, err := updateLabels(resource, labels)
+			delete(labelCopy, rbac.AggregationFeatureLabel)
+			updated, err := updateLabels(resource, labelCopy)
 			if err != nil {
 				return updated, err
 			}
@@ -388,8 +391,8 @@ func handleAggregationMigration[T any](
 			return resource, err
 		}
 
-		labels[rbac.AggregationFeatureLabel] = "true"
-		return updateLabels(resource, labels)
+		labelCopy[rbac.AggregationFeatureLabel] = "true"
+		return updateLabels(resource, labelCopy)
 	}
 	return resource, nil
 }

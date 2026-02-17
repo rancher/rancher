@@ -566,7 +566,6 @@ func Test_OnChange(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			features.AggregatedRoleTemplates.Set(true)
 			if tt.rt != nil {
 				if tt.rt.Labels == nil {

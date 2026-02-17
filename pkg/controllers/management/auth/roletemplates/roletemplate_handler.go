@@ -68,6 +68,10 @@ func (r *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.RoleT
 		return rt, err
 	}
 
+	if !features.AggregatedRoleTemplates.Enabled() {
+		return rt, nil
+	}
+
 	return rt, r.reconcileClusterRoles(rt)
 }
 

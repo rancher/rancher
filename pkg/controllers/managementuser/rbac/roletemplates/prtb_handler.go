@@ -271,14 +271,14 @@ func (p *prtbHandler) ensureOnlyDesiredClusterRoleBindingsExists(crbs []*rbacv1.
 	}
 
 	aggregationCRBs, err := p.crbClient.List(metav1.ListOptions{LabelSelector: prtbOwnerLabel})
-	if err != nil {
+	if err != nil || aggregationCRBs == nil {
 		return err
 	}
 
 	// Delete any ClusterRoleBindings that were created for this PRTB before the aggregation changes.
 	// TODO: Remove this once roletemplate aggregation is the only enabled RBAC model. https://github.com/rancher/rancher/issues/53743
 	legacyCRBs, err := p.crbClient.List(metav1.ListOptions{LabelSelector: rtbOwnerLabel + "=" + legacyRTBOwnerLabel})
-	if err != nil {
+	if err != nil || legacyCRBs == nil {
 		return err
 	}
 
@@ -337,7 +337,7 @@ func (p *prtbHandler) ensureOnlyDesiredRoleBindingExists(desiredRB *rbacv1.RoleB
 		return err
 	}
 
-	// Delete any ClusterRoleBindings that were created for this PRTB before the aggregation changes.
+	// Delete any RoleBindings that were created for this PRTB before the aggregation changes.
 	// TODO: Remove this once roletemplate aggregation is the only enabled RBAC model. https://github.com/rancher/rancher/issues/53743
 	legacyRBs, err := p.rbClient.List(desiredRB.Namespace, metav1.ListOptions{LabelSelector: rtbOwnerLabel + "=" + legacyRTBOwnerLabel})
 	if err != nil || legacyRBs == nil {

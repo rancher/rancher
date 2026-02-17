@@ -67,6 +67,10 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 		return prtb, err
 	}
 
+	if !features.AggregatedRoleTemplates.Enabled() {
+		return prtb, nil
+	}
+
 	prtb, err = p.reconcileSubject(prtb)
 	if err != nil {
 		return nil, err
@@ -335,7 +339,7 @@ func (p *prtbHandler) deleteLegacyBinding(prtb *v3.ProjectRoleTemplateBinding) e
 	var returnErr error
 	for _, rb := range rbs.Items {
 		if strings.HasPrefix(rb.Name, prtb.Name) {
-			returnErr = errors.Join(returnErr, rbac.DeleteNamespacedResource(prtb.Namespace, fmt.Sprintf("%s-%s", prtb.Name, prtb.RoleTemplateName), p.rbController))
+			returnErr = errors.Join(returnErr, rbac.DeleteNamespacedResource(prtb.Namespace, fmt.Sprintf("%s-%s", prtb.Name, rb.Name), p.rbController))
 		}
 	}
 	return returnErr

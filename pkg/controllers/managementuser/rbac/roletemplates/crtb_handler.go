@@ -104,7 +104,7 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, rem
 	}
 
 	aggregationCRBs, err := c.crbClient.List(metav1.ListOptions{LabelSelector: rbac.GetCRTBOwnerLabel(crtb.Name)})
-	if err != nil {
+	if err != nil || aggregationCRBs == nil {
 		c.s.AddCondition(remoteConditions, condition, failureToListClusterRoleBindings, err)
 		return err
 	}
@@ -112,7 +112,7 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, rem
 	// Delete any ClusterRoleBindings that were created for this CRTB before the aggregation changes.
 	// TODO: Remove this once roletemplate aggregation is the only enabled RBAC model. https://github.com/rancher/rancher/issues/53743
 	legacyCRBs, err := c.crbClient.List(metav1.ListOptions{LabelSelector: rtbOwnerLabel + "=" + rbac.GetRTBLabel(crtb.ObjectMeta)})
-	if err != nil {
+	if err != nil || legacyCRBs == nil {
 		c.s.AddCondition(remoteConditions, condition, failureToListClusterRoleBindings, err)
 		return err
 	}

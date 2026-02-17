@@ -76,6 +76,10 @@ func (c *crtbHandler) OnChange(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 		return crtb, err
 	}
 
+	if !features.AggregatedRoleTemplates.Enabled() {
+		return crtb, nil
+	}
+
 	var localConditions []metav1.Condition
 	crtb, err = c.reconcileSubject(crtb, &localConditions)
 	if err != nil {
