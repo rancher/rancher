@@ -80,7 +80,9 @@ jobs:
           docker tag "$image_agent_id" ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}
           echo "the image created is ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}"
       - name: Run tests
-        run: ./.dapper provisioning-tests
+        run: |
+          set -eo pipefail
+          ./.dapper provisioning-tests | tee provtest_output.txt
         env:
           DRONE_BUILD_EVENT: "${{ github.event_name }}"
           V2PROV_TEST_RUN_REGEX: "${{ matrix.V2PROV_TEST_RUN_REGEX }}"
@@ -96,11 +98,18 @@ jobs:
           # need sudo due to this being created in the dapper container
           sudo mv ./build/out.txt /tmp/report-${{ matrix.V2PROV_TEST_DIST }}-$TESTSUITE.txt
       - name: Upload Plain Text Test Results
-        if: steps.test_output.outcome == 'success'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
         with:
           name: "Test Results ${{ matrix.V2PROV_TEST_DIST }} ${{ steps.test_output.outputs.suite }}"
           path: "/tmp/report-${{ matrix.V2PROV_TEST_DIST }}-${{ steps.test_output.outputs.suite }}.*"
+      - name: Upload logdump artifact if we had some tests failures
+        if: failure()
+        uses: rancherlabs/cowboy@be178bda40ee2199a674861d8ba1a399b28d5451
+        with:
+          log-file-path: provtest_output.txt
+          artifact-retention-days: 7
+          artifact-name: "Parsed Failure Log Dump (${{ matrix.V2PROV_TEST_DIST }}, ${{ steps.test_output.outputs.suite }})"
 
   convert-to-xml:
     needs: [provisioning_tests]
