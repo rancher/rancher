@@ -28,6 +28,7 @@ type prtbHandler struct {
 	rbController         crbacv1.RoleBindingController
 	crController         crbacv1.ClusterRoleController
 	crbController        crbacv1.ClusterRoleBindingController
+	prtbClient           mgmtv3.ProjectRoleTemplateBindingController
 	clusterController    mgmtv3.ClusterController
 	clusterManager       *clustermanager.Manager
 	impersonationHandler *impersonationHandler
@@ -41,6 +42,7 @@ func newPRTBHandler(management *config.ManagementContext, clusterManager *cluste
 		rbController:      management.Wrangler.RBAC.RoleBinding(),
 		crController:      management.Wrangler.RBAC.ClusterRole(),
 		crbController:     management.Wrangler.RBAC.ClusterRoleBinding(),
+		prtbClient:        management.Wrangler.Mgmt.ProjectRoleTemplateBinding(),
 		clusterController: management.Wrangler.Mgmt.Cluster(),
 		clusterManager:    clusterManager,
 		impersonationHandler: &impersonationHandler{
@@ -60,7 +62,34 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 	}
 
 	if !features.AggregatedRoleTemplates.Enabled() {
-		return prtb, p.deleteRoleBindings(prtb)
+		if prtb.Labels[rbac.AggregationFeatureLabel] == "true" {
+			prtbCopy := prtb.DeepCopy()
+			delete(prtbCopy.Labels, rbac.AggregationFeatureLabel)
+			prtbCopy, err := p.prtbClient.Update(prtbCopy)
+			if err != nil {
+				return prtbCopy, err
+			}
+
+			return prtbCopy, p.deleteRoleBindings(prtb)
+		}
+		return prtb, nil
+	}
+
+	if prtb.Labels[rbac.AggregationFeatureLabel] != "true" {
+		// Remove any legacy bindings that were created before the aggregation feature was enabled.
+		if err := p.deleteLegacyBinding(prtb); err != nil {
+			return prtb, err
+		}
+
+		prtbCopy := prtb.DeepCopy()
+		if prtbCopy.Labels == nil {
+			prtbCopy.Labels = map[string]string{}
+		}
+		prtbCopy.Labels[rbac.AggregationFeatureLabel] = "true"
+		prtbCopy, err := p.prtbClient.Update(prtbCopy)
+		if err != nil {
+			return prtbCopy, err
+		}
 	}
 
 	var err error
@@ -302,8 +331,7 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 		}
 	}
 
-	// Remove any legacy bindings that were created before the aggregation feature was enabled.
-	return p.deleteLegacyBinding(prtb)
+	return nil
 }
 
 // deleteLegacyBinding deletes the management plane Role Binding in the project namespace that was created for this PRTB before the aggregation feature was enabled.

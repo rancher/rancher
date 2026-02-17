@@ -71,7 +71,34 @@ func (c *crtbHandler) OnChange(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 	}
 
 	if !features.AggregatedRoleTemplates.Enabled() {
-		return crtb, c.removeRoleBindings(crtb)
+		if crtb.Labels[rbac.AggregationFeatureLabel] == "true" {
+			crtbCopy := crtb.DeepCopy()
+			delete(crtbCopy.Labels, rbac.AggregationFeatureLabel)
+			crtbCopy, err := c.crtbClient.Update(crtbCopy)
+			if err != nil {
+				return crtbCopy, err
+			}
+
+			return crtbCopy, c.removeRoleBindings(crtb)
+		}
+		return crtb, nil
+	}
+
+	if crtb.Labels[rbac.AggregationFeatureLabel] != "true" {
+		// Remove any legacy bindings that were created before the aggregation feature was enabled.
+		if err := c.deleteLegacyRoleBindings(crtb); err != nil {
+			return crtb, err
+		}
+
+		crtbCopy := crtb.DeepCopy()
+		if crtbCopy.Labels == nil {
+			crtbCopy.Labels = map[string]string{}
+		}
+		crtbCopy.Labels[rbac.AggregationFeatureLabel] = "true"
+		crtbCopy, err := c.crtbClient.Update(crtbCopy)
+		if err != nil {
+			return crtbCopy, err
+		}
 	}
 
 	var localConditions []metav1.Condition
@@ -201,8 +228,7 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, loc
 
 	c.s.AddCondition(localConditions, condition, bindingsExists, nil)
 
-	// Remove any legacy bindings that were created before the aggregation feature was enabled.
-	return c.deleteLegacyRoleBindings(crtb)
+	return nil
 }
 
 // getDesiredRoleBindings checks for project and cluster management roles, and if they exist, builds and returns the needed RoleBindings

@@ -16,6 +16,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -108,8 +109,17 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, rem
 		c.s.AddCondition(remoteConditions, condition, failureToBuildClusterRoleBinding, err)
 		return err
 	}
+	r1, err := labels.NewRequirement(rbac.GetCRTBOwnerLabel(crtb.Name), selection.Exists, []string{})
+	if err != nil {
+		return err
+	}
+	r2, err := labels.NewRequirement(rtbOwnerLabel, selection.Equals, []string{rbac.GetRTBLabel(crtb.ObjectMeta)})
+	if err != nil {
+		return err
+	}
+	selector := labels.NewSelector().Add(*r1, *r2)
 
-	currentCRBs, err := c.crbClient.List(metav1.ListOptions{LabelSelector: rbac.GetCRTBOwnerLabel(crtb.Name)})
+	currentCRBs, err := c.crbClient.List(metav1.ListOptions{LabelSelector: selector.String()})
 	if err != nil || currentCRBs == nil {
 		c.s.AddCondition(remoteConditions, condition, failureToListClusterRoleBindings, err)
 		return err

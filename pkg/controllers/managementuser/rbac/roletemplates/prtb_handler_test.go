@@ -224,7 +224,7 @@ func Test_ensureOnlyDesiredRoleBindingsExist(t *testing.T) {
 			p := &prtbHandler{
 				rbClient: tt.rbController(ctrl),
 			}
-			if err := p.ensureOnlyDesiredRoleBindingExists(tt.desiredRB, "ownerlabel"); (err != nil) != tt.wantErr {
+			if err := p.ensureOnlyDesiredRoleBindingExists(tt.desiredRB, "ownerlabel", ""); (err != nil) != tt.wantErr {
 				t.Errorf("prtbHandler.ensureOnlyDesiredRoleBindingsExist() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -695,7 +695,7 @@ func Test_ensureOnlyDesiredClusterRoleBindingsExists(t *testing.T) {
 			p := &prtbHandler{
 				crbClient: crbController,
 			}
-			if err := p.ensureOnlyDesiredClusterRoleBindingsExists(tt.crbs, "ownerlabel"); (err != nil) != tt.wantErr {
+			if err := p.ensureOnlyDesiredClusterRoleBindingsExists(tt.crbs, "ownerlabel", ""); (err != nil) != tt.wantErr {
 				t.Errorf("prtbHandler.reconcileClusterRoleBindings() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

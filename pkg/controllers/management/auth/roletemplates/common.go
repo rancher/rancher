@@ -29,10 +29,7 @@ const (
 	reconcileSubject                 = "ReconcileSubject"
 	reconcileMembershipBindings      = "ReconcileMembershipBindings"
 	reconcileBindings                = "ReconcileBindings"
-	reconcileClusterRoleBindings     = "ReconcileClusterRoleBindings"
 	deleteClusterRoleBindings        = "DeleteClusterRoleBindings"
-	ensureServiceAccountImpersonator = "EnsureServiceAccountImpersonator"
-	deleteServiceAccountImpersonator = "DeleteServiceAccountImpersonator"
 	// Reasons
 	roleBindingDeleted                      = "roleBindingDeleted"
 	clusterRoleBindingsDeleted              = "ClusterRoleBindingsDeleted"
