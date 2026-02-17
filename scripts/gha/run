@@ -2,7 +2,7 @@
 set -ex
 
 echo "Starting rancher server in container"
-cd $(git rev-parse --show-toplevel)
+cd "$(dirname "$0")/../.." || exit
 
 source scripts/package-env
 

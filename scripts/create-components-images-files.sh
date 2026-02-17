@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -e
 
-cd $(git rev-parse --show-toplevel)
+cd "$(dirname "$0")/.." || exit
 
-source package-env
+source scripts/package-env
 
-cd ../package
+cd package
 
 if [ ${ARCH} == arm64 ]; then
   ETCD_UNSUPPORTED_ARCH=arm64

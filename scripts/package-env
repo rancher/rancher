@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cd "$(git rev-parse --show-toplevel)" || exit
+cd "$(dirname "$0")/.." || exit
 
 check_missing() {
   var=$1
