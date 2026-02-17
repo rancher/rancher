@@ -34,18 +34,18 @@ quick-binary-server:
 quick-k3s-images:
 	@$(MAKE) quick TARGET="k3s-images"
 
-build-server: buildx-machine
+build-rancher-server: buildx-machine
 	@$(MAKE) BUILDER="$(MACHINE)" build TARGET="build-server"
 
-build-server-tarball: buildx-machine
+build-rancher-server-tarball: buildx-machine
 	@$(MAKE) BUILDER="$(MACHINE)" build TARGET="build-server-tarball"
 
-build-agent: buildx-machine
+build-rancher-agent: buildx-machine
 	@$(MAKE) BUILDER="$(MACHINE)" build TARGET="build-agent"
-build-agent-tarball: buildx-machine
+build-rancher-agent-tarball: buildx-machine
 	@$(MAKE) BUILDER="$(MACHINE)" build TARGET="build-agent-tarball"
 
 $(DEV_TARGETS):
 	./dev-scripts/$@
 
-.PHONY: $(TARGETS) $(DEV_TARGETS) quick-agent quick-server quick-binary-server build-server build-server-tarball build-agent build-agent-tarball
+.PHONY: $(TARGETS) $(DEV_TARGETS) quick-agent quick-server quick-binary-server build-rancher-server build-rancher-server-tarball build-rancher-agent build-rancher-agent-tarball
