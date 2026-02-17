@@ -17,8 +17,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	rbacAuth "k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 )
@@ -144,10 +142,6 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 		if err := p.ensureOnlyDesiredRoleBindingExists(rb, rbac.GetPRTBOwnerLabel(prtb.Name), rbac.GetRTBLabel(prtb.ObjectMeta)); err != nil {
 			return err
 		}
-
-		if err := p.deleteLegacyRoleBindings(prtb, namespace.Name); err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -189,16 +183,7 @@ func (p *prtbHandler) reconcileClusterRoleBindings(prtb *v3.ProjectRoleTemplateB
 
 	crbs = append(crbs, namespaceCRBs...)
 
-	err = p.ensureOnlyDesiredClusterRoleBindingsExists(crbs, rbac.GetPRTBOwnerLabel(prtb.Name), rbac.GetRTBLabel(prtb.ObjectMeta))
-	if err != nil {
-		return err
-	}
-
-	if err := p.deleteLegacyClusterRoleBindings(prtb); err != nil {
-		return err
-	}
-
-	return nil
+	return p.ensureOnlyDesiredClusterRoleBindingsExists(crbs, rbac.GetPRTBOwnerLabel(prtb.Name), rbac.GetRTBLabel(prtb.ObjectMeta))
 }
 
 // buildNamespaceBindings builds the Cluster Role Bindings used to provide access to the project's namespaces.
@@ -285,24 +270,22 @@ func (p *prtbHandler) ensureOnlyDesiredClusterRoleBindingsExists(crbs []*rbacv1.
 		desiredCRBs[crb.Name] = crb
 	}
 
-	r1, err := labels.NewRequirement(prtbOwnerLabel, selection.Exists, []string{})
+	aggregationCRBs, err := p.crbClient.List(metav1.ListOptions{LabelSelector: prtbOwnerLabel})
 	if err != nil {
 		return err
 	}
-	r2, err := labels.NewRequirement(rtbOwnerLabel, selection.Equals, []string{legacyRTBOwnerLabel})
-	if err != nil {
-		return err
-	}
-	selector := labels.NewSelector().Add(*r1, *r2)
 
-	// Check if any Cluster Role Bindings exist already.
-	currentCRBs, err := p.crbClient.List(metav1.ListOptions{LabelSelector: selector.String()})
-	if err != nil || currentCRBs == nil {
+	// Delete any ClusterRoleBindings that were created for this PRTB before the aggregation changes.
+	// TODO: Remove this once roletemplate aggregation is the only enabled RBAC model. https://github.com/rancher/rancher/issues/53743
+	legacyCRBs, err := p.crbClient.List(metav1.ListOptions{LabelSelector: rtbOwnerLabel + "=" + legacyRTBOwnerLabel})
+	if err != nil {
 		return err
 	}
+
+	currentCRBs := append(aggregationCRBs.Items, legacyCRBs.Items...)
 
 	// Search for the ClusterRoleBindings that are needed, all others should be removed.
-	for _, currentCRB := range currentCRBs.Items {
+	for _, currentCRB := range currentCRBs {
 		if desiredCRB, ok := desiredCRBs[currentCRB.Name]; ok {
 			if rbac.IsClusterRoleBindingContentSame(&currentCRB, desiredCRB) {
 				delete(desiredCRBs, desiredCRB.Name)
@@ -349,25 +332,23 @@ func (p *prtbHandler) getNamespacesFromProject(prtb *v3.ProjectRoleTemplateBindi
 // ensureOnlyDesiredRoleBindingExists finds any RoleBindings owned by the PRTB, and removes them if they don't match the desired RoleBinding.
 // If the desired RoleBinding isn't found, it creates it.
 func (p *prtbHandler) ensureOnlyDesiredRoleBindingExists(desiredRB *rbacv1.RoleBinding, prtbOwnerLabel, legacyRTBOwnerLabel string) error {
-	r1, err := labels.NewRequirement(prtbOwnerLabel, selection.Exists, []string{})
-	if err != nil {
+	aggregationRBs, err := p.rbClient.List(desiredRB.Namespace, metav1.ListOptions{LabelSelector: prtbOwnerLabel})
+	if err != nil || aggregationRBs == nil {
 		return err
 	}
-	r2, err := labels.NewRequirement(rtbOwnerLabel, selection.Equals, []string{legacyRTBOwnerLabel})
-	if err != nil {
-		return err
-	}
-	selector := labels.NewSelector().Add(*r1, *r2)
 
-	// Check if any Role Bindings exist already.
-	currentRBs, err := p.rbClient.List(desiredRB.Namespace, metav1.ListOptions{LabelSelector: selector.String()})
-	if err != nil || currentRBs == nil {
+	// Delete any ClusterRoleBindings that were created for this PRTB before the aggregation changes.
+	// TODO: Remove this once roletemplate aggregation is the only enabled RBAC model. https://github.com/rancher/rancher/issues/53743
+	legacyRBs, err := p.rbClient.List(desiredRB.Namespace, metav1.ListOptions{LabelSelector: rtbOwnerLabel + "=" + legacyRTBOwnerLabel})
+	if err != nil || legacyRBs == nil {
 		return err
 	}
+
+	currentRBs := append(aggregationRBs.Items, legacyRBs.Items...)
 
 	var matchingRB *rbacv1.RoleBinding
 	// Search for the RoleBindings that is needed, all others should be removed.
-	for _, currentRB := range currentRBs.Items {
+	for _, currentRB := range currentRBs {
 		if rbac.IsRoleBindingContentSame(&currentRB, desiredRB) && matchingRB == nil {
 			matchingRB = &currentRB
 		} else {
@@ -384,42 +365,4 @@ func (p *prtbHandler) ensureOnlyDesiredRoleBindingExists(desiredRB *rbacv1.RoleB
 		}
 	}
 	return nil
-}
-
-func (p *prtbHandler) deleteLegacyRoleBindings(prtb *v3.ProjectRoleTemplateBinding, namespace string) error {
-	// The label used for pre-aggregation PRTB ClusterRoleBindings
-	set := labels.Set{rtbOwnerLabel: rbac.GetRTBLabel(prtb.ObjectMeta)}
-
-	rbs, err := p.rbClient.List(namespace, metav1.ListOptions{LabelSelector: set.AsSelector().String()})
-	if err != nil {
-		return fmt.Errorf("failed to list legacy role bindings in namespace %s for PRTB %s: %w", namespace, prtb.Name, err)
-	}
-	var returnErr error
-	for _, rb := range rbs.Items {
-		if err := rbac.DeleteNamespacedResource(namespace, rb.Name, p.rbClient); err != nil {
-			returnErr = errors.Join(returnErr, err)
-		}
-	}
-
-	return returnErr
-}
-
-// deleteLegacyClusterRoleBindings deletes any ClusterRoleBindings that were created for this PRTB before the aggregation feature was enabled.
-// TODO: Remove this once roletemplate aggregation is the only enabled RBAC model. https://github.com/rancher/rancher/issues/53743
-func (p *prtbHandler) deleteLegacyClusterRoleBindings(prtb *v3.ProjectRoleTemplateBinding) error {
-	// The label used for pre-aggregation PRTB ClusterRoleBindings
-	set := labels.Set{rtbOwnerLabel: rbac.GetRTBLabel(prtb.ObjectMeta)}
-
-	crbs, err := p.crbClient.List(metav1.ListOptions{LabelSelector: set.AsSelector().String()})
-	if err != nil {
-		return fmt.Errorf("failed to list legacy cluster role bindings in cluster %s for PRTB %s: %w", p.clusterName, prtb.Name, err)
-	}
-	var returnErr error
-	for _, crb := range crbs.Items {
-		if err := rbac.DeleteResource(crb.Name, p.crbClient); err != nil {
-			returnErr = errors.Join(returnErr, err)
-		}
-	}
-
-	return returnErr
 }

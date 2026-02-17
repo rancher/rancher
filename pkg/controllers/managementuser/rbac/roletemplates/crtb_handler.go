@@ -15,8 +15,6 @@ import (
 	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -72,11 +70,6 @@ func (c *crtbHandler) OnChange(key string, crtb *v3.ClusterRoleTemplateBinding) 
 		return nil, errors.Join(err, c.updateStatus(crtb, remoteConditions))
 	}
 
-	// Clean up any CRBs from old controllers
-	if err := c.deleteLegacyBindings(crtb); err != nil {
-		return nil, err
-	}
-
 	// Ensure a service account impersonator exists on the cluster
 	var err error
 	if crtb.UserName != "" {
@@ -109,26 +102,27 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, rem
 		c.s.AddCondition(remoteConditions, condition, failureToBuildClusterRoleBinding, err)
 		return err
 	}
-	r1, err := labels.NewRequirement(rbac.GetCRTBOwnerLabel(crtb.Name), selection.Exists, []string{})
-	if err != nil {
-		return err
-	}
-	r2, err := labels.NewRequirement(rtbOwnerLabel, selection.Equals, []string{rbac.GetRTBLabel(crtb.ObjectMeta)})
-	if err != nil {
-		return err
-	}
-	selector := labels.NewSelector().Add(*r1, *r2)
 
-	currentCRBs, err := c.crbClient.List(metav1.ListOptions{LabelSelector: selector.String()})
-	if err != nil || currentCRBs == nil {
+	aggregationCRBs, err := c.crbClient.List(metav1.ListOptions{LabelSelector: rbac.GetCRTBOwnerLabel(crtb.Name)})
+	if err != nil {
 		c.s.AddCondition(remoteConditions, condition, failureToListClusterRoleBindings, err)
 		return err
 	}
 
+	// Delete any ClusterRoleBindings that were created for this CRTB before the aggregation changes.
+	// TODO: Remove this once roletemplate aggregation is the only enabled RBAC model. https://github.com/rancher/rancher/issues/53743
+	legacyCRBs, err := c.crbClient.List(metav1.ListOptions{LabelSelector: rtbOwnerLabel + "=" + rbac.GetRTBLabel(crtb.ObjectMeta)})
+	if err != nil {
+		c.s.AddCondition(remoteConditions, condition, failureToListClusterRoleBindings, err)
+		return err
+	}
+
+	currentCRBs := append(aggregationCRBs.Items, legacyCRBs.Items...)
+
 	// Find if the required CRB that already exists and delete all excess CRBs.
 	// There should only ever be 1 cluster role binding per CRTB.
 	var matchingCRB *rbacv1.ClusterRoleBinding
-	for _, currentCRB := range currentCRBs.Items {
+	for _, currentCRB := range currentCRBs {
 		if rbac.IsClusterRoleBindingContentSame(crb, &currentCRB) && matchingCRB == nil {
 			matchingCRB = &currentCRB
 			continue
@@ -152,26 +146,6 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, rem
 	}
 	c.s.AddCondition(remoteConditions, condition, clusterRoleBindingExists, nil)
 	return nil
-}
-
-// deleteLegacyBindings deletes any ClusterRoleBindings that were created for this CRTB before the aggregation changes.
-// TODO: Remove this once roletemplate aggregation is the only enabled RBAC model. https://github.com/rancher/rancher/issues/53743
-func (c *crtbHandler) deleteLegacyBindings(crtb *v3.ClusterRoleTemplateBinding) error {
-	// The label used for pre-aggregation CRTB ClusterRoleBindings
-	set := labels.Set{rtbOwnerLabel: rbac.GetRTBLabel(crtb.ObjectMeta)}
-
-	crbs, err := c.crbClient.List(metav1.ListOptions{LabelSelector: labels.SelectorFromSet(set).String()})
-	if err != nil {
-		return fmt.Errorf("failed to list legacy cluster role bindings in cluster %s for CRTB %s: %w", crtb.ClusterName, crtb.Name, err)
-	}
-	var returnErr error
-	for _, crb := range crbs.Items {
-		if err := rbac.DeleteResource(crb.Name, c.crbClient); err != nil {
-			returnErr = errors.Join(returnErr, err)
-		}
-	}
-
-	return returnErr
 }
 
 var timeNow = func() time.Time {

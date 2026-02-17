@@ -7,6 +7,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/status"
 	controllersv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -118,9 +119,28 @@ func Test_reconcileBindings(t *testing.T) {
 			},
 		},
 		{
+			name: "error listing legacy CRBs",
+			setupCRBController: func(c *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
+				c.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				legacyListOption := metav1.ListOptions{LabelSelector: rtbOwnerLabel + "=" + rbac.GetRTBLabel(defaultCRTB.ObjectMeta)}
+				c.EXPECT().List(legacyListOption).Return(nil, errDefault)
+			},
+			setupRTController: func(m *fake.MockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]) {
+				m.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(nonExternalRT.DeepCopy(), nil)
+			},
+			crtb:    defaultCRTB.DeepCopy(),
+			wantErr: true,
+			wantedCondition: &reducedCondition{
+				reason: "FailureToListClusterRoleBindings",
+				status: metav1.ConditionFalse,
+			},
+		},
+		{
 			name: "error creating CRB",
 			setupCRBController: func(c *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				c.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				legacyListOption := metav1.ListOptions{LabelSelector: rtbOwnerLabel + "=" + rbac.GetRTBLabel(defaultCRTB.ObjectMeta)}
+				c.EXPECT().List(legacyListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
 				c.EXPECT().Create(defaultCRB.DeepCopy()).Return(nil, errDefault)
 			},
 			setupRTController: func(m *fake.MockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]) {
@@ -137,6 +157,8 @@ func Test_reconcileBindings(t *testing.T) {
 			name: "success creating CRB",
 			setupCRBController: func(c *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				c.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				legacyListOption := metav1.ListOptions{LabelSelector: rtbOwnerLabel + "=" + rbac.GetRTBLabel(defaultCRTB.ObjectMeta)}
+				c.EXPECT().List(legacyListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
 				c.EXPECT().Create(defaultCRB.DeepCopy()).Return(nil, nil)
 			},
 			setupRTController: func(m *fake.MockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]) {
@@ -154,6 +176,9 @@ func Test_reconcileBindings(t *testing.T) {
 				c.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{
 					Items: []rbacv1.ClusterRoleBinding{*defaultCRB.DeepCopy()},
 				}, nil)
+				legacyListOption := metav1.ListOptions{LabelSelector: rtbOwnerLabel + "=" + rbac.GetRTBLabel(defaultCRTB.ObjectMeta)}
+				c.EXPECT().List(legacyListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+
 			},
 			setupRTController: func(m *fake.MockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]) {
 				m.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(nonExternalRT.DeepCopy(), nil)
@@ -174,6 +199,8 @@ func Test_reconcileBindings(t *testing.T) {
 						},
 					},
 				}, nil)
+				legacyListOption := metav1.ListOptions{LabelSelector: rtbOwnerLabel + "=" + rbac.GetRTBLabel(defaultCRTB.ObjectMeta)}
+				c.EXPECT().List(legacyListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
 				c.EXPECT().Delete("bad-crb1", &metav1.DeleteOptions{}).Return(errDefault)
 			},
 			setupRTController: func(m *fake.MockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]) {
@@ -199,6 +226,8 @@ func Test_reconcileBindings(t *testing.T) {
 						},
 					},
 				}, nil)
+				legacyListOption := metav1.ListOptions{LabelSelector: rtbOwnerLabel + "=" + rbac.GetRTBLabel(defaultCRTB.ObjectMeta)}
+				c.EXPECT().List(legacyListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
 				c.EXPECT().Delete("bad-crb1", &metav1.DeleteOptions{}).Return(nil)
 				c.EXPECT().Delete("bad-crb2", &metav1.DeleteOptions{}).Return(nil)
 				c.EXPECT().Create(defaultCRB.DeepCopy()).Return(nil, nil)
@@ -226,8 +255,38 @@ func Test_reconcileBindings(t *testing.T) {
 						},
 					},
 				}, nil)
+				legacyListOption := metav1.ListOptions{LabelSelector: rtbOwnerLabel + "=" + rbac.GetRTBLabel(defaultCRTB.ObjectMeta)}
+				c.EXPECT().List(legacyListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
 				c.EXPECT().Delete("bad-crb1", &metav1.DeleteOptions{}).Return(nil)
 				c.EXPECT().Delete("bad-crb2", &metav1.DeleteOptions{}).Return(nil)
+			},
+			setupRTController: func(m *fake.MockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]) {
+				m.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(nonExternalRT.DeepCopy(), nil)
+			},
+			crtb: defaultCRTB.DeepCopy(),
+			wantedCondition: &reducedCondition{
+				reason: "ClusterRoleBindingExists",
+				status: metav1.ConditionTrue,
+			},
+		},
+		{
+			name: "legacy CRBs exist and get deleted",
+			setupCRBController: func(c *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
+				c.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				legacyListOption := metav1.ListOptions{LabelSelector: rtbOwnerLabel + "=" + rbac.GetRTBLabel(defaultCRTB.ObjectMeta)}
+				c.EXPECT().List(legacyListOption).Return(&rbacv1.ClusterRoleBindingList{
+					Items: []rbacv1.ClusterRoleBinding{
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "bad-crb1"},
+						},
+						{
+							ObjectMeta: metav1.ObjectMeta{Name: "bad-crb2"},
+						},
+					},
+				}, nil)
+				c.EXPECT().Delete("bad-crb1", &metav1.DeleteOptions{}).Return(nil)
+				c.EXPECT().Delete("bad-crb2", &metav1.DeleteOptions{}).Return(nil)
+				c.EXPECT().Create(defaultCRB.DeepCopy()).Return(nil, nil)
 			},
 			setupRTController: func(m *fake.MockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]) {
 				m.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(nonExternalRT.DeepCopy(), nil)
@@ -253,6 +312,8 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "create binding for external cluster role",
 			setupCRBController: func(c *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
+				legacyListOption := metav1.ListOptions{LabelSelector: rtbOwnerLabel + "=" + rbac.GetRTBLabel(defaultCRTB.ObjectMeta)}
+				c.EXPECT().List(legacyListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
 				c.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
 				c.EXPECT().Create(externalCRB.DeepCopy()).Return(nil, nil)
 			},

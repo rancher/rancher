@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
@@ -88,8 +89,9 @@ func Test_doesRoleTemplateHavePromotedRules(t *testing.T) {
 }
 
 var (
-	listOption = metav1.ListOptions{LabelSelector: "ownerlabel"}
-	subject    = rbacv1.Subject{
+	listOption       = metav1.ListOptions{LabelSelector: "ownerlabel"}
+	legacyListOption = metav1.ListOptions{LabelSelector: rtbOwnerLabel + "=legacyownerlabel"}
+	subject          = rbacv1.Subject{
 		Name: "test-subject",
 	}
 	roleRef = rbacv1.RoleRef{
@@ -132,10 +134,21 @@ func Test_ensureOnlyDesiredRoleBindingsExist(t *testing.T) {
 			desiredRB: defaultRB.DeepCopy(),
 		},
 		{
+			name: "list legacy RBs returns nil list is no op",
+			rbController: func(c *gomock.Controller) *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList] {
+				rbController := fake.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](c)
+				rbController.EXPECT().List("test-ns", listOption).Return(&rbacv1.RoleBindingList{}, nil)
+				rbController.EXPECT().List("test-ns", legacyListOption).Return(nil, nil)
+				return rbController
+			},
+			desiredRB: defaultRB.DeepCopy(),
+		},
+		{
 			name: "no pre-existing rolebindings, no promoted rolebinding",
 			rbController: func(c *gomock.Controller) *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList] {
 				rbController := fake.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](c)
 				rbController.EXPECT().List("test-ns", listOption).Return(&rbacv1.RoleBindingList{}, nil)
+				rbController.EXPECT().List("test-ns", legacyListOption).Return(&rbacv1.RoleBindingList{}, nil)
 				rbController.EXPECT().Create(defaultRB.DeepCopy()).Return(nil, nil)
 				return rbController
 			},
@@ -146,6 +159,7 @@ func Test_ensureOnlyDesiredRoleBindingsExist(t *testing.T) {
 			rbController: func(c *gomock.Controller) *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList] {
 				rbController := fake.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](c)
 				rbController.EXPECT().List("test-ns", listOption).Return(&rbacv1.RoleBindingList{}, nil)
+				rbController.EXPECT().List("test-ns", legacyListOption).Return(&rbacv1.RoleBindingList{}, nil)
 				rbController.EXPECT().Create(defaultRB.DeepCopy()).Return(nil, errDefault)
 				return rbController
 			},
@@ -157,6 +171,7 @@ func Test_ensureOnlyDesiredRoleBindingsExist(t *testing.T) {
 			rbController: func(c *gomock.Controller) *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList] {
 				rbController := fake.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](c)
 				rbController.EXPECT().List("test-ns", listOption).Return(&rbacv1.RoleBindingList{}, nil)
+				rbController.EXPECT().List("test-ns", legacyListOption).Return(&rbacv1.RoleBindingList{}, nil)
 				rbController.EXPECT().Create(defaultRB.DeepCopy()).Return(nil, nil)
 				return rbController
 			},
@@ -170,6 +185,7 @@ func Test_ensureOnlyDesiredRoleBindingsExist(t *testing.T) {
 					*defaultRB.DeepCopy(),
 				}}
 				rbController.EXPECT().List("test-ns", listOption).Return(list, nil)
+				rbController.EXPECT().List("test-ns", legacyListOption).Return(&rbacv1.RoleBindingList{}, nil)
 				return rbController
 			},
 			desiredRB: defaultRB.DeepCopy(),
@@ -182,8 +198,28 @@ func Test_ensureOnlyDesiredRoleBindingsExist(t *testing.T) {
 					{ObjectMeta: metav1.ObjectMeta{Name: "bad-rt"}},
 				}}
 				rbController.EXPECT().List("test-ns", listOption).Return(list, nil)
+				rbController.EXPECT().List("test-ns", legacyListOption).Return(&rbacv1.RoleBindingList{}, nil)
 				rbController.EXPECT().Create(defaultRB.DeepCopy()).Return(nil, nil)
 				rbController.EXPECT().Delete("test-ns", "bad-rt", &metav1.DeleteOptions{}).Return(nil)
+				return rbController
+			},
+			desiredRB: defaultRB.DeepCopy(),
+		},
+		{
+			name: "unwanted legacy rolebindings and aggregation rolebindings exist with no desired rolebindings",
+			rbController: func(c *gomock.Controller) *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList] {
+				rbController := fake.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](c)
+				legacyList := &rbacv1.RoleBindingList{Items: []rbacv1.RoleBinding{
+					{ObjectMeta: metav1.ObjectMeta{Name: "bad-rt1"}},
+				}}
+				aggregationList := &rbacv1.RoleBindingList{Items: []rbacv1.RoleBinding{
+					{ObjectMeta: metav1.ObjectMeta{Name: "bad-rt2"}},
+				}}
+				rbController.EXPECT().List("test-ns", listOption).Return(aggregationList, nil)
+				rbController.EXPECT().List("test-ns", legacyListOption).Return(legacyList, nil)
+				rbController.EXPECT().Create(defaultRB.DeepCopy()).Return(nil, nil)
+				rbController.EXPECT().Delete("test-ns", "bad-rt1", &metav1.DeleteOptions{}).Return(nil)
+				rbController.EXPECT().Delete("test-ns", "bad-rt2", &metav1.DeleteOptions{}).Return(nil)
 				return rbController
 			},
 			desiredRB: defaultRB.DeepCopy(),
@@ -197,6 +233,7 @@ func Test_ensureOnlyDesiredRoleBindingsExist(t *testing.T) {
 					*defaultRB.DeepCopy(),
 				}}
 				rbController.EXPECT().List("test-ns", listOption).Return(list, nil)
+				rbController.EXPECT().List("test-ns", legacyListOption).Return(&rbacv1.RoleBindingList{}, nil)
 				rbController.EXPECT().Delete("test-ns", "bad-rt", &metav1.DeleteOptions{}).Return(nil)
 				return rbController
 			},
@@ -211,6 +248,7 @@ func Test_ensureOnlyDesiredRoleBindingsExist(t *testing.T) {
 					*defaultRB.DeepCopy(),
 				}}
 				rbController.EXPECT().List("test-ns", listOption).Return(list, nil)
+				rbController.EXPECT().List("test-ns", legacyListOption).Return(&rbacv1.RoleBindingList{}, nil)
 				rbController.EXPECT().Delete("test-ns", "bad-rt", &metav1.DeleteOptions{}).Return(errDefault)
 				return rbController
 			},
@@ -224,7 +262,7 @@ func Test_ensureOnlyDesiredRoleBindingsExist(t *testing.T) {
 			p := &prtbHandler{
 				rbClient: tt.rbController(ctrl),
 			}
-			if err := p.ensureOnlyDesiredRoleBindingExists(tt.desiredRB, "ownerlabel", ""); (err != nil) != tt.wantErr {
+			if err := p.ensureOnlyDesiredRoleBindingExists(tt.desiredRB, "ownerlabel", "legacyownerlabel"); (err != nil) != tt.wantErr {
 				t.Errorf("prtbHandler.ensureOnlyDesiredRoleBindingsExist() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -308,6 +346,8 @@ func Test_prtbHandler_reconcileBindings(t *testing.T) {
 					},
 				}, nil)
 				c.rbController.EXPECT().List("ns1", rbListOptions).Return(&rbacv1.RoleBindingList{}, nil)
+				legacyListOption := metav1.ListOptions{LabelSelector: rtbOwnerLabel + "=" + rbac.GetRTBLabel(defaultPRTB.ObjectMeta)}
+				c.rbController.EXPECT().List("ns1", legacyListOption).Return(&rbacv1.RoleBindingList{}, nil)
 				rb := defaultRoleBinding.DeepCopy()
 				rb.Namespace = "ns1"
 				c.rbController.EXPECT().Create(rb).Return(nil, errDefault)
@@ -326,10 +366,13 @@ func Test_prtbHandler_reconcileBindings(t *testing.T) {
 					},
 				}, nil)
 				c.rbController.EXPECT().List("ns1", rbListOptions).Return(&rbacv1.RoleBindingList{}, nil)
+				legacyListOption := metav1.ListOptions{LabelSelector: rtbOwnerLabel + "=" + rbac.GetRTBLabel(defaultPRTB.ObjectMeta)}
+				c.rbController.EXPECT().List("ns1", legacyListOption).Return(&rbacv1.RoleBindingList{}, nil)
 				rb1 := defaultRoleBinding.DeepCopy()
 				rb1.Namespace = "ns1"
 				c.rbController.EXPECT().Create(rb1).Return(nil, nil)
 				c.rbController.EXPECT().List("ns2", rbListOptions).Return(&rbacv1.RoleBindingList{}, nil)
+				c.rbController.EXPECT().List("ns2", legacyListOption).Return(&rbacv1.RoleBindingList{}, nil)
 				rb2 := defaultRoleBinding.DeepCopy()
 				rb2.Namespace = "ns2"
 				rb2.Name = "rb-x3nurktcw6"
@@ -566,10 +609,11 @@ func Test_ensureOnlyDesiredClusterRoleBindingsExists(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "error listing crbs",
+			name: "error listing legacy crbs",
 			crbs: []*rbacv1.ClusterRoleBinding{},
 			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
-				m.EXPECT().List(listOption).Return(nil, errDefault)
+				m.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				m.EXPECT().List(legacyListOption).Return(nil, errDefault)
 			},
 			wantErr: true,
 		},
@@ -580,6 +624,7 @@ func Test_ensureOnlyDesiredClusterRoleBindingsExists(t *testing.T) {
 			},
 			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				m.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				m.EXPECT().List(legacyListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
 				m.EXPECT().Create(&rbacv1.ClusterRoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:   "crb1",
@@ -596,6 +641,7 @@ func Test_ensureOnlyDesiredClusterRoleBindingsExists(t *testing.T) {
 			},
 			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
 				m.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				m.EXPECT().List(legacyListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
 				m.EXPECT().Create(&rbacv1.ClusterRoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:   "crb1",
@@ -635,6 +681,7 @@ func Test_ensureOnlyDesiredClusterRoleBindingsExists(t *testing.T) {
 						Subjects:   defaultCRB.Subjects,
 					},
 				}}, nil)
+				m.EXPECT().List(legacyListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
 			},
 		},
 		{
@@ -662,10 +709,38 @@ func Test_ensureOnlyDesiredClusterRoleBindingsExists(t *testing.T) {
 						ObjectMeta: metav1.ObjectMeta{Name: "crb2"},
 					},
 				}}, nil)
+				m.EXPECT().List(legacyListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
 				m.EXPECT().Delete("crb2", &metav1.DeleteOptions{}).Return(nil)
 				m.EXPECT().Create(&rbacv1.ClusterRoleBinding{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:   "crb2",
+						Labels: map[string]string{"management.cattle.io/roletemplate-aggregation": "true"},
+					},
+					RoleRef:  defaultCRB.RoleRef,
+					Subjects: defaultCRB.Subjects,
+				})
+			},
+		},
+		{
+			name: "pre-existing legacy CRB, delete and create correct CRB",
+			crbs: []*rbacv1.ClusterRoleBinding{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: "crb1"},
+					RoleRef:    defaultCRB.RoleRef,
+					Subjects:   defaultCRB.Subjects,
+				},
+			},
+			setupCRBController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]) {
+				m.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
+				m.EXPECT().List(legacyListOption).Return(&rbacv1.ClusterRoleBindingList{Items: []rbacv1.ClusterRoleBinding{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "crb1"},
+					},
+				}}, nil)
+				m.EXPECT().Delete("crb1", &metav1.DeleteOptions{}).Return(nil)
+				m.EXPECT().Create(&rbacv1.ClusterRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "crb1",
 						Labels: map[string]string{"management.cattle.io/roletemplate-aggregation": "true"},
 					},
 					RoleRef:  defaultCRB.RoleRef,
@@ -680,6 +755,7 @@ func Test_ensureOnlyDesiredClusterRoleBindingsExists(t *testing.T) {
 				m.EXPECT().List(listOption).Return(&rbacv1.ClusterRoleBindingList{Items: []rbacv1.ClusterRoleBinding{
 					{ObjectMeta: metav1.ObjectMeta{Name: "crb1"}},
 				}}, nil)
+				m.EXPECT().List(legacyListOption).Return(&rbacv1.ClusterRoleBindingList{}, nil)
 				m.EXPECT().Delete("crb1", &metav1.DeleteOptions{}).Return(errDefault)
 			},
 			wantErr: true,
@@ -695,7 +771,7 @@ func Test_ensureOnlyDesiredClusterRoleBindingsExists(t *testing.T) {
 			p := &prtbHandler{
 				crbClient: crbController,
 			}
-			if err := p.ensureOnlyDesiredClusterRoleBindingsExists(tt.crbs, "ownerlabel", ""); (err != nil) != tt.wantErr {
+			if err := p.ensureOnlyDesiredClusterRoleBindingsExists(tt.crbs, "ownerlabel", "legacyownerlabel"); (err != nil) != tt.wantErr {
 				t.Errorf("prtbHandler.reconcileClusterRoleBindings() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
