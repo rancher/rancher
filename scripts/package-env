@@ -1,6 +1,8 @@
 #!/bin/bash
 
+pwd
 cd "$(dirname "$0")/.." || exit
+pwd
 
 check_missing() {
   var=$1
