@@ -45,8 +45,8 @@ runs:
     - id: vars
       shell: bash
       run: |
-        cd ${{ inputs.rancher_path }}
-        source scripts/package-env
+        cd ${{ inputs.rancher_path }}/scripts
+        source package-env
 
         echo "CATTLE_KDM_BRANCH=$CATTLE_KDM_BRANCH" >> $GITHUB_OUTPUT
         echo "CATTLE_K3S_VERSION=$CATTLE_K3S_VERSION" >> $GITHUB_OUTPUT
