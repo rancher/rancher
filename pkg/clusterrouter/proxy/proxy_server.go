@@ -73,8 +73,8 @@ func (e *errorResponder) Error(w http.ResponseWriter, req *http.Request, err err
 	w.Write([]byte(err.Error()))
 }
 
-func prefix(cluster *v3.Cluster) string {
-	return "/k8s/clusters/" + cluster.Name
+func trimClusterPrefix(c *v3.Cluster, path string) string {
+	return strings.TrimPrefix(strings.TrimPrefix(path, "/k8s/clusters/"+c.Name), "k8s/proxy/"+c.Name)
 }
 
 func New(localConfig *rest.Config, cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dialer.Factory, clusterContextGetter ClusterContextGetter) (*RemoteService, error) {
@@ -238,7 +238,7 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	u.Path = strings.TrimPrefix(req.URL.Path, prefix(r.cluster))
+	u.Path = trimClusterPrefix(r.cluster, req.URL.Path)
 	u.RawQuery = req.URL.RawQuery
 
 	proto := req.Header.Get("X-Forwarded-Proto")

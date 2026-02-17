@@ -16,7 +16,7 @@ func GetClusterID(req *http.Request) string {
 	if len(parts) > 3 &&
 		parts[0] == "" &&
 		(parts[1] == "k8s" || parts[1] == "v3") &&
-		(parts[2] == "clusters" || parts[2] == "cluster") {
+		(parts[2] == "clusters" || parts[2] == "cluster" || parts[2] == "proxy") {
 		return parts[3]
 	}
 
