@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/rancher/rancher/pkg/fleet"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/impersonation"
@@ -336,4 +337,59 @@ func (ih *impersonationHandler) deleteServiceAccountImpersonator(clusterName, us
 		return nil
 	}
 	return fmt.Errorf("failed to delete service account impersonator role %s: %w", roleName, err)
+}
+
+// handleAggregationMigration is a helper function that handles the common migration logic
+// when toggling the AggregatedRoleTemplates feature flag.
+//
+// When the feature is being disabled (flag is off):
+//   - If the resource has the aggregation label, it removes it and calls deleteAggregatedResources
+//   - Returns the resource unchanged if the label is already absent
+//
+// When the feature is being enabled (flag is on):
+//   - If the resource lacks the aggregation label, it calls deleteLegacyResources and adds the label
+//   - Returns the resource unchanged if the label is already present
+//
+// Parameters:
+//   - resource: The resource being migrated
+//   - labels: The resource's current labels map
+//   - updateLabels: Function to update the resource with new labels and return the updated resource
+//   - deleteAggregatedResources: Function to delete resources created with aggregation
+//   - deleteLegacyResources: Function to delete resources created before aggregation
+//
+// Returns the updated resource and any error encountered
+// TODO: To be removed once roletemplate aggregation is the only enabled RBAC model. https://github.com/rancher/rancher/issues/53743
+func handleAggregationMigration[T any](
+	resource T,
+	labels map[string]string,
+	updateLabels func(T, map[string]string) (T, error),
+	deleteAggregatedResources func(T) error,
+	deleteLegacyResources func(T) error,
+) (T, error) {
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	hasLabel := labels[rbac.AggregationFeatureLabel] == "true"
+
+	if !features.AggregatedRoleTemplates.Enabled() {
+		if hasLabel {
+			delete(labels, rbac.AggregationFeatureLabel)
+			updated, err := updateLabels(resource, labels)
+			if err != nil {
+				return updated, err
+			}
+			return updated, deleteAggregatedResources(resource)
+		}
+		return resource, nil
+	}
+
+	if !hasLabel {
+		if err := deleteLegacyResources(resource); err != nil {
+			return resource, err
+		}
+
+		labels[rbac.AggregationFeatureLabel] = "true"
+		return updateLabels(resource, labels)
+	}
+	return resource, nil
 }

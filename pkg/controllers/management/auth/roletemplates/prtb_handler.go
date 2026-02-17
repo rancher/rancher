@@ -84,34 +84,17 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 // If the feature flag is enabled, it adds the aggregation label and deletes any legacy bindings that were created before aggregation.
 // TODO: To be removed once roletemplate aggregation is the only enabled RBAC model. https://github.com/rancher/rancher/issues/53743
 func (p *prtbHandler) handleMigration(prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
-	if !features.AggregatedRoleTemplates.Enabled() {
-		if prtb.Labels[rbac.AggregationFeatureLabel] == "true" {
-			prtbCopy := prtb.DeepCopy()
-			delete(prtbCopy.Labels, rbac.AggregationFeatureLabel)
-			prtbCopy, err := p.prtbClient.Update(prtbCopy)
-			if err != nil {
-				return prtbCopy, err
-			}
-
-			return prtbCopy, p.deleteRoleBindings(prtb)
-		}
-		return prtb, nil
-	}
-
-	if prtb.Labels[rbac.AggregationFeatureLabel] != "true" {
-		// Remove any legacy bindings that were created before the aggregation feature was enabled.
-		if err := p.deleteLegacyBinding(prtb); err != nil {
-			return prtb, err
-		}
-
-		prtbCopy := prtb.DeepCopy()
-		if prtbCopy.Labels == nil {
-			prtbCopy.Labels = map[string]string{}
-		}
-		prtbCopy.Labels[rbac.AggregationFeatureLabel] = "true"
-		return p.prtbClient.Update(prtbCopy)
-	}
-	return prtb, nil
+	return handleAggregationMigration(
+		prtb,
+		prtb.Labels,
+		func(resource *v3.ProjectRoleTemplateBinding, labels map[string]string) (*v3.ProjectRoleTemplateBinding, error) {
+			prtbCopy := resource.DeepCopy()
+			prtbCopy.Labels = labels
+			return p.prtbClient.Update(prtbCopy)
+		},
+		p.deleteRoleBindings,
+		p.deleteLegacyBinding,
+	)
 }
 
 // OnRemove deletes Role Bindings that are owned by the PRTB. It also removes the membership binding if no other PRTBs give membership access.
@@ -339,7 +322,6 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 			return fmt.Errorf("failed to create role binding %s: %w", rb.Name, err)
 		}
 	}
-
 	return nil
 }
 

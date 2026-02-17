@@ -94,35 +94,17 @@ func (c *crtbHandler) OnChange(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 // If the feature flag is enabled, it adds the aggregation label and deletes any legacy bindings that were created before aggregation.
 // TODO: To be removed once roletemplate aggregation is the only enabled RBAC model. https://github.com/rancher/rancher/issues/53743
 func (c *crtbHandler) handleMigration(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-	if !features.AggregatedRoleTemplates.Enabled() {
-		if crtb.Labels[rbac.AggregationFeatureLabel] == "true" {
-			crtbCopy := crtb.DeepCopy()
-			delete(crtbCopy.Labels, rbac.AggregationFeatureLabel)
-			crtbCopy, err := c.crtbClient.Update(crtbCopy)
-			if err != nil {
-				return crtbCopy, err
-			}
-
-			return crtbCopy, c.removeRoleBindings(crtb)
-		}
-		return crtb, nil
-	}
-
-	if crtb.Labels[rbac.AggregationFeatureLabel] != "true" {
-		// Remove any legacy bindings that were created before the aggregation feature was enabled.
-		if err := c.deleteLegacyRoleBindings(crtb); err != nil {
-			return crtb, err
-		}
-
-		crtbCopy := crtb.DeepCopy()
-		if crtbCopy.Labels == nil {
-			crtbCopy.Labels = map[string]string{}
-		}
-		crtbCopy.Labels[rbac.AggregationFeatureLabel] = "true"
-		return c.crtbClient.Update(crtbCopy)
-
-	}
-	return crtb, nil
+	return handleAggregationMigration(
+		crtb,
+		crtb.Labels,
+		func(resource *v3.ClusterRoleTemplateBinding, labels map[string]string) (*v3.ClusterRoleTemplateBinding, error) {
+			crtbCopy := resource.DeepCopy()
+			crtbCopy.Labels = labels
+			return c.crtbClient.Update(crtbCopy)
+		},
+		c.removeRoleBindings,
+		c.deleteLegacyRoleBindings,
+	)
 }
 
 // reconcileSubject ensures that the user referenced by the role template binding exists
@@ -237,7 +219,6 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, loc
 	}
 
 	c.s.AddCondition(localConditions, condition, bindingsExists, nil)
-
 	return nil
 }
 

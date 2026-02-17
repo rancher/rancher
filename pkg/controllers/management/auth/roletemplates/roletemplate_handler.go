@@ -71,36 +71,22 @@ func (r *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.RoleT
 	return rt, r.reconcileClusterRoles(rt)
 }
 
+// handleMigration handles the migration of Role Templates when toggling the AggregatedRoleTemplates feature flag.
+// If the feature flag is disabled, it removes the aggregation label and deletes any cluster roles that were created for aggregation.
+// If the feature flag is enabled, it adds the aggregation label and deletes any legacy roles that were created before aggregation.
+// TODO: To be removed once roletemplate aggregation is the only enabled RBAC model. https://github.com/rancher/rancher/issues/53743
 func (r *roleTemplateHandler) handleMigration(rt *v3.RoleTemplate) (*v3.RoleTemplate, error) {
-	if !features.AggregatedRoleTemplates.Enabled() {
-		// If the feature is disabled, ensure any existing cluster roles created for aggregation are deleted.
-		if rt.Labels[rbac.AggregationFeatureLabel] == "true" {
-			rtCopy := rt.DeepCopy()
-			delete(rtCopy.Labels, rbac.AggregationFeatureLabel)
-			rtCopy, err := r.rtController.Update(rtCopy)
-			if err != nil {
-				return rtCopy, err
-			}
-
-			return rtCopy, r.deleteClusterRoles(rt)
-		}
-		return rt, nil
-	}
-
-	if rt.Labels[rbac.AggregationFeatureLabel] != "true" {
-		// The first time the feature is enabled we need to delete any Roles that were created for this RoleTemplate before the aggregation feature was enabled.
-		if err := r.deleteLegacyRoles(rt); err != nil {
-			return rt, err
-		}
-
-		rtCopy := rt.DeepCopy()
-		if rtCopy.Labels == nil {
-			rtCopy.Labels = map[string]string{}
-		}
-		rtCopy.Labels[rbac.AggregationFeatureLabel] = "true"
-		return r.rtController.Update(rtCopy)
-	}
-	return rt, nil
+	return handleAggregationMigration(
+		rt,
+		rt.Labels,
+		func(resource *v3.RoleTemplate, labels map[string]string) (*v3.RoleTemplate, error) {
+			rtCopy := resource.DeepCopy()
+			rtCopy.Labels = labels
+			return r.rtController.Update(rtCopy)
+		},
+		r.deleteClusterRoles,
+		r.deleteLegacyRoles,
+	)
 }
 
 // reconcileClusterRoles is responsible for ensuring the right set of Cluster Roles exist. It deletes any owned by the Role Template that shouldn't exist.
