@@ -378,7 +378,7 @@ func handleAggregationMigration[T any](
 			if err != nil {
 				return updated, err
 			}
-			return updated, deleteAggregatedResources(resource)
+			return updated, deleteAggregatedResources(updated)
 		}
 		return resource, nil
 	}
