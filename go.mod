@@ -1,6 +1,8 @@
 module github.com/rancher/rancher
 
-go 1.25.7
+go 1.25.0
+
+toolchain go1.25.7
 
 replace (
 	github.com/crewjam/saml => github.com/rancher/saml v0.4.14-rancher3
@@ -117,9 +119,9 @@ require (
 	github.com/rancher/apiserver v0.8.3
 	github.com/rancher/channelserver v0.9.1-0.20260116181358-8dcd92dec745
 	github.com/rancher/dynamiclistener v0.7.4
-	github.com/rancher/eks-operator v1.14.0-rc.2
+	github.com/rancher/eks-operator v1.14.0-rc.3
 	github.com/rancher/fleet/pkg/apis v0.15.0-alpha.10
-	github.com/rancher/gke-operator v1.14.0-rc.1
+	github.com/rancher/gke-operator v1.14.0-rc.2
 	github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1
 	github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae75779379
 	github.com/rancher/lasso v0.2.6
