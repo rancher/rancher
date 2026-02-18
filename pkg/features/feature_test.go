@@ -47,6 +47,9 @@ func TestInitializeNil(t *testing.T) {
 }
 
 func TestInitializeFeatures(t *testing.T) {
+	trueVal := true
+	falseVal := false
+
 	tests := map[string]struct {
 		featureMock func() managementv3.FeatureClient
 		features    map[string]*Feature
@@ -59,6 +62,138 @@ func TestInitializeFeatures(t *testing.T) {
 				return mock
 			},
 			features: nil,
+		},
+		"new feature with lockedOnInstall=true sets LockedValue": {
+			featureMock: func() managementv3.FeatureClient {
+				mock := fake.NewMockNonNamespacedControllerInterface[*v3.Feature, *v3.FeatureList](gomock.NewController(t))
+				mock.EXPECT().Delete("external-rules", &metav1.DeleteOptions{})
+				mock.EXPECT().Get("locked-feature", gomock.Any()).Return(nil, fmt.Errorf("not found"))
+				mock.EXPECT().Create(gomock.Any()).DoAndReturn(func(feature *v3.Feature) (*v3.Feature, error) {
+					assert.Equal(t, "locked-feature", feature.Name)
+					assert.NotNil(t, feature.Status.LockedValue)
+					assert.True(t, *feature.Status.LockedValue)
+					assert.True(t, feature.Status.Default)
+					return feature, nil
+				})
+
+				return mock
+			},
+			features: map[string]*Feature{
+				"locked-feature": {
+					name:            "locked-feature",
+					description:     "A locked feature",
+					def:             true,
+					dynamic:         false,
+					install:         true,
+					lockedOnInstall: true,
+				},
+			},
+		},
+		"new feature with lockedOnInstall=false and def=false sets LockedValue to nil": {
+			featureMock: func() managementv3.FeatureClient {
+				mock := fake.NewMockNonNamespacedControllerInterface[*v3.Feature, *v3.FeatureList](gomock.NewController(t))
+				mock.EXPECT().Delete("external-rules", &metav1.DeleteOptions{})
+				mock.EXPECT().Get("unlocked-feature", gomock.Any()).Return(nil, fmt.Errorf("not found"))
+				mock.EXPECT().Create(gomock.Any()).DoAndReturn(func(feature *v3.Feature) (*v3.Feature, error) {
+					assert.Equal(t, "unlocked-feature", feature.Name)
+					assert.Nil(t, feature.Status.LockedValue)
+					assert.False(t, feature.Status.Default)
+					return feature, nil
+				})
+
+				return mock
+			},
+			features: map[string]*Feature{
+				"unlocked-feature": {
+					name:            "unlocked-feature",
+					description:     "An unlocked feature",
+					def:             false,
+					dynamic:         true,
+					install:         true,
+					lockedOnInstall: false,
+				},
+			},
+		},
+		"existing feature with lockedOnInstall=false removes LockedValue": {
+			featureMock: func() managementv3.FeatureClient {
+				mock := fake.NewMockNonNamespacedControllerInterface[*v3.Feature, *v3.FeatureList](gomock.NewController(t))
+				mock.EXPECT().Delete("external-rules", &metav1.DeleteOptions{})
+
+				existingFeature := &v3.Feature{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "unlocked-feature",
+					},
+					Spec: v3.FeatureSpec{
+						Value: nil,
+					},
+					Status: v3.FeatureStatus{
+						Default:     false,
+						Dynamic:     true,
+						Description: "An unlocked feature",
+						LockedValue: &trueVal, // Has a locked value that should be removed
+					},
+				}
+
+				mock.EXPECT().Get("unlocked-feature", gomock.Any()).Return(existingFeature, nil)
+				mock.EXPECT().Update(gomock.Any()).DoAndReturn(func(feature *v3.Feature) (*v3.Feature, error) {
+					assert.Equal(t, "unlocked-feature", feature.Name)
+					assert.Nil(t, feature.Status.LockedValue, "LockedValue should be removed when lockedOnInstall=false")
+					return feature, nil
+				})
+
+				return mock
+			},
+			features: map[string]*Feature{
+				"unlocked-feature": {
+					name:            "unlocked-feature",
+					description:     "An unlocked feature",
+					def:             false,
+					dynamic:         true,
+					install:         true,
+					lockedOnInstall: false, // Not locked, so existing LockedValue should be removed
+				},
+			},
+		},
+		"existing feature with lockedOnInstall=true preserves LockedValue": {
+			featureMock: func() managementv3.FeatureClient {
+				mock := fake.NewMockNonNamespacedControllerInterface[*v3.Feature, *v3.FeatureList](gomock.NewController(t))
+				mock.EXPECT().Delete("external-rules", &metav1.DeleteOptions{})
+
+				existingFeature := &v3.Feature{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "locked-feature",
+					},
+					Spec: v3.FeatureSpec{
+						Value: &falseVal,
+					},
+					Status: v3.FeatureStatus{
+						Default:     true,
+						Dynamic:     false,
+						Description: "A locked feature",
+						LockedValue: &trueVal,
+					},
+				}
+
+				mock.EXPECT().Get("locked-feature", gomock.Any()).Return(existingFeature, nil)
+				mock.EXPECT().Update(gomock.Any()).DoAndReturn(func(feature *v3.Feature) (*v3.Feature, error) {
+					assert.Equal(t, "locked-feature", feature.Name)
+					assert.NotNil(t, feature.Status.LockedValue, "LockedValue should be preserved when lockedOnInstall=true")
+					assert.True(t, *feature.Status.LockedValue)
+					return feature, nil
+				})
+
+				return mock
+			},
+			features: map[string]*Feature{
+				"locked-feature": {
+					name:            "locked-feature",
+					description:     "A locked feature",
+					def:             true,
+					dynamic:         false,
+					install:         true,
+					lockedOnInstall: true,
+				},
+			},
 		},
 	}
 
