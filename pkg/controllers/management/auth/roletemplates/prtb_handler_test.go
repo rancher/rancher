@@ -932,6 +932,10 @@ func Test_prtbHandler_handleMigration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			prev := features.AggregatedRoleTemplates.Enabled()
+			t.Cleanup(func() {
+				features.AggregatedRoleTemplates.Set(prev)
+			})
 			features.AggregatedRoleTemplates.Set(tt.featureFlagEnabled)
 
 			prtbController := fake.NewMockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList](ctrl)

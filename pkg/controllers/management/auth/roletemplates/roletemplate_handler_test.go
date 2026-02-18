@@ -566,6 +566,10 @@ func Test_OnChange(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			prev := features.AggregatedRoleTemplates.Enabled()
+			t.Cleanup(func() {
+				features.AggregatedRoleTemplates.Set(prev)
+			})
 			features.AggregatedRoleTemplates.Set(true)
 			if tt.rt != nil {
 				if tt.rt.Labels == nil {
@@ -1099,6 +1103,10 @@ func Test_roleTemplateHandler_handleMigration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			prev := features.AggregatedRoleTemplates.Enabled()
+			t.Cleanup(func() {
+				features.AggregatedRoleTemplates.Set(prev)
+			})
 			features.AggregatedRoleTemplates.Set(tt.featureFlagEnabled)
 
 			rtController := fake.NewMockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList](ctrl)
