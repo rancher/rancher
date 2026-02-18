@@ -79,7 +79,7 @@ func (rth *roleTemplateHandler) ensureOnlyDesiredClusterRolesExist(rt *v3.RoleTe
 	for _, currentCR := range currentCRs.Items {
 		if _, ok := desiredCRNames[currentCR.Name]; !ok {
 			// This ClusterRole is not part of the desired Cluster Role list, delete it
-			if err := rth.crController.Delete(currentCR.Name, &metav1.DeleteOptions{}); err != nil {
+			if err := rbac.DeleteResource(currentCR.Name, rth.crController); err != nil {
 				return fmt.Errorf("failed to delete cluster role %s: %w", currentCR.Name, err)
 			}
 		}
