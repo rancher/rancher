@@ -49,12 +49,6 @@ func (rth *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.Rol
 		return nil, err
 	}
 
-	for _, cr := range clusterRoles {
-		if err := rbac.CreateOrUpdateResource(cr, rth.crController, rbac.AreClusterRolesSame); err != nil {
-			return nil, err
-		}
-	}
-
 	// add aggregation label to external cluster role
 	if err := rth.addLabelToExternalRole(rt); err != nil {
 		return nil, err

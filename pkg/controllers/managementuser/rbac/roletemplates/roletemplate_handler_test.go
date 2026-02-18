@@ -734,14 +734,14 @@ func Test_addLabelToExternalRole(t *testing.T) {
 func Test_ensureOnlyDesiredClusterRolesExist(t *testing.T) {
 	t.Parallel()
 
-	testRT := &v3.RoleTemplate{
+	testRT := v3.RoleTemplate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-rt",
 		},
 		Context: "cluster",
 	}
 
-	desiredCR1 := &rbacv1.ClusterRole{
+	desiredCR1 := rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-rt",
 			Labels: map[string]string{
@@ -751,7 +751,7 @@ func Test_ensureOnlyDesiredClusterRolesExist(t *testing.T) {
 		Rules: []rbacv1.PolicyRule{sampleRule},
 	}
 
-	desiredCR2 := &rbacv1.ClusterRole{
+	desiredCR2 := rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-rt-aggregator",
 			Labels: map[string]string{
@@ -769,7 +769,7 @@ func Test_ensureOnlyDesiredClusterRolesExist(t *testing.T) {
 		},
 	}
 
-	unwantedCR := &rbacv1.ClusterRole{
+	unwantedCR := rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "old-cluster-role",
 			Labels: map[string]string{
@@ -778,7 +778,7 @@ func Test_ensureOnlyDesiredClusterRolesExist(t *testing.T) {
 		},
 	}
 
-	outdatedCR := &rbacv1.ClusterRole{
+	outdatedCR := rbacv1.ClusterRole{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "test-rt",
 			Labels: map[string]string{
@@ -804,8 +804,8 @@ func Test_ensureOnlyDesiredClusterRolesExist(t *testing.T) {
 	}{
 		{
 			name:       "create cluster roles when they don't exist",
-			rt:         testRT,
-			desiredCRs: []*rbacv1.ClusterRole{desiredCR1, desiredCR2},
+			rt:         testRT.DeepCopy(),
+			desiredCRs: []*rbacv1.ClusterRole{desiredCR1.DeepCopy(), desiredCR2.DeepCopy()},
 			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
 				// List returns empty list (no existing cluster roles)
 				m.EXPECT().List(metav1.ListOptions{LabelSelector: rbac.GetClusterRoleOwnerLabel("test-rt")}).Return(&rbacv1.ClusterRoleList{}, nil)
@@ -813,50 +813,50 @@ func Test_ensureOnlyDesiredClusterRolesExist(t *testing.T) {
 				// Expect Get calls for each desired cluster role (they don't exist)
 				notFoundErr := apierrors.NewNotFound(schema.GroupResource{Group: "rbac.authorization.k8s.io", Resource: "clusterroles"}, "test-rt")
 				m.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(nil, notFoundErr)
-				m.EXPECT().Create(gomock.Any()).Return(desiredCR1, nil)
+				m.EXPECT().Create(gomock.Any()).Return(desiredCR1.DeepCopy(), nil)
 
 				notFoundErr2 := apierrors.NewNotFound(schema.GroupResource{Group: "rbac.authorization.k8s.io", Resource: "clusterroles"}, "test-rt-aggregator")
 				m.EXPECT().Get("test-rt-aggregator", metav1.GetOptions{}).Return(nil, notFoundErr2)
-				m.EXPECT().Create(gomock.Any()).Return(desiredCR2, nil)
+				m.EXPECT().Create(gomock.Any()).Return(desiredCR2.DeepCopy(), nil)
 			},
 		},
 		{
 			name:       "update cluster roles with wrong rules and labels",
-			rt:         testRT,
-			desiredCRs: []*rbacv1.ClusterRole{desiredCR1},
+			rt:         testRT.DeepCopy(),
+			desiredCRs: []*rbacv1.ClusterRole{desiredCR1.DeepCopy()},
 			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
 				m.EXPECT().List(metav1.ListOptions{LabelSelector: rbac.GetClusterRoleOwnerLabel("test-rt")}).Return(&rbacv1.ClusterRoleList{}, nil)
 
 				// Get returns outdated cluster role
-				m.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(outdatedCR, nil)
+				m.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(outdatedCR.DeepCopy(), nil)
 				// Expect update to fix the cluster role
-				m.EXPECT().Update(gomock.Any()).Return(desiredCR1, nil)
+				m.EXPECT().Update(gomock.Any()).Return(desiredCR1.DeepCopy(), nil)
 			},
 		},
 		{
 			name:       "delete unwanted cluster roles",
-			rt:         testRT,
-			desiredCRs: []*rbacv1.ClusterRole{desiredCR1},
+			rt:         testRT.DeepCopy(),
+			desiredCRs: []*rbacv1.ClusterRole{desiredCR1.DeepCopy()},
 			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
 				// List returns an unwanted cluster role
 				m.EXPECT().List(metav1.ListOptions{LabelSelector: rbac.GetClusterRoleOwnerLabel("test-rt")}).Return(&rbacv1.ClusterRoleList{
-					Items: []rbacv1.ClusterRole{*unwantedCR},
+					Items: []rbacv1.ClusterRole{*unwantedCR.DeepCopy()},
 				}, nil)
 				// Expect delete of unwanted cluster role
 				m.EXPECT().Delete("old-cluster-role", &metav1.DeleteOptions{}).Return(nil)
 
 				// Get returns the desired cluster role already exists
-				m.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(desiredCR1, nil)
+				m.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(desiredCR1.DeepCopy(), nil)
 			},
 		},
 		{
 			name:       "delete unwanted and create desired cluster roles",
-			rt:         testRT,
-			desiredCRs: []*rbacv1.ClusterRole{desiredCR1, desiredCR2},
+			rt:         testRT.DeepCopy(),
+			desiredCRs: []*rbacv1.ClusterRole{desiredCR1.DeepCopy(), desiredCR2.DeepCopy()},
 			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
 				// List returns unwanted cluster role
 				m.EXPECT().List(metav1.ListOptions{LabelSelector: rbac.GetClusterRoleOwnerLabel("test-rt")}).Return(&rbacv1.ClusterRoleList{
-					Items: []rbacv1.ClusterRole{*unwantedCR},
+					Items: []rbacv1.ClusterRole{*unwantedCR.DeepCopy()},
 				}, nil)
 				// Expect delete
 				m.EXPECT().Delete("old-cluster-role", &metav1.DeleteOptions{}).Return(nil)
@@ -864,17 +864,17 @@ func Test_ensureOnlyDesiredClusterRolesExist(t *testing.T) {
 				// Create new desired cluster roles
 				notFoundErr := apierrors.NewNotFound(schema.GroupResource{Group: "rbac.authorization.k8s.io", Resource: "clusterroles"}, "test-rt")
 				m.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(nil, notFoundErr)
-				m.EXPECT().Create(gomock.Any()).Return(desiredCR1, nil)
+				m.EXPECT().Create(gomock.Any()).Return(desiredCR1.DeepCopy(), nil)
 
 				notFoundErr2 := apierrors.NewNotFound(schema.GroupResource{Group: "rbac.authorization.k8s.io", Resource: "clusterroles"}, "test-rt-aggregator")
 				m.EXPECT().Get("test-rt-aggregator", metav1.GetOptions{}).Return(nil, notFoundErr2)
-				m.EXPECT().Create(gomock.Any()).Return(desiredCR2, nil)
+				m.EXPECT().Create(gomock.Any()).Return(desiredCR2.DeepCopy(), nil)
 			},
 		},
 		{
 			name:       "error listing existing cluster roles",
-			rt:         testRT,
-			desiredCRs: []*rbacv1.ClusterRole{desiredCR1},
+			rt:         testRT.DeepCopy(),
+			desiredCRs: []*rbacv1.ClusterRole{desiredCR1.DeepCopy()},
 			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
 				m.EXPECT().List(metav1.ListOptions{LabelSelector: rbac.GetClusterRoleOwnerLabel("test-rt")}).Return(nil, fmt.Errorf("list error"))
 			},
@@ -882,12 +882,12 @@ func Test_ensureOnlyDesiredClusterRolesExist(t *testing.T) {
 		},
 		{
 			name:       "error deleting unwanted cluster role",
-			rt:         testRT,
-			desiredCRs: []*rbacv1.ClusterRole{desiredCR1},
+			rt:         testRT.DeepCopy(),
+			desiredCRs: []*rbacv1.ClusterRole{desiredCR1.DeepCopy()},
 			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
 				// List returns unwanted cluster role
 				m.EXPECT().List(metav1.ListOptions{LabelSelector: rbac.GetClusterRoleOwnerLabel("test-rt")}).Return(&rbacv1.ClusterRoleList{
-					Items: []rbacv1.ClusterRole{*unwantedCR},
+					Items: []rbacv1.ClusterRole{*unwantedCR.DeepCopy()},
 				}, nil)
 				// Delete fails
 				m.EXPECT().Delete("old-cluster-role", &metav1.DeleteOptions{}).Return(fmt.Errorf("delete error"))
@@ -896,8 +896,8 @@ func Test_ensureOnlyDesiredClusterRolesExist(t *testing.T) {
 		},
 		{
 			name:       "error creating cluster role",
-			rt:         testRT,
-			desiredCRs: []*rbacv1.ClusterRole{desiredCR1},
+			rt:         testRT.DeepCopy(),
+			desiredCRs: []*rbacv1.ClusterRole{desiredCR1.DeepCopy()},
 			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
 				m.EXPECT().List(metav1.ListOptions{LabelSelector: rbac.GetClusterRoleOwnerLabel("test-rt")}).Return(&rbacv1.ClusterRoleList{}, nil)
 
@@ -909,8 +909,8 @@ func Test_ensureOnlyDesiredClusterRolesExist(t *testing.T) {
 		},
 		{
 			name:       "error updating cluster role",
-			rt:         testRT,
-			desiredCRs: []*rbacv1.ClusterRole{desiredCR1},
+			rt:         testRT.DeepCopy(),
+			desiredCRs: []*rbacv1.ClusterRole{desiredCR1.DeepCopy()},
 			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
 				m.EXPECT().List(metav1.ListOptions{LabelSelector: rbac.GetClusterRoleOwnerLabel("test-rt")}).Return(&rbacv1.ClusterRoleList{}, nil)
 
@@ -922,12 +922,12 @@ func Test_ensureOnlyDesiredClusterRolesExist(t *testing.T) {
 		},
 		{
 			name:       "no desired cluster roles - delete all existing",
-			rt:         testRT,
+			rt:         testRT.DeepCopy(),
 			desiredCRs: []*rbacv1.ClusterRole{},
 			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
 				// List returns existing cluster roles
 				m.EXPECT().List(metav1.ListOptions{LabelSelector: rbac.GetClusterRoleOwnerLabel("test-rt")}).Return(&rbacv1.ClusterRoleList{
-					Items: []rbacv1.ClusterRole{*unwantedCR, *desiredCR1},
+					Items: []rbacv1.ClusterRole{*unwantedCR.DeepCopy(), *desiredCR1.DeepCopy()},
 				}, nil)
 				// Expect both to be deleted
 				m.EXPECT().Delete("old-cluster-role", &metav1.DeleteOptions{}).Return(nil)
