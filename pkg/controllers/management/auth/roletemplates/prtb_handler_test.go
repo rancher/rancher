@@ -814,7 +814,7 @@ func Test_prtbHandler_handleMigration(t *testing.T) {
 
 	type controllers struct {
 		prtbController *fake.MockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList]
-		rbController   *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]
+		rbCache        *fake.MockCacheInterface[*rbacv1.RoleBinding]
 	}
 
 	tests := []struct {
@@ -845,8 +845,8 @@ func Test_prtbHandler_handleMigration(t *testing.T) {
 					}
 					return obj, nil
 				})
-				// deleteRoleBindings will be called, so mock rbController.List to return empty list
-				c.rbController.EXPECT().List(gomock.Any(), gomock.Any()).Return(&rbacv1.RoleBindingList{}, nil)
+				// deleteRoleBindings will be called, so mock rbCache.List to return empty list
+				c.rbCache.EXPECT().List("test-ns", gomock.Any()).Return([]*rbacv1.RoleBinding{}, nil)
 			},
 			wantLabel: false,
 		},
@@ -875,8 +875,8 @@ func Test_prtbHandler_handleMigration(t *testing.T) {
 			featureFlagEnabled: true,
 			setupControllers: func(c controllers) {
 				// deleteLegacyBinding will be called
-				// Mock rbController.List to return empty list
-				c.rbController.EXPECT().List(gomock.Any(), gomock.Any()).Return(&rbacv1.RoleBindingList{}, nil)
+				// Mock rbCache.GetByIndex to return empty list
+				c.rbCache.EXPECT().GetByIndex(rbByPRTBOwnerReferenceIndex, "test-prtb").Return([]*rbacv1.RoleBinding{}, nil)
 				// Expect Update to be called with label added
 				c.prtbController.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
 					if obj.Labels[rbac.AggregationFeatureLabel] != "true" {
@@ -914,7 +914,7 @@ func Test_prtbHandler_handleMigration(t *testing.T) {
 			featureFlagEnabled: true,
 			setupControllers: func(c controllers) {
 				// deleteLegacyBinding will be called
-				c.rbController.EXPECT().List(gomock.Any(), gomock.Any()).Return(&rbacv1.RoleBindingList{}, nil)
+				c.rbCache.EXPECT().GetByIndex(rbByPRTBOwnerReferenceIndex, "test-prtb").Return([]*rbacv1.RoleBinding{}, nil)
 				// Expect Update to be called with label added
 				c.prtbController.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
 					if obj.Labels == nil {
@@ -935,18 +935,18 @@ func Test_prtbHandler_handleMigration(t *testing.T) {
 			features.AggregatedRoleTemplates.Set(tt.featureFlagEnabled)
 
 			prtbController := fake.NewMockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList](ctrl)
-			rbController := fake.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl)
+			rbCache := fake.NewMockCacheInterface[*rbacv1.RoleBinding](ctrl)
 
 			if tt.setupControllers != nil {
 				tt.setupControllers(controllers{
 					prtbController: prtbController,
-					rbController:   rbController,
+					rbCache:        rbCache,
 				})
 			}
 
 			h := &prtbHandler{
-				prtbClient:   prtbController,
-				rbController: rbController,
+				prtbClient: prtbController,
+				rbCache:    rbCache,
 			}
 
 			result, err := h.handleMigration(tt.prtb)

@@ -26,6 +26,7 @@ type prtbHandler struct {
 	userController       mgmtv3.UserController
 	rtController         mgmtv3.RoleTemplateController
 	rbController         crbacv1.RoleBindingController
+	rbCache              crbacv1.RoleBindingCache
 	crController         crbacv1.ClusterRoleController
 	crbController        crbacv1.ClusterRoleBindingController
 	prtbClient           mgmtv3.ProjectRoleTemplateBindingController
@@ -40,6 +41,7 @@ func newPRTBHandler(management *config.ManagementContext, clusterManager *cluste
 		userController:    management.Wrangler.Mgmt.User(),
 		rtController:      management.Wrangler.Mgmt.RoleTemplate(),
 		rbController:      management.Wrangler.RBAC.RoleBinding(),
+		rbCache:           management.Wrangler.RBAC.RoleBinding().Cache(),
 		crController:      management.Wrangler.RBAC.ClusterRole(),
 		crbController:     management.Wrangler.RBAC.ClusterRoleBinding(),
 		prtbClient:        management.Wrangler.Mgmt.ProjectRoleTemplateBinding(),
@@ -126,13 +128,14 @@ func (p *prtbHandler) deleteRoleBindings(prtb *v3.ProjectRoleTemplateBinding) er
 		rbac.GetPRTBOwnerLabel(prtb.Name): "true",
 		rbac.AggregationFeatureLabel:      "true",
 	}
-	currentRBs, err := p.rbController.List(prtb.Namespace, metav1.ListOptions{LabelSelector: set.AsSelector().String()})
+
+	currentRBs, err := p.rbCache.List(prtb.Namespace, set.AsSelector())
 	if err != nil {
 		return fmt.Errorf("failed to list role bindings in namespace %s: %w", prtb.Namespace, err)
 	}
 
 	var returnErr error
-	for _, rb := range currentRBs.Items {
+	for _, rb := range currentRBs {
 		returnErr = errors.Join(returnErr, rbac.DeleteNamespacedResource(rb.Namespace, rb.Name, p.rbController))
 	}
 	return returnErr
@@ -332,15 +335,14 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 // deleteLegacyBinding deletes the management plane Role Binding in the project namespace that was created for this PRTB before the aggregation feature was enabled.
 // TODO: Remove this once roletemplate aggregation is the only enabled RBAC model. https://github.com/rancher/rancher/issues/53743
 func (p *prtbHandler) deleteLegacyBinding(prtb *v3.ProjectRoleTemplateBinding) error {
-	rbs, err := p.rbController.List(prtb.Namespace, metav1.ListOptions{LabelSelector: labels.Everything().String()})
+	// get role bindings who's owner reference is this PRTB
+	rbs, err := p.rbCache.GetByIndex(rbByPRTBOwnerReferenceIndex, prtb.Name)
 	if err != nil {
 		return fmt.Errorf("failed to list role bindings in cluster namespace %s: %w", prtb.Namespace, err)
 	}
 	var returnErr error
-	for _, rb := range rbs.Items {
-		if strings.HasPrefix(rb.Name, prtb.Name) {
-			returnErr = errors.Join(returnErr, rbac.DeleteNamespacedResource(prtb.Namespace, fmt.Sprintf("%s-%s", prtb.Name, rb.Name), p.rbController))
-		}
+	for _, rb := range rbs {
+		returnErr = errors.Join(returnErr, rbac.DeleteNamespacedResource(prtb.Namespace, rb.Name, p.rbController))
 	}
 	return returnErr
 }

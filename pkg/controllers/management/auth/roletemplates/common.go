@@ -369,9 +369,6 @@ func handleAggregationMigration[T any](
 ) (T, error) {
 	labelCopy := make(map[string]string)
 	maps.Copy(labelCopy, labels)
-	if labelCopy == nil {
-		labelCopy = map[string]string{}
-	}
 	hasLabel := labelCopy[rbac.AggregationFeatureLabel] == "true"
 
 	if !features.AggregatedRoleTemplates.Enabled() {

@@ -986,7 +986,7 @@ func Test_crtbHandler_handleMigration(t *testing.T) {
 	type controllers struct {
 		crtbController *fake.MockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList]
 		rbController   *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]
-		projectCache   *fake.MockCacheInterface[*v3.Project]
+		rbCache        *fake.MockCacheInterface[*rbacv1.RoleBinding]
 	}
 
 	tests := []struct {
@@ -1048,9 +1048,9 @@ func Test_crtbHandler_handleMigration(t *testing.T) {
 			setupControllers: func(c controllers) {
 				// deleteLegacyRoleBindings will be called
 				// Mock projectCache.List to return empty list
-				c.projectCache.EXPECT().List(gomock.Any(), gomock.Any()).Return([]*v3.Project{}, nil)
+				c.rbCache.EXPECT().GetByIndex(rbByCRTBOwnerReferenceIndex, "test-crtb").Return([]*rbacv1.RoleBinding{}, nil)
 				// Mock rbController.List for cluster namespace
-				c.rbController.EXPECT().List(gomock.Any(), gomock.Any()).Return(&rbacv1.RoleBindingList{}, nil)
+				c.rbCache.EXPECT().List("", gomock.Any()).Return([]*rbacv1.RoleBinding{}, nil)
 				// Expect Update to be called with label added
 				c.crtbController.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
 					if obj.Labels[rbac.AggregationFeatureLabel] != "true" {
@@ -1089,8 +1089,8 @@ func Test_crtbHandler_handleMigration(t *testing.T) {
 			featureFlagEnabled: true,
 			setupControllers: func(c controllers) {
 				// deleteLegacyRoleBindings will be called
-				c.projectCache.EXPECT().List(gomock.Any(), gomock.Any()).Return([]*v3.Project{}, nil)
-				c.rbController.EXPECT().List(gomock.Any(), gomock.Any()).Return(&rbacv1.RoleBindingList{}, nil)
+				c.rbCache.EXPECT().GetByIndex(rbByCRTBOwnerReferenceIndex, "test-crtb").Return([]*rbacv1.RoleBinding{}, nil)
+				c.rbCache.EXPECT().List("", gomock.Any()).Return([]*rbacv1.RoleBinding{}, nil)
 				// Expect Update to be called with label added
 				c.crtbController.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
 					if obj.Labels == nil {
@@ -1112,20 +1112,20 @@ func Test_crtbHandler_handleMigration(t *testing.T) {
 
 			crtbController := fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
 			rbController := fake.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl)
-			projectCache := fake.NewMockCacheInterface[*v3.Project](ctrl)
+			rbCache := fake.NewMockCacheInterface[*rbacv1.RoleBinding](ctrl)
 
 			if tt.setupControllers != nil {
 				tt.setupControllers(controllers{
 					crtbController: crtbController,
 					rbController:   rbController,
-					projectCache:   projectCache,
+					rbCache:        rbCache,
 				})
 			}
 
 			h := &crtbHandler{
 				crtbClient:   crtbController,
 				rbController: rbController,
-				projectCache: projectCache,
+				rbCache:      rbCache,
 				s:            status.NewStatus(),
 			}
 
