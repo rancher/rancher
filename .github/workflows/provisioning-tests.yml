@@ -57,28 +57,28 @@ jobs:
         with:
           path: "/tmp"
           merge-multiple: true
-      - name: Load rancher/rancher image
+      - name: Load images
+        shell: bash
         run: |
-          image_id=$(docker load --input /tmp/rancher-linux-amd64.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
-          if [ -z "$image_id" ]; then
+          source scripts/package-env
+
+          image_server_id=$(docker load --input /tmp/rancher-linux-amd64.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
+          if [ -z "$image_server_id" ]; then
             echo "Error: Failed to load image from tarball!"
             exit 1
           fi
 
-          AMD_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "rancher/rancher:.*amd64.*$" | head -n 1)
-          docker tag "$image_id" ${{ env.IMAGE }}:${{ env.TAG }}
-          echo "the image created is ${{ env.IMAGE }}:${{ env.TAG }}"
-      - name: Load rancher/rancher-agent image
-        run: |
+          docker tag "$image_server_id" "${IMAGE_TAG}"
+          docker image ls
+
           image_agent_id=$(docker load --input /tmp/rancher-agent-linux-amd64.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
           if [ -z "$image_agent_id" ]; then
             echo "Error: Failed to load image from tarball!"
             exit 1
           fi
 
-          AMD_IMAGE_AGENT=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "rancher/rancher-agent:.*amd64.*$" | head -n 1)
-          docker tag "$image_agent_id" ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}
-          echo "the image created is ${{ env.REGISTRY }}/${{ env.IMAGE_AGENT }}:${{ env.TAG }}"
+          docker tag "$image_agent_id" "{$IMAGE_AGENT_TAG}"
+          docker image ls
       - name: Run tests
         run: ./.dapper provisioning-tests
         env:
