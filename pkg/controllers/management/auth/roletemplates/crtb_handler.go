@@ -40,6 +40,7 @@ type crtbHandler struct {
 	crbController        wrbacv1.ClusterRoleBindingController
 	crtbCache            mgmtv3.ClusterRoleTemplateBindingCache
 	crtbClient           mgmtv3.ClusterRoleTemplateBindingController
+	projectCache         mgmtv3.ProjectCache
 	clusterController    mgmtv3.ClusterController
 	projectCache         mgmtv3.ProjectCache
 	clusterManager       *clustermanager.Manager
@@ -58,6 +59,7 @@ func newCRTBHandler(management *config.ManagementContext, clusterManager *cluste
 		crbController:     management.Wrangler.RBAC.ClusterRoleBinding(),
 		crtbCache:         management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
 		crtbClient:        management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
+		projectCache:      management.Wrangler.Mgmt.Project().Cache(),
 		clusterController: management.Wrangler.Mgmt.Cluster(),
 		projectCache:      management.Wrangler.Mgmt.Project().Cache(),
 		clusterManager:    clusterManager,
@@ -240,11 +242,23 @@ func (c *crtbHandler) getDesiredRoleBindings(crtb *v3.ClusterRoleTemplateBinding
 	projectManagementRoleName := rbac.ProjectManagementPlaneClusterRoleNameFor(crtb.RoleTemplateName)
 	cr, err := c.crController.Get(rbac.AggregatedClusterRoleNameFor(projectManagementRoleName), metav1.GetOptions{})
 	if err == nil && cr != nil {
-		rb, err := rbac.BuildAggregatingRoleBindingFromRTB(crtb, projectManagementRoleName)
+		// Create the project management role for each project in the cluster
+		projects, err := c.projectCache.List(crtb.ClusterName, labels.Everything())
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to list projects: %w", err)
 		}
-		desiredRBs[rb.Name] = rb
+
+		for _, project := range projects {
+			rb, err := rbac.BuildAggregatingRoleBindingFromRTB(crtb, projectManagementRoleName)
+			if err != nil {
+				return nil, err
+			}
+			// Give the role binding a unique name based on the project and role, and set the namespace to the project backing namespace
+			rb.Name = rbac.NameForRoleBinding(project.GetProjectBackingNamespace(), rb.RoleRef, rb.Subjects[0])
+			// Need to create the role binding in the project backing namespace
+			rb.Namespace = project.GetProjectBackingNamespace()
+			desiredRBs[rb.Name] = rb
+		}
 	} else if !apierrors.IsNotFound(err) {
 		return nil, err
 	}
