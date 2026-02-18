@@ -370,6 +370,16 @@ func Test_crtbHandler_getDesiredRoleBindings(t *testing.T) {
 			want: map[string]*rbacv1.RoleBinding{},
 		},
 		{
+			name: "found project management plane role with no projects",
+			crtb: defaultCRTB.DeepCopy(),
+			setupControllers: func(c controllers) {
+				c.crController.EXPECT().Get(projectMGMT, metav1.GetOptions{}).Return(&rbacv1.ClusterRole{}, nil)
+				c.projectCache.EXPECT().List("test-cluster", gomock.Any()).Return([]*v3.Project{}, nil)
+				c.crController.EXPECT().Get(clusterMGMT, metav1.GetOptions{}).Return(nil, errNotFound)
+			},
+			want: map[string]*rbacv1.RoleBinding{},
+		},
+		{
 			name: "found project management plane role with single project",
 			crtb: defaultCRTB.DeepCopy(),
 			setupControllers: func(c controllers) {
