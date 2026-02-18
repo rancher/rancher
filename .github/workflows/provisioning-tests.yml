@@ -77,7 +77,7 @@ jobs:
             exit 1
           fi
 
-          docker tag "$image_agent_id" "{$IMAGE_AGENT_TAG}"
+          docker tag "$image_agent_id" "${IMAGE_AGENT_TAG}"
           docker image ls
       - name: Run tests
         run: ./.dapper provisioning-tests

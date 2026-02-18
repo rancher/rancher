@@ -39,6 +39,7 @@ jobs:
           path: "/tmp"
           merge-multiple: true
       - name: Load images
+        shell: bash
         run: |
           source scripts/package-env
 
@@ -57,7 +58,7 @@ jobs:
             exit 1
           fi
 
-          docker tag "$image_agent_id" "{$IMAGE_AGENT_TAG}"
+          docker tag "$image_agent_id" "${IMAGE_AGENT_TAG}"
           docker image ls
       - name: Install k3d
         run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=${{ env.K3D_VERSION }} bash
