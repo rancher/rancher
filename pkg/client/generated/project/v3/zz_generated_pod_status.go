@@ -2,6 +2,7 @@ package client
 
 const (
 	PodStatusType                             = "podStatus"
+	PodStatusFieldAllocatedResources          = "allocatedResources"
 	PodStatusFieldConditions                  = "conditions"
 	PodStatusFieldContainerStatuses           = "containerStatuses"
 	PodStatusFieldEphemeralContainerStatuses  = "ephemeralContainerStatuses"
@@ -19,10 +20,12 @@ const (
 	PodStatusFieldReason                      = "reason"
 	PodStatusFieldResize                      = "resize"
 	PodStatusFieldResourceClaimStatuses       = "resourceClaimStatuses"
+	PodStatusFieldResources                   = "resources"
 	PodStatusFieldStartTime                   = "startTime"
 )
 
 type PodStatus struct {
+	AllocatedResources          map[string]string               `json:"allocatedResources,omitempty" yaml:"allocatedResources,omitempty"`
 	Conditions                  []PodCondition                  `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	ContainerStatuses           []ContainerStatus               `json:"containerStatuses,omitempty" yaml:"containerStatuses,omitempty"`
 	EphemeralContainerStatuses  []ContainerStatus               `json:"ephemeralContainerStatuses,omitempty" yaml:"ephemeralContainerStatuses,omitempty"`
@@ -40,5 +43,6 @@ type PodStatus struct {
 	Reason                      string                          `json:"reason,omitempty" yaml:"reason,omitempty"`
 	Resize                      string                          `json:"resize,omitempty" yaml:"resize,omitempty"`
 	ResourceClaimStatuses       []PodResourceClaimStatus        `json:"resourceClaimStatuses,omitempty" yaml:"resourceClaimStatuses,omitempty"`
+	Resources                   *ResourceRequirements           `json:"resources,omitempty" yaml:"resources,omitempty"`
 	StartTime                   string                          `json:"startTime,omitempty" yaml:"startTime,omitempty"`
 }
