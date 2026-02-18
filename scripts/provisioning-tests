@@ -263,8 +263,8 @@ echo "Waiting up to 5 minutes for capi-controller-manager deployment"
   --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
   --message "capi-controller-manager was not available after {{elapsed}} seconds" `# Print this progress message` \
   --exit-command "dump_rancher_logs" `# Dump logs to find out why capi-controller-manager did not start` \
-  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml get ns capi-system &>/dev/null \
-    && kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n capi-system deploy/capi-controller-manager &>/dev/null"
+  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml get ns cattle-capi-system &>/dev/null \
+    && kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-capi-system deploy/capi-controller-manager &>/dev/null"
 
 # only push the image if we're not using the default image:tag
 if [ "${CATTLE_AGENT_IMAGE}" != "rancher/rancher-agent:head" ]; then
