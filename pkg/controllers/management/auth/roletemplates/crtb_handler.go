@@ -202,7 +202,7 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, loc
 		return err
 	}
 
-	currentRBs, err := c.rbController.List(crtb.Namespace, metav1.ListOptions{LabelSelector: rbac.GetCRTBOwnerLabel(crtb.Name)})
+	currentRBs, err := c.rbController.List(metav1.NamespaceAll, metav1.ListOptions{LabelSelector: rbac.GetCRTBOwnerLabel(crtb.Name)})
 	if err != nil {
 		c.s.AddCondition(localConditions, condition, failedToListExistingRoleBindings, err)
 		return err
@@ -337,7 +337,8 @@ func (c *crtbHandler) removeRoleBindings(crtb *v3.ClusterRoleTemplateBinding) er
 		rbac.GetCRTBOwnerLabel(crtb.Name): "true",
 		rbac.AggregationFeatureLabel:      "true",
 	})
-	currentRBs, err := c.rbController.List(crtb.Namespace, metav1.ListOptions{LabelSelector: set.AsSelector().String()})
+	// List all RoleBindings with the CRTB owner label
+	currentRBs, err := c.rbController.List(metav1.NamespaceAll, metav1.ListOptions{LabelSelector: set.AsSelector().String()})
 	if err != nil {
 		c.s.AddCondition(&crtb.Status.LocalConditions, condition, failedToListExistingRoleBindings, err)
 		return err
@@ -345,7 +346,7 @@ func (c *crtbHandler) removeRoleBindings(crtb *v3.ClusterRoleTemplateBinding) er
 
 	var returnErr error
 	for _, rb := range currentRBs.Items {
-		err = rbac.DeleteNamespacedResource(crtb.Namespace, rb.Name, c.rbController)
+		err = rbac.DeleteNamespacedResource(rb.Namespace, rb.Name, c.rbController)
 		if err != nil {
 			c.s.AddCondition(&crtb.Status.LocalConditions, condition, failedToDeleteRoleBinding, err)
 			returnErr = errors.Join(returnErr, err)

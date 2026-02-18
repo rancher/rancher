@@ -760,6 +760,10 @@ func Test_crtbHandler_removeRoleBindings(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	errDefault := fmt.Errorf("error")
 
+	listOptions := metav1.ListOptions{
+		LabelSelector: "authz.cluster.cattle.io/crtb-owner-test-crtb=true,management.cattle.io/roletemplate-aggregation=true",
+	}
+
 	// Define test role bindings for reuse
 	testRoleBinding1 := rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
@@ -788,21 +792,14 @@ func Test_crtbHandler_removeRoleBindings(t *testing.T) {
 
 	tests := []struct {
 		name             string
-		crtb             *v3.ClusterRoleTemplateBinding
 		setupControllers func(controllers)
 		wantErr          bool
 		wantedConditions []reducedCondition
 	}{
 		{
 			name: "error listing role bindings",
-			crtb: &v3.ClusterRoleTemplateBinding{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "test-namespace",
-					Name:      "test-crtb",
-				},
-			},
 			setupControllers: func(c controllers) {
-				c.rbController.EXPECT().List("test-namespace", gomock.Any()).Return(nil, errDefault)
+				c.rbController.EXPECT().List(metav1.NamespaceAll, listOptions).Return(nil, errDefault)
 			},
 			wantErr: true,
 			wantedConditions: []reducedCondition{
@@ -814,14 +811,8 @@ func Test_crtbHandler_removeRoleBindings(t *testing.T) {
 		},
 		{
 			name: "no role bindings to remove",
-			crtb: &v3.ClusterRoleTemplateBinding{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "test-namespace",
-					Name:      "test-crtb",
-				},
-			},
 			setupControllers: func(c controllers) {
-				c.rbController.EXPECT().List("test-namespace", gomock.Any()).Return(&rbacv1.RoleBindingList{
+				c.rbController.EXPECT().List(metav1.NamespaceAll, listOptions).Return(&rbacv1.RoleBindingList{
 					Items: []rbacv1.RoleBinding{},
 				}, nil)
 			},
@@ -835,14 +826,8 @@ func Test_crtbHandler_removeRoleBindings(t *testing.T) {
 		},
 		{
 			name: "successfully remove single role binding",
-			crtb: &v3.ClusterRoleTemplateBinding{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "test-namespace",
-					Name:      "test-crtb",
-				},
-			},
 			setupControllers: func(c controllers) {
-				c.rbController.EXPECT().List("test-namespace", gomock.Any()).Return(&rbacv1.RoleBindingList{
+				c.rbController.EXPECT().List(metav1.NamespaceAll, listOptions).Return(&rbacv1.RoleBindingList{
 					Items: []rbacv1.RoleBinding{testRoleBinding1},
 				}, nil)
 				c.rbController.EXPECT().Delete("test-namespace", "rb-1", &metav1.DeleteOptions{}).Return(nil)
@@ -857,14 +842,8 @@ func Test_crtbHandler_removeRoleBindings(t *testing.T) {
 		},
 		{
 			name: "successfully remove multiple role bindings",
-			crtb: &v3.ClusterRoleTemplateBinding{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "test-namespace",
-					Name:      "test-crtb",
-				},
-			},
 			setupControllers: func(c controllers) {
-				c.rbController.EXPECT().List("test-namespace", gomock.Any()).Return(&rbacv1.RoleBindingList{
+				c.rbController.EXPECT().List(metav1.NamespaceAll, listOptions).Return(&rbacv1.RoleBindingList{
 					Items: []rbacv1.RoleBinding{testRoleBinding1, testRoleBinding2},
 				}, nil)
 				c.rbController.EXPECT().Delete("test-namespace", "rb-1", &metav1.DeleteOptions{}).Return(nil)
@@ -880,14 +859,8 @@ func Test_crtbHandler_removeRoleBindings(t *testing.T) {
 		},
 		{
 			name: "error deleting one role binding",
-			crtb: &v3.ClusterRoleTemplateBinding{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "test-namespace",
-					Name:      "test-crtb",
-				},
-			},
 			setupControllers: func(c controllers) {
-				c.rbController.EXPECT().List("test-namespace", gomock.Any()).Return(&rbacv1.RoleBindingList{
+				c.rbController.EXPECT().List(metav1.NamespaceAll, listOptions).Return(&rbacv1.RoleBindingList{
 					Items: []rbacv1.RoleBinding{testRoleBinding1},
 				}, nil)
 				c.rbController.EXPECT().Delete("test-namespace", "rb-1", &metav1.DeleteOptions{}).Return(errDefault)
@@ -902,14 +875,8 @@ func Test_crtbHandler_removeRoleBindings(t *testing.T) {
 		},
 		{
 			name: "error deleting multiple role bindings",
-			crtb: &v3.ClusterRoleTemplateBinding{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "test-namespace",
-					Name:      "test-crtb",
-				},
-			},
 			setupControllers: func(c controllers) {
-				c.rbController.EXPECT().List("test-namespace", gomock.Any()).Return(&rbacv1.RoleBindingList{
+				c.rbController.EXPECT().List(metav1.NamespaceAll, listOptions).Return(&rbacv1.RoleBindingList{
 					Items: []rbacv1.RoleBinding{testRoleBinding1, testRoleBinding2},
 				}, nil)
 				c.rbController.EXPECT().Delete("test-namespace", "rb-1", &metav1.DeleteOptions{}).Return(errDefault)
@@ -925,14 +892,8 @@ func Test_crtbHandler_removeRoleBindings(t *testing.T) {
 		},
 		{
 			name: "partial success - one deletion succeeds, one fails",
-			crtb: &v3.ClusterRoleTemplateBinding{
-				ObjectMeta: metav1.ObjectMeta{
-					Namespace: "test-namespace",
-					Name:      "test-crtb",
-				},
-			},
 			setupControllers: func(c controllers) {
-				c.rbController.EXPECT().List("test-namespace", gomock.Any()).Return(&rbacv1.RoleBindingList{
+				c.rbController.EXPECT().List(metav1.NamespaceAll, listOptions).Return(&rbacv1.RoleBindingList{
 					Items: []rbacv1.RoleBinding{testRoleBinding1, testRoleBinding2},
 				}, nil)
 				c.rbController.EXPECT().Delete("test-namespace", "rb-1", &metav1.DeleteOptions{}).Return(nil)
@@ -964,16 +925,22 @@ func Test_crtbHandler_removeRoleBindings(t *testing.T) {
 				rbController: rbController,
 			}
 
-			err := c.removeRoleBindings(tt.crtb)
+			crtb := v3.ClusterRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-namespace",
+					Name:      "test-crtb",
+				},
+			}
+			err := c.removeRoleBindings(&crtb)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("crtbHandler.removeRoleBindings() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
 			// Check the conditions were set correctly
-			assert.Len(t, tt.crtb.Status.LocalConditions, len(tt.wantedConditions))
+			assert.Len(t, crtb.Status.LocalConditions, len(tt.wantedConditions))
 			for i, wantedCondition := range tt.wantedConditions {
-				assert.Equal(t, wantedCondition.reason, tt.crtb.Status.LocalConditions[i].Reason)
-				assert.Equal(t, wantedCondition.status, tt.crtb.Status.LocalConditions[i].Status)
+				assert.Equal(t, wantedCondition.reason, crtb.Status.LocalConditions[i].Reason)
+				assert.Equal(t, wantedCondition.status, crtb.Status.LocalConditions[i].Status)
 			}
 		})
 	}
