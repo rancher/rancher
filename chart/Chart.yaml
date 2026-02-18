@@ -3,7 +3,7 @@ name: rancher
 description: Install Rancher Server to manage Kubernetes clusters across providers.
 version: %VERSION%
 appVersion: %APP_VERSION%
-kubeVersion: < 1.35.0-0
+kubeVersion: < 1.36.0-0
 home: https://rancher.com
 icon: https://raw.githubusercontent.com/rancher/ui/master/public/assets/images/logos/welcome-cow.svg
 keywords:
