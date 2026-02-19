@@ -42,7 +42,6 @@ type crtbHandler struct {
 	crtbClient           mgmtv3.ClusterRoleTemplateBindingController
 	projectCache         mgmtv3.ProjectCache
 	clusterController    mgmtv3.ClusterController
-	projectCache         mgmtv3.ProjectCache
 	clusterManager       *clustermanager.Manager
 	impersonationHandler *impersonationHandler
 }
@@ -61,7 +60,6 @@ func newCRTBHandler(management *config.ManagementContext, clusterManager *cluste
 		crtbClient:        management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
 		projectCache:      management.Wrangler.Mgmt.Project().Cache(),
 		clusterController: management.Wrangler.Mgmt.Cluster(),
-		projectCache:      management.Wrangler.Mgmt.Project().Cache(),
 		clusterManager:    clusterManager,
 		impersonationHandler: &impersonationHandler{
 			crtbCache: management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
@@ -248,16 +246,17 @@ func (c *crtbHandler) getDesiredRoleBindings(crtb *v3.ClusterRoleTemplateBinding
 			return nil, fmt.Errorf("failed to list projects: %w", err)
 		}
 
+		rb, err := rbac.BuildAggregatingRoleBindingFromRTB(crtb, projectManagementRoleName)
+		if err != nil {
+			return nil, err
+		}
 		for _, project := range projects {
-			rb, err := rbac.BuildAggregatingRoleBindingFromRTB(crtb, projectManagementRoleName)
-			if err != nil {
-				return nil, err
-			}
+			rbCopy := rb.DeepCopy()
 			// Give the role binding a unique name based on the project and role, and set the namespace to the project backing namespace
-			rb.Name = rbac.NameForRoleBinding(project.GetProjectBackingNamespace(), rb.RoleRef, rb.Subjects[0])
+			rbCopy.Name = rbac.NameForRoleBinding(project.GetProjectBackingNamespace(), rbCopy.RoleRef, rbCopy.Subjects[0])
 			// Need to create the role binding in the project backing namespace
-			rb.Namespace = project.GetProjectBackingNamespace()
-			desiredRBs[rb.Name] = rb
+			rbCopy.Namespace = project.GetProjectBackingNamespace()
+			desiredRBs[rbCopy.Name] = rbCopy
 		}
 	} else if !apierrors.IsNotFound(err) {
 		return nil, err
