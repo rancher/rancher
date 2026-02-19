@@ -1,7 +1,6 @@
 package roletemplates
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
@@ -13,10 +12,6 @@ import (
 	"go.uber.org/mock/gomock"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
-
-var (
-	errDefault = fmt.Errorf("error")
 )
 
 func Test_reconcileSubject(t *testing.T) {
@@ -104,7 +99,7 @@ func Test_reconcileSubject(t *testing.T) {
 				UserPrincipalName: "test-principal",
 			},
 			setupUserManager: func(m *userMocks.MockManager) {
-				m.EXPECT().EnsureUser("test-principal", "display-name").Return(nil, fmt.Errorf("error"))
+				m.EXPECT().EnsureUser("test-principal", "display-name").Return(nil, errDefault)
 			},
 			want: &v3.ProjectRoleTemplateBinding{
 				ObjectMeta: metav1.ObjectMeta{
@@ -140,7 +135,7 @@ func Test_reconcileSubject(t *testing.T) {
 				UserPrincipalName: "",
 			},
 			setupUserController: func(m *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList]) {
-				m.EXPECT().Get("test-user", metav1.GetOptions{}).Return(nil, fmt.Errorf("error"))
+				m.EXPECT().Get("test-user", metav1.GetOptions{}).Return(nil, errDefault)
 			},
 			want: &v3.ProjectRoleTemplateBinding{
 				UserName:          "test-user",
@@ -224,7 +219,7 @@ func Test_reconcileBindings(t *testing.T) {
 		{
 			name: "error getting cluster role",
 			setupCRController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
-				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, fmt.Errorf("error"))
+				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, errDefault)
 			},
 			prtb: &v3.ProjectRoleTemplateBinding{
 				RoleTemplateName: "test-rt",

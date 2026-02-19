@@ -40,8 +40,8 @@ type crtbHandler struct {
 	crbController        wrbacv1.ClusterRoleBindingController
 	crtbCache            mgmtv3.ClusterRoleTemplateBindingCache
 	crtbClient           mgmtv3.ClusterRoleTemplateBindingController
-	clusterController    mgmtv3.ClusterController
 	projectCache         mgmtv3.ProjectCache
+	clusterController    mgmtv3.ClusterController
 	clusterManager       *clustermanager.Manager
 	impersonationHandler *impersonationHandler
 }
@@ -58,8 +58,8 @@ func newCRTBHandler(management *config.ManagementContext, clusterManager *cluste
 		crbController:     management.Wrangler.RBAC.ClusterRoleBinding(),
 		crtbCache:         management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
 		crtbClient:        management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
-		clusterController: management.Wrangler.Mgmt.Cluster(),
 		projectCache:      management.Wrangler.Mgmt.Project().Cache(),
+		clusterController: management.Wrangler.Mgmt.Cluster(),
 		clusterManager:    clusterManager,
 		impersonationHandler: &impersonationHandler{
 			crtbCache: management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
@@ -200,7 +200,7 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, loc
 		return err
 	}
 
-	currentRBs, err := c.rbController.List(crtb.Namespace, metav1.ListOptions{LabelSelector: rbac.GetCRTBOwnerLabel(crtb.Name)})
+	currentRBs, err := c.rbController.List(metav1.NamespaceAll, metav1.ListOptions{LabelSelector: rbac.GetCRTBOwnerLabel(crtb.Name)})
 	if err != nil {
 		c.s.AddCondition(localConditions, condition, failedToListExistingRoleBindings, err)
 		return err
@@ -240,11 +240,24 @@ func (c *crtbHandler) getDesiredRoleBindings(crtb *v3.ClusterRoleTemplateBinding
 	projectManagementRoleName := rbac.ProjectManagementPlaneClusterRoleNameFor(crtb.RoleTemplateName)
 	cr, err := c.crController.Get(rbac.AggregatedClusterRoleNameFor(projectManagementRoleName), metav1.GetOptions{})
 	if err == nil && cr != nil {
+		// Create the project management role for each project in the cluster
+		projects, err := c.projectCache.List(crtb.ClusterName, labels.Everything())
+		if err != nil {
+			return nil, fmt.Errorf("failed to list projects: %w", err)
+		}
+
 		rb, err := rbac.BuildAggregatingRoleBindingFromRTB(crtb, projectManagementRoleName)
 		if err != nil {
 			return nil, err
 		}
-		desiredRBs[rb.Name] = rb
+		for _, project := range projects {
+			rbCopy := rb.DeepCopy()
+			// Give the role binding a unique name based on the project and role, and set the namespace to the project backing namespace
+			rbCopy.Name = rbac.NameForRoleBinding(project.GetProjectBackingNamespace(), rbCopy.RoleRef, rbCopy.Subjects[0])
+			// Need to create the role binding in the project backing namespace
+			rbCopy.Namespace = project.GetProjectBackingNamespace()
+			desiredRBs[rbCopy.Name] = rbCopy
+		}
 	} else if !apierrors.IsNotFound(err) {
 		return nil, err
 	}
@@ -323,7 +336,8 @@ func (c *crtbHandler) removeRoleBindings(crtb *v3.ClusterRoleTemplateBinding) er
 		rbac.GetCRTBOwnerLabel(crtb.Name): "true",
 		rbac.AggregationFeatureLabel:      "true",
 	})
-	currentRBs, err := c.rbController.List(crtb.Namespace, metav1.ListOptions{LabelSelector: set.AsSelector().String()})
+	// List all RoleBindings with the CRTB owner label
+	currentRBs, err := c.rbController.List(metav1.NamespaceAll, metav1.ListOptions{LabelSelector: set.AsSelector().String()})
 	if err != nil {
 		c.s.AddCondition(&crtb.Status.LocalConditions, condition, failedToListExistingRoleBindings, err)
 		return err
@@ -331,7 +345,7 @@ func (c *crtbHandler) removeRoleBindings(crtb *v3.ClusterRoleTemplateBinding) er
 
 	var returnErr error
 	for _, rb := range currentRBs.Items {
-		err = rbac.DeleteNamespacedResource(crtb.Namespace, rb.Name, c.rbController)
+		err = rbac.DeleteNamespacedResource(rb.Namespace, rb.Name, c.rbController)
 		if err != nil {
 			c.s.AddCondition(&crtb.Status.LocalConditions, condition, failedToDeleteRoleBinding, err)
 			returnErr = errors.Join(returnErr, err)

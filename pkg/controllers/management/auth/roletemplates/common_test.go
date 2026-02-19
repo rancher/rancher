@@ -17,6 +17,7 @@ import (
 
 var (
 	errNotFound    = apierrors.NewNotFound(schema.GroupResource{}, "error")
+	errDefault     = fmt.Errorf("error")
 	defaultSubject = rbacv1.Subject{
 		Kind:     "User",
 		Name:     "test-user",
