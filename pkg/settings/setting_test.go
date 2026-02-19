@@ -203,3 +203,18 @@ func TestGetRancherVersion(t *testing.T) {
 		assert.Equal(t, value, result)
 	}
 }
+
+func TestKDMUseLocalData(t *testing.T) {
+	original := KDMUseLocalData.Get()
+	defer func() {
+		require.NoError(t, KDMUseLocalData.Set(original))
+	}()
+
+	assert.Equal(t, "false", KDMUseLocalData.Get(), "default value should be false")
+
+	require.NoError(t, KDMUseLocalData.Set("true"))
+	assert.Equal(t, "true", KDMUseLocalData.Get())
+
+	require.NoError(t, KDMUseLocalData.Set("false"))
+	assert.Equal(t, "false", KDMUseLocalData.Get())
+}

@@ -72,6 +72,9 @@ func Refresh(ctx context.Context) error {
 type DynamicSource struct{}
 
 func (d *DynamicSource) URL() string {
+	if settings.KDMUseLocalData.Get() == "true" {
+		return "/var/lib/rancher-data/driver-metadata/data.json"
+	}
 	url, _ := GetURLAndInterval()
 	return url
 }
