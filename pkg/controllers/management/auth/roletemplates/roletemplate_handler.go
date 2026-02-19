@@ -38,6 +38,9 @@ var (
 
 type roleTemplateHandler struct {
 	crController      crbacv1.ClusterRoleController
+	rController       crbacv1.RoleController
+	rtController      mgmtcontroller.RoleTemplateController
+	projectCache      mgmtcontroller.ProjectCache
 	clusterController mgmtcontroller.ClusterController
 	clusterManager    *clustermanager.Manager
 }
@@ -45,6 +48,9 @@ type roleTemplateHandler struct {
 func newRoleTemplateHandler(w *wrangler.Context, clusterManager *clustermanager.Manager) *roleTemplateHandler {
 	return &roleTemplateHandler{
 		crController:      w.RBAC.ClusterRole(),
+		rController:       w.RBAC.Role(),
+		rtController:      w.Mgmt.RoleTemplate(),
+		projectCache:      w.Mgmt.Project().Cache(),
 		clusterController: w.Mgmt.Cluster(),
 		clusterManager:    clusterManager,
 	}
@@ -56,11 +62,35 @@ func (r *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.RoleT
 		return nil, nil
 	}
 
-	if !features.AggregatedRoleTemplates.Enabled() {
-		// If the feature is disabled, ensure any existing cluster roles created for aggregation are deleted.
-		return rt, r.deleteClusterRoles(rt)
+	var err error
+	rt, err = r.handleMigration(rt)
+	if err != nil {
+		return rt, err
 	}
+
+	if !features.AggregatedRoleTemplates.Enabled() {
+		return rt, nil
+	}
+
 	return rt, r.reconcileClusterRoles(rt)
+}
+
+// handleMigration handles the migration of Role Templates when toggling the AggregatedRoleTemplates feature flag.
+// If the feature flag is disabled, it removes the aggregation label and deletes any cluster roles that were created for aggregation.
+// If the feature flag is enabled, it adds the aggregation label and deletes any legacy roles that were created before aggregation.
+// TODO: To be removed once roletemplate aggregation is the only enabled RBAC model. https://github.com/rancher/rancher/issues/53743
+func (r *roleTemplateHandler) handleMigration(rt *v3.RoleTemplate) (*v3.RoleTemplate, error) {
+	return handleAggregationMigration(
+		rt,
+		rt.Labels,
+		func(resource *v3.RoleTemplate, labels map[string]string) (*v3.RoleTemplate, error) {
+			rtCopy := resource.DeepCopy()
+			rtCopy.Labels = labels
+			return r.rtController.Update(rtCopy)
+		},
+		r.deleteClusterRoles,
+		r.deleteLegacyRoles,
+	)
 }
 
 // reconcileClusterRoles is responsible for ensuring the right set of Cluster Roles exist. It deletes any owned by the Role Template that shouldn't exist.
@@ -227,6 +257,32 @@ func (r *roleTemplateHandler) gatherRules(rt *v3.RoleTemplate) ([]rbacv1.PolicyR
 	}
 
 	return rt.Rules, nil
+}
+
+// deleteLegacyRoles deletes any Roles that were created for this RoleTemplate before the aggregation feature was enabled.
+// It deletes the cluster management plane role in each cluster namespace and the project management plane role in each project namespace for each cluster.
+// If the Roles aren't found, no error is returned.
+// TODO: Remove this once roletemplate aggregation is the only enabled RBAC model. https://github.com/rancher/rancher/issues/53743
+func (r *roleTemplateHandler) deleteLegacyRoles(rt *v3.RoleTemplate) error {
+	clusters, err := r.clusterController.List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	var returnedErrors error
+	for _, cluster := range clusters.Items {
+		// Delete the cluster management plane role created by the legacy role template controllers
+		returnedErrors = errors.Join(returnedErrors, rbac.DeleteNamespacedResource(cluster.Name, rt.Name, r.rController))
+		projects, err := r.projectCache.List(cluster.Name, labels.Everything())
+		if err != nil {
+			return err
+		}
+		// Delete each of the project management plane roles create by the legacy role template controllers
+		for _, project := range projects {
+			returnedErrors = errors.Join(returnedErrors, rbac.DeleteNamespacedResource(project.GetProjectBackingNamespace(), rt.Name, r.rController))
+		}
+	}
+	return returnedErrors
 }
 
 // OnRemove deletes all the ClusterRoles created in each cluster for the RoleTemplate

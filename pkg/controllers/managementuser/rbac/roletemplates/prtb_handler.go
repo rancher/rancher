@@ -139,7 +139,7 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 			Subjects: []rbacv1.Subject{subject},
 		}
 
-		if err := p.ensureOnlyDesiredRoleBindingExists(rb, rbac.GetPRTBOwnerLabel(prtb.Name)); err != nil {
+		if err := p.ensureOnlyDesiredRoleBindingExists(rb, rbac.GetPRTBOwnerLabel(prtb.Name), rbac.GetRTBLabel(prtb.ObjectMeta)); err != nil {
 			return err
 		}
 	}
@@ -183,7 +183,7 @@ func (p *prtbHandler) reconcileClusterRoleBindings(prtb *v3.ProjectRoleTemplateB
 
 	crbs = append(crbs, namespaceCRBs...)
 
-	return p.ensureOnlyDesiredClusterRoleBindingsExists(crbs, rbac.GetPRTBOwnerLabel(prtb.Name))
+	return p.ensureOnlyDesiredClusterRoleBindingsExists(crbs, rbac.GetPRTBOwnerLabel(prtb.Name), rbac.GetRTBLabel(prtb.ObjectMeta))
 }
 
 // buildNamespaceBindings builds the Cluster Role Bindings used to provide access to the project's namespaces.
@@ -263,21 +263,29 @@ func (p *prtbHandler) buildNamespaceBindings(prtb *v3.ProjectRoleTemplateBinding
 
 // ensureOnlyDesiredClusterRoleBindingsExists takes a list of ClusterRoleBindings and ensures they are the only CRBs that exist for this PRTB.
 // Deletes any CRBs with the prtbOwnerLabel that aren't in the given list.
-func (p *prtbHandler) ensureOnlyDesiredClusterRoleBindingsExists(crbs []*rbacv1.ClusterRoleBinding, prtbOwnerLabel string) error {
+func (p *prtbHandler) ensureOnlyDesiredClusterRoleBindingsExists(crbs []*rbacv1.ClusterRoleBinding, prtbOwnerLabel, legacyRTBOwnerLabel string) error {
 	// Turn the slice into a map for easier operations.
 	desiredCRBs := map[string]*rbacv1.ClusterRoleBinding{}
 	for _, crb := range crbs {
 		desiredCRBs[crb.Name] = crb
 	}
 
-	// Check if any Cluster Role Bindings exist already.
-	currentCRBs, err := p.crbClient.List(metav1.ListOptions{LabelSelector: prtbOwnerLabel})
-	if err != nil || currentCRBs == nil {
+	aggregationCRBs, err := p.crbClient.List(metav1.ListOptions{LabelSelector: prtbOwnerLabel})
+	if err != nil || aggregationCRBs == nil {
 		return err
 	}
 
+	// Delete any ClusterRoleBindings that were created for this PRTB before the aggregation changes.
+	// TODO: Remove this once roletemplate aggregation is the only enabled RBAC model. https://github.com/rancher/rancher/issues/53743
+	legacyCRBs, err := p.crbClient.List(metav1.ListOptions{LabelSelector: rtbOwnerLabel + "=" + legacyRTBOwnerLabel})
+	if err != nil || legacyCRBs == nil {
+		return err
+	}
+
+	currentCRBs := append(aggregationCRBs.Items, legacyCRBs.Items...)
+
 	// Search for the ClusterRoleBindings that are needed, all others should be removed.
-	for _, currentCRB := range currentCRBs.Items {
+	for _, currentCRB := range currentCRBs {
 		if desiredCRB, ok := desiredCRBs[currentCRB.Name]; ok {
 			if rbac.IsClusterRoleBindingContentSame(&currentCRB, desiredCRB) {
 				delete(desiredCRBs, desiredCRB.Name)
@@ -323,16 +331,24 @@ func (p *prtbHandler) getNamespacesFromProject(prtb *v3.ProjectRoleTemplateBindi
 
 // ensureOnlyDesiredRoleBindingExists finds any RoleBindings owned by the PRTB, and removes them if they don't match the desired RoleBinding.
 // If the desired RoleBinding isn't found, it creates it.
-func (p *prtbHandler) ensureOnlyDesiredRoleBindingExists(desiredRB *rbacv1.RoleBinding, prtbOwnerLabel string) error {
-	// Check if any Role Bindings exist already.
-	currentRBs, err := p.rbClient.List(desiredRB.Namespace, metav1.ListOptions{LabelSelector: prtbOwnerLabel})
-	if err != nil || currentRBs == nil {
+func (p *prtbHandler) ensureOnlyDesiredRoleBindingExists(desiredRB *rbacv1.RoleBinding, prtbOwnerLabel, legacyRTBOwnerLabel string) error {
+	aggregationRBs, err := p.rbClient.List(desiredRB.Namespace, metav1.ListOptions{LabelSelector: prtbOwnerLabel})
+	if err != nil || aggregationRBs == nil {
 		return err
 	}
 
+	// Delete any RoleBindings that were created for this PRTB before the aggregation changes.
+	// TODO: Remove this once roletemplate aggregation is the only enabled RBAC model. https://github.com/rancher/rancher/issues/53743
+	legacyRBs, err := p.rbClient.List(desiredRB.Namespace, metav1.ListOptions{LabelSelector: rtbOwnerLabel + "=" + legacyRTBOwnerLabel})
+	if err != nil || legacyRBs == nil {
+		return err
+	}
+
+	currentRBs := append(aggregationRBs.Items, legacyRBs.Items...)
+
 	var matchingRB *rbacv1.RoleBinding
 	// Search for the RoleBindings that is needed, all others should be removed.
-	for _, currentRB := range currentRBs.Items {
+	for _, currentRB := range currentRBs {
 		if rbac.IsRoleBindingContentSame(&currentRB, desiredRB) && matchingRB == nil {
 			matchingRB = &currentRB
 		} else {

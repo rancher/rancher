@@ -21,7 +21,12 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/client-go/util/retry"
+)
+
+const (
+	crtbInProjectBindingOwner = "crtb-in-project-binding-owner"
 )
 
 type crtbHandler struct {
@@ -30,11 +35,13 @@ type crtbHandler struct {
 	userController       mgmtv3.UserController
 	rtController         mgmtv3.RoleTemplateController
 	rbController         wrbacv1.RoleBindingController
+	rbCache              wrbacv1.RoleBindingCache
 	crController         wrbacv1.ClusterRoleController
 	crbController        wrbacv1.ClusterRoleBindingController
 	crtbCache            mgmtv3.ClusterRoleTemplateBindingCache
 	crtbClient           mgmtv3.ClusterRoleTemplateBindingController
 	clusterController    mgmtv3.ClusterController
+	projectCache         mgmtv3.ProjectCache
 	clusterManager       *clustermanager.Manager
 	impersonationHandler *impersonationHandler
 }
@@ -46,11 +53,13 @@ func newCRTBHandler(management *config.ManagementContext, clusterManager *cluste
 		userController:    management.Wrangler.Mgmt.User(),
 		rtController:      management.Wrangler.Mgmt.RoleTemplate(),
 		rbController:      management.Wrangler.RBAC.RoleBinding(),
+		rbCache:           management.Wrangler.RBAC.RoleBinding().Cache(),
 		crController:      management.Wrangler.RBAC.ClusterRole(),
 		crbController:     management.Wrangler.RBAC.ClusterRoleBinding(),
 		crtbCache:         management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
 		crtbClient:        management.Wrangler.Mgmt.ClusterRoleTemplateBinding(),
 		clusterController: management.Wrangler.Mgmt.Cluster(),
+		projectCache:      management.Wrangler.Mgmt.Project().Cache(),
 		clusterManager:    clusterManager,
 		impersonationHandler: &impersonationHandler{
 			crtbCache: management.Wrangler.Mgmt.ClusterRoleTemplateBinding().Cache(),
@@ -68,12 +77,17 @@ func (c *crtbHandler) OnChange(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 		return nil, nil
 	}
 
+	var err error
+	crtb, err = c.handleMigration(crtb)
+	if err != nil {
+		return crtb, err
+	}
+
 	if !features.AggregatedRoleTemplates.Enabled() {
-		return crtb, c.removeRoleBindings(crtb)
+		return crtb, nil
 	}
 
 	var localConditions []metav1.Condition
-	var err error
 	crtb, err = c.reconcileSubject(crtb, &localConditions)
 	if err != nil {
 		return crtb, errors.Join(err, c.updateStatus(crtb, localConditions))
@@ -84,6 +98,24 @@ func (c *crtbHandler) OnChange(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 	}
 
 	return crtb, errors.Join(c.reconcileBindings(crtb, &localConditions), c.updateStatus(crtb, localConditions))
+}
+
+// handleMigration handles the migration of CRTBs when toggling the AggregatedRoleTemplates feature flag.
+// If the feature flag is disabled, it removes the aggregation label and deletes any bindings that were created for aggregation.
+// If the feature flag is enabled, it adds the aggregation label and deletes any legacy bindings that were created before aggregation.
+// TODO: To be removed once roletemplate aggregation is the only enabled RBAC model. https://github.com/rancher/rancher/issues/53743
+func (c *crtbHandler) handleMigration(crtb *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+	return handleAggregationMigration(
+		crtb,
+		crtb.Labels,
+		func(resource *v3.ClusterRoleTemplateBinding, labels map[string]string) (*v3.ClusterRoleTemplateBinding, error) {
+			crtbCopy := resource.DeepCopy()
+			crtbCopy.Labels = labels
+			return c.crtbClient.Update(crtbCopy)
+		},
+		c.removeRoleBindings,
+		c.deleteLegacyRoleBindings,
+	)
 }
 
 // reconcileSubject ensures that the user referenced by the role template binding exists
@@ -231,6 +263,35 @@ func (c *crtbHandler) getDesiredRoleBindings(crtb *v3.ClusterRoleTemplateBinding
 	}
 
 	return desiredRBs, nil
+}
+
+// deleteLegacyRoleBindings deletes any management plane RoleBindings that were created for this CRTB before the aggregation feature was enabled.
+// TODO: Remove this once roletemplate aggregation is the only enabled RBAC model. https://github.com/rancher/rancher/issues/53743
+func (c *crtbHandler) deleteLegacyRoleBindings(crtb *v3.ClusterRoleTemplateBinding) error {
+	// get role bindings who's owner reference is this CRTB
+	rbs, err := c.rbCache.GetByIndex(rbByCRTBOwnerReferenceIndex, crtb.Name)
+	if err != nil {
+		return fmt.Errorf("failed to list role bindings in cluster namespace %s: %w", crtb.Namespace, err)
+	}
+	var returnErr error
+	for _, rb := range rbs {
+		returnErr = errors.Join(returnErr, rbac.DeleteNamespacedResource(rb.Namespace, rb.Name, c.rbController))
+	}
+
+	r, err := labels.NewRequirement(rbac.GetRTBLabel(crtb.ObjectMeta), selection.Equals, []string{crtbInProjectBindingOwner})
+	if err != nil {
+		return fmt.Errorf("failed to create label selector for CRTB %s: %w", crtb.Name, err)
+	}
+	// get legacy project crtb role bindings
+	rbs, err = c.rbCache.List(metav1.NamespaceAll, labels.NewSelector().Add(*r))
+	if err != nil {
+		return fmt.Errorf("failed to list project role bindings for CRTB %s: %w", crtb.Name, err)
+	}
+	for _, rb := range rbs {
+		returnErr = errors.Join(returnErr, rbac.DeleteNamespacedResource(rb.Namespace, rb.Name, c.rbController))
+	}
+
+	return returnErr
 }
 
 // OnRemove deletes Cluster Role Bindings that are owned by the CRTB and the membership binding if no other CRTBs give membership access.

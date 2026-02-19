@@ -8,7 +8,9 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/status"
+	"github.com/rancher/rancher/pkg/features"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/rbac"
 	userMocks "github.com/rancher/rancher/pkg/user/mocks"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
@@ -973,6 +975,178 @@ func Test_deleteDownstreamClusterRoleBindings(t *testing.T) {
 
 			if err := c.deleteDownstreamClusterRoleBindings(tt.crtb, crbController); (err != nil) != tt.wantErr {
 				t.Errorf("crtbHandler.deleteBindings() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_crtbHandler_handleMigration(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	type controllers struct {
+		crtbController *fake.MockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList]
+		rbController   *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]
+		rbCache        *fake.MockCacheInterface[*rbacv1.RoleBinding]
+	}
+
+	tests := []struct {
+		name               string
+		crtb               *v3.ClusterRoleTemplateBinding
+		featureFlagEnabled bool
+		setupControllers   func(controllers)
+		wantLabel          bool
+		wantErr            bool
+	}{
+		{
+			name: "feature flag disabled, label present - should remove label and call removeRoleBindings",
+			crtb: &v3.ClusterRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-crtb",
+					Namespace: "test-ns",
+					Labels: map[string]string{
+						rbac.AggregationFeatureLabel: "true",
+					},
+				},
+			},
+			featureFlagEnabled: false,
+			setupControllers: func(c controllers) {
+				// Expect Update to be called with label removed
+				c.crtbController.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+					if _, exists := obj.Labels[rbac.AggregationFeatureLabel]; exists {
+						t.Error("expected label to be removed from updated CRTB")
+					}
+					return obj, nil
+				})
+				// removeRoleBindings will be called, so mock rbController.List to return empty list
+				c.rbController.EXPECT().List(gomock.Any(), gomock.Any()).Return(&rbacv1.RoleBindingList{}, nil)
+			},
+			wantLabel: false,
+		},
+		{
+			name: "feature flag disabled, label absent - no-op",
+			crtb: &v3.ClusterRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-crtb",
+					Namespace: "test-ns",
+					Labels:    map[string]string{},
+				},
+			},
+			featureFlagEnabled: false,
+			wantLabel:          false,
+		},
+		{
+			name: "feature flag enabled, label absent - should add label and call deleteLegacyRoleBindings",
+			crtb: &v3.ClusterRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-crtb",
+					Namespace: "test-ns",
+					Labels:    map[string]string{},
+				},
+				ClusterName: "test-cluster",
+			},
+			featureFlagEnabled: true,
+			setupControllers: func(c controllers) {
+				// deleteLegacyRoleBindings will be called
+				// Mock projectCache.List to return empty list
+				c.rbCache.EXPECT().GetByIndex(rbByCRTBOwnerReferenceIndex, "test-crtb").Return([]*rbacv1.RoleBinding{}, nil)
+				// Mock rbController.List for cluster namespace
+				c.rbCache.EXPECT().List("", gomock.Any()).Return([]*rbacv1.RoleBinding{}, nil)
+				// Expect Update to be called with label added
+				c.crtbController.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+					if obj.Labels[rbac.AggregationFeatureLabel] != "true" {
+						t.Error("expected label to be added to updated CRTB")
+					}
+					return obj, nil
+				})
+			},
+			wantLabel: true,
+		},
+		{
+			name: "feature flag enabled, label present - no-op",
+			crtb: &v3.ClusterRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-crtb",
+					Namespace: "test-ns",
+					Labels: map[string]string{
+						rbac.AggregationFeatureLabel: "true",
+					},
+				},
+			},
+			featureFlagEnabled: true,
+			setupControllers:   func(c controllers) {},
+			wantLabel:          true,
+		},
+		{
+			name: "feature flag enabled, nil labels - should add label",
+			crtb: &v3.ClusterRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-crtb",
+					Namespace: "test-ns",
+					Labels:    nil,
+				},
+				ClusterName: "test-cluster",
+			},
+			featureFlagEnabled: true,
+			setupControllers: func(c controllers) {
+				// deleteLegacyRoleBindings will be called
+				c.rbCache.EXPECT().GetByIndex(rbByCRTBOwnerReferenceIndex, "test-crtb").Return([]*rbacv1.RoleBinding{}, nil)
+				c.rbCache.EXPECT().List("", gomock.Any()).Return([]*rbacv1.RoleBinding{}, nil)
+				// Expect Update to be called with label added
+				c.crtbController.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
+					if obj.Labels == nil {
+						t.Error("expected labels map to be initialized")
+					}
+					if obj.Labels[rbac.AggregationFeatureLabel] != "true" {
+						t.Error("expected label to be added to updated CRTB")
+					}
+					return obj, nil
+				})
+			},
+			wantLabel: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			prev := features.AggregatedRoleTemplates.Enabled()
+			t.Cleanup(func() {
+				features.AggregatedRoleTemplates.Set(prev)
+			})
+			features.AggregatedRoleTemplates.Set(tt.featureFlagEnabled)
+
+			crtbController := fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
+			rbController := fake.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl)
+			rbCache := fake.NewMockCacheInterface[*rbacv1.RoleBinding](ctrl)
+
+			if tt.setupControllers != nil {
+				tt.setupControllers(controllers{
+					crtbController: crtbController,
+					rbController:   rbController,
+					rbCache:        rbCache,
+				})
+			}
+
+			h := &crtbHandler{
+				crtbClient:   crtbController,
+				rbController: rbController,
+				rbCache:      rbCache,
+				s:            status.NewStatus(),
+			}
+
+			result, err := h.handleMigration(tt.crtb)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("handleMigration() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if tt.wantLabel {
+				if result.Labels[rbac.AggregationFeatureLabel] != "true" {
+					t.Error("expected label to be present and set to 'true'")
+				}
+			} else {
+				if result != nil && result.Labels[rbac.AggregationFeatureLabel] == "true" {
+					t.Error("expected label to be absent or not set to 'true'")
+				}
 			}
 		})
 	}

@@ -26,8 +26,10 @@ type prtbHandler struct {
 	userController       mgmtv3.UserController
 	rtController         mgmtv3.RoleTemplateController
 	rbController         crbacv1.RoleBindingController
+	rbCache              crbacv1.RoleBindingCache
 	crController         crbacv1.ClusterRoleController
 	crbController        crbacv1.ClusterRoleBindingController
+	prtbClient           mgmtv3.ProjectRoleTemplateBindingController
 	clusterController    mgmtv3.ClusterController
 	clusterManager       *clustermanager.Manager
 	impersonationHandler *impersonationHandler
@@ -39,8 +41,10 @@ func newPRTBHandler(management *config.ManagementContext, clusterManager *cluste
 		userController:    management.Wrangler.Mgmt.User(),
 		rtController:      management.Wrangler.Mgmt.RoleTemplate(),
 		rbController:      management.Wrangler.RBAC.RoleBinding(),
+		rbCache:           management.Wrangler.RBAC.RoleBinding().Cache(),
 		crController:      management.Wrangler.RBAC.ClusterRole(),
 		crbController:     management.Wrangler.RBAC.ClusterRoleBinding(),
+		prtbClient:        management.Wrangler.Mgmt.ProjectRoleTemplateBinding(),
 		clusterController: management.Wrangler.Mgmt.Cluster(),
 		clusterManager:    clusterManager,
 		impersonationHandler: &impersonationHandler{
@@ -59,11 +63,16 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 		return nil, nil
 	}
 
-	if !features.AggregatedRoleTemplates.Enabled() {
-		return prtb, p.deleteRoleBindings(prtb)
+	var err error
+	prtb, err = p.handleMigration(prtb)
+	if err != nil {
+		return prtb, err
 	}
 
-	var err error
+	if !features.AggregatedRoleTemplates.Enabled() {
+		return prtb, nil
+	}
+
 	prtb, err = p.reconcileSubject(prtb)
 	if err != nil {
 		return nil, err
@@ -74,6 +83,24 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 	}
 
 	return prtb, p.reconcileBindings(prtb)
+}
+
+// handleMigration handles the migration of PRTBs when toggling the AggregatedRoleTemplates feature flag.
+// If the feature flag is disabled, it removes the aggregation label and deletes any bindings that were created for aggregation.
+// If the feature flag is enabled, it adds the aggregation label and deletes any legacy bindings that were created before aggregation.
+// TODO: To be removed once roletemplate aggregation is the only enabled RBAC model. https://github.com/rancher/rancher/issues/53743
+func (p *prtbHandler) handleMigration(prtb *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
+	return handleAggregationMigration(
+		prtb,
+		prtb.Labels,
+		func(resource *v3.ProjectRoleTemplateBinding, labels map[string]string) (*v3.ProjectRoleTemplateBinding, error) {
+			prtbCopy := resource.DeepCopy()
+			prtbCopy.Labels = labels
+			return p.prtbClient.Update(prtbCopy)
+		},
+		p.deleteRoleBindings,
+		p.deleteLegacyBinding,
+	)
 }
 
 // OnRemove deletes Role Bindings that are owned by the PRTB. It also removes the membership binding if no other PRTBs give membership access.
@@ -101,13 +128,14 @@ func (p *prtbHandler) deleteRoleBindings(prtb *v3.ProjectRoleTemplateBinding) er
 		rbac.GetPRTBOwnerLabel(prtb.Name): "true",
 		rbac.AggregationFeatureLabel:      "true",
 	}
-	currentRBs, err := p.rbController.List(prtb.Namespace, metav1.ListOptions{LabelSelector: set.AsSelector().String()})
+
+	currentRBs, err := p.rbCache.List(prtb.Namespace, set.AsSelector())
 	if err != nil {
 		return fmt.Errorf("failed to list role bindings in namespace %s: %w", prtb.Namespace, err)
 	}
 
 	var returnErr error
-	for _, rb := range currentRBs.Items {
+	for _, rb := range currentRBs {
 		returnErr = errors.Join(returnErr, rbac.DeleteNamespacedResource(rb.Namespace, rb.Name, p.rbController))
 	}
 	return returnErr
@@ -302,4 +330,19 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 		}
 	}
 	return nil
+}
+
+// deleteLegacyBinding deletes the management plane Role Binding in the project namespace that was created for this PRTB before the aggregation feature was enabled.
+// TODO: Remove this once roletemplate aggregation is the only enabled RBAC model. https://github.com/rancher/rancher/issues/53743
+func (p *prtbHandler) deleteLegacyBinding(prtb *v3.ProjectRoleTemplateBinding) error {
+	// get role bindings who's owner reference is this PRTB
+	rbs, err := p.rbCache.GetByIndex(rbByPRTBOwnerReferenceIndex, prtb.Name)
+	if err != nil {
+		return fmt.Errorf("failed to list role bindings in cluster namespace %s: %w", prtb.Namespace, err)
+	}
+	var returnErr error
+	for _, rb := range rbs {
+		returnErr = errors.Join(returnErr, rbac.DeleteNamespacedResource(prtb.Namespace, rb.Name, p.rbController))
+	}
+	return returnErr
 }

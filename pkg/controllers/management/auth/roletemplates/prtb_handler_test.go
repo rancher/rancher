@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/features"
+	"github.com/rancher/rancher/pkg/rbac"
 	userMocks "github.com/rancher/rancher/pkg/user/mocks"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"go.uber.org/mock/gomock"
@@ -802,6 +804,169 @@ func Test_prtbHandler_deleteDownstreamClusterRoleBindings(t *testing.T) {
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("prtbHandler.deleteDownstreamClusterRoleBindings() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_prtbHandler_handleMigration(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	type controllers struct {
+		prtbController *fake.MockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList]
+		rbCache        *fake.MockCacheInterface[*rbacv1.RoleBinding]
+	}
+
+	tests := []struct {
+		name               string
+		prtb               *v3.ProjectRoleTemplateBinding
+		featureFlagEnabled bool
+		setupControllers   func(controllers)
+		wantLabel          bool
+		wantErr            bool
+	}{
+		{
+			name: "feature flag disabled, label present - should remove label and call deleteRoleBindings",
+			prtb: &v3.ProjectRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-prtb",
+					Namespace: "test-ns",
+					Labels: map[string]string{
+						rbac.AggregationFeatureLabel: "true",
+					},
+				},
+			},
+			featureFlagEnabled: false,
+			setupControllers: func(c controllers) {
+				// Expect Update to be called with label removed
+				c.prtbController.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
+					if _, exists := obj.Labels[rbac.AggregationFeatureLabel]; exists {
+						t.Error("expected label to be removed from updated PRTB")
+					}
+					return obj, nil
+				})
+				// deleteRoleBindings will be called, so mock rbCache.List to return empty list
+				c.rbCache.EXPECT().List("test-ns", gomock.Any()).Return([]*rbacv1.RoleBinding{}, nil)
+			},
+			wantLabel: false,
+		},
+		{
+			name: "feature flag disabled, label absent - no-op",
+			prtb: &v3.ProjectRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-prtb",
+					Namespace: "test-ns",
+					Labels:    map[string]string{},
+				},
+			},
+			featureFlagEnabled: false,
+			setupControllers:   func(c controllers) {},
+			wantLabel:          false,
+		},
+		{
+			name: "feature flag enabled, label absent - should add label and call deleteLegacyBinding",
+			prtb: &v3.ProjectRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-prtb",
+					Namespace: "test-ns",
+					Labels:    map[string]string{},
+				},
+			},
+			featureFlagEnabled: true,
+			setupControllers: func(c controllers) {
+				// deleteLegacyBinding will be called
+				// Mock rbCache.GetByIndex to return empty list
+				c.rbCache.EXPECT().GetByIndex(rbByPRTBOwnerReferenceIndex, "test-prtb").Return([]*rbacv1.RoleBinding{}, nil)
+				// Expect Update to be called with label added
+				c.prtbController.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
+					if obj.Labels[rbac.AggregationFeatureLabel] != "true" {
+						t.Error("expected label to be added to updated PRTB")
+					}
+					return obj, nil
+				})
+			},
+			wantLabel: true,
+		},
+		{
+			name: "feature flag enabled, label present - no-op",
+			prtb: &v3.ProjectRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-prtb",
+					Namespace: "test-ns",
+					Labels: map[string]string{
+						rbac.AggregationFeatureLabel: "true",
+					},
+				},
+			},
+			featureFlagEnabled: true,
+			setupControllers:   func(c controllers) {},
+			wantLabel:          true,
+		},
+		{
+			name: "feature flag enabled, nil labels - should add label",
+			prtb: &v3.ProjectRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-prtb",
+					Namespace: "test-ns",
+					Labels:    nil,
+				},
+			},
+			featureFlagEnabled: true,
+			setupControllers: func(c controllers) {
+				// deleteLegacyBinding will be called
+				c.rbCache.EXPECT().GetByIndex(rbByPRTBOwnerReferenceIndex, "test-prtb").Return([]*rbacv1.RoleBinding{}, nil)
+				// Expect Update to be called with label added
+				c.prtbController.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
+					if obj.Labels == nil {
+						t.Error("expected labels map to be initialized")
+					}
+					if obj.Labels[rbac.AggregationFeatureLabel] != "true" {
+						t.Error("expected label to be added to updated PRTB")
+					}
+					return obj, nil
+				})
+			},
+			wantLabel: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			prev := features.AggregatedRoleTemplates.Enabled()
+			t.Cleanup(func() {
+				features.AggregatedRoleTemplates.Set(prev)
+			})
+			features.AggregatedRoleTemplates.Set(tt.featureFlagEnabled)
+
+			prtbController := fake.NewMockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList](ctrl)
+			rbCache := fake.NewMockCacheInterface[*rbacv1.RoleBinding](ctrl)
+
+			if tt.setupControllers != nil {
+				tt.setupControllers(controllers{
+					prtbController: prtbController,
+					rbCache:        rbCache,
+				})
+			}
+
+			h := &prtbHandler{
+				prtbClient: prtbController,
+				rbCache:    rbCache,
+			}
+
+			result, err := h.handleMigration(tt.prtb)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("handleMigration() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if tt.wantLabel {
+				if result.Labels[rbac.AggregationFeatureLabel] != "true" {
+					t.Error("expected label to be present and set to 'true'")
+				}
+			} else {
+				if result != nil && result.Labels[rbac.AggregationFeatureLabel] == "true" {
+					t.Error("expected label to be absent or not set to 'true'")
+				}
 			}
 		})
 	}
