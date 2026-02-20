@@ -3,14 +3,15 @@ package oci
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"helm.sh/helm/v3/pkg/registry"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/opencontainers/go-digest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	"helm.sh/helm/v3/pkg/registry"
 
 	corev1 "k8s.io/api/core/v1"
 
