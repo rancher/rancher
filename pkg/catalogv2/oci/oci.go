@@ -128,26 +128,27 @@ func GenerateIndex(ociClient *Client, URL string, credentialSecret *corev1.Secre
 		var maxSemver *version.Version
 
 		for i := len(tags) - 1; i >= 0; i-- {
-			existingTags[tags[i]] = true
 			// Check if the tag is a valid semver version or not. If yes, then proceed.
 			// Change underscore (_) back to plus (+) same as Helm does
-			// See https://github.com/helm/helm/issues/10166
+			// See https://github.com/helm/helm/issues/10166. Also having _ is not a valid semver.
 			semverTag, err := version.NewVersion(strings.ReplaceAll(tags[i], "_", "+"))
 			if err != nil {
 				// skipping the tag since it is not semver
+				logrus.Debugf("skipping tag %s since it is not a valid semver for chart %s", tags[i], chartName)
 				continue
 			}
+			existingTags[semverTag.String()] = true
 
 			if maxSemver == nil || maxSemver.LessThan(semverTag) {
 				maxSemver = semverTag
-				maxTag = tags[i]
+				maxTag = semverTag.String()
 			}
 
 			// Add tags into the helm repo index
-			if !indexFile.Has(chartName, tags[i]) {
+			if !indexFile.Has(chartName, semverTag.String()) {
 				chartVersion := &repo.ChartVersion{
 					Metadata: &chart.Metadata{
-						Version: tags[i],
+						Version: semverTag.String(),
 						Name:    chartName,
 					},
 					URLs: []string{fmt.Sprintf("oci://%s/%s:%s", ociClient.registry, ociClient.repository, tags[i])},
