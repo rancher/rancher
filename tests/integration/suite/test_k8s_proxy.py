@@ -21,6 +21,22 @@ def _downstream_cluster_id(admin_mc):
     pytest.skip("No active downstream cluster is available for this test")
 
 
+def test_k8s_proxy_fetches_namespaces_from_local_cluster(admin_mc):
+    cluster_id = "local"
+    url = f"{SERVER_URL}/k8s/proxy/{cluster_id}/api/v1/namespaces"
+
+    response = requests.get(
+        url,
+        headers=_auth_headers(admin_mc.client.token),
+        verify=False,
+    )
+    protect_response(response)
+
+    payload = response.json()
+    assert payload["kind"] == "NamespaceList"
+    assert "items" in payload
+
+
 def test_k8s_proxy_fetches_namespaces_from_downstream_cluster(admin_mc):
     cluster_id = _downstream_cluster_id(admin_mc)
     url = f"{SERVER_URL}/k8s/proxy/{cluster_id}/api/v1/namespaces"
