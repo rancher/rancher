@@ -303,11 +303,32 @@ func addToHelmRepoIndex(ociClient Client, indexFile *repo.IndexFile, orasReposit
 		}
 	}
 
+	// Make sure to convert + to _ since OCI registries do not support + in tags and Helm converts it to _ while fetching the chart.
+	originalTag := ociClient.tag
+	ociClient.tag = strings.ReplaceAll(ociClient.tag, "+", "_")
+
 	// Fetch the helm chart tar to get the Chart.yaml
 	filePath, err = ociClient.fetchChart(orasRepository)
 	if err != nil {
 		err = fmt.Errorf("failed to fetch the helm chart %s: %w", ociURL, err)
 		return
+	}
+
+	// Add the chart to the index
+	err = ociClient.addToIndex(indexFile, filePath)
+	if err != nil {
+		err = fmt.Errorf("unable to add helm chart %s to index: %w", ociURL, err)
+	}
+
+	// Replace it back so that further comparisons can continue
+	ociClient.tag = originalTag
+
+	// Remove the entry from the indexfile since the next function addToIndex
+	// will add. This is done to avoid duplication.
+	for index, entry := range indexFile.Entries[chartName] {
+		if entry.Metadata.Name == chartName && entry.Version == ociClient.tag && entry.Digest == "" {
+			indexFile.Entries[chartName] = append(indexFile.Entries[chartName][:index], indexFile.Entries[chartName][index+1:]...)
+		}
 	}
 
 	// We load index into memory and so we should set a limit
@@ -319,20 +340,6 @@ func addToHelmRepoIndex(ociClient Client, indexFile *repo.IndexFile, orasReposit
 	if len(indexFileBytes) > maxHelmRepoIndexSize {
 		err = fmt.Errorf("there are a lot of charts inside this oci URL %s which is making the index larger than %d", ociURL, maxHelmRepoIndexSize)
 		return
-	}
-
-	// Remove the entry from the indexfile since the next function addToIndex
-	// will add. This is done to avoid duplication.
-	for index, entry := range indexFile.Entries[chartName] {
-		if entry.Metadata.Name == chartName && entry.Version == ociClient.tag {
-			indexFile.Entries[chartName] = append(indexFile.Entries[chartName][:index], indexFile.Entries[chartName][index+1:]...)
-		}
-	}
-
-	// Add the chart to the index
-	err = ociClient.addToIndex(indexFile, filePath)
-	if err != nil {
-		err = fmt.Errorf("unable to add helm chart %s to index: %w", ociURL, err)
 	}
 
 	return
