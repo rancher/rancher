@@ -74,7 +74,7 @@ func (e *errorResponder) Error(w http.ResponseWriter, req *http.Request, err err
 }
 
 func trimClusterPrefix(c *v3.Cluster, path string) string {
-	return strings.TrimPrefix(strings.TrimPrefix(path, "/k8s/clusters/"+c.Name), "k8s/proxy/"+c.Name)
+	return strings.TrimPrefix(strings.TrimPrefix(path, "/k8s/clusters/"+c.Name), "/k8s/proxy/"+c.Name)
 }
 
 func New(localConfig *rest.Config, cluster *v3.Cluster, clusterLister v3.ClusterLister, factory dialer.Factory, clusterContextGetter ClusterContextGetter) (*RemoteService, error) {
