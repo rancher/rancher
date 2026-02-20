@@ -145,7 +145,7 @@ func GenerateIndex(ociClient *Client, URL string, credentialSecret *corev1.Secre
 			}
 
 			// Add tags into the helm repo index
-			if !indexFile.Has(chartName, semverTag.String()) {
+			if !indexHas(indexFile, chartName, semverTag.String()) {
 				chartVersion := &repo.ChartVersion{
 					Metadata: &chart.Metadata{
 						Version: semverTag.String(),
@@ -336,4 +336,23 @@ func addToHelmRepoIndex(ociClient Client, indexFile *repo.IndexFile, orasReposit
 	}
 
 	return
+}
+
+func indexHas(indexFile *repo.IndexFile, chartName string, version string) bool {
+	// check if chart exists
+	entries, ok := indexFile.Entries[chartName]
+	if !ok {
+		return false
+	}
+
+	// check if the version exists
+	for _, chartVersion := range entries {
+		if chartVersion != nil &&
+			chartVersion.Metadata != nil &&
+			chartVersion.Metadata.Version == version {
+			return true
+		}
+	}
+
+	return false
 }
