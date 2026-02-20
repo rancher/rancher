@@ -39,7 +39,7 @@ def test_k8s_proxy_fetches_namespaces_from_downstream_cluster(admin_mc):
 
 def test_proxy_k8s_v1_path_returns_not_found(admin_mc):
     cluster_id = _downstream_cluster_id(admin_mc)
-    url = f"{SERVER_URL}/proxy/k8s/{cluster_id}/v1"
+    url = f"{SERVER_URL}/k8s/proxy/{cluster_id}/v1"
 
     response = requests.get(
         url,
