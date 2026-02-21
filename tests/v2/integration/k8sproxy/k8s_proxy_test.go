@@ -13,8 +13,10 @@ import (
 	"github.com/rancher/rancher/tests/v2prov/defaults"
 	"github.com/rancher/shepherd/clients/rancher"
 	"github.com/rancher/shepherd/pkg/session"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 )
@@ -72,15 +74,25 @@ func (s *K8sProxyTestSuite) TearDownSuite() {
 }
 
 func (s *K8sProxyTestSuite) TestK8sProxyLocalNamespaces() {
-	responseCode, body := s.doProxyRequest("local", "/api/v1/namespaces")
+	responseCode, body := s.doProxyRequest("local", "/api/v1/namespaces/default")
 	s.Require().Equal(http.StatusOK, responseCode)
-	assertListResponse(s.T(), body)
+
+	var ns *corev1.Namespace
+	err := json.Unmarshal(body, ns)
+	require.NoError(s.T(), err)
+
+	assert.Equal(s.T(), ns.Name, "default")
 }
 
 func (s *K8sProxyTestSuite) TestK8sProxyDownstreamNamespaces() {
-	responseCode, body := s.doProxyRequest(s.downstreamClusterID, "/v1/namespaces")
+	responseCode, body := s.doProxyRequest(s.downstreamClusterID, "/api/v1/namespaces/default")
 	s.Require().Equal(http.StatusOK, responseCode)
-	assertListResponse(s.T(), body)
+
+	var ns *corev1.Namespace
+	err := json.Unmarshal(body, ns)
+	require.NoError(s.T(), err)
+
+	assert.Equal(s.T(), ns.Name, "default")
 }
 
 func (s *K8sProxyTestSuite) TestK8sProxyDownstreamV1NotFound() {
@@ -105,26 +117,6 @@ func (s *K8sProxyTestSuite) doProxyRequest(clusterID, pathSuffix string) (int, [
 	s.Require().NoError(err)
 
 	return response.StatusCode, body
-}
-
-func assertListResponse(t *testing.T, body []byte) {
-	t.Helper()
-
-	parsed := map[string]any{}
-	err := json.Unmarshal(body, &parsed)
-	require.NoError(t, err)
-
-	if items, ok := parsed["items"].([]any); ok {
-		require.NotNil(t, items)
-		return
-	}
-
-	if data, ok := parsed["data"].([]any); ok {
-		require.NotNil(t, data)
-		return
-	}
-
-	require.Fail(t, "response did not contain list field", "body: %s", string(body))
 }
 
 func TestK8sProxySuite(t *testing.T) {
