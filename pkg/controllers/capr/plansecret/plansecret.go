@@ -200,7 +200,7 @@ func (h *handler) reconcileMachinePlanAppliedCondition(secret *corev1.Secret, pl
 			!conditions.IsFalse(machine, condition) ||
 			conditions.GetReason(machine, condition) != "Error") {
 		logrus.Debugf("[plansecret] machine %s/%s: marking PlanApplied as false", machine.Namespace, machine.Name)
-		conditions.Set(machine, metav1.Condition{
+		capr.SetCAPIResourceCondition(machine, metav1.Condition{
 			Type:    condition,
 			Status:  metav1.ConditionFalse,
 			Reason:  "Error",
@@ -209,7 +209,7 @@ func (h *handler) reconcileMachinePlanAppliedCondition(secret *corev1.Secret, pl
 		needsUpdate = true
 	} else if planAppliedErr == nil && !conditions.IsTrue(machine, condition) {
 		logrus.Debugf("[plansecret] machine %s/%s: marking PlanApplied as true", machine.Namespace, machine.Name)
-		conditions.Set(machine, metav1.Condition{
+		capr.SetCAPIResourceCondition(machine, metav1.Condition{
 			Type:   condition,
 			Status: metav1.ConditionTrue,
 			Reason: "PlanApplied",

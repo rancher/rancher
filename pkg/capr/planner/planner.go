@@ -199,7 +199,7 @@ func (p *Planner) setMachineConditionStatus(clusterPlan *plan.Plan, machineNames
 			if capr.Reconciled.GetMessage(machine) == msg {
 				continue
 			}
-			conditions.Set(machine, metav1.Condition{
+			capr.SetCAPIResourceCondition(machine, metav1.Condition{
 				Type:    string(capr.Reconciled),
 				Status:  metav1.ConditionUnknown,
 				Reason:  "Waiting",
@@ -207,7 +207,7 @@ func (p *Planner) setMachineConditionStatus(clusterPlan *plan.Plan, machineNames
 			})
 		} else if !capr.Reconciled.IsTrue(machine) {
 			// Since there is no status message, then the condition should be set to true.
-			conditions.Set(machine, metav1.Condition{
+			capr.SetCAPIResourceCondition(machine, metav1.Condition{
 				Type:   string(capr.Reconciled),
 				Status: metav1.ConditionTrue,
 				Reason: "Reconciled",
@@ -1258,7 +1258,7 @@ func (p *Planner) ensureCAPIClusterControlPlaneInitializedFalse(cp *rkev1.RKECon
 	}
 	cluster = cluster.DeepCopy()
 	if !conditions.IsFalse(cluster, capi.ClusterControlPlaneInitializedCondition) {
-		conditions.Set(cluster, metav1.Condition{
+		capr.SetCAPIResourceCondition(cluster, metav1.Condition{
 			Type:    capi.ClusterControlPlaneInitializedCondition,
 			Status:  metav1.ConditionFalse,
 			Reason:  capi.ClusterControlPlaneNotInitializedReason,

@@ -38,6 +38,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	capiconditions "sigs.k8s.io/cluster-api/util/conditions"
+	capiconditionsv1beta1 "sigs.k8s.io/cluster-api/util/conditions/deprecated/v1beta1"
 )
 
 const (
@@ -782,4 +783,33 @@ func InsertOrUpdateCondition(d data.Object, desiredCondition summary.Condition) 
 	d.SetNested(conditions, "status", "conditions")
 
 	return true, nil
+}
+
+// CAPIConditionSetter is an interface satisfied by all CAPI resource types (e.g., Machine, Cluster,
+// MachineDeployment, MachineSet) that support both v1beta2 and deprecated v1beta1 conditions.
+type CAPIConditionSetter interface {
+	capiconditions.Setter
+	capiconditionsv1beta1.Setter
+}
+
+// SetCAPIResourceCondition sets the given metav1.Condition on a CAPI resource's .status.conditions (v1beta2)
+// and syncs it to .status.deprecated.v1beta1.conditions for backward compatibility.
+func SetCAPIResourceCondition(obj CAPIConditionSetter, condition metav1.Condition) {
+	if obj == nil {
+		return
+	}
+
+	// Set the condition on the v1beta2 status.conditions
+	capiconditions.Set(obj, condition)
+
+	// Sync the condition to .status.deprecated.v1beta1.conditions
+	v1beta1Cond := capi.Condition{
+		Type:               capi.ConditionType(condition.Type),
+		Status:             corev1.ConditionStatus(condition.Status),
+		LastTransitionTime: condition.LastTransitionTime,
+		Reason:             condition.Reason,
+		Message:            condition.Message,
+	}
+
+	capiconditionsv1beta1.Set(obj, &v1beta1Cond)
 }
