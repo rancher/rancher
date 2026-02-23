@@ -146,13 +146,14 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 		return nil, err
 	}
 
-	// For CAPR as the infrastructure provider, we only need to set the system agent
+	// For CAPR or elemental as the infrastructure provider, we only need to set the system agent
 	// install script in the bootstrap secret.
 	//
-	// Additional userdata is defined in the machine config and it will be merged with
+	// For CAPR, additional userdata is defined in the machine config and it will be merged with
 	// install script from the secret by rancher-machine.
 	if machine.Spec.InfrastructureRef.APIGroup == capr.RKEMachineAPIGroup ||
-		machine.Spec.InfrastructureRef.APIGroup == capr.RKEAPIGroup {
+		machine.Spec.InfrastructureRef.APIGroup == capr.RKEAPIGroup ||
+		machine.Spec.InfrastructureRef.APIGroup == "elemental.cattle.io" {
 		return &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,

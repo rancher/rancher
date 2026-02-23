@@ -77,10 +77,11 @@ func (h *handler) associateMachineWithNode(_ string, bootstrap *rkev1.RKEBootstr
 		return bootstrap, err
 	}
 
-	// Skip this controller when CAPR isn't the infrastructure provider. The external infrastructure provider
+	// Skip this controller when CAPR or elemental isn't the infrastructure provider. The external infrastructure provider
 	// will be responsible for setting the providerID and addresses in the infra machine.
 	if machine.Spec.InfrastructureRef.APIGroup != capr.RKEMachineAPIGroup &&
-		machine.Spec.InfrastructureRef.APIGroup != capr.RKEAPIGroup {
+		machine.Spec.InfrastructureRef.APIGroup != capr.RKEAPIGroup &&
+		machine.Spec.InfrastructureRef.APIGroup != "elemental.cattle.io" {
 		return bootstrap, nil
 	}
 
