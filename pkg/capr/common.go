@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	capiutils "sigs.k8s.io/cluster-api/util"
 	capiconditions "sigs.k8s.io/cluster-api/util/conditions"
 	capiconditionsv1beta1 "sigs.k8s.io/cluster-api/util/conditions/deprecated/v1beta1"
 )
@@ -795,7 +796,7 @@ type CAPIConditionSetter interface {
 // SetCAPIResourceCondition sets the given metav1.Condition on a CAPI resource's .status.conditions (v1beta2)
 // and syncs it to .status.deprecated.v1beta1.conditions for backward compatibility.
 func SetCAPIResourceCondition(obj CAPIConditionSetter, condition metav1.Condition) {
-	if obj == nil {
+	if capiutils.IsNil(obj) {
 		return
 	}
 
