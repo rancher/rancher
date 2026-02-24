@@ -273,7 +273,7 @@ RUN mkdir -p /var/lib/rancher/k3s/agent/images/ && \
 ENV CATTLE_UI_VERSION=2.11.11-alpha1
 ENV CATTLE_DASHBOARD_UI_VERSION=v2.11.11-alpha1
 
-ENV CATTLE_CLI_VERSION=v2.11.10
+ENV CATTLE_CLI_VERSION=v2.11.11
 
 # Base UI brand used as a fallback env setting (not user facing) to indicate this is a non-prime install
 ENV CATTLE_BASE_UI_BRAND=
