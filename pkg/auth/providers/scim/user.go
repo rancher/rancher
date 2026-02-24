@@ -112,7 +112,7 @@ func (s *SCIMServer) ListUsers(w http.ResponseWriter, r *http.Request) {
 
 		attr, err := s.userAttributeCache.Get(user.Name)
 		if err != nil {
-			if !apierrors.IsNotFound(err) {
+			if apierrors.IsNotFound(err) {
 				continue
 			}
 			logrus.Errorf("scim::ListUsers: failed to get user attributes for %s: %s", user.Name, err)
@@ -309,7 +309,7 @@ func (s *SCIMServer) GetUser(w http.ResponseWriter, r *http.Request) {
 
 	attr, err := s.userAttributeCache.Get(user.Name)
 	if err != nil {
-		logrus.Errorf("scim::ListUsers: failed to get user attributes for %s: %s", user.Name, err)
+		logrus.Errorf("scim::GetUsers: failed to get user attributes for %s: %s", user.Name, err)
 		writeError(w, NewInternalError())
 		return
 	}
