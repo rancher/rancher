@@ -21,244 +21,373 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
-	const namespaceName = "test-ns"
-	ctrl := gomock.NewController(t)
-	tests := []struct {
-		name                string
-		indexedRoles        []*rbacv1.ClusterRole
-		currentRoles        []*rbacv1.ClusterRole
-		projectNSAnnotation string
-		indexerError        error
-		updateError         error
-		createError         error
-		deleteError         error
-		getError            error
+var (
+	testNamespace1 = corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-ns-1",
+			Annotations: map[string]string{
+				projectIDAnnotation: "c-123xyz:p-123xyz",
+			},
+		},
+	}
+	testNamespace2 = corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-ns-2",
+			Annotations: map[string]string{
+				projectIDAnnotation: "c-123xyz:p-123xyz",
+			},
+		},
+	}
+	// The following namespace does not have any projectIDAnnotation
+	unrelatedNamespace = corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-ns-unrelated",
+		},
+	}
+)
 
-		wantRoles           []*rbacv1.ClusterRole
-		wantDeleteRoleNames []string
-		wantError           bool
+func TestReconcileNamespaceProjectClusterRole(t *testing.T) {
+	getCR := createClusterRoleForProject("p-123xyz", testNamespace1.Name, "get")
+	updateGetCR := addNamespaceToClusterRole(testNamespace2.Name, "get", getCR.DeepCopy())
+	manageCR := createClusterRoleForProject("p-123xyz", testNamespace1.Name, manageNSVerb)
+	editCR := createClusterRoleForProject("p-123xyz", testNamespace1.Name, editVerb)
+	noResourceNameCR := createClusterRoleForProject("p-123xyz", unrelatedNamespace.Name, "get")
+	tests := []struct {
+		name                 string
+		namespace            *corev1.Namespace
+		roleVerb             []string
+		setupCRController    func(*wfakes.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList], *[]*rbacv1.ClusterRole, *[]string)
+		setupCRLister        func(*wfakes.MockNonNamespacedCacheInterface[*rbacv1.ClusterRole])
+		crIndexer            *FakeResourceIndexer[*rbacv1.ClusterRole]
+		currentRoles         []*rbacv1.ClusterRole
+		wantRoles            []*rbacv1.ClusterRole
+		wantDeletedRoleNames []string
+		wantErr              bool
+		wantErrMessage       string
 	}{
 		{
-			name:                "create read-only",
-			projectNSAnnotation: "c-123xyz:p-123xyz",
-			indexedRoles: []*rbacv1.ClusterRole{
-				createClusterRoleForProject("p-123xyz", namespaceName, "*"),
+			name:      "create read-only role",
+			namespace: &testNamespace1,
+			roleVerb:  []string{"get"},
+			setupCRController: func(c *wfakes.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList], finalRoles *[]*rbacv1.ClusterRole, deletedRoleNames *[]string) {
+				c.EXPECT().Create(gomock.Any()).DoAndReturn(
+					func(role *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
+						created := getCR.DeepCopy()
+						*finalRoles = append(*finalRoles, created)
+						return created, nil
+					})
+			},
+			setupCRLister: func(l *wfakes.MockNonNamespacedCacheInterface[*rbacv1.ClusterRole]) {
+				l.EXPECT().Get(gomock.Any()).Return(nil, nil)
+			},
+			crIndexer: &FakeResourceIndexer[*rbacv1.ClusterRole]{
+				index:     crByNSIndex,
+				resources: map[string][]*rbacv1.ClusterRole{},
+				err:       nil,
 			},
 			wantRoles: []*rbacv1.ClusterRole{
-				createClusterRoleForProject("p-123xyz", namespaceName, "get"),
+				getCR,
 			},
-			wantError: false,
+			wantDeletedRoleNames: []string{},
+			wantErr:              false,
 		},
 		{
-			name:                "update old create new read-only",
-			projectNSAnnotation: "c-123xyz:p-123xyz",
-			indexedRoles: []*rbacv1.ClusterRole{
-				createClusterRoleForProject("p-123xyz", namespaceName, "*"),
-				addNamespaceToClusterRole("otherNamespace", "get", createClusterRoleForProject("p-123abc", namespaceName, "get")),
+			name:      "update existing read-only role",
+			namespace: &testNamespace2,
+			roleVerb:  []string{"get"},
+			setupCRController: func(c *wfakes.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList], finalRoles *[]*rbacv1.ClusterRole, deletedRoleNames *[]string) {
+				c.EXPECT().Update(gomock.Any()).DoAndReturn(
+					func(cr *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
+						updated := updateGetCR.DeepCopy()
+						*finalRoles = append(*finalRoles, updated)
+						return updated, nil
+					}).Times(1)
 			},
-			wantRoles: []*rbacv1.ClusterRole{
-				createClusterRoleForProject("p-123xyz", namespaceName, "get"),
-				createClusterRoleForProject("p-123abc", "otherNamespace", "get"),
+			setupCRLister: func(l *wfakes.MockNonNamespacedCacheInterface[*rbacv1.ClusterRole]) {
+				l.EXPECT().Get("p-123xyz-namespaces-readonly").Return(getCR.DeepCopy(), nil)
 			},
-			wantError: false,
-		},
-		{
-			name:                "delete old create new read-only",
-			projectNSAnnotation: "c-123xyz:p-123xyz",
-			indexedRoles: []*rbacv1.ClusterRole{
-				createClusterRoleForProject("p-123xyz", namespaceName, "*"),
-				createClusterRoleForProject("p-123abc", namespaceName, "get"),
-			},
-			wantRoles: []*rbacv1.ClusterRole{
-				createClusterRoleForProject("p-123xyz", namespaceName, "get"),
-			},
-			wantDeleteRoleNames: []string{createRoleName("p-123abc", "get")},
-			wantError:           false,
-		},
-		{
-			name:                "delete old update new read-only",
-			projectNSAnnotation: "c-123xyz:p-123xyz",
-			indexedRoles: []*rbacv1.ClusterRole{
-				createClusterRoleForProject("p-123xyz", namespaceName, "*"),
-				createClusterRoleForProject("p-123abc", namespaceName, "get"),
-			},
-			currentRoles: []*rbacv1.ClusterRole{
-				createClusterRoleForProject("p-123xyz", "otherNamespace", "get"),
-			},
-			wantRoles: []*rbacv1.ClusterRole{
-				addNamespaceToClusterRole(namespaceName, "get", createClusterRoleForProject("p-123xyz", "otherNamespace", "get")),
-			},
-			wantDeleteRoleNames: []string{createRoleName("p-123abc", "get")},
-			wantError:           false,
-		},
-		{
-			name:                "create edit",
-			projectNSAnnotation: "c-123xyz:p-123xyz",
-			indexedRoles: []*rbacv1.ClusterRole{
-				createClusterRoleForProject("p-123xyz", namespaceName, "get"),
-			},
-			wantRoles: []*rbacv1.ClusterRole{
-				addManagePermissionToClusterRole("p-123xyz", createClusterRoleForProject("p-123xyz", namespaceName, "*")),
-			},
-			wantError: false,
-		},
-		{
-			name:                "update old create new edit",
-			projectNSAnnotation: "c-123xyz:p-123xyz",
-			indexedRoles: []*rbacv1.ClusterRole{
-				createClusterRoleForProject("p-123xyz", namespaceName, "get"),
-				addManagePermissionToClusterRole("p-123abc", addNamespaceToClusterRole("otherNamespace", "*", createClusterRoleForProject("p-123abc", namespaceName, "*"))),
-			},
-			wantRoles: []*rbacv1.ClusterRole{
-				addManagePermissionToClusterRole("p-123xyz", createClusterRoleForProject("p-123xyz", namespaceName, "*")),
-				addManagePermissionToClusterRole("p-123abc", createClusterRoleForProject("p-123abc", "otherNamespace", "*")),
-			},
-			wantError: false,
-		},
-		{
-			name:                "update old update new edit",
-			projectNSAnnotation: "c-123xyz:p-123xyz",
-			indexedRoles: []*rbacv1.ClusterRole{
-				createClusterRoleForProject("p-123xyz", namespaceName, "get"),
-				addManagePermissionToClusterRole("p-123abc", createClusterRoleForProject("p-123abc", namespaceName, "*")),
-			},
-			currentRoles: []*rbacv1.ClusterRole{
-				addManagePermissionToClusterRole("p-123xyz", createClusterRoleForProject("p-123xyz", "otherNamespace", "*")),
-			},
-			wantRoles: []*rbacv1.ClusterRole{
-				addManagePermissionToClusterRole("p-123xyz", addNamespaceToClusterRole(namespaceName, "*", createClusterRoleForProject("p-123xyz", "otherNamespace", "*"))),
-				addManagePermissionToClusterRole("p-123abc", createBaseClusterRoleForProject("p-123abc", "*")),
-			},
-			wantError: false,
-		},
-		{
-			name:                "indexer error",
-			projectNSAnnotation: "c-123xyz:p-123xyz",
-			indexerError:        fmt.Errorf("unable to read from indexer"),
-			wantError:           true,
-		},
-		{
-			name:                "update error",
-			projectNSAnnotation: "c-123xyz:p-123xyz",
-			indexedRoles: []*rbacv1.ClusterRole{
-				createClusterRoleForProject("p-123xyz", namespaceName, "*"),
-				addNamespaceToClusterRole("otherNamespace", "get", createClusterRoleForProject("p-123abc", namespaceName, "get")),
-			},
-			updateError: fmt.Errorf("unable to update"),
-			wantError:   true,
-		},
-		{
-			name:                "create error",
-			projectNSAnnotation: "c-123xyz:p-123xyz",
-			createError:         fmt.Errorf("unable to create"),
-			wantError:           true,
-		},
-		{
-			name:                "delete error",
-			projectNSAnnotation: "c-123xyz:p-123xyz",
-			indexedRoles: []*rbacv1.ClusterRole{
-				createClusterRoleForProject("p-123xyz", namespaceName, "*"),
-				createClusterRoleForProject("p-123abc", namespaceName, "get"),
-			},
-			deleteError: fmt.Errorf("unable to delete"),
-			wantError:   true,
-		},
-		{
-			name:                "get error",
-			projectNSAnnotation: "c-123xyz:p-123xyz",
-			getError:            fmt.Errorf("unable to get"),
-			wantError:           true,
-		},
-	}
-	for _, test := range tests {
-		test := test
-		t.Run(test.name, func(t *testing.T) {
-			var newRoles []*rbacv1.ClusterRole
-			var deletedRoleNames []string
-			indexer := FakeResourceIndexer[*rbacv1.ClusterRole]{
+			crIndexer: &FakeResourceIndexer[*rbacv1.ClusterRole]{
 				index: crByNSIndex,
 				resources: map[string][]*rbacv1.ClusterRole{
-					namespaceName: test.indexedRoles,
+					testNamespace2.Name: {getCR.DeepCopy()},
 				},
-				err: test.indexerError,
+				err: nil,
+			},
+			wantRoles: []*rbacv1.ClusterRole{
+				updateGetCR,
+			},
+			wantDeletedRoleNames: []string{},
+			wantErr:              false,
+		},
+		{
+			name:      "create manage-ns role",
+			namespace: &testNamespace1,
+			roleVerb:  []string{manageNSVerb},
+			setupCRController: func(c *wfakes.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList], finalRoles *[]*rbacv1.ClusterRole, deletedRoleNames *[]string) {
+				c.EXPECT().Create(gomock.Any()).DoAndReturn(
+					func(cr *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
+						created := manageCR.DeepCopy()
+						*finalRoles = append(*finalRoles, created)
+						return created, nil
+					})
+			},
+			setupCRLister: func(l *wfakes.MockNonNamespacedCacheInterface[*rbacv1.ClusterRole]) {
+				l.EXPECT().Get(gomock.Any()).Return(nil, nil)
+			},
+			crIndexer: &FakeResourceIndexer[*rbacv1.ClusterRole]{
+				index:     crByNSIndex,
+				resources: map[string][]*rbacv1.ClusterRole{},
+				err:       nil,
+			},
+			wantRoles: []*rbacv1.ClusterRole{
+				manageCR,
+			},
+			wantDeletedRoleNames: []string{},
+			wantErr:              false,
+		},
+		{
+			name:      "create edit role",
+			namespace: &testNamespace1,
+			roleVerb:  []string{editVerb},
+			setupCRController: func(c *wfakes.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList], finalRoles *[]*rbacv1.ClusterRole, deletedRoleNames *[]string) {
+				c.EXPECT().Create(gomock.Any()).DoAndReturn(
+					func(cr *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
+						created := editCR.DeepCopy()
+						*finalRoles = append(*finalRoles, created)
+						return created, nil
+					})
+			},
+			setupCRLister: func(l *wfakes.MockNonNamespacedCacheInterface[*rbacv1.ClusterRole]) {
+				l.EXPECT().Get(gomock.Any()).Return(nil, nil)
+			},
+			crIndexer: &FakeResourceIndexer[*rbacv1.ClusterRole]{
+				index:     crByNSIndex,
+				resources: map[string][]*rbacv1.ClusterRole{},
+				err:       nil,
+			},
+			wantRoles: []*rbacv1.ClusterRole{
+				editCR,
+			},
+			wantDeletedRoleNames: []string{},
+			wantErr:              false,
+		},
+		{
+			name:      "update get & create manage-ns role",
+			namespace: &testNamespace2,
+			roleVerb:  []string{"get", manageNSVerb},
+			setupCRController: func(c *wfakes.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList], finalRoles *[]*rbacv1.ClusterRole, deletedRoleNames *[]string) {
+				c.EXPECT().Create(gomock.Any()).DoAndReturn(
+					func(cr *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
+						created := createClusterRoleForProject("p-123xyz", testNamespace2.Name, manageNSVerb)
+						*finalRoles = append(*finalRoles, created)
+						return created, nil
+					})
+				c.EXPECT().Update(gomock.Any()).DoAndReturn(
+					func(cr *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
+						updated := updateGetCR.DeepCopy()
+						*finalRoles = append(*finalRoles, updated)
+						return updated, nil
+					})
+			},
+			setupCRLister: func(l *wfakes.MockNonNamespacedCacheInterface[*rbacv1.ClusterRole]) {
+				l.EXPECT().Get(gomock.Any()).Return(getCR.DeepCopy(), nil)
+				l.EXPECT().Get(gomock.Any()).Return(nil, nil)
+			},
+			crIndexer: &FakeResourceIndexer[*rbacv1.ClusterRole]{
+				index: crByNSIndex,
+				resources: map[string][]*rbacv1.ClusterRole{
+					testNamespace1.Name: {getCR.DeepCopy()},
+				},
+				err: nil,
+			},
+			wantRoles: []*rbacv1.ClusterRole{
+				updateGetCR,
+				createClusterRoleForProject("p-123xyz", testNamespace2.Name, manageNSVerb),
+			},
+			wantDeletedRoleNames: []string{},
+			wantErr:              false,
+		},
+		{
+			// manage-ns role is applied at the project level. It's not expected be updated per namespace reconciliation.
+			name:      "update get & no change to existing manage-ns role",
+			namespace: &testNamespace2,
+			roleVerb:  []string{"get", manageNSVerb},
+			setupCRController: func(c *wfakes.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList], finalRoles *[]*rbacv1.ClusterRole, deletedRoleNames *[]string) {
+				c.EXPECT().Update(gomock.Any()).DoAndReturn(
+					func(cr *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
+						updated := updateGetCR.DeepCopy()
+						*finalRoles = append(*finalRoles, updated)
+						return updated, nil
+					})
+			},
+			setupCRLister: func(l *wfakes.MockNonNamespacedCacheInterface[*rbacv1.ClusterRole]) {
+				l.EXPECT().Get(gomock.Any()).Return(getCR.DeepCopy(), nil)
+				l.EXPECT().Get(gomock.Any()).Return(manageCR.DeepCopy(), nil)
+			},
+			crIndexer: &FakeResourceIndexer[*rbacv1.ClusterRole]{
+				index: crByNSIndex,
+				resources: map[string][]*rbacv1.ClusterRole{
+					testNamespace1.Name: {getCR.DeepCopy(), manageCR.DeepCopy()},
+				},
+				err: nil,
+			},
+			wantRoles: []*rbacv1.ClusterRole{
+				updateGetCR,
+			},
+			wantDeletedRoleNames: []string{},
+			wantErr:              false,
+		},
+		{
+			name:      "delete a role with no resourceName",
+			namespace: &unrelatedNamespace,
+			roleVerb:  []string{"get"},
+			setupCRController: func(c *wfakes.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList], finalRoles *[]*rbacv1.ClusterRole, deletedRoleNames *[]string) {
+				c.EXPECT().Delete(gomock.Any(), gomock.Any()).DoAndReturn(
+					func(name string, opts *metav1.DeleteOptions) error {
+						*deletedRoleNames = append(*deletedRoleNames, noResourceNameCR.Name)
+						return nil
+					})
+			},
+			setupCRLister: func(l *wfakes.MockNonNamespacedCacheInterface[*rbacv1.ClusterRole]) {},
+			crIndexer: &FakeResourceIndexer[*rbacv1.ClusterRole]{
+				index: crByNSIndex,
+				resources: map[string][]*rbacv1.ClusterRole{
+					unrelatedNamespace.Name: {noResourceNameCR.DeepCopy()},
+				},
+				err: nil,
+			},
+			wantRoles: []*rbacv1.ClusterRole{},
+			wantDeletedRoleNames: []string{
+				noResourceNameCR.Name,
+			},
+			wantErr: false,
+		},
+		{
+			name:              "indexer error",
+			namespace:         &testNamespace1,
+			roleVerb:          []string{"get"},
+			setupCRController: nil,
+			setupCRLister:     nil,
+			crIndexer: &FakeResourceIndexer[*rbacv1.ClusterRole]{
+				index:     crByNSIndex,
+				resources: nil,
+				err:       fmt.Errorf("unable to read from indexer"),
+			},
+			wantErr:        true,
+			wantErrMessage: "unable to read from indexer",
+		},
+		{
+			name:      "update error",
+			namespace: &testNamespace2,
+			roleVerb:  []string{"get"},
+			setupCRController: func(c *wfakes.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList], finalRoles *[]*rbacv1.ClusterRole, deletedRoleNames *[]string) {
+				c.EXPECT().Update(gomock.Any()).Return(nil, fmt.Errorf("unable to update"))
+			},
+			setupCRLister: func(l *wfakes.MockNonNamespacedCacheInterface[*rbacv1.ClusterRole]) {
+				l.EXPECT().Get("p-123xyz-namespaces-readonly").Return(getCR.DeepCopy(), nil)
+			},
+			crIndexer: &FakeResourceIndexer[*rbacv1.ClusterRole]{
+				index: crByNSIndex,
+				resources: map[string][]*rbacv1.ClusterRole{
+					testNamespace1.Name: {getCR.DeepCopy()},
+				},
+				err: nil,
+			},
+			wantErr:        true,
+			wantErrMessage: "unable to update",
+		},
+		{
+			name:      "create error",
+			namespace: &testNamespace1,
+			roleVerb:  []string{"get"},
+			setupCRController: func(c *wfakes.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList], finalRoles *[]*rbacv1.ClusterRole, deletedRoleNames *[]string) {
+				c.EXPECT().Create(gomock.Any()).Return(nil, fmt.Errorf("unable to create"))
+			},
+			setupCRLister: func(l *wfakes.MockNonNamespacedCacheInterface[*rbacv1.ClusterRole]) {
+				l.EXPECT().Get(gomock.Any()).Return(nil, nil)
+			},
+			crIndexer: &FakeResourceIndexer[*rbacv1.ClusterRole]{
+				index:     crByNSIndex,
+				resources: map[string][]*rbacv1.ClusterRole{},
+				err:       nil,
+			},
+			wantErr:        true,
+			wantErrMessage: "unable to create",
+		},
+		{
+			name:      "delete error",
+			namespace: &unrelatedNamespace,
+			roleVerb:  []string{"get"},
+			setupCRController: func(c *wfakes.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList], finalRoles *[]*rbacv1.ClusterRole, deletedRoleNames *[]string) {
+				c.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(fmt.Errorf("unable to delete"))
+			},
+			setupCRLister: nil,
+			crIndexer: &FakeResourceIndexer[*rbacv1.ClusterRole]{
+				index: crByNSIndex,
+				resources: map[string][]*rbacv1.ClusterRole{
+					unrelatedNamespace.Name: {noResourceNameCR.DeepCopy()},
+				},
+				err: nil,
+			},
+			wantErr:        true,
+			wantErrMessage: "unable to delete",
+		},
+		{
+			name:              "get error",
+			namespace:         &testNamespace1,
+			roleVerb:          []string{"get"},
+			setupCRController: nil,
+			setupCRLister: func(l *wfakes.MockNonNamespacedCacheInterface[*rbacv1.ClusterRole]) {
+				l.EXPECT().Get(gomock.Any()).Return(nil, fmt.Errorf("unable to get"))
+			},
+			crIndexer: &FakeResourceIndexer[*rbacv1.ClusterRole]{
+				index:     crByNSIndex,
+				resources: map[string][]*rbacv1.ClusterRole{},
+				err:       nil,
+			},
+			wantErr:        true,
+			wantErrMessage: "unable to get",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockCRController := wfakes.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
+			var finalRoles []*rbacv1.ClusterRole
+			var deletedRoleNames []string
+			if tc.setupCRController != nil {
+				tc.setupCRController(mockCRController, &finalRoles, &deletedRoleNames)
 			}
-			fakeLister := wfakes.NewMockNonNamespacedCacheInterface[*rbacv1.ClusterRole](ctrl)
-			fakeLister.EXPECT().Get(gomock.Any()).DoAndReturn(
-				func(in1 string) (*rbacv1.ClusterRole, error) {
-					if test.getError != nil {
-						return nil, test.getError
-					}
-					for _, role := range test.currentRoles {
-						if role.Name == in1 {
-							return role, nil
-						}
-					}
-					return nil, apierrors.NewNotFound(schema.GroupResource{
-						Group:    "rbac.authorization.k8s.io",
-						Resource: "ClusterRoles",
-					}, in1)
-				},
-			).AnyTimes()
-			fakeClusterRoles := wfakes.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
-			fakeClusterRoles.EXPECT().Create(gomock.Any()).DoAndReturn(
-				func(in *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
-					newRoles = append(newRoles, in)
-					if test.createError != nil {
-						return nil, test.createError
-					}
-					return in, nil
-				},
-			).AnyTimes()
-			fakeClusterRoles.EXPECT().Update(gomock.Any()).DoAndReturn(
-				func(in *rbacv1.ClusterRole) (*rbacv1.ClusterRole, error) {
-					newRoles = append(newRoles, in)
-					if test.updateError != nil {
-						return nil, test.updateError
-					}
-					return in, nil
-				},
-			).AnyTimes()
-			fakeClusterRoles.EXPECT().Delete(gomock.Any(), gomock.Any()).DoAndReturn(
-				func(name string, options *metav1.DeleteOptions) error {
-					deletedRoleNames = append(deletedRoleNames, name)
-					if test.deleteError != nil {
-						return test.deleteError
-					}
-					return nil
-				},
-			).AnyTimes()
-			lifecycle := nsLifecycle{
+
+			mockCRLister := wfakes.NewMockNonNamespacedCacheInterface[*rbacv1.ClusterRole](ctrl)
+			if tc.setupCRLister != nil {
+				tc.setupCRLister(mockCRLister)
+			}
+
+			mockNSLifecycle := &nsLifecycle{
 				m: &manager{
-					crLister:     fakeLister,
-					crIndexer:    &indexer,
-					clusterRoles: fakeClusterRoles,
+					crIndexer:    tc.crIndexer,
+					crLister:     mockCRLister,
+					clusterRoles: mockCRController,
 				},
 			}
-			err := lifecycle.reconcileNamespaceProjectClusterRole(&corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: namespaceName,
-					Annotations: map[string]string{
-						projectIDAnnotation: test.projectNSAnnotation,
-					},
-				},
-			})
-			if test.wantError {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-				assert.Len(t, newRoles, len(test.wantRoles))
-				for _, role := range test.wantRoles {
-					assert.Contains(t, newRoles, role)
-				}
-				assert.Len(t, deletedRoleNames, len(test.wantDeleteRoleNames))
-				for _, roleName := range test.wantDeleteRoleNames {
-					assert.Contains(t, deletedRoleNames, roleName)
+
+			for _, verb := range tc.roleVerb {
+				err := mockNSLifecycle.reconcileNamespaceProjectClusterRole(tc.namespace, verb)
+				if tc.wantErr {
+					if assert.Error(t, err, "expected error but got none") && tc.wantErrMessage != "" {
+						assert.EqualError(t, err, tc.wantErrMessage)
+					}
+				} else {
+					assert.NoError(t, err, "expected no error but got one")
 				}
 			}
+			assert.ElementsMatch(t, tc.wantRoles, finalRoles, "expected roles to match")
+			assert.ElementsMatch(t, tc.wantDeletedRoleNames, deletedRoleNames, "expected deleted roles to match")
 		})
 	}
-
 }
 
 func TestCreateProjectNSRole(t *testing.T) {
@@ -270,6 +399,7 @@ func TestCreateProjectNSRole(t *testing.T) {
 		verb        string
 		namespace   string
 		projectName string
+		crSetup     func()
 		startingCR  *rbacv1.ClusterRole
 		expectedCR  *rbacv1.ClusterRole
 		createError error
@@ -290,14 +420,14 @@ func TestCreateProjectNSRole(t *testing.T) {
 			},
 		},
 		{
-			description: "create edit role",
-			verb:        "*",
+			description: "create manage role",
+			verb:        "manage-namespaces",
 			projectName: "p-123xyz",
 			expectedCR: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "p-123xyz-namespaces-edit",
+					Name: "p-123xyz-namespaces-manage",
 					Annotations: map[string]string{
-						projectNSAnn: "p-123xyz-namespaces-edit",
+						projectNSAnn: "p-123xyz-namespaces-manage",
 					},
 				},
 				Rules: []rbacv1.PolicyRule{
@@ -312,13 +442,13 @@ func TestCreateProjectNSRole(t *testing.T) {
 		},
 		{
 			description: "do not change role if already exists and return AlreadyExists error",
-			verb:        "*",
+			verb:        "manage-namespaces",
 			projectName: "p-123xyz",
 			expectedCR: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "p-123xyz-namespaces-edit",
+					Name: "p-123xyz-namespaces-manage",
 					Annotations: map[string]string{
-						projectNSAnn: "p-123xyz-namespaces-edit",
+						projectNSAnn: "p-123xyz-namespaces-manage",
 					},
 				},
 				Rules: []rbacv1.PolicyRule{
@@ -332,9 +462,9 @@ func TestCreateProjectNSRole(t *testing.T) {
 			},
 			startingCR: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "p-123xyz-namespaces-edit",
+					Name: "p-123xyz-namespaces-manage",
 					Annotations: map[string]string{
-						projectNSAnn: "p-123xyz-namespaces-edit",
+						projectNSAnn: "p-123xyz-namespaces-manage",
 					},
 				},
 				Rules: []rbacv1.PolicyRule{
@@ -346,11 +476,11 @@ func TestCreateProjectNSRole(t *testing.T) {
 					},
 				},
 			},
-			expectedErr: `roletemplates.management.cattle.io "p-123xyz-namespaces-edit" already exists`,
+			expectedErr: `roletemplates.management.cattle.io "p-123xyz-namespaces-manage" already exists`,
 		},
 		{
 			description: "test should return non-AlreadyExists error",
-			verb:        "*",
+			verb:        "manage-namespaces",
 			projectName: "p-123xyz",
 			createError: apierrors.NewInternalError(fmt.Errorf("some error")),
 			expectedErr: "Internal error occurred: some error",
@@ -440,13 +570,20 @@ func addNamespaceToClusterRole(namespace string, verb string, clusterRole *rbacv
 		clusterRole.Rules[foundIdx].ResourceNames = append(clusterRole.Rules[foundIdx].ResourceNames, namespace)
 		return clusterRole
 	}
+
+	verbs := []string{verb}
+	if verb == editVerb {
+		verbs = editVerbs
+	}
+
 	rule := rbacv1.PolicyRule{
 		APIGroups:     []string{""},
-		Verbs:         []string{verb},
+		Verbs:         verbs,
 		Resources:     []string{"namespaces"},
 		ResourceNames: []string{namespace},
 	}
 	clusterRole.Rules = append(clusterRole.Rules, rule)
+
 	return clusterRole
 }
 

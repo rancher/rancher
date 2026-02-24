@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/rancher/rancher/tests/v2/integration/actions/namespaces"
@@ -8,6 +9,7 @@ import (
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	"github.com/rancher/shepherd/extensions/users"
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
+	"github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -78,9 +80,10 @@ func (p *ProjectUserTestSuite) TestCreateNamespaceProjectMember() {
 	testUser, err := client.AsUser(p.testUser)
 	require.NoError(p.T(), err)
 
-	createdNamespace, err := namespaces.CreateNamespace(testUser, namespaceName, "{}", map[string]string{}, map[string]string{}, p.project)
+	testNamespaceName := fmt.Sprintf("%s-%s", namespaceName, namegenerator.RandStringLower(5))
+	createdNamespace, err := namespaces.CreateNamespace(testUser, testNamespaceName, "{}", map[string]string{}, map[string]string{}, p.project)
 	assert.NoError(p.T(), err)
-	assert.Equal(p.T(), namespaceName, createdNamespace.Name)
+	assert.Equal(p.T(), testNamespaceName, createdNamespace.Name)
 }
 
 func (p *ProjectUserTestSuite) TestCreateNamespaceProjectOwner() {
@@ -96,9 +99,10 @@ func (p *ProjectUserTestSuite) TestCreateNamespaceProjectOwner() {
 	testUser, err := client.AsUser(p.testUser)
 	require.NoError(p.T(), err)
 
-	createdNamespace, err := namespaces.CreateNamespace(testUser, namespaceName, "{}", map[string]string{}, map[string]string{}, p.project)
+	testNamespaceName := fmt.Sprintf("%s-%s", namespaceName, namegenerator.RandStringLower(5))
+	createdNamespace, err := namespaces.CreateNamespace(testUser, testNamespaceName, "{}", map[string]string{}, map[string]string{}, p.project)
 	assert.NoError(p.T(), err)
-	assert.Equal(p.T(), namespaceName, createdNamespace.Name)
+	assert.Equal(p.T(), testNamespaceName, createdNamespace.Name)
 }
 
 func TestProjectUserTestSuite(t *testing.T) {
