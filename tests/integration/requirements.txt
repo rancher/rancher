@@ -13,5 +13,5 @@ requests==2.32.5
 kubernetes==12.0.1
 urllib3<2.6.4
 jinja2>=2.10
-cryptography==44.0.3
-werkzeug==3.1.5
+cryptography==46.0.5
+werkzeug==3.1.6
