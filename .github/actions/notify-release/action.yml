@@ -24,4 +24,4 @@ runs:
         WORKFLOW_URL: ${{ inputs.workflow_url }}
       shell: bash
       run: |
-        curl -X POST ${{ env.WEBHOOK_URL }} -d '{"tag": "${{ env.TAG }}","status": "${{ env.STATUS }}","commit_url": "${{ env.COMMIT_URL }}","workflow_url": "${{ env.WORKFLOW_URL }}"}'
+        curl -X POST "${{ env.WEBHOOK_URL }}" -d '{"tag": "${{ env.TAG }}","status": "${{ env.STATUS }}","commit_url": "${{ env.COMMIT_URL }}","workflow_url": "${{ env.WORKFLOW_URL }}"}'
