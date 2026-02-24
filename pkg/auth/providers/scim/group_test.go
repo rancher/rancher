@@ -205,7 +205,7 @@ func TestSyncGroupMembers(t *testing.T) {
 		newMember := scimMember{Value: "u-mo773yttt4", Display: "john.doe"}
 		userCache.EXPECT().Get("u-mo773yttt4").Return(&v3.User{
 			ObjectMeta: metav1.ObjectMeta{Name: "u-mo773yttt4"},
-		}, nil)
+		}, nil).Times(2) // Once for pre-flight check, once inside addGroupMember.
 
 		existingAttr := &v3.UserAttribute{
 			ObjectMeta: metav1.ObjectMeta{Name: "u-mo773yttt4"},
@@ -281,6 +281,79 @@ func TestSyncGroupMembers(t *testing.T) {
 
 		err := srv.syncGroupMembers(provider, groupName, []scimMember{})
 		require.NoError(t, err)
+	})
+
+	t.Run("rejects nested group member", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		// getRancherGroupMembers: no current members.
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
+
+		srv := &SCIMServer{
+			userCache: userCache,
+		}
+
+		err := srv.syncGroupMembers(provider, groupName, []scimMember{
+			{Value: "grp-xyz", Type: "Group", Display: "SubTeam"},
+		})
+
+		require.Error(t, err)
+		scimErr, ok := err.(*Error)
+		require.True(t, ok)
+		assert.Equal(t, http.StatusBadRequest, scimErr.Status)
+	})
+
+	t.Run("rejects unsupported member type", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		// getRancherGroupMembers: no current members.
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
+
+		srv := &SCIMServer{
+			userCache: userCache,
+		}
+
+		err := srv.syncGroupMembers(provider, groupName, []scimMember{
+			{Value: "something-else", Type: "SomethingElse", Display: "Something Else"},
+		})
+
+		require.Error(t, err)
+		scimErr, ok := err.(*Error)
+		require.True(t, ok)
+		assert.Equal(t, http.StatusBadRequest, scimErr.Status)
+	})
+
+	t.Run("rejects member not found in pre-flight", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		// getRancherGroupMembers: no current members.
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
+
+		// Pre-flight: user does not exist.
+		notFound := &apierrors.StatusError{
+			ErrStatus: metav1.Status{
+				Status: metav1.StatusFailure,
+				Reason: metav1.StatusReasonNotFound,
+				Code:   http.StatusNotFound,
+			},
+		}
+		userCache.EXPECT().Get("u-missing").Return(nil, notFound)
+
+		srv := &SCIMServer{
+			userCache: userCache,
+		}
+
+		err := srv.syncGroupMembers(provider, groupName, []scimMember{
+			{Value: "u-missing", Display: "missing.user"},
+		})
+
+		require.Error(t, err)
+		scimErr, ok := err.(*Error)
+		require.True(t, ok)
+		assert.Equal(t, http.StatusNotFound, scimErr.Status)
 	})
 }
 
@@ -407,7 +480,7 @@ func TestPatchGroup(t *testing.T) {
 		// Adding member.
 		userCache.EXPECT().Get("u-mo773yttt4").Return(&v3.User{
 			ObjectMeta: metav1.ObjectMeta{Name: "u-mo773yttt4"},
-		}, nil)
+		}, nil).Times(2) // Once for pre-flight check, once inside addGroupMember.
 		userAttributeCache.EXPECT().Get("u-mo773yttt4").Return(&v3.UserAttribute{
 			ObjectMeta:      metav1.ObjectMeta{Name: "u-mo773yttt4"},
 			GroupPrincipals: map[string]v3.Principals{provider: {Items: []v3.Principal{}}},
@@ -476,6 +549,151 @@ func TestPatchGroup(t *testing.T) {
 		assert.Contains(t, meta["location"], wantLocation)
 		assert.Contains(t, w.Header().Get("Location"), wantLocation)
 
+	})
+
+	t.Run("add group as member is rejected", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		existingGroup := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			DisplayName: "Engineering",
+			Provider:    provider,
+		}
+		groupCache.EXPECT().Get(groupID).Return(existingGroup, nil)
+
+		srv := &SCIMServer{
+			groupsCache: groupCache,
+		}
+
+		payload := map[string]any{
+			"schemas": []string{"urn:ietf:params:scim:api:messages:2.0:PatchOp"},
+			"Operations": []map[string]any{
+				{
+					"op":   "add",
+					"path": "members",
+					"value": []map[string]any{
+						{"value": "grp-xyz", "display": "SubTeam", "type": "Group"},
+					},
+				},
+			},
+		}
+		body, _ := json.Marshal(payload)
+
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewReader(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+
+		srv.PatchGroup(w, r)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusBadRequest, resp.Status)
+	})
+
+	t.Run("add unsupported member type is rejected", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		existingGroup := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			DisplayName: "Engineering",
+			Provider:    provider,
+		}
+		groupCache.EXPECT().Get(groupID).Return(existingGroup, nil)
+
+		srv := &SCIMServer{
+			groupsCache: groupCache,
+		}
+
+		payload := map[string]any{
+			"schemas": []string{"urn:ietf:params:scim:api:messages:2.0:PatchOp"},
+			"Operations": []map[string]any{
+				{
+					"op":   "add",
+					"path": "members",
+					"value": []map[string]any{
+						{"value": "something-else", "display": "Something Else", "type": "SomethingElse"},
+					},
+				},
+			},
+		}
+		body, _ := json.Marshal(payload)
+
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewReader(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+
+		srv.PatchGroup(w, r)
+
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+
+		var respBad Error
+		err := json.Unmarshal(w.Body.Bytes(), &respBad)
+		require.NoError(t, err)
+		assert.Contains(t, respBad.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusBadRequest, respBad.Status)
+	})
+
+	t.Run("add member that does not exist returns 404", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+
+		existingGroup := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			DisplayName: "Engineering",
+			Provider:    provider,
+		}
+		groupCache.EXPECT().Get(groupID).Return(existingGroup, nil)
+
+		// Pre-flight: user does not exist.
+		notFound := &apierrors.StatusError{
+			ErrStatus: metav1.Status{
+				Status: metav1.StatusFailure,
+				Reason: metav1.StatusReasonNotFound,
+				Code:   http.StatusNotFound,
+			},
+		}
+		userCache.EXPECT().Get("u-missing").Return(nil, notFound)
+
+		srv := &SCIMServer{
+			groupsCache: groupCache,
+			userCache:   userCache,
+		}
+
+		payload := map[string]any{
+			"schemas": []string{"urn:ietf:params:scim:api:messages:2.0:PatchOp"},
+			"Operations": []map[string]any{
+				{
+					"op":   "add",
+					"path": "members",
+					"value": []map[string]any{
+						{"value": "u-missing", "display": "missing.user"},
+					},
+				},
+			},
+		}
+		body, _ := json.Marshal(payload)
+
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewReader(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+
+		srv.PatchGroup(w, r)
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+
+		var resp404 Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp404)
+		require.NoError(t, err)
+		assert.Contains(t, resp404.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusNotFound, resp404.Status)
 	})
 
 	t.Run("remove member operation", func(t *testing.T) {
@@ -879,7 +1097,7 @@ func TestCreateGroup(t *testing.T) {
 		userCache.EXPECT().Get("u-user1").Return(&v3.User{
 			ObjectMeta: metav1.ObjectMeta{Name: "u-user1"},
 			Enabled:    &enabled,
-		}, nil)
+		}, nil).Times(2) // Once for pre-flight check, once inside addGroupMember.
 
 		userAttr := &v3.UserAttribute{
 			ObjectMeta: metav1.ObjectMeta{Name: "u-user1"},
@@ -957,6 +1175,13 @@ func TestCreateGroup(t *testing.T) {
 
 		srv.CreateGroup(w, r)
 		require.Equal(t, http.StatusConflict, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusConflict, resp.Status)
+
 	})
 
 	t.Run("conflict is case insensitive", func(t *testing.T) {
@@ -983,6 +1208,12 @@ func TestCreateGroup(t *testing.T) {
 
 		srv.CreateGroup(w, r)
 		require.Equal(t, http.StatusConflict, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusConflict, resp.Status)
 	})
 
 	t.Run("invalid request body", func(t *testing.T) {
@@ -995,6 +1226,12 @@ func TestCreateGroup(t *testing.T) {
 
 		srv.CreateGroup(w, r)
 		require.Equal(t, http.StatusBadRequest, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusBadRequest, resp.Status)
 	})
 
 	t.Run("error listing groups", func(t *testing.T) {
@@ -1017,6 +1254,12 @@ func TestCreateGroup(t *testing.T) {
 
 		srv.CreateGroup(w, r)
 		require.Equal(t, http.StatusInternalServerError, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusInternalServerError, resp.Status)
 	})
 
 	t.Run("error creating group", func(t *testing.T) {
@@ -1043,6 +1286,12 @@ func TestCreateGroup(t *testing.T) {
 
 		srv.CreateGroup(w, r)
 		require.Equal(t, http.StatusInternalServerError, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusInternalServerError, resp.Status)
 	})
 
 	t.Run("error syncing members", func(t *testing.T) {
@@ -1080,6 +1329,106 @@ func TestCreateGroup(t *testing.T) {
 		srv.CreateGroup(w, r)
 
 		require.Equal(t, http.StatusInternalServerError, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusInternalServerError, resp.Status)
+	})
+
+	t.Run("rejects group type member in members list", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().List(labels.Set{authProviderLabel: provider}.AsSelector()).Return([]*v3.Group{}, nil)
+
+		createdGroup := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: "grp-abc123"},
+			DisplayName: "Engineering",
+		}
+		groupClient := fake.NewMockNonNamespacedClientInterface[*v3.Group, *v3.GroupList](ctrl)
+		groupClient.EXPECT().Create(gomock.Any()).Return(createdGroup, nil)
+
+		// syncGroupMembers -> getRancherGroupMembers needs List; pre-flight rejects group type before any Get.
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
+
+		srv := &SCIMServer{
+			groupsCache: groupsCache,
+			groups:      groupClient,
+			userCache:   userCache,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+			"displayName": "Engineering",
+			"members": [{"value": "grp-xyz", "display": "SubTeam", "type": "Group"}]
+		}`
+		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		w := httptest.NewRecorder()
+
+		srv.CreateGroup(w, r)
+
+		require.Equal(t, http.StatusBadRequest, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusBadRequest, resp.Status)
+	})
+
+	t.Run("member not found returns 404", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().List(labels.Set{authProviderLabel: provider}.AsSelector()).Return([]*v3.Group{}, nil)
+
+		createdGroup := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: "grp-abc123"},
+			DisplayName: "Engineering",
+		}
+		groupClient := fake.NewMockNonNamespacedClientInterface[*v3.Group, *v3.GroupList](ctrl)
+		groupClient.EXPECT().Create(gomock.Any()).Return(createdGroup, nil)
+
+		// syncGroupMembers -> getRancherGroupMembers; then pre-flight Get finds user missing.
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
+		notFound := &apierrors.StatusError{
+			ErrStatus: metav1.Status{
+				Status: metav1.StatusFailure,
+				Reason: metav1.StatusReasonNotFound,
+				Code:   http.StatusNotFound,
+			},
+		}
+		userCache.EXPECT().Get("u-missing").Return(nil, notFound)
+
+		srv := &SCIMServer{
+			groupsCache: groupsCache,
+			groups:      groupClient,
+			userCache:   userCache,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+			"displayName": "Engineering",
+			"members": [{"value": "u-missing", "display": "missing.user"}]
+		}`
+		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		w := httptest.NewRecorder()
+
+		srv.CreateGroup(w, r)
+
+		require.Equal(t, http.StatusNotFound, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusNotFound, resp.Status)
 	})
 
 	t.Run("conflict when group found by ID", func(t *testing.T) {
@@ -1113,6 +1462,12 @@ func TestCreateGroup(t *testing.T) {
 
 		srv.CreateGroup(w, r)
 		require.Equal(t, http.StatusConflict, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusConflict, resp.Status)
 	})
 
 	t.Run("conflict when group found by displayName with different externalId", func(t *testing.T) {
@@ -1151,6 +1506,12 @@ func TestCreateGroup(t *testing.T) {
 
 		srv.CreateGroup(w, r)
 		require.Equal(t, http.StatusConflict, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusConflict, resp.Status)
 	})
 }
 
@@ -1312,6 +1673,12 @@ func TestGetGroup(t *testing.T) {
 
 		srv.GetGroup(w, r)
 		require.Equal(t, http.StatusNotFound, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusNotFound, resp.Status)
 	})
 
 	t.Run("error getting group from cache", func(t *testing.T) {
@@ -1332,6 +1699,12 @@ func TestGetGroup(t *testing.T) {
 
 		srv.GetGroup(w, r)
 		require.Equal(t, http.StatusInternalServerError, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusInternalServerError, resp.Status)
 	})
 
 	t.Run("error getting group members", func(t *testing.T) {
@@ -1360,6 +1733,12 @@ func TestGetGroup(t *testing.T) {
 
 		srv.GetGroup(w, r)
 		require.Equal(t, http.StatusInternalServerError, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusInternalServerError, resp.Status)
 	})
 
 	t.Run("skips system users when getting members", func(t *testing.T) {
@@ -1504,7 +1883,7 @@ func TestUpdateGroup(t *testing.T) {
 		userCache.EXPECT().Get("u-user1").Return(&v3.User{
 			ObjectMeta: metav1.ObjectMeta{Name: "u-user1"},
 			Enabled:    &enabled,
-		}, nil)
+		}, nil).Times(2) // Once for pre-flight check, once inside addGroupMember.
 
 		userAttr := &v3.UserAttribute{
 			ObjectMeta: metav1.ObjectMeta{Name: "u-user1"},
@@ -1565,6 +1944,12 @@ func TestUpdateGroup(t *testing.T) {
 
 		srv.UpdateGroup(w, r)
 		require.Equal(t, http.StatusBadRequest, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusBadRequest, resp.Status)
 	})
 
 	t.Run("invalid request body", func(t *testing.T) {
@@ -1577,6 +1962,12 @@ func TestUpdateGroup(t *testing.T) {
 
 		srv.UpdateGroup(w, r)
 		require.Equal(t, http.StatusBadRequest, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusBadRequest, resp.Status)
 	})
 
 	t.Run("error ensuring group", func(t *testing.T) {
@@ -1602,6 +1993,12 @@ func TestUpdateGroup(t *testing.T) {
 
 		srv.UpdateGroup(w, r)
 		require.Equal(t, http.StatusInternalServerError, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusInternalServerError, resp.Status)
 	})
 
 	t.Run("error syncing members", func(t *testing.T) {
@@ -1638,6 +2035,12 @@ func TestUpdateGroup(t *testing.T) {
 
 		srv.UpdateGroup(w, r)
 		require.Equal(t, http.StatusInternalServerError, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusInternalServerError, resp.Status)
 	})
 
 	t.Run("removes members not in update", func(t *testing.T) {
@@ -1828,6 +2231,12 @@ func TestDeleteGroup(t *testing.T) {
 
 		srv.DeleteGroup(w, r)
 		require.Equal(t, http.StatusNotFound, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusNotFound, resp.Status)
 	})
 
 	t.Run("error getting group from cache", func(t *testing.T) {
@@ -1848,6 +2257,12 @@ func TestDeleteGroup(t *testing.T) {
 
 		srv.DeleteGroup(w, r)
 		require.Equal(t, http.StatusInternalServerError, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusInternalServerError, resp.Status)
 	})
 
 	t.Run("error removing group members", func(t *testing.T) {
@@ -1876,6 +2291,12 @@ func TestDeleteGroup(t *testing.T) {
 
 		srv.DeleteGroup(w, r)
 		require.Equal(t, http.StatusInternalServerError, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusInternalServerError, resp.Status)
 	})
 
 	t.Run("error deleting group", func(t *testing.T) {
@@ -1908,5 +2329,11 @@ func TestDeleteGroup(t *testing.T) {
 
 		srv.DeleteGroup(w, r)
 		require.Equal(t, http.StatusInternalServerError, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusInternalServerError, resp.Status)
 	})
 }
