@@ -10,7 +10,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 var (
@@ -724,6 +726,232 @@ func Test_addLabelToExternalRole(t *testing.T) {
 			}
 			if err := rth.addLabelToExternalRole(tt.rt); (err != nil) != tt.wantErr {
 				t.Errorf("roleTemplateHandler.addLabelToExternalRole() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_ensureOnlyDesiredClusterRolesExist(t *testing.T) {
+	t.Parallel()
+
+	testRT := v3.RoleTemplate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-rt",
+		},
+		Context: "cluster",
+	}
+
+	desiredCR1 := rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-rt",
+			Labels: map[string]string{
+				rbac.ClusterRoleOwnerLabel: "test-rt",
+			},
+		},
+		Rules: []rbacv1.PolicyRule{sampleRule},
+	}
+
+	desiredCR2 := rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-rt-aggregator",
+			Labels: map[string]string{
+				rbac.ClusterRoleOwnerLabel: "test-rt",
+			},
+		},
+		AggregationRule: &rbacv1.AggregationRule{
+			ClusterRoleSelectors: []metav1.LabelSelector{
+				{
+					MatchLabels: map[string]string{
+						rbac.AggregationLabel: "test-rt",
+					},
+				},
+			},
+		},
+	}
+
+	unwantedCR := rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "old-cluster-role",
+			Labels: map[string]string{
+				rbac.ClusterRoleOwnerLabel: "test-rt",
+			},
+		},
+	}
+
+	outdatedCR := rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-rt",
+			Labels: map[string]string{
+				rbac.ClusterRoleOwnerLabel: "test-rt",
+				"old-label":                "old-value",
+			},
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				Verbs:     []string{"get"},
+				Resources: []string{"configmaps"},
+				APIGroups: []string{""},
+			},
+		},
+	}
+
+	tests := []struct {
+		name                       string
+		rt                         *v3.RoleTemplate
+		desiredCRs                 []*rbacv1.ClusterRole
+		setupClusterRoleController func(*fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList])
+		wantErr                    bool
+	}{
+		{
+			name:       "create cluster roles when they don't exist",
+			rt:         testRT.DeepCopy(),
+			desiredCRs: []*rbacv1.ClusterRole{desiredCR1.DeepCopy(), desiredCR2.DeepCopy()},
+			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				// List returns empty list (no existing cluster roles)
+				m.EXPECT().List(metav1.ListOptions{LabelSelector: rbac.GetClusterRoleOwnerLabel("test-rt")}).Return(&rbacv1.ClusterRoleList{}, nil)
+
+				// Expect Get calls for each desired cluster role (they don't exist)
+				notFoundErr := apierrors.NewNotFound(schema.GroupResource{Group: "rbac.authorization.k8s.io", Resource: "clusterroles"}, "test-rt")
+				m.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(nil, notFoundErr)
+				m.EXPECT().Create(gomock.Any()).Return(desiredCR1.DeepCopy(), nil)
+
+				notFoundErr2 := apierrors.NewNotFound(schema.GroupResource{Group: "rbac.authorization.k8s.io", Resource: "clusterroles"}, "test-rt-aggregator")
+				m.EXPECT().Get("test-rt-aggregator", metav1.GetOptions{}).Return(nil, notFoundErr2)
+				m.EXPECT().Create(gomock.Any()).Return(desiredCR2.DeepCopy(), nil)
+			},
+		},
+		{
+			name:       "update cluster roles with wrong rules and labels",
+			rt:         testRT.DeepCopy(),
+			desiredCRs: []*rbacv1.ClusterRole{desiredCR1.DeepCopy()},
+			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().List(metav1.ListOptions{LabelSelector: rbac.GetClusterRoleOwnerLabel("test-rt")}).Return(&rbacv1.ClusterRoleList{}, nil)
+
+				// Get returns outdated cluster role
+				m.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(outdatedCR.DeepCopy(), nil)
+				// Expect update to fix the cluster role
+				m.EXPECT().Update(gomock.Any()).Return(desiredCR1.DeepCopy(), nil)
+			},
+		},
+		{
+			name:       "delete unwanted cluster roles",
+			rt:         testRT.DeepCopy(),
+			desiredCRs: []*rbacv1.ClusterRole{desiredCR1.DeepCopy()},
+			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				// List returns an unwanted cluster role
+				m.EXPECT().List(metav1.ListOptions{LabelSelector: rbac.GetClusterRoleOwnerLabel("test-rt")}).Return(&rbacv1.ClusterRoleList{
+					Items: []rbacv1.ClusterRole{*unwantedCR.DeepCopy()},
+				}, nil)
+				// Expect delete of unwanted cluster role
+				m.EXPECT().Delete("old-cluster-role", &metav1.DeleteOptions{}).Return(nil)
+
+				// Get returns the desired cluster role already exists
+				m.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(desiredCR1.DeepCopy(), nil)
+			},
+		},
+		{
+			name:       "delete unwanted and create desired cluster roles",
+			rt:         testRT.DeepCopy(),
+			desiredCRs: []*rbacv1.ClusterRole{desiredCR1.DeepCopy(), desiredCR2.DeepCopy()},
+			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				// List returns unwanted cluster role
+				m.EXPECT().List(metav1.ListOptions{LabelSelector: rbac.GetClusterRoleOwnerLabel("test-rt")}).Return(&rbacv1.ClusterRoleList{
+					Items: []rbacv1.ClusterRole{*unwantedCR.DeepCopy()},
+				}, nil)
+				// Expect delete
+				m.EXPECT().Delete("old-cluster-role", &metav1.DeleteOptions{}).Return(nil)
+
+				// Create new desired cluster roles
+				notFoundErr := apierrors.NewNotFound(schema.GroupResource{Group: "rbac.authorization.k8s.io", Resource: "clusterroles"}, "test-rt")
+				m.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(nil, notFoundErr)
+				m.EXPECT().Create(gomock.Any()).Return(desiredCR1.DeepCopy(), nil)
+
+				notFoundErr2 := apierrors.NewNotFound(schema.GroupResource{Group: "rbac.authorization.k8s.io", Resource: "clusterroles"}, "test-rt-aggregator")
+				m.EXPECT().Get("test-rt-aggregator", metav1.GetOptions{}).Return(nil, notFoundErr2)
+				m.EXPECT().Create(gomock.Any()).Return(desiredCR2.DeepCopy(), nil)
+			},
+		},
+		{
+			name:       "error listing existing cluster roles",
+			rt:         testRT.DeepCopy(),
+			desiredCRs: []*rbacv1.ClusterRole{desiredCR1.DeepCopy()},
+			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().List(metav1.ListOptions{LabelSelector: rbac.GetClusterRoleOwnerLabel("test-rt")}).Return(nil, fmt.Errorf("list error"))
+			},
+			wantErr: true,
+		},
+		{
+			name:       "error deleting unwanted cluster role",
+			rt:         testRT.DeepCopy(),
+			desiredCRs: []*rbacv1.ClusterRole{desiredCR1.DeepCopy()},
+			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				// List returns unwanted cluster role
+				m.EXPECT().List(metav1.ListOptions{LabelSelector: rbac.GetClusterRoleOwnerLabel("test-rt")}).Return(&rbacv1.ClusterRoleList{
+					Items: []rbacv1.ClusterRole{*unwantedCR.DeepCopy()},
+				}, nil)
+				// Delete fails
+				m.EXPECT().Delete("old-cluster-role", &metav1.DeleteOptions{}).Return(fmt.Errorf("delete error"))
+			},
+			wantErr: true,
+		},
+		{
+			name:       "error creating cluster role",
+			rt:         testRT.DeepCopy(),
+			desiredCRs: []*rbacv1.ClusterRole{desiredCR1.DeepCopy()},
+			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().List(metav1.ListOptions{LabelSelector: rbac.GetClusterRoleOwnerLabel("test-rt")}).Return(&rbacv1.ClusterRoleList{}, nil)
+
+				notFoundErr := apierrors.NewNotFound(schema.GroupResource{Group: "rbac.authorization.k8s.io", Resource: "clusterroles"}, "test-rt")
+				m.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(nil, notFoundErr)
+				m.EXPECT().Create(gomock.Any()).Return(nil, fmt.Errorf("create error"))
+			},
+			wantErr: true,
+		},
+		{
+			name:       "error updating cluster role",
+			rt:         testRT.DeepCopy(),
+			desiredCRs: []*rbacv1.ClusterRole{desiredCR1.DeepCopy()},
+			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				m.EXPECT().List(metav1.ListOptions{LabelSelector: rbac.GetClusterRoleOwnerLabel("test-rt")}).Return(&rbacv1.ClusterRoleList{}, nil)
+
+				// Get returns outdated cluster role, triggering an update
+				m.EXPECT().Get("test-rt", metav1.GetOptions{}).Return(outdatedCR.DeepCopy(), nil)
+				m.EXPECT().Update(gomock.Any()).Return(nil, fmt.Errorf("update error"))
+			},
+			wantErr: true,
+		},
+		{
+			name:       "no desired cluster roles - delete all existing",
+			rt:         testRT.DeepCopy(),
+			desiredCRs: []*rbacv1.ClusterRole{},
+			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
+				// List returns existing cluster roles
+				m.EXPECT().List(metav1.ListOptions{LabelSelector: rbac.GetClusterRoleOwnerLabel("test-rt")}).Return(&rbacv1.ClusterRoleList{
+					Items: []rbacv1.ClusterRole{*unwantedCR.DeepCopy(), *desiredCR1.DeepCopy()},
+				}, nil)
+				// Expect both to be deleted
+				m.EXPECT().Delete("old-cluster-role", &metav1.DeleteOptions{}).Return(nil)
+				m.EXPECT().Delete("test-rt", &metav1.DeleteOptions{}).Return(nil)
+			},
+		},
+	}
+
+	ctrl := gomock.NewController(t)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			crController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
+			if tt.setupClusterRoleController != nil {
+				tt.setupClusterRoleController(crController)
+			}
+
+			rth := &roleTemplateHandler{
+				crController: crController,
+			}
+
+			err := rth.ensureOnlyDesiredClusterRolesExist(tt.rt, tt.desiredCRs)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("roleTemplateHandler.ensureOnlyDesiredClusterRolesExist() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

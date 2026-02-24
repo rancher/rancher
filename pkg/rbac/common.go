@@ -428,7 +428,7 @@ func CreateOrUpdateNamespacedResource[T generic.RuntimeMetaObject, TList runtime
 // The fields it checks are:
 //
 //   - Rules or AggregationRule
-//   - Cluster role owner annotation
+//   - Cluster role owner label
 //   - Aggregation label
 func AreClusterRolesSame(currentCR, wantedCR *rbacv1.ClusterRole) (bool, *rbacv1.ClusterRole) {
 	same := true

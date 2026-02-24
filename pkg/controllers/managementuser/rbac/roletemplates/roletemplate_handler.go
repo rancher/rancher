@@ -44,10 +44,9 @@ func (rth *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.Rol
 	if err != nil {
 		return nil, err
 	}
-	for _, cr := range clusterRoles {
-		if err := rbac.CreateOrUpdateResource(cr, rth.crController, rbac.AreClusterRolesSame); err != nil {
-			return nil, err
-		}
+
+	if err := rth.ensureOnlyDesiredClusterRolesExist(rt, clusterRoles); err != nil {
+		return nil, err
 	}
 
 	// add aggregation label to external cluster role
@@ -56,6 +55,37 @@ func (rth *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.Rol
 	}
 
 	return rt, nil
+}
+
+// ensureOnlyDesiredClusterRolesExist ensures that only the given list of Cluster Roles exist for the RoleTemplate.
+func (rth *roleTemplateHandler) ensureOnlyDesiredClusterRolesExist(rt *v3.RoleTemplate, desiredCRs []*rbacv1.ClusterRole) error {
+	// ensure only desired Cluster Roles exist
+	desiredCRNames := make(map[string]any)
+	for _, cr := range desiredCRs {
+		desiredCRNames[cr.Name] = nil
+	}
+
+	// get all existing Cluster Roles using the RoleTemplate owner label
+	currentCRs, err := rth.crController.List(metav1.ListOptions{LabelSelector: rbac.GetClusterRoleOwnerLabel(rt.Name)})
+	if err != nil {
+		return fmt.Errorf("failed to list cluster roles for role template %s: %w", rt.Name, err)
+	}
+	for _, currentCR := range currentCRs.Items {
+		if _, ok := desiredCRNames[currentCR.Name]; !ok {
+			// This ClusterRole is not part of the desired Cluster Role list, delete it
+			if err := rbac.DeleteResource(currentCR.Name, rth.crController); err != nil {
+				return fmt.Errorf("failed to delete cluster role %s: %w", currentCR.Name, err)
+			}
+		}
+	}
+
+	// Make sure the desired Cluster Roles exist and have the right contents
+	for _, cr := range desiredCRs {
+		if err := rbac.CreateOrUpdateResource(cr, rth.crController, rbac.AreClusterRolesSame); err != nil {
+			return fmt.Errorf("failed to create or update cluster role %s: %w", cr.Name, err)
+		}
+	}
+	return nil
 }
 
 // clusterRolesForRoleTemplate builds and returns all needed Cluster Roles for the RoleTemplate using the given rules.
