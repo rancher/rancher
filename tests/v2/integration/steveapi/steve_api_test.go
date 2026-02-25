@@ -738,7 +738,7 @@ type listTestType struct {
 	expect         []map[string]string
 	expectExcludes bool
 	expectContains bool
-	expectSummary []clientv1.SteveAPISummaryItem
+	expectSummary  []clientv1.SteveAPISummaryItem
 }
 
 // TEST LIST
@@ -780,13 +780,13 @@ var SQLOnlyListTests = []listTestType{
 			clientv1.SteveAPISummaryItem{
 				Property: "metadata.name",
 				Counts: map[string]int{
-					"test1":5, "test2":5, "test3":5, "test4":5, "test5":5,
+					"test1": 5, "test2": 5, "test3": 5, "test4": 5, "test5": 5,
 				},
 			},
 			clientv1.SteveAPISummaryItem{
 				Property: "metadata.namespace",
 				Counts: map[string]int{
-					"test-ns-1":5, "test-ns-2":5, "test-ns-3":5, "test-ns-4":5, "test-ns-5":5,
+					"test-ns-1": 5, "test-ns-2": 5, "test-ns-3": 5, "test-ns-4": 5, "test-ns-5": 5,
 				},
 			},
 		},
@@ -810,13 +810,13 @@ var SQLOnlyListTests = []listTestType{
 			clientv1.SteveAPISummaryItem{
 				Property: "metadata.name",
 				Counts: map[string]int{
-					"test1":2, "test2":2, "test3":2, "test4":1, "test5":1,
+					"test1": 2, "test2": 2, "test3": 2, "test4": 1, "test5": 1,
 				},
 			},
 			clientv1.SteveAPISummaryItem{
 				Property: "metadata.namespace",
 				Counts: map[string]int{
-					"test-ns-1":5, "test-ns-2":3,
+					"test-ns-1": 5, "test-ns-2": 3,
 				},
 			},
 		},
@@ -856,13 +856,13 @@ var SQLOnlyListTests = []listTestType{
 			clientv1.SteveAPISummaryItem{
 				Property: "metadata.name",
 				Counts: map[string]int{
-					"test2":1,
+					"test2": 1,
 				},
 			},
 			clientv1.SteveAPISummaryItem{
 				Property: "metadata.namespace",
 				Counts: map[string]int{
-					"test-ns-2":1,
+					"test-ns-2": 1,
 				},
 			},
 		},
@@ -903,7 +903,7 @@ var SQLOnlyListTests = []listTestType{
 			clientv1.SteveAPISummaryItem{
 				Property: "metadata.state.name",
 				Counts: map[string]int{
-					"active":25,
+					"active": 25,
 				},
 			},
 		},
@@ -931,9 +931,10 @@ var SQLOnlyListTests = []listTestType{
 		},
 	},
 }
+
 // TEST LIST
 var nonSQLListTests = []listTestType{
-		// user-a
+	// user-a
 	{
 		description: "user:user-a,namespace:none,query:limit=8",
 		user:        "user-a",
@@ -3046,6 +3047,8 @@ func getFileName(user, ns, query string) string {
 		query = "none"
 	} else {
 		query = strings.ReplaceAll(query, "/", "%2F")
+		query = strings.ReplaceAll(query, ">", "%3E")
+		query = strings.ReplaceAll(query, "<", "%3C")
 	}
 	return user + "_" + ns + "_" + query + ".json"
 }
