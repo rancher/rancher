@@ -10,6 +10,7 @@ import (
 
 	"github.com/rancher/norman/condition"
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	util "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/project"
@@ -101,9 +102,8 @@ func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Objec
 	}
 
 	// update if it has changed
-	if obj != nil && !reflect.DeepEqual(orig, obj) {
-		logrus.Infof("[%s] Updating cluster %s", ClusterCreateController, orig.Name)
-		cluster := obj.(*apisv3.Cluster)
+	cluster := obj.(*apisv3.Cluster)
+	if obj != nil && !reflect.DeepEqual(orig.Annotations, cluster.Annotations) {
 		_, err = l.clusterClient.Update(cluster)
 		if err != nil {
 			return nil, err
@@ -119,11 +119,21 @@ func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Objec
 		return nil, err
 	}
 
-	// update if it has changed
-	if obj != nil && !reflect.DeepEqual(orig, obj) {
-		logrus.Infof("[%s] Updating cluster %s", ClusterCreateController, orig.Name)
-		cluster := obj.(*apisv3.Cluster)
-		_, err = l.clusterClient.Update(cluster)
+	// update status if it has changed
+	cluster = obj.(*apisv3.Cluster)
+	if obj != nil && !reflect.DeepEqual(orig.Status.Conditions, cluster.Status.Conditions) {
+		logrus.Infof("[%s] Updating cluster status %s", ClusterCreateController, orig.Name)
+		toUpdate, err := l.clusterClient.Get(cluster.Name, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		// Copy conditions this controller owns
+		util.CopyCondition(apisv3.NamespaceBackedResource, cluster, toUpdate)
+		util.CopyCondition(apisv3.ClusterConditionDefaultProjectCreated, cluster, toUpdate)
+		util.CopyCondition(apisv3.ClusterConditionSystemProjectCreated, cluster, toUpdate)
+		util.CopyCondition(apisv3.CreatorMadeOwner, cluster, toUpdate)
+		util.CopyCondition(apisv3.ClusterConditionInitialRolesPopulated, cluster, toUpdate)
+		_, err = l.clusterClient.UpdateStatus(toUpdate)
 		if err != nil {
 			return nil, err
 		}
@@ -381,13 +391,20 @@ func (l *clusterLifecycle) reconcileClusterCreatorRTB(obj runtime.Object) (runti
 
 		updateCondition := reflect.DeepEqual(roleMap["required"], createdRoles)
 
-		err = l.updateClusterAnnotationandCondition(cluster, string(d), updateCondition)
+		err = l.updateClusterAnnotation(cluster, string(d))
+		if err != nil {
+			return obj, err
+		}
+
+		if updateCondition {
+			apisv3.ClusterConditionInitialRolesPopulated.True(cluster)
+		}
 
 		return obj, err
 	})
 }
 
-func (l *clusterLifecycle) updateClusterAnnotationandCondition(cluster *apisv3.Cluster, annotation string, updateCondition bool) error {
+func (l *clusterLifecycle) updateClusterAnnotation(cluster *apisv3.Cluster, annotation string) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		c, err := l.clusterClient.Get(cluster.Name, metav1.GetOptions{})
 		if err != nil {
@@ -396,19 +413,7 @@ func (l *clusterLifecycle) updateClusterAnnotationandCondition(cluster *apisv3.C
 
 		c.Annotations[roleTemplatesRequiredAnnotation] = annotation
 
-		if updateCondition {
-			apisv3.ClusterConditionInitialRolesPopulated.True(c)
-		}
-
 		_, err = l.clusterClient.Update(c)
-		if err != nil {
-			return err
-		}
-		// Only log if we successfully updated the cluster
-		if updateCondition {
-			logrus.Infof("[%s] Setting InitialRolesPopulated condition on cluster %s", ClusterCreateController, cluster.Name)
-		}
-
-		return nil
+		return err
 	})
 }

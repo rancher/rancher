@@ -200,6 +200,7 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 			})
 		}).
 		MustImportAndCustomize(&Version, v3.Cluster{}, func(schema *types.Schema) {
+			schema.Status = true
 			schema.MustCustomizeField("name", func(field types.Field) types.Field {
 				field.Type = "dnsLabel"
 				field.Nullable = true

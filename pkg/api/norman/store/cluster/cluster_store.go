@@ -2,7 +2,6 @@ package cluster
 
 import (
 	"fmt"
-	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -137,52 +136,12 @@ func (r *Store) Create(apiContext *types.APIContext, schema *types.Schema, data 
 		values.PutValue(data, m, managementv3.ClusterFieldAnnotations)
 	}
 
-	if err = setInitialConditions(data); err != nil {
-		return nil, err
-	}
-
 	data, err = r.Store.Create(apiContext, schema, data)
 	if err != nil {
 		return nil, err
 	}
 
 	return data, nil
-}
-
-func setInitialConditions(data map[string]interface{}) error {
-	if data[managementv3.ClusterStatusFieldConditions] == nil {
-		data[managementv3.ClusterStatusFieldConditions] = []map[string]interface{}{}
-	}
-
-	conditions, ok := data[managementv3.ClusterStatusFieldConditions].([]map[string]interface{})
-	if !ok {
-		return fmt.Errorf("unable to parse field \"%v\" type \"%v\" as \"[]map[string]interface{}\"",
-			managementv3.ClusterStatusFieldConditions, reflect.TypeOf(data[managementv3.ClusterStatusFieldConditions]))
-	}
-	for key := range data {
-		if strings.Index(key, "Config") == len(key)-6 {
-			data[managementv3.ClusterStatusFieldConditions] =
-				append(
-					conditions,
-					[]map[string]interface{}{
-						{
-							"status": "True",
-							"type":   string(apimgmtv3.ClusterConditionPending),
-						},
-						{
-							"status": "Unknown",
-							"type":   string(apimgmtv3.ClusterConditionProvisioned),
-						},
-						{
-							"status": "Unknown",
-							"type":   string(apimgmtv3.ClusterConditionWaiting),
-						},
-					}...,
-				)
-		}
-	}
-
-	return nil
 }
 
 func toMap(rawMap interface{}) map[string]interface{} {

@@ -90,7 +90,7 @@ func (c *CertificateAuthorityValidator) onStvAggregationSecret(key string, obj *
 			CertificateAuthorityValid.Unknown(mgmtCluster)
 		}
 
-		_, err = c.clusters.Update(mgmtCluster)
+		_, err = c.clusters.UpdateStatus(mgmtCluster)
 		return err
 	})
 }

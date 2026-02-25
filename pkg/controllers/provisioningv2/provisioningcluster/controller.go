@@ -25,7 +25,7 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	apierror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -364,11 +364,13 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 			if !useRKEControlPlaneReadyStatus {
 				reconcileCondition(&status, capr.Ready, mgmtCluster, capr.Ready)
 			}
-			reconcileCondition(mgmtCluster, capr.Updated, rkeCP, capr.Ready)
-			reconcileCondition(mgmtCluster, capr.Provisioned, rkeCP, capr.Provisioned) // This was originally set by checking machine provisioning, but now we simply set it to true.
-			_, err := h.mgmtClusterClient.Update(mgmtCluster)
-			if err != nil {
-				return nil, status, err
+			updatedChanged := reconcileCondition(mgmtCluster, capr.Updated, rkeCP, capr.Ready)
+			provisionedChanged := reconcileCondition(mgmtCluster, capr.Provisioned, rkeCP, capr.Provisioned) // This was originally set by checking machine provisioning, but now we simply set it to true.
+			if updatedChanged || provisionedChanged {
+				_, err := h.mgmtClusterClient.UpdateStatus(mgmtCluster)
+				if err != nil {
+					return nil, status, err
+				}
 			}
 		}
 	}
@@ -382,7 +384,7 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 // an rkecontrolplane, or the rkecontrolplane object can't be found and the cluster is deleting, it returns nil, nil.
 func (h *handler) getRKEControlPlaneForCluster(cluster *rancherv1.Cluster) (*rkev1.RKEControlPlane, error) {
 	capiCluster, err := h.capiClusters.Get(cluster.Namespace, cluster.Name)
-	if apierrors.IsNotFound(err) {
+	if apierror.IsNotFound(err) {
 		return nil, nil
 	} else if err != nil {
 		return nil, err
@@ -393,7 +395,7 @@ func (h *handler) getRKEControlPlaneForCluster(cluster *rancherv1.Cluster) (*rke
 	}
 
 	cp, err := h.rkeControlPlane.Get(capiCluster.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
-	if apierrors.IsNotFound(err) && cluster.DeletionTimestamp != nil {
+	if apierror.IsNotFound(err) && cluster.DeletionTimestamp != nil {
 		return nil, nil
 	} else if err != nil {
 		return nil, err
@@ -442,15 +444,15 @@ func (h *handler) OnRemove(_ string, cluster *rancherv1.Cluster) (*rancherv1.Clu
 	// controlplane to the object. If it does not exist, allow the v1 Cluster object to be removed.
 	mgmtCluster, err := h.retrieveMgmtClusterFromCache(cluster)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
+		if apierror.IsNotFound(err) {
 			// go ahead and proceed with removal
 			return cluster, nil
 		}
 		logrus.Errorf("rkecluster %s/%s: error retrieving management cluster during removal of cluster: %v", cluster.Namespace, cluster.Name, err)
 	}
 	if mgmtCluster != nil && reconcileCondition(mgmtCluster, capr.Removed, rkeCP, capr.Removed) {
-		_, err = h.mgmtClusterClient.Update(mgmtCluster)
-		if apierrors.IsNotFound(err) {
+		_, err = h.mgmtClusterClient.UpdateStatus(mgmtCluster)
+		if apierror.IsNotFound(err) {
 			return cluster, nil
 		} else if err != nil {
 			return cluster, err
@@ -486,7 +488,7 @@ func triggerProvisioningClusterOnMachineDeploymentUpdate(clients *wrangler.CAPIC
 			}
 
 			cluster, err := capr.GetProvisioningClusterFromCAPICluster(capiCluster, clients.Provisioning.Cluster().Cache())
-			if apierrors.IsNotFound(err) || cluster == nil {
+			if apierror.IsNotFound(err) || cluster == nil {
 				// if no v2prov cluster available - just return.
 				return []relatedresource.Key{}, nil
 			}
