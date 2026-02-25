@@ -14,6 +14,7 @@ import (
 	"time"
 
 	fleetv1alpha1api "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
+	"github.com/rancher/lasso/pkg/cache"
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/lasso/pkg/dynamic"
 	"github.com/rancher/lasso/pkg/metrics"
@@ -372,6 +373,12 @@ func NewPrimaryContext(ctx context.Context, clientConfig clientcmd.ClientConfig,
 
 func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restConfig *rest.Config) (*Context, error) {
 	sharedOpts := controllers.GetOptsFromEnv(controllers.Management)
+	sharedOpts.CacheOptions = &cache.SharedCacheFactoryOptions{
+		KindDisableWatchList: map[schema.GroupVersionKind]bool{
+			extv1api.SchemeGroupVersion.WithKind("Kubeconfig"): true,
+			extv1api.SchemeGroupVersion.WithKind("Token"):      true,
+		},
+	}
 	controllerFactory, err := controller.NewSharedControllerFactoryFromConfigWithOptions(enableProtobuf(restConfig), Scheme, sharedOpts)
 	if err != nil {
 		return nil, err
