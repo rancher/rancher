@@ -104,14 +104,42 @@ func (cd *clusterDeploy) sync(key string, cluster *apimgmtv3.Cluster) (runtime.O
 	cluster = original.DeepCopy()
 
 	err = cd.doSync(cluster)
-	if cluster != nil && !reflect.DeepEqual(cluster, original) {
-		logrus.Tracef("clusterDeploy: sync: cluster changed, calling Update on cluster [%s]", cluster.Name)
-		_, updateErr = cd.clusters.Update(cluster)
+
+	modified := cluster
+	var toUpdate *apimgmtv3.Cluster
+	if !reflect.DeepEqual(modified.Spec, original.Spec) || !reflect.DeepEqual(modified.ObjectMeta, original.ObjectMeta) {
+		toUpdate, updateErr = cd.clusters.Update(modified)
+		if updateErr != nil {
+			if err != nil {
+				return nil, err
+			}
+			return nil, updateErr
+		}
+	}
+
+	// copy only owned fields in status update
+	if cluster != nil && !reflect.DeepEqual(modified.Status, original.Status) {
+		if toUpdate == nil {
+			toUpdate, err = cd.clusters.Get(cluster.Name, metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+		}
+		toUpdate.Status.AgentImage = modified.Status.AgentImage
+		toUpdate.Status.AgentFeatures = modified.Status.AgentFeatures
+		toUpdate.Status.AuthImage = modified.Status.AuthImage
+		toUpdate.Status.AppliedAgentEnvVars = modified.Status.AppliedAgentEnvVars
+		toUpdate.Status.AppliedClusterAgentDeploymentCustomization = modified.Status.AppliedClusterAgentDeploymentCustomization
+		// Copy conditions this controller owns
+		util.CopyCondition(apimgmtv3.ClusterConditionAgentDeployed, modified, toUpdate)
+		util.CopyCondition(apimgmtv3.ClusterConditionSystemAccountCreated, modified, toUpdate)
+		_, updateErr = cd.clusters.UpdateStatus(toUpdate)
 	}
 
 	if err != nil {
 		return nil, err
 	}
+
 	return nil, updateErr
 }
 
@@ -145,13 +173,14 @@ func (cd *clusterDeploy) doSync(cluster *apimgmtv3.Cluster) error {
 		return nil
 	}
 
-	_, err = apimgmtv3.ClusterConditionSystemAccountCreated.DoUntilTrue(cluster, func() (runtime.Object, error) {
-		logrus.Tracef("clusterDeploy: doSync: Creating SystemAccount for cluster [%s]", cluster.Name)
+	obj, err := apimgmtv3.ClusterConditionSystemAccountCreated.DoUntilTrue(cluster, func() (runtime.Object, error) {
+		logrus.Infof("clusterDeploy: doSync: Creating SystemAccount for cluster [%s]", cluster.Name)
 		return cluster, cd.systemAccountManager.CreateSystemAccount(cluster)
 	})
 	if err != nil {
 		return err
 	}
+	cluster = obj.(*apimgmtv3.Cluster)
 
 	if cluster.Status.AgentImage != "" && !agentImagesCached(cluster.Name) {
 		if err := cd.cacheAgentImages(cluster.Name); err != nil {

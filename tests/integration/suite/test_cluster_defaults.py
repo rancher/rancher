@@ -80,4 +80,4 @@ def test_import_initial_conditions(admin_mc, remove_resource):
     cluster = admin_mc.client.create_cluster(name=random_str())
     remove_resource(cluster)
 
-    assert not cluster.conditions
+    assert not cluster.get("conditions")
