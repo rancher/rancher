@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -235,6 +236,59 @@ func TestAddAwsClusterOwnedTag(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			addAwsClusterOwnedTag(tt.args, testClusterId)
 			assert.Equal(t, tt.expected, tt.args)
+		})
+	}
+}
+
+func TestMultipleSameArgument(t *testing.T) {
+
+	tests := []struct {
+		name       string
+		driverName string
+		args       map[string]any
+		cluster    *rancherv1.Cluster
+		expected   []string
+	}{
+		{
+			name:       "Ordered args",
+			driverName: "vmwarevsphere",
+			args: map[string]any{
+				"network": []interface{}{"net-a", "net-b", "net-c"},
+			},
+			cluster: &rancherv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-cluster",
+				},
+			},
+			expected: []string{
+				"--vmwarevsphere-network=net-a",
+				"--vmwarevsphere-network=net-b",
+				"--vmwarevsphere-network=net-c",
+			},
+		},
+		{
+			name:       "Unordered args",
+			driverName: "vmwarevsphere",
+			args: map[string]any{
+				"network": []interface{}{"net-c", "net-a", "net-b"},
+			},
+			cluster: &rancherv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-cluster",
+				},
+			},
+			expected: []string{
+				"--vmwarevsphere-network=net-c",
+				"--vmwarevsphere-network=net-a",
+				"--vmwarevsphere-network=net-b",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := toArgs(tt.driverName, tt.args, tt.cluster)
+			assert.Equal(t, tt.expected, cmd)
 		})
 	}
 }
