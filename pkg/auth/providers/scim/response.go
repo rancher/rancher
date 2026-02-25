@@ -50,14 +50,14 @@ func (e Error) MarshalJSON() ([]byte, error) {
 }
 
 func (e *Error) UnmarshalJSON(data []byte) error {
-	t := struct {
+	var t struct {
 		Schemas  []string `json:"schemas"`
 		Status   string   `json:"status"`
 		Detail   string   `json:"detail"`
 		ScimType string   `json:"scimType,omitempty"`
-	}{}
+	}
 	if err := json.Unmarshal(data, &t); err != nil {
-		return err
+		return fmt.Errorf("failed to unmarshal Error: %w", err)
 	}
 
 	e.Schemas = t.Schemas
@@ -67,7 +67,7 @@ func (e *Error) UnmarshalJSON(data []byte) error {
 	if t.Status != "" {
 		status, err := strconv.Atoi(t.Status)
 		if err != nil {
-			return fmt.Errorf("invalid status value: %s", t.Status)
+			return fmt.Errorf("invalid Error status value: %s", t.Status)
 		}
 		e.Status = status
 	}
