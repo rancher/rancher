@@ -84,7 +84,6 @@ func main() {
 	if err != nil {
 		logrus.Fatalf("error creating and importing a k3d cluster: %v", err)
 	}
-
 }
 
 // Get preferred outbound ip of this machine

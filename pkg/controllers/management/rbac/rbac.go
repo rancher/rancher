@@ -17,16 +17,13 @@ import (
 )
 
 const (
-	OwnerAccess                     = "owner"
-	MemberAccess                    = "member"
-	ReadOnlyAccess                  = "read-only"
-	ClusterTemplateResource         = "clustertemplates"
-	ClusterTemplateRevisionResource = "clustertemplaterevisions"
-	CloudCredentialResource         = "secrets"
-	CreatorIDAnn                    = "field.cattle.io/creatorId"
-	RancherManagementAPIVersion     = "management.cattle.io/v3"
-	RancherManagementAPIGroup       = "management.cattle.io"
-	NodeTemplateResource            = "nodetemplates"
+	OwnerAccess                 = "owner"
+	MemberAccess                = "member"
+	ReadOnlyAccess              = "read-only"
+	CloudCredentialResource     = "secrets"
+	CreatorIDAnn                = "field.cattle.io/creatorId"
+	RancherManagementAPIVersion = "management.cattle.io/v3"
+	RancherManagementAPIGroup   = "management.cattle.io"
 )
 
 var subjectWithAllUsers = k8srbacv1.Subject{
@@ -64,7 +61,7 @@ func CreateRoleAndRoleBinding(resource, kind, name, namespace, apiVersion, creat
 		case ReadOnlyAccess:
 			readOnlyAccessSubjects = append(readOnlyAccessSubjects, s)
 		default:
-			// for mcapp and cluster templates which can have other access types
+			// for mcapp which can have other access types
 			readOnlyAccessSubjects = append(readOnlyAccessSubjects, s)
 		}
 	}
@@ -209,16 +206,8 @@ func GetRoleNameAndVerbs(roleAccess string, resourceName string, resourceType st
 	var roleName string
 	var verbs []string
 
-	switch resourceType {
-	case ClusterTemplateResource:
-		resourceName += "-ct-"
-	case ClusterTemplateRevisionResource:
-		resourceName += "-ctr-"
-	case NodeTemplateResource:
-		resourceName += "-nt-"
-	default:
-		resourceName += "-" + resourceType + "-"
-	}
+	resourceName += "-" + resourceType + "-"
+
 	switch roleAccess {
 	case OwnerAccess:
 		roleName = resourceName + "a"
