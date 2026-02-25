@@ -21,8 +21,8 @@ def _downstream_cluster_id(admin_mc):
                 for condition in cluster.conditions:
                     if (condition.type == 'Ready' and
                             condition.status == 'True'):
+                        logging.debug("Cluster %s state: %s", cluster.id, cluster.state)
                         return cluster.id
-
     pytest.skip("No ready downstream cluster is available for this test")
 
 
@@ -67,5 +67,11 @@ def test_proxy_k8s_v1_path_returns_not_found(admin_mc):
         headers=_auth_headers(admin_mc.client.token),
         verify=False,
     )
+
+    clusters = admin_mc.client.list_cluster().data
+    for cluster in clusters:
+        if cluster.id != "local" and cluster.state == "active":
+            print(cluster.id, cluster.state)
+        print(cluster.state)
 
     assert response.status_code == 404

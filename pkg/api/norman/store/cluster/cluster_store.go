@@ -229,7 +229,7 @@ func (r *Store) getDynamicField(data map[string]interface{}) (string, error) {
 		}
 
 		if data[driverName] != nil {
-			if !(driver.Status.DisplayName == "rancherKubernetesEngine" || driver.Status.DisplayName == "import") {
+			if !(driver.Status.DisplayName == "import") {
 				return driverName, nil
 			}
 		}

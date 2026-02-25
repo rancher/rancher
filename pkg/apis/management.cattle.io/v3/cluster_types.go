@@ -12,7 +12,6 @@ import (
 	gkev1 "github.com/rancher/gke-operator/pkg/apis/gke.cattle.io/v1"
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types"
-	rketypes "github.com/rancher/rke/types"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -75,7 +74,6 @@ const (
 
 	ClusterDriverImported = "imported"
 	ClusterDriverLocal    = "local"
-	ClusterDriverRKE      = "rancherKubernetesEngine" // Deprecated: RKE clusters are deprecated
 	ClusterDriverK3s      = "k3s"
 	ClusterDriverK3os     = "k3os"
 	ClusterDriverRke2     = "rke2"
@@ -108,20 +106,19 @@ type Cluster struct {
 }
 
 type ClusterSpecBase struct {
-	DesiredAgentImage                                    string                                  `json:"desiredAgentImage"`
-	DesiredAuthImage                                     string                                  `json:"desiredAuthImage"`
-	AgentImageOverride                                   string                                  `json:"agentImageOverride"`
-	AgentEnvVars                                         []v1.EnvVar                             `json:"agentEnvVars,omitempty"`
-	RancherKubernetesEngineConfig                        *rketypes.RancherKubernetesEngineConfig `json:"rancherKubernetesEngineConfig,omitempty"`
-	DefaultPodSecurityAdmissionConfigurationTemplateName string                                  `json:"defaultPodSecurityAdmissionConfigurationTemplateName,omitempty"`
-	DefaultClusterRoleForProjectMembers                  string                                  `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
-	DockerRootDir                                        string                                  `json:"dockerRootDir,omitempty" norman:"default=/var/lib/docker"`
-	EnableNetworkPolicy                                  *bool                                   `json:"enableNetworkPolicy" norman:"default=false"`
-	WindowsPreferedCluster                               bool                                    `json:"windowsPreferedCluster" norman:"noupdate"`
-	LocalClusterAuthEndpoint                             LocalClusterAuthEndpoint                `json:"localClusterAuthEndpoint,omitempty"`
-	ClusterSecrets                                       ClusterSecrets                          `json:"clusterSecrets" norman:"nocreate,noupdate"`
-	ClusterAgentDeploymentCustomization                  *AgentDeploymentCustomization           `json:"clusterAgentDeploymentCustomization,omitempty"`
-	FleetAgentDeploymentCustomization                    *AgentDeploymentCustomization           `json:"fleetAgentDeploymentCustomization,omitempty"`
+	DesiredAgentImage                                    string                        `json:"desiredAgentImage"`
+	DesiredAuthImage                                     string                        `json:"desiredAuthImage"`
+	AgentImageOverride                                   string                        `json:"agentImageOverride"`
+	AgentEnvVars                                         []v1.EnvVar                   `json:"agentEnvVars,omitempty"`
+	DefaultPodSecurityAdmissionConfigurationTemplateName string                        `json:"defaultPodSecurityAdmissionConfigurationTemplateName,omitempty"`
+	DefaultClusterRoleForProjectMembers                  string                        `json:"defaultClusterRoleForProjectMembers,omitempty" norman:"type=reference[roleTemplate]"`
+	DockerRootDir                                        string                        `json:"dockerRootDir,omitempty" norman:"default=/var/lib/docker"`
+	EnableNetworkPolicy                                  *bool                         `json:"enableNetworkPolicy" norman:"default=false"`
+	WindowsPreferedCluster                               bool                          `json:"windowsPreferedCluster" norman:"noupdate"`
+	LocalClusterAuthEndpoint                             LocalClusterAuthEndpoint      `json:"localClusterAuthEndpoint,omitempty"`
+	ClusterSecrets                                       ClusterSecrets                `json:"clusterSecrets" norman:"nocreate,noupdate"`
+	ClusterAgentDeploymentCustomization                  *AgentDeploymentCustomization `json:"clusterAgentDeploymentCustomization,omitempty"`
+	FleetAgentDeploymentCustomization                    *AgentDeploymentCustomization `json:"fleetAgentDeploymentCustomization,omitempty"`
 }
 
 type AgentDeploymentCustomization struct {
@@ -372,7 +369,6 @@ type ImportYamlOutput struct {
 type Capabilities struct {
 	LoadBalancerCapabilities LoadBalancerCapabilities `json:"loadBalancerCapabilities,omitempty"`
 	IngressCapabilities      []IngressCapabilities    `json:"ingressCapabilities,omitempty"`
-	NodePoolScalingSupported bool                     `json:"nodePoolScalingSupported,omitempty"`
 	NodePortRange            string                   `json:"nodePortRange,omitempty"`
 	TaintSupport             *bool                    `json:"taintSupport,omitempty"`
 }
