@@ -37,7 +37,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	capiutils "sigs.k8s.io/cluster-api/util"
 	capiconditions "sigs.k8s.io/cluster-api/util/conditions"
+	capiconditionsv1beta1 "sigs.k8s.io/cluster-api/util/conditions/deprecated/v1beta1"
 )
 
 const (
@@ -115,22 +117,62 @@ const (
 
 	// Conditions
 
-	Provisioned                  = condition.Cond("Provisioned")
-	Stable                       = condition.Cond("Stable") // The Stable condition is used to indicate whether we can safely copy the v3 management cluster Ready condition to the v1 object.
-	Updated                      = condition.Cond("Updated")
-	Reconciled                   = condition.Cond("Reconciled")
-	Ready                        = condition.Cond("Ready")
-	Waiting                      = condition.Cond("Waiting")
-	Pending                      = condition.Cond("Pending")
-	Removed                      = condition.Cond("Removed")
-	PlanApplied                  = condition.Cond("PlanApplied")
-	InfrastructureReady          = condition.Cond(capi.InfrastructureReadyCondition)
-	SystemUpgradeControllerReady = condition.Cond("SystemUpgradeControllerReady")
-	Bootstrapped                 = condition.Cond("Bootstrapped")
+	// Provisioned indicates whether the cluster or control plane has been provisioned.
+	// Used on: provisioning.cattle.io/v1 Cluster, rke.cattle.io/v1 RKEControlPlane
+	Provisioned = condition.Cond("Provisioned")
 
+	// Stable indicates whether we can safely copy the v3 management cluster Ready condition to the v1 object.
+	// Used on: rke.cattle.io/v1 RKEControlPlane
+	Stable = condition.Cond("Stable")
+
+	// Updated indicates whether the cluster or control plane has been updated to the desired state.
+	// Used on: provisioning.cattle.io/v1 Cluster, rke.cattle.io/v1 RKEControlPlane
+	Updated = condition.Cond("Updated")
+
+	// Reconciled indicates whether the resource has been successfully reconciled by its controller.
+	// Used on: cluster.x-k8s.io/v1beta2 Machine, rke.cattle.io/v1 RKEControlPlane
+	Reconciled = condition.Cond("Reconciled")
+
+	// Ready indicates whether the resource is ready to serve its purpose.
+	// Used on: rke.cattle.io/v1 RKEControlPlane, rke.cattle.io/v1 CustomMachine
+	Ready = condition.Cond("Ready")
+
+	// Waiting indicates that a removal operation is waiting for dependents to be cleaned up.
+	// Used on: provisioning.cattle.io/v1 Cluster, rke.cattle.io/v1 RKEControlPlane
+	Waiting = condition.Cond("Waiting")
+
+	// Pending indicates that a removal operation is pending.
+	// Used on: provisioning.cattle.io/v1 Cluster, rke.cattle.io/v1 RKEControlPlane
+	Pending = condition.Cond("Pending")
+
+	// Removed indicates that the resource has been successfully removed.
+	// Used on: provisioning.cattle.io/v1 Cluster, rke.cattle.io/v1 RKEControlPlane
+	Removed = condition.Cond("Removed")
+
+	// PlanApplied indicates whether the assigned plan has been applied to the machine.
+	// Used on: cluster.x-k8s.io/v1beta2 Machine
+	PlanApplied = condition.Cond("PlanApplied")
+
+	// InfrastructureReady indicates whether the machine's infrastructure provider has completed provisioning.
+	// Read-only in Rancher; set by CAPI infrastructure provider controllers.
+	// Used on: cluster.x-k8s.io/v1beta2 Machine
+	InfrastructureReady = condition.Cond(capi.InfrastructureReadyCondition)
+
+	// SystemUpgradeControllerReady indicates whether the system-upgrade-controller is deployed and ready.
+	// Used on: rke.cattle.io/v1 RKEControlPlane
+	SystemUpgradeControllerReady = condition.Cond("SystemUpgradeControllerReady")
+
+	// Bootstrapped indicates whether the control plane has completed its bootstrap process.
+	// Used on: rke.cattle.io/v1 RKEControlPlane
+	Bootstrapped = condition.Cond("Bootstrapped")
+
+	// MachineDeploymentMachinesReadyCondition indicates whether all machines in the deployment are ready.
+	// Read-only in Rancher; set by CAPI controllers.
+	// Used on: cluster.x-k8s.io/v1beta2 MachineDeployment
 	MachineDeploymentMachinesReadyCondition = condition.Cond(capi.MachineDeploymentMachinesReadyCondition)
 
-	// ClusterAutoscalerDeploymentReady is a condition that indicates whether the cluster autoscaler deployment is ready
+	// ClusterAutoscalerDeploymentReady indicates whether the cluster autoscaler deployment is ready.
+	// Used on: provisioning.cattle.io/v1 Cluster
 	ClusterAutoscalerDeploymentReady = condition.Cond("ClusterAutoscalerDeploymentReady")
 
 	// ClusterAutoscalerEnabledAnnotation is an annotation used to enable cluster autoscaling for a cluster.
@@ -742,4 +784,33 @@ func InsertOrUpdateCondition(d data.Object, desiredCondition summary.Condition) 
 	d.SetNested(conditions, "status", "conditions")
 
 	return true, nil
+}
+
+// CAPIConditionSetter is an interface satisfied by all CAPI resource types (e.g., Machine, Cluster,
+// MachineDeployment, MachineSet) that support both v1beta2 and deprecated v1beta1 conditions.
+type CAPIConditionSetter interface {
+	capiconditions.Setter
+	capiconditionsv1beta1.Setter
+}
+
+// SetCAPIResourceCondition sets the given metav1.Condition on a CAPI resource's .status.conditions (v1beta2)
+// and syncs it to .status.deprecated.v1beta1.conditions for backward compatibility.
+func SetCAPIResourceCondition(obj CAPIConditionSetter, condition metav1.Condition) {
+	if capiutils.IsNil(obj) {
+		return
+	}
+
+	// Set the condition on the v1beta2 status.conditions
+	capiconditions.Set(obj, condition)
+
+	// Sync the condition to .status.deprecated.v1beta1.conditions
+	v1beta1Cond := capi.Condition{
+		Type:               capi.ConditionType(condition.Type),
+		Status:             corev1.ConditionStatus(condition.Status),
+		LastTransitionTime: condition.LastTransitionTime,
+		Reason:             condition.Reason,
+		Message:            condition.Message,
+	}
+
+	capiconditionsv1beta1.Set(obj, &v1beta1Cond)
 }

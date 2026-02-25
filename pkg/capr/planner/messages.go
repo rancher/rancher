@@ -30,24 +30,57 @@ func detailedMessage(machines []string, messages map[string][]string) string {
 }
 
 // removeReconciledCondition removes the condition "Reconciled" from a CAPI machine object so that messages are not
-// duplicated during summarization.
+// duplicated during summarization. The condition is removed from both v1beta2 (status.conditions) and deprecated
+// v1beta1 (status.deprecated.v1beta1.conditions) because the wrangler summarizer reads from the v1beta1 conditions
+// for CAPI v1beta2 resources.
 func removeReconciledCondition(machine *capi.Machine) *capi.Machine {
-	if machine == nil || len(machine.Status.Conditions) == 0 {
+	if machine == nil {
 		return machine
 	}
 
-	conds := make([]metav1.Condition, 0, len(machine.Status.Conditions))
+	reconciledType := string(capr.Reconciled)
+
+	// Check if the Reconciled condition exists in either location.
+	var foundInV1Beta2, foundInV1Beta1 bool
 	for _, c := range machine.Status.Conditions {
-		if string(c.Type) != string(capr.Reconciled) {
-			conds = append(conds, c)
+		if c.Type == reconciledType {
+			foundInV1Beta2 = true
+			break
+		}
+	}
+	for _, c := range machine.GetV1Beta1Conditions() {
+		if string(c.Type) == reconciledType {
+			foundInV1Beta1 = true
+			break
 		}
 	}
 
-	if len(conds) == len(machine.Status.Conditions) {
+	if !foundInV1Beta2 && !foundInV1Beta1 {
 		return machine
 	}
 
 	machine = machine.DeepCopy()
-	machine.SetConditions(conds)
+
+	if foundInV1Beta2 {
+		conds := make([]metav1.Condition, 0, len(machine.Status.Conditions))
+		for _, c := range machine.Status.Conditions {
+			if c.Type != reconciledType {
+				conds = append(conds, c)
+			}
+		}
+		machine.SetConditions(conds)
+	}
+
+	if foundInV1Beta1 {
+		v1beta1Conds := machine.GetV1Beta1Conditions()
+		filtered := make(capi.Conditions, 0, len(v1beta1Conds))
+		for _, c := range v1beta1Conds {
+			if string(c.Type) != reconciledType {
+				filtered = append(filtered, c)
+			}
+		}
+		machine.SetV1Beta1Conditions(filtered)
+	}
+
 	return machine
 }

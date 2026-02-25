@@ -558,3 +558,206 @@ func TestGetProvisioningClusterFromCAPICluster(t *testing.T) {
 		})
 	}
 }
+
+func TestSetCAPIResourceCondition(t *testing.T) {
+	tests := []struct {
+		name      string
+		obj       CAPIConditionSetter
+		condition metav1.Condition
+		// expectedV1Beta2Condition is checked against the object's status.conditions
+		expectedV1Beta2Status metav1.ConditionStatus
+		expectedV1Beta1Status corev1.ConditionStatus
+		expectedReason        string
+		expectedMessage       string
+	}{
+		{
+			name: "set Reconciled condition to true on machine",
+			obj:  &capi.Machine{},
+			condition: metav1.Condition{
+				Type:   string(Reconciled),
+				Status: metav1.ConditionTrue,
+				Reason: "Reconciled",
+			},
+			expectedV1Beta2Status: metav1.ConditionTrue,
+			expectedV1Beta1Status: corev1.ConditionTrue,
+			expectedReason:        "Reconciled",
+		},
+		{
+			name: "set Reconciled condition to unknown with message on machine",
+			obj:  &capi.Machine{},
+			condition: metav1.Condition{
+				Type:    string(Reconciled),
+				Status:  metav1.ConditionUnknown,
+				Reason:  "Waiting",
+				Message: "waiting for something",
+			},
+			expectedV1Beta2Status: metav1.ConditionUnknown,
+			expectedV1Beta1Status: corev1.ConditionUnknown,
+			expectedReason:        "Waiting",
+			expectedMessage:       "waiting for something",
+		},
+		{
+			name: "set PlanApplied condition to false with error on machine",
+			obj:  &capi.Machine{},
+			condition: metav1.Condition{
+				Type:    string(PlanApplied),
+				Status:  metav1.ConditionFalse,
+				Reason:  "Error",
+				Message: "error applying plan",
+			},
+			expectedV1Beta2Status: metav1.ConditionFalse,
+			expectedV1Beta1Status: corev1.ConditionFalse,
+			expectedReason:        "Error",
+			expectedMessage:       "error applying plan",
+		},
+		{
+			name: "set PlanApplied condition to true on machine",
+			obj:  &capi.Machine{},
+			condition: metav1.Condition{
+				Type:   string(PlanApplied),
+				Status: metav1.ConditionTrue,
+				Reason: "PlanApplied",
+			},
+			expectedV1Beta2Status: metav1.ConditionTrue,
+			expectedV1Beta1Status: corev1.ConditionTrue,
+			expectedReason:        "PlanApplied",
+		},
+		{
+			name: "update existing condition on machine",
+			obj: &capi.Machine{
+				Status: capi.MachineStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   string(Reconciled),
+							Status: metav1.ConditionUnknown,
+							Reason: "Waiting",
+						},
+					},
+					Deprecated: &capi.MachineDeprecatedStatus{
+						V1Beta1: &capi.MachineV1Beta1DeprecatedStatus{
+							Conditions: capi.Conditions{
+								{
+									Type:   capi.ConditionType(string(Reconciled)),
+									Status: corev1.ConditionUnknown,
+									Reason: "Waiting",
+								},
+							},
+						},
+					},
+				},
+			},
+			condition: metav1.Condition{
+				Type:   string(Reconciled),
+				Status: metav1.ConditionTrue,
+				Reason: "Reconciled",
+			},
+			expectedV1Beta2Status: metav1.ConditionTrue,
+			expectedV1Beta1Status: corev1.ConditionTrue,
+			expectedReason:        "Reconciled",
+		},
+		{
+			name: "set condition to true on cluster",
+			obj:  &capi.Cluster{},
+			condition: metav1.Condition{
+				Type:   string(Reconciled),
+				Status: metav1.ConditionTrue,
+				Reason: "Reconciled",
+			},
+			expectedV1Beta2Status: metav1.ConditionTrue,
+			expectedV1Beta1Status: corev1.ConditionTrue,
+			expectedReason:        "Reconciled",
+		},
+		{
+			name: "set condition to false on cluster",
+			obj:  &capi.Cluster{},
+			condition: metav1.Condition{
+				Type:    capi.ClusterControlPlaneInitializedCondition,
+				Status:  metav1.ConditionFalse,
+				Reason:  capi.ClusterControlPlaneNotInitializedReason,
+				Message: "Waiting for control plane provider to indicate the control plane has been initialized",
+			},
+			expectedV1Beta2Status: metav1.ConditionFalse,
+			expectedV1Beta1Status: corev1.ConditionFalse,
+			expectedReason:        capi.ClusterControlPlaneNotInitializedReason,
+			expectedMessage:       "Waiting for control plane provider to indicate the control plane has been initialized",
+		},
+		{
+			name: "update existing condition on cluster",
+			obj: &capi.Cluster{
+				Status: capi.ClusterStatus{
+					Conditions: []metav1.Condition{
+						{
+							Type:   string(Reconciled),
+							Status: metav1.ConditionUnknown,
+							Reason: "Waiting",
+						},
+					},
+					Deprecated: &capi.ClusterDeprecatedStatus{
+						V1Beta1: &capi.ClusterV1Beta1DeprecatedStatus{
+							Conditions: capi.Conditions{
+								{
+									Type:   capi.ConditionType(string(Reconciled)),
+									Status: corev1.ConditionUnknown,
+									Reason: "Waiting",
+								},
+							},
+						},
+					},
+				},
+			},
+			condition: metav1.Condition{
+				Type:   string(Reconciled),
+				Status: metav1.ConditionTrue,
+				Reason: "Reconciled",
+			},
+			expectedV1Beta2Status: metav1.ConditionTrue,
+			expectedV1Beta1Status: corev1.ConditionTrue,
+			expectedReason:        "Reconciled",
+		},
+		{
+			name: "nil object does not panic",
+			obj:  nil,
+			condition: metav1.Condition{
+				Type:   string(Reconciled),
+				Status: metav1.ConditionTrue,
+				Reason: "Reconciled",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			SetCAPIResourceCondition(tt.obj, tt.condition)
+			if tt.obj == nil {
+				return
+			}
+
+			// Verify v1beta2 condition was set
+			var v1beta2Found bool
+			for _, c := range tt.obj.GetConditions() {
+				if c.Type == tt.condition.Type {
+					v1beta2Found = true
+					assert.Equal(t, tt.expectedV1Beta2Status, c.Status)
+					assert.Equal(t, tt.expectedReason, c.Reason)
+					assert.Equal(t, tt.expectedMessage, c.Message)
+					break
+				}
+			}
+			assert.True(t, v1beta2Found, "v1beta2 condition should be set on status.conditions")
+
+			// Verify v1beta1 deprecated condition was set
+			v1beta1Conditions := tt.obj.GetV1Beta1Conditions()
+			var v1beta1Found bool
+			for _, c := range v1beta1Conditions {
+				if string(c.Type) == tt.condition.Type {
+					v1beta1Found = true
+					assert.Equal(t, tt.expectedV1Beta1Status, c.Status)
+					assert.Equal(t, tt.expectedReason, c.Reason)
+					assert.Equal(t, tt.expectedMessage, c.Message)
+					break
+				}
+			}
+			assert.True(t, v1beta1Found, "v1beta1 condition should be set on status.deprecated.v1beta1.conditions")
+		})
+	}
+}
