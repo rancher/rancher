@@ -54,7 +54,7 @@ func (e *OperatorController) SetUnknown(cluster *mgmtv3.Cluster, condition condi
 	condition.Unknown(cluster)
 	condition.Message(cluster, message)
 	var err error
-	cluster, err = e.ClusterClient.Update(cluster)
+	cluster, err = e.ClusterClient.UpdateStatus(cluster)
 	if err != nil {
 		return cluster, err
 	}
@@ -69,7 +69,7 @@ func (e *OperatorController) SetTrue(cluster *mgmtv3.Cluster, condition conditio
 	condition.True(cluster)
 	condition.Message(cluster, message)
 	var err error
-	cluster, err = e.ClusterClient.Update(cluster)
+	cluster, err = e.ClusterClient.UpdateStatus(cluster)
 	if err != nil {
 		return cluster, err
 	}
@@ -84,7 +84,7 @@ func (e *OperatorController) SetFalse(cluster *mgmtv3.Cluster, condition conditi
 	condition.False(cluster)
 	condition.Message(cluster, message)
 	var err error
-	cluster, err = e.ClusterClient.Update(cluster)
+	cluster, err = e.ClusterClient.UpdateStatus(cluster)
 	if err != nil {
 		return cluster, err
 	}
@@ -138,7 +138,7 @@ func (e *OperatorController) RecordCAAndAPIEndpoint(cluster *mgmtv3.Cluster) (*m
 		}
 		currentCluster.Status.APIEndpoint = apiEndpoint
 		currentCluster.Status.CACert = caCert
-		currentCluster, err = e.ClusterClient.Update(currentCluster)
+		currentCluster, err = e.ClusterClient.UpdateStatus(currentCluster)
 		return err
 	})
 

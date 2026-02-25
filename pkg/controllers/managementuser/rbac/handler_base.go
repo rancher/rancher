@@ -140,7 +140,7 @@ func Register(ctx context.Context, workload *config.UserContext) error {
 	management.Management.Projects(workload.ClusterName).AddClusterScopedLifecycle(ctx, "project-namespace-auth", workload.ClusterName, newProjectLifecycle(r, workload.Corew.Secret()))
 	workload.RBACw.ClusterRole().OnChange(ctx, "cluster-clusterrole-sync", newClusterRoleHandler(r).sync)
 	workload.RBACw.ClusterRoleBinding().OnChange(ctx, "legacy-crb-cleaner-sync", newLegacyCRBCleaner(r).sync)
-	management.Management.Clusters("").AddHandler(ctx, "global-admin-cluster-sync", newClusterHandler(workload))
+	management.Wrangler.Mgmt.Cluster().OnChange(ctx, "global-admin-cluster-sync", newClusterHandler(workload))
 	management.Management.GlobalRoleBindings("").AddHandler(ctx, grbHandlerName, newGlobalRoleBindingHandler(workload))
 
 	sync := &resourcequota.SyncController{

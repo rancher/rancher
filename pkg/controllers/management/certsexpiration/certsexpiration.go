@@ -10,14 +10,13 @@ import (
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"k8s.io/client-go/kubernetes"
 
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/rkecerts"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8sErrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -40,18 +39,20 @@ type State struct {
 // This controller handles cert expiration for local cluster only
 func Register(ctx context.Context, management *config.ManagementContext) {
 	c := &certsExpiration{
-		clusters:  management.Management.Clusters(""),
-		k8sClient: management.K8sClient,
+		clusterCache: management.Wrangler.Mgmt.Cluster().Cache(),
+		clusters:     management.Wrangler.Mgmt.Cluster(),
+		k8sClient:    management.K8sClient,
 	}
-	management.Management.Clusters("").AddHandler(ctx, "certificate-expiration", c.sync)
+	management.Wrangler.Mgmt.Cluster().OnChange(ctx, "certificate-expiration", c.sync)
 }
 
 type certsExpiration struct {
-	clusters  v3.ClusterInterface
-	k8sClient kubernetes.Interface
+	clusterCache mgmtcontrollers.ClusterCache
+	clusters     mgmtcontrollers.ClusterClient
+	k8sClient    kubernetes.Interface
 }
 
-func (c *certsExpiration) sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
+func (c *certsExpiration) sync(key string, cluster *v32.Cluster) (*v32.Cluster, error) {
 	if cluster == nil || cluster.Name != "local" {
 		return cluster, nil // We are only checking local cluster
 	}
@@ -82,8 +83,9 @@ func (c *certsExpiration) sync(key string, cluster *v3.Cluster) (runtime.Object,
 	}
 	// Update certExpiration on cluster obj in order for it to display in API, and the UI if expiring
 	if !reflect.DeepEqual(cluster.Status.CertificatesExpiration, certsExpInfo) {
+		cluster = cluster.DeepCopy()
 		cluster.Status.CertificatesExpiration = certsExpInfo
-		return c.clusters.Update(cluster)
+		return c.clusters.UpdateStatus(cluster)
 	}
 	return cluster, nil
 }

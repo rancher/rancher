@@ -325,7 +325,7 @@ func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, r
 	}
 
 	if changed {
-		_, err = t.clusters.Update(cluster)
+		_, err = t.clusters.ObjectClient().UpdateStatus(cluster.Name, cluster)
 		if currentSecret != nil {
 			migrator.CleanupKnownSecrets([]*corev1.Secret{currentSecret})
 		}

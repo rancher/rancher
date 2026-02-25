@@ -341,6 +341,11 @@ func getMockAliOperatorController(t *testing.T, dynamicClient dynamic.Namespacea
 			return c, nil
 		},
 	).AnyTimes()
+	clusterMock.EXPECT().UpdateStatus(gomock.Any()).DoAndReturn(
+		func(c *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
+			return c, nil
+		},
+	).AnyTimes()
 
 	return aliOperatorController{
 		OperatorController: clusteroperator.OperatorController{

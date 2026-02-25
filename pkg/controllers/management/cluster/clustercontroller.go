@@ -106,10 +106,9 @@ func (c *controller) capsSync(key string, cluster *v3.Cluster) (runtime.Object, 
 	if !reflect.DeepEqual(capabilities, cluster.Status.Capabilities) {
 		toUpdateCluster := cluster.DeepCopy()
 		toUpdateCluster.Status.Capabilities = capabilities
-		if _, err := c.clusterClient.Update(toUpdateCluster); err != nil {
+		if _, err := c.clusterClient.ObjectClient().UpdateStatus(toUpdateCluster.Name, toUpdateCluster); err != nil {
 			return nil, err
 		}
-		return toUpdateCluster, nil
 	}
 
 	return nil, nil

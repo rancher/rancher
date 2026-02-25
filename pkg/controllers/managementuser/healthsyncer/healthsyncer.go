@@ -91,7 +91,7 @@ func (h *HealthSyncer) getComponentStatus(cluster *v3.Cluster) error {
 		return nil
 	}
 	parts := versionMatchRE.FindStringSubmatch(cluster.Status.Version.String())
-	if parts == nil || len(parts) < 2 {
+	if len(parts) < 2 {
 		return condition.Error("ComponentStatusFetchingFailure", fmt.Errorf("Failed to parse cluster status version %s",
 			cluster.Status.Version.String()))
 	}
@@ -178,7 +178,8 @@ func (h *HealthSyncer) updateClusterHealth() error {
 
 	if !reflect.DeepEqual(oldCluster, newObj) {
 		logrus.Tracef("[healthSyncer] update cluster %s", cluster.Name)
-		if _, err := h.clusters.Update(newObj.(*v3.Cluster)); err != nil {
+		obj := newObj.(*v3.Cluster)
+		if _, err := h.clusters.ObjectClient().UpdateStatus(obj.Name, obj); err != nil {
 			return errors.Wrapf(err, "[updateClusterHealth] Failed to update cluster [%s]", cluster.Name)
 		}
 	}
