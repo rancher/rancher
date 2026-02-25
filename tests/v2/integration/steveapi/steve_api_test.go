@@ -738,7 +738,7 @@ type listTestType struct {
 	expect         []map[string]string
 	expectExcludes bool
 	expectContains bool
-	expectSummary []clientv1.SteveAPISummaryItem
+	expectSummary  []clientv1.SteveAPISummaryItem
 }
 
 // TEST LIST
@@ -780,13 +780,13 @@ var SQLOnlyListTests = []listTestType{
 			clientv1.SteveAPISummaryItem{
 				Property: "metadata.name",
 				Counts: map[string]int{
-					"test1":5, "test2":5, "test3":5, "test4":5, "test5":5,
+					"test1": 5, "test2": 5, "test3": 5, "test4": 5, "test5": 5,
 				},
 			},
 			clientv1.SteveAPISummaryItem{
 				Property: "metadata.namespace",
 				Counts: map[string]int{
-					"test-ns-1":5, "test-ns-2":5, "test-ns-3":5, "test-ns-4":5, "test-ns-5":5,
+					"test-ns-1": 5, "test-ns-2": 5, "test-ns-3": 5, "test-ns-4": 5, "test-ns-5": 5,
 				},
 			},
 		},
@@ -810,13 +810,13 @@ var SQLOnlyListTests = []listTestType{
 			clientv1.SteveAPISummaryItem{
 				Property: "metadata.name",
 				Counts: map[string]int{
-					"test1":2, "test2":2, "test3":2, "test4":1, "test5":1,
+					"test1": 2, "test2": 2, "test3": 2, "test4": 1, "test5": 1,
 				},
 			},
 			clientv1.SteveAPISummaryItem{
 				Property: "metadata.namespace",
 				Counts: map[string]int{
-					"test-ns-1":5, "test-ns-2":3,
+					"test-ns-1": 5, "test-ns-2": 3,
 				},
 			},
 		},
@@ -856,13 +856,13 @@ var SQLOnlyListTests = []listTestType{
 			clientv1.SteveAPISummaryItem{
 				Property: "metadata.name",
 				Counts: map[string]int{
-					"test2":1,
+					"test2": 1,
 				},
 			},
 			clientv1.SteveAPISummaryItem{
 				Property: "metadata.namespace",
 				Counts: map[string]int{
-					"test-ns-2":1,
+					"test-ns-2": 1,
 				},
 			},
 		},
@@ -903,7 +903,7 @@ var SQLOnlyListTests = []listTestType{
 			clientv1.SteveAPISummaryItem{
 				Property: "metadata.state.name",
 				Counts: map[string]int{
-					"active":25,
+					"active": 25,
 				},
 			},
 		},
@@ -931,9 +931,10 @@ var SQLOnlyListTests = []listTestType{
 		},
 	},
 }
+
 // TEST LIST
 var nonSQLListTests = []listTestType{
-		// user-a
+	// user-a
 	{
 		description: "user:user-a,namespace:none,query:limit=8",
 		user:        "user-a",
@@ -3115,7 +3116,12 @@ func formatJSON(obj *clientv1.SteveCollection) ([]byte, error) {
 }
 
 func setUpResults() (*csv.Writer, *os.File, string, error) {
-	outputFile := "output.csv"
+	testDataDir := "testdata"
+	err := os.MkdirAll(testDataDir, 0755)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	outputFile := filepath.Join(testDataDir, "output.csv")
 	fields := []string{"user", "url", "response"}
 	csvFile, err := os.OpenFile(outputFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
@@ -3126,7 +3132,7 @@ func setUpResults() (*csv.Writer, *os.File, string, error) {
 	if csvWriter.Error() != nil {
 		return nil, csvFile, "", err
 	}
-	jsonDir := "json"
+	jsonDir := filepath.Join(testDataDir, "json")
 	err = os.MkdirAll(jsonDir, 0755)
 	if err != nil {
 		return nil, csvFile, "", err
@@ -3140,7 +3146,11 @@ func writeResp(csvWriter *csv.Writer, user, url, path string, resp []byte) error
 		return err
 	}
 	jsonFile.Write(resp)
-	csvWriter.Write([]string{user, url, fmt.Sprintf("[%s](%s)", path, path)})
+	relPath, err := filepath.Rel("testdata", path)
+	if err != nil {
+		relPath = path
+	}
+	csvWriter.Write([]string{user, url, fmt.Sprintf("[%s](%s)", relPath, relPath)})
 	return nil
 }
 
