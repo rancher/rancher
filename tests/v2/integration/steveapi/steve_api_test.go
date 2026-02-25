@@ -3118,7 +3118,12 @@ func formatJSON(obj *clientv1.SteveCollection) ([]byte, error) {
 }
 
 func setUpResults() (*csv.Writer, *os.File, string, error) {
-	outputFile := "output.csv"
+	testDataDir := "testdata"
+	err := os.MkdirAll(testDataDir, 0755)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	outputFile := filepath.Join(testDataDir, "output.csv")
 	fields := []string{"user", "url", "response"}
 	csvFile, err := os.OpenFile(outputFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
@@ -3129,7 +3134,7 @@ func setUpResults() (*csv.Writer, *os.File, string, error) {
 	if csvWriter.Error() != nil {
 		return nil, csvFile, "", err
 	}
-	jsonDir := "json"
+	jsonDir := filepath.Join(testDataDir, "json")
 	err = os.MkdirAll(jsonDir, 0755)
 	if err != nil {
 		return nil, csvFile, "", err
@@ -3143,7 +3148,11 @@ func writeResp(csvWriter *csv.Writer, user, url, path string, resp []byte) error
 		return err
 	}
 	jsonFile.Write(resp)
-	csvWriter.Write([]string{user, url, fmt.Sprintf("[%s](%s)", path, path)})
+	relPath, err := filepath.Rel("testdata", path)
+	if err != nil {
+		relPath = path
+	}
+	csvWriter.Write([]string{user, url, fmt.Sprintf("[%s](%s)", relPath, relPath)})
 	return nil
 }
 
