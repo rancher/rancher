@@ -333,56 +333,102 @@ func TestListUsersWithFilter(t *testing.T) {
 }
 
 func TestListUsersExcludesSystemUsers(t *testing.T) {
-	ctrl := gomock.NewController(t)
 	provider := "okta"
 
-	users := []*v3.User{
-		{ObjectMeta: metav1.ObjectMeta{Name: "u-aaa"}},
-		{
-			ObjectMeta:   metav1.ObjectMeta{Name: "u-system"},
-			PrincipalIDs: []string{"system://local"}, // System user.
-		},
-		{ObjectMeta: metav1.ObjectMeta{Name: "u-bbb"}},
-	}
+	t.Run("skips users with not found attributes", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
 
-	userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
-	userCache.EXPECT().List(labels.Everything()).Return(users, nil).AnyTimes()
-
-	userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
-	userAttributeCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v3.UserAttribute, error) {
-		if name == "u-system" {
-			return nil, apierrors.NewNotFound(v3.Resource("userattributes"), name)
+		users := []*v3.User{
+			{ObjectMeta: metav1.ObjectMeta{Name: "u-aaa"}},
+			{
+				ObjectMeta:   metav1.ObjectMeta{Name: "u-system"},
+				PrincipalIDs: []string{"system://local"}, // System user.
+			},
+			{ObjectMeta: metav1.ObjectMeta{Name: "u-bbb"}},
 		}
-		return &v3.UserAttribute{
-			ObjectMeta: metav1.ObjectMeta{Name: name},
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return(users, nil).AnyTimes()
+
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(gomock.Any()).DoAndReturn(func(name string) (*v3.UserAttribute, error) {
+			if name == "u-system" {
+				return nil, apierrors.NewNotFound(v3.Resource("userattributes"), name)
+			}
+			return &v3.UserAttribute{
+				ObjectMeta: metav1.ObjectMeta{Name: name},
+				ExtraByProvider: map[string]map[string][]string{
+					provider: {
+						"principalid": {provider + "_user://" + name},
+						"username":    {"user-" + name},
+					},
+				},
+			}, nil
+		}).AnyTimes()
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+		}
+
+		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users", nil)
+		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		w := httptest.NewRecorder()
+
+		srv.ListUsers(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
+
+		var resp listResponse
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+
+		// Should only have 2 users (system user excluded).
+		assert.Equal(t, 2, resp.TotalResults)
+		assert.Len(t, resp.Resources, 2)
+	})
+
+	t.Run("returns error when user attribute cache fails with non-NotFound error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		users := []*v3.User{
+			{ObjectMeta: metav1.ObjectMeta{Name: "u-aaa"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "u-ccc"}},
+			{ObjectMeta: metav1.ObjectMeta{Name: "u-bbb"}},
+		}
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return(users, nil)
+
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get("u-aaa").Return(&v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: "u-aaa"},
 			ExtraByProvider: map[string]map[string][]string{
 				provider: {
-					"principalid": {provider + "_user://" + name},
-					"username":    {"user-" + name},
+					"principalid": {provider + "_user://u-aaa"},
+					"username":    {"user-u-aaa"},
 				},
 			},
-		}, nil
-	}).AnyTimes()
+		}, nil)
+		userAttributeCache.EXPECT().Get("u-bbb").Return(nil, fmt.Errorf("cache error"))
 
-	srv := &SCIMServer{
-		userCache:          userCache,
-		userAttributeCache: userAttributeCache,
-	}
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+		}
 
-	r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users", nil)
-	r = mux.SetURLVars(r, map[string]string{"provider": provider})
-	w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users", nil)
+		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		w := httptest.NewRecorder()
 
-	srv.ListUsers(w, r)
-	require.Equal(t, http.StatusOK, w.Code)
+		srv.ListUsers(w, r)
+		require.Equal(t, http.StatusInternalServerError, w.Code)
 
-	var resp listResponse
-	err := json.Unmarshal(w.Body.Bytes(), &resp)
-	require.NoError(t, err)
-
-	// Should only have 2 users (system user excluded).
-	assert.Equal(t, 2, resp.TotalResults)
-	assert.Len(t, resp.Resources, 2)
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusInternalServerError, resp.Status)
+	})
 }
 
 func TestGetUser(t *testing.T) {
@@ -515,10 +561,10 @@ func TestGetUser(t *testing.T) {
 		srv.GetUser(w, r)
 		require.Equal(t, http.StatusNotFound, w.Code)
 
-		var errResp map[string]any
-		err := json.Unmarshal(w.Body.Bytes(), &errResp)
+		var resp map[string]any
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
-		assert.Contains(t, errResp["schemas"], errorSchemaID)
+		assert.Contains(t, resp["schemas"], errorSchemaID)
 	})
 
 	t.Run("system user returns not found", func(t *testing.T) {
@@ -546,10 +592,45 @@ func TestGetUser(t *testing.T) {
 		srv.GetUser(w, r)
 		require.Equal(t, http.StatusNotFound, w.Code)
 
-		var errResp map[string]any
-		err := json.Unmarshal(w.Body.Bytes(), &errResp)
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
-		assert.Contains(t, errResp["schemas"], errorSchemaID)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusNotFound, resp.Status)
+	})
+
+	t.Run("returns error when user attribute cache fails", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-error"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}, nil)
+
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(nil, fmt.Errorf("cache error"))
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+		}
+
+		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users/"+userID, nil)
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
+
+		srv.GetUser(w, r)
+		require.Equal(t, http.StatusInternalServerError, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusInternalServerError, resp.Status)
 	})
 }
 
@@ -717,10 +798,11 @@ func TestCreateUser(t *testing.T) {
 		srv.CreateUser(w, r)
 		require.Equal(t, http.StatusConflict, w.Code)
 
-		var errResp map[string]any
-		err := json.Unmarshal(w.Body.Bytes(), &errResp)
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
-		assert.Contains(t, errResp["schemas"], errorSchemaID)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusConflict, resp.Status)
 	})
 
 	t.Run("invalid request body", func(t *testing.T) {
@@ -742,10 +824,11 @@ func TestCreateUser(t *testing.T) {
 		srv.CreateUser(w, r)
 		require.Equal(t, http.StatusBadRequest, w.Code)
 
-		var errResp map[string]any
-		err := json.Unmarshal(w.Body.Bytes(), &errResp)
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
-		assert.Contains(t, errResp["schemas"], errorSchemaID)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusBadRequest, resp.Status)
 	})
 
 	t.Run("error listing users", func(t *testing.T) {
@@ -1215,10 +1298,11 @@ func TestUpdateUser(t *testing.T) {
 		srv.UpdateUser(w, r)
 		require.Equal(t, http.StatusConflict, w.Code)
 
-		var errResp map[string]any
-		err := json.Unmarshal(w.Body.Bytes(), &errResp)
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
-		assert.Contains(t, errResp["schemas"], errorSchemaID)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusConflict, resp.Status)
 	})
 
 	t.Run("invalid request body", func(t *testing.T) {
@@ -1385,10 +1469,11 @@ func TestDeleteUser(t *testing.T) {
 		srv.DeleteUser(w, r)
 		require.Equal(t, http.StatusNotFound, w.Code)
 
-		var errResp map[string]any
-		err := json.Unmarshal(w.Body.Bytes(), &errResp)
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
-		assert.Contains(t, errResp["schemas"], errorSchemaID)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusNotFound, resp.Status)
 	})
 
 	t.Run("system user returns not found", func(t *testing.T) {
@@ -1436,10 +1521,11 @@ func TestDeleteUser(t *testing.T) {
 		srv.DeleteUser(w, r)
 		require.Equal(t, http.StatusConflict, w.Code)
 
-		var errResp map[string]any
-		err := json.Unmarshal(w.Body.Bytes(), &errResp)
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
-		assert.Contains(t, errResp["schemas"], errorSchemaID)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusConflict, resp.Status)
 	})
 
 	t.Run("error deleting user", func(t *testing.T) {

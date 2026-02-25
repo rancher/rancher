@@ -102,6 +102,92 @@ func TestErrorMarshalJSON(t *testing.T) {
 	}
 }
 
+func TestErrorUnmarshalJSON(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    Error
+		wantErr bool
+	}{
+		{
+			name:  "basic error",
+			input: `{"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"status":"400","detail":"Bad request"}`,
+			want: Error{
+				Schemas: []string{errorSchemaID},
+				Status:  400,
+				Detail:  "Bad request",
+			},
+		},
+		{
+			name:  "error with scimType",
+			input: `{"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"status":"409","detail":"Resource already exists","scimType":"uniqueness"}`,
+			want: Error{
+				Schemas:  []string{errorSchemaID},
+				Status:   409,
+				Detail:   "Resource already exists",
+				ScimType: "uniqueness",
+			},
+		},
+		{
+			name:  "empty status uses zero value",
+			input: `{"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"status":"","detail":"Bad request"}`,
+			want: Error{
+				Schemas: []string{errorSchemaID},
+				Status:  0,
+				Detail:  "Bad request",
+			},
+		},
+		{
+			name:  "missing status uses zero value",
+			input: `{"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"detail":"Bad request"}`,
+			want: Error{
+				Schemas: []string{errorSchemaID},
+				Status:  0,
+				Detail:  "Bad request",
+			},
+		},
+		{
+			name:    "invalid status returns error",
+			input:   `{"schemas":["urn:ietf:params:scim:api:messages:2.0:Error"],"status":"abc","detail":"Bad request"}`,
+			wantErr: true,
+		},
+		{
+			name:    "invalid json returns error",
+			input:   `not valid json`,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var e Error
+			err := json.Unmarshal([]byte(tt.input), &e)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.want, e)
+			}
+		})
+	}
+}
+
+func TestErrorRoundTrip(t *testing.T) {
+	original := Error{
+		Schemas:  []string{errorSchemaID},
+		Status:   http.StatusConflict,
+		Detail:   "Resource already exists",
+		ScimType: "uniqueness",
+	}
+
+	data, err := json.Marshal(original)
+	require.NoError(t, err)
+
+	var result Error
+	require.NoError(t, json.Unmarshal(data, &result))
+	assert.Equal(t, original, result)
+}
+
 func TestNewError(t *testing.T) {
 	tests := []struct {
 		name     string

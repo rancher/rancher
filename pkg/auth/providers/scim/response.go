@@ -49,6 +49,32 @@ func (e Error) MarshalJSON() ([]byte, error) {
 	return json.Marshal(t)
 }
 
+func (e *Error) UnmarshalJSON(data []byte) error {
+	var t struct {
+		Schemas  []string `json:"schemas"`
+		Status   string   `json:"status"`
+		Detail   string   `json:"detail"`
+		ScimType string   `json:"scimType,omitempty"`
+	}
+	if err := json.Unmarshal(data, &t); err != nil {
+		return fmt.Errorf("failed to unmarshal Error: %w", err)
+	}
+
+	e.Schemas = t.Schemas
+	e.Detail = t.Detail
+	e.ScimType = t.ScimType
+
+	if t.Status != "" {
+		status, err := strconv.Atoi(t.Status)
+		if err != nil {
+			return fmt.Errorf("invalid Error status value: %s", t.Status)
+		}
+		e.Status = status
+	}
+
+	return nil
+}
+
 // NewError creates a new SCIM error.
 func NewError(status int, detail string, scimType ...string) *Error {
 	err := &Error{
