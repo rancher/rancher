@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/status"
 	"github.com/rancher/rancher/pkg/ext/mocks"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -384,6 +385,220 @@ func TestCreate(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, tt.wantObj, obj)
 			}
+		})
+	}
+}
+
+func TestCreateWithFirstLoginOff(t *testing.T) {
+	// Parallel not possible for this due to the manipulation and checking
+	// of the first-login setting
+
+	ctrl := gomock.NewController(t)
+	userID := "fake-user-id"
+	username := "fake-username"
+	oldPassword := "fake-current-password"
+	newPassword := "fake-new-password"
+
+	userCache := func() mgmtv3.UserCache {
+		cache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		cache.EXPECT().Get(gomock.Any()).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: userID,
+			},
+			Username: username,
+		}, nil).AnyTimes()
+		return cache
+	}
+
+	tests := []struct {
+		desc       string
+		obj        *ext.PasswordChangeRequest
+		ctx        context.Context
+		options    *metav1.CreateOptions
+		authorizer authorizer.Authorizer
+		pwdUpdater func() PasswordUpdater
+		userCache  func() mgmtv3.UserCache
+		userClient func() mgmtv3.UserClient
+	}{
+		{
+			desc: "password changed for the same user",
+			obj: &ext.PasswordChangeRequest{
+				Spec: ext.PasswordChangeRequestSpec{
+					UserID:          userID,
+					CurrentPassword: oldPassword,
+					NewPassword:     newPassword,
+				},
+			},
+			ctx: request.WithUser(context.Background(), &user.DefaultInfo{Name: userID}),
+			pwdUpdater: func() PasswordUpdater {
+				mock := mocks.NewMockPasswordUpdater(ctrl)
+				mock.EXPECT().VerifyAndUpdatePassword(userID, oldPassword, newPassword).Return(nil)
+
+				return mock
+			},
+			userCache: userCache,
+			authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+				return authorizer.DecisionDeny, "", nil
+			}),
+		},
+		{
+			desc: "password changed for a different user",
+			obj: &ext.PasswordChangeRequest{
+				Spec: ext.PasswordChangeRequestSpec{
+					UserID:          userID,
+					CurrentPassword: oldPassword,
+					NewPassword:     newPassword,
+				},
+			},
+			ctx: request.WithUser(context.Background(), &user.DefaultInfo{Name: "another-user"}),
+			authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+				return authorizer.DecisionAllow, "", nil
+			}),
+			pwdUpdater: func() PasswordUpdater {
+				mock := mocks.NewMockPasswordUpdater(ctrl)
+				mock.EXPECT().UpdatePassword(userID, newPassword).Return(nil)
+
+				return mock
+			},
+			userCache: userCache,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			// force first-login to false, and restore old state at end
+			firstLoginAtStart := settings.FirstLogin.Get()
+			_ = settings.FirstLogin.Set("false")
+			t.Cleanup(func() {
+				_ = settings.FirstLogin.Set(firstLoginAtStart)
+			})
+
+			store := Store{
+				authorizer:           tt.authorizer,
+				getPasswordMinLength: func() int { return 12 },
+			}
+			if tt.pwdUpdater != nil {
+				store.pwdUpdater = tt.pwdUpdater()
+			}
+			if tt.userCache != nil {
+				store.userCache = tt.userCache()
+			}
+			if tt.userClient != nil {
+				store.userClient = tt.userClient()
+			}
+
+			_, err := store.Create(tt.ctx, tt.obj, nil, tt.options)
+
+			assert.NoError(t, err)
+			// verify that the setting is still unset
+			assert.Equal(t, "false", settings.FirstLogin.Get())
+		})
+	}
+}
+
+func TestCreateWithFirstLogin(t *testing.T) {
+	// Parallel not possible for this due to the manipulation and checking
+	// of the first-login setting
+
+	ctrl := gomock.NewController(t)
+	userID := "fake-user-id"
+	username := "fake-username"
+	oldPassword := "fake-current-password"
+	newPassword := "fake-new-password"
+
+	userCache := func() mgmtv3.UserCache {
+		cache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		cache.EXPECT().Get(gomock.Any()).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: userID,
+			},
+			Username: username,
+		}, nil).AnyTimes()
+		return cache
+	}
+
+	tests := []struct {
+		desc       string
+		obj        *ext.PasswordChangeRequest
+		ctx        context.Context
+		options    *metav1.CreateOptions
+		authorizer authorizer.Authorizer
+		pwdUpdater func() PasswordUpdater
+		userCache  func() mgmtv3.UserCache
+		userClient func() mgmtv3.UserClient
+	}{
+		{
+			desc: "password changed for the same user",
+			obj: &ext.PasswordChangeRequest{
+				Spec: ext.PasswordChangeRequestSpec{
+					UserID:          userID,
+					CurrentPassword: oldPassword,
+					NewPassword:     newPassword,
+				},
+			},
+			ctx: request.WithUser(context.Background(), &user.DefaultInfo{Name: userID}),
+			pwdUpdater: func() PasswordUpdater {
+				mock := mocks.NewMockPasswordUpdater(ctrl)
+				mock.EXPECT().VerifyAndUpdatePassword(userID, oldPassword, newPassword).Return(nil)
+
+				return mock
+			},
+			userCache: userCache,
+			authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+				return authorizer.DecisionDeny, "", nil
+			}),
+		},
+		{
+			desc: "password changed for a different user",
+			obj: &ext.PasswordChangeRequest{
+				Spec: ext.PasswordChangeRequestSpec{
+					UserID:          userID,
+					CurrentPassword: oldPassword,
+					NewPassword:     newPassword,
+				},
+			},
+			ctx: request.WithUser(context.Background(), &user.DefaultInfo{Name: "another-user"}),
+			authorizer: authorizer.AuthorizerFunc(func(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
+				return authorizer.DecisionAllow, "", nil
+			}),
+			pwdUpdater: func() PasswordUpdater {
+				mock := mocks.NewMockPasswordUpdater(ctrl)
+				mock.EXPECT().UpdatePassword(userID, newPassword).Return(nil)
+
+				return mock
+			},
+			userCache: userCache,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			// force first-login to true, and restore old state at end
+			firstLoginAtStart := settings.FirstLogin.Get()
+			_ = settings.FirstLogin.Set("true")
+			t.Cleanup(func() {
+				_ = settings.FirstLogin.Set(firstLoginAtStart)
+			})
+
+			store := Store{
+				authorizer:           tt.authorizer,
+				getPasswordMinLength: func() int { return 12 },
+			}
+			if tt.pwdUpdater != nil {
+				store.pwdUpdater = tt.pwdUpdater()
+			}
+			if tt.userCache != nil {
+				store.userCache = tt.userCache()
+			}
+			if tt.userClient != nil {
+				store.userClient = tt.userClient()
+			}
+
+			_, err := store.Create(tt.ctx, tt.obj, nil, tt.options)
+
+			assert.NoError(t, err)
+			// verify that the setting was unset.
+			assert.Equal(t, "false", settings.FirstLogin.Get())
 		})
 	}
 }

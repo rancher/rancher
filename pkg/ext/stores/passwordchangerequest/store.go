@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"unicode/utf8"
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
@@ -181,6 +182,12 @@ func (s *Store) Create(
 			Summary: status.SummaryCompleted,
 		}
 
+		if !strings.EqualFold(settings.FirstLogin.Get(), "false") {
+			if err := settings.FirstLogin.Set("false"); err != nil {
+				return nil, err
+			}
+		}
+
 		return req, nil
 	}
 
@@ -205,6 +212,12 @@ func (s *Store) Create(
 				},
 			},
 			Summary: status.SummaryCompleted,
+		}
+
+		if !strings.EqualFold(settings.FirstLogin.Get(), "false") {
+			if err := settings.FirstLogin.Set("false"); err != nil {
+				return nil, err
+			}
 		}
 
 		return req, nil
