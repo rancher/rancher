@@ -1443,11 +1443,17 @@ func TestCreateGroup(t *testing.T) {
 		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
 		groupsCache.EXPECT().Get("grp-existing").Return(existingGroup, nil)
 
-		// When ID is provided and exists, ensureRancherGroup returns the existing group
-		// with created=false, which triggers a 409 Conflict.
+		// When ID is provided and exists, ensureRancherGroup updates externalId if it
+		// differs, then returns created=false, which triggers a 409 Conflict.
+		groupClient := fake.NewMockNonNamespacedClientInterface[*v3.Group, *v3.GroupList](ctrl)
+		groupClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(g *v3.Group) (*v3.Group, error) {
+			assert.Equal(t, "new-ext-id", g.ExternalID)
+			return g, nil
+		})
 
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
+			groups:      groupClient,
 		}
 
 		body := `{
@@ -1819,7 +1825,7 @@ func TestUpdateGroup(t *testing.T) {
 		}
 
 		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
-		// ensureRancherGroup with ID just returns from cache (no update logic)
+		// externalId is unchanged so ensureRancherGroup does not call groups.Update.
 		groupsCache.EXPECT().Get(groupID).Return(existingGroup, nil)
 
 		// syncGroupMembers needs userCache for getRancherGroupMembers
@@ -1859,6 +1865,61 @@ func TestUpdateGroup(t *testing.T) {
 		wantLocation := "/v1-scim/" + provider + "/Groups/" + groupID
 		assert.Contains(t, meta["location"], wantLocation)
 		assert.Contains(t, w.Header().Get("Location"), wantLocation)
+	})
+
+	t.Run("updates externalId when it changes", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupID := "grp-abc123"
+		existingGroup := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			DisplayName: "Engineering",
+			ExternalID:  "old-ext-id",
+		}
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().Get(groupID).Return(existingGroup, nil)
+
+		updatedGroup := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			DisplayName: "Engineering",
+			ExternalID:  "new-ext-id",
+		}
+		groupClient := fake.NewMockNonNamespacedClientInterface[*v3.Group, *v3.GroupList](ctrl)
+		groupClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(g *v3.Group) (*v3.Group, error) {
+			assert.Equal(t, "new-ext-id", g.ExternalID)
+			return updatedGroup, nil
+		})
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
+
+		srv := &SCIMServer{
+			groupsCache: groupsCache,
+			groups:      groupClient,
+			userCache:   userCache,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+			"id": "grp-abc123",
+			"displayName": "Engineering",
+			"externalId": "new-ext-id",
+			"members": []
+		}`
+		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		w := httptest.NewRecorder()
+
+		srv.UpdateGroup(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Equal(t, groupID, resp["id"])
+		assert.Equal(t, "Engineering", resp["displayName"])
+		assert.Equal(t, "new-ext-id", resp["externalId"])
 	})
 
 	t.Run("updates group with members", func(t *testing.T) {

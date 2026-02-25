@@ -788,32 +788,53 @@ func (s *SCIMServer) removeAllGroupMembers(provider, groupName string) error {
 // ensureRancherGroup ensures that a Rancher group exists for the given SCIM group.
 // Returns the group, a boolean indicating if a new group was created, and any error.
 func (s *SCIMServer) ensureRancherGroup(provider string, grp scimGroup) (*v3.Group, bool, error) {
+	var (
+		group *v3.Group
+		err   error
+	)
+
 	if grp.ID != "" {
-		g, err := s.groupsCache.Get(grp.ID)
-		return g, false, err
-	}
+		group, err = s.groupsCache.Get(grp.ID)
+		if err != nil {
+			return nil, false, err
+		}
+	} else {
+		// Try to find an existing group by display name.
+		groups, err := s.groupsCache.List(labels.Set{authProviderLabel: provider}.AsSelector())
+		if err != nil {
+			return nil, false, fmt.Errorf("failed to list groups for provider %s: %w", provider, err)
+		}
 
-	// Try to find an existing group by display name.
-	groups, err := s.groupsCache.List(labels.Set{authProviderLabel: provider}.AsSelector())
-	if err != nil {
-		return nil, false, fmt.Errorf("failed to list groups for provider %s: %w", provider, err)
-	}
-
-	for _, g := range groups {
-		if strings.EqualFold(g.DisplayName, grp.DisplayName) {
-			// Found existing group - update if needed and return created=false.
-			group := g.DeepCopy()
-			if group.ExternalID != grp.ExternalID {
-				group.ExternalID = grp.ExternalID
-				updated, err := s.groups.Update(group)
-				return updated, false, err
+		for _, g := range groups {
+			if strings.EqualFold(g.DisplayName, grp.DisplayName) {
+				group = g
+				break
 			}
-			return g, false, nil
 		}
 	}
 
-	// Create new group.
-	group := &v3.Group{
+	if group != nil {
+		// Found existing group - update if needed and return created=false.
+		var shouldUpdate bool
+		group = group.DeepCopy()
+
+		if group.ExternalID != grp.ExternalID {
+			group.ExternalID = grp.ExternalID
+			shouldUpdate = true
+		}
+
+		if shouldUpdate {
+			group, err = s.groups.Update(group)
+			if err != nil {
+				return nil, false, fmt.Errorf("failed to update group %s: %w", group.Name, err)
+			}
+		}
+
+		return group, false, nil
+	}
+
+	// Create a new group and return created=true.
+	group = &v3.Group{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "grp-",
 			Labels: map[string]string{
