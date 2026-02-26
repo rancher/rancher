@@ -3,6 +3,8 @@ package telemetry
 import (
 	"fmt"
 	"time"
+
+	"github.com/Masterminds/semver/v3"
 )
 
 const (
@@ -139,8 +141,20 @@ func GenerateSCCPayload(telG RancherManagerTelemetry) (*SccPayload, error) {
 		})
 	}
 
+	// Remove pre-release and build metadata from the version
+	productVersion := telG.RancherVersion()
+	semVer, err := semver.NewVersion(productVersion)
+	if err == nil {
+		productVersion = fmt.Sprintf(
+			"%d.%d.%d",
+			semVer.Major(),
+			semVer.Minor(),
+			semVer.Patch(),
+		)
+	}
+
 	return &SccPayload{
-		Version:         telG.RancherVersion(),
+		Version:         productVersion,
 		FeatureFlags:    telG.FeatureFlags(),
 		ManagedSystems:  systems,
 		ManagedClusters: clusters,
