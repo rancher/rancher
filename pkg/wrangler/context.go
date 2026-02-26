@@ -374,6 +374,8 @@ func NewPrimaryContext(ctx context.Context, clientConfig clientcmd.ClientConfig,
 func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restConfig *rest.Config) (*Context, error) {
 	sharedOpts := controllers.GetOptsFromEnv(controllers.Management)
 	sharedOpts.CacheOptions = &cache.SharedCacheFactoryOptions{
+		// Due to a bug in a previous Rancher's extension apiserver for the token and kubeconfig APIs, we
+		// must disable the WatchList features for those APIs.
 		KindDisableWatchList: map[schema.GroupVersionKind]bool{
 			extv1api.SchemeGroupVersion.WithKind("Kubeconfig"): true,
 			extv1api.SchemeGroupVersion.WithKind("Token"):      true,
