@@ -42,9 +42,9 @@ func getInitInfo(wContext *wrangler.Context) InitInfo {
 	rancherVersion := settings.ServerVersion.Get()
 	clusterUUID := ""
 
-	kubeSystenNs, err := namespaces.Get("kube-system", metav1.GetOptions{})
+	kubeSystemNs, err := namespaces.Get("kube-system", metav1.GetOptions{})
 	if err == nil {
-		clusterUUID = string(kubeSystenNs.UID)
+		clusterUUID = string(kubeSystemNs.UID)
 	}
 
 	return InitInfo{
