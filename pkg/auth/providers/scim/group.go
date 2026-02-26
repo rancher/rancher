@@ -170,6 +170,11 @@ func (s *SCIMServer) CreateGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if payload.DisplayName == "" {
+		writeError(w, NewError(http.StatusBadRequest, "displayName is required"))
+		return
+	}
+
 	group, created, err := s.ensureRancherGroup(provider, payload)
 	if err != nil {
 		logrus.Errorf("scim::CreateGroup: failed to ensure rancher group: %s", err)
@@ -299,6 +304,11 @@ func (s *SCIMServer) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 	if id != payload.ID {
 		logrus.Errorf("scim::UpdateGroup: id in URL %s does not match id in body %s", id, payload.ID)
 		writeError(w, NewError(http.StatusBadRequest, "Mismatched Group id"))
+		return
+	}
+
+	if payload.DisplayName == "" {
+		writeError(w, NewError(http.StatusBadRequest, "displayName is required"))
 		return
 	}
 

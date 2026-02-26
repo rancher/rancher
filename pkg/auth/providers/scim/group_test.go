@@ -1237,6 +1237,26 @@ func TestCreateGroup(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, resp.Status)
 	})
 
+	t.Run("missing displayName", func(t *testing.T) {
+		// ensureRancherGroup must not be called when displayName is absent.
+		srv := &SCIMServer{}
+
+		body := `{"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"]}`
+		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		w := httptest.NewRecorder()
+
+		srv.CreateGroup(w, r)
+		require.Equal(t, http.StatusBadRequest, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusBadRequest, resp.Status)
+		assert.Contains(t, resp.Detail, "displayName is required")
+	})
+
 	t.Run("error listing groups", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
@@ -2034,6 +2054,26 @@ func TestUpdateGroup(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, resp.Schemas, errorSchemaID)
 		assert.Equal(t, http.StatusBadRequest, resp.Status)
+	})
+
+	t.Run("missing displayName", func(t *testing.T) {
+		// ensureRancherGroup must not be called when displayName is absent.
+		srv := &SCIMServer{}
+
+		body := `{"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"], "id": "grp-abc123"}`
+		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/grp-abc123", bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": "grp-abc123"})
+		w := httptest.NewRecorder()
+
+		srv.UpdateGroup(w, r)
+		require.Equal(t, http.StatusBadRequest, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusBadRequest, resp.Status)
+		assert.Contains(t, resp.Detail, "displayName is required")
 	})
 
 	t.Run("error ensuring group", func(t *testing.T) {
