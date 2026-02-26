@@ -24,7 +24,8 @@ type Service struct {
 	secretsInterface wcorev1.SecretController
 	secretsCache     wcorev1.SecretCache
 
-	userClient controllers.UserClient
+	userClient  controllers.UserClient
+	groupClient controllers.GroupClient
 
 	clusterRoleTemplateBindingsCache  controllers.ClusterRoleTemplateBindingCache
 	clusterRoleTemplateBindingsClient controllers.ClusterRoleTemplateBindingClient
@@ -45,7 +46,8 @@ func NewCleanupService(secretsInterface wcorev1.SecretController, c controllers.
 		secretsInterface: secretsInterface,
 		secretsCache:     secretsInterface.Cache(),
 
-		userClient: c.User(),
+		userClient:  c.User(),
+		groupClient: c.Group(),
 
 		clusterRoleTemplateBindingsCache:  c.ClusterRoleTemplateBinding().Cache(),
 		clusterRoleTemplateBindingsClient: c.ClusterRoleTemplateBinding(),
@@ -88,7 +90,7 @@ func (s *Service) Run(config *v3.AuthConfig) error {
 		return fmt.Errorf("error cleaning up tokens associated with a disabled auth provider %s: %w", config.Name, err)
 	}
 
-	if err := scim.CleanupSecrets(s.secretsInterface, config.GetName()); err != nil {
+	if err := scim.Cleanup(s.secretsInterface, s.groupClient, config.GetName()); err != nil {
 		return fmt.Errorf("error cleaning up SCIM token secrets associated with a disabled auth provider %s: %w", config.Name, err)
 	}
 
