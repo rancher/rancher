@@ -93,6 +93,7 @@ func TestGetRancherGroupMembers(t *testing.T) {
 	require.Len(t, members, 1)
 	assert.Equal(t, "u-mo773yttt4", members[0].Value)
 	assert.Equal(t, "john.doe", members[0].Display)
+	assert.Equal(t, userResource, members[0].Type)
 }
 
 func TestGetAllRancherGroupMembers(t *testing.T) {
@@ -182,12 +183,14 @@ func TestGetAllRancherGroupMembers(t *testing.T) {
 	require.Len(t, architects, 1)
 	assert.Equal(t, "u-mo773yttt4", architects[0].Value)
 	assert.Equal(t, "john.doe", architects[0].Display)
+	assert.Equal(t, userResource, architects[0].Type)
 
 	// Verify Developers group has 1 member.
 	developers := groups["Developers"]
 	require.Len(t, developers, 1)
 	assert.Equal(t, "u-yypnjwjmkq", developers[0].Value)
 	assert.Equal(t, "jane.smith", developers[0].Display)
+	assert.Equal(t, userResource, developers[0].Type)
 }
 
 func TestSyncGroupMembers(t *testing.T) {
@@ -1586,6 +1589,7 @@ func TestGetGroup(t *testing.T) {
 		member := members[0].(map[string]any)
 		assert.Equal(t, "u-user1", member["value"])
 		assert.Equal(t, "user1", member["display"])
+		assert.Equal(t, userResource, member["type"])
 	})
 
 	t.Run("returns group without members when excluded", func(t *testing.T) {
@@ -1808,6 +1812,7 @@ func TestGetGroup(t *testing.T) {
 		require.Len(t, members, 1)
 		member := members[0].(map[string]any)
 		assert.Equal(t, "u-normal", member["value"])
+		assert.Equal(t, userResource, member["type"])
 	})
 }
 

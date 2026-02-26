@@ -18,9 +18,9 @@ import (
 
 // scimMember represents a member of a SCIM group.
 type scimMember struct {
-	Value   string `json:"value"`   // Member identifier.
-	Type    string `json:"type"`    // Member type, e.g., "User" or "Group".
-	Display string `json:"display"` // A human-readable name.
+	Value   string `json:"value"`          // Member identifier.
+	Type    string `json:"type,omitempty"` // Member type, e.g., "User" or "Group".
+	Display string `json:"display"`        // A human-readable name.
 }
 
 // scimGroup represents a SCIM group.
@@ -594,6 +594,7 @@ func (s *SCIMServer) getAllRancherGroupMembers(provider string) (map[string][]sc
 			uniqueGroups[group.DisplayName] = append(uniqueGroups[group.DisplayName], scimMember{
 				Value:   user.Name,
 				Display: first(attr.ExtraByProvider[provider]["username"]),
+				Type:    userResource,
 			})
 		}
 	}
@@ -627,6 +628,7 @@ func (s *SCIMServer) getRancherGroupMembers(provider string, name string) ([]sci
 				members = append(members, scimMember{
 					Value:   user.Name,
 					Display: first(attr.ExtraByProvider[provider]["username"]),
+					Type:    userResource,
 				})
 				break // No need to check other groups.
 			}
