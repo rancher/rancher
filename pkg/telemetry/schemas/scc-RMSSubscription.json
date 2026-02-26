@@ -4,18 +4,21 @@
   "type": "object",
   "properties": {
     "version": {
+      "$comment": "Product Version normalized for SCC - must be semver. https://semver.org/",
       "type": "string",
-      "pattern": "^\\d+\\.\\d+$"
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
     },
     "subscription": {
       "type": "object",
       "required": ["installuuid", "clusteruuid", "product", "version", "arch", "git", "server_url"],
       "properties": {
         "installuuid": {
+          "$comment": "The UID of the k8s kube-system namespace.",
           "type": "string",
           "format": "uuid"
         },
         "clusteruuid": {
+          "$comment": "Rancher's unique cluster identifier - based on InstallUUID setting.",
           "type": "string",
           "format": "uuid"
         },
@@ -24,9 +27,11 @@
           "type": "string"
         },
         "version": {
+          "$comment": "Rancher's raw build version",
           "type": "string"
         },
         "git": {
+          "$comment": "Rancher's build git SHA",
           "type": "string"
         },
         "arch": {
