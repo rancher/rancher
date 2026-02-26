@@ -5,7 +5,7 @@ turtlesVersion: 108.0.4+up0.25.4
 cspAdapterMinVersion: 108.0.0+up8.0.0
 defaultShellVersion: rancher/shell:v0.6.2
 fleetVersion: 108.0.3+up0.14.3
-defaultSccOperatorImage: rancher/scc-operator:v0.3.1
+defaultSccOperatorImage: rancher/scc-operator:v0.4.0-rc.0
 # NOTE: when updating this version, you will also need to update the hardcoded
 # k8s minor <-> image tag mapping in pkg/controllers/capr/autoscaler/fleet.go (imageTagVersions variable).
 # if adding support for a new k8s minor release (e.g. new rancher release)

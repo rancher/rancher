@@ -5,7 +5,7 @@ package buildconfig
 const (
 	ClusterAutoscalerChartVersion = "9.50.1"
 	CspAdapterMinVersion          = "108.0.0+up8.0.0"
-	DefaultSccOperatorImage       = "rancher/scc-operator:v0.3.1"
+	DefaultSccOperatorImage       = "rancher/scc-operator:v0.4.0-rc.0"
 	DefaultShellVersion           = "rancher/shell:v0.6.2"
 	FleetVersion                  = "108.0.3+up0.14.3"
 	ProvisioningCAPIVersion       = "108.0.0+up0.9.0"
