@@ -464,6 +464,10 @@ func (c *fakeRoleBindingClient) WithImpersonation(_ rest.ImpersonationConfig) (g
 	panic("implement me")
 }
 
+func (c *fakeRoleBindingClient) DeleteCollection(_ string, _ metav1.DeleteOptions, _ metav1.ListOptions) error {
+	panic("implement me")
+}
+
 type fakePRTBClient struct {
 	bindings []v3.ProjectRoleTemplateBinding
 }
@@ -508,6 +512,10 @@ func (c *fakePRTBClient) WithImpersonation(_ rest.ImpersonationConfig) (generic.
 }
 
 func (c *fakePRTBClient) UpdateStatus(_ *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
+	panic("implement me")
+}
+
+func (c *fakePRTBClient) DeleteCollection(_ string, _ metav1.DeleteOptions, _ metav1.ListOptions) error {
 	panic("implement me")
 }
 
