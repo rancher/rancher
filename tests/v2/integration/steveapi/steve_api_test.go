@@ -3047,6 +3047,8 @@ func getFileName(user, ns, query string) string {
 		query = "none"
 	} else {
 		query = strings.ReplaceAll(query, "/", "%2F")
+		query = strings.ReplaceAll(query, "<", "%3C")
+		query = strings.ReplaceAll(query, ">", "%3E")
 	}
 	return user + "_" + ns + "_" + query + ".json"
 }
