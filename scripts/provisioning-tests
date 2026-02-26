@@ -63,6 +63,7 @@ export CATTLE_FEATURES=${CATTLE_FEATURES}
 # Tell Rancher to use the recently-built Rancher cluster agent image. This image is built as part of CI and will be
 # copied to the in-cluster registry during test setup below.
 source ./scripts/version
+source ./scripts/package-env
 
 # defaulting to :head (matching the hardcoded value within rancher) if CATTLE_AGENT_IMAGE or TAG is not specified
 if [ $TAG = "dev" ]; then

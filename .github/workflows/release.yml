@@ -19,7 +19,7 @@ jobs:
   unit-tests:
     uses: ./.github/workflows/unit-test.yml
   build-server:
-    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
+    runs-on: runs-on,runner=8cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }},spot=false
     strategy:
       matrix:
         os: [linux]
@@ -37,7 +37,7 @@ jobs:
       matrix:
         os: [linux]
         arch: [x64, arm64]
-    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
+    runs-on: runs-on,runner=8cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }},spot=false
     env:
       ARCH: ${{ matrix.arch }}
       OS: ${{ matrix.os }}
@@ -57,7 +57,7 @@ jobs:
       matrix:
         os: [linux]
         arch: [x64, arm64]
-    runs-on: runs-on,runner=2cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
+    runs-on: runs-on,runner=2cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }},spot=false
     permissions:
       contents: read
       id-token: write
@@ -83,7 +83,7 @@ jobs:
       contents: read
       id-token: write
     concurrency:
-      group: 'build-chart-tag'
+      group: "build-chart-tag"
       # instead of cancelling other runs, wait until they are finished
       cancel-in-progress: false
     env:
@@ -107,7 +107,7 @@ jobs:
       - name: publish
         uses: ./.github/actions/rancher-chart/publish-gcp
   build-installer:
-    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }}
+    runs-on: runs-on,runner=4cpu-${{ matrix.os }}-${{ matrix.arch }},image=ubuntu22-full-${{ matrix.arch }},run-id=${{ github.run_id }},spot=false
     strategy:
       matrix:
         os: [linux]
@@ -131,7 +131,7 @@ jobs:
         uses: ./.github/actions/build-images/installer
   merge-server-agent-installer-manifests:
     needs: [push-images, build-installer]
-    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,runner=4cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }},spot=false
     permissions:
       contents: read
       id-token: write
@@ -165,7 +165,7 @@ jobs:
           image: "${{ env.IMAGE_INSTALLER }}"
         uses: ./.github/actions/merge-manifests
   create-images-files:
-    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
+    runs-on: runs-on,runner=8cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }},spot=false
     permissions:
       contents: write
       id-token: write

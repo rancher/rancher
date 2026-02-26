@@ -1,18 +1,12 @@
 #!/bin/bash
 set -ex
 
-echo Starting rancher server in container
+echo "Starting rancher server in container"
+cd "$(dirname "$0")/../.." || exit
 
-source $(dirname $0)/../version
-source $(dirname $0)/../export-config
-cd scripts
-source ./package-env
-cd ..
+source scripts/package-env
 
-
-cd $(dirname $0)/../..
-
-if [ ! -z $1 ] && ( [ $1 = "--trace" ] || [ $1 = "--info" ] || [ $1 = "--debug" ] ); then
+if [ ! -z $1 ] && ([ $1 = "--trace" ] || [ $1 = "--info" ] || [ $1 = "--debug" ]); then
   LOGFLAG=$1
 fi
 
@@ -26,4 +20,17 @@ export CATTLE_BOOTSTRAP_PASSWORD="admin"
 export CATTLE_FEATURES="harvester=false"
 
 mkdir -p /etc/rancher/k3s/
-docker run -d --name rancher-server -v /etc/rancher/k3s:/etc/rancher/k3s --restart=unless-stopped --privileged -p 6443:6443 -p 8080:8080 -p 443:443 -e CATTLE_SERVER_URL=$CATTLE_SERVER_URL -e CATTLE_BOOTSTRAP_PASSWORD=$CATTLE_BOOTSTRAP_PASSWORD -e CATTLE_DEV_MODE=yes -e CATTLE_AGENT_IMAGE=$AGENT_IMAGE $IMAGE
+
+docker run -d \
+  --name rancher-server \
+  -v /etc/rancher/k3s:/etc/rancher/k3s \
+  --restart=unless-stopped \
+  --privileged \
+  -p 6443:6443 \
+  -p 8080:8080 \
+  -p 443:443 \
+  -e CATTLE_SERVER_URL="$CATTLE_SERVER_URL" \
+  -e CATTLE_BOOTSTRAP_PASSWORD="$CATTLE_BOOTSTRAP_PASSWORD" \
+  -e CATTLE_DEV_MODE=yes \
+  -e CATTLE_AGENT_IMAGE="$AGENT_IMAGE" \
+  "$IMAGE_TAG"

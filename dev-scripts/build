@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+
+set -eo pipefail
+set -x
+
+source scripts/package-env
+
+BUILD_ARGS=()
+BUILDX_ARGS=()
+LABELS_STR="${LABELS_STR:-""}"
+LABELS=()
+
+BUILD_ACTION="${BUILD_ACTION:-"--load"}"
+TARGET_PLATFORMS="${TARGET_PLATFORMS:-"${OS}/${ARCH}"}"
+
+# add labels from string into the labels array
+if [ -n "${LABELS_STR}" ]; then
+  temp_labels=()
+  mapfile -t temp_labels <<<"$LABELS_STR"
+  temp_labels=("${temp_labels[@]/#/--label=}")
+  LABELS=("${LABELS[@]}" "${temp_labels[@]}")
+fi
+
+build_rancher() {
+  docker_target=$1
+  docker_tag=$2
+
+  check_missing "docker_target"
+  check_missing "docker_tag"
+
+  if [ -n "${BUILDER}" ]; then
+    BUILDX_ARGS+=("--builder=${BUILDER}")
+  fi
+
+  BUILD_ARGS+=("--build-arg=VERSION=${TAG}")
+  BUILD_ARGS+=("--build-arg=COMMIT=${COMMIT}")
+  BUILD_ARGS+=("--build-arg=ARCH=${ARCH}")
+  BUILD_ARGS+=("--build-arg=CATTLE_RANCHER_WEBHOOK_VERSION=${CATTLE_RANCHER_WEBHOOK_VERSION}")
+  BUILD_ARGS+=("--build-arg=CATTLE_REMOTEDIALER_PROXY_VERSION=${CATTLE_REMOTEDIALER_PROXY_VERSION}")
+  BUILD_ARGS+=("--build-arg=CATTLE_RANCHER_TURTLES_VERSION=${CATTLE_RANCHER_TURTLES_VERSION}")
+  BUILD_ARGS+=("--build-arg=CATTLE_CSP_ADAPTER_MIN_VERSION=${CATTLE_CSP_ADAPTER_MIN_VERSION}")
+  BUILD_ARGS+=("--build-arg=CATTLE_FLEET_VERSION=${CATTLE_FLEET_VERSION}")
+
+  docker buildx build \
+    "${BUILD_ARGS[@]}" \
+    "${BUILDX_ARGS[@]}" \
+    "${LABELS[@]}" \
+    ${BUILD_ACTION} \
+    --target="${docker_target}" \
+    --platform="${TARGET_PLATFORMS}" \
+    --tag="$docker_tag" \
+    --file=package/Dockerfile .
+}
+
+build_installer() {
+  docker_tag=$1
+
+  check_missing "docker_tag"
+
+  BUILD_ARGS+=("--build-arg=VERSION=${TAG}")
+  BUILD_ARGS+=("--build-arg=COMMIT=${COMMIT}")
+  BUILD_ARGS+=("--build-arg=ARCH=${ARCH}")
+
+  docker buildx build \
+    "${BUILD_ARGS[@]}" \
+    "${BUILDX_ARGS[@]}" \
+    "${LABELS[@]}" \
+    ${BUILD_ACTION} \
+    --platform="${TARGET_PLATFORMS}" \
+    --tag="$docker_tag" \
+    --file=package/Dockerfile.installer .
+}
+
+if [ "$TARGET" = "build-server" ]; then
+  build_rancher "server" "${IMAGE_TAG}"
+fi
+
+if [ "$TARGET" = "build-agent" ]; then
+  build_rancher "agent" "${IMAGE_AGENT_TAG}"
+fi
+
+if [ "$TARGET" = "build-server-tarball" ]; then
+  BUILD_ACTION=""
+  BUILDX_ARGS+=("--output=type=docker,dest=/tmp/rancher-${OS}-${ARCH}.tar")
+  BUILDX_ARGS+=("--no-cache")
+
+  build_rancher "server" "${IMAGE_TAG}"
+fi
+
+if [ "$TARGET" = "build-agent-tarball" ]; then
+  BUILD_ACTION=""
+  BUILDX_ARGS+=("--output=type=docker,dest=/tmp/rancher-agent-${OS}-${ARCH}.tar")
+  BUILDX_ARGS+=("--no-cache")
+
+  build_rancher "agent" "${IMAGE_AGENT_TAG}"
+fi

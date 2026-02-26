@@ -11,7 +11,7 @@ runs:
         fi
     - name: Setup Environment Variables
       uses: ./.github/actions/setup-tag-env
-    - id: env 
+    - id: env
       name: Setup Dependencies Env Variables
       uses: ./.github/actions/setup-build-env
     - name: Docker meta
@@ -26,27 +26,10 @@ runs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
     - name: Build and export server
-      id: build
-      uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
-      with:
-        push: false
-        build-args: |
-          "VERSION=${{ env.TAG }}"
-          "COMMIT=${{ env.COMMIT }}"
-          "ARCH=${{ env.ARCH }}"
-          "CATTLE_RANCHER_WEBHOOK_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_WEBHOOK_VERSION }}"
-          "CATTLE_REMOTEDIALER_PROXY_VERSION=${{ steps.env.outputs.CATTLE_REMOTEDIALER_PROXY_VERSION }}"
-          "CATTLE_RANCHER_TURTLES_VERSION=${{ steps.env.outputs.CATTLE_RANCHER_TURTLES_VERSION }}"
-          "CATTLE_CSP_ADAPTER_MIN_VERSION=${{ steps.env.outputs.CATTLE_CSP_ADAPTER_MIN_VERSION }}"
-          "CATTLE_FLEET_VERSION=${{ steps.env.outputs.CATTLE_FLEET_VERSION }}"
-        tags: ${{ github.repository_owner }}/rancher:${{ env.TAG }}-${{ env.ARCH }}
-        context: .
-        platforms: "${{ env.OS }}/${{ env.ARCH }}"
-        file: ./package/Dockerfile
-        labels: "${{ steps.meta.outputs.labels }}"
-        outputs: type=docker,dest=/tmp/rancher-${{ env.OS }}-${{ env.ARCH }}.tar
-        no-cache: true
-        target: "server"
+      shell: bash
+      env:
+        LABELS_STR: ${{ steps.meta.outputs.labels }}
+      run: make build-rancher-server-tarball
     - name: Upload image
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       with:
