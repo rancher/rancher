@@ -196,6 +196,11 @@ func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if payload.UserName == "" {
+		writeError(w, NewError(http.StatusBadRequest, "userName is required"))
+		return
+	}
+
 	list, err := s.userCache.List(labels.Everything())
 	if err != nil {
 		logrus.Errorf("scim::CreateUser: failed to list users: %s", err)
@@ -357,6 +362,11 @@ func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logrus.Errorf("scim::UpdateUser: failed to decode request body: %s", err)
 		writeError(w, NewError(http.StatusBadRequest, "Invalid request body"))
+		return
+	}
+
+	if payload.UserName == "" {
+		writeError(w, NewError(http.StatusBadRequest, "userName is required"))
 		return
 	}
 
