@@ -6,6 +6,7 @@ const (
 	FeatureStatusFieldDescription = "description"
 	FeatureStatusFieldDynamic     = "dynamic"
 	FeatureStatusFieldLockedValue = "lockedValue"
+	FeatureStatusFieldPrime       = "prime"
 )
 
 type FeatureStatus struct {
@@ -13,4 +14,5 @@ type FeatureStatus struct {
 	Description string `json:"description,omitempty" yaml:"description,omitempty"`
 	Dynamic     bool   `json:"dynamic,omitempty" yaml:"dynamic,omitempty"`
 	LockedValue *bool  `json:"lockedValue,omitempty" yaml:"lockedValue,omitempty"`
+	Prime       bool   `json:"prime,omitempty" yaml:"prime,omitempty"`
 }
