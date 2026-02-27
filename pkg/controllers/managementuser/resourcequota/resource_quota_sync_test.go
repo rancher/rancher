@@ -11,7 +11,124 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+func TestSetLimitRangeAnnotation(t *testing.T) {
+	t.Run("setLimitRangeAnnotation, no annotations", func(t *testing.T) {
+		ns := corev1.Namespace{}
+		setLimitRangeAnnotation(&ns, &v32.ContainerResourceLimit{
+			RequestsCPU: "10m",
+			LimitsCPU:   "100m",
+		})
+		assert.Equal(t, corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					limitRangeAnnotation: `{"requestsCpu":"10m","limitsCpu":"100m"}`,
+				},
+			},
+		}, ns)
+	})
+	t.Run("setLimitRangeAnnotation, with annotations, no conflict", func(t *testing.T) {
+		ns := corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					"other": "x",
+				},
+			},
+		}
+		setLimitRangeAnnotation(&ns, &v32.ContainerResourceLimit{
+			RequestsCPU: "10m",
+			LimitsCPU:   "100m",
+		})
+		assert.Equal(t, corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					"other":              "x",
+					limitRangeAnnotation: `{"requestsCpu":"10m","limitsCpu":"100m"}`,
+				},
+			},
+		}, ns)
+	})
+	t.Run("setLimitRangeAnnotation, with annotations, overwrite", func(t *testing.T) {
+		ns := corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					limitRangeAnnotation: `{"requestsMem":"10M","limitsMem":"100M"}`,
+				},
+			},
+		}
+		setLimitRangeAnnotation(&ns, &v32.ContainerResourceLimit{
+			RequestsCPU: "10m",
+			LimitsCPU:   "100m",
+		})
+		assert.Equal(t, corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					limitRangeAnnotation: `{"requestsCpu":"10m","limitsCpu":"100m"}`,
+				},
+			},
+		}, ns)
+	})
+}
+
+func TestDeleteLimitRangeAnnotation(t *testing.T) {
+	t.Run("deleteLimitRangeAnnotation, no annotations, no change", func(t *testing.T) {
+		ns := corev1.Namespace{}
+		deleteLimitRangeAnnotation(&ns)
+		assert.Equal(t, corev1.Namespace{}, ns)
+	})
+	t.Run("deleteLimitRangeAnnotation, with annotations, not present, no change", func(t *testing.T) {
+		ns := corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					"other": "x",
+				},
+			},
+		}
+		deleteLimitRangeAnnotation(&ns)
+		assert.Equal(t, corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					"other": "x",
+				},
+			},
+		}, ns)
+	})
+	t.Run("deleteLimitRangeAnnotation, with annotations, present, removed", func(t *testing.T) {
+		ns := corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					limitRangeAnnotation: `{"requestsCpu":"10m","limitsCpu":"100m"}`,
+				},
+			},
+		}
+		deleteLimitRangeAnnotation(&ns)
+		assert.Equal(t, corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{},
+			},
+		}, ns)
+	})
+	t.Run("deleteLimitRangeAnnotation, with annotations, present and other, untouched other", func(t *testing.T) {
+		ns := corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					"other":              "x",
+					limitRangeAnnotation: `{"requestsCpu":"10m","limitsCpu":"100m"}`,
+				},
+			},
+		}
+		deleteLimitRangeAnnotation(&ns)
+		assert.Equal(t, corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Annotations: map[string]string{
+					"other": "x",
+				},
+			},
+		}, ns)
+	})
+}
 
 func TestSetValidated(t *testing.T) {
 	t.Run("setup changes, second identical not", func(t *testing.T) {
@@ -114,8 +231,9 @@ func TestUpdateDefaultLimitRange(t *testing.T) {
 		lrMock.EXPECT().Update(gomock.Any()).Return(nil, nil).Times(0)
 		sc := SyncController{LimitRange: lrMock}
 
-		err := sc.updateDefaultLimitRange(&corev1.LimitRange{Spec: specA}, &specA)
+		update, err := sc.updateDefaultLimitRange(&corev1.LimitRange{Spec: specA}, &specA)
 		assert.NoError(t, err)
+		assert.False(t, update)
 	})
 
 	t.Run("update for changes", func(t *testing.T) {
@@ -125,8 +243,9 @@ func TestUpdateDefaultLimitRange(t *testing.T) {
 		lrMock.EXPECT().Update(gomock.Any()).Return(nil, nil)
 		sc := SyncController{LimitRange: lrMock}
 
-		err := sc.updateDefaultLimitRange(&corev1.LimitRange{Spec: specA}, &specB)
+		update, err := sc.updateDefaultLimitRange(&corev1.LimitRange{Spec: specA}, &specB)
 		assert.NoError(t, err)
+		assert.True(t, update)
 	})
 }
 
@@ -302,7 +421,6 @@ func TestCompleteLimit(t *testing.T) {
 }
 
 func TestLimitsChanged(t *testing.T) {
-
 	tests := []struct {
 		name     string
 		existing []corev1.LimitRangeItem
@@ -344,7 +462,6 @@ func TestLimitsChanged(t *testing.T) {
 }
 
 func TestSemanticDeepEqual(t *testing.T) {
-
 	tests := []struct {
 		name     string
 		method   func(x, y interface{}) bool
