@@ -398,10 +398,7 @@ func (s *Provider) HandleSamlAssertion(w http.ResponseWriter, r *http.Request, a
 
 	for _, attributeStatement := range assertion.AttributeStatements {
 		for _, attr := range attributeStatement.Attributes {
-			attrName := attr.FriendlyName
-			if attrName == "" {
-				attrName = attr.Name
-			}
+			attrName := attrName = attr.Name
 			for _, value := range attr.Values {
 				samlData[attrName] = append(samlData[attrName], value.Value)
 			}
