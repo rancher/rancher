@@ -13,16 +13,17 @@ import (
 )
 
 const (
+	// Labels
+	AggregationFeatureLabel = "management.cattle.io/roletemplate-aggregation"
+)
+
+const (
 	// Statuses
 	reconcileClusterRoleBindings     = "ReconcileClusterRoleBindings"
-	deleteClusterRoleBindings        = "DeleteClusterRoleBindings"
 	ensureServiceAccountImpersonator = "EnsureServiceAccountImpersonator"
-	deleteServiceAccountImpersonator = "DeleteServiceAccountImpersonator"
 	// Reasons
 	clusterRoleBindingExists          = "ClusterRoleBindingExists"
-	clusterRoleBindingsDeleted        = "ClusterRoleBindingsDeleted"
 	serviceAccountImpersonatorExists  = "ServiceAccountImpersonatorExists"
-	failureToDeleteServiceAccount     = "FailureToDeleteServiceAccount"
 	failureToBuildClusterRoleBinding  = "FailureToBuildClusterRoleBinding"
 	failureToListClusterRoleBindings  = "FailureToListClusterRoleBindings"
 	failureToDeleteClusterRoleBinding = "FailureToDeleteClusterRoleBinding"
@@ -61,4 +62,14 @@ func isRoleTemplateExternal(rtName string, rtClient mgmtv3.RoleTemplateControlle
 		return false, fmt.Errorf("roletemplate %s is nil", rtName)
 	}
 	return rt.External, nil
+}
+
+func AddAggregationFeatureLabel(obj metav1.Object) metav1.Object {
+	labels := obj.GetLabels()
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	labels[AggregationFeatureLabel] = "true"
+	obj.SetLabels(labels)
+	return obj
 }

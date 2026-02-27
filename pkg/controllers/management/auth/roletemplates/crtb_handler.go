@@ -199,8 +199,15 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, loc
 		c.s.AddCondition(localConditions, condition, failedToGetDesiredRoleBindings, err)
 		return err
 	}
+	for i, rb := range desiredRBs {
+		desiredRBs[i] = AddAggregationManagementFeatureLabel(rb).(*rbacv1.RoleBinding)
+	}
 
-	currentRBs, err := c.rbController.List(metav1.NamespaceAll, metav1.ListOptions{LabelSelector: rbac.GetCRTBOwnerLabel(crtb.Name)})
+	labelSelector := labels.Set{
+		rbac.CrtbOwnerLabel:               crtb.Name,
+		AggregationManagementFeatureLabel: "true",
+	}
+	currentRBs, err := c.rbController.List(metav1.NamespaceAll, metav1.ListOptions{LabelSelector: labelSelector.AsSelector().String()})
 	if err != nil {
 		c.s.AddCondition(localConditions, condition, failedToListExistingRoleBindings, err)
 		return err
@@ -313,7 +320,7 @@ func (c *crtbHandler) OnRemove(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 		return nil, nil
 	}
 	if !features.AggregatedRoleTemplates.Enabled() {
-		return nil, c.deleteDownstreamResources(crtb, false)
+		return nil, nil
 	}
 
 	condition := metav1.Condition{Type: clusterRoleTemplateBindingDelete}
@@ -334,7 +341,7 @@ func (c *crtbHandler) removeRoleBindings(crtb *v3.ClusterRoleTemplateBinding) er
 	// Collect all RoleBindings owned by this ClusterRoleTemplateBinding
 	set := labels.Set(map[string]string{
 		rbac.GetCRTBOwnerLabel(crtb.Name): "true",
-		rbac.AggregationFeatureLabel:      "true",
+		AggregationManagementFeatureLabel: "true",
 	})
 	// List all RoleBindings with the CRTB owner label
 	currentRBs, err := c.rbController.List(metav1.NamespaceAll, metav1.ListOptions{LabelSelector: set.AsSelector().String()})
@@ -387,7 +394,7 @@ func (c *crtbHandler) deleteDownstreamClusterRoleBindings(crtb *v3.ClusterRoleTe
 	// Get all ClusterRoleBindings owned by this CRTB.
 	set := labels.Set{
 		rbac.GetCRTBOwnerLabel(crtb.Name): "true",
-		rbac.AggregationFeatureLabel:      "true",
+		AggregationFeatureLabel:           "true",
 	}
 	lo := metav1.ListOptions{LabelSelector: set.AsSelector().String()}
 
