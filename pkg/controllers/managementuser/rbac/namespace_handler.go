@@ -95,6 +95,20 @@ func (n *nsLifecycle) removeFinalizer(obj *v1.Namespace) (*v1.Namespace, error) 
 	return obj, nil
 }
 
+func (n *nsLifecycle) addFinalizer(obj *v1.Namespace) (*v1.Namespace, error) {
+	if !slices.Contains(obj.GetFinalizers(), normanLifecycleFinalizer) {
+		toUpdate := obj.DeepCopy()
+		toUpdate.Finalizers = append(obj.GetFinalizers(), normanLifecycleFinalizer)
+
+		update, err := n.m.namespaces.Update(toUpdate)
+		if err != nil {
+			return nil, err
+		}
+		return update, nil
+	}
+	return obj, nil
+}
+
 func (n *nsLifecycle) onCreate(obj *v1.Namespace) (*v1.Namespace, error) {
 	obj, err := n.resourceQuotaInit(obj)
 	if err != nil {
@@ -172,6 +186,14 @@ func (n *nsLifecycle) syncNS(obj *v1.Namespace) (bool, error) {
 	hasPRTBs, err := n.ensurePRTBAddToNamespace(obj)
 	if err != nil {
 		return false, fmt.Errorf("ensuring PRTBs are added to namespace %s: %w", obj.Name, err)
+	}
+
+	if hasPRTBs {
+		updatedObj, err := n.addFinalizer(obj)
+		if err != nil {
+			return false, err
+		}
+		obj = updatedObj
 	}
 
 	if err := n.reconcileNamespaceProjectClusterRole(obj); err != nil {
