@@ -34,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/version"
 )
 
 // addEtcd mutates the given config map with etcd-specific configuration elements, and adds S3-related arguments and files if renderS3 is true.
@@ -67,9 +68,37 @@ func (p *Planner) addETCD(config map[string]interface{}, controlPlane *rkev1.RKE
 			}
 		}
 		result = files
+		if hasEtcdS3RetentionFlag(controlPlane.Spec.KubernetesVersion) && controlPlane.Spec.ETCD.SnapshotRetention > 0 {
+			config["etcd-s3-retention"] = controlPlane.Spec.ETCD.SnapshotRetention
+		}
+
 	}
 
 	return
+}
+
+func hasEtcdS3RetentionFlag(vStr string) bool {
+	v, err := version.ParseSemantic(vStr)
+	if err != nil {
+		return false
+	}
+	// 1.34+ (and any future major)
+	if v.Major() > 1 || (v.Major() == 1 && v.Minor() >= 34) {
+		return true
+	}
+	if v.Major() != 1 {
+		return false
+	}
+	switch v.Minor() {
+	case 33:
+		return v.AtLeast(version.MustParseSemantic("v1.33.4"))
+	case 32:
+		return v.AtLeast(version.MustParseSemantic("v1.32.8"))
+	case 31:
+		return v.AtLeast(version.MustParseSemantic("v1.31.12"))
+	default:
+		return false
+	}
 }
 
 func addDefaults(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane) {
