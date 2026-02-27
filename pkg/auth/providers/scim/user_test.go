@@ -831,6 +831,34 @@ func TestCreateUser(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, resp.Status)
 	})
 
+	t.Run("missing userName", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		// List must not be called when userName is absent.
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+		}
+
+		body := `{"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"]}`
+		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		w := httptest.NewRecorder()
+
+		srv.CreateUser(w, r)
+		require.Equal(t, http.StatusBadRequest, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusBadRequest, resp.Status)
+		assert.Contains(t, resp.Detail, "userName is required")
+	})
+
 	t.Run("error listing users", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 
@@ -1323,6 +1351,34 @@ func TestUpdateUser(t *testing.T) {
 
 		srv.UpdateUser(w, r)
 		require.Equal(t, http.StatusBadRequest, w.Code)
+	})
+
+	t.Run("missing userName", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+
+		// userCache.Get must not be called when userName is absent.
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+
+		srv := &SCIMServer{
+			userCache: userCache,
+		}
+
+		body := `{"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"]}`
+		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		w := httptest.NewRecorder()
+
+		srv.UpdateUser(w, r)
+		require.Equal(t, http.StatusBadRequest, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Schemas, errorSchemaID)
+		assert.Equal(t, http.StatusBadRequest, resp.Status)
+		assert.Contains(t, resp.Detail, "userName is required")
 	})
 
 	t.Run("error updating user attributes", func(t *testing.T) {

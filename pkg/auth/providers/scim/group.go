@@ -18,9 +18,9 @@ import (
 
 // scimMember represents a member of a SCIM group.
 type scimMember struct {
-	Value   string `json:"value"`   // Member identifier.
-	Type    string `json:"type"`    // Member type, e.g., "User" or "Group".
-	Display string `json:"display"` // A human-readable name.
+	Value   string `json:"value"`          // Member identifier.
+	Type    string `json:"type,omitempty"` // Member type, e.g., "User" or "Group".
+	Display string `json:"display"`        // A human-readable name.
 }
 
 // scimGroup represents a SCIM group.
@@ -170,6 +170,11 @@ func (s *SCIMServer) CreateGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if payload.DisplayName == "" {
+		writeError(w, NewError(http.StatusBadRequest, "displayName is required"))
+		return
+	}
+
 	group, created, err := s.ensureRancherGroup(provider, payload)
 	if err != nil {
 		logrus.Errorf("scim::CreateGroup: failed to ensure rancher group: %s", err)
@@ -299,6 +304,11 @@ func (s *SCIMServer) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 	if id != payload.ID {
 		logrus.Errorf("scim::UpdateGroup: id in URL %s does not match id in body %s", id, payload.ID)
 		writeError(w, NewError(http.StatusBadRequest, "Mismatched Group id"))
+		return
+	}
+
+	if payload.DisplayName == "" {
+		writeError(w, NewError(http.StatusBadRequest, "displayName is required"))
 		return
 	}
 
@@ -594,6 +604,7 @@ func (s *SCIMServer) getAllRancherGroupMembers(provider string) (map[string][]sc
 			uniqueGroups[group.DisplayName] = append(uniqueGroups[group.DisplayName], scimMember{
 				Value:   user.Name,
 				Display: first(attr.ExtraByProvider[provider]["username"]),
+				Type:    userResource,
 			})
 		}
 	}
@@ -627,6 +638,7 @@ func (s *SCIMServer) getRancherGroupMembers(provider string, name string) ([]sci
 				members = append(members, scimMember{
 					Value:   user.Name,
 					Display: first(attr.ExtraByProvider[provider]["username"]),
+					Type:    userResource,
 				})
 				break // No need to check other groups.
 			}
