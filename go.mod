@@ -124,7 +124,7 @@ require (
 	github.com/rancher/gke-operator v1.14.0-rc.2
 	github.com/rancher/jsonpath v0.0.0-20250620213443-ad24535cf0c1
 	github.com/rancher/kubernetes-provider-detector v0.1.6-0.20240606163014-fcae75779379
-	github.com/rancher/lasso v0.2.6
+	github.com/rancher/lasso v0.2.7
 	github.com/rancher/machine v0.15.0-rancher139
 	github.com/rancher/muchang v0.1.0
 	github.com/rancher/norman v0.8.4
@@ -133,10 +133,10 @@ require (
 	github.com/rancher/remotedialer-proxy v0.7.0-rc.5
 	github.com/rancher/rke v1.8.0
 	github.com/rancher/shepherd v0.0.0-20260218212518-d89877f13cac
-	github.com/rancher/steve v0.8.15
+	github.com/rancher/steve v0.8.17
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260218133309-b0ff1f4c330d
 	github.com/rancher/wrangler v1.1.2
-	github.com/rancher/wrangler/v3 v3.4.0
+	github.com/rancher/wrangler/v3 v3.5.0-rc.2
 	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.9.4
 	github.com/stretchr/testify v1.11.1

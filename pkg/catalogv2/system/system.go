@@ -1,5 +1,12 @@
 package system
 
+//go:generate go tool -modfile ../../../gotools/mockery/go.mod mockery --name HelmClient --output ./mocks --case underscore
+//go:generate go tool -modfile ../../../gotools/mockery/go.mod mockery --name OperationClient --output ./mocks --case underscore
+//go:generate go tool -modfile ../../../gotools/mockery/go.mod mockery --name ContentClient --output ./mocks --case underscore
+//go:generate go tool -modfile ../../../gotools/mockery/go.mod mockery --name PodClient --output ./mocks --case underscore --srcpkg github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1
+//go:generate go tool -modfile ../../../gotools/mockery/go.mod mockery --name SettingController --output ./mocks --case underscore --srcpkg github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3
+//go:generate go tool -modfile ../../../gotools/mockery/go.mod mockery --name ClusterRepoController --output ./mocks --case underscore --srcpkg github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1
+
 import (
 	"bytes"
 	"context"
