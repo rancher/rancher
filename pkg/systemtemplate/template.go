@@ -125,7 +125,72 @@ rules:
 {{ .PodDisruptionBudget }}
 {{- end }}
 
+{{- if .AuthImage }}
 ---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kube-api-auth
+  namespace: cattle-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kube-api-auth
+  labels:
+    app: kube-api-auth
+rules:
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources:
+      - roles
+      - clusterroles
+      - rolebindings
+      - clusterrolebindings
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups: ["catalog.cattle.io"]
+    resources:
+      - clusterrepos
+    verbs:
+      - list
+      - get
+      - watch
+  - apiGroups: ["cluster.cattle.io"]
+    resources:
+      - clusterauthtokens
+      - clusteruserattributes
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+  - apiGroups: [""]
+    resources:
+      - secrets
+      - configmaps
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kube-api-auth
+subjects:
+  - kind: ServiceAccount
+    name: kube-api-auth
+    namespace: cattle-system
+roleRef:
+  kind: ClusterRole
+  name: kube-api-auth
+  apiGroup: rbac.authorization.k8s.io  
+---
+{{- end }}
 
 apiVersion: apps/v1
 kind: Deployment
@@ -286,7 +351,7 @@ spec:
                   values:
                     - "true"
       hostNetwork: true
-      serviceAccountName: cattle
+      serviceAccountName: kube-api-auth
       tolerations:
       - operator: Exists
       containers:
