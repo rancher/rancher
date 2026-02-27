@@ -15,6 +15,7 @@ import (
 	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -103,7 +104,13 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, rem
 		return err
 	}
 
-	aggregationCRBs, err := c.crbClient.List(metav1.ListOptions{LabelSelector: rbac.GetCRTBOwnerLabel(crtb.Name)})
+	crb = AddAggregationFeatureLabel(crb).(*rbacv1.ClusterRoleBinding)
+
+	labelSelector := labels.Set{
+		rbac.CrtbOwnerLabel:     crtb.Name,
+		AggregationFeatureLabel: "true",
+	}
+	aggregationCRBs, err := c.crbClient.List(metav1.ListOptions{LabelSelector: labelSelector.AsSelector().String()})
 	if err != nil || aggregationCRBs == nil {
 		c.s.AddCondition(remoteConditions, condition, failureToListClusterRoleBindings, err)
 		return err
@@ -135,10 +142,6 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, rem
 
 	// If we didn't find an existing CRB, create it.
 	if matchingCRB == nil {
-		if crb.Labels == nil {
-			crb.Labels = map[string]string{}
-		}
-		crb.Labels[rbac.AggregationFeatureLabel] = "true"
 		if _, err := c.crbClient.Create(crb); err != nil {
 			c.s.AddCondition(remoteConditions, condition, failureToCreateClusterRoleBinding, err)
 			return fmt.Errorf("failed to create cluster role binding %s: %w", crb.Name, err)

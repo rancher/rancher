@@ -596,9 +596,8 @@ func TestBuildAggregatingClusterRole(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-rt-transform-aggregator",
 					Labels: map[string]string{
-						"management.cattle.io/aggregates":               "test-rt-transform-aggregator",
-						"authz.cluster.cattle.io/clusterrole-owner":     "test-rt",
-						"management.cattle.io/roletemplate-aggregation": "true",
+						"management.cattle.io/aggregates":           "test-rt-transform-aggregator",
+						"authz.cluster.cattle.io/clusterrole-owner": "test-rt",
 					},
 				},
 				AggregationRule: &rbacv1.AggregationRule{
@@ -622,9 +621,8 @@ func TestBuildAggregatingClusterRole(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-rt-transform-aggregator",
 					Labels: map[string]string{
-						"management.cattle.io/aggregates":               "test-rt-transform-aggregator",
-						"authz.cluster.cattle.io/clusterrole-owner":     "test-rt",
-						"management.cattle.io/roletemplate-aggregation": "true",
+						"management.cattle.io/aggregates":           "test-rt-transform-aggregator",
+						"authz.cluster.cattle.io/clusterrole-owner": "test-rt",
 					},
 				},
 				AggregationRule: &rbacv1.AggregationRule{

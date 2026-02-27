@@ -20,8 +20,10 @@ import (
 )
 
 const (
-	clusterContext = "cluster"
-	projectContext = "project"
+	clusterContext                    = "cluster"
+	projectContext                    = "project"
+	AggregationManagementFeatureLabel = "management.cattle.io/roletemplate-aggregation-mgmt"
+	AggregationFeatureLabel           = "management.cattle.io/roletemplate-aggregation"
 )
 
 const (
@@ -369,11 +371,11 @@ func handleAggregationMigration[T any](
 ) (T, error) {
 	labelCopy := make(map[string]string)
 	maps.Copy(labelCopy, labels)
-	hasLabel := labelCopy[rbac.AggregationFeatureLabel] == "true"
+	hasLabel := labelCopy[AggregationFeatureLabel] == "true"
 
 	if !features.AggregatedRoleTemplates.Enabled() {
 		if hasLabel {
-			delete(labelCopy, rbac.AggregationFeatureLabel)
+			delete(labelCopy, AggregationFeatureLabel)
 			updated, err := updateLabels(resource, labelCopy)
 			if err != nil {
 				return updated, err
@@ -388,8 +390,18 @@ func handleAggregationMigration[T any](
 			return resource, err
 		}
 
-		labelCopy[rbac.AggregationFeatureLabel] = "true"
+		labelCopy[AggregationFeatureLabel] = "true"
 		return updateLabels(resource, labelCopy)
 	}
 	return resource, nil
+}
+
+func AddAggregationManagementFeatureLabel(obj metav1.Object) metav1.Object {
+	labels := obj.GetLabels()
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	labels[AggregationManagementFeatureLabel] = "true"
+	obj.SetLabels(labels)
+	return obj
 }

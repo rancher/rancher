@@ -915,3 +915,84 @@ func Test_deleteProjectMembershipBinding(t *testing.T) {
 		})
 	}
 }
+
+func TestAddAggregationManagementFeatureLabel(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name           string
+		inputLabels    map[string]string
+		expectedLabels map[string]string
+	}{
+		{
+			name:        "adds label to object with no labels",
+			inputLabels: nil,
+			expectedLabels: map[string]string{
+				AggregationManagementFeatureLabel: "true",
+			},
+		},
+		{
+			name: "adds label to object with existing labels",
+			inputLabels: map[string]string{
+				"existing-label": "value",
+			},
+			expectedLabels: map[string]string{
+				"existing-label":                  "value",
+				AggregationManagementFeatureLabel: "true",
+			},
+		},
+		{
+			name: "updates label when already present",
+			inputLabels: map[string]string{
+				AggregationManagementFeatureLabel: "false",
+				"other-label":                     "value",
+			},
+			expectedLabels: map[string]string{
+				AggregationManagementFeatureLabel: "true",
+				"other-label":                     "value",
+			},
+		},
+		{
+			name: "label already set to true",
+			inputLabels: map[string]string{
+				AggregationManagementFeatureLabel: "true",
+			},
+			expectedLabels: map[string]string{
+				AggregationManagementFeatureLabel: "true",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			// Create a test object (using ClusterRoleTemplateBinding as an example)
+			obj := &v3.ClusterRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-crtb",
+					Labels: tt.inputLabels,
+				},
+			}
+
+			result := AddAggregationManagementFeatureLabel(obj)
+
+			// Verify the returned object is the same as input
+			if result != obj {
+				t.Errorf("AddAggregationManagementFeatureLabel() should return the same object")
+			}
+
+			// Verify labels are set correctly
+			resultLabels := result.GetLabels()
+			if len(resultLabels) != len(tt.expectedLabels) {
+				t.Errorf("AddAggregationManagementFeatureLabel() labels count = %v, want %v", len(resultLabels), len(tt.expectedLabels))
+			}
+
+			for key, expectedValue := range tt.expectedLabels {
+				if actualValue, ok := resultLabels[key]; !ok {
+					t.Errorf("AddAggregationManagementFeatureLabel() missing label %s", key)
+				} else if actualValue != expectedValue {
+					t.Errorf("AddAggregationManagementFeatureLabel() label %s = %v, want %v", key, actualValue, expectedValue)
+				}
+			}
+		})
+	}
+}

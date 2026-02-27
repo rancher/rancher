@@ -12,6 +12,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 const (
@@ -44,6 +45,10 @@ func (rth *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.Rol
 	if err != nil {
 		return nil, err
 	}
+	// add aggregation feature label to all ClusterRoles for this RoleTemplate, so we can easily find them later when we need to clean them up
+	for i, cr := range clusterRoles {
+		clusterRoles[i] = AddAggregationFeatureLabel(cr).(*rbacv1.ClusterRole)
+	}
 
 	if err := rth.ensureOnlyDesiredClusterRolesExist(rt, clusterRoles); err != nil {
 		return nil, err
@@ -65,11 +70,16 @@ func (rth *roleTemplateHandler) ensureOnlyDesiredClusterRolesExist(rt *v3.RoleTe
 		desiredCRNames[cr.Name] = nil
 	}
 
-	// get all existing Cluster Roles using the RoleTemplate owner label
-	currentCRs, err := rth.crController.List(metav1.ListOptions{LabelSelector: rbac.GetClusterRoleOwnerLabel(rt.Name)})
+	// List all existing Cluster Roles using the RoleTemplate owner label and aggregation feature label.
+	labelSelector := labels.Set{
+		rbac.ClusterRoleOwnerLabel: rt.Name,
+		AggregationFeatureLabel:    "true",
+	}
+	currentCRs, err := rth.crController.List(metav1.ListOptions{LabelSelector: labelSelector.AsSelector().String()})
 	if err != nil {
 		return fmt.Errorf("failed to list cluster roles for role template %s: %w", rt.Name, err)
 	}
+
 	for _, currentCR := range currentCRs.Items {
 		if _, ok := desiredCRNames[currentCR.Name]; !ok {
 			// This ClusterRole is not part of the desired Cluster Role list, delete it
@@ -227,4 +237,13 @@ func (rth *roleTemplateHandler) addLabelToExternalRole(rt *v3.RoleTemplate) erro
 	}
 
 	return nil
+}
+
+func addAggregationFeatureLabel(crs []*rbacv1.ClusterRole) {
+	for _, cr := range crs {
+		if cr.Labels == nil {
+			cr.Labels = map[string]string{}
+		}
+		cr.Labels[AggregationFeatureLabel] = "true"
+	}
 }

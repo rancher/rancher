@@ -10,7 +10,6 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/status"
 	"github.com/rancher/rancher/pkg/features"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/rbac"
 	userMocks "github.com/rancher/rancher/pkg/user/mocks"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
@@ -393,8 +392,7 @@ func Test_crtbHandler_getDesiredRoleBindings(t *testing.T) {
 						Name:      "rb-jhe3mikle5",
 						Namespace: "c-test-p-project1",
 						Labels: map[string]string{
-							"authz.cluster.cattle.io/crtb-owner-test-crtb":  "true",
-							"management.cattle.io/roletemplate-aggregation": "true",
+							"authz.cluster.cattle.io/crtb-owner-test-crtb": "true",
 						},
 					},
 					RoleRef: rbacv1.RoleRef{
@@ -420,8 +418,7 @@ func Test_crtbHandler_getDesiredRoleBindings(t *testing.T) {
 						Name:      "rb-jhe3mikle5",
 						Namespace: "c-test-p-project1",
 						Labels: map[string]string{
-							"authz.cluster.cattle.io/crtb-owner-test-crtb":  "true",
-							"management.cattle.io/roletemplate-aggregation": "true",
+							"authz.cluster.cattle.io/crtb-owner-test-crtb": "true",
 						},
 					},
 					RoleRef: rbacv1.RoleRef{
@@ -436,8 +433,7 @@ func Test_crtbHandler_getDesiredRoleBindings(t *testing.T) {
 						Name:      "rb-37o6abbhaq",
 						Namespace: "c-test-p-project2",
 						Labels: map[string]string{
-							"authz.cluster.cattle.io/crtb-owner-test-crtb":  "true",
-							"management.cattle.io/roletemplate-aggregation": "true",
+							"authz.cluster.cattle.io/crtb-owner-test-crtb": "true",
 						},
 					},
 					RoleRef: rbacv1.RoleRef{
@@ -462,8 +458,7 @@ func Test_crtbHandler_getDesiredRoleBindings(t *testing.T) {
 						Name:      "rb-lhchhtbxqn",
 						Namespace: "test-namespace",
 						Labels: map[string]string{
-							"authz.cluster.cattle.io/crtb-owner-test-crtb":  "true",
-							"management.cattle.io/roletemplate-aggregation": "true",
+							"authz.cluster.cattle.io/crtb-owner-test-crtb": "true",
 						},
 					},
 					RoleRef: rbacv1.RoleRef{
@@ -489,8 +484,7 @@ func Test_crtbHandler_getDesiredRoleBindings(t *testing.T) {
 						Name:      "rb-lhchhtbxqn",
 						Namespace: "test-namespace",
 						Labels: map[string]string{
-							"authz.cluster.cattle.io/crtb-owner-test-crtb":  "true",
-							"management.cattle.io/roletemplate-aggregation": "true",
+							"authz.cluster.cattle.io/crtb-owner-test-crtb": "true",
 						},
 					},
 					RoleRef: rbacv1.RoleRef{
@@ -505,8 +499,7 @@ func Test_crtbHandler_getDesiredRoleBindings(t *testing.T) {
 						Name:      "rb-jhe3mikle5",
 						Namespace: "c-test-p-project1",
 						Labels: map[string]string{
-							"authz.cluster.cattle.io/crtb-owner-test-crtb":  "true",
-							"management.cattle.io/roletemplate-aggregation": "true",
+							"authz.cluster.cattle.io/crtb-owner-test-crtb": "true",
 						},
 					},
 					RoleRef: rbacv1.RoleRef{
@@ -761,7 +754,7 @@ func Test_crtbHandler_removeRoleBindings(t *testing.T) {
 	errDefault := fmt.Errorf("error")
 
 	listOptions := metav1.ListOptions{
-		LabelSelector: "authz.cluster.cattle.io/crtb-owner-test-crtb=true,management.cattle.io/roletemplate-aggregation=true",
+		LabelSelector: "authz.cluster.cattle.io/crtb-owner-test-crtb=true,management.cattle.io/roletemplate-aggregation-mgmt=true",
 	}
 
 	// Define test role bindings for reuse
@@ -770,8 +763,8 @@ func Test_crtbHandler_removeRoleBindings(t *testing.T) {
 			Name:      "rb-1",
 			Namespace: "test-namespace",
 			Labels: map[string]string{
-				"authz.cluster.cattle.io/crtb-owner-test-crtb":  "true",
-				"management.cattle.io/roletemplate-aggregation": "true",
+				"authz.cluster.cattle.io/crtb-owner-test-crtb":       "true",
+				"management.cattle.io/roletemplate-aggregation-mgmt": "true",
 			},
 		},
 	}
@@ -780,8 +773,8 @@ func Test_crtbHandler_removeRoleBindings(t *testing.T) {
 			Name:      "rb-2",
 			Namespace: "test-namespace",
 			Labels: map[string]string{
-				"authz.cluster.cattle.io/crtb-owner-test-crtb":  "true",
-				"management.cattle.io/roletemplate-aggregation": "true",
+				"authz.cluster.cattle.io/crtb-owner-test-crtb":       "true",
+				"management.cattle.io/roletemplate-aggregation-mgmt": "true",
 			},
 		},
 	}
@@ -1061,7 +1054,7 @@ func Test_crtbHandler_handleMigration(t *testing.T) {
 					Name:      "test-crtb",
 					Namespace: "test-ns",
 					Labels: map[string]string{
-						rbac.AggregationFeatureLabel: "true",
+						AggregationFeatureLabel: "true",
 					},
 				},
 			},
@@ -1069,7 +1062,7 @@ func Test_crtbHandler_handleMigration(t *testing.T) {
 			setupControllers: func(c controllers) {
 				// Expect Update to be called with label removed
 				c.crtbController.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-					if _, exists := obj.Labels[rbac.AggregationFeatureLabel]; exists {
+					if _, exists := obj.Labels[AggregationFeatureLabel]; exists {
 						t.Error("expected label to be removed from updated CRTB")
 					}
 					return obj, nil
@@ -1110,7 +1103,7 @@ func Test_crtbHandler_handleMigration(t *testing.T) {
 				c.rbCache.EXPECT().List("", gomock.Any()).Return([]*rbacv1.RoleBinding{}, nil)
 				// Expect Update to be called with label added
 				c.crtbController.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-					if obj.Labels[rbac.AggregationFeatureLabel] != "true" {
+					if obj.Labels[AggregationFeatureLabel] != "true" {
 						t.Error("expected label to be added to updated CRTB")
 					}
 					return obj, nil
@@ -1125,7 +1118,7 @@ func Test_crtbHandler_handleMigration(t *testing.T) {
 					Name:      "test-crtb",
 					Namespace: "test-ns",
 					Labels: map[string]string{
-						rbac.AggregationFeatureLabel: "true",
+						AggregationFeatureLabel: "true",
 					},
 				},
 			},
@@ -1153,7 +1146,7 @@ func Test_crtbHandler_handleMigration(t *testing.T) {
 					if obj.Labels == nil {
 						t.Error("expected labels map to be initialized")
 					}
-					if obj.Labels[rbac.AggregationFeatureLabel] != "true" {
+					if obj.Labels[AggregationFeatureLabel] != "true" {
 						t.Error("expected label to be added to updated CRTB")
 					}
 					return obj, nil
@@ -1197,11 +1190,11 @@ func Test_crtbHandler_handleMigration(t *testing.T) {
 			}
 
 			if tt.wantLabel {
-				if result.Labels[rbac.AggregationFeatureLabel] != "true" {
+				if result.Labels[AggregationFeatureLabel] != "true" {
 					t.Error("expected label to be present and set to 'true'")
 				}
 			} else {
-				if result != nil && result.Labels[rbac.AggregationFeatureLabel] == "true" {
+				if result != nil && result.Labels[AggregationFeatureLabel] == "true" {
 					t.Error("expected label to be absent or not set to 'true'")
 				}
 			}

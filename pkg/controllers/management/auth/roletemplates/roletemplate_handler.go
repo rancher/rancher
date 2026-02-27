@@ -105,25 +105,21 @@ func (r *roleTemplateHandler) reconcileClusterRoles(rt *v3.RoleTemplate) error {
 		return err
 	}
 	addOwnerReferenceToClusterRole(desiredCRs, rt)
+	for i, cr := range desiredCRs {
+		desiredCRs[i] = AddAggregationManagementFeatureLabel(cr).(*rbacv1.ClusterRole)
+	}
 
-	currentCRs, err := r.crController.List(metav1.ListOptions{LabelSelector: rbac.GetClusterRoleOwnerLabel(rt.Name)})
+	// List cluster roles that are owned by this RoleTemplate and have the management aggregation feature label.
+	labelSelector := labels.Set{
+		rbac.ClusterRoleOwnerLabel:        rt.Name,
+		AggregationManagementFeatureLabel: "true",
+	}
+	currentCRs, err := r.crController.List(metav1.ListOptions{LabelSelector: labelSelector.AsSelector().String()})
 	if err != nil {
 		return err
 	}
 
-	// We want to keep desired Cluster Roles from this handler and the Cluster Roles created by the handler in
-	// pkg/controllers/managementuser/rbac/roletemplates/roletemplate_handler.go
-	// These are:
-	//	- Base Cluster Role
-	//  - Aggregating Cluster Role
-	//  - Promoted Cluster Role
-	//  - Aggregating Promoted Cluster Role
-	desiredCRNames := []string{
-		rt.Name,
-		rbac.AggregatedClusterRoleNameFor(rt.Name),
-		rbac.PromotedClusterRoleNameFor(rt.Name),
-		rbac.AggregatedClusterRoleNameFor(rbac.PromotedClusterRoleNameFor(rt.Name)),
-	}
+	desiredCRNames := []string{}
 	for _, desiredCR := range desiredCRs {
 		desiredCRNames = append(desiredCRNames, desiredCR.Name)
 	}
@@ -317,10 +313,9 @@ func (r *roleTemplateHandler) deleteClusterRoles(rt *v3.RoleTemplate) error {
 		returnedErrors = errors.Join(returnedErrors, removeLabelFromExternalRole(rt, crController))
 
 		// Collect all ClusterRoles owned by this RoleTemplate
-		set := labels.Set(map[string]string{
-			rbac.ClusterRoleOwnerLabel:   rt.Name,
-			rbac.AggregationFeatureLabel: "true",
-		})
+		set := labels.Set{
+			rbac.ClusterRoleOwnerLabel: rt.Name,
+		}
 		clusterRoles, err := crController.List(metav1.ListOptions{LabelSelector: set.AsSelector().String()})
 		returnedErrors = errors.Join(returnedErrors, err)
 
