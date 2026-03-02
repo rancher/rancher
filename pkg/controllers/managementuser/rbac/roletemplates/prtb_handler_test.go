@@ -89,7 +89,7 @@ func Test_doesRoleTemplateHavePromotedRules(t *testing.T) {
 }
 
 var (
-	listOption       = metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/prtb-owner=test-prtb,management.cattle.io/roletemplate-aggregation=true"}
+	listOption       = metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/prtb-owner-test-prtb=true,management.cattle.io/roletemplate-aggregation=true"}
 	legacyListOption = metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/rtb-owner-updated=_test-prtb"}
 	subject          = rbacv1.Subject{
 		Name: "test-subject",
@@ -272,7 +272,7 @@ func Test_ensureOnlyDesiredRoleBindingsExist(t *testing.T) {
 
 var (
 	namespaceListOptions = metav1.ListOptions{LabelSelector: "field.cattle.io/projectId=p-xyz789"}
-	rbListOptions        = metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/prtb-owner=test-prtb,management.cattle.io/roletemplate-aggregation=true"}
+	rbListOptions        = metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/prtb-owner-test-prtb=true,management.cattle.io/roletemplate-aggregation=true"}
 	defaultRoleBinding   = rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "rb-d2l5e2jqi6",

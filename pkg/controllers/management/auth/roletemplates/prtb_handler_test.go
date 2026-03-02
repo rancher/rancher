@@ -174,7 +174,7 @@ func Test_reconcileSubject(t *testing.T) {
 }
 
 var (
-	labelSelector = "authz.cluster.cattle.io/prtb-owner=test-prtb,management.cattle.io/roletemplate-aggregation-mgmt=true"
+	labelSelector = "authz.cluster.cattle.io/prtb-owner-test-prtb=true,management.cattle.io/roletemplate-aggregation-mgmt=true"
 	defaultRB     = rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "rb-visjzlqzqw",

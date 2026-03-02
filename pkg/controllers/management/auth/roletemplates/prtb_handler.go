@@ -308,7 +308,7 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 	rb = AddAggregationManagementFeatureLabel(rb).(*rbacv1.RoleBinding)
 
 	labelSelector := labels.Set{
-		rbac.PrtbOwnerLabel:               prtb.Name,
+		rbac.GetPRTBOwnerLabel(prtb.Name): "true",
 		AggregationManagementFeatureLabel: "true",
 	}
 	currentRBs, err := p.rbController.List(prtb.Namespace, metav1.ListOptions{LabelSelector: labelSelector.AsSelector().String()})

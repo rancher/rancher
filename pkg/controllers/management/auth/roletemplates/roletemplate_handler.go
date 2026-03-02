@@ -315,9 +315,25 @@ func (r *roleTemplateHandler) deleteClusterRoles(rt *v3.RoleTemplate) error {
 		// Collect all ClusterRoles owned by this RoleTemplate
 		set := labels.Set{
 			rbac.ClusterRoleOwnerLabel: rt.Name,
+			AggregationFeatureLabel:    "true",
 		}
 		clusterRoles, err := crController.List(metav1.ListOptions{LabelSelector: set.AsSelector().String()})
-		returnedErrors = errors.Join(returnedErrors, err)
+		if err != nil {
+			return err
+		}
+
+		// In the local cluster, look for management ClusterRoles as well.
+		if cluster.Name == "local" {
+			set = labels.Set{
+				rbac.ClusterRoleOwnerLabel:        rt.Name,
+				AggregationManagementFeatureLabel: "true",
+			}
+			mgmtClusterRoles, err := crController.List(metav1.ListOptions{LabelSelector: set.AsSelector().String()})
+			if err != nil {
+				return err
+			}
+			clusterRoles.Items = append(clusterRoles.Items, mgmtClusterRoles.Items...)
+		}
 
 		for _, cr := range clusterRoles.Items {
 			returnedErrors = errors.Join(returnedErrors, rbac.DeleteResource(cr.Name, crController))

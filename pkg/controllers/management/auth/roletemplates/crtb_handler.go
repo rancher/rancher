@@ -204,7 +204,7 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, loc
 	}
 
 	labelSelector := labels.Set{
-		rbac.CrtbOwnerLabel:               crtb.Name,
+		rbac.GetCRTBOwnerLabel(crtb.Name): "true",
 		AggregationManagementFeatureLabel: "true",
 	}
 	currentRBs, err := c.rbController.List(metav1.NamespaceAll, metav1.ListOptions{LabelSelector: labelSelector.AsSelector().String()})
