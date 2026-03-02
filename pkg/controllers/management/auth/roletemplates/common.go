@@ -29,7 +29,7 @@ const (
 const (
 	// Statuses
 	clusterRoleTemplateBindingDelete = "ClusterRoleTemplateBindingDelete"
-	removeRoleBindings               = "RemoveRoleBindings"
+	deleteRoleBindings               = "DeleteRoleBindings"
 	reconcileSubject                 = "ReconcileSubject"
 	reconcileMembershipBindings      = "ReconcileMembershipBindings"
 	reconcileBindings                = "ReconcileBindings"
@@ -396,6 +396,7 @@ func handleAggregationMigration[T any](
 	return resource, nil
 }
 
+// AddAggregationFeatureLabel adds the aggregation label to the given resource and returns the updated resource.
 func AddAggregationManagementFeatureLabel(obj metav1.Object) metav1.Object {
 	labels := obj.GetLabels()
 	if labels == nil {

@@ -98,7 +98,9 @@ func (p *prtbHandler) handleMigration(prtb *v3.ProjectRoleTemplateBinding) (*v3.
 			prtbCopy.Labels = labels
 			return p.prtbClient.Update(prtbCopy)
 		},
-		p.deleteRoleBindings,
+		func(prtb *v3.ProjectRoleTemplateBinding) error {
+			return errors.Join(p.deleteRoleBindings(prtb), p.deleteDownstreamResources(prtb, false))
+		},
 		p.deleteLegacyBinding,
 	)
 }
@@ -123,7 +125,7 @@ func (p *prtbHandler) OnRemove(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 
 // deleteRoleBindings deletes all Role Bindings in the project namespace made by the PRTB.
 func (p *prtbHandler) deleteRoleBindings(prtb *v3.ProjectRoleTemplateBinding) error {
-	// Collect all RoleBindings owned by this ProjectRoleTemplateBinding
+	// Collect all management RoleBindings owned by this ProjectRoleTemplateBinding
 	set := labels.Set{
 		rbac.GetPRTBOwnerLabel(prtb.Name): "true",
 		AggregationManagementFeatureLabel: "true",
@@ -307,6 +309,7 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 	}
 	rb = AddAggregationManagementFeatureLabel(rb).(*rbacv1.RoleBinding)
 
+	// Find any existing management RoleBindings owned by this PRTB that have the aggregation label.
 	labelSelector := labels.Set{
 		rbac.GetPRTBOwnerLabel(prtb.Name): "true",
 		AggregationManagementFeatureLabel: "true",

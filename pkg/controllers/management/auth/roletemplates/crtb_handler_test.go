@@ -924,9 +924,9 @@ func Test_crtbHandler_removeRoleBindings(t *testing.T) {
 					Name:      "test-crtb",
 				},
 			}
-			err := c.removeRoleBindings(&crtb)
+			err := c.deleteRoleBindings(&crtb)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("crtbHandler.removeRoleBindings() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("crtbHandler.deleteRoleBindings() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
 			// Check the conditions were set correctly
