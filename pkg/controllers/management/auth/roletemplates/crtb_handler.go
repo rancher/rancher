@@ -366,7 +366,7 @@ func (c *crtbHandler) deleteRoleBindings(crtb *v3.ClusterRoleTemplateBinding) er
 	return returnErr
 }
 
-// deleteDownstreamResources deletest any resources that were created in the downstream cluster for this CRTB.
+// deleteDownstreamResources deletes any resources that were created in the downstream cluster for this CRTB.
 // If deleteImpersonator is true, it also deletes the service account and cluster role bindings that were created for impersonation.
 func (c *crtbHandler) deleteDownstreamResources(crtb *v3.ClusterRoleTemplateBinding, deleteImpersonator bool) error {
 	clusterName := crtb.ClusterName
