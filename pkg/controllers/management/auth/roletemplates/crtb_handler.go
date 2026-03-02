@@ -207,8 +207,8 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, loc
 
 	// Find all existing management RoleBindings owned by this CRTB.
 	labelSelector := labels.Set{
-		rbac.GetCRTBOwnerLabel(crtb.Name): "true",
-		AggregationManagementFeatureLabel: "true",
+		rbac.GetCRTBOwnerLabel(crtb.Name):      "true",
+		rbac.AggregationManagementFeatureLabel: "true",
 	}
 	currentRBs, err := c.rbController.List(metav1.NamespaceAll, metav1.ListOptions{LabelSelector: labelSelector.AsSelector().String()})
 	if err != nil {
@@ -343,8 +343,8 @@ func (c *crtbHandler) deleteRoleBindings(crtb *v3.ClusterRoleTemplateBinding) er
 
 	// Collect all management RoleBindings owned by this ClusterRoleTemplateBinding
 	set := labels.Set(map[string]string{
-		rbac.GetCRTBOwnerLabel(crtb.Name): "true",
-		AggregationManagementFeatureLabel: "true",
+		rbac.GetCRTBOwnerLabel(crtb.Name):      "true",
+		rbac.AggregationManagementFeatureLabel: "true",
 	})
 	// List all RoleBindings with the CRTB owner label
 	currentRBs, err := c.rbController.List(metav1.NamespaceAll, metav1.ListOptions{LabelSelector: set.AsSelector().String()})
@@ -399,7 +399,7 @@ func (c *crtbHandler) deleteDownstreamClusterRoleBindings(crtb *v3.ClusterRoleTe
 	// Get all ClusterRoleBindings owned by this CRTB.
 	set := labels.Set{
 		rbac.GetCRTBOwnerLabel(crtb.Name): "true",
-		AggregationFeatureLabel:           "true",
+		rbac.AggregationFeatureLabel:      "true",
 	}
 	lo := metav1.ListOptions{LabelSelector: set.AsSelector().String()}
 

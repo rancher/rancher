@@ -72,8 +72,8 @@ func (rth *roleTemplateHandler) ensureOnlyDesiredClusterRolesExist(rt *v3.RoleTe
 
 	// List all existing Cluster Roles using the RoleTemplate owner label and aggregation feature label.
 	labelSelector := labels.Set{
-		rbac.ClusterRoleOwnerLabel: rt.Name,
-		AggregationFeatureLabel:    "true",
+		rbac.ClusterRoleOwnerLabel:   rt.Name,
+		rbac.AggregationFeatureLabel: "true",
 	}
 	currentCRs, err := rth.crController.List(metav1.ListOptions{LabelSelector: labelSelector.AsSelector().String()})
 	if err != nil {
@@ -237,13 +237,4 @@ func (rth *roleTemplateHandler) addLabelToExternalRole(rt *v3.RoleTemplate) erro
 	}
 
 	return nil
-}
-
-func addAggregationFeatureLabel(crs []*rbacv1.ClusterRole) {
-	for _, cr := range crs {
-		if cr.Labels == nil {
-			cr.Labels = map[string]string{}
-		}
-		cr.Labels[AggregationFeatureLabel] = "true"
-	}
 }

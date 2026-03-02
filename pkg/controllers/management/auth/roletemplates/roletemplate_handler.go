@@ -111,8 +111,8 @@ func (r *roleTemplateHandler) reconcileClusterRoles(rt *v3.RoleTemplate) error {
 
 	// List cluster roles that are owned by this RoleTemplate and have the management aggregation feature label.
 	labelSelector := labels.Set{
-		rbac.ClusterRoleOwnerLabel:        rt.Name,
-		AggregationManagementFeatureLabel: "true",
+		rbac.ClusterRoleOwnerLabel:             rt.Name,
+		rbac.AggregationManagementFeatureLabel: "true",
 	}
 	currentCRs, err := r.crController.List(metav1.ListOptions{LabelSelector: labelSelector.AsSelector().String()})
 	if err != nil {
@@ -271,7 +271,8 @@ func (r *roleTemplateHandler) deleteLegacyRoles(rt *v3.RoleTemplate) error {
 		returnedErrors = errors.Join(returnedErrors, rbac.DeleteNamespacedResource(cluster.Name, rt.Name, r.rController))
 		projects, err := r.projectCache.List(cluster.Name, labels.Everything())
 		if err != nil {
-			return err
+			returnedErrors = errors.Join(returnedErrors, err)
+			continue
 		}
 		// Delete each of the project management plane roles create by the legacy role template controllers
 		for _, project := range projects {
@@ -314,23 +315,25 @@ func (r *roleTemplateHandler) deleteClusterRoles(rt *v3.RoleTemplate) error {
 
 		// Collect all ClusterRoles owned by this RoleTemplate
 		set := labels.Set{
-			rbac.ClusterRoleOwnerLabel: rt.Name,
-			AggregationFeatureLabel:    "true",
+			rbac.ClusterRoleOwnerLabel:   rt.Name,
+			rbac.AggregationFeatureLabel: "true",
 		}
 		clusterRoles, err := crController.List(metav1.ListOptions{LabelSelector: set.AsSelector().String()})
 		if err != nil {
-			return err
+			returnedErrors = errors.Join(returnedErrors, err)
+			continue
 		}
 
 		// In the local cluster, look for management ClusterRoles as well.
 		if cluster.Name == "local" {
 			set = labels.Set{
-				rbac.ClusterRoleOwnerLabel:        rt.Name,
-				AggregationManagementFeatureLabel: "true",
+				rbac.ClusterRoleOwnerLabel:             rt.Name,
+				rbac.AggregationManagementFeatureLabel: "true",
 			}
 			mgmtClusterRoles, err := crController.List(metav1.ListOptions{LabelSelector: set.AsSelector().String()})
 			if err != nil {
-				return err
+				returnedErrors = errors.Join(returnedErrors, err)
+				continue
 			}
 			clusterRoles.Items = append(clusterRoles.Items, mgmtClusterRoles.Items...)
 		}

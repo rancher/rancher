@@ -20,10 +20,8 @@ import (
 )
 
 const (
-	clusterContext                    = "cluster"
-	projectContext                    = "project"
-	AggregationManagementFeatureLabel = "management.cattle.io/roletemplate-aggregation-mgmt"
-	AggregationFeatureLabel           = "management.cattle.io/roletemplate-aggregation"
+	clusterContext = "cluster"
+	projectContext = "project"
 )
 
 const (
@@ -360,7 +358,15 @@ func (ih *impersonationHandler) deleteServiceAccountImpersonator(clusterName, us
 //   - deleteAggregatedResources: Function to delete resources created with aggregation
 //   - deleteLegacyResources: Function to delete resources created before aggregation
 //
-// Returns the updated resource and any error encountered
+// # Returns the updated resource and any error encountered
+//
+// Note:
+//
+//	The handleAggregationMigration code is called in the OnChange handlers of CRTBs, PRTBs, and RoleTemplates.
+//	If a CRTB/PRTB/RoleTemplate is deleted before the migration can take place, it is possible it will leave behind some resources.
+//	Therefore the migration should be given time to complete before modifying the RBAC system.
+//	See https://ranchermanager.docs.rancher.com/how-to-guides/advanced-user-guides/enable-experimental-features/role-template-aggregation for more details.
+//
 // TODO: To be removed once roletemplate aggregation is the only enabled RBAC model. https://github.com/rancher/rancher/issues/53743
 func handleAggregationMigration[T any](
 	resource T,
@@ -371,11 +377,11 @@ func handleAggregationMigration[T any](
 ) (T, error) {
 	labelCopy := make(map[string]string)
 	maps.Copy(labelCopy, labels)
-	hasLabel := labelCopy[AggregationFeatureLabel] == "true"
+	hasLabel := labelCopy[rbac.AggregationFeatureLabel] == "true"
 
 	if !features.AggregatedRoleTemplates.Enabled() {
 		if hasLabel {
-			delete(labelCopy, AggregationFeatureLabel)
+			delete(labelCopy, rbac.AggregationFeatureLabel)
 			updated, err := updateLabels(resource, labelCopy)
 			if err != nil {
 				return updated, err
@@ -390,7 +396,7 @@ func handleAggregationMigration[T any](
 			return resource, err
 		}
 
-		labelCopy[AggregationFeatureLabel] = "true"
+		labelCopy[rbac.AggregationFeatureLabel] = "true"
 		return updateLabels(resource, labelCopy)
 	}
 	return resource, nil
@@ -402,7 +408,7 @@ func AddAggregationManagementFeatureLabel(obj metav1.Object) metav1.Object {
 	if labels == nil {
 		labels = map[string]string{}
 	}
-	labels[AggregationManagementFeatureLabel] = "true"
+	labels[rbac.AggregationManagementFeatureLabel] = "true"
 	obj.SetLabels(labels)
 	return obj
 }

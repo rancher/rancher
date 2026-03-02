@@ -33,7 +33,7 @@ var (
 	errNotFound    = apierrors.NewNotFound(schema.GroupResource{}, "error")
 )
 
-func Test_doesRoleTemplateHavePromotedRules(t *testing.T) {
+func TestPRTBHandlerDoesRoleTemplateHavePromotedRules(t *testing.T) {
 	tests := []struct {
 		name      string
 		rt        *v3.RoleTemplate
@@ -107,7 +107,7 @@ var (
 	}
 )
 
-func Test_ensureOnlyDesiredRoleBindingsExist(t *testing.T) {
+func TestPRTBHandlerEnsureOnlyDesiredRoleBindingsExist(t *testing.T) {
 	tests := []struct {
 		name         string
 		desiredRB    *rbacv1.RoleBinding
@@ -294,7 +294,7 @@ var (
 	}
 )
 
-func Test_prtbHandler_reconcileBindings(t *testing.T) {
+func TestPRTBHandlerReconcileBindings(t *testing.T) {
 	type controllers struct {
 		rtController *fake.MockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]
 		nsController *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList]
@@ -488,7 +488,7 @@ var (
 	}
 )
 
-func Test_prtbHandler_buildNamespaceBindings(t *testing.T) {
+func TestPRTBHandlerBuildNamespaceBindings(t *testing.T) {
 	tests := []struct {
 		name          string
 		prtb          *v3.ProjectRoleTemplateBinding
@@ -594,7 +594,7 @@ func Test_prtbHandler_buildNamespaceBindings(t *testing.T) {
 	}
 }
 
-func Test_ensureOnlyDesiredClusterRoleBindingsExists(t *testing.T) {
+func TestPRTBHandlerEnsureOnlyDesiredClusterRoleBindingsExists(t *testing.T) {
 	tests := []struct {
 		name               string
 		crbs               []*rbacv1.ClusterRoleBinding

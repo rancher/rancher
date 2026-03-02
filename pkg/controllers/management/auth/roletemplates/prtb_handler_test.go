@@ -6,6 +6,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/features"
+	"github.com/rancher/rancher/pkg/rbac"
 	userMocks "github.com/rancher/rancher/pkg/user/mocks"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"go.uber.org/mock/gomock"
@@ -13,7 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func Test_reconcileSubject(t *testing.T) {
+func TestPRTBHandlerReconcileSubject(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name                string
@@ -206,7 +207,7 @@ var (
 	}
 )
 
-func Test_reconcileBindings(t *testing.T) {
+func TestPRTBHandlerReconcileBindings(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name              string
@@ -358,7 +359,7 @@ func Test_reconcileBindings(t *testing.T) {
 	}
 }
 
-func Test_prtbHandler_reconcileMembershipBindings(t *testing.T) {
+func TestPRTBHandlerReconcileMembershipBindings(t *testing.T) {
 	type controllers struct {
 		rbController  *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]
 		crbController *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]
@@ -419,7 +420,7 @@ func Test_prtbHandler_reconcileMembershipBindings(t *testing.T) {
 	}
 }
 
-func Test_prtbHandler_deleteDownstreamRoleBindings(t *testing.T) {
+func TestPRTBHandlerDeleteDownstreamRoleBindings(t *testing.T) {
 	t.Parallel()
 
 	prtbName := "test-prtb"
@@ -575,7 +576,7 @@ func Test_prtbHandler_deleteDownstreamRoleBindings(t *testing.T) {
 	}
 }
 
-func Test_prtbHandler_deleteDownstreamClusterRoleBindings(t *testing.T) {
+func TestPRTBHandlerDeleteDownstreamClusterRoleBindings(t *testing.T) {
 	t.Parallel()
 
 	prtbName := "test-prtb"
@@ -803,7 +804,7 @@ func Test_prtbHandler_deleteDownstreamClusterRoleBindings(t *testing.T) {
 	}
 }
 
-func Test_prtbHandler_handleMigration(t *testing.T) {
+func TestPRTBHandlerHandleMigration(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	type controllers struct {
@@ -827,7 +828,7 @@ func Test_prtbHandler_handleMigration(t *testing.T) {
 					Name:      "test-prtb",
 					Namespace: "test-ns",
 					Labels: map[string]string{
-						AggregationFeatureLabel: "true",
+						rbac.AggregationFeatureLabel: "true",
 					},
 				},
 				ProjectName: "test-cluster:test-project",
@@ -836,7 +837,7 @@ func Test_prtbHandler_handleMigration(t *testing.T) {
 			setupControllers: func(c controllers) {
 				// Expect Update to be called with label removed
 				c.prtbController.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
-					if _, exists := obj.Labels[AggregationFeatureLabel]; exists {
+					if _, exists := obj.Labels[rbac.AggregationFeatureLabel]; exists {
 						t.Error("expected label to be removed from updated PRTB")
 					}
 					return obj, nil
@@ -877,7 +878,7 @@ func Test_prtbHandler_handleMigration(t *testing.T) {
 				c.rbCache.EXPECT().GetByIndex(rbByPRTBOwnerReferenceIndex, "test-prtb").Return([]*rbacv1.RoleBinding{}, nil)
 				// Expect Update to be called with label added
 				c.prtbController.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *v3.ProjectRoleTemplateBinding) (*v3.ProjectRoleTemplateBinding, error) {
-					if obj.Labels[AggregationFeatureLabel] != "true" {
+					if obj.Labels[rbac.AggregationFeatureLabel] != "true" {
 						t.Error("expected label to be added to updated PRTB")
 					}
 					return obj, nil
@@ -892,7 +893,7 @@ func Test_prtbHandler_handleMigration(t *testing.T) {
 					Name:      "test-prtb",
 					Namespace: "test-ns",
 					Labels: map[string]string{
-						AggregationFeatureLabel: "true",
+						rbac.AggregationFeatureLabel: "true",
 					},
 				},
 			},
@@ -918,7 +919,7 @@ func Test_prtbHandler_handleMigration(t *testing.T) {
 					if obj.Labels == nil {
 						t.Error("expected labels map to be initialized")
 					}
-					if obj.Labels[AggregationFeatureLabel] != "true" {
+					if obj.Labels[rbac.AggregationFeatureLabel] != "true" {
 						t.Error("expected label to be added to updated PRTB")
 					}
 					return obj, nil
@@ -961,11 +962,11 @@ func Test_prtbHandler_handleMigration(t *testing.T) {
 			}
 
 			if tt.wantLabel {
-				if result.Labels[AggregationFeatureLabel] != "true" {
+				if result.Labels[rbac.AggregationFeatureLabel] != "true" {
 					t.Error("expected label to be present and set to 'true'")
 				}
 			} else {
-				if result != nil && result.Labels[AggregationFeatureLabel] == "true" {
+				if result != nil && result.Labels[rbac.AggregationFeatureLabel] == "true" {
 					t.Error("expected label to be absent or not set to 'true'")
 				}
 			}

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -460,7 +461,7 @@ func TestDeleteClusterMembershipBinding(t *testing.T) {
 	}
 }
 
-func Test_getClusterMembershipRoleName(t *testing.T) {
+func TestGetClusterMembershipRoleName(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name    string
@@ -503,7 +504,7 @@ func Test_getClusterMembershipRoleName(t *testing.T) {
 	}
 }
 
-func Test_getProjectMembershipRoleName(t *testing.T) {
+func TestGetProjectMembershipRoleName(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name    string
@@ -543,7 +544,7 @@ var (
 	crtbListOptions = metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/crtb-owner=test-crtb"}
 )
 
-func Test_removeAuthV2Permissions(t *testing.T) {
+func TestRemoveAuthV2Permissions(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name            string
@@ -672,7 +673,7 @@ var (
 	}
 )
 
-func Test_createOrUpdateProjectMembershipBinding(t *testing.T) {
+func TestCreateOrUpdateProjectMembershipBinding(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name              string
@@ -792,7 +793,7 @@ func Test_createOrUpdateProjectMembershipBinding(t *testing.T) {
 	}
 }
 
-func Test_deleteProjectMembershipBinding(t *testing.T) {
+func TestDeleteProjectMembershipBinding(t *testing.T) {
 	tests := []struct {
 		name              string
 		prtb              *v3.ProjectRoleTemplateBinding
@@ -927,7 +928,7 @@ func TestAddAggregationManagementFeatureLabel(t *testing.T) {
 			name:        "adds label to object with no labels",
 			inputLabels: nil,
 			expectedLabels: map[string]string{
-				AggregationManagementFeatureLabel: "true",
+				rbac.AggregationManagementFeatureLabel: "true",
 			},
 		},
 		{
@@ -936,28 +937,28 @@ func TestAddAggregationManagementFeatureLabel(t *testing.T) {
 				"existing-label": "value",
 			},
 			expectedLabels: map[string]string{
-				"existing-label":                  "value",
-				AggregationManagementFeatureLabel: "true",
+				"existing-label":                       "value",
+				rbac.AggregationManagementFeatureLabel: "true",
 			},
 		},
 		{
 			name: "updates label when already present",
 			inputLabels: map[string]string{
-				AggregationManagementFeatureLabel: "false",
-				"other-label":                     "value",
+				rbac.AggregationManagementFeatureLabel: "false",
+				"other-label":                          "value",
 			},
 			expectedLabels: map[string]string{
-				AggregationManagementFeatureLabel: "true",
-				"other-label":                     "value",
+				rbac.AggregationManagementFeatureLabel: "true",
+				"other-label":                          "value",
 			},
 		},
 		{
 			name: "label already set to true",
 			inputLabels: map[string]string{
-				AggregationManagementFeatureLabel: "true",
+				rbac.AggregationManagementFeatureLabel: "true",
 			},
 			expectedLabels: map[string]string{
-				AggregationManagementFeatureLabel: "true",
+				rbac.AggregationManagementFeatureLabel: "true",
 			},
 		},
 	}

@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/rancher/pkg/controllers/status"
 	"github.com/rancher/rancher/pkg/features"
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/rbac"
 	userMocks "github.com/rancher/rancher/pkg/user/mocks"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
@@ -23,7 +24,7 @@ type reducedCondition struct {
 	status metav1.ConditionStatus
 }
 
-func Test_crtbHandler_reconcileSubject(t *testing.T) {
+func TestCRTBHandlerReconcileSubject(t *testing.T) {
 	type controllers struct {
 		userMGR        *userMocks.MockManager
 		userController *fake.MockNonNamespacedControllerInterface[*v3.User, *v3.UserList]
@@ -211,7 +212,7 @@ func Test_crtbHandler_reconcileSubject(t *testing.T) {
 	}
 }
 
-func Test_crtbHandler_reconcileMembershipBindings(t *testing.T) {
+func TestCRTBHandlerReconcileMembershipBindings(t *testing.T) {
 	type controllers struct {
 		crController  *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]
 		crbController *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]
@@ -303,7 +304,7 @@ const (
 	clusterMGMT = "test-rt-cluster-mgmt-aggregator"
 )
 
-func Test_crtbHandler_getDesiredRoleBindings(t *testing.T) {
+func TestCRTBHandlerGetDesiredRoleBindings(t *testing.T) {
 	defaultProject1 := v3.Project{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "project1",
@@ -748,7 +749,7 @@ func TestUpdateStatus(t *testing.T) {
 	}
 }
 
-func Test_crtbHandler_removeRoleBindings(t *testing.T) {
+func TestCRTBHandlerDeleteRoleBindings(t *testing.T) {
 	t.Parallel()
 	ctrl := gomock.NewController(t)
 	errDefault := fmt.Errorf("error")
@@ -943,7 +944,7 @@ var (
 	defaultListOption = metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/crtb-owner-test-crtb=true,management.cattle.io/roletemplate-aggregation=true"}
 )
 
-func Test_deleteDownstreamClusterRoleBindings(t *testing.T) {
+func TestCRTBHandlerDeleteDownstreamClusterRoleBindings(t *testing.T) {
 	tests := []struct {
 		name               string
 		setupCRBController func(*fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList])
@@ -1030,7 +1031,7 @@ func Test_deleteDownstreamClusterRoleBindings(t *testing.T) {
 	}
 }
 
-func Test_crtbHandler_handleMigration(t *testing.T) {
+func TestCRTBHandlerHandleMigration(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	type controllers struct {
@@ -1049,13 +1050,13 @@ func Test_crtbHandler_handleMigration(t *testing.T) {
 		wantErr            bool
 	}{
 		{
-			name: "feature flag disabled, label present - should remove label and call removeRoleBindings and deleteDownstreamResources",
+			name: "feature flag disabled, label present - should remove label and call deleteRoleBindings and deleteDownstreamResources",
 			crtb: &v3.ClusterRoleTemplateBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-crtb",
 					Namespace: "test-ns",
 					Labels: map[string]string{
-						AggregationFeatureLabel: "true",
+						rbac.AggregationFeatureLabel: "true",
 					},
 				},
 				ClusterName: "test-cluster",
@@ -1064,12 +1065,12 @@ func Test_crtbHandler_handleMigration(t *testing.T) {
 			setupControllers: func(c controllers) {
 				// Expect Update to be called with label removed
 				c.crtbController.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-					if _, exists := obj.Labels[AggregationFeatureLabel]; exists {
+					if _, exists := obj.Labels[rbac.AggregationFeatureLabel]; exists {
 						t.Error("expected label to be removed from updated CRTB")
 					}
 					return obj, nil
 				})
-				// removeRoleBindings will be called, so mock rbController.List to return empty list
+				// deleteRoleBindings will be called, so mock rbController.List to return empty list
 				c.rbController.EXPECT().List(gomock.Any(), gomock.Any()).Return(&rbacv1.RoleBindingList{}, nil)
 				// deleteDownstreamResources will be called, mock clusterController.Get to return not found
 				c.clusterController.EXPECT().Get("test-cluster", gomock.Any()).Return(nil, errNotFound)
@@ -1107,7 +1108,7 @@ func Test_crtbHandler_handleMigration(t *testing.T) {
 				c.rbCache.EXPECT().List("", gomock.Any()).Return([]*rbacv1.RoleBinding{}, nil)
 				// Expect Update to be called with label added
 				c.crtbController.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *v3.ClusterRoleTemplateBinding) (*v3.ClusterRoleTemplateBinding, error) {
-					if obj.Labels[AggregationFeatureLabel] != "true" {
+					if obj.Labels[rbac.AggregationFeatureLabel] != "true" {
 						t.Error("expected label to be added to updated CRTB")
 					}
 					return obj, nil
@@ -1122,7 +1123,7 @@ func Test_crtbHandler_handleMigration(t *testing.T) {
 					Name:      "test-crtb",
 					Namespace: "test-ns",
 					Labels: map[string]string{
-						AggregationFeatureLabel: "true",
+						rbac.AggregationFeatureLabel: "true",
 					},
 				},
 			},
@@ -1150,7 +1151,7 @@ func Test_crtbHandler_handleMigration(t *testing.T) {
 					if obj.Labels == nil {
 						t.Error("expected labels map to be initialized")
 					}
-					if obj.Labels[AggregationFeatureLabel] != "true" {
+					if obj.Labels[rbac.AggregationFeatureLabel] != "true" {
 						t.Error("expected label to be added to updated CRTB")
 					}
 					return obj, nil
@@ -1197,11 +1198,11 @@ func Test_crtbHandler_handleMigration(t *testing.T) {
 			}
 
 			if tt.wantLabel {
-				if result.Labels[AggregationFeatureLabel] != "true" {
+				if result.Labels[rbac.AggregationFeatureLabel] != "true" {
 					t.Error("expected label to be present and set to 'true'")
 				}
 			} else {
-				if result != nil && result.Labels[AggregationFeatureLabel] == "true" {
+				if result != nil && result.Labels[rbac.AggregationFeatureLabel] == "true" {
 					t.Error("expected label to be absent or not set to 'true'")
 				}
 			}

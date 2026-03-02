@@ -28,7 +28,7 @@ var (
 	}
 )
 
-func Test_clusterRolesForRoleTemplate(t *testing.T) {
+func TestRTHandlerClusterRolesForRoleTemplate(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name                       string
@@ -261,7 +261,7 @@ func Test_clusterRolesForRoleTemplate(t *testing.T) {
 	}
 }
 
-func Test_ExtractPromotedRules(t *testing.T) {
+func TestRTHandlerExtractPromotedRules(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name              string
@@ -618,7 +618,7 @@ var (
 	}
 )
 
-func Test_addLabelToExternalRole(t *testing.T) {
+func TestRTHandlerAddLabelToExternalRole(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name       string
@@ -731,7 +731,7 @@ func Test_addLabelToExternalRole(t *testing.T) {
 	}
 }
 
-func Test_ensureOnlyDesiredClusterRolesExist(t *testing.T) {
+func TestRTHandlerEnsureOnlyDesiredClusterRolesExist(t *testing.T) {
 	t.Parallel()
 
 	testRT := v3.RoleTemplate{

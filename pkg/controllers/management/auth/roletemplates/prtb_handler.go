@@ -127,8 +127,8 @@ func (p *prtbHandler) OnRemove(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 func (p *prtbHandler) deleteRoleBindings(prtb *v3.ProjectRoleTemplateBinding) error {
 	// Collect all management RoleBindings owned by this ProjectRoleTemplateBinding
 	set := labels.Set{
-		rbac.GetPRTBOwnerLabel(prtb.Name): "true",
-		AggregationManagementFeatureLabel: "true",
+		rbac.GetPRTBOwnerLabel(prtb.Name):      "true",
+		rbac.AggregationManagementFeatureLabel: "true",
 	}
 
 	currentRBs, err := p.rbCache.List(prtb.Namespace, set.AsSelector())
@@ -177,7 +177,7 @@ func (p *prtbHandler) deleteDownstreamResources(prtb *v3.ProjectRoleTemplateBind
 func (p *prtbHandler) deleteDownstreamRoleBindings(prtb *v3.ProjectRoleTemplateBinding, rbController crbacv1.RoleBindingController) error {
 	set := labels.Set{
 		rbac.GetPRTBOwnerLabel(prtb.Name): "true",
-		AggregationFeatureLabel:           "true",
+		rbac.AggregationFeatureLabel:      "true",
 	}
 	currentRBs, err := rbController.List(metav1.NamespaceAll, metav1.ListOptions{LabelSelector: set.AsSelector().String()})
 	if err != nil {
@@ -196,7 +196,7 @@ func (p *prtbHandler) deleteDownstreamRoleBindings(prtb *v3.ProjectRoleTemplateB
 func (p *prtbHandler) deleteDownstreamClusterRoleBindings(prtb *v3.ProjectRoleTemplateBinding, crbController crbacv1.ClusterRoleBindingController) error {
 	set := labels.Set{
 		rbac.GetPRTBOwnerLabel(prtb.Name): "true",
-		AggregationFeatureLabel:           "true",
+		rbac.AggregationFeatureLabel:      "true",
 	}
 	currentCRBs, err := crbController.List(metav1.ListOptions{LabelSelector: set.AsSelector().String()})
 	if err != nil {
@@ -311,8 +311,8 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 
 	// Find any existing management RoleBindings owned by this PRTB that have the aggregation label.
 	labelSelector := labels.Set{
-		rbac.GetPRTBOwnerLabel(prtb.Name): "true",
-		AggregationManagementFeatureLabel: "true",
+		rbac.GetPRTBOwnerLabel(prtb.Name):      "true",
+		rbac.AggregationManagementFeatureLabel: "true",
 	}
 	currentRBs, err := p.rbController.List(prtb.Namespace, metav1.ListOptions{LabelSelector: labelSelector.AsSelector().String()})
 	if err != nil {

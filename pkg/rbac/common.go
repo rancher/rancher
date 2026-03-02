@@ -51,6 +51,8 @@ const (
 	CrbGlobalRoleAnnotation             = "authz.cluster.cattle.io/globalrole"
 	CrbGlobalRoleBindingAnnotation      = "authz.cluster.cattle.io/globalrolebinding"
 	CrbAdminGlobalRoleCheckedAnnotation = "authz.cluster.cattle.io/admin-globalrole-checked"
+	AggregationManagementFeatureLabel   = "management.cattle.io/roletemplate-aggregation-mgmt"
+	AggregationFeatureLabel             = "management.cattle.io/roletemplate-aggregation"
 )
 
 // BuildSubjectFromRTB This function will generate

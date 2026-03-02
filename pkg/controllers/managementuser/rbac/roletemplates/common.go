@@ -4,17 +4,13 @@ import (
 	"fmt"
 
 	mgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/types/config"
 	rbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
-)
-
-const (
-	// Labels
-	AggregationFeatureLabel = "management.cattle.io/roletemplate-aggregation"
 )
 
 const (
@@ -70,7 +66,7 @@ func AddAggregationFeatureLabel(obj metav1.Object) metav1.Object {
 	if labels == nil {
 		labels = map[string]string{}
 	}
-	labels[AggregationFeatureLabel] = "true"
+	labels[rbac.AggregationFeatureLabel] = "true"
 	obj.SetLabels(labels)
 	return obj
 }

@@ -132,7 +132,7 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 				Name: rbac.NameForRoleBinding(namespace.Name, roleRef, subject),
 				Labels: map[string]string{
 					rbac.GetPRTBOwnerLabel(prtb.Name): "true",
-					AggregationFeatureLabel:           "true",
+					rbac.AggregationFeatureLabel:      "true",
 				},
 				Namespace: namespace.Name,
 			},
@@ -278,7 +278,7 @@ func (p *prtbHandler) ensureOnlyDesiredClusterRoleBindingsExists(crbs []*rbacv1.
 
 	labelSelector := labels.Set{
 		rbac.GetPRTBOwnerLabel(prtb.Name): "true",
-		AggregationFeatureLabel:           "true",
+		rbac.AggregationFeatureLabel:      "true",
 	}
 	aggregationCRBs, err := p.crbClient.List(metav1.ListOptions{LabelSelector: labelSelector.AsSelector().String()})
 	if err != nil || aggregationCRBs == nil {
@@ -340,7 +340,7 @@ func (p *prtbHandler) getNamespacesFromProject(prtb *v3.ProjectRoleTemplateBindi
 func (p *prtbHandler) ensureOnlyDesiredRoleBindingExists(desiredRB *rbacv1.RoleBinding, prtb *v3.ProjectRoleTemplateBinding) error {
 	labelSelector := labels.Set{
 		rbac.GetPRTBOwnerLabel(prtb.Name): "true",
-		AggregationFeatureLabel:           "true",
+		rbac.AggregationFeatureLabel:      "true",
 	}
 	aggregationRBs, err := p.rbClient.List(desiredRB.Namespace, metav1.ListOptions{LabelSelector: labelSelector.AsSelector().String()})
 	if err != nil || aggregationRBs == nil {

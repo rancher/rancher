@@ -4,12 +4,13 @@ import (
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"go.uber.org/mock/gomock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func Test_isRoleTemplateExternal(t *testing.T) {
+func TestIsRoleTemplateExternal(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name    string
@@ -93,7 +94,7 @@ func TestAddAggregationFeatureLabel(t *testing.T) {
 			name:        "adds label to object with no labels",
 			inputLabels: nil,
 			expectedLabels: map[string]string{
-				AggregationFeatureLabel: "true",
+				rbac.AggregationFeatureLabel: "true",
 			},
 		},
 		{
@@ -102,28 +103,28 @@ func TestAddAggregationFeatureLabel(t *testing.T) {
 				"existing-label": "value",
 			},
 			expectedLabels: map[string]string{
-				"existing-label":        "value",
-				AggregationFeatureLabel: "true",
+				"existing-label":             "value",
+				rbac.AggregationFeatureLabel: "true",
 			},
 		},
 		{
 			name: "updates label when already present",
 			inputLabels: map[string]string{
-				AggregationFeatureLabel: "false",
-				"other-label":           "value",
+				rbac.AggregationFeatureLabel: "false",
+				"other-label":                "value",
 			},
 			expectedLabels: map[string]string{
-				AggregationFeatureLabel: "true",
-				"other-label":           "value",
+				rbac.AggregationFeatureLabel: "true",
+				"other-label":                "value",
 			},
 		},
 		{
 			name: "label already set to true",
 			inputLabels: map[string]string{
-				AggregationFeatureLabel: "true",
+				rbac.AggregationFeatureLabel: "true",
 			},
 			expectedLabels: map[string]string{
-				AggregationFeatureLabel: "true",
+				rbac.AggregationFeatureLabel: "true",
 			},
 		},
 	}

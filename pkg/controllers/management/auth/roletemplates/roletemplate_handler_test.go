@@ -118,7 +118,7 @@ var (
 	}
 )
 
-func Test_OnChange(t *testing.T) {
+func TestRTHandlerOnChange(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name                       string
@@ -543,7 +543,7 @@ func Test_OnChange(t *testing.T) {
 				if tt.rt.Labels == nil {
 					tt.rt.Labels = map[string]string{}
 				}
-				tt.rt.Labels[AggregationFeatureLabel] = "true"
+				tt.rt.Labels[rbac.AggregationFeatureLabel] = "true"
 			}
 			crController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
 			if tt.setupClusterRoleController != nil {
@@ -563,7 +563,7 @@ func Test_OnChange(t *testing.T) {
 	}
 }
 
-func Test_getManagementPlaneRules(t *testing.T) {
+func TestGetManagementPlaneRules(t *testing.T) {
 	t.Parallel()
 	sampleResources := map[string]string{
 		"nodes": "management.cattle.io",
@@ -762,7 +762,7 @@ func Test_getManagementPlaneRules(t *testing.T) {
 	}
 }
 
-func Test_gatherRules(t *testing.T) {
+func TestRTHandlerGatherRules(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name    string
@@ -855,7 +855,7 @@ var (
 	}
 )
 
-func Test_removeLabelFromExternalRole(t *testing.T) {
+func TestRemoveLabelFromExternalRole(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name       string
@@ -951,7 +951,7 @@ func Test_removeLabelFromExternalRole(t *testing.T) {
 	}
 }
 
-func Test_roleTemplateHandler_handleMigration(t *testing.T) {
+func TestRTHandlerHandleMigration(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	type controllers struct {
@@ -976,7 +976,7 @@ func Test_roleTemplateHandler_handleMigration(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-rt",
 					Labels: map[string]string{
-						AggregationFeatureLabel: "true",
+						rbac.AggregationFeatureLabel: "true",
 					},
 				},
 			},
@@ -984,7 +984,7 @@ func Test_roleTemplateHandler_handleMigration(t *testing.T) {
 			setupControllers: func(c controllers) {
 				// Expect Update to be called with label removed
 				c.rtController.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *v3.RoleTemplate) (*v3.RoleTemplate, error) {
-					if _, exists := obj.Labels[AggregationFeatureLabel]; exists {
+					if _, exists := obj.Labels[rbac.AggregationFeatureLabel]; exists {
 						t.Error("expected label to be removed from updated RoleTemplate")
 					}
 					return obj, nil
@@ -1020,7 +1020,7 @@ func Test_roleTemplateHandler_handleMigration(t *testing.T) {
 				c.clusterController.EXPECT().List(gomock.Any()).Return(&v3.ClusterList{}, nil)
 				// Expect Update to be called with label added
 				c.rtController.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *v3.RoleTemplate) (*v3.RoleTemplate, error) {
-					if obj.Labels[AggregationFeatureLabel] != "true" {
+					if obj.Labels[rbac.AggregationFeatureLabel] != "true" {
 						t.Error("expected label to be added to updated RoleTemplate")
 					}
 					return obj, nil
@@ -1034,7 +1034,7 @@ func Test_roleTemplateHandler_handleMigration(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-rt",
 					Labels: map[string]string{
-						AggregationFeatureLabel: "true",
+						rbac.AggregationFeatureLabel: "true",
 					},
 				},
 			},
@@ -1059,7 +1059,7 @@ func Test_roleTemplateHandler_handleMigration(t *testing.T) {
 					if obj.Labels == nil {
 						t.Error("expected labels map to be initialized")
 					}
-					if obj.Labels[AggregationFeatureLabel] != "true" {
+					if obj.Labels[rbac.AggregationFeatureLabel] != "true" {
 						t.Error("expected label to be added to updated RoleTemplate")
 					}
 					return obj, nil
@@ -1108,11 +1108,11 @@ func Test_roleTemplateHandler_handleMigration(t *testing.T) {
 			}
 
 			if tt.wantLabel {
-				if result.Labels[AggregationFeatureLabel] != "true" {
+				if result.Labels[rbac.AggregationFeatureLabel] != "true" {
 					t.Error("expected label to be present and set to 'true'")
 				}
 			} else {
-				if result != nil && result.Labels[AggregationFeatureLabel] == "true" {
+				if result != nil && result.Labels[rbac.AggregationFeatureLabel] == "true" {
 					t.Error("expected label to be absent or not set to 'true'")
 				}
 			}
