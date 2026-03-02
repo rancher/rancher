@@ -1034,9 +1034,10 @@ func Test_crtbHandler_handleMigration(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	type controllers struct {
-		crtbController *fake.MockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList]
-		rbController   *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]
-		rbCache        *fake.MockCacheInterface[*rbacv1.RoleBinding]
+		crtbController    *fake.MockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList]
+		rbController      *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]
+		rbCache           *fake.MockCacheInterface[*rbacv1.RoleBinding]
+		clusterController *fake.MockNonNamespacedControllerInterface[*v3.Cluster, *v3.ClusterList]
 	}
 
 	tests := []struct {
@@ -1048,7 +1049,7 @@ func Test_crtbHandler_handleMigration(t *testing.T) {
 		wantErr            bool
 	}{
 		{
-			name: "feature flag disabled, label present - should remove label and call removeRoleBindings",
+			name: "feature flag disabled, label present - should remove label and call removeRoleBindings and deleteDownstreamResources",
 			crtb: &v3.ClusterRoleTemplateBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-crtb",
@@ -1057,6 +1058,7 @@ func Test_crtbHandler_handleMigration(t *testing.T) {
 						AggregationFeatureLabel: "true",
 					},
 				},
+				ClusterName: "test-cluster",
 			},
 			featureFlagEnabled: false,
 			setupControllers: func(c controllers) {
@@ -1069,6 +1071,8 @@ func Test_crtbHandler_handleMigration(t *testing.T) {
 				})
 				// removeRoleBindings will be called, so mock rbController.List to return empty list
 				c.rbController.EXPECT().List(gomock.Any(), gomock.Any()).Return(&rbacv1.RoleBindingList{}, nil)
+				// deleteDownstreamResources will be called, mock clusterController.Get to return not found
+				c.clusterController.EXPECT().Get("test-cluster", gomock.Any()).Return(nil, errNotFound)
 			},
 			wantLabel: false,
 		},
@@ -1167,20 +1171,23 @@ func Test_crtbHandler_handleMigration(t *testing.T) {
 			crtbController := fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
 			rbController := fake.NewMockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList](ctrl)
 			rbCache := fake.NewMockCacheInterface[*rbacv1.RoleBinding](ctrl)
+			clusterController := fake.NewMockNonNamespacedControllerInterface[*v3.Cluster, *v3.ClusterList](ctrl)
 
 			if tt.setupControllers != nil {
 				tt.setupControllers(controllers{
-					crtbController: crtbController,
-					rbController:   rbController,
-					rbCache:        rbCache,
+					crtbController:    crtbController,
+					rbController:      rbController,
+					rbCache:           rbCache,
+					clusterController: clusterController,
 				})
 			}
 
 			h := &crtbHandler{
-				crtbClient:   crtbController,
-				rbController: rbController,
-				rbCache:      rbCache,
-				s:            status.NewStatus(),
+				crtbClient:        crtbController,
+				rbController:      rbController,
+				rbCache:           rbCache,
+				clusterController: clusterController,
+				s:                 status.NewStatus(),
 			}
 
 			result, err := h.handleMigration(tt.crtb)

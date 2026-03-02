@@ -807,8 +807,9 @@ func Test_prtbHandler_handleMigration(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	type controllers struct {
-		prtbController *fake.MockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList]
-		rbCache        *fake.MockCacheInterface[*rbacv1.RoleBinding]
+		prtbController    *fake.MockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList]
+		rbCache           *fake.MockCacheInterface[*rbacv1.RoleBinding]
+		clusterController *fake.MockNonNamespacedControllerInterface[*v3.Cluster, *v3.ClusterList]
 	}
 
 	tests := []struct {
@@ -820,7 +821,7 @@ func Test_prtbHandler_handleMigration(t *testing.T) {
 		wantErr            bool
 	}{
 		{
-			name: "feature flag disabled, label present - should remove label and call deleteRoleBindings",
+			name: "feature flag disabled, label present - should remove label and call deleteRoleBindings and deleteDownstreamResources",
 			prtb: &v3.ProjectRoleTemplateBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-prtb",
@@ -829,6 +830,7 @@ func Test_prtbHandler_handleMigration(t *testing.T) {
 						AggregationFeatureLabel: "true",
 					},
 				},
+				ProjectName: "test-cluster:test-project",
 			},
 			featureFlagEnabled: false,
 			setupControllers: func(c controllers) {
@@ -841,6 +843,8 @@ func Test_prtbHandler_handleMigration(t *testing.T) {
 				})
 				// deleteRoleBindings will be called, so mock rbCache.List to return empty list
 				c.rbCache.EXPECT().List("test-ns", gomock.Any()).Return([]*rbacv1.RoleBinding{}, nil)
+				// deleteDownstreamResources will be called, mock clusterController.Get to return not found
+				c.clusterController.EXPECT().Get("test-cluster", gomock.Any()).Return(nil, errNotFound)
 			},
 			wantLabel: false,
 		},
@@ -934,17 +938,20 @@ func Test_prtbHandler_handleMigration(t *testing.T) {
 
 			prtbController := fake.NewMockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList](ctrl)
 			rbCache := fake.NewMockCacheInterface[*rbacv1.RoleBinding](ctrl)
+			clusterController := fake.NewMockNonNamespacedControllerInterface[*v3.Cluster, *v3.ClusterList](ctrl)
 
 			if tt.setupControllers != nil {
 				tt.setupControllers(controllers{
-					prtbController: prtbController,
-					rbCache:        rbCache,
+					prtbController:    prtbController,
+					rbCache:           rbCache,
+					clusterController: clusterController,
 				})
 			}
 
 			h := &prtbHandler{
-				prtbClient: prtbController,
-				rbCache:    rbCache,
+				prtbClient:        prtbController,
+				rbCache:           rbCache,
+				clusterController: clusterController,
 			}
 
 			result, err := h.handleMigration(tt.prtb)
