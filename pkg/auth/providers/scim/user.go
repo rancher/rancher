@@ -16,20 +16,42 @@ import (
 )
 
 // Bool represents a boolean value that can be unmarshaled from JSON strings or boolean literals.
-// Okta uses boolean values, whereas Azure uses strings "true"/"false" for primary email flag.
+// Okta uses boolean values, whereas Azure uses strings "true"/"false" e.g. for primary email flag.
 type Bool bool
 
 // UnmarshalJSON implements the [json.Unmarshaler] interface.
 func (b *Bool) UnmarshalJSON(data []byte) error {
-	switch string(data) {
-	case "true", `"true"`:
+	switch strings.ToLower(strings.Trim(string(data), `"`)) {
+	case "true":
 		*b = true
-	case "false", `"false"`:
+	case "false":
 		*b = false
 	default:
 		return fmt.Errorf("invalid boolean value: %s", data)
 	}
+
 	return nil
+}
+
+func (b Bool) Bool() bool {
+	return bool(b)
+}
+
+// boolFromValue converts an [any] value to bool, accepting both actual bool
+// values (e.g. Okta) and string representations "true"/"false" (e.g. Azure),
+// by constructing the raw JSON bytes and delegating to [Bool.UnmarshalJSON].
+func boolFromValue(v any) (bool, error) {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return false, err
+	}
+
+	var b Bool
+	if err := b.UnmarshalJSON(data); err != nil {
+		return false, err
+	}
+
+	return b.Bool(), nil
 }
 
 // scimUser represents a SCIM user.
@@ -37,7 +59,7 @@ type scimUser struct {
 	Schemas    []string `json:"schemas"`    // Resource schema URIs.
 	ID         string   `json:"id"`         // Service provider identifier User.Name.
 	ExternalID string   `json:"externalId"` // IdPs identifier.
-	Active     bool     `json:"active"`     // A flag indicating the user's active status.
+	Active     Bool     `json:"active"`     // A flag indicating the user's active status.
 	Name       struct { // The components of the user's real name.
 		GivenName  string `json:"givenName"`
 		FamilyName string `json:"familyName"`
@@ -183,6 +205,12 @@ func (s *SCIMServer) ListUsers(w http.ResponseWriter, r *http.Request) {
 //   - 201 on success
 //   - 400 for invalid requests
 //   - 409 if the user already exists.
+//
+// Note: The requested state of the active attribute is deliberately ignored - true is implied.
+// For IdP-driven provisioning, active acts as a lifecycle signal:
+// - active=true -> "this user exists and has access, provision them"
+// - active=false -> "this user no longer has access, deprovision them" (via PATCH/PUT).
+// We could reject such requests, but it could potentially break poorly-behaved IdPs.
 func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 	logrus.Tracef("scim::CreateUser: url %s", r.URL)
 
@@ -407,14 +435,16 @@ func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		attr.ExtraByProvider[provider]["externalid"] = []string{payload.ExternalID}
 		shouldUpdateAttr = true
 	}
-	if user.GetEnabled() != payload.Active {
-		if user.IsDefaultAdmin() && !payload.Active {
+
+	payloadActive := payload.Active.Bool()
+	if user.GetEnabled() != payloadActive {
+		if user.IsDefaultAdmin() && !payloadActive {
 			writeError(w, NewError(http.StatusConflict, "Cannot deprovision default admin user"))
 			return
 		}
 
 		user = user.DeepCopy()
-		user.Enabled = &payload.Active
+		user.Enabled = &payloadActive
 		shouldUpdateUser = true
 	}
 	if shouldUpdateAttr {
@@ -438,7 +468,7 @@ func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		"id":         user.Name,
 		"userName":   first(attr.ExtraByProvider[provider]["username"]),
 		"externalId": first(attr.ExtraByProvider[provider]["externalid"]),
-		"active":     payload.Active,
+		"active":     payloadActive,
 		"meta": map[string]any{
 			"resourceType": userResource,
 			"created":      user.CreationTimestamp,
@@ -649,8 +679,8 @@ func applyReplaceUser(provider string, attr *v3.UserAttribute, user *v3.User, op
 	var updateAttr, updateUser bool
 	switch strings.ToLower(op.Path) {
 	case "active":
-		active, ok := op.Value.(bool)
-		if !ok {
+		active, err := boolFromValue(op.Value)
+		if err != nil {
 			return false, false, NewError(http.StatusBadRequest, fmt.Sprintf("Invalid value for active: %v", op.Value))
 		}
 
