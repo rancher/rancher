@@ -358,14 +358,13 @@ func (ih *impersonationHandler) deleteServiceAccountImpersonator(clusterName, us
 //   - deleteAggregatedResources: Function to delete resources created with aggregation
 //   - deleteLegacyResources: Function to delete resources created before aggregation
 //
-// # Returns the updated resource and any error encountered
+// Returns the updated resource and any error encountered.
 //
 // Note:
-//
-//	The handleAggregationMigration code is called in the OnChange handlers of CRTBs, PRTBs, and RoleTemplates.
-//	If a CRTB/PRTB/RoleTemplate is deleted before the migration can take place, it is possible it will leave behind some resources.
-//	Therefore the migration should be given time to complete before modifying the RBAC system.
-//	See https://ranchermanager.docs.rancher.com/how-to-guides/advanced-user-guides/enable-experimental-features/role-template-aggregation for more details.
+// The handleAggregationMigration code is called in the OnChange handlers of CRTBs, PRTBs, and RoleTemplates.
+// If a CRTB/PRTB/RoleTemplate is deleted before the migration can take place, it is possible it will leave behind some resources.
+// Therefore the migration should be given time to complete before modifying the RBAC system.
+// See https://ranchermanager.docs.rancher.com/how-to-guides/advanced-user-guides/enable-experimental-features/role-template-aggregation for more details.
 //
 // TODO: To be removed once roletemplate aggregation is the only enabled RBAC model. https://github.com/rancher/rancher/issues/53743
 func handleAggregationMigration[T any](
