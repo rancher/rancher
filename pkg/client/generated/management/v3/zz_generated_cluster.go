@@ -58,10 +58,12 @@ const (
 	ClusterFieldInternal                                             = "internal"
 	ClusterFieldIstioEnabled                                         = "istioEnabled"
 	ClusterFieldK3sConfig                                            = "k3sConfig"
+	ClusterFieldKubernetesVersion                                    = "kubernetesVersion"
 	ClusterFieldLabels                                               = "labels"
 	ClusterFieldLimits                                               = "limits"
 	ClusterFieldLinuxWorkerCount                                     = "linuxWorkerCount"
 	ClusterFieldLocalClusterAuthEndpoint                             = "localClusterAuthEndpoint"
+	ClusterFieldMachineProvider                                      = "machineProvider"
 	ClusterFieldName                                                 = "name"
 	ClusterFieldNodeCount                                            = "nodeCount"
 	ClusterFieldNodeVersion                                          = "nodeVersion"
@@ -141,10 +143,12 @@ type Cluster struct {
 	Internal                                             bool                           `json:"internal,omitempty" yaml:"internal,omitempty"`
 	IstioEnabled                                         bool                           `json:"istioEnabled,omitempty" yaml:"istioEnabled,omitempty"`
 	K3sConfig                                            *K3sConfig                     `json:"k3sConfig,omitempty" yaml:"k3sConfig,omitempty"`
+	KubernetesVersion                                    string                         `json:"kubernetesVersion,omitempty" yaml:"kubernetesVersion,omitempty"`
 	Labels                                               map[string]string              `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Limits                                               map[string]string              `json:"limits,omitempty" yaml:"limits,omitempty"`
 	LinuxWorkerCount                                     int64                          `json:"linuxWorkerCount,omitempty" yaml:"linuxWorkerCount,omitempty"`
 	LocalClusterAuthEndpoint                             *LocalClusterAuthEndpoint      `json:"localClusterAuthEndpoint,omitempty" yaml:"localClusterAuthEndpoint,omitempty"`
+	MachineProvider                                      string                         `json:"machineProvider,omitempty" yaml:"machineProvider,omitempty"`
 	Name                                                 string                         `json:"name,omitempty" yaml:"name,omitempty"`
 	NodeCount                                            int64                          `json:"nodeCount,omitempty" yaml:"nodeCount,omitempty"`
 	NodeVersion                                          int64                          `json:"nodeVersion,omitempty" yaml:"nodeVersion,omitempty"`

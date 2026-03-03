@@ -27,8 +27,10 @@ const (
 	ClusterStatusFieldFailedSpec                                 = "failedSpec"
 	ClusterStatusFieldGKEStatus                                  = "gkeStatus"
 	ClusterStatusFieldIstioEnabled                               = "istioEnabled"
+	ClusterStatusFieldKubernetesVersion                          = "kubernetesVersion"
 	ClusterStatusFieldLimits                                     = "limits"
 	ClusterStatusFieldLinuxWorkerCount                           = "linuxWorkerCount"
+	ClusterStatusFieldMachineProvider                            = "machineProvider"
 	ClusterStatusFieldNodeCount                                  = "nodeCount"
 	ClusterStatusFieldNodeVersion                                = "nodeVersion"
 	ClusterStatusFieldOpenStackSecret                            = "openStackSecret"
@@ -70,8 +72,10 @@ type ClusterStatus struct {
 	FailedSpec                                 *ClusterSpec                  `json:"failedSpec,omitempty" yaml:"failedSpec,omitempty"`
 	GKEStatus                                  *GKEStatus                    `json:"gkeStatus,omitempty" yaml:"gkeStatus,omitempty"`
 	IstioEnabled                               bool                          `json:"istioEnabled,omitempty" yaml:"istioEnabled,omitempty"`
+	KubernetesVersion                          string                        `json:"kubernetesVersion,omitempty" yaml:"kubernetesVersion,omitempty"`
 	Limits                                     map[string]string             `json:"limits,omitempty" yaml:"limits,omitempty"`
 	LinuxWorkerCount                           int64                         `json:"linuxWorkerCount,omitempty" yaml:"linuxWorkerCount,omitempty"`
+	MachineProvider                            string                        `json:"machineProvider,omitempty" yaml:"machineProvider,omitempty"`
 	NodeCount                                  int64                         `json:"nodeCount,omitempty" yaml:"nodeCount,omitempty"`
 	NodeVersion                                int64                         `json:"nodeVersion,omitempty" yaml:"nodeVersion,omitempty"`
 	OpenStackSecret                            string                        `json:"openStackSecret,omitempty" yaml:"openStackSecret,omitempty"`

@@ -147,6 +147,8 @@ func EarlyRegister(ctx context.Context, clients *wrangler.Context, kubeconfigMan
 	clients.Provisioning.Cluster().OnChange(ctx, "v1-scheduling-customization-backfill", h.updateV1SchedulingCustomization)
 	clients.Mgmt.Cluster().OnChange(ctx, "v3-scheduling-customization-backfill", h.updateV3SchedulingCustomization)
 
+	clients.Mgmt.Cluster().OnChange(ctx, "management-cluster-status-update", h.updateClusterStatus)
+
 	relatedresource.Watch(ctx, "cluster-watch", h.clusterWatch,
 		clients.Provisioning.Cluster(), clients.Mgmt.Cluster())
 }
