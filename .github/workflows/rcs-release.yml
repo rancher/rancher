@@ -94,8 +94,6 @@ jobs:
         run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
         uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
-      - name: setup and build
-        uses: ./.github/actions/rancher-chart/build
       - name: Load Secrets from Vault
         uses: rancher-eio/read-vault-secrets@main
         with:
@@ -103,6 +101,9 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/aws/credentials accessKeyId | AWS_ACCESS_KEY_ID_CHARTS;
             secret/data/github/repo/${{ github.repository }}/aws/credentials secretAccessKey | AWS_SECRET_ACCESS_KEY_CHARTS;
             secret/data/github/repo/${{ github.repository }}/aws/credentials chartsBucketName | CHARTS_BUCKET_NAME;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | REGISTRY;
+      - name: setup and build
+        uses: ./.github/actions/rancher-chart/build
       - name: publish
         env:
           CHARTS_BUCKET_NAME: ${{ env.CHARTS_BUCKET_NAME }}
