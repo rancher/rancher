@@ -52,6 +52,39 @@ func TestBoolUnmarshalJSON(t *testing.T) {
 	}
 }
 
+func TestBoolFromValue(t *testing.T) {
+	tests := []struct {
+		desc    string
+		input   any
+		want    bool
+		wantErr bool
+	}{
+		{desc: "bool true", input: true, want: true},
+		{desc: "bool false", input: false},
+		{desc: "string true", input: "true", want: true},
+		{desc: "string false", input: "false"},
+		{desc: "string True", input: "True", want: true},
+		{desc: "string False", input: "False"},
+		{desc: "invalid string", input: "invalid", wantErr: true},
+		{desc: "empty string", input: "", wantErr: true},
+		{desc: "integer", input: 1, wantErr: true},
+		{desc: "float", input: 1.0, wantErr: true},
+		{desc: "nil", input: nil, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			got, err := boolFromValue(tt.input)
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.want, got)
+			}
+		})
+	}
+}
+
 func TestListUsersPagination(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	provider := "okta"
@@ -1731,9 +1764,10 @@ func TestPatchUser(t *testing.T) {
 			userAttributeCache: userAttributeCache,
 		}
 
+		// We deliberately use a string "True" here to verify that we handle string booleans.
 		body := `{
 			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
-			"Operations": [{"op": "replace", "path": "active", "value": true}]
+			"Operations": [{"op": "replace", "path": "active", "value": "True"}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
 		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
