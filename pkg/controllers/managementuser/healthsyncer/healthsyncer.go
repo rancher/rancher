@@ -23,8 +23,8 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes"
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/rest"
 )
 
 const (
@@ -53,7 +53,7 @@ type HealthSyncer struct {
 	clusterLister     v3.ClusterLister
 	clusters          v3.ClusterInterface
 	componentStatuses generic.NonNamespacedClientInterface[*v1.ComponentStatus, *v1.ComponentStatusList]
-	k8s               kubernetes.Interface
+	unversionedClient rest.Interface
 }
 
 func Register(ctx context.Context, workload *config.UserContext) {
@@ -63,7 +63,7 @@ func Register(ctx context.Context, workload *config.UserContext) {
 		clusterLister:     workload.Management.Management.Clusters("").Controller().Lister(),
 		clusters:          workload.Management.Management.Clusters(""),
 		componentStatuses: workload.Corew.ComponentStatus(),
-		k8s:               workload.K8sClient,
+		unversionedClient: workload.UnversionedClient,
 	}
 
 	go h.syncHealth(ctx, syncInterval)
@@ -81,8 +81,8 @@ func (h *HealthSyncer) syncHealth(ctx context.Context, syncHealth time.Duration)
 func (h *HealthSyncer) getComponentStatus(cluster *v3.Cluster) error {
 	// Prior to k8s v1.14, we only needed to list the ComponentStatuses from the user cluster.
 	// As of k8s v1.14, kubeapi returns a successful ComponentStatuses response even if etcd is not available.
-	// To work around this, now we try to get a namespace from the API, even if not found, it means the API is up.
-	if err := IsAPIUp(h.ctx, h.k8s.CoreV1().Namespaces()); err != nil {
+	// Newer k8s versions have dedicated health endpoints that aggregate checks from other subsystems, including etcd.
+	if err := CheckAPIReadiness(h.ctx, h.unversionedClient); err != nil {
 		return condition.Error("ComponentStatusFetchingFailure", errors.Wrap(err, "Failed to communicate with API server during namespace check"))
 	}
 
@@ -125,6 +125,13 @@ func (h *HealthSyncer) getComponentStatus(cluster *v3.Cluster) error {
 	})
 
 	return nil
+}
+
+// CheckAPIReadiness provides a better alternative to IsAPIUp, making use of Kubernetes' health endpoints.
+// See https://kubernetes.io/docs/reference/using-api/health-checks
+func CheckAPIReadiness(ctx context.Context, client rest.Interface) error {
+	_, err := client.Get().AbsPath("/readyz").DoRaw(ctx)
+	return err
 }
 
 // IsAPIUp checks if the Kubernetes API server is up and etcd is available.
