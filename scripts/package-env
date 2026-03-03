@@ -1,37 +1,81 @@
 #!/bin/bash
 
+check_missing() {
+  var=$1
+  if [ -z "${!var}" ]; then
+    >&2 echo "missing var $var"
+    exit 1
+  fi
+}
+
+source scripts/export-config
+source scripts/version
+
+OS="${OS:-linux}"
 ARCH=${ARCH:-"amd64"}
 CHART_REPO_DIR=build/charts
 CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH:-"dev-v2.14"}
-
-REGISTRY=${REGISTRY/:-""}
-IMAGE=${REGISTRY}${REPO}/rancher:${TAG}
-AGENT_IMAGE=${REPO}/rancher-agent:${AGENT_TAG}
-SYSTEM_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_SYSTEM_AGENT_VERSION" ../package/Dockerfile | awk -F'=' '{ print $NF }')-suc
+REGISTRY=${REGISTRY:-""}
+SYSTEM_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_SYSTEM_AGENT_VERSION" package/Dockerfile | awk -F'=' '{ print $NF }')-suc
 SYSTEM_AGENT_UPGRADE_IMAGE=${REPO}/system-agent:${SYSTEM_AGENT_UPGRADE_TAG}
-WINS_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_WINS_AGENT_VERSION" ../package/Dockerfile | awk -F'=' '{ print $NF }')
+WINS_AGENT_UPGRADE_TAG=$(grep "ENV CATTLE_WINS_AGENT_VERSION" package/Dockerfile | awk -F'=' '{ print $NF }')
 WINS_AGENT_UPGRADE_IMAGE=${REPO}/wins:${WINS_AGENT_UPGRADE_TAG}
 CLUSTER_API_CONTROLLER_TAG=v1.12.2
 CLUSTER_API_CONTROLLER_IMAGE=rancher/cluster-api-controller:${CLUSTER_API_CONTROLLER_TAG}
+REPO_OWNER="${REPO_OWNER:-"rancher"}"
+IMAGE="${IMAGE:-"$REPO_OWNER/rancher"}"
+IMAGE_TAG="${IMAGE_TAG:-"$IMAGE-$OS-$ARCH:$TAG"}"
+IMAGE_AGENT="${IMAGE_AGENT:-"$REPO_OWNER/rancher-agent"}"
+IMAGE_AGENT_TAG="${IMAGE_AGENT_TAG:-"$IMAGE_AGENT-$OS-$ARCH:$TAG"}"
+IMAGE_INSTALLER="${IMAGE_INSTALLER:-"$REPO_OWNER/system-agent-installer-rancher"}"
+CATTLE_KDM_BRANCH=$(grep -m1 'ARG CATTLE_KDM_BRANCH=' package/Dockerfile | cut -d '=' -f2)
+CATTLE_K3S_VERSION=$(grep -m1 'ENV CATTLE_K3S_VERSION=' package/Dockerfile | cut -d '=' -f2)
+HELM_VERSION=$(grep -m1 'ENV HELM_VERSION=' package/Dockerfile.installer | cut -d '=' -f2)
+GO_VERSION=$(grep -m1 'golang:' package/Dockerfile | cut -d ':' -f2 | cut -d ' ' -f1)
+HELM_UNITTEST_VERSION=$(grep -m1 'ENV HELM_UNITTEST_VERSION=' Dockerfile.dapper | cut -d '=' -f2)
+CATTLE_HELM_VERSION=$(grep -m1 'ENV CATTLE_HELM_VERSION=' package/Dockerfile | cut -d '=' -f2)
 
-# Query KDM data for RKE2 released versions where server args are defined.
-RKE2_RELEASE_VERSIONS=$(jq -r 'def semver_array: (if startswith("v") then ltrimstr("v") else . end) | split(".") | map(tonumber? // .);
+check_missing "ARCH"
+check_missing "OS"
+check_missing "REPO"
+check_missing "IMAGE"
+check_missing "IMAGE_TAG"
+check_missing "IMAGE_AGENT"
+check_missing "IMAGE_INSTALLER"
+check_missing "CATTLE_KDM_BRANCH"
+check_missing "CATTLE_K3S_VERSION"
+check_missing "HELM_VERSION"
+check_missing "GO_VERSION"
+check_missing "HELM_UNITTEST_VERSION"
+check_missing "CATTLE_HELM_VERSION"
+check_missing "CATTLE_RANCHER_WEBHOOK_VERSION"
+check_missing "CATTLE_REMOTEDIALER_PROXY_VERSION"
+check_missing "CATTLE_RANCHER_TURTLES_VERSION"
+check_missing "CATTLE_CSP_ADAPTER_MIN_VERSION"
+check_missing "CATTLE_FLEET_VERSION"
+check_missing "TAG"
+check_missing "COMMIT"
 
-  "v1.32.0" as $min_version | ($min_version | semver_array) as $target_array |
-
-  [.rke2.releases[] | select(.serverArgs) | .version | select( semver_array >= $target_array ) ] | join(" ")' ../bin/data.json)
-# Convert versions with build metadata into valid image tags (replace + for -) and construct an array of tags.
-RKE2_RELEASE_TAGS=( $(echo $RKE2_RELEASE_VERSIONS | tr + -) )
-# Prefix image repo and name to tags.
-SYSTEM_AGENT_INSTALLER_RKE2_IMAGES=( "${RKE2_RELEASE_TAGS[@]/#/${REPO}/system-agent-installer-rke2:}" )
-
-# Query KDM data for K3S released versions where server args are defined.
-K3S_RELEASE_VERSIONS=$(jq -r 'def semver_array: (if startswith("v") then ltrimstr("v") else . end) | split(".") | map(tonumber? // .);
-
-  "v1.32.0" as $min_version | ($min_version | semver_array) as $target_array |
-
-  [.k3s.releases[] | select(.serverArgs) | .version | select( semver_array >= $target_array ) ] | join(" ")' ../bin/data.json)
-# Convert versions with build metadata into valid image tags (replace + for -) and construct an array of tags.
-K3S_RELEASE_TAGS=( $(echo $K3S_RELEASE_VERSIONS | tr + -) )
-# Prefix image repo and name to tags.
-SYSTEM_AGENT_INSTALLER_K3S_IMAGES=( "${K3S_RELEASE_TAGS[@]/#/${REPO}/system-agent-installer-k3s:}" )
+export OS
+export ARCH
+export CHART_REPO_DIR
+export CHART_DEFAULT_BRANCH
+export REGISTRY
+export SYSTEM_AGENT_UPGRADE_TAG
+export SYSTEM_AGENT_UPGRADE_IMAGE
+export WINS_AGENT_UPGRADE_TAG
+export WINS_AGENT_UPGRADE_IMAGE
+export CLUSTER_API_CONTROLLER_TAG
+export CLUSTER_API_CONTROLLER_IMAGE
+export REPO_OWNER
+export IMAGE
+export IMAGE_TAG
+export IMAGE_AGENT
+export IMAGE_AGENT_TAG
+export IMAGE_INSTALLER
+export CATTLE_KDM_BRANCH
+export CATTLE_K3S_VERSION
+export HELM_VERSION
+export GO_VERSION
+export HELM_UNITTEST_VERSION
+export CATTLE_HELM_VERSION
