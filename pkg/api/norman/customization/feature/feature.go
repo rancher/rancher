@@ -59,24 +59,21 @@ func Formatter(request *types.APIContext, resource *types.RawResource) {
 }
 
 func getEffectiveValue(resource *types.RawResource) bool {
-	// Prime features always return false on non-Prime builds.
+	var defVal bool
 	status, ok := resource.Values["status"].(map[string]interface{})
 	if ok {
+		// Prime features always return false on non-Prime builds.
 		if prime, _ := status["prime"].(bool); prime && !features.IsPrime() {
 			return false
 		}
+
+		defVal, _ = status["default"].(bool)
 	}
 
-	if val := resource.Values["value"]; val != nil {
-		val, _ := val.(bool)
+	if valRaw := resource.Values["value"]; valRaw != nil {
+		val, _ := valRaw.(bool)
 		return val
 	}
 
-	var val bool
-	// if value is nil, then this ensures default value will be used
-	if ok {
-		val, _ = status["default"].(bool)
-	}
-
-	return val
+	return defVal
 }
