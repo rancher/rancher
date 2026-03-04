@@ -1,12 +1,15 @@
 package cleanup
 
 import (
+	"encoding/json"
 	"errors"
+	"strings"
 
 	"github.com/rancher/rancher/pkg/auth/api/secrets"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 var cleanupProviders = []string{"genericoidc", "cognito"}
@@ -36,16 +39,37 @@ func CleanupUnusedSecretTokens(secretsInterface wcorev1.SecretController, authCo
 			continue
 		}
 
-		authConfig = authConfig.DeepCopy()
-		if authConfig.Annotations == nil {
-			authConfig.Annotations = map[string]string{}
+		var patch []byte
+		if authConfig.Annotations != nil {
+			patch, err = json.Marshal([]jsonPatch{{
+				Op:    "add",
+				Path:  "/metadata/annotations/" + strings.ReplaceAll(cleanedUpSecretsAnnotation, "/", "~1"),
+				Value: "true",
+			}})
+		} else {
+			patch, err = json.Marshal([]jsonPatch{{
+				Op:   "add",
+				Path: "/metadata/annotations",
+				Value: map[string]string{
+					cleanedUpSecretsAnnotation: "true",
+				},
+			}})
+		}
+		if err != nil {
+			cleanupErr = errors.Join(cleanupErr, err)
+			continue
 		}
 
-		authConfig.Annotations[cleanedUpSecretsAnnotation] = "true"
-		if _, err := authConfigs.Update(authConfig); err != nil {
+		if _, err := authConfigs.Patch(name, types.JSONPatchType, patch); err != nil {
 			cleanupErr = errors.Join(cleanupErr, err)
 		}
 	}
 
 	return
+}
+
+type jsonPatch struct {
+	Op    string `json:"op"`
+	Path  string `json:"path"`
+	Value any    `json:"value"`
 }
