@@ -109,6 +109,29 @@ func Test_onClusterChange_Active(t *testing.T) {
 	}
 }
 
+func Test_onClusterChange_DisableEKSConfigSyncAnnotation(t *testing.T) {
+	mockOperatorController = getMockEksOperatorController(t, "disable-sync")
+	mockCluster, err := getMockV3Cluster(MockActiveClusterFilename)
+	if err != nil {
+		t.Errorf("error getting mock v3 cluster: %s", err)
+	}
+
+	if mockCluster.Annotations == nil {
+		mockCluster.Annotations = map[string]string{}
+	}
+	mockCluster.Annotations[disableEKSConfigSyncAnnotation] = "true"
+	mockCluster.Spec.EKSConfig.KubernetesVersion = to.StringPtr("1.23")
+
+	cluster, err := mockOperatorController.onClusterChange("", &mockCluster)
+
+	if err != nil {
+		t.Errorf("error running onClusterChange: %s", err)
+	}
+	if cluster == nil {
+		t.Errorf("cluster should have returned successfully")
+	}
+}
+
 func Test_onClusterChange_UpdateNodePool(t *testing.T) {
 	mockOperatorController = getMockEksOperatorController(t, "update")
 	mockCluster, err := getMockV3Cluster(MockUpdateClusterFilename)
