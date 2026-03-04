@@ -307,7 +307,7 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 	if err != nil {
 		return err
 	}
-	rb = AddAggregationManagementFeatureLabel(rb).(*rbacv1.RoleBinding)
+	AddAggregationManagementFeatureLabel(rb)
 
 	// Find any existing management RoleBindings owned by this PRTB that have the aggregation label.
 	labelSelector := labels.Set{

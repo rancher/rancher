@@ -60,13 +60,12 @@ func isRoleTemplateExternal(rtName string, rtClient mgmtv3.RoleTemplateControlle
 	return rt.External, nil
 }
 
-// AddAggregationFeatureLabel adds the aggregation label to the given resource and returns the updated resource.
-func AddAggregationFeatureLabel(obj metav1.Object) metav1.Object {
+// AddAggregationFeatureLabel adds the aggregation label to the given resource.
+func AddAggregationFeatureLabel(obj metav1.Object) {
 	labels := obj.GetLabels()
 	if labels == nil {
 		labels = map[string]string{}
 	}
 	labels[rbac.AggregationFeatureLabel] = "true"
 	obj.SetLabels(labels)
-	return obj
 }

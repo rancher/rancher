@@ -401,13 +401,12 @@ func handleAggregationMigration[T any](
 	return resource, nil
 }
 
-// AddAggregationManagementFeatureLabel adds the aggregation management label to the given resource and returns the updated resource.
-func AddAggregationManagementFeatureLabel(obj metav1.Object) metav1.Object {
+// AddAggregationManagementFeatureLabel adds the aggregation management label to the given resource.
+func AddAggregationManagementFeatureLabel(obj metav1.Object) {
 	labels := obj.GetLabels()
 	if labels == nil {
 		labels = map[string]string{}
 	}
 	labels[rbac.AggregationManagementFeatureLabel] = "true"
 	obj.SetLabels(labels)
-	return obj
 }

@@ -201,8 +201,8 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, loc
 		c.s.AddCondition(localConditions, condition, failedToGetDesiredRoleBindings, err)
 		return err
 	}
-	for i, rb := range desiredRBs {
-		desiredRBs[i] = AddAggregationManagementFeatureLabel(rb).(*rbacv1.RoleBinding)
+	for _, rb := range desiredRBs {
+		AddAggregationManagementFeatureLabel(rb)
 	}
 
 	// Find all existing management RoleBindings owned by this CRTB.

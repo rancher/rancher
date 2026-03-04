@@ -974,15 +974,10 @@ func TestAddAggregationManagementFeatureLabel(t *testing.T) {
 				},
 			}
 
-			result := AddAggregationManagementFeatureLabel(obj)
-
-			// Verify the returned object is the same as input
-			if result != obj {
-				t.Errorf("AddAggregationManagementFeatureLabel() should return the same object")
-			}
+			AddAggregationManagementFeatureLabel(obj)
 
 			// Verify labels are set correctly
-			resultLabels := result.GetLabels()
+			resultLabels := obj.GetLabels()
 			if len(resultLabels) != len(tt.expectedLabels) {
 				t.Errorf("AddAggregationManagementFeatureLabel() labels count = %v, want %v", len(resultLabels), len(tt.expectedLabels))
 			}

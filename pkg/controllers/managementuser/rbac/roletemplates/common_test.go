@@ -140,15 +140,10 @@ func TestAddAggregationFeatureLabel(t *testing.T) {
 				},
 			}
 
-			result := AddAggregationFeatureLabel(obj)
-
-			// Verify the returned object is the same as input
-			if result != obj {
-				t.Errorf("AddAggregationFeatureLabel() should return the same object")
-			}
+			AddAggregationFeatureLabel(obj)
 
 			// Verify labels are set correctly
-			resultLabels := result.GetLabels()
+			resultLabels := obj.GetLabels()
 			if len(resultLabels) != len(tt.expectedLabels) {
 				t.Errorf("AddAggregationFeatureLabel() labels count = %v, want %v", len(resultLabels), len(tt.expectedLabels))
 			}

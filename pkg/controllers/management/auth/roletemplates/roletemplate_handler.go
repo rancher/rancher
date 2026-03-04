@@ -105,8 +105,8 @@ func (r *roleTemplateHandler) reconcileClusterRoles(rt *v3.RoleTemplate) error {
 		return err
 	}
 	addOwnerReferenceToClusterRole(desiredCRs, rt)
-	for i, cr := range desiredCRs {
-		desiredCRs[i] = AddAggregationManagementFeatureLabel(cr).(*rbacv1.ClusterRole)
+	for _, cr := range desiredCRs {
+		AddAggregationManagementFeatureLabel(cr)
 	}
 
 	// List cluster roles that are owned by this RoleTemplate and have the management aggregation feature label.

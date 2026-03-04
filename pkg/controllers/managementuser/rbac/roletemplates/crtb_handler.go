@@ -104,7 +104,7 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, rem
 		return err
 	}
 
-	crb = AddAggregationFeatureLabel(crb).(*rbacv1.ClusterRoleBinding)
+	AddAggregationFeatureLabel(crb)
 
 	labelSelector := labels.Set{
 		rbac.GetCRTBOwnerLabel(crtb.Name): "true",

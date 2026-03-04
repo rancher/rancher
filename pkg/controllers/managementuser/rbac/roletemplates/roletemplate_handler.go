@@ -46,8 +46,8 @@ func (rth *roleTemplateHandler) OnChange(_ string, rt *v3.RoleTemplate) (*v3.Rol
 		return nil, err
 	}
 	// add aggregation feature label to all ClusterRoles for this RoleTemplate, so we can easily find them later when we need to clean them up
-	for i, cr := range clusterRoles {
-		clusterRoles[i] = AddAggregationFeatureLabel(cr).(*rbacv1.ClusterRole)
+	for _, cr := range clusterRoles {
+		AddAggregationFeatureLabel(cr)
 	}
 
 	if err := rth.ensureOnlyDesiredClusterRolesExist(rt, clusterRoles); err != nil {

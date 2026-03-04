@@ -272,8 +272,8 @@ func (p *prtbHandler) ensureOnlyDesiredClusterRoleBindingsExists(crbs []*rbacv1.
 	}
 
 	// Make sure the aggregation label is set on all the desired CRBs so they can be filtered on later.
-	for i, crb := range crbs {
-		crbs[i] = AddAggregationFeatureLabel(crb).(*rbacv1.ClusterRoleBinding)
+	for _, crb := range crbs {
+		AddAggregationFeatureLabel(crb)
 	}
 
 	labelSelector := labels.Set{
