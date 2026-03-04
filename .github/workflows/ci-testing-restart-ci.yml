@@ -45,15 +45,19 @@ jobs:
 
       - name: Find CI testing PR
         id: find-pr
+        env:
+          BRANCH_NAME: ${{ github.event.workflow_run.head_branch }}
+          WORKFLOW_ID: ${{ github.event.workflow_run.workflow_id }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
         run: |
-          BRANCH_NAME="${{ github.event.workflow_run.head_branch }}"
           PR_NUMBER=$(gh pr list --head "$BRANCH_NAME" --json number -q '.[0].number')
           if [[ -n "$PR_NUMBER" ]]; then
             echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
             echo "branch=$BRANCH_NAME" >> $GITHUB_OUTPUT
-            echo "workflow_id=${{ github.event.workflow_run.workflow_id }}" >> $GITHUB_OUTPUT
-            echo "run_id=${{ github.event.workflow_run.id }}" >> $GITHUB_OUTPUT
-            echo "workflow_name=${{ github.event.workflow_run.name }}" >> $GITHUB_OUTPUT
+            echo "workflow_id=$WORKFLOW_ID" >> $GITHUB_OUTPUT
+            echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
+            echo "workflow_name=$WORKFLOW_NAME" >> $GITHUB_OUTPUT
           else
             echo "No PR found for branch $BRANCH_NAME"
             exit 0
