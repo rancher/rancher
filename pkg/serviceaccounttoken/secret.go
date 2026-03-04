@@ -41,8 +41,8 @@ func EnsureSecretForServiceAccount(ctx context.Context, secretsCache corecontrol
 	logrus.Tracef("EnsureSecretForServiceAccount for %s", logKeyFromObject(sa))
 
 	// Happy path: secret is already cached and ready to be used
-	if secret, err := serviceAccountSecretFromCache(secretsCache, sa); err != nil || saSecretIsReady(secret) {
-		return secret, err
+	if secret := serviceAccountSecretFromCache(secretsCache, sa); saSecretIsReady(secret) {
+		return secret, nil
 	}
 
 	secretClient := secretsGetter.Secrets(sa.Namespace)
@@ -133,16 +133,23 @@ func saSecretIsReady(secret *corev1.Secret) bool {
 	return len(secret.Data[corev1.ServiceAccountTokenKey]) > 0
 }
 
-func serviceAccountSecretFromCache(cache corecontrollers.SecretCache, sa *corev1.ServiceAccount) (*corev1.Secret, error) {
+func serviceAccountSecretFromCache(cache corecontrollers.SecretCache, sa *corev1.ServiceAccount) *corev1.Secret {
 	if cache == nil || sa == nil {
-		return nil, nil
+		return nil
 	}
 	ref, err := secretRefFromSA(sa)
 	if err != nil {
 		// reference may be not set or invalid, ignore
-		return nil, nil
+		return nil
 	}
-	return cache.Get(ref.Namespace, ref.Name)
+	secret, err := cache.Get(ref.Namespace, ref.Name)
+	if err != nil {
+		if !apierrors.IsNotFound(err) {
+			logrus.WithError(err).Warn("error looking up service account secret")
+		}
+		return nil
+	}
+	return secret
 }
 
 // SecretTemplate generate a template of service-account-token Secret for the provided Service Account.
