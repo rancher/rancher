@@ -54,9 +54,9 @@ func TestCleanupUnusedSecretTokens(t *testing.T) {
 	}
 
 	for _, provider := range cleanupProviders {
-		addAnnotationPatch := `[{"op":"add","path":"/metadata/annotations","value":{"auth.cattle.io/unused-secrets-cleaned":"true"}}]`
+		addAnnotationPatch := `{"metadata":{"annotations":{"auth.cattle.io/unused-secrets-cleaned":"true"}}}`
 		if patched := authConfigStore[provider].patched; patched != addAnnotationPatch {
-			t.Errorf("didn't update the annotations for provider %s", provider)
+			t.Errorf("didn't update the annotations for provider %s got %v", provider, patched)
 		}
 	}
 
@@ -92,7 +92,7 @@ func TestCleanupUnusedSecretTokensHandlesErrors(t *testing.T) {
 
 	for _, provider := range cleanupProviders {
 		// Only the non-erroring configs should be updated
-		addAnnotationPatch := `[{"op":"add","path":"/metadata/annotations","value":{"auth.cattle.io/unused-secrets-cleaned":"true"}}]`
+		addAnnotationPatch := `{"metadata":{"annotations":{"auth.cattle.io/unused-secrets-cleaned":"true"}}}`
 		ap := authConfigStore[provider]
 		if ap.err != nil {
 			if ap.patched != "" {
@@ -143,7 +143,7 @@ func TestCleanupUnusedSecretTokensAlreadyAnnotated(t *testing.T) {
 	}
 
 	for _, provider := range cleanupProviders {
-		addAnnotationPatch := `[{"op":"add","path":"/metadata/annotations","value":{"auth.cattle.io/unused-secrets-cleaned":"true"}}]`
+		addAnnotationPatch := `{"metadata":{"annotations":{"auth.cattle.io/unused-secrets-cleaned":"true"}}}`
 		if patched := authConfigStore[provider].patched; authConfigStore[provider].updated && patched != addAnnotationPatch {
 			t.Errorf("didn't update the annotations correctly for provider %s: %v", provider, patched)
 		}
@@ -173,7 +173,7 @@ func getAuthConfigControllerMock(ctrl *gomock.Controller, store map[string]store
 		})
 
 		if v.updated {
-			authConfigs.EXPECT().Patch(v.authConfig.Name, types.JSONPatchType, gomock.Any()).DoAndReturn(func(name string, _ types.PatchType, data []byte, _ ...any) (*v3.OIDCConfig, error) {
+			authConfigs.EXPECT().Patch(v.authConfig.Name, types.MergePatchType, gomock.Any()).DoAndReturn(func(name string, _ types.PatchType, data []byte, _ ...any) (*v3.AuthConfig, error) {
 				stored := store[name]
 				stored.patched = string(data)
 				store[name] = stored

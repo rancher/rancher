@@ -3,7 +3,6 @@ package cleanup
 import (
 	"encoding/json"
 	"errors"
-	"strings"
 
 	"github.com/rancher/rancher/pkg/auth/api/secrets"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -39,37 +38,22 @@ func CleanupUnusedSecretTokens(secretsInterface wcorev1.SecretController, authCo
 			continue
 		}
 
-		var patch []byte
-		if authConfig.Annotations != nil {
-			patch, err = json.Marshal([]jsonPatch{{
-				Op:    "add",
-				Path:  "/metadata/annotations/" + strings.ReplaceAll(cleanedUpSecretsAnnotation, "/", "~1"),
-				Value: "true",
-			}})
-		} else {
-			patch, err = json.Marshal([]jsonPatch{{
-				Op:   "add",
-				Path: "/metadata/annotations",
-				Value: map[string]string{
+		patch, err := json.Marshal(map[string]any{
+			"metadata": map[string]any{
+				"annotations": map[string]string{
 					cleanedUpSecretsAnnotation: "true",
 				},
-			}})
-		}
+			},
+		})
 		if err != nil {
 			cleanupErr = errors.Join(cleanupErr, err)
 			continue
 		}
 
-		if _, err := authConfigs.Patch(name, types.JSONPatchType, patch); err != nil {
+		if _, err := authConfigs.Patch(name, types.MergePatchType, patch); err != nil {
 			cleanupErr = errors.Join(cleanupErr, err)
 		}
 	}
 
 	return
-}
-
-type jsonPatch struct {
-	Op    string `json:"op"`
-	Path  string `json:"path"`
-	Value any    `json:"value"`
 }
