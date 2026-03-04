@@ -143,7 +143,7 @@ func GenerateSCCPayload(telG RancherManagerTelemetry) (*SccPayload, error) {
 
 	// Remove pre-release and build metadata from the version
 	productVersion := telG.RancherVersion()
-	semVer, err := semver.NewVersion(productVersion)
+	semVer, err := semver.StrictNewVersion(productVersion)
 	if err == nil {
 		productVersion = fmt.Sprintf(
 			"%d.%d.%d",
