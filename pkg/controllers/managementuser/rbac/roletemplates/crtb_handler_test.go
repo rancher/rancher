@@ -80,8 +80,8 @@ var (
 	}
 )
 
-func Test_reconcileBindings(t *testing.T) {
-	listOption := metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/crtb-owner-test-crtb"}
+func TestCRTBHandlerReconcileBindings(t *testing.T) {
+	listOption := metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/crtb-owner-test-crtb=true,management.cattle.io/roletemplate-aggregation=true"}
 
 	tests := []struct {
 		name               string

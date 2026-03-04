@@ -113,7 +113,9 @@ func (c *crtbHandler) handleMigration(crtb *v3.ClusterRoleTemplateBinding) (*v3.
 			crtbCopy.Labels = labels
 			return c.crtbClient.Update(crtbCopy)
 		},
-		c.removeRoleBindings,
+		func(crtb *v3.ClusterRoleTemplateBinding) error {
+			return errors.Join(c.deleteRoleBindings(crtb), c.deleteDownstreamResources(crtb, false))
+		},
 		c.deleteLegacyRoleBindings,
 	)
 }
@@ -199,8 +201,16 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, loc
 		c.s.AddCondition(localConditions, condition, failedToGetDesiredRoleBindings, err)
 		return err
 	}
+	for _, rb := range desiredRBs {
+		AddAggregationManagementFeatureLabel(rb)
+	}
 
-	currentRBs, err := c.rbController.List(metav1.NamespaceAll, metav1.ListOptions{LabelSelector: rbac.GetCRTBOwnerLabel(crtb.Name)})
+	// Find all existing management RoleBindings owned by this CRTB.
+	labelSelector := labels.Set{
+		rbac.GetCRTBOwnerLabel(crtb.Name):      "true",
+		rbac.AggregationManagementFeatureLabel: "true",
+	}
+	currentRBs, err := c.rbController.List(metav1.NamespaceAll, metav1.ListOptions{LabelSelector: labelSelector.AsSelector().String()})
 	if err != nil {
 		c.s.AddCondition(localConditions, condition, failedToListExistingRoleBindings, err)
 		return err
@@ -313,7 +323,7 @@ func (c *crtbHandler) OnRemove(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 		return nil, nil
 	}
 	if !features.AggregatedRoleTemplates.Enabled() {
-		return nil, c.deleteDownstreamResources(crtb, false)
+		return nil, nil
 	}
 
 	condition := metav1.Condition{Type: clusterRoleTemplateBindingDelete}
@@ -324,17 +334,17 @@ func (c *crtbHandler) OnRemove(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 	err = removeAuthV2Permissions(crtb, c.rbController)
 	c.s.AddCondition(&crtb.Status.LocalConditions, condition, authv2ProvisioningBindingDeleted, err)
 
-	return crtb, errors.Join(err, c.removeRoleBindings(crtb), c.deleteDownstreamResources(crtb, true))
+	return crtb, errors.Join(err, c.deleteRoleBindings(crtb), c.deleteDownstreamResources(crtb, true))
 }
 
-// removeClusterRoleBindings removes all bindings owned by the CRTB
-func (c *crtbHandler) removeRoleBindings(crtb *v3.ClusterRoleTemplateBinding) error {
-	condition := metav1.Condition{Type: removeRoleBindings}
+// deleteRoleBindings removes all bindings owned by the CRTB
+func (c *crtbHandler) deleteRoleBindings(crtb *v3.ClusterRoleTemplateBinding) error {
+	condition := metav1.Condition{Type: deleteRoleBindings}
 
-	// Collect all RoleBindings owned by this ClusterRoleTemplateBinding
+	// Collect all management RoleBindings owned by this ClusterRoleTemplateBinding
 	set := labels.Set(map[string]string{
-		rbac.GetCRTBOwnerLabel(crtb.Name): "true",
-		rbac.AggregationFeatureLabel:      "true",
+		rbac.GetCRTBOwnerLabel(crtb.Name):      "true",
+		rbac.AggregationManagementFeatureLabel: "true",
 	})
 	// List all RoleBindings with the CRTB owner label
 	currentRBs, err := c.rbController.List(metav1.NamespaceAll, metav1.ListOptions{LabelSelector: set.AsSelector().String()})
@@ -356,6 +366,8 @@ func (c *crtbHandler) removeRoleBindings(crtb *v3.ClusterRoleTemplateBinding) er
 	return returnErr
 }
 
+// deleteDownstreamResources deletes any resources that were created in the downstream cluster for this CRTB.
+// If deleteImpersonator is true, it also deletes the service account and cluster role bindings that were created for impersonation.
 func (c *crtbHandler) deleteDownstreamResources(crtb *v3.ClusterRoleTemplateBinding, deleteImpersonator bool) error {
 	clusterName := crtb.ClusterName
 	cluster, err := c.clusterController.Get(clusterName, metav1.GetOptions{})

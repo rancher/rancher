@@ -33,7 +33,7 @@ var (
 		Resources: []string{"clusterroletemplatebindings"},
 	}
 	listOptions = metav1.ListOptions{
-		LabelSelector: "authz.cluster.cattle.io/clusterrole-owner=test-rt",
+		LabelSelector: "authz.cluster.cattle.io/clusterrole-owner=test-rt,management.cattle.io/roletemplate-aggregation-mgmt=true",
 	}
 	terminatingRoleTemplate = v3.RoleTemplate{
 		ObjectMeta: metav1.ObjectMeta{
@@ -61,9 +61,9 @@ var (
 			Name:            "test-rt-project-mgmt",
 			OwnerReferences: []metav1.OwnerReference{defaultOwnerReference},
 			Labels: map[string]string{
-				"management.cattle.io/aggregates":               "test-rt-project-mgmt",
-				"authz.cluster.cattle.io/clusterrole-owner":     "test-rt",
-				"management.cattle.io/roletemplate-aggregation": "true",
+				"management.cattle.io/aggregates":                    "test-rt-project-mgmt",
+				"authz.cluster.cattle.io/clusterrole-owner":          "test-rt",
+				"management.cattle.io/roletemplate-aggregation-mgmt": "true",
 			},
 		},
 		Rules: []rbacv1.PolicyRule{getPRTBS},
@@ -73,9 +73,9 @@ var (
 			Name:            "test-rt-project-mgmt-aggregator",
 			OwnerReferences: []metav1.OwnerReference{defaultOwnerReference},
 			Labels: map[string]string{
-				"management.cattle.io/aggregates":               "test-rt-project-mgmt-aggregator",
-				"management.cattle.io/roletemplate-aggregation": "true",
-				"authz.cluster.cattle.io/clusterrole-owner":     "test-rt",
+				"management.cattle.io/aggregates":                    "test-rt-project-mgmt-aggregator",
+				"management.cattle.io/roletemplate-aggregation-mgmt": "true",
+				"authz.cluster.cattle.io/clusterrole-owner":          "test-rt",
 			},
 		},
 		AggregationRule: &rbacv1.AggregationRule{
@@ -91,9 +91,9 @@ var (
 			Name:            "test-rt-cluster-mgmt",
 			OwnerReferences: []metav1.OwnerReference{defaultOwnerReference},
 			Labels: map[string]string{
-				"management.cattle.io/aggregates":               "test-rt-cluster-mgmt",
-				"authz.cluster.cattle.io/clusterrole-owner":     "test-rt",
-				"management.cattle.io/roletemplate-aggregation": "true",
+				"management.cattle.io/aggregates":                    "test-rt-cluster-mgmt",
+				"authz.cluster.cattle.io/clusterrole-owner":          "test-rt",
+				"management.cattle.io/roletemplate-aggregation-mgmt": "true",
 			},
 		},
 		Rules: []rbacv1.PolicyRule{getCRTBs},
@@ -103,9 +103,9 @@ var (
 			Name:            "test-rt-cluster-mgmt-aggregator",
 			OwnerReferences: []metav1.OwnerReference{defaultOwnerReference},
 			Labels: map[string]string{
-				"management.cattle.io/aggregates":               "test-rt-cluster-mgmt-aggregator",
-				"authz.cluster.cattle.io/clusterrole-owner":     "test-rt",
-				"management.cattle.io/roletemplate-aggregation": "true",
+				"management.cattle.io/aggregates":                    "test-rt-cluster-mgmt-aggregator",
+				"authz.cluster.cattle.io/clusterrole-owner":          "test-rt",
+				"management.cattle.io/roletemplate-aggregation-mgmt": "true",
 			},
 		},
 		AggregationRule: &rbacv1.AggregationRule{
@@ -118,7 +118,7 @@ var (
 	}
 )
 
-func Test_OnChange(t *testing.T) {
+func TestRTHandlerOnChange(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name                       string
@@ -332,9 +332,9 @@ func Test_OnChange(t *testing.T) {
 							},
 						},
 						Labels: map[string]string{
-							"management.cattle.io/aggregates":               "test-rt-project-mgmt-aggregator",
-							"authz.cluster.cattle.io/clusterrole-owner":     "test-rt",
-							"management.cattle.io/roletemplate-aggregation": "true",
+							"management.cattle.io/aggregates":                    "test-rt-project-mgmt-aggregator",
+							"authz.cluster.cattle.io/clusterrole-owner":          "test-rt",
+							"management.cattle.io/roletemplate-aggregation-mgmt": "true",
 						},
 					},
 					AggregationRule: &rbacv1.AggregationRule{
@@ -362,9 +362,9 @@ func Test_OnChange(t *testing.T) {
 							},
 						},
 						Labels: map[string]string{
-							"management.cattle.io/aggregates":               "test-rt-cluster-mgmt-aggregator",
-							"authz.cluster.cattle.io/clusterrole-owner":     "test-rt",
-							"management.cattle.io/roletemplate-aggregation": "true",
+							"management.cattle.io/aggregates":                    "test-rt-cluster-mgmt-aggregator",
+							"authz.cluster.cattle.io/clusterrole-owner":          "test-rt",
+							"management.cattle.io/roletemplate-aggregation-mgmt": "true",
 						},
 					},
 					AggregationRule: &rbacv1.AggregationRule{
@@ -405,9 +405,9 @@ func Test_OnChange(t *testing.T) {
 							},
 						},
 						Labels: map[string]string{
-							"management.cattle.io/aggregates":               "test-rt-project-mgmt-aggregator",
-							"authz.cluster.cattle.io/clusterrole-owner":     "test-rt",
-							"management.cattle.io/roletemplate-aggregation": "true",
+							"management.cattle.io/aggregates":                    "test-rt-project-mgmt-aggregator",
+							"authz.cluster.cattle.io/clusterrole-owner":          "test-rt",
+							"management.cattle.io/roletemplate-aggregation-mgmt": "true",
 						},
 					},
 					AggregationRule: &rbacv1.AggregationRule{
@@ -506,38 +506,6 @@ func Test_OnChange(t *testing.T) {
 			},
 		},
 		{
-			name: "dont remove cluster roles from downstream cluster handler",
-			rt: &v3.RoleTemplate{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-rt",
-				},
-				Context: "project",
-				Rules:   []rbacv1.PolicyRule{getRoleTemplates},
-			},
-			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
-				m.EXPECT().List(listOptions).Return(&rbacv1.ClusterRoleList{
-					Items: []rbacv1.ClusterRole{
-						{
-							ObjectMeta: metav1.ObjectMeta{Name: "test-rt"},
-						},
-						{
-							ObjectMeta: metav1.ObjectMeta{Name: "test-rt-aggregator"},
-						},
-						{
-							ObjectMeta: metav1.ObjectMeta{Name: "test-rt-promoted"},
-						},
-						{
-							ObjectMeta: metav1.ObjectMeta{Name: "test-rt-promoted-aggregator"},
-						},
-						{
-							ObjectMeta: metav1.ObjectMeta{Name: "bad-cr"},
-						},
-					},
-				}, nil)
-				m.EXPECT().Delete("bad-cr", &metav1.DeleteOptions{}).Return(nil)
-			},
-		},
-		{
 			name: "error deleting cluster roles, non blocking",
 			rt: &v3.RoleTemplate{
 				ObjectMeta: metav1.ObjectMeta{
@@ -595,7 +563,7 @@ func Test_OnChange(t *testing.T) {
 	}
 }
 
-func Test_getManagementPlaneRules(t *testing.T) {
+func TestGetManagementPlaneRules(t *testing.T) {
 	t.Parallel()
 	sampleResources := map[string]string{
 		"nodes": "management.cattle.io",
@@ -794,7 +762,7 @@ func Test_getManagementPlaneRules(t *testing.T) {
 	}
 }
 
-func Test_gatherRules(t *testing.T) {
+func TestRTHandlerGatherRules(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name    string
@@ -887,7 +855,7 @@ var (
 	}
 )
 
-func Test_removeLabelFromExternalRole(t *testing.T) {
+func TestRemoveLabelFromExternalRole(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name       string
@@ -983,7 +951,7 @@ func Test_removeLabelFromExternalRole(t *testing.T) {
 	}
 }
 
-func Test_roleTemplateHandler_handleMigration(t *testing.T) {
+func TestRTHandlerHandleMigration(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	type controllers struct {

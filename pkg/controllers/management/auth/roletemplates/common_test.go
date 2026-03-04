@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -460,7 +461,7 @@ func TestDeleteClusterMembershipBinding(t *testing.T) {
 	}
 }
 
-func Test_getClusterMembershipRoleName(t *testing.T) {
+func TestGetClusterMembershipRoleName(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name    string
@@ -503,7 +504,7 @@ func Test_getClusterMembershipRoleName(t *testing.T) {
 	}
 }
 
-func Test_getProjectMembershipRoleName(t *testing.T) {
+func TestGetProjectMembershipRoleName(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name    string
@@ -543,7 +544,7 @@ var (
 	crtbListOptions = metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/crtb-owner=test-crtb"}
 )
 
-func Test_removeAuthV2Permissions(t *testing.T) {
+func TestRemoveAuthV2Permissions(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name            string
@@ -672,7 +673,7 @@ var (
 	}
 )
 
-func Test_createOrUpdateProjectMembershipBinding(t *testing.T) {
+func TestCreateOrUpdateProjectMembershipBinding(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name              string
@@ -792,7 +793,7 @@ func Test_createOrUpdateProjectMembershipBinding(t *testing.T) {
 	}
 }
 
-func Test_deleteProjectMembershipBinding(t *testing.T) {
+func TestDeleteProjectMembershipBinding(t *testing.T) {
 	tests := []struct {
 		name              string
 		prtb              *v3.ProjectRoleTemplateBinding
@@ -911,6 +912,82 @@ func Test_deleteProjectMembershipBinding(t *testing.T) {
 			}
 			if err := deleteProjectMembershipBinding(tt.prtb, rbController); (err != nil) != tt.wantErr {
 				t.Errorf("deleteProjectMembershipBinding() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestAddAggregationManagementFeatureLabel(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name           string
+		inputLabels    map[string]string
+		expectedLabels map[string]string
+	}{
+		{
+			name:        "adds label to object with no labels",
+			inputLabels: nil,
+			expectedLabels: map[string]string{
+				rbac.AggregationManagementFeatureLabel: "true",
+			},
+		},
+		{
+			name: "adds label to object with existing labels",
+			inputLabels: map[string]string{
+				"existing-label": "value",
+			},
+			expectedLabels: map[string]string{
+				"existing-label":                       "value",
+				rbac.AggregationManagementFeatureLabel: "true",
+			},
+		},
+		{
+			name: "updates label when already present",
+			inputLabels: map[string]string{
+				rbac.AggregationManagementFeatureLabel: "false",
+				"other-label":                          "value",
+			},
+			expectedLabels: map[string]string{
+				rbac.AggregationManagementFeatureLabel: "true",
+				"other-label":                          "value",
+			},
+		},
+		{
+			name: "label already set to true",
+			inputLabels: map[string]string{
+				rbac.AggregationManagementFeatureLabel: "true",
+			},
+			expectedLabels: map[string]string{
+				rbac.AggregationManagementFeatureLabel: "true",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			// Create a test object (using ClusterRoleTemplateBinding as an example)
+			obj := &v3.ClusterRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-crtb",
+					Labels: tt.inputLabels,
+				},
+			}
+
+			AddAggregationManagementFeatureLabel(obj)
+
+			// Verify labels are set correctly
+			resultLabels := obj.GetLabels()
+			if len(resultLabels) != len(tt.expectedLabels) {
+				t.Errorf("AddAggregationManagementFeatureLabel() labels count = %v, want %v", len(resultLabels), len(tt.expectedLabels))
+			}
+
+			for key, expectedValue := range tt.expectedLabels {
+				if actualValue, ok := resultLabels[key]; !ok {
+					t.Errorf("AddAggregationManagementFeatureLabel() missing label %s", key)
+				} else if actualValue != expectedValue {
+					t.Errorf("AddAggregationManagementFeatureLabel() label %s = %v, want %v", key, actualValue, expectedValue)
+				}
 			}
 		})
 	}

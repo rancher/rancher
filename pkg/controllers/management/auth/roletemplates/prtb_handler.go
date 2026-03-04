@@ -98,7 +98,9 @@ func (p *prtbHandler) handleMigration(prtb *v3.ProjectRoleTemplateBinding) (*v3.
 			prtbCopy.Labels = labels
 			return p.prtbClient.Update(prtbCopy)
 		},
-		p.deleteRoleBindings,
+		func(prtb *v3.ProjectRoleTemplateBinding) error {
+			return errors.Join(p.deleteRoleBindings(prtb), p.deleteDownstreamResources(prtb, false))
+		},
 		p.deleteLegacyBinding,
 	)
 }
@@ -109,7 +111,7 @@ func (p *prtbHandler) OnRemove(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 		return nil, nil
 	}
 	if !features.AggregatedRoleTemplates.Enabled() {
-		return nil, p.deleteDownstreamResources(prtb, false)
+		return nil, nil
 	}
 
 	returnErr := errors.Join(deleteClusterMembershipBinding(prtb, p.crbController),
@@ -123,10 +125,10 @@ func (p *prtbHandler) OnRemove(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 
 // deleteRoleBindings deletes all Role Bindings in the project namespace made by the PRTB.
 func (p *prtbHandler) deleteRoleBindings(prtb *v3.ProjectRoleTemplateBinding) error {
-	// Collect all RoleBindings owned by this ProjectRoleTemplateBinding
+	// Collect all management RoleBindings owned by this ProjectRoleTemplateBinding
 	set := labels.Set{
-		rbac.GetPRTBOwnerLabel(prtb.Name): "true",
-		rbac.AggregationFeatureLabel:      "true",
+		rbac.GetPRTBOwnerLabel(prtb.Name):      "true",
+		rbac.AggregationManagementFeatureLabel: "true",
 	}
 
 	currentRBs, err := p.rbCache.List(prtb.Namespace, set.AsSelector())
@@ -305,8 +307,14 @@ func (p *prtbHandler) reconcileBindings(prtb *v3.ProjectRoleTemplateBinding) err
 	if err != nil {
 		return err
 	}
+	AddAggregationManagementFeatureLabel(rb)
 
-	currentRBs, err := p.rbController.List(prtb.Namespace, metav1.ListOptions{LabelSelector: rbac.GetPRTBOwnerLabel(prtb.Name)})
+	// Find any existing management RoleBindings owned by this PRTB that have the aggregation label.
+	labelSelector := labels.Set{
+		rbac.GetPRTBOwnerLabel(prtb.Name):      "true",
+		rbac.AggregationManagementFeatureLabel: "true",
+	}
+	currentRBs, err := p.rbController.List(prtb.Namespace, metav1.ListOptions{LabelSelector: labelSelector.AsSelector().String()})
 	if err != nil {
 		return err
 	}

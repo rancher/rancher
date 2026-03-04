@@ -14,7 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func Test_reconcileSubject(t *testing.T) {
+func TestPRTBHandlerReconcileSubject(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name                string
@@ -175,14 +175,14 @@ func Test_reconcileSubject(t *testing.T) {
 }
 
 var (
-	ownerLabel = "authz.cluster.cattle.io/prtb-owner-test-prtb"
-	defaultRB  = rbacv1.RoleBinding{
+	labelSelector = "authz.cluster.cattle.io/prtb-owner-test-prtb=true,management.cattle.io/roletemplate-aggregation-mgmt=true"
+	defaultRB     = rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "rb-visjzlqzqw",
 			Namespace: "test-namespace",
 			Labels: map[string]string{
-				"authz.cluster.cattle.io/prtb-owner-test-prtb":  "true",
-				"management.cattle.io/roletemplate-aggregation": "true",
+				"authz.cluster.cattle.io/prtb-owner-test-prtb":       "true",
+				"management.cattle.io/roletemplate-aggregation-mgmt": "true",
 			},
 		},
 		RoleRef: rbacv1.RoleRef{
@@ -207,7 +207,7 @@ var (
 	}
 )
 
-func Test_reconcileBindings(t *testing.T) {
+func TestPRTBHandlerReconcileBindings(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name              string
@@ -252,7 +252,7 @@ func Test_reconcileBindings(t *testing.T) {
 				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, nil)
 			},
 			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
-				m.EXPECT().List("test-namespace", metav1.ListOptions{LabelSelector: ownerLabel}).Return(nil, errDefault)
+				m.EXPECT().List("test-namespace", metav1.ListOptions{LabelSelector: labelSelector}).Return(nil, errDefault)
 			},
 			prtb:    defaultPRTB.DeepCopy(),
 			wantErr: true,
@@ -263,7 +263,7 @@ func Test_reconcileBindings(t *testing.T) {
 				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, nil)
 			},
 			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
-				m.EXPECT().List("test-namespace", metav1.ListOptions{LabelSelector: ownerLabel}).Return(nil, errDefault)
+				m.EXPECT().List("test-namespace", metav1.ListOptions{LabelSelector: labelSelector}).Return(nil, errDefault)
 			},
 			prtb:    defaultPRTB.DeepCopy(),
 			wantErr: true,
@@ -274,7 +274,7 @@ func Test_reconcileBindings(t *testing.T) {
 				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, nil)
 			},
 			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
-				m.EXPECT().List("test-namespace", metav1.ListOptions{LabelSelector: ownerLabel}).Return(&rbacv1.RoleBindingList{
+				m.EXPECT().List("test-namespace", metav1.ListOptions{LabelSelector: labelSelector}).Return(&rbacv1.RoleBindingList{
 					Items: []rbacv1.RoleBinding{badRB},
 				}, nil)
 				m.EXPECT().Delete("test-namespace", "bad-crb", &metav1.DeleteOptions{}).Return(errDefault)
@@ -288,7 +288,7 @@ func Test_reconcileBindings(t *testing.T) {
 				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, nil)
 			},
 			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
-				m.EXPECT().List("test-namespace", metav1.ListOptions{LabelSelector: ownerLabel}).Return(&rbacv1.RoleBindingList{
+				m.EXPECT().List("test-namespace", metav1.ListOptions{LabelSelector: labelSelector}).Return(&rbacv1.RoleBindingList{
 					Items: []rbacv1.RoleBinding{defaultRB},
 				}, nil)
 			},
@@ -300,7 +300,7 @@ func Test_reconcileBindings(t *testing.T) {
 				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, nil)
 			},
 			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
-				m.EXPECT().List("test-namespace", metav1.ListOptions{LabelSelector: ownerLabel}).Return(&rbacv1.RoleBindingList{
+				m.EXPECT().List("test-namespace", metav1.ListOptions{LabelSelector: labelSelector}).Return(&rbacv1.RoleBindingList{
 					Items: []rbacv1.RoleBinding{defaultRB, badRB},
 				}, nil)
 				m.EXPECT().Delete("test-namespace", "bad-crb", &metav1.DeleteOptions{}).Return(nil)
@@ -313,7 +313,7 @@ func Test_reconcileBindings(t *testing.T) {
 				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, nil)
 			},
 			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
-				m.EXPECT().List("test-namespace", metav1.ListOptions{LabelSelector: ownerLabel}).Return(&rbacv1.RoleBindingList{
+				m.EXPECT().List("test-namespace", metav1.ListOptions{LabelSelector: labelSelector}).Return(&rbacv1.RoleBindingList{
 					Items: []rbacv1.RoleBinding{},
 				}, nil)
 				m.EXPECT().Create(defaultRB.DeepCopy()).Return(nil, nil)
@@ -326,7 +326,7 @@ func Test_reconcileBindings(t *testing.T) {
 				m.EXPECT().Get("test-rt-project-mgmt-aggregator", metav1.GetOptions{}).Return(nil, nil)
 			},
 			setupRBController: func(m *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]) {
-				m.EXPECT().List("test-namespace", metav1.ListOptions{LabelSelector: ownerLabel}).Return(&rbacv1.RoleBindingList{
+				m.EXPECT().List("test-namespace", metav1.ListOptions{LabelSelector: labelSelector}).Return(&rbacv1.RoleBindingList{
 					Items: []rbacv1.RoleBinding{},
 				}, nil)
 				m.EXPECT().Create(defaultRB.DeepCopy()).Return(nil, errDefault)
@@ -359,7 +359,7 @@ func Test_reconcileBindings(t *testing.T) {
 	}
 }
 
-func Test_prtbHandler_reconcileMembershipBindings(t *testing.T) {
+func TestPRTBHandlerReconcileMembershipBindings(t *testing.T) {
 	type controllers struct {
 		rbController  *fake.MockControllerInterface[*rbacv1.RoleBinding, *rbacv1.RoleBindingList]
 		crbController *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRoleBinding, *rbacv1.ClusterRoleBindingList]
@@ -420,7 +420,7 @@ func Test_prtbHandler_reconcileMembershipBindings(t *testing.T) {
 	}
 }
 
-func Test_prtbHandler_deleteDownstreamRoleBindings(t *testing.T) {
+func TestPRTBHandlerDeleteDownstreamRoleBindings(t *testing.T) {
 	t.Parallel()
 
 	prtbName := "test-prtb"
@@ -576,7 +576,7 @@ func Test_prtbHandler_deleteDownstreamRoleBindings(t *testing.T) {
 	}
 }
 
-func Test_prtbHandler_deleteDownstreamClusterRoleBindings(t *testing.T) {
+func TestPRTBHandlerDeleteDownstreamClusterRoleBindings(t *testing.T) {
 	t.Parallel()
 
 	prtbName := "test-prtb"
@@ -804,12 +804,13 @@ func Test_prtbHandler_deleteDownstreamClusterRoleBindings(t *testing.T) {
 	}
 }
 
-func Test_prtbHandler_handleMigration(t *testing.T) {
+func TestPRTBHandlerHandleMigration(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	type controllers struct {
-		prtbController *fake.MockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList]
-		rbCache        *fake.MockCacheInterface[*rbacv1.RoleBinding]
+		prtbController    *fake.MockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList]
+		rbCache           *fake.MockCacheInterface[*rbacv1.RoleBinding]
+		clusterController *fake.MockNonNamespacedControllerInterface[*v3.Cluster, *v3.ClusterList]
 	}
 
 	tests := []struct {
@@ -821,7 +822,7 @@ func Test_prtbHandler_handleMigration(t *testing.T) {
 		wantErr            bool
 	}{
 		{
-			name: "feature flag disabled, label present - should remove label and call deleteRoleBindings",
+			name: "feature flag disabled, label present - should remove label and call deleteRoleBindings and deleteDownstreamResources",
 			prtb: &v3.ProjectRoleTemplateBinding{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-prtb",
@@ -830,6 +831,7 @@ func Test_prtbHandler_handleMigration(t *testing.T) {
 						rbac.AggregationFeatureLabel: "true",
 					},
 				},
+				ProjectName: "test-cluster:test-project",
 			},
 			featureFlagEnabled: false,
 			setupControllers: func(c controllers) {
@@ -842,6 +844,8 @@ func Test_prtbHandler_handleMigration(t *testing.T) {
 				})
 				// deleteRoleBindings will be called, so mock rbCache.List to return empty list
 				c.rbCache.EXPECT().List("test-ns", gomock.Any()).Return([]*rbacv1.RoleBinding{}, nil)
+				// deleteDownstreamResources will be called, mock clusterController.Get to return not found
+				c.clusterController.EXPECT().Get("test-cluster", gomock.Any()).Return(nil, errNotFound)
 			},
 			wantLabel: false,
 		},
@@ -935,17 +939,20 @@ func Test_prtbHandler_handleMigration(t *testing.T) {
 
 			prtbController := fake.NewMockControllerInterface[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList](ctrl)
 			rbCache := fake.NewMockCacheInterface[*rbacv1.RoleBinding](ctrl)
+			clusterController := fake.NewMockNonNamespacedControllerInterface[*v3.Cluster, *v3.ClusterList](ctrl)
 
 			if tt.setupControllers != nil {
 				tt.setupControllers(controllers{
-					prtbController: prtbController,
-					rbCache:        rbCache,
+					prtbController:    prtbController,
+					rbCache:           rbCache,
+					clusterController: clusterController,
 				})
 			}
 
 			h := &prtbHandler{
-				prtbClient: prtbController,
-				rbCache:    rbCache,
+				prtbClient:        prtbController,
+				rbCache:           rbCache,
+				clusterController: clusterController,
 			}
 
 			result, err := h.handleMigration(tt.prtb)

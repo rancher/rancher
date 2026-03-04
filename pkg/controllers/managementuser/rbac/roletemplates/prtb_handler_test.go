@@ -33,7 +33,7 @@ var (
 	errNotFound    = apierrors.NewNotFound(schema.GroupResource{}, "error")
 )
 
-func Test_doesRoleTemplateHavePromotedRules(t *testing.T) {
+func TestPRTBHandlerDoesRoleTemplateHavePromotedRules(t *testing.T) {
 	tests := []struct {
 		name      string
 		rt        *v3.RoleTemplate
@@ -89,8 +89,8 @@ func Test_doesRoleTemplateHavePromotedRules(t *testing.T) {
 }
 
 var (
-	listOption       = metav1.ListOptions{LabelSelector: "ownerlabel"}
-	legacyListOption = metav1.ListOptions{LabelSelector: rtbOwnerLabel + "=legacyownerlabel"}
+	listOption       = metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/prtb-owner-test-prtb=true,management.cattle.io/roletemplate-aggregation=true"}
+	legacyListOption = metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/rtb-owner-updated=_test-prtb"}
 	subject          = rbacv1.Subject{
 		Name: "test-subject",
 	}
@@ -107,7 +107,7 @@ var (
 	}
 )
 
-func Test_ensureOnlyDesiredRoleBindingsExist(t *testing.T) {
+func TestPRTBHandlerEnsureOnlyDesiredRoleBindingsExist(t *testing.T) {
 	tests := []struct {
 		name         string
 		desiredRB    *rbacv1.RoleBinding
@@ -259,10 +259,11 @@ func Test_ensureOnlyDesiredRoleBindingsExist(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
+			prtb := defaultPRTB.DeepCopy()
 			p := &prtbHandler{
 				rbClient: tt.rbController(ctrl),
 			}
-			if err := p.ensureOnlyDesiredRoleBindingExists(tt.desiredRB, "ownerlabel", "legacyownerlabel"); (err != nil) != tt.wantErr {
+			if err := p.ensureOnlyDesiredRoleBindingExists(tt.desiredRB, prtb); (err != nil) != tt.wantErr {
 				t.Errorf("prtbHandler.ensureOnlyDesiredRoleBindingsExist() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -271,7 +272,7 @@ func Test_ensureOnlyDesiredRoleBindingsExist(t *testing.T) {
 
 var (
 	namespaceListOptions = metav1.ListOptions{LabelSelector: "field.cattle.io/projectId=p-xyz789"}
-	rbListOptions        = metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/prtb-owner-test-prtb"}
+	rbListOptions        = metav1.ListOptions{LabelSelector: "authz.cluster.cattle.io/prtb-owner-test-prtb=true,management.cattle.io/roletemplate-aggregation=true"}
 	defaultRoleBinding   = rbacv1.RoleBinding{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "rb-d2l5e2jqi6",
@@ -293,7 +294,7 @@ var (
 	}
 )
 
-func Test_prtbHandler_reconcileBindings(t *testing.T) {
+func TestPRTBHandlerReconcileBindings(t *testing.T) {
 	type controllers struct {
 		rtController *fake.MockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]
 		nsController *fake.MockNonNamespacedControllerInterface[*corev1.Namespace, *corev1.NamespaceList]
@@ -487,7 +488,7 @@ var (
 	}
 )
 
-func Test_prtbHandler_buildNamespaceBindings(t *testing.T) {
+func TestPRTBHandlerBuildNamespaceBindings(t *testing.T) {
 	tests := []struct {
 		name          string
 		prtb          *v3.ProjectRoleTemplateBinding
@@ -593,7 +594,7 @@ func Test_prtbHandler_buildNamespaceBindings(t *testing.T) {
 	}
 }
 
-func Test_ensureOnlyDesiredClusterRoleBindingsExists(t *testing.T) {
+func TestPRTBHandlerEnsureOnlyDesiredClusterRoleBindingsExists(t *testing.T) {
 	tests := []struct {
 		name               string
 		crbs               []*rbacv1.ClusterRoleBinding
@@ -771,7 +772,8 @@ func Test_ensureOnlyDesiredClusterRoleBindingsExists(t *testing.T) {
 			p := &prtbHandler{
 				crbClient: crbController,
 			}
-			if err := p.ensureOnlyDesiredClusterRoleBindingsExists(tt.crbs, "ownerlabel", "legacyownerlabel"); (err != nil) != tt.wantErr {
+			prtb := defaultPRTB.DeepCopy()
+			if err := p.ensureOnlyDesiredClusterRoleBindingsExists(tt.crbs, prtb); (err != nil) != tt.wantErr {
 				t.Errorf("prtbHandler.reconcileClusterRoleBindings() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

@@ -27,7 +27,7 @@ const (
 const (
 	// Statuses
 	clusterRoleTemplateBindingDelete = "ClusterRoleTemplateBindingDelete"
-	removeRoleBindings               = "RemoveRoleBindings"
+	deleteRoleBindings               = "DeleteRoleBindings"
 	reconcileSubject                 = "ReconcileSubject"
 	reconcileMembershipBindings      = "ReconcileMembershipBindings"
 	reconcileBindings                = "ReconcileBindings"
@@ -358,7 +358,14 @@ func (ih *impersonationHandler) deleteServiceAccountImpersonator(clusterName, us
 //   - deleteAggregatedResources: Function to delete resources created with aggregation
 //   - deleteLegacyResources: Function to delete resources created before aggregation
 //
-// Returns the updated resource and any error encountered
+// Returns the updated resource and any error encountered.
+//
+// Note:
+// The handleAggregationMigration code is called in the OnChange handlers of CRTBs, PRTBs, and RoleTemplates.
+// If a CRTB/PRTB/RoleTemplate is deleted before the migration can take place, it is possible it will leave behind some resources.
+// Therefore the migration should be given time to complete before modifying the RBAC system.
+// See https://ranchermanager.docs.rancher.com/how-to-guides/advanced-user-guides/enable-experimental-features/role-template-aggregation for more details.
+//
 // TODO: To be removed once roletemplate aggregation is the only enabled RBAC model. https://github.com/rancher/rancher/issues/53743
 func handleAggregationMigration[T any](
 	resource T,
@@ -392,4 +399,14 @@ func handleAggregationMigration[T any](
 		return updateLabels(resource, labelCopy)
 	}
 	return resource, nil
+}
+
+// AddAggregationManagementFeatureLabel adds the aggregation management label to the given resource.
+func AddAggregationManagementFeatureLabel(obj metav1.Object) {
+	labels := obj.GetLabels()
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	labels[rbac.AggregationManagementFeatureLabel] = "true"
+	obj.SetLabels(labels)
 }

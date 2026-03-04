@@ -58,7 +58,7 @@ var (
 	}
 )
 
-func Test_roletemplateEnqueueCRTBs(t *testing.T) {
+func TestRoletemplateEnqueueCRTBs(t *testing.T) {
 	t.Parallel()
 
 	type caches struct {
@@ -155,7 +155,7 @@ func Test_roletemplateEnqueueCRTBs(t *testing.T) {
 	}
 }
 
-func Test_roletemplateEnqueuePRTBs(t *testing.T) {
+func TestRoletemplateEnqueuePRTBs(t *testing.T) {
 	t.Parallel()
 
 	type caches struct {
