@@ -2,6 +2,7 @@ package serviceaccounttoken
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -11,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -198,18 +198,17 @@ func TestEnsureSecretForServiceAccount(t *testing.T) {
 			wantSecret: defaultWantSecret,
 		},
 		{
-			name: "fallbacks when secret is not cached",
-			sa: defaultWantSA,
+			name:   "fallbacks when cache returns an error",
+			sa:     defaultWantSA,
 			wantSA: defaultWantSA,
 			cacheFunc: func(t *testing.T) corecontrollers.SecretCache {
 				cache := wfake.NewMockCacheInterface[*corev1.Secret](gomock.NewController(t))
-				cache.EXPECT().Get(defaultWantSecret.Namespace, defaultWantSecret.Name).Return(nil, apierrors.NewNotFound(corev1.Resource("secret"), defaultWantSecret.Name))
+				cache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, errors.New("not found"))
 				cache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil)
 				return cache
 			},
 			wantSecret: defaultWantSecret,
 		},
-
 	}
 
 	for _, tt := range tests {
