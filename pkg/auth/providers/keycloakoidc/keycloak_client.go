@@ -173,7 +173,8 @@ func getSearchURL(issuer string) (string, error) {
 	if len(iss) == 2 {
 		return fmt.Sprintf("%s/admin/realms/%s", iss[0], iss[1]), nil
 	}
-	return "", fmt.Errorf("can't parse issuer url")
+
+	return "", fmt.Errorf("can't parse issuer url: %s", issuer)
 }
 
 // URLEncoded encodes the string
@@ -183,11 +184,12 @@ func URLEncoded(str string) string {
 		logrus.Errorf("[keycloak oidc] URLEncoded: Error encoding the url: %s, error: %v", str, err)
 		return str
 	}
+
 	return u.String()
 }
 
 func (k *KeyCloakClient) getFromKeyCloak(url string) ([]byte, error) {
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
