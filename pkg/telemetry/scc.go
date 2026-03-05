@@ -49,10 +49,6 @@ type sccSystemKey struct {
 	Upstream bool `json:"upstream,omitempty"`
 }
 
-func (s sccSystemKey) Key() string {
-	return fmt.Sprintf("%d-%d-%s", s.Cpu, s.Memory, s.Arch)
-}
-
 type SccCluster struct {
 	Count    int  `json:"count"`
 	Nodes    int  `json:"nodes"`
