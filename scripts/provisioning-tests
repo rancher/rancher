@@ -93,19 +93,43 @@ eval "$(grep '^ENV CATTLE_SYSTEM_AGENT_UPGRADE_IMAGE' package/Dockerfile | awk '
 
 export CATTLE_RANCHER_WEBHOOK_VERSION=$(grep -m1 'webhookVersion' build.yaml | cut -d ' ' -f2)
 export CATTLE_REMOTEDIALER_PROXY_VERSION=$(grep -m1 'remoteDialerProxyVersion' build.yaml | cut -d ' ' -f2)
-export CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$(grep -m1 'provisioningCAPIVersion' build.yaml | cut -d ' ' -f2)
 export CATTLE_RANCHER_TURTLES_VERSION=$(grep -m1 'turtlesVersion' build.yaml | cut -d ' ' -f2)
 export CATTLE_CSP_ADAPTER_MIN_VERSION=$(grep -m1 'cspAdapterMinVersion' build.yaml | cut -d ' ' -f2)
 export CATTLE_FLEET_VERSION=$(grep -m1 'fleetVersion' build.yaml | cut -d ' ' -f2)
 
 if [ -z "${SOME_K8S_VERSION}" ]; then
-# Only set SOME_K8S_VERSION if it is empty -- for KDM provisioning tests, this value should already be populated
-# Get the last release for $DIST, which is usually the latest version or an experimental version.
-# Previously this would use channels, but channels no longer reflect the latest version since
-# https://github.com/rancher/rancher/issues/36827 has added appDefaults. We do not use appDefaults
-# here for simplicity's sake, as it requires semver parsing & matching. The last release should
-# be good enough for our needs.
+# Only resolve SOME_K8S_VERSION if it's empty - KDM-driven runs may set it upstream.
+# Prime context:
+# "Latest" in KDM can be Prime-only. To avoid unintentionally selecting a Prime-only
+# release when the job isn't configured for Prime, this script FIRST honors per-distro
+# pins provided by the workflow (K3S_PINNED_VERSION / RKE2_PINNED_VERSION). If no pin is set
+# for the current DIST, we fall back to the latest from KDM's data.json for the
+# referenced KDM branch.
+  case "${DIST}" in
+    k3s)
+      if [ -n "${K3S_PINNED_VERSION}" ]; then
+        export SOME_K8S_VERSION="${K3S_PINNED_VERSION}"
+        echo "Resolved ${DIST} to pinned version ${K3S_PINNED_VERSION}"
+      fi
+      ;;
+    rke2)
+      if [ -n "${RKE2_PINNED_VERSION}" ]; then
+        export SOME_K8S_VERSION="${RKE2_PINNED_VERSION}"
+        echo "Resolved ${DIST} to pinned version ${RKE2_PINNED_VERSION}"
+      fi
+      ;;
+  esac
+fi
+
+# Fallback: use the latest release for this $DIST from KDM data.json
+if [ -z "${SOME_K8S_VERSION}" ]; then
   export SOME_K8S_VERSION=$(curl -sS https://raw.githubusercontent.com/rancher/kontainer-driver-metadata/dev-v2.14/data/data.json | jq -r ".$DIST.releases[-1].version")
+  echo "Resolved ${DIST} to latest version ${SOME_K8S_VERSION}"
+fi
+
+if [ $SOME_K8S_VERSION = "v1.35.0+k3s3" ]; then
+  echo "WARNING: Downgrading k3s version v1.35.0+k3s3 to v1.35.0+k3s1 to skip temporary test problem"
+  export SOME_K8S_VERSION="v1.35.0+k3s1"
 fi
 
 if [ -z "${CATTLE_CHART_DEFAULT_URL}" ]; then
@@ -251,6 +275,16 @@ echo "Waiting up to 5 minutes for rancher-turtles deployment"
   --exit-command "dump_rancher_logs" `# Dump logs to find out why turtles did not start` \
   "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml get ns cattle-turtles-system &>/dev/null \
     && kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-turtles-system deploy/rancher-turtles-controller-manager &>/dev/null"
+
+echo "Waiting up to 5 minutes for capi-controller-manager deployment"
+./scripts/retry \
+  --timeout 300 `# Time out after 300 seconds (5 min)` \
+  --sleep 2 `# Sleep for 2 seconds in between attempts` \
+  --message-interval 30 `# Print the progress message below every 30 attempts (roughly every minute)` \
+  --message "capi-controller-manager was not available after {{elapsed}} seconds" `# Print this progress message` \
+  --exit-command "dump_rancher_logs" `# Dump logs to find out why capi-controller-manager did not start` \
+  "kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml get ns cattle-capi-system &>/dev/null \
+    && kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status -w -n cattle-capi-system deploy/capi-controller-manager &>/dev/null"
 
 # only push the image if we're not using the default image:tag
 if [ "${CATTLE_AGENT_IMAGE}" != "rancher/rancher-agent:head" ]; then

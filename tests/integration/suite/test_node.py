@@ -41,7 +41,8 @@ def test_node_fields(admin_mc):
         'dockerInfo': 'r',
         'scaledownTime': 'cru',
         'runtimeHandlers': 'r',
-        'features': 'r'
+        'features': 'r',
+        'declaredFeatures': 'r',
     }
 
     for name in cclient.schema.types['node'].resourceFields.keys():

@@ -2,11 +2,15 @@ package serviceaccounttoken
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
+	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	wfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -42,8 +46,10 @@ func TestEnsureSecretForServiceAccount(t *testing.T) {
 		},
 		Type: corev1.SecretTypeServiceAccountToken,
 	}
+
 	tests := []struct {
 		name           string
+		cacheFunc      func(t *testing.T) corecontrollers.SecretCache
 		sa             *corev1.ServiceAccount
 		wantSA         *corev1.ServiceAccount
 		existingSecret *corev1.Secret
@@ -163,6 +169,46 @@ func TestEnsureSecretForServiceAccount(t *testing.T) {
 			},
 			wantSecret: defaultWantSecret,
 		},
+		{
+			name:   "secret already in the cache",
+			sa:     defaultWantSA,
+			wantSA: defaultWantSA, // unchanged
+			cacheFunc: func(t *testing.T) corecontrollers.SecretCache {
+				cache := wfake.NewMockCacheInterface[*corev1.Secret](gomock.NewController(t))
+				cache.EXPECT().Get(defaultWantSecret.Namespace, defaultWantSecret.Name).Return(defaultWantSecret, nil)
+				return cache
+			},
+			wantSecret: defaultWantSecret,
+		},
+		{
+			name: "cache is not used when serviceaccount is not ready",
+			sa: &corev1.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test",
+					Namespace: "default",
+				},
+			},
+			wantSA: defaultWantSA,
+			cacheFunc: func(t *testing.T) corecontrollers.SecretCache {
+				cache := wfake.NewMockCacheInterface[*corev1.Secret](gomock.NewController(t))
+				cache.EXPECT().Get(gomock.Any(), gomock.Any()).Times(0)
+				cache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil)
+				return cache
+			},
+			wantSecret: defaultWantSecret,
+		},
+		{
+			name:   "fallbacks when cache returns an error",
+			sa:     defaultWantSA,
+			wantSA: defaultWantSA,
+			cacheFunc: func(t *testing.T) corecontrollers.SecretCache {
+				cache := wfake.NewMockCacheInterface[*corev1.Secret](gomock.NewController(t))
+				cache.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, errors.New("not found"))
+				cache.EXPECT().List(gomock.Any(), gomock.Any()).Return(nil, nil)
+				return cache
+			},
+			wantSecret: defaultWantSecret,
+		},
 	}
 
 	for _, tt := range tests {
@@ -189,7 +235,11 @@ func TestEnsureSecretForServiceAccount(t *testing.T) {
 					return true, ret, nil
 				},
 			)
-			got, gotErr := EnsureSecretForServiceAccount(context.Background(), nil, k8sClient.CoreV1(), k8sClient.CoreV1(), tt.sa.DeepCopy())
+			var cache corecontrollers.SecretCache
+			if tt.cacheFunc != nil {
+				cache = tt.cacheFunc(t)
+			}
+			got, gotErr := EnsureSecretForServiceAccount(context.Background(), cache, k8sClient.CoreV1(), k8sClient.CoreV1(), tt.sa.DeepCopy())
 			if tt.wantErr {
 				assert.Error(t, gotErr)
 				return

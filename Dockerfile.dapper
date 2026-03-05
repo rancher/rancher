@@ -2,8 +2,8 @@ FROM registry.suse.com/bci/golang:1.25
 
 ARG DAPPER_HOST_ARCH
 ENV HOST_ARCH=${DAPPER_HOST_ARCH} ARCH=${DAPPER_HOST_ARCH}
-ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher138
-ENV CATTLE_K3S_VERSION=v1.34.1+k3s1
+ENV CATTLE_MACHINE_VERSION=v0.15.0-rancher140
+ENV CATTLE_K3S_VERSION=v1.35.1+k3s1
 ENV HELM_UNITTEST_VERSION=1.0.3
 # k3d ci version
 ENV K3D_VERSION=v5.7.1
@@ -29,7 +29,7 @@ RUN if [ "${ARCH}" == "amd64" ]; then \
     fi
 
 # Set up K3s: copy the necessary binaries from the K3s image.
-COPY --from=rancher/k3s:v1.34.1-k3s1 \
+COPY --from=rancher/k3s:v1.35.1-k3s1 \
     /bin/blkid \
     /bin/bandwidth \
     /bin/cni \
@@ -80,7 +80,7 @@ RUN mkdir /usr/tmp && \
 RUN zypper -n install python311-pip python311-base python311 python311-devel python311-tox libffi-devel libopenssl-devel
 
 ENV HELM_HOME=/root/.helm
-ENV DAPPER_ENV="REPO TAG CI DRONE_BUILD_NUMBER DRONE_TAG DRONE_COMMIT DRONE_BRANCH DRONE_BUILD_EVENT GOGET_MODULE GOGET_VERSION RELEASE_ACTION RELEASE_TYPE POSTRELEASE_RANCHER_VERSION POSTRELEASE_RANCHER_STABLE DEBUG SOME_K8S_VERSION V2PROV_TEST_DIST V2PROV_TEST_RUN_REGEX V2PROV_DISTRO_DATA_DIR V2PROV_PROVISIONING_DATA_DIR V2PROV_SYSTEM_AGENT_DATA_DIR"
+ENV DAPPER_ENV="REPO TAG CI DRONE_BUILD_NUMBER DRONE_TAG DRONE_COMMIT DRONE_BRANCH DRONE_BUILD_EVENT GOGET_MODULE GOGET_VERSION RELEASE_ACTION RELEASE_TYPE POSTRELEASE_RANCHER_VERSION POSTRELEASE_RANCHER_STABLE DEBUG SOME_K8S_VERSION V2PROV_TEST_DIST V2PROV_TEST_RUN_REGEX V2PROV_DISTRO_DATA_DIR V2PROV_PROVISIONING_DATA_DIR V2PROV_SYSTEM_AGENT_DATA_DIR K3S_PINNED_VERSION RKE2_PINNED_VERSION"
 ENV DAPPER_SOURCE=/go/src/github.com/rancher/rancher/
 ENV DAPPER_OUTPUT="./bin ./dist ./go.mod ./go.sum ./pkg/apis/go.mod ./pkg/apis/go.sum ./pkg/client/go.mod ./pkg/client/go.sum ./scripts/package ./pkg/settings/setting.go ./package/Dockerfile ./Dockerfile.dapper ./pkg/crds/yaml/generated ./pkg/apis ./pkg/generated ./pkg/client/generated"
 ENV DAPPER_DOCKER_SOCKET=true

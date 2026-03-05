@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	mgmt "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	prov "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/controllers/management/cluster"
 	provcluster "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
@@ -20,6 +21,8 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/steve/pkg/auth"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/net/publicsuffix"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
@@ -88,6 +91,15 @@ func (p *proxy) isAllowed(host string) bool {
 	for _, valid := range p.validHostsSupplier() {
 		if valid == host {
 			return true
+		}
+
+		// Ideally the rancher webhook would prevent resources from specifying an overly
+		// broad domain from the get-go, but due to rancher/rancher/issues/50631,
+		// this may not always be the case. To prevent potential security issues,
+		// we also check for overly broad domains here and skip them if found.
+		if isOverlyBroad(valid) {
+			logrus.Debugf("Skipping overly broad wildcard match for proxy request: %s", valid)
+			continue
 		}
 
 		if strings.HasPrefix(valid, "*") && strings.HasSuffix(host, valid[1:]) {
@@ -220,7 +232,7 @@ func (p *proxy) proxy(req *http.Request) error {
 
 func (p *proxy) secretGetter(req *http.Request, cAuth string) SecretGetter {
 	clusterID := getRequestParams(cAuth)["clusterID"]
-	return func(namespace, name string) (*v1.Secret, error) {
+	return func(namespace, name string) (*corev1.Secret, error) {
 		user, ok := request.UserFrom(req.Context())
 		if !ok {
 			return nil, fmt.Errorf("failed to find user")
@@ -256,7 +268,7 @@ func (p *proxy) secretGetter(req *http.Request, cAuth string) SecretGetter {
 // GKE and AKS clusters also have cloud credential associated to them, but those are checked via specific proxies (not the meta proxy).
 func (p *proxy) checkIndirectAccessViaCluster(req *http.Request, user user.Info, clusterID, credID string) (authorizer.Decision, error) {
 	var (
-		mgmtClusters []*v3.Cluster
+		mgmtClusters []*mgmt.Cluster
 		provClusters []*prov.Cluster
 		err          error
 	)
@@ -274,7 +286,7 @@ func (p *proxy) checkIndirectAccessViaCluster(req *http.Request, user user.Info,
 		}
 	} else {
 		if c, err := p.mgmtClustersCache.Get(clusterID); err == nil {
-			mgmtClusters = []*v3.Cluster{c}
+			mgmtClusters = []*mgmt.Cluster{c}
 		} else {
 			return authorizer.DecisionDeny, err
 		}
@@ -352,4 +364,35 @@ func constructRegex(host string) *regexp.Regexp {
 	str := "^" + strings.Join(parts, "\\.") + "$"
 
 	return regexp.MustCompile(str)
+}
+
+// isOverlyBroad checks if the given domain is an overly broad wildcard
+// that would allow proxying to essentially any domain. It does this by determining the
+// eTLD and ensuring that the segment preceding that is not a wildcard.
+func isOverlyBroad(pattern string) bool {
+	if !strings.ContainsAny(pattern, "*%") {
+		return false
+	}
+
+	// replace wildcards with a valid character so publicsuffix can parse it
+	normalized := strings.ReplaceAll(pattern, "*", "z")
+	normalized = strings.ReplaceAll(normalized, "%", "z")
+
+	// get the suffix, .com, .co.uk, etc.
+	suffix, _ := publicsuffix.PublicSuffix(normalized)
+
+	// identify the label right before the eTLD
+	suffixDotCount := strings.Count(suffix, ".")
+	labels := strings.Split(pattern, ".")
+
+	// Find the character for that label
+	idx := len(labels) - suffixDotCount - 2
+
+	if idx < 0 {
+		return true // Pattern is just a suffix, treat as broad/invalid
+	}
+	targetLabel := labels[idx]
+
+	// check if that label is a plain wildcard.
+	return targetLabel == "*" || targetLabel == "%"
 }

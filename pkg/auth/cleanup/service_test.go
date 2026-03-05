@@ -278,6 +278,12 @@ func newMockCleanupService(t *testing.T,
 		return &lst, nil
 	}).AnyTimes()
 
+	// Setup Group mock client
+	groupClient := fake.NewMockNonNamespacedClientInterface[*v3.Group, *v3.GroupList](ctrl)
+	groupClient.EXPECT().List(gomock.Any()).DoAndReturn(func(_ metav1.ListOptions) (*v3.GroupList, error) {
+		return &v3.GroupList{}, nil
+	}).AnyTimes()
+
 	// Setup SecretsCache mock client
 	secretsCache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
 	secretsCache.EXPECT().Get(pbkdf2.LocalUserPasswordsNamespace, gomock.Any()).Return(nil, apierrors.NewNotFound(schema.GroupResource{
@@ -288,6 +294,7 @@ func newMockCleanupService(t *testing.T,
 	return Service{
 		secretsInterface:                  getSecretControllerMock(ctrl, secretStore),
 		secretsCache:                      secretsCache,
+		groupClient:                       groupClient,
 		globalRoleBindingsCache:           grbCache,
 		globalRoleBindingsClient:          grbClient,
 		projectRoleTemplateBindingsCache:  prtbCache,

@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	clusterPrefixRegexp = regexp.MustCompile(`^/k8s/clusters/[^/]+`)
+	clusterPrefixRegexp = regexp.MustCompile(`^/k8s/(clusters|proxy)/[^/]+`)
 )
 
 type aggregationHandler struct {

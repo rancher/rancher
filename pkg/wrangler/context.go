@@ -14,6 +14,7 @@ import (
 	"time"
 
 	fleetv1alpha1api "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
+	"github.com/rancher/lasso/pkg/cache"
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/lasso/pkg/dynamic"
 	"github.com/rancher/lasso/pkg/metrics"
@@ -46,6 +47,7 @@ import (
 	telemetryv1 "github.com/rancher/rancher/pkg/generated/controllers/telemetry.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/generated/controllers/upgrade.cattle.io"
 	plancontrolers "github.com/rancher/rancher/pkg/generated/controllers/upgrade.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/peermanager"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/tunnelserver"
@@ -86,13 +88,13 @@ import (
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/clientcmd"
 	apiregistrationv12 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
-	capiv1beta1api "sigs.k8s.io/cluster-api/api/v1beta1"
+	capiv1beta2api "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 var (
 	localSchemeBuilder = runtime.SchemeBuilder{
 		provisioningv1api.AddToScheme,
-		capiv1beta1api.AddToScheme,
+		capiv1beta2api.AddToScheme,
 		fleetv1alpha1api.AddToScheme,
 		managementv3api.AddToScheme,
 		projectv3api.AddToScheme,
@@ -152,7 +154,7 @@ type Context struct {
 	Core                corev1.Interface
 	API                 apiregv1.Interface
 	CRD                 crdv1.Interface
-	K8s                 *kubernetes.Clientset
+	K8s                 *namespace.Clientset
 	Plan                plancontrolers.Interface
 	Telemetry           telemetryv1.Interface
 
@@ -179,7 +181,7 @@ type Context struct {
 	fleet        *fleet.Factory
 	provisioning *provisioning.Factory
 	batch        *batch.Factory
-	core         *core.Factory
+	core         *namespace.WranglerFactory
 	api          *apiregistration.Factory
 	crd          *apiextensions.Factory
 	plan         *upgrade.Factory
@@ -316,7 +318,7 @@ func (w *Context) WithAgent(userAgent string) *Context {
 		*restConfigCopy = *w.RESTConfig
 		restConfigCopy.UserAgent = userAgent
 	}
-	k8sClientWithAgent, err := kubernetes.NewForConfig(restConfigCopy)
+	k8sClientWithAgent, err := namespace.NewForConfig(restConfigCopy)
 	if err != nil {
 		logrus.Debugf("failed to set agent [%s] on k8s client: %v", userAgent, err)
 	}
@@ -371,6 +373,14 @@ func NewPrimaryContext(ctx context.Context, clientConfig clientcmd.ClientConfig,
 
 func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restConfig *rest.Config) (*Context, error) {
 	sharedOpts := controllers.GetOptsFromEnv(controllers.Management)
+	sharedOpts.CacheOptions = &cache.SharedCacheFactoryOptions{
+		// Due to a bug in a previous Rancher's extension apiserver for the token and kubeconfig APIs, we
+		// must disable the WatchList features for those APIs.
+		KindDisableWatchList: map[schema.GroupVersionKind]bool{
+			extv1api.SchemeGroupVersion.WithKind("Kubeconfig"): true,
+			extv1api.SchemeGroupVersion.WithKind("Token"):      true,
+		},
+	}
 	controllerFactory, err := controller.NewSharedControllerFactoryFromConfigWithOptions(enableProtobuf(restConfig), Scheme, sharedOpts)
 	if err != nil {
 		return nil, err
@@ -445,10 +455,11 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		return nil, err
 	}
 
-	core, err := core.NewFactoryFromConfigWithOptions(restConfig, opts)
+	rCore, err := core.NewFactoryFromConfigWithOptions(restConfig, opts)
 	if err != nil {
 		return nil, err
 	}
+	core := namespace.NewWranglerFactory(rCore)
 
 	api, err := apiregistration.NewFactoryFromConfigWithOptions(restConfig, opts)
 	if err != nil {
@@ -465,7 +476,7 @@ func NewContext(ctx context.Context, clientConfig clientcmd.ClientConfig, restCo
 		return nil, err
 	}
 
-	k8s, err := kubernetes.NewForConfig(restConfig)
+	k8s, err := namespace.NewForConfig(restConfig)
 	if err != nil {
 		return nil, err
 	}

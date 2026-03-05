@@ -33,7 +33,7 @@ var (
 		Resources: []string{"clusterroletemplatebindings"},
 	}
 	listOptions = metav1.ListOptions{
-		LabelSelector: "authz.cluster.cattle.io/clusterrole-owner=test-rt",
+		LabelSelector: "authz.cluster.cattle.io/clusterrole-owner=test-rt,management.cattle.io/roletemplate-aggregation-mgmt=true",
 	}
 	terminatingRoleTemplate = v3.RoleTemplate{
 		ObjectMeta: metav1.ObjectMeta{
@@ -61,9 +61,9 @@ var (
 			Name:            "test-rt-project-mgmt",
 			OwnerReferences: []metav1.OwnerReference{defaultOwnerReference},
 			Labels: map[string]string{
-				"management.cattle.io/aggregates":               "test-rt-project-mgmt",
-				"authz.cluster.cattle.io/clusterrole-owner":     "test-rt",
-				"management.cattle.io/roletemplate-aggregation": "true",
+				"management.cattle.io/aggregates":                    "test-rt-project-mgmt",
+				"authz.cluster.cattle.io/clusterrole-owner":          "test-rt",
+				"management.cattle.io/roletemplate-aggregation-mgmt": "true",
 			},
 		},
 		Rules: []rbacv1.PolicyRule{getPRTBS},
@@ -73,9 +73,9 @@ var (
 			Name:            "test-rt-project-mgmt-aggregator",
 			OwnerReferences: []metav1.OwnerReference{defaultOwnerReference},
 			Labels: map[string]string{
-				"management.cattle.io/aggregates":               "test-rt-project-mgmt-aggregator",
-				"management.cattle.io/roletemplate-aggregation": "true",
-				"authz.cluster.cattle.io/clusterrole-owner":     "test-rt",
+				"management.cattle.io/aggregates":                    "test-rt-project-mgmt-aggregator",
+				"management.cattle.io/roletemplate-aggregation-mgmt": "true",
+				"authz.cluster.cattle.io/clusterrole-owner":          "test-rt",
 			},
 		},
 		AggregationRule: &rbacv1.AggregationRule{
@@ -91,9 +91,9 @@ var (
 			Name:            "test-rt-cluster-mgmt",
 			OwnerReferences: []metav1.OwnerReference{defaultOwnerReference},
 			Labels: map[string]string{
-				"management.cattle.io/aggregates":               "test-rt-cluster-mgmt",
-				"authz.cluster.cattle.io/clusterrole-owner":     "test-rt",
-				"management.cattle.io/roletemplate-aggregation": "true",
+				"management.cattle.io/aggregates":                    "test-rt-cluster-mgmt",
+				"authz.cluster.cattle.io/clusterrole-owner":          "test-rt",
+				"management.cattle.io/roletemplate-aggregation-mgmt": "true",
 			},
 		},
 		Rules: []rbacv1.PolicyRule{getCRTBs},
@@ -103,9 +103,9 @@ var (
 			Name:            "test-rt-cluster-mgmt-aggregator",
 			OwnerReferences: []metav1.OwnerReference{defaultOwnerReference},
 			Labels: map[string]string{
-				"management.cattle.io/aggregates":               "test-rt-cluster-mgmt-aggregator",
-				"authz.cluster.cattle.io/clusterrole-owner":     "test-rt",
-				"management.cattle.io/roletemplate-aggregation": "true",
+				"management.cattle.io/aggregates":                    "test-rt-cluster-mgmt-aggregator",
+				"authz.cluster.cattle.io/clusterrole-owner":          "test-rt",
+				"management.cattle.io/roletemplate-aggregation-mgmt": "true",
 			},
 		},
 		AggregationRule: &rbacv1.AggregationRule{
@@ -118,7 +118,7 @@ var (
 	}
 )
 
-func Test_OnChange(t *testing.T) {
+func TestRTHandlerOnChange(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name                       string
@@ -332,9 +332,9 @@ func Test_OnChange(t *testing.T) {
 							},
 						},
 						Labels: map[string]string{
-							"management.cattle.io/aggregates":               "test-rt-project-mgmt-aggregator",
-							"authz.cluster.cattle.io/clusterrole-owner":     "test-rt",
-							"management.cattle.io/roletemplate-aggregation": "true",
+							"management.cattle.io/aggregates":                    "test-rt-project-mgmt-aggregator",
+							"authz.cluster.cattle.io/clusterrole-owner":          "test-rt",
+							"management.cattle.io/roletemplate-aggregation-mgmt": "true",
 						},
 					},
 					AggregationRule: &rbacv1.AggregationRule{
@@ -362,9 +362,9 @@ func Test_OnChange(t *testing.T) {
 							},
 						},
 						Labels: map[string]string{
-							"management.cattle.io/aggregates":               "test-rt-cluster-mgmt-aggregator",
-							"authz.cluster.cattle.io/clusterrole-owner":     "test-rt",
-							"management.cattle.io/roletemplate-aggregation": "true",
+							"management.cattle.io/aggregates":                    "test-rt-cluster-mgmt-aggregator",
+							"authz.cluster.cattle.io/clusterrole-owner":          "test-rt",
+							"management.cattle.io/roletemplate-aggregation-mgmt": "true",
 						},
 					},
 					AggregationRule: &rbacv1.AggregationRule{
@@ -405,9 +405,9 @@ func Test_OnChange(t *testing.T) {
 							},
 						},
 						Labels: map[string]string{
-							"management.cattle.io/aggregates":               "test-rt-project-mgmt-aggregator",
-							"authz.cluster.cattle.io/clusterrole-owner":     "test-rt",
-							"management.cattle.io/roletemplate-aggregation": "true",
+							"management.cattle.io/aggregates":                    "test-rt-project-mgmt-aggregator",
+							"authz.cluster.cattle.io/clusterrole-owner":          "test-rt",
+							"management.cattle.io/roletemplate-aggregation-mgmt": "true",
 						},
 					},
 					AggregationRule: &rbacv1.AggregationRule{
@@ -506,38 +506,6 @@ func Test_OnChange(t *testing.T) {
 			},
 		},
 		{
-			name: "dont remove cluster roles from downstream cluster handler",
-			rt: &v3.RoleTemplate{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-rt",
-				},
-				Context: "project",
-				Rules:   []rbacv1.PolicyRule{getRoleTemplates},
-			},
-			setupClusterRoleController: func(m *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]) {
-				m.EXPECT().List(listOptions).Return(&rbacv1.ClusterRoleList{
-					Items: []rbacv1.ClusterRole{
-						{
-							ObjectMeta: metav1.ObjectMeta{Name: "test-rt"},
-						},
-						{
-							ObjectMeta: metav1.ObjectMeta{Name: "test-rt-aggregator"},
-						},
-						{
-							ObjectMeta: metav1.ObjectMeta{Name: "test-rt-promoted"},
-						},
-						{
-							ObjectMeta: metav1.ObjectMeta{Name: "test-rt-promoted-aggregator"},
-						},
-						{
-							ObjectMeta: metav1.ObjectMeta{Name: "bad-cr"},
-						},
-					},
-				}, nil)
-				m.EXPECT().Delete("bad-cr", &metav1.DeleteOptions{}).Return(nil)
-			},
-		},
-		{
 			name: "error deleting cluster roles, non blocking",
 			rt: &v3.RoleTemplate{
 				ObjectMeta: metav1.ObjectMeta{
@@ -566,8 +534,17 @@ func Test_OnChange(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
+			prev := features.AggregatedRoleTemplates.Enabled()
+			t.Cleanup(func() {
+				features.AggregatedRoleTemplates.Set(prev)
+			})
 			features.AggregatedRoleTemplates.Set(true)
+			if tt.rt != nil {
+				if tt.rt.Labels == nil {
+					tt.rt.Labels = map[string]string{}
+				}
+				tt.rt.Labels[rbac.AggregationFeatureLabel] = "true"
+			}
 			crController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
 			if tt.setupClusterRoleController != nil {
 				tt.setupClusterRoleController(crController)
@@ -586,7 +563,7 @@ func Test_OnChange(t *testing.T) {
 	}
 }
 
-func Test_getManagementPlaneRules(t *testing.T) {
+func TestGetManagementPlaneRules(t *testing.T) {
 	t.Parallel()
 	sampleResources := map[string]string{
 		"nodes": "management.cattle.io",
@@ -785,7 +762,7 @@ func Test_getManagementPlaneRules(t *testing.T) {
 	}
 }
 
-func Test_gatherRules(t *testing.T) {
+func TestRTHandlerGatherRules(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name    string
@@ -878,7 +855,7 @@ var (
 	}
 )
 
-func Test_removeLabelFromExternalRole(t *testing.T) {
+func TestRemoveLabelFromExternalRole(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name       string
@@ -969,6 +946,175 @@ func Test_removeLabelFromExternalRole(t *testing.T) {
 
 			if err := removeLabelFromExternalRole(tt.rt, crController); (err != nil) != tt.wantErr {
 				t.Errorf("roleTemplateHandler.removeLabelFromExternalRole() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestRTHandlerHandleMigration(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	type controllers struct {
+		rtController      *fake.MockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList]
+		crController      *fake.MockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList]
+		clusterController *fake.MockNonNamespacedControllerInterface[*v3.Cluster, *v3.ClusterList]
+		projectCache      *fake.MockCacheInterface[*v3.Project]
+		rController       *fake.MockControllerInterface[*rbacv1.Role, *rbacv1.RoleList]
+	}
+
+	tests := []struct {
+		name               string
+		rt                 *v3.RoleTemplate
+		featureFlagEnabled bool
+		setupControllers   func(controllers)
+		wantLabel          bool
+		wantErr            bool
+	}{
+		{
+			name: "feature flag disabled, label present - should remove label and call deleteClusterRoles",
+			rt: &v3.RoleTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-rt",
+					Labels: map[string]string{
+						rbac.AggregationFeatureLabel: "true",
+					},
+				},
+			},
+			featureFlagEnabled: false,
+			setupControllers: func(c controllers) {
+				// Expect Update to be called with label removed
+				c.rtController.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *v3.RoleTemplate) (*v3.RoleTemplate, error) {
+					if _, exists := obj.Labels[rbac.AggregationFeatureLabel]; exists {
+						t.Error("expected label to be removed from updated RoleTemplate")
+					}
+					return obj, nil
+				})
+				// deleteClusterRoles will be called, which needs clusterController.List
+				c.clusterController.EXPECT().List(gomock.Any()).Return(&v3.ClusterList{}, nil)
+			},
+			wantLabel: false,
+		},
+		{
+			name: "feature flag disabled, label absent - no-op",
+			rt: &v3.RoleTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-rt",
+					Labels: map[string]string{},
+				},
+			},
+			featureFlagEnabled: false,
+			setupControllers:   func(c controllers) {},
+			wantLabel:          false,
+		},
+		{
+			name: "feature flag enabled, label absent - should add label and call deleteLegacyRoles",
+			rt: &v3.RoleTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-rt",
+					Labels: map[string]string{},
+				},
+			},
+			featureFlagEnabled: true,
+			setupControllers: func(c controllers) {
+				// deleteLegacyRoles will be called, which needs clusterController.List
+				c.clusterController.EXPECT().List(gomock.Any()).Return(&v3.ClusterList{}, nil)
+				// Expect Update to be called with label added
+				c.rtController.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *v3.RoleTemplate) (*v3.RoleTemplate, error) {
+					if obj.Labels[rbac.AggregationFeatureLabel] != "true" {
+						t.Error("expected label to be added to updated RoleTemplate")
+					}
+					return obj, nil
+				})
+			},
+			wantLabel: true,
+		},
+		{
+			name: "feature flag enabled, label present - no-op",
+			rt: &v3.RoleTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-rt",
+					Labels: map[string]string{
+						rbac.AggregationFeatureLabel: "true",
+					},
+				},
+			},
+			featureFlagEnabled: true,
+			setupControllers:   func(c controllers) {},
+			wantLabel:          true,
+		},
+		{
+			name: "feature flag enabled, nil labels - should add label",
+			rt: &v3.RoleTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-rt",
+					Labels: nil,
+				},
+			},
+			featureFlagEnabled: true,
+			setupControllers: func(c controllers) {
+				// deleteLegacyRoles will be called
+				c.clusterController.EXPECT().List(gomock.Any()).Return(&v3.ClusterList{}, nil)
+				// Expect Update to be called with label added
+				c.rtController.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *v3.RoleTemplate) (*v3.RoleTemplate, error) {
+					if obj.Labels == nil {
+						t.Error("expected labels map to be initialized")
+					}
+					if obj.Labels[rbac.AggregationFeatureLabel] != "true" {
+						t.Error("expected label to be added to updated RoleTemplate")
+					}
+					return obj, nil
+				})
+			},
+			wantLabel: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			prev := features.AggregatedRoleTemplates.Enabled()
+			t.Cleanup(func() {
+				features.AggregatedRoleTemplates.Set(prev)
+			})
+			features.AggregatedRoleTemplates.Set(tt.featureFlagEnabled)
+
+			rtController := fake.NewMockNonNamespacedControllerInterface[*v3.RoleTemplate, *v3.RoleTemplateList](ctrl)
+			crController := fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl)
+			clusterController := fake.NewMockNonNamespacedControllerInterface[*v3.Cluster, *v3.ClusterList](ctrl)
+			projectCache := fake.NewMockCacheInterface[*v3.Project](ctrl)
+			rController := fake.NewMockControllerInterface[*rbacv1.Role, *rbacv1.RoleList](ctrl)
+
+			if tt.setupControllers != nil {
+				tt.setupControllers(controllers{
+					rtController:      rtController,
+					crController:      crController,
+					clusterController: clusterController,
+					projectCache:      projectCache,
+					rController:       rController,
+				})
+			}
+
+			h := &roleTemplateHandler{
+				rtController:      rtController,
+				crController:      crController,
+				clusterController: clusterController,
+				projectCache:      projectCache,
+				rController:       rController,
+			}
+
+			result, err := h.handleMigration(tt.rt)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("handleMigration() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if tt.wantLabel {
+				if result.Labels[rbac.AggregationFeatureLabel] != "true" {
+					t.Error("expected label to be present and set to 'true'")
+				}
+			} else {
+				if result != nil && result.Labels[rbac.AggregationFeatureLabel] == "true" {
+					t.Error("expected label to be absent or not set to 'true'")
+				}
 			}
 		})
 	}

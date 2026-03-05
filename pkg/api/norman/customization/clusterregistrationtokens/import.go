@@ -9,6 +9,7 @@ import (
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/image"
+	"github.com/rancher/rancher/pkg/namespace"
 	schema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/systemtemplate"
@@ -48,7 +49,7 @@ func (ch *ClusterImport) ClusterImportHandler(resp http.ResponseWriter, req *htt
 
 	agentImage := image.ResolveWithCluster(settings.AgentImage.Get(), cluster)
 	if err = systemtemplate.SystemTemplate(resp, agentImage, authImage, "", token, url,
-		false, cluster, nil, nil, nil, false); err != nil {
+		false, cluster, nil, nil, nil, false, namespace.GetMutator()); err != nil {
 		resp.WriteHeader(500)
 		resp.Write([]byte(err.Error()))
 	}

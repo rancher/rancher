@@ -330,6 +330,11 @@ func (in *RKEConfig) DeepCopy() *RKEConfig {
 func (in *RKEMachinePool) DeepCopyInto(out *RKEMachinePool) {
 	*out = *in
 	in.RKECommonNodeConfig.DeepCopyInto(&out.RKECommonNodeConfig)
+	if in.Userdata != nil {
+		in, out := &in.Userdata, &out.Userdata
+		*out = new(rkecattleiov1.UserdataSpec)
+		**out = **in
+	}
 	if in.DrainBeforeDeleteTimeout != nil {
 		in, out := &in.DrainBeforeDeleteTimeout, &out.DrainBeforeDeleteTimeout
 		*out = new(metav1.Duration)

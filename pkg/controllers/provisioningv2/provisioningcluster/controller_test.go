@@ -11,6 +11,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/wrangler/v3/pkg/condition"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	wfake "github.com/rancher/wrangler/v3/pkg/generic/fake"
@@ -21,7 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 func TestProvisioningClusterController_reconcileConditions(t *testing.T) {
@@ -501,11 +502,10 @@ func buildCAPICluster(namespace, name string) *capi.Cluster {
 	return &capi.Cluster{
 		ObjectMeta: metav1.ObjectMeta{Namespace: namespace, Name: name},
 		Spec: capi.ClusterSpec{
-			ControlPlaneRef: &corev1.ObjectReference{
-				APIVersion: rkev1.SchemeGroupVersion.String(),
-				Kind:       "RKEControlPlane",
-				Namespace:  namespace,
-				Name:       name,
+			ControlPlaneRef: capi.ContractVersionedObjectReference{
+				Kind:     "RKEControlPlane",
+				Name:     name,
+				APIGroup: capr.RKEAPIGroup,
 			},
 		},
 	}

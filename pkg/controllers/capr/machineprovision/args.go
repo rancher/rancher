@@ -25,7 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	"k8s.io/utils/ptr"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	"sigs.k8s.io/cluster-api/controllers/external"
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rancherv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
@@ -191,7 +193,7 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]any, d
 		Args:                cmd,
 		BackoffLimit:        jobBackoffLimit,
 		RKEMachineStatus: rkev1.RKEMachineStatus{
-			Ready:                     infra.data.String("spec", "providerID") != "",
+			Initialization:            rkev1.MachineInitializationStatus{Provisioned: ptr.To(infra.data.String("spec", "providerID") != "")},
 			DriverHash:                hash,
 			DriverURL:                 url,
 			CloudCredentialSecretName: cloudCredentialSecretName,
@@ -200,13 +202,11 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]any, d
 }
 
 func (h *handler) getBootstrapSecret(machine *capi.Machine) (string, error) {
-	if machine == nil || machine.Spec.Bootstrap.ConfigRef == nil {
+	if machine == nil || !machine.Spec.Bootstrap.ConfigRef.IsDefined() {
 		return "", nil
 	}
 
-	gvk := schema.FromAPIVersionAndKind(machine.Spec.Bootstrap.ConfigRef.APIVersion,
-		machine.Spec.Bootstrap.ConfigRef.Kind)
-	bootstrap, err := h.dynamic.Get(gvk, machine.Namespace, machine.Spec.Bootstrap.ConfigRef.Name)
+	bootstrap, err := external.GetObjectFromContractVersionedRef(h.ctx, h.client, machine.Spec.Bootstrap.ConfigRef, machine.Namespace)
 	if apierrors.IsNotFound(err) {
 		return "", nil
 	} else if err != nil {

@@ -33,6 +33,7 @@ import (
 	projectv3 "github.com/rancher/rancher/pkg/generated/norman/project.cattle.io/v3"
 	rbacv1 "github.com/rancher/rancher/pkg/generated/norman/rbac.authorization.k8s.io/v1"
 	storagev1 "github.com/rancher/rancher/pkg/generated/norman/storage.k8s.io/v1"
+	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/peermanager"
 	clusterSchema "github.com/rancher/rancher/pkg/schemas/cluster.cattle.io/v3"
 	managementSchema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
@@ -138,7 +139,7 @@ func NewScaledContext(config rest.Config, opts *ScaleContextOptions) (*ScaledCon
 	context.Management = managementv3.NewFromControllerFactory(context.ControllerFactory)
 	context.Project = projectv3.NewFromControllerFactory(context.ControllerFactory)
 	context.RBAC = rbacv1.NewFromControllerFactory(context.ControllerFactory)
-	context.Core = corev1.NewFromControllerFactory(context.ControllerFactory)
+	context.Core = namespace.NormanInterface(corev1.NewFromControllerFactory(context.ControllerFactory))
 
 	context.K8sClient, err = kubernetes.NewForConfig(&config)
 	if err != nil {
@@ -250,7 +251,7 @@ func (c *ManagementContext) WithAgent(userAgent string) *ManagementContext {
 	mgmtCopy.Management = managementv3.NewFromControllerFactoryWithAgent(fullUserAgent, c.ControllerFactory)
 	mgmtCopy.Project = projectv3.NewFromControllerFactoryWithAgent(fullUserAgent, c.ControllerFactory)
 	mgmtCopy.RBAC = rbacv1.NewFromControllerFactoryWithAgent(fullUserAgent, c.ControllerFactory)
-	mgmtCopy.Core = corev1.NewFromControllerFactoryWithAgent(fullUserAgent, c.ControllerFactory)
+	mgmtCopy.Core = namespace.NormanInterface(corev1.NewFromControllerFactoryWithAgent(fullUserAgent, c.ControllerFactory))
 	mgmtCopy.Apps = appsv1.NewFromControllerFactoryWithAgent(fullUserAgent, c.ControllerFactory)
 
 	mgmtCopy.Wrangler = mgmtCopy.Wrangler.WithAgent(userAgent)
@@ -339,7 +340,7 @@ func newManagementContext(c *ScaledContext) (*ManagementContext, error) {
 	context.Management = managementv3.NewFromControllerFactory(controllerFactory)
 	context.Project = projectv3.NewFromControllerFactory(controllerFactory)
 	context.RBAC = rbacv1.NewFromControllerFactory(controllerFactory)
-	context.Core = corev1.NewFromControllerFactory(controllerFactory)
+	context.Core = namespace.NormanInterface(corev1.NewFromControllerFactory(controllerFactory))
 	context.Apps = appsv1.NewFromControllerFactory(controllerFactory)
 
 	context.K8sClient, err = kubernetes.NewForConfig(&config)
@@ -437,7 +438,7 @@ func NewUserContext(scaledContext *ScaledContext, config rest.Config, clusterNam
 	if err != nil {
 		return nil, err
 	}
-	context.Corew = coreInterface{corew}
+	context.Corew = coreInterface{namespace.NewWranglerFactory(corew)}
 
 	ctlg, err := catalog.NewFactoryFromConfigWithOptions(&context.RESTConfig, &catalog.FactoryOptions{SharedControllerFactory: controllerFactory})
 	if err != nil {
@@ -522,7 +523,7 @@ func NewUserOnlyContext(config *wrangler.Context) (*UserOnlyContext, error) {
 	}
 
 	context.Apps = appsv1.NewFromControllerFactory(context.ControllerFactory)
-	context.Core = corev1.NewFromControllerFactory(context.ControllerFactory)
+	context.Core = namespace.NormanInterface(corev1.NewFromControllerFactory(context.ControllerFactory))
 	context.Project = projectv3.NewFromControllerFactory(context.ControllerFactory)
 	context.Storage = storagev1.NewFromControllerFactory(context.ControllerFactory)
 	context.Extensions = extv1beta1.NewFromControllerFactory(context.ControllerFactory)

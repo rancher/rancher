@@ -74,6 +74,7 @@ const (
 	DaemonSetFieldWorkloadAnnotations           = "workloadAnnotations"
 	DaemonSetFieldWorkloadLabels                = "workloadLabels"
 	DaemonSetFieldWorkloadMetrics               = "workloadMetrics"
+	DaemonSetFieldWorkloadRef                   = "workloadRef"
 )
 
 type DaemonSet struct {
@@ -144,6 +145,7 @@ type DaemonSet struct {
 	WorkloadAnnotations           map[string]string              `json:"workloadAnnotations,omitempty" yaml:"workloadAnnotations,omitempty"`
 	WorkloadLabels                map[string]string              `json:"workloadLabels,omitempty" yaml:"workloadLabels,omitempty"`
 	WorkloadMetrics               []WorkloadMetric               `json:"workloadMetrics,omitempty" yaml:"workloadMetrics,omitempty"`
+	WorkloadRef                   *WorkloadReference             `json:"workloadRef,omitempty" yaml:"workloadRef,omitempty"`
 }
 
 type DaemonSetCollection struct {

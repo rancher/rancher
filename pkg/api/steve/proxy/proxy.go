@@ -42,6 +42,11 @@ func RewriteLocalCluster(next http.Handler) http.Handler {
 			if req.URL.Path == "" {
 				req.URL.Path = "/"
 			}
+		} else if strings.HasPrefix(req.URL.Path, "/k8s/proxy/local") {
+			req.URL.Path = strings.TrimPrefix(req.URL.Path, "/k8s/proxy/local")
+			if req.URL.Path == "" {
+				req.URL.Path = "/"
+			}
 		}
 		next.ServeHTTP(rw, req)
 	})

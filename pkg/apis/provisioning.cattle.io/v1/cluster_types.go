@@ -170,6 +170,22 @@ type RKEConfig struct {
 type RKEMachinePool struct {
 	rkev1.RKECommonNodeConfig `json:",inline"`
 
+	// Additional userdata to merge with rancher-defined userdata.
+	//
+	// Currently, this field is only supported for external CAPI
+	// infrastructure providers, and will have no effect for
+	// Rancher-provisioned nodes. Userdata for Rancher-provisioned nodes
+	// can be set in the machine configuration.
+	//
+	// WARNING: Do not include sensitive data, this field is visible
+	// in non-Secret API objects.
+	//
+	// EXPERIMENTAL: this field is experimental and future compatibility
+	// is not guaranteed.
+	// +nullable
+	// +optional
+	Userdata *rkev1.UserdataSpec `json:"userdata,omitempty"`
+
 	// Paused indicates that the machine pool is paused, preventing CAPI
 	// controllers from reconciling it.
 	// NOTE: this only applies to the corresponding generated machine

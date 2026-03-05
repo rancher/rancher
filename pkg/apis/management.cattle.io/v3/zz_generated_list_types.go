@@ -774,6 +774,23 @@ func NewProjectRoleTemplateBinding(namespace, name string, obj ProjectRoleTempla
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// ProxyEndpointList is a list of ProxyEndpoint resources
+type ProxyEndpointList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []ProxyEndpoint `json:"items"`
+}
+
+func NewProxyEndpoint(namespace, name string, obj ProxyEndpoint) *ProxyEndpoint {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ProxyEndpoint").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // RancherUserNotificationList is a list of RancherUserNotification resources
 type RancherUserNotificationList struct {
 	metav1.TypeMeta `json:",inline"`

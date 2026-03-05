@@ -4,12 +4,13 @@ import (
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"go.uber.org/mock/gomock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func Test_isRoleTemplateExternal(t *testing.T) {
+func TestIsRoleTemplateExternal(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name    string
@@ -77,6 +78,82 @@ func Test_isRoleTemplateExternal(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("isRoleTemplateExternal() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestAddAggregationFeatureLabel(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name           string
+		inputLabels    map[string]string
+		expectedLabels map[string]string
+	}{
+		{
+			name:        "adds label to object with no labels",
+			inputLabels: nil,
+			expectedLabels: map[string]string{
+				rbac.AggregationFeatureLabel: "true",
+			},
+		},
+		{
+			name: "adds label to object with existing labels",
+			inputLabels: map[string]string{
+				"existing-label": "value",
+			},
+			expectedLabels: map[string]string{
+				"existing-label":             "value",
+				rbac.AggregationFeatureLabel: "true",
+			},
+		},
+		{
+			name: "updates label when already present",
+			inputLabels: map[string]string{
+				rbac.AggregationFeatureLabel: "false",
+				"other-label":                "value",
+			},
+			expectedLabels: map[string]string{
+				rbac.AggregationFeatureLabel: "true",
+				"other-label":                "value",
+			},
+		},
+		{
+			name: "label already set to true",
+			inputLabels: map[string]string{
+				rbac.AggregationFeatureLabel: "true",
+			},
+			expectedLabels: map[string]string{
+				rbac.AggregationFeatureLabel: "true",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			// Create a test object (using ClusterRoleTemplateBinding as an example)
+			obj := &v3.ClusterRoleTemplateBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:   "test-crtb",
+					Labels: tt.inputLabels,
+				},
+			}
+
+			AddAggregationFeatureLabel(obj)
+
+			// Verify labels are set correctly
+			resultLabels := obj.GetLabels()
+			if len(resultLabels) != len(tt.expectedLabels) {
+				t.Errorf("AddAggregationFeatureLabel() labels count = %v, want %v", len(resultLabels), len(tt.expectedLabels))
+			}
+
+			for key, expectedValue := range tt.expectedLabels {
+				if actualValue, ok := resultLabels[key]; !ok {
+					t.Errorf("AddAggregationFeatureLabel() missing label %s", key)
+				} else if actualValue != expectedValue {
+					t.Errorf("AddAggregationFeatureLabel() label %s = %v, want %v", key, actualValue, expectedValue)
+				}
 			}
 		})
 	}

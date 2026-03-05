@@ -102,6 +102,7 @@ const (
 	WorkloadFieldWorkloadAnnotations                  = "workloadAnnotations"
 	WorkloadFieldWorkloadLabels                       = "workloadLabels"
 	WorkloadFieldWorkloadMetrics                      = "workloadMetrics"
+	WorkloadFieldWorkloadRef                          = "workloadRef"
 )
 
 type Workload struct {
@@ -200,6 +201,7 @@ type Workload struct {
 	WorkloadAnnotations                  map[string]string                                `json:"workloadAnnotations,omitempty" yaml:"workloadAnnotations,omitempty"`
 	WorkloadLabels                       map[string]string                                `json:"workloadLabels,omitempty" yaml:"workloadLabels,omitempty"`
 	WorkloadMetrics                      []WorkloadMetric                                 `json:"workloadMetrics,omitempty" yaml:"workloadMetrics,omitempty"`
+	WorkloadRef                          *WorkloadReference                               `json:"workloadRef,omitempty" yaml:"workloadRef,omitempty"`
 }
 
 type WorkloadCollection struct {

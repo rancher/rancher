@@ -1,5 +1,10 @@
 name: Validate
-on: [pull_request, push]
+on:
+  pull_request:
+  push:
+    branches:
+      - "main"
+      - "release/v*"
 jobs:
   validate:
     runs-on: runs-on,runner=8cpu-linux-x64,run-id=${{ github.run_id }}
@@ -21,7 +26,7 @@ jobs:
         with:
           version: ${{ env.GOLANG_CI_LINT_VERSION }}
           args: -v
-          only-new-issues: true
+          only-new-issues: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000') }}
           skip-cache: false
       - name: Set up Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0

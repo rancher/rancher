@@ -55,7 +55,6 @@ eval "$(grep '^ENV CATTLE_WINS_AGENT' package/Dockerfile | awk '{print "export "
 eval "$(grep '^ENV CATTLE_CSI_PROXY_AGENT' package/Dockerfile | awk '{print "export " $2}')"
 eval "$(grep '^ENV CATTLE_KDM_BRANCH' package/Dockerfile | awk '{print "export " $2}')"
 
-export CATTLE_RANCHER_PROVISIONING_CAPI_VERSION=$(grep -m1 'provisioningCAPIVersion' build.yaml | cut -d ' ' -f2)
 export CATTLE_RANCHER_TURTLES_VERSION=$(grep -m1 'turtlesVersion' build.yaml | cut -d ' ' -f2)
 
 if [ -z "${SOME_K8S_VERSION}" ]; then

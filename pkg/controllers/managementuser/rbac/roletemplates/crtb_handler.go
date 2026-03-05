@@ -15,7 +15,12 @@ import (
 	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/util/retry"
+)
+
+const (
+	rtbOwnerLabel = "authz.cluster.cattle.io/rtb-owner-updated"
 )
 
 type crtbHandler struct {
@@ -99,16 +104,32 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, rem
 		return err
 	}
 
-	currentCRBs, err := c.crbClient.List(metav1.ListOptions{LabelSelector: rbac.GetCRTBOwnerLabel(crtb.Name)})
-	if err != nil || currentCRBs == nil {
+	AddAggregationFeatureLabel(crb)
+
+	labelSelector := labels.Set{
+		rbac.GetCRTBOwnerLabel(crtb.Name): "true",
+		rbac.AggregationFeatureLabel:      "true",
+	}
+	aggregationCRBs, err := c.crbClient.List(metav1.ListOptions{LabelSelector: labelSelector.AsSelector().String()})
+	if err != nil || aggregationCRBs == nil {
 		c.s.AddCondition(remoteConditions, condition, failureToListClusterRoleBindings, err)
 		return err
 	}
 
+	// Delete any ClusterRoleBindings that were created for this CRTB before the aggregation changes.
+	// TODO: Remove this once roletemplate aggregation is the only enabled RBAC model. https://github.com/rancher/rancher/issues/53743
+	legacyCRBs, err := c.crbClient.List(metav1.ListOptions{LabelSelector: rtbOwnerLabel + "=" + rbac.GetRTBLabel(crtb.ObjectMeta)})
+	if err != nil || legacyCRBs == nil {
+		c.s.AddCondition(remoteConditions, condition, failureToListClusterRoleBindings, err)
+		return err
+	}
+
+	currentCRBs := append(aggregationCRBs.Items, legacyCRBs.Items...)
+
 	// Find if the required CRB that already exists and delete all excess CRBs.
 	// There should only ever be 1 cluster role binding per CRTB.
 	var matchingCRB *rbacv1.ClusterRoleBinding
-	for _, currentCRB := range currentCRBs.Items {
+	for _, currentCRB := range currentCRBs {
 		if rbac.IsClusterRoleBindingContentSame(crb, &currentCRB) && matchingCRB == nil {
 			matchingCRB = &currentCRB
 			continue
@@ -121,10 +142,6 @@ func (c *crtbHandler) reconcileBindings(crtb *v3.ClusterRoleTemplateBinding, rem
 
 	// If we didn't find an existing CRB, create it.
 	if matchingCRB == nil {
-		if crb.Labels == nil {
-			crb.Labels = map[string]string{}
-		}
-		crb.Labels[rbac.AggregationFeatureLabel] = "true"
 		if _, err := c.crbClient.Create(crb); err != nil {
 			c.s.AddCondition(remoteConditions, condition, failureToCreateClusterRoleBinding, err)
 			return fmt.Errorf("failed to create cluster role binding %s: %w", crb.Name, err)

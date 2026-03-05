@@ -28,7 +28,6 @@ services:
                enforce-version: latest
              exemptions:
                namespaces: 
-               - cattle-provisioning-capi-system
                - cattle-turtles-system
                - calico-apiserver
                - calico-system

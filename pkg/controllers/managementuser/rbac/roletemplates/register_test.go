@@ -7,7 +7,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 )
 
-func Test_getCRTBByUsername(t *testing.T) {
+func TestGetCRTBByUsername(t *testing.T) {
 	tests := []struct {
 		name string
 		obj  *v3.ClusterRoleTemplateBinding
@@ -56,7 +56,7 @@ func Test_getCRTBByUsername(t *testing.T) {
 	}
 }
 
-func Test_getPRTBByUsername(t *testing.T) {
+func TestGetPRTBByUsername(t *testing.T) {
 	tests := []struct {
 		name string
 		obj  *v3.ProjectRoleTemplateBinding

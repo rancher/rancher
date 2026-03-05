@@ -19,23 +19,27 @@ import (
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/channelserver"
 	"github.com/rancher/rancher/pkg/features"
-	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/wrangler/v3/pkg/condition"
 	"github.com/rancher/wrangler/v3/pkg/data"
+	"github.com/rancher/wrangler/v3/pkg/data/convert"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
 	"github.com/rancher/wrangler/v3/pkg/name"
+	"github.com/rancher/wrangler/v3/pkg/summary"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
-	capierrors "sigs.k8s.io/cluster-api/errors"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	capiutils "sigs.k8s.io/cluster-api/util"
+	capiconditions "sigs.k8s.io/cluster-api/util/conditions"
+	capiconditionsv1beta1 "sigs.k8s.io/cluster-api/util/conditions/deprecated/v1beta1"
 )
 
 const (
@@ -83,35 +87,92 @@ const (
 
 	SecretTypeMachinePlan  = "rke.cattle.io/machine-plan"
 	SecretTypeClusterState = "rke.cattle.io/cluster-state"
+	SecretTypeBootstrap    = "rke.cattle.io/bootstrap"
 
 	MachineTemplateClonedFromGroupVersionAnn = "rke.cattle.io/cloned-from-group-version"
 	MachineTemplateClonedFromKindAnn         = "rke.cattle.io/cloned-from-kind"
 	MachineTemplateClonedFromNameAnn         = "rke.cattle.io/cloned-from-name"
 
-	// Label added to secrets to make sure they are included in backups when created in a namespace other than fleet-default
+	// BackupLabel is added to secrets to make sure they are included in backups when created in a namespace other than fleet-default
 	BackupLabel = "resources.cattle.io/backup"
 
 	CattleOSLabel    = "cattle.io/os"
 	DefaultMachineOS = "linux"
 	WindowsMachineOS = "windows"
 
-	DefaultMachineConfigAPIVersion = "rke-machine-config.cattle.io/v1"
-	RKEMachineAPIVersion           = "rke-machine.cattle.io/v1"
-	RKEAPIVersion                  = "rke.cattle.io/v1"
+	// API Groups and Versions
 
-	Provisioned                  = condition.Cond("Provisioned")
-	Stable                       = condition.Cond("Stable") // The Stable condition is used to indicate whether we can safely copy the v3 management cluster Ready condition to the v1 object.
-	Updated                      = condition.Cond("Updated")
-	Reconciled                   = condition.Cond("Reconciled")
-	Ready                        = condition.Cond("Ready")
-	Waiting                      = condition.Cond("Waiting")
-	Pending                      = condition.Cond("Pending")
-	Removed                      = condition.Cond("Removed")
-	PlanApplied                  = condition.Cond("PlanApplied")
-	InfrastructureReady          = condition.Cond(capi.InfrastructureReadyCondition)
+	DefaultMachineConfigAPIVersion = "rke-machine-config.cattle.io/v1"
+
+	// RKEMachineAPIGroup contains kinds for rancher-provisioned, aka node-driver, machine and machineTemplate
+	RKEMachineAPIGroup   = "rke-machine.cattle.io"
+	RKEMachineAPIVersion = "rke-machine.cattle.io/v1"
+
+	RKEAPIGroup   = "rke.cattle.io"
+	RKEAPIVersion = "rke.cattle.io/v1"
+
+	// Kinds
+
+	RKEBootstrapKind = "RKEBootstrap"
+
+	// Conditions
+
+	// Provisioned indicates whether the cluster or control plane has been provisioned.
+	// Used on: provisioning.cattle.io/v1 Cluster, rke.cattle.io/v1 RKEControlPlane
+	Provisioned = condition.Cond("Provisioned")
+
+	// Stable indicates whether we can safely copy the v3 management cluster Ready condition to the v1 object.
+	// Used on: rke.cattle.io/v1 RKEControlPlane
+	Stable = condition.Cond("Stable")
+
+	// Updated indicates whether the cluster or control plane has been updated to the desired state.
+	// Used on: provisioning.cattle.io/v1 Cluster, rke.cattle.io/v1 RKEControlPlane
+	Updated = condition.Cond("Updated")
+
+	// Reconciled indicates whether the resource has been successfully reconciled by its controller.
+	// Used on: cluster.x-k8s.io/v1beta2 Machine, rke.cattle.io/v1 RKEControlPlane
+	Reconciled = condition.Cond("Reconciled")
+
+	// Ready indicates whether the resource is ready to serve its purpose.
+	// Used on: rke.cattle.io/v1 RKEControlPlane, rke.cattle.io/v1 CustomMachine
+	Ready = condition.Cond("Ready")
+
+	// Waiting indicates that a removal operation is waiting for dependents to be cleaned up.
+	// Used on: provisioning.cattle.io/v1 Cluster, rke.cattle.io/v1 RKEControlPlane
+	Waiting = condition.Cond("Waiting")
+
+	// Pending indicates that a removal operation is pending.
+	// Used on: provisioning.cattle.io/v1 Cluster, rke.cattle.io/v1 RKEControlPlane
+	Pending = condition.Cond("Pending")
+
+	// Removed indicates that the resource has been successfully removed.
+	// Used on: provisioning.cattle.io/v1 Cluster, rke.cattle.io/v1 RKEControlPlane
+	Removed = condition.Cond("Removed")
+
+	// PlanApplied indicates whether the assigned plan has been applied to the machine.
+	// Used on: cluster.x-k8s.io/v1beta2 Machine
+	PlanApplied = condition.Cond("PlanApplied")
+
+	// InfrastructureReady indicates whether the machine's infrastructure provider has completed provisioning.
+	// Read-only in Rancher; set by CAPI infrastructure provider controllers.
+	// Used on: cluster.x-k8s.io/v1beta2 Machine
+	InfrastructureReady = condition.Cond(capi.InfrastructureReadyCondition)
+
+	// SystemUpgradeControllerReady indicates whether the system-upgrade-controller is deployed and ready.
+	// Used on: rke.cattle.io/v1 RKEControlPlane
 	SystemUpgradeControllerReady = condition.Cond("SystemUpgradeControllerReady")
-	Bootstrapped                 = condition.Cond("Bootstrapped")
-	// ClusterAutoscalerDeploymentReady is a condition that indicates whether the cluster autoscaler deployment is ready
+
+	// Bootstrapped indicates whether the control plane has completed its bootstrap process.
+	// Used on: rke.cattle.io/v1 RKEControlPlane
+	Bootstrapped = condition.Cond("Bootstrapped")
+
+	// MachineDeploymentMachinesReadyCondition indicates whether all machines in the deployment are ready.
+	// Read-only in Rancher; set by CAPI controllers.
+	// Used on: cluster.x-k8s.io/v1beta2 MachineDeployment
+	MachineDeploymentMachinesReadyCondition = condition.Cond(capi.MachineDeploymentMachinesReadyCondition)
+
+	// ClusterAutoscalerDeploymentReady indicates whether the cluster autoscaler deployment is ready.
+	// Used on: provisioning.cattle.io/v1 Cluster
 	ClusterAutoscalerDeploymentReady = condition.Cond("ClusterAutoscalerDeploymentReady")
 
 	// ClusterAutoscalerEnabledAnnotation is an annotation used to enable cluster autoscaling for a cluster.
@@ -305,7 +366,7 @@ func GetSystemAgentDataDir(spec *rkev1.ClusterConfiguration) string {
 
 func IsOwnedByMachine(bootstrapCache rkecontroller.RKEBootstrapCache, machineName string, sa *corev1.ServiceAccount) (bool, error) {
 	for _, owner := range sa.OwnerReferences {
-		if owner.Kind == "RKEBootstrap" {
+		if owner.Kind == RKEBootstrapKind {
 			bootstrap, err := bootstrapCache.Get(sa.Namespace, owner.Name)
 			if err != nil {
 				return false, err
@@ -408,7 +469,8 @@ func GetMachineDeletionStatus(machines []*capi.Machine) (string, error) {
 		return machines[i].Name < machines[j].Name
 	})
 	for _, machine := range machines {
-		if machine.Status.FailureReason != nil && *machine.Status.FailureReason == capierrors.DeleteMachineError {
+		cond := capiconditions.Get(machine, capi.MachineDeletingCondition)
+		if cond != nil && cond.Status == metav1.ConditionTrue && cond.Reason == capi.MachineDeletingInternalErrorReason {
 			return "", fmt.Errorf("error deleting machine [%s], machine must be deleted manually", machine.Name)
 		}
 		return fmt.Sprintf("waiting for machine [%s] to delete", machine.Name), nil
@@ -675,4 +737,80 @@ func ToOwnerReference(typeMeta metav1.TypeMeta, objectMeta metav1.ObjectMeta) me
 		Controller:         &[]bool{true}[0],
 		BlockOwnerDeletion: &[]bool{true}[0],
 	}
+}
+
+func GetCondition(d data.Object, conditionType string) *summary.Condition {
+	for _, cond := range summary.GetUnstructuredConditions(d) {
+		if cond.Type() == conditionType {
+			return &cond
+		}
+	}
+
+	return nil
+}
+
+func InsertOrUpdateCondition(d data.Object, desiredCondition summary.Condition) (bool, error) {
+	for _, cond := range summary.GetUnstructuredConditions(d) {
+		if desiredCondition.Equals(cond) {
+			return false, nil
+		}
+	}
+
+	// The conditions must be converted to a map so that DeepCopyJSONValue will
+	// recognize it as a map instead of a data.Object.
+	newCond, err := convert.EncodeToMap(desiredCondition.Object)
+	if err != nil {
+		return false, err
+	}
+
+	dConditions := d.Slice("status", "conditions")
+	conditions := make([]interface{}, len(dConditions))
+	found := false
+	for i, cond := range dConditions {
+		if cond.String("type") == desiredCondition.Type() {
+			conditions[i] = newCond
+			found = true
+		} else {
+			conditions[i], err = convert.EncodeToMap(cond)
+			if err != nil {
+				return false, err
+			}
+		}
+	}
+
+	if !found {
+		conditions = append(conditions, newCond)
+	}
+	d.SetNested(conditions, "status", "conditions")
+
+	return true, nil
+}
+
+// CAPIConditionSetter is an interface satisfied by all CAPI resource types (e.g., Machine, Cluster,
+// MachineDeployment, MachineSet) that support both v1beta2 and deprecated v1beta1 conditions.
+type CAPIConditionSetter interface {
+	capiconditions.Setter
+	capiconditionsv1beta1.Setter
+}
+
+// SetCAPIResourceCondition sets the given metav1.Condition on a CAPI resource's .status.conditions (v1beta2)
+// and syncs it to .status.deprecated.v1beta1.conditions for backward compatibility.
+func SetCAPIResourceCondition(obj CAPIConditionSetter, condition metav1.Condition) {
+	if capiutils.IsNil(obj) {
+		return
+	}
+
+	// Set the condition on the v1beta2 status.conditions
+	capiconditions.Set(obj, condition)
+
+	// Sync the condition to .status.deprecated.v1beta1.conditions
+	v1beta1Cond := capi.Condition{
+		Type:               capi.ConditionType(condition.Type),
+		Status:             corev1.ConditionStatus(condition.Status),
+		LastTransitionTime: condition.LastTransitionTime,
+		Reason:             condition.Reason,
+		Message:            condition.Message,
+	}
+
+	capiconditionsv1beta1.Set(obj, &v1beta1Cond)
 }

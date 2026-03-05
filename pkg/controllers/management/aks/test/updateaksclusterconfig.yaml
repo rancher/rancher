@@ -65,7 +65,6 @@ spec:
   windowsPreferedCluster: false
 status:
   agentFeatures:
-    embedded-cluster-api: false
     fleet: false
     monitoringv1: false
     multi-cluster-management: false

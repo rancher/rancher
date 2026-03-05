@@ -110,8 +110,8 @@ var (
 	WinsAgentVersion                    = NewSetting("wins-agent-version", "")
 	CSIProxyAgentVersion                = NewSetting("csi-proxy-agent-version", "")
 	CSIProxyAgentURL                    = NewSetting("csi-proxy-agent-url", "https://acs-mirror.azureedge.net/csi-proxy/%[1]s/binaries/csi-proxy-%[1]s.tar.gz")
-	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://github.com/rancher/system-agent/releases/download/v0.3.15-rc.1/install.sh") // To ensure consistency between SystemAgentInstallScript default value and CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT to utilize the local system-agent-install.sh script when both values are equal.
-	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.5.4-rc.1/install.ps1")
+	SystemAgentInstallScript            = NewSetting("system-agent-install-script", "https://github.com/rancher/system-agent/releases/download/v0.3.15-rc.3/install.sh") // To ensure consistency between SystemAgentInstallScript default value and CATTLE_SYSTEM_AGENT_INSTALL_SCRIPT to utilize the local system-agent-install.sh script when both values are equal.
+	WinsAgentInstallScript              = NewSetting("wins-agent-install-script", "https://raw.githubusercontent.com/rancher/wins/v0.5.4-rc.2/install.ps1")
 	SystemAgentInstallerImage           = NewSetting("system-agent-installer-image", "") // Defined via environment variable
 	SystemAgentUpgradeImage             = NewSetting("system-agent-upgrade-image", "")   // Defined via environment variable
 	WinsAgentUpgradeImage               = NewSetting("wins-agent-upgrade-image", "")
@@ -139,7 +139,7 @@ var (
 	GKEUpstreamRefresh                  = NewSetting("gke-refresh", "300")
 	AlibabaUpstreamRefresh              = NewSetting("alibaba-refresh", "300")
 	HideLocalCluster                    = NewSetting("hide-local-cluster", "false")
-	MachineProvisionImage               = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher138")
+	MachineProvisionImage               = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher140")
 	SystemFeatureChartRefreshSeconds    = NewSetting("system-feature-chart-refresh-seconds", "21600")
 	ClusterAgentDefaultAffinity         = NewSetting("cluster-agent-default-affinity", ClusterAgentAffinity)
 	FleetAgentDefaultAffinity           = NewSetting("fleet-agent-default-affinity", FleetAgentAffinity)
@@ -247,9 +247,6 @@ var (
 
 	// RemoteDialerProxyVersion is the exact version of the RDP that Rancher will install.
 	RemoteDialerProxyVersion = NewSetting("remotedialer-proxy-version", "")
-
-	// RancherProvisioningCAPIVersion is the exact version of the cluster api controller that Rancher will install.
-	RancherProvisioningCAPIVersion = NewSetting("rancher-provisioning-capi-version", "")
 
 	// RancherTurtlesVersion is the exact version of the rancher-turtles chart that Rancher will install.
 	RancherTurtlesVersion = NewSetting("rancher-turtles-version", "")
@@ -416,6 +413,17 @@ var (
 	// bytes.
 	// The default = 1MiB
 	APIBodyLimit = NewSetting("public-api-body-limit", "1Mi")
+
+	// DisableDefaultProxyEndpoint controls whether built-in ProxyEndpoint CRs are automatically
+	// created in the local cluster. Its value is a comma-separated list of ProxyEndpoint resource names to disable
+	// (for example, "rancher-aws-endpoints"). The special value "all" disables creation of all built-in ProxyEndpoints.
+	// Refer to Rancher documentation for the list of built-in ProxyEndpoints.
+	DisableDefaultProxyEndpoint = NewSetting("disable-default-proxy-endpoints", "")
+
+	// ExpireSCIMTokensAfter is the duration after which SCIM authentication tokens expire.
+	// The value should be expressed in valid time.Duration units e.g. "24h".
+	// An empty string or a zero value means SCIM tokens do not expire.
+	ExpireSCIMTokensAfter = NewSetting("expire-scim-tokens-after", "720h") // 30 days
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.

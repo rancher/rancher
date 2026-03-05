@@ -12,19 +12,23 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
+	prtbByUsernameIndex         = "auth.management.cattle.io/prtb-by-username"
+	crtbByUsernameIndex         = "auth.management.cattle.io/crtb-by-username"
+	rbByPRTBOwnerReferenceIndex = "auth.management.cattle.io/rb-by-prtb-owner-reference"
+	rbByCRTBOwnerReferenceIndex = "auth.management.cattle.io/rb-by-crtb-owner-reference"
+
 	roleTemplateChangeHandler = "mgmt-roletemplate-change-handler"
 	roleTemplateRemoveHandler = "mgmt-roletemplate-remove-handler"
-	prtbByUsernameIndex       = "auth.management.cattle.io/prtb-by-username"
 
 	crtbChangeHandler        = "mgmt-crtb-change-handler"
 	crtbRemoveHandler        = "mgmt-crtb-remove-handler"
 	crtbRoleTemplateEnqueuer = "cluster-crtb-roletemplate-enqueuer"
-	crtbByUsernameIndex      = "auth.management.cattle.io/crtb-by-username"
 
 	prtbChangeHandler        = "mgmt-prtb-change-handler"
 	prtbRemoveHandler        = "mgmt-prtb-remove-handler"
@@ -34,6 +38,8 @@ const (
 func RegisterIndexers(wranglerContext *wrangler.Context) {
 	wranglerContext.Mgmt.ClusterRoleTemplateBinding().Cache().AddIndexer(crtbByUsernameIndex, getCRTBByUsername)
 	wranglerContext.Mgmt.ProjectRoleTemplateBinding().Cache().AddIndexer(prtbByUsernameIndex, getPRTBByUsername)
+	wranglerContext.RBAC.RoleBinding().Cache().AddIndexer(rbByPRTBOwnerReferenceIndex, getRBByPRTBOwnerReference)
+	wranglerContext.RBAC.RoleBinding().Cache().AddIndexer(rbByCRTBOwnerReferenceIndex, getRBByCRTBOwnerReference)
 }
 
 func Register(ctx context.Context, management *config.ManagementContext, clusterManager *clustermanager.Manager) {
@@ -151,6 +157,36 @@ func getPRTBByUsername(prtb *v3.ProjectRoleTemplateBinding) ([]string, error) {
 	if prtb.UserName != "" && prtb.ProjectName != "" {
 		clusterName, _, _ := strings.Cut(prtb.ProjectName, ":")
 		return []string{name.SafeConcatName(clusterName, prtb.UserName)}, nil
+	}
+	return []string{}, nil
+}
+
+func getRBByPRTBOwnerReference(rb *rbacv1.RoleBinding) ([]string, error) {
+	if rb == nil {
+		return []string{}, nil
+	}
+
+	if rb.OwnerReferences != nil {
+		for _, ownerRef := range rb.OwnerReferences {
+			if ownerRef.Kind == "ProjectRoleTemplateBinding" {
+				return []string{ownerRef.Name}, nil
+			}
+		}
+	}
+	return []string{}, nil
+}
+
+func getRBByCRTBOwnerReference(rb *rbacv1.RoleBinding) ([]string, error) {
+	if rb == nil {
+		return []string{}, nil
+	}
+
+	if rb.OwnerReferences != nil {
+		for _, ownerRef := range rb.OwnerReferences {
+			if ownerRef.Kind == "ClusterRoleTemplateBinding" {
+				return []string{ownerRef.Name}, nil
+			}
+		}
 	}
 	return []string{}, nil
 }

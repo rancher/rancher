@@ -59,6 +59,7 @@ const (
 	CronJobSpecFieldUid                           = "uid"
 	CronJobSpecFieldVolumes                       = "volumes"
 	CronJobSpecFieldWindowsOptions                = "windowsOptions"
+	CronJobSpecFieldWorkloadRef                   = "workloadRef"
 )
 
 type CronJobSpec struct {
@@ -119,4 +120,5 @@ type CronJobSpec struct {
 	Uid                           *int64                         `json:"uid,omitempty" yaml:"uid,omitempty"`
 	Volumes                       []Volume                       `json:"volumes,omitempty" yaml:"volumes,omitempty"`
 	WindowsOptions                *WindowsSecurityContextOptions `json:"windowsOptions,omitempty" yaml:"windowsOptions,omitempty"`
+	WorkloadRef                   *WorkloadReference             `json:"workloadRef,omitempty" yaml:"workloadRef,omitempty"`
 }

@@ -209,6 +209,12 @@ func TestConstructRegex(t *testing.T) {
 			found:         false,
 			description:   "should not match suffix",
 		},
+		{
+			host:          "ec2.amazonaws.com",
+			whitelistItem: "%c2.amazonaws.com",
+			found:         false,
+			description:   "must be a complete label",
+		},
 	}
 
 	for _, scenario := range tests {
@@ -220,6 +226,273 @@ func TestConstructRegex(t *testing.T) {
 				scenario.whitelistItem,
 				scenario.description,
 			))
+	}
+}
+
+func TestIsOverlyBroad(t *testing.T) {
+	tests := []struct {
+		name          string
+		domain        string
+		isOverlyBroad bool
+	}{
+		{
+			name:          "simple url",
+			domain:        "example.com",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "simple properly scoped wildcard using *",
+			domain:        "*.example.com",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "simple properly scoped wildcard using %",
+			domain:        "%.example.org",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "properly scoped wildcard using *",
+			domain:        "*example.com",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "properly scoped wildcard subdomain using *",
+			domain:        "*.sub.example.com",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "properly scoped wildcard subdomain using %",
+			domain:        "%.sub.example.com",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "properly scoped wildcard subdomain using % with multi-part TLD",
+			domain:        "%.sub.example.co.uk",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "properly scoped wildcard subdomain using * with multi-part TLD",
+			domain:        "*.sub.example.co.uk",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "overly broad wildcard using *",
+			domain:        "*.com",
+			isOverlyBroad: true,
+		},
+		{
+			name:          "overly broad wildcard using %",
+			domain:        "%.com",
+			isOverlyBroad: true,
+		},
+		{
+			name:          "standard multi-part TLD without wildcard, non-ICANN",
+			domain:        "objects.rma.cloudscale.ch",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "overly broad wildcard using * and a multi-part TLD",
+			domain:        "*.co.uk",
+			isOverlyBroad: true,
+		},
+		{
+			name:          "overly broad wildcard using % and a multi-part TLD",
+			domain:        "%.co.uk",
+			isOverlyBroad: true,
+		},
+		{
+			name:          "overly broad wildcard using % and *",
+			domain:        "*.%.com",
+			isOverlyBroad: true,
+		},
+		{
+			name:          "overly broad wildcard using multiple %",
+			domain:        "%.%.org",
+			isOverlyBroad: true,
+		},
+		{
+			name:          "overly broad wildcard using multiple % and multi-part TLD",
+			domain:        "%.%.co.uk",
+			isOverlyBroad: true,
+		},
+		{
+			name:          "overly broad wildcard using % and * and a multi-part TLD",
+			domain:        "*.%.gov.uk",
+			isOverlyBroad: true,
+		},
+		{
+			name:          "just a TLD",
+			domain:        "com",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "multi-part TLD only",
+			domain:        "co.uk",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "overly broad with only star",
+			domain:        "*",
+			isOverlyBroad: true,
+		},
+		{
+			name:          "overly broad with only percentage",
+			domain:        "%",
+			isOverlyBroad: true,
+		},
+		{
+			name:          "aws iam.amazonaws.com",
+			domain:        "iam.amazonaws.com",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "aws iam.us-gov.amazonaws.com",
+			domain:        "iam.us-gov.amazonaws.com",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "aws iam with % and multi-part TLD",
+			domain:        "iam.%.amazonaws.com.cn",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "aws iam.global.api.aws",
+			domain:        "iam.global.api.aws",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "aws ec2 with % (single-part TLD)",
+			domain:        "ec2.%.amazonaws.com",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "aws ec2 with % and multi-part TLD",
+			domain:        "ec2.%.amazonaws.com.cn",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "aws ec2 with % and api.aws",
+			domain:        "ec2.%.api.aws",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "aws eks with %",
+			domain:        "eks.%.amazonaws.com",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "aws eks with % and multi-part TLD",
+			domain:        "eks.%.amazonaws.com.cn",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "aws eks with % and api.aws",
+			domain:        "eks.%.api.aws",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "aws kms with %",
+			domain:        "kms.%.amazonaws.com",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "aws kms with % and multi-part TLD",
+			domain:        "kms.%.amazonaws.com.cn",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "aws kms with % and api.aws",
+			domain:        "kms.%.api.aws",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "cloud.ca objects-east",
+			domain:        "objects-east.cloud.ca",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "cloudscale objects.rma",
+			domain:        "objects.rma.cloudscale.ch",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "digitalocean api",
+			domain:        "api.digitalocean.com",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "exoscale api",
+			domain:        "api.exoscale.ch",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "linode api",
+			domain:        "api.linode.com",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "oracle cloud wildcard",
+			domain:        "*.oraclecloud.com",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "otc wildcard",
+			domain:        "*.otc.t-systems.com",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "packet api",
+			domain:        "api.packet.net",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "equinix api",
+			domain:        "api.equinix.com",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "equinix rancher-drivers",
+			domain:        "rancher-drivers.equinixmetal.net",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "phoenixnap securedservers api",
+			domain:        "api.securedservers.com",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "phoenixnap api",
+			domain:        "api.phoenixnap.com",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "phoenixnap auth",
+			domain:        "auth.phoenixnap.com",
+			isOverlyBroad: false,
+		},
+
+		{
+			name:          "nutanix github.io",
+			domain:        "nutanix.github.io",
+			isOverlyBroad: false,
+		},
+
+		{
+			name:          "outscale oos",
+			domain:        "oos.eu-west-2.outscale.com",
+			isOverlyBroad: false,
+		},
+		{
+			name:          "github.com",
+			domain:        "github.com",
+			isOverlyBroad: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equalf(t, test.isOverlyBroad, isOverlyBroad(test.domain), "failed on domain %v, expected isOverlyBroad to be %v", test.domain, test.isOverlyBroad)
+		})
 	}
 }
 

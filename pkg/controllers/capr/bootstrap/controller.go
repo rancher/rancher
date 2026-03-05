@@ -1,6 +1,8 @@
 package bootstrap
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
@@ -13,7 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/capr/installer"
 	"github.com/rancher/rancher/pkg/controllers/capr/etcdmgmt"
-	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta1"
+	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
@@ -25,6 +27,7 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -33,7 +36,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	"k8s.io/utils/ptr"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
 	"sigs.k8s.io/cluster-api/util/secret"
 )
@@ -101,7 +105,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 			}
 		}
 		if machine, ok := obj.(*capi.Machine); ok {
-			if machine.Spec.Bootstrap.ConfigRef != nil && machine.Spec.Bootstrap.ConfigRef.Kind == "RKEBootstrap" {
+			if machine.Spec.Bootstrap.ConfigRef.IsDefined() && machine.Spec.Bootstrap.ConfigRef.Kind == capr.RKEBootstrapKind {
 				return []relatedresource.Key{{
 					Namespace: machine.Namespace,
 					Name:      machine.Spec.Bootstrap.ConfigRef.Name,
@@ -112,7 +116,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext) {
 	}, clients.RKE.RKEBootstrap(), clients.Core.ServiceAccount(), clients.CAPI.Machine())
 }
 
-func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.EnvVar, machine *capi.Machine, dataDir string) (*corev1.Secret, error) {
+func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.EnvVar, machine *capi.Machine, bootstrap *rkev1.RKEBootstrap, dataDir string) (*corev1.Secret, error) {
 	sa, err := h.serviceAccountCache.Get(namespace, name)
 	if apierrors.IsNotFound(err) {
 		return nil, nil
@@ -137,10 +141,102 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 		is = installer.WindowsInstallScript
 	}
 
-	data, err := is(context.WithValue(context.Background(), tls.InternalAPI, hasHostPort), base64.URLEncoding.EncodeToString(hash[:]), envVars, "", dataDir)
+	installScript, err := is(context.WithValue(context.Background(), tls.InternalAPI, hasHostPort), base64.URLEncoding.EncodeToString(hash[:]), envVars, "", dataDir)
 	if err != nil {
 		return nil, err
 	}
+
+	// For CAPR or elemental as the infrastructure provider, we only need to set the system agent
+	// install script in the bootstrap secret.
+	//
+	// For CAPR, additional userdata is defined in the machine config and it will be merged with
+	// install script from the secret by rancher-machine.
+	if machine.Spec.InfrastructureRef.APIGroup == capr.RKEMachineAPIGroup ||
+		machine.Spec.InfrastructureRef.APIGroup == capr.RKEAPIGroup ||
+		machine.Spec.InfrastructureRef.APIGroup == "elemental.cattle.io" {
+		return &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: namespace,
+			},
+			Data: map[string][]byte{
+				"value": installScript,
+			},
+			Type: capr.SecretTypeBootstrap,
+		}, nil
+	}
+
+	if os := machine.GetLabels()[capr.CattleOSLabel]; os == capr.WindowsMachineOS {
+		return nil, fmt.Errorf("windows is not currently supported with external capi infrastructure providers")
+	}
+
+	// For external capi infrastructure providers, we merge the user-provided
+	// userdata here.
+	userdata := make(map[string]any)
+
+	if bootstrap.Spec.Userdata != nil && bootstrap.Spec.Userdata.InlineUserdata != "" {
+		err = yaml.Unmarshal([]byte(bootstrap.Spec.Userdata.InlineUserdata), &userdata)
+		if err != nil {
+			return nil, fmt.Errorf("could not unmarshal inline userdata")
+		}
+	}
+
+	var output bytes.Buffer
+
+	// We need to gzip the system agent install script
+	// because some cloud providers have a userdata size limit.
+	gz := gzip.NewWriter(&output)
+	if _, err = gz.Write(installScript); err != nil {
+		return nil, err
+	}
+	if err = gz.Close(); err != nil {
+		return nil, err
+	}
+
+	content := base64.StdEncoding.EncodeToString(output.Bytes())
+
+	command := "sh"
+	path := "/usr/local/custom_script/install.sh"
+
+	// Copy system agent install script
+	writeFiles := []any{
+		map[string]string{
+			"content":     content,
+			"encoding":    "gzip+b64",
+			"path":        path,
+			"permissions": "0600",
+		},
+	}
+
+	if userWriteFiles, ok := userdata["write_files"]; ok {
+		userWriteFiles, ok := userWriteFiles.([]any)
+		if !ok {
+			return nil, fmt.Errorf("error parsing userdata write_files")
+		}
+		writeFiles = append(writeFiles, userWriteFiles...)
+	}
+
+	userdata["write_files"] = writeFiles
+
+	// Call system agent install script
+	runcmd := []any{fmt.Sprintf("%s %s", command, path)}
+
+	if userRunCmd, ok := userdata["runcmd"]; ok {
+		userRunCmd, ok := userRunCmd.([]any)
+		if !ok {
+			return nil, fmt.Errorf("error parsing userdata runcmd")
+		}
+		runcmd = append(runcmd, userRunCmd...)
+	}
+
+	userdata["runcmd"] = runcmd
+
+	userdataBytes, err := yaml.Marshal(userdata)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling userdata")
+	}
+
+	userdataBytes = append([]byte("#cloud-config\n"), userdataBytes...)
 
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -148,9 +244,9 @@ func (h *handler) getBootstrapSecret(namespace, name string, envVars []corev1.En
 			Namespace: namespace,
 		},
 		Data: map[string][]byte{
-			"value": data,
+			"value": userdataBytes,
 		},
-		Type: "rke.cattle.io/bootstrap",
+		Type: capr.SecretTypeBootstrap,
 	}, nil
 }
 
@@ -253,7 +349,7 @@ func (h *handler) assignBootStrapSecret(machine *capi.Machine, bootstrap *rkev1.
 		return nil, nil, nil
 	}
 
-	if capiCluster.Spec.ControlPlaneRef == nil || capiCluster.Spec.ControlPlaneRef.Kind != "RKEControlPlane" {
+	if !capiCluster.Spec.ControlPlaneRef.IsDefined() || capiCluster.Spec.ControlPlaneRef.Kind != "RKEControlPlane" {
 		return nil, nil, nil
 	}
 	controlPlane, err := h.rkeControlPlanes.Get(bootstrap.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
@@ -282,7 +378,7 @@ func (h *handler) assignBootStrapSecret(machine *capi.Machine, bootstrap *rkev1.
 		},
 	}
 
-	bootstrapSecret, err := h.getBootstrapSecret(sa.Namespace, sa.Name, envVars, machine, dataDir)
+	bootstrapSecret, err := h.getBootstrapSecret(sa.Namespace, sa.Name, envVars, machine, bootstrap, dataDir)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -340,7 +436,7 @@ func (h *handler) GeneratingHandler(bootstrap *rkev1.RKEBootstrap, status rkev1.
 		return result, status, generic.ErrSkip
 	}
 
-	if !capiCluster.Status.InfrastructureReady {
+	if !ptr.Deref(capiCluster.Status.Initialization.InfrastructureProvisioned, false) {
 		logrus.Debugf("[rkebootstrap] %s/%s: waiting: CAPI cluster infrastructure is not ready", bootstrap.Namespace, bootstrap.Name)
 		h.rkeBootstrap.EnqueueAfter(bootstrap.Namespace, bootstrap.Name, 10*time.Second)
 		return result, status, generic.ErrSkip
@@ -358,7 +454,7 @@ func (h *handler) GeneratingHandler(bootstrap *rkev1.RKEBootstrap, status rkev1.
 	if bootstrapSecret != nil {
 		if status.DataSecretName == nil {
 			status.DataSecretName = &bootstrapSecret.Name
-			status.Ready = true
+			status.Initialization.DataSecretCreated = ptr.To(true)
 			logrus.Debugf("[rkebootstrap] %s/%s: setting dataSecretName: %s", bootstrap.Namespace, bootstrap.Name, *status.DataSecretName)
 		}
 		result = append(result, bootstrapSecret)
@@ -476,15 +572,15 @@ func (h *handler) reconcileMachinePreTerminateAnnotation(bootstrap *rkev1.RKEBoo
 		return bootstrap, err
 	}
 
-	if capiCluster.Spec.ControlPlaneRef == nil {
+	if !capiCluster.Spec.ControlPlaneRef.IsDefined() {
 		logrus.Warnf("[rkebootstrap] %s/%s: CAPI cluster %s/%s controlplane object reference was nil, ensuring machine pre-terminate annotation is removed", bootstrap.Namespace, bootstrap.Name, capiCluster.Namespace, capiCluster.Name)
 		return h.ensureMachinePreTerminateAnnotationRemoved(bootstrap, machine)
 	}
 
-	cp, err := h.rkeControlPlanes.Get(capiCluster.Spec.ControlPlaneRef.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
+	cp, err := h.rkeControlPlanes.Get(capiCluster.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			logrus.Warnf("[rkebootstrap] %s/%s: RKEControlPlane %s/%s was not found, ensuring machine pre-terminate annotation is removed", bootstrap.Namespace, bootstrap.Name, capiCluster.Spec.ControlPlaneRef.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
+			logrus.Warnf("[rkebootstrap] %s/%s: RKEControlPlane %s/%s was not found, ensuring machine pre-terminate annotation is removed", bootstrap.Namespace, bootstrap.Name, capiCluster.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
 			return h.ensureMachinePreTerminateAnnotationRemoved(bootstrap, machine)
 		}
 		return bootstrap, err
@@ -494,7 +590,7 @@ func (h *handler) reconcileMachinePreTerminateAnnotation(bootstrap *rkev1.RKEBoo
 		return h.ensureMachinePreTerminateAnnotationRemoved(bootstrap, machine)
 	}
 
-	if machine.Status.NodeRef == nil {
+	if !machine.Status.NodeRef.IsDefined() {
 		logrus.Infof("[rkebootstrap] No associated node found for machine %s/%s in cluster %s, ensuring machine pre-terminate annotation is removed", machine.Namespace, machine.Name, bootstrap.Spec.ClusterName)
 		return h.ensureMachinePreTerminateAnnotationRemoved(bootstrap, machine)
 	}

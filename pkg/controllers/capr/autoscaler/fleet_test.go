@@ -1,49 +1,187 @@
 package autoscaler
 
 import (
+	"context"
 	"fmt"
+	"strings"
 
 	fleet "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	rke "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/buildconfig"
 	"github.com/rancher/rancher/pkg/settings"
 	"go.uber.org/mock/gomock"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 // Test cases for ensureFleetHelmOp method
+// Test helper functions
 
-func (s *autoscalerSuite) TestEnsureFleetHelmOp_HappyPath_CreateNewHelmOp() {
-	cluster := &capi.Cluster{
+func (s *autoscalerSuite) createTestCluster(name, namespace string) *capi.Cluster {
+	return &capi.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-cluster",
+			Name:      name,
+			Namespace: namespace,
+		},
+	}
+}
+
+func (s *autoscalerSuite) createTestClusterWithControlPlane(name, namespace, apiGroup, kind, cpName string) *capi.Cluster {
+	cluster := s.createTestCluster(name, namespace)
+	cluster.Spec.ControlPlaneRef = capi.ContractVersionedObjectReference{
+		APIGroup: apiGroup,
+		Kind:     kind,
+		Name:     cpName,
+	}
+	return cluster
+}
+
+func (s *autoscalerSuite) setupClientForControlPlane(apiVersion, kind, kubernetesVersion string, isRKE bool) {
+	// Mock the controller-runtime client's Get method to return an unstructured object
+	s.client.SetGetFunc(func(ctx context.Context, key any, obj any, opts ...any) error {
+		// Handle PartialObjectMetadata requests for CRD discovery
+		if pom, ok := obj.(*metav1.PartialObjectMetadata); ok {
+			// Set up a minimal CRD metadata response
+			pom.APIVersion = "apiextensions.k8s.io/v1"
+			pom.Kind = "CustomResourceDefinition"
+			pom.Name = kind + "s." + apiVersion[:strings.LastIndex(apiVersion, "/")]
+
+			// Set the contract version label that CAPI needs to discover the version
+			// Extract the version from the apiVersion (e.g., "rke.cattle.io/v1" -> "v1")
+			version := apiVersion[strings.LastIndex(apiVersion, "/")+1:]
+			pom.Labels = map[string]string{
+				"cluster.x-k8s.io/v1beta2": version,
+			}
+
+			// Set the versions in the CRD
+			pom.SetGroupVersionKind(schema.GroupVersionKind{
+				Group:   "apiextensions.k8s.io",
+				Version: "v1",
+				Kind:    "CustomResourceDefinition",
+			})
+			return nil
+		}
+
+		// Handle Unstructured requests for the actual control plane object
+		u, ok := obj.(*unstructured.Unstructured)
+		if !ok {
+			return fmt.Errorf("expected *unstructured.Unstructured or *metav1.PartialObjectMetadata, got %T", obj)
+		}
+
+		// Initialize the object map if it's nil
+		if u.Object == nil {
+			u.Object = make(map[string]interface{})
+		}
+
+		// Set the GVK on both the object and its TypeMeta
+		u.SetAPIVersion(apiVersion)
+		u.SetKind(kind)
+		gvk := schema.FromAPIVersionAndKind(apiVersion, kind)
+		u.GetObjectKind().SetGroupVersionKind(gvk)
+
+		// Also set metadata
+		u.Object["apiVersion"] = apiVersion
+		u.Object["kind"] = kind
+		u.Object["metadata"] = map[string]interface{}{
+			"name":      "test-control-plane",
+			"namespace": "default",
+		}
+
+		// Set the kubernetes version field based on control plane type
+		if isRKE {
+			u.Object["spec"] = map[string]interface{}{
+				"kubernetesVersion": kubernetesVersion,
+			}
+		} else {
+			u.Object["spec"] = map[string]interface{}{
+				"version": kubernetesVersion,
+			}
+		}
+
+		return nil
+	})
+}
+
+func (s *autoscalerSuite) setupDynamicClientForRKEControlPlane(kubernetesVersion string) {
+	rkeCP := &rke.RKEControlPlane{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "RKEControlPlane",
+			APIVersion: "rke.cattle.io/v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-control-plane",
 			Namespace: "default",
+		},
+		Spec: rke.RKEControlPlaneSpec{
+			KubernetesVersion: kubernetesVersion,
 		},
 	}
 
-	s.helmOpCache.EXPECT().Get("default", "autoscaler-default-test-cluster").Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+	s.dynamicClient.SetGetFunc(func(gvk schema.GroupVersionKind, namespace string, name string) (runtime.Object, error) {
+		if gvk.Group == "rke.cattle.io" && gvk.Kind == "RKEControlPlane" {
+			return rkeCP, nil
+		}
+		return nil, fmt.Errorf("not found")
+	})
+}
+
+func (s *autoscalerSuite) setupDynamicClientForCAPIControlPlane(kubernetesVersion string) {
+	unstructuredCP := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"spec": map[string]interface{}{
+				"version": kubernetesVersion,
+			},
+		},
+	}
+
+	s.dynamicClient.SetGetFunc(func(gvk schema.GroupVersionKind, namespace string, name string) (runtime.Object, error) {
+		if gvk.Group == "controlplane.cluster.x-k8s.io" && gvk.Kind == "KubeadmControlPlane" {
+			return unstructuredCP, nil
+		}
+		return nil, fmt.Errorf("not found")
+	})
+}
+
+func (s *autoscalerSuite) expectHelmOpGet(namespace, name string, helmOp *fleet.HelmOp, err error) {
+	s.helmOpCache.EXPECT().Get(namespace, name).Return(helmOp, err)
+}
+
+func (s *autoscalerSuite) expectHelmOpCreate() {
 	s.helmOp.EXPECT().Create(gomock.Any()).Do(func(helmOp *fleet.HelmOp) {
 		s.Equal("default", helmOp.Namespace)
 		s.Equal("autoscaler-default-test-cluster", helmOp.Name)
 	}).Return(&fleet.HelmOp{}, nil)
+}
+
+func (s *autoscalerSuite) expectHelmOpUpdate(expectedNamespace, expectedName string) {
+	s.helmOp.EXPECT().Update(gomock.Any()).Do(func(helmOp *fleet.HelmOp) {
+		s.Equal(expectedNamespace, helmOp.Namespace)
+		s.Equal(expectedName, helmOp.Name)
+	}).Return(&fleet.HelmOp{}, nil)
+}
+
+func (s *autoscalerSuite) expectHelmOpDelete(namespace, name string, err error) {
+	s.helmOp.EXPECT().Delete(namespace, name, &metav1.DeleteOptions{}).Return(err)
+}
+
+// Test cases for ensureFleetHelmOp method
+
+func (s *autoscalerSuite) TestEnsureFleetHelmOp_HappyPath_CreateNewHelmOp() {
+	cluster := s.createTestCluster("test-cluster", "default")
+
+	s.expectHelmOpGet("default", "autoscaler-default-test-cluster", nil, errors.NewNotFound(schema.GroupResource{}, ""))
+	s.expectHelmOpCreate()
 
 	err := s.h.ensureFleetHelmOp(cluster, "v1", 3)
 	s.NoError(err)
 }
 
 func (s *autoscalerSuite) TestEnsureFleetHelmOp_HappyPath_UpdateExistingHelmOp() {
-	cluster := &capi.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-cluster",
-			Namespace: "default",
-		},
-	}
+	cluster := s.createTestCluster("test-cluster", "default")
 
 	existingHelmOp := &fleet.HelmOp{
 		ObjectMeta: metav1.ObjectMeta{
@@ -57,23 +195,15 @@ func (s *autoscalerSuite) TestEnsureFleetHelmOp_HappyPath_UpdateExistingHelmOp()
 		},
 	}
 
-	s.helmOpCache.EXPECT().Get("default", "autoscaler-default-test-cluster").Return(existingHelmOp, nil)
-	s.helmOp.EXPECT().Update(gomock.Any()).Do(func(helmOp *fleet.HelmOp) {
-		s.Equal("default", helmOp.Namespace)
-		s.Equal("cluster-autoscaler-test-cluster", helmOp.Name)
-	}).Return(&fleet.HelmOp{}, nil)
+	s.expectHelmOpGet("default", "autoscaler-default-test-cluster", existingHelmOp, nil)
+	s.expectHelmOpUpdate("default", "cluster-autoscaler-test-cluster")
 
 	err := s.h.ensureFleetHelmOp(cluster, "v1", 3)
 	s.NoError(err)
 }
 
 func (s *autoscalerSuite) TestEnsureFleetHelmOp_HappyPath_NoUpdateNeeded() {
-	cluster := &capi.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-cluster",
-			Namespace: "default",
-		},
-	}
+	cluster := s.createTestCluster("test-cluster", "default")
 
 	existingHelmOp := &fleet.HelmOp{
 		ObjectMeta: metav1.ObjectMeta{
@@ -125,7 +255,7 @@ func (s *autoscalerSuite) TestEnsureFleetHelmOp_HappyPath_NoUpdateNeeded() {
 		},
 	}
 
-	s.helmOpCache.EXPECT().Get("default", "autoscaler-default-test-cluster").Return(existingHelmOp, nil)
+	s.expectHelmOpGet("default", "autoscaler-default-test-cluster", existingHelmOp, nil)
 	s.helmOp.EXPECT().Update(gomock.Any()).Times(0)
 
 	err := s.h.ensureFleetHelmOp(cluster, "v1", 3)
@@ -135,45 +265,12 @@ func (s *autoscalerSuite) TestEnsureFleetHelmOp_HappyPath_NoUpdateNeeded() {
 // Test cases for resolveImageTagVersion method
 
 func (s *autoscalerSuite) TestResolveImageTagVersion_HappyPath_KnownVersion() {
-	rkeCP := &rke.RKEControlPlane{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "RKEControlPlane",
-			APIVersion: "rke.cattle.io/v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-control-plane",
-			Namespace: "default",
-		},
-		Spec: rke.RKEControlPlaneSpec{
-			KubernetesVersion: "v1.34.0+k3s1",
-		},
-	}
+	cluster := s.createTestClusterWithControlPlane("test-cluster", "default", "rke.cattle.io", "RKEControlPlane", "test-control-plane")
 
-	cluster := &capi.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-cluster",
-			Namespace: "default",
-		},
-		Spec: capi.ClusterSpec{
-			ControlPlaneRef: &corev1.ObjectReference{
-				APIVersion: "rke.cattle.io/v1",
-				Kind:       "RKEControlPlane",
-				Name:       "test-control-plane",
-				Namespace:  "default",
-			},
-		},
-	}
-
-	s.dynamicClient.SetGetFunc(func(gvk schema.GroupVersionKind, namespace string, name string) (runtime.Object, error) {
-		// Only return the RKEControlPlane if the GVK matches what we expect for RKEControlPlane
-		if gvk.Group == "rke.cattle.io" && gvk.Version == "v1" && gvk.Kind == "RKEControlPlane" {
-			return rkeCP, nil
-		}
-		return nil, fmt.Errorf("not found")
-	})
+	s.setupClientForControlPlane("rke.cattle.io/v1", "RKEControlPlane", "v1.34.0+k3s1", true)
 
 	result := s.h.resolveImageTagVersion(cluster)
-	s.Equal("1.34.0-3.4", result) // Should return the version for minor 34
+	s.Equal("1.34.0-3.4", result)
 }
 
 func (s *autoscalerSuite) TestResolveImageTagVersion_EdgeCase_UnknownVersion() {
@@ -201,28 +298,20 @@ func (s *autoscalerSuite) TestResolveImageTagVersion_EdgeCase_UnknownVersion() {
 // Test cases for getChartImageSettings method
 
 func (s *autoscalerSuite) TestGetChartImageSettings_HappyPath_NoOverride() {
-	cluster := &capi.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-cluster",
-			Namespace: "default",
-		},
-	}
+	cluster := s.createTestCluster("test-cluster", "default")
 
 	result := s.h.getChartImageSettings(cluster)
-	s.Equal(map[string]any{}, result) // Should return empty map when no override
+	s.Equal(map[string]any{}, result)
 }
 
 func (s *autoscalerSuite) TestGetChartImageSettings_HappyPath_WithValidImage() {
 	originalImage := settings.ClusterAutoscalerImage.Get()
-	defer settings.ClusterAutoscalerImage.Set(originalImage)
-	settings.ClusterAutoscalerImage.Set("registry.example.com/cluster-autoscaler:1.2.3")
+	defer func() {
+		_ = settings.ClusterAutoscalerImage.Set(originalImage)
+	}()
+	_ = settings.ClusterAutoscalerImage.Set("registry.example.com/cluster-autoscaler:1.2.3")
 
-	cluster := &capi.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-cluster",
-			Namespace: "default",
-		},
-	}
+	cluster := s.createTestCluster("test-cluster", "default")
 
 	result := s.h.getChartImageSettings(cluster)
 	expected := map[string]any{
@@ -236,382 +325,181 @@ func (s *autoscalerSuite) TestGetChartImageSettings_HappyPath_WithValidImage() {
 // Test cases for getKubernetesMinorVersion method
 
 func (s *autoscalerSuite) TestGetKubernetesMinorVersion_HappyPath_RKEControlPlane() {
-	cluster := &capi.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-cluster",
-			Namespace: "default",
-		},
-		Spec: capi.ClusterSpec{
-			ControlPlaneRef: &corev1.ObjectReference{
-				APIVersion: "rke.cattle.io/v1",
-				Kind:       "RKEControlPlane",
-				Name:       "test-control-plane",
-				Namespace:  "default",
-			},
-		},
-	}
+	cluster := s.createTestClusterWithControlPlane("test-cluster", "default", "rke.cattle.io", "RKEControlPlane", "test-control-plane")
 
-	rkeCP := &rke.RKEControlPlane{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "RKEControlPlane",
-			APIVersion: "rke.cattle.io/v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-control-plane",
-			Namespace: "default",
-		},
-		Spec: rke.RKEControlPlaneSpec{
-			KubernetesVersion: "v1.34.0+k3s1",
-		},
-	}
-
-	s.dynamicClient.SetGetFunc(func(gvk schema.GroupVersionKind, namespace string, name string) (runtime.Object, error) {
-		// Only return the RKEControlPlane if the GVK matches what we expect for RKEControlPlane
-		if gvk.Group == "rke.cattle.io" && gvk.Version == "v1" && gvk.Kind == "RKEControlPlane" {
-			return rkeCP, nil
-		}
-		return nil, fmt.Errorf("not found")
-	})
+	s.setupClientForControlPlane("rke.cattle.io/v1", "RKEControlPlane", "v1.34.0+k3s1", true)
 
 	result := s.h.getKubernetesMinorVersion(cluster)
-	s.Equal(34, result) // Should return minor version 34
+	s.Equal(34, result)
 }
 
 func (s *autoscalerSuite) TestGetKubernetesMinorVersion_HappyPath_CAPIControlPlane() {
-	cluster := &capi.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-cluster",
-			Namespace: "default",
-		},
-		Spec: capi.ClusterSpec{
-			ControlPlaneRef: &corev1.ObjectReference{
-				APIVersion: "controlplane.cluster.x-k8s.io/v1beta1",
-				Kind:       "KubeadmControlPlane",
-				Name:       "test-control-plane",
-				Namespace:  "default",
-			},
-		},
-	}
+	cluster := s.createTestClusterWithControlPlane("test-cluster", "default", "controlplane.cluster.x-k8s.io", "KubeadmControlPlane", "test-control-plane")
 
-	unstructuredCP := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"spec": map[string]interface{}{
-				"version": "v1.33.0+k3s1",
-			},
-		},
-	}
-
-	s.dynamicClient.SetGetFunc(func(gvk schema.GroupVersionKind, namespace string, name string) (runtime.Object, error) {
-		// Only return the Unstructured object if the GVK matches what we expect for CAPI control plane
-		if gvk.Group == "controlplane.cluster.x-k8s.io" && gvk.Version == "v1beta1" && gvk.Kind == "KubeadmControlPlane" {
-			return unstructuredCP, nil
-		}
-		return nil, fmt.Errorf("not found")
-	})
+	s.setupClientForControlPlane("controlplane.cluster.x-k8s.io/v1beta1", "KubeadmControlPlane", "v1.33.0+k3s1", false)
 
 	result := s.h.getKubernetesMinorVersion(cluster)
-	s.Equal(33, result) // Should return minor version 33
+	s.Equal(33, result)
 }
 
 func (s *autoscalerSuite) TestGetKubernetesMinorVersion_EdgeCase_ErrorGettingControlPlane() {
-	cluster := &capi.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-cluster",
-			Namespace: "default",
-		},
-		Spec: capi.ClusterSpec{
-			ControlPlaneRef: &corev1.ObjectReference{
-				APIVersion: "rke.cattle.io/v1",
-				Kind:       "RKEControlPlane",
-				Name:       "non-existent",
-				Namespace:  "default",
-			},
-		},
-	}
+	cluster := s.createTestClusterWithControlPlane("test-cluster", "default", "rke.cattle.io", "RKEControlPlane", "non-existent")
 
-	s.dynamicClient.SetGetFunc(func(gvk schema.GroupVersionKind, namespace string, name string) (runtime.Object, error) {
-		// Only return an error if the GVK matches what we expect for RKEControlPlane
-		if gvk.Group == "rke.cattle.io" && gvk.Version == "v1" && gvk.Kind == "RKEControlPlane" {
-			return nil, fmt.Errorf("not found")
-		}
-		return nil, fmt.Errorf("not found")
+	s.client.SetGetFunc(func(ctx context.Context, key any, obj any, opts ...any) error {
+		return fmt.Errorf("not found")
 	})
 
 	result := s.h.getKubernetesMinorVersion(cluster)
-	s.Equal(0, result) // Should return 0 on error
+	s.Equal(0, result)
 }
 
 func (s *autoscalerSuite) TestGetKubernetesMinorVersion_EdgeCase_InvalidVersion() {
-	cluster := &capi.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-cluster",
-			Namespace: "default",
-		},
-		Spec: capi.ClusterSpec{
-			ControlPlaneRef: &corev1.ObjectReference{
-				APIVersion: "rke.cattle.io/v1",
-				Kind:       "RKEControlPlane",
-				Name:       "test-control-plane",
-				Namespace:  "default",
-			},
-		},
-	}
+	cluster := s.createTestClusterWithControlPlane("test-cluster", "default", "rke.cattle.io", "RKEControlPlane", "test-control-plane")
 
-	rkeCP := &rke.RKEControlPlane{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-control-plane",
-			Namespace: "default",
-		},
-		Spec: rke.RKEControlPlaneSpec{
-			KubernetesVersion: "invalid-version",
-		},
-	}
-
-	s.dynamicClient.SetGetFunc(func(gvk schema.GroupVersionKind, namespace string, name string) (runtime.Object, error) {
-		// Only return the RKEControlPlane if the GVK matches what we expect for RKEControlPlane
-		if gvk.Group == "rke.cattle.io" && gvk.Version == "v1" && gvk.Kind == "RKEControlPlane" {
-			return rkeCP, nil
-		}
-		return nil, fmt.Errorf("not found")
-	})
+	s.setupClientForControlPlane("rke.cattle.io/v1", "RKEControlPlane", "invalid-version", true)
 
 	result := s.h.getKubernetesMinorVersion(cluster)
-	s.Equal(0, result) // Should return 0 for invalid version
+	s.Equal(0, result)
 }
 
 func (s *autoscalerSuite) TestGetKubernetesMinorVersion_EdgeCase_NilControlPlaneRef() {
-	cluster := &capi.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-cluster",
-			Namespace: "default",
-		},
-		Spec: capi.ClusterSpec{
-			ControlPlaneRef: nil, // Nil control plane ref
-		},
-	}
+	cluster := s.createTestCluster("test-cluster", "default")
 
 	result := s.h.getKubernetesMinorVersion(cluster)
-	s.Equal(0, result) // Should return 0 when ControlPlaneRef is nil
+	s.Equal(0, result)
 }
 
 // Test cases for cleanupFleet method
 
 func (s *autoscalerSuite) TestCleanupFleet_HappyPath_HelmOpExists() {
-	cluster := &capi.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-cluster",
-			Namespace: "default",
-		},
-	}
+	cluster := s.createTestCluster("test-cluster", "default")
+	helmOpName := helmOpName(cluster)
 
-	s.helmOpCache.EXPECT().Get("default", "autoscaler-default-test-cluster").Return(&fleet.HelmOp{}, nil)
-	s.helmOp.EXPECT().Delete("default", "autoscaler-default-test-cluster", &metav1.DeleteOptions{}).Return(nil)
+	s.expectHelmOpGet(cluster.Namespace, helmOpName, &fleet.HelmOp{}, nil)
+	s.expectHelmOpDelete(cluster.Namespace, helmOpName, nil)
 
 	err := s.h.cleanupFleet(cluster)
 	s.NoError(err)
 }
 
 func (s *autoscalerSuite) TestCleanupFleet_HappyPath_HelmOpDoesNotExist() {
-	cluster := &capi.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-cluster",
-			Namespace: "default",
-		},
-	}
+	cluster := s.createTestCluster("test-cluster", "default")
+	helmOpName := helmOpName(cluster)
 
-	s.helmOpCache.EXPECT().Get("default", "autoscaler-default-test-cluster").Return(nil, errors.NewNotFound(schema.GroupResource{}, ""))
+	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, errors.NewNotFound(schema.GroupResource{}, ""))
 
 	err := s.h.cleanupFleet(cluster)
 	s.NoError(err)
 }
 
 func (s *autoscalerSuite) TestCleanupFleet_EdgeCase_DeleteError() {
-	cluster := &capi.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-cluster",
-			Namespace: "default",
-		},
-	}
+	cluster := s.createTestCluster("test-cluster", "default")
+	helmOpName := helmOpName(cluster)
 
-	s.helmOpCache.EXPECT().Get("default", "autoscaler-default-test-cluster").Return(&fleet.HelmOp{}, nil)
-	s.helmOp.EXPECT().Delete("default", "autoscaler-default-test-cluster", &metav1.DeleteOptions{}).Return(fmt.Errorf("delete failed"))
+	s.expectHelmOpGet(cluster.Namespace, helmOpName, &fleet.HelmOp{}, nil)
+	s.expectHelmOpDelete(cluster.Namespace, helmOpName, fmt.Errorf("delete failed"))
 
 	err := s.h.cleanupFleet(cluster)
 	s.Error(err)
-	s.Contains(err.Error(), "failed to delete Helm operation")
+	if err != nil {
+		s.Contains(err.Error(), "failed to delete Helm operation")
+	}
 }
 
 func (s *autoscalerSuite) TestCleanupFleet_EdgeCase_GetError() {
-	cluster := &capi.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-cluster",
-			Namespace: "default",
-		},
-	}
+	cluster := s.createTestCluster("test-cluster", "default")
+	helmOpName := helmOpName(cluster)
 
-	s.helmOpCache.EXPECT().Get("default", "autoscaler-default-test-cluster").Return(nil, fmt.Errorf("get failed"))
+	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, fmt.Errorf("get failed"))
 
 	err := s.h.cleanupFleet(cluster)
 	s.Error(err)
-	s.Contains(err.Error(), "failed to check existence of Helm operation")
+	if err != nil {
+		s.Contains(err.Error(), "failed to check existence of Helm operation")
+	}
 }
 
-// Test cases for cleanupFleet method
-
 func (s *autoscalerSuite) TestCleanupFleet_HappyPath_SuccessfulHelmOpDeletion() {
-	// Create test cluster
-	cluster := &capi.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-cluster",
-			Namespace: "default",
-		},
-	}
-
+	cluster := s.createTestCluster("test-cluster", "default")
 	helmOpName := helmOpName(cluster)
 
-	// Set up mock expectations for successful HelmOp deletion
-	s.helmOpCache.EXPECT().Get(cluster.Namespace, helmOpName).Return(&fleet.HelmOp{}, nil)
-	s.helmOp.EXPECT().Delete(cluster.Namespace, helmOpName, &metav1.DeleteOptions{}).Return(nil)
+	s.expectHelmOpGet(cluster.Namespace, helmOpName, &fleet.HelmOp{}, nil)
+	s.expectHelmOpDelete(cluster.Namespace, helmOpName, nil)
 
-	// Call the method
 	err := s.h.cleanupFleet(cluster)
-
-	// Assert the result
 	s.NoError(err, "Expected no error when successfully cleaning up HelmOp")
 }
 
 func (s *autoscalerSuite) TestCleanupFleet_HappyPath_NoHelmOpExists() {
-	// Create test cluster
-	cluster := &capi.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-cluster",
-			Namespace: "default",
-		},
-	}
-
+	cluster := s.createTestCluster("test-cluster", "default")
 	helmOpName := helmOpName(cluster)
 
-	// Set up mock expectations for HelmOp not found
-	s.helmOpCache.EXPECT().Get(cluster.Namespace, helmOpName).Return(nil, errors.NewNotFound(schema.GroupResource{}, "helmop"))
+	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, errors.NewNotFound(schema.GroupResource{}, "helmop"))
 
-	// Call the method
 	err := s.h.cleanupFleet(cluster)
-
-	// Assert the result - should succeed when HelmOp doesn't exist
 	s.NoError(err, "Expected no error when HelmOp doesn't exist")
 }
 
 func (s *autoscalerSuite) TestCleanupFleet_Error_FailedToDeleteHelmOp() {
-	// Create test cluster
-	cluster := &capi.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-cluster",
-			Namespace: "default",
-		},
-	}
-
+	cluster := s.createTestCluster("test-cluster", "default")
 	helmOpName := helmOpName(cluster)
 	deleteError := fmt.Errorf("failed to delete HelmOp: access denied")
 
-	// Set up mock expectations
-	s.helmOpCache.EXPECT().Get(cluster.Namespace, helmOpName).Return(&fleet.HelmOp{}, nil)
-	s.helmOp.EXPECT().Delete(cluster.Namespace, helmOpName, &metav1.DeleteOptions{}).Return(deleteError)
+	s.expectHelmOpGet(cluster.Namespace, helmOpName, &fleet.HelmOp{}, nil)
+	s.expectHelmOpDelete(cluster.Namespace, helmOpName, deleteError)
 
-	// Call the method
 	err := s.h.cleanupFleet(cluster)
-
-	// Assert the result
 	s.Error(err, "Expected error when HelmOp deletion fails")
-	s.Contains(err.Error(), "encountered 1 errors during fleet cleanup", "Error should mention count of errors")
-	s.Contains(err.Error(), "failed to delete Helm operation "+helmOpName+" in namespace "+cluster.Namespace, "Error should include HelmOp name and namespace")
-	s.Contains(err.Error(), "access denied", "Original error should be preserved")
+	if err != nil {
+		s.Contains(err.Error(), "encountered 1 errors during fleet cleanup")
+		s.Contains(err.Error(), "failed to delete Helm operation "+helmOpName+" in namespace "+cluster.Namespace)
+		s.Contains(err.Error(), "access denied")
+	}
 }
 
 func (s *autoscalerSuite) TestCleanupFleet_Error_FailedToCheckHelmOpExistence() {
-	// Create test cluster
-	cluster := &capi.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-cluster",
-			Namespace: "default",
-		},
-	}
-
+	cluster := s.createTestCluster("test-cluster", "default")
 	helmOpName := helmOpName(cluster)
 	checkError := fmt.Errorf("failed to check HelmOp existence: network timeout")
 
-	// Set up mock expectations for cache error
-	s.helmOpCache.EXPECT().Get(cluster.Namespace, helmOpName).Return(nil, checkError)
+	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, checkError)
 
-	// Call the method
 	err := s.h.cleanupFleet(cluster)
-
-	// Assert the result
 	s.Error(err, "Expected error when HelmOp existence check fails")
-	s.Contains(err.Error(), "encountered 1 errors during fleet cleanup", "Error should mention count of errors")
-	s.Contains(err.Error(), "failed to check existence of Helm operation "+helmOpName+" in namespace "+cluster.Namespace, "Error should include HelmOp name and namespace")
-	s.Contains(err.Error(), "network timeout", "Original error should be preserved")
+	if err != nil {
+		s.Contains(err.Error(), "encountered 1 errors during fleet cleanup", "Error should mention count of errors")
+		s.Contains(err.Error(), "failed to check existence of Helm operation "+helmOpName+" in namespace "+cluster.Namespace, "Error should include HelmOp name and namespace")
+		s.Contains(err.Error(), "network timeout", "Original error should be preserved")
+	}
 }
 
 func (s *autoscalerSuite) TestCleanupFleet_EdgeCase_ClusterWithEmptyName() {
-	// Create test cluster with empty name
-	cluster := &capi.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "",
-			Namespace: "default",
-		},
-	}
-
+	cluster := s.createTestCluster("", "default")
 	helmOpName := helmOpName(cluster)
 
-	// Set up mock expectations for HelmOp not found (should handle empty names gracefully)
-	s.helmOpCache.EXPECT().Get(cluster.Namespace, helmOpName).Return(nil, errors.NewNotFound(schema.GroupResource{}, "helmop"))
+	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, errors.NewNotFound(schema.GroupResource{}, "helmop"))
 
-	// Call the method
 	err := s.h.cleanupFleet(cluster)
-
-	// Assert the result
 	s.NoError(err, "Expected no error when cluster has empty name")
 }
 
 func (s *autoscalerSuite) TestCleanupFleet_EdgeCase_ClusterWithEmptyNamespace() {
-	// Create test cluster with empty namespace
-	cluster := &capi.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-cluster",
-			Namespace: "",
-		},
-	}
-
+	cluster := s.createTestCluster("test-cluster", "")
 	helmOpName := helmOpName(cluster)
 
-	// Set up mock expectations for HelmOp not found (should handle empty namespace gracefully)
-	s.helmOpCache.EXPECT().Get(cluster.Namespace, helmOpName).Return(nil, errors.NewNotFound(schema.GroupResource{}, "helmop"))
+	s.expectHelmOpGet(cluster.Namespace, helmOpName, nil, errors.NewNotFound(schema.GroupResource{}, "helmop"))
 
-	// Call the method
 	err := s.h.cleanupFleet(cluster)
-
-	// Assert the result
 	s.NoError(err, "Expected no error when cluster has empty namespace")
 }
 
 func (s *autoscalerSuite) TestCleanupFleet_EdgeCase_ClusterWithSpecialCharacters() {
-	// Create test cluster with special characters in name and namespace
-	cluster := &capi.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-cluster-123",
-			Namespace: "test-namespace-456",
-		},
-	}
-
+	cluster := s.createTestCluster("test-cluster-123", "test-namespace-456")
 	helmOpName := helmOpName(cluster)
 
-	// Set up mock expectations for successful deletion (should handle special characters gracefully)
-	s.helmOpCache.EXPECT().Get(cluster.Namespace, helmOpName).Return(&fleet.HelmOp{}, nil)
-	s.helmOp.EXPECT().Delete(cluster.Namespace, helmOpName, &metav1.DeleteOptions{}).Return(nil)
+	s.expectHelmOpGet(cluster.Namespace, helmOpName, &fleet.HelmOp{}, nil)
+	s.expectHelmOpDelete(cluster.Namespace, helmOpName, nil)
 
-	// Call the method
 	err := s.h.cleanupFleet(cluster)
-
-	// Assert the result
 	s.NoError(err, "Expected no error when cluster has special characters in name and namespace")
 }

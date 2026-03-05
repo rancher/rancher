@@ -12,9 +12,6 @@ func RequiredCRDs() []string {
 		if features.RKE2.Enabled() {
 			requiredCRDS = append(requiredCRDS, RKE2CRDs()...)
 		}
-		if features.EmbeddedClusterAPI.Enabled() && !features.Turtles.Enabled() {
-			requiredCRDS = append(requiredCRDS, CAPICRDs()...)
-		}
 		if features.Fleet.Enabled() {
 			requiredCRDS = append(requiredCRDS, "managedcharts.management.cattle.io")
 		}
@@ -67,6 +64,7 @@ func BasicCRDs() []string {
 		"podsecurityadmissionconfigurationtemplates.management.cattle.io",
 		"preferences.management.cattle.io",
 		"settings.management.cattle.io",
+		"proxyendpoints.management.cattle.io",
 	}
 }
 
@@ -280,4 +278,5 @@ var MigratedResources = map[string]bool{
 	"users.management.cattle.io":                                      true,
 	"uiplugins.catalog.cattle.io":                                     true,
 	"workloads.project.cattle.io":                                     false,
+	"proxyendpoints.management.cattle.io":                             true,
 }

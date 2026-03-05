@@ -76,10 +76,17 @@ jobs:
           ASSIGNEES=$(echo "${ORIGINAL_ISSUE}" | jq -r .assignees[].login)
           if [ -n "$ASSIGNEES" ]; then
               echo "Checking if assignee is member before assigning"
+              # Fetch organization members once to reduce API calls
+              ORG_MEMBERS=$(gh api orgs/${GITHUB_REPOSITORY_OWNER}/members --paginate | jq -r '.[].login')
               DELIMITER=""
               NEW_ASSIGNEES=""
               for ASSIGNEE in $ASSIGNEES; do
-                  if gh api orgs/${GITHUB_REPOSITORY_OWNER}/members --paginate | jq -e --arg GITHUB_ACTOR "$GITHUB_ACTOR" '.[] | select(.login == $GITHUB_ACTOR)' > /dev/null; then
+                  # Exclude Copilot assignees (copilot, copilot-swe-agent, etc.)
+                  if [[ "${ASSIGNEE,,}" =~ ^copilot(-.+)?$ ]]; then
+                      echo "Skipping Copilot assignee: ${ASSIGNEE}"
+                      continue
+                  fi
+                  if echo "$ORG_MEMBERS" | grep -Fqx "$ASSIGNEE"; then
                       echo "${ASSIGNEE} is a member, adding to assignees"
                       NEW_ASSIGNEES="${NEW_ASSIGNEES}${DELIMITER}${ASSIGNEE}"
                       DELIMITER=","

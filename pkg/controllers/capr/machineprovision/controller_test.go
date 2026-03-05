@@ -16,10 +16,14 @@ import (
 	"go.uber.org/mock/gomock"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/utils/ptr"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	capierrors "sigs.k8s.io/cluster-api/errors"
+	k8sfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
 func MustStatus(status rkev1.RKEMachineStatus, err error) rkev1.RKEMachineStatus {
@@ -330,6 +334,37 @@ func TestOnChange(t *testing.T) {
 
 	apply := fake.FakeApply{}
 	now := metav1.Now()
+
+	scheme := runtime.NewScheme()
+	if err := rkev1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+	if err := apiextensionsv1.AddToScheme(scheme); err != nil {
+		t.Fatal(err)
+	}
+
+	rkeBootstrap := &rkev1.RKEBootstrap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testing",
+			Namespace: "namespace",
+		},
+		Status: rkev1.RKEBootstrapStatus{
+			DataSecretName: ptr.To("dataSecretName"),
+		},
+	}
+
+	crd := &apiextensionsv1.CustomResourceDefinition{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "rkebootstraps.rke.cattle.io",
+			Labels: map[string]string{
+				"cluster.x-k8s.io/v1beta1": "v1",
+				"cluster.x-k8s.io/v1beta2": "v1",
+			},
+		},
+	}
+
+	client := k8sfake.NewClientBuilder().WithScheme(scheme).WithStatusSubresource(rkeBootstrap).WithRuntimeObjects(rkeBootstrap, crd).Build()
+
 	h := &handler{
 		machineCache:        machineCache,
 		machineClient:       machineClient,
@@ -338,6 +373,7 @@ func TestOnChange(t *testing.T) {
 		rancherClusterCache: rancherClusterCache,
 		secrets:             secrets,
 		apply:               &apply,
+		client:              client,
 	}
 
 	testCases := []struct {
@@ -413,8 +449,10 @@ func newCapiMachine(name, namespace string) *capi.Machine {
 		},
 		Spec: capi.MachineSpec{
 			Bootstrap: capi.Bootstrap{
-				ConfigRef: &corev1.ObjectReference{
-					APIVersion: "v1",
+				ConfigRef: capi.ContractVersionedObjectReference{
+					Kind:     "RKEBootstrap",
+					Name:     "testing",
+					APIGroup: "rke.cattle.io",
 				},
 				DataSecretName: &dataSecretName,
 			},
@@ -437,7 +475,9 @@ func newCluster(name, namespace string) *capi.Cluster {
 		},
 		Spec: capi.ClusterSpec{},
 		Status: capi.ClusterStatus{
-			InfrastructureReady: true,
+			Initialization: capi.ClusterInitializationStatus{
+				InfrastructureProvisioned: ptr.To(true),
+			},
 		},
 	}
 }
@@ -485,7 +525,7 @@ func newInfra(jobName string) *infraObject {
 // newTestInfraMachine creates an object that will be translated to a infraMachine on the OnChange function
 func newTestInfraMachine(withFailure bool) *unstructured.Unstructured {
 	objectData := map[string]interface{}{
-		"apiVersion": "infrastructure.cluster.x-k8s.io/v1beta1",
+		"apiVersion": "infrastructure.cluster.x-k8s.io/v1beta2",
 		"kind":       "InfraMachine",
 		"metadata": map[string]interface{}{
 			"namespace": "namespace",

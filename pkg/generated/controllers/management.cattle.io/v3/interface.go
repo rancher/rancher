@@ -75,6 +75,7 @@ type Interface interface {
 	Project() ProjectController
 	ProjectNetworkPolicy() ProjectNetworkPolicyController
 	ProjectRoleTemplateBinding() ProjectRoleTemplateBindingController
+	ProxyEndpoint() ProxyEndpointController
 	RancherUserNotification() RancherUserNotificationController
 	RkeAddon() RkeAddonController
 	RkeK8sServiceOption() RkeK8sServiceOptionController
@@ -272,6 +273,10 @@ func (v *version) ProjectNetworkPolicy() ProjectNetworkPolicyController {
 
 func (v *version) ProjectRoleTemplateBinding() ProjectRoleTemplateBindingController {
 	return generic.NewController[*v3.ProjectRoleTemplateBinding, *v3.ProjectRoleTemplateBindingList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ProjectRoleTemplateBinding"}, "projectroletemplatebindings", true, v.controllerFactory)
+}
+
+func (v *version) ProxyEndpoint() ProxyEndpointController {
+	return generic.NewNonNamespacedController[*v3.ProxyEndpoint, *v3.ProxyEndpointList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ProxyEndpoint"}, "proxyendpoints", v.controllerFactory)
 }
 
 func (v *version) RancherUserNotification() RancherUserNotificationController {
