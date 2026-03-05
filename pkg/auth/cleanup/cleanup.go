@@ -1,14 +1,12 @@
 package cleanup
 
 import (
-	"encoding/json"
 	"errors"
 
 	"github.com/rancher/rancher/pkg/auth/api/secrets"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 var cleanupProviders = []string{"genericoidc", "cognito"}
@@ -38,19 +36,13 @@ func CleanupUnusedSecretTokens(secretsInterface wcorev1.SecretController, authCo
 			continue
 		}
 
-		patch, err := json.Marshal(map[string]any{
-			"metadata": map[string]any{
-				"annotations": map[string]string{
-					cleanedUpSecretsAnnotation: "true",
-				},
-			},
-		})
-		if err != nil {
-			cleanupErr = errors.Join(cleanupErr, err)
-			continue
+		authConfig = authConfig.DeepCopy()
+		if authConfig.Annotations == nil {
+			authConfig.Annotations = map[string]string{}
 		}
 
-		if _, err := authConfigs.Patch(name, types.MergePatchType, patch); err != nil {
+		authConfig.Annotations[cleanedUpSecretsAnnotation] = "true"
+		if _, err := authConfigs.Update(authConfig); err != nil {
 			cleanupErr = errors.Join(cleanupErr, err)
 		}
 	}
