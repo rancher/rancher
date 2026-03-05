@@ -204,7 +204,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("ui.cattle.io").resources("navlinks").verbs("get", "list", "watch").
 		addRule().apiGroups("").resources("nodes").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("projectroletemplatebindings").verbs("*").
-		addRule().apiGroups("").resources("namespaces").verbs("create").
+		addRule().apiGroups("").resources("namespaces").verbs("*").
 		addRule().apiGroups("").resources("persistentvolumes").verbs("get", "list", "watch").
 		addRule().apiGroups("storage.k8s.io").resources("storageclasses").verbs("get", "list", "watch").
 		addRule().apiGroups("apiregistration.k8s.io").resources("apiservices").verbs("get", "list", "watch").
@@ -228,7 +228,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 	rb.addRoleTemplate("Project Member", "project-member", "project", false, false, false).
 		addRule().apiGroups("ui.cattle.io").resources("navlinks").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("projectroletemplatebindings").verbs("get", "list", "watch").
-		addRule().apiGroups("").resources("namespaces").verbs("create").
+		addRule().apiGroups("").resources("namespaces").verbs("*").
 		addRule().apiGroups("").resources("persistentvolumes").verbs("get", "list", "watch").
 		addRule().apiGroups("storage.k8s.io").resources("storageclasses").verbs("get", "list", "watch").
 		addRule().apiGroups("apiregistration.k8s.io").resources("apiservices").verbs("get", "list", "watch").
@@ -271,7 +271,7 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		setRoleTemplateNames("view")
 
 	rb.addRoleTemplate("Create Namespaces", "create-ns", "project", false, false, false).
-		addRule().apiGroups("").resources("namespaces").verbs("create")
+		addRule().apiGroups("").resources("namespaces").verbs("*")
 
 	rb.addRoleTemplate("Manage Workloads", "workloads-manage", "project", false, false, false).
 		addRule().
