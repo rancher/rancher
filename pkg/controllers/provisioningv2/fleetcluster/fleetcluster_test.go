@@ -120,6 +120,206 @@ func TestClusterCustomization(t *testing.T) {
 			},
 		},
 		{
+			"cluster-has-no-scheduling-customization",
+			&provv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-cluster", Namespace: "test-namespace",
+				},
+				Spec: provv1.ClusterSpec{
+					FleetAgentDeploymentCustomization: &provv1.AgentDeploymentCustomization{},
+				},
+			},
+			clusterStatus,
+			map[string]*apimgmtv3.Cluster{
+				"cluster-name": newMgmtCluster(
+					"cluster-name",
+					labels,
+					nil,
+					apimgmtv3.ClusterSpec{
+						FleetWorkspaceName: "fleet-default",
+						ClusterSpecBase: apimgmtv3.ClusterSpecBase{
+							FleetAgentDeploymentCustomization: &apimgmtv3.AgentDeploymentCustomization{},
+						},
+					},
+				),
+			},
+			&fleet.Cluster{
+				Spec: fleet.ClusterSpec{
+					AgentAffinity:                &builtinAffinity,
+					AgentSchedulingCustomization: nil,
+				},
+			},
+		},
+		{
+			"cluster-has-empty-scheduling-customization",
+			&provv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-cluster", Namespace: "test-namespace",
+				},
+				Spec: provv1.ClusterSpec{
+					FleetAgentDeploymentCustomization: &provv1.AgentDeploymentCustomization{
+						SchedulingCustomization: &provv1.AgentSchedulingCustomization{},
+					},
+				},
+			},
+			clusterStatus,
+			map[string]*apimgmtv3.Cluster{
+				"cluster-name": newMgmtCluster(
+					"cluster-name",
+					labels,
+					nil,
+					apimgmtv3.ClusterSpec{
+						FleetWorkspaceName: "fleet-default",
+						ClusterSpecBase: apimgmtv3.ClusterSpecBase{
+							FleetAgentDeploymentCustomization: &apimgmtv3.AgentDeploymentCustomization{
+								SchedulingCustomization: &apimgmtv3.AgentSchedulingCustomization{},
+							},
+						},
+					},
+				),
+			},
+			&fleet.Cluster{
+				Spec: fleet.ClusterSpec{
+					AgentAffinity:                &builtinAffinity,
+					AgentSchedulingCustomization: nil,
+				},
+			},
+		},
+		{
+			"cluster-has-only-pod-disruption-budget",
+			&provv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-cluster", Namespace: "test-namespace",
+				},
+				Spec: provv1.ClusterSpec{
+					FleetAgentDeploymentCustomization: &provv1.AgentDeploymentCustomization{
+						SchedulingCustomization: &provv1.AgentSchedulingCustomization{
+							PodDisruptionBudget: &provv1.PodDisruptionBudgetSpec{
+								MinAvailable: "1",
+							},
+						},
+					},
+				},
+			},
+			clusterStatus,
+			map[string]*apimgmtv3.Cluster{
+				"cluster-name": newMgmtCluster(
+					"cluster-name",
+					labels,
+					nil,
+					apimgmtv3.ClusterSpec{
+						FleetWorkspaceName: "fleet-default",
+						ClusterSpecBase:    apimgmtv3.ClusterSpecBase{},
+					},
+				),
+			},
+			&fleet.Cluster{
+				Spec: fleet.ClusterSpec{
+					AgentAffinity: &builtinAffinity,
+					AgentSchedulingCustomization: &fleet.AgentSchedulingCustomization{
+						PodDisruptionBudget: &fleet.PodDisruptionBudgetSpec{
+							MinAvailable: "1",
+						},
+					},
+				},
+			},
+		},
+		{
+			"cluster-has-only-priority-class",
+			&provv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-cluster", Namespace: "test-namespace",
+				},
+				Spec: provv1.ClusterSpec{
+					FleetAgentDeploymentCustomization: &provv1.AgentDeploymentCustomization{
+						SchedulingCustomization: &provv1.AgentSchedulingCustomization{
+							PriorityClass: &provv1.PriorityClassSpec{
+								Value: 100,
+							},
+						},
+					},
+				},
+			},
+			clusterStatus,
+			map[string]*apimgmtv3.Cluster{
+				"cluster-name": newMgmtCluster(
+					"cluster-name",
+					labels,
+					nil,
+					apimgmtv3.ClusterSpec{
+						FleetWorkspaceName: "fleet-default",
+						ClusterSpecBase:    apimgmtv3.ClusterSpecBase{},
+					},
+				),
+			},
+			&fleet.Cluster{
+				Spec: fleet.ClusterSpec{
+					AgentAffinity: &builtinAffinity,
+					AgentSchedulingCustomization: &fleet.AgentSchedulingCustomization{
+						PriorityClass: &fleet.PriorityClassSpec{
+							Value: 100,
+						},
+					},
+				},
+			},
+		},
+		{
+			"cluster-has-scheduling-customization",
+			&provv1.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-cluster", Namespace: "test-namespace",
+				},
+				Spec: provv1.ClusterSpec{
+					FleetAgentDeploymentCustomization: &provv1.AgentDeploymentCustomization{
+						SchedulingCustomization: &provv1.AgentSchedulingCustomization{
+							PodDisruptionBudget: &provv1.PodDisruptionBudgetSpec{
+								MinAvailable: "1",
+							},
+							PriorityClass: &provv1.PriorityClassSpec{
+								Value: 100,
+							},
+						},
+					},
+				},
+			},
+			clusterStatus,
+			map[string]*apimgmtv3.Cluster{
+				"cluster-name": newMgmtCluster(
+					"cluster-name",
+					labels,
+					nil,
+					apimgmtv3.ClusterSpec{
+						FleetWorkspaceName: "fleet-default",
+						ClusterSpecBase: apimgmtv3.ClusterSpecBase{
+							FleetAgentDeploymentCustomization: &apimgmtv3.AgentDeploymentCustomization{
+								SchedulingCustomization: &apimgmtv3.AgentSchedulingCustomization{
+									PodDisruptionBudget: &apimgmtv3.PodDisruptionBudgetSpec{
+										MinAvailable: "1",
+									},
+									PriorityClass: &apimgmtv3.PriorityClassSpec{
+										Value: 100,
+									},
+								},
+							},
+						},
+					},
+				),
+			},
+			&fleet.Cluster{
+				Spec: fleet.ClusterSpec{
+					AgentAffinity: &builtinAffinity,
+					AgentSchedulingCustomization: &fleet.AgentSchedulingCustomization{
+						PodDisruptionBudget: &fleet.PodDisruptionBudgetSpec{
+							MinAvailable: "1",
+						},
+						PriorityClass: &fleet.PriorityClassSpec{
+							Value: 100,
+						},
+					},
+				},
+			},
+		},
+		{
 			"cluster-has-affinity-override",
 			cluster,
 			clusterStatus,
@@ -197,6 +397,7 @@ func TestClusterCustomization(t *testing.T) {
 			require.Equal(tt.expectedFleet.Spec.AgentAffinity, fleetCluster.Spec.AgentAffinity)
 			require.Equal(tt.expectedFleet.Spec.AgentResources, fleetCluster.Spec.AgentResources)
 			require.Equal(tt.expectedFleet.Spec.AgentTolerations, fleetCluster.Spec.AgentTolerations)
+			require.Equal(tt.expectedFleet.Spec.AgentSchedulingCustomization, fleetCluster.Spec.AgentSchedulingCustomization)
 		})
 	}
 }
