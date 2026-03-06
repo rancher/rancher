@@ -20,7 +20,7 @@ replace (
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.53.0
 	go.opentelemetry.io/otel => go.opentelemetry.io/otel v1.28.0
 	go.opentelemetry.io/otel/metric => go.opentelemetry.io/otel/metric v1.28.0
-	go.opentelemetry.io/otel/sdk => go.opentelemetry.io/otel/sdk v1.28.0
+	go.opentelemetry.io/otel/sdk => go.opentelemetry.io/otel/sdk v1.40.0
 	go.opentelemetry.io/otel/trace => go.opentelemetry.io/otel/trace v1.28.0
 	go.opentelemetry.io/proto/otlp => go.opentelemetry.io/proto/otlp v1.3.1
 	go.qase.io/client => github.com/rancher/qase-go/client v0.0.0-20231114201952-65195ec001fa
