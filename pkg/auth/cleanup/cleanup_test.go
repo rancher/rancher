@@ -53,8 +53,8 @@ func TestCleanupUnusedSecretTokens(t *testing.T) {
 		t.Errorf("failed to delete secrets: %#v", secretStore)
 	}
 
+	addAnnotationPatch := `{"metadata":{"annotations":{"auth.cattle.io/unused-secrets-cleaned":"true"}}}`
 	for _, provider := range cleanupProviders {
-		addAnnotationPatch := `{"metadata":{"annotations":{"auth.cattle.io/unused-secrets-cleaned":"true"}}}`
 		if patched := authConfigStore[provider].patched; patched != addAnnotationPatch {
 			t.Errorf("didn't update the annotations for provider %s got %v", provider, patched)
 		}
