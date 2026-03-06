@@ -167,7 +167,7 @@ func (s *shell) createPod(imageOverride string) *v1.Pod {
 					Image:           imageName,
 					ImagePullPolicy: v1.PullIfNotPresent,
 					Command: []string{
-						"sh", "-c", "cp -a /home/shell/. /home-init/",
+						"sh", "-c", "cp -r /home/shell/. /home-init/",
 					},
 					SecurityContext: &v1.SecurityContext{
 						AllowPrivilegeEscalation: &f,
