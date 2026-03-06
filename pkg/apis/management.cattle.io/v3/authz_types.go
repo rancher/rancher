@@ -423,6 +423,7 @@ func (p *ProjectRoleTemplateBinding) ObjClusterName() string {
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="STATUS",type="string",JSONPath=".status.summary"
 // +kubebuilder:printcolumn:name="AGE",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:selectablefield:JSONPath=".userName"
 
 // ClusterRoleTemplateBinding is the object representing membership of a subject in a cluster with permissions
 // specified by a given role template.
