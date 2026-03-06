@@ -250,9 +250,10 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 	// sort tolerations for consistent ordering to avoid unnecessary updates
 	sortTolerations(tolerations)
 
-	schedulingCustomization := &fleet.AgentSchedulingCustomization{}
+	var schedulingCustomization *fleet.AgentSchedulingCustomization
 	if cluster.Spec.FleetAgentDeploymentCustomization != nil && cluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization != nil {
 		sc := cluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization
+		schedulingCustomization = &fleet.AgentSchedulingCustomization{}
 		if sc.PodDisruptionBudget != nil {
 			schedulingCustomization.PodDisruptionBudget = &fleet.PodDisruptionBudgetSpec{}
 			schedulingCustomization.PodDisruptionBudget.MaxUnavailable = sc.PodDisruptionBudget.MaxUnavailable
@@ -262,6 +263,9 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 			schedulingCustomization.PriorityClass = &fleet.PriorityClassSpec{}
 			schedulingCustomization.PriorityClass.PreemptionPolicy = sc.PriorityClass.PreemptionPolicy
 			schedulingCustomization.PriorityClass.Value = sc.PriorityClass.Value
+		}
+		if schedulingCustomization.PodDisruptionBudget == nil && schedulingCustomization.PriorityClass == nil {
+			schedulingCustomization = nil
 		}
 	}
 
