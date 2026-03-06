@@ -253,19 +253,19 @@ func (h *handler) createCluster(cluster *provv1.Cluster, status provv1.ClusterSt
 	var schedulingCustomization *fleet.AgentSchedulingCustomization
 	if cluster.Spec.FleetAgentDeploymentCustomization != nil && cluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization != nil {
 		sc := cluster.Spec.FleetAgentDeploymentCustomization.SchedulingCustomization
-		tmp := &fleet.AgentSchedulingCustomization{}
+		schedulingCustomization = &fleet.AgentSchedulingCustomization{}
 		if sc.PodDisruptionBudget != nil {
-			tmp.PodDisruptionBudget = &fleet.PodDisruptionBudgetSpec{}
-			tmp.PodDisruptionBudget.MaxUnavailable = sc.PodDisruptionBudget.MaxUnavailable
-			tmp.PodDisruptionBudget.MinAvailable = sc.PodDisruptionBudget.MinAvailable
+			schedulingCustomization.PodDisruptionBudget = &fleet.PodDisruptionBudgetSpec{}
+			schedulingCustomization.PodDisruptionBudget.MaxUnavailable = sc.PodDisruptionBudget.MaxUnavailable
+			schedulingCustomization.PodDisruptionBudget.MinAvailable = sc.PodDisruptionBudget.MinAvailable
 		}
 		if sc.PriorityClass != nil {
-			tmp.PriorityClass = &fleet.PriorityClassSpec{}
-			tmp.PriorityClass.PreemptionPolicy = sc.PriorityClass.PreemptionPolicy
-			tmp.PriorityClass.Value = sc.PriorityClass.Value
+			schedulingCustomization.PriorityClass = &fleet.PriorityClassSpec{}
+			schedulingCustomization.PriorityClass.PreemptionPolicy = sc.PriorityClass.PreemptionPolicy
+			schedulingCustomization.PriorityClass.Value = sc.PriorityClass.Value
 		}
-		if tmp.PodDisruptionBudget != nil || tmp.PriorityClass != nil {
-			schedulingCustomization = tmp
+		if schedulingCustomization.PodDisruptionBudget == nil && schedulingCustomization.PriorityClass == nil {
+			schedulingCustomization = nil
 		}
 	}
 
