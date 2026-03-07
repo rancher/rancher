@@ -510,6 +510,90 @@ func Test_handler_syncSystemUpgradeControllerStatus(t *testing.T) {
 			planClientIsInvoked:   false,
 			clusterCacheIsInvoked: true,
 		},
+		{
+			name: "condition recently updated - downstream API call is skipped",
+			setup: setupConfig{
+				mgmtClusterName: mgmtClusterName,
+				chartVersion:    "160.1.0",
+			},
+			input: &v1.RKEControlPlane{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      controlPlaneName,
+					Namespace: namespace.System,
+				},
+				Spec: v1.RKEControlPlaneSpec{
+					ClusterName:           provClusterName,
+					ManagementClusterName: mgmtClusterName,
+				},
+				Status: v1.RKEControlPlaneStatus{
+					Conditions: []genericcondition.GenericCondition{
+						{
+							Type:           "SystemUpgradeControllerReady",
+							Status:         "False",
+							LastUpdateTime: time.Now().UTC().Format(time.RFC3339),
+						},
+					},
+				},
+			},
+			wantError:             false,
+			wantedConditionStatus: "False",
+			appClientIsInvoked:    false,
+			planClientIsInvoked:   false,
+			clusterCacheIsInvoked: false,
+		},
+		{
+			name: "condition updated more than 10 seconds ago - downstream API call proceeds",
+			setup: setupConfig{
+				mgmtClusterName: mgmtClusterName,
+				app: &catalog.App{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      appName(provClusterName),
+						Namespace: namespace.System,
+					},
+					Spec: catalog.ReleaseSpec{
+						Chart: &catalog.Chart{
+							Metadata: &catalog.Metadata{
+								Version: "160.1.0",
+							},
+						},
+					},
+					Status: catalog.ReleaseStatus{
+						Summary: catalog.Summary{
+							State:         string(catalog.StatusDeployed),
+							Error:         false,
+							Transitioning: false,
+						},
+					},
+				},
+				cluster:      basicCluster,
+				appError:     nil,
+				chartVersion: "160.1.0",
+			},
+			input: &v1.RKEControlPlane{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      controlPlaneName,
+					Namespace: namespace.System,
+				},
+				Spec: v1.RKEControlPlaneSpec{
+					ClusterName:           provClusterName,
+					ManagementClusterName: mgmtClusterName,
+				},
+				Status: v1.RKEControlPlaneStatus{
+					Conditions: []genericcondition.GenericCondition{
+						{
+							Type:           "SystemUpgradeControllerReady",
+							Status:         "False",
+							LastUpdateTime: time.Now().Add(-15 * time.Second).UTC().Format(time.RFC3339),
+						},
+					},
+				},
+			},
+			wantError:             false,
+			wantedConditionStatus: "True",
+			appClientIsInvoked:    true,
+			planClientIsInvoked:   false,
+			clusterCacheIsInvoked: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

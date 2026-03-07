@@ -3,6 +3,7 @@ package rkecontrolplanecondition
 import (
 	"context"
 	"fmt"
+	"time"
 
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
@@ -20,6 +21,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// systemUpgradeControllerConditionThrottleDuration defines how recently the SystemUpgradeControllerReady
+// condition must have been updated before downstream API calls are skipped to reduce load.
+const systemUpgradeControllerConditionThrottleDuration = 10 * time.Second
 
 type handler struct {
 	mgmtClusterName      string
@@ -75,6 +80,15 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 			capr.SystemUpgradeControllerReady.Message(&status, "")
 			capr.SystemUpgradeControllerReady.False(&status)
 			return status, nil
+		}
+	}
+
+	// Skip if the condition was recently updated to avoid excessive downstream API calls
+	if lastUpdated := capr.SystemUpgradeControllerReady.GetLastUpdated(&status); lastUpdated != "" {
+		if lastUpdatedTime, parseErr := time.Parse(time.RFC3339, lastUpdated); parseErr == nil {
+			if time.Since(lastUpdatedTime) < systemUpgradeControllerConditionThrottleDuration {
+				return status, nil
+			}
 		}
 	}
 
