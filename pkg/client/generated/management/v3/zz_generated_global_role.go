@@ -13,6 +13,7 @@ const (
 	GlobalRoleFieldDescription                        = "description"
 	GlobalRoleFieldInheritedClusterRoles              = "inheritedClusterRoles"
 	GlobalRoleFieldInheritedFleetWorkspacePermissions = "inheritedFleetWorkspacePermissions"
+	GlobalRoleFieldInheritedNamespacedRules           = "inheritedNamespacedRules"
 	GlobalRoleFieldLabels                             = "labels"
 	GlobalRoleFieldName                               = "name"
 	GlobalRoleFieldNamespacedRules                    = "namespacedRules"
@@ -33,6 +34,7 @@ type GlobalRole struct {
 	Description                        string                    `json:"description,omitempty" yaml:"description,omitempty"`
 	InheritedClusterRoles              []string                  `json:"inheritedClusterRoles,omitempty" yaml:"inheritedClusterRoles,omitempty"`
 	InheritedFleetWorkspacePermissions *FleetWorkspacePermission `json:"inheritedFleetWorkspacePermissions,omitempty" yaml:"inheritedFleetWorkspacePermissions,omitempty"`
+	InheritedNamespacedRules           map[string][]PolicyRule   `json:"inheritedNamespacedRules,omitempty" yaml:"inheritedNamespacedRules,omitempty"`
 	Labels                             map[string]string         `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Name                               string                    `json:"name,omitempty" yaml:"name,omitempty"`
 	NamespacedRules                    map[string][]PolicyRule   `json:"namespacedRules,omitempty" yaml:"namespacedRules,omitempty"`

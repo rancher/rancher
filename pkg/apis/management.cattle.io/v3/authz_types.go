@@ -179,6 +179,13 @@ type GlobalRole struct {
 	// +optional
 	NamespacedRules map[string][]rbacv1.PolicyRule `json:"namespacedRules,omitempty"`
 
+	// InheritedNamespacedRules are the rules that are active in each namespace of every cluster besides
+	// the local cluster. If the namespace does not exist in a downstream cluster, the rules will not be applied.
+	// * has no special meaning in the keys - these keys are read as raw strings
+	// and must exactly match with one existing namespace.
+	// +optional
+	InheritedNamespacedRules map[string][]rbacv1.PolicyRule `json:"inheritedNamespacedRules,omitempty"`
+
 	// InheritedFleetWorkspacePermissions are the permissions granted by this GlobalRole in every fleet workspace besides
 	// the local one.
 	// +optional

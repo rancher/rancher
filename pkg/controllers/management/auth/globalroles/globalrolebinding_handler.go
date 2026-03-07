@@ -31,18 +31,20 @@ import (
 )
 
 const (
-	globalRoleBindingReconciled                = "GlobalRoleBindingReconciled"
-	clusterPermissionsReconciled               = "ClusterPermissionsReconciled"
-	namespacedRoleBindingReconciled            = "NamespacedRoleBindingReconciled"
-	failedToUpdateClusterRoleBinding           = "FailedToUpdateClusterRoleBinding"
-	failedToCreateClusterRoleBinding           = "FailedToCreateClusterRoleBinding"
-	failedToGetGlobalRole                      = "FailedToGetGlobalRole"
-	failedToListCluster                        = "FailedToListCluster"
-	failedToReconcileCRTBs                     = "FailedToReconcileCRTBs"
-	failedToCreateLabels                       = "FailedToCreateLabels"
-	failedToCreateFleetLabels                  = "FailedToCreateFleetLabels"
-	failedToListRoleBindings                   = "FailedToListRoleBindings"
-	failedToPurgeInvalidNamespacedRoleBindings = "FailedToPurgeInvalidNamespacedRoleBindings"
+	globalRoleBindingReconciled                     = "GlobalRoleBindingReconciled"
+	clusterPermissionsReconciled                    = "ClusterPermissionsReconciled"
+	namespacedRoleBindingReconciled                 = "NamespacedRoleBindingReconciled"
+	inheritedNamespacedRoleBindingReconciled        = "InheritedNamespacedRoleBindingReconciled"
+	failedToUpdateClusterRoleBinding                = "FailedToUpdateClusterRoleBinding"
+	failedToCreateClusterRoleBinding                = "FailedToCreateClusterRoleBinding"
+	failedToGetGlobalRole                           = "FailedToGetGlobalRole"
+	failedToListCluster                             = "FailedToListCluster"
+	failedToReconcileCRTBs                          = "FailedToReconcileCRTBs"
+	failedToCreateLabels                            = "FailedToCreateLabels"
+	failedToCreateFleetLabels                       = "FailedToCreateFleetLabels"
+	failedToListRoleBindings                        = "FailedToListRoleBindings"
+	failedToPurgeInvalidNamespacedRoleBindings      = "FailedToPurgeInvalidNamespacedRoleBindings"
+	failedToReconcileInheritedNamespacedRoleBinding = "FailedToReconcileInheritedNamespacedRoleBinding"
 
 	grbHasNoSubject    = "GRBHasNoSubject"
 	subjectReconciled  = "SubjectReconciled"
@@ -130,6 +132,7 @@ func (l *globalRoleBindingLifecycle) Create(obj *v3.GlobalRoleBinding) (runtime.
 		l.reconcileClusterPermissions(obj, &localConditions),
 		l.reconcileGlobalRoleBinding(obj, &localConditions),
 		l.reconcileNamespacedRoleBindings(obj, &localConditions),
+		l.reconcileInheritedNamespacedRoleBindings(obj, &localConditions),
 		l.fleetPermissionsHandler.reconcileFleetWorkspacePermissionsBindings(obj, &localConditions),
 		l.updateStatus(obj, localConditions),
 	)
@@ -146,6 +149,7 @@ func (l *globalRoleBindingLifecycle) Updated(obj *v3.GlobalRoleBinding) (runtime
 		l.reconcileClusterPermissions(obj, &localConditions),
 		l.reconcileGlobalRoleBinding(obj, &localConditions),
 		l.reconcileNamespacedRoleBindings(obj, &localConditions),
+		l.reconcileInheritedNamespacedRoleBindings(obj, &localConditions),
 		l.fleetPermissionsHandler.reconcileFleetWorkspacePermissionsBindings(obj, &localConditions),
 		l.updateStatus(obj, localConditions),
 	)
@@ -174,8 +178,10 @@ func (l *globalRoleBindingLifecycle) Remove(obj *v3.GlobalRoleBinding) (runtime.
 		}
 	}
 
-	// Don't need to delete the created ClusterRole or RoleBindings because owner reference will take care of them
-	return obj, nil
+	// Don't need to delete the created ClusterRole or RoleBindings in local cluster because owner reference will take care of them
+	// However, RoleBindings in downstream clusters need to be deleted manually
+	err := l.deleteInheritedNamespacedRoleBindings(obj)
+	return obj, err
 }
 
 func (l *globalRoleBindingLifecycle) reconcileSubject(binding *v3.GlobalRoleBinding, localConditions *[]metav1.Condition) (*v3.GlobalRoleBinding, error) {
@@ -586,6 +592,241 @@ func (l *globalRoleBindingLifecycle) purgeInvalidNamespacedRBs(rbs []*rbacv1.Rol
 			}
 		}
 	}
+	return returnError
+}
+
+// reconcileInheritedNamespacedRoleBindings ensures that RoleBindings exist for each namespace listed in InheritedNamespacedRules
+// from the associated GlobalRole in all downstream (non-local) clusters
+func (l *globalRoleBindingLifecycle) reconcileInheritedNamespacedRoleBindings(globalRoleBinding *v3.GlobalRoleBinding, localConditions *[]metav1.Condition) error {
+	condition := metav1.Condition{Type: inheritedNamespacedRoleBindingReconciled}
+
+	gr, err := l.grLister.Get(globalRoleBinding.GlobalRoleName)
+	if err != nil {
+		l.status.AddCondition(localConditions, condition, failedToGetGlobalRole, err)
+		return fmt.Errorf("couldn't get global role %s: %w", globalRoleBinding.GlobalRoleName, err)
+	}
+
+	// If there are no InheritedNamespacedRules, nothing to do
+	if len(gr.InheritedNamespacedRules) == 0 {
+		return nil
+	}
+
+	var returnError error
+	grbName := wrangler.SafeConcatName(globalRoleBinding.Name)
+
+	// Get all clusters
+	clusters, err := l.clusterLister.List(labels.Everything())
+	if err != nil {
+		l.status.AddCondition(localConditions, condition, failedToListCluster, err)
+		return fmt.Errorf("couldn't list clusters: %w", err)
+	}
+
+	// Get the subject for the RoleBindings
+	subject := rbac.GetGRBSubject(globalRoleBinding)
+
+	// Iterate through all clusters except local
+	for _, cluster := range clusters {
+		if cluster.Name == localClusterName {
+			continue
+		}
+		returnError = errors.Join(returnError, l.reconcileInheritedNamespacedRoleBindingsForCluster(cluster, gr, grbName, subject))
+	}
+
+	l.status.AddCondition(localConditions, condition, inheritedNamespacedRoleBindingReconciled, returnError)
+	return returnError
+}
+
+// reconcileInheritedNamespacedRoleBindingsForCluster reconciles RoleBindings for a single downstream cluster
+func (l *globalRoleBindingLifecycle) reconcileInheritedNamespacedRoleBindingsForCluster(cluster *v3.Cluster, gr *v3.GlobalRole, grbName string, subject rbacv1.Subject) error {
+	// Get user context for the cluster
+	userContext, err := l.clusterManager.UserContext(cluster.Name)
+	if err != nil {
+		logrus.Warnf("[%v] Failed to get user context for cluster %s: %v. Continuing with other clusters.", grbController, cluster.Name, err)
+		return nil
+	}
+
+	// Get the RoleBinding client for this cluster
+	roleBindingClient := userContext.RBACw.RoleBinding()
+	roleBindingCache := roleBindingClient.Cache()
+	namespaceCache := userContext.Corew.Namespace().Cache()
+
+	var returnError error
+	globalRoleName := wrangler.SafeConcatName(gr.Name)
+
+	// Track all RoleBinding UIDs that should exist in this clusters
+	roleBindingUIDs := map[types.UID]struct{}{}
+
+	// Iterate through all namespaces in InheritedNamespacedRules
+	for ns := range gr.InheritedNamespacedRules {
+		nsErr := l.reconcileInheritedRoleBindingInNamespace(cluster.Name, ns, globalRoleName, grbName, subject, roleBindingClient, roleBindingCache, namespaceCache, roleBindingUIDs)
+		if nsErr != nil {
+			returnError = errors.Join(returnError, nsErr)
+		}
+	}
+
+	// Purge invalid RoleBindings in this cluster
+	purgeErr := l.purgeInvalidInheritedRoleBindingsInCluster(cluster.Name, grbName, roleBindingCache, roleBindingClient, roleBindingUIDs)
+	if purgeErr != nil {
+		returnError = errors.Join(returnError, purgeErr)
+	}
+
+	return returnError
+}
+
+// reconcileInheritedRoleBindingInNamespace reconciles a single RoleBinding in a specific namespace of a downstream cluster
+func (l *globalRoleBindingLifecycle) reconcileInheritedRoleBindingInNamespace(clusterName, ns, globalRoleName, grbName string, subject rbacv1.Subject, roleBindingClient wrbacv1.RoleBindingClient, roleBindingCache wrbacv1.RoleBindingCache, namespaceCache wcorev1.NamespaceCache, roleBindingUIDs map[types.UID]struct{}) error {
+	// Check if the namespace exists in this cluster
+	shouldSkip, err := validateNamespace(namespaceCache, ns, fmt.Sprintf("cluster %s", clusterName))
+	if shouldSkip {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("%s in cluster %s: %w", err.Error(), clusterName, err)
+	}
+
+	// The Role name follows the pattern from globalrole_handler.go: <globalrole-name>-<namespace>
+	roleName := wrangler.SafeConcatName(globalRoleName, ns)
+	roleRef := rbacv1.RoleRef{
+		APIGroup: rbacv1.GroupName,
+		Kind:     "Role",
+		Name:     roleName,
+	}
+
+	// Generate a deterministic name for the RoleBinding
+	roleBindingName := wrangler.SafeConcatName(grbName, ns)
+
+	// Check if the RoleBinding exists and is correct
+	roleBinding, err := roleBindingCache.Get(ns, roleBindingName)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return fmt.Errorf("couldn't get RoleBinding %s in namespace %s in cluster %s: %w", roleBindingName, ns, clusterName, err)
+	}
+
+	// If RoleBinding exists, check if it's correct
+	if roleBinding != nil {
+		labelCorrect := roleBinding.Labels != nil && roleBinding.Labels[grbOwnerLabel] == grbName
+		contentCorrect := rbac.IsRoleBindingContentSame(roleBinding, &rbacv1.RoleBinding{
+			Subjects: []rbacv1.Subject{subject},
+			RoleRef:  roleRef,
+		})
+
+		if labelCorrect && contentCorrect {
+			roleBindingUIDs[roleBinding.GetUID()] = struct{}{}
+			return nil
+		}
+
+		// RoleBinding is incorrect, delete it so we can recreate. RoleRef is immutable.
+		if err := rbac.DeleteNamespacedResource(ns, roleBindingName, roleBindingClient); err != nil {
+			return fmt.Errorf("couldn't delete incorrect RoleBinding %s in namespace %s in cluster %s: %w", roleBindingName, ns, clusterName, err)
+		}
+	}
+
+	// Create the RoleBinding
+	newRoleBinding := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      roleBindingName,
+			Namespace: ns,
+			Labels: map[string]string{
+				grbOwnerLabel: grbName,
+			},
+		},
+		Subjects: []rbacv1.Subject{subject},
+		RoleRef:  roleRef,
+	}
+	createdRoleBinding, err := roleBindingClient.Create(newRoleBinding)
+	if err != nil {
+		return fmt.Errorf("couldn't create RoleBinding %s in namespace %s in cluster %s: %w", roleBindingName, ns, clusterName, err)
+	}
+	roleBindingUIDs[createdRoleBinding.UID] = struct{}{}
+
+	return nil
+}
+
+// purgeInvalidInheritedRoleBindingsInCluster removes RoleBindings in a cluster that are no longer needed
+func (l *globalRoleBindingLifecycle) purgeInvalidInheritedRoleBindingsInCluster(clusterName, grbName string, roleBindingCache wrbacv1.RoleBindingCache, roleBindingClient wrbacv1.RoleBindingClient, validRoleBindingUIDs map[types.UID]struct{}) error {
+	// Create selector for RoleBindings owned by this GRB
+	r, err := labels.NewRequirement(grbOwnerLabel, selection.Equals, []string{grbName})
+	if err != nil {
+		return fmt.Errorf("couldn't create label selector for cluster %s: %w", clusterName, err)
+	}
+
+	roleBindings, err := roleBindingCache.List("", labels.NewSelector().Add(*r))
+	if err != nil {
+		return fmt.Errorf("couldn't list RoleBindings in cluster %s: %w", clusterName, err)
+	}
+
+	// Delete RoleBindings that are not in the valid set
+	var returnError error
+	for _, rb := range roleBindings {
+		if _, ok := validRoleBindingUIDs[rb.UID]; !ok {
+			returnError = errors.Join(returnError, rbac.DeleteNamespacedResource(rb.Namespace, rb.Name, roleBindingClient))
+		}
+	}
+
+	return returnError
+}
+
+// deleteInheritedNamespacedRoleBindings removes all RoleBindings in downstream clusters that are owned by this GlobalRoleBinding
+func (l *globalRoleBindingLifecycle) deleteInheritedNamespacedRoleBindings(globalRoleBinding *v3.GlobalRoleBinding) error {
+	gr, err := l.grLister.Get(globalRoleBinding.GlobalRoleName)
+	if err != nil {
+		// If we can't get the GlobalRole, we can't determine what to clean up
+		if apierrors.IsNotFound(err) {
+			logrus.Warnf("[%v] GlobalRole %s not found during cleanup of GlobalRoleBinding %s", grbController, globalRoleBinding.GlobalRoleName, globalRoleBinding.Name)
+			return nil
+		}
+		return fmt.Errorf("couldn't get global role %s: %w", globalRoleBinding.GlobalRoleName, err)
+	}
+
+	// If there are no InheritedNamespacedRules, nothing to do
+	if len(gr.InheritedNamespacedRules) == 0 {
+		return nil
+	}
+
+	var returnError error
+	grbName := wrangler.SafeConcatName(globalRoleBinding.Name)
+
+	// Get all clusters
+	clusters, err := l.clusterLister.List(labels.Everything())
+	if err != nil {
+		return fmt.Errorf("couldn't list clusters: %w", err)
+	}
+
+	// Iterate through all clusters except local
+	for _, cluster := range clusters {
+		if cluster.Name == localClusterName {
+			continue
+		}
+
+		// Get user context for the cluster
+		userContext, err := l.clusterManager.UserContext(cluster.Name)
+		if err != nil {
+			logrus.Warnf("[%v] Failed to get user context for cluster %s during cleanup: %v. Continuing with other clusters.", grbController, cluster.Name, err)
+			continue
+		}
+
+		// Get the RoleBinding client for this cluster
+		roleBindingClient := userContext.RBACw.RoleBinding()
+		roleBindingCache := roleBindingClient.Cache()
+
+		// Get all RoleBindings owned by this GRB
+		r, err := labels.NewRequirement(grbOwnerLabel, selection.Equals, []string{grbName})
+		if err != nil {
+			returnError = errors.Join(returnError, fmt.Errorf("cluster %s: %w", cluster.Name, err))
+			continue
+		}
+
+		roleBindings, err := roleBindingCache.List("", labels.NewSelector().Add(*r))
+		if err != nil {
+			returnError = errors.Join(returnError, fmt.Errorf("couldn't list RoleBindings in cluster %s: %w", cluster.Name, err))
+			continue
+		}
+
+		// Delete all RoleBindings owned by this GRB
+		for _, rb := range roleBindings {
+			errors.Join(returnError, rbac.DeleteNamespacedResource(rb.Namespace, rb.Name, roleBindingClient))
+		}
+	}
+
 	return returnError
 }
 
