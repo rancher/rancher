@@ -16,7 +16,7 @@ jobs:
     runs-on:
       - runs-on
       - spot=false
-      - runner=16cpu-linux-x64
+      - runner=32cpu-linux-x64
       - run-id=${{ github.run_id }}
     timeout-minutes: 60
     env:
