@@ -35,20 +35,18 @@ type SccSubscription struct {
 }
 
 type SccSystem struct {
-	Arch   string `json:"arch"`
-	Cpu    int    `json:"cpu"`
-	Memory int    `json:"memory"`
-	Count  int    `json:"count"`
+	Arch     string `json:"arch"`
+	Cpu      int    `json:"cpu"`
+	Memory   int    `json:"memory"`
+	Count    int    `json:"count"`
+	Upstream bool   `json:"upstream,omitempty"`
 }
 
 type sccSystemKey struct {
-	Arch   string
-	Cpu    int
-	Memory int
-}
-
-func (s sccSystemKey) Key() string {
-	return fmt.Sprintf("%d-%d-%s", s.Cpu, s.Memory, s.Arch)
+	Arch     string
+	Cpu      int
+	Memory   int
+	Upstream bool `json:"upstream,omitempty"`
 }
 
 type SccCluster struct {
@@ -85,9 +83,10 @@ func GenerateSCCPayload(telG RancherManagerTelemetry) (*SccPayload, error) {
 		cores, _ := localNode.CpuCores()
 		mem, _ := localNode.MemoryCapacityBytes()
 		k := sccSystemKey{
-			Arch:   localNode.CpuArchitecture(),
-			Cpu:    cores,
-			Memory: bytesToMiBRounded(mem),
+			Arch:     localNode.CpuArchitecture(),
+			Cpu:      cores,
+			Memory:   bytesToMiBRounded(mem),
+			Upstream: true,
 		}
 		if _, ok := systemsMap[k]; !ok {
 			systemsMap[k] = 0
@@ -126,10 +125,11 @@ func GenerateSCCPayload(telG RancherManagerTelemetry) (*SccPayload, error) {
 	}
 	for system, count := range systemsMap {
 		systems = append(systems, SccSystem{
-			Arch:   system.Arch,
-			Cpu:    system.Cpu,
-			Memory: system.Memory,
-			Count:  count,
+			Arch:     system.Arch,
+			Cpu:      system.Cpu,
+			Memory:   system.Memory,
+			Count:    count,
+			Upstream: system.Upstream,
 		})
 	}
 
