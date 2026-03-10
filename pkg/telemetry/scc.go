@@ -2,10 +2,13 @@ package telemetry
 
 import (
 	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
 )
+
+var semVerCoreRe = regexp.MustCompile(`^v?(\d+)\.(\d+)\.(\d+)`)
 
 const (
 	SccSecretName = "rancher-scc-telemetry"
@@ -141,16 +144,14 @@ func GenerateSCCPayload(telG RancherManagerTelemetry) (*SccPayload, error) {
 		})
 	}
 
-	// Remove pre-release and build metadata from the version
+	// Remove pre-release and build metadata from the version.
+	// Try strict semver first (handles 1.2.0-alpha.4), then fall back to a
+	// regex to handle non-standard prerelease formats like 1.2.0-alpha4.
 	productVersion := telG.RancherVersion()
-	semVer, err := semver.StrictNewVersion(productVersion)
-	if err == nil {
-		productVersion = fmt.Sprintf(
-			"%d.%d.%d",
-			semVer.Major(),
-			semVer.Minor(),
-			semVer.Patch(),
-		)
+	if semVer, err := semver.StrictNewVersion(productVersion); err == nil {
+		productVersion = fmt.Sprintf("%d.%d.%d", semVer.Major(), semVer.Minor(), semVer.Patch())
+	} else if m := semVerCoreRe.FindStringSubmatch(productVersion); len(m) == 4 {
+		productVersion = fmt.Sprintf("%s.%s.%s", m[1], m[2], m[3])
 	}
 
 	return &SccPayload{
