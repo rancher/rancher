@@ -122,6 +122,16 @@ func GenerateIndex(ociClient *Client, URL string, credentialSecret *corev1.Secre
 	var maxTag string
 	var chartName string
 	var updatedChartVersions []*repo.ChartVersion
+	var constraint version.Constraints
+	if clusterRepoSpec.OCIOptions != nil && clusterRepoSpec.OCIOptions.TagFilter != "" {
+		constraint, err = version.NewConstraint(clusterRepoSpec.OCIOptions.TagFilter)
+		if err != nil {
+			logrus.Errorf("failed to parse semver constraint %s: %s", clusterRepoSpec.OCIOptions.TagFilter, err.Error())
+			constraint = version.Constraints{}
+		}
+	} else {
+		constraint = version.Constraints{}
+	}
 	// Loop over all the tags and find the latest version
 	tagsFunc := func(tags []string) error {
 		existingTags := make(map[string]bool)
@@ -137,7 +147,33 @@ func GenerateIndex(ociClient *Client, URL string, credentialSecret *corev1.Secre
 				logrus.Debugf("skipping tag %s since it is not a valid semver for chart %s", tags[i], chartName)
 				continue
 			}
+			// Check if the tag matches the semver constraint from the clusterrepo
+			if !constraint.Check(semverTag) {
+				logrus.Errorf("skipping tag %s since it does not match the semver constraint %s for chart %s", tags[i], clusterRepoSpec.OCIOptions.TagFilter, chartName)
+				continue
+			}
+
 			existingTags[semverTag.String()] = true
+			if clusterRepoSpec.OCIOptions.DownloadAllTags {
+				ociClient.tag = semverTag.String()
+				orasRepository, err := ociClient.GetOrasRepository()
+				if err != nil {
+					return fmt.Errorf("failed to create an oras repository for url %s: %w", URL, err)
+				}
+				err = addToHelmRepoIndex(*ociClient, indexFile, orasRepository)
+				if err != nil {
+					// Users can have access to only some repositories and not all.
+					// So, if pulling the chart fails due to Forbidden error, then skip it.
+					var errResp *errcode.ErrorResponse
+					if errors.As(err, &errResp) && errResp.StatusCode == http.StatusForbidden {
+						delete(indexFile.Entries, chartName)
+						logrus.Warnf("failed to add OCI repository %s to helm repo index: %v", ociClient.repository, err)
+					} else {
+						return fmt.Errorf("failed to add tag %s in OCI repository %s to helm repo index: %w", maxTag, ociClient.repository, err)
+					}
+				}
+				continue
+			}
 
 			if maxSemver == nil || maxSemver.LessThan(semverTag) {
 				maxSemver = semverTag
@@ -194,7 +230,7 @@ func GenerateIndex(ociClient *Client, URL string, credentialSecret *corev1.Secre
 					return fmt.Errorf("failed to fetch tags for repository %s: %w", URL, err)
 				}
 
-				if maxTag != "" {
+				if !clusterRepoSpec.OCIOptions.DownloadAllTags && maxTag != "" {
 					ociClient.tag = maxTag
 					err = addToHelmRepoIndex(*ociClient, indexFile, orasRepository)
 					if err != nil {
