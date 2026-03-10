@@ -35,11 +35,11 @@ replace (
 )
 
 require (
-	github.com/rancher/aks-operator v1.13.3
+	github.com/rancher/aks-operator v1.13.4-rc.1
 	github.com/rancher/ali-operator v1.13.2
-	github.com/rancher/eks-operator v1.13.3
+	github.com/rancher/eks-operator v1.13.4-rc.1
 	github.com/rancher/fleet/pkg/apis v0.14.2
-	github.com/rancher/gke-operator v1.13.3
+	github.com/rancher/gke-operator v1.13.4-rc.1
 	github.com/rancher/norman v0.7.2
 	github.com/rancher/rke v1.8.0
 	github.com/rancher/wrangler/v3 v3.3.4
@@ -86,7 +86,7 @@ require (
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/net v0.49.0 // indirect
-	golang.org/x/oauth2 v0.34.0 // indirect
+	golang.org/x/oauth2 v0.35.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/term v0.39.0 // indirect
