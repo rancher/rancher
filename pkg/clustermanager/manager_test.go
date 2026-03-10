@@ -1,6 +1,7 @@
 package clustermanager
 
 import (
+	"errors"
 	"testing"
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -99,7 +100,9 @@ func TestShouldPreBootstrap(t *testing.T) {
 			}
 
 			m := &Manager{secretLister: lister}
-			assert.Equal(t, tt.want, m.shouldPreBootstrap(tt.cluster))
+			shouldPreBootstrap, err := m.shouldPreBootstrap(tt.cluster)
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want, shouldPreBootstrap)
 		})
 	}
 }
@@ -122,7 +125,30 @@ func TestShouldPreBootstrapWhenClusterAlreadyPreBootstrapped(t *testing.T) {
 	}
 
 	m := &Manager{secretLister: lister}
-	assert.False(t, m.shouldPreBootstrap(cluster))
+	shouldPreBootstrap, err := m.shouldPreBootstrap(cluster)
+	assert.NoError(t, err)
+	assert.False(t, shouldPreBootstrap)
+}
+
+func TestShouldPreBootstrapWhenSecretListFails(t *testing.T) {
+	cluster := &apimgmtv3.Cluster{
+		ObjectMeta: metav1.ObjectMeta{Name: "c-m-abc"},
+		Spec: apimgmtv3.ClusterSpec{
+			DisplayName:        "c-test",
+			FleetWorkspaceName: "fleet-default",
+		},
+	}
+
+	lister := &corefakes.SecretListerMock{
+		ListFunc: func(namespace string, selector labels.Selector) ([]*corev1.Secret, error) {
+			return nil, errors.New("list failed")
+		},
+	}
+
+	m := &Manager{secretLister: lister}
+	shouldPreBootstrap, err := m.shouldPreBootstrap(cluster)
+	assert.Error(t, err)
+	assert.False(t, shouldPreBootstrap)
 }
 
 func TestClusterAuthorizedForSecret(t *testing.T) {

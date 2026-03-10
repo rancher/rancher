@@ -221,7 +221,13 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 
 	// pre-bootstrap the cluster if it's not already bootstrapped
 	apimgmtv3.ClusterConditionPreBootstrapped.CreateUnknownIfNotExists(rec.clusterRec)
-	if m.shouldPreBootstrap(rec.clusterRec) {
+	shouldPreBootstrap, err := m.shouldPreBootstrap(rec.clusterRec)
+	if err != nil {
+		transaction.Rollback()
+		return err
+	}
+
+	if shouldPreBootstrap {
 		err := clusterController.PreBootstrap(transaction, m.ScaledContext, rec.cluster, rec.clusterRec, m)
 		if err != nil {
 			transaction.Rollback()
@@ -272,19 +278,20 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 	}
 }
 
-func (m *Manager) shouldPreBootstrap(cluster *apimgmtv3.Cluster) bool {
+func (m *Manager) shouldPreBootstrap(cluster *apimgmtv3.Cluster) (bool, error) {
 	if !capr.PreBootstrap(cluster) {
-		return false
+		return false, nil
 	}
 
+	// The bootstrap gate is annotation-based (`provisioning.cattle.io/sync-bootstrap=true`), so we must list
+	// and inspect secrets in-memory because annotation selectors are not supported by the Kubernetes API.
 	secrets, err := m.secretLister.List(cluster.Spec.FleetWorkspaceName, labels.Everything())
 	if err != nil {
-		logrus.Errorf("[pre-bootstrap] failed to list secrets in namespace %s for cluster %s: %v", cluster.Spec.FleetWorkspaceName, cluster.Name, err)
-		return true
+		return false, fmt.Errorf("failed to list secrets in namespace %s for cluster %s: %w", cluster.Spec.FleetWorkspaceName, cluster.Name, err)
 	}
 
 	for _, secret := range secrets {
-		if secret == nil || secret.Annotations == nil {
+		if secret.Annotations == nil {
 			continue
 		}
 
@@ -292,15 +299,17 @@ func (m *Manager) shouldPreBootstrap(cluster *apimgmtv3.Cluster) bool {
 			continue
 		}
 
+		// Keep this aligned with managementuser/secret bootstrap sync authorization, which authorizes by
+		// management cluster display name.
 		if !clusterAuthorizedForSecret(secret.Annotations[capr.AuthorizedObjectAnnotation], cluster.Spec.DisplayName) {
 			continue
 		}
 
-		return true
+		return true, nil
 	}
 
 	logrus.Debugf("[pre-bootstrap] no authorized sync-bootstrap secrets found for cluster %s, skipping pre-bootstrap flow", cluster.Name)
-	return false
+	return false, nil
 }
 
 func clusterAuthorizedForSecret(authorizedClusters, clusterName string) bool {
