@@ -32,6 +32,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	authv1 "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	"k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
@@ -58,6 +59,10 @@ type record struct {
 	ctx           context.Context
 	cancel        context.CancelFunc
 }
+
+const (
+	preBootstrapSyncAnnotation = "provisioning.cattle.io/sync-bootstrap"
+)
 
 func NewManager(httpsPort int, context *config.ScaledContext, asl accesscontrol.AccessSetLookup) *Manager {
 	return &Manager{
@@ -216,9 +221,15 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 
 	// pre-bootstrap the cluster if it's not already bootstrapped
 	apimgmtv3.ClusterConditionPreBootstrapped.CreateUnknownIfNotExists(rec.clusterRec)
-	if capr.PreBootstrap(rec.clusterRec) {
+	if m.shouldPreBootstrap(rec.clusterRec) {
 		err := clusterController.PreBootstrap(transaction, m.ScaledContext, rec.cluster, rec.clusterRec, m)
 		if err != nil {
+			transaction.Rollback()
+			return err
+		}
+	} else if !apimgmtv3.ClusterConditionPreBootstrapped.IsTrue(rec.clusterRec) {
+		apimgmtv3.ClusterConditionPreBootstrapped.True(rec.clusterRec)
+		if _, err := m.clusters.Update(rec.clusterRec); err != nil {
 			transaction.Rollback()
 			return err
 		}
@@ -259,6 +270,51 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 	case err := <-done:
 		return err
 	}
+}
+
+func (m *Manager) shouldPreBootstrap(cluster *apimgmtv3.Cluster) bool {
+	if !capr.PreBootstrap(cluster) {
+		return false
+	}
+
+	secrets, err := m.secretLister.List(cluster.Spec.FleetWorkspaceName, labels.Everything())
+	if err != nil {
+		logrus.Errorf("[pre-bootstrap] failed to list secrets in namespace %s for cluster %s: %v", cluster.Spec.FleetWorkspaceName, cluster.Name, err)
+		return true
+	}
+
+	for _, secret := range secrets {
+		if secret == nil || secret.Annotations == nil {
+			continue
+		}
+
+		if secret.Annotations[preBootstrapSyncAnnotation] != "true" {
+			continue
+		}
+
+		if !clusterAuthorizedForSecret(secret.Annotations[capr.AuthorizedObjectAnnotation], cluster.Spec.DisplayName) {
+			continue
+		}
+
+		return true
+	}
+
+	logrus.Debugf("[pre-bootstrap] no authorized sync-bootstrap secrets found for cluster %s, skipping pre-bootstrap flow", cluster.Name)
+	return false
+}
+
+func clusterAuthorizedForSecret(authorizedClusters, clusterName string) bool {
+	if authorizedClusters == "" || clusterName == "" {
+		return false
+	}
+
+	for _, authorizedCluster := range strings.Split(authorizedClusters, ",") {
+		if strings.TrimSpace(authorizedCluster) == clusterName {
+			return true
+		}
+	}
+
+	return false
 }
 
 // ToRESTConfig generates a rest.Config for a given cluster.
