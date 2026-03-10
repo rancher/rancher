@@ -61,10 +61,12 @@ type OIDCClientSpec struct {
 	// TokenExpirationSeconds specifies the duration (in seconds) before
 	// an access token and ID token expire.
 	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=3600
 	TokenExpirationSeconds int64 `json:"tokenExpirationSeconds"`
 	// RefreshTokenExpirationSeconds defines how long (in seconds)
 	// a refresh token remains valid before expiration.
 	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=86400
 	RefreshTokenExpirationSeconds int64 `json:"refreshTokenExpirationSeconds"`
 
 	// Scopes is the list of scopes allowed for this client.
