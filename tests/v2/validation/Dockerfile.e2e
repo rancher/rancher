@@ -1,4 +1,4 @@
-FROM registry.suse.com/bci/golang:1.24
+FROM registry.suse.com/bci/golang:1.25
 
 # Configure Go
 ENV GOFLAGS=-buildvcs=false
