@@ -240,6 +240,12 @@ func (c *SyncController) updateResourceQuota(quota *corev1.ResourceQuota, spec *
 	return err
 }
 
+// updateDefaultLimitRange updates the limit range stored in the system if the
+// new `limitRange` differs from the old `spec`. The boolean result conveys to
+// the caller if an update actually happened, or not. This is important for the
+// caller, `createLimitRange`, to know if it has to update the limitrange
+// annotation, or not. An error is only possible if the limit range was actually
+// updated.
 func (c *SyncController) updateDefaultLimitRange(limitRange *corev1.LimitRange, spec *corev1.LimitRangeSpec) (bool, error) {
 	// avoid updates if nothing would change
 	if reflect.DeepEqual(limitRange.Spec, *spec) {
@@ -465,6 +471,13 @@ func (c *SyncController) setValidated(ns *corev1.Namespace, value bool, msg stri
 	return c.Namespaces.Update(toUpdate)
 }
 
+// getResourceLimitToUpdate determines the current state of limit range
+// information. To this end it looks at three places: (1) the
+// `field.cattle.io/containerDefaultResourceLimit` annotation of the namespace,
+// (2) the container default resource limit of the project the namespace belongs
+// to,, and (3) a combination of the first two calculated by
+// `completeLimit`. These results are checked in the order of 3, 1, 2 and the
+// first non-nil result is returned.
 func (c *SyncController) getResourceLimitToUpdate(ns *corev1.Namespace) (*v32.ContainerResourceLimit, *corev1.LimitRangeSpec, error) {
 	nsLimit, err := getNamespaceContainerResourceLimit(ns)
 	if err != nil {
