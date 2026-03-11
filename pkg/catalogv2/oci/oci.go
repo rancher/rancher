@@ -154,7 +154,7 @@ func GenerateIndex(ociClient *Client, URL string, credentialSecret *corev1.Secre
 			}
 
 			existingTags[semverTag.String()] = true
-			if clusterRepoSpec.OCIOptions.DownloadAllTags {
+			if clusterRepoSpec.OCIOptions != nil && clusterRepoSpec.OCIOptions.DownloadAllTags {
 				ociClient.tag = semverTag.String()
 				orasRepository, err := ociClient.GetOrasRepository()
 				if err != nil {
@@ -230,7 +230,7 @@ func GenerateIndex(ociClient *Client, URL string, credentialSecret *corev1.Secre
 					return fmt.Errorf("failed to fetch tags for repository %s: %w", URL, err)
 				}
 
-				if !clusterRepoSpec.OCIOptions.DownloadAllTags && maxTag != "" {
+				if (clusterRepoSpec.OCIOptions != nil && !clusterRepoSpec.OCIOptions.DownloadAllTags) || maxTag != "" {
 					ociClient.tag = maxTag
 					err = addToHelmRepoIndex(*ociClient, indexFile, orasRepository)
 					if err != nil {
