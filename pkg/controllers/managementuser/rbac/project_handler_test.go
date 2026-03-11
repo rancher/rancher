@@ -39,9 +39,9 @@ func TestCreate(t *testing.T) {
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "p-123xyz-namespaces-manage",
+						Name: "p-123xyz-namespaces-edit",
 						Annotations: map[string]string{
-							projectNSAnn: "p-123xyz-namespaces-manage",
+							projectNSAnn: "p-123xyz-namespaces-edit",
 						},
 					},
 					Rules: []rbacv1.PolicyRule{
@@ -50,14 +50,6 @@ func TestCreate(t *testing.T) {
 							Verbs:         []string{"manage-namespaces"},
 							Resources:     []string{"projects"},
 							ResourceNames: []string{"p-123xyz"},
-						},
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "p-123xyz-namespaces-edit",
-						Annotations: map[string]string{
-							projectNSAnn: "p-123xyz-namespaces-edit",
 						},
 					},
 				},
@@ -75,7 +67,7 @@ func TestCreate(t *testing.T) {
 		},
 		{
 			name:                     "roles already exist",
-			existingClusterRoleNames: []string{"p-123xyz-namespaces-readonly", "p-123xyz-namespaces-manage", "p-123xyz-namespaces-edit"},
+			existingClusterRoleNames: []string{"p-123xyz-namespaces-readonly", "p-123xyz-namespaces-edit"},
 			wantErr:                  false,
 		},
 	}
@@ -157,22 +149,35 @@ func TestUpdated(t *testing.T) {
 			name: "missing cluster role annotation",
 			currentClusterRole: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "p-123xyz-namespaces-manage",
+					Name: "p-123xyz-namespaces-edit",
 					Annotations: map[string]string{
-						projectNSAnn: "p-123xyz-namespaces-manage",
+						projectNSAnn: "p-123xyz-namespaces-edit",
 					},
 				},
-				Rules: []rbacv1.PolicyRule{},
+				Rules: []rbacv1.PolicyRule{
+					{
+						APIGroups:     []string{""},
+						Verbs:         []string{"*"},
+						Resources:     []string{"namespaces"},
+						ResourceNames: []string{"test-ns"},
+					},
+				},
 			},
 			wantError: false,
 			wantClusterRole: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "p-123xyz-namespaces-manage",
+					Name: "p-123xyz-namespaces-edit",
 					Annotations: map[string]string{
-						projectNSAnn: "p-123xyz-namespaces-manage",
+						projectNSAnn: "p-123xyz-namespaces-edit",
 					},
 				},
 				Rules: []rbacv1.PolicyRule{
+					{
+						APIGroups:     []string{""},
+						Verbs:         []string{"*"},
+						Resources:     []string{"namespaces"},
+						ResourceNames: []string{"test-ns"},
+					},
 					{
 						APIGroups:     []string{"management.cattle.io"},
 						Verbs:         []string{"manage-namespaces"},
@@ -186,12 +191,18 @@ func TestUpdated(t *testing.T) {
 			name: "annotation present",
 			currentClusterRole: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "p-123xyz-namespaces-manage",
+					Name: "p-123xyz-namespaces-edit",
 					Annotations: map[string]string{
-						projectNSAnn: "p-123xyz-namespaces-manage",
+						projectNSAnn: "p-123xyz-namespaces-edit",
 					},
 				},
 				Rules: []rbacv1.PolicyRule{
+					{
+						APIGroups:     []string{""},
+						Verbs:         []string{"*"},
+						Resources:     []string{"namespaces"},
+						ResourceNames: []string{"test-ns"},
+					},
 					{
 						APIGroups:     []string{"management.cattle.io"},
 						Verbs:         []string{"manage-namespaces"},
@@ -206,9 +217,9 @@ func TestUpdated(t *testing.T) {
 			name: "missing cluster role",
 			wantClusterRole: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "p-123xyz-namespaces-manage",
+					Name: "p-123xyz-namespaces-edit",
 					Annotations: map[string]string{
-						projectNSAnn: "p-123xyz-namespaces-manage",
+						projectNSAnn: "p-123xyz-namespaces-edit",
 					},
 				},
 				Rules: []rbacv1.PolicyRule{
@@ -236,9 +247,16 @@ func TestUpdated(t *testing.T) {
 			name: "update error",
 			currentClusterRole: &rbacv1.ClusterRole{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "p-123xyz-namespaces-manage",
+					Name: "p-123xyz-namespaces-edit",
 				},
-				Rules: []rbacv1.PolicyRule{},
+				Rules: []rbacv1.PolicyRule{
+					{
+						APIGroups:     []string{""},
+						Verbs:         []string{"*"},
+						Resources:     []string{"namespaces"},
+						ResourceNames: []string{"test-ns"},
+					},
+				},
 			},
 			updError:  fmt.Errorf("unexpected error"),
 			wantError: true,

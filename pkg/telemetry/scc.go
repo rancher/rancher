@@ -2,10 +2,13 @@ package telemetry
 
 import (
 	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/Masterminds/semver/v3"
 )
+
+var semVerCoreRe = regexp.MustCompile(`^v?(\d+)\.(\d+)\.(\d+)`)
 
 const (
 	SccSecretName = "rancher-scc-telemetry"
@@ -35,20 +38,18 @@ type SccSubscription struct {
 }
 
 type SccSystem struct {
-	Arch   string `json:"arch"`
-	Cpu    int    `json:"cpu"`
-	Memory int    `json:"memory"`
-	Count  int    `json:"count"`
+	Arch     string `json:"arch"`
+	Cpu      int    `json:"cpu"`
+	Memory   int    `json:"memory"`
+	Count    int    `json:"count"`
+	Upstream bool   `json:"upstream,omitempty"`
 }
 
 type sccSystemKey struct {
-	Arch   string
-	Cpu    int
-	Memory int
-}
-
-func (s sccSystemKey) Key() string {
-	return fmt.Sprintf("%d-%d-%s", s.Cpu, s.Memory, s.Arch)
+	Arch     string
+	Cpu      int
+	Memory   int
+	Upstream bool `json:"upstream,omitempty"`
 }
 
 type SccCluster struct {
@@ -85,9 +86,10 @@ func GenerateSCCPayload(telG RancherManagerTelemetry) (*SccPayload, error) {
 		cores, _ := localNode.CpuCores()
 		mem, _ := localNode.MemoryCapacityBytes()
 		k := sccSystemKey{
-			Arch:   localNode.CpuArchitecture(),
-			Cpu:    cores,
-			Memory: bytesToMiBRounded(mem),
+			Arch:     localNode.CpuArchitecture(),
+			Cpu:      cores,
+			Memory:   bytesToMiBRounded(mem),
+			Upstream: true,
 		}
 		if _, ok := systemsMap[k]; !ok {
 			systemsMap[k] = 0
@@ -126,10 +128,11 @@ func GenerateSCCPayload(telG RancherManagerTelemetry) (*SccPayload, error) {
 	}
 	for system, count := range systemsMap {
 		systems = append(systems, SccSystem{
-			Arch:   system.Arch,
-			Cpu:    system.Cpu,
-			Memory: system.Memory,
-			Count:  count,
+			Arch:     system.Arch,
+			Cpu:      system.Cpu,
+			Memory:   system.Memory,
+			Count:    count,
+			Upstream: system.Upstream,
 		})
 	}
 
@@ -141,16 +144,14 @@ func GenerateSCCPayload(telG RancherManagerTelemetry) (*SccPayload, error) {
 		})
 	}
 
-	// Remove pre-release and build metadata from the version
+	// Remove pre-release and build metadata from the version.
+	// Try strict semver first (handles 1.2.0-alpha.4), then fall back to a
+	// regex to handle non-standard prerelease formats like 1.2.0-alpha4.
 	productVersion := telG.RancherVersion()
-	semVer, err := semver.StrictNewVersion(productVersion)
-	if err == nil {
-		productVersion = fmt.Sprintf(
-			"%d.%d.%d",
-			semVer.Major(),
-			semVer.Minor(),
-			semVer.Patch(),
-		)
+	if semVer, err := semver.StrictNewVersion(productVersion); err == nil {
+		productVersion = fmt.Sprintf("%d.%d.%d", semVer.Major(), semVer.Minor(), semVer.Patch())
+	} else if m := semVerCoreRe.FindStringSubmatch(productVersion); len(m) == 4 {
+		productVersion = fmt.Sprintf("%s.%s.%s", m[1], m[2], m[3])
 	}
 
 	return &SccPayload{

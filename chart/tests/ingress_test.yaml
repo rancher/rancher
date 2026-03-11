@@ -174,3 +174,10 @@ tests:
           cert-manager.io/issuer: RELEASE-NAME-rancher
           cert-manager.io/issuer-kind: Issuer
           nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+- it: it should fail when disableHTTP is set and servicePort is not 443
+  set:
+    hostname: host.example.com
+    service.disableHTTP: true
+  asserts:
+    - failedTemplate:
+        errorPattern: "'/ingress/servicePort': value must be 443"

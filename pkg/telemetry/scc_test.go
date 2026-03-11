@@ -10,6 +10,27 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+func TestSccPayloadVersion(t *testing.T) {
+	cases := []struct {
+		input    string
+		expected string
+	}{
+		{"2.6.0", "2.6.0"},
+		{"2.6.0-alpha.4", "2.6.0"},
+		{"2.6.0-alpha4", "2.6.0"},
+		{"v2.6.0-rc.1", "2.6.0"},
+		{"v2.6.0-rc1", "2.6.0"},
+		{"2.6.0+build.1", "2.6.0"},
+		{"not-a-version", "not-a-version"},
+	}
+	for _, tc := range cases {
+		rancherT := newTelemetryImpl(tc.input, "", "", "", "", &v3.Cluster{}, nil, nil, nil)
+		payload, err := GenerateSCCPayload(rancherT)
+		assert.NoError(t, err)
+		assert.Equal(t, tc.expected, payload.Version, "input: %s", tc.input)
+	}
+}
+
 func TestSccPayload(t *testing.T) {
 	type testcase struct {
 		input            telInput

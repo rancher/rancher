@@ -161,6 +161,26 @@ func (s *shell) createPod(imageOverride string) *v1.Pod {
 					Effect:   "NoExecute",
 				},
 			},
+			InitContainers: []v1.Container{
+				{
+					Name:            "init-home",
+					Image:           imageName,
+					ImagePullPolicy: v1.PullIfNotPresent,
+					Command: []string{
+						"sh", "-c", "cp -r /home/shell/. /home-init/",
+					},
+					SecurityContext: &v1.SecurityContext{
+						AllowPrivilegeEscalation: &f,
+						ReadOnlyRootFilesystem:   &t,
+					},
+					VolumeMounts: []v1.VolumeMount{
+						{
+							Name:      "home",
+							MountPath: "/home-init",
+						},
+					},
+				},
+			},
 			Containers: []v1.Container{
 				{
 					Name:      "shell",
@@ -189,8 +209,8 @@ func (s *shell) createPod(imageOverride string) *v1.Pod {
 							MountPath: "/run",
 						},
 						{
-							Name:      "helm-run",
-							MountPath: "/home/shell/helm-run",
+							Name:      "home",
+							MountPath: "/home/shell",
 						},
 					},
 				},
@@ -209,7 +229,7 @@ func (s *shell) createPod(imageOverride string) *v1.Pod {
 					},
 				},
 				{
-					Name: "helm-run",
+					Name: "home",
 					VolumeSource: v1.VolumeSource{
 						EmptyDir: &v1.EmptyDirVolumeSource{},
 					},
