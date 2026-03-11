@@ -3,6 +3,7 @@ package rkecontrolplanecondition
 import (
 	"context"
 	"fmt"
+	"time"
 
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
@@ -21,11 +22,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// systemUpgradeControllerConditionThrottleDuration defines how recently the SystemUpgradeControllerReady
+// condition must have been updated before downstream API calls are skipped to reduce load.
+const systemUpgradeControllerConditionThrottleDuration = 30 * time.Second
+
 type handler struct {
-	mgmtClusterName      string
-	clusterCache         provisioningcontrollers.ClusterCache
-	downstreamAppClient  catalogv1.AppClient
-	downstreamPlanClient upgradev1.PlanClient
+	mgmtClusterName           string
+	clusterCache              provisioningcontrollers.ClusterCache
+	downstreamAppClient       catalogv1.AppClient
+	downstreamPlanClient      upgradev1.PlanClient
+	rkeControlPlaneController rkecontrollers.RKEControlPlaneController
 }
 
 func Register(ctx context.Context, mgmtClusterName string, clusterCache provisioningcontrollers.ClusterCache,
@@ -33,10 +39,11 @@ func Register(ctx context.Context, mgmtClusterName string, clusterCache provisio
 	rkeControlPlaneController rkecontrollers.RKEControlPlaneController) {
 
 	h := handler{
-		mgmtClusterName:      mgmtClusterName,
-		clusterCache:         clusterCache,
-		downstreamAppClient:  downstreamAppClient,
-		downstreamPlanClient: downstreamPlanClient,
+		mgmtClusterName:           mgmtClusterName,
+		clusterCache:              clusterCache,
+		downstreamAppClient:       downstreamAppClient,
+		downstreamPlanClient:      downstreamPlanClient,
+		rkeControlPlaneController: rkeControlPlaneController,
 	}
 
 	rkecontrollers.RegisterRKEControlPlaneStatusHandler(ctx, rkeControlPlaneController,
@@ -59,6 +66,7 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 		capr.SystemUpgradeControllerReady.Reason(&status, "the SystemUpgradeControllerChartVersion setting is not set")
 		capr.SystemUpgradeControllerReady.Message(&status, "")
 		capr.SystemUpgradeControllerReady.False(&status)
+		capr.SystemUpgradeControllerReady.LastUpdated(&status, time.Now().UTC().Format(time.RFC3339))
 		return status, nil
 	}
 
@@ -74,7 +82,19 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 			capr.SystemUpgradeControllerReady.Reason(&status, "reset the condition")
 			capr.SystemUpgradeControllerReady.Message(&status, "")
 			capr.SystemUpgradeControllerReady.False(&status)
+			capr.SystemUpgradeControllerReady.LastUpdated(&status, time.Now().UTC().Format(time.RFC3339))
 			return status, nil
+		}
+	}
+
+	// Skip if the condition was recently updated to avoid excessive downstream API calls
+	if lastUpdated := capr.SystemUpgradeControllerReady.GetLastUpdated(&status); lastUpdated != "" {
+		if lastUpdatedTime, parseErr := time.Parse(time.RFC3339, lastUpdated); parseErr == nil {
+			now := time.Now()
+			if !lastUpdatedTime.After(now) && now.Sub(lastUpdatedTime) < systemUpgradeControllerConditionThrottleDuration {
+				h.rkeControlPlaneController.EnqueueAfter(obj.Namespace, obj.Name, systemUpgradeControllerConditionThrottleDuration)
+				return status, nil
+			}
 		}
 	}
 
@@ -84,6 +104,7 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 	}
 	// Skip if Rancher does not have a connection to the cluster
 	if !clusterconnected.Connected.IsTrue(cluster) {
+		h.rkeControlPlaneController.EnqueueAfter(obj.Namespace, obj.Name, systemUpgradeControllerConditionThrottleDuration)
 		return status, nil
 	}
 
@@ -92,10 +113,12 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 	// and delaying the execution of other handlers.
 	name := appName(obj.Spec.ClusterName)
 	app, err := h.downstreamAppClient.Get(namespace.System, name, metav1.GetOptions{})
+	logrus.Debugf("[rkecontrolplanecondition] checking %s app in cluster %s", name, obj.Spec.ClusterName)
 	if errors.IsNotFound(err) {
 		capr.SystemUpgradeControllerReady.Reason(&status, err.Error())
 		capr.SystemUpgradeControllerReady.Message(&status, "")
 		capr.SystemUpgradeControllerReady.False(&status)
+		capr.SystemUpgradeControllerReady.LastUpdated(&status, time.Now().UTC().Format(time.RFC3339))
 		// don't return the error, otherwise the status won't be set to 'false'
 		return status, nil
 	} else if err != nil {
@@ -105,6 +128,7 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 		capr.SystemUpgradeControllerReady.Reason(&status, fmt.Sprintf("waiting for %s to be reinstalled", app.Name))
 		capr.SystemUpgradeControllerReady.Message(&status, "")
 		capr.SystemUpgradeControllerReady.False(&status)
+		capr.SystemUpgradeControllerReady.LastUpdated(&status, time.Now().UTC().Format(time.RFC3339))
 		return status, nil
 	}
 
@@ -113,6 +137,7 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 		capr.SystemUpgradeControllerReady.Reason(&status, fmt.Sprintf("waiting for %s to be updated to %s", app.Name, targetVersion))
 		capr.SystemUpgradeControllerReady.Message(&status, "")
 		capr.SystemUpgradeControllerReady.False(&status)
+		capr.SystemUpgradeControllerReady.LastUpdated(&status, time.Now().UTC().Format(time.RFC3339))
 		return status, nil
 	}
 
@@ -120,12 +145,14 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 		capr.SystemUpgradeControllerReady.Reason(&status, fmt.Sprintf("waiting for %s to be ready, current state %s", app.Name, app.Status.Summary.State))
 		capr.SystemUpgradeControllerReady.Message(&status, "")
 		capr.SystemUpgradeControllerReady.False(&status)
+		capr.SystemUpgradeControllerReady.LastUpdated(&status, time.Now().UTC().Format(time.RFC3339))
 		return status, nil
 	}
 
 	capr.SystemUpgradeControllerReady.Reason(&status, "")
 	capr.SystemUpgradeControllerReady.Message(&status, version)
 	capr.SystemUpgradeControllerReady.True(&status)
+	capr.SystemUpgradeControllerReady.LastUpdated(&status, time.Now().UTC().Format(time.RFC3339))
 
 	return status, nil
 }

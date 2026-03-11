@@ -70,6 +70,7 @@ type testCase struct {
 	appClientIsInvoked    bool
 	planClientIsInvoked   bool
 	clusterCacheIsInvoked bool
+	enqueueAfterIsInvoked bool
 }
 
 func Test_handler_syncSystemUpgradeControllerStatus(t *testing.T) {
@@ -510,6 +511,91 @@ func Test_handler_syncSystemUpgradeControllerStatus(t *testing.T) {
 			planClientIsInvoked:   false,
 			clusterCacheIsInvoked: true,
 		},
+		{
+			name: "condition recently updated - downstream API call is skipped",
+			setup: setupConfig{
+				mgmtClusterName: mgmtClusterName,
+				chartVersion:    "160.1.0",
+			},
+			input: &v1.RKEControlPlane{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      controlPlaneName,
+					Namespace: namespace.System,
+				},
+				Spec: v1.RKEControlPlaneSpec{
+					ClusterName:           provClusterName,
+					ManagementClusterName: mgmtClusterName,
+				},
+				Status: v1.RKEControlPlaneStatus{
+					Conditions: []genericcondition.GenericCondition{
+						{
+							Type:           "SystemUpgradeControllerReady",
+							Status:         "False",
+							LastUpdateTime: time.Now().UTC().Format(time.RFC3339),
+						},
+					},
+				},
+			},
+			wantError:             false,
+			wantedConditionStatus: "False",
+			appClientIsInvoked:    false,
+			planClientIsInvoked:   false,
+			clusterCacheIsInvoked: false,
+			enqueueAfterIsInvoked: true,
+		},
+		{
+			name: "condition updated more than 30 seconds ago - downstream API call proceeds",
+			setup: setupConfig{
+				mgmtClusterName: mgmtClusterName,
+				app: &catalog.App{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      appName(provClusterName),
+						Namespace: namespace.System,
+					},
+					Spec: catalog.ReleaseSpec{
+						Chart: &catalog.Chart{
+							Metadata: &catalog.Metadata{
+								Version: "160.1.0",
+							},
+						},
+					},
+					Status: catalog.ReleaseStatus{
+						Summary: catalog.Summary{
+							State:         string(catalog.StatusDeployed),
+							Error:         false,
+							Transitioning: false,
+						},
+					},
+				},
+				cluster:      basicCluster,
+				appError:     nil,
+				chartVersion: "160.1.0",
+			},
+			input: &v1.RKEControlPlane{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      controlPlaneName,
+					Namespace: namespace.System,
+				},
+				Spec: v1.RKEControlPlaneSpec{
+					ClusterName:           provClusterName,
+					ManagementClusterName: mgmtClusterName,
+				},
+				Status: v1.RKEControlPlaneStatus{
+					Conditions: []genericcondition.GenericCondition{
+						{
+							Type:           "SystemUpgradeControllerReady",
+							Status:         "False",
+							LastUpdateTime: time.Now().Add(-35 * time.Second).UTC().Format(time.RFC3339),
+						},
+					},
+				},
+			},
+			wantError:             false,
+			wantedConditionStatus: "True",
+			appClientIsInvoked:    true,
+			planClientIsInvoked:   false,
+			clusterCacheIsInvoked: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -517,11 +603,13 @@ func Test_handler_syncSystemUpgradeControllerStatus(t *testing.T) {
 			bc := fake.NewMockControllerInterface[*catalog.App, *catalog.AppList](ctrl)
 			cc := fake.NewMockCacheInterface[*prov.Cluster](ctrl)
 			pc := fake.NewMockControllerInterface[*upgradev1.Plan, *upgradev1.PlanList](ctrl)
+			rc := fake.NewMockControllerInterface[*v1.RKEControlPlane, *v1.RKEControlPlaneList](ctrl)
 			h := &handler{
-				mgmtClusterName:      tt.setup.mgmtClusterName,
-				downstreamAppClient:  bc,
-				downstreamPlanClient: pc,
-				clusterCache:         cc,
+				mgmtClusterName:           tt.setup.mgmtClusterName,
+				downstreamAppClient:       bc,
+				downstreamPlanClient:      pc,
+				clusterCache:              cc,
+				rkeControlPlaneController: rc,
 			}
 			if tt.appClientIsInvoked {
 				bc.EXPECT().Get(namespace.System, appName(tt.input.Spec.ClusterName), metav1.GetOptions{}).Return(tt.setup.app, tt.setup.appError)
@@ -531,6 +619,9 @@ func Test_handler_syncSystemUpgradeControllerStatus(t *testing.T) {
 			}
 			if tt.planClientIsInvoked {
 				pc.EXPECT().Get(namespace.System, managesystemagent.SystemAgentUpgrader, metav1.GetOptions{}).Return(tt.setup.plan, tt.setup.appError)
+			}
+			if tt.enqueueAfterIsInvoked {
+				rc.EXPECT().EnqueueAfter(tt.input.Namespace, tt.input.Name, gomock.Any()).Times(1)
 			}
 
 			if tt.setup.chartVersion != "" {
