@@ -20,7 +20,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	clientcache "k8s.io/client-go/tools/cache"
 )
 
@@ -56,12 +55,11 @@ func (c *SyncController) syncResourceQuota(_ string, ns *corev1.Namespace) (*cor
 		return nil, nil
 	}
 
-	nsUpdatedObj, err := c.CreateResourceQuota(ns)
+	nsUpdated, err := c.CreateResourceQuota(ns)
 	if err != nil {
 		return nil, err
 	}
 
-	nsUpdated := nsUpdatedObj.(*corev1.Namespace)
 	return nil, c.createLimitRange(nsUpdated)
 }
 
@@ -140,7 +138,7 @@ func limitsChanged(existing []corev1.LimitRangeItem, toUpdate []corev1.LimitRang
 	return false
 }
 
-func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (runtime.Object, error) {
+func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (*corev1.Namespace, error) {
 	existing, err := c.getExistingResourceQuota(ns)
 	if err != nil {
 		return ns, err
