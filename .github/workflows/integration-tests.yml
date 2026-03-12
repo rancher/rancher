@@ -11,8 +11,10 @@ env:
   IMAGE: ${{ github.repository_owner }}/rancher
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   REPO: ${{ github.repository_owner }}
+permissions: {}
 jobs:
   test:
+    name: Run integration tests
     runs-on:
       - runs-on
       - spot=false
@@ -21,9 +23,13 @@ jobs:
     timeout-minutes: 60
     env:
       K3D_VERSION: v5.7.1
+    permissions:
+      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
       - name: Configure Docker for cgroupfs
         run: |
           echo '{"exec-opts": ["native.cgroupdriver=cgroupfs"]}'| sudo tee /etc/docker/daemon.json
@@ -48,7 +54,7 @@ jobs:
 
           AMD_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "rancher/rancher:.*amd64.*$" | head -n 1)
           echo "the image created is $AMD_IMAGE"
-          docker tag "$image_server_id" ${{ env.IMAGE }}:${{ env.TAG }}
+          docker tag "$image_server_id" "${IMAGE}:${TAG}"
           docker image ls
           docker rmi "$AMD_IMAGE"
           docker image ls
@@ -61,13 +67,13 @@ jobs:
           fi
 
           AMD_IMAGE_AGENT=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "rancher/rancher-agent:.*amd64.*$" | head -n 1)
-          docker tag "$image_agent_id" ${{ env.IMAGE_AGENT }}:${{ env.TAG }}
+          docker tag "$image_agent_id" "${IMAGE_AGENT}:${TAG}"
           echo "the image created is $AMD_IMAGE_AGENT"
           docker image ls
           docker rmi "$AMD_IMAGE_AGENT"
           docker image ls
       - name: Install k3d
-        run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG=${{ env.K3D_VERSION }} bash
+        run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG="${K3D_VERSION}" bash
       - name: Check Python version
         run: |
           python -V
@@ -75,15 +81,17 @@ jobs:
       - name: Update dependencies
         run: sudo apt-get update
       - name: Install python and dependencies
-        run: sudo apt-get install -y python${{ env.PYTHON_VERSION }} python3-pip python3-dev libffi-dev libssl-dev
+        run: sudo apt-get install -y "python${PYTHON_VERSION}" python3-pip python3-dev libffi-dev libssl-dev
       - name: Install tox and flake8
         run: |
           sudo pip3 install --upgrade pip
           sudo pip3 install tox flake8
       - name: KDM data
+        env:
+          CATTLE_KDM_BRANCH: ${{ steps.env.outputs.CATTLE_KDM_BRANCH }}
         run: |
           mkdir -p bin
-          curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data.json > bin/data.json
+          curl -sLf "https://releases.rancher.com/kontainer-driver-metadata/${CATTLE_KDM_BRANCH}/data.json" > bin/data.json
       - name: Set up Go
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
