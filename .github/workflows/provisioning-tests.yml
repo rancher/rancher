@@ -1,11 +1,6 @@
 name: Provisioning tests
 on:
   workflow_call:
-env:
-  TAG: ${{ github.sha }}-head
-  COMMIT: ${{ github.sha }}
-  IMAGE: ${{ github.repository_owner }}/rancher
-  IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
 permissions: {}
 jobs:
   provisioning_tests:
@@ -43,7 +38,10 @@ jobs:
       V2PROV_TEST_RUN_REGEX: "${{ matrix.V2PROV_TEST_RUN_REGEX }}"
       V2PROV_TEST_DIST: "${{ matrix.V2PROV_TEST_DIST }}"
       CATTLE_FEATURES: "${{ matrix.CATTLE_FEATURES }}"
-      CATTLE_AGENT_IMAGE: "${{ env.IMAGE_AGENT}}:${{ env.TAG }}"
+      TAG: ${{ github.sha }}-head
+      COMMIT: ${{ github.sha }}
+      IMAGE: ${{ github.repository_owner }}/rancher
+      IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
     permissions:
       contents: read
     steps:
@@ -90,6 +88,8 @@ jobs:
           docker tag "$image_agent_id" "${REGISTRY}/${IMAGE_AGENT}:${TAG}"
           echo "the image created is "${REGISTRY}/${IMAGE_AGENT}:${TAG}"
       - name: Run tests
+        env:
+          CATTLE_AGENT_IMAGE: "${{ env.IMAGE_AGENT}}:${{ env.TAG }}"
         run: |
           set -eo pipefail
           ./.dapper provisioning-tests | tee provtest_output.txt
