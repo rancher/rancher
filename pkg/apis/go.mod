@@ -38,15 +38,15 @@ require (
 	github.com/rancher/aks-operator v1.14.0-rc.1
 	github.com/rancher/ali-operator v1.14.0-rc.1
 	github.com/rancher/eks-operator v1.14.0-rc.4
-	github.com/rancher/fleet/pkg/apis v0.15.0-beta.4
+	github.com/rancher/fleet/pkg/apis v0.15.0-rc.3
 	github.com/rancher/gke-operator v1.14.0-rc.2
 	github.com/rancher/norman v0.8.4
 	github.com/rancher/rke v1.8.0
 	github.com/rancher/wrangler/v3 v3.5.0-rc.2
 	github.com/sirupsen/logrus v1.9.4
 	github.com/stretchr/testify v1.11.1
-	k8s.io/api v0.35.1
-	k8s.io/apimachinery v0.35.1
+	k8s.io/api v0.35.2
+	k8s.io/apimachinery v0.35.2
 	sigs.k8s.io/cluster-api v1.12.2
 )
 
