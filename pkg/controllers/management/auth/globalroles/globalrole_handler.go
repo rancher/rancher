@@ -39,17 +39,10 @@ const (
 const (
 	ClusterRoleExists         = "ClusterRoleExists"
 	NamespacedRuleRoleExists  = "NamespacedRuleRoleExists"
-	NamespaceNotFound         = "NamespaceNotFound"
-	NamespaceTerminating      = "NamespaceTerminating"
-	FailedToGetRole           = "GetRoleFailed"
-	FailedToCreateRole        = "CreateRoleFailed"
-	FailedToUpdateRole        = "UpdateRoleFailed"
-	FailedToGetNamespace      = "GetNamespaceFailed"
 	FailedToCreateClusterRole = "CreateClusterRoleFailed"
 	FailedToUpdateClusterRole = "UpdateClusterRoleFailed"
 	FailedToCreateLabel       = "CreateLabelFailed"
 	FailedToListRoles         = "ListRolesFailed"
-	FailedToPurgeRoles        = "PurgeRolesFailed"
 )
 
 type fleetPermissionsRoleHandler interface {
@@ -313,7 +306,6 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 	if len(roleUIDs) != len(roles) {
 		err = gr.purgeInvalidNamespacedRoles(roles, roleUIDs)
 		if err != nil {
-			gr.status.AddCondition(localConditions, condition, FailedToPurgeRoles, err)
 			returnError = errors.Join(returnError, err)
 		}
 	}

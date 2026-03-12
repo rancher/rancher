@@ -308,7 +308,7 @@ spec:
                 format: int64
                 type: integer
               summary:
-                description: Summary is a string. Either "Complete" or "Error".
+                description: Summary is a string. Either "Completed" or "Error".
                 type: string
             type: object
         type: object
