@@ -102,9 +102,7 @@ func registerProvV2(ctx context.Context, cluster *config.UserContext, capi *wran
 		cluster.Plan = upgrade.New(cluster.ControllerFactory)
 		rkecontrolplanecondition.Register(ctx,
 			cluster.ClusterName,
-			cluster.Management.Wrangler.Provisioning.Cluster().Cache(),
 			cluster.Catalog.V1().App(),
-			cluster.Plan.V1().Plan(),
 			cluster.Management.Wrangler.RKE.RKEControlPlane())
 	}
 	machinerole.Register(ctx, cluster)

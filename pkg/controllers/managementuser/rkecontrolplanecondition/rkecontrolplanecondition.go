@@ -3,18 +3,14 @@ package rkecontrolplanecondition
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
-	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/rancher/pkg/controllers/management/clusterconnected"
-	cluster2 "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	catalogv1 "github.com/rancher/rancher/pkg/generated/controllers/catalog.cattle.io/v1"
-	provisioningcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontrollers "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
-	upgradev1 "github.com/rancher/rancher/pkg/generated/controllers/upgrade.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
@@ -28,21 +24,17 @@ const systemUpgradeControllerConditionThrottleDuration = 30 * time.Second
 
 type handler struct {
 	mgmtClusterName           string
-	clusterCache              provisioningcontrollers.ClusterCache
 	downstreamAppClient       catalogv1.AppClient
-	downstreamPlanClient      upgradev1.PlanClient
 	rkeControlPlaneController rkecontrollers.RKEControlPlaneController
+	pendingEnqueues           sync.Map
 }
 
-func Register(ctx context.Context, mgmtClusterName string, clusterCache provisioningcontrollers.ClusterCache,
-	downstreamAppClient catalogv1.AppClient, downstreamPlanClient upgradev1.PlanClient,
+func Register(ctx context.Context, mgmtClusterName string, downstreamAppClient catalogv1.AppClient,
 	rkeControlPlaneController rkecontrollers.RKEControlPlaneController) {
 
 	h := handler{
 		mgmtClusterName:           mgmtClusterName,
-		clusterCache:              clusterCache,
 		downstreamAppClient:       downstreamAppClient,
-		downstreamPlanClient:      downstreamPlanClient,
 		rkeControlPlaneController: rkeControlPlaneController,
 	}
 
@@ -53,9 +45,16 @@ func Register(ctx context.Context, mgmtClusterName string, clusterCache provisio
 // syncSystemUpgradeControllerCondition checks the status of the system-upgrade-controller app in the target cluster
 // and manages the SystemUpgradeControllerReady condition on the RKEControlPlane object
 func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
-	if obj == nil || obj.DeletionTimestamp != nil {
+	if obj == nil {
 		return status, nil
 	}
+
+	key := obj.Namespace + "/" + obj.Name
+	if obj.DeletionTimestamp != nil {
+		h.pendingEnqueues.Delete(key)
+		return status, nil
+	}
+
 	if obj.Spec.ManagementClusterName != h.mgmtClusterName {
 		return status, nil
 	}
@@ -63,10 +62,23 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 	targetVersion := settings.SystemUpgradeControllerChartVersion.Get()
 	if targetVersion == "" {
 		logrus.Warn("[rkecontrolplanecondition] the SystemUpgradeControllerChartVersion setting is not set")
-		capr.SystemUpgradeControllerReady.Reason(&status, "the SystemUpgradeControllerChartVersion setting is not set")
+		desiredReason := "the SystemUpgradeControllerChartVersion setting is not set"
+		// Only update the condition if it is not already in the desired state, to avoid
+		// unnecessary status updates and a tight reconcile loop while the setting is unset.
+		if capr.SystemUpgradeControllerReady.IsFalse(&status) &&
+			capr.SystemUpgradeControllerReady.GetReason(&status) == desiredReason &&
+			capr.SystemUpgradeControllerReady.GetMessage(&status) == "" {
+			return status, nil
+		}
+		capr.SystemUpgradeControllerReady.Reason(&status, desiredReason)
 		capr.SystemUpgradeControllerReady.Message(&status, "")
 		capr.SystemUpgradeControllerReady.False(&status)
 		capr.SystemUpgradeControllerReady.LastUpdated(&status, time.Now().UTC().Format(time.RFC3339))
+		return status, nil
+	}
+
+	// Skip if Rancher does not have a connection to the cluster
+	if !status.AgentConnected {
 		return status, nil
 	}
 
@@ -90,25 +102,22 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 	// Skip if the condition was recently updated to avoid excessive downstream API calls
 	if lastUpdated := capr.SystemUpgradeControllerReady.GetLastUpdated(&status); lastUpdated != "" {
 		if lastUpdatedTime, parseErr := time.Parse(time.RFC3339, lastUpdated); parseErr == nil {
-			now := time.Now()
-			if !lastUpdatedTime.After(now) && now.Sub(lastUpdatedTime) < systemUpgradeControllerConditionThrottleDuration {
-				h.rkeControlPlaneController.EnqueueAfter(obj.Namespace, obj.Name, systemUpgradeControllerConditionThrottleDuration)
+			if wait := systemUpgradeControllerConditionThrottleDuration - time.Since(lastUpdatedTime); wait > 0 {
+				// Only call EnqueueAfter if there isn't already a pending enqueue for this object.
+				// This avoids stacking up redundant delayed enqueues when the handler is invoked
+				// multiple times during the throttle window.
+				if _, alreadyPending := h.pendingEnqueues.LoadOrStore(key, struct{}{}); !alreadyPending {
+					h.rkeControlPlaneController.EnqueueAfter(obj.Namespace, obj.Name, wait)
+				}
 				return status, nil
 			}
 		}
 	}
 
-	cluster, err := h.getCluster()
-	if err != nil {
-		return status, err
-	}
-	// Skip if Rancher does not have a connection to the cluster
-	if !clusterconnected.Connected.IsTrue(cluster) {
-		h.rkeControlPlaneController.EnqueueAfter(obj.Namespace, obj.Name, systemUpgradeControllerConditionThrottleDuration)
-		return status, nil
-	}
+	// Clear the pending enqueue flag since we're proceeding with a full reconciliation.
+	h.pendingEnqueues.Delete(key)
 
-	// In rare cases, downstream cluster may become disconnected even if the Connected condition was recently true.
+	// In rare cases, downstream cluster may become disconnected but AgentConnected has not been updated to false.
 	// If that happens, the following Get call can hang until it times out, causing this handler to take longer to return
 	// and delaying the execution of other handlers.
 	name := appName(obj.Spec.ClusterName)
@@ -160,13 +169,4 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 func appName(clusterName string) string {
 	return capr.SafeConcatName(capr.MaxHelmReleaseNameLength, "mcc",
 		capr.SafeConcatName(48, clusterName, "managed", "system-upgrade-controller"))
-}
-
-// getCluster returns the provisioning cluster associated with the current userContext.
-func (h *handler) getCluster() (*provv1.Cluster, error) {
-	clusters, err := h.clusterCache.GetByIndex(cluster2.ByCluster, h.mgmtClusterName)
-	if err != nil || len(clusters) != 1 {
-		return nil, fmt.Errorf("error while retrieving cluster %s from cache via index: %w", h.mgmtClusterName, err)
-	}
-	return clusters[0], nil
 }
