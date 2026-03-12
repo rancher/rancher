@@ -86,7 +86,7 @@ jobs:
 
           AMD_IMAGE_AGENT=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "rancher/rancher-agent:.*amd64.*$" | head -n 1)
           docker tag "$image_agent_id" "${REGISTRY}/${IMAGE_AGENT}:${TAG}"
-          echo "the image created is "${REGISTRY}/${IMAGE_AGENT}:${TAG}"
+          echo "the image created is ${REGISTRY}/${IMAGE_AGENT}:${TAG}"
       - name: Run tests
         env:
           CATTLE_AGENT_IMAGE: "${{ env.IMAGE_AGENT}}:${{ env.TAG }}"
