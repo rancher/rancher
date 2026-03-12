@@ -191,6 +191,7 @@ func Test_handler_syncSystemUpgradeControllerStatus(t *testing.T) {
 			appClientIsInvoked:    false,
 			planClientIsInvoked:   false,
 			clusterCacheIsInvoked: true,
+			enqueueAfterIsInvoked: true,
 		},
 		{
 			name: "fail to get the app with notFound error",

@@ -78,7 +78,7 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 		} else if actual == "" {
 			// If SystemUpgradeControllerReady is true but its message is empty, this may occur in scenarios where Rancher
 			// is upgraded to 2.12.x, then rolled back to 2.11.x, and later re-upgraded to 2.12.x without restoring the local cluster.
-			// In such cases, the condition should be rest
+			// In such cases, the condition should be reset
 			capr.SystemUpgradeControllerReady.Reason(&status, "reset the condition")
 			capr.SystemUpgradeControllerReady.Message(&status, "")
 			capr.SystemUpgradeControllerReady.False(&status)
@@ -112,8 +112,8 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 	// If that happens, the following Get call can hang until it times out, causing this handler to take longer to return
 	// and delaying the execution of other handlers.
 	name := appName(obj.Spec.ClusterName)
-	app, err := h.downstreamAppClient.Get(namespace.System, name, metav1.GetOptions{})
 	logrus.Debugf("[rkecontrolplanecondition] checking %s app in cluster %s", name, obj.Spec.ClusterName)
+	app, err := h.downstreamAppClient.Get(namespace.System, name, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		capr.SystemUpgradeControllerReady.Reason(&status, err.Error())
 		capr.SystemUpgradeControllerReady.Message(&status, "")
