@@ -9,8 +9,8 @@ import (
 
 	wrangler "github.com/rancher/wrangler/v3/pkg/name"
 
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	rbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	v1 "k8s.io/api/rbac/v1"
@@ -26,8 +26,6 @@ const (
 	fleetWorkspaceVerbsName        = "fwv"
 
 	fleetWorkspaceRolePermissionsReconciled = "FleetWorkspaceRolePermissionsReconciled"
-	failedToReconcileResourceRuleRoles      = "FailedToReconcileResourceRuleRoles"
-	failedToReconcileWorkspaceVerbRoles     = "FailedToReconcileWorkspaceVerbRoles"
 )
 
 var (
@@ -59,17 +57,12 @@ func (h *fleetWorkspaceRoleHandler) reconcileFleetWorkspacePermissions(gr *v3.Gl
 	condition := metav1.Condition{Type: fleetWorkspaceRolePermissionsReconciled}
 	var returnErr error
 	if err := h.reconcileResourceRules(gr); err != nil {
-		h.status.AddCondition(localConditions, condition, failedToReconcileResourceRuleRoles, err)
 		returnErr = errors.Join(returnErr, errReconcileResourceRules, err)
 	}
 	if err := h.reconcileWorkspaceVerbs(gr); err != nil {
-		h.status.AddCondition(localConditions, condition, failedToReconcileWorkspaceVerbRoles, err)
 		returnErr = errors.Join(returnErr, errReconcileWorkspaceVerbs, err)
 	}
-
-	if returnErr == nil {
-		h.status.AddCondition(localConditions, condition, fleetWorkspaceRolePermissionsReconciled, nil)
-	}
+	h.status.AddCondition(localConditions, condition, fleetWorkspaceRolePermissionsReconciled, returnErr)
 
 	return returnErr
 }
@@ -158,8 +151,8 @@ func backingResourceRulesClusterRole(gr *v3.GlobalRole, crName string) *v1.Clust
 			Name: crName,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion: v3.GlobalRoleGroupVersionKind.GroupVersion().String(),
-					Kind:       v3.GlobalRoleGroupVersionKind.Kind,
+					APIVersion: gr.APIVersion,
+					Kind:       gr.Kind,
 					Name:       gr.Name,
 					UID:        gr.UID,
 				},
@@ -179,8 +172,8 @@ func backingWorkspaceVerbsClusterRole(gr *v3.GlobalRole, crName string, workspac
 			Name: crName,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion: v3.GlobalRoleGroupVersionKind.GroupVersion().String(),
-					Kind:       v3.GlobalRoleGroupVersionKind.Kind,
+					APIVersion: gr.APIVersion,
+					Kind:       gr.Kind,
 					Name:       gr.Name,
 					UID:        gr.UID,
 				},

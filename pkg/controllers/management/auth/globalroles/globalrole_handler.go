@@ -318,9 +318,7 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 		}
 	}
 
-	if returnError == nil {
-		gr.status.AddCondition(localConditions, condition, NamespacedRuleRoleExists, nil)
-	}
+	gr.status.AddCondition(localConditions, condition, NamespacedRuleRoleExists, returnError)
 	return returnError
 }
 

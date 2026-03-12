@@ -240,9 +240,8 @@ spec:
             description: Status is the most recently observed status of the GlobalRole.
             properties:
               conditions:
-                description: |-
-                  Conditions is a slice of Condition, indicating the status of specific backing RBAC objects in the local cluster.
-                  There is one condition per ClusterRole and Role managed by the GlobalRole.
+                description: Conditions is a slice of Condition, indicating the status
+                  of specific backing RBAC objects in the local cluster.
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -309,8 +308,7 @@ spec:
                 format: int64
                 type: integer
               summary:
-                description: Summary is a string. One of "Complete", "InProgress"
-                  or "Error".
+                description: Summary is a string. Either "Complete" or "Error".
                 type: string
             type: object
         type: object

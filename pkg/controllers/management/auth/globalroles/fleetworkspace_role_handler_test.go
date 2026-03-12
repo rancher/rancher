@@ -24,6 +24,10 @@ var (
 			Name: grName,
 			UID:  grUID,
 		},
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "GlobalRole",
+			APIVersion: "management.cattle.io/v3",
+		},
 		InheritedFleetWorkspacePermissions: &v3.FleetWorkspacePermission{
 			ResourceRules: []rbac.PolicyRule{
 				{
@@ -290,6 +294,10 @@ func TestReconcileFleetPermissions_errors(t *testing.T) {
 					Name: grName,
 					UID:  grUID,
 				},
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "GlobalRole",
+					APIVersion: "management.cattle.io/v3",
+				},
 			},
 			wantErrs: []error{errReconcileResourceRules, unexpectedErr},
 		},
@@ -338,6 +346,10 @@ func TestReconcileFleetPermissions_errors(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: grName,
 					UID:  grUID,
+				},
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "GlobalRole",
+					APIVersion: "management.cattle.io/v3",
 				},
 				InheritedFleetWorkspacePermissions: &v3.FleetWorkspacePermission{
 					ResourceRules: gr.InheritedFleetWorkspacePermissions.ResourceRules,

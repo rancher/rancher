@@ -322,7 +322,12 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
 			wantError:  true,
-			conditions: []reducedCondition{},
+			conditions: []reducedCondition{
+				{
+					reason: NamespacedRuleRoleExists,
+					status: metav1.ConditionFalse,
+				},
+			},
 		},
 		{
 			name: "namespace is not found",
@@ -369,7 +374,12 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
 			wantError:  true,
-			conditions: []reducedCondition{},
+			conditions: []reducedCondition{
+				{
+					reason: NamespacedRuleRoleExists,
+					status: metav1.ConditionFalse,
+				},
+			},
 		},
 		{
 			name: "creating role fails",
@@ -381,7 +391,12 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
 			wantError:  true,
-			conditions: []reducedCondition{},
+			conditions: []reducedCondition{
+				{
+					reason: NamespacedRuleRoleExists,
+					status: metav1.ConditionFalse,
+				},
+			},
 		},
 		{
 			name: "created role already exists but get continuously fails",
@@ -393,7 +408,12 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
 			wantError:  true,
-			conditions: []reducedCondition{},
+			conditions: []reducedCondition{
+				{
+					reason: NamespacedRuleRoleExists,
+					status: metav1.ConditionFalse,
+				},
+			},
 		},
 		{
 			// It's possible that a user can create the role in the middle of the reconcile
@@ -476,7 +496,12 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
 			wantError:  true,
-			conditions: []reducedCondition{},
+			conditions: []reducedCondition{
+				{
+					reason: NamespacedRuleRoleExists,
+					status: metav1.ConditionFalse,
+				},
+			},
 		},
 		{
 			name: "update an existing role with rule and label changes",
@@ -538,7 +563,12 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
 			wantError:  true,
-			conditions: []reducedCondition{},
+			conditions: []reducedCondition{
+				{
+					reason: NamespacedRuleRoleExists,
+					status: metav1.ConditionFalse,
+				},
+			},
 		},
 		{
 			name: "listing existing roles fails",
