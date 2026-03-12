@@ -22,7 +22,8 @@ jobs:
       - run-id=${{ github.run_id }}
     timeout-minutes: 60
     env:
-      K3D_VERSION: v5.7.1
+      K3D_VERSION: v5.8.3
+      K3D_BIN_HASH_AMD64: "dbaa79a76ace7f4ca230a1ff41dc7d8a5036a8ad0309e9c54f9bf3836dbe853e"
     permissions:
       contents: read
     steps:
@@ -73,7 +74,11 @@ jobs:
           docker rmi "$AMD_IMAGE_AGENT"
           docker image ls
       - name: Install k3d
-        run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | TAG="${K3D_VERSION}" bash
+        run: |
+          curl -sSfL -o k3d "https://github.com/k3d-io/k3d/releases/download/${K3D_VERSION}/k3d-linux-${ARCH}"
+          echo "${K3D_BIN_HASH_AMD64}  k3d" | shasum -a 256 --check
+          sudo mv k3d /usr/local/bin
+          sudo chmod +x /usr/local/bin/k3d
       - name: Check Python version
         run: |
           python -V
