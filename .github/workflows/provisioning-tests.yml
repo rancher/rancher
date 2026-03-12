@@ -100,7 +100,7 @@ jobs:
           export TESTSUITE="$(echo "${V2PROV_TEST_RUN_REGEX}" | sed 's/Test//' | tr -d '()|_^.*$')"
           echo "suite=${TESTSUITE}" >> $GITHUB_OUTPUT
           # need sudo due to this being created in the dapper container
-          sudo mv ./build/out.txt "/tmp/report-${V2PROV_TEST_DIST}-$TESTSUITE.txt"
+          sudo mv ./build/out.txt "/tmp/report-${V2PROV_TEST_DIST}-${TESTSUITE}.txt"
       - name: Upload Plain Text Test Results
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
