@@ -75,7 +75,7 @@ jobs:
 
           AMD_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -E "rancher/rancher:.*amd64.*$" | head -n 1)
           docker tag "$image_id" "${IMAGE}:${TAG}"
-          echo "the image created is "${IMAGE}:${TAG}"
+          echo "the image created is ${IMAGE}:${TAG}"
       - name: Load rancher/rancher-agent image
         run: |
           image_agent_id=$(docker load --input /tmp/rancher-agent-linux-amd64.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
