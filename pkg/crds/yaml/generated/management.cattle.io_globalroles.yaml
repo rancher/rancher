@@ -241,7 +241,7 @@ spec:
             properties:
               conditions:
                 description: |-
-                  Conditions is a slice of Condition, indicating the status of specific backing RBAC objects.
+                  Conditions is a slice of Condition, indicating the status of specific backing RBAC objects in the local cluster.
                   There is one condition per ClusterRole and Role managed by the GlobalRole.
                 items:
                   description: Condition contains details for one aspect of the current

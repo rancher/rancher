@@ -5,6 +5,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers"
+	"github.com/rancher/rancher/pkg/controllers/status"
 	genv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	wrangler "github.com/rancher/wrangler/v3/pkg/name"
@@ -217,9 +218,10 @@ func TestReconcileFleetPermissions(t *testing.T) {
 				crClient: state.crClient,
 				crCache:  state.crCache,
 				fwCache:  state.fwCache,
+				status:   status.NewStatus(),
 			}
-
-			err := h.reconcileFleetWorkspacePermissions(test.gr)
+			conditions := []metav1.Condition{}
+			err := h.reconcileFleetWorkspacePermissions(test.gr, &conditions)
 
 			assert.Equal(t, err, nil)
 		})
@@ -371,8 +373,10 @@ func TestReconcileFleetPermissions_errors(t *testing.T) {
 				crClient: state.crClient,
 				crCache:  state.crCache,
 				fwCache:  state.fwCache,
+				status:   status.NewStatus(),
 			}
-			err := h.reconcileFleetWorkspacePermissions(test.globalRole)
+			conditions := []metav1.Condition{}
+			err := h.reconcileFleetWorkspacePermissions(test.globalRole, &conditions)
 
 			for _, wantErr := range test.wantErrs {
 				assert.ErrorIs(t, err, wantErr)

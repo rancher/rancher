@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/rancher/rancher/pkg/controllers"
+	"github.com/rancher/rancher/pkg/controllers/status"
 
 	wrangler "github.com/rancher/wrangler/v3/pkg/name"
 
@@ -23,6 +24,10 @@ const (
 	localFleetWorkspace            = "fleet-local"
 	fleetWorkspaceClusterRulesName = "fwcr"
 	fleetWorkspaceVerbsName        = "fwv"
+
+	fleetWorkspaceRolePermissionsReconciled = "FleetWorkspaceRolePermissionsReconciled"
+	failedToReconcileResourceRuleRoles      = "FailedToReconcileResourceRuleRoles"
+	failedToReconcileWorkspaceVerbRoles     = "FailedToReconcileWorkspaceVerbRoles"
 )
 
 var (
@@ -37,6 +42,7 @@ type fleetWorkspaceRoleHandler struct {
 	crClient rbacv1.ClusterRoleController
 	crCache  rbacv1.ClusterRoleCache
 	fwCache  mgmtcontroller.FleetWorkspaceCache
+	status   *status.Status
 }
 
 func newFleetWorkspaceRoleHandler(management *config.ManagementContext) *fleetWorkspaceRoleHandler {
@@ -44,17 +50,25 @@ func newFleetWorkspaceRoleHandler(management *config.ManagementContext) *fleetWo
 		crClient: management.Wrangler.RBAC.ClusterRole(),
 		crCache:  management.Wrangler.RBAC.ClusterRole().Cache(),
 		fwCache:  management.Wrangler.Mgmt.FleetWorkspace().Cache(),
+		status:   status.NewStatus(),
 	}
 }
 
 // ReconcileFleetWorkspacePermissions reconciles backing ClusterRoles created for granting permission to fleet workspaces.
-func (h *fleetWorkspaceRoleHandler) reconcileFleetWorkspacePermissions(gr *v3.GlobalRole) error {
+func (h *fleetWorkspaceRoleHandler) reconcileFleetWorkspacePermissions(gr *v3.GlobalRole, localConditions *[]metav1.Condition) error {
+	condition := metav1.Condition{Type: fleetWorkspaceRolePermissionsReconciled}
 	var returnErr error
 	if err := h.reconcileResourceRules(gr); err != nil {
+		h.status.AddCondition(localConditions, condition, failedToReconcileResourceRuleRoles, err)
 		returnErr = errors.Join(returnErr, errReconcileResourceRules, err)
 	}
 	if err := h.reconcileWorkspaceVerbs(gr); err != nil {
+		h.status.AddCondition(localConditions, condition, failedToReconcileWorkspaceVerbRoles, err)
 		returnErr = errors.Join(returnErr, errReconcileWorkspaceVerbs, err)
+	}
+
+	if returnErr == nil {
+		h.status.AddCondition(localConditions, condition, fleetWorkspaceRolePermissionsReconciled, nil)
 	}
 
 	return returnErr
