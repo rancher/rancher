@@ -20,7 +20,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
 	clientcache "k8s.io/client-go/tools/cache"
 )
 
@@ -56,12 +55,12 @@ func (c *SyncController) syncResourceQuota(_ string, ns *corev1.Namespace) (*cor
 		return nil, nil
 	}
 
-	_, err := c.CreateResourceQuota(ns)
+	nsUpdated, err := c.CreateResourceQuota(ns)
 	if err != nil {
 		return nil, err
 	}
 
-	return nil, c.createLimitRange(ns)
+	return nil, c.createLimitRange(nsUpdated)
 }
 
 func (c *SyncController) createLimitRange(ns *corev1.Namespace) error {
@@ -70,7 +69,7 @@ func (c *SyncController) createLimitRange(ns *corev1.Namespace) error {
 		return err
 	}
 
-	limitRangeSpec, err := c.getResourceLimitToUpdate(ns)
+	rangeLimit, limitRangeSpec, err := c.getResourceLimitToUpdate(ns)
 	if err != nil {
 		return err
 	}
@@ -88,16 +87,38 @@ func (c *SyncController) createLimitRange(ns *corev1.Namespace) error {
 		}
 	}
 
-	switch operation {
-	case "create":
-		return c.createDefaultLimitRange(ns, limitRangeSpec)
-	case "update":
-		return c.updateDefaultLimitRange(existing, limitRangeSpec)
-	case "delete":
-		return c.deleteDefaultLimitRange(existing)
+	if operation == "none" {
+		return nil
 	}
 
-	return nil
+	updateAnnotation := true
+	switch operation {
+	case "create":
+		err = c.createDefaultLimitRange(ns, limitRangeSpec)
+	case "update":
+		updateAnnotation, err = c.updateDefaultLimitRange(existing, limitRangeSpec)
+	case "delete":
+		err = c.deleteDefaultLimitRange(existing)
+	}
+	if err != nil {
+		return err
+	}
+
+	if !updateAnnotation {
+		return nil
+	}
+
+	updatedNs := ns.DeepCopy()
+	if operation == "delete" {
+		deleteLimitRangeAnnotation(updatedNs)
+	} else {
+		if err := setLimitRangeAnnotation(updatedNs, rangeLimit); err != nil {
+			return err
+		}
+	}
+
+	_, err = c.Namespaces.Update(updatedNs)
+	return err
 }
 
 func limitsChanged(existing []corev1.LimitRangeItem, toUpdate []corev1.LimitRangeItem) bool {
@@ -117,7 +138,7 @@ func limitsChanged(existing []corev1.LimitRangeItem, toUpdate []corev1.LimitRang
 	return false
 }
 
-func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (runtime.Object, error) {
+func (c *SyncController) CreateResourceQuota(ns *corev1.Namespace) (*corev1.Namespace, error) {
 	existing, err := c.getExistingResourceQuota(ns)
 	if err != nil {
 		return ns, err
@@ -219,16 +240,22 @@ func (c *SyncController) updateResourceQuota(quota *corev1.ResourceQuota, spec *
 	return err
 }
 
-func (c *SyncController) updateDefaultLimitRange(limitRange *corev1.LimitRange, spec *corev1.LimitRangeSpec) error {
+// updateDefaultLimitRange updates the limit range stored in the system if the
+// new `limitRange` differs from the old `spec`. The boolean result conveys to
+// the caller if an update actually happened, or not. This is important for the
+// caller, `createLimitRange`, to know if it has to update the limitrange
+// annotation, or not. An error is only possible if the limit range was actually
+// updated.
+func (c *SyncController) updateDefaultLimitRange(limitRange *corev1.LimitRange, spec *corev1.LimitRangeSpec) (bool, error) {
 	// avoid updates if nothing would change
 	if reflect.DeepEqual(limitRange.Spec, *spec) {
-		return nil
+		return false, nil
 	}
 	toUpdate := limitRange.DeepCopy()
 	toUpdate.Spec = *spec
 	logrus.Infof("Updating default limit range for namespace %v", toUpdate.Namespace)
 	_, err := c.LimitRange.Update(toUpdate)
-	return err
+	return true, err
 }
 
 func (c *SyncController) deleteResourceQuota(quota *corev1.ResourceQuota) error {
@@ -317,6 +344,25 @@ func (c *SyncController) createResourceQuota(ns *corev1.Namespace, spec *corev1.
 	logrus.Infof("Creating default resource quota for namespace %v", ns.Name)
 	_, err := c.ResourceQuotas.Create(resourceQuota)
 	return err
+}
+
+func setLimitRangeAnnotation(ns *corev1.Namespace, limit *v32.ContainerResourceLimit) error {
+	if ns.Annotations == nil {
+		ns.Annotations = make(map[string]string)
+	}
+	b, err := json.Marshal(limit)
+	if err != nil {
+		return err
+	}
+	ns.Annotations[limitRangeAnnotation] = string(b)
+	return nil
+}
+
+func deleteLimitRangeAnnotation(ns *corev1.Namespace) {
+	if ns.Annotations == nil {
+		return
+	}
+	delete(ns.Annotations, limitRangeAnnotation)
 }
 
 func (c *SyncController) createDefaultLimitRange(ns *corev1.Namespace, spec *corev1.LimitRangeSpec) error {
@@ -425,14 +471,21 @@ func (c *SyncController) setValidated(ns *corev1.Namespace, value bool, msg stri
 	return c.Namespaces.Update(toUpdate)
 }
 
-func (c *SyncController) getResourceLimitToUpdate(ns *corev1.Namespace) (*corev1.LimitRangeSpec, error) {
+// getResourceLimitToUpdate determines the current state of limit range
+// information. To this end it looks at three places: (1) the
+// `field.cattle.io/containerDefaultResourceLimit` annotation of the namespace,
+// (2) the container default resource limit of the project the namespace belongs
+// to,, and (3) a combination of the first two calculated by
+// `completeLimit`. These results are checked in the order of 3, 1, 2 and the
+// first non-nil result is returned.
+func (c *SyncController) getResourceLimitToUpdate(ns *corev1.Namespace) (*v32.ContainerResourceLimit, *corev1.LimitRangeSpec, error) {
 	nsLimit, err := getNamespaceContainerResourceLimit(ns)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	projectLimit, err := getProjectContainerDefaultLimit(ns, c.ProjectCache)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// rework after api framework change is done
@@ -444,20 +497,23 @@ func (c *SyncController) getResourceLimitToUpdate(ns *corev1.Namespace) (*corev1
 		// based on the default quota
 		updatedLimit, err = completeLimit(nsLimit, projectLimit)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
 	if updatedLimit != nil {
-		return convertPodResourceLimitToLimitRangeSpec(updatedLimit)
+		spec, err := convertPodResourceLimitToLimitRangeSpec(updatedLimit)
+		return updatedLimit, spec, err
 	}
 	if nsLimit != nil {
-		return convertPodResourceLimitToLimitRangeSpec(nsLimit)
+		spec, err := convertPodResourceLimitToLimitRangeSpec(nsLimit)
+		return nsLimit, spec, err
 	}
 	if projectLimit != nil {
-		return convertPodResourceLimitToLimitRangeSpec(projectLimit)
+		spec, err := convertPodResourceLimitToLimitRangeSpec(projectLimit)
+		return projectLimit, spec, err
 	}
-	return nil, nil
+	return nil, nil, nil
 }
 
 func completeQuota(requestedQuota *v32.ResourceQuotaLimit, defaultQuota *v32.ResourceQuotaLimit) (*v32.ResourceQuotaLimit, error) {
