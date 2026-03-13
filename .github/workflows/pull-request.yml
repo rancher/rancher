@@ -6,6 +6,7 @@ on:
       - "tests/v2/codecoverage/**"
       - "tests/validation/**"
 
+permissions: {}
 env:
   ARCH: amd64
   TAG: v2.14-${{ github.sha }}-head
@@ -22,6 +23,8 @@ jobs:
   build-chart:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
     container: registry.suse.com/bci/bci-base:15.7
+    permissions:
+      contents: read
     steps:
       - name: install dependencies
         shell: bash
@@ -30,6 +33,8 @@ jobs:
         run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
       - name: setup and build
         uses: ./.github/actions/rancher-chart/build
   build-server:
@@ -41,9 +46,13 @@ jobs:
     env:
       ARCH: ${{ matrix.arch }}
       OS: ${{ matrix.OS }}
+    permissions:
+      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
       - name: setup and build
         uses: ./.github/actions/build-images/server
   build-agent:
@@ -55,14 +64,22 @@ jobs:
     env:
       ARCH: ${{ matrix.arch }}
       OS: ${{ matrix.OS }}
+    permissions:
+      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
       - name: setup and build
         uses: ./.github/actions/build-images/agent
   integration-tests:
+    permissions:
+      contents: read
     needs: [build-server, build-agent]
     uses: ./.github/workflows/integration-tests.yml
   provisioning-tests:
+    permissions:
+      contents: read
     needs: [build-server, build-agent]
     uses: ./.github/workflows/provisioning-tests.yml
