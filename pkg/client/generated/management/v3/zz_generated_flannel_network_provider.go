@@ -1,10 +1,12 @@
 package client
 
 const (
-	FlannelNetworkProviderType       = "flannelNetworkProvider"
-	FlannelNetworkProviderFieldIface = "iface"
+	FlannelNetworkProviderType                = "flannelNetworkProvider"
+	FlannelNetworkProviderFieldBlackholeRoute = "blackholeRoute"
+	FlannelNetworkProviderFieldIface          = "iface"
 )
 
 type FlannelNetworkProvider struct {
-	Iface string `json:"iface,omitempty" yaml:"iface,omitempty"`
+	BlackholeRoute string `json:"blackholeRoute,omitempty" yaml:"blackholeRoute,omitempty"`
+	Iface          string `json:"iface,omitempty" yaml:"iface,omitempty"`
 }
