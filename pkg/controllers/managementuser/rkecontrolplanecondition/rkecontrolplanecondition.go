@@ -18,9 +18,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// systemUpgradeControllerConditionThrottleDuration defines how recently the SystemUpgradeControllerReady
-// condition must have been updated before downstream API calls are skipped to reduce load.
+// systemUpgradeControllerConditionThrottleDuration defines the minimum interval between
+// downstream API calls to check the system-upgrade-controller app status.
 const systemUpgradeControllerConditionThrottleDuration = 30 * time.Second
+
+// throttleState tracks throttle and enqueue deduplication state for a single RKEControlPlane object.
+type throttleState struct {
+	lastDownstreamCheck time.Time // when the downstream API was last called
+	enqueuePending      bool      // whether an EnqueueAfter has already been scheduled for this throttle window
+}
 
 type handler struct {
 	mgmtClusterName           string
@@ -62,18 +68,9 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 	targetVersion := settings.SystemUpgradeControllerChartVersion.Get()
 	if targetVersion == "" {
 		logrus.Warn("[rkecontrolplanecondition] the SystemUpgradeControllerChartVersion setting is not set")
-		desiredReason := "the SystemUpgradeControllerChartVersion setting is not set"
-		// Only update the condition if it is not already in the desired state, to avoid
-		// unnecessary status updates and a tight reconcile loop while the setting is unset.
-		if capr.SystemUpgradeControllerReady.IsFalse(&status) &&
-			capr.SystemUpgradeControllerReady.GetReason(&status) == desiredReason &&
-			capr.SystemUpgradeControllerReady.GetMessage(&status) == "" {
-			return status, nil
-		}
-		capr.SystemUpgradeControllerReady.Reason(&status, desiredReason)
+		capr.SystemUpgradeControllerReady.Reason(&status, "the SystemUpgradeControllerChartVersion setting is not set")
 		capr.SystemUpgradeControllerReady.Message(&status, "")
 		capr.SystemUpgradeControllerReady.False(&status)
-		capr.SystemUpgradeControllerReady.LastUpdated(&status, time.Now().UTC().Format(time.RFC3339))
 		return status, nil
 	}
 
@@ -94,28 +91,27 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 			capr.SystemUpgradeControllerReady.Reason(&status, "reset the condition")
 			capr.SystemUpgradeControllerReady.Message(&status, "")
 			capr.SystemUpgradeControllerReady.False(&status)
-			capr.SystemUpgradeControllerReady.LastUpdated(&status, time.Now().UTC().Format(time.RFC3339))
 			return status, nil
 		}
 	}
 
-	// Skip if the condition was recently updated to avoid excessive downstream API calls
-	if lastUpdated := capr.SystemUpgradeControllerReady.GetLastUpdated(&status); lastUpdated != "" {
-		if lastUpdatedTime, parseErr := time.Parse(time.RFC3339, lastUpdated); parseErr == nil {
-			if wait := systemUpgradeControllerConditionThrottleDuration - time.Since(lastUpdatedTime); wait > 0 {
-				// Only call EnqueueAfter if there isn't already a pending enqueue for this object.
-				// This avoids stacking up redundant delayed enqueues when the handler is invoked
-				// multiple times during the throttle window.
-				if _, alreadyPending := h.pendingEnqueues.LoadOrStore(key, struct{}{}); !alreadyPending {
-					h.rkeControlPlaneController.EnqueueAfter(obj.Namespace, obj.Name, wait)
-				}
-				return status, nil
+	// Skip if a downstream API check was performed recently, to reduce load on downstream clusters.
+	if val, ok := h.pendingEnqueues.Load(key); ok {
+		ts := val.(*throttleState)
+		if wait := systemUpgradeControllerConditionThrottleDuration - time.Since(ts.lastDownstreamCheck); wait > 0 {
+			// Only call EnqueueAfter if there isn't already a pending enqueue for this object.
+			// This avoids stacking up redundant delayed enqueues when the handler is invoked
+			// multiple times during the throttle window.
+			if !ts.enqueuePending {
+				ts.enqueuePending = true
+				h.rkeControlPlaneController.EnqueueAfter(obj.Namespace, obj.Name, wait)
 			}
+			return status, nil
 		}
 	}
 
-	// Clear the pending enqueue flag since we're proceeding with a full reconciliation.
-	h.pendingEnqueues.Delete(key)
+	// Record that we are performing a downstream API check for throttle purposes.
+	h.pendingEnqueues.Store(key, &throttleState{lastDownstreamCheck: time.Now()})
 
 	// In rare cases, downstream cluster may become disconnected but AgentConnected has not been updated to false.
 	// If that happens, the following Get call can hang until it times out, causing this handler to take longer to return
@@ -127,17 +123,17 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 		capr.SystemUpgradeControllerReady.Reason(&status, err.Error())
 		capr.SystemUpgradeControllerReady.Message(&status, "")
 		capr.SystemUpgradeControllerReady.False(&status)
-		capr.SystemUpgradeControllerReady.LastUpdated(&status, time.Now().UTC().Format(time.RFC3339))
 		// don't return the error, otherwise the status won't be set to 'false'
 		return status, nil
 	} else if err != nil {
+		// Don't throttle retries on transient errors.
+		h.pendingEnqueues.Delete(key)
 		return status, err
 	}
 	if app.DeletionTimestamp != nil {
 		capr.SystemUpgradeControllerReady.Reason(&status, fmt.Sprintf("waiting for %s to be reinstalled", app.Name))
 		capr.SystemUpgradeControllerReady.Message(&status, "")
 		capr.SystemUpgradeControllerReady.False(&status)
-		capr.SystemUpgradeControllerReady.LastUpdated(&status, time.Now().UTC().Format(time.RFC3339))
 		return status, nil
 	}
 
@@ -146,7 +142,6 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 		capr.SystemUpgradeControllerReady.Reason(&status, fmt.Sprintf("waiting for %s to be updated to %s", app.Name, targetVersion))
 		capr.SystemUpgradeControllerReady.Message(&status, "")
 		capr.SystemUpgradeControllerReady.False(&status)
-		capr.SystemUpgradeControllerReady.LastUpdated(&status, time.Now().UTC().Format(time.RFC3339))
 		return status, nil
 	}
 
@@ -154,14 +149,12 @@ func (h *handler) syncSystemUpgradeControllerCondition(obj *rkev1.RKEControlPlan
 		capr.SystemUpgradeControllerReady.Reason(&status, fmt.Sprintf("waiting for %s to be ready, current state %s", app.Name, app.Status.Summary.State))
 		capr.SystemUpgradeControllerReady.Message(&status, "")
 		capr.SystemUpgradeControllerReady.False(&status)
-		capr.SystemUpgradeControllerReady.LastUpdated(&status, time.Now().UTC().Format(time.RFC3339))
 		return status, nil
 	}
 
 	capr.SystemUpgradeControllerReady.Reason(&status, "")
 	capr.SystemUpgradeControllerReady.Message(&status, version)
 	capr.SystemUpgradeControllerReady.True(&status)
-	capr.SystemUpgradeControllerReady.LastUpdated(&status, time.Now().UTC().Format(time.RFC3339))
 
 	return status, nil
 }

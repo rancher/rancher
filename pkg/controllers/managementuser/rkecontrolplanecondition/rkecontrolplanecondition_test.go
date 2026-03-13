@@ -11,7 +11,6 @@ import (
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
-	"github.com/rancher/wrangler/v3/pkg/genericcondition"
 	"go.uber.org/mock/gomock"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,6 +34,10 @@ type setupConfig struct {
 
 	// The value for the SystemUpgradeControllerChartVersion setting
 	chartVersion string
+
+	// Pre-populated throttle state for the handler's pendingEnqueues sync.Map.
+	// When non-nil, this is stored in the map before invoking the handler.
+	throttle *throttleState
 }
 
 type testCase struct {
@@ -431,10 +434,11 @@ func Test_handler_syncSystemUpgradeControllerStatus(t *testing.T) {
 			appClientIsInvoked:    true,
 		},
 		{
-			name: "condition recently updated - downstream API call is skipped",
+			name: "recently checked downstream API - call is skipped",
 			setup: setupConfig{
 				mgmtClusterName: mgmtClusterName,
 				chartVersion:    "160.1.0",
+				throttle:        &throttleState{lastDownstreamCheck: time.Now()},
 			},
 			input: &v1.RKEControlPlane{
 				ObjectMeta: metav1.ObjectMeta{
@@ -447,22 +451,15 @@ func Test_handler_syncSystemUpgradeControllerStatus(t *testing.T) {
 				},
 				Status: v1.RKEControlPlaneStatus{
 					AgentConnected: true,
-					Conditions: []genericcondition.GenericCondition{
-						{
-							Type:           "SystemUpgradeControllerReady",
-							Status:         "False",
-							LastUpdateTime: time.Now().UTC().Format(time.RFC3339),
-						},
-					},
 				},
 			},
 			wantError:             false,
-			wantedConditionStatus: "False",
+			wantedConditionStatus: "",
 			appClientIsInvoked:    false,
 			enqueueAfterIsInvoked: true,
 		},
 		{
-			name: "condition updated more than 30 seconds ago - downstream API call proceeds",
+			name: "downstream API last checked more than 30s ago - call proceeds",
 			setup: setupConfig{
 				mgmtClusterName: mgmtClusterName,
 				app: &catalog.App{
@@ -486,6 +483,7 @@ func Test_handler_syncSystemUpgradeControllerStatus(t *testing.T) {
 					},
 				},
 				chartVersion: "160.1.0",
+				throttle:     &throttleState{lastDownstreamCheck: time.Now().Add(-35 * time.Second)},
 			},
 			input: &v1.RKEControlPlane{
 				ObjectMeta: metav1.ObjectMeta{
@@ -498,18 +496,36 @@ func Test_handler_syncSystemUpgradeControllerStatus(t *testing.T) {
 				},
 				Status: v1.RKEControlPlaneStatus{
 					AgentConnected: true,
-					Conditions: []genericcondition.GenericCondition{
-						{
-							Type:           "SystemUpgradeControllerReady",
-							Status:         "False",
-							LastUpdateTime: time.Now().Add(-35 * time.Second).UTC().Format(time.RFC3339),
-						},
-					},
 				},
 			},
 			wantError:             false,
 			wantedConditionStatus: "True",
 			appClientIsInvoked:    true,
+		},
+		{
+			name: "recently checked downstream API with enqueue already pending - call and enqueue both skipped",
+			setup: setupConfig{
+				mgmtClusterName: mgmtClusterName,
+				chartVersion:    "160.1.0",
+				throttle:        &throttleState{lastDownstreamCheck: time.Now(), enqueuePending: true},
+			},
+			input: &v1.RKEControlPlane{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      controlPlaneName,
+					Namespace: namespace.System,
+				},
+				Spec: v1.RKEControlPlaneSpec{
+					ClusterName:           provClusterName,
+					ManagementClusterName: mgmtClusterName,
+				},
+				Status: v1.RKEControlPlaneStatus{
+					AgentConnected: true,
+				},
+			},
+			wantError:             false,
+			wantedConditionStatus: "",
+			appClientIsInvoked:    false,
+			enqueueAfterIsInvoked: false,
 		},
 	}
 	for _, tt := range tests {
@@ -521,6 +537,10 @@ func Test_handler_syncSystemUpgradeControllerStatus(t *testing.T) {
 				mgmtClusterName:           tt.setup.mgmtClusterName,
 				downstreamAppClient:       bc,
 				rkeControlPlaneController: rc,
+			}
+			if tt.setup.throttle != nil {
+				key := tt.input.Namespace + "/" + tt.input.Name
+				h.pendingEnqueues.Store(key, tt.setup.throttle)
 			}
 			if tt.appClientIsInvoked {
 				bc.EXPECT().Get(namespace.System, appName(tt.input.Spec.ClusterName), metav1.GetOptions{}).Return(tt.setup.app, tt.setup.appError)
