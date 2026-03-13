@@ -444,6 +444,11 @@ func shouldSkip(clusterRepo *catalog.ClusterRepo,
 		return false
 	}
 
+	// negative refresh interval disables periodic updates
+	if clusterRepo.Spec.RefreshInterval < 0 {
+		return true
+	}
+
 	// The handler is triggered immediately after any changes, including when updating the number of retries done.
 	// This check is to prevent the handler from executing before the backoff time has passed
 	if !newStatus.NextRetryAt.IsZero() && newStatus.NextRetryAt.Time.After(now) {
