@@ -1,10 +1,12 @@
 package client
 
 const (
-	CanalNetworkProviderType       = "canalNetworkProvider"
-	CanalNetworkProviderFieldIface = "iface"
+	CanalNetworkProviderType                = "canalNetworkProvider"
+	CanalNetworkProviderFieldBlackholeRoute = "blackholeRoute"
+	CanalNetworkProviderFieldIface          = "iface"
 )
 
 type CanalNetworkProvider struct {
-	Iface string `json:"iface,omitempty" yaml:"iface,omitempty"`
+	BlackholeRoute string `json:"blackholeRoute,omitempty" yaml:"blackholeRoute,omitempty"`
+	Iface          string `json:"iface,omitempty" yaml:"iface,omitempty"`
 }
