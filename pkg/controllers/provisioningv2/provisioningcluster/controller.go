@@ -364,11 +364,13 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 			if !useRKEControlPlaneReadyStatus {
 				reconcileCondition(&status, capr.Ready, mgmtCluster, capr.Ready)
 			}
-			reconcileCondition(mgmtCluster, capr.Updated, rkeCP, capr.Ready)
-			reconcileCondition(mgmtCluster, capr.Provisioned, rkeCP, capr.Provisioned) // This was originally set by checking machine provisioning, but now we simply set it to true.
-			_, err := h.mgmtClusterClient.Update(mgmtCluster)
-			if err != nil {
-				return nil, status, err
+			updatedChanged := reconcileCondition(mgmtCluster, capr.Updated, rkeCP, capr.Ready)
+			provisionedChanged := reconcileCondition(mgmtCluster, capr.Provisioned, rkeCP, capr.Provisioned) // This was originally set by checking machine provisioning, but now we simply set it to true.
+			if updatedChanged || provisionedChanged {
+				_, err := h.mgmtClusterClient.UpdateStatus(mgmtCluster)
+				if err != nil {
+					return nil, status, err
+				}
 			}
 		}
 	}
@@ -449,7 +451,7 @@ func (h *handler) OnRemove(_ string, cluster *rancherv1.Cluster) (*rancherv1.Clu
 		logrus.Errorf("rkecluster %s/%s: error retrieving management cluster during removal of cluster: %v", cluster.Namespace, cluster.Name, err)
 	}
 	if mgmtCluster != nil && reconcileCondition(mgmtCluster, capr.Removed, rkeCP, capr.Removed) {
-		_, err = h.mgmtClusterClient.Update(mgmtCluster)
+		_, err = h.mgmtClusterClient.UpdateStatus(mgmtCluster)
 		if apierrors.IsNotFound(err) {
 			return cluster, nil
 		} else if err != nil {

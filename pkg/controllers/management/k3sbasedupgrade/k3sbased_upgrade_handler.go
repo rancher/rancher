@@ -129,7 +129,7 @@ func (h *handler) onClusterChange(_ string, cluster *mgmtv3.Cluster) (*mgmtv3.Cl
 				logrus.Debug("[k3s-based-upgrader] updating the Upgraded condition to true")
 				cluster = cluster.DeepCopy()
 				cluster = upgradeDone(cluster)
-				if cluster, err = h.clusterClient.Update(cluster); err != nil {
+				if cluster, err = h.clusterClient.UpdateStatus(cluster); err != nil {
 					return nil, err
 				}
 				logrus.Infof("[k3s-based-upgrader] finished upgrading cluster [%s]", cluster.Name)

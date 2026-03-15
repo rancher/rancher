@@ -69,7 +69,7 @@ func List(cfg *rest.Config) (_ []crd.CRD, err error) {
 			return c
 		}),
 		newCRD(&v3.Cluster{}, func(c crd.CRD) crd.CRD {
-			c.Status = false
+			c.Status = true
 			c.NonNamespace = true
 			c.GVK.Kind = "Cluster"
 			c.GVK.Group = "management.cattle.io"

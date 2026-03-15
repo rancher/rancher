@@ -82,7 +82,7 @@ func (e *aliOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 	if cluster.Status.Driver == "" {
 		cluster = cluster.DeepCopy()
 		cluster.Status.Driver = apimgmtv3.ClusterDriverAlibaba
-		return e.ClusterClient.Update(cluster)
+		return e.ClusterClient.UpdateStatus(cluster)
 	}
 
 	cluster, err := e.CheckCrdReady(cluster, "ali")
@@ -199,7 +199,7 @@ func (e *aliOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 					cluster.Status.ServiceAccountTokenSecret = secret.Name
 					cluster.Status.ServiceAccountToken = ""
 				}
-				return e.ClusterClient.Update(cluster)
+				return e.ClusterClient.UpdateStatus(cluster)
 			}
 		}
 
@@ -350,14 +350,14 @@ func (e *aliOperatorController) setInitialUpstreamSpec(cluster *apimgmtv3.Cluste
 		return cluster, err
 	}
 	cluster.Status.AliStatus.UpstreamSpec = upstreamSpec
-	return e.ClusterClient.Update(cluster)
+	return e.ClusterClient.UpdateStatus(cluster)
 }
 
 // recordAppliedSpec sets the cluster's current spec as its appliedSpec
 func (e *aliOperatorController) recordAppliedSpec(cluster *apimgmtv3.Cluster) (*apimgmtv3.Cluster, error) {
 	cluster = cluster.DeepCopy()
 	cluster.Status.AppliedSpec.AliConfig = cluster.Spec.AliConfig
-	return e.ClusterClient.Update(cluster)
+	return e.ClusterClient.UpdateStatus(cluster)
 }
 
 // generateSATokenWithPublicAPI tries to get a service account token from the cluster using the public API endpoint.
@@ -446,7 +446,7 @@ func (e *aliOperatorController) generateAndSetServiceAccount(secretsCache coreco
 	}
 	cluster.Status.ServiceAccountTokenSecret = secret.Name
 	cluster.Status.ServiceAccountToken = ""
-	return e.ClusterClient.Update(cluster)
+	return e.ClusterClient.UpdateStatus(cluster)
 }
 
 func (e *aliOperatorController) fixAliConfig(cluster *apimgmtv3.Cluster, aliClusterConfigDynamic *unstructured.Unstructured) {
