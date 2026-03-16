@@ -43,7 +43,7 @@ func verbosityForLevel(level auditlogv1.Level) auditlogv1.LogVerbosity {
 				Headers: true,
 			},
 		}
-	case auditlogv1.LevelRequestResponse:
+	case auditlogv1.LevelRequestResponse, auditlogv1.LevelRequestResponseNoGroups:
 		return auditlogv1.LogVerbosity{
 			Level: level,
 			Request: auditlogv1.Verbosity{

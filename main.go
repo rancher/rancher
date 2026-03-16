@@ -138,7 +138,7 @@ func main() {
 			Name:        "audit-level",
 			Value:       0,
 			EnvVar:      "AUDIT_LEVEL",
-			Usage:       "Audit log level: 0 - audit log event metadata, 1 - log metadata and headers, 2 - log event metadata, headers, and request body, 3 - log event metadata, headers, request body, and response body",
+			Usage:       "Audit log level: 0 - audit log event metadata, 1 - log metadata and headers, 2 - log event metadata, headers, and request body, 3 - log event metadata, headers, request body, and response body, 4 - includes all of 3 but without the user's groups",
 			Destination: &config.AuditLogLevel,
 		},
 		cli.BoolFlag{

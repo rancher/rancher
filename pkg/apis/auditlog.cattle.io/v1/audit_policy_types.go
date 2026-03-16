@@ -90,6 +90,28 @@ const (
 	//     },
 	// }
 	LevelRequestResponse
+
+	// LevelRequestResponseNoGroups indicates that along with the default audit
+	// log metadata and headers, the request and response bodies will also be
+	// included. A LogVerbosity with LevelHeaders is the same as the following
+	// LogVerbosity:
+	//
+	// LogVerbosity {
+	//     Request: {
+	//         Headers: true
+	//         Body: true,
+	//     },
+	//     Response: {
+	//         Headers: true
+	//         Body: true,
+	//     },
+	// }
+	//
+	// But the request user groups will not be logged out.
+	//
+	// External providers can result in large numbers of groups for a user which
+	// can bloat the logs.
+	LevelRequestResponseNoGroups
 )
 
 // LogVerbosity defines what is included in an audit log. Log metadata (including RequestURI, user info, etc) is always present.

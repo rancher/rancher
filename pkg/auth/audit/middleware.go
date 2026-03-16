@@ -27,6 +27,7 @@ func GetAuditLoggerMiddleware(auditLog *LoggingHandler) func(next http.Handler) 
 			// Note: Buffering large responses (e.g., cluster lists) can consume significant
 			// memory (MBs-GBs). Only enable LevelRequestResponse if response body logging is required.
 			keepResBody := auditLog.level >= auditlogv1.LevelRequestResponse
+
 			wrappedRw := &wrapWriter{
 				ResponseWriter: rw,
 				keepBody:       keepResBody,
@@ -42,7 +43,15 @@ func GetAuditLoggerMiddleware(auditLog *LoggingHandler) func(next http.Handler) 
 			respTimestamp := time.Now().Format(time.RFC3339)
 
 			verbosityLevel := auditLog.ResolveVerbosity(req.RequestURI)
-			auditLogEntry := newLog(verbosityLevel, user, req, wrappedRw, reqTimestamp, respTimestamp, rawReqBody, userName)
+
+			// keepGroups determines whether or not to log out the request
+			// user's groups.
+			keepGroups := auditLog.level < auditlogv1.LevelRequestResponseNoGroups
+			auditUser := user
+			if !keepGroups {
+				auditUser.Group = nil
+			}
+			auditLogEntry := newLog(verbosityLevel, auditUser, req, wrappedRw, reqTimestamp, respTimestamp, rawReqBody, userName)
 			auditLog.Write(auditLogEntry)
 		})
 	}

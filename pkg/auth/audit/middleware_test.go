@@ -81,6 +81,7 @@ func TestMiddlewareBasicFunctionality(t *testing.T) {
 		{"LevelHeaders", auditlogv1.LevelHeaders},
 		{"LevelRequest", auditlogv1.LevelRequest},
 		{"LevelRequestResponse", auditlogv1.LevelRequestResponse},
+		{"LevelRequestResponseNoGroups", auditlogv1.LevelRequestResponseNoGroups},
 	}
 
 	for _, tt := range tests {
@@ -283,6 +284,56 @@ func TestMiddlewareStatusCodes(t *testing.T) {
 	}
 }
 
+// TestMiddlewareGroups tests that request bodies are buffered at appropriate levels
+func TestMiddlewareGroupsLogging(t *testing.T) {
+	tests := []struct {
+		name                   string
+		level                  auditlogv1.Level
+		method                 string
+		expectGroupsInAuditLog bool
+	}{
+		{"LevelNull_HasGroups", auditlogv1.LevelNull, http.MethodPost, true},
+		{"LevelHeaders_HasGroups", auditlogv1.LevelHeaders, http.MethodPost, true},
+		{"LevelRequest_HasGroups", auditlogv1.LevelRequest, http.MethodPost, true},
+		{"LevelRequestResponse_HasGroups", auditlogv1.LevelRequestResponse, http.MethodPost, true},
+		{"LevelRequestResponseNoGroups_HasGroups", auditlogv1.LevelRequestResponseNoGroups, http.MethodPost, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			writer, auditOutput := newTestAuditWriter(tt.level)
+			middleware := NewAuditLogMiddleware(writer)
+
+			requestBody := `{"cluster":"test"}`
+			handler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+				// Verify the handler can still read the body
+				body, err := io.ReadAll(req.Body)
+				require.NoError(t, err)
+				assert.Equal(t, requestBody, string(body), "handler should still be able to read request body")
+
+				rw.WriteHeader(http.StatusOK)
+			})
+
+			wrappedHandler := middleware(handler)
+			req := newTestRequest(tt.method, "/v3/clusters", strings.NewReader(requestBody))
+			rw := httptest.NewRecorder()
+
+			wrappedHandler.ServeHTTP(rw, req)
+
+			// Check audit log content
+			auditLogContent := auditOutput.String()
+			if tt.expectGroupsInAuditLog {
+				assert.Contains(t, auditLogContent, "group", "audit log should contain groups")
+			} else {
+				// If groups are not expected it should contain an empty value.
+				if strings.Contains(auditLogContent, "group") {
+					assert.Contains(t, auditLogContent, `"group":null`, "group should be null")
+				}
+			}
+		})
+	}
+}
+
 // =============================================================================
 // INTERFACE PRESERVATION TESTS
 // =============================================================================
@@ -351,25 +402,25 @@ func TestMiddlewareHijack(t *testing.T) {
 // This test demonstrates the bug: memory grows even when audit level doesn't need response body
 func TestMiddlewareMemoryUsage(t *testing.T) {
 	tests := []struct {
-		name                 string
-		level                auditlogv1.Level
-		responseSize         int
-		expectLargeMemUsage  bool
-		description          string
+		name                string
+		level               auditlogv1.Level
+		responseSize        int
+		expectLargeMemUsage bool
+		description         string
 	}{
 		{
-			name:                 "LevelNull_LargeResponse_ShouldNotBuffer",
-			level:                auditlogv1.LevelNull,
-			responseSize:         10 * 1024 * 1024, // 10MB
-			expectLargeMemUsage:  false,
-			description:          "Should not buffer response body at LevelNull, but currently does (bug)",
+			name:                "LevelNull_LargeResponse_ShouldNotBuffer",
+			level:               auditlogv1.LevelNull,
+			responseSize:        10 * 1024 * 1024, // 10MB
+			expectLargeMemUsage: false,
+			description:         "Should not buffer response body at LevelNull, but currently does (bug)",
 		},
 		{
-			name:                 "LevelRequestResponse_LargeResponse_ShouldBuffer",
-			level:                auditlogv1.LevelRequestResponse,
-			responseSize:         10 * 1024 * 1024, // 10MB
-			expectLargeMemUsage:  true,
-			description:          "Should buffer response body at LevelRequestResponse",
+			name:                "LevelRequestResponse_LargeResponse_ShouldBuffer",
+			level:               auditlogv1.LevelRequestResponse,
+			responseSize:        10 * 1024 * 1024, // 10MB
+			expectLargeMemUsage: true,
+			description:         "Should buffer response body at LevelRequestResponse",
 		},
 	}
 

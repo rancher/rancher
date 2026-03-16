@@ -144,6 +144,62 @@ func TestBlockList(t *testing.T) {
 	assert.Equal(t, expected, logs.logs)
 }
 
+func TestNewWriterDropsImpersonateGroups(t *testing.T) {
+	tests := []struct {
+		name           string
+		level          auditlogv1.Level
+		expectPolicy   bool
+		expectedHeader []string
+	}{
+		{
+			name:           "no-groups-level",
+			level:          auditlogv1.LevelRequestResponseNoGroups,
+			expectPolicy:   true,
+			expectedHeader: []string{redacted},
+		},
+		{
+			name:           "request-response-level",
+			level:          auditlogv1.LevelRequestResponse,
+			expectPolicy:   false,
+			expectedHeader: []string{"keycloakoidc_group://testers", "keycloakoidc_group://developers"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lw := &logWriter{logs: []logEntry{}}
+
+			w, err := NewWriter(lw, WriterOptions{
+				DefaultPolicyLevel:     tt.level,
+				DisableDefaultPolicies: true,
+			})
+			assert.NoError(t, err)
+
+			_, ok := w.GetPolicy("drop-impersonation-groups")
+			assert.Equal(t, tt.expectPolicy, ok)
+
+			err = w.Write(&logEntry{
+				RequestURI: "/api/v1/secrets",
+				RequestHeader: http.Header{
+					"Impersonate-Group": []string{"keycloakoidc_group://testers", "keycloakoidc_group://developers"},
+				},
+			})
+			assert.NoError(t, err)
+
+			expected := []logEntry{
+				{
+					RequestURI: "/api/v1/secrets",
+					RequestHeader: http.Header{
+						"Impersonate-Group": tt.expectedHeader,
+					},
+				},
+			}
+
+			assert.Equal(t, expected, lw.logs)
+		})
+	}
+}
+
 func TestHigherVerbosityForPolicy(t *testing.T) {
 	bodyContent := []byte(`{"password":"password"}`)
 	headers := map[string][]string{
