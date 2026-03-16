@@ -106,7 +106,6 @@ type LogVerbosity struct {
 // +genclient:nonNamespaced
 // +kubebuilder:printcolumn:name="Enabled",type=string,JSONPath=`.spec.enabled`
 // +kubebuilder:printcolumn:name="Active",type=string,JSONPath=`.status.conditions[?(@.type == "Active")].status`
-// +kubebuilder:printcolumn:name="Valid",type=string,JSONPath=`.status.conditions[?(@.type == "Valid")].status`
 // +kubebuilder:subresource:status
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:resource:scope=Cluster
