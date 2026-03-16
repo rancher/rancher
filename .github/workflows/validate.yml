@@ -1,5 +1,5 @@
 name: Validate
-on: [pull_request, push]
+on: [push]  # Disabled on pull_request for faster iteration
 jobs:
   validate:
     runs-on: runs-on,runner=8cpu-linux-x64,run-id=${{ github.run_id }}

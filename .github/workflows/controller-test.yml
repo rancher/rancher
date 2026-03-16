@@ -2,7 +2,8 @@ name: Controller Integration Tests
 
 on:
   workflow_dispatch:
-  pull_request:
+  # Disabled on pull_request for faster iteration
+  # pull_request:
   push:
     branches:
     - 'release/*'

@@ -122,7 +122,13 @@ func (e *aliOperatorController) onClusterChange(_ string, cluster *apimgmtv3.Clu
 
 	// fixAliConfig update the clusterID in clusterSpec (cluster.Spec.AliConfig.ClusterID) for cluster that are created with rancher
 	// since this field is only available in AliClusterConfig object after ali-operator creates the cluster, it is needed to be fixed on clusterSpec
-	e.fixAliConfig(cluster, aliClusterConfigDynamic)
+	clusterIDFixed := e.fixAliConfig(cluster, aliClusterConfigDynamic)
+	if clusterIDFixed {
+		cluster, err = e.ClusterClient.Update(cluster)
+		if err != nil {
+			return cluster, err
+		}
+	}
 
 	// check for changes between ali spec on cluster and the ali spec on the aliClusterConfig object
 	if !reflect.DeepEqual(aliClusterConfigMap, aliClusterConfigDynamic.Object["spec"]) {
@@ -451,13 +457,18 @@ func (e *aliOperatorController) generateAndSetServiceAccount(secretsCache wrangl
 	return e.ClusterClient.UpdateStatus(cluster)
 }
 
-func (e *aliOperatorController) fixAliConfig(cluster *apimgmtv3.Cluster, aliClusterConfigDynamic *unstructured.Unstructured) {
+func (e *aliOperatorController) fixAliConfig(cluster *apimgmtv3.Cluster, aliClusterConfigDynamic *unstructured.Unstructured) bool {
 	aliConfigSpec, exist := aliClusterConfigDynamic.Object["spec"]
 	if exist && aliConfigSpec != nil {
 		spec := aliConfigSpec.(map[string]interface{})
 		clusterID, exists := spec["clusterId"]
 		if exists && clusterID != nil {
-			cluster.Spec.AliConfig.ClusterID = clusterID.(string)
+			clusterIDStr := clusterID.(string)
+			if cluster.Spec.AliConfig.ClusterID != clusterIDStr {
+				cluster.Spec.AliConfig.ClusterID = clusterIDStr
+				return true
+			}
 		}
 	}
+	return false
 }

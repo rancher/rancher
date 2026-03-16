@@ -132,6 +132,9 @@ func (h *handler) onClusterChange(_ string, cluster *mgmtv3.Cluster) (*mgmtv3.Cl
 				if cluster, err = h.clusterClient.UpdateStatus(cluster); err != nil {
 					return nil, err
 				}
+				if cluster, err = h.forceDeployIfACEEnabled(cluster); err != nil {
+					return nil, err
+				}
 				logrus.Infof("[k3s-based-upgrader] finished upgrading cluster [%s]", cluster.Name)
 			}
 			return cluster, nil

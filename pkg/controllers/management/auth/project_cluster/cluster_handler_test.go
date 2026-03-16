@@ -1,6 +1,7 @@
 package project_cluster
 
 import (
+	"reflect"
 	"testing"
 
 	apisv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -124,6 +125,9 @@ func TestReconcileClusterCreatorRTBRespectsUserPrincipalName(t *testing.T) {
 	clusterClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *apisv3.Cluster) (*apisv3.Cluster, error) {
 		return obj, nil
 	}).AnyTimes()
+	clusterClient.EXPECT().UpdateStatus(gomock.Any()).DoAndReturn(func(obj *apisv3.Cluster) (*apisv3.Cluster, error) {
+		return obj, nil
+	}).AnyTimes()
 
 	lifecycle := &clusterLifecycle{
 		crtbLister:    crtbLister,
@@ -157,4 +161,62 @@ func TestReconcileClusterCreatorRTBNoCreatorRBAC(t *testing.T) {
 	obj, err := lifecycle.reconcileClusterCreatorRTB(cluster)
 	assert.NoError(t, err)
 	assert.NotNil(t, obj)
+}
+
+func TestSyncPersistsCreatorConditionsViaUpdateStatus(t *testing.T) {
+	clusterName := "test-cluster"
+	userID := "u-abcdef"
+	userPrincipalName := "keycloak_user://12345"
+
+	cluster := &apisv3.Cluster{
+		ObjectMeta: v1.ObjectMeta{
+			Name: clusterName,
+			Annotations: map[string]string{
+				roleTemplatesRequiredAnnotation: `{"created":[],"required":["cluster-owner"]}`,
+				CreatorIDAnnotation:             userID,
+				creatorPrincipalNameAnnotation:  userPrincipalName,
+			},
+		},
+	}
+
+	ctrl := gomock.NewController(t)
+
+	crtbLister := fake.NewMockCacheInterface[*apisv3.ClusterRoleTemplateBinding](ctrl)
+	crtbLister.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, nil).AnyTimes()
+
+	crtbClient := fake.NewMockControllerInterface[*apisv3.ClusterRoleTemplateBinding, *apisv3.ClusterRoleTemplateBindingList](ctrl)
+	crtbClient.EXPECT().Create(gomock.Any()).DoAndReturn(func(obj *apisv3.ClusterRoleTemplateBinding) (*apisv3.ClusterRoleTemplateBinding, error) {
+		return obj, nil
+	}).AnyTimes()
+
+	clusterClient := fake.NewMockNonNamespacedControllerInterface[*apisv3.Cluster, *apisv3.ClusterList](ctrl)
+	// Get is called by updateClusterAnnotation and by Sync's status update block
+	clusterClient.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(func(name string, opts v1.GetOptions) (*apisv3.Cluster, error) {
+		return cluster.DeepCopy(), nil
+	}).AnyTimes()
+	// Update is called by updateClusterAnnotation for the annotation change
+	clusterClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(obj *apisv3.Cluster) (*apisv3.Cluster, error) {
+		return obj, nil
+	}).AnyTimes()
+
+	lifecycle := &clusterLifecycle{
+		crtbLister:    crtbLister,
+		crtbClient:    crtbClient,
+		clusterClient: clusterClient,
+	}
+
+	obj, err := lifecycle.reconcileClusterCreatorRTB(cluster)
+	require.NoError(t, err)
+	require.NotNil(t, obj)
+
+	// Verify conditions are set on the in-memory object so Sync's
+	// status diff will detect them and call UpdateStatus
+	result := obj.(*apisv3.Cluster)
+	orig := &apisv3.Cluster{}
+	require.False(t, reflect.DeepEqual(orig.Status, result.Status),
+		"status should have changed with CreatorMadeOwner and InitialRolesPopulated conditions")
+	assert.True(t, apisv3.CreatorMadeOwner.IsTrue(result),
+		"CreatorMadeOwner condition should be set on returned object")
+	assert.True(t, apisv3.ClusterConditionInitialRolesPopulated.IsTrue(result),
+		"InitialRolesPopulated condition should be set on returned object")
 }
