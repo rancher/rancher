@@ -298,7 +298,7 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 	roles, err := gr.rLister.List("", labels.NewSelector().Add(*r))
 	if err != nil {
 		gr.status.AddCondition(localConditions, condition, FailedToListRoles, err)
-		return errors.Join(returnError, fmt.Errorf("couldn't list roles with label %s : %s: %w", grOwnerLabel, globalRoleName, err))
+		return errors.Join(returnError, fmt.Errorf("couldn't list roles with label %s: %s: %w", grOwnerLabel, globalRoleName, err))
 	}
 
 	// After creating/updating all Roles, if the number of roles with the grOwnerLabel is the same as

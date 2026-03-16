@@ -151,8 +151,8 @@ func backingResourceRulesClusterRole(gr *v3.GlobalRole, crName string) *v1.Clust
 			Name: crName,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion: gr.APIVersion,
-					Kind:       gr.Kind,
+					APIVersion: v3.SchemeGroupVersion.String(),
+					Kind:       "GlobalRole",
 					Name:       gr.Name,
 					UID:        gr.UID,
 				},

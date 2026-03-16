@@ -6,7 +6,6 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers"
 	"github.com/rancher/rancher/pkg/controllers/status"
-	genv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	wrangler "github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/stretchr/testify/assert"
@@ -403,8 +402,8 @@ func mockResourceRulesClusterRole(gr *v3.GlobalRole, crName string) *rbac.Cluste
 			Name: crName,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion: genv3.GlobalRoleGroupVersionKind.GroupVersion().String(),
-					Kind:       genv3.GlobalRoleGroupVersionKind.Kind,
+					APIVersion: v3.SchemeGroupVersion.String(),
+					Kind:       "GlobalRole",
 					Name:       gr.Name,
 					UID:        gr.UID,
 				},
@@ -424,8 +423,8 @@ func mockWorkspaceVerbsClusterRole(gr *v3.GlobalRole, crName string, workspaceNa
 			Name: crName,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion: genv3.GlobalRoleGroupVersionKind.GroupVersion().String(),
-					Kind:       genv3.GlobalRoleGroupVersionKind.Kind,
+					APIVersion: v3.SchemeGroupVersion.String(),
+					Kind:       "GlobalRole",
 					Name:       gr.Name,
 					UID:        gr.UID,
 				},
