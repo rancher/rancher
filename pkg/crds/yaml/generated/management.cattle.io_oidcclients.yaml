@@ -61,6 +61,7 @@ spec:
                   type: string
                 type: array
               refreshTokenExpirationSeconds:
+                default: 86400
                 description: |-
                   RefreshTokenExpirationSeconds defines how long (in seconds)
                   a refresh token remains valid before expiration.
@@ -76,6 +77,7 @@ spec:
                   type: string
                 type: array
               tokenExpirationSeconds:
+                default: 3600
                 description: |-
                   TokenExpirationSeconds specifies the duration (in seconds) before
                   an access token and ID token expire.
