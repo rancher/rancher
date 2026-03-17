@@ -3,7 +3,6 @@ package globalroles
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers/status"
@@ -22,8 +21,6 @@ type reducedCondition struct {
 	reason string
 	status metav1.ConditionStatus
 }
-
-const generation int64 = 1
 
 var (
 	readPodPolicyRule = rbacv1.PolicyRule{
@@ -218,8 +215,10 @@ func TestReconcileGlobalRole(t *testing.T) {
 			grLifecycle := globalRoleLifecycle{
 				crClient: controllers.crController,
 				crLister: controllers.crCache,
+				status:   status.NewStatus(),
 			}
-			err := grLifecycle.reconcileGlobalRole(test.globalRole)
+			localConditions := []metav1.Condition{}
+			err := grLifecycle.reconcileGlobalRole(test.globalRole, &localConditions)
 
 			if test.wantError {
 				require.Error(t, err)
@@ -230,8 +229,8 @@ func TestReconcileGlobalRole(t *testing.T) {
 				require.Equal(t, test.annotation, test.globalRole.Annotations[crNameAnnotation])
 			}
 			// only 1 ClusterRole is created, so there should only ever be 1 condition
-			require.Len(t, test.globalRole.Status.Conditions, 1)
-			c := test.globalRole.Status.Conditions[0]
+			require.Len(t, localConditions, 1)
+			c := localConditions[0]
 			rc := reducedCondition{
 				reason: c.Reason,
 				status: c.Status,
@@ -325,7 +324,7 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 			wantError:  true,
 			conditions: []reducedCondition{
 				{
-					reason: FailedToGetNamespace,
+					reason: NamespacedRuleRoleExists,
 					status: metav1.ConditionFalse,
 				},
 			},
@@ -346,8 +345,8 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 			wantError:  false,
 			conditions: []reducedCondition{
 				{
-					reason: NamespaceNotFound,
-					status: metav1.ConditionFalse,
+					reason: NamespacedRuleRoleExists,
+					status: metav1.ConditionTrue,
 				},
 			},
 		},
@@ -361,8 +360,8 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 			wantError:  false,
 			conditions: []reducedCondition{
 				{
-					reason: NamespaceNotFound,
-					status: metav1.ConditionFalse,
+					reason: NamespacedRuleRoleExists,
+					status: metav1.ConditionTrue,
 				},
 			},
 		},
@@ -377,7 +376,7 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 			wantError:  true,
 			conditions: []reducedCondition{
 				{
-					reason: FailedToGetRole,
+					reason: NamespacedRuleRoleExists,
 					status: metav1.ConditionFalse,
 				},
 			},
@@ -394,7 +393,7 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 			wantError:  true,
 			conditions: []reducedCondition{
 				{
-					reason: FailedToCreateRole,
+					reason: NamespacedRuleRoleExists,
 					status: metav1.ConditionFalse,
 				},
 			},
@@ -411,7 +410,7 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 			wantError:  true,
 			conditions: []reducedCondition{
 				{
-					reason: FailedToGetRole,
+					reason: NamespacedRuleRoleExists,
 					status: metav1.ConditionFalse,
 				},
 			},
@@ -481,8 +480,8 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 			wantError:  false,
 			conditions: []reducedCondition{
 				{
-					reason: NamespaceTerminating,
-					status: metav1.ConditionFalse,
+					reason: NamespacedRuleRoleExists,
+					status: metav1.ConditionTrue,
 				},
 			},
 		},
@@ -500,10 +499,6 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 			conditions: []reducedCondition{
 				{
 					reason: NamespacedRuleRoleExists,
-					status: metav1.ConditionTrue,
-				},
-				{
-					reason: FailedToGetNamespace,
 					status: metav1.ConditionFalse,
 				},
 			},
@@ -570,12 +565,8 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 			wantError:  true,
 			conditions: []reducedCondition{
 				{
-					reason: FailedToUpdateRole,
-					status: metav1.ConditionFalse,
-				},
-				{
 					reason: NamespacedRuleRoleExists,
-					status: metav1.ConditionTrue,
+					status: metav1.ConditionFalse,
 				},
 			},
 		},
@@ -590,6 +581,12 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 			},
 			globalRole: namespacedRulesGR.DeepCopy(),
 			wantError:  true,
+			conditions: []reducedCondition{
+				{
+					reason: FailedToListRoles,
+					status: metav1.ConditionFalse,
+				},
+			},
 		},
 	}
 	ctrl := gomock.NewController(t)
@@ -609,373 +606,121 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 				rClient: controllers.rController,
 				rLister: controllers.rCache,
 				nsCache: controllers.nsCache,
+				status:  status.NewStatus(),
 			}
-
-			err := grLifecycle.reconcileNamespacedRoles(test.globalRole)
+			localConditions := []metav1.Condition{}
+			err := grLifecycle.reconcileNamespacedRoles(test.globalRole, &localConditions)
 
 			if test.wantError {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
 			}
-			if test.conditions != nil {
-				// All tests are done with 2 NamespacedRules
-				require.Len(t, test.globalRole.Status.Conditions, 2)
-				for _, c := range test.globalRole.Status.Conditions {
-					rc := reducedCondition{
-						reason: c.Reason,
-						status: c.Status,
-					}
-					require.Contains(t, test.conditions, rc)
-					require.Equal(t, NamespacedRuleRoleExists, c.Type)
+			require.Len(t, localConditions, len(test.conditions))
+			for _, c := range localConditions {
+				rc := reducedCondition{
+					reason: c.Reason,
+					status: c.Status,
 				}
+				require.Contains(t, test.conditions, rc)
+				require.Equal(t, NamespacedRuleRoleExists, c.Type)
 			}
 		})
 	}
 }
 
-func TestSetGRAsInProgress(t *testing.T) {
+func TestUpdateStatus(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name         string
-		oldGR        *v3.GlobalRole
-		updateReturn error
-		wantError    bool
+		name            string
+		localConditions []metav1.Condition
+		grFromCluster   *v3.GlobalRole
+		grCacheErr      error
+		updateErr       error
+		wantError       bool
+		wantSummary     string
+		wantSkipUpdate  bool
 	}{
 		{
-			name: "update gr status to InProgress",
-			oldGR: &v3.GlobalRole{
+			name: "conditions unchanged - no update",
+			localConditions: []metav1.Condition{
+				{Type: ClusterRoleExists, Status: metav1.ConditionTrue, Reason: ClusterRoleExists},
+			},
+			grFromCluster: &v3.GlobalRole{
 				Status: v3.GlobalRoleStatus{
-					Summary: status.SummaryCompleted,
 					Conditions: []metav1.Condition{
-						{
-							Type:   "test",
-							Status: metav1.ConditionTrue,
-						},
+						{Type: ClusterRoleExists, Status: metav1.ConditionTrue, Reason: ClusterRoleExists},
 					},
 				},
 			},
-			updateReturn: nil,
-			wantError:    false,
+			wantSkipUpdate: true,
 		},
 		{
-			name: "update gr with empty status to InProgress",
-			oldGR: &v3.GlobalRole{
-				Status: v3.GlobalRoleStatus{},
+			name: "all conditions true - completed summary",
+			localConditions: []metav1.Condition{
+				{Type: ClusterRoleExists, Status: metav1.ConditionTrue, Reason: ClusterRoleExists},
 			},
-			updateReturn: nil,
-			wantError:    false,
+			grFromCluster: &v3.GlobalRole{},
+			wantSummary:   status.SummaryCompleted,
 		},
 		{
-			name:         "update gr with nil status to InProgress",
-			oldGR:        &v3.GlobalRole{},
-			updateReturn: nil,
-			wantError:    false,
+			name: "condition false - error summary",
+			localConditions: []metav1.Condition{
+				{Type: ClusterRoleExists, Status: metav1.ConditionFalse, Reason: FailedToCreateClusterRole},
+			},
+			grFromCluster: &v3.GlobalRole{},
+			wantSummary:   status.SummaryError,
 		},
 		{
-			name:         "update gr fails",
-			oldGR:        &v3.GlobalRole{},
-			updateReturn: fmt.Errorf("error"),
-			wantError:    true,
+			name:       "cache get fails",
+			grCacheErr: fmt.Errorf("cache error"),
+			wantError:  true,
+		},
+		{
+			name: "update status fails",
+			localConditions: []metav1.Condition{
+				{Type: ClusterRoleExists, Status: metav1.ConditionTrue, Reason: ClusterRoleExists},
+			},
+			grFromCluster: &v3.GlobalRole{},
+			updateErr:     fmt.Errorf("update error"),
+			wantError:     true,
 		},
 	}
 	for _, test := range tests {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			grLifecycle := globalRoleLifecycle{}
 			ctrl := gomock.NewController(t)
+			grCacheMock := fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl)
+			grCacheMock.EXPECT().Get(gomock.Any()).AnyTimes().Return(test.grFromCluster, test.grCacheErr)
 
 			grClientMock := fake.NewMockNonNamespacedControllerInterface[*v3.GlobalRole, *v3.GlobalRoleList](ctrl)
 			var updatedGR *v3.GlobalRole
-			grClientMock.EXPECT().UpdateStatus(gomock.Any()).AnyTimes().DoAndReturn(
-				func(gr *v3.GlobalRole) (*v3.GlobalRole, error) {
-					updatedGR = gr
-					return updatedGR, test.updateReturn
-				},
-			)
-			grLifecycle.grClient = grClientMock
+			if !test.wantSkipUpdate && test.grCacheErr == nil {
+				grClientMock.EXPECT().UpdateStatus(gomock.Any()).DoAndReturn(
+					func(gr *v3.GlobalRole) (*v3.GlobalRole, error) {
+						updatedGR = gr
+						return gr, test.updateErr
+					},
+				)
+			}
 
-			err := grLifecycle.setGRAsInProgress(test.oldGR)
+			grLifecycle := globalRoleLifecycle{
+				grClient: grClientMock,
+				grCache:  grCacheMock,
+				status:   status.NewStatus(),
+			}
+			err := grLifecycle.updateStatus(&v3.GlobalRole{}, test.localConditions)
 			if test.wantError {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
 			}
-			// ensure the lastUpdateTime is of format RFC3339
-			if _, err := time.Parse(time.RFC3339, updatedGR.Status.LastUpdate); err != nil {
-				t.Errorf("failed to parse lastUpdate as RFC3339: %v", err)
+			if test.wantSummary != "" {
+				require.NotNil(t, updatedGR)
+				require.Equal(t, test.wantSummary, updatedGR.Status.Summary)
 			}
-			require.Empty(t, updatedGR.Status.Conditions)
-			require.Equal(t, status.SummaryInProgress, updatedGR.Status.Summary)
-		})
-	}
-}
-
-func TestSetGRAsCompleted(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name         string
-		gr           *v3.GlobalRole
-		summary      string
-		updateReturn error
-		wantError    bool
-	}{
-		{
-			name: "gr with a met condition is Completed",
-			gr: &v3.GlobalRole{
-				ObjectMeta: metav1.ObjectMeta{
-					Generation: generation,
-				},
-				Status: v3.GlobalRoleStatus{
-					Conditions: []metav1.Condition{
-						{
-							Type:   "test1",
-							Status: metav1.ConditionTrue,
-						},
-					},
-				},
-			},
-			summary:      status.SummaryCompleted,
-			updateReturn: nil,
-			wantError:    false,
-		},
-		{
-			name: "gr with multiple met conditions is Completed",
-			gr: &v3.GlobalRole{
-				ObjectMeta: metav1.ObjectMeta{
-					Generation: generation,
-				},
-				Status: v3.GlobalRoleStatus{
-					Conditions: []metav1.Condition{
-						{
-							Type:   "test1",
-							Status: metav1.ConditionTrue,
-						},
-						{
-							Type:   "test2",
-							Status: metav1.ConditionTrue,
-						},
-					},
-				},
-			},
-			summary:      status.SummaryCompleted,
-			updateReturn: nil,
-			wantError:    false,
-		},
-		{
-			name: "gr with no conditions is Completed",
-			gr: &v3.GlobalRole{
-				ObjectMeta: metav1.ObjectMeta{
-					Generation: generation,
-				},
-				Status: v3.GlobalRoleStatus{
-					Conditions: []metav1.Condition{},
-				},
-			},
-			summary:      status.SummaryCompleted,
-			updateReturn: nil,
-			wantError:    false,
-		},
-		{
-			name: "gr with nil status is Completed",
-			gr: &v3.GlobalRole{
-				ObjectMeta: metav1.ObjectMeta{
-					Generation: generation,
-				},
-			},
-			summary:      status.SummaryCompleted,
-			updateReturn: nil,
-			wantError:    false,
-		},
-		{
-			name: "gr with one unmet and one met condition is Error",
-			gr: &v3.GlobalRole{
-				ObjectMeta: metav1.ObjectMeta{
-					Generation: generation,
-				},
-				Status: v3.GlobalRoleStatus{
-					Conditions: []metav1.Condition{
-						{
-							Type:   "test1",
-							Status: metav1.ConditionTrue,
-						},
-						{
-							Type:   "test2",
-							Status: metav1.ConditionFalse,
-						},
-					},
-				},
-			},
-			summary:      status.SummaryError,
-			updateReturn: nil,
-			wantError:    false,
-		},
-		{
-			name: "gr with multiple unmet conditions is Error",
-			gr: &v3.GlobalRole{
-				ObjectMeta: metav1.ObjectMeta{
-					Generation: generation,
-				},
-				Status: v3.GlobalRoleStatus{
-					Conditions: []metav1.Condition{
-						{
-							Type:   "test1",
-							Status: metav1.ConditionFalse,
-						},
-						{
-							Type:   "test2",
-							Status: metav1.ConditionFalse,
-						},
-					},
-				},
-			},
-			summary:      status.SummaryError,
-			updateReturn: nil,
-			wantError:    false,
-		},
-		{
-			name: "gr with unknown conditions is Error",
-			gr: &v3.GlobalRole{
-				ObjectMeta: metav1.ObjectMeta{
-					Generation: generation,
-				},
-				Status: v3.GlobalRoleStatus{
-					Conditions: []metav1.Condition{
-						{
-							Type:   "test1",
-							Status: metav1.ConditionUnknown,
-						},
-						{
-							Type:   "test2",
-							Status: metav1.ConditionTrue,
-						},
-					},
-				},
-			},
-			summary:      status.SummaryError,
-			updateReturn: nil,
-			wantError:    false,
-		},
-		{
-			name: "update gr fails",
-			gr: &v3.GlobalRole{
-				ObjectMeta: metav1.ObjectMeta{
-					Generation: generation,
-				},
-			},
-			updateReturn: fmt.Errorf("error"),
-			wantError:    true,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			grLifecycle := globalRoleLifecycle{}
-			ctrl := gomock.NewController(t)
-			grClientMock := fake.NewMockNonNamespacedControllerInterface[*v3.GlobalRole, *v3.GlobalRoleList](ctrl)
-			var updatedGR *v3.GlobalRole
-			grClientMock.EXPECT().UpdateStatus(gomock.Any()).AnyTimes().DoAndReturn(
-				func(gr *v3.GlobalRole) (*v3.GlobalRole, error) {
-					updatedGR = gr
-					return nil, test.updateReturn
-				},
-			)
-
-			grLifecycle.grClient = grClientMock
-			err := grLifecycle.setGRAsCompleted(test.gr)
-			if test.wantError {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
-			// ensure the lastUpdateTime follows format RFC3339
-			if _, err := time.Parse(time.RFC3339, updatedGR.Status.LastUpdate); err != nil {
-				t.Errorf("failed to parse lastUpdate as RFC3339: %v", err)
-			}
-			if test.summary != "" {
-				require.Equal(t, test.summary, updatedGR.Status.Summary)
-			}
-			require.Equal(t, generation, updatedGR.Status.ObservedGeneration)
-		})
-	}
-}
-
-func TestSetGRAsTerminating(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name         string
-		oldGR        *v3.GlobalRole
-		updateReturn error
-		wantError    bool
-	}{
-		{
-			name: "update gr status to Terminating",
-			oldGR: &v3.GlobalRole{
-				Status: v3.GlobalRoleStatus{
-					Summary: status.SummaryCompleted,
-					Conditions: []metav1.Condition{
-						{
-							Type:   "test",
-							Status: metav1.ConditionTrue,
-						},
-					},
-				},
-			},
-			updateReturn: nil,
-			wantError:    false,
-		},
-		{
-			name: "update gr with empty status to Terminating",
-			oldGR: &v3.GlobalRole{
-				Status: v3.GlobalRoleStatus{},
-			},
-			updateReturn: nil,
-			wantError:    false,
-		},
-		{
-			name:         "update gr with nil status to Terminating",
-			oldGR:        &v3.GlobalRole{},
-			updateReturn: nil,
-			wantError:    false,
-		},
-		{
-			name:         "update gr fails",
-			oldGR:        &v3.GlobalRole{},
-			updateReturn: fmt.Errorf("error"),
-			wantError:    true,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			grLifecycle := globalRoleLifecycle{}
-			ctrl := gomock.NewController(t)
-
-			grClientMock := fake.NewMockNonNamespacedControllerInterface[*v3.GlobalRole, *v3.GlobalRoleList](ctrl)
-			var updatedGR *v3.GlobalRole
-			grClientMock.EXPECT().UpdateStatus(gomock.Any()).AnyTimes().DoAndReturn(
-				func(gr *v3.GlobalRole) (*v3.GlobalRole, error) {
-					updatedGR = gr
-					return updatedGR, test.updateReturn
-				},
-			)
-			grLifecycle.grClient = grClientMock
-
-			err := grLifecycle.setGRAsTerminating(test.oldGR)
-			if test.wantError {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
-			// ensure the lastUpdateTime is of format RFC3339
-			if _, err := time.Parse(time.RFC3339, updatedGR.Status.LastUpdate); err != nil {
-				t.Errorf("failed to parse lastUpdate as RFC3339: %v", err)
-			}
-			require.Empty(t, updatedGR.Status.Conditions)
-			require.Equal(t, status.SummaryTerminating, updatedGR.Status.Summary)
 		})
 	}
 }

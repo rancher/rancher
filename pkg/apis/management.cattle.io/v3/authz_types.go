@@ -209,12 +209,11 @@ type GlobalRoleStatus struct {
 	// +optional
 	LastUpdate string `json:"lastUpdateTime,omitempty"`
 
-	// Summary is a string. One of "Complete", "InProgress" or "Error".
+	// Summary represents the summary of all conditions of the GlobalRole. Either "Completed" or "Error".
 	// +optional
 	Summary string `json:"summary,omitempty"`
 
-	// Conditions is a slice of Condition, indicating the status of specific backing RBAC objects.
-	// There is one condition per ClusterRole and Role managed by the GlobalRole.
+	// Conditions is a slice of Condition, indicating the status of specific backing RBAC objects in the local cluster.
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
 }

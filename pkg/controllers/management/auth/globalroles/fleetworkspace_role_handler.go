@@ -5,11 +5,12 @@ import (
 	"fmt"
 
 	"github.com/rancher/rancher/pkg/controllers"
+	"github.com/rancher/rancher/pkg/controllers/status"
 
 	wrangler "github.com/rancher/wrangler/v3/pkg/name"
 
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	rbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	v1 "k8s.io/api/rbac/v1"
@@ -23,6 +24,8 @@ const (
 	localFleetWorkspace            = "fleet-local"
 	fleetWorkspaceClusterRulesName = "fwcr"
 	fleetWorkspaceVerbsName        = "fwv"
+
+	fleetWorkspaceRolePermissionsReconciled = "FleetWorkspaceRolePermissionsReconciled"
 )
 
 var (
@@ -37,6 +40,7 @@ type fleetWorkspaceRoleHandler struct {
 	crClient rbacv1.ClusterRoleController
 	crCache  rbacv1.ClusterRoleCache
 	fwCache  mgmtcontroller.FleetWorkspaceCache
+	status   *status.Status
 }
 
 func newFleetWorkspaceRoleHandler(management *config.ManagementContext) *fleetWorkspaceRoleHandler {
@@ -44,11 +48,13 @@ func newFleetWorkspaceRoleHandler(management *config.ManagementContext) *fleetWo
 		crClient: management.Wrangler.RBAC.ClusterRole(),
 		crCache:  management.Wrangler.RBAC.ClusterRole().Cache(),
 		fwCache:  management.Wrangler.Mgmt.FleetWorkspace().Cache(),
+		status:   status.NewStatus(),
 	}
 }
 
 // ReconcileFleetWorkspacePermissions reconciles backing ClusterRoles created for granting permission to fleet workspaces.
-func (h *fleetWorkspaceRoleHandler) reconcileFleetWorkspacePermissions(gr *v3.GlobalRole) error {
+func (h *fleetWorkspaceRoleHandler) reconcileFleetWorkspacePermissions(gr *v3.GlobalRole, localConditions *[]metav1.Condition) error {
+	condition := metav1.Condition{Type: fleetWorkspaceRolePermissionsReconciled}
 	var returnErr error
 	if err := h.reconcileResourceRules(gr); err != nil {
 		returnErr = errors.Join(returnErr, errReconcileResourceRules, err)
@@ -56,6 +62,7 @@ func (h *fleetWorkspaceRoleHandler) reconcileFleetWorkspacePermissions(gr *v3.Gl
 	if err := h.reconcileWorkspaceVerbs(gr); err != nil {
 		returnErr = errors.Join(returnErr, errReconcileWorkspaceVerbs, err)
 	}
+	h.status.AddCondition(localConditions, condition, fleetWorkspaceRolePermissionsReconciled, returnErr)
 
 	return returnErr
 }
@@ -144,8 +151,8 @@ func backingResourceRulesClusterRole(gr *v3.GlobalRole, crName string) *v1.Clust
 			Name: crName,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion: v3.GlobalRoleGroupVersionKind.GroupVersion().String(),
-					Kind:       v3.GlobalRoleGroupVersionKind.Kind,
+					APIVersion: v3.SchemeGroupVersion.String(),
+					Kind:       "GlobalRole",
 					Name:       gr.Name,
 					UID:        gr.UID,
 				},
@@ -165,8 +172,8 @@ func backingWorkspaceVerbsClusterRole(gr *v3.GlobalRole, crName string, workspac
 			Name: crName,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion: v3.GlobalRoleGroupVersionKind.GroupVersion().String(),
-					Kind:       v3.GlobalRoleGroupVersionKind.Kind,
+					APIVersion: gr.APIVersion,
+					Kind:       gr.Kind,
 					Name:       gr.Name,
 					UID:        gr.UID,
 				},

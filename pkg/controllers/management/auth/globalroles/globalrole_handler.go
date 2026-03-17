@@ -24,16 +24,15 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 )
 
-var (
+const (
 	globalRoleLabel       = "authz.management.cattle.io/globalrole"
 	crNameAnnotation      = "authz.management.cattle.io/cr-name"
 	initialSyncAnnotation = "authz.management.cattle.io/initial-sync"
 	clusterRoleKind       = "ClusterRole"
-)
-
-const (
+	// grOwnerLabel is used to label ClusterRoles and Roles created by the GlobalRole with the name of the owning GlobalRole.
 	grOwnerLabel = "authz.management.cattle.io/gr-owner"
 )
 
@@ -41,18 +40,14 @@ const (
 const (
 	ClusterRoleExists         = "ClusterRoleExists"
 	NamespacedRuleRoleExists  = "NamespacedRuleRoleExists"
-	NamespaceNotFound         = "NamespaceNotFound"
-	NamespaceTerminating      = "NamespaceTerminating"
-	FailedToGetRole           = "GetRoleFailed"
-	FailedToCreateRole        = "CreateRoleFailed"
-	FailedToUpdateRole        = "UpdateRoleFailed"
-	FailedToGetNamespace      = "GetNamespaceFailed"
 	FailedToCreateClusterRole = "CreateClusterRoleFailed"
 	FailedToUpdateClusterRole = "UpdateClusterRoleFailed"
+	FailedToCreateLabel       = "CreateLabelFailed"
+	FailedToListRoles         = "ListRolesFailed"
 )
 
 type fleetPermissionsRoleHandler interface {
-	reconcileFleetWorkspacePermissions(globalRole *v3.GlobalRole) error
+	reconcileFleetWorkspacePermissions(globalRole *v3.GlobalRole, localConditions *[]metav1.Condition) error
 }
 
 func newGlobalRoleLifecycle(management *config.ManagementContext, clusterManager *clustermanager.Manager) *globalRoleLifecycle {
@@ -65,8 +60,10 @@ func newGlobalRoleLifecycle(management *config.ManagementContext, clusterManager
 		rLister:                 management.Wrangler.RBAC.Role().Cache(),
 		rClient:                 management.Wrangler.RBAC.Role(),
 		grClient:                management.Wrangler.Mgmt.GlobalRole(),
+		grCache:                 management.Wrangler.Mgmt.GlobalRole().Cache(),
 		grbCache:                management.Wrangler.Mgmt.GlobalRoleBinding().Cache(),
 		fleetPermissionsHandler: newFleetWorkspaceRoleHandler(management),
+		status:                  status.NewStatus(),
 	}
 }
 
@@ -79,41 +76,30 @@ type globalRoleLifecycle struct {
 	rLister                 wrbacv1.RoleCache
 	rClient                 wrbacv1.RoleClient
 	grClient                mgmtv3.GlobalRoleClient
+	grCache                 mgmtv3.GlobalRoleCache
 	grbCache                mgmtv3.GlobalRoleBindingCache
 	fleetPermissionsHandler fleetPermissionsRoleHandler
+	status                  *status.Status
 }
 
 func (gr *globalRoleLifecycle) Create(obj *v3.GlobalRole) (runtime.Object, error) {
-	// ObjectMeta.Generation does not get updated when the Status is updated.
-	// If only the status has been updated and we have finished updating the status (status.Summary != "InProgress")
-	// we don't need to perform a reconcile as nothing has changed.
-	if obj.Status.ObservedGeneration == obj.ObjectMeta.Generation && obj.Status.Summary != status.SummaryInProgress {
-		return obj, nil
-	}
+	localConditions := []metav1.Condition{}
 	returnError := errors.Join(
-		gr.setGRAsInProgress(obj), // set GR status to "in progress" while the underlying roles get added
-		gr.reconcileGlobalRole(obj),
-		gr.reconcileNamespacedRoles(obj),
-		gr.fleetPermissionsHandler.reconcileFleetWorkspacePermissions(obj),
-		gr.setGRAsCompleted(obj),
+		gr.reconcileGlobalRole(obj, &localConditions),
+		gr.reconcileNamespacedRoles(obj, &localConditions),
+		gr.fleetPermissionsHandler.reconcileFleetWorkspacePermissions(obj, &localConditions),
+		gr.updateStatus(obj, localConditions),
 	)
 	return obj, returnError
 }
 
 func (gr *globalRoleLifecycle) Updated(obj *v3.GlobalRole) (runtime.Object, error) {
-	// ObjectMeta.Generation does not get updated when the Status is updated.
-	// If only the status has been updated and we have finished updating the status (status.Summary != "InProgress")
-	// we don't need to perform a reconcile as nothing has changed.
-	if obj.Status.ObservedGeneration == obj.ObjectMeta.Generation && obj.Status.Summary != status.SummaryInProgress {
-		return obj, nil
-	}
-
+	localConditions := []metav1.Condition{}
 	returnError := errors.Join(
-		gr.setGRAsInProgress(obj), // set GR status to "in progress" while the underlying roles get added
-		gr.reconcileGlobalRole(obj),
-		gr.reconcileNamespacedRoles(obj),
-		gr.fleetPermissionsHandler.reconcileFleetWorkspacePermissions(obj),
-		gr.setGRAsCompleted(obj),
+		gr.reconcileGlobalRole(obj, &localConditions),
+		gr.reconcileNamespacedRoles(obj, &localConditions),
+		gr.fleetPermissionsHandler.reconcileFleetWorkspacePermissions(obj, &localConditions),
+		gr.updateStatus(obj, localConditions),
 	)
 	return nil, returnError
 }
@@ -141,11 +127,10 @@ func (gr *globalRoleLifecycle) Remove(obj *v3.GlobalRole) (runtime.Object, error
 	}
 
 	// Don't need to delete the created ClusterRole or Roles because owner reference will take care of them
-	err := gr.setGRAsTerminating(obj)
-	return nil, err
+	return nil, nil
 }
 
-func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole) error {
+func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole, localConditions *[]metav1.Condition) error {
 	crName := getCRName(globalRole)
 	condition := metav1.Condition{
 		Type: ClusterRoleExists,
@@ -169,11 +154,11 @@ func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole) er
 
 		if updated {
 			if _, err := gr.crClient.Update(clusterRole); err != nil {
-				addCondition(globalRole, condition, FailedToUpdateClusterRole, crName, err)
+				gr.status.AddCondition(localConditions, condition, FailedToUpdateClusterRole, err)
 				return fmt.Errorf("couldn't update ClusterRole %v: %w", clusterRole.Name, err)
 			}
 		}
-		addCondition(globalRole, condition, ClusterRoleExists, crName, nil)
+		gr.status.AddCondition(localConditions, condition, ClusterRoleExists, nil)
 		return nil
 	}
 
@@ -197,7 +182,7 @@ func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole) er
 		Rules: globalRole.Rules,
 	})
 	if err != nil {
-		addCondition(globalRole, condition, FailedToCreateClusterRole, crName, err)
+		gr.status.AddCondition(localConditions, condition, FailedToCreateClusterRole, err)
 		return err
 	}
 	// Add an annotation to the globalrole indicating the name we used for future updates
@@ -205,12 +190,13 @@ func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole) er
 		globalRole.Annotations = map[string]string{}
 	}
 	globalRole.Annotations[crNameAnnotation] = crName
-	addCondition(globalRole, condition, ClusterRoleExists, crName, nil)
+	gr.status.AddCondition(localConditions, condition, ClusterRoleExists, nil)
 	return nil
 }
 
 // reconcileNamespacedRoles ensures that Roles exist in each namespace of NamespacedRules
-func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRole) error {
+func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRole, localConditions *[]metav1.Condition) error {
+	condition := metav1.Condition{Type: NamespacedRuleRoleExists}
 	var returnError error
 	globalRoleName := wrangler.SafeConcatName(globalRole.Name)
 
@@ -219,19 +205,14 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 
 	for ns, rules := range globalRole.NamespacedRules {
 		roleName := wrangler.SafeConcatName(globalRole.Name, ns)
-		condition := metav1.Condition{
-			Type: NamespacedRuleRoleExists,
-		}
 
 		namespace, err := gr.nsCache.Get(ns)
 		if apierrors.IsNotFound(err) || namespace == nil {
 			// When a namespace is not found, don't re-enqueue GlobalRole
 			logrus.Warnf("[%v] Namespace %s not found. Not re-enqueueing GlobalRole %s", grController, ns, globalRole.Name)
-			addCondition(globalRole, condition, NamespaceNotFound, roleName, fmt.Errorf("namespace %s not found", ns))
 			continue
 		} else if err != nil {
 			returnError = errors.Join(returnError, fmt.Errorf("couldn't get namespace %s: %w", ns, err))
-			addCondition(globalRole, condition, FailedToGetNamespace, roleName, err)
 			continue
 		}
 
@@ -240,14 +221,12 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 		if err != nil {
 			if !apierrors.IsNotFound(err) {
 				returnError = errors.Join(returnError, err)
-				addCondition(globalRole, condition, FailedToGetRole, roleName, err)
 				continue
 			}
 
 			// If the namespace is terminating, don't create a Role
 			if namespace.Status.Phase == corev1.NamespaceTerminating {
 				logrus.Warnf("[%v] Namespace %s is terminating. Not creating role %s for %s", grController, ns, roleName, globalRole.Name)
-				addCondition(globalRole, condition, NamespaceTerminating, roleName, fmt.Errorf("namespace %s is terminating", ns))
 				continue
 			}
 
@@ -272,13 +251,11 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 			createdRole, err := gr.rClient.Create(newRole)
 			if err == nil {
 				roleUIDs[createdRole.UID] = struct{}{}
-				addCondition(globalRole, condition, NamespacedRuleRoleExists, roleName, nil)
 				continue
 			}
 
 			if !apierrors.IsAlreadyExists(err) {
 				returnError = errors.Join(returnError, err)
-				addCondition(globalRole, condition, FailedToCreateRole, roleName, err)
 				continue
 			}
 
@@ -286,7 +263,6 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 			role, err = gr.rLister.Get(ns, roleName)
 			if err != nil {
 				returnError = errors.Join(returnError, err)
-				addCondition(globalRole, condition, FailedToGetRole, roleName, err)
 				continue
 			}
 		}
@@ -295,7 +271,6 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 
 			// Check that the rules for the existing role are correct and that it has the right Owner Label
 			if reflect.DeepEqual(role.Rules, rules) && role.Labels != nil && role.Labels[grOwnerLabel] == globalRoleName {
-				addCondition(globalRole, condition, NamespacedRuleRoleExists, roleName, nil)
 				continue
 			}
 
@@ -309,32 +284,34 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 			_, err := gr.rClient.Update(newRole)
 			if err != nil {
 				returnError = errors.Join(returnError, err)
-				addCondition(globalRole, condition, FailedToUpdateRole, roleName, err)
 				continue
 			}
-			addCondition(globalRole, condition, NamespacedRuleRoleExists, roleName, nil)
 		}
 	}
 
 	// get all the roles claiming to be owned by this GR and remove any that shouldn't exist
 	r, err := labels.NewRequirement(grOwnerLabel, selection.Equals, []string{globalRoleName})
 	if err != nil {
+		gr.status.AddCondition(localConditions, condition, FailedToCreateLabel, err)
 		return errors.Join(returnError, fmt.Errorf("couldn't create label: %s: %w", grOwnerLabel, err))
 	}
 
 	roles, err := gr.rLister.List("", labels.NewSelector().Add(*r))
 	if err != nil {
-		return errors.Join(returnError, fmt.Errorf("couldn't list roles with label %s : %s: %w", grOwnerLabel, globalRoleName, err))
+		gr.status.AddCondition(localConditions, condition, FailedToListRoles, err)
+		return errors.Join(returnError, fmt.Errorf("couldn't list roles with label %s: %s: %w", grOwnerLabel, globalRoleName, err))
 	}
 
-	// After creating/updating all Roles, if the number of RBs with the grOwnerLabel is the same as
-	// as the number of created/updated Roles, we know there are no invalid Roles to purge
+	// After creating/updating all Roles, if the number of roles with the grOwnerLabel is the same as
+	// the number of created/updated Roles, we know there are no invalid Roles to purge
 	if len(roleUIDs) != len(roles) {
 		err = gr.purgeInvalidNamespacedRoles(roles, roleUIDs)
 		if err != nil {
 			returnError = errors.Join(returnError, err)
 		}
 	}
+
+	gr.status.AddCondition(localConditions, condition, NamespacedRuleRoleExists, returnError)
 	return returnError
 }
 
@@ -352,36 +329,34 @@ func (gr *globalRoleLifecycle) purgeInvalidNamespacedRoles(roles []*rbacv1.Role,
 	return returnError
 }
 
-func (gr *globalRoleLifecycle) setGRAsInProgress(globalRole *v3.GlobalRole) error {
-	globalRole.Status.Conditions = []metav1.Condition{}
-	globalRole.Status.Summary = status.SummaryInProgress
-	globalRole.Status.LastUpdate = time.Now().UTC().Format(time.RFC3339)
-	updatedGR, err := gr.grClient.UpdateStatus(globalRole)
-	// For future updates, we want the latest version of our GlobalRole
-	*globalRole = *updatedGR
-	return err
-}
-
-func (gr *globalRoleLifecycle) setGRAsCompleted(globalRole *v3.GlobalRole) error {
-	globalRole.Status.Summary = status.SummaryCompleted
-	for _, c := range globalRole.Status.Conditions {
-		if c.Status != metav1.ConditionTrue {
-			globalRole.Status.Summary = status.SummaryError
-			break
+// updateStatus updates the Status field of the GlobalRole. localConditions are created in each reconciliation loop.
+// Status is only updated if any condition has changed.
+func (gr *globalRoleLifecycle) updateStatus(globalRole *v3.GlobalRole, localConditions []metav1.Condition) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		grFromCluster, err := gr.grCache.Get(globalRole.Name)
+		if err != nil {
+			return err
 		}
-	}
-	globalRole.Status.LastUpdate = time.Now().UTC().Format(time.RFC3339)
-	globalRole.Status.ObservedGeneration = globalRole.ObjectMeta.Generation
-	_, err := gr.grClient.UpdateStatus(globalRole)
-	return err
-}
+		if status.CompareConditions(grFromCluster.Status.Conditions, localConditions) {
+			return nil
+		}
 
-func (gr *globalRoleLifecycle) setGRAsTerminating(globalRole *v3.GlobalRole) error {
-	globalRole.Status.Conditions = []metav1.Condition{}
-	globalRole.Status.Summary = status.SummaryTerminating
-	globalRole.Status.LastUpdate = time.Now().UTC().Format(time.RFC3339)
-	_, err := gr.grClient.UpdateStatus(globalRole)
-	return err
+		grCopy := grFromCluster.DeepCopy()
+		grCopy.Status.Summary = status.SummaryCompleted
+		for _, c := range localConditions {
+			if c.Status != metav1.ConditionTrue {
+				grCopy.Status.Summary = status.SummaryError
+				break
+			}
+		}
+
+		status.KeepLastTransitionTimeIfConditionHasNotChanged(localConditions, grFromCluster.Status.Conditions)
+		grCopy.Status.LastUpdate = gr.status.TimeNow().Format(time.RFC3339)
+		grCopy.Status.ObservedGeneration = globalRole.ObjectMeta.Generation
+		grCopy.Status.Conditions = localConditions
+		_, err = gr.grClient.UpdateStatus(grCopy)
+		return err
+	})
 }
 
 func getCRName(globalRole *v3.GlobalRole) string {
@@ -393,17 +368,4 @@ func getCRName(globalRole *v3.GlobalRole) string {
 
 func generateCRName(name string) string {
 	return "cattle-globalrole-" + name
-}
-
-func addCondition(globalRole *v3.GlobalRole, condition metav1.Condition, reason, name string, err error) {
-	if err != nil {
-		condition.Status = metav1.ConditionFalse
-		condition.Message = fmt.Sprintf("%s not created: %v", name, err)
-	} else {
-		condition.Status = metav1.ConditionTrue
-		condition.Message = fmt.Sprintf("%s created", name)
-	}
-	condition.Reason = reason
-	condition.LastTransitionTime = metav1.Time{Time: time.Now()}
-	globalRole.Status.Conditions = append(globalRole.Status.Conditions, condition)
 }

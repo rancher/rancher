@@ -5,7 +5,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/controllers"
-	genv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/controllers/status"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	wrangler "github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/stretchr/testify/assert"
@@ -22,6 +22,10 @@ var (
 		ObjectMeta: metav1.ObjectMeta{
 			Name: grName,
 			UID:  grUID,
+		},
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "GlobalRole",
+			APIVersion: "management.cattle.io/v3",
 		},
 		InheritedFleetWorkspacePermissions: &v3.FleetWorkspacePermission{
 			ResourceRules: []rbac.PolicyRule{
@@ -217,11 +221,12 @@ func TestReconcileFleetPermissions(t *testing.T) {
 				crClient: state.crClient,
 				crCache:  state.crCache,
 				fwCache:  state.fwCache,
+				status:   status.NewStatus(),
 			}
+			conditions := []metav1.Condition{}
+			err := h.reconcileFleetWorkspacePermissions(test.gr, &conditions)
 
-			err := h.reconcileFleetWorkspacePermissions(test.gr)
-
-			assert.Equal(t, err, nil)
+			assert.NoError(t, err)
 		})
 	}
 }
@@ -288,6 +293,10 @@ func TestReconcileFleetPermissions_errors(t *testing.T) {
 					Name: grName,
 					UID:  grUID,
 				},
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "GlobalRole",
+					APIVersion: "management.cattle.io/v3",
+				},
 			},
 			wantErrs: []error{errReconcileResourceRules, unexpectedErr},
 		},
@@ -337,6 +346,10 @@ func TestReconcileFleetPermissions_errors(t *testing.T) {
 					Name: grName,
 					UID:  grUID,
 				},
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "GlobalRole",
+					APIVersion: "management.cattle.io/v3",
+				},
 				InheritedFleetWorkspacePermissions: &v3.FleetWorkspacePermission{
 					ResourceRules: gr.InheritedFleetWorkspacePermissions.ResourceRules,
 				},
@@ -371,8 +384,10 @@ func TestReconcileFleetPermissions_errors(t *testing.T) {
 				crClient: state.crClient,
 				crCache:  state.crCache,
 				fwCache:  state.fwCache,
+				status:   status.NewStatus(),
 			}
-			err := h.reconcileFleetWorkspacePermissions(test.globalRole)
+			conditions := []metav1.Condition{}
+			err := h.reconcileFleetWorkspacePermissions(test.globalRole, &conditions)
 
 			for _, wantErr := range test.wantErrs {
 				assert.ErrorIs(t, err, wantErr)
@@ -387,8 +402,8 @@ func mockResourceRulesClusterRole(gr *v3.GlobalRole, crName string) *rbac.Cluste
 			Name: crName,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion: genv3.GlobalRoleGroupVersionKind.GroupVersion().String(),
-					Kind:       genv3.GlobalRoleGroupVersionKind.Kind,
+					APIVersion: v3.SchemeGroupVersion.String(),
+					Kind:       "GlobalRole",
 					Name:       gr.Name,
 					UID:        gr.UID,
 				},
@@ -408,8 +423,8 @@ func mockWorkspaceVerbsClusterRole(gr *v3.GlobalRole, crName string, workspaceNa
 			Name: crName,
 			OwnerReferences: []metav1.OwnerReference{
 				{
-					APIVersion: genv3.GlobalRoleGroupVersionKind.GroupVersion().String(),
-					Kind:       genv3.GlobalRoleGroupVersionKind.Kind,
+					APIVersion: v3.SchemeGroupVersion.String(),
+					Kind:       "GlobalRole",
 					Name:       gr.Name,
 					UID:        gr.UID,
 				},
