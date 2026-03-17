@@ -736,19 +736,9 @@ func (m *Manager) GetKubeconfigToken(clusterName, tokenName, description, kind, 
 	return token, createdTokenValue, nil
 }
 
-// ParseTokenTTL parses an integer representing minutes as a string and returns its duration.
-func ParseTokenTTL(ttl string) (time.Duration, error) {
-	durString := fmt.Sprintf("%vm", ttl)
-	dur, err := time.ParseDuration(durString)
-	if err != nil {
-		return 0, fmt.Errorf("error parsing token ttl: %v", err)
-	}
-	return dur, nil
-}
-
 // ClampToMaxTTL will return the duration of the provided TTL or the duration of settings.AuthTokenMaxTTLMinutes whichever is smaller.
 func ClampToMaxTTL(ttl time.Duration) (time.Duration, error) {
-	maxTTL, err := ParseTokenTTL(settings.AuthTokenMaxTTLMinutes.Get())
+	maxTTL, err := exttokenstore.ParseTokenTTL(settings.AuthTokenMaxTTLMinutes.Get())
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse setting '%s': %w", settings.AuthTokenMaxTTLMinutes.Name, err)
 	}
@@ -767,7 +757,7 @@ func ClampToMaxTTL(ttl time.Duration) (time.Duration, error) {
 
 // GetKubeconfigDefaultTokenTTLInMilliSeconds will return the default TTL for kubeconfig tokens
 func GetKubeconfigDefaultTokenTTLInMilliSeconds() (*int64, error) {
-	defaultTokenTTL, err := ParseTokenTTL(settings.KubeconfigDefaultTokenTTLMinutes.Get())
+	defaultTokenTTL, err := exttokenstore.ParseTokenTTL(settings.KubeconfigDefaultTokenTTLMinutes.Get())
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse setting '%s': %w", settings.KubeconfigDefaultTokenTTLMinutes.Name, err)
 	}

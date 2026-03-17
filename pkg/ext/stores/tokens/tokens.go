@@ -20,7 +20,6 @@ import (
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
-	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	extcommon "github.com/rancher/rancher/pkg/ext/common"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -1722,8 +1721,18 @@ func clampMaxTTL(ttl int64) (int64, error) {
 	return ttl, nil
 }
 
+// ParseTokenTTL parses an integer representing minutes as a string and returns its duration.
+func ParseTokenTTL(ttl string) (time.Duration, error) {
+	durString := fmt.Sprintf("%vm", ttl)
+	dur, err := time.ParseDuration(durString)
+	if err != nil {
+		return 0, fmt.Errorf("error parsing token ttl: %v", err)
+	}
+	return dur, nil
+}
+
 func maxTTL() (int64, error) {
-	maxTTL, err := tokens.ParseTokenTTL(settings.AuthTokenMaxTTLMinutes.Get())
+	maxTTL, err := ParseTokenTTL(settings.AuthTokenMaxTTLMinutes.Get())
 
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse setting '%s': %w", settings.AuthTokenMaxTTLMinutes.Name, err)
