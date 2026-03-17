@@ -14,7 +14,7 @@ const (
 	SccSecretName = "rancher-scc-telemetry"
 
 	archUnknown              = "unknown"
-	rancherProductIdentifier = "rancher"
+	rancherProductIdentifier = "rancher-prime"
 )
 
 // SccPayload represents the canonical golang implementation of `schemas/scc-RMSSubscription.json`
