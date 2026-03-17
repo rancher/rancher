@@ -292,6 +292,8 @@ var OriginMap = map[string]string{
 	"kuberlr-kubectl":                                         "https://github.com/rancher/kuberlr-kubectl",
 	"compliance-operator":                                     "https://github.com/rancher/compliance-operator",
 	"helm-controller":                                         "https://github.com/k3s-io/helm-controller",
+	"rancher-ai-agent":                                        "https://github.com/rancher/rancher-ai-agent",
+	"rancher-ai-mcp":                                          "https://github.com/rancher/rancher-ai-mcp",
 }
 
 const (
