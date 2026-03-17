@@ -371,7 +371,7 @@ func (a *tokenAuthenticator) TokenFromRequest(req *http.Request) (accessor.Token
 		logrus.Debug("Could not parse tokenName and tokenKey from request - attempting JWT authentication")
 		claims, err := a.parseTokenFromJWT(tokenAuthValue)
 		if err != nil {
-			logrus.Errorf("TokenFromRequest failed to parse JWT: %s", err)
+			logrus.Debugf("TokenFromRequest failed to parse JWT for %s: %s", req.URL, err)
 			return nil, ErrMustAuthenticate
 		}
 
