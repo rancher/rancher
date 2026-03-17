@@ -127,7 +127,7 @@ require (
 	github.com/rancher/lasso v0.2.7
 	github.com/rancher/machine v0.15.0-rancher142
 	github.com/rancher/muchang v0.1.0
-	github.com/rancher/norman v0.8.4
+	github.com/rancher/norman v0.9.0
 	github.com/rancher/rancher/pkg/client v0.0.0
 	github.com/rancher/remotedialer v0.6.0
 	github.com/rancher/remotedialer-proxy v0.7.0-rc.5
