@@ -226,7 +226,7 @@ func TestReconcileFleetPermissions(t *testing.T) {
 			conditions := []metav1.Condition{}
 			err := h.reconcileFleetWorkspacePermissions(test.gr, &conditions)
 
-			assert.Equal(t, err, nil)
+			assert.NoError(t, err)
 		})
 	}
 }

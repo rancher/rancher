@@ -209,7 +209,7 @@ type GlobalRoleStatus struct {
 	// +optional
 	LastUpdate string `json:"lastUpdateTime,omitempty"`
 
-	// Summary is a string. Either "Completed" or "Error".
+	// Summary represents the summary of all conditions of the GlobalRole. Either "Completed" or "Error".
 	// +optional
 	Summary string `json:"summary,omitempty"`
 
