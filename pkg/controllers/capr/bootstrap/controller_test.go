@@ -5,7 +5,9 @@ import (
 	"encoding/base64"
 	"fmt"
 	"testing"
+	"time"
 
+	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/namespace"
 	"github.com/rancher/rancher/pkg/settings"
@@ -16,6 +18,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
@@ -292,6 +296,261 @@ func TestShouldCreateBootstrapSecret(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(string(tt.phase), func(t *testing.T) {
 			actual := shouldCreateBootstrapSecret(tt.phase)
+			assert.Equal(t, tt.expected, actual)
+		})
+	}
+}
+
+func TestReplacementEtcdMachineReady(t *testing.T) {
+	newPlanSecret := func(machineName, machineNamespace, joinURL string, labels, annotations map[string]string) *v1.Secret {
+		resultLabels := map[string]string{
+			capr.MachineNameLabel: machineName,
+		}
+		for k, v := range labels {
+			resultLabels[k] = v
+		}
+		if machineNamespace != "" {
+			resultLabels[capr.MachineNamespaceLabel] = machineNamespace
+		}
+
+		resultAnnotations := map[string]string{}
+		if joinURL != "" {
+			resultAnnotations[capr.JoinURLAnnotation] = joinURL
+		}
+		for k, v := range annotations {
+			resultAnnotations[k] = v
+		}
+
+		return &v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels:      resultLabels,
+				Annotations: resultAnnotations,
+			},
+		}
+	}
+	newReadyNode := func(name string, labels map[string]string) *v1.Node {
+		return &v1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   name,
+				Labels: labels,
+			},
+			Status: v1.NodeStatus{
+				Conditions: []v1.NodeCondition{{
+					Type:   v1.NodeReady,
+					Status: v1.ConditionTrue,
+				}},
+			},
+		}
+	}
+	newNotReadyNode := func(name string, labels map[string]string) *v1.Node {
+		return &v1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   name,
+				Labels: labels,
+			},
+			Status: v1.NodeStatus{
+				Conditions: []v1.NodeCondition{{
+					Type:   v1.NodeReady,
+					Status: v1.ConditionFalse,
+				}},
+			},
+		}
+	}
+
+	tests := []struct {
+		name              string
+		planSecrets       []*v1.Secret
+		setupMachineCache func(*ctrlfake.MockCacheInterface[*capi.Machine])
+		downstreamNodes   []*v1.Node
+		expected          bool
+		expectErr         bool
+	}{
+		{
+			name: "replacement etcd machine ready through noderef",
+			planSecrets: []*v1.Secret{
+				newPlanSecret("machine-1", "", "https://10.0.0.1:9345", map[string]string{
+					capr.EtcdRoleLabel: "true",
+					capr.InitNodeLabel: "true",
+				}, nil),
+				newPlanSecret("machine-2", "", "https://10.0.0.2:9345", map[string]string{
+					capr.EtcdRoleLabel: "true",
+					capr.InitNodeLabel: "true",
+				}, map[string]string{
+					capr.PlanProbesPassedAnnotation: time.Now().UTC().Format(time.RFC3339),
+				}),
+			},
+			setupMachineCache: func(machineCache *ctrlfake.MockCacheInterface[*capi.Machine]) {
+				machineCache.EXPECT().Get("fleet-default", "machine-2").Return(&capi.Machine{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "machine-2",
+						Namespace: "fleet-default",
+						UID:       types.UID("machine-2-uid"),
+					},
+					Status: capi.MachineStatus{
+						NodeRef: capi.MachineNodeReference{Name: "node-2"},
+					},
+				}, nil)
+			},
+			downstreamNodes: []*v1.Node{
+				newReadyNode("node-2", nil),
+			},
+			expected: true,
+		},
+		{
+			name: "replacement etcd machine ready through machine uid label fallback",
+			planSecrets: []*v1.Secret{
+				newPlanSecret("machine-2", "", "https://10.0.0.2:9345", map[string]string{
+					capr.EtcdRoleLabel: "true",
+					capr.InitNodeLabel: "true",
+				}, map[string]string{
+					capr.PlanProbesPassedAnnotation: time.Now().UTC().Format(time.RFC3339),
+				}),
+			},
+			setupMachineCache: func(machineCache *ctrlfake.MockCacheInterface[*capi.Machine]) {
+				machineCache.EXPECT().Get("fleet-default", "machine-2").Return(&capi.Machine{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "machine-2",
+						Namespace: "fleet-default",
+						UID:       types.UID("machine-2-uid"),
+					},
+				}, nil)
+			},
+			downstreamNodes: []*v1.Node{
+				newReadyNode("node-2", map[string]string{
+					capr.MachineUIDLabel: "machine-2-uid",
+				}),
+			},
+			expected: true,
+		},
+		{
+			name: "replacement etcd machine missing joinURL",
+			planSecrets: []*v1.Secret{
+				newPlanSecret("machine-2", "", "", map[string]string{
+					capr.EtcdRoleLabel: "true",
+					capr.InitNodeLabel: "true",
+				}, map[string]string{
+					capr.PlanProbesPassedAnnotation: time.Now().UTC().Format(time.RFC3339),
+				}),
+			},
+			setupMachineCache: func(_ *ctrlfake.MockCacheInterface[*capi.Machine]) {},
+			expected:          false,
+		},
+		{
+			name: "replacement etcd machine missing passed probes",
+			planSecrets: []*v1.Secret{
+				newPlanSecret("machine-2", "", "https://10.0.0.2:9345", map[string]string{
+					capr.EtcdRoleLabel: "true",
+					capr.InitNodeLabel: "true",
+				}, nil),
+			},
+			setupMachineCache: func(_ *ctrlfake.MockCacheInterface[*capi.Machine]) {},
+			expected:          false,
+		},
+		{
+			name: "replacement etcd machine node not ready",
+			planSecrets: []*v1.Secret{
+				newPlanSecret("machine-2", "", "https://10.0.0.2:9345", map[string]string{
+					capr.EtcdRoleLabel: "true",
+					capr.InitNodeLabel: "true",
+				}, map[string]string{
+					capr.PlanProbesPassedAnnotation: time.Now().UTC().Format(time.RFC3339),
+				}),
+			},
+			setupMachineCache: func(machineCache *ctrlfake.MockCacheInterface[*capi.Machine]) {
+				machineCache.EXPECT().Get("fleet-default", "machine-2").Return(&capi.Machine{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "machine-2",
+						Namespace: "fleet-default",
+					},
+					Status: capi.MachineStatus{
+						NodeRef: capi.MachineNodeReference{Name: "node-2"},
+					},
+				}, nil)
+			},
+			downstreamNodes: []*v1.Node{
+				newNotReadyNode("node-2", nil),
+			},
+			expected: false,
+		},
+		{
+			name: "replacement etcd machine deleting",
+			planSecrets: []*v1.Secret{
+				newPlanSecret("machine-2", "", "https://10.0.0.2:9345", map[string]string{
+					capr.EtcdRoleLabel: "true",
+					capr.InitNodeLabel: "true",
+				}, map[string]string{
+					capr.PlanProbesPassedAnnotation: time.Now().UTC().Format(time.RFC3339),
+				}),
+			},
+			setupMachineCache: func(machineCache *ctrlfake.MockCacheInterface[*capi.Machine]) {
+				machineCache.EXPECT().Get("fleet-default", "machine-2").Return(&capi.Machine{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "machine-2",
+						Namespace:         "fleet-default",
+						DeletionTimestamp: &metav1.Time{Time: time.Now()},
+					},
+				}, nil)
+			},
+			expected: false,
+		},
+		{
+			name: "machine cache error bubbles up",
+			planSecrets: []*v1.Secret{
+				newPlanSecret("machine-2", "", "https://10.0.0.2:9345", map[string]string{
+					capr.EtcdRoleLabel: "true",
+					capr.InitNodeLabel: "true",
+				}, map[string]string{
+					capr.PlanProbesPassedAnnotation: time.Now().UTC().Format(time.RFC3339),
+				}),
+			},
+			setupMachineCache: func(machineCache *ctrlfake.MockCacheInterface[*capi.Machine]) {
+				machineCache.EXPECT().Get("fleet-default", "machine-2").Return(nil, fmt.Errorf("boom"))
+			},
+			expected:  false,
+			expectErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			machineCache := ctrlfake.NewMockCacheInterface[*capi.Machine](ctrl)
+			tt.setupMachineCache(machineCache)
+
+			h := &handler{
+				machineCache: machineCache,
+			}
+			downstream := fake.NewSimpleClientset()
+
+			bootstrap := &rkev1.RKEBootstrap{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "fleet-default",
+				},
+				Spec: rkev1.RKEBootstrapSpec{
+					ClusterName: "cluster",
+				},
+			}
+			deletingMachine := &capi.Machine{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "machine-1",
+					Namespace: "fleet-default",
+				},
+			}
+
+			if len(tt.downstreamNodes) > 0 {
+				runtimeObjects := make([]runtime.Object, 0, len(tt.downstreamNodes))
+				for _, node := range tt.downstreamNodes {
+					runtimeObjects = append(runtimeObjects, node)
+				}
+				downstream = fake.NewClientset(runtimeObjects...)
+			}
+
+			actual, err := h.replacementEtcdMachineReady(bootstrap, deletingMachine, tt.planSecrets, downstream)
+			if tt.expectErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
 			assert.Equal(t, tt.expected, actual)
 		})
 	}
