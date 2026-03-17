@@ -253,6 +253,154 @@ func TestGenerateIndex(t *testing.T) {
 	}
 }
 
+func TestGenerateIndexWithOptions(t *testing.T) {
+	one := 1
+	two := 2
+
+	testingHelmChartPath := "../../../tests/testdata/testingchart-0.1.0.tgz"
+	testingHelmChartPath2 := "../../../tests/testdata/testingchart-1.0.0.tgz"
+	layerDesc1, manifestDesc1, manifestJSON1, err := createTestManifest(testingHelmChartPath, t)
+	if err != nil {
+		t.Fatalf("failed to create test manifest for version 0.1: %v", err)
+	}
+	layerDesc2, manifestDesc2, manifestJSON2, err := createTestManifest(testingHelmChartPath2, t)
+	if err != nil {
+		t.Fatalf("failed to create test manifest for version 1.0: %v", err)
+	}
+
+	tests := []struct {
+		name            string
+		indexFile       *repo.IndexFile
+		expectedErrMsg  string
+		numberOfEntries *int
+		options         *v1.OCIOptions
+		urlPath         string
+		forbiddenTag    string
+	}{
+		{
+			name:            "Can filter tags by semver constraint",
+			indexFile:       repo.NewIndexFile(),
+			numberOfEntries: &one,
+			options: &v1.OCIOptions{
+				TagFilter: ">=1.0.0",
+			},
+			urlPath: "testingchart",
+		},
+		{
+			name:            "Can filter tags by multiple semver constraints",
+			indexFile:       repo.NewIndexFile(),
+			numberOfEntries: &one,
+			options: &v1.OCIOptions{
+				TagFilter: ">=0.1.0, <1.0.0",
+			},
+			urlPath: "testingchart",
+		},
+		{
+			name:            "Should not fail with invalid semver constraint",
+			indexFile:       repo.NewIndexFile(),
+			numberOfEntries: &two,
+			options: &v1.OCIOptions{
+				TagFilter: "invalid",
+			},
+			urlPath: "testingchart",
+		},
+		{
+			name:            "Can download all tags",
+			indexFile:       repo.NewIndexFile(),
+			numberOfEntries: &two,
+			options: &v1.OCIOptions{
+				DownloadAllTags: true,
+			},
+			urlPath: "testingchart",
+		},
+		{
+			name:            "Can download all tags and skip forbidden",
+			indexFile:       repo.NewIndexFile(),
+			numberOfEntries: &one,
+			options: &v1.OCIOptions{
+				DownloadAllTags: true,
+			},
+			urlPath:      "testingchart",
+			forbiddenTag: "1.0.0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var layerDesc, manifestDesc ocispec.Descriptor
+			var manifestJSON []byte
+			var chartPath string
+
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch {
+				case r.Method == http.MethodGet && r.URL.Path == "/v2/_catalog":
+					fmt.Fprintf(w, `{"repositories": ["testingchart"]}`)
+
+				case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v2/testingchart/tags/list"):
+					w.Header().Set("Content-Type", "application/json")
+					w.Write([]byte(`{"tags": ["0.1.0", "1.0.0"]}`))
+
+				case r.URL.Path == "/v2/testingchart/manifests/0.1.0" || r.URL.Path == "/v2/testingchart/manifests/1.0.0":
+					tag := strings.Split(r.URL.Path, "/")[4]
+					if tt.forbiddenTag != "" && tt.forbiddenTag == tag {
+						w.WriteHeader(http.StatusForbidden)
+						return
+					}
+					if tag == "0.1.0" {
+						layerDesc = layerDesc1
+						manifestDesc = manifestDesc1
+						manifestJSON = manifestJSON1
+						chartPath = testingHelmChartPath
+					} else if tag == "1.0.0" {
+						layerDesc = layerDesc2
+						manifestDesc = manifestDesc2
+						manifestJSON = manifestJSON2
+						chartPath = testingHelmChartPath2
+					}
+					if accept := r.Header.Get("Accept"); !strings.Contains(accept, manifestDesc.MediaType) {
+						w.WriteHeader(http.StatusBadRequest)
+						return
+					}
+					w.Header().Set("Content-Type", manifestDesc.MediaType)
+					w.Header().Set("Docker-Content-Digest", manifestDesc.Digest.String())
+					if _, err := w.Write(manifestJSON); err != nil {
+						assert.NoError(t, err)
+					}
+
+				case r.URL.Path == "/v2/testingchart/blobs/"+layerDesc.Digest.String():
+					http.ServeFile(w, r, chartPath)
+
+				default:
+					http.NotFound(w, r)
+				}
+			}))
+			defer srv.Close()
+
+			trimmedURL := strings.TrimPrefix(srv.URL, "http://")
+			u := fmt.Sprintf("oci://%s/%s", trimmedURL, tt.urlPath)
+			repoSpec := v1.RepoSpec{
+				InsecurePlainHTTP:     true,
+				InsecureSkipTLSverify: true,
+			}
+			if tt.options != nil {
+				repoSpec.OCIOptions = tt.options
+			}
+			ociClient, err := NewClient(u, repoSpec, nil)
+			assert.Nil(t, err)
+
+			i, err := GenerateIndex(ociClient, u, nil, repoSpec, v1.RepoStatus{}, tt.indexFile)
+			if tt.expectedErrMsg != "" {
+				assert.Contains(t, err.Error(), tt.expectedErrMsg, "wrong error")
+			} else {
+				assert.Nil(t, err)
+			}
+			if tt.numberOfEntries != nil && len(i.Entries) > 0 {
+				assert.Equal(t, len(i.Entries["testingchart"]), *tt.numberOfEntries, "number of entries don't match")
+			}
+		})
+	}
+}
+
 func TestGenerateIndexExactAndSubMatch(t *testing.T) {
 	base := "forgejo-helm/forgejo"
 	catalog := []string{
@@ -465,4 +613,35 @@ func TestGenerateIndexPaginatedRegistry(t *testing.T) {
 		assert.Equal(t, len(indexFile.Entries), 1, "should have one entry")
 		assert.Equal(t, len(indexFile.Entries["testingchart"]), 20, "should have 20 versions")
 	}, "GenerateIndex should not panic on paginated registry")
+}
+
+// createTestManifest creates and returns the necessary OCI manifest components for testing.
+func createTestManifest(helmChartPath string, t *testing.T) (ocispec.Descriptor, ocispec.Descriptor, []byte, error) {
+	helmChartTar, err := os.ReadFile(helmChartPath)
+	if err != nil {
+		return ocispec.Descriptor{}, ocispec.Descriptor{}, nil, fmt.Errorf("failed to read helm chart: %w", err)
+	}
+
+	layerDesc := ocispec.Descriptor{
+		MediaType: registry.ChartLayerMediaType,
+		Digest:    digest.FromBytes(helmChartTar),
+		Size:      int64(len(helmChartTar)),
+	}
+
+	configBlob := []byte("config")
+	configDesc := ocispec.Descriptor{
+		MediaType: registry.ConfigMediaType,
+		Digest:    digest.FromBytes(configBlob),
+		Size:      int64(len(configBlob)),
+	}
+
+	manifest := ocispec.Manifest{
+		MediaType: ocispec.MediaTypeImageManifest,
+		Config:    configDesc,
+		Layers:    []ocispec.Descriptor{layerDesc},
+	}
+	manifest.Config.MediaType = registry.ConfigMediaType
+	manifestJSON, err := json.Marshal(manifest)
+	assert.NoError(t, err)
+	return layerDesc, ocispec.Descriptor{MediaType: ocispec.MediaTypeImageManifest, Digest: digest.FromBytes(manifestJSON), Size: int64(len(manifestJSON))}, manifestJSON, nil
 }

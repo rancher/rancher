@@ -458,7 +458,7 @@ func skipIndexFiltering() bool {
 	serverVersion := settings.ServerVersion.Get()
 
 	// If the server version is a release or a release candidate (rc), we don't skip filtering.
-	if settings.IsRelease() || strings.Contains(serverVersion, "-rc") {
+	if settings.IsRelease() || strings.Contains(serverVersion, "-rc") || strings.Contains(serverVersion, "-alpha") {
 		return false
 	}
 	// If setting is true, we skip filtering.
