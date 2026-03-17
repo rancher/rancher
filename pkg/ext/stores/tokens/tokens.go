@@ -1279,6 +1279,18 @@ func (t *SystemStore) generateName(prefix string) (string, error) {
 // token, and returns a proper interface hiding the differences from the caller.
 // It is public because it is of use to other parts of rancher, not just here.
 func (t *SystemStore) Fetch(tokenID string) (accessor.TokenAccessor, error) {
+	// Support the possibility of getting a token ID with an `ext/`
+	// prefix. When that happens we can dispatch directly to the proper
+	// fetcher.
+
+	if extTokenID, found := strings.CutPrefix(tokenID, "ext/"); found {
+		if ext, err := t.Get(extTokenID, "", &metav1.GetOptions{}); err == nil {
+			return ext, nil
+		}
+
+		return nil, fmt.Errorf("unable to fetch unknown token %q", tokenID)
+	}
+
 	// checking for a v3 Token first, as it is the currently more common
 	// type of tokens. in other words, high probability that we are done
 	// with a single request. or even none, if the token is found in the
