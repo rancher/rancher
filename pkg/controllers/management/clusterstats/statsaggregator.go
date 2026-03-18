@@ -66,7 +66,7 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 	machinesClient.AddHandler(ctx, "cluster-stats", s.machineChanged)
 }
 
-func (s *StatsAggregator) sync(key string, cluster *v3.Cluster) (runtime.Object, error) {
+func (s *StatsAggregator) sync(key string, cluster *v32.Cluster) (runtime.Object, error) {
 	if cluster == nil {
 		s.lastReconcile.Delete(key)
 		return nil, nil
@@ -223,7 +223,11 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster) (*v3.Cluster, error) {
 	}
 
 	if statusChanged(origStatus, &cluster.Status) || versionChanged {
-		return s.Clusters.Update(cluster)
+		// Use UpdateStatus to only update the status subresource - Update() ignores status changes.
+		// Return nil to avoid norman's redundant Update() write-back.
+		if _, err := s.Clusters.UpdateStatus(cluster); err != nil {
+			return nil, err
+		}
 	}
 	return nil, nil
 }

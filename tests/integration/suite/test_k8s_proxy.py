@@ -1,8 +1,7 @@
 import pytest
 import requests
 
-from .conftest import SERVER_URL, protect_response
-
+from .conftest import SERVER_URL, protect_response, wait_for_condition
 
 def _auth_headers(token):
     return {
@@ -10,15 +9,18 @@ def _auth_headers(token):
         "Content-Type": "application/json",
     }
 
-
 def _downstream_cluster_id(admin_mc):
     clusters = admin_mc.client.list_cluster().data
 
     for cluster in clusters:
         if cluster.id != "local" and cluster.state == "active":
-            return cluster.id
+            if hasattr(cluster, 'conditions') and cluster.conditions:
+                ready = any(c.type == "Ready" and c.status == "True"
+                           for c in cluster.conditions)
+                if ready:
+                    return cluster.id
 
-    pytest.skip("No active downstream cluster is available for this test")
+    pytest.skip("No ready downstream cluster is available for this test")
 
 
 def test_k8s_proxy_fetches_namespaces_from_local_cluster(admin_mc):

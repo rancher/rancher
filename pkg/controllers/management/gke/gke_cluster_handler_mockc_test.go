@@ -43,6 +43,11 @@ func getMockGkeOperatorController(t *testing.T, clusterState string) mockGkeOper
 			return c, nil
 		},
 	).AnyTimes()
+	clusterMock.EXPECT().UpdateStatus(gomock.Any()).DoAndReturn(
+		func(c *apisv3.Cluster) (*apisv3.Cluster, error) {
+			return c, nil
+		},
+	).AnyTimes()
 
 	var dynamicClient dynamic.NamespaceableResourceInterface
 

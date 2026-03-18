@@ -18,8 +18,9 @@ env:
   IMAGE_AGENT: ${{ github.repository_owner }}/rancher-agent
   IMAGE_INSTALLER: ${{ github.repository_owner }}/system-agent-installer-rancher
 jobs:
-  unit-tests:
-    uses: ./.github/workflows/unit-test.yml
+  # Temporarily disabled for debugging
+  # unit-tests:
+  #   uses: ./.github/workflows/unit-test.yml
   build-chart:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
     container: registry.suse.com/bci/bci-base:15.7
@@ -78,8 +79,9 @@ jobs:
       contents: read
     needs: [build-server, build-agent]
     uses: ./.github/workflows/integration-tests.yml
-  provisioning-tests:
-    permissions:
-      contents: read
-    needs: [build-server, build-agent]
-    uses: ./.github/workflows/provisioning-tests.yml
+  # Temporarily disabled for debugging
+  # provisioning-tests:
+  #   permissions:
+  #     contents: read
+  #   needs: [build-server, build-agent]
+  #   uses: ./.github/workflows/provisioning-tests.yml

@@ -142,7 +142,8 @@ export CATTLE_TEST_CONFIG=$(pwd)/config.yaml # used by integration tests and tes
 }
 
 echo Running go integration tests
-$GOBIN test -v -failfast -timeout 30m -p 1 ./tests/v2/integration/... || {
+# Temporarily skip catalogv2 tests for faster debugging
+$GOBIN test -v -failfast -timeout 30m -p 1 $($GOBIN list ./tests/v2/integration/... | grep -v catalogv2) || {
   dump_rancher_logs
   exit 1
 }

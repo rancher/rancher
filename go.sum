@@ -463,6 +463,8 @@ github.com/kevinburke/ssh_config v1.2.0 h1:x584FjTGwHzMwvHx18PXxbBVzfnxogHaAReU4
 github.com/kevinburke/ssh_config v1.2.0/go.mod h1:CT57kijsi8u/K/BOFA39wgDQJ9CxiF4nAY/ojJ6r6mM=
 github.com/keybase/go-keychain v0.0.1 h1:way+bWYa6lDppZoZcgMbYsvC7GxljxrskdNInRtuthU=
 github.com/keybase/go-keychain v0.0.1/go.mod h1:PdEILRW3i9D8JcdM+FmY6RwkHGnhHxXwkPPMeUgOK1k=
+github.com/kinarashah/norman v0.0.0-20260316184320-2ae1c3917024 h1:y2AyqlAgfGh8ElMo3/0TWRZy99/FR1buZmKU7JP+UdY=
+github.com/kinarashah/norman v0.0.0-20260316184320-2ae1c3917024/go.mod h1:nC+V+MIKIBozs95Ac4np7xluk21VIcvYKz0BaPfF3CM=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
 github.com/klauspost/compress v1.18.0 h1:c/Cqfb0r+Yi+JtIEq73FWXVkRonBlf0CRNYc8Zttxdo=
@@ -627,8 +629,6 @@ github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77 h1:k+vzmkZQsH06rZnDr+p
 github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77/go.mod h1:wpITyDPTi/Na5h73XkbuEf2AP9fbgrIGqqxVzFhYD6U=
 github.com/rancher/muchang v0.1.0 h1:Yuu3b7eFRqnnbp6qbLsP/5SY3IKGDj2mUUTzy4AiUVw=
 github.com/rancher/muchang v0.1.0/go.mod h1:sVg6mngaaZIpSegx/I79rymxm7n5gbI8j5PeoVoIONs=
-github.com/rancher/norman v0.8.4 h1:/3xPNdR85lDU5RIfuai8oBJjzSrS/umSjOQ+7M3njKc=
-github.com/rancher/norman v0.8.4/go.mod h1:9khwZhpsg8QmWnAJSJ3luAyxJKMzKKJgoxi0fqXron4=
 github.com/rancher/remotedialer v0.6.0 h1:fUDO3SUuIKuwAz3a+ofARNthzX4xOTispknKk2AGSck=
 github.com/rancher/remotedialer v0.6.0/go.mod h1:CW6Q8F8IESN05/yl48OSwhVi54nDwVQQriV16zAiGkg=
 github.com/rancher/remotedialer-proxy v0.7.0-rc.5 h1:3ZpVA+dHj4O8yC4PVxhGb3S2BBKAu9g0A+QjokSuxyk=

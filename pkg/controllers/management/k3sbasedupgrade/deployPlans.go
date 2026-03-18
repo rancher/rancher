@@ -194,7 +194,7 @@ func (h *handler) modifyClusterCondition(cluster *mgmtv3.Cluster, masterPlan, wo
 			if mgmtv3.ClusterConditionUpgraded.IsTrue(cluster) {
 				mgmtv3.ClusterConditionUpgraded.Unknown(cluster)
 				mgmtv3.ClusterConditionUpgraded.Message(cluster, "cluster is being upgraded")
-				return h.clusterClient.Update(cluster)
+				return h.clusterClient.UpdateStatus(cluster)
 			}
 			if mgmtv3.ClusterConditionUpgraded.IsUnknown(cluster) {
 				// remain in upgrading state if we are passed empty plans
@@ -206,7 +206,11 @@ func (h *handler) modifyClusterCondition(cluster *mgmtv3.Cluster, masterPlan, wo
 			// After the plans are removed, indicated by both plans being empty, the cluster's upgrade condition should be set to true.
 			if mgmtv3.ClusterConditionUpgraded.IsUnknown(cluster) {
 				cluster = upgradeDone(cluster)
-				return h.clusterClient.Update(cluster)
+				cluster, err := h.clusterClient.UpdateStatus(cluster)
+				if err != nil {
+					return cluster, err
+				}
+				return h.forceDeployIfACEEnabled(cluster)
 			}
 		}
 	}
@@ -260,17 +264,31 @@ func (h *handler) modifyClusterCondition(cluster *mgmtv3.Cluster, masterPlan, wo
 	// if we made it this far nothing is applying
 	// see k3supgrade_handler also
 	cluster = upgradeDone(cluster)
-	return h.clusterClient.Update(cluster)
+	cluster, err = h.clusterClient.UpdateStatus(cluster)
+	if err != nil {
+		return cluster, err
+	}
+	return h.forceDeployIfACEEnabled(cluster)
 }
 
 func upgradeDone(cluster *mgmtv3.Cluster) *mgmtv3.Cluster {
 	mgmtv3.ClusterConditionUpgraded.True(cluster)
 	mgmtv3.ClusterConditionUpgraded.Message(cluster, "")
-	if cluster.Spec.LocalClusterAuthEndpoint.Enabled {
-		// If ACE is enabled, then force a re-deployment of the cluster-agent and kube-api-auth
-		cluster.Annotations[clusterdeploy.AgentForceDeployAnn] = "true"
-	}
 	return cluster
+}
+
+// forceDeployIfACEEnabled sets the AgentForceDeployAnn annotation and persists it
+// via Update() if ACE is enabled. This is done separately from UpdateStatus()
+// because Update() persists metadata while UpdateStatus() persists status.
+func (h *handler) forceDeployIfACEEnabled(cluster *mgmtv3.Cluster) (*mgmtv3.Cluster, error) {
+	if !cluster.Spec.LocalClusterAuthEndpoint.Enabled {
+		return cluster, nil
+	}
+	if cluster.Annotations == nil {
+		cluster.Annotations = make(map[string]string)
+	}
+	cluster.Annotations[clusterdeploy.AgentForceDeployAnn] = "true"
+	return h.clusterClient.Update(cluster)
 }
 
 func upgradingMessage(concurrency int, nodes []string) string {
@@ -293,6 +311,6 @@ func (h *handler) enqueueOrUpdate(cluster *mgmtv3.Cluster, upgradeMessage string
 	}
 
 	mgmtv3.ClusterConditionUpgraded.Message(cluster, upgradeMessage)
-	return h.clusterClient.Update(cluster)
+	return h.clusterClient.UpdateStatus(cluster)
 
 }

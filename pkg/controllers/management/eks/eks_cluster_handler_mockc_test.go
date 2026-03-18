@@ -44,6 +44,11 @@ func getMockEksOperatorController(t *testing.T, clusterState string) mockEksOper
 			return c, nil
 		},
 	).AnyTimes()
+	clusterMock.EXPECT().UpdateStatus(gomock.Any()).DoAndReturn(
+		func(c *apisv3.Cluster) (*apisv3.Cluster, error) {
+			return c, nil
+		},
+	).AnyTimes()
 
 	var dynamicClient dynamic.NamespaceableResourceInterface
 
@@ -91,7 +96,7 @@ func (m *mockEksOperatorController) setInitialUpstreamSpec(cluster *mgmtv3.Clust
 
 	cluster = cluster.DeepCopy()
 	cluster.Status.EKSStatus.UpstreamSpec = upstreamSpec
-	return m.ClusterClient.Update(cluster)
+	return m.ClusterClient.UpdateStatus(cluster)
 }
 
 // test generateAndSetServiceAccount with mock sibling func (getAccessToken)
@@ -117,7 +122,7 @@ func (m *mockEksOperatorController) generateAndSetServiceAccount(cluster *mgmtv3
 	cluster = cluster.DeepCopy()
 	cluster.Status.ServiceAccountTokenSecret = secret.Name
 	cluster.Status.ServiceAccountToken = ""
-	return m.ClusterClient.Update(cluster)
+	return m.ClusterClient.UpdateStatus(cluster)
 }
 
 // test generateSATokenWithPublicAPI with mock sibling func (getRestConfig)

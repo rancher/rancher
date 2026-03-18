@@ -5,6 +5,7 @@ go 1.25.0
 toolchain go1.25.7
 
 replace (
+	github.com/rancher/norman => github.com/kinarashah/norman v0.0.0-20260316184320-2ae1c3917024
 	k8s.io/api => k8s.io/api v0.35.1
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.35.1
 	k8s.io/apimachinery => k8s.io/apimachinery v0.35.1
