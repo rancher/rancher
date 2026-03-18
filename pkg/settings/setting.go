@@ -140,7 +140,7 @@ var (
 	AlibabaUpstreamRefresh              = NewSetting("alibaba-refresh", "300")
 	HideLocalCluster                    = NewSetting("hide-local-cluster", "false")
 	MachineProvisionImage               = NewSetting("machine-provision-image", "rancher/machine:v0.15.0-rancher142")
-	SystemFeatureChartRefreshSeconds    = NewSetting("system-feature-chart-refresh-seconds", "21600")
+	SystemFeatureChartRefreshSeconds    = NewSetting("system-feature-chart-refresh-seconds", "5")
 	ClusterAgentDefaultAffinity         = NewSetting("cluster-agent-default-affinity", ClusterAgentAffinity)
 	FleetAgentDefaultAffinity           = NewSetting("fleet-agent-default-affinity", FleetAgentAffinity)
 	MaxUIPluginFileByteSize             = NewSetting("max-ui-plugin-file-byte-size", strconv.Itoa(DefaultMaxUIPluginFileSizeInBytes)) // Max file size in bytes for ui plugins
