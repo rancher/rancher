@@ -601,8 +601,8 @@ github.com/rancher/aks-operator v1.14.0-rc.2 h1:KhXvWn+ZuHlnHb1acCYtT1q0YlAZSX6K
 github.com/rancher/aks-operator v1.14.0-rc.2/go.mod h1:WqkM8U5n+w8fNTkYmq4rm7OGZRqGA2eTLnHQYjAmkoM=
 github.com/rancher/ali-operator v1.14.0-rc.1 h1:K/9sFAdo7QM8rD+ZpPM8YkwhLee4NHqvu5psNEdZArU=
 github.com/rancher/ali-operator v1.14.0-rc.1/go.mod h1:96zTYfGWn5kQ6bkVimm2NlsEUYB5FzAYHmn+hlqs4Hc=
-github.com/rancher/apiserver v0.8.3 h1:ZkoT9Pte6lB+gz+D6wQbcOrUnT+FC5oEt3V7mF6M3M4=
-github.com/rancher/apiserver v0.8.3/go.mod h1:EqdyCXM/FuLXg1/Pw2xaAltuU7qvxMoec+vnWhulz1I=
+github.com/rancher/apiserver v0.9.0 h1:FFYh9DGfA6pitysy53asQxtOgQqfTC7y38qfvpEb/iM=
+github.com/rancher/apiserver v0.9.0/go.mod h1:EqdyCXM/FuLXg1/Pw2xaAltuU7qvxMoec+vnWhulz1I=
 github.com/rancher/channelserver v0.9.1-0.20260116181358-8dcd92dec745 h1:yZB0IGl9b9HZ5Uh2pch3YEGBqs7bGEGmIONzsNAiqmU=
 github.com/rancher/channelserver v0.9.1-0.20260116181358-8dcd92dec745/go.mod h1:+AqEVDYgWALI15YTnCAnkNuPJEDF25x+cHBKKXT78Vs=
 github.com/rancher/dynamiclistener v0.7.4 h1:8R1kRGqSoHgMcAL8fcbLWSRyEWQFrxLI1KmFbcwT3KA=
@@ -627,8 +627,8 @@ github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77 h1:k+vzmkZQsH06rZnDr+p
 github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77/go.mod h1:wpITyDPTi/Na5h73XkbuEf2AP9fbgrIGqqxVzFhYD6U=
 github.com/rancher/muchang v0.1.0 h1:Yuu3b7eFRqnnbp6qbLsP/5SY3IKGDj2mUUTzy4AiUVw=
 github.com/rancher/muchang v0.1.0/go.mod h1:sVg6mngaaZIpSegx/I79rymxm7n5gbI8j5PeoVoIONs=
-github.com/rancher/norman v0.8.4 h1:/3xPNdR85lDU5RIfuai8oBJjzSrS/umSjOQ+7M3njKc=
-github.com/rancher/norman v0.8.4/go.mod h1:9khwZhpsg8QmWnAJSJ3luAyxJKMzKKJgoxi0fqXron4=
+github.com/rancher/norman v0.9.0 h1:tlmjLuqn4kydO+A2/59CKD/1jFbgK0w5TBch6jUl5Wk=
+github.com/rancher/norman v0.9.0/go.mod h1:nC+V+MIKIBozs95Ac4np7xluk21VIcvYKz0BaPfF3CM=
 github.com/rancher/remotedialer v0.6.0 h1:fUDO3SUuIKuwAz3a+ofARNthzX4xOTispknKk2AGSck=
 github.com/rancher/remotedialer v0.6.0/go.mod h1:CW6Q8F8IESN05/yl48OSwhVi54nDwVQQriV16zAiGkg=
 github.com/rancher/remotedialer-proxy v0.7.0-rc.5 h1:3ZpVA+dHj4O8yC4PVxhGb3S2BBKAu9g0A+QjokSuxyk=
