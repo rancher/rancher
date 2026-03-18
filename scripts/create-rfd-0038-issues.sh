@@ -58,46 +58,14 @@ create_issue() {
 # ---------------------------------------------------------------------------
 # Shared preamble used in every issue body
 # ---------------------------------------------------------------------------
-RFD_LINK="https://github.com/rancher/rancher/issues/53153"
+RFD_LINK="https://github.com/rancher/rancher/issues/54228"
 
 preamble() {
   cat <<EOF
 > Part of **RFD 0038 – Day 2 Ops for Imported Clusters**.
-> Tracking issue / RFD context: $RFD_LINK
+> Tracking issue: $RFD_LINK
 
 EOF
-}
-
-size_legend() {
-  cat <<'EOF'
-
----
-**Size legend**
-| Code | Story-point range | Calendar proxy |
-|------|-------------------|----------------|
-| S | < 5 pts | up to 1 week |
-| M | 5–10 pts | 1–2 weeks |
-| L | 10–20 pts | 2–4 weeks |
-| XL | 20+ pts | 4+ weeks |
-
-_Time is per-engineer, 100 % focused. RFD, QA, post-QA and UI/UX work are excluded._
-EOF
-}
-
-deps_section() {
-  local deps="$1"
-  if [[ -n "$deps" ]]; then
-    echo ""
-    echo "**Dependencies (CSV index):** $deps"
-  fi
-}
-
-optional_note() {
-  local note="$1"
-  if [[ -n "$note" ]]; then
-    echo ""
-    echo "> ⚠️ **Optional / lower priority:** $note"
-  fi
 }
 
 # ===========================================================================
@@ -116,11 +84,7 @@ This library underpins virtually every other work item in this epic (items 2, 3,
 - [ ] Package (or CRD group) for plan types is created and versioned under an appropriate API group (e.g. \`plan.cattle.io/v1\`)
 - [ ] Existing plan types used by CAPR are migrated / aliased to the new library without breaking existing functionality
 - [ ] Go client and generated DeepCopy / List types are produced
-- [ ] Unit tests cover type helpers
-
-**Dependencies:** none
-**Size:** M (5–10 pts, ~1–2 weeks)
-$(size_legend)"
+- [ ] Unit tests cover type helpers"
 
 # ===========================================================================
 # Issue 2 – Plan Secret Schema Validation via Webhook
@@ -138,11 +102,7 @@ This prevents plan corruption bugs from being silently applied to downstream nod
 - [ ] Validating webhook is registered for plan secrets (or the relevant plan CRD)
 - [ ] Schema violations return a descriptive admission error
 - [ ] Existing valid plans continue to pass without modification
-- [ ] Unit + integration tests for the webhook handler
-
-$(deps_section "1 (Public Plan Library)")
-**Size:** S (< 5 pts, up to 1 week)
-$(size_legend)"
+- [ ] Unit + integration tests for the webhook handler"
 
 # ===========================================================================
 # Issue 3 – Plan State Rework
@@ -164,11 +124,7 @@ This is a prerequisite for Snapshot Creation (#8), Certificate Rotation (#9), En
 - [ ] Plan state enum / conditions are formally defined in the public plan library
 - [ ] Planner writes state according to the new model
 - [ ] System-agent reconciles against the new state fields
-- [ ] Existing day-2-ops for provisioned v2 clusters continue to work
-
-$(deps_section "1 (Public Plan Library)")
-**Size:** S (< 5 pts, up to 1 week)
-$(size_legend)"
+- [ ] Existing day-2-ops for provisioned v2 clusters continue to work"
 
 # ===========================================================================
 # Issue 4 – Plan Cancellation
@@ -180,17 +136,11 @@ create_issue \
 
 Allow an in-progress plan execution to be **cancelled** by an operator — useful when a day-2 op is taking too long, was triggered by mistake, or the cluster is in an unrecoverable partial state.
 
-$(optional_note "Quality-of-life improvement; not strictly necessary for initial release.")
-
 ### Acceptance criteria
 - [ ] A cancellation signal can be written to the plan or a derived resource
 - [ ] The system-agent honours the signal and halts plan execution cleanly
 - [ ] The planner transitions the plan state to \`Cancelled\`
-- [ ] Partially applied plans emit a clear warning
-
-$(deps_section "1 (Public Plan Library)")
-**Size:** S (< 5 pts, up to 1 week)
-$(size_legend)"
+- [ ] Partially applied plans emit a clear warning"
 
 # ===========================================================================
 # Issue 5 – Day-2-op Data Preparation (feature, cluster context)
@@ -209,11 +159,7 @@ Extract and normalise the **cluster-level data** needed to generate day-2 operat
 ### Acceptance criteria
 - [ ] Helper functions that return data-dir and CNI for all three cluster types
 - [ ] Fallback logic when values are absent
-- [ ] Unit tests covering provisioning-v2, CAPI/Turtles, and imported cluster fixtures
-
-**Dependencies:** none
-**Size:** S (< 5 pts, up to 1 week)
-$(size_legend)"
+- [ ] Unit tests covering provisioning-v2, CAPI/Turtles, and imported cluster fixtures"
 
 # ===========================================================================
 # Issue 6 – Beacon Implementation (CAPR, system-agent)
@@ -238,11 +184,7 @@ Key points from the RFD:
 - [ ] CAPR controller creates / updates the Beacon for provisioning-v2 and imported RKE2/K3s clusters
 - [ ] system-agent is updated to discover its plan via the Beacon
 - [ ] Beacon deletion triggers graceful cleanup of agent-side state
-- [ ] Integration tests verify plan delivery end-to-end
-
-$(deps_section "1 (Public Plan Library)")
-**Size:** M (5–10 pts, ~1–2 weeks)
-$(size_legend)"
+- [ ] Integration tests verify plan delivery end-to-end"
 
 # ===========================================================================
 # Issue 7 – Beacon Implementation (CAPRKE2)
@@ -259,11 +201,7 @@ CAPRKE2 uses per-node bootstrap resources (\`rke2bootstrap.cluster.x-k8s.io\`), 
 ### Acceptance criteria
 - [ ] CAPRKE2 controller creates / reconciles Beacons for its clusters
 - [ ] Per-node data directory from \`rke2bootstrap\` is surfaced correctly
-- [ ] No regression in existing CAPRKE2 provisioning flows
-
-$(deps_section "1 (Public Plan Library)")
-**Size:** S (< 5 pts, up to 1 week)
-$(size_legend)"
+- [ ] No regression in existing CAPRKE2 provisioning flows"
 
 # ===========================================================================
 # Issue 8 – Snapshot Creation
@@ -282,11 +220,7 @@ Today this operation is only available for provisioning-v2 clusters.  This work 
 - [ ] A plan is generated, delivered via the Beacon, and executed by the system-agent
 - [ ] Snapshot metadata is stored in \`etcdsnapshots.rke.cattle.io\`
 - [ ] Existing provisioning-v2 snapshot creation is unaffected
-- [ ] v2prov integration test for imported cluster snapshot creation
-
-$(deps_section "3 (Plan State Rework), 5 (Day-2-op Data Preparation), 6 (Beacon – CAPR/system-agent)")
-**Size:** S (< 5 pts, up to 1 week)
-$(size_legend)"
+- [ ] v2prov integration test for imported cluster snapshot creation"
 
 # ===========================================================================
 # Issue 9 – Certificate Rotation
@@ -305,11 +239,7 @@ The existing implementation (CAPR) removes \`/agent/pod-manifests\` to force cer
 - [ ] Plan correctly references the data directory resolved from \`node.management.cattle.io\` status annotations
 - [ ] HTTP probes (etcd, kube-apiserver, kube-scheduler, kube-controller-manager, kubelet, calico) are rendered and tracked
 - [ ] Operation completes successfully on a real imported RKE2 cluster (integration test)
-- [ ] Provisioning-v2 certificate rotation is not regressed
-
-$(deps_section "3 (Plan State Rework), 5 (Day-2-op Data Preparation), 6 (Beacon – CAPR/system-agent)")
-**Size:** M (5–10 pts, ~1–2 weeks)
-$(size_legend)"
+- [ ] Provisioning-v2 certificate rotation is not regressed"
 
 # ===========================================================================
 # Issue 10 – Encryption Key Rotation
@@ -327,11 +257,7 @@ Similar scope to Certificate Rotation (#9) but with its own plan steps (running 
 - [ ] Encryption key rotation can be triggered on an imported cluster
 - [ ] Plan steps match the existing CAPR implementation adapted for imported cluster data sources
 - [ ] Integration test verifies end-to-end key rotation on an imported RKE2 cluster
-- [ ] Provisioning-v2 encryption key rotation is not regressed
-
-$(deps_section "3 (Plan State Rework), 5 (Day-2-op Data Preparation), 6 (Beacon – CAPR/system-agent)")
-**Size:** M (5–10 pts, ~1–2 weeks)
-$(size_legend)"
+- [ ] Provisioning-v2 encryption key rotation is not regressed"
 
 # ===========================================================================
 # Issue 11 – In-place Updates (CAPRKE2)
@@ -357,11 +283,7 @@ This is the most complex work item in the epic.  It requires:
 - [ ] system-agent executes the upgrade safely (drains workloads, upgrades binaries, validates probes)
 - [ ] Upgrade can be paused, resumed, and cancelled
 - [ ] Failure leaves the cluster in a recoverable state
-- [ ] Integration tests cover single-node and multi-node upgrade scenarios
-
-$(deps_section "1 (Public Plan Library), 2 (Webhook Validation), 3 (Plan State Rework), 5 (Data Preparation), 7 (Beacon – CAPRKE2), 18 (Locking), 20 (In-place Update Contracts)")
-**Size:** L (10–20 pts, ~2–4 weeks)
-$(size_legend)"
+- [ ] Integration tests cover single-node and multi-node upgrade scenarios"
 
 # ===========================================================================
 # Issue 12 – Snapshot Restore
@@ -387,11 +309,7 @@ Restore depends on Snapshot Creation (#8) being functional first.
 - [ ] All restore steps execute in order with proper guardrails
 - [ ] Cluster health probes gate completion
 - [ ] Integration test verifies restore on an imported RKE2 cluster
-- [ ] Provisioning-v2 snapshot restore is not regressed
-
-$(deps_section "3 (Plan State Rework), 5 (Day-2-op Data Preparation), 6 (Beacon – CAPR/system-agent), 8 (Snapshot Creation)")
-**Size:** L (10–20 pts, ~2–4 weeks)
-$(size_legend)"
+- [ ] Provisioning-v2 snapshot restore is not regressed"
 
 # ===========================================================================
 # Issue 13 – Lifecycle Hooks
@@ -403,16 +321,10 @@ create_issue \
 
 Add **lifecycle hooks** that fire before and after each day-2 operation (snapshot create, cert rotation, etc.).  Primarily useful for debugging, investigation, and potentially for custom pre/post scripts.
 
-$(optional_note "Not strictly required for the initial release; useful for investigation and extensibility.")
-
 ### Acceptance criteria
 - [ ] Pre- and post-operation hooks can be defined on the plan or operation resource
 - [ ] Hook failures can be configured to block or warn-only
-- [ ] Hooks are visible in the plan status / events
-
-$(deps_section "8 (Snapshot Creation)")
-**Size:** S (< 5 pts, up to 1 week)
-$(size_legend)"
+- [ ] Hooks are visible in the plan status / events"
 
 # ===========================================================================
 # Issue 14 – Plan Pausing
@@ -424,17 +336,11 @@ create_issue \
 
 Allow an operator to **pause** plan execution — halting further application of instructions without cancelling the operation — and then resume it.
 
-$(optional_note "Quality-of-life improvement; not strictly necessary for initial release.")
-
 ### Acceptance criteria
 - [ ] A pause field / annotation can be set on the plan resource
 - [ ] The planner and system-agent honour the pause and do not advance to the next instruction
 - [ ] Resuming the plan continues from where it stopped (idempotent)
-- [ ] Status clearly reflects the \`Paused\` state
-
-$(deps_section "1 (Public Plan Library), 3 (Plan State Rework)")
-**Size:** S (< 5 pts, up to 1 week)
-$(size_legend)"
+- [ ] Status clearly reflects the \`Paused\` state"
 
 # ===========================================================================
 # Issue 15 – Operation Pausing
@@ -446,16 +352,10 @@ create_issue \
 
 Extend the pausing concept from plan-level (#14) to **operation-level** — pausing an entire day-2 operation (e.g. snapshot restore) across all its constituent plans.
 
-$(optional_note "Quality-of-life improvement; not strictly necessary for initial release.")
-
 ### Acceptance criteria
 - [ ] An operation can be paused and resumed atomically
 - [ ] Pausing an operation pauses all its constituent machine-level plans
-- [ ] The operation status reflects \`Paused\`
-
-$(deps_section "8 (Snapshot Creation), 14 (Plan Pausing)")
-**Size:** S (< 5 pts, up to 1 week)
-$(size_legend)"
+- [ ] The operation status reflects \`Paused\`"
 
 # ===========================================================================
 # Issue 16 – Operation Cancellation
@@ -467,16 +367,10 @@ create_issue \
 
 Allow an operator to **cancel** an entire in-progress day-2 operation (not just a single plan).
 
-$(optional_note "Quality-of-life improvement; not strictly necessary for initial release.")
-
 ### Acceptance criteria
 - [ ] An operation-level cancellation signal propagates to all machine-level plans
 - [ ] All constituent plans transition to \`Cancelled\` (via plan cancellation from #4)
-- [ ] The operation resource records the cancellation reason and timestamp
-
-$(deps_section "8 (Snapshot Creation), 4 (Plan Cancellation)")
-**Size:** S (< 5 pts, up to 1 week)
-$(size_legend)"
+- [ ] The operation resource records the cancellation reason and timestamp"
 
 # ===========================================================================
 # Issue 17 – Data Extraction and Probes
@@ -502,11 +396,7 @@ Probe success must be tracked independently of plan-apply success (a plan can su
 - [ ] Periodic instruction outputs are surfaced in the plan/operation status
 - [ ] Probes are rendered correctly for imported clusters (CNI determined via data-prep helpers)
 - [ ] Probe status is polled and reported by the system-agent
-- [ ] Dashboards / status fields distinguish \`PlanApplied\` from \`ProbesHealthy\`
-
-$(deps_section "8 (Snapshot Creation)")
-**Size:** M (5–10 pts, ~1–2 weeks)
-$(size_legend)"
+- [ ] Dashboards / status fields distinguish \`PlanApplied\` from \`ProbesHealthy\`"
 
 # ===========================================================================
 # Issue 18 – Locking Mechanism
@@ -527,11 +417,7 @@ The lock must be:
 - [ ] Lock resource or field is defined in the public plan library or on the management cluster object
 - [ ] Webhook enforces the lock for annotation changes (per the RFD webhook requirements)
 - [ ] Planner refuses to start a new operation if the lock is held
-- [ ] Lock is always released, even on failure (no stuck locks)
-
-$(deps_section "2 (Webhook Validation), 6 (Beacon – CAPR/system-agent), 7 (Beacon – CAPRKE2)")
-**Size:** S (< 5 pts, up to 1 week)
-$(size_legend)"
+- [ ] Lock is always released, even on failure (no stuck locks)"
 
 # ===========================================================================
 # Issue 19 – Scaling Improvements
@@ -543,8 +429,6 @@ create_issue \
 
 Improve the performance of the day-2 ops infrastructure for **large clusters** (many nodes, many concurrent operations across multiple clusters).
 
-$(optional_note "Performance improvement; not strictly necessary for the initial release.")
-
 Areas of focus:
 - Reduce planner reconcile churn for unchanged plans
 - Improve plan-secret watch efficiency in the system-agent
@@ -553,11 +437,7 @@ Areas of focus:
 ### Acceptance criteria
 - [ ] Benchmarks establish a baseline for planner throughput
 - [ ] Identified bottlenecks are resolved
-- [ ] No visible latency increase in existing day-2-ops at scale
-
-$(deps_section "6 (Beacon – CAPR/system-agent)")
-**Size:** M (5–10 pts, ~1–2 weeks)
-$(size_legend)"
+- [ ] No visible latency increase in existing day-2-ops at scale"
 
 # ===========================================================================
 # Issue 20 – In-place Update Contracts (CAPRKE2)
@@ -575,11 +455,7 @@ This is foundational work for the in-place upgrades implementation (#11) and sho
 - [ ] API types for in-place upgrade spec and status are defined and versioned
 - [ ] Upgrade compatibility rules are documented (minimum supported version delta, etc.)
 - [ ] Existing CAPRKE2 API is not broken
-- [ ] CRD validation rules enforce the contracts
-
-**Dependencies:** none
-**Size:** L (10–20 pts, ~2–4 weeks)
-$(size_legend)"
+- [ ] CRD validation rules enforce the contracts"
 
 echo ""
 echo "✅  Done. All 20 RFD-0038 issues submitted to $REPO."
