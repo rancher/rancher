@@ -99,8 +99,9 @@ func (h *handle) OnChange(workspace *mgmt.FleetWorkspace, status mgmt.FleetWorks
 	return []runtime.Object{
 		&corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:   workspace.Name,
-				Labels: yaml.CleanAnnotationsForExport(workspace.Labels),
+				Name:        workspace.Name,
+				Labels:      yaml.CleanAnnotationsForExport(workspace.Labels),
+				Annotations: yaml.CleanAnnotationsForExport(workspace.Annotations),
 			},
 		},
 	}, status, nil
