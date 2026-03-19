@@ -475,7 +475,7 @@ func TestUpdateConfigWithAdvertiseAddresses(t *testing.T) {
 }
 
 func TestClusterObjectAuthorized(t *testing.T) {
-	annotation := "rke.cattle.io/object-authorized-for-clusters"
+	annotation := capr.AuthorizedObjectAnnotation
 
 	tests := []struct {
 		name             string
