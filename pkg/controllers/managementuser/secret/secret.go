@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
-	"strings"
 	"time"
 
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -116,7 +115,7 @@ func (c *ResourceSyncController) syncable(obj *corev1.Secret) bool {
 	}
 
 	// if secret is authorized to be synchronized to the cluster
-	if !slices.Contains(strings.Split(obj.Annotations[capr.AuthorizedObjectAnnotation], ","), c.clusterName) {
+	if !capr.ClusterAuthorizedForSecret(obj.Annotations[capr.AuthorizedObjectAnnotation], c.clusterName) {
 		return false
 	}
 
