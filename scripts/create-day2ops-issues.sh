@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# create-rfd-0038-issues.sh
+# create-day2ops-issues.sh
 #
-# Creates GitHub issues for every work item in the RFD 0038
-# "Day 2 Ops for Imported Clusters" planning CSV.
+# Creates GitHub issues for every work item in the Day 2 Ops
+# "Day 2 Ops for Imported Clusters" planning doc and links each
+# new issue as a sub-issue of the tracking issue (#54228).
 #
 # Prerequisites:
 #   * gh CLI authenticated with a token that has 'repo' scope:
@@ -11,7 +12,7 @@
 #     the repository explicitly via --repo.
 #
 # Usage:
-#   ./scripts/create-rfd-0038-issues.sh [--repo owner/repo] [--dry-run]
+#   ./scripts/create-day2ops-issues.sh [--repo owner/repo] [--dry-run]
 #
 # --dry-run   Print the gh commands without executing them.
 # --repo      Override the target repository (default: rancher/rancher)
@@ -20,6 +21,7 @@ set -euo pipefail
 
 REPO="rancher/rancher"
 DRY_RUN=false
+PARENT_ISSUE=54228
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -30,7 +32,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 # ---------------------------------------------------------------------------
-# Helper – create one issue and print its URL.
+# Helper – create one issue, print its URL, and link it as a sub-issue of
+# PARENT_ISSUE via the GitHub sub-issues REST API.
 # Usage: create_issue <title> <body>
 # ---------------------------------------------------------------------------
 create_issue() {
@@ -39,31 +42,43 @@ create_issue() {
 
   if [[ "$DRY_RUN" == "true" ]]; then
     echo "=== DRY RUN: gh issue create ==="
-    echo "  --repo  $REPO"
-    echo "  --title $title"
-    echo "  --body  (see below)"
+    echo "  --repo   $REPO"
+    echo "  --title  $title"
+    echo "  --body   (see below)"
     echo "$body"
+    echo "  [would then link as sub-issue of #$PARENT_ISSUE]"
     echo ""
     return
   fi
 
   local url
   url=$(gh issue create \
-    --repo "$REPO" \
+    --repo  "$REPO" \
     --title "$title" \
     --body  "$body")
   echo "Created: $url"
+
+  # Extract the issue number from the URL (last path segment)
+  local issue_number
+  issue_number="${url##*/}"
+
+  # Add the new issue as a sub-issue of the parent tracking issue
+  gh api --method POST \
+    "/repos/$REPO/issues/$PARENT_ISSUE/sub_issues" \
+    --field sub_issue_id="$issue_number" \
+    --silent
+  echo "  → linked as sub-issue of #$PARENT_ISSUE"
 }
 
 # ---------------------------------------------------------------------------
 # Shared preamble used in every issue body
 # ---------------------------------------------------------------------------
-RFD_LINK="https://github.com/rancher/rancher/issues/54228"
+PARENT_LINK="https://github.com/rancher/rancher/issues/$PARENT_ISSUE"
 
 preamble() {
   cat <<EOF
-> Part of **RFD 0038 – Day 2 Ops for Imported Clusters**.
-> Tracking issue: $RFD_LINK
+> Part of **Day 2 Ops for Imported Clusters**.
+> Tracking issue: $PARENT_LINK
 
 EOF
 }
@@ -72,7 +87,7 @@ EOF
 # Issue 1 – Public Plan Library
 # ===========================================================================
 create_issue \
-  "[RFD-0038] 1. Public Plan Library" \
+  "[Day 2 Ops] 1. Public Plan Library" \
   "$(preamble)
 ## Description
 
@@ -90,7 +105,7 @@ This library underpins virtually every other work item in this epic (items 2, 3,
 # Issue 2 – Plan Secret Schema Validation via Webhook
 # ===========================================================================
 create_issue \
-  "[RFD-0038] 2. Plan Secret Schema Validation via Webhook" \
+  "[Day 2 Ops] 2. Plan Secret Schema Validation via Webhook" \
   "$(preamble)
 ## Description
 
@@ -108,7 +123,7 @@ This prevents plan corruption bugs from being silently applied to downstream nod
 # Issue 3 – Plan State Rework
 # ===========================================================================
 create_issue \
-  "[RFD-0038] 3. Plan State Rework" \
+  "[Day 2 Ops] 3. Plan State Rework" \
   "$(preamble)
 ## Description
 
@@ -130,7 +145,7 @@ This is a prerequisite for Snapshot Creation (#8), Certificate Rotation (#9), En
 # Issue 4 – Plan Cancellation
 # ===========================================================================
 create_issue \
-  "[RFD-0038] 4. Plan Cancellation" \
+  "[Day 2 Ops] 4. Plan Cancellation" \
   "$(preamble)
 ## Description
 
@@ -146,7 +161,7 @@ Allow an in-progress plan execution to be **cancelled** by an operator — usefu
 # Issue 5 – Day-2-op Data Preparation (feature, cluster context)
 # ===========================================================================
 create_issue \
-  "[RFD-0038] 5. Day-2-op Data Preparation (feature, cluster context)" \
+  "[Day 2 Ops] 5. Day-2-op Data Preparation (feature, cluster context)" \
   "$(preamble)
 ## Description
 
@@ -165,7 +180,7 @@ Extract and normalise the **cluster-level data** needed to generate day-2 operat
 # Issue 6 – Beacon Implementation (CAPR, system-agent)
 # ===========================================================================
 create_issue \
-  "[RFD-0038] 6. Beacon Implementation (CAPR, system-agent)" \
+  "[Day 2 Ops] 6. Beacon Implementation (CAPR, system-agent)" \
   "$(preamble)
 ## Description
 
@@ -173,7 +188,7 @@ Implement the \`Beacon\` CRD (\`beacons.plan.cattle.io\`) and its handling in **
 
 A Beacon is a namespaced sentinel resource (one per cluster) that tells the system-agent where to find its machine-plan secret.  It is the bootstrapping handshake between Rancher and a node.
 
-Key points from the RFD:
+Key points:
 - Lives in the cluster's management namespace (e.g. \`c-m-xxxxxxx\`)
 - Contains the minimum information required for plan lookup
 - Created automatically when day-2-ops are enabled for a cluster
@@ -190,7 +205,7 @@ Key points from the RFD:
 # Issue 7 – Beacon Implementation (CAPRKE2)
 # ===========================================================================
 create_issue \
-  "[RFD-0038] 7. Beacon Implementation (CAPRKE2)" \
+  "[Day 2 Ops] 7. Beacon Implementation (CAPRKE2)" \
   "$(preamble)
 ## Description
 
@@ -207,7 +222,7 @@ CAPRKE2 uses per-node bootstrap resources (\`rke2bootstrap.cluster.x-k8s.io\`), 
 # Issue 8 – Snapshot Creation
 # ===========================================================================
 create_issue \
-  "[RFD-0038] 8. Snapshot Creation" \
+  "[Day 2 Ops] 8. Snapshot Creation" \
   "$(preamble)
 ## Description
 
@@ -226,7 +241,7 @@ Today this operation is only available for provisioning-v2 clusters.  This work 
 # Issue 9 – Certificate Rotation
 # ===========================================================================
 create_issue \
-  "[RFD-0038] 9. Certificate Rotation" \
+  "[Day 2 Ops] 9. Certificate Rotation" \
   "$(preamble)
 ## Description
 
@@ -245,7 +260,7 @@ The existing implementation (CAPR) removes \`/agent/pod-manifests\` to force cer
 # Issue 10 – Encryption Key Rotation
 # ===========================================================================
 create_issue \
-  "[RFD-0038] 10. Encryption Key Rotation" \
+  "[Day 2 Ops] 10. Encryption Key Rotation" \
   "$(preamble)
 ## Description
 
@@ -263,7 +278,7 @@ Similar scope to Certificate Rotation (#9) but with its own plan steps (running 
 # Issue 11 – In-place Updates (CAPRKE2)
 # ===========================================================================
 create_issue \
-  "[RFD-0038] 11. In-place Updates (CAPRKE2)" \
+  "[Day 2 Ops] 11. In-place Updates (CAPRKE2)" \
   "$(preamble)
 ## Description
 
@@ -289,7 +304,7 @@ This is the most complex work item in the epic.  It requires:
 # Issue 12 – Snapshot Restore
 # ===========================================================================
 create_issue \
-  "[RFD-0038] 12. Snapshot Restore" \
+  "[Day 2 Ops] 12. Snapshot Restore" \
   "$(preamble)
 ## Description
 
@@ -315,7 +330,7 @@ Restore depends on Snapshot Creation (#8) being functional first.
 # Issue 13 – Lifecycle Hooks
 # ===========================================================================
 create_issue \
-  "[RFD-0038] 13. Lifecycle Hooks" \
+  "[Day 2 Ops] 13. Lifecycle Hooks" \
   "$(preamble)
 ## Description
 
@@ -330,7 +345,7 @@ Add **lifecycle hooks** that fire before and after each day-2 operation (snapsho
 # Issue 14 – Plan Pausing
 # ===========================================================================
 create_issue \
-  "[RFD-0038] 14. Plan Pausing" \
+  "[Day 2 Ops] 14. Plan Pausing" \
   "$(preamble)
 ## Description
 
@@ -346,7 +361,7 @@ Allow an operator to **pause** plan execution — halting further application of
 # Issue 15 – Operation Pausing
 # ===========================================================================
 create_issue \
-  "[RFD-0038] 15. Operation Pausing" \
+  "[Day 2 Ops] 15. Operation Pausing" \
   "$(preamble)
 ## Description
 
@@ -361,7 +376,7 @@ Extend the pausing concept from plan-level (#14) to **operation-level** — paus
 # Issue 16 – Operation Cancellation
 # ===========================================================================
 create_issue \
-  "[RFD-0038] 16. Operation Cancellation" \
+  "[Day 2 Ops] 16. Operation Cancellation" \
   "$(preamble)
 ## Description
 
@@ -376,7 +391,7 @@ Allow an operator to **cancel** an entire in-progress day-2 operation (not just 
 # Issue 17 – Data Extraction and Probes
 # ===========================================================================
 create_issue \
-  "[RFD-0038] 17. Data Extraction and Probes" \
+  "[Day 2 Ops] 17. Data Extraction and Probes" \
   "$(preamble)
 ## Description
 
@@ -402,7 +417,7 @@ Probe success must be tracked independently of plan-apply success (a plan can su
 # Issue 18 – Locking Mechanism
 # ===========================================================================
 create_issue \
-  "[RFD-0038] 18. Locking Mechanism" \
+  "[Day 2 Ops] 18. Locking Mechanism" \
   "$(preamble)
 ## Description
 
@@ -415,7 +430,7 @@ The lock must be:
 
 ### Acceptance criteria
 - [ ] Lock resource or field is defined in the public plan library or on the management cluster object
-- [ ] Webhook enforces the lock for annotation changes (per the RFD webhook requirements)
+- [ ] Webhook enforces the lock for annotation changes
 - [ ] Planner refuses to start a new operation if the lock is held
 - [ ] Lock is always released, even on failure (no stuck locks)"
 
@@ -423,7 +438,7 @@ The lock must be:
 # Issue 19 – Scaling Improvements
 # ===========================================================================
 create_issue \
-  "[RFD-0038] 19. Scaling Improvements" \
+  "[Day 2 Ops] 19. Scaling Improvements" \
   "$(preamble)
 ## Description
 
@@ -443,7 +458,7 @@ Areas of focus:
 # Issue 20 – In-place Update Contracts (CAPRKE2)
 # ===========================================================================
 create_issue \
-  "[RFD-0038] 20. In-place Update Contracts (CAPRKE2)" \
+  "[Day 2 Ops] 20. In-place Update Contracts (CAPRKE2)" \
   "$(preamble)
 ## Description
 
@@ -458,4 +473,4 @@ This is foundational work for the in-place upgrades implementation (#11) and sho
 - [ ] CRD validation rules enforce the contracts"
 
 echo ""
-echo "✅  Done. All 20 RFD-0038 issues submitted to $REPO."
+echo "✅  Done. All 20 Day 2 Ops issues submitted to $REPO."
