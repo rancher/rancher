@@ -107,7 +107,7 @@ const (
 	//     },
 	// }
 	//
-	// But the request user groups will not be logged out.
+	// But the request user's groups will not be logged out.
 	//
 	// External providers can result in large numbers of groups for a user which
 	// can bloat the logs.
