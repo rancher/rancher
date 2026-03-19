@@ -84,16 +84,16 @@ EOF
 }
 
 # ===========================================================================
-# Issue 1 – Public Plan Library
+# Public Plan Library
 # ===========================================================================
 create_issue \
-  "[Day 2 Ops] 1. Public Plan Library" \
+  "[Day 2 Ops] Public Plan Library" \
   "$(preamble)
 ## Description
 
 Introduce a **public plan library** — a well-defined, versioned set of plan primitives that controllers and external consumers can use to express cluster-level and machine-level day-2-operation intent.
 
-This library underpins virtually every other work item in this epic (items 2, 3, 6, 7, 11, 14 all depend on it directly).  Getting the API surface right here is the most important step for long-term maintainability.
+Getting the API surface right here is the most important step for long-term maintainability.
 
 ### Acceptance criteria
 - [ ] Package (or CRD group) for plan types is created and versioned under an appropriate API group (e.g. \`plan.cattle.io/v1\`)
@@ -102,10 +102,10 @@ This library underpins virtually every other work item in this epic (items 2, 3,
 - [ ] Unit tests cover type helpers"
 
 # ===========================================================================
-# Issue 2 – Plan Secret Schema Validation via Webhook
+# Plan Secret Schema Validation via Webhook
 # ===========================================================================
 create_issue \
-  "[Day 2 Ops] 2. Plan Secret Schema Validation via Webhook" \
+  "[Day 2 Ops] Plan Secret Schema Validation via Webhook" \
   "$(preamble)
 ## Description
 
@@ -120,10 +120,10 @@ This prevents plan corruption bugs from being silently applied to downstream nod
 - [ ] Unit + integration tests for the webhook handler"
 
 # ===========================================================================
-# Issue 3 – Plan State Rework
+# Plan State Rework
 # ===========================================================================
 create_issue \
-  "[Day 2 Ops] 3. Plan State Rework" \
+  "[Day 2 Ops] Plan State Rework" \
   "$(preamble)
 ## Description
 
@@ -133,8 +133,6 @@ Refactor the internal representation of **plan state** so that:
 - State transitions are auditable
 - The planner and system-agent converge on a single, consistent state model
 
-This is a prerequisite for Snapshot Creation (#8), Certificate Rotation (#9), Encryption Key Rotation (#10), and Snapshot Restore (#12).
-
 ### Acceptance criteria
 - [ ] Plan state enum / conditions are formally defined in the public plan library
 - [ ] Planner writes state according to the new model
@@ -142,10 +140,10 @@ This is a prerequisite for Snapshot Creation (#8), Certificate Rotation (#9), En
 - [ ] Existing day-2-ops for provisioned v2 clusters continue to work"
 
 # ===========================================================================
-# Issue 4 – Plan Cancellation
+# Plan Cancellation
 # ===========================================================================
 create_issue \
-  "[Day 2 Ops] 4. Plan Cancellation" \
+  "[Day 2 Ops] Plan Cancellation" \
   "$(preamble)
 ## Description
 
@@ -158,10 +156,10 @@ Allow an in-progress plan execution to be **cancelled** by an operator — usefu
 - [ ] Partially applied plans emit a clear warning"
 
 # ===========================================================================
-# Issue 5 – Day-2-op Data Preparation (feature, cluster context)
+# Day-2-op Data Preparation (feature, cluster context)
 # ===========================================================================
 create_issue \
-  "[Day 2 Ops] 5. Day-2-op Data Preparation (feature, cluster context)" \
+  "[Day 2 Ops] Day-2-op Data Preparation (feature, cluster context)" \
   "$(preamble)
 ## Description
 
@@ -177,10 +175,10 @@ Extract and normalise the **cluster-level data** needed to generate day-2 operat
 - [ ] Unit tests covering provisioning-v2, CAPI/Turtles, and imported cluster fixtures"
 
 # ===========================================================================
-# Issue 6 – Beacon Implementation (CAPR, system-agent)
+# Beacon Implementation (CAPR, system-agent)
 # ===========================================================================
 create_issue \
-  "[Day 2 Ops] 6. Beacon Implementation (CAPR, system-agent)" \
+  "[Day 2 Ops] Beacon Implementation (CAPR, system-agent)" \
   "$(preamble)
 ## Description
 
@@ -195,23 +193,23 @@ Key points:
 - CAPR reconciles it; system-agent watches it
 
 ### Acceptance criteria
-- [ ] \`Beacon\` type defined in the public plan library (depends on #1)
+- [ ] \`Beacon\` type defined in the public plan library
 - [ ] CAPR controller creates / updates the Beacon for provisioning-v2 and imported RKE2/K3s clusters
 - [ ] system-agent is updated to discover its plan via the Beacon
 - [ ] Beacon deletion triggers graceful cleanup of agent-side state
 - [ ] Integration tests verify plan delivery end-to-end"
 
 # ===========================================================================
-# Issue 7 – Beacon Implementation (CAPRKE2)
+# Beacon Implementation (CAPRKE2)
 # ===========================================================================
 create_issue \
-  "[Day 2 Ops] 7. Beacon Implementation (CAPRKE2)" \
+  "[Day 2 Ops] Beacon Implementation (CAPRKE2)" \
   "$(preamble)
 ## Description
 
 Extend the Beacon implementation to **CAPRKE2** (Cluster API Provider RKE2).
 
-CAPRKE2 uses per-node bootstrap resources (\`rke2bootstrap.cluster.x-k8s.io\`), so the Beacon wiring differs slightly from the CAPR path in issue #6.
+CAPRKE2 uses per-node bootstrap resources (\`rke2bootstrap.cluster.x-k8s.io\`), so the Beacon wiring differs slightly from the CAPR path.
 
 ### Acceptance criteria
 - [ ] CAPRKE2 controller creates / reconciles Beacons for its clusters
@@ -219,16 +217,16 @@ CAPRKE2 uses per-node bootstrap resources (\`rke2bootstrap.cluster.x-k8s.io\`), 
 - [ ] No regression in existing CAPRKE2 provisioning flows"
 
 # ===========================================================================
-# Issue 8 – Snapshot Creation
+# Snapshot Creation
 # ===========================================================================
 create_issue \
-  "[Day 2 Ops] 8. Snapshot Creation" \
+  "[Day 2 Ops] Snapshot Creation" \
   "$(preamble)
 ## Description
 
 Enable **etcd snapshot creation** for imported RKE2/K3s clusters using the new day-2 ops infrastructure.
 
-Today this operation is only available for provisioning-v2 clusters.  This work item wires snapshot creation through the public plan library, Beacon-based plan delivery (items #6 / #3), and the data-preparation helpers (#5).
+Today this operation is only available for provisioning-v2 clusters.
 
 ### Acceptance criteria
 - [ ] Snapshot creation can be triggered on an imported cluster via the Rancher API
@@ -238,10 +236,10 @@ Today this operation is only available for provisioning-v2 clusters.  This work 
 - [ ] v2prov integration test for imported cluster snapshot creation"
 
 # ===========================================================================
-# Issue 9 – Certificate Rotation
+# Certificate Rotation
 # ===========================================================================
 create_issue \
-  "[Day 2 Ops] 9. Certificate Rotation" \
+  "[Day 2 Ops] Certificate Rotation" \
   "$(preamble)
 ## Description
 
@@ -257,16 +255,16 @@ The existing implementation (CAPR) removes \`/agent/pod-manifests\` to force cer
 - [ ] Provisioning-v2 certificate rotation is not regressed"
 
 # ===========================================================================
-# Issue 10 – Encryption Key Rotation
+# Encryption Key Rotation
 # ===========================================================================
 create_issue \
-  "[Day 2 Ops] 10. Encryption Key Rotation" \
+  "[Day 2 Ops] Encryption Key Rotation" \
   "$(preamble)
 ## Description
 
 Enable **encryption key rotation** for imported RKE2/K3s clusters.
 
-Similar scope to Certificate Rotation (#9) but with its own plan steps (running encryption-key-rotation scripts, etc.).
+Similar scope to Certificate Rotation but with its own plan steps (running encryption-key-rotation scripts, etc.).
 
 ### Acceptance criteria
 - [ ] Encryption key rotation can be triggered on an imported cluster
@@ -275,23 +273,14 @@ Similar scope to Certificate Rotation (#9) but with its own plan steps (running 
 - [ ] Provisioning-v2 encryption key rotation is not regressed"
 
 # ===========================================================================
-# Issue 11 – In-place Updates (CAPRKE2)
+# In-place Updates (CAPRKE2)
 # ===========================================================================
 create_issue \
-  "[Day 2 Ops] 11. In-place Updates (CAPRKE2)" \
+  "[Day 2 Ops] In-place Updates (CAPRKE2)" \
   "$(preamble)
 ## Description
 
 Implement **in-place Kubernetes version upgrades** for CAPRKE2-managed clusters — as opposed to rolling node replacement.
-
-This is the most complex work item in the epic.  It requires:
-- The public plan library (#1) for plan expression
-- Webhook validation (#2) to prevent unsafe upgrade plans
-- In-place update contracts (#20) defining the CAPRKE2 API surface
-- Plan State Rework (#3) for tracking upgrade progress
-- Data preparation (#5) for version/image resolution
-- Beacon implementations (#7 for CAPRKE2, #6 for system-agent)
-- The locking mechanism (#18) to prevent concurrent operations
 
 ### Acceptance criteria
 - [ ] CAPRKE2 controller can initiate an in-place upgrade plan
@@ -301,10 +290,10 @@ This is the most complex work item in the epic.  It requires:
 - [ ] Integration tests cover single-node and multi-node upgrade scenarios"
 
 # ===========================================================================
-# Issue 12 – Snapshot Restore
+# Snapshot Restore
 # ===========================================================================
 create_issue \
-  "[Day 2 Ops] 12. Snapshot Restore" \
+  "[Day 2 Ops] Snapshot Restore" \
   "$(preamble)
 ## Description
 
@@ -317,8 +306,6 @@ This is the most destructive day-2 operation and therefore the most complex to i
 4. Runs \`RKE2_DATA_DIR=%s rke2-killall.sh\`
 5. Runs the etcd-restore script
 
-Restore depends on Snapshot Creation (#8) being functional first.
-
 ### Acceptance criteria
 - [ ] Snapshot restore can be triggered on an imported cluster referencing a previously created snapshot
 - [ ] All restore steps execute in order with proper guardrails
@@ -327,10 +314,10 @@ Restore depends on Snapshot Creation (#8) being functional first.
 - [ ] Provisioning-v2 snapshot restore is not regressed"
 
 # ===========================================================================
-# Issue 13 – Lifecycle Hooks
+# Lifecycle Hooks
 # ===========================================================================
 create_issue \
-  "[Day 2 Ops] 13. Lifecycle Hooks" \
+  "[Day 2 Ops] Lifecycle Hooks" \
   "$(preamble)
 ## Description
 
@@ -342,10 +329,10 @@ Add **lifecycle hooks** that fire before and after each day-2 operation (snapsho
 - [ ] Hooks are visible in the plan status / events"
 
 # ===========================================================================
-# Issue 14 – Plan Pausing
+# Plan Pausing
 # ===========================================================================
 create_issue \
-  "[Day 2 Ops] 14. Plan Pausing" \
+  "[Day 2 Ops] Plan Pausing" \
   "$(preamble)
 ## Description
 
@@ -358,14 +345,14 @@ Allow an operator to **pause** plan execution — halting further application of
 - [ ] Status clearly reflects the \`Paused\` state"
 
 # ===========================================================================
-# Issue 15 – Operation Pausing
+# Operation Pausing
 # ===========================================================================
 create_issue \
-  "[Day 2 Ops] 15. Operation Pausing" \
+  "[Day 2 Ops] Operation Pausing" \
   "$(preamble)
 ## Description
 
-Extend the pausing concept from plan-level (#14) to **operation-level** — pausing an entire day-2 operation (e.g. snapshot restore) across all its constituent plans.
+Extend the pausing concept from plan-level to **operation-level** — pausing an entire day-2 operation (e.g. snapshot restore) across all its constituent plans.
 
 ### Acceptance criteria
 - [ ] An operation can be paused and resumed atomically
@@ -373,10 +360,10 @@ Extend the pausing concept from plan-level (#14) to **operation-level** — paus
 - [ ] The operation status reflects \`Paused\`"
 
 # ===========================================================================
-# Issue 16 – Operation Cancellation
+# Operation Cancellation
 # ===========================================================================
 create_issue \
-  "[Day 2 Ops] 16. Operation Cancellation" \
+  "[Day 2 Ops] Operation Cancellation" \
   "$(preamble)
 ## Description
 
@@ -384,14 +371,14 @@ Allow an operator to **cancel** an entire in-progress day-2 operation (not just 
 
 ### Acceptance criteria
 - [ ] An operation-level cancellation signal propagates to all machine-level plans
-- [ ] All constituent plans transition to \`Cancelled\` (via plan cancellation from #4)
+- [ ] All constituent plans transition to \`Cancelled\`
 - [ ] The operation resource records the cancellation reason and timestamp"
 
 # ===========================================================================
-# Issue 17 – Data Extraction and Probes
+# Data Extraction and Probes
 # ===========================================================================
 create_issue \
-  "[Day 2 Ops] 17. Data Extraction and Probes" \
+  "[Day 2 Ops] Data Extraction and Probes" \
   "$(preamble)
 ## Description
 
@@ -414,10 +401,10 @@ Probe success must be tracked independently of plan-apply success (a plan can su
 - [ ] Dashboards / status fields distinguish \`PlanApplied\` from \`ProbesHealthy\`"
 
 # ===========================================================================
-# Issue 18 – Locking Mechanism
+# Locking Mechanism
 # ===========================================================================
 create_issue \
-  "[Day 2 Ops] 18. Locking Mechanism" \
+  "[Day 2 Ops] Locking Mechanism" \
   "$(preamble)
 ## Description
 
@@ -435,10 +422,10 @@ The lock must be:
 - [ ] Lock is always released, even on failure (no stuck locks)"
 
 # ===========================================================================
-# Issue 19 – Scaling Improvements
+# Scaling Improvements
 # ===========================================================================
 create_issue \
-  "[Day 2 Ops] 19. Scaling Improvements" \
+  "[Day 2 Ops] Scaling Improvements" \
   "$(preamble)
 ## Description
 
@@ -455,16 +442,16 @@ Areas of focus:
 - [ ] No visible latency increase in existing day-2-ops at scale"
 
 # ===========================================================================
-# Issue 20 – In-place Update Contracts (CAPRKE2)
+# In-place Update Contracts (CAPRKE2)
 # ===========================================================================
 create_issue \
-  "[Day 2 Ops] 20. In-place Update Contracts (CAPRKE2)" \
+  "[Day 2 Ops] In-place Update Contracts (CAPRKE2)" \
   "$(preamble)
 ## Description
 
 Define and implement the **API contracts** that govern in-place Kubernetes version upgrades in CAPRKE2 — the public-facing spec changes, status conditions, and compatibility guarantees that downstream consumers (UI, CLI, other controllers) can rely on.
 
-This is foundational work for the in-place upgrades implementation (#11) and should be designed with future extensibility in mind.
+This should be designed with future extensibility in mind.
 
 ### Acceptance criteria
 - [ ] API types for in-place upgrade spec and status are defined and versioned
