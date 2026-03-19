@@ -39,6 +39,7 @@ import (
 	"k8s.io/utils/ptr"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	capiannotations "sigs.k8s.io/cluster-api/util/annotations"
+	"sigs.k8s.io/cluster-api/util/conditions"
 	"sigs.k8s.io/cluster-api/util/secret"
 )
 
@@ -539,7 +540,7 @@ func (h *handler) reconcileMachinePreTerminateAnnotation(bootstrap *rkev1.RKEBoo
 	}
 
 	_, isEtcd := machine.Labels[capr.EtcdRoleLabel]
-	logrus.Debugf("[rkebootstrap] %s/%s: start machine=%s/%s isEtcd=%t machineDeleting=%t bootstrapDeleting=%t nodeRef=%t",
+	logrus.Tracef("[rkebootstrap] %s/%s: evaluating machine %s/%s for pre-terminate hook reconciliation (etcd=%t, machineDeleting=%t, bootstrapDeleting=%t, nodeRef=%t)",
 		bootstrap.Namespace, bootstrap.Name,
 		machine.Namespace, machine.Name,
 		isEtcd,
@@ -552,7 +553,7 @@ func (h *handler) reconcileMachinePreTerminateAnnotation(bootstrap *rkev1.RKEBoo
 	if (ok && strings.ToLower(forceRemove) == "true") || !isEtcd {
 		// This delete path only protects etcd membership. If this machine is not etcd, or the caller asked
 		// for force removal, we should not hold the machine behind the pre-terminate hook.
-		logrus.Debugf("[rkebootstrap] %s/%s: machine=%s/%s release-hook early isEtcd=%t forceRemove=%q",
+		logrus.Tracef("[rkebootstrap] %s/%s: releasing pre-terminate hook for machine %s/%s because etcd protection does not apply (etcd=%t, forceRemove=%q)",
 			bootstrap.Namespace, bootstrap.Name,
 			machine.Namespace, machine.Name,
 			isEtcd,
@@ -564,7 +565,7 @@ func (h *handler) reconcileMachinePreTerminateAnnotation(bootstrap *rkev1.RKEBoo
 	// Add the hook before delete starts. Later, when CAPI begins deleting the machine, delete will pause
 	// here and Rancher will get one last chance to do etcd-safe removal first.
 	if machine.DeletionTimestamp.IsZero() && bootstrap.DeletionTimestamp.IsZero() {
-		logrus.Debugf("[rkebootstrap] %s/%s: machine=%s/%s pre-delete ensure-hook",
+		logrus.Tracef("[rkebootstrap] %s/%s: ensuring pre-terminate hook on machine %s/%s before delete starts",
 			bootstrap.Namespace, bootstrap.Name,
 			machine.Namespace, machine.Name,
 		)
@@ -585,7 +586,7 @@ func (h *handler) reconcileMachinePreTerminateAnnotation(bootstrap *rkev1.RKEBoo
 	// Start of safe removal validations
 
 	if bootstrap.Spec.ClusterName == "" {
-		logrus.Debugf("[rkebootstrap] %s/%s: machine=%s/%s release-hook reason=empty-cluster-name",
+		logrus.Tracef("[rkebootstrap] %s/%s: releasing pre-terminate hook for machine %s/%s because cluster name is empty",
 			bootstrap.Namespace, bootstrap.Name,
 			machine.Namespace, machine.Name,
 		)
@@ -596,7 +597,7 @@ func (h *handler) reconcileMachinePreTerminateAnnotation(bootstrap *rkev1.RKEBoo
 	capiCluster, err := h.capiClusterCache.Get(bootstrap.Namespace, bootstrap.Spec.ClusterName)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			logrus.Debugf("[rkebootstrap] %s/%s: machine=%s/%s release-hook reason=capi-cluster-missing",
+			logrus.Tracef("[rkebootstrap] %s/%s: releasing pre-terminate hook for machine %s/%s because the CAPI cluster is missing",
 				bootstrap.Namespace, bootstrap.Name,
 				machine.Namespace, machine.Name,
 			)
@@ -607,7 +608,7 @@ func (h *handler) reconcileMachinePreTerminateAnnotation(bootstrap *rkev1.RKEBoo
 	}
 
 	if !capiCluster.Spec.ControlPlaneRef.IsDefined() {
-		logrus.Debugf("[rkebootstrap] %s/%s: machine=%s/%s release-hook reason=controlplane-ref-missing",
+		logrus.Tracef("[rkebootstrap] %s/%s: releasing pre-terminate hook for machine %s/%s because the control plane reference is missing",
 			bootstrap.Namespace, bootstrap.Name,
 			machine.Namespace, machine.Name,
 		)
@@ -618,7 +619,7 @@ func (h *handler) reconcileMachinePreTerminateAnnotation(bootstrap *rkev1.RKEBoo
 	cp, err := h.rkeControlPlanes.Get(capiCluster.Namespace, capiCluster.Spec.ControlPlaneRef.Name)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			logrus.Debugf("[rkebootstrap] %s/%s: machine=%s/%s release-hook reason=rkecontrolplane-missing",
+			logrus.Tracef("[rkebootstrap] %s/%s: releasing pre-terminate hook for machine %s/%s because the RKEControlPlane is missing",
 				bootstrap.Namespace, bootstrap.Name,
 				machine.Namespace, machine.Name,
 			)
@@ -631,7 +632,7 @@ func (h *handler) reconcileMachinePreTerminateAnnotation(bootstrap *rkev1.RKEBoo
 	if !cp.DeletionTimestamp.IsZero() || !capiCluster.DeletionTimestamp.IsZero() {
 		// If the whole control plane or whole cluster is being deleted, this machine is no longer being
 		// removed as a single etcd member change. In that case we should not keep this hook.
-		logrus.Debugf("[rkebootstrap] %s/%s: machine=%s/%s release-hook reason=cluster-or-controlplane-deleting cpDeleting=%t clusterDeleting=%t",
+		logrus.Tracef("[rkebootstrap] %s/%s: releasing pre-terminate hook for machine %s/%s because the cluster or control plane is deleting (controlPlaneDeleting=%t, clusterDeleting=%t)",
 			bootstrap.Namespace, bootstrap.Name,
 			machine.Namespace, machine.Name,
 			!cp.DeletionTimestamp.IsZero(),
@@ -653,7 +654,7 @@ func (h *handler) reconcileMachinePreTerminateAnnotation(bootstrap *rkev1.RKEBoo
 	if err != nil {
 		return bootstrap, fmt.Errorf("error encountered list plansecrets to validate etcd safe removal: %v", err)
 	}
-	logrus.Debugf("[rkebootstrap] %s/%s: machine=%s/%s delete-checks planSecret=%t planSecrets=%d",
+	logrus.Tracef("[rkebootstrap] %s/%s: loaded delete state for machine %s/%s (hasPlanSecret=%t, planSecrets=%d)",
 		bootstrap.Namespace, bootstrap.Name,
 		machine.Namespace, machine.Name,
 		planSecret != nil,
@@ -666,13 +667,11 @@ func (h *handler) reconcileMachinePreTerminateAnnotation(bootstrap *rkev1.RKEBoo
 		// can break that replacement before it becomes stable.
 		joinURL := planSecret.Annotations[capr.JoinURLAnnotation]
 		if joinedMachine, joined := machineStillJoinedToJoinURL(planSecrets, joinURL); joined {
-			logrus.Debugf("[rkebootstrap] %s/%s: machine=%s/%s block reason=machine-still-joined joinedMachine=%s joinURL=%s",
+			logrus.Debugf("[rkebootstrap] %s/%s: waiting: deleting etcd machine %s/%s is still the join target for machine %s",
 				bootstrap.Namespace, bootstrap.Name,
 				machine.Namespace, machine.Name,
 				joinedMachine,
-				joinURL,
 			)
-			logrus.Errorf("[rkebootstrap] %s/%s: cluster %s/%s machine %s/%s was still joined to deleting etcd machine %s/%s", bootstrap.Namespace, bootstrap.Name, capiCluster.Namespace, capiCluster.Name, bootstrap.Namespace, joinedMachine, machine.Namespace, machine.Name)
 			h.rkeBootstrap.EnqueueAfter(bootstrap.Namespace, bootstrap.Name, 5*time.Second)
 			return bootstrap, generic.ErrSkip
 		}
@@ -683,7 +682,7 @@ func (h *handler) reconcileMachinePreTerminateAnnotation(bootstrap *rkev1.RKEBoo
 	kcSecret, err := h.secretCache.Get(bootstrap.Namespace, secret.Name(bootstrap.Spec.ClusterName, secret.Kubeconfig))
 	if err != nil {
 		if apierrors.IsNotFound(err) {
-			logrus.Debugf("[rkebootstrap] %s/%s: machine=%s/%s release-hook reason=downstream-kubeconfig-missing",
+			logrus.Tracef("[rkebootstrap] %s/%s: releasing pre-terminate hook for machine %s/%s because the downstream kubeconfig secret is missing",
 				bootstrap.Namespace, bootstrap.Name,
 				machine.Namespace, machine.Name,
 			)
@@ -697,28 +696,20 @@ func (h *handler) reconcileMachinePreTerminateAnnotation(bootstrap *rkev1.RKEBoo
 		return bootstrap, err
 	}
 
-	downstream, err := kubernetes.NewForConfig(restConfig)
-	if err != nil {
-		return bootstrap, err
-	}
 	// Before we remove the old member, wait for a real replacement. This is the main timing gate in this
 	// function: Rancher should not remove the old etcd member until another etcd machine has joined and
 	// proved it is stable enough to carry the cluster forward.
-	replacementReady, err := h.replacementEtcdMachineReady(bootstrap, machine, planSecrets, downstream)
+	replacementReady, err := h.replacementEtcdMachineReady(bootstrap, machine, planSecrets)
 	if err != nil {
 		return bootstrap, err
 	}
 	if !replacementReady {
-		logrus.Infof("[rkebootstrap] %s/%s: machine=%s/%s block reason=replacement-not-ready",
-			bootstrap.Namespace, bootstrap.Name,
-			machine.Namespace, machine.Name,
-		)
-		logrus.Infof("[rkebootstrap] %s/%s: waiting to remove etcd machine %s/%s until another etcd machine has joined, passed plan probes, and reported a ready node",
+		logrus.Debugf("[rkebootstrap] %s/%s: waiting: deleting etcd machine %s/%s does not yet have a replacement machine with NodeReady=True and passed plan probes",
 			bootstrap.Namespace, bootstrap.Name, machine.Namespace, machine.Name)
 		h.rkeBootstrap.EnqueueAfter(bootstrap.Namespace, bootstrap.Name, 5*time.Second)
 		return bootstrap, generic.ErrSkip
 	}
-	logrus.Infof("[rkebootstrap] %s/%s: machine=%s/%s replacement-ready",
+	logrus.Debugf("[rkebootstrap] %s/%s: deleting etcd machine %s/%s has a replacement machine ready for safe removal",
 		bootstrap.Namespace, bootstrap.Name,
 		machine.Namespace, machine.Name,
 	)
@@ -726,10 +717,6 @@ func (h *handler) reconcileMachinePreTerminateAnnotation(bootstrap *rkev1.RKEBoo
 	if !machine.Status.NodeRef.IsDefined() {
 		// At this point, a missing NodeRef means there is no downstream Node object left for Rancher to mark
 		// for safe removal. There is nothing more this hook can do, so release it.
-		logrus.Infof("[rkebootstrap] %s/%s: machine=%s/%s release-hook reason=node-ref-missing-after-replacement-ready",
-			bootstrap.Namespace, bootstrap.Name,
-			machine.Namespace, machine.Name,
-		)
 		logrus.Infof("[rkebootstrap] No associated node found for machine %s/%s in cluster %s, ensuring machine pre-terminate annotation is removed", machine.Namespace, machine.Name, bootstrap.Spec.ClusterName)
 		return h.ensureMachinePreTerminateAnnotationRemoved(bootstrap, machine)
 	}
@@ -741,7 +728,7 @@ func (h *handler) reconcileMachinePreTerminateAnnotation(bootstrap *rkev1.RKEBoo
 	if err != nil {
 		return bootstrap, err
 	}
-	logrus.Infof("[rkebootstrap] %s/%s: machine=%s/%s safe-remove-result removed=%t node=%s",
+	logrus.Debugf("[rkebootstrap] %s/%s: safe remove for machine %s/%s returned %t for node %s",
 		bootstrap.Namespace, bootstrap.Name,
 		machine.Namespace, machine.Name,
 		removed,
@@ -776,9 +763,9 @@ func (h *handler) ensureMachinePreTerminateAnnotationRemoved(bootstrap *rkev1.RK
 // * etcd role label: only another etcd machine can replace this member
 // * join URL: the machine has progressed far enough in bootstrap to act as a join target
 // * plan probes passed: Rancher has seen the current plan become healthy at least once
-// * ready downstream node: kubelet has registered the machine and the node is usable
+// * machine node ready: the CAPI machine controller has already mirrored node readiness onto the local machine object
 // * not deleting: the replacement is still expected to stay in the cluster
-func (h *handler) replacementEtcdMachineReady(bootstrap *rkev1.RKEBootstrap, deletingMachine *capi.Machine, planSecrets []*corev1.Secret, downstream kubernetes.Interface) (bool, error) {
+func (h *handler) replacementEtcdMachineReady(bootstrap *rkev1.RKEBootstrap, deletingMachine *capi.Machine, planSecrets []*corev1.Secret) (bool, error) {
 	if deletingMachine == nil {
 		return false, nil
 	}
@@ -792,7 +779,7 @@ func (h *handler) replacementEtcdMachineReady(bootstrap *rkev1.RKEBootstrap, del
 		// We need a real machine behind the plan secret, otherwise this secret is not enough to trust.
 		machineName := ps.GetLabels()[capr.MachineNameLabel]
 		if machineName == "" {
-			logrus.Debugf("[rkebootstrap] %s/%s: candidate skip reason=machine-name-missing", bootstrap.Namespace, bootstrap.Name)
+			logrus.Tracef("[rkebootstrap] %s/%s: replacement candidate skipped because the machine name label is missing", bootstrap.Namespace, bootstrap.Name)
 			continue
 		}
 		machineNamespace := ps.GetLabels()[capr.MachineNamespaceLabel]
@@ -800,20 +787,20 @@ func (h *handler) replacementEtcdMachineReady(bootstrap *rkev1.RKEBootstrap, del
 			machineNamespace = bootstrap.Namespace
 		}
 		if machineName == deletingMachine.Name && machineNamespace == deletingMachine.Namespace {
-			logrus.Debugf("[rkebootstrap] %s/%s: candidate=%s/%s skip reason=same-machine", bootstrap.Namespace, bootstrap.Name, machineNamespace, machineName)
+			logrus.Tracef("[rkebootstrap] %s/%s: replacement candidate %s/%s skipped because it is the deleting machine", bootstrap.Namespace, bootstrap.Name, machineNamespace, machineName)
 			continue
 		}
 
 		// The join URL appears after bootstrap has advanced enough for this machine to act as a join target.
 		// Before that point, Rancher should still treat the replacement as too early.
 		if ps.GetAnnotations()[capr.JoinURLAnnotation] == "" {
-			logrus.Debugf("[rkebootstrap] %s/%s: candidate=%s/%s skip reason=join-url-empty", bootstrap.Namespace, bootstrap.Name, machineNamespace, machineName)
+			logrus.Tracef("[rkebootstrap] %s/%s: replacement candidate %s/%s skipped because join URL is not set", bootstrap.Namespace, bootstrap.Name, machineNamespace, machineName)
 			continue
 		}
 		// This tells us Rancher has already seen the current plan become healthy at least once. That makes
 		// it a better late-bootstrap signal than just "the machine object exists".
 		if ps.GetAnnotations()[capr.PlanProbesPassedAnnotation] == "" {
-			logrus.Debugf("[rkebootstrap] %s/%s: candidate=%s/%s skip reason=plan-probes-not-passed joinURL=%s",
+			logrus.Tracef("[rkebootstrap] %s/%s: replacement candidate %s/%s skipped because plan probes have not passed yet (joinURL=%s)",
 				bootstrap.Namespace, bootstrap.Name,
 				machineNamespace, machineName,
 				ps.GetAnnotations()[capr.JoinURLAnnotation],
@@ -824,81 +811,30 @@ func (h *handler) replacementEtcdMachineReady(bootstrap *rkev1.RKEBootstrap, del
 		machine, err := h.machineCache.Get(machineNamespace, machineName)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
-				logrus.Debugf("[rkebootstrap] %s/%s: candidate=%s/%s skip reason=machine-not-found", bootstrap.Namespace, bootstrap.Name, machineNamespace, machineName)
+				logrus.Tracef("[rkebootstrap] %s/%s: replacement candidate %s/%s skipped because the machine object was not found", bootstrap.Namespace, bootstrap.Name, machineNamespace, machineName)
 				continue
 			}
 			return false, err
 		}
 
-		// Node readiness is one of the last signals in this flow. We wait for it because machine objects,
-		// plan secrets, and join metadata all show up earlier than a fully usable downstream node.
-		ready, err := machineHasReadyNode(context.Background(), downstream, machine)
-		if err != nil {
-			return false, err
-		}
-		logrus.Debugf("[rkebootstrap] %s/%s: candidate=%s/%s check deleting=%t ready=%t nodeRef=%t",
+		// The machine controller mirrors node readiness onto the local machine object, so we can
+		// validate replacement readiness without querying the downstream cluster directly.
+		nodeReady := conditions.IsTrue(machine, capi.MachineNodeReadyCondition)
+		logrus.Tracef("[rkebootstrap] %s/%s: replacement candidate %s/%s evaluated with deleting=%t, nodeReady=%t, phase=%s, nodeRef=%t",
 			bootstrap.Namespace, bootstrap.Name,
 			machineNamespace, machineName,
 			!machine.DeletionTimestamp.IsZero(),
-			ready,
+			nodeReady,
+			machine.Status.Phase,
 			machine.Status.NodeRef.IsDefined(),
 		)
-		if machine.DeletionTimestamp.IsZero() && ready {
-			logrus.Infof("[rkebootstrap] %s/%s: candidate=%s/%s selected replacement", bootstrap.Namespace, bootstrap.Name, machineNamespace, machineName)
+		if machine.DeletionTimestamp.IsZero() && machine.Status.NodeRef.IsDefined() && nodeReady {
+			logrus.Debugf("[rkebootstrap] %s/%s: replacement candidate %s/%s is ready", bootstrap.Namespace, bootstrap.Name, machineNamespace, machineName)
 			return true, nil
 		}
 	}
 
 	return false, nil
-}
-
-func machineHasReadyNode(ctx context.Context, downstream kubernetes.Interface, machine *capi.Machine) (bool, error) {
-	if downstream == nil || machine == nil {
-		return false, nil
-	}
-
-	if machine.Status.NodeRef.IsDefined() {
-		node, err := downstream.CoreV1().Nodes().Get(ctx, machine.Status.NodeRef.Name, metav1.GetOptions{})
-		if err == nil {
-			return nodeReady(node), nil
-		}
-		if !apierrors.IsNotFound(err) {
-			return false, err
-		}
-	}
-
-	if machine.UID == "" {
-		return false, nil
-	}
-
-	nodes, err := downstream.CoreV1().Nodes().List(ctx, metav1.ListOptions{
-		LabelSelector: labels.Set{capr.MachineUIDLabel: string(machine.UID)}.String(),
-	})
-	if err != nil {
-		return false, err
-	}
-
-	for i := range nodes.Items {
-		if nodeReady(&nodes.Items[i]) {
-			return true, nil
-		}
-	}
-
-	return false, nil
-}
-
-func nodeReady(node *corev1.Node) bool {
-	if node == nil {
-		return false
-	}
-
-	for _, condition := range node.Status.Conditions {
-		if condition.Type == corev1.NodeReady && condition.Status == corev1.ConditionTrue {
-			return true
-		}
-	}
-
-	return false
 }
 
 func machineStillJoinedToJoinURL(planSecrets []*corev1.Secret, joinURL string) (string, bool) {
