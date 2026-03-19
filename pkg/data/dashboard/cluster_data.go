@@ -55,7 +55,7 @@ func addLocalCluster(embedded bool, wrangler *wrangler.Context) error {
 		return err
 	}
 
-	if c.Status.Driver == desiredDriver || !hasReadyCondition(c.Status.Conditions) {
+	if c.Status.Driver != desiredDriver || !hasReadyCondition(c.Status.Conditions) {
 		c.Status.Driver = desiredDriver
 		c.Status.Conditions = []v32.ClusterCondition{
 			{

@@ -339,23 +339,19 @@ func (p *Provisioner) update(cluster *apimgmtv3.Cluster, create bool) (*apimgmtv
 		return cluster, err
 	}
 
-	// Spec changes (K3sConfig/Rke2Config) must be persisted via Update() since
-	// UpdateStatus() won't write spec fields, and we return nil to norman so
-	// norman's write-back won't persist them either.
 	if specChanged {
+		// Save driver field before calling Update(), since Update() only persists
+		// spec and returns the old status from the server.
+		savedDriver := cluster.Status.Driver
 		updatedCluster, err := p.Clusters.Update(cluster)
 		if err != nil {
 			return cluster, err
 		}
 		cluster = updatedCluster
-	}
-
-	if statusChanged {
-		updatedCluster, err := p.Clusters.UpdateStatus(cluster)
-		if err != nil {
-			return cluster, err
+		if statusChanged {
+			// Restore the driver field so the batched UpdateStatus can persist it.
+			cluster.Status.Driver = savedDriver
 		}
-		cluster = updatedCluster
 	}
 
 	return cluster, nil
