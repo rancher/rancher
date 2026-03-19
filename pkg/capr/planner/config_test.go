@@ -15,7 +15,65 @@ import (
 	"github.com/rancher/rancher/pkg/data/management"
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
 	"github.com/stretchr/testify/assert"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+func TestClusterObjectAuthorized(t *testing.T) {
+	tests := []struct {
+		name           string
+		obj            *corev1.Secret
+		annotation     string
+		clusterName    string
+		wantAuthorized bool
+		wantFound      bool
+	}{
+		{
+			name: "authorized cluster",
+			obj: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						capr.AuthorizedObjectAnnotation: "cluster-a,cluster-b",
+					},
+				},
+			},
+			annotation:     capr.AuthorizedObjectAnnotation,
+			clusterName:    "cluster-b",
+			wantAuthorized: true,
+			wantFound:      true,
+		},
+		{
+			name: "unauthorized cluster",
+			obj: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						capr.AuthorizedObjectAnnotation: "cluster-a",
+					},
+				},
+			},
+			annotation:     capr.AuthorizedObjectAnnotation,
+			clusterName:    "cluster-b",
+			wantAuthorized: false,
+			wantFound:      true,
+		},
+		{
+			name:           "nil object",
+			obj:            nil,
+			annotation:     capr.AuthorizedObjectAnnotation,
+			clusterName:    "cluster-b",
+			wantAuthorized: false,
+			wantFound:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			authorized, found := clusterObjectAuthorized(tt.obj, tt.annotation, tt.clusterName)
+			assert.Equal(t, tt.wantAuthorized, authorized)
+			assert.Equal(t, tt.wantFound, found)
+		})
+	}
+}
 
 func TestUpdateConfigWithAddresses(t *testing.T) {
 	tests := []struct {

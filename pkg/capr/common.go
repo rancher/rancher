@@ -34,6 +34,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
@@ -77,6 +78,7 @@ const (
 	UnCordonAnnotation                         = "rke.cattle.io/uncordon"
 	WorkerRoleLabel                            = "rke.cattle.io/worker-role"
 	AuthorizedObjectAnnotation                 = "rke.cattle.io/object-authorized-for-clusters"
+	PreBootstrapSyncAnnotation                 = "provisioning.cattle.io/sync-bootstrap"
 	PlanUpdatedTimeAnnotation                  = "rke.cattle.io/plan-last-updated"
 	PlanProbesPassedAnnotation                 = "rke.cattle.io/plan-probes-passed"
 	DeleteMissingCustomMachinesAfterAnnotation = "rke.cattle.io/delete-missing-custom-machines-after"
@@ -653,6 +655,76 @@ func PreBootstrap(mgmtCluster *v3.Cluster) bool {
 	}
 
 	return !v3.ClusterConditionPreBootstrapped.IsTrue(mgmtCluster)
+}
+
+// ShouldPreBootstrap determines whether the given cluster should enter the pre-bootstrap flow.
+// It checks whether the feature flag is enabled, whether the cluster has already been pre-bootstrapped,
+// and whether there are any authorized sync-bootstrap secrets for this cluster.
+func ShouldPreBootstrap(secretCache corecontrollers.SecretCache, cluster *v3.Cluster) (bool, error) {
+	if !PreBootstrap(cluster) {
+		return false, nil
+	}
+
+	// The bootstrap gate is annotation-based (`provisioning.cattle.io/sync-bootstrap=true`), so we must list
+	// and inspect secrets in-memory because annotation selectors are not supported by the Kubernetes API.
+	secrets, err := secretCache.List(cluster.Spec.FleetWorkspaceName, labels.Everything())
+	if err != nil {
+		return false, fmt.Errorf("failed to list secrets in namespace %s for cluster %s: %w", cluster.Spec.FleetWorkspaceName, cluster.Name, err)
+	}
+
+	for _, secret := range secrets {
+		if secret.Annotations == nil {
+			continue
+		}
+
+		if secret.Annotations[PreBootstrapSyncAnnotation] != "true" {
+			continue
+		}
+
+		// Keep this aligned with managementuser/secret bootstrap sync authorization, which authorizes by
+		// management cluster display name.
+		if !ClusterAuthorizedForSecret(secret.Annotations[AuthorizedObjectAnnotation], cluster.Spec.DisplayName) {
+			continue
+		}
+
+		return true, nil
+	}
+
+	logrus.Debugf("[pre-bootstrap] no authorized sync-bootstrap secrets found for cluster %s, skipping pre-bootstrap flow", cluster.Name)
+	return false, nil
+}
+
+// AuthorizedClusterNames returns the authorized cluster names from a comma-separated annotation value.
+func AuthorizedClusterNames(authorizedClusters string) []string {
+	if authorizedClusters == "" {
+		return nil
+	}
+
+	var clusterNames []string
+	for _, authorizedCluster := range strings.Split(authorizedClusters, ",") {
+		clusterName := strings.TrimSpace(authorizedCluster)
+		if clusterName == "" {
+			continue
+		}
+		clusterNames = append(clusterNames, clusterName)
+	}
+
+	return clusterNames
+}
+
+// ClusterAuthorizedForSecret checks whether a cluster name appears in a comma-separated list of authorized clusters.
+func ClusterAuthorizedForSecret(authorizedClusters, clusterName string) bool {
+	if clusterName == "" {
+		return false
+	}
+
+	for _, authorizedCluster := range AuthorizedClusterNames(authorizedClusters) {
+		if authorizedCluster == clusterName {
+			return true
+		}
+	}
+
+	return false
 }
 
 // AutoscalerEnabledByCAPI looks at the cluster object for the ClusterAutoscalerEnabledAnnotation, and
