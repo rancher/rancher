@@ -92,6 +92,7 @@ type WriterOptions struct {
 	DefaultPolicyLevel auditlogv1.Level
 
 	DisableDefaultPolicies bool
+	ExcludeGroups          bool
 }
 
 type Writer struct {
@@ -119,7 +120,7 @@ func NewWriter(output io.Writer, opts WriterOptions) (*Writer, error) {
 		}
 	}
 
-	if opts.DefaultPolicyLevel > auditlogv1.LevelRequestResponse {
+	if opts.ExcludeGroups {
 		additionalPolicy := auditlogv1.AuditPolicy{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "drop-impersonation-groups",

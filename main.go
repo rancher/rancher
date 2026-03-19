@@ -138,7 +138,7 @@ func main() {
 			Name:        "audit-level",
 			Value:       0,
 			EnvVar:      "AUDIT_LEVEL",
-			Usage:       "Audit log level: 0 - audit log event metadata, 1 - log metadata and headers, 2 - log event metadata, headers, and request body, 3 - log event metadata, headers, request body, and response body, 4 - includes all of 3 but without the user's groups",
+			Usage:       "Audit log level: 0 - audit log event metadata, 1 - log metadata and headers, 2 - log event metadata, headers, and request body, 3 - log event metadata, headers, request body, and response body",
 			Destination: &config.AuditLogLevel,
 		},
 		cli.BoolFlag{
@@ -146,6 +146,12 @@ func main() {
 			Usage:       "enable the rancher audit log system",
 			EnvVar:      "AUDIT_LOG_ENABLED",
 			Destination: &config.AuditLogEnabled,
+		},
+		cli.BoolFlag{
+			Name:        "audit-exclude-groups",
+			Usage:       "Indicates that user groups should not be logged in the auditing, this can reduce the bandwidth",
+			EnvVar:      "AUDIT_EXCLUDE_GROUPS",
+			Destination: &config.AuditLogExcludeGroups,
 		},
 		cli.StringFlag{
 			Name:        "profile-listen-address",

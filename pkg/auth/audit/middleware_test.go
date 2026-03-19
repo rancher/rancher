@@ -55,12 +55,17 @@ func newSizedResponseHandler(size int, statusCode int) http.HandlerFunc {
 }
 
 // Helper function to setup audit writer with specific level (mirrors rancher.go setup)
-func newTestAuditWriter(level auditlogv1.Level) (*Writer, *bytes.Buffer) {
+func newTestAuditWriter(level auditlogv1.Level, opts ...func(*WriterOptions)) (*Writer, *bytes.Buffer) {
 	out := &bytes.Buffer{}
-	writer, err := NewWriter(out, WriterOptions{
+	options := WriterOptions{
 		DefaultPolicyLevel:     level,
 		DisableDefaultPolicies: false,
-	})
+	}
+	for _, opt := range opts {
+		opt(&options)
+	}
+
+	writer, err := NewWriter(out, options)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create audit writer: %v", err))
 	}
@@ -81,7 +86,6 @@ func TestMiddlewareBasicFunctionality(t *testing.T) {
 		{"LevelHeaders", auditlogv1.LevelHeaders},
 		{"LevelRequest", auditlogv1.LevelRequest},
 		{"LevelRequestResponse", auditlogv1.LevelRequestResponse},
-		{"LevelRequestResponseNoGroups", auditlogv1.LevelRequestResponseNoGroups},
 	}
 
 	for _, tt := range tests {
@@ -286,22 +290,46 @@ func TestMiddlewareStatusCodes(t *testing.T) {
 
 // TestMiddlewareGroups tests that request bodies are buffered at appropriate levels
 func TestMiddlewareGroupsLogging(t *testing.T) {
-	tests := []struct {
+	tests := map[string]struct {
 		name                   string
 		level                  auditlogv1.Level
 		method                 string
 		expectGroupsInAuditLog bool
+		options                []func(*WriterOptions)
 	}{
-		{"LevelNull_HasGroups", auditlogv1.LevelNull, http.MethodPost, true},
-		{"LevelHeaders_HasGroups", auditlogv1.LevelHeaders, http.MethodPost, true},
-		{"LevelRequest_HasGroups", auditlogv1.LevelRequest, http.MethodPost, true},
-		{"LevelRequestResponse_HasGroups", auditlogv1.LevelRequestResponse, http.MethodPost, true},
-		{"LevelRequestResponseNoGroups_HasGroups", auditlogv1.LevelRequestResponseNoGroups, http.MethodPost, false},
+
+		"LevelNull_HasGroups": {
+			level:                  auditlogv1.LevelNull,
+			method:                 http.MethodPost,
+			expectGroupsInAuditLog: true,
+		},
+		"LevelHeaders_HasGroups": {
+			level:                  auditlogv1.LevelHeaders,
+			method:                 http.MethodPost,
+			expectGroupsInAuditLog: true,
+		},
+		"LevelRequest_HasGroups": {
+			level:                  auditlogv1.LevelRequest,
+			method:                 http.MethodPost,
+			expectGroupsInAuditLog: true,
+		},
+		"LevelRequestResponse_HasGroups": {
+			level:                  auditlogv1.LevelRequestResponse,
+			method:                 http.MethodPost,
+			expectGroupsInAuditLog: true,
+		},
+		"LevelRequestResponse_WithNoGroups": {
+			level:  auditlogv1.LevelRequestResponse,
+			method: http.MethodPost,
+			options: []func(*WriterOptions){func(o *WriterOptions) {
+				o.ExcludeGroups = true
+			}},
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			writer, auditOutput := newTestAuditWriter(tt.level)
+			writer, auditOutput := newTestAuditWriter(tt.level, tt.options...)
 			middleware := NewAuditLogMiddleware(writer)
 
 			requestBody := `{"cluster":"test"}`

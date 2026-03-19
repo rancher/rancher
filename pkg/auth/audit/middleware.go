@@ -44,11 +44,8 @@ func GetAuditLoggerMiddleware(auditLog *LoggingHandler) func(next http.Handler) 
 
 			verbosityLevel := auditLog.ResolveVerbosity(req.RequestURI)
 
-			// keepGroups determines whether or not to log out the request
-			// user's groups.
-			keepGroups := auditLog.level < auditlogv1.LevelRequestResponseNoGroups
 			auditUser := user
-			if !keepGroups {
+			if auditLog.writer.ExcludeGroups {
 				auditUser.Group = nil
 			}
 			auditLogEntry := newLog(verbosityLevel, auditUser, req, wrappedRw, reqTimestamp, respTimestamp, rawReqBody, userName)

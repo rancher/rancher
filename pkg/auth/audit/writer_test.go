@@ -148,19 +148,20 @@ func TestNewWriterDropsImpersonateGroups(t *testing.T) {
 	tests := []struct {
 		name           string
 		level          auditlogv1.Level
+		excludeGroups  bool
 		expectPolicy   bool
 		expectedHeader []string
 	}{
 		{
 			name:           "no-groups-level",
-			level:          auditlogv1.LevelRequestResponseNoGroups,
+			level:          auditlogv1.LevelRequestResponse,
+			excludeGroups:  true,
 			expectPolicy:   true,
 			expectedHeader: []string{redacted},
 		},
 		{
 			name:           "request-response-level",
 			level:          auditlogv1.LevelRequestResponse,
-			expectPolicy:   false,
 			expectedHeader: []string{"keycloakoidc_group://testers", "keycloakoidc_group://developers"},
 		},
 	}
@@ -172,6 +173,7 @@ func TestNewWriterDropsImpersonateGroups(t *testing.T) {
 			w, err := NewWriter(lw, WriterOptions{
 				DefaultPolicyLevel:     tt.level,
 				DisableDefaultPolicies: true,
+				ExcludeGroups:          tt.excludeGroups,
 			})
 			assert.NoError(t, err)
 
