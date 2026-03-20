@@ -604,15 +604,14 @@ func clusterObjectAuthorized(obj runtime.Object, annotation, clusterName string)
 	}
 	copiedObj := obj.DeepCopyObject()
 	if objMeta, err := meta.Accessor(copiedObj); err == nil && objMeta != nil {
-		authorizedClusters := strings.Split(objMeta.GetAnnotations()[annotation], ",")
-		if len(authorizedClusters) > 0 {
+		authorizedClusters := objMeta.GetAnnotations()[annotation]
+		// Preserve the existing "found" behavior for callers while delegating the match
+		// decision to the shared CAPR authorization helper.
+		splitAuthorizedClusters := strings.Split(authorizedClusters, ",")
+		if len(splitAuthorizedClusters) > 0 {
 			annotationValueFound = true
 		}
-		for _, authorizedCluster := range authorizedClusters {
-			if clusterName == authorizedCluster {
-				return true, annotationValueFound
-			}
-		}
+		return capr.ClusterAuthorizedForSecret(authorizedClusters, clusterName), annotationValueFound
 	}
 	return false, annotationValueFound
 }
