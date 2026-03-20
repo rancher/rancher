@@ -609,9 +609,24 @@ func clusterObjectAuthorized(obj runtime.Object, annotation, clusterName string)
 			annotationValueFound = true
 		}
 		for _, authorizedCluster := range authorizedClusters {
+			authorizedCluster = strings.TrimSpace(authorizedCluster)
 			if clusterName == authorizedCluster {
 				return true, annotationValueFound
 			}
+
+			// Global wildcard match ("*"), only matches if the annotation being checked is the AuthorizedObjectAnnotation
+			if authorizedCluster == "*" && annotation == capr.AuthorizedObjectAnnotation {
+				return true, annotationValueFound
+			}
+
+			// Prefix wildcard match (e.g., "dev-*")
+			if strings.HasSuffix(authorizedCluster, "*") && annotation == capr.AuthorizedObjectAnnotation {
+				prefix := strings.TrimSuffix(authorizedCluster, "*")
+				if strings.HasPrefix(clusterName, prefix) {
+					return true, annotationValueFound
+				}
+			}
+
 		}
 	}
 	return false, annotationValueFound

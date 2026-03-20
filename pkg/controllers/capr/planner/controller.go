@@ -38,6 +38,7 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext, planner *caprp
 		planner:       planner,
 		controlPlanes: clients.RKE.RKEControlPlane(),
 	}
+	cpCache := clients.RKE.RKEControlPlane().Cache()
 	v1.RegisterRKEControlPlaneStatusHandler(ctx, clients.RKE.RKEControlPlane(), "", "planner", h.OnChange)
 	relatedresource.Watch(ctx, "planner", func(namespace, name string, obj runtime.Object) ([]relatedresource.Key, error) {
 		if secret, ok := obj.(*corev1.Secret); ok {
@@ -51,15 +52,11 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext, planner *caprp
 				})
 			}
 			authorizedObjects := secret.Annotations[capr.AuthorizedObjectAnnotation]
-			if authorizedObjects != "" {
-				for _, clusterName = range strings.Split(authorizedObjects, ",") {
-					logrus.Tracef("[planner] rkecluster %s/%s enqueue triggered by authorized secret %s/%s", secret.Namespace, clusterName, secret.Namespace, secret.Name)
-					relatedResources = append(relatedResources, relatedresource.Key{
-						Namespace: secret.Namespace,
-						Name:      clusterName,
-					})
-				}
+			keys, err := getRelatedClustersFromAnnotation(authorizedObjects, secret.Namespace, cpCache, false)
+			if err != nil {
+				return relatedResources, err
 			}
+			relatedResources = append(relatedResources, keys...)
 			return relatedResources, nil
 		} else if machine, ok := obj.(*capi.Machine); ok {
 			clusterName := machine.Labels[capi.ClusterNameLabel]
@@ -71,21 +68,69 @@ func Register(ctx context.Context, clients *wrangler.CAPIContext, planner *caprp
 				}}, nil
 			}
 		} else if configmap, ok := obj.(*corev1.ConfigMap); ok {
-			var relatedResources []relatedresource.Key
 			authorizedObjects := configmap.Annotations[capr.AuthorizedObjectAnnotation]
-			if authorizedObjects != "" {
-				for _, clusterName := range strings.Split(authorizedObjects, ",") {
-					logrus.Tracef("[planner] rkecluster %s/%s enqueue triggered by authorized configmap %s/%s", configmap.Namespace, clusterName, configmap.Namespace, configmap.Name)
-					relatedResources = append(relatedResources, relatedresource.Key{
-						Namespace: configmap.Namespace,
-						Name:      clusterName,
-					})
-				}
-			}
-			return relatedResources, nil
+			return getRelatedClustersFromAnnotation(authorizedObjects, configmap.Namespace, cpCache, true)
 		}
 		return nil, nil
 	}, clients.RKE.RKEControlPlane(), clients.Core.Secret(), clients.CAPI.Machine(), clients.Core.ConfigMap())
+}
+
+func getRelatedClustersFromAnnotation(annotationValue, namespace string, cache v1.RKEControlPlaneCache, allowWildcard bool) ([]relatedresource.Key, error) {
+	if annotationValue == "" {
+		return nil, nil
+	}
+
+	var keys []relatedresource.Key
+	tokens := strings.Split(annotationValue, ",")
+	var allClusters []*rkev1.RKEControlPlane
+	loadedClusters := false
+
+	for _, token := range tokens {
+		val := strings.TrimSpace(token)
+		if val == "" {
+			continue
+		}
+
+		// Global Wildcard Match
+		if allowWildcard && val == "*" {
+			if !loadedClusters {
+				clusters, err := cache.List(namespace, nil)
+				if err != nil {
+					return nil, err
+				}
+				allClusters = clusters
+			}
+
+			for _, c := range allClusters {
+				keys = append(keys, relatedresource.Key{Namespace: namespace, Name: c.Name})
+			}
+			// If it's a global wildcard, we don't need to process further tokens, we already enqueued everything.
+			break
+		}
+
+		// Prefix Wildcard Match
+		if allowWildcard && strings.HasSuffix(val, "*") {
+			prefix := strings.TrimSuffix(val, "*")
+			if !loadedClusters {
+				clusters, err := cache.List(namespace, nil)
+				if err != nil {
+					return nil, err
+				}
+				allClusters = clusters
+				loadedClusters = true
+			}
+
+			for _, c := range allClusters {
+				if strings.HasPrefix(c.Name, prefix) {
+					keys = append(keys, relatedresource.Key{Namespace: namespace, Name: c.Name})
+				}
+			}
+			continue
+		}
+
+		keys = append(keys, relatedresource.Key{Namespace: namespace, Name: val})
+	}
+	return keys, nil
 }
 
 func (h *handler) OnChange(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus) (rkev1.RKEControlPlaneStatus, error) {
