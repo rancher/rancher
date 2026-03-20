@@ -11,6 +11,7 @@ import (
 
 	extstores "github.com/rancher/rancher/pkg/ext/stores"
 	"github.com/rancher/rancher/pkg/features"
+	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	steveext "github.com/rancher/steve/pkg/ext"
 	steveserver "github.com/rancher/steve/pkg/server"
@@ -54,8 +55,18 @@ const (
 	Port              = 6666
 	APIServiceName    = "v1.ext.cattle.io"
 	TargetServiceName = "imperative-api-extension"
-	Namespace         = "cattle-system"
+	defaultNamespace  = "cattle-system"
 )
+
+// GetNamespace returns the namespace where Rancher is running.
+// It reads from the "namespace" setting (populated from the CATTLE_NAMESPACE
+// environment variable) and falls back to "cattle-system" if the setting is empty.
+func GetNamespace() string {
+	if ns := settings.Namespace.Get(); ns != "" {
+		return ns
+	}
+	return defaultNamespace
+}
 
 func CreateOrUpdateAPIService(apiservice wranglerapiregistrationv1.APIServiceController, caBundle []byte) error {
 	port := int32(Port)
@@ -68,7 +79,7 @@ func CreateOrUpdateAPIService(apiservice wranglerapiregistrationv1.APIServiceCon
 			GroupPriorityMinimum: 100,
 			CABundle:             caBundle,
 			Service: &apiregv1.ServiceReference{
-				Namespace: Namespace,
+				Namespace: GetNamespace(),
 				Name:      TargetServiceName,
 				Port:      &port,
 			},
@@ -103,7 +114,7 @@ func CreateOrUpdateService(service wranglercorev1.ServiceController, appSelector
 	desired := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      TargetServiceName,
-			Namespace: Namespace,
+			Namespace: GetNamespace(),
 		},
 		Spec: corev1.ServiceSpec{
 			Ports: []corev1.ServicePort{
@@ -117,7 +128,7 @@ func CreateOrUpdateService(service wranglercorev1.ServiceController, appSelector
 		},
 	}
 
-	current, err := service.Get(Namespace, TargetServiceName, metav1.GetOptions{})
+	current, err := service.Get(GetNamespace(), TargetServiceName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		if _, err := service.Create(desired); err != nil {
 			return err
@@ -160,7 +171,7 @@ func NewExtensionAPIServer(ctx context.Context, wranglerContext *wrangler.Contex
 
 	sniProvider, err := NewSNIProviderForCname(
 		"imperative-api-sni-provider",
-		[]string{fmt.Sprintf("%s.%s.svc", TargetServiceName, Namespace)},
+		[]string{fmt.Sprintf("%s.%s.svc", TargetServiceName, GetNamespace())},
 		wranglerContext.Core.Secret(),
 	)
 	if err != nil {
