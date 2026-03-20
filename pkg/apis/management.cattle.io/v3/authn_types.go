@@ -732,6 +732,11 @@ type OIDCConfig struct {
 	// RancherAPIHost should be the base URL for accessing Rancher through the
 	// web. e.g. https://rancher.example.com.
 	RancherAPIHost string `json:"rancherApiHost"`
+
+	// clientAuthenticatedSearch indicates that we should search with the
+	// client/secret rather than the user credentials if the underlying provider
+	// supports this.
+	ClientAuthenticatedSearch bool `json:"clientAuthenticatedSearch"`
 }
 
 type OIDCTestOutput struct {
