@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/gorilla/mux"
 	normanapi "github.com/rancher/norman/api"
 	"github.com/rancher/norman/store/subtype"
 	"github.com/rancher/norman/types"
@@ -23,11 +22,11 @@ func NewV1Handler(ctx context.Context, scaledContext *config.ScaledContext) (htt
 
 	authTokenStore := newV1AuthTokenStore(scaledContext.Wrangler)
 
-	r := mux.NewRouter()
-	r.Methods(http.MethodGet).Path("/v1-public/authproviders").HandlerFunc(providerStore.List)
-	r.Methods(http.MethodPost).Path("/v1-public/login").HandlerFunc(newV1LoginHandler(scaledContext).login)
-	r.Methods(http.MethodGet).Path("/v1-public/authtokens/{id}").HandlerFunc(authTokenStore.Get)
-	r.Methods(http.MethodDelete).Path("/v1-public/authtokens/{id}").HandlerFunc(authTokenStore.Delete)
+	r := http.NewServeMux()
+	r.HandleFunc("GET /v1-public/authproviders", providerStore.List)
+	r.HandleFunc("POST /v1-public/login", newV1LoginHandler(scaledContext).login)
+	r.HandleFunc("GET /v1-public/authtokens/{id}", authTokenStore.Get)
+	r.HandleFunc("DELETE /v1-public/authtokens/{id}", authTokenStore.Delete)
 
 	return r, nil
 }

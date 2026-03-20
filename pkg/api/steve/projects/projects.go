@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/gorilla/mux"
 	"github.com/rancher/apiserver/pkg/server"
 	"github.com/rancher/apiserver/pkg/types"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -91,26 +90,50 @@ func (s *projectServer) middleware() func(http.Handler) http.Handler {
 	server := s.newAPIHandler()
 	server = prefix(server)
 
-	router := mux.NewRouter()
-	router.UseEncodedPath()
-	router.Path("/v1/management.cattle.io.clusters/{namespace}").Queries("link", "{type:projects?}").Handler(server)
-	router.Path("/v1/management.cattle.io.clusters/{namespace}/{type}").Handler(server)
-	router.Path("/v1/management.cattle.io.clusters/{namespace}/{type}/{name}").Handler(server)
-	router.Path("/v1/management.cattle.io.clusters/{clusterID}/{type}/{namespace}/{name}").Handler(server)
+	router := http.NewServeMux()
+
+	// Register routes with query parameter checking in handlers
+	router.HandleFunc("/v1/management.cattle.io.clusters/{namespace}", func(w http.ResponseWriter, r *http.Request) {
+		// Check for ?link=projects or ?link=project query param
+		if link := r.URL.Query().Get("link"); link == "projects" || link == "project" {
+			server.ServeHTTP(w, r)
+		} else {
+			http.NotFound(w, r)
+		}
+	})
+
+	router.Handle("/v1/management.cattle.io.clusters/{namespace}/{type}", server)
+	router.Handle("/v1/management.cattle.io.clusters/{namespace}/{type}/{name}", server)
+	router.Handle("/v1/management.cattle.io.clusters/{clusterID}/{type}/{namespace}/{name}", server)
 
 	return func(next http.Handler) http.Handler {
-		router.NotFoundHandler = next
-		return router
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Try our routes first
+			if matches(router, r) {
+				router.ServeHTTP(w, r)
+				return
+			}
+			// Fall back to next handler
+			next.ServeHTTP(w, r)
+		})
 	}
+}
+
+// matches checks if the request matches any of our patterns
+func matches(mux *http.ServeMux, r *http.Request) bool {
+	// Check if path starts with our prefix
+	return len(r.URL.Path) >= 34 && r.URL.Path[:34] == "/v1/management.cattle.io.clusters/"
 }
 
 func prefix(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		vars := mux.Vars(req)
-		if vars["clusterID"] != "" {
-			vars["prefix"] = "/v1/management.cattle.io.clusters/" + vars["clusterID"]
-		} else {
-			vars["prefix"] = "/v1/management.cattle.io.clusters/" + vars["namespace"]
+		clusterID := req.PathValue("clusterID")
+		namespace := req.PathValue("namespace")
+
+		if clusterID != "" {
+			req.SetPathValue("prefix", "/v1/management.cattle.io.clusters/"+clusterID)
+		} else if namespace != "" {
+			req.SetPathValue("prefix", "/v1/management.cattle.io.clusters/"+namespace)
 		}
 		next.ServeHTTP(rw, req)
 	})

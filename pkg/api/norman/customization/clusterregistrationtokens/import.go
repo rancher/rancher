@@ -2,8 +2,8 @@ package clusterregistrationtokens
 
 import (
 	"net/http"
+	"strings"
 
-	"github.com/gorilla/mux"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/urlbuilder"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -22,8 +22,30 @@ type ClusterImport struct {
 
 func (ch *ClusterImport) ClusterImportHandler(resp http.ResponseWriter, req *http.Request) {
 	resp.Header().Set("Content-Type", "text/plain")
-	token := mux.Vars(req)["token"]
-	clusterID := mux.Vars(req)["clusterId"]
+
+	// Parse filename to extract token and clusterId
+	// Expected format: {token}_{clusterId}.yaml
+	filename := req.PathValue("filename")
+	if !strings.HasSuffix(filename, ".yaml") {
+		resp.WriteHeader(404)
+		resp.Write([]byte("not found"))
+		return
+	}
+
+	// Remove .yaml suffix
+	filenameWithoutExt := strings.TrimSuffix(filename, ".yaml")
+
+	// Split by underscore to get token and clusterId
+	parts := strings.SplitN(filenameWithoutExt, "_", 2)
+	token := ""
+	clusterID := ""
+
+	if len(parts) >= 1 {
+		token = parts[0]
+	}
+	if len(parts) >= 2 {
+		clusterID = parts[1]
+	}
 
 	urlBuilder, err := urlbuilder.New(req, schema.Version, types.NewSchemas())
 	if err != nil {

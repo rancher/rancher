@@ -15,7 +15,7 @@ import (
 	"time"
 
 	goidc "github.com/coreos/go-oidc/v3/oidc"
-	gmux "github.com/gorilla/mux"
+	gmux "github.com/rancher/rancher/pkg/mux"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	providermocks "github.com/rancher/rancher/pkg/auth/providers/mocks"

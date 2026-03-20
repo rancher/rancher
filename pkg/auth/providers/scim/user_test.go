@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gorilla/mux"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/user/mocks"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
@@ -202,7 +201,7 @@ func TestListUsersPagination(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users?"+tt.queryString, nil)
-			r = mux.SetURLVars(r, map[string]string{"provider": provider})
+			r.SetPathValue("provider", provider)
 			w := httptest.NewRecorder()
 
 			srv.ListUsers(w, r)
@@ -267,7 +266,7 @@ func TestListUsersPaginationConsistency(t *testing.T) {
 
 	for startIndex := 1; ; startIndex += pageSize {
 		r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/v1-scim/%s/Users?startIndex=%d&count=%d", provider, startIndex, pageSize), nil)
-		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		r.SetPathValue("provider", provider)
 		w := httptest.NewRecorder()
 
 		srv.ListUsers(w, r)
@@ -346,7 +345,7 @@ func TestListUsersWithFilter(t *testing.T) {
 	}
 
 	r := httptest.NewRequest(http.MethodGet, `/v1-scim/`+provider+`/Users?filter=userName%20eq%20%22jane.smith%22`, nil)
-	r = mux.SetURLVars(r, map[string]string{"provider": provider})
+	r.SetPathValue("provider", provider)
 	w := httptest.NewRecorder()
 
 	srv.ListUsers(w, r)
@@ -405,7 +404,7 @@ func TestListUsersExcludesSystemUsers(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users", nil)
-		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		r.SetPathValue("provider", provider)
 		w := httptest.NewRecorder()
 
 		srv.ListUsers(w, r)
@@ -450,7 +449,7 @@ func TestListUsersExcludesSystemUsers(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users", nil)
-		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		r.SetPathValue("provider", provider)
 		w := httptest.NewRecorder()
 
 		srv.ListUsers(w, r)
@@ -498,7 +497,7 @@ func TestGetUser(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.GetUser(w, r)
@@ -557,7 +556,7 @@ func TestGetUser(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.GetUser(w, r)
@@ -588,7 +587,7 @@ func TestGetUser(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.GetUser(w, r)
@@ -619,7 +618,7 @@ func TestGetUser(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.GetUser(w, r)
@@ -653,7 +652,7 @@ func TestGetUser(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.GetUser(w, r)
@@ -710,7 +709,7 @@ func TestCreateUser(t *testing.T) {
 			"emails": [{"value": "john.doe@example.com", "primary": true}]
 		}`
 		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		r.SetPathValue("provider", provider)
 		w := httptest.NewRecorder()
 
 		srv.CreateUser(w, r)
@@ -779,7 +778,7 @@ func TestCreateUser(t *testing.T) {
 			"externalId": "ext-67890"
 		}`
 		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		r.SetPathValue("provider", provider)
 		w := httptest.NewRecorder()
 
 		srv.CreateUser(w, r)
@@ -825,7 +824,7 @@ func TestCreateUser(t *testing.T) {
 			"externalId": "ext-12345"
 		}`
 		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		r.SetPathValue("provider", provider)
 		w := httptest.NewRecorder()
 
 		srv.CreateUser(w, r)
@@ -851,7 +850,7 @@ func TestCreateUser(t *testing.T) {
 
 		body := `not valid json`
 		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		r.SetPathValue("provider", provider)
 		w := httptest.NewRecorder()
 
 		srv.CreateUser(w, r)
@@ -878,7 +877,7 @@ func TestCreateUser(t *testing.T) {
 
 		body := `{"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"]}`
 		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		r.SetPathValue("provider", provider)
 		w := httptest.NewRecorder()
 
 		srv.CreateUser(w, r)
@@ -910,7 +909,7 @@ func TestCreateUser(t *testing.T) {
 			"userName": "john.doe"
 		}`
 		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		r.SetPathValue("provider", provider)
 		w := httptest.NewRecorder()
 
 		srv.CreateUser(w, r)
@@ -939,7 +938,7 @@ func TestCreateUser(t *testing.T) {
 			"userName": "john.doe"
 		}`
 		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		r.SetPathValue("provider", provider)
 		w := httptest.NewRecorder()
 
 		srv.CreateUser(w, r)
@@ -978,7 +977,7 @@ func TestCreateUser(t *testing.T) {
 			"userName": "john.doe"
 		}`
 		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		r.SetPathValue("provider", provider)
 		w := httptest.NewRecorder()
 
 		srv.CreateUser(w, r)
@@ -1022,7 +1021,7 @@ func TestCreateUser(t *testing.T) {
 			"userName": "john.doe"
 		}`
 		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Users", bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		r.SetPathValue("provider", provider)
 		w := httptest.NewRecorder()
 
 		srv.CreateUser(w, r)
@@ -1077,7 +1076,7 @@ func TestUpdateUser(t *testing.T) {
 			"active": true
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateUser(w, r)
@@ -1143,7 +1142,7 @@ func TestUpdateUser(t *testing.T) {
 			"active": false
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateUser(w, r)
@@ -1199,7 +1198,7 @@ func TestUpdateUser(t *testing.T) {
 			"active": true
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateUser(w, r)
@@ -1249,7 +1248,7 @@ func TestUpdateUser(t *testing.T) {
 			"active": true
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateUser(w, r)
@@ -1274,7 +1273,7 @@ func TestUpdateUser(t *testing.T) {
 			"active": true
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateUser(w, r)
@@ -1309,7 +1308,7 @@ func TestUpdateUser(t *testing.T) {
 			"active": true
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateUser(w, r)
@@ -1353,7 +1352,7 @@ func TestUpdateUser(t *testing.T) {
 			"active": false
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateUser(w, r)
@@ -1379,7 +1378,7 @@ func TestUpdateUser(t *testing.T) {
 
 		body := `not valid json`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateUser(w, r)
@@ -1400,7 +1399,7 @@ func TestUpdateUser(t *testing.T) {
 
 		body := `{"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"]}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateUser(w, r)
@@ -1454,7 +1453,7 @@ func TestUpdateUser(t *testing.T) {
 			"active": true
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateUser(w, r)
@@ -1501,7 +1500,7 @@ func TestUpdateUser(t *testing.T) {
 			"active": false
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateUser(w, r)
@@ -1531,7 +1530,7 @@ func TestDeleteUser(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.DeleteUser(w, r)
@@ -1552,7 +1551,7 @@ func TestDeleteUser(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.DeleteUser(w, r)
@@ -1581,7 +1580,7 @@ func TestDeleteUser(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.DeleteUser(w, r)
@@ -1604,7 +1603,7 @@ func TestDeleteUser(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.DeleteUser(w, r)
@@ -1636,7 +1635,7 @@ func TestDeleteUser(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.DeleteUser(w, r)
@@ -1656,7 +1655,7 @@ func TestDeleteUser(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Users/"+userID, nil)
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.DeleteUser(w, r)
@@ -1708,7 +1707,7 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "active", "value": false}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -1770,7 +1769,7 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "active", "value": "True"}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -1823,7 +1822,7 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "externalId", "value": "new-ext-id"}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -1877,7 +1876,7 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "emails[primary eq true].value", "value": "new@example.com"}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -1938,7 +1937,7 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "value": {"externalId": "new-ext-id", "active": false}}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -1980,7 +1979,7 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "active", "value": true}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -2004,7 +2003,7 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "active", "value": false}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -2031,7 +2030,7 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "active", "value": false}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -2072,7 +2071,7 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "active", "value": false}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -2112,7 +2111,7 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "add", "path": "active", "value": false}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -2152,7 +2151,7 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "unsupportedPath", "value": "test"}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -2177,7 +2176,7 @@ func TestPatchUser(t *testing.T) {
 
 		body := `not valid json`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -2217,7 +2216,7 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "active", "value": "not-a-boolean"}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -2262,7 +2261,7 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "externalId", "value": "new-ext-id"}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)
@@ -2306,7 +2305,7 @@ func TestPatchUser(t *testing.T) {
 			"Operations": [{"op": "replace", "path": "active", "value": false}]
 		}`
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": userID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
 		w := httptest.NewRecorder()
 
 		srv.PatchUser(w, r)

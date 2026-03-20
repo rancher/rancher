@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gorilla/mux"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -42,7 +41,7 @@ type scimGroup struct {
 func (s *SCIMServer) ListGroups(w http.ResponseWriter, r *http.Request) {
 	logrus.Tracef("scim::ListGroups: url %s", r.URL)
 
-	provider := mux.Vars(r)["provider"]
+	provider := r.PathValue("provider")
 
 	// Parse pagination parameters.
 	pagination, err := parsePaginationParams(r)
@@ -160,7 +159,7 @@ func (s *SCIMServer) ListGroups(w http.ResponseWriter, r *http.Request) {
 func (s *SCIMServer) CreateGroup(w http.ResponseWriter, r *http.Request) {
 	logrus.Tracef("scim::CreateGroup: url %s", r.URL)
 
-	provider := mux.Vars(r)["provider"]
+	provider := r.PathValue("provider")
 
 	payload := scimGroup{}
 	err := json.NewDecoder(r.Body).Decode(&payload)
@@ -232,8 +231,8 @@ func (s *SCIMServer) CreateGroup(w http.ResponseWriter, r *http.Request) {
 func (s *SCIMServer) GetGroup(w http.ResponseWriter, r *http.Request) {
 	logrus.Tracef("scim::GetGroup: url %s", r.URL)
 
-	provider := mux.Vars(r)["provider"]
-	id := mux.Vars(r)["id"]
+	provider := r.PathValue("provider")
+	id := r.PathValue("id")
 
 	var excludeMembers bool
 	if value := r.URL.Query().Get("excludedAttributes"); value != "" {
@@ -290,8 +289,8 @@ func (s *SCIMServer) GetGroup(w http.ResponseWriter, r *http.Request) {
 func (s *SCIMServer) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 	logrus.Tracef("scim::UpdateGroup: url %s", r.URL)
 
-	provider := mux.Vars(r)["provider"]
-	id := mux.Vars(r)["id"]
+	provider := r.PathValue("provider")
+	id := r.PathValue("id")
 
 	payload := scimGroup{}
 	err := json.NewDecoder(r.Body).Decode(&payload)
@@ -364,8 +363,8 @@ func (s *SCIMServer) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 func (s *SCIMServer) PatchGroup(w http.ResponseWriter, r *http.Request) {
 	logrus.Infof("scim::PatchGroup: url %s", r.URL)
 
-	provider := mux.Vars(r)["provider"]
-	id := mux.Vars(r)["id"]
+	provider := r.PathValue("provider")
+	id := r.PathValue("id")
 
 	group, err := s.groupsCache.Get(id)
 	if err != nil {
@@ -548,8 +547,8 @@ func (s *SCIMServer) PatchGroup(w http.ResponseWriter, r *http.Request) {
 func (s *SCIMServer) DeleteGroup(w http.ResponseWriter, r *http.Request) {
 	logrus.Infof("scim::DeleteGroup: url %s", r.URL)
 
-	provider := mux.Vars(r)["provider"]
-	id := mux.Vars(r)["id"]
+	provider := r.PathValue("provider")
+	id := r.PathValue("id")
 
 	group, err := s.groupsCache.Get(id)
 	if err != nil {

@@ -3,7 +3,6 @@ package scim
 import (
 	"net/http"
 
-	"github.com/gorilla/mux"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
@@ -34,28 +33,37 @@ func NewHandler(scaledContext *config.ScaledContext) http.Handler {
 
 	authenticator := NewTokenAuthenticator(scaledContext.Wrangler)
 
-	r := mux.NewRouter().UseEncodedPath().StrictSlash(true)
-	r.Use(authenticator.Authenticate)
-	// Discovery.
-	r.Methods(http.MethodGet).Path(URLPrefix + "/{provider}/ServiceProviderConfig").HandlerFunc(srv.GetServiceProviderConfig)
-	r.Methods(http.MethodGet).Path(URLPrefix + "/{provider}/ResourceTypes").HandlerFunc(srv.ListResourceTypes)
-	r.Methods(http.MethodGet).Path(URLPrefix + "/{provider}/ResourceTypes/{id}").HandlerFunc(srv.GetResourceType)
-	r.Methods(http.MethodGet).Path(URLPrefix + "/{provider}/Schemas").HandlerFunc(srv.ListSchemas)
-	r.Methods(http.MethodGet).Path(URLPrefix + "/{provider}/Schemas/{id}").HandlerFunc(srv.GetSchema)
-	// Users.
-	r.Methods(http.MethodGet).Path(URLPrefix + "/{provider}/Users").HandlerFunc(srv.ListUsers)
-	r.Methods(http.MethodPost).Path(URLPrefix + "/{provider}/Users").HandlerFunc(srv.CreateUser)
-	r.Methods(http.MethodGet).Path(URLPrefix + "/{provider}/Users/{id}").HandlerFunc(srv.GetUser)
-	r.Methods(http.MethodPut).Path(URLPrefix + "/{provider}/Users/{id}").HandlerFunc(srv.UpdateUser)
-	r.Methods(http.MethodPatch).Path(URLPrefix + "/{provider}/Users/{id}").HandlerFunc(srv.PatchUser)
-	r.Methods(http.MethodDelete).Path(URLPrefix + "/{provider}/Users/{id}").HandlerFunc(srv.DeleteUser)
-	// Groups.
-	r.Methods(http.MethodGet).Path(URLPrefix + "/{provider}/Groups").HandlerFunc(srv.ListGroups)
-	r.Methods(http.MethodPost).Path(URLPrefix + "/{provider}/Groups").HandlerFunc(srv.CreateGroup)
-	r.Methods(http.MethodGet).Path(URLPrefix + "/{provider}/Groups/{id}").HandlerFunc(srv.GetGroup)
-	r.Methods(http.MethodPut).Path(URLPrefix + "/{provider}/Groups/{id}").HandlerFunc(srv.UpdateGroup)
-	r.Methods(http.MethodPatch).Path(URLPrefix + "/{provider}/Groups/{id}").HandlerFunc(srv.PatchGroup)
-	r.Methods(http.MethodDelete).Path(URLPrefix + "/{provider}/Groups/{id}").HandlerFunc(srv.DeleteGroup)
+	r := http.NewServeMux()
+
+	// Apply authentication middleware by wrapping each handler
+	authWrap := func(h http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, req *http.Request) {
+			authenticator.Authenticate(http.HandlerFunc(h)).ServeHTTP(w, req)
+		}
+	}
+
+	// Discovery endpoints
+	r.HandleFunc("GET "+URLPrefix+"/{provider}/ServiceProviderConfig", authWrap(srv.GetServiceProviderConfig))
+	r.HandleFunc("GET "+URLPrefix+"/{provider}/ResourceTypes", authWrap(srv.ListResourceTypes))
+	r.HandleFunc("GET "+URLPrefix+"/{provider}/ResourceTypes/{id}", authWrap(srv.GetResourceType))
+	r.HandleFunc("GET "+URLPrefix+"/{provider}/Schemas", authWrap(srv.ListSchemas))
+	r.HandleFunc("GET "+URLPrefix+"/{provider}/Schemas/{id}", authWrap(srv.GetSchema))
+
+	// User endpoints
+	r.HandleFunc("GET "+URLPrefix+"/{provider}/Users", authWrap(srv.ListUsers))
+	r.HandleFunc("POST "+URLPrefix+"/{provider}/Users", authWrap(srv.CreateUser))
+	r.HandleFunc("GET "+URLPrefix+"/{provider}/Users/{id}", authWrap(srv.GetUser))
+	r.HandleFunc("PUT "+URLPrefix+"/{provider}/Users/{id}", authWrap(srv.UpdateUser))
+	r.HandleFunc("PATCH "+URLPrefix+"/{provider}/Users/{id}", authWrap(srv.PatchUser))
+	r.HandleFunc("DELETE "+URLPrefix+"/{provider}/Users/{id}", authWrap(srv.DeleteUser))
+
+	// Group endpoints
+	r.HandleFunc("GET "+URLPrefix+"/{provider}/Groups", authWrap(srv.ListGroups))
+	r.HandleFunc("POST "+URLPrefix+"/{provider}/Groups", authWrap(srv.CreateGroup))
+	r.HandleFunc("GET "+URLPrefix+"/{provider}/Groups/{id}", authWrap(srv.GetGroup))
+	r.HandleFunc("PUT "+URLPrefix+"/{provider}/Groups/{id}", authWrap(srv.UpdateGroup))
+	r.HandleFunc("PATCH "+URLPrefix+"/{provider}/Groups/{id}", authWrap(srv.PatchGroup))
+	r.HandleFunc("DELETE "+URLPrefix+"/{provider}/Groups/{id}", authWrap(srv.DeleteGroup))
 
 	return r
 }
