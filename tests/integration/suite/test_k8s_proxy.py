@@ -16,9 +16,14 @@ def _downstream_cluster_id(admin_mc):
 
     for cluster in clusters:
         if cluster.id != "local" and cluster.state == "active":
-            return cluster.id
+            # Check if cluster already has Ready condition set to True
+            if hasattr(cluster, "conditions"):
+                for condition in cluster.conditions:
+                    if (condition.type == 'Ready' and
+                            condition.status == 'True'):
+                        return cluster.id
 
-    pytest.skip("No active downstream cluster is available for this test")
+    pytest.skip("No ready downstream cluster is available for this test")
 
 
 def test_k8s_proxy_fetches_namespaces_from_local_cluster(admin_mc):

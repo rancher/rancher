@@ -43,6 +43,11 @@ func getMockAksOperatorController(t *testing.T, clusterState string) mockAksOper
 			return c, nil
 		},
 	).AnyTimes()
+	clusterMock.EXPECT().UpdateStatus(gomock.Any()).DoAndReturn(
+		func(c *apisv3.Cluster) (*apisv3.Cluster, error) {
+			return c, nil
+		},
+	).AnyTimes()
 	var dynamicClient dynamic.NamespaceableResourceInterface
 
 	switch clusterState {
@@ -90,7 +95,7 @@ func (m *mockAksOperatorController) setInitialUpstreamSpec(cluster *mgmtv3.Clust
 
 	cluster = cluster.DeepCopy()
 	cluster.Status.AKSStatus.UpstreamSpec = upstreamSpec
-	return m.ClusterClient.Update(cluster)
+	return m.ClusterClient.UpdateStatus(cluster)
 }
 
 // test generateAndSetServiceAccount with mock sibling func (getRestConfig)
@@ -121,7 +126,7 @@ func (m *mockAksOperatorController) generateAndSetServiceAccount(cluster *mgmtv3
 	}
 	cluster.Status.ServiceAccountTokenSecret = secret.Name
 	cluster.Status.ServiceAccountToken = ""
-	return m.ClusterClient.Update(cluster)
+	return m.ClusterClient.UpdateStatus(cluster)
 }
 
 // test generateSATokenWithPublicAPI with mock sibling func (getRestConfig)

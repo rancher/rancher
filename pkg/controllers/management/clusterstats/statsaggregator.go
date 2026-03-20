@@ -223,7 +223,11 @@ func (s *StatsAggregator) aggregate(cluster *v3.Cluster) (*v3.Cluster, error) {
 	}
 
 	if statusChanged(origStatus, &cluster.Status) || versionChanged {
-		return s.Clusters.Update(cluster)
+		// Use UpdateStatus to only update the status subresource - Update() ignores status changes.
+		// Return nil to avoid norman's redundant Update() write-back.
+		if _, err := s.Clusters.UpdateStatus(cluster); err != nil {
+			return nil, err
+		}
 	}
 	return nil, nil
 }

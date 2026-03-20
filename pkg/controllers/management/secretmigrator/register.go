@@ -2,6 +2,7 @@ package secretmigrator
 
 import (
 	"context"
+	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 
 	provv1 "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
@@ -24,7 +25,7 @@ type authConfigsClient interface {
 type handler struct {
 	migrator             *Migrator
 	authConfigLister     v3.AuthConfigLister
-	clusters             v3.ClusterInterface
+	clusters             mgmtcontrollers.ClusterClient
 	provisioningClusters provv1.ClusterController
 	projectLister        v3.ProjectLister
 	// AuthConfigs contain internal-only fields that deal with various auth providers.
@@ -50,12 +51,12 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		),
 		authConfigs:          management.Management.AuthConfigs("").ObjectClient().UnstructuredClient(),
 		authConfigLister:     management.Management.AuthConfigs("").Controller().Lister(),
-		clusters:             management.Management.Clusters(""),
+		clusters:             management.Wrangler.Mgmt.Cluster(),
 		provisioningClusters: management.Wrangler.Provisioning.Cluster(),
 		projectLister:        management.Management.Projects("").Controller().Lister(),
 	}
 	management.Management.AuthConfigs("").AddHandler(ctx, "authconfigs-secret-migrator", h.syncAuthConfig)
-	management.Management.Clusters("").AddHandler(ctx, "cluster-secret-migrator", h.sync)
+	management.Wrangler.Mgmt.Cluster().OnChange(ctx, "cluster-secret-migrator", h.sync)
 
 	management.Wrangler.Provisioning.Cluster().OnChange(ctx, "harvester-secret-migrator", h.syncHarvesterCloudConfig)
 	management.Wrangler.Provisioning.Cluster().OnRemove(ctx, "cloud-config-secret-remover", h.cloudConfigSecretRemover)

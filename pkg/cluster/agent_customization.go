@@ -5,10 +5,29 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/rancher/norman/condition"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
+
+// CopyCondition copies all fields of a single condition (status, reason, message,
+// lastUpdated) from src to dst using per-condition helpers. The helpers find or
+// create the matching condition entry in-place, so unrelated conditions on dst
+// are not affected. If the condition doesn't exist on src, this is a no-op.
+// Consider moving this to norman to optimize.
+func CopyCondition(cond condition.Cond, src, dst runtime.Object) {
+	status := cond.GetStatus(src)
+	if status == "" {
+		// Condition doesn't exist on src, don't create it on dst
+		return
+	}
+	cond.SetStatus(dst, status)
+	cond.Reason(dst, cond.GetReason(src))
+	cond.Message(dst, cond.GetMessage(src))
+	cond.LastUpdated(dst, cond.GetLastUpdated(src))
+}
 
 const (
 	PriorityClassName        = "cattle-cluster-agent-priority-class"
