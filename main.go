@@ -147,6 +147,12 @@ func main() {
 			EnvVar:      "AUDIT_LOG_ENABLED",
 			Destination: &config.AuditLogEnabled,
 		},
+		cli.BoolFlag{
+			Name:        "audit-exclude-groups",
+			Usage:       "Indicates that user groups should not be logged in the auditing, this can reduce the bandwidth",
+			EnvVar:      "AUDIT_EXCLUDE_GROUPS",
+			Destination: &config.AuditLogExcludeGroups,
+		},
 		cli.StringFlag{
 			Name:        "profile-listen-address",
 			Value:       "127.0.0.1:6060",

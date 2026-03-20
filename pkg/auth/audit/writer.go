@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	auditlogv1 "github.com/rancher/rancher/pkg/apis/auditlog.cattle.io/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
@@ -91,6 +92,7 @@ type WriterOptions struct {
 	DefaultPolicyLevel auditlogv1.Level
 
 	DisableDefaultPolicies bool
+	ExcludeGroups          bool
 }
 
 type Writer struct {
@@ -115,6 +117,27 @@ func NewWriter(output io.Writer, opts WriterOptions) (*Writer, error) {
 			if err := w.UpdatePolicy(&v); err != nil {
 				return nil, fmt.Errorf("failed to add default policies: %w", err)
 			}
+		}
+	}
+
+	if opts.ExcludeGroups {
+		additionalPolicy := auditlogv1.AuditPolicy{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "drop-impersonation-groups",
+			},
+			Spec: auditlogv1.AuditPolicySpec{
+				AdditionalRedactions: []auditlogv1.Redaction{
+					{
+						Headers: []string{
+							"Impersonate-Group",
+						},
+					},
+				},
+			},
+		}
+
+		if err := w.UpdatePolicy(&additionalPolicy); err != nil {
+			return nil, fmt.Errorf("failed to add redact impersonation policy: %w", err)
 		}
 	}
 

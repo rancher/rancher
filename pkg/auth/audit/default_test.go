@@ -14,7 +14,6 @@ import (
 )
 
 func TestDefaultPolicies(t *testing.T) {
-
 	machineDataInput, machineDataWant := make(map[string]interface{}), make(map[string]interface{})
 	for driverName, fields := range management.DriverData {
 		inputFields := make(map[string]string)
