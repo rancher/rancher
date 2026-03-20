@@ -825,12 +825,14 @@ func getTaints(entry *planEntry, cp *rkev1.RKEControlPlane) (result []corev1.Tai
 		if isEtcd(entry) && (capr.GetRuntime(cp.Spec.KubernetesVersion) != capr.RuntimeK3S || !isControlPlane(entry)) {
 			result = append(result, corev1.Taint{
 				Key:    "node-role.kubernetes.io/etcd",
+				Value:  "true",
 				Effect: corev1.TaintEffectNoExecute,
 			})
 		}
 		if isControlPlane(entry) {
 			result = append(result, corev1.Taint{
 				Key:    "node-role.kubernetes.io/control-plane",
+				Value:  "true",
 				Effect: corev1.TaintEffectNoSchedule,
 			})
 		}
