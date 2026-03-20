@@ -99,7 +99,6 @@ func getRelatedClustersFromAnnotation(annotationValue, namespace string, cache v
 					return nil, err
 				}
 				allClusters = clusters
-				loadedClusters = true
 			}
 
 			for _, c := range allClusters {
