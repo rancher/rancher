@@ -5,7 +5,6 @@ import (
 
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types"
-	rketypes "github.com/rancher/rke/types"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -89,19 +88,17 @@ type MapDelta struct {
 }
 
 type NodeStatus struct {
-	Conditions         []NodeCondition         `json:"conditions,omitempty"`
-	InternalNodeStatus v1.NodeStatus           `json:"internalNodeStatus,omitempty"`
-	NodeName           string                  `json:"nodeName,omitempty"`
-	Requested          v1.ResourceList         `json:"requested,omitempty"`
-	Limits             v1.ResourceList         `json:"limits,omitempty"`
-	NodeTemplateSpec   *NodeTemplateSpec       `json:"nodeTemplateSpec,omitempty"`
-	NodeConfig         *rketypes.RKEConfigNode `json:"rkeNode,omitempty"`
-	NodeAnnotations    map[string]string       `json:"nodeAnnotations,omitempty"`
-	NodeLabels         map[string]string       `json:"nodeLabels,omitempty"`
-	NodeTaints         []v1.Taint              `json:"nodeTaints,omitempty"`
-	DockerInfo         *DockerInfo             `json:"dockerInfo,omitempty"`
-	NodePlan           *NodePlan               `json:"nodePlan,omitempty"`
-	AppliedNodeVersion int                     `json:"appliedNodeVersion,omitempty"`
+	Conditions         []NodeCondition   `json:"conditions,omitempty"`
+	InternalNodeStatus v1.NodeStatus     `json:"internalNodeStatus,omitempty"`
+	NodeName           string            `json:"nodeName,omitempty"`
+	Requested          v1.ResourceList   `json:"requested,omitempty"`
+	Limits             v1.ResourceList   `json:"limits,omitempty"`
+	NodeTemplateSpec   *NodeTemplateSpec `json:"nodeTemplateSpec,omitempty"`
+	NodeAnnotations    map[string]string `json:"nodeAnnotations,omitempty"`
+	NodeLabels         map[string]string `json:"nodeLabels,omitempty"`
+	NodeTaints         []v1.Taint        `json:"nodeTaints,omitempty"`
+	DockerInfo         *DockerInfo       `json:"dockerInfo,omitempty"`
+	AppliedNodeVersion int               `json:"appliedNodeVersion,omitempty"`
 }
 
 type DockerInfo struct {
@@ -240,16 +237,9 @@ type NodeSpec struct {
 	DesiredNodeTaints        []v1.Taint      `json:"desiredNodeTaints"`
 	UpdateTaintsFromAPI      *bool           `json:"updateTaintsFromAPI,omitempty"`
 	DesiredNodeUnschedulable string          `json:"desiredNodeUnschedulable,omitempty"`
-	NodeDrainInput           *NodeDrainInput `json:"nodeDrainInput,omitempty"`
 	MetadataUpdate           MetadataUpdate  `json:"metadataUpdate,omitempty"`
 	ScaledownTime            string          `json:"scaledownTime,omitempty"`
-}
-
-type NodePlan struct {
-	Plan    *rketypes.RKEConfigNodePlan `json:"plan,omitempty"`
-	Version int                         `json:"version,omitempty"`
-	// current default in rancher-agent is 2m (120s)
-	AgentCheckInterval int `json:"agentCheckInterval,omitempty" norman:"min=1,max=1800,default=120"`
+	NodeDrainInput           *NodeDrainInput `json:"nodeDrainInput,omitempty"`
 }
 
 type NodeCommonParams struct {
@@ -384,7 +374,21 @@ type PublicEndpoint struct {
 	AllNodes bool `json:"allNodes" norman:"nocreate,noupdate"`
 }
 
-type NodeDrainInput = rketypes.NodeDrainInput
+type NodeDrainInput struct {
+	// Drain node even if there are pods not managed by a ReplicationController, Job, or DaemonSet
+	// Drain will not proceed without Force set to true if there are such pods
+	Force bool `yaml:"force" json:"force,omitempty"`
+	// If there are DaemonSet-managed pods, drain will not proceed without IgnoreDaemonSets set to true
+	// (even when set to true, kubectl won't delete pods - so setting default to true)
+	IgnoreDaemonSets *bool `yaml:"ignore_daemonsets" json:"ignoreDaemonSets,omitempty" norman:"default=true"`
+	// Continue even if there are pods using emptyDir
+	DeleteLocalData bool `yaml:"delete_local_data" json:"deleteLocalData,omitempty"`
+	// Period of time in seconds given to each pod to terminate gracefully.
+	// If negative, the default value specified in the pod will be used
+	GracePeriod int `yaml:"grace_period" json:"gracePeriod,omitempty" norman:"default=-1"`
+	// Time to wait (in seconds) before giving up for one try
+	Timeout int `yaml:"timeout" json:"timeout" norman:"min=1,max=10800,default=120"`
+}
 
 // +genclient
 // +kubebuilder:skipversion
