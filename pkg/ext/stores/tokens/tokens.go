@@ -1402,7 +1402,7 @@ func (tp *tokenAuth) UserName(ctx context.Context, store *SystemStore, verb stri
 }
 
 // SessionID hides the details of extracting the name of the authenticated token
-// governing the current session from the request context, for a a store. It
+// governing the current session from the request context, for a store. It
 // exists purely to allow unit testing to intercept and mock responses.  It also
 // DIFFERS from the core function, see below, in that it ignores errors.
 // I.e. in case of error the result is simply the empty string. Which means that
