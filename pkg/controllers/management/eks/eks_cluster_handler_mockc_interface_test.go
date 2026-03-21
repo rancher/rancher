@@ -477,6 +477,104 @@ func (m MockNamespaceableResourceInterfaceEksCC) Patch(ctx context.Context, name
 	panic("implement me")
 }
 
+// Test Disable EKS sync annotation
+
+type MockNamespaceableResourceInterfaceDisableSync struct{}
+
+func (m MockNamespaceableResourceInterfaceDisableSync) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockNamespaceableResourceInterfaceDisableSync) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockNamespaceableResourceInterfaceDisableSync) Namespace(s string) dynamic.ResourceInterface {
+	return MockResourceInterfaceDisableSync{}
+}
+
+func (m MockNamespaceableResourceInterfaceDisableSync) Create(ctx context.Context, obj *unstructured.Unstructured, options meta1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockNamespaceableResourceInterfaceDisableSync) Update(ctx context.Context, obj *unstructured.Unstructured, options meta1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockNamespaceableResourceInterfaceDisableSync) UpdateStatus(ctx context.Context, obj *unstructured.Unstructured, options meta1.UpdateOptions) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockNamespaceableResourceInterfaceDisableSync) Delete(ctx context.Context, name string, options meta1.DeleteOptions, subresources ...string) error {
+	panic("implement me")
+}
+
+func (m MockNamespaceableResourceInterfaceDisableSync) DeleteCollection(ctx context.Context, options meta1.DeleteOptions, listOptions meta1.ListOptions) error {
+	panic("implement me")
+}
+
+func (m MockNamespaceableResourceInterfaceDisableSync) Get(ctx context.Context, name string, options meta1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	return getMockEksClusterConfig(MockActiveEksClusterConfigFilename)
+}
+
+func (m MockNamespaceableResourceInterfaceDisableSync) List(ctx context.Context, opts meta1.ListOptions) (*unstructured.UnstructuredList, error) {
+	panic("implement me")
+}
+
+func (m MockNamespaceableResourceInterfaceDisableSync) Watch(ctx context.Context, opts meta1.ListOptions) (watch.Interface, error) {
+	panic("implement me")
+}
+
+func (m MockNamespaceableResourceInterfaceDisableSync) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, options meta1.PatchOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+type MockResourceInterfaceDisableSync struct{}
+
+func (m MockResourceInterfaceDisableSync) Create(ctx context.Context, obj *unstructured.Unstructured, options meta1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockResourceInterfaceDisableSync) Update(ctx context.Context, obj *unstructured.Unstructured, options meta1.UpdateOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("update should not be called when disable-eks-sync is set")
+}
+
+func (m MockResourceInterfaceDisableSync) UpdateStatus(ctx context.Context, obj *unstructured.Unstructured, options meta1.UpdateOptions) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockResourceInterfaceDisableSync) Delete(ctx context.Context, name string, options meta1.DeleteOptions, subresources ...string) error {
+	panic("implement me")
+}
+
+func (m MockResourceInterfaceDisableSync) DeleteCollection(ctx context.Context, options meta1.DeleteOptions, listOptions meta1.ListOptions) error {
+	panic("implement me")
+}
+
+func (m MockResourceInterfaceDisableSync) Get(ctx context.Context, name string, options meta1.GetOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	return getMockEksClusterConfig(MockActiveEksClusterConfigFilename)
+}
+
+func (m MockResourceInterfaceDisableSync) List(ctx context.Context, opts meta1.ListOptions) (*unstructured.UnstructuredList, error) {
+	panic("implement me")
+}
+
+func (m MockResourceInterfaceDisableSync) Watch(ctx context.Context, opts meta1.ListOptions) (watch.Interface, error) {
+	panic("implement me")
+}
+
+func (m MockResourceInterfaceDisableSync) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, options meta1.PatchOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockResourceInterfaceDisableSync) Apply(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
+func (m MockResourceInterfaceDisableSync) ApplyStatus(ctx context.Context, name string, obj *unstructured.Unstructured, options meta1.ApplyOptions) (*unstructured.Unstructured, error) {
+	panic("implement me")
+}
+
 type MockResourceInterfaceEksCC struct{}
 
 func (m MockResourceInterfaceEksCC) Create(ctx context.Context, obj *unstructured.Unstructured, options meta1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
