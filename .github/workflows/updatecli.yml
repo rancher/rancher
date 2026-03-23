@@ -58,7 +58,7 @@ jobs:
           done
 
       - name: Get App secrets
-        uses: rancher-eio/read-vault-secrets@main
+        uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
         with:
           # We use Renovate's App token, because it has the same permissions
           # needed and serve the same purpose.
