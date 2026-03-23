@@ -42,15 +42,11 @@ const (
 	NamespacedRuleRoleExists          = "NamespacedRuleRoleExists"
 	InheritedNamespacedRuleRoleExists = "InheritedNamespacedRuleRoleExists"
 	NamespaceNotAvailable             = "NamespaceNotAvailable"
-	FailedToGetRole                   = "GetRoleFailed"
-	FailedToListRoles                 = "ListRolesFailed"
 	FailedToCreateRole                = "CreateRoleFailed"
-	FailedToUpdateRole                = "UpdateRoleFailed"
 	FailedToGetNamespace              = "GetNamespaceFailed"
 	FailedToCreateClusterRole         = "CreateClusterRoleFailed"
 	FailedToUpdateClusterRole         = "UpdateClusterRoleFailed"
 	FailedToGetCluster                = "GetClusterFailed"
-	FailedToGetUserContext            = "GetUserContextFailed"
 )
 
 type fleetPermissionsRoleHandler interface {
@@ -94,6 +90,7 @@ func (gr *globalRoleLifecycle) Create(obj *v3.GlobalRole) (runtime.Object, error
 	returnError := errors.Join(
 		gr.reconcileGlobalRole(obj, &localConditions),
 		gr.reconcileNamespacedRoles(obj, &localConditions),
+		gr.reconcileInheritedNamespacedRoles(obj),
 		gr.fleetPermissionsHandler.reconcileFleetWorkspacePermissions(obj, &localConditions),
 		gr.updateStatus(obj, localConditions),
 	)
@@ -105,6 +102,7 @@ func (gr *globalRoleLifecycle) Updated(obj *v3.GlobalRole) (runtime.Object, erro
 	returnError := errors.Join(
 		gr.reconcileGlobalRole(obj, &localConditions),
 		gr.reconcileNamespacedRoles(obj, &localConditions),
+		gr.reconcileInheritedNamespacedRoles(obj),
 		gr.fleetPermissionsHandler.reconcileFleetWorkspacePermissions(obj, &localConditions),
 		gr.updateStatus(obj, localConditions),
 	)
@@ -299,7 +297,9 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 
 	roles, err := gr.rLister.List("", selector)
 	if err != nil {
-		return errors.Join(returnError, fmt.Errorf("couldn't list roles with label %s: %s: %w", grOwnerLabel, globalRoleName, err))
+		returnError = errors.Join(returnError, fmt.Errorf("couldn't list roles with label %s: %s: %w", grOwnerLabel, globalRoleName, err))
+		gr.status.AddCondition(localConditions, condition, NamespacedRuleRoleExists, returnError)
+		return returnError
 	}
 
 	// After creating/updating all Roles, if the number of roles with the grOwnerLabel is the same as

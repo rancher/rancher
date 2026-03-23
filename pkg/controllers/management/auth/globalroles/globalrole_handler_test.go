@@ -348,8 +348,8 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 			wantError:  false,
 			conditions: []reducedCondition{
 				{
-					reason: NamespaceNotAvailable,
-					status: metav1.ConditionFalse,
+					reason: NamespacedRuleRoleExists,
+					status: metav1.ConditionTrue,
 				},
 			},
 		},
@@ -363,7 +363,7 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 			wantError:  true,
 			conditions: []reducedCondition{
 				{
-					reason: FailedToGetNamespace,
+					reason: NamespacedRuleRoleExists,
 					status: metav1.ConditionFalse,
 				},
 			},
@@ -482,8 +482,8 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 			wantError:  false,
 			conditions: []reducedCondition{
 				{
-					reason: NamespaceNotAvailable,
-					status: metav1.ConditionFalse,
+					reason: NamespacedRuleRoleExists,
+					status: metav1.ConditionTrue,
 				},
 			},
 		},
@@ -585,7 +585,7 @@ func TestReconcileNamespacedRoles(t *testing.T) {
 			wantError:  true,
 			conditions: []reducedCondition{
 				{
-					reason: FailedToListRoles,
+					reason: NamespacedRuleRoleExists,
 					status: metav1.ConditionFalse,
 				},
 			},
