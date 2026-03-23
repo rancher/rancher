@@ -122,6 +122,7 @@ type ClusterSpecBase struct {
 	ClusterSecrets                                       ClusterSecrets                          `json:"clusterSecrets" norman:"nocreate,noupdate"`
 	ClusterAgentDeploymentCustomization                  *AgentDeploymentCustomization           `json:"clusterAgentDeploymentCustomization,omitempty"`
 	FleetAgentDeploymentCustomization                    *AgentDeploymentCustomization           `json:"fleetAgentDeploymentCustomization,omitempty"`
+	WebhookDeploymentCustomization                       *WebhookDeploymentCustomization         `json:"webhookDeploymentCustomization,omitempty"`
 }
 
 type AgentDeploymentCustomization struct {
@@ -144,6 +145,17 @@ type PriorityClassSpec struct {
 type PodDisruptionBudgetSpec struct {
 	MinAvailable   string `json:"minAvailable,omitempty"`
 	MaxUnavailable string `json:"maxUnavailable,omitempty"`
+}
+
+// WebhookDeploymentCustomization holds HA and resource configuration for the rancher-webhook deployment.
+type WebhookDeploymentCustomization struct {
+	// ReplicaCount sets the number of webhook pod replicas. The webhook natively supports
+	// multi-replica operation via leader election and shared TLS certificates.
+	ReplicaCount                 *int32                   `json:"replicaCount,omitempty"`
+	AppendTolerations            []v1.Toleration          `json:"appendTolerations,omitempty"`
+	OverrideAffinity             *v1.Affinity             `json:"overrideAffinity,omitempty"`
+	OverrideResourceRequirements *v1.ResourceRequirements `json:"overrideResourceRequirements,omitempty"`
+	PodDisruptionBudget          *PodDisruptionBudgetSpec `json:"podDisruptionBudget,omitempty"`
 }
 
 type ClusterSpec struct {
@@ -231,7 +243,8 @@ type ClusterStatus struct {
 	AADClientSecret            string                    `json:"aadClientSecret,omitempty" norman:"nocreate,noupdate"`       // Deprecated: use ClusterSpec.ClusterSecrets.AADClientSecret instead
 	AADClientCertSecret        string                    `json:"aadClientCertSecret,omitempty" norman:"nocreate,noupdate"`   // Deprecated: use ClusterSpec.ClusterSecrets.AADClientCertSecret instead
 
-	AppliedClusterAgentDeploymentCustomization *AgentDeploymentCustomization `json:"appliedClusterAgentDeploymentCustomization,omitempty"`
+	AppliedClusterAgentDeploymentCustomization *AgentDeploymentCustomization    `json:"appliedClusterAgentDeploymentCustomization,omitempty"`
+	AppliedWebhookDeploymentCustomization      *WebhookDeploymentCustomization  `json:"appliedWebhookDeploymentCustomization,omitempty"`
 }
 
 type ClusterComponentStatus struct {

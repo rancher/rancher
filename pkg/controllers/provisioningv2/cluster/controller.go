@@ -357,6 +357,22 @@ func (h *handler) generateProvisioningClusterFromLegacyCluster(cluster *v3.Clust
 		}
 	}
 
+	if cluster.Spec.WebhookDeploymentCustomization != nil {
+		wdc := cluster.Spec.WebhookDeploymentCustomization.DeepCopy()
+		provCluster.Spec.WebhookDeploymentCustomization = &v1.WebhookDeploymentCustomization{
+			ReplicaCount:                 wdc.ReplicaCount,
+			AppendTolerations:            wdc.AppendTolerations,
+			OverrideAffinity:             wdc.OverrideAffinity,
+			OverrideResourceRequirements: wdc.OverrideResourceRequirements,
+		}
+		if wdc.PodDisruptionBudget != nil {
+			provCluster.Spec.WebhookDeploymentCustomization.PodDisruptionBudget = &v1.PodDisruptionBudgetSpec{
+				MinAvailable:   wdc.PodDisruptionBudget.MinAvailable,
+				MaxUnavailable: wdc.PodDisruptionBudget.MaxUnavailable,
+			}
+		}
+	}
+
 	return []runtime.Object{
 		provCluster,
 	}, status, nil
@@ -532,6 +548,22 @@ func (h *handler) createNewCluster(cluster *v1.Cluster, status v1.ClusterStatus,
 			AppendTolerations:            fleetAgentCustomizationCopy.AppendTolerations,
 			OverrideAffinity:             fleetAgentCustomizationCopy.OverrideAffinity,
 			OverrideResourceRequirements: fleetAgentCustomizationCopy.OverrideResourceRequirements,
+		}
+	}
+
+	if cluster.Spec.WebhookDeploymentCustomization != nil {
+		wdc := cluster.Spec.WebhookDeploymentCustomization.DeepCopy()
+		spec.WebhookDeploymentCustomization = &v3.WebhookDeploymentCustomization{
+			ReplicaCount:                 wdc.ReplicaCount,
+			AppendTolerations:            wdc.AppendTolerations,
+			OverrideAffinity:             wdc.OverrideAffinity,
+			OverrideResourceRequirements: wdc.OverrideResourceRequirements,
+		}
+		if wdc.PodDisruptionBudget != nil {
+			spec.WebhookDeploymentCustomization.PodDisruptionBudget = &v3.PodDisruptionBudgetSpec{
+				MinAvailable:   wdc.PodDisruptionBudget.MinAvailable,
+				MaxUnavailable: wdc.PodDisruptionBudget.MaxUnavailable,
+			}
 		}
 	}
 

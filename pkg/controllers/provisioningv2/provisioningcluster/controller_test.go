@@ -1099,6 +1099,44 @@ func TestReconcileClusterSpecEtcdRestore(t *testing.T) {
 				assert.Equal(t, "bar", c.Spec.FleetAgentDeploymentCustomization.AppendTolerations[0].Key)
 			},
 		},
+		{
+			name: "update WebhookDeploymentCustomization",
+			current: &provv1.Cluster{
+				Spec: provv1.ClusterSpec{
+					RKEConfig: &provv1.RKEConfig{},
+				},
+			},
+			desired: provv1.ClusterSpec{
+				WebhookDeploymentCustomization: &provv1.WebhookDeploymentCustomization{
+					AppendTolerations: []corev1.Toleration{{Key: "webhook-node", Operator: "Exists"}},
+				},
+				RKEConfig: &provv1.RKEConfig{},
+			},
+			expectedChange: true,
+			assertState: func(t *testing.T, c *provv1.Cluster) {
+				assert.NotNil(t, c.Spec.WebhookDeploymentCustomization)
+				assert.Equal(t, "webhook-node", c.Spec.WebhookDeploymentCustomization.AppendTolerations[0].Key)
+			},
+		},
+		{
+			name: "no change when WebhookDeploymentCustomization is unchanged",
+			current: &provv1.Cluster{
+				Spec: provv1.ClusterSpec{
+					WebhookDeploymentCustomization: &provv1.WebhookDeploymentCustomization{
+						AppendTolerations: []corev1.Toleration{{Key: "webhook-node", Operator: "Exists"}},
+					},
+					RKEConfig: &provv1.RKEConfig{},
+				},
+			},
+			desired: provv1.ClusterSpec{
+				WebhookDeploymentCustomization: &provv1.WebhookDeploymentCustomization{
+					AppendTolerations: []corev1.Toleration{{Key: "webhook-node", Operator: "Exists"}},
+				},
+				RKEConfig: &provv1.RKEConfig{},
+			},
+			expectedChange: false,
+			assertState:    func(t *testing.T, c *provv1.Cluster) {},
+		},
 	}
 
 	for _, tt := range tests {

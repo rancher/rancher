@@ -282,6 +282,10 @@ func reconcileClusterSpecEtcdRestore(cluster *rancherv1.Cluster, desiredSpec ran
 		changed = true
 		cluster.Spec.FleetAgentDeploymentCustomization = desiredSpec.FleetAgentDeploymentCustomization
 	}
+	if !equality.Semantic.DeepEqual(cluster.Spec.WebhookDeploymentCustomization, desiredSpec.WebhookDeploymentCustomization) {
+		changed = true
+		cluster.Spec.WebhookDeploymentCustomization = desiredSpec.WebhookDeploymentCustomization
+	}
 	return changed
 }
 
