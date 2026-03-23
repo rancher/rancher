@@ -59,7 +59,7 @@ jobs:
           git commit -a -m "go get ${GOGET_MODULE} ${GOGET_VERSION}"
           git push origin "$BRANCH"
       - name: Read App Secrets
-        uses: rancher-eio/read-vault-secrets@main
+        uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
         with:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/github/app-credentials appId | APP_ID ;

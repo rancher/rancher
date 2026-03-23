@@ -20,13 +20,13 @@ jobs:
     # The FOSSA token is shared between all repos in Rancher's GH org. It can be
     # used directly and there is no need to request specific access to EIO.
     - name: Read FOSSA token
-      uses: rancher-eio/read-vault-secrets@main
+      uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
       with:
         secrets: |
           secret/data/github/org/rancher/fossa/push token | FOSSA_API_KEY_PUSH_ONLY
 
     - name: FOSSA scan
-      uses: fossas/fossa-action@main
+      uses: fossas/fossa-action@c414b9ad82eaad041e47a7cf62a4f02411f427a0 # v1.8.0
       with:
         api-key: ${{ env.FOSSA_API_KEY_PUSH_ONLY }}
         # Only runs the scan and do not provide/returns any results back to the
