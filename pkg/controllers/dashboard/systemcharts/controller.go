@@ -229,7 +229,21 @@ func (h *handler) getChartsToInstall() []*chart.Definition {
 				}
 				// add priority class value
 				h.setPriorityClass(values, chart.WebhookChartName)
-				// get custom values for the rancher-webhook
+				// merge per-cluster webhook customization from the local cluster spec;
+				// this is overridden by any values set in the rancher-config ConfigMap below.
+				wdc, err := h.getLocalWebhookCustomization()
+				if err != nil && !errors.IsNotFound(err) {
+					logrus.Warnf("[systemcharts] failed to get local cluster for webhook values: %v", err)
+				}
+				if wdc != nil {
+					helmValues, err := chart.WebhookHelmValues(wdc)
+					if err != nil {
+						logrus.Warnf("[systemcharts] failed to build webhook helm values: %v", err)
+					} else {
+						values = data.MergeMaps(values, helmValues)
+					}
+				}
+				// get custom values for the rancher-webhook; ConfigMap values take highest precedence
 				configMapValues := h.getChartValues(chart.WebhookChartName)
 				return data.MergeMaps(values, configMapValues)
 			},
@@ -558,6 +572,16 @@ func (h *handler) getChartValues(chartName string) map[string]interface{} {
 		logrus.Warnf("[systemcharts] Failed to get chart values for %s: %s", chartName, err.Error())
 	}
 	return configMapValues
+}
+
+// getLocalWebhookCustomization returns the WebhookDeploymentCustomization from the local
+// management cluster, or nil if the cluster has no customization set.
+func (h *handler) getLocalWebhookCustomization() (*v3.WebhookDeploymentCustomization, error) {
+	cluster, err := h.clusterCache.Get("local")
+	if err != nil {
+		return nil, err
+	}
+	return cluster.Spec.WebhookDeploymentCustomization, nil
 }
 
 func relatedFeatures(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
