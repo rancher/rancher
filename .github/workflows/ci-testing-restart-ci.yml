@@ -19,7 +19,7 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: "Read some Secrets"
-        uses: rancher-eio/read-vault-secrets@main
+        uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
         with:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/github/pr-actions-write-app/credentials appId | APP_ID;
