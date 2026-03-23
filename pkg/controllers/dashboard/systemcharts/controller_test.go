@@ -115,6 +115,7 @@ type testMocks struct {
 	deployment      *fake.MockControllerInterface[*appsv1.Deployment, *appsv1.DeploymentList]
 	deploymentCache *fake.MockCacheInterface[*appsv1.Deployment]
 	clusterCache    *fake.MockNonNamespacedCacheInterface[*v3.Cluster]
+	clusters        *fake.MockNonNamespacedControllerInterface[*v3.Cluster, *v3.ClusterList]
 	plan            *fake.MockControllerInterface[*upgradev1.Plan, *upgradev1.PlanList]
 	planCache       *fake.MockCacheInterface[*upgradev1.Plan]
 }
@@ -128,6 +129,7 @@ func (t *testMocks) Handler() *handler {
 		deployment:      t.deployment,
 		deploymentCache: t.deploymentCache,
 		clusterCache:    t.clusterCache,
+		clusters:        t.clusters,
 		plan:            t.plan,
 		planCache:       t.planCache,
 	}
@@ -1538,7 +1540,13 @@ mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-c
 				plan:            fake.NewMockControllerInterface[*upgradev1.Plan, *upgradev1.PlanList](ctrl),
 				planCache:       fake.NewMockCacheInterface[*upgradev1.Plan](ctrl),
 				clusterCache:    fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl),
+				clusters:        fake.NewMockNonNamespacedControllerInterface[*v3.Cluster, *v3.ClusterList](ctrl),
 			}
+
+			// Default AnyTimes expectations for status updates after webhook Ensure().
+			// Individual tests that need stricter validation override these in their setup function.
+			mocks.clusters.EXPECT().Get("local", gomock.Any()).Return(localCuster, nil).AnyTimes()
+			mocks.clusters.EXPECT().UpdateStatus(gomock.Any()).Return(localCuster, nil).AnyTimes()
 
 			// allow test to add expected calls to mock and run any additional setup
 			tt.setup(mocks)
@@ -1576,8 +1584,11 @@ func Test_TurtlesInstallation(t *testing.T) {
 		plan:            fake.NewMockControllerInterface[*upgradev1.Plan, *upgradev1.PlanList](ctrl),
 		planCache:       fake.NewMockCacheInterface[*upgradev1.Plan](ctrl),
 		clusterCache:    fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl),
+		clusters:        fake.NewMockNonNamespacedControllerInterface[*v3.Cluster, *v3.ClusterList](ctrl),
 	}
 
+	mocks.clusters.EXPECT().Get("local", gomock.Any()).Return(localCuster, nil).AnyTimes()
+	mocks.clusters.EXPECT().UpdateStatus(gomock.Any()).Return(localCuster, nil).AnyTimes()
 	mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).AnyTimes()
 	features.ManagedSystemUpgradeController.Set(false)
 	mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(plans, nil).Times(1)
@@ -1644,8 +1655,11 @@ func Test_TurtlesWinsWhenBothEnabled(t *testing.T) {
 		plan:            fake.NewMockControllerInterface[*upgradev1.Plan, *upgradev1.PlanList](ctrl),
 		planCache:       fake.NewMockCacheInterface[*upgradev1.Plan](ctrl),
 		clusterCache:    fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl),
+		clusters:        fake.NewMockNonNamespacedControllerInterface[*v3.Cluster, *v3.ClusterList](ctrl),
 	}
 
+	mocks.clusters.EXPECT().Get("local", gomock.Any()).Return(localCuster, nil).AnyTimes()
+	mocks.clusters.EXPECT().UpdateStatus(gomock.Any()).Return(localCuster, nil).AnyTimes()
 	mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).AnyTimes()
 
 	mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(plans, nil).AnyTimes()

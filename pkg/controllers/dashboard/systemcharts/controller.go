@@ -10,6 +10,7 @@ import (
 
 	catalog "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	clusterutil "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/chart"
 	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
 	"github.com/rancher/rancher/pkg/controllers/management/k3sbasedupgrade"
@@ -75,6 +76,7 @@ func Register(ctx context.Context, wContext *wrangler.Context, registryOverride 
 		deploymentCache:                wContext.Apps.Deployment().Cache(),
 		clusterRepo:                    wContext.Catalog.ClusterRepo(),
 		clusterCache:                   wContext.Mgmt.Cluster().Cache(),
+		clusters:                       wContext.Mgmt.Cluster(),
 		plan:                           wContext.Plan.Plan(),
 		planCache:                      wContext.Plan.Plan().Cache(),
 		secrets:                        wContext.Core.Secret(),
@@ -116,6 +118,7 @@ type handler struct {
 	validatingWebhookConfiguration admissionregcontrollers.ValidatingWebhookConfigurationController
 	chartsConfig                   chart.RancherConfigGetter
 	clusterCache                   mgmtcontrollers.ClusterCache
+	clusters                       mgmtcontrollers.ClusterController
 	plan                           plancontrolers.PlanController
 	planCache                      plancontrolers.PlanCache
 	registryOverride               string
@@ -183,6 +186,12 @@ func (h *handler) onRepo(key string, repo *catalog.ClusterRepo) (*catalog.Cluste
 		takeOwnership := chartDef.ChartName == chart.WebhookChartName
 		if err := h.manager.Ensure(chartDef.ReleaseNamespace, chartDef.ChartName, chartDef.ReleaseName, minVersion, exactVersion, values, takeOwnership, installImageOverride); err != nil {
 			return repo, err
+		}
+		if chartDef.ChartName == chart.WebhookChartName {
+			if err := h.updateAppliedWebhookCustomization(); err != nil {
+				// Log but do not block chart reconciliation — status is best-effort.
+				logrus.Warnf("[systemcharts] failed to update applied webhook customization status: %v", err)
+			}
 		}
 	}
 
@@ -545,10 +554,15 @@ func (h *handler) onPlan(_ string, plan *upgradev1.Plan) (*upgradev1.Plan, error
 // It ensures the timely installation or uninstallation of the system-upgrade-controller app in the local cluster
 // when the "rancher.io/imported-cluster-version-management" annotation is changed.
 func (h *handler) onCluster(_ string, obj *v3.Cluster) (*v3.Cluster, error) {
-	if !features.MCM.Enabled() {
+	if obj == nil || obj.DeletionTimestamp != nil || obj.Name != "local" {
 		return obj, nil
 	}
-	if obj == nil || obj.DeletionTimestamp != nil || obj.Name != "local" {
+	// Always re-sync when webhook deployment customization has drifted from applied state.
+	if clusterutil.WebhookDeploymentCustomizationChanged(obj) {
+		h.clusterRepo.EnqueueAfter(repoName, 2*time.Second)
+		return obj, nil
+	}
+	if !features.MCM.Enabled() {
 		return obj, nil
 	}
 	h.clusterRepo.EnqueueAfter(repoName, 2*time.Second)
@@ -582,6 +596,24 @@ func (h *handler) getLocalWebhookCustomization() (*v3.WebhookDeploymentCustomiza
 		return nil, err
 	}
 	return cluster.Spec.WebhookDeploymentCustomization, nil
+}
+
+// updateAppliedWebhookCustomization reads the local cluster from cache, copies the webhook
+// customization from Spec to Status, and persists the status via UpdateStatus.
+func (h *handler) updateAppliedWebhookCustomization() error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		cluster, err := h.clusters.Get("local", metav1.GetOptions{})
+		if err != nil {
+			if errors.IsNotFound(err) {
+				return nil
+			}
+			return err
+		}
+		cluster = cluster.DeepCopy()
+		clusterutil.UpdateAppliedWebhookDeploymentCustomization(cluster)
+		_, err = h.clusters.UpdateStatus(cluster)
+		return err
+	})
 }
 
 func relatedFeatures(_, _ string, obj runtime.Object) ([]relatedresource.Key, error) {
