@@ -21,7 +21,7 @@ jobs:
       id-token: write
     steps:
       - name: Load Secrets from Vault
-        uses: rancher-eio/read-vault-secrets@main
+        uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
         with:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
@@ -53,7 +53,7 @@ jobs:
       - name: Copy chart and build index
         run: ./scripts/chart/copy
       - name: Load Secrets from Vault
-        uses: rancher-eio/read-vault-secrets@main
+        uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
         with:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/google-auth/rancher/credentials token | GOOGLE_AUTH ;
@@ -103,7 +103,7 @@ jobs:
           git commit -a -m "update README with latest/stable"
           git push origin "$BRANCH"
       - name: Read App Secrets
-        uses: rancher-eio/read-vault-secrets@main
+        uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
         with:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/github/app-credentials appId | APP_ID ;
