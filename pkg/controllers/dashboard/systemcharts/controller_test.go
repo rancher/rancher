@@ -153,7 +153,7 @@ func Test_ChartInstallation(t *testing.T) {
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
 				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(6)
-				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(1)
+				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).AnyTimes()
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
@@ -248,7 +248,7 @@ func Test_ChartInstallation(t *testing.T) {
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
 				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(6)
-				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(1)
+				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).AnyTimes()
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
@@ -343,7 +343,7 @@ func Test_ChartInstallation(t *testing.T) {
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
 				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(4)
-				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(1)
+				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).AnyTimes()
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeploymentFromFleetBundle, nil).Times(1)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
@@ -421,7 +421,7 @@ func Test_ChartInstallation(t *testing.T) {
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
 				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(4)
-				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(1)
+				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).AnyTimes()
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(nil, errTest).Times(1)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
@@ -499,7 +499,7 @@ func Test_ChartInstallation(t *testing.T) {
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
 				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(4)
-				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(1)
+				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).AnyTimes()
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(plans, nil).Times(1)
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
@@ -577,7 +577,7 @@ func Test_ChartInstallation(t *testing.T) {
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
 				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(4)
-				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(1)
+				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).AnyTimes()
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
 				_ = settings.RancherTurtlesVersion.Set("2.0.0")
@@ -656,7 +656,7 @@ func Test_ChartInstallation(t *testing.T) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
 				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(7)
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
-				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(3)
+				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(4)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
 				_ = settings.RancherTurtlesVersion.Set("2.0.0")
@@ -768,7 +768,7 @@ func Test_ChartInstallation(t *testing.T) {
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
 				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(5)
-				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(2)
+				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(3)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
 				_ = settings.RancherTurtlesVersion.Set("2.0.0")
@@ -865,7 +865,7 @@ func Test_ChartInstallation(t *testing.T) {
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
 				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(5)
-				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(3)
+				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(4)
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(plans, nil).Times(1)
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
@@ -962,7 +962,7 @@ func Test_ChartInstallation(t *testing.T) {
 			setup: func(mocks testMocks) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
 				mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(4)
-				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(3)
+				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(4)
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(plans, nil).Times(1)
 				os.Setenv("IMPERATIVE_API_DIRECT", "true")
@@ -1041,7 +1041,7 @@ func Test_ChartInstallation(t *testing.T) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
 				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(nil, errTest).Times(7)
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
-				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(3)
+				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(4)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
 				_ = settings.RancherTurtlesVersion.Set("2.0.0")
@@ -1150,7 +1150,7 @@ func Test_ChartInstallation(t *testing.T) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
 				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(emptyConfig, nil).Times(7)
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
-				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(3)
+				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(4)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
 				_ = settings.RancherWebhookVersion.Set("2.0.1")
 				_ = settings.RancherTurtlesVersion.Set("2.0.1")
@@ -1278,7 +1278,7 @@ func Test_ChartInstallation(t *testing.T) {
 				mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
 				mocks.configCache.EXPECT().Get(gomock.Any(), chart.CustomValueMapName).Return(fullConfig, nil).Times(7)
 				mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
-				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(3)
+				mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(4)
 				mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
 				_ = settings.RancherWebhookVersion.Set("2.0.0")
 				_ = settings.RancherTurtlesVersion.Set("2.0.0")
@@ -1406,7 +1406,7 @@ ReplicaCount: &rc,
 mocks.namespaceCtrl.EXPECT().Delete(operatorNamespace, nil).Return(nil)
 mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).Times(7)
 mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(sucDeployment, nil).Times(1)
-mocks.clusterCache.EXPECT().Get("local").Return(clusterWithWebhookCustom, nil).Times(3)
+mocks.clusterCache.EXPECT().Get("local").Return(clusterWithWebhookCustom, nil).Times(4)
 mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(nil, nil).Times(1)
 _ = settings.RancherWebhookVersion.Set("2.0.0")
 _ = settings.RancherTurtlesVersion.Set("2.0.0")
@@ -1546,7 +1546,7 @@ mocks.manager.EXPECT().Remove(provisioningCapiNamespace, "rancher-provisioning-c
 			// Default AnyTimes expectations for status updates after webhook Ensure().
 			// Individual tests that need stricter validation override these in their setup function.
 			mocks.clusters.EXPECT().Get("local", gomock.Any()).Return(localCuster, nil).AnyTimes()
-			mocks.clusters.EXPECT().UpdateStatus(gomock.Any()).Return(localCuster, nil).AnyTimes()
+			mocks.clusters.EXPECT().Update(gomock.Any()).Return(localCuster, nil).AnyTimes()
 
 			// allow test to add expected calls to mock and run any additional setup
 			tt.setup(mocks)
@@ -1588,12 +1588,12 @@ func Test_TurtlesInstallation(t *testing.T) {
 	}
 
 	mocks.clusters.EXPECT().Get("local", gomock.Any()).Return(localCuster, nil).AnyTimes()
-	mocks.clusters.EXPECT().UpdateStatus(gomock.Any()).Return(localCuster, nil).AnyTimes()
+	mocks.clusters.EXPECT().Update(gomock.Any()).Return(localCuster, nil).AnyTimes()
 	mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).AnyTimes()
 	features.ManagedSystemUpgradeController.Set(false)
 	mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(plans, nil).Times(1)
 	mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(nil, apierrors.NewNotFound(schema.GroupResource{Group: "apps", Resource: "deployments"}, sucDeploymentName)).AnyTimes()
-	mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(1)
+	mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).AnyTimes()
 
 	expectedWebhookValues := map[string]interface{}{
 		"priorityClassName": priorityClassName,
@@ -1659,12 +1659,12 @@ func Test_TurtlesWinsWhenBothEnabled(t *testing.T) {
 	}
 
 	mocks.clusters.EXPECT().Get("local", gomock.Any()).Return(localCuster, nil).AnyTimes()
-	mocks.clusters.EXPECT().UpdateStatus(gomock.Any()).Return(localCuster, nil).AnyTimes()
+	mocks.clusters.EXPECT().Update(gomock.Any()).Return(localCuster, nil).AnyTimes()
 	mocks.configCache.EXPECT().Get(namespace.System, chart.CustomValueMapName).Return(priorityConfig, nil).AnyTimes()
 
 	mocks.planCache.EXPECT().List(namespace.System, managedPlanSelector).Return(plans, nil).AnyTimes()
 	mocks.deploymentCache.EXPECT().Get(namespace.System, sucDeploymentName).Return(nil, apierrors.NewNotFound(schema.GroupResource{Group: "apps", Resource: "deployments"}, sucDeploymentName)).AnyTimes()
-	mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).Times(1)
+	mocks.clusterCache.EXPECT().Get("local").Return(localCuster, nil).AnyTimes()
 
 	expectedTurtlesValues := map[string]interface{}{
 		"priorityClassName": priorityClassName,

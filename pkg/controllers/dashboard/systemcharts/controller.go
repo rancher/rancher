@@ -590,7 +590,16 @@ func (h *handler) getChartValues(chartName string) map[string]interface{} {
 
 // getLocalWebhookCustomization returns the WebhookDeploymentCustomization from the local
 // management cluster, or nil if the cluster has no customization set.
+// On downstream clusters (MCMAgent enabled), webhook customization is delivered via a
+// rancher-config ConfigMap pushed by the management server's clusterdeploy controller.
+// The systemcharts controller reads those values through the existing getChartValues()
+// path, so this function returns nil in that context.
 func (h *handler) getLocalWebhookCustomization() (*v3.WebhookDeploymentCustomization, error) {
+	if features.MCMAgent.Enabled() {
+		// Downstream: values come from rancher-config ConfigMap, not from
+		// the cluster spec. Return nil so they are merged in getChartValues().
+		return nil, nil
+	}
 	cluster, err := h.clusterCache.Get("local")
 	if err != nil {
 		return nil, err
@@ -600,18 +609,28 @@ func (h *handler) getLocalWebhookCustomization() (*v3.WebhookDeploymentCustomiza
 
 // updateAppliedWebhookCustomization reads the local cluster from cache, copies the webhook
 // customization from Spec to Status, and persists the status via UpdateStatus.
+// On downstream clusters (MCMAgent enabled), this is a no-op because the management server
+// tracks applied state via the clusterdeploy controller's manageWebhookConfig().
 func (h *handler) updateAppliedWebhookCustomization() error {
+	if features.MCMAgent.Enabled() {
+		return nil
+	}
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		cluster, err := h.clusters.Get("local", metav1.GetOptions{})
+		// Read from the informer cache which is available immediately at startup,
+		// rather than h.clusters.Get() which can return "not found" for several
+		// minutes while the wrangler controller client initializes.
+		cached, err := h.clusterCache.Get("local")
 		if err != nil {
 			if errors.IsNotFound(err) {
 				return nil
 			}
 			return err
 		}
-		cluster = cluster.DeepCopy()
+		cluster := cached.DeepCopy()
 		clusterutil.UpdateAppliedWebhookDeploymentCustomization(cluster)
-		_, err = h.clusters.UpdateStatus(cluster)
+		// Use Update (not UpdateStatus) because the clusters.management.cattle.io
+		// CRD does not define a status subresource.
+		_, err = h.clusters.Update(cluster)
 		return err
 	})
 }
