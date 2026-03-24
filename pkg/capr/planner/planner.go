@@ -335,7 +335,7 @@ func (p *Planner) Process(cp *rkev1.RKEControlPlane, status rkev1.RKEControlPlan
 		return status, err
 	}
 
-	if status, err = p.rotateEncryptionKeys(cp, status, clusterSecretTokens, plan, releaseData); err != nil {
+	if status, err = p.rotateEncryptionKeys(cp, status, clusterSecretTokens, plan); err != nil {
 		return status, err
 	}
 
