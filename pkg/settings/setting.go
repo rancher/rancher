@@ -424,6 +424,8 @@ var (
 	// The value should be expressed in valid time.Duration units e.g. "24h".
 	// An empty string or a zero value means SCIM tokens do not expire.
 	ExpireSCIMTokensAfter = NewSetting("expire-scim-tokens-after", "720h") // 30 days
+
+	ImportedClusterDay2OpsEnabledDefault = NewSetting("imported-cluster-day2-ops-enabled", "true")
 )
 
 // FullShellImage returns the full private registry name of the rancher shell image.

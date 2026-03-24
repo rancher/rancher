@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/rancher/rancher/pkg/capr"
@@ -21,45 +22,69 @@ const (
 	headerPrefix    = "X-Cattle-"
 )
 
-func (r *RKE2ConfigServer) findMachineByClusterToken(req *http.Request) (string, string, error) {
+var (
+	mgmtNameRegexp = regexp.MustCompile("^(c-[a-z0-9]{5}|local)$")
+)
+
+func (r *RKE2ConfigServer) findMachineByClusterToken(req *http.Request) (*corev1.ObjectReference, error) {
 	token := strings.TrimPrefix(req.Header.Get("Authorization"), "Bearer ")
 	if token == "" {
-		return "", "", nil
+		return nil, nil
 	}
 
 	machineID := req.Header.Get(machineIDHeader)
 	if machineID == "" {
-		return "", "", nil
+		return nil, nil
 	}
 
 	tokens, err := r.clusterTokenCache.GetByIndex(tokenIndex, token)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 
 	data := dataFromHeaders(req)
 
 	if len(tokens) == 0 {
-		return "", "", nil
+		return nil, nil
 	}
 
-	secretName := machineRequestSecretName(machineID)
+	imported := false
+	if mgmtNameRegexp.MatchString(tokens[0].Namespace) {
+		imported = true
+	}
+
+	secretName := machineRequestSecretName(imported, machineID)
 	secret, err := r.secretsCache.Get(tokens[0].Namespace, secretName)
 	if apierror.IsNotFound(err) {
 		secret, err = r.createSecret(tokens[0].Namespace, secretName, data)
 	}
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 
 	secret, err = r.waitReady(secret)
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 
 	machineNamespace, machineName := secret.Labels[capr.MachineNamespaceLabel], secret.Labels[capr.MachineNameLabel]
 	_ = r.secrets.Delete(secret.Namespace, secret.Name, nil)
-	return machineNamespace, machineName, nil
+
+	if imported {
+		return &corev1.ObjectReference{
+			APIVersion: "management.cattle.io/v3",
+			Kind:       "Node",
+			Namespace:  machineNamespace,
+			Name:       machineName,
+		}, nil
+	}
+
+	return &corev1.ObjectReference{
+		APIVersion: "cluster.x-k8s.io/v1beta2",
+		Kind:       "Machine",
+		Namespace:  machineNamespace,
+		Name:       machineName,
+	}, nil
 }
 
 func (r *RKE2ConfigServer) findMachineByID(machineID, ns string) (*capi.Machine, error) {
@@ -126,9 +151,13 @@ func (r *RKE2ConfigServer) waitReady(secret *corev1.Secret) (*corev1.Secret, err
 	return nil, fmt.Errorf("timeout waiting for %s/%s to be ready", secret.Namespace, secret.Name)
 }
 
-func machineRequestSecretName(name string) string {
+func machineRequestSecretName(imported bool, name string) string {
 	hash := sha256.Sum256([]byte(name))
-	return "custom-" + hex.EncodeToString(hash[:])[:12]
+	prefix := "custom-"
+	if imported {
+		prefix = "imported-"
+	}
+	return prefix + hex.EncodeToString(hash[:])[:12]
 }
 
 func dataFromHeaders(req *http.Request) map[string]interface{} {
