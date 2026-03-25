@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	gmux "github.com/gorilla/mux"
 	"github.com/rancher/rancher/pkg/api/steve/disallow"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	managementv3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -106,10 +105,9 @@ func NewProxyMiddleware(sar v1.AuthorizationV1Interface,
 	}, nil
 }
 
-func routeToShellProxy(key, value string, localSupport bool, localCluster http.Handler, mux *gmux.Router, proxyHandler *Handler) func(rw http.ResponseWriter, r *http.Request) {
+func routeToShellProxy(key, value string, localSupport bool, localCluster http.Handler, notFoundHandler http.Handler, proxyHandler *Handler) func(rw http.ResponseWriter, r *http.Request) {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		vars := gmux.Vars(r)
-		cluster := vars["clusterID"]
+		cluster := r.PathValue("clusterID")
 		if cluster == "local" {
 			if localSupport {
 				authed := proxyHandler.userCanAccessCluster(r, cluster)
@@ -123,12 +121,10 @@ func routeToShellProxy(key, value string, localSupport bool, localCluster http.H
 				r.URL.Path = "/v1/management.cattle.io.clusters/local"
 				localCluster.ServeHTTP(rw, r)
 			} else {
-				mux.NotFoundHandler.ServeHTTP(rw, r)
+				notFoundHandler.ServeHTTP(rw, r)
 			}
 			return
 		}
-		vars["prefix"] = "k8s/clusters/" + cluster
-		vars["suffix"] = "/v1/management.cattle.io.clusters/local"
 		q := r.URL.Query()
 		q.Set(key, value)
 		r.URL.RawQuery = q.Encode()
@@ -147,51 +143,34 @@ func NewProxyHandler(authorizer authorizer.Authorizer,
 	}
 }
 
-func (h *Handler) MatchNonLegacy(prefix string) gmux.MatcherFunc {
-	return func(req *http.Request, match *gmux.RouteMatch) bool {
-		clusterID := strings.TrimPrefix(req.URL.Path, prefix)
-		clusterID = strings.SplitN(clusterID, "/", 2)[0]
-		if match.Vars == nil {
-			match.Vars = map[string]string{}
-		}
-		match.Vars["clusterID"] = clusterID
-
-		return true
+func (h *Handler) authLocalCluster(notFoundHandler http.Handler, rw http.ResponseWriter, req *http.Request) {
+	authed := h.userCanAccessCluster(req, "local")
+	if !authed {
+		rw.WriteHeader(http.StatusForbidden)
+		return
 	}
-}
-
-func (h *Handler) authLocalCluster(router *gmux.Router) func(rw http.ResponseWriter, r *http.Request) {
-	return func(rw http.ResponseWriter, req *http.Request) {
-		authed := h.userCanAccessCluster(req, "local")
-		if !authed {
-			rw.WriteHeader(http.StatusForbidden)
-			return
-		}
-		router.NotFoundHandler.ServeHTTP(rw, req)
-	}
+	notFoundHandler.ServeHTTP(rw, req)
 }
 
 // matchManagementCRDs matches paths that are for management CRDs that are not in the allow-list of specific management resources.
 // To decide what to match, it tries to extract request information from the URL path and examine the group and resource.
-func (h *Handler) matchManagementCRDs() gmux.MatcherFunc {
-	return func(req *http.Request, match *gmux.RouteMatch) bool {
-		info, err := h.requestInfoFactory.NewRequestInfo(req)
-		if err != nil {
-			// This isn't a K8s request, don't match it.
-			return false
-		}
-		return info.APIGroup == managementv3.GroupName && info.Resource != "" && !disallow.AllowAll[info.Resource]
+func (h *Handler) matchManagementCRDs(req *http.Request) bool {
+	info, err := h.requestInfoFactory.NewRequestInfo(req)
+	if err != nil {
+		// This isn't a K8s request, don't match it.
+		return false
 	}
+	return info.APIGroup == managementv3.GroupName && info.Resource != "" && !disallow.AllowAll[info.Resource]
 }
 
 func (h *Handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	clusterID := gmux.Vars(req)["clusterID"]
+	clusterID := req.PathValue("clusterID")
 	authed := h.userCanAccessCluster(req, clusterID)
 	if !authed {
 		rw.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	prefix := "/" + gmux.Vars(req)["prefix"]
+	prefix := "/k8s/clusters/" + clusterID
 	handler, err := h.next(clusterID, prefix)
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
