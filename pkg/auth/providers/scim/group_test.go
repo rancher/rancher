@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gorilla/mux"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
@@ -527,7 +526,7 @@ func TestPatchGroup(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewReader(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
 
 		srv.PatchGroup(w, r)
 
@@ -585,7 +584,7 @@ func TestPatchGroup(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewReader(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
 
 		srv.PatchGroup(w, r)
 
@@ -629,7 +628,7 @@ func TestPatchGroup(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewReader(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
 
 		srv.PatchGroup(w, r)
 
@@ -686,7 +685,7 @@ func TestPatchGroup(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewReader(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
 
 		srv.PatchGroup(w, r)
 
@@ -750,7 +749,7 @@ func TestPatchGroup(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewReader(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
 
 		srv.PatchGroup(w, r)
 
@@ -798,7 +797,7 @@ func TestPatchGroup(t *testing.T) {
 
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewReader(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
 
 		srv.PatchGroup(w, r)
 
@@ -916,7 +915,7 @@ func TestListGroupsPagination(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups?"+tt.queryString, nil)
-			r = mux.SetURLVars(r, map[string]string{"provider": provider})
+			r.SetPathValue("provider", provider)
 			w := httptest.NewRecorder()
 
 			srv.ListGroups(w, r)
@@ -975,7 +974,7 @@ func TestListGroupsPaginationConsistency(t *testing.T) {
 
 	for startIndex := 1; ; startIndex += pageSize {
 		r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/v1-scim/%s/Groups?startIndex=%d&count=%d&excludedAttributes=members", provider, startIndex, pageSize), nil)
-		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		r.SetPathValue("provider", provider)
 		w := httptest.NewRecorder()
 
 		srv.ListGroups(w, r)
@@ -1052,7 +1051,7 @@ func TestCreateGroup(t *testing.T) {
 			"externalId": "ext-eng-001"
 		}`
 		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		r.SetPathValue("provider", provider)
 		w := httptest.NewRecorder()
 
 		srv.CreateGroup(w, r)
@@ -1138,7 +1137,7 @@ func TestCreateGroup(t *testing.T) {
 			"members": [{"value": "u-user1", "display": "user1"}]
 		}`
 		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		r.SetPathValue("provider", provider)
 		w := httptest.NewRecorder()
 
 		srv.CreateGroup(w, r)
@@ -1173,7 +1172,7 @@ func TestCreateGroup(t *testing.T) {
 			"displayName": "Engineering"
 		}`
 		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		r.SetPathValue("provider", provider)
 		w := httptest.NewRecorder()
 
 		srv.CreateGroup(w, r)
@@ -1206,7 +1205,7 @@ func TestCreateGroup(t *testing.T) {
 			"displayName": "engineering"
 		}`
 		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		r.SetPathValue("provider", provider)
 		w := httptest.NewRecorder()
 
 		srv.CreateGroup(w, r)
@@ -1224,7 +1223,7 @@ func TestCreateGroup(t *testing.T) {
 
 		body := `not valid json`
 		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		r.SetPathValue("provider", provider)
 		w := httptest.NewRecorder()
 
 		srv.CreateGroup(w, r)
@@ -1243,7 +1242,7 @@ func TestCreateGroup(t *testing.T) {
 
 		body := `{"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"]}`
 		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		r.SetPathValue("provider", provider)
 		w := httptest.NewRecorder()
 
 		srv.CreateGroup(w, r)
@@ -1272,7 +1271,7 @@ func TestCreateGroup(t *testing.T) {
 			"displayName": "Engineering"
 		}`
 		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		r.SetPathValue("provider", provider)
 		w := httptest.NewRecorder()
 
 		srv.CreateGroup(w, r)
@@ -1304,7 +1303,7 @@ func TestCreateGroup(t *testing.T) {
 			"displayName": "Engineering"
 		}`
 		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		r.SetPathValue("provider", provider)
 		w := httptest.NewRecorder()
 
 		srv.CreateGroup(w, r)
@@ -1346,7 +1345,7 @@ func TestCreateGroup(t *testing.T) {
 			"members": [{"value": "u-user1", "display": "user1"}]
 		}`
 		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		r.SetPathValue("provider", provider)
 		w := httptest.NewRecorder()
 
 		srv.CreateGroup(w, r)
@@ -1389,7 +1388,7 @@ func TestCreateGroup(t *testing.T) {
 			"members": [{"value": "grp-xyz", "display": "SubTeam", "type": "Group"}]
 		}`
 		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		r.SetPathValue("provider", provider)
 		w := httptest.NewRecorder()
 
 		srv.CreateGroup(w, r)
@@ -1440,7 +1439,7 @@ func TestCreateGroup(t *testing.T) {
 			"members": [{"value": "u-missing", "display": "missing.user"}]
 		}`
 		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		r.SetPathValue("provider", provider)
 		w := httptest.NewRecorder()
 
 		srv.CreateGroup(w, r)
@@ -1486,7 +1485,7 @@ func TestCreateGroup(t *testing.T) {
 			"externalId": "new-ext-id"
 		}`
 		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		r.SetPathValue("provider", provider)
 		w := httptest.NewRecorder()
 
 		srv.CreateGroup(w, r)
@@ -1530,7 +1529,7 @@ func TestCreateGroup(t *testing.T) {
 			"externalId": "new-ext-id"
 		}`
 		r := httptest.NewRequest(http.MethodPost, "/v1-scim/"+provider+"/Groups", bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider})
+		r.SetPathValue("provider", provider)
 		w := httptest.NewRecorder()
 
 		srv.CreateGroup(w, r)
@@ -1590,7 +1589,7 @@ func TestGetGroup(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.GetGroup(w, r)
@@ -1632,7 +1631,7 @@ func TestGetGroup(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID+"?excludedAttributes=members,other_attribute", nil)
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.GetGroup(w, r)
@@ -1670,7 +1669,7 @@ func TestGetGroup(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.GetGroup(w, r)
@@ -1698,7 +1697,7 @@ func TestGetGroup(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.GetGroup(w, r)
@@ -1724,7 +1723,7 @@ func TestGetGroup(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.GetGroup(w, r)
@@ -1758,7 +1757,7 @@ func TestGetGroup(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.GetGroup(w, r)
@@ -1817,7 +1816,7 @@ func TestGetGroup(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.GetGroup(w, r)
@@ -1870,7 +1869,7 @@ func TestUpdateGroup(t *testing.T) {
 			"members": []
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateGroup(w, r)
@@ -1933,7 +1932,7 @@ func TestUpdateGroup(t *testing.T) {
 			"members": []
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateGroup(w, r)
@@ -2001,7 +2000,7 @@ func TestUpdateGroup(t *testing.T) {
 			"members": [{"value": "u-user1", "display": "user1"}]
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateGroup(w, r)
@@ -2025,7 +2024,7 @@ func TestUpdateGroup(t *testing.T) {
 			"displayName": "Engineering"
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/grp-abc123", bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": "grp-abc123"})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", "grp-abc123")
 		w := httptest.NewRecorder()
 
 		srv.UpdateGroup(w, r)
@@ -2043,7 +2042,7 @@ func TestUpdateGroup(t *testing.T) {
 
 		body := `not valid json`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/grp-abc123", bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": "grp-abc123"})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", "grp-abc123")
 		w := httptest.NewRecorder()
 
 		srv.UpdateGroup(w, r)
@@ -2062,7 +2061,7 @@ func TestUpdateGroup(t *testing.T) {
 
 		body := `{"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"], "id": "grp-abc123"}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/grp-abc123", bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": "grp-abc123"})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", "grp-abc123")
 		w := httptest.NewRecorder()
 
 		srv.UpdateGroup(w, r)
@@ -2094,7 +2093,7 @@ func TestUpdateGroup(t *testing.T) {
 			"displayName": "Engineering"
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateGroup(w, r)
@@ -2136,7 +2135,7 @@ func TestUpdateGroup(t *testing.T) {
 			"members": [{"value": "u-user1", "display": "user1"}]
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateGroup(w, r)
@@ -2212,7 +2211,7 @@ func TestUpdateGroup(t *testing.T) {
 			"members": []
 		}`
 		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.UpdateGroup(w, r)
@@ -2249,7 +2248,7 @@ func TestDeleteGroup(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.DeleteGroup(w, r)
@@ -2312,7 +2311,7 @@ func TestDeleteGroup(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.DeleteGroup(w, r)
@@ -2332,7 +2331,7 @@ func TestDeleteGroup(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.DeleteGroup(w, r)
@@ -2358,7 +2357,7 @@ func TestDeleteGroup(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.DeleteGroup(w, r)
@@ -2392,7 +2391,7 @@ func TestDeleteGroup(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.DeleteGroup(w, r)
@@ -2430,7 +2429,7 @@ func TestDeleteGroup(t *testing.T) {
 		}
 
 		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
-		r = mux.SetURLVars(r, map[string]string{"provider": provider, "id": groupID})
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
 		w := httptest.NewRecorder()
 
 		srv.DeleteGroup(w, r)

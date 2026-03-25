@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )
 
@@ -193,7 +192,7 @@ var schemaRegistry = map[string]Schema{
 func (s *SCIMServer) ListSchemas(w http.ResponseWriter, r *http.Request) {
 	logrus.Tracef("scim::ListSchemas: url %s", r.URL)
 
-	provider := mux.Vars(r)["provider"]
+	provider := r.PathValue("provider")
 
 	response := &listResponse{Schemas: []string{listSchemaID}}
 	for _, schema := range schemaRegistry {
@@ -214,8 +213,8 @@ func (s *SCIMServer) ListSchemas(w http.ResponseWriter, r *http.Request) {
 func (s *SCIMServer) GetSchema(w http.ResponseWriter, r *http.Request) {
 	logrus.Tracef("scim::GetSchemas: url %s", r.URL)
 
-	provider := mux.Vars(r)["provider"]
-	id := mux.Vars(r)["id"]
+	provider := r.PathValue("provider")
+	id := r.PathValue("id")
 
 	schema, ok := schemaRegistry[id]
 	if !ok {
