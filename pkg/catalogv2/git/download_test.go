@@ -75,11 +75,6 @@ func Test_Ensure(t *testing.T) {
 			if tc.expectedError == nil && tc.expectedError != err {
 				t.Errorf("Expected error: %v |But got: %v", tc.expectedError, err)
 			}
-
-			// Check the error
-			if tc.expectedError == nil && tc.expectedError != err {
-				t.Errorf("Expected error: %v |But got: %v", tc.expectedError, err)
-			}
 			// Only testing error in some cases
 			if err != nil {
 				assert.EqualError(t, tc.expectedError, err.Error())
