@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
-	"github.com/gorilla/mux"
 	"github.com/rancher/rancher/pkg/api/norman"
 	"github.com/rancher/rancher/pkg/auth/api"
 	"github.com/rancher/rancher/pkg/auth/data"
@@ -66,11 +66,6 @@ func NewServer(ctx context.Context, wContext *wrangler.Context, scaledContext *c
 }
 
 func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext, authToken requests.AuthTokenGetter) (steveauth.Middleware, error) {
-	privateAPI, err := newPrivateAPI(ctx, scaledContext, authToken)
-	if err != nil {
-		return nil, err
-	}
-
 	// Deprecated. Use /v1-public instead.
 	v3PublicAPI, err := publicapi.NewV3Handler(ctx, scaledContext, norman.ConfigureAPIUI)
 	if err != nil {
@@ -84,36 +79,12 @@ func newAPIManagement(ctx context.Context, scaledContext *config.ScaledContext, 
 
 	saml := saml.AuthHandler()
 
-	root := mux.NewRouter()
-	root.UseEncodedPath()
-
 	apiLimit, err := quantityAsInt64(getEnvWithDefault("CATTLE_AUTH_API_BODY_LIMIT", "1Mi"), 1024*1024)
 	if err != nil {
 		return nil, err
 	}
 	logrus.Infof("Configuring auth server API body limit to %v bytes", apiLimit)
 
-	p := handler.NewFromAuthConfigInterface(scaledContext.Management.AuthConfigs(""))
-	p.RegisterOIDCProviderHandlers(root)
-
-	limitingHandler := utils.APIBodyLimitingHandler(apiLimit)
-	root.PathPrefix("/v1-saml").Handler(limitingHandler(saml))
-	if features.V3Public.Enabled() {
-		root.PathPrefix("/v3-public").Handler(limitingHandler(v3PublicAPI)) // Deprecated. Use /v1-public instead.
-	}
-	root.PathPrefix("/v1-public").Handler(limitingHandler(v1PublicAPI))
-	if features.SCIM.Enabled() {
-		root.PathPrefix(scim.URLPrefix).Handler(limitingHandler(scim.NewHandler(scaledContext)))
-	}
-	root.NotFoundHandler = privateAPI
-
-	return func(next http.Handler) http.Handler {
-		privateAPI.NotFoundHandler = next
-		return root
-	}, nil
-}
-
-func newPrivateAPI(ctx context.Context, scaledContext *config.ScaledContext, authToken requests.AuthTokenGetter) (*mux.Router, error) {
 	logout := logout.NewHandler(ctx, tokens.NewManager(scaledContext.Wrangler))
 
 	tokenAPI, err := tokens.NewAPIHandler(ctx, scaledContext.Wrangler, logout, norman.ConfigureAPIUI)
@@ -126,17 +97,44 @@ func newPrivateAPI(ctx context.Context, scaledContext *config.ScaledContext, aut
 		return nil, err
 	}
 
-	root := mux.NewRouter()
-	root.UseEncodedPath()
-	root.Use(requests.NewAuthenticatedFilter)
-	root.PathPrefix("/v3/identit").Handler(tokenAPI)
-	root.PathPrefix("/v3/token").Handler(tokenAPI)
-	root.PathPrefix("/v3/authConfig").Handler(otherAPIs)
-	root.PathPrefix("/v3/principal").Handler(otherAPIs)
-	root.PathPrefix("/v3/user").Handler(otherAPIs)
-	root.PathPrefix("/v3/schema").Handler(otherAPIs)
-	root.PathPrefix("/v3/subscribe").Handler(otherAPIs)
-	return root, nil
+	return func(next http.Handler) http.Handler {
+		authedTokenAPI := requests.NewAuthenticatedFilter(tokenAPI)
+		authedOtherAPIs := requests.NewAuthenticatedFilter(otherAPIs)
+
+		v3Handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			path := r.URL.Path
+			if strings.HasPrefix(path, "/v3/identit") || strings.HasPrefix(path, "/v3/token") {
+				authedTokenAPI.ServeHTTP(w, r)
+			} else if strings.HasPrefix(path, "/v3/authConfig") ||
+				strings.HasPrefix(path, "/v3/principal") ||
+				strings.HasPrefix(path, "/v3/user") ||
+				strings.HasPrefix(path, "/v3/schema") ||
+				strings.HasPrefix(path, "/v3/subscribe") {
+				authedOtherAPIs.ServeHTTP(w, r)
+			} else {
+				next.ServeHTTP(w, r)
+			}
+		})
+
+		root := http.NewServeMux()
+
+		p := handler.NewFromAuthConfigInterface(scaledContext.Management.AuthConfigs(""))
+		p.RegisterOIDCProviderHandlers(root)
+
+		limitingHandler := utils.APIBodyLimitingHandler(apiLimit)
+		root.Handle("/v1-saml/", limitingHandler(saml))
+		if features.V3Public.Enabled() {
+			root.Handle("/v3-public/", limitingHandler(v3PublicAPI)) // Deprecated. Use /v1-public instead.
+		}
+		root.Handle("/v1-public/", limitingHandler(v1PublicAPI))
+		if features.SCIM.Enabled() {
+			root.Handle(fmt.Sprint(scim.URLPrefix, "/"), limitingHandler(scim.NewHandler(scaledContext)))
+		}
+		root.Handle("/v3/", v3Handler)
+		root.Handle("/", next)
+
+		return root
+	}, nil
 }
 
 func (s *Server) OnLeader(ctx context.Context) error {
