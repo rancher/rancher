@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/gorilla/mux"
 	"github.com/rancher/apiserver/pkg/server"
 	"github.com/rancher/apiserver/pkg/types"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -91,26 +90,33 @@ func (s *projectServer) middleware() func(http.Handler) http.Handler {
 	server := s.newAPIHandler()
 	server = prefix(server)
 
-	router := mux.NewRouter()
-	router.UseEncodedPath()
-	router.Path("/v1/management.cattle.io.clusters/{namespace}").Queries("link", "{type:projects?}").Handler(server)
-	router.Path("/v1/management.cattle.io.clusters/{namespace}/{type}").Handler(server)
-	router.Path("/v1/management.cattle.io.clusters/{namespace}/{type}/{name}").Handler(server)
-	router.Path("/v1/management.cattle.io.clusters/{clusterID}/{type}/{namespace}/{name}").Handler(server)
-
 	return func(next http.Handler) http.Handler {
-		router.NotFoundHandler = next
+		router := http.NewServeMux()
+		router.HandleFunc("/v1/management.cattle.io.clusters/{namespace}", func(w http.ResponseWriter, r *http.Request) {
+			link := r.URL.Query().Get("link")
+			if link == "projects" || link == "project" {
+				server.ServeHTTP(w, r)
+			} else {
+				next.ServeHTTP(w, r)
+			}
+		})
+		router.Handle("/v1/management.cattle.io.clusters/{namespace}/{type}", server)
+		router.Handle("/v1/management.cattle.io.clusters/{namespace}/{type}/{name}", server)
+		router.Handle("/v1/management.cattle.io.clusters/{clusterID}/{type}/{namespace}/{name}", server)
+		router.Handle("/", next)
 		return router
 	}
 }
 
 func prefix(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		vars := mux.Vars(req)
-		if vars["clusterID"] != "" {
-			vars["prefix"] = "/v1/management.cattle.io.clusters/" + vars["clusterID"]
-		} else {
-			vars["prefix"] = "/v1/management.cattle.io.clusters/" + vars["namespace"]
+		clusterID := req.PathValue("clusterID")
+		namespace := req.PathValue("namespace")
+
+		if clusterID != "" {
+			req.SetPathValue("prefix", "/v1/management.cattle.io.clusters/"+clusterID)
+		} else if namespace != "" {
+			req.SetPathValue("prefix", "/v1/management.cattle.io.clusters/"+namespace)
 		}
 		next.ServeHTTP(rw, req)
 	})

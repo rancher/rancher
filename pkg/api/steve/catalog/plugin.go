@@ -11,7 +11,6 @@ import (
 	neturl "net/url"
 	"path/filepath"
 
-	"github.com/gorilla/mux"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/plugin"
 	"github.com/sirupsen/logrus"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -19,9 +18,9 @@ import (
 
 type denyFunc func(host string) bool
 
-func RegisterUIPluginHandlers(router *mux.Router) {
+func RegisterUIPluginHandlers(router *http.ServeMux) {
 	router.HandleFunc("/v1/uiplugins", indexHandler)
-	router.HandleFunc("/v1/uiplugins/{name}/{version}/{rest:.*}", pluginHandler)
+	router.HandleFunc("/v1/uiplugins/{name}/{version}/{rest...}", pluginHandler)
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
@@ -40,13 +39,15 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func pluginHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	logrus.Debugf("http request vars %s", vars)
+	name := r.PathValue("name")
+	version := r.PathValue("version")
+	rest := r.PathValue("rest")
+	logrus.Debugf("http request vars name=%s version=%s rest=%s", name, version, rest)
 	authed := isAuthenticated(r)
-	entry, ok := plugin.Index.Entries[vars["name"]]
+	entry, ok := plugin.Index.Entries[name]
 	// Checks if the requested plugin exists and if the user has authorization to see it
-	if (!ok || entry.Version != vars["version"]) || (!authed && !entry.NoAuth) {
-		msg := fmt.Sprintf("plugin [name: %s version: %s] does not exist in index", vars["name"], vars["version"])
+	if (!ok || entry.Version != version) || (!authed && !entry.NoAuth) {
+		msg := fmt.Sprintf("plugin [name: %s version: %s] does not exist in index", name, version)
 		http.Error(w, msg, http.StatusNotFound)
 		logrus.Debug(msg)
 		return
@@ -55,14 +56,14 @@ func pluginHandler(w http.ResponseWriter, r *http.Request) {
 	if entry.NoCache || entry.CacheState == plugin.Pending {
 		if entry.Endpoint != "" {
 			logrus.Debugf("[noCache: %v] proxying request to [endpoint: %v]\n", entry.NoCache, entry.Endpoint)
-			proxyRequest(entry.Endpoint, vars["rest"], w, r, denylist)
+			proxyRequest(entry.Endpoint, rest, w, r, denylist)
 		} else {
 			logrus.Errorf("[noCache: %v] caching still in progress for [endpoint: %v]\n", entry.NoCache, entry.Endpoint)
 			http.Error(w, "caching still in progress", http.StatusTooEarly)
 		}
 	} else {
 		logrus.Debugf("[noCache: %v] serving plugin files from filesystem cache\n", entry.NoCache)
-		r.URL.Path = fmt.Sprintf("/%s/%s/%s", vars["name"], vars["version"], vars["rest"])
+		r.URL.Path = fmt.Sprintf("/%s/%s/%s", name, version, rest)
 		http.FileServer(http.Dir(plugin.FSCacheRootDir)).ServeHTTP(w, r)
 	}
 }
