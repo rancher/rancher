@@ -7,7 +7,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gorilla/mux"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/sirupsen/logrus"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -82,7 +81,7 @@ type scimUser struct {
 func (s *SCIMServer) ListUsers(w http.ResponseWriter, r *http.Request) {
 	logrus.Tracef("scim::ListUsers: url %s", r.URL)
 
-	provider := mux.Vars(r)["provider"]
+	provider := r.PathValue("provider")
 
 	// Parse pagination parameters.
 	pagination, err := parsePaginationParams(r)
@@ -214,7 +213,7 @@ func (s *SCIMServer) ListUsers(w http.ResponseWriter, r *http.Request) {
 func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 	logrus.Tracef("scim::CreateUser: url %s", r.URL)
 
-	provider := mux.Vars(r)["provider"]
+	provider := r.PathValue("provider")
 
 	payload := scimUser{}
 	err := json.NewDecoder(r.Body).Decode(&payload)
@@ -320,8 +319,8 @@ func (s *SCIMServer) CreateUser(w http.ResponseWriter, r *http.Request) {
 func (s *SCIMServer) GetUser(w http.ResponseWriter, r *http.Request) {
 	logrus.Tracef("scim::GetUser: query %s", r.URL)
 
-	provider := mux.Vars(r)["provider"]
-	id := mux.Vars(r)["id"]
+	provider := r.PathValue("provider")
+	id := r.PathValue("id")
 
 	user, err := s.userCache.Get(id)
 	if err != nil {
@@ -382,8 +381,8 @@ func (s *SCIMServer) GetUser(w http.ResponseWriter, r *http.Request) {
 func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	logrus.Tracef("scim::UpdateUser: url %s", r.URL)
 
-	provider := mux.Vars(r)["provider"]
-	id := mux.Vars(r)["id"]
+	provider := r.PathValue("provider")
+	id := r.PathValue("id")
 
 	payload := scimUser{}
 	err := json.NewDecoder(r.Body).Decode(&payload)
@@ -497,8 +496,8 @@ func (s *SCIMServer) UpdateUser(w http.ResponseWriter, r *http.Request) {
 //   - 409 if attempting to delete the default admin user.
 func (s *SCIMServer) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	logrus.Tracef("scim::DeleteUser: url %s", r.URL)
-	// provider := mux.Vars(r)["provider"]
-	id := mux.Vars(r)["id"]
+	// provider := r.PathValue("provider")
+	id := r.PathValue("id")
 
 	user, err := s.userCache.Get(id)
 	if err != nil {
@@ -542,8 +541,8 @@ func (s *SCIMServer) DeleteUser(w http.ResponseWriter, r *http.Request) {
 func (s *SCIMServer) PatchUser(w http.ResponseWriter, r *http.Request) {
 	logrus.Tracef("scim::PatchUser: url %s", r.URL)
 
-	provider := mux.Vars(r)["provider"]
-	id := mux.Vars(r)["id"]
+	provider := r.PathValue("provider")
+	id := r.PathValue("id")
 
 	user, err := s.userCache.Get(id)
 	if err != nil {
