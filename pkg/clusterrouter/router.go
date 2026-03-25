@@ -43,7 +43,7 @@ func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 }
 
 func response(rw http.ResponseWriter, code httperror.ErrorCode, message string) {
-	rw.WriteHeader(code.Status)
 	rw.Header().Set("content-type", "application/json")
+	rw.WriteHeader(code.Status)
 	json.NewEncoder(rw).Encode(httperror.NewAPIError(code, message))
 }
