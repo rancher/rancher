@@ -4,7 +4,6 @@ import (
 	"context"
 	"net/http"
 
-	gmux "github.com/gorilla/mux"
 	"github.com/rancher/rancher/pkg/api/steve/aggregation"
 	"github.com/rancher/rancher/pkg/api/steve/catalog"
 	"github.com/rancher/rancher/pkg/api/steve/github"
@@ -23,15 +22,20 @@ import (
 func AdditionalAPIsPreMCM(config *wrangler.Context) func(http.Handler) http.Handler {
 	if features.RKE2.Enabled() {
 		connectHandler := configserver.New(config)
-		mux := gmux.NewRouter()
-		mux.UseEncodedPath()
+		mux := http.NewServeMux()
 		mux.Handle(configserver.ConnectAgent, connectHandler)
 		mux.Handle(configserver.ConnectConfigYamlPath, connectHandler)
 		mux.Handle(configserver.ConnectClusterInfo, connectHandler)
 		mux.Handle(installer.SystemAgentInstallPath, installer.Handler)
 		mux.Handle(installer.WindowsRke2InstallPath, installer.Handler)
+		var nextHandler http.Handler
+		mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if nextHandler != nil {
+				nextHandler.ServeHTTP(w, r)
+			}
+		}))
 		return func(next http.Handler) http.Handler {
-			mux.NotFoundHandler = next
+			nextHandler = next
 			return mux
 		}
 	}
@@ -55,12 +59,11 @@ func AdditionalAPIs(ctx context.Context, config *wrangler.Context, steve *steve.
 		return nil, err
 	}
 
-	mux := gmux.NewRouter()
-	mux.UseEncodedPath()
+	mux := http.NewServeMux()
 	if features.UIExtension.Enabled() {
 		catalog.RegisterUIPluginHandlers(mux)
 	}
-	mux.Handle("/v1/github{path:.*}", githubHandler)
+	mux.Handle("/v1/github/", githubHandler)
 	mux.Handle("/v3/connect", Tunnel(config))
 
 	health.Register(mux)
@@ -73,8 +76,14 @@ func AdditionalAPIs(ctx context.Context, config *wrangler.Context, steve *steve.
 		p.RegisterOIDCProviderHandles(mux)
 	}
 
+	var nextHandler http.Handler
+	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if nextHandler != nil {
+			nextHandler.ServeHTTP(w, r)
+		}
+	}))
 	return func(next http.Handler) http.Handler {
-		mux.NotFoundHandler = clusterAPI(next)
+		nextHandler = clusterAPI(next)
 		return mux
 	}, nil
 }
