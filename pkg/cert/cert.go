@@ -44,7 +44,7 @@ func matchAndKeySize(publicKey crypto.PublicKey, privateKey crypto.PrivateKey) (
 		return "", 0, false
 	}
 
-	return "ECC", 256, privKey.X.Cmp(pubKey.X) == 0 && privKey.Y.Cmp(privKey.Y) == 0
+	return "ECC", 256, privKey.X.Cmp(pubKey.X) == 0 && privKey.Y.Cmp(pubKey.Y) == 0
 }
 
 func rsaMatchAndKeySize(publicKey crypto.PublicKey, privateKey crypto.PrivateKey) (string, int, bool) {
