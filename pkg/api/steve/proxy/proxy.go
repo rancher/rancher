@@ -71,19 +71,38 @@ func NewProxyMiddleware(sar v1.AuthorizationV1Interface,
 
 	proxyHandler := NewProxyHandler(authorizer, dialerFactory, clusters)
 
-	mux := gmux.NewRouter()
-	mux.UseEncodedPath()
-	mux.PathPrefix("/api").MatcherFunc(proxyHandler.matchManagementCRDs()).HandlerFunc(proxyHandler.authLocalCluster(mux))
-	mux.Path("/v1/management.cattle.io.clusters/{clusterID}").Queries("link", "shell").HandlerFunc(routeToShellProxy("link", "shell", localSupport, localCluster, mux, proxyHandler))
-	mux.Path("/v1/management.cattle.io.clusters/{clusterID}").Queries("action", "apply").HandlerFunc(routeToShellProxy("action", "apply", localSupport, localCluster, mux, proxyHandler))
-	mux.Path("/v3/clusters/{clusterID}").Queries("shell", "true").HandlerFunc(routeToShellProxy("link", "shell", localSupport, localCluster, mux, proxyHandler))
-	mux.Path("/{prefix:k8s/clusters/[^/]+}{suffix:/v1.*}").MatcherFunc(proxyHandler.MatchNonLegacy("/k8s/clusters/")).Handler(proxyHandler)
+	return func(next http.Handler) http.Handler {
+		mux := http.NewServeMux()
 
-	return func(handler http.Handler) http.Handler {
-		return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-			mux.NotFoundHandler = handler
-			mux.ServeHTTP(rw, req)
+		apiHandler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+			if proxyHandler.matchManagementCRDs(req) {
+				proxyHandler.authLocalCluster(next, rw, req)
+				return
+			}
+			next.ServeHTTP(rw, req)
 		})
+		mux.Handle("/api/", apiHandler)
+		mux.Handle("/apis/", apiHandler)
+		mux.HandleFunc("/v1/management.cattle.io.clusters/{clusterID}", func(rw http.ResponseWriter, req *http.Request) {
+			if req.URL.Query().Get("link") == "shell" {
+				routeToShellProxy("link", "shell", localSupport, localCluster, next, proxyHandler)(rw, req)
+			} else if req.URL.Query().Get("action") == "apply" {
+				routeToShellProxy("action", "apply", localSupport, localCluster, next, proxyHandler)(rw, req)
+			} else {
+				next.ServeHTTP(rw, req)
+			}
+		})
+		mux.HandleFunc("/v3/clusters/{clusterID}", func(rw http.ResponseWriter, req *http.Request) {
+			if req.URL.Query().Get("shell") == "true" {
+				routeToShellProxy("link", "shell", localSupport, localCluster, next, proxyHandler)(rw, req)
+			} else {
+				next.ServeHTTP(rw, req)
+			}
+		})
+		mux.Handle("/k8s/clusters/{clusterID}/v1/", proxyHandler)
+		mux.Handle("/", next)
+
+		return mux
 	}, nil
 }
 
