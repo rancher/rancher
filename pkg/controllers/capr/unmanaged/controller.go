@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
+	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterindex"
@@ -38,6 +40,10 @@ import (
 )
 
 const UnmanagedMachineKind = "CustomMachine"
+
+var (
+	mgmtNameRegexp = regexp.MustCompile("^(c-[a-z0-9]{5}|local)$")
+)
 
 func Register(ctx context.Context, clients *wrangler.CAPIContext, kubeconfigManager *kubeconfig.Manager) {
 	h := handler{
@@ -157,6 +163,10 @@ func (h *handler) onSecretChange(_ string, secret *corev1.Secret) (*corev1.Secre
 		return secret, nil
 	}
 
+	if mgmtNameRegexp.MatchString(secret.Namespace) {
+		return h.createMachinePlanForImported(secret, data)
+	}
+
 	capiCluster, err := h.getCAPICluster(secret)
 	if err != nil {
 		return secret, err
@@ -205,6 +215,8 @@ func (h *handler) createMachinePlanForImported(secret *corev1.Secret, data data.
 		labels[capr.WorkerRoleLabel] = "true"
 	}
 
+	var machine *apimgmtv3.Node
+
 	if val := data.String("node-name"); val != "" {
 		labels[capr.NodeNameLabel] = val
 
@@ -213,10 +225,13 @@ func (h *handler) createMachinePlanForImported(secret *corev1.Secret, data data.
 			return nil, err
 		}
 		if len(machines) != 1 {
-			return nil, fmt.Errorf("expected exactly one machine, but got %d", len(machine))
+			return nil, fmt.Errorf("expected exactly one machine, but got %d", len(machines))
 		}
 
-		machine := machines[0].DeepCopy()
+		machine = machines[0].DeepCopy()
+		if machine.Labels == nil {
+			machine.Labels = map[string]string{}
+		}
 		machine.Labels[capr.MachineIDLabel] = data.String("id")
 
 		machine, err = h.mgmtNodeClient.Update(machine)
@@ -240,47 +255,6 @@ func (h *handler) createMachinePlanForImported(secret *corev1.Secret, data data.
 		annotations[capr.InternalAddressAnnotation] = internalAddress
 	}
 
-	labelsMap := map[string]string{}
-	for _, str := range strings.Split(data.String("labels"), ",") {
-		k, v := kv.Split(str, "=")
-		if k == "" {
-			continue
-		}
-		labelsMap[k] = v
-		if _, ok := labels[k]; !ok {
-			labels[k] = v
-		}
-	}
-
-	if len(labelsMap) > 0 {
-		data, err := json.Marshal(labelsMap)
-		if err != nil {
-			return nil, err
-		}
-		annotations[capr.LabelsAnnotation] = string(data)
-	}
-
-	var coreTaints []corev1.Taint
-	for _, taint := range data.StringSlice("taints") {
-		coreTaints = append(coreTaints, taints.GetTaintsFromStrings(strings.Split(taint, ","))...)
-	}
-
-	if len(coreTaints) > 0 {
-		data, err := json.Marshal(coreTaints)
-		if err != nil {
-			return nil, err
-		}
-		annotations[capr.TaintsAnnotation] = string(data)
-	}
-
-	annotationWithTaints := func() map[string]string {
-		m := map[string]string{}
-		if annotations[capr.TaintsAnnotation] != "" {
-			m[capr.TaintsAnnotation] = annotations[capr.TaintsAnnotation]
-		}
-		return m
-	}
-
 	planSecretName := name.SafeConcatName(secret.Name, "machine", "plan")
 
 	sa := &corev1.ServiceAccount{
@@ -288,8 +262,12 @@ func (h *handler) createMachinePlanForImported(secret *corev1.Secret, data data.
 			Name:      planSecretName,
 			Namespace: secret.Namespace,
 			Labels: map[string]string{
-				capr.RoleLabel:  capr.RolePlan,
-				capr.PlanSecret: planSecretName,
+				capr.RoleLabel:             capr.RolePlan,
+				capr.PlanSecret:            planSecretName,
+				capr.MachineIDLabel:        data.String("id"),
+				capr.MachineNamespaceLabel: machine.Namespace,
+				capr.MachineNameLabel:      machine.Name,
+				capr.ClusterNameLabel:      machine.Namespace,
 			},
 		},
 	}
@@ -298,7 +276,7 @@ func (h *handler) createMachinePlanForImported(secret *corev1.Secret, data data.
 			Name:        planSecretName,
 			Namespace:   secret.Namespace,
 			Labels:      labels,
-			Annotations: annotationWithTaints(),
+			Annotations: annotations,
 		},
 		Type: capr.SecretTypeMachinePlan,
 	}
@@ -337,7 +315,23 @@ func (h *handler) createMachinePlanForImported(secret *corev1.Secret, data data.
 
 	objs := []runtime.Object{sa, planSecret, role, roleBinding}
 
-	return secret, h.apply.WithOwner(secret).ApplyObjects(objs...)
+	err := h.apply.WithOwner(secret).ApplyObjects(objs...)
+	if err != nil {
+		return secret, err
+	}
+
+	if secret.Labels[capr.MachineNameLabel] != machine.Name {
+		secret = secret.DeepCopy()
+		if secret.Labels == nil {
+			secret.Labels = map[string]string{}
+		}
+
+		secret.Labels[capr.MachineNamespaceLabel] = machine.Namespace
+		secret.Labels[capr.MachineNameLabel] = machine.Name
+		return h.secrets.Update(secret)
+	}
+
+	return secret, nil
 }
 
 func (h *handler) createMachine(capiCluster *capi.Cluster, secret *corev1.Secret, data data.Object) error {

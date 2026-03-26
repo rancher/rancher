@@ -6,6 +6,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/capr"
 	corev1 "k8s.io/api/core/v1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 func (r *RKE2ConfigServer) findMachineByProvisioningSA(req *http.Request) (*corev1.ObjectReference, error) {
@@ -28,5 +29,5 @@ func (r *RKE2ConfigServer) findMachineByProvisioningSA(req *http.Request) (*core
 		return nil, err
 	}
 
-	return &corev1.ObjectReference{Kind: "Machine", APIVersion: "cluster.x-k8s.io/v1beta2", Namespace: sa.Namespace, Name: sa.Labels[capr.MachineNameLabel]}, nil
+	return &corev1.ObjectReference{Kind: "Machine", APIVersion: capi.GroupVersion.String(), Namespace: sa.Namespace, Name: sa.Labels[capr.MachineNameLabel]}, nil
 }

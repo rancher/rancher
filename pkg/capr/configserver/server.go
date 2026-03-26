@@ -16,7 +16,6 @@ import (
 	mgmtcontroller "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	provisioningcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
-	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/tls"
@@ -140,7 +139,7 @@ func (r *RKE2ConfigServer) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 	}
 }
 
-func (r *RKE2ConfigServer) connectAgent(planSecret string, secret *v1.Secret, rw http.ResponseWriter, req *http.Request) {
+func (r *RKE2ConfigServer) connectAgent(planSecret string, secret *corev1.Secret, rw http.ResponseWriter, req *http.Request) {
 	var ca []byte
 	url, pem := settings.ServerURL.Get(), settings.CACerts.Get()
 	if strings.TrimSpace(pem) != "" {
@@ -241,10 +240,10 @@ func (r *RKE2ConfigServer) connectConfigYaml(name, ns string, rw http.ResponseWr
 	}
 
 	rw.Header().Set("Content-Type", "application/json")
-	rw.Write(jsonContent)
+	_, _ = rw.Write(jsonContent)
 }
 
-func (r *RKE2ConfigServer) connectClusterInfo(secret *v1.Secret, rw http.ResponseWriter, req *http.Request) {
+func (r *RKE2ConfigServer) connectClusterInfo(secret *corev1.Secret, rw http.ResponseWriter, req *http.Request) {
 	headers := dataFromHeaders(req)
 
 	// expecting -H "X-Cattle-Field: kubernetesversion" -H "X-Cattle-Field: name"
@@ -280,7 +279,7 @@ func (r *RKE2ConfigServer) connectClusterInfo(secret *v1.Secret, rw http.Respons
 	}
 
 	rw.Header().Set("Content-Type", "application/json")
-	rw.Write(jsonContent)
+	_, _ = rw.Write(jsonContent)
 }
 
 func (r *RKE2ConfigServer) infoKubernetesVersion(machineID, ns string) (string, error) {
@@ -352,7 +351,7 @@ func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, er
 	logrus.Debugf("[rke2configserver] %s/%s listed %d planSAs", ref.Namespace, ref.Name, len(planSAs))
 
 	for _, planSA := range planSAs {
-		if ref.APIVersion == "rke.cattle.io/v1" {
+		if ref.APIVersion == capi.GroupVersion.String() {
 			if err := capr.PlanSACheck(r.bootstrapCache, ref.Name, planSA); err != nil {
 				logrus.Errorf("[rke2configserver] error encountered when searching for checking planSA %s/%s against machine %s: %v", planSA.Namespace, planSA.Name, ref.Name, err)
 				continue
@@ -405,7 +404,7 @@ func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, er
 	for event := range respSA.ResultChan() {
 		var ok bool
 		if planSA, ok = event.Object.(*corev1.ServiceAccount); ok {
-			if ref.APIVersion == "rke.cattle.io/v1" {
+			if ref.APIVersion == capi.GroupVersion.String() {
 				if err := capr.PlanSACheck(r.bootstrapCache, ref.Name, planSA); err != nil {
 					logrus.Errorf("[rke2configserver] error encountered when searching for checking planSA %s/%s against machine %s: %v", planSA.Namespace, planSA.Name, ref.Name, err)
 					continue
@@ -469,7 +468,12 @@ func (r *RKE2ConfigServer) findSA(req *http.Request) (string, *corev1.Secret, er
 }
 
 func (r *RKE2ConfigServer) setOrUpdateMachineID(ref *corev1.ObjectReference, machineID string) error {
-	if ref == nil || ref.APIVersion != "management.cattle.io/v3" {
+	if ref == nil {
+		return nil
+	}
+
+	// Only update CAPI Machines; no-op for other kinds (e.g., management Nodes).
+	if ref.APIVersion != capi.GroupVersion.String() || ref.Kind != "Machine" {
 		return nil
 	}
 
@@ -495,14 +499,14 @@ func (r *RKE2ConfigServer) setOrUpdateMachineID(ref *corev1.ObjectReference, mac
 	return err
 }
 
-func (r *RKE2ConfigServer) getMachinePlanSecret(ns, name string) (*v1.Secret, error) {
+func (r *RKE2ConfigServer) getMachinePlanSecret(ns, name string) (*corev1.Secret, error) {
 	backoff := wait.Backoff{
 		Duration: 500 * time.Millisecond,
 		Factor:   2,
 		Steps:    10,
 		Cap:      2 * time.Second,
 	}
-	var secret *v1.Secret
+	var secret *corev1.Secret
 	return secret, wait.ExponentialBackoff(backoff, func() (bool, error) {
 		var err error
 		secret, err = r.secretsCache.Get(name, ns)

@@ -51,7 +51,6 @@ while [ $i -lt 30 ]; do
 done
 exit 1
 `
-
 	encryptionKeyRotationWaitForSecretsEncryptStatusScript = `
 #!/bin/sh
 

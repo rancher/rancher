@@ -183,7 +183,7 @@ func (h *handler) InstallSystemAgentUpgrader(_ string, cluster *rancherv1.Cluste
 	val, ok := cp.Annotations[AppliedSystemAgentUpgraderHashAnnotation]
 	if ok && hash == val {
 		logrus.Debugf("[managesystemagent] cluster %s/%s: applied templates for system-agent-upgrader is up to date. "+
-			"To trigger a force redeployment, remove the %s annotation from the conresponding rkeControlPlane object",
+			"To trigger a force redeployment, remove the %s annotation from the corresponding rkeControlPlane object",
 			cluster.Namespace, cluster.Name, AppliedSystemAgentUpgraderHashAnnotation)
 		return cluster, nil
 	}

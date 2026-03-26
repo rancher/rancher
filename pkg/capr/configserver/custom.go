@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 
+	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/capr"
 	corev1 "k8s.io/api/core/v1"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
@@ -72,7 +73,7 @@ func (r *RKE2ConfigServer) findMachineByClusterToken(req *http.Request) (*corev1
 
 	if imported {
 		return &corev1.ObjectReference{
-			APIVersion: "management.cattle.io/v3",
+			APIVersion: v3.SchemeGroupVersion.String(),
 			Kind:       "Node",
 			Namespace:  machineNamespace,
 			Name:       machineName,
@@ -80,7 +81,7 @@ func (r *RKE2ConfigServer) findMachineByClusterToken(req *http.Request) (*corev1
 	}
 
 	return &corev1.ObjectReference{
-		APIVersion: "cluster.x-k8s.io/v1beta2",
+		APIVersion: capi.GroupVersion.String(),
 		Kind:       "Machine",
 		Namespace:  machineNamespace,
 		Name:       machineName,
