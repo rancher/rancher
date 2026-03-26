@@ -488,7 +488,8 @@ func setConditionWithInterval(clusterRepo *catalog.ClusterRepo,
 		//Since status has changed, update the lastUpdatedTime
 		downloaded.LastUpdated(newStatus, timeNow().UTC().Format(time.RFC3339))
 		clusterRepo.Status = *newStatus
-		_, statusErr := controller.UpdateStatus(clusterRepo)
+		var statusErr error
+		clusterRepo, statusErr = controller.UpdateStatus(clusterRepo)
 		if statusErr != nil {
 			return clusterRepo, statusErr
 		}
@@ -519,7 +520,8 @@ func setCondition(clusterRepo *catalog.ClusterRepo,
 		//Since status has changed, update the lastUpdatedTime
 		downloaded.LastUpdated(newStatus, timeNow().UTC().Format(time.RFC3339))
 		clusterRepo.Status = *newStatus
-		_, statusErr := controller.UpdateStatus(clusterRepo)
+		var statusErr error
+		clusterRepo, statusErr = controller.UpdateStatus(clusterRepo)
 		if statusErr != nil {
 			return clusterRepo, statusErr
 		}

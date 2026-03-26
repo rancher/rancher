@@ -173,8 +173,6 @@ func (p *Provisioner) Updated(cluster *apimgmtv3.Cluster) (runtime.Object, error
 		}
 	}
 
-	// Return nil to norman to skip the redundant Update() write-back.
-	// All status changes are already persisted via UpdateStatus above.
 	return nil, err
 }
 

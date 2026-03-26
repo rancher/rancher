@@ -187,6 +187,7 @@ func (h *handler) modifyClusterCondition(cluster *mgmtv3.Cluster, masterPlan, wo
 	// implement a simple state machine
 	// UpgradedTrue => GenericUpgrading =>  MasterPlanUpgrading || WorkerPlanUpgrading =>  UpgradedTrue
 
+	var err error
 	cluster = cluster.DeepCopy()
 	if masterPlan.Name == "" && workerPlan.Name == "" {
 		if importedclusterversionmanagement.Enabled(cluster) {
@@ -206,7 +207,7 @@ func (h *handler) modifyClusterCondition(cluster *mgmtv3.Cluster, masterPlan, wo
 			// After the plans are removed, indicated by both plans being empty, the cluster's upgrade condition should be set to true.
 			if mgmtv3.ClusterConditionUpgraded.IsUnknown(cluster) {
 				cluster = upgradeDone(cluster)
-				cluster, err := h.clusterClient.UpdateStatus(cluster)
+				cluster, err = h.clusterClient.UpdateStatus(cluster)
 				if err != nil {
 					return cluster, err
 				}
@@ -240,7 +241,6 @@ func (h *handler) modifyClusterCondition(cluster *mgmtv3.Cluster, masterPlan, wo
 
 	var (
 		isMasterPlanVersionNewer, isWorkerPlanVersionNewer bool
-		err                                                error
 	)
 	if masterPlan.Name != "" && masterPlan.Spec.Version != "" {
 		isMasterPlanVersionNewer, err = nodesyncer.IsNewerVersion(cluster.Status.Version.GitVersion, masterPlan.Spec.Version)

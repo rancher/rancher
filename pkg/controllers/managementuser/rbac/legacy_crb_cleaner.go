@@ -86,9 +86,11 @@ func (c *crbCleaner) sync(key string, crb *rbacv1.ClusterRoleBinding) (*rbacv1.C
 		}
 
 		crb.Annotations[rbac.CrbAdminGlobalRoleCheckedAnnotation] = "true"
-		if _, err := c.crbs.Update(crb); err != nil {
+		updatedCrb, err := c.crbs.Update(crb)
+		if err != nil {
 			return nil, fmt.Errorf("updating ClusterRoleBinding %s: %w", crb.Name, err)
 		}
+		return updatedCrb, nil
 	}
 
 	return crb, nil

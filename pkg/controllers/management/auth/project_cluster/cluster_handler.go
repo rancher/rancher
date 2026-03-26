@@ -102,11 +102,15 @@ func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Objec
 	}
 
 	// update if it has changed
-	cluster := obj.(*apisv3.Cluster)
-	if obj != nil && !reflect.DeepEqual(orig.Annotations, cluster.Annotations) {
-		_, err = l.clusterClient.Update(cluster)
-		if err != nil {
-			return nil, err
+	var cluster *apisv3.Cluster
+	if obj != nil {
+		cluster = obj.(*apisv3.Cluster)
+		if !reflect.DeepEqual(orig.Annotations, cluster.Annotations) {
+			cluster, err = l.clusterClient.Update(cluster)
+			if err != nil {
+				return nil, err
+			}
+			obj = cluster
 		}
 	}
 
@@ -120,22 +124,24 @@ func (l *clusterLifecycle) Sync(key string, orig *apisv3.Cluster) (runtime.Objec
 	}
 
 	// update status if it has changed
-	cluster = obj.(*apisv3.Cluster)
-	if obj != nil && !reflect.DeepEqual(orig.Status.Conditions, cluster.Status.Conditions) {
-		logrus.Infof("[%s] Updating cluster status %s", ClusterCreateController, orig.Name)
-		toUpdate, err := l.clusterClient.Get(cluster.Name, metav1.GetOptions{})
-		if err != nil {
-			return nil, err
-		}
-		// Copy conditions this controller owns
-		util.CopyCondition(apisv3.NamespaceBackedResource, cluster, toUpdate)
-		util.CopyCondition(apisv3.ClusterConditionDefaultProjectCreated, cluster, toUpdate)
-		util.CopyCondition(apisv3.ClusterConditionSystemProjectCreated, cluster, toUpdate)
-		util.CopyCondition(apisv3.CreatorMadeOwner, cluster, toUpdate)
-		util.CopyCondition(apisv3.ClusterConditionInitialRolesPopulated, cluster, toUpdate)
-		_, err = l.clusterClient.UpdateStatus(toUpdate)
-		if err != nil {
-			return nil, err
+	if obj != nil {
+		cluster = obj.(*apisv3.Cluster)
+		if !reflect.DeepEqual(orig.Status.Conditions, cluster.Status.Conditions) {
+			logrus.Infof("[%s] Updating cluster status %s", ClusterCreateController, orig.Name)
+			toUpdate, err := l.clusterClient.Get(cluster.Name, metav1.GetOptions{})
+			if err != nil {
+				return nil, err
+			}
+			// Copy conditions this controller owns
+			util.CopyCondition(apisv3.NamespaceBackedResource, cluster, toUpdate)
+			util.CopyCondition(apisv3.ClusterConditionDefaultProjectCreated, cluster, toUpdate)
+			util.CopyCondition(apisv3.ClusterConditionSystemProjectCreated, cluster, toUpdate)
+			util.CopyCondition(apisv3.CreatorMadeOwner, cluster, toUpdate)
+			util.CopyCondition(apisv3.ClusterConditionInitialRolesPopulated, cluster, toUpdate)
+			_, err = l.clusterClient.UpdateStatus(toUpdate)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -391,21 +397,22 @@ func (l *clusterLifecycle) reconcileClusterCreatorRTB(obj runtime.Object) (runti
 
 		updateCondition := reflect.DeepEqual(roleMap["required"], createdRoles)
 
-		err = l.updateClusterAnnotation(cluster, string(d))
+		cluster, err = l.updateClusterAnnotation(cluster, string(d))
 		if err != nil {
 			return obj, err
 		}
-
+		// obj has all the conditions set so far and will be persisted with UpdateStatus at the end of Sync.
 		if updateCondition {
-			apisv3.ClusterConditionInitialRolesPopulated.True(cluster)
+			apisv3.ClusterConditionInitialRolesPopulated.True(obj)
 		}
 
 		return obj, err
 	})
 }
 
-func (l *clusterLifecycle) updateClusterAnnotation(cluster *apisv3.Cluster, annotation string) error {
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+func (l *clusterLifecycle) updateClusterAnnotation(cluster *apisv3.Cluster, annotation string) (*apisv3.Cluster, error) {
+	var updated *apisv3.Cluster
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		c, err := l.clusterClient.Get(cluster.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -413,7 +420,8 @@ func (l *clusterLifecycle) updateClusterAnnotation(cluster *apisv3.Cluster, anno
 
 		c.Annotations[roleTemplatesRequiredAnnotation] = annotation
 
-		_, err = l.clusterClient.Update(c)
+		updated, err = l.clusterClient.Update(c)
 		return err
 	})
+	return updated, err
 }

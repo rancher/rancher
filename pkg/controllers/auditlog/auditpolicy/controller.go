@@ -83,7 +83,7 @@ func (h *handler) OnChange(key string, obj *auditlogv1.AuditPolicy) (*auditlogv1
 		Reason:             reasonPolicyIsActive,
 	})
 
-	if obj, err := h.auditpolicy.UpdateStatus(obj); err != nil {
+	if obj, err = h.auditpolicy.UpdateStatus(obj); err != nil {
 		return obj, fmt.Errorf("could not mark audit log policy active: %s", err)
 	}
 
