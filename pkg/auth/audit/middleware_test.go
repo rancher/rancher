@@ -55,12 +55,17 @@ func newSizedResponseHandler(size int, statusCode int) http.HandlerFunc {
 }
 
 // Helper function to setup audit writer with specific level (mirrors rancher.go setup)
-func newTestAuditWriter(level auditlogv1.Level) (*Writer, *bytes.Buffer) {
+func newTestAuditWriter(level auditlogv1.Level, opts ...func(*WriterOptions)) (*Writer, *bytes.Buffer) {
 	out := &bytes.Buffer{}
-	writer, err := NewWriter(out, WriterOptions{
+	options := WriterOptions{
 		DefaultPolicyLevel:     level,
 		DisableDefaultPolicies: false,
-	})
+	}
+	for _, opt := range opts {
+		opt(&options)
+	}
+
+	writer, err := NewWriter(out, options)
 	if err != nil {
 		panic(fmt.Sprintf("failed to create audit writer: %v", err))
 	}
@@ -283,6 +288,80 @@ func TestMiddlewareStatusCodes(t *testing.T) {
 	}
 }
 
+// TestMiddlewareGroups tests that request bodies are buffered at appropriate levels
+func TestMiddlewareGroupsLogging(t *testing.T) {
+	tests := map[string]struct {
+		name                   string
+		level                  auditlogv1.Level
+		method                 string
+		expectGroupsInAuditLog bool
+		options                []func(*WriterOptions)
+	}{
+
+		"LevelNull_HasGroups": {
+			level:                  auditlogv1.LevelNull,
+			method:                 http.MethodPost,
+			expectGroupsInAuditLog: true,
+		},
+		"LevelHeaders_HasGroups": {
+			level:                  auditlogv1.LevelHeaders,
+			method:                 http.MethodPost,
+			expectGroupsInAuditLog: true,
+		},
+		"LevelRequest_HasGroups": {
+			level:                  auditlogv1.LevelRequest,
+			method:                 http.MethodPost,
+			expectGroupsInAuditLog: true,
+		},
+		"LevelRequestResponse_HasGroups": {
+			level:                  auditlogv1.LevelRequestResponse,
+			method:                 http.MethodPost,
+			expectGroupsInAuditLog: true,
+		},
+		"LevelRequestResponse_WithNoGroups": {
+			level:  auditlogv1.LevelRequestResponse,
+			method: http.MethodPost,
+			options: []func(*WriterOptions){func(o *WriterOptions) {
+				o.ExcludeGroups = true
+			}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			writer, auditOutput := newTestAuditWriter(tt.level, tt.options...)
+			middleware := NewAuditLogMiddleware(writer)
+
+			requestBody := `{"cluster":"test"}`
+			handler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+				// Verify the handler can still read the body
+				body, err := io.ReadAll(req.Body)
+				require.NoError(t, err)
+				assert.Equal(t, requestBody, string(body), "handler should still be able to read request body")
+
+				rw.WriteHeader(http.StatusOK)
+			})
+
+			wrappedHandler := middleware(handler)
+			req := newTestRequest(tt.method, "/v3/clusters", strings.NewReader(requestBody))
+			rw := httptest.NewRecorder()
+
+			wrappedHandler.ServeHTTP(rw, req)
+
+			// Check audit log content
+			auditLogContent := auditOutput.String()
+			if tt.expectGroupsInAuditLog {
+				assert.Contains(t, auditLogContent, "group", "audit log should contain groups")
+			} else {
+				// If groups are not expected it should contain an empty value.
+				if strings.Contains(auditLogContent, "group") {
+					assert.Contains(t, auditLogContent, `"group":null`, "group should be null")
+				}
+			}
+		})
+	}
+}
+
 // =============================================================================
 // INTERFACE PRESERVATION TESTS
 // =============================================================================
@@ -351,25 +430,25 @@ func TestMiddlewareHijack(t *testing.T) {
 // This test demonstrates the bug: memory grows even when audit level doesn't need response body
 func TestMiddlewareMemoryUsage(t *testing.T) {
 	tests := []struct {
-		name                 string
-		level                auditlogv1.Level
-		responseSize         int
-		expectLargeMemUsage  bool
-		description          string
+		name                string
+		level               auditlogv1.Level
+		responseSize        int
+		expectLargeMemUsage bool
+		description         string
 	}{
 		{
-			name:                 "LevelNull_LargeResponse_ShouldNotBuffer",
-			level:                auditlogv1.LevelNull,
-			responseSize:         10 * 1024 * 1024, // 10MB
-			expectLargeMemUsage:  false,
-			description:          "Should not buffer response body at LevelNull, but currently does (bug)",
+			name:                "LevelNull_LargeResponse_ShouldNotBuffer",
+			level:               auditlogv1.LevelNull,
+			responseSize:        10 * 1024 * 1024, // 10MB
+			expectLargeMemUsage: false,
+			description:         "Should not buffer response body at LevelNull, but currently does (bug)",
 		},
 		{
-			name:                 "LevelRequestResponse_LargeResponse_ShouldBuffer",
-			level:                auditlogv1.LevelRequestResponse,
-			responseSize:         10 * 1024 * 1024, // 10MB
-			expectLargeMemUsage:  true,
-			description:          "Should buffer response body at LevelRequestResponse",
+			name:                "LevelRequestResponse_LargeResponse_ShouldBuffer",
+			level:               auditlogv1.LevelRequestResponse,
+			responseSize:        10 * 1024 * 1024, // 10MB
+			expectLargeMemUsage: true,
+			description:         "Should buffer response body at LevelRequestResponse",
 		},
 	}
 

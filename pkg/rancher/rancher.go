@@ -106,6 +106,7 @@ type Options struct {
 	AuditLogMaxbackup              int
 	AuditLogLevel                  int
 	AuditLogEnabled                bool
+	AuditLogExcludeGroups          bool
 	Features                       string
 	ClusterRegistry                string
 	AggregationRegistrationTimeout time.Duration
@@ -343,6 +344,7 @@ func New(ctx context.Context, clientConfg clientcmd.ClientConfig, opts *Options)
 		auditLogWriter, err = audit.NewWriter(out, audit.WriterOptions{
 			DefaultPolicyLevel:     auditlogv1.Level(opts.AuditLogLevel),
 			DisableDefaultPolicies: !opts.AuditLogEnabled,
+			ExcludeGroups:          opts.AuditLogExcludeGroups,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create audit log writer: %w", err)
