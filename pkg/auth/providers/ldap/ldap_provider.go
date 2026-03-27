@@ -1,6 +1,7 @@
 package ldap
 
 import (
+	"cmp"
 	"crypto/x509"
 	"errors"
 	"fmt"
@@ -79,8 +80,6 @@ type ldapProvider struct {
 	caPool                *x509.CertPool
 	providerName          string
 	testAndApplyInputType string
-	userScope             string
-	groupScope            string
 }
 
 func Configure(mgmtCtx *config.ScaledContext, userMGR userManager, tokenMGR tokenManager, providerName string) common.AuthProvider {
@@ -91,18 +90,34 @@ func Configure(mgmtCtx *config.ScaledContext, userMGR userManager, tokenMGR toke
 		tokenMGR:              tokenMGR,
 		providerName:          providerName,
 		testAndApplyInputType: testAndApplyInputTypes[providerName],
-		userScope:             providerName + "_user",
-		groupScope:            providerName + "_group",
 	}
 }
 
-func GetLDAPConfig(authProvider common.AuthProvider) (*v3.LdapConfig, *x509.CertPool, error) {
+// userScope returns the scope of user principal IDs issued by the config,
+// e.g. "corp-ldap_user".
+func (p *ldapProvider) userScope(config *v3.LdapConfig) string {
+	return cmp.Or(config.Name, p.providerName) + "_" + common.UserPrincipalType
+}
+
+// groupScope returns the scope of group principal IDs issued by the config,
+// e.g. "corp-ldap_group".
+func (p *ldapProvider) groupScope(config *v3.LdapConfig) string {
+	return cmp.Or(config.Name, p.providerName) + "_" + common.GroupPrincipalType
+}
+
+func (p *ldapProvider) isValidScope(config *v3.LdapConfig, scope string) bool {
+	return scope == p.userScope(config) || scope == p.groupScope(config)
+}
+
+// GetLDAPConfig returns the LDAP config for the named AuthConfig from an LDAP
+// provider. If configName is empty, the provider's default config is used.
+func GetLDAPConfig(authProvider common.AuthProvider, configName string) (*v3.LdapConfig, *x509.CertPool, error) {
 	ldapProvider, ok := authProvider.(*ldapProvider)
 	if !ok {
 		return nil, nil, fmt.Errorf("can not get ldap config from type other than ldapProvider")
 	}
 
-	return ldapProvider.getLDAPConfig(ldapProvider.authConfigs.ObjectClient().UnstructuredClient())
+	return ldapProvider.getLDAPConfig(ldapProvider.authConfigs.ObjectClient().UnstructuredClient(), cmp.Or(configName, ldapProvider.GetName()))
 }
 
 // IsNotConfigured checks whether this error indicates a missing LDAP configuration.
@@ -148,7 +163,7 @@ func (p *ldapProvider) AuthenticateUser(_ http.ResponseWriter, _ *http.Request, 
 		return v3.Principal{}, nil, "", err
 	}
 
-	config, caPool, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient())
+	config, caPool, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient(), login.ConfigName)
 	if err != nil {
 		return v3.Principal{}, nil, "", errors.New("can't find authprovider")
 	}
@@ -168,16 +183,21 @@ func (p *ldapProvider) AuthenticateUser(_ http.ResponseWriter, _ *http.Request, 
 }
 
 // searchKey can be user PrincipalID e.g. shibboleth_user://username with principalType of group for group search by user
-func (p *ldapProvider) SearchPrincipals(searchKey, principalType string, myToken accessor.TokenAccessor) ([]v3.Principal, error) {
-	var principals []v3.Principal
-	var err error
+func (p *ldapProvider) SearchPrincipals(searchKey, principalType string, token accessor.TokenAccessor) ([]v3.Principal, error) {
+	// TODO: This will fail for cross-provider access.
+	configName, err := common.ConfigNameFromToken(token)
+	if err != nil {
+		return nil, err
+	}
 
-	config, caPool, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient())
+	var principals []v3.Principal
+	config, caPool, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient(), configName)
 	if err != nil {
 		if IsNotConfigured(err) {
 			return principals, err
 		}
 		logrus.Warnf("ldap search principals failed to get ldap config: %s\n", err)
+		// Warning: this does not return the error here?
 		return principals, nil
 	}
 
@@ -193,11 +213,11 @@ func (p *ldapProvider) SearchPrincipals(searchKey, principalType string, myToken
 		for _, principal := range principals {
 			switch principal.PrincipalType {
 			case "user":
-				if common.SamePrincipal(myToken.GetUserPrincipal(), principal) {
+				if common.SamePrincipal(token.GetUserPrincipal(), principal) {
 					principal.Me = true
 				}
 			case "group":
-				if p.isMemberOf(myToken.GetGroupPrincipals(), principal) {
+				if p.isMemberOf(token.GetGroupPrincipals(), principal) {
 					principal.MemberOf = true
 				}
 			}
@@ -208,7 +228,14 @@ func (p *ldapProvider) SearchPrincipals(searchKey, principalType string, myToken
 }
 
 func (p *ldapProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
-	config, caPool, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient())
+	// The principal is looked up using the AuthConfig that issued it, which
+	// may not be the one that issued the token.
+	configName, _, _, err := common.SplitPrincipalID(principalID)
+	if err != nil {
+		return v3.Principal{}, err
+	}
+
+	config, caPool, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient(), configName)
 	if err != nil {
 		if IsNotConfigured(err) {
 			return v3.Principal{}, err
@@ -250,11 +277,10 @@ func (p *ldapProvider) isMemberOf(myGroups []v3.Principal, other v3.Principal) b
 	return false
 }
 
-func (p *ldapProvider) getLDAPConfig(genericClient objectclient.GenericClient) (*v3.LdapConfig, *x509.CertPool, error) {
-	// TODO See if this can be simplified. also, this makes an api call everytime. find a better way
-	authConfigObj, err := genericClient.Get(p.providerName, metav1.GetOptions{})
+func (p *ldapProvider) getLDAPConfig(genericClient objectclient.GenericClient, configName string) (*v3.LdapConfig, *x509.CertPool, error) {
+	authConfigObj, err := genericClient.Get(configName, metav1.GetOptions{})
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to retrieve %s, error: %w", p.providerName, err)
+		return nil, nil, fmt.Errorf("failed to retrieve %s, error: %w", configName, err)
 	}
 
 	u, ok := authConfigObj.(runtime.Unstructured)
@@ -286,6 +312,11 @@ func (p *ldapProvider) getLDAPConfig(genericClient objectclient.GenericClient) (
 		}
 	}
 
+	// LDAP configs nested in SAML configs don't have their own metadata.
+	if storedLdapConfig.Name == "" {
+		storedLdapConfig.Name = configName
+	}
+
 	if p.certs != storedLdapConfig.Certificate || p.caPool == nil {
 		pool, err := ldap.NewCAPool(storedLdapConfig.Certificate)
 		if err != nil {
@@ -308,7 +339,12 @@ func (p *ldapProvider) getLDAPConfig(genericClient objectclient.GenericClient) (
 }
 
 func (p *ldapProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
-	config, _, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient())
+	configName, _, _, err := common.SplitPrincipalID(userPrincipalID)
+	if err != nil {
+		return false, err
+	}
+
+	config, _, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient(), configName)
 	if err != nil {
 		logrus.Errorf("Error fetching ldap config: %v", err)
 		return false, err
@@ -317,18 +353,17 @@ func (p *ldapProvider) CanAccessWithGroupProviders(userPrincipalID string, group
 	if err != nil {
 		return false, err
 	}
+
 	return allowed, nil
 }
 
 func (p *ldapProvider) getDNAndScopeFromPrincipalID(principalID string) (string, string, error) {
-	parts := strings.SplitN(principalID, ":", 2)
-	if len(parts) != 2 {
-		return "", "", fmt.Errorf("invalid id %s", principalID)
+	configName, principalType, externalID, err := common.SplitPrincipalID(principalID)
+	if err != nil {
+		return "", "", err
 	}
-	scope := parts[0]
-	externalID := strings.TrimPrefix(parts[1], "//")
 
-	return externalID, scope, nil
+	return externalID, configName + "_" + principalType, nil
 }
 
 // if provider only enabled for search by a SAML provider
@@ -342,8 +377,8 @@ func (p *ldapProvider) samlSearchProvider() bool {
 func (p *ldapProvider) samlSearchGetPrincipal(
 	externalID string, scope string, config *v3.LdapConfig, caPool *x509.CertPool) (*v3.Principal, error) {
 
-	if scope != p.userScope && scope != p.groupScope {
-		return nil, fmt.Errorf("invalid %s and/or %s scope", p.userScope, p.groupScope)
+	if !p.isValidScope(config, scope) {
+		return nil, fmt.Errorf("invalid %s and/or %s scope", p.userScope(config), p.groupScope(config))
 	}
 
 	lConn, err := ldap.Connect(config, caPool)
@@ -360,7 +395,7 @@ func (p *ldapProvider) samlSearchGetPrincipal(
 
 	var searchRequest *ldapv3.SearchRequest
 
-	if scope == p.userScope {
+	if scope == p.userScope(config) {
 		filter := fmt.Sprintf(
 			"(&(%s=%s)(%s=%s))",
 			ObjectClass, ldap.SanitizeAttr(config.UserObjectClass),
@@ -416,7 +451,7 @@ func (p *ldapProvider) samlSearchGetPrincipal(
 // falling back to the entry DN when the attribute is absent.
 func (p *ldapProvider) samlSearchExternalID(entry *ldapv3.Entry, scope string, config *v3.LdapConfig) string {
 	attribute := config.GroupDNAttribute
-	if scope == p.userScope {
+	if scope == p.userScope(config) {
 		attribute = config.UserLoginAttribute
 	}
 	if values := ldap.GetAttributeValuesByName(entry.Attributes, attribute); len(values) > 0 {
@@ -428,8 +463,8 @@ func (p *ldapProvider) samlSearchExternalID(entry *ldapv3.Entry, scope string, c
 func (p *ldapProvider) getPrincipalByAttribute(
 	externalID, scope, identifierAttribute string, config *v3.LdapConfig, caPool *x509.CertPool,
 ) (*v3.Principal, error) {
-	if scope != p.userScope && scope != p.groupScope {
-		return nil, fmt.Errorf("invalid %s and/or %s scope", p.userScope, p.groupScope)
+	if !p.isValidScope(config, scope) {
+		return nil, fmt.Errorf("invalid %s and/or %s scope", p.userScope(config), p.groupScope(config))
 	}
 
 	lConn, err := ldap.Connect(config, caPool)
@@ -449,7 +484,7 @@ func (p *ldapProvider) getPrincipalByAttribute(
 
 func (p *ldapProvider) searchPrincipalByAttribute(lConn ldapv3.Client, externalID, scope, identifierAttribute string, config *v3.LdapConfig) (*v3.Principal, error) {
 	var searchRequest *ldapv3.SearchRequest
-	if scope == p.userScope {
+	if scope == p.userScope(config) {
 		searchRequest = ldap.NewIdentifierSearchRequest(
 			config.UserSearchBase,
 			config.UserObjectClass,
@@ -501,7 +536,7 @@ func (p *ldapProvider) searchPrincipalByAttribute(lConn ldapv3.Client, externalI
 }
 
 func (p *ldapProvider) identifierAttributeForScope(config *v3.LdapConfig, scope string) string {
-	if scope == p.userScope {
+	if scope == p.userScope(config) {
 		return config.UserIDAttribute
 	}
 	return config.GroupIDAttribute
@@ -512,8 +547,8 @@ func (p *ldapProvider) GetUserExtraAttributes(userPrincipal v3.Principal) map[st
 }
 
 // IsDisabledProvider checks if the LDAP auth provider is currently disabled in Rancher.
-func (p *ldapProvider) IsDisabledProvider() (bool, error) {
-	ldapConfig, _, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient())
+func (p *ldapProvider) IsDisabledProvider(configName string) (bool, error) {
+	ldapConfig, _, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient(), configName)
 	if err != nil {
 		return false, err
 	}

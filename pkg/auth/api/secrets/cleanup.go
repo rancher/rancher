@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v3/pkg/name"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -24,15 +25,17 @@ func CleanupClientSecrets(secretInterface wcorev1.SecretController, config *v3.A
 		return fmt.Errorf("cannot delete auth provider %s because it's unknown to Rancher", config.Type)
 	}
 
+	prefix := common.SecretNamePrefix(config.Name, config.Type)
 	var result error
 	for _, field := range fields {
-		err := common.DeleteSecret(secretInterface, config.Type, field)
+		err := common.DeleteSecret(secretInterface, prefix, field)
 		if err != nil && !apierrors.IsNotFound(err) {
 			result = errors.Join(result, err)
 		}
 	}
 
-	if slices.Contains(tokens.PerUserCacheProviders, config.Name) {
+	providerName := common.ProviderNameFromType(config.Type)
+	if slices.Contains(tokens.PerUserCacheProviders, providerName) {
 		err := CleanupOAuthTokens(secretInterface, config.Name)
 		result = errors.Join(result, err)
 	}
@@ -40,7 +43,7 @@ func CleanupClientSecrets(secretInterface wcorev1.SecretController, config *v3.A
 	if fieldsMap, ok := SubTypeToFields[config.Type]; ok {
 		for _, slice := range fieldsMap {
 			for _, field := range slice {
-				err := common.DeleteSecret(secretInterface, config.Type, field)
+				err := common.DeleteSecret(secretInterface, prefix, field)
 				if err != nil && !apierrors.IsNotFound(err) {
 					result = errors.Join(result, err)
 				}
@@ -48,8 +51,10 @@ func CleanupClientSecrets(secretInterface wcorev1.SecretController, config *v3.A
 		}
 	}
 
-	for _, secretName := range NameToFields[config.Name] {
-		err := common.DeleteSecret(secretInterface, config.Name, secretName)
+	for _, secretName := range NameToFields[providerName] {
+		// Secrets named after the AuthConfig are shortened like the
+		// Azure access token secret, see clients.AccessTokenSecretName.
+		err := common.DeleteSecret(secretInterface, name.SafeConcatName(config.Name), secretName)
 		if err != nil && !apierrors.IsNotFound(err) {
 			result = errors.Join(result, err)
 		}

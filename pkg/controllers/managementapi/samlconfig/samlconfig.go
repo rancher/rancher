@@ -3,20 +3,32 @@ package samlconfig
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/saml"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
 type authProvider struct {
 	authConfigs v3.AuthConfigInterface
 	secrets     wcorev1.SecretController
+}
+
+var samlConfigTypes = []string{
+	client.ADFSConfigType,
+	client.OKTAConfigType,
+	client.PingConfigType,
+	client.KeyCloakConfigType,
+	client.GenericSAMLConfigType,
+	client.ShibbolethConfigType,
 }
 
 func Register(ctx context.Context, apiContext *config.ScaledContext) {
@@ -34,16 +46,22 @@ func newAuthProvider(apiContext *config.ScaledContext) *authProvider {
 
 func (a *authProvider) sync(key string, config *v3.AuthConfig) (runtime.Object, error) {
 	samlConfig := &v32.SamlConfig{}
-	if key == "" || config == nil {
+	if key == "" {
 		return nil, nil
 	}
 
-	if config.Name != saml.PingName && config.Name != saml.ADFSName && config.Name != saml.KeyCloakName &&
-		config.Name != saml.OKTAName && config.Name != saml.ShibbolethName && config.Name != saml.GenericSAMLName {
+	if config == nil || config.DeletionTimestamp != nil {
+		// Removing a config that isn't SAML is a no-op.
+		saml.RemoveSamlServiceProvider(key)
+		return nil, nil
+	}
+
+	if !slices.Contains(samlConfigTypes, config.Type) {
 		return nil, nil
 	}
 
 	if !config.Enabled {
+		saml.RemoveSamlServiceProvider(config.Name)
 		return nil, nil
 	}
 

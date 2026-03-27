@@ -1,6 +1,7 @@
 package azure
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -30,7 +31,7 @@ func (ap *Provider) formatter(apiContext *types.APIContext, resource *types.RawR
 }
 
 func (ap *Provider) actionHandler(actionName string, action *types.Action, request *types.APIContext) error {
-	handled, err := common.HandleCommonAction(actionName, action, request, Name, ap.authConfigs)
+	handled, err := common.HandleCommonAction(actionName, action, request, ProviderName, ap.authConfigs)
 	if err != nil {
 		return err
 	}
@@ -67,11 +68,14 @@ func (ap *Provider) ConfigureTest(request *types.APIContext) error {
 
 func (ap *Provider) testAndApply(request *types.APIContext) error {
 	var err error
+	// configName is set once the request is decoded, so that only the access
+	// token for the config being applied is deleted.
+	configName := ProviderName
 	// On any error, delete the cached secret containing the access token to the Microsoft Graph, in case it had been
 	// cached without having sufficient API permissions. Rancher has no precise control over when this secret is cached.
 	defer func() {
 		if err != nil {
-			if err = ap.secrets.Delete(common.SecretsNamespace, clients.AccessTokenSecretName, &metav1.DeleteOptions{}); err != nil {
+			if err = ap.secrets.Delete(common.SecretsNamespace, clients.AccessTokenSecretName(configName), &metav1.DeleteOptions{}); err != nil {
 				logrus.Errorf("Failed to delete the Azure AD access token secret from Kubernetes")
 			}
 		}
@@ -84,8 +88,10 @@ func (ap *Provider) testAndApply(request *types.APIContext) error {
 	}
 
 	azureADConfig := &azureADConfigApplyInput.Config
+	azureADConfig.Name = applyConfigName(azureADConfigApplyInput.ConfigName, azureADConfig.Name)
+	configName = azureADConfig.Name
 
-	currentConfig, err := ap.GetAzureConfigK8s()
+	currentConfig, err := ap.GetAzureConfigK8s(azureADConfig.Name)
 	if err != nil {
 		logrus.Errorf("Failed to fetch Azure AD Config from Kubernetes: %v", err)
 		return httperror.NewAPIError(httperror.ServerError, "failed to fetch Azure AD Config from Kubernetes")
@@ -126,7 +132,7 @@ func (ap *Provider) testAndApply(request *types.APIContext) error {
 
 	userExtraInfo := ap.GetUserExtraAttributes(userPrincipal)
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return ap.userMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
+		return ap.userMGR.UserAttributeCreateOrUpdate(user.Name, common.ConfigNameFromPrincipal(userPrincipal), groupPrincipals, userExtraInfo)
 	}); err != nil {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to create or update userAttribute: %v", err))
 	}
@@ -162,4 +168,11 @@ func migrateNewFlowAnnotation(proposed *apiv3.AzureADConfig) {
 		proposed.Annotations = make(map[string]string)
 	}
 	proposed.Annotations[GraphEndpointMigratedAnnotation] = "true"
+}
+
+// applyConfigName returns the name of the config to apply. Clients that don't
+// send a configName fall back to the name in the config, and then to the
+// default config for the provider.
+func applyConfigName(inputConfigName, configName string) string {
+	return cmp.Or(inputConfigName, configName, ProviderName)
 }

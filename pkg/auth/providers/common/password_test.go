@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	clientv3 "github.com/rancher/rancher/pkg/client/generated/management/v3"
@@ -134,4 +135,49 @@ func TestCreateOrUpdateSecretsNoUpdateWhenUnchanged(t *testing.T) {
 	got, err := CreateOrUpdateSecrets(secretController, value, field, authType)
 	assert.NoError(t, err)
 	assert.Equal(t, SecretsNamespace+":"+secretName, got)
+}
+
+func TestProviderNameFromType(t *testing.T) {
+	for configType, want := range map[string]string{
+		clientv3.GithubConfigType:          "github",
+		clientv3.AzureADConfigType:         "azuread",
+		clientv3.KeyCloakOIDCConfigType:    "keycloakoidc",
+		clientv3.GenericSAMLConfigType:     "genericsaml",
+		clientv3.ActiveDirectoryConfigType: "activedirectory",
+	} {
+		assert.Equal(t, want, ProviderNameFromType(configType), configType)
+	}
+}
+
+func TestSecretNamePrefix(t *testing.T) {
+	tests := []struct {
+		name       string
+		configName string
+		configType string
+		want       string
+	}{
+		{name: "default config", configName: "github", configType: clientv3.GithubConfigType, want: "githubconfig"},
+		{name: "no config name", configName: "", configType: clientv3.GithubConfigType, want: "githubconfig"},
+		{name: "default config with mixed case type", configName: "keycloakoidc", configType: clientv3.KeyCloakOIDCConfigType, want: "keycloakoidcconfig"},
+		{name: "additional config", configName: "github-eu", configType: clientv3.GithubConfigType, want: "githubconfig-github-eu"},
+		{name: "additional config named after another provider", configName: "azuread", configType: clientv3.GithubConfigType, want: "githubconfig-azuread"},
+		{name: "additional config with a long name", configName: strings.Repeat("a", 253), configType: clientv3.GithubConfigType, want: "githubconfig-" + strings.Repeat("a", 44) + "-d3f66"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := SecretNamePrefix(tt.configName, tt.configType)
+			assert.Equal(t, tt.want, got)
+			assert.LessOrEqual(t, len(got), 63)
+		})
+	}
+}
+
+func TestSecretNamePrefixLongNamesAreDistinct(t *testing.T) {
+	longName := strings.Repeat("a", 100)
+
+	assert.NotEqual(t,
+		SecretNamePrefix(longName+"-eu", clientv3.GithubConfigType),
+		SecretNamePrefix(longName+"-us", clientv3.GithubConfigType),
+	)
 }

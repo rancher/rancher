@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
+	"github.com/rancher/rancher/pkg/auth/providers/local"
 	"github.com/rancher/rancher/pkg/auth/scimconfig"
 	"github.com/rancher/rancher/pkg/auth/settings"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -35,7 +36,7 @@ type UserAuthRefresher interface {
 func NewUserAuthRefresher(scaledContext *config.ScaledContext) UserAuthRefresher {
 	extTokenStore := exttokenstore.NewSystemFromWrangler(scaledContext.Wrangler)
 
-	return &refresher{
+	r := &refresher{
 		tokenLister:               scaledContext.Management.Tokens("").Controller().Lister(),
 		tokens:                    scaledContext.Management.Tokens(""),
 		tokenMGR:                  tokens.NewManager(scaledContext.Wrangler),
@@ -43,9 +44,13 @@ func NewUserAuthRefresher(scaledContext *config.ScaledContext) UserAuthRefresher
 		userAttributes:            scaledContext.Management.UserAttributes(""),
 		userAttributeLister:       scaledContext.Management.UserAttributes("").Controller().Lister(),
 		extTokenStore:             extTokenStore,
+		authConfigLister:          scaledContext.Management.AuthConfigs("").Controller().Lister(),
 		ensureAndGetUserAttribute: scaledContext.UserManager.EnsureAndGetUserAttribute,
 		configMapCache:            scaledContext.Wrangler.Core.ConfigMap().Cache(),
 	}
+	r.isDisabledProvider = providers.IsDisabledProvider
+
+	return r
 }
 
 type refresher struct {
@@ -60,7 +65,20 @@ type refresher struct {
 	maxAge                    time.Duration
 	extTokenStore             *exttokenstore.SystemStore
 	ensureAndGetUserAttribute func(userID string) (*apiv3.UserAttribute, bool, error)
-	configMapCache            wcorev1.ConfigMapCache
+
+	configMapCache     wcorev1.ConfigMapCache
+	authConfigLister   v3.AuthConfigLister
+	isDisabledProvider func(providerName, configName string) (bool, error)
+}
+
+// configuredProvider identifies an AuthConfig and the provider that implements
+// it. Several AuthConfigs can share the same provider.
+type configuredProvider struct {
+	// configName is the name of the AuthConfig, used as the prefix for
+	// principal IDs and as the key for per-provider user attributes and tokens.
+	configName string
+	// providerName is the name of the registered provider implementation.
+	providerName string
 }
 
 func (r *refresher) ensureMaxAgeUpToDate(maxAge string) {
@@ -85,8 +103,9 @@ func (r *refresher) TriggerUserRefresh(userName string, force bool) {
 	}
 	r.Lock()
 	r.ensureMaxAgeUpToDate(settings.AuthUserInfoMaxAgeSeconds.Get())
+	maxAge := r.maxAge
 	r.Unlock()
-	if !force && (r.maxAge <= 0) {
+	if !force && (maxAge <= 0) {
 		logrus.Debugf("Skipping refresh trigger on user %v because max age setting is <= 0", userName)
 		return
 	}
@@ -118,7 +137,10 @@ func (r *refresher) triggerUserRefresh(userName string, force bool) {
 	now := time.Now().UTC()
 	// in the case there is an invalid (or no) last refresh ignore the error, lastrefresh will be 0
 	lastRefresh, _ := time.Parse(time.RFC3339, attribs.LastRefresh)
-	earliestRefresh := lastRefresh.Add(r.maxAge)
+	r.Lock()
+	maxAge := r.maxAge
+	r.Unlock()
+	earliestRefresh := lastRefresh.Add(maxAge)
 	if !force && now.Before(earliestRefresh) {
 		logrus.Debugf("Skipping refresh for %v due to max-age", userName)
 		return
@@ -209,8 +231,8 @@ func (r *refresher) disableToken(token accessor.TokenAccessor) error {
 	}
 }
 
-func (r *refresher) deleteLoginTokens(providerName string, loginTokens map[string][]accessor.TokenAccessor) error {
-	for _, token := range loginTokens[providerName] {
+func (r *refresher) deleteLoginTokens(configName string, loginTokens map[string][]accessor.TokenAccessor) error {
+	for _, token := range loginTokens[configName] {
 		if err := r.deleteToken(token); err != nil {
 			if apierrors.IsNotFound(err) {
 				continue
@@ -245,8 +267,14 @@ func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*apiv3.User
 	loginTokens := make(map[string][]accessor.TokenAccessor)
 	derivedTokens := make(map[string][]accessor.TokenAccessor)
 
+	// Tokens are grouped by the AuthConfig they were issued for rather than
+	// by provider, so tokens from different configs of the same provider are
+	// handled independently.
 	assign := func(token accessor.TokenAccessor) {
-		provider := token.GetAuthProvider()
+		provider, err := common.ConfigNameFromToken(token)
+		if err != nil {
+			provider = token.GetAuthProvider()
+		}
 		if token.GetIsDerived() {
 			derivedTokens[provider] = append(derivedTokens[provider], token)
 			derivedTokenList = append(derivedTokenList, token)
@@ -274,8 +302,12 @@ func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*apiv3.User
 		assign(&token)
 	}
 
-	for _, providerName := range providers.ProviderNames() {
-		canAccess, errConfirming, err := r.refreshProvider(attribs, providerName, user, loginTokens, derivedTokens, errorConfirmingLogins)
+	configured, err := r.configuredProviders()
+	if err != nil {
+		return nil, err
+	}
+	for _, provider := range configured {
+		canAccess, errConfirming, err := r.refreshProvider(attribs, provider, user, loginTokens, derivedTokens, errorConfirmingLogins)
 		if err != nil {
 			return nil, err
 		}
@@ -285,6 +317,10 @@ func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*apiv3.User
 		if canAccess {
 			canLogInAtAll = true
 		}
+	}
+
+	if err := r.cleanupDeletedConfigs(attribs, configured, loginTokens, errorConfirmingLogins); err != nil {
+		return nil, err
 	}
 
 	if canLogInAtAll || errorConfirmingLogins {
@@ -300,38 +336,40 @@ func (r *refresher) refreshAttributes(attribs *apiv3.UserAttribute) (*apiv3.User
 	return attribs, nil
 }
 
-// refreshProvider refreshes a single provider's state within attribs.
+// refreshProvider refreshes a single AuthConfig's state within attribs.
 // It returns whether the user can access the provider and whether there was
 // an error confirming their login (which prevents token cleanup).
 func (r *refresher) refreshProvider(
 	attribs *apiv3.UserAttribute,
-	providerName string,
+	provider configuredProvider,
 	user *apiv3.User,
 	loginTokens, derivedTokens map[string][]accessor.TokenAccessor,
 	errorConfirmingLogins bool,
 ) (canAccess bool, errConfirming bool, err error) {
-	principalID := GetPrincipalIDForProvider(providerName, user)
+	configName, providerName := provider.configName, provider.providerName
+	principalID := GetPrincipalIDForProvider(configName, user)
 
-	providerDisabled, err := providers.IsDisabledProvider(providerName)
+	providerDisabled, err := r.isDisabledProvider(providerName, configName)
 	if err != nil {
-		logrus.Warnf("Unable to determine if provider %s was disabled, will assume that it isn't with error: %v", providerName, err)
+		logrus.Warnf("Unable to determine if provider %s was disabled, will assume that it isn't with error: %v", configName, err)
 		providerDisabled = false
 	}
+
 	if providerDisabled {
 		principalID = ""
 	}
 
 	if principalID == "" {
-		attribs.GroupPrincipals[providerName] = apiv3.Principals{}
+		attribs.GroupPrincipals[configName] = apiv3.Principals{}
 		if !errorConfirmingLogins {
-			if err := r.deleteLoginTokens(providerName, loginTokens); err != nil {
+			if err := r.deleteLoginTokens(configName, loginTokens); err != nil {
 				return false, false, err
 			}
 		}
 		return false, false, nil
 	}
 
-	newGroupPrincipals, canRefresh, errConfirming, principalID, err := r.refreshGroupPrincipals(attribs, providerName, user.Name, principalID, loginTokens)
+	newGroupPrincipals, canRefresh, errConfirming, principalID, err := r.refreshGroupPrincipals(attribs, provider, user.Name, principalID, loginTokens)
 	if err != nil {
 		return false, false, err
 	}
@@ -339,7 +377,7 @@ func (r *refresher) refreshProvider(
 	if len(newGroupPrincipals) == 0 {
 		newGroupPrincipals = nil
 	}
-	attribs.GroupPrincipals[providerName] = apiv3.Principals{Items: newGroupPrincipals}
+	attribs.GroupPrincipals[configName] = apiv3.Principals{Items: newGroupPrincipals}
 
 	if principalID != "" && !errorConfirmingLogins && !errConfirming {
 		canStillAccess, err := providers.CanAccessWithGroupProviders(providerName, principalID, newGroupPrincipals)
@@ -349,12 +387,12 @@ func (r *refresher) refreshProvider(
 		canAccess = canStillAccess
 	}
 
-	if principalID != "" && canRefresh && (len(loginTokens[providerName]) > 0 || (len(derivedTokens[providerName]) > 0 && (canAccess || errorConfirmingLogins || errConfirming))) {
+	if principalID != "" && canRefresh && (len(loginTokens[configName]) > 0 || (len(derivedTokens[configName]) > 0 && (canAccess || errorConfirmingLogins || errConfirming))) {
 		var token accessor.TokenAccessor
-		if len(loginTokens[providerName]) > 0 {
-			token = loginTokens[providerName][0]
+		if len(loginTokens[configName]) > 0 {
+			token = loginTokens[configName][0]
 		} else {
-			token = derivedTokens[providerName][0]
+			token = derivedTokens[configName][0]
 		}
 		userPrincipal, err := providers.GetPrincipal(principalID, token)
 		if err != nil {
@@ -365,16 +403,16 @@ func (r *refresher) refreshProvider(
 			if attribs.ExtraByProvider == nil {
 				attribs.ExtraByProvider = make(map[string]map[string][]string)
 			}
-			if scimconfig.Enabled(r.configMapCache, providerName) {
+			if scimconfig.Enabled(r.configMapCache, configName) {
 				// Keep the stored keys the refresh doesn't set, such as SCIM's externalid and email.
-				userExtraInfo = common.MergeUserExtraAttributes(attribs.ExtraByProvider[providerName], userExtraInfo)
+				userExtraInfo = common.MergeUserExtraAttributes(attribs.ExtraByProvider[configName], userExtraInfo)
 			}
-			attribs.ExtraByProvider[providerName] = userExtraInfo
+			attribs.ExtraByProvider[configName] = userExtraInfo
 		}
 	}
 
 	if !canAccess && !errorConfirmingLogins && !errConfirming {
-		if err := r.deleteLoginTokens(providerName, loginTokens); err != nil {
+		if err := r.deleteLoginTokens(configName, loginTokens); err != nil {
 			return false, false, err
 		}
 	}
@@ -385,17 +423,18 @@ func (r *refresher) refreshProvider(
 // refreshGroupPrincipals fetches or preserves group principals for a provider.
 func (r *refresher) refreshGroupPrincipals(
 	attribs *apiv3.UserAttribute,
-	providerName string,
+	provider configuredProvider,
 	userName string,
 	principalID string,
 	loginTokens map[string][]accessor.TokenAccessor,
 ) (groups []apiv3.Principal, canRefresh bool, errConfirming bool, updatedPrincipalID string, err error) {
+	configName, providerName := provider.configName, provider.providerName
 	canRefresh = true
 	updatedPrincipalID = principalID
 	secret := ""
 
 	if providers.ProviderUsesUserSecrets(providerName) {
-		secret, err = r.tokenMGR.GetSecret(userName, providerName, loginTokens[providerName])
+		secret, err = r.tokenMGR.GetSecret(userName, configName, loginTokens[configName])
 		if apierrors.IsNotFound(err) {
 			canRefresh = false
 			errConfirming = true
@@ -405,7 +444,7 @@ func (r *refresher) refreshGroupPrincipals(
 	}
 
 	if !providers.ProviderCanRefreshPrincipals(providerName) || !canRefresh {
-		existing := attribs.GroupPrincipals[providerName].Items
+		existing := attribs.GroupPrincipals[configName].Items
 		if existing != nil {
 			groups = existing
 		}
@@ -427,10 +466,10 @@ func (r *refresher) refreshGroupPrincipals(
 	if err.Error() != "no access" {
 		errConfirming = true
 		logrus.Warnf(
-			"Error refreshing token principals for auth provider %s, userattribute %s, principal %s, skipping: %v",
-			providerName, attribs.Name, principalID, err,
+			"Error refreshing token principals for auth config %s, userattribute %s, principal %s, skipping: %v",
+			configName, attribs.Name, principalID, err,
 		)
-		existing := attribs.GroupPrincipals[providerName].Items
+		existing := attribs.GroupPrincipals[configName].Items
 		if existing != nil {
 			groups = existing
 		}
@@ -443,9 +482,74 @@ func (r *refresher) refreshGroupPrincipals(
 	return nil, canRefresh, errConfirming, updatedPrincipalID, nil
 }
 
-func GetPrincipalIDForProvider(providerName string, user *apiv3.User) string {
-	prefix := providerName + "_user://"
-	if providerName == "local" {
+// cleanupDeletedConfigs removes the state left behind by AuthConfigs that no
+// longer exist: their stored groups and extras and, unless a login couldn't
+// be confirmed, their login tokens.
+func (r *refresher) cleanupDeletedConfigs(
+	attribs *apiv3.UserAttribute,
+	configured []configuredProvider,
+	loginTokens map[string][]accessor.TokenAccessor,
+	errorConfirmingLogins bool,
+) error {
+	exists := make(map[string]bool, len(configured))
+	for _, provider := range configured {
+		exists[provider.configName] = true
+	}
+	// The local AuthConfig always exists, so a list without it is incomplete,
+	// for example because the cache hasn't synced. Don't treat every config
+	// as deleted.
+	if !exists[local.Name] {
+		return nil
+	}
+	deleted := func(configName string) bool {
+		return configName != "" && !exists[configName]
+	}
+
+	for configName := range attribs.GroupPrincipals {
+		if deleted(configName) {
+			delete(attribs.GroupPrincipals, configName)
+		}
+	}
+	for configName := range attribs.ExtraByProvider {
+		if deleted(configName) {
+			delete(attribs.ExtraByProvider, configName)
+		}
+	}
+
+	if errorConfirmingLogins {
+		return nil
+	}
+	for configName := range loginTokens {
+		if !deleted(configName) {
+			continue
+		}
+		if err := r.deleteLoginTokens(configName, loginTokens); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (r *refresher) configuredProviders() ([]configuredProvider, error) {
+	authConfigs, err := r.authConfigLister.List("", labels.Everything())
+	if err != nil {
+		return nil, fmt.Errorf("error listing auth configs: %w", err)
+	}
+
+	configured := make([]configuredProvider, 0, len(authConfigs))
+	for _, authConfig := range authConfigs {
+		configured = append(configured, configuredProvider{
+			configName:   authConfig.Name,
+			providerName: providers.NameFromType(authConfig.Type),
+		})
+	}
+	return configured, nil
+}
+
+func GetPrincipalIDForProvider(configName string, user *apiv3.User) string {
+	prefix := configName + "_user://"
+	if configName == "local" {
 		prefix = "local://"
 	}
 

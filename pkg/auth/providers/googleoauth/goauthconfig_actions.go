@@ -1,6 +1,7 @@
 package googleoauth
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -23,7 +24,7 @@ func (g *googleOauthProvider) formatter(apiContext *types.APIContext, resource *
 }
 
 func (g *googleOauthProvider) actionHandler(actionName string, action *types.Action, request *types.APIContext) error {
-	handled, err := common.HandleCommonAction(actionName, action, request, Name, g.authConfigs)
+	handled, err := common.HandleCommonAction(actionName, action, request, ProviderName, g.authConfigs)
 	if err != nil {
 		return err
 	}
@@ -62,14 +63,17 @@ func (g *googleOauthProvider) configureTest(request *types.APIContext) error {
 }
 
 func (g *googleOauthProvider) testAndApply(request *types.APIContext) error {
-	var googleOAuthConfig apiv3.GoogleOauthConfig
 	googleOAuthConfigApplyInput := &apiv3.GoogleOauthConfigApplyInput{}
 	if err := json.NewDecoder(request.Request.Body).Decode(googleOAuthConfigApplyInput); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("[Google OAuth] testAndApply: Failed to parse body: %v", err))
 	}
 
-	googleOAuthConfig = googleOAuthConfigApplyInput.GoogleOauthConfig
+	googleOAuthConfig := googleOAuthConfigApplyInput.GoogleOauthConfig
+	// TODO: Fix this when we're receiving the configName
+	configName := cmp.Or(googleOAuthConfigApplyInput.ConfigName, strings.ToLower(strings.TrimSuffix(googleOAuthConfigApplyInput.GoogleOauthConfig.AuthConfig.Type, "Config")))
+	googleOAuthConfig.ObjectMeta.Name = configName
+
 	googleLogin := &apiv3.GoogleOauthLogin{
 		Code: googleOAuthConfigApplyInput.Code,
 	}
@@ -114,7 +118,7 @@ func (g *googleOauthProvider) testAndApply(request *types.APIContext) error {
 
 	userExtraInfo := g.GetUserExtraAttributes(userPrincipal)
 	if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		return g.userMGR.UserAttributeCreateOrUpdate(user.Name, userPrincipal.Provider, groupPrincipals, userExtraInfo)
+		return g.userMGR.UserAttributeCreateOrUpdate(user.Name, common.ConfigNameFromPrincipal(userPrincipal), groupPrincipals, userExtraInfo)
 	}); err != nil {
 		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to create or update userAttribute: %v", err))
 	}

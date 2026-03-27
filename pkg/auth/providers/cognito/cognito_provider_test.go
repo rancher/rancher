@@ -7,11 +7,12 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/genericoidc"
 	"github.com/rancher/rancher/pkg/auth/providers/oidc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -25,21 +26,31 @@ func TestLogoutAllWhenNotEnabled(t *testing.T) {
 		providerName string = "cognito"
 	)
 
-	oidcConfig := newOIDCConfig("8090", func(s *v3.OIDCConfig) {
+	oidcConfig := newOIDCConfig("8090", func(s *apiv3.OIDCConfig) {
 		s.EndSessionEndpoint = "http://localhost:8090/user/logout"
 		s.LogoutAllEnabled = false
 	})
-	testToken := &v3.Token{UserID: userId, AuthProvider: providerName}
+	testToken := &apiv3.Token{
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cognito_user://9253000",
+			},
+			PrincipalType: "user",
+		},
+
+		UserID:       userId,
+		AuthProvider: providerName,
+	}
 	o := CognitoProvider{
 		GenOIDCProvider: genericoidc.GenOIDCProvider{
 			OpenIDCProvider: oidc.OpenIDCProvider{
 				Name:      providerName,
-				GetConfig: func() (*v3.OIDCConfig, error) { return oidcConfig, nil },
+				GetConfig: func(string) (*apiv3.OIDCConfig, error) { return oidcConfig, nil },
 			},
 		},
 	}
 
-	b, err := json.Marshal(&v3.AuthConfigLogoutInput{
+	b, err := json.Marshal(&apiv3.AuthConfigLogoutInput{
 		FinalRedirectURL: "https://example.com/logged-out",
 	})
 	require.NoError(t, err)
@@ -56,19 +67,30 @@ func TestLogoutAll(t *testing.T) {
 		providerName string = "cognito"
 	)
 
-	oidcConfig := newOIDCConfig("8090", func(s *v3.OIDCConfig) {
+	oidcConfig := newOIDCConfig("8090", func(s *apiv3.OIDCConfig) {
 		s.EndSessionEndpoint = "http://localhost:8090/user/logout"
 	})
-	testToken := &v3.Token{UserID: userId, AuthProvider: providerName}
+	testToken := &apiv3.Token{
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cognito_user://9253000",
+			},
+			PrincipalType: "user",
+		},
+
+		UserID:       userId,
+		AuthProvider: providerName,
+	}
+
 	o := CognitoProvider{
 		GenOIDCProvider: genericoidc.GenOIDCProvider{
 			OpenIDCProvider: oidc.OpenIDCProvider{
 				Name:      providerName,
-				GetConfig: func() (*v3.OIDCConfig, error) { return oidcConfig, nil },
+				GetConfig: func(string) (*apiv3.OIDCConfig, error) { return oidcConfig, nil },
 			},
 		},
 	}
-	b, err := json.Marshal(&v3.AuthConfigLogoutInput{
+	b, err := json.Marshal(&apiv3.AuthConfigLogoutInput{
 		FinalRedirectURL: "https://example.com/logged-out",
 	})
 	require.NoError(t, err)
@@ -96,16 +118,27 @@ func TestLogoutAllNoEndSessionEndpoint(t *testing.T) {
 	)
 
 	oidcConfig := newOIDCConfig("8090")
-	testToken := &v3.Token{UserID: userId, AuthProvider: providerName}
+	testToken := &apiv3.Token{
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cognito_user://9253000",
+			},
+			PrincipalType: "user",
+		},
+
+		UserID:       userId,
+		AuthProvider: providerName,
+	}
+
 	o := CognitoProvider{
 		GenOIDCProvider: genericoidc.GenOIDCProvider{
 			OpenIDCProvider: oidc.OpenIDCProvider{
 				Name:      providerName,
-				GetConfig: func() (*v3.OIDCConfig, error) { return oidcConfig, nil },
+				GetConfig: func(string) (*apiv3.OIDCConfig, error) { return oidcConfig, nil },
 			},
 		},
 	}
-	b, err := json.Marshal(&v3.AuthConfigLogoutInput{
+	b, err := json.Marshal(&apiv3.AuthConfigLogoutInput{
 		FinalRedirectURL: "https://example.com/logged-out",
 	})
 	require.NoError(t, err)
@@ -123,11 +156,11 @@ func TestLogout(t *testing.T) {
 	)
 
 	logoutTests := map[string]struct {
-		config *v3.OIDCConfig
+		config *apiv3.OIDCConfig
 		verify func(t require.TestingT, err error, msgAndArgs ...any)
 	}{
 		"when logout all is forced": {
-			config: newOIDCConfig("9090", func(s *v3.OIDCConfig) {
+			config: newOIDCConfig("9090", func(s *apiv3.OIDCConfig) {
 				s.LogoutAllForced = true
 			}),
 			verify: require.Error,
@@ -138,19 +171,30 @@ func TestLogout(t *testing.T) {
 		},
 	}
 
+	testToken := &apiv3.Token{
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "cognito_user://9253000",
+			},
+			PrincipalType: "user",
+		},
+
+		UserID:       userId,
+		AuthProvider: providerName,
+	}
+
 	for name, tt := range logoutTests {
 		t.Run(name, func(t *testing.T) {
-			testToken := &v3.Token{UserID: userId, AuthProvider: providerName}
 			o := CognitoProvider{
 				GenOIDCProvider: genericoidc.GenOIDCProvider{
 					OpenIDCProvider: oidc.OpenIDCProvider{
 						Name:      providerName,
-						GetConfig: func() (*v3.OIDCConfig, error) { return tt.config, nil },
+						GetConfig: func(string) (*apiv3.OIDCConfig, error) { return tt.config, nil },
 					},
 				},
 			}
 
-			b, err := json.Marshal(&v3.AuthConfigLogoutInput{
+			b, err := json.Marshal(&apiv3.AuthConfigLogoutInput{
 				FinalRedirectURL: "https://example.com/logged-out",
 			})
 			require.NoError(t, err)
@@ -163,8 +207,8 @@ func TestLogout(t *testing.T) {
 	}
 }
 
-func newOIDCConfig(port string, opts ...func(*v3.OIDCConfig)) *v3.OIDCConfig {
-	cfg := &v3.OIDCConfig{
+func newOIDCConfig(port string, opts ...func(*apiv3.OIDCConfig)) *apiv3.OIDCConfig {
+	cfg := &apiv3.OIDCConfig{
 		Issuer:           "http://localhost:" + port,
 		ClientID:         "test",
 		JWKSUrl:          "http://localhost:" + port + "/.well-known/jwks.json",

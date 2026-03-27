@@ -9,9 +9,12 @@ import (
 
 	"github.com/rancher/norman/api/writer"
 	"github.com/rancher/norman/types"
+	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/stretchr/testify/assert"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func Test_validScopes(t *testing.T) {
@@ -121,5 +124,56 @@ func TestConfigureTest(t *testing.T) {
 			assert.Equal(t, test.expectedRedirectURL, output.RedirectURL)
 		})
 	}
+}
+func TestConfigFromApplyInput(t *testing.T) {
+	tests := map[string]struct {
+		input    apiv3.OIDCApplyInput
+		wantName string
+	}{
+		"configName is used": {
+			input: apiv3.OIDCApplyInput{
+				ConfigName: "test-eu-oidc",
+				OIDCConfig: apiv3.OIDCConfig{AuthConfig: apiv3.AuthConfig{ObjectMeta: metav1.ObjectMeta{Name: "other"}}},
+			},
+			wantName: "test-eu-oidc",
+		},
+		"missing configName falls back to the config name": {
+			input: apiv3.OIDCApplyInput{
+				OIDCConfig: apiv3.OIDCConfig{AuthConfig: apiv3.AuthConfig{ObjectMeta: metav1.ObjectMeta{Name: "test-eu-oidc"}}},
+			},
+			wantName: "test-eu-oidc",
+		},
+		"missing configName and config name falls back to the provider name": {
+			input:    apiv3.OIDCApplyInput{},
+			wantName: ProviderName,
+		},
+	}
 
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			o := &OpenIDCProvider{Name: ProviderName}
+			tt.input.Code = "test-code"
+
+			config, login := o.configFromApplyInput(&tt.input)
+
+			assert.Equal(t, tt.wantName, config.Name)
+			assert.Equal(t, tt.wantName, login.ConfigName)
+			assert.Equal(t, "test-code", login.Code)
+			if assert.NotNil(t, config.GroupSearchEnabled) {
+				assert.False(t, *config.GroupSearchEnabled)
+			}
+		})
+	}
+}
+
+func TestConfigFromApplyInputCognito(t *testing.T) {
+	o := &OpenIDCProvider{Name: "cognito"}
+	input := &apiv3.OIDCApplyInput{
+		ConfigName: "test-eu-cognito",
+		OIDCConfig: apiv3.OIDCConfig{AuthConfig: apiv3.AuthConfig{Type: client.CognitoConfigType}},
+	}
+
+	config, _ := o.configFromApplyInput(input)
+
+	assert.Equal(t, cognitoGroupsClaim, config.GroupsClaim)
 }

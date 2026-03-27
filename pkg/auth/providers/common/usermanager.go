@@ -151,6 +151,9 @@ func (m *userManager) SetPrincipalOnCurrentUser(r *http.Request, principal v3.Pr
 	return m.SetPrincipalOnCurrentUserByUserID(userID, principal)
 }
 
+// SetPrincipalOnCurrentUserByUserID sets the specified principal on the user identified by the given userID.
+//
+// It ensures that the principal is unique to this user and updates the user's principal IDs accordingly.
 func (m *userManager) SetPrincipalOnCurrentUserByUserID(userID string, principal v3.Principal) (*v3.User, error) {
 	user, err := m.users.Get(userID, metav1.GetOptions{})
 	if err != nil {
@@ -165,10 +168,15 @@ func (m *userManager) SetPrincipalOnCurrentUserByUserID(userID string, principal
 		return user, errors.New("refusing to set principal on user that is already bound to another user")
 	}
 
-	if providerExists(user.PrincipalIDs, principal.Provider) {
+	configName, _, _, err := SplitPrincipalID(principal.Name)
+	if err != nil {
+		return nil, fmt.Errorf("parsing principal name: %w", err)
+	}
+
+	if providerExists(user.PrincipalIDs, configName) {
 		var principalIDs []string
 		for _, id := range user.PrincipalIDs {
-			if !strings.Contains(id, principal.Provider) {
+			if idConfigName, _, _, err := SplitPrincipalID(id); err != nil || idConfigName != configName {
 				principalIDs = append(principalIDs, id)
 			}
 		}
@@ -530,7 +538,10 @@ func (m *userManager) GetGroupsForTokenAuthProvider(token accessor.TokenAccessor
 
 	hitProvider := false
 	if attribs != nil {
-		tokenProvider := token.GetAuthProvider()
+		tokenProvider, err := ConfigNameFromToken(token)
+		if err != nil {
+			tokenProvider = token.GetAuthProvider()
+		}
 		for provider, y := range attribs.GroupPrincipals {
 			if provider == tokenProvider {
 				hitProvider = true
@@ -889,8 +900,13 @@ func grbByUser(obj any) ([]string, error) {
 
 func providerExists(principalIDs []string, provider string) bool {
 	for _, id := range principalIDs {
-		splitID := strings.Split(id, ":")[0]
-		if strings.Contains(splitID, provider) {
+		configName, _, _, err := SplitPrincipalID(id)
+		if err != nil {
+			logrus.Debugf("checking for existing provider %s: %s", provider, err)
+			continue
+		}
+
+		if provider == configName {
 			return true
 		}
 	}

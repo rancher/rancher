@@ -28,6 +28,7 @@ func (p *ldapProvider) loginUser(lConn ldapv3.Client, credentials *v3.BasicLogin
 
 	err := ldap.AuthenticateServiceAccountUser(config.ServiceAccountPassword, config.ServiceAccountDistinguishedName, "", lConn)
 	if err != nil {
+		logrus.Errorf("loginUser: failed to authenticate service account: %s", err)
 		return v3.Principal{}, nil, err
 	}
 
@@ -66,10 +67,12 @@ func (p *ldapProvider) loginUser(lConn ldapv3.Client, credentials *v3.BasicLogin
 		return v3.Principal{}, nil, apierror.WrapAPIError(err, validation.Unauthorized, "Unauthorized")
 	}
 
-	logrus.Debug("Binding username password")
 	userDN := result.Entries[0].DN // userDN is externalID
+	logrus.Debugf("Binding username password userDN = %s", userDN)
+
 	err = lConn.Bind(userDN, credentials.Password)
 	if err != nil {
+		logrus.Errorf("loginUser: failed to bind user: %s", err)
 		if ldapv3.IsErrorWithCode(err, ldapv3.LDAPResultInvalidCredentials) {
 			return v3.Principal{}, nil, apierror.WrapAPIError(err, validation.Unauthorized, "Unauthorized")
 		}
@@ -119,7 +122,6 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv3.SearchResult
 		groupPrincipals           []v3.Principal
 		userPrincipal             v3.Principal
 		nonDupGroupPrincipals     []v3.Principal
-		userScope, groupScope     string
 		nestedGroupPrincipals     []v3.Principal
 		freeipaNonEntrydnApproach bool
 	)
@@ -146,8 +148,8 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv3.SearchResult
 		return v3.Principal{}, nil, nil
 	}
 
-	userScope = p.userScope
-	groupScope = p.groupScope
+	userScope := p.userScope(config)
+	groupScope := p.groupScope(config)
 
 	userExternalID := entry.DN
 	if config.UserIDAttribute == "" && p.samlSearchProvider() {
@@ -229,7 +231,7 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv3.SearchResult
 		freeipaNonEntrydnApproach = true
 	}
 	// Handle nestedgroups for openldap, filter operationalAttrList already handles nestedgroups for freeipa
-	if (config.NestedGroupMembershipEnabled && groupScope == "openldap_group") || freeipaNonEntrydnApproach {
+	if (config.NestedGroupMembershipEnabled && p.providerName == OpenLdapName) || freeipaNonEntrydnApproach {
 		searchDomain := config.UserSearchBase
 		if config.GroupSearchBase != "" {
 			searchDomain = config.GroupSearchBase
@@ -243,7 +245,7 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv3.SearchResult
 			GroupObjectClass:            config.GroupObjectClass,
 			GroupSearchAttribute:        config.GroupSearchAttribute,
 			ObjectClass:                 ObjectClass,
-			ProviderName:                OpenLdapName,
+			ProviderName:                p.providerName,
 			UserLoginAttribute:          config.UserLoginAttribute,
 			UserNameAttribute:           config.UserNameAttribute,
 			UserObjectClass:             config.UserObjectClass,
@@ -267,7 +269,7 @@ func (p *ldapProvider) getPrincipalsFromSearchResult(result *ldapv3.SearchResult
 func (p *ldapProvider) getPrincipal(distinguishedName string, scope string, config *v3.LdapConfig, caPool *x509.CertPool) (*v3.Principal, error) {
 	var search *ldapv3.SearchRequest
 	var filter string
-	if (scope != p.userScope) && (scope != p.groupScope) {
+	if !p.isValidScope(config, scope) {
 		return nil, fmt.Errorf("invalid scope")
 	}
 
@@ -415,7 +417,7 @@ func (p *ldapProvider) searchUser(name string, config *v3.LdapConfig, lConn ldap
 	// and is expected to follow ldap syntax and enclosed in parentheses.
 	query += srchAttrs + ")" + config.UserSearchFilter + ")"
 	logrus.Debugf("%s searchUser query: %s", p.providerName, query)
-	return p.searchLdap(query, p.userScope, config, lConn)
+	return p.searchLdap(query, p.userScope(config), config, lConn)
 }
 
 func (p *ldapProvider) searchGroup(name string, config *v3.LdapConfig, lConn ldapv3.Client) ([]v3.Principal, error) {
@@ -441,8 +443,8 @@ func (p *ldapProvider) searchGroup(name string, config *v3.LdapConfig, lConn lda
 		config.GroupSearchFilter,
 	)
 
-	logrus.Debugf("%s searchGroup query: %s scope: %s", p.providerName, query, p.groupScope)
-	return p.searchLdap(query, p.groupScope, config, lConn)
+	logrus.Debugf("%s searchGroup query: %s scope: %s", p.providerName, query, p.groupScope(config))
+	return p.searchLdap(query, p.groupScope(config), config, lConn)
 }
 
 func (p *ldapProvider) searchLdap(query string, scope string, config *v3.LdapConfig, lConn ldapv3.Client) ([]v3.Principal, error) {
@@ -520,7 +522,12 @@ func (p *ldapProvider) permissionCheck(attributes []*ldapv3.EntryAttribute, conf
 }
 
 func (p *ldapProvider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
-	config, caPool, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient())
+	provider, _, _, err := common.SplitPrincipalID(principalID)
+	if err != nil {
+		return nil, err
+	}
+
+	config, caPool, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient(), provider)
 	if err != nil {
 		return nil, err
 	}

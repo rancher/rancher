@@ -1,6 +1,7 @@
 package oidc
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -36,7 +37,7 @@ import (
 )
 
 const (
-	Name                   = "oidc"
+	ProviderName           = "oidc"
 	UserType               = "user"
 	GroupType              = "group"
 	IDTokenCookie          = "R_OIDC_ID"
@@ -62,7 +63,7 @@ type OpenIDCProvider struct {
 	UserMGR      user.Manager
 	TokenMgr     tokenManager
 	UserSearcher *common.UserSearcher
-	GetConfig    func() (*apiv3.OIDCConfig, error)
+	GetConfig    func(string) (*apiv3.OIDCConfig, error)
 }
 
 type ClaimInfo struct {
@@ -200,7 +201,7 @@ func coerceToStringSlice(v any) []string {
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, TokenMgr *tokens.Manager) common.AuthProvider {
 	p := &OpenIDCProvider{
-		Name:         Name,
+		Name:         ProviderName,
 		Type:         client.OIDCConfigType,
 		CTX:          ctx,
 		AuthConfigs:  mgmtCtx.Management.AuthConfigs(""),
@@ -215,7 +216,7 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 }
 
 func (o *OpenIDCProvider) GetName() string {
-	return Name
+	return ProviderName
 }
 
 func (o *OpenIDCProvider) CustomizeSchema(schema *types.Schema) {
@@ -238,8 +239,12 @@ func (o *OpenIDCProvider) LoginUser(w http.ResponseWriter, req *http.Request, oa
 	var userClaimInfo ClaimInfo
 	var err error
 
-	if config == nil {
-		config, err = o.GetConfig()
+	configName := oauthLoginInfo.ConfigName
+	if config != nil {
+		configName = cmp.Or(configName, config.Name)
+	} else {
+		logrus.Debugf("Loading OIDC config %s", configName)
+		config, err = o.GetConfig(configName)
 		if err != nil {
 			return userPrincipal, nil, "", userClaimInfo, err
 		}
@@ -249,9 +254,9 @@ func (o *OpenIDCProvider) LoginUser(w http.ResponseWriter, req *http.Request, oa
 	if err != nil {
 		return userPrincipal, groupPrincipals, "", userClaimInfo, err
 	}
-	userPrincipal = o.userToPrincipal(userInfo, userClaimInfo)
+	userPrincipal = o.userToPrincipal(userInfo, userClaimInfo, configName)
 	userPrincipal.Me = true
-	groupPrincipals = o.getGroupsFromClaimInfo(userClaimInfo)
+	groupPrincipals = o.getGroupsFromClaimInfo(userClaimInfo, configName)
 
 	logrus.Debug("OpenIDCProvider: loginuser: checking user's access to rancher")
 	allowed, err := o.UserMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipal.Name, groupPrincipals)
@@ -279,12 +284,18 @@ func (o *OpenIDCProvider) LoginUser(w http.ResponseWriter, req *http.Request, oa
 // An OIDC subject is an ID chosen by the identity provider, so on its own it
 // only helps someone who already knows that ID.
 func (o *OpenIDCProvider) SearchPrincipals(searchValue, principalType string, token accessor.TokenAccessor) ([]apiv3.Principal, error) {
+	configName, err := common.ConfigNameFromToken(token)
+	if err != nil {
+		return nil, err
+	}
+	// This doesn't need the Config but it ensures that it exists.
 	if principalType == "" {
 		principalType = UserType
 	}
 
+	// This returns the searching principal's configName.
 	fromSearchValue := apiv3.Principal{
-		ObjectMeta:    metav1.ObjectMeta{Name: o.Name + "_" + principalType + "://" + searchValue},
+		ObjectMeta:    metav1.ObjectMeta{Name: configName + "_" + principalType + "://" + searchValue},
 		DisplayName:   searchValue,
 		LoginName:     searchValue,
 		PrincipalType: principalType,
@@ -295,41 +306,33 @@ func (o *OpenIDCProvider) SearchPrincipals(searchValue, principalType string, to
 		return []apiv3.Principal{fromSearchValue}, nil
 	}
 
-	return common.PrincipalsWithFallback(o.UserSearcher, o.Name, searchValue, fromSearchValue)
+	return common.PrincipalsWithFallback(o.UserSearcher, o.Name, configName, searchValue, fromSearchValue)
 }
 
 func (o *OpenIDCProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
 	var p apiv3.Principal
-
-	// parsing id to get the external id and type. Example oidc_<user|group>://<user sub | group name>
-	var externalID string
-	parts := strings.SplitN(principalID, ":", 2)
-	if len(parts) != 2 {
-		return p, fmt.Errorf("invalid id %v", principalID)
-	}
-	externalID = strings.TrimPrefix(parts[1], "//")
-	parts = strings.SplitN(parts[0], "_", 2)
-	if len(parts) != 2 {
-		return p, fmt.Errorf("invalid id %v", principalID)
+	configName, principalType, externalID, err := common.SplitPrincipalID(principalID)
+	if err != nil {
+		return p, err
 	}
 
-	principalType := parts[1]
 	if externalID == "" && principalType == "" {
 		return p, fmt.Errorf("invalid id %v", principalID)
 	}
 	if principalType != UserType && principalType != GroupType {
 		return p, fmt.Errorf("invalid principal type")
 	}
-	if principalID == UserType {
+
+	if principalType == UserType {
 		p = apiv3.Principal{
-			ObjectMeta:    metav1.ObjectMeta{Name: principalType + "://" + externalID},
+			ObjectMeta:    metav1.ObjectMeta{Name: configName + "_" + principalType + "://" + externalID},
 			DisplayName:   externalID,
 			LoginName:     externalID,
 			PrincipalType: UserType,
 			Provider:      o.Name,
 		}
 	} else {
-		p = o.groupToPrincipal(externalID)
+		p = o.groupToPrincipal(externalID, configName)
 	}
 	p = o.toPrincipalFromToken(principalType, p, token)
 	return p, nil
@@ -404,9 +407,13 @@ func (o *OpenIDCProvider) getRedirectURL(authConfig map[string]any) (string, err
 }
 
 func (o *OpenIDCProvider) RefetchGroupPrincipals(principalID string, secret string) ([]apiv3.Principal, error) {
-	var groupPrincipals []apiv3.Principal
+	provider, _, _, err := common.SplitPrincipalID(principalID)
+	if err != nil {
+		return nil, err
+	}
 
-	config, err := o.GetConfig()
+	var groupPrincipals []apiv3.Principal
+	config, err := o.GetConfig(provider)
 	if err != nil {
 		logrus.Errorf("OpenIDCProvider: refetchGroupPrincipals: error fetching OIDCConfig: %v", err)
 		return groupPrincipals, err
@@ -430,14 +437,19 @@ func (o *OpenIDCProvider) RefetchGroupPrincipals(principalID string, secret stri
 		}
 		return groupPrincipals, err
 	}
-	return o.getGroupsFromClaimInfo(*claimInfo), nil
+	return o.getGroupsFromClaimInfo(*claimInfo, provider), nil
 }
 
 func (o *OpenIDCProvider) UsesUserSecrets() bool      { return true }
 func (o *OpenIDCProvider) CanRefreshPrincipals() bool { return true }
 
 func (o *OpenIDCProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
-	config, err := o.GetConfig()
+	provider, _, _, err := common.SplitPrincipalID(userPrincipalID)
+	if err != nil {
+		return false, err
+	}
+
+	config, err := o.GetConfig(provider)
 	if err != nil {
 		logrus.Errorf("OpenIDCProvider: canAccessWithGroupProviders: error fetching OIDCConfig: %v", err)
 		return false, err
@@ -449,13 +461,13 @@ func (o *OpenIDCProvider) CanAccessWithGroupProviders(userPrincipalID string, gr
 	return allowed, nil
 }
 
-func (o *OpenIDCProvider) userToPrincipal(userInfo *oidc.UserInfo, claimInfo ClaimInfo) apiv3.Principal {
+func (o *OpenIDCProvider) userToPrincipal(userInfo *oidc.UserInfo, claimInfo ClaimInfo, providerName string) apiv3.Principal {
 	displayName := claimInfo.Name
 	if displayName == "" {
 		displayName = userInfo.Email
 	}
 	p := apiv3.Principal{
-		ObjectMeta:    metav1.ObjectMeta{Name: o.Name + "_" + UserType + "://" + userInfo.Subject},
+		ObjectMeta:    metav1.ObjectMeta{Name: providerName + "_" + UserType + "://" + userInfo.Subject},
 		DisplayName:   displayName,
 		LoginName:     userInfo.Email,
 		Provider:      o.Name,
@@ -465,9 +477,9 @@ func (o *OpenIDCProvider) userToPrincipal(userInfo *oidc.UserInfo, claimInfo Cla
 	return p
 }
 
-func (o *OpenIDCProvider) groupToPrincipal(groupName string) apiv3.Principal {
+func (o *OpenIDCProvider) groupToPrincipal(groupName, providerName string) apiv3.Principal {
 	p := apiv3.Principal{
-		ObjectMeta:    metav1.ObjectMeta{Name: o.Name + "_" + GroupType + "://" + groupName},
+		ObjectMeta:    metav1.ObjectMeta{Name: providerName + "_" + GroupType + "://" + groupName},
 		DisplayName:   groupName,
 		Provider:      o.Name,
 		PrincipalType: GroupType,
@@ -497,18 +509,31 @@ func (o *OpenIDCProvider) toPrincipalFromToken(principalType string, princ apiv3
 }
 
 func (o *OpenIDCProvider) saveOIDCConfig(config *apiv3.OIDCConfig) error {
-	storedOidcConfig, err := o.GetConfig()
+	storedOidcConfig, err := o.GetConfig(config.GetName())
 	if err != nil {
-		return err
+		return fmt.Errorf("getting OIDC Config %s: %w", config.GetName(), err)
 	}
 	config.APIVersion = "management.cattle.io/v3"
 	config.Kind = v3.AuthConfigGroupVersionKind.Kind
 	config.Type = o.Type
 	config.ObjectMeta = storedOidcConfig.ObjectMeta
 
+	if err := o.saveOIDCSecrets(config); err != nil {
+		return err
+	}
+
+	logrus.Debugf("OpenIDCProvider: saveOIDCConfig: updating config")
+	_, err = o.AuthConfigs.ObjectClient().Update(config.ObjectMeta.Name, config)
+	return err
+}
+
+// saveOIDCSecrets stores the private key and client secret from the config in
+// Secrets and replaces them in the config with references to the Secrets.
+func (o *OpenIDCProvider) saveOIDCSecrets(config *apiv3.OIDCConfig) error {
+	prefix := common.SecretNamePrefix(config.Name, config.Type)
 	if config.PrivateKey != "" {
 		privateKeyField := strings.ToLower(client.OIDCConfigFieldPrivateKey)
-		name, err := common.CreateOrUpdateSecrets(o.Secrets, config.PrivateKey, privateKeyField, strings.ToLower(config.Type))
+		name, err := common.CreateOrUpdateSecrets(o.Secrets, config.PrivateKey, privateKeyField, prefix)
 		if err != nil {
 			return err
 		}
@@ -516,7 +541,7 @@ func (o *OpenIDCProvider) saveOIDCConfig(config *apiv3.OIDCConfig) error {
 	}
 
 	secretField := strings.ToLower(client.OIDCConfigFieldClientSecret)
-	name, err := common.CreateOrUpdateSecrets(o.Secrets, convert.ToString(config.ClientSecret), secretField, strings.ToLower(config.Type))
+	name, err := common.CreateOrUpdateSecrets(o.Secrets, convert.ToString(config.ClientSecret), secretField, prefix)
 	if err != nil {
 		return err
 	}
@@ -527,10 +552,10 @@ func (o *OpenIDCProvider) saveOIDCConfig(config *apiv3.OIDCConfig) error {
 	return err
 }
 
-func (o *OpenIDCProvider) GetOIDCConfig() (*apiv3.OIDCConfig, error) {
-	authConfigObj, err := o.AuthConfigs.ObjectClient().UnstructuredClient().Get(o.Name, metav1.GetOptions{})
+func (o *OpenIDCProvider) GetOIDCConfig(configName string) (*apiv3.OIDCConfig, error) {
+	authConfigObj, err := o.AuthConfigs.ObjectClient().UnstructuredClient().Get(configName, metav1.GetOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve OIDCConfig, error: %v", err)
+		return nil, fmt.Errorf("failed to retrieve OIDCConfig %s: error: %w", configName, err)
 	}
 
 	u, ok := authConfigObj.(runtime.Unstructured)
@@ -634,8 +659,12 @@ func (o *OpenIDCProvider) getUserInfoFromAuthCode(rw http.ResponseWriter, req *h
 		return userInfo, oauth2Token, "", fmt.Errorf("not valid token: %w", err)
 	}
 
-	if err := o.UpdateToken(oauth2Token, userName); err != nil {
-		return nil, nil, "", err
+	// During login there's no Rancher user yet, the token is stored in the
+	// user's secret when the login token is created.
+	if userName != "" {
+		if err := o.UpdateToken(oauth2Token, userName, config.Name); err != nil {
+			return nil, nil, "", err
+		}
 	}
 
 	if config.AcrValue != "" {
@@ -692,7 +721,7 @@ func (o *OpenIDCProvider) getClaimInfoFromToken(ctx context.Context, config *api
 			return nil, err
 		}
 		if !reflect.DeepEqual(token, reusedToken) {
-			err := o.UpdateToken(reusedToken, userName)
+			err := o.UpdateToken(reusedToken, userName, config.Name)
 			if err != nil {
 				return nil, fmt.Errorf("failed to update token: %w", err)
 			}
@@ -826,7 +855,7 @@ func applyCustomClaims(idToken *oidc.IDToken, userInfo *oidc.UserInfo, config *a
 	return nil
 }
 
-func (o *OpenIDCProvider) getGroupsFromClaimInfo(claimInfo ClaimInfo) []apiv3.Principal {
+func (o *OpenIDCProvider) getGroupsFromClaimInfo(claimInfo ClaimInfo, configName string) []apiv3.Principal {
 	var groupPrincipals []apiv3.Principal
 
 	// If full_group_path is provided, it takes precedence over groups.
@@ -842,7 +871,7 @@ func (o *OpenIDCProvider) getGroupsFromClaimInfo(claimInfo ClaimInfo) []apiv3.Pr
 			groupsFromPath := strings.Split(groupPath, "/")
 			for _, group := range groupsFromPath {
 				if group != "" {
-					groupPrincipal := o.groupToPrincipal(group)
+					groupPrincipal := o.groupToPrincipal(group, configName)
 					groupPrincipal.MemberOf = true
 					groupPrincipals = append(groupPrincipals, groupPrincipal)
 				}
@@ -851,7 +880,7 @@ func (o *OpenIDCProvider) getGroupsFromClaimInfo(claimInfo ClaimInfo) []apiv3.Pr
 	} else {
 		logrus.Debugf("OpenIDCProvider: using groups claim")
 		for _, group := range claimInfo.Groups {
-			groupPrincipal := o.groupToPrincipal(group)
+			groupPrincipal := o.groupToPrincipal(group, configName)
 			groupPrincipal.MemberOf = true
 			groupPrincipals = append(groupPrincipals, groupPrincipal)
 		}
@@ -863,7 +892,7 @@ func (o *OpenIDCProvider) getGroupsFromClaimInfo(claimInfo ClaimInfo) []apiv3.Pr
 	if claimInfo.Roles != nil {
 		logrus.Debugf("OpenIDCProvider: using roles claim")
 		for _, role := range claimInfo.Roles {
-			groupPrincipal := o.groupToPrincipal(role)
+			groupPrincipal := o.groupToPrincipal(role, configName)
 			groupPrincipal.MemberOf = true
 			groupPrincipals = append(groupPrincipals, groupPrincipal)
 		}
@@ -871,7 +900,9 @@ func (o *OpenIDCProvider) getGroupsFromClaimInfo(claimInfo ClaimInfo) []apiv3.Pr
 	return groupPrincipals
 }
 
-func (o *OpenIDCProvider) UpdateToken(refreshedToken *oauth2.Token, userID string) error {
+// UpdateToken stores the refreshed token in the user's secret, keyed by the
+// name of the AuthConfig it was issued for.
+func (o *OpenIDCProvider) UpdateToken(refreshedToken *oauth2.Token, userID, configName string) error {
 	var err error
 	logrus.Debugf("OpenIDCProvider: UpdateToken: access token has been refreshed")
 	marshalledToken, err := json.Marshal(refreshedToken)
@@ -879,13 +910,12 @@ func (o *OpenIDCProvider) UpdateToken(refreshedToken *oauth2.Token, userID strin
 		return err
 	}
 	logrus.Debugf("OpenIDCProvider: UpdateToken: saving refreshed access token")
-	o.TokenMgr.UpdateSecret(userID, o.Name, string(marshalledToken))
-	return err
+	return o.TokenMgr.UpdateSecret(userID, configName, string(marshalledToken))
 }
 
 // IsDisabledProvider checks if the OIDC auth provider is currently disabled in Rancher.
-func (o *OpenIDCProvider) IsDisabledProvider() (bool, error) {
-	oidcConfig, err := o.GetConfig()
+func (o *OpenIDCProvider) IsDisabledProvider(name string) (bool, error) {
+	oidcConfig, err := o.GetConfig(name)
 	if err != nil {
 		return false, err
 	}
@@ -928,30 +958,36 @@ func (o *OpenIDCProvider) getOIDCProvider(ctx context.Context, oidcConfig *apiv3
 }
 
 func (o *OpenIDCProvider) Logout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
-	providerName := token.GetAuthProvider()
-	logrus.Debugf("OpenIDCProvider [logout]: triggered by provider %s", providerName)
-	oidcConfig, err := o.GetConfig()
+	configName, err := common.ConfigNameFromToken(token)
+	if err != nil {
+		return err
+	}
+	logrus.Debugf("OpenIDCProvider [logout]: triggered by provider %s", configName)
+	oidcConfig, err := o.GetConfig(configName)
 	if err != nil {
 		return fmt.Errorf("getting config for OIDC Logout: %w", err)
 	}
 	if oidcConfig.LogoutAllForced {
-		return fmt.Errorf("OpenIDCProvider [logout]: Rancher provider resource `%v` configured for forced SLO, rejecting regular logout", providerName)
+		return fmt.Errorf("OpenIDCProvider [logout]: Rancher provider resource `%v` configured for forced SLO, rejecting regular logout", configName)
 	}
 
 	return nil
 }
 
 func (o *OpenIDCProvider) LogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
+	configName, err := common.ConfigNameFromToken(token)
+	if err != nil {
+		return err
+	}
 	logrus.Debugf("OpenIDCProvider [logout-all]: triggered by provider %s", token.GetAuthProvider())
 
-	oidcConfig, err := o.GetConfig()
+	oidcConfig, err := o.GetConfig(configName)
 	if err != nil {
 		return err
 	}
 
-	providerName := token.GetAuthProvider()
 	if !oidcConfig.LogoutAllEnabled {
-		return fmt.Errorf("OpenIDCProvider [logout-all]: Rancher provider resource `%v` not configured for SLO", providerName)
+		return fmt.Errorf("OpenIDCProvider [logout-all]: Rancher provider resource `%v` not configured for SLO", configName)
 	}
 
 	idpRedirectURL, err := o.createIDPRedirectURL(r, oidcConfig)

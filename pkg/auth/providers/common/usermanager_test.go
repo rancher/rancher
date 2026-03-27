@@ -39,9 +39,9 @@ func TestSetPrincipalOnCurrentUserByUserID(t *testing.T) {
 			userID: "user1",
 			principal: v3.Principal{
 				ObjectMeta: v1.ObjectMeta{
-					Name: "github_user1",
+					Name: "github_user1://1",
 				},
-				DisplayName: "github_user1",
+				DisplayName: "github_user1s",
 				Provider:    "github",
 			},
 			existingUser: &v3.User{
@@ -58,7 +58,7 @@ func TestSetPrincipalOnCurrentUserByUserID(t *testing.T) {
 					Name: "user1",
 					UID:  "uid1",
 				},
-				PrincipalIDs: []string{"local://user", "github_user1"},
+				PrincipalIDs: []string{"local://user", "github_user1://1"},
 			},
 			expectedError:    nil,
 			expectedToUpdate: true,
@@ -111,6 +111,35 @@ func TestSetPrincipalOnCurrentUserByUserID(t *testing.T) {
 			},
 			expectedError:    errors.New("refusing to set principal on user that is already bound to another user"),
 			expectedToUpdate: false,
+		},
+		{
+			name:   "successfully add principal to user with custom name for config",
+			userID: "user1",
+			principal: v3.Principal{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "github-eu_user1://12345",
+				},
+				DisplayName: "github_user1",
+				Provider:    "github",
+			},
+			existingUser: &v3.User{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "user1",
+					UID:  "uid1",
+				},
+				PrincipalIDs: []string{"local://user"},
+			},
+			principalUser:  nil,
+			principalError: nil,
+			expectedUser: &v3.User{
+				ObjectMeta: v1.ObjectMeta{
+					Name: "user1",
+					UID:  "uid1",
+				},
+				PrincipalIDs: []string{"local://user", "github-eu_user1://12345"},
+			},
+			expectedError:    nil,
+			expectedToUpdate: true,
 		},
 	}
 
@@ -761,4 +790,81 @@ func TestUserAttributeCreateOrUpdateNoGroups(t *testing.T) {
 			assert.ElementsMatch(t, tt.wantGroups, gotGroups)
 		})
 	}
+}
+
+func TestProviderExists(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name         string
+		principalIDs []string
+		provider     string
+		want         bool
+	}{
+		{
+			name:     "no principal IDs",
+			provider: "github",
+			want:     false,
+		},
+		{
+			name:         "provider in principal ID prefix",
+			principalIDs: []string{"github_user://123"},
+			provider:     "github",
+			want:         true,
+		},
+		{
+			name:         "provider in one of multiple principal IDs",
+			principalIDs: []string{"local://user", "github_user://123"},
+			provider:     "github",
+			want:         true,
+		},
+		{
+			name:         "different provider",
+			principalIDs: []string{"google_user://123"},
+			provider:     "github",
+			want:         false,
+		},
+		{
+			name:         "similarly named provider",
+			principalIDs: []string{"google-eu_user://123"},
+			provider:     "google",
+			want:         false,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, test.want, providerExists(test.principalIDs, test.provider))
+		})
+	}
+}
+
+func TestGetGroupsForTokenAuthProviderUsesConfigName(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+	userAttributeCache.EXPECT().Get("u-abcdef").Return(&v3.UserAttribute{
+		GroupPrincipals: map[string]v3.Principals{
+			"github":    {Items: []v3.Principal{{ObjectMeta: v1.ObjectMeta{Name: "github_org://1"}}}},
+			"github-eu": {Items: []v3.Principal{{ObjectMeta: v1.ObjectMeta{Name: "github-eu_org://2"}}}},
+		},
+	}, nil)
+
+	manager := userManager{userAttributeCache: userAttributeCache}
+
+	// The token records the provider name, but the groups must come from the
+	// config that issued it.
+	token := &v3.Token{
+		UserID:       "u-abcdef",
+		AuthProvider: "github",
+		UserPrincipal: v3.Principal{
+			ObjectMeta: v1.ObjectMeta{Name: "github-eu_user://42"},
+			Provider:   "github",
+		},
+	}
+
+	groups := manager.GetGroupsForTokenAuthProvider(token)
+
+	assert.Equal(t, []v3.Principal{{ObjectMeta: v1.ObjectMeta{Name: "github-eu_org://2"}}}, groups)
 }

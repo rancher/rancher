@@ -2,15 +2,27 @@ package integration
 
 import (
 	"context"
-	"errors"
-	"net/http"
 	"testing"
 	"time"
 
+	"github.com/rancher/norman/types"
+	"github.com/rancher/rancher/pkg/auth/providers/activedirectory"
+	"github.com/rancher/rancher/pkg/auth/providers/azure"
+	"github.com/rancher/rancher/pkg/auth/providers/cognito"
+	"github.com/rancher/rancher/pkg/auth/providers/genericoidc"
+	"github.com/rancher/rancher/pkg/auth/providers/github"
+	"github.com/rancher/rancher/pkg/auth/providers/githubapp"
+	"github.com/rancher/rancher/pkg/auth/providers/googleoauth"
+	"github.com/rancher/rancher/pkg/auth/providers/keycloakoidc"
+	"github.com/rancher/rancher/pkg/auth/providers/ldap"
+	"github.com/rancher/rancher/pkg/auth/providers/local"
+	"github.com/rancher/rancher/pkg/auth/providers/oidc"
+	"github.com/rancher/rancher/pkg/auth/providers/saml"
+	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
-	"github.com/rancher/shepherd/pkg/clientbase"
 	"github.com/rancher/shepherd/pkg/session"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,62 +47,13 @@ func (s *AuthConfigTestSuite) TearDownSuite() {
 	s.session.Cleanup()
 }
 
-// TestAuthConfigsExistAndCannotBeDeleted verifies that the expected set of auth
-// config types are returned by the API, and that attempting to delete any of
-// them returns 405 Method Not Allowed.
-func (s *AuthConfigTestSuite) TestAuthConfigsExistAndCannotBeDeleted() {
-	configs, err := s.client.Management.AuthConfig.List(nil)
-	s.Require().NoError(err)
-
-	expectedTypes := map[string]bool{
-		"activeDirectoryConfig": false,
-		"adfsConfig":            false,
-		"azureADConfig":         false,
-		"cognitoConfig":         false,
-		"freeIpaConfig":         false,
-		"genericOIDCConfig":     false,
-		"genericSAMLConfig":     false,
-		"githubAppConfig":       false,
-		"githubConfig":          false,
-		"googleOauthConfig":     false,
-		"keyCloakConfig":        false,
-		"keyCloakOIDCConfig":    false,
-		"localConfig":           false,
-		"oidcConfig":            false,
-		"oktaConfig":            false,
-		"openLdapConfig":        false,
-		"pingConfig":            false,
-		"shibbolethConfig":      false,
-	}
-
-	for _, config := range configs.Data {
-		if _, ok := expectedTypes[config.Type]; ok {
-			expectedTypes[config.Type] = true
-		} else {
-			s.Failf("unexpected auth config type %q found in API response", config.Type)
-		}
-	}
-
-	// Assert every expected auth config type was found.
-	for configType, found := range expectedTypes {
-		s.Require().True(found, "expected auth config type %q not found in API response", configType)
-	}
-
-	// Verify that deleting any auth config returns 405.
-	for _, config := range configs.Data {
-		c := config
-		err := s.client.Management.AuthConfig.Delete(&c)
-		s.Require().Error(err, "expected error deleting auth config %s", c.Type)
-
-		var apiErr *clientbase.APIError
-		s.Require().True(errors.As(err, &apiErr), "expected APIError for %s, got: %v", c.Type, err)
-		s.Require().Equal(http.StatusMethodNotAllowed, apiErr.StatusCode, "expected 405 for %s", c.Type)
-	}
-}
-
 // TestAuthConfigActions verifies that each auth config type exposes the
 // expected set of actions (testAndApply, configureTest, testAndEnable).
 func (s *AuthConfigTestSuite) TestAuthConfigActions() {
+	for name, config := range authProviderTypes {
+		createAuthConfig(s.T(), s.client.Management.AuthConfig, name, config)
+	}
+
 	configs, err := s.client.Management.AuthConfig.List(nil)
 	s.Require().NoError(err)
 
@@ -158,12 +121,11 @@ func (s *AuthConfigTestSuite) TestAuthConfigActions() {
 // namespace, and that secrets for other unconfigured SAML providers are not
 // created.
 func (s *AuthConfigTestSuite) TestAuthConfigSecrets() {
-	pingConfig, err := s.client.Management.AuthConfig.ByID("ping")
-	s.Require().NoError(err)
+	pingConfig := createAuthConfig(s.T(), s.client.Management.AuthConfig, saml.PingName, client.PingConfigType)
 
 	// Enable the config and set the spKey — the controller should create a
 	// secret named "pingconfig-spkey" in the cattle-global-data namespace.
-	_, err = s.client.Management.AuthConfig.Update(pingConfig, map[string]any{
+	_, err := s.client.Management.AuthConfig.Update(pingConfig, map[string]any{
 		"spKey":   "-----BEGIN PRIVATE KEY-----",
 		"enabled": true,
 	})
@@ -202,4 +164,40 @@ func (s *AuthConfigTestSuite) TestAuthConfigSecrets() {
 
 func TestAuthConfig(t *testing.T) {
 	suite.Run(t, new(AuthConfigTestSuite))
+}
+
+func createAuthConfig(t *testing.T, authConfigs management.AuthConfigOperations, name, configType string) *management.AuthConfig {
+	created, err := authConfigs.Create(
+		&management.AuthConfig{
+			Resource: types.Resource{
+				ID: name,
+			},
+			Type:               configType,
+			Enabled:            true,
+			LogoutAllSupported: true,
+		})
+	require.NoError(t, err)
+
+	return created
+}
+
+var authProviderTypes = map[string]string{
+	activedirectory.ProviderName: client.ActiveDirectoryConfigType,
+	azure.ProviderName:           client.AzureADConfigType,
+	github.ProviderName:          client.GithubConfigType,
+	githubapp.ProviderName:       client.GithubAppConfigType,
+	local.Name:                   client.LocalConfigType,
+	ldap.OpenLdapName:            client.OpenLdapConfigType,
+	ldap.FreeIpaName:             client.FreeIpaConfigType,
+	saml.PingName:                client.PingConfigType,
+	saml.ADFSName:                client.ADFSConfigType,
+	saml.KeyCloakName:            client.KeyCloakConfigType,
+	saml.OKTAName:                client.OKTAConfigType,
+	saml.ShibbolethName:          client.ShibbolethConfigType,
+	saml.GenericSAMLName:         client.GenericSAMLConfigType,
+	googleoauth.ProviderName:     client.GoogleOauthConfigType,
+	oidc.ProviderName:            client.OIDCConfigType,
+	keycloakoidc.ProviderName:    client.KeyCloakOIDCConfigType,
+	genericoidc.ProviderName:     client.GenericOIDCConfigType,
+	cognito.ProviderName:         client.CognitoConfigType,
 }

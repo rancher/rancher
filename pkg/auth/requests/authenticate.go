@@ -173,9 +173,20 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 		return nil, errors.Wrapf(ErrMustAuthenticate, "clusterID does not match")
 	}
 
-	// If the auth provider is specified make sure it exists and enabled.
-	if token.GetAuthProvider() != "" {
-		disabled, err := providers.IsDisabledProvider(token.GetAuthProvider())
+	authUser, err := a.userLister.Get("", token.GetUserID())
+	if err != nil {
+		return nil, errors.Wrapf(ErrMustAuthenticate,
+			"failed to retrieve user %s: %v", token.GetUserID(), err)
+	}
+
+	// System tokens are not tied to an auth provider configuration. Their
+	// system:// principals cannot be used to determine a provider config name.
+	if token.GetAuthProvider() != "" && !authUser.IsSystem() {
+		configName, err := common.ConfigNameFromToken(token)
+		if err != nil {
+			return nil, err
+		}
+		disabled, err := providers.IsDisabledProvider(token.GetAuthProvider(), configName)
 		if err != nil {
 			return nil, errors.Wrapf(ErrMustAuthenticate,
 				"error checking if provider %s is disabled: %v",
@@ -191,12 +202,6 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	if err != nil && !apierrors.IsNotFound(err) {
 		return nil, errors.Wrapf(ErrMustAuthenticate,
 			"failed to retrieve userattribute %s: %v", token.GetUserID(), err)
-	}
-
-	authUser, err := a.userLister.Get("", token.GetUserID())
-	if err != nil {
-		return nil, errors.Wrapf(ErrMustAuthenticate,
-			"failed to retrieve user %s: %v", token.GetUserID(), err)
 	}
 
 	if authUser.Enabled != nil && !*authUser.Enabled {
@@ -288,6 +293,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	}
 
 	logrus.Debugf("auth: Updated lastUsedAt for token %s", token.GetName())
+
 	return authResp, nil
 }
 
@@ -311,8 +317,13 @@ func getUserExtraInfo(token accessor.TokenAccessor, user *apiv3.User, attribs *a
 			}
 			return extraInfo
 		}
-		// AuthProvider is set in the token.
-		if extra, ok := attribs.ExtraByProvider[ap]; ok {
+		// AuthProvider is set in the token. Extras are keyed by the AuthConfig
+		// the token was issued for.
+		configName, err := common.ConfigNameFromToken(token)
+		if err != nil {
+			configName = ap
+		}
+		if extra, ok := attribs.ExtraByProvider[configName]; ok {
 			for key, value := range extra {
 				if common.IsValidUserExtraAttribute(key) {
 					extraInfo[key] = value

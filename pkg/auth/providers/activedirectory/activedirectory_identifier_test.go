@@ -93,7 +93,7 @@ func TestADProviderSearchPrincipalByAttribute(t *testing.T) {
 				DisplayName:   "jdoe",
 				LoginName:     "jdoe",
 				PrincipalType: "user",
-				Provider:      Name,
+				Provider:      ProviderName,
 				Me:            true,
 			},
 		},
@@ -109,7 +109,7 @@ func TestADProviderSearchPrincipalByAttribute(t *testing.T) {
 				DisplayName:   "engineering",
 				LoginName:     "engineering",
 				PrincipalType: "group",
-				Provider:      Name,
+				Provider:      ProviderName,
 				Me:            true,
 			},
 		},
@@ -217,51 +217,68 @@ func TestADProviderLoginUserWithIDAttributes(t *testing.T) {
 
 	credentials := v3.BasicLogin{Username: userName, Password: userPassword}
 
-	config := identifierTestConfig()
-	nested := true
-	config.NestedGroupMembershipEnabled = &nested
-	// objectSid is not part of the attribute list Rancher requests by default.
-	config.GroupIDAttribute = "objectSid"
-
-	var pagingAttributes [][]string
-	conn := &ldapFakes.FakeLdapConn{
-		SearchFunc: func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
-			switch searchRequest.Filter {
-			case "(&(sAMAccountName=user))":
-				return &ldapv3.SearchResult{Entries: []*ldapv3.Entry{adUserEntry(userDN, "user", "512", groupDN)}}, nil
-			case "(&(objectClass=group)(objectSid=S-1-5-group))":
-				// Nested group traversal resolves the group identifier back to its DN.
-				return &ldapv3.SearchResult{Entries: []*ldapv3.Entry{{DN: groupDN}}}, nil
-			}
-			return &ldapv3.SearchResult{}, nil
-		},
-		SearchWithPagingFunc: func(searchRequest *ldapv3.SearchRequest, pagingSize uint32) (*ldapv3.SearchResult, error) {
-			pagingAttributes = append(pagingAttributes, searchRequest.Attributes)
-			switch searchRequest.Filter {
-			case "(&(objectClass=group)(|(distinguishedName=" + groupDN + ")))":
-				return &ldapv3.SearchResult{Entries: []*ldapv3.Entry{adGroupEntry(groupDN, "group")}}, nil
-			case "(&(member=" + groupDN + ")(objectClass=group))":
-				return &ldapv3.SearchResult{Entries: []*ldapv3.Entry{adGroupEntry(parentDN, "parent")}}, nil
-			}
-			return &ldapv3.SearchResult{}, nil
-		},
+	tests := []struct {
+		name       string
+		configName string
+		wantScope  string
+	}{
+		{name: "unnamed config", configName: "", wantScope: "activedirectory"},
+		{name: "default config", configName: "activedirectory", wantScope: "activedirectory"},
+		{name: "additional config", configName: "corp-ad", wantScope: "corp-ad"},
 	}
 
-	userPrincipal, groupPrincipals, err := provider.loginUser(conn, &credentials, &config)
-	require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	assert.Equal(t, "activedirectory_user://user", userPrincipal.Name)
-	assert.Equal(t, "user", userPrincipal.LoginName)
+			config := identifierTestConfig()
+			config.Name = tt.configName
+			nested := true
+			config.NestedGroupMembershipEnabled = &nested
+			// objectSid is not part of the attribute list Rancher requests by default.
+			config.GroupIDAttribute = "objectSid"
 
-	var groupNames []string
-	for _, g := range groupPrincipals {
-		groupNames = append(groupNames, g.Name)
-	}
-	assert.Equal(t, []string{"activedirectory_group://S-1-5-group", "activedirectory_group://S-1-5-parent"}, groupNames)
+			var pagingAttributes [][]string
+			conn := &ldapFakes.FakeLdapConn{
+				SearchFunc: func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
+					switch searchRequest.Filter {
+					case "(&(sAMAccountName=user))":
+						return &ldapv3.SearchResult{Entries: []*ldapv3.Entry{adUserEntry(userDN, "user", "512", groupDN)}}, nil
+					case "(&(objectClass=group)(objectSid=S-1-5-group))":
+						// Nested group traversal resolves the group identifier back to its DN.
+						return &ldapv3.SearchResult{Entries: []*ldapv3.Entry{{DN: groupDN}}}, nil
+					}
+					return &ldapv3.SearchResult{}, nil
+				},
+				SearchWithPagingFunc: func(searchRequest *ldapv3.SearchRequest, pagingSize uint32) (*ldapv3.SearchResult, error) {
+					pagingAttributes = append(pagingAttributes, searchRequest.Attributes)
+					switch searchRequest.Filter {
+					case "(&(objectClass=group)(|(distinguishedName=" + groupDN + ")))":
+						return &ldapv3.SearchResult{Entries: []*ldapv3.Entry{adGroupEntry(groupDN, "group")}}, nil
+					case "(&(member=" + groupDN + ")(objectClass=group))":
+						return &ldapv3.SearchResult{Entries: []*ldapv3.Entry{adGroupEntry(parentDN, "parent")}}, nil
+					}
+					return &ldapv3.SearchResult{}, nil
+				},
+			}
 
-	require.Len(t, pagingAttributes, 3)
-	for _, attrs := range pagingAttributes {
-		assert.Contains(t, attrs, "objectSid")
+			userPrincipal, groupPrincipals, err := provider.loginUser(conn, &credentials, &config)
+			require.NoError(t, err)
+
+			assert.Equal(t, tt.wantScope+"_user://user", userPrincipal.Name)
+			assert.Equal(t, "user", userPrincipal.LoginName)
+
+			var groupNames []string
+			for _, g := range groupPrincipals {
+				groupNames = append(groupNames, g.Name)
+			}
+			assert.Equal(t, []string{tt.wantScope + "_group://S-1-5-group", tt.wantScope + "_group://S-1-5-parent"}, groupNames)
+
+			require.Len(t, pagingAttributes, 3)
+			for _, attrs := range pagingAttributes {
+				assert.Contains(t, attrs, "objectSid")
+			}
+		})
 	}
 }
 
@@ -288,6 +305,22 @@ func TestADProviderGetGroupPrincipalsFromSearchBindFailure(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, groups, 1)
 		assert.Equal(t, "activedirectory_group://"+groupDN, groups[0].Name)
+		assert.Equal(t, common.GroupPrincipalType, groups[0].PrincipalType)
+	})
+
+	t.Run("groups identified by DN for an additional config", func(t *testing.T) {
+		t.Parallel()
+
+		config := identifierTestConfig()
+		config.Name = "corp-ad"
+		config.Enabled = true
+		config.GroupIDAttribute = ""
+
+		groups, err := provider.getGroupPrincipalsFromSearch(conn, &config, config.GroupSearchBase, "(objectClass=group)", []string{groupDN})
+		require.NoError(t, err)
+		require.Len(t, groups, 1)
+		assert.Equal(t, "corp-ad_group://"+groupDN, groups[0].Name)
+		assert.Equal(t, ProviderName, groups[0].Provider)
 	})
 
 	t.Run("groups identified by attribute return the bind error", func(t *testing.T) {
@@ -329,4 +362,40 @@ func TestValidateIDAttributesUnchanged(t *testing.T) {
 			require.ErrorContains(t, err, tt.wantErr)
 		})
 	}
+}
+
+func TestADProviderPrincipalScopesForAdditionalConfig(t *testing.T) {
+	t.Parallel()
+
+	provider := adProvider{}
+	config := identifierTestConfig()
+	config.Name = "corp-ad"
+
+	t.Run("scopes of another config are rejected", func(t *testing.T) {
+		t.Parallel()
+
+		for _, scope := range []string{UserScope, GroupScope, "other-ad_user"} {
+			_, err := provider.getPrincipalByAttribute("user", scope, "sAMAccountName", &config, nil)
+			assert.ErrorContains(t, err, "invalid scope", scope)
+		}
+	})
+
+	t.Run("groups are searched for using the config's group scope", func(t *testing.T) {
+		t.Parallel()
+
+		const groupDN = "cn=group,ou=groups,dc=foo,dc=bar"
+		var searchBase string
+		conn := &ldapFakes.FakeLdapConn{
+			SearchFunc: func(searchRequest *ldapv3.SearchRequest) (*ldapv3.SearchResult, error) {
+				searchBase = searchRequest.BaseDN
+				return &ldapv3.SearchResult{Entries: []*ldapv3.Entry{adGroupEntry(groupDN, "group")}}, nil
+			},
+		}
+
+		principal, err := provider.searchPrincipalByAttribute(conn, "group", "corp-ad_group", "sAMAccountName", &config)
+		require.NoError(t, err)
+		assert.Equal(t, config.GroupSearchBase, searchBase)
+		assert.Equal(t, "corp-ad_group://group", principal.Name)
+		assert.Equal(t, ProviderName, principal.Provider)
+	})
 }

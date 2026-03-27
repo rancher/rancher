@@ -529,8 +529,10 @@ var PerUserCacheProviders = []string{"github", "azuread", "googleoauth", "oidc",
 func (m *Manager) NewLoginToken(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, ttl int64, description string) (*apiv3.Token, string, error) {
 	provider := userPrincipal.Provider
 	// Providers that use oauth need to create a secret for storing the access token.
+	// The secret is keyed by the AuthConfig name so that multiple configs of
+	// the same provider don't overwrite each other.
 	if slices.Contains(PerUserCacheProviders, provider) && providerToken != "" {
-		err := m.CreateSecret(userID, provider, providerToken)
+		err := m.CreateSecret(userID, secretKeyForPrincipal(userPrincipal), providerToken)
 		if err != nil {
 			return nil, "", fmt.Errorf("unable to create secret: %s", err)
 		}
@@ -549,6 +551,21 @@ func (m *Manager) NewLoginToken(userID string, userPrincipal apiv3.Principal, gr
 			},
 		},
 	})
+}
+
+// secretKeyForPrincipal returns the AuthConfig name from the principal ID,
+// falling back to the provider name if the ID can't be parsed.
+func secretKeyForPrincipal(principal apiv3.Principal) string {
+	scheme, _, found := strings.Cut(principal.Name, ":")
+	if !found {
+		return principal.Provider
+	}
+	configName, _, found := strings.Cut(scheme, "_")
+	if !found || configName == "" {
+		return principal.Provider
+	}
+
+	return configName
 }
 
 func (m *Manager) UpdateToken(token *apiv3.Token) (*apiv3.Token, error) {
