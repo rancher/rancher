@@ -176,8 +176,10 @@ func Untar(dst string, r io.Reader) error {
 			continue
 		}
 
-		target := filepath.Join(dst, header.Name)
-
+		target, err := filepathsecure.SecureJoin(dst, header.Name)
+		if err != nil {
+			return fmt.Errorf("failed to build path for file [%s]", header.Name)
+		}
 		switch header.Typeflag {
 
 		// if it's a dir, and it doesn't exist, create it
