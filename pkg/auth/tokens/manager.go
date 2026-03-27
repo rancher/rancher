@@ -165,7 +165,8 @@ func (m *Manager) GetToken(tokenAuthValue string) (accessor.TokenAccessor, int, 
 		if err == nil {
 			return ext, 0, nil
 		}
-		return nil, http.StatusNotFound, fmt.Errorf("failed to retrieve to retrieve auth ext token %q, error: %#v", tokenName, err)
+		logrus.Errorf("failed to retrieve auth ext token %q, error: %#v", tokenName, err)
+		return nil, http.StatusNotFound, fmt.Errorf("%s", http.StatusText(http.StatusNotFound))
 	}
 
 	var lookupUsingClient bool
