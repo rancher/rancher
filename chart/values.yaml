@@ -18,8 +18,8 @@ auditLog:
   #   3: Log metadata, request header, response heaeders, request body, and response body
   level: 0
 
-  # destination may be one of "sidecar" or "hostpath". When set to "sidecar" logs will be sent and output to a sidecar
-  # container called "rancher-audit-log". When "hostpath" logs are written to a hostpath volume called "audit-log" to
+  # destination may be one of "sidecar" or "hostPath". When set to "sidecar" logs will be sent and output to a sidecar
+  # container called "rancher-audit-log". When "hostPath" logs are written to a hostpath volume called "audit-log" to
   # a directory configured by auditLog.hostPath.
   destination: sidecar
   hostPath: /var/log/rancher/audit/
