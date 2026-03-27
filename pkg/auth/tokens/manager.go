@@ -162,11 +162,16 @@ func (m *Manager) GetToken(tokenAuthValue string) (accessor.TokenAccessor, int, 
 	// Support ext tokens
 	if extTokenID, found := strings.CutPrefix(tokenName, "ext/"); found {
 		ext, err := m.extTokenStore.Get(extTokenID, "", &metav1.GetOptions{})
-		if err == nil {
-			return ext, 0, nil
+		if err != nil {
+			logrus.Errorf("failed to retrieve auth ext token %q, error: %#v", tokenName, err)
+			return nil, http.StatusNotFound, fmt.Errorf("%s", http.StatusText(http.StatusNotFound))
 		}
-		logrus.Errorf("failed to retrieve auth ext token %q, error: %#v", tokenName, err)
-		return nil, http.StatusNotFound, fmt.Errorf("%s", http.StatusText(http.StatusNotFound))
+
+		if code, err := ExtVerifyToken(ext, extTokenID, tokenKey); err != nil {
+			return nil, code, err
+		}
+
+		return ext, 0, nil
 	}
 
 	var lookupUsingClient bool
