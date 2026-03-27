@@ -165,7 +165,7 @@ func (m *Manager) GetToken(tokenAuthValue string) (accessor.TokenAccessor, int, 
 		if err == nil {
 			return ext, 0, nil
 		}
-		return nil, 404, fmt.Errorf("failed to retrieve to retrieve auth ext token %q, error: %#v", tokenName, err)
+		return nil, http.StatusNotFound, fmt.Errorf("failed to retrieve to retrieve auth ext token %q, error: %#v", tokenName, err)
 	}
 
 	var lookupUsingClient bool
@@ -175,7 +175,7 @@ func (m *Manager) GetToken(tokenAuthValue string) (accessor.TokenAccessor, int, 
 		if apierrors.IsNotFound(err) {
 			lookupUsingClient = true
 		} else {
-			return nil, 404, fmt.Errorf("failed to retrieve auth token from cache, error: %v", err)
+			return nil, http.StatusNotFound, fmt.Errorf("failed to retrieve auth token from cache, error: %v", err)
 		}
 	} else if len(objs) == 0 {
 		lookupUsingClient = true
@@ -185,7 +185,7 @@ func (m *Manager) GetToken(tokenAuthValue string) (accessor.TokenAccessor, int, 
 	if lookupUsingClient {
 		storedToken, err = m.tokens.Get(tokenName, metav1.GetOptions{})
 		if err != nil {
-			return nil, 404, fmt.Errorf("failed to retrieve auth token, error: %#v", err)
+			return nil, http.StatusNotFound, fmt.Errorf("failed to retrieve auth token, error: %#v", err)
 		}
 	} else {
 		storedToken = objs[0].(*apiv3.Token)
@@ -204,7 +204,7 @@ func (m *Manager) getTokens(tokenAuthValue string) ([]apiv3.Token, int, error) {
 
 	storedToken, _, err := m.GetToken(tokenAuthValue)
 	if err != nil {
-		return tokens, 401, err
+		return tokens, http.StatusUnauthorized, err
 	}
 
 	userID := storedToken.GetUserID()
@@ -369,7 +369,7 @@ func (m *Manager) getTokenFromRequest(request *types.APIContext) error {
 		switch status {
 		case 0:
 			status = http.StatusInternalServerError
-		case 410:
+		case http.StatusGone:
 			status = http.StatusNotFound
 		default:
 		}
@@ -400,7 +400,7 @@ func (m *Manager) removeToken(request *types.APIContext) error {
 	//getToken
 	t, status, err := m.getTokenByID(tokenAuthValue, tokenID)
 	if err != nil {
-		if status != 410 {
+		if status != http.StatusGone {
 			logrus.Errorf("DeleteToken Failed to fetch the token to delete with error: %v", err)
 			if status == 0 {
 				status = http.StatusInternalServerError
