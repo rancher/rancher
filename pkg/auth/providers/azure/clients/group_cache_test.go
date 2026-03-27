@@ -41,7 +41,7 @@ type fakePrincipalsClient struct {
 }
 
 func (f *fakePrincipalsClient) GetGroup(id string) (v3.Principal, error) {
-	return groupToPrincipal(f.groups[id]), nil
+	return groupToPrincipal("azuread", f.groups[id]), nil
 }
 
 type fakeGroup struct {

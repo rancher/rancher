@@ -563,6 +563,10 @@ func TestRefreshAttributes(t *testing.T) {
 					exttokens.NewTimeHandler(),
 					exttokens.NewHashHandler(),
 					exttokens.NewAuthHandler()),
+				isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+					"local":      !tt.enabled,
+					"shibboleth": false,
+				}),
 			}
 			got, err := r.refreshAttributes(tt.attribs)
 			assert.Nil(t, err)
@@ -753,6 +757,10 @@ func TestTriggerUserRefreshIgnoresUserAttributeNotFound(t *testing.T) {
 					name)
 			},
 		},
+		isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+			"local":      false,
+			"shibboleth": false,
+		}),
 	}
 
 	r.triggerUserRefresh(userID, true)
@@ -868,6 +876,9 @@ func TestRefreshAttributesNonTransientError(t *testing.T) {
 			exttokens.NewTimeHandler(),
 			exttokens.NewHashHandler(),
 			exttokens.NewAuthHandler()),
+		isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+			providerName: false,
+		}),
 	}
 
 	got, err := r.refreshAttributes(attribs)
@@ -888,7 +899,7 @@ func (p *mockNonTransientProvider) RefetchGroupPrincipals(principalID string, se
 	return nil, &common.NonTransientError{Err: fmt.Errorf("oauth2: invalid_grant: Session not active")}
 }
 
-func (p *mockNonTransientProvider) IsDisabledProvider() (bool, error) {
+func (p *mockNonTransientProvider) IsDisabledProvider(string) (bool, error) {
 	return false, nil
 }
 
@@ -900,7 +911,7 @@ type mockLocalProvider struct {
 	disabledErr    error
 }
 
-func (p *mockLocalProvider) IsDisabledProvider() (bool, error) {
+func (p *mockLocalProvider) IsDisabledProvider(string) (bool, error) {
 	return p.disabled, p.disabledErr
 }
 
@@ -966,7 +977,7 @@ type mockShibbolethProvider struct {
 	enabledErr error
 }
 
-func (p *mockShibbolethProvider) IsDisabledProvider() (bool, error) {
+func (p *mockShibbolethProvider) IsDisabledProvider(string) (bool, error) {
 	return p.enabled, p.enabledErr
 }
 
@@ -1037,7 +1048,7 @@ func (p *mockGitHubAppProvider) RefetchGroupPrincipals(principalID, secret strin
 	return p.groupPrincipals, nil
 }
 
-func (p *mockGitHubAppProvider) IsDisabledProvider() (bool, error) {
+func (p *mockGitHubAppProvider) IsDisabledProvider(string) (bool, error) {
 	return false, nil
 }
 
@@ -1115,6 +1126,9 @@ func TestRefreshAttributesNoPerUserSecrets(t *testing.T) {
 			exttokens.NewTimeHandler(),
 			exttokens.NewHashHandler(),
 			exttokens.NewAuthHandler()),
+		isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+			"githubapp": false,
+		}),
 	}
 
 	got, err := r.refreshAttributes(attribs)
@@ -1139,7 +1153,7 @@ func (p *mockSecretProvider) RefetchGroupPrincipals(principalID, secret string) 
 	return p.refetchGroups, p.refetchErr
 }
 
-func (p *mockSecretProvider) IsDisabledProvider() (bool, error) {
+func (p *mockSecretProvider) IsDisabledProvider(string) (bool, error) {
 	return p.disabled, p.disabledErr
 }
 
@@ -1152,7 +1166,7 @@ func (p *mockRefetchErrorProvider) RefetchGroupPrincipals(principalID, secret st
 	return nil, p.refetchErr
 }
 
-func (p *mockRefetchErrorProvider) IsDisabledProvider() (bool, error) {
+func (p *mockRefetchErrorProvider) IsDisabledProvider(string) (bool, error) {
 	return false, nil
 }
 
@@ -1164,6 +1178,9 @@ func TestRefreshAttributesEarlyErrors(t *testing.T) {
 					return nil, fmt.Errorf("user lookup failed")
 				},
 			},
+			isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+				"github": false,
+			}),
 		}
 
 		attribs := &apiv3.UserAttribute{
@@ -1299,6 +1316,9 @@ func TestRefreshAttributesPerUserSecrets(t *testing.T) {
 				exttokens.NewTimeHandler(),
 				exttokens.NewHashHandler(),
 				exttokens.NewAuthHandler()),
+			isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+				providerName: false,
+			}),
 		}
 
 		attribs := &apiv3.UserAttribute{
@@ -1366,6 +1386,9 @@ func TestRefreshAttributesPerUserSecrets(t *testing.T) {
 				exttokens.NewTimeHandler(),
 				exttokens.NewHashHandler(),
 				exttokens.NewAuthHandler()),
+			isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+				providerName: false,
+			}),
 		}
 
 		attribs := &apiv3.UserAttribute{
@@ -1381,7 +1404,7 @@ func TestRefreshAttributesPerUserSecrets(t *testing.T) {
 }
 
 func TestRefreshAttributesRefetchErrors(t *testing.T) {
-	const providerName = "testprovider"
+	const providerName = "test"
 
 	user := &apiv3.User{
 		ObjectMeta:   metav1.ObjectMeta{Name: "user-refetch"},
@@ -1446,6 +1469,10 @@ func TestRefreshAttributesRefetchErrors(t *testing.T) {
 				exttokens.NewTimeHandler(),
 				exttokens.NewHashHandler(),
 				exttokens.NewAuthHandler()),
+
+			isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+				providerName: false,
+			}),
 		}
 
 		attribs := &apiv3.UserAttribute{
@@ -1511,6 +1538,9 @@ func TestRefreshAttributesRefetchErrors(t *testing.T) {
 				exttokens.NewTimeHandler(),
 				exttokens.NewHashHandler(),
 				exttokens.NewAuthHandler()),
+			isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+				providerName: false,
+			}),
 		}
 
 		tokenClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(token *apiv3.Token) (*apiv3.Token, error) {
@@ -1535,7 +1565,7 @@ func TestRefreshAttributesRefetchErrors(t *testing.T) {
 }
 
 func TestRefreshAttributesAccessAndPrincipalErrors(t *testing.T) {
-	const providerName = "testprovider"
+	const providerName = "test"
 
 	user := &apiv3.User{
 		ObjectMeta:   metav1.ObjectMeta{Name: "user-err"},
@@ -1593,6 +1623,10 @@ func TestRefreshAttributesAccessAndPrincipalErrors(t *testing.T) {
 				exttokens.NewTimeHandler(),
 				exttokens.NewHashHandler(),
 				exttokens.NewAuthHandler()),
+			isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+				providerName: false,
+				"local":      false,
+			}),
 		}
 
 		attribs := &apiv3.UserAttribute{
@@ -1649,6 +1683,9 @@ func TestRefreshAttributesAccessAndPrincipalErrors(t *testing.T) {
 				exttokens.NewTimeHandler(),
 				exttokens.NewHashHandler(),
 				exttokens.NewAuthHandler()),
+			isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+				providerName: false,
+			}),
 		}
 
 		attribs := &apiv3.UserAttribute{
@@ -1694,6 +1731,9 @@ func TestRefreshAttributesAccessAndPrincipalErrors(t *testing.T) {
 				exttokens.NewTimeHandler(),
 				exttokens.NewHashHandler(),
 				exttokens.NewAuthHandler()),
+			isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+				providerName: false,
+			}),
 		}
 
 		attribs := &apiv3.UserAttribute{
@@ -1747,6 +1787,9 @@ func TestRefreshAttributesAccessAndPrincipalErrors(t *testing.T) {
 				exttokens.NewTimeHandler(),
 				exttokens.NewHashHandler(),
 				exttokens.NewAuthHandler()),
+			isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+				providerName: false,
+			}),
 		}
 
 		attribs := &apiv3.UserAttribute{
@@ -1796,6 +1839,9 @@ func TestRefreshAttributesAccessAndPrincipalErrors(t *testing.T) {
 				exttokens.NewTimeHandler(),
 				exttokens.NewHashHandler(),
 				exttokens.NewAuthHandler()),
+			isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+				providerName: false,
+			}),
 		}
 
 		attribs := &apiv3.UserAttribute{
@@ -1888,6 +1934,9 @@ func TestRefreshAttributesExtTokenDisable(t *testing.T) {
 				exttokens.NewTimeHandler(),
 				exttokens.NewHashHandler(),
 				exttokens.NewAuthHandler()),
+			isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+				"local": false,
+			}),
 		}
 
 		attribs := &apiv3.UserAttribute{
@@ -1937,6 +1986,9 @@ func TestRefreshAttributesExtTokenDisable(t *testing.T) {
 				exttokens.NewTimeHandler(),
 				exttokens.NewHashHandler(),
 				exttokens.NewAuthHandler()),
+			isDisabledProvider: newFakeIsDisabledFunc(map[string]bool{
+				"local": false,
+			}),
 		}
 
 		attribs := &apiv3.UserAttribute{
@@ -1949,4 +2001,16 @@ func TestRefreshAttributesExtTokenDisable(t *testing.T) {
 		assert.Nil(t, got)
 		assert.ErrorContains(t, err, "error disabling token")
 	})
+}
+
+// accepts a map of named provider to whether or not it's disabled.
+func newFakeIsDisabledFunc(data map[string]bool) func(string) (bool, error) {
+	return func(name string) (bool, error) {
+		disabled, ok := data[name]
+		if ok {
+			return disabled, nil
+		}
+
+		return false, apierrors.NewNotFound(schema.GroupResource{Resource: "authconfigs"}, name)
+	}
 }

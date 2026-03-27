@@ -123,6 +123,11 @@ func TestTokenEndpoint(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: fakeTokenName,
 		},
+		UserPrincipal: v3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "local://u-1234a",
+			},
+		},
 		Token:        fakeTokenValue,
 		UserID:       fakeUserID,
 		Enabled:      ptr.To(true),
@@ -133,6 +138,11 @@ func TestTokenEndpoint(t *testing.T) {
 			Name: fakeTokenName,
 			CreationTimestamp: metav1.Time{
 				Time: time.Unix(10, 0),
+			},
+		},
+		UserPrincipal: v3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "local://u-1234a",
 			},
 		},
 		Token:        fakeTokenValue,
@@ -150,7 +160,7 @@ func TestTokenEndpoint(t *testing.T) {
 		AuthProvider: fakeAuthProvider,
 	}
 	fakePrincipal := ext.TokenPrincipal{
-		Name:        "world",
+		Name:        "local://u-1234a",
 		Provider:    fakeAuthProvider,
 		DisplayName: "myself",
 		LoginName:   "hello",
@@ -1343,7 +1353,7 @@ func TestTokenEndpoint(t *testing.T) {
 
 	// register auth provider
 	mockProvider := providermocks.NewMockAuthProvider(ctrl)
-	mockProvider.EXPECT().IsDisabledProvider().Return(false, nil).AnyTimes()
+	mockProvider.EXPECT().IsDisabledProvider("local").Return(false, nil).AnyTimes()
 	providers.SetProviders(map[string]common.AuthProvider{fakeAuthProvider: mockProvider})
 	t.Cleanup(func() { providers.SetProviders(nil) })
 

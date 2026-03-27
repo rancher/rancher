@@ -3,6 +3,7 @@ package client
 const (
 	ActiveDirectoryTestAndApplyInputType                       = "activeDirectoryTestAndApplyInput"
 	ActiveDirectoryTestAndApplyInputFieldActiveDirectoryConfig = "activeDirectoryConfig"
+	ActiveDirectoryTestAndApplyInputFieldConfigName            = "configName"
 	ActiveDirectoryTestAndApplyInputFieldEnabled               = "enabled"
 	ActiveDirectoryTestAndApplyInputFieldPassword              = "password"
 	ActiveDirectoryTestAndApplyInputFieldUsername              = "username"
@@ -10,6 +11,7 @@ const (
 
 type ActiveDirectoryTestAndApplyInput struct {
 	ActiveDirectoryConfig *ActiveDirectoryConfig `json:"activeDirectoryConfig,omitempty" yaml:"activeDirectoryConfig,omitempty"`
+	ConfigName            string                 `json:"configName,omitempty" yaml:"configName,omitempty"`
 	Enabled               bool                   `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	Password              string                 `json:"password,omitempty" yaml:"password,omitempty"`
 	Username              string                 `json:"username,omitempty" yaml:"username,omitempty"`

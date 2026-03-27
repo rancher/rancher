@@ -175,15 +175,20 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 
 	// If the auth provider is specified make sure it exists and enabled.
 	if token.GetAuthProvider() != "" {
-		disabled, err := providers.IsDisabledProvider(token.GetAuthProvider())
+		configName, err := common.ConfigNameFromToken(token)
+		if err != nil {
+			return nil, errors.Wrapf(ErrMustAuthenticate, "invalid principal for token")
+		}
+
+		disabled, err := providers.IsDisabledProvider(token.GetAuthProvider(), configName)
 		if err != nil {
 			return nil, errors.Wrapf(ErrMustAuthenticate,
 				"error checking if provider %s is disabled: %v",
-				token.GetAuthProvider(), err)
+				configName, err)
 		}
 		if disabled {
 			return nil, errors.Wrapf(ErrMustAuthenticate, "provider %s is disabled",
-				token.GetAuthProvider())
+				configName)
 		}
 	}
 
@@ -288,6 +293,7 @@ func (a *tokenAuthenticator) Authenticate(req *http.Request) (*AuthenticatorResp
 	}
 
 	logrus.Debugf("auth: Updated lastUsedAt for token %s", token.GetName())
+
 	return authResp, nil
 }
 

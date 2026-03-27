@@ -65,7 +65,7 @@ type fakeProvider struct {
 	getUserExtraAttributesFunc func(v3.Principal) map[string][]string
 }
 
-func (p *fakeProvider) IsDisabledProvider() (bool, error) {
+func (p *fakeProvider) IsDisabledProvider(string) (bool, error) {
 	return p.disabled, nil
 }
 

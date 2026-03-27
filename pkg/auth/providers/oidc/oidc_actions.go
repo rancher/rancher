@@ -92,6 +92,9 @@ func (o *OpenIDCProvider) TestAndApply(request *types.APIContext) error {
 	}
 
 	oidcConfig = oidcConfigApplyInput.OIDCConfig
+
+	oidcConfig.Name = oidcConfigApplyInput.ConfigName
+
 	// set a default value for GroupSearchEnabled
 	// in case user input is nil for some reasons.
 	if oidcConfigApplyInput.OIDCConfig.GroupSearchEnabled == nil {

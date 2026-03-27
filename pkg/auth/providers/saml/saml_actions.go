@@ -41,7 +41,7 @@ func (s *Provider) testAndEnable(request *types.APIContext) error {
 			fmt.Sprintf("SAML: Failed to parse body: %v", err))
 	}
 
-	samlConfig, err := s.getSamlConfig()
+	samlConfig, err := s.getSamlConfig(s.name)
 	if err != nil {
 		return err
 	}
