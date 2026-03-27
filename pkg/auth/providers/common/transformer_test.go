@@ -66,6 +66,22 @@ func TestTransformToAuthProvider(t *testing.T) {
 				"logoutAllForced":    false,
 			},
 		},
+		{
+			desc: "Google OAuth config type is corrected to canonical provider type",
+			authConfig: map[string]any{
+				"metadata": map[string]any{
+					"name": "googleoauth",
+				},
+				"type": "googleOauthConfig",
+			},
+			provider: map[string]any{
+				"id":                 "googleoauth",
+				"type":               "googleOAuthProvider",
+				"logoutAllSupported": false,
+				"logoutAllEnabled":   false,
+				"logoutAllForced":    false,
+			},
+		},
 	}
 
 	for _, test := range tests {
