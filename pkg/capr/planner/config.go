@@ -385,15 +385,15 @@ func getMachineNetworkInfo(secrets corecontrollers.SecretCache, entry *planEntry
 	info.Entry = entry
 	if ips := entry.Metadata.Annotations[capr.InternalAddressAnnotation]; ips != "" {
 		for _, ip := range strings.Split(ips, ",") {
-			if ip != "" {
-				info.InternalAddresses = append(info.InternalAddresses, strings.TrimSpace(ip))
+			if ip = strings.TrimSpace(ip); ip != "" {
+				info.InternalAddresses = append(info.InternalAddresses, ip)
 			}
 		}
 	}
 	if ips := entry.Metadata.Annotations[capr.AddressAnnotation]; ips != "" {
 		for _, ip := range strings.Split(ips, ",") {
-			if ip != "" {
-				info.ExternalAddresses = append(info.ExternalAddresses, strings.TrimSpace(ip))
+			if ip = strings.TrimSpace(ip); ip != "" {
+				info.ExternalAddresses = append(info.ExternalAddresses, ip)
 			}
 		}
 	}
@@ -482,11 +482,11 @@ func updateConfigWithAddresses(config map[string]interface{}, info *machineNetwo
 	config["node-ip"] = nodeIPs
 
 	// If a cloud provider is configured, it will manage the external IP.
-	// If no cloud provider is set, assign node-external-ip if public IPs are available,
-	// and have not already been assigned to node-ip.
-	if convert.ToString(config["cloud-provider-name"]) == "" {
+	// If node-ip is not set, then do not set node-external-ip.
+	if convert.ToString(config["cloud-provider-name"]) == "" && len(nodeIPs) > 0 {
 		nodeExternalIPs := convert.ToStringSlice(config["node-external-ip"])
 		for _, ip := range info.ExternalAddresses {
+			// Assign node public IPs to node-external-ip if it has not already been assigned to node-ip.
 			if ip == "" || slices.Contains(nodeExternalIPs, ip) || slices.Contains(nodeIPs, ip) {
 				continue
 			}
