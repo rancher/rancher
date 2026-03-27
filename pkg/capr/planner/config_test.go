@@ -258,6 +258,72 @@ func TestUpdateConfigWithAddresses(t *testing.T) {
 			expectedNodeIPs:         []string{"10.0.0.5"},
 			expectedNodeExternalIPs: []string{"2001:db8::dead:beef"},
 		},
+		// Azure (and other drivers that only populate Driver.IPAddress with no PrivateIPAddress):
+		// node-ip and node-external-ip must both remain unset when there is no internal IP.
+		{
+			name: "Azure default config: only external IP, no internal IP - neither node-ip nor node-external-ip set",
+			initialConfig: map[string]interface{}{
+				"node-ip":             []string{},
+				"node-external-ip":    []string{},
+				"cloud-provider-name": "",
+			},
+			info: &machineNetworkInfo{
+				InternalAddresses: []string{},
+				ExternalAddresses: []string{"20.1.2.3"},
+				DriverName:        management.Azuredriver,
+			},
+			expectedNodeIPs:         []string{},
+			expectedNodeExternalIPs: []string{},
+		},
+		// Other drivers without PrivateIPAddress (e.g. vSphere, Google) also hit the default
+		// case and must not have node-external-ip set when InternalAddresses is empty.
+		{
+			name: "Generic driver with only external IP and no internal IP - neither node-ip nor node-external-ip set",
+			initialConfig: map[string]interface{}{
+				"node-ip":             []string{},
+				"node-external-ip":    []string{},
+				"cloud-provider-name": "",
+			},
+			info: &machineNetworkInfo{
+				InternalAddresses: []string{},
+				ExternalAddresses: []string{"10.0.0.5"},
+				DriverName:        "vsphere",
+			},
+			expectedNodeIPs:         []string{},
+			expectedNodeExternalIPs: []string{},
+		},
+		// When InternalAddresses is empty but an IPv6 address is present, nodeIPs is non-empty
+		// after the IPv6 append, so node-external-ip must still be set from ExternalAddresses.
+		{
+			name: "No internal IP but IPv6 address present: node-external-ip still set",
+			initialConfig: map[string]interface{}{
+				"node-ip":             []string{},
+				"node-external-ip":    []string{},
+				"cloud-provider-name": "",
+			},
+			info: &machineNetworkInfo{
+				InternalAddresses: []string{},
+				ExternalAddresses: []string{"20.1.2.3"},
+				IPv6Address:       "2001:db8::1",
+				DriverName:        management.Azuredriver,
+			},
+			expectedNodeIPs:         []string{"2001:db8::1"},
+			expectedNodeExternalIPs: []string{"20.1.2.3"},
+		},
+		// When all external IPs are already present in node-ip (duplicates), node-external-ip
+		// must not be written to the config at all (new len(nodeExternalIPs)>0 guard).
+		{
+			name: "All external IPs are duplicates of node-ip: node-external-ip key not written",
+			initialConfig: map[string]interface{}{
+				"cloud-provider-name": "",
+			},
+			info: &machineNetworkInfo{
+				InternalAddresses: []string{"10.0.0.5"},
+				ExternalAddresses: []string{"10.0.0.5"},
+			},
+			expectedNodeIPs:         []string{"10.0.0.5"},
+			expectedNodeExternalIPs: []string{},
+		},
 	}
 
 	for _, tt := range tests {
