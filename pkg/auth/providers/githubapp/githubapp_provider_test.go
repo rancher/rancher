@@ -20,7 +20,7 @@ import (
 func TestLogOutAll(t *testing.T) {
 	provider := Provider{
 		githubClient: &githubAppClient{httpClient: http.DefaultClient},
-		getConfig:    func() (*apiv3.GithubAppConfig, error) { return nil, nil },
+		getConfig:    func(string) (*apiv3.GithubAppConfig, error) { return nil, nil },
 	}
 
 	// LogoutAll does nothing in this case and does not fail.
@@ -30,7 +30,7 @@ func TestLogOutAll(t *testing.T) {
 func TestLogOut(t *testing.T) {
 	provider := Provider{
 		githubClient: &githubAppClient{httpClient: http.DefaultClient},
-		getConfig:    func() (*apiv3.GithubAppConfig, error) { return nil, nil },
+		getConfig:    func(string) (*apiv3.GithubAppConfig, error) { return nil, nil },
 	}
 
 	// Logout does nothing in this case and does not fail.
@@ -40,10 +40,10 @@ func TestLogOut(t *testing.T) {
 func TestGetName(t *testing.T) {
 	provider := Provider{
 		githubClient: &githubAppClient{httpClient: http.DefaultClient},
-		getConfig:    func() (*apiv3.GithubAppConfig, error) { return nil, nil },
+		getConfig:    func(string) (*apiv3.GithubAppConfig, error) { return nil, nil },
 	}
 
-	assert.Equal(t, Name, provider.GetName())
+	assert.Equal(t, ProviderName, provider.GetName())
 }
 
 func TestCustomizeSchema(t *testing.T) {
@@ -55,7 +55,7 @@ func TestTransformToAuthProvider(t *testing.T) {
 
 	provider := Provider{
 		githubClient: &githubAppClient{httpClient: http.DefaultClient},
-		getConfig:    func() (*apiv3.GithubAppConfig, error) { return config, nil },
+		getConfig:    func(string) (*apiv3.GithubAppConfig, error) { return config, nil },
 	}
 
 	t.Run("when no alternative client_id is provided for hostname", func(t *testing.T) {
@@ -123,7 +123,7 @@ func TestAuthenticateUser(t *testing.T) {
 	}
 	provider := Provider{
 		githubClient: &githubAppClient{httpClient: http.DefaultClient},
-		getConfig:    func() (*apiv3.GithubAppConfig, error) { return config, nil },
+		getConfig:    func(string) (*apiv3.GithubAppConfig, error) { return config, nil },
 		userManager:  &fakeUserManager{},
 	}
 	req := httptest.NewRequest(http.MethodGet, "http://example.com", nil)
@@ -224,6 +224,11 @@ func TestRefetchGroupPrincipals(t *testing.T) {
 	defer srv.Close()
 
 	config := &apiv3.GithubAppConfig{
+		AuthConfig: apiv3.AuthConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "githubapp",
+			},
+		},
 		Hostname:     stripScheme(t, srv),
 		ClientID:     "test_client_id",
 		ClientSecret: "test_client_secret",
@@ -232,7 +237,7 @@ func TestRefetchGroupPrincipals(t *testing.T) {
 	}
 	provider := Provider{
 		githubClient: &githubAppClient{httpClient: http.DefaultClient},
-		getConfig:    func() (*apiv3.GithubAppConfig, error) { return config, nil },
+		getConfig:    func(string) (*apiv3.GithubAppConfig, error) { return config, nil },
 		userManager:  &fakeUserManager{},
 	}
 
@@ -314,6 +319,11 @@ func TestSearchPrincipals(t *testing.T) {
 	defer srv.Close()
 
 	config := &apiv3.GithubAppConfig{
+		AuthConfig: apiv3.AuthConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "githubapp",
+			},
+		},
 		Hostname:     stripScheme(t, srv),
 		ClientID:     "test_client_id",
 		ClientSecret: "test_client_secret",
@@ -322,8 +332,12 @@ func TestSearchPrincipals(t *testing.T) {
 	}
 	provider := Provider{
 		githubClient: &githubAppClient{httpClient: http.DefaultClient},
-		getConfig:    func() (*apiv3.GithubAppConfig, error) { return config, nil },
-		userManager:  &fakeUserManager{},
+		getConfig:    func(string) (*apiv3.GithubAppConfig, error) { return config, nil },
+		userManager: &fakeUserManager{
+			members: map[string][]string{
+				"githubapp_org://1": []string{"githubapp_user://12345"},
+			},
+		},
 	}
 
 	searchTests := map[string]struct {
@@ -360,6 +374,7 @@ func TestSearchPrincipals(t *testing.T) {
 					ProfilePicture: "https://example.com/example-org-2-avatar.jpg",
 					PrincipalType:  "group",
 					Provider:       "githubapp",
+					MemberOf:       false,
 				},
 			},
 		},
@@ -374,8 +389,8 @@ func TestSearchPrincipals(t *testing.T) {
 					DisplayName:    "Dev Team",
 					LoginName:      "dev-team",
 					ProfilePicture: "https://example.com/example-org-1-avatar.jpg",
-					PrincipalType:  "group", MemberOf: false,
-					Provider: "githubapp",
+					PrincipalType:  "group",
+					Provider:       "githubapp",
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -402,6 +417,7 @@ func TestSearchPrincipals(t *testing.T) {
 					ProfilePicture: "https://example.com/example-org-1-avatar.jpg",
 					PrincipalType:  "group",
 					Provider:       "githubapp",
+					MemberOf:       true,
 				},
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -429,7 +445,14 @@ func TestSearchPrincipals(t *testing.T) {
 
 	for name, tt := range searchTests {
 		t.Run(name, func(t *testing.T) {
-			accts, err := provider.SearchPrincipals(tt.key, tt.principalType, nil)
+			accts, err := provider.SearchPrincipals(tt.key, tt.principalType, &apiv3.Token{
+				UserPrincipal: apiv3.Principal{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "githubapp_user://12345",
+					},
+					LoginName:     "octocat",
+					PrincipalType: userType,
+				}})
 			require.NoError(t, err)
 
 			slices.SortFunc(accts, func(a, b apiv3.Principal) int {
@@ -462,7 +485,7 @@ func TestGetPrincipal(t *testing.T) {
 	}
 	provider := Provider{
 		githubClient: &githubAppClient{httpClient: http.DefaultClient},
-		getConfig:    func() (*apiv3.GithubAppConfig, error) { return config, nil },
+		getConfig:    func(string) (*apiv3.GithubAppConfig, error) { return config, nil },
 		userManager:  &fakeUserManager{},
 	}
 
@@ -481,6 +504,7 @@ func TestGetPrincipal(t *testing.T) {
 				ProfilePicture: "https://github.com/images/error/octocat_happy.gif",
 				PrincipalType:  "user",
 				Provider:       "githubapp",
+				Me:             true,
 			},
 		},
 		"existing org": {
@@ -500,7 +524,15 @@ func TestGetPrincipal(t *testing.T) {
 
 	for name, tt := range principalTests {
 		t.Run(name, func(t *testing.T) {
-			principal, err := provider.GetPrincipal(tt.principalID, nil)
+			principal, err := provider.GetPrincipal(tt.principalID, &apiv3.Token{
+				UserPrincipal: apiv3.Principal{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "githubapp_user://1234",
+					},
+					LoginName:     "octocat",
+					PrincipalType: userType,
+				}})
+
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, principal)
 		})
@@ -508,43 +540,8 @@ func TestGetPrincipal(t *testing.T) {
 
 }
 
-func TestParsePrincipalID(t *testing.T) {
-	parseTests := []struct {
-		principalID string
-		wantKind    string
-		wantID      int
-	}{
-		{
-			"githubapp_user://867746",
-			userType,
-			867746,
-		},
-	}
-
-	for _, tt := range parseTests {
-		t.Run(tt.principalID, func(t *testing.T) {
-			principalKind, id, err := parsePrincipalID(tt.principalID)
-			require.NoError(t, err)
-
-			assert.Equal(t, tt.wantKind, principalKind)
-			assert.Equal(t, tt.wantID, id)
-		})
-	}
-}
-
-func TestParsePrincipalIDErrors(t *testing.T) {
-	parseTests := []string{
-		"githubapp_user://testing",
-		"github://",
-	}
-
-	for _, tt := range parseTests {
-		_, _, err := parsePrincipalID(tt)
-		assert.ErrorContains(t, err, "invalid id "+tt)
-	}
-}
-
 type fakeUserManager struct {
+	members map[string][]string
 }
 
 func (f *fakeUserManager) CheckAccess(accessMode string, allowedPrincipalIDs []string, userPrincipalID string, groups []apiv3.Principal) (bool, error) {
@@ -556,7 +553,16 @@ func (f *fakeUserManager) SetPrincipalOnCurrentUser(r *http.Request, principal a
 }
 
 func (f *fakeUserManager) IsMemberOf(token accessor.TokenAccessor, group apiv3.Principal) bool {
-	return true
+	if f.members == nil {
+		return false
+	}
+
+	groups, ok := f.members[group.Name]
+	if !ok {
+		return false
+	}
+
+	return slices.Contains(groups, token.GetUserPrincipal().Name)
 }
 
 func (f *fakeUserManager) UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []apiv3.Principal, userExtraInfo map[string][]string, loginTime ...time.Time) error {

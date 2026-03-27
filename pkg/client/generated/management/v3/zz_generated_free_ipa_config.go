@@ -9,6 +9,7 @@ const (
 	FreeIpaConfigFieldConnectionTimeout               = "connectionTimeout"
 	FreeIpaConfigFieldCreated                         = "created"
 	FreeIpaConfigFieldCreatorID                       = "creatorId"
+	FreeIpaConfigFieldDisplayName                     = "displayName"
 	FreeIpaConfigFieldEnabled                         = "enabled"
 	FreeIpaConfigFieldGroupDNAttribute                = "groupDNAttribute"
 	FreeIpaConfigFieldGroupMemberMappingAttribute     = "groupMemberMappingAttribute"
@@ -53,6 +54,7 @@ type FreeIpaConfig struct {
 	ConnectionTimeout               int64             `json:"connectionTimeout,omitempty" yaml:"connectionTimeout,omitempty"`
 	Created                         string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                       string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	DisplayName                     string            `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	Enabled                         bool              `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	GroupDNAttribute                string            `json:"groupDNAttribute,omitempty" yaml:"groupDNAttribute,omitempty"`
 	GroupMemberMappingAttribute     string            `json:"groupMemberMappingAttribute,omitempty" yaml:"groupMemberMappingAttribute,omitempty"`

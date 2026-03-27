@@ -102,6 +102,7 @@ func NewMSGraphClient(config *v3.AzureADConfig, secrets wcorev1.SecretController
 		GraphClient:        graphClient,
 		ConfidentialClient: confidentialClient,
 		authResult:         authResult,
+		config:             config,
 	}, nil
 }
 
@@ -113,6 +114,7 @@ type AzureMSGraphClient struct {
 	ConfidentialClient confidential.Client
 
 	GraphClient *msgraphsdk.GraphServiceClient
+	config      *v3.AzureADConfig
 }
 
 // GetUser takes a user ID and fetches the user principal from the Microsoft Graph API.
@@ -127,7 +129,7 @@ func (c AzureMSGraphClient) GetUser(userID string) (v3.Principal, error) {
 		return v3.Principal{}, wrapped
 	}
 
-	return userToPrincipal(result), nil
+	return userToPrincipal(c.config.Name, result), nil
 }
 
 // ListUsers fetches all user principals in a directory from the Microsoft Graph API.
@@ -149,7 +151,7 @@ func (c AzureMSGraphClient) ListUsers(filter string) ([]v3.Principal, error) {
 
 	var users []v3.Principal
 	err = pageIterator.Iterate(context.Background(), func(user models.Userable) bool {
-		users = append(users, userToPrincipal(user))
+		users = append(users, userToPrincipal(c.config.Name, user))
 		return true
 	})
 
@@ -168,7 +170,7 @@ func (c AzureMSGraphClient) GetGroup(groupID string) (v3.Principal, error) {
 		return v3.Principal{}, wrapped
 	}
 
-	return groupToPrincipal(result), nil
+	return groupToPrincipal(c.config.Name, result), nil
 }
 
 // ListGroups fetches all group principals in a directory from the Microsoft Graph API.
@@ -190,7 +192,7 @@ func (c AzureMSGraphClient) ListGroups(filter string) ([]v3.Principal, error) {
 
 	var groups []v3.Principal
 	err = pageIterator.Iterate(context.Background(), func(group models.Groupable) bool {
-		groups = append(groups, groupToPrincipal(group))
+		groups = append(groups, groupToPrincipal(c.config.Name, group))
 		return true
 	})
 
@@ -351,10 +353,10 @@ type azureUserObject interface {
 	GetUserPrincipalName() *string
 }
 
-func userToPrincipal(user azureUserObject) v3.Principal {
+func userToPrincipal(configName string, user azureUserObject) v3.Principal {
 	return v3.Principal{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: Name + "_user://" + *user.GetId(),
+			Name: configName + "_user://" + *user.GetId(),
 		},
 		DisplayName:   ptr.Deref(user.GetDisplayName(), ""),
 		LoginName:     ptr.Deref(user.GetUserPrincipalName(), ""),
@@ -363,10 +365,10 @@ func userToPrincipal(user azureUserObject) v3.Principal {
 	}
 }
 
-func groupToPrincipal(group azureObject) v3.Principal {
+func groupToPrincipal(configName string, group azureObject) v3.Principal {
 	return v3.Principal{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: Name + "_group://" + *group.GetId(),
+			Name: configName + "_group://" + *group.GetId(),
 		},
 		DisplayName:   ptr.Deref(group.GetDisplayName(), ""),
 		PrincipalType: "group",

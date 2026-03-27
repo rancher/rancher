@@ -145,7 +145,8 @@ func TestV1AuthProviderStoreListLocalHidden(t *testing.T) {
 	// externalMock stands in for the global provider registry entry that makes
 	// IsExternalProviderEnabled() return true, which in turn makes IsLocalHidden() true.
 	externalMock := mocks.NewMockAuthProvider(ctrl)
-	externalMock.EXPECT().IsDisabledProvider().Return(false, nil).AnyTimes()
+	externalMock.EXPECT().GetName().Return("test")
+	externalMock.EXPECT().IsDisabledProvider("test").Return(false, nil).AnyTimes()
 
 	providers.SetProviders(map[string]common.AuthProvider{"okta": externalMock})
 	defer providers.SetProviders(nil)
@@ -313,11 +314,13 @@ func TestAuthProvidersStoreByID(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	localMock := mocks.NewMockAuthProvider(ctrl)
+	localMock.EXPECT().GetName().Return("local").AnyTimes()
 	localMock.EXPECT().TransformToAuthProvider(gomock.Any()).
 		Return(map[string]any{"id": "local", "type": "localProvider"}, nil).AnyTimes()
 
 	externalMock := mocks.NewMockAuthProvider(ctrl)
-	externalMock.EXPECT().IsDisabledProvider().Return(false, nil).AnyTimes()
+	externalMock.EXPECT().GetName().Return("github").AnyTimes()
+	externalMock.EXPECT().IsDisabledProvider("github").Return(false, nil).AnyTimes()
 	externalMock.EXPECT().TransformToAuthProvider(gomock.Any()).
 		Return(map[string]any{"id": "github", "type": "githubProvider"}, nil).AnyTimes()
 
@@ -472,7 +475,7 @@ func TestAuthProvidersStoreList(t *testing.T) {
 
 	externalMock := mocks.NewMockAuthProvider(ctrl)
 	externalMock.EXPECT().GetName().Return("github").AnyTimes()
-	externalMock.EXPECT().IsDisabledProvider().Return(false, nil).AnyTimes()
+	externalMock.EXPECT().IsDisabledProvider("github").Return(false, nil).AnyTimes()
 	externalMock.EXPECT().TransformToAuthProvider(gomock.Any()).
 		Return(map[string]any{"id": "github", "type": "githubProvider"}, nil).AnyTimes()
 

@@ -25,19 +25,22 @@ import (
 )
 
 func AuthConfigs(management *config.ManagementContext) error {
-	if err := addAuthConfig(github.Name, client.GithubConfigType, false, management); err != nil {
+	// KEVIN: TODO: Remove these.
+	// KEVIN: We need to figure out how to provide a list of possible
+	// AuthConfigs
+	if err := addAuthConfig(github.ProviderName, client.GithubConfigType, false, management); err != nil {
 		return err
 	}
 
-	if err := addAuthConfig(githubapp.Name, client.GithubAppConfigType, false, management); err != nil {
+	if err := addAuthConfig(githubapp.ProviderName, client.GithubAppConfigType, false, management); err != nil {
 		return err
 	}
 
-	if err := addAuthConfig(activedirectory.Name, client.ActiveDirectoryConfigType, false, management); err != nil {
+	if err := addAuthConfig(activedirectory.ProviderName, client.ActiveDirectoryConfigType, false, management); err != nil {
 		return err
 	}
 
-	if err := addAuthConfigWithSLO(azure.Name, client.AzureADConfigType, false, management); err != nil {
+	if err := addAuthConfigWithSLO(azure.ProviderName, client.AzureADConfigType, false, management); err != nil {
 		return err
 	}
 
@@ -73,7 +76,7 @@ func AuthConfigs(management *config.ManagementContext) error {
 		return err
 	}
 
-	if err := addAuthConfig(googleoauth.Name, client.GoogleOauthConfigType, false, management); err != nil {
+	if err := addAuthConfig(googleoauth.ProviderName, client.GoogleOauthConfigType, false, management); err != nil {
 		return err
 	}
 
@@ -81,11 +84,11 @@ func AuthConfigs(management *config.ManagementContext) error {
 		return err
 	}
 
-	if err := addAuthConfigWithSLO(keycloakoidc.Name, client.KeyCloakOIDCConfigType, false, management); err != nil {
+	if err := addAuthConfigWithSLO(keycloakoidc.ProviderName, client.KeyCloakOIDCConfigType, false, management); err != nil {
 		return err
 	}
 
-	if err := addAuthConfigWithSLO(genericoidc.Name, client.GenericOIDCConfigType, false, management); err != nil {
+	if err := addAuthConfigWithSLO(genericoidc.ProviderName, client.GenericOIDCConfigType, false, management); err != nil {
 		return err
 	}
 	if err := addAuthConfigWithSLO(cognito.Name, client.CognitoConfigType, false, management); err != nil {
@@ -105,7 +108,7 @@ func addAuthConfigWithSLO(name, aType string, enabled bool, management *config.M
 
 func addAuthConfigCore(name, aType string, enabled, sloSupported bool, management *config.ManagementContext) error {
 	annotations := make(map[string]string)
-	if name == azure.Name {
+	if name == azure.ProviderName {
 		annotations[azure.GraphEndpointMigratedAnnotation] = "true"
 	}
 	annotations[auth.CleanupAnnotation] = auth.CleanupRancherLocked

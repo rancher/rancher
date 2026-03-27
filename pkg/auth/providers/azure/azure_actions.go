@@ -30,7 +30,7 @@ func (ap *Provider) formatter(apiContext *types.APIContext, resource *types.RawR
 }
 
 func (ap *Provider) actionHandler(actionName string, action *types.Action, request *types.APIContext) error {
-	handled, err := common.HandleCommonAction(actionName, action, request, Name, ap.authConfigs)
+	handled, err := common.HandleCommonAction(actionName, action, request, ProviderName, ap.authConfigs)
 	if err != nil {
 		return err
 	}
@@ -84,8 +84,9 @@ func (ap *Provider) testAndApply(request *types.APIContext) error {
 	}
 
 	azureADConfig := &azureADConfigApplyInput.Config
+	azureADConfig.Name = azureADConfigApplyInput.ConfigName
 
-	currentConfig, err := ap.GetAzureConfigK8s()
+	currentConfig, err := ap.GetAzureConfigK8s(azureADConfig.Name)
 	if err != nil {
 		logrus.Errorf("Failed to fetch Azure AD Config from Kubernetes: %v", err)
 		return httperror.NewAPIError(httperror.ServerError, "failed to fetch Azure AD Config from Kubernetes")

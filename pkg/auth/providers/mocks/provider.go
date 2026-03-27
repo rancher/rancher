@@ -145,18 +145,18 @@ func (mr *MockAuthProviderMockRecorder) GetUserExtraAttributes(userPrincipal any
 }
 
 // IsDisabledProvider mocks base method.
-func (m *MockAuthProvider) IsDisabledProvider() (bool, error) {
+func (m *MockAuthProvider) IsDisabledProvider(arg0 string) (bool, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IsDisabledProvider")
+	ret := m.ctrl.Call(m, "IsDisabledProvider", arg0)
 	ret0, _ := ret[0].(bool)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // IsDisabledProvider indicates an expected call of IsDisabledProvider.
-func (mr *MockAuthProviderMockRecorder) IsDisabledProvider() *gomock.Call {
+func (mr *MockAuthProviderMockRecorder) IsDisabledProvider(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsDisabledProvider", reflect.TypeOf((*MockAuthProvider)(nil).IsDisabledProvider))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsDisabledProvider", reflect.TypeOf((*MockAuthProvider)(nil).IsDisabledProvider), arg0)
 }
 
 // Logout mocks base method.

@@ -13,6 +13,7 @@ const (
 	OIDCConfigFieldClientSecret              = "clientSecret"
 	OIDCConfigFieldCreated                   = "created"
 	OIDCConfigFieldCreatorID                 = "creatorId"
+	OIDCConfigFieldDisplayName               = "displayName"
 	OIDCConfigFieldEmailClaim                = "emailClaim"
 	OIDCConfigFieldEnabled                   = "enabled"
 	OIDCConfigFieldEndSessionEndpoint        = "endSessionEndpoint"
@@ -52,6 +53,7 @@ type OIDCConfig struct {
 	ClientSecret              string            `json:"clientSecret,omitempty" yaml:"clientSecret,omitempty"`
 	Created                   string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                 string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
+	DisplayName               string            `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	EmailClaim                string            `json:"emailClaim,omitempty" yaml:"emailClaim,omitempty"`
 	Enabled                   bool              `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	EndSessionEndpoint        string            `json:"endSessionEndpoint,omitempty" yaml:"endSessionEndpoint,omitempty"`

@@ -381,7 +381,7 @@ func (l *Provider) GetUserExtraAttributes(userPrincipal apiv3.Principal) map[str
 
 // IsDisabledProvider checks if the local auth provider is currently disabled in Rancher.
 // As of now, local provider can't be disabled, so this method always returns false and nil for the error.
-func (l *Provider) IsDisabledProvider() (bool, error) {
+func (l *Provider) IsDisabledProvider(_ string) (bool, error) {
 	return false, nil
 }
 

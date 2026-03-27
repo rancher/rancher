@@ -74,7 +74,7 @@ func TestMSGraphClient_ListUsers(t *testing.T) {
 	}
 
 	// Note these can change because of changes in the remote service
-	assert.Len(t, users, 191)
+	assert.Len(t, users, 92)
 }
 
 func TestMSGraphClient_ListUsers_with_filter(t *testing.T) {
@@ -389,6 +389,11 @@ func newTestClientWithSecretsClient(t *testing.T, secrets wcorev1.SecretControll
 	}
 
 	client, err := NewMSGraphClient(&v3.AzureADConfig{
+		AuthConfig: v3.AuthConfig{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "azuread",
+			},
+		},
 		Endpoint:          endpoint,
 		GraphEndpoint:     graphEndpoint,
 		TenantID:          tenantID,
@@ -472,7 +477,7 @@ func TestUserToPrincipal(t *testing.T) {
 			},
 			want: v3.Principal{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "azuread_user://3f2504e0-4f89-11d3-9a0c-0305e82c3301",
+					Name: "azuread-test_user://3f2504e0-4f89-11d3-9a0c-0305e82c3301",
 				},
 				PrincipalType: "user",
 				DisplayName:   "Test User",
@@ -487,7 +492,7 @@ func TestUserToPrincipal(t *testing.T) {
 			},
 			want: v3.Principal{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "azuread_user://3f2504e0-4f89-11d3-9a0c-0305e82c3301",
+					Name: "azuread-test_user://3f2504e0-4f89-11d3-9a0c-0305e82c3301",
 				},
 				PrincipalType: "user",
 				LoginName:     "testuser",
@@ -501,7 +506,7 @@ func TestUserToPrincipal(t *testing.T) {
 			},
 			want: v3.Principal{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "azuread_user://3f2504e0-4f89-11d3-9a0c-0305e82c3301",
+					Name: "azuread-test_user://3f2504e0-4f89-11d3-9a0c-0305e82c3301",
 				},
 				PrincipalType: "user",
 				DisplayName:   "Test User",
@@ -514,7 +519,7 @@ func TestUserToPrincipal(t *testing.T) {
 			},
 			want: v3.Principal{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: "azuread_user://3f2504e0-4f89-11d3-9a0c-0305e82c3301",
+					Name: "azuread-test_user://3f2504e0-4f89-11d3-9a0c-0305e82c3301",
 				},
 				PrincipalType: "user",
 				Provider:      "azuread",
@@ -524,7 +529,7 @@ func TestUserToPrincipal(t *testing.T) {
 
 	for name, tt := range principalTests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tt.want, userToPrincipal(tt.user))
+			assert.Equal(t, tt.want, userToPrincipal("azuread-test", tt.user))
 		})
 	}
 }

@@ -1,6 +1,7 @@
 package ldap
 
 import (
+	"cmp"
 	"fmt"
 	"strings"
 
@@ -41,23 +42,20 @@ func (p *ldapProvider) actionHandler(actionName string, action *types.Action, re
 }
 
 func (p *ldapProvider) testAndApply(request *types.APIContext) error {
-	var input map[string]any
-	var err error
-	input, err = handler.ParseAndValidateActionBody(request, request.Schemas.Schema(&managementschema.Version,
+	input, err := handler.ParseAndValidateActionBody(request, request.Schemas.Schema(&managementschema.Version,
 		p.testAndApplyInputType))
-
 	if err != nil {
 		return err
 	}
 
 	configApplyInput := &v3.LdapTestAndApplyInput{}
-
 	if err := common.Decode(input, configApplyInput); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("Failed to parse body: %v", err))
 	}
 
 	config := &configApplyInput.LdapConfig
+	config.Name = configApplyInput.Name
 
 	login := &v3.BasicLogin{
 		Username: configApplyInput.Username,
@@ -150,6 +148,10 @@ func (p *ldapProvider) testAndApply(request *types.APIContext) error {
 		return err
 	}
 
+	// TODO: Front end isn't sending this - this needs to be fixed.
+	configName := cmp.Or(configApplyInput.ConfigName, strings.ToLower(strings.TrimSuffix(configApplyInput.LdapConfig.AuthConfig.Type, "Config")))
+	config.ObjectMeta.Name = configName
+
 	// If this works, save LDAPConfig CR adding enabled flag.
 	config.Enabled = configApplyInput.Enabled
 	err = p.saveLDAPConfig(config)
@@ -173,7 +175,7 @@ func (p *ldapProvider) testAndApply(request *types.APIContext) error {
 }
 
 func (p *ldapProvider) saveLDAPConfig(config *v3.LdapConfig) error {
-	storedConfig, _, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient())
+	storedConfig, _, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient(), config.Name)
 	if err != nil {
 		return err
 	}

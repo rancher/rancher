@@ -3,7 +3,6 @@ package genericoidc
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"github.com/pkg/errors"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -23,15 +22,15 @@ type GenOIDCProvider struct {
 }
 
 const (
-	Name      = "genericoidc"
-	UserType  = "user"
-	GroupType = "group"
+	ProviderName = "genericoidc"
+	UserType     = "user"
+	GroupType    = "group"
 )
 
 func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
 	p := &GenOIDCProvider{
 		baseoidc.OpenIDCProvider{
-			Name:         Name,
+			Name:         ProviderName,
 			Type:         client.GenericOIDCConfigType,
 			CTX:          ctx,
 			AuthConfigs:  mgmtCtx.Management.AuthConfigs(""),
@@ -47,7 +46,7 @@ func Configure(ctx context.Context, mgmtCtx *config.ScaledContext, userMGR user.
 
 // GetName returns the name of this provider.
 func (g *GenOIDCProvider) GetName() string {
-	return Name
+	return ProviderName
 }
 
 // SearchPrincipals will return the users Rancher already knows about whose
@@ -57,12 +56,17 @@ func (g *GenOIDCProvider) GetName() string {
 // be returned.  This is done because OIDC does not have a proper lookup
 // mechanism, so that last principal lets an admin enter a subject or group ID by
 // hand for an identity Rancher has not seen yet.
-func (g *GenOIDCProvider) SearchPrincipals(searchValue, principalType string, _ accessor.TokenAccessor) ([]apiv3.Principal, error) {
-	var principals []apiv3.Principal
+func (g *GenOIDCProvider) SearchPrincipals(searchValue, principalType string, token accessor.TokenAccessor) ([]apiv3.Principal, error) {
+	// TODO: This will not work across providers.
+	configName, err := common.ConfigNameFromToken(token)
+	if err != nil {
+		return nil, err
+	}
 
+	var principals []apiv3.Principal
 	if principalType != GroupType {
 		fromSearchValue := apiv3.Principal{
-			ObjectMeta:    metav1.ObjectMeta{Name: g.Name + "_" + UserType + "://" + searchValue},
+			ObjectMeta:    metav1.ObjectMeta{Name: configName + "_" + UserType + "://" + searchValue},
 			DisplayName:   searchValue,
 			LoginName:     searchValue,
 			PrincipalType: UserType,
@@ -90,17 +94,13 @@ func (g *GenOIDCProvider) SearchPrincipals(searchValue, principalType string, _ 
 
 func (g *GenOIDCProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
 	var p apiv3.Principal
+	// TODO: this should compare the principalID configName and the token configName
+	// And return an error if they don't match?
 
-	// parsing id to get the external id and type. Example genericoidc_<user|group>://<user sub | group name>
-	principalScheme, externalID, found := strings.Cut(principalID, "://")
-	if !found {
-		return p, fmt.Errorf("invalid principal id: %s", principalID)
+	principalConfigName, principalType, externalID, err := common.SplitPrincipalID(principalID)
+	if err != nil {
+		return p, err
 	}
-	provider, principalType, found := strings.Cut(principalScheme, "_")
-	if !found {
-		return p, fmt.Errorf("invalid principal scheme: %s", principalScheme)
-	}
-
 	if externalID == "" && principalType == "" {
 		return p, fmt.Errorf("invalid id %v", principalID)
 	}
@@ -109,16 +109,17 @@ func (g *GenOIDCProvider) GetPrincipal(principalID string, token accessor.TokenA
 	}
 	if principalType == UserType {
 		p = apiv3.Principal{
-			ObjectMeta:    metav1.ObjectMeta{Name: provider + "_" + principalType + "://" + externalID},
+			ObjectMeta:    metav1.ObjectMeta{Name: principalConfigName + "_" + principalType + "://" + externalID},
 			DisplayName:   externalID,
 			LoginName:     externalID,
 			PrincipalType: UserType,
 			Provider:      g.Name,
 		}
 	} else {
-		p = g.groupToPrincipal(externalID)
+		p = g.groupToPrincipal(externalID, principalConfigName)
 	}
 	p = g.toPrincipalFromToken(principalType, p, token)
+
 	return p, nil
 }
 
@@ -149,9 +150,9 @@ func (g *GenOIDCProvider) CanRefreshPrincipals() bool { return false }
 
 // groupToPrincipal takes a bare group name and turns it into a apiv3.Principal group object by filling-in other fields
 // with basic provider information.
-func (g *GenOIDCProvider) groupToPrincipal(groupName string) apiv3.Principal {
+func (g *GenOIDCProvider) groupToPrincipal(configName, groupName string) apiv3.Principal {
 	return apiv3.Principal{
-		ObjectMeta:    metav1.ObjectMeta{Name: g.Name + "_" + GroupType + "://" + groupName},
+		ObjectMeta:    metav1.ObjectMeta{Name: configName + "_" + GroupType + "://" + groupName},
 		DisplayName:   groupName,
 		Provider:      g.Name,
 		PrincipalType: GroupType,
@@ -178,5 +179,6 @@ func (g *GenOIDCProvider) toPrincipalFromToken(principalType string, princ apiv3
 			princ.MemberOf = g.UserMGR.IsMemberOf(token, princ)
 		}
 	}
+
 	return princ
 }

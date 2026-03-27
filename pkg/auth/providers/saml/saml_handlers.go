@@ -10,7 +10,7 @@ import (
 
 	"github.com/crewjam/saml"
 	"github.com/golang-jwt/jwt/v5"
-	log "github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 const rancherUserID = "rancherUserID"
@@ -19,33 +19,35 @@ const rancherUserID = "rancherUserID"
 func (s *Provider) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	serviceProvider := s.serviceProvider
 
-	log.Debugf("SAML [ServeHTTP]: Received %q %q", r.Method, r.URL)
+	logrus.Debugf("SAML [ServeHTTP]: Received %q %q", r.Method, r.URL)
 
 	r.ParseForm()
 
+	logrus.Debugf("SAML [ServeHTTP]: MetadataURL.Path = %s", serviceProvider.MetadataURL.Path)
 	if r.URL.Path == serviceProvider.MetadataURL.Path {
 		buf, _ := xml.MarshalIndent(serviceProvider.Metadata(), "", "  ")
 		w.Header().Set("Content-Type", "application/samlmetadata+xml")
 		w.Write(buf)
 
-		log.Debugf("SAML [ServeHTTP]: Returned meta data")
+		logrus.Debugf("SAML [ServeHTTP]: Returned meta data")
 		return
 	}
 
+	logrus.Debugf("SAML [ServeHTTP]: AcsURL.Path = %s", serviceProvider.AcsURL.Path)
 	if r.URL.Path == serviceProvider.AcsURL.Path {
-		log.Debugf("SAML [ServeHTTP]: assertion processing started")
+		logrus.Debugf("SAML [ServeHTTP]: assertion processing started")
 
 		r.ParseForm()
 		assertion, err := serviceProvider.ParseResponse(r, s.getPossibleRequestIDs(r))
 
 		if err != nil {
-			log.Debugf("SAML [ServeHTTP]: assertion validation failed: %q", err)
+			logrus.Debugf("SAML [ServeHTTP]: assertion validation failed: %q", err)
 
 			if parseErr, ok := err.(*saml.InvalidResponseError); ok {
 				// Note: If access to the response itself is needed (debugging)
 				// just add `parseErr.Response` to the log statement.
 
-				log.Debugf("SAML NOW: %s\nSAML ERROR: %s",
+				logrus.Debugf("SAML [ServeHTTP]: NOW: %s\nSAML ERROR: %s",
 					parseErr.Now, parseErr.PrivateErr)
 			}
 
@@ -54,24 +56,25 @@ func (s *Provider) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		log.Debugf("SAML [ServeHTTP]: assertions validated ok")
+		logrus.Debugf("SAML [ServeHTTP]: assertions validated ok")
 
 		s.HandleSamlAssertion(w, r, assertion)
 
-		log.Debugf("SAML [ServeHTTP]: assertion processing completed")
+		logrus.Debugf("SAML [ServeHTTP]: assertion processing completed")
 		return
 	}
 
+	logrus.Debugf("SAML [ServeHTTP]: SloURL.Path = %s", serviceProvider.SloURL.Path)
 	if r.URL.Path == serviceProvider.SloURL.Path {
-		log.Debugf("SAML [ServeHTTP]: logout response processing started")
+		logrus.Debugf("SAML [ServeHTTP]: logout response processing started")
 
 		s.FinalizeSamlLogout(w, r)
 
-		log.Debugf("SAML [ServeHTTP]: logout response processing completed")
+		logrus.Debugf("SAML [ServeHTTP]: logout response processing completed")
 		return
 	}
 
-	log.Debugf("SAML [ServeHTTP]: Failed to handle %s %s", r.Method, r.URL)
+	logrus.Debugf("SAML [ServeHTTP]: Failed to handle %s %s", r.Method, r.URL)
 
 	http.NotFoundHandler().ServeHTTP(w, r)
 }
@@ -90,7 +93,7 @@ func (s *Provider) getPossibleRequestIDs(r *http.Request) []string {
 			return secretBlock, nil
 		})
 		if err != nil || !token.Valid {
-			log.Debugf("... invalid token %s", err)
+			logrus.Debugf("... invalid token %s", err)
 			continue
 		}
 		claims := token.Claims.(jwt.MapClaims)
@@ -117,7 +120,7 @@ func (s *Provider) HandleSamlLogin(w http.ResponseWriter, r *http.Request, userI
 	// relayState is limited to 80 bytes but also must be integrity protected.
 	// this means that we cannot use a JWT because it is way too long. Instead
 	// we set a cookie that corresponds to the state
-	relayState := base64.URLEncoding.EncodeToString(randomBytes(42))
+	relayState := base64.URLEncoding.EncodeToString(randomBytes())
 
 	secretBlock := x509.MarshalPKCS1PrivateKey(serviceProvider.Key)
 	state := jwt.New(jwt.SigningMethodHS256)
@@ -162,7 +165,7 @@ func (s *Provider) HandleSamlLogout(name string, w http.ResponseWriter, r *http.
 	// relayState is limited to 80 bytes but also must be integrity protected.
 	// this means that we cannot use a JWT because it is way too long. Instead
 	// we set a cookie that corresponds to the state
-	relayState := base64.URLEncoding.EncodeToString(randomBytes(42))
+	relayState := base64.URLEncoding.EncodeToString(randomBytes())
 
 	secretBlock := x509.MarshalPKCS1PrivateKey(serviceProvider.Key)
 	state := jwt.New(jwt.SigningMethodHS256)
@@ -186,8 +189,8 @@ func (s *Provider) HandleSamlLogout(name string, w http.ResponseWriter, r *http.
 	return redirectURL.String(), nil
 }
 
-func randomBytes(n int) []byte {
-	rv := make([]byte, n)
+func randomBytes() []byte {
+	rv := make([]byte, 42)
 	if _, err := saml.RandReader.Read(rv); err != nil {
 		panic(err)
 	}

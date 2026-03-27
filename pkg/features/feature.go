@@ -228,6 +228,12 @@ var (
 		true,
 		true,
 	)
+	MultiAuthProviders = newPrimeFeature(
+		"multiple-auth-providers",
+		"Allows multiple enabled auth-providers",
+		true,
+		false,
+		true)
 )
 
 func ListEnabled() []string {

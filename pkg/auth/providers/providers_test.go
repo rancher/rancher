@@ -57,39 +57,42 @@ func TestIsSAMLProvider(t *testing.T) {
 
 func TestProviderUsesUserSecrets(t *testing.T) {
 	SetProviders(map[string]common.AuthProvider{
-		github.Name:    &github.Provider{},
-		githubapp.Name: &githubapp.Provider{},
-		local.Name:     &local.Provider{},
+		github.ProviderName:    &github.Provider{},
+		githubapp.ProviderName: &githubapp.Provider{},
+		local.Name:             &local.Provider{},
 	})
 	defer SetProviders(nil)
 
-	assert.True(t, ProviderUsesUserSecrets(github.Name))
-	assert.False(t, ProviderUsesUserSecrets(githubapp.Name))
+	assert.True(t, ProviderUsesUserSecrets(github.ProviderName))
+	assert.False(t, ProviderUsesUserSecrets(githubapp.ProviderName))
 	assert.False(t, ProviderUsesUserSecrets(local.Name))
 }
 
 func TestProviderCanRefreshPrincipals(t *testing.T) {
 	SetProviders(map[string]common.AuthProvider{
-		github.Name:      &github.Provider{},
-		genericoidc.Name: &genericoidc.GenOIDCProvider{},
+		github.ProviderName:      &github.Provider{},
+		genericoidc.ProviderName: &genericoidc.GenOIDCProvider{},
 	})
 	defer SetProviders(nil)
 
-	assert.True(t, ProviderCanRefreshPrincipals(github.Name))
-	assert.False(t, ProviderCanRefreshPrincipals(genericoidc.Name))
+	assert.True(t, ProviderCanRefreshPrincipals(github.ProviderName))
+	assert.False(t, ProviderCanRefreshPrincipals(genericoidc.ProviderName))
 }
 
 func TestIsExternalProviderEnabled(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	active := mocks.NewMockAuthProvider(ctrl)
-	active.EXPECT().IsDisabledProvider().Return(false, nil).AnyTimes()
+	active.EXPECT().GetName().Return(local.Name).AnyTimes()
+	active.EXPECT().IsDisabledProvider(local.Name).Return(false, nil).AnyTimes()
 
 	inactive := mocks.NewMockAuthProvider(ctrl)
-	inactive.EXPECT().IsDisabledProvider().Return(true, nil).AnyTimes()
+	inactive.EXPECT().GetName().Return(github.ProviderName).AnyTimes()
+	inactive.EXPECT().IsDisabledProvider(github.ProviderName).Return(true, nil).AnyTimes()
 
 	broken := mocks.NewMockAuthProvider(ctrl)
-	broken.EXPECT().IsDisabledProvider().Return(false, fmt.Errorf("db timeout")).AnyTimes()
+	broken.EXPECT().GetName().Return(github.ProviderName).AnyTimes()
+	broken.EXPECT().IsDisabledProvider("github").Return(false, fmt.Errorf("db timeout")).AnyTimes()
 
 	tests := []struct {
 		name     string
@@ -152,7 +155,8 @@ func TestIsLocalHidden(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	active := mocks.NewMockAuthProvider(ctrl)
-	active.EXPECT().IsDisabledProvider().Return(false, nil).AnyTimes()
+	active.EXPECT().GetName().Return("github").AnyTimes()
+	active.EXPECT().IsDisabledProvider("github").Return(false, nil).AnyTimes()
 
 	tests := []struct {
 		name     string
@@ -203,10 +207,11 @@ func TestIsExternalProviderEnabledFastPathErrorRetriedInFullScan(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	provider := mocks.NewMockAuthProvider(ctrl)
+	provider.EXPECT().GetName().Return("github").AnyTimes()
 	gomock.InOrder(
-		provider.EXPECT().IsDisabledProvider().Return(false, nil),                           // full scan warms the hint
-		provider.EXPECT().IsDisabledProvider().Return(false, fmt.Errorf("transient error")), // fast path errors: alreadyChecked must stay ""
-		provider.EXPECT().IsDisabledProvider().Return(false, nil),                           // full scan retries and confirms enabled
+		provider.EXPECT().IsDisabledProvider("github").Return(false, nil),                           // full scan warms the hint
+		provider.EXPECT().IsDisabledProvider("github").Return(false, fmt.Errorf("transient error")), // fast path errors: alreadyChecked must stay ""
+		provider.EXPECT().IsDisabledProvider("github").Return(false, nil),                           // full scan retries and confirms enabled
 	)
 
 	SetProviders(map[string]common.AuthProvider{
@@ -223,9 +228,10 @@ func TestIsLocalHiddenReflectsProviderStateChange(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	provider := mocks.NewMockAuthProvider(ctrl)
+	provider.EXPECT().GetName().Return("github").AnyTimes()
 	gomock.InOrder(
-		provider.EXPECT().IsDisabledProvider().Return(false, nil), // external enabled
-		provider.EXPECT().IsDisabledProvider().Return(true, nil),  // external disabled
+		provider.EXPECT().IsDisabledProvider("github").Return(false, nil), // external enabled
+		provider.EXPECT().IsDisabledProvider("github").Return(true, nil),  // external disabled
 	)
 
 	features.HideLocalAuthProvider.Set(true)
@@ -273,9 +279,9 @@ func TestSearchPrincipalsHybridUser(t *testing.T) {
 	}
 
 	SetProviders(map[string]common.AuthProvider{
-		genericoidc.Name: &genericoidc.GenOIDCProvider{
+		genericoidc.ProviderName: &genericoidc.GenOIDCProvider{
 			OpenIDCProvider: oidc.OpenIDCProvider{
-				Name:         genericoidc.Name,
+				Name:         genericoidc.ProviderName,
 				UserSearcher: common.NewUserSearcher(lister),
 			},
 		},
@@ -283,7 +289,18 @@ func TestSearchPrincipalsHybridUser(t *testing.T) {
 	})
 	defer SetProviders(nil)
 
-	got, err := SearchPrincipals("admin", "", &apiv3.Token{AuthProvider: genericoidc.Name})
+	token := &apiv3.Token{
+		AuthProvider: genericoidc.ProviderName,
+		UserPrincipal: apiv3.Principal{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "genericoidc_user://9253000",
+			},
+			LoginName:     "developer",
+			PrincipalType: "user",
+		},
+	}
+
+	got, err := SearchPrincipals("admin", "", token)
 	require.NoError(t, err)
 
 	var ids []string
