@@ -224,7 +224,14 @@ func (m *Manager) getTokens(tokenAuthValue string) ([]apiv3.Token, int, error) {
 }
 
 func (m *Manager) DeleteTokenByName(tokenName string) (int, error) {
-	err := m.tokens.Delete(tokenName, &metav1.DeleteOptions{})
+	// Support ext tokens
+	var err error
+	if extTokenID, found := strings.CutPrefix(tokenName, "ext/"); found {
+		err = m.extTokenStore.Delete(extTokenID, &metav1.DeleteOptions{})
+	} else {
+		// Legacy token
+		err = m.tokens.Delete(tokenName, &metav1.DeleteOptions{})
+	}
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return 0, nil
