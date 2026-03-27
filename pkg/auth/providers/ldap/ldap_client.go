@@ -28,6 +28,7 @@ func (p *ldapProvider) loginUser(lConn ldapv3.Client, credentials *v3.BasicLogin
 
 	err := ldap.AuthenticateServiceAccountUser(config.ServiceAccountPassword, config.ServiceAccountDistinguishedName, "", lConn)
 	if err != nil {
+		logrus.Errorf("loginUser: failed to authenticate service account: %s", err)
 		return v3.Principal{}, nil, err
 	}
 
@@ -66,10 +67,12 @@ func (p *ldapProvider) loginUser(lConn ldapv3.Client, credentials *v3.BasicLogin
 		return v3.Principal{}, nil, apierror.WrapAPIError(err, validation.Unauthorized, "Unauthorized")
 	}
 
-	logrus.Debug("Binding username password")
 	userDN := result.Entries[0].DN // userDN is externalID
+	logrus.Debugf("Binding username password userDN = %s", userDN)
+
 	err = lConn.Bind(userDN, credentials.Password)
 	if err != nil {
+		logrus.Errorf("loginUser: failed to bind user: %s", err)
 		if ldapv3.IsErrorWithCode(err, ldapv3.LDAPResultInvalidCredentials) {
 			return v3.Principal{}, nil, apierror.WrapAPIError(err, validation.Unauthorized, "Unauthorized")
 		}
@@ -77,6 +80,7 @@ func (p *ldapProvider) loginUser(lConn ldapv3.Client, credentials *v3.BasicLogin
 	}
 
 	if config.SearchUsingServiceAccount {
+		logrus.Errorf("loginUser: failed to bind user: %s", err)
 		err = ldap.AuthenticateServiceAccountUser(config.ServiceAccountPassword, config.ServiceAccountDistinguishedName, "", lConn)
 		if err != nil {
 			return v3.Principal{}, nil, apierror.WrapAPIError(err, validation.Unauthorized, "authentication failed")
@@ -523,7 +527,12 @@ func (p *ldapProvider) permissionCheck(attributes []*ldapv3.EntryAttribute, conf
 }
 
 func (p *ldapProvider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
-	config, caPool, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient())
+	provider, _, _, err := common.SplitPrincipalID(principalID)
+	if err != nil {
+		return nil, err
+	}
+
+	config, caPool, err := p.getLDAPConfig(p.authConfigs.ObjectClient().UnstructuredClient(), provider)
 	if err != nil {
 		return nil, err
 	}

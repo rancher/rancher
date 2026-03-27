@@ -6,6 +6,7 @@ import (
 
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/features"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -255,6 +256,98 @@ func TestProviderSearchPrincipal(t *testing.T) {
 	}
 }
 
+func TestProviderSearchPrincipalsMultiAuthProviderCrossSearchesAllUsers(t *testing.T) {
+	t.Setenv("RANCHER_VERSION_TYPE", "prime")
+	previousMultiAuthProviderCross := features.MultiAuthProviderCross.Enabled()
+	features.MultiAuthProviderCross.Set(true)
+	t.Cleanup(func() {
+		features.MultiAuthProviderCross.Set(previousMultiAuthProviderCross)
+	})
+
+	testUsers := []*v3.User{
+		{
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-local"},
+			Username:     "local-user",
+			DisplayName:  "Local User",
+			PrincipalIDs: []string{"local://u-local"},
+		},
+		{
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-okta"},
+			DisplayName:  "Okta User",
+			PrincipalIDs: []string{"okta_user://indexed", "local://u-indexed"},
+		},
+		{
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-genericoidc"},
+			DisplayName:  "GenericOIDC User",
+			PrincipalIDs: []string{"genericoidc_user://distinctive", "local://u-distinctive"},
+		},
+	}
+
+	provider := Provider{
+		userLister:  fakeUserLister{users: testUsers},
+		userIndexer: newTestUserIndexer(testUsers...),
+	}
+	token := &v3.Token{
+		UserPrincipal: v3.Principal{
+			ObjectMeta:    metav1.ObjectMeta{Name: "okta_user://indexed"},
+			PrincipalType: "user",
+		},
+	}
+
+	tests := []struct {
+		name      string
+		searchKey string
+		want      []v3.Principal
+	}{
+		{
+			name:      "short search uses index and includes external user",
+			searchKey: "okta",
+			want: []v3.Principal{
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "okta_user://indexed"},
+					DisplayName:   "Okta User",
+					Provider:      Name,
+					PrincipalType: "user",
+					Me:            true,
+				},
+			},
+		},
+		{
+			name:      "long search scans lister and includes external user",
+			searchKey: "genericoidc user",
+			want: []v3.Principal{
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "genericoidc_user://distinctive"},
+					DisplayName:   "GenericOIDC User",
+					Provider:      Name,
+					PrincipalType: "user",
+				},
+			},
+		},
+		{
+			name:      "local users remain searchable",
+			searchKey: "local",
+			want: []v3.Principal{
+				{
+					ObjectMeta:    metav1.ObjectMeta{Name: "local://u-local"},
+					DisplayName:   "Local User",
+					LoginName:     "local-user",
+					Provider:      Name,
+					PrincipalType: "user",
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := provider.SearchPrincipals(tt.searchKey, "user", token)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestUserSearchIndexer(t *testing.T) {
 	indexerTests := []struct {
 		user        *v3.User
@@ -387,6 +480,55 @@ func TestProviderSearchPrincipalHybridUser(t *testing.T) {
 	}
 
 	require.Equal(t, []string{"local://u-admin"}, ids)
+}
+
+func TestProviderSearchPrincipalMultiAuthProviderCrossFeature(t *testing.T) {
+	t.Setenv("RANCHER_VERSION_TYPE", "prime")
+	previousMultiAuthProviderCross := features.MultiAuthProviderCross.Enabled()
+	t.Cleanup(func() {
+		features.MultiAuthProviderCross.Set(previousMultiAuthProviderCross)
+	})
+
+	testUsers := []*v3.User{
+		{
+			ObjectMeta:  metav1.ObjectMeta{Name: "u-local"},
+			Username:    "local-user",
+			DisplayName: "Local User",
+		},
+		{
+			ObjectMeta:   metav1.ObjectMeta{Name: "u-okta"},
+			DisplayName:  "Okta User",
+			PrincipalIDs: []string{"okta_user://indexed", "local://u-okta"},
+		},
+	}
+
+	provider := Provider{
+		userLister:  fakeUserLister{users: testUsers},
+		userIndexer: newTestUserIndexer(testUsers...),
+	}
+
+	t.Run("disabled", func(t *testing.T) {
+		features.MultiAuthProviderCross.Set(false)
+
+		got, err := provider.SearchPrincipals("okta", "user", nil)
+		require.NoError(t, err)
+		require.Empty(t, got)
+	})
+
+	t.Run("enabled", func(t *testing.T) {
+		features.MultiAuthProviderCross.Set(true)
+
+		got, err := provider.SearchPrincipals("okta", "user", nil)
+		require.NoError(t, err)
+		require.Equal(t, []v3.Principal{
+			{
+				ObjectMeta:    metav1.ObjectMeta{Name: "okta_user://indexed"},
+				DisplayName:   "Okta User",
+				Provider:      Name,
+				PrincipalType: "user",
+			},
+		}, got)
+	})
 }
 
 func TestProviderSearchPrincipalWhitespaceSearchKey(t *testing.T) {

@@ -23,7 +23,8 @@ func (g *Provider) formatter(apiContext *types.APIContext, resource *types.RawRe
 }
 
 func (g *Provider) actionHandler(actionName string, action *types.Action, request *types.APIContext) error {
-	handled, err := common.HandleCommonAction(actionName, action, request, Name, g.authConfigs)
+	// TODO: How to get the Name here?
+	handled, err := common.HandleCommonAction(actionName, action, request, ProviderName, g.authConfigs)
 	if err != nil {
 		return err
 	}
@@ -91,18 +92,16 @@ func githubRedirectURL(hostname, clientID string, tls bool) string {
 }
 
 func (g *Provider) testAndApply(request *types.APIContext) error {
-	var githubConfig v32.GithubConfig
 	githubConfigApplyInput := &v32.GithubConfigApplyInput{}
-
 	if err := json.NewDecoder(request.Request.Body).Decode(githubConfigApplyInput); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("Failed to parse body: %v", err))
 	}
-	githubConfig = githubConfigApplyInput.GithubConfig
+	githubConfig := githubConfigApplyInput.GithubConfig
+	githubConfig.Name = githubConfigApplyInput.ConfigName
 	githubLogin := &v32.GithubLogin{
 		Code: githubConfigApplyInput.Code,
 	}
-
 	if githubConfig.ClientSecret != "" {
 		value, err := common.ReadFromSecret(g.secrets, githubConfig.ClientSecret,
 			strings.ToLower(client.GithubConfigFieldClientSecret))

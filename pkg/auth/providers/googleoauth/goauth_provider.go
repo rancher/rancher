@@ -1,6 +1,7 @@
 package googleoauth
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -35,7 +36,7 @@ import (
 )
 
 const (
-	Name                 = "googleoauth"
+	ProviderName         = "googleoauth"
 	userType             = "user"
 	groupType            = "group"
 	domainPublicViewType = "domain_public"
@@ -82,8 +83,11 @@ func (g *googleOauthProvider) loginUser(c context.Context, googleOAuthCredential
 	var userPrincipal apiv3.Principal
 	var err error
 
+	// TODO: Ensure that these are populated!
+	configName := cmp.Or(googleOAuthCredential.ConfigName, ProviderName)
 	if config == nil {
-		config, err = g.getGoogleOAuthConfigCR()
+		logrus.Debugf("Loading GoogleOAuth config %s", configName)
+		config, err = g.getGoogleOAuthConfigCR(configName)
 		if err != nil {
 			return userPrincipal, groupPrincipals, "", err
 		}
@@ -133,10 +137,14 @@ func (g *googleOauthProvider) loginUser(c context.Context, googleOAuthCredential
 }
 
 func (g *googleOauthProvider) SearchPrincipals(searchKey, principalType string, token accessor.TokenAccessor) ([]apiv3.Principal, error) {
-	var principals []apiv3.Principal
-	var err error
+	principalID := token.GetUserPrincipal().Name
+	configName, _, _, err := common.SplitPrincipalID(principalID)
+	if err != nil {
+		return nil, err
+	}
 
-	config, err := g.getGoogleOAuthConfigCR()
+	var principals []apiv3.Principal
+	config, err := g.getGoogleOAuthConfigCR(configName)
 	if err != nil {
 		return principals, err
 	}
@@ -157,19 +165,27 @@ func (g *googleOauthProvider) SearchPrincipals(searchKey, principalType string, 
 		return principals, err
 	}
 	for _, acc := range accounts {
-		principals = append(principals, g.toPrincipal(acc.Type, acc, token))
+		principals = append(principals, g.toPrincipal(acc.Type, acc, config.GetName(), token))
 	}
 	logrus.Debugf("[Google OAuth] SearchPrincipals: Returning principals")
 	return principals, nil
 }
 
 func (g *googleOauthProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
+	// Use the authenticated token's principal to get the config to get the
+	// principal from.
+	// This will not work cross providers.
+	configName, err := common.ConfigNameFromToken(token)
 	var principal apiv3.Principal
-	config, err := g.getGoogleOAuthConfigCR()
 	if err != nil {
 		return principal, err
 	}
-	storedOauthToken, err := g.tokenMGR.GetSecret(token.GetUserID(), token.GetAuthProvider(), []accessor.TokenAccessor{token})
+	config, err := g.getGoogleOAuthConfigCR(configName)
+	if err != nil {
+		return principal, err
+	}
+
+	storedOauthToken, err := g.tokenMGR.GetSecret(token.GetUserID(), configName, []accessor.TokenAccessor{token})
 	if err != nil {
 		if !apierrors.IsNotFound(err) {
 			return principal, err
@@ -217,7 +233,7 @@ func (g *googleOauthProvider) GetPrincipal(principalID string, token accessor.To
 			acc.GivenName = user.Name.GivenName
 			acc.FamilyName = user.Name.FamilyName
 		}
-		return g.toPrincipal(userType, acc, token), nil
+		return g.toPrincipal(userType, acc, configName, token), nil
 	case groupType:
 		group, err := adminSvc.Groups.Get(externalID).Do()
 		if err != nil {
@@ -231,7 +247,7 @@ func (g *googleOauthProvider) GetPrincipal(principalID string, token accessor.To
 			}
 			return principal, wrapGoogleNonTransient(err)
 		}
-		return g.toPrincipal(groupType, Account{SubjectUniqueID: group.Id, Email: group.Email, Name: group.Name}, token), nil
+		return g.toPrincipal(groupType, Account{SubjectUniqueID: group.Id, Email: group.Email, Name: group.Name}, configName, token), nil
 	default:
 		return principal, fmt.Errorf("cannot get the google account due to invalid externalIDType %v", principalType)
 	}
@@ -246,7 +262,7 @@ func (g *googleOauthProvider) Logout(w http.ResponseWriter, r *http.Request, tok
 }
 
 func (g *googleOauthProvider) GetName() string {
-	return Name
+	return ProviderName
 }
 
 func (g *googleOauthProvider) CustomizeSchema(schema *types.Schema) {
@@ -264,25 +280,29 @@ func (g *googleOauthProvider) TransformToAuthProvider(authConfig map[string]any)
 	return p, nil
 }
 
-func (g *googleOauthProvider) RefetchGroupPrincipals(principalID string, secret string) ([]apiv3.Principal, error) {
-	var principals []apiv3.Principal
-	config, err := g.getGoogleOAuthConfigCR()
+func (g *googleOauthProvider) RefetchGroupPrincipals(principalID, secret string) ([]apiv3.Principal, error) {
+	configName, _, _, err := common.SplitPrincipalID(principalID)
 	if err != nil {
-		return principals, err
+		return nil, err
 	}
+	config, err := g.getGoogleOAuthConfigCR(configName)
+	if err != nil {
+		return nil, err
+	}
+
 	adminSvc, err := g.getdirectoryServiceFromStoredToken(secret, config)
 	if err != nil {
-		return principals, err
+		return nil, err
 	}
 	logrus.Debugf("[Google OAuth] RefetchGroupPrincipals: Initialized dir svc with stored oauth token")
 	externalID, _, err := getUIDFromPrincipalID(principalID)
 	if err != nil {
-		return principals, err
+		return nil, err
 	}
 	logrus.Debugf("[Google OAuth] GetPrincipal: Parsed principalID")
 	groupPrincipals, err := g.getGroupsUserBelongsTo(adminSvc, externalID, config.Hostname, config)
 	if err != nil {
-		return principals, wrapGoogleNonTransient(err)
+		return nil, wrapGoogleNonTransient(err)
 	}
 	if !config.NestedGroupMembershipEnabled {
 		return groupPrincipals, nil
@@ -291,6 +311,7 @@ func (g *googleOauthProvider) RefetchGroupPrincipals(principalID string, secret 
 	if err != nil {
 		return nil, wrapGoogleNonTransient(err)
 	}
+
 	return nested, nil
 }
 
@@ -298,20 +319,26 @@ func (g *googleOauthProvider) UsesUserSecrets() bool      { return true }
 func (g *googleOauthProvider) CanRefreshPrincipals() bool { return true }
 
 func (g *googleOauthProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []apiv3.Principal) (bool, error) {
-	config, err := g.getGoogleOAuthConfigCR()
+	configName, _, _, err := common.SplitPrincipalID(userPrincipalID)
+	if err != nil {
+		return false, err
+	}
+	config, err := g.getGoogleOAuthConfigCR(configName)
 	if err != nil {
 		logrus.Errorf("Error fetching google OAuth config: %v", err)
 		return false, err
 	}
+
 	allowed, err := g.userMGR.CheckAccess(config.AccessMode, config.AllowedPrincipalIDs, userPrincipalID, groupPrincipals)
 	if err != nil {
 		return false, err
 	}
+
 	return allowed, nil
 }
 
-func (g *googleOauthProvider) getGoogleOAuthConfigCR() (*apiv3.GoogleOauthConfig, error) {
-	authConfigObj, err := g.authConfigs.ObjectClient().UnstructuredClient().Get(Name, metav1.GetOptions{})
+func (g *googleOauthProvider) getGoogleOAuthConfigCR(configName string) (*apiv3.GoogleOauthConfig, error) {
+	authConfigObj, err := g.authConfigs.ObjectClient().UnstructuredClient().Get(configName, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve GoogleOAuthConfig, error: %v", err)
 	}
@@ -346,7 +373,7 @@ func (g *googleOauthProvider) getGoogleOAuthConfigCR() (*apiv3.GoogleOauthConfig
 }
 
 func (g *googleOauthProvider) saveGoogleOAuthConfigCR(config *apiv3.GoogleOauthConfig) error {
-	storedGoogleOAuthConfig, err := g.getGoogleOAuthConfigCR()
+	storedGoogleOAuthConfig, err := g.getGoogleOAuthConfigCR(config.GetName())
 	if err != nil {
 		return err
 	}
@@ -380,17 +407,17 @@ func (g *googleOauthProvider) saveGoogleOAuthConfigCR(config *apiv3.GoogleOauthC
 	return nil
 }
 
-func (g *googleOauthProvider) toPrincipal(principalType string, acct Account, token accessor.TokenAccessor) apiv3.Principal {
+func (g *googleOauthProvider) toPrincipal(principalType string, acct Account, configName string, token accessor.TokenAccessor) apiv3.Principal {
 	displayName := acct.Name
 	if displayName == "" {
 		displayName = acct.Email
 	}
 
 	princ := apiv3.Principal{
-		ObjectMeta:     metav1.ObjectMeta{Name: Name + "_" + principalType + "://" + acct.SubjectUniqueID},
+		ObjectMeta:     metav1.ObjectMeta{Name: configName + "_" + principalType + "://" + acct.SubjectUniqueID},
 		DisplayName:    displayName,
 		LoginName:      acct.Email,
-		Provider:       Name,
+		Provider:       ProviderName,
 		Me:             false,
 		ProfilePicture: acct.PictureURL,
 	}
@@ -439,8 +466,8 @@ func (g *googleOauthProvider) GetUserExtraAttributes(userPrincipal apiv3.Princip
 }
 
 // IsDisabledProvider checks if the Google auth provider is currently disabled in Rancher.
-func (g *googleOauthProvider) IsDisabledProvider() (bool, error) {
-	googleOauthConfig, err := g.getGoogleOAuthConfigCR()
+func (g *googleOauthProvider) IsDisabledProvider(configName string) (bool, error) {
+	googleOauthConfig, err := g.getGoogleOAuthConfigCR(configName)
 	if err != nil {
 		return false, err
 	}

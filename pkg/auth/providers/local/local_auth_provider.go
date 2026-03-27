@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/rancher/apiserver/pkg/apierror"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -14,6 +13,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
+	"github.com/rancher/rancher/pkg/features"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
@@ -201,16 +201,12 @@ func (l *Provider) SearchPrincipals(searchKey, principalType string, token acces
 		return nil, nil
 	}
 
+	return l.searchUsers(searchKey, token, !features.MultiAuthProviderCross.Enabled())
+}
+
+func (l *Provider) searchUsers(searchKey string, token accessor.TokenAccessor, localOnly bool) ([]apiv3.Principal, error) {
 	queryKey := strings.ToLower(searchKey)
-	var (
-		matched []*apiv3.User
-		err     error
-	)
-	if len(searchKey) > searchIndexDefaultLen {
-		matched, err = l.listAllUsers(queryKey)
-	} else {
-		matched, err = l.listUsersByIndex(queryKey)
-	}
+	matched, err := l.searchUserResources(searchKey, queryKey)
 	if err != nil {
 		logrus.Infof("Failed to search User resources for %v: %v", searchKey, err)
 		return nil, err
@@ -218,15 +214,26 @@ func (l *Provider) SearchPrincipals(searchKey, principalType string, token acces
 
 	var principals []apiv3.Principal
 	for _, user := range matched {
-		if !isLocalUser(user) {
+		if localOnly && !isLocalUser(user) {
 			continue
 		}
 
 		principalID := getLocalPrincipalID(user)
+		if !localOnly && len(user.PrincipalIDs) > 0 {
+			principalID = user.PrincipalIDs[0]
+		}
 		principals = append(principals, l.toPrincipal("user", user.DisplayName, user.Username, principalID, token))
 	}
 
 	return principals, nil
+}
+
+func (l *Provider) searchUserResources(searchKey string, queryKey string) ([]*apiv3.User, error) {
+	if len(searchKey) > searchIndexDefaultLen {
+		return l.listAllUsers(queryKey)
+	} else {
+		return l.listUsersByIndex(queryKey)
+	}
 }
 
 func (l *Provider) toPrincipal(principalType, displayName, loginName, id string, token accessor.TokenAccessor) apiv3.Principal {
@@ -244,17 +251,16 @@ func (l *Provider) toPrincipal(principalType, displayName, loginName, id string,
 	if token != nil {
 		princ.Me = common.SamePrincipal(token.GetUserPrincipal(), princ)
 	}
+
 	return princ
 }
 
 func (l *Provider) GetPrincipal(principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
 	// id looks like local://u-12345
-	var name string
-	parts := strings.SplitN(principalID, ":", 2)
-	if len(parts) != 2 {
-		return apiv3.Principal{}, errors.Errorf("invalid id %v", principalID)
+	_, _, name, err := common.SplitPrincipalID(principalID)
+	if err != nil {
+		return apiv3.Principal{}, err
 	}
-	name = strings.TrimPrefix(parts[1], "//")
 
 	user, err := l.userLister.Get("", name)
 	if err != nil {
@@ -381,7 +387,7 @@ func (l *Provider) GetUserExtraAttributes(userPrincipal apiv3.Principal) map[str
 
 // IsDisabledProvider checks if the local auth provider is currently disabled in Rancher.
 // As of now, local provider can't be disabled, so this method always returns false and nil for the error.
-func (l *Provider) IsDisabledProvider() (bool, error) {
+func (l *Provider) IsDisabledProvider(_ string) (bool, error) {
 	return false, nil
 }
 

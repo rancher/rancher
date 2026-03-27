@@ -1,6 +1,7 @@
 package activedirectory
 
 import (
+	"cmp"
 	"crypto/x509"
 	"fmt"
 	"net/http"
@@ -26,9 +27,9 @@ import (
 )
 
 const (
-	Name                               = "activedirectory"
-	UserScope                          = Name + "_user"
-	GroupScope                         = Name + "_group"
+	ProviderName                       = "activedirectory"
+	UserScope                          = ProviderName + "_user"
+	GroupScope                         = ProviderName + "_group"
 	ObjectClass                        = "objectClass"
 	ObjectGUIDAttribute                = "objectGUID"
 	MemberOfAttribute                  = "memberOf"
@@ -75,7 +76,7 @@ func (p *adProvider) Logout(w http.ResponseWriter, r *http.Request, token access
 }
 
 func (p *adProvider) GetName() string {
-	return Name
+	return ProviderName
 }
 
 func (p *adProvider) CustomizeSchema(schema *types.Schema) {
@@ -98,8 +99,11 @@ func (p *adProvider) AuthenticateUser(_ http.ResponseWriter, _ *http.Request, in
 	if !ok {
 		return v3.Principal{}, nil, "", errors.New("unexpected input type")
 	}
+	// TODO: Ensure that these are populated!
+	configName := cmp.Or(login.ConfigName, ProviderName)
 
-	config, caPool, err := p.getActiveDirectoryConfig()
+	logrus.Debugf("Loading ActiveDirectory config %s", configName)
+	config, caPool, err := p.getActiveDirectoryConfig(configName)
 	if err != nil {
 		return v3.Principal{}, nil, "", errors.New("can't find authprovider")
 	}
@@ -123,11 +127,16 @@ func (p *adProvider) AuthenticateUser(_ http.ResponseWriter, _ *http.Request, in
 	return principal, groupPrincipal, "", err
 }
 
-func (p *adProvider) SearchPrincipals(searchKey, principalType string, myToken accessor.TokenAccessor) ([]v3.Principal, error) {
+func (p *adProvider) SearchPrincipals(searchKey, principalType string, token accessor.TokenAccessor) ([]v3.Principal, error) {
 	var principals []v3.Principal
-	var err error
+	// Use the authenticated token's principal to get the config to search.
+	// This will not search cross providers.
+	configName, err := common.ConfigNameFromToken(token)
+	if err != nil {
+		return nil, err
+	}
 
-	config, caPool, err := p.getActiveDirectoryConfig()
+	config, caPool, err := p.getActiveDirectoryConfig(configName)
 	if err != nil {
 		return principals, nil
 	}
@@ -142,11 +151,11 @@ func (p *adProvider) SearchPrincipals(searchKey, principalType string, myToken a
 	if err == nil {
 		for _, principal := range principals {
 			if principal.PrincipalType == "user" {
-				if common.SamePrincipal(myToken.GetUserPrincipal(), principal) {
+				if common.SamePrincipal(token.GetUserPrincipal(), principal) {
 					principal.Me = true
 				}
 			} else if principal.PrincipalType == "group" {
-				principal.MemberOf = p.userMGR.IsMemberOf(myToken, principal)
+				principal.MemberOf = p.userMGR.IsMemberOf(token, principal)
 			}
 		}
 	}
@@ -155,7 +164,15 @@ func (p *adProvider) SearchPrincipals(searchKey, principalType string, myToken a
 }
 
 func (p *adProvider) GetPrincipal(principalID string, token accessor.TokenAccessor) (v3.Principal, error) {
-	config, caPool, err := p.getActiveDirectoryConfig()
+	// Use the authenticated token's principal to get the config to get the
+	// principal from.
+	// This will not work cross providers.
+	configName, err := common.ConfigNameFromToken(token)
+	if err != nil {
+		return v3.Principal{}, err
+	}
+
+	config, caPool, err := p.getActiveDirectoryConfig(configName)
 	if err != nil {
 		return v3.Principal{}, nil
 	}
@@ -175,9 +192,9 @@ func (p *adProvider) GetPrincipal(principalID string, token accessor.TokenAccess
 	return *principal, err
 }
 
-func (p *adProvider) getActiveDirectoryConfig() (*v3.ActiveDirectoryConfig, *x509.CertPool, error) {
+func (p *adProvider) getActiveDirectoryConfig(configName string) (*v3.ActiveDirectoryConfig, *x509.CertPool, error) {
 	// TODO See if this can be simplified. also, this makes an api call everytime. find a better way
-	authConfigObj, err := p.authConfigs.ObjectClient().UnstructuredClient().Get("activedirectory", metav1.GetOptions{})
+	authConfigObj, err := p.authConfigs.ObjectClient().UnstructuredClient().Get(configName, metav1.GetOptions{})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to retrieve ActiveDirectoryConfig, error: %v", err)
 	}
@@ -225,7 +242,12 @@ func newCAPool(cert string) (*x509.CertPool, error) {
 }
 
 func (p *adProvider) CanAccessWithGroupProviders(userPrincipalID string, groupPrincipals []v3.Principal) (bool, error) {
-	config, _, err := p.getActiveDirectoryConfig()
+	configName, _, _, err := common.SplitPrincipalID(userPrincipalID)
+	if err != nil {
+		return false, err
+	}
+
+	config, _, err := p.getActiveDirectoryConfig(configName)
 	if err != nil {
 		logrus.Errorf("Error fetching AD config: %v", err)
 		return false, err
@@ -259,8 +281,8 @@ func (e LoginDisabledError) Error() string {
 }
 
 // IsDisabledProvider checks if the Azure Active Directory provider is currently disabled in Rancher.
-func (p *adProvider) IsDisabledProvider() (bool, error) {
-	adConfig, _, err := p.getActiveDirectoryConfig()
+func (p *adProvider) IsDisabledProvider(configName string) (bool, error) {
+	adConfig, _, err := p.getActiveDirectoryConfig(configName)
 	if err != nil {
 		return false, err
 	}

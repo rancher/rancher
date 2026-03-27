@@ -146,7 +146,7 @@ func TestAuthConfigReset(t *testing.T) {
 					APIVersion: "management.cattle.io/v3",
 				},
 				ObjectMeta: metav1.ObjectMeta{
-					Name:        github.Name,
+					Name:        github.ProviderName,
 					Annotations: map[string]string{CleanupAnnotation: test.annotationValue},
 				},
 				Type:                "githubConfig",
@@ -180,7 +180,7 @@ func TestAuthConfigReset(t *testing.T) {
 func TestAuthConfigSync(t *testing.T) {
 	config := v3.AuthConfig{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: github.Name,
+			Name: github.ProviderName,
 		},
 	}
 	tests := []struct {

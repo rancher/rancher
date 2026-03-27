@@ -336,7 +336,7 @@ var (
 	UIDashboardPath = NewSetting("ui-dashboard-path", "/usr/share/rancher/ui-dashboard")
 
 	// UIDashboardIndex depends on ui-offline-preferred, use this version of the dashboard instead of the one contained in Rancher Manager.
-	UIDashboardIndex = NewSetting("ui-dashboard-index", "https://releases.rancher.com/dashboard/latest/index.html")
+	UIDashboardIndex = NewSetting("ui-dashboard-index", getFromEnvOrDefault("CATTLE_UI_DASHBOARD_INDEX", "https://releases.rancher.com/dashboard/latest/index.html"))
 
 	// UIDashboardHarvesterLegacyPlugin depending on ui-offline-preferred and if a Harvester Cluster does not contain it's own Harvester plugin, use this version of the plugin instead.
 	UIDashboardHarvesterLegacyPlugin = NewSetting("ui-dashboard-harvester-legacy-plugin", "https://releases.rancher.com/harvester-ui/plugin/harvester-1.0.3-head/harvester-1.0.3-head.umd.min.js")
@@ -655,6 +655,14 @@ func (s Setting) WithDefaultOnUpgrade(defOnUpgrade string) Setting {
 // GetEnvKey will return the given string formatted as a rancher environmental variable.
 func GetEnvKey(key string) string {
 	return "CATTLE_" + strings.ToUpper(strings.Replace(key, "-", "_", -1))
+}
+
+func getFromEnvOrDefault(key, defaultVal string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+
+	return defaultVal
 }
 
 func getMetadataConfig() string {

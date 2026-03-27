@@ -3,6 +3,7 @@ package client
 const (
 	AzureADLoginType              = "azureADLogin"
 	AzureADLoginFieldCode         = "code"
+	AzureADLoginFieldConfigName   = "configName"
 	AzureADLoginFieldDescription  = "description"
 	AzureADLoginFieldIDToken      = "id_token"
 	AzureADLoginFieldResponseType = "responseType"
@@ -12,6 +13,7 @@ const (
 
 type AzureADLogin struct {
 	Code         string `json:"code,omitempty" yaml:"code,omitempty"`
+	ConfigName   string `json:"configName,omitempty" yaml:"configName,omitempty"`
 	Description  string `json:"description,omitempty" yaml:"description,omitempty"`
 	IDToken      string `json:"id_token,omitempty" yaml:"id_token,omitempty"`
 	ResponseType string `json:"responseType,omitempty" yaml:"responseType,omitempty"`

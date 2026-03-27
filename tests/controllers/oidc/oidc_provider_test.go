@@ -213,7 +213,7 @@ func (s *OIDCProviderSuite) TestOIDCAuthorizationCodeFlow() {
 
 	// mock auth provider
 	mockProvider := providermocks.NewMockAuthProvider(ctrl)
-	mockProvider.EXPECT().IsDisabledProvider().Return(false, nil).AnyTimes()
+	mockProvider.EXPECT().IsDisabledProvider("testing").Return(false, nil).AnyTimes()
 	providers.SetProviders(map[string]providercommon.AuthProvider{fakeAuthProvider: mockProvider})
 
 	// create OIDC client

@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
@@ -23,7 +22,7 @@ func (g *Provider) formatter(apiContext *types.APIContext, resource *types.RawRe
 }
 
 func (g *Provider) actionHandler(actionName string, action *types.Action, request *types.APIContext) error {
-	handled, err := common.HandleCommonAction(actionName, action, request, Name, g.authConfigs)
+	handled, err := common.HandleCommonAction(actionName, action, request, ProviderName, g.authConfigs)
 	if err != nil {
 		return err
 	}
@@ -92,34 +91,33 @@ func githubRedirectURL(hostname, clientID string, tls bool) string {
 }
 
 func (g *Provider) testAndApply(request *types.APIContext) error {
-	var githubConfig apiv3.GithubAppConfig
-	githubConfigApplyInput := &apiv3.GithubAppConfigApplyInput{}
-
-	if err := json.NewDecoder(request.Request.Body).Decode(githubConfigApplyInput); err != nil {
+	githubAppConfigApplyInput := &apiv3.GithubAppConfigApplyInput{}
+	if err := json.NewDecoder(request.Request.Body).Decode(githubAppConfigApplyInput); err != nil {
 		return httperror.NewAPIError(httperror.InvalidBodyContent,
 			fmt.Sprintf("Failed to parse body: %v", err))
 	}
-	githubConfig = githubConfigApplyInput.GithubConfig
+	githubAppConfig := githubAppConfigApplyInput.GithubConfig
+	githubAppConfig.Name = githubAppConfigApplyInput.ConfigName
 	githubLogin := &apiv3.GithubLogin{
-		Code: githubConfigApplyInput.Code,
+		Code: githubAppConfigApplyInput.Code,
 	}
 
-	if githubConfig.ClientSecret != "" {
-		value, err := common.ReadFromSecret(g.secrets, githubConfig.ClientSecret,
+	if githubAppConfig.ClientSecret != "" {
+		value, err := common.ReadFromSecret(g.secrets, githubAppConfig.ClientSecret,
 			strings.ToLower(client.GithubConfigFieldClientSecret))
 		if err != nil {
 			return err
 		}
-		githubConfig.ClientSecret = value
+		githubAppConfig.ClientSecret = value
 	}
 
 	// Call provider to testLogin
-	userPrincipal, groupPrincipals, providerInfo, err := g.LoginUser("", githubLogin, &githubConfig, true)
+	userPrincipal, groupPrincipals, providerInfo, err := g.LoginUser("", githubLogin, &githubAppConfig, true)
 	if err != nil {
 		if httperror.IsAPIError(err) {
 			return err
 		}
-		return errors.Wrap(err, "server error while authenticating")
+		return fmt.Errorf("server error while authenticating: %w", err)
 	}
 
 	// if this works, save githubConfig CR adding enabled flag
@@ -128,10 +126,10 @@ func (g *Provider) testAndApply(request *types.APIContext) error {
 		return err
 	}
 
-	githubConfig.Enabled = githubConfigApplyInput.Enabled
-	err = g.saveGithubAppConfig(&githubConfig)
+	githubAppConfig.Enabled = githubAppConfigApplyInput.Enabled
+	err = g.saveGithubAppConfig(&githubAppConfig)
 	if err != nil {
-		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to save github config: %v", err))
+		return httperror.NewAPIError(httperror.ServerError, fmt.Sprintf("Failed to save github app config: %v", err))
 	}
 
 	userExtraInfo := g.GetUserExtraAttributes(userPrincipal)

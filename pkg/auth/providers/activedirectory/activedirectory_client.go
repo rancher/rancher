@@ -98,8 +98,13 @@ func (p *adProvider) loginUser(lConn ldapv3.Client, credentials *v3.BasicLogin, 
 	return userPrincipal, groupPrincipals, err
 }
 
-func (p *adProvider) RefetchGroupPrincipals(principalID string, secret string) ([]v3.Principal, error) {
-	config, caPool, err := p.getActiveDirectoryConfig()
+func (p *adProvider) RefetchGroupPrincipals(principalID, secret string) ([]v3.Principal, error) {
+	configName, _, _, err := common.SplitPrincipalID(principalID)
+	if err != nil {
+		return nil, err
+	}
+
+	config, caPool, err := p.getActiveDirectoryConfig(configName)
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +191,7 @@ func (p *adProvider) getPrincipalsFromSearchResult(lConn ldapv3.Client, config *
 		return v3.Principal{}, nil, nil
 	}
 
-	user, err := ldap.AttributesToPrincipal(entry.Attributes, result.Entries[0].DN, UserScope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
+	user, err := ldap.AttributesToPrincipal(entry.Attributes, result.Entries[0].DN, UserScope, ProviderName, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
 	if err != nil {
 		return userPrincipal, groupPrincipals, err
 	}
@@ -237,7 +242,7 @@ func (p *adProvider) getPrincipalsFromSearchResult(lConn ldapv3.Client, config *
 			GroupObjectClass:            config.GroupObjectClass,
 			GroupSearchAttribute:        config.GroupSearchAttribute,
 			ObjectClass:                 ObjectClass,
-			ProviderName:                Name,
+			ProviderName:                ProviderName,
 			UserLoginAttribute:          config.UserLoginAttribute,
 			UserNameAttribute:           config.UserNameAttribute,
 			UserObjectClass:             config.UserObjectClass,
@@ -301,7 +306,7 @@ func (p *adProvider) getGroupPrincipalsFromSearch(
 	}
 
 	for _, e := range result.Entries {
-		principal, err := ldap.AttributesToPrincipal(e.Attributes, e.DN, GroupScope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
+		principal, err := ldap.AttributesToPrincipal(e.Attributes, e.DN, GroupScope, ProviderName, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
 		if err != nil {
 			logrus.Errorf("AD: Error in getting principal for group entry %v: %v", e, err)
 			continue
@@ -408,7 +413,7 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 		return nil, fmt.Errorf("permission denied")
 	}
 
-	principal, err := ldap.AttributesToPrincipal(entryAttributes, distinguishedName, scope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
+	principal, err := ldap.AttributesToPrincipal(entryAttributes, distinguishedName, scope, ProviderName, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
 	if err != nil {
 		return nil, err
 	}
@@ -521,7 +526,7 @@ func (p *adProvider) searchLdap(query string, scope string, config *v3.ActiveDir
 
 	for i := 0; i < len(results.Entries); i++ {
 		entry := results.Entries[i]
-		principal, err := ldap.AttributesToPrincipal(entry.Attributes, results.Entries[i].DN, scope, Name, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
+		principal, err := ldap.AttributesToPrincipal(entry.Attributes, results.Entries[i].DN, scope, ProviderName, config.UserObjectClass, config.UserNameAttribute, config.UserLoginAttribute, config.GroupObjectClass, config.GroupNameAttribute)
 		if err != nil {
 			logrus.Errorf("Error translating search result: %s", err)
 			continue

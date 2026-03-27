@@ -1343,7 +1343,7 @@ func TestTokenEndpoint(t *testing.T) {
 
 	// register auth provider
 	mockProvider := providermocks.NewMockAuthProvider(ctrl)
-	mockProvider.EXPECT().IsDisabledProvider().Return(false, nil).AnyTimes()
+	mockProvider.EXPECT().IsDisabledProvider("testing").Return(false, nil).AnyTimes()
 	providers.SetProviders(map[string]common.AuthProvider{fakeAuthProvider: mockProvider})
 	t.Cleanup(func() { providers.SetProviders(nil) })
 

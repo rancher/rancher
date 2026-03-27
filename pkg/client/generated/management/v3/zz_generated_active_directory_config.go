@@ -10,6 +10,7 @@ const (
 	ActiveDirectoryConfigFieldCreated                      = "created"
 	ActiveDirectoryConfigFieldCreatorID                    = "creatorId"
 	ActiveDirectoryConfigFieldDefaultLoginDomain           = "defaultLoginDomain"
+	ActiveDirectoryConfigFieldDisplayName                  = "displayName"
 	ActiveDirectoryConfigFieldEnabled                      = "enabled"
 	ActiveDirectoryConfigFieldGroupDNAttribute             = "groupDNAttribute"
 	ActiveDirectoryConfigFieldGroupMemberMappingAttribute  = "groupMemberMappingAttribute"
@@ -54,6 +55,7 @@ type ActiveDirectoryConfig struct {
 	Created                      string            `json:"created,omitempty" yaml:"created,omitempty"`
 	CreatorID                    string            `json:"creatorId,omitempty" yaml:"creatorId,omitempty"`
 	DefaultLoginDomain           string            `json:"defaultLoginDomain,omitempty" yaml:"defaultLoginDomain,omitempty"`
+	DisplayName                  string            `json:"displayName,omitempty" yaml:"displayName,omitempty"`
 	Enabled                      bool              `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	GroupDNAttribute             string            `json:"groupDNAttribute,omitempty" yaml:"groupDNAttribute,omitempty"`
 	GroupMemberMappingAttribute  string            `json:"groupMemberMappingAttribute,omitempty" yaml:"groupMemberMappingAttribute,omitempty"`

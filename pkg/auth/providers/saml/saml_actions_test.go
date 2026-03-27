@@ -23,7 +23,7 @@ func TestTestAndEnableInvalidFinalRedirectURL(t *testing.T) {
 		userMGR:     &fakeUserManager{userName: "test-user"},
 		clientState: &fakeClientState{},
 	}
-	provider.getSamlConfig = func() (*apiv3.SamlConfig, error) {
+	provider.getSamlConfig = func(string) (*apiv3.SamlConfig, error) {
 		return &apiv3.SamlConfig{
 			RancherAPIHost: "https://rancher.example.com",
 		}, nil

@@ -25,7 +25,7 @@ func (p *adProvider) formatter(apiContext *types.APIContext, resource *types.Raw
 }
 
 func (p *adProvider) actionHandler(actionName string, action *types.Action, request *types.APIContext) error {
-	handled, err := common.HandleCommonAction(actionName, action, request, Name, p.authConfigs)
+	handled, err := common.HandleCommonAction(actionName, action, request, ProviderName, p.authConfigs)
 	if err != nil {
 		return err
 	}
@@ -53,6 +53,7 @@ func (p *adProvider) testAndApply(request *types.APIContext) error {
 	}
 
 	config := &configApplyInput.ActiveDirectoryConfig
+	config.Name = configApplyInput.ConfigName
 
 	login := &v32.BasicLogin{
 		Username: configApplyInput.Username,
@@ -165,7 +166,7 @@ func (p *adProvider) testAndApply(request *types.APIContext) error {
 }
 
 func (p *adProvider) saveActiveDirectoryConfig(config *v32.ActiveDirectoryConfig) error {
-	storedConfig, _, err := p.getActiveDirectoryConfig()
+	storedConfig, _, err := p.getActiveDirectoryConfig(config.GetName())
 	if err != nil {
 		return err
 	}
