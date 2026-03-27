@@ -1283,11 +1283,11 @@ func (t *SystemStore) Fetch(tokenID string) (accessor.TokenAccessor, error) {
 	// fetcher.
 
 	if extTokenID, found := strings.CutPrefix(tokenID, "ext/"); found {
-		if ext, err := t.Get(extTokenID, "", &metav1.GetOptions{}); err == nil {
+		ext, err := t.Get(extTokenID, "", &metav1.GetOptions{})
+		if err == nil {
 			return ext, nil
 		}
-
-		return nil, fmt.Errorf("unable to fetch unknown token %q", tokenID)
+		return nil, fmt.Errorf("unable to fetch token %s: %w", tokenID, err)
 	}
 
 	// checking for a v3 Token first, as it is the currently more common
