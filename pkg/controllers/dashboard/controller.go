@@ -80,9 +80,7 @@ func Register(ctx context.Context, wrangler *wrangler.Context, embedded bool, re
 	if !features.MCMAgent.Enabled() && !features.MCM.Enabled() && features.Harvester.Enabled() {
 		rkecontrolplanecondition.Register(ctx,
 			"local",
-			wrangler.Provisioning.Cluster().Cache(),
 			wrangler.Catalog.App(),
-			wrangler.Plan.Plan(),
 			wrangler.RKE.RKEControlPlane())
 	}
 
