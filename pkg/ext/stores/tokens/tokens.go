@@ -1722,6 +1722,7 @@ func clampMaxTTL(ttl int64) (int64, error) {
 }
 
 // ParseTokenTTL parses an integer representing minutes as a string and returns its duration.
+// See also pkg/auth/tokens/manager.go
 func ParseTokenTTL(ttl string) (time.Duration, error) {
 	durString := fmt.Sprintf("%vm", ttl)
 	dur, err := time.ParseDuration(durString)
