@@ -662,7 +662,7 @@ func (g *globalRoleEnqueuer) namespaceEnqueueGRBs(_, name string, obj runtime.Ob
 		if err != nil {
 			return nil, fmt.Errorf("failed to get GlobalRole %s for GlobalRoleBinding %s: %w", grb.GlobalRoleName, grb.Name, err)
 		}
-		for nsName, _ := range gr.InheritedNamespacedRules {
+		for nsName := range gr.InheritedNamespacedRules {
 			if nsName == name {
 				keys = append(keys, relatedresource.Key{
 					Name: grb.Name,
@@ -684,7 +684,7 @@ func (g *globalRoleEnqueuer) namespaceEnqueueGRs(_, name string, obj runtime.Obj
 	}
 	var keys []relatedresource.Key
 	for _, gr := range grs {
-		for nsName, _ := range gr.InheritedNamespacedRules {
+		for nsName := range gr.InheritedNamespacedRules {
 			if nsName == name {
 				keys = append(keys, relatedresource.Key{
 					Name: gr.Name,

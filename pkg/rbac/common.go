@@ -421,7 +421,7 @@ func CreateOrUpdateNamespacedResource[T generic.RuntimeMetaObject, TList runtime
 			return returnObj, fmt.Errorf("failed to update %s %s in namespace %s: %w", kind, desiredObj.GetName(), desiredObj.GetNamespace(), err)
 		}
 	}
-	return returnObj, nil
+	return existingObj, nil
 }
 
 // AreClusterRolesSame returns true if the current ClusterRole has the same fields present in the desired ClusterRole.

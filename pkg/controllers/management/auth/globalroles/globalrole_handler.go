@@ -19,6 +19,7 @@ import (
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -297,7 +298,7 @@ func (gr *globalRoleLifecycle) reconcileInheritedNamespacedRoles(globalRole *v3.
 
 	// Iterate through all clusters except local
 	for _, cluster := range clusters.Items {
-		if cluster.Name == "local" {
+		if cluster.Name == localClusterName {
 			continue
 		}
 
@@ -422,7 +423,7 @@ func (gr *globalRoleLifecycle) deleteInheritedNamespacedRoles(globalRole *v3.Glo
 
 	// Iterate through all clusters except local
 	for _, cluster := range clusters.Items {
-		if cluster.Name == "local" {
+		if cluster.Name == localClusterName {
 			continue
 		}
 
@@ -544,8 +545,8 @@ func ensureRoleLabels(role *rbacv1.Role, ownerLabel string) bool {
 
 // areRolesEqual compares the Rules and Labels of two Roles and returns true if they are equal
 func areRolesEqual(existingRole, desiredRole *rbacv1.Role) bool {
-	return reflect.DeepEqual(desiredRole.Rules, existingRole.Rules) &&
-		reflect.DeepEqual(desiredRole.Labels, existingRole.Labels)
+	return equality.Semantic.DeepEqual(desiredRole.Rules, existingRole.Rules) &&
+		equality.Semantic.DeepEqual(desiredRole.Labels, existingRole.Labels)
 }
 
 // createOwnerLabelSelector creates a label selector for roles owned by a GlobalRole
