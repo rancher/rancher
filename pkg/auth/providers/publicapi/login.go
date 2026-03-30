@@ -206,7 +206,7 @@ func providerInputForType(providerType string) loginAccessor {
 			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: saml.ShibbolethName},
 		}
 		// isSAMLProvider = true
-	case client.GoogleOAuthProviderType:
+	case client.GoogleOAuthProviderType, "googleOauthProvider":
 		return &apiv3.GoogleOauthLogin{
 			GenericLogin: apiv3.GenericLogin{Type: providerType, Name: googleoauth.Name},
 		}
