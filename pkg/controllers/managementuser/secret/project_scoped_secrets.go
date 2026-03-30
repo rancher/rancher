@@ -95,7 +95,7 @@ func (n *namespaceHandler) OnChange(_ string, namespace *corev1.Namespace) (*cor
 	for _, secret := range secrets {
 		secretCopy := getNamespacedSecret(secret, namespace.Name)
 
-		err := rbac.CreateOrUpdateNamespacedResource(secretCopy, n.secretClient, areSecretsSame)
+		_, err := rbac.CreateOrUpdateNamespacedResource(secretCopy, n.secretClient, areSecretsSame)
 		desiredSecrets.Insert(client.ObjectKeyFromObject(secretCopy))
 		errs = errors.Join(errs, err)
 	}
@@ -278,8 +278,8 @@ func getNamespacedSecret(obj *corev1.Secret, namespace string) *corev1.Secret {
 	return namespacedSecret
 }
 
-func areSecretsSame(s1, s2 *corev1.Secret) (bool, *corev1.Secret) {
+func areSecretsSame(s1, s2 *corev1.Secret) bool {
 	return reflect.DeepEqual(s1.Data, s2.Data) &&
 		s1.Annotations[ProjectScopedSecretLabel] == s2.Annotations[ProjectScopedSecretLabel] &&
-		s1.Annotations[pssCopyAnnotation] == s2.Annotations[pssCopyAnnotation], s2
+		s1.Annotations[pssCopyAnnotation] == s2.Annotations[pssCopyAnnotation]
 }
