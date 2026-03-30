@@ -1,10 +1,18 @@
 package saml
 
 import (
+	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"encoding/json"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"testing"
+	"time"
 
+	"github.com/crewjam/saml"
 	"github.com/rancher/norman/types"
 	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -13,10 +21,12 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers/ldap"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/rancher/rancher/pkg/types/config"
+	"github.com/rancher/rancher/pkg/user"
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apitypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 )
 
@@ -133,6 +143,273 @@ func TestSearchPrincipals(t *testing.T) {
 		})
 	}
 }
+
+func TestLogoutAllInvalidFinalRedirectURL(t *testing.T) {
+	providerName := "test-provider"
+	userName := "test-user"
+	invalidRedirect := "https://attacker.example.com/logout"
+
+	metadataURL, err := url.Parse("https://rancher.example.com/v1-saml/" + providerName + "/metadata")
+	require.NoError(t, err)
+
+	serviceProvider := &saml.ServiceProvider{
+		MetadataURL: *metadataURL,
+	}
+
+	SamlProvidersOriginal := SamlProviders[providerName]
+	provider := &Provider{
+		serviceProvider: serviceProvider,
+		name:            providerName,
+		userMGR: &fakeUserManager{
+			userName: userName,
+			userAttribute: &apiv3.UserAttribute{
+				ExtraByProvider: map[string]map[string][]string{
+					providerName: {
+						"username": {"idp-username"},
+					},
+				},
+			},
+		},
+		clientState: &fakeClientState{},
+		sloEnabled:  true,
+	}
+	SamlProviders[providerName] = provider
+	t.Cleanup(func() {
+		SamlProviders[providerName] = SamlProvidersOriginal
+	})
+
+	body := bytes.NewBufferString(`{"finalRedirectUrl":"` + invalidRedirect + `"}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1-saml/"+providerName+"/logout", body)
+	res := httptest.NewRecorder()
+	token := &fakeToken{authProvider: providerName}
+
+	err = provider.LogoutAll(res, req, token)
+	assert.ErrorContains(t, err, "Invalid redirect URL 400: failed to logout")
+}
+
+func TestPerformSamlLoginSetsStateAndResponds(t *testing.T) {
+	providerName := "test-provider"
+	finalRedirect := "https://rancher.example.com/dashboard"
+	publicKey := "rsa-public-key"
+	requestID := "req-12345"
+	responseType := "code"
+
+	metadataURL := testParseURL(t, "https://rancher.example.com/v1-saml/"+providerName+"/metadata")
+	acsURL := testParseURL(t, "https://rancher.example.com/v1-saml/"+providerName+"/acs")
+
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	serviceProvider := &saml.ServiceProvider{
+		Key:         privateKey,
+		MetadataURL: metadataURL,
+		AcsURL:      acsURL,
+		IDPMetadata: &saml.EntityDescriptor{
+			IDPSSODescriptors: []saml.IDPSSODescriptor{{
+				SingleSignOnServices: []saml.Endpoint{{
+					Binding:  saml.HTTPRedirectBinding,
+					Location: "https://idp.example.com/sso",
+				}},
+			}},
+		},
+	}
+
+	clientState := newRecordingClientState()
+	provider := &Provider{
+		serviceProvider: serviceProvider,
+		clientState:     clientState,
+	}
+
+	originalProvider, exists := SamlProviders[providerName]
+	SamlProviders[providerName] = provider
+	t.Cleanup(func() {
+		if exists {
+			SamlProviders[providerName] = originalProvider
+			return
+		}
+		delete(SamlProviders, providerName)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1-saml/"+providerName+"/login", nil)
+	res := httptest.NewRecorder()
+	loginInput := &apiv3.SamlLoginInput{
+		FinalRedirectURL: finalRedirect,
+		PublicKey:        publicKey,
+		RequestID:        requestID,
+		ResponseType:     responseType,
+	}
+
+	err = PerformSamlLogin(req, res, providerName, loginInput, provider)
+	require.NoError(t, err)
+
+	assert.Equal(t, serviceProvider.AcsURL.Path, clientState.path)
+	assert.Equal(t, finalRedirect, clientState.states["Rancher_FinalRedirectURL"])
+	assert.Equal(t, loginAction, clientState.states["Rancher_Action"])
+	assert.Equal(t, publicKey, clientState.states["Rancher_PublicKey"])
+	assert.Equal(t, requestID, clientState.states["Rancher_RequestID"])
+	assert.Equal(t, responseType, clientState.states["Rancher_ResponseType"])
+
+	assert.Equal(t, "application/json", res.Header().Get("Content-Type"))
+	var output struct {
+		IDPRedirectURL string `json:"idpRedirectUrl"`
+		Type           string `json:"type"`
+	}
+	require.NoError(t, json.NewDecoder(res.Body).Decode(&output))
+	assert.Equal(t, "samlLoginOutput", output.Type)
+	assert.NotEmpty(t, output.IDPRedirectURL)
+}
+
+func TestPerformSamlLoginRejectsInvalidRedirect(t *testing.T) {
+	providerName := "test-provider"
+
+	metadataURL, err := url.Parse("https://rancher.example.com/v1-saml/" + providerName + "/metadata")
+	require.NoError(t, err)
+
+	provider := &Provider{
+		serviceProvider: &saml.ServiceProvider{MetadataURL: *metadataURL},
+		clientState:     newRecordingClientState(),
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1-saml/"+providerName+"/login", nil)
+	res := httptest.NewRecorder()
+	loginInput := &apiv3.SamlLoginInput{FinalRedirectURL: "https://attacker.example.com/login"}
+
+	err = PerformSamlLogin(req, res, providerName, loginInput, provider)
+	assert.ErrorContains(t, err, "Invalid redirect URL 400: failed to login")
+	assert.Empty(t, res.Body.String())
+	assert.Empty(t, res.Header().Get("Content-Type"))
+}
+
+var _ ClientState = (*recordingClientState)(nil)
+
+type recordingClientState struct {
+	path   string
+	states map[string]string
+}
+
+func newRecordingClientState() *recordingClientState {
+	return &recordingClientState{states: map[string]string{}}
+}
+
+func (m *recordingClientState) SetPath(path string) {
+	m.path = path
+}
+
+func (m *recordingClientState) SetState(w http.ResponseWriter, r *http.Request, id string, value string) {
+	m.states[id] = value
+}
+
+func (m *recordingClientState) GetStates(r *http.Request) map[string]string {
+	return m.states
+}
+
+func (m *recordingClientState) GetState(r *http.Request, id string) string {
+	return m.states[id]
+}
+
+func (m *recordingClientState) DeleteState(w http.ResponseWriter, r *http.Request, id string) error {
+	delete(m.states, id)
+	return nil
+}
+
+var _ ClientState = (*fakeClientState)(nil)
+
+type fakeClientState struct{}
+
+func (m *fakeClientState) SetPath(path string) {}
+
+func (m *fakeClientState) SetState(w http.ResponseWriter, r *http.Request, id string, value string) {}
+
+func (m *fakeClientState) GetStates(r *http.Request) map[string]string { return nil }
+
+func (m *fakeClientState) GetState(r *http.Request, id string) string { return "" }
+
+func (m *fakeClientState) DeleteState(w http.ResponseWriter, r *http.Request, id string) error {
+	return nil
+}
+
+var _ user.Manager = (*fakeUserManager)(nil)
+
+type fakeUserManager struct {
+	userName      string
+	userAttribute *apiv3.UserAttribute
+}
+
+func (m *fakeUserManager) GetUser(r *http.Request) string { return m.userName }
+
+func (m *fakeUserManager) EnsureUser(principalName, displayName string) (*apiv3.User, error) {
+	return nil, nil
+}
+
+func (m *fakeUserManager) CheckAccess(accessMode string, allowedPrincipalIDs []string, userPrincipalID string, groups []apiv3.Principal) (bool, error) {
+	return true, nil
+}
+
+func (m *fakeUserManager) SetPrincipalOnCurrentUserByUserID(userID string, principal apiv3.Principal) (*apiv3.User, error) {
+	return nil, nil
+}
+
+func (m *fakeUserManager) SetPrincipalOnCurrentUser(r *http.Request, principal apiv3.Principal) (*apiv3.User, error) {
+	return nil, nil
+}
+
+func (m *fakeUserManager) CreateNewUserClusterRoleBinding(userName string, userUID apitypes.UID) error {
+	return nil
+}
+
+func (m *fakeUserManager) GetUserByPrincipalID(principalName string) (*apiv3.User, error) {
+	return nil, nil
+}
+
+func (m *fakeUserManager) GetGroupsForTokenAuthProvider(token accessor.TokenAccessor) []apiv3.Principal {
+	return nil
+}
+
+func (m *fakeUserManager) EnsureAndGetUserAttribute(userID string) (*apiv3.UserAttribute, bool, error) {
+	return m.userAttribute, false, nil
+}
+
+func (m *fakeUserManager) IsMemberOf(token accessor.TokenAccessor, group apiv3.Principal) bool {
+	return false
+}
+
+func (m *fakeUserManager) UserAttributeCreateOrUpdate(userID, provider string, groupPrincipals []apiv3.Principal, userExtraInfo map[string][]string, loginTime ...time.Time) error {
+	return nil
+}
+
+var _ accessor.TokenAccessor = (*fakeToken)(nil)
+
+type fakeToken struct {
+	authProvider string
+}
+
+func (m *fakeToken) GetName() string { return "" }
+
+func (m *fakeToken) GetIsEnabled() bool { return true }
+
+func (m *fakeToken) GetIsDerived() bool { return false }
+
+func (m *fakeToken) GetAuthProvider() string { return m.authProvider }
+
+func (m *fakeToken) GetUserID() string { return "" }
+
+func (m *fakeToken) GetProviderInfo() map[string]string { return nil }
+
+func (m *fakeToken) ObjClusterName() string { return "" }
+
+func (m *fakeToken) GetUserPrincipal() apiv3.Principal { return apiv3.Principal{} }
+
+func (m *fakeToken) GetGroupPrincipals() []apiv3.Principal { return nil }
+
+func (m *fakeToken) GetLastUsedAt() *metav1.Time { return nil }
+
+func (m *fakeToken) GetLastActivitySeen() *metav1.Time { return nil }
+
+func (m *fakeToken) GetCreationTime() metav1.Time { return metav1.Time{} }
+
+func (m *fakeToken) GetExpiresAt() string { return "" }
+
+func (m *fakeToken) GetIsExpired() bool { return false }
 
 // Bare minimum to provide ldap responses (or error conditions) when performing SearchPrincipals. We're testing
 // the SAML provider's logic, not anything the ldap provider is doing, so we merely need enough scaffolding to
