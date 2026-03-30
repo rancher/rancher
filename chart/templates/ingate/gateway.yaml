@@ -5,6 +5,10 @@ metadata:
   name: {{ include "rancher.gateway" . }}
   labels:
 {{ include "rancher.labels" . | indent 4 }}
+  {{- with .Values.gateway.gatewayClass.extraAnnotations }}
+  annotations:
+    {{ toYaml . | nindent 4 }}
+  {{- end }}
 spec:
   gatewayClassName: {{ .Values.gateway.gatewayClass.name }}
   listeners:
