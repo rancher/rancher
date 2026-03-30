@@ -29,12 +29,12 @@ func New(_ v3.PreferenceCache, clusterRegistrationTokenCache v3.ClusterRegistrat
 	router.Path("/verify-auth").Queries("state", "{state}").HandlerFunc(redirectAuth)
 	router.PathPrefix("/api-ui").Handler(ember.ServeAPIUI())
 	router.PathPrefix("/assets/rancher-ui-driver-linode").Handler(emberAlwaysOffline.ServeAsset())
-	router.PathPrefix("/assets").Handler(ember.ServeAsset())
+	router.PathPrefix("/assets").Handler(ember.IndexFileOnNotFound())
 	router.PathPrefix("/dashboard/").Handler(vue.IndexFileOnNotFound())
 	router.PathPrefix("/ember-fetch").Handler(ember.ServeAsset())
 	router.PathPrefix("/engines-dist").Handler(ember.ServeAsset())
 	router.PathPrefix("/static").Handler(ember.ServeAsset())
-	router.PathPrefix("/translations").Handler(ember.ServeAsset())
+	router.PathPrefix("/translations").Handler(ember.IndexFileOnNotFound())
 	router.NotFoundHandler = emberIndexUnlessAPI()
 
 	return router
