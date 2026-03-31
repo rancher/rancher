@@ -24,7 +24,7 @@ runs:
         sudo mv /tmp/helm /usr/bin/helm_v3 && \
         sudo chmod +x /usr/bin/helm_v3
 
-        helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${HELM_UNITTEST_VERSION}; \
+        helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${HELM_UNITTEST_VERSION};
     - name: Build
       shell: bash
       run: ./scripts/chart/build chart
