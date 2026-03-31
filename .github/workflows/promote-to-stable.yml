@@ -29,9 +29,9 @@ jobs:
       - name: Skopeo login
         run: echo "${DOCKER_PASSWORD}" | skopeo login "${REGISTRY}" --username "${DOCKER_USERNAME}" --password-stdin
       - name: Copy image to latest
-        run: skopeo copy "docker://${REGISTRY }}/${IMAGE}:${TAG}" "docker://${REGISTRY}/${IMAGE}:latest" --all
+        run: skopeo copy "docker://${REGISTRY}/${IMAGE}:${TAG}" "docker://${REGISTRY}/${IMAGE}:latest" --all
       - name: Copy image to stable
-        run: skopeo copy "docker://${REGISTRY }}/${IMAGE}:${TAG}" "docker://${REGISTRY}/${IMAGE}:stable" --all
+        run: skopeo copy "docker://${REGISTRY}/${IMAGE}:${TAG}" "docker://${REGISTRY}/${IMAGE}:stable" --all
   promote-chart:
     runs-on: ubuntu-latest
     permissions:
