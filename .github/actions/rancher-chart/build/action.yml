@@ -20,14 +20,12 @@ runs:
       shell: bash
       run: |
         set -ex
-        curl "${HELM_URL}" --output /tmp/helm.tar.gz && \
+        curl "${HELM_URL}" -o /tmp/helm.tar.gz && \
         echo "${HELM_HASH}  /tmp/helm.tar.gz" | sha256sum -c - && \
         tar xvzf /tmp/helm.tar.gz --strip-components=1 -C /tmp/ && \
-        mv /tmp/helm /usr/bin/helm_v3 && \
-        chmod +x /usr/bin/helm_v3 && \
-        rm -f /tmp/helm.tar.gz
-
-        helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${HELM_UNITTEST_VERSION};
+        mv /tmp/helm /usr/bin/helm_v4 && \
+        chmod +x /usr/bin/helm_v4
+        helm_v4 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${HELM_UNITTEST_VERSION} --verify=false;
     - name: Build
       shell: bash
       run: ./scripts/chart/build chart

@@ -15,7 +15,7 @@ import (
 	"github.com/rancher/rancher/pkg/managedcharts/cspadapter"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/sirupsen/logrus"
-	"helm.sh/helm/v3/pkg/release"
+	releasev1 "helm.sh/helm/v4/pkg/release/v1"
 	authzv1 "k8s.io/api/authorization/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,7 +40,7 @@ const (
 var errNotFound = errors.New("not implemented")
 
 type cspAdapterInterface interface {
-	GetRelease(chartNamespace string, chartName string) (*release.Release, error)
+	GetRelease(chartNamespace string, chartName string) (*releasev1.Release, error)
 }
 
 // Handler implements http.Handler - and serves supportconfigs (tar file which contains support relevant information)

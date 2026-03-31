@@ -28,10 +28,11 @@ import (
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/merr"
 	"github.com/sirupsen/logrus"
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/release"
-	"helm.sh/helm/v3/pkg/repo"
-	v1 "k8s.io/api/core/v1"
+	"helm.sh/helm/v4/pkg/action"
+	releasecommon "helm.sh/helm/v4/pkg/release/common"
+	release "helm.sh/helm/v4/pkg/release/v1"
+	"helm.sh/helm/v4/pkg/repo/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -76,7 +77,7 @@ type OperationClient interface {
 	// Returns a catalog.Operation that represents the helm operation to be created
 	Uninstall(ctx context.Context, user user.Info, namespace, name string, options io.Reader, imageOverride string) (*catalog.Operation, error)
 	// AddCpTaintsToTolerations gets the list of control plane nodes and adds their taints to the given tolerations.
-	AddCpTaintsToTolerations(tolerations []v1.Toleration) ([]v1.Toleration, error)
+	AddCpTaintsToTolerations(tolerations []corev1.Toleration) ([]corev1.Toleration, error)
 }
 
 type ContentClient interface {
@@ -334,7 +335,7 @@ func (m *Manager) install(namespace, chartName, releaseName, minVersion, exactVe
 	}
 	// if tolerations are already present we don't change them
 	if v, ok := desiredValue["tolerations"]; !ok || v == nil {
-		var tolerations []v1.Toleration
+		var tolerations []corev1.Toleration
 		tolerations, err = m.operation.AddCpTaintsToTolerations(tolerations)
 		if err != nil {
 			logrus.Warnf("failed to add tolerations for control plane taints: %v", err)
@@ -413,7 +414,7 @@ func (m *Manager) waitPodDone(op *catalog.Operation) error {
 	}()
 
 	for event := range resp.ResultChan() {
-		newPod, ok := event.Object.(*v1.Pod)
+		newPod, ok := event.Object.(*corev1.Pod)
 		if !ok {
 			continue
 		}
@@ -430,7 +431,7 @@ func (m *Manager) waitPodDone(op *catalog.Operation) error {
 // podDone receives a chart name and a pod. It will check all containers in that pod and
 // get one named helm to check if it terminated and if it did so successfully.
 // If there's no helm container or if the container didn't terminate, it returns false.
-func podDone(chart string, newPod *v1.Pod) (bool, error) {
+func podDone(chart string, newPod *corev1.Pod) (bool, error) {
 	for _, container := range newPod.Status.ContainerStatuses {
 		if container.Name != "helm" {
 			continue
@@ -463,7 +464,7 @@ func (m *Manager) isInstalled(namespace, name, minVersion, desiredVersion string
 // or may not be installed, depending on the value of the min version.
 func desiredVersionAndValues(releases []*release.Release, minVersion, desiredVersion string, isExact bool, desiredValues map[string]any) (bool, string, map[string]interface{}, error) {
 	for _, r := range releases {
-		if r.Info.Status != release.StatusDeployed {
+		if r.Info.Status != releasecommon.StatusDeployed {
 			continue
 		}
 		if desiredValues == nil {
