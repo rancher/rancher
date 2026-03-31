@@ -13,7 +13,7 @@ runs:
         GH_CLI_HASH_amd64: "d0422caade520530e76c1c558da47daebaa8e1203d6b7ff10ad7d6faba3490d8"
       run: |
         mkdir -p /tmp/gh && \
-        curl -fsL "https://github.com/cli/cli/releases/download/v${GH_CLI_VERSION}/gh_${GH_CLI_VERSION}_linux_amd64.tar.gz | tar xvzf - --strip-components=1 -C /tmp/gh && \
+        curl -fsL "https://github.com/cli/cli/releases/download/v${GH_CLI_VERSION}/gh_${GH_CLI_VERSION}_linux_amd64.tar.gz" | tar xvzf - --strip-components=1 -C /tmp/gh && \
         echo "${GH_CLI_HASH_amd64}  /tmp/gh/bin/gh" | sha256sum -c - && \
         mv /tmp/gh/bin/gh /usr/bin/gh && \
         chmod +x /usr/bin/gh
