@@ -16,6 +16,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      with:
+        persist-credentials: false
 
     # The FOSSA token is shared between all repos in Rancher's GH org. It can be
     # used directly and there is no need to request specific access to EIO.
