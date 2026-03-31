@@ -14,6 +14,5 @@ runs:
         GH_TOKEN: ${{ steps.app-token.outputs.token }}
       shell: bash
       run: |
-        gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$ARTIFACTS_BASE_DIR/$LINUX_FILE" --clobber
-        gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$ARTIFACTS_BASE_DIR/$WINDOWS_FILE" --clobber
-        gh release upload -R ${{ env.REPOSITORY_OWNER }}/rancher ${{ env.TAG }} "$ARTIFACTS_BASE_DIR/$CHECKSUM_FILE" --clobber
+        cd "${ARTIFACTS_BASE_DIR}"
+        gh release upload -R "${REPOSITORY_OWNER}/rancher" "${TAG}" "$LINUX_FILE" "$WINDOWS_FILE" "${CHECKSUM_FILE}" --clobber
