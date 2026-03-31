@@ -17,7 +17,7 @@ ENV HELM_HASH_arm64=2d776c1ff5653d95010e318d0db08a591cf7f183f4cc75647078de458960
 RUN if [ "${BUILDARCH}" = "amd64" ]; then \
         HELM_HASH="${HELM_HASH_amd64}"; \
     elif [ "${BUILDARCH}" = "arm64" ]; then \
-        HELM_HASH="${HELM_HASH_amd64}"; \
+        HELM_HASH="${HELM_HASH_arm64}"; \
     fi; \
     wget "https://get.helm.sh/helm-${HELM_VERSION}-linux-${BUILDARCH}.tar.gz" -O - | \
     tar -xz --strip-components=1 -C /usr/bin && \
