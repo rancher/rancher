@@ -19,6 +19,7 @@ runs:
         HELM_UNITTEST_VERSION: ${{ steps.env.outputs.HELM_UNITTEST_VERSION }}
       shell: bash
       run: |
+        set -ex
         curl "${HELM_URL}" | tar xvzf - --strip-components=1 -C /tmp/ && \
         echo "${HELM_HASH}  /tmp/helm" | sha256sum -c - && \
         sudo mv /tmp/helm /usr/bin/helm_v3 && \
