@@ -92,6 +92,18 @@ var (
 		false,
 		true,
 		true)
+	CloudCredentialLockdown = newFeature(
+		"cloud-credential-lockdown",
+		"Restrict regular users from managing cloud credentials.",
+		false,
+		false,
+		true)
+	GenericCloudCredentials = newFeature(
+		"generic-cloud-credentials",
+		"Allow generic cloud credentials with x- prefixed types that have no DynamicSchema.",
+		false,
+		false,
+		true)
 	Harvester = newFeature(
 		"harvester",
 		"Enable Harvester integration, with ability to import and manage Harvester clusters",
