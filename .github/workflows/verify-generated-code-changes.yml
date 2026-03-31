@@ -7,6 +7,8 @@ on:
     branches:
     - 'release/*'
 
+permissions: {}
+
 env:
   MAIN_BRANCH: origin/main
   GOARCH: amd64
@@ -18,16 +20,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      -
-        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
         with:
           fetch-depth: 0
-      -
-        uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4.4.0
+          persist-credentials: false
+      - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4.4.0
         with:
           go-version: ${{ env.SETUP_GO_VERSION }}
-      -
-        uses: actions/cache@6f8efc29b200d32929f49075959781ed54ec270c # v3.5.0
+          cache: ${{ github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }}
+      - uses: actions/cache@6f8efc29b200d32929f49075959781ed54ec270c # v3.5.0
+        if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
         with:
           path: |
             ~/.cache/go-build
