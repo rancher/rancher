@@ -91,7 +91,7 @@ jobs:
               body: body,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              base: "${GITHUB_REF_NAME}",
+              base: `${GITHUB_REF_NAME}`,
               head: `${ process.env.SOURCE_BRANCH }`
             });
             await github.rest.issues.addLabels({
