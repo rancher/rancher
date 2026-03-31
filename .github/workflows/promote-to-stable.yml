@@ -50,6 +50,7 @@ jobs:
           HELM_URL: https://get.helm.sh/helm-${{ steps.env.outputs.HELM_VERSION }}-linux-amd64.tar.gz
           HELM_HASH: ${{ steps.env.outputs.HELM_HASH_amd64 }}
         run: |
+          set -ex
           curl "${HELM_URL}" | tar xvzf - --strip-components=1 -C /tmp/ && \
           echo "${HELM_HASH}  /tmp/helm" | sha256sum -c - && \
           sudo mv /tmp/helm /usr/bin/helm_v3 && \
