@@ -31,7 +31,7 @@ runs:
           echo "Error: Failed to load image from tarball!"
           exit 1
         fi
-        docker tag "$image_id" ${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/rancher:${TAG}-${ARCH}"
+        docker tag "$image_id" "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/rancher:${TAG}-${ARCH}"
         docker push "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/rancher:${TAG}-${ARCH}"
     - name: Push agent image
       shell: bash
