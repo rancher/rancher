@@ -261,12 +261,12 @@ def install_cert_manager():
     cm_repo = "https://charts.jetstack.io"
 
     run_command_with_stderr(export_cmd + " && kubectl apply -f " + manifests)
-    run_command_with_stderr("helm_v3 repo add jetstack " + cm_repo)
-    run_command_with_stderr("helm_v3 repo update")
+    run_command_with_stderr("helm_v4 repo add jetstack " + cm_repo)
+    run_command_with_stderr("helm_v4 repo update")
     run_command_with_stderr(export_cmd + " && " +
                             "kubectl create namespace cert-manager")
     run_command_with_stderr(export_cmd + " && " +
-                            "helm_v3 install cert-manager "
+                            "helm_v4 install cert-manager "
                             "jetstack/cert-manager "
                             "--namespace cert-manager "
                             "--version {0}".format(CERT_MANAGER_VERSION))
@@ -332,8 +332,8 @@ def add_repo_create_namespace(repo=RANCHER_HELM_REPO, url=RANCHER_HELM_URL):
     repo_name = "rancher-" + repo
     repo_url = url + repo
 
-    run_command_with_stderr("helm_v3 repo add " + repo_name + " " + repo_url)
-    run_command_with_stderr("helm_v3 repo update")
+    run_command_with_stderr("helm_v4 repo add " + repo_name + " " + repo_url)
+    run_command_with_stderr("helm_v4 repo update")
     run_command_with_stderr(export_cmd + " && " +
                             "kubectl create namespace cattle-system")
 
@@ -357,7 +357,7 @@ def install_rancher(type=RANCHER_HA_CERT_OPTION, repo=RANCHER_HELM_REPO,
         operation = "upgrade"
 
     helm_rancher_cmd = \
-        export_cmd + " && helm_v3 " + operation + " rancher " + \
+        export_cmd + " && helm_v4 " + operation + " rancher " + \
         "rancher-" + repo + "/rancher " + \
         "--version " + RANCHER_CHART_VERSION + " " + \
         "--namespace cattle-system " + \

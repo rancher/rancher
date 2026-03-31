@@ -3,7 +3,7 @@ package content
 import (
 	"net/url"
 
-	"helm.sh/helm/v3/pkg/repo"
+	"helm.sh/helm/v4/pkg/repo/v1"
 )
 
 // TranslateURLs - creates URLs that are unique to each version of a chart,

@@ -9,22 +9,18 @@ ARG BUILDARCH
 ARG VERSION
 ENV CHART_VERSION=${VERSION}
 
-# set up helm 3
-ENV HELM_VERSION=v3.20.0
-ENV HELM_HASH_amd64=1f7ed083dbc200a10fdfe04df94c21530140fdc955de5a1daed2694150f77b17
-ENV HELM_HASH_arm64=2d776c1ff5653d95010e318d0db08a591cf7f183f4cc75647078de458960b2b9
-
-RUN if [ "${BUILDARCH}" = "amd64" ]; then \
-        HELM_HASH="${HELM_HASH_amd64}"; \
-    elif [ "${BUILDARCH}" = "arm64" ]; then \
-        HELM_HASH="${HELM_HASH_arm64}"; \
-    fi; \
-    wget "https://get.helm.sh/helm-${HELM_VERSION}-linux-${BUILDARCH}.tar.gz" -O - | \
-    tar -xz --strip-components=1 -C /usr/bin && \
-    echo "${HELM_HASH}  /usr/bin/helm" | sha256sum -c - && \
-    mv /usr/bin/helm /usr/bin/helm_v3 && \
-    chown root:root /usr/bin/helm_v3 && \
-    chmod +x /usr/bin/helm_v3
+# set up helm 4
+ENV HELM_VERSION=v4.1.4
+ENV HELM_HASH_amd64=70b2c30a19da4db264dfd68c8a3664e05093a361cefd89572ffb36f8abfa3d09
+ENV HELM_HASH_arm64=13d03672be289045d2ff00e4e345d61de1c6f21c1257a45955a30e8ae036d8f1
+RUN wget https://get.helm.sh/helm-${HELM_VERSION}-linux-${BUILDARCH}.tar.gz -O /tmp/helm.tar.gz && \
+    HELM_HASH="HELM_HASH_${BUILDARCH}" && \
+    echo "${!HELM_HASH}  /tmp/helm.tar.gz" | sha256sum -c - && \
+    tar -xzf /tmp/helm.tar.gz --strip-components=1 -C /usr/bin \
+    mv /usr/bin/helm /usr/bin/helm_v4 && \
+    chown root:root /usr/bin/helm_v4 && \
+    chmod +x /usr/bin/helm_v4 && \
+    rm /tmp/helm.tar.gz
 
 ENV YQ_VERSION=v4.44.2
 ENV YQ_HASH_amd64=246b781828353a59fb04ffaada241f78a8f3f25c623047b40306def1f6806e71
@@ -49,6 +45,6 @@ RUN /src/scripts/export-config
 RUN /src/scripts/chart/ci
 
 FROM scratch
-COPY --from=build /usr/bin/helm_v3 /helm
+COPY --from=build /usr/bin/helm_v4 /helm
 COPY --from=build /src/bin/chart/*/*.tgz /
 COPY package/installer-run.sh /run.sh

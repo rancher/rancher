@@ -8,13 +8,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/chartutil"
-	kubefake "helm.sh/helm/v3/pkg/kube/fake"
-	"helm.sh/helm/v3/pkg/registry"
-	"helm.sh/helm/v3/pkg/release"
-	"helm.sh/helm/v3/pkg/storage"
-	"helm.sh/helm/v3/pkg/storage/driver"
+	"helm.sh/helm/v4/pkg/action"
+	chartutil "helm.sh/helm/v4/pkg/chart/common"
+	kubefake "helm.sh/helm/v4/pkg/kube/fake"
+	"helm.sh/helm/v4/pkg/registry"
+	releasecommon "helm.sh/helm/v4/pkg/release/common"
+	releasev1 "helm.sh/helm/v4/pkg/release/v1"
+	"helm.sh/helm/v4/pkg/storage"
+	"helm.sh/helm/v4/pkg/storage/driver"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	testing2 "k8s.io/kubectl/pkg/cmd/testing"
 )
@@ -25,10 +26,10 @@ func TestListReleases(t *testing.T) {
 	type testInput struct {
 		name             string
 		stateMask        action.ListStates
-		releases         []*release.Release
+		releases         []*releasev1.Release
 		restClientGetter genericclioptions.RESTClientGetter
 		namespace        string
-		runAction        func(l *action.List) ([]*release.Release, error)
+		runAction        func(l *action.List) ([]*releasev1.Release, error)
 	}
 
 	type testCase struct {
@@ -38,7 +39,7 @@ func TestListReleases(t *testing.T) {
 		fails bool
 	}
 
-	testRelease := []*release.Release{{Name: "test", Version: 1, Info: &release.Info{Status: release.StatusPendingInstall}}}
+	testRelease := []*releasev1.Release{{Name: "test", Version: 1, Info: &releasev1.Info{Status: releasecommon.StatusPendingInstall}}}
 
 	testCases := []testCase{{
 		name: "name and stateMask matches",
@@ -88,10 +89,18 @@ func TestListReleases(t *testing.T) {
 			releases:         testRelease,
 			restClientGetter: testing2.NewTestFactory(),
 			namespace:        "",
-			runAction: func(l *action.List) ([]*release.Release, error) {
+			runAction: func(l *action.List) ([]*releasev1.Release, error) {
 				r, e := l.Run()
-				r[0].Manifest = "random stuff"
-				return r, e
+				var rels []*releasev1.Release
+				for _, res := range r {
+					if rel, ok := res.(*releasev1.Release); ok {
+						rels = append(rels, rel)
+					}
+				}
+				if len(rels) > 0 {
+					rels[0].Manifest = "random stuff"
+				}
+				return rels, e
 			},
 		},
 		skip:  false,
@@ -106,26 +115,29 @@ func TestListReleases(t *testing.T) {
 		mockCfg := &action.Configuration{
 			Releases:       storage.Init(driver.NewMemory()),
 			KubeClient:     &kubefake.FailingKubeClient{PrintingKubeClient: kubefake.PrintingKubeClient{Out: io.Discard}},
-			Capabilities:   chartutil.DefaultCapabilities,
+			Capabilities:   &chartutil.Capabilities{},
 			RegistryClient: r,
-			Log: func(format string, v ...interface{}) {
-				t.Helper()
-			},
 		}
 		for _, r := range test.input.releases {
 			asserts.NoError(mockCfg.Releases.Create(r), test.name)
 		}
-		var originalReleases []*release.Release
+		var originalReleases []*releasev1.Release
 		var originalErr error
 		client := Client{
 			restClientGetter: test.input.restClientGetter,
-			actRun: func(list *action.List) ([]*release.Release, error) {
+			actRun: func(list *action.List) ([]*releasev1.Release, error) {
 				//filter and stateMask should be set
 				asserts.Equal("^"+test.input.name+"$", list.Filter, test.name)
 				asserts.Equal(test.input.stateMask, list.StateMask, test.name)
 
 				r, e := list.Run()
-				err := deepCopy(&originalReleases, r)
+				var rels []*releasev1.Release
+				for _, res := range r {
+					if rel, ok := res.(*releasev1.Release); ok {
+						rels = append(rels, rel)
+					}
+				}
+				err := deepCopy(&originalReleases, rels)
 				asserts.NoError(err)
 				err = deepCopy(&originalErr, &e)
 				asserts.NoError(err)

@@ -10,7 +10,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/catalogv2/chart"
 	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
-	"helm.sh/helm/v3/pkg/repo"
+	"helm.sh/helm/v4/pkg/repo/v1"
 )
 
 // Icon will return the icon for a chartName version in a local repository by getting the relative path

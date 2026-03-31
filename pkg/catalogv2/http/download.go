@@ -16,7 +16,7 @@ import (
 
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/sirupsen/logrus"
-	"helm.sh/helm/v3/pkg/repo"
+	"helm.sh/helm/v4/pkg/repo/v1"
 	corev1 "k8s.io/api/core/v1"
 )
 
