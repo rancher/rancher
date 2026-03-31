@@ -1,6 +1,9 @@
 TARGETS := $(shell ls scripts)
 DEV_TARGETS := $(shell ls dev-scripts)
 
+include hack/make/deps.mk
+export DEPS_BUILD_ARGS
+
 .dapper:
 	@echo Downloading dapper
 	@curl -sL https://releases.rancher.com/dapper/latest/dapper-`uname -s`-`uname -m` > .dapper.tmp
