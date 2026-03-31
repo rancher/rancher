@@ -22,8 +22,8 @@ runs:
         set -ex
         curl "${HELM_URL}" | tar xvzf - --strip-components=1 -C /tmp/ && \
         echo "${HELM_HASH}  /tmp/helm" | sha256sum -c - && \
-        sudo mv /tmp/helm /usr/bin/helm_v3 && \
-        sudo chmod +x /usr/bin/helm_v3
+        mv /tmp/helm /usr/bin/helm_v3 && \
+        chmod +x /usr/bin/helm_v3
 
         helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${HELM_UNITTEST_VERSION};
     - name: Build
