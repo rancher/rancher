@@ -3,6 +3,7 @@ package keycloakoidc
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -18,6 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/user"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/clientcredentials"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -61,13 +63,25 @@ func (k *keyCloakOIDCProvider) newClient(config *apiv3.OIDCConfig, token accesso
 	}
 	provider, err := gooidc.NewProvider(ctx, config.Issuer)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create new oidc provider: %w", err)
 	}
+
 	oauthConfig := oidc.ConfigToOauthConfig(provider.Endpoint(), config)
-	// get, refresh and update token
-	oauthToken, err := k.getRefreshAndUpdateToken(ctx, oauthConfig, token)
-	if err != nil {
-		return nil, err
+	var oauthToken *oauth2.Token
+	if config.ClientAuthenticatedSearch {
+		token, err := k.getClientCredentialsToken(ctx, provider, config)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get client credentials: %w", err)
+		}
+		oauthToken = token
+	} else {
+		// get, refresh and update token
+		token, err := k.getRefreshAndUpdateToken(ctx, oauthConfig, token)
+		if err != nil {
+			return nil, err
+		}
+		oauthToken = token
+
 	}
 	keyCloakClient := &KeyCloakClient{
 		httpClient: oauthConfig.Client(ctx, oauthToken),
@@ -80,7 +94,7 @@ func (k *keyCloakOIDCProvider) SearchPrincipals(searchValue, principalType strin
 	var principals []apiv3.Principal
 	var err error
 
-	config, err := k.GetOIDCConfig()
+	config, err := k.GetConfig()
 	if err != nil {
 		return principals, err
 	}
@@ -161,28 +175,109 @@ func (k *keyCloakOIDCProvider) GetPrincipal(principalID string, token accessor.T
 func (k *keyCloakOIDCProvider) getRefreshAndUpdateToken(ctx context.Context, oauthConfig oauth2.Config, token accessor.TokenAccessor) (*oauth2.Token, error) {
 	var oauthToken *oauth2.Token
 	storedOauthToken, err := k.TokenMgr.GetSecret(token.GetUserID(), token.GetAuthProvider(), []accessor.TokenAccessor{token})
-	if err := json.Unmarshal([]byte(storedOauthToken), &oauthToken); err != nil {
-		return oauthToken, err
-	}
 	if err != nil {
+		// If the secret lookup failed for a reason other than NotFound, surface the error.
 		if !apierrors.IsNotFound(err) {
-			return oauthToken, err
+			return nil, fmt.Errorf("getting access token for user: %w", err)
 		}
-		oauthToken.AccessToken = token.GetProviderInfo()["access_token"]
+
+		// Secret not found: fall back to the access token stored in ProviderInfo.
+		accessToken, ok := token.GetProviderInfo()["access_token"]
+		if !ok || strings.TrimSpace(accessToken) == "" {
+			return nil, fmt.Errorf("no stored access token found for user %s", token.GetUserID())
+		}
+		oauthToken = &oauth2.Token{
+			AccessToken: strings.TrimSpace(accessToken),
+		}
+	} else {
+		// Secret retrieved successfully. First, try to interpret it as JSON-encoded oauth2.Token.
+		stored := strings.TrimSpace(storedOauthToken)
+		if stored == "" {
+			return nil, fmt.Errorf("empty access token secret for user %s", token.GetUserID())
+		}
+		if unmarshalErr := json.Unmarshal([]byte(stored), &oauthToken); unmarshalErr != nil || oauthToken == nil {
+			// If unmarshalling fails or yields nil, fall back to treating the secret as a raw access token string.
+			oauthToken = &oauth2.Token{
+				AccessToken: stored,
+			}
+		}
 	}
+
 	// Valid will return false if access token is expired
 	if !oauthToken.Valid() {
 		// since token is not valid, the TokenSource func used in the Client func will attempt to refresh the access token
 		// if the refresh token has not expired
-		logrus.Debugf("[generic oidc] RefeshAndUpdateToken: attempting to refresh access token")
+		logrus.Debugf("[generic oidc] RefreshAndUpdateToken: attempting to refresh access token")
 	}
+
 	reusedToken, err := oauth2.ReuseTokenSource(oauthToken, oauthConfig.TokenSource(ctx, oauthToken)).Token()
 	if err != nil {
-		return oauthToken, err
+		return oauthToken, fmt.Errorf("setting up reusable token: %w", err)
 	}
 
 	if !reflect.DeepEqual(oauthToken, reusedToken) {
-		k.UpdateToken(reusedToken, token.GetUserID())
+		if err := k.UpdateToken(reusedToken, token.GetUserID()); err != nil {
+			logrus.Errorf("updating cached oauth token for user %s: %s", token.GetUserID(), err)
+		}
 	}
+
+	return reusedToken, nil
+}
+
+func (k *keyCloakOIDCProvider) getClientCredentialsToken(ctx context.Context, provider *gooidc.Provider, config *apiv3.OIDCConfig) (*oauth2.Token, error) {
+	var oauthToken *oauth2.Token
+	secretExists := true
+	storedOauthToken, err := k.TokenMgr.GetSecret(k.GetName(), k.GetName(), nil)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			secretExists = false
+		} else {
+			return nil, fmt.Errorf("finding oauth token for provider %s: %w", k.GetName(), err)
+		}
+	}
+	if storedOauthToken != "" {
+		if err := json.Unmarshal([]byte(storedOauthToken), &oauthToken); err != nil {
+			return nil, fmt.Errorf("unmarshalling cached oauth token for provider %s: %w", k.GetName(), err)
+		}
+	}
+	oauthConfig := oidc.ConfigToOauthConfig(provider.Endpoint(), config)
+	clientConf := clientcredentials.Config{
+		ClientID:     oauthConfig.ClientID,
+		ClientSecret: oauthConfig.ClientSecret,
+		TokenURL:     provider.Endpoint().TokenURL,
+		AuthStyle:    oauth2.AuthStyleInParams,
+		Scopes:       oauthConfig.Scopes,
+	}
+	if oauthToken != nil && (!oauthToken.Valid() || oauthToken.AccessToken == "") {
+		logrus.Debugf("[keycloak oidc] RefreshAndUpdateToken: attempting to refresh access token from client credentials")
+		tok, err := clientConf.Token(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch token: %w", err)
+		}
+		oauthToken = tok
+	}
+
+	reusedToken, err := oauth2.ReuseTokenSource(oauthToken, clientConf.TokenSource(ctx)).Token()
+	if err != nil {
+		return nil, fmt.Errorf("reusing the token source for provider %s: %w", k.GetName(), err)
+	}
+
+	if !reflect.DeepEqual(oauthToken, reusedToken) {
+		if !secretExists {
+			tokenBytes, err := json.Marshal(reusedToken)
+			if err != nil {
+				logrus.Errorf("marshalling oauth token for provider %s: %s", k.GetName(), err)
+			} else {
+				if err := k.TokenMgr.CreateSecret(k.GetName(), k.GetName(), string(tokenBytes)); err != nil {
+					logrus.Errorf("creating cached oauth token for provider %s: %s", k.GetName(), err)
+				}
+			}
+		} else {
+			if err := k.UpdateToken(reusedToken, k.GetName()); err != nil {
+				logrus.Errorf("updating cached oauth token for provider %s: %s", k.GetName(), err)
+			}
+		}
+	}
+
 	return reusedToken, nil
 }

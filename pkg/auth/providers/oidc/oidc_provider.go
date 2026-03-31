@@ -49,6 +49,7 @@ const (
 type tokenManager interface {
 	UpdateSecret(userID, provider, secret string) error
 	CreateTokenAndSetCookie(userID string, userPrincipal apiv3.Principal, groupPrincipals []apiv3.Principal, providerToken string, ttl int, description string, request *types.APIContext) error
+	CreateSecret(userID, provider, secret string) error
 	GetSecret(userID string, provider string, fallbackTokens []accessor.TokenAccessor) (string, error)
 }
 
@@ -231,7 +232,6 @@ func GetOIDCRedirectionURL(config map[string]any, pkceVerifier string, values ur
 	values.Add("client_id", config["clientId"].(string))
 	values.Add("response_type", "code")
 
-	logrus.Debug("Checking for PKCE")
 	if pkceMethod, ok := config[client.GenericOIDCConfigFieldPKCEMethod]; ok {
 		if pkceVerifier != "" {
 			switch pkceMethod {
@@ -408,12 +408,6 @@ func (o *OpenIDCProvider) GetOIDCConfig() (*apiv3.OIDCConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode OidcConfig: %w", err)
 	}
-	if storedOidcConfig.PKCEMethod != "" {
-		logrus.Debugf("GetOIDCConfig PKCE Enabled for %s", o.Name)
-	} else {
-		logrus.Debugf("GetOIDCConfig PKCE IS NOT Enabled %s", o.Name)
-	}
-
 	if storedOidcConfig.PrivateKey != "" {
 		value, err := common.ReadFromSecret(o.Secrets, storedOidcConfig.PrivateKey, strings.ToLower(client.OIDCConfigFieldPrivateKey))
 		if err != nil {

@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -895,8 +896,7 @@ type Token struct {
 func newOIDCResponses(privateKey *rsa.PrivateKey, port string) oidcResponses {
 	jwtToken := jwt.New(jwt.SigningMethodRS256)
 	jwtToken.Claims = jwt.RegisteredClaims{
-		Audience: []string{"test"},
-		// has expired
+		Audience:  []string{"test"},
 		ExpiresAt: jwt.NewNumericDate(time.Now().Add(5 * time.Minute)),
 		Issuer:    "http://localhost:" + port,
 	}
@@ -979,14 +979,9 @@ type jsonWebKey struct {
 	E   string `json:"e"`
 }
 
-// Helper function to convert a big.Int (exponent) to []byte
+// Helper function to convert an integer exponent to its minimal big-endian byte representation.
 func bigIntToBytes(i int) []byte {
-	var b [4]byte
-	b[0] = byte(i >> 24)
-	b[1] = byte(i >> 16)
-	b[2] = byte(i >> 8)
-	b[3] = byte(i)
-	return b[:]
+	return big.NewInt(int64(i)).Bytes()
 }
 
 type providerJSON struct {
