@@ -11,8 +11,17 @@ ENV CHART_VERSION=${VERSION}
 
 # set up helm 3
 ENV HELM_VERSION=v3.20.0
-RUN wget https://get.helm.sh/helm-${HELM_VERSION}-linux-${BUILDARCH}.tar.gz -O - | \
+ENV HELM_HASH_amd64=dbb4c8fc8e19d159d1a63dda8db655f9ffa4aac1b9a6b188b34a40957119b286
+ENV HELM_HASH_arm64=bfb14953295d5324d47ab55f3dfba6da28d46c848978c8fbf412d4271bdc29f1
+
+RUN if [ "${BUILDARCH}" = "amd64" ]; then \
+        HELM_HASH="${HELM_HASH_amd64}"; \
+    elif [ "${BUILDARCH}" = "arm64" ]; then \
+        HELM_HASH="${HELM_HASH_amd64}"; \
+    fi; \
+    wget "https://get.helm.sh/helm-${HELM_VERSION}-linux-${BUILDARCH}.tar.gz" -O - | \
     tar -xz --strip-components=1 -C /usr/bin && \
+    echo "${HELM_HASH}  /usr/bin/helm" | sha256sum -c - && \
     mv /usr/bin/helm /usr/bin/helm_v3 && \
     chown root:root /usr/bin/helm_v3 && \
     chmod +x /usr/bin/helm_v3
