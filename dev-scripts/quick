@@ -110,32 +110,20 @@ if [ "$needs_workdir" = "true" ]; then
   BUILD_ARGS+=("--build-arg=BUILD_WORKDIR=$PWD")
 fi
 
+# Convert BUILD_ARGS array to a string for make
+TARGET_ARGS="${BUILD_ARGS[*]}"
+
 if [ "$TARGET" = "k3s-images" ]; then
-  docker buildx build \
-    "${BUILD_ARGS[@]}" \
-    --output=type=local,dest=$PWD/bin \
-    --platform="${OS}/${ARCH}" \
-    --target k3s-images \
-    --file ./package/Dockerfile .
+  make target-k3s-images TARGET_ARGS="--output=type=local,dest=$PWD/bin $TARGET_ARGS"
 fi
 
 if [ "$TARGET" = "binary-server" ]; then
-  docker buildx build \
-    "${BUILD_ARGS[@]}" \
-    --output=type=local,dest=$PWD \
-    --platform="${OS}/${ARCH}" \
-    --target server-binary \
-    --file ./package/Dockerfile .
+  make target-server-binary TARGET_ARGS="--output=type=local,dest=$PWD $TARGET_ARGS"
 fi
 
 if [ -z "$TARGET" ] || [ "$TARGET" = "server" ]; then
   # start the builds
-  docker buildx build \
-    "${BUILD_ARGS[@]}" \
-    --tag "${REPO}"/rancher:"${TAG}" \
-    --platform="${OS}/${ARCH}" \
-    --target server \
-    --file ./package/Dockerfile .
+  make target-server TARGET_ARGS="--tag ${REPO}/rancher:${TAG} $TARGET_ARGS"
 
   if [ "$PUSH" = "true" ]; then
     docker push "${REPO}"/rancher:"${TAG}" &
@@ -143,12 +131,7 @@ if [ -z "$TARGET" ] || [ "$TARGET" = "server" ]; then
 fi
 
 if [ -z "$TARGET" ] || [ "$TARGET" = "agent" ]; then
-  docker buildx build \
-    "${BUILD_ARGS[@]}" \
-    --tag "${REPO}"/rancher-agent:"${TAG}" \
-    --platform="${OS}/${ARCH}" \
-    --target agent \
-    --file ./package/Dockerfile .
+  make target-agent TARGET_ARGS="--tag ${REPO}/rancher-agent:${TAG} $TARGET_ARGS"
 
   if [ "$PUSH" = "true" ]; then
     docker push "${REPO}"/rancher-agent:"${TAG}" &
