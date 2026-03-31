@@ -2296,6 +2296,16 @@ func (in *DynamicSchemaSpec) DeepCopyInto(out *DynamicSchemaSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.PublicFields != nil {
+		in, out := &in.PublicFields, &out.PublicFields
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.PrivateFields != nil {
+		in, out := &in.PrivateFields, &out.PrivateFields
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

@@ -32,6 +32,10 @@ import (
 
 func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 	return map[string]common.OpenAPIDefinition{
+		v1.CloudCredential{}.OpenAPIModelName():                                          schema_pkg_apis_extcattleio_v1_CloudCredential(ref),
+		v1.CloudCredentialList{}.OpenAPIModelName():                                      schema_pkg_apis_extcattleio_v1_CloudCredentialList(ref),
+		v1.CloudCredentialSpec{}.OpenAPIModelName():                                      schema_pkg_apis_extcattleio_v1_CloudCredentialSpec(ref),
+		v1.CloudCredentialStatus{}.OpenAPIModelName():                                    schema_pkg_apis_extcattleio_v1_CloudCredentialStatus(ref),
 		v1.GroupMembershipRefreshRequest{}.OpenAPIModelName():                            schema_pkg_apis_extcattleio_v1_GroupMembershipRefreshRequest(ref),
 		v1.GroupMembershipRefreshRequestList{}.OpenAPIModelName():                        schema_pkg_apis_extcattleio_v1_GroupMembershipRefreshRequestList(ref),
 		v1.GroupMembershipRefreshRequestSpec{}.OpenAPIModelName():                        schema_pkg_apis_extcattleio_v1_GroupMembershipRefreshRequestSpec(ref),
@@ -113,6 +117,220 @@ func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenA
 		runtime.TypeMeta{}.OpenAPIModelName():                                            schema_k8sio_apimachinery_pkg_runtime_TypeMeta(ref),
 		runtime.Unknown{}.OpenAPIModelName():                                             schema_k8sio_apimachinery_pkg_runtime_Unknown(ref),
 		version.Info{}.OpenAPIModelName():                                                schema_k8sio_apimachinery_pkg_version_Info(ref),
+	}
+}
+
+func schema_pkg_apis_extcattleio_v1_CloudCredential(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CloudCredential is the public API for managing cloud credentials in Rancher.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.",
+							Default:     map[string]interface{}{},
+							Ref:         ref(metav1.ObjectMeta{}.OpenAPIModelName()),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref(v1.CloudCredentialSpec{}.OpenAPIModelName()),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref(v1.CloudCredentialStatus{}.OpenAPIModelName()),
+						},
+					},
+				},
+			},
+		},
+		Dependencies: []string{
+			v1.CloudCredentialSpec{}.OpenAPIModelName(), v1.CloudCredentialStatus{}.OpenAPIModelName(), metav1.ObjectMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_pkg_apis_extcattleio_v1_CloudCredentialList(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CloudCredentialList is a list of CloudCredential resources",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"kind": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"apiVersion": {
+						SchemaProps: spec.SchemaProps{
+							Description: "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Default: map[string]interface{}{},
+							Ref:     ref(metav1.ListMeta{}.OpenAPIModelName()),
+						},
+					},
+					"items": {
+						SchemaProps: spec.SchemaProps{
+							Type: []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(v1.CloudCredential{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"metadata", "items"},
+			},
+		},
+		Dependencies: []string{
+			v1.CloudCredential{}.OpenAPIModelName(), metav1.ListMeta{}.OpenAPIModelName()},
+	}
+}
+
+func schema_pkg_apis_extcattleio_v1_CloudCredentialSpec(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CloudCredentialSpec defines the desired state of CloudCredential.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"type": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Type specifies the cloud provider type (e.g., \"amazon\", \"digitalocean\", \"azure\", \"google\", \"vsphere\"). For generic credentials without validation, use \"generic\".",
+							Default:     "",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+					"credentials": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Credentials contains the write-only credential fields as key-value pairs. These fields are NOT persisted to etcd on the CloudCredential resource. The ext CloudCredential store writes them to the backing Secret and omits them from read responses.",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"visibleFields": {
+						VendorExtensible: spec.VendorExtensible{
+							Extensions: spec.Extensions{
+								"x-kubernetes-list-type": "set",
+							},
+						},
+						SchemaProps: spec.SchemaProps{
+							Description: "VisibleFields is an optional list of credential field keys that are considered non-sensitive. Fields listed here will have their values returned in Status.PublicData on read operations. Any credential key NOT listed here is treated as private and will not be returned.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"description": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Description is an optional human-readable description of the credential.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
+				},
+				Required: []string{"type"},
+			},
+		},
+	}
+}
+
+func schema_pkg_apis_extcattleio_v1_CloudCredentialStatus(ref common.ReferenceCallback) common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "CloudCredentialStatus defines the observed state of CloudCredential.",
+				Type:        []string{"object"},
+				Properties: map[string]spec.Schema{
+					"secret": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Secret is the backing secret created for this credential.",
+							Ref:         ref("k8s.io/api/core/v1.ObjectReference"),
+						},
+					},
+					"publicData": {
+						SchemaProps: spec.SchemaProps{
+							Description: "PublicData contains the values of any field in the `PublicFields` list from the corresponding DynamicSchema config for this type of CloudCredential.\n\nIn the generic usecase PublicData contains the values of fields listed in Spec.VisibleFields. Only non-sensitive fields explicitly marked as visible are included here",
+							Type:        []string{"object"},
+							AdditionalProperties: &spec.SchemaOrBool{
+								Allows: true,
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: "",
+										Type:    []string{"string"},
+										Format:  "",
+									},
+								},
+							},
+						},
+					},
+					"conditions": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Conditions represents the current state of the CloudCredential.",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Default: map[string]interface{}{},
+										Ref:     ref(metav1.Condition{}.OpenAPIModelName()),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"conditions"},
+			},
+		},
+		Dependencies: []string{
+			"k8s.io/api/core/v1.ObjectReference", metav1.Condition{}.OpenAPIModelName()},
 	}
 }
 
