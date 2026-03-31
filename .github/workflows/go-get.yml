@@ -32,7 +32,7 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
-          persist-credentials: false
+          persist-credentials: true
       - name: Validate goget_module input
         run: |
           if [[ ! "$GOGET_MODULE" =~ ^[a-zA-Z0-9./_@-]*$ ]]; then
