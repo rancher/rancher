@@ -15,7 +15,7 @@ runs:
       shell: bash
       run: |
         NOTES=$(cat "$ARTIFACTS_BASE_DIR/rancher-components.txt")
-        gh release edit -R ${{ github.repository }} ${{ env.TAG }} --notes "$NOTES"
+        gh release edit -R "${GITHUB_REPOSITORY}" "${TAG}" --notes "$NOTES"
     - name: Upload artifacts
       env:
         GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -26,5 +26,5 @@ runs:
         ARTIFACTS+=("$CHECKSUM_FILE")
 
         for artifact in "${ARTIFACTS[@]}"; do
-          gh release upload -R ${{ github.repository_owner }}/rancher ${{ env.TAG }} "./$ARTIFACTS_BASE_DIR/$artifact" --clobber
+          gh release upload -R "${GITHUB_REPOSITORY}" "${TAG}" "./${ARTIFACTS_BASE_DIR}/${artifact}" --clobber
         done
