@@ -110,11 +110,22 @@ RUN mkdir -p /var/lib/rancher-data/driver-metadata && \
 FROM builder AS tini
 ARG ARCH
 ENV TINI_VERSION=v0.18.0
-ENV TINI_URL_amd64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini \
-    TINI_URL_arm64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-arm64 \
-    TINI_URL_s390x=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-s390x \
-    TINI_URL=TINI_URL_${ARCH}
-RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
+ENV TINI_HASH_amd64=12d20136605531b09a2c2dac02ccee85e1b874eb322ef6baf7561cd93f93c855 \
+    TINI_HASH_arm64=7c5463f55393985ee22357d976758aaaecd08defb3c5294d353732018169b019 \
+    TINI_HASH_s390x=c8aaa618ea7897f26979ea10920373e06f3e6dfeb41ef95342eda2eb5672f24d
+
+RUN if [ "${ARCH}" = "amd64" ]; then \
+        TINI_URL="https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini"; \
+        TINI_HASH=${TINI_HASH_amd64}; \
+    elif [ "${ARCH}" = "arm64" ]; then \
+        TINI_URL="https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-arm64"; \
+        TINI_HASH=${TINI_HASH_arm64}; \
+    elif [ "${ARCH}" = "s390x" ]; then \
+        TINI_URL="https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-s390x"; \
+        TINI_HASH=${TINI_HASH_s390x}; \
+    fi; \
+    curl -sLf ${TINI_URL} > /usr/bin/tini && \
+    echo "${TINI_HASH}  /usr/bin/tini" | sha256sum -c - && \
     chmod +x /usr/bin/tini
 
 
