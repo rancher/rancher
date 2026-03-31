@@ -62,7 +62,7 @@ func pluginHandler(w http.ResponseWriter, r *http.Request) {
 	if entry.NoCache || entry.CacheState == plugin.Pending {
 		if entry.Endpoint != "" {
 			logrus.Debugf("[noCache: %v] proxying request to [endpoint: %v]\n", entry.NoCache, entry.Endpoint)
-			proxyRequest(entry.Endpoint, rest, w, r, denylist)
+			proxyRequest(entry.Endpoint, rest, w, r, denylist, nil)
 		} else {
 			logrus.Errorf("[noCache: %v] caching still in progress for [endpoint: %v]\n", entry.NoCache, entry.Endpoint)
 			http.Error(w, "caching still in progress", http.StatusTooEarly)
@@ -74,7 +74,7 @@ func pluginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func proxyRequest(target, path string, w http.ResponseWriter, r *http.Request, denyListFunc denyFunc) {
+func proxyRequest(target, path string, w http.ResponseWriter, r *http.Request, denyListFunc denyFunc, transport http.RoundTripper) {
 	url, err := neturl.Parse(target)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to parse url [%s]", target), http.StatusInternalServerError)
@@ -97,19 +97,21 @@ func proxyRequest(target, path string, w http.ResponseWriter, r *http.Request, d
 		port = "443"
 	}
 	pinnedAddrs := resolvedAddrs
-	transport := &http.Transport{
-		DialContext: func(ctx context.Context, network, _ string) (net.Conn, error) {
-			var lastErr error
-			for _, addr := range pinnedAddrs {
-				dialer := &net.Dialer{}
-				conn, err := dialer.DialContext(ctx, network, net.JoinHostPort(addr.String(), port))
-				if err == nil {
-					return conn, nil
+	if transport == nil {
+		transport = &http.Transport{
+			DialContext: func(ctx context.Context, network, _ string) (net.Conn, error) {
+				var lastErr error
+				for _, addr := range pinnedAddrs {
+					dialer := &net.Dialer{}
+					conn, err := dialer.DialContext(ctx, network, net.JoinHostPort(addr.String(), port))
+					if err == nil {
+						return conn, nil
+					}
+					lastErr = err
 				}
-				lastErr = err
-			}
-			return nil, fmt.Errorf("failed to connect to any resolved address: %w", lastErr)
-		},
+				return nil, fmt.Errorf("failed to connect to any resolved address: %w", lastErr)
+			},
+		}
 	}
 
 	proxy := httputil.NewSingleHostReverseProxy(url)
