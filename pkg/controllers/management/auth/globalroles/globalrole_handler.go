@@ -15,7 +15,6 @@ import (
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/name"
-	wrangler "github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -91,7 +90,7 @@ func (gr *globalRoleLifecycle) Create(obj *v3.GlobalRole) (runtime.Object, error
 	returnError := errors.Join(
 		gr.reconcileGlobalRole(obj, &localConditions),
 		gr.reconcileNamespacedRoles(obj, &localConditions),
-		gr.reconcileInheritedNamespacedRoles(obj),
+		gr.reconcileInheritedNamespacedRoles(obj, &localConditions),
 		gr.fleetPermissionsHandler.reconcileFleetWorkspacePermissions(obj, &localConditions),
 		gr.updateStatus(obj, localConditions),
 	)
@@ -103,7 +102,7 @@ func (gr *globalRoleLifecycle) Updated(obj *v3.GlobalRole) (runtime.Object, erro
 	returnError := errors.Join(
 		gr.reconcileGlobalRole(obj, &localConditions),
 		gr.reconcileNamespacedRoles(obj, &localConditions),
-		gr.reconcileInheritedNamespacedRoles(obj),
+		gr.reconcileInheritedNamespacedRoles(obj, &localConditions),
 		gr.fleetPermissionsHandler.reconcileFleetWorkspacePermissions(obj, &localConditions),
 		gr.updateStatus(obj, localConditions),
 	)
@@ -206,22 +205,20 @@ func (gr *globalRoleLifecycle) reconcileGlobalRole(globalRole *v3.GlobalRole, lo
 func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRole, localConditions *[]metav1.Condition) error {
 	condition := metav1.Condition{Type: NamespacedRuleRoleExists}
 	var returnError error
-	globalRoleName := wrangler.SafeConcatName(globalRole.Name)
+	globalRoleName := name.SafeConcatName(globalRole.Name)
 
 	// For collecting all the roles that should exist for the GlobalRole
 	roleUIDs := map[types.UID]struct{}{}
 
 	for ns, rules := range globalRole.NamespacedRules {
-		roleName := wrangler.SafeConcatName(globalRole.Name, ns)
+		roleName := name.SafeConcatName(globalRole.Name, ns)
 
 		shouldSkip, err := validateNamespace(gr.nsCache, ns, "local cluster")
 		if shouldSkip {
-			addCondition(globalRole, condition, NamespaceNotAvailable, roleName, fmt.Errorf("namespace %s not available", ns))
 			continue
 		}
 		if err != nil {
 			returnError = errors.Join(returnError, err)
-			addCondition(globalRole, condition, FailedToGetNamespace, roleName, err)
 			continue
 		}
 
@@ -278,7 +275,7 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 }
 
 // reconcileInheritedNamespacedRoles ensures that Roles exist in each namespace of InheritedNamespacedRules for all downstream clusters
-func (gr *globalRoleLifecycle) reconcileInheritedNamespacedRoles(globalRole *v3.GlobalRole) error {
+func (gr *globalRoleLifecycle) reconcileInheritedNamespacedRoles(globalRole *v3.GlobalRole, localConditions *[]metav1.Condition) error {
 	// If there are no InheritedNamespacedRules, nothing to do
 	if len(globalRole.InheritedNamespacedRules) == 0 {
 		return nil
@@ -292,7 +289,7 @@ func (gr *globalRoleLifecycle) reconcileInheritedNamespacedRoles(globalRole *v3.
 		condition := metav1.Condition{
 			Type: InheritedNamespacedRuleRoleExists,
 		}
-		addCondition(globalRole, condition, FailedToGetCluster, "InheritedNamespacedRules", err)
+		gr.status.AddCondition(localConditions, condition, FailedToGetCluster, err)
 		return fmt.Errorf("couldn't list clusters: %w", err)
 	}
 
@@ -312,7 +309,7 @@ func (gr *globalRoleLifecycle) reconcileInheritedNamespacedRoles(globalRole *v3.
 	condition := metav1.Condition{
 		Type: InheritedNamespacedRuleRoleExists,
 	}
-	addCondition(globalRole, condition, InheritedNamespacedRuleRoleExists, "InheritedNamespacedRules", returnError)
+	gr.status.AddCondition(localConditions, condition, InheritedNamespacedRuleRoleExists, returnError)
 	return returnError
 }
 
@@ -355,8 +352,8 @@ func (gr *globalRoleLifecycle) reconcileInheritedNamespacedRolesForCluster(clust
 
 // reconcileInheritedRoleInNamespace reconciles a single role in a specific namespace of a downstream cluster
 func (gr *globalRoleLifecycle) reconcileInheritedRoleInNamespace(clusterName, ns string, rules []rbacv1.PolicyRule, globalRoleName string, roleClient wrbacv1.RoleClient, namespaceCache wcorev1.NamespaceCache) (types.UID, error) {
-	roleName := wrangler.SafeConcatName(globalRoleName, ns)
-	safeGlobalRoleName := wrangler.SafeConcatName(globalRoleName)
+	roleName := name.SafeConcatName(globalRoleName, ns)
+	safeGlobalRoleName := name.SafeConcatName(globalRoleName)
 
 	// Check if the namespace exists in this cluster
 	shouldSkip, err := validateNamespace(namespaceCache, ns, fmt.Sprintf("cluster %s", clusterName))
@@ -409,7 +406,7 @@ func (gr *globalRoleLifecycle) deleteInheritedNamespacedRoles(globalRole *v3.Glo
 	}
 
 	var returnError error
-	globalRoleName := wrangler.SafeConcatName(globalRole.Name)
+	globalRoleName := name.SafeConcatName(globalRole.Name)
 	selector, err := createOwnerLabelSelector(globalRoleName)
 	if err != nil {
 		return fmt.Errorf("couldn't create label selector: %w", err)
@@ -496,19 +493,6 @@ func generateCRName(name string) string {
 	return "cattle-globalrole-" + name
 }
 
-func addCondition(globalRole *v3.GlobalRole, condition metav1.Condition, reason, name string, err error) {
-	if err != nil {
-		condition.Status = metav1.ConditionFalse
-		condition.Message = fmt.Sprintf("%s not created: %v", name, err)
-	} else {
-		condition.Status = metav1.ConditionTrue
-		condition.Message = fmt.Sprintf("%s created", name)
-	}
-	condition.Reason = reason
-	condition.LastTransitionTime = metav1.Time{Time: time.Now()}
-	globalRole.Status.Conditions = append(globalRole.Status.Conditions, condition)
-}
-
 // validateNamespace checks if a namespace exists and is not terminating
 // Returns (shouldSkip, error)
 // - shouldSkip is true if the namespace is not found (warning logged, no error)
@@ -519,10 +503,12 @@ func validateNamespace(nsCache wcorev1.NamespaceCache, ns, context string) (bool
 		logrus.Warnf("[%v] Namespace %s not found in %s. Continuing.", grController, ns, context)
 		return true, nil
 	}
-	if err != nil || namespace == nil {
+	if err != nil {
 		return false, fmt.Errorf("couldn't get namespace %s in %s: %w", ns, context, err)
 	}
-
+	if namespace == nil {
+		return false, fmt.Errorf("couldn't get namespace %s in %s: namespace is nil", ns, context)
+	}
 	if namespace.Status.Phase == corev1.NamespaceTerminating {
 		logrus.Warnf("[%v] Namespace %s is terminating in %s. Skipping role creation.", grController, ns, context)
 		return true, nil

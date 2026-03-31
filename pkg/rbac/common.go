@@ -359,8 +359,7 @@ func IsAdminGlobalRole(gr *v3.GlobalRole) bool {
 // CreateOrUpdateResource creates or updates the given non-namespaced resource
 //   - obj is the resource to create or update.
 //   - client is the Wrangler client to use to get/create/update resource.
-//   - areResourcesTheSame is a func that compares two resources and returns (true, nil) if they are equal, and (false, T) when not the same.
-//     T is an updated version of the resource.
+//   - areResourcesTheSame is a func that compares two resources and returns true if they are equal, and false otherwise.
 func CreateOrUpdateResource[T generic.RuntimeMetaObject, TList runtime.Object](desiredObj T, client generic.NonNamespacedClientInterface[T, TList], areResourcesTheSame func(T, T) bool) error {
 	kind := desiredObj.GetObjectKind().GroupVersionKind().Kind
 	// attempt to get the resource
@@ -393,8 +392,7 @@ func CreateOrUpdateResource[T generic.RuntimeMetaObject, TList runtime.Object](d
 // CreateOrUpdateNamespacedResource creates or updates the given namespaced resource.
 //   - obj is the resource to create or update.
 //   - client is the Wrangler client to use to get/create/update resource.
-//   - areResourcesTheSame is a func that compares two resources and returns (true, nil) if they are equal, and (false, T) when not the same.
-//     T is an updated version of the resource.
+//   - areResourcesTheSame is a func that compares two resources and returns true if they are equal, and false otherwise.
 func CreateOrUpdateNamespacedResource[T generic.RuntimeMetaObject, TList runtime.Object](desiredObj T, client generic.ClientInterface[T, TList], areResourcesTheSame func(T, T) bool) (T, error) {
 	var returnObj T
 	kind := desiredObj.GetObjectKind().GroupVersionKind().Kind
@@ -420,7 +418,9 @@ func CreateOrUpdateNamespacedResource[T generic.RuntimeMetaObject, TList runtime
 		if err != nil {
 			return returnObj, fmt.Errorf("failed to update %s %s in namespace %s: %w", kind, desiredObj.GetName(), desiredObj.GetNamespace(), err)
 		}
+		return returnObj, nil
 	}
+	// if the resource was not updated, return the existing version since this was a no-op
 	return existingObj, nil
 }
 

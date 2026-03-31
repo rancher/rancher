@@ -823,7 +823,7 @@ func (l *globalRoleBindingLifecycle) deleteInheritedNamespacedRoleBindings(globa
 
 		// Delete all RoleBindings owned by this GRB
 		for _, rb := range roleBindings {
-			errors.Join(returnError, rbac.DeleteNamespacedResource(rb.Namespace, rb.Name, roleBindingClient))
+			returnError = errors.Join(returnError, rbac.DeleteNamespacedResource(rb.Namespace, rb.Name, roleBindingClient))
 		}
 	}
 
