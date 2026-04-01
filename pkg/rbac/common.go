@@ -52,6 +52,8 @@ const (
 	CrbAdminGlobalRoleCheckedAnnotation = "authz.cluster.cattle.io/admin-globalrole-checked"
 	AggregationManagementFeatureLabel   = "management.cattle.io/roletemplate-aggregation-mgmt"
 	AggregationFeatureLabel             = "management.cattle.io/roletemplate-aggregation"
+	// GRDownstreamNSIndex is the cache index name for looking up GlobalRoles by the namespaces in InheritedNamespacedRules.
+	GRDownstreamNSIndex = "mgmt-auth-gr-downstream-ns-index"
 )
 
 // BuildSubjectFromRTB This function will generate

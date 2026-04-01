@@ -21,6 +21,7 @@ import (
 	wrbacv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/rbac/v1"
 	"github.com/rancher/wrangler/v3/pkg/relatedresource"
 	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -48,6 +49,9 @@ const (
 	rtbLabelUpdated                  = "authz.cluster.cattle.io/rtb-label-updated"
 	rtbCrbRbLabelsUpdated            = "authz.cluster.cattle.io/crb-rb-labels-updated"
 	rtByInheritedRTsIndex            = "authz.cluster.cattle.io/rts-by-inherited-rts"
+
+	grbByNamespaceEnqueuer = "enqueue-grbs-by-namespace"
+	grByNamespaceEnqueuer  = "enqueue-grs-by-namespace"
 
 	rolesCircularSoftLimit = 100
 	rolesCircularHardLimit = 500
@@ -167,8 +171,8 @@ func Register(ctx context.Context, workload *config.UserContext) error {
 		grbLister: management.Wrangler.Mgmt.GlobalRoleBinding().Cache(),
 		grLister:  management.Wrangler.Mgmt.GlobalRole().Cache(),
 	}
-	relatedresource.WatchClusterScoped(ctx, "enqueue-grbs-by-namespace", grEnqueuer.namespaceEnqueueGRBs, management.Wrangler.Mgmt.GlobalRoleBinding(), workload.Corew.Namespace())
-	relatedresource.WatchClusterScoped(ctx, "enqueue-grs-by-namespace", grEnqueuer.namespaceEnqueueGRs, management.Wrangler.Mgmt.GlobalRole(), workload.Corew.Namespace())
+	relatedresource.WatchClusterScoped(ctx, grbByNamespaceEnqueuer, grEnqueuer.namespaceEnqueueGRBs, management.Wrangler.Mgmt.GlobalRoleBinding(), workload.Corew.Namespace())
+	relatedresource.WatchClusterScoped(ctx, grByNamespaceEnqueuer, grEnqueuer.namespaceEnqueueGRs, management.Wrangler.Mgmt.GlobalRole(), workload.Corew.Namespace())
 
 	// Register roletemplate-aggregation controllers
 	if err := roletemplates.Register(ctx, workload); err != nil {
@@ -649,25 +653,23 @@ type globalRoleEnqueuer struct {
 
 // namespaceEnqueueGRBs enqueues GRBs that reference the changed namespace in their inherited namespaced rules.
 func (g *globalRoleEnqueuer) namespaceEnqueueGRBs(_, name string, obj runtime.Object) ([]relatedresource.Key, error) {
-	if obj == nil {
-		return nil, nil
+	ns, ok := obj.(*corev1.Namespace)
+	if !ok {
+		return nil, fmt.Errorf("[%s]: failed to convert object to *Namespace", grbByNamespaceEnqueuer)
 	}
-	grbs, err := g.grbLister.List(labels.Everything())
+
+	grs, err := g.grLister.GetByIndex(pkgrbac.GRDownstreamNSIndex, ns.Name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list GlobalRoleBindings: %w", err)
+		return nil, fmt.Errorf("failed to list GlobalRoles for namespace %s: %w", ns.Name, err)
 	}
 	var keys []relatedresource.Key
-	for _, grb := range grbs {
-		gr, err := g.grLister.Get(grb.GlobalRoleName)
+	for _, gr := range grs {
+		grbs, err := g.grbLister.GetByIndex("mgmt-auth-grb-gr-idex", gr.Name)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get GlobalRole %s for GlobalRoleBinding %s: %w", grb.GlobalRoleName, grb.Name, err)
+			return nil, fmt.Errorf("failed to list GlobalRoleBindings for GlobalRole %s: %w", gr.Name, err)
 		}
-		for nsName := range gr.InheritedNamespacedRules {
-			if nsName == name {
-				keys = append(keys, relatedresource.Key{
-					Name: grb.Name,
-				})
-			}
+		for _, grb := range grbs {
+			keys = append(keys, relatedresource.Key{Name: grb.Name})
 		}
 	}
 	return keys, nil
@@ -675,22 +677,18 @@ func (g *globalRoleEnqueuer) namespaceEnqueueGRBs(_, name string, obj runtime.Ob
 
 // namespaceEnqueueGRs enqueues GRs that reference the changed namespace in their inherited namespaced rules.
 func (g *globalRoleEnqueuer) namespaceEnqueueGRs(_, name string, obj runtime.Object) ([]relatedresource.Key, error) {
-	if obj == nil {
-		return nil, nil
+	ns, ok := obj.(*corev1.Namespace)
+	if !ok {
+		return nil, fmt.Errorf("[%s]: failed to convert object to *Namespace", grbByNamespaceEnqueuer)
 	}
-	grs, err := g.grLister.List(labels.Everything())
+
+	grs, err := g.grLister.GetByIndex(pkgrbac.GRDownstreamNSIndex, ns.Name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list GlobalRoles: %w", err)
+		return nil, fmt.Errorf("failed to list GlobalRoles for namespace %s: %w", ns.Name, err)
 	}
 	var keys []relatedresource.Key
 	for _, gr := range grs {
-		for nsName := range gr.InheritedNamespacedRules {
-			if nsName == name {
-				keys = append(keys, relatedresource.Key{
-					Name: gr.Name,
-				})
-			}
-		}
+		keys = append(keys, relatedresource.Key{Name: gr.Name})
 	}
 	return keys, nil
 }

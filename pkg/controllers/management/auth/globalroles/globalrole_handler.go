@@ -276,11 +276,6 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 
 // reconcileInheritedNamespacedRoles ensures that Roles exist in each namespace of InheritedNamespacedRules for all downstream clusters
 func (gr *globalRoleLifecycle) reconcileInheritedNamespacedRoles(globalRole *v3.GlobalRole, localConditions *[]metav1.Condition) error {
-	// If there are no InheritedNamespacedRules, nothing to do
-	if len(globalRole.InheritedNamespacedRules) == 0 {
-		return nil
-	}
-
 	var returnError error
 
 	// Get all clusters
@@ -337,6 +332,7 @@ func (gr *globalRoleLifecycle) reconcileInheritedNamespacedRolesForCluster(clust
 		roleUID, nsErr := gr.reconcileInheritedRoleInNamespace(cluster.Name, ns, rules, globalRole.Name, roleClient, namespaceCache)
 		if nsErr != nil {
 			returnError = errors.Join(returnError, nsErr)
+			continue
 		}
 		roleUIDs[roleUID] = struct{}{}
 	}

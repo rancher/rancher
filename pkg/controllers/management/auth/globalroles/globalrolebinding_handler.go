@@ -606,11 +606,6 @@ func (l *globalRoleBindingLifecycle) reconcileInheritedNamespacedRoleBindings(gl
 		return fmt.Errorf("couldn't get global role %s: %w", globalRoleBinding.GlobalRoleName, err)
 	}
 
-	// If there are no InheritedNamespacedRules, nothing to do
-	if len(gr.InheritedNamespacedRules) == 0 {
-		return nil
-	}
-
 	var returnError error
 	grbName := wrangler.SafeConcatName(globalRoleBinding.Name)
 
@@ -681,7 +676,7 @@ func (l *globalRoleBindingLifecycle) reconcileInheritedRoleBindingInNamespace(cl
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("%s in cluster %s: %w", err.Error(), clusterName, err)
+		return fmt.Errorf("couldn't validate namespace %s in cluster %s: %w", ns, clusterName, err)
 	}
 
 	// The Role name follows the pattern from globalrole_handler.go: <globalrole-name>-<namespace>
@@ -770,11 +765,10 @@ func (l *globalRoleBindingLifecycle) deleteInheritedNamespacedRoleBindings(globa
 	gr, err := l.grLister.Get(globalRoleBinding.GlobalRoleName)
 	if err != nil {
 		// If we can't get the GlobalRole, we can't determine what to clean up
-		if apierrors.IsNotFound(err) {
-			logrus.Warnf("[%v] GlobalRole %s not found during cleanup of GlobalRoleBinding %s", grbController, globalRoleBinding.GlobalRoleName, globalRoleBinding.Name)
-			return nil
+		if !apierrors.IsNotFound(err) {
+			return fmt.Errorf("couldn't get global role %s: %w", globalRoleBinding.GlobalRoleName, err)
 		}
-		return fmt.Errorf("couldn't get global role %s: %w", globalRoleBinding.GlobalRoleName, err)
+		logrus.Warnf("[%v] GlobalRole %s not found during cleanup of GlobalRoleBinding %s", grbController, globalRoleBinding.GlobalRoleName, globalRoleBinding.Name)
 	}
 
 	// If there are no InheritedNamespacedRules, nothing to do
