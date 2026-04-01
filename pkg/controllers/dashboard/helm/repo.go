@@ -144,7 +144,7 @@ func (r *repoHandler) ClusterRepoOnChange(key string, repo *catalog.ClusterRepo)
 	// If repo is disabled, then don't update the clusterrepo
 	if isDisabled(repo) {
 		logrus.Infof("skipping repo %s because it is disabled", repo.Name)
-		return setErrorCondition(repo, nil, newStatus, interval, ociCondition, r.clusterRepos)
+		return setErrorCondition(repo, nil, newStatus, interval, repoCondition, r.clusterRepos)
 	}
 
 	return r.download(repo, newStatus, metav1.OwnerReference{
