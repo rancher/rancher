@@ -242,7 +242,7 @@ func (m *Manager) DeleteTokenByName(tokenName string) (int, error) {
 		if apierrors.IsNotFound(err) {
 			return 0, nil
 		}
-		return 500, fmt.Errorf("failed to delete token")
+		return http.StatusInternalServerError, fmt.Errorf("failed to delete token")
 	}
 	logrus.Debug("Deleted Token")
 	return 0, nil

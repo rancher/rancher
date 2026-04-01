@@ -183,8 +183,7 @@ func ExtVerifyToken(storedToken *ext.Token, tokenName, tokenKey string) (int, er
 	hasher, err := hashers.GetHasherForHash(storedToken.Status.Hash)
 	if err != nil {
 		logrus.Errorf("unable to get a hasher for token with error %v", err)
-		return http.StatusInternalServerError,
-			fmt.Errorf("unable to verify hash '%s'", storedToken.Status.Hash)
+		return http.StatusInternalServerError, fmt.Errorf("unable to verify hash")
 	}
 
 	if err := hasher.VerifyHash(storedToken.Status.Hash, tokenKey); err != nil {
