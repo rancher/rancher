@@ -196,7 +196,7 @@ func ExtVerifyToken(storedToken *ext.Token, tokenName, tokenKey string) (int, er
 	}
 
 	if IsIdleExpired(storedToken, time.Now()) {
-		return http.StatusGone, errors.New("must authenticate, idle session timeout expired")
+		return http.StatusGone, errors.New("must authenticate, session idle timeout expired")
 	}
 
 	return http.StatusOK, nil

@@ -204,7 +204,10 @@ func (m *Manager) GetToken(tokenAuthValue string) (accessor.TokenAccessor, int, 
 	return storedToken, 0, nil
 }
 
-// GetTokens will list all (login and derived, and even expired) tokens of the authenticated user
+// getTokens will list all (login and derived, and even expired) tokens of the
+// authenticated user - BEWARE that while the session token identified by
+// `tokenAuthValue` is allowed to be an ext token, the returned tokens will
+// always be legacy tokens, as that is what is managed here.
 func (m *Manager) getTokens(tokenAuthValue string) ([]apiv3.Token, int, error) {
 	tokens := make([]apiv3.Token, 0)
 
@@ -248,7 +251,10 @@ func (m *Manager) DeleteTokenByName(tokenName string) (int, error) {
 	return 0, nil
 }
 
-// getToken will get the token by ID
+// getToken will get the token by ID - BEWARE that while the session token
+// identified by `tokenAuthValue` is allowed to be an ext token, the token
+// referenced by `tokenID` has to be a legacy token, as that is what is managed
+// here.
 func (m *Manager) getTokenByID(tokenAuthValue string, tokenID string) (apiv3.Token, int, error) {
 	logrus.Debug("GET Token Invoked")
 	token := &apiv3.Token{}
