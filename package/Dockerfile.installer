@@ -27,8 +27,17 @@ RUN if [ "${BUILDARCH}" = "amd64" ]; then \
     chmod +x /usr/bin/helm_v3
 
 ENV YQ_VERSION=v4.44.2
-RUN wget -q https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${BUILDARCH}.tar.gz -O - | \
-        tar xz && mv yq_linux_${BUILDARCH} /usr/bin/yq
+ENV YQ_HASH_amd64=246b781828353a59fb04ffaada241f78a8f3f25c623047b40306def1f6806e71
+ENV YQ_HASH_arm64=d05d9dae44503433e668d097143bfeb102ee7e2d486773ae23aaf81256ed54fd
+
+RUN if [ "${BUILDARCH}" = "amd64" ]; then \
+        YQ_HASH="${YQ_HASH_amd64}"; \
+    elif [ "${BUILDARCH}" = "arm64" ]; then \
+        YQ_HASH="${YQ_HASH_arm64}"; \
+    fi; \
+    wget -q https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${BUILDARCH}.tar.gz -O - | \
+    tar xz && mv yq_linux_${BUILDARCH} /usr/bin/yq && \
+    echo "${YQ_HASH}  /usr/bin/yq" | sha256sum -c -
 
 WORKDIR /src
 COPY .git/ /src/.git/
