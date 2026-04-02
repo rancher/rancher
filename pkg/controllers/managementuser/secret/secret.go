@@ -101,7 +101,7 @@ func (c *ResourceSyncController) bootstrap(mgmtClusterClient v3.ClusterInterface
 	}
 
 	apimgmtv3.ClusterConditionPreBootstrapped.True(mgmtCluster)
-	_, err = mgmtClusterClient.Update(mgmtCluster)
+	_, err = mgmtClusterClient.UpdateStatus(mgmtCluster)
 	if err != nil {
 		return fmt.Errorf("failed to update cluster bootstrap condition for %v: %w", c.clusterName, err)
 	}
