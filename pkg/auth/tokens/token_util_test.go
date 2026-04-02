@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
 	"github.com/rancher/rancher/pkg/features"
@@ -134,6 +135,119 @@ func TestVerifyToken(t *testing.T) {
 	}
 }
 
+func TestExtVerifyToken(t *testing.T) {
+	tokenName := "test-token"
+	hashedTokenName := "hashed-test-token"
+
+	tokenKey := "dddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+	badTokenKey := "cccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+	// SHA3 hash of tokenKey
+	hashedTokenKey := "$3:1:uFrxm43ggfw:zsN1zEFC7SvABTdR58o7yjIqfrI4cQ/HSYz3jBwwVnx5X+/ph4etGDIU9dvIYuy1IvnYUVe6a/Ar95xE+gfjhA"
+	invalidHashToken := "$-1:111:111"
+	unhashedToken := ext.Token{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: tokenName,
+		},
+		Spec: ext.TokenSpec{
+			TTL: 0,
+		},
+		Status: ext.TokenStatus{
+			Value: tokenKey,
+		},
+	}
+	hashedToken := ext.Token{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: hashedTokenName,
+			Annotations: map[string]string{
+				TokenHashed: "true",
+			},
+		},
+		Spec: ext.TokenSpec{
+			TTL: 0,
+		},
+		Status: ext.TokenStatus{
+			Hash: hashedTokenKey,
+		},
+	}
+	invalidHashedToken := *hashedToken.DeepCopy()
+	invalidHashedToken.Status.Hash = invalidHashToken
+
+	tests := []struct {
+		name      string
+		token     *ext.Token
+		tokenName string
+		tokenKey  string
+
+		wantResponseCode int
+		wantErr          bool
+	}{
+		{
+			name:             "non-hashed token is not valid for ext",
+			token:            &unhashedToken,
+			tokenName:        tokenName,
+			tokenKey:         tokenKey,
+			wantResponseCode: 500,
+		},
+		{
+			name:             "valid hashed token",
+			token:            &hashedToken,
+			tokenName:        hashedTokenName,
+			tokenKey:         tokenKey,
+			wantResponseCode: 200,
+		},
+		{
+			name:             "valid hashed token, incorrect key",
+			token:            &hashedToken,
+			tokenName:        hashedTokenName,
+			tokenKey:         badTokenKey,
+			wantResponseCode: 422,
+			wantErr:          true,
+		},
+		{
+			name:             "wrong token",
+			token:            &unhashedToken,
+			tokenName:        hashedTokenName,
+			tokenKey:         tokenKey,
+			wantResponseCode: 422,
+			wantErr:          true,
+		},
+		{
+			name:             "expired token",
+			token:            expireExtToken(&hashedToken),
+			tokenName:        hashedTokenName,
+			tokenKey:         tokenKey,
+			wantResponseCode: 410,
+			wantErr:          true,
+		},
+		{
+			name:             "nil token",
+			token:            nil,
+			tokenName:        tokenName,
+			tokenKey:         tokenKey,
+			wantResponseCode: 422,
+			wantErr:          true,
+		},
+		{
+			name:             "unable to retrieve hasher",
+			token:            &invalidHashedToken,
+			tokenName:        hashedTokenName,
+			tokenKey:         tokenKey,
+			wantResponseCode: 500,
+			wantErr:          true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			responseCode, err := ExtVerifyToken(test.token, test.tokenName, test.tokenKey)
+			if test.wantErr {
+				require.Error(t, err)
+			}
+			require.Equal(t, test.wantResponseCode, responseCode)
+		})
+	}
+}
+
 func TestConvertTokenKeyToHash(t *testing.T) {
 	plaintextToken := "cccccccccccccccccccccccccccccccccccccccccccccccccccccc"
 	token := apiv3.Token{
@@ -213,6 +327,14 @@ func expireToken(token *apiv3.Token) *apiv3.Token {
 	newToken := token.DeepCopy()
 	newToken.CreationTimestamp = metav1.NewTime(time.Now().Add(-time.Second * 10))
 	newToken.TTLMillis = 1
+	return newToken
+}
+
+func expireExtToken(token *ext.Token) *ext.Token {
+	newToken := token.DeepCopy()
+	newToken.CreationTimestamp = metav1.NewTime(time.Now().Add(-time.Second * 10))
+	newToken.Spec.TTL = 1
+	newToken.Status.Expired = true
 	return newToken
 }
 
