@@ -31,20 +31,19 @@ import (
 )
 
 const (
-	globalRoleBindingReconciled                     = "GlobalRoleBindingReconciled"
-	clusterPermissionsReconciled                    = "ClusterPermissionsReconciled"
-	namespacedRoleBindingReconciled                 = "NamespacedRoleBindingReconciled"
-	inheritedNamespacedRoleBindingReconciled        = "InheritedNamespacedRoleBindingReconciled"
-	failedToUpdateClusterRoleBinding                = "FailedToUpdateClusterRoleBinding"
-	failedToCreateClusterRoleBinding                = "FailedToCreateClusterRoleBinding"
-	failedToGetGlobalRole                           = "FailedToGetGlobalRole"
-	failedToListCluster                             = "FailedToListCluster"
-	failedToReconcileCRTBs                          = "FailedToReconcileCRTBs"
-	failedToCreateLabels                            = "FailedToCreateLabels"
-	failedToCreateFleetLabels                       = "FailedToCreateFleetLabels"
-	failedToListRoleBindings                        = "FailedToListRoleBindings"
-	failedToPurgeInvalidNamespacedRoleBindings      = "FailedToPurgeInvalidNamespacedRoleBindings"
-	failedToReconcileInheritedNamespacedRoleBinding = "FailedToReconcileInheritedNamespacedRoleBinding"
+	globalRoleBindingReconciled                = "GlobalRoleBindingReconciled"
+	clusterPermissionsReconciled               = "ClusterPermissionsReconciled"
+	namespacedRoleBindingReconciled            = "NamespacedRoleBindingReconciled"
+	inheritedNamespacedRoleBindingReconciled   = "InheritedNamespacedRoleBindingReconciled"
+	failedToUpdateClusterRoleBinding           = "FailedToUpdateClusterRoleBinding"
+	failedToCreateClusterRoleBinding           = "FailedToCreateClusterRoleBinding"
+	failedToGetGlobalRole                      = "FailedToGetGlobalRole"
+	failedToListCluster                        = "FailedToListCluster"
+	failedToReconcileCRTBs                     = "FailedToReconcileCRTBs"
+	failedToCreateLabels                       = "FailedToCreateLabels"
+	failedToCreateFleetLabels                  = "FailedToCreateFleetLabels"
+	failedToListRoleBindings                   = "FailedToListRoleBindings"
+	failedToPurgeInvalidNamespacedRoleBindings = "FailedToPurgeInvalidNamespacedRoleBindings"
 
 	grbHasNoSubject    = "GRBHasNoSubject"
 	subjectReconciled  = "SubjectReconciled"
@@ -103,10 +102,15 @@ type fleetPermissionsHandler interface {
 	reconcileFleetWorkspacePermissionsBindings(globalRoleBinding *v3.GlobalRoleBinding, localConditions *[]metav1.Condition) error
 }
 
+// clusterContextGetter provides access to user contexts for downstream clusters.
+type clusterContextGetter interface {
+	UserContext(clusterName string) (*config.UserContext, error)
+}
+
 type globalRoleBindingLifecycle struct {
 	clusters                mgmtv3.ClusterClient
 	clusterLister           mgmtv3.ClusterCache
-	clusterManager          *clustermanager.Manager
+	clusterManager          clusterContextGetter
 	crbClient               wrbacv1.ClusterRoleBindingClient
 	crbLister               wrbacv1.ClusterRoleBindingCache
 	crtbCache               mgmtv3.ClusterRoleTemplateBindingCache
@@ -763,14 +767,14 @@ func (l *globalRoleBindingLifecycle) purgeInvalidInheritedRoleBindingsInCluster(
 // deleteInheritedNamespacedRoleBindings removes all RoleBindings in downstream clusters that are owned by this GlobalRoleBinding
 func (l *globalRoleBindingLifecycle) deleteInheritedNamespacedRoleBindings(globalRoleBinding *v3.GlobalRoleBinding) error {
 	gr, err := l.grLister.Get(globalRoleBinding.GlobalRoleName)
-	if err != nil {
+	if err != nil || gr == nil {
 		// If we can't get the GlobalRole, we can't determine what to clean up
 		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("couldn't get global role %s: %w", globalRoleBinding.GlobalRoleName, err)
 		}
 		logrus.Warnf("[%v] GlobalRole %s not found during cleanup of GlobalRoleBinding %s", grbController, globalRoleBinding.GlobalRoleName, globalRoleBinding.Name)
+		return nil
 	}
-
 	// If there are no InheritedNamespacedRules, nothing to do
 	if len(gr.InheritedNamespacedRules) == 0 {
 		return nil

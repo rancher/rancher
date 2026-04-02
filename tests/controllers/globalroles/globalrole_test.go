@@ -130,7 +130,13 @@ func (s *GlobalRoleTestSuite) SetupSuite() {
 			Group:   "",
 			Version: "v1",
 			Kind:    "Namespace",
-		})
+		},
+		schema.GroupVersionKind{
+			Group:   "management.cattle.io",
+			Version: "v3",
+			Kind:    "Cluster",
+		},
+	)
 }
 
 func (s *GlobalRoleTestSuite) TearDownSuite() {

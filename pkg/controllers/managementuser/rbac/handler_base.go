@@ -679,7 +679,7 @@ func (g *globalRoleEnqueuer) namespaceEnqueueGRBs(_, name string, obj runtime.Ob
 func (g *globalRoleEnqueuer) namespaceEnqueueGRs(_, name string, obj runtime.Object) ([]relatedresource.Key, error) {
 	ns, ok := obj.(*corev1.Namespace)
 	if !ok {
-		return nil, fmt.Errorf("[%s]: failed to convert object to *Namespace", grbByNamespaceEnqueuer)
+		return nil, fmt.Errorf("[%s]: failed to convert object to *Namespace", grByNamespaceEnqueuer)
 	}
 
 	grs, err := g.grLister.GetByIndex(pkgrbac.GRDownstreamNSIndex, ns.Name)

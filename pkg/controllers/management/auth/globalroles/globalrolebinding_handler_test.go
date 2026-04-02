@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
-	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/controllers"
 	"github.com/rancher/rancher/pkg/controllers/status"
+	"github.com/rancher/rancher/pkg/types/config"
 	userMocks "github.com/rancher/rancher/pkg/user/mocks"
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	wrangler "github.com/rancher/wrangler/v3/pkg/name"
@@ -40,14 +40,6 @@ var (
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "missing-test-gr",
 		},
-	}
-	purgeTestGR = v3.GlobalRole{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "purge-inherit-test-gr",
-		},
-		InheritedClusterRoles: []string{"already-exists", "missing",
-			"wrong-cluster-name", "wrong-user-name", "wrong-group-name",
-			"deleting", "duplicate"},
 	}
 	notLocalCluster = v3.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
@@ -1012,6 +1004,14 @@ func (f *fleetPermissionsHandlerMock) reconcileFleetWorkspacePermissionsBindings
 	return f.reconcileFleetWorkspacePermissionsFunc(globalRoleBinding, conditions)
 }
 
+type clusterContextGetterMock struct {
+	userContextFunc func(clusterName string) (*config.UserContext, error)
+}
+
+func (m *clusterContextGetterMock) UserContext(clusterName string) (*config.UserContext, error) {
+	return m.userContextFunc(clusterName)
+}
+
 func Test_reconcileSubject(t *testing.T) {
 	t.Parallel()
 
@@ -1339,7 +1339,7 @@ func Test_globalRoleBindingLifecycle_Create(t *testing.T) {
 			// Verify that status was updated with all conditions
 			require.Equal(t, status.SummaryCompleted, obj.Status.Summary)
 			require.Equal(t, status.SummaryCompleted, obj.Status.SummaryLocal)
-			require.Len(t, obj.Status.LocalConditions, 5)
+			require.Len(t, obj.Status.LocalConditions, 6)
 
 			// Verify all conditions are present and successful
 			conditionTypes := make(map[string]metav1.ConditionStatus)
@@ -1351,6 +1351,7 @@ func Test_globalRoleBindingLifecycle_Create(t *testing.T) {
 			require.Equal(t, metav1.ConditionTrue, conditionTypes[clusterPermissionsReconciled])
 			require.Equal(t, metav1.ConditionTrue, conditionTypes[globalRoleBindingReconciled])
 			require.Equal(t, metav1.ConditionTrue, conditionTypes[namespacedRoleBindingReconciled])
+			require.Equal(t, metav1.ConditionTrue, conditionTypes[inheritedNamespacedRoleBindingReconciled])
 			require.Equal(t, metav1.ConditionTrue, conditionTypes["FleetWorkspacePermissionsReconciled"])
 
 			return obj, nil
@@ -1374,6 +1375,11 @@ func Test_globalRoleBindingLifecycle_Create(t *testing.T) {
 		lifecycle := &globalRoleBindingLifecycle{
 			userLister:              userLister,
 			clusterLister:           clusterCache,
+			clusterManager: &clusterContextGetterMock{
+				userContextFunc: func(clusterName string) (*config.UserContext, error) {
+					return nil, fmt.Errorf("cluster unavailable")
+				},
+			},
 			grLister:                grLister,
 			crtbCache:               crtbCache,
 			crtbClient:              crtbClient,
@@ -1436,27 +1442,14 @@ var (
 		UserName:       "testuser",
 		GlobalRoleName: "inheritedNamespacedRulesGR",
 	}
-
-	cluster1 = v3.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "cluster1",
-		},
-	}
-
-	cluster2 = v3.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "cluster2",
-		},
-	}
 )
 
 func TestReconcileInheritedNamespacedRoleBindings(t *testing.T) {
 	t.Parallel()
 
 	type controllers struct {
-		grCache        *fake.MockNonNamespacedCacheInterface[*v3.GlobalRole]
-		clusterLister  *fake.MockNonNamespacedCacheInterface[*v3.Cluster]
-		clusterManager *clustermanager.Manager
+		grCache       *fake.MockNonNamespacedCacheInterface[*v3.GlobalRole]
+		clusterLister *fake.MockNonNamespacedCacheInterface[*v3.Cluster]
 	}
 
 	tests := []struct {
@@ -1476,6 +1469,7 @@ func TestReconcileInheritedNamespacedRoleBindings(t *testing.T) {
 					InheritedNamespacedRules: map[string][]rbacv1.PolicyRule{},
 				}
 				c.grCache.EXPECT().Get("no-inherited-gr").Return(&noInheritedGR, nil)
+				c.clusterLister.EXPECT().List(labels.Everything()).Return([]*v3.Cluster{&localCluster}, nil)
 			},
 			globalRoleBinding: &v3.GlobalRoleBinding{
 				ObjectMeta: metav1.ObjectMeta{
@@ -1485,7 +1479,7 @@ func TestReconcileInheritedNamespacedRoleBindings(t *testing.T) {
 				UserName:       "testuser",
 			},
 			wantError:     false,
-			wantCondition: "",
+			wantCondition: inheritedNamespacedRoleBindingReconciled,
 		},
 		{
 			name: "failed to get global role",
@@ -1529,12 +1523,15 @@ func TestReconcileInheritedNamespacedRoleBindings(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			grCache := fake.NewMockNonNamespacedCacheInterface[*v3.GlobalRole](ctrl)
 			clusterLister := fake.NewMockNonNamespacedCacheInterface[*v3.Cluster](ctrl)
-			clusterManager := &clustermanager.Manager{}
+			clusterManager := &clusterContextGetterMock{
+				userContextFunc: func(clusterName string) (*config.UserContext, error) {
+					return nil, fmt.Errorf("cluster unavailable")
+				},
+			}
 
 			test.setupControllers(controllers{
-				grCache:        grCache,
-				clusterLister:  clusterLister,
-				clusterManager: clusterManager,
+				grCache:       grCache,
+				clusterLister: clusterLister,
 			})
 
 			lifecycle := &globalRoleBindingLifecycle{
@@ -2069,7 +2066,11 @@ func TestDeleteInheritedNamespacedRoleBindings(t *testing.T) {
 			lifecycle := &globalRoleBindingLifecycle{
 				grLister:       grCache,
 				clusterLister:  clusterLister,
-				clusterManager: &clustermanager.Manager{},
+				clusterManager: &clusterContextGetterMock{
+					userContextFunc: func(clusterName string) (*config.UserContext, error) {
+						return nil, fmt.Errorf("cluster unavailable")
+					},
+				},
 			}
 
 			err := lifecycle.deleteInheritedNamespacedRoleBindings(test.globalRoleBinding)
