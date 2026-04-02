@@ -27,11 +27,11 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials username | DOCKER_USERNAME ;
             secret/data/github/repo/${{ github.repository }}/dockerhub/rancher/credentials password | DOCKER_PASSWORD
       - name: Skopeo login
-        run: echo ${{ env.DOCKER_PASSWORD }} | skopeo login ${{ env.REGISTRY }} --username ${{ env.DOCKER_USERNAME }} --password-stdin
+        run: echo "${DOCKER_PASSWORD}" | skopeo login "${REGISTRY}" --username "${DOCKER_USERNAME}" --password-stdin
       - name: Copy image to latest
-        run: skopeo copy docker://${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }} docker://${{ env.REGISTRY }}/${{ env.IMAGE }}:latest --all
+        run: skopeo copy "docker://${REGISTRY}/${IMAGE}:${TAG}" "docker://${REGISTRY}/${IMAGE}:latest" --all
       - name: Copy image to stable
-        run: skopeo copy docker://${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }} docker://${{ env.REGISTRY }}/${{ env.IMAGE }}:stable --all
+        run: skopeo copy "docker://${REGISTRY}/${IMAGE}:${TAG}" "docker://${REGISTRY}/${IMAGE}:stable" --all
   promote-chart:
     runs-on: ubuntu-latest
     permissions:
@@ -40,14 +40,19 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
       - id: env 
         name: Setup Dependencies Env Variables
         uses: ./.github/actions/setup-build-env
       - name: Install dependencies
         env:
           HELM_URL: https://get.helm.sh/helm-${{ steps.env.outputs.HELM_VERSION }}-linux-amd64.tar.gz
+          HELM_HASH: ${{ steps.env.outputs.HELM_HASH_amd64 }}
         run: |
-          curl ${{ env.HELM_URL }} | tar xvzf - --strip-components=1 -C /tmp/ && \
+          set -ex
+          curl "${HELM_URL}" | tar xvzf - --strip-components=1 -C /tmp/ && \
+          echo "${HELM_HASH}  /tmp/helm" | sha256sum -c - && \
           sudo mv /tmp/helm /usr/bin/helm_v3 && \
           sudo chmod +x /usr/bin/helm_v3
       - name: Copy chart and build index
@@ -81,6 +86,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: true
       - name: Update readme to new stable
         shell: bash
         run: |

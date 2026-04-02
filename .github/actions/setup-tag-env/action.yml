@@ -5,18 +5,17 @@ runs:
   steps:
     - shell: bash
       run: |
-        ref_name="${{ github.ref_name }}"
-        TAG=v2.15-${{ github.sha }}-head
+        ref_name="${GITHUB_REF_NAME}"
+        TAG="v2.15-${GITHUB_SHA}-head"
         prefix="release/"
         if [[ "$ref_name" == "main" ]]; then
-          TAG=v2.15-${{ github.sha }}-head
           echo "HEAD_TAG=head" >> "$GITHUB_ENV"
         elif [[ "$ref_name" == release/v* ]]; then
-          TAG=${ref_name#$prefix}-${{ github.sha }}-head
+          TAG="${ref_name#$prefix}-${GITHUB_SHA}-head"
           HEAD_TAG=${ref_name#$prefix}-head
           echo "HEAD_TAG=$HEAD_TAG" >> "$GITHUB_ENV"
         fi
-        if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+        if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
           TAG="$ref_name"
         fi
         echo "TAG=$TAG" >> "$GITHUB_ENV"

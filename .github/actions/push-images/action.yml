@@ -26,20 +26,20 @@ runs:
     - name: Push server image
       shell: bash
       run: |
-        image_id=$(docker load --input /tmp/rancher-${{ env.OS }}-${{ env.ARCH }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
+        image_id=$(docker load --input "/tmp/rancher-${OS}-${ARCH}.tar" 2>&1 | grep "Loaded image" | awk '{print $NF}')
         if [ -z "$image_id" ]; then
           echo "Error: Failed to load image from tarball!"
           exit 1
         fi
-        docker tag "$image_id" ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher:${{ env.TAG }}-${{ env.ARCH }}
-        docker push ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher:${{ env.TAG }}-${{ env.ARCH }}
+        docker tag "$image_id" "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/rancher:${TAG}-${ARCH}"
+        docker push "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/rancher:${TAG}-${ARCH}"
     - name: Push agent image
       shell: bash
       run: |
-        image_agent_id=$(docker load --input /tmp/rancher-agent-${{ env.OS }}-${{ env.ARCH }}.tar 2>&1 | grep "Loaded image" | awk '{print $NF}')
+        image_agent_id=$(docker load --input "/tmp/rancher-agent-${OS}-${ARCH}.tar" 2>&1 | grep "Loaded image" | awk '{print $NF}')
         if [ -z "$image_agent_id" ]; then
           echo "Error: Failed to load image from tarball!"
           exit 1
         fi
-        docker tag "$image_agent_id" ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.TAG }}-${{ env.ARCH }}
-        docker push ${{ env.REGISTRY }}/${{ github.repository_owner }}/rancher-agent:${{ env.TAG }}-${{ env.ARCH }}
+        docker tag "$image_agent_id" "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/rancher-agent:${TAG}-${ARCH}"
+        docker push "${REGISTRY}/${GITHUB_REPOSITORY_OWNER}/rancher-agent:${TAG}-${ARCH}"

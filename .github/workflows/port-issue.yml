@@ -6,24 +6,28 @@ on:
     types:
       - created
 
+permissions: {}
+
 jobs:
   port-issue:
     runs-on: ubuntu-latest
     if: startsWith(github.event.comment.body, '/backport') || startsWith(github.event.comment.body, '/forwardport')
     steps:
       - name: Check org membership
+        id: membership
         env:
           GITHUB_TOKEN: ${{ secrets.ADD_TO_PROJECT_PAT }}
         run: |
           if gh api orgs/${GITHUB_REPOSITORY_OWNER}/members --paginate | jq -e --arg GITHUB_ACTOR "$GITHUB_ACTOR" '.[] | select(.login == $GITHUB_ACTOR)' > /dev/null; then
               echo "${GITHUB_ACTOR} is a member"
-              echo "is_member=true" >> $GITHUB_ENV
+              echo "is_member=true" >> $GITHUB_OUTPUT
           else
               echo "${GITHUB_ACTOR} is not a member of ${GITHUB_REPOSITORY_OWNER}" >> $GITHUB_STEP_SUMMARY
-              echo "is_member=false" >> $GITHUB_ENV
+              echo "is_member=false" >> $GITHUB_OUTPUT
           fi
       - name: Check milestone
-        if: env.is_member == 'true'
+        if: steps.membership.outputs.is_member == 'true'
+        id: milestone
         env:
           GITHUB_TOKEN: ${{ secrets.ADD_TO_PROJECT_PAT }}
           ORIGINAL_ISSUE_NUMBER: ${{ github.event.issue.number }}
@@ -34,16 +38,16 @@ jobs:
           MILESTONE=${BODY_MILESTONE//[^a-zA-Z0-9\-\.]/}
           if gh api repos/${GITHUB_REPOSITORY}/milestones --paginate | jq -e --arg MILESTONE "$MILESTONE" '.[] | select(.title == $MILESTONE)' > /dev/null; then
               echo "Milestone exists"
-              echo "milestone_exists=true" >> $GITHUB_ENV
+              echo "milestone_exists=true" >> $GITHUB_OUTPUT
            else
               echo "Milestone ${MILESTONE} does not exist" >> $GITHUB_STEP_SUMMARY
               gh issue comment -R ${GITHUB_REPOSITORY} ${ORIGINAL_ISSUE_NUMBER} --body "Not creating port issue, milestone ${MILESTONE} does not exist or is not an open milestone"
-              echo "milestone_exists=false" >> $GITHUB_ENV
+              echo "milestone_exists=false" >> $GITHUB_OUTPUT
            fi
       - name: Port issue
         if: |
-          env.is_member == 'true' &&
-          env.milestone_exists == 'true'
+          steps.membership.outputs.is_member == 'true' &&
+          steps.milestone.outputs.milestone_exists == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.ADD_TO_PROJECT_PAT }}
           ORIGINAL_ISSUE_NUMBER: ${{ github.event.issue.number }}

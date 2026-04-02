@@ -7,6 +7,8 @@ on:
     branches:
     - 'release/*'
 
+permissions: {}
+
 env:
   GOARCH: amd64
   CGO_ENABLED: 0
@@ -17,16 +19,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      -
-        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
         with:
           fetch-depth: 0
-      -
-        uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4.4.0
+          persist-credentials: false
+      - uses: actions/setup-go@7b8cf10d4e4a01d4992d18a89f4d7dc5a3e6d6f4 # v4.4.0
         with:
           go-version: ${{ env.SETUP_GO_VERSION }}
-      -
-        name: Run Integration Tests
+          cache: ${{ github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' }}
+      - name: Run Integration Tests
         env:
           ENVTEST_K8S_VERSION: "1.30"
         run: ./tests/controllers/run_controller_tests.sh
