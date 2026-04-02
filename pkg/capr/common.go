@@ -18,10 +18,10 @@ import (
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
 	"github.com/rancher/rancher/pkg/channelserver"
-	"github.com/rancher/rancher/pkg/features"
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
+	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/wrangler/v3/pkg/condition"
 	"github.com/rancher/wrangler/v3/pkg/data"
@@ -647,27 +647,21 @@ func SafeConcatName(maxLength int, name ...string) string {
 	return fullPath[0:maxLength-(hashLength+1)] + "-" + hex.EncodeToString(digest[0:])[0:hashLength]
 }
 
-func PreBootstrap(mgmtCluster *v3.Cluster) bool {
-	// if the upstream rancher _does not_ have pre-bootstrapping enabled just always return false.
-	if !features.ProvisioningPreBootstrap.Enabled() {
-		logrus.Debug("[pre-bootstrap] feature-flag disabled, skipping pre-bootstrap flow")
-		return false
+// ShouldPreBootstrap determines whether the given cluster should enter the pre-bootstrap flow.
+// It checks whether the cluster has already been pre-bootstrapped, and whether there are any authorized
+// sync-bootstrap secrets for this cluster.
+func ShouldPreBootstrap(secretLister v1.SecretLister, cluster *v3.Cluster) (bool, error) {
+	if v3.ClusterConditionPreBootstrapped.IsTrue(cluster) {
+		return false, nil
 	}
 
-	return !v3.ClusterConditionPreBootstrapped.IsTrue(mgmtCluster)
-}
-
-// ShouldPreBootstrap determines whether the given cluster should enter the pre-bootstrap flow.
-// It checks whether the feature flag is enabled, whether the cluster has already been pre-bootstrapped,
-// and whether there are any authorized sync-bootstrap secrets for this cluster.
-func ShouldPreBootstrap(secretCache corecontrollers.SecretCache, cluster *v3.Cluster) (bool, error) {
-	if !PreBootstrap(cluster) {
+	if cluster.Spec.FleetWorkspaceName == "" {
 		return false, nil
 	}
 
 	// The bootstrap gate is annotation-based (`provisioning.cattle.io/sync-bootstrap=true`), so we must list
 	// and inspect secrets in-memory because annotation selectors are not supported by the Kubernetes API.
-	secrets, err := secretCache.List(cluster.Spec.FleetWorkspaceName, labels.Everything())
+	secrets, err := secretLister.List(cluster.Spec.FleetWorkspaceName, labels.Everything())
 	if err != nil {
 		return false, fmt.Errorf("failed to list secrets in namespace %s for cluster %s: %w", cluster.Spec.FleetWorkspaceName, cluster.Name, err)
 	}

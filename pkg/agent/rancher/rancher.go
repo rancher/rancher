@@ -105,10 +105,6 @@ func (h *handler) startRancher() {
 	}()
 }
 
-func isPreBootstrap() bool {
-	return strings.EqualFold(os.Getenv(preBootstrapEnvVar), "true")
-}
-
 func (h *handler) OnChange(key string, service *corev1.Service) (*corev1.Service, error) {
 	h.lock.Lock()
 	defer h.lock.Unlock()
@@ -187,4 +183,8 @@ func setupSteveAggregation(ctx context.Context) error {
 			},
 			Data: data,
 		})
+}
+
+func isPreBootstrap() bool {
+	return strings.EqualFold(os.Getenv(preBootstrapEnvVar), "true")
 }
