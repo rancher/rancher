@@ -228,7 +228,8 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 			transaction.Rollback()
 			return err
 		}
-	} else if !apimgmtv3.ClusterConditionPreBootstrapped.IsTrue(rec.clusterRec) {
+	} else {
+		// mark as prebootstrapped implicitly in order to prevent cluster-agent from being deployed in prebootstrap mode
 		apimgmtv3.ClusterConditionPreBootstrapped.True(rec.clusterRec)
 		if _, err := m.clusters.Update(rec.clusterRec); err != nil {
 			transaction.Rollback()
