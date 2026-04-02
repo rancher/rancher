@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/remotedialer"
 	"github.com/rancher/wrangler/v3/pkg/condition"
+	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/ticker"
 	"github.com/sirupsen/logrus"
 	apierror "k8s.io/apimachinery/pkg/api/errors"
@@ -29,6 +30,7 @@ func Register(ctx context.Context, wrangler *wrangler.Context) {
 	c := checker{
 		clusterCache: wrangler.Mgmt.Cluster().Cache(),
 		clusters:     wrangler.Mgmt.Cluster(),
+		secretCache:  wrangler.Core.Secret().Cache(),
 		tunnelServer: wrangler.TunnelServer,
 	}
 
@@ -44,6 +46,7 @@ func Register(ctx context.Context, wrangler *wrangler.Context) {
 type checker struct {
 	clusterCache managementcontrollers.ClusterCache
 	clusters     managementcontrollers.ClusterClient
+	secretCache  corecontrollers.SecretCache
 	tunnelServer *remotedialer.Server
 }
 
@@ -104,8 +107,13 @@ func (c *checker) checkCluster(cluster *v3.Cluster) error {
 		return nil
 	}
 
+	preboostrapping, err := capr.ShouldPreBootstrap(c.secretCache, cluster)
+	if err != nil {
+		return err
+	}
+
 	// RKE2: wait to update the connected condition until it is pre-bootstrapped
-	if capr.PreBootstrap(cluster) &&
+	if preboostrapping &&
 		cluster.Annotations["provisioning.cattle.io/administrated"] == "true" &&
 		cluster.Name != "local" {
 		// overriding it to be disconnected until bootstrapping is done
