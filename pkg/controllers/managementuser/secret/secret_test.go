@@ -42,8 +42,8 @@ func TestSyncable(t *testing.T) {
 			secret: &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						syncPreBootstrapAnnotation:      "true",
-						syncNamespaceAnnotation:         "kube-system",
+						capr.SyncPreBootstrapAnnotation: "true",
+						capr.SyncNamespaceAnnotation:    "kube-system",
 						capr.AuthorizedObjectAnnotation: "cluster-a,cluster-b",
 					},
 				},
@@ -56,8 +56,8 @@ func TestSyncable(t *testing.T) {
 			secret: &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						syncPreBootstrapAnnotation:      "true",
-						syncNamespaceAnnotation:         "kube-system",
+						capr.SyncPreBootstrapAnnotation: "true",
+						capr.SyncNamespaceAnnotation:    "kube-system",
 						capr.AuthorizedObjectAnnotation: "cluster-a",
 					},
 				},
@@ -70,8 +70,8 @@ func TestSyncable(t *testing.T) {
 			secret: &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						syncPreBootstrapAnnotation:      "true",
-						syncNamespaceAnnotation:         "default",
+						capr.SyncPreBootstrapAnnotation: "true",
+						capr.SyncNamespaceAnnotation:    "default",
 						capr.AuthorizedObjectAnnotation: "cluster-a,cluster-b",
 					},
 				},
