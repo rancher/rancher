@@ -78,7 +78,6 @@ const (
 	UnCordonAnnotation                         = "rke.cattle.io/uncordon"
 	WorkerRoleLabel                            = "rke.cattle.io/worker-role"
 	AuthorizedObjectAnnotation                 = "rke.cattle.io/object-authorized-for-clusters"
-	PreBootstrapSyncAnnotation                 = "provisioning.cattle.io/sync-bootstrap"
 	PlanUpdatedTimeAnnotation                  = "rke.cattle.io/plan-last-updated"
 	PlanProbesPassedAnnotation                 = "rke.cattle.io/plan-probes-passed"
 	DeleteMissingCustomMachinesAfterAnnotation = "rke.cattle.io/delete-missing-custom-machines-after"
@@ -203,6 +202,13 @@ const (
 	MaximumHostnameLengthLimit = 63
 
 	SystemAgentDataDirEnvVar = "CATTLE_AGENT_VAR_DIR"
+
+	// various sync-related annotations for the secret-sync mechanism
+	SyncAnnotation             = "provisioning.cattle.io/sync"
+	SyncPreBootstrapAnnotation = "provisioning.cattle.io/sync-bootstrap"
+	SyncNamespaceAnnotation    = "provisioning.cattle.io/sync-target-namespace"
+	SyncNameAnnotation         = "provisioning.cattle.io/sync-target-name"
+	SyncedAtAnnotation         = "provisioning.cattle.io/synced-at"
 )
 
 var (
@@ -671,7 +677,7 @@ func ShouldPreBootstrap(secretLister v1.SecretLister, cluster *v3.Cluster) (bool
 			continue
 		}
 
-		if secret.Annotations[PreBootstrapSyncAnnotation] != "true" {
+		if secret.Annotations[SyncPreBootstrapAnnotation] != "true" {
 			continue
 		}
 
