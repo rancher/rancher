@@ -21,7 +21,6 @@ import (
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
-	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/wrangler/v3/pkg/condition"
 	"github.com/rancher/wrangler/v3/pkg/data"
@@ -81,7 +80,6 @@ const (
 	UnCordonAnnotation                         = "rke.cattle.io/uncordon"
 	WorkerRoleLabel                            = "rke.cattle.io/worker-role"
 	AuthorizedObjectAnnotation                 = "rke.cattle.io/object-authorized-for-clusters"
-	PreBootstrapSyncAnnotation                 = "provisioning.cattle.io/sync-bootstrap"
 	PlanUpdatedTimeAnnotation                  = "rke.cattle.io/plan-last-updated"
 	PlanProbesPassedAnnotation                 = "rke.cattle.io/plan-probes-passed"
 	DeleteMissingCustomMachinesAfterAnnotation = "rke.cattle.io/delete-missing-custom-machines-after"
@@ -220,6 +218,13 @@ const (
 	MaximumHostnameLengthLimit = 63
 
 	SystemAgentDataDirEnvVar = "CATTLE_AGENT_VAR_DIR"
+
+	// various sync-related annotations for the secret-sync mechanism
+	SyncAnnotation             = "provisioning.cattle.io/sync"
+	SyncPreBootstrapAnnotation = "provisioning.cattle.io/sync-bootstrap"
+	SyncNamespaceAnnotation    = "provisioning.cattle.io/sync-target-namespace"
+	SyncNameAnnotation         = "provisioning.cattle.io/sync-target-name"
+	SyncedAtAnnotation         = "provisioning.cattle.io/synced-at"
 )
 
 var (
@@ -684,10 +689,15 @@ func SafeConcatName(maxLength int, name ...string) string {
 	return fullPath[0:maxLength-(hashLength+1)] + "-" + hex.EncodeToString(digest[0:])[0:hashLength]
 }
 
+// SecretLister is a minimal interface for listing secrets in order to be compatible with core controllers, norman, etc
+type SecretLister interface {
+	List(namespace string, selector labels.Selector) ([]*corev1.Secret, error)
+}
+
 // ShouldPreBootstrap determines whether the given cluster should enter the pre-bootstrap flow.
 // It checks whether the cluster has already been pre-bootstrapped, and whether there are any authorized
 // sync-bootstrap secrets for this cluster.
-func ShouldPreBootstrap(secretLister v1.SecretLister, cluster *v3.Cluster) (bool, error) {
+func ShouldPreBootstrap(secretLister SecretLister, cluster *v3.Cluster) (bool, error) {
 	if v3.ClusterConditionPreBootstrapped.IsTrue(cluster) {
 		return false, nil
 	}
@@ -708,7 +718,7 @@ func ShouldPreBootstrap(secretLister v1.SecretLister, cluster *v3.Cluster) (bool
 			continue
 		}
 
-		if secret.Annotations[PreBootstrapSyncAnnotation] != "true" {
+		if secret.Annotations[SyncPreBootstrapAnnotation] != "true" {
 			continue
 		}
 
