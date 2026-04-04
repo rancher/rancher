@@ -127,9 +127,12 @@ func (c *checker) updateClusterConnectedCondition(cluster *v3.Cluster, connected
 		}
 		Connected.SetStatusBool(latestCluster, connected)
 		if !connected && v3.ClusterConditionProvisioned.IsTrue(latestCluster) {
-			v3.ClusterConditionReady.False(latestCluster)
-			v3.ClusterConditionReady.Reason(latestCluster, "Disconnected")
-			v3.ClusterConditionReady.Message(latestCluster, "Cluster agent is not connected")
+			// For v2prov clusters, only update Ready when the condition is not being managed by the provisioner.
+			if !cluster.Status.ReadyReconciling {
+				v3.ClusterConditionReady.False(latestCluster)
+				v3.ClusterConditionReady.Reason(latestCluster, "Disconnected")
+				v3.ClusterConditionReady.Message(latestCluster, "Cluster agent is not connected")
+			}
 		}
 		logrus.Tracef("[clusterConnectedCondition] update cluster %v", cluster.Name)
 		_, err = c.clusters.UpdateStatus(latestCluster)

@@ -232,7 +232,11 @@ type ClusterStatus struct {
 	AADClientCertSecret        string                    `json:"aadClientCertSecret,omitempty" norman:"nocreate,noupdate"`   // Deprecated: use ClusterSpec.ClusterSecrets.AADClientCertSecret instead
 
 	AppliedClusterAgentDeploymentCustomization *AgentDeploymentCustomization `json:"appliedClusterAgentDeploymentCustomization,omitempty"`
-	Info                                       ClusterInfo                   `json:"info,omitempty"`
+
+	// ReadyReconciling indicates that the cluster's readiness state is currently being managed by provisioning controller.
+	// Currently used only for v2prov clusters. When true, secondary health controllers (like HealthSyncer, Connected) should avoid updating Ready condition to prevent state flapping.
+	ReadyReconciling bool        `json:"readyReconciling,omitempty"`
+	Info             ClusterInfo `json:"info,omitempty"`
 }
 
 // ClusterInfo provides aggregated cluster metadata for UI display.

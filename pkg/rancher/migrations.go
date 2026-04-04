@@ -20,6 +20,7 @@ import (
 	"github.com/rancher/rancher/pkg/wrangler"
 	"github.com/rancher/wrangler/v3/pkg/data"
 	controllerv1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	"github.com/rancher/wrangler/v3/pkg/genericcondition"
 	"github.com/rancher/wrangler/v3/pkg/summary"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/mod/semver"
@@ -34,28 +35,30 @@ import (
 )
 
 const (
-	cattleNamespace                            = "cattle-system"
-	forceUpgradeLogoutConfig                   = "forceupgradelogout"
-	forceLocalSystemAndDefaultProjectCreation  = "forcelocalprojectcreation"
-	forceSystemNamespacesAssignment            = "forcesystemnamespaceassignment"
-	migrateFromMachineToPlanSecret             = "migratefrommachinetoplanesecret"
-	migrateEncryptionKeyRotationLeaderToStatus = "migrateencryptionkeyrotationleadertostatus"
-	migrateDynamicSchemaToMachinePools         = "migratedynamicschematomachinepools"
-	migrateRKEClusterState                     = "migraterkeclusterstate"
-	migrateSystemAgentVarDirToDataDirectory    = "migratesystemagentvardirtodatadirectory"
-	migrateImportedClusterManagedFields        = "migrateimportedclustermanagedfields"
-	rkeCleanupMigration                        = "rkecleanupmigration"
-	managementNodeCleanupMigration             = "managementnodecleanupmigration"
-	rancherVersionKey                          = "rancherVersion"
-	projectsCreatedKey                         = "projectsCreated"
-	namespacesAssignedKey                      = "namespacesAssigned"
-	capiMigratedKey                            = "capiMigrated"
-	encryptionKeyRotationStatusMigratedKey     = "encryptionKeyRotationStatusMigrated"
-	dynamicSchemaMachinePoolsMigratedKey       = "dynamicSchemaMachinePoolsMigrated"
-	systemAgentVarDirMigratedKey               = "systemAgentVarDirMigrated"
-	importedClusterManagedFieldsMigratedKey    = "importedClusterManagedFieldsMigrated"
-	rkeCleanupCompletedKey                     = "rkecleanupcompleted"
-	managementCleanupCompletedKey              = "managementcleanupcompleted"
+	cattleNamespace                                   = "cattle-system"
+	forceUpgradeLogoutConfig                          = "forceupgradelogout"
+	forceLocalSystemAndDefaultProjectCreation         = "forcelocalprojectcreation"
+	forceSystemNamespacesAssignment                   = "forcesystemnamespaceassignment"
+	migrateFromMachineToPlanSecret                    = "migratefrommachinetoplanesecret"
+	migrateEncryptionKeyRotationLeaderToStatus        = "migrateencryptionkeyrotationleadertostatus"
+	migrateDynamicSchemaToMachinePools                = "migratedynamicschematomachinepools"
+	migrateRKEClusterState                            = "migraterkeclusterstate"
+	migrateSystemAgentVarDirToDataDirectory           = "migratesystemagentvardirtodatadirectory"
+	migrateImportedClusterManagedFields               = "migrateimportedclustermanagedfields"
+	rkeCleanupMigration                               = "rkecleanupmigration"
+	managementNodeCleanupMigration                    = "managementnodecleanupmigration"
+	cleanupProvisioningClusterMgmtOnlyConditions      = "cleanupprovisioningclustermgmtonlyconditions"
+	rancherVersionKey                                 = "rancherVersion"
+	projectsCreatedKey                                = "projectsCreated"
+	namespacesAssignedKey                             = "namespacesAssigned"
+	capiMigratedKey                                   = "capiMigrated"
+	encryptionKeyRotationStatusMigratedKey            = "encryptionKeyRotationStatusMigrated"
+	dynamicSchemaMachinePoolsMigratedKey              = "dynamicSchemaMachinePoolsMigrated"
+	systemAgentVarDirMigratedKey                      = "systemAgentVarDirMigrated"
+	importedClusterManagedFieldsMigratedKey           = "importedClusterManagedFieldsMigrated"
+	rkeCleanupCompletedKey                            = "rkecleanupcompleted"
+	managementCleanupCompletedKey                     = "managementcleanupcompleted"
+	provisioningClusterMgmtOnlyConditionsCleanedUpKey = "provisioningClusterMgmtOnlyConditionsCleanedUp"
 )
 
 var (
@@ -109,6 +112,9 @@ func runRKE2Migrations(wranglerContext *wrangler.CAPIContext) error {
 			return err
 		}
 		if err := migrateMachinePoolsDynamicSchemaLabel(wranglerContext); err != nil {
+			return err
+		}
+		if err := cleanupMgmtOnlyConditionsFromProvisioningClusters(wranglerContext); err != nil {
 			return err
 		}
 	}
@@ -713,4 +719,88 @@ func cleanupNodeFinalizers(w *wrangler.Context, nodeNamespace, nodeName string) 
 		}
 		return err
 	})
+}
+
+// cleanupMgmtOnlyConditionsFromProvisioningClusters removes management cluster-specific conditions
+// from provisioning clusters. These conditions were previously copied from management clusters to
+// provisioning clusters but are not relevant to provisioning clusters.
+func cleanupMgmtOnlyConditionsFromProvisioningClusters(w *wrangler.CAPIContext) error {
+	cm, err := getConfigMap(w.Core.ConfigMap(), cleanupProvisioningClusterMgmtOnlyConditions)
+	if err != nil || cm == nil {
+		return err
+	}
+
+	if cm.Data[provisioningClusterMgmtOnlyConditionsCleanedUpKey] == "true" {
+		return nil
+	}
+
+	mgmtClusterOnlyConditions := map[string]struct{}{
+		"ACISecretsMigrated":                   {},
+		"AddonDeploy":                          {},
+		"AgentDeployed":                        {},
+		"AlertingEnabled":                      {},
+		"CertsGenerated":                       {},
+		"DefaultNamespaceAssigned":             {},
+		"DefaultProjectCreated":                {},
+		"etcd":                                 {},
+		"GlobalAdminsSynced":                   {},
+		"HarvesterCloudProviderConfigMigrated": {},
+		"InitialRolesPopulated":                {},
+		"NoDiskPressure":                       {},
+		"NoMemoryPressure":                     {},
+		"Pending":                              {},
+		"PreBootstrapped":                      {},
+		"RKESecretsMigrated":                   {},
+		"SecretsMigrated":                      {},
+		"ServiceAccountMigrated":               {},
+		"ServiceAccountSecretsMigrated":        {},
+		"SystemAccountCreated":                 {},
+		"SystemNamespacesAssigned":             {},
+		"SystemProjectCreated":                 {},
+		"Upgraded":                             {},
+		"Waiting":                              {},
+	}
+
+	provClusters, err := w.Provisioning.Cluster().List("", metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+
+	for _, cluster := range provClusters.Items {
+		if len(cluster.Status.Conditions) == 0 {
+			continue
+		}
+
+		if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			cluster, err := w.Provisioning.Cluster().Get(cluster.Namespace, cluster.Name, metav1.GetOptions{})
+			if apierrors.IsNotFound(err) {
+				return nil
+			} else if err != nil {
+				return err
+			}
+
+			// Filter out management cluster-only conditions
+			filteredConditions := make([]genericcondition.GenericCondition, 0, len(cluster.Status.Conditions))
+			for _, cond := range cluster.Status.Conditions {
+				if _, shouldRemove := mgmtClusterOnlyConditions[cond.Type]; !shouldRemove {
+					filteredConditions = append(filteredConditions, cond)
+				}
+			}
+
+			// Only update if conditions were actually removed
+			if len(filteredConditions) == len(cluster.Status.Conditions) {
+				return nil
+			}
+
+			cluster = cluster.DeepCopy()
+			cluster.Status.Conditions = filteredConditions
+			_, err = w.Provisioning.Cluster().UpdateStatus(cluster)
+			return err
+		}); err != nil {
+			return err
+		}
+	}
+
+	cm.Data[provisioningClusterMgmtOnlyConditionsCleanedUpKey] = "true"
+	return createOrUpdateConfigMap(w.Core.ConfigMap(), cm)
 }
