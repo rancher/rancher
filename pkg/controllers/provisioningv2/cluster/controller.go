@@ -88,6 +88,7 @@ func handlerWithoutCAPI(clients *wrangler.Context, kubeconfigManager *kubeconfig
 	return &handler{
 		mgmtClusterCache:      clients.Mgmt.Cluster().Cache(),
 		mgmtClusters:          clients.Mgmt.Cluster(),
+		mgmtNodesCache:        clients.Mgmt.Node().Cache(),
 		clusterTokenCache:     clients.Mgmt.ClusterRegistrationToken().Cache(),
 		clusterTokens:         clients.Mgmt.ClusterRegistrationToken(),
 		featureCache:          clients.Mgmt.Feature().Cache(),

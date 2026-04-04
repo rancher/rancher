@@ -11,7 +11,7 @@ replace (
 	github.com/matryer/moq => github.com/rancher/moq v0.0.0-20200712062324-13d1f37d2d77
 	github.com/rancher/rancher/pkg/apis => ./pkg/apis
 	github.com/rancher/rancher/pkg/client => ./pkg/client
-	github.com/rancher/shepherd => github.com/kinarashah/shepherd v0.0.0-20260331214404-cb07db909004
+	github.com/rancher/shepherd => github.com/kinarashah/shepherd v0.0.0-20260406165354-e6d0807b3108
 	github.com/stretchr/testify => github.com/stretchr/testify v1.10.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc => go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.63.0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.63.0

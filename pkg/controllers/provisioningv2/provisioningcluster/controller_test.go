@@ -560,6 +560,8 @@ func Test_OnRancherClusterChange(t *testing.T) {
 					Return(buildMgmtCluster("cluster-none"), nil).AnyTimes()
 				mgmtClient.EXPECT().Update(gomock.Any()).
 					Return(&v3.Cluster{}, nil).AnyTimes()
+				mgmtClient.EXPECT().UpdateStatus(gomock.Any()).
+					Return(&v3.Cluster{}, nil).AnyTimes()
 
 				// No provisioning update expected for restore mode "none"
 				provController.EXPECT().Update(gomock.Any()).Times(0)
@@ -601,6 +603,8 @@ func Test_OnRancherClusterChange(t *testing.T) {
 				mgmtCache.EXPECT().Get("cluster-kversion").
 					Return(buildMgmtCluster("cluster-kversion"), nil).AnyTimes()
 				mgmtClient.EXPECT().Update(gomock.Any()).
+					Return(&v3.Cluster{}, nil).AnyTimes()
+				mgmtClient.EXPECT().UpdateStatus(gomock.Any()).
 					Return(&v3.Cluster{}, nil).AnyTimes()
 
 				snap := buildSnapshotWithClusterSpec(t, "ns", "snap-kv",
@@ -663,6 +667,10 @@ func Test_OnRancherClusterChange(t *testing.T) {
 					AnyTimes()
 				mgmtClient.EXPECT().
 					Update(gomock.Any()).
+					Return(&v3.Cluster{}, nil).
+					AnyTimes()
+				mgmtClient.EXPECT().
+					UpdateStatus(gomock.Any()).
 					Return(&v3.Cluster{}, nil).
 					AnyTimes()
 
@@ -732,6 +740,8 @@ func Test_OnRancherClusterChange(t *testing.T) {
 				mgmtCache.EXPECT().Get("cluster-fail").
 					Return(buildMgmtCluster("cluster-fail"), nil).AnyTimes()
 				mgmtClient.EXPECT().Update(gomock.Any()).
+					Return(&v3.Cluster{}, nil).AnyTimes()
+				mgmtClient.EXPECT().UpdateStatus(gomock.Any()).
 					Return(&v3.Cluster{}, nil).AnyTimes()
 
 				etcdSnapshotCache.EXPECT().Get("ns", "snap-missing").
