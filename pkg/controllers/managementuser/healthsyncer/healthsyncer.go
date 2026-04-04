@@ -164,6 +164,12 @@ func (h *HealthSyncer) updateClusterHealth() error {
 		return nil
 	}
 
+	// For v2prov clusters, only update Ready when the condition is not being managed by the provisioner.
+	if cluster.Status.ReadyReconciling {
+		logrus.Debugf("Skip updating cluster condition Ready - condition is currently reconciling [%s]", h.clusterName)
+		return nil
+	}
+
 	newObj, err := v32.ClusterConditionReady.Do(cluster, func() (runtime.Object, error) {
 		for i := 0; ; i++ {
 			err := h.getComponentStatus(cluster)
