@@ -16,7 +16,7 @@ const (
 	clusterInfoQuietPeriod = 30 * time.Second
 )
 
-var lastClusterInfoReconcile sync.Map // map[clusterKey]time.Time for debouncing ClusterInfo field computations
+var lastClusterInfoReconcile sync.Map // map[clusterKey]time.Time for debouncing ClusterInfo field computations when needed
 
 func (h *handler) updateClusterStatus(key string, cluster *v3.Cluster) (*v3.Cluster, error) {
 	if cluster == nil || cluster.DeletionTimestamp != nil || cluster.Name == "" {
@@ -185,7 +185,7 @@ func (h *handler) getMachineProvider(cluster *v3.Cluster, provCluster *v1.Cluste
 
 func (h *handler) getNodeCount(cluster *v3.Cluster, provCluster *v1.Cluster) (int, error) {
 	// There's usually lag between status.NodeCount and actual number of nodes for v2prov clusters, so checking capi machines cache for actual count.
-	if provCluster != nil && provCluster.Spec.RKEConfig != nil {
+	if provCluster != nil && provCluster.Spec.RKEConfig != nil && h.capiMachinesCache != nil {
 		machines, err := h.capiMachinesCache.List(provCluster.Namespace, labels.SelectorFromSet(labels.Set{capi.ClusterNameLabel: provCluster.Name}))
 		if err != nil {
 			return 0, err
