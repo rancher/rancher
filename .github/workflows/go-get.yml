@@ -31,6 +31,36 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Validate goget_module input
+        run: |
+          if [[ ! "$GOGET_MODULE" =~ ^[a-zA-Z0-9./_@-]*$ ]]; then
+            echo "::error::Invalid characters detected in goget_module input."
+            exit 1
+          fi
+          
+          ALLOWED_PREFIXES=(
+            "github.com/rancher/"
+            "github.com/k3s-io/"
+            "k8s.io/"
+            "sigs.k8s.io/"
+            "helm.sh/"
+            "github.com/docker/"
+            "github.com/containerd/"
+            "github.com/coreos/"
+          )
+          
+          IS_ALLOWED=false
+          for prefix in "${ALLOWED_PREFIXES[@]}"; do
+            if [[ "$GOGET_MODULE" == "$prefix"* ]]; then
+              IS_ALLOWED=true
+              break
+            fi
+          done
+          
+          if [ "$IS_ALLOWED" = false ]; then
+            echo "::error::Module '$GOGET_MODULE' is not in the approved allowlist."
+            exit 1
+          fi
       - name: Run go get to get Go module
         run: make go-get
       - name: Run go generate
