@@ -221,7 +221,7 @@ func forceSystemAndDefaultProjectCreation(configMapController controllerv1.Confi
 		v32.ClusterConditionDefaultProjectCreated.Unknown(localCluster)
 		v32.ClusterConditionSystemProjectCreated.Unknown(localCluster)
 
-		_, err = clusterClient.Update(localCluster)
+		_, err = clusterClient.UpdateStatus(localCluster)
 		return err
 	}); err != nil {
 		return err

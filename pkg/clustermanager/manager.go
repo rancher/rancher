@@ -108,7 +108,7 @@ func (m *Manager) markUnavailable(clusterName string) {
 	if cluster, err := m.clusters.Get(clusterName, metav1.GetOptions{}); err == nil {
 		if !apimgmtv3.ClusterConditionReady.IsFalse(cluster) {
 			apimgmtv3.ClusterConditionReady.False(cluster)
-			m.clusters.Update(cluster)
+			m.clusters.UpdateStatus(cluster)
 		}
 		m.Stop(cluster)
 	}

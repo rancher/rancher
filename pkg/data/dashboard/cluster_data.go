@@ -5,7 +5,6 @@ import (
 
 	v32 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	fleetconst "github.com/rancher/rancher/pkg/fleet"
-	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corev1 "k8s.io/api/core/v1"
@@ -15,7 +14,7 @@ import (
 )
 
 func addLocalCluster(embedded bool, wrangler *wrangler.Context) error {
-	c := &v3.Cluster{
+	c := &v32.Cluster{
 		ObjectMeta: v1.ObjectMeta{
 			Name: "local",
 		},
@@ -27,18 +26,11 @@ func addLocalCluster(embedded bool, wrangler *wrangler.Context) error {
 				DockerRootDir: settings.InitialDockerRootDir.Get(),
 			},
 		},
-		Status: v32.ClusterStatus{
-			Driver: v32.ClusterDriverImported,
-			Conditions: []v32.ClusterCondition{
-				{
-					Type:   "Ready",
-					Status: corev1.ConditionTrue,
-				},
-			},
-		},
 	}
+
+	desiredDriver := v32.ClusterDriverImported
 	if embedded {
-		c.Status.Driver = v32.ClusterDriverLocal
+		desiredDriver = v32.ClusterDriverLocal
 	}
 
 	var err error
@@ -63,6 +55,20 @@ func addLocalCluster(embedded bool, wrangler *wrangler.Context) error {
 		return err
 	}
 
+	if !hasReadyCondition(c.Status.Conditions) {
+		c.Status.Driver = desiredDriver
+		c.Status.Conditions = []v32.ClusterCondition{
+			{
+				Type:   "Ready",
+				Status: corev1.ConditionTrue,
+			},
+		}
+		c, err = wrangler.Mgmt.Cluster().UpdateStatus(c)
+		if err != nil {
+			return err
+		}
+	}
+
 	_, err = wrangler.Core.Namespace().Create(&corev1.Namespace{
 		ObjectMeta: v1.ObjectMeta{
 			Name: "local",
@@ -81,6 +87,15 @@ func addLocalCluster(embedded bool, wrangler *wrangler.Context) error {
 	}
 
 	return err
+}
+
+func hasReadyCondition(conditions []v32.ClusterCondition) bool {
+	for _, c := range conditions {
+		if c.Type == "Ready" {
+			return true
+		}
+	}
+	return false
 }
 
 func removeLocalCluster(wrangler *wrangler.Context) error {
