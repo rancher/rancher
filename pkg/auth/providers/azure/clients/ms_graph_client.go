@@ -120,7 +120,11 @@ func (c AzureMSGraphClient) GetUser(userID string) (v3.Principal, error) {
 	logrus.Debugf("[%s] GetUser %s", providerLogPrefix, userID)
 	result, err := c.GraphClient.Users().ByUserId(userID).Get(context.Background(), nil)
 	if err != nil {
-		return v3.Principal{}, fmt.Errorf("getting user by ID: %w", getMSGraphErrorData(err))
+		wrapped := fmt.Errorf("getting user by ID: %w", getMSGraphErrorData(err))
+		if isODataNotFound(err) {
+			return v3.Principal{}, &common.NonTransientError{Err: wrapped}
+		}
+		return v3.Principal{}, wrapped
 	}
 
 	return userToPrincipal(result), nil
@@ -157,7 +161,11 @@ func (c AzureMSGraphClient) GetGroup(groupID string) (v3.Principal, error) {
 	logrus.Debugf("[%s] GetGroup %s", providerLogPrefix, groupID)
 	result, err := c.GraphClient.Groups().ByGroupId(groupID).Get(context.Background(), nil)
 	if err != nil {
-		return v3.Principal{}, fmt.Errorf("getting group by ID: %w", getMSGraphErrorData(err))
+		wrapped := fmt.Errorf("getting group by ID: %w", getMSGraphErrorData(err))
+		if isODataNotFound(err) {
+			return v3.Principal{}, &common.NonTransientError{Err: wrapped}
+		}
+		return v3.Principal{}, wrapped
 	}
 
 	return groupToPrincipal(result), nil
@@ -223,7 +231,11 @@ func (c AzureMSGraphClient) listGroupMemberships(ctx context.Context, userID str
 					Count:  &requestCount,
 				}})
 	if err != nil {
-		return fmt.Errorf("listing group memberships: %w", getMSGraphErrorData(err))
+		wrapped := fmt.Errorf("listing group memberships: %w", getMSGraphErrorData(err))
+		if isODataNotFound(err) {
+			return &common.NonTransientError{Err: wrapped}
+		}
+		return wrapped
 	}
 
 	pageIterator, err := msgraphcore.NewPageIterator[models.DirectoryObjectable](
@@ -432,6 +444,15 @@ func getMSGraphErrorData(err error) error {
 		return odataErr
 	}
 	return err
+}
+
+func isODataNotFound(err error) bool {
+	var odataErr *odataerrors.ODataError
+	if !errors.As(err, &odataErr) {
+		return false
+	}
+	oErr := odataErr.GetErrorEscaped()
+	return oErr != nil && oErr.GetCode() != nil && *oErr.GetCode() == "Request_ResourceNotFound"
 }
 
 // accessTokenCache is responsible for reading (replacing) the access token from some storage (a secret in the database,
