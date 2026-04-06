@@ -122,7 +122,7 @@ func (c AzureMSGraphClient) GetUser(userID string) (v3.Principal, error) {
 	if err != nil {
 		wrapped := fmt.Errorf("getting user by ID: %w", getMSGraphErrorData(err))
 		if isODataNotFound(err) {
-			return v3.Principal{}, &common.NonTransientError{Err: wrapped}
+			wrapped = &common.NonTransientError{Err: wrapped}
 		}
 		return v3.Principal{}, wrapped
 	}
@@ -163,7 +163,7 @@ func (c AzureMSGraphClient) GetGroup(groupID string) (v3.Principal, error) {
 	if err != nil {
 		wrapped := fmt.Errorf("getting group by ID: %w", getMSGraphErrorData(err))
 		if isODataNotFound(err) {
-			return v3.Principal{}, &common.NonTransientError{Err: wrapped}
+			wrapped = &common.NonTransientError{Err: wrapped}
 		}
 		return v3.Principal{}, wrapped
 	}
@@ -233,7 +233,7 @@ func (c AzureMSGraphClient) listGroupMemberships(ctx context.Context, userID str
 	if err != nil {
 		wrapped := fmt.Errorf("listing group memberships: %w", getMSGraphErrorData(err))
 		if isODataNotFound(err) {
-			return &common.NonTransientError{Err: wrapped}
+			wrapped = &common.NonTransientError{Err: wrapped}
 		}
 		return wrapped
 	}
