@@ -74,6 +74,7 @@ var OriginMap = map[string]string{
 	"klipper-helm":                                            "https://github.com/rancher/klipper-helm",
 	"klipper-lb":                                              "https://github.com/rancher/klipper-lb",
 	"kube-api-auth":                                           "https://github.com/rancher/kube-api-auth",
+	"kube-webhook-certgen":                                    "https://github.com/rancher/ingress-nginx", 
 	"kubectl":                                                 "https://github.com/rancher/kubectl",
 	"kubelet-pause":                                           "https://github.com/kubernetes/kubernetes",
 	"library-nginx":                                           "https://github.com/nginx/nginx",
