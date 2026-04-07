@@ -241,7 +241,7 @@ func (h *loginHandler) login(w http.ResponseWriter, r *http.Request, input login
 	if providers.IsSAMLProviderType(input.GetType()) {
 		// SAML's login flow is different. Unlike other providers it gets the logged in user's data
 		// via the POST from the identity provider on a separate endpoint.
-		err := saml.PerformSamlLogin(r, w, input.GetName(), input)
+		err := saml.PerformSamlLogin(r, w, input.GetName(), input, providers.Providers[input.GetName()])
 		if err != nil {
 			if !util.IsAPIError(err) {
 				logrus.Errorf("login: Error performing SAML login: %s", err)

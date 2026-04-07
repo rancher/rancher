@@ -141,3 +141,54 @@ func TestGetUserIdFromRelayState(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateFinalRedirectURL(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		redirectURL string
+		rancherURL  string
+		want        string
+		wantErr     string
+	}{
+		"empty redirect": {
+			redirectURL: "",
+			rancherURL:  "https://rancher.example.com",
+			wantErr:     "redirect URL was not provided",
+		},
+		"invalid redirect": {
+			redirectURL: "http://[::1",
+			rancherURL:  "https://rancher.example.com",
+			wantErr:     "invalid redirect URL",
+		},
+		"invalid rancher url": {
+			redirectURL: "https://rancher.example.com/verify",
+			rancherURL:  "::://not-a-url",
+			wantErr:     "could not parse Rancher server URL",
+		},
+		"mismatched hosts": {
+			redirectURL: "https://attacker.example.com/login",
+			rancherURL:  "https://rancher.example.com",
+			wantErr:     "does not match Rancher host",
+		},
+		"matching host": {
+			redirectURL: "https://rancher.example.com/dashboard/auth?token=abc",
+			rancherURL:  "https://rancher.example.com",
+			want:        "https://rancher.example.com/dashboard/auth?token=abc",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, err := validateFinalRedirectURL(tt.redirectURL, tt.rancherURL)
+
+			if tt.wantErr != "" {
+				assert.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

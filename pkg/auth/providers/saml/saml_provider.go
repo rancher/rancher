@@ -51,6 +51,8 @@ type Provider struct {
 	ldapProvider    common.AuthProvider
 	sloEnabled      bool
 	sloForced       bool
+
+	getSamlConfig func() (*apiv3.SamlConfig, error)
 }
 
 var SamlProviders = make(map[string]*Provider)
@@ -66,7 +68,7 @@ func Configure(mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *to
 		userType:    name + "_user",
 		groupType:   name + "_group",
 	}
-
+	provider.getSamlConfig = provider.getSamlConfigFromUnstructured
 	if provider.hasLdapGroupSearch() {
 		provider.ldapProvider = ldap.Configure(mgmtCtx, userMGR, tokenMGR, name)
 	}
@@ -161,8 +163,14 @@ func (s *Provider) LogoutAll(w http.ResponseWriter, r *http.Request, token acces
 	userAtProvider := usernames[0]
 	finalRedirectURL := authLogout.FinalRedirectURL
 
+	validatedRedirectURL, err := validateFinalRedirectURL(finalRedirectURL, provider.serviceProvider.MetadataURL.String())
+	if err != nil {
+		logrus.Errorf("SAML [LogoutAll]: validating redirect URL: %v", err)
+		return newInvalidURLError("failed to logout")
+	}
+
 	provider.clientState.SetPath(provider.serviceProvider.SloURL.Path)
-	provider.clientState.SetState(w, r, "Rancher_FinalRedirectURL", finalRedirectURL)
+	provider.clientState.SetState(w, r, "Rancher_FinalRedirectURL", validatedRedirectURL)
 	provider.clientState.SetState(w, r, "Rancher_Action", "logout-all")
 
 	idpRedirectURL, err := provider.HandleSamlLogout(userAtProvider, w, r)
@@ -182,13 +190,26 @@ func (s *Provider) LogoutAll(w http.ResponseWriter, r *http.Request, token acces
 	return json.NewEncoder(w).Encode(data)
 }
 
-func PerformSamlLogin(r *http.Request, w http.ResponseWriter, name string, input any) error {
+func newInvalidURLError(msg string) error {
+	return httperror.NewAPIError(httperror.ErrorCode{Code: "Invalid redirect URL", Status: http.StatusBadRequest}, msg)
+}
+
+func PerformSamlLogin(r *http.Request, w http.ResponseWriter, name string, input any, commonProvider common.AuthProvider) error {
 	// input will contain the FINAL redirect URL
 	login, ok := input.(*apiv3.SamlLoginInput)
 	if !ok {
 		return errors.New("unexpected input type")
 	}
-	finalRedirectURL := login.FinalRedirectURL
+	provider, ok := commonProvider.(*Provider)
+	if !ok {
+		return errors.New("unexpected provider type")
+	}
+
+	finalRedirectURL, err := validateFinalRedirectURL(login.FinalRedirectURL, provider.serviceProvider.MetadataURL.String())
+	if err != nil {
+		logrus.Errorf("SAML [PerformSamlLogin]: validating redirect URL: %v", err)
+		return newInvalidURLError("failed to login")
+	}
 
 	logrus.Debugf("SAML [PerformSamlLogin]: Id Provider            (%v)", name)
 
@@ -232,7 +253,7 @@ func PerformSamlLogin(r *http.Request, w http.ResponseWriter, name string, input
 	return nil
 }
 
-func (s *Provider) getSamlConfig() (*apiv3.SamlConfig, error) {
+func (s *Provider) getSamlConfigFromUnstructured() (*apiv3.SamlConfig, error) {
 	authConfigObj, err := s.authConfigs.ObjectClient().UnstructuredClient().Get(s.name, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("SAML: failed to retrieve SamlConfig, error: %v", err)

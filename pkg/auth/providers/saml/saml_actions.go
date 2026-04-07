@@ -59,7 +59,11 @@ func (s *Provider) testAndEnable(request *types.APIContext) error {
 
 	logrus.Debugf("SAML [testAndEnable]: Setting clientState for SAML service provider %v", s.name)
 
-	finalRedirectURL := samlLogin.FinalRedirectURL
+	finalRedirectURL, err := validateFinalRedirectURL(samlLogin.FinalRedirectURL, provider.serviceProvider.MetadataURL.String())
+	if err != nil {
+		logrus.Errorf("SAML: testAndEnable validating redirect URL: %v", err)
+		return newInvalidURLError("failed to validate final redirection URL")
+	}
 	logrus.Debugf("SAML [testAndEnable]: Final redirect will be (%v)", finalRedirectURL)
 
 	provider.clientState.SetPath(provider.serviceProvider.AcsURL.Path)

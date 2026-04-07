@@ -20,6 +20,7 @@ import (
 	"github.com/crewjam/saml"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/mux"
+	"github.com/pkg/errors"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/settings"
@@ -309,7 +310,6 @@ func (s *Provider) getSamlPrincipals(config *apiv3.SamlConfig, samlData map[stri
 
 // FinalizeSamlLogout processes the logout obtained by the POST to /saml/slo from IdP
 func (s *Provider) FinalizeSamlLogout(w http.ResponseWriter, r *http.Request) {
-
 	if relayState := r.Form.Get("RelayState"); relayState != "" {
 		// delete the cookie
 		s.clientState.DeleteState(w, r, relayState)
@@ -629,4 +629,22 @@ func (s *Provider) getUserIdFromRelayStateCookie(r *http.Request) (string, error
 
 func newJWTParser() *jwt.Parser {
 	return jwt.NewParser(jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Name}))
+}
+
+func validateFinalRedirectURL(redirectURL string, rancherServerURL string) (string, error) {
+	if redirectURL == "" {
+		return "", errors.New("redirect URL was not provided")
+	}
+	parsed, err := url.Parse(redirectURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid redirect URL: %w", err)
+	}
+	rancherParsed, err := url.Parse(rancherServerURL)
+	if err != nil {
+		return "", fmt.Errorf("could not parse Rancher server URL: %w", err)
+	}
+	if parsed.Host != rancherParsed.Host {
+		return "", fmt.Errorf("redirect URL host %q does not match Rancher host %q", parsed.Host, rancherParsed.Host)
+	}
+	return redirectURL, nil
 }
