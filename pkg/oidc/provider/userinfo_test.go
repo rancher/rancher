@@ -57,7 +57,7 @@ func TestUserInfoEndpoint(t *testing.T) {
 		"iat":           float64(time.Now().Unix()),
 		"sub":           fakeUserID,
 		"auth_provider": "auth-provider",
-		"scope":         []string{"openid", "profile"},
+		"scope":         []string{"openid", "profile", "groups"},
 	})
 	fakeAccessToken.Header["kid"] = fakeSigningKey
 	var privateKey *rsa.PrivateKey
@@ -70,10 +70,22 @@ func TestUserInfoEndpoint(t *testing.T) {
 		"iat":           float64(time.Now().Unix()),
 		"sub":           fakeUserID,
 		"auth_provider": "auth-provider",
-		"scope":         []string{"openid"},
+		"scope":         []string{"openid", "groups"},
 	})
 	fakeAccessTokenNoProfile.Header["kid"] = fakeSigningKey
 	fakeAccessTokenNoProfileString, _ := fakeAccessTokenNoProfile.SignedString(privateKey)
+
+	fakeAccessTokenNoGroups := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
+		"aud":           []interface{}{"client-id"},
+		"exp":           float64(time.Now().Add(10 * time.Hour).Unix()),
+		"iss":           settings.ServerURL.Get() + "/oidc",
+		"iat":           float64(time.Now().Unix()),
+		"sub":           fakeUserID,
+		"auth_provider": "auth-provider",
+		"scope":         []string{"openid", "profile"},
+	})
+	fakeAccessTokenNoGroups.Header["kid"] = fakeSigningKey
+	fakeAccessTokenNoGroupsString, _ := fakeAccessTokenNoGroups.SignedString(privateKey)
 
 	tests := map[string]struct {
 		req          func() *http.Request
@@ -83,7 +95,7 @@ func TestUserInfoEndpoint(t *testing.T) {
 	}{
 		"success response": {
 			req: func() *http.Request {
-				req, _ := http.NewRequest("GET", "https://rancher.com", nil)
+				req, _ := http.NewRequest(http.MethodGet, "https://rancher.com", nil)
 				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", fakeAccessTokenString))
 
 				return req
@@ -101,7 +113,7 @@ func TestUserInfoEndpoint(t *testing.T) {
 		},
 		"success response without profile": {
 			req: func() *http.Request {
-				req, _ := http.NewRequest("GET", "https://rancher.com", nil)
+				req, _ := http.NewRequest(http.MethodGet, "https://rancher.com", nil)
 				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", fakeAccessTokenNoProfileString))
 
 				return req
@@ -115,11 +127,26 @@ func TestUserInfoEndpoint(t *testing.T) {
 				Groups: []string{fakeGroupName},
 			},
 		},
+		"success response without groups": {
+			req: func() *http.Request {
+				req, _ := http.NewRequest(http.MethodGet, "https://rancher.com", nil)
+				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", fakeAccessTokenNoGroupsString))
+
+				return req
+			},
+			mockSetup: func(mockParams mockParams) {
+				mockParams.signingKeyGetter.EXPECT().GetPublicKey(fakeSigningKey).Return(&privateKey.PublicKey, nil)
+				mockParams.userCache.EXPECT().Get(fakeUserID).Return(&fakeUser, nil)
+			},
+			wantResponse: &UserInfoResponse{
+				Sub: fakeUserID,
+			},
+		},
 		"invalid signature": {
 			req: func() *http.Request {
 				anotherKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 				accessTokenString, _ := fakeAccessToken.SignedString(anotherKey)
-				req, _ := http.NewRequest("GET", "https://rancher.com", nil)
+				req, _ := http.NewRequest(http.MethodGet, "https://rancher.com", nil)
 				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", accessTokenString))
 				return req
 			},
@@ -140,7 +167,7 @@ func TestUserInfoEndpoint(t *testing.T) {
 				})
 				invalidAccessToken.Header["kid"] = fakeSigningKey
 				accessTokenString, _ := invalidAccessToken.SignedString(privateKey)
-				req, _ := http.NewRequest("GET", "https://rancher.com", nil)
+				req, _ := http.NewRequest(http.MethodGet, "https://rancher.com", nil)
 				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", accessTokenString))
 				return req
 			},
@@ -151,7 +178,7 @@ func TestUserInfoEndpoint(t *testing.T) {
 		},
 		"no access token": {
 			req: func() *http.Request {
-				req, _ := http.NewRequest("GET", "https://rancher.com", nil)
+				req, _ := http.NewRequest(http.MethodGet, "https://rancher.com", nil)
 				return req
 			},
 			wantError: `{"error":"invalid_request","error_description":"failed to get token from header: authorization header is missing"}`,
@@ -160,7 +187,6 @@ func TestUserInfoEndpoint(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			t.Parallel()
 			m := mockParams{
 				userCache:          fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl),
 				useAttributeLister: fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl),
