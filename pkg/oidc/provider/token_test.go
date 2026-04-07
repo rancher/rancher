@@ -427,6 +427,8 @@ func TestTokenEndpoint(t *testing.T) {
 				m.useAttributeLister.EXPECT().Get(fakeUserID).Return(fakeUserAttributes, nil)
 				m.signingKeyGetter.EXPECT().GetSigningKey().Return(privateKey, fakeSigningKey, nil)
 				m.signingKeyGetter.EXPECT().GetPublicKey(fakeSigningKey).Return(&privateKey.PublicKey, nil)
+				m.secretCache.EXPECT().Get("cattle-oidc-client-secrets", fakeClientID).Return(fakeClientk8sSecret, nil)
+				m.oidcClient.EXPECT().Patch(fakeClientName, types.JSONPatchType, clientSecretIDPatch).Return(fakeOIDCClient, nil)
 			},
 			wantIdTokenClaims: &jwt.MapClaims{
 				"aud":           []any{fakeClientID},
@@ -491,7 +493,6 @@ func TestTokenEndpoint(t *testing.T) {
 				m.tokenCache.EXPECT().List(labels.SelectorFromSet(map[string]string{
 					tokens.UserIDLabel: fakeUserID,
 				})).Return([]*v3.Token{}, nil)
-
 			},
 			wantError: `{"error":"access_denied","error_description":"Rancher token no longer present."}`,
 		},
@@ -511,7 +512,9 @@ func TestTokenEndpoint(t *testing.T) {
 				m.tokenCache.EXPECT().List(labels.SelectorFromSet(map[string]string{
 					tokens.UserIDLabel: fakeUserID,
 				})).Return(fakeTokenExpiredList, nil)
+				m.secretCache.EXPECT().Get("cattle-oidc-client-secrets", fakeClientID).Return(fakeClientk8sSecret, nil)
 				m.signingKeyGetter.EXPECT().GetPublicKey(fakeSigningKey).Return(&privateKey.PublicKey, nil)
+				m.oidcClient.EXPECT().Patch(fakeClientName, types.JSONPatchType, clientSecretIDPatch).Return(fakeOIDCClient, nil)
 			},
 			wantError: `{"error":"access_denied","error_description":"Rancher token has expired"}`,
 		},
@@ -532,7 +535,6 @@ func TestTokenEndpoint(t *testing.T) {
 					tokens.UserIDLabel: fakeUserID,
 				})).Return(fakeTokenList, nil)
 				m.oidcClientCache.EXPECT().GetByIndex("oidc.management.cattle.io/oidcclient-by-id", fakeClientID).Return([]*v3.OIDCClient{}, nil)
-
 			},
 			wantError: `{"error":"server_error","error_description":"failed to get oidc client: no OIDC clients found"}`,
 		},

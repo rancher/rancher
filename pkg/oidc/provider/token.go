@@ -160,7 +160,6 @@ func (h *tokenHandler) createTokenFromCode(r *http.Request) (TokenResponse, *oid
 	}
 
 	// verify clientID and secret. They can be set in the Authorization header or as a form param as specified in the OIDC spec.
-	var clientID string
 	clientID, clientSecret, ok := r.BasicAuth()
 	if !ok {
 		clientID = r.FormValue("client_id")
@@ -173,22 +172,9 @@ func (h *tokenHandler) createTokenFromCode(r *http.Request) (TokenResponse, *oid
 	if err != nil {
 		return TokenResponse{}, oidcerror.New(oidcerror.ServerError, "failed to get OIDC client")
 	}
-	secret, err := h.secretCache.Get(secretsNamespace, clientID)
-	if err != nil {
-		return TokenResponse{}, oidcerror.New(oidcerror.ServerError, "failed to get client secret")
-	}
-	clientSecretFound := false
-	for key, cs := range secret.Data {
-		if clientSecret == string(cs) {
-			clientSecretFound = true
-			if err := h.updateClientSecretUsedTimeStamp(oidcClient, key); err != nil {
-				logrus.Errorf("[OIDC provider] failed to update client secret's used timestamp: %v", err)
-			}
-			break
-		}
-	}
-	if !clientSecretFound {
-		return TokenResponse{}, oidcerror.New(oidcerror.InvalidRequest, "invalid client_secret")
+
+	if oidcErr := h.isValidClientSecret(clientSecret, oidcClient); oidcErr != nil {
+		return TokenResponse{}, oidcErr
 	}
 
 	// PKCE verification
@@ -215,6 +201,30 @@ func (h *tokenHandler) createTokenFromCode(r *http.Request) (TokenResponse, *oid
 	return resp, oidcErr
 }
 
+func (h *tokenHandler) isValidClientSecret(clientSecret string, oidcClient *v3.OIDCClient) *oidcerror.Error {
+	secret, err := h.secretCache.Get(secretsNamespace, oidcClient.Status.ClientID)
+	if err != nil {
+		return oidcerror.New(oidcerror.ServerError, "failed to get client secret")
+	}
+
+	clientSecretFound := false
+	for key, cs := range secret.Data {
+		if clientSecret == string(cs) {
+			clientSecretFound = true
+			if err := h.updateClientSecretUsedTimeStamp(oidcClient, key); err != nil {
+				logrus.Errorf("[OIDC provider] failed to update client secret's used timestamp: %v", err)
+			}
+			break
+		}
+	}
+
+	if !clientSecretFound {
+		return oidcerror.New(oidcerror.InvalidRequest, "invalid client_secret")
+	}
+
+	return nil
+}
+
 // createRefreshToken issues a new id_token, access_token and refresh_token using a refresh_token
 func (h *tokenHandler) createRefreshToken(r *http.Request) (TokenResponse, *oidcerror.Error) {
 	refreshToken := r.Form.Get("refresh_token")
@@ -239,7 +249,7 @@ func (h *tokenHandler) createRefreshToken(r *http.Request) (TokenResponse, *oidc
 		return TokenResponse{}, oidcerror.New(oidcerror.ServerError, fmt.Sprintf("failed to parse refresh token: %v", err))
 	}
 	claims, ok := token.Claims.(*RefreshTokenClaims)
-	if !ok && !token.Valid {
+	if !ok || !token.Valid {
 		return TokenResponse{}, oidcerror.New(oidcerror.ServerError, "refresh token not valid")
 	}
 
@@ -270,6 +280,14 @@ func (h *tokenHandler) createRefreshToken(r *http.Request) (TokenResponse, *oidc
 	oidcClient, err := h.getOIDCClientByClientID(claims.Audience[0])
 	if err != nil {
 		return TokenResponse{}, oidcerror.New(oidcerror.ServerError, fmt.Sprintf("failed to get oidc client: %v", err))
+	}
+
+	_, clientSecret, ok := r.BasicAuth()
+	if !ok {
+		clientSecret = r.FormValue("client_secret")
+	}
+	if oidcErr := h.isValidClientSecret(clientSecret, oidcClient); oidcErr != nil {
+		return TokenResponse{}, oidcErr
 	}
 
 	return h.createTokenResponse(rancherToken, oidcClient, "", claims.Scope)
@@ -422,7 +440,7 @@ func CreateAccessToken(oidcClient *v3.OIDCClient, rancherToken *v3.Token, scopes
 	return accessToken
 }
 
-func (h *tokenHandler) updateClientSecretUsedTimeStamp(oidcClient *v3.OIDCClient, clientSecretID string) interface{} {
+func (h *tokenHandler) updateClientSecretUsedTimeStamp(oidcClient *v3.OIDCClient, clientSecretID string) error {
 	var patch []byte
 	var err error
 	if oidcClient.Annotations != nil {
