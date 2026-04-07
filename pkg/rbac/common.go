@@ -47,6 +47,7 @@ const (
 	clusterManagementPlaneSuffix        = "cluster-mgmt"
 	projectManagementPlaneSuffix        = "project-mgmt"
 	ClusterAdminRoleName                = "cluster-admin"
+	HelmProvisioningReaderRole          = "cattle-helm-provisioning-reader"
 	CrbGlobalRoleAnnotation             = "authz.cluster.cattle.io/globalrole"
 	CrbGlobalRoleBindingAnnotation      = "authz.cluster.cattle.io/globalrolebinding"
 	CrbAdminGlobalRoleCheckedAnnotation = "authz.cluster.cattle.io/admin-globalrole-checked"
