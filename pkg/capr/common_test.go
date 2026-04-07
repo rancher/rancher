@@ -785,7 +785,7 @@ func TestShouldPreBootstrap(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "bootstrap-secret",
 						Annotations: map[string]string{
-							PreBootstrapSyncAnnotation: "true",
+							SyncPreBootstrapAnnotation: "true",
 							AuthorizedObjectAnnotation: "c-test",
 						},
 					},
@@ -807,7 +807,7 @@ func TestShouldPreBootstrap(t *testing.T) {
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "bootstrap-secret",
 						Annotations: map[string]string{
-							PreBootstrapSyncAnnotation: "true",
+							SyncPreBootstrapAnnotation: "true",
 							AuthorizedObjectAnnotation: "c-other",
 						},
 					},
