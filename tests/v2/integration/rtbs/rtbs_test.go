@@ -1,11 +1,13 @@
 package integration
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
 
 	extnamespaces "github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/namespaces"
+	extrbac "github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/rbac"
 	"github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/secrets"
 
 	"github.com/rancher/shepherd/clients/rancher"
@@ -403,6 +405,103 @@ func (p *RTBTestSuite) TestPermissionsCanBeRemoved() {
 		_, err2 := extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns2.Name)
 		return apierrors.IsForbidden(err2) && err1 == nil
 	}, 2*time.Minute, 2*time.Second, "waiting for permissions to be removed from user")
+}
+
+func (p *RTBTestSuite) TestProjectOwnerPermissions() {
+	subSession := p.session.NewSession()
+	defer subSession.Cleanup()
+
+	client, err := p.client.WithSession(subSession)
+	require.NoError(p.T(), err)
+
+	// Grant user the cluster-member role on the local cluster.
+	localCluster, err := client.Management.Cluster.ByID(p.downstreamClusterID)
+	require.NoError(p.T(), err)
+
+	err = users.AddClusterRoleToUser(client, localCluster, p.testUser, "cluster-member", nil)
+	require.NoError(p.T(), err)
+
+	testUser, err := client.AsUser(p.testUser)
+	require.NoError(p.T(), err)
+
+	// User creates a project, retrying until RBAC propagates.
+	var project *management.Project
+	require.Eventually(p.T(), func() bool {
+		project, err = testUser.Management.Project.Create(&management.Project{
+			ClusterID: p.downstreamClusterID,
+			Name:      namegen.AppendRandomString("test-proj-"),
+		})
+		return err == nil
+	}, 2*time.Minute, 2*time.Second, "waiting for user to be able to create a project")
+
+	// Wait for project to become active.
+	require.Eventually(p.T(), func() bool {
+		proj, err := testUser.Management.Project.ByID(project.ID)
+		return err == nil && proj.State == "active"
+	}, 2*time.Minute, 2*time.Second, "waiting for project to become active")
+
+	// Wait until user can create namespaces.
+	err = extauthz.WaitForAllowed(testUser, p.downstreamClusterID, []*authzv1.ResourceAttributes{
+		{
+			Verb:     "create",
+			Resource: "namespaces",
+			Group:    "",
+		},
+	})
+	require.NoError(p.T(), err)
+
+	// User creates a namespace in the project.
+	projectName := strings.Split(project.ID, ":")[1]
+	ns, err := extnamespaces.CreateNamespace(testUser, p.downstreamClusterID, projectName, namegen.AppendRandomString("testns-"), "{}", map[string]string{}, map[string]string{})
+	require.NoError(p.T(), err)
+
+	// Verify user can list pods in the namespace (proves basic access).
+	dynamicClient, err := testUser.GetDownStreamClusterClient(p.downstreamClusterID)
+	require.NoError(p.T(), err)
+
+	podGVR := corev1.SchemeGroupVersion.WithResource("pods")
+	_, err = dynamicClient.Resource(podGVR).Namespace(ns.Name).List(context.TODO(), metav1.ListOptions{})
+	require.NoError(p.T(), err)
+
+	// Verify user has both 'project-owner' and 'admin' role bindings in the namespace.
+	rbs, err := extrbac.ListRoleBindings(client, p.downstreamClusterID, ns.Name, metav1.ListOptions{})
+	require.NoError(p.T(), err)
+
+	rbRoles := map[string]bool{}
+	for _, rb := range rbs.Items {
+		for _, subject := range rb.Subjects {
+			if subject.Name == p.testUser.ID {
+				rbRoles[rb.RoleRef.Name] = true
+			}
+		}
+	}
+	require.True(p.T(), rbRoles["project-owner"], "expected project-owner role binding for user")
+	require.True(p.T(), rbRoles["admin"], "expected admin role binding for user")
+
+	// Verify user can create deployments (extensions group) in the namespace.
+	err = extauthz.WaitForAllowed(testUser, p.downstreamClusterID, []*authzv1.ResourceAttributes{
+		{
+			Verb:      "create",
+			Resource:  "deployments",
+			Group:     "extensions",
+			Namespace: ns.Name,
+		},
+	})
+	require.NoError(p.T(), err)
+
+	// Verify user can list pods.metrics.k8s.io in the namespace.
+	err = extauthz.WaitForAllowed(testUser, p.downstreamClusterID, []*authzv1.ResourceAttributes{
+		{
+			Verb:      "list",
+			Resource:  "pods",
+			Group:     "metrics.k8s.io",
+			Namespace: ns.Name,
+		},
+	})
+	require.NoError(p.T(), err)
+
+	err = users.RemoveClusterRoleFromUser(client, p.testUser)
+	require.NoError(p.T(), err)
 }
 
 func TestRTBTestSuite(t *testing.T) {
