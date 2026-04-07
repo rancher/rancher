@@ -39,6 +39,34 @@ type TestManager struct {
 	testCases    []testCase
 }
 
+func TestDeleteTokenByNameLegacy(t *testing.T) {
+	tokenName := "testname"
+	tokenClient := &fakeTokenClient{}
+	tokenManager := Manager{
+		tokens: tokenClient,
+	}
+	code, err := tokenManager.DeleteTokenByName(tokenName)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, code)
+	assert.Equal(t, 1, tokenClient.DeleteCount())
+}
+
+func TestDeleteTokenByNameExt(t *testing.T) {
+	tokenName := "testname"
+	ctrl := gomock.NewController(t)
+	secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+	users.EXPECT().Cache().Return(nil)
+	secrets.EXPECT().Cache().Return(nil)
+	secrets.EXPECT().Delete("cattle-tokens", tokenName, &metav1.DeleteOptions{}).Return(nil)
+	tokenManager := Manager{
+		extTokenStore: exttokenstore.NewSystem(nil, nil, secrets, users, nil, nil, nil, nil, nil),
+	}
+	code, err := tokenManager.DeleteTokenByName("ext/"+tokenName)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, code)
+}
+
 func TestGetTokenLegacy(t *testing.T) {
 	tokenName := "testname"
 	tokenKey := mustGenerateRandomToken(t)
@@ -416,8 +444,13 @@ func mustGenerateRandomToken(t *testing.T) string {
 }
 
 type fakeTokenClient struct {
-	list []apiv3.Token
-	get  *apiv3.Token
+	list   []apiv3.Token
+	get    *apiv3.Token
+	delete int
+}
+
+func (f *fakeTokenClient) DeleteCount() int {
+	return f.delete
 }
 
 func (f *fakeTokenClient) Create(o *apiv3.Token) (*apiv3.Token, error) {
@@ -429,6 +462,7 @@ func (f *fakeTokenClient) Get(name string, options metav1.GetOptions) (*apiv3.To
 }
 
 func (f *fakeTokenClient) Delete(name string, options *metav1.DeleteOptions) error {
+	f.delete += 1
 	return nil
 }
 
