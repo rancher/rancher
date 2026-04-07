@@ -21,7 +21,6 @@ import (
 	capicontrollers "github.com/rancher/rancher/pkg/generated/controllers/cluster.x-k8s.io/v1beta2"
 	provcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	rkecontroller "github.com/rancher/rancher/pkg/generated/controllers/rke.cattle.io/v1"
-	v1 "github.com/rancher/rancher/pkg/generated/norman/core/v1"
 	"github.com/rancher/rancher/pkg/serviceaccounttoken"
 	"github.com/rancher/wrangler/v3/pkg/condition"
 	"github.com/rancher/wrangler/v3/pkg/data"
@@ -653,10 +652,15 @@ func SafeConcatName(maxLength int, name ...string) string {
 	return fullPath[0:maxLength-(hashLength+1)] + "-" + hex.EncodeToString(digest[0:])[0:hashLength]
 }
 
+// SecretLister is a minimal interface for listing secrets in order to be compatible with core controllers, norman, etc
+type SecretLister interface {
+	List(namespace string, selector labels.Selector) ([]*corev1.Secret, error)
+}
+
 // ShouldPreBootstrap determines whether the given cluster should enter the pre-bootstrap flow.
 // It checks whether the cluster has already been pre-bootstrapped, and whether there are any authorized
 // sync-bootstrap secrets for this cluster.
-func ShouldPreBootstrap(secretLister v1.SecretLister, cluster *v3.Cluster) (bool, error) {
+func ShouldPreBootstrap(secretLister SecretLister, cluster *v3.Cluster) (bool, error) {
 	if v3.ClusterConditionPreBootstrapped.IsTrue(cluster) {
 		return false, nil
 	}
