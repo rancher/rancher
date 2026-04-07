@@ -504,6 +504,79 @@ func (p *RTBTestSuite) TestProjectOwnerPermissions() {
 	require.NoError(p.T(), err)
 }
 
+func (p *RTBTestSuite) TestAPIGroupInRoleTemplate() {
+	subSession := p.session.NewSession()
+	defer subSession.Cleanup()
+
+	client, err := p.client.WithSession(subSession)
+	require.NoError(p.T(), err)
+
+	// Skip if admin can't see any nodes.
+	adminNodes, err := client.Management.Node.List(nil)
+	require.NoError(p.T(), err)
+	if len(adminNodes.Data) == 0 {
+		p.T().Skip("no nodes in the cluster")
+	}
+
+	testUser, err := client.AsUser(p.testUser)
+	require.NoError(p.T(), err)
+
+	// Validate the standard user cannot see any nodes initially.
+	userNodes, err := testUser.Management.Node.List(nil)
+	require.NoError(p.T(), err)
+	require.Empty(p.T(), userNodes.Data, "standard user should not see any nodes")
+
+	// Create a cluster-scoped role template with apiGroup-specific rules.
+	rt, err := client.Management.RoleTemplate.Create(&management.RoleTemplate{
+		Context: "cluster",
+		Name:    namegen.AppendRandomString("test-rt-"),
+		Rules: []management.PolicyRule{
+			{
+				APIGroups: []string{"management.cattle.io"},
+				Resources: []string{"nodes", "nodepools"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+			{
+				APIGroups: []string{"scheduling.k8s.io"},
+				Resources: []string{"*"},
+				Verbs:     []string{"*"},
+			},
+		},
+	})
+	require.NoError(p.T(), err)
+
+	// Wait for the role template to be available.
+	require.Eventually(p.T(), func() bool {
+		_, err := client.Management.RoleTemplate.ByID(rt.ID)
+		return err == nil
+	}, 2*time.Minute, 2*time.Second, "role template never became available")
+
+	// Bind the user to the role template via a CRTB using the user's principal ID.
+	require.NotEmpty(p.T(), p.testUser.PrincipalIDs, "test user has no principal IDs")
+	_, err = client.Management.ClusterRoleTemplateBinding.Create(&management.ClusterRoleTemplateBinding{
+		UserPrincipalID: p.testUser.PrincipalIDs[0],
+		RoleTemplateID:  rt.ID,
+		ClusterID:       p.downstreamClusterID,
+	})
+	require.NoError(p.T(), err)
+
+	// Wait for the user to be able to see nodes.
+	require.Eventually(p.T(), func() bool {
+		nodes, err := testUser.Management.Node.List(nil)
+		return err == nil && len(nodes.Data) > 0
+	}, 2*time.Minute, 2*time.Second, "user could never see nodes")
+
+	// Verify user can see nodes.
+	userNodes, err = testUser.Management.Node.List(nil)
+	require.NoError(p.T(), err)
+	require.NotEmpty(p.T(), userNodes.Data)
+
+	// Verify user cannot delete a node (role only grants get/list/watch).
+	err = testUser.Management.Node.Delete(&userNodes.Data[0])
+	require.Error(p.T(), err)
+	require.Contains(p.T(), err.Error(), "403")
+}
+
 func TestRTBTestSuite(t *testing.T) {
 	suite.Run(t, new(RTBTestSuite))
 }
