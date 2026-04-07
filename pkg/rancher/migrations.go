@@ -735,30 +735,30 @@ func cleanupMgmtOnlyConditionsFromProvisioningClusters(w *wrangler.CAPIContext) 
 	}
 
 	mgmtClusterOnlyConditions := map[string]struct{}{
-		"ACISecretsMigrated":                   {},
-		"AddonDeploy":                          {},
-		"AgentDeployed":                        {},
-		"AlertingEnabled":                      {},
-		"CertsGenerated":                       {},
-		"DefaultNamespaceAssigned":             {},
-		"DefaultProjectCreated":                {},
-		"etcd":                                 {},
-		"GlobalAdminsSynced":                   {},
-		"HarvesterCloudProviderConfigMigrated": {},
-		"InitialRolesPopulated":                {},
-		"NoDiskPressure":                       {},
-		"NoMemoryPressure":                     {},
-		"Pending":                              {},
-		"PreBootstrapped":                      {},
-		"RKESecretsMigrated":                   {},
-		"SecretsMigrated":                      {},
-		"ServiceAccountMigrated":               {},
-		"ServiceAccountSecretsMigrated":        {},
-		"SystemAccountCreated":                 {},
-		"SystemNamespacesAssigned":             {},
-		"SystemProjectCreated":                 {},
-		"Upgraded":                             {},
-		"Waiting":                              {},
+		string(v32.ClusterConditionACISecretsMigrated):                   {},
+		string(v32.ClusterConditionAddonDeploy):                          {},
+		string(v32.ClusterConditionAgentDeployed):                        {},
+		string(v32.ClusterConditionAlertingEnabled):                      {},
+		string(v32.ClusterConditionCertsGenerated):                       {},
+		string(v32.ClusterConditionDefaultNamespaceAssigned):             {},
+		string(v32.ClusterConditionDefaultProjectCreated):                {},
+		string(v32.ClusterConditionEtcd):                                 {},
+		string(v32.ClusterConditionGlobalAdminsSynced):                   {},
+		string(v32.ClusterConditionHarvesterCloudProviderConfigMigrated): {},
+		string(v32.ClusterConditionInitialRolesPopulated):                {},
+		string(v32.ClusterConditionNoDiskPressure):                       {},
+		string(v32.ClusterConditionNoMemoryPressure):                     {},
+		string(v32.ClusterConditionPending):                              {},
+		string(v32.ClusterConditionPreBootstrapped):                      {},
+		string(v32.ClusterConditionRKESecretsMigrated):                   {},
+		string(v32.ClusterConditionSecretsMigrated):                      {},
+		string(v32.ClusterConditionServiceAccountMigrated):               {},
+		string(v32.ClusterConditionServiceAccountSecretsMigrated):        {},
+		string(v32.ClusterConditionSystemAccountCreated):                 {},
+		string(v32.ClusterConditionSystemNamespacesAssigned):             {},
+		string(v32.ClusterConditionSystemProjectCreated):                 {},
+		string(v32.ClusterConditionUpgraded):                             {},
+		string(v32.ClusterConditionWaiting):                              {},
 	}
 
 	provClusters, err := w.Provisioning.Cluster().List("", metav1.ListOptions{})
@@ -766,13 +766,13 @@ func cleanupMgmtOnlyConditionsFromProvisioningClusters(w *wrangler.CAPIContext) 
 		return err
 	}
 
-	for _, cluster := range provClusters.Items {
-		if len(cluster.Status.Conditions) == 0 {
+	for _, provCluster := range provClusters.Items {
+		if len(provCluster.Status.Conditions) == 0 {
 			continue
 		}
 
 		if err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			cluster, err := w.Provisioning.Cluster().Get(cluster.Namespace, cluster.Name, metav1.GetOptions{})
+			cluster, err := w.Provisioning.Cluster().Get(provCluster.Namespace, provCluster.Name, metav1.GetOptions{})
 			if apierrors.IsNotFound(err) {
 				return nil
 			} else if err != nil {

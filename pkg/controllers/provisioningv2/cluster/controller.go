@@ -149,6 +149,9 @@ func EarlyRegister(ctx context.Context, clients *wrangler.Context, kubeconfigMan
 	clients.Mgmt.Cluster().OnChange(ctx, "v3-scheduling-customization-backfill", h.updateV3SchedulingCustomization)
 
 	clients.Mgmt.Cluster().OnChange(ctx, "management-cluster-status-update", h.updateClusterStatus)
+	clients.DeferredCAPIRegistration.DeferFunc(func(capiClients *wrangler.CAPIContext) {
+		h.capiMachinesCache = capiClients.CAPI.Machine().Cache()
+	})
 
 	relatedresource.Watch(ctx, "cluster-watch", h.clusterWatch,
 		clients.Provisioning.Cluster(), clients.Mgmt.Cluster())

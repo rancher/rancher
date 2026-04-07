@@ -235,8 +235,8 @@ type ClusterStatus struct {
 
 	// ReadyReconciling indicates that the cluster's readiness state is currently being managed by provisioning controller.
 	// Currently used only for v2prov clusters. When true, secondary health controllers (like HealthSyncer, Connected) should avoid updating Ready condition to prevent state flapping.
-	ReadyReconciling bool        `json:"readyReconciling,omitempty"`
-	Info             ClusterInfo `json:"info,omitempty"`
+	ReadyReconciling bool         `json:"readyReconciling,omitempty"`
+	Info             *ClusterInfo `json:"info,omitempty"`
 }
 
 // ClusterInfo provides aggregated cluster metadata for UI display.
@@ -249,8 +249,8 @@ type ClusterInfo struct {
 	NodeCount int `json:"nodeCount,omitempty"`
 	// Arch is the node architecture from node labels, or "mixed" if multiple architectures exist.
 	Arch string `json:"arch,omitempty"`
-	// ProvisioningCluster is the namespace/name reference to the provisioning.cattle.io/v1 Cluster. Set only for v2prov clusters.
-	ProvisioningCluster string `json:"provisioningCluster,omitempty"`
+	// ProvisioningClusterRef is a reference to the provisioning.cattle.io/v1 Cluster. Set only for v2prov clusters.
+	ProvisioningClusterRef *v1.ObjectReference `json:"provisioningClusterRef,omitempty"`
 	/* Other fields UI uses:
 	1. Distro: available in cluster.Status.Provider.
 	2. Human name of the cluster: cluster.Spec.DisplayName

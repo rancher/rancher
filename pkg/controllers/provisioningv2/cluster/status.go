@@ -1,19 +1,21 @@
 package cluster
 
 import (
+	"reflect"
 	"strings"
 	"sync"
 	"time"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	v1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+	"github.com/rancher/wrangler/v3/pkg/gvk"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 const (
-	clusterInfoQuietPeriod = 30 * time.Second
+	clusterInfoQuietPeriod = 20 * time.Second
 )
 
 var lastClusterInfoReconcile sync.Map // map[clusterKey]time.Time for debouncing ClusterInfo field computations when needed
@@ -33,14 +35,22 @@ func (h *handler) updateClusterStatus(key string, cluster *v3.Cluster) (*v3.Clus
 		provCluster = provClusters[0]
 	}
 
-	provider := cluster.Status.Info.MachineProvider
-	if provider == "" {
-		provider = h.getMachineProvider(cluster, provCluster)
+	provider := h.getMachineProvider(cluster, provCluster)
+	if provider == "" && cluster.Status.Info != nil {
+		provider = cluster.Status.Info.MachineProvider
 	}
 
-	provisioningCluster := cluster.Status.Info.ProvisioningCluster
-	if provisioningCluster == "" && provCluster != nil && cluster.Annotations["provisioning.cattle.io/administrated"] == "true" {
-		provisioningCluster = provCluster.Namespace + "/" + provCluster.Name
+	var provisioningClusterRef *corev1.ObjectReference
+	if cluster.Status.Info != nil {
+		provisioningClusterRef = cluster.Status.Info.ProvisioningClusterRef
+	}
+	if provisioningClusterRef == nil && provCluster != nil && cluster.Annotations["provisioning.cattle.io/administrated"] == "true" {
+		gvk, _ := gvk.Get(provCluster)
+		provisioningClusterRef = &corev1.ObjectReference{
+			Namespace: provCluster.Namespace,
+			Name:      provCluster.Name,
+		}
+		provisioningClusterRef.APIVersion, provisioningClusterRef.Kind = gvk.ToAPIVersionAndKind()
 	}
 
 	kubernetesVersion := h.getKubernetesVersion(cluster, provCluster)
@@ -50,8 +60,11 @@ func (h *handler) updateClusterStatus(key string, cluster *v3.Cluster) (*v3.Clus
 	}
 
 	// Debounce expensive fields, currently only arch
-	arch := cluster.Status.Info.Arch
-	if arch == "" || h.getClusterInfoWaitTime(key) == 0 {
+	arch := ""
+	if cluster.Status.Info != nil {
+		arch = cluster.Status.Info.Arch
+	}
+	if h.getClusterInfoWaitTime(key) == 0 {
 		arch, err = h.getArch(cluster)
 		if err != nil {
 			return nil, err
@@ -59,21 +72,20 @@ func (h *handler) updateClusterStatus(key string, cluster *v3.Cluster) (*v3.Clus
 		lastClusterInfoReconcile.Store(key, time.Now())
 	}
 
-	desiredInfo := v3.ClusterInfo{
-		MachineProvider:     provider,
-		KubernetesVersion:   kubernetesVersion,
-		NodeCount:           nodeCount,
-		Arch:                arch,
-		ProvisioningCluster: provisioningCluster,
+	desiredInfo := &v3.ClusterInfo{
+		MachineProvider:        provider,
+		KubernetesVersion:      kubernetesVersion,
+		NodeCount:              nodeCount,
+		Arch:                   arch,
+		ProvisioningClusterRef: provisioningClusterRef,
 	}
 
-	if cluster.Status.Info == desiredInfo {
+	if reflect.DeepEqual(cluster.Status.Info, desiredInfo) {
 		return cluster, nil
 	}
 
 	clusterCopy := cluster.DeepCopy()
 	clusterCopy.Status.Info = desiredInfo
-
 	return h.mgmtClusters.UpdateStatus(clusterCopy)
 }
 
@@ -204,10 +216,10 @@ func (h *handler) getArch(cluster *v3.Cluster) (string, error) {
 	}
 	arch := ""
 	for _, machine := range machines {
-		if machine.Labels[corev1.LabelArchStable] != "" {
+		if machine.Status.NodeLabels[corev1.LabelArchStable] != "" {
 			if arch == "" {
-				arch = machine.Labels[corev1.LabelArchStable]
-			} else if arch != machine.Labels[corev1.LabelArchStable] {
+				arch = machine.Status.NodeLabels[corev1.LabelArchStable]
+			} else if arch != machine.Status.NodeLabels[corev1.LabelArchStable] {
 				return "mixed", nil
 			}
 		}
