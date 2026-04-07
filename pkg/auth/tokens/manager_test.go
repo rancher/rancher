@@ -39,6 +39,141 @@ type TestManager struct {
 	testCases    []testCase
 }
 
+func TestGetTokenByIDLegacy(t *testing.T) {
+	// legacy refers here to the session token the token to be retrieved is
+	// checked against.  the token to be retrieved is always a legacy token,
+	// because that is what is managed here. The session token is retrieved via `GetToken`.
+
+	// session token, legacy
+	authToken := "testname"
+	tokenKey := mustGenerateRandomToken(t)
+	legacyAuthToken := &apiv3.Token{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "management.cattle.io/v3",
+			Kind:       "Token",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: authToken,
+		},
+		AuthProvider: "testing",
+		Token:        tokenKey,
+		TTLMillis:    0,
+		UserID:       "u-mo12345",
+	}
+
+	// token to actually get, legacy, always
+	tokenName := "testother"
+	legacyToken := &apiv3.Token{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "management.cattle.io/v3",
+			Kind:       "Token",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: tokenName,
+		},
+		AuthProvider: "testing",
+		Token:        mustGenerateRandomToken(t),
+		TTLMillis:    0,
+		UserID:       "u-mo12345",
+	}
+	di := &dummyIndexer{
+		Store: &cache.FakeCustomStore{},
+	}
+	di.Empty()
+	tokenManager := Manager{
+		tokenIndexer: di,
+		tokens: &fakeTokenClient{
+			gmap: map[string]*apiv3.Token{
+				authToken: legacyAuthToken,
+				tokenName: legacyToken,
+			},
+		},
+	}
+
+	token, code, err := tokenManager.getTokenByID(authToken+":"+tokenKey, tokenName)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, code)
+	assert.Equal(t, legacyToken, &token)
+}
+
+func TestGetTokenByIDExt(t *testing.T) {
+	// ext refers here to the session token the token to be retrieved is
+	// checked against.  the token to be retrieved is always a legacy token,
+	// because that is what is managed here. The session token is retrieved
+	// via `GetToken`.
+
+	// session token, ext
+	authToken := "testname"
+	tokenKey := "dddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+	// SHA3 hash of tokenKey
+	hashedTokenKey := "$3:1:uFrxm43ggfw:zsN1zEFC7SvABTdR58o7yjIqfrI4cQ/HSYz3jBwwVnx5X+/ph4etGDIU9dvIYuy1IvnYUVe6a/Ar95xE+gfjhA"
+	extUser := "u-mo12345"
+	extPrincipal := ext.TokenPrincipal{
+		Name:     "world",
+		Provider: "testing",
+	}
+	extPrincipalBytes, _ := json.Marshal(extPrincipal)
+	extSecret := corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: authToken,
+			Labels: map[string]string{
+				exttokenstore.UserIDLabel:     extUser,
+				exttokenstore.SecretKindLabel: exttokenstore.SecretKindLabelValue,
+			},
+			UID: "",
+		},
+		Data: map[string][]byte{
+			exttokenstore.FieldDescription:    []byte(""),
+			exttokenstore.FieldEnabled:        []byte("false"),
+			exttokenstore.FieldHash:           []byte(hashedTokenKey),
+			exttokenstore.FieldKind:           []byte(exttokenstore.IsLogin),
+			exttokenstore.FieldLastUpdateTime: []byte("13:00:05"),
+			exttokenstore.FieldPrincipal:      extPrincipalBytes,
+			exttokenstore.FieldTTL:            []byte("-1"),
+			exttokenstore.FieldUID:            []byte("kubid"),
+			exttokenstore.FieldUserID:         []byte(extUser),
+		},
+	}
+	// token to actually get, legacy, always
+	tokenName := "testother"
+	legacyToken := &apiv3.Token{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "management.cattle.io/v3",
+			Kind:       "Token",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: tokenName,
+		},
+		AuthProvider: "testing",
+		Token:        mustGenerateRandomToken(t),
+		TTLMillis:    0,
+		UserID:       "u-mo12345",
+	}
+	di := &dummyIndexer{
+		Store: &cache.FakeCustomStore{},
+	}
+	di.Empty()
+	ctrl := gomock.NewController(t)
+	secrets := fake.NewMockControllerInterface[*corev1.Secret, *corev1.SecretList](ctrl)
+	scache := fake.NewMockCacheInterface[*corev1.Secret](ctrl)
+	users := fake.NewMockNonNamespacedControllerInterface[*apiv3.User, *apiv3.UserList](ctrl)
+	users.EXPECT().Cache().Return(nil)
+	secrets.EXPECT().Cache().Return(scache)
+	scache.EXPECT().Get("cattle-tokens", authToken).Return(&extSecret, nil)
+	tokenManager := Manager{
+		extTokenStore: exttokenstore.NewSystem(nil, nil, secrets, users, nil, nil, nil, nil, nil),
+		tokenIndexer:  di,
+		tokens: &fakeTokenClient{
+			get: legacyToken,
+		},
+	}
+
+	token, code, err := tokenManager.getTokenByID("ext/"+authToken+":"+tokenKey, tokenName)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, code)
+	assert.Equal(t, legacyToken, &token)
+}
+
 func TestDeleteTokenByNameLegacy(t *testing.T) {
 	tokenName := "testname"
 	tokenClient := &fakeTokenClient{}
@@ -62,7 +197,7 @@ func TestDeleteTokenByNameExt(t *testing.T) {
 	tokenManager := Manager{
 		extTokenStore: exttokenstore.NewSystem(nil, nil, secrets, users, nil, nil, nil, nil, nil),
 	}
-	code, err := tokenManager.DeleteTokenByName("ext/"+tokenName)
+	code, err := tokenManager.DeleteTokenByName("ext/" + tokenName)
 	assert.NoError(t, err)
 	assert.Equal(t, 0, code)
 }
@@ -446,6 +581,7 @@ func mustGenerateRandomToken(t *testing.T) string {
 type fakeTokenClient struct {
 	list   []apiv3.Token
 	get    *apiv3.Token
+	gmap   map[string]*apiv3.Token
 	delete int
 }
 
@@ -458,7 +594,10 @@ func (f *fakeTokenClient) Create(o *apiv3.Token) (*apiv3.Token, error) {
 }
 
 func (f *fakeTokenClient) Get(name string, options metav1.GetOptions) (*apiv3.Token, error) {
-	return f.get.DeepCopy(), nil
+	if f.get != nil {
+		return f.get.DeepCopy(), nil
+	}
+	return f.gmap[name].DeepCopy(), nil
 }
 
 func (f *fakeTokenClient) Delete(name string, options *metav1.DeleteOptions) error {
