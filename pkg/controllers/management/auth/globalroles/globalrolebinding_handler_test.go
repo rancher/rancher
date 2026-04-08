@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 var (
@@ -1373,8 +1374,8 @@ func Test_globalRoleBindingLifecycle_Create(t *testing.T) {
 
 		// Create lifecycle with all mocks
 		lifecycle := &globalRoleBindingLifecycle{
-			userLister:              userLister,
-			clusterLister:           clusterCache,
+			userLister:    userLister,
+			clusterLister: clusterCache,
 			clusterManager: &clusterContextGetterMock{
 				userContextFunc: func(clusterName string) (*config.UserContext, error) {
 					return nil, fmt.Errorf("cluster unavailable")
@@ -1787,7 +1788,7 @@ func TestReconcileInheritedRoleBindingInNamespace(t *testing.T) {
 			})
 
 			lifecycle := &globalRoleBindingLifecycle{}
-			roleBindingUIDs := make(map[types.UID]struct{})
+			roleBindingUIDs := sets.New[types.UID]()
 
 			err := lifecycle.reconcileInheritedRoleBindingInNamespace(
 				"cluster1",
@@ -1862,7 +1863,7 @@ func TestPurgeInvalidInheritedRoleBindingsInCluster(t *testing.T) {
 	tests := []struct {
 		name                string
 		setupControllers    func(controllers)
-		validUIDs           map[types.UID]struct{}
+		validUIDs           sets.Set[types.UID]
 		wantError           bool
 		expectedDeleteCalls int
 	}{
@@ -1871,10 +1872,7 @@ func TestPurgeInvalidInheritedRoleBindingsInCluster(t *testing.T) {
 			setupControllers: func(c controllers) {
 				c.rbCache.EXPECT().List("", gomock.Any()).Return([]*rbacv1.RoleBinding{validRB1, validRB2}, nil)
 			},
-			validUIDs: map[types.UID]struct{}{
-				"valid-uid-1": {},
-				"valid-uid-2": {},
-			},
+			validUIDs:           sets.New[types.UID]("valid-uid-1", "valid-uid-2"),
 			wantError:           false,
 			expectedDeleteCalls: 0,
 		},
@@ -1884,10 +1882,7 @@ func TestPurgeInvalidInheritedRoleBindingsInCluster(t *testing.T) {
 				c.rbCache.EXPECT().List("", gomock.Any()).Return([]*rbacv1.RoleBinding{validRB1, validRB2, invalidRB}, nil)
 				c.rbController.EXPECT().Delete("namespace3", "invalid-rb", gomock.Any()).Return(nil)
 			},
-			validUIDs: map[types.UID]struct{}{
-				"valid-uid-1": {},
-				"valid-uid-2": {},
-			},
+			validUIDs:           sets.New[types.UID]("valid-uid-1", "valid-uid-2"),
 			wantError:           false,
 			expectedDeleteCalls: 1,
 		},
@@ -1896,9 +1891,7 @@ func TestPurgeInvalidInheritedRoleBindingsInCluster(t *testing.T) {
 			setupControllers: func(c controllers) {
 				c.rbCache.EXPECT().List("", gomock.Any()).Return(nil, fmt.Errorf("list failed"))
 			},
-			validUIDs: map[types.UID]struct{}{
-				"valid-uid-1": {},
-			},
+			validUIDs:           sets.New[types.UID]("valid-uid-1"),
 			wantError:           true,
 			expectedDeleteCalls: 0,
 		},
@@ -1908,9 +1901,7 @@ func TestPurgeInvalidInheritedRoleBindingsInCluster(t *testing.T) {
 				c.rbCache.EXPECT().List("", gomock.Any()).Return([]*rbacv1.RoleBinding{validRB1, invalidRB}, nil)
 				c.rbController.EXPECT().Delete("namespace3", "invalid-rb", gomock.Any()).Return(fmt.Errorf("delete failed"))
 			},
-			validUIDs: map[types.UID]struct{}{
-				"valid-uid-1": {},
-			},
+			validUIDs:           sets.New[types.UID]("valid-uid-1"),
 			wantError:           true,
 			expectedDeleteCalls: 1,
 		},
@@ -1931,9 +1922,7 @@ func TestPurgeInvalidInheritedRoleBindingsInCluster(t *testing.T) {
 				c.rbController.EXPECT().Delete("namespace3", "invalid-rb", gomock.Any()).Return(nil)
 				c.rbController.EXPECT().Delete("namespace4", "invalid-rb-2", gomock.Any()).Return(nil)
 			},
-			validUIDs: map[types.UID]struct{}{
-				"valid-uid-1": {},
-			},
+			validUIDs:           sets.New[types.UID]("valid-uid-1"),
 			wantError:           false,
 			expectedDeleteCalls: 2,
 		},
@@ -2064,8 +2053,8 @@ func TestDeleteInheritedNamespacedRoleBindings(t *testing.T) {
 			})
 
 			lifecycle := &globalRoleBindingLifecycle{
-				grLister:       grCache,
-				clusterLister:  clusterLister,
+				grLister:      grCache,
+				clusterLister: clusterLister,
 				clusterManager: &clusterContextGetterMock{
 					userContextFunc: func(clusterName string) (*config.UserContext, error) {
 						return nil, fmt.Errorf("cluster unavailable")

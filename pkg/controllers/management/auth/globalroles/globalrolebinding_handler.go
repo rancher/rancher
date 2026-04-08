@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -653,7 +654,7 @@ func (l *globalRoleBindingLifecycle) reconcileInheritedNamespacedRoleBindingsFor
 	globalRoleName := wrangler.SafeConcatName(gr.Name)
 
 	// Track all RoleBinding UIDs that should exist in this clusters
-	roleBindingUIDs := map[types.UID]struct{}{}
+	roleBindingUIDs := sets.New[types.UID]()
 
 	// Iterate through all namespaces in InheritedNamespacedRules
 	for ns := range gr.InheritedNamespacedRules {
@@ -673,7 +674,7 @@ func (l *globalRoleBindingLifecycle) reconcileInheritedNamespacedRoleBindingsFor
 }
 
 // reconcileInheritedRoleBindingInNamespace reconciles a single RoleBinding in a specific namespace of a downstream cluster
-func (l *globalRoleBindingLifecycle) reconcileInheritedRoleBindingInNamespace(clusterName, ns, globalRoleName, grbName string, subject rbacv1.Subject, roleBindingClient wrbacv1.RoleBindingClient, roleBindingCache wrbacv1.RoleBindingCache, namespaceCache wcorev1.NamespaceCache, roleBindingUIDs map[types.UID]struct{}) error {
+func (l *globalRoleBindingLifecycle) reconcileInheritedRoleBindingInNamespace(clusterName, ns, globalRoleName, grbName string, subject rbacv1.Subject, roleBindingClient wrbacv1.RoleBindingClient, roleBindingCache wrbacv1.RoleBindingCache, namespaceCache wcorev1.NamespaceCache, roleBindingUIDs sets.Set[types.UID]) error {
 	// Check if the namespace exists in this cluster
 	shouldSkip, err := validateNamespace(namespaceCache, ns, fmt.Sprintf("cluster %s", clusterName))
 	if shouldSkip {
@@ -709,7 +710,7 @@ func (l *globalRoleBindingLifecycle) reconcileInheritedRoleBindingInNamespace(cl
 		})
 
 		if labelCorrect && contentCorrect {
-			roleBindingUIDs[roleBinding.GetUID()] = struct{}{}
+			roleBindingUIDs.Insert(roleBinding.GetUID())
 			return nil
 		}
 
@@ -735,13 +736,13 @@ func (l *globalRoleBindingLifecycle) reconcileInheritedRoleBindingInNamespace(cl
 	if err != nil {
 		return fmt.Errorf("couldn't create RoleBinding %s in namespace %s in cluster %s: %w", roleBindingName, ns, clusterName, err)
 	}
-	roleBindingUIDs[createdRoleBinding.UID] = struct{}{}
+	roleBindingUIDs.Insert(createdRoleBinding.UID)
 
 	return nil
 }
 
 // purgeInvalidInheritedRoleBindingsInCluster removes RoleBindings in a cluster that are no longer needed
-func (l *globalRoleBindingLifecycle) purgeInvalidInheritedRoleBindingsInCluster(clusterName, grbName string, roleBindingCache wrbacv1.RoleBindingCache, roleBindingClient wrbacv1.RoleBindingClient, validRoleBindingUIDs map[types.UID]struct{}) error {
+func (l *globalRoleBindingLifecycle) purgeInvalidInheritedRoleBindingsInCluster(clusterName, grbName string, roleBindingCache wrbacv1.RoleBindingCache, roleBindingClient wrbacv1.RoleBindingClient, validRoleBindingUIDs sets.Set[types.UID]) error {
 	// Create selector for RoleBindings owned by this GRB
 	r, err := labels.NewRequirement(grbOwnerLabel, selection.Equals, []string{grbName})
 	if err != nil {
@@ -756,7 +757,7 @@ func (l *globalRoleBindingLifecycle) purgeInvalidInheritedRoleBindingsInCluster(
 	// Delete RoleBindings that are not in the valid set
 	var returnError error
 	for _, rb := range roleBindings {
-		if _, ok := validRoleBindingUIDs[rb.UID]; !ok {
+		if !validRoleBindingUIDs.Has(rb.UID) {
 			returnError = errors.Join(returnError, rbac.DeleteNamespacedResource(rb.Namespace, rb.Name, roleBindingClient))
 		}
 	}

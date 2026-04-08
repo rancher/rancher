@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/retry"
 )
 
@@ -208,7 +209,7 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 	globalRoleName := name.SafeConcatName(globalRole.Name)
 
 	// For collecting all the roles that should exist for the GlobalRole
-	roleUIDs := map[types.UID]struct{}{}
+	roleUIDs := sets.New[types.UID]()
 
 	for ns, rules := range globalRole.NamespacedRules {
 		roleName := name.SafeConcatName(globalRole.Name, ns)
@@ -263,7 +264,7 @@ func (gr *globalRoleLifecycle) reconcileNamespacedRoles(globalRole *v3.GlobalRol
 
 	// After creating/updating all Roles, if the number of roles with the grOwnerLabel is the same as
 	// the number of created/updated Roles, we know there are no invalid Roles to purge
-	if len(roleUIDs) != len(roles) {
+	if roleUIDs.Len() != len(roles) {
 		err = deleteRolesByUID(roles, roleUIDs, gr.rClient)
 		if err != nil {
 			returnError = errors.Join(returnError, err)
@@ -325,7 +326,7 @@ func (gr *globalRoleLifecycle) reconcileInheritedNamespacedRolesForCluster(clust
 	var returnError error
 
 	// Collect the UIDs of all the roles that should exist for this cluster based on the InheritedNamespacedRules. This will be used later to purge any invalid roles that may exist.
-	roleUIDs := map[types.UID]struct{}{}
+	roleUIDs := sets.New[types.UID]()
 
 	// Iterate through all namespaces in InheritedNamespacedRules
 	for ns, rules := range globalRole.InheritedNamespacedRules {
@@ -334,7 +335,9 @@ func (gr *globalRoleLifecycle) reconcileInheritedNamespacedRolesForCluster(clust
 			returnError = errors.Join(returnError, nsErr)
 			continue
 		}
-		roleUIDs[roleUID] = struct{}{}
+		if roleUID != "" {
+			roleUIDs.Insert(roleUID)
+		}
 	}
 
 	// Purge invalid roles in this cluster
@@ -380,7 +383,7 @@ func (gr *globalRoleLifecycle) reconcileInheritedRoleInNamespace(clusterName, ns
 }
 
 // purgeInvalidInheritedRolesInCluster removes roles in a cluster that are no longer needed
-func (gr *globalRoleLifecycle) purgeInvalidInheritedRolesInCluster(clusterName, globalRoleName string, roleCache wrbacv1.RoleCache, roleClient wrbacv1.RoleClient, validRoleUIDs map[types.UID]struct{}) error {
+func (gr *globalRoleLifecycle) purgeInvalidInheritedRolesInCluster(clusterName, globalRoleName string, roleCache wrbacv1.RoleCache, roleClient wrbacv1.RoleClient, validRoleUIDs sets.Set[types.UID]) error {
 	selector, err := createOwnerLabelSelector(name.SafeConcatName(globalRoleName))
 	if err != nil {
 		return fmt.Errorf("failed to create label selector for cluster %s: %w", clusterName, err)
@@ -513,18 +516,6 @@ func validateNamespace(nsCache wcorev1.NamespaceCache, ns, context string) (bool
 	return false, nil
 }
 
-// ensureRoleLabels ensures a role has the correct owner label
-func ensureRoleLabels(role *rbacv1.Role, ownerLabel string) bool {
-	if role.Labels == nil {
-		role.Labels = map[string]string{}
-	}
-	if role.Labels[grOwnerLabel] != ownerLabel {
-		role.Labels[grOwnerLabel] = ownerLabel
-		return true
-	}
-	return false
-}
-
 // areRolesEqual compares the Rules and Labels of two Roles and returns true if they are equal
 func areRolesEqual(existingRole, desiredRole *rbacv1.Role) bool {
 	return equality.Semantic.DeepEqual(desiredRole.Rules, existingRole.Rules) &&
@@ -541,10 +532,10 @@ func createOwnerLabelSelector(ownerLabel string) (labels.Selector, error) {
 }
 
 // deleteRolesByUID deletes roles that are not in the validUIDs set
-func deleteRolesByUID(roles []*rbacv1.Role, validUIDs map[types.UID]struct{}, roleClient wrbacv1.RoleClient) error {
+func deleteRolesByUID(roles []*rbacv1.Role, validUIDs sets.Set[types.UID], roleClient wrbacv1.RoleClient) error {
 	var returnError error
 	for _, role := range roles {
-		if _, ok := validUIDs[role.UID]; !ok {
+		if !validUIDs.Has(role.UID) {
 			returnError = errors.Join(returnError, rbac.DeleteNamespacedResource(role.Namespace, role.Name, roleClient))
 		}
 	}

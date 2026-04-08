@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // using a subset of condition, because we don't need to check LastTransitionTime or Message
@@ -787,90 +788,6 @@ func TestValidateNamespace(t *testing.T) {
 	}
 }
 
-func TestEnsureRoleLabels(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name        string
-		role        *rbacv1.Role
-		ownerLabel  string
-		wantUpdated bool
-		wantLabels  map[string]string
-	}{
-		{
-			name: "role has no labels, adds owner label",
-			role: &rbacv1.Role{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-role",
-				},
-			},
-			ownerLabel:  "my-global-role",
-			wantUpdated: true,
-			wantLabels: map[string]string{
-				grOwnerLabel: "my-global-role",
-			},
-		},
-		{
-			name: "role has correct label",
-			role: &rbacv1.Role{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-role",
-					Labels: map[string]string{
-						grOwnerLabel: "my-global-role",
-					},
-				},
-			},
-			ownerLabel:  "my-global-role",
-			wantUpdated: false,
-			wantLabels: map[string]string{
-				grOwnerLabel: "my-global-role",
-			},
-		},
-		{
-			name: "role has incorrect label, updates it",
-			role: &rbacv1.Role{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-role",
-					Labels: map[string]string{
-						grOwnerLabel: "old-global-role",
-					},
-				},
-			},
-			ownerLabel:  "new-global-role",
-			wantUpdated: true,
-			wantLabels: map[string]string{
-				grOwnerLabel: "new-global-role",
-			},
-		},
-		{
-			name: "role has other labels, preserves them",
-			role: &rbacv1.Role{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-role",
-					Labels: map[string]string{
-						"other-label": "value",
-					},
-				},
-			},
-			ownerLabel:  "my-global-role",
-			wantUpdated: true,
-			wantLabels: map[string]string{
-				grOwnerLabel:  "my-global-role",
-				"other-label": "value",
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			gotUpdated := ensureRoleLabels(tt.role, tt.ownerLabel)
-			assert.Equal(t, tt.wantUpdated, gotUpdated)
-			assert.Equal(t, tt.wantLabels, tt.role.Labels)
-		})
-	}
-}
-
 func TestCreateOwnerLabelSelector(t *testing.T) {
 	t.Parallel()
 
@@ -933,7 +850,7 @@ func TestDeleteRolesByUID(t *testing.T) {
 	tests := []struct {
 		name        string
 		roles       []*rbacv1.Role
-		validUIDs   map[types.UID]struct{}
+		validUIDs   sets.Set[types.UID]
 		setupClient func(*fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList])
 		wantError   bool
 	}{
@@ -943,9 +860,7 @@ func TestDeleteRolesByUID(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "role1", Namespace: "ns1", UID: uid1}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "role2", Namespace: "ns2", UID: uid2}},
 			},
-			validUIDs: map[types.UID]struct{}{
-				uid1: {},
-			},
+			validUIDs: sets.New(uid1),
 			setupClient: func(client *fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList]) {
 				client.EXPECT().Delete("ns2", "role2", gomock.Any()).Return(nil)
 			},
@@ -957,10 +872,7 @@ func TestDeleteRolesByUID(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "role1", Namespace: "ns1", UID: uid1}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "role2", Namespace: "ns2", UID: uid2}},
 			},
-			validUIDs: map[types.UID]struct{}{
-				uid1: {},
-				uid2: {},
-			},
+			validUIDs: sets.New(uid1, uid2),
 			setupClient: func(client *fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList]) {
 				// No deletions expected
 			},
@@ -971,7 +883,7 @@ func TestDeleteRolesByUID(t *testing.T) {
 			roles: []*rbacv1.Role{
 				{ObjectMeta: metav1.ObjectMeta{Name: "role1", Namespace: "ns1", UID: uid1}},
 			},
-			validUIDs: map[types.UID]struct{}{},
+			validUIDs: sets.New[types.UID](),
 			setupClient: func(client *fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList]) {
 				client.EXPECT().Delete("ns1", "role1", gomock.Any()).Return(fmt.Errorf("delete error"))
 			},
@@ -982,7 +894,7 @@ func TestDeleteRolesByUID(t *testing.T) {
 			roles: []*rbacv1.Role{
 				{ObjectMeta: metav1.ObjectMeta{Name: "role1", Namespace: "ns1", UID: uid1}},
 			},
-			validUIDs: map[types.UID]struct{}{},
+			validUIDs: sets.New[types.UID](),
 			setupClient: func(client *fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList]) {
 				client.EXPECT().Delete("ns1", "role1", gomock.Any()).Return(apierrors.NewNotFound(schema.GroupResource{}, "role1"))
 			},
@@ -995,9 +907,7 @@ func TestDeleteRolesByUID(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "role2", Namespace: "ns2", UID: uid2}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "role3", Namespace: "ns3", UID: uid3}},
 			},
-			validUIDs: map[types.UID]struct{}{
-				uid2: {},
-			},
+			validUIDs: sets.New(uid2),
 			setupClient: func(client *fake.MockClientInterface[*rbacv1.Role, *rbacv1.RoleList]) {
 				client.EXPECT().Delete("ns1", "role1", gomock.Any()).Return(nil)
 				client.EXPECT().Delete("ns3", "role3", gomock.Any()).Return(nil)
