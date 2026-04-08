@@ -2,6 +2,8 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -24,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8stypes "k8s.io/apimachinery/pkg/types"
 )
 
 func init() {
@@ -625,6 +628,103 @@ func (p *RTBTestSuite) TestRemovingUserFromCluster() {
 		})
 		return err == nil && len(crbs.Items) == 0
 	}, 2*time.Minute, 2*time.Second, "failed waiting for clusterRoleBinding to get deleted")
+
+	// User should no longer see any clusters.
+	require.Eventually(p.T(), func() bool {
+		clusters, err := testUser.Management.Cluster.List(nil)
+		return err == nil && len(clusters.Data) == 0
+	}, 2*time.Minute, 2*time.Second, "failed revoking cluster access from user")
+
+	// Accessing the cluster by ID should fail with 403.
+	_, err = testUser.Management.Cluster.ByID(p.downstreamClusterID)
+	require.Error(p.T(), err)
+	require.Contains(p.T(), err.Error(), "403")
+}
+
+func (p *RTBTestSuite) TestUpgradedSetupRemovingUserFromCluster() {
+	subSession := p.session.NewSession()
+	defer subSession.Cleanup()
+
+	client, err := p.client.WithSession(subSession)
+	require.NoError(p.T(), err)
+
+	testUser, err := client.AsUser(p.testUser)
+	require.NoError(p.T(), err)
+
+	mbo := "membership-binding-owner"
+	// Intentionally misspelled — this is how the label was spelled prior to 2.5.
+	mboLegacy := "memberhsip-binding-owner"
+
+	// Admin creates a PRTB giving user project-member on the suite project.
+	prtb, err := client.Management.ProjectRoleTemplateBinding.Create(&management.ProjectRoleTemplateBinding{
+		UserID:         p.testUser.ID,
+		RoleTemplateID: "project-member",
+		ProjectID:      p.project.ID,
+	})
+	require.NoError(p.T(), err)
+
+	// Verify the user can see the cluster.
+	require.Eventually(p.T(), func() bool {
+		_, err := testUser.Management.Cluster.ByID(p.downstreamClusterID)
+		return err == nil
+	}, 2*time.Minute, 2*time.Second, "user could never see the cluster")
+
+	prtbKey := strings.ReplaceAll(prtb.ID, ":", "_")
+
+	// Wait for the CRB with the new-style label.
+	require.Eventually(p.T(), func() bool {
+		crbs, err := extrbac.ListClusterRoleBindings(client, p.downstreamClusterID, metav1.ListOptions{
+			LabelSelector: prtbKey + "=" + mbo,
+		})
+		return err == nil && len(crbs.Items) == 1
+	}, 2*time.Minute, 2*time.Second, "failed waiting for clusterRoleBinding to get created")
+
+	// Fetch the CRB to patch it with the legacy label.
+	crbs, err := extrbac.ListClusterRoleBindings(client, p.downstreamClusterID, metav1.ListOptions{
+		LabelSelector: prtbKey + "=" + mbo,
+	})
+	require.NoError(p.T(), err)
+	require.Len(p.T(), crbs.Items, 1)
+
+	// Patch the CRB to add the legacy label (using PRTB UUID as key) to simulate a pre-2.5 upgrade.
+	patchPayload, err := json.Marshal(map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"labels": map[string]string{
+				prtb.UUID: mboLegacy,
+			},
+		},
+	})
+	require.NoError(p.T(), err)
+
+	dynamicClient, err := client.GetDownStreamClusterClient(p.downstreamClusterID)
+	require.NoError(p.T(), err)
+
+	crbResource := dynamicClient.Resource(extrbac.ClusterRoleBindingGroupVersionResource)
+	_, err = crbResource.Patch(context.TODO(), crbs.Items[0].Name, k8stypes.StrategicMergePatchType, patchPayload, metav1.PatchOptions{})
+	require.NoError(p.T(), err)
+
+	// Wait for the legacy label to appear.
+	require.Eventually(p.T(), func() bool {
+		crbs, err := extrbac.ListClusterRoleBindings(client, p.downstreamClusterID, metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("%s=%s", prtb.UUID, mboLegacy),
+		})
+		return err == nil && len(crbs.Items) == 1
+	}, 2*time.Minute, 2*time.Second, "failed waiting for legacy label to be applied")
+
+	// Delete the PRTB — user should lose access and both labels should be cleaned up.
+	err = client.Management.ProjectRoleTemplateBinding.Delete(prtb)
+	require.NoError(p.T(), err)
+
+	// Wait for CRBs with both the new and legacy labels to be gone.
+	require.Eventually(p.T(), func() bool {
+		newCRBs, err1 := extrbac.ListClusterRoleBindings(client, p.downstreamClusterID, metav1.ListOptions{
+			LabelSelector: prtbKey + "=" + mbo,
+		})
+		legacyCRBs, err2 := extrbac.ListClusterRoleBindings(client, p.downstreamClusterID, metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("%s=%s", prtb.UUID, mboLegacy),
+		})
+		return err1 == nil && err2 == nil && len(newCRBs.Items) == 0 && len(legacyCRBs.Items) == 0
+	}, 2*time.Minute, 2*time.Second, "failed waiting for cluster role bindings to be deleted")
 
 	// User should no longer see any clusters.
 	require.Eventually(p.T(), func() bool {
