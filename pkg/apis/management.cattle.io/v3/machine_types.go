@@ -13,51 +13,6 @@ import (
 // +kubebuilder:skipversion
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-type NodeTemplate struct {
-	types.Namespaced
-
-	metav1.TypeMeta `json:",inline"`
-	// Standard object’s metadata. More info:
-	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-	// Specification of the desired behavior of the the cluster. More info:
-	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
-	Spec NodeTemplateSpec `json:"spec"`
-	// Most recent observed status of the cluster. More info:
-	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
-	Status NodeTemplateStatus `json:"status"`
-}
-
-type NodeTemplateStatus struct {
-	Conditions []NodeTemplateCondition `json:"conditions"`
-}
-
-type NodeTemplateCondition struct {
-	// Type of cluster condition.
-	Type string `json:"type"`
-	// Status of the condition, one of True, False, Unknown.
-	Status v1.ConditionStatus `json:"status"`
-	// The last time this condition was updated.
-	LastUpdateTime string `json:"lastUpdateTime,omitempty"`
-	// Last time the condition transitioned from one status to another.
-	LastTransitionTime string `json:"lastTransitionTime,omitempty"`
-	// The reason for the condition's last transition.
-	Reason string `json:"reason,omitempty"`
-}
-
-type NodeTemplateSpec struct {
-	DisplayName         string     `json:"displayName"`
-	Description         string     `json:"description"`
-	Driver              string     `json:"driver" norman:"nocreate,noupdate"`
-	CloudCredentialName string     `json:"cloudCredentialName" norman:"type=reference[cloudCredential]"`
-	NodeTaints          []v1.Taint `json:"nodeTaints,omitempty"`
-	NodeCommonParams    `json:",inline"`
-}
-
-// +genclient
-// +kubebuilder:skipversion
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 type Node struct {
 	types.Namespaced
 
@@ -93,7 +48,6 @@ type NodeStatus struct {
 	NodeName           string            `json:"nodeName,omitempty"`
 	Requested          v1.ResourceList   `json:"requested,omitempty"`
 	Limits             v1.ResourceList   `json:"limits,omitempty"`
-	NodeTemplateSpec   *NodeTemplateSpec `json:"nodeTemplateSpec,omitempty"`
 	NodeAnnotations    map[string]string `json:"nodeAnnotations,omitempty"`
 	NodeLabels         map[string]string `json:"nodeLabels,omitempty"`
 	NodeTaints         []v1.Taint        `json:"nodeTaints,omitempty"`
@@ -176,10 +130,9 @@ func (n *NodePool) ObjClusterName() string {
 }
 
 type NodePoolSpec struct {
-	Etcd             bool   `json:"etcd"`
-	ControlPlane     bool   `json:"controlPlane"`
-	Worker           bool   `json:"worker"`
-	NodeTemplateName string `json:"nodeTemplateName,omitempty" norman:"type=reference[nodeTemplate],required,notnullable"`
+	Etcd         bool `json:"etcd"`
+	ControlPlane bool `json:"controlPlane"`
+	Worker       bool `json:"worker"`
 
 	HostnamePrefix    string            `json:"hostnamePrefix" norman:"required,notnullable"`
 	Quantity          int               `json:"quantity" norman:"required,default=1"`
@@ -222,10 +175,9 @@ type CustomConfig struct {
 type NodeSpec struct {
 	// Common fields.  They aren't in a shared struct because the annotations are different
 
-	Etcd             bool   `json:"etcd" norman:"noupdate"`
-	ControlPlane     bool   `json:"controlPlane" norman:"noupdate"`
-	Worker           bool   `json:"worker" norman:"noupdate"`
-	NodeTemplateName string `json:"nodeTemplateName,omitempty" norman:"type=reference[nodeTemplate],noupdate"`
+	Etcd         bool `json:"etcd" norman:"noupdate"`
+	ControlPlane bool `json:"controlPlane" norman:"noupdate"`
+	Worker       bool `json:"worker" norman:"noupdate"`
 
 	NodePoolName             string          `json:"nodePoolName" norman:"type=reference[nodePool],nocreate,noupdate"`
 	CustomConfig             *CustomConfig   `json:"customConfig"`
