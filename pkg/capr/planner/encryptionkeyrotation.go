@@ -27,6 +27,7 @@ const (
 	encryptionKeyRotationCommandRotateKeys = "rotate-keys"
 
 	encryptionKeyRotationSecretsEncryptStatusCommand = "secrets-encrypt-status"
+	encryptionKeyRotationRotateKeysTimeoutMessage    = "see server log for details"
 
 	encryptionKeyRotationBinPrefix = "capr/encryption-key-rotation/bin"
 
@@ -81,8 +82,8 @@ type encryptionKeyRotationRestartTargets struct {
 	controlPlane []*planEntry
 }
 
-func (r encryptionKeyRotationRestartTargets) count() int {
-	return len(r.etcdOnly) + len(r.controlPlane)
+func (restartTargets encryptionKeyRotationRestartTargets) count() int {
+	return len(restartTargets.etcdOnly) + len(restartTargets.controlPlane)
 }
 
 func (p *Planner) setEncryptionKeyRotateState(status rkev1.RKEControlPlaneStatus, rotate *rkev1.RotateEncryptionKeys, phase rkev1.RotateEncryptionKeysPhase) (rkev1.RKEControlPlaneStatus, error) {
@@ -220,7 +221,7 @@ func (p *Planner) rotateEncryptionKeys(controlPlane *rkev1.RKEControlPlane, stat
 // and an error if one was encountered.
 func encryptionKeyRotationSupported(controlPlane *rkev1.RKEControlPlane) (bool, error) {
 	if controlPlane == nil {
-		return false, fmt.Errorf("unable to determine encryption key rotation support for nil controlplane")
+		return false, fmt.Errorf("unable to determine encryption key rotation support for nil control plane")
 	}
 
 	kubernetesVersion, err := semver.Make(strings.TrimPrefix(controlPlane.Spec.KubernetesVersion, "v"))
@@ -297,7 +298,7 @@ func encryptionKeyRotationPhaseIsKnown(phase rkev1.RotateEncryptionKeysPhase) bo
 // phase is "rotate", it will re-elect a new leader. It will look for the init node, and if the init node is not valid
 // (etcd-only), it will elect the first suitable control plane node. If the phase is not in "rotate" and a re-election
 // of the leader is necessary, the phase will be set to failed as this is unexpected.
-func (p *Planner) encryptionKeyRotationFindLeader(status rkev1.RKEControlPlaneStatus, clusterPlan *plan.Plan, init *planEntry) (*planEntry, error) {
+func (p *Planner) encryptionKeyRotationFindLeader(status rkev1.RKEControlPlaneStatus, clusterPlan *plan.Plan, initNode *planEntry) (*planEntry, error) {
 	machineName := status.RotateEncryptionKeysLeader
 	if machine, ok := clusterPlan.Machines[machineName]; ok {
 		entry := &planEntry{
@@ -314,8 +315,8 @@ func (p *Planner) encryptionKeyRotationFindLeader(status rkev1.RKEControlPlaneSt
 		return nil, fmt.Errorf("cannot elect control plane leader in phase %s", status.RotateEncryptionKeysPhase)
 	}
 
-	leader := init
-	if !isControlPlane(init) {
+	leader := initNode
+	if !isControlPlane(initNode) {
 		machines := collect(clusterPlan, encryptionKeyRotationIsSuitableControlPlane)
 		if len(machines) == 0 {
 			return nil, fmt.Errorf("no suitable control plane nodes for encryption key rotation")
@@ -367,7 +368,7 @@ func encryptionKeyRotationRestartTargetsForCluster(controlPlane *rkev1.RKEContro
 
 	// Upstream documents restarting the server that ran rotate-keys before the remaining servers. Rancher follows that
 	// ordering after the init node when they are different, so split-role clusters still bring the designated init server
-	// back first and then restart the elected command leader before the rest of the HA servers.
+	// back first and then restart the elected command leader before the rest of the high-availability servers.
 	targets.etcdOnly = append(targets.etcdOnly, collect(clusterPlan, encryptionKeyRotationIsEtcdAndNotControlPlaneAndNotLeaderAndInit(controlPlane))...)
 	targets.controlPlane = append(targets.controlPlane, collect(clusterPlan, encryptionKeyRotationIsControlPlaneAndNotLeaderAndInit(controlPlane))...)
 
@@ -447,7 +448,7 @@ func (p *Planner) encryptionKeyRotationRestartService(controlPlane *rkev1.RKECon
 	return rotationStatus, status, nil
 }
 
-// encryptionKeyRotationRestartPlan creates a restart-only plan. During the HA convergence step Rancher no longer runs
+// encryptionKeyRotationRestartPlan creates a restart-only plan. During the high-availability convergence step Rancher no longer runs
 // additional secrets-encrypt subcommands on follower nodes; it only restarts the server unit and resumes observing the
 // periodic secrets-encrypt status that the system-agent reports back in the node plan.
 func (p *Planner) encryptionKeyRotationRestartPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, joinServer string, entry *planEntry) (plan.NodePlan, string, error) {
@@ -522,6 +523,14 @@ func (p *Planner) encryptionKeyRotationRotateKeysReconcile(controlPlane *rkev1.R
 			}
 			return encryptionKeyRotationRuntimeStatus{}, status, err
 		}
+		if encryptionKeyRotationRotateKeysTimedOut(leader, nodePlan.Instructions[0].Name) {
+			logrus.Warnf("[planner] rkecluster %s/%s: rotate-keys command on leader [%s] exceeded the CLI timeout; continuing to observe periodic status because rotation may still be running in the background", controlPlane.Namespace, controlPlane.Spec.ClusterName, leader.Machine.Name)
+			rotationStatus, periodicStatusErr := encryptionKeyRotationSecretsEncryptStatusFromPeriodic(leader)
+			if periodicStatusErr == nil {
+				return rotationStatus, status, nil
+			}
+			return encryptionKeyRotationRuntimeStatus{}, status, errWaitingf("waiting for encryption key rotation status after rotate-keys timeout on leader [%s]", leader.Machine.Name)
+		}
 		status, err = p.encryptionKeyRotationFailed(status, err)
 		return encryptionKeyRotationRuntimeStatus{}, status, err
 	}
@@ -562,8 +571,8 @@ func (p *Planner) encryptionKeyRotationRotateKeysPlan(controlPlane *rkev1.RKECon
 func encryptionKeyRotationSecretsEncryptStatusFromPeriodic(plan *planEntry) (encryptionKeyRotationRuntimeStatus, error) {
 	output, ok := plan.Plan.PeriodicOutput[encryptionKeyRotationSecretsEncryptStatusCommand]
 	if !ok {
-		for _, pi := range plan.Plan.Plan.PeriodicInstructions {
-			if pi.Name == encryptionKeyRotationSecretsEncryptStatusCommand {
+		for _, periodicInstruction := range plan.Plan.Plan.PeriodicInstructions {
+			if periodicInstruction.Name == encryptionKeyRotationSecretsEncryptStatusCommand {
 				return encryptionKeyRotationRuntimeStatus{}, errWaitingf("could not extract current status from plan for [%s]: no output for status", plan.Machine.Name)
 			}
 		}
@@ -608,23 +617,57 @@ func encryptionKeyRotationStatusFromOutput(plan *planEntry, output string) (encr
 // the current secrets-encrypt phase.
 func encryptionKeyRotationSecretsEncryptInstruction(controlPlane *rkev1.RKEControlPlane) (plan.OneTimeInstruction, error) {
 	if controlPlane == nil {
-		return plan.OneTimeInstruction{}, fmt.Errorf("controlplane cannot be nil")
+		return plan.OneTimeInstruction{}, fmt.Errorf("control plane cannot be nil")
 	}
 	if controlPlane.Status.RotateEncryptionKeysPhase != rkev1.RotateEncryptionKeysPhaseRotate {
 		return plan.OneTimeInstruction{}, fmt.Errorf("cannot determine desired secrets-encrypt command for phase: [%s]", controlPlane.Status.RotateEncryptionKeysPhase)
 	}
 
-	return idempotentInstruction(
+	// SaveOutput on one-time instructions only persists stdout. Wrap the runtime command in `sh -c ... 2>&1` so Rancher
+	// can inspect timeout text from the K3s/RKE2 CLI when the client exits before the background rotation finishes.
+	instruction := idempotentInstruction(
 		controlPlane,
 		strings.ToLower(fmt.Sprintf("encryption-key-rotation/%s", controlPlane.Status.RotateEncryptionKeysPhase)),
 		strconv.FormatInt(controlPlane.Spec.RotateEncryptionKeys.Generation, 10),
-		capr.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion),
+		"/bin/sh",
 		[]string{
-			"secrets-encrypt",
-			encryptionKeyRotationCommandRotateKeys,
+			"-c",
+			fmt.Sprintf("%s secrets-encrypt %s 2>&1", capr.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion), encryptionKeyRotationCommandRotateKeys),
 		},
 		[]string{},
-	), nil
+	)
+	instruction.SaveOutput = true
+
+	return instruction, nil
+}
+
+// encryptionKeyRotationRotateKeysTimedOut reports whether the saved one-time instruction output matches the
+// expected timeout signature from the K3s or RKE2 secrets-encrypt client.
+func encryptionKeyRotationRotateKeysTimedOut(entry *planEntry, instructionName string) bool {
+	if entry == nil || entry.Plan == nil || instructionName == "" {
+		return false
+	}
+
+	outputs := entry.Plan.Output
+	if entry.Plan.Failed {
+		// system-agent writes SaveOutput for failed one-time instructions to the failed-output secret key instead of
+		// applied-output, so Rancher has to inspect the corresponding FailedOutput map on failed plans.
+		outputs = entry.Plan.FailedOutput
+	}
+
+	output, ok := outputs[instructionName]
+	if !ok {
+		return false
+	}
+
+	message := string(output)
+	if !strings.Contains(message, encryptionKeyRotationRotateKeysTimeoutMessage) {
+		return false
+	}
+
+	return strings.Contains(message, "Client.Timeout exceeded while awaiting headers") ||
+		strings.Contains(message, "timeout awaiting response headers") ||
+		strings.Contains(message, "context deadline exceeded")
 }
 
 // encryptionKeyRotationStatusEnv returns an environment variable in order to force followers to rerun their plans
