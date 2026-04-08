@@ -738,6 +738,81 @@ func (p *RTBTestSuite) TestUpgradedSetupRemovingUserFromCluster() {
 	require.Contains(p.T(), err.Error(), "403")
 }
 
+func (p *RTBTestSuite) TestUserRolePermissions() {
+	subSession := p.session.NewSession()
+	defer subSession.Cleanup()
+
+	client, err := p.client.WithSession(subSession)
+	require.NoError(p.T(), err)
+
+	enabled := true
+
+	// Create user1 with the standard "user" global role.
+	user1Pass := password.GenerateUserPassword("testpass-")
+	user1, err := users.CreateUserWithRole(client, &management.User{
+		Username: namegen.AppendRandomString("testuser1-"),
+		Password: user1Pass,
+		Name:     "testuser1",
+		Enabled:  &enabled,
+	}, "user")
+	require.NoError(p.T(), err)
+	user1.Password = user1Pass
+
+	// Create user2 with the "user-base" global role.
+	user2Pass := password.GenerateUserPassword("testpass-")
+	user2, err := users.CreateUserWithRole(client, &management.User{
+		Username: namegen.AppendRandomString("testuser2-"),
+		Password: user2Pass,
+		Name:     "testuser2",
+		Enabled:  &enabled,
+	}, "user-base")
+	require.NoError(p.T(), err)
+	user2.Password = user2Pass
+
+	// Create 2 more users (just to pad the user count).
+	for i := 0; i < 2; i++ {
+		pw := password.GenerateUserPassword("testpass-")
+		_, err := users.CreateUserWithRole(client, &management.User{
+			Username: namegen.AppendRandomString("testuser-"),
+			Password: pw,
+			Name:     "testuser",
+			Enabled:  &enabled,
+		}, "user")
+		require.NoError(p.T(), err)
+	}
+
+	// Admin should see at least 5 users.
+	adminUsers, err := client.Management.User.List(nil)
+	require.NoError(p.T(), err)
+	require.GreaterOrEqual(p.T(), len(adminUsers.Data), 5)
+
+	user1Client, err := client.AsUser(user1)
+	require.NoError(p.T(), err)
+
+	user2Client, err := client.AsUser(user2)
+	require.NoError(p.T(), err)
+
+	// user1 (standard "user" role) should only see themselves.
+	user1Users, err := user1Client.Management.User.List(nil)
+	require.NoError(p.T(), err)
+	require.Len(p.T(), user1Users.Data, 1, "user should only see themselves")
+
+	// user1 can see all roleTemplates.
+	user1RTs, err := user1Client.Management.RoleTemplate.List(nil)
+	require.NoError(p.T(), err)
+	require.NotEmpty(p.T(), user1RTs.Data, "user should be able to see all roleTemplates")
+
+	// user2 (user-base role) should only see themselves.
+	user2Users, err := user2Client.Management.User.List(nil)
+	require.NoError(p.T(), err)
+	require.Len(p.T(), user2Users.Data, 1, "user should only see themselves")
+
+	// user2 should not see any role templates.
+	user2RTs, err := user2Client.Management.RoleTemplate.List(nil)
+	require.NoError(p.T(), err)
+	require.Empty(p.T(), user2RTs.Data, "user2 does not have permission to view roleTemplates")
+}
+
 func TestRTBTestSuite(t *testing.T) {
 	suite.Run(t, new(RTBTestSuite))
 }

@@ -9,38 +9,6 @@ from .conftest import wait_until_available, wait_until, \
     kubernetes_api_client, wait_for, user_cluster_client
 
 
-def test_user_role_permissions(admin_mc, user_factory, remove_resource):
-    """Test that a standard user can only see themselves """
-    admin_client = admin_mc.client
-
-    # Create 4 new users, one with user-base
-    user1 = user_factory()
-    user2 = user_factory(globalRoleId='user-base')
-    user_factory()
-    user_factory()
-
-    users = admin_client.list_user()
-    # Admin should see at least 5 users
-    assert len(users.data) >= 5
-
-    # user1 should only see themselves in the user list
-    users1 = user1.client.list_user()
-    assert len(users1.data) == 1, "user should only see themselves"
-
-    # user1 can see all roleTemplates
-    role_templates = user1.client.list_role_template()
-    assert len(role_templates.data) > 0, ("user should be able to see all " +
-                                          "roleTemplates")
-
-    # user2 should only see themselves in the user list
-    users2 = user2.client.list_user()
-    assert len(users2.data) == 1, "user should only see themselves"
-    # user2 should not see any role templates
-    role_templates = user2.client.list_role_template()
-    assert len(role_templates.data) == 0, ("user2 does not have permission " +
-                                           "to view roleTemplates")
-
-
 def test_impersonation_passthrough(admin_mc, admin_cc, user_mc, user_factory,
                                    remove_resource, request):
     """Test users abalility to impersonate other users"""
