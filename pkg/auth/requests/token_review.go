@@ -13,6 +13,8 @@ import (
 	authv1 "k8s.io/client-go/kubernetes/typed/authentication/v1"
 )
 
+const errorUserName string = "system:cattle:error"
+
 type TokenReviewAuth struct {
 	AuthClient authv1.AuthenticationV1Interface
 }
@@ -23,12 +25,16 @@ func NewTokenReviewAuth(authClient authv1.AuthenticationV1Interface) auth.Authen
 	}
 }
 
-// Authenticate attempts to authenticate using given function. If authentication
-// fails AND the endpoint is in allowedPaths, it will attempt to perform a token
-// review to authenticate token and extract user info.
+// Authenticate relies on a previous authentication step to have set the user in
+// the request context.
+//
+// If the user is not the error user, it returns the user info from the context.
+// If the user is the error user, it performs a token review using the token
+// extracted from the request and returns the reviewed user info. If the token
+// review fails, it returns no user and no error.
 func (t *TokenReviewAuth) Authenticate(req *http.Request) (user.Info, bool, error) {
 	info, hasAuth := request.UserFrom(req.Context())
-	if info.GetName() != "system:cattle:error" {
+	if info.GetName() != errorUserName {
 		// auth has succeeded
 		return info, hasAuth, nil
 	}
@@ -55,5 +61,5 @@ func (t *TokenReviewAuth) Authenticate(req *http.Request) (user.Info, bool, erro
 		Groups: tokenReview.Status.User.Groups,
 	}
 
-	return tokenReviewUserInfo, true, nil
+	return tokenReviewUserInfo, tokenReview.Status.Authenticated, nil
 }
