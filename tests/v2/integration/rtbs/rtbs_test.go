@@ -20,6 +20,7 @@ import (
 	"github.com/rancher/shepherd/pkg/api/scheme"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
+	wranglerName "github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	authzv1 "k8s.io/api/authorization/v1"
@@ -70,8 +71,11 @@ func (p *RTBTestSuite) createUser(client *rancher.Client, prefix, globalRole str
 }
 
 // projectName extracts the project namespace name from a project ID (e.g. "local:p-xxxxx" → "p-xxxxx").
-func projectName(project *management.Project) string {
-	return strings.Split(project.ID, ":")[1]
+func (p *RTBTestSuite) projectName(project *management.Project) string {
+	require.NotNil(p.T(), project)
+	_, name, found := strings.Cut(project.ID, ":")
+	require.True(p.T(), found, "projectName: invalid project ID %q, expected format <cluster>:<project>", project.ID)
+	return name
 }
 
 // createNamespace creates a namespace in the given project with default settings.
@@ -120,7 +124,7 @@ func (p *RTBTestSuite) TestPRTBRoleTemplateInheritance() {
 	client, cleanup := p.newSubSession()
 	defer cleanup()
 
-	createdNamespace := p.createNamespace(client, projectName(p.project))
+	createdNamespace := p.createNamespace(client, p.projectName(p.project))
 
 	testUser, err := client.AsUser(p.testUser)
 	require.NoError(p.T(), err)
@@ -247,7 +251,7 @@ func (p *RTBTestSuite) TestCRTBRoleTemplateInheritance() {
 	// Test that user can get a specified namespace once granted the permission to do so via roletemplate inheritance bounded
 	// by a CRTB.
 
-	pn := projectName(p.project)
+	pn := p.projectName(p.project)
 	ns := p.createNamespace(client, pn)
 
 	testUser, err := client.AsUser(p.testUser)
@@ -393,7 +397,7 @@ func (p *RTBTestSuite) TestRemovingPRTBRevokesNamespaceAccess() {
 
 	// Helper function to add a namespace to a project
 	addNamespaceToProject := func(project *management.Project) *corev1.Namespace {
-		return p.createNamespace(client, projectName(project))
+		return p.createNamespace(client, p.projectName(project))
 	}
 
 	// Add namespace to first project
@@ -522,7 +526,7 @@ func (p *RTBTestSuite) TestDeletingPRTBRemovesClusterAccess() {
 	}, 2*time.Minute, 2*time.Second, "user could never see the cluster")
 
 	// Derive the label key from the PRTB ID (namespace:name -> namespace_name).
-	prtbKey := strings.ReplaceAll(prtb.ID, ":", "_")
+	prtbKey := wranglerName.SafeConcatName(prtb.NamespaceId, prtb.Name)
 
 	// Wait for the expected ClusterRoleBinding with the membership-binding-owner label.
 	require.Eventually(p.T(), func() bool {
@@ -590,8 +594,8 @@ func (p *RTBTestSuite) TestDeletingPRTBCleansUpLegacyMembershipLabels() {
 	require.Len(p.T(), crbs.Items, 1)
 
 	// Patch the CRB to add the legacy label (using PRTB UUID as key) to simulate a pre-2.5 upgrade.
-	patchPayload, err := json.Marshal(map[string]interface{}{
-		"metadata": map[string]interface{}{
+	patchPayload, err := json.Marshal(map[string]any{
+		"metadata": map[string]any{
 			"labels": map[string]string{
 				prtb.UUID: mboLegacy,
 			},

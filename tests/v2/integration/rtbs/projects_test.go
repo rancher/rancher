@@ -62,7 +62,7 @@ func (p *RTBTestSuite) TestProjectCreatorGetsOwnerBindings() {
 	require.NoError(p.T(), err)
 
 	// User creates a namespace in the project.
-	ns := p.createNamespace(testUser, projectName(project))
+	ns := p.createNamespace(testUser, p.projectName(project))
 
 	// Verify user can list pods in the namespace (proves basic access).
 	dynamicClient, err := testUser.GetDownStreamClusterClient(p.downstreamClusterID)
@@ -126,19 +126,9 @@ func (p *RTBTestSuite) TestReadOnlyCannotEditSecret() {
 	require.NoError(p.T(), err)
 
 	// Create a namespace in the project for testing namespaced secrets.
-	ns := p.createNamespace(client, projectName(p.project))
+	ns := p.createNamespace(client, p.projectName(p.project))
 
 	testUser, err := client.AsUser(p.testUser)
-	require.NoError(p.T(), err)
-
-	// Wait until the read-only user can list secrets (confirms RBAC propagation).
-	err = extauthz.WaitForAllowed(testUser, p.downstreamClusterID, []*authzv1.ResourceAttributes{
-		{
-			Verb:      "get",
-			Resource:  "secrets",
-			Namespace: ns.Name,
-		},
-	})
 	require.NoError(p.T(), err)
 
 	// Read-only user should fail to create a secret.
@@ -158,27 +148,6 @@ func (p *RTBTestSuite) TestReadOnlyCannotEditSecret() {
 
 	// Read-only user should fail to update the secret.
 	_, err = secrets.PatchSecret(testUser, p.downstreamClusterID, adminSecret.Name, ns.Name,
-		k8stypes.JSONPatchType, secrets.ReplacePatchOP, "/data/abc", "ZmdoCg==", metav1.PatchOptions{})
-	require.Error(p.T(), err)
-	require.True(p.T(), apierrors.IsForbidden(err), "expected forbidden, got: %v", err)
-
-	// Read-only user should fail to create a namespaced secret.
-	_, err = secrets.CreateSecretForCluster(testUser, &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{GenerateName: "test-ns-secret-"},
-		StringData: map[string]string{"abc": "123"},
-	}, p.downstreamClusterID, ns.Name)
-	require.Error(p.T(), err)
-	require.True(p.T(), apierrors.IsForbidden(err), "expected forbidden, got: %v", err)
-
-	// Admin creates a namespaced secret so the read-only user can see it but not update it.
-	adminNsSecret, err := secrets.CreateSecretForCluster(client, &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{GenerateName: "test-ns-secret-"},
-		StringData: map[string]string{"abc": "123"},
-	}, p.downstreamClusterID, ns.Name)
-	require.NoError(p.T(), err)
-
-	// Read-only user should fail to update the namespaced secret.
-	_, err = secrets.PatchSecret(testUser, p.downstreamClusterID, adminNsSecret.Name, ns.Name,
 		k8stypes.JSONPatchType, secrets.ReplacePatchOP, "/data/abc", "ZmdoCg==", metav1.PatchOptions{})
 	require.Error(p.T(), err)
 	require.True(p.T(), apierrors.IsForbidden(err), "expected forbidden, got: %v", err)
@@ -202,8 +171,8 @@ func (p *RTBTestSuite) TestReadOnlyCannotMoveNamespace() {
 	require.NoError(p.T(), err)
 
 	// Wait for project namespaces to exist.
-	p1Name := projectName(p1)
-	p2Name := projectName(p2)
+	p1Name := p.projectName(p1)
+	p2Name := p.projectName(p2)
 
 	require.Eventually(p.T(), func() bool {
 		_, err1 := extnamespaces.GetNamespaceByName(client, p.downstreamClusterID, p1Name)

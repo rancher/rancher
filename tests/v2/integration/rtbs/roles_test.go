@@ -155,6 +155,10 @@ func (p *RTBTestSuite) TestImpersonationByClusterRole() {
 	crResource := dynamicClient.Resource(extrbac.ClusterRoleGroupVersionResource)
 	_, err = crResource.Create(context.TODO(), extunstructured.MustToUnstructured(impRole), metav1.CreateOptions{})
 	require.NoError(p.T(), err)
+	defer func() {
+		err := crResource.Delete(context.TODO(), impRoleName, metav1.DeleteOptions{})
+		require.NoError(p.T(), err)
+	}()
 
 	// Create a ClusterRoleBinding binding user1 to the impersonation role.
 	impBindingName := namegen.AppendRandomString("limited-impersonator-binding-")
@@ -176,6 +180,10 @@ func (p *RTBTestSuite) TestImpersonationByClusterRole() {
 	crbResource := dynamicClient.Resource(extrbac.ClusterRoleBindingGroupVersionResource)
 	_, err = crbResource.Create(context.TODO(), extunstructured.MustToUnstructured(impBinding), metav1.CreateOptions{})
 	require.NoError(p.T(), err)
+	defer func() {
+		err := crbResource.Delete(context.TODO(), impBindingName, metav1.DeleteOptions{})
+		require.NoError(p.T(), err)
+	}()
 
 	// User1 should now be able to impersonate user2 specifically.
 	err = extauthz.WaitForAllowed(user1Client, p.downstreamClusterID, []*authzv1.ResourceAttributes{
