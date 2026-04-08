@@ -26,6 +26,7 @@ const (
 	ClusterStatusFieldEKSStatus                                  = "eksStatus"
 	ClusterStatusFieldFailedSpec                                 = "failedSpec"
 	ClusterStatusFieldGKEStatus                                  = "gkeStatus"
+	ClusterStatusFieldInfo                                       = "info"
 	ClusterStatusFieldIstioEnabled                               = "istioEnabled"
 	ClusterStatusFieldLimits                                     = "limits"
 	ClusterStatusFieldLinuxWorkerCount                           = "linuxWorkerCount"
@@ -34,6 +35,7 @@ const (
 	ClusterStatusFieldOpenStackSecret                            = "openStackSecret"
 	ClusterStatusFieldPrivateRegistrySecret                      = "privateRegistrySecret"
 	ClusterStatusFieldProvider                                   = "provider"
+	ClusterStatusFieldReadyReconciling                           = "readyReconciling"
 	ClusterStatusFieldRequested                                  = "requested"
 	ClusterStatusFieldS3CredentialSecret                         = "s3CredentialSecret"
 	ClusterStatusFieldServiceAccountTokenSecret                  = "serviceAccountTokenSecret"
@@ -69,6 +71,7 @@ type ClusterStatus struct {
 	EKSStatus                                  *EKSStatus                    `json:"eksStatus,omitempty" yaml:"eksStatus,omitempty"`
 	FailedSpec                                 *ClusterSpec                  `json:"failedSpec,omitempty" yaml:"failedSpec,omitempty"`
 	GKEStatus                                  *GKEStatus                    `json:"gkeStatus,omitempty" yaml:"gkeStatus,omitempty"`
+	Info                                       *ClusterInfo                  `json:"info,omitempty" yaml:"info,omitempty"`
 	IstioEnabled                               bool                          `json:"istioEnabled,omitempty" yaml:"istioEnabled,omitempty"`
 	Limits                                     map[string]string             `json:"limits,omitempty" yaml:"limits,omitempty"`
 	LinuxWorkerCount                           int64                         `json:"linuxWorkerCount,omitempty" yaml:"linuxWorkerCount,omitempty"`
@@ -77,6 +80,7 @@ type ClusterStatus struct {
 	OpenStackSecret                            string                        `json:"openStackSecret,omitempty" yaml:"openStackSecret,omitempty"`
 	PrivateRegistrySecret                      string                        `json:"privateRegistrySecret,omitempty" yaml:"privateRegistrySecret,omitempty"`
 	Provider                                   string                        `json:"provider,omitempty" yaml:"provider,omitempty"`
+	ReadyReconciling                           bool                          `json:"readyReconciling,omitempty" yaml:"readyReconciling,omitempty"`
 	Requested                                  map[string]string             `json:"requested,omitempty" yaml:"requested,omitempty"`
 	S3CredentialSecret                         string                        `json:"s3CredentialSecret,omitempty" yaml:"s3CredentialSecret,omitempty"`
 	ServiceAccountTokenSecret                  string                        `json:"serviceAccountTokenSecret,omitempty" yaml:"serviceAccountTokenSecret,omitempty"`

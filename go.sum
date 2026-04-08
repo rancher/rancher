@@ -463,6 +463,8 @@ github.com/kevinburke/ssh_config v1.2.0 h1:x584FjTGwHzMwvHx18PXxbBVzfnxogHaAReU4
 github.com/kevinburke/ssh_config v1.2.0/go.mod h1:CT57kijsi8u/K/BOFA39wgDQJ9CxiF4nAY/ojJ6r6mM=
 github.com/keybase/go-keychain v0.0.1 h1:way+bWYa6lDppZoZcgMbYsvC7GxljxrskdNInRtuthU=
 github.com/keybase/go-keychain v0.0.1/go.mod h1:PdEILRW3i9D8JcdM+FmY6RwkHGnhHxXwkPPMeUgOK1k=
+github.com/kinarashah/shepherd v0.0.0-20260406165354-e6d0807b3108 h1:clJtHwbIliFon+bi/ufxkR2bUI1GCiNbbza7iLjGTBw=
+github.com/kinarashah/shepherd v0.0.0-20260406165354-e6d0807b3108/go.mod h1:SJtW8Jqv0rphZzsGnvB965YdyR2FqFtB+TbbzVLt8F4=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
 github.com/klauspost/compress v1.18.0 h1:c/Cqfb0r+Yi+JtIEq73FWXVkRonBlf0CRNYc8Zttxdo=
@@ -637,8 +639,6 @@ github.com/rancher/rke v1.8.0 h1:87jeoOccnnNCq27YgWgMh4o0GVrrVKbw+zfo+cHMZlo=
 github.com/rancher/rke v1.8.0/go.mod h1:x9N1abruzDFMwTpqq2cnaDYpKCptlNoW8VraNWB6Pc4=
 github.com/rancher/saml v0.4.14-rancher3 h1:2NN6cPqm9FJeiT25x8+gLHWGdulsEak33cHRkGaJ5v0=
 github.com/rancher/saml v0.4.14-rancher3/go.mod h1:S4+611dxnKt8z/ulbvaJzcgSHsuhjVc1QHNTcr1R7Fw=
-github.com/rancher/shepherd v0.0.0-20260331204545-07fe2049a102 h1:hkDHfP7JNlvE9b1J3gEjJnRZu5xo5lnwdBp3ofB1Nlc=
-github.com/rancher/shepherd v0.0.0-20260331204545-07fe2049a102/go.mod h1:SJtW8Jqv0rphZzsGnvB965YdyR2FqFtB+TbbzVLt8F4=
 github.com/rancher/steve v0.8.19 h1:ZF3FO72Em1ILofc4FjrrBsrNcmgZhNnq1z4e75a7RLY=
 github.com/rancher/steve v0.8.19/go.mod h1:HA+t10Rzd1V9lg4lGk88dLSH8+oua93UgvffNJRPWM0=
 github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260218133309-b0ff1f4c330d h1:OfXAOEoBm4BYEFd4wWkF7c+Eu/OvaOpLb1a+ZBTfZps=
