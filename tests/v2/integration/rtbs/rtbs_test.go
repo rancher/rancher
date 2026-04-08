@@ -962,6 +962,51 @@ func (p *RTBTestSuite) TestImpersonationPassthrough() {
 	require.NoError(p.T(), err)
 }
 
+func (p *RTBTestSuite) TestAppropriateUsersCanSeeKontainerDrivers() {
+	subSession := p.session.NewSession()
+	defer subSession.Cleanup()
+
+	client, err := p.client.WithSession(subSession)
+	require.NoError(p.T(), err)
+
+	enabled := true
+
+	createUserWithRole := func(role string) *rancher.Client {
+		pw := password.GenerateUserPassword("testpass-")
+		u, err := users.CreateUserWithRole(client, &management.User{
+			Username: namegen.AppendRandomString("kd-user-"),
+			Password: pw,
+			Name:     "kd-user",
+			Enabled:  &enabled,
+		}, role)
+		require.NoError(p.T(), err)
+		u.Password = pw
+		c, err := client.AsUser(u)
+		require.NoError(p.T(), err)
+		return c
+	}
+
+	// Standard "user" role can see kontainer drivers.
+	kds, err := createUserWithRole("user").Management.KontainerDriver.List(nil)
+	require.NoError(p.T(), err)
+	require.Len(p.T(), kds.Data, 3)
+
+	// "clusters-create" role can see kontainer drivers.
+	kds, err = createUserWithRole("clusters-create").Management.KontainerDriver.List(nil)
+	require.NoError(p.T(), err)
+	require.Len(p.T(), kds.Data, 3)
+
+	// "kontainerdrivers-manage" role can see kontainer drivers.
+	kds, err = createUserWithRole("kontainerdrivers-manage").Management.KontainerDriver.List(nil)
+	require.NoError(p.T(), err)
+	require.Len(p.T(), kds.Data, 3)
+
+	// "settings-manage" role cannot see kontainer drivers.
+	kds, err = createUserWithRole("settings-manage").Management.KontainerDriver.List(nil)
+	require.NoError(p.T(), err)
+	require.Empty(p.T(), kds.Data)
+}
+
 func TestRTBTestSuite(t *testing.T) {
 	suite.Run(t, new(RTBTestSuite))
 }
