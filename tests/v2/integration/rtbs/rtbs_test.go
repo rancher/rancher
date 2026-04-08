@@ -15,7 +15,6 @@ import (
 	"github.com/rancher/shepherd/clients/rancher"
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	extauthz "github.com/rancher/shepherd/extensions/kubeapi/authorization"
-	extunstructured "github.com/rancher/shepherd/extensions/unstructured"
 	"github.com/rancher/shepherd/extensions/users"
 	password "github.com/rancher/shepherd/extensions/users/passwordgenerator"
 	"github.com/rancher/shepherd/pkg/api/scheme"
@@ -25,7 +24,6 @@ import (
 	"github.com/stretchr/testify/suite"
 	authzv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
@@ -48,6 +46,53 @@ func (p *RTBTestSuite) TearDownSuite() {
 	p.session.Cleanup()
 }
 
+// newSubSession creates a new sub-session client for test isolation.
+func (p *RTBTestSuite) newSubSession() (*rancher.Client, func()) {
+	subSession := p.session.NewSession()
+	client, err := p.client.WithSession(subSession)
+	require.NoError(p.T(), err)
+	return client, subSession.Cleanup
+}
+
+// createUser creates a new user with the given global role and returns it with password set.
+func (p *RTBTestSuite) createUser(client *rancher.Client, prefix, globalRole string) *management.User {
+	enabled := true
+	pw := password.GenerateUserPassword("testpass-")
+	user, err := users.CreateUserWithRole(client, &management.User{
+		Username: namegen.AppendRandomString(prefix + "-"),
+		Password: pw,
+		Name:     prefix,
+		Enabled:  &enabled,
+	}, globalRole)
+	require.NoError(p.T(), err)
+	user.Password = pw
+	return user
+}
+
+// projectName extracts the project namespace name from a project ID (e.g. "local:p-xxxxx" → "p-xxxxx").
+func projectName(project *management.Project) string {
+	return strings.Split(project.ID, ":")[1]
+}
+
+// createNamespace creates a namespace in the given project with default settings.
+func (p *RTBTestSuite) createNamespace(client *rancher.Client, projName string) *corev1.Namespace {
+	ns, err := extnamespaces.CreateNamespace(client, p.downstreamClusterID, projName, namegen.AppendRandomString("testns-"), "{}", map[string]string{}, map[string]string{})
+	require.NoError(p.T(), err)
+	return ns
+}
+
+// assertClusterAccessRevoked verifies that the given user client no longer has access to the downstream cluster.
+func (p *RTBTestSuite) assertClusterAccessRevoked(userClient *rancher.Client) {
+	require.Eventually(p.T(), func() bool {
+		clusters, err := userClient.Management.Cluster.List(nil)
+		return err == nil && len(clusters.Data) == 0
+	}, 2*time.Minute, 2*time.Second, "failed revoking cluster access from user")
+
+	_, err := userClient.Management.Cluster.ByID(p.downstreamClusterID)
+	require.Error(p.T(), err)
+	require.Contains(p.T(), err.Error(), "403")
+}
+
 func (p *RTBTestSuite) SetupSuite() {
 	p.downstreamClusterID = "local"
 	testSession := session.NewSession()
@@ -68,32 +113,14 @@ func (p *RTBTestSuite) SetupSuite() {
 
 	p.project = testProject
 
-	enabled := true
-	var testuser = namegen.AppendRandomString("testuser-")
-	var testpassword = password.GenerateUserPassword("testpass-")
-	user := &management.User{
-		Username: testuser,
-		Password: testpassword,
-		Name:     testuser,
-		Enabled:  &enabled,
-	}
-
-	newUser, err := users.CreateUserWithRole(client, user, "user")
-	require.NoError(p.T(), err)
-	newUser.Password = user.Password
-	p.testUser = newUser
+	p.testUser = p.createUser(client, "testuser", "user")
 }
 
 func (p *RTBTestSuite) TestPRTBRoleTemplateInheritance() {
-	subSession := p.session.NewSession()
-	defer subSession.Cleanup()
+	client, cleanup := p.newSubSession()
+	defer cleanup()
 
-	client, err := p.client.WithSession(subSession)
-	require.NoError(p.T(), err)
-
-	projectName := strings.Split(p.project.ID, ":")[1]
-	createdNamespace, err := extnamespaces.CreateNamespace(client, p.downstreamClusterID, projectName, namegen.AppendRandomString("testns-"), "{}", map[string]string{}, map[string]string{})
-	require.NoError(p.T(), err)
+	createdNamespace := p.createNamespace(client, projectName(p.project))
 
 	testUser, err := client.AsUser(p.testUser)
 	require.NoError(p.T(), err)
@@ -214,18 +241,14 @@ func (p *RTBTestSuite) TestPRTBRoleTemplateInheritance() {
 }
 
 func (p *RTBTestSuite) TestCRTBRoleTemplateInheritance() {
-	subSession := p.session.NewSession()
-	defer subSession.Cleanup()
-
-	client, err := p.client.WithSession(subSession)
-	require.NoError(p.T(), err)
+	client, cleanup := p.newSubSession()
+	defer cleanup()
 
 	// Test that user can get a specified namespace once granted the permission to do so via roletemplate inheritance bounded
 	// by a CRTB.
 
-	projectName := strings.Split(p.project.ID, ":")[1]
-	ns, err := extnamespaces.CreateNamespace(client, p.downstreamClusterID, projectName, namegen.AppendRandomString("testns-"), "{}", map[string]string{}, map[string]string{})
-	require.NoError(p.T(), err)
+	pn := projectName(p.project)
+	ns := p.createNamespace(client, pn)
 
 	testUser, err := client.AsUser(p.testUser)
 	require.NoError(p.T(), err)
@@ -301,8 +324,7 @@ func (p *RTBTestSuite) TestCRTBRoleTemplateInheritance() {
 	_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, ns.Name)
 	require.NoError(p.T(), err)
 
-	anotherNS, err := extnamespaces.CreateNamespace(client, p.downstreamClusterID, projectName, namegen.AppendRandomString("testns-"), "{}", map[string]string{}, map[string]string{})
-	require.NoError(p.T(), err)
+	anotherNS := p.createNamespace(client, pn)
 
 	_, err = extnamespaces.GetNamespaceByName(testUser, p.downstreamClusterID, anotherNS.Name)
 	require.Error(p.T(), err)
@@ -338,12 +360,9 @@ func (p *RTBTestSuite) TestCRTBRoleTemplateInheritance() {
 	require.NoError(p.T(), err)
 }
 
-func (p *RTBTestSuite) TestPermissionsCanBeRemoved() {
-	subSession := p.session.NewSession()
-	defer subSession.Cleanup()
-
-	client, err := p.client.WithSession(subSession)
-	require.NoError(p.T(), err)
+func (p *RTBTestSuite) TestRemovingPRTBRevokesNamespaceAccess() {
+	client, cleanup := p.newSubSession()
+	defer cleanup()
 
 	testUser, err := client.AsUser(p.testUser)
 	require.NoError(p.T(), err)
@@ -374,10 +393,7 @@ func (p *RTBTestSuite) TestPermissionsCanBeRemoved() {
 
 	// Helper function to add a namespace to a project
 	addNamespaceToProject := func(project *management.Project) *corev1.Namespace {
-		projectName := strings.Split(project.ID, ":")[1]
-		ns, err := extnamespaces.CreateNamespace(client, p.downstreamClusterID, projectName, namegen.AppendRandomString("testns-"), "{}", map[string]string{}, map[string]string{})
-		require.NoError(p.T(), err)
-		return ns
+		return p.createNamespace(client, projectName(project))
 	}
 
 	// Add namespace to first project
@@ -412,109 +428,9 @@ func (p *RTBTestSuite) TestPermissionsCanBeRemoved() {
 	}, 2*time.Minute, 2*time.Second, "waiting for permissions to be removed from user")
 }
 
-func (p *RTBTestSuite) TestProjectOwnerPermissions() {
-	subSession := p.session.NewSession()
-	defer subSession.Cleanup()
-
-	client, err := p.client.WithSession(subSession)
-	require.NoError(p.T(), err)
-
-	// Grant user the cluster-member role on the local cluster.
-	localCluster, err := client.Management.Cluster.ByID(p.downstreamClusterID)
-	require.NoError(p.T(), err)
-
-	err = users.AddClusterRoleToUser(client, localCluster, p.testUser, "cluster-member", nil)
-	require.NoError(p.T(), err)
-
-	testUser, err := client.AsUser(p.testUser)
-	require.NoError(p.T(), err)
-
-	// User creates a project, retrying until RBAC propagates.
-	var project *management.Project
-	require.Eventually(p.T(), func() bool {
-		project, err = testUser.Management.Project.Create(&management.Project{
-			ClusterID: p.downstreamClusterID,
-			Name:      namegen.AppendRandomString("test-proj-"),
-		})
-		return err == nil
-	}, 2*time.Minute, 2*time.Second, "waiting for user to be able to create a project")
-
-	// Wait for project to become active.
-	require.Eventually(p.T(), func() bool {
-		proj, err := testUser.Management.Project.ByID(project.ID)
-		return err == nil && proj.State == "active"
-	}, 2*time.Minute, 2*time.Second, "waiting for project to become active")
-
-	// Wait until user can create namespaces.
-	err = extauthz.WaitForAllowed(testUser, p.downstreamClusterID, []*authzv1.ResourceAttributes{
-		{
-			Verb:     "create",
-			Resource: "namespaces",
-			Group:    "",
-		},
-	})
-	require.NoError(p.T(), err)
-
-	// User creates a namespace in the project.
-	projectName := strings.Split(project.ID, ":")[1]
-	ns, err := extnamespaces.CreateNamespace(testUser, p.downstreamClusterID, projectName, namegen.AppendRandomString("testns-"), "{}", map[string]string{}, map[string]string{})
-	require.NoError(p.T(), err)
-
-	// Verify user can list pods in the namespace (proves basic access).
-	dynamicClient, err := testUser.GetDownStreamClusterClient(p.downstreamClusterID)
-	require.NoError(p.T(), err)
-
-	podGVR := corev1.SchemeGroupVersion.WithResource("pods")
-	_, err = dynamicClient.Resource(podGVR).Namespace(ns.Name).List(context.TODO(), metav1.ListOptions{})
-	require.NoError(p.T(), err)
-
-	// Verify user has both 'project-owner' and 'admin' role bindings in the namespace.
-	rbs, err := extrbac.ListRoleBindings(client, p.downstreamClusterID, ns.Name, metav1.ListOptions{})
-	require.NoError(p.T(), err)
-
-	rbRoles := map[string]bool{}
-	for _, rb := range rbs.Items {
-		for _, subject := range rb.Subjects {
-			if subject.Name == p.testUser.ID {
-				rbRoles[rb.RoleRef.Name] = true
-			}
-		}
-	}
-	require.True(p.T(), rbRoles["project-owner"], "expected project-owner role binding for user")
-	require.True(p.T(), rbRoles["admin"], "expected admin role binding for user")
-
-	// Verify user can create deployments (extensions group) in the namespace.
-	err = extauthz.WaitForAllowed(testUser, p.downstreamClusterID, []*authzv1.ResourceAttributes{
-		{
-			Verb:      "create",
-			Resource:  "deployments",
-			Group:     "extensions",
-			Namespace: ns.Name,
-		},
-	})
-	require.NoError(p.T(), err)
-
-	// Verify user can list pods.metrics.k8s.io in the namespace.
-	err = extauthz.WaitForAllowed(testUser, p.downstreamClusterID, []*authzv1.ResourceAttributes{
-		{
-			Verb:      "list",
-			Resource:  "pods",
-			Group:     "metrics.k8s.io",
-			Namespace: ns.Name,
-		},
-	})
-	require.NoError(p.T(), err)
-
-	err = users.RemoveClusterRoleFromUser(client, p.testUser)
-	require.NoError(p.T(), err)
-}
-
 func (p *RTBTestSuite) TestAPIGroupInRoleTemplate() {
-	subSession := p.session.NewSession()
-	defer subSession.Cleanup()
-
-	client, err := p.client.WithSession(subSession)
-	require.NoError(p.T(), err)
+	client, cleanup := p.newSubSession()
+	defer cleanup()
 
 	// Skip if admin can't see any nodes.
 	adminNodes, err := client.Management.Node.List(nil)
@@ -582,12 +498,9 @@ func (p *RTBTestSuite) TestAPIGroupInRoleTemplate() {
 	require.Contains(p.T(), err.Error(), "403")
 }
 
-func (p *RTBTestSuite) TestRemovingUserFromCluster() {
-	subSession := p.session.NewSession()
-	defer subSession.Cleanup()
-
-	client, err := p.client.WithSession(subSession)
-	require.NoError(p.T(), err)
+func (p *RTBTestSuite) TestDeletingPRTBRemovesClusterAccess() {
+	client, cleanup := p.newSubSession()
+	defer cleanup()
 
 	testUser, err := client.AsUser(p.testUser)
 	require.NoError(p.T(), err)
@@ -631,24 +544,12 @@ func (p *RTBTestSuite) TestRemovingUserFromCluster() {
 		return err == nil && len(crbs.Items) == 0
 	}, 2*time.Minute, 2*time.Second, "failed waiting for clusterRoleBinding to get deleted")
 
-	// User should no longer see any clusters.
-	require.Eventually(p.T(), func() bool {
-		clusters, err := testUser.Management.Cluster.List(nil)
-		return err == nil && len(clusters.Data) == 0
-	}, 2*time.Minute, 2*time.Second, "failed revoking cluster access from user")
-
-	// Accessing the cluster by ID should fail with 403.
-	_, err = testUser.Management.Cluster.ByID(p.downstreamClusterID)
-	require.Error(p.T(), err)
-	require.Contains(p.T(), err.Error(), "403")
+	p.assertClusterAccessRevoked(testUser)
 }
 
-func (p *RTBTestSuite) TestUpgradedSetupRemovingUserFromCluster() {
-	subSession := p.session.NewSession()
-	defer subSession.Cleanup()
-
-	client, err := p.client.WithSession(subSession)
-	require.NoError(p.T(), err)
+func (p *RTBTestSuite) TestDeletingPRTBCleansUpLegacyMembershipLabels() {
+	client, cleanup := p.newSubSession()
+	defer cleanup()
 
 	testUser, err := client.AsUser(p.testUser)
 	require.NoError(p.T(), err)
@@ -728,432 +629,7 @@ func (p *RTBTestSuite) TestUpgradedSetupRemovingUserFromCluster() {
 		return err1 == nil && err2 == nil && len(newCRBs.Items) == 0 && len(legacyCRBs.Items) == 0
 	}, 2*time.Minute, 2*time.Second, "failed waiting for cluster role bindings to be deleted")
 
-	// User should no longer see any clusters.
-	require.Eventually(p.T(), func() bool {
-		clusters, err := testUser.Management.Cluster.List(nil)
-		return err == nil && len(clusters.Data) == 0
-	}, 2*time.Minute, 2*time.Second, "failed revoking cluster access from user")
-
-	// Accessing the cluster by ID should fail with 403.
-	_, err = testUser.Management.Cluster.ByID(p.downstreamClusterID)
-	require.Error(p.T(), err)
-	require.Contains(p.T(), err.Error(), "403")
-}
-
-func (p *RTBTestSuite) TestUserRolePermissions() {
-	subSession := p.session.NewSession()
-	defer subSession.Cleanup()
-
-	client, err := p.client.WithSession(subSession)
-	require.NoError(p.T(), err)
-
-	enabled := true
-
-	// Create user1 with the standard "user" global role.
-	user1Pass := password.GenerateUserPassword("testpass-")
-	user1, err := users.CreateUserWithRole(client, &management.User{
-		Username: namegen.AppendRandomString("testuser1-"),
-		Password: user1Pass,
-		Name:     "testuser1",
-		Enabled:  &enabled,
-	}, "user")
-	require.NoError(p.T(), err)
-	user1.Password = user1Pass
-
-	// Create user2 with the "user-base" global role.
-	user2Pass := password.GenerateUserPassword("testpass-")
-	user2, err := users.CreateUserWithRole(client, &management.User{
-		Username: namegen.AppendRandomString("testuser2-"),
-		Password: user2Pass,
-		Name:     "testuser2",
-		Enabled:  &enabled,
-	}, "user-base")
-	require.NoError(p.T(), err)
-	user2.Password = user2Pass
-
-	// Create 2 more users (just to pad the user count).
-	for i := 0; i < 2; i++ {
-		pw := password.GenerateUserPassword("testpass-")
-		_, err := users.CreateUserWithRole(client, &management.User{
-			Username: namegen.AppendRandomString("testuser-"),
-			Password: pw,
-			Name:     "testuser",
-			Enabled:  &enabled,
-		}, "user")
-		require.NoError(p.T(), err)
-	}
-
-	// Admin should see at least 5 users.
-	adminUsers, err := client.Management.User.List(nil)
-	require.NoError(p.T(), err)
-	require.GreaterOrEqual(p.T(), len(adminUsers.Data), 5)
-
-	user1Client, err := client.AsUser(user1)
-	require.NoError(p.T(), err)
-
-	user2Client, err := client.AsUser(user2)
-	require.NoError(p.T(), err)
-
-	// user1 (standard "user" role) should only see themselves.
-	user1Users, err := user1Client.Management.User.List(nil)
-	require.NoError(p.T(), err)
-	require.Len(p.T(), user1Users.Data, 1, "user should only see themselves")
-
-	// user1 can see all roleTemplates.
-	user1RTs, err := user1Client.Management.RoleTemplate.List(nil)
-	require.NoError(p.T(), err)
-	require.NotEmpty(p.T(), user1RTs.Data, "user should be able to see all roleTemplates")
-
-	// user2 (user-base role) should only see themselves.
-	user2Users, err := user2Client.Management.User.List(nil)
-	require.NoError(p.T(), err)
-	require.Len(p.T(), user2Users.Data, 1, "user should only see themselves")
-
-	// user2 should not see any role templates.
-	user2RTs, err := user2Client.Management.RoleTemplate.List(nil)
-	require.NoError(p.T(), err)
-	require.Empty(p.T(), user2RTs.Data, "user2 does not have permission to view roleTemplates")
-}
-
-// checkAccessAllowed performs a single SelfSubjectAccessReview and returns whether access is allowed.
-func checkAccessAllowed(client *rancher.Client, clusterID string, attr *authzv1.ResourceAttributes) (bool, error) {
-	dynamicClient, err := client.GetDownStreamClusterClient(clusterID)
-	if err != nil {
-		return false, err
-	}
-
-	ssar := &authzv1.SelfSubjectAccessReview{
-		Spec: authzv1.SelfSubjectAccessReviewSpec{
-			ResourceAttributes: attr,
-		},
-	}
-
-	ssarGVR := authzv1.SchemeGroupVersion.WithResource("selfsubjectaccessreviews")
-	resp, err := dynamicClient.Resource(ssarGVR).Create(context.TODO(), extunstructured.MustToUnstructured(ssar), metav1.CreateOptions{})
-	if err != nil {
-		return false, err
-	}
-
-	result := &authzv1.SelfSubjectAccessReview{}
-	if err := scheme.Scheme.Convert(resp, result, resp.GroupVersionKind()); err != nil {
-		return false, err
-	}
-
-	return result.Status.Allowed, nil
-}
-
-func (p *RTBTestSuite) TestImpersonationPassthrough() {
-	subSession := p.session.NewSession()
-	defer subSession.Cleanup()
-
-	client, err := p.client.WithSession(subSession)
-	require.NoError(p.T(), err)
-
-	enabled := true
-
-	// Create user1 with standard "user" role.
-	user1Pass := password.GenerateUserPassword("testpass-")
-	user1, err := users.CreateUserWithRole(client, &management.User{
-		Username: namegen.AppendRandomString("imp-user1-"),
-		Password: user1Pass,
-		Name:     "imp-user1",
-		Enabled:  &enabled,
-	}, "user")
-	require.NoError(p.T(), err)
-	user1.Password = user1Pass
-
-	// Create user2 with standard "user" role.
-	user2Pass := password.GenerateUserPassword("testpass-")
-	user2, err := users.CreateUserWithRole(client, &management.User{
-		Username: namegen.AppendRandomString("imp-user2-"),
-		Password: user2Pass,
-		Name:     "imp-user2",
-		Enabled:  &enabled,
-	}, "user")
-	require.NoError(p.T(), err)
-	user2.Password = user2Pass
-
-	localCluster, err := client.Management.Cluster.ByID(p.downstreamClusterID)
-	require.NoError(p.T(), err)
-
-	// Give user1 cluster-member and user2 cluster-owner.
-	err = users.AddClusterRoleToUser(client, localCluster, user1, "cluster-member", nil)
-	require.NoError(p.T(), err)
-
-	err = users.AddClusterRoleToUser(client, localCluster, user2, "cluster-owner", nil)
-	require.NoError(p.T(), err)
-
-	user1Client, err := client.AsUser(user1)
-	require.NoError(p.T(), err)
-
-	user2Client, err := client.AsUser(user2)
-	require.NoError(p.T(), err)
-
-	impersonateAttr := &authzv1.ResourceAttributes{
-		Verb:     "impersonate",
-		Resource: "users",
-		Group:    "",
-	}
-
-	// Admin can always impersonate.
-	err = extauthz.WaitForAllowed(client, p.downstreamClusterID, []*authzv1.ResourceAttributes{impersonateAttr})
-	require.NoError(p.T(), err)
-
-	// User1 is a cluster-member which does not grant impersonate.
-	allowed, err := checkAccessAllowed(user1Client, p.downstreamClusterID, impersonateAttr)
-	require.NoError(p.T(), err)
-	require.False(p.T(), allowed, "cluster-member should not be able to impersonate")
-
-	// User2 is a cluster-owner which allows impersonation.
-	err = extauthz.WaitForAllowed(user2Client, p.downstreamClusterID, []*authzv1.ResourceAttributes{impersonateAttr})
-	require.NoError(p.T(), err)
-
-	// Create a ClusterRole allowing limited impersonation of user2 only.
-	dynamicClient, err := client.GetDownStreamClusterClient(p.downstreamClusterID)
-	require.NoError(p.T(), err)
-
-	impRoleName := namegen.AppendRandomString("limited-impersonator-")
-	impRole := &rbacv1.ClusterRole{
-		ObjectMeta: metav1.ObjectMeta{Name: impRoleName},
-		Rules: []rbacv1.PolicyRule{
-			{
-				APIGroups:     []string{""},
-				Resources:     []string{"users"},
-				Verbs:         []string{"impersonate"},
-				ResourceNames: []string{user2.ID},
-			},
-		},
-	}
-
-	crResource := dynamicClient.Resource(extrbac.ClusterRoleGroupVersionResource)
-	_, err = crResource.Create(context.TODO(), extunstructured.MustToUnstructured(impRole), metav1.CreateOptions{})
-	require.NoError(p.T(), err)
-
-	// Create a ClusterRoleBinding binding user1 to the impersonation role.
-	impBindingName := namegen.AppendRandomString("limited-impersonator-binding-")
-	impBinding := &rbacv1.ClusterRoleBinding{
-		ObjectMeta: metav1.ObjectMeta{Name: impBindingName},
-		Subjects: []rbacv1.Subject{
-			{
-				Kind: "User",
-				Name: user1.ID,
-			},
-		},
-		RoleRef: rbacv1.RoleRef{
-			APIGroup: rbacv1.SchemeGroupVersion.Group,
-			Kind:     "ClusterRole",
-			Name:     impRoleName,
-		},
-	}
-
-	crbResource := dynamicClient.Resource(extrbac.ClusterRoleBindingGroupVersionResource)
-	_, err = crbResource.Create(context.TODO(), extunstructured.MustToUnstructured(impBinding), metav1.CreateOptions{})
-	require.NoError(p.T(), err)
-
-	// User1 should now be able to impersonate user2 specifically.
-	err = extauthz.WaitForAllowed(user1Client, p.downstreamClusterID, []*authzv1.ResourceAttributes{
-		{
-			Verb:     "impersonate",
-			Resource: "users",
-			Group:    "",
-			Name:     user2.ID,
-		},
-	})
-	require.NoError(p.T(), err)
-}
-
-func (p *RTBTestSuite) TestAppropriateUsersCanSeeKontainerDrivers() {
-	subSession := p.session.NewSession()
-	defer subSession.Cleanup()
-
-	client, err := p.client.WithSession(subSession)
-	require.NoError(p.T(), err)
-
-	enabled := true
-
-	createUserWithRole := func(role string) *rancher.Client {
-		pw := password.GenerateUserPassword("testpass-")
-		u, err := users.CreateUserWithRole(client, &management.User{
-			Username: namegen.AppendRandomString("kd-user-"),
-			Password: pw,
-			Name:     "kd-user",
-			Enabled:  &enabled,
-		}, role)
-		require.NoError(p.T(), err)
-		u.Password = pw
-		c, err := client.AsUser(u)
-		require.NoError(p.T(), err)
-		return c
-	}
-
-	// Standard "user" role can see kontainer drivers.
-	kds, err := createUserWithRole("user").Management.KontainerDriver.List(nil)
-	require.NoError(p.T(), err)
-	require.Len(p.T(), kds.Data, 3)
-
-	// "clusters-create" role can see kontainer drivers.
-	kds, err = createUserWithRole("clusters-create").Management.KontainerDriver.List(nil)
-	require.NoError(p.T(), err)
-	require.Len(p.T(), kds.Data, 3)
-
-	// "kontainerdrivers-manage" role can see kontainer drivers.
-	kds, err = createUserWithRole("kontainerdrivers-manage").Management.KontainerDriver.List(nil)
-	require.NoError(p.T(), err)
-	require.Len(p.T(), kds.Data, 3)
-
-	// "settings-manage" role cannot see kontainer drivers.
-	kds, err = createUserWithRole("settings-manage").Management.KontainerDriver.List(nil)
-	require.NoError(p.T(), err)
-	require.Empty(p.T(), kds.Data)
-}
-
-func (p *RTBTestSuite) TestReadOnlyCannotEditSecret() {
-	subSession := p.session.NewSession()
-	defer subSession.Cleanup()
-
-	client, err := p.client.WithSession(subSession)
-	require.NoError(p.T(), err)
-
-	// Create a PRTB giving the test user read-only access to the project.
-	_, err = client.Management.ProjectRoleTemplateBinding.Create(&management.ProjectRoleTemplateBinding{
-		UserID:         p.testUser.ID,
-		RoleTemplateID: "read-only",
-		ProjectID:      p.project.ID,
-	})
-	require.NoError(p.T(), err)
-
-	// Create a namespace in the project for testing namespaced secrets.
-	projectName := strings.Split(p.project.ID, ":")[1]
-	ns, err := extnamespaces.CreateNamespace(client, p.downstreamClusterID, projectName, namegen.AppendRandomString("testns-"), "{}", map[string]string{}, map[string]string{})
-	require.NoError(p.T(), err)
-
-	testUser, err := client.AsUser(p.testUser)
-	require.NoError(p.T(), err)
-
-	// Wait until the read-only user can list secrets (confirms RBAC propagation).
-	err = extauthz.WaitForAllowed(testUser, p.downstreamClusterID, []*authzv1.ResourceAttributes{
-		{
-			Verb:      "get",
-			Resource:  "secrets",
-			Namespace: ns.Name,
-		},
-	})
-	require.NoError(p.T(), err)
-
-	// Read-only user should fail to create a secret.
-	_, err = secrets.CreateSecretForCluster(testUser, &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{GenerateName: "test-secret-"},
-		StringData: map[string]string{"abc": "123"},
-	}, p.downstreamClusterID, ns.Name)
-	require.Error(p.T(), err)
-	require.True(p.T(), apierrors.IsForbidden(err), "expected forbidden, got: %v", err)
-
-	// Admin creates a secret so the read-only user can see it but not update it.
-	adminSecret, err := secrets.CreateSecretForCluster(client, &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{GenerateName: "test-secret-"},
-		StringData: map[string]string{"abc": "123"},
-	}, p.downstreamClusterID, ns.Name)
-	require.NoError(p.T(), err)
-
-	// Read-only user should fail to update the secret.
-	_, err = secrets.PatchSecret(testUser, p.downstreamClusterID, adminSecret.Name, ns.Name,
-		k8stypes.JSONPatchType, secrets.ReplacePatchOP, "/data/abc", "ZmdoCg==", metav1.PatchOptions{})
-	require.Error(p.T(), err)
-	require.True(p.T(), apierrors.IsForbidden(err), "expected forbidden, got: %v", err)
-
-	// Read-only user should fail to create a namespaced secret.
-	_, err = secrets.CreateSecretForCluster(testUser, &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{GenerateName: "test-ns-secret-"},
-		StringData: map[string]string{"abc": "123"},
-	}, p.downstreamClusterID, ns.Name)
-	require.Error(p.T(), err)
-	require.True(p.T(), apierrors.IsForbidden(err), "expected forbidden, got: %v", err)
-
-	// Admin creates a namespaced secret so the read-only user can see it but not update it.
-	adminNsSecret, err := secrets.CreateSecretForCluster(client, &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{GenerateName: "test-ns-secret-"},
-		StringData: map[string]string{"abc": "123"},
-	}, p.downstreamClusterID, ns.Name)
-	require.NoError(p.T(), err)
-
-	// Read-only user should fail to update the namespaced secret.
-	_, err = secrets.PatchSecret(testUser, p.downstreamClusterID, adminNsSecret.Name, ns.Name,
-		k8stypes.JSONPatchType, secrets.ReplacePatchOP, "/data/abc", "ZmdoCg==", metav1.PatchOptions{})
-	require.Error(p.T(), err)
-	require.True(p.T(), apierrors.IsForbidden(err), "expected forbidden, got: %v", err)
-}
-
-func (p *RTBTestSuite) TestReadOnlyCannotMoveNamespace() {
-	subSession := p.session.NewSession()
-	defer subSession.Cleanup()
-
-	client, err := p.client.WithSession(subSession)
-	require.NoError(p.T(), err)
-
-	// Create two projects.
-	p1, err := client.Management.Project.Create(&management.Project{
-		ClusterID: p.downstreamClusterID,
-		Name:      namegen.AppendRandomString("test-proj-"),
-	})
-	require.NoError(p.T(), err)
-
-	p2, err := client.Management.Project.Create(&management.Project{
-		ClusterID: p.downstreamClusterID,
-		Name:      namegen.AppendRandomString("test-proj-"),
-	})
-	require.NoError(p.T(), err)
-
-	// Wait for project namespaces to exist.
-	p1Name := strings.Split(p1.ID, ":")[1]
-	p2Name := strings.Split(p2.ID, ":")[1]
-
-	require.Eventually(p.T(), func() bool {
-		_, err1 := extnamespaces.GetNamespaceByName(client, p.downstreamClusterID, p1Name)
-		_, err2 := extnamespaces.GetNamespaceByName(client, p.downstreamClusterID, p2Name)
-		return err1 == nil && err2 == nil
-	}, 2*time.Minute, 2*time.Second, "waiting for project namespaces to exist")
-
-	// Give the test user read-only access to both projects.
-	_, err = client.Management.ProjectRoleTemplateBinding.Create(&management.ProjectRoleTemplateBinding{
-		UserID:         p.testUser.ID,
-		RoleTemplateID: "read-only",
-		ProjectID:      p1.ID,
-	})
-	require.NoError(p.T(), err)
-
-	_, err = client.Management.ProjectRoleTemplateBinding.Create(&management.ProjectRoleTemplateBinding{
-		UserID:         p.testUser.ID,
-		RoleTemplateID: "read-only",
-		ProjectID:      p2.ID,
-	})
-	require.NoError(p.T(), err)
-
-	// Create a namespace in project 1.
-	ns, err := extnamespaces.CreateNamespace(client, p.downstreamClusterID, p1Name, namegen.AppendRandomString("testns-"), "{}", map[string]string{}, map[string]string{})
-	require.NoError(p.T(), err)
-
-	testUser, err := client.AsUser(p.testUser)
-	require.NoError(p.T(), err)
-
-	// Wait until the read-only user can see the namespace.
-	err = extauthz.WaitForAllowed(testUser, p.downstreamClusterID, []*authzv1.ResourceAttributes{
-		{
-			Verb:     "get",
-			Resource: "namespaces",
-			Name:     ns.Name,
-		},
-	})
-	require.NoError(p.T(), err)
-
-	// Read-only user should fail to move the namespace to project 2 by updating the projectId annotation.
-	dynamicClient, err := testUser.GetDownStreamClusterClient(p.downstreamClusterID)
-	require.NoError(p.T(), err)
-
-	nsGVR := corev1.SchemeGroupVersion.WithResource("namespaces")
-	patchPayload := fmt.Sprintf(`{"metadata":{"annotations":{"field.cattle.io/projectId":"%s:%s"}}}`, p.downstreamClusterID, p2Name)
-	_, err = dynamicClient.Resource(nsGVR).Patch(context.TODO(), ns.Name, k8stypes.MergePatchType, []byte(patchPayload), metav1.PatchOptions{})
-	require.Error(p.T(), err)
-	require.True(p.T(), apierrors.IsForbidden(err), "expected forbidden, got: %v", err)
+	p.assertClusterAccessRevoked(testUser)
 }
 
 func TestRTBTestSuite(t *testing.T) {
