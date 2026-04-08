@@ -324,6 +324,45 @@ func GetDesiredPriorityClassValueAndPreemption(cluster *v3.Cluster) (int, string
 	return agentCustomization.PriorityClass.Value, PCPreemption
 }
 
+// WebhookDeploymentCustomizationChanged reports whether the webhook customization in the
+// cluster spec differs from what was last applied (stored in the status).  A return value
+// of true means the webhook chart should be re-deployed.
+func WebhookDeploymentCustomizationChanged(cluster *v3.Cluster) bool {
+	if cluster == nil {
+		return false
+	}
+	return !reflect.DeepEqual(cluster.Spec.WebhookDeploymentCustomization,
+		cluster.Status.AppliedWebhookDeploymentCustomization)
+}
+
+// UpdateAppliedWebhookDeploymentCustomization copies the webhook customization from the
+// cluster spec into the status so that it reflects what was most recently applied to the
+// rancher-webhook Helm release.
+func UpdateAppliedWebhookDeploymentCustomization(cluster *v3.Cluster) {
+	if cluster == nil {
+		return
+	}
+
+	wdc := cluster.Spec.WebhookDeploymentCustomization
+	if wdc == nil {
+		cluster.Status.AppliedWebhookDeploymentCustomization = nil
+		return
+	}
+
+	// If the struct exists but all fields are empty, clear the status too.
+	if wdc.ReplicaCount == nil &&
+		wdc.AppendTolerations == nil &&
+		wdc.OverrideAffinity == nil &&
+		wdc.OverrideResourceRequirements == nil &&
+		wdc.PodDisruptionBudget == nil {
+
+		cluster.Status.AppliedWebhookDeploymentCustomization = nil
+		return
+	}
+
+	cluster.Status.AppliedWebhookDeploymentCustomization = wdc.DeepCopy()
+}
+
 // UpdateAppliedAgentDeploymentCustomization updates the cluster AppliedClusterAgentDeploymentCustomization Status
 // field with the most recent configuration located in the Spec.
 func UpdateAppliedAgentDeploymentCustomization(cluster *v3.Cluster) {
