@@ -60,6 +60,19 @@ spec:
               RepoSec contains details about the Helm repository that needs to be used.
               More info: kubectl explain clusterrepo.spec
             properties:
+              OCIOptions:
+                description: OCIOptions contains options that are only used when the
+                  ClusterRepo points to an OCI registry.
+                properties:
+                  downloadAllTags:
+                    description: DownloadAllTags if set, will download all tags that
+                      match TagFilter and not just the latest one.
+                    type: boolean
+                  tagFilter:
+                    description: TagFilter a semver constraint string used to filter
+                      the tags of the charts present in the OCI registry.
+                    type: string
+                type: object
               basicAuthSecretName:
                 description: BasicAuthSecretName is the client secret to be used to
                   connect to the Helm repository.
