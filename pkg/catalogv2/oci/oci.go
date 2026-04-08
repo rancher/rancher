@@ -149,7 +149,7 @@ func GenerateIndex(ociClient *Client, URL string, credentialSecret *corev1.Secre
 			}
 			// Check if the tag matches the semver constraint from the clusterrepo
 			if !constraint.Check(semverTag) {
-				logrus.Errorf("skipping tag %s since it does not match the semver constraint %s for chart %s", tags[i], clusterRepoSpec.OCIOptions.TagFilter, chartName)
+				logrus.Debugf("skipping tag %s since it does not match the semver constraint %s for chart %s", tags[i], clusterRepoSpec.OCIOptions.TagFilter, chartName)
 				continue
 			}
 
