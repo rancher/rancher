@@ -1007,6 +1007,82 @@ func (p *RTBTestSuite) TestAppropriateUsersCanSeeKontainerDrivers() {
 	require.Empty(p.T(), kds.Data)
 }
 
+func (p *RTBTestSuite) TestReadOnlyCannotEditSecret() {
+	subSession := p.session.NewSession()
+	defer subSession.Cleanup()
+
+	client, err := p.client.WithSession(subSession)
+	require.NoError(p.T(), err)
+
+	// Create a PRTB giving the test user read-only access to the project.
+	_, err = client.Management.ProjectRoleTemplateBinding.Create(&management.ProjectRoleTemplateBinding{
+		UserID:         p.testUser.ID,
+		RoleTemplateID: "read-only",
+		ProjectID:      p.project.ID,
+	})
+	require.NoError(p.T(), err)
+
+	// Create a namespace in the project for testing namespaced secrets.
+	projectName := strings.Split(p.project.ID, ":")[1]
+	ns, err := extnamespaces.CreateNamespace(client, p.downstreamClusterID, projectName, namegen.AppendRandomString("testns-"), "{}", map[string]string{}, map[string]string{})
+	require.NoError(p.T(), err)
+
+	testUser, err := client.AsUser(p.testUser)
+	require.NoError(p.T(), err)
+
+	// Wait until the read-only user can list secrets (confirms RBAC propagation).
+	err = extauthz.WaitForAllowed(testUser, p.downstreamClusterID, []*authzv1.ResourceAttributes{
+		{
+			Verb:      "get",
+			Resource:  "secrets",
+			Namespace: ns.Name,
+		},
+	})
+	require.NoError(p.T(), err)
+
+	// Read-only user should fail to create a secret.
+	_, err = secrets.CreateSecretForCluster(testUser, &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{GenerateName: "test-secret-"},
+		StringData: map[string]string{"abc": "123"},
+	}, p.downstreamClusterID, ns.Name)
+	require.Error(p.T(), err)
+	require.True(p.T(), apierrors.IsForbidden(err), "expected forbidden, got: %v", err)
+
+	// Admin creates a secret so the read-only user can see it but not update it.
+	adminSecret, err := secrets.CreateSecretForCluster(client, &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{GenerateName: "test-secret-"},
+		StringData: map[string]string{"abc": "123"},
+	}, p.downstreamClusterID, ns.Name)
+	require.NoError(p.T(), err)
+
+	// Read-only user should fail to update the secret.
+	_, err = secrets.PatchSecret(testUser, p.downstreamClusterID, adminSecret.Name, ns.Name,
+		k8stypes.JSONPatchType, secrets.ReplacePatchOP, "/data/abc", "ZmdoCg==", metav1.PatchOptions{})
+	require.Error(p.T(), err)
+	require.True(p.T(), apierrors.IsForbidden(err), "expected forbidden, got: %v", err)
+
+	// Read-only user should fail to create a namespaced secret.
+	_, err = secrets.CreateSecretForCluster(testUser, &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{GenerateName: "test-ns-secret-"},
+		StringData: map[string]string{"abc": "123"},
+	}, p.downstreamClusterID, ns.Name)
+	require.Error(p.T(), err)
+	require.True(p.T(), apierrors.IsForbidden(err), "expected forbidden, got: %v", err)
+
+	// Admin creates a namespaced secret so the read-only user can see it but not update it.
+	adminNsSecret, err := secrets.CreateSecretForCluster(client, &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{GenerateName: "test-ns-secret-"},
+		StringData: map[string]string{"abc": "123"},
+	}, p.downstreamClusterID, ns.Name)
+	require.NoError(p.T(), err)
+
+	// Read-only user should fail to update the namespaced secret.
+	_, err = secrets.PatchSecret(testUser, p.downstreamClusterID, adminNsSecret.Name, ns.Name,
+		k8stypes.JSONPatchType, secrets.ReplacePatchOP, "/data/abc", "ZmdoCg==", metav1.PatchOptions{})
+	require.Error(p.T(), err)
+	require.True(p.T(), apierrors.IsForbidden(err), "expected forbidden, got: %v", err)
+}
+
 func TestRTBTestSuite(t *testing.T) {
 	suite.Run(t, new(RTBTestSuite))
 }
