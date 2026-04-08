@@ -96,7 +96,6 @@ var OriginMap = map[string]string{
 	"kubeadm-control-plane-controller":                        "https://github.com/rancher-sandbox/cluster-api",
 	"kubectl":                                                 "https://github.com/rancher/kubectl",
 	"kubelet-pause":                                           "https://github.com/kubernetes/kubernetes",
-	"kube-webhook-certgen":                                    "https://github.com/rancher/ingress-nginx",
 	"library-nginx":                                           "https://github.com/nginx/nginx",
 	"local-path-provisioner":                                  "https://github.com/rancher/local-path-provisioner",
 	"longhornio-csi-attacher":                                 "https://github.com/longhorn/longhorn",
