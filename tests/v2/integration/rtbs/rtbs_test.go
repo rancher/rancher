@@ -577,6 +577,67 @@ func (p *RTBTestSuite) TestAPIGroupInRoleTemplate() {
 	require.Contains(p.T(), err.Error(), "403")
 }
 
+func (p *RTBTestSuite) TestRemovingUserFromCluster() {
+	subSession := p.session.NewSession()
+	defer subSession.Cleanup()
+
+	client, err := p.client.WithSession(subSession)
+	require.NoError(p.T(), err)
+
+	testUser, err := client.AsUser(p.testUser)
+	require.NoError(p.T(), err)
+
+	mbo := "membership-binding-owner"
+
+	// Admin creates a PRTB giving user project-member on the suite project.
+	prtb, err := client.Management.ProjectRoleTemplateBinding.Create(&management.ProjectRoleTemplateBinding{
+		UserID:         p.testUser.ID,
+		RoleTemplateID: "project-member",
+		ProjectID:      p.project.ID,
+	})
+	require.NoError(p.T(), err)
+
+	// Verify the user can see the cluster.
+	require.Eventually(p.T(), func() bool {
+		_, err := testUser.Management.Cluster.ByID(p.downstreamClusterID)
+		return err == nil
+	}, 2*time.Minute, 2*time.Second, "user could never see the cluster")
+
+	// Derive the label key from the PRTB ID (namespace:name -> namespace_name).
+	prtbKey := strings.ReplaceAll(prtb.ID, ":", "_")
+
+	// Wait for the expected ClusterRoleBinding with the membership-binding-owner label.
+	require.Eventually(p.T(), func() bool {
+		crbs, err := extrbac.ListClusterRoleBindings(client, p.downstreamClusterID, metav1.ListOptions{
+			LabelSelector: prtbKey + "=" + mbo,
+		})
+		return err == nil && len(crbs.Items) == 1
+	}, 2*time.Minute, 2*time.Second, "failed waiting for clusterRoleBinding to get created")
+
+	// Delete the PRTB — user should lose access.
+	err = client.Management.ProjectRoleTemplateBinding.Delete(prtb)
+	require.NoError(p.T(), err)
+
+	// Wait for the ClusterRoleBinding to be deleted.
+	require.Eventually(p.T(), func() bool {
+		crbs, err := extrbac.ListClusterRoleBindings(client, p.downstreamClusterID, metav1.ListOptions{
+			LabelSelector: prtbKey + "=" + mbo,
+		})
+		return err == nil && len(crbs.Items) == 0
+	}, 2*time.Minute, 2*time.Second, "failed waiting for clusterRoleBinding to get deleted")
+
+	// User should no longer see any clusters.
+	require.Eventually(p.T(), func() bool {
+		clusters, err := testUser.Management.Cluster.List(nil)
+		return err == nil && len(clusters.Data) == 0
+	}, 2*time.Minute, 2*time.Second, "failed revoking cluster access from user")
+
+	// Accessing the cluster by ID should fail with 403.
+	_, err = testUser.Management.Cluster.ByID(p.downstreamClusterID)
+	require.Error(p.T(), err)
+	require.Contains(p.T(), err.Error(), "403")
+}
+
 func TestRTBTestSuite(t *testing.T) {
 	suite.Run(t, new(RTBTestSuite))
 }

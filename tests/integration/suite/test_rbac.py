@@ -9,69 +9,6 @@ from .conftest import wait_until_available, wait_until, \
     kubernetes_api_client, wait_for, user_cluster_client
 
 
-def test_removing_user_from_cluster(admin_pc, admin_mc, user_mc, admin_cc,
-                                    remove_resource):
-    """Test that a user added to a project in a cluster is able to see that
-    cluster and after being removed from the project they are no longer able
-    to see the cluster.
-    """
-
-    mbo = 'membership-binding-owner'
-
-    admin_client = admin_mc.client
-    prtb = admin_client.create_project_role_template_binding(
-        userId=user_mc.user.id,
-        roleTemplateId="project-member",
-        projectId=admin_pc.project.id,
-    )
-    remove_resource(prtb)
-
-    # Verify the user can see the cluster
-    wait_until_available(user_mc.client, admin_cc.cluster)
-
-    split = str.split(prtb.id, ":")
-    prtb_key = split[0] + "_" + split[1]
-    api_instance = kubernetes.client.RbacAuthorizationV1Api(
-        admin_mc.k8s_client)
-
-    def crb_created():
-        crbs = api_instance.list_cluster_role_binding(
-            label_selector=prtb_key + "=" + mbo)
-        return len(crbs.items) == 1
-
-    # Find the expected k8s clusterRoleBinding
-    wait_for(crb_created,
-             fail_handler=lambda: "failed waiting for clusterRoleBinding"
-                                  " to get created",
-             timeout=120)
-
-    # Delete the projectRoleTemplateBinding, this should cause the user to no
-    # longer be able to see the cluster
-    admin_mc.client.delete(prtb)
-
-    def crb_deleted():
-        crbs = api_instance.list_cluster_role_binding(
-            label_selector=prtb_key + "=" + mbo)
-        return len(crbs.items) == 0
-
-    wait_for(crb_deleted,
-             fail_handler=lambda: "failed waiting for clusterRoleBinding"
-                                  " to get deleted",
-             timeout=120)
-
-    # user should now have no access to any clusters
-    def list_clusters():
-        clusters = user_mc.client.list_cluster()
-        return len(clusters.data) == 0
-
-    wait_for(list_clusters,
-             fail_handler=lambda: "failed revoking access to cluster",
-             timeout=120)
-
-    with pytest.raises(ApiError) as e:
-        user_mc.client.by_id_cluster(admin_cc.cluster.id)
-    assert e.value.error.status == 403
-
 
 def test_upgraded_setup_removing_user_from_cluster(admin_pc, admin_mc,
                                                    user_mc, admin_cc,
