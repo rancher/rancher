@@ -226,7 +226,6 @@ func nodeTypes(schemas *types.Schemas) *types.Schemas {
 	return schemas.
 		AddMapperForType(&Version, v3.NodeSpec{}, &m.Embed{Field: "internalNodeSpec"}).
 		AddMapperForType(&Version, v3.NodeStatus{},
-			&m.Drop{Field: "nodeTemplateSpec"},
 			&m.Embed{Field: "internalNodeStatus"},
 			&m.Drop{Field: "config"},
 			&m.SliceMerge{From: []string{"conditions", "nodeConditions"}, To: "conditions"}).
