@@ -9,6 +9,8 @@ import (
 	"github.com/rancher/rancher/pkg/data/management"
 	"github.com/rancher/wrangler/v3/pkg/data/convert"
 	"github.com/stretchr/testify/assert"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestUpdateConfigWithAddresses(t *testing.T) {
@@ -534,6 +536,88 @@ func TestUpdateConfigWithAdvertiseAddresses(t *testing.T) {
 				assert.False(t, ok, "expected advertise-address not to be set")
 				assert.Equal(t, len(tt.expectedConfig), len(config))
 			}
+		})
+	}
+}
+
+func TestClusterObjectAuthorized(t *testing.T) {
+	annotation := capr.AuthorizedObjectAnnotation
+
+	tests := []struct {
+		name             string
+		annotationValue  string
+		clusterName      string
+		expectAuthorized bool
+		expectFound      bool
+	}{
+		{
+			name:             "Exact match",
+			annotationValue:  "cluster-1",
+			clusterName:      "cluster-1",
+			expectAuthorized: true,
+			expectFound:      true,
+		},
+		{
+			name:             "Exact match failure",
+			annotationValue:  "cluster-1",
+			clusterName:      "cluster-2",
+			expectAuthorized: false,
+			expectFound:      true,
+		},
+		{
+			name:             "Multiple exact match with spaces",
+			annotationValue:  "cluster-1, cluster-2",
+			clusterName:      "cluster-2",
+			expectAuthorized: true,
+			expectFound:      true,
+		},
+		{
+			name:             "Global wildcard (*)",
+			annotationValue:  "*",
+			clusterName:      "dynamic-argocd-cluster",
+			expectAuthorized: true,
+			expectFound:      true,
+		},
+		{
+			name:             "Prefix wildcard match (dev-*)",
+			annotationValue:  "dev-*",
+			clusterName:      "dev-cluster-1",
+			expectAuthorized: true,
+			expectFound:      true,
+		},
+		{
+			name:             "Prefix wildcard mismatch",
+			annotationValue:  "dev-*",
+			clusterName:      "prod-cluster-1",
+			expectAuthorized: false,
+			expectFound:      true,
+		},
+		{
+			name:             "Mixed list with wildcards",
+			annotationValue:  "prod-1, dev-*, test-*",
+			clusterName:      "dev-cluster-2",
+			expectAuthorized: true,
+			expectFound:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Mock a generic Kubernetes object (like a Secret or ConfigMap)
+			obj := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{},
+				},
+			}
+
+			if tt.annotationValue != "" {
+				obj.Annotations[annotation] = tt.annotationValue
+			}
+
+			authorized, found := clusterObjectAuthorized(obj, annotation, tt.clusterName)
+
+			assert.Equal(t, tt.expectAuthorized, authorized, "authorization mismatch")
+			assert.Equal(t, tt.expectFound, found, "annotation found mismatch")
 		})
 	}
 }
