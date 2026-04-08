@@ -1,6 +1,7 @@
 package planner
 
 import (
+	"strings"
 	"testing"
 
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
@@ -64,7 +65,7 @@ func Test_rotateEncryptionKeys_noopWhenDoneForSameGeneration(t *testing.T) {
 }
 
 func Test_encryptionKeyRotationFindLeader(t *testing.T) {
-	tests := []struct {
+	testCases := []struct {
 		name          string
 		status        rkev1.RKEControlPlaneStatus
 		clusterPlan   *plan.Plan
@@ -123,19 +124,19 @@ func Test_encryptionKeyRotationFindLeader(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
 			planner := newTestEncryptionKeyRotationPlanner()
-			initNode := newTestPlanEntryFromPlan(tt.clusterPlan, tt.initNodeName)
+			initNode := newTestPlanEntryFromPlan(testCase.clusterPlan, testCase.initNodeName)
 
-			leader, err := planner.encryptionKeyRotationFindLeader(tt.status, tt.clusterPlan, initNode)
-			if tt.expectedError != "" {
-				assert.EqualError(t, err, tt.expectedError)
+			leader, err := planner.encryptionKeyRotationFindLeader(testCase.status, testCase.clusterPlan, initNode)
+			if testCase.expectedError != "" {
+				assert.EqualError(t, err, testCase.expectedError)
 				return
 			}
 
 			assert.NoError(t, err)
-			assert.Equal(t, tt.expectedName, leader.Machine.Name)
+			assert.Equal(t, testCase.expectedName, leader.Machine.Name)
 		})
 	}
 }
@@ -144,21 +145,21 @@ func Test_encryptionKeyRotationRestartTargetsForCluster(t *testing.T) {
 	controlPlane := newTestEncryptionKeyRotationControlPlane(&rkev1.RotateEncryptionKeys{Generation: 1}, rkev1.RKEControlPlaneStatus{
 		RotateEncryptionKeys:       &rkev1.RotateEncryptionKeys{Generation: 1},
 		RotateEncryptionKeysPhase:  rkev1.RotateEncryptionKeysPhasePostRotateRestart,
-		RotateEncryptionKeysLeader: "cp-leader",
+		RotateEncryptionKeysLeader: "control-plane-leader",
 	})
 
 	t.Run("etcd-only init node split from control-plane convergence entries", func(t *testing.T) {
 		clusterPlan := newTestEncryptionKeyRotationPlan(
 			newTestEncryptionKeyRotationMachine("etcd-init", true, false, true, true, "https://etcd-init:9345"),
-			newTestEncryptionKeyRotationMachine("cp-leader", true, true, false, true, "https://cp-leader:9345"),
+			newTestEncryptionKeyRotationMachine("control-plane-leader", true, true, false, true, "https://control-plane-leader:9345"),
 			newTestEncryptionKeyRotationMachine("etcd-follower", true, false, false, true, "https://etcd-follower:9345"),
-			newTestEncryptionKeyRotationMachine("cp-follower", true, true, false, true, "https://cp-follower:9345"),
+			newTestEncryptionKeyRotationMachine("control-plane-follower", true, true, false, true, "https://control-plane-follower:9345"),
 		)
 
 		targets := encryptionKeyRotationRestartTargetsForCluster(
 			controlPlane,
 			clusterPlan,
-			newTestPlanEntryFromPlan(clusterPlan, "cp-leader"),
+			newTestPlanEntryFromPlan(clusterPlan, "control-plane-leader"),
 			newTestPlanEntryFromPlan(clusterPlan, "etcd-init"),
 		)
 
@@ -167,30 +168,30 @@ func Test_encryptionKeyRotationRestartTargetsForCluster(t *testing.T) {
 		assert.Equal(t, "etcd-init", targets.etcdOnly[0].Machine.Name)
 		assert.Equal(t, "etcd-follower", targets.etcdOnly[1].Machine.Name)
 		assert.Len(t, targets.controlPlane, 2)
-		assert.Equal(t, "cp-leader", targets.controlPlane[0].Machine.Name)
-		assert.Equal(t, "cp-follower", targets.controlPlane[1].Machine.Name)
+		assert.Equal(t, "control-plane-leader", targets.controlPlane[0].Machine.Name)
+		assert.Equal(t, "control-plane-follower", targets.controlPlane[1].Machine.Name)
 	})
 
 	t.Run("control plane init node stays in control-plane ordering", func(t *testing.T) {
 		clusterPlan := newTestEncryptionKeyRotationPlan(
-			newTestEncryptionKeyRotationMachine("cp-init", true, true, true, true, "https://cp-init:9345"),
-			newTestEncryptionKeyRotationMachine("cp-leader", true, true, false, true, "https://cp-leader:9345"),
-			newTestEncryptionKeyRotationMachine("cp-follower", true, true, false, true, "https://cp-follower:9345"),
+			newTestEncryptionKeyRotationMachine("control-plane-init", true, true, true, true, "https://control-plane-init:9345"),
+			newTestEncryptionKeyRotationMachine("control-plane-leader", true, true, false, true, "https://control-plane-leader:9345"),
+			newTestEncryptionKeyRotationMachine("control-plane-follower", true, true, false, true, "https://control-plane-follower:9345"),
 		)
 
 		targets := encryptionKeyRotationRestartTargetsForCluster(
 			controlPlane,
 			clusterPlan,
-			newTestPlanEntryFromPlan(clusterPlan, "cp-leader"),
-			newTestPlanEntryFromPlan(clusterPlan, "cp-init"),
+			newTestPlanEntryFromPlan(clusterPlan, "control-plane-leader"),
+			newTestPlanEntryFromPlan(clusterPlan, "control-plane-init"),
 		)
 
 		assert.Equal(t, 3, targets.count())
 		assert.Empty(t, targets.etcdOnly)
 		assert.Len(t, targets.controlPlane, 3)
-		assert.Equal(t, "cp-init", targets.controlPlane[0].Machine.Name)
-		assert.Equal(t, "cp-leader", targets.controlPlane[1].Machine.Name)
-		assert.Equal(t, "cp-follower", targets.controlPlane[2].Machine.Name)
+		assert.Equal(t, "control-plane-init", targets.controlPlane[0].Machine.Name)
+		assert.Equal(t, "control-plane-leader", targets.controlPlane[1].Machine.Name)
+		assert.Equal(t, "control-plane-follower", targets.controlPlane[2].Machine.Name)
 	})
 }
 
@@ -201,14 +202,16 @@ func Test_encryptionKeyRotationSecretsEncryptInstruction(t *testing.T) {
 	})
 
 	instruction, err := encryptionKeyRotationSecretsEncryptInstruction(controlPlane)
+	commandArguments := strings.Join(instruction.Args, " ")
 
 	assert.NoError(t, err)
 	assert.Equal(t, "/bin/sh", instruction.Command)
-	assert.Contains(t, instruction.Args, "secrets-encrypt")
-	assert.Contains(t, instruction.Args, encryptionKeyRotationCommandRotateKeys)
-	assert.NotContains(t, instruction.Args, "prepare")
-	assert.NotContains(t, instruction.Args, "rotate")
-	assert.NotContains(t, instruction.Args, "reencrypt")
+	assert.True(t, instruction.SaveOutput)
+	assert.Contains(t, commandArguments, "secrets-encrypt")
+	assert.Contains(t, commandArguments, encryptionKeyRotationCommandRotateKeys)
+	assert.Contains(t, commandArguments, "2>&1")
+	assert.NotContains(t, commandArguments, "prepare")
+	assert.NotContains(t, commandArguments, "reencrypt")
 }
 
 func Test_encryptionKeyRotationStatusFromOutput(t *testing.T) {
@@ -216,7 +219,7 @@ func Test_encryptionKeyRotationStatusFromOutput(t *testing.T) {
 		Machine: &capi.Machine{ObjectMeta: metav1.ObjectMeta{Name: "server-1"}},
 	}
 
-	tests := []struct {
+	testCases := []struct {
 		name       string
 		output     string
 		expected   encryptionKeyRotationRuntimeStatus
@@ -256,24 +259,25 @@ func Test_encryptionKeyRotationStatusFromOutput(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			status, err := encryptionKeyRotationStatusFromOutput(entry, tt.output)
-			if tt.expectWait {
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			status, err := encryptionKeyRotationStatusFromOutput(entry, testCase.output)
+			if testCase.expectWait {
 				assert.True(t, IsErrWaiting(err))
 				return
 			}
 
 			assert.NoError(t, err)
-			assert.Equal(t, tt.expected, status)
+			assert.Equal(t, testCase.expected, status)
 		})
 	}
 }
 
 func Test_encryptionKeyRotationRotateKeysReconcile(t *testing.T) {
-	tests := []struct {
+	testCases := []struct {
 		name         string
 		periodicOut  string
+		savedOutput  string
 		planFailed   bool
 		expectStage  string
 		expectWait   bool
@@ -292,14 +296,28 @@ func Test_encryptionKeyRotationRotateKeysReconcile(t *testing.T) {
 			expectStage: encryptionKeyRotationStageStart,
 		},
 		{
+			name: "timeout output falls back to periodic status",
+			periodicOut: "Current Rotation Stage: reencrypt_finished\n" +
+				"Server Encryption Hashes: All hashes match\n",
+			savedOutput: "level=fatal msg=\"Put \\\"https://127.0.0.1:6443/v1-k3s/encrypt/config\\\": context deadline exceeded (Client.Timeout exceeded while awaiting headers): " + encryptionKeyRotationRotateKeysTimeoutMessage + "\"\n",
+			planFailed:  true,
+			expectStage: encryptionKeyRotationStageReencryptFinished,
+		},
+		{
+			name:        "timeout output waits for periodic status when not yet available",
+			savedOutput: "level=fatal msg=\"Put \\\"https://127.0.0.1:6443/v1-k3s/encrypt/config\\\": context deadline exceeded (Client.Timeout exceeded while awaiting headers): " + encryptionKeyRotationRotateKeysTimeoutMessage + "\"\n",
+			planFailed:  true,
+			expectWait:  true,
+		},
+		{
 			name:         "plan failure marks status failed",
 			planFailed:   true,
 			expectFailed: true,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
 			planner := newTestEncryptionKeyRotationPlanner()
 			controlPlane := newTestEncryptionKeyRotationControlPlane(&rkev1.RotateEncryptionKeys{Generation: 1}, rkev1.RKEControlPlaneStatus{
 				RotateEncryptionKeys:      &rkev1.RotateEncryptionKeys{Generation: 1},
@@ -310,35 +328,45 @@ func Test_encryptionKeyRotationRotateKeysReconcile(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Empty(t, joinedServer)
 
+			failedOutput := map[string][]byte{}
+			if testCase.savedOutput != "" {
+				failedOutput[nodePlan.Instructions[0].Name] = []byte(testCase.savedOutput)
+			}
 			leaderEntry.Plan = &plan.Node{
-				Plan:    nodePlan,
-				Failed:  tt.planFailed,
-				InSync:  true,
-				Healthy: true,
+				Plan:         nodePlan,
+				FailedOutput: failedOutput,
+				Failed:       testCase.planFailed,
+				InSync:       true,
+				Healthy:      true,
 				PeriodicOutput: map[string]plan.PeriodicInstructionOutput{
 					encryptionKeyRotationSecretsEncryptStatusCommand: {
-						Stdout: []byte(tt.periodicOut),
+						Stdout: []byte(testCase.periodicOut),
 					},
 				},
 			}
 
 			rotationStatus, updatedStatus, err := planner.encryptionKeyRotationRotateKeysReconcile(controlPlane, controlPlane.Status, plan.Secret{}, "https://server-1:9345", leaderEntry)
-			if tt.expectFailed {
+			if testCase.expectWait {
+				assert.True(t, IsErrWaiting(err))
+				assert.Equal(t, controlPlane.Status.RotateEncryptionKeysPhase, updatedStatus.RotateEncryptionKeysPhase)
+				return
+			}
+			if testCase.expectFailed {
 				assert.Error(t, err)
 				assert.Equal(t, rkev1.RotateEncryptionKeysPhaseFailed, updatedStatus.RotateEncryptionKeysPhase)
 				return
 			}
 
 			assert.NoError(t, err)
-			assert.Equal(t, tt.expectStage, rotationStatus.Stage)
+			assert.Equal(t, testCase.expectStage, rotationStatus.Stage)
 			assert.Equal(t, controlPlane.Status.RotateEncryptionKeysPhase, updatedStatus.RotateEncryptionKeysPhase)
 		})
 	}
 }
 
 func Test_rotateEncryptionKeys_marksDoneWhenSingleServerHasFinishedStatus(t *testing.T) {
-	mp := newMockPlanner(t, InfoFunctions{})
-	mp.planner.store.equalities = testPlannerEqualities()
+	mockPlanner := newMockPlanner(t, InfoFunctions{})
+	mockPlanner.planner.store.equalities = testPlannerEqualities()
 
 	controlPlane := newOwnedEncryptionKeyRotationControlPlane(&rkev1.RotateEncryptionKeys{Generation: 1}, rkev1.RKEControlPlaneStatus{
 		RotateEncryptionKeys:       &rkev1.RotateEncryptionKeys{Generation: 1},
@@ -352,7 +380,7 @@ func Test_rotateEncryptionKeys_marksDoneWhenSingleServerHasFinishedStatus(t *tes
 		newTestEncryptionKeyRotationMachine("server-1", true, true, true, true, "https://server-1:9345"),
 	)
 	leader := newTestPlanEntryFromPlan(clusterPlan, "server-1")
-	nodePlan, _, err := mp.planner.encryptionKeyRotationRotateKeysPlan(controlPlane, plan.Secret{}, "https://server-1:9345", leader)
+	nodePlan, _, err := mockPlanner.planner.encryptionKeyRotationRotateKeysPlan(controlPlane, plan.Secret{}, "https://server-1:9345", leader)
 	assert.NoError(t, err)
 	clusterPlan.Nodes["server-1"] = &plan.Node{
 		Plan:    nodePlan,
@@ -365,10 +393,10 @@ func Test_rotateEncryptionKeys_marksDoneWhenSingleServerHasFinishedStatus(t *tes
 		},
 	}
 
-	mp.capiClusters.EXPECT().Get(controlPlane.Namespace, "capi-cluster").Return(pausedCluster(controlPlane.Namespace, true), nil)
-	mp.capiClusters.EXPECT().Get(controlPlane.Namespace, "capi-cluster").Return(pausedCluster(controlPlane.Namespace, false), nil)
+	mockPlanner.capiClusters.EXPECT().Get(controlPlane.Namespace, "capi-cluster").Return(pausedCluster(controlPlane.Namespace, true), nil)
+	mockPlanner.capiClusters.EXPECT().Get(controlPlane.Namespace, "capi-cluster").Return(pausedCluster(controlPlane.Namespace, false), nil)
 
-	updatedStatus, err := mp.planner.rotateEncryptionKeys(controlPlane, controlPlane.Status, plan.Secret{}, clusterPlan)
+	updatedStatus, err := mockPlanner.planner.rotateEncryptionKeys(controlPlane, controlPlane.Status, plan.Secret{}, clusterPlan)
 
 	assert.True(t, IsErrWaiting(err))
 	assert.Equal(t, rkev1.RotateEncryptionKeysPhaseDone, updatedStatus.RotateEncryptionKeysPhase)
@@ -376,26 +404,26 @@ func Test_rotateEncryptionKeys_marksDoneWhenSingleServerHasFinishedStatus(t *tes
 }
 
 func Test_rotateEncryptionKeys_movesToRestartPhaseWhenEtcdOnlyFollowersExist(t *testing.T) {
-	mp := newMockPlanner(t, InfoFunctions{})
-	mp.planner.store.equalities = testPlannerEqualities()
+	mockPlanner := newMockPlanner(t, InfoFunctions{})
+	mockPlanner.planner.store.equalities = testPlannerEqualities()
 
 	controlPlane := newOwnedEncryptionKeyRotationControlPlane(&rkev1.RotateEncryptionKeys{Generation: 1}, rkev1.RKEControlPlaneStatus{
 		RotateEncryptionKeys:       &rkev1.RotateEncryptionKeys{Generation: 1},
 		RotateEncryptionKeysPhase:  rkev1.RotateEncryptionKeysPhaseRotate,
-		RotateEncryptionKeysLeader: "cp-leader",
+		RotateEncryptionKeysLeader: "control-plane-leader",
 		Initialization: rkev1.RKEControlPlaneInitializationStatus{
 			ControlPlaneInitialized: ptr.To(true),
 		},
 	})
 	clusterPlan := newTestEncryptionKeyRotationPlan(
 		newTestEncryptionKeyRotationMachine("etcd-init", true, false, true, true, "https://etcd-init:9345"),
-		newTestEncryptionKeyRotationMachine("cp-leader", true, true, false, true, "https://cp-leader:9345"),
+		newTestEncryptionKeyRotationMachine("control-plane-leader", true, true, false, true, "https://control-plane-leader:9345"),
 		newTestEncryptionKeyRotationMachine("etcd-follower", true, false, false, true, "https://etcd-follower:9345"),
 	)
-	leader := newTestPlanEntryFromPlan(clusterPlan, "cp-leader")
-	nodePlan, _, err := mp.planner.encryptionKeyRotationRotateKeysPlan(controlPlane, plan.Secret{}, "https://etcd-init:9345", leader)
+	leader := newTestPlanEntryFromPlan(clusterPlan, "control-plane-leader")
+	nodePlan, _, err := mockPlanner.planner.encryptionKeyRotationRotateKeysPlan(controlPlane, plan.Secret{}, "https://etcd-init:9345", leader)
 	assert.NoError(t, err)
-	clusterPlan.Nodes["cp-leader"] = &plan.Node{
+	clusterPlan.Nodes["control-plane-leader"] = &plan.Node{
 		Plan:    nodePlan,
 		InSync:  true,
 		Healthy: true,
@@ -406,18 +434,18 @@ func Test_rotateEncryptionKeys_movesToRestartPhaseWhenEtcdOnlyFollowersExist(t *
 		},
 	}
 
-	mp.capiClusters.EXPECT().Get(controlPlane.Namespace, "capi-cluster").Return(pausedCluster(controlPlane.Namespace, true), nil)
+	mockPlanner.capiClusters.EXPECT().Get(controlPlane.Namespace, "capi-cluster").Return(pausedCluster(controlPlane.Namespace, true), nil)
 
-	updatedStatus, err := mp.planner.rotateEncryptionKeys(controlPlane, controlPlane.Status, plan.Secret{}, clusterPlan)
+	updatedStatus, err := mockPlanner.planner.rotateEncryptionKeys(controlPlane, controlPlane.Status, plan.Secret{}, clusterPlan)
 
 	assert.True(t, IsErrWaiting(err))
 	assert.Equal(t, rkev1.RotateEncryptionKeysPhasePostRotateRestart, updatedStatus.RotateEncryptionKeysPhase)
-	assert.Equal(t, "cp-leader", updatedStatus.RotateEncryptionKeysLeader)
+	assert.Equal(t, "control-plane-leader", updatedStatus.RotateEncryptionKeysLeader)
 }
 
 func Test_rotateEncryptionKeys_requeuesWhileLeaderStatusIncomplete(t *testing.T) {
-	mp := newMockPlanner(t, InfoFunctions{})
-	mp.planner.store.equalities = testPlannerEqualities()
+	mockPlanner := newMockPlanner(t, InfoFunctions{})
+	mockPlanner.planner.store.equalities = testPlannerEqualities()
 
 	controlPlane := newOwnedEncryptionKeyRotationControlPlane(&rkev1.RotateEncryptionKeys{Generation: 1}, rkev1.RKEControlPlaneStatus{
 		RotateEncryptionKeys:       &rkev1.RotateEncryptionKeys{Generation: 1},
@@ -431,7 +459,7 @@ func Test_rotateEncryptionKeys_requeuesWhileLeaderStatusIncomplete(t *testing.T)
 		newTestEncryptionKeyRotationMachine("server-1", true, true, true, true, "https://server-1:9345"),
 	)
 	leader := newTestPlanEntryFromPlan(clusterPlan, "server-1")
-	nodePlan, _, err := mp.planner.encryptionKeyRotationRotateKeysPlan(controlPlane, plan.Secret{}, "https://server-1:9345", leader)
+	nodePlan, _, err := mockPlanner.planner.encryptionKeyRotationRotateKeysPlan(controlPlane, plan.Secret{}, "https://server-1:9345", leader)
 	assert.NoError(t, err)
 	clusterPlan.Nodes["server-1"] = &plan.Node{
 		Plan:    nodePlan,
@@ -444,9 +472,9 @@ func Test_rotateEncryptionKeys_requeuesWhileLeaderStatusIncomplete(t *testing.T)
 		},
 	}
 
-	mp.capiClusters.EXPECT().Get(controlPlane.Namespace, "capi-cluster").Return(pausedCluster(controlPlane.Namespace, true), nil)
+	mockPlanner.capiClusters.EXPECT().Get(controlPlane.Namespace, "capi-cluster").Return(pausedCluster(controlPlane.Namespace, true), nil)
 
-	updatedStatus, err := mp.planner.rotateEncryptionKeys(controlPlane, controlPlane.Status, plan.Secret{}, clusterPlan)
+	updatedStatus, err := mockPlanner.planner.rotateEncryptionKeys(controlPlane, controlPlane.Status, plan.Secret{}, clusterPlan)
 
 	assert.True(t, IsErrWaiting(err))
 	assert.Equal(t, rkev1.RotateEncryptionKeysPhaseRotate, updatedStatus.RotateEncryptionKeysPhase)
@@ -454,8 +482,8 @@ func Test_rotateEncryptionKeys_requeuesWhileLeaderStatusIncomplete(t *testing.T)
 }
 
 func Test_rotateEncryptionKeys_marksFailedWhenLeaderPlanFails(t *testing.T) {
-	mp := newMockPlanner(t, InfoFunctions{})
-	mp.planner.store.equalities = testPlannerEqualities()
+	mockPlanner := newMockPlanner(t, InfoFunctions{})
+	mockPlanner.planner.store.equalities = testPlannerEqualities()
 
 	controlPlane := newOwnedEncryptionKeyRotationControlPlane(&rkev1.RotateEncryptionKeys{Generation: 1}, rkev1.RKEControlPlaneStatus{
 		RotateEncryptionKeys:       &rkev1.RotateEncryptionKeys{Generation: 1},
@@ -469,7 +497,7 @@ func Test_rotateEncryptionKeys_marksFailedWhenLeaderPlanFails(t *testing.T) {
 		newTestEncryptionKeyRotationMachine("server-1", true, true, true, true, "https://server-1:9345"),
 	)
 	leader := newTestPlanEntryFromPlan(clusterPlan, "server-1")
-	nodePlan, _, err := mp.planner.encryptionKeyRotationRotateKeysPlan(controlPlane, plan.Secret{}, "https://server-1:9345", leader)
+	nodePlan, _, err := mockPlanner.planner.encryptionKeyRotationRotateKeysPlan(controlPlane, plan.Secret{}, "https://server-1:9345", leader)
 	assert.NoError(t, err)
 	clusterPlan.Nodes["server-1"] = &plan.Node{
 		Plan:   nodePlan,
@@ -477,19 +505,60 @@ func Test_rotateEncryptionKeys_marksFailedWhenLeaderPlanFails(t *testing.T) {
 		InSync: true,
 	}
 
-	mp.capiClusters.EXPECT().Get(controlPlane.Namespace, "capi-cluster").Return(pausedCluster(controlPlane.Namespace, true), nil)
-	mp.capiClusters.EXPECT().Get(controlPlane.Namespace, "capi-cluster").Return(pausedCluster(controlPlane.Namespace, false), nil)
+	mockPlanner.capiClusters.EXPECT().Get(controlPlane.Namespace, "capi-cluster").Return(pausedCluster(controlPlane.Namespace, true), nil)
+	mockPlanner.capiClusters.EXPECT().Get(controlPlane.Namespace, "capi-cluster").Return(pausedCluster(controlPlane.Namespace, false), nil)
 
-	updatedStatus, err := mp.planner.rotateEncryptionKeys(controlPlane, controlPlane.Status, plan.Secret{}, clusterPlan)
+	updatedStatus, err := mockPlanner.planner.rotateEncryptionKeys(controlPlane, controlPlane.Status, plan.Secret{}, clusterPlan)
 
 	assert.Error(t, err)
 	assert.Equal(t, rkev1.RotateEncryptionKeysPhaseFailed, updatedStatus.RotateEncryptionKeysPhase)
 	assert.Empty(t, updatedStatus.RotateEncryptionKeysLeader)
 }
 
+func Test_rotateEncryptionKeys_requeuesWhenLeaderRotateKeysTimesOut(t *testing.T) {
+	mockPlanner := newMockPlanner(t, InfoFunctions{})
+	mockPlanner.planner.store.equalities = testPlannerEqualities()
+
+	controlPlane := newOwnedEncryptionKeyRotationControlPlane(&rkev1.RotateEncryptionKeys{Generation: 1}, rkev1.RKEControlPlaneStatus{
+		RotateEncryptionKeys:       &rkev1.RotateEncryptionKeys{Generation: 1},
+		RotateEncryptionKeysPhase:  rkev1.RotateEncryptionKeysPhaseRotate,
+		RotateEncryptionKeysLeader: "server-1",
+		Initialization: rkev1.RKEControlPlaneInitializationStatus{
+			ControlPlaneInitialized: ptr.To(true),
+		},
+	})
+	clusterPlan := newTestEncryptionKeyRotationPlan(
+		newTestEncryptionKeyRotationMachine("server-1", true, true, true, true, "https://server-1:9345"),
+	)
+	leader := newTestPlanEntryFromPlan(clusterPlan, "server-1")
+	nodePlan, _, err := mockPlanner.planner.encryptionKeyRotationRotateKeysPlan(controlPlane, plan.Secret{}, "https://server-1:9345", leader)
+	assert.NoError(t, err)
+	clusterPlan.Nodes["server-1"] = &plan.Node{
+		Plan:   nodePlan,
+		Failed: true,
+		InSync: true,
+		FailedOutput: map[string][]byte{
+			nodePlan.Instructions[0].Name: []byte("level=fatal msg=\"Put \\\"https://127.0.0.1:6443/v1-k3s/encrypt/config\\\": context deadline exceeded (Client.Timeout exceeded while awaiting headers): " + encryptionKeyRotationRotateKeysTimeoutMessage + "\"\n"),
+		},
+		PeriodicOutput: map[string]plan.PeriodicInstructionOutput{
+			encryptionKeyRotationSecretsEncryptStatusCommand: {
+				Stdout: []byte("Current Rotation Stage: start\nServer Encryption Hashes: hash mismatch\n"),
+			},
+		},
+	}
+
+	mockPlanner.capiClusters.EXPECT().Get(controlPlane.Namespace, "capi-cluster").Return(pausedCluster(controlPlane.Namespace, true), nil)
+
+	updatedStatus, err := mockPlanner.planner.rotateEncryptionKeys(controlPlane, controlPlane.Status, plan.Secret{}, clusterPlan)
+
+	assert.True(t, IsErrWaiting(err))
+	assert.Equal(t, rkev1.RotateEncryptionKeysPhaseRotate, updatedStatus.RotateEncryptionKeysPhase)
+	assert.Equal(t, "server-1", updatedStatus.RotateEncryptionKeysLeader)
+}
+
 func Test_rotateEncryptionKeys_marksFailedWhenNoSuitableLeaderExists(t *testing.T) {
-	mp := newMockPlanner(t, InfoFunctions{})
-	mp.planner.store.equalities = testPlannerEqualities()
+	mockPlanner := newMockPlanner(t, InfoFunctions{})
+	mockPlanner.planner.store.equalities = testPlannerEqualities()
 
 	controlPlane := newOwnedEncryptionKeyRotationControlPlane(&rkev1.RotateEncryptionKeys{Generation: 1}, rkev1.RKEControlPlaneStatus{
 		RotateEncryptionKeys:      &rkev1.RotateEncryptionKeys{Generation: 1},
@@ -502,9 +571,9 @@ func Test_rotateEncryptionKeys_marksFailedWhenNoSuitableLeaderExists(t *testing.
 		newTestEncryptionKeyRotationMachine("etcd-init", true, false, true, true, "https://etcd-init:9345"),
 	)
 
-	mp.capiClusters.EXPECT().Get(controlPlane.Namespace, "capi-cluster").Return(pausedCluster(controlPlane.Namespace, false), nil)
+	mockPlanner.capiClusters.EXPECT().Get(controlPlane.Namespace, "capi-cluster").Return(pausedCluster(controlPlane.Namespace, false), nil)
 
-	updatedStatus, err := mp.planner.rotateEncryptionKeys(controlPlane, controlPlane.Status, plan.Secret{}, clusterPlan)
+	updatedStatus, err := mockPlanner.planner.rotateEncryptionKeys(controlPlane, controlPlane.Status, plan.Secret{}, clusterPlan)
 
 	assert.Error(t, err)
 	assert.Equal(t, rkev1.RotateEncryptionKeysPhaseFailed, updatedStatus.RotateEncryptionKeysPhase)
@@ -512,8 +581,8 @@ func Test_rotateEncryptionKeys_marksFailedWhenNoSuitableLeaderExists(t *testing.
 }
 
 func Test_rotateEncryptionKeys_marksFailedWhenVersionUnsupported(t *testing.T) {
-	mp := newMockPlanner(t, InfoFunctions{})
-	mp.planner.store.equalities = testPlannerEqualities()
+	mockPlanner := newMockPlanner(t, InfoFunctions{})
+	mockPlanner.planner.store.equalities = testPlannerEqualities()
 
 	controlPlane := newOwnedEncryptionKeyRotationControlPlane(&rkev1.RotateEncryptionKeys{Generation: 1}, rkev1.RKEControlPlaneStatus{
 		Initialization: rkev1.RKEControlPlaneInitializationStatus{
@@ -522,9 +591,9 @@ func Test_rotateEncryptionKeys_marksFailedWhenVersionUnsupported(t *testing.T) {
 	})
 	controlPlane.Spec.KubernetesVersion = "v1.29.9+rke2r1"
 
-	mp.capiClusters.EXPECT().Get(controlPlane.Namespace, "capi-cluster").Return(pausedCluster(controlPlane.Namespace, false), nil)
+	mockPlanner.capiClusters.EXPECT().Get(controlPlane.Namespace, "capi-cluster").Return(pausedCluster(controlPlane.Namespace, false), nil)
 
-	updatedStatus, err := mp.planner.rotateEncryptionKeys(controlPlane, controlPlane.Status, plan.Secret{}, &plan.Plan{})
+	updatedStatus, err := mockPlanner.planner.rotateEncryptionKeys(controlPlane, controlPlane.Status, plan.Secret{}, &plan.Plan{})
 
 	assert.True(t, IsErrWaiting(err))
 	assert.Equal(t, rkev1.RotateEncryptionKeysPhaseFailed, updatedStatus.RotateEncryptionKeysPhase)
@@ -726,6 +795,12 @@ func copyNode(in *plan.Node) *plan.Node {
 		out.Output = make(map[string][]byte, len(in.Output))
 		for key, value := range in.Output {
 			out.Output[key] = append([]byte(nil), value...)
+		}
+	}
+	if in.FailedOutput != nil {
+		out.FailedOutput = make(map[string][]byte, len(in.FailedOutput))
+		for key, value := range in.FailedOutput {
+			out.FailedOutput[key] = append([]byte(nil), value...)
 		}
 	}
 	if in.PeriodicOutput != nil {

@@ -7,7 +7,7 @@ const (
 	// During this phase, the "secrets-encrypt rotate-keys" subcommand is executed on the elected control plane leader and Rancher observes the resulting runtime status.
 	RotateEncryptionKeysPhaseRotate = RotateEncryptionKeysPhase("Rotate")
 
-	// RotateEncryptionKeysPhasePostRotateRestart is the state assigned to the RKEControlPlane when Rancher is restarting server nodes after rotate-keys in order to converge HA secrets-encrypt status and hashes.
+	// RotateEncryptionKeysPhasePostRotateRestart is the state assigned to the RKEControlPlane when Rancher is restarting server nodes after rotate-keys in order to converge high-availability secrets-encrypt status and hashes.
 	RotateEncryptionKeysPhasePostRotateRestart = RotateEncryptionKeysPhase("PostRotateRestart")
 
 	// RotateEncryptionKeysPhaseDone is the state assigned to the RKEControlPlane upon successful completion of the encryption key rotation operation.
