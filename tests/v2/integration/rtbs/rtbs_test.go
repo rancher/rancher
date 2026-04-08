@@ -1083,6 +1083,79 @@ func (p *RTBTestSuite) TestReadOnlyCannotEditSecret() {
 	require.True(p.T(), apierrors.IsForbidden(err), "expected forbidden, got: %v", err)
 }
 
+func (p *RTBTestSuite) TestReadOnlyCannotMoveNamespace() {
+	subSession := p.session.NewSession()
+	defer subSession.Cleanup()
+
+	client, err := p.client.WithSession(subSession)
+	require.NoError(p.T(), err)
+
+	// Create two projects.
+	p1, err := client.Management.Project.Create(&management.Project{
+		ClusterID: p.downstreamClusterID,
+		Name:      namegen.AppendRandomString("test-proj-"),
+	})
+	require.NoError(p.T(), err)
+
+	p2, err := client.Management.Project.Create(&management.Project{
+		ClusterID: p.downstreamClusterID,
+		Name:      namegen.AppendRandomString("test-proj-"),
+	})
+	require.NoError(p.T(), err)
+
+	// Wait for project namespaces to exist.
+	p1Name := strings.Split(p1.ID, ":")[1]
+	p2Name := strings.Split(p2.ID, ":")[1]
+
+	require.Eventually(p.T(), func() bool {
+		_, err1 := extnamespaces.GetNamespaceByName(client, p.downstreamClusterID, p1Name)
+		_, err2 := extnamespaces.GetNamespaceByName(client, p.downstreamClusterID, p2Name)
+		return err1 == nil && err2 == nil
+	}, 2*time.Minute, 2*time.Second, "waiting for project namespaces to exist")
+
+	// Give the test user read-only access to both projects.
+	_, err = client.Management.ProjectRoleTemplateBinding.Create(&management.ProjectRoleTemplateBinding{
+		UserID:         p.testUser.ID,
+		RoleTemplateID: "read-only",
+		ProjectID:      p1.ID,
+	})
+	require.NoError(p.T(), err)
+
+	_, err = client.Management.ProjectRoleTemplateBinding.Create(&management.ProjectRoleTemplateBinding{
+		UserID:         p.testUser.ID,
+		RoleTemplateID: "read-only",
+		ProjectID:      p2.ID,
+	})
+	require.NoError(p.T(), err)
+
+	// Create a namespace in project 1.
+	ns, err := extnamespaces.CreateNamespace(client, p.downstreamClusterID, p1Name, namegen.AppendRandomString("testns-"), "{}", map[string]string{}, map[string]string{})
+	require.NoError(p.T(), err)
+
+	testUser, err := client.AsUser(p.testUser)
+	require.NoError(p.T(), err)
+
+	// Wait until the read-only user can see the namespace.
+	err = extauthz.WaitForAllowed(testUser, p.downstreamClusterID, []*authzv1.ResourceAttributes{
+		{
+			Verb:     "get",
+			Resource: "namespaces",
+			Name:     ns.Name,
+		},
+	})
+	require.NoError(p.T(), err)
+
+	// Read-only user should fail to move the namespace to project 2 by updating the projectId annotation.
+	dynamicClient, err := testUser.GetDownStreamClusterClient(p.downstreamClusterID)
+	require.NoError(p.T(), err)
+
+	nsGVR := corev1.SchemeGroupVersion.WithResource("namespaces")
+	patchPayload := fmt.Sprintf(`{"metadata":{"annotations":{"field.cattle.io/projectId":"%s:%s"}}}`, p.downstreamClusterID, p2Name)
+	_, err = dynamicClient.Resource(nsGVR).Patch(context.TODO(), ns.Name, k8stypes.MergePatchType, []byte(patchPayload), metav1.PatchOptions{})
+	require.Error(p.T(), err)
+	require.True(p.T(), apierrors.IsForbidden(err), "expected forbidden, got: %v", err)
+}
+
 func TestRTBTestSuite(t *testing.T) {
 	suite.Run(t, new(RTBTestSuite))
 }
