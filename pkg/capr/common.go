@@ -121,7 +121,7 @@ const (
 	// Used on: provisioning.cattle.io/v1 Cluster, rke.cattle.io/v1 RKEControlPlane
 	Provisioned = condition.Cond("Provisioned")
 
-	// Stable indicates whether we can safely copy the v3 management cluster Ready condition to the v1 object.
+	// Stable indicates whether we can safely copy the Ready condition to the management.cluster.cattle.io/v3 cluster.
 	// Used on: rke.cattle.io/v1 RKEControlPlane
 	Stable = condition.Cond("Stable")
 

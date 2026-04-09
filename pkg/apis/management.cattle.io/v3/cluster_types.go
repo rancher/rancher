@@ -232,6 +232,31 @@ type ClusterStatus struct {
 	AADClientCertSecret        string                    `json:"aadClientCertSecret,omitempty" norman:"nocreate,noupdate"`   // Deprecated: use ClusterSpec.ClusterSecrets.AADClientCertSecret instead
 
 	AppliedClusterAgentDeploymentCustomization *AgentDeploymentCustomization `json:"appliedClusterAgentDeploymentCustomization,omitempty"`
+
+	// ReadyReconciling indicates that the cluster's readiness state is currently being managed by provisioning controller.
+	// Currently used only for v2prov clusters. When true, secondary health controllers (like HealthSyncer, Connected) should avoid updating Ready condition to prevent state flapping.
+	ReadyReconciling bool         `json:"readyReconciling,omitempty"`
+	Info             *ClusterInfo `json:"info,omitempty"`
+}
+
+// ClusterInfo provides aggregated cluster metadata for UI display.
+type ClusterInfo struct {
+	// MachineProvider is the infrastructure provider for v2prov (amazonec2, digitalocean, custom) or cluster type (local, imported, aks, eks, gke).
+	MachineProvider string `json:"machineProvider,omitempty"`
+	// KubernetesVersion is the cluster's Kubernetes version, from status.Version.GitVersion or spec if pending.
+	KubernetesVersion string `json:"kubernetesVersion,omitempty"`
+	// NodeCount is the number of nodes. For v2prov clusters it's from CAPI machines, otherwise from status.NodeCount.
+	NodeCount int `json:"nodeCount,omitempty"`
+	// Arch is the node architecture from node labels, or "mixed" if multiple architectures exist.
+	Arch string `json:"arch,omitempty"`
+	// ProvisioningClusterRef is a reference to the provisioning.cattle.io/v1 Cluster. Set only for v2prov clusters.
+	ProvisioningClusterRef *v1.ObjectReference `json:"provisioningClusterRef,omitempty"`
+	/* Other fields UI uses:
+	1. Distro: available in cluster.Status.Provider.
+	2. Human name of the cluster: cluster.Spec.DisplayName
+	3. CPU/Memory/Pod Count: cluster.Status.Capacity
+	4. State: summarized from cluster.Status.Conditions
+	*/
 }
 
 type ClusterComponentStatus struct {

@@ -55,6 +55,7 @@ const (
 	ClusterFieldGKEConfig                                            = "gkeConfig"
 	ClusterFieldGKEStatus                                            = "gkeStatus"
 	ClusterFieldImportedConfig                                       = "importedConfig"
+	ClusterFieldInfo                                                 = "info"
 	ClusterFieldInternal                                             = "internal"
 	ClusterFieldIstioEnabled                                         = "istioEnabled"
 	ClusterFieldK3sConfig                                            = "k3sConfig"
@@ -70,6 +71,7 @@ const (
 	ClusterFieldPrivateRegistrySecret                                = "privateRegistrySecret"
 	ClusterFieldProvider                                             = "provider"
 	ClusterFieldRancherKubernetesEngineConfig                        = "rancherKubernetesEngineConfig"
+	ClusterFieldReadyReconciling                                     = "readyReconciling"
 	ClusterFieldRemoved                                              = "removed"
 	ClusterFieldRequested                                            = "requested"
 	ClusterFieldRke2Config                                           = "rke2Config"
@@ -138,6 +140,7 @@ type Cluster struct {
 	GKEConfig                                            *GKEClusterConfigSpec          `json:"gkeConfig,omitempty" yaml:"gkeConfig,omitempty"`
 	GKEStatus                                            *GKEStatus                     `json:"gkeStatus,omitempty" yaml:"gkeStatus,omitempty"`
 	ImportedConfig                                       *ImportedConfig                `json:"importedConfig,omitempty" yaml:"importedConfig,omitempty"`
+	Info                                                 *ClusterInfo                   `json:"info,omitempty" yaml:"info,omitempty"`
 	Internal                                             bool                           `json:"internal,omitempty" yaml:"internal,omitempty"`
 	IstioEnabled                                         bool                           `json:"istioEnabled,omitempty" yaml:"istioEnabled,omitempty"`
 	K3sConfig                                            *K3sConfig                     `json:"k3sConfig,omitempty" yaml:"k3sConfig,omitempty"`
@@ -153,6 +156,7 @@ type Cluster struct {
 	PrivateRegistrySecret                                string                         `json:"privateRegistrySecret,omitempty" yaml:"privateRegistrySecret,omitempty"`
 	Provider                                             string                         `json:"provider,omitempty" yaml:"provider,omitempty"`
 	RancherKubernetesEngineConfig                        *RancherKubernetesEngineConfig `json:"rancherKubernetesEngineConfig,omitempty" yaml:"rancherKubernetesEngineConfig,omitempty"`
+	ReadyReconciling                                     bool                           `json:"readyReconciling,omitempty" yaml:"readyReconciling,omitempty"`
 	Removed                                              string                         `json:"removed,omitempty" yaml:"removed,omitempty"`
 	Requested                                            map[string]string              `json:"requested,omitempty" yaml:"requested,omitempty"`
 	Rke2Config                                           *Rke2Config                    `json:"rke2Config,omitempty" yaml:"rke2Config,omitempty"`

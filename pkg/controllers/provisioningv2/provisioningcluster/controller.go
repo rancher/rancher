@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/rancher/lasso/pkg/dynamic"
@@ -352,23 +353,28 @@ func (h *handler) OnRancherClusterChange(obj *rancherv1.Cluster, status rancherv
 
 		reconcileCondition(&status, capr.Updated, rkeCP, capr.Ready)
 		reconcileCondition(&status, capr.Provisioned, rkeCP, capr.Ready)
+		reconcileCondition(&status, capr.Ready, rkeCP, capr.Ready)
 
-		// If the Stable condition is not true, then copy the Ready condition from the rkeControlPlane to the v1.Clusters object
-		// Otherwise, use the v3 clusters Ready condition. Note that we use `IsTrue` here because `IsFalse` specifically looks
-		// for `False`, and the condition may not be defined which would not match `IsFalse`.
-		useRKEControlPlaneReadyStatus := !capr.Stable.IsTrue(rkeCP)
-		if useRKEControlPlaneReadyStatus {
-			reconcileCondition(&status, capr.Ready, rkeCP, capr.Ready)
-		}
 		if mgmtCluster != nil {
-			if !useRKEControlPlaneReadyStatus {
-				reconcileCondition(&status, capr.Ready, mgmtCluster, capr.Ready)
+			// mgmtCluster from retrieveMgmtClusterFromCache is already a DeepCopy.
+			oldStatus := mgmtCluster.Status
+
+			mgmtCluster.Status.ReadyReconciling = !capr.Stable.IsTrue(rkeCP)
+
+			// Set MCIC.Ready from rkeCP when !Stable (rkeCP's Ready owns MCIC.Ready during provisioning)
+			// After Stable, healthsyncer/clusterconnected own MCIC.Ready
+			if mgmtCluster.Status.ReadyReconciling {
+				reconcileCondition(mgmtCluster, capr.Ready, rkeCP, capr.Ready)
 			}
-			updatedChanged := reconcileCondition(mgmtCluster, capr.Updated, rkeCP, capr.Ready)
-			provisionedChanged := reconcileCondition(mgmtCluster, capr.Provisioned, rkeCP, capr.Provisioned) // This was originally set by checking machine provisioning, but now we simply set it to true.
-			if updatedChanged || provisionedChanged {
-				_, err := h.mgmtClusterClient.UpdateStatus(mgmtCluster)
-				if err != nil {
+
+			// Reconcile necessary conditions to MCIC for state summarization
+			reconcileCondition(mgmtCluster, capr.ClusterAutoscalerDeploymentReady, &status, capr.ClusterAutoscalerDeploymentReady)
+			reconcileCondition(mgmtCluster, capr.Updated, rkeCP, capr.Ready)
+			// This was originally set by checking machine provisioning, but now we simply set it to true.
+			reconcileCondition(mgmtCluster, capr.Provisioned, rkeCP, capr.Provisioned)
+
+			if !reflect.DeepEqual(oldStatus, mgmtCluster.Status) {
+				if _, err := h.mgmtClusterClient.UpdateStatus(mgmtCluster); err != nil {
 					return nil, status, err
 				}
 			}
