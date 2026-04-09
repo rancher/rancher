@@ -9,6 +9,7 @@ import (
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/util"
 	"k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/kubernetes/pkg/apis/authentication"
 )
 
 func NewAuthenticatedFilter(next http.Handler) http.Handler {
@@ -31,8 +32,7 @@ func (h authHeaderHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 
 	// clean extra that is not part of userInfo
 	for header := range req.Header {
-		if strings.HasPrefix(header, "Impersonate-Extra-") {
-			key := strings.TrimPrefix(header, "Impersonate-Extra-")
+		if key, ok := strings.CutPrefix(header, authentication.ImpersonateUserExtraHeaderPrefix); ok {
 			if !providers.IsValidUserExtraAttribute(key) {
 				req.Header.Del(header)
 			}
@@ -41,17 +41,23 @@ func (h authHeaderHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 
 	if !authcontext.IsSAAuthenticated(req.Context()) {
 		// If the request is not authenticated as a service account,
-		// we need to set impersonation headers.
-		req.Header.Set("Impersonate-User", userInfo.GetName())
-		req.Header.Del("Impersonate-Group")
+		// we need to set impersonation headers to the authenticated user
+		// impersonation details.
+		// This allows the SubjectAccessReviewHandler to work based on the
+		// authenticated user instead of the service account.
+		req.Header.Set(authentication.ImpersonateUserHeader, userInfo.GetName())
+		req.Header.Del(authentication.ImpersonateGroupHeader)
 		for _, group := range userInfo.GetGroups() {
-			req.Header.Add("Impersonate-Group", group)
+			req.Header.Add(authentication.ImpersonateGroupHeader, group)
 		}
 
+		// This copies over the extra fields of the user info as impersonation
+		// headers, so they can be used by the SubjectAccessReviewHandler if
+		// needed.
 		for key, extras := range userInfo.GetExtra() {
 			for _, s := range extras {
 				if s != "" {
-					req.Header.Add("Impersonate-Extra-"+key, s)
+					req.Header.Add(authentication.ImpersonateUserExtraHeaderPrefix+key, s)
 				}
 			}
 		}
