@@ -20,7 +20,6 @@ import (
 	"github.com/rancher/shepherd/pkg/api/scheme"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	"github.com/rancher/shepherd/pkg/session"
-	wranglerName "github.com/rancher/wrangler/v3/pkg/name"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	authzv1 "k8s.io/api/authorization/v1"
@@ -43,7 +42,38 @@ type RTBTestSuite struct {
 	downstreamClusterID string
 }
 
+func (p *RTBTestSuite) SetupSuite() {
+	p.downstreamClusterID = "local"
+	testSession := session.NewSession()
+	p.session = testSession
+
+	client, err := rancher.NewClient("", testSession)
+	require.NoError(p.T(), err)
+
+	p.client = client
+
+	projectConfig := &management.Project{
+		ClusterID: p.downstreamClusterID,
+		Name:      "TestProject",
+	}
+
+	testProject, err := client.Management.Project.Create(projectConfig)
+	require.NoError(p.T(), err)
+
+	p.project = testProject
+
+	p.testUser = p.createUser(client, "testuser", "user")
+}
+
 func (p *RTBTestSuite) TearDownSuite() {
+	client, err := p.client.WithSession(p.session)
+	require.NoError(p.T(), err)
+
+	// Clean up the project and user we created
+	err = client.Management.Project.Delete(p.project)
+	require.NoError(p.T(), err)
+	err = client.Management.User.Delete(p.testUser)
+	require.NoError(p.T(), err)
 	p.session.Cleanup()
 }
 
@@ -95,29 +125,6 @@ func (p *RTBTestSuite) assertClusterAccessRevoked(userClient *rancher.Client) {
 	_, err := userClient.Management.Cluster.ByID(p.downstreamClusterID)
 	require.Error(p.T(), err)
 	require.Contains(p.T(), err.Error(), "403")
-}
-
-func (p *RTBTestSuite) SetupSuite() {
-	p.downstreamClusterID = "local"
-	testSession := session.NewSession()
-	p.session = testSession
-
-	client, err := rancher.NewClient("", testSession)
-	require.NoError(p.T(), err)
-
-	p.client = client
-
-	projectConfig := &management.Project{
-		ClusterID: p.downstreamClusterID,
-		Name:      "TestProject",
-	}
-
-	testProject, err := client.Management.Project.Create(projectConfig)
-	require.NoError(p.T(), err)
-
-	p.project = testProject
-
-	p.testUser = p.createUser(client, "testuser", "user")
 }
 
 func (p *RTBTestSuite) TestPRTBRoleTemplateInheritance() {
@@ -526,7 +533,7 @@ func (p *RTBTestSuite) TestDeletingPRTBRemovesClusterAccess() {
 	}, 2*time.Minute, 2*time.Second, "user could never see the cluster")
 
 	// Derive the label key from the PRTB ID (namespace:name -> namespace_name).
-	prtbKey := wranglerName.SafeConcatName(prtb.NamespaceId, prtb.Name)
+	prtbKey := strings.ReplaceAll(prtb.ID, ":", "_")
 
 	// Wait for the expected ClusterRoleBinding with the membership-binding-owner label.
 	require.Eventually(p.T(), func() bool {
@@ -534,7 +541,7 @@ func (p *RTBTestSuite) TestDeletingPRTBRemovesClusterAccess() {
 			LabelSelector: prtbKey + "=" + mbo,
 		})
 		return err == nil && len(crbs.Items) == 1
-	}, 2*time.Minute, 2*time.Second, "failed waiting for clusterRoleBinding to get created")
+	}, 2*time.Minute, 2*time.Second, fmt.Sprintf("failed waiting for clusterRoleBinding to get created with label %s for prtb %+v", prtbKey, prtb))
 
 	// Delete the PRTB — user should lose access.
 	err = client.Management.ProjectRoleTemplateBinding.Delete(prtb)

@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/secrets"
@@ -171,14 +172,14 @@ func (p *RTBTestSuite) TestReadOnlyCannotMoveNamespace() {
 	require.NoError(p.T(), err)
 
 	// Wait for project namespaces to exist.
-	p1Name := p.projectName(p1)
-	p2Name := p.projectName(p2)
+	p1Name := strings.ReplaceAll(p1.ID, ":", "-")
+	p2Name := strings.ReplaceAll(p2.ID, ":", "-")
 
 	require.Eventually(p.T(), func() bool {
 		_, err1 := extnamespaces.GetNamespaceByName(client, p.downstreamClusterID, p1Name)
 		_, err2 := extnamespaces.GetNamespaceByName(client, p.downstreamClusterID, p2Name)
 		return err1 == nil && err2 == nil
-	}, 2*time.Minute, 2*time.Second, "waiting for project namespaces to exist")
+	}, 2*time.Minute, 2*time.Second, fmt.Sprintf("waiting for project namespaces %s and %s to exist", p1Name, p2Name))
 
 	// Give the test user read-only access to both projects.
 	_, err = client.Management.ProjectRoleTemplateBinding.Create(&management.ProjectRoleTemplateBinding{
@@ -196,7 +197,7 @@ func (p *RTBTestSuite) TestReadOnlyCannotMoveNamespace() {
 	require.NoError(p.T(), err)
 
 	// Create a namespace in project 1.
-	ns := p.createNamespace(client, p1Name)
+	ns := p.createNamespace(client, p.projectName(p1))
 
 	testUser, err := client.AsUser(p.testUser)
 	require.NoError(p.T(), err)
@@ -216,7 +217,7 @@ func (p *RTBTestSuite) TestReadOnlyCannotMoveNamespace() {
 	require.NoError(p.T(), err)
 
 	nsGVR := corev1.SchemeGroupVersion.WithResource("namespaces")
-	patchPayload := fmt.Sprintf(`{"metadata":{"annotations":{"field.cattle.io/projectId":"%s:%s"}}}`, p.downstreamClusterID, p2Name)
+	patchPayload := fmt.Sprintf(`{"metadata":{"annotations":{"field.cattle.io/projectId":"%s:%s"}}}`, p.downstreamClusterID, p.projectName(p2))
 	_, err = dynamicClient.Resource(nsGVR).Patch(context.TODO(), ns.Name, k8stypes.MergePatchType, []byte(patchPayload), metav1.PatchOptions{})
 	require.Error(p.T(), err)
 	require.True(p.T(), apierrors.IsForbidden(err), "expected forbidden, got: %v", err)
