@@ -17,6 +17,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/rancher/pkg/jailer"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/utils"
 	"github.com/sirupsen/logrus"
 )
 
@@ -166,8 +167,10 @@ func extractConfig(baseDir, extractedConfig string) error {
 			return fmt.Errorf("error reinitializing config (tarRead.Next). Config Dir: %v. Error: %v", baseDir, err)
 		}
 
-		filename := header.Name
-		filePath := filepath.Join(baseDir, filename)
+		filePath, err := utils.SecureJoin(baseDir, header.Name)
+		if err != nil {
+			return fmt.Errorf("error bulding path for file [%s]. Error: %v", header.Name, err)
+		}
 		logrus.Debugf("Extracting %v", filePath)
 
 		info := header.FileInfo()
