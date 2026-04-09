@@ -30,15 +30,17 @@ func (h *handler) deployPlans(cluster *mgmtv3.Cluster) error {
 		Version        string
 		strategy       mgmtv3.ClusterUpgradeStrategy
 	)
+
+	privateRegistry := cluster.Spec.ClusterSpecBase.ClusterSecrets.PrivateRegistryURL
 	switch {
 	case cluster.Status.Driver == mgmtv3.ClusterDriverRke2:
-		upgradeImage = settings.PrefixPrivateRegistry(rke2upgradeImage)
+		upgradeImage = settings.PrefixPrivateRegistry(privateRegistry, rke2upgradeImage)
 		masterPlanName = rke2MasterPlanName
 		workerPlanName = rke2WorkerPlanName
 		Version = cluster.Spec.Rke2Config.Version
 		strategy = cluster.Spec.Rke2Config.ClusterUpgradeStrategy
 	case cluster.Status.Driver == mgmtv3.ClusterDriverK3s:
-		upgradeImage = settings.PrefixPrivateRegistry(k3supgradeImage)
+		upgradeImage = settings.PrefixPrivateRegistry(privateRegistry, k3supgradeImage)
 		masterPlanName = k3sMasterPlanName
 		workerPlanName = k3sWorkerPlanName
 		Version = cluster.Spec.K3sConfig.Version

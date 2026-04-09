@@ -428,21 +428,24 @@ var (
 
 // FullShellImage returns the full private registry name of the rancher shell image.
 func FullShellImage() string {
-	return PrefixPrivateRegistry(ShellImage.Get())
+	return PrefixPrivateRegistry("", ShellImage.Get())
 }
 
 // FullSCCOperatorImage returns the full private registry name of the rancher shell image.
 func FullSCCOperatorImage() string {
-	return PrefixPrivateRegistry(SCCOperatorImage.Get())
+	return PrefixPrivateRegistry("", SCCOperatorImage.Get())
 }
 
 // PrefixPrivateRegistry prefixes the given image name with the stored private registry path.
-func PrefixPrivateRegistry(image string) string {
-	private := SystemDefaultRegistry.Get()
-	if private == "" {
+func PrefixPrivateRegistry(privateReg, image string) string {
+	if privateReg == "" {
+		privateReg = SystemDefaultRegistry.Get()
+	}
+	if privateReg == "" {
+
 		return image
 	}
-	return private + "/" + image
+	return strings.TrimSuffix(privateReg, "/") + "/" + image
 }
 
 // IsRelease returns true if the running server is a released version of rancher.
