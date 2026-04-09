@@ -51,7 +51,7 @@ func (h authHeaderHandler) ServeHTTP(rw http.ResponseWriter, req *http.Request) 
 			req.Header.Add(authentication.ImpersonateGroupHeader, group)
 		}
 
-		// This copes over the extra fields of the user info as impersonation
+		// This copies over the extra fields of the user info as impersonation
 		// headers, so they can be used by the SubjectAccessReviewHandler if
 		// needed.
 		for key, extras := range userInfo.GetExtra() {
