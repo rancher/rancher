@@ -15,7 +15,7 @@ import (
 
 func DeleteAdminClusterRoleBindings(
 	clusterClient mgmtconv3.ClusterClient,
-	clusterManager *clustermanager.Manager,
+	clusterManager clusterContextGetter,
 	grb *v3.GlobalRoleBinding,
 ) error {
 	// Explicit API call to ensure we have the most recent cluster info when deleting admin bindings
