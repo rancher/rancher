@@ -7,7 +7,7 @@ toolchain go1.25.8
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.7.30 // CVE-2024-40635
 	github.com/docker/docker => github.com/docker/docker v28.3.3+incompatible // CVE-2025-54388
-	github.com/go-jose/go-jose/v4 => github.com/go-jose/go-jose/v4 v4.0.5 // CVE-2025-27144
+	github.com/go-jose/go-jose/v4 => github.com/go-jose/go-jose/v4 v4.1.4 // CVE-2025-27144
 	github.com/opencontainers/runc => github.com/opencontainers/runc v1.2.8 // CVE-2024-45310
 	github.com/ulikunitz/xz => github.com/ulikunitz/xz v0.5.15 // CVE-2025-58058
 	golang.org/x/crypto => golang.org/x/crypto v0.35.0 // CVE-2024-45337, CVE-2025-22869
