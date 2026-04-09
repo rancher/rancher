@@ -69,7 +69,7 @@ func relative(base, publicURL, path string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve relative path: %w", err)
 	}
-	if filepath.IsLocal(rel) {
+	if !filepath.IsLocal(rel) {
 		return "", fmt.Errorf("invalid file path [%s]", path)
 	}
 
