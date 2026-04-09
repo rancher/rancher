@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
-
-	"github.com/gorilla/mux"
 )
 
 var (
@@ -17,8 +15,8 @@ var (
 )
 
 func redirectAuth(rw http.ResponseWriter, req *http.Request) {
-	vars := mux.Vars(req)
-	bytes, err := base64.RawURLEncoding.DecodeString(vars["state"])
+	state := req.URL.Query().Get("state")
+	bytes, err := base64.RawURLEncoding.DecodeString(state)
 	if err != nil {
 		emberIndexUnlessAPI().ServeHTTP(rw, req)
 		return
