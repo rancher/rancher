@@ -95,7 +95,6 @@ require (
 	github.com/google/gnostic-models v0.7.1
 	github.com/google/go-containerregistry v0.19.0
 	github.com/google/go-github/v73 v73.0.0
-	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
 	github.com/hashicorp/golang-lru v1.0.2
 	github.com/k3s-io/api v0.1.0
@@ -238,6 +237,7 @@ require (
 	github.com/google/go-github/v72 v72.0.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.12 // indirect
+	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.2 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
