@@ -17,7 +17,6 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/gorilla/mux"
 	"github.com/rancher/rancher/pkg/auth/providers/oidc"
 	client "github.com/rancher/rancher/pkg/client/generated/management/v3"
 	v3 "github.com/rancher/rancher/pkg/generated/norman/management.cattle.io/v3"
@@ -49,7 +48,7 @@ func NewFromUnstructuredClient(gc authConfigGetter) *AuthProviderServer {
 }
 
 // RegisterOIDCProviderHandlers registers HTTP handlers for OIDC provider redirects on the given mux.
-func (p *AuthProviderServer) RegisterOIDCProviderHandlers(mux *mux.Router) {
+func (p *AuthProviderServer) RegisterOIDCProviderHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/v1-oidc/{provider}", p.redirectToIdP)
 }
 
@@ -75,8 +74,7 @@ func (p *AuthProviderServer) RegisterOIDCProviderHandlers(mux *mux.Router) {
 //   - PKCE is used when configured to prevent authorization code interception attacks
 //   - The PKCE verifier is stored in a secure cookie when PKCE is enabled
 func (p *AuthProviderServer) redirectToIdP(w http.ResponseWriter, req *http.Request) {
-	vars := mux.Vars(req)
-	provider := vars["provider"]
+	provider := req.PathValue("provider")
 
 	logrus.Debugf("[oidc] Redirecting to IdP for provider: %s", provider)
 

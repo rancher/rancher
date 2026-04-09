@@ -3,39 +3,50 @@ package ui
 import (
 	"net/http"
 
-	"github.com/gorilla/mux"
 	"github.com/rancher/apiserver/pkg/parse"
 	"github.com/rancher/rancher/pkg/cacerts"
 	v3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 )
 
 func New(_ v3.PreferenceCache, clusterRegistrationTokenCache v3.ClusterRegistrationTokenCache) http.Handler {
-	router := mux.NewRouter()
-	router.UseEncodedPath()
+	router := http.NewServeMux()
 
-	router.Handle("/", PreferredIndex())
+	router.Handle("/{$}", PreferredIndex())
 	router.Handle("/cacerts", cacerts.Handler(clusterRegistrationTokenCache))
 	router.Handle("/asset-manifest.json", ember.ServeAsset())
 	router.Handle("/crossdomain.xml", ember.ServeAsset())
 	router.Handle("/dashboard", http.RedirectHandler("/dashboard/", http.StatusFound))
-	router.Handle("/dashboard/", vue.IndexFile())
 	router.Handle("/humans.txt", ember.ServeAsset())
 	router.Handle("/index.txt", ember.ServeAsset())
 	router.Handle("/robots.txt", ember.ServeAsset())
 	router.Handle("/VERSION.txt", ember.ServeAsset())
 	router.Handle("/favicon.png", vue.ServeFaviconDashboard())
 	router.Handle("/favicon.ico", vue.ServeFaviconDashboard())
-	router.Path("/verify-auth-azure").Queries("state", "{state}").HandlerFunc(redirectAuth)
-	router.Path("/verify-auth").Queries("state", "{state}").HandlerFunc(redirectAuth)
-	router.PathPrefix("/api-ui").Handler(ember.ServeAPIUI())
-	router.PathPrefix("/assets/rancher-ui-driver-linode").Handler(emberAlwaysOffline.ServeAsset())
-	router.PathPrefix("/assets").Handler(ember.IndexFileOnNotFound())
-	router.PathPrefix("/dashboard/").Handler(vue.IndexFileOnNotFound())
-	router.PathPrefix("/ember-fetch").Handler(ember.ServeAsset())
-	router.PathPrefix("/engines-dist").Handler(ember.ServeAsset())
-	router.PathPrefix("/static").Handler(ember.ServeAsset())
-	router.PathPrefix("/translations").Handler(ember.IndexFileOnNotFound())
-	router.NotFoundHandler = emberIndexUnlessAPI()
+	router.HandleFunc("/verify-auth-azure", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Has("state") {
+			redirectAuth(w, r)
+		} else {
+			emberIndexUnlessAPI().ServeHTTP(w, r)
+		}
+	})
+	router.HandleFunc("/verify-auth", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Has("state") {
+			redirectAuth(w, r)
+		} else {
+			emberIndexUnlessAPI().ServeHTTP(w, r)
+		}
+	})
+	router.Handle("/api-ui/", ember.ServeAPIUI())
+	router.Handle("/assets/rancher-ui-driver-linode/", emberAlwaysOffline.ServeAsset())
+	router.Handle("/assets/", ember.IndexFileOnNotFound())
+	router.Handle("/assets", ember.IndexFileOnNotFound())
+	router.Handle("/dashboard/", vue.IndexFileOnNotFound())
+	router.Handle("/ember-fetch/", ember.ServeAsset())
+	router.Handle("/engines-dist/", ember.ServeAsset())
+	router.Handle("/static/", ember.ServeAsset())
+	router.Handle("/translations/", ember.IndexFileOnNotFound())
+	router.Handle("/translations", ember.IndexFileOnNotFound())
+	router.Handle("/", emberIndexUnlessAPI())
 
 	return router
 }

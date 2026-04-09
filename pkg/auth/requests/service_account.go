@@ -7,7 +7,6 @@ import (
 	"time"
 
 	jwtv5 "github.com/golang-jwt/jwt/v5"
-	"github.com/gorilla/mux"
 	authcontext "github.com/rancher/rancher/pkg/auth/context"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	controllers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
@@ -65,7 +64,7 @@ func (t *ServiceAccountAuth) Authenticate(req *http.Request) (user.Info, bool, e
 	if info.GetName() != "system:cattle:error" {
 		return info, hasAuth, nil
 	}
-	clusterID := mux.Vars(req)["clusterID"]
+	clusterID := req.PathValue("clusterID")
 	if clusterID == "" {
 		return info, hasAuth, fmt.Errorf("no clusterID found in request")
 	}

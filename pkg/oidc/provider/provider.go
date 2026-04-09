@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/gorilla/mux"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	wrangmgmtv3 "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	oidcerror "github.com/rancher/rancher/pkg/oidc/provider/error"
@@ -122,7 +121,7 @@ func (p *Provider) middleware(next http.HandlerFunc) http.HandlerFunc {
 }
 
 // RegisterOIDCProviderHandles register all Handlers for the OIDC provider.
-func (p *Provider) RegisterOIDCProviderHandles(mux *mux.Router) {
+func (p *Provider) RegisterOIDCProviderHandles(mux *http.ServeMux) {
 	mux.HandleFunc("/oidc/.well-known/openid-configuration", p.middleware(openIDConfigurationEndpoint))
 	mux.HandleFunc("/oidc/.well-known/jwks.json", p.middleware(p.jwksHandler.jwksEndpoint))
 	mux.HandleFunc("/oidc/authorize", p.middleware(p.authHandler.authEndpoint))
