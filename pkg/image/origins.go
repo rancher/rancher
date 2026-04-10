@@ -171,6 +171,7 @@ var OriginMap = map[string]string{
 	"mirrored-jetstack-cert-manager-controller":               "https://github.com/cert-manager/cert-manager",
 	"mirrored-jimmidyson-configmap-reload":                    "https://github.com/jimmidyson/configmap-reload",
 	"mirrored-jkroepke-kube-webhook-certgen":                  "https://github.com/jkroepke/kube-webhook-certgen",
+	"kube-webhook-certgen":                                    "https://github.com/rancher/ingress-nginx",
 	"mirrored-k8scsi-csi-node-driver-registrar":               "https://github.com/kubernetes-csi/node-driver-registrar",
 	"mirrored-k8scsi-csi-resizer":                             "https://github.com/kubernetes-csi/external-resizer",
 	"mirrored-k8scsi-livenessprobe":                           "https://github.com/kubernetes-csi/livenessprobe",
@@ -328,7 +329,7 @@ func GenerateImageOrigins(linuxImagesFromArgs, targetImages, targetWindowsImages
 		return fmt.Errorf("could not create %s file: %w", imageOriginFileName, err)
 	}
 
-	originsFile.Chmod(0755)
+	originsFile.Chmod(0o755)
 	originsFile.WriteString(fileContents)
 	return originsFile.Close()
 }
