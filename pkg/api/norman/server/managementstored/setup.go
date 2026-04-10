@@ -17,6 +17,7 @@ import (
 	"github.com/rancher/rancher/pkg/api/norman/customization/globalrolebinding"
 	"github.com/rancher/rancher/pkg/api/norman/customization/kontainerdriver"
 	"github.com/rancher/rancher/pkg/api/norman/customization/node"
+	"github.com/rancher/rancher/pkg/encryptedstore"
 
 	projectaction "github.com/rancher/rancher/pkg/api/norman/customization/project"
 	"github.com/rancher/rancher/pkg/api/norman/customization/roletemplate"
@@ -43,7 +44,6 @@ import (
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/clusterrouter"
 	md "github.com/rancher/rancher/pkg/kontainerdrivermetadata"
-	"github.com/rancher/rancher/pkg/nodeconfig"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	projectschema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -245,7 +245,7 @@ func Preference(schemas *types.Schemas, management *config.ScaledContext) {
 }
 
 func NodeTypes(schemas *types.Schemas, management *config.ScaledContext) error {
-	secretStore, err := nodeconfig.NewStore(management.Core.Namespaces(""), management.Core)
+	secretStore, err := encryptedstore.NewGenericEncryptedStore("mc-", "", management.Core.Namespaces(""), management.Core)
 	if err != nil {
 		return err
 	}
