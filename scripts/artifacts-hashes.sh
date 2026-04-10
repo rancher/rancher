@@ -4,44 +4,36 @@ set -ex
 
 cd "$(dirname "$0")/.." || return
 
+source scripts/artifacts-list.sh
+
 CHECKSUM_FILE=${CHECKSUM_FILE:-"sha256sum.txt"}
+ARTIFACTS_BASE_DIR=${ARTIFACTS_BASE_DIR:-"bin"}
 
 if [[ -z "${ARTIFACTS_TYPE}" ]]; then
   >&2 echo "missing ARTIFACTS_TYPE env var"
   exit 1
 fi
 
-case $ARTIFACTS_TYPE in
-  components)
-    source scripts/artifacts-list.sh
-    ;;
-  digests)
-    export ARTIFACTS=(
-      "$(basename "$LINUX_FILE")"
-      "$(basename "$WINDOWS_FILE")"
-    )
-    ;;
-  *)
-    >&2 echo "invalid ARTIFACTS_TYPE"
-    exit 1
-esac
-
-
-if [[ -z "${ARTIFACTS_BASE_DIR}" ]]; then
-  >&2 echo "missing ARTIFACTS_BASE_DIR env var"
+if [[ "${ARTIFACTS_TYPE}" != "components" ]] && [[ "${ARTIFACTS_TYPE}" != "digests" ]]; then
+  >&2 echo "invalid ARTIFACTS_TYPE, must be either 'components' or 'digests'"
   exit 1
 fi
 
-rm "$ARTIFACTS_BASE_DIR/$CHECKSUM_FILE" || true
-touch "$ARTIFACTS_BASE_DIR/$CHECKSUM_FILE"
+if [[ "${ARTIFACTS_TYPE}" == "digests" ]]; then
+  export ARTIFACTS=("${IMAGES_DIGESTS_ARTIFACTS[@]}")
+fi
+
+mkdir -p "${ARTIFACTS_BASE_DIR}"
+rm "${ARTIFACTS_BASE_DIR}/${CHECKSUM_FILE}" || true
+touch "${ARTIFACTS_BASE_DIR}/${CHECKSUM_FILE}"
 
 for artifact in "${ARTIFACTS[@]}"; do
-  if [[ -z "$artifact" ]]; then
-    >&2 echo "missing artifact"
+  if [[ ! -f "${ARTIFACTS_BASE_DIR}/${artifact}" ]]; then
+    >&2 echo "missing artifact ${ARTIFACTS_BASE_DIR}/${artifact}"
     exit 1
   fi
 
-  sum_file=$(sha256sum "$ARTIFACTS_BASE_DIR/$artifact")
+  sum_file=$(sha256sum "${ARTIFACTS_BASE_DIR}/${artifact}")
   sum=$(echo "$sum_file" | awk '{print $1}')
-  echo "$sum $artifact" >> "$ARTIFACTS_BASE_DIR/$CHECKSUM_FILE"
+  echo "$sum $artifact" >>"${ARTIFACTS_BASE_DIR}/${CHECKSUM_FILE}"
 done
