@@ -1,5 +1,30 @@
-name: '{{ .k8s_k3s.manifest }}'
-pipelineid: update-k8s-k3s-versions
+name: '{{ .k8s.manifest }}'
+pipelineid: update-k8s-versions
+
+sources:
+  rancher-go-mod-k8s:
+    name: 'Get K8s <major>.<minor> version in go.mod'
+    kind: golang/gomod
+    scmid: 'default'
+    spec:
+      module: 'k8s.io/kubernetes'
+    transformers:
+      - find: 'v\d+\.\d+'
+
+  k8s-release:
+    name: 'Get latest upstream K8s patch version for {{ source "rancher-go-mod-k8s" }}'
+    kind: githubrelease
+    spec:
+      owner: '{{ .repos.k8s.owner }}'
+      repository: '{{ .repos.k8s.repo }}'
+      key: tagname
+      typefilter:
+        release: true
+      username: '{{ .scm.username }}'
+      token: '{{ requiredEnv .scm.token }}'
+      versionfilter:
+        kind: semver
+        pattern: '~{{ source "rancher-go-mod-k8s" }}'
 
 conditions:
   check-dockerfile-kubectl-version:
@@ -30,21 +55,23 @@ targets:
     name: 'Update ENV|ARG KUBECTL_VERSION to {{ .k8s.main }} in Dockerfiles'
     kind: file
     scmid: 'default'
+    sourceid: 'k8s-release'
     spec:
       files:
         - 'package/Dockerfile'
         - 'tests/validation/Dockerfile.rke'
         - 'tests/validation/Dockerfile.v3api'
       matchpattern: '(ENV|ARG)[\s\t]+KUBECTL_VERSION[=\s]\S+'
-      replacepattern: '$1 KUBECTL_VERSION={{ .k8s.main }}'
+      replacepattern: '$1 KUBECTL_VERSION={{ source "k8s-release" }}'
 
   update-shell-script-kubectl-version:
     name: 'Update KUBECTL_VERSION to {{ .k8s.main }} in shell scripts'
     kind: file
     scmid: 'default'
+    sourceid: 'k8s-release'
     spec:
       files:
         - 'tests/validation/tests/rke/scripts/build.sh'
         - 'tests/validation/tests/v3_api/scripts/build.sh'
       matchpattern: 'KUBECTL_VERSION="\${KUBECTL_VERSION:-\S+}"'
-      replacepattern: 'KUBECTL_VERSION="${KUBECTL_VERSION:-{{ .k8s.main }}}"'
+      replacepattern: 'KUBECTL_VERSION="${KUBECTL_VERSION:-{{ source "k8s-release" }}}"'

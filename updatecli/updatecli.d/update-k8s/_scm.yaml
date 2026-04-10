@@ -15,10 +15,10 @@ scms:
       commitusingapi: {{ .scm.commitusingapi }}
       commitmessage:
         squash: {{ .scm.commitmessage.squash }}
-        type: '{{ .k8s_k3s.commitmessage.type }}'
-        scope: '{{ .k8s_k3s.commitmessage.scope }}'
-        title: 'Bump patch versions of K8s and K3s'
-        body: 'Bump patch versions of K8s to {{ .k8s.main }} and K3s to {{ .k3s.release }}.'
+        type: '{{ .k8s.commitmessage.type }}'
+        scope: '{{ .k8s.commitmessage.scope }}'
+        title: 'Bump patch versions of K8s'
+        body: 'Bump patch versions of K8s'
 
 actions:
   rancher-pr:
@@ -28,8 +28,8 @@ actions:
       labels:
         - 'dependencies'
       reviewers:
-        - 'rancher/infracloud-team'
         - 'rancher/rancher-team-2-hostbusters-dev'
+        - 'rancher/rancher-security'
       mergemethod: '{{ .scm.mergemethod }}'
-      title: '[{{ .scm.branch }}] Bump K8s to `{{ .k8s.main }}` and K3s to `{{ .k3s.release }}`'
-      description: 'Bump patch versions of K8s to `{{ .k8s.main }}` and K3s to `{{ .k3s.release }}`.'
+      title: '[{{ .scm.branch }}] Bump K8s patch version'
+      description: 'Bump patch versions of K8s'
