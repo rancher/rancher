@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	"github.com/rancher/rancher/pkg/auth/tokens"
@@ -15,7 +14,7 @@ import (
 var cookieUnsetTimestamp = time.Date(1982, time.February, 10, 23, 0, 0, 0, time.UTC)
 
 type tokenManager interface {
-	GetToken(token string) (*v3.Token, int, error)
+	GetToken(token string) (accessor.TokenAccessor, int, error)
 	DeleteTokenByName(name string) (int, error)
 }
 
@@ -87,9 +86,9 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = h.tokenMgr.DeleteTokenByName(storedToken.Name)
+	_, err = h.tokenMgr.DeleteTokenByName(storedToken.GetName())
 	if err != nil { // NotFound is already handled by DeleteTokenByName.
-		logrus.Errorf("logout: deleting session token %s: %v", storedToken.Name, err)
+		logrus.Errorf("logout: deleting session token %s: %v", storedToken.GetName(), err)
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 	}
 }

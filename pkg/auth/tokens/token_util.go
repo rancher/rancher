@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/types"
 	"github.com/rancher/norman/types/convert"
+	ext "github.com/rancher/rancher/pkg/apis/ext.cattle.io/v1"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
 	"github.com/rancher/rancher/pkg/auth/tokens/hashers"
@@ -156,6 +157,38 @@ func VerifyToken(storedToken *apiv3.Token, tokenName, tokenKey string) (int, err
 		if storedToken.Token != tokenKey {
 			return http.StatusUnprocessableEntity, errInvalidAuthToken
 		}
+	}
+
+	if IsExpired(storedToken) {
+		return http.StatusGone, errors.New("must authenticate, expired")
+	}
+
+	if IsIdleExpired(storedToken, time.Now()) {
+		return http.StatusGone, errors.New("must authenticate, session idle timeout expired")
+	}
+
+	return http.StatusOK, nil
+}
+
+// Given a stored token with hashed key, check if the provided (unhashed) tokenKey matches and is valid.
+// This must match the logic of `VerifyToken` above.
+func ExtVerifyToken(storedToken *ext.Token, tokenName, tokenKey string) (int, error) {
+	invalidAuthTokenErr := errors.New("invalid token")
+
+	if storedToken == nil || storedToken.ObjectMeta.Name != tokenName {
+		return http.StatusUnprocessableEntity, invalidAuthTokenErr
+	}
+
+	// Ext token always has a hash. Only a hash.
+	hasher, err := hashers.GetHasherForHash(storedToken.Status.Hash)
+	if err != nil {
+		logrus.Errorf("unable to get a hasher for token with error %v", err)
+		return http.StatusInternalServerError, fmt.Errorf("unable to verify hash")
+	}
+
+	if err := hasher.VerifyHash(storedToken.Status.Hash, tokenKey); err != nil {
+		logrus.Errorf("VerifyHash failed with error: %v", err)
+		return http.StatusUnprocessableEntity, invalidAuthTokenErr
 	}
 
 	if IsExpired(storedToken) {
