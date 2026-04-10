@@ -6,34 +6,27 @@ runs:
     - name: install dependencies
       shell: bash
       run: zypper install -y aws-cli wget jq awk
-    - name: install gh
+    - name: Create base dir
       shell: bash
-      env:
-        GH_CLI_VERSION: "2.89.0"
-        GH_CLI_HASH_amd64: "d0422caade520530e76c1c558da47daebaa8e1203d6b7ff10ad7d6faba3490d8"
-      run: |
-        mkdir -p /tmp/gh && \
-        curl -fsL "https://github.com/cli/cli/releases/download/v${GH_CLI_VERSION}/gh_${GH_CLI_VERSION}_linux_amd64.tar.gz" | tar xvzf - --strip-components=1 -C /tmp/gh && \
-        echo "${GH_CLI_HASH_amd64}  /tmp/gh/bin/gh" | sha256sum -c - && \
-        mv /tmp/gh/bin/gh /usr/bin/gh && \
-        chmod +x /usr/bin/gh
+      run: mkdir -p "${ARTIFACTS_BASE_DIR}" /tmp/images-files
+    - name: Download Docker images artifact
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      with:
+        path: /tmp/images-files
+        merge-multiple: true
+        pattern: "*-images.txt"
     - name: Setup Environment Variables
       uses: ./.github/actions/setup-tag-env
     - name: Setup ecm-distro-tools
-      uses: rancher/ecm-distro-tools@df74c04bbc0176c3a2a04ebd8f6620c5a23229f6 # v0.61.0
-    - name: Create base dir
-      shell: bash
-      run: mkdir -p "$ARTIFACTS_BASE_DIR"
+      uses: rancher/ecm-distro-tools@df74c04bbc0176c3a2a04ebd8f6620c5a23229f6 # v0.67.2
     - name: Generate linux docker digests
       shell: bash
       run: |
-        export LINUX_IMAGES_URL=https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/rancher-images.txt
-        release generate rancher docker-images-digests --config "{}" --registry "${{ env.REGISTRY }}" --images-url "${LINUX_IMAGES_URL}" --output-file "$ARTIFACTS_BASE_DIR/$LINUX_FILE"
+        release generate rancher docker-images-digests --config "{}" --registry "${REGISTRY}" --images-list "$(paste -sd, /tmp/images-files/rancher-images.txt)" --output-file "$ARTIFACTS_BASE_DIR/$LINUX_FILE"
     - name: Generate windows docker digests
       shell: bash
       run: |
-        export WINDOWS_IMAGES_URL=https://github.com/${{ github.repository }}/releases/download/${{ env.TAG }}/rancher-windows-images.txt
-        release generate rancher docker-images-digests --config "{}" --registry "${{ env.REGISTRY }}" --images-url "${WINDOWS_IMAGES_URL}" --output-file "$ARTIFACTS_BASE_DIR/$WINDOWS_FILE"
+        release generate rancher docker-images-digests --config "{}" --registry "${REGISTRY}" --images-list "$(paste -sd, /tmp/images-files/rancher-windows-images.txt)" --output-file "$ARTIFACTS_BASE_DIR/$WINDOWS_FILE"
     - name: Generate sha256sum file
       shell: bash
       env:
