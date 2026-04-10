@@ -14,7 +14,7 @@ runs:
       with:
         path: /tmp/images-files
         merge-multiple: true
-        pattern: "*-images.txt"
+        name: images-files
     - name: Setup Environment Variables
       uses: ./.github/actions/setup-tag-env
     - name: Setup ecm-distro-tools
@@ -22,11 +22,11 @@ runs:
     - name: Generate linux docker digests
       shell: bash
       run: |
-        release generate rancher docker-images-digests --config "{}" --registry "${REGISTRY}" --images-list "$(paste -sd, /tmp/images-files/rancher-images.txt)" --output-file "$ARTIFACTS_BASE_DIR/$LINUX_FILE"
-    - name: Generate windows docker digests
-      shell: bash
-      run: |
-        release generate rancher docker-images-digests --config "{}" --registry "${REGISTRY}" --images-list "$(paste -sd, /tmp/images-files/rancher-windows-images.txt)" --output-file "$ARTIFACTS_BASE_DIR/$WINDOWS_FILE"
+        set -ex
+        LINUX_IMAGES=$(paste -sd, /tmp/images-files/rancher-images.txt)
+        release generate rancher docker-images-digests --config "{}" --registry "${REGISTRY}" --images-list "${LINUX_IMAGES}" --output-file "$ARTIFACTS_BASE_DIR/$LINUX_FILE"
+        WINDOWS_IMAGES=$(paste -sd, /tmp/images-files/rancher-windows-images.txt)
+        release generate rancher docker-images-digests --config "{}" --registry "${REGISTRY}" --images-list "${WINDOWS_IMAGES}" --output-file "$ARTIFACTS_BASE_DIR/$WINDOWS_FILE"
     - name: Generate sha256sum file
       shell: bash
       env:
