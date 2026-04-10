@@ -126,6 +126,7 @@ jobs:
       LINUX_FILE: "rancher-images-digests-linux.txt"
       WINDOWS_FILE: "rancher-images-digests-windows.txt"
       CHECKSUM_FILE: "images-digests-sha256sum.txt"
+      REGISTRY: "docker.io"
     steps:
       - name: install dependencies
         shell: bash
