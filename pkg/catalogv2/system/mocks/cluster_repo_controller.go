@@ -4,16 +4,23 @@ package mocks
 
 import (
 	context "context"
-	time "time"
 
 	catalog_cattle_iov1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
-	generic "github.com/rancher/wrangler/v3/pkg/generic"
-	mock "github.com/stretchr/testify/mock"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	schema "k8s.io/apimachinery/pkg/runtime/schema"
-	types "k8s.io/apimachinery/pkg/types"
-	rest "k8s.io/client-go/rest"
 	cache "k8s.io/client-go/tools/cache"
+
+	generic "github.com/rancher/wrangler/v3/pkg/generic"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	mock "github.com/stretchr/testify/mock"
+
+	rest "k8s.io/client-go/rest"
+
+	schema "k8s.io/apimachinery/pkg/runtime/schema"
+
+	time "time"
+
+	types "k8s.io/apimachinery/pkg/types"
 
 	watch "k8s.io/apimachinery/pkg/watch"
 )
