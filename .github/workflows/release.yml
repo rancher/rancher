@@ -316,6 +316,14 @@ jobs:
           source scripts/artifacts-list.sh
 
           cd /tmp/artifacts
+
+          for artifact in "${ALL_ARTIFACTS[@]}"; do
+            if [[ ! -f "${artifact}" ]]; then
+              >&2 echo "missing artifact ${artifact}"
+              exit 1
+            fi
+          done
+
           gh release create "${TAG}" -R "${GITHUB_REPOSITORY}" --draft --notes-file /tmp/artifacts/rancher-components.txt  "${ALL_ARTIFACTS[@]}"
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
