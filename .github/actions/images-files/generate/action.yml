@@ -21,19 +21,11 @@ runs:
       shell: bash
       run: |
         make quick-k3s-images
-    - name: Create files
-      shell: bash
-      run: |
-        mkdir -p $HOME/bin
-        touch $HOME/bin/rancher-rke-k8s-versions.txt
     - name: Create components and images files
       shell: bash
       env:
         REGISTRY: ""
       run: ./scripts/create-components-images-files.sh
-    - name: Move rke-k8s version file
-      shell: bash
-      run: mv $HOME/bin/rancher-rke-k8s-versions.txt "./$ARTIFACTS_BASE_DIR"
     - name: Generate sha256sum
       shell: bash
       env:
