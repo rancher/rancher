@@ -14,6 +14,7 @@ runs:
     - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
       with:
         go-version: '${{ steps.env.outputs.GO_VERSION }}'
+        cache: ${{ github.event_name == 'pull_request' }}
     - name: Download data.json
       shell: bash
       run: |
