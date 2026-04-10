@@ -39,8 +39,8 @@ import (
 	projectclient "github.com/rancher/rancher/pkg/client/generated/project/v3"
 	"github.com/rancher/rancher/pkg/clustermanager"
 	"github.com/rancher/rancher/pkg/clusterrouter"
+	"github.com/rancher/rancher/pkg/encryptedstore"
 	md "github.com/rancher/rancher/pkg/kontainerdrivermetadata"
-	"github.com/rancher/rancher/pkg/nodeconfig"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	projectschema "github.com/rancher/rancher/pkg/schemas/project.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/types/config"
@@ -244,7 +244,7 @@ func Preference(schemas *types.Schemas, management *config.ScaledContext) {
 }
 
 func NodeTypes(schemas *types.Schemas, management *config.ScaledContext) error {
-	secretStore, err := nodeconfig.NewStore(management.Core.Namespaces(""), management.Core)
+	secretStore, err := encryptedstore.NewGenericEncryptedStore("mc-", "", management.Core.Namespaces(""), management.Core)
 	if err != nil {
 		return err
 	}
