@@ -8,6 +8,7 @@ import (
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/accessor"
+	"github.com/rancher/rancher/pkg/auth/providers/azure"
 	"github.com/rancher/rancher/pkg/auth/tokens"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -58,10 +59,10 @@ func TestLogout(t *testing.T) {
 	}
 
 	checkCookiesUnset := func(t *testing.T, w *httptest.ResponseRecorder) {
-		require.Len(t, w.Result().Cookies(), 3)
+		require.Len(t, w.Result().Cookies(), 4)
 		for _, cookie := range w.Result().Cookies() {
 			switch cookie.Name {
-			case tokens.CookieName, tokens.CSRFCookie, tokens.IDTokenCookieName:
+			case tokens.CookieName, tokens.CSRFCookie, tokens.IDTokenCookieName, azure.IDTokenCookie:
 				assert.Equal(t, "", cookie.Value)
 				assert.Equal(t, -1, cookie.MaxAge)
 				assert.True(t, cookie.HttpOnly)

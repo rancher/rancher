@@ -12,6 +12,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	managementschema "github.com/rancher/rancher/pkg/schemas/management.cattle.io/v3"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -401,4 +402,175 @@ func TestMigrateNewFlowAnnotation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func newAzureConfig(endpoint, tenantID, appID string, mods ...func(*v3.AzureADConfig)) *v3.AzureADConfig {
+	cfg := &v3.AzureADConfig{
+		Endpoint:         endpoint,
+		TenantID:         tenantID,
+		ApplicationID:    appID,
+		LogoutAllEnabled: true,
+	}
+	for _, mod := range mods {
+		mod(cfg)
+	}
+	return cfg
+}
+
+func TestLogout(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		config  *v3.AzureADConfig
+		wantErr bool
+	}{
+		"regular logout allowed when LogoutAllForced is false": {
+			config:  newAzureConfig("https://login.microsoftonline.com/", "tenant1", "app1"),
+			wantErr: false,
+		},
+		"regular logout rejected when LogoutAllForced is true": {
+			config: newAzureConfig("https://login.microsoftonline.com/", "tenant1", "app1", func(c *v3.AzureADConfig) {
+				c.LogoutAllForced = true
+			}),
+			wantErr: true,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			p := &Provider{getConfig: func() (*v3.AzureADConfig, error) { return tt.config, nil }}
+			r := httptest.NewRequest(http.MethodPost, "/v3/tokens?action=logout", nil)
+			w := httptest.NewRecorder()
+
+			err := p.Logout(w, r, &v3.Token{})
+			if tt.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestLogoutAllDisabled(t *testing.T) {
+	t.Parallel()
+
+	cfg := newAzureConfig("https://login.microsoftonline.com/", "tenant1", "app1", func(c *v3.AzureADConfig) {
+		c.LogoutAllEnabled = false
+	})
+	p := &Provider{getConfig: func() (*v3.AzureADConfig, error) { return cfg, nil }}
+
+	b, err := json.Marshal(&v3.AuthConfigLogoutInput{FinalRedirectURL: "https://example.com/logged-out"})
+	require.NoError(t, err)
+
+	r := httptest.NewRequest(http.MethodPost, "/v3/tokens?action=logoutAll", bytes.NewReader(b))
+	w := httptest.NewRecorder()
+
+	assert.ErrorContains(t, p.LogoutAll(w, r, &v3.Token{}), "not configured for SSO logout")
+}
+
+func TestLogoutAll(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		config          *v3.AzureADConfig
+		idTokenCookie   string
+		finalRedirect   string
+		wantURLContains []string
+		wantURLAbsent   []string
+	}{
+		"default endpoint, with id_token_hint and post_logout_redirect_uri": {
+			config:        newAzureConfig("https://login.microsoftonline.com/", "tenant1", "app1"),
+			idTokenCookie: "my.jwt.token",
+			finalRedirect: "https://example.com/logged-out",
+			wantURLContains: []string{
+				"https://login.microsoftonline.com/tenant1/oauth2/v2.0/logout",
+				"client_id=app1",
+				"id_token_hint=my.jwt.token",
+				"post_logout_redirect_uri=https%3A%2F%2Fexample.com%2Flogged-out",
+			},
+		},
+		"default endpoint, without id_token_hint": {
+			config:        newAzureConfig("https://login.microsoftonline.com/", "tenant1", "app1"),
+			finalRedirect: "https://example.com/logged-out",
+			wantURLContains: []string{
+				"https://login.microsoftonline.com/tenant1/oauth2/v2.0/logout",
+				"client_id=app1",
+				"post_logout_redirect_uri=https%3A%2F%2Fexample.com%2Flogged-out",
+			},
+			wantURLAbsent: []string{"id_token_hint"},
+		},
+		"default endpoint, without post_logout_redirect_uri": {
+			config:        newAzureConfig("https://login.microsoftonline.com/", "tenant1", "app1"),
+			idTokenCookie: "my.jwt.token",
+			wantURLContains: []string{
+				"https://login.microsoftonline.com/tenant1/oauth2/v2.0/logout",
+				"client_id=app1",
+				"id_token_hint=my.jwt.token",
+			},
+			wantURLAbsent: []string{"post_logout_redirect_uri"},
+		},
+		"custom LogoutEndpoint overrides default": {
+			config: newAzureConfig("https://login.microsoftonline.com/", "tenant1", "app1", func(c *v3.AzureADConfig) {
+				c.LogoutEndpoint = "https://custom.gov/logout"
+			}),
+			finalRedirect: "https://example.com/logged-out",
+			wantURLContains: []string{
+				"https://custom.gov/logout",
+				"client_id=app1",
+			},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			p := &Provider{getConfig: func() (*v3.AzureADConfig, error) { return tt.config, nil }}
+
+			b, err := json.Marshal(&v3.AuthConfigLogoutInput{FinalRedirectURL: tt.finalRedirect})
+			require.NoError(t, err)
+
+			r := httptest.NewRequest(http.MethodPost, "/v3/tokens?action=logoutAll", bytes.NewReader(b))
+			if tt.idTokenCookie != "" {
+				r.AddCookie(&http.Cookie{Name: IDTokenCookie, Value: tt.idTokenCookie})
+			}
+			w := httptest.NewRecorder()
+
+			require.NoError(t, p.LogoutAll(w, r, &v3.Token{}))
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp map[string]any
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			assert.Equal(t, "authConfigLogoutOutput", resp["type"])
+			assert.Equal(t, "authConfigLogoutOutput", resp["baseType"])
+
+			idpURL, _ := resp["idpRedirectUrl"].(string)
+			for _, want := range tt.wantURLContains {
+				assert.Contains(t, idpURL, want)
+			}
+			for _, absent := range tt.wantURLAbsent {
+				assert.NotContains(t, idpURL, absent)
+			}
+		})
+	}
+}
+
+func TestSetIDTokenCookie(t *testing.T) {
+	t.Parallel()
+
+	r := httptest.NewRequest(http.MethodGet, "https://rancher.example.com/", nil)
+	w := httptest.NewRecorder()
+	setIDTokenCookie(r, w, "my.id.token")
+
+	resp := w.Result()
+	cookies := resp.Cookies()
+	var found *http.Cookie
+	for _, c := range cookies {
+		if c.Name == IDTokenCookie {
+			found = c
+			break
+		}
+	}
+	require.NotNil(t, found, "expected %s cookie to be set", IDTokenCookie)
+	assert.Equal(t, "my.id.token", found.Value)
+	assert.True(t, found.HttpOnly)
 }

@@ -2,6 +2,7 @@
 package azure
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -33,6 +34,13 @@ import (
 
 const (
 	Name = "azuread"
+
+	// IDTokenCookie is the name of the cookie that holds the raw Azure AD ID token for SSO logout.
+	IDTokenCookie = "R_AZUREAD_ID"
+
+	// maxSafeCookieSize is the threshold above which we warn that a cookie may exceed
+	// the browser's ~4 KB per-cookie limit and be silently dropped.
+	maxSafeCookieSize = 3800
 )
 
 type unstructuredGetter interface {
@@ -45,6 +53,8 @@ type Provider struct {
 	secrets     wcorev1.SecretController
 	userMGR     user.Manager
 	tokenMGR    *tokens.Manager
+	// getConfig is used to retrieve the AzureAD configuration; injectable for testing.
+	getConfig func() (*apiv3.AzureADConfig, error)
 }
 
 func Configure(mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *tokens.Manager) common.AuthProvider {
@@ -55,20 +65,77 @@ func Configure(mgmtCtx *config.ScaledContext, userMGR user.Manager, tokenMGR *to
 		clients.GroupCache, _ = lru.New(10000)
 	}
 
-	return &Provider{
+	p := &Provider{
 		Retriever:   mgmtCtx.Management.AuthConfigs("").ObjectClient().UnstructuredClient(),
 		authConfigs: mgmtCtx.Management.AuthConfigs(""),
 		secrets:     mgmtCtx.Wrangler.Core.Secret(),
 		userMGR:     userMGR,
 		tokenMGR:    tokenMGR,
 	}
+	p.getConfig = p.GetAzureConfigK8s
+	return p
 }
 
 func (ap *Provider) LogoutAll(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
-	return nil
+	cfg, err := ap.getConfig()
+	if err != nil {
+		return fmt.Errorf("getting Azure AD config for LogoutAll: %w", err)
+	}
+
+	if !cfg.LogoutAllEnabled {
+		logrus.Debugf("azure AD [logout-all]: provider not configured for SSO logout")
+		return fmt.Errorf("azure AD provider not configured for SSO logout")
+	}
+
+	endSessionEndpoint := cfg.LogoutEndpoint
+	if endSessionEndpoint == "" {
+		endSessionEndpoint, err = url.JoinPath(cfg.Endpoint, cfg.TenantID, "/oauth2/v2.0/logout")
+		if err != nil {
+			return fmt.Errorf("building Azure AD logout endpoint: %w", err)
+		}
+	}
+
+	endSessionURL, err := url.Parse(endSessionEndpoint)
+	if err != nil {
+		return fmt.Errorf("parsing Azure AD logout endpoint: %w", err)
+	}
+
+	authLogout := &apiv3.AuthConfigLogoutInput{}
+	if err := json.NewDecoder(r.Body).Decode(authLogout); err != nil {
+		return httperror.NewAPIError(httperror.InvalidBodyContent,
+			fmt.Sprintf("azure AD: parsing request body: %v", err))
+	}
+
+	params := endSessionURL.Query()
+	params.Set("client_id", cfg.ApplicationID)
+	if authLogout.FinalRedirectURL != "" {
+		params.Set("post_logout_redirect_uri", authLogout.FinalRedirectURL)
+	}
+	if idToken := getIDTokenCookie(r); idToken != "" {
+		params.Set("id_token_hint", idToken)
+	}
+	endSessionURL.RawQuery = params.Encode()
+
+	logrus.Debugf("azure AD [logout-all]: redirecting to %s", endSessionURL.String())
+
+	data := map[string]any{
+		"idpRedirectUrl": endSessionURL.String(),
+		"type":           "authConfigLogoutOutput",
+		"baseType":       "authConfigLogoutOutput",
+	}
+	w.Header().Set("Content-Type", "application/json")
+	return json.NewEncoder(w).Encode(data)
 }
 
 func (ap *Provider) Logout(w http.ResponseWriter, r *http.Request, token accessor.TokenAccessor) error {
+	cfg, err := ap.getConfig()
+	if err != nil {
+		return fmt.Errorf("getting Azure AD config for Logout: %w", err)
+	}
+	if cfg.LogoutAllForced {
+		logrus.Debugf("azure AD [logout]: provider configured for forced SSO logout, rejecting regular logout")
+		return fmt.Errorf("azure AD provider configured for forced SSO logout, rejecting regular logout")
+	}
 	return nil
 }
 
@@ -76,16 +143,23 @@ func (ap *Provider) GetName() string {
 	return Name
 }
 
-func (ap *Provider) AuthenticateUser(_ http.ResponseWriter, _ *http.Request, input any) (apiv3.Principal, []apiv3.Principal, string, error) {
+func (ap *Provider) AuthenticateUser(w http.ResponseWriter, r *http.Request, input any) (apiv3.Principal, []apiv3.Principal, string, error) {
 	login, ok := input.(*apiv3.AzureADLogin)
 	if !ok {
 		return apiv3.Principal{}, nil, "", errors.New("unexpected input type")
 	}
-	cfg, err := ap.GetAzureConfigK8s()
+	cfg, err := ap.getConfig()
 	if err != nil {
 		return apiv3.Principal{}, nil, "", err
 	}
-	return ap.loginUser(cfg, login, false)
+	userPrincipal, groupPrincipals, providerToken, idToken, err := ap.loginUser(cfg, login, false)
+	if err != nil {
+		return apiv3.Principal{}, nil, "", err
+	}
+	if idToken != "" {
+		setIDTokenCookie(r, w, idToken)
+	}
+	return userPrincipal, groupPrincipals, providerToken, nil
 }
 
 func (ap *Provider) RefetchGroupPrincipals(principalID, secret string) ([]apiv3.Principal, error) {
@@ -263,14 +337,14 @@ func (ap *Provider) TransformToAuthProvider(
 	return p, nil
 }
 
-func (ap *Provider) loginUser(config *apiv3.AzureADConfig, azureCredential *apiv3.AzureADLogin, test bool) (apiv3.Principal, []apiv3.Principal, string, error) {
+func (ap *Provider) loginUser(config *apiv3.AzureADConfig, azureCredential *apiv3.AzureADLogin, test bool) (apiv3.Principal, []apiv3.Principal, string, string, error) {
 	azureClient, err := clients.NewAzureClient(config, ap.secrets)
 	if err != nil {
-		return apiv3.Principal{}, nil, "", err
+		return apiv3.Principal{}, nil, "", "", err
 	}
-	userPrincipal, groupPrincipals, providerToken, err := azureClient.LoginUser(config, azureCredential)
+	userPrincipal, groupPrincipals, providerToken, idToken, err := azureClient.LoginUser(config, azureCredential)
 	if err != nil {
-		return apiv3.Principal{}, nil, "", err
+		return apiv3.Principal{}, nil, "", "", err
 	}
 	testAllowedPrincipals := config.AllowedPrincipalIDs
 	if test && config.AccessMode == "restricted" {
@@ -279,13 +353,13 @@ func (ap *Provider) loginUser(config *apiv3.AzureADConfig, azureCredential *apiv
 
 	allowed, err := ap.userMGR.CheckAccess(config.AccessMode, testAllowedPrincipals, userPrincipal.Name, groupPrincipals)
 	if err != nil {
-		return apiv3.Principal{}, nil, "", err
+		return apiv3.Principal{}, nil, "", "", err
 	}
 	if !allowed {
-		return apiv3.Principal{}, nil, "", apierror.NewAPIError(validation.Unauthorized, "unauthorized")
+		return apiv3.Principal{}, nil, "", "", apierror.NewAPIError(validation.Unauthorized, "unauthorized")
 	}
 
-	return userPrincipal, groupPrincipals, providerToken, nil
+	return userPrincipal, groupPrincipals, providerToken, idToken, nil
 }
 
 func (ap *Provider) getUserPrincipal(client clients.AzureClient, principalID string, token accessor.TokenAccessor) (apiv3.Principal, error) {
@@ -458,4 +532,28 @@ func (ap *Provider) IsDisabledProvider() (bool, error) {
 		return false, err
 	}
 	return !azureConfig.Enabled, nil
+}
+
+// setIDTokenCookie writes the Azure AD ID token to the R_AZUREAD_ID cookie.
+func setIDTokenCookie(req *http.Request, w http.ResponseWriter, token string) {
+	if len(token) > maxSafeCookieSize {
+		logrus.Warnf("[AZURE_PROVIDER] ID token is %d bytes, may exceed browser cookie limit; SSO logout will fall back to client_id only", len(token))
+	}
+	isSecure := req.URL.Scheme == "https"
+	http.SetCookie(w, &http.Cookie{
+		Name:     IDTokenCookie,
+		Value:    token,
+		Secure:   isSecure,
+		Path:     "/",
+		HttpOnly: true,
+	})
+}
+
+// getIDTokenCookie retrieves the Azure AD ID token from the R_AZUREAD_ID cookie.
+func getIDTokenCookie(req *http.Request) string {
+	cookie, err := req.Cookie(IDTokenCookie)
+	if err != nil {
+		return ""
+	}
+	return cookie.Value
 }
