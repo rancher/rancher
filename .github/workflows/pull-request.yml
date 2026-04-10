@@ -83,3 +83,37 @@ jobs:
       contents: read
     needs: [build-server, build-agent]
     uses: ./.github/workflows/provisioning-tests.yml
+  create-images-files:
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: registry.suse.com/bci/bci-base:15.7
+    env:
+      REGISTRY: ""
+      ARTIFACTS_BASE_DIR: "bin"
+    steps:
+      - name: install dependencies
+        shell: bash
+        run: zypper install -y git
+      - name: Git safe directory
+        run: git config --global --add safe.directory "$PWD"
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: generate
+        uses: ./.github/actions/images-files/generate
+      - name: Move files to upload directory
+        shell: bash
+        run: |
+          set -ex
+          source scripts/artifacts-list.sh
+
+          mkdir -p /tmp/artifacts
+
+          for artifact in "${ARTIFACTS_WITH_CHEKCSUM[@]}"; do
+            mv "./${ARTIFACTS_BASE_DIR}/${artifact}" /tmp/artifacts
+          done
+      - name: "Upload artifacts"
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: images-files
+          path: /tmp/artifacts

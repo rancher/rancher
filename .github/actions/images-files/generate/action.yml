@@ -3,9 +3,12 @@ description: "Setup and generate images files"
 runs:
   using: "composite"
   steps:
+    - name: install dependencies
+      shell: bash
+      run: zypper install -y jq awk
     - name: Setup Environment Variables
       uses: ./.github/actions/setup-tag-env
-    - id: env 
+    - id: env
       name: Setup Dependencies Env Variables
       uses: ./.github/actions/setup-build-env
     - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
