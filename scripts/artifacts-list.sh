@@ -24,6 +24,6 @@ export IMAGES_DIGESTS_ARTIFACTS=(
   "rancher-images-digests-windows.txt"
 )
 
-export IMAGES_DIGESTS_ARTIFACTS_WITH_CHECKSUM=("${ARTIFACTS[@]}" "images-digests-sha256sum.txt")
+export IMAGES_DIGESTS_ARTIFACTS_WITH_CHECKSUM=("${IMAGES_DIGESTS_ARTIFACTS[@]}" "images-digests-sha256sum.txt")
 
 export ALL_ARTIFACTS=("${ARTIFACTS_WITH_CHECKSUM[@]}" "${IMAGES_DIGESTS_ARTIFACTS_WITH_CHECKSUM[@]}")
