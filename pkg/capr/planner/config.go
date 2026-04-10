@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/rancher/norman/types/values"
 	rkev1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1/plan"
@@ -67,9 +68,43 @@ func (p *Planner) addETCD(config map[string]interface{}, controlPlane *rkev1.RKE
 			}
 		}
 		result = files
+		if hasEtcdS3RetentionFlag(controlPlane.Spec.KubernetesVersion) && controlPlane.Spec.ETCD.SnapshotRetention > 0 {
+			config["etcd-s3-retention"] = controlPlane.Spec.ETCD.SnapshotRetention
+		}
+
 	}
 
 	return
+}
+
+// hasEtcdS3RetentionFlag returns true if the etcd S3 retention flag should be
+// Starting in RkE2 versions v1.34.0+rke2r1, v1.33.4+rke2r1, v1.32.8+rke2r1, v1.31.12+rke2r1,
+// See:
+// https://documentation.suse.com/cloudnative/rke2/latest/en/datastore/backup_restore.html#:~:text=S3%20Retention,-Version%20Gate&text=Starting%20in%20versions%20v1.,as%20the%20local%20snapshot%20retention.
+func hasEtcdS3RetentionFlag(vStr string) bool {
+	v, err := semver.NewVersion(vStr)
+	if err != nil {
+		return false
+	}
+
+	constraints := []string{
+		">= 1.34.0",
+		">= 1.33.4",
+		">= 1.32.8",
+		">= 1.31.12",
+	}
+
+	for _, constraint := range constraints {
+		c, err := semver.NewConstraint(constraint)
+		if err != nil {
+			continue
+		}
+		if c.Check(v) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func addDefaults(config map[string]interface{}, controlPlane *rkev1.RKEControlPlane) {
