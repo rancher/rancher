@@ -290,7 +290,7 @@ func (r *RemoteService) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 				// This is because the impersonator service account does exist on the downstream cluster, and
 				// it has sufficient permissions to perform the TokenReview.
 				token, err = r.impersonatorAccountTokenGetter(userInfo, r.clusterContextGetter, r.cluster.Name)
-				if err != nil && !strings.Contains(err.Error(), dialer2.ErrAgentDisconnected.Error()) {
+				if err != nil {
 					er.Error(rw, req, fmt.Errorf("unable to create impersonator account: %w", err))
 					return
 				}
