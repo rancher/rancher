@@ -17,10 +17,6 @@ runs:
         mkdir -p "$ARTIFACTS_BASE_DIR"
         curl -sLf https://releases.rancher.com/kontainer-driver-metadata/${{ steps.env.outputs.CATTLE_KDM_BRANCH }}/data.json > "./$ARTIFACTS_BASE_DIR/data.json"
         cp "./$ARTIFACTS_BASE_DIR/data.json" "./$ARTIFACTS_BASE_DIR/rancher-data.json"
-    - name: Create k3s images file
-      shell: bash
-      run: |
-        make quick-k3s-images
     - name: Create components and images files
       shell: bash
       env:
