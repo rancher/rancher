@@ -52,6 +52,14 @@ type ExponentialBackOffValues struct {
 	MaxRetries int `json:"maxRetries,omitempty"`
 }
 
+// OCIOptions contains options that are only used when the ClusterRepo points to an OCI registry.
+type OCIOptions struct {
+	// DownloadAllTags if set, will download all tags that match TagFilter and not just the latest one.
+	DownloadAllTags bool `json:"downloadAllTags,omitempty"`
+	// TagFilter a semver constraint string used to filter the tags of the charts present in the OCI registry.
+	TagFilter string `json:"tagFilter,omitempty"`
+}
+
 // RepoSpec contains details about the helm repository that needs to be used.
 type RepoSpec struct {
 	// URL is the HTTP or OCI URL of the helm repository to connect to.
@@ -72,6 +80,9 @@ type RepoSpec struct {
 	// ExponentialBackOffValues are values given to the Rancher manager to handle
 	// 429 TOOMANYREQUESTS response code from the OCI registry.
 	ExponentialBackOffValues *ExponentialBackOffValues `json:"exponentialBackOffValues,omitempty"`
+
+	//OCIOptions contains options that are only used when the ClusterRepo points to an OCI registry.
+	OCIOptions *OCIOptions `json:"OCIOptions,omitempty"`
 
 	// CABundle is a PEM encoded CA bundle which will be used to validate the repo's certificate.
 	// If unspecified, system trust roots will be used.
