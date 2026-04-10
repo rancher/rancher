@@ -94,25 +94,6 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 	return prtb, p.reconcileBindings(prtb)
 }
 
-// prtbContentKey returns a string key that uniquely identifies the content of a PRTB.
-// Two PRTBs with the same content key are considered duplicates.
-// The key is built from the subject (using the same priority order as the webhook:
-// UserPrincipalName > UserName > GroupPrincipalName > GroupName), RoleTemplateName, and ProjectName.
-func prtbContentKey(prtb *v3.ProjectRoleTemplateBinding) string {
-	var subject string
-	switch {
-	case prtb.UserPrincipalName != "":
-		subject = prtb.UserPrincipalName
-	case prtb.UserName != "":
-		subject = prtb.UserName
-	case prtb.GroupPrincipalName != "":
-		subject = prtb.GroupPrincipalName
-	case prtb.GroupName != "":
-		subject = prtb.GroupName
-	}
-	return subject + "/" + prtb.RoleTemplateName + "/" + prtb.ProjectName
-}
-
 // deleteDuplicatePRTBs checks if there are duplicate PRTBs with the same content in the same namespace.
 // If duplicates are found, it keeps the oldest one (by creation timestamp, then by name as tiebreaker)
 // and deletes the rest. It returns true if the given prtb was itself deleted as a duplicate.
@@ -122,7 +103,8 @@ func (p *prtbHandler) deleteDuplicatePRTBs(prtb *v3.ProjectRoleTemplateBinding) 
 		return false, fmt.Errorf("failed to list PRTBs in namespace %s: %w", prtb.Namespace, err)
 	}
 
-	currentKey := prtbContentKey(prtb)
+	currentKey := rtbContentKey(prtb.UserPrincipalName, prtb.UserName, prtb.GroupPrincipalName, prtb.GroupName,
+		prtb.RoleTemplateName, prtb.ProjectName)
 
 	// Find all PRTBs with the same content key.
 	var duplicates []*v3.ProjectRoleTemplateBinding
@@ -130,7 +112,12 @@ func (p *prtbHandler) deleteDuplicatePRTBs(prtb *v3.ProjectRoleTemplateBinding) 
 		if other.DeletionTimestamp != nil {
 			continue
 		}
-		if prtbContentKey(other) == currentKey {
+		if rtbContentKey(other.UserPrincipalName,
+			other.UserName,
+			other.GroupPrincipalName,
+			other.GroupName,
+			other.RoleTemplateName,
+			other.ProjectName) == currentKey {
 			duplicates = append(duplicates, other)
 		}
 	}
