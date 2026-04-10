@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"sort"
 	"strings"
 
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -55,6 +56,7 @@ func newPRTBHandler(management *config.ManagementContext, clusterManager *cluste
 }
 
 // OnChange syncs the required resources used to implement a PRTB. It does the following:
+//   - Delete duplicate PRTBs with the same content (subject, role template, and project).
 //   - Create the specified user if it doesn't already exist.
 //   - Create the membership bindings to give access to the cluster.
 //   - Create a binding to the project management role if it exists.
@@ -63,7 +65,14 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 		return nil, nil
 	}
 
-	var err error
+	isDuplicate, err := p.deleteDuplicatePRTBs(prtb)
+	if err != nil {
+		return prtb, err
+	}
+	if isDuplicate {
+		return prtb, nil
+	}
+
 	prtb, err = p.handleMigration(prtb)
 	if err != nil {
 		return prtb, err
@@ -83,6 +92,82 @@ func (p *prtbHandler) OnChange(_ string, prtb *v3.ProjectRoleTemplateBinding) (*
 	}
 
 	return prtb, p.reconcileBindings(prtb)
+}
+
+// prtbContentKey returns a string key that uniquely identifies the content of a PRTB.
+// Two PRTBs with the same content key are considered duplicates.
+// The key is built from the subject (using the same priority order as the webhook:
+// UserPrincipalName > UserName > GroupPrincipalName > GroupName), RoleTemplateName, and ProjectName.
+func prtbContentKey(prtb *v3.ProjectRoleTemplateBinding) string {
+	var subject string
+	switch {
+	case prtb.UserPrincipalName != "":
+		subject = prtb.UserPrincipalName
+	case prtb.UserName != "":
+		subject = prtb.UserName
+	case prtb.GroupPrincipalName != "":
+		subject = prtb.GroupPrincipalName
+	case prtb.GroupName != "":
+		subject = prtb.GroupName
+	}
+	return subject + "/" + prtb.RoleTemplateName + "/" + prtb.ProjectName
+}
+
+// deleteDuplicatePRTBs checks if there are duplicate PRTBs with the same content in the same namespace.
+// If duplicates are found, it keeps the oldest one (by creation timestamp, then by name as tiebreaker)
+// and deletes the rest. It returns true if the given prtb was itself deleted as a duplicate.
+func (p *prtbHandler) deleteDuplicatePRTBs(prtb *v3.ProjectRoleTemplateBinding) (bool, error) {
+	allPRTBs, err := p.prtbClient.Cache().List(prtb.Namespace, labels.Everything())
+	if err != nil {
+		return false, fmt.Errorf("failed to list PRTBs in namespace %s: %w", prtb.Namespace, err)
+	}
+
+	currentKey := prtbContentKey(prtb)
+
+	// Find all PRTBs with the same content key.
+	var duplicates []*v3.ProjectRoleTemplateBinding
+	for _, other := range allPRTBs {
+		if other.DeletionTimestamp != nil {
+			continue
+		}
+		if prtbContentKey(other) == currentKey {
+			duplicates = append(duplicates, other)
+		}
+	}
+
+	if len(duplicates) <= 1 {
+		return false, nil
+	}
+
+	// Sort: oldest first by CreationTimestamp, then by Name as tiebreaker.
+	sort.Slice(duplicates, func(i, j int) bool {
+		ti := duplicates[i].CreationTimestamp
+		tj := duplicates[j].CreationTimestamp
+		if !ti.Equal(&tj) {
+			return ti.Before(&tj)
+		}
+		return duplicates[i].Name < duplicates[j].Name
+	})
+
+	// Keep the first (oldest), delete the rest.
+	keeper := duplicates[0]
+	logrus.Infof("[prtb-handler] found %d duplicate PRTBs for key %q in namespace %s, keeping %s",
+		len(duplicates), currentKey, prtb.Namespace, keeper.Name)
+
+	currentDeleted := false
+	var returnErr error
+	for _, dup := range duplicates[1:] {
+		logrus.Infof("[prtb-handler] deleting duplicate PRTB %s/%s", dup.Namespace, dup.Name)
+		if err := p.prtbClient.Delete(dup.Namespace, dup.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			returnErr = errors.Join(returnErr, fmt.Errorf("failed to delete duplicate PRTB %s/%s: %w", dup.Namespace, dup.Name, err))
+			continue
+		}
+		if dup.Name == prtb.Name {
+			currentDeleted = true
+		}
+	}
+
+	return currentDeleted, returnErr
 }
 
 // handleMigration handles the migration of PRTBs when toggling the AggregatedRoleTemplates feature flag.
