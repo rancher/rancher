@@ -18,7 +18,7 @@ runs:
     - name: Setup Environment Variables
       uses: ./.github/actions/setup-tag-env
     - name: Setup ecm-distro-tools
-      uses: rancher/ecm-distro-tools@df74c04bbc0176c3a2a04ebd8f6620c5a23229f6 # v0.67.2
+      uses: rancher/ecm-distro-tools@dcb7716af5a318567115a231643164e1d8446021 # v0.67.2
     - name: Generate linux docker digests
       shell: bash
       run: |
