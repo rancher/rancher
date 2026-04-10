@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -77,7 +78,16 @@ func (c *crtbHandler) OnChange(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 		return nil, nil
 	}
 
-	var err error
+	// Delete duplicate CRTBs (same subject + roleTemplateName + clusterName).
+	// If this CRTB is itself the duplicate that got deleted, stop processing.
+	isDup, err := c.deleteDuplicateCRTBs(crtb)
+	if err != nil {
+		return crtb, err
+	}
+	if isDup {
+		return nil, nil
+	}
+
 	crtb, err = c.handleMigration(crtb)
 	if err != nil {
 		return crtb, err
@@ -98,6 +108,67 @@ func (c *crtbHandler) OnChange(_ string, crtb *v3.ClusterRoleTemplateBinding) (*
 	}
 
 	return crtb, errors.Join(c.reconcileBindings(crtb, &localConditions), c.updateStatus(crtb, localConditions))
+}
+
+// deleteDuplicateCRTBs checks for other CRTBs in the same namespace that have the same content
+// (subject + roleTemplateName + clusterName). If duplicates are found, only the oldest one (by
+// CreationTimestamp, then by Name as tiebreaker) is kept. All others are deleted.
+// It returns true if the current CRTB was itself a duplicate that was deleted.
+func (c *crtbHandler) deleteDuplicateCRTBs(crtb *v3.ClusterRoleTemplateBinding) (bool, error) {
+	allCRTBs, err := c.crtbCache.List(crtb.Namespace, labels.Everything())
+	if err != nil {
+		return false, fmt.Errorf("failed to list CRTBs in namespace %s: %w", crtb.Namespace, err)
+	}
+
+	currentKey := rtbContentKey(crtb.UserPrincipalName, crtb.UserName, crtb.GroupPrincipalName, crtb.GroupName,
+		crtb.RoleTemplateName, crtb.ClusterName)
+
+	// Collect all non-deleting CRTBs with the same content key.
+	var duplicates []*v3.ClusterRoleTemplateBinding
+	for _, crtb := range allCRTBs {
+		if crtb.DeletionTimestamp != nil {
+			continue
+		}
+		if rtbContentKey(crtb.UserPrincipalName,
+			crtb.UserName,
+			crtb.GroupPrincipalName,
+			crtb.GroupName,
+			crtb.RoleTemplateName,
+			crtb.ClusterName) == currentKey {
+			duplicates = append(duplicates, crtb)
+		}
+	}
+
+	if len(duplicates) <= 1 {
+		return false, nil
+	}
+
+	// Sort: oldest CreationTimestamp first, then lexicographically by Name as tiebreaker.
+	sort.Slice(duplicates, func(i, j int) bool {
+		ti := duplicates[i].CreationTimestamp.Time
+		tj := duplicates[j].CreationTimestamp.Time
+		if !ti.Equal(tj) {
+			return ti.Before(tj)
+		}
+		return duplicates[i].Name < duplicates[j].Name
+	})
+
+	// The first element is the "winner" that we keep.
+	keeper := duplicates[0]
+	currentIsDuplicate := crtb.Name != keeper.Name
+
+	logrus.Infof("[mgmt-crtb-change-handler] found %d duplicate CRTBs for content key %q in namespace %s, keeping %s",
+		len(duplicates), currentKey, crtb.Namespace, keeper.Name)
+
+	var returnErr error
+	for _, dup := range duplicates[1:] {
+		logrus.Infof("[mgmt-crtb-change-handler] deleting duplicate CRTB %s/%s", dup.Namespace, dup.Name)
+		if err := c.crtbClient.Delete(dup.Namespace, dup.Name, &metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			returnErr = errors.Join(returnErr, fmt.Errorf("failed to delete duplicate CRTB %s/%s: %w", dup.Namespace, dup.Name, err))
+		}
+	}
+
+	return currentIsDuplicate, returnErr
 }
 
 // handleMigration handles the migration of CRTBs when toggling the AggregatedRoleTemplates feature flag.
