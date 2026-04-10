@@ -12,6 +12,7 @@ jobs:
   zizmor:
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       security-events: write # used by zizmor to write events for advanced security features
     steps:
       - name: Checkout repository
