@@ -24,7 +24,6 @@ actions:
   rancher-pr:
     kind: github/pullrequest
     scmid: 'default'
-    source: 'k3s-release'
     spec:
       labels:
         - 'dependencies'

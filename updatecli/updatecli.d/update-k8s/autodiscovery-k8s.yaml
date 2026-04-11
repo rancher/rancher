@@ -9,7 +9,7 @@ autodiscovery:
     golang:
       versionfilter:
         kind: semver
-        pattern: minor
+        pattern: patch
       only:
         - modules:
             '^k8s\.io\/.*': ''

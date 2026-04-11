@@ -14,6 +14,9 @@ sources:
   k8s-release:
     name: 'Get latest upstream K8s patch version for {{ source "rancher-go-mod-k8s" }}'
     kind: githubrelease
+    dependson:
+      - 'rancher-go-mod-k8s'
+    disablesourceinput: true
     spec:
       owner: '{{ .repos.k8s.owner }}'
       repository: '{{ .repos.k8s.repo }}'

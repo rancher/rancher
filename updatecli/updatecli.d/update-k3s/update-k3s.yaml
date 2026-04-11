@@ -12,7 +12,9 @@ sources:
   k3s-release:
     name: 'Get latest upstream K3s patch version for {{ source "rancher-go-mod-k8s" }}'
     kind: githubrelease
-    sourceid: 'rancher-go-mod-k8s'
+    disablesourceinput: true
+    dependson:
+      - 'rancher-go-mod-k8s'
     spec:
       owner: '{{ .repos.k3s.owner }}'
       repository: '{{ .repos.k3s.repo }}'
@@ -23,29 +25,28 @@ sources:
       token: '{{ requiredEnv .scm.token }}'
       versionfilter:
         kind: semver
-        pattern: '~{{ source "rancher-go-mod-k8s" }}'
+        pattern: '{{ source "rancher-go-mod-k8s" }}'
 
   k3s-image-release:
-    name: 'Get latest upstream K3s patch version for {{ source "rancher-go-mod-k8s" }}'
-    kind: githubrelease
-    sourceid: 'rancher-go-mod-k8s'
+    name: 'Transform {{ source "k3s-release" }} into image version tag'
+    kind: shell
+    dependson:
+      - 'k3s-release'
     spec:
-      owner: '{{ .repos.k3s.owner }}'
-      repository: '{{ .repos.k3s.repo }}'
-      key: tagname
-      typefilter:
-        release: true
-      username: '{{ .scm.username }}'
-      token: '{{ requiredEnv .scm.token }}'
-      versionfilter:
-        kind: semver
-        pattern: '~{{ source "rancher-go-mod-k8s" }}'
+      command: 'echo {{ source "k3s-release" }}'
     transformers:
       - replacer:
           from: '+'
           to: '-'
 
 conditions:
+  docker:
+    name: 'Confirm that image rancher/k3s:{{ source "k3s-image-release" }} is available'
+    kind: dockerimage
+    sourceid: 'k3s-image-release'
+    spec:
+      image: "rancher/k3s"
+
   check-dockerfile-k3s-cattle-version:
     name: 'Check if ENV CATTLE_K3S_VERSION is set in Dockerfiles'
     kind: file
@@ -73,7 +74,7 @@ targets:
     name: 'Update ENV CATTLE_K3S_VERSION to {{ source "k3s-release" }} in Dockerfiles'
     kind: file
     scmid: 'default'
-    sourceid: 'k3s-release'
+    disablesourceinput: true
     spec:
       files:
         - 'Dockerfile.dapper'
@@ -82,10 +83,10 @@ targets:
       replacepattern: 'ENV CATTLE_K3S_VERSION={{ source "k3s-release" }}'
 
   update-dockerfile-k3s-image-version:
-    name: 'Update rancher/k3s image to {{ source "k3s-release" }} in Dockerfiles'
+    name: 'Update rancher/k3s image to {{ source "k3s-image-release" }} in Dockerfiles'
     kind: file
     scmid: 'default'
-    sourceid: 'k3s-image-release'
+    disablesourceinput: true
     spec:
       files:
         - 'Dockerfile.dapper'
