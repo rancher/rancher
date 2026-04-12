@@ -55,10 +55,10 @@ conditions:
 
 targets:
   update-dockerfile-kubectl-version:
-    name: 'Update ENV|ARG KUBECTL_VERSION to {{ .k8s.main }} in Dockerfiles'
+    name: 'Update ENV|ARG KUBECTL_VERSION to {{ source "k8s-release" }} in Dockerfiles'
     kind: file
     scmid: 'default'
-    sourceid: 'k8s-release'
+    disablesourceinput: true
     spec:
       files:
         - 'package/Dockerfile'
@@ -68,10 +68,10 @@ targets:
       replacepattern: '$1 KUBECTL_VERSION={{ source "k8s-release" }}'
 
   update-shell-script-kubectl-version:
-    name: 'Update KUBECTL_VERSION to {{ .k8s.main }} in shell scripts'
+    name: 'Update KUBECTL_VERSION to {{ source "k8s-release" }} in shell scripts'
     kind: file
     scmid: 'default'
-    sourceid: 'k8s-release'
+    disablesourceinput: true
     spec:
       files:
         - 'tests/validation/tests/rke/scripts/build.sh'
