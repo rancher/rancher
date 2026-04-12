@@ -1,5 +1,5 @@
 name: '{{ .k8s.manifest }}'
-pipelineid: update-k8s-versions
+pipelineid: '{{ .k8s.pipelineid }}'
 
 sources:
   rancher-go-mod-k8s:
