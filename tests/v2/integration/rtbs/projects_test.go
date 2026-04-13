@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/secrets"
-	"github.com/stretchr/testify/require"
 
 	extnamespaces "github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/namespaces"
 	extrbac "github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/rbac"
@@ -42,7 +41,7 @@ func (p *RTBTestSuite) TestProjectCreatorGetsOwnerBindings() {
 
 	// User creates a project, retrying until RBAC propagates.
 	var project *management.Project
-	require.Eventually(p.T(), func() bool {
+	p.Require().Eventually(func() bool {
 		project, err = testUser.Management.Project.Create(&management.Project{
 			ClusterID: p.downstreamClusterID,
 			Name:      namegen.AppendRandomString("test-proj-"),
@@ -51,7 +50,7 @@ func (p *RTBTestSuite) TestProjectCreatorGetsOwnerBindings() {
 	}, 2*time.Minute, 2*time.Second, "waiting for user to be able to create a project")
 
 	// Wait for project to become active.
-	require.Eventually(p.T(), func() bool {
+	p.Require().Eventually(func() bool {
 		proj, err := testUser.Management.Project.ByID(project.ID)
 		return err == nil && proj.State == "active"
 	}, 2*time.Minute, 2*time.Second, "waiting for project to become active")
@@ -169,13 +168,13 @@ func (p *RTBTestSuite) TestReadOnlyCannotMoveNamespace() {
 		ClusterID: p.downstreamClusterID,
 		Name:      namegen.AppendRandomString("test-proj-"),
 	})
-	require.NoError(p.T(), err)
+	p.Require().NoError(err)
 
 	// Wait for project namespaces to exist.
 	p1Name := strings.ReplaceAll(p1.ID, ":", "-")
 	p2Name := strings.ReplaceAll(p2.ID, ":", "-")
 
-	require.Eventually(p.T(), func() bool {
+	p.Require().Eventually(func() bool {
 		_, err1 := extnamespaces.GetNamespaceByName(client, p.downstreamClusterID, p1Name)
 		_, err2 := extnamespaces.GetNamespaceByName(client, p.downstreamClusterID, p2Name)
 		return err1 == nil && err2 == nil
