@@ -48,3 +48,40 @@ func Test_Operation_SetA_MP_CertificateRotation(t *testing.T) {
 	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
 	assert.NoError(t, err)
 }
+
+func Test_Operation_SetA_MP_CertificateRotationThreeNodes(t *testing.T) {
+	clients, err := clients.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clients.Close()
+
+	c, err := cluster.New(clients, &provisioningv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-mp-certificate-rotation-operations-three-nodes",
+		},
+		Spec: provisioningv1.ClusterSpec{
+			KubernetesVersion: defaults.SomeK8sVersion,
+			RKEConfig: &provisioningv1.RKEConfig{
+				MachinePools: []provisioningv1.RKEMachinePool{{
+					EtcdRole:         true,
+					ControlPlaneRole: true,
+					WorkerRole:       true,
+					Quantity:         &defaults.Three,
+				}},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = cluster.WaitForCreate(clients, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	operations.RunCertificateRotationTest(t, clients, c)
+	err = cluster.EnsureMinimalConflictsWithThreshold(clients, c, cluster.SaneConflictMessageThreshold)
+	assert.NoError(t, err)
+}
