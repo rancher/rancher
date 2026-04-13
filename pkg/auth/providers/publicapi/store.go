@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/gorilla/mux"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/objectclient"
 	"github.com/rancher/norman/store/empty"
@@ -198,7 +197,7 @@ type v1AuthTokenStore struct {
 }
 
 func (s *v1AuthTokenStore) Get(w http.ResponseWriter, r *http.Request) {
-	id := mux.Vars(r)["id"]
+	id := r.PathValue("id")
 
 	token, err := s.tokens.Get(namespace.GlobalNamespace, id, metav1.GetOptions{})
 	if err != nil {
@@ -226,7 +225,7 @@ func (s *v1AuthTokenStore) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *v1AuthTokenStore) Delete(w http.ResponseWriter, r *http.Request) {
-	id := mux.Vars(r)["id"]
+	id := r.PathValue("id")
 
 	err := s.tokens.Delete(namespace.GlobalNamespace, id, &metav1.DeleteOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {

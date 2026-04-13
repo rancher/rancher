@@ -19,7 +19,6 @@ import (
 
 	"github.com/crewjam/saml"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	responsewriter "github.com/rancher/apiserver/pkg/middleware"
 	apiv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
@@ -40,13 +39,36 @@ type IDPMetadata struct {
 	SPSSODescriptors  []saml.SPSSODescriptor  `xml:"SPSSODescriptor"`
 }
 
-var root *mux.Router
+var root *http.ServeMux
+var routeHandlers = make(map[string]http.HandlerFunc)
+var handlerMu sync.RWMutex
 var appliedVersion string
 var initMu sync.Mutex
 
 const UITranslationKeyForErrorMessage = "invalidSamlAttrs"
 const dashboardAuthPath = "/dashboard/auth"
 const loginPath = "/login?"
+
+func setRouteHandler(path string, handler http.HandlerFunc) {
+	handlerMu.Lock()
+	defer handlerMu.Unlock()
+	// Wrap with ContentTypeOptions middleware
+	wrapped := responsewriter.ContentTypeOptions(handler)
+	routeHandlers[path] = wrapped.ServeHTTP
+}
+
+func getRouteHandler(name string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		handlerMu.RLock()
+		h, ok := routeHandlers[name]
+		handlerMu.RUnlock()
+		if ok {
+			h(w, r)
+			return
+		}
+		http.NotFound(w, r)
+	}
+}
 
 // InitializeSamlServiceProvider validates changes to SamlConfig structures and
 // creates or updates the associated in-memory information. It is called from the
@@ -186,38 +208,36 @@ func InitializeSamlServiceProvider(configToSet *apiv3.SamlConfig, name string) e
 
 	provider.clientState = &cookieStore
 
-	root.Use(responsewriter.ContentTypeOptions)
-
 	SamlProviders[name] = provider
 
 	log.Debugf("SAML [InitializeSamlServiceProvider]: Set /v1-saml handlers for %s on root %p", name, root)
 
 	switch name {
 	case PingName:
-		root.Get("PingACS").HandlerFunc(provider.ServeHTTP)
-		root.Get("PingSLO").HandlerFunc(provider.ServeHTTP)
-		root.Get("PingSLOGet").HandlerFunc(provider.ServeHTTP)
-		root.Get("PingMetadata").HandlerFunc(provider.ServeHTTP)
+		setRouteHandler("PingACS", provider.ServeHTTP)
+		setRouteHandler("PingSLO", provider.ServeHTTP)
+		setRouteHandler("PingSLOGet", provider.ServeHTTP)
+		setRouteHandler("PingMetadata", provider.ServeHTTP)
 	case ADFSName:
-		root.Get("AdfsACS").HandlerFunc(provider.ServeHTTP)
-		root.Get("AdfsSLO").HandlerFunc(provider.ServeHTTP)
-		root.Get("AdfsSLOGet").HandlerFunc(provider.ServeHTTP)
-		root.Get("AdfsMetadata").HandlerFunc(provider.ServeHTTP)
+		setRouteHandler("AdfsACS", provider.ServeHTTP)
+		setRouteHandler("AdfsSLO", provider.ServeHTTP)
+		setRouteHandler("AdfsSLOGet", provider.ServeHTTP)
+		setRouteHandler("AdfsMetadata", provider.ServeHTTP)
 	case KeyCloakName:
-		root.Get("KeyCloakACS").HandlerFunc(provider.ServeHTTP)
-		root.Get("KeyCloakSLO").HandlerFunc(provider.ServeHTTP)
-		root.Get("KeyCloakSLOGet").HandlerFunc(provider.ServeHTTP)
-		root.Get("KeyCloakMetadata").HandlerFunc(provider.ServeHTTP)
+		setRouteHandler("KeyCloakACS", provider.ServeHTTP)
+		setRouteHandler("KeyCloakSLO", provider.ServeHTTP)
+		setRouteHandler("KeyCloakSLOGet", provider.ServeHTTP)
+		setRouteHandler("KeyCloakMetadata", provider.ServeHTTP)
 	case OKTAName:
-		root.Get("OktaACS").HandlerFunc(provider.ServeHTTP)
-		root.Get("OktaSLO").HandlerFunc(provider.ServeHTTP)
-		root.Get("OktaSLOGet").HandlerFunc(provider.ServeHTTP)
-		root.Get("OktaMetadata").HandlerFunc(provider.ServeHTTP)
+		setRouteHandler("OktaACS", provider.ServeHTTP)
+		setRouteHandler("OktaSLO", provider.ServeHTTP)
+		setRouteHandler("OktaSLOGet", provider.ServeHTTP)
+		setRouteHandler("OktaMetadata", provider.ServeHTTP)
 	case ShibbolethName:
-		root.Get("ShibbolethACS").HandlerFunc(provider.ServeHTTP)
-		root.Get("ShibbolethSLO").HandlerFunc(provider.ServeHTTP)
-		root.Get("ShibbolethSLOGet").HandlerFunc(provider.ServeHTTP)
-		root.Get("ShibbolethMetadata").HandlerFunc(provider.ServeHTTP)
+		setRouteHandler("ShibbolethACS", provider.ServeHTTP)
+		setRouteHandler("ShibbolethSLO", provider.ServeHTTP)
+		setRouteHandler("ShibbolethSLOGet", provider.ServeHTTP)
+		setRouteHandler("ShibbolethMetadata", provider.ServeHTTP)
 	}
 
 	log.Debugf("SAML [InitializeSamlServiceProvider]: /v1-saml handlers for %s on root %p active", name, root)
@@ -234,32 +254,32 @@ func AuthHandler() http.Handler {
 		return root
 	}
 
-	root = mux.NewRouter()
+	root = http.NewServeMux()
 
-	root.Methods("POST").Path("/v1-saml/ping/saml/acs").Name("PingACS")
-	root.Methods("POST").Path("/v1-saml/ping/saml/slo").Name("PingSLO")
-	root.Methods("GET").Path("/v1-saml/ping/saml/slo").Name("PingSLOGet")
-	root.Methods("GET").Path("/v1-saml/ping/saml/metadata").Name("PingMetadata")
+	root.HandleFunc("POST /v1-saml/ping/saml/acs", getRouteHandler("PingACS"))
+	root.HandleFunc("POST /v1-saml/ping/saml/slo", getRouteHandler("PingSLO"))
+	root.HandleFunc("GET /v1-saml/ping/saml/slo", getRouteHandler("PingSLOGet"))
+	root.HandleFunc("GET /v1-saml/ping/saml/metadata", getRouteHandler("PingMetadata"))
 
-	root.Methods("POST").Path("/v1-saml/adfs/saml/acs").Name("AdfsACS")
-	root.Methods("POST").Path("/v1-saml/adfs/saml/slo").Name("AdfsSLO")
-	root.Methods("GET").Path("/v1-saml/adfs/saml/slo").Name("AdfsSLOGet")
-	root.Methods("GET").Path("/v1-saml/adfs/saml/metadata").Name("AdfsMetadata")
+	root.HandleFunc("POST /v1-saml/adfs/saml/acs", getRouteHandler("AdfsACS"))
+	root.HandleFunc("POST /v1-saml/adfs/saml/slo", getRouteHandler("AdfsSLO"))
+	root.HandleFunc("GET /v1-saml/adfs/saml/slo", getRouteHandler("AdfsSLOGet"))
+	root.HandleFunc("GET /v1-saml/adfs/saml/metadata", getRouteHandler("AdfsMetadata"))
 
-	root.Methods("POST").Path("/v1-saml/keycloak/saml/acs").Name("KeyCloakACS")
-	root.Methods("POST").Path("/v1-saml/keycloak/saml/slo").Name("KeyCloakSLO")
-	root.Methods("GET").Path("/v1-saml/keycloak/saml/slo").Name("KeyCloakSLOGet")
-	root.Methods("GET").Path("/v1-saml/keycloak/saml/metadata").Name("KeyCloakMetadata")
+	root.HandleFunc("POST /v1-saml/keycloak/saml/acs", getRouteHandler("KeyCloakACS"))
+	root.HandleFunc("POST /v1-saml/keycloak/saml/slo", getRouteHandler("KeyCloakSLO"))
+	root.HandleFunc("GET /v1-saml/keycloak/saml/slo", getRouteHandler("KeyCloakSLOGet"))
+	root.HandleFunc("GET /v1-saml/keycloak/saml/metadata", getRouteHandler("KeyCloakMetadata"))
 
-	root.Methods("POST").Path("/v1-saml/okta/saml/acs").Name("OktaACS")
-	root.Methods("POST").Path("/v1-saml/okta/saml/slo").Name("OktaSLO")
-	root.Methods("GET").Path("/v1-saml/okta/saml/slo").Name("OktaSLOGet")
-	root.Methods("GET").Path("/v1-saml/okta/saml/metadata").Name("OktaMetadata")
+	root.HandleFunc("POST /v1-saml/okta/saml/acs", getRouteHandler("OktaACS"))
+	root.HandleFunc("POST /v1-saml/okta/saml/slo", getRouteHandler("OktaSLO"))
+	root.HandleFunc("GET /v1-saml/okta/saml/slo", getRouteHandler("OktaSLOGet"))
+	root.HandleFunc("GET /v1-saml/okta/saml/metadata", getRouteHandler("OktaMetadata"))
 
-	root.Methods("POST").Path("/v1-saml/shibboleth/saml/acs").Name("ShibbolethACS")
-	root.Methods("POST").Path("/v1-saml/shibboleth/saml/slo").Name("ShibbolethSLO")
-	root.Methods("GET").Path("/v1-saml/shibboleth/saml/slo").Name("ShibbolethSLOGet")
-	root.Methods("GET").Path("/v1-saml/shibboleth/saml/metadata").Name("ShibbolethMetadata")
+	root.HandleFunc("POST /v1-saml/shibboleth/saml/acs", getRouteHandler("ShibbolethACS"))
+	root.HandleFunc("POST /v1-saml/shibboleth/saml/slo", getRouteHandler("ShibbolethSLO"))
+	root.HandleFunc("GET /v1-saml/shibboleth/saml/slo", getRouteHandler("ShibbolethSLOGet"))
+	root.HandleFunc("GET /v1-saml/shibboleth/saml/metadata", getRouteHandler("ShibbolethMetadata"))
 
 	log.Debugf("SAML [AuthHandler]: /v1-saml routes made, mux is %p", root)
 	return root

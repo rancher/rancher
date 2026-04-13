@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"regexp"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
-	"github.com/gorilla/mux"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	mgmtcontrollers "github.com/rancher/rancher/pkg/generated/controllers/management.cattle.io/v3"
 	"github.com/rancher/remotedialer"
@@ -26,7 +26,8 @@ type aggregationHandler struct {
 	sync.Mutex
 
 	apiServiceCache mgmtcontrollers.APIServiceCache
-	mux             *mux.Router
+	mux             *http.ServeMux
+	notFound        http.Handler
 	remote          *remotedialer.Server
 }
 
@@ -59,21 +60,32 @@ func (h *aggregationHandler) next(notFound http.Handler) http.Handler {
 	if h.mux == nil {
 		return notFound
 	}
-	h.mux.NotFoundHandler = notFound
+	h.notFound = notFound
 	return h.mux
 }
 
 func (h *aggregationHandler) setEntries(routes []routeEntry) {
-	mux := mux.NewRouter()
-	mux.UseEncodedPath()
+	mux := http.NewServeMux()
 	for _, entry := range routes {
 		if entry.prefix != "" {
-			mux.PathPrefix(entry.prefix).Handler(h.makeHandler(entry.uuid))
+			prefix := entry.prefix
+			if !strings.HasSuffix(prefix, "/") {
+				prefix += "/"
+			}
+			mux.Handle(prefix, h.makeHandler(entry.uuid))
 		}
 		if entry.path != "" {
-			mux.Path(entry.path).Handler(h.makeHandler(entry.uuid))
+			mux.Handle(entry.path, h.makeHandler(entry.uuid))
 		}
 	}
+	mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h.Lock()
+		nf := h.notFound
+		h.Unlock()
+		if nf != nil {
+			nf.ServeHTTP(w, r)
+		}
+	}))
 
 	h.Lock()
 	defer h.Unlock()
