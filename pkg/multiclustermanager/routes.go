@@ -94,22 +94,22 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 	accessControlHandler := rbac.NewAccessControlHandler()
 
 	// Setup middlewares for the service account authenticated routes.
-	saauthedMw := func(h http.Handler) http.Handler {
+	saAuthedMW := func(h http.Handler) http.Handler {
 		h = requests.NewAuthenticatedFilter(h)
 		h = accessControlHandler(h)
 		h = saAuth.Chain(impersonatingAuth.ImpersonationMiddleware)(h)
 		return h
 	}
-	saauthed := http.NewServeMux()
-	saauthed.Handle("/k8s/clusters/{clusterID}/", saauthedMw(k8sProxy))
-	saauthed.Handle("/k8s/proxy/{clusterID}/", saauthedMw(k8sProxy))
+	saAuthed := http.NewServeMux()
+	saAuthed.Handle("/k8s/clusters/{clusterID}/", saAuthedMW(k8sProxy))
+	saAuthed.Handle("/k8s/proxy/{clusterID}/", saAuthedMW(k8sProxy))
 
 	unauthed.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" && parse.MatchNotBrowser(r) {
 			managementAPI.ServeHTTP(w, r)
 			return
 		}
-		saauthed.ServeHTTP(w, r)
+		saAuthed.ServeHTTP(w, r)
 	}))
 	unauthed.Handle("/v3/connect", connectHandler)
 	unauthed.Handle("/v3/connect/register", connectHandler)
@@ -143,7 +143,7 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 
 	// Setup middlewares for the metrics route.
 	tokenReviewAuth := auth.ToMiddleware(requests.NewTokenReviewAuth(scaledContext.K8sClient.AuthenticationV1()))
-	metricsMw := func(h http.Handler) http.Handler {
+	metricsMW := func(h http.Handler) http.Handler {
 		h = metrics.NewMetricsHandler(scaledContext.K8sClient)(h)
 		h = requests.NewAuthenticatedFilter(h)
 		h = accessControlHandler(h)
@@ -151,10 +151,10 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 		return h
 	}
 	metricsAuthed := http.NewServeMux()
-	metricsAuthed.Handle("/metrics", metricsMw(promhttp.Handler()))
+	metricsAuthed.Handle("/metrics", metricsMW(promhttp.Handler()))
 
 	// Setup middlewares for authenticated routes.
-	authedMw := func(h http.Handler) http.Handler {
+	authedMW := func(h http.Handler) http.Handler {
 		h = requests.NewAuthenticatedFilter(h)
 		h = accessControlHandler(h)
 		h = impersonatingAuth.ImpersonationMiddleware(h)
@@ -166,31 +166,31 @@ func router(ctx context.Context, localClusterEnabled bool, scaledContext *config
 		resource := r.PathValue("resource")
 		var h http.Handler
 		if strings.HasPrefix(resource, "aks") {
-			h = authedMw(aks.NewAKSHandler(scaledContext))
+			h = authedMW(aks.NewAKSHandler(scaledContext))
 		} else if strings.HasPrefix(resource, "gke") {
-			h = authedMw(gke.NewGKEHandler(scaledContext))
+			h = authedMW(gke.NewGKEHandler(scaledContext))
 		} else if strings.HasPrefix(resource, "alibaba") {
-			h = authedMw(alibaba.NewAlibabaHandler(scaledContext))
+			h = authedMW(alibaba.NewAlibabaHandler(scaledContext))
 		} else {
 			metricsAuthed.ServeHTTP(w, r)
 			return
 		}
 		h.ServeHTTP(w, r)
 	}))
-	authed.Handle("/meta/oci/{resource}", authedMw(oci.NewOCIHandler(scaledContext)))
-	authed.Handle("GET /meta/vsphere/{field}", authedMw(vsphere.NewVsphereHandler(scaledContext)))
-	authed.Handle("POST /v3/tokenreview", authedMw(&webhook.TokenReviewer{}))
-	authed.Handle(supportconfigs.Endpoint, authedMw(&supportConfigGenerator))
-	authed.Handle("/meta/proxy/", authedMw(metaProxy))
-	authed.Handle("/v3/", authedMw(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	authed.Handle("/meta/oci/{resource}", authedMW(oci.NewOCIHandler(scaledContext)))
+	authed.Handle("GET /meta/vsphere/{field}", authedMW(vsphere.NewVsphereHandler(scaledContext)))
+	authed.Handle("POST /v3/tokenreview", authedMW(&webhook.TokenReviewer{}))
+	authed.Handle(supportconfigs.Endpoint, authedMW(&supportConfigGenerator))
+	authed.Handle("/meta/proxy/", authedMW(metaProxy))
+	authed.Handle("/v3/", authedMW(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/v3/identit") || strings.HasPrefix(r.URL.Path, "/v3/token") {
 			tokenAPI.ServeHTTP(w, r)
 		} else {
 			managementAPI.ServeHTTP(w, r)
 		}
 	})))
-	authed.Handle("POST /v1/logout", authedMw(logout))
-	saauthed.Handle("/", authed)
+	authed.Handle("POST /v1/logout", authedMW(logout))
+	saAuthed.Handle("/", authed)
 	authed.Handle("/", metricsAuthed)
 
 	var nextHandler http.Handler
