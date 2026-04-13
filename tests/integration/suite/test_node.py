@@ -27,7 +27,6 @@ def test_node_fields(admin_mc):
         'worker': 'cr',
         'requestedHostname': 'cr',
         'volumesAttached': 'r',
-        'nodeTemplateId': 'cr',
         'volumesInUse': 'r',
         'podCidr': 'r',
         'podCidrs': 'r',

@@ -1,3 +1,4 @@
+import logging
 import pytest
 import requests
 
@@ -54,7 +55,7 @@ def test_k8s_proxy_fetches_namespaces_from_downstream_cluster(admin_mc):
     clusters = admin_mc.client.list_cluster().data
     for cluster in clusters:
         if cluster.id != "local":
-            print(cluster.id, cluster.state)
+            logging.debug("Cluster %s state: %s", cluster.id, cluster.state)
     protect_response(response)
 
     payload = response.json()
@@ -75,7 +76,6 @@ def test_proxy_k8s_v1_path_returns_not_found(admin_mc):
     clusters = admin_mc.client.list_cluster().data
     for cluster in clusters:
         if cluster.id != "local" and cluster.state == "active":
-            print(cluster.id, cluster.state)
-        print(cluster.state)
+            logging.debug("Cluster %s state: %s", cluster.id, cluster.state)
 
     assert response.status_code == 404

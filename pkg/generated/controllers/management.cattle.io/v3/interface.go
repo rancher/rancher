@@ -42,8 +42,6 @@ type Interface interface {
 	ClusterProxyConfig() ClusterProxyConfigController
 	ClusterRegistrationToken() ClusterRegistrationTokenController
 	ClusterRoleTemplateBinding() ClusterRoleTemplateBindingController
-	ClusterTemplate() ClusterTemplateController
-	ClusterTemplateRevision() ClusterTemplateRevisionController
 	CognitoProvider() CognitoProviderController
 	ComposeConfig() ComposeConfigController
 	DynamicSchema() DynamicSchemaController
@@ -64,7 +62,6 @@ type Interface interface {
 	Node() NodeController
 	NodeDriver() NodeDriverController
 	NodePool() NodePoolController
-	NodeTemplate() NodeTemplateController
 	OIDCClient() OIDCClientController
 	OIDCProvider() OIDCProviderController
 	OpenLdapProvider() OpenLdapProviderController
@@ -137,14 +134,6 @@ func (v *version) ClusterRegistrationToken() ClusterRegistrationTokenController 
 
 func (v *version) ClusterRoleTemplateBinding() ClusterRoleTemplateBindingController {
 	return generic.NewController[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterRoleTemplateBinding"}, "clusterroletemplatebindings", true, v.controllerFactory)
-}
-
-func (v *version) ClusterTemplate() ClusterTemplateController {
-	return generic.NewController[*v3.ClusterTemplate, *v3.ClusterTemplateList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterTemplate"}, "clustertemplates", true, v.controllerFactory)
-}
-
-func (v *version) ClusterTemplateRevision() ClusterTemplateRevisionController {
-	return generic.NewController[*v3.ClusterTemplateRevision, *v3.ClusterTemplateRevisionList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "ClusterTemplateRevision"}, "clustertemplaterevisions", true, v.controllerFactory)
 }
 
 func (v *version) CognitoProvider() CognitoProviderController {
@@ -225,10 +214,6 @@ func (v *version) NodeDriver() NodeDriverController {
 
 func (v *version) NodePool() NodePoolController {
 	return generic.NewController[*v3.NodePool, *v3.NodePoolList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "NodePool"}, "nodepools", true, v.controllerFactory)
-}
-
-func (v *version) NodeTemplate() NodeTemplateController {
-	return generic.NewController[*v3.NodeTemplate, *v3.NodeTemplateList](schema.GroupVersionKind{Group: "management.cattle.io", Version: "v3", Kind: "NodeTemplate"}, "nodetemplates", true, v.controllerFactory)
 }
 
 func (v *version) OIDCClient() OIDCClientController {

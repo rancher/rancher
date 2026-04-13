@@ -39,8 +39,6 @@ var (
 	ClusterProxyConfigResourceName                        = "clusterproxyconfigs"
 	ClusterRegistrationTokenResourceName                  = "clusterregistrationtokens"
 	ClusterRoleTemplateBindingResourceName                = "clusterroletemplatebindings"
-	ClusterTemplateResourceName                           = "clustertemplates"
-	ClusterTemplateRevisionResourceName                   = "clustertemplaterevisions"
 	CognitoProviderResourceName                           = "cognitoproviders"
 	ComposeConfigResourceName                             = "composeconfigs"
 	DynamicSchemaResourceName                             = "dynamicschemas"
@@ -61,7 +59,6 @@ var (
 	NodeResourceName                                      = "nodes"
 	NodeDriverResourceName                                = "nodedrivers"
 	NodePoolResourceName                                  = "nodepools"
-	NodeTemplateResourceName                              = "nodetemplates"
 	OIDCClientResourceName                                = "oidcclients"
 	OIDCProviderResourceName                              = "oidcproviders"
 	OpenLdapProviderResourceName                          = "openldapproviders"
@@ -125,10 +122,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ClusterRegistrationTokenList{},
 		&ClusterRoleTemplateBinding{},
 		&ClusterRoleTemplateBindingList{},
-		&ClusterTemplate{},
-		&ClusterTemplateList{},
-		&ClusterTemplateRevision{},
-		&ClusterTemplateRevisionList{},
 		&CognitoProvider{},
 		&CognitoProviderList{},
 		&ComposeConfig{},
@@ -169,8 +162,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&NodeDriverList{},
 		&NodePool{},
 		&NodePoolList{},
-		&NodeTemplate{},
-		&NodeTemplateList{},
 		&OIDCClient{},
 		&OIDCClientList{},
 		&OIDCProvider{},
