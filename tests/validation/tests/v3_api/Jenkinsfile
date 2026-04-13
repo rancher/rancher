@@ -35,7 +35,7 @@ node {
                         string(credentialsId: 'AWS_SECRET_ACCESS_KEY', variable: 'RANCHER_EKS_SECRET_KEY'),
                         string(credentialsId: 'DO_ACCESSKEY', variable: 'DO_ACCESSKEY'),
                         usernamePassword(
-                                credentialsId: 'jenkins-dockerhub-org-token', 
+                                credentialsId: 'DOCKERHUB_ORG_CREDS', 
                                 usernameVariable: 'DOCKER_ORG_TOKEN_USERNAME', 
                                 passwordVariable: 'DOCKER_ORG_TOKEN_PASSWORD'
                         ),
