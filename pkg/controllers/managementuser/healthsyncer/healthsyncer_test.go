@@ -2,7 +2,11 @@ package healthsyncer
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"net"
+	"net/http"
+	"strings"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -11,6 +15,8 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	applycorev1 "k8s.io/client-go/applyconfigurations/core/v1"
 	typedv1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/rest"
+	fakerest "k8s.io/client-go/rest/fake"
 )
 
 func TestIsAPIUp(t *testing.T) {
@@ -115,4 +121,56 @@ func (m mockNamespaces) ApplyStatus(ctx context.Context, namespace *applycorev1.
 
 func (m mockNamespaces) Finalize(ctx context.Context, item *v1.Namespace, opts metav1.UpdateOptions) (*v1.Namespace, error) {
 	panic("implement me")
+}
+
+func TestCheckAPIReadiness(t *testing.T) {
+	tests := []struct {
+		name    string
+		client  rest.Interface
+		wantErr bool
+	}{
+		{
+			name: "api-up",
+			client: &fakerest.RESTClient{
+				Client: fakerest.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					if req.URL.Path != "/readyz" {
+						return nil, fmt.Errorf("unexpected path: %s", req.URL.Path)
+					}
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Body:       io.NopCloser(strings.NewReader("ok")),
+					}, nil
+				}),
+			},
+			wantErr: false,
+		},
+		{
+			name: "api-down",
+			client: &fakerest.RESTClient{
+				Client: fakerest.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					return &http.Response{
+						StatusCode: http.StatusInternalServerError,
+						Body:       io.NopCloser(strings.NewReader("failed")),
+					}, nil
+				}),
+			},
+			wantErr: true,
+		},
+		{
+			name: "api-timeout",
+			client: &fakerest.RESTClient{
+				Client: fakerest.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+					return nil, context.DeadlineExceeded
+				}),
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := CheckAPIReadiness(t.Context(), tt.client); (err != nil) != tt.wantErr {
+				t.Errorf("IsAPIUp() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
 }
