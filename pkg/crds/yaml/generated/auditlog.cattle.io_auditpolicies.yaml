@@ -21,9 +21,6 @@ spec:
     - jsonPath: .status.conditions[?(@.type == "Active")].status
       name: Active
       type: string
-    - jsonPath: .status.conditions[?(@.type == "Valid")].status
-      name: Valid
-      type: string
     name: v1
     schema:
       openAPIV3Schema:
