@@ -31,10 +31,6 @@ const (
 	ClusterFieldCertificatesExpiration                               = "certificatesExpiration"
 	ClusterFieldClusterAgentDeploymentCustomization                  = "clusterAgentDeploymentCustomization"
 	ClusterFieldClusterSecrets                                       = "clusterSecrets"
-	ClusterFieldClusterTemplateAnswers                               = "answers"
-	ClusterFieldClusterTemplateID                                    = "clusterTemplateId"
-	ClusterFieldClusterTemplateQuestions                             = "questions"
-	ClusterFieldClusterTemplateRevisionID                            = "clusterTemplateRevisionId"
 	ClusterFieldComponentStatuses                                    = "componentStatuses"
 	ClusterFieldConditions                                           = "conditions"
 	ClusterFieldCreated                                              = "created"
@@ -71,6 +67,7 @@ const (
 	ClusterFieldOwnerReferences                                      = "ownerReferences"
 	ClusterFieldPrivateRegistrySecret                                = "privateRegistrySecret"
 	ClusterFieldProvider                                             = "provider"
+	ClusterFieldReadyReconciling                                     = "readyReconciling"
 	ClusterFieldRemoved                                              = "removed"
 	ClusterFieldRequested                                            = "requested"
 	ClusterFieldRke2Config                                           = "rke2Config"
@@ -105,6 +102,7 @@ type Cluster struct {
 	Annotations                                          map[string]string             `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	AppliedAgentEnvVars                                  []EnvVar                      `json:"appliedAgentEnvVars,omitempty" yaml:"appliedAgentEnvVars,omitempty"`
 	AppliedClusterAgentDeploymentCustomization           *AgentDeploymentCustomization `json:"appliedClusterAgentDeploymentCustomization,omitempty" yaml:"appliedClusterAgentDeploymentCustomization,omitempty"`
+	AppliedClusterAgentImagePullSecretsHash              string                        `json:"appliedClusterAgentImagePullSecretsHash,omitempty" yaml:"appliedClusterAgentImagePullSecretsHash,omitempty"`
 	AppliedEnableNetworkPolicy                           bool                          `json:"appliedEnableNetworkPolicy,omitempty" yaml:"appliedEnableNetworkPolicy,omitempty"`
 	AppliedSpec                                          *ClusterSpec                  `json:"appliedSpec,omitempty" yaml:"appliedSpec,omitempty"`
 	AuthImage                                            string                        `json:"authImage,omitempty" yaml:"authImage,omitempty"`
@@ -114,10 +112,6 @@ type Cluster struct {
 	CertificatesExpiration                               map[string]CertExpiration     `json:"certificatesExpiration,omitempty" yaml:"certificatesExpiration,omitempty"`
 	ClusterAgentDeploymentCustomization                  *AgentDeploymentCustomization `json:"clusterAgentDeploymentCustomization,omitempty" yaml:"clusterAgentDeploymentCustomization,omitempty"`
 	ClusterSecrets                                       *ClusterSecrets               `json:"clusterSecrets,omitempty" yaml:"clusterSecrets,omitempty"`
-	ClusterTemplateAnswers                               *Answer                       `json:"answers,omitempty" yaml:"answers,omitempty"`
-	ClusterTemplateID                                    string                        `json:"clusterTemplateId,omitempty" yaml:"clusterTemplateId,omitempty"`
-	ClusterTemplateQuestions                             []Question                    `json:"questions,omitempty" yaml:"questions,omitempty"`
-	ClusterTemplateRevisionID                            string                        `json:"clusterTemplateRevisionId,omitempty" yaml:"clusterTemplateRevisionId,omitempty"`
 	ComponentStatuses                                    []ClusterComponentStatus      `json:"componentStatuses,omitempty" yaml:"componentStatuses,omitempty"`
 	Conditions                                           []ClusterCondition            `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	Created                                              string                        `json:"created,omitempty" yaml:"created,omitempty"`
@@ -139,6 +133,7 @@ type Cluster struct {
 	GKEConfig                                            *GKEClusterConfigSpec         `json:"gkeConfig,omitempty" yaml:"gkeConfig,omitempty"`
 	GKEStatus                                            *GKEStatus                    `json:"gkeStatus,omitempty" yaml:"gkeStatus,omitempty"`
 	ImportedConfig                                       *ImportedConfig               `json:"importedConfig,omitempty" yaml:"importedConfig,omitempty"`
+	Info                                                 *ClusterInfo                  `json:"info,omitempty" yaml:"info,omitempty"`
 	Internal                                             bool                          `json:"internal,omitempty" yaml:"internal,omitempty"`
 	IstioEnabled                                         bool                          `json:"istioEnabled,omitempty" yaml:"istioEnabled,omitempty"`
 	K3sConfig                                            *K3sConfig                    `json:"k3sConfig,omitempty" yaml:"k3sConfig,omitempty"`
@@ -153,6 +148,7 @@ type Cluster struct {
 	OwnerReferences                                      []OwnerReference              `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	PrivateRegistrySecret                                string                        `json:"privateRegistrySecret,omitempty" yaml:"privateRegistrySecret,omitempty"`
 	Provider                                             string                        `json:"provider,omitempty" yaml:"provider,omitempty"`
+	ReadyReconciling                                     bool                          `json:"readyReconciling,omitempty" yaml:"readyReconciling,omitempty"`
 	Removed                                              string                        `json:"removed,omitempty" yaml:"removed,omitempty"`
 	Requested                                            map[string]string             `json:"requested,omitempty" yaml:"requested,omitempty"`
 	Rke2Config                                           *Rke2Config                   `json:"rke2Config,omitempty" yaml:"rke2Config,omitempty"`
@@ -189,21 +185,11 @@ type ClusterOperations interface {
 	ByID(id string) (*Cluster, error)
 	Delete(container *Cluster) error
 
-	ActionBackupEtcd(resource *Cluster) error
-
 	ActionExportYaml(resource *Cluster) (*ExportOutput, error)
 
 	ActionGenerateKubeconfig(resource *Cluster) (*GenerateKubeConfigOutput, error)
 
 	ActionImportYaml(resource *Cluster, input *ImportClusterYamlInput) (*ImportYamlOutput, error)
-
-	ActionRestoreFromEtcdBackup(resource *Cluster, input *RestoreFromEtcdBackupInput) error
-
-	ActionRotateCertificates(resource *Cluster, input *RotateCertificateInput) (*RotateCertificateOutput, error)
-
-	ActionRotateEncryptionKey(resource *Cluster) (*RotateEncryptionKeyOutput, error)
-
-	ActionSaveAsTemplate(resource *Cluster, input *SaveAsTemplateInput) (*SaveAsTemplateOutput, error)
 }
 
 func newClusterClient(apiClient *Client) *ClusterClient {
@@ -275,11 +261,6 @@ func (c *ClusterClient) Delete(container *Cluster) error {
 	return c.apiClient.Ops.DoResourceDelete(ClusterType, &container.Resource)
 }
 
-func (c *ClusterClient) ActionBackupEtcd(resource *Cluster) error {
-	err := c.apiClient.Ops.DoAction(ClusterType, "backupEtcd", &resource.Resource, nil, nil)
-	return err
-}
-
 func (c *ClusterClient) ActionExportYaml(resource *Cluster) (*ExportOutput, error) {
 	resp := &ExportOutput{}
 	err := c.apiClient.Ops.DoAction(ClusterType, "exportYaml", &resource.Resource, nil, resp)
@@ -295,28 +276,5 @@ func (c *ClusterClient) ActionGenerateKubeconfig(resource *Cluster) (*GenerateKu
 func (c *ClusterClient) ActionImportYaml(resource *Cluster, input *ImportClusterYamlInput) (*ImportYamlOutput, error) {
 	resp := &ImportYamlOutput{}
 	err := c.apiClient.Ops.DoAction(ClusterType, "importYaml", &resource.Resource, input, resp)
-	return resp, err
-}
-
-func (c *ClusterClient) ActionRestoreFromEtcdBackup(resource *Cluster, input *RestoreFromEtcdBackupInput) error {
-	err := c.apiClient.Ops.DoAction(ClusterType, "restoreFromEtcdBackup", &resource.Resource, input, nil)
-	return err
-}
-
-func (c *ClusterClient) ActionRotateCertificates(resource *Cluster, input *RotateCertificateInput) (*RotateCertificateOutput, error) {
-	resp := &RotateCertificateOutput{}
-	err := c.apiClient.Ops.DoAction(ClusterType, "rotateCertificates", &resource.Resource, input, resp)
-	return resp, err
-}
-
-func (c *ClusterClient) ActionRotateEncryptionKey(resource *Cluster) (*RotateEncryptionKeyOutput, error) {
-	resp := &RotateEncryptionKeyOutput{}
-	err := c.apiClient.Ops.DoAction(ClusterType, "rotateEncryptionKey", &resource.Resource, nil, resp)
-	return resp, err
-}
-
-func (c *ClusterClient) ActionSaveAsTemplate(resource *Cluster, input *SaveAsTemplateInput) (*SaveAsTemplateOutput, error) {
-	resp := &SaveAsTemplateOutput{}
-	err := c.apiClient.Ops.DoAction(ClusterType, "saveAsTemplate", &resource.Resource, input, resp)
 	return resp, err
 }

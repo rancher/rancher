@@ -193,6 +193,7 @@ type ClusterStatus struct {
 	Limits                     v1.ResourceList           `json:"limits,omitempty"`
 	Version                    *version.Info             `json:"version,omitempty"`
 	AppliedEnableNetworkPolicy bool                      `json:"appliedEnableNetworkPolicy" norman:"nocreate,noupdate,default=false"`
+	Capabilities               Capabilities              `json:"capabilities,omitempty"`
 	NodeVersion                int                       `json:"nodeVersion,omitempty"`
 	NodeCount                  int                       `json:"nodeCount,omitempty" norman:"nocreate,noupdate"`
 	LinuxWorkerCount           int                       `json:"linuxWorkerCount,omitempty" norman:"nocreate,noupdate"`
@@ -352,6 +353,25 @@ type ImportYamlOutput struct {
 	Message string `json:"message,omitempty"`
 }
 
+type Capabilities struct {
+	LoadBalancerCapabilities LoadBalancerCapabilities `json:"loadBalancerCapabilities,omitempty"`
+	IngressCapabilities      []IngressCapabilities    `json:"ingressCapabilities,omitempty"`
+	NodePoolScalingSupported bool                     `json:"nodePoolScalingSupported,omitempty"`
+	NodePortRange            string                   `json:"nodePortRange,omitempty"`
+	TaintSupport             *bool                    `json:"taintSupport,omitempty"`
+}
+
+type LoadBalancerCapabilities struct {
+	Enabled              *bool    `json:"enabled,omitempty"`
+	Provider             string   `json:"provider,omitempty"`
+	ProtocolsSupported   []string `json:"protocolsSupported,omitempty"`
+	HealthCheckSupported bool     `json:"healthCheckSupported,omitempty"`
+}
+
+type IngressCapabilities struct {
+	IngressProvider      string `json:"ingressProvider,omitempty"`
+	CustomDefaultBackend *bool  `json:"customDefaultBackend,omitempty"`
+}
 
 type RestoreFromEtcdBackupInput struct {
 	EtcdBackupName   string `json:"etcdBackupName,omitempty" norman:"type=reference[etcdBackup]"`

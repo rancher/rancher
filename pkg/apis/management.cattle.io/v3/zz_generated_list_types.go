@@ -213,40 +213,6 @@ func NewClusterRoleTemplateBinding(namespace, name string, obj ClusterRoleTempla
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ClusterTemplateList is a list of ClusterTemplate resources
-type ClusterTemplateList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []ClusterTemplate `json:"items"`
-}
-
-func NewClusterTemplate(namespace, name string, obj ClusterTemplate) *ClusterTemplate {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ClusterTemplate").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// ClusterTemplateRevisionList is a list of ClusterTemplateRevision resources
-type ClusterTemplateRevisionList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []ClusterTemplateRevision `json:"items"`
-}
-
-func NewClusterTemplateRevision(namespace, name string, obj ClusterTemplateRevision) *ClusterTemplateRevision {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("ClusterTemplateRevision").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
 // CognitoProviderList is a list of CognitoProvider resources
 type CognitoProviderList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -563,40 +529,6 @@ type NodeDriverList struct {
 
 func NewNodeDriver(namespace, name string, obj NodeDriver) *NodeDriver {
 	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("NodeDriver").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// NodePoolList is a list of NodePool resources
-type NodePoolList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []NodePool `json:"items"`
-}
-
-func NewNodePool(namespace, name string, obj NodePool) *NodePool {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("NodePool").ToAPIVersionAndKind()
-	obj.Name = name
-	obj.Namespace = namespace
-	return &obj
-}
-
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// NodeTemplateList is a list of NodeTemplate resources
-type NodeTemplateList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata"`
-
-	Items []NodeTemplate `json:"items"`
-}
-
-func NewNodeTemplate(namespace, name string, obj NodeTemplate) *NodeTemplate {
-	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("NodeTemplate").ToAPIVersionAndKind()
 	obj.Name = name
 	obj.Namespace = namespace
 	return &obj

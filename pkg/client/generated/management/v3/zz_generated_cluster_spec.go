@@ -10,10 +10,6 @@ const (
 	ClusterSpecFieldAzureKubernetesServiceConfig                         = "azureKubernetesServiceConfig"
 	ClusterSpecFieldClusterAgentDeploymentCustomization                  = "clusterAgentDeploymentCustomization"
 	ClusterSpecFieldClusterSecrets                                       = "clusterSecrets"
-	ClusterSpecFieldClusterTemplateAnswers                               = "answers"
-	ClusterSpecFieldClusterTemplateID                                    = "clusterTemplateId"
-	ClusterSpecFieldClusterTemplateQuestions                             = "questions"
-	ClusterSpecFieldClusterTemplateRevisionID                            = "clusterTemplateRevisionId"
 	ClusterSpecFieldDefaultClusterRoleForProjectMembers                  = "defaultClusterRoleForProjectMembers"
 	ClusterSpecFieldDefaultPodSecurityAdmissionConfigurationTemplateName = "defaultPodSecurityAdmissionConfigurationTemplateName"
 	ClusterSpecFieldDescription                                          = "description"
@@ -45,10 +41,6 @@ type ClusterSpec struct {
 	AzureKubernetesServiceConfig                         map[string]interface{}        `json:"azureKubernetesServiceConfig,omitempty" yaml:"azureKubernetesServiceConfig,omitempty"`
 	ClusterAgentDeploymentCustomization                  *AgentDeploymentCustomization `json:"clusterAgentDeploymentCustomization,omitempty" yaml:"clusterAgentDeploymentCustomization,omitempty"`
 	ClusterSecrets                                       *ClusterSecrets               `json:"clusterSecrets,omitempty" yaml:"clusterSecrets,omitempty"`
-	ClusterTemplateAnswers                               *Answer                       `json:"answers,omitempty" yaml:"answers,omitempty"`
-	ClusterTemplateID                                    string                        `json:"clusterTemplateId,omitempty" yaml:"clusterTemplateId,omitempty"`
-	ClusterTemplateQuestions                             []Question                    `json:"questions,omitempty" yaml:"questions,omitempty"`
-	ClusterTemplateRevisionID                            string                        `json:"clusterTemplateRevisionId,omitempty" yaml:"clusterTemplateRevisionId,omitempty"`
 	DefaultClusterRoleForProjectMembers                  string                        `json:"defaultClusterRoleForProjectMembers,omitempty" yaml:"defaultClusterRoleForProjectMembers,omitempty"`
 	DefaultPodSecurityAdmissionConfigurationTemplateName string                        `json:"defaultPodSecurityAdmissionConfigurationTemplateName,omitempty" yaml:"defaultPodSecurityAdmissionConfigurationTemplateName,omitempty"`
 	Description                                          string                        `json:"description,omitempty" yaml:"description,omitempty"`

@@ -10,7 +10,6 @@ type Config struct {
 	Version string `yaml:"version,omitempty"`
 
 	// Management Client
-	NodePools                                  map[string]managementClient.NodePool                                  `json:"nodePools,omitempty" yaml:"nodePools,omitempty"`
 	Nodes                                      map[string]managementClient.Node                                      `json:"nodes,omitempty" yaml:"nodes,omitempty"`
 	NodeDrivers                                map[string]managementClient.NodeDriver                                `json:"nodeDrivers,omitempty" yaml:"nodeDrivers,omitempty"`
 	PodSecurityAdmissionConfigurationTemplates map[string]managementClient.PodSecurityAdmissionConfigurationTemplate `json:"podSecurityAdmissionConfigurationTemplates,omitempty" yaml:"podSecurityAdmissionConfigurationTemplates,omitempty"`
