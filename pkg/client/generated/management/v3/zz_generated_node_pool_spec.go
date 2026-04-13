@@ -12,7 +12,6 @@ const (
 	NodePoolSpecFieldNodeAnnotations         = "nodeAnnotations"
 	NodePoolSpecFieldNodeLabels              = "nodeLabels"
 	NodePoolSpecFieldNodeTaints              = "nodeTaints"
-	NodePoolSpecFieldNodeTemplateID          = "nodeTemplateId"
 	NodePoolSpecFieldQuantity                = "quantity"
 	NodePoolSpecFieldWorker                  = "worker"
 )
@@ -28,7 +27,6 @@ type NodePoolSpec struct {
 	NodeAnnotations         map[string]string `json:"nodeAnnotations,omitempty" yaml:"nodeAnnotations,omitempty"`
 	NodeLabels              map[string]string `json:"nodeLabels,omitempty" yaml:"nodeLabels,omitempty"`
 	NodeTaints              []Taint           `json:"nodeTaints,omitempty" yaml:"nodeTaints,omitempty"`
-	NodeTemplateID          string            `json:"nodeTemplateId,omitempty" yaml:"nodeTemplateId,omitempty"`
 	Quantity                int64             `json:"quantity,omitempty" yaml:"quantity,omitempty"`
 	Worker                  bool              `json:"worker,omitempty" yaml:"worker,omitempty"`
 }

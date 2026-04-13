@@ -33,7 +33,6 @@ const (
 	NodeFieldNodeName             = "nodeName"
 	NodeFieldNodePoolID           = "nodePoolId"
 	NodeFieldNodeTaints           = "nodeTaints"
-	NodeFieldNodeTemplateID       = "nodeTemplateId"
 	NodeFieldOwnerReferences      = "ownerReferences"
 	NodeFieldPodCidr              = "podCidr"
 	NodeFieldPodCidrs             = "podCidrs"
@@ -84,7 +83,6 @@ type Node struct {
 	NodeName             string                    `json:"nodeName,omitempty" yaml:"nodeName,omitempty"`
 	NodePoolID           string                    `json:"nodePoolId,omitempty" yaml:"nodePoolId,omitempty"`
 	NodeTaints           []Taint                   `json:"nodeTaints,omitempty" yaml:"nodeTaints,omitempty"`
-	NodeTemplateID       string                    `json:"nodeTemplateId,omitempty" yaml:"nodeTemplateId,omitempty"`
 	OwnerReferences      []OwnerReference          `json:"ownerReferences,omitempty" yaml:"ownerReferences,omitempty"`
 	PodCidr              string                    `json:"podCidr,omitempty" yaml:"podCidr,omitempty"`
 	PodCidrs             []string                  `json:"podCidrs,omitempty" yaml:"podCidrs,omitempty"`
