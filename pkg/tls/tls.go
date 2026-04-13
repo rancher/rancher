@@ -416,18 +416,21 @@ func collectNodeIPs(nodeController corev1controllers.NodeController) ([]string, 
 func filterCN(cns ...string) []string {
 	serverURL := settings.ServerURL.Get()
 	if serverURL == "" {
-		return cns
+		serverURL = os.Getenv("CATTLE_SERVER")
+	}
+	if serverURL == "" {
+		return nil
 	}
 	u, err := url.Parse(serverURL)
 	if err != nil {
 		logrus.Errorf("invalid server-url, can not parse %s: %v", serverURL, err)
-		return cns
+		return nil
 	}
 	host := u.Hostname()
 	if host != "" {
 		return []string{host}
 	}
-	return cns
+	return nil
 }
 
 func fileExists(path string) bool {
