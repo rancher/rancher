@@ -257,6 +257,7 @@ RUN case "${ARCH}" in \
     sha256sum -c machine.sha256 && \
     rm machine.sha256 && \
     tar xvzf /tmp/rancher-machine.tar.gz -C /usr/bin && \
+    rm /tmp/rancher-machine.tar.gz && \
     chown root:root /usr/bin/rancher-machine && \
     curl -fsSL "https://github.com/linode/docker-machine-driver-linode/releases/download/${DOCKER_MACHINE_LINODE_VERSION}/docker-machine-driver-linode_linux-${ARCH}.zip" > /tmp/docker-machine-driver-linode.zip && \
     printf "%s  %s\n" "${DOCKER_MACHINE_LINODE_CHECKSUM}" "/tmp/docker-machine-driver-linode.zip" > driver-linode.sha256 && \
@@ -276,7 +277,7 @@ RUN case "${ARCH}" in \
     printf "%s  %s\n" "${DOCKER_MACHINE_HARVESTER_CHECKSUM}" "/tmp/docker-machine-driver-harvester.tar.gz" > machine-harvester.sha256 && \
     sha256sum -c machine-harvester.sha256 && \
     rm machine-harvester.sha256 && \
-    tar xvzf /tmp/rancher-machine.tar.gz -C /opt/drivers/management-state/bin && \
+    tar xvzf /tmp/docker-machine-driver-harvester.tar.gz -C /opt/drivers/management-state/bin && \
     ln -s /opt/drivers/management-state/bin/docker-machine-driver-harvester /usr/share/rancher/ui/assets/ && \
     rm /tmp/docker-machine-driver-harvester.tar.gz
 
