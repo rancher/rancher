@@ -4,10 +4,8 @@ import requests
 import time
 import urllib3
 import yaml
-import subprocess
 import json
 import rancher
-from sys import platform
 from .common import random_str, wait_for_template_to_be_created
 from kubernetes.client import ApiClient, Configuration, CustomObjectsApi, \
     ApiextensionsV1Api
@@ -65,6 +63,7 @@ class ProjectContext:
         self.client = client
 
 
+@pytest.fixture(scope="session")
 def admin_mc():
     """Returns a ManagementContext for the default global admin user."""
     r = requests.post(AUTH_URL, json={
@@ -80,7 +79,7 @@ def admin_mc():
     return ManagementContext(client, k8s_client, user=admin)
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def admin_cc(admin_mc):
     """Returns a ClusterContext for the local cluster for the default global
     admin user."""
@@ -109,7 +108,7 @@ def user_cluster_client(user, cluster):
                           token=user.client.token)
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def admin_pc_factory(admin_cc, remove_resource):
     """Returns a ProjectContext for a newly created project in the local
     cluster for the default global admin user. The project will be deleted
@@ -131,12 +130,12 @@ def admin_pc_factory(admin_cc, remove_resource):
     return _admin_pc
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def admin_pc(admin_pc_factory):
     return admin_pc_factory()
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def admin_system_pc(admin_mc):
     """Returns a ProjectContext for the system project in the local cluster
     for the default global admin user."""
@@ -150,13 +149,13 @@ def admin_system_pc(admin_mc):
                                                       token=admin.token))
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def user_mc(user_factory):
     """Returns a ManagementContext for a newly created standard user"""
     return user_factory()
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def user_factory(admin_mc, remove_resource):
     """Returns a factory for creating new users which a ManagementContext for
     a newly created standard user is returned.
@@ -188,13 +187,13 @@ def user_factory(admin_mc, remove_resource):
     return _create_user
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def admin_cc_client(admin_cc):
     """Returns the client from the default admin's ClusterContext"""
     return admin_cc.client
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def admin_pc_client(admin_pc):
     """Returns the client from the default admin's ProjectContext """
     return admin_pc.client
@@ -235,7 +234,6 @@ def set_server_version(client, version):
     wait_for(_wait_for_version)
 
 
-@pytest.fixture(scope="session")
 def wait_for(callback, timeout=DEFAULT_TIMEOUT, fail_handler=None):
     sleep_time = _sleep_time()
     start = time.time()
@@ -283,7 +281,7 @@ def wait_until_available(client, obj, timeout=DEFAULT_TIMEOUT):
             raise Exception(msg)
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def remove_resource(admin_mc, request):
     """Remove a resource after a test finishes even if the test fails."""
     client = admin_mc.client
@@ -303,7 +301,7 @@ def remove_resource(admin_mc, request):
     return _cleanup
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def remove_resouce_func(request):
     """Call the delete_func passing in the name of the resource. This is useful
     when dealing with the k8s clients for objects that don't exist in the
@@ -321,7 +319,7 @@ def remove_resouce_func(request):
     return _cleanup
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def raw_remove_custom_resource(admin_mc, request):
     """Remove a custom resource, using the k8s client, after a test finishes
     even if the test fails. This should only be used if remove_resource, which

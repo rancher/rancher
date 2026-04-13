@@ -131,9 +131,8 @@ require (
 	github.com/rancher/remotedialer v0.6.1-rc.1
 	github.com/rancher/remotedialer-proxy v0.7.0-rc.5
 	github.com/rancher/shepherd v0.0.0-20260218212518-d89877f13cac
-	github.com/rancher/steve v0.8.19
+	github.com/rancher/steve v0.9.5
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260218133309-b0ff1f4c330d
-	github.com/rancher/wrangler v1.1.2
 	github.com/rancher/wrangler/v3 v3.5.0
 	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.9.4
@@ -142,9 +141,9 @@ require (
 	github.com/urfave/cli v1.22.16
 	github.com/vmware/govmomi v0.42.0
 	go.uber.org/mock v0.6.0
-	golang.org/x/crypto v0.48.0
-	golang.org/x/mod v0.33.0
-	golang.org/x/net v0.51.0
+	golang.org/x/crypto v0.49.0
+	golang.org/x/mod v0.34.0
+	golang.org/x/net v0.52.0
 	golang.org/x/oauth2 v0.35.0
 	golang.org/x/sync v0.20.0
 	golang.org/x/text v0.35.0

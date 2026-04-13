@@ -155,8 +155,6 @@ func clusterTypes(schemas *types.Schemas) *types.Schemas {
 		MustImport(&Version, v3.ImportYamlOutput{}).
 		MustImport(&Version, v3.ExportOutput{}).
 		MustImport(&Version, v3.RestoreFromEtcdBackupInput{}).
-		MustImport(&Version, v3.SaveAsTemplateInput{}).
-		MustImport(&Version, v3.SaveAsTemplateOutput{}).
 		AddMapperForType(&Version, v1.EnvVar{},
 			&m.Move{
 				From: "envVar",

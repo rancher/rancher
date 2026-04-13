@@ -11,7 +11,6 @@ import (
 )
 
 type Interface interface {
-	NodePoolsGetter
 	NodesGetter
 	NodeDriversGetter
 	PodSecurityAdmissionConfigurationTemplatesGetter
@@ -76,20 +75,6 @@ func NewFromControllerFactoryWithAgent(userAgent string, factory controller.Shar
 	return &Client{
 		controllerFactory: factory,
 		clientFactory:     client.NewSharedClientFactoryWithAgent(userAgent, factory.SharedCacheFactory().SharedClientFactory()),
-	}
-}
-
-type NodePoolsGetter interface {
-	NodePools(namespace string) NodePoolInterface
-}
-
-func (c *Client) NodePools(namespace string) NodePoolInterface {
-	sharedClient := c.clientFactory.ForResourceKind(NodePoolGroupVersionResource, NodePoolGroupVersionKind.Kind, true)
-	objectClient := objectclient.NewObjectClient(namespace, sharedClient, &NodePoolResource, NodePoolGroupVersionKind, nodePoolFactory{})
-	return &nodePoolClient{
-		ns:           namespace,
-		client:       c,
-		objectClient: objectClient,
 	}
 }
 

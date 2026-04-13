@@ -159,22 +159,7 @@ type ClusterSpec struct {
 	EKSConfig                           *eksv1.EKSClusterConfigSpec `json:"eksConfig,omitempty"`
 	GKEConfig                           *gkev1.GKEClusterConfigSpec `json:"gkeConfig,omitempty"`
 	AliConfig                           *aliv1.AliClusterConfigSpec `json:"aliConfig,omitempty"`
-	ClusterTemplateName                 string                      `json:"clusterTemplateName,omitempty" norman:"type=reference[clusterTemplate],nocreate,noupdate"`
-	ClusterTemplateRevisionName         string                      `json:"clusterTemplateRevisionName,omitempty" norman:"type=reference[clusterTemplateRevision]"`
-	ClusterTemplateAnswers              Answer                      `json:"answers,omitempty"`
-	ClusterTemplateQuestions            []Question                  `json:"questions,omitempty" norman:"nocreate,noupdate"`
 	FleetWorkspaceName                  string                      `json:"fleetWorkspaceName,omitempty"`
-}
-
-type Answer struct {
-	ProjectName     string            `json:"projectName,omitempty" norman:"type=reference[project]"`
-	ClusterName     string            `json:"clusterName,omitempty" norman:"type=reference[cluster]"`
-	Values          map[string]string `json:"values,omitempty"`
-	ValuesSetString map[string]string `json:"valuesSetString,omitempty"`
-}
-
-func (a *Answer) ObjClusterName() string {
-	return a.ClusterName
 }
 
 type ImportedConfig struct {
@@ -411,16 +396,6 @@ type LocalClusterAuthEndpoint struct {
 
 type CertExpiration struct {
 	ExpirationDate string `json:"expirationDate,omitempty"`
-}
-
-type SaveAsTemplateInput struct {
-	ClusterTemplateName         string `json:"clusterTemplateName,omitempty"`
-	ClusterTemplateRevisionName string `json:"clusterTemplateRevisionName,omitempty"`
-}
-
-type SaveAsTemplateOutput struct {
-	ClusterTemplateName         string `json:"clusterTemplateName,omitempty"`
-	ClusterTemplateRevisionName string `json:"clusterTemplateRevisionName,omitempty"`
 }
 
 type AKSStatus struct {

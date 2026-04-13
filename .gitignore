@@ -39,9 +39,4 @@ data.json
 informer_object_cache.db
 informer_object_cache.db-shm
 informer_object_cache.db-wal
-.opencode
-.docker
-.config
-.cache
-.local
-.tox
+management-state/git-repo/
