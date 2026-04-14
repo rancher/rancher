@@ -46,7 +46,6 @@ conditions:
     sourceid: 'k3s-image-release'
     spec:
       image: "rancher/k3s"
-      tag: '{{ source "k3s-image-release" }}'
 
   check-dockerfile-k3s-cattle-version:
     name: 'Check if ENV CATTLE_K3S_VERSION is set in Dockerfiles'
