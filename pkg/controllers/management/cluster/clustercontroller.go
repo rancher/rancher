@@ -42,6 +42,8 @@ type controller struct {
 	namespaces            v1.NamespaceInterface
 	coreV1                v1.Interface
 	capabilitiesSchema    *normantypes.Schema
+	cloudCredClient       v3.CloudCredentialInterface
+	cloudCredLister       v3.CloudCredentialLister
 }
 
 func Register(ctx context.Context, management *config.ManagementContext) {
@@ -52,9 +54,12 @@ func Register(ctx context.Context, management *config.ManagementContext) {
 		namespaces:            management.Core.Namespaces(""),
 		coreV1:                management.Core,
 		capabilitiesSchema:    management.Schemas.Schema(&managementschema.Version, client.CapabilitiesType).InternalSchema,
+		cloudCredClient:       management.Management.CloudCredentials(""),
+		cloudCredLister:       management.Management.CloudCredentials("").Controller().Lister(),
 	}
 
 	c.clusterClient.AddHandler(ctx, "clusterCreateUpdate", c.capsSync)
+	c.clusterClient.AddLifecycle(ctx, "clusterCredentialCleanup", &c)
 }
 
 func (c *controller) capsSync(key string, cluster *v3.Cluster) (runtime.Object, error) {
