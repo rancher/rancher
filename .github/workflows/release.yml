@@ -353,6 +353,6 @@ jobs:
         uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
         with:
           secrets: |
-            secrets/data/github/repo/${{ github.repository }}/slack/rancher-notify-release-bot/credentials webhookUrl | WEBHOOK_URL;
+            secret/data/github/repo/${{ github.repository }}/slack/rancher-notify-release-bot/credentials webhookUrl | WEBHOOK_URL;
       - name: notify
         uses: ./.github/actions/notify-release
