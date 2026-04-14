@@ -153,6 +153,7 @@ func EarlyRegister(ctx context.Context, clients *wrangler.Context, kubeconfigMan
 		h.capiMachinesCache = capiClients.CAPI.Machine().Cache()
 	})
 
+	// For every mgmt.Cluster reconciliation, trigger the corresponding prov.Cluster
 	relatedresource.Watch(ctx, "cluster-watch", h.clusterWatch,
 		clients.Provisioning.Cluster(), clients.Mgmt.Cluster())
 }
