@@ -1,5 +1,5 @@
-name: '{{ .k8s_k3s.manifest }}'
-pipelineid: '{{ .k8s_k3s.pipelineid }}'
+name: '{{ .k8s.manifest }}'
+pipelineid: '{{ .k8s.pipelineid }}'
 
 autodiscovery:
   scmid: 'default'
@@ -9,14 +9,16 @@ autodiscovery:
     golang:
       versionfilter:
         kind: semver
-        pattern: '{{ .k8s.deps }}'
+        pattern: patch
       only:
         - modules:
             '^k8s\.io\/.*': ''
       ignore:
         - modules:
-            '^k8s\.io\/kubernetes': ''
-            '^k8s\.io\/kube-openapi': ''
-            '^k8s\.io\/legacy-cloud-providers': ''
+            '^k8s\.io\/client-go': ''
+            '^k8s\.io\/gengo': ''
             '^k8s\.io\/helm': ''
+            '^k8s\.io\/legacy-cloud-providers': ''
+            '^k8s\.io\/kube-openapi': ''
+            '^k8s\.io\/klog.*': ''
             '^k8s\.io\/utils': ''
