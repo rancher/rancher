@@ -24,6 +24,14 @@ ARG RKE2_CHART_DEFAULT_BRANCH=main
 ARG CATTLE_KDM_BRANCH=dev-v2.14
 ARG VERSION=${VERSION}
 
+ARG TINI_VERSION
+ARG TINI_URL_amd64
+ARG TINI_URL_arm64
+ARG TINI_URL_s390x
+ARG TINI_HASH_amd64
+ARG TINI_HASH_arm64
+ARG TINI_HASH_s390x
+
 FROM --platform=$BUILDPLATFORM ${GODEP_APISERVER} AS godep-apiserver
 FROM --platform=$BUILDPLATFORM ${GODEP_LASSO} AS godep-lasso
 FROM --platform=$BUILDPLATFORM ${GODEP_NORMAN} AS godep-norman
@@ -109,12 +117,24 @@ RUN mkdir -p /var/lib/rancher-data/driver-metadata && \
 
 FROM builder AS tini
 ARG ARCH
-ENV TINI_VERSION=v0.18.0
-ENV TINI_URL_amd64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini \
-    TINI_URL_arm64=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-arm64 \
-    TINI_URL_s390x=https://github.com/krallin/tini/releases/download/${TINI_VERSION}/tini-s390x \
-    TINI_URL=TINI_URL_${ARCH}
-RUN curl -sLf ${!TINI_URL} > /usr/bin/tini && \
+ARG TINI_URL_amd64
+ARG TINI_URL_arm64
+ARG TINI_URL_s390x
+ARG TINI_HASH_amd64
+ARG TINI_HASH_arm64
+ARG TINI_HASH_s390x
+
+ENV TINI_URL_amd64=${TINI_URL_amd64} \
+    TINI_URL_arm64=${TINI_URL_arm64} \
+    TINI_URL_s390x=${TINI_URL_s390x} \
+    TINI_HASH_amd64=${TINI_HASH_amd64} \
+    TINI_HASH_arm64=${TINI_HASH_arm64} \
+    TINI_HASH_s390x=${TINI_HASH_s390x}
+
+RUN TINI_URL=TINI_URL_${ARCH} && \
+    TINI_HASH=TINI_HASH_${ARCH} && \
+    curl -sLf ${!TINI_URL} > /usr/bin/tini && \
+    echo "${!TINI_HASH}  /usr/bin/tini" | sha256sum -c - && \
     chmod +x /usr/bin/tini
 
 

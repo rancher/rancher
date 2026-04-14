@@ -38,6 +38,7 @@ BUILD_ARGS+=("--build-arg=CATTLE_FLEET_VERSION=${CATTLE_FLEET_VERSION}")
 BUILD_ARGS+=("--build-arg=CATTLE_HELM_VERSION=${CATTLE_HELM_VERSION}")
 BUILD_ARGS+=("--build-arg=RANCHER_TAG=${TAG}")
 BUILD_ARGS+=("--build-arg=RANCHER_REPO=${REPO}")
+BUILD_ARGS+=(${DEPS_BUILD_ARGS})
 if [ "$BINARY_DEBUG" = true ]; then
   # Remove -s (strip symbols)
   BUILD_ARGS+=("--build-arg=LINKFLAGS=-extldflags -static")
