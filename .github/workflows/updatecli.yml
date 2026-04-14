@@ -13,6 +13,8 @@ on:
         type: choice
         options:
           - 'all'
+          - 'k3s'
+          - 'k8s'
           - 'harvester-docker-machine'
           - 'wins-system-agent'
 

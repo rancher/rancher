@@ -15,7 +15,6 @@ import (
 	"time"
 
 	goidc "github.com/coreos/go-oidc/v3/oidc"
-	gmux "github.com/gorilla/mux"
 	apimgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers"
 	providermocks "github.com/rancher/rancher/pkg/auth/providers/mocks"
@@ -173,8 +172,7 @@ func (s *OIDCProviderSuite) SetupSuite() {
 	assert.NoError(s.T(), err)
 
 	// init OIDC provider
-	mux := gmux.NewRouter()
-	mux.UseEncodedPath()
+	mux := http.NewServeMux()
 	p, err := oprovider.NewProvider(s.ctx, s.wranglerContext.Mgmt.Token().Cache(), s.wranglerContext.Mgmt.Token(), s.wranglerContext.Mgmt.User().Cache(), s.wranglerContext.Mgmt.UserAttribute().Cache(), s.wranglerContext.Core.Secret().Cache(), s.wranglerContext.Core.Secret(), s.wranglerContext.Mgmt.OIDCClient().Cache(), s.wranglerContext.Mgmt.OIDCClient(), s.wranglerContext.Core.Namespace())
 	assert.NoError(s.T(), err)
 	p.RegisterOIDCProviderHandles(mux)
