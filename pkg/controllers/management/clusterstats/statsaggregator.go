@@ -352,8 +352,12 @@ func (s *StatsAggregator) machineChanged(key string, machine *v3.Node) (runtime.
 		return nil, nil
 	}
 
-	d := s.getMininumWaitTime(machine.Namespace)
-	s.Clusters.Controller().EnqueueAfter("", machine.Namespace, d)
+	if d := s.getMininumWaitTime(machine.Namespace); d > 0 {
+		s.Clusters.Controller().EnqueueAfter("", machine.Namespace, d)
+	} else {
+		// EnqueueAfter with a zero duration short-circuits to workqueue.Add, bypassing the rate-limiter
+		s.Clusters.Controller().Enqueue("", machine.Namespace)
+	}
 
 	return nil, nil
 }
