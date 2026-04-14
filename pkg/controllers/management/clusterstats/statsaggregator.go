@@ -63,6 +63,8 @@ func Register(ctx context.Context, management *config.ManagementContext, cluster
 	}
 
 	clustersClient.AddHandler(ctx, "cluster-stats", s.sync)
+	// This handler enqueues the corresponding mgmt.Cluster for every mgmt.Node reconciliation. Other handlers may also rely on this.
+	// Nonetheless, in order to prevent unnecessary reconciliation when a cluster has many nodes, we are throttling (and deduplicating) the trigger.
 	machinesClient.AddHandler(ctx, "cluster-stats", s.machineChanged)
 }
 
