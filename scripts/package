@@ -14,36 +14,31 @@ cp ../bin/rancher ../bin/agent ../bin/data.json ../bin/k3s-airgap-images.tar .
 # Make sure the used data.json is a release artifact
 cp ../bin/data.json ../bin/rancher-data.json
 
-if [ ${ARCH} == arm64 ]; then
+if [ "${ARCH}" == "arm64" ]; then
     ETCD_UNSUPPORTED_ARCH=arm64
 fi
-if [ ${ARCH} == s390x ]; then
+if [ "${ARCH}" == "s390x" ]; then
     ETCD_UNSUPPORTED_ARCH=s390x
 fi
 
-docker build \
-    --build-arg VERSION=${TAG} \
-    --build-arg ETCD_UNSUPPORTED_ARCH=${ETCD_UNSUPPORTED_ARCH} \
-    --build-arg ARCH=${ARCH} \
-    --build-arg IMAGE_REPO=${REPO} \
-    --build-arg CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH} \
-    --build-arg CATTLE_RANCHER_WEBHOOK_VERSION="${CATTLE_RANCHER_WEBHOOK_VERSION}" \
-    --build-arg CATTLE_REMOTEDIALER_PROXY_VERSION="${CATTLE_REMOTEDIALER_PROXY_VERSION}" \
-    --build-arg CATTLE_RANCHER_TURTLES_VERSION="${CATTLE_RANCHER_TURTLES_VERSION}" \
-    --build-arg CATTLE_CSP_ADAPTER_MIN_VERSION="${CATTLE_CSP_ADAPTER_MIN_VERSION}" \
-    --build-arg CATTLE_FLEET_VERSION="${CATTLE_FLEET_VERSION}" \
-    --target server \
-    -t ${IMAGE} .
+BUILD_ARGS=()
+BUILD_ARGS+=("--build-arg=VERSION=${TAG}")
+BUILD_ARGS+=("--build-arg=ETCD_UNSUPPORTED_ARCH=${ETCD_UNSUPPORTED_ARCH}")
+BUILD_ARGS+=("--build-arg=ARCH=${ARCH}")
+BUILD_ARGS+=("--build-arg=IMAGE_REPO=${REPO}")
+BUILD_ARGS+=("--build-arg=CHART_DEFAULT_BRANCH=${CHART_DEFAULT_BRANCH}")
+BUILD_ARGS+=("--build-arg=CATTLE_RANCHER_WEBHOOK_VERSION=${CATTLE_RANCHER_WEBHOOK_VERSION}")
+BUILD_ARGS+=("--build-arg=CATTLE_REMOTEDIALER_PROXY_VERSION=${CATTLE_REMOTEDIALER_PROXY_VERSION}")
+BUILD_ARGS+=("--build-arg=CATTLE_RANCHER_TURTLES_VERSION=${CATTLE_RANCHER_TURTLES_VERSION}")
+BUILD_ARGS+=("--build-arg=CATTLE_CSP_ADAPTER_MIN_VERSION=${CATTLE_CSP_ADAPTER_MIN_VERSION}")
+BUILD_ARGS+=("--build-arg=CATTLE_FLEET_VERSION=${CATTLE_FLEET_VERSION}")
 
-docker build \
-    --build-arg VERSION=${TAG} \
-    --build-arg ARCH=${ARCH} \
-    --build-arg RANCHER_TAG=${TAG} \
-    --build-arg CATTLE_RANCHER_WEBHOOK_VERSION="${CATTLE_RANCHER_WEBHOOK_VERSION}" \
-    --build-arg CATTLE_RANCHER_TURTLES_VERSION="${CATTLE_RANCHER_TURTLES_VERSION}" \
-    --build-arg RANCHER_REPO=${REPO} \
-    --target agent \
-    -t ${AGENT_IMAGE} .
+# Convert BUILD_ARGS to string for make
+TARGET_ARGS="${BUILD_ARGS[*]}"
+
+make target-server TARGET_ARGS="--tag ${IMAGE} ${TARGET_ARGS}"
+
+make target-agent TARGET_ARGS="--tag ${AGENT_IMAGE} ${TARGET_ARGS}"
 
 mkdir -p ../dist
 echo ${IMAGE} > ../dist/images

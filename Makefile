@@ -1,5 +1,39 @@
+include hack/make/deps.mk
+
+# Build defaults
+REPO ?= rancher
+TAG ?= dev
+ARCH ?= amd64
+OS ?= linux
+COMMIT ?= $(shell $(CURDIR)/scripts/version | grep 'COMMIT:' | cut -d' ' -f2)
+
+# Common build arguments
+COMMON_ARGS += --build-arg VERSION=$(TAG)
+COMMON_ARGS += --build-arg ARCH=$(ARCH)
+COMMON_ARGS += --build-arg IMAGE_REPO=$(REPO)
+COMMON_ARGS += --build-arg COMMIT=$(COMMIT)
+COMMON_ARGS += $(DEPS_BUILD_ARGS)
+
+# Platform
+PLATFORM ?= $(OS)/$(ARCH)
+
+# Build command
+BUILD := docker buildx build
+
+.PHONY: target-%
+target-%: ## Builds the specified target defined in the Dockerfile.
+	$(BUILD) \
+		--target=$* \
+		--platform=$(PLATFORM) \
+		$(COMMON_ARGS) \
+		$(TARGET_ARGS) \
+		--file ./package/Dockerfile .
+
 TARGETS := $(shell ls scripts)
 DEV_TARGETS := $(shell ls dev-scripts)
+
+include hack/make/deps.mk
+export DEPS_BUILD_ARGS
 
 .dapper:
 	@echo Downloading dapper
