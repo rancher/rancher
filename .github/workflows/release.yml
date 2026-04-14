@@ -313,7 +313,7 @@ jobs:
             fi
           done
 
-          gh release create "${TAG}" -R "${GITHUB_REPOSITORY}" --draft --notes-file /tmp/artifacts/rancher-components.txt  "${ALL_ARTIFACTS[@]}"
+          gh release create "${TAG}" -R "${GITHUB_REPOSITORY}" --draft --prerelease --title "${TAG}" --notes-file /tmp/artifacts/rancher-components.txt  "${ALL_ARTIFACTS[@]}"
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
   notify-release:
