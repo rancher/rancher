@@ -309,7 +309,7 @@ func (t *Authorizer) authorizeCluster(cluster *v3.Cluster, inCluster *cluster, r
 			cluster.Status.CACert != caCert ||
 			cluster.Status.ServiceAccountTokenSecret == "" ||
 			tokenChanged(currentSecret, token) {
-			secret, err := migrator.CreateOrUpdateServiceAccountTokenSecret("", token, cluster)
+			secret, err := migrator.CreateOrUpdateServiceAccountTokenSecret(cluster.Status.ServiceAccountTokenSecret, token, cluster)
 			if err != nil {
 				return cluster, true, err
 			}
