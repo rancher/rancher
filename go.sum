@@ -598,10 +598,10 @@ github.com/rancher/aks-operator v1.14.0-rc.2 h1:KhXvWn+ZuHlnHb1acCYtT1q0YlAZSX6K
 github.com/rancher/aks-operator v1.14.0-rc.2/go.mod h1:WqkM8U5n+w8fNTkYmq4rm7OGZRqGA2eTLnHQYjAmkoM=
 github.com/rancher/ali-operator v1.14.0-rc.1 h1:K/9sFAdo7QM8rD+ZpPM8YkwhLee4NHqvu5psNEdZArU=
 github.com/rancher/ali-operator v1.14.0-rc.1/go.mod h1:96zTYfGWn5kQ6bkVimm2NlsEUYB5FzAYHmn+hlqs4Hc=
-github.com/rancher/apiserver v0.9.1 h1:XIMgnj7CpCu9qGrkOgD8dWzWNdCesUz4z4SbYxjiu0w=
-github.com/rancher/apiserver v0.9.1/go.mod h1:O7bN3BYxi9kWZfqDrh/ULOss+6eZ1ZWwES/3ZbwitkA=
-github.com/rancher/channelserver v0.9.1-0.20260116181358-8dcd92dec745 h1:yZB0IGl9b9HZ5Uh2pch3YEGBqs7bGEGmIONzsNAiqmU=
-github.com/rancher/channelserver v0.9.1-0.20260116181358-8dcd92dec745/go.mod h1:+AqEVDYgWALI15YTnCAnkNuPJEDF25x+cHBKKXT78Vs=
+github.com/rancher/apiserver v0.9.2 h1:uX4+N9IKsHrf1R/p6NIAgrzvCmEMpXV/AXfBMNBenKQ=
+github.com/rancher/apiserver v0.9.2/go.mod h1:O7bN3BYxi9kWZfqDrh/ULOss+6eZ1ZWwES/3ZbwitkA=
+github.com/rancher/channelserver v0.10.0 h1:ratT05kZhO7r0TRg/lxYvsxd2XYqc0pKM+uS6LhCdBg=
+github.com/rancher/channelserver v0.10.0/go.mod h1:EtOthUa5LHBFnXm6M/190nSF0oxB1oVc+4pjj9GpFeg=
 github.com/rancher/dynamiclistener v0.7.4 h1:8R1kRGqSoHgMcAL8fcbLWSRyEWQFrxLI1KmFbcwT3KA=
 github.com/rancher/dynamiclistener v0.7.4/go.mod h1:0dO+pAb3FHrGIR6IaOjXqGXSRLMsecVdz64x7aRjBoU=
 github.com/rancher/eks-operator v1.14.0-rc.5 h1:aA7Kjxi3VfeveTR1sHpLN3YQiPb98f6r0+6yoDifvbc=
