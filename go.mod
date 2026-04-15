@@ -115,8 +115,8 @@ require (
 	github.com/prometheus/client_model v0.6.2
 	github.com/rancher/aks-operator v1.14.0-rc.2
 	github.com/rancher/ali-operator v1.14.0-rc.1
-	github.com/rancher/apiserver v0.9.1
-	github.com/rancher/channelserver v0.9.1-0.20260116181358-8dcd92dec745
+	github.com/rancher/apiserver v0.9.2
+	github.com/rancher/channelserver v0.10.0
 	github.com/rancher/dynamiclistener v0.7.4
 	github.com/rancher/eks-operator v1.14.0-rc.5
 	github.com/rancher/fleet/pkg/apis v0.15.0-beta.4
@@ -237,7 +237,6 @@ require (
 	github.com/google/go-github/v72 v72.0.0 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.12 // indirect
-	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.2 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
@@ -343,7 +342,6 @@ require (
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/uuid v1.6.0
 	github.com/googleapis/gax-go/v2 v2.17.0 // indirect
-	github.com/gorilla/handlers v1.5.2 // indirect
 	github.com/gosuri/uitable v0.0.4 // indirect
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
