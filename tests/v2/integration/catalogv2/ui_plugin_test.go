@@ -298,7 +298,7 @@ func (w *UIPluginTest) TestCompressedEndpoint() {
 }
 
 func (w *UIPluginTest) TestExponentialBackoff() {
-	ts, err := StartUIPluginServer()
+	ts, err := StartUIPluginServerWithBackoff()
 	if err != nil {
 		w.T().Fatal(err)
 	}
@@ -345,6 +345,39 @@ func (w *UIPluginTest) TestExponentialBackoff() {
 	w.Require().NoError(err)
 }
 
+func (w *UIPluginTest) TestUnreachableCompressedEndpoint() {
+	ts, err := StartUIPluginServer()
+	if err != nil {
+		w.T().Fatal(err)
+	}
+	url := ts.URL
+
+	uiplugin, err := w.catalogClient.UIPlugins(namespace.UIPluginNamespace).Get(context.TODO(), "homepage", metav1.GetOptions{})
+	if err != nil {
+		return
+	}
+
+	uiplugin.Spec.Plugin.CompressedEndpoint = "https://some-unreachable.location.tgz"
+	uiplugin.Spec.Plugin.Endpoint = url
+	_, err = w.catalogClient.UIPlugins(namespace.UIPluginNamespace).Update(context.TODO(), uiplugin, metav1.UpdateOptions{})
+	if err != nil {
+		return
+	}
+
+	t := 360
+	err = kwait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, time.Duration(t)*time.Second, false, func(ctx context.Context) (done bool, err error) {
+		uiplugin, err := w.catalogClient.UIPlugins(namespace.UIPluginNamespace).Get(ctx, "homepage", metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		if uiplugin.Status.Ready {
+			return true, nil
+		}
+		return false, nil
+	})
+	w.Require().NoError(err)
+}
+
 func StartUIPluginTgzServer() (*httptest.Server, error) {
 
 	customHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -365,6 +398,25 @@ func StartUIPluginTgzServer() (*httptest.Server, error) {
 }
 
 func StartUIPluginServer() (*httptest.Server, error) {
+
+	customHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.FileServer(http.Dir("../../../testdata/uiext")).ServeHTTP(w, r)
+	})
+
+	ts := httptest.NewUnstartedServer(customHandler)
+
+	ip := getOutboundIP()
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:0", ip.String()))
+	if err != nil {
+		return nil, err
+	}
+	ts.Listener = listener
+	ts.Start()
+
+	return ts, nil
+}
+
+func StartUIPluginServerWithBackoff() (*httptest.Server, error) {
 	reqCount := 1
 
 	customHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
