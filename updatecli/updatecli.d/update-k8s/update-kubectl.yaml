@@ -34,7 +34,7 @@ sources:
     kind: shell
     disablesourceinput: true
     spec:
-      command: 'curl -sL --output - https://dl.k8s.io/{{source "k8s-release" }}/bin/linux/amd64/kubectl | sha256sum'
+      command: 'wget -t 3 -T 300 https://dl.k8s.io/{{source "k8s-release" }}/bin/linux/amd64/kubectl && sha256sum kubectl && rm kubectl'
     transformers:
       - find: '\S+'
 
@@ -43,7 +43,7 @@ sources:
     kind: shell
     disablesourceinput: true
     spec:
-      command: 'curl -sL --output - https://dl.k8s.io/{{source "k8s-release" }}/bin/linux/arm64/kubectl | sha256sum'
+      command: 'wget -t 3 -T 300 https://dl.k8s.io/{{source "k8s-release" }}/bin/linux/arm64/kubectl && sha256sum kubectl && rm kubectl'
     transformers:
       - find: '\S+'
 

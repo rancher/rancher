@@ -42,7 +42,7 @@ conditions:
     scmid: 'default'
     disablesourceinput: true
     spec:
-      command: 'go generate ./... ; git diff --exit-code'
+      command: 'go generate ./... && git diff --exit-code'
       environments:
         - name: HOME
         - name: PATH
@@ -59,7 +59,7 @@ targets:
     scmid: 'default'
     disablesourceinput: true
     spec:
-      command: 'go generate ./... ; git diff'
+      command: 'go generate ./... && git diff'
       environments:
         - name: HOME
         - name: PATH
