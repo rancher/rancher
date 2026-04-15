@@ -134,7 +134,7 @@ require (
 	github.com/rancher/shepherd v0.0.0-20260407221419-05978184aa1e
 	github.com/rancher/steve v0.9.1
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260218133309-b0ff1f4c330d
-	github.com/rancher/wrangler/v3 v3.5.0-rc.2
+	github.com/rancher/wrangler/v3 v3.6.0-rc.1
 	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.9.4
 	github.com/stretchr/testify v1.11.1
