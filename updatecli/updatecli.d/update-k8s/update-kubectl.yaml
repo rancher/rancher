@@ -29,6 +29,24 @@ sources:
         kind: semver
         pattern: '~{{ source "rancher-go-mod-k8s" }}'
 
+  get-sha256-kubectl-amd64:
+    name: 'Get the sha256sum of Kubectl for {{ source "k8s-release" }} for amd64'
+    kind: shell
+    disablesourceinput: true
+    spec:
+      command: 'wget -t 3 -T 300 https://dl.k8s.io/{{source "k8s-release" }}/bin/linux/amd64/kubectl && sha256sum kubectl && rm kubectl'
+    transformers:
+      - find: '\S+'
+
+  get-sha256-kubectl-arm64:
+    name: 'Get the sha256sum of Kubectl for {{ source "k8s-release" }} for arm64'
+    kind: shell
+    disablesourceinput: true
+    spec:
+      command: 'wget -t 3 -T 300 https://dl.k8s.io/{{source "k8s-release" }}/bin/linux/arm64/kubectl && sha256sum kubectl && rm kubectl'
+    transformers:
+      - find: '\S+'
+
 conditions:
   check-dockerfile-kubectl-version:
     name: 'Check if ENV|ARG KUBECTL_VERSION is set in Dockerfiles'
@@ -78,3 +96,25 @@ targets:
         - 'tests/validation/tests/v3_api/scripts/build.sh'
       matchpattern: 'KUBECTL_VERSION="\${KUBECTL_VERSION:-\S+}"'
       replacepattern: 'KUBECTL_VERSION="${KUBECTL_VERSION:-{{ source "k8s-release" }}}"'
+
+  update-kubectl-sha256-amd64:
+    name: 'Update the sha256sum of Kubectl for amd64 in Dockerfiles'
+    kind: file
+    scmid: 'default'
+    disablesourceinput: true
+    spec:
+      files:
+        - 'package/Dockerfile'
+      matchpattern: '(ENV|ARG)[\s\t]+KUBECTL_CHECKSUM_amd64[=\s]\S+'
+      replacepattern: '$1 KUBECTL_CHECKSUM_amd64={{ source "get-sha256-kubectl-amd64" }}'
+
+  update-kubectl-sha256-arm64:
+    name: 'Update the sha256sum of Kubectl for arm64 in Dockerfiles'
+    kind: file
+    scmid: 'default'
+    disablesourceinput: true
+    spec:
+      files:
+        - 'package/Dockerfile'
+      matchpattern: '(ENV|ARG)[\s\t]+KUBECTL_CHECKSUM_arm64[=\s]\S+'
+      replacepattern: '$1 KUBECTL_CHECKSUM_arm64={{ source "get-sha256-kubectl-arm64" }}'
