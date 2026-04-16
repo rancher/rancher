@@ -40,9 +40,9 @@ require (
 	github.com/rancher/eks-operator v1.14.1-rc.1
 	github.com/rancher/fleet/pkg/apis v0.15.0
 	github.com/rancher/gke-operator v1.14.1-rc.1
-	github.com/rancher/norman v0.8.5
+	github.com/rancher/norman v0.8.6
 	github.com/rancher/rke v1.8.0
-	github.com/rancher/wrangler/v3 v3.5.1-rc.1
+	github.com/rancher/wrangler/v3 v3.5.1
 	github.com/sirupsen/logrus v1.9.4
 	github.com/stretchr/testify v1.11.1
 	k8s.io/api v0.35.2
