@@ -70,8 +70,12 @@ done
 exit 1
 `
 
-	encryptionKeyRotationEndpointEnv = "CONTAINER_RUNTIME_ENDPOINT=unix:///var/run/k3s/containerd/containerd.sock"
-	encryptionKeyRotationAttemptEnv  = "ENCRYPTION_KEY_ROTATION_ATTEMPT"
+	encryptionKeyRotationEndpointEnv       = "CONTAINER_RUNTIME_ENDPOINT=unix:///var/run/k3s/containerd/containerd.sock"
+	encryptionKeyRotationGenerationEnvName = "ENCRYPTION_KEY_ROTATION_GENERATION"
+	encryptionKeyRotationAttemptEnvName    = "ENCRYPTION_KEY_ROTATION_ATTEMPT"
+	encryptionKeyRotationRetryCountEnv     = "ENCRYPTION_KEY_ROTATION_RETRY_COUNT"
+
+	encryptionKeyRotationMaxRotateKeysRetries = 3
 )
 
 var encryptionKeyRotationMinimumVersion = semver.Version{Major: 1, Minor: 30}
@@ -522,8 +526,8 @@ func (p *Planner) encryptionKeyRotationRestartPlan(controlPlane *rkev1.RKEContro
 // encryptionKeyRotationRotateKeysReconcile runs the rotate-keys command on the elected leader and returns the most
 // recent periodic secrets-encrypt status observed on that node.
 func (p *Planner) encryptionKeyRotationRotateKeysReconcile(controlPlane *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, tokensSecret plan.Secret, joinServer string, leader *planEntry) (encryptionKeyRotationRuntimeStatus, rkev1.RKEControlPlaneStatus, error) {
-	attempt := encryptionKeyRotationRotateKeysAttempt(controlPlane, leader)
-	nodePlan, joinedServer, err := p.encryptionKeyRotationRotateKeysPlanWithAttempt(controlPlane, tokensSecret, joinServer, leader, attempt)
+	retryCount := encryptionKeyRotationRotateKeysRetryCount(controlPlane, leader)
+	nodePlan, joinedServer, err := p.encryptionKeyRotationRotateKeysPlanWithRetryCount(controlPlane, tokensSecret, joinServer, leader, retryCount)
 	if err != nil {
 		return encryptionKeyRotationRuntimeStatus{}, status, err
 	}
@@ -537,14 +541,17 @@ func (p *Planner) encryptionKeyRotationRotateKeysReconcile(controlPlane *rkev1.R
 			logrus.Warnf("[planner] rkecluster %s/%s: rotate-keys command on leader [%s] failed with a retryable precondition and current periodic status is stage [%s] with hashesMatch=%t; waiting to retry", controlPlane.Namespace, controlPlane.Spec.ClusterName, leader.Machine.Name, rotationStatus.Stage, rotationStatus.HashesMatch)
 			return encryptionKeyRotationRuntimeStatus{}, status, errWaitingf("waiting for leader [%s] to reach a stable secrets-encrypt state before retrying rotate-keys", leader.Machine.Name)
 		}
+		if !encryptionKeyRotationRotateKeysCanRetryAgain(retryCount) {
+			logrus.Warnf("[planner] rkecluster %s/%s: rotate-keys command on leader [%s] failed with a retryable precondition after retry count [%d]; surfacing the failure instead of retrying indefinitely", controlPlane.Namespace, controlPlane.Spec.ClusterName, leader.Machine.Name, retryCount)
+		} else {
+			retryCount = encryptionKeyRotationNextRotateKeysRetryCount(retryCount)
+			nodePlan, joinedServer, err = p.encryptionKeyRotationRotateKeysPlanWithRetryCount(controlPlane, tokensSecret, joinServer, leader, retryCount)
+			if err != nil {
+				return encryptionKeyRotationRuntimeStatus{}, status, err
+			}
 
-		attempt = encryptionKeyRotationNextRotateKeysAttempt(attempt)
-		nodePlan, joinedServer, err = p.encryptionKeyRotationRotateKeysPlanWithAttempt(controlPlane, tokensSecret, joinServer, leader, attempt)
-		if err != nil {
-			return encryptionKeyRotationRuntimeStatus{}, status, err
+			logrus.Warnf("[planner] rkecluster %s/%s: rotate-keys command on leader [%s] failed with a retryable precondition; reissuing rotate-keys once periodic status returned to stage [%s] with converged hashes", controlPlane.Namespace, controlPlane.Spec.ClusterName, leader.Machine.Name, rotationStatus.Stage)
 		}
-
-		logrus.Warnf("[planner] rkecluster %s/%s: rotate-keys command on leader [%s] failed with a retryable precondition; reissuing rotate-keys once periodic status returned to stage [%s] with converged hashes", controlPlane.Namespace, controlPlane.Spec.ClusterName, leader.Machine.Name, rotationStatus.Stage)
 	}
 
 	err = assignAndCheckPlan(p.store, fmt.Sprintf("encryption key rotation [%s] for machine [%s]", controlPlane.Status.RotateEncryptionKeysPhase, leader.Machine.Name), leader, nodePlan, joinedServer, 1, 1)
@@ -580,16 +587,16 @@ func (p *Planner) encryptionKeyRotationRotateKeysReconcile(controlPlane *rkev1.R
 // periodic status output for progress. That lets the planner resume cleanly after controller restarts without having to
 // preserve one-time status scraping state from an earlier reconcile.
 func (p *Planner) encryptionKeyRotationRotateKeysPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, joinServer string, leader *planEntry) (plan.NodePlan, string, error) {
-	return p.encryptionKeyRotationRotateKeysPlanWithAttempt(controlPlane, tokensSecret, joinServer, leader, encryptionKeyRotationRotateKeysAttempt(controlPlane, leader))
+	return p.encryptionKeyRotationRotateKeysPlanWithRetryCount(controlPlane, tokensSecret, joinServer, leader, encryptionKeyRotationRotateKeysRetryCount(controlPlane, leader))
 }
 
-func (p *Planner) encryptionKeyRotationRotateKeysPlanWithAttempt(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, joinServer string, leader *planEntry, attempt string) (plan.NodePlan, string, error) {
+func (p *Planner) encryptionKeyRotationRotateKeysPlanWithRetryCount(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, joinServer string, leader *planEntry, retryCount int) (plan.NodePlan, string, error) {
 	nodePlan, _, joinedServer, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, leader, joinServer, true)
 	if err != nil {
 		return plan.NodePlan{}, "", err
 	}
 
-	apply, err := encryptionKeyRotationSecretsEncryptInstructionWithAttempt(controlPlane, attempt)
+	apply, err := encryptionKeyRotationSecretsEncryptInstructionWithRetryCount(controlPlane, retryCount)
 	if err != nil {
 		return plan.NodePlan{}, "", err
 	}
@@ -682,67 +689,121 @@ func encryptionKeyRotationActiveGeneration(controlPlane *rkev1.RKEControlPlane) 
 	return controlPlane.Spec.RotateEncryptionKeys.Generation
 }
 
-func encryptionKeyRotationRotateKeysBaseAttempt(controlPlane *rkev1.RKEControlPlane) string {
-	return strconv.FormatInt(encryptionKeyRotationActiveGeneration(controlPlane), 10)
+func encryptionKeyRotationRotateKeysInstructionValue(controlPlane *rkev1.RKEControlPlane, retryCount int) string {
+	return fmt.Sprintf("%d-retry-%d", encryptionKeyRotationActiveGeneration(controlPlane), retryCount)
 }
 
-func encryptionKeyRotationRotateKeysAttempt(controlPlane *rkev1.RKEControlPlane, leader *planEntry) string {
-	baseAttempt := encryptionKeyRotationRotateKeysBaseAttempt(controlPlane)
-
-	if attempt, ok := encryptionKeyRotationRotateKeysAttemptFromPlan(leader); ok &&
-		(attempt == baseAttempt || strings.HasPrefix(attempt, baseAttempt+"-retry")) {
-		return attempt
+func encryptionKeyRotationRotateKeysRetryCount(controlPlane *rkev1.RKEControlPlane, leader *planEntry) int {
+	activeGeneration := encryptionKeyRotationActiveGeneration(controlPlane)
+	plannedGeneration, retryCount, ok := encryptionKeyRotationRotateKeysRetryCountFromPlan(leader)
+	if ok && plannedGeneration == activeGeneration {
+		return retryCount
 	}
 
-	return baseAttempt
+	return 0
 }
 
-func encryptionKeyRotationRotateKeysAttemptFromPlan(entry *planEntry) (string, bool) {
+func encryptionKeyRotationRotateKeysRetryCountFromPlan(entry *planEntry) (int64, int, bool) {
 	if entry == nil || entry.Plan == nil {
-		return "", false
+		return 0, 0, false
 	}
 
 	for _, instruction := range entry.Plan.Plan.Instructions {
 		if !strings.HasPrefix(instruction.Name, "idempotent-encryption-key-rotation/rotate-") {
 			continue
 		}
+
+		var generation int64
+		var retryCount int
+		var foundGeneration, foundRetryCount bool
+		var legacyAttempt string
+
 		for _, env := range instruction.Env {
-			if strings.HasPrefix(env, encryptionKeyRotationAttemptEnv+"=") {
-				return strings.TrimPrefix(env, encryptionKeyRotationAttemptEnv+"="), true
+			switch {
+			case strings.HasPrefix(env, encryptionKeyRotationGenerationEnvName+"="):
+				value := strings.TrimPrefix(env, encryptionKeyRotationGenerationEnvName+"=")
+				parsedGeneration, err := strconv.ParseInt(value, 10, 64)
+				if err != nil {
+					return 0, 0, false
+				}
+				generation = parsedGeneration
+				foundGeneration = true
+			case strings.HasPrefix(env, encryptionKeyRotationRetryCountEnv+"="):
+				value := strings.TrimPrefix(env, encryptionKeyRotationRetryCountEnv+"=")
+				parsedRetryCount, err := strconv.Atoi(value)
+				if err != nil || parsedRetryCount < 0 {
+					return 0, 0, false
+				}
+				retryCount = parsedRetryCount
+				foundRetryCount = true
+			case strings.HasPrefix(env, encryptionKeyRotationAttemptEnvName+"="):
+				legacyAttempt = strings.TrimPrefix(env, encryptionKeyRotationAttemptEnvName+"=")
+			}
+		}
+
+		if foundGeneration && foundRetryCount {
+			return generation, retryCount, true
+		}
+		if legacyAttempt != "" {
+			parsedGeneration, parsedRetryCount, ok := encryptionKeyRotationLegacyRetryCount(legacyAttempt)
+			if ok {
+				return parsedGeneration, parsedRetryCount, true
 			}
 		}
 	}
 
-	return "", false
+	return 0, 0, false
 }
 
-func encryptionKeyRotationNextRotateKeysAttempt(attempt string) string {
+func encryptionKeyRotationLegacyRetryCount(attempt string) (int64, int, bool) {
 	if attempt == "" {
-		return "retry"
+		return 0, 0, false
 	}
 
-	return attempt + "-retry"
+	parts := strings.Split(attempt, "-")
+	generation, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		return 0, 0, false
+	}
+
+	retryCount := 0
+	for _, part := range parts[1:] {
+		if part != "retry" {
+			return 0, 0, false
+		}
+		retryCount++
+	}
+
+	return generation, retryCount, true
 }
 
-func encryptionKeyRotationRotateKeysAttemptEnv(attempt string) string {
-	return fmt.Sprintf("%s=%s", encryptionKeyRotationAttemptEnv, attempt)
+func encryptionKeyRotationNextRotateKeysRetryCount(retryCount int) int {
+	return retryCount + 1
+}
+
+func encryptionKeyRotationRotateKeysCanRetryAgain(retryCount int) bool {
+	return retryCount < encryptionKeyRotationMaxRotateKeysRetries
+}
+
+func encryptionKeyRotationRotateKeysRetryCountEnv(retryCount int) string {
+	return fmt.Sprintf("%s=%d", encryptionKeyRotationRetryCountEnv, retryCount)
 }
 
 // encryptionKeyRotationSecretsEncryptInstruction generates a secrets-encrypt command to run on the leader node given
 // the current secrets-encrypt phase.
 func encryptionKeyRotationSecretsEncryptInstruction(controlPlane *rkev1.RKEControlPlane) (plan.OneTimeInstruction, error) {
-	return encryptionKeyRotationSecretsEncryptInstructionWithAttempt(controlPlane, encryptionKeyRotationRotateKeysBaseAttempt(controlPlane))
+	return encryptionKeyRotationSecretsEncryptInstructionWithRetryCount(controlPlane, 0)
 }
 
-func encryptionKeyRotationSecretsEncryptInstructionWithAttempt(controlPlane *rkev1.RKEControlPlane, attempt string) (plan.OneTimeInstruction, error) {
+func encryptionKeyRotationSecretsEncryptInstructionWithRetryCount(controlPlane *rkev1.RKEControlPlane, retryCount int) (plan.OneTimeInstruction, error) {
 	if controlPlane == nil {
 		return plan.OneTimeInstruction{}, fmt.Errorf("control plane cannot be nil")
 	}
 	if controlPlane.Status.RotateEncryptionKeysPhase != rkev1.RotateEncryptionKeysPhaseRotate {
 		return plan.OneTimeInstruction{}, fmt.Errorf("cannot determine desired secrets-encrypt command for phase: [%s]", controlPlane.Status.RotateEncryptionKeysPhase)
 	}
-	if attempt == "" {
-		attempt = encryptionKeyRotationRotateKeysBaseAttempt(controlPlane)
+	if retryCount < 0 {
+		retryCount = 0
 	}
 
 	// SaveOutput on one-time instructions only persists stdout. Wrap the runtime command in `sh -c ... 2>&1` so Rancher
@@ -750,13 +811,16 @@ func encryptionKeyRotationSecretsEncryptInstructionWithAttempt(controlPlane *rke
 	instruction := idempotentInstruction(
 		controlPlane,
 		strings.ToLower(fmt.Sprintf("encryption-key-rotation/%s", controlPlane.Status.RotateEncryptionKeysPhase)),
-		attempt,
+		encryptionKeyRotationRotateKeysInstructionValue(controlPlane, retryCount),
 		"/bin/sh",
 		[]string{
 			"-c",
 			fmt.Sprintf("%s secrets-encrypt %s 2>&1", capr.GetRuntimeCommand(controlPlane.Spec.KubernetesVersion), encryptionKeyRotationCommandRotateKeys),
 		},
-		[]string{encryptionKeyRotationRotateKeysAttemptEnv(attempt)},
+		[]string{
+			encryptionKeyRotationGenerationEnv(controlPlane),
+			encryptionKeyRotationRotateKeysRetryCountEnv(retryCount),
+		},
 	)
 	instruction.SaveOutput = true
 
@@ -774,6 +838,9 @@ func encryptionKeyRotationRotateKeysTimedOut(entry *planEntry, instructionName s
 	return encryptionKeyRotationCommandTimedOut(message, encryptionKeyRotationRotateKeysTimeoutEndpoint)
 }
 
+// encryptionKeyRotationRotateKeysFailedWithRetryablePrecondition intentionally matches the coarse CLI error shape that
+// K3s/RKE2 exposes to Rancher. The CLI does not include the underlying server-side cause, so the planner only retries
+// after separately observing a stable periodic secrets-encrypt status, and the retry count is strictly bounded.
 func encryptionKeyRotationRotateKeysFailedWithRetryablePrecondition(entry *planEntry, instructionName string) bool {
 	message, ok := encryptionKeyRotationRotateKeysOutput(entry, instructionName)
 	if !ok {
@@ -843,7 +910,7 @@ func encryptionKeyRotationStatusEnv(controlPlane *rkev1.RKEControlPlane) string 
 // encryptionKeyRotationGenerationEnv returns an environment variable in order to force followers to rerun their plans
 // on subsequent generations.
 func encryptionKeyRotationGenerationEnv(controlPlane *rkev1.RKEControlPlane) string {
-	return fmt.Sprintf("ENCRYPTION_KEY_ROTATION_GENERATION=%d", encryptionKeyRotationActiveGeneration(controlPlane))
+	return fmt.Sprintf("%s=%d", encryptionKeyRotationGenerationEnvName, encryptionKeyRotationActiveGeneration(controlPlane))
 }
 
 // encryptionKeyRotationSecretsEncryptStatusPeriodicInstruction generates a periodic instruction which will scrape the secrets-encrypt
