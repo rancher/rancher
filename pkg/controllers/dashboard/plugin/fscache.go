@@ -73,23 +73,25 @@ func (c FSCache) SyncWithControllersCache(p *v1.UIPlugin, forceUpdate bool) erro
 
 	hasCompressedEndpoint := plugin.CompressedEndpoint != ""
 	hasEndpoint := plugin.Endpoint != ""
-	var err error
+	var errs error
 
 	if hasCompressedEndpoint {
-		err = c.cacheCompressedEndpoint(&plugin)
-		if err != nil {
-			logrus.Errorf("failed to cache using the compressed endpoint. Error: %s", err)
+		cmpCacheErr := c.cacheCompressedEndpoint(&plugin)
+		if cmpCacheErr == nil {
+			return nil
+		}
+		logrus.Warnf("failed to cache using the compressed endpoint. Error: %s", cmpCacheErr)
+		errs = errors.Join(errs, cmpCacheErr)
+	}
+
+	if hasEndpoint {
+		if cacheErr := c.cacheEndpoint(&plugin); cacheErr != nil {
+			logrus.Warnf("failed to cache using the endpoint. Error: %s", cacheErr)
+			errs = errors.Join(errs, cacheErr)
 		}
 	}
 
-	if err != nil || !hasCompressedEndpoint {
-		if hasEndpoint {
-			return c.cacheEndpoint(&plugin)
-		}
-		return err
-	}
-
-	return nil
+	return errs
 }
 
 // SyncWithIndex syncs up entries in the filesystem cache with the index's entries.
