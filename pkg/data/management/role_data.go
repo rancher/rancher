@@ -8,6 +8,7 @@ import (
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
 	"github.com/rancher/rancher/pkg/auth/providers/local/pbkdf2"
 	"github.com/rancher/rancher/pkg/features"
+	"github.com/rancher/rancher/pkg/rbac"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/wrangler"
@@ -379,6 +380,10 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		return "", fmt.Errorf("problem reconciling role templates: %w", err)
 	}
 
+	if err := ensureHelmProvisioningReaderRole(wrangler); err != nil {
+		return "", fmt.Errorf("problem bootstrapping helm provisioning reader role: %w", err)
+	}
+
 	adminName, err := BootstrapAdmin(wrangler)
 	if err != nil {
 		return "", err
@@ -632,4 +637,30 @@ func bootstrapDefaultRoles(management *config.ManagementContext) error {
 	}
 
 	return nil
+}
+
+// ensureHelmProvisioningReaderRole creates or updates the cattle-helm-provisioning-reader
+// ClusterRole. This role is not bound to any user; it is bound ephemerally to the
+// impersonation service account for each helm install/upgrade operation pod so that
+// helm's pre-install conflict check can GET provisioning resources. See
+// pkg/catalogv2/helmop/operation.go.
+func ensureHelmProvisioningReaderRole(wrangler *wrangler.Context) error {
+	desired := &rbacv1.ClusterRole{
+		ObjectMeta: v1.ObjectMeta{
+			Name: rbac.HelmProvisioningReaderRole,
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{"provisioning.cattle.io"},
+				Resources: []string{"clusters"},
+				Verbs:     []string{"get"},
+			},
+			{
+				APIGroups: []string{"rke-machine-config.cattle.io"},
+				Resources: []string{"*"},
+				Verbs:     []string{"get"},
+			},
+		},
+	}
+	return rbac.CreateOrUpdateResource(desired, wrangler.RBAC.ClusterRole(), rbac.AreClusterRolesSame)
 }
