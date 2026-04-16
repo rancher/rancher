@@ -278,7 +278,7 @@ jobs:
         env:
           # renovate: datasource=github-release-attachments depName=cli/cli
           GH_CLI_VERSION: v2.89.0
-          # renovate: datasource=github-release-attachments depName=cli/cli digestVersion=v2.88.0
+          # renovate: datasource=github-release-attachments depName=cli/cli digestVersion=v2.89.0
           GH_CLI_SUM_amd64: d0422caade520530e76c1c558da47daebaa8e1203d6b7ff10ad7d6faba3490d8
         run: |
           mkdir -p /tmp/gh && \
