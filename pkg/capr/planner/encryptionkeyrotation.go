@@ -19,8 +19,6 @@ import (
 )
 
 const (
-	// start is the pre-rotation steady state reported by current K3s/RKE2 status output. Rancher does not branch on it
-	// directly, but keeping it named documents the expected intermediate state we wait through before convergence.
 	encryptionKeyRotationStageStart             = "start"
 	encryptionKeyRotationStageReencryptFinished = "reencrypt_finished"
 	encryptionKeyRotationHashesMatch            = "All hashes match"
@@ -120,8 +118,9 @@ func (p *Planner) resetEncryptionKeyRotateState(status rkev1.RKEControlPlaneStat
 	return status, errWaiting("refreshing encryption key rotation state")
 }
 
-// rotateEncryptionKeys first verifies that the control plane is in a state where the next step can be derived. If encryption key rotation is required, the corresponding phase and status fields will be set.
-// The function is expected to be called multiple times throughout encryption key rotation, and will set the next corresponding phase based on previous output.
+// rotateEncryptionKeys drives one requested generation through the simplified upstream flow:
+// elect one control-plane leader, run rotate-keys there, then restart the remaining server nodes
+// and wait for secrets-encrypt status to converge before marking the generation done.
 func (p *Planner) rotateEncryptionKeys(controlPlane *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, tokensSecret plan.Secret, clusterPlan *plan.Plan) (rkev1.RKEControlPlaneStatus, error) {
 	if controlPlane == nil || clusterPlan == nil {
 		return status, fmt.Errorf("cannot pass nil parameters to rotateEncryptionKeys")
@@ -174,8 +173,6 @@ func (p *Planner) rotateEncryptionKeys(controlPlane *rkev1.RKEControlPlane, stat
 		return p.setEncryptionKeyRotateState(status, controlPlane.Spec.RotateEncryptionKeys, rkev1.RotateEncryptionKeysPhaseRotate)
 	}
 
-	// The stored leader is part of Rancher's idempotency contract. rotate-keys must only be launched from one server,
-	// and once it has been chosen we keep reconciling through that server until the generation either finishes or fails.
 	leader, err := p.encryptionKeyRotationFindLeader(status, clusterPlan, initNode)
 	if err != nil {
 		status, err = p.encryptionKeyRotationFailed(status, err)
@@ -232,8 +229,6 @@ func (p *Planner) rotateEncryptionKeys(controlPlane *rkev1.RKEControlPlane, stat
 	return p.encryptionKeyRotationHandleFailure(controlPlane, status, err)
 }
 
-// encryptionKeyRotationSupported returns a boolean indicating whether encryption key rotation is supported for the control plane version,
-// and an error if one was encountered.
 func encryptionKeyRotationSupported(controlPlane *rkev1.RKEControlPlane) (bool, error) {
 	if controlPlane == nil {
 		return false, fmt.Errorf("unable to determine encryption key rotation support for nil control plane")
@@ -243,10 +238,6 @@ func encryptionKeyRotationSupported(controlPlane *rkev1.RKEControlPlane) (bool, 
 	if err != nil {
 		return false, fmt.Errorf("unable to parse kubernetes version for encryption key rotation: %s", controlPlane.Spec.KubernetesVersion)
 	}
-	// Older Rancher releases relied on the KDM encryption-key-rotation feature gate because the legacy orchestration
-	// could not be enabled retroactively for all historical versions without risking unrecoverable clusters. Rancher
-	// v2.15 only supports downstream v1.30+ and only uses the newer rotate-keys flow, so the Kubernetes version itself
-	// is the compatibility boundary for this planner path.
 	if kubernetesVersion.LT(encryptionKeyRotationMinimumVersion) {
 		return false, nil
 	}
@@ -254,9 +245,6 @@ func encryptionKeyRotationSupported(controlPlane *rkev1.RKEControlPlane) (bool, 
 	return true, nil
 }
 
-// encryptionKeyRotationShouldSkip returns true when the planner should ignore the current spec/status combination:
-// either the control plane is not ready and rotation is not already in progress, or the requested generation already
-// finished and should not be re-run.
 func encryptionKeyRotationShouldSkip(controlPlane *rkev1.RKEControlPlane) bool {
 	if controlPlane == nil || controlPlane.Spec.RotateEncryptionKeys == nil {
 		return true
@@ -273,9 +261,6 @@ func encryptionKeyRotationShouldSkip(controlPlane *rkev1.RKEControlPlane) bool {
 		(phase == rkev1.RotateEncryptionKeysPhaseDone || phase == rkev1.RotateEncryptionKeysPhaseFailed)
 }
 
-// encryptionKeyRotationShouldStart collapses the phase/generation restart logic for the simplified rotate-keys flow.
-// It returns true when a new reconciliation should initialize the Rotate phase, and returns an error if the current
-// generation is stuck in an unsupported legacy phase.
 func encryptionKeyRotationShouldStart(controlPlane *rkev1.RKEControlPlane) (bool, error) {
 	if controlPlane == nil || controlPlane.Spec.RotateEncryptionKeys == nil {
 		return false, nil
@@ -288,8 +273,6 @@ func encryptionKeyRotationShouldStart(controlPlane *rkev1.RKEControlPlane) (bool
 			controlPlane.Status.RotateEncryptionKeysPhase == rkev1.RotateEncryptionKeysPhaseFailed ||
 			!encryptionKeyRotationPhaseIsKnown(controlPlane.Status.RotateEncryptionKeysPhase), nil
 	}
-	// Rancher v2.15 only understands the simplified rotate-keys flow. If we ever see a stale legacy phase for the
-	// generation currently being reconciled, fail it explicitly instead of trying to map it back into the new flow.
 	if encryptionKeyRotationPhaseIsKnown(controlPlane.Status.RotateEncryptionKeysPhase) {
 		return false, nil
 	}
@@ -309,10 +292,6 @@ func encryptionKeyRotationPhaseIsKnown(phase rkev1.RotateEncryptionKeysPhase) bo
 	}
 }
 
-// encryptionKeyRotationFindLeader returns the current encryption rotation leader if it is valid, otherwise, if the
-// phase is "rotate", it will re-elect a new leader. It will look for the init node, and if the init node is not valid
-// (etcd-only), it will elect the first suitable control plane node. If the phase is not in "rotate" and a re-election
-// of the leader is necessary, the phase will be set to failed as this is unexpected.
 func (p *Planner) encryptionKeyRotationFindLeader(status rkev1.RKEControlPlaneStatus, clusterPlan *plan.Plan, initNode *planEntry) (*planEntry, error) {
 	machineName := status.RotateEncryptionKeysLeader
 	if machine, ok := clusterPlan.Machines[machineName]; ok {
@@ -342,13 +321,10 @@ func (p *Planner) encryptionKeyRotationFindLeader(status rkev1.RKEControlPlaneSt
 	return leader, nil
 }
 
-// encryptionKeyRotationIsSuitableControlPlane ensures that a control plane node has not been deleted and has a valid
-// node associated with it.
 func encryptionKeyRotationIsSuitableControlPlane(entry *planEntry) bool {
 	return isControlPlane(entry) && isNotDeleting(entry) && entry.Machine.Status.NodeRef.IsDefined() && capr.Ready.IsTrue(entry.Machine)
 }
 
-// encryptionKeyRotationIsControlPlaneAndNotLeaderAndInit allows us to filter cluster plans to restart healthy follower nodes.
 func encryptionKeyRotationIsControlPlaneAndNotLeaderAndInit(controlPlane *rkev1.RKEControlPlane) roleFilter {
 	return func(entry *planEntry) bool {
 		return isControlPlaneAndNotInitNode(entry) &&
@@ -356,7 +332,6 @@ func encryptionKeyRotationIsControlPlaneAndNotLeaderAndInit(controlPlane *rkev1.
 	}
 }
 
-// encryptionKeyRotationIsEtcdAndNotControlPlaneAndNotLeaderAndInit allows us to filter cluster plans to restart healthy follower nodes.
 func encryptionKeyRotationIsEtcdAndNotControlPlaneAndNotLeaderAndInit(controlPlane *rkev1.RKEControlPlane) roleFilter {
 	return func(entry *planEntry) bool {
 		return isEtcd(entry) && !isControlPlane(entry) &&
@@ -365,9 +340,6 @@ func encryptionKeyRotationIsEtcdAndNotControlPlaneAndNotLeaderAndInit(controlPla
 	}
 }
 
-// encryptionKeyRotationRestartTargetsForCluster centralizes the restart topology for split-role clusters.
-// The etcd-only and control-plane restart slices are kept separate because only control-plane nodes can be used as
-// secrets-encrypt status sources during convergence, while etcd-only nodes still need to participate in the restart pass.
 func encryptionKeyRotationRestartTargetsForCluster(controlPlane *rkev1.RKEControlPlane, clusterPlan *plan.Plan, leader, initNode *planEntry) encryptionKeyRotationRestartTargets {
 	targets := encryptionKeyRotationRestartTargets{
 		controlPlane: []*planEntry{leader},
@@ -381,26 +353,18 @@ func encryptionKeyRotationRestartTargetsForCluster(controlPlane *rkev1.RKEContro
 		}
 	}
 
-	// Upstream documents restarting the server that ran rotate-keys before the remaining servers. Rancher follows that
-	// ordering after the init node when they are different, so split-role clusters still bring the designated init server
-	// back first and then restart the elected command leader before the rest of the high-availability servers.
 	targets.etcdOnly = append(targets.etcdOnly, collect(clusterPlan, encryptionKeyRotationIsEtcdAndNotControlPlaneAndNotLeaderAndInit(controlPlane))...)
 	targets.controlPlane = append(targets.controlPlane, collect(clusterPlan, encryptionKeyRotationIsControlPlaneAndNotLeaderAndInit(controlPlane))...)
 
 	return targets
 }
 
-// encryptionKeyRotationRestartNodes restarts the required server nodes and waits for control plane nodes to converge.
-// Etcd-only nodes are restarted first. Rancher does not use them as local secrets-encrypt status sources during
-// convergence because the local encrypt status handler depends on Runtime.Core, which is not initialized on
-// disable-apiserver servers.
-// Control plane nodes are then restarted in order, with each required to reach the reencrypt_finished stage and the
-// last one also required to report matching hashes.
+// encryptionKeyRotationRestartNodes restarts etcd-only nodes first and then control-plane nodes.
+// Only control-plane nodes are used for local secrets-encrypt status checks during convergence,
+// and the last control-plane node must also report matching hashes before the phase can finish.
 func (p *Planner) encryptionKeyRotationRestartNodes(controlPlane *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, tokensSecret plan.Secret, clusterPlan *plan.Plan, leader *planEntry, initNode *planEntry, joinServer string) (rkev1.RKEControlPlaneStatus, error) {
 	restartTargets := encryptionKeyRotationRestartTargetsForCluster(controlPlane, clusterPlan, leader, initNode)
 
-	// Restart etcd-only nodes first. These nodes do not produce usable local status output after restart,
-	// so they only participate in the restart portion of the flow.
 	for _, entry := range restartTargets.etcdOnly {
 		_, updatedStatus, err := p.encryptionKeyRotationRestartService(controlPlane, status, tokensSecret, joinServer, entry)
 		if err != nil {
@@ -409,7 +373,6 @@ func (p *Planner) encryptionKeyRotationRestartNodes(controlPlane *rkev1.RKEContr
 		status = updatedStatus
 	}
 
-	// Restart control plane nodes in order and verify secrets-encrypt status convergence.
 	for i, entry := range restartTargets.controlPlane {
 		rotationStatus, updatedStatus, err := p.encryptionKeyRotationRestartService(controlPlane, status, tokensSecret, joinServer, entry)
 		if err != nil {
@@ -429,10 +392,6 @@ func (p *Planner) encryptionKeyRotationRestartNodes(controlPlane *rkev1.RKEContr
 	return status, nil
 }
 
-// encryptionKeyRotationRestartService restarts the server unit on the downstream node, waits until secrets-encrypt
-// status can be successfully queried, and then returns the current runtime status from the periodic status output.
-// For etcd-only nodes (non control plane), the restart is performed but no runtime status is returned. The local
-// secrets-encrypt status endpoint requires Runtime.Core, which is not initialized on disable-apiserver servers.
 func (p *Planner) encryptionKeyRotationRestartService(controlPlane *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, tokensSecret plan.Secret, joinServer string, entry *planEntry) (encryptionKeyRotationRuntimeStatus, rkev1.RKEControlPlaneStatus, error) {
 	nodePlan, joinedServer, err := p.encryptionKeyRotationRestartPlan(controlPlane, tokensSecret, joinServer, entry)
 	if err != nil {
@@ -463,9 +422,6 @@ func (p *Planner) encryptionKeyRotationRestartService(controlPlane *rkev1.RKECon
 	return rotationStatus, status, nil
 }
 
-// encryptionKeyRotationRestartPlan creates a restart-only plan. During the high-availability convergence step Rancher no longer runs
-// additional secrets-encrypt subcommands on follower nodes; it only restarts the server unit and resumes observing the
-// periodic secrets-encrypt status that the system-agent reports back in the node plan.
 func (p *Planner) encryptionKeyRotationRestartPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, joinServer string, entry *planEntry) (plan.NodePlan, string, error) {
 	nodePlan, config, joinedServer, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, entry, joinServer, true)
 	if err != nil {
@@ -500,8 +456,6 @@ func (p *Planner) encryptionKeyRotationRestartPlan(controlPlane *rkev1.RKEContro
 		encryptionKeyRotationWaitForSystemctlStatusInstruction(controlPlane),
 	)
 
-	// Only control plane nodes get local status polling. Rancher relies on them for convergence because etcd-only
-	// servers cannot satisfy the local encrypt status endpoint after restart.
 	if isControlPlane(entry) {
 		nodePlan.Files = append(nodePlan.Files, plan.File{
 			Content: base64.StdEncoding.EncodeToString([]byte(encryptionKeyRotationWaitForSecretsEncryptStatusScript)),
@@ -528,8 +482,9 @@ func (p *Planner) encryptionKeyRotationRestartPlan(controlPlane *rkev1.RKEContro
 	return nodePlan, joinedServer, nil
 }
 
-// encryptionKeyRotationRotateKeysReconcile runs the rotate-keys command on the elected leader and returns the most
-// recent periodic secrets-encrypt status observed on that node.
+// encryptionKeyRotationRotateKeysReconcile runs rotate-keys on the elected leader and then trusts
+// periodic secrets-encrypt status as the source of progress. A CLI timeout is treated as ambiguous,
+// so Rancher keeps watching periodic status before deciding whether to wait, retry, or fail.
 func (p *Planner) encryptionKeyRotationRotateKeysReconcile(controlPlane *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, tokensSecret plan.Secret, joinServer string, leader *planEntry) (encryptionKeyRotationRuntimeStatus, rkev1.RKEControlPlaneStatus, error) {
 	retryCount := encryptionKeyRotationRotateKeysRetryCount(controlPlane, leader)
 	nodePlan, joinedServer, err := p.encryptionKeyRotationRotateKeysPlanWithRetryCount(controlPlane, tokensSecret, joinServer, leader, retryCount)
@@ -588,9 +543,6 @@ func (p *Planner) encryptionKeyRotationRotateKeysReconcile(controlPlane *rkev1.R
 	return rotationStatus, status, nil
 }
 
-// encryptionKeyRotationRotateKeysPlan keeps only the rotate-keys command as a one-time instruction and relies on
-// periodic status output for progress. That lets the planner resume cleanly after controller restarts without having to
-// preserve one-time status scraping state from an earlier reconcile.
 func (p *Planner) encryptionKeyRotationRotateKeysPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, joinServer string, leader *planEntry) (plan.NodePlan, string, error) {
 	return p.encryptionKeyRotationRotateKeysPlanWithRetryCount(controlPlane, tokensSecret, joinServer, leader, encryptionKeyRotationRotateKeysRetryCount(controlPlane, leader))
 }
@@ -620,8 +572,8 @@ func (p *Planner) encryptionKeyRotationRotateKeysPlanWithRetryCount(controlPlane
 	return nodePlan, joinedServer, nil
 }
 
-// encryptionKeyRotationSecretsEncryptStatusFromPeriodic will attempt to extract the current secrets-encrypt status from the
-// plan by parsing the periodic output.
+// encryptionKeyRotationSecretsEncryptStatusFromPeriodic reads the latest periodic status output from
+// system-agent and converts it into the small runtime state Rancher reconciles on.
 func encryptionKeyRotationSecretsEncryptStatusFromPeriodic(plan *planEntry) (encryptionKeyRotationRuntimeStatus, error) {
 	output, ok := plan.Plan.PeriodicOutput[encryptionKeyRotationSecretsEncryptStatusCommand]
 	if !ok {
@@ -646,8 +598,6 @@ func encryptionKeyRotationSecretsEncryptStatusFromPeriodic(plan *planEntry) (enc
 	}
 }
 
-// encryptionKeyRotationStatusFromOutput parses the parts of secrets-encrypt status that Rancher actually reconciles on:
-// the current rotation stage and whether the server hash set has converged.
 func encryptionKeyRotationStatusFromOutput(plan *planEntry, output string) (encryptionKeyRotationRuntimeStatus, error) {
 	var status encryptionKeyRotationRuntimeStatus
 
@@ -682,9 +632,6 @@ func encryptionKeyRotationStatusFromOutput(plan *planEntry, output string) (encr
 	return status, nil
 }
 
-// encryptionKeyRotationActiveGeneration returns the generation that should be embedded in node plans.
-// Once a rotation has started, the planner must stay pinned to status.RotateEncryptionKeys.Generation until
-// that generation either completes or fails, even if spec has already been bumped to request a later one.
 func encryptionKeyRotationActiveGeneration(controlPlane *rkev1.RKEControlPlane) int64 {
 	if controlPlane == nil || controlPlane.Spec.RotateEncryptionKeys == nil {
 		return 0
@@ -800,8 +747,6 @@ func encryptionKeyRotationRotateKeysRetryCountEnv(retryCount int) string {
 	return fmt.Sprintf("%s=%d", encryptionKeyRotationRetryCountEnv, retryCount)
 }
 
-// encryptionKeyRotationSecretsEncryptInstruction generates a secrets-encrypt command to run on the leader node given
-// the current secrets-encrypt phase.
 func encryptionKeyRotationSecretsEncryptInstruction(controlPlane *rkev1.RKEControlPlane) (plan.OneTimeInstruction, error) {
 	return encryptionKeyRotationSecretsEncryptInstructionWithRetryCount(controlPlane, 0)
 }
@@ -817,8 +762,6 @@ func encryptionKeyRotationSecretsEncryptInstructionWithRetryCount(controlPlane *
 		retryCount = 0
 	}
 
-	// SaveOutput on one-time instructions only persists stdout. Wrap the runtime command in `sh -c ... 2>&1` so Rancher
-	// can inspect timeout text from the K3s/RKE2 CLI when the client exits before the background rotation finishes.
 	instruction := idempotentInstruction(
 		controlPlane,
 		strings.ToLower(fmt.Sprintf("encryption-key-rotation/%s", controlPlane.Status.RotateEncryptionKeysPhase)),
@@ -838,8 +781,6 @@ func encryptionKeyRotationSecretsEncryptInstructionWithRetryCount(controlPlane *
 	return instruction, nil
 }
 
-// encryptionKeyRotationRotateKeysTimedOut reports whether the saved one-time instruction output matches the
-// expected timeout signature from the K3s or RKE2 secrets-encrypt client.
 func encryptionKeyRotationRotateKeysTimedOut(entry *planEntry, instructionName string) bool {
 	message, ok := encryptionKeyRotationRotateKeysOutput(entry, instructionName)
 	if !ok {
@@ -849,9 +790,6 @@ func encryptionKeyRotationRotateKeysTimedOut(entry *planEntry, instructionName s
 	return encryptionKeyRotationCommandTimedOut(message, encryptionKeyRotationRotateKeysTimeoutEndpoint)
 }
 
-// encryptionKeyRotationRotateKeysFailedWithRetryablePrecondition intentionally matches the coarse CLI error shape that
-// K3s/RKE2 exposes to Rancher. The CLI does not include the underlying server-side cause, so the planner only retries
-// after separately observing a stable periodic secrets-encrypt status, and the retry count is strictly bounded.
 func encryptionKeyRotationRotateKeysFailedWithRetryablePrecondition(entry *planEntry, instructionName string) bool {
 	message, ok := encryptionKeyRotationRotateKeysOutput(entry, instructionName)
 	if !ok {
@@ -869,8 +807,6 @@ func encryptionKeyRotationRotateKeysOutput(entry *planEntry, instructionName str
 
 	outputs := entry.Plan.Output
 	if entry.Plan.Failed {
-		// system-agent writes SaveOutput for failed one-time instructions to the failed-output secret key instead of
-		// applied-output, so Rancher has to inspect the corresponding FailedOutput map on failed plans.
 		outputs = entry.Plan.FailedOutput
 	}
 
@@ -910,16 +846,12 @@ func encryptionKeyRotationRotateKeysCanRetry(status encryptionKeyRotationRuntime
 	}
 }
 
-// encryptionKeyRotationStatusEnv returns an environment variable in order to force followers to rerun their plans
-// when the planner advances between the rotate-keys and restart phases. assignAndCheckPlan only reapplies when the
-// desired plan changes, so the planner uses phase/generation env vars to deliberately perturb otherwise identical
-// restart and status instructions across reconciliations.
+// encryptionKeyRotationStatusEnv forces restart and status instructions to rerun as the planner
+// moves through encryption key rotation phases.
 func encryptionKeyRotationStatusEnv(controlPlane *rkev1.RKEControlPlane) string {
 	return fmt.Sprintf("ENCRYPTION_KEY_ROTATION_STAGE=%s", controlPlane.Status.RotateEncryptionKeysPhase)
 }
 
-// encryptionKeyRotationGenerationEnv returns an environment variable in order to force followers to rerun their plans
-// on subsequent generations.
 func encryptionKeyRotationGenerationEnv(controlPlane *rkev1.RKEControlPlane) string {
 	return fmt.Sprintf("%s=%d", encryptionKeyRotationGenerationEnvName, encryptionKeyRotationActiveGeneration(controlPlane))
 }
@@ -986,10 +918,6 @@ func encryptionKeyRotationSecretsEncryptStatusPeriodicInstruction(controlPlane *
 	}
 }
 
-// encryptionKeyRotationWaitForSystemctlStatusInstruction is intended to run after a node is restart, and wait until the
-// node is online and able to provide systemctl status, ensuring that the server service is able to be restarted. If the
-// service never comes active, the plan advances anyway in order to restart the service. If restarting the service
-// fails, then the plan will fail.
 func encryptionKeyRotationWaitForSystemctlStatusInstruction(controlPlane *rkev1.RKEControlPlane) plan.OneTimeInstruction {
 	return plan.OneTimeInstruction{
 		CommonInstruction: planapi.CommonInstruction{
@@ -1008,9 +936,6 @@ func encryptionKeyRotationWaitForSystemctlStatusInstruction(controlPlane *rkev1.
 	}
 }
 
-// encryptionKeyRotationWaitForSecretsEncryptStatus is intended to run after a node is restart, and wait until the node
-// is online and able to provide secrets-encrypt status, ensuring that subsequent status commands from the system-agent
-// will be successful.
 func encryptionKeyRotationWaitForSecretsEncryptStatus(controlPlane *rkev1.RKEControlPlane) plan.OneTimeInstruction {
 	return plan.OneTimeInstruction{
 		CommonInstruction: planapi.CommonInstruction{
@@ -1029,9 +954,6 @@ func encryptionKeyRotationWaitForSecretsEncryptStatus(controlPlane *rkev1.RKECon
 	}
 }
 
-// encryptionKeyRotationHandleFailure makes sure the planner leaves the owning CAPI cluster unpaused after an
-// unrecoverable rotation failure. The phase transition to Failed is handled separately so Rancher can persist status
-// and surface the original reconciliation error.
 func (p *Planner) encryptionKeyRotationHandleFailure(controlPlane *rkev1.RKEControlPlane, status rkev1.RKEControlPlaneStatus, err error) (rkev1.RKEControlPlaneStatus, error) {
 	if err == nil || IsErrWaiting(err) || status.RotateEncryptionKeysPhase != rkev1.RotateEncryptionKeysPhaseFailed {
 		return status, err
@@ -1043,8 +965,6 @@ func (p *Planner) encryptionKeyRotationHandleFailure(controlPlane *rkev1.RKECont
 	return status, err
 }
 
-// encryptionKeyRotationFailed updates the various status objects on the control plane, allowing the cluster to
-// continue the reconciliation loop. Encryption key rotation will not be restarted again until requested.
 func (p *Planner) encryptionKeyRotationFailed(status rkev1.RKEControlPlaneStatus, err error) (rkev1.RKEControlPlaneStatus, error) {
 	status.RotateEncryptionKeysPhase = rkev1.RotateEncryptionKeysPhaseFailed
 	status.RotateEncryptionKeysLeader = ""
