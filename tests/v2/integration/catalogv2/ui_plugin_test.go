@@ -50,7 +50,6 @@ func (w *UIPluginTest) TearDownSuite() {
 	w.Require().NoError(w.uninstallApp(namespace.UIPluginNamespace, "homepage"))
 	w.Require().NoError(w.catalogClient.ClusterRepos().Delete(context.Background(), "extensions-examples", metav1.DeleteOptions{PropagationPolicy: &propagation}))
 	w.session.Cleanup()
-
 }
 
 func (w *UIPluginTest) SetupSuite() {
@@ -146,7 +145,7 @@ func (w *UIPluginTest) SetupSuite() {
 	}, "extensions-examples"))
 	w.Require().NoError(w.waitForChart(rv1.StatusDeployed, "homepage", 0))
 
-	//Waiting for controller cache to update
+	// Waiting for controller cache to update
 	time.Sleep(10 * time.Second)
 }
 
@@ -350,25 +349,28 @@ func (w *UIPluginTest) TestUnreachableCompressedEndpoint() {
 	if err != nil {
 		w.T().Fatal(err)
 	}
-	url := ts.URL
+	compressedEndpoint := "https://some-unreachable.location.tgz"
+	endpoint := ts.URL
 
 	uiplugin, err := w.catalogClient.UIPlugins(namespace.UIPluginNamespace).Get(context.TODO(), "homepage", metav1.GetOptions{})
-	if err != nil {
-		return
-	}
+	require.NoError(w.T(), err)
 
-	uiplugin.Spec.Plugin.CompressedEndpoint = "https://some-unreachable.location.tgz"
-	uiplugin.Spec.Plugin.Endpoint = url
+	uiplugin.Spec.Plugin.CompressedEndpoint = compressedEndpoint
+	uiplugin.Spec.Plugin.Endpoint = endpoint
 	_, err = w.catalogClient.UIPlugins(namespace.UIPluginNamespace).Update(context.TODO(), uiplugin, metav1.UpdateOptions{})
-	if err != nil {
-		return
-	}
+	require.NoError(w.T(), err)
 
 	t := 360
 	err = kwait.PollUntilContextTimeout(context.Background(), 500*time.Millisecond, time.Duration(t)*time.Second, false, func(ctx context.Context) (done bool, err error) {
 		uiplugin, err := w.catalogClient.UIPlugins(namespace.UIPluginNamespace).Get(ctx, "homepage", metav1.GetOptions{})
 		if err != nil {
 			return false, err
+		}
+		if uiplugin.Spec.Plugin.CompressedEndpoint != compressedEndpoint {
+			return false, nil
+		}
+		if uiplugin.Spec.Plugin.Endpoint != endpoint {
+			return false, nil
 		}
 		if uiplugin.Status.Ready {
 			return true, nil
@@ -379,7 +381,6 @@ func (w *UIPluginTest) TestUnreachableCompressedEndpoint() {
 }
 
 func StartUIPluginTgzServer() (*httptest.Server, error) {
-
 	customHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "../../../testdata/uiext/0.4.1.tgz")
 	})
@@ -398,7 +399,6 @@ func StartUIPluginTgzServer() (*httptest.Server, error) {
 }
 
 func StartUIPluginServer() (*httptest.Server, error) {
-
 	customHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.FileServer(http.Dir("../../../testdata/uiext")).ServeHTTP(w, r)
 	})
@@ -423,8 +423,9 @@ func StartUIPluginServerWithBackoff() (*httptest.Server, error) {
 		if reqCount <= 2 {
 			reqCount++
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		} else {
+			http.FileServer(http.Dir("../../../testdata/uiext")).ServeHTTP(w, r)
 		}
-		http.FileServer(http.Dir("../../../testdata/uiext")).ServeHTTP(w, r)
 	})
 
 	ts := httptest.NewUnstartedServer(customHandler)

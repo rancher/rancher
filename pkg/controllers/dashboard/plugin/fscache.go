@@ -365,7 +365,11 @@ func (c FSCache) cacheCompressedEndpoint(plugin *v1.UIPluginEntry) error {
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("failed to fetch file from URL [%s]. Status code: %d", plugin.CompressedEndpoint, resp.StatusCode)
 	}
-	p, _ := filepathsecure.SecureJoin(FSCacheRootDir, plugin.Name)
+	p, err := filepathsecure.SecureJoin(FSCacheRootDir, plugin.Name)
+	if err != nil {
+		return fmt.Errorf("failed to build cache directory path for plugin [%s]. Error: %w", plugin.Name, err)
+	}
+
 	if err := os.MkdirAll(p, os.ModePerm); err != nil {
 		return fmt.Errorf("failed to create cache directory with path [%s]. Error: %w", p, err)
 	}
@@ -406,7 +410,8 @@ func (c FSCache) cacheEndpoint(plugin *v1.UIPluginEntry) error {
 		}
 		if err := c.Save(data, path); err != nil {
 			logrus.Debugf("failed to cache plugin [Name: %s Version: %s] in filesystem [path: %s]", plugin.Name, plugin.Version, path)
+			return fmt.Errorf("failed to cache file [%s] at path [%s]. Error: %w", file, path, err)
 		}
 	}
-	return err
+	return nil
 }
