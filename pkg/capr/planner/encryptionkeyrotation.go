@@ -538,10 +538,6 @@ func (p *Planner) encryptionKeyRotationRotateKeysReconcile(controlPlane *rkev1.R
 	return rotationStatus, status, nil
 }
 
-func (p *Planner) encryptionKeyRotationRotateKeysPlan(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, joinServer string, leader *planEntry) (plan.NodePlan, string, error) {
-	return p.encryptionKeyRotationRotateKeysPlanWithRetryCount(controlPlane, tokensSecret, joinServer, leader, encryptionKeyRotationRotateKeysRetryCount(controlPlane, leader))
-}
-
 func (p *Planner) encryptionKeyRotationRotateKeysPlanWithRetryCount(controlPlane *rkev1.RKEControlPlane, tokensSecret plan.Secret, joinServer string, leader *planEntry, retryCount int) (plan.NodePlan, string, error) {
 	nodePlan, _, joinedServer, err := p.generatePlanWithConfigFiles(controlPlane, tokensSecret, leader, joinServer, true)
 	if err != nil {
@@ -734,10 +730,6 @@ func encryptionKeyRotationRotateKeysCanRetryAgain(retryCount int) bool {
 
 func encryptionKeyRotationRotateKeysRetryCountEnv(retryCount int) string {
 	return fmt.Sprintf("%s=%d", encryptionKeyRotationRetryCountEnv, retryCount)
-}
-
-func encryptionKeyRotationSecretsEncryptInstruction(controlPlane *rkev1.RKEControlPlane) (plan.OneTimeInstruction, error) {
-	return encryptionKeyRotationSecretsEncryptInstructionWithRetryCount(controlPlane, 0)
 }
 
 func encryptionKeyRotationSecretsEncryptInstructionWithRetryCount(controlPlane *rkev1.RKEControlPlane, retryCount int) (plan.OneTimeInstruction, error) {
