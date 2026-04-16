@@ -112,7 +112,7 @@ spec:
           value: {{ template "rancher.fullname" . }}
 {{- if .Values.features }}
         - name: CATTLE_FEATURES
-          value: "{{ .Values.features }}"
+          value: {{ include "rancher-features" . }}
 {{- end}}
 {{- if .Values.noDefaultAdmin }}
         - name: CATTLE_NO_DEFAULT_ADMIN
