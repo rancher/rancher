@@ -163,6 +163,64 @@ func TestKeycloakOIDCProvider_SearchPrincipals(t *testing.T) {
 	})
 }
 
+func TestKeyCloakOIDCProvider_TransformToAuthProvider(t *testing.T) {
+	tests := map[string]struct {
+		authConfig map[string]any
+		expected   map[string]any
+	}{
+		"Test with valid authConfig": {
+			authConfig: map[string]any{
+				"metadata":     map[string]any{"name": "keycloakoidc"},
+				"clientId":     "client123",
+				"rancherUrl":   "https://example.com/callback",
+				"scope":        "openid profile email",
+				"issuer":       "https://ranchertest.io/issuer",
+				"authEndpoint": "https://ranchertest.io/auth",
+			},
+			expected: map[string]any{
+				"id":                 "keycloakoidc",
+				"redirectUrl":        "https://ranchertest.io/auth?client_id=client123&response_type=code&redirect_uri=https://example.com/callback",
+				"scopes":             "openid profile email",
+				"logoutAllSupported": false,
+				"logoutAllEnabled":   false,
+				"logoutAllForced":    false,
+			},
+		},
+		"When configuration has acrValue": {
+			authConfig: map[string]any{
+				"metadata":     map[string]any{"name": "keycloakoidc"},
+				"clientId":     "client123",
+				"rancherUrl":   "https://example.com/callback",
+				"scope":        "openid profile email",
+				"issuer":       "https://ranchertest.io/issuer",
+				"authEndpoint": "https://ranchertest.io/auth",
+				"acrValue":     "testing",
+			},
+			expected: map[string]any{
+				"id":                 "keycloakoidc",
+				"redirectUrl":        "https://ranchertest.io/auth?client_id=client123&response_type=code&redirect_uri=https://example.com/callback",
+				"scopes":             "openid profile email",
+				"logoutAllSupported": false,
+				"logoutAllEnabled":   false,
+				"logoutAllForced":    false,
+			},
+		},
+	}
+
+	provider := &keyCloakOIDCProvider{
+		oidc.OpenIDCProvider{},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			result, err := provider.TransformToAuthProvider(test.authConfig)
+			assert.NoError(t, err)
+			assert.Equal(t, test.expected, result)
+		})
+	}
+}
+
 func testOIDCConfig(baseURL string, opts ...func(*v3.OIDCConfig)) *v3.OIDCConfig {
 	issuerURL := baseURL + "/realms/testing"
 	cfg := &v3.OIDCConfig{
