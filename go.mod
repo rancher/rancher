@@ -93,7 +93,7 @@ require (
 	github.com/go-ldap/ldap/v3 v3.4.1
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/golang/protobuf v1.5.4
-	github.com/google/gnostic-models v0.7.0
+	github.com/google/gnostic-models v0.7.1
 	github.com/google/go-containerregistry v0.19.0
 	github.com/google/go-github/v73 v73.0.0
 	github.com/gorilla/mux v1.8.1
@@ -134,7 +134,7 @@ require (
 	github.com/rancher/remotedialer-proxy v0.6.0
 	github.com/rancher/rke v1.8.0
 	github.com/rancher/shepherd v0.0.0-20260330171752-7c0b1b32fa89
-	github.com/rancher/steve v0.7.41
+	github.com/rancher/steve v0.7.42
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20250930163923-f2c9e60b1078
 	github.com/rancher/wrangler v1.1.2
 	github.com/rancher/wrangler/v3 v3.3.5
