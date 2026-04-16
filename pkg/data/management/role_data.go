@@ -60,6 +60,8 @@ func addRoles(wrangler *wrangler.Context, management *config.ManagementContext) 
 		addRule().apiGroups("ext.cattle.io").resources("groupmembershiprefreshrequests").verbs("create").
 		addRule().apiGroups("management.cattle.io").resources("users", "globalrolebindings").verbs("*").
 		addRule().apiGroups("management.cattle.io").resources("globalroles").verbs("get", "list", "watch")
+	rb.addRole("Cloud Credential Administrator", "cloud-credential-administrator").
+		addRule().apiGroups("ext.cattle.io").resources("cloudcredentials").verbs("*")
 	rb.addRole("Manage Roles", "roles-manage").
 		addRule().apiGroups("management.cattle.io").resources("roletemplates").verbs("delete", "deletecollection", "get", "list", "patch", "create", "update", "watch")
 	rb.addRole("Manage Authentication", "authn-manage").
@@ -419,6 +421,14 @@ func addUserRules(role *roleBuilder) *roleBuilder {
 		addRule().apiGroups("management.cattle.io").resources("rancherusernotifications").verbs("get", "list", "watch").
 		addRule().apiGroups("catalog.cattle.io").resources("clusterrepos").verbs("get", "list", "watch").
 		addRule().apiGroups("management.cattle.io").resources("podsecurityadmissionconfigurationtemplates").verbs("get", "list", "watch")
+
+	if features.CloudCredentialLockdown.Enabled() {
+		// permissions to be able to get/list credentials, but not create/update/delete them.
+		role.addRule().apiGroups("ext.cattle.io").resources("cloudcredentials").verbs("get", "list", "watch")
+	} else {
+		// otherwise explicitly grant limited CRUD permissions vs the full wildcard, to differentiate from the full admin role which has wildcard permissions on everything.
+		role.addRule().apiGroups("ext.cattle.io").resources("cloudcredentials").verbs("get", "list", "watch", "create", "delete", "update", "patch")
+	}
 
 	return role
 }
