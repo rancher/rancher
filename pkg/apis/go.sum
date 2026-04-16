@@ -88,12 +88,12 @@ github.com/rancher/gke-operator v1.14.1-rc.1 h1:rVnvCwfTXOXPYe8YTCVmx80Moi8fO1Fo
 github.com/rancher/gke-operator v1.14.1-rc.1/go.mod h1:QvyFKskw0JOtKsUjwKnejOm5r+UBop1b/WxKIT8OkZQ=
 github.com/rancher/lasso v0.2.7 h1:N56Pm8KJSk7gRVYILSGb35QBfjcDDeGFMfwUCivsbeg=
 github.com/rancher/lasso v0.2.7/go.mod h1:L3ol8PdO21KoMhNa3RWjpR3ZBnE70JCAod1nJuOvT1E=
-github.com/rancher/norman v0.8.5 h1:rdOoeelAlxZPFvIvRVH9hfREF+GKjYN+xn4+rAac39c=
-github.com/rancher/norman v0.8.5/go.mod h1:fosIYZceSnRHmW4UNzI8pV6HwaMjy5TqD7848/XMLkc=
+github.com/rancher/norman v0.8.6 h1:xM80D35KFN4Q5SU3pYe9YGhEPrQuGyrxKBDeB0AK/4U=
+github.com/rancher/norman v0.8.6/go.mod h1:Ldk07TkjMZlHBbcLvET3Idsr9IWePpLEbjALEFjC59M=
 github.com/rancher/rke v1.8.0 h1:87jeoOccnnNCq27YgWgMh4o0GVrrVKbw+zfo+cHMZlo=
 github.com/rancher/rke v1.8.0/go.mod h1:x9N1abruzDFMwTpqq2cnaDYpKCptlNoW8VraNWB6Pc4=
-github.com/rancher/wrangler/v3 v3.5.1-rc.1 h1:OWnBCu4KdYfh4icTSBKI2+3e1xmqMF+s2HVY+7jahX8=
-github.com/rancher/wrangler/v3 v3.5.1-rc.1/go.mod h1:G5moxB9PpU5MUXavc89NS6Mpfgr8Nfmf9DZ3BkGgeYM=
+github.com/rancher/wrangler/v3 v3.5.1 h1:o2iLDoqTTkwVenZ521YhcH/0N2CFktp8aXb0f96aYMU=
+github.com/rancher/wrangler/v3 v3.5.1/go.mod h1:G5moxB9PpU5MUXavc89NS6Mpfgr8Nfmf9DZ3BkGgeYM=
 github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=
 github.com/rogpeppe/go-internal v1.14.1/go.mod h1:MaRKkUm5W0goXpeCfT7UZI6fk/L7L7so1lCWt35ZSgc=
 github.com/sirupsen/logrus v1.9.4 h1:TsZE7l11zFCLZnZ+teH4Umoq5BhEIfIzfRDZ1Uzql2w=

@@ -117,9 +117,9 @@ require (
 	github.com/prometheus/client_model v0.6.2
 	github.com/rancher/aks-operator v1.14.1-rc.1
 	github.com/rancher/ali-operator v1.14.0-rc.1
-	github.com/rancher/apiserver v0.8.4
+	github.com/rancher/apiserver v0.8.5
 	github.com/rancher/channelserver v0.9.1-0.20260116181358-8dcd92dec745
-	github.com/rancher/dynamiclistener v0.8.1-rc.2
+	github.com/rancher/dynamiclistener v0.8.1
 	github.com/rancher/eks-operator v1.14.1-rc.1
 	github.com/rancher/fleet/pkg/apis v0.15.0
 	github.com/rancher/gke-operator v1.14.1-rc.1
@@ -128,16 +128,16 @@ require (
 	github.com/rancher/lasso v0.2.7
 	github.com/rancher/machine v0.15.0-rancher142
 	github.com/rancher/muchang v0.1.0
-	github.com/rancher/norman v0.8.5
+	github.com/rancher/norman v0.8.6
 	github.com/rancher/rancher/pkg/client v0.0.0
-	github.com/rancher/remotedialer v0.6.0
-	github.com/rancher/remotedialer-proxy v0.7.1
+	github.com/rancher/remotedialer v0.6.1
+	github.com/rancher/remotedialer-proxy v0.7.2-rc.2
 	github.com/rancher/rke v1.8.0
 	github.com/rancher/shepherd v0.0.0-20260401174036-5bef12e42baf
-	github.com/rancher/steve v0.8.20
+	github.com/rancher/steve v0.8.21
 	github.com/rancher/system-upgrade-controller/pkg/apis v0.0.0-20260218133309-b0ff1f4c330d
 	github.com/rancher/wrangler v1.1.2
-	github.com/rancher/wrangler/v3 v3.5.1-rc.1
+	github.com/rancher/wrangler/v3 v3.5.1
 	github.com/robfig/cron v1.2.0
 	github.com/sirupsen/logrus v1.9.4
 	github.com/stretchr/testify v1.11.1
