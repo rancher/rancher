@@ -39,12 +39,9 @@ var (
 	ClusterProxyConfigResourceName                        = "clusterproxyconfigs"
 	ClusterRegistrationTokenResourceName                  = "clusterregistrationtokens"
 	ClusterRoleTemplateBindingResourceName                = "clusterroletemplatebindings"
-	ClusterTemplateResourceName                           = "clustertemplates"
-	ClusterTemplateRevisionResourceName                   = "clustertemplaterevisions"
 	CognitoProviderResourceName                           = "cognitoproviders"
 	ComposeConfigResourceName                             = "composeconfigs"
 	DynamicSchemaResourceName                             = "dynamicschemas"
-	EtcdBackupResourceName                                = "etcdbackups"
 	FeatureResourceName                                   = "features"
 	FleetWorkspaceResourceName                            = "fleetworkspaces"
 	FreeIpaProviderResourceName                           = "freeipaproviders"
@@ -62,7 +59,6 @@ var (
 	NodeResourceName                                      = "nodes"
 	NodeDriverResourceName                                = "nodedrivers"
 	NodePoolResourceName                                  = "nodepools"
-	NodeTemplateResourceName                              = "nodetemplates"
 	OIDCClientResourceName                                = "oidcclients"
 	OIDCProviderResourceName                              = "oidcproviders"
 	OpenLdapProviderResourceName                          = "openldapproviders"
@@ -74,9 +70,6 @@ var (
 	ProjectRoleTemplateBindingResourceName                = "projectroletemplatebindings"
 	ProxyEndpointResourceName                             = "proxyendpoints"
 	RancherUserNotificationResourceName                   = "rancherusernotifications"
-	RkeAddonResourceName                                  = "rkeaddons"
-	RkeK8sServiceOptionResourceName                       = "rkek8sserviceoptions"
-	RkeK8sSystemImageResourceName                         = "rkek8ssystemimages"
 	RoleTemplateResourceName                              = "roletemplates"
 	SamlProviderResourceName                              = "samlproviders"
 	SamlTokenResourceName                                 = "samltokens"
@@ -129,18 +122,12 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ClusterRegistrationTokenList{},
 		&ClusterRoleTemplateBinding{},
 		&ClusterRoleTemplateBindingList{},
-		&ClusterTemplate{},
-		&ClusterTemplateList{},
-		&ClusterTemplateRevision{},
-		&ClusterTemplateRevisionList{},
 		&CognitoProvider{},
 		&CognitoProviderList{},
 		&ComposeConfig{},
 		&ComposeConfigList{},
 		&DynamicSchema{},
 		&DynamicSchemaList{},
-		&EtcdBackup{},
-		&EtcdBackupList{},
 		&Feature{},
 		&FeatureList{},
 		&FleetWorkspace{},
@@ -175,8 +162,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&NodeDriverList{},
 		&NodePool{},
 		&NodePoolList{},
-		&NodeTemplate{},
-		&NodeTemplateList{},
 		&OIDCClient{},
 		&OIDCClientList{},
 		&OIDCProvider{},
@@ -199,12 +184,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&ProxyEndpointList{},
 		&RancherUserNotification{},
 		&RancherUserNotificationList{},
-		&RkeAddon{},
-		&RkeAddonList{},
-		&RkeK8sServiceOption{},
-		&RkeK8sServiceOptionList{},
-		&RkeK8sSystemImage{},
-		&RkeK8sSystemImageList{},
 		&RoleTemplate{},
 		&RoleTemplateList{},
 		&SamlProvider{},

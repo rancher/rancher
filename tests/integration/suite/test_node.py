@@ -19,7 +19,6 @@ def test_node_fields(admin_mc):
         'limits': 'r',
         'publicEndpoints': 'r',
         'nodePoolId': 'r',
-        'nodePlan': 'r',
         'nodeName': 'r',
         'requested': 'r',
         'clusterId': 'cr',
@@ -28,7 +27,6 @@ def test_node_fields(admin_mc):
         'worker': 'cr',
         'requestedHostname': 'cr',
         'volumesAttached': 'r',
-        'nodeTemplateId': 'cr',
         'volumesInUse': 'r',
         'podCidr': 'r',
         'podCidrs': 'r',
@@ -36,7 +34,6 @@ def test_node_fields(admin_mc):
         'taints': 'ru',
         'unschedulable': 'r',
         'providerId': 'r',
-        'sshUser': 'r',
         'imported': 'cru',
         'dockerInfo': 'r',
         'scaledownTime': 'cru',
@@ -44,13 +41,10 @@ def test_node_fields(admin_mc):
         'features': 'r',
         'declaredFeatures': 'r',
     }
-
     for name in cclient.schema.types['node'].resourceFields.keys():
         if name.endswith("Config"):
             fields[name] = 'cr'
-
     fields['customConfig'] = 'cru'
-
     auth_check(cclient.schema, 'node', 'crud', fields)
 
 

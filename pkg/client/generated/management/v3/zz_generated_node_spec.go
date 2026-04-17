@@ -13,7 +13,6 @@ const (
 	NodeSpecFieldMetadataUpdate           = "metadataUpdate"
 	NodeSpecFieldNodeDrainInput           = "nodeDrainInput"
 	NodeSpecFieldNodePoolID               = "nodePoolId"
-	NodeSpecFieldNodeTemplateID           = "nodeTemplateId"
 	NodeSpecFieldPodCidr                  = "podCidr"
 	NodeSpecFieldPodCidrs                 = "podCidrs"
 	NodeSpecFieldProviderId               = "providerId"
@@ -37,7 +36,6 @@ type NodeSpec struct {
 	MetadataUpdate           *MetadataUpdate `json:"metadataUpdate,omitempty" yaml:"metadataUpdate,omitempty"`
 	NodeDrainInput           *NodeDrainInput `json:"nodeDrainInput,omitempty" yaml:"nodeDrainInput,omitempty"`
 	NodePoolID               string          `json:"nodePoolId,omitempty" yaml:"nodePoolId,omitempty"`
-	NodeTemplateID           string          `json:"nodeTemplateId,omitempty" yaml:"nodeTemplateId,omitempty"`
 	PodCidr                  string          `json:"podCidr,omitempty" yaml:"podCidr,omitempty"`
 	PodCidrs                 []string        `json:"podCidrs,omitempty" yaml:"podCidrs,omitempty"`
 	ProviderId               string          `json:"providerId,omitempty" yaml:"providerId,omitempty"`

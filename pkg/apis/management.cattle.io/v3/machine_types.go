@@ -5,55 +5,9 @@ import (
 
 	"github.com/rancher/norman/condition"
 	"github.com/rancher/norman/types"
-	rketypes "github.com/rancher/rke/types"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
-
-// +genclient
-// +kubebuilder:skipversion
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-type NodeTemplate struct {
-	types.Namespaced
-
-	metav1.TypeMeta `json:",inline"`
-	// Standard object’s metadata. More info:
-	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#metadata
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-	// Specification of the desired behavior of the the cluster. More info:
-	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
-	Spec NodeTemplateSpec `json:"spec"`
-	// Most recent observed status of the cluster. More info:
-	// https://github.com/kubernetes/community/blob/master/contributors/devel/api-conventions.md#spec-and-status
-	Status NodeTemplateStatus `json:"status"`
-}
-
-type NodeTemplateStatus struct {
-	Conditions []NodeTemplateCondition `json:"conditions"`
-}
-
-type NodeTemplateCondition struct {
-	// Type of cluster condition.
-	Type string `json:"type"`
-	// Status of the condition, one of True, False, Unknown.
-	Status v1.ConditionStatus `json:"status"`
-	// The last time this condition was updated.
-	LastUpdateTime string `json:"lastUpdateTime,omitempty"`
-	// Last time the condition transitioned from one status to another.
-	LastTransitionTime string `json:"lastTransitionTime,omitempty"`
-	// The reason for the condition's last transition.
-	Reason string `json:"reason,omitempty"`
-}
-
-type NodeTemplateSpec struct {
-	DisplayName         string     `json:"displayName"`
-	Description         string     `json:"description"`
-	Driver              string     `json:"driver" norman:"nocreate,noupdate"`
-	CloudCredentialName string     `json:"cloudCredentialName" norman:"type=reference[cloudCredential]"`
-	NodeTaints          []v1.Taint `json:"nodeTaints,omitempty"`
-	NodeCommonParams    `json:",inline"`
-}
 
 // +genclient
 // +kubebuilder:skipversion
@@ -89,19 +43,16 @@ type MapDelta struct {
 }
 
 type NodeStatus struct {
-	Conditions         []NodeCondition         `json:"conditions,omitempty"`
-	InternalNodeStatus v1.NodeStatus           `json:"internalNodeStatus,omitempty"`
-	NodeName           string                  `json:"nodeName,omitempty"`
-	Requested          v1.ResourceList         `json:"requested,omitempty"`
-	Limits             v1.ResourceList         `json:"limits,omitempty"`
-	NodeTemplateSpec   *NodeTemplateSpec       `json:"nodeTemplateSpec,omitempty"`
-	NodeConfig         *rketypes.RKEConfigNode `json:"rkeNode,omitempty"`
-	NodeAnnotations    map[string]string       `json:"nodeAnnotations,omitempty"`
-	NodeLabels         map[string]string       `json:"nodeLabels,omitempty"`
-	NodeTaints         []v1.Taint              `json:"nodeTaints,omitempty"`
-	DockerInfo         *DockerInfo             `json:"dockerInfo,omitempty"`
-	NodePlan           *NodePlan               `json:"nodePlan,omitempty"`
-	AppliedNodeVersion int                     `json:"appliedNodeVersion,omitempty"`
+	Conditions         []NodeCondition   `json:"conditions,omitempty"`
+	InternalNodeStatus v1.NodeStatus     `json:"internalNodeStatus,omitempty"`
+	NodeName           string            `json:"nodeName,omitempty"`
+	Requested          v1.ResourceList   `json:"requested,omitempty"`
+	Limits             v1.ResourceList   `json:"limits,omitempty"`
+	NodeAnnotations    map[string]string `json:"nodeAnnotations,omitempty"`
+	NodeLabels         map[string]string `json:"nodeLabels,omitempty"`
+	NodeTaints         []v1.Taint        `json:"nodeTaints,omitempty"`
+	DockerInfo         *DockerInfo       `json:"dockerInfo,omitempty"`
+	AppliedNodeVersion int               `json:"appliedNodeVersion,omitempty"`
 }
 
 type DockerInfo struct {
@@ -179,10 +130,9 @@ func (n *NodePool) ObjClusterName() string {
 }
 
 type NodePoolSpec struct {
-	Etcd             bool   `json:"etcd"`
-	ControlPlane     bool   `json:"controlPlane"`
-	Worker           bool   `json:"worker"`
-	NodeTemplateName string `json:"nodeTemplateName,omitempty" norman:"type=reference[nodeTemplate],required,notnullable"`
+	Etcd         bool `json:"etcd"`
+	ControlPlane bool `json:"controlPlane"`
+	Worker       bool `json:"worker"`
 
 	HostnamePrefix    string            `json:"hostnamePrefix" norman:"required,notnullable"`
 	Quantity          int               `json:"quantity" norman:"required,default=1"`
@@ -225,10 +175,9 @@ type CustomConfig struct {
 type NodeSpec struct {
 	// Common fields.  They aren't in a shared struct because the annotations are different
 
-	Etcd             bool   `json:"etcd" norman:"noupdate"`
-	ControlPlane     bool   `json:"controlPlane" norman:"noupdate"`
-	Worker           bool   `json:"worker" norman:"noupdate"`
-	NodeTemplateName string `json:"nodeTemplateName,omitempty" norman:"type=reference[nodeTemplate],noupdate"`
+	Etcd         bool `json:"etcd" norman:"noupdate"`
+	ControlPlane bool `json:"controlPlane" norman:"noupdate"`
+	Worker       bool `json:"worker" norman:"noupdate"`
 
 	NodePoolName             string          `json:"nodePoolName" norman:"type=reference[nodePool],nocreate,noupdate"`
 	CustomConfig             *CustomConfig   `json:"customConfig"`
@@ -240,16 +189,9 @@ type NodeSpec struct {
 	DesiredNodeTaints        []v1.Taint      `json:"desiredNodeTaints"`
 	UpdateTaintsFromAPI      *bool           `json:"updateTaintsFromAPI,omitempty"`
 	DesiredNodeUnschedulable string          `json:"desiredNodeUnschedulable,omitempty"`
-	NodeDrainInput           *NodeDrainInput `json:"nodeDrainInput,omitempty"`
 	MetadataUpdate           MetadataUpdate  `json:"metadataUpdate,omitempty"`
 	ScaledownTime            string          `json:"scaledownTime,omitempty"`
-}
-
-type NodePlan struct {
-	Plan    *rketypes.RKEConfigNodePlan `json:"plan,omitempty"`
-	Version int                         `json:"version,omitempty"`
-	// current default in rancher-agent is 2m (120s)
-	AgentCheckInterval int `json:"agentCheckInterval,omitempty" norman:"min=1,max=1800,default=120"`
+	NodeDrainInput           *NodeDrainInput `json:"nodeDrainInput,omitempty"`
 }
 
 type NodeCommonParams struct {
@@ -384,7 +326,21 @@ type PublicEndpoint struct {
 	AllNodes bool `json:"allNodes" norman:"nocreate,noupdate"`
 }
 
-type NodeDrainInput = rketypes.NodeDrainInput
+type NodeDrainInput struct {
+	// Drain node even if there are pods not managed by a ReplicationController, Job, or DaemonSet
+	// Drain will not proceed without Force set to true if there are such pods
+	Force bool `yaml:"force" json:"force,omitempty"`
+	// If there are DaemonSet-managed pods, drain will not proceed without IgnoreDaemonSets set to true
+	// (even when set to true, kubectl won't delete pods - so setting default to true)
+	IgnoreDaemonSets *bool `yaml:"ignore_daemonsets" json:"ignoreDaemonSets,omitempty" norman:"default=true"`
+	// Continue even if there are pods using emptyDir
+	DeleteLocalData bool `yaml:"delete_local_data" json:"deleteLocalData,omitempty"`
+	// Period of time in seconds given to each pod to terminate gracefully.
+	// If negative, the default value specified in the pod will be used
+	GracePeriod int `yaml:"grace_period" json:"gracePeriod,omitempty" norman:"default=-1"`
+	// Time to wait (in seconds) before giving up for one try
+	Timeout int `yaml:"timeout" json:"timeout" norman:"min=1,max=10800,default=120"`
+}
 
 // +genclient
 // +kubebuilder:skipversion
