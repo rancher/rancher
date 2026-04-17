@@ -20,6 +20,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const localKDMDataPath = "/var/lib/rancher-data/driver-metadata/data.json"
+
 var (
 	configs     map[string]*config.Config
 	configsInit sync.Once
@@ -72,6 +74,9 @@ func Refresh(ctx context.Context) error {
 type DynamicSource struct{}
 
 func (d *DynamicSource) URL() string {
+	if settings.KDMUseLocalData.Get() == "true" {
+		return localKDMDataPath
+	}
 	url, _ := GetURLAndInterval()
 	return url
 }
@@ -104,7 +109,7 @@ func GetReleaseConfigByRuntime(ctx context.Context, runtime string) *config.Conf
 	configsInit.Do(func() {
 		urls := []config.Source{
 			&DynamicSource{},
-			config.StringSource("/var/lib/rancher-data/driver-metadata/data.json"),
+			config.StringSource(localKDMDataPath),
 		}
 		configs = map[string]*config.Config{
 			"k3s":  config.NewConfigNoLoad(ctx, "k3s", getChannelServerArg(), "rancher", "", urls),
