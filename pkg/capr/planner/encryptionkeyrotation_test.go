@@ -19,15 +19,22 @@ import (
 )
 
 func Test_rotateEncryptionKeys_resetsStateWhenSpecCleared(t *testing.T) {
-	planner := newTestEncryptionKeyRotationPlanner()
+	mockPlanner := newMockPlanner(t, InfoFunctions{})
 	status := rkev1.RKEControlPlaneStatus{
 		RotateEncryptionKeys:       &rkev1.RotateEncryptionKeys{Generation: 1},
 		RotateEncryptionKeysPhase:  rkev1.RotateEncryptionKeysPhaseRotate,
 		RotateEncryptionKeysLeader: "server-1",
 	}
+	controlPlane := newOwnedEncryptionKeyRotationControlPlane(nil, status)
 
-	controlPlane := newTestEncryptionKeyRotationControlPlane(nil, status)
-	updatedStatus, err := planner.rotateEncryptionKeys(controlPlane, status, plan.Secret{}, &plan.Plan{})
+	mockPlanner.capiClusters.EXPECT().Get(controlPlane.Namespace, "capi-cluster").Return(pausedCluster(controlPlane.Namespace, true), nil)
+	mockPlanner.capiClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(cluster *capi.Cluster) (*capi.Cluster, error) {
+		assert.NotNil(t, cluster.Spec.Paused)
+		assert.False(t, *cluster.Spec.Paused)
+		return cluster, nil
+	})
+
+	updatedStatus, err := mockPlanner.planner.rotateEncryptionKeys(controlPlane, status, plan.Secret{}, &plan.Plan{})
 
 	assert.True(t, IsErrWaiting(err))
 	assert.Nil(t, updatedStatus.RotateEncryptionKeys)
