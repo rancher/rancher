@@ -67,6 +67,32 @@ func Test_rotateEncryptionKeys_noopWhenDoneForSameGeneration(t *testing.T) {
 	assert.Equal(t, status, updatedStatus)
 }
 
+func Test_encryptionKeyRotationShouldStart(t *testing.T) {
+	t.Run("restarts unknown phase for same generation", func(t *testing.T) {
+		controlPlane := newTestEncryptionKeyRotationControlPlane(&rkev1.RotateEncryptionKeys{Generation: 1}, rkev1.RKEControlPlaneStatus{
+			RotateEncryptionKeys:      &rkev1.RotateEncryptionKeys{Generation: 1},
+			RotateEncryptionKeysPhase: "legacy-phase",
+		})
+
+		shouldStart, err := encryptionKeyRotationShouldStart(controlPlane)
+
+		assert.NoError(t, err)
+		assert.True(t, shouldStart)
+	})
+
+	t.Run("does not restart known in-progress phase for same generation", func(t *testing.T) {
+		controlPlane := newTestEncryptionKeyRotationControlPlane(&rkev1.RotateEncryptionKeys{Generation: 1}, rkev1.RKEControlPlaneStatus{
+			RotateEncryptionKeys:      &rkev1.RotateEncryptionKeys{Generation: 1},
+			RotateEncryptionKeysPhase: rkev1.RotateEncryptionKeysPhaseRotate,
+		})
+
+		shouldStart, err := encryptionKeyRotationShouldStart(controlPlane)
+
+		assert.NoError(t, err)
+		assert.False(t, shouldStart)
+	})
+}
+
 func Test_encryptionKeyRotationFindLeader(t *testing.T) {
 	testCases := []struct {
 		name          string
@@ -283,10 +309,6 @@ func Test_encryptionKeyRotationRotateKeysPlan_pinsGenerationToActiveStatus(t *te
 }
 
 func Test_encryptionKeyRotationStatusFromOutput(t *testing.T) {
-	entry := &planEntry{
-		Machine: &capi.Machine{ObjectMeta: metav1.ObjectMeta{Name: "server-1"}},
-	}
-
 	testCases := []struct {
 		name       string
 		output     string
@@ -334,7 +356,7 @@ func Test_encryptionKeyRotationStatusFromOutput(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			status, err := encryptionKeyRotationStatusFromOutput(entry, testCase.output)
+			status, err := encryptionKeyRotationStatusFromOutput(testCase.output)
 			if testCase.expectWait {
 				assert.True(t, IsErrWaiting(err))
 				return
