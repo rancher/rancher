@@ -1,5 +1,5 @@
 /*
-Package helm implements ways of extracting information from helm2 and helm3 data and making a k8s releaseSpec.
+Package helm implements ways of extracting information from helm2 and helm4 data and making a k8s releaseSpec.
 It also implements a partition.Partition to handle the resources needed by the release.
 */
 package helm
@@ -15,31 +15,30 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
-
-	"helm.sh/helm/v3/pkg/release"
+	releasev1 "helm.sh/helm/v4/pkg/release/v1"
 )
 
-// isHelm3 checks if the value of the owner key of the received map is equal to helm.
-// Every helm3 release object has this particular label on it.
-func isHelm3(labels map[string]string) bool {
+// isHelm4 checks if the value of the owner key of the received map is equal to helm.
+// Every helm4 release object has this particular label on it.
+func isHelm4(labels map[string]string) bool {
 	return labels["owner"] == "helm"
 }
 
-// fromHelm3Data receives a helm3 release data string of an installed helm chart.
-// It then converts the string into Helm3 release struct and again to rancher
+// fromHelm4Data receives a helm4 release data string of an installed helm chart.
+// It then converts the string into Helm4 release struct and again to rancher
 // v1.ReleaseSpec struct to return it.
-func fromHelm3Data(data string, isNamespaced IsNamespaced) (*v1.ReleaseSpec, error) {
-	release, err := decodeHelm3(data)
+func fromHelm4Data(data string, isNamespaced IsNamespaced) (*v1.ReleaseSpec, error) {
+	release, err := decodeHelm4(data)
 	if err != nil {
 		return nil, err
 	}
 
-	return fromHelm3ReleaseToRelease(release, isNamespaced)
+	return fromHelm4ReleaseToRelease(release, isNamespaced)
 }
 
-// fromHelm3ReleaseToRelease receives a helm3 release struct.
-// Returns a pointer to a rancher v1.ReleaseSpec struct constructed from the helm3 release struct.
-func fromHelm3ReleaseToRelease(release *release.Release, isNamespaced IsNamespaced) (*v1.ReleaseSpec, error) {
+// fromHelm4ReleaseToRelease receives a helm4 release struct.
+// Returns a pointer to a rancher v1.ReleaseSpec struct constructed from the helm4 release struct.
+func fromHelm4ReleaseToRelease(release *releasev1.Release, isNamespaced IsNamespaced) (*v1.ReleaseSpec, error) {
 	var (
 		info  = &v1.Info{}
 		chart = &v1.Chart{}
@@ -53,13 +52,13 @@ func fromHelm3ReleaseToRelease(release *release.Release, isNamespaced IsNamespac
 			Notes:       release.Info.Notes,
 		}
 		if !release.Info.FirstDeployed.IsZero() {
-			info.FirstDeployed = &metav1.Time{Time: release.Info.FirstDeployed.Time}
+			info.FirstDeployed = &metav1.Time{Time: release.Info.FirstDeployed}
 		}
 		if !release.Info.LastDeployed.IsZero() {
-			info.LastDeployed = &metav1.Time{Time: release.Info.LastDeployed.Time}
+			info.LastDeployed = &metav1.Time{Time: release.Info.LastDeployed}
 		}
 		if !release.Info.Deleted.IsZero() {
-			info.Deleted = &metav1.Time{Time: release.Info.Deleted.Time}
+			info.Deleted = &metav1.Time{Time: release.Info.Deleted}
 		}
 	}
 
@@ -120,9 +119,9 @@ func fromHelm3ReleaseToRelease(release *release.Release, isNamespaced IsNamespac
 	return hr, err
 }
 
-// decodeHelm3 receives a helm3 release data string, decodes the string data using the standard base64 library
+// decodeHelm4 receives a helm4 release data string, decodes the string data using the standard base64 library
 // and unmarshals the data into release.Release struct to return it.
-func decodeHelm3(data string) (*release.Release, error) {
+func decodeHelm4(data string) (*releasev1.Release, error) {
 	b, err := base64.StdEncoding.DecodeString(data)
 	if err != nil {
 		return nil, err
@@ -148,7 +147,7 @@ func decodeHelm3(data string) (*release.Release, error) {
 		b = b2
 	}
 
-	var rls release.Release
+	var rls releasev1.Release
 	// unmarshal release object bytes
 	if err := json.Unmarshal(b, &rls); err != nil {
 		return nil, err

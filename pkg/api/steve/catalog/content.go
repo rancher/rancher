@@ -11,7 +11,7 @@ import (
 	"github.com/rancher/apiserver/pkg/types"
 	"github.com/rancher/rancher/pkg/catalogv2/content"
 	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
-	"helm.sh/helm/v3/pkg/repo"
+	"helm.sh/helm/v4/pkg/repo/v1"
 )
 
 // contentDownload implements the http handler interface.
