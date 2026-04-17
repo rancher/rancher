@@ -37,7 +37,7 @@ func AuthConfigs(management *config.ManagementContext) error {
 		return err
 	}
 
-	if err := addAuthConfig(azure.Name, client.AzureADConfigType, false, management); err != nil {
+	if err := addAuthConfigWithSLO(azure.Name, client.AzureADConfigType, false, management); err != nil {
 		return err
 	}
 

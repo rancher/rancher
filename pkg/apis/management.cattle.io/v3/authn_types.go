@@ -459,6 +459,18 @@ type AzureADConfig struct {
 	ApplicationSecret     string `json:"applicationSecret,omitempty" norman:"required,type=password"`
 	RancherURL            string `json:"rancherUrl,omitempty" norman:"required,notnullable"`
 	GroupMembershipFilter string `json:"groupMembershipFilter,omitempty"`
+
+	// LogoutEndpoint overrides the Azure AD end_session_endpoint used for SSO logout.
+	// If empty, defaults to {Endpoint}/{TenantID}/oauth2/v2.0/logout.
+	LogoutEndpoint string `json:"logoutEndpoint,omitempty"`
+
+	// LogoutAllEnabled enables SSO logout (RP-Initiated Logout) for this provider.
+	// Can be set only if AuthConfig.LogoutAllSupported is true.
+	LogoutAllEnabled bool `json:"logoutAllEnabled,omitempty"`
+
+	// LogoutAllForced, when set, makes SSO logout the only accepted logout path.
+	// Requires LogoutAllEnabled to be true.
+	LogoutAllForced bool `json:"logoutAllForced,omitempty"`
 }
 
 type AzureADConfigTestOutput struct {
