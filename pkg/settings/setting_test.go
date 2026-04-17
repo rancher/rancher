@@ -203,3 +203,66 @@ func TestGetRancherVersion(t *testing.T) {
 		assert.Equal(t, value, result)
 	}
 }
+
+func TestPrefixPrivateRegistry(t *testing.T) {
+	tests := []struct {
+		name       string
+		privateReg string
+		defaultReg string
+		image      string
+		expected   string
+	}{
+		{
+			name:       "explicit registry prefixes image",
+			privateReg: "my.registry.io",
+			defaultReg: "",
+			image:      "rancher/rancher:v2.10.0",
+			expected:   "my.registry.io/rancher/rancher:v2.10.0",
+		},
+		{
+			name:       "empty registry falls back to global setting",
+			privateReg: "",
+			defaultReg: "global.registry.io",
+			image:      "rancher/rancher:v2.10.0",
+			expected:   "global.registry.io/rancher/rancher:v2.10.0",
+		},
+		{
+			name:       "explicit registry takes precedence over global",
+			privateReg: "my.registry.io",
+			defaultReg: "global.registry.io",
+			image:      "rancher/rancher:v2.10.0",
+			expected:   "my.registry.io/rancher/rancher:v2.10.0",
+		},
+		{
+			name:       "both empty returns image unchanged",
+			privateReg: "",
+			defaultReg: "",
+			image:      "rancher/rancher:v2.10.0",
+			expected:   "rancher/rancher:v2.10.0",
+		},
+		{
+			name:       "empty image with registry",
+			privateReg: "my.registry.io",
+			defaultReg: "",
+			image:      "",
+			expected:   "my.registry.io/",
+		},
+		{
+			name:       "registry with trailing slash",
+			privateReg: "my.registry.io/",
+			defaultReg: "",
+			image:      "rancher/rancher:v2.10.0",
+			expected:   "my.registry.io/rancher/rancher:v2.10.0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// set global registry setting for this test case
+			SystemDefaultRegistry = NewSetting("system-default-registry", tt.defaultReg)
+
+			result := PrefixPrivateRegistry(tt.privateReg, tt.image)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}

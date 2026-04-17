@@ -182,7 +182,7 @@ func (h *handler) getArgsEnvAndStatus(infra *infraObject, args map[string]any, d
 		MachineName:         infra.meta.GetName(),
 		MachineNamespace:    infra.meta.GetNamespace(),
 		MachineGVK:          infra.obj.GetObjectKind().GroupVersionKind(),
-		ImageName:           settings.PrefixPrivateRegistry(settings.MachineProvisionImage.Get()),
+		ImageName:           settings.PrefixPrivateRegistry("", settings.MachineProvisionImage.Get()),
 		ImagePullPolicy:     settings.GetMachineProvisionImagePullPolicy(),
 		EnvSecret:           envSecret,
 		FilesSecret:         filesSecret,
