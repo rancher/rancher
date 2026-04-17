@@ -126,6 +126,11 @@ func (p *Planner) rotateEncryptionKeys(controlPlane *rkev1.RKEControlPlane, stat
 	}
 
 	if controlPlane.Spec.RotateEncryptionKeys == nil {
+		if status.RotateEncryptionKeys != nil || status.RotateEncryptionKeysPhase != "" || status.RotateEncryptionKeysLeader != "" {
+			if err := p.pauseCAPICluster(controlPlane, false); err != nil {
+				return status, errWaiting("unpausing CAPI cluster")
+			}
+		}
 		return p.resetEncryptionKeyRotateState(status)
 	}
 
@@ -589,15 +594,15 @@ func (p *Planner) encryptionKeyRotationRotateKeysPlanWithRetryCount(controlPlane
 
 // encryptionKeyRotationSecretsEncryptStatusFromPeriodic reads the latest periodic status output from
 // system-agent and converts it into the small runtime state Rancher reconciles on.
-func encryptionKeyRotationSecretsEncryptStatusFromPeriodic(plan *planEntry) (encryptionKeyRotationRuntimeStatus, error) {
-	output, ok := plan.Plan.PeriodicOutput[encryptionKeyRotationSecretsEncryptStatusCommand]
+func encryptionKeyRotationSecretsEncryptStatusFromPeriodic(entry *planEntry) (encryptionKeyRotationRuntimeStatus, error) {
+	output, ok := entry.Plan.PeriodicOutput[encryptionKeyRotationSecretsEncryptStatusCommand]
 	if !ok {
-		for _, periodicInstruction := range plan.Plan.Plan.PeriodicInstructions {
+		for _, periodicInstruction := range entry.Plan.Plan.PeriodicInstructions {
 			if periodicInstruction.Name == encryptionKeyRotationSecretsEncryptStatusCommand {
-				return encryptionKeyRotationRuntimeStatus{}, errWaitingf("could not extract current status from plan for [%s]: no output for status", plan.Machine.Name)
+				return encryptionKeyRotationRuntimeStatus{}, errWaitingf("could not extract current status from plan for [%s]: no output for status", entry.Machine.Name)
 			}
 		}
-		return encryptionKeyRotationRuntimeStatus{}, fmt.Errorf("could not extract current status from plan for [%s]: status command not present in plan", plan.Machine.Name)
+		return encryptionKeyRotationRuntimeStatus{}, fmt.Errorf("could not extract current status from plan for [%s]: status command not present in plan", entry.Machine.Name)
 	}
 
 	stdout := strings.TrimSpace(string(output.Stdout))
