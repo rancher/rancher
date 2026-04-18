@@ -28,6 +28,9 @@ jobs:
         run: mkdir -p /tmp/test-results
 
       - name: Download All XML Test Reports
+        id: xml_reports
+        # don't error the entire job if the artifact is not there
+        continue-on-error: true
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           run-id: ${{ github.event.workflow_run.id }}
@@ -38,6 +41,9 @@ jobs:
           name: "XML Results"
 
       - name: Download the Event File
+        id: event_file
+        continue-on-error: true
+        if: steps.xml_reports.outcome == 'success'
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           run-id: ${{ github.event.workflow_run.id }}
@@ -47,8 +53,8 @@ jobs:
           name: "Event File"
 
       - name: Publish Test Results
+        if: steps.xml_reports.outcome == 'success' && steps.event_file.outcome == 'success'
         uses: rancher/publish-unit-test-result-action/linux@29a85161a9d18bf8cbf186abc523927ce71221b0
-        if: (!cancelled())
         with:
           check_name: Provisioning Tests Results
           commit: ${{ github.event.workflow_run.head_sha }}
