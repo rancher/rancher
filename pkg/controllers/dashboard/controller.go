@@ -6,7 +6,6 @@ import (
 
 	"github.com/rancher/rancher/pkg/controllers/capr"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/apiservice"
-	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterindex"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterregistrationtoken"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/cspadaptercharts"
 	"github.com/rancher/rancher/pkg/controllers/dashboard/fleetcharts"
@@ -68,8 +67,6 @@ func Register(ctx context.Context, clients *wrangler.Context, embedded bool, reg
 
 	if features.ProvisioningV2.Enabled() {
 		kubeconfigManager := kubeconfig.New(clients)
-		clusterindex.Register(ctx, clients)
-
 		provisioningv2.EarlyRegister(ctx, clients, kubeconfigManager)
 		if features.RKE2.Enabled() {
 			if err := capr.EarlyRegister(ctx, clients); err != nil {

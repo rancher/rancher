@@ -41,7 +41,7 @@ type roleTemplateHandler struct {
 	rController       crbacv1.RoleController
 	rtController      mgmtcontroller.RoleTemplateController
 	projectCache      mgmtcontroller.ProjectCache
-	clusterController mgmtcontroller.ClusterController
+	clusterController mgmtcontroller.ClusterClient
 	clusterManager    *clustermanager.Manager
 }
 

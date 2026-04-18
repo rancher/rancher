@@ -9,7 +9,7 @@ import (
 
 	provv1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/capr"
-	"github.com/rancher/rancher/pkg/controllers/dashboard/clusterindex"
+	provcluster "github.com/rancher/rancher/pkg/controllers/provisioningv2/cluster"
 	provisioningcontrollers "github.com/rancher/rancher/pkg/generated/controllers/provisioning.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/wrangler"
 	corev1controllers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
@@ -51,7 +51,7 @@ func (h *handler) OnConfigMap(_ string, cm *corev1.ConfigMap) (*corev1.ConfigMap
 	if cm.Name != provisioningLogName || (!clusterRegexp.MatchString(cm.Namespace) && cm.Namespace != "local") {
 		return cm, nil
 	}
-	provCluster, err := h.clusterCache.GetByIndex(clusterindex.ClusterV1ByClusterV3Reference, cm.Namespace)
+	provCluster, err := h.clusterCache.GetByIndex(provcluster.ByCluster, cm.Namespace)
 	if err != nil && !apierrors.IsNotFound(err) {
 		return cm, err
 	}

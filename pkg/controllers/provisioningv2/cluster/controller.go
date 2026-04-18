@@ -23,8 +23,6 @@ import (
 	"github.com/rancher/rancher/pkg/provisioningv2/kubeconfig"
 	"github.com/rancher/rancher/pkg/settings"
 	"github.com/rancher/rancher/pkg/wrangler"
-
-	"github.com/rancher/wrangler/v3/pkg/apply"
 	"github.com/rancher/wrangler/v3/pkg/condition"
 	corecontrollers "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/rancher/wrangler/v3/pkg/generic"
@@ -77,7 +75,6 @@ type handler struct {
 	rkeControlPlanesCache rkecontrollers.RKEControlPlaneCache
 	secretCache           corecontrollers.SecretCache
 	kubeconfigManager     *kubeconfig.Manager
-	apply                 apply.Apply
 
 	capiClustersCache capicontrollers.ClusterCache
 	capiClusters      capicontrollers.ClusterClient
@@ -99,9 +96,6 @@ func handlerWithoutCAPI(clients *wrangler.Context, kubeconfigManager *kubeconfig
 		rkeControlPlanesCache: clients.RKE.RKEControlPlane().Cache(),
 		secretCache:           clients.Core.Secret().Cache(),
 		kubeconfigManager:     kubeconfigManager,
-		apply: clients.Apply.WithCacheTypes(
-			clients.Provisioning.Cluster(),
-			clients.Mgmt.Cluster()),
 	}
 }
 
@@ -153,6 +147,7 @@ func EarlyRegister(ctx context.Context, clients *wrangler.Context, kubeconfigMan
 		h.capiMachinesCache = capiClients.CAPI.Machine().Cache()
 	})
 
+	// For every mgmt.Cluster reconciliation, trigger the corresponding prov.Cluster
 	relatedresource.Watch(ctx, "cluster-watch", h.clusterWatch,
 		clients.Provisioning.Cluster(), clients.Mgmt.Cluster())
 }
@@ -178,9 +173,6 @@ func Register(
 		capiMachinesCache: clients.CAPI.Machine().Cache(),
 
 		kubeconfigManager: kubeconfigManager,
-		apply: clients.Apply.WithCacheTypes(
-			clients.Provisioning.Cluster(),
-			clients.Mgmt.Cluster()),
 	}
 
 	clients.Mgmt.Cluster().OnRemove(ctx, "mgmt-cluster-remove", h.OnMgmtClusterRemove)
