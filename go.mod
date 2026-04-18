@@ -153,7 +153,7 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.1
-	helm.sh/helm/v3 v3.20.0
+	helm.sh/helm/v3 v3.20.2
 	k8s.io/api v0.35.3
 	k8s.io/apiextensions-apiserver v0.35.3
 	k8s.io/apimachinery v0.35.3
