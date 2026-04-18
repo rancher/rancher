@@ -517,7 +517,7 @@ func TestCRTBHandlerGetDesiredRoleBindings(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			controllers := controllers{
-				crController: fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl),
+				crController:  fake.NewMockNonNamespacedControllerInterface[*rbacv1.ClusterRole, *rbacv1.ClusterRoleList](ctrl),
 				projectCache: fake.NewMockCacheInterface[*v3.Project](ctrl),
 			}
 			if tt.setupControllers != nil {
@@ -1209,3 +1209,169 @@ func TestCRTBHandlerHandleMigration(t *testing.T) {
 		})
 	}
 }
+
+func TestCRTBHandlerDeleteDuplicateCRTBs(t *testing.T) {
+	t.Parallel()
+
+	now := metav1.Now()
+	earlier := metav1.NewTime(now.Add(-time.Minute))
+	later := metav1.NewTime(now.Add(time.Minute))
+
+	baseCRTB := func(name string, ts metav1.Time) *v3.ClusterRoleTemplateBinding {
+		return &v3.ClusterRoleTemplateBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:              name,
+				Namespace:         "c-test",
+				CreationTimestamp: ts,
+			},
+			UserName:         "user1",
+			RoleTemplateName: "cluster-member",
+			ClusterName:      "c-test",
+		}
+	}
+
+	tests := []struct {
+		name           string
+		crtb           *v3.ClusterRoleTemplateBinding
+		cachedCRTBs    []*v3.ClusterRoleTemplateBinding
+		wantDeleted    []string // names of CRTBs expected to be deleted
+		wantIsDup      bool
+		wantErr        bool
+		deleteErr      error
+	}{
+		{
+			name: "no duplicates - single CRTB",
+			crtb: baseCRTB("crtb-1", now),
+			cachedCRTBs: []*v3.ClusterRoleTemplateBinding{
+				baseCRTB("crtb-1", now),
+			},
+			wantIsDup: false,
+		},
+		{
+			name: "no duplicates - different content keys",
+			crtb: baseCRTB("crtb-1", now),
+			cachedCRTBs: []*v3.ClusterRoleTemplateBinding{
+				baseCRTB("crtb-1", now),
+				func() *v3.ClusterRoleTemplateBinding {
+					c := baseCRTB("crtb-2", now)
+					c.RoleTemplateName = "cluster-owner" // different role
+					return c
+				}(),
+			},
+			wantIsDup: false,
+		},
+		{
+			name: "two duplicates - current is older (keeper), deletes the newer one",
+			crtb: baseCRTB("crtb-1", earlier),
+			cachedCRTBs: []*v3.ClusterRoleTemplateBinding{
+				baseCRTB("crtb-1", earlier),
+				baseCRTB("crtb-2", later),
+			},
+			wantDeleted: []string{"crtb-2"},
+			wantIsDup:   false,
+		},
+		{
+			name: "two duplicates - current is newer (duplicate), gets itself deleted",
+			crtb: baseCRTB("crtb-2", later),
+			cachedCRTBs: []*v3.ClusterRoleTemplateBinding{
+				baseCRTB("crtb-1", earlier),
+				baseCRTB("crtb-2", later),
+			},
+			wantDeleted: []string{"crtb-2"},
+			wantIsDup:   true,
+		},
+		{
+			name: "three duplicates - oldest is kept, two newer are deleted",
+			crtb: baseCRTB("crtb-1", earlier),
+			cachedCRTBs: []*v3.ClusterRoleTemplateBinding{
+				baseCRTB("crtb-1", earlier),
+				baseCRTB("crtb-2", now),
+				baseCRTB("crtb-3", later),
+			},
+			wantDeleted: []string{"crtb-2", "crtb-3"},
+			wantIsDup:   false,
+		},
+		{
+			name: "same timestamp - tiebreak by name, earlier name wins",
+			crtb: baseCRTB("crtb-b", now),
+			cachedCRTBs: []*v3.ClusterRoleTemplateBinding{
+				baseCRTB("crtb-a", now),
+				baseCRTB("crtb-b", now),
+			},
+			wantDeleted: []string{"crtb-b"},
+			wantIsDup:   true,
+		},
+		{
+			name: "skip CRTBs with deletion timestamp",
+			crtb: baseCRTB("crtb-1", earlier),
+			cachedCRTBs: []*v3.ClusterRoleTemplateBinding{
+				baseCRTB("crtb-1", earlier),
+				func() *v3.ClusterRoleTemplateBinding {
+					c := baseCRTB("crtb-2", later)
+					delTime := metav1.Now()
+					c.DeletionTimestamp = &delTime
+					return c
+				}(),
+			},
+			wantIsDup: false, // only one non-deleting CRTB, so no duplicates
+		},
+		{
+			name: "error listing CRTBs from cache",
+			crtb: baseCRTB("crtb-1", now),
+			// cachedCRTBs is nil but we'll set up the mock to return error
+			wantErr: true,
+		},
+		{
+			name: "error deleting duplicate CRTB",
+			crtb: baseCRTB("crtb-1", earlier),
+			cachedCRTBs: []*v3.ClusterRoleTemplateBinding{
+				baseCRTB("crtb-1", earlier),
+				baseCRTB("crtb-2", later),
+			},
+			wantDeleted: []string{"crtb-2"},
+			deleteErr:   fmt.Errorf("delete failed"),
+			wantIsDup:   false,
+			wantErr:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctrl := gomock.NewController(t)
+
+			crtbCache := fake.NewMockCacheInterface[*v3.ClusterRoleTemplateBinding](ctrl)
+			crtbClient := fake.NewMockControllerInterface[*v3.ClusterRoleTemplateBinding, *v3.ClusterRoleTemplateBindingList](ctrl)
+
+			if tt.name == "error listing CRTBs from cache" {
+				crtbCache.EXPECT().List(tt.crtb.Namespace, gomock.Any()).Return(nil, fmt.Errorf("cache error"))
+			} else {
+				crtbCache.EXPECT().List(tt.crtb.Namespace, gomock.Any()).Return(tt.cachedCRTBs, nil)
+			}
+
+			for _, delName := range tt.wantDeleted {
+				if tt.deleteErr != nil {
+					crtbClient.EXPECT().Delete(tt.crtb.Namespace, delName, gomock.Any()).Return(tt.deleteErr)
+				} else {
+					crtbClient.EXPECT().Delete(tt.crtb.Namespace, delName, gomock.Any()).Return(nil)
+				}
+			}
+
+			c := &crtbHandler{
+				crtbCache:  crtbCache,
+				crtbClient: crtbClient,
+			}
+
+			isDup, err := c.deleteDuplicateCRTBs(tt.crtb)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, tt.wantIsDup, isDup)
+		})
+	}
+}
+
