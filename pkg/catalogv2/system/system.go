@@ -309,6 +309,7 @@ func (m *Manager) install(namespace, chartName, releaseName, minVersion, exactVe
 		// The helm library is using github.com/pkg/errors which is deprecated
 		return errors.New(err.Error())
 	}
+
 	// Because of the behavior of `index.Get`, we need this check.
 	if v != latestVersionMatcher && chart.Version != v {
 		return fmt.Errorf("specified version %s doesn't exist in the index", v)

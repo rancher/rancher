@@ -595,6 +595,10 @@ func (c Command) renderArgs() ([]string, error) {
 		dataMap["force-replace"] = v
 	}
 
+	if v, ok := dataMap["takeOwnership"]; ok && convert.ToString(v) == "true" {
+		dataMap["force-conflicts"] = "true"
+	}
+
 	for k, v := range dataMap {
 		s := convert.ToString(v)
 		k = convert.ToArgKey(k)

@@ -1,10 +1,10 @@
 webhookVersion: 109.0.0+up0.10.0
-remoteDialerProxyVersion: 109.0.1+up0.7.1
+remoteDialerProxyVersion: 109.0.0+up0.7.0
 # NOTE: CAPI controller version has to be updated in scripts/package-env
 turtlesVersion: 109.0.0+up0.26.0
 cspAdapterMinVersion: 109.0.0+up9.0.0-rc.3
-defaultShellVersion: iyashmaurya/shell:dev
-fleetVersion: 110.0.0+up0.16.0-alpha.3
+defaultShellVersion: iyashmaurya/shell:dev-amd64
+fleetVersion: 110.0.0+up0.16.0-alpha.5
 defaultSccOperatorImage: rancher/scc-operator:v0.4.0-rc.1
 # NOTE: when updating this version, you will also need to update the hardcoded
 # k8s minor <-> image tag mapping in pkg/controllers/capr/autoscaler/fleet.go (imageTagVersions variable).

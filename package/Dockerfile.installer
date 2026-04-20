@@ -13,13 +13,18 @@ ENV CHART_VERSION=${VERSION}
 ENV HELM_VERSION=v4.1.4
 ENV HELM_HASH_amd64=70b2c30a19da4db264dfd68c8a3664e05093a361cefd89572ffb36f8abfa3d09
 ENV HELM_HASH_arm64=13d03672be289045d2ff00e4e345d61de1c6f21c1257a45955a30e8ae036d8f1
-RUN wget https://get.helm.sh/helm-${HELM_VERSION}-linux-${BUILDARCH}.tar.gz -O /tmp/helm.tar.gz && \
-    HELM_HASH="HELM_HASH_${BUILDARCH}" && \
-    echo "${!HELM_HASH}  /tmp/helm.tar.gz" | sha256sum -c - && \
-    tar -xzf /tmp/helm.tar.gz --strip-components=1 -C /usr/bin \
-    mv /usr/bin/helm /usr/bin/helm_v4 && \
-    chown root:root /usr/bin/helm_v4 && \
-    chmod +x /usr/bin/helm_v4 && \
+RUN if [ "${BUILDARCH}" = "amd64" ]; then \
+        EXPECTED_HASH="${HELM_HASH_amd64}"; \
+    elif [ "${BUILDARCH}" = "arm64" ]; then \
+        EXPECTED_HASH="${HELM_HASH_arm64}"; \
+    fi && \
+    wget -q https://get.helm.sh/helm-${HELM_VERSION}-linux-${BUILDARCH}.tar.gz -O /tmp/helm.tar.gz && \
+    echo "${EXPECTED_HASH}  /tmp/helm.tar.gz" | sha256sum -c - && \
+    tar -xzf /tmp/helm.tar.gz --strip-components=1 -C /usr/bin && \
+    chown root:root /usr/bin/helm && \
+    chmod +x /usr/bin/helm && \
+    ln -s /usr/bin/helm /usr/bin/helm_v4 && \
+    ln -s /usr/bin/helm /usr/bin/helm_v3 && \
     rm /tmp/helm.tar.gz
 
 # renovate: datasource=github-release-attachments depName=mikefarah/yq
@@ -49,6 +54,8 @@ RUN /src/scripts/export-config
 RUN /src/scripts/chart/ci
 
 FROM scratch
-COPY --from=build /usr/bin/helm_v4 /helm
+COPY --from=build /usr/bin/helm /helm
+COPY --from=build /usr/bin/helm /helm_v3
+COPY --from=build /usr/bin/helm /helm_v4
 COPY --from=build /src/bin/chart/*/*.tgz /
 COPY package/installer-run.sh /run.sh
