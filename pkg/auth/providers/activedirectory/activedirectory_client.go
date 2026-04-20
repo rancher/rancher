@@ -11,6 +11,7 @@ import (
 	"github.com/rancher/apiserver/pkg/apierror"
 	"github.com/rancher/norman/types/slice"
 	v3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	"github.com/rancher/rancher/pkg/auth/providers/common"
 	"github.com/rancher/rancher/pkg/auth/providers/common/ldap"
 	"github.com/rancher/wrangler/v3/pkg/schemas/validation"
 	"github.com/sirupsen/logrus"
@@ -384,7 +385,7 @@ func (p *adProvider) getPrincipal(distinguishedName string, scope string, config
 	result, err := lConn.Search(search)
 	if err != nil {
 		if ldapErr, ok := err.(*ldapv3.Error); ok && ldapErr.ResultCode == 32 {
-			return nil, apierror.NewAPIError(validation.NotFound, fmt.Sprintf("%s not found", distinguishedName))
+			return nil, &common.NonTransientError{Err: apierror.NewAPIError(validation.NotFound, fmt.Sprintf("%s not found", distinguishedName))}
 		}
 		return nil, apierror.WrapAPIError(errors.Wrapf(err, "server returned error for search %v %v: %v", search.BaseDN, filter, err), validation.ServerError, "Internal server error")
 	}

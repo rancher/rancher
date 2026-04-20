@@ -377,7 +377,16 @@ func (m *userManager) UserAttributeCreateOrUpdate(userID, provider string, group
 		userExtraInfo = make(map[string][]string)
 	}
 
-	shouldUpdate := m.userAttributeChanged(attribs, provider, userExtraInfo, groupPrincipals)
+	var shouldUpdate bool
+
+	if _, ok := attribs.Annotations[ProviderRefreshErrorAnnotation]; ok {
+		delete(attribs.Annotations, ProviderRefreshErrorAnnotation)
+		shouldUpdate = true
+	}
+
+	if m.userAttributeChanged(attribs, provider, userExtraInfo, groupPrincipals) {
+		shouldUpdate = true
+	}
 	if len(loginTime) > 0 && !loginTime[0].IsZero() {
 		// Login time is truncated to seconds as the corresponding user label is set as epoch time.
 		lastLogin := metav1.NewTime(loginTime[0].Truncate(time.Second))
