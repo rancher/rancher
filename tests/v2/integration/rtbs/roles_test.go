@@ -5,6 +5,7 @@ import (
 
 	extrbac "github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/rbac"
 	"github.com/rancher/shepherd/clients/rancher"
+	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	extauthz "github.com/rancher/shepherd/extensions/kubeapi/authorization"
 	extunstructured "github.com/rancher/shepherd/extensions/unstructured"
 	"github.com/rancher/shepherd/extensions/users"
@@ -233,4 +234,50 @@ func (p *RTBTestSuite) TestKontainerDriverVisibilityByGlobalRole() {
 	kds, err = createUserWithRole("settings-manage").Management.KontainerDriver.List(nil)
 	p.Require().NoError(err)
 	p.Require().Empty(kds.Data)
+}
+
+func (p *RTBTestSuite) TestCannotCreateFeature() {
+	client := p.newSubSession()
+
+	// Create a standard user.
+	user := p.createUser(client, "feature-user", "user")
+	userClient, err := client.AsUser(user)
+	p.Require().NoError(err)
+
+	trueVal := true
+
+	// Admin should not be able to create features (405 Method Not Allowed).
+	_, err = client.Management.Feature.Create(&management.Feature{
+		Name:  "testfeature",
+		Value: &trueVal,
+	})
+	p.Require().Error(err)
+	p.Require().ErrorContains(err, "405")
+
+	// Standard user should not be able to create features (405 Method Not Allowed).
+	_, err = userClient.Management.Feature.Create(&management.Feature{
+		Name:  "testfeature",
+		Value: &trueVal,
+	})
+	p.Require().Error(err)
+	p.Require().ErrorContains(err, "405")
+}
+
+func (p *RTBTestSuite) TestCanListFeatures() {
+	client := p.newSubSession()
+
+	// Create a standard user.
+	user := p.createUser(client, "feature-user", "user")
+	userClient, err := client.AsUser(user)
+	p.Require().NoError(err)
+
+	// Standard user should be able to list features.
+	userFeatures, err := userClient.Management.Feature.List(nil)
+	p.Require().NoError(err)
+	p.Require().NotEmpty(userFeatures.Data)
+
+	// Admin should be able to list features.
+	adminFeatures, err := client.Management.Feature.List(nil)
+	p.Require().NoError(err)
+	p.Require().NotEmpty(adminFeatures.Data)
 }
