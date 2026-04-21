@@ -5,8 +5,6 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 runtime_dockerfile="${repo_root}/Dockerfile.runtime"
 runtime_dir="/go/src/github.com/rancher/rancher"
-git_dir=""
-git_common_dir=""
 allowed_env_vars=(
     REPO
     TAG
@@ -65,9 +63,6 @@ normalize_arch() {
         aarch64|arm64)
             echo arm64
             ;;
-        s390x)
-            echo s390x
-            ;;
         *)
             echo "$1"
             ;;
@@ -82,52 +77,18 @@ hash_file() {
     fi
 }
 
-canonical_path() {
-    local path="$1"
-
-    if [[ "${path}" != /* ]]; then
-        path="${repo_root}/${path}"
-    fi
-
-    printf '%s\n' "$(cd "$(dirname "${path}")" && pwd -P)/$(basename "${path}")"
-}
-
-restore_permissions() {
-    local uid gid
-
-    uid="$(id -u)"
-    gid="$(id -g)"
-
-    # If already root, nothing to fix.
-    if [ "$uid" = "0" ]; then
-        return
-    fi
-
-    # Attempt chown directly on the host. On Linux the container runs as root so
-    # files may be owned by root; we need sudo to reclaim them. On macOS with
-    # Rancher Desktop / Docker Desktop the VM's UID mapping means files already
-    # appear owned by the host user, so chown succeeds without sudo.
-    if chown -R "${uid}:${gid}" "${repo_root}" "${git_dir}" 2>/dev/null; then
-        return
-    fi
-
-    # Direct chown failed (Linux non-root without sudo). Try with sudo.
-    sudo chown -R "${uid}:${gid}" "${repo_root}" "${git_dir}" 2>/dev/null || true
-}
-
 runtime_arch="$(normalize_arch "$(uname -m)")"
 runtime_hash="$(hash_file "${runtime_dockerfile}" | cut -c1-12)"
 runtime_image="rancher-runtime:${runtime_hash}-${runtime_arch}"
-git_dir="$(canonical_path "$(git -C "${repo_root}" rev-parse --git-dir)")"
-git_common_dir="$(canonical_path "$(git -C "${repo_root}" rev-parse --git-common-dir)")"
+host_uid="$(id -u)"
+host_gid="$(id -g)"
 env_file="$(mktemp)"
 
 cleanup() {
     rm -f "${env_file}"
-    restore_permissions
 }
 
-trap cleanup EXIT
+trap cleanup EXIT INT TERM
 
 mkdir -p "${repo_root}/bin" "${repo_root}/dist" "${repo_root}/build"
 
@@ -147,31 +108,6 @@ if ! docker image inspect "${runtime_image}" >/dev/null 2>&1; then
         "${repo_root}"
 fi
 
-while [ "$#" -gt 0 ]; do
-    case "$1" in
-        -q|--no-out)
-            shift
-            ;;
-        --)
-            shift
-            break
-            ;;
-        *)
-            break
-            ;;
-    esac
-done
-
-if [ "$#" -eq 0 ]; then
-    set -- ci
-fi
-
-if [ -f "${repo_root}/scripts/$1" ] && [ "$1" != "container-run" ]; then
-    script_target="$1"
-    shift
-    set -- "./scripts/${script_target}" "$@"
-fi
-
 docker_args=(
     run
     --rm
@@ -180,15 +116,14 @@ docker_args=(
     --label "CI=${CI:-}"
     --label "DRONE_BUILD_NUMBER=${DRONE_BUILD_NUMBER:-}"
     --volume "${repo_root}:${runtime_dir}"
-    --volume "${git_common_dir}:${git_common_dir}"
     --volume "${repo_root}/build:/tmp"
     --volume rancher2-go16-pkg-1:/go/pkg
     --volume rancher2-go16-cache-1:/root/.cache/go-build
     --workdir "${runtime_dir}"
     --env "ARCH=${ARCH:-${runtime_arch}}"
     --env "HOST_ARCH=${runtime_arch}"
-    --env "HOME=${runtime_dir}"
-    --env "GOCACHE=/root/.cache/go-build"
+    --env "HOST_UID=${host_uid}"
+    --env "HOST_GID=${host_gid}"
     --env "DOCKER_HOST=unix:///var/run/docker.sock"
     --env "GOTELEMETRY=off"
 )

@@ -42,3 +42,6 @@ informer_object_cache.db-wal
 .opencode
 .docker
 .config
+.cache
+.local
+.tox

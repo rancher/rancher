@@ -1,0 +1,24 @@
+#!/bin/bash
+set -e
+
+mkdir -p bin dist
+
+restore_permissions() {
+    if [ -z "${HOST_UID:-}" ] || [ -z "${HOST_GID:-}" ]; then
+        return
+    fi
+
+    if [ "${HOST_UID}" = "0" ]; then
+        return
+    fi
+
+    chown -R "${HOST_UID}:${HOST_GID}" /go/src/github.com/rancher/rancher 2>/dev/null || true
+}
+
+trap restore_permissions EXIT INT TERM
+
+if [ -e ./scripts/$1 ]; then
+    ./scripts/"$@"
+else
+    exec "$@"
+fi

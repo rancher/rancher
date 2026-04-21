@@ -110,3 +110,4 @@ ENV HOME=/go/src/github.com/rancher/rancher
 VOLUME /var/lib/rancher
 VOLUME /var/lib/kubelet
 WORKDIR /go/src/github.com/rancher/rancher
+ENTRYPOINT ["scripts/entry"]

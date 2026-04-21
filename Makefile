@@ -4,11 +4,7 @@ DEV_TARGETS := $(shell ls dev-scripts)
 .DEFAULT_GOAL := ci
 
 $(TARGETS):
-	@if [ "$@" = "check-chart-kdm-source-values" ]; then \
-		./scripts/container-run -q --no-out "$@"; \
-	else \
-		./scripts/container-run "$@"; \
-	fi
+	./scripts/container-run "$@"
 
 quick-agent:
 	@$(MAKE) quick TARGET="agent"
