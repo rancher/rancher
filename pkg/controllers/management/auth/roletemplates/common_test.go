@@ -992,3 +992,78 @@ func TestAddAggregationManagementFeatureLabel(t *testing.T) {
 		})
 	}
 }
+
+func TestRTBContentKey(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name               string
+		userPrincipalName  string
+		userName           string
+		groupPrincipalName string
+		groupName          string
+		roleTemplateName   string
+		scope              string
+		want               string
+	}{
+		{
+			name:               "user principal name takes priority",
+			userPrincipalName:  "local://user1",
+			userName:           "user1",
+			groupPrincipalName: "group-principal",
+			groupName:          "group1",
+			roleTemplateName:   "cluster-owner",
+			scope:              "c-abc123",
+			want:               "local://user1/cluster-owner/c-abc123",
+		},
+		{
+			name:             "falls back to user name",
+			userName:         "user1",
+			roleTemplateName: "cluster-member",
+			scope:            "c-abc123",
+			want:             "user1/cluster-member/c-abc123",
+		},
+		{
+			name:               "falls back to group principal name",
+			groupPrincipalName: "keycloak_group://admins",
+			groupName:          "admins",
+			roleTemplateName:   "cluster-owner",
+			scope:              "c-abc123",
+			want:               "keycloak_group://admins/cluster-owner/c-abc123",
+		},
+		{
+			name:             "falls back to group name",
+			groupName:        "admins",
+			roleTemplateName: "cluster-member",
+			scope:            "c-abc123",
+			want:             "admins/cluster-member/c-abc123",
+		},
+		{
+			name:             "empty subject fields",
+			roleTemplateName: "cluster-member",
+			scope:            "c-abc123",
+			want:             "/cluster-member/c-abc123",
+		},
+		{
+			name:              "works for CRTB scope",
+			userPrincipalName: "local://user1",
+			roleTemplateName:  "cluster-owner",
+			scope:             "c-abc123",
+			want:              "local://user1/cluster-owner/c-abc123",
+		},
+		{
+			name:              "works for PRTB scope",
+			userPrincipalName: "local://user1",
+			roleTemplateName:  "project-member",
+			scope:             "c-m-1234:p-5678",
+			want:              "local://user1/project-member/c-m-1234:p-5678",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := rtbContentKey(tt.userPrincipalName, tt.userName, tt.groupPrincipalName, tt.groupName, tt.roleTemplateName, tt.scope)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
