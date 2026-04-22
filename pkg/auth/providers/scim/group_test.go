@@ -18,6 +18,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
+var testDefaultGetConfig = func(string) providerConfig { return defaultProviderConfig() }
+
 func TestGetRancherGroupMembers(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	provider := "okta"
@@ -46,8 +48,8 @@ func TestGetRancherGroupMembers(t *testing.T) {
 				GroupPrincipals: map[string]v3.Principals{
 					provider: {
 						Items: []v3.Principal{
-							{DisplayName: groupName},
-							{DisplayName: "Other Group"},
+							{ObjectMeta: metav1.ObjectMeta{Name: groupPrincipalName(provider, groupName)}, DisplayName: groupName},
+							{ObjectMeta: metav1.ObjectMeta{Name: groupPrincipalName(provider, "Other Group")}, DisplayName: "Other Group"},
 						},
 					},
 				},
@@ -61,7 +63,7 @@ func TestGetRancherGroupMembers(t *testing.T) {
 				GroupPrincipals: map[string]v3.Principals{
 					provider: {
 						Items: []v3.Principal{
-							{DisplayName: "Different Group"},
+							{ObjectMeta: metav1.ObjectMeta{Name: groupPrincipalName(provider, "Different Group")}, DisplayName: "Different Group"},
 						},
 					},
 				},
@@ -84,9 +86,10 @@ func TestGetRancherGroupMembers(t *testing.T) {
 	srv := &SCIMServer{
 		userCache:          userCache,
 		userAttributeCache: userAttributeCache,
+		getConfig:          testDefaultGetConfig,
 	}
 
-	members, err := srv.getRancherGroupMembers(provider, groupName)
+	members, err := srv.getRancherGroupMembers(provider, groupPrincipalName(provider, groupName))
 
 	require.NoError(t, err)
 	require.Len(t, members, 1)
@@ -122,8 +125,8 @@ func TestGetAllRancherGroupMembers(t *testing.T) {
 				GroupPrincipals: map[string]v3.Principals{
 					provider: {
 						Items: []v3.Principal{
-							{DisplayName: "Engineering"},
-							{DisplayName: "Architects"},
+							{ObjectMeta: metav1.ObjectMeta{Name: groupPrincipalName(provider, "Engineering")}, DisplayName: "Engineering"},
+							{ObjectMeta: metav1.ObjectMeta{Name: groupPrincipalName(provider, "Architects")}, DisplayName: "Architects"},
 						},
 					},
 				},
@@ -137,8 +140,8 @@ func TestGetAllRancherGroupMembers(t *testing.T) {
 				GroupPrincipals: map[string]v3.Principals{
 					provider: {
 						Items: []v3.Principal{
-							{DisplayName: "Engineering"},
-							{DisplayName: "Developers"},
+							{ObjectMeta: metav1.ObjectMeta{Name: groupPrincipalName(provider, "Engineering")}, DisplayName: "Engineering"},
+							{ObjectMeta: metav1.ObjectMeta{Name: groupPrincipalName(provider, "Developers")}, DisplayName: "Developers"},
 						},
 					},
 				},
@@ -161,6 +164,7 @@ func TestGetAllRancherGroupMembers(t *testing.T) {
 	srv := &SCIMServer{
 		userCache:          userCache,
 		userAttributeCache: userAttributeCache,
+		getConfig:          testDefaultGetConfig,
 	}
 
 	groups, err := srv.getAllRancherGroupMembers(provider)
@@ -169,7 +173,7 @@ func TestGetAllRancherGroupMembers(t *testing.T) {
 	require.Len(t, groups, 3) // Engineering, Architects, Developers.
 
 	// Verify Engineering group has 2 members.
-	engineers := groups["Engineering"]
+	engineers := groups[groupPrincipalName(provider, "Engineering")]
 	require.Len(t, engineers, 2)
 
 	// Check both members are present (order may vary).
@@ -178,14 +182,14 @@ func TestGetAllRancherGroupMembers(t *testing.T) {
 	assert.Contains(t, memberNames, "u-yypnjwjmkq")
 
 	// Verify Architects group has 1 member.
-	architects := groups["Architects"]
+	architects := groups[groupPrincipalName(provider, "Architects")]
 	require.Len(t, architects, 1)
 	assert.Equal(t, "u-mo773yttt4", architects[0].Value)
 	assert.Equal(t, "john.doe", architects[0].Display)
 	assert.Equal(t, userResource, architects[0].Type)
 
 	// Verify Developers group has 1 member.
-	developers := groups["Developers"]
+	developers := groups[groupPrincipalName(provider, "Developers")]
 	require.Len(t, developers, 1)
 	assert.Equal(t, "u-yypnjwjmkq", developers[0].Value)
 	assert.Equal(t, "jane.smith", developers[0].Display)
@@ -236,9 +240,10 @@ func TestSyncGroupMembers(t *testing.T) {
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
 			userAttributes:     userAttrClient,
+			getConfig:          testDefaultGetConfig,
 		}
 
-		err := srv.syncGroupMembers(provider, groupName, []scimMember{newMember})
+		err := srv.syncGroupMembers(provider, groupPrincipalName(provider, groupName), groupName, []scimMember{newMember})
 		require.NoError(t, err)
 	})
 
@@ -254,7 +259,7 @@ func TestSyncGroupMembers(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "u-mo773yttt4"},
 			GroupPrincipals: map[string]v3.Principals{
 				provider: {
-					Items: []v3.Principal{{DisplayName: groupName}},
+					Items: []v3.Principal{{ObjectMeta: metav1.ObjectMeta{Name: groupPrincipalName(provider, groupName)}, DisplayName: groupName}},
 				},
 			},
 			ExtraByProvider: map[string]map[string][]string{
@@ -279,9 +284,10 @@ func TestSyncGroupMembers(t *testing.T) {
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
 			userAttributes:     userAttrClient,
+			getConfig:          testDefaultGetConfig,
 		}
 
-		err := srv.syncGroupMembers(provider, groupName, []scimMember{})
+		err := srv.syncGroupMembers(provider, groupPrincipalName(provider, groupName), groupName, []scimMember{})
 		require.NoError(t, err)
 	})
 
@@ -294,9 +300,10 @@ func TestSyncGroupMembers(t *testing.T) {
 
 		srv := &SCIMServer{
 			userCache: userCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
-		err := srv.syncGroupMembers(provider, groupName, []scimMember{
+		err := srv.syncGroupMembers(provider, groupPrincipalName(provider, groupName), groupName, []scimMember{
 			{Value: "grp-xyz", Type: "Group", Display: "SubTeam"},
 		})
 
@@ -315,9 +322,10 @@ func TestSyncGroupMembers(t *testing.T) {
 
 		srv := &SCIMServer{
 			userCache: userCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
-		err := srv.syncGroupMembers(provider, groupName, []scimMember{
+		err := srv.syncGroupMembers(provider, groupPrincipalName(provider, groupName), groupName, []scimMember{
 			{Value: "something-else", Type: "SomethingElse", Display: "Something Else"},
 		})
 
@@ -346,9 +354,10 @@ func TestSyncGroupMembers(t *testing.T) {
 
 		srv := &SCIMServer{
 			userCache: userCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
-		err := srv.syncGroupMembers(provider, groupName, []scimMember{
+		err := srv.syncGroupMembers(provider, groupPrincipalName(provider, groupName), groupName, []scimMember{
 			{Value: "u-missing", Display: "missing.user"},
 		})
 
@@ -496,7 +505,7 @@ func TestPatchGroup(t *testing.T) {
 		userAttributeCache.EXPECT().Get("u-mo773yttt4").Return(&v3.UserAttribute{
 			ObjectMeta: metav1.ObjectMeta{Name: "u-mo773yttt4"},
 			GroupPrincipals: map[string]v3.Principals{
-				provider: {Items: []v3.Principal{{DisplayName: "Engineering"}}},
+				provider: {Items: []v3.Principal{{ObjectMeta: metav1.ObjectMeta{Name: groupPrincipalName(provider, "Engineering")}, DisplayName: "Engineering"}}},
 			},
 			ExtraByProvider: map[string]map[string][]string{
 				provider: {"username": {"john.doe"}},
@@ -508,6 +517,7 @@ func TestPatchGroup(t *testing.T) {
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
 			userAttributes:     userAttrClient,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		payload := map[string]any{
@@ -566,6 +576,7 @@ func TestPatchGroup(t *testing.T) {
 
 		srv := &SCIMServer{
 			groupsCache: groupCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		payload := map[string]any{
@@ -610,6 +621,7 @@ func TestPatchGroup(t *testing.T) {
 
 		srv := &SCIMServer{
 			groupsCache: groupCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		payload := map[string]any{
@@ -667,6 +679,7 @@ func TestPatchGroup(t *testing.T) {
 		srv := &SCIMServer{
 			groupsCache: groupCache,
 			userCache:   userCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		payload := map[string]any{
@@ -720,7 +733,7 @@ func TestPatchGroup(t *testing.T) {
 		userAttributeCache.EXPECT().Get("u-mo773yttt4").Return(&v3.UserAttribute{
 			ObjectMeta: metav1.ObjectMeta{Name: "u-mo773yttt4"},
 			GroupPrincipals: map[string]v3.Principals{
-				provider: {Items: []v3.Principal{{DisplayName: "Engineering"}}},
+				provider: {Items: []v3.Principal{{ObjectMeta: metav1.ObjectMeta{Name: groupPrincipalName(provider, "Engineering")}, DisplayName: "Engineering"}}},
 			},
 		}, nil)
 		userAttrClient.EXPECT().Update(gomock.Any()).Return(&v3.UserAttribute{}, nil)
@@ -733,6 +746,7 @@ func TestPatchGroup(t *testing.T) {
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
 			userAttributes:     userAttrClient,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		payload := map[string]any{
@@ -780,6 +794,7 @@ func TestPatchGroup(t *testing.T) {
 			groups:      groupClient,
 			groupsCache: groupCache,
 			userCache:   userCache,
+			getConfig:   testDefaultGetConfig,
 		}
 
 		payload := map[string]any{
@@ -835,6 +850,7 @@ func TestListGroupsPagination(t *testing.T) {
 		groupsCache:        groupsCache,
 		userCache:          userCache,
 		userAttributeCache: userAttributeCache,
+		getConfig:          testDefaultGetConfig,
 	}
 
 	tests := []struct {
@@ -966,6 +982,7 @@ func TestListGroupsPaginationConsistency(t *testing.T) {
 		groupsCache:        groupsCache,
 		userCache:          userCache,
 		userAttributeCache: userAttributeCache,
+		getConfig:          testDefaultGetConfig,
 	}
 
 	// Collect all group IDs by paginating through all pages.
@@ -1015,6 +1032,43 @@ func TestListGroupsPaginationConsistency(t *testing.T) {
 	}
 }
 
+func TestListGroupsWithExternalIdFilter(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	provider := "azuread"
+
+	groups := []*v3.Group{
+		{ObjectMeta: metav1.ObjectMeta{Name: "g-aaa", Labels: map[string]string{authProviderLabel: provider}}, DisplayName: "Engineering", ExternalID: "obj-111"},
+		{ObjectMeta: metav1.ObjectMeta{Name: "g-bbb", Labels: map[string]string{authProviderLabel: provider}}, DisplayName: "Marketing", ExternalID: "obj-222"},
+		{ObjectMeta: metav1.ObjectMeta{Name: "g-ccc", Labels: map[string]string{authProviderLabel: provider}}, DisplayName: "Sales", ExternalID: "obj-333"},
+	}
+
+	groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+	groupsCache.EXPECT().List(labels.Set{authProviderLabel: provider}.AsSelector()).Return(groups, nil)
+
+	srv := &SCIMServer{
+		groupsCache: groupsCache,
+		getConfig:   testDefaultGetConfig,
+	}
+
+	r := httptest.NewRequest(http.MethodGet, `/v1-scim/`+provider+`/Groups?filter=externalId%20eq%20%22obj-222%22&excludedAttributes=members`, nil)
+	r.SetPathValue("provider", provider)
+	w := httptest.NewRecorder()
+
+	srv.ListGroups(w, r)
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var resp listResponse
+	err := json.Unmarshal(w.Body.Bytes(), &resp)
+	require.NoError(t, err)
+
+	assert.Equal(t, 1, resp.TotalResults)
+	require.Len(t, resp.Resources, 1)
+
+	resource := resp.Resources[0].(map[string]any)
+	assert.Equal(t, "g-bbb", resource["id"])
+	assert.Equal(t, "Marketing", resource["displayName"])
+}
+
 func TestCreateGroup(t *testing.T) {
 	provider := "okta"
 
@@ -1043,6 +1097,7 @@ func TestCreateGroup(t *testing.T) {
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
 			groups:      groupClient,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1128,6 +1183,7 @@ func TestCreateGroup(t *testing.T) {
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
 			userAttributes:     userAttributeClient,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1165,6 +1221,7 @@ func TestCreateGroup(t *testing.T) {
 
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1198,6 +1255,7 @@ func TestCreateGroup(t *testing.T) {
 
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1264,6 +1322,7 @@ func TestCreateGroup(t *testing.T) {
 
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1296,6 +1355,7 @@ func TestCreateGroup(t *testing.T) {
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
 			groups:      groupClient,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1337,6 +1397,7 @@ func TestCreateGroup(t *testing.T) {
 			groupsCache: groupsCache,
 			groups:      groupClient,
 			userCache:   userCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1380,6 +1441,7 @@ func TestCreateGroup(t *testing.T) {
 			groupsCache: groupsCache,
 			groups:      groupClient,
 			userCache:   userCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1431,6 +1493,7 @@ func TestCreateGroup(t *testing.T) {
 			groupsCache: groupsCache,
 			groups:      groupClient,
 			userCache:   userCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1476,6 +1539,7 @@ func TestCreateGroup(t *testing.T) {
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
 			groups:      groupClient,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1521,6 +1585,7 @@ func TestCreateGroup(t *testing.T) {
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
 			groups:      groupClient,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1577,7 +1642,7 @@ func TestGetGroup(t *testing.T) {
 			},
 			GroupPrincipals: map[string]v3.Principals{
 				provider: {Items: []v3.Principal{
-					{DisplayName: "Engineering"},
+					{ObjectMeta: metav1.ObjectMeta{Name: groupPrincipalName(provider, "Engineering")}, DisplayName: "Engineering"},
 				}},
 			},
 		}, nil)
@@ -1586,6 +1651,7 @@ func TestGetGroup(t *testing.T) {
 			groupsCache:        groupsCache,
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
@@ -1628,6 +1694,7 @@ func TestGetGroup(t *testing.T) {
 
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID+"?excludedAttributes=members,other_attribute", nil)
@@ -1666,6 +1733,7 @@ func TestGetGroup(t *testing.T) {
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
 			userCache:   userCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
@@ -1694,6 +1762,7 @@ func TestGetGroup(t *testing.T) {
 
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
@@ -1720,6 +1789,7 @@ func TestGetGroup(t *testing.T) {
 
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
@@ -1754,6 +1824,7 @@ func TestGetGroup(t *testing.T) {
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
 			userCache:   userCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
@@ -1804,7 +1875,7 @@ func TestGetGroup(t *testing.T) {
 			},
 			GroupPrincipals: map[string]v3.Principals{
 				provider: {Items: []v3.Principal{
-					{DisplayName: "Engineering"},
+					{ObjectMeta: metav1.ObjectMeta{Name: groupPrincipalName(provider, "Engineering")}, DisplayName: "Engineering"},
 				}},
 			},
 		}, nil)
@@ -1813,6 +1884,7 @@ func TestGetGroup(t *testing.T) {
 			groupsCache:        groupsCache,
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		r := httptest.NewRequest(http.MethodGet, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
@@ -1859,6 +1931,7 @@ func TestUpdateGroup(t *testing.T) {
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
 			userCache:   userCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1922,6 +1995,7 @@ func TestUpdateGroup(t *testing.T) {
 			groupsCache: groupsCache,
 			groups:      groupClient,
 			userCache:   userCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1990,6 +2064,7 @@ func TestUpdateGroup(t *testing.T) {
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
 			userAttributes:     userAttributeClient,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -2085,6 +2160,7 @@ func TestUpdateGroup(t *testing.T) {
 
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -2125,6 +2201,7 @@ func TestUpdateGroup(t *testing.T) {
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
 			userCache:   userCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -2180,7 +2257,7 @@ func TestUpdateGroup(t *testing.T) {
 			},
 			GroupPrincipals: map[string]v3.Principals{
 				provider: {Items: []v3.Principal{
-					{DisplayName: "Engineering"},
+					{ObjectMeta: metav1.ObjectMeta{Name: groupPrincipalName(provider, "Engineering")}, DisplayName: "Engineering"},
 				}},
 			},
 		}
@@ -2200,6 +2277,7 @@ func TestUpdateGroup(t *testing.T) {
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
 			userAttributes:     userAttributeClient,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		// Update with empty members list should remove existing member
@@ -2245,6 +2323,7 @@ func TestDeleteGroup(t *testing.T) {
 			groupsCache: groupsCache,
 			groups:      groupClient,
 			userCache:   userCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
@@ -2287,7 +2366,7 @@ func TestDeleteGroup(t *testing.T) {
 			},
 			GroupPrincipals: map[string]v3.Principals{
 				provider: {Items: []v3.Principal{
-					{DisplayName: "Engineering"},
+					{ObjectMeta: metav1.ObjectMeta{Name: groupPrincipalName(provider, "Engineering")}, DisplayName: "Engineering"},
 				}},
 			},
 		}
@@ -2308,6 +2387,7 @@ func TestDeleteGroup(t *testing.T) {
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
 			userAttributes:     userAttributeClient,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
@@ -2328,6 +2408,7 @@ func TestDeleteGroup(t *testing.T) {
 
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
@@ -2354,6 +2435,7 @@ func TestDeleteGroup(t *testing.T) {
 
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
@@ -2388,6 +2470,7 @@ func TestDeleteGroup(t *testing.T) {
 		srv := &SCIMServer{
 			groupsCache: groupsCache,
 			userCache:   userCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)
@@ -2426,6 +2509,7 @@ func TestDeleteGroup(t *testing.T) {
 			groupsCache: groupsCache,
 			groups:      groupClient,
 			userCache:   userCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		r := httptest.NewRequest(http.MethodDelete, "/v1-scim/"+provider+"/Groups/"+groupID, nil)

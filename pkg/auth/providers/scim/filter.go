@@ -162,16 +162,24 @@ func (f *Filter) MatchesCaseExact(value string) bool {
 	return f.MatchesValue(value, true)
 }
 
-// ValidateForAttribute checks if the filter is valid for the specified attribute and operators.
+// ValidateForAttribute checks if the filter is valid for the specified attributes and operators.
 // Returns an error if the filter uses an unsupported attribute or operator.
-func (f *Filter) ValidateForAttribute(allowedAttribute string, allowedOperators ...filterOperator) error {
+func (f *Filter) ValidateForAttribute(allowedAttributes []string, allowedOperators ...filterOperator) error {
 	if f == nil {
 		return nil
 	}
 
 	// Check attribute (case-insensitive per SCIM spec).
-	if !strings.EqualFold(f.Attribute, allowedAttribute) {
-		return fmt.Errorf("unsupported filter attribute %q: only %q is supported", f.Attribute, allowedAttribute)
+	matched := false
+	for _, allowed := range allowedAttributes {
+		if strings.EqualFold(f.Attribute, allowed) {
+			matched = true
+			break
+		}
+	}
+	if !matched {
+		return fmt.Errorf("unsupported filter attribute %q: only %s supported",
+			f.Attribute, strings.Join(allowedAttributes, ", "))
 	}
 
 	// Check operator.
