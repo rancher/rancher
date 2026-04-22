@@ -329,7 +329,7 @@ func GenerateImageOrigins(linuxImagesFromArgs, targetImages, targetWindowsImages
 		return fmt.Errorf("could not create %s file: %w", imageOriginFileName, err)
 	}
 
-	originsFile.Chmod(0755)
+	originsFile.Chmod(0o755)
 	originsFile.WriteString(fileContents)
 	return originsFile.Close()
 }

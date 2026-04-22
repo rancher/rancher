@@ -165,31 +165,78 @@ jobs:
           image: "${{ env.IMAGE_INSTALLER }}"
         uses: ./.github/actions/merge-manifests
   create-images-files:
-    runs-on: runs-on,runner=2cpu-linux-x64,image=ubuntu22-full-x64,run-id=${{ github.run_id }}
-    permissions:
-      contents: write
-      id-token: write
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: registry.suse.com/bci/bci-base:15.7
     env:
       REGISTRY: ""
-      CHECKSUM_FILE: "sha256sum.txt"
       ARTIFACTS_BASE_DIR: "bin"
     steps:
+      - name: install dependencies
+        shell: bash
+        run: zypper install -y git
+      - name: Git safe directory
+        run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: generate
         uses: ./.github/actions/images-files/generate
-      - name: Read App Secrets
-        uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
+      - name: Move files to upload directory
+        shell: bash
+        run: |
+          set -ex
+          source scripts/artifacts-list.sh
+
+          mkdir -p /tmp/artifacts
+
+          for artifact in "${ARTIFACTS_WITH_CHECKSUM[@]}"; do
+            mv "${ARTIFACTS_BASE_DIR}/${artifact}" "/tmp/artifacts/${artifact}"
+          done
+      - name: "Upload artifacts"
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
-          secrets: |
-            secret/data/github/repo/${{ github.repository }}/github/app-credentials appId | APP_ID ;
-            secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY ;
-      - name: publish to gh
-        uses: ./.github/actions/images-files/publish-gh
+          name: images-files
+          path: /tmp/artifacts
   docker-image-digests:
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
     container: registry.suse.com/bci/bci-base:15.7
     needs: [create-images-files, merge-server-agent-installer-manifests]
+    env:
+      ARTIFACTS_BASE_DIR: "dist"
+      LINUX_FILE: "rancher-images-digests-linux.txt"
+      WINDOWS_FILE: "rancher-images-digests-windows.txt"
+      CHECKSUM_FILE: "images-digests-sha256sum.txt"
+    steps:
+      - name: install dependencies
+        shell: bash
+        run: zypper install -y git
+      - name: Git safe directory
+        run: git config --global --add safe.directory "$PWD"
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: generate
+        uses: ./.github/actions/images-digests/generate
+      - name: Move files to upload directory
+        shell: bash
+        run: |
+          set -ex
+          source scripts/artifacts-list.sh
+
+          mkdir -p /tmp/artifacts
+
+          for artifact in "${IMAGES_DIGESTS_ARTIFACTS_WITH_CHECKSUM[@]}"; do
+            mv "./${ARTIFACTS_BASE_DIR}/${artifact}" "/tmp/artifacts/${artifact}"
+          done
+      - name: "Upload artifacts"
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: images-digests
+          path: /tmp/artifacts
+  publish-artifacts:
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: registry.suse.com/bci/bci-base:15.7
+    needs: [merge-server-agent-installer-manifests, create-images-files, docker-image-digests]
     permissions:
       contents: write
       id-token: write
@@ -206,13 +253,90 @@ jobs:
         run: git config --global --add safe.directory "$PWD"
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-      - name: generate
-        uses: ./.github/actions/images-digests/generate
+        with:
+          persist-credentials: false
+      - name: Setup Environment Variables
+        uses: ./.github/actions/setup-tag-env
+      - name: install gh
+        shell: bash
+        env:
+          # renovate: datasource=github-release-attachments depName=cli/cli
+          GH_CLI_VERSION: v2.89.0
+          # renovate: datasource=github-release-attachments depName=cli/cli digestVersion=v2.89.0
+          GH_CLI_SUM_amd64: d0422caade520530e76c1c558da47daebaa8e1203d6b7ff10ad7d6faba3490d8
+        run: |
+          mkdir -p /tmp/gh && \
+          curl -fsL "https://github.com/cli/cli/releases/download/${GH_CLI_VERSION}/gh_${GH_CLI_VERSION#v}_linux_amd64.tar.gz" > /tmp/gh.tar.gz && \
+          echo "${GH_CLI_SUM_amd64}  /tmp/gh.tar.gz" | sha256sum -c - && \
+          tar xvzf /tmp/gh.tar.gz --strip-components=1 -C /tmp/gh && \
+          mv /tmp/gh/bin/gh /usr/bin/gh && \
+          chmod +x /usr/bin/gh
+      - name: Create artifacts dir
+        shell: bash
+        run: mkdir -p /tmp/artifacts
+      - name: Download artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: /tmp/artifacts
+          name: images-files
+          merge-multiple: true
+      - name: Download artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: /tmp/artifacts
+          name: images-digests
+          merge-multiple: true
       - name: Read App Secrets
         uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
         with:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/github/app-credentials appId | APP_ID ;
             secret/data/github/repo/${{ github.repository }}/github/app-credentials privateKey | PRIVATE_KEY ;
-      - name: publish to gh
-        uses: ./.github/actions/images-digests/publish-gh
+      - name: Create App Token
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        id: app-token
+        with:
+          app-id: ${{ env.APP_ID }}
+          private-key: ${{ env.PRIVATE_KEY }}
+      - name: create draft release
+        shell: bash
+        run: |
+          set -ex
+          source scripts/artifacts-list.sh
+
+          cd /tmp/artifacts
+
+          for artifact in "${ALL_ARTIFACTS[@]}"; do
+            if [[ ! -f "${artifact}" ]]; then
+              >&2 echo "missing artifact ${artifact}"
+              exit 1
+            fi
+          done
+
+          gh release create "${TAG}" -R "${GITHUB_REPOSITORY}" --draft --prerelease --title "${TAG}" --notes-file /tmp/artifacts/rancher-components.txt  "${ALL_ARTIFACTS[@]}"
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+  notify-release:
+    runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
+    container: registry.suse.com/bci/bci-base:15.7
+    needs: [publish-artifacts, merge-server-agent-installer-manifests, docker-image-digests]
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: install dependencies
+        shell: bash
+        run: zypper install -y git
+      - name: Git safe directory
+        run: git config --global --add safe.directory "$PWD"
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Read App Secrets
+        uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # v3
+        with:
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/slack/rancher-notify-release-bot/credentials webhookUrl | WEBHOOK_URL;
+      - name: notify
+        uses: ./.github/actions/notify-release
