@@ -51,7 +51,6 @@ Prepare the Rancher Image repo value w/ new fields as opt-in for now.
 {{ default "rancher/rancher" .Values.image.repository -}}
 {{ end -}}
 
-
 {{/*
 Prepare the Rancher Image Tag value w/ new fields as opt-in for now.
 */}}
@@ -112,6 +111,17 @@ app.kubernetes.io/component: {{ . | quote }}
 app.kubernetes.io/part-of: {{ . | quote }}
 {{- end }}
 {{- end }}
+
+{{/*
+Convert "features" map into a comma separates string to conform with CATTLE_FEATURES env
+*/}}
+{{- define "rancher-features" -}}
+{{- $list := list -}}
+{{- range $k, $v := .Values.features -}}
+{{- $list = append $list (printf "%s=%t" $k $v ) -}}
+{{- end -}}
+{{ join "," $list }}
+{{- end -}}
 
 # Windows Support
 
