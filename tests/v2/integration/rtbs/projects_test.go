@@ -2,10 +2,13 @@ package integration
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
+	"github.com/rancher/norman/types"
 	"github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/secrets"
 
 	extnamespaces "github.com/rancher/rancher/tests/v2/integration/actions/kubeapi/namespaces"
@@ -13,11 +16,13 @@ import (
 	management "github.com/rancher/shepherd/clients/rancher/generated/management/v3"
 	extauthz "github.com/rancher/shepherd/extensions/kubeapi/authorization"
 	"github.com/rancher/shepherd/extensions/users"
+	"github.com/rancher/shepherd/pkg/clientbase"
 	namegen "github.com/rancher/shepherd/pkg/namegenerator"
 	authzv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 )
 
@@ -220,4 +225,101 @@ func (p *RTBTestSuite) TestReadOnlyCannotMoveNamespace() {
 	_, err = dynamicClient.Resource(nsGVR).Patch(context.TODO(), ns.Name, k8stypes.MergePatchType, []byte(patchPayload), metav1.PatchOptions{})
 	p.Require().Error(err)
 	p.Require().True(apierrors.IsForbidden(err), "expected forbidden, got: %v", err)
+}
+
+func (p *RTBTestSuite) TestSystemProjectCreated() {
+	client := p.newSubSession()
+
+	projects, err := client.Management.Project.List(&types.ListOpts{
+		Filters: map[string]any{
+			"clusterId": p.downstreamClusterID,
+		},
+	})
+	p.Require().NoError(err)
+
+	systemProjectLabel := "authz.management.cattle.io/system-project"
+	defaultProjectLabel := "authz.management.cattle.io/default-project"
+
+	initialProjects := map[string]string{
+		"Default": defaultProjectLabel,
+		"System":  systemProjectLabel,
+	}
+
+	var requiredProjects []string
+	for _, project := range projects.Data {
+		if label, ok := initialProjects[project.Name]; ok {
+			p.Require().Equal("true", project.Labels[label])
+			requiredProjects = append(requiredProjects, project.Name)
+		}
+	}
+
+	p.Require().Len(requiredProjects, len(initialProjects))
+}
+
+func (p *RTBTestSuite) TestSystemProjectCannotBeDeleted() {
+	client := p.newSubSession()
+
+	projects, err := client.Management.Project.List(&types.ListOpts{
+		Filters: map[string]any{
+			"clusterId": p.downstreamClusterID,
+		},
+	})
+	p.Require().NoError(err)
+
+	var systemProject *management.Project
+	for _, project := range projects.Data {
+		if project.Name == "System" {
+			systemProject = &project
+			break
+		}
+	}
+	p.Require().NotNil(systemProject, "System project not found")
+
+	// Attempting to delete the System project should return 405.
+	err = client.Management.Project.Delete(systemProject)
+	p.Require().Error(err)
+
+	var apiErr *clientbase.APIError
+	p.Require().True(errors.As(err, &apiErr), "expected APIError, got: %v", err)
+	p.Require().Equal(http.StatusMethodNotAllowed, apiErr.StatusCode)
+	p.Require().Contains(apiErr.Body, "System Project cannot be deleted")
+}
+
+func (p *RTBTestSuite) TestSystemNamespacesDefaultServiceAccount() {
+	client := p.newSubSession()
+
+	setting, err := client.Management.Setting.ByID("system-namespaces")
+	p.Require().NoError(err)
+
+	systemNamespaces := make(map[string]any)
+	for ns := range strings.SplitSeq(setting.Value, ",") {
+		trimmed := strings.TrimSpace(ns)
+		if trimmed != "" {
+			systemNamespaces[trimmed] = true
+		}
+	}
+
+	dynamicClient, err := client.GetDownStreamClusterClient(p.downstreamClusterID)
+	p.Require().NoError(err)
+
+	saGVR := corev1.SchemeGroupVersion.WithResource("serviceaccounts")
+
+	for ns := range systemNamespaces {
+		if ns == "kube-system" {
+			continue
+		}
+
+		p.Require().Eventually(func() bool {
+			saList, err := dynamicClient.Resource(saGVR).Namespace(ns).List(context.TODO(), metav1.ListOptions{
+				FieldSelector: "metadata.name=default",
+			})
+			if err != nil || len(saList.Items) == 0 {
+				return false
+			}
+
+			sa := saList.Items[0]
+			automount, found, _ := unstructured.NestedBool(sa.Object, "automountServiceAccountToken")
+			return found && !automount
+		}, 2*time.Minute, 2*time.Second, fmt.Sprintf("default service account in namespace %s does not have automountServiceAccountToken set to false", ns))
+	}
 }
