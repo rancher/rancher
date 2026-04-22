@@ -54,6 +54,8 @@ jobs:
     permissions:
       contents: write
       id-token: write
+    env:
+      TAG: ${{ github.ref_name }}
     steps:
       - name: install gh
         shell: bash
@@ -83,6 +85,6 @@ jobs:
           private-key: ${{ env.PRIVATE_KEY }}
       - name: create draft release
         shell: bash
-        run: gh release create "${TAG}" -R "${GITHUB_REPOSITORY}" --draft --prerelease --title "${TAG}"
+        run: gh release create "${TAG}" -R "${GITHUB_REPOSITORY}" --draft --prerelease --verify-tag --title "${TAG}"
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
