@@ -364,9 +364,10 @@ func encryptionKeyRotationIsEtcdAndNotControlPlaneAndNotLeaderAndInit(controlPla
 	}
 }
 
-// encryptionKeyRotationRestartTargetsForCluster builds the ordered restart groups for
-// the current cluster topology. Etcd-only nodes are restarted first. Control-plane nodes
-// are restarted after that and are the nodes Rancher uses for local status convergence.
+// encryptionKeyRotationRestartTargetsForCluster groups the nodes for the restart phase.
+// Etcd-only nodes are grouped first because Rancher does not use them for local
+// secrets-encrypt convergence checks. Control-plane nodes are grouped after that
+// for convergence checks.
 func encryptionKeyRotationRestartTargetsForCluster(controlPlane *rkev1.RKEControlPlane, clusterPlan *plan.Plan, leader, initNode *planEntry) encryptionKeyRotationRestartTargets {
 	targets := encryptionKeyRotationRestartTargets{
 		controlPlane: []*planEntry{leader},
@@ -374,7 +375,7 @@ func encryptionKeyRotationRestartTargetsForCluster(controlPlane *rkev1.RKEContro
 
 	if initNode != nil && !isInitNode(leader) {
 		if isControlPlane(initNode) {
-			targets.controlPlane = append([]*planEntry{initNode}, targets.controlPlane...)
+			targets.controlPlane = append(targets.controlPlane, initNode)
 		} else if isEtcd(initNode) {
 			targets.etcdOnly = append(targets.etcdOnly, initNode)
 		}
