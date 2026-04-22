@@ -18,7 +18,7 @@ import (
 // automatically resolved. In the case where images are detected but cannot be automatically resolved, a warning
 // will be printed to the console indicating such images, and the value of the image in the map will be 'unknown'.
 //
-// This tool can be run with the command `dapper check-origins`.
+// This tool can be run from the Rancher runtime with `make check-origins`.
 
 func main() {
 	if err := inner(os.Args[1], os.Args[2:], os.Getenv("OCI_CHART_DIRS"), os.Getenv("OCI_CHART_REPOSITORY")); err != nil {

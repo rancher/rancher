@@ -31,8 +31,7 @@ jobs:
       - runner=16cpu-linux-x64
       - run-id=${{ github.run_id }}
     env:
-      # this is due to the dapper pod having a host-port on the registry-cache container
-      # we can hit this registry from dapper OR the host docker if we use the docker IP
+      # The registry-cache pod exposes a host port, so use the Docker bridge IP from the runner.
       REGISTRY: "172.17.0.2:5000"
       DRONE_BUILD_EVENT: "${{ github.event_name }}"
       V2PROV_TEST_RUN_REGEX: "${{ matrix.V2PROV_TEST_RUN_REGEX }}"
@@ -51,10 +50,6 @@ jobs:
           persist-credentials: false
       - name: testdata
         run: mkdir -p build/testdata
-      - name: Install Dapper
-        run: |
-          curl -sL https://releases.rancher.com/dapper/latest/dapper-$(uname -s)-$(uname -m) > ./.dapper
-          chmod +x ./.dapper
       - name: Configure Docker for cgroupfs/insecure-registry
         run: |
           echo '{"exec-opts": ["native.cgroupdriver=cgroupfs"], "insecure-registries": ["172.17.0.2:5000"]}' | sudo tee /etc/docker/daemon.json
@@ -92,15 +87,14 @@ jobs:
           CATTLE_AGENT_IMAGE: "${{ env.IMAGE_AGENT}}:${{ env.TAG }}"
         run: |
           set -eo pipefail
-          ./.dapper provisioning-tests | tee provtest_output.txt
+          ./scripts/container-run provisioning-tests | tee provtest_output.txt
       - name: Move plaintext test results for upload
         if: always()
         id: test_output
         run: |
           export TESTSUITE="$(echo "${V2PROV_TEST_RUN_REGEX}" | sed 's/Test//' | tr -d '()|_^.*$')"
           echo "suite=${TESTSUITE}" >> $GITHUB_OUTPUT
-          # need sudo due to this being created in the dapper container
-          sudo mv ./build/out.txt "/tmp/report-${V2PROV_TEST_DIST}-${TESTSUITE}.txt"
+          mv ./build/out.txt "/tmp/report-${V2PROV_TEST_DIST}-${TESTSUITE}.txt"
       - name: Upload Plain Text Test Results
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
