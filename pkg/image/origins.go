@@ -13,7 +13,7 @@ import (
 // no longer used by Rancher. The keys of this map should
 // mirror the images listed in rancher-images.txt.
 // Some net-new images may be resolved via the check-origins script
-// (dapper check-origins).
+// (`make check-origins`).
 
 // images should be double-checked and confirmed
 // by the team which owns the image.
