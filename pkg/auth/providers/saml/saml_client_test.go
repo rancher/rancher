@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/crewjam/saml"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 )
@@ -127,9 +126,7 @@ func TestGetUserIdFromRelayState(t *testing.T) {
 			}
 			p := Provider{
 				clientState: cookieStore,
-				serviceProvider: &saml.ServiceProvider{
-					Key: privateKey,
-				},
+				spKey:       privateKey,
 			}
 
 			userID, err := p.getUserIdFromRelayStateCookie(test.createRequest())

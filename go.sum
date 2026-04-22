@@ -659,8 +659,6 @@ github.com/rancher/remotedialer v0.6.1 h1:smq2sHKJn+NxxIeQ8To9CGGkz8l6Ir7EPzfAdj
 github.com/rancher/remotedialer v0.6.1/go.mod h1:0+dmsw9TPjcqNUPrgAVFZpvbxy1r/fRaGPpVa84OMjU=
 github.com/rancher/remotedialer-proxy v0.8.0-rc.5 h1:22cdanfJa8OeBhbiZVixgnQOWmUD1BA2QLN06MpKMKM=
 github.com/rancher/remotedialer-proxy v0.8.0-rc.5/go.mod h1:UbCeDnl3rtedAEvBp1PJc3itP26jSm3SYbaEw5SqKVw=
-github.com/rancher/saml v0.4.14-rancher3 h1:2NN6cPqm9FJeiT25x8+gLHWGdulsEak33cHRkGaJ5v0=
-github.com/rancher/saml v0.4.14-rancher3/go.mod h1:S4+611dxnKt8z/ulbvaJzcgSHsuhjVc1QHNTcr1R7Fw=
 github.com/rancher/shepherd v0.0.0-20260610155525-6d926c75d49a h1://lhZJ7E6znLttBO9b2+V/Xl51iw3bDspjiH8W5MxMk=
 github.com/rancher/shepherd v0.0.0-20260610155525-6d926c75d49a/go.mod h1:OxexRIlEGlPaWS9YeFVfYD5ANH/8Yqb+hMyPuUiCp2o=
 github.com/rancher/steve v0.9.18 h1:d3q1iCSEO4EXhRhdpiZqHrZM3gHUisD64YZiW5VUw4g=
@@ -691,6 +689,8 @@ github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0t
 github.com/rogpeppe/go-internal v1.14.1/go.mod h1:MaRKkUm5W0goXpeCfT7UZI6fk/L7L7so1lCWt35ZSgc=
 github.com/rubenv/sql-migrate v1.8.1 h1:EPNwCvjAowHI3TnZ+4fQu3a915OpnQoPAjTXCGOy2U0=
 github.com/rubenv/sql-migrate v1.8.1/go.mod h1:BTIKBORjzyxZDS6dzoiw6eAFYJ1iNlGAtjn4LGeVjS8=
+github.com/russellhaering/gosaml2 v0.11.0 h1:wlWm7dWMrpJBzh0xEOZof70nVen4f/2BEF8ZXaidJ9o=
+github.com/russellhaering/gosaml2 v0.11.0/go.mod h1:GmL5LeCP7PBYzSkkFxtmHuRzC2eUZ/6JSLYQd5fzKK4=
 github.com/russellhaering/goxmldsig v1.6.0 h1:8fdWXEPh2k/NZNQBPFNoVfS3JmzS4ZprY/sAOpKQLks=
 github.com/russellhaering/goxmldsig v1.6.0/go.mod h1:TrnaquDcYxWXfJrOjeMBTX4mLBeYAqaHEyUeWPxZlBM=
 github.com/russross/blackfriday/v2 v2.1.0 h1:JIOH55/0cWyOuilr9/qlrm0BSXldqnqwMsf35Ld67mk=
@@ -994,8 +994,6 @@ gopkg.in/yaml.v2 v2.4.0 h1:D8xgwECY7CYvx+Y2n4sBz93Jn9JRvxdiyyo8CTfuKaY=
 gopkg.in/yaml.v2 v2.4.0/go.mod h1:RDklbk79AGWmwhnvt/jBztapEOGDOx6ZbXqjP6csGnQ=
 gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
 gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
-gotest.tools v2.2.0+incompatible h1:VsBPFP1AI068pPrMxtb/S8Zkgf9xEmTLJjfM+P5UIEo=
-gotest.tools v2.2.0+incompatible/go.mod h1:DsYFclhRJ6vuDpmuTbkuFWG+y2sxOXAzmJt81HFBacw=
 gotest.tools/v3 v3.5.2 h1:7koQfIKdy+I8UTetycgUqXWSDwpgv193Ka+qRsmBY8Q=
 gotest.tools/v3 v3.5.2/go.mod h1:LtdLGcnqToBH83WByAAi/wiwSFCArdFIUV/xxN4pcjA=
 helm.sh/helm/v4 v4.2.2 h1:E2zSCA2uUm9PNiZsSC/BioDVGsYk7nF2jNJFg/i+Dng=
