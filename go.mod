@@ -54,6 +54,8 @@ replace (
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.36.0
 	oras.land/oras-go => oras.land/oras-go v1.2.2 // for docker 20.10.x compatibility
 
+	github.com/rancher/aks-operator => github.com/rancher-teja/aks-operator v1.13.0-rc.1.0.20260422092428-0a8250c41d6f
+	github.com/rancher/ali-operator => github.com/rancher-teja/ali-operator v1.13.0-rc.1.0.20260422092428-0a8250c41d6f
 	github.com/rancher/norman => github.com/rancher-teja/norman v0.9.3-0.20260422052120-0d3c42580dd0
 	github.com/rancher/wrangler/v3 => github.com/rancher-teja/wrangler/v3 v3.6.0-rc.1.0.20260422041726-1ad245aff676
 )
