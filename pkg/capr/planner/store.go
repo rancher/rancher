@@ -271,6 +271,9 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 		if err != nil {
 			return nil, err
 		}
+		if err := gzipReader.Close(); err != nil {
+			return nil, err
+		}
 		result.Output = map[string][]byte{}
 		if err := json.Unmarshal(output, &result.Output); err != nil {
 			return nil, err
@@ -286,6 +289,9 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 		if err != nil {
 			return nil, err
 		}
+		if err := gzipReader.Close(); err != nil {
+			return nil, err
+		}
 		result.FailedOutput = map[string][]byte{}
 		if err := json.Unmarshal(failedOutput, &result.FailedOutput); err != nil {
 			return nil, err
@@ -299,6 +305,9 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 		}
 		output, err = io.ReadAll(gzipReader)
 		if err != nil {
+			return nil, err
+		}
+		if err := gzipReader.Close(); err != nil {
 			return nil, err
 		}
 		result.PeriodicOutput = map[string]plan.PeriodicInstructionOutput{}

@@ -208,7 +208,7 @@ func Test_encryptionKeyRotationRestartTargetsForCluster(t *testing.T) {
 		assert.Equal(t, "control-plane-follower", targets.controlPlane[1].Machine.Name)
 	})
 
-	t.Run("control plane init node stays in control-plane ordering", func(t *testing.T) {
+	t.Run("control plane init node stays in control-plane restart group", func(t *testing.T) {
 		clusterPlan := newTestEncryptionKeyRotationPlan(
 			newTestEncryptionKeyRotationMachine("control-plane-init", true, true, true, true, "https://control-plane-init:9345"),
 			newTestEncryptionKeyRotationMachine("control-plane-leader", true, true, false, true, "https://control-plane-leader:9345"),
@@ -225,8 +225,8 @@ func Test_encryptionKeyRotationRestartTargetsForCluster(t *testing.T) {
 		assert.Equal(t, 3, targets.count())
 		assert.Empty(t, targets.etcdOnly)
 		assert.Len(t, targets.controlPlane, 3)
-		assert.Equal(t, "control-plane-init", targets.controlPlane[0].Machine.Name)
-		assert.Equal(t, "control-plane-leader", targets.controlPlane[1].Machine.Name)
+		assert.Equal(t, "control-plane-leader", targets.controlPlane[0].Machine.Name)
+		assert.Equal(t, "control-plane-init", targets.controlPlane[1].Machine.Name)
 		assert.Equal(t, "control-plane-follower", targets.controlPlane[2].Machine.Name)
 	})
 }
