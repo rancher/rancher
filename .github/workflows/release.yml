@@ -48,7 +48,7 @@ jobs:
     permissions:
       contents: read
   create-release:
-    needs: [build-server, buid-agent, integration-tests, unit-tests]
+    needs: [build-server, build-agent, integration-tests, unit-tests]
     runs-on: org-${{ github.repository_owner_id }}-amd64-k8s
     container: registry.suse.com/bci/bci-base:15.7
     permissions:
