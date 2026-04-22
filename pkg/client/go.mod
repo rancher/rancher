@@ -1,12 +1,12 @@
 module github.com/rancher/rancher/pkg/client
 
-go 1.25.0
+go 1.26.0
 
-toolchain go1.25.8
+replace github.com/rancher/norman => github.com/rancher-teja/norman v0.9.3-0.20260423064226-5e6ff046a71a
 
 require (
-	github.com/rancher/norman v0.9.1
-	k8s.io/apimachinery v0.35.5
+	github.com/rancher/norman v0.9.0
+	k8s.io/apimachinery v0.36.0
 )
 
 require (
@@ -18,11 +18,11 @@ require (
 	github.com/rancher/wrangler/v3 v3.4.0 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	golang.org/x/net v0.52.0 // indirect
-	golang.org/x/sys v0.42.0 // indirect
-	golang.org/x/text v0.35.0 // indirect
+	golang.org/x/net v0.53.0 // indirect
+	golang.org/x/sys v0.43.0 // indirect
+	golang.org/x/text v0.36.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	k8s.io/klog/v2 v2.130.1 // indirect
+	k8s.io/klog/v2 v2.140.0 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
 )
