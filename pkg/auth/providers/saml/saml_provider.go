@@ -1,12 +1,13 @@
 package saml
 
 import (
+	"crypto/rsa"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
-	"github.com/crewjam/saml"
 	"github.com/pkg/errors"
 	"github.com/rancher/norman/httperror"
 	"github.com/rancher/norman/types"
@@ -22,6 +23,7 @@ import (
 	"github.com/rancher/rancher/pkg/types/config"
 	"github.com/rancher/rancher/pkg/user"
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
+	saml2 "github.com/russellhaering/gosaml2"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -43,7 +45,11 @@ type Provider struct {
 	samlTokens      v3.SamlTokenInterface
 	userMGR         user.Manager
 	tokenMGR        *tokens.Manager
-	serviceProvider *saml.ServiceProvider
+	serviceProvider *saml2.SAMLServiceProvider
+	spKey           *rsa.PrivateKey
+	metadataURL     url.URL
+	acsURL          url.URL
+	sloURL          url.URL
 	name            string
 	userType        string
 	groupType       string
@@ -163,13 +169,13 @@ func (s *Provider) LogoutAll(w http.ResponseWriter, r *http.Request, token acces
 	userAtProvider := usernames[0]
 	finalRedirectURL := authLogout.FinalRedirectURL
 
-	validatedRedirectURL, err := validateFinalRedirectURL(finalRedirectURL, provider.serviceProvider.MetadataURL.String())
+	validatedRedirectURL, err := validateFinalRedirectURL(finalRedirectURL, provider.metadataURL.String())
 	if err != nil {
 		logrus.Errorf("SAML [LogoutAll]: validating redirect URL: %v", err)
 		return newInvalidURLError("failed to logout")
 	}
 
-	provider.clientState.SetPath(provider.serviceProvider.SloURL.Path)
+	provider.clientState.SetPath(provider.sloURL.Path)
 	provider.clientState.SetState(w, r, "Rancher_FinalRedirectURL", validatedRedirectURL)
 	provider.clientState.SetState(w, r, "Rancher_Action", "logout-all")
 
@@ -205,7 +211,7 @@ func PerformSamlLogin(r *http.Request, w http.ResponseWriter, name string, input
 		return errors.New("unexpected provider type")
 	}
 
-	finalRedirectURL, err := validateFinalRedirectURL(login.FinalRedirectURL, provider.serviceProvider.MetadataURL.String())
+	finalRedirectURL, err := validateFinalRedirectURL(login.FinalRedirectURL, provider.metadataURL.String())
 	if err != nil {
 		logrus.Errorf("SAML [PerformSamlLogin]: validating redirect URL: %v", err)
 		return newInvalidURLError("failed to login")
@@ -223,7 +229,7 @@ func PerformSamlLogin(r *http.Request, w http.ResponseWriter, name string, input
 			return fmt.Errorf("SAML: Provider %v clientState not set", name)
 		}
 
-		provider.clientState.SetPath(provider.serviceProvider.AcsURL.Path)
+		provider.clientState.SetPath(provider.acsURL.Path)
 		provider.clientState.SetState(w, r, "Rancher_FinalRedirectURL", finalRedirectURL)
 		provider.clientState.SetState(w, r, "Rancher_Action", loginAction)
 		provider.clientState.SetState(w, r, "Rancher_PublicKey", login.PublicKey)
