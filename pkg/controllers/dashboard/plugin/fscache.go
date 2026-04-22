@@ -17,9 +17,9 @@ import (
 	"syscall"
 
 	"github.com/Masterminds/semver/v3"
-	filepathsecure "github.com/cyphar/filepath-securejoin"
 	v1 "github.com/rancher/rancher/pkg/apis/catalog.cattle.io/v1"
 	"github.com/rancher/rancher/pkg/settings"
+	"github.com/rancher/rancher/pkg/utils"
 	"github.com/sirupsen/logrus"
 )
 
@@ -80,7 +80,7 @@ func (c FSCache) SyncWithControllersCache(p *v1.UIPlugin, forceUpdate bool) erro
 		if resp.StatusCode != 200 {
 			return fmt.Errorf("failed to fetch file from URL [%s]. Status code: %d", plugin.CompressedEndpoint, resp.StatusCode)
 		}
-		p, _ := filepathsecure.SecureJoin(FSCacheRootDir, plugin.Name)
+		p, _ := utils.SecureJoin(FSCacheRootDir, plugin.Name)
 		if err := os.MkdirAll(p, os.ModePerm); err != nil {
 			return fmt.Errorf("failed to create cache directory with path [%s]. Error: %w", p, err)
 		}
@@ -112,7 +112,7 @@ func (c FSCache) SyncWithControllersCache(p *v1.UIPlugin, forceUpdate bool) erro
 			if err != nil {
 				return fmt.Errorf("failed to fetch file [%s] .Error: %w", file, err)
 			}
-			path, err := filepathsecure.SecureJoin(FSCacheRootDir, filepath.Join(plugin.Name, plugin.Version, file))
+			path, err := utils.SecureJoin(FSCacheRootDir, filepath.Join(plugin.Name, plugin.Version, file))
 			if err != nil {
 				return fmt.Errorf("failed to build file [%s] path for caching. Error: %w", file, err)
 			}
@@ -176,8 +176,10 @@ func Untar(dst string, r io.Reader) error {
 			continue
 		}
 
-		target := filepath.Join(dst, header.Name)
-
+		target, err := utils.SecureJoin(dst, header.Name)
+		if err != nil {
+			return fmt.Errorf("failed to build path for file [%s]", header.Name)
+		}
 		switch header.Typeflag {
 
 		// if it's a dir, and it doesn't exist, create it
@@ -222,7 +224,7 @@ func (c FSCache) Save(data []byte, path string) error {
 
 // Delete takes in a plugin's name and version, and deletes its entry in the filesystem cache
 func (c FSCache) Delete(name, version string) error {
-	p, err := filepathsecure.SecureJoin(FSCacheRootDir, name)
+	p, err := utils.SecureJoin(FSCacheRootDir, name)
 	if err != nil {
 		return fmt.Errorf("failed to get cache path for [%s]. Error: %w", name, err)
 	}
@@ -239,7 +241,7 @@ func (c FSCache) Delete(name, version string) error {
 // isCached takes in the name and version of a plugin and returns true if
 // it is cached (entry exists and files were fetched), returns false otherwise
 func (c FSCache) isCached(name, version string) (bool, error) {
-	path, err := filepathsecure.SecureJoin(FSCacheRootDir, filepath.Join(name, version))
+	path, err := utils.SecureJoin(FSCacheRootDir, filepath.Join(name, version))
 	if err != nil {
 		return false, fmt.Errorf("failed to get cache directory path [%s]. Error: %w", filepath.Join(name, version), err)
 	}
