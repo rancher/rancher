@@ -1,8 +1,8 @@
 package scim
 
 import (
-	"encoding/json"
 	"fmt"
+	"strconv"
 
 	wcorev1 "github.com/rancher/wrangler/v3/pkg/generated/controllers/core/v1"
 	"github.com/sirupsen/logrus"
@@ -25,19 +25,35 @@ const (
 
 // providerConfig holds SCIM provisioning settings for a single auth provider.
 // Stored as a ConfigMap in cattle-global-data with name "scim-config-{provider}".
+//
+// Each field maps directly to a key in ConfigMap.Data:
+//
+//	enabled:          "true" | "false"   (default: false)
+//	paused:           "true" | "false"   (default: false)
+//	userIdAttribute:  "userName" | "externalId"   (default: "userName")
+//	groupIdAttribute: "displayName" | "externalId" (default: "displayName")
 type providerConfig struct {
+	// Enabled controls whether SCIM provisioning is active for this provider.
+	// The SCIM feature flag must also be enabled; this flag alone is not sufficient.
+	Enabled bool
+
+	// Paused suspends SCIM provisioning without revoking tokens or losing configuration.
+	// When paused, the SCIM server returns 503 Service Unavailable.
+	// Once unpaused, the IdP can re-sync and reconcile any changes that occurred in the interim.
+	Paused bool
+
 	// UserIDAttribute specifies which SCIM user attribute to use as the
 	// identifier in the Rancher principal ID (e.g. "okta_user://<value>").
 	// Must match what the auth provider's login flow uses.
 	//
 	// Supported values: "userName" (default), "externalId".
-	UserIDAttribute string `json:"userIdAttribute,omitempty"`
+	UserIDAttribute string
 
 	// GroupIDAttribute specifies which SCIM group attribute to use as the
 	// identifier in the Rancher group principal ID.
 	//
 	// Supported values: "displayName" (default), "externalId".
-	GroupIDAttribute string `json:"groupIdAttribute,omitempty"`
+	GroupIDAttribute string
 }
 
 func (c *providerConfig) userID(user scimUser) string {
@@ -89,30 +105,28 @@ func getProviderConfig(configMapCache wcorev1.ConfigMapCache, provider string) p
 		return cfg
 	}
 
-	data, ok := cm.Data["config"]
-	if !ok {
-		return cfg
+	if v, ok := cm.Data["enabled"]; ok {
+		cfg.Enabled, _ = strconv.ParseBool(v)
 	}
 
-	if err := json.Unmarshal([]byte(data), &cfg); err != nil {
-		logrus.Errorf("scim::getProviderConfig: failed to parse configmap %s: %s", name, err)
-		return defaultProviderConfig()
+	if v, ok := cm.Data["paused"]; ok {
+		cfg.Paused, _ = strconv.ParseBool(v)
 	}
 
-	if cfg.UserIDAttribute == "" {
-		cfg.UserIDAttribute = UserIDUserName
-	}
-	if cfg.GroupIDAttribute == "" {
-		cfg.GroupIDAttribute = GroupIDDisplayName
+	if v := cm.Data["userIdAttribute"]; v != "" {
+		if validUserIDAttributes[v] {
+			cfg.UserIDAttribute = v
+		} else {
+			logrus.Errorf("scim::getProviderConfig: invalid userIdAttribute %q in configmap %s, using default", v, name)
+		}
 	}
 
-	if !validUserIDAttributes[cfg.UserIDAttribute] {
-		logrus.Errorf("scim::getProviderConfig: invalid userIdAttribute %q in configmap %s, using default", cfg.UserIDAttribute, name)
-		cfg.UserIDAttribute = UserIDUserName
-	}
-	if !validGroupIDAttributes[cfg.GroupIDAttribute] {
-		logrus.Errorf("scim::getProviderConfig: invalid groupIdAttribute %q in configmap %s, using default", cfg.GroupIDAttribute, name)
-		cfg.GroupIDAttribute = GroupIDDisplayName
+	if v := cm.Data["groupIdAttribute"]; v != "" {
+		if validGroupIDAttributes[v] {
+			cfg.GroupIDAttribute = v
+		} else {
+			logrus.Errorf("scim::getProviderConfig: invalid groupIdAttribute %q in configmap %s, using default", v, name)
+		}
 	}
 
 	return cfg

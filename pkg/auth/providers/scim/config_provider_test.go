@@ -106,6 +106,8 @@ func TestDefaultProviderConfig(t *testing.T) {
 	t.Parallel()
 
 	cfg := defaultProviderConfig()
+	assert.False(t, cfg.Enabled)
+	assert.False(t, cfg.Paused)
 	assert.Equal(t, UserIDUserName, cfg.UserIDAttribute)
 	assert.Equal(t, GroupIDDisplayName, cfg.GroupIDAttribute)
 }
@@ -114,10 +116,9 @@ func TestGetProviderConfig(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name     string
-		setup    func(*fake.MockCacheInterface[*corev1.ConfigMap])
-		wantUser string
-		wantGroup string
+		name       string
+		setup      func(*fake.MockCacheInterface[*corev1.ConfigMap])
+		wantConfig providerConfig
 	}{
 		{
 			name: "configmap not found returns defaults",
@@ -125,11 +126,20 @@ func TestGetProviderConfig(t *testing.T) {
 				cache.EXPECT().Get(tokenSecretNamespace, "scim-config-azuread").
 					Return(nil, apierrors.NewNotFound(schema.GroupResource{}, "scim-config-azuread"))
 			},
-			wantUser:  UserIDUserName,
-			wantGroup: GroupIDDisplayName,
+			wantConfig: defaultProviderConfig(),
 		},
 		{
-			name: "configmap missing config key returns defaults",
+			name: "empty configmap returns defaults",
+			setup: func(cache *fake.MockCacheInterface[*corev1.ConfigMap]) {
+				cache.EXPECT().Get(tokenSecretNamespace, "scim-config-azuread").
+					Return(&corev1.ConfigMap{
+						ObjectMeta: metav1.ObjectMeta{Name: "scim-config-azuread"},
+					}, nil)
+			},
+			wantConfig: defaultProviderConfig(),
+		},
+		{
+			name: "unknown keys are ignored",
 			setup: func(cache *fake.MockCacheInterface[*corev1.ConfigMap]) {
 				cache.EXPECT().Get(tokenSecretNamespace, "scim-config-azuread").
 					Return(&corev1.ConfigMap{
@@ -137,46 +147,77 @@ func TestGetProviderConfig(t *testing.T) {
 						Data:       map[string]string{"other": "value"},
 					}, nil)
 			},
-			wantUser:  UserIDUserName,
-			wantGroup: GroupIDDisplayName,
+			wantConfig: defaultProviderConfig(),
 		},
 		{
-			name: "valid config with externalId for both",
+			name: "enabled true",
+			setup: func(cache *fake.MockCacheInterface[*corev1.ConfigMap]) {
+				cache.EXPECT().Get(tokenSecretNamespace, "scim-config-azuread").
+					Return(&corev1.ConfigMap{
+						ObjectMeta: metav1.ObjectMeta{Name: "scim-config-azuread"},
+						Data:       map[string]string{"enabled": "true"},
+					}, nil)
+			},
+			wantConfig: providerConfig{Enabled: true, UserIDAttribute: UserIDUserName, GroupIDAttribute: GroupIDDisplayName},
+		},
+		{
+			name: "enabled false",
+			setup: func(cache *fake.MockCacheInterface[*corev1.ConfigMap]) {
+				cache.EXPECT().Get(tokenSecretNamespace, "scim-config-azuread").
+					Return(&corev1.ConfigMap{
+						ObjectMeta: metav1.ObjectMeta{Name: "scim-config-azuread"},
+						Data:       map[string]string{"enabled": "false"},
+					}, nil)
+			},
+			wantConfig: defaultProviderConfig(),
+		},
+		{
+			name: "enabled missing defaults to false",
+			setup: func(cache *fake.MockCacheInterface[*corev1.ConfigMap]) {
+				cache.EXPECT().Get(tokenSecretNamespace, "scim-config-azuread").
+					Return(&corev1.ConfigMap{
+						ObjectMeta: metav1.ObjectMeta{Name: "scim-config-azuread"},
+						Data:       map[string]string{"userIdAttribute": "externalId"},
+					}, nil)
+			},
+			wantConfig: providerConfig{Enabled: false, UserIDAttribute: UserIDExternalID, GroupIDAttribute: GroupIDDisplayName},
+		},
+		{
+			name: "paused true",
+			setup: func(cache *fake.MockCacheInterface[*corev1.ConfigMap]) {
+				cache.EXPECT().Get(tokenSecretNamespace, "scim-config-azuread").
+					Return(&corev1.ConfigMap{
+						ObjectMeta: metav1.ObjectMeta{Name: "scim-config-azuread"},
+						Data:       map[string]string{"enabled": "true", "paused": "true"},
+					}, nil)
+			},
+			wantConfig: providerConfig{Enabled: true, Paused: true, UserIDAttribute: UserIDUserName, GroupIDAttribute: GroupIDDisplayName},
+		},
+		{
+			name: "invalid bool value for enabled defaults to false",
+			setup: func(cache *fake.MockCacheInterface[*corev1.ConfigMap]) {
+				cache.EXPECT().Get(tokenSecretNamespace, "scim-config-azuread").
+					Return(&corev1.ConfigMap{
+						ObjectMeta: metav1.ObjectMeta{Name: "scim-config-azuread"},
+						Data:       map[string]string{"enabled": "yes"},
+					}, nil)
+			},
+			wantConfig: defaultProviderConfig(),
+		},
+		{
+			name: "externalId for both id attributes",
 			setup: func(cache *fake.MockCacheInterface[*corev1.ConfigMap]) {
 				cache.EXPECT().Get(tokenSecretNamespace, "scim-config-azuread").
 					Return(&corev1.ConfigMap{
 						ObjectMeta: metav1.ObjectMeta{Name: "scim-config-azuread"},
 						Data: map[string]string{
-							"config": `{"userIdAttribute":"externalId","groupIdAttribute":"externalId"}`,
+							"enabled":          "true",
+							"userIdAttribute":  "externalId",
+							"groupIdAttribute": "externalId",
 						},
 					}, nil)
 			},
-			wantUser:  UserIDExternalID,
-			wantGroup: GroupIDExternalID,
-		},
-		{
-			name: "invalid JSON returns defaults",
-			setup: func(cache *fake.MockCacheInterface[*corev1.ConfigMap]) {
-				cache.EXPECT().Get(tokenSecretNamespace, "scim-config-azuread").
-					Return(&corev1.ConfigMap{
-						ObjectMeta: metav1.ObjectMeta{Name: "scim-config-azuread"},
-						Data:       map[string]string{"config": "{invalid json"},
-					}, nil)
-			},
-			wantUser:  UserIDUserName,
-			wantGroup: GroupIDDisplayName,
-		},
-		{
-			name: "empty attribute values filled with defaults",
-			setup: func(cache *fake.MockCacheInterface[*corev1.ConfigMap]) {
-				cache.EXPECT().Get(tokenSecretNamespace, "scim-config-azuread").
-					Return(&corev1.ConfigMap{
-						ObjectMeta: metav1.ObjectMeta{Name: "scim-config-azuread"},
-						Data:       map[string]string{"config": `{}`},
-					}, nil)
-			},
-			wantUser:  UserIDUserName,
-			wantGroup: GroupIDDisplayName,
+			wantConfig: providerConfig{Enabled: true, UserIDAttribute: UserIDExternalID, GroupIDAttribute: GroupIDExternalID},
 		},
 		{
 			name: "invalid attribute values fall back to defaults",
@@ -185,12 +226,12 @@ func TestGetProviderConfig(t *testing.T) {
 					Return(&corev1.ConfigMap{
 						ObjectMeta: metav1.ObjectMeta{Name: "scim-config-azuread"},
 						Data: map[string]string{
-							"config": `{"userIdAttribute":"bogus","groupIdAttribute":"invalid"}`,
+							"userIdAttribute":  "bogus",
+							"groupIdAttribute": "invalid",
 						},
 					}, nil)
 			},
-			wantUser:  UserIDUserName,
-			wantGroup: GroupIDDisplayName,
+			wantConfig: defaultProviderConfig(),
 		},
 		{
 			name: "partial config only sets specified attribute",
@@ -198,13 +239,10 @@ func TestGetProviderConfig(t *testing.T) {
 				cache.EXPECT().Get(tokenSecretNamespace, "scim-config-azuread").
 					Return(&corev1.ConfigMap{
 						ObjectMeta: metav1.ObjectMeta{Name: "scim-config-azuread"},
-						Data: map[string]string{
-							"config": `{"userIdAttribute":"externalId"}`,
-						},
+						Data:       map[string]string{"userIdAttribute": "externalId"},
 					}, nil)
 			},
-			wantUser:  UserIDExternalID,
-			wantGroup: GroupIDDisplayName,
+			wantConfig: providerConfig{UserIDAttribute: UserIDExternalID, GroupIDAttribute: GroupIDDisplayName},
 		},
 	}
 
@@ -216,8 +254,7 @@ func TestGetProviderConfig(t *testing.T) {
 			tt.setup(cache)
 
 			cfg := getProviderConfig(cache, "azuread")
-			assert.Equal(t, tt.wantUser, cfg.UserIDAttribute)
-			assert.Equal(t, tt.wantGroup, cfg.GroupIDAttribute)
+			assert.Equal(t, tt.wantConfig, cfg)
 		})
 	}
 }
