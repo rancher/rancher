@@ -304,22 +304,17 @@ func (p *RTBTestSuite) TestSystemNamespacesDefaultServiceAccount() {
 
 	saGVR := corev1.SchemeGroupVersion.WithResource("serviceaccounts")
 
-	for ns := range systemNamespaces {
-		if ns == "kube-system" {
+	saList, err := dynamicClient.Resource(saGVR).Namespace("").List(context.TODO(), metav1.ListOptions{
+		FieldSelector: "metadata.name=default",
+	})
+
+	for _, sa := range saList.Items {
+		ns := sa.GetNamespace()
+		if _, ok := systemNamespaces[ns]; !ok || ns == "kube-system" {
 			continue
 		}
-
-		p.Require().Eventually(func() bool {
-			saList, err := dynamicClient.Resource(saGVR).Namespace(ns).List(context.TODO(), metav1.ListOptions{
-				FieldSelector: "metadata.name=default",
-			})
-			if err != nil || len(saList.Items) == 0 {
-				return false
-			}
-
-			sa := saList.Items[0]
-			automount, found, _ := unstructured.NestedBool(sa.Object, "automountServiceAccountToken")
-			return found && !automount
-		}, 2*time.Minute, 2*time.Second, fmt.Sprintf("default service account in namespace %s does not have automountServiceAccountToken set to false", ns))
+		automount, found, _ := unstructured.NestedBool(sa.Object, "automountServiceAccountToken")
+		p.Require().True(found, fmt.Sprintf("automountServiceAccountToken not found for service account %s in namespace %s", sa.GetName(), ns))
+		p.Require().False(automount, fmt.Sprintf("automountServiceAccountToken should be false for service account %s in namespace %s", sa.GetName(), ns))
 	}
 }
