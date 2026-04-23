@@ -2,7 +2,7 @@ module github.com/rancher/rancher/airgap
 
 go 1.24.0
 
-toolchain go1.24.12
+toolchain go1.25.9
 
 require (
 	github.com/containers/common v0.60.0
