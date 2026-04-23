@@ -3,16 +3,17 @@ package k3sbasedupgrade
 import (
 	"context"
 	"fmt"
+	"path"
 	"reflect"
 	"strings"
 	"time"
 
 	mgmtv3 "github.com/rancher/rancher/pkg/apis/management.cattle.io/v3"
+	clusterutils "github.com/rancher/rancher/pkg/cluster"
 	"github.com/rancher/rancher/pkg/controllers/management/clusterdeploy"
 	"github.com/rancher/rancher/pkg/controllers/management/importedclusterversionmanagement"
 	"github.com/rancher/rancher/pkg/controllers/managementuser/nodesyncer"
 	planClientset "github.com/rancher/rancher/pkg/generated/clientset/versioned/typed/upgrade.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/settings"
 	planv1 "github.com/rancher/system-upgrade-controller/pkg/apis/upgrade.cattle.io/v1"
 	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,13 +33,13 @@ func (h *handler) deployPlans(cluster *mgmtv3.Cluster) error {
 	)
 	switch {
 	case cluster.Status.Driver == mgmtv3.ClusterDriverRke2:
-		upgradeImage = settings.PrefixPrivateRegistry(rke2upgradeImage)
+		upgradeImage = path.Join(clusterutils.GetPrivateRegistryURL(cluster), rke2upgradeImage)
 		masterPlanName = rke2MasterPlanName
 		workerPlanName = rke2WorkerPlanName
 		Version = cluster.Spec.Rke2Config.Version
 		strategy = cluster.Spec.Rke2Config.ClusterUpgradeStrategy
 	case cluster.Status.Driver == mgmtv3.ClusterDriverK3s:
-		upgradeImage = settings.PrefixPrivateRegistry(k3supgradeImage)
+		upgradeImage = path.Join(clusterutils.GetPrivateRegistryURL(cluster), k3supgradeImage)
 		masterPlanName = k3sMasterPlanName
 		workerPlanName = k3sWorkerPlanName
 		Version = cluster.Spec.K3sConfig.Version
