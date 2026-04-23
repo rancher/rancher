@@ -6,13 +6,13 @@ toolchain go1.24.12
 
 require (
 	github.com/rancher/norman v0.7.1
-	k8s.io/apimachinery v0.34.6
+	k8s.io/apimachinery v0.34.7
 )
 
 require (
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
-	github.com/go-logr/logr v1.4.2 // indirect
+	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
