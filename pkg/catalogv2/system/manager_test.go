@@ -12,11 +12,12 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/generic/fake"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/chart"
-	"helm.sh/helm/v3/pkg/release"
-	"helm.sh/helm/v3/pkg/repo"
-	v1 "k8s.io/api/core/v1"
+	"helm.sh/helm/v4/pkg/action"
+	chart "helm.sh/helm/v4/pkg/chart/v2"
+	releasecommon "helm.sh/helm/v4/pkg/release/common"
+	releasev1 "helm.sh/helm/v4/pkg/release/v1"
+	repo "helm.sh/helm/v4/pkg/repo/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -75,7 +76,7 @@ func TestStart(t *testing.T) {
 
 func TestInstallCharts(t *testing.T) {
 	var (
-		fleetChartV1 = release.Release{
+		fleetChartV1 = releasev1.Release{
 			Namespace: "cattle-fleet-system",
 			Name:      "fleet",
 			Chart: &chart.Chart{
@@ -83,11 +84,11 @@ func TestInstallCharts(t *testing.T) {
 					Version: "1.0.0",
 				},
 			},
-			Info: &release.Info{
-				Status: release.StatusDeployed,
+			Info: &releasev1.Info{
+				Status: releasecommon.StatusDeployed,
 			},
 		}
-		fleetChartV2 = release.Release{
+		fleetChartV2 = releasev1.Release{
 			Namespace: "cattle-fleet-system",
 			Name:      "fleet",
 			Chart: &chart.Chart{
@@ -95,11 +96,11 @@ func TestInstallCharts(t *testing.T) {
 					Version: "2.0.0",
 				},
 			},
-			Info: &release.Info{
-				Status: release.StatusDeployed,
+			Info: &releasev1.Info{
+				Status: releasecommon.StatusDeployed,
 			},
 		}
-		fleetChartV3 = release.Release{
+		fleetChartV3 = releasev1.Release{
 			Namespace: "cattle-fleet-system",
 			Name:      "fleet",
 			Chart: &chart.Chart{
@@ -107,11 +108,11 @@ func TestInstallCharts(t *testing.T) {
 					Version: "3.0.0",
 				},
 			},
-			Info: &release.Info{
-				Status: release.StatusDeployed,
+			Info: &releasev1.Info{
+				Status: releasecommon.StatusDeployed,
 			},
 		}
-		rancherChartV1 = release.Release{
+		rancherChartV1 = releasev1.Release{
 			Namespace: "cattle-system",
 			Name:      "rancher-webhook",
 			Chart: &chart.Chart{
@@ -119,11 +120,11 @@ func TestInstallCharts(t *testing.T) {
 					Version: "1.0.0",
 				},
 			},
-			Info: &release.Info{
-				Status: release.StatusDeployed,
+			Info: &releasev1.Info{
+				Status: releasecommon.StatusDeployed,
 			},
 		}
-		aksOperatorChartV1 = release.Release{
+		aksOperatorChartV1 = releasev1.Release{
 			Namespace: "cattle-fleet-system",
 			Name:      "aks-operator",
 			Chart: &chart.Chart{
@@ -131,11 +132,11 @@ func TestInstallCharts(t *testing.T) {
 					Version: "1.0.0",
 				},
 			},
-			Info: &release.Info{
-				Status: release.StatusDeployed,
+			Info: &releasev1.Info{
+				Status: releasecommon.StatusDeployed,
 			},
 		}
-		aksOperatorChartV2 = release.Release{
+		aksOperatorChartV2 = releasev1.Release{
 			Namespace: "cattle-fleet-system",
 			Name:      "aks-operator",
 			Chart: &chart.Chart{
@@ -143,11 +144,11 @@ func TestInstallCharts(t *testing.T) {
 					Version: "2.0.0",
 				},
 			},
-			Info: &release.Info{
-				Status: release.StatusDeployed,
+			Info: &releasev1.Info{
+				Status: releasecommon.StatusDeployed,
 			},
 		}
-		aksOperatorChartV3 = release.Release{
+		aksOperatorChartV3 = releasev1.Release{
 			Namespace: "cattle-fleet-system",
 			Name:      "aks-operator",
 			Chart: &chart.Chart{
@@ -155,8 +156,8 @@ func TestInstallCharts(t *testing.T) {
 					Version: "3.0.0",
 				},
 			},
-			Info: &release.Info{
-				Status: release.StatusDeployed,
+			Info: &releasev1.Info{
+				Status: releasecommon.StatusDeployed,
 			},
 		}
 		fleetRepoV1 = repo.ChartVersion{
@@ -211,7 +212,7 @@ func TestInstallCharts(t *testing.T) {
 
 	tests := []struct {
 		name            string
-		releases        []*release.Release
+		releases        []*releasev1.Release
 		indexedReleases map[string]repo.ChartVersions
 		desiredCharts   map[desiredKey]map[string]any
 		takeOwnership   bool
@@ -220,7 +221,7 @@ func TestInstallCharts(t *testing.T) {
 	}{
 		{
 			name:     "Updates charts to desired version",
-			releases: []*release.Release{&rancherChartV1, &fleetChartV1, &aksOperatorChartV1},
+			releases: []*releasev1.Release{&rancherChartV1, &fleetChartV1, &aksOperatorChartV1},
 			indexedReleases: map[string]repo.ChartVersions{
 				"fleet":           {&fleetRepoV1, &fleetRepoV2},
 				"rancher-webhook": {&rancherRepoV1, &rancherRepoV2},
@@ -258,7 +259,7 @@ func TestInstallCharts(t *testing.T) {
 		},
 		{
 			name:     "Keeps installed release matching desired version",
-			releases: []*release.Release{&fleetChartV2, &rancherChartV1, &aksOperatorChartV2},
+			releases: []*releasev1.Release{&fleetChartV2, &rancherChartV1, &aksOperatorChartV2},
 			indexedReleases: map[string]repo.ChartVersions{
 				"fleet":           {&fleetRepoV1, &fleetRepoV2},
 				"rancher-webhook": {&rancherRepoV1, &rancherRepoV2},
@@ -296,7 +297,7 @@ func TestInstallCharts(t *testing.T) {
 		},
 		{
 			name:     "Keeps installed release, more recent than desired version",
-			releases: []*release.Release{&rancherChartV1, &fleetChartV3, &aksOperatorChartV3},
+			releases: []*releasev1.Release{&rancherChartV1, &fleetChartV3, &aksOperatorChartV3},
 			indexedReleases: map[string]repo.ChartVersions{
 				"fleet":           {&fleetRepoV1, &fleetRepoV2, &fleetRepoV3},
 				"rancher-webhook": {&rancherRepoV1, &rancherRepoV2},
@@ -335,7 +336,7 @@ func TestInstallCharts(t *testing.T) {
 		{
 			// This use case can occur when restoring to an older Rancher version.
 			name:     "Downgrades installed release, more recent than desired version",
-			releases: []*release.Release{&rancherChartV1, &fleetChartV3, &aksOperatorChartV3},
+			releases: []*releasev1.Release{&rancherChartV1, &fleetChartV3, &aksOperatorChartV3},
 			indexedReleases: map[string]repo.ChartVersions{
 				"fleet":           {&fleetRepoV1, &fleetRepoV2, &fleetRepoV3},
 				"rancher-webhook": {&rancherRepoV1, &rancherRepoV2},
@@ -373,7 +374,7 @@ func TestInstallCharts(t *testing.T) {
 		},
 		{
 			name:     "Installs release if none installed",
-			releases: []*release.Release{&rancherChartV1},
+			releases: []*releasev1.Release{&rancherChartV1},
 			indexedReleases: map[string]repo.ChartVersions{
 				"fleet":           {&fleetRepoV1, &fleetRepoV2},
 				"rancher-webhook": {&rancherRepoV1, &rancherRepoV2},
@@ -411,7 +412,7 @@ func TestInstallCharts(t *testing.T) {
 		},
 		{
 			name:     "Fails to install specified release if not found in catalog",
-			releases: []*release.Release{&rancherChartV1},
+			releases: []*releasev1.Release{&rancherChartV1},
 			indexedReleases: map[string]repo.ChartVersions{
 				"fleet":           {&fleetRepoV1, &fleetRepoV3},
 				"rancher-webhook": {&rancherRepoV1, &rancherRepoV2},
@@ -460,20 +461,20 @@ func TestInstallCharts(t *testing.T) {
 			ctx := context.Background()
 			mockContentClient := NewMockContentClient(ctrl)
 			mockOperationClient := NewMockOperationClient(ctrl)
-			mockPodClient := fake.NewMockClientInterface[*v1.Pod, *v1.PodList](ctrl)
+			mockPodClient := fake.NewMockClientInterface[*corev1.Pod, *corev1.PodList](ctrl)
 			mockHelmClient := NewMockHelmClient(ctrl)
 
 			for dc := range test.desiredCharts {
-				var foundRelease *release.Release
+				var foundRelease *releasev1.Release
 				for _, r := range test.releases {
 					if r.Name == dc.releaseName && r.Namespace == dc.namespace {
 						foundRelease = r
 					}
 				}
 
-				var foundReleases []*release.Release
+				var foundReleases []*releasev1.Release
 				if foundRelease != nil {
-					foundReleases = []*release.Release{foundRelease}
+					foundReleases = []*releasev1.Release{foundRelease}
 				}
 				// Call from installCharts and isInstalled
 				mockHelmClient.EXPECT().ListReleases(dc.namespace, dc.releaseName, action.ListDeployed).
@@ -481,7 +482,7 @@ func TestInstallCharts(t *testing.T) {
 					MaxTimes(2)
 
 				if test.expectInstalls[dc.chartName] {
-					mockOperationClient.EXPECT().AddCpTaintsToTolerations([]v1.Toleration(nil)).Return([]v1.Toleration{{Value: "bar", Key: "foo"}}, nil)
+					mockOperationClient.EXPECT().AddCpTaintsToTolerations([]corev1.Toleration(nil)).Return([]corev1.Toleration{{Value: "bar", Key: "foo"}}, nil)
 					// Call from install -> hasStatus
 					mockHelmClient.EXPECT().ListReleases(
 						dc.namespace,
@@ -499,16 +500,16 @@ func TestInstallCharts(t *testing.T) {
 					mockOperationClient.EXPECT().Upgrade(ctx, installUser, "", "rancher-charts", gomock.Any(), gomock.Any()).
 						Return(&upgradeOp, nil)
 
-					pod := v1.Pod{
+					pod := corev1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "foo",
 						},
-						Status: v1.PodStatus{
-							ContainerStatuses: []v1.ContainerStatus{
+						Status: corev1.PodStatus{
+							ContainerStatuses: []corev1.ContainerStatus{
 								{
 									Name: "helm",
-									State: v1.ContainerState{
-										Terminated: &v1.ContainerStateTerminated{
+									State: corev1.ContainerState{
+										Terminated: &corev1.ContainerStateTerminated{
 											ExitCode: 0,
 										},
 									},

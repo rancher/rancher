@@ -11,9 +11,9 @@ import (
 	configmapfakes "github.com/rancher/rancher/pkg/generated/norman/core/v1/fakes"
 	"github.com/rancher/rancher/pkg/managedcharts/cspadapter"
 	"github.com/stretchr/testify/assert"
-	"helm.sh/helm/v3/pkg/release"
+	releasev1 "helm.sh/helm/v4/pkg/release/v1"
 	authv1 "k8s.io/api/authorization/v1"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -34,7 +34,7 @@ func NewFakeChartUtil(generateError bool, generateNotFound bool) *FakeChartUtil 
 	}
 }
 
-func (c *FakeChartUtil) GetRelease(_ string, _ string) (*release.Release, error) {
+func (c *FakeChartUtil) GetRelease(_ string, _ string) (*releasev1.Release, error) {
 	if c.generateError {
 		return nil, fmt.Errorf("random error")
 	}
@@ -44,7 +44,7 @@ func (c *FakeChartUtil) GetRelease(_ string, _ string) (*release.Release, error)
 	}
 	// NOTE: we don't actually have to return a helm release as it will be
 	// ignored by the caller
-	return &release.Release{}, nil
+	return &releasev1.Release{}, nil
 }
 
 func TestGenerateSupportConfigScenarios(t *testing.T) {
@@ -169,10 +169,10 @@ func TestGenerateSupportConfigScenarios(t *testing.T) {
 			)
 			h := &Handler{
 				ConfigMaps: &configmapfakes.ConfigMapInterfaceMock{
-					GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*v1.ConfigMap, error) {
+					GetNamespacedFunc: func(namespace string, name string, opts metav1.GetOptions) (*corev1.ConfigMap, error) {
 						// NOTE: we are not testing the configmap itself. Just need to return a valid configmap.
 						if name == cspAdapterConfigmap {
-							return &v1.ConfigMap{
+							return &corev1.ConfigMap{
 								Data: map[string]string{
 									"data": "{}",
 								},
@@ -181,7 +181,7 @@ func TestGenerateSupportConfigScenarios(t *testing.T) {
 							if test.generateMeteringArchiveNotFound {
 								return nil, errNotFound
 							}
-							return &v1.ConfigMap{
+							return &corev1.ConfigMap{
 								Data: map[string]string{
 									"archive": "[]",
 								},

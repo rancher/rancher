@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 
 	"github.com/rancher/rancher/pkg/catalogv2/chart"
-	"helm.sh/helm/v3/pkg/provenance"
-	"helm.sh/helm/v3/pkg/repo"
+	"helm.sh/helm/v4/pkg/provenance"
+	"helm.sh/helm/v4/pkg/repo/v1"
 )
 
 func BuildOrGetIndex(namespace, name, gitURL string) (*repo.IndexFile, error) {

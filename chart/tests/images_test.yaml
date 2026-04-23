@@ -27,7 +27,7 @@ tests:
           of: Job
       - equal:
           path: spec.template.spec.containers[0].image
-          value: "registry.company.com/rancher/shell:v1.0.0-testing"
+          value: "registry.company.com/iyashmaurya/shell:v1.0.0-testing"
   - it: "should correctly set image for post-delete-hook-job.yaml"
     templates:
       - post-delete-hook-job.yaml
@@ -42,4 +42,4 @@ tests:
           of: Job
       - equal:
           path: spec.template.spec.containers[0].image
-          value: "registry.company.com/rancher/shell:v1.0.0-testing"
+          value: "registry.company.com/iyashmaurya/shell:v1.0.0-testing"

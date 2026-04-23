@@ -14,9 +14,9 @@ import (
 	ocispecv1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"helm.sh/helm/v3/pkg/chart"
-	"helm.sh/helm/v3/pkg/registry"
-	"helm.sh/helm/v3/pkg/repo"
+	chartv2 "helm.sh/helm/v4/pkg/chart/v2"
+	"helm.sh/helm/v4/pkg/registry"
+	"helm.sh/helm/v4/pkg/repo/v1"
 	corev1 "k8s.io/api/core/v1"
 	"oras.land/oras-go/v2"
 	"oras.land/oras-go/v2/content"
@@ -183,7 +183,7 @@ func GenerateIndex(ociClient *Client, URL string, credentialSecret *corev1.Secre
 			// Add tags into the helm repo index
 			if !indexHas(indexFile, chartName, semverTag.String()) {
 				chartVersion := &repo.ChartVersion{
-					Metadata: &chart.Metadata{
+					Metadata: &chartv2.Metadata{
 						Version: semverTag.String(),
 						Name:    chartName,
 					},

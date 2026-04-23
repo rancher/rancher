@@ -1,7 +1,7 @@
 from .common import *  # NOQA
 import pytest
 
-CATALOG_NAME = random_test_name("test-v3")
+CATALOG_NAME = random_test_name("test-v4")
 CATALOG_URL = "https://github.com/rancher/integration-test-charts.git"
 BRANCH = "validation-tests"
 MYSQL_EXTERNALID_131 = \
@@ -12,7 +12,7 @@ cluster_detail = {"cluster1": {"project1": None, "namespace1": None,
                                "cluster": None}}
 
 
-def test_helm_v3_app_deploy():
+def test_helm_v4_app_deploy():
     client = get_user_client()
     answer = get_defaut_question_answers(client, MYSQL_EXTERNALID_131)
     proj_client, ns, project = get_project_details("cluster1")
@@ -21,7 +21,7 @@ def test_helm_v3_app_deploy():
     proj_client.delete(app)
 
 
-def test_helm_v3_app_delete():
+def test_helm_v4_app_delete():
     client = get_user_client()
     answer = get_defaut_question_answers(client, MYSQL_EXTERNALID_131)
     proj_client, ns, project = get_project_details("cluster1")
@@ -31,7 +31,7 @@ def test_helm_v3_app_delete():
     validate_app_deletion(proj_client, app.id)
 
 
-def test_helm_v3_app_upgrade_version():
+def test_helm_v4_app_upgrade_version():
     client = get_user_client()
     answer = get_defaut_question_answers(client, MYSQL_EXTERNALID_131)
     proj_client, ns, project = get_project_details("cluster1")
@@ -46,7 +46,7 @@ def test_helm_v3_app_upgrade_version():
     proj_client.delete(app)
 
 
-def test_helm_v3_app_answer_override():
+def test_helm_v4_app_answer_override():
     client = get_user_client()
     answer = get_defaut_question_answers(client, MYSQL_EXTERNALID_131)
     proj_client, ns, project = get_project_details("cluster1")
@@ -83,9 +83,9 @@ def create_project_client(request):
         branch=BRANCH,
         kind="helm",
         url=CATALOG_URL,
-        helmVersion="helm_v3")
+        helmVersion="helm_v4")
     assert v3_catalog["helmVersion"] == \
-           "helm_v3", "Helm version is not helm_v3"
+           "helm_v4", "Helm version is not helm_v4"
     time.sleep(5)
 
     def fin():
@@ -113,7 +113,7 @@ def create_and_validate_app(proj_client, externalid, ns, project, answer):
         projectId=project,
         answers=answer)
     app = validate_catalog_app(proj_client, app, externalid)
-    assert app["helmVersion"] == "helm_v3", "Helm version is not helm_v3"
+    assert app["helmVersion"] == "helm_v4", "Helm version is not helm_v4"
     return app
 
 
@@ -135,7 +135,7 @@ def update_and_validate_app(app, proj_client, externalid, ns, project, answer):
         projectId=project,
         answers=answer)
     app = validate_catalog_app(proj_client, app, externalid, answer)
-    assert app["helmVersion"] == "helm_v3", "Helm version is not helm_v3"
+    assert app["helmVersion"] == "helm_v4", "Helm version is not helm_v4"
     return app
 
 

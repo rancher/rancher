@@ -9,7 +9,7 @@ cd $(dirname $0)/..
 
 mkdir -p ../bin/chart/${CHART_REPO}
 
-helm_v3 package -d ../bin/chart/${CHART_REPO} ../build/chart/rancher
+helm_v4 package -d ../bin/chart/${CHART_REPO} ../build/chart/rancher
 
 echo "updating index ... "
 ./chart/index ${CHART_REPO}

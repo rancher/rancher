@@ -17,9 +17,10 @@ import (
 	"github.com/rancher/rancher/pkg/catalogv2/oci/capturewindowclient"
 	"github.com/rancher/rancher/pkg/catalogv2/roundtripper"
 	"github.com/sirupsen/logrus"
-	"helm.sh/helm/v3/pkg/chart/loader"
-	helmregistry "helm.sh/helm/v3/pkg/registry"
-	"helm.sh/helm/v3/pkg/repo"
+	"helm.sh/helm/v4/pkg/chart/loader"
+	chartv2 "helm.sh/helm/v4/pkg/chart/v2"
+	helmregistry "helm.sh/helm/v4/pkg/registry"
+	"helm.sh/helm/v4/pkg/repo/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/helm/pkg/provenance"
 	"oras.land/oras-go/v2"
@@ -281,9 +282,14 @@ func (o *Client) GetOrasRepository() (*remote.Repository, error) {
 // addToIndex adds the given helm chart entry into the helm repo index provided.
 func (o *Client) addToIndex(indexFile *repo.IndexFile, chartTarFilePath string) error {
 	// Load the Chart into chart golang struct.
-	chart, err := loader.Load(chartTarFilePath)
+	chartInt, err := loader.Load(chartTarFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to load the chart %s: %w", chartTarFilePath, err)
+	}
+
+	chart, ok := chartInt.(*chartv2.Chart)
+	if !ok {
+		return fmt.Errorf("loaded chart is not of type *chartv2.Chart")
 	}
 
 	// Generate the digest of the chart.

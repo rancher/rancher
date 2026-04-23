@@ -5,9 +5,8 @@ package cspadapter
 import (
 	"errors"
 
-	"github.com/sirupsen/logrus"
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/release"
+	"helm.sh/helm/v4/pkg/action"
+	releasev1 "helm.sh/helm/v4/pkg/release/v1"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
@@ -40,9 +39,9 @@ func NewChartUtil(clientGetter genericclioptions.RESTClientGetter) *ChartUtil {
 }
 
 // GetRelease finds the release for the CSP adapter for a given offering. If not found, returns nil, ErrNotFound.
-func (c *ChartUtil) GetRelease(chartNamespace string, chartName string) (*release.Release, error) {
+func (c *ChartUtil) GetRelease(chartNamespace string, chartName string) (*releasev1.Release, error) {
 	cfg := &action.Configuration{}
-	if err := cfg.Init(c.restClientGetter, chartNamespace, "", logrus.Infof); err != nil {
+	if err := cfg.Init(c.restClientGetter, chartNamespace, ""); err != nil {
 		return nil, err
 	}
 	l := action.NewList(cfg)
@@ -50,9 +49,15 @@ func (c *ChartUtil) GetRelease(chartNamespace string, chartName string) (*releas
 	if err != nil {
 		return nil, err
 	}
+
 	for _, helmRelease := range releases {
-		if helmRelease.Chart.Name() == chartName {
-			return helmRelease, nil
+		rel, ok := helmRelease.(*releasev1.Release)
+		if !ok || rel.Chart == nil {
+			continue
+		}
+
+		if rel.Chart.Name() == chartName {
+			return rel, nil
 		}
 	}
 	return nil, ErrNotFound

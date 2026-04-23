@@ -585,6 +585,20 @@ func (c Command) renderArgs() ([]string, error) {
 		dataMap["disableOpenapiValidation"] = v
 	}
 
+	if v, ok := dataMap["atomic"]; ok {
+		delete(dataMap, "atomic")
+		dataMap["rollback-on-failure"] = v
+	}
+
+	if v, ok := dataMap["force"]; ok {
+		delete(dataMap, "force")
+		dataMap["force-replace"] = v
+	}
+
+	if v, ok := dataMap["takeOwnership"]; ok && convert.ToString(v) == "true" {
+		dataMap["force-conflicts"] = "true"
+	}
+
 	for k, v := range dataMap {
 		s := convert.ToString(v)
 		k = convert.ToArgKey(k)
