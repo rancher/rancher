@@ -348,6 +348,7 @@ func (h *loginHandler) login(w http.ResponseWriter, r *http.Request, input login
 			Secure:   true,
 			Path:     "/",
 			HttpOnly: true,
+			SameSite: http.SameSiteStrictMode,
 		}
 		http.SetCookie(w, tokenCookie)
 

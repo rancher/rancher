@@ -66,6 +66,7 @@ func TestLogout(t *testing.T) {
 				assert.Equal(t, -1, cookie.MaxAge)
 				assert.True(t, cookie.HttpOnly)
 				assert.Equal(t, "/", cookie.Path)
+				assert.Equal(t, http.SameSiteStrictMode, cookie.SameSite)
 				assert.Equal(t, cookieUnsetTimestamp, cookie.Expires)
 			default:
 				require.FailNow(t, "unexpected cookie "+cookie.Name)

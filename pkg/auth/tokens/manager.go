@@ -550,6 +550,7 @@ func (m *Manager) CreateTokenAndSetCookie(userID string, userPrincipal apiv3.Pri
 		Secure:   isSecure,
 		Path:     "/",
 		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
 	}
 	http.SetCookie(request.Response, tokenCookie)
 	request.WriteResponse(http.StatusOK, nil)
