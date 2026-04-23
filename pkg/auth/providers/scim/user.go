@@ -603,7 +603,7 @@ func (s *SCIMServer) PatchUser(w http.ResponseWriter, r *http.Request) {
 	for _, op := range payload.Operations {
 		switch strings.ToLower(op.Op) {
 		case "replace", "add":
-			updateAttr, updateUser, err := applyReplaceUser(provider, attr, user, op)
+			updateAttr, updateUser, err := applyPatchUser(provider, attr, user, op)
 			if err != nil {
 				logrus.Errorf("scim::PatchUser: failed to apply %s operation: %s", op.Op, err)
 				writeError(w, NewError(http.StatusBadRequest, fmt.Sprintf("Failed to apply %s operation: %s", op.Op, err)))
@@ -664,8 +664,9 @@ func (s *SCIMServer) PatchUser(w http.ResponseWriter, r *http.Request) {
 	writeResponse(w, response)
 }
 
-// applyReplaceUser applies a SCIM PATCH replace operation to a user.
-func applyReplaceUser(provider string, attr *v3.UserAttribute, user *v3.User, op patchOp) (bool, bool, error) {
+// applyPatchUser applies a SCIM PATCH add/replace operation to a user.
+// For single-valued attributes, add and replace have identical semantics (RFC 7644 §3.5.2).
+func applyPatchUser(provider string, attr *v3.UserAttribute, user *v3.User, op patchOp) (bool, bool, error) {
 	if op.Path == "" {
 		fields, ok := op.Value.(map[string]any)
 		if !ok {
@@ -674,7 +675,7 @@ func applyReplaceUser(provider string, attr *v3.UserAttribute, user *v3.User, op
 
 		var shouldUpdateAttr, shouldUpdateUser bool
 		for name, value := range fields {
-			updateAttr, updateUser, err := applyReplaceUser(provider, attr, user, patchOp{
+			updateAttr, updateUser, err := applyPatchUser(provider, attr, user, patchOp{
 				Op:    "replace",
 				Path:  name,
 				Value: value,

@@ -116,6 +116,9 @@ func (s *SCIMServer) ListGroups(w http.ResponseWriter, r *http.Request) {
 			}
 
 			gid := cfg.groupID(group.DisplayName, group.ExternalID)
+			if gid == "" {
+				continue
+			}
 			gpn := groupPrincipalName(provider, gid)
 
 			resource := map[string]any{
@@ -271,6 +274,11 @@ func (s *SCIMServer) GetGroup(w http.ResponseWriter, r *http.Request) {
 
 	cfg := s.getConfig(provider)
 	gid := cfg.groupID(group.DisplayName, group.ExternalID)
+	if gid == "" {
+		logrus.Errorf("scim::GetGroup: group %s has empty %s configured as groupIdAttribute", group.Name, cfg.GroupIDAttribute)
+		writeError(w, NewInternalError())
+		return
+	}
 	gpn := groupPrincipalName(provider, gid)
 
 	var members []scimMember
@@ -348,6 +356,11 @@ func (s *SCIMServer) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	gid := cfg.groupID(group.DisplayName, group.ExternalID)
+	if gid == "" {
+		logrus.Errorf("scim::UpdateGroup: group %s has empty %s configured as groupIdAttribute", group.Name, cfg.GroupIDAttribute)
+		writeError(w, NewInternalError())
+		return
+	}
 	gpn := groupPrincipalName(provider, gid)
 	err = s.syncGroupMembers(provider, gpn, group.DisplayName, payload.Members)
 	if err != nil {
@@ -509,6 +522,11 @@ func (s *SCIMServer) PatchGroup(w http.ResponseWriter, r *http.Request) {
 
 	cfg := s.getConfig(provider)
 	gid := cfg.groupID(group.DisplayName, group.ExternalID)
+	if gid == "" {
+		logrus.Errorf("scim::PatchGroup: group %s has empty %s configured as groupIdAttribute", group.Name, cfg.GroupIDAttribute)
+		writeError(w, NewInternalError())
+		return
+	}
 	gpn := groupPrincipalName(provider, gid)
 
 	// Apply group updates
@@ -594,6 +612,11 @@ func (s *SCIMServer) DeleteGroup(w http.ResponseWriter, r *http.Request) {
 
 	cfg := s.getConfig(provider)
 	gid := cfg.groupID(group.DisplayName, group.ExternalID)
+	if gid == "" {
+		logrus.Errorf("scim::DeleteGroup: group %s has empty %s configured as groupIdAttribute", group.Name, cfg.GroupIDAttribute)
+		writeError(w, NewInternalError())
+		return
+	}
 	gpn := groupPrincipalName(provider, gid)
 
 	err = s.removeAllGroupMembers(provider, gpn)
