@@ -368,12 +368,135 @@ func TestSyncGroupMembers(t *testing.T) {
 	})
 }
 
+func TestUpdateGroupMemberDisplayName(t *testing.T) {
+	t.Parallel()
+
+	provider := "okta"
+	principalName := groupPrincipalName(provider, "Engineering")
+
+	t.Run("updates stale displayName", func(t *testing.T) {
+		t.Parallel()
+		ctrl := gomock.NewController(t)
+
+		memberID := "u-mo773yttt4"
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: memberID},
+			GroupPrincipals: map[string]v3.Principals{
+				provider: {Items: []v3.Principal{
+					{ObjectMeta: metav1.ObjectMeta{Name: principalName}, DisplayName: "Old Name"},
+				}},
+			},
+		}
+
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(memberID).Return(existingAttr, nil)
+
+		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+		userAttrClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+			items := attr.GroupPrincipals[provider].Items
+			require.Len(t, items, 1)
+			assert.Equal(t, "Engineering", items[0].DisplayName)
+			return attr, nil
+		})
+
+		srv := &SCIMServer{
+			userAttributeCache: userAttributeCache,
+			userAttributes:     userAttrClient,
+		}
+
+		err := srv.updateGroupMemberDisplayName(provider, principalName, "Engineering", memberID)
+		require.NoError(t, err)
+	})
+
+	t.Run("no update when displayName is current", func(t *testing.T) {
+		t.Parallel()
+		ctrl := gomock.NewController(t)
+
+		memberID := "u-mo773yttt4"
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: memberID},
+			GroupPrincipals: map[string]v3.Principals{
+				provider: {Items: []v3.Principal{
+					{ObjectMeta: metav1.ObjectMeta{Name: principalName}, DisplayName: "Engineering"},
+				}},
+			},
+		}
+
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(memberID).Return(existingAttr, nil)
+
+		// No Update call expected.
+		srv := &SCIMServer{
+			userAttributeCache: userAttributeCache,
+		}
+
+		err := srv.updateGroupMemberDisplayName(provider, principalName, "Engineering", memberID)
+		require.NoError(t, err)
+	})
+}
+
+func TestSyncGroupMembersUpdatesStaleDisplayName(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	provider := "okta"
+	groupName := "Engineering"
+	principalName := groupPrincipalName(provider, groupName)
+	memberID := "u-mo773yttt4"
+
+	// User is already a member but with a stale DisplayName.
+	existingAttr := &v3.UserAttribute{
+		ObjectMeta: metav1.ObjectMeta{Name: memberID},
+		GroupPrincipals: map[string]v3.Principals{
+			provider: {Items: []v3.Principal{
+				{ObjectMeta: metav1.ObjectMeta{Name: principalName}, DisplayName: "Old Name"},
+			}},
+		},
+		ExtraByProvider: map[string]map[string][]string{
+			provider: {"username": {"john.doe"}},
+		},
+	}
+
+	userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+	userCache.EXPECT().Get(memberID).Return(&v3.User{
+		ObjectMeta: metav1.ObjectMeta{Name: memberID},
+	}, nil).AnyTimes()
+	userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{
+		{ObjectMeta: metav1.ObjectMeta{Name: memberID}},
+	}, nil)
+
+	userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+	userAttributeCache.EXPECT().Get(memberID).Return(existingAttr, nil).AnyTimes()
+
+	userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+	userAttrClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+		items := attr.GroupPrincipals[provider].Items
+		require.Len(t, items, 1)
+		assert.Equal(t, "Engineering", items[0].DisplayName)
+		return attr, nil
+	})
+
+	srv := &SCIMServer{
+		userCache:          userCache,
+		userAttributeCache: userAttributeCache,
+		userAttributes:     userAttrClient,
+		getConfig:          testDefaultGetConfig,
+	}
+
+	err := srv.syncGroupMembers(provider, principalName, groupName, []scimMember{
+		{Value: memberID, Display: "john.doe"},
+	})
+	require.NoError(t, err)
+}
+
 func TestApplyReplaceGroup(t *testing.T) {
+	cfg := defaultProviderConfig()
+	externalIDCfg := providerConfig{GroupIDAttribute: GroupIDExternalID}
+
 	t.Run("replaces externalId", func(t *testing.T) {
 		group := &v3.Group{ExternalID: "old-id"}
 		op := patchOp{Op: "replace", Path: "externalId", Value: "new-id"}
 
-		updated, err := applyReplaceGroup(group, op)
+		updated, err := applyReplaceGroup(group, op, cfg)
 
 		require.NoError(t, err)
 		assert.True(t, updated)
@@ -384,7 +507,7 @@ func TestApplyReplaceGroup(t *testing.T) {
 		group := &v3.Group{ExternalID: "same-id"}
 		op := patchOp{Op: "replace", Path: "externalId", Value: "same-id"}
 
-		updated, err := applyReplaceGroup(group, op)
+		updated, err := applyReplaceGroup(group, op, cfg)
 
 		require.NoError(t, err)
 		assert.False(t, updated)
@@ -400,7 +523,7 @@ func TestApplyReplaceGroup(t *testing.T) {
 			},
 		}
 
-		updated, err := applyReplaceGroup(group, op)
+		updated, err := applyReplaceGroup(group, op, cfg)
 
 		require.NoError(t, err)
 		assert.True(t, updated)
@@ -411,17 +534,39 @@ func TestApplyReplaceGroup(t *testing.T) {
 		group := &v3.Group{}
 		op := patchOp{Op: "replace", Path: "unsupported", Value: "value"}
 
-		updated, err := applyReplaceGroup(group, op)
+		updated, err := applyReplaceGroup(group, op, cfg)
 
 		require.Error(t, err)
 		assert.False(t, updated)
 	})
 
-	t.Run("rejects invalid value type", func(t *testing.T) {
+	t.Run("replaces displayName when externalId is group ID", func(t *testing.T) {
+		group := &v3.Group{DisplayName: "Old Name", ExternalID: "ext-123"}
+		op := patchOp{Op: "replace", Path: "displayName", Value: "New Name"}
+
+		updated, err := applyReplaceGroup(group, op, externalIDCfg)
+
+		require.NoError(t, err)
+		assert.True(t, updated)
+		assert.Equal(t, "New Name", group.DisplayName)
+	})
+
+	t.Run("rejects displayName change when displayName is group ID", func(t *testing.T) {
+		group := &v3.Group{DisplayName: "Old Name"}
+		op := patchOp{Op: "replace", Path: "displayName", Value: "New Name"}
+
+		updated, err := applyReplaceGroup(group, op, cfg)
+
+		require.Error(t, err)
+		assert.False(t, updated)
+		assert.Contains(t, err.Error(), "cannot be changed")
+	})
+
+	t.Run("rejects invalid displayName value type", func(t *testing.T) {
 		group := &v3.Group{}
 		op := patchOp{Op: "replace", Path: "displayName", Value: 123}
 
-		updated, err := applyReplaceGroup(group, op)
+		updated, err := applyReplaceGroup(group, op, externalIDCfg)
 
 		require.Error(t, err)
 		assert.False(t, updated)
@@ -2018,6 +2163,95 @@ func TestUpdateGroup(t *testing.T) {
 		assert.Equal(t, groupID, resp["id"])
 		assert.Equal(t, "Engineering", resp["displayName"])
 		assert.Equal(t, "new-ext-id", resp["externalId"])
+	})
+
+	t.Run("updates displayName with externalId config", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupID := "grp-abc123"
+		existingGroup := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			DisplayName: "Old Name",
+			ExternalID:  "ext-123",
+		}
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().Get(groupID).Return(existingGroup, nil)
+
+		groupClient := fake.NewMockNonNamespacedClientInterface[*v3.Group, *v3.GroupList](ctrl)
+		groupClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(g *v3.Group) (*v3.Group, error) {
+			assert.Equal(t, "New Name", g.DisplayName)
+			return g, nil
+		})
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().List(labels.Everything()).Return([]*v3.User{}, nil)
+
+		srv := &SCIMServer{
+			groupsCache: groupsCache,
+			groups:      groupClient,
+			userCache:   userCache,
+			getConfig: func(string) providerConfig {
+				return providerConfig{GroupIDAttribute: GroupIDExternalID}
+			},
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+			"id": "grp-abc123",
+			"displayName": "New Name",
+			"externalId": "ext-123",
+			"members": []
+		}`
+		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		w := httptest.NewRecorder()
+
+		srv.UpdateGroup(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Equal(t, "New Name", resp["displayName"])
+	})
+
+	t.Run("rejects displayName change with default config", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		groupID := "grp-abc123"
+		existingGroup := &v3.Group{
+			ObjectMeta:  metav1.ObjectMeta{Name: groupID},
+			DisplayName: "Old Name",
+			ExternalID:  "ext-123",
+		}
+
+		groupsCache := fake.NewMockNonNamespacedCacheInterface[*v3.Group](ctrl)
+		groupsCache.EXPECT().Get(groupID).Return(existingGroup, nil)
+
+		srv := &SCIMServer{
+			groupsCache: groupsCache,
+			getConfig:   testDefaultGetConfig,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+			"id": "grp-abc123",
+			"displayName": "New Name",
+			"externalId": "ext-123",
+			"members": []
+		}`
+		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Groups/"+groupID, bytes.NewBufferString(body))
+		r.SetPathValue("provider", provider); r.SetPathValue("id", groupID)
+		w := httptest.NewRecorder()
+
+		srv.UpdateGroup(w, r)
+		require.Equal(t, http.StatusBadRequest, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Detail, "cannot be changed")
 	})
 
 	t.Run("updates group with members", func(t *testing.T) {

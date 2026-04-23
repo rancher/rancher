@@ -1126,6 +1126,9 @@ func TestUpdateUser(t *testing.T) {
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
 			userAttributes:     userAttrClient,
+			getConfig: func(string) providerConfig {
+				return providerConfig{UserIDAttribute: UserIDExternalID}
+			},
 		}
 
 		body := `{
@@ -1156,6 +1159,55 @@ func TestUpdateUser(t *testing.T) {
 		wantLocation := "/v1-scim/" + provider + "/Users/" + userID
 		assert.Contains(t, meta["location"], wantLocation)
 		assert.Contains(t, w.Header().Get("Location"), wantLocation)
+	})
+
+	t.Run("rejects userName change with default config", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username":   {"old.name"},
+					"externalid": {"ext-12345"},
+				},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+			getConfig:          testDefaultGetConfig,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+			"userName": "new.name",
+			"externalId": "ext-12345",
+			"active": true
+		}`
+		r := httptest.NewRequest(http.MethodPut, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		w := httptest.NewRecorder()
+
+		srv.UpdateUser(w, r)
+		require.Equal(t, http.StatusBadRequest, w.Code)
+
+		var resp Error
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Contains(t, resp.Detail, "cannot be changed")
 	})
 
 	t.Run("deactivates user", func(t *testing.T) {
@@ -1192,6 +1244,7 @@ func TestUpdateUser(t *testing.T) {
 			userCache:          userCache,
 			users:              userClient,
 			userAttributeCache: userAttributeCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1248,6 +1301,7 @@ func TestUpdateUser(t *testing.T) {
 			userCache:          userCache,
 			users:              userClient,
 			userAttributeCache: userAttributeCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1298,6 +1352,7 @@ func TestUpdateUser(t *testing.T) {
 		srv := &SCIMServer{
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1402,6 +1457,7 @@ func TestUpdateUser(t *testing.T) {
 		srv := &SCIMServer{
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1503,6 +1559,9 @@ func TestUpdateUser(t *testing.T) {
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
 			userAttributes:     userAttrClient,
+			getConfig: func(string) providerConfig {
+				return providerConfig{UserIDAttribute: UserIDExternalID}
+			},
 		}
 
 		body := `{
@@ -1550,6 +1609,7 @@ func TestUpdateUser(t *testing.T) {
 			userCache:          userCache,
 			users:              userClient,
 			userAttributeCache: userAttributeCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1759,6 +1819,7 @@ func TestPatchUser(t *testing.T) {
 			userCache:          userCache,
 			users:              userClient,
 			userAttributeCache: userAttributeCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1820,6 +1881,7 @@ func TestPatchUser(t *testing.T) {
 			userCache:          userCache,
 			users:              userClient,
 			userAttributeCache: userAttributeCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		// We deliberately use a string "True" here to verify that we handle string booleans.
@@ -1874,6 +1936,7 @@ func TestPatchUser(t *testing.T) {
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
 			userAttributes:     userAttrClient,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1928,6 +1991,7 @@ func TestPatchUser(t *testing.T) {
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
 			userAttributes:     userAttrClient,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -1989,6 +2053,7 @@ func TestPatchUser(t *testing.T) {
 			users:              userClient,
 			userAttributeCache: userAttributeCache,
 			userAttributes:     userAttrClient,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -2037,6 +2102,7 @@ func TestPatchUser(t *testing.T) {
 			userCache:          userCache,
 			users:              userClient,
 			userAttributeCache: userAttributeCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -2084,6 +2150,7 @@ func TestPatchUser(t *testing.T) {
 			userCache:          userCache,
 			users:              userClient,
 			userAttributeCache: userAttributeCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -2131,6 +2198,7 @@ func TestPatchUser(t *testing.T) {
 			userCache:          userCache,
 			users:              userClient,
 			userAttributeCache: userAttributeCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -2148,6 +2216,103 @@ func TestPatchUser(t *testing.T) {
 		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		require.NoError(t, err)
 		assert.Equal(t, false, resp["active"])
+	})
+
+	t.Run("replace userName with externalId config", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username":   {"old.name"},
+					"externalid": {"ext-123"},
+				},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+		userAttrClient := fake.NewMockNonNamespacedClientInterface[*v3.UserAttribute, *v3.UserAttributeList](ctrl)
+		userAttrClient.EXPECT().Update(gomock.Any()).DoAndReturn(func(attr *v3.UserAttribute) (*v3.UserAttribute, error) {
+			assert.Equal(t, "new.name", first(attr.ExtraByProvider[provider]["username"]))
+			return attr, nil
+		})
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+			userAttributes:     userAttrClient,
+			getConfig: func(string) providerConfig {
+				return providerConfig{UserIDAttribute: UserIDExternalID}
+			},
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+			"Operations": [{"op": "replace", "path": "userName", "value": "new.name"}]
+		}`
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		w := httptest.NewRecorder()
+
+		srv.PatchUser(w, r)
+		require.Equal(t, http.StatusOK, w.Code)
+
+		var resp map[string]any
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		require.NoError(t, err)
+		assert.Equal(t, "new.name", resp["userName"])
+	})
+
+	t.Run("reject userName change with default config", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+
+		userID := "u-abc123"
+		enabled := true
+
+		userCache := fake.NewMockNonNamespacedCacheInterface[*v3.User](ctrl)
+		userCache.EXPECT().Get(userID).Return(&v3.User{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			Enabled:    &enabled,
+		}, nil)
+
+		existingAttr := &v3.UserAttribute{
+			ObjectMeta: metav1.ObjectMeta{Name: userID},
+			ExtraByProvider: map[string]map[string][]string{
+				provider: {
+					"username": {"old.name"},
+				},
+			},
+		}
+		userAttributeCache := fake.NewMockNonNamespacedCacheInterface[*v3.UserAttribute](ctrl)
+		userAttributeCache.EXPECT().Get(userID).Return(existingAttr, nil)
+
+		srv := &SCIMServer{
+			userCache:          userCache,
+			userAttributeCache: userAttributeCache,
+			getConfig:          testDefaultGetConfig,
+		}
+
+		body := `{
+			"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+			"Operations": [{"op": "replace", "path": "userName", "value": "new.name"}]
+		}`
+		r := httptest.NewRequest(http.MethodPatch, "/v1-scim/"+provider+"/Users/"+userID, bytes.NewBufferString(body))
+		r.SetPathValue("provider", provider); r.SetPathValue("id", userID)
+		w := httptest.NewRecorder()
+
+		srv.PatchUser(w, r)
+		require.Equal(t, http.StatusBadRequest, w.Code)
 	})
 
 	t.Run("no update when value unchanged", func(t *testing.T) {
@@ -2178,6 +2343,7 @@ func TestPatchUser(t *testing.T) {
 		srv := &SCIMServer{
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -2270,6 +2436,7 @@ func TestPatchUser(t *testing.T) {
 		srv := &SCIMServer{
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -2310,6 +2477,7 @@ func TestPatchUser(t *testing.T) {
 		srv := &SCIMServer{
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -2350,6 +2518,7 @@ func TestPatchUser(t *testing.T) {
 		srv := &SCIMServer{
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -2415,6 +2584,7 @@ func TestPatchUser(t *testing.T) {
 		srv := &SCIMServer{
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -2460,6 +2630,7 @@ func TestPatchUser(t *testing.T) {
 			userCache:          userCache,
 			userAttributeCache: userAttributeCache,
 			userAttributes:     userAttrClient,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{
@@ -2504,6 +2675,7 @@ func TestPatchUser(t *testing.T) {
 			userCache:          userCache,
 			users:              userClient,
 			userAttributeCache: userAttributeCache,
+			getConfig:          testDefaultGetConfig,
 		}
 
 		body := `{

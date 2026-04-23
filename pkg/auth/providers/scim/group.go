@@ -355,6 +355,22 @@ func (s *SCIMServer) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Update DisplayName if it changed (only when externalId is the group ID).
+	if group.DisplayName != payload.DisplayName {
+		if cfg.GroupIDAttribute != GroupIDExternalID {
+			writeError(w, NewError(http.StatusBadRequest, "displayName cannot be changed when it is used as the group principal identifier"))
+			return
+		}
+		group = group.DeepCopy()
+		group.DisplayName = payload.DisplayName
+		group, err = s.groups.Update(group)
+		if err != nil {
+			logrus.Errorf("scim::UpdateGroup: failed to update group %s: %s", group.Name, err)
+			writeError(w, NewInternalError())
+			return
+		}
+	}
+
 	gid := cfg.groupID(group.DisplayName, group.ExternalID)
 	if gid == "" {
 		logrus.Errorf("scim::UpdateGroup: group %s has empty %s configured as groupIdAttribute", group.Name, cfg.GroupIDAttribute)
@@ -429,15 +445,16 @@ func (s *SCIMServer) PatchGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	group = group.DeepCopy()
-	var shouldUpdateGroup bool
+	cfg := s.getConfig(provider)
 
+	var shouldUpdateGroup bool
 	var membersToAdd []scimMember
 	var membersToRemove []string
 
 	for _, op := range payload.Operations {
 		switch strings.ToLower(op.Op) {
 		case "replace":
-			updated, err := applyReplaceGroup(group, op)
+			updated, err := applyReplaceGroup(group, op, cfg)
 			if err != nil {
 				logrus.Errorf("scim::PatchGroup: failed to apply replace operation: %s", err)
 				writeError(w, NewError(http.StatusBadRequest, fmt.Sprintf("Failed to apply replace operation: %s", err)))
@@ -520,7 +537,6 @@ func (s *SCIMServer) PatchGroup(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	cfg := s.getConfig(provider)
 	gid := cfg.groupID(group.DisplayName, group.ExternalID)
 	if gid == "" {
 		logrus.Errorf("scim::PatchGroup: group %s has empty %s configured as groupIdAttribute", group.Name, cfg.GroupIDAttribute)
@@ -738,6 +754,7 @@ func (s *SCIMServer) syncGroupMembers(provider, principalName, displayName strin
 		}
 	}
 
+	retained := make(map[string]struct{})
 	for _, member := range members {
 		if _, ok := existing[member.Value]; !ok {
 			// New member added.
@@ -745,6 +762,8 @@ func (s *SCIMServer) syncGroupMembers(provider, principalName, displayName strin
 			if err != nil {
 				return fmt.Errorf("failed to add member %s to group %s: %w", member.Value, principalName, err)
 			}
+		} else {
+			retained[member.Value] = struct{}{}
 		}
 		delete(existing, member.Value)
 	}
@@ -754,6 +773,13 @@ func (s *SCIMServer) syncGroupMembers(provider, principalName, displayName strin
 		err := s.removeGroupMember(provider, principalName, value)
 		if err != nil {
 			return fmt.Errorf("failed to remove member %s from group %s: %w", value, principalName, err)
+		}
+	}
+
+	// Update DisplayName on retained members' group principals if it changed.
+	for memberID := range retained {
+		if err := s.updateGroupMemberDisplayName(provider, principalName, displayName, memberID); err != nil {
+			return fmt.Errorf("failed to update display name for member %s in group %s: %w", memberID, principalName, err)
 		}
 	}
 
@@ -799,6 +825,34 @@ func (s *SCIMServer) addGroupMember(provider, principalName, displayName string,
 	_, err = s.userAttributes.Update(attr)
 	if err != nil {
 		return fmt.Errorf("failed to update user attributes for %s: %w", user.Name, err)
+	}
+
+	return nil
+}
+
+// updateGroupMemberDisplayName updates the DisplayName on a member's group principal if it is stale.
+func (s *SCIMServer) updateGroupMemberDisplayName(provider, principalName, displayName, memberID string) error {
+	attr, err := s.userAttributeCache.Get(memberID)
+	if err != nil {
+		return fmt.Errorf("failed to get user attributes for %s: %w", memberID, err)
+	}
+
+	for _, p := range attr.GroupPrincipals[provider].Items {
+		if p.Name == principalName && p.DisplayName != displayName {
+			attr = attr.DeepCopy()
+			items := attr.GroupPrincipals[provider].Items
+			for i := range items {
+				if items[i].Name == principalName {
+					items[i].DisplayName = displayName
+					break
+				}
+			}
+			attr.GroupPrincipals[provider] = v3.Principals{Items: items}
+			if _, err := s.userAttributes.Update(attr); err != nil {
+				return fmt.Errorf("failed to update user attributes for %s: %w", memberID, err)
+			}
+			return nil
+		}
 	}
 
 	return nil
@@ -927,8 +981,7 @@ func (s *SCIMServer) ensureRancherGroup(provider string, grp scimGroup) (*v3.Gro
 }
 
 // applyReplaceGroup applies a replace operation to a group.
-// Currently only supports replacing externalId.
-func applyReplaceGroup(group *v3.Group, op patchOp) (bool, error) {
+func applyReplaceGroup(group *v3.Group, op patchOp, cfg providerConfig) (bool, error) {
 	if op.Path == "" {
 		// Bulk replace - replace multiple attributes at once
 		fields, ok := op.Value.(map[string]any)
@@ -942,7 +995,7 @@ func applyReplaceGroup(group *v3.Group, op patchOp) (bool, error) {
 				Op:    "replace",
 				Path:  name,
 				Value: value,
-			})
+			}, cfg)
 			if err != nil {
 				return false, fmt.Errorf("failed to apply replace operation: %v", err)
 			}
@@ -955,7 +1008,19 @@ func applyReplaceGroup(group *v3.Group, op patchOp) (bool, error) {
 
 	var updated bool
 	switch strings.ToLower(op.Path) {
-	// Note: We can't change displayName as it is used as the unique identifier for groups.
+	case "displayname":
+		if cfg.GroupIDAttribute != GroupIDExternalID {
+			return false, NewError(http.StatusBadRequest, "displayName cannot be changed when it is used as the group principal identifier")
+		}
+
+		displayName, ok := op.Value.(string)
+		if !ok {
+			return false, NewError(http.StatusBadRequest, fmt.Sprintf("Invalid value for displayName: %v", op.Value))
+		}
+		if group.DisplayName != displayName {
+			group.DisplayName = displayName
+			updated = true
+		}
 	case "externalid":
 		externalID, ok := op.Value.(string)
 		if !ok {
