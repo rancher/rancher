@@ -554,6 +554,9 @@ func (m *Manager) CreateTokenAndSetCookie(userID string, userPrincipal apiv3.Pri
 		Secure:   isSecure,
 		Path:     "/",
 		HttpOnly: true,
+		// Lax is the default in most browsers; setting it
+		// explicitly is a good security measure.
+		SameSite: http.SameSiteLaxMode,
 	}
 	http.SetCookie(request.Response, tokenCookie)
 	request.WriteResponse(http.StatusOK, nil)
