@@ -96,6 +96,7 @@ var (
 	KubernetesVersionsCurrent           = NewSetting("k8s-versions-current", "")
 	KubernetesVersionsDeprecated        = NewSetting("k8s-versions-deprecated", "")
 	KDMBranch                           = NewSetting("kdm-branch", "dev-v2.14")
+	KDMUseLocalData                     = NewSetting("kdm-use-local-data", "false")
 	MachineVersion                      = NewSetting("machine-version", "dev")
 	Namespace                           = NewSetting("namespace", os.Getenv("CATTLE_NAMESPACE"))
 	PasswordMinLength                   = NewSetting("password-min-length", "12")
