@@ -186,6 +186,7 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 	appliedPlanData := secret.Data["appliedPlan"]
 	failedChecksum := string(secret.Data["failed-checksum"])
 	output := secret.Data["applied-output"]
+	failedOutput := secret.Data["failed-output"]
 	appliedPeriodicOutput := secret.Data["applied-periodic-output"]
 	probes := secret.Data["probe-statuses"]
 	failureCount := secret.Data["failure-count"]
@@ -247,12 +248,15 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 	}
 
 	if len(output) > 0 {
-		gz, err := gzip.NewReader(bytes.NewBuffer(output))
+		gzipReader, err := gzip.NewReader(bytes.NewBuffer(output))
 		if err != nil {
 			return nil, err
 		}
-		output, err = io.ReadAll(gz)
+		output, err = io.ReadAll(gzipReader)
 		if err != nil {
+			return nil, err
+		}
+		if err := gzipReader.Close(); err != nil {
 			return nil, err
 		}
 		result.Output = map[string][]byte{}
@@ -261,13 +265,34 @@ func SecretToNode(secret *corev1.Secret) (*plan.Node, error) {
 		}
 	}
 
-	if len(appliedPeriodicOutput) > 0 {
-		gz, err := gzip.NewReader(bytes.NewBuffer(appliedPeriodicOutput))
+	if len(failedOutput) > 0 {
+		gzipReader, err := gzip.NewReader(bytes.NewBuffer(failedOutput))
 		if err != nil {
 			return nil, err
 		}
-		output, err = io.ReadAll(gz)
+		failedOutput, err = io.ReadAll(gzipReader)
 		if err != nil {
+			return nil, err
+		}
+		if err := gzipReader.Close(); err != nil {
+			return nil, err
+		}
+		result.FailedOutput = map[string][]byte{}
+		if err := json.Unmarshal(failedOutput, &result.FailedOutput); err != nil {
+			return nil, err
+		}
+	}
+
+	if len(appliedPeriodicOutput) > 0 {
+		gzipReader, err := gzip.NewReader(bytes.NewBuffer(appliedPeriodicOutput))
+		if err != nil {
+			return nil, err
+		}
+		output, err = io.ReadAll(gzipReader)
+		if err != nil {
+			return nil, err
+		}
+		if err := gzipReader.Close(); err != nil {
 			return nil, err
 		}
 		result.PeriodicOutput = map[string]plan.PeriodicInstructionOutput{}
