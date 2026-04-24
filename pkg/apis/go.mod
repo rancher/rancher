@@ -35,11 +35,11 @@ replace (
 )
 
 require (
-	github.com/rancher/aks-operator v1.14.1-rc.1
-	github.com/rancher/ali-operator v1.14.0-rc.1
-	github.com/rancher/eks-operator v1.14.1-rc.1
+	github.com/rancher/aks-operator v1.14.1
+	github.com/rancher/ali-operator v1.14.0
+	github.com/rancher/eks-operator v1.14.1
 	github.com/rancher/fleet/pkg/apis v0.15.0
-	github.com/rancher/gke-operator v1.14.1-rc.1
+	github.com/rancher/gke-operator v1.14.1
 	github.com/rancher/norman v0.8.6
 	github.com/rancher/rke v1.8.0
 	github.com/rancher/wrangler/v3 v3.5.1
@@ -78,11 +78,11 @@ require (
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.66.1 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
-	github.com/rancher/lasso v0.2.7 // indirect
+	github.com/rancher/lasso v0.2.8 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	go.opentelemetry.io/otel v1.42.0 // indirect
-	go.opentelemetry.io/otel/trace v1.42.0 // indirect
+	go.opentelemetry.io/otel v1.43.0 // indirect
+	go.opentelemetry.io/otel/trace v1.43.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/net v0.52.0 // indirect
