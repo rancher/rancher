@@ -3,10 +3,9 @@ description: "Install dependencies, pull files and build the Rancher chart"
 runs:
   using: "composite"
   steps:
-    # git is assumed to be installed because it is a requirement to run from the same repo
     - name: install dependencies
       shell: bash
-      run: zypper install -y jq awk aws-cli
+      run: zypper install -y aws-cli
     - name: Setup Tag Env Variables
       uses: ./.github/actions/setup-tag-env
     - id: env
@@ -14,19 +13,9 @@ runs:
       uses: ./.github/actions/setup-build-env
     - name: Install Helm dependencies
       env:
-        HELM_URL: https://get.helm.sh/helm-${{ steps.env.outputs.HELM_VERSION }}-linux-amd64.tar.gz
-        HELM_HASH: ${{ steps.env.outputs.HELM_HASH_amd64 }}
         HELM_UNITTEST_VERSION: ${{ steps.env.outputs.HELM_UNITTEST_VERSION }}
       shell: bash
       run: |
-        set -ex
-        curl "${HELM_URL}" --output /tmp/helm.tar.gz && \
-        echo "${HELM_HASH}  /tmp/helm.tar.gz" | sha256sum -c - && \
-        tar xvzf /tmp/helm.tar.gz --strip-components=1 -C /tmp/ && \
-        mv /tmp/helm /usr/bin/helm_v3 && \
-        chmod +x /usr/bin/helm_v3 && \
-        rm -f /tmp/helm.tar.gz
-
         helm_v3 plugin install https://github.com/helm-unittest/helm-unittest.git --version ${HELM_UNITTEST_VERSION};
     - name: Build
       shell: bash
