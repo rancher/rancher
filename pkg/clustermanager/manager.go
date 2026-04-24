@@ -216,9 +216,22 @@ func (m *Manager) doStart(rec *record, clusterOwner bool) (exit error) {
 
 	// pre-bootstrap the cluster if it's not already bootstrapped
 	apimgmtv3.ClusterConditionPreBootstrapped.CreateUnknownIfNotExists(rec.clusterRec)
-	if capr.PreBootstrap(rec.clusterRec) {
+	shouldPreBootstrap, err := capr.ShouldPreBootstrap(m.ScaledContext.Wrangler.Core.Secret().Cache(), rec.clusterRec)
+	if err != nil {
+		transaction.Rollback()
+		return err
+	}
+
+	if shouldPreBootstrap {
 		err := clusterController.PreBootstrap(transaction, m.ScaledContext, rec.cluster, rec.clusterRec, m)
 		if err != nil {
+			transaction.Rollback()
+			return err
+		}
+	} else {
+		// mark as prebootstrapped implicitly in order to prevent cluster-agent from being deployed in prebootstrap mode
+		apimgmtv3.ClusterConditionPreBootstrapped.True(rec.clusterRec)
+		if _, err := m.clusters.Update(rec.clusterRec); err != nil {
 			transaction.Rollback()
 			return err
 		}
